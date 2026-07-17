@@ -8,9 +8,11 @@ export default function TeamsPage() {
 
       {teams.map((team) => (
         <TeamCard
-          key={team.slug}
-          name={team.name}
-        />
+  key={team.slug}
+  name={team.name}
+  gm={team.gm}
+  arena={team.arena}
+/>
       ))}
     </main>
   );

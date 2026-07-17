@@ -1,9 +1,13 @@
 type TeamCardProps = {
   name: string;
+  gm: string;
+  arena: string;
 };
 
 export default function TeamCard({
   name,
+  gm,
+  arena,
 }: TeamCardProps) {
   return (
     <div
@@ -16,7 +20,9 @@ export default function TeamCard({
     >
       <h2>{name}</h2>
 
-      <p>GM: Ladislav Mozolic</p>
+      <p>GM: {gm}</p>
+
+      <p>Arena: {arena}</p>
     </div>
   );
 }
