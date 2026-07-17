@@ -1,4 +1,4 @@
-import { teams } from "../../../data/teams";
+import { prisma } from "../../../lib/prisma";
 
 export default async function TeamDetailPage({
   params,
@@ -7,9 +7,14 @@ export default async function TeamDetailPage({
 }) {
   const { slug } = await params;
 
-  const team = teams.find(
-    (team) => team.slug === slug
-  );
+  const team = await prisma.team.findUnique({
+    where: {
+      slug,
+    },
+    include: {
+      players: true,
+    },
+  });
 
   if (!team) {
     return <h1>Team not found</h1>;
@@ -22,6 +27,16 @@ export default async function TeamDetailPage({
       <p>GM: {team.gm}</p>
 
       <p>Arena: {team.arena}</p>
+
+      <h2>Players</h2>
+
+      <ul>
+        {team.players.map((player) => (
+          <li key={player.id}>
+            {player.name} ({player.position})
+          </li>
+        ))}
+      </ul>
     </main>
   );
 }

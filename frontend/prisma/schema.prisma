@@ -10,6 +10,7 @@ datasource db {
 model Team {
   id      Int      @id @default(autoincrement())
   slug    String   @unique
+  code String? @unique
   name    String
   gm      String
   arena   String
