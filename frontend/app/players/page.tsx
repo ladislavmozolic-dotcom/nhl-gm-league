@@ -1,16 +1,24 @@
-import PlayerCard from "../../components/PlayerCard";
-import { players } from "../../data/players";
+import { PrismaClient } from "@prisma/client";
 
-export default function PlayersPage() {
+export default async function PlayersPage() {
+  const prisma = new PrismaClient();
+
+  const players = await prisma.player.findMany({
+    include: {
+      team: true,
+    },
+  });
+
   return (
     <main>
       <h1>Players</h1>
 
       {players.map((player) => (
-        <PlayerCard
-          key={player.slug}
-          name={player.name}
-        />
+        <div key={player.id}>
+          <h2>{player.name}</h2>
+          <p>Position: {player.position}</p>
+          <p>Team: {player.team.name}</p>
+        </div>
       ))}
     </main>
   );
