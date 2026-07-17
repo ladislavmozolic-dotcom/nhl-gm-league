@@ -1,11 +1,23 @@
+import TeamCard from "../../components/TeamCard";
+
+const teams = [
+  "Edmonton Oilers",
+  "Toronto Maple Leafs",
+  "Boston Bruins",
+  "Anaheim Ducks",
+];
+
 export default function TeamsPage() {
   return (
     <main>
       <h1>Teams</h1>
 
-      <p>Edmonton Oilers</p>
-      <p>Toronto Maple Leafs</p>
-      <p>Boston Bruins</p>
+      {teams.map((team) => (
+        <TeamCard
+          key={team}
+          name={team}
+        />
+      ))}
     </main>
   );
 }
