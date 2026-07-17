@@ -1,22 +1,4 @@
-const players = {
-  "connor-mcdavid": {
-    name: "Connor McDavid",
-    position: "C",
-    team: "Edmonton Oilers",
-  },
-
-  "leon-draisaitl": {
-    name: "Leon Draisaitl",
-    position: "C",
-    team: "Edmonton Oilers",
-  },
-
-  "auston-matthews": {
-    name: "Auston Matthews",
-    position: "C",
-    team: "Toronto Maple Leafs",
-  },
-};
+import { players } from "../../../data/players";
 
 export default async function PlayerDetailPage({
   params,
@@ -25,8 +7,9 @@ export default async function PlayerDetailPage({
 }) {
   const { slug } = await params;
 
-  const player =
-    players[slug as keyof typeof players];
+  const player = players.find(
+    (player) => player.slug === slug
+  );
 
   if (!player) {
     return <h1>Player not found</h1>;

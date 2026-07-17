@@ -1,11 +1,5 @@
 import TeamCard from "../../components/TeamCard";
-
-const teams = [
-  "Edmonton Oilers",
-  "Toronto Maple Leafs",
-  "Boston Bruins",
-  "Anaheim Ducks",
-];
+import { teams } from "../../data/teams";
 
 export default function TeamsPage() {
   return (
@@ -14,8 +8,8 @@ export default function TeamsPage() {
 
       {teams.map((team) => (
         <TeamCard
-          key={team}
-          name={team}
+          key={team.slug}
+          name={team.name}
         />
       ))}
     </main>

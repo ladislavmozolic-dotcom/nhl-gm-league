@@ -1,22 +1,4 @@
-const teams = {
-  "edmonton-oilers": {
-    name: "Edmonton Oilers",
-    gm: "Ladislav Mozolic",
-    arena: "Rogers Place",
-  },
-
-  "toronto-maple-leafs": {
-    name: "Toronto Maple Leafs",
-    gm: "Unknown",
-    arena: "Scotiabank Arena",
-  },
-
-  "boston-bruins": {
-    name: "Boston Bruins",
-    gm: "Unknown",
-    arena: "TD Garden",
-  },
-};
+import { teams } from "../../../data/teams";
 
 export default async function TeamDetailPage({
   params,
@@ -25,8 +7,9 @@ export default async function TeamDetailPage({
 }) {
   const { slug } = await params;
 
-  const team =
-    teams[slug as keyof typeof teams];
+  const team = teams.find(
+    (team) => team.slug === slug
+  );
 
   if (!team) {
     return <h1>Team not found</h1>;
