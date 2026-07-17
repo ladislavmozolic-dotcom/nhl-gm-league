@@ -1,5 +1,4 @@
 import axios from "axios";
-import * as cheerio from "cheerio";
 
 async function main() {
   const url =
@@ -7,21 +6,23 @@ async function main() {
 
   const response = await axios.get(url);
 
-  const $ = cheerio.load(response.data);
+  const html = response.data;
 
-  console.log("TITLE:");
-  console.log($("title").text());
+  const matches = html.match(
+    /https?:\/\/[^"']+/g
+  );
 
-  console.log("TABLES FOUND:");
-  console.log($("table").length);
-
-  $("table").each((i) => {
-    console.log(
-      `Table ${i}: rows = ${$("table")
-        .eq(i)
-        .find("tr").length}`
-    );
-  });
+  if (matches) {
+    matches.forEach((url: string) => {
+      if (
+        url.includes("hockeytech") ||
+        url.includes("feed") ||
+        url.includes("statview")
+      ) {
+        console.log(url);
+      }
+    });
+  }
 }
 
 main().catch(console.error);

@@ -17,6 +17,8 @@ model Team {
 
   league String @default("NHL")
 
+  eliteProspectsUrl String?
+
   parentTeamId Int?
   parentTeam Team? @relation("Affiliates", fields: [parentTeamId], references: [id])
 
