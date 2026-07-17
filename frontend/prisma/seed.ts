@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import axios from "axios";
 
 const prisma = new PrismaClient();
 
@@ -37,6 +38,60 @@ const teams = [
   { code: "WPG", slug: "winnipeg-jets", name: "Winnipeg Jets", arena: "Canada Life Centre" },
 ];
 
+async function importTeamRoster(
+  code: string,
+  teamId: number
+) {
+  const response = await axios.get(
+    `https://api-web.nhle.com/v1/roster/${code}/current`
+  );
+
+  const players = [
+    ...response.data.forwards,
+    ...response.data.defensemen,
+    ...response.data.goalies,
+  ];
+
+  for (const player of players) {
+    const firstName =
+      player.firstName?.default ?? "";
+
+    const lastName =
+      player.lastName?.default ?? "";
+
+    const fullName =
+      `${firstName} ${lastName}`.trim();
+
+    const slug = fullName
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, "")
+      .replace(/\s+/g, "-");
+
+    await prisma.player.upsert({
+      where: {
+        slug,
+      },
+      update: {
+        teamId,
+        nhlId: player.id,
+        number: player.sweaterNumber ?? null,
+      },
+      create: {
+        slug,
+        name: fullName,
+        position: player.positionCode,
+        nhlId: player.id,
+        number: player.sweaterNumber ?? null,
+        teamId,
+      },
+    });
+  }
+
+  console.log(
+    `${code}: ${players.length} players imported`
+  );
+}
+
 async function main() {
   for (const team of teams) {
     await prisma.team.upsert({
@@ -56,30 +111,30 @@ async function main() {
 
   console.log(`Imported ${teams.length} teams`);
 
-  const edm = await prisma.team.findUnique({
-    where: {
-      code: "EDM",
-    },
-  });
+  const databaseTeams =
+    await prisma.team.findMany({
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        gm: true,
+        arena: true,
+        code: true,
+      },
+    });
 
-  if (!edm) {
-    throw new Error("EDM team not found");
+  for (const team of databaseTeams) {
+    if (!team.code) {
+      continue;
+    }
+
+    await importTeamRoster(
+      team.code,
+      team.id
+    );
   }
 
-  await prisma.player.upsert({
-    where: {
-      slug: "connor-mcdavid",
-    },
-    update: {},
-    create: {
-      slug: "connor-mcdavid",
-      name: "Connor McDavid",
-      position: "C",
-      teamId: edm.id,
-    },
-  });
-
-  console.log("Player imported");
+  console.log("All NHL rosters imported");
 }
 
 main()

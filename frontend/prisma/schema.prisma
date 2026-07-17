@@ -8,22 +8,48 @@ datasource db {
 }
 
 model Team {
-  id      Int      @id @default(autoincrement())
-  slug    String   @unique
-  code String? @unique
+  id      Int    @id @default(autoincrement())
+  slug    String @unique
+  code    String? @unique
   name    String
   gm      String
   arena   String
 
+  league String @default("NHL")
+
+  parentTeamId Int?
+  parentTeam Team? @relation("Affiliates", fields: [parentTeamId], references: [id])
+
+  affiliateTeams Team[] @relation("Affiliates")
+
   players Player[]
 }
+
 
 model Player {
   id       Int    @id @default(autoincrement())
   slug     String @unique
+
   name     String
   position String
 
-  teamId   Int
-  team     Team   @relation(fields: [teamId], references: [id])
+  nhlId    Int?   @unique
+  number   Int?
+
+  photoUrl String?
+
+  birthDate String?
+  birthPlace String?
+
+  shoots String?
+
+  height String?
+  weight Int?
+
+  capHit         Float?
+  contractYears  Int?
+  contractExpiry Int?
+
+  teamId Int
+  team   Team @relation(fields: [teamId], references: [id])
 }

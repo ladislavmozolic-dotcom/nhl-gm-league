@@ -7,12 +7,35 @@ export default function Home() {
         NHL GM League
       </h1>
 
-      <Link
-        href="/teams"
-        className="bg-blue-600 text-white px-4 py-2 rounded"
-      >
-        Teams
-      </Link>
+      <div className="flex gap-4">
+        <Link
+          href="/teams"
+          className="bg-blue-600 text-white px-4 py-2 rounded"
+        >
+          NHL Teams
+        </Link>
+
+        <Link
+          href="/ahl"
+          className="bg-green-600 text-white px-4 py-2 rounded"
+        >
+          AHL Teams
+        </Link>
+
+        <Link
+          href="/players"
+          className="bg-purple-600 text-white px-4 py-2 rounded"
+        >
+          Players
+        </Link>
+
+        <Link
+          href="/contracts"
+          className="bg-indigo-600 text-white px-4 py-2 rounded"
+        >
+          Contracts
+        </Link>
+      </div>
     </main>
   );
 }

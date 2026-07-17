@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "../../../lib/prisma";
 
-export default async function TeamDetailPage({
+export default async function AhlTeamDetailPage({
   params,
 }: {
   params: Promise<{ slug: string }>;
@@ -13,6 +13,7 @@ export default async function TeamDetailPage({
       slug,
     },
     include: {
+      parentTeam: true,
       players: {
         orderBy: {
           name: "asc",
@@ -22,40 +23,23 @@ export default async function TeamDetailPage({
   });
 
   if (!team) {
-    return <h1>Team not found</h1>;
+    return <h1>AHL Team not found</h1>;
   }
-
-  const payroll = team.players.reduce(
-    (total, player) => total + ((player as any).capHit ?? 0),
-    0
-  );
-
-  const salaryCap = 95;
-  const capSpace = salaryCap - payroll;
 
   return (
     <main>
       <h1>{team.name}</h1>
 
-      <p>GM: {team.gm}</p>
-
-      <p>Arena: {team.arena}</p>
-
-      <hr />
-
-      <h2>Salary Cap</h2>
-
       <p>
-        <strong>Payroll:</strong> $
-        {payroll.toFixed(2)}M
+        NHL Affiliate:{" "}
+        {team.parentTeam ? (
+          <Link href={`/teams/${team.parentTeam.slug}`}>
+            {team.parentTeam.name}
+          </Link>
+        ) : (
+          "None"
+        )}
       </p>
-
-      <p>
-        <strong>Cap Space:</strong> $
-        {capSpace.toFixed(2)}M
-      </p>
-
-      <hr />
 
       <h2>Roster ({team.players.length})</h2>
 
