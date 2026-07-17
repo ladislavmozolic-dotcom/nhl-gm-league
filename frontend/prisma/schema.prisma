@@ -8,9 +8,21 @@ datasource db {
 }
 
 model Team {
-  id    Int    @id @default(autoincrement())
-  slug  String @unique
-  name  String
-  gm    String
-  arena String
+  id      Int      @id @default(autoincrement())
+  slug    String   @unique
+  name    String
+  gm      String
+  arena   String
+
+  players Player[]
+}
+
+model Player {
+  id       Int    @id @default(autoincrement())
+  slug     String @unique
+  name     String
+  position String
+
+  teamId   Int
+  team     Team   @relation(fields: [teamId], references: [id])
 }
