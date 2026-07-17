@@ -1,19 +1,11 @@
-import TeamCard from "../../components/TeamCard";
-import { teams } from "../../data/teams";
+import { prisma } from "../../lib/prisma";
 
-export default function TeamsPage() {
+export default async function TeamsPage() {
+  console.log(Object.keys(prisma));
+
   return (
     <main>
       <h1>Teams</h1>
-
-      {teams.map((team) => (
-        <TeamCard
-  key={team.slug}
-  name={team.name}
-  gm={team.gm}
-  arena={team.arena}
-/>
-      ))}
     </main>
   );
 }
