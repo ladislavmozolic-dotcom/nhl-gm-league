@@ -34,6 +34,7 @@ model Player {
 
   name     String
   position String
+  positions String?
 
   nhlId    Int?   @unique
   number   Int?
