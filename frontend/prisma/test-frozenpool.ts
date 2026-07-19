@@ -1,29 +1,12 @@
-import { chromium } from "playwright";
-import fs from "fs";
+import axios from "axios";
 
 async function main() {
-  const browser = await chromium.launch({
-    headless: true,
-  });
+  const url =
+    "https://frozenpool.dobbersports.com/players/dans-locmelis";
 
-  const page = await browser.newPage();
+  const response = await axios.get(url);
 
-  await page.goto(
-    "https://frozenpool.dobbersports.com/frozenpool_ahl_stats.php",
-    {
-      waitUntil: "networkidle",
-      timeout: 60000,
-    }
-  );
-
-  fs.writeFileSync(
-    "ahl-stats.html",
-    await page.content()
-  );
-
-  console.log("saved");
-
-  await browser.close();
+  console.log(response.data.substring(0, 5000));
 }
 
 main().catch(console.error);

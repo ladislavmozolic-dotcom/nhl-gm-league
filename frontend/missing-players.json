@@ -1,0 +1,5497 @@
+[
+  {
+    "id": 10290,
+    "name": "Aaron Huglen",
+    "slug": "aaron-huglen"
+  },
+  {
+    "id": 5436,
+    "name": "Aaron Ness",
+    "slug": "aaron-ness"
+  },
+  {
+    "id": 5026,
+    "name": "Aatu Jamsen",
+    "slug": "aatu-jamsen"
+  },
+  {
+    "id": 9883,
+    "name": "Adam Beckman",
+    "slug": "adam-beckman"
+  },
+  {
+    "id": 95,
+    "name": "Adam Engstrom",
+    "slug": "adam-engstrom"
+  },
+  {
+    "id": 5387,
+    "name": "Adam Ginning",
+    "slug": "adam-ginning"
+  },
+  {
+    "id": 184,
+    "name": "Adam Sykora",
+    "slug": "adam-sykora"
+  },
+  {
+    "id": 5526,
+    "name": "Aidan Fulp",
+    "slug": "aidan-fulp"
+  },
+  {
+    "id": 5633,
+    "name": "Aidan Hreschuk",
+    "slug": "aidan-hreschuk"
+  },
+  {
+    "id": 9920,
+    "name": "Aidan Mcdonough",
+    "slug": "aidan-mcdonough"
+  },
+  {
+    "id": 5130,
+    "name": "Aidan Thompson",
+    "slug": "aidan-thompson"
+  },
+  {
+    "id": 5703,
+    "name": "Aiden Dubinsky",
+    "slug": "aiden-dubinsky"
+  },
+  {
+    "id": 111,
+    "name": "Aiden Fink",
+    "slug": "aiden-fink"
+  },
+  {
+    "id": 5634,
+    "name": "Aiden Hansen-bukata",
+    "slug": "aiden-hansen-bukata"
+  },
+  {
+    "id": 5131,
+    "name": "Akil Thomas",
+    "slug": "akil-thomas"
+  },
+  {
+    "id": 5320,
+    "name": "Alec Regula",
+    "slug": "alec-regula"
+  },
+  {
+    "id": 4882,
+    "name": "Aleksanteri Kaskimaki",
+    "slug": "aleksanteri-kaskimaki"
+  },
+  {
+    "id": 5171,
+    "name": "Aleksi Heimosalmi",
+    "slug": "aleksi-heimosalmi"
+  },
+  {
+    "id": 10349,
+    "name": "Alex Alexeyev",
+    "slug": "alex-alexeyev"
+  },
+  {
+    "id": 4797,
+    "name": "Alex Barre-boulet",
+    "slug": "alex-barre-boulet"
+  },
+  {
+    "id": 4806,
+    "name": "Alex Belzile",
+    "slug": "alex-belzile"
+  },
+  {
+    "id": 229,
+    "name": "Alex Bump",
+    "slug": "alex-bump"
+  },
+  {
+    "id": 5262,
+    "name": "Alex Doucet",
+    "slug": "alex-doucet"
+  },
+  {
+    "id": 5704,
+    "name": "Alex Gaffney",
+    "slug": "alex-gaffney"
+  },
+  {
+    "id": 5279,
+    "name": "Alex Gagne",
+    "slug": "alex-gagne"
+  },
+  {
+    "id": 5527,
+    "name": "Alex Gallant",
+    "slug": "alex-gallant"
+  },
+  {
+    "id": 10078,
+    "name": "Alex Jefferies",
+    "slug": "alex-jefferies"
+  },
+  {
+    "id": 5244,
+    "name": "Alex Kannok Leipert",
+    "slug": "alex-kannok-leipert"
+  },
+  {
+    "id": 4836,
+    "name": "Alex Nylander",
+    "slug": "alex-nylander"
+  },
+  {
+    "id": 562,
+    "name": "Alex Steeves",
+    "slug": "alex-steeves"
+  },
+  {
+    "id": 5090,
+    "name": "Alex Suzdalev",
+    "slug": "alex-suzdalev"
+  },
+  {
+    "id": 451,
+    "name": "Alexander Holtz",
+    "slug": "alexander-holtz"
+  },
+  {
+    "id": 5072,
+    "name": "Alexis Gendron",
+    "slug": "alexis-gendron"
+  },
+  {
+    "id": 5635,
+    "name": "Alfons Freij",
+    "slug": "alfons-freij"
+  },
+  {
+    "id": 4895,
+    "name": "Amadeus Lombardi",
+    "slug": "amadeus-lombardi"
+  },
+  {
+    "id": 5705,
+    "name": "Andre Anania",
+    "slug": "andre-anania"
+  },
+  {
+    "id": 4861,
+    "name": "Andre Lee",
+    "slug": "andre-lee"
+  },
+  {
+    "id": 5280,
+    "name": "Andreas Englund",
+    "slug": "andreas-englund"
+  },
+  {
+    "id": 5263,
+    "name": "Andrei Loshko",
+    "slug": "andrei-loshko"
+  },
+  {
+    "id": 10737,
+    "name": "Andrej Sustr",
+    "slug": "andrej-sustr"
+  },
+  {
+    "id": 4914,
+    "name": "Andrew Agozzino",
+    "slug": "andrew-agozzino"
+  },
+  {
+    "id": 5464,
+    "name": "Andrew Basha",
+    "slug": "andrew-basha"
+  },
+  {
+    "id": 4811,
+    "name": "Andrew Cristall",
+    "slug": "andrew-cristall"
+  },
+  {
+    "id": 5281,
+    "name": "Andrew Gibson",
+    "slug": "andrew-gibson"
+  },
+  {
+    "id": 665,
+    "name": "Andrew Mangiapane",
+    "slug": "andrew-mangiapane"
+  },
+  {
+    "id": 5493,
+    "name": "Andrew Perrott",
+    "slug": "andrew-perrott"
+  },
+  {
+    "id": 5172,
+    "name": "Angus Booth",
+    "slug": "angus-booth"
+  },
+  {
+    "id": 4936,
+    "name": "Angus Crookshank",
+    "slug": "angus-crookshank"
+  },
+  {
+    "id": 5494,
+    "name": "Anri Ravinskis",
+    "slug": "anri-ravinskis"
+  },
+  {
+    "id": 5707,
+    "name": "Anthony Kehrer",
+    "slug": "anthony-kehrer"
+  },
+  {
+    "id": 4876,
+    "name": "Anthony Richard",
+    "slug": "anthony-richard"
+  },
+  {
+    "id": 5708,
+    "name": "Anthony Romano",
+    "slug": "anthony-romano"
+  },
+  {
+    "id": 5226,
+    "name": "Anthony Vincent",
+    "slug": "anthony-vincent"
+  },
+  {
+    "id": 5227,
+    "name": "Anton Blidh",
+    "slug": "anton-blidh"
+  },
+  {
+    "id": 5409,
+    "name": "Anton Johansson",
+    "slug": "anton-johansson"
+  },
+  {
+    "id": 5709,
+    "name": "Anton Lundmark",
+    "slug": "anton-lundmark"
+  },
+  {
+    "id": 535,
+    "name": "Anton Wahlberg",
+    "slug": "anton-wahlberg"
+  },
+  {
+    "id": 4963,
+    "name": "Antonio Stranges",
+    "slug": "antonio-stranges"
+  },
+  {
+    "id": 5012,
+    "name": "Antti Tuomisto",
+    "slug": "antti-tuomisto"
+  },
+  {
+    "id": 5528,
+    "name": "Aram Minnetian",
+    "slug": "aram-minnetian"
+  },
+  {
+    "id": 5529,
+    "name": "Arnaud Durandeau",
+    "slug": "arnaud-durandeau"
+  },
+  {
+    "id": 5091,
+    "name": "Arshdeep Bains",
+    "slug": "arshdeep-bains"
+  },
+  {
+    "id": 5282,
+    "name": "Artem Duda",
+    "slug": "artem-duda"
+  },
+  {
+    "id": 5580,
+    "name": "Artem Grushnikov",
+    "slug": "artem-grushnikov"
+  },
+  {
+    "id": 5710,
+    "name": "Artem Guryev",
+    "slug": "artem-guryev"
+  },
+  {
+    "id": 4916,
+    "name": "Artem Shlaine",
+    "slug": "artem-shlaine"
+  },
+  {
+    "id": 4798,
+    "name": "Arthur Kaliyev",
+    "slug": "arthur-kaliyev"
+  },
+  {
+    "id": 733,
+    "name": "Arttu Hyry",
+    "slug": "arttu-hyry"
+  },
+  {
+    "id": 5581,
+    "name": "Artur Cholach",
+    "slug": "artur-cholach"
+  },
+  {
+    "id": 5297,
+    "name": "Ashton Sautner",
+    "slug": "ashton-sautner"
+  },
+  {
+    "id": 9981,
+    "name": "Atley Calvert",
+    "slug": "atley-calvert"
+  },
+  {
+    "id": 4906,
+    "name": "Atro Leppanen",
+    "slug": "atro-leppanen"
+  },
+  {
+    "id": 5636,
+    "name": "Austin Brimmer",
+    "slug": "austin-brimmer"
+  },
+  {
+    "id": 4825,
+    "name": "Austin Poganski",
+    "slug": "austin-poganski"
+  },
+  {
+    "id": 5410,
+    "name": "Austin Roest",
+    "slug": "austin-roest"
+  },
+  {
+    "id": 5228,
+    "name": "Austin Strand",
+    "slug": "austin-strand"
+  },
+  {
+    "id": 5092,
+    "name": "Austin Watson",
+    "slug": "austin-watson"
+  },
+  {
+    "id": 9954,
+    "name": "Avery Hayes",
+    "slug": "avery-hayes"
+  },
+  {
+    "id": 5530,
+    "name": "Axel Sandin-pellikka",
+    "slug": "axel-sandin-pellikka"
+  },
+  {
+    "id": 620,
+    "name": "Aydar Suniev",
+    "slug": "aydar-suniev"
+  },
+  {
+    "id": 5298,
+    "name": "Ayrton Martino",
+    "slug": "ayrton-martino"
+  },
+  {
+    "id": 5347,
+    "name": "Beau Akey",
+    "slug": "beau-akey"
+  },
+  {
+    "id": 4896,
+    "name": "Ben Berard",
+    "slug": "ben-berard"
+  },
+  {
+    "id": 5711,
+    "name": "Ben Dexheimer",
+    "slug": "ben-dexheimer"
+  },
+  {
+    "id": 5132,
+    "name": "Ben Gleason",
+    "slug": "ben-gleason"
+  },
+  {
+    "id": 4854,
+    "name": "Ben Hemmerling",
+    "slug": "ben-hemmerling"
+  },
+  {
+    "id": 614,
+    "name": "Ben Jones",
+    "slug": "ben-jones"
+  },
+  {
+    "id": 5495,
+    "name": "Ben King",
+    "slug": "ben-king"
+  },
+  {
+    "id": 405,
+    "name": "Ben Mccartney",
+    "slug": "ben-mccartney"
+  },
+  {
+    "id": 5712,
+    "name": "Ben Meehan",
+    "slug": "ben-meehan"
+  },
+  {
+    "id": 307,
+    "name": "Ben Meyers",
+    "slug": "ben-meyers"
+  },
+  {
+    "id": 4862,
+    "name": "Ben Steeves",
+    "slug": "ben-steeves"
+  },
+  {
+    "id": 5713,
+    "name": "Ben Strinden",
+    "slug": "ben-strinden"
+  },
+  {
+    "id": 5714,
+    "name": "Ben Zloty",
+    "slug": "ben-zloty"
+  },
+  {
+    "id": 5321,
+    "name": "Bennett Schimek",
+    "slug": "bennett-schimek"
+  },
+  {
+    "id": 4841,
+    "name": "Benoit-olivier Groulx",
+    "slug": "benoit-olivier-groulx"
+  },
+  {
+    "id": 5210,
+    "name": "Billy Sweezey",
+    "slug": "billy-sweezey"
+  },
+  {
+    "id": 5531,
+    "name": "Blake Biondi",
+    "slug": "blake-biondi"
+  },
+  {
+    "id": 5389,
+    "name": "Blake Hillman",
+    "slug": "blake-hillman"
+  },
+  {
+    "id": 5637,
+    "name": "Blake Montgomery",
+    "slug": "blake-montgomery"
+  },
+  {
+    "id": 5369,
+    "name": "Blake Smith",
+    "slug": "blake-smith"
+  },
+  {
+    "id": 4877,
+    "name": "Bogdan Trineyev",
+    "slug": "bogdan-trineyev"
+  },
+  {
+    "id": 10420,
+    "name": "Bokondji Imama",
+    "slug": "bokondji-imama"
+  },
+  {
+    "id": 5073,
+    "name": "Boris Katchouk",
+    "slug": "boris-katchouk"
+  },
+  {
+    "id": 5074,
+    "name": "Borya Valis",
+    "slug": "borya-valis"
+  },
+  {
+    "id": 5264,
+    "name": "Brad Lambert",
+    "slug": "brad-lambert"
+  },
+  {
+    "id": 5638,
+    "name": "Braden Birnie",
+    "slug": "braden-birnie"
+  },
+  {
+    "id": 5715,
+    "name": "Braden Doyle",
+    "slug": "braden-doyle"
+  },
+  {
+    "id": 5299,
+    "name": "Braden Hache",
+    "slug": "braden-hache"
+  },
+  {
+    "id": 5300,
+    "name": "Bradley Marek",
+    "slug": "bradley-marek"
+  },
+  {
+    "id": 4818,
+    "name": "Bradly Nadeau",
+    "slug": "bradly-nadeau"
+  },
+  {
+    "id": 5532,
+    "name": "Brady Stonehouse",
+    "slug": "brady-stonehouse"
+  },
+  {
+    "id": 445,
+    "name": "Braeden Bowman",
+    "slug": "braeden-bowman"
+  },
+  {
+    "id": 11922,
+    "name": "Braidan Simmons-fischer",
+    "slug": "braidan-simmons-fischer"
+  },
+  {
+    "id": 5496,
+    "name": "Brandon Baddock",
+    "slug": "brandon-baddock"
+  },
+  {
+    "id": 10675,
+    "name": "Brandon Buhr",
+    "slug": "brandon-buhr"
+  },
+  {
+    "id": 5716,
+    "name": "Brandon Hawkins",
+    "slug": "brandon-hawkins"
+  },
+  {
+    "id": 5437,
+    "name": "Brandon Hickey",
+    "slug": "brandon-hickey"
+  },
+  {
+    "id": 5582,
+    "name": "Brandon Holt",
+    "slug": "brandon-holt"
+  },
+  {
+    "id": 5322,
+    "name": "Brandon Scanlin",
+    "slug": "brandon-scanlin"
+  },
+  {
+    "id": 10825,
+    "name": "Brayden Edwards",
+    "slug": "brayden-edwards"
+  },
+  {
+    "id": 5497,
+    "name": "Brayden Hislop",
+    "slug": "brayden-hislop"
+  },
+  {
+    "id": 5004,
+    "name": "Brayden Yager",
+    "slug": "brayden-yager"
+  },
+  {
+    "id": 4927,
+    "name": "Brendan Brisson",
+    "slug": "brendan-brisson"
+  },
+  {
+    "id": 5027,
+    "name": "Brendan Furry",
+    "slug": "brendan-furry"
+  },
+  {
+    "id": 4937,
+    "name": "Brendan Gaunce",
+    "slug": "brendan-gaunce"
+  },
+  {
+    "id": 5717,
+    "name": "Brendan Gorman",
+    "slug": "brendan-gorman"
+  },
+  {
+    "id": 5323,
+    "name": "Brendan Hoffmann",
+    "slug": "brendan-hoffmann"
+  },
+  {
+    "id": 5639,
+    "name": "Brendan Smith",
+    "slug": "brendan-smith"
+  },
+  {
+    "id": 5324,
+    "name": "Brendan Warren",
+    "slug": "brendan-warren"
+  },
+  {
+    "id": 5111,
+    "name": "Brennan Othmann",
+    "slug": "brennan-othmann"
+  },
+  {
+    "id": 10827,
+    "name": "Brent Johnson",
+    "slug": "brent-johnson"
+  },
+  {
+    "id": 5144,
+    "name": "Brett Berard",
+    "slug": "brett-berard"
+  },
+  {
+    "id": 5145,
+    "name": "Brett Harrison",
+    "slug": "brett-harrison"
+  },
+  {
+    "id": 5112,
+    "name": "Brett Chorske",
+    "slug": "brett-chorske"
+  },
+  {
+    "id": 4883,
+    "name": "Brett Leason",
+    "slug": "brett-leason"
+  },
+  {
+    "id": 4832,
+    "name": "Brett Seney",
+    "slug": "brett-seney"
+  },
+  {
+    "id": 4964,
+    "name": "Brian Halonen",
+    "slug": "brian-halonen"
+  },
+  {
+    "id": 4938,
+    "name": "Brian Pinho",
+    "slug": "brian-pinho"
+  },
+  {
+    "id": 5370,
+    "name": "Brody Lamb",
+    "slug": "brody-lamb"
+  },
+  {
+    "id": 5718,
+    "name": "Brooklyn Kalmikov",
+    "slug": "brooklyn-kalmikov"
+  },
+  {
+    "id": 10829,
+    "name": "Broten Sabo",
+    "slug": "broten-sabo"
+  },
+  {
+    "id": 5390,
+    "name": "Bryan Yoon",
+    "slug": "bryan-yoon"
+  },
+  {
+    "id": 5075,
+    "name": "Bryce Mcconnell-barker",
+    "slug": "bryce-mcconnell-barker"
+  },
+  {
+    "id": 5498,
+    "name": "Bryce Montgomery",
+    "slug": "bryce-montgomery"
+  },
+  {
+    "id": 10469,
+    "name": "C.j. Smith",
+    "slug": "c-j-smith"
+  },
+  {
+    "id": 5533,
+    "name": "Cade Webber",
+    "slug": "cade-webber"
+  },
+  {
+    "id": 5348,
+    "name": "Caden Price",
+    "slug": "caden-price"
+  },
+  {
+    "id": 5161,
+    "name": "Caedan Bankier",
+    "slug": "caedan-bankier"
+  },
+  {
+    "id": 5719,
+    "name": "Caige Sterzer",
+    "slug": "caige-sterzer"
+  },
+  {
+    "id": 5245,
+    "name": "Cal Burke",
+    "slug": "cal-burke"
+  },
+  {
+    "id": 5191,
+    "name": "Cal Foote",
+    "slug": "cal-foote"
+  },
+  {
+    "id": 10831,
+    "name": "Caleb Jones",
+    "slug": "caleb-jones"
+  },
+  {
+    "id": 5301,
+    "name": "Caleb Macdonald",
+    "slug": "caleb-macdonald"
+  },
+  {
+    "id": 4989,
+    "name": "Calen Addison",
+    "slug": "calen-addison"
+  },
+  {
+    "id": 10623,
+    "name": "Calle Odelius",
+    "slug": "calle-odelius"
+  },
+  {
+    "id": 4917,
+    "name": "Calle Rosen",
+    "slug": "calle-rosen"
+  },
+  {
+    "id": 10624,
+    "name": "Calum Ritchie",
+    "slug": "calum-ritchie"
+  },
+  {
+    "id": 5411,
+    "name": "Cam Allen",
+    "slug": "cam-allen"
+  },
+  {
+    "id": 10221,
+    "name": "Cam Berg",
+    "slug": "cam-berg"
+  },
+  {
+    "id": 5162,
+    "name": "Cam Dineen",
+    "slug": "cam-dineen"
+  },
+  {
+    "id": 5051,
+    "name": "Cam Lund",
+    "slug": "cam-lund"
+  },
+  {
+    "id": 5229,
+    "name": "Cam Squires",
+    "slug": "cam-squires"
+  },
+  {
+    "id": 10273,
+    "name": "Cam Thiesing",
+    "slug": "cam-thiesing"
+  },
+  {
+    "id": 5640,
+    "name": "Cameron Butler",
+    "slug": "cameron-butler"
+  },
+  {
+    "id": 217,
+    "name": "Cameron Crotty",
+    "slug": "cameron-crotty"
+  },
+  {
+    "id": 4837,
+    "name": "Cameron Hebig",
+    "slug": "cameron-hebig"
+  },
+  {
+    "id": 4796,
+    "name": "Cameron Hughes",
+    "slug": "cameron-hughes"
+  },
+  {
+    "id": 5265,
+    "name": "Carey Terrance",
+    "slug": "carey-terrance"
+  },
+  {
+    "id": 236,
+    "name": "Carl Grundstrom",
+    "slug": "carl-grundstrom"
+  },
+  {
+    "id": 5412,
+    "name": "Carson Bantle",
+    "slug": "carson-bantle"
+  },
+  {
+    "id": 5641,
+    "name": "Carson Golder",
+    "slug": "carson-golder"
+  },
+  {
+    "id": 70,
+    "name": "Carson Lambos",
+    "slug": "carson-lambos"
+  },
+  {
+    "id": 4990,
+    "name": "Carson Meyer",
+    "slug": "carson-meyer"
+  },
+  {
+    "id": 5175,
+    "name": "Carson Rehkopf",
+    "slug": "carson-rehkopf"
+  },
+  {
+    "id": 5535,
+    "name": "Carter Berger",
+    "slug": "carter-berger"
+  },
+  {
+    "id": 5266,
+    "name": "Carter King",
+    "slug": "carter-king"
+  },
+  {
+    "id": 5230,
+    "name": "Carter Mazur",
+    "slug": "carter-mazur"
+  },
+  {
+    "id": 5536,
+    "name": "Carter Wilkie",
+    "slug": "carter-wilkie"
+  },
+  {
+    "id": 222,
+    "name": "Carter Yakemchuk",
+    "slug": "carter-yakemchuk"
+  },
+  {
+    "id": 5642,
+    "name": "Case Mccarthy",
+    "slug": "case-mccarthy"
+  },
+  {
+    "id": 5113,
+    "name": "Casey Fitzgerald",
+    "slug": "casey-fitzgerald"
+  },
+  {
+    "id": 5413,
+    "name": "Cavan Fitzgerald",
+    "slug": "cavan-fitzgerald"
+  },
+  {
+    "id": 5133,
+    "name": "Cedric Pare",
+    "slug": "cedric-pare"
+  },
+  {
+    "id": 5036,
+    "name": "Clark Bishop",
+    "slug": "clark-bishop"
+  },
+  {
+    "id": 5231,
+    "name": "Colby Barlow",
+    "slug": "colby-barlow"
+  },
+  {
+    "id": 5325,
+    "name": "Cole Clayton",
+    "slug": "cole-clayton"
+  },
+  {
+    "id": 10450,
+    "name": "Cole Eiserman",
+    "slug": "cole-eiserman"
+  },
+  {
+    "id": 4838,
+    "name": "Cole Guttman",
+    "slug": "cole-guttman"
+  },
+  {
+    "id": 5539,
+    "name": "Cole Knuble",
+    "slug": "cole-knuble"
+  },
+  {
+    "id": 5725,
+    "name": "Cole Krygier",
+    "slug": "cole-krygier"
+  },
+  {
+    "id": 10062,
+    "name": "Cole Mcward",
+    "slug": "cole-mcward"
+  },
+  {
+    "id": 4884,
+    "name": "Cole O'hara",
+    "slug": "cole-o-hara"
+  },
+  {
+    "id": 5502,
+    "name": "Colin Felix",
+    "slug": "colin-felix"
+  },
+  {
+    "id": 5585,
+    "name": "Colin Ralph",
+    "slug": "colin-ralph"
+  },
+  {
+    "id": 5726,
+    "name": "Colin Swoyer",
+    "slug": "colin-swoyer"
+  },
+  {
+    "id": 4868,
+    "name": "Colin White",
+    "slug": "colin-white"
+  },
+  {
+    "id": 5438,
+    "name": "Colton Huard",
+    "slug": "colton-huard"
+  },
+  {
+    "id": 5414,
+    "name": "Colton White",
+    "slug": "colton-white"
+  },
+  {
+    "id": 5503,
+    "name": "Connor Clattenburg",
+    "slug": "connor-clattenburg"
+  },
+  {
+    "id": 5192,
+    "name": "Connor Mackey",
+    "slug": "connor-mackey"
+  },
+  {
+    "id": 5648,
+    "name": "Connor Mayer",
+    "slug": "connor-mayer"
+  },
+  {
+    "id": 5373,
+    "name": "Connor Mylymok",
+    "slug": "connor-mylymok"
+  },
+  {
+    "id": 5586,
+    "name": "Connor Punnett",
+    "slug": "connor-punnett"
+  },
+  {
+    "id": 345,
+    "name": "Conor Geekie",
+    "slug": "conor-geekie"
+  },
+  {
+    "id": 5439,
+    "name": "Cooper Flinton",
+    "slug": "cooper-flinton"
+  },
+  {
+    "id": 5587,
+    "name": "Cooper Gay",
+    "slug": "cooper-gay"
+  },
+  {
+    "id": 4940,
+    "name": "Cooper Marody",
+    "slug": "cooper-marody"
+  },
+  {
+    "id": 5392,
+    "name": "Cooper Moore",
+    "slug": "cooper-moore"
+  },
+  {
+    "id": 5465,
+    "name": "Cooper Walker",
+    "slug": "cooper-walker"
+  },
+  {
+    "id": 544,
+    "name": "Corey Schueneman",
+    "slug": "corey-schueneman"
+  },
+  {
+    "id": 5094,
+    "name": "Corson Ceulemans",
+    "slug": "corson-ceulemans"
+  },
+  {
+    "id": 5504,
+    "name": "Coulson Pitre",
+    "slug": "coulson-pitre"
+  },
+  {
+    "id": 4928,
+    "name": "Cross Hanas",
+    "slug": "cross-hanas"
+  },
+  {
+    "id": 5727,
+    "name": "Curtis Douglas",
+    "slug": "curtis-douglas"
+  },
+  {
+    "id": 5037,
+    "name": "Curtis Mckenzie",
+    "slug": "curtis-mckenzie"
+  },
+  {
+    "id": 5588,
+    "name": "D.j. King",
+    "slug": "d-j-king"
+  },
+  {
+    "id": 5415,
+    "name": "Dakota Mermis",
+    "slug": "dakota-mermis"
+  },
+  {
+    "id": 323,
+    "name": "Dalibor Dvorsky",
+    "slug": "dalibor-dvorsky"
+  },
+  {
+    "id": 5416,
+    "name": "Dalton Bancroft",
+    "slug": "dalton-bancroft"
+  },
+  {
+    "id": 5417,
+    "name": "Dalton Smith",
+    "slug": "dalton-smith"
+  },
+  {
+    "id": 5134,
+    "name": "Damien Carfagna",
+    "slug": "damien-carfagna"
+  },
+  {
+    "id": 4992,
+    "name": "Daniel Carr",
+    "slug": "daniel-carr"
+  },
+  {
+    "id": 5193,
+    "name": "Daniel D'amato",
+    "slug": "daniel-d-amato"
+  },
+  {
+    "id": 10631,
+    "name": "Daniel Laatsch",
+    "slug": "daniel-laatsch"
+  },
+  {
+    "id": 10683,
+    "name": "Daniel Russell",
+    "slug": "daniel-russell"
+  },
+  {
+    "id": 5393,
+    "name": "Daniel Walcott",
+    "slug": "daniel-walcott"
+  },
+  {
+    "id": 395,
+    "name": "Daniil But",
+    "slug": "daniil-but"
+  },
+  {
+    "id": 4918,
+    "name": "Daniil Miromanov",
+    "slug": "daniil-miromanov"
+  },
+  {
+    "id": 10841,
+    "name": "Daniil Prokhorov",
+    "slug": "daniil-prokhorov"
+  },
+  {
+    "id": 4980,
+    "name": "Danil Gushchin",
+    "slug": "danil-gushchin"
+  },
+  {
+    "id": 4965,
+    "name": "Danila Klimovich",
+    "slug": "danila-klimovich"
+  },
+  {
+    "id": 5728,
+    "name": "Danny Katic",
+    "slug": "danny-katic"
+  },
+  {
+    "id": 5095,
+    "name": "Danny Zhilkin",
+    "slug": "danny-zhilkin"
+  },
+  {
+    "id": 5028,
+    "name": "Dans Locmelis",
+    "slug": "dans-locmelis"
+  },
+  {
+    "id": 5176,
+    "name": "Danton Heinen",
+    "slug": "danton-heinen"
+  },
+  {
+    "id": 5729,
+    "name": "Darick Louis-jean",
+    "slug": "darick-louis-jean"
+  },
+  {
+    "id": 10591,
+    "name": "David Breazeale",
+    "slug": "david-breazeale"
+  },
+  {
+    "id": 5135,
+    "name": "David Edstrom",
+    "slug": "david-edstrom"
+  },
+  {
+    "id": 5505,
+    "name": "David Gagnon",
+    "slug": "david-gagnon"
+  },
+  {
+    "id": 5350,
+    "name": "David Goyette",
+    "slug": "david-goyette"
+  },
+  {
+    "id": 5284,
+    "name": "David Gucciardi",
+    "slug": "david-gucciardi"
+  },
+  {
+    "id": 4981,
+    "name": "David Gustafsson",
+    "slug": "david-gustafsson"
+  },
+  {
+    "id": 247,
+    "name": "David Jiricek",
+    "slug": "david-jiricek"
+  },
+  {
+    "id": 5649,
+    "name": "David Kampf",
+    "slug": "david-kampf"
+  },
+  {
+    "id": 5650,
+    "name": "David Lewandowski",
+    "slug": "david-lewandowski"
+  },
+  {
+    "id": 99,
+    "name": "David Reinbacher",
+    "slug": "david-reinbacher"
+  },
+  {
+    "id": 5351,
+    "name": "David Silye",
+    "slug": "david-silye"
+  },
+  {
+    "id": 72,
+    "name": "David Spacek",
+    "slug": "david-spacek"
+  },
+  {
+    "id": 5730,
+    "name": "Davis Burnside",
+    "slug": "davis-burnside"
+  },
+  {
+    "id": 5651,
+    "name": "Dawson Barteaux",
+    "slug": "dawson-barteaux"
+  },
+  {
+    "id": 10131,
+    "name": "Daylan Kuefler",
+    "slug": "daylan-kuefler"
+  },
+  {
+    "id": 271,
+    "name": "Declan Carlile",
+    "slug": "declan-carlile"
+  },
+  {
+    "id": 5731,
+    "name": "Deni Goure",
+    "slug": "deni-goure"
+  },
+  {
+    "id": 5732,
+    "name": "Dennis Cesana",
+    "slug": "dennis-cesana"
+  },
+  {
+    "id": 593,
+    "name": "Dennis Gilbert",
+    "slug": "dennis-gilbert"
+  },
+  {
+    "id": 5467,
+    "name": "Dennis Cholowski",
+    "slug": "dennis-cholowski"
+  },
+  {
+    "id": 228,
+    "name": "Denver Barkey",
+    "slug": "denver-barkey"
+  },
+  {
+    "id": 5652,
+    "name": "Derek Daschke",
+    "slug": "derek-daschke"
+  },
+  {
+    "id": 4966,
+    "name": "Derrick Pouliot",
+    "slug": "derrick-pouliot"
+  },
+  {
+    "id": 5286,
+    "name": "Devin Kaplan",
+    "slug": "devin-kaplan"
+  },
+  {
+    "id": 5733,
+    "name": "Dillan Bentley",
+    "slug": "dillan-bentley"
+  },
+  {
+    "id": 5394,
+    "name": "Dillon Boucher",
+    "slug": "dillon-boucher"
+  },
+  {
+    "id": 4929,
+    "name": "Dillon Dube",
+    "slug": "dillon-dube"
+  },
+  {
+    "id": 5352,
+    "name": "Dino Kambeitz",
+    "slug": "dino-kambeitz"
+  },
+  {
+    "id": 5506,
+    "name": "Djibril Toure",
+    "slug": "djibril-toure"
+  },
+  {
+    "id": 418,
+    "name": "Dmitri Simashev",
+    "slug": "dmitri-simashev"
+  },
+  {
+    "id": 5247,
+    "name": "Dmitry Kuzmin",
+    "slug": "dmitry-kuzmin"
+  },
+  {
+    "id": 5418,
+    "name": "Dmitry Osipov",
+    "slug": "dmitry-osipov"
+  },
+  {
+    "id": 4943,
+    "name": "Domenick Fensore",
+    "slug": "domenick-fensore"
+  },
+  {
+    "id": 353,
+    "name": "Dominic James",
+    "slug": "dominic-james"
+  },
+  {
+    "id": 671,
+    "name": "Dominic Toninato",
+    "slug": "dominic-toninato"
+  },
+  {
+    "id": 5267,
+    "name": "Dominik Badinka",
+    "slug": "dominik-badinka"
+  },
+  {
+    "id": 4919,
+    "name": "Dominik Shine",
+    "slug": "dominik-shine"
+  },
+  {
+    "id": 5287,
+    "name": "Donavan Houle",
+    "slug": "donavan-houle"
+  },
+  {
+    "id": 10848,
+    "name": "Drake Burgin",
+    "slug": "drake-burgin"
+  },
+  {
+    "id": 5653,
+    "name": "Drew Callin",
+    "slug": "drew-callin"
+  },
+  {
+    "id": 5654,
+    "name": "Drew Elliott",
+    "slug": "drew-elliott"
+  },
+  {
+    "id": 4808,
+    "name": "Dryden Hunt",
+    "slug": "dryden-hunt"
+  },
+  {
+    "id": 5211,
+    "name": "Dylan Anhorn",
+    "slug": "dylan-anhorn"
+  },
+  {
+    "id": 462,
+    "name": "Dylan Coghlan",
+    "slug": "dylan-coghlan"
+  },
+  {
+    "id": 4819,
+    "name": "Dylan Duke",
+    "slug": "dylan-duke"
+  },
+  {
+    "id": 4930,
+    "name": "Dylan Gambrell",
+    "slug": "dylan-gambrell"
+  },
+  {
+    "id": 5440,
+    "name": "Dylan Hryckowian",
+    "slug": "dylan-hryckowian"
+  },
+  {
+    "id": 5589,
+    "name": "Dylan James",
+    "slug": "dylan-james"
+  },
+  {
+    "id": 10757,
+    "name": "Dylan Moulton",
+    "slug": "dylan-moulton"
+  },
+  {
+    "id": 5096,
+    "name": "Dylan Peterson",
+    "slug": "dylan-peterson"
+  },
+  {
+    "id": 5076,
+    "name": "Dylan Roobroeck",
+    "slug": "dylan-roobroeck"
+  },
+  {
+    "id": 5540,
+    "name": "Dylan Wendt",
+    "slug": "dylan-wendt"
+  },
+  {
+    "id": 5734,
+    "name": "Dyllan Gill",
+    "slug": "dyllan-gill"
+  },
+  {
+    "id": 5014,
+    "name": "Dysin Mayo",
+    "slug": "dysin-mayo"
+  },
+  {
+    "id": 5441,
+    "name": "Eamon Powell",
+    "slug": "eamon-powell"
+  },
+  {
+    "id": 5541,
+    "name": "Easton Cowan",
+    "slug": "easton-cowan"
+  },
+  {
+    "id": 5542,
+    "name": "Eddie Genborg",
+    "slug": "eddie-genborg"
+  },
+  {
+    "id": 5053,
+    "name": "Eduard Sale",
+    "slug": "eduard-sale"
+  },
+  {
+    "id": 4897,
+    "name": "Eduards Tralmaks",
+    "slug": "eduards-tralmaks"
+  },
+  {
+    "id": 10426,
+    "name": "Eetu Liukas",
+    "slug": "eetu-liukas"
+  },
+  {
+    "id": 4908,
+    "name": "Egor Afanasyev",
+    "slug": "egor-afanasyev"
+  },
+  {
+    "id": 10685,
+    "name": "Egor Zamula",
+    "slug": "egor-zamula"
+  },
+  {
+    "id": 430,
+    "name": "Elias Pettersson",
+    "slug": "elias-pettersson"
+  },
+  {
+    "id": 5395,
+    "name": "Elias Salomonsson",
+    "slug": "elias-salomonsson"
+  },
+  {
+    "id": 5507,
+    "name": "Elliot Desnoyers",
+    "slug": "elliot-desnoyers"
+  },
+  {
+    "id": 5543,
+    "name": "Ellis Rickwood",
+    "slug": "ellis-rickwood"
+  },
+  {
+    "id": 385,
+    "name": "Emil Andrae",
+    "slug": "emil-andrae"
+  },
+  {
+    "id": 5736,
+    "name": "Emil Hemming",
+    "slug": "emil-hemming"
+  },
+  {
+    "id": 10636,
+    "name": "Emil Pieniniemi",
+    "slug": "emil-pieniniemi"
+  },
+  {
+    "id": 5737,
+    "name": "Erik Bargholtz",
+    "slug": "erik-bargholtz"
+  },
+  {
+    "id": 45,
+    "name": "Erik Gustafsson",
+    "slug": "erik-gustafsson"
+  },
+  {
+    "id": 5508,
+    "name": "Eriks Mateiko",
+    "slug": "eriks-mateiko"
+  },
+  {
+    "id": 10091,
+    "name": "Ethan Bear",
+    "slug": "ethan-bear"
+  },
+  {
+    "id": 5248,
+    "name": "Ethan Cardwell",
+    "slug": "ethan-cardwell"
+  },
+  {
+    "id": 5738,
+    "name": "Ethan Czata",
+    "slug": "ethan-czata"
+  },
+  {
+    "id": 674,
+    "name": "Ethan Del Mastro",
+    "slug": "ethan-del-mastro"
+  },
+  {
+    "id": 5116,
+    "name": "Ethan Edwards",
+    "slug": "ethan-edwards"
+  },
+  {
+    "id": 5590,
+    "name": "Ethan Frisch",
+    "slug": "ethan-frisch"
+  },
+  {
+    "id": 5038,
+    "name": "Ethan Gauthier",
+    "slug": "ethan-gauthier"
+  },
+  {
+    "id": 5442,
+    "name": "Ethan Keppen",
+    "slug": "ethan-keppen"
+  },
+  {
+    "id": 5739,
+    "name": "Ethan Leyh",
+    "slug": "ethan-leyh"
+  },
+  {
+    "id": 5194,
+    "name": "Ethan Samson",
+    "slug": "ethan-samson"
+  },
+  {
+    "id": 476,
+    "name": "Ethen Frank",
+    "slug": "ethen-frank"
+  },
+  {
+    "id": 5419,
+    "name": "Etienne Morin",
+    "slug": "etienne-morin"
+  },
+  {
+    "id": 4950,
+    "name": "Evan Vierling",
+    "slug": "evan-vierling"
+  },
+  {
+    "id": 4898,
+    "name": "Fabian Lysell",
+    "slug": "fabian-lysell"
+  },
+  {
+    "id": 5544,
+    "name": "Fabian Wagner",
+    "slug": "fabian-wagner"
+  },
+  {
+    "id": 694,
+    "name": "Fedor Svechkov",
+    "slug": "fedor-svechkov"
+  },
+  {
+    "id": 5592,
+    "name": "Felix Trudeau",
+    "slug": "felix-trudeau"
+  },
+  {
+    "id": 4801,
+    "name": "Felix Unger Sorum",
+    "slug": "felix-unger-sorum"
+  },
+  {
+    "id": 4812,
+    "name": "Filip Bystedt",
+    "slug": "filip-bystedt"
+  },
+  {
+    "id": 10758,
+    "name": "Filip Hallander",
+    "slug": "filip-hallander"
+  },
+  {
+    "id": 5039,
+    "name": "Filip Mesar",
+    "slug": "filip-mesar"
+  },
+  {
+    "id": 10204,
+    "name": "Finn Harding",
+    "slug": "finn-harding"
+  },
+  {
+    "id": 92,
+    "name": "Florian Xhekaj",
+    "slug": "florian-xhekaj"
+  },
+  {
+    "id": 4951,
+    "name": "Francesco Pinelli",
+    "slug": "francesco-pinelli"
+  },
+  {
+    "id": 5740,
+    "name": "Frank Djurasevic",
+    "slug": "frank-djurasevic"
+  },
+  {
+    "id": 4920,
+    "name": "Frederic Brunet",
+    "slug": "frederic-brunet"
+  },
+  {
+    "id": 9989,
+    "name": "Gabe Klassen",
+    "slug": "gabe-klassen"
+  },
+  {
+    "id": 181,
+    "name": "Gabe Perreault",
+    "slug": "gabe-perreault"
+  },
+  {
+    "id": 5146,
+    "name": "Gabriel Seger",
+    "slug": "gabriel-seger"
+  },
+  {
+    "id": 5177,
+    "name": "Gabriel Szturc",
+    "slug": "gabriel-szturc"
+  },
+  {
+    "id": 4993,
+    "name": "Garrett Pilon",
+    "slug": "garrett-pilon"
+  },
+  {
+    "id": 5741,
+    "name": "Garrett Pyke",
+    "slug": "garrett-pyke"
+  },
+  {
+    "id": 5249,
+    "name": "Garrett Wilson",
+    "slug": "garrett-wilson"
+  },
+  {
+    "id": 5054,
+    "name": "Gavin Bayreuther",
+    "slug": "gavin-bayreuther"
+  },
+  {
+    "id": 5443,
+    "name": "Gavin Brindley",
+    "slug": "gavin-brindley"
+  },
+  {
+    "id": 5742,
+    "name": "Gavin Hain",
+    "slug": "gavin-hain"
+  },
+  {
+    "id": 5055,
+    "name": "Gavin Hayes",
+    "slug": "gavin-hayes"
+  },
+  {
+    "id": 10858,
+    "name": "Gavin Mccarthy",
+    "slug": "gavin-mccarthy"
+  },
+  {
+    "id": 5303,
+    "name": "Gavin White",
+    "slug": "gavin-white"
+  },
+  {
+    "id": 4810,
+    "name": "Georgii Merkulov",
+    "slug": "georgii-merkulov"
+  },
+  {
+    "id": 4899,
+    "name": "Gerry Mayhew",
+    "slug": "gerry-mayhew"
+  },
+  {
+    "id": 5470,
+    "name": "Givani Smith",
+    "slug": "givani-smith"
+  },
+  {
+    "id": 5327,
+    "name": "Gleb Trikozov",
+    "slug": "gleb-trikozov"
+  },
+  {
+    "id": 10596,
+    "name": "Gleb Veremyev",
+    "slug": "gleb-veremyev"
+  },
+  {
+    "id": 4848,
+    "name": "Glenn Gawdin",
+    "slug": "glenn-gawdin"
+  },
+  {
+    "id": 5117,
+    "name": "Gracyn Sawchyn",
+    "slug": "gracyn-sawchyn"
+  },
+  {
+    "id": 4889,
+    "name": "Graeme Clarke",
+    "slug": "graeme-clarke"
+  },
+  {
+    "id": 5420,
+    "name": "Graham Slaggert",
+    "slug": "graham-slaggert"
+  },
+  {
+    "id": 5195,
+    "name": "Grant Cruikshank",
+    "slug": "grant-cruikshank"
+  },
+  {
+    "id": 5593,
+    "name": "Guillaume Brisebois",
+    "slug": "guillaume-brisebois"
+  },
+  {
+    "id": 5178,
+    "name": "Guillaume Richard",
+    "slug": "guillaume-richard"
+  },
+  {
+    "id": 4982,
+    "name": "Gustav Olofsson",
+    "slug": "gustav-olofsson"
+  },
+  {
+    "id": 5545,
+    "name": "Gustav Stjernberg",
+    "slug": "gustav-stjernberg"
+  },
+  {
+    "id": 5594,
+    "name": "Hank Kempf",
+    "slug": "hank-kempf"
+  },
+  {
+    "id": 10501,
+    "name": "Harrison Brunicke",
+    "slug": "harrison-brunicke"
+  },
+  {
+    "id": 5546,
+    "name": "Harrison Israels",
+    "slug": "harrison-israels"
+  },
+  {
+    "id": 4983,
+    "name": "Harrison Scott",
+    "slug": "harrison-scott"
+  },
+  {
+    "id": 210,
+    "name": "Hayden Hodgson",
+    "slug": "hayden-hodgson"
+  },
+  {
+    "id": 5743,
+    "name": "Hayes Hundley",
+    "slug": "hayes-hundley"
+  },
+  {
+    "id": 246,
+    "name": "Helge Grans",
+    "slug": "helge-grans"
+  },
+  {
+    "id": 4994,
+    "name": "Henrik Rybinski",
+    "slug": "henrik-rybinski"
+  },
+  {
+    "id": 5744,
+    "name": "Henry Brzustewicz",
+    "slug": "henry-brzustewicz"
+  },
+  {
+    "id": 5136,
+    "name": "Henry Thrun",
+    "slug": "henry-thrun"
+  },
+  {
+    "id": 5745,
+    "name": "Herman Traff",
+    "slug": "herman-traff"
+  },
+  {
+    "id": 5655,
+    "name": "Hoyt Stanley",
+    "slug": "hoyt-stanley"
+  },
+  {
+    "id": 5196,
+    "name": "Hudson Fasching",
+    "slug": "hudson-fasching"
+  },
+  {
+    "id": 4995,
+    "name": "Hugh Mcging",
+    "slug": "hugh-mcging"
+  },
+  {
+    "id": 624,
+    "name": "Hunter Brzustewicz",
+    "slug": "hunter-brzustewicz"
+  },
+  {
+    "id": 10174,
+    "name": "Hunter Drew",
+    "slug": "hunter-drew"
+  },
+  {
+    "id": 55,
+    "name": "Hunter Haight",
+    "slug": "hunter-haight"
+  },
+  {
+    "id": 5746,
+    "name": "Hunter Johannes",
+    "slug": "hunter-johannes"
+  },
+  {
+    "id": 248,
+    "name": "Hunter Mcdonald",
+    "slug": "hunter-mcdonald"
+  },
+  {
+    "id": 5077,
+    "name": "Hunter Mckown",
+    "slug": "hunter-mckown"
+  },
+  {
+    "id": 5197,
+    "name": "Hunter Skinner",
+    "slug": "hunter-skinner"
+  },
+  {
+    "id": 5289,
+    "name": "Hunter St. Martin",
+    "slug": "hunter-st-martin"
+  },
+  {
+    "id": 5499,
+    "name": "Chad Hillebrand",
+    "slug": "chad-hillebrand"
+  },
+  {
+    "id": 5720,
+    "name": "Chad Nychuk",
+    "slug": "chad-nychuk"
+  },
+  {
+    "id": 5537,
+    "name": "Charle-edouard D'astous",
+    "slug": "charle-edouard-d-astous"
+  },
+  {
+    "id": 362,
+    "name": "Charle-Edouard D'Astous",
+    "slug": "charle-edouard-dastous"
+  },
+  {
+    "id": 5391,
+    "name": "Charles Alexis Legault",
+    "slug": "charles-alexis-legault"
+  },
+  {
+    "id": 5643,
+    "name": "Charlie Elick",
+    "slug": "charlie-elick"
+  },
+  {
+    "id": 5583,
+    "name": "Charlie Wright",
+    "slug": "charlie-wright"
+  },
+  {
+    "id": 5371,
+    "name": "Chas Sharpe",
+    "slug": "chas-sharpe"
+  },
+  {
+    "id": 5302,
+    "name": "Chase Bradley",
+    "slug": "chase-bradley"
+  },
+  {
+    "id": 5538,
+    "name": "Chase Dafoe",
+    "slug": "chase-dafoe"
+  },
+  {
+    "id": 5721,
+    "name": "Chase Pauls",
+    "slug": "chase-pauls"
+  },
+  {
+    "id": 10296,
+    "name": "Chase Pietila",
+    "slug": "chase-pietila"
+  },
+  {
+    "id": 5372,
+    "name": "Chase Stillman",
+    "slug": "chase-stillman"
+  },
+  {
+    "id": 5644,
+    "name": "Chase Wheatcroft",
+    "slug": "chase-wheatcroft"
+  },
+  {
+    "id": 5052,
+    "name": "Chase Wouters",
+    "slug": "chase-wouters"
+  },
+  {
+    "id": 5500,
+    "name": "Chase Yoder",
+    "slug": "chase-yoder"
+  },
+  {
+    "id": 5722,
+    "name": "Chongmin Lee",
+    "slug": "chongmin-lee"
+  },
+  {
+    "id": 5584,
+    "name": "Chris Harpur",
+    "slug": "chris-harpur"
+  },
+  {
+    "id": 10835,
+    "name": "Chris Hedden",
+    "slug": "chris-hedden"
+  },
+  {
+    "id": 5645,
+    "name": "Chris Ortiz",
+    "slug": "chris-ortiz"
+  },
+  {
+    "id": 10203,
+    "name": "Chris Terry",
+    "slug": "chris-terry"
+  },
+  {
+    "id": 4847,
+    "name": "Chris Wagner",
+    "slug": "chris-wagner"
+  },
+  {
+    "id": 5723,
+    "name": "Christian Felton",
+    "slug": "christian-felton"
+  },
+  {
+    "id": 5724,
+    "name": "Christian Fitzgerald",
+    "slug": "christian-fitzgerald"
+  },
+  {
+    "id": 4939,
+    "name": "Christian Kyrou",
+    "slug": "christian-kyrou"
+  },
+  {
+    "id": 4991,
+    "name": "Christian Wolanin",
+    "slug": "christian-wolanin"
+  },
+  {
+    "id": 5501,
+    "name": "Christoffer Sedoff",
+    "slug": "christoffer-sedoff"
+  },
+  {
+    "id": 5646,
+    "name": "Christopher Brown",
+    "slug": "christopher-brown"
+  },
+  {
+    "id": 5647,
+    "name": "Christopher Douglas",
+    "slug": "christopher-douglas"
+  },
+  {
+    "id": 5374,
+    "name": "Ian Mckinnon",
+    "slug": "ian-mckinnon"
+  },
+  {
+    "id": 5040,
+    "name": "Ian Mitchell",
+    "slug": "ian-mitchell"
+  },
+  {
+    "id": 543,
+    "name": "Ian Moore",
+    "slug": "ian-moore"
+  },
+  {
+    "id": 4972,
+    "name": "Igor Chernyshov",
+    "slug": "igor-chernyshov"
+  },
+  {
+    "id": 483,
+    "name": "Ilya Protas",
+    "slug": "ilya-protas"
+  },
+  {
+    "id": 5748,
+    "name": "Ilya Solovyov",
+    "slug": "ilya-solovyov"
+  },
+  {
+    "id": 5445,
+    "name": "Isaac Belliveau",
+    "slug": "isaac-belliveau"
+  },
+  {
+    "id": 4849,
+    "name": "Isaac Howard",
+    "slug": "isaac-howard"
+  },
+  {
+    "id": 5118,
+    "name": "Isaac Ratcliffe",
+    "slug": "isaac-ratcliffe"
+  },
+  {
+    "id": 5016,
+    "name": "Isaak Phillips",
+    "slug": "isaak-phillips"
+  },
+  {
+    "id": 10259,
+    "name": "Isaiah George",
+    "slug": "isaiah-george"
+  },
+  {
+    "id": 508,
+    "name": "Isak Rosen",
+    "slug": "isak-rosen"
+  },
+  {
+    "id": 5656,
+    "name": "Isak Walther",
+    "slug": "isak-walther"
+  },
+  {
+    "id": 5657,
+    "name": "Israel Mianscum",
+    "slug": "israel-mianscum"
+  },
+  {
+    "id": 5056,
+    "name": "Ivan Ivan",
+    "slug": "ivan-ivan"
+  },
+  {
+    "id": 480,
+    "name": "Ivan Miroshnichenko",
+    "slug": "ivan-miroshnichenko"
+  },
+  {
+    "id": 5375,
+    "name": "Ivan Ryabkin",
+    "slug": "ivan-ryabkin"
+  },
+  {
+    "id": 5097,
+    "name": "J.r. Avon",
+    "slug": "j-r-avon"
+  },
+  {
+    "id": 4842,
+    "name": "Jack Ahcan",
+    "slug": "jack-ahcan"
+  },
+  {
+    "id": 5547,
+    "name": "Jack Anderson",
+    "slug": "jack-anderson"
+  },
+  {
+    "id": 5749,
+    "name": "Jack Bar",
+    "slug": "jack-bar"
+  },
+  {
+    "id": 4901,
+    "name": "Jack Becker",
+    "slug": "jack-becker"
+  },
+  {
+    "id": 5658,
+    "name": "Jack Berglund",
+    "slug": "jack-berglund"
+  },
+  {
+    "id": 4878,
+    "name": "Jack Devine",
+    "slug": "jack-devine"
+  },
+  {
+    "id": 324,
+    "name": "Jack Finley",
+    "slug": "jack-finley"
+  },
+  {
+    "id": 136,
+    "name": "Jack Hughes",
+    "slug": "jack-hughes"
+  },
+  {
+    "id": 5376,
+    "name": "Jack Malone",
+    "slug": "jack-malone"
+  },
+  {
+    "id": 5446,
+    "name": "Jack Matier",
+    "slug": "jack-matier"
+  },
+  {
+    "id": 5377,
+    "name": "Jack Millar",
+    "slug": "jack-millar"
+  },
+  {
+    "id": 5250,
+    "name": "Jack Peart",
+    "slug": "jack-peart"
+  },
+  {
+    "id": 5179,
+    "name": "Jack Rathbone",
+    "slug": "jack-rathbone"
+  },
+  {
+    "id": 5353,
+    "name": "Jack Ricketts",
+    "slug": "jack-ricketts"
+  },
+  {
+    "id": 10529,
+    "name": "Jack St. Ivany",
+    "slug": "jack-st-ivany"
+  },
+  {
+    "id": 5005,
+    "name": "Jack Studnicka",
+    "slug": "jack-studnicka"
+  },
+  {
+    "id": 5078,
+    "name": "Jack Thompson",
+    "slug": "jack-thompson"
+  },
+  {
+    "id": 4944,
+    "name": "Jack Williams",
+    "slug": "jack-williams"
+  },
+  {
+    "id": 5659,
+    "name": "Jackson Berezowski",
+    "slug": "jackson-berezowski"
+  },
+  {
+    "id": 5397,
+    "name": "Jackson Cates",
+    "slug": "jackson-cates"
+  },
+  {
+    "id": 5354,
+    "name": "Jackson Dorrington",
+    "slug": "jackson-dorrington"
+  },
+  {
+    "id": 5509,
+    "name": "Jackson Edward",
+    "slug": "jackson-edward"
+  },
+  {
+    "id": 5057,
+    "name": "Jackson Hallum",
+    "slug": "jackson-hallum"
+  },
+  {
+    "id": 10764,
+    "name": "Jackson Jutting",
+    "slug": "jackson-jutting"
+  },
+  {
+    "id": 5595,
+    "name": "Jackson Kunz",
+    "slug": "jackson-kunz"
+  },
+  {
+    "id": 5510,
+    "name": "Jackson Van De Leest",
+    "slug": "jackson-van-de-leest"
+  },
+  {
+    "id": 5750,
+    "name": "Jacob Dion",
+    "slug": "jacob-dion"
+  },
+  {
+    "id": 5511,
+    "name": "Jacob Doty",
+    "slug": "jacob-doty"
+  },
+  {
+    "id": 234,
+    "name": "Jacob Gaucher",
+    "slug": "jacob-gaucher"
+  },
+  {
+    "id": 5751,
+    "name": "Jacob Hudson",
+    "slug": "jacob-hudson"
+  },
+  {
+    "id": 5421,
+    "name": "Jacob Julien",
+    "slug": "jacob-julien"
+  },
+  {
+    "id": 5304,
+    "name": "Jacob Macdonald",
+    "slug": "jacob-macdonald"
+  },
+  {
+    "id": 5180,
+    "name": "Jacob Melanson",
+    "slug": "jacob-melanson"
+  },
+  {
+    "id": 5471,
+    "name": "Jacob Perreault",
+    "slug": "jacob-perreault"
+  },
+  {
+    "id": 4953,
+    "name": "Jacob Quillan",
+    "slug": "jacob-quillan"
+  },
+  {
+    "id": 5549,
+    "name": "Jacob Truscott",
+    "slug": "jacob-truscott"
+  },
+  {
+    "id": 4820,
+    "name": "Jagger Firkus",
+    "slug": "jagger-firkus"
+  },
+  {
+    "id": 5058,
+    "name": "Jagger Joshua",
+    "slug": "jagger-joshua"
+  },
+  {
+    "id": 5596,
+    "name": "Jake Boltmann",
+    "slug": "jake-boltmann"
+  },
+  {
+    "id": 5378,
+    "name": "Jake Furlong",
+    "slug": "jake-furlong"
+  },
+  {
+    "id": 5660,
+    "name": "Jake Chiasson",
+    "slug": "jake-chiasson"
+  },
+  {
+    "id": 5137,
+    "name": "Jake Leschyshyn",
+    "slug": "jake-leschyshyn"
+  },
+  {
+    "id": 5214,
+    "name": "Jake Livingstone",
+    "slug": "jake-livingstone"
+  },
+  {
+    "id": 4850,
+    "name": "Jake Lucchini",
+    "slug": "jake-lucchini"
+  },
+  {
+    "id": 5752,
+    "name": "Jake Murray",
+    "slug": "jake-murray"
+  },
+  {
+    "id": 5119,
+    "name": "Jake Schmaltz",
+    "slug": "jake-schmaltz"
+  },
+  {
+    "id": 5329,
+    "name": "Jake Wise",
+    "slug": "jake-wise"
+  },
+  {
+    "id": 4795,
+    "name": "Jakob Pelletier",
+    "slug": "jakob-pelletier"
+  },
+  {
+    "id": 5355,
+    "name": "Jakov Novak",
+    "slug": "jakov-novak"
+  },
+  {
+    "id": 4996,
+    "name": "Jakub Brabenec",
+    "slug": "jakub-brabenec"
+  },
+  {
+    "id": 5661,
+    "name": "Jakub Demek",
+    "slug": "jakub-demek"
+  },
+  {
+    "id": 5447,
+    "name": "Jakub Dvorak",
+    "slug": "jakub-dvorak"
+  },
+  {
+    "id": 5017,
+    "name": "Jakub Rychlovsky",
+    "slug": "jakub-rychlovsky"
+  },
+  {
+    "id": 5181,
+    "name": "Jakub Stancl",
+    "slug": "jakub-stancl"
+  },
+  {
+    "id": 5422,
+    "name": "Jalen Luypen",
+    "slug": "jalen-luypen"
+  },
+  {
+    "id": 552,
+    "name": "James Hagens",
+    "slug": "james-hagens"
+  },
+  {
+    "id": 526,
+    "name": "James Hamblin",
+    "slug": "james-hamblin"
+  },
+  {
+    "id": 5199,
+    "name": "James Malatesta",
+    "slug": "james-malatesta"
+  },
+  {
+    "id": 5753,
+    "name": "James Stefan",
+    "slug": "james-stefan"
+  },
+  {
+    "id": 5029,
+    "name": "Jamie Engelbert",
+    "slug": "jamie-engelbert"
+  },
+  {
+    "id": 5215,
+    "name": "Jamieson Rees",
+    "slug": "jamieson-rees"
+  },
+  {
+    "id": 5216,
+    "name": "Jan Jenik",
+    "slug": "jan-jenik"
+  },
+  {
+    "id": 5138,
+    "name": "Jan Mysak",
+    "slug": "jan-mysak"
+  },
+  {
+    "id": 4973,
+    "name": "Jani Nyman",
+    "slug": "jani-nyman"
+  },
+  {
+    "id": 5079,
+    "name": "Jared Davidson",
+    "slug": "jared-davidson"
+  },
+  {
+    "id": 5006,
+    "name": "Jared Wright",
+    "slug": "jared-wright"
+  },
+  {
+    "id": 4946,
+    "name": "Jaret Anderson-dolan",
+    "slug": "jaret-anderson-dolan"
+  },
+  {
+    "id": 5598,
+    "name": "Jarod Crespo",
+    "slug": "jarod-crespo"
+  },
+  {
+    "id": 174,
+    "name": "Jaroslav Chmelar",
+    "slug": "jaroslav-chmelar"
+  },
+  {
+    "id": 5398,
+    "name": "Jarred Tinordi",
+    "slug": "jarred-tinordi"
+  },
+  {
+    "id": 5147,
+    "name": "Jason Polin",
+    "slug": "jason-polin"
+  },
+  {
+    "id": 5512,
+    "name": "Jaxon Nelson",
+    "slug": "jaxon-nelson"
+  },
+  {
+    "id": 468,
+    "name": "Jaycob Megna",
+    "slug": "jaycob-megna"
+  },
+  {
+    "id": 5662,
+    "name": "Jayden Grubbe",
+    "slug": "jayden-grubbe"
+  },
+  {
+    "id": 5754,
+    "name": "Jayden Lee",
+    "slug": "jayden-lee"
+  },
+  {
+    "id": 4821,
+    "name": "Jayson Megna",
+    "slug": "jayson-megna"
+  },
+  {
+    "id": 5098,
+    "name": "Jean-luc Foudy",
+    "slug": "jean-luc-foudy"
+  },
+  {
+    "id": 5200,
+    "name": "Jeremie Poirier",
+    "slug": "jeremie-poirier"
+  },
+  {
+    "id": 463,
+    "name": "Jeremy Davies",
+    "slug": "jeremy-davies"
+  },
+  {
+    "id": 5599,
+    "name": "Jesse Kiiskinen",
+    "slug": "jesse-kiiskinen"
+  },
+  {
+    "id": 10696,
+    "name": "Jesse Pulkkinen",
+    "slug": "jesse-pulkkinen"
+  },
+  {
+    "id": 5755,
+    "name": "Jett Jones",
+    "slug": "jett-jones"
+  },
+  {
+    "id": 546,
+    "name": "Jett Woo",
+    "slug": "jett-woo"
+  },
+  {
+    "id": 4864,
+    "name": "Jimmy Huntington",
+    "slug": "jimmy-huntington"
+  },
+  {
+    "id": 5201,
+    "name": "Jimmy Schuldt",
+    "slug": "jimmy-schuldt"
+  },
+  {
+    "id": 5600,
+    "name": "Jiri Felcman",
+    "slug": "jiri-felcman"
+  },
+  {
+    "id": 5018,
+    "name": "Joakim Kemell",
+    "slug": "joakim-kemell"
+  },
+  {
+    "id": 5423,
+    "name": "Joe Arntsen",
+    "slug": "joe-arntsen"
+  },
+  {
+    "id": 5550,
+    "name": "Joe Dunlap",
+    "slug": "joe-dunlap"
+  },
+  {
+    "id": 5251,
+    "name": "Joe Fleming",
+    "slug": "joe-fleming"
+  },
+  {
+    "id": 5148,
+    "name": "Joe Hicketts",
+    "slug": "joe-hicketts"
+  },
+  {
+    "id": 5358,
+    "name": "Joel Nystrom",
+    "slug": "joel-nystrom"
+  },
+  {
+    "id": 5139,
+    "name": "Joey Abate",
+    "slug": "joey-abate"
+  },
+  {
+    "id": 4974,
+    "name": "Joey Anderson",
+    "slug": "joey-anderson"
+  },
+  {
+    "id": 10069,
+    "name": "Joey Larson",
+    "slug": "joey-larson"
+  },
+  {
+    "id": 5140,
+    "name": "Joey Willis",
+    "slug": "joey-willis"
+  },
+  {
+    "id": 5202,
+    "name": "John Farinacci",
+    "slug": "john-farinacci"
+  },
+  {
+    "id": 5756,
+    "name": "John Gormley",
+    "slug": "john-gormley"
+  },
+  {
+    "id": 5099,
+    "name": "John Hayden",
+    "slug": "john-hayden"
+  },
+  {
+    "id": 4833,
+    "name": "John Leonard",
+    "slug": "john-leonard"
+  },
+  {
+    "id": 5551,
+    "name": "John Prokop",
+    "slug": "john-prokop"
+  },
+  {
+    "id": 5305,
+    "name": "Jon Mcdonald",
+    "slug": "jon-mcdonald"
+  },
+  {
+    "id": 5059,
+    "name": "JONAS RøNDBJERG",
+    "slug": "jonas-r-ndbjerg"
+  },
+  {
+    "id": 564,
+    "name": "Jonathan Aspirot",
+    "slug": "jonathan-aspirot"
+  },
+  {
+    "id": 5060,
+    "name": "Jonathan Gruden",
+    "slug": "jonathan-gruden"
+  },
+  {
+    "id": 5163,
+    "name": "Jonathan Lekkerimaki",
+    "slug": "jonathan-lekkerimaki"
+  },
+  {
+    "id": 10115,
+    "name": "Joona Koppanen",
+    "slug": "joona-koppanen"
+  },
+  {
+    "id": 5203,
+    "name": "Jordan Dumais",
+    "slug": "jordan-dumais"
+  },
+  {
+    "id": 5663,
+    "name": "Jordan Gustafson",
+    "slug": "jordan-gustafson"
+  },
+  {
+    "id": 567,
+    "name": "Jordan Harris",
+    "slug": "jordan-harris"
+  },
+  {
+    "id": 4873,
+    "name": "Jordan Oesterle",
+    "slug": "jordan-oesterle"
+  },
+  {
+    "id": 5149,
+    "name": "Jorian Donovan",
+    "slug": "jorian-donovan"
+  },
+  {
+    "id": 5359,
+    "name": "Joseph Labate",
+    "slug": "joseph-labate"
+  },
+  {
+    "id": 5554,
+    "name": "Josh Bloom",
+    "slug": "josh-bloom"
+  },
+  {
+    "id": 5290,
+    "name": "Josh Brown",
+    "slug": "josh-brown"
+  },
+  {
+    "id": 5664,
+    "name": "Josh Davies",
+    "slug": "josh-davies"
+  },
+  {
+    "id": 5665,
+    "name": "Josh Dunne",
+    "slug": "josh-dunne"
+  },
+  {
+    "id": 5757,
+    "name": "Josh Eernisse",
+    "slug": "josh-eernisse"
+  },
+  {
+    "id": 5448,
+    "name": "Josh Filmon",
+    "slug": "josh-filmon"
+  },
+  {
+    "id": 5472,
+    "name": "Josh Jacobs",
+    "slug": "josh-jacobs"
+  },
+  {
+    "id": 5666,
+    "name": "Josh Lopina",
+    "slug": "josh-lopina"
+  },
+  {
+    "id": 5667,
+    "name": "Josh Nadeau",
+    "slug": "josh-nadeau"
+  },
+  {
+    "id": 13,
+    "name": "Josh Samanski",
+    "slug": "josh-samanski"
+  },
+  {
+    "id": 4879,
+    "name": "Joshua Roy",
+    "slug": "joshua-roy"
+  },
+  {
+    "id": 5473,
+    "name": "Josiah Didier",
+    "slug": "josiah-didier"
+  },
+  {
+    "id": 5081,
+    "name": "Josiah Slavin",
+    "slug": "josiah-slavin"
+  },
+  {
+    "id": 521,
+    "name": "Judd Caulfield",
+    "slug": "judd-caulfield"
+  },
+  {
+    "id": 5379,
+    "name": "Jujhar Khaira",
+    "slug": "jujhar-khaira"
+  },
+  {
+    "id": 5306,
+    "name": "Julian Lutz",
+    "slug": "julian-lutz"
+  },
+  {
+    "id": 5307,
+    "name": "Julien Gauthier",
+    "slug": "julien-gauthier"
+  },
+  {
+    "id": 4954,
+    "name": "Juraj Pekarcik",
+    "slug": "juraj-pekarcik"
+  },
+  {
+    "id": 4903,
+    "name": "Justin Bailey",
+    "slug": "justin-bailey"
+  },
+  {
+    "id": 5019,
+    "name": "Justin Dowling",
+    "slug": "justin-dowling"
+  },
+  {
+    "id": 5424,
+    "name": "Justin Ertel",
+    "slug": "justin-ertel"
+  },
+  {
+    "id": 5269,
+    "name": "Justin Holl",
+    "slug": "justin-holl"
+  },
+  {
+    "id": 5601,
+    "name": "Justin Janicke",
+    "slug": "justin-janicke"
+  },
+  {
+    "id": 5150,
+    "name": "Justin Kirkland",
+    "slug": "justin-kirkland"
+  },
+  {
+    "id": 5555,
+    "name": "Justin Nachbaur",
+    "slug": "justin-nachbaur"
+  },
+  {
+    "id": 5082,
+    "name": "Justin Pearson",
+    "slug": "justin-pearson"
+  },
+  {
+    "id": 4805,
+    "name": "Justin Robidas",
+    "slug": "justin-robidas"
+  },
+  {
+    "id": 5425,
+    "name": "Juuso Parssinen",
+    "slug": "juuso-parssinen"
+  },
+  {
+    "id": 5120,
+    "name": "Juuso Valimaki",
+    "slug": "juuso-valimaki"
+  },
+  {
+    "id": 5602,
+    "name": "Kaden Bohlsen",
+    "slug": "kaden-bohlsen"
+  },
+  {
+    "id": 5291,
+    "name": "Kaden Hammell",
+    "slug": "kaden-hammell"
+  },
+  {
+    "id": 5449,
+    "name": "Kai Schwindt",
+    "slug": "kai-schwindt"
+  },
+  {
+    "id": 460,
+    "name": "Kai Uchacz",
+    "slug": "kai-uchacz"
+  },
+  {
+    "id": 5399,
+    "name": "Kalan Lind",
+    "slug": "kalan-lind"
+  },
+  {
+    "id": 5083,
+    "name": "Kale Clague",
+    "slug": "kale-clague"
+  },
+  {
+    "id": 5758,
+    "name": "Kale Kessy",
+    "slug": "kale-kessy"
+  },
+  {
+    "id": 5556,
+    "name": "Kaleb Lawrence",
+    "slug": "kaleb-lawrence"
+  },
+  {
+    "id": 10773,
+    "name": "Kaleb Pearson",
+    "slug": "kaleb-pearson"
+  },
+  {
+    "id": 5513,
+    "name": "Kalle Vaisanen",
+    "slug": "kalle-vaisanen"
+  },
+  {
+    "id": 5100,
+    "name": "Karsen Dorwart",
+    "slug": "karsen-dorwart"
+  },
+  {
+    "id": 4955,
+    "name": "Kasper Halttunen",
+    "slug": "kasper-halttunen"
+  },
+  {
+    "id": 5668,
+    "name": "Keaton Mastrodonato",
+    "slug": "keaton-mastrodonato"
+  },
+  {
+    "id": 5270,
+    "name": "Keaton Middleton",
+    "slug": "keaton-middleton"
+  },
+  {
+    "id": 5217,
+    "name": "Keean Washkurak",
+    "slug": "keean-washkurak"
+  },
+  {
+    "id": 4909,
+    "name": "Kenny Connors",
+    "slug": "kenny-connors"
+  },
+  {
+    "id": 5759,
+    "name": "Kent Anderson",
+    "slug": "kent-anderson"
+  },
+  {
+    "id": 5450,
+    "name": "Kenta Isogai",
+    "slug": "kenta-isogai"
+  },
+  {
+    "id": 5603,
+    "name": "Kevin Conley",
+    "slug": "kevin-conley"
+  },
+  {
+    "id": 5474,
+    "name": "Kevin Connauton",
+    "slug": "kevin-connauton"
+  },
+  {
+    "id": 5330,
+    "name": "Kevin Gravel",
+    "slug": "kevin-gravel"
+  },
+  {
+    "id": 676,
+    "name": "Kevin Korchinski",
+    "slug": "kevin-korchinski"
+  },
+  {
+    "id": 5121,
+    "name": "Kevin Lombardi",
+    "slug": "kevin-lombardi"
+  },
+  {
+    "id": 5101,
+    "name": "Kevin Rooney",
+    "slug": "kevin-rooney"
+  },
+  {
+    "id": 5760,
+    "name": "Kevin Wall",
+    "slug": "kevin-wall"
+  },
+  {
+    "id": 5761,
+    "name": "Kienan Draper",
+    "slug": "kienan-draper"
+  },
+  {
+    "id": 5292,
+    "name": "Kirill Kirsanov",
+    "slug": "kirill-kirsanov"
+  },
+  {
+    "id": 5164,
+    "name": "Kirill Kudryavtsev",
+    "slug": "kirill-kudryavtsev"
+  },
+  {
+    "id": 5102,
+    "name": "Koehn Ziemmer",
+    "slug": "koehn-ziemmer"
+  },
+  {
+    "id": 4956,
+    "name": "Kole Lind",
+    "slug": "kole-lind"
+  },
+  {
+    "id": 5669,
+    "name": "Konnor Smith",
+    "slug": "konnor-smith"
+  },
+  {
+    "id": 579,
+    "name": "Konsta Helenius",
+    "slug": "konsta-helenius"
+  },
+  {
+    "id": 5475,
+    "name": "Kyle Burroughs",
+    "slug": "kyle-burroughs"
+  },
+  {
+    "id": 741,
+    "name": "Kyle Capobianco",
+    "slug": "kyle-capobianco"
+  },
+  {
+    "id": 4957,
+    "name": "Kyle Criscuolo",
+    "slug": "kyle-criscuolo"
+  },
+  {
+    "id": 5451,
+    "name": "Kyle Crnkovic",
+    "slug": "kyle-crnkovic"
+  },
+  {
+    "id": 5604,
+    "name": "Kyle Jackson",
+    "slug": "kyle-jackson"
+  },
+  {
+    "id": 5400,
+    "name": "Kyle Looft",
+    "slug": "kyle-looft"
+  },
+  {
+    "id": 5252,
+    "name": "Kyle Marino",
+    "slug": "kyle-marino"
+  },
+  {
+    "id": 5360,
+    "name": "Kyle Mcdonald",
+    "slug": "kyle-mcdonald"
+  },
+  {
+    "id": 5762,
+    "name": "Kyle Walker",
+    "slug": "kyle-walker"
+  },
+  {
+    "id": 5557,
+    "name": "Kyler Kupka",
+    "slug": "kyler-kupka"
+  },
+  {
+    "id": 10879,
+    "name": "Lachlan Getz",
+    "slug": "lachlan-getz"
+  },
+  {
+    "id": 5331,
+    "name": "Landen Hookey",
+    "slug": "landen-hookey"
+  },
+  {
+    "id": 5763,
+    "name": "Landon Mccallum",
+    "slug": "landon-mccallum"
+  },
+  {
+    "id": 5558,
+    "name": "Landon Sim",
+    "slug": "landon-sim"
+  },
+  {
+    "id": 668,
+    "name": "Landon Slaggert",
+    "slug": "landon-slaggert"
+  },
+  {
+    "id": 4865,
+    "name": "Lane Pederson",
+    "slug": "lane-pederson"
+  },
+  {
+    "id": 5084,
+    "name": "Lassi Thomson",
+    "slug": "lassi-thomson"
+  },
+  {
+    "id": 4815,
+    "name": "Laurent Dauphin",
+    "slug": "laurent-dauphin"
+  },
+  {
+    "id": 5085,
+    "name": "Lenni Hameenaho",
+    "slug": "lenni-hameenaho"
+  },
+  {
+    "id": 5452,
+    "name": "Leo Loof",
+    "slug": "leo-loof"
+  },
+  {
+    "id": 5426,
+    "name": "Leon Muggli",
+    "slug": "leon-muggli"
+  },
+  {
+    "id": 9911,
+    "name": "Liam Foudy",
+    "slug": "liam-foudy"
+  },
+  {
+    "id": 5453,
+    "name": "Liam Mclinskey",
+    "slug": "liam-mclinskey"
+  },
+  {
+    "id": 429,
+    "name": "Liam Ohgren",
+    "slug": "liam-ohgren"
+  },
+  {
+    "id": 5670,
+    "name": "Liam Valente",
+    "slug": "liam-valente"
+  },
+  {
+    "id": 5361,
+    "name": "Lleyton Moore",
+    "slug": "lleyton-moore"
+  },
+  {
+    "id": 4922,
+    "name": "Lleyton Roed",
+    "slug": "lleyton-roed"
+  },
+  {
+    "id": 5233,
+    "name": "Logan Brown",
+    "slug": "logan-brown"
+  },
+  {
+    "id": 339,
+    "name": "Logan Mailloux",
+    "slug": "logan-mailloux"
+  },
+  {
+    "id": 4816,
+    "name": "Logan Morrison",
+    "slug": "logan-morrison"
+  },
+  {
+    "id": 4834,
+    "name": "Logan Shaw",
+    "slug": "logan-shaw"
+  },
+  {
+    "id": 5764,
+    "name": "Loke Johansson",
+    "slug": "loke-johansson"
+  },
+  {
+    "id": 4975,
+    "name": "Louie Belpedio",
+    "slug": "louie-belpedio"
+  },
+  {
+    "id": 4891,
+    "name": "Luca Cagnoni",
+    "slug": "luca-cagnoni"
+  },
+  {
+    "id": 4813,
+    "name": "Luca Del Bel Belluz",
+    "slug": "luca-del-bel-belluz"
+  },
+  {
+    "id": 5234,
+    "name": "Luca Marrelli",
+    "slug": "luca-marrelli"
+  },
+  {
+    "id": 4880,
+    "name": "Luca Pinelli",
+    "slug": "luca-pinelli"
+  },
+  {
+    "id": 5062,
+    "name": "Lucas Carlsson",
+    "slug": "lucas-carlsson"
+  },
+  {
+    "id": 5380,
+    "name": "Lucas Ciona",
+    "slug": "lucas-ciona"
+  },
+  {
+    "id": 5218,
+    "name": "Lucas Condotta",
+    "slug": "lucas-condotta"
+  },
+  {
+    "id": 5477,
+    "name": "Lucas Johansen",
+    "slug": "lucas-johansen"
+  },
+  {
+    "id": 5041,
+    "name": "Lucas Mercuri",
+    "slug": "lucas-mercuri"
+  },
+  {
+    "id": 5765,
+    "name": "Lucas Pettersson",
+    "slug": "lucas-pettersson"
+  },
+  {
+    "id": 5427,
+    "name": "Lucas Vanroboys",
+    "slug": "lucas-vanroboys"
+  },
+  {
+    "id": 5559,
+    "name": "Lucas Wahlin",
+    "slug": "lucas-wahlin"
+  },
+  {
+    "id": 5332,
+    "name": "Ludvig Jansson",
+    "slug": "ludvig-jansson"
+  },
+  {
+    "id": 5671,
+    "name": "Ludwig Persson",
+    "slug": "ludwig-persson"
+  },
+  {
+    "id": 4869,
+    "name": "Lukas Cormier",
+    "slug": "lukas-cormier"
+  },
+  {
+    "id": 5333,
+    "name": "Lukas Dragicevic",
+    "slug": "lukas-dragicevic"
+  },
+  {
+    "id": 5672,
+    "name": "Lukas Gustafsson",
+    "slug": "lukas-gustafsson"
+  },
+  {
+    "id": 5182,
+    "name": "Lukas Reichel",
+    "slug": "lukas-reichel"
+  },
+  {
+    "id": 5766,
+    "name": "Lukas Sillinger",
+    "slug": "lukas-sillinger"
+  },
+  {
+    "id": 374,
+    "name": "Luke Haymes",
+    "slug": "luke-haymes"
+  },
+  {
+    "id": 5235,
+    "name": "Luke Krys",
+    "slug": "luke-krys"
+  },
+  {
+    "id": 5606,
+    "name": "Luke Kunin",
+    "slug": "luke-kunin"
+  },
+  {
+    "id": 5767,
+    "name": "Luke Mistelbacher",
+    "slug": "luke-mistelbacher"
+  },
+  {
+    "id": 5478,
+    "name": "Luke Mittelstadt",
+    "slug": "luke-mittelstadt"
+  },
+  {
+    "id": 5308,
+    "name": "Luke Prokop",
+    "slug": "luke-prokop"
+  },
+  {
+    "id": 10380,
+    "name": "Luke Rowe",
+    "slug": "luke-rowe"
+  },
+  {
+    "id": 5236,
+    "name": "Luke Toporowski",
+    "slug": "luke-toporowski"
+  },
+  {
+    "id": 5271,
+    "name": "Luke Tuch",
+    "slug": "luke-tuch"
+  },
+  {
+    "id": 10885,
+    "name": "Mack Oliphant",
+    "slug": "mack-oliphant"
+  },
+  {
+    "id": 5334,
+    "name": "Mackenzie Entwistle",
+    "slug": "mackenzie-entwistle"
+  },
+  {
+    "id": 5401,
+    "name": "Mackenzie Maceachern",
+    "slug": "mackenzie-maceachern"
+  },
+  {
+    "id": 5165,
+    "name": "Marc-andre Gaudet",
+    "slug": "marc-andre-gaudet"
+  },
+  {
+    "id": 5042,
+    "name": "Marc Del Gaizo",
+    "slug": "marc-del-gaizo"
+  },
+  {
+    "id": 449,
+    "name": "Marc Gatcomb",
+    "slug": "marc-gatcomb"
+  },
+  {
+    "id": 5063,
+    "name": "Marc Johnstone",
+    "slug": "marc-johnstone"
+  },
+  {
+    "id": 5272,
+    "name": "Marc Mclaughlin",
+    "slug": "marc-mclaughlin"
+  },
+  {
+    "id": 5673,
+    "name": "Marcel Marcel",
+    "slug": "marcel-marcel"
+  },
+  {
+    "id": 5309,
+    "name": "Marek Alscher",
+    "slug": "marek-alscher"
+  },
+  {
+    "id": 5402,
+    "name": "Mark Duarte",
+    "slug": "mark-duarte"
+  },
+  {
+    "id": 5516,
+    "name": "Mark Liwiski",
+    "slug": "mark-liwiski"
+  },
+  {
+    "id": 5293,
+    "name": "Mark Senden",
+    "slug": "mark-senden"
+  },
+  {
+    "id": 5335,
+    "name": "Maros Jedlicka",
+    "slug": "maros-jedlicka"
+  },
+  {
+    "id": 5479,
+    "name": "Marshall Rifai",
+    "slug": "marshall-rifai"
+  },
+  {
+    "id": 10032,
+    "name": "Marshall Warren",
+    "slug": "marshall-warren"
+  },
+  {
+    "id": 4814,
+    "name": "Martin Frk",
+    "slug": "martin-frk"
+  },
+  {
+    "id": 4826,
+    "name": "Martin Chromiak",
+    "slug": "martin-chromiak"
+  },
+  {
+    "id": 5253,
+    "name": "Martin Misiak",
+    "slug": "martin-misiak"
+  },
+  {
+    "id": 617,
+    "name": "Martin Pospisil",
+    "slug": "martin-pospisil"
+  },
+  {
+    "id": 5560,
+    "name": "Mason Geertsen",
+    "slug": "mason-geertsen"
+  },
+  {
+    "id": 10887,
+    "name": "Mason Mccormick",
+    "slug": "mason-mccormick"
+  },
+  {
+    "id": 5403,
+    "name": "Mason Millman",
+    "slug": "mason-millman"
+  },
+  {
+    "id": 4892,
+    "name": "Mason Shaw",
+    "slug": "mason-shaw"
+  },
+  {
+    "id": 5480,
+    "name": "Massimo Rizzo",
+    "slug": "massimo-rizzo"
+  },
+  {
+    "id": 4843,
+    "name": "Matej Blumel",
+    "slug": "matej-blumel"
+  },
+  {
+    "id": 5294,
+    "name": "Mathieu Cataford",
+    "slug": "mathieu-cataford"
+  },
+  {
+    "id": 10704,
+    "name": "Mathieu De St. Phalle",
+    "slug": "mathieu-de-st-phalle"
+  },
+  {
+    "id": 9,
+    "name": "Mathieu Joseph",
+    "slug": "mathieu-joseph"
+  },
+  {
+    "id": 5607,
+    "name": "Matt Basgall",
+    "slug": "matt-basgall"
+  },
+  {
+    "id": 5254,
+    "name": "Matt Benning",
+    "slug": "matt-benning"
+  },
+  {
+    "id": 5561,
+    "name": "Matt Copponi",
+    "slug": "matt-copponi"
+  },
+  {
+    "id": 5562,
+    "name": "Matt Dimarsico",
+    "slug": "matt-dimarsico"
+  },
+  {
+    "id": 10226,
+    "name": "Matt Dumba",
+    "slug": "matt-dumba"
+  },
+  {
+    "id": 69,
+    "name": "Matt Kiersted",
+    "slug": "matt-kiersted"
+  },
+  {
+    "id": 9874,
+    "name": "Matt Luff",
+    "slug": "matt-luff"
+  },
+  {
+    "id": 5141,
+    "name": "Matt Strome",
+    "slug": "matt-strome"
+  },
+  {
+    "id": 5381,
+    "name": "Matteo Costantini",
+    "slug": "matteo-costantini"
+  },
+  {
+    "id": 4984,
+    "name": "Matteo Pietroniro",
+    "slug": "matteo-pietroniro"
+  },
+  {
+    "id": 5769,
+    "name": "Matthew Andonovski",
+    "slug": "matthew-andonovski"
+  },
+  {
+    "id": 5064,
+    "name": "Matthew Barbolini",
+    "slug": "matthew-barbolini"
+  },
+  {
+    "id": 5675,
+    "name": "Matthew Brown",
+    "slug": "matthew-brown"
+  },
+  {
+    "id": 9951,
+    "name": "Matthew Highmore",
+    "slug": "matthew-highmore"
+  },
+  {
+    "id": 10024,
+    "name": "Matthew Maggio",
+    "slug": "matthew-maggio"
+  },
+  {
+    "id": 4856,
+    "name": "Matthew Peca",
+    "slug": "matthew-peca"
+  },
+  {
+    "id": 4844,
+    "name": "Matthew Phillips",
+    "slug": "matthew-phillips"
+  },
+  {
+    "id": 4893,
+    "name": "Matthew Poitras",
+    "slug": "matthew-poitras"
+  },
+  {
+    "id": 5676,
+    "name": "Matthew Savoie",
+    "slug": "matthew-savoie"
+  },
+  {
+    "id": 4845,
+    "name": "Matthew Seminoff",
+    "slug": "matthew-seminoff"
+  },
+  {
+    "id": 5770,
+    "name": "Matthew Sop",
+    "slug": "matthew-sop"
+  },
+  {
+    "id": 5563,
+    "name": "Matthew Stienburg",
+    "slug": "matthew-stienburg"
+  },
+  {
+    "id": 119,
+    "name": "Matthew Wood",
+    "slug": "matthew-wood"
+  },
+  {
+    "id": 5255,
+    "name": "Mattias Havelid",
+    "slug": "mattias-havelid"
+  },
+  {
+    "id": 610,
+    "name": "Matvei Gridin",
+    "slug": "matvei-gridin"
+  },
+  {
+    "id": 5311,
+    "name": "Matvey Petrov",
+    "slug": "matvey-petrov"
+  },
+  {
+    "id": 5065,
+    "name": "Matyas Melovsky",
+    "slug": "matyas-melovsky"
+  },
+  {
+    "id": 4958,
+    "name": "Matyas Sapovaliv",
+    "slug": "matyas-sapovaliv"
+  },
+  {
+    "id": 413,
+    "name": "Maveric Lamoureux",
+    "slug": "maveric-lamoureux"
+  },
+  {
+    "id": 5771,
+    "name": "Max Andreev",
+    "slug": "max-andreev"
+  },
+  {
+    "id": 10706,
+    "name": "Max Dorrington",
+    "slug": "max-dorrington"
+  },
+  {
+    "id": 10891,
+    "name": "Max Graham",
+    "slug": "max-graham"
+  },
+  {
+    "id": 5608,
+    "name": "Max Grondin",
+    "slug": "max-grondin"
+  },
+  {
+    "id": 8,
+    "name": "Max Jones",
+    "slug": "max-jones"
+  },
+  {
+    "id": 5404,
+    "name": "Max Mccue",
+    "slug": "max-mccue"
+  },
+  {
+    "id": 5677,
+    "name": "Max Psenicka",
+    "slug": "max-psenicka"
+  },
+  {
+    "id": 433,
+    "name": "Max Sasson",
+    "slug": "max-sasson"
+  },
+  {
+    "id": 5066,
+    "name": "Max Szuber",
+    "slug": "max-szuber"
+  },
+  {
+    "id": 5564,
+    "name": "Max Wanner",
+    "slug": "max-wanner"
+  },
+  {
+    "id": 5103,
+    "name": "Maxence Guenette",
+    "slug": "maxence-guenette"
+  },
+  {
+    "id": 5772,
+    "name": "Maxim Barbashev",
+    "slug": "maxim-barbashev"
+  },
+  {
+    "id": 5151,
+    "name": "Maxim Groshev",
+    "slug": "maxim-groshev"
+  },
+  {
+    "id": 5678,
+    "name": "Maxim Strbak",
+    "slug": "maxim-strbak"
+  },
+  {
+    "id": 12682,
+    "name": "Melvin Fernstrom",
+    "slug": "melvin-fernstrom"
+  },
+  {
+    "id": 4998,
+    "name": "Michael Benning",
+    "slug": "michael-benning"
+  },
+  {
+    "id": 4885,
+    "name": "Michael Brandsegg-nygard",
+    "slug": "michael-brandsegg-nygard"
+  },
+  {
+    "id": 5336,
+    "name": "Michael Buchinger",
+    "slug": "michael-buchinger"
+  },
+  {
+    "id": 5237,
+    "name": "Michael Callahan",
+    "slug": "michael-callahan"
+  },
+  {
+    "id": 5030,
+    "name": "Michael Karow",
+    "slug": "michael-karow"
+  },
+  {
+    "id": 5610,
+    "name": "Michael Koster",
+    "slug": "michael-koster"
+  },
+  {
+    "id": 5454,
+    "name": "Michael Milne",
+    "slug": "michael-milne"
+  },
+  {
+    "id": 286,
+    "name": "Michael Misa",
+    "slug": "michael-misa"
+  },
+  {
+    "id": 5337,
+    "name": "Michael Pezzetta",
+    "slug": "michael-pezzetta"
+  },
+  {
+    "id": 5219,
+    "name": "Michal Kunc",
+    "slug": "michal-kunc"
+  },
+  {
+    "id": 5405,
+    "name": "Mikael Diotte",
+    "slug": "mikael-diotte"
+  },
+  {
+    "id": 4857,
+    "name": "Mikael Pyyhtia",
+    "slug": "mikael-pyyhtia"
+  },
+  {
+    "id": 5152,
+    "name": "Mike Hardman",
+    "slug": "mike-hardman"
+  },
+  {
+    "id": 10710,
+    "name": "Mikhail Ilyin",
+    "slug": "mikhail-ilyin"
+  },
+  {
+    "id": 5338,
+    "name": "Miko Matikka",
+    "slug": "miko-matikka"
+  },
+  {
+    "id": 5205,
+    "name": "Mikulas Hovorka",
+    "slug": "mikulas-hovorka"
+  },
+  {
+    "id": 5680,
+    "name": "Milan Lucic",
+    "slug": "milan-lucic"
+  },
+  {
+    "id": 5565,
+    "name": "Milo Roelens",
+    "slug": "milo-roelens"
+  },
+  {
+    "id": 5681,
+    "name": "Miroslav Holinka",
+    "slug": "miroslav-holinka"
+  },
+  {
+    "id": 4923,
+    "name": "Mitch Mclain",
+    "slug": "mitch-mclain"
+  },
+  {
+    "id": 4822,
+    "name": "Mitchell Chaffee",
+    "slug": "mitchell-chaffee"
+  },
+  {
+    "id": 5043,
+    "name": "Mitchell Stephens",
+    "slug": "mitchell-stephens"
+  },
+  {
+    "id": 5362,
+    "name": "Mitchell Vande Sompel",
+    "slug": "mitchell-vande-sompel"
+  },
+  {
+    "id": 5363,
+    "name": "Montana Onyebuchi",
+    "slug": "montana-onyebuchi"
+  },
+  {
+    "id": 5339,
+    "name": "Nate Clurman",
+    "slug": "nate-clurman"
+  },
+  {
+    "id": 5256,
+    "name": "Nate Danielson",
+    "slug": "nate-danielson"
+  },
+  {
+    "id": 5007,
+    "name": "Nate Smith",
+    "slug": "nate-smith"
+  },
+  {
+    "id": 5566,
+    "name": "Nathan Bastian",
+    "slug": "nathan-bastian"
+  },
+  {
+    "id": 5773,
+    "name": "Nathan Brown",
+    "slug": "nathan-brown"
+  },
+  {
+    "id": 522,
+    "name": "Nathan Gaucher",
+    "slug": "nathan-gaucher"
+  },
+  {
+    "id": 5166,
+    "name": "Nathan Legare",
+    "slug": "nathan-legare"
+  },
+  {
+    "id": 5611,
+    "name": "Navrin Mutter",
+    "slug": "navrin-mutter"
+  },
+  {
+    "id": 5682,
+    "name": "Neil Shea",
+    "slug": "neil-shea"
+  },
+  {
+    "id": 4846,
+    "name": "Nick Abruzzese",
+    "slug": "nick-abruzzese"
+  },
+  {
+    "id": 10894,
+    "name": "Nick Andrews",
+    "slug": "nick-andrews"
+  },
+  {
+    "id": 5086,
+    "name": "Nick Cicek",
+    "slug": "nick-cicek"
+  },
+  {
+    "id": 664,
+    "name": "Nick Lardis",
+    "slug": "nick-lardis"
+  },
+  {
+    "id": 10789,
+    "name": "Nick Leddy",
+    "slug": "nick-leddy"
+  },
+  {
+    "id": 5340,
+    "name": "Nick Poisson",
+    "slug": "nick-poisson"
+  },
+  {
+    "id": 5612,
+    "name": "Nicky Leivermann",
+    "slug": "nicky-leivermann"
+  },
+  {
+    "id": 530,
+    "name": "Nico Myatovic",
+    "slug": "nico-myatovic"
+  },
+  {
+    "id": 4924,
+    "name": "Nicolas Aube-kubel",
+    "slug": "nicolas-aube-kubel"
+  },
+  {
+    "id": 4830,
+    "name": "Nikita Alexandrov",
+    "slug": "nikita-alexandrov"
+  },
+  {
+    "id": 500,
+    "name": "Nikita Chibrikov",
+    "slug": "nikita-chibrikov"
+  },
+  {
+    "id": 5257,
+    "name": "Nikita Nesterenko",
+    "slug": "nikita-nesterenko"
+  },
+  {
+    "id": 5184,
+    "name": "Nikita Novikov",
+    "slug": "nikita-novikov"
+  },
+  {
+    "id": 5031,
+    "name": "Nikita Pavlychev",
+    "slug": "nikita-pavlychev"
+  },
+  {
+    "id": 5312,
+    "name": "Nikita Prishchepov",
+    "slug": "nikita-prishchepov"
+  },
+  {
+    "id": 5428,
+    "name": "Nikita Susuyev",
+    "slug": "nikita-susuyev"
+  },
+  {
+    "id": 5567,
+    "name": "Niko Huuhtanen",
+    "slug": "niko-huuhtanen"
+  },
+  {
+    "id": 5429,
+    "name": "Nikolai Knyzhov",
+    "slug": "nikolai-knyzhov"
+  },
+  {
+    "id": 5104,
+    "name": "Nikolas Brouillard",
+    "slug": "nikolas-brouillard"
+  },
+  {
+    "id": 4904,
+    "name": "Nils Aman",
+    "slug": "nils-aman"
+  },
+  {
+    "id": 5613,
+    "name": "Noah Beck",
+    "slug": "noah-beck"
+  },
+  {
+    "id": 5221,
+    "name": "Noah Gregor",
+    "slug": "noah-gregor"
+  },
+  {
+    "id": 5122,
+    "name": "Noah Chadwick",
+    "slug": "noah-chadwick"
+  },
+  {
+    "id": 5382,
+    "name": "Noah Laaouan",
+    "slug": "noah-laaouan"
+  },
+  {
+    "id": 586,
+    "name": "Noah Ostlund",
+    "slug": "noah-ostlund"
+  },
+  {
+    "id": 5222,
+    "name": "Noah Philp",
+    "slug": "noah-philp"
+  },
+  {
+    "id": 5518,
+    "name": "Noah Powell",
+    "slug": "noah-powell"
+  },
+  {
+    "id": 5683,
+    "name": "Noah Steen",
+    "slug": "noah-steen"
+  },
+  {
+    "id": 545,
+    "name": "Noah Warren",
+    "slug": "noah-warren"
+  },
+  {
+    "id": 4977,
+    "name": "Noel Gunler",
+    "slug": "noel-gunler"
+  },
+  {
+    "id": 5153,
+    "name": "Noel Nordh",
+    "slug": "noel-nordh"
+  },
+  {
+    "id": 5154,
+    "name": "Nolan Allan",
+    "slug": "nolan-allan"
+  },
+  {
+    "id": 4999,
+    "name": "Nolan Foote",
+    "slug": "nolan-foote"
+  },
+  {
+    "id": 5614,
+    "name": "Nolan Moyle",
+    "slug": "nolan-moyle"
+  },
+  {
+    "id": 10538,
+    "name": "Nolan Renwick",
+    "slug": "nolan-renwick"
+  },
+  {
+    "id": 5000,
+    "name": "Oasiz Wiesblatt",
+    "slug": "oasiz-wiesblatt"
+  },
+  {
+    "id": 5568,
+    "name": "OLE JULIAN BJøRGVIK-HOLM",
+    "slug": "ole-julian-bj-rgvik-holm"
+  },
+  {
+    "id": 244,
+    "name": "Oliver Bonk",
+    "slug": "oliver-bonk"
+  },
+  {
+    "id": 666,
+    "name": "Oliver Moore",
+    "slug": "oliver-moore"
+  },
+  {
+    "id": 4894,
+    "name": "Oliver Wahlstrom",
+    "slug": "oliver-wahlstrom"
+  },
+  {
+    "id": 5105,
+    "name": "Olivier Nadeau",
+    "slug": "olivier-nadeau"
+  },
+  {
+    "id": 5008,
+    "name": "Olle Lycksell",
+    "slug": "olle-lycksell"
+  },
+  {
+    "id": 5032,
+    "name": "Ondrej Becher",
+    "slug": "ondrej-becher"
+  },
+  {
+    "id": 5258,
+    "name": "Oscar Eklind",
+    "slug": "oscar-eklind"
+  },
+  {
+    "id": 4968,
+    "name": "OSCAR FISKER MøLGAARD",
+    "slug": "oscar-fisker-m-lgaard"
+  },
+  {
+    "id": 5021,
+    "name": "Oskar Olausson",
+    "slug": "oskar-olausson"
+  },
+  {
+    "id": 212,
+    "name": "Oskar Pettersson",
+    "slug": "oskar-pettersson"
+  },
+  {
+    "id": 5481,
+    "name": "Otto Salin",
+    "slug": "otto-salin"
+  },
+  {
+    "id": 5238,
+    "name": "Otto Stenberg",
+    "slug": "otto-stenberg"
+  },
+  {
+    "id": 5186,
+    "name": "Owen Allard",
+    "slug": "owen-allard"
+  },
+  {
+    "id": 80,
+    "name": "Owen Beck",
+    "slug": "owen-beck"
+  },
+  {
+    "id": 5774,
+    "name": "Owen Lindmark",
+    "slug": "owen-lindmark"
+  },
+  {
+    "id": 10085,
+    "name": "Owen Pickering",
+    "slug": "owen-pickering"
+  },
+  {
+    "id": 4960,
+    "name": "Owen Sillinger",
+    "slug": "owen-sillinger"
+  },
+  {
+    "id": 5455,
+    "name": "Parker Bell",
+    "slug": "parker-bell"
+  },
+  {
+    "id": 5067,
+    "name": "Parker Ford",
+    "slug": "parker-ford"
+  },
+  {
+    "id": 4827,
+    "name": "Patrick Brown",
+    "slug": "patrick-brown"
+  },
+  {
+    "id": 5106,
+    "name": "Patrick Giles",
+    "slug": "patrick-giles"
+  },
+  {
+    "id": 5569,
+    "name": "Patrick Thomas",
+    "slug": "patrick-thomas"
+  },
+  {
+    "id": 5615,
+    "name": "Paul Ludwinski",
+    "slug": "paul-ludwinski"
+  },
+  {
+    "id": 5313,
+    "name": "Pavol Regenda",
+    "slug": "pavol-regenda"
+  },
+  {
+    "id": 5684,
+    "name": "Peter Tischke",
+    "slug": "peter-tischke"
+  },
+  {
+    "id": 10440,
+    "name": "Phil Kemp",
+    "slug": "phil-kemp"
+  },
+  {
+    "id": 4910,
+    "name": "Phil Tomasino",
+    "slug": "phil-tomasino"
+  },
+  {
+    "id": 4851,
+    "name": "Philippe Daoust",
+    "slug": "philippe-daoust"
+  },
+  {
+    "id": 4969,
+    "name": "Phillip Di Giuseppe",
+    "slug": "phillip-di-giuseppe"
+  },
+  {
+    "id": 5570,
+    "name": "Phip Waugh",
+    "slug": "phip-waugh"
+  },
+  {
+    "id": 10341,
+    "name": "Pierrick Dube",
+    "slug": "pierrick-dube"
+  },
+  {
+    "id": 4886,
+    "name": "Quentin Musty",
+    "slug": "quentin-musty"
+  },
+  {
+    "id": 10896,
+    "name": "Quinn Beauchesne",
+    "slug": "quinn-beauchesne"
+  },
+  {
+    "id": 4804,
+    "name": "Quinn Hutson",
+    "slug": "quinn-hutson"
+  },
+  {
+    "id": 5482,
+    "name": "Quinton Burns",
+    "slug": "quinton-burns"
+  },
+  {
+    "id": 597,
+    "name": "Radim Mrtka",
+    "slug": "radim-mrtka"
+  },
+  {
+    "id": 9953,
+    "name": "Rafael Harvey-pinard",
+    "slug": "rafael-harvey-pinard"
+  },
+  {
+    "id": 10540,
+    "name": "Raivis Ansons",
+    "slug": "raivis-ansons"
+  },
+  {
+    "id": 455,
+    "name": "Raphael Lavoie",
+    "slug": "raphael-lavoie"
+  },
+  {
+    "id": 5483,
+    "name": "Rasmus Kumpulainen",
+    "slug": "rasmus-kumpulainen"
+  },
+  {
+    "id": 5456,
+    "name": "Red Savage",
+    "slug": "red-savage"
+  },
+  {
+    "id": 5519,
+    "name": "Reece Newkirk",
+    "slug": "reece-newkirk"
+  },
+  {
+    "id": 5686,
+    "name": "Reece Vitelli",
+    "slug": "reece-vitelli"
+  },
+  {
+    "id": 5259,
+    "name": "Reese Johnson",
+    "slug": "reese-johnson"
+  },
+  {
+    "id": 5033,
+    "name": "Reid Schaefer",
+    "slug": "reid-schaefer"
+  },
+  {
+    "id": 5616,
+    "name": "Reilly Connors",
+    "slug": "reilly-connors"
+  },
+  {
+    "id": 5571,
+    "name": "Reilly Webb",
+    "slug": "reilly-webb"
+  },
+  {
+    "id": 4852,
+    "name": "Rem Pitlick",
+    "slug": "rem-pitlick"
+  },
+  {
+    "id": 5687,
+    "name": "Rhett Parsons",
+    "slug": "rhett-parsons"
+  },
+  {
+    "id": 5123,
+    "name": "Rhett Pitlick",
+    "slug": "rhett-pitlick"
+  },
+  {
+    "id": 5775,
+    "name": "Rieger Lorenz",
+    "slug": "rieger-lorenz"
+  },
+  {
+    "id": 5155,
+    "name": "Riese Gaber",
+    "slug": "riese-gaber"
+  },
+  {
+    "id": 5430,
+    "name": "Riley Bezeau",
+    "slug": "riley-bezeau"
+  },
+  {
+    "id": 5187,
+    "name": "Riley Duran",
+    "slug": "riley-duran"
+  },
+  {
+    "id": 578,
+    "name": "Riley Fiddler-schultz",
+    "slug": "riley-fiddler-schultz"
+  },
+  {
+    "id": 5087,
+    "name": "Riley Heidt",
+    "slug": "riley-heidt"
+  },
+  {
+    "id": 5572,
+    "name": "Riley Kidney",
+    "slug": "riley-kidney"
+  },
+  {
+    "id": 5776,
+    "name": "Riley Mccourt",
+    "slug": "riley-mccourt"
+  },
+  {
+    "id": 5573,
+    "name": "Riley Mckay",
+    "slug": "riley-mckay"
+  },
+  {
+    "id": 5617,
+    "name": "Riley Patterson",
+    "slug": "riley-patterson"
+  },
+  {
+    "id": 5223,
+    "name": "Riley Stillman",
+    "slug": "riley-stillman"
+  },
+  {
+    "id": 5520,
+    "name": "Riley Thompson",
+    "slug": "riley-thompson"
+  },
+  {
+    "id": 4828,
+    "name": "Riley Tufte",
+    "slug": "riley-tufte"
+  },
+  {
+    "id": 5224,
+    "name": "Robbie Russo",
+    "slug": "robbie-russo"
+  },
+  {
+    "id": 5688,
+    "name": "Robby Drazner",
+    "slug": "robby-drazner"
+  },
+  {
+    "id": 5618,
+    "name": "Robby Fabbri",
+    "slug": "robby-fabbri"
+  },
+  {
+    "id": 4986,
+    "name": "Robert Mastrosimone",
+    "slug": "robert-mastrosimone"
+  },
+  {
+    "id": 4870,
+    "name": "Roby Jarventie",
+    "slug": "roby-jarventie"
+  },
+  {
+    "id": 5574,
+    "name": "Roger Mcqueen",
+    "slug": "roger-mcqueen"
+  },
+  {
+    "id": 5068,
+    "name": "Roland Mckeown",
+    "slug": "roland-mckeown"
+  },
+  {
+    "id": 5777,
+    "name": "Romain Rodzinski",
+    "slug": "romain-rodzinski"
+  },
+  {
+    "id": 5088,
+    "name": "Roman Ahcan",
+    "slug": "roman-ahcan"
+  },
+  {
+    "id": 5778,
+    "name": "Roman Kinal",
+    "slug": "roman-kinal"
+  },
+  {
+    "id": 5575,
+    "name": "Roman Schmidt",
+    "slug": "roman-schmidt"
+  },
+  {
+    "id": 5142,
+    "name": "Ronan Seeley",
+    "slug": "ronan-seeley"
+  },
+  {
+    "id": 5225,
+    "name": "Ronnie Attard",
+    "slug": "ronnie-attard"
+  },
+  {
+    "id": 615,
+    "name": "Rory Kerins",
+    "slug": "rory-kerins"
+  },
+  {
+    "id": 10016,
+    "name": "Rutger Mcgroarty",
+    "slug": "rutger-mcgroarty"
+  },
+  {
+    "id": 5779,
+    "name": "Ryan Bottrill",
+    "slug": "ryan-bottrill"
+  },
+  {
+    "id": 4858,
+    "name": "Ryan Carpenter",
+    "slug": "ryan-carpenter"
+  },
+  {
+    "id": 5431,
+    "name": "Ryan Gagnier",
+    "slug": "ryan-gagnier"
+  },
+  {
+    "id": 273,
+    "name": "Ryan Graves",
+    "slug": "ryan-graves"
+  },
+  {
+    "id": 5690,
+    "name": "Ryan Hofer",
+    "slug": "ryan-hofer"
+  },
+  {
+    "id": 5239,
+    "name": "Ryan Chesley",
+    "slug": "ryan-chesley"
+  },
+  {
+    "id": 5689,
+    "name": "Ryan Chyzowski",
+    "slug": "ryan-chyzowski"
+  },
+  {
+    "id": 594,
+    "name": "Ryan Johnson",
+    "slug": "ryan-johnson"
+  },
+  {
+    "id": 5576,
+    "name": "Ryan Kirwan",
+    "slug": "ryan-kirwan"
+  },
+  {
+    "id": 5273,
+    "name": "Ryan Mast",
+    "slug": "ryan-mast"
+  },
+  {
+    "id": 10513,
+    "name": "Ryan Mcallister",
+    "slug": "ryan-mcallister"
+  },
+  {
+    "id": 5780,
+    "name": "Ryan Mccleary",
+    "slug": "ryan-mccleary"
+  },
+  {
+    "id": 5314,
+    "name": "Ryan Mcgregor",
+    "slug": "ryan-mcgregor"
+  },
+  {
+    "id": 5781,
+    "name": "Ryan Mcguire",
+    "slug": "ryan-mcguire"
+  },
+  {
+    "id": 10904,
+    "name": "Ryan Miller",
+    "slug": "ryan-miller"
+  },
+  {
+    "id": 5577,
+    "name": "Ryan O'rourke",
+    "slug": "ryan-o-rourke"
+  },
+  {
+    "id": 5383,
+    "name": "Ryan Sandelin",
+    "slug": "ryan-sandelin"
+  },
+  {
+    "id": 5034,
+    "name": "Ryan Schmelzer",
+    "slug": "ryan-schmelzer"
+  },
+  {
+    "id": 4866,
+    "name": "Ryan Suzuki",
+    "slug": "ryan-suzuki"
+  },
+  {
+    "id": 5782,
+    "name": "Ryan Tattle",
+    "slug": "ryan-tattle"
+  },
+  {
+    "id": 4947,
+    "name": "Ryan Tverberg",
+    "slug": "ryan-tverberg"
+  },
+  {
+    "id": 4871,
+    "name": "Ryan Ufko",
+    "slug": "ryan-ufko"
+  },
+  {
+    "id": 5274,
+    "name": "Ryder Rolston",
+    "slug": "ryder-rolston"
+  },
+  {
+    "id": 5619,
+    "name": "Ryland Mosley",
+    "slug": "ryland-mosley"
+  },
+  {
+    "id": 5691,
+    "name": "Saige Weinstein",
+    "slug": "saige-weinstein"
+  },
+  {
+    "id": 5432,
+    "name": "Sam Bitten",
+    "slug": "sam-bitten"
+  },
+  {
+    "id": 4970,
+    "name": "Sam Colangelo",
+    "slug": "sam-colangelo"
+  },
+  {
+    "id": 5406,
+    "name": "Sam Lipkin",
+    "slug": "sam-lipkin"
+  },
+  {
+    "id": 4932,
+    "name": "Sam Morton",
+    "slug": "sam-morton"
+  },
+  {
+    "id": 4859,
+    "name": "Sam Poulin",
+    "slug": "sam-poulin"
+  },
+  {
+    "id": 678,
+    "name": "Sam Rinzel",
+    "slug": "sam-rinzel"
+  },
+  {
+    "id": 5783,
+    "name": "Sam Sedley",
+    "slug": "sam-sedley"
+  },
+  {
+    "id": 5521,
+    "name": "Sam Stange",
+    "slug": "sam-stange"
+  },
+  {
+    "id": 5784,
+    "name": "Sam Stevens",
+    "slug": "sam-stevens"
+  },
+  {
+    "id": 5022,
+    "name": "Sammy Walker",
+    "slug": "sammy-walker"
+  },
+  {
+    "id": 5366,
+    "name": "Samu Tuomaala",
+    "slug": "samu-tuomaala"
+  },
+  {
+    "id": 4926,
+    "name": "Samuel Blais",
+    "slug": "samuel-blais"
+  },
+  {
+    "id": 5001,
+    "name": "Samuel Bolduc",
+    "slug": "samuel-bolduc"
+  },
+  {
+    "id": 4961,
+    "name": "Samuel Fagemo",
+    "slug": "samuel-fagemo"
+  },
+  {
+    "id": 5342,
+    "name": "Samuel Johannesson",
+    "slug": "samuel-johannesson"
+  },
+  {
+    "id": 5692,
+    "name": "Samuel Laberge",
+    "slug": "samuel-laberge"
+  },
+  {
+    "id": 5785,
+    "name": "Samuel Mayer",
+    "slug": "samuel-mayer"
+  },
+  {
+    "id": 5069,
+    "name": "Samuel Savoie",
+    "slug": "samuel-savoie"
+  },
+  {
+    "id": 4933,
+    "name": "Sandis Vilmanis",
+    "slug": "sandis-vilmanis"
+  },
+  {
+    "id": 4829,
+    "name": "Sasha Pastujov",
+    "slug": "sasha-pastujov"
+  },
+  {
+    "id": 5693,
+    "name": "Sawyer Boulton",
+    "slug": "sawyer-boulton"
+  },
+  {
+    "id": 5156,
+    "name": "Sawyer Mynio",
+    "slug": "sawyer-mynio"
+  },
+  {
+    "id": 10720,
+    "name": "Scooter Brickey",
+    "slug": "scooter-brickey"
+  },
+  {
+    "id": 5189,
+    "name": "Scott Harrington",
+    "slug": "scott-harrington"
+  },
+  {
+    "id": 5167,
+    "name": "Scott Morrow",
+    "slug": "scott-morrow"
+  },
+  {
+    "id": 46,
+    "name": "Scott Perunovich",
+    "slug": "scott-perunovich"
+  },
+  {
+    "id": 10909,
+    "name": "Scott Reedy",
+    "slug": "scott-reedy"
+  },
+  {
+    "id": 357,
+    "name": "Scott Sabourin",
+    "slug": "scott-sabourin"
+  },
+  {
+    "id": 5208,
+    "name": "Seamus Casey",
+    "slug": "seamus-casey"
+  },
+  {
+    "id": 5124,
+    "name": "Sean Behrens",
+    "slug": "sean-behrens"
+  },
+  {
+    "id": 10289,
+    "name": "Sean Day",
+    "slug": "sean-day"
+  },
+  {
+    "id": 4839,
+    "name": "Sean Farrell",
+    "slug": "sean-farrell"
+  },
+  {
+    "id": 5457,
+    "name": "Sean Chisholm",
+    "slug": "sean-chisholm"
+  },
+  {
+    "id": 10910,
+    "name": "Sean Larochelle",
+    "slug": "sean-larochelle"
+  },
+  {
+    "id": 635,
+    "name": "Sebastian Aho",
+    "slug": "sebastian-aho"
+  },
+  {
+    "id": 4802,
+    "name": "Seth Griffith",
+    "slug": "seth-griffith"
+  },
+  {
+    "id": 5276,
+    "name": "Shai Buium",
+    "slug": "shai-buium"
+  },
+  {
+    "id": 5484,
+    "name": "Shane Bowers",
+    "slug": "shane-bowers"
+  },
+  {
+    "id": 5125,
+    "name": "Shane Lachance",
+    "slug": "shane-lachance"
+  },
+  {
+    "id": 5458,
+    "name": "Shawn Element",
+    "slug": "shawn-element"
+  },
+  {
+    "id": 4881,
+    "name": "Sheldon Dries",
+    "slug": "sheldon-dries"
+  },
+  {
+    "id": 5620,
+    "name": "Sheldon Rempal",
+    "slug": "sheldon-rempal"
+  },
+  {
+    "id": 5343,
+    "name": "Simon Lundmark",
+    "slug": "simon-lundmark"
+  },
+  {
+    "id": 5621,
+    "name": "Simon Mack",
+    "slug": "simon-mack"
+  },
+  {
+    "id": 5694,
+    "name": "Simon Pinard",
+    "slug": "simon-pinard"
+  },
+  {
+    "id": 5433,
+    "name": "Simon Robertsson",
+    "slug": "simon-robertsson"
+  },
+  {
+    "id": 4979,
+    "name": "Skyler Brind'amour",
+    "slug": "skyler-brind-amour"
+  },
+  {
+    "id": 5485,
+    "name": "Sloan Stanick",
+    "slug": "sloan-stanick"
+  },
+  {
+    "id": 5295,
+    "name": "Sonny Milano",
+    "slug": "sonny-milano"
+  },
+  {
+    "id": 5459,
+    "name": "Spencer Kersten",
+    "slug": "spencer-kersten"
+  },
+  {
+    "id": 5315,
+    "name": "Spencer Smallman",
+    "slug": "spencer-smallman"
+  },
+  {
+    "id": 5434,
+    "name": "Stanislav Svozil",
+    "slug": "stanislav-svozil"
+  },
+  {
+    "id": 209,
+    "name": "Stephen Halliday",
+    "slug": "stephen-halliday"
+  },
+  {
+    "id": 5460,
+    "name": "Steven Santini",
+    "slug": "steven-santini"
+  },
+  {
+    "id": 5786,
+    "name": "Stevie Leskovar",
+    "slug": "stevie-leskovar"
+  },
+  {
+    "id": 5126,
+    "name": "Stian Solberg",
+    "slug": "stian-solberg"
+  },
+  {
+    "id": 5787,
+    "name": "Sullivan Mack",
+    "slug": "sullivan-mack"
+  },
+  {
+    "id": 5622,
+    "name": "T.j. Hughes",
+    "slug": "t-j-hughes"
+  },
+  {
+    "id": 4853,
+    "name": "T.j. Tynan",
+    "slug": "t-j-tynan"
+  },
+  {
+    "id": 5788,
+    "name": "Tag Bertuzzi",
+    "slug": "tag-bertuzzi"
+  },
+  {
+    "id": 5384,
+    "name": "Taige Harding",
+    "slug": "taige-harding"
+  },
+  {
+    "id": 10306,
+    "name": "Tanner Howe",
+    "slug": "tanner-howe"
+  },
+  {
+    "id": 454,
+    "name": "Tanner Laczynski",
+    "slug": "tanner-laczynski"
+  },
+  {
+    "id": 5127,
+    "name": "Tanner Molendyk",
+    "slug": "tanner-molendyk"
+  },
+  {
+    "id": 5789,
+    "name": "Tarun Fizer",
+    "slug": "tarun-fizer"
+  },
+  {
+    "id": 5344,
+    "name": "Tate Singleton",
+    "slug": "tate-singleton"
+  },
+  {
+    "id": 5107,
+    "name": "Taylor Makar",
+    "slug": "taylor-makar"
+  },
+  {
+    "id": 37,
+    "name": "Taylor Ward",
+    "slug": "taylor-ward"
+  },
+  {
+    "id": 5790,
+    "name": "Terrell Goldsmith",
+    "slug": "terrell-goldsmith"
+  },
+  {
+    "id": 5277,
+    "name": "Theo Lindstein",
+    "slug": "theo-lindstein"
+  },
+  {
+    "id": 5158,
+    "name": "Thomas Bordeleau",
+    "slug": "thomas-bordeleau"
+  },
+  {
+    "id": 5791,
+    "name": "Thomas Messineo",
+    "slug": "thomas-messineo"
+  },
+  {
+    "id": 5522,
+    "name": "Tim Rego",
+    "slug": "tim-rego"
+  },
+  {
+    "id": 536,
+    "name": "Tim Washe",
+    "slug": "tim-washe"
+  },
+  {
+    "id": 5316,
+    "name": "Tobias Bjornfot",
+    "slug": "tobias-bjornfot"
+  },
+  {
+    "id": 5345,
+    "name": "Tobie Bisson",
+    "slug": "tobie-bisson"
+  },
+  {
+    "id": 440,
+    "name": "Tom Willander",
+    "slug": "tom-willander"
+  },
+  {
+    "id": 5461,
+    "name": "Tomas Hamara",
+    "slug": "tomas-hamara"
+  },
+  {
+    "id": 5462,
+    "name": "Tommy Bergsland",
+    "slug": "tommy-bergsland"
+  },
+  {
+    "id": 10917,
+    "name": "Tommy Budnick",
+    "slug": "tommy-budnick"
+  },
+  {
+    "id": 5624,
+    "name": "Tommy Lafreniere",
+    "slug": "tommy-lafreniere"
+  },
+  {
+    "id": 5367,
+    "name": "Tommy Miller",
+    "slug": "tommy-miller"
+  },
+  {
+    "id": 5045,
+    "name": "Topias Vilen",
+    "slug": "topias-vilen"
+  },
+  {
+    "id": 5024,
+    "name": "Travis Boyd",
+    "slug": "travis-boyd"
+  },
+  {
+    "id": 5578,
+    "name": "Travis Dermott",
+    "slug": "travis-dermott"
+  },
+  {
+    "id": 5695,
+    "name": "Travis Howe",
+    "slug": "travis-howe"
+  },
+  {
+    "id": 542,
+    "name": "Travis Mitchell",
+    "slug": "travis-mitchell"
+  },
+  {
+    "id": 5089,
+    "name": "Trevor Carrick",
+    "slug": "trevor-carrick"
+  },
+  {
+    "id": 446,
+    "name": "Trevor Connelly",
+    "slug": "trevor-connelly"
+  },
+  {
+    "id": 4948,
+    "name": "Trevor Kuntar",
+    "slug": "trevor-kuntar"
+  },
+  {
+    "id": 4831,
+    "name": "Trey Fix-wolansky",
+    "slug": "trey-fix-wolansky"
+  },
+  {
+    "id": 5070,
+    "name": "Trey Taylor",
+    "slug": "trey-taylor"
+  },
+  {
+    "id": 5108,
+    "name": "Tristan Allard",
+    "slug": "tristan-allard"
+  },
+  {
+    "id": 5109,
+    "name": "Tristan Bertucci",
+    "slug": "tristan-bertucci"
+  },
+  {
+    "id": 9926,
+    "name": "Tristan Broz",
+    "slug": "tristan-broz"
+  },
+  {
+    "id": 4905,
+    "name": "Tristan Luneau",
+    "slug": "tristan-luneau"
+  },
+  {
+    "id": 5792,
+    "name": "Tristan Sarsland",
+    "slug": "tristan-sarsland"
+  },
+  {
+    "id": 4867,
+    "name": "Tristen Nielsen",
+    "slug": "tristen-nielsen"
+  },
+  {
+    "id": 5793,
+    "name": "Troy Murray",
+    "slug": "troy-murray"
+  },
+  {
+    "id": 5046,
+    "name": "Tucker Robertson",
+    "slug": "tucker-robertson"
+  },
+  {
+    "id": 5168,
+    "name": "Tuomas Uronen",
+    "slug": "tuomas-uronen"
+  },
+  {
+    "id": 5296,
+    "name": "Turner Ottenbreit",
+    "slug": "turner-ottenbreit"
+  },
+  {
+    "id": 5169,
+    "name": "Ty Gallagher",
+    "slug": "ty-gallagher"
+  },
+  {
+    "id": 4934,
+    "name": "Ty Mueller",
+    "slug": "ty-mueller"
+  },
+  {
+    "id": 5463,
+    "name": "Ty Murchison",
+    "slug": "ty-murchison"
+  },
+  {
+    "id": 4962,
+    "name": "Ty Nelson",
+    "slug": "ty-nelson"
+  },
+  {
+    "id": 5128,
+    "name": "Ty Tullio",
+    "slug": "ty-tullio"
+  },
+  {
+    "id": 4987,
+    "name": "Tye Felhaber",
+    "slug": "tye-felhaber"
+  },
+  {
+    "id": 5047,
+    "name": "Tyler Angle",
+    "slug": "tyler-angle"
+  },
+  {
+    "id": 201,
+    "name": "Tyler Boucher",
+    "slug": "tyler-boucher"
+  },
+  {
+    "id": 5625,
+    "name": "Tyler Inamoto",
+    "slug": "tyler-inamoto"
+  },
+  {
+    "id": 5486,
+    "name": "Tyler Kopff",
+    "slug": "tyler-kopff"
+  },
+  {
+    "id": 5696,
+    "name": "Tyler Motte",
+    "slug": "tyler-motte"
+  },
+  {
+    "id": 5260,
+    "name": "Tyler Pitlick",
+    "slug": "tyler-pitlick"
+  },
+  {
+    "id": 5240,
+    "name": "Tyler Thorpe",
+    "slug": "tyler-thorpe"
+  },
+  {
+    "id": 5794,
+    "name": "Tyler Weiss",
+    "slug": "tyler-weiss"
+  },
+  {
+    "id": 5487,
+    "name": "Tyrel Bauer",
+    "slug": "tyrel-bauer"
+  },
+  {
+    "id": 5579,
+    "name": "Tyson Empey",
+    "slug": "tyson-empey"
+  },
+  {
+    "id": 5697,
+    "name": "Tyson Feist",
+    "slug": "tyson-feist"
+  },
+  {
+    "id": 538,
+    "name": "Tyson Hinds",
+    "slug": "tyson-hinds"
+  },
+  {
+    "id": 4874,
+    "name": "Tyson Jugnauth",
+    "slug": "tyson-jugnauth"
+  },
+  {
+    "id": 5795,
+    "name": "Valtteri Piironen",
+    "slug": "valtteri-piironen"
+  },
+  {
+    "id": 4912,
+    "name": "Valtteri Puustinen",
+    "slug": "valtteri-puustinen"
+  },
+  {
+    "id": 10444,
+    "name": "Victor Eklund",
+    "slug": "victor-eklund"
+  },
+  {
+    "id": 436,
+    "name": "Victor Mancini",
+    "slug": "victor-mancini"
+  },
+  {
+    "id": 5002,
+    "name": "Victor Soderstrom",
+    "slug": "victor-soderstrom"
+  },
+  {
+    "id": 5626,
+    "name": "Viggo Gustafsson",
+    "slug": "viggo-gustafsson"
+  },
+  {
+    "id": 66,
+    "name": "Viking Gustafsson Nyberg",
+    "slug": "viking-gustafsson-nyberg"
+  },
+  {
+    "id": 5110,
+    "name": "Viktor Neuchev",
+    "slug": "viktor-neuchev"
+  },
+  {
+    "id": 5241,
+    "name": "Viliam Kmec",
+    "slug": "viliam-kmec"
+  },
+  {
+    "id": 4817,
+    "name": "Viljami Marjala",
+    "slug": "viljami-marjala"
+  },
+  {
+    "id": 465,
+    "name": "Ville Heinola",
+    "slug": "ville-heinola"
+  },
+  {
+    "id": 9946,
+    "name": "Ville Koivunen",
+    "slug": "ville-koivunen"
+  },
+  {
+    "id": 5242,
+    "name": "Ville Ottavainen",
+    "slug": "ville-ottavainen"
+  },
+  {
+    "id": 5385,
+    "name": "Vilmer Alriksson",
+    "slug": "vilmer-alriksson"
+  },
+  {
+    "id": 5488,
+    "name": "Vincent Arseneau",
+    "slug": "vincent-arseneau"
+  },
+  {
+    "id": 191,
+    "name": "Vincent Iorio",
+    "slug": "vincent-iorio"
+  },
+  {
+    "id": 5796,
+    "name": "Vincent Sevigny",
+    "slug": "vincent-sevigny"
+  },
+  {
+    "id": 4900,
+    "name": "Vinni Lettieri",
+    "slug": "vinni-lettieri"
+  },
+  {
+    "id": 5699,
+    "name": "Vinny Borgesi",
+    "slug": "vinny-borgesi"
+  },
+  {
+    "id": 5627,
+    "name": "Vinzenz Rohrer",
+    "slug": "vinzenz-rohrer"
+  },
+  {
+    "id": 5523,
+    "name": "Vitali Kravtsov",
+    "slug": "vitali-kravtsov"
+  },
+  {
+    "id": 5408,
+    "name": "Vladislav Kolyachonok",
+    "slug": "vladislav-kolyachonok"
+  },
+  {
+    "id": 595,
+    "name": "Vsevolod Komarov",
+    "slug": "vsevolod-komarov"
+  },
+  {
+    "id": 4971,
+    "name": "Walker Duehr",
+    "slug": "walker-duehr"
+  },
+  {
+    "id": 5143,
+    "name": "Will Butcher",
+    "slug": "will-butcher"
+  },
+  {
+    "id": 5489,
+    "name": "Will Dineen",
+    "slug": "will-dineen"
+  },
+  {
+    "id": 5797,
+    "name": "Will Mackinnon",
+    "slug": "will-mackinnon"
+  },
+  {
+    "id": 5798,
+    "name": "Will Riedell",
+    "slug": "will-riedell"
+  },
+  {
+    "id": 5490,
+    "name": "Will Zmolek",
+    "slug": "will-zmolek"
+  },
+  {
+    "id": 5628,
+    "name": "William Dufour",
+    "slug": "william-dufour"
+  },
+  {
+    "id": 5160,
+    "name": "William Lagesson",
+    "slug": "william-lagesson"
+  },
+  {
+    "id": 5700,
+    "name": "William Nicholl",
+    "slug": "william-nicholl"
+  },
+  {
+    "id": 4875,
+    "name": "William Stromgren",
+    "slug": "william-stromgren"
+  },
+  {
+    "id": 5170,
+    "name": "William Trudeau",
+    "slug": "william-trudeau"
+  },
+  {
+    "id": 5009,
+    "name": "William Villeneuve",
+    "slug": "william-villeneuve"
+  },
+  {
+    "id": 5190,
+    "name": "William Wallinder",
+    "slug": "william-wallinder"
+  },
+  {
+    "id": 4935,
+    "name": "Wilmer Skoog",
+    "slug": "wilmer-skoog"
+  },
+  {
+    "id": 4988,
+    "name": "Wojciech Stachowiak",
+    "slug": "wojciech-stachowiak"
+  },
+  {
+    "id": 5129,
+    "name": "Wyatt Aamodt",
+    "slug": "wyatt-aamodt"
+  },
+  {
+    "id": 5010,
+    "name": "Wyatt Bongiovanni",
+    "slug": "wyatt-bongiovanni"
+  },
+  {
+    "id": 5386,
+    "name": "Wyatt Newpower",
+    "slug": "wyatt-newpower"
+  },
+  {
+    "id": 5701,
+    "name": "Wyatte Wylie",
+    "slug": "wyatte-wylie"
+  },
+  {
+    "id": 5799,
+    "name": "Xavier Bernard",
+    "slug": "xavier-bernard"
+  },
+  {
+    "id": 4824,
+    "name": "Xavier Bourgault",
+    "slug": "xavier-bourgault"
+  },
+  {
+    "id": 4913,
+    "name": "Xavier Parent",
+    "slug": "xavier-parent"
+  },
+  {
+    "id": 5319,
+    "name": "Xavier Simoneau",
+    "slug": "xavier-simoneau"
+  },
+  {
+    "id": 626,
+    "name": "Yan Kuznetsov",
+    "slug": "yan-kuznetsov"
+  },
+  {
+    "id": 5630,
+    "name": "Yanick Turcotte",
+    "slug": "yanick-turcotte"
+  },
+  {
+    "id": 5025,
+    "name": "Yegor Sidorov",
+    "slug": "yegor-sidorov"
+  },
+  {
+    "id": 5631,
+    "name": "Zac Funk",
+    "slug": "zac-funk"
+  },
+  {
+    "id": 4809,
+    "name": "Zac Jones",
+    "slug": "zac-jones"
+  },
+  {
+    "id": 5632,
+    "name": "Zack Hayes",
+    "slug": "zack-hayes"
+  },
+  {
+    "id": 287,
+    "name": "Zack Ostapchuk",
+    "slug": "zack-ostapchuk"
+  },
+  {
+    "id": 5243,
+    "name": "Zach Aston-reese",
+    "slug": "zach-aston-reese"
+  },
+  {
+    "id": 5800,
+    "name": "Zach Berzolla",
+    "slug": "zach-berzolla"
+  },
+  {
+    "id": 5278,
+    "name": "Zach Dean",
+    "slug": "zach-dean"
+  },
+  {
+    "id": 10576,
+    "name": "Zach Gallant",
+    "slug": "zach-gallant"
+  },
+  {
+    "id": 5035,
+    "name": "Zach L'heureux",
+    "slug": "zach-l-heureux"
+  },
+  {
+    "id": 596,
+    "name": "Zach Metsa",
+    "slug": "zach-metsa"
+  },
+  {
+    "id": 5801,
+    "name": "Zach Okabe",
+    "slug": "zach-okabe"
+  },
+  {
+    "id": 5491,
+    "name": "Zach Uens",
+    "slug": "zach-uens"
+  },
+  {
+    "id": 10809,
+    "name": "Zach Urdahl",
+    "slug": "zach-urdahl"
+  },
+  {
+    "id": 5525,
+    "name": "Zakary Karpa",
+    "slug": "zakary-karpa"
+  },
+  {
+    "id": 682,
+    "name": "Zakhar Bardakov",
+    "slug": "zakhar-bardakov"
+  },
+  {
+    "id": 5048,
+    "name": "Zayde Wisdom",
+    "slug": "zayde-wisdom"
+  },
+  {
+    "id": 630,
+    "name": "Zayne Parekh",
+    "slug": "zayne-parekh"
+  }
+]

@@ -29,12 +29,19 @@ async function main() {
     },
   });
 
+  const missingPhoto = await prisma.player.count({
+    where: {
+      photoUrl: null,
+    },
+  });
+
   console.log({
     total,
     missingBirthDate,
     missingHeight,
     missingWeight,
     missingShoots,
+    missingPhoto,
   });
 }
 

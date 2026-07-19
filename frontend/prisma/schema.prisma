@@ -41,8 +41,14 @@ model Player {
 
   photoUrl String?
 
+  frozenPoolId Int?
+  frozenPoolUrl String?
+  frozenPoolPlayerSlug String?
+
+
   birthDate String?
   birthPlace String?
+  nationality String?
 
   shoots String?
 

@@ -141,4 +141,5 @@ main()
   .catch(console.error)
   .finally(async () => {
     await prisma.$disconnect();
+    
   });

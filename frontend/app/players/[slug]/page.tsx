@@ -1,4 +1,6 @@
 import Link from "next/link";
+import Image from "next/image";
+``
 import { PrismaClient } from "@prisma/client";
 
 export default async function PlayerDetailPage({
@@ -27,8 +29,20 @@ export default async function PlayerDetailPage({
     <main>
       <h1>{player.name}</h1>
 
+      {player.photoUrl && (
+        <div style={{ marginBottom: "20px" }}>
+          <Image
+            src={player.photoUrl}
+            alt={player.name}
+            width={168}
+            height={168}
+            priority
+          />
+        </div>
+      )}
+
       <p>
-        <strong>Number:</strong> #{player.number}
+        <strong>Number:</strong> #{player.number ?? "-"}
       </p>
 
       <p>
@@ -37,11 +51,43 @@ export default async function PlayerDetailPage({
 
       <p>
         <strong>Team:</strong>{" "}
-        <Link href={`/teams/${player.team.slug}`}>{player.team.name}</Link>
+        <Link href={`/teams/${player.team.slug}`}>
+          {player.team.name}
+        </Link>
       </p>
 
       <p>
-        <strong>NHL ID:</strong> {player.nhlId}
+        <strong>NHL ID:</strong> {player.nhlId ?? "-"}
+      </p>
+
+      <p>
+        <strong>Nationality:</strong>{" "}
+        {(player as any).nationality ?? "-"}
+      </p>
+
+      <p>
+        <strong>Birth Date:</strong>{" "}
+        {player.birthDate ?? "-"}
+      </p>
+
+      <p>
+        <strong>Birth Place:</strong>{" "}
+        {player.birthPlace ?? "-"}
+      </p>
+
+      <p>
+        <strong>Shoots:</strong>{" "}
+        {player.shoots ?? "-"}
+      </p>
+
+      <p>
+        <strong>Height:</strong>{" "}
+        {player.height ?? "-"}
+      </p>
+
+      <p>
+        <strong>Weight:</strong>{" "}
+        {player.weight ?? "-"} lbs
       </p>
 
       <hr />
@@ -50,9 +96,9 @@ export default async function PlayerDetailPage({
 
       <p>
         <strong>Cap Hit:</strong>{" "}
-        {((player as any).capHit
+        {(player as any).capHit
           ? `$${(player as any).capHit.toFixed(2)}M`
-          : "-")}
+          : "-"}
       </p>
 
       <p>
