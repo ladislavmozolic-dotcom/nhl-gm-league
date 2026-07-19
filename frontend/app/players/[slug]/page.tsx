@@ -1,6 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
-``
 import { PrismaClient } from "@prisma/client";
 
 export default async function PlayerDetailPage({
@@ -29,14 +27,17 @@ export default async function PlayerDetailPage({
     <main>
       <h1>{player.name}</h1>
 
+      <p>
+        <strong>PHOTO URL:</strong> {player.photoUrl ?? "NULL"}
+      </p>
+
       {player.photoUrl && (
         <div style={{ marginBottom: "20px" }}>
-          <Image
+          <img
             src={player.photoUrl}
             alt={player.name}
             width={168}
             height={168}
-            priority
           />
         </div>
       )}
