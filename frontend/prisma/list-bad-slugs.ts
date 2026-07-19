@@ -3,18 +3,25 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function main() {
-  const teams = await prisma.team.findMany({
+  const players = await prisma.player.findMany({
     where: {
-      league: "NHL",
+      birthDate: null,
     },
     select: {
       id: true,
-      code: true,
       name: true,
+      slug: true,
+    },
+    orderBy: {
+      name: "asc",
     },
   });
 
-  console.table(teams);
+  for (const p of players) {
+    console.log(
+      `${p.id};${p.name};${p.slug}`
+    );
+  }
 }
 
 main()

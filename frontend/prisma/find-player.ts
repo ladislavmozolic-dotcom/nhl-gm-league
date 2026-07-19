@@ -3,13 +3,37 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function main() {
-  const player = await prisma.player.findUnique({
+  const players = await prisma.player.findMany({
     where: {
-      id: 4913,
+      OR: [
+        {
+          name: {
+            contains: "Pastr",
+            mode: "insensitive",
+          },
+        },
+        {
+          name: {
+            contains: "Lafren",
+            mode: "insensitive",
+          },
+        },
+        {
+          name: {
+            contains: "Kopitar",
+            mode: "insensitive",
+          },
+        },
+      ],
+    },
+    select: {
+      id: true,
+      name: true,
+      nhlId: true,
     },
   });
 
-  console.dir(player, {
+  console.dir(players, {
     depth: null,
   });
 }

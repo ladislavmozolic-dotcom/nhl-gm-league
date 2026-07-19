@@ -1,0 +1,854 @@
+[
+  {
+    "name": "Matthew Savoie",
+    "dbName": "Matthew Savoie"
+  },
+  {
+    "name": "Calum Ritchie",
+    "dbName": "Calum Ritchie"
+  },
+  {
+    "name": "Easton Cowan",
+    "dbName": "Easton Cowan"
+  },
+  {
+    "name": "Axel Sandin Pellikka",
+    "dbName": "Axel Sandin-pellikka"
+  },
+  {
+    "name": "Igor Chernyshov",
+    "dbName": "Igor Chernyshov"
+  },
+  {
+    "name": "Gavin Brindley",
+    "dbName": "Gavin Brindley"
+  },
+  {
+    "name": "Danton Heinen",
+    "dbName": "Danton Heinen"
+  },
+  {
+    "name": "Danton Heinen",
+    "dbName": "Danton Heinen"
+  },
+  {
+    "name": "Danton Heinen",
+    "dbName": "Danton Heinen"
+  },
+  {
+    "name": "Ryan Ufko",
+    "dbName": "Ryan Ufko"
+  },
+  {
+    "name": "Luke Kunin",
+    "dbName": "Luke Kunin"
+  },
+  {
+    "name": "Joel Nystrom",
+    "dbName": "Joel Nystrom"
+  },
+  {
+    "name": "Pavol Regenda",
+    "dbName": "Pavol Regenda"
+  },
+  {
+    "name": "Otto Stenberg",
+    "dbName": "Otto Stenberg"
+  },
+  {
+    "name": "Noah Gregor",
+    "dbName": "Noah Gregor"
+  },
+  {
+    "name": "Nikita Nesterenko",
+    "dbName": "Nikita Nesterenko"
+  },
+  {
+    "name": "Lenni Hameenaho",
+    "dbName": "Lenni Hameenaho"
+  },
+  {
+    "name": "Sonny Milano",
+    "dbName": "Sonny Milano"
+  },
+  {
+    "name": "Reid Schaefer",
+    "dbName": "Reid Schaefer"
+  },
+  {
+    "name": "Ilya Solovyov",
+    "dbName": "Ilya Solovyov"
+  },
+  {
+    "name": "Ilya Solovyov",
+    "dbName": "Ilya Solovyov"
+  },
+  {
+    "name": "Ilya Solovyov",
+    "dbName": "Ilya Solovyov"
+  },
+  {
+    "name": "Lukas Reichel",
+    "dbName": "Lukas Reichel"
+  },
+  {
+    "name": "Lukas Reichel",
+    "dbName": "Lukas Reichel"
+  },
+  {
+    "name": "Lukas Reichel",
+    "dbName": "Lukas Reichel"
+  },
+  {
+    "name": "Lukas Reichel",
+    "dbName": "Lukas Reichel"
+  },
+  {
+    "name": "Nathan Bastian",
+    "dbName": "Nathan Bastian"
+  },
+  {
+    "name": "Nate Danielson",
+    "dbName": "Nate Danielson"
+  },
+  {
+    "name": "Ville Koivunen",
+    "dbName": "Ville Koivunen"
+  },
+  {
+    "name": "Nick Leddy",
+    "dbName": "Nick Leddy"
+  },
+  {
+    "name": "Jani Nyman",
+    "dbName": "Jani Nyman"
+  },
+  {
+    "name": "Jack St. Ivany",
+    "dbName": "Jack St. Ivany"
+  },
+  {
+    "name": "Michael Benning",
+    "dbName": "Michael Benning"
+  },
+  {
+    "name": "Brendan Gaunce",
+    "dbName": "Brendan Gaunce"
+  },
+  {
+    "name": "David Kämpf",
+    "dbName": "David Kampf"
+  },
+  {
+    "name": "David Kämpf",
+    "dbName": "David Kampf"
+  },
+  {
+    "name": "David Kämpf",
+    "dbName": "David Kampf"
+  },
+  {
+    "name": "Brad Lambert",
+    "dbName": "Brad Lambert"
+  },
+  {
+    "name": "Rutger McGroarty",
+    "dbName": "Rutger Mcgroarty"
+  },
+  {
+    "name": "Scott Morrow",
+    "dbName": "Scott Morrow"
+  },
+  {
+    "name": "Zach Aston-Reese",
+    "dbName": "Zach Aston-reese"
+  },
+  {
+    "name": "Arshdeep Bains",
+    "dbName": "Arshdeep Bains"
+  },
+  {
+    "name": "Benoit-Olivier Groulx",
+    "dbName": "Benoit-olivier Groulx"
+  },
+  {
+    "name": "Avery Hayes",
+    "dbName": "Avery Hayes"
+  },
+  {
+    "name": "Isaac Howard",
+    "dbName": "Isaac Howard"
+  },
+  {
+    "name": "Jacob Melanson",
+    "dbName": "Jacob Melanson"
+  },
+  {
+    "name": "Elias Salomonsson",
+    "dbName": "Elias Salomonsson"
+  },
+  {
+    "name": "Sandis Vilmanis",
+    "dbName": "Sandis Vilmanis"
+  },
+  {
+    "name": "Robby Fabbri",
+    "dbName": "Robby Fabbri"
+  },
+  {
+    "name": "Robby Fabbri",
+    "dbName": "Robby Fabbri"
+  },
+  {
+    "name": "Robby Fabbri",
+    "dbName": "Robby Fabbri"
+  },
+  {
+    "name": "Tobias Björnfot",
+    "dbName": "Tobias Bjornfot"
+  },
+  {
+    "name": "Filip Hallander",
+    "dbName": "Filip Hallander"
+  },
+  {
+    "name": "John Leonard",
+    "dbName": "John Leonard"
+  },
+  {
+    "name": "Theo Lindstein",
+    "dbName": "Theo Lindstein"
+  },
+  {
+    "name": "Mackenzie MacEachern",
+    "dbName": "Mackenzie Maceachern"
+  },
+  {
+    "name": "Colton White",
+    "dbName": "Colton White"
+  },
+  {
+    "name": "Jared Wright",
+    "dbName": "Jared Wright"
+  },
+  {
+    "name": "Curtis Douglas",
+    "dbName": "Curtis Douglas"
+  },
+  {
+    "name": "Curtis Douglas",
+    "dbName": "Curtis Douglas"
+  },
+  {
+    "name": "Curtis Douglas",
+    "dbName": "Curtis Douglas"
+  },
+  {
+    "name": "Marek Alscher",
+    "dbName": "Marek Alscher"
+  },
+  {
+    "name": "Joakim Kemell",
+    "dbName": "Joakim Kemell"
+  },
+  {
+    "name": "Vladislav Kolyachonok",
+    "dbName": "Vladislav Kolyachonok"
+  },
+  {
+    "name": "Vladislav Kolyachonok",
+    "dbName": "Vladislav Kolyachonok"
+  },
+  {
+    "name": "Vladislav Kolyachonok",
+    "dbName": "Vladislav Kolyachonok"
+  },
+  {
+    "name": "Jonathan Lekkerimäki",
+    "dbName": "Jonathan Lekkerimaki"
+  },
+  {
+    "name": "Bradly Nadeau",
+    "dbName": "Bradly Nadeau"
+  },
+  {
+    "name": "Juuso Pärssinen",
+    "dbName": "Juuso Parssinen"
+  },
+  {
+    "name": "Noah Philp",
+    "dbName": "Noah Philp"
+  },
+  {
+    "name": "Noah Philp",
+    "dbName": "Noah Philp"
+  },
+  {
+    "name": "Noah Philp",
+    "dbName": "Noah Philp"
+  },
+  {
+    "name": "Jacob Quillan",
+    "dbName": "Jacob Quillan"
+  },
+  {
+    "name": "Alec Regula",
+    "dbName": "Alec Regula"
+  },
+  {
+    "name": "Dominik Shine",
+    "dbName": "Dominik Shine"
+  },
+  {
+    "name": "Lassi Thomson",
+    "dbName": "Lassi Thomson"
+  },
+  {
+    "name": "Marshall Warren",
+    "dbName": "Marshall Warren"
+  },
+  {
+    "name": "Brennan Othmann",
+    "dbName": "Brennan Othmann"
+  },
+  {
+    "name": "Brennan Othmann",
+    "dbName": "Brennan Othmann"
+  },
+  {
+    "name": "Brennan Othmann",
+    "dbName": "Brennan Othmann"
+  },
+  {
+    "name": "Egor Zamula",
+    "dbName": "Egor Zamula"
+  },
+  {
+    "name": "Egor Zamula",
+    "dbName": "Egor Zamula"
+  },
+  {
+    "name": "Egor Zamula",
+    "dbName": "Egor Zamula"
+  },
+  {
+    "name": "Jack Ahcan",
+    "dbName": "Jack Ahcan"
+  },
+  {
+    "name": "Nicolas Aubé-Kubel",
+    "dbName": "Nicolas Aube-kubel"
+  },
+  {
+    "name": "Dennis Cholowski",
+    "dbName": "Dennis Cholowski"
+  },
+  {
+    "name": "Brian Halonen",
+    "dbName": "Brian Halonen"
+  },
+  {
+    "name": "Justin Holl",
+    "dbName": "Justin Holl"
+  },
+  {
+    "name": "Justin Kirkland",
+    "dbName": "Justin Kirkland"
+  },
+  {
+    "name": "Kirill Kudryavtsev",
+    "dbName": "Kirill Kudryavtsev"
+  },
+  {
+    "name": "Andre Lee",
+    "dbName": "Andre Lee"
+  },
+  {
+    "name": "Charles-Alexis Legault",
+    "dbName": "Charles Alexis Legault"
+  },
+  {
+    "name": "Olle Lycksell",
+    "dbName": "Olle Lycksell"
+  },
+  {
+    "name": "Hugh McGing",
+    "dbName": "Hugh Mcging"
+  },
+  {
+    "name": "Tyler Pitlick",
+    "dbName": "Tyler Pitlick"
+  },
+  {
+    "name": "Wilmer Skoog",
+    "dbName": "Wilmer Skoog"
+  },
+  {
+    "name": "Brendan Smith",
+    "dbName": "Brendan Smith"
+  },
+  {
+    "name": "Alex Barré-Boulet",
+    "dbName": "Alex Barre-boulet"
+  },
+  {
+    "name": "Anton Blidh",
+    "dbName": "Anton Blidh"
+  },
+  {
+    "name": "Angus Booth",
+    "dbName": "Angus Booth"
+  },
+  {
+    "name": "Michael Brandsegg-Nygard",
+    "dbName": "Michael Brandsegg-nygard"
+  },
+  {
+    "name": "Brendan Brisson",
+    "dbName": "Brendan Brisson"
+  },
+  {
+    "name": "Harrison Brunicke",
+    "dbName": "Harrison Brunicke"
+  },
+  {
+    "name": "Ethan Cardwell",
+    "dbName": "Ethan Cardwell"
+  },
+  {
+    "name": "Mitchell Chaffee",
+    "dbName": "Mitchell Chaffee"
+  },
+  {
+    "name": "Connor Clattenburg",
+    "dbName": "Connor Clattenburg"
+  },
+  {
+    "name": "Sam Colangelo",
+    "dbName": "Sam Colangelo"
+  },
+  {
+    "name": "Angus Crookshank",
+    "dbName": "Angus Crookshank"
+  },
+  {
+    "name": "Jared Davidson",
+    "dbName": "Jared Davidson"
+  },
+  {
+    "name": "Luca Del Bel Belluz",
+    "dbName": "Luca Del Bel Belluz"
+  },
+  {
+    "name": "Victor Eklund",
+    "dbName": "Victor Eklund"
+  },
+  {
+    "name": "Nolan Foote",
+    "dbName": "Nolan Foote"
+  },
+  {
+    "name": "Parker Ford",
+    "dbName": "Parker Ford"
+  },
+  {
+    "name": "Isaiah George",
+    "dbName": "Isaiah George"
+  },
+  {
+    "name": "Patrick Giles",
+    "dbName": "Patrick Giles"
+  },
+  {
+    "name": "Maxim Groshev",
+    "dbName": "Maxim Groshev"
+  },
+  {
+    "name": "Mikulas Hovorka",
+    "dbName": "Mikulas Hovorka"
+  },
+  {
+    "name": "Cameron Hughes",
+    "dbName": "Cameron Hughes"
+  },
+  {
+    "name": "Quinn Hutson",
+    "dbName": "Quinn Hutson"
+  },
+  {
+    "name": "Ivan Ivan",
+    "dbName": "Ivan Ivan"
+  },
+  {
+    "name": "Ludvig Jansson",
+    "dbName": "Ludvig Jansson"
+  },
+  {
+    "name": "Caleb Jones",
+    "dbName": "Caleb Jones"
+  },
+  {
+    "name": "Arthur Kaliyev",
+    "dbName": "Arthur Kaliyev"
+  },
+  {
+    "name": "Joona Koppanen",
+    "dbName": "Joona Koppanen"
+  },
+  {
+    "name": "Matt Luff",
+    "dbName": "Matt Luff"
+  },
+  {
+    "name": "Tristan Luneau",
+    "dbName": "Tristan Luneau"
+  },
+  {
+    "name": "Dysin Mayo",
+    "dbName": "Dysin Mayo"
+  },
+  {
+    "name": "Dakota Mermis",
+    "dbName": "Dakota Mermis"
+  },
+  {
+    "name": "Keaton Middleton",
+    "dbName": "Keaton Middleton"
+  },
+  {
+    "name": "Ty Mueller",
+    "dbName": "Ty Mueller"
+  },
+  {
+    "name": "Tristen Nielsen",
+    "dbName": "Tristen Nielsen"
+  },
+  {
+    "name": "Cole O'Hara",
+    "dbName": "Cole O'hara"
+  },
+  {
+    "name": "Matthew Poitras",
+    "dbName": "Matthew Poitras"
+  },
+  {
+    "name": "Mikael Pyyhtia",
+    "dbName": "Mikael Pyyhtia"
+  },
+  {
+    "name": "Justin Robidas",
+    "dbName": "Justin Robidas"
+  },
+  {
+    "name": "Kevin Rooney",
+    "dbName": "Kevin Rooney"
+  },
+  {
+    "name": "Jonas Røndbjerg",
+    "dbName": "JONAS RøNDBJERG"
+  },
+  {
+    "name": "Steven Santini",
+    "dbName": "Steven Santini"
+  },
+  {
+    "name": "Victor Söderström",
+    "dbName": "Victor Soderstrom"
+  },
+  {
+    "name": "Riley Tufte",
+    "dbName": "Riley Tufte"
+  },
+  {
+    "name": "Felix Unger Sorum",
+    "dbName": "Felix Unger Sorum"
+  },
+  {
+    "name": "Andrew Agozzino",
+    "dbName": "Andrew Agozzino"
+  },
+  {
+    "name": "Nils Åman",
+    "dbName": "Nils Aman"
+  },
+  {
+    "name": "Matt Benning",
+    "dbName": "Matt Benning"
+  },
+  {
+    "name": "Brett Berard",
+    "dbName": "Brett Berard"
+  },
+  {
+    "name": "Matěj Blümel",
+    "dbName": "Matej Blumel"
+  },
+  {
+    "name": "Xavier Bourgault",
+    "dbName": "Xavier Bourgault"
+  },
+  {
+    "name": "Skyler Brind'Amour",
+    "dbName": "Skyler Brind'amour"
+  },
+  {
+    "name": "Tristan Broz",
+    "dbName": "Tristan Broz"
+  },
+  {
+    "name": "Luca Cagnoni",
+    "dbName": "Luca Cagnoni"
+  },
+  {
+    "name": "Michael Callahan",
+    "dbName": "Michael Callahan"
+  },
+  {
+    "name": "Seamus Casey",
+    "dbName": "Seamus Casey"
+  },
+  {
+    "name": "Kenny Connors",
+    "dbName": "Kenny Connors"
+  },
+  {
+    "name": "Jack Devine",
+    "dbName": "Jack Devine"
+  },
+  {
+    "name": "Jorian Donovan",
+    "dbName": "Jorian Donovan"
+  },
+  {
+    "name": "Justin Dowling",
+    "dbName": "Justin Dowling"
+  },
+  {
+    "name": "Sheldon Dries",
+    "dbName": "Sheldon Dries"
+  },
+  {
+    "name": "Walker Duehr",
+    "dbName": "Walker Duehr"
+  },
+  {
+    "name": "Dylan Duke",
+    "dbName": "Dylan Duke"
+  },
+  {
+    "name": "Andreas Englund",
+    "dbName": "Andreas Englund"
+  },
+  {
+    "name": "Domenick Fensore",
+    "dbName": "Domenick Fensore"
+  },
+  {
+    "name": "Liam Foudy",
+    "dbName": "Liam Foudy"
+  },
+  {
+    "name": "Mason Geertsen",
+    "dbName": "Mason Geertsen"
+  },
+  {
+    "name": "Adam Ginning",
+    "dbName": "Adam Ginning"
+  },
+  {
+    "name": "Kevin Gravel",
+    "dbName": "Kevin Gravel"
+  },
+  {
+    "name": "Rafaël Harvey-Pinard",
+    "dbName": "Rafael Harvey-pinard"
+  },
+  {
+    "name": "John Hayden",
+    "dbName": "John Hayden"
+  },
+  {
+    "name": "Dryden Hunt",
+    "dbName": "Dryden Hunt"
+  },
+  {
+    "name": "Bokondji Imama",
+    "dbName": "Bokondji Imama"
+  },
+  {
+    "name": "Roby Jarventie",
+    "dbName": "Roby Jarventie"
+  },
+  {
+    "name": "Aleksanteri Kaskimaki",
+    "dbName": "Aleksanteri Kaskimaki"
+  },
+  {
+    "name": "Boris Katchouk",
+    "dbName": "Boris Katchouk"
+  },
+  {
+    "name": "Trevor Kuntar",
+    "dbName": "Trevor Kuntar"
+  },
+  {
+    "name": "Joseph LaBate",
+    "dbName": "Joseph Labate"
+  },
+  {
+    "name": "Shane Lachance",
+    "dbName": "Shane Lachance"
+  },
+  {
+    "name": "Brett Leason",
+    "dbName": "Brett Leason"
+  },
+  {
+    "name": "Nathan Legare",
+    "dbName": "Nathan Legare"
+  },
+  {
+    "name": "Simon Lundmark",
+    "dbName": "Simon Lundmark"
+  },
+  {
+    "name": "Connor Mackey",
+    "dbName": "Connor Mackey"
+  },
+  {
+    "name": "Taylor Makar",
+    "dbName": "Taylor Makar"
+  },
+  {
+    "name": "Carter Mazur",
+    "dbName": "Carter Mazur"
+  },
+  {
+    "name": "Marc McLaughlin",
+    "dbName": "Marc Mclaughlin"
+  },
+  {
+    "name": "Cole McWard",
+    "dbName": "Cole Mcward"
+  },
+  {
+    "name": "Georgii Merkulov",
+    "dbName": "Georgii Merkulov"
+  },
+  {
+    "name": "Daniil Miromanov",
+    "dbName": "Daniil Miromanov"
+  },
+  {
+    "name": "Sam Morton",
+    "dbName": "Sam Morton"
+  },
+  {
+    "name": "Ty Murchison",
+    "dbName": "Ty Murchison"
+  },
+  {
+    "name": "Jordan Oesterle",
+    "dbName": "Jordan Oesterle"
+  },
+  {
+    "name": "Xavier Parent",
+    "dbName": "Xavier Parent"
+  },
+  {
+    "name": "Lane Pederson",
+    "dbName": "Lane Pederson"
+  },
+  {
+    "name": "Jakob Pelletier",
+    "dbName": "Jakob Pelletier"
+  },
+  {
+    "name": "Michael Pezzetta",
+    "dbName": "Michael Pezzetta"
+  },
+  {
+    "name": "Isaak Phillips",
+    "dbName": "Isaak Phillips"
+  },
+  {
+    "name": "Owen Pickering",
+    "dbName": "Owen Pickering"
+  },
+  {
+    "name": "Luca Pinelli",
+    "dbName": "Luca Pinelli"
+  },
+  {
+    "name": "Jason Polin",
+    "dbName": "Jason Polin"
+  },
+  {
+    "name": "Anthony Richard",
+    "dbName": "Anthony Richard"
+  },
+  {
+    "name": "Marshall Rifai",
+    "dbName": "Marshall Rifai"
+  },
+  {
+    "name": "Joshua Roy",
+    "dbName": "Joshua Roy"
+  },
+  {
+    "name": "Ronan Seeley",
+    "dbName": "Ronan Seeley"
+  },
+  {
+    "name": "Hunter Skinner",
+    "dbName": "Hunter Skinner"
+  },
+  {
+    "name": "Josiah Slavin",
+    "dbName": "Josiah Slavin"
+  },
+  {
+    "name": "Riley Stillman",
+    "dbName": "Riley Stillman"
+  },
+  {
+    "name": "William Stromgren",
+    "dbName": "William Stromgren"
+  },
+  {
+    "name": "Jack Studnicka",
+    "dbName": "Jack Studnicka"
+  },
+  {
+    "name": "Henry Thrun",
+    "dbName": "Henry Thrun"
+  },
+  {
+    "name": "Bogdan Trineyev",
+    "dbName": "Bogdan Trineyev"
+  },
+  {
+    "name": "Ryan Tverberg",
+    "dbName": "Ryan Tverberg"
+  },
+  {
+    "name": "T.J. Tynan",
+    "dbName": "T.j. Tynan"
+  },
+  {
+    "name": "Topias Vilen",
+    "dbName": "Topias Vilen"
+  },
+  {
+    "name": "William Villeneuve",
+    "dbName": "William Villeneuve"
+  },
+  {
+    "name": "Garrett Wilson",
+    "dbName": "Garrett Wilson"
+  },
+  {
+    "name": "Brayden Yager",
+    "dbName": "Brayden Yager"
+  }
+]

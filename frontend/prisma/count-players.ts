@@ -3,18 +3,20 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function main() {
-  const teams = await prisma.team.findMany({
+  const total = await prisma.player.count();
+
+  const nhlPlayers = await prisma.player.count({
     where: {
-      league: "NHL",
-    },
-    select: {
-      id: true,
-      code: true,
-      name: true,
+      nhlId: {
+        not: null,
+      },
     },
   });
 
-  console.table(teams);
+  console.log({
+    totalPlayers: total,
+    nhlPlayers,
+  });
 }
 
 main()
