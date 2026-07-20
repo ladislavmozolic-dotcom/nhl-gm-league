@@ -18,7 +18,8 @@ model Team {
   gm    String
   arena String
 
-  profinhlName String? @unique
+  profinhlName   String? @unique
+  profinhlLogoId Int?
 
   league String @default("NHL")
 
@@ -178,15 +179,10 @@ model Prospect {
 model DraftPick {
   id Int @id @default(autoincrement())
 
-  year Int
-
+  year  Int
   round Int
 
-  originalTeam String?
-
-  owningTeam String?
-
-  condition String?
+  ownerLogoId Int
 
   teamId Int
   team   Team @relation(fields: [teamId], references: [id])
