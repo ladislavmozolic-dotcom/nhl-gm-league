@@ -30,6 +30,10 @@ model Team {
   affiliateTeams Team[] @relation("Affiliates")
 
   players Player[]
+
+  prospects Prospect[]
+
+  draftPicks DraftPick[]
 }
 
 model Player {
@@ -154,4 +158,34 @@ model GoalieRating {
   mo Int?
 
   overall Int?
+}
+
+model Prospect {
+  id Int @id @default(autoincrement())
+
+  name String
+
+  draftYear Int?
+
+  overallPick Int?
+
+  teamId Int
+  team   Team @relation(fields: [teamId], references: [id])
+}
+
+model DraftPick {
+  id Int @id @default(autoincrement())
+
+  year Int
+
+  round Int
+
+  originalTeam String?
+
+  owningTeam String?
+
+  condition String?
+
+  teamId Int
+  team   Team @relation(fields: [teamId], references: [id])
 }
