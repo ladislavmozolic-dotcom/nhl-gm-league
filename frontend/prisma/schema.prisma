@@ -83,6 +83,8 @@ ex Int?
 ld Int?
 mo Int?
 
+isGoalie Boolean @default(false)
+
   teamId Int
   team   Team @relation(fields: [teamId], references: [id])
 }
