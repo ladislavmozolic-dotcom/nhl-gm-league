@@ -12,6 +12,7 @@ model Team {
   slug    String @unique
   code    String? @unique
   name    String
+  logoUrl String?
   gm      String
   arena   String
 
@@ -54,10 +55,32 @@ model Player {
 
   height String?
   weight Int?
-
+capWagesSlug String?
   capHit         Float?
   contractYears  Int?
   contractExpiry Int?
+  age Int?
+overall Int?
+contractText String?
+rosterType String?
+condition Float?
+
+ck Int?
+fg Int?
+di Int?
+sk Int?
+st Int?
+en Int?
+du Int?
+ph Int?
+fo Int?
+pa Int?
+sc Int?
+df Int?
+ps Int?
+ex Int?
+ld Int?
+mo Int?
 
   teamId Int
   team   Team @relation(fields: [teamId], references: [id])

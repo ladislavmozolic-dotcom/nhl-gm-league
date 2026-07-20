@@ -12,24 +12,20 @@ async function main() {
     select: {
       id: true,
       nhlId: true,
-      team: {
-        select: {
-          code: true,
-        },
-      },
     },
   });
 
   let updated = 0;
-  const season = "20262027";
 
   for (const player of players) {
-    if (!player.nhlId || !player.team?.code) {
+    if (!player.nhlId) {
       continue;
     }
 
     const photoUrl =
-      `https://assets.nhle.com/mugs/nhl/${season}/${player.team.code}/${player.nhlId}.png`;
+      "https://assets.nhle.com/mugs/nhl/latest/168x168/" +
+      player.nhlId +
+      ".png";
 
     await prisma.player.update({
       where: {
@@ -43,9 +39,7 @@ async function main() {
     updated++;
   }
 
-  console.log({
-    updated,
-  });
+  console.log({ updated });
 }
 
 main()

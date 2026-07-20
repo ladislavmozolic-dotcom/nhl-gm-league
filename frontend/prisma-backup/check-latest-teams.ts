@@ -1,0 +1,21 @@
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+
+async function main() {
+  const count = await prisma.player.count({
+    where: {
+      photoUrl: {
+        contains: "/latest/168x168/",
+      },
+    },
+  });
+
+  console.log("Remaining:", count);
+}
+
+main()
+  .catch(console.error)
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

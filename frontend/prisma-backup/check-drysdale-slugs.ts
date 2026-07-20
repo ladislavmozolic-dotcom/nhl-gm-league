@@ -1,22 +1,23 @@
+
+
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const player = await prisma.player.findFirst({
+  const players = await prisma.player.findMany({
     where: {
-      name: {
-        contains: "McDavid",
-      },
+      frozenPoolPlayerSlug: "jamie-drysdale",
     },
     select: {
       name: true,
-      photoUrl: true,
       nhlId: true,
+      birthDate: true,
     },
   });
 
-  console.log(player);
+  console.log("Count:", players.length);
+  console.table(players);
 }
 
 main()
