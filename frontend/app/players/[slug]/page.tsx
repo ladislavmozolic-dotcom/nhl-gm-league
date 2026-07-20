@@ -47,7 +47,8 @@ export default async function PlayerDetailPage({
       </p>
 
       <p>
-        <strong>Position:</strong> {player.position}
+        <strong>Position:</strong>{" "}
+{player.positions || player.position}
       </p>
 
       <p>
