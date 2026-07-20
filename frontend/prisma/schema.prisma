@@ -8,13 +8,16 @@ datasource db {
 }
 
 model Team {
-  id      Int    @id @default(autoincrement())
-  slug    String @unique
-  code    String? @unique
+  id   Int     @id @default(autoincrement())
+  slug String  @unique
+  code String? @unique
+
   name    String
   logoUrl String?
-  gm      String
-  arena   String
+
+  gm    String
+  arena String
+
   profinhlName String? @unique
 
   league String @default("NHL")
@@ -22,69 +25,133 @@ model Team {
   eliteProspectsUrl String?
 
   parentTeamId Int?
-  parentTeam Team? @relation("Affiliates", fields: [parentTeamId], references: [id])
+  parentTeam   Team? @relation("Affiliates", fields: [parentTeamId], references: [id])
 
   affiliateTeams Team[] @relation("Affiliates")
 
   players Player[]
 }
 
-
 model Player {
-  id       Int    @id @default(autoincrement())
-  slug     String @unique
+  id   Int    @id @default(autoincrement())
+  slug String @unique
 
-  name     String
-  position String
+  name      String
+  position  String
   positions String?
 
-  nhlId    Int?   @unique
-  number   Int?
+  nhlId  Int? @unique
+  number Int?
 
   photoUrl String?
 
-  frozenPoolId Int?
-  frozenPoolUrl String?
+  frozenPoolId         Int?
+  frozenPoolUrl        String?
   frozenPoolPlayerSlug String?
 
-
-  birthDate String?
-  birthPlace String?
+  birthDate   String?
+  birthPlace  String?
   nationality String?
 
   shoots String?
 
   height String?
   weight Int?
-capWagesSlug String?
+
+  capWagesSlug String?
+
   capHit         Float?
   contractYears  Int?
   contractExpiry Int?
+
   age Int?
-overall Int?
-contractText String?
-rosterType String?
-condition Float?
 
-ck Int?
-fg Int?
-di Int?
-sk Int?
-st Int?
-en Int?
-du Int?
-ph Int?
-fo Int?
-pa Int?
-sc Int?
-df Int?
-ps Int?
-ex Int?
-ld Int?
-mo Int?
+  overall Int?
 
-isGoalie Boolean @default(false)
+  contractText String?
+
+  rosterType String?
+
+  condition Float?
+
+  ck Int?
+  fg Int?
+  di Int?
+  sk Int?
+  st Int?
+  en Int?
+  du Int?
+  ph Int?
+  fo Int?
+  pa Int?
+  sc Int?
+  df Int?
+  ps Int?
+  ex Int?
+  ld Int?
+  mo Int?
+
+  isGoalie Boolean @default(false)
 
   teamId Int
   team   Team @relation(fields: [teamId], references: [id])
+
+  skaterRating SkaterRating?
+  goalieRating GoalieRating?
+}
+
+model SkaterRating {
+  id Int @id @default(autoincrement())
+
+  playerId Int    @unique
+  player   Player @relation(fields: [playerId], references: [id])
+
+  condition Float?
+
+  ck Int?
+  fg Int?
+  di Int?
+  sk Int?
+  st Int?
+  en Int?
+  du Int?
+  ph Int?
+  fo Int?
+  pa Int?
+  sc Int?
+  df Int?
+  ps Int?
+  ex Int?
+  ld Int?
+  mo Int?
+
+  overall Int?
+}
+
+model GoalieRating {
+  id Int @id @default(autoincrement())
+
+  playerId Int    @unique
+  player   Player @relation(fields: [playerId], references: [id])
+
+  condition Float?
+
+  sk Int?
+  du Int?
+  en Int?
+
+  sz Int?
+  ag Int?
+  rb Int?
+  sc Int?
+  hs Int?
+  rt Int?
+
+  ph Int?
+  ps Int?
+  ex Int?
+  ld Int?
+  mo Int?
+
+  overall Int?
 }
