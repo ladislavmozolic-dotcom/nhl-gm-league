@@ -15,6 +15,7 @@ model Team {
   logoUrl String?
   gm      String
   arena   String
+  profinhlName String? @unique
 
   league String @default("NHL")
 
