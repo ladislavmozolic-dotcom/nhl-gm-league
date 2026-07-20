@@ -97,6 +97,8 @@ model Player {
 
   isGoalie Boolean @default(false)
 
+  sourceType String?
+
   teamId Int
   team   Team @relation(fields: [teamId], references: [id])
 
