@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import MovePlayerButton from "@/components/MovePlayerButton";
 
 export default async function TeamPage({
   params,
@@ -235,6 +236,8 @@ ahlGoalies.sort(
         </div>
       </div>
 
+{team.league === "NHL" && (
+  <>
       <table
         style={{
           width: "100%",
@@ -243,71 +246,85 @@ ahlGoalies.sort(
         }}
       >
         <thead>
-          <th style={{ width: "35%", textAlign: "left", padding: "8px" }}>
-  Name
-</th>
+          <tr>
+            <th style={{ width: "35%", textAlign: "left", padding: "8px" }}>
+              Name
+            </th>
 
-<th style={{ width: "15%", textAlign: "left", padding: "8px" }}>
-  Pos
-</th>
+            <th style={{ width: "15%", textAlign: "left", padding: "8px" }}>
+              Pos
+            </th>
 
-<th style={{ width: "10%", textAlign: "left", padding: "8px" }}>
-  Age
-</th>
+            <th style={{ width: "10%", textAlign: "left", padding: "8px" }}>
+              Age
+            </th>
 
-<th style={{ width: "10%", textAlign: "left", padding: "8px" }}>
-  OVR
-</th>
+            <th style={{ width: "10%", textAlign: "left", padding: "8px" }}>
+              OVR
+            </th>
 
-<th style={{ width: "30%", textAlign: "left", padding: "8px" }}>
-  Contract
-</th>
+            <th style={{ width: "20%", textAlign: "left", padding: "8px" }}>
+              Contract
+            </th>
+
+            <th style={{ textAlign: "left", padding: "8px" }}>
+              Action
+            </th>
+          </tr>
         </thead>
 
-  <tbody>
-    {nhlForwards.map((player: any) => (
-      <tr
-        key={player.id}
-        style={{
-          borderTop: "1px solid #334155",
-        }}
-      >
-        <td style={{ padding: "8px" }}>
-          <Link href={`/players/${player.slug}`}>
-            {player.name}
-          </Link>
-        </td>
+        <tbody>
+          {nhlForwards.map((player: any) => (
+            <tr
+              key={player.id}
+              style={{
+                borderTop: "1px solid #334155",
+              }}
+            >
+              <td style={{ padding: "8px" }}>
+                <Link href={`/players/${player.slug}`}>
+                  {player.name}
+                </Link>
+              </td>
 
-        <td style={{ padding: "8px" }}>
-          {player.positions || player.position}
-        </td>
+              <td style={{ padding: "8px" }}>
+                {player.positions || player.position}
+              </td>
 
-        <td style={{ padding: "8px" }}>
-          {player.age ?? "-"}
-        </td>
+              <td style={{ padding: "8px" }}>
+                {player.age ?? "-"}
+              </td>
 
-        <td
-  style={{
-    padding: "8px",
-    color:
-      (player.overall ?? 0) >= 80
-        ? "#22c55e"
-        : (player.overall ?? 0) >= 70
-        ? "#eab308"
-        : "#ef4444",
-    fontWeight: "bold",
-  }}
->
-  {player.overall ?? "-"}
-</td>
-<td style={{ padding: "8px" }}>
-  {player.contractText || "-"}
-</td>
-      </tr>
-    ))}
-  </tbody>
-</table>
-<h2>NHL Defensemen ({nhlDefense.length})</h2>
+              <td
+                style={{
+                  padding: "8px",
+                  color:
+                    (player.overall ?? 0) >= 80
+                      ? "#22c55e"
+                      : (player.overall ?? 0) >= 70
+                      ? "#eab308"
+                      : "#ef4444",
+                  fontWeight: "bold",
+                }}
+              >
+                {player.overall ?? "-"}
+              </td>
+              <td style={{ padding: "8px" }}>
+                {player.contractText || "-"}
+              </td>
+
+              <td style={{ padding: "8px" }}>
+                <MovePlayerButton
+                  playerId={player.id}
+                  targetRoster="AHL"
+                  label="Send Down"
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <h2>NHL Defensemen ({nhlDefense.length})</h2>
 
 <table
   style={{
@@ -317,26 +334,32 @@ ahlGoalies.sort(
   }}
 >
   <thead>
-   <th style={{ width: "35%", textAlign: "left", padding: "8px" }}>
-  Name
-</th>
+  <tr>
+    <th style={{ width: "35%", textAlign: "left", padding: "8px" }}>
+      Name
+    </th>
 
-<th style={{ width: "15%", textAlign: "left", padding: "8px" }}>
-  Pos
-</th>
+    <th style={{ width: "15%", textAlign: "left", padding: "8px" }}>
+      Pos
+    </th>
 
-<th style={{ width: "10%", textAlign: "left", padding: "8px" }}>
-  Age
-</th>
+    <th style={{ width: "10%", textAlign: "left", padding: "8px" }}>
+      Age
+    </th>
 
-<th style={{ width: "10%", textAlign: "left", padding: "8px" }}>
-  OVR
-</th>
+    <th style={{ width: "10%", textAlign: "left", padding: "8px" }}>
+      OVR
+    </th>
 
-<th style={{ width: "30%", textAlign: "left", padding: "8px" }}>
-  Contract
-</th>
-  </thead>
+    <th style={{ width: "20%", textAlign: "left", padding: "8px" }}>
+      Contract
+    </th>
+
+    <th style={{ textAlign: "left", padding: "8px" }}>
+      Action
+    </th>
+  </tr>
+</thead>
 
   <tbody>
     {nhlDefense.map((player: any) => (
@@ -379,6 +402,16 @@ ahlGoalies.sort(
   {player.contractText || "-"}
 </td>
 
+
+<td style={{ padding: "8px" }}>
+  <MovePlayerButton
+    playerId={player.id}
+    targetRoster="AHL"
+    label="Send Down"
+  />
+</td>
+
+
       </tr>
     ))}
   </tbody>
@@ -393,26 +426,32 @@ ahlGoalies.sort(
   }}
 >
   <thead>
+  <tr>
     <th style={{ width: "35%", textAlign: "left", padding: "8px" }}>
-  Name
-</th>
+      Name
+    </th>
 
-<th style={{ width: "15%", textAlign: "left", padding: "8px" }}>
-  Pos
-</th>
+    <th style={{ width: "15%", textAlign: "left", padding: "8px" }}>
+      Pos
+    </th>
 
-<th style={{ width: "10%", textAlign: "left", padding: "8px" }}>
-  Age
-</th>
+    <th style={{ width: "10%", textAlign: "left", padding: "8px" }}>
+      Age
+    </th>
 
-<th style={{ width: "10%", textAlign: "left", padding: "8px" }}>
-  OVR
-</th>
+    <th style={{ width: "10%", textAlign: "left", padding: "8px" }}>
+      OVR
+    </th>
 
-<th style={{ width: "30%", textAlign: "left", padding: "8px" }}>
-  Contract
-</th>
-  </thead>
+    <th style={{ width: "20%", textAlign: "left", padding: "8px" }}>
+      Contract
+    </th>
+
+    <th style={{ textAlign: "left", padding: "8px" }}>
+      Action
+    </th>
+  </tr>
+</thead>
 
   <tbody>
     {nhlGoalies.map((player: any) => (
@@ -453,12 +492,27 @@ ahlGoalies.sort(
 <td style={{ padding: "8px" }}>
   {player.contractText || "-"}
 </td>
+
+<td style={{ padding: "8px" }}>
+  <MovePlayerButton
+    playerId={player.id}
+    targetRoster="AHL"
+    label="Send Down"
+  />
+</td>
+
       </tr>
     ))}
   </tbody>
 </table>
+  </>)}
 {team.league === "AHL" && (
   <>
+
+
+  {team.league === "AHL" && (
+  <>
+
       <h2>AHL Forwards ({ahlForwards.length})</h2>
 
       <table
@@ -470,12 +524,37 @@ ahlGoalies.sort(
 >
   <thead>
     <tr>
-      <th style={{ textAlign: "left", padding: "8px" }}>Name</th>
-      <th style={{ textAlign: "left", padding: "8px" }}>Pos</th>
-      <th style={{ textAlign: "left", padding: "8px" }}>Age</th>
-      <th style={{ textAlign: "left", padding: "8px" }}>OVR</th>
+      <th style={{ width: "40%", textAlign: "left", padding: "8px" }}>
+  Name
+</th>
+
+<th style={{ width: "10%", textAlign: "left", padding: "8px" }}>
+  Pos
+</th>
+
+<th style={{ width: "10%", textAlign: "left", padding: "8px" }}>
+  Age
+</th>
+
+<th style={{ width: "10%", textAlign: "left", padding: "8px" }}>
+  OVR
+</th>
+
+<th style={{ width: "20%", textAlign: "left", padding: "8px" }}>
+  Contract
+</th>
+
+<th style={{ width: "10%", textAlign: "left", padding: "8px" }}>
+  Action
+</th>
+
+
+    <th style={{ textAlign: "left", padding: "8px" }}>
+      Action
+    </th>
     </tr>
   </thead>
+
 
   <tbody>
     {ahlForwards.map((player: any) => (
@@ -513,6 +592,17 @@ ahlGoalies.sort(
 >
   {player.overall ?? "-"}
 </td>
+<td style={{ padding: "8px" }}>
+  {player.contractText || "-"}
+</td>
+
+<td style={{ padding: "8px" }}>
+  <MovePlayerButton
+    playerId={player.id}
+    targetRoster="NHL"
+    label="Call Up"
+  />
+</td>
       </tr>
     ))}
   </tbody>
@@ -528,10 +618,34 @@ ahlGoalies.sort(
 >
   <thead>
     <tr>
-      <th style={{ textAlign: "left", padding: "8px" }}>Name</th>
-      <th style={{ textAlign: "left", padding: "8px" }}>Pos</th>
-      <th style={{ textAlign: "left", padding: "8px" }}>Age</th>
-      <th style={{ textAlign: "left", padding: "8px" }}>OVR</th>
+      <th style={{ width: "40%", textAlign: "left", padding: "8px" }}>
+  Name
+</th>
+
+<th style={{ width: "10%", textAlign: "left", padding: "8px" }}>
+  Pos
+</th>
+
+<th style={{ width: "10%", textAlign: "left", padding: "8px" }}>
+  Age
+</th>
+
+<th style={{ width: "10%", textAlign: "left", padding: "8px" }}>
+  OVR
+</th>
+
+<th style={{ width: "20%", textAlign: "left", padding: "8px" }}>
+  Contract
+</th>
+
+<th style={{ width: "10%", textAlign: "left", padding: "8px" }}>
+  Action
+</th>
+
+
+    <th style={{ textAlign: "left", padding: "8px" }}>
+      Action
+    </th>
     </tr>
   </thead>
 
@@ -560,6 +674,17 @@ ahlGoalies.sort(
         <td style={{ padding: "8px" }}>
           {player.overall ?? "-"}
         </td>
+        <td style={{ padding: "8px" }}>
+  {player.contractText || "-"}
+</td>
+
+<td style={{ padding: "8px" }}>
+  <MovePlayerButton
+    playerId={player.id}
+    targetRoster="NHL"
+    label="Call Up"
+  />
+</td>
       </tr>
     ))}
   </tbody>
@@ -575,10 +700,34 @@ ahlGoalies.sort(
 >
   <thead>
     <tr>
-      <th style={{ textAlign: "left", padding: "8px" }}>Name</th>
-      <th style={{ textAlign: "left", padding: "8px" }}>Pos</th>
-      <th style={{ textAlign: "left", padding: "8px" }}>Age</th>
-      <th style={{ textAlign: "left", padding: "8px" }}>OVR</th>
+     <th style={{ width: "40%", textAlign: "left", padding: "8px" }}>
+  Name
+</th>
+
+<th style={{ width: "10%", textAlign: "left", padding: "8px" }}>
+  Pos
+</th>
+
+<th style={{ width: "10%", textAlign: "left", padding: "8px" }}>
+  Age
+</th>
+
+<th style={{ width: "10%", textAlign: "left", padding: "8px" }}>
+  OVR
+</th>
+
+<th style={{ width: "20%", textAlign: "left", padding: "8px" }}>
+  Contract
+</th>
+
+<th style={{ width: "10%", textAlign: "left", padding: "8px" }}>
+  Action
+</th>
+
+
+    <th style={{ textAlign: "left", padding: "8px" }}>
+      Action
+    </th>
     </tr>
   </thead>
 
@@ -607,88 +756,28 @@ ahlGoalies.sort(
         <td style={{ padding: "8px" }}>
           {player.overall ?? "-"}
         </td>
+        <td style={{ padding: "8px" }}>
+  {player.contractText || "-"}
+</td>
+
+<td style={{ padding: "8px" }}>
+  <MovePlayerButton
+    playerId={player.id}
+    targetRoster="NHL"
+    label="Call Up"
+  />
+</td>
       </tr>
     ))}
   </tbody>
 </table>
+
+</>
+)}
 
   </>)}
 
-  <h2>Prospects ({prospects.length})</h2>
-
-<table
-  style={{
-    width: "100%",
-    borderCollapse: "collapse",
-    marginBottom: "40px",
-  }}
->
-  <thead>
-    <tr>
-      <th style={{ textAlign: "left", padding: "8px" }}>Name</th>
-      <th style={{ textAlign: "left", padding: "8px" }}>Draft Year</th>
-      <th style={{ textAlign: "left", padding: "8px" }}>Overall Pick</th>
-    </tr>
-  </thead>
-
-  <tbody>
-    {prospects.map((prospect: any) => (
-      <tr
-        key={prospect.id}
-        style={{
-          borderTop: "1px solid #334155",
-        }}
-      >
-        <td style={{ padding: "8px" }}>
-          {prospect.name}
-        </td>
-
-        <td style={{ padding: "8px" }}>
-          {prospect.draftYear ?? "-"}
-        </td>
-
-        <td style={{ padding: "8px" }}>
-          {prospect.overallPick ?? "-"}
-        </td>
-      </tr>
-    ))}
-  </tbody>
-</table>
- <h2>Draft Picks ({draftPicks.length})</h2>
-
-<table
-  style={{
-    width: "100%",
-    borderCollapse: "collapse",
-    marginBottom: "40px",
-  }}
->
-  <thead>
-    <tr>
-      <th style={{ textAlign: "left", padding: "8px" }}>Year</th>
-      <th style={{ textAlign: "left", padding: "8px" }}>Round</th>
-    </tr>
-  </thead>
-
-  <tbody>
-    {draftPicks.map((pick: any) => (
-      <tr
-        key={pick.id}
-        style={{
-          borderTop: "1px solid #334155",
-        }}
-      >
-        <td style={{ padding: "8px" }}>
-          {pick.year}
-        </td>
-
-        <td style={{ padding: "8px" }}>
-          {pick.round}
-        </td>
-      </tr>
-    ))}
-  </tbody>
-</table>
+ 
     </main>
   );
 }
