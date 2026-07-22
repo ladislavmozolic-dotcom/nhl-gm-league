@@ -14,9 +14,9 @@ model Team {
 
   name    String
   logoUrl String?
+  capacity Int?
 
-  gm    String
-  arena String
+
 
   profinhlName   String? @unique
   profinhlLogoId Int?
@@ -29,6 +29,12 @@ model Team {
   parentTeam   Team? @relation("Affiliates", fields: [parentTeamId], references: [id])
 
   affiliateTeams Team[] @relation("Affiliates")
+
+gm    String
+  arena String
+  coach String?
+conference String?
+division String?
 
   players Player[]
 

@@ -11,11 +11,11 @@ async function main() {
 
   const $ = cheerio.load(data);
 
-  let currentTeam = null;
+  let currentTeamId: number | null = null;
   let importedTeams = 0;
   let importedPlayers = 0;
 
-  $("table").each(async (_, table) => {
+  for (const table of $("table").toArray()) {
     const text = $(table)
       .text()
       .replace(/\s+/g, " ")
@@ -42,7 +42,7 @@ async function main() {
         teamName &&
         teamName.length > 3
       ) {
-        currentTeam =
+        const createdTeam =
           await prisma.team.create({
             data: {
               name: teamName,
@@ -55,6 +55,8 @@ async function main() {
               league: "NHL",
             },
           });
+
+        currentTeamId = createdTeam.id;
 
         importedTeams++;
 
@@ -122,14 +124,14 @@ async function main() {
             ld: Number(cells[17]),
             mo: Number(cells[18]),
 
-            teamId: currentTeam.id,
+            teamId: currentTeamId!,
           },
         });
 
         importedPlayers++;
       });
     }
-  });
+  }
 
   console.log("");
   console.log(

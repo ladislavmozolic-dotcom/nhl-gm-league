@@ -73,55 +73,111 @@ async function main() {
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, "-")
           .replace(/^-|-$/g, "");
+const existingPlayer = await prisma.player.findFirst({
+  where: {
+    name,
+    teamId: team.id,
+  },
+});
 
-      const player = await prisma.player.create({
-        data: {
-          slug,
-          name,
+console.log(
+  "CHECK:",
+  name,
+  existingPlayer ? "FOUND" : "NOT FOUND"
+);
+      let player;
 
-          position: cells[1],
+if (existingPlayer) {
+  player = await prisma.player.update({
+    where: {
+      id: existingPlayer.id,
+    },
+    data: {
+      rosterType: "AHL",
+      sourceType: "AHL_SKATER",
+      overall: Number(cells[19]),
+      age: Number(cells[20]),
+      contractText: cells[21],
+    },
+  });
 
-          age: Number(cells[20]),
+  console.log("UPDATED:", name);
+} else {
+  player = await prisma.player.create({
+    data: {
+      slug,
+      name,
+      position: cells[1],
+      age: Number(cells[20]),
+      overall: Number(cells[19]),
+      contractText: cells[21],
+      rosterType: "AHL",
+      sourceType: "AHL_SKATER",
+      teamId: team.id,
+    },
+  });
 
-          overall: Number(cells[19]),
+  console.log("CREATED:", name);
+}
 
-          contractText: cells[21],
+const existingRating =
+  await prisma.skaterRating.findUnique({
+    where: {
+      playerId: player.id,
+    },
+  });
 
-          rosterType: "AHL",
-
-          sourceType: "AHL_SKATER",
-
-          teamId: team.id,
-        },
-      });
-
-      await prisma.skaterRating.create({
-        data: {
-          playerId: player.id,
-
-          condition: Number(cells[2]),
-
-          ck: Number(cells[3]),
-          fg: Number(cells[4]),
-          di: Number(cells[5]),
-          sk: Number(cells[6]),
-          st: Number(cells[7]),
-          en: Number(cells[8]),
-          du: Number(cells[9]),
-          ph: Number(cells[10]),
-          fo: Number(cells[11]),
-          pa: Number(cells[12]),
-          sc: Number(cells[13]),
-          df: Number(cells[14]),
-          ps: Number(cells[15]),
-          ex: Number(cells[16]),
-          ld: Number(cells[17]),
-          mo: Number(cells[18]),
-
-          overall: Number(cells[19]),
-        },
-      });
-
+if (existingRating) {
+  await prisma.skaterRating.update({
+    where: {
+      playerId: player.id,
+    },
+    data: {
+      condition: Number(cells[2]),
+      ck: Number(cells[3]),
+      fg: Number(cells[4]),
+      di: Number(cells[5]),
+      sk: Number(cells[6]),
+      st: Number(cells[7]),
+      en: Number(cells[8]),
+      du: Number(cells[9]),
+      ph: Number(cells[10]),
+      fo: Number(cells[11]),
+      pa: Number(cells[12]),
+      sc: Number(cells[13]),
+      df: Number(cells[14]),
+      ps: Number(cells[15]),
+      ex: Number(cells[16]),
+      ld: Number(cells[17]),
+      mo: Number(cells[18]),
+      overall: Number(cells[19]),
+    },
+  });
+} else {
+  await prisma.skaterRating.create({
+    data: {
+      playerId: player.id,
+      condition: Number(cells[2]),
+      ck: Number(cells[3]),
+      fg: Number(cells[4]),
+      di: Number(cells[5]),
+      sk: Number(cells[6]),
+      st: Number(cells[7]),
+      en: Number(cells[8]),
+      du: Number(cells[9]),
+      ph: Number(cells[10]),
+      fo: Number(cells[11]),
+      pa: Number(cells[12]),
+      sc: Number(cells[13]),
+      df: Number(cells[14]),
+      ps: Number(cells[15]),
+      ex: Number(cells[16]),
+      ld: Number(cells[17]),
+      mo: Number(cells[18]),
+      overall: Number(cells[19]),
+    },
+  });
+}
       imported++;
     }
   }

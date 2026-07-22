@@ -74,56 +74,126 @@ async function main() {
           .replace(/[^a-z0-9]+/g, "-")
           .replace(/^-|-$/g, "");
 
-      const player = await prisma.player.create({
-        data: {
-          slug,
-          name,
+      const existingPlayer = await prisma.player.findFirst({
+  where: {
+    name,
+    teamId: team.id,
+  },
+});
 
-          position: "G",
+let player;
 
-          age: Number(cells[18]),
+if (existingPlayer) {
+  player = await prisma.player.update({
+    where: {
+      id: existingPlayer.id,
+    },
+    data: {
+      rosterType: "AHL",
+      sourceType: "AHL_GOALIE",
+      isGoalie: true,
+      position: "G",
 
-          overall: Number(cells[17]),
+      age: Number(cells[18]),
+      overall: Number(cells[17]),
+      contractText: cells[19],
+    },
+  });
 
-          contractText: cells[19],
+  console.log("UPDATED:", name);
+} else {
+  player = await prisma.player.create({
+    data: {
+      slug,
+      name,
 
-          rosterType: "AHL",
-          sourceType: "AHL_GOALIE",
+      position: "G",
 
-          isGoalie: true,
+      age: Number(cells[18]),
 
-          teamId: team.id,
-        },
-      });
+      overall: Number(cells[17]),
 
-      await prisma.goalieRating.create({
-        data: {
-          playerId: player.id,
+      contractText: cells[19],
 
-          condition: Number(cells[2]),
+      rosterType: "AHL",
+      sourceType: "AHL_GOALIE",
 
-          sk: Number(cells[3]),
-          du: Number(cells[4]),
-          en: Number(cells[5]),
+      isGoalie: true,
 
-          sz: Number(cells[6]),
-          ag: Number(cells[7]),
-          rb: Number(cells[8]),
-          sc: Number(cells[9]),
-          hs: Number(cells[10]),
-          rt: Number(cells[11]),
+      teamId: team.id,
+    },
+  });
 
-          ph: Number(cells[12]),
-          ps: Number(cells[13]),
+  console.log("CREATED:", name);
+}
+      
 
-          ex: Number(cells[14]),
-          ld: Number(cells[15]),
-          mo: Number(cells[16]),
+      const existingRating =
+  await prisma.goalieRating.findUnique({
+    where: {
+      playerId: player.id,
+    },
+  });
 
-          overall: Number(cells[17]),
-        },
-      });
+if (existingRating) {
+  await prisma.goalieRating.update({
+    where: {
+      playerId: player.id,
+    },
+    data: {
+      condition: Number(cells[2]),
 
+      sk: Number(cells[3]),
+      du: Number(cells[4]),
+      en: Number(cells[5]),
+
+      sz: Number(cells[6]),
+      ag: Number(cells[7]),
+      rb: Number(cells[8]),
+      sc: Number(cells[9]),
+      hs: Number(cells[10]),
+      rt: Number(cells[11]),
+
+      ph: Number(cells[12]),
+      ps: Number(cells[13]),
+
+      ex: Number(cells[14]),
+      ld: Number(cells[15]),
+      mo: Number(cells[16]),
+
+      overall: Number(cells[17]),
+    },
+  });
+} else {
+  await prisma.goalieRating.create({
+    data: {
+      playerId: player.id,
+
+      condition: Number(cells[2]),
+
+      sk: Number(cells[3]),
+      du: Number(cells[4]),
+      en: Number(cells[5]),
+
+      sz: Number(cells[6]),
+      ag: Number(cells[7]),
+      rb: Number(cells[8]),
+      sc: Number(cells[9]),
+      hs: Number(cells[10]),
+      rt: Number(cells[11]),
+
+      ph: Number(cells[12]),
+      ps: Number(cells[13]),
+
+      ex: Number(cells[14]),
+      ld: Number(cells[15]),
+      mo: Number(cells[16]),
+
+      overall: Number(cells[17]),
+    },
+  });
+}
+      
       imported++;
     }
   }

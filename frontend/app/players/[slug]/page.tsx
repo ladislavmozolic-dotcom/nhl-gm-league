@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { PrismaClient } from "@prisma/client";
 
 export default async function PlayerDetailPage({
@@ -33,9 +34,9 @@ export default async function PlayerDetailPage({
 
       {player.photoUrl && (
         <div style={{ marginBottom: "20px" }}>
-          <img
-            src={player.photoUrl}
-            alt={player.name}
+          <Image
+            src="https://assets.nhle.com/mugs/nhl/20262027/EDM/8478402.png"
+            alt="McDavid"
             width={168}
             height={168}
           />
@@ -48,7 +49,7 @@ export default async function PlayerDetailPage({
 
       <p>
         <strong>Position:</strong>{" "}
-{player.positions || player.position}
+        {player.positions || player.position}
       </p>
 
       <p>
@@ -56,6 +57,10 @@ export default async function PlayerDetailPage({
         <Link href={`/teams/${player.team.slug}`}>
           {player.team.name}
         </Link>
+      </p>
+
+      <p>
+        <strong>Team Code:</strong> {player.team.code}
       </p>
 
       <p>
