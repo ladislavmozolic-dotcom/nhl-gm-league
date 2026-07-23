@@ -12,11 +12,9 @@ model Team {
   slug String  @unique
   code String? @unique
 
-  name    String
-  logoUrl String?
+  name     String
+  logoUrl  String?
   capacity Int?
-
-
 
   profinhlName   String? @unique
   profinhlLogoId Int?
@@ -30,11 +28,11 @@ model Team {
 
   affiliateTeams Team[] @relation("Affiliates")
 
-gm    String
-  arena String
-  coach String?
-conference String?
-division String?
+  gm         String
+  arena      String
+  coach      String?
+  conference String?
+  division   String?
 
   players Player[]
 
@@ -74,15 +72,15 @@ model Player {
   capHit         Float?
   contractYears  Int?
   contractExpiry Int?
+  waiverStatus   String? @default("NONE")
 
   age Int?
 
- overall Int?
- contractText String?
- rosterType String?
- condition Float?
- onTradeBlock Boolean @default(false)
-
+  overall      Int?
+  contractText String?
+  rosterType   String?
+  condition    Float?
+  onTradeBlock Boolean @default(false)
 
   ck Int?
   fg Int?
@@ -110,6 +108,13 @@ model Player {
 
   skaterRating SkaterRating?
   goalieRating GoalieRating?
+}
+
+model Transaction {
+  id        Int      @id @default(autoincrement())
+  type      String
+  message   String
+  createdAt DateTime @default(now())
 }
 
 model SkaterRating {

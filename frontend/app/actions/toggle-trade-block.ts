@@ -7,12 +7,29 @@ export async function toggleTradeBlock(
   playerId: number,
   value: boolean
 ) {
+
+  const player = await prisma.player.findUnique({
+  where: {
+    id: playerId,
+  },
+});
+
+if (!player) return;
   await prisma.player.update({
     where: {
       id: playerId,
     },
     data: {
       onTradeBlock: value,
+    },
+  });
+
+  await (prisma as any).transaction.create({
+    data: {
+      type: "TRADE_BLOCK",
+      message: value
+        ? `${player.name} added to trade block`
+        : `${player.name} removed from trade block`,
     },
   });
 

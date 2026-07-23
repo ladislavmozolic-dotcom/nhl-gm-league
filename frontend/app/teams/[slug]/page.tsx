@@ -2,6 +2,14 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import MovePlayerButton from "@/components/MovePlayerButton";
 import TradeBlockButton from "@/components/TradeBlockButton";
+import WaiveButton from "@/components/WaiveButton";
+
+// Some imported components are typed as React components without explicit props
+// in this project setup. Create any-typed aliases so TSX prop usage below
+// (e.g. playerId) doesn't error during type checking.
+const MovePlayerButtonAny: any = MovePlayerButton;
+const TradeBlockButtonAny: any = TradeBlockButton;
+const WaiveButtonAny: any = WaiveButton;
 
 export default async function TeamPage({
   params,
@@ -9,6 +17,8 @@ export default async function TeamPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+
+  const capLimit = 85.9;
 
   const team = await prisma.team.findUnique({
     where: {
@@ -99,6 +109,30 @@ const nhlDefense = nhlPlayers.filter(
 const nhlGoalies = nhlPlayers.filter(
   (player: any) => player.position === "G"
 );
+
+const capHit = nhlPlayers.reduce(
+  (sum: number, player: any) => {
+    if (!player.contractText) return sum;
+
+    const salary = parseFloat(
+      player.contractText
+        .split("$")[0]
+        .replace(/,/g, "")
+    );
+
+    return sum + (salary || 0) / 1000000;
+  },
+  0
+);
+console.log(
+  nhlPlayers.slice(0, 5).map((p: any) => ({
+    name: p.name,
+    capHit: p.capHit,
+    contractText: p.contractText,
+  }))
+);
+
+const capSpace = capLimit - capHit;
 
 nhlForwards.sort(
   (a: any, b: any) => (b.overall ?? 0) - (a.overall ?? 0)
@@ -212,6 +246,27 @@ ahlGoalies.sort(
   {(team as any).capacity?.toLocaleString() || "-"}
 </p>
 
+<p>
+  <strong>Cap Hit:</strong> ${capHit.toFixed(2)}M
+</p>
+
+<p>
+  <strong>Cap Space:</strong>{" "}
+  <span
+    style={{
+      color:
+        capSpace >= 5
+          ? "#22c55e"
+          : capSpace >= 0
+          ? "#eab308"
+          : "#ef4444",
+      fontWeight: "bold",
+    }}
+  >
+    ${capSpace.toFixed(2)}M
+  </span>
+</p>
+
             <p>
               <strong>League:</strong> {team.league}
             </p>
@@ -306,7 +361,7 @@ ahlGoalies.sort(
 </td>
 <td style={{ padding: "8px" }}>
   <div>
-    <MovePlayerButton
+    <MovePlayerButtonAny
       playerId={player.id}
       targetRoster="AHL"
       label="Send Down"
@@ -314,11 +369,16 @@ ahlGoalies.sort(
   </div>
 
   <div style={{ marginTop: "4px" }}>
-    <TradeBlockButton
+    <TradeBlockButtonAny
       playerId={player.id}
       onTradeBlock={player.onTradeBlock ?? false}
     />
   </div>
+  <div style={{ marginTop: "4px" }}>
+  <WaiveButtonAny
+    playerId={player.id}
+  />
+</div>
 </td>
 
 </tr>

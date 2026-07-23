@@ -53,6 +53,12 @@ export async function movePlayer(
         teamId: parentTeam.id,
       },
     });
+    await (prisma as any).transaction.create({
+      data: {
+        type: "CALL_UP",
+        message: `${player.name} recalled from AHL`,
+      },
+    });
   }
 
   revalidatePath("/teams");
