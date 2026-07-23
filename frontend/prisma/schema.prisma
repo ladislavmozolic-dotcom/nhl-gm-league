@@ -77,13 +77,12 @@ model Player {
 
   age Int?
 
-  overall Int?
+ overall Int?
+ contractText String?
+ rosterType String?
+ condition Float?
+ onTradeBlock Boolean @default(false)
 
-  contractText String?
-
-  rosterType String?
-
-  condition Float?
 
   ck Int?
   fg Int?
