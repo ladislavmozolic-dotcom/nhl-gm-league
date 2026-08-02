@@ -90,4 +90,5 @@ export default async function TradeBlockPage() {
       </table>
     </main>
   );
+  
 }

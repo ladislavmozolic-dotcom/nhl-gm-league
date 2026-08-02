@@ -3,10 +3,13 @@ import { prisma } from "@/lib/prisma";
 
 export default async function TeamsPage() {
   const teams = await prisma.team.findMany({
-    orderBy: {
-      name: "asc",
-    },
-  });
+  where: {
+    parentTeamId: null,
+  },
+  orderBy: {
+    name: "asc",
+  },
+});
 
   return (
     <main>

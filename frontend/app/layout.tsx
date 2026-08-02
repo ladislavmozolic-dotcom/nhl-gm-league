@@ -22,6 +22,7 @@ export default function RootLayout({
           <Link href="/trade-block">Trade Block</Link>
           <Link href="/waivers">Waivers</Link>
           <Link href="/transactions">Transactions</Link>
+          <Link href="/trades">Trades</Link>
         </nav>
 
         {children}

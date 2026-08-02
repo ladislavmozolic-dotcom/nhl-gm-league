@@ -18,6 +18,7 @@ export default function TradeBlockButton({
         );
 
         window.location.reload();
+        
       }}
       style={{
         padding: "4px 8px",

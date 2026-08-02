@@ -20,15 +20,19 @@ export default async function TeamPage({
 
   const capLimit = 85.9;
 
-  const team = await prisma.team.findUnique({
-    where: {
-      slug,
-    },
-    include: {
-      parentTeam: true,
-      affiliateTeams: true,
-    },
-  });
+  const teams = await prisma.team.findMany({
+  where: {
+    parentTeamId: null,
+  },
+  orderBy: {
+    name: "asc",
+  },
+  include: {
+    affiliateTeams: true,
+  },
+});
+
+  const team = teams.find((t: any) => t.slug === slug);
 
   if (!team) {
     return <h1>Team not found</h1>;
@@ -271,11 +275,11 @@ ahlGoalies.sort(
               <strong>League:</strong> {team.league}
             </p>
 
-            {team.parentTeam && (
+            {team.parentTeamId && (
               <p>
                 <strong>Parent Team:</strong>{" "}
-                <Link href={`/teams/${team.parentTeam.slug}`}>
-                  {team.parentTeam.name}
+                <Link href={`/teams/${team.parentTeamId}`}>
+                  View Team
                 </Link>
               </p>
             )}

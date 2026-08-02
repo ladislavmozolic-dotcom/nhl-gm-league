@@ -27,6 +27,7 @@ model Team {
   parentTeam   Team? @relation("Affiliates", fields: [parentTeamId], references: [id])
 
   affiliateTeams Team[] @relation("Affiliates")
+  isAffiliate Boolean @default(false)
 
   gm         String
   arena      String
@@ -115,6 +116,38 @@ model Transaction {
   type      String
   message   String
   createdAt DateTime @default(now())
+}
+
+model Trade {
+  id Int @id @default(autoincrement())
+
+  fromTeamId Int
+  toTeamId   Int
+
+  status String @default("PENDING")
+
+  createdAt DateTime @default(now())
+}
+
+model TradeAsset {
+  id Int @id @default(autoincrement())
+
+  tradeId Int
+
+  assetType String
+
+  playerId    Int?
+  prospectId  Int?
+  draftPickId Int?
+
+  cashAmount Float?
+
+  retentionPct Float?
+
+  side String
+
+  createdAt DateTime @default(now())
+
 }
 
 model SkaterRating {
