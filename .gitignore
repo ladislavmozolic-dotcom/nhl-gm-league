@@ -11,3 +11,7 @@ frontend/.next/
 
 # logs
 *.log
+
+# large DB restore dumps (keep local, don't bloat git)
+backups/pre-nextgen-*.sql
+backups/*.dump
