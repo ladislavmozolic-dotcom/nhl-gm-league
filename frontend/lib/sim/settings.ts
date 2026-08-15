@@ -31,6 +31,7 @@ export type EngineSettings = {
   fightsPct: number;
   powerPlayPct: number;
   homeAdvPct: number;
+  homeLastChangePct: number;   // home last-change: how much the home side's matchups suppress opponent chance danger
   // Pull a shelled starter mid-game and bring in the backup
   pullGoalieEnabled: boolean;
   pullGoalieMinGoals: number; // starter must have conceded at least this many
@@ -100,6 +101,8 @@ export type EngineSettings = {
   momentumConcedeDip: number;  // momentum the conceding team loses on a goal
   momentumDecaySec: number;    // exponential decay time-constant (higher = longer swings)
   momentumMax: number;         // clamp on |momentum|
+  momentumPkKill: number;      // momentum gained for killing off a penalty
+  momentumFlurry: number;      // momentum gained for a sustained shot flurry
   // Clutch (high EX/LD players rise in tight late-game / OT / playoff moments)
   clutchEnabled: boolean;
   clutchBoostPct: number;      // conversion swing for a max-clutch player in the clutch
@@ -139,7 +142,7 @@ export type EngineSettings = {
 export const DEFAULT_SETTINGS: EngineSettings = {
   engineModel: "possession", inGameFatiguePct: 100, possessionSkillPct: 0.85, defenseTalentPct: 35, catchUpStrength: 0.03,
   goalsPct: 100, shotsPct: 100, penaltiesPct: 100, hitsPct: 100,
-  fightsPct: 100, powerPlayPct: 100, homeAdvPct: 100,
+  fightsPct: 100, powerPlayPct: 100, homeAdvPct: 100, homeLastChangePct: 100,
   pullGoalieEnabled: true, pullGoalieMinGoals: 6, pullGoalieMinShots: 15, pullGoalieSvPct: 0.80,
   rivalryEnabled: true, rivalryFightMult: 2.6, rivalryPenaltyMult: 1.5,
   scrumChance: 0.5, brawlChance: 0.08, abuseOfficialChance: 0.06, coachFinePimThreshold: 24, coachFineAmount: 100000,
@@ -160,6 +163,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   skaterConRecovery: 1, skaterConSlope: 0,
   momentumEnabled: true, momentumBoostPct: 0.16, momentumGoalSpike: 1.2,
   momentumConcedeDip: 1.1, momentumDecaySec: 220, momentumMax: 2.4,
+  momentumPkKill: 0.5, momentumFlurry: 0.35,
   clutchEnabled: true, clutchBoostPct: 0.22, clutchWindowSec: 300, clutchPlayoffMult: 1.5,
   moraleEnabled: true, moraleBase: 50, moraleWin: 2, moraleNeutral: 50, moraleSlope: 0.0018,
   moraleGoalieSlope: 0.0008, moraleFrustrationPct: 0.006,

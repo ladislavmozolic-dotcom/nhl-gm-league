@@ -274,6 +274,13 @@ function momoOnGoal(st: SimState, scorerId: number, concederId: number, absT: nu
   st.momentum[scorerId] = clamp(momoNow(st, scorerId, absT) + CFG.momentumGoalSpike);
   st.momentum[concederId] = clamp(momoNow(st, concederId, absT) - (st.momoDip[concederId] ?? CFG.momentumConcedeDip));
 }
+// A smaller momentum bump for the swing plays that aren't goals — killing a
+// penalty, a sustained shot flurry, winning a fight. Energises the bench.
+function momoSwing(st: SimState, teamId: number, absT: number, amount: number) {
+  if (!CFG.momentumEnabled) return;
+  const clamp = (v: number) => Math.max(-CFG.momentumMax, Math.min(CFG.momentumMax, v));
+  st.momentum[teamId] = clamp(momoNow(st, teamId, absT) + amount);
+}
 
 // ---- clutch & morale --------------------------------------------------------
 // Clutch = poise in decisive moments, from experience + leadership + composure.
@@ -740,10 +747,21 @@ function simulatePeriodPossession(st: SimState, period: number) {
   const fat = (team: SimTeam, s: SimSkater) => fatigueMult(shifts[team.id].fElapsed * team.tactics.fatigue, s.attrs.en ?? 50);
   const dfat = (team: SimTeam, s: SimSkater) => fatigueMult(shifts[team.id].dElapsed * team.tactics.fatigue, s.attrs.en ?? 50);
 
+  const killedPens = new Set<Penalty>(); // penalties that expired without a PP goal → PK momentum
+
   for (let tick = 0; tick < PERIOD_SECONDS; tick++) {
     advanceShift(st, home.id, shifts[home.id], 1, rng);
     advanceShift(st, away.id, shifts[away.id], 1, rng);
     const absT = base + tick;
+
+    // PK KILL momentum: a penalty that runs its full time (not ended by a PP goal)
+    // is a kill — the shorthanded team's bench gets a lift.
+    for (const p of active) {
+      if (!p.expired && tick >= p.end && !killedPens.has(p)) {
+        killedPens.add(p);
+        momoSwing(st, p.team, absT, CFG.momentumPkKill); // p.team was shorthanded → they killed it
+      }
+    }
 
     if (state === "FACEOFF") {
       // centers of the on-ice units contest the draw (FO vs FO)
@@ -833,7 +851,10 @@ function simulatePeriodPossession(st: SimState, period: number) {
       // team-system: rush raises chance danger, shot-volume lowers it (more but softer);
       // the defending team's D-zone posture (collapse) suppresses danger.
       const dangerBias = atkFx.dangerMix * defFx.oppDangerMult;
-      const danger = baseDanger * dangerBias;
+      // home-ice last change: the home coach gets the final matchup, smothering some
+      // danger when defending (away team carrying → home defends).
+      const lastChange = !isHome ? 1 - 0.035 * (CFG.homeLastChangePct / 100) : 1;
+      const danger = baseDanger * dangerBias * lastChange;
       const strength = strengthAt(carrierTeam, def, tick, active);
       const gLine = liveGoalieLine(st, def.id);
       const gSim = liveGoalie(st, def);
@@ -870,6 +891,7 @@ function simulatePeriodPossession(st: SimState, period: number) {
       const danger3: "hd" | "md" | "ld" = danger >= 1.5 ? "hd" : danger >= 0.6 ? "md" : "ld";
       if (danger3 === "hd") gLine.hdShotsAg++; else if (danger3 === "md") gLine.mdShotsAg++; else gLine.ldShotsAg++;
       press++; // sustained pressure: screening / traffic / a tiring goalie
+      if (press === 3) momoSwing(st, carrierTeam.id, absT, CFG.momentumFlurry); // shot flurry lifts the bench
       const pressBonus = 1 + 0.06 * Math.min(press - 1, 4);
       const offMult = chemFactor(carrier.chem, carrier.roleFit) * moraleFactor(carrier.morale) * physFactor(carrier.weight) * fat(carrierTeam, carrier) * tOff.of * carrierTeam.coachOff;
       const defShield = (2 - (st.defChem[def.id] ?? 1)) * (2 - dfat(def, dman)) * tDef.df * def.coachDef;

@@ -17,7 +17,8 @@ const GAME_OPTIONS: Array<{ key: keyof EngineSettings; label: string; hint: stri
   { key: "hitsPct", label: "Hits", hint: "hits per game" },
   { key: "fightsPct", label: "Fights", hint: "fight frequency" },
   { key: "injuryChancePct", label: "Injuries", hint: "injury frequency — 100% ≈ NHL-realistic (~44/team/season); lower = fewer, higher = more" },
-  { key: "homeAdvPct", label: "Home Advantage", hint: "home-ice edge" },
+  { key: "homeAdvPct", label: "Home Advantage", hint: "home-ice edge (shots + conversion)" },
+  { key: "homeLastChangePct", label: "Home Last Change", hint: "how much home matchups smother opponent chance danger" },
   { key: "defenseTalentPct", label: "Defence Impact", hint: "how strongly the D in front lowers goals-against (0 = goalie only)" },
 ];
 

@@ -127,7 +127,7 @@ export async function runCalibration(opts?: { settings?: EngineSettings; season?
     { group: "EDGE tracking", label: "Offensive-zone time %", value: ozPct.toFixed(1) + "%", target: "32 – 39%", status: grade(ozPct, [32, 39], [28, 43]) },
     { group: "EDGE tracking", label: "Hits / team / game", value: perTeamGame(hits).toFixed(1), target: "18 – 24", status: grade(perTeamGame(hits), [18, 24], [15, 28]) },
     // injuries
-    { group: "Injuries", label: "Injuries / team / game", value: injPerGame.toFixed(3), target: "0.15 – 0.28", status: grade(injPerGame, [0.15, 0.28], [0.1, 0.35]), hint: `most common cause: ${topMech}` },
+    { group: "Injuries", label: "Injuries / team / game", value: injPerGame.toFixed(3), target: "0.45 – 0.62", status: grade(injPerGame, [0.45, 0.62], [0.38, 0.72]), hint: `~${(injPerGame * 82).toFixed(0)}/team/season · most common: ${topMech}` },
   ];
 
   return { metrics: m, games, teams: N, ms: Date.now() - t0, season };
