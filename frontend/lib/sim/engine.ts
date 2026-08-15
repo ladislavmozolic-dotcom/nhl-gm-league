@@ -7,6 +7,7 @@ import { RNG, fixtureSeed } from "./rng";
 import { generatePlayByPlay } from "./playbyplay";
 import { DEFAULT_SETTINGS, type EngineSettings } from "./settings";
 import { EventSink, type SimEvent } from "./events";
+import { shotProfile, expectedGoal, isHighDanger, type ShotStrength } from "./shot-quality";
 import type {
   SimTeam, SimSkater, SimGoalie, GameResult, TeamBox, PlayerLine, GoalieLine,
   GoalEvent, PenaltyEvent, InjuryEvent, ShootoutAttempt, LineTactic,
@@ -153,6 +154,7 @@ function newPlayerLine(s: SimSkater): PlayerLine {
     ppGoals: 0, shGoals: 0, gwg: 0, hits: 0, blocks: 0,
     faceoffWins: 0, faceoffLosses: 0, toi: 0,
     conBefore: s.con ?? 100, conAfter: s.con ?? 100,
+    xg: 0, hdShots: 0,
   };
 }
 
@@ -173,19 +175,20 @@ function initTeamBox(team: SimTeam): TeamBox {
     id: team.goalie.id, name: team.goalie.name, started: true,
     shotsAgainst: 0, saves: 0, goalsAgainst: 0, savePct: 0, toi: 0,
     conBefore: team.goalie.con, conAfter: team.goalie.con, fatigued: team.goalie.fatigued,
-    decision: null,
+    decision: null, xga: 0,
   };
   const backupGoalie: GoalieLine | null = team.backup ? {
     id: team.backup.id, name: team.backup.name, started: false,
     shotsAgainst: 0, saves: 0, goalsAgainst: 0, savePct: 0, toi: 0,
     conBefore: team.backup.con, conAfter: team.backup.con, fatigued: false,
-    decision: null,
+    decision: null, xga: 0,
   } : null;
   return {
     teamId: team.id, name: team.name, code: team.code,
     goals: 0, shots: 0, pim: 0, ppGoals: 0, ppOpp: 0,
     faceoffWins: 0, faceoffLosses: 0, hits: 0, blocks: 0,
     goalsByPeriod: [0, 0, 0, 0], shotsByPeriod: [0, 0, 0, 0],
+    xgFor: 0, hdFor: 0,
     skaters: [], goalie, backupGoalie,
   };
 }
@@ -339,6 +342,7 @@ function weightedSample(rng: RNG, pool: SimSkater[], n: number): SimSkater[] {
 function recordGoal(
   st: SimState, off: SimTeam, def: SimTeam, period: number, seconds: number,
   strength: GoalEvent["strength"], emptyNet = false, explicitScorer?: SimSkater,
+  shot?: { sector: string; shotType: string; xg: number },
 ) {
   const scorer = explicitScorer ?? pickShooter(st.rng, off);
   const assists = strength === "SO" ? [] : pickAssists(st.rng, off, scorer.id);
@@ -373,7 +377,7 @@ function recordGoal(
     teamId: off.id, teamCode: off.code,
     playerId: scorer.id, playerName: scorer.name,
     targetId: liveGoalie(st, def).id, targetName: liveGoalie(st, def).name,
-    zone: "OFF",
+    zone: "OFF", sector: shot?.sector, shotType: shot?.shotType, xg: shot?.xg,
     strength: strength === "SO" ? "EV" : (strength === "PP" ? "PP" : strength === "SH" ? "SH" : "EV"),
     importance: "HIGHLIGHT",
     meta: { emptyNet, assistIds: assists, assistNames, seasonGoal: sl.goals, so: strength === "SO" },
@@ -808,6 +812,18 @@ function simulatePeriodPossession(st: SimState, period: number) {
       if (period <= 4) st.box[carrierTeam.id].shotsByPeriod[period - 1]++;
       st.lines[carrierTeam.id][carrier.id].shots++;
       gLine.shotsAgainst++;
+      // Phase 2 — shot quality: tag the shot with a location, type and expected
+      // goals (independent of shooter finishing / goalie quality). Accumulate the
+      // xG into the shooter, his team, and the goalie facing it (→ GSAx).
+      const strengthKey: ShotStrength = strength === "PP" ? "PP" : strength === "SH" ? "SH" : "EV";
+      const { sector, shotType } = shotProfile(rng, { isDefense: carrier.isDefense, setup, danger });
+      const xg = expectedGoal(rng, sector, shotType, strengthKey);
+      const hd = isHighDanger(sector);
+      st.lines[carrierTeam.id][carrier.id].xg += xg;
+      if (hd) st.lines[carrierTeam.id][carrier.id].hdShots++;
+      st.box[carrierTeam.id].xgFor += xg;
+      if (hd) st.box[carrierTeam.id].hdFor++;
+      gLine.xga += xg;
       press++; // sustained pressure: screening / traffic / a tiring goalie
       const pressBonus = 1 + 0.06 * Math.min(press - 1, 4);
       const offMult = chemFactor(carrier.chem, carrier.roleFit) * moraleFactor(carrier.morale) * physFactor(carrier.weight) * fat(carrierTeam, carrier) * tOff.of * carrierTeam.coachOff;
@@ -823,19 +839,19 @@ function simulatePeriodPossession(st: SimState, period: number) {
       const p = conversion(shOff, effGoalieQuality(gSim), isHome, strength) * danger * pressBonus
         * momoBoost(st, carrierTeam.id, absT) * clutchFactor(st, carrier, period, tick, margin)
         * offMult * defShield * defTalent * catchUp * ppMod;
-      const highDanger = danger >= 1.5;
       st.sink.emit({
         period, seconds: tick, type: "SHOT",
         teamId: carrierTeam.id, teamCode: carrierTeam.code,
         playerId: carrier.id, playerName: carrier.name,
         targetId: gSim.id, targetName: gSim.name,
-        zone: "OFF", strength: strength === "SO" ? "EV" : strength as SimEvent["strength"], xg: p,
-        importance: highDanger ? "NOTABLE" : "MINOR",
+        zone: "OFF", sector, shotType,
+        strength: strength === "SO" ? "EV" : strength as SimEvent["strength"], xg,
+        importance: hd ? "NOTABLE" : "MINOR",
         meta: { danger, setup },
       });
       if (rng.chance(p)) {
         gLine.goalsAgainst++;
-        recordGoal(st, carrierTeam, def, period, tick, strength, false, carrier);
+        recordGoal(st, carrierTeam, def, period, tick, strength, false, carrier, { sector, shotType, xg });
         momoOnGoal(st, carrierTeam.id, def.id, absT);
         maybePullGoalie(st, def.id); // yank the starter if he's been shelled
         if (strength === "PP") expireOnePenalty(def.id, tick, active);
@@ -847,8 +863,8 @@ function simulatePeriodPossession(st: SimState, period: number) {
         teamId: def.id, teamCode: def.code,
         playerId: gSim.id, playerName: gSim.name,
         targetId: carrier.id, targetName: carrier.name,
-        zone: "OFF", xg: p,
-        importance: highDanger ? "NOTABLE" : "MINOR",
+        zone: "OFF", sector, shotType, xg,
+        importance: hd ? "NOTABLE" : "MINOR",
         meta: { danger, setup },
       });
       const rb = gSim.attrs.rb ?? 50;

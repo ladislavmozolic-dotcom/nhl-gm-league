@@ -130,6 +130,8 @@ export type PlayerLine = {
   toi: number;           // time on ice, seconds
   conBefore: number;     // condition at puck drop
   conAfter: number;      // condition after the game (post workload drop)
+  xg: number;            // individual expected goals (shot quality generated)
+  hdShots: number;       // high-danger shots (slot / net-front)
 };
 
 export type GoalieLine = {
@@ -145,6 +147,7 @@ export type GoalieLine = {
   conAfter: number;      // condition after the game (post shot-load drop)
   fatigued: boolean;     // started on a back-to-back
   decision: "W" | "L" | "OTL" | null;
+  xga: number;           // expected goals against (sum of faced shots' xG) → GSAx = xga - goalsAgainst
 };
 
 export type GoalEvent = {
@@ -190,6 +193,8 @@ export type TeamBox = {
   blocks: number;
   goalsByPeriod: number[]; // [p1, p2, p3, (ot)]
   shotsByPeriod: number[];
+  xgFor: number;         // team expected goals for (sum of its shots' xG)
+  hdFor: number;         // high-danger shots for
   skaters: PlayerLine[];
   goalie: GoalieLine;             // the goalie who started
   backupGoalie: GoalieLine | null; // dressed, did not play (shows ending CON)

@@ -396,6 +396,10 @@ model Game {
   awayGoalsByPeriod Int[]            @default([])
   homeShotsByPeriod Int[]            @default([])
   awayShotsByPeriod Int[]            @default([])
+  homeXg            Float?           // team expected goals (Phase 2 shot quality)
+  awayXg            Float?
+  homeHd            Int?             // high-danger shots for
+  awayHd            Int?
   endedIn           String?          // REG | OT | SO
   otPeriods         Int?             @default(0) // sudden-death OT periods played (playoff marathons: 1=OT, 2=2OT…)
   winnerTeamId      Int?
@@ -720,6 +724,8 @@ model PlayerGameStat {
   toi           Int    @default(0)
   conBefore     Int?
   conAfter      Int?
+  xg            Float  @default(0) // individual expected goals (Phase 2 shot quality)
+  hdShots       Int    @default(0) // high-danger shots (slot / net-front)
   game          Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
   player        Player @relation(fields: [playerId], references: [id])
 
@@ -740,6 +746,7 @@ model GoalieGameStat {
   conAfter     Int?
   fatigued     Boolean @default(false)
   decision     String? // W | L | OTL
+  xga          Float   @default(0) // expected goals against faced → GSAx = xga - goalsAgainst
   game         Game    @relation(fields: [gameId], references: [id], onDelete: Cascade)
   player       Player  @relation(fields: [playerId], references: [id])
 

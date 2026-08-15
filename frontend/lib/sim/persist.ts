@@ -25,6 +25,7 @@ function skaterRows(box: TeamBox, gameId: number) {
       hits: s.hits, blocks: s.blocks,
       faceoffWins: s.faceoffWins, faceoffLosses: s.faceoffLosses, toi: s.toi,
       conBefore: Math.round(s.conBefore), conAfter: Math.round(s.conAfter),
+      xg: s.xg, hdShots: s.hdShots,
     }));
 }
 
@@ -34,7 +35,7 @@ function goalieRows(box: TeamBox, gameId: number) {
     gameId, playerId: g.id, teamId: box.teamId, started: g.started,
     shotsAgainst: g.shotsAgainst, saves: g.saves, goalsAgainst: g.goalsAgainst,
     conBefore: g.conBefore, conAfter: g.conAfter, fatigued: g.fatigued,
-    decision: g.decision,
+    decision: g.decision, xga: g.xga,
   }));
 }
 
@@ -54,6 +55,10 @@ export async function saveGameResult(result: GameResult, meta: GameMeta = {}) {
     awayGoalsByPeriod: result.away.goalsByPeriod,
     homeShotsByPeriod: result.home.shotsByPeriod,
     awayShotsByPeriod: result.away.shotsByPeriod,
+    homeXg: result.home.xgFor,
+    awayXg: result.away.xgFor,
+    homeHd: result.home.hdFor,
+    awayHd: result.away.hdFor,
     endedIn: result.endedIn,
     otPeriods: result.otPeriods,
     winnerTeamId: result.winner,
