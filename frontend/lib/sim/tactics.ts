@@ -146,3 +146,39 @@ export const DIAL_LABELS = {
   puckStyle: { cycle: "Cycle", balanced: "Balanced", rush: "Rush / Transition", shotVolume: "Shot Volume" },
   dZone: { collapse: "Collapse / Box", balanced: "Balanced", aggressive: "Aggressive / Man" },
 } as const;
+
+// Plain-language explanation of what each option does — shown under the picker.
+export const DIAL_DESC: Record<keyof typeof DIAL_LABELS, Record<string, string>> = {
+  tempo: {
+    slow: "Control the puck and slow it down — fewer chances at both ends and less fatigue. Good for protecting a lead or a team lacking depth.",
+    balanced: "No emphasis on pace — play it as the game comes.",
+    fast: "Push the pace and turn it into a track meet — more chances for AND against, but your legs tire faster. Wants skating (SK) and endurance (EN).",
+  },
+  forecheck: {
+    passive: "Sit back in a 1-2-2, protect the middle and wait for mistakes — fewer penalties and fresher legs, but you concede more of the puck.",
+    balanced: "Standard forechecking pressure.",
+    aggressive: "Hound the puck deep in a 2-1-2 — you pin them in and force turnovers, but a beaten forecheck gives up odd-man rushes and you take more penalties + tire faster. Wants checking (CK) and speed (SK).",
+  },
+  puckStyle: {
+    cycle: "Grind it down low and cycle — more sustained-pressure shots, but each is a touch lower quality. Wants passing (PA) and strength (ST).",
+    balanced: "Mixed attack, no signature.",
+    rush: "Attack off the rush and transition — fewer shots, but far more dangerous ones from the slot. Wants finishing (SC), passing (PA) and speed (SK).",
+    shotVolume: "Throw everything at the net from everywhere — lots of point shots, screens and rebounds; high volume, lower average danger. Wants shooters (SC) and net-front size (weight).",
+  },
+  dZone: {
+    collapse: "Collapse into a box, block shots and take away the slot — you cede the perimeter but starve them of high-danger looks. Wants defence (DF).",
+    balanced: "Standard defensive-zone coverage.",
+    aggressive: "Pressure the puck man-to-man in your own end — more takeaways, but if you lose your check the danger against goes up, and you take a few more penalties. Wants defence (DF) and speed (SK).",
+  },
+};
+
+// What each row in the "Projected effect" panel means.
+export const EFFECT_DESC: Record<string, string> = {
+  shotRate: "How many shots your team generates.",
+  oppShotRate: "How many shots you give up to the opponent.",
+  dangerMix: "The quality of your chances — slot & net-front vs perimeter.",
+  oppDangerMult: "The quality of chances you allow the opponent.",
+  takeaway: "How hard you hunt the puck — forcing turnovers on the forecheck.",
+  fatigue: "How quickly your skaters tire over a shift and a game.",
+  penaltyMult: "How many penalties your team takes.",
+};

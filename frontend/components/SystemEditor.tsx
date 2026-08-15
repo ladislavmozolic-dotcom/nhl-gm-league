@@ -2,16 +2,16 @@
 
 import { useState, useTransition, useMemo } from "react";
 import {
-  resolveTactics, PRESETS, DIAL_LABELS, mergeTactics,
+  resolveTactics, PRESETS, DIAL_LABELS, DIAL_DESC, EFFECT_DESC, mergeTactics,
   type TeamTactics, type RosterProfile, type Tempo, type Forecheck, type PuckStyle, type DZone,
 } from "@/lib/sim/tactics";
 import { saveSystem } from "@/app/teams/[slug]/tactics/actions";
 
 const DIALS = [
-  { key: "tempo", label: "Tempo", hint: "Fast = more chances both ways + fatigue; slow = controlled, fewer" },
-  { key: "forecheck", label: "Forecheck", hint: "Aggressive = pin them in, but exposed on the counter + penalties" },
-  { key: "puckStyle", label: "Puck Style", hint: "Rush = fewer but dangerous; shot-volume = lots of point shots" },
-  { key: "dZone", label: "D-Zone", hint: "Collapse = block the slot, cede the perimeter; aggressive = pressure" },
+  { key: "tempo", label: "Tempo", hint: "How fast you play — pace of the game" },
+  { key: "forecheck", label: "Forecheck", hint: "How hard you pressure the puck in the offensive & neutral zones" },
+  { key: "puckStyle", label: "Puck Style", hint: "How your offence generates chances" },
+  { key: "dZone", label: "D-Zone", hint: "How you defend your own end" },
 ] as const;
 
 function fitLabel(fit: number): { text: string; cls: string } {
@@ -23,14 +23,14 @@ function fitLabel(fit: number): { text: string; cls: string } {
 }
 
 // a signed % chip for an effect multiplier
-function Chip({ label, mult, invert = false }: { label: string; mult: number; invert?: boolean }) {
+function Chip({ label, mult, invert = false, title }: { label: string; mult: number; invert?: boolean; title?: string }) {
   const pct = Math.round((mult - 1) * 100);
   const good = invert ? pct < 0 : pct > 0;
   const neutral = pct === 0;
   const cls = neutral ? "text-slate-500" : good ? "text-emerald-400" : "text-red-400";
   return (
-    <div className="flex items-center justify-between text-sm py-1 border-b border-slate-800/60">
-      <span className="text-slate-400">{label}</span>
+    <div className="flex items-center justify-between text-sm py-1 border-b border-slate-800/60" title={title}>
+      <span className="text-slate-400 cursor-help border-b border-dotted border-slate-700">{label}</span>
       <span className={`tabular-nums font-semibold ${cls}`}>{pct > 0 ? "+" : ""}{pct}%</span>
     </div>
   );
@@ -52,8 +52,14 @@ export default function SystemEditor({ teamId, profile, initial, coachEx = 70 }:
     <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
       {/* dials + presets */}
       <div className="space-y-5">
+        <div className="bg-slate-900/40 rounded-lg border border-slate-800 p-4 text-sm text-slate-400 space-y-1.5">
+          <p><span className="text-slate-200 font-semibold">Your team&apos;s identity.</span> Pick four dials (or a ready-made preset). Every dial has an upside and a real cost.</p>
+          <p><span className="text-emerald-400 font-semibold">System Fit</span> is the key: benefits scale with how well your roster suits the system, but the costs (fatigue, penalties, shots against) apply no matter what — so force a system your players can&apos;t run and you pay the price for little reward. A good coach (high EX) helps execute it.</p>
+          <p className="text-slate-500">All-<em>Balanced</em> = no effect, play it straight.</p>
+        </div>
+
         <div>
-          <div className="text-xs uppercase tracking-wide text-slate-500 mb-2">Presets</div>
+          <div className="text-xs uppercase tracking-wide text-slate-500 mb-2">Presets <span className="normal-case text-slate-600">— one-click ready systems</span></div>
           <div className="flex flex-wrap gap-2">
             {Object.keys(PRESETS).map((name) => (
               <button key={name} onClick={() => applyPreset(name)}
@@ -69,6 +75,7 @@ export default function SystemEditor({ teamId, profile, initial, coachEx = 70 }:
         {DIALS.map((d) => {
           const opts = DIAL_LABELS[d.key];
           const val = tac[d.key] as string;
+          const desc = DIAL_DESC[d.key][val];
           return (
             <div key={d.key}>
               <div className="flex items-baseline justify-between mb-1.5">
@@ -86,6 +93,7 @@ export default function SystemEditor({ teamId, profile, initial, coachEx = 70 }:
                   </button>
                 ))}
               </div>
+              {desc && <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{desc}</p>}
             </div>
           );
         })}
@@ -104,17 +112,19 @@ export default function SystemEditor({ teamId, profile, initial, coachEx = 70 }:
               style={{ width: `${Math.max(0, Math.min(100, (eff.fit - 0.6) / 0.55 * 100))}%` }} />
           </div>
           <p className={`text-xs mt-2 ${fl.cls}`}>{fl.text}</p>
+          <p className="text-[11px] text-slate-600 mt-1">How well your roster suits the chosen dials (100 = neutral). Higher = your players fit; lower = they don&apos;t.</p>
         </div>
 
         <div className="bg-slate-900/40 rounded-lg border border-slate-800 p-4">
-          <div className="text-xs uppercase tracking-wide text-slate-500 mb-2">Projected effect</div>
-          <Chip label="Your shot volume" mult={eff.shotRate} />
-          <Chip label="Shots against" mult={eff.oppShotRate} invert />
-          <Chip label="Your chance quality" mult={eff.dangerMix} />
-          <Chip label="Opponent chance quality" mult={eff.oppDangerMult} invert />
-          <Chip label="Forechecking pressure" mult={eff.takeaway} />
-          <Chip label="Fatigue" mult={eff.fatigue} invert />
-          <Chip label="Penalties taken" mult={eff.penaltyMult} invert />
+          <div className="text-xs uppercase tracking-wide text-slate-500 mb-2">Projected effect <span className="normal-case text-slate-600">— vs a balanced system</span></div>
+          <Chip label="Your shot volume" mult={eff.shotRate} title={EFFECT_DESC.shotRate} />
+          <Chip label="Shots against" mult={eff.oppShotRate} invert title={EFFECT_DESC.oppShotRate} />
+          <Chip label="Your chance quality" mult={eff.dangerMix} title={EFFECT_DESC.dangerMix} />
+          <Chip label="Opponent chance quality" mult={eff.oppDangerMult} invert title={EFFECT_DESC.oppDangerMult} />
+          <Chip label="Forechecking pressure" mult={eff.takeaway} title={EFFECT_DESC.takeaway} />
+          <Chip label="Fatigue" mult={eff.fatigue} invert title={EFFECT_DESC.fatigue} />
+          <Chip label="Penalties taken" mult={eff.penaltyMult} invert title={EFFECT_DESC.penaltyMult} />
+          <p className="text-[11px] text-slate-600 mt-2">Green = helps you, red = hurts you. Hover a row for what it means.</p>
         </div>
 
         <button onClick={save} disabled={pending}
