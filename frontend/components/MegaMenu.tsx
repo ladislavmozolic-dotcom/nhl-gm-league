@@ -45,6 +45,7 @@ const menuItems: MenuItem[] = [
     children: [
       { label: "Individual Leaders", href: "/stats/leaders" },
       { label: "Advanced Stats", href: "/stats/advanced" },
+      { label: "EDGE Tracking", href: "/stats/edge" },
       { label: "Player Stats", href: "/stats/players" },
       { label: "Goalie Stats", href: "/stats/goalies" },
       { label: "Team Stats", href: "/stats/teams" },
@@ -122,6 +123,7 @@ const menuItems: MenuItem[] = [
       { label: "AHL Schedule", href: "/schedule?league=AHL" },
       { label: "AHL Scores", href: "/scores?league=AHL" },
       { label: "Individual Leaders", href: "/stats/leaders?league=AHL" },
+      { label: "EDGE Tracking", href: "/stats/edge?league=AHL" },
       { label: "Player Stats", href: "/stats/players?league=AHL" },
       { label: "Goalie Stats", href: "/stats/goalies?league=AHL" },
       { label: "Team Stats", href: "/stats/teams?league=AHL" },
