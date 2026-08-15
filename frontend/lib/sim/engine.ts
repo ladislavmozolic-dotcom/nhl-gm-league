@@ -943,7 +943,8 @@ const INJ_PARTS: Record<InjuryMechanism, string[]> = {
   "Blocked shot": ["Hand", "Foot", "Ankle", "Lower Body"],
   "Fight": ["Hand", "Facial", "Upper Body"],
   "Collision": ["Knee", "Concussion", "Upper Body", "Ankle"],
-  "Fatigue": ["Groin", "Knee", "Lower Body", "Hip", "Back"],
+  "Fatigue": ["Groin", "Lower Body", "Hip", "Lower Body"],
+  "Non-contact": ["Lower Body", "Upper Body", "Lower Body"], // NHL-style vague report
 };
 
 function severityOf(days: number): InjurySeverity {
@@ -1031,17 +1032,23 @@ function generateInjuries(st: SimState) {
       addInjury(st, team, victim, "Blocked shot");
     }
 
-    // 3) FATIGUE / non-contact — a player worn down by heavy minutes breaks down
-    //    (groin, knee, hip). Victim strongly weighted toward the most-played skaters
-    //    (ice-time²) and the most tired (low condition) + low durability — the guy
-    //    logging 25 min a night on a back-to-back, exactly what the name implies.
-    const fatigueLambda = 0.20 * scale;
-    for (let i = 0; i < st.rng.poisson(fatigueLambda); i++) {
-      const victim = pool[st.rng.weighted(pool.map((s) => {
-        const worn = (118 - s.con) / 20;                 // tired legs (con drops with workload)
-        return s.iceTime * s.iceTime * (115 - s.attrs.du) * Math.max(0.4, worn);
-      }))];
-      addInjury(st, team, victim, "Fatigue");
+    // 3) NON-CONTACT — a lower/upper-body knock, reported vaguely like the real NHL.
+    //    It's labelled "Fatigue" ONLY when the victim is genuinely worn down (CON < 95
+    //    from heavy minutes / double-shifts / a back-to-back); otherwise it's just a
+    //    generic Lower/Upper Body injury. Victim weighted toward the most-played and
+    //    most tired skaters either way.
+    const nonContactLambda = 0.20 * scale;
+    for (let i = 0; i < st.rng.poisson(nonContactLambda); i++) {
+      // spread across the roster by exposure (ice time) + fragility (low DU); NOT
+      // over-weighted to the tired, so a non-contact knock can hit anyone. Whoever
+      // is bottomed out at the CON floor gets the "Fatigue" label below; the rest
+      // are generic body injuries.
+      const victim = pool[st.rng.weighted(pool.map((s) => s.iceTime * (115 - s.attrs.du)))];
+      // "Fatigue" only for a victim bottomed out at the CON floor (~95) — genuinely
+      // gassed from heavy minutes / double-shifts / a back-to-back, the exception a
+      // well-managed team mostly avoids. Everyone else is a generic Lower/Upper Body
+      // knock, reported vaguely like the real NHL.
+      addInjury(st, team, victim, victim.con < 95.5 ? "Fatigue" : "Non-contact");
     }
 
     // 4) FIGHT injuries — a combatant (rare) tweaks a hand.

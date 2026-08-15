@@ -557,7 +557,7 @@ export default function GameView({ data }: { data: Data }) {
                   <span>
                     {inj.playerSlug ? <Link href={`/players/${inj.playerSlug}`} className="font-semibold text-red-200 hover:text-red-100">{inj.playerName}</Link> : <span className="font-semibold text-red-200">{inj.playerName}</span>}
                     {" — "}<span className="text-slate-300">{inj.part}</span>
-                    <span className="text-slate-500"> ({inj.mechanism.toLowerCase()}{inj.byName ? ` by ${inj.byName}` : ""})</span>
+                    {inj.mechanism !== "Non-contact" && <span className="text-slate-500"> ({inj.mechanism.toLowerCase()}{inj.byName ? ` by ${inj.byName}` : ""})</span>}
                     {" · "}<span className={sevClass(inj.severity)}>{inj.severity}</span>
                     <span className="text-slate-500"> · out ~{inj.days}d</span>
                   </span>
