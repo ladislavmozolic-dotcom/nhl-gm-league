@@ -2,15 +2,15 @@
 // client components (the line editor) and on the server.
 
 import type { GameStrategy } from "./types";
-import { mergeTactics, type TeamTactics } from "./tactics";
+import { mergeTactics, type TeamTactics, type PuckStyle, type DZone } from "./tactics";
 
 import type { LineTactic } from "./types";
 export type { GameStrategy, StratWeights, LineTactic } from "./types";
 // Per-line tactic (STHS): PHY = physical/forecheck, DF = defensive commitment,
 // OF = offensive push. Small integers (0-5). Neutral baseline is PHY 1 / DF 2 / OF 2.
 export const NEUTRAL_TACTIC: LineTactic = { phy: 1, df: 2, of: 2 };
-export type ForwardLine = { lw: number | null; c: number | null; rw: number | null; timePct: number; tactic?: LineTactic };
-export type DefensePair = { ld: number | null; rd: number | null; timePct: number; tactic?: LineTactic };
+export type ForwardLine = { lw: number | null; c: number | null; rw: number | null; timePct: number; tactic?: LineTactic; puck?: PuckStyle };
+export type DefensePair = { ld: number | null; rd: number | null; timePct: number; tactic?: LineTactic; dzone?: DZone };
 /** A generic ordered special-teams / situational unit (slots + ice-time share + tactic). */
 export type SpecialUnit = { players: (number | null)[]; timePct: number; tactic?: LineTactic };
 export type Others = {

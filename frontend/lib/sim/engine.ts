@@ -775,6 +775,11 @@ function simulatePeriodPossession(st: SimState, period: number) {
     // suppresses). Neutral CK1/DF2/OF2 → 1.0, no effect.
     const atkTilt = lineTilt(carrierTeam.fwdTactics[shifts[carrierTeam.id].fIdx]);
     const defTilt = lineTilt(def.defTactics[shifts[def.id].dIdx]);
+    // per-line SYSTEM: the on-ice forward line's Puck Style drives its shot rate &
+    // chance quality; the on-ice D pair's D-Zone drives how much danger it allows &
+    // its takeaways. Falls back to the team system when a unit has no override.
+    const atkFx = carrierTeam.fwdLineFx[shifts[carrierTeam.id].fIdx] ?? carrierTeam.tactics;
+    const defFx = def.defPairFx[shifts[def.id].dIdx] ?? def.tactics;
     // pick a defending skater; fall back to forwards if a (thin AHL) roster has no D
     // on ice, and never let it be undefined — an empty pool would otherwise crash.
     const dPool = onIceD(def).length ? onIceD(def) : def.defense.length ? def.defense : def.forwards;
@@ -797,7 +802,7 @@ function simulatePeriodPossession(st: SimState, period: number) {
     // a passive forecheck concedes possession. Contained to this node so it doesn't
     // over-suppress the opponent (see tactics.ts).
     if (rng.chance(0.09)) {
-      const keep = Math.pow(ratio(atkSkill(carrier.attrs.sk ?? 50), defSkill(dman.attrs.df ?? 50)), def.tactics.takeaway);
+      const keep = Math.pow(ratio(atkSkill(carrier.attrs.sk ?? 50), defSkill(dman.attrs.df ?? 50)), defFx.takeaway);
       if (!rng.chance(keep)) { // turnover — defenders take over in their own zone
         carrierTeam = def; carrier = pickByAttr(rng, onIceD(def).concat(onIceF(def)), (s) => (s.attrs.df ?? 50) + (s.attrs.pa ?? 50)) ?? dman;
         zone = "DEF"; setup = "carry"; press = 0; continue;
@@ -817,7 +822,7 @@ function simulatePeriodPossession(st: SimState, period: number) {
     // 3) in the O-zone: an offensive action fires some ticks (shoot vs pass: SC vs PA).
     // team-system tempo/style scales HOW OFTEN the carrier generates a chance, and the
     // defender's posture scales how many it allows.
-    if (!rng.chance(0.29 * carrierTeam.tactics.shotRate * def.tactics.oppShotRate)) continue;
+    if (!rng.chance(0.29 * atkFx.shotRate * def.tactics.oppShotRate)) continue;
     if (rng.chance(ratio(atkSkill(carrier.attrs.sc ?? 50), (carrier.attrs.pa ?? 50), 0.7))) {
       // SHOT — blocked? (DF vs SC)
       if (rng.chance(0.5 * ratio(defSkill(dman.attrs.df ?? 50), atkSkill(carrier.attrs.sc ?? 50)))) { setup = "carry"; continue; } // blocked
@@ -827,7 +832,7 @@ function simulatePeriodPossession(st: SimState, period: number) {
       const baseDanger = carrier.isDefense ? 0.35 : setup === "pass" ? 1.75 : setup === "rebound" ? 1.6 : 1.0;
       // team-system: rush raises chance danger, shot-volume lowers it (more but softer);
       // the defending team's D-zone posture (collapse) suppresses danger.
-      const dangerBias = carrierTeam.tactics.dangerMix * def.tactics.oppDangerMult;
+      const dangerBias = atkFx.dangerMix * defFx.oppDangerMult;
       const danger = baseDanger * dangerBias;
       const strength = strengthAt(carrierTeam, def, tick, active);
       const gLine = liveGoalieLine(st, def.id);

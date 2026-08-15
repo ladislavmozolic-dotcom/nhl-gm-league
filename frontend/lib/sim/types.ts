@@ -100,6 +100,8 @@ export type SimTeam = {
   defTactics: LineTactic[];        // per defense-pair tactic (aligned to the 3 pairs)
   tactics: TacticsEffect;          // Phase 3 team-system multipliers (resolved from dials + roster fit)
   profile: RosterProfile;          // ice-weighted roster attribute averages (drives system fit)
+  fwdLineFx: TacticsEffect[];      // per forward-line effect (team system + the line's own Puck Style override)
+  defPairFx: TacticsEffect[];      // per defence-pair effect (team system + the pair's own D-Zone override)
 };
 
 /** Raw coach card passed into buildTeam. */

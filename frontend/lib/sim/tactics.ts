@@ -139,6 +139,19 @@ export function mergeTactics(partial: Partial<TeamTactics> | null | undefined): 
   return { ...DEFAULT_TACTICS, ...(partial ?? {}) };
 }
 
+/**
+ * Resolve a per-line effect: the team system, with this unit's own Puck Style
+ * (forward line) and/or D-Zone (defence pair) overriding the team dial. Tempo &
+ * Forecheck stay team-level. Returns the full effect for the on-ice unit.
+ */
+export function resolveLineTactics(
+  team: TeamTactics, profile: RosterProfile, coachEx: number,
+  override: { puckStyle?: PuckStyle; dZone?: DZone },
+): TacticsEffect {
+  if (!override.puckStyle && !override.dZone) return resolveTactics(team, profile, coachEx);
+  return resolveTactics({ ...team, ...override }, profile, coachEx);
+}
+
 // Human-readable labels for the UI.
 export const DIAL_LABELS = {
   tempo: { slow: "Slow / Control", balanced: "Balanced", fast: "Fast / Up-tempo" },

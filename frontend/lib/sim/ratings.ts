@@ -11,7 +11,7 @@ import type {
 } from "./types";
 import type { TeamLinesData } from "./lines";
 import { buildUnits, depthChartUnits, playerChemistry, unitSignature } from "./chemistry";
-import { resolveTactics, mergeTactics, type RosterProfile, type TeamTactics } from "./tactics";
+import { resolveTactics, resolveLineTactics, mergeTactics, type RosterProfile, type TeamTactics } from "./tactics";
 
 const clamp = (v: number, lo = 20, hi = 99) => Math.max(lo, Math.min(hi, v));
 const w = (parts: Array<[number, number]>) => {
@@ -331,7 +331,14 @@ export function buildTeam(input: {
 
   // Phase 3 team system: ice-weighted roster profile → resolve the dials + fit.
   const profile = rosterProfile(roster);
-  const tactics = resolveTactics(mergeTactics(input.system ?? input.lines?.system), profile, input.coach?.ex ?? 70);
+  const teamTac = mergeTactics(input.system ?? input.lines?.system);
+  const coachEx = input.coach?.ex ?? 70;
+  const tactics = resolveTactics(teamTac, profile, coachEx);
+  // Per-line overrides: a forward line's Puck Style / a D pair's D-Zone (else team).
+  const fwdLineFx = (input.lines?.forwardLines ?? []).map((l) =>
+    resolveLineTactics(teamTac, profile, coachEx, { puckStyle: l.puck }));
+  const defPairFx = (input.lines?.defensePairs ?? []).map((p) =>
+    resolveLineTactics(teamTac, profile, coachEx, { dZone: p.dzone }));
 
   return {
     id: input.id,
@@ -358,6 +365,8 @@ export function buildTeam(input: {
     defTactics: (input.lines?.defensePairs ?? []).map((p) => p.tactic ?? { phy: 1, df: 2, of: 2 }),
     tactics,
     profile,
+    fwdLineFx,
+    defPairFx,
   };
 }
 

@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { autoFill, type TeamLinesData, type ForwardLine, type DefensePair, type SpecialUnit } from "@/lib/sim/lines-core";
+import { DIAL_LABELS, type PuckStyle, type DZone } from "@/lib/sim/tactics";
 import type { GameStrategy, StratWeights } from "@/lib/sim/types";
 
 type Player = { id: number; name: string; position: string; overall: number };
@@ -111,6 +112,18 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
   const tac = (t?: { phy: number; df: number; of: number }) => t ?? NEUT;
   const setFwdTac = (i: number, k: "phy" | "df" | "of", v: number) => change((d) => { d.forwardLines[i].tactic = { ...tac(d.forwardLines[i].tactic), [k]: v }; });
   const setDefTac = (i: number, k: "phy" | "df" | "of", v: number) => change((d) => { d.defensePairs[i].tactic = { ...tac(d.defensePairs[i].tactic), [k]: v }; });
+  // per-line SYSTEM override (empty = inherit the team system). Forward lines pick a
+  // Puck Style; D pairs pick a D-Zone. Lets e.g. a defensive 4th line under an
+  // attacking team, or a shut-down pair under an aggressive one.
+  const setFwdPuck = (i: number, v: PuckStyle | "") => change((d) => { if (v) d.forwardLines[i].puck = v; else delete d.forwardLines[i].puck; });
+  const setDefDzone = (i: number, v: DZone | "") => change((d) => { if (v) d.defensePairs[i].dzone = v; else delete d.defensePairs[i].dzone; });
+  const SysSelect = ({ value, opts, onChange }: { value: string | undefined; opts: Record<string, string>; onChange: (v: string) => void }) => (
+    <select value={value ?? ""} onChange={(e) => onChange(e.target.value)}
+      className={`bg-slate-800 border rounded px-1.5 py-1 text-xs ${value ? "border-sky-600 text-sky-300" : "border-slate-700 text-slate-400"}`}>
+      <option value="">Team</option>
+      {Object.entries(opts).filter(([k]) => k !== "balanced").map(([k, lbl]) => <option key={k} value={k}>{lbl}</option>)}
+    </select>
+  );
   const setUnitTac = (key: keyof TeamLinesData["situations"] & string, ui: number, k: "phy" | "df" | "of", v: number) =>
     change((d) => { const u = (d.situations[key] as SpecialUnit[])[ui]; u.tactic = { ...tac(u.tactic), [k]: v }; });
   // three PHY/DF/OF steppers for one unit's tactic (clamped 0..5, red when the row ≠ 5)
@@ -125,7 +138,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
   };
 
   const ForwardSection = (
-    <UnitBlock title="5 vs 5 Forward" head={["#", "Left Wing", "Center", "Right Wing", "PHY", "DF", "OF", "Time %"]} timeTotal={timeSum(data.forwardLines)}>
+    <UnitBlock title="5 vs 5 Forward" head={["#", "Left Wing", "Center", "Right Wing", "PHY", "DF", "OF", "System", "Time %"]} timeTotal={timeSum(data.forwardLines)}>
       {data.forwardLines.map((l, i) => (
         <tr key={i} className="border-b border-slate-800/60">
           <td className="px-2 py-1.5 text-slate-500">{i + 1}</td>
@@ -133,6 +146,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
           <td className="px-2"><Select value={l.c} onChange={(v) => setFwd(i, "c", v)} pool={forwards} /></td>
           <td className="px-2"><Select value={l.rw} onChange={(v) => setFwd(i, "rw", v)} pool={forwards} /></td>
           <TacCells t={l.tactic} onSet={(k, v) => setFwdTac(i, k, v)} />
+          <td className="px-2"><SysSelect value={l.puck} opts={DIAL_LABELS.puckStyle} onChange={(v) => setFwdPuck(i, v as PuckStyle | "")} /></td>
           <td className="px-2 py-1.5 text-right"><Stepper value={l.timePct} step={1} onChange={(v) => setFwd(i, "timePct", v as unknown as number)} /></td>
         </tr>
       ))}
@@ -140,13 +154,14 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
   );
 
   const DefenseSection = (
-    <UnitBlock title="5 vs 5 Defense" head={["#", "Left Defense", "Right Defense", "PHY", "DF", "OF", "Time %"]} timeTotal={timeSum(data.defensePairs)}>
+    <UnitBlock title="5 vs 5 Defense" head={["#", "Left Defense", "Right Defense", "PHY", "DF", "OF", "System", "Time %"]} timeTotal={timeSum(data.defensePairs)}>
       {data.defensePairs.map((p, i) => (
         <tr key={i} className="border-b border-slate-800/60">
           <td className="px-2 py-1.5 text-slate-500">{i + 1}</td>
           <td className="px-2"><Select value={p.ld} onChange={(v) => setDef(i, "ld", v)} pool={defense} /></td>
           <td className="px-2"><Select value={p.rd} onChange={(v) => setDef(i, "rd", v)} pool={defense} /></td>
           <TacCells t={p.tactic} onSet={(k, v) => setDefTac(i, k, v)} />
+          <td className="px-2"><SysSelect value={p.dzone} opts={DIAL_LABELS.dZone} onChange={(v) => setDefDzone(i, v as DZone | "")} /></td>
           <td className="px-2 py-1.5 text-right"><Stepper value={p.timePct} step={1} onChange={(v) => setDef(i, "timePct", v as unknown as number)} /></td>
         </tr>
       ))}
@@ -255,8 +270,8 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
         ))}
       </div>
 
-      {tab === "Forward" && ForwardSection}
-      {tab === "Defense" && DefenseSection}
+      {tab === "Forward" && <>{ForwardSection}<p className="text-xs text-slate-500 mt-2 px-1">💡 <strong>System</strong>: give a line its own Puck Style (else it inherits the team system from <em>Team → System</em>). E.g. set your 4th line to <em>Cycle</em> while the team runs <em>Rush</em>. Tempo &amp; Forecheck stay team-wide.</p></>}
+      {tab === "Defense" && <>{DefenseSection}<p className="text-xs text-slate-500 mt-2 px-1">💡 <strong>System</strong>: give a pair its own D-Zone (else it inherits the team system). E.g. a <em>Collapse</em> shut-down pair for defending a lead.</p></>}
       {tab === "PP" && SplitUnitSection("pp", "Power Play (5 on 4)", 3, 2)}
       {tab === "4 vs 4" && SplitUnitSection("fourVFour", "4 vs 4", 2, 2)}
       {tab === "PK4" && SplitUnitSection("pk4", "Penalty Kill (4 on 5)", 2, 2)}
