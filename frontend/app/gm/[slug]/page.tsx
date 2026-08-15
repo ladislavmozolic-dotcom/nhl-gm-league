@@ -83,7 +83,7 @@ export default async function GmProfilePage({ params }: { params: Promise<{ slug
                       <td className="pr-2 text-slate-400">{p.position}</td>
                       <td className="text-right px-1.5 tabular-nums">{p.ov}</td>
                       <td className="text-right px-1.5 tabular-nums text-slate-400">{p.potential}</td>
-                      <td className="text-right pl-1.5">{p.status ? <span className={p.status === "NHL" ? "text-emerald-400" : "text-slate-400"}>{p.status}{p.overall ? ` ${p.overall}` : ""}</span> : <span className="text-slate-600">prospect</span>}</td>
+                      <td className="text-right pl-1.5">{p.ov >= 85 ? <span className="text-amber-400">⭐ star</span> : p.ov >= 78 ? <span className="text-emerald-400">NHL-calibre</span> : <span className="text-slate-600">developing</span>}</td>
                     </tr>
                   ))}
                 </tbody>

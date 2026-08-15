@@ -135,11 +135,10 @@ export async function runRetirementsAction() {
  *  yet (one-time / after a draft), then develop all prospects one step. */
 export async function developProspectsAction() {
   if (!(await isAdmin())) throw new Error("Only a league admin can develop prospects.");
-  const { backfillProspectPlayers, developProspects } = await import("@/lib/prospect-dev-server");
-  const created = await backfillProspectPlayers();
+  const { developProspects } = await import("@/lib/prospect-dev-server");
   const dev = await developProspects();
-  for (const p of ["/hall-of-fame", "/teams", "/players/all", "/admin/season", "/admin/dashboard"]) revalidatePath(p);
-  return { created, ...dev };
+  for (const p of ["/teams", "/admin/season", "/admin/dashboard"]) revalidatePath(p);
+  return { created: 0, ...dev };
 }
 
 /** Admin: simulate the NEXT scheduled day (one round) — a manual fallback if the

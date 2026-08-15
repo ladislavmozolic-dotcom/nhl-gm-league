@@ -4,6 +4,7 @@
 
 import { prisma } from "./prisma";
 import { franchiseHistory } from "./career-server";
+import { draftSourceFilter } from "./prospect-dev-server";
 
 export type Achievement = { key: string; icon: string; label: string; desc: string; earned: boolean };
 export type DraftPickRow = { name: string; position: string; year: number; round: number; overallPick: number; ov: number; potential: number; playerSlug: string | null; status: string | null; overall: number | null };
@@ -21,23 +22,21 @@ export type GmProfile = {
 // A franchise's draft record from its own-league selections (DraftProspect). Links
 // to the developed Player via playerId when set → "hit" = a pick now in the NHL.
 export async function franchiseDraftRecord(teamId: number): Promise<DraftRecord> {
-  // this league's own drafts only (2026 onward); earlier years are imported real
-  // NHL draft history, not this GM's selections.
+  // this league's OWN drafts only (2026 onward, matching the active roster world —
+  // profinhl picks are source null/"profinhl", the real-NHL import is source "real").
+  const src = await draftSourceFilter();
   const picks = await prisma.draftProspect.findMany({
-    where: { draftedByTeamId: teamId, overallPick: { not: null }, draftYear: { gte: 2026 } },
-    select: { name: true, position: true, draftYear: true, overallPick: true, ov: true, potential: true, playerId: true },
+    where: { draftedByTeamId: teamId, overallPick: { not: null }, draftYear: { gte: 2026 }, ...src },
+    select: { name: true, position: true, draftYear: true, overallPick: true, ov: true, potential: true },
     orderBy: [{ draftYear: "desc" }, { overallPick: "asc" }],
   });
-  const linkedIds = picks.map((p) => p.playerId).filter((x): x is number => x != null);
-  const players = linkedIds.length ? await prisma.player.findMany({ where: { id: { in: linkedIds } }, select: { id: true, slug: true, rosterType: true, overall: true } }) : [];
-  const pById = new Map(players.map((p) => [p.id, p]));
   let hits = 0, stars = 0;
   const list: DraftPickRow[] = picks.map((p) => {
-    const pl = p.playerId != null ? pById.get(p.playerId) : undefined;
-    // a "hit" = developed into NHL-calibre talent (on an NHL roster, or overall >= 78)
-    if (pl && (pl.rosterType === "NHL" || (pl.overall ?? 0) >= 78)) hits++;
-    if (pl && (pl.overall ?? 0) >= 85) stars++;
-    return { name: p.name, position: p.position, year: p.draftYear, round: Math.max(1, Math.ceil((p.overallPick ?? 1) / 32)), overallPick: p.overallPick ?? 0, ov: p.ov, potential: p.potential, playerSlug: pl?.slug ?? null, status: pl?.rosterType ?? null, overall: pl?.overall ?? null };
+    // a "hit" = a prospect whose developed OV reaches NHL-calibre; star = 85+
+    const ov = p.ov ?? 0;
+    if (ov >= 78) hits++;
+    if (ov >= 85) stars++;
+    return { name: p.name, position: p.position, year: p.draftYear, round: Math.max(1, Math.ceil((p.overallPick ?? 1) / 32)), overallPick: p.overallPick ?? 0, ov, potential: p.potential, playerSlug: null, status: null, overall: ov };
   });
   return { picks: picks.length, hits, stars, list };
 }

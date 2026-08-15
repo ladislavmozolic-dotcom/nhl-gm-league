@@ -130,8 +130,6 @@ export async function makePickAction(prospectId: number) {
     prisma.prospect.create({ data: { name: prospect.name, position: prospect.position, draftYear: YEAR, overallPick: s.currentPick, teamId: slot.pickerTeamId, source } }),
     prisma.draftState.update({ where: { year: YEAR }, data: { currentPick: nextPick, onClockAt: (roundDone || done) ? null : new Date(), status: done ? "DONE" : roundDone ? "ROUND_DONE" : "LIVE" } }),
   ]);
-  // the pick becomes a real PROSPECT player in the club's org (develops over seasons)
-  try { const { createProspectPlayerForPick } = await import("@/lib/prospect-dev-server"); await createProspectPlayerForPick(prospectId); } catch (e) { console.error("[makePick] prospect player:", e); }
   revalidatePath("/draft/room");
   return { ok: true, roundDone, done };
 }
