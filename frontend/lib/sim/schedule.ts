@@ -104,26 +104,30 @@ function fillToTarget(
     count.set(f.awayTeamId, (count.get(f.awayTeamId) ?? 0) + 1);
   }
   const conf = new Map(teams.map((t) => [t.id, t.conference]));
-  const pairs: Array<[number, number]> = [];
-  for (let i = 0; i < teams.length; i++)
-    for (let j = i + 1; j < teams.length; j++)
-      if (conf.get(teams[i].id) === conf.get(teams[j].id))
-        pairs.push([teams[i].id, teams[j].id]);
+  const deficit = (id: number) => target - (count.get(id) ?? 0);
 
+  // Max-deficit matching: always pair the two neediest clubs (same conference
+  // when possible), so no team is ever left stranded a game or two short — the
+  // old greedy pass got stuck when a straggler's only partners were already full.
+  // Total deficit is even (each conference has an even team count), so this always
+  // drains to zero and every club lands on exactly `target`.
   const extra: Fixture[] = [];
-  let progress = true;
-  while (progress) {
-    progress = false;
-    for (const [a, b] of pairs) {
-      if ((count.get(a) ?? 0) >= target || (count.get(b) ?? 0) >= target) continue;
-      const home = ((count.get(a)! + count.get(b)!) % 2 === 0) ? a : b;
-      const away = home === a ? b : a;
-      extra.push({ round: startRound + Math.floor(extra.length / (teams.length / 2)), homeTeamId: home, awayTeamId: away });
-      count.set(a, count.get(a)! + 1);
-      count.set(b, count.get(b)! + 1);
-      progress = true;
-    }
+  let guard = 0;
+  while (guard++ < 5000) {
+    const needy = teams.map((t) => t.id).filter((id) => deficit(id) > 0)
+      .sort((a, b) => deficit(b) - deficit(a) || a - b);
+    if (needy.length < 2) break;
+    const a = needy[0];
+    // prefer the neediest same-conference partner; else the neediest overall
+    const partner = needy.slice(1).find((id) => conf.get(id) === conf.get(a)) ?? needy[1];
+    const home = ((count.get(a)! + count.get(partner)!) % 2 === 0) ? a : partner;
+    const away = home === a ? partner : a;
+    extra.push({ round: startRound, homeTeamId: home, awayTeamId: away });
+    count.set(a, count.get(a)! + 1);
+    count.set(partner, count.get(partner)! + 1);
   }
+  // pack the extra games into rounds (assignDays re-spreads by calendar anyway)
+  extra.forEach((f, i) => { f.round = startRound + Math.floor(i / Math.max(1, teams.length / 2)); });
   return extra;
 }
 
