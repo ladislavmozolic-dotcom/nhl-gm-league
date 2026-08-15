@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { getTeamSession } from "@/lib/auth";
+import { getTeamSession, isAdmin } from "@/lib/auth";
 import { loadSettings } from "@/lib/sim/settings";
 import { CURRENT_SEASON_START } from "@/lib/finance";
 import { revalidatePath } from "next/cache";
@@ -183,6 +183,22 @@ export async function respondToTrade(tradeId: number, accept: boolean) {
   await prisma.$transaction(ops);
   revalidatePath("/trades"); revalidatePath("/salary-cap"); revalidatePath("/finance");
   return { status: "ACCEPTED" as const };
+}
+
+/** Commissioner deletes a trade entirely (and its assets/conditions). For clearing
+ *  spam, duplicates, or a mistaken proposal. Does NOT reverse an already-applied
+ *  ACCEPTED trade's roster moves — it only removes the record. */
+export async function deleteTradeAction(tradeId: number) {
+  if (!(await isAdmin())) throw new Error("Only the commissioner can delete trades.");
+  const trade = await prisma.trade.findUnique({ where: { id: tradeId }, select: { id: true, status: true } });
+  if (!trade) throw new Error("Trade not found.");
+  await prisma.$transaction([
+    prisma.tradeAsset.deleteMany({ where: { tradeId } }),
+    prisma.tradeCondition.deleteMany({ where: { tradeId } }),
+    prisma.trade.delete({ where: { id: tradeId } }),
+  ]);
+  revalidatePath("/trades");
+  return { ok: true, wasStatus: trade.status };
 }
 
 /** GM A cancels their own still-pending proposal. */

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { getTeamSession } from "@/lib/auth";
+import { getTeamSession, isAdmin } from "@/lib/auth";
 import { money } from "@/lib/finance";
 import TradeActions from "@/components/TradeActions";
 import { PageHeader } from "@/components/ui";
@@ -10,8 +10,9 @@ export const dynamic = "force-dynamic";
 type AssetLabel = { text: string };
 
 export default async function TradesPage() {
-  const [session, trades, teams] = await Promise.all([
+  const [session, admin, trades, teams] = await Promise.all([
     getTeamSession(),
+    isAdmin(),
     prisma.trade.findMany({ take: 60, orderBy: { createdAt: "desc" } }),
     prisma.team.findMany({ select: { id: true, name: true, code: true, logoUrl: true } }),
   ]);
@@ -67,7 +68,7 @@ export default async function TradesPage() {
         ) : (
           <div className="grid gap-4">
             {pending.map((t) => (
-              <TradeCard key={t.id} trade={t}
+              <TradeCard key={t.id} trade={t} admin={admin}
                 action={session === t.toTeamId ? "receiver" : session === t.fromTeamId ? "proposer" : null} />
             ))}
           </div>
@@ -78,7 +79,7 @@ export default async function TradesPage() {
         <section>
           <h2 className="text-lg font-bold mb-4">History</h2>
           <div className="grid gap-4">
-            {history.map((t) => <TradeCard key={t.id} trade={t} action={null} />)}
+            {history.map((t) => <TradeCard key={t.id} trade={t} action={null} admin={admin} />)}
           </div>
         </section>
       )}
@@ -117,7 +118,7 @@ function AssetList({ team, labels }: { team?: { name: string }; labels: { text: 
   );
 }
 
-function TradeCard({ trade, action }: {
+function TradeCard({ trade, action, admin }: {
   trade: {
     id: number; status: string; condition: string | null; createdAt: Date;
     fromTeam?: { name: string; code: string | null; logoUrl: string | null };
@@ -125,6 +126,7 @@ function TradeCard({ trade, action }: {
     fromLabels: { text: string }[]; toLabels: { text: string }[];
   };
   action: "receiver" | "proposer" | null;
+  admin?: boolean;
 }) {
   return (
     <div className="bg-slate-900/70 rounded-2xl border border-slate-800 shadow-lg shadow-black/20 p-5">
@@ -146,7 +148,7 @@ function TradeCard({ trade, action }: {
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-xs text-slate-600">{trade.createdAt.toLocaleDateString("sk-SK", { day: "numeric", month: "long", year: "numeric" })}</p>
-        {action && <TradeActions tradeId={trade.id} role={action} />}
+        {(action || admin) && <TradeActions tradeId={trade.id} role={action} admin={admin} />}
       </div>
     </div>
   );
