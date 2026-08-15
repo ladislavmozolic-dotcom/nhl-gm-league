@@ -6,6 +6,7 @@
 import { RNG, fixtureSeed } from "./rng";
 import { generatePlayByPlay } from "./playbyplay";
 import { DEFAULT_SETTINGS, type EngineSettings } from "./settings";
+import { EventSink, type SimEvent } from "./events";
 import type {
   SimTeam, SimSkater, SimGoalie, GameResult, TeamBox, PlayerLine, GoalieLine,
   GoalEvent, PenaltyEvent, InjuryEvent, ShootoutAttempt, LineTactic,
@@ -109,7 +110,14 @@ type SimState = {
   rivalry: boolean;                 // heated rivalry game — more fights, scrums, misconducts
   pulled: Record<number, boolean>;  // has this team's starter been yanked for the backup
   shootout: ShootoutAttempt[];      // shootout attempts (empty unless the game went to a shootout)
+  sink: EventSink;                  // next-gen typed event stream (v2)
 };
+
+// Absolute game-clock seconds → period + clock-within-period, for events.
+function clockOf(absSeconds: number): { period: number; seconds: number } {
+  if (absSeconds < 3600) return { period: Math.floor(absSeconds / 1200) + 1, seconds: absSeconds % 1200 };
+  return { period: 4, seconds: absSeconds - 3600 }; // OT
+}
 
 // The goalie currently in net for a team (backup if the starter was pulled).
 function liveGoalie(st: SimState, team: SimTeam): SimGoalie {
@@ -359,6 +367,17 @@ function recordGoal(
     scorer: scorer.id, scorerName: scorer.name, scorerSeasonGoal: sl.goals,
     assists, assistNames, strength, emptyNet,
   });
+
+  st.sink.emit({
+    period, seconds, type: "GOAL",
+    teamId: off.id, teamCode: off.code,
+    playerId: scorer.id, playerName: scorer.name,
+    targetId: liveGoalie(st, def).id, targetName: liveGoalie(st, def).name,
+    zone: "OFF",
+    strength: strength === "SO" ? "EV" : (strength === "PP" ? "PP" : strength === "SH" ? "SH" : "EV"),
+    importance: "HIGHLIGHT",
+    meta: { emptyNet, assistIds: assists, assistNames, seasonGoal: sl.goals, so: strength === "SO" },
+  });
 }
 
 // ---- penalties --------------------------------------------------------------
@@ -399,6 +418,13 @@ function addPenalty(
   st.penalties.push({
     period, seconds: at, time: fmt(at), team: team.id, teamCode: team.code,
     playerId: offender.id, playerName: offender.name, type, minutes, severity,
+  });
+  st.sink.emit({
+    period, seconds: at, type: "PENALTY",
+    teamId: team.id, teamCode: team.code,
+    playerId: offender.id, playerName: offender.name,
+    importance: minutes >= 5 ? "MAJOR" : "NOTABLE",
+    meta: { penalty: type, minutes, severity, givesPP },
   });
 }
 // active list is period-local; addPenalty pushes to it via a per-period ref
@@ -797,6 +823,16 @@ function simulatePeriodPossession(st: SimState, period: number) {
       const p = conversion(shOff, effGoalieQuality(gSim), isHome, strength) * danger * pressBonus
         * momoBoost(st, carrierTeam.id, absT) * clutchFactor(st, carrier, period, tick, margin)
         * offMult * defShield * defTalent * catchUp * ppMod;
+      const highDanger = danger >= 1.5;
+      st.sink.emit({
+        period, seconds: tick, type: "SHOT",
+        teamId: carrierTeam.id, teamCode: carrierTeam.code,
+        playerId: carrier.id, playerName: carrier.name,
+        targetId: gSim.id, targetName: gSim.name,
+        zone: "OFF", strength: strength === "SO" ? "EV" : strength as SimEvent["strength"], xg: p,
+        importance: highDanger ? "NOTABLE" : "MINOR",
+        meta: { danger, setup },
+      });
       if (rng.chance(p)) {
         gLine.goalsAgainst++;
         recordGoal(st, carrierTeam, def, period, tick, strength, false, carrier);
@@ -806,6 +842,15 @@ function simulatePeriodPossession(st: SimState, period: number) {
         state = "FACEOFF"; setup = "carry"; continue;
       }
       gLine.saves++;
+      st.sink.emit({
+        period, seconds: tick, type: "SAVE",
+        teamId: def.id, teamCode: def.code,
+        playerId: gSim.id, playerName: gSim.name,
+        targetId: carrier.id, targetName: carrier.name,
+        zone: "OFF", xg: p,
+        importance: highDanger ? "NOTABLE" : "MINOR",
+        meta: { danger, setup },
+      });
       const rb = gSim.attrs.rb ?? 50;
       if (rng.chance(Math.max(0.05, 0.32 - rb / 300))) { carrier = pickByAttr(rng, onIceF(carrierTeam), (s) => involvement(s.attrs.sc ?? 50) * 60) ?? carrier; setup = "rebound"; } // rebound in the slot (press stays → escalating danger)
       else if (rng.chance(0.12)) { state = "FACEOFF"; setup = "carry"; press = 0; } // goalie freezes it → whistle
@@ -1035,6 +1080,7 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     rivalry: CFG.rivalryEnabled && !!opts.rivalry,
     pulled: {},
     shootout: [],
+    sink: new EventSink(),
   };
   for (const team of [home, away]) {
     for (const s of [...team.forwards, ...team.defense]) {
@@ -1116,6 +1162,7 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     winner: winnerId, loser: loserId, endedIn, periods, otPeriods,
     goals: st.goals, penalties: st.penalties, injuries: st.injuries, playByPlay: [], shootout: st.shootout, seed,
     engineVersion: opts.engineVersion ?? ENGINE_VERSION,
+    events: st.sink.notable(),
   };
   if (CFG.playByPlayEnabled) result.playByPlay = generatePlayByPlay(result, home, away);
   return result;

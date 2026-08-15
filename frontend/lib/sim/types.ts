@@ -2,6 +2,8 @@
 // The engine is DB-agnostic: it operates on plain SimTeam/SimPlayer objects.
 // A loader (index.ts) builds these from Prisma rows.
 
+import type { SimEvent } from "./events";
+
 export type SkaterAttrs = {
   ck: number; fg: number; di: number; sk: number; st: number; en: number;
   du: number; ph: number; fo: number; pa: number; sc: number; df: number;
@@ -233,4 +235,5 @@ export type GameResult = {
   shootout: ShootoutAttempt[]; // shootout attempts in order (empty unless the game went to a shootout)
   seed: number;
   engineVersion?: string;      // which engine produced this game (stamped on the Game row)
+  events?: SimEvent[];         // next-gen notable event stream (persisted to GameEvent)
 };

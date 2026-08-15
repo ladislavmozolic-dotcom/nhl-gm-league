@@ -413,6 +413,7 @@ model Game {
   goalieStats       GoalieGameStat[]
   goalEvents        GameGoal[]
   penaltyEvents     GamePenalty[]
+  events            GameEvent[]
 
   @@index([season, status])
   @@index([homeTeamId])
@@ -435,6 +436,31 @@ model GameGoal {
   game        Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
 
   @@index([gameId])
+}
+
+// Next-gen event stream (v2 engine): the persisted, NOTABLE micro-events a game is
+// built from — the single source of truth for play-by-play, advanced stats and xG.
+// Transient ticks are NOT stored; only events above an importance threshold.
+model GameEvent {
+  id         Int      @id @default(autoincrement())
+  gameId     Int
+  seq        Int      // order within the game
+  period     Int
+  seconds    Int      // clock within the period
+  type       String   // FACEOFF|SHOT|GOAL|SAVE|BLOCK|MISS|REBOUND|HIT|TAKEAWAY|GIVEAWAY|PENALTY|ZONE_ENTRY|...
+  teamId     Int?     // acting team
+  playerId   Int?     // primary actor
+  targetId   Int?     // e.g. hit target, goalie, defender
+  zone       String?  // DEF|NEU|OFF
+  sector     String?  // e.g. SLOT|POINT|LEFT_CIRCLE|NET_FRONT (shot location, later)
+  shotType   String?  // WRIST|SLAP|SNAP|BACKHAND|TIP|ONE_TIMER
+  strength   String?  // EV|PP|SH|EN
+  xg         Float?   // shot-quality / expected-goal probability at the moment
+  importance String   @default("MINOR") // MINOR|NOTABLE|MAJOR|HIGHLIGHT
+  meta       Json?    // small extra payload (assist ids, danger, etc.)
+  game       Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@index([gameId, seq])
 }
 
 model SimSettings {

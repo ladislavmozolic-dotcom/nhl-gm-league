@@ -77,6 +77,13 @@ export async function saveGameResult(result: GameResult, meta: GameMeta = {}) {
     playerId: p.playerId, playerName: p.playerName,
     type: p.type, minutes: p.minutes, severity: p.severity,
   }));
+  const eventRows = (gameId: number) => (result.events ?? []).map((e) => ({
+    gameId, seq: e.seq, period: e.period, seconds: e.seconds, type: e.type,
+    teamId: e.teamId ?? null, playerId: e.playerId ?? null, targetId: e.targetId ?? null,
+    zone: e.zone ?? null, sector: e.sector ?? null, shotType: e.shotType ?? null,
+    strength: e.strength ?? null, xg: e.xg ?? null, importance: e.importance,
+    meta: (e.meta ?? undefined) as object | undefined,
+  }));
 
   return prisma.$transaction(async (tx) => {
     let gameId: number;
@@ -97,6 +104,7 @@ export async function saveGameResult(result: GameResult, meta: GameMeta = {}) {
       await tx.goalieGameStat.deleteMany({ where: { gameId } });
       await tx.gameGoal.deleteMany({ where: { gameId } });
       await tx.gamePenalty.deleteMany({ where: { gameId } });
+      await tx.gameEvent.deleteMany({ where: { gameId } });
     } else {
       const game = await tx.game.create({
         data: {
@@ -121,6 +129,7 @@ export async function saveGameResult(result: GameResult, meta: GameMeta = {}) {
     });
     if (result.goals.length) await tx.gameGoal.createMany({ data: goalRows(gameId) });
     if (result.penalties.length) await tx.gamePenalty.createMany({ data: penaltyRows(gameId) });
+    if (result.events?.length) await tx.gameEvent.createMany({ data: eventRows(gameId) });
 
     return gameId;
   });
