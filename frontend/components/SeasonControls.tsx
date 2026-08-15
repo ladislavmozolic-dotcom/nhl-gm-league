@@ -10,6 +10,7 @@ type Actions = {
   playSeasonAction: () => Promise<{ played: number }>;
   runPlayoffsAction: () => Promise<{ champion: number | null }>;
   resetSeasonAction: () => Promise<void>;
+  runRetirementsAction: () => Promise<{ retired: { name: string; age: number }[]; inducted: string[] }>;
   importNhlApiAction: () => Promise<ImportResult>;
   importCsvAction: (formData: FormData) => Promise<ImportResult>;
 };
@@ -109,6 +110,17 @@ export default function SeasonControls({ state, actions }: { state: State; actio
             onClick={() => run("po", async () => { const r = await actions.runPlayoffsAction(); setMsg(r.champion ? "Playoffs complete — champion crowned." : "Playoffs run."); })} />
           {!seasonDone && <span className="text-xs text-slate-500">Finish the regular season first.</span>}
           <Link href="/admin/simulation" className="text-xs text-slate-400 hover:text-blue-400 ml-auto">Format &amp; engine settings →</Link>
+        </div>
+      </section>
+
+      {/* 3. offseason — retirements + Hall of Fame */}
+      <section className="bg-slate-900/40 border border-slate-800 rounded-xl p-5">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400 mb-3">3 · Offseason</h2>
+        <div className="flex items-center gap-3">
+          <Btn id="retire" label="Run retirements" disabled={!seasonDone}
+            onClick={() => { if (confirm("Retire aging players (age 38+) and induct any who clear the Hall of Fame bar? This changes rosters.")) run("retire", async () => { const r = await actions.runRetirementsAction(); setMsg(`${r.retired.length} retired${r.inducted.length ? ` · ${r.inducted.length} inducted: ${r.inducted.join(", ")}` : ""}.`); }); }} />
+          <span className="text-xs text-slate-500">Aging players retire; Hall-of-Fame résumés get inducted.</span>
+          <Link href="/hall-of-fame" className="text-xs text-slate-400 hover:text-blue-400 ml-auto">Hall of Fame →</Link>
         </div>
       </section>
 

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import SeasonControls from "@/components/SeasonControls";
-import { generateScheduleAction, playSeasonAction, runPlayoffsAction, resetSeasonAction, importNhlApiAction, importCsvAction, archiveSeasonAction } from "./actions";
+import { generateScheduleAction, playSeasonAction, runPlayoffsAction, resetSeasonAction, importNhlApiAction, importCsvAction, archiveSeasonAction, runRetirementsAction } from "./actions";
 import { PageHeader, Card } from "@/components/ui";
 import PrepareNextDraftButton from "@/components/PrepareNextDraftButton";
 import PhaseControl from "@/components/PhaseControl";
@@ -42,7 +42,7 @@ export default async function SeasonAdminPage() {
 
       <SeasonControls
         state={{ played, scheduled, playoffSeries, champion: champ?.name ?? null }}
-        actions={{ generateScheduleAction, playSeasonAction, runPlayoffsAction, resetSeasonAction, importNhlApiAction, importCsvAction }}
+        actions={{ generateScheduleAction, playSeasonAction, runPlayoffsAction, resetSeasonAction, runRetirementsAction, importNhlApiAction, importCsvAction }}
       />
 
       <Card title="Archive season → History" accent="text-amber-400">
