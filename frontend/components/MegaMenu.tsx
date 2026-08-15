@@ -77,6 +77,7 @@ const menuItems: MenuItem[] = [
     label: "League",
     href: "/league",
     children: [
+      { label: "Living League — Nightly", href: "/league/digest" },
       { label: "Team / GM", href: "/league" },
       { label: "Captains", href: "/captains" },
       { label: "Coaches", href: "/coaches" },
