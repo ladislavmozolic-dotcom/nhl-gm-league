@@ -30,7 +30,7 @@ export default async function DigestPage({ searchParams }: { searchParams: Promi
 
   return (
     <div className="space-y-6 py-2">
-      <PageHeader title="Living League" subtitle={`The story of the night — ${dateStr} · ${d.gameCount} games`} />
+      <PageHeader title="Tonight's Best" subtitle={`The story of the night — ${dateStr} · ${d.gameCount} games`} />
 
       <div className="flex items-center justify-between">
         {prev != null ? <Link href={`/league/digest?round=${prev}`} className="px-3 py-1.5 rounded-md bg-slate-800/60 text-sm hover:bg-slate-800">← Previous night</Link> : <span />}

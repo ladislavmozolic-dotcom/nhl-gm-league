@@ -180,6 +180,7 @@ export default async function HomePage() {
           ) : highlights.length > 0 ? (
             <p className="text-xs text-slate-500 mt-2 truncate" title={highlights[0]}>{highlights[0]}</p>
           ) : null}
+          <Link href="/league/digest" className="block mt-2 text-xs text-amber-400 hover:underline">🌙 Tonight&apos;s Best — the story of the night →</Link>
         </div>
       </div>
 
@@ -199,10 +200,13 @@ export default async function HomePage() {
             </div>
           </Card>
 
-          <Card title="Highlights" accent="text-amber-400">
+          <Card title="Tonight's Best" href="/league/digest" accent="text-amber-400">
             {highlights.length ? (
-              <ul className="space-y-2 text-sm text-slate-300">{highlights.map((h, i) => <li key={i}>{h}</li>)}</ul>
-            ) : <p className="text-sm text-slate-500">Highlights (hat tricks, big nights) appear here after each simulation.</p>}
+              <>
+                <ul className="space-y-2 text-sm text-slate-300">{highlights.slice(0, 4).map((h, i) => <li key={i}>{h}</li>)}</ul>
+                <Link href="/league/digest" className="block mt-2 text-xs text-amber-400 hover:underline">Game / Player / Best goalie of the night, upsets, biggest hit →</Link>
+              </>
+            ) : <p className="text-sm text-slate-500">The night&apos;s best — Game &amp; Player of the Night, upsets, biggest hits — appear here after each simulation. <Link href="/league/digest" className="text-amber-400 hover:underline">Open →</Link></p>}
           </Card>
 
           <Card title="Today's Birthdays" accent="text-pink-400">
