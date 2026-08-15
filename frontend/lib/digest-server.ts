@@ -18,7 +18,52 @@ export type DailyDigest = {
   bestGoalie: NightPlayer | null;
   biggestHit: { hitter: string; hitterSlug: string | null; victim: string; victimSlug: string | null; team: string | null; note: string } | null;
   injuries: NightInjury[];
+  hottest: { code: string | null; slug: string | null; name: string; streakLen: number; last10: string } | null;
+  coldest: { code: string | null; slug: string | null; name: string; streakLen: number; last10: string } | null;
+  powerRanking: { rank: number; code: string | null; slug: string | null; points: number; gp: number; streakType: "W" | "L" | "OT" | null; streakLen: number }[];
 };
+
+export type TeamForm = {
+  teamId: number; code: string | null; name: string; slug: string | null;
+  points: number; gp: number; last10: string; // "7-2-1"
+  streakType: "W" | "L" | "OT" | null; streakLen: number; // active streak
+};
+
+/** Per-team form up to and including `round`: active streak + last-10 record. */
+export async function leagueForm(season: string, round: number, league = "NHL"): Promise<TeamForm[]> {
+  const teams = await prisma.team.findMany({ where: { league }, select: { id: true, name: true, code: true, slug: true } });
+  const games = await prisma.game.findMany({
+    where: { season, league, status: "FINAL", seriesId: null, round: { lte: round } },
+    select: { homeTeamId: true, awayTeamId: true, homeGoals: true, awayGoals: true, endedIn: true, round: true, id: true },
+    orderBy: [{ round: "asc" }, { id: "asc" }],
+  });
+  // per-team chronological result list: "W" | "L" | "OT" (OT/SO loss)
+  const seq = new Map<number, ("W" | "L" | "OT")[]>();
+  const pts = new Map<number, number>();
+  for (const t of teams) { seq.set(t.id, []); pts.set(t.id, 0); }
+  for (const g of games) {
+    const hg = g.homeGoals ?? 0, ag = g.awayGoals ?? 0;
+    const homeWon = hg > ag;
+    const otl = g.endedIn !== "REG";
+    const home = seq.get(g.homeTeamId), away = seq.get(g.awayTeamId);
+    if (home) { home.push(homeWon ? "W" : otl ? "OT" : "L"); pts.set(g.homeTeamId, (pts.get(g.homeTeamId) ?? 0) + (homeWon ? 2 : otl ? 1 : 0)); }
+    if (away) { away.push(!homeWon ? "W" : otl ? "OT" : "L"); pts.set(g.awayTeamId, (pts.get(g.awayTeamId) ?? 0) + (!homeWon ? 2 : otl ? 1 : 0)); }
+  }
+  return teams.map((t) => {
+    const s = seq.get(t.id) ?? [];
+    const last10 = s.slice(-10);
+    const w = last10.filter((r) => r === "W").length, l = last10.filter((r) => r === "L").length, o = last10.filter((r) => r === "OT").length;
+    // active streak: walk from the end. A win streak breaks on any non-win;
+    // a skid counts consecutive non-wins (regulation or OT losses).
+    let streakType: "W" | "L" | "OT" | null = null, streakLen = 0;
+    if (s.length) {
+      const last = s[s.length - 1];
+      if (last === "W") { streakType = "W"; for (let i = s.length - 1; i >= 0 && s[i] === "W"; i--) streakLen++; }
+      else { streakType = "L"; for (let i = s.length - 1; i >= 0 && s[i] !== "W"; i--) streakLen++; }
+    }
+    return { teamId: t.id, code: t.code, name: t.name, slug: t.slug, points: pts.get(t.id) ?? 0, gp: s.length, last10: `${w}-${l}-${o}`, streakType, streakLen };
+  });
+}
 
 export async function latestDigestRound(season: string): Promise<number> {
   const g = await prisma.game.findFirst({ where: { season, league: "NHL", status: "FINAL", seriesId: null }, orderBy: { round: "desc" }, select: { round: true } });
@@ -46,7 +91,7 @@ export async function dailyDigest(season: string, round: number): Promise<DailyD
   }));
 
   if (games.length === 0) {
-    return { season, round, date: null, gameCount: 0, scores: [], gameOfNight: null, playerOfNight: null, upset: null, bestGoalie: null, biggestHit: null, injuries: [] };
+    return { season, round, date: null, gameCount: 0, scores: [], gameOfNight: null, playerOfNight: null, upset: null, bestGoalie: null, biggestHit: null, injuries: [], hottest: null, coldest: null, powerRanking: [] };
   }
 
   // team strength proxy = season points (for the upset)
@@ -113,5 +158,16 @@ export async function dailyDigest(season: string, round: number): Promise<DailyD
     team: null, note: `left ${hitInj.playerId != null ? nm.get(hitInj.playerId) : "a player"} with a ${(hitInj.meta as { part?: string })?.part ?? "injury"}`,
   } : null;
 
-  return { season, round, date: date ? date.toISOString() : null, gameCount: games.length, scores, gameOfNight, playerOfNight, upset, bestGoalie, biggestHit, injuries };
+  // STREAKS + POWER RANKING — the league's shape up to this night.
+  const form = await leagueForm(season, round);
+  const hotCand = form.filter((f) => f.streakType === "W" && f.streakLen >= 3).sort((a, b) => b.streakLen - a.streakLen)[0];
+  const coldCand = form.filter((f) => f.streakType === "L" && f.streakLen >= 3).sort((a, b) => b.streakLen - a.streakLen)[0];
+  const hottest = hotCand ? { code: hotCand.code, slug: hotCand.slug, name: hotCand.name, streakLen: hotCand.streakLen, last10: hotCand.last10 } : null;
+  const coldest = coldCand ? { code: coldCand.code, slug: coldCand.slug, name: coldCand.name, streakLen: coldCand.streakLen, last10: coldCand.last10 } : null;
+  const powerRanking = [...form]
+    .sort((a, b) => (b.points / Math.max(1, b.gp)) - (a.points / Math.max(1, a.gp)) || b.points - a.points)
+    .slice(0, 5)
+    .map((f, i) => ({ rank: i + 1, code: f.code, slug: f.slug, points: f.points, gp: f.gp, streakType: f.streakType, streakLen: f.streakLen }));
+
+  return { season, round, date: date ? date.toISOString() : null, gameCount: games.length, scores, gameOfNight, playerOfNight, upset, bestGoalie, biggestHit, injuries, hottest, coldest, powerRanking };
 }

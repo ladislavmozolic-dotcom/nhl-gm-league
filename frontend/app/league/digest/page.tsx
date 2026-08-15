@@ -73,6 +73,26 @@ export default async function DigestPage({ searchParams }: { searchParams: Promi
               <p className="text-sm text-slate-400 mt-1">{d.biggestHit.note}</p>
             </Card>
           )}
+          {(d.hottest || d.coldest) && (
+            <Card title="🌡️ Hot & Cold" accent="text-orange-400 bg-orange-950/10">
+              {d.hottest && <p className="text-sm"><span className="text-orange-400">🔥</span> {tlink(d.hottest.code, d.hottest.slug)} <span className="text-slate-300">won {d.hottest.streakLen} straight</span> <span className="text-slate-500">· {d.hottest.last10} L10</span></p>}
+              {d.coldest && <p className="text-sm mt-1"><span className="text-sky-400">🧊</span> {tlink(d.coldest.code, d.coldest.slug)} <span className="text-slate-300">winless in {d.coldest.streakLen}</span> <span className="text-slate-500">· {d.coldest.last10} L10</span></p>}
+            </Card>
+          )}
+          {d.powerRanking.length > 0 && (
+            <Card title="📊 Power Ranking" accent="text-indigo-400 bg-indigo-950/10">
+              <ol className="space-y-1 text-sm">
+                {d.powerRanking.map((p) => (
+                  <li key={p.rank} className="flex items-center gap-2">
+                    <span className="w-4 text-slate-500 text-xs">{p.rank}</span>
+                    <span className="flex-1">{tlink(p.code, p.slug)}</span>
+                    <span className="tabular-nums text-slate-400">{p.points} pts · {p.gp} GP</span>
+                    {p.streakType && p.streakLen >= 3 && <span className={`text-xs ${p.streakType === "W" ? "text-emerald-400" : "text-red-400"}`}>{p.streakType === "W" ? "W" : "L"}{p.streakLen}</span>}
+                  </li>
+                ))}
+              </ol>
+            </Card>
+          )}
           <Card title="✚ Injury Report" accent="text-red-300 bg-red-950/10">
             {d.injuries.length === 0 ? <p className="text-emerald-400 text-sm">No injuries — a clean night.</p> : (
               <ul className="space-y-1 text-sm">
