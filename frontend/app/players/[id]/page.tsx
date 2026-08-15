@@ -5,6 +5,8 @@ import { cleanName } from "@/lib/playerName";
 import { Card } from "@/components/ui";
 import { posGroup, ratingColor, ovColor } from "@/lib/ratingBands";
 import { playerType } from "@/lib/player-type";
+import { playerCareer } from "@/lib/career-server";
+import PlayerCareerCard from "@/components/PlayerCareerCard";
 
 export const dynamic = "force-dynamic";
 
@@ -213,6 +215,8 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   const hasNhl = isGoalie ? !!(gl.nhlReg || gl.nhlPo) : !!(sk.nhlReg || sk.nhlPo);
   const hasAhl = isGoalie ? !!(gl.ahlReg || gl.ahlPo) : !!(sk.ahlReg || sk.ahlPo);
 
+  const career = await playerCareer(p.id);
+
   const team = p.team as any;
   const teamCode: string = team?.code ?? team?.name ?? "—";
   const backHref = team ? `/teams/${team.slug}` : "/free-agents";
@@ -375,6 +379,9 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
           <div className="py-8 text-center text-slate-500">No games played in {SEASON}.</div>
         )}
       </Card>
+
+      {/* ── CAREER ─────────────────────────────────────────────────── */}
+      <PlayerCareerCard career={career} />
 
       {/* ── INJURY ─────────────────────────────────────────────────── */}
       {p.injuryDaysLeft > 0 && (

@@ -122,5 +122,13 @@ export async function archiveSeason(season: string, league = "NHL") {
       data: a.awards.map((w) => ({ season, league, category: w.category, playerId: w.playerId, playerName: w.playerName, teamId: w.teamId, detail: w.detail })),
     }),
   ]);
+  // Freeze the per-season stat archive (careers + franchise history) before any
+  // reset wipes the per-game rows. Best-effort — never block the award archive.
+  try {
+    const { archiveSeasonStats } = await import("./career-server");
+    await archiveSeasonStats(season, league);
+  } catch (e) {
+    console.error("[archiveSeason] archiveSeasonStats failed:", e);
+  }
   return a;
 }

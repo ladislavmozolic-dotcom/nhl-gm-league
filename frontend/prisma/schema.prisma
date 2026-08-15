@@ -551,6 +551,75 @@ model SeasonAward {
   @@index([season, league])
 }
 
+// Durable per-season stat archive — the foundation of Player Careers and Franchise
+// History. Written by archiveSeasonStats() when a season ends (before a reset wipes
+// the per-game rows). Regular season and playoffs are stored as separate rows.
+model PlayerSeasonStat {
+  id        Int     @id @default(autoincrement())
+  playerId  Int
+  season    String
+  league    String  @default("NHL")
+  teamId    Int
+  isPlayoff Boolean @default(false)
+  gp        Int     @default(0)
+  goals     Int     @default(0)
+  assists   Int     @default(0)
+  points    Int     @default(0)
+  shots     Int     @default(0)
+  pim       Int     @default(0)
+  plusMinus Int     @default(0)
+  ppGoals   Int     @default(0)
+  shGoals   Int     @default(0)
+  gwg       Int     @default(0)
+  hits      Int     @default(0)
+  blocks    Int     @default(0)
+
+  @@unique([playerId, season, league, isPlayoff])
+  @@index([playerId])
+  @@index([season, league])
+}
+
+model GoalieSeasonStat {
+  id           Int     @id @default(autoincrement())
+  playerId     Int
+  season       String
+  league       String  @default("NHL")
+  teamId       Int
+  isPlayoff    Boolean @default(false)
+  gp           Int     @default(0) // games started
+  wins         Int     @default(0)
+  losses       Int     @default(0)
+  otl          Int     @default(0)
+  shutouts     Int     @default(0)
+  shotsAgainst Int     @default(0)
+  saves        Int     @default(0)
+  goalsAgainst Int     @default(0)
+
+  @@unique([playerId, season, league, isPlayoff])
+  @@index([playerId])
+  @@index([season, league])
+}
+
+model TeamSeasonStat {
+  id            Int     @id @default(autoincrement())
+  teamId        Int
+  season        String
+  league        String  @default("NHL")
+  gp            Int     @default(0)
+  wins          Int     @default(0)
+  losses        Int     @default(0)
+  otl           Int     @default(0)
+  points        Int     @default(0)
+  gf            Int     @default(0)
+  ga            Int     @default(0)
+  finish        Int?    // regular-season rank within the league
+  playoffResult String? // Champion | Final | Conf Final | Round 2 | Playoffs | Missed
+
+  @@unique([teamId, season, league])
+  @@index([teamId])
+  @@index([season, league])
+}
+
 // GM award voting: some trophies (Hart, Norris, Vezina, Calder, Selke, Lady Byng,
 // Ted Lindsay, Conn Smythe, Jack Adams, GM of the Year) are decided by a GM ballot,
 // scored 5-4-3-2-1 (or 3-2-1). Teams with no human GM cast a stat-based AI ballot.

@@ -35,6 +35,12 @@ async function main() {
   const nhl = await runPlayoffs(SEASON, "NHL");
   const ahl = await runPlayoffs(SEASON, "AHL").catch((e) => { console.log("AHL playoffs skipped:", e.message); return { championTeamId: null as number | null }; });
 
+  // freeze awards + season-record + the career/franchise stat archive
+  const { archiveSeason } = await import("../lib/awards");
+  await archiveSeason(SEASON, "NHL").catch((e) => console.log("archive NHL skipped:", e.message));
+  await archiveSeason(SEASON, "AHL").catch((e) => console.log("archive AHL skipped:", e.message));
+  console.log("Archived awards + season stats.");
+
   // ── summary ──
   const std = await computeStandings(SEASON, "NHL");
   console.log("\n=== NHL — top 6 ===");
