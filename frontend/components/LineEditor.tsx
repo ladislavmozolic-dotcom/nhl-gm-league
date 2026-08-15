@@ -140,35 +140,94 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
     ));
   };
 
+  // one labelled 0-5 tactic stepper
+  const TacStep = ({ label, value, onSet }: { label: string; value: number; onSet: (v: number) => void }) => (
+    <div className="flex items-center gap-1.5">
+      <span className="text-[11px] uppercase tracking-wide text-slate-500 w-8">{label}</span>
+      <Stepper value={value} step={1} compact onChange={(v) => onSet(Math.max(0, Math.min(5, v as unknown as number)))} />
+    </div>
+  );
+  // a player slot: small label above a full-width select
+  const Slot = ({ label, value, onChange, pool }: { label: string; value: number | null; onChange: (v: number | null) => void; pool: Player[] }) => (
+    <div>
+      <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">{label}</div>
+      <Select value={value} onChange={onChange} pool={pool} />
+    </div>
+  );
+
+  const LineTotalBar = (rows: { timePct: number }[]) => {
+    const tot = timeSum(rows);
+    return (
+      <div className="flex justify-end items-center gap-2 text-xs pt-1">
+        <span className="uppercase tracking-wide text-slate-500">Time total</span>
+        <span className={`font-bold tabular-nums ${tot === 100 ? "text-green-400" : "text-red-400"}`}>{tot}%{tot !== 100 && " ✗"}</span>
+      </div>
+    );
+  };
+
   const ForwardSection = (
-    <UnitBlock title="5 vs 5 Forward" head={["#", "Left Wing", "Center", "Right Wing", "PHY", "DF", "OF", "System", "Time %"]} timeTotal={timeSum(data.forwardLines)}>
-      {data.forwardLines.map((l, i) => (
-        <tr key={i} className="border-b border-slate-800/60">
-          <td className="px-2 py-1.5 text-slate-500">{i + 1}</td>
-          <td className="px-2"><Select value={l.lw} onChange={(v) => setFwd(i, "lw", v)} pool={forwards} /></td>
-          <td className="px-2"><Select value={l.c} onChange={(v) => setFwd(i, "c", v)} pool={forwards} /></td>
-          <td className="px-2"><Select value={l.rw} onChange={(v) => setFwd(i, "rw", v)} pool={forwards} /></td>
-          <TacCells t={l.tactic} onSet={(k, v) => setFwdTac(i, k, v)} />
-          <td className="px-2"><SysSelect value={l.puck} opts={DIAL_LABELS.puckStyle} onChange={(v) => setFwdPuck(i, v as PuckStyle | "")} /></td>
-          <td className="px-2 py-1.5 text-right"><Stepper value={l.timePct} step={1} onChange={(v) => setFwd(i, "timePct", v as unknown as number)} /></td>
-        </tr>
-      ))}
-    </UnitBlock>
+    <section className="space-y-3">
+      <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400">5 vs 5 Forward</h2>
+      {data.forwardLines.map((l, i) => {
+        const t = tac(l.tactic); const bad = t.phy + t.df + t.of !== 5;
+        return (
+          <div key={i} className="bg-slate-900/40 border border-slate-800 rounded-lg p-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-bold text-slate-300">Line {i + 1}</span>
+              <div className="flex items-center gap-2"><span className="text-[11px] uppercase tracking-wide text-slate-500">Time</span><Stepper value={l.timePct} step={1} onChange={(v) => setFwd(i, "timePct", v as unknown as number)} /><span className="text-slate-500 text-sm">%</span></div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <Slot label="Left Wing" value={l.lw} onChange={(v) => setFwd(i, "lw", v)} pool={forwards} />
+              <Slot label="Center" value={l.c} onChange={(v) => setFwd(i, "c", v)} pool={forwards} />
+              <Slot label="Right Wing" value={l.rw} onChange={(v) => setFwd(i, "rw", v)} pool={forwards} />
+            </div>
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-1 border-t border-slate-800/60">
+              <TacStep label="PHY" value={t.phy} onSet={(v) => setFwdTac(i, "phy", v)} />
+              <TacStep label="DF" value={t.df} onSet={(v) => setFwdTac(i, "df", v)} />
+              <TacStep label="OF" value={t.of} onSet={(v) => setFwdTac(i, "of", v)} />
+              {bad && <span className="text-[11px] text-rose-400" title="PHY+DF+OF must total 5">PHY+DF+OF ≠ 5</span>}
+              <div className="flex items-center gap-1.5 ml-auto">
+                <span className="text-[11px] uppercase tracking-wide text-slate-500">System</span>
+                <SysSelect value={l.puck} opts={DIAL_LABELS.puckStyle} onChange={(v) => setFwdPuck(i, v as PuckStyle | "")} />
+              </div>
+            </div>
+          </div>
+        );
+      })}
+      {LineTotalBar(data.forwardLines)}
+    </section>
   );
 
   const DefenseSection = (
-    <UnitBlock title="5 vs 5 Defense" head={["#", "Left Defense", "Right Defense", "PHY", "DF", "OF", "System", "Time %"]} timeTotal={timeSum(data.defensePairs)}>
-      {data.defensePairs.map((p, i) => (
-        <tr key={i} className="border-b border-slate-800/60">
-          <td className="px-2 py-1.5 text-slate-500">{i + 1}</td>
-          <td className="px-2"><Select value={p.ld} onChange={(v) => setDef(i, "ld", v)} pool={defense} /></td>
-          <td className="px-2"><Select value={p.rd} onChange={(v) => setDef(i, "rd", v)} pool={defense} /></td>
-          <TacCells t={p.tactic} onSet={(k, v) => setDefTac(i, k, v)} />
-          <td className="px-2"><SysSelect value={p.dzone} opts={DIAL_LABELS.dZone} onChange={(v) => setDefDzone(i, v as DZone | "")} /></td>
-          <td className="px-2 py-1.5 text-right"><Stepper value={p.timePct} step={1} onChange={(v) => setDef(i, "timePct", v as unknown as number)} /></td>
-        </tr>
-      ))}
-    </UnitBlock>
+    <section className="space-y-3">
+      <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400">5 vs 5 Defense</h2>
+      {data.defensePairs.map((p, i) => {
+        const t = tac(p.tactic); const bad = t.phy + t.df + t.of !== 5;
+        return (
+          <div key={i} className="bg-slate-900/40 border border-slate-800 rounded-lg p-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-bold text-slate-300">Pair {i + 1}</span>
+              <div className="flex items-center gap-2"><span className="text-[11px] uppercase tracking-wide text-slate-500">Time</span><Stepper value={p.timePct} step={1} onChange={(v) => setDef(i, "timePct", v as unknown as number)} /><span className="text-slate-500 text-sm">%</span></div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <Slot label="Left Defense" value={p.ld} onChange={(v) => setDef(i, "ld", v)} pool={defense} />
+              <Slot label="Right Defense" value={p.rd} onChange={(v) => setDef(i, "rd", v)} pool={defense} />
+            </div>
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-1 border-t border-slate-800/60">
+              <TacStep label="PHY" value={t.phy} onSet={(v) => setDefTac(i, "phy", v)} />
+              <TacStep label="DF" value={t.df} onSet={(v) => setDefTac(i, "df", v)} />
+              <TacStep label="OF" value={t.of} onSet={(v) => setDefTac(i, "of", v)} />
+              {bad && <span className="text-[11px] text-rose-400" title="PHY+DF+OF must total 5">PHY+DF+OF ≠ 5</span>}
+              <div className="flex items-center gap-1.5 ml-auto">
+                <span className="text-[11px] uppercase tracking-wide text-slate-500">System</span>
+                <SysSelect value={p.dzone} opts={DIAL_LABELS.dZone} onChange={(v) => setDefDzone(i, v as DZone | "")} />
+              </div>
+            </div>
+          </div>
+        );
+      })}
+      {LineTotalBar(data.defensePairs)}
+    </section>
   );
 
   // special-teams / situational units (generic ordered slots)
