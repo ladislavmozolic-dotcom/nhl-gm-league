@@ -1,17 +1,80 @@
+import { skaterTotals, goalieTotals } from "@/lib/stats-server";
 import StatsTabs from "@/components/StatsTabs";
-import ComingSoon from "@/components/ComingSoon";
+import StatTable, { type Col } from "@/components/StatTable";
 import { PageHeader } from "@/components/ui";
 
-export default function AdvancedStatsPage() {
+export const dynamic = "force-dynamic";
+const SEASON = "2026-27";
+
+// Phase 2 shot-quality leaderboards: individual expected goals + finishing for
+// skaters, goals-saved-above-expected for goalies. All derived from the sim's
+// per-shot xG (see lib/sim/shot-quality.ts).
+const SKATER_COLS: Col[] = [
+  { key: "name", label: "Player", title: "Player Name", frozen: true },
+  { key: "teamCode", label: "Team", title: "Team" },
+  { key: "pos", label: "Pos", title: "Position" },
+  { key: "gp", label: "GP", title: "Games Played", num: true },
+  { key: "goals", label: "G", title: "Goals", num: true },
+  { key: "xg", label: "xG", title: "Expected Goals (shot quality generated)", num: true, format: "dec1" },
+  { key: "fin", label: "G−xG", title: "Finishing: goals above expected", num: true, format: "plusDec1" },
+  { key: "hdShots", label: "HDS", title: "High-danger shots (slot / net-front)", num: true },
+  { key: "shots", label: "S", title: "Shots on goal", num: true },
+  { key: "shPct", label: "S%", title: "Shooting %", num: true, format: "dec1" },
+  { key: "points", label: "P", title: "Points", num: true },
+];
+
+const GOALIE_COLS: Col[] = [
+  { key: "name", label: "Goalie", title: "Goalie Name", frozen: true },
+  { key: "teamCode", label: "Team", title: "Team" },
+  { key: "gp", label: "GP", title: "Games Played", num: true },
+  { key: "gsax", label: "GSAx", title: "Goals Saved Above Expected (xGA − GA)", num: true, format: "plusDec1" },
+  { key: "xga", label: "xGA", title: "Expected Goals Against faced", num: true, format: "dec1" },
+  { key: "goalsAgainst", label: "GA", title: "Goals Against", num: true },
+  { key: "svPct", label: "PCT", title: "Save Percentage", num: true, format: "pct3" },
+  { key: "gaa", label: "GAA", title: "Goals-Against Average", num: true, format: "dec2" },
+  { key: "shotsAgainst", label: "SA", title: "Shots Against", num: true },
+];
+
+export default async function AdvancedStatsPage({ searchParams }: { searchParams: Promise<{ league?: string }> }) {
+  const league = (await searchParams).league === "AHL" ? "AHL" : "NHL";
+  const [sk, gk] = await Promise.all([skaterTotals(SEASON, league), goalieTotals(SEASON, league)]);
+
+  const skaterRows = sk
+    .filter((s) => s.shots >= 20) // qualify by a minimum shot sample
+    .map((s) => ({
+      name: s.name, teamCode: s.teamCode ?? "—", pos: s.position, gp: s.gp,
+      goals: s.goals, xg: s.xg, fin: s.goals - s.xg, hdShots: s.hdShots, shots: s.shots,
+      shPct: s.shots ? (s.goals / s.shots) * 100 : 0, points: s.points,
+    }));
+
+  const goalieRows = gk
+    .filter((g) => g.shotsAgainst >= 150) // qualify by workload
+    .map((g) => ({
+      name: g.name, teamCode: g.teamCode ?? "—", gp: g.gp, gsax: g.gsax, xga: g.xga,
+      goalsAgainst: g.goalsAgainst, svPct: g.svPct, gaa: g.gaa, shotsAgainst: g.shotsAgainst,
+    }));
+
   return (
     <div className="space-y-6 py-2">
-      <PageHeader title="Statistics" subtitle="Advanced metrics" />
-      <StatsTabs active="advanced" />
-      <ComingSoon title="Advanced Stats" points={[
-        "League summary of advanced metrics (Corsi/Fenwick-style shot share, PDO, points%, goal-share) with an overall leaderboard",
-        "Filter by team to see that club's skaters/goalies",
-        "Derived from existing per-game shots, goals and TOI — needs on-ice event tracking added to the sim engine for true possession metrics",
-      ]} />
+      <PageHeader title="Statistics" subtitle={`Advanced — shot quality & expected goals · ${league} ${SEASON}`} />
+      <StatsTabs active="advanced" league={league} />
+      <p className="text-slate-400 text-sm">
+        Expected goals (xG) rate every shot by its location, type and situation — independent of who shot it or who was
+        in net. A skater’s <strong>G−xG</strong> is pure finishing; a goalie’s <strong>GSAx</strong> is goals saved
+        above expected. Click a header to sort.
+      </p>
+
+      <section className="space-y-2">
+        <h2 className="text-lg font-bold">Skaters — expected goals &amp; finishing</h2>
+        <StatTable cols={SKATER_COLS} rows={skaterRows} initialSort="xg" minWidth={860} />
+        <p className="text-xs text-slate-600">Minimum 20 shots. G−xG above zero = finished better than an average shooter would from those spots.</p>
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="text-lg font-bold">Goalies — goals saved above expected</h2>
+        <StatTable cols={GOALIE_COLS} rows={goalieRows} initialSort="gsax" minWidth={760} />
+        <p className="text-xs text-slate-600">Minimum 150 shots against. GSAx above zero = stopped more than the shot quality faced would predict.</p>
+      </section>
     </div>
   );
 }

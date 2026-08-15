@@ -11,6 +11,7 @@ export type SkaterTotal = {
   gp: number; goals: number; assists: number; points: number; shots: number;
   pim: number; plusMinus: number; ppGoals: number; shGoals: number; gwg: number;
   hits: number; blocks: number; toi: number;
+  xg: number; hdShots: number; // Phase 2 shot quality
 };
 
 export type GoalieTotal = {
@@ -18,6 +19,7 @@ export type GoalieTotal = {
   gp: number; wins: number; losses: number; otl: number; shutouts: number;
   shotsAgainst: number; saves: number; goalsAgainst: number; toiMin: number;
   svPct: number; gaa: number;
+  xga: number; gsax: number; // Phase 2: expected goals against + goals saved above expected
 };
 
 type GameFilter = { season: string; league: string; playoffs: boolean };
@@ -37,7 +39,7 @@ export async function skaterTotals(season: string, league = "NHL", playoffs = fa
   const grouped = await prisma.playerGameStat.groupBy({
     by: ["playerId", "teamId"],
     where: { game: gameWhere({ season, league, playoffs }) },
-    _sum: { goals: true, assists: true, points: true, shots: true, pim: true, plusMinus: true, ppGoals: true, shGoals: true, gwg: true, hits: true, blocks: true, toi: true },
+    _sum: { goals: true, assists: true, points: true, shots: true, pim: true, plusMinus: true, ppGoals: true, shGoals: true, gwg: true, hits: true, blocks: true, toi: true, xg: true, hdShots: true },
     _count: { _all: true },
   });
   const [players, teams] = await Promise.all([
@@ -55,6 +57,7 @@ export async function skaterTotals(season: string, league = "NHL", playoffs = fa
       gp: g._count._all, goals: s.goals ?? 0, assists: s.assists ?? 0, points: s.points ?? 0, shots: s.shots ?? 0,
       pim: s.pim ?? 0, plusMinus: s.plusMinus ?? 0, ppGoals: s.ppGoals ?? 0, shGoals: s.shGoals ?? 0, gwg: s.gwg ?? 0,
       hits: s.hits ?? 0, blocks: s.blocks ?? 0, toi: s.toi ?? 0,
+      xg: s.xg ?? 0, hdShots: s.hdShots ?? 0,
     };
   });
 }
@@ -62,7 +65,7 @@ export async function skaterTotals(season: string, league = "NHL", playoffs = fa
 export async function goalieTotals(season: string, league = "NHL", playoffs = false): Promise<GoalieTotal[]> {
   const rows = await prisma.goalieGameStat.findMany({
     where: { game: gameWhere({ season, league, playoffs }) },
-    select: { playerId: true, teamId: true, shotsAgainst: true, saves: true, goalsAgainst: true, decision: true, started: true },
+    select: { playerId: true, teamId: true, shotsAgainst: true, saves: true, goalsAgainst: true, decision: true, started: true, xga: true },
   });
   type Acc = Omit<GoalieTotal, "name" | "teamCode" | "teamSlug" | "svPct" | "gaa"> & { teamId: number | null };
   // key by (goalie, team-played-for) so a called-up farm goalie who covered an
@@ -74,9 +77,9 @@ export async function goalieTotals(season: string, league = "NHL", playoffs = fa
     if (!r.started && r.shotsAgainst === 0) continue;
     const key = `${r.playerId}:${r.teamId}`;
     let a = acc.get(key);
-    if (!a) { a = { playerId: r.playerId, teamId: r.teamId ?? null, gp: 0, wins: 0, losses: 0, otl: 0, shutouts: 0, shotsAgainst: 0, saves: 0, goalsAgainst: 0, toiMin: 0 }; acc.set(key, a); }
+    if (!a) { a = { playerId: r.playerId, teamId: r.teamId ?? null, gp: 0, wins: 0, losses: 0, otl: 0, shutouts: 0, shotsAgainst: 0, saves: 0, goalsAgainst: 0, toiMin: 0, xga: 0, gsax: 0 }; acc.set(key, a); }
     a.gp++;
-    a.shotsAgainst += r.shotsAgainst; a.saves += r.saves; a.goalsAgainst += r.goalsAgainst;
+    a.shotsAgainst += r.shotsAgainst; a.saves += r.saves; a.goalsAgainst += r.goalsAgainst; a.xga += r.xga ?? 0;
     a.toiMin += 60; // one full game ≈ 60 min (no per-goalie TOI stored)
     if (r.decision === "W") a.wins++;
     else if (r.decision === "L") a.losses++;
@@ -93,7 +96,7 @@ export async function goalieTotals(season: string, league = "NHL", playoffs = fa
     const t = a.teamId ? teams.get(a.teamId) : null;
     const svPct = a.shotsAgainst ? a.saves / a.shotsAgainst : 0;
     const gaa = a.toiMin ? (a.goalsAgainst * 60) / a.toiMin : 0;
-    return { ...a, name: cleanName(p?.name ?? "—"), teamCode: t?.code ?? null, teamSlug: t?.slug ?? null, svPct, gaa };
+    return { ...a, name: cleanName(p?.name ?? "—"), teamCode: t?.code ?? null, teamSlug: t?.slug ?? null, svPct, gaa, gsax: a.xga - a.goalsAgainst };
   });
 }
 
