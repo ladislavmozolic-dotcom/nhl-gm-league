@@ -1164,7 +1164,7 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     engineVersion: opts.engineVersion ?? ENGINE_VERSION,
     events: st.sink.notable(),
   };
-  if (CFG.playByPlayEnabled) result.playByPlay = generatePlayByPlay(result, home, away);
+  if (CFG.playByPlayEnabled) result.playByPlay = generatePlayByPlay(result, home, away, st.sink.all());
   return result;
 }
 
