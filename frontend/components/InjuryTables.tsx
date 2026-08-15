@@ -6,7 +6,7 @@ const SEV_CLS: Record<string, string> = {
   "Multi-week": "text-orange-400", "Long-term": "text-red-400", "Season-ending": "text-red-500 font-bold",
 };
 const sevCls = (s: string) => SEV_CLS[s] ?? "text-slate-400";
-const MECH_ICON: Record<string, string> = { Hit: "💥", "Blocked shot": "🛡️", Fight: "🥊", Collision: "🚑", Overuse: "🔥" };
+const MECH_ICON: Record<string, string> = { Hit: "💥", "Blocked shot": "🛡️", Fight: "🥊", Collision: "🚑", Fatigue: "🔥" };
 
 export function CurrentInjuryTable({ rows, showTeam = true }: { rows: CurrentInjury[]; showTeam?: boolean }) {
   if (rows.length === 0) return <p className="text-emerald-400 text-center py-10 text-lg font-semibold">No current injuries. 🎉</p>;

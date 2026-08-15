@@ -233,7 +233,7 @@ export type PbpEvent = {
   major: boolean;        // shown in the condensed PLAY-BY-PLAY tab
 };
 
-export type InjuryMechanism = "Hit" | "Blocked shot" | "Fight" | "Collision" | "Overuse";
+export type InjuryMechanism = "Hit" | "Blocked shot" | "Fight" | "Collision" | "Fatigue";
 export type InjurySeverity = "Day-to-Day" | "Week-to-Week" | "Multi-week" | "Long-term" | "Season-ending";
 
 export type InjuryEvent = {

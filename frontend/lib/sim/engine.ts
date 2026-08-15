@@ -943,7 +943,7 @@ const INJ_PARTS: Record<InjuryMechanism, string[]> = {
   "Blocked shot": ["Hand", "Foot", "Ankle", "Lower Body"],
   "Fight": ["Hand", "Facial", "Upper Body"],
   "Collision": ["Knee", "Concussion", "Upper Body", "Ankle"],
-  "Overuse": ["Groin", "Knee", "Lower Body", "Hip", "Back"],
+  "Fatigue": ["Groin", "Knee", "Lower Body", "Hip", "Back"],
 };
 
 function severityOf(days: number): InjurySeverity {
@@ -1031,11 +1031,17 @@ function generateInjuries(st: SimState) {
       addInjury(st, team, victim, "Blocked shot");
     }
 
-    // 3) OVERUSE / non-contact — fatigue & durability driven (groin, knee).
-    const overuseLambda = 0.20 * scale;
-    for (let i = 0; i < st.rng.poisson(overuseLambda); i++) {
-      const victim = pool[st.rng.weighted(pool.map((s) => fragility(s)))];
-      addInjury(st, team, victim, "Overuse");
+    // 3) FATIGUE / non-contact — a player worn down by heavy minutes breaks down
+    //    (groin, knee, hip). Victim strongly weighted toward the most-played skaters
+    //    (ice-time²) and the most tired (low condition) + low durability — the guy
+    //    logging 25 min a night on a back-to-back, exactly what the name implies.
+    const fatigueLambda = 0.20 * scale;
+    for (let i = 0; i < st.rng.poisson(fatigueLambda); i++) {
+      const victim = pool[st.rng.weighted(pool.map((s) => {
+        const worn = (118 - s.con) / 20;                 // tired legs (con drops with workload)
+        return s.iceTime * s.iceTime * (115 - s.attrs.du) * Math.max(0.4, worn);
+      }))];
+      addInjury(st, team, victim, "Fatigue");
     }
 
     // 4) FIGHT injuries — a combatant (rare) tweaks a hand.

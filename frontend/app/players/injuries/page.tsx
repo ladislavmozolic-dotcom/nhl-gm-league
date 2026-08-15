@@ -37,7 +37,7 @@ export default async function InjuriesPage({ searchParams }: { searchParams: Pro
           {view === "current" ? <CurrentInjuryTable rows={current} /> : <SeasonInjuryTable rows={all} />}
         </div>
       </Card>
-      {view === "all" && <p className="text-xs text-slate-600">Every injury the sim recorded this season, with how it happened (hit / blocked shot / fight / overuse / collision) and who caused it.</p>}
+      {view === "all" && <p className="text-xs text-slate-600">Every injury the sim recorded this season, with how it happened (hit / blocked shot / fight / fatigue / collision) and who caused it.</p>}
     </div>
   );
 }
