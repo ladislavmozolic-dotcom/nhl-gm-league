@@ -5,6 +5,7 @@ import type { PbpEvent, ShootoutAttempt } from "@/lib/sim/types";
 import { loadTeamLines, autoLines, deployDistinct } from "@/lib/sim/lines";
 import { cleanName } from "@/lib/playerName";
 import GameIntegrity from "@/components/GameIntegrity";
+import { gameStory } from "@/lib/game-report-server";
 
 // Build every line unit for the Lines tab — the manager's lines if set, else the
 // same position-aware auto lines the sim uses — resolved to player names.
@@ -125,6 +126,8 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
     };
   });
 
+  const story = game.status === "FINAL" ? await gameStory(game.id).catch(() => null) : null;
+
   const data = {
     id: game.id,
     endedIn: game.endedIn ?? "REG",
@@ -168,6 +171,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
       playerName: p.playerName, type: p.type, minutes: p.minutes, severity: p.severity,
     })),
     injuries,
+    story,
     homeSystem: (game.homeSystem as Record<string, string> | null) ?? null,
     awaySystem: (game.awaySystem as Record<string, string> | null) ?? null,
     playByPlay: (game.playByPlay as unknown as PbpEvent[] | null) ?? [],

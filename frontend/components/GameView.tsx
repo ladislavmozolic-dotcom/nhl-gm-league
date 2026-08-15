@@ -3,6 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import { cleanName } from "@/lib/playerName";
+import type { GameReport, GameFlow } from "@/lib/game-report-server";
+import GameReportCard from "@/components/GameReportCard";
+import GameFlowChart from "@/components/GameFlowChart";
 
 // ---- types (shape passed from the server page) ------------------------------
 type Skater = {
@@ -39,6 +42,7 @@ type Data = {
   id: number; endedIn: string; home: Side; away: Side; homeTeamId: number; awayTeamId: number;
   goals: GoalE[]; penalties: PenE[]; playByPlay: PbpE[]; shootout?: ShootoutE[];
   injuries?: InjuryRow[]; homeSystem?: SystemDials; awaySystem?: SystemDials;
+  story?: { report: GameReport; flow: GameFlow } | null;
 };
 
 function ShootoutView({ data }: { data: Data }) {
@@ -421,6 +425,7 @@ export default function GameView({ data }: { data: Data }) {
   const [tab, setTab] = useState("summary");
   const tabs = [
     { id: "summary", label: "Summary" },
+    ...(data.story ? [{ id: "report", label: "Game Report" }] : []),
     { id: "stats", label: "Team Stats" },
     { id: "lines", label: "Lines" },
     { id: "fullpbp", label: "Play-by-Play" },
@@ -618,7 +623,13 @@ export default function GameView({ data }: { data: Data }) {
               </div>
             ))}
           </div>
+        </div>
+      )}
 
+      {tab === "report" && data.story && (
+        <div className="space-y-6">
+          <GameReportCard report={data.story.report} />
+          {data.story.flow.points.length > 2 && <GameFlowChart flow={data.story.flow} />}
           <EdgePanel data={data} />
         </div>
       )}
