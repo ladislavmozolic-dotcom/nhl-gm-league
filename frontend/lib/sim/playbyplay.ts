@@ -160,14 +160,18 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
     add(p, 1, (homeWins ? home : away).id, "faceoff",
       `${(homeWins ? fc : fa).name} wins face-off versus ${(homeWins ? fa : fc).name} in neutral zone.`);
 
+    // sudden-death OT ends on the goal — cap all filler/colour to before it.
+    const cap = p >= 4 ? (stream.find((e) => e.period === p && e.type === "GOAL")?.seconds ?? PERIOD_SECONDS) : PERIOD_SECONDS;
+    const rt = () => 5 + rng.int(Math.max(1, cap - 10));
+
     // atmospheric filler (not simulated as timed events): hits, icings, offsides
     const hitCount = Math.round(((result.home.hits ?? 0) + (result.away.hits ?? 0)) / 3 / maxRegPeriod);
     for (let i = 0; i < hitCount; i++) {
       const t = sideOf(rng.chance(0.5) ? home.id : away.id);
-      add(p, 5 + rng.int(PERIOD_SECONDS - 10), t.id, "hit", `${anySkater(oppOf(t.id)).name} is hit by ${hitter(t).name} and loses puck.`);
+      add(p, rt(), t.id, "hit", `${anySkater(oppOf(t.id)).name} is hit by ${hitter(t).name} and loses puck.`);
     }
-    for (let i = 0; i < 2 + rng.int(3); i++) { const t = rng.chance(0.5) ? home : away; add(p, 5 + rng.int(PERIOD_SECONDS - 10), t.id, "icing", `Icing by ${anySkater(t).name}.`); }
-    for (let i = 0; i < 1 + rng.int(3); i++) { const t = rng.chance(0.5) ? home : away; add(p, 5 + rng.int(PERIOD_SECONDS - 10), t.id, "offside", `Off-side.`); }
+    for (let i = 0; i < 2 + rng.int(3); i++) { const t = rng.chance(0.5) ? home : away; add(p, rt(), t.id, "icing", `Icing by ${anySkater(t).name}.`); }
+    for (let i = 0; i < 1 + rng.int(3); i++) { const t = rng.chance(0.5) ? home : away; add(p, rt(), t.id, "offside", `Off-side.`); }
 
     // real events this period, in order
     for (const e of stream.filter((x) => x.period === p)) {
@@ -186,9 +190,10 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
         const assistNames = ((e.meta as { assistNames?: string[] } | undefined)?.assistNames) ?? [];
         const tag = en ? " (EN)" : e.strength && e.strength !== "EV" ? ` (${e.strength})` : "";
         add(p, e.seconds, tId, "shot", `Shot by ${e.playerName ?? "?"}.`);
+        const gameOver = p >= 4; // sudden-death OT winner
         add(p, e.seconds, tId, "goal",
-          `GOAL${tag} scored by ${e.playerName ?? "?"}${assistNames.length ? ` assisted by ${assistNames.join(" and ")}` : " unassisted"}.`, true);
-        if (p <= 3) add(p, e.seconds + 1, null, "faceoff", `${center(home).name} wins face-off versus ${center(away).name} in neutral zone.`);
+          `GOAL${tag} scored by ${e.playerName ?? "?"}${assistNames.length ? ` assisted by ${assistNames.join(" and ")}` : " unassisted"}.${gameOver ? " Game over." : ""}`, true);
+        if (!gameOver) add(p, e.seconds + 1, null, "faceoff", `${center(home).name} wins face-off versus ${center(away).name} in neutral zone.`);
       } else if (e.type === "PENALTY") {
         const m = e.meta as { penalty?: string; minutes?: number; severity?: string } | undefined;
         if (m?.penalty === "Fighting") continue; // paired into a fight line below
@@ -206,7 +211,9 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
       add(p, inj.seconds, inj.teamId, "injury", `${inj.playerName} injured (${inj.desc}) — out ~${inj.days} day${inj.days === 1 ? "" : "s"}.`, true);
     }
 
-    if (p <= 3 || p === 4) add(p, PERIOD_SECONDS, null, "period", `End of the ${label}.`, p <= 3);
+    // no end-of-period line once a sudden-death OT goal has ended the game
+    const otEnded = p >= 4 && stream.some((e) => e.period === p && e.type === "GOAL");
+    if (p <= 3 || (p === 4 && !otEnded)) add(p, PERIOD_SECONDS, null, "period", `End of the ${label}.`, p <= 3);
   }
 
   if (result.endedIn === "SO") add(5, 0, null, "period", `Shootout — won by ${sideOf(result.winner).name}.`, true);
