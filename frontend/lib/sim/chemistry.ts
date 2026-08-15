@@ -30,6 +30,22 @@ export function buildUnits(lines: TeamLinesData | null | undefined): LineUnit[] 
 }
 
 /**
+ * Special-teams units (PP1 + PK1) as their OWN chemistry units, tracked and
+ * grown SEPARATELY from 5v5 (a PP unit that stays together gels on the PP
+ * specifically). Signatures are prefixed so they never collide with 5v5 units,
+ * and they're kept out of the per-player 5v5 chemistry map.
+ */
+export function buildStUnits(lines: TeamLinesData | null | undefined): LineUnit[] {
+  if (!lines) return [];
+  const units: LineUnit[] = [];
+  const pp1 = (lines.situations?.pp?.[0]?.players ?? []).filter((x): x is number => x != null);
+  if (pp1.length >= 3) units.push({ sig: "pp:" + unitSignature(pp1), members: pp1, isDef: false });
+  const pk1 = (lines.situations?.pk4?.[0]?.players ?? []).filter((x): x is number => x != null);
+  if (pk1.length >= 3) units.push({ sig: "pk:" + unitSignature(pk1), members: pk1, isDef: true });
+  return units;
+}
+
+/**
  * Fallback units when a team has no manager-set lines: group the depth chart
  * (ids already ordered by ice time) into forward trios and defense pairs. This
  * only defines *who gels with whom* for chemistry — it does NOT set deployment.

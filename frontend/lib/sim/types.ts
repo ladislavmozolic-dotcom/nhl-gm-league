@@ -85,6 +85,7 @@ export type SimTeam = {
   avgOV: number;          // ice-time-weighted roster overall (+ starter) — team quality
   // line chemistry
   units: LineUnit[];               // forward trios + defense pairs from the set lines
+  stUnits: LineUnit[];             // PP1 + PK1 as their own chemistry units (grown separately)
   chemistry: Record<string, number>; // unit signature -> chemistry value (mutable across a season)
   slowChem: string[];              // unit signatures that gel 20% slower (an off-side player)
   ppChem: number;                  // power-play unit chemistry factor (~1; >1 = gelled PP1 → deadly)

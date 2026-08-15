@@ -10,7 +10,7 @@ import type {
   SimSkater, SimGoalie, SimTeam, SkaterAttrs, GoalieAttrs, CoachInput,
 } from "./types";
 import type { TeamLinesData } from "./lines";
-import { buildUnits, depthChartUnits, playerChemistry, unitSignature } from "./chemistry";
+import { buildUnits, buildStUnits, depthChartUnits, playerChemistry, unitSignature } from "./chemistry";
 import { resolveTactics, resolveLineTactics, mergeTactics, type RosterProfile, type TeamTactics } from "./tactics";
 
 const clamp = (v: number, lo = 20, hi = 99) => Math.max(lo, Math.min(hi, v));
@@ -304,14 +304,17 @@ export function buildTeam(input: {
   // is far more effective. Carry the members' 5v5 chemistry into a unit factor
   // (centered ~65 so an average unit is neutral). Rewards "don't split your top
   // line onto the power play" — put the intact line on PP1 and it stays deadly.
-  const unitChemFactor = (players: (number | null | undefined)[], swing: number) => {
-    const chems = players.map((id) => (id != null ? byId.get(id)?.chem : undefined)).filter((c): c is number => c != null);
-    if (!chems.length) return 1;
-    const avg = chems.reduce((a, b) => a + b, 0) / chems.length;
-    return 1 + swing * (avg - 65) / 35;
+  // PP1 / PK1 carry their OWN chemistry (tracked + grown separately from 5v5): a
+  // unit kept together on the man-advantage gels there specifically. Centered ~65.
+  const stUnits = buildStUnits(input.lines);
+  const stFactor = (prefix: string, swing: number) => {
+    const u = stUnits.find((x) => x.sig.startsWith(prefix));
+    if (!u) return 1;
+    const c = chemistry[u.sig] ?? (input.chemBase ?? 100);
+    return 1 + swing * (c - 65) / 35;
   };
-  const ppChem = unitChemFactor(input.lines?.situations?.pp?.[0]?.players ?? [], 0.15);
-  const pkChem = unitChemFactor(input.lines?.situations?.pk4?.[0]?.players ?? [], 0.12);
+  const ppChem = stFactor("pp:", 0.15);
+  const pkChem = stFactor("pk:", 0.12);
 
   // team quality: ice-time-weighted roster overall blended with the starter — the
   // metric the standings should track (a better team on paper finishes higher).
@@ -354,6 +357,7 @@ export function buildTeam(input: {
     defenseRating,
     avgOV,
     units,
+    stUnits,
     chemistry,
     slowChem,
     ppChem,

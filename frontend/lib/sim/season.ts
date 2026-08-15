@@ -47,7 +47,8 @@ function syncChem(team: SimTeam, base: number) {
 function evolveChem(team: SimTeam, cfg: EngineSettings) {
   const dressed = new Set([...team.forwards, ...team.defense].map((s) => s.id));
   const slow = new Set(team.slowChem ?? []);
-  for (const u of team.units) {
+  // 5v5 units + special-teams units (PP1/PK1) each gel on their own signature
+  for (const u of [...team.units, ...(team.stUnits ?? [])]) {
     const intact = u.members.every((id) => dressed.has(id));
     const cur = team.chemistry[u.sig] ?? cfg.chemistryBase;
     // an off-position unit never fully gels — its chemistry is capped

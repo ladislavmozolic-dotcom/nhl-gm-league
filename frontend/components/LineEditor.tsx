@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { autoFill, type TeamLinesData, type ForwardLine, type DefensePair, type SpecialUnit } from "@/lib/sim/lines-core";
-import { DIAL_LABELS, DIAL_DESC, type PuckStyle, type DZone } from "@/lib/sim/tactics";
+import { DIAL_LABELS, DIAL_DESC, mergeTactics, type PuckStyle, type DZone, type PpStyle, type PkStyle } from "@/lib/sim/tactics";
 import type { GameStrategy, StratWeights } from "@/lib/sim/types";
 
 type Player = { id: number; name: string; position: string; overall: number };
@@ -128,6 +128,26 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
       {Object.entries(opts).filter(([k]) => k !== "balanced").map(([k, lbl]) => <option key={k} value={k} title={desc?.[k]}>{lbl}</option>)}
     </select>
   );
+  // team-level special-teams formation (stored on data.system, persisted with lines)
+  const setStyle = (k: "ppStyle" | "pkStyle", v: string) => change((d) => { d.system = { ...mergeTactics(d.system), [k]: v as PpStyle & PkStyle }; });
+  const FormationPicker = (k: "ppStyle" | "pkStyle", label: string) => {
+    const opts = DIAL_LABELS[k]; const desc = DIAL_DESC[k];
+    const val = (mergeTactics(data.system) as Record<string, string>)[k] ?? "balanced";
+    return (
+      <div className="mb-3 bg-slate-900/40 border border-slate-800 rounded-lg p-3">
+        <div className="flex items-baseline gap-2 mb-1.5"><span className="text-sm font-semibold">{label}</span><span className="text-xs text-slate-500">classic NHL systems — hover an option for what it does</span></div>
+        <div className="flex flex-wrap gap-1.5">
+          {Object.entries(opts).map(([kk, lbl]) => (
+            <button key={kk} type="button" title={desc?.[kk]} onClick={() => setStyle(k, kk)}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors cursor-help ${
+                val === kk ? "bg-blue-600 text-white border-blue-500" : "border-slate-700 text-slate-300 hover:bg-slate-800/60"
+              }`}>{lbl as string}</button>
+          ))}
+        </div>
+        <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{desc?.[val]}</p>
+      </div>
+    );
+  };
   const setUnitTac = (key: keyof TeamLinesData["situations"] & string, ui: number, k: "phy" | "df" | "of", v: number) =>
     change((d) => { const u = (d.situations[key] as SpecialUnit[])[ui]; u.tactic = { ...tac(u.tactic), [k]: v }; });
   // three PHY/DF/OF steppers for one unit's tactic (clamped 0..5, red when the row ≠ 5)
@@ -341,9 +361,9 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
 
       {tab === "Forward" && <>{ForwardSection}<p className="text-xs text-slate-500 mt-2 px-1">💡 <strong>System</strong>: give a line its own Puck Style (else it inherits the team system from <em>Team → System</em>). E.g. set your 4th line to <em>Cycle</em> while the team runs <em>Rush</em>. Tempo &amp; Forecheck stay team-wide.</p></>}
       {tab === "Defense" && <>{DefenseSection}<p className="text-xs text-slate-500 mt-2 px-1">💡 <strong>System</strong>: give a pair its own D-Zone (else it inherits the team system). E.g. a <em>Collapse</em> shut-down pair for defending a lead.</p></>}
-      {tab === "PP" && SplitUnitSection("pp", "Power Play (5 on 4)", 3, 2)}
+      {tab === "PP" && <>{FormationPicker("ppStyle", "Power-play formation")}{SplitUnitSection("pp", "Power Play (5 on 4)", 3, 2)}</>}
       {tab === "4 vs 4" && SplitUnitSection("fourVFour", "4 vs 4", 2, 2)}
-      {tab === "PK4" && SplitUnitSection("pk4", "Penalty Kill (4 on 5)", 2, 2)}
+      {tab === "PK4" && <>{FormationPicker("pkStyle", "Penalty-kill structure")}{SplitUnitSection("pk4", "Penalty Kill (4 on 5)", 2, 2)}</>}
       {tab === "PK3" && SplitUnitSection("pk3", "Penalty Kill (3 on 5)", 1, 2)}
       {tab === "Overtime" && UnitSection("overtime", "Overtime (3 vs 3)", ["OT1", "OT2", "OT3"], () => players)}
 

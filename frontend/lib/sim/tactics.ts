@@ -12,17 +12,23 @@ export type Tempo = "slow" | "balanced" | "fast";
 export type Forecheck = "passive" | "balanced" | "aggressive";
 export type PuckStyle = "cycle" | "balanced" | "rush" | "shotVolume";
 export type DZone = "collapse" | "balanced" | "aggressive";
+// Classic NHL special-teams formations.
+export type PpStyle = "balanced" | "umbrella" | "131" | "overload";
+export type PkStyle = "balanced" | "box" | "diamond" | "aggressive";
 
 export type TeamTactics = {
   tempo: Tempo;
   forecheck: Forecheck;
   puckStyle: PuckStyle;
   dZone: DZone;
+  ppStyle?: PpStyle;  // power-play formation
+  pkStyle?: PkStyle;  // penalty-kill structure
   preset?: string; // name of the applied preset, if any
 };
 
 export const DEFAULT_TACTICS: TeamTactics = {
   tempo: "balanced", forecheck: "balanced", puckStyle: "balanced", dZone: "balanced",
+  ppStyle: "balanced", pkStyle: "balanced",
 };
 
 // Resolved multipliers the engine reads. All 1.0 = neutral (balanced everything).
@@ -34,11 +40,14 @@ export type TacticsEffect = {
   oppDangerMult: number;  // opponent shot danger when THIS team defends (D-zone collapse lowers)
   fatigue: number;        // extra shift fatigue drain (fast tempo, aggressive forecheck)
   penaltyMult: number;    // penalty rate (aggressive forecheck)
+  ppConv: number;         // this team's power-play conversion (its PP formation)
+  pkSuppress: number;     // multiplier on the OPPONENT's PP when this team kills (its PK structure)
   fit: number;            // system fit 0.6..1.15 (1 = neutral) — how well the roster suits the system
 };
 
 export const NEUTRAL_EFFECT: TacticsEffect = {
-  shotRate: 1, oppShotRate: 1, takeaway: 1, dangerMix: 1, oppDangerMult: 1, fatigue: 1, penaltyMult: 1, fit: 1,
+  shotRate: 1, oppShotRate: 1, takeaway: 1, dangerMix: 1, oppDangerMult: 1, fatigue: 1, penaltyMult: 1,
+  ppConv: 1, pkSuppress: 1, fit: 1,
 };
 
 // --- per-dial raw effects (before fit scaling) ------------------------------
@@ -66,6 +75,20 @@ const DZONE_FX: Record<DZone, Dial> = {
   collapse: { oppDangerMult: 0.91, takeaway: 0.90 },
   balanced: {},
   aggressive: { oppDangerMult: 1.10, takeaway: 1.14, penaltyMult: 1.08 },
+};
+// Classic NHL power-play formations — raise this team's PP conversion.
+const PP_FX: Record<PpStyle, Dial> = {
+  balanced: {},
+  umbrella: { ppConv: 1.05 },   // three up high + net-front: point shots, screens & tips
+  "131": { ppConv: 1.11 },      // 1-3-1: cross-ice seam one-timers — the deadly modern PP
+  overload: { ppConv: 1.06 },   // load one side, cycle & work it low for a backdoor look
+};
+// Classic NHL penalty-kill structures — suppress the OPPONENT's PP (pkSuppress<1).
+const PK_FX: Record<PkStyle, Dial> = {
+  balanced: {},
+  box: { pkSuppress: 0.93 },                        // passive box: protect the slot, block lanes
+  diamond: { pkSuppress: 0.91 },                    // diamond: pressure the points, deny the seam
+  aggressive: { pkSuppress: 0.89, penaltyMult: 1.05 }, // attack the puck & force clears — riskier
 };
 
 // Which effect keys are BENEFITS (scaled by fit) vs COSTS (always applied).
@@ -106,6 +129,14 @@ export function systemFit(p: RosterProfile, t: TeamTactics): number {
   if (t.puckStyle === "shotVolume") parts.push((fitDim(p.sc, 64) + fitDim(p.weight, 92, 14)) / 2);
   if (t.dZone === "collapse") parts.push(fitDim(p.df, 70));
   if (t.dZone === "aggressive") parts.push((fitDim(p.df, 70) + fitDim(p.sk, 70)) / 2);
+  // special teams: a 1-3-1 needs a one-timer sniper + a playmaker; umbrella a point
+  // shot; overload puck-possession; a diamond/aggressive PK needs mobile checkers.
+  if (t.ppStyle === "131") parts.push((fitDim(p.sc, 64) + fitDim(p.pa, 68)) / 2);
+  if (t.ppStyle === "umbrella") parts.push(fitDim(p.sc, 64));
+  if (t.ppStyle === "overload") parts.push((fitDim(p.pa, 68) + fitDim(p.st, 70)) / 2);
+  if (t.pkStyle === "box") parts.push(fitDim(p.df, 70));
+  if (t.pkStyle === "diamond") parts.push((fitDim(p.df, 70) + fitDim(p.sk, 70)) / 2);
+  if (t.pkStyle === "aggressive") parts.push(fitDim(p.sk, 70));
   if (!parts.length) return 1; // all balanced
   return parts.reduce((s, v) => s + v, 0) / parts.length;
 }
@@ -120,8 +151,9 @@ export function resolveTactics(t: TeamTactics, profile: RosterProfile, coachEx =
   const apply = (d: Dial) => {
     for (const k of Object.keys(d) as (keyof Dial)[]) {
       const raw = d[k]!;
-      const isCost = COST_KEYS.has(k) || (k === "oppDangerMult" && raw > 1);
-      // benefits scale by fit (a bad fit gives less reward); costs apply in full
+      // benefits scale by fit; costs apply in full. oppDangerMult & pkSuppress are
+      // "lower = better", so >1 is the cost side there.
+      const isCost = COST_KEYS.has(k) || ((k === "oppDangerMult" || k === "pkSuppress") && raw > 1);
       const delta = raw - 1;
       const scaled = isCost ? delta : delta * fit;
       eff[k] = eff[k] * (1 + scaled);
@@ -131,6 +163,8 @@ export function resolveTactics(t: TeamTactics, profile: RosterProfile, coachEx =
   apply(FORECHECK_FX[t.forecheck]);
   apply(PUCK_FX[t.puckStyle]);
   apply(DZONE_FX[t.dZone]);
+  apply(PP_FX[t.ppStyle ?? "balanced"]);
+  apply(PK_FX[t.pkStyle ?? "balanced"]);
   return eff;
 }
 
@@ -158,6 +192,8 @@ export const DIAL_LABELS = {
   forecheck: { passive: "Passive (1-2-2)", balanced: "Balanced", aggressive: "Aggressive (2-1-2)" },
   puckStyle: { cycle: "Cycle", balanced: "Balanced", rush: "Rush / Transition", shotVolume: "Shot Volume" },
   dZone: { collapse: "Collapse / Box", balanced: "Balanced", aggressive: "Aggressive / Man" },
+  ppStyle: { balanced: "Balanced", umbrella: "Umbrella", "131": "1-3-1", overload: "Overload" },
+  pkStyle: { balanced: "Balanced", box: "Box (passive)", diamond: "Diamond", aggressive: "Aggressive" },
 } as const;
 
 // Plain-language explanation of what each option does — shown under the picker.
@@ -182,6 +218,18 @@ export const DIAL_DESC: Record<keyof typeof DIAL_LABELS, Record<string, string>>
     collapse: "Collapse into a box, block shots and take away the slot — you cede the perimeter but starve them of high-danger looks. Wants defence (DF).",
     balanced: "Standard defensive-zone coverage.",
     aggressive: "Pressure the puck man-to-man in your own end — more takeaways, but if you lose your check the danger against goes up, and you take a few more penalties. Wants defence (DF) and speed (SK).",
+  },
+  ppStyle: {
+    balanced: "No signature power play.",
+    umbrella: "Three men up high + a net-front presence — point shots, screens and tips. Wants a shooter (SC).",
+    "131": "The modern 1-3-1: a flank one-timer off cross-ice seam passes — the deadliest PP when it clicks. Wants a one-timer sniper (SC) + a playmaker (PA).",
+    overload: "Load one side and cycle it low for a backdoor look — patient, puck-possession power play. Wants passing (PA) and strength (ST).",
+  },
+  pkStyle: {
+    balanced: "Standard penalty kill.",
+    box: "Passive box — protect the slot, block lanes, clear when you can. Solid all-round, cedes the perimeter. Wants defence (DF).",
+    diamond: "Diamond — pressure the points and deny the seam pass; strong against an Umbrella / 1-3-1. Wants defence (DF) + speed (SK).",
+    aggressive: "Attack the puck and force clears — kills PP time but a beaten pressure leaks a big chance, and you risk extra penalties. Wants speed (SK).",
   },
 };
 

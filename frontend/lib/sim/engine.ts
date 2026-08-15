@@ -623,7 +623,7 @@ function simulatePeriod(st: SimState, period: number, homeShots: number, awaySho
     // on the final probability (offMult<=1, defShield>=1) so they cancel league-wide.
     const offMult = chemFactor(shooter.chem, shooter.roleFit) * moraleFactor(shooter.morale) * physFactor(shooter.weight) * shot.team.coachOff;
     const defShield = (2 - (st.defChem[shot.opp.id] ?? 1)) * shot.opp.coachDef; // poor/redundant D → opponent converts more
-    const ppMod = strength === "PP" ? shot.team.ppChem / shot.opp.pkChem : 1; // gelled PP1 vs gelled PK1
+    const ppMod = strength === "PP" ? (shot.team.ppChem / shot.opp.pkChem) * shot.team.tactics.ppConv * shot.opp.tactics.pkSuppress : 1; // gelled PP1 + formation vs PK
     // off-position penalty is waived on special teams (STHS) — restore full offense
     const shOff = strength !== "EV" ? shooter.offense / shooter.posPenalty : shooter.offense;
     const p = conversion(shOff, effGoalieQuality(shot.opp.goalie), shot.isHome, strength)
@@ -901,7 +901,7 @@ function simulatePeriodPossession(st: SimState, period: number) {
       const dPair = onIceD(def);
       const avgDefDf = dPair.length ? dPair.reduce((s, d) => s + (d.attrs.df ?? 50), 0) / dPair.length : (dman.attrs.df ?? 50);
       const defTalent = Math.max(0.72, Math.min(1.3, 1 - (CFG.defenseTalentPct / 100) * (avgDefDf - 74) / 20));
-      const ppMod = strength === "PP" ? carrierTeam.ppChem / def.pkChem : 1; // gelled PP1 vs gelled PK1
+      const ppMod = strength === "PP" ? (carrierTeam.ppChem / def.pkChem) * atkFx.ppConv * defFx.pkSuppress : 1; // gelled PP1 + PP formation vs gelled PK1 + PK structure
       const shOff = strength !== "EV" ? carrier.offense / carrier.posPenalty : carrier.offense; // off-position waived on ST
       const p = conversion(shOff, effGoalieQuality(gSim), isHome, strength) * danger * pressBonus
         * momoBoost(st, carrierTeam.id, absT) * clutchFactor(st, carrier, period, tick, margin)
