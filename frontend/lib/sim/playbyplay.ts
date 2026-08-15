@@ -115,7 +115,7 @@ function legacyPlayByPlay(result: GameResult, home: SimTeam, away: SimTeam): Pbp
     }
     // injuries
     for (const inj of result.injuries.filter((x) => x.period === p)) {
-      add(p, inj.seconds, inj.teamId, "injury", `${inj.playerName} injured (${inj.desc}) — out ~${inj.days} day${inj.days === 1 ? "" : "s"}.`, true);
+      add(p, inj.seconds, inj.teamId, "injury", `${inj.playerName} injured — ${inj.desc}${inj.mechanism === "Hit" && inj.byName ? ` (hit by ${inj.byName})` : ` (${inj.mechanism.toLowerCase()})`} — ${inj.severity}, out ~${inj.days} day${inj.days === 1 ? "" : "s"}.`, true);
     }
 
     add(p, PERIOD_SECONDS, null, "period", `End of the ${p}${["st", "nd", "rd"][p - 1]} period.`, true);
@@ -208,7 +208,7 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
     }
     // injuries
     for (const inj of result.injuries.filter((x) => x.period === p)) {
-      add(p, inj.seconds, inj.teamId, "injury", `${inj.playerName} injured (${inj.desc}) — out ~${inj.days} day${inj.days === 1 ? "" : "s"}.`, true);
+      add(p, inj.seconds, inj.teamId, "injury", `${inj.playerName} injured — ${inj.desc}${inj.mechanism === "Hit" && inj.byName ? ` (hit by ${inj.byName})` : ` (${inj.mechanism.toLowerCase()})`} — ${inj.severity}, out ~${inj.days} day${inj.days === 1 ? "" : "s"}.`, true);
     }
 
     // no end-of-period line once a sudden-death OT goal has ended the game

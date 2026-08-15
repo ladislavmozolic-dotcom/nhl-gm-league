@@ -331,7 +331,7 @@ export function buildTeam(input: {
 
   // Phase 3 team system: ice-weighted roster profile → resolve the dials + fit.
   const profile = rosterProfile(roster);
-  const tactics = resolveTactics(mergeTactics(input.system ?? input.lines?.system), profile);
+  const tactics = resolveTactics(mergeTactics(input.system ?? input.lines?.system), profile, input.coach?.ex ?? 70);
 
   return {
     id: input.id,

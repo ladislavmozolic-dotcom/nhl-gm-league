@@ -273,11 +273,12 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
       for (const g of team.goalies) moraleState.set(g.id, g.morale);
     }
 
-    // apply injuries -> CON crashes (severity-scaled), player is out until healed
+    // apply injuries -> CON crashes (severity-scaled), player is out until healed.
+    // Store the body part + how it happened, e.g. "Shoulder (Hit)".
     for (const inj of result.injuries) {
       await prisma.player.update({
         where: { id: inj.playerId },
-        data: { injuryDaysLeft: inj.days, injuryDesc: inj.desc, condition: injuryConTarget(inj.days) },
+        data: { injuryDaysLeft: inj.days, injuryDesc: `${inj.desc} (${inj.mechanism})`, condition: injuryConTarget(inj.days) },
       });
       cache.delete(inj.teamId);
       injuredTeams.add(inj.teamId);

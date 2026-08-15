@@ -22,7 +22,7 @@ export default async function TeamTacticsPage({ params }: { params: Promise<{ sl
   return (
     <div className="space-y-6 py-2">
       <PageHeader title="Team System" subtitle={`${team.name} — set your club's identity. Pick a system your roster fits.`} />
-      <SystemEditor teamId={team.id} profile={sim.profile} initial={current} />
+      <SystemEditor teamId={team.id} profile={sim.profile} initial={current} coachEx={sim.coachEx} />
     </div>
   );
 }

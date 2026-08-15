@@ -36,12 +36,12 @@ function Chip({ label, mult, invert = false }: { label: string; mult: number; in
   );
 }
 
-export default function SystemEditor({ teamId, profile, initial }: { teamId: number; profile: RosterProfile; initial: TeamTactics }) {
+export default function SystemEditor({ teamId, profile, initial, coachEx = 70 }: { teamId: number; profile: RosterProfile; initial: TeamTactics; coachEx?: number }) {
   const [tac, setTac] = useState<TeamTactics>(mergeTactics(initial));
   const [saved, setSaved] = useState(false);
   const [pending, start] = useTransition();
 
-  const eff = useMemo(() => resolveTactics(tac, profile), [tac, profile]);
+  const eff = useMemo(() => resolveTactics(tac, profile, coachEx), [tac, profile, coachEx]);
   const fl = fitLabel(eff.fit);
 
   const set = <K extends keyof TeamTactics>(k: K, v: TeamTactics[K]) => { setTac((t) => ({ ...t, [k]: v, preset: undefined })); setSaved(false); };

@@ -230,6 +230,9 @@ export type PbpEvent = {
   major: boolean;        // shown in the condensed PLAY-BY-PLAY tab
 };
 
+export type InjuryMechanism = "Hit" | "Blocked shot" | "Fight" | "Collision" | "Overuse";
+export type InjurySeverity = "Day-to-Day" | "Week-to-Week" | "Multi-week" | "Long-term" | "Season-ending";
+
 export type InjuryEvent = {
   period: number;
   seconds: number;
@@ -238,7 +241,11 @@ export type InjuryEvent = {
   playerId: number;
   playerName: string;
   days: number;          // games/days out
-  desc: string;          // e.g. "Upper Body"
+  desc: string;          // body part, e.g. "Shoulder"
+  mechanism: InjuryMechanism; // how it happened (Phase 4)
+  severity: InjurySeverity;   // duration tier
+  byId?: number;         // the player who caused it (hitter/fighter), if any
+  byName?: string;
 };
 
 export type GameResult = {

@@ -110,9 +110,12 @@ export function systemFit(p: RosterProfile, t: TeamTactics): number {
   return parts.reduce((s, v) => s + v, 0) / parts.length;
 }
 
-/** Resolve the four dials + roster fit into engine multipliers. */
-export function resolveTactics(t: TeamTactics, profile: RosterProfile): TacticsEffect {
-  const fit = systemFit(profile, t);
+/** Resolve the four dials + roster fit into engine multipliers. A coach's
+ *  experience (EX 0..99, ~70 neutral) helps execute the system — a veteran bench
+ *  boss lifts a shaky fit, a rookie can't get as much out of a demanding one. */
+export function resolveTactics(t: TeamTactics, profile: RosterProfile, coachEx = 70): TacticsEffect {
+  const rawFit = systemFit(profile, t);
+  const fit = Math.max(0.6, Math.min(1.18, rawFit + (coachEx - 70) * 0.003));
   const eff: TacticsEffect = { ...NEUTRAL_EFFECT, fit };
   const apply = (d: Dial) => {
     for (const k of Object.keys(d) as (keyof Dial)[]) {

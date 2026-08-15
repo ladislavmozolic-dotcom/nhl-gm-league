@@ -11,6 +11,7 @@ import { shotProfile, expectedGoal, isHighDanger, shotSpeed, sectorIndex, type S
 import type {
   SimTeam, SimSkater, SimGoalie, GameResult, TeamBox, PlayerLine, GoalieLine,
   GoalEvent, PenaltyEvent, InjuryEvent, ShootoutAttempt, LineTactic,
+  InjuryMechanism, InjurySeverity,
 } from "./types";
 
 // Engine version stamped on every simulated Game (for reproducibility, history and
@@ -930,32 +931,112 @@ function simulatePeriodPossession(st: SimState, period: number) {
  * rises with ice time (exposure) and falls with durability (DU). Duration is
  * mostly short, occasionally long-term (concussions skew longer).
  */
+// Phase 4 — body parts by injury mechanism (contact injuries hit the upper body /
+// head; blocks hurt hands & feet; overuse is groin/knee/hip).
+const INJ_PARTS: Record<InjuryMechanism, string[]> = {
+  "Hit": ["Shoulder", "Upper Body", "Concussion", "Collarbone", "Ribs"],
+  "Blocked shot": ["Hand", "Foot", "Ankle", "Lower Body"],
+  "Fight": ["Hand", "Facial", "Upper Body"],
+  "Collision": ["Knee", "Concussion", "Upper Body", "Ankle"],
+  "Overuse": ["Groin", "Knee", "Lower Body", "Hip", "Back"],
+};
+
+function severityOf(days: number): InjurySeverity {
+  if (days >= 120) return "Season-ending";
+  if (days >= 45) return "Long-term";
+  if (days >= 20) return "Multi-week";
+  if (days >= 7) return "Week-to-Week";
+  return "Day-to-Day";
+}
+
+// Roll a duration; contact/awkward injuries skew a bit longer, concussions longest.
+function injuryDays(st: SimState, mech: InjuryMechanism, part: string): number {
+  const roll = st.rng.next();
+  let days = roll < 0.45 ? 1 + st.rng.int(5) : roll < 0.8 ? 6 + st.rng.int(14) : 20 + st.rng.int(45);
+  if (part === "Concussion") days = Math.max(days, 10 + st.rng.int(30));
+  if (mech === "Hit" || mech === "Collision") days = Math.round(days * 1.1);
+  if (st.rng.chance(0.015)) days = Math.max(days, 120 + st.rng.int(60)); // rare season-ender
+  return days;
+}
+
+// A physical checker on the opponent — the guy who threw the hit that hurt someone.
+function pickHitter(st: SimState, team: SimTeam): SimSkater {
+  const pool = [...team.forwards, ...team.defense];
+  return pool[st.rng.weighted(pool.map((s) => s.hitting * s.iceTime * physFactor(s.weight)))] ?? pool[0];
+}
+
+function addInjury(st: SimState, team: SimTeam, victim: SimSkater, mech: InjuryMechanism, by?: SimSkater) {
+  const part = INJ_PARTS[mech][st.rng.int(INJ_PARTS[mech].length)];
+  const days = injuryDays(st, mech, part);
+  const period = 1 + st.rng.int(3);
+  const seconds = st.rng.int(PERIOD_SECONDS);
+  st.injuries.push({
+    period, seconds, time: fmt(seconds), teamId: team.id,
+    playerId: victim.id, playerName: victim.name, days, desc: part,
+    mechanism: mech, severity: severityOf(days), byId: by?.id, byName: by?.name,
+  });
+  st.sink.emit({
+    period, seconds, type: "INJURY", teamId: team.id,
+    playerId: victim.id, playerName: victim.name, targetId: by?.id, targetName: by?.name,
+    importance: days >= 20 ? "MAJOR" : "NOTABLE",
+    meta: { part, days, mechanism: mech, severity: severityOf(days) },
+  });
+}
+
+// Injuries are driven by the physical play, not a flat random roll: a heavy,
+// chippy opponent that out-hits you injures more of your players (STHS's
+// light-vs-heavy hit calc); blocking hard shots hurts your D; the rest is
+// overuse (fatigue/durability). Total rate stays ~INJURY_BASE at a neutral,
+// average-physicality matchup so the season-long injury load is unchanged.
 function generateInjuries(st: SimState) {
   if (!CFG.injuriesEnabled) return;
+  const scale = CFG.injuryChancePct / 100;
   for (const team of [st.home, st.away]) {
-    const lambda = INJURY_BASE * (CFG.injuryChancePct / 100);
-    const count = st.rng.poisson(lambda);
-    const pool = [...team.forwards, ...team.defense];
-    for (let i = 0; i < count; i++) {
-      // risk rises with ice time (exposure) and falls with durability (DU); a
-      // just-returned "rusty" skater (CON just at/under the 95 threshold) with low
-      // DU is far likelier to break down again — re-injury.
-      const victim = pool[st.rng.weighted(pool.map((s) => {
-        const fragility = s.con < 96 ? 1 + (96 - s.con) * (0.9 - s.attrs.du / 200) : 1;
-        return s.iceTime * (115 - s.attrs.du) * fragility;
-      }))];
-      const desc = BODY_PARTS[st.rng.int(BODY_PARTS.length)];
-      const roll = st.rng.next();
-      // more medium & long-term injuries: ~45% day-to-day, ~35% a couple weeks,
-      // ~20% long-term (up to ~2 months), concussions skew long.
-      let days = roll < 0.45 ? 1 + st.rng.int(5) : roll < 0.8 ? 6 + st.rng.int(14) : 20 + st.rng.int(45);
-      if (desc === "Concussion") days = Math.max(days, 10 + st.rng.int(28));
-      const period = 1 + st.rng.int(3);
-      const seconds = st.rng.int(PERIOD_SECONDS);
-      st.injuries.push({
-        period, seconds, time: fmt(seconds), teamId: team.id,
-        playerId: victim.id, playerName: victim.name, days, desc,
-      });
+    const opp = team === st.home ? st.away : st.home;
+    const fwd = team.forwards, def = team.defense, pool = [...fwd, ...def];
+    if (!pool.length) continue;
+
+    // fragility weight: exposure (ice time) × low durability × rusty return × lighter
+    // frame (a light player absorbs a big hit worse).
+    const fragility = (s: SimSkater, hitTarget = false) => {
+      const rust = s.con < 96 ? 1 + (96 - s.con) * (0.9 - s.attrs.du / 200) : 1;
+      const light = hitTarget ? Math.max(0.7, (100 - Math.max(0, s.weight - 82)) / 100 + 0.15) : 1;
+      return s.iceTime * (115 - s.attrs.du) * rust * light;
+    };
+
+    // 1) HIT injuries — scaled by the opponent's physical pressure (their hits ×
+    //    how heavy/chippy they are). Contact injuries land on forwards more.
+    const oppHits = st.box[opp.id].hits;
+    const physPressure = (opp.profile.ck / 66) * (opp.profile.weight / 92);
+    const hitLambda = 0.075 * scale * (oppHits / 21) * physPressure;
+    for (let i = 0; i < st.rng.poisson(hitLambda); i++) {
+      const cPool = fwd.length ? [...fwd, ...fwd, ...def] : pool; // forwards ~2x exposed
+      const victim = cPool[st.rng.weighted(cPool.map((s) => fragility(s, true)))];
+      addInjury(st, team, victim, st.rng.chance(0.15) ? "Collision" : "Hit", pickHitter(st, opp));
+    }
+
+    // 2) BLOCKED-SHOT injuries — blocking hard shots hurts hands/feet; D block most.
+    const blockLambda = 0.024 * scale * (st.box[team.id].blocks / 14);
+    for (let i = 0; i < st.rng.poisson(blockLambda); i++) {
+      const bPool = def.length ? [...def, ...def, ...fwd] : pool;
+      const victim = bPool[st.rng.weighted(bPool.map((s) => s.iceTime * (115 - s.attrs.du)))];
+      addInjury(st, team, victim, "Blocked shot");
+    }
+
+    // 3) OVERUSE / non-contact — fatigue & durability driven (groin, knee).
+    const overuseLambda = 0.04 * scale;
+    for (let i = 0; i < st.rng.poisson(overuseLambda); i++) {
+      const victim = pool[st.rng.weighted(pool.map((s) => fragility(s)))];
+      addInjury(st, team, victim, "Overuse");
+    }
+
+    // 4) FIGHT injuries — a combatant (rare) tweaks a hand.
+    const fighters = st.penalties.filter((p) => p.team === team.id && p.type === "Fighting");
+    for (const f of fighters) {
+      if (st.rng.chance(0.06 * scale)) {
+        const victim = pool.find((s) => s.id === f.playerId) ?? pool[0];
+        addInjury(st, team, victim, "Fight");
+      }
     }
   }
 }
@@ -1189,7 +1270,6 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
   simulateEndgame(st);
   generateFights(st);
   generateHeatEvents(st);
-  generateInjuries(st);
 
   let winnerId: number;
   let endedIn: GameResult["endedIn"] = "REG";
@@ -1214,6 +1294,7 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
   const loserId = winnerId === home.id ? away.id : home.id;
 
   distributeCounting(st);
+  generateInjuries(st); // after hits/blocks are tallied — physical play drives injuries (Phase 4)
   finalizeBoxes(st, winnerId, endedIn, otPeriods);
 
   st.goals.sort((a, b) => a.period - b.period || a.seconds - b.seconds);
