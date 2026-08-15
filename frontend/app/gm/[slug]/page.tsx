@@ -37,7 +37,7 @@ export default async function GmProfilePage({ params }: { params: Promise<{ slug
         <Stat big={`${gm.playoff.seriesWon}-${gm.playoff.seriesLost}`} label="Playoff series" sub={`${gm.playoff.w}-${gm.playoff.l} games · ${gm.playoff.appearances} appearances`} />
         <Stat big={String(gm.championships.length)} label="Championships" sub={gm.championships.join(", ") || undefined} />
         <Stat big={String(gm.awards)} label="Team awards" />
-        <Stat big={String(gm.tradesCompleted)} label="Trades completed" />
+        <Stat big={String(gm.draft.picks)} label="Draft picks" sub={gm.draft.hits ? `${gm.draft.hits} in the NHL` : undefined} />
       </div>
 
       {/* achievements */}
@@ -58,6 +58,42 @@ export default async function GmProfilePage({ params }: { params: Promise<{ slug
         </div>
       </Card>
 
+      {/* draft record */}
+      <Card title="🎯 Draft Record" accent="text-sky-400">
+        {gm.draft.picks === 0 ? (
+          <p className="text-sm text-slate-500">No draft selections on record yet.</p>
+        ) : (
+          <>
+            <p className="text-xs text-slate-500 mb-3">{gm.draft.picks} career selections · {gm.draft.hits} developed into NHL players{gm.draft.stars ? ` · ${gm.draft.stars} stars` : ""}. Outcomes fill in as prospects develop.</p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-[11px] uppercase tracking-wide text-slate-500 border-b border-slate-800">
+                    <th className="text-left py-1.5 pr-2">Year</th><th className="text-left pr-2">Rd</th><th className="text-left pr-2">Pick</th>
+                    <th className="text-left pr-2">Player</th><th className="text-left pr-2">Pos</th><th className="text-right px-1.5">OV</th><th className="text-right px-1.5">Pot</th><th className="text-right pl-1.5">Now</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {gm.draft.list.slice(0, 20).map((p, i) => (
+                    <tr key={i} className="border-b border-slate-800/50">
+                      <td className="py-1.5 pr-2 tabular-nums">{p.year}</td>
+                      <td className="pr-2 tabular-nums text-slate-400">{p.round}</td>
+                      <td className="pr-2 tabular-nums text-slate-400">#{p.overallPick}</td>
+                      <td className="pr-2">{p.playerSlug ? <Link href={`/players/${p.playerSlug}`} className="hover:text-blue-400">{p.name}</Link> : p.name}</td>
+                      <td className="pr-2 text-slate-400">{p.position}</td>
+                      <td className="text-right px-1.5 tabular-nums">{p.ov}</td>
+                      <td className="text-right px-1.5 tabular-nums text-slate-400">{p.potential}</td>
+                      <td className="text-right pl-1.5">{p.status ? <span className={p.status === "NHL" ? "text-emerald-400" : "text-slate-400"}>{p.status}{p.overall ? ` ${p.overall}` : ""}</span> : <span className="text-slate-600">prospect</span>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {gm.draft.list.length > 20 && <p className="text-[11px] text-slate-600 mt-2">+{gm.draft.list.length - 20} more selections</p>}
+          </>
+        )}
+      </Card>
+
       {/* honours + links */}
       <div className="grid gap-4 sm:grid-cols-2">
         <Card title="Honours" accent="text-slate-200">
@@ -66,6 +102,7 @@ export default async function GmProfilePage({ params }: { params: Promise<{ slug
             <li><span className="text-slate-300">🥈 Finals</span> — {gm.finals.length ? gm.finals.join(", ") : "—"}</li>
             <li><span className="text-green-400">🥇 President&apos;s Trophies</span> — {gm.presidents.length ? gm.presidents.join(", ") : "—"}</li>
             <li><span className="text-orange-400">🔥 Longest win streak</span> — {gm.longestWinStreak} games</li>
+            <li><span className="text-slate-300">🔀 Trades completed</span> — {gm.tradesCompleted}</li>
           </ul>
         </Card>
         <Card title="More" accent="text-slate-200">
