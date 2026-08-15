@@ -100,6 +100,11 @@ export default async function DigestPage({ searchParams }: { searchParams: Promi
               </ol>
             </Card>
           )}
+          {d.milestones.length > 0 && (
+            <Card title="🎖️ Milestones" accent="text-yellow-300 bg-yellow-950/10">
+              <ul className="space-y-1 text-sm text-slate-200">{d.milestones.map((m, i) => <li key={i}>{m}</li>)}</ul>
+            </Card>
+          )}
           <Card title="✚ Injury Report" accent="text-red-300 bg-red-950/10">
             {d.injuries.length === 0 ? <p className="text-emerald-400 text-sm">No injuries — a clean night.</p> : (
               <ul className="space-y-1 text-sm">

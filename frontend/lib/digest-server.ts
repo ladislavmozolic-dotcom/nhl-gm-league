@@ -23,6 +23,7 @@ export type DailyDigest = {
   coldest: { code: string | null; slug: string | null; name: string; streakLen: number; last10: string } | null;
   powerRanking: { rank: number; code: string | null; slug: string | null; points: number; gp: number; streakType: "W" | "L" | "OT" | null; streakLen: number }[];
   recordAlerts: string[]; // "LEAGUE RECORD" feats set/tied this night
+  milestones: string[];   // career round-number milestones reached this night
 };
 
 export type TeamForm = {
@@ -93,7 +94,7 @@ export async function dailyDigest(season: string, round: number): Promise<DailyD
   }));
 
   if (games.length === 0) {
-    return { season, round, date: null, gameCount: 0, scores: [], gameOfNight: null, playerOfNight: null, upset: null, bestGoalie: null, biggestHit: null, injuries: [], hottest: null, coldest: null, powerRanking: [], recordAlerts: [] };
+    return { season, round, date: null, gameCount: 0, scores: [], gameOfNight: null, playerOfNight: null, upset: null, bestGoalie: null, biggestHit: null, injuries: [], hottest: null, coldest: null, powerRanking: [], recordAlerts: [], milestones: [] };
   }
 
   // team strength proxy = season points (for the upset)
@@ -193,5 +194,36 @@ export async function dailyDigest(season: string, round: number): Promise<DailyD
   } catch { /* records unavailable — skip alerts */ }
   const uniqueAlerts = [...new Set(recordAlerts)].slice(0, 6);
 
-  return { season, round, date: date ? date.toISOString() : null, gameCount: games.length, scores, gameOfNight, playerOfNight, upset, bestGoalie, biggestHit, injuries, hottest, coldest, powerRanking, recordAlerts: uniqueAlerts };
+  // CAREER MILESTONES — a player who crossed a round-number career total tonight.
+  // Career-through = every FINAL NHL game in a prior season, or this season up to
+  // this round; "before" = through minus tonight's line. A threshold that falls in
+  // (before, through] was reached tonight.
+  const milestones: string[] = [];
+  const nightIds = [...new Set(skaters.map((s) => s.playerId))];
+  if (nightIds.length) {
+    const through = await prisma.playerGameStat.groupBy({
+      by: ["playerId"],
+      where: {
+        playerId: { in: nightIds },
+        game: { league: "NHL", status: "FINAL", seriesId: null, OR: [{ season: { lt: season } }, { season, round: { lte: round } }] },
+      },
+      _sum: { points: true, goals: true, assists: true }, _count: { _all: true },
+    });
+    const nightGain = new Map<number, { pts: number; g: number; a: number }>();
+    for (const s of skaters) { const c = nightGain.get(s.playerId) ?? { pts: 0, g: 0, a: 0 }; c.pts += s.points; c.g += s.goals; c.a += s.assists; nightGain.set(s.playerId, c); }
+    const nmById = new Map((await prisma.player.findMany({ where: { id: { in: nightIds } }, select: { id: true, name: true } })).map((p) => [p.id, cleanName(p.name)]));
+    const crossed = (before: number, after: number, steps: number[]) => steps.find((t) => before < t && after >= t) ?? null;
+    const PTS = [50, 100, 150, 200, 300, 400, 500, 750, 1000], GOALS = [25, 50, 100, 150, 200, 300, 400, 500], GP = [100, 200, 300, 500, 750, 1000];
+    for (const t of through) {
+      const gain = nightGain.get(t.playerId) ?? { pts: 0, g: 0, a: 0 };
+      const nm = nmById.get(t.playerId) ?? "A player";
+      const pTot = t._sum.points ?? 0, gTot = t._sum.goals ?? 0, gpTot = t._count._all;
+      const mp = crossed(pTot - gain.pts, pTot, PTS); if (mp) milestones.push(`\u{1F31F} ${nm} reached ${mp} career points`);
+      const mg = crossed(gTot - gain.g, gTot, GOALS); if (mg) milestones.push(`\u{1F3D2} ${nm} reached ${mg} career goals`);
+      const mgp = crossed(gpTot - 1, gpTot, GP); if (mgp) milestones.push(`\u{1F4C6} ${nm} played career game #${mgp}`);
+    }
+  }
+  const uniqueMilestones = [...new Set(milestones)].slice(0, 8);
+
+  return { season, round, date: date ? date.toISOString() : null, gameCount: games.length, scores, gameOfNight, playerOfNight, upset, bestGoalie, biggestHit, injuries, hottest, coldest, powerRanking, recordAlerts: uniqueAlerts, milestones: uniqueMilestones };
 }
