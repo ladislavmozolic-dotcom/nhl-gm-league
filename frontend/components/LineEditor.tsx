@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { autoFill, type TeamLinesData, type ForwardLine, type DefensePair, type SpecialUnit } from "@/lib/sim/lines-core";
-import { DIAL_LABELS, type PuckStyle, type DZone } from "@/lib/sim/tactics";
+import { DIAL_LABELS, DIAL_DESC, type PuckStyle, type DZone } from "@/lib/sim/tactics";
 import type { GameStrategy, StratWeights } from "@/lib/sim/types";
 
 type Player = { id: number; name: string; position: string; overall: number };
@@ -120,11 +120,12 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
   // attacking team, or a shut-down pair under an aggressive one.
   const setFwdPuck = (i: number, v: PuckStyle | "") => change((d) => { if (v) d.forwardLines[i].puck = v; else delete d.forwardLines[i].puck; });
   const setDefDzone = (i: number, v: DZone | "") => change((d) => { if (v) d.defensePairs[i].dzone = v; else delete d.defensePairs[i].dzone; });
-  const SysSelect = ({ value, opts, onChange }: { value: string | undefined; opts: Record<string, string>; onChange: (v: string) => void }) => (
+  const SysSelect = ({ value, opts, desc, onChange }: { value: string | undefined; opts: Record<string, string>; desc?: Record<string, string>; onChange: (v: string) => void }) => (
     <select value={value ?? ""} onChange={(e) => onChange(e.target.value)}
-      className={`bg-slate-800 border rounded px-1.5 py-1 text-xs ${value ? "border-sky-600 text-sky-300" : "border-slate-700 text-slate-400"}`}>
-      <option value="">Team</option>
-      {Object.entries(opts).filter(([k]) => k !== "balanced").map(([k, lbl]) => <option key={k} value={k}>{lbl}</option>)}
+      title={value && desc?.[value] ? desc[value] : "Inherit the team system (set an option to override just this line)"}
+      className={`bg-slate-800 border rounded px-1.5 py-1 text-xs cursor-help ${value ? "border-sky-600 text-sky-300" : "border-slate-700 text-slate-400"}`}>
+      <option value="" title="Inherit the team system (from Team → System)">Team</option>
+      {Object.entries(opts).filter(([k]) => k !== "balanced").map(([k, lbl]) => <option key={k} value={k} title={desc?.[k]}>{lbl}</option>)}
     </select>
   );
   const setUnitTac = (key: keyof TeamLinesData["situations"] & string, ui: number, k: "phy" | "df" | "of", v: number) =>
@@ -194,7 +195,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
               {bad && <span className="text-[11px] text-rose-400" title="PHY+DF+OF must total 5">PHY+DF+OF ≠ 5</span>}
               <div className="flex items-center gap-1.5 ml-auto">
                 <span title="Puck Style for this line only (empty = inherit the team system from Team → System). e.g. a Cycle 4th line under a Rush team." className="text-[11px] uppercase tracking-wide text-slate-500 cursor-help border-b border-dotted border-slate-600">System</span>
-                <SysSelect value={l.puck} opts={DIAL_LABELS.puckStyle} onChange={(v) => setFwdPuck(i, v as PuckStyle | "")} />
+                <SysSelect value={l.puck} opts={DIAL_LABELS.puckStyle} desc={DIAL_DESC.puckStyle} onChange={(v) => setFwdPuck(i, v as PuckStyle | "")} />
               </div>
             </div>
           </div>
@@ -226,7 +227,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
               {bad && <span className="text-[11px] text-rose-400" title="PHY+DF+OF must total 5">PHY+DF+OF ≠ 5</span>}
               <div className="flex items-center gap-1.5 ml-auto">
                 <span title="D-Zone for this pair only (empty = inherit the team system). e.g. a Collapse shut-down pair to defend a lead." className="text-[11px] uppercase tracking-wide text-slate-500 cursor-help border-b border-dotted border-slate-600">System</span>
-                <SysSelect value={p.dzone} opts={DIAL_LABELS.dZone} onChange={(v) => setDefDzone(i, v as DZone | "")} />
+                <SysSelect value={p.dzone} opts={DIAL_LABELS.dZone} desc={DIAL_DESC.dZone} onChange={(v) => setDefDzone(i, v as DZone | "")} />
               </div>
             </div>
           </div>
