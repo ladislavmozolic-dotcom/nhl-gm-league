@@ -38,6 +38,13 @@ export default async function DigestPage({ searchParams }: { searchParams: Promi
         {next != null ? <Link href={`/league/digest?round=${next}`} className="px-3 py-1.5 rounded-md bg-slate-800/60 text-sm hover:bg-slate-800">Next night →</Link> : <span />}
       </div>
 
+      {d.recordAlerts.length > 0 && (
+        <div className="rounded-xl border border-amber-500/40 bg-amber-950/20 px-4 py-3">
+          <div className="text-xs font-bold uppercase tracking-wide text-amber-400 mb-1">League Record</div>
+          <ul className="space-y-0.5 text-sm text-amber-200">{d.recordAlerts.map((a, i) => <li key={i}>{a}</li>)}</ul>
+        </div>
+      )}
+
       {d.gameCount === 0 ? (
         <p className="text-slate-500 text-center py-10">No games on this day.</p>
       ) : (

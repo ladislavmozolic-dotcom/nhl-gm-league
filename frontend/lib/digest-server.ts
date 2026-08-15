@@ -5,6 +5,7 @@
 import { prisma } from "./prisma";
 import { cleanName } from "./playerName";
 import { computeStandings } from "./sim/standings";
+import { recordThresholds } from "./records-server";
 
 export type DigestGame = { id: number; away: string; home: string; awaySlug: string | null; homeSlug: string | null; awayGoals: number; homeGoals: number; endedIn: string };
 export type NightPlayer = { name: string; slug: string | null; team: string | null; teamSlug: string | null; line: string };
@@ -21,6 +22,7 @@ export type DailyDigest = {
   hottest: { code: string | null; slug: string | null; name: string; streakLen: number; last10: string } | null;
   coldest: { code: string | null; slug: string | null; name: string; streakLen: number; last10: string } | null;
   powerRanking: { rank: number; code: string | null; slug: string | null; points: number; gp: number; streakType: "W" | "L" | "OT" | null; streakLen: number }[];
+  recordAlerts: string[]; // "LEAGUE RECORD" feats set/tied this night
 };
 
 export type TeamForm = {
@@ -91,7 +93,7 @@ export async function dailyDigest(season: string, round: number): Promise<DailyD
   }));
 
   if (games.length === 0) {
-    return { season, round, date: null, gameCount: 0, scores: [], gameOfNight: null, playerOfNight: null, upset: null, bestGoalie: null, biggestHit: null, injuries: [], hottest: null, coldest: null, powerRanking: [] };
+    return { season, round, date: null, gameCount: 0, scores: [], gameOfNight: null, playerOfNight: null, upset: null, bestGoalie: null, biggestHit: null, injuries: [], hottest: null, coldest: null, powerRanking: [], recordAlerts: [] };
   }
 
   // team strength proxy = season points (for the upset)
@@ -169,5 +171,27 @@ export async function dailyDigest(season: string, round: number): Promise<DailyD
     .slice(0, 5)
     .map((f, i) => ({ rank: i + 1, code: f.code, slug: f.slug, points: f.points, gp: f.gp, streakType: f.streakType, streakLen: f.streakLen }));
 
-  return { season, round, date: date ? date.toISOString() : null, gameCount: games.length, scores, gameOfNight, playerOfNight, upset, bestGoalie, biggestHit, injuries, hottest, coldest, powerRanking };
+  // LEAGUE RECORD alerts — a feat this night that equals the all-time single-game
+  // maximum (records include tonight's games, so equalling the max = holds/ties it).
+  const recordAlerts: string[] = [];
+  try {
+    const thr = await recordThresholds();
+    for (const s of skaters) {
+      if (thr.points > 0 && s.points === thr.points) recordAlerts.push(`\u{1F4E2} ${cleanName(s.player.name)} tied the league record with ${s.points} points`);
+      else if (thr.goals > 0 && s.goals === thr.goals) recordAlerts.push(`\u{1F4E2} ${cleanName(s.player.name)} tied the league record with ${s.goals} goals`);
+    }
+    for (const gl of goalies) {
+      if (thr.saves > 0 && gl.saves === thr.saves) recordAlerts.push(`\u{1F4E2} ${cleanName(gl.player.name)} tied the league record with ${gl.saves} saves`);
+    }
+    for (const g of games) {
+      const mx = Math.max(g.homeGoals ?? 0, g.awayGoals ?? 0);
+      if (thr.teamGoals > 0 && mx === thr.teamGoals) {
+        const t = (g.homeGoals ?? 0) >= (g.awayGoals ?? 0) ? g.homeTeam : g.awayTeam;
+        recordAlerts.push(`\u{1F4E2} ${t.code ?? t.name} tied the league record with ${mx} goals in a game`);
+      }
+    }
+  } catch { /* records unavailable — skip alerts */ }
+  const uniqueAlerts = [...new Set(recordAlerts)].slice(0, 6);
+
+  return { season, round, date: date ? date.toISOString() : null, gameCount: games.length, scores, gameOfNight, playerOfNight, upset, bestGoalie, biggestHit, injuries, hottest, coldest, powerRanking, recordAlerts: uniqueAlerts };
 }
