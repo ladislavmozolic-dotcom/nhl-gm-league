@@ -400,6 +400,15 @@ model Game {
   awayXg            Float?
   homeHd            Int?             // high-danger shots for
   awayHd            Int?
+  // NHL EDGE-style tracking
+  homeOzPct         Float?           // offensive-zone possession time %
+  awayOzPct         Float?
+  homeShotSectors   Int[]            @default([]) // shots by [POINT,PERIMETER,CIRCLE,SLOT,NET_FRONT]
+  awayShotSectors   Int[]            @default([])
+  homeTopShot       Float?           // fastest shot (mph)
+  awayTopShot       Float?
+  homeTopShotBy     String?
+  awayTopShotBy     String?
   endedIn           String?          // REG | OT | SO
   otPeriods         Int?             @default(0) // sudden-death OT periods played (playoff marathons: 1=OT, 2=2OT…)
   winnerTeamId      Int?

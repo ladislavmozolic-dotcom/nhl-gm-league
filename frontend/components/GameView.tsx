@@ -10,17 +10,20 @@ type Skater = {
   goals: number; assists: number; points: number; shots: number; pim: number;
   plusMinus: number; ppGoals: number; shGoals: number; gwg: number;
   hits: number; blocks: number; faceoffWins: number; faceoffLosses: number; toi: number;
-  conAfter: number | null;
+  conAfter: number | null; xg?: number; hdShots?: number;
 };
 type Goalie = {
   id: number; name: string; slug: string | null; started: boolean;
   shotsAgainst: number; saves: number; goalsAgainst: number;
   conBefore: number | null; conAfter: number | null; fatigued: boolean; decision: string | null;
+  xga?: number;
 };
 type LineGroup = { title: string; cols: string[]; units: { n: number; players: (string | null)[]; tactic?: { phy: number; df: number; of: number }; wanted?: number }[] };
 type Side = {
   teamId: number; name: string; slug: string; logoUrl: string | null; code?: string | null;
   goals: number; shots: number; goalsByPeriod: number[]; shotsByPeriod: number[];
+  xg?: number | null; hd?: number | null;
+  ozPct?: number | null; shotSectors?: number[]; topShot?: number | null; topShotBy?: string | null;
   skaters: Skater[]; goalies: Goalie[]; lines?: LineGroup[];
 };
 type GoalAssist = { name: string; slug: string | null; total: number | null };
@@ -140,6 +143,11 @@ function GoalieBlock({ side }: { side: Side }) {
               {g.started
                 ? <>{g.saves}/{g.shotsAgainst} · {(svp(g) * 100).toFixed(1)}% · {g.goalsAgainst} GA{g.decision && <span className={`ml-2 text-xs font-bold ${g.decision === "W" ? "text-green-400" : "text-slate-500"}`}>[{g.decision}]</span>}</>
                 : <span className="text-slate-500">DNP</span>}
+              {g.started && g.xga != null && (() => { const gsax = g.xga - g.goalsAgainst; return (
+                <span className={`ml-3 text-xs ${gsax >= 0 ? "text-green-400" : "text-red-400"}`} title="goals saved above expected">
+                  GSAx {gsax >= 0 ? "+" : ""}{gsax.toFixed(1)}
+                </span>
+              ); })()}
               <span className="ml-3 text-xs text-slate-500">CON {con}</span>
             </span>
           </div>
@@ -150,7 +158,7 @@ function GoalieBlock({ side }: { side: Side }) {
 }
 
 function SkaterTable({ side }: { side: Side }) {
-  const H = ["G", "A", "P", "+/-", "S", "PIM", "HIT", "BLK", "FO", "TOI", "CON"];
+  const H = ["G", "A", "P", "+/-", "S", "xG", "PIM", "HIT", "BLK", "FO", "TOI", "CON"];
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm min-w-[600px]">
@@ -172,6 +180,7 @@ function SkaterTable({ side }: { side: Side }) {
                 <td className="px-2 text-right font-bold tabular-nums">{s.points}</td>
                 <td className="px-2 text-right tabular-nums">{s.plusMinus > 0 ? `+${s.plusMinus}` : s.plusMinus}</td>
                 <td className="px-2 text-right tabular-nums text-slate-300">{s.shots}</td>
+                <td className={`px-2 text-right tabular-nums ${s.xg && s.goals > s.xg + 0.5 ? "text-green-400" : "text-slate-400"}`} title={s.hdShots ? `${s.hdShots} high-danger` : undefined}>{s.xg != null ? s.xg.toFixed(1) : "—"}</td>
                 <td className="px-2 text-right tabular-nums text-slate-300">{s.pim}</td>
                 <td className="px-2 text-right tabular-nums text-slate-300">{s.hits}</td>
                 <td className="px-2 text-right tabular-nums text-slate-300">{s.blocks}</td>
@@ -300,6 +309,75 @@ function PbpView({ data, full }: { data: Data; full: boolean }) {
   );
 }
 
+// ---- NHL EDGE-style tracking panel ------------------------------------------
+const SECTOR_LABELS = ["Point", "Perimeter", "Circle", "Slot", "Net-front"];
+const SECTOR_HD = [false, false, false, true, true]; // slot + net-front = high-danger
+
+function EdgePanel({ data }: { data: Data }) {
+  const { away, home } = data;
+  const hasEdge = away.ozPct != null || home.ozPct != null || (away.topShot ?? 0) > 0;
+  if (!hasEdge) return null;
+
+  // a two-sided share bar (away left, home right)
+  const ShareBar = ({ a, h, fmt }: { a: number; h: number; fmt: (n: number) => string }) => {
+    const tot = a + h || 1;
+    return (
+      <div className="flex items-center gap-2 text-xs">
+        <span className="w-16 text-right tabular-nums font-semibold">{fmt(a)}</span>
+        <div className="flex-1 flex h-2.5 rounded overflow-hidden bg-slate-800">
+          <div className="bg-sky-500/70" style={{ width: `${(a / tot) * 100}%` }} />
+          <div className="bg-rose-500/70" style={{ width: `${(h / tot) * 100}%` }} />
+        </div>
+        <span className="w-16 tabular-nums font-semibold">{fmt(h)}</span>
+      </div>
+    );
+  };
+
+  const secA = away.shotSectors ?? [];
+  const secH = home.shotSectors ?? [];
+
+  return (
+    <div className="bg-slate-900/40 rounded-lg overflow-hidden border border-slate-800">
+      <div className="px-4 py-2 text-xs font-bold text-slate-400 bg-slate-800/60 uppercase tracking-wide flex items-center gap-2">
+        <span className="text-sky-400">◆</span> NHL Edge — Tracking
+      </div>
+      <div className="p-4 space-y-4">
+        {away.ozPct != null && home.ozPct != null && (
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Offensive-zone time</div>
+            <ShareBar a={away.ozPct} h={home.ozPct} fmt={(n) => `${n.toFixed(0)}%`} />
+          </div>
+        )}
+        {(away.topShot ?? 0) > 0 && (home.topShot ?? 0) > 0 && (
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Fastest shot</div>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="tabular-nums"><span className="text-lg font-bold">{away.topShot!.toFixed(1)}</span> <span className="text-slate-500">mph</span> <span className="text-slate-400 text-xs">{away.topShotBy}</span></div>
+              <div className="tabular-nums text-right"><span className="text-slate-400 text-xs">{home.topShotBy}</span> <span className="text-lg font-bold">{home.topShot!.toFixed(1)}</span> <span className="text-slate-500">mph</span></div>
+            </div>
+          </div>
+        )}
+        {secA.length === 5 && secH.length === 5 && (
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Shot locations <span className="text-amber-400/80 normal-case">· slot / net-front = high-danger</span></div>
+            <div className="space-y-1">
+              {SECTOR_LABELS.map((lbl, i) => (
+                <div key={lbl} className="flex items-center gap-2 text-xs">
+                  <span className="w-8 text-right tabular-nums font-semibold">{secA[i]}</span>
+                  <div className="flex-1 flex justify-end"><div className={`h-2 rounded ${SECTOR_HD[i] ? "bg-amber-500/70" : "bg-sky-500/50"}`} style={{ width: `${Math.min(100, secA[i] * 8)}%` }} /></div>
+                  <span className={`w-20 text-center text-[10px] uppercase ${SECTOR_HD[i] ? "text-amber-400" : "text-slate-500"}`}>{lbl}</span>
+                  <div className="flex-1 flex justify-start"><div className={`h-2 rounded ${SECTOR_HD[i] ? "bg-amber-500/70" : "bg-rose-500/50"}`} style={{ width: `${Math.min(100, secH[i] * 8)}%` }} /></div>
+                  <span className="w-8 tabular-nums font-semibold">{secH[i]}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ---- main view --------------------------------------------------------------
 export default function GameView({ data }: { data: Data }) {
   const [tab, setTab] = useState("summary");
@@ -325,6 +403,12 @@ export default function GameView({ data }: { data: Data }) {
   const teamRows: Array<[string, string | number, string | number]> = [
     ["Goals", data.away.goals, data.home.goals],
     ["Shots on goal", data.away.shots, data.home.shots],
+    ...(data.away.xg != null && data.home.xg != null
+      ? ([["Expected goals (xG)", data.away.xg.toFixed(2), data.home.xg.toFixed(2)]] as Array<[string, string, string]>)
+      : []),
+    ...(data.away.hd != null && data.home.hd != null
+      ? ([["High-danger shots", data.away.hd, data.home.hd]] as Array<[string, number, number]>)
+      : []),
     ["Power play", `${ppFor(data.awayTeamId)}/${ppOpp(data.awayTeamId)}`, `${ppFor(data.homeTeamId)}/${ppOpp(data.homeTeamId)}`],
     ["Penalty minutes", teamSum(data.away, "pim"), teamSum(data.home, "pim")],
     ["Faceoff %", foPct(data.away), foPct(data.home)],
@@ -460,6 +544,8 @@ export default function GameView({ data }: { data: Data }) {
               </div>
             ))}
           </div>
+
+          <EdgePanel data={data} />
         </div>
       )}
 

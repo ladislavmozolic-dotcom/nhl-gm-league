@@ -7,7 +7,7 @@ import { RNG, fixtureSeed } from "./rng";
 import { generatePlayByPlay } from "./playbyplay";
 import { DEFAULT_SETTINGS, type EngineSettings } from "./settings";
 import { EventSink, type SimEvent } from "./events";
-import { shotProfile, expectedGoal, isHighDanger, type ShotStrength } from "./shot-quality";
+import { shotProfile, expectedGoal, isHighDanger, shotSpeed, sectorIndex, type ShotStrength } from "./shot-quality";
 import type {
   SimTeam, SimSkater, SimGoalie, GameResult, TeamBox, PlayerLine, GoalieLine,
   GoalEvent, PenaltyEvent, InjuryEvent, ShootoutAttempt, LineTactic,
@@ -189,6 +189,7 @@ function initTeamBox(team: SimTeam): TeamBox {
     faceoffWins: 0, faceoffLosses: 0, hits: 0, blocks: 0,
     goalsByPeriod: [0, 0, 0, 0], shotsByPeriod: [0, 0, 0, 0],
     xgFor: 0, hdFor: 0,
+    ozTime: 0, posTime: 0, shotSectors: [0, 0, 0, 0, 0], topShotSpeed: 0, topShotBy: "",
     skaters: [], goalie, backupGoalie,
   };
 }
@@ -751,6 +752,9 @@ function simulatePeriodPossession(st: SimState, period: number) {
     }
 
     // ---- PLAY: run the decision tree for the carrier this tick ----
+    // EDGE: puck-possession zone time — one carried tick in each zone.
+    st.box[carrierTeam.id].posTime++;
+    if (zone === "OFF") st.box[carrierTeam.id].ozTime++;
     const def = other(carrierTeam);
     const isHome = carrierTeam === home;
     const margin = st.box[carrierTeam.id].goals - st.box[def.id].goals;
@@ -824,6 +828,13 @@ function simulatePeriodPossession(st: SimState, period: number) {
       st.box[carrierTeam.id].xgFor += xg;
       if (hd) st.box[carrierTeam.id].hdFor++;
       gLine.xga += xg;
+      // EDGE: shot location distribution + shot speed (fastest tracked per team)
+      st.box[carrierTeam.id].shotSectors[sectorIndex(sector)]++;
+      const mph = shotSpeed(rng, shotType, carrier.attrs.sc ?? 50);
+      if (mph > st.box[carrierTeam.id].topShotSpeed) {
+        st.box[carrierTeam.id].topShotSpeed = mph;
+        st.box[carrierTeam.id].topShotBy = carrier.name;
+      }
       press++; // sustained pressure: screening / traffic / a tiring goalie
       const pressBonus = 1 + 0.06 * Math.min(press - 1, 4);
       const offMult = chemFactor(carrier.chem, carrier.roleFit) * moraleFactor(carrier.morale) * physFactor(carrier.weight) * fat(carrierTeam, carrier) * tOff.of * carrierTeam.coachOff;
@@ -847,7 +858,7 @@ function simulatePeriodPossession(st: SimState, period: number) {
         zone: "OFF", sector, shotType,
         strength: strength === "SO" ? "EV" : strength as SimEvent["strength"], xg,
         importance: hd ? "NOTABLE" : "MINOR",
-        meta: { danger, setup },
+        meta: { danger, setup, mph: Math.round(mph) },
       });
       if (rng.chance(p)) {
         gLine.goalsAgainst++;

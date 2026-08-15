@@ -65,7 +65,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
       goals: s.goals, assists: s.assists, points: s.points, shots: s.shots, pim: s.pim,
       plusMinus: s.plusMinus, ppGoals: s.ppGoals, shGoals: s.shGoals, gwg: s.gwg,
       hits: s.hits, blocks: s.blocks, faceoffWins: s.faceoffWins, faceoffLosses: s.faceoffLosses,
-      toi: s.toi, conAfter: s.conAfter,
+      toi: s.toi, conAfter: s.conAfter, xg: s.xg, hdShots: s.hdShots,
     }))
     .sort((a, b) => b.points - a.points || b.goals - a.goals || b.toi - a.toi);
 
@@ -95,6 +95,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
       id: s.playerId, name: s.player.name, slug: s.player.slug, started: s.started,
       shotsAgainst: s.shotsAgainst, saves: s.saves, goalsAgainst: s.goalsAgainst,
       conBefore: s.conBefore, conAfter: s.conAfter, fatigued: s.fatigued, decision: s.decision,
+      xga: s.xga,
     }))
     .sort((a, b) => Number(b.started) - Number(a.started));
 
@@ -107,11 +108,17 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
     endedIn: game.endedIn ?? "REG",
     home: {
       ...teamMeta(game.homeTeam), goals: game.homeGoals ?? 0, shots: game.homeShots ?? 0,
+      xg: game.homeXg ?? null, hd: game.homeHd ?? null,
+      ozPct: game.homeOzPct ?? null, shotSectors: game.homeShotSectors ?? [],
+      topShot: game.homeTopShot ?? null, topShotBy: game.homeTopShotBy ?? null,
       goalsByPeriod: game.homeGoalsByPeriod, shotsByPeriod: game.homeShotsByPeriod,
       skaters: skaters(game.homeTeamId), goalies: goalies(game.homeTeamId), lines: homeLines,
     },
     away: {
       ...teamMeta(game.awayTeam), goals: game.awayGoals ?? 0, shots: game.awayShots ?? 0,
+      xg: game.awayXg ?? null, hd: game.awayHd ?? null,
+      ozPct: game.awayOzPct ?? null, shotSectors: game.awayShotSectors ?? [],
+      topShot: game.awayTopShot ?? null, topShotBy: game.awayTopShotBy ?? null,
       goalsByPeriod: game.awayGoalsByPeriod, shotsByPeriod: game.awayShotsByPeriod,
       skaters: skaters(game.awayTeamId), goalies: goalies(game.awayTeamId), lines: awayLines,
     },

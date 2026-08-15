@@ -84,3 +84,23 @@ export function expectedGoal(
 export function isHighDanger(sector: ShotSector): boolean {
   return sector === "SLOT" || sector === "NET_FRONT";
 }
+
+// The 5 shot sectors in a fixed order (for compact per-team storage / heatmaps).
+export const SECTORS: ShotSector[] = ["POINT", "PERIMETER", "CIRCLE", "SLOT", "NET_FRONT"];
+export const sectorIndex = (s: ShotSector): number => SECTORS.indexOf(s);
+
+// --- NHL EDGE-style tracking: shot speed (mph) -------------------------------
+// A synthesised puck speed off the stick, from the shot type and the shooter's
+// shot power (SC). Slap shots are hardest, tips/backhands softest; an elite
+// shooter adds ~10 mph over a fourth-liner. Real NHL: ~70-90 mph, record ~108.
+const TYPE_MPH: Record<ShotType, number> = {
+  SLAP: 88, ONE_TIMER: 84, SNAP: 78, WRIST: 72, BACKHAND: 62, TIP: 58,
+};
+
+/** Shot speed in mph for a shot of `shotType` by a shooter with shot rating `sc` (0..99). */
+export function shotSpeed(rng: RNG, shotType: ShotType, sc: number): number {
+  const base = TYPE_MPH[shotType];
+  const skill = (sc - 60) * 0.35;          // ±~14 mph across the rating range
+  const jitter = (rng.next() - 0.5) * 8;   // ±4 mph
+  return Math.max(45, Math.min(108, base + skill + jitter));
+}

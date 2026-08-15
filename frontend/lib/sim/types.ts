@@ -195,6 +195,12 @@ export type TeamBox = {
   shotsByPeriod: number[];
   xgFor: number;         // team expected goals for (sum of its shots' xG)
   hdFor: number;         // high-danger shots for
+  // NHL EDGE-style tracking
+  ozTime: number;        // seconds of puck possession in the offensive zone
+  posTime: number;       // total seconds of puck possession (denominator for O-zone %)
+  shotSectors: number[]; // shots by sector [POINT, PERIMETER, CIRCLE, SLOT, NET_FRONT]
+  topShotSpeed: number;  // fastest shot (mph)
+  topShotBy: string;     // who fired it
   skaters: PlayerLine[];
   goalie: GoalieLine;             // the goalie who started
   backupGoalie: GoalieLine | null; // dressed, did not play (shows ending CON)
