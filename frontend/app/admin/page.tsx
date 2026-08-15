@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/ui";
 
 export default function AdminPage() {
   const cards = [
+    { href: "/admin/dashboard", title: "⭐ Commissioner Dashboard", desc: "Today at a glance — games ready, missing lines, illegal lineups, pending trades — and one-click Simulate Day." },
     { href: "/admin/season", title: "Season Control", desc: "Generate the schedule, play the season, run the playoffs." },
     { href: "/admin/announcements", title: "Commissioner Announcements", desc: "Post a league-wide message — reaches every GM's inbox and the home page." },
     { href: "/admin/awards", title: "Award Voting", desc: "Open/close the GM award ballot, watch the running tally, resolve winners." },
