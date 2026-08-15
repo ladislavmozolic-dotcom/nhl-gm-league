@@ -81,6 +81,8 @@ export async function saveGameResult(result: GameResult, meta: GameMeta = {}) {
     awayTopShotBy: result.away.topShotBy || null,
     homeAvgShot: result.home.shots ? result.home.shotSpeedSum / result.home.shots : null,
     awayAvgShot: result.away.shots ? result.away.shotSpeedSum / result.away.shots : null,
+    homeSystem: (result.homeSystem ?? undefined) as object | undefined,
+    awaySystem: (result.awaySystem ?? undefined) as object | undefined,
     endedIn: result.endedIn,
     otPeriods: result.otPeriods,
     winnerTeamId: result.winner,

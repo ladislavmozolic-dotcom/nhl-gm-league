@@ -364,6 +364,7 @@ export function buildTeam(input: {
     fwdTactics: (input.lines?.forwardLines ?? []).map((l) => l.tactic ?? { phy: 1, df: 2, of: 2 }),
     defTactics: (input.lines?.defensePairs ?? []).map((p) => p.tactic ?? { phy: 1, df: 2, of: 2 }),
     tactics,
+    teamTactics: teamTac,
     profile,
     fwdLineFx,
     defPairFx,

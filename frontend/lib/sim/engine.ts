@@ -1029,7 +1029,7 @@ function generateInjuries(st: SimState) {
     }
 
     // 3) OVERUSE / non-contact — fatigue & durability driven (groin, knee).
-    const overuseLambda = 0.048 * scale;
+    const overuseLambda = 0.036 * scale;
     for (let i = 0; i < st.rng.poisson(overuseLambda); i++) {
       const victim = pool[st.rng.weighted(pool.map((s) => fragility(s)))];
       addInjury(st, team, victim, "Overuse");
@@ -1312,6 +1312,8 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     goals: st.goals, penalties: st.penalties, injuries: st.injuries, playByPlay: [], shootout: st.shootout, seed,
     engineVersion: opts.engineVersion ?? ENGINE_VERSION,
     events: st.sink.notable(),
+    homeSystem: home.teamTactics,
+    awaySystem: away.teamTactics,
   };
   if (CFG.playByPlayEnabled) result.playByPlay = generatePlayByPlay(result, home, away, st.sink.all());
   return result;

@@ -129,6 +129,8 @@ const menuItems: MenuItem[] = [
       { label: "Player Stats", href: "/stats/players?league=AHL" },
       { label: "Goalie Stats", href: "/stats/goalies?league=AHL" },
       { label: "Team Stats", href: "/stats/teams?league=AHL" },
+      { label: "Current Injuries", href: "/players/injuries?view=current&league=AHL" },
+      { label: "All Injuries (season)", href: "/players/injuries?view=all&league=AHL" },
     ],
   },
 ];

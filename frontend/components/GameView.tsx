@@ -33,9 +33,12 @@ type GoalE = { period: number; seconds: number; teamId: number; scorerName: stri
 type PenE = { period: number; seconds: number; teamId: number; playerName: string; type: string; minutes: number; severity: string };
 type PbpE = { period: number; seconds: number; time: string; teamId: number | null; kind: string; text: string; major: boolean };
 type ShootoutE = { round: number; teamId: number; teamCode: string | null; shooterName: string; shooterSlug: string | null; result: "goal" | "save" | "miss" };
+type InjuryRow = { period: number; seconds: number; teamId: number | null; playerName: string; playerSlug: string | null; part: string; mechanism: string; severity: string; days: number; byName: string | null };
+type SystemDials = { tempo?: string; forecheck?: string; puckStyle?: string; dZone?: string; preset?: string } | null;
 type Data = {
   id: number; endedIn: string; home: Side; away: Side; homeTeamId: number; awayTeamId: number;
   goals: GoalE[]; penalties: PenE[]; playByPlay: PbpE[]; shootout?: ShootoutE[];
+  injuries?: InjuryRow[]; homeSystem?: SystemDials; awaySystem?: SystemDials;
 };
 
 function ShootoutView({ data }: { data: Data }) {
@@ -68,6 +71,21 @@ function ShootoutView({ data }: { data: Data }) {
 }
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, "0")}`;
+
+const sevClass = (s: string) => s === "Season-ending" ? "text-red-500 font-bold" : s === "Long-term" ? "text-red-400" : s === "Multi-week" ? "text-orange-400" : s === "Week-to-Week" ? "text-amber-400" : "text-slate-400";
+
+const DIAL_LABEL: Record<string, string> = {
+  slow: "Slow", balanced: "Balanced", fast: "Fast", passive: "Passive", aggressive: "Aggressive",
+  cycle: "Cycle", rush: "Rush", shotVolume: "Shot Volume", collapse: "Collapse",
+};
+function SystemSummary({ s }: { s: { tempo?: string; forecheck?: string; puckStyle?: string; dZone?: string; preset?: string } | null | undefined }) {
+  if (!s) return <span className="text-slate-500 text-sm">Balanced</span>;
+  if (s.preset && s.preset !== "Balanced") return <span className="text-sky-300 text-sm font-semibold">{s.preset}</span>;
+  const dials = ([["Tempo", s.tempo], ["Forecheck", s.forecheck], ["Puck", s.puckStyle], ["D-Zone", s.dZone]] as const)
+    .filter(([, v]) => v && v !== "balanced");
+  if (dials.length === 0) return <span className="text-slate-400 text-sm">Balanced</span>;
+  return <span className="text-sm text-slate-300">{dials.map(([k, v]) => `${k}: ${DIAL_LABEL[v as string] ?? v}`).join(" · ")}</span>;
+}
 const periodLabel = (p: number) => (p === 4 ? "Overtime" : p === 5 ? "Shootout" : `${p}${["st", "nd", "rd"][p - 1]} Period`);
 const strengthTag = (g: { strength: string; emptyNet: boolean }) => (g.emptyNet ? "EN" : g.strength !== "EV" ? g.strength : "");
 const svp = (g: Goalie) => (g.shotsAgainst ? g.saves / g.shotsAgainst : 0);
@@ -524,6 +542,42 @@ export default function GameView({ data }: { data: Data }) {
               );
             })}
           </div>
+
+          {/* INJURIES — timed, red-flagged, with the cause */}
+          {data.injuries && data.injuries.length > 0 && (
+            <div className="bg-red-950/20 border border-red-900/40 rounded-xl overflow-hidden">
+              <div className="px-4 py-2 bg-red-900/30 text-xs font-bold tracking-wide text-red-300 uppercase flex items-center gap-2">
+                <span className="text-red-500">✚</span> Injuries
+              </div>
+              {data.injuries.map((inj, i) => (
+                <div key={i} className="px-4 py-1.5 text-sm leading-snug border-t border-red-900/20 flex items-baseline gap-2">
+                  <span className="text-red-500 font-bold shrink-0" title="Injury">✚</span>
+                  <span className="text-slate-500 tabular-nums shrink-0">P{inj.period} {mmss(inj.seconds)}</span>
+                  <span className="text-slate-500 shrink-0">{inj.teamId != null ? codeOf(inj.teamId) : ""}</span>
+                  <span>
+                    {inj.playerSlug ? <Link href={`/players/${inj.playerSlug}`} className="font-semibold text-red-200 hover:text-red-100">{inj.playerName}</Link> : <span className="font-semibold text-red-200">{inj.playerName}</span>}
+                    {" — "}<span className="text-slate-300">{inj.part}</span>
+                    <span className="text-slate-500"> ({inj.mechanism.toLowerCase()}{inj.byName ? ` by ${inj.byName}` : ""})</span>
+                    {" · "}<span className={sevClass(inj.severity)}>{inj.severity}</span>
+                    <span className="text-slate-500"> · out ~{inj.days}d</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* SYSTEMS — what tactic each side played (scouting) */}
+          {(data.awaySystem || data.homeSystem) && (
+            <div className="bg-slate-900/40 border border-slate-800 rounded-xl overflow-hidden">
+              <div className="px-4 py-2 bg-slate-800/60 text-xs font-bold tracking-wide text-slate-300 uppercase flex items-center gap-2">
+                <span className="text-sky-400">◆</span> Systems played
+              </div>
+              <div className="grid grid-cols-2 divide-x divide-slate-800">
+                <div className="px-4 py-2"><div className="text-xs text-slate-500 mb-0.5">{data.away.code ?? data.away.name}</div><SystemSummary s={data.awaySystem} /></div>
+                <div className="px-4 py-2"><div className="text-xs text-slate-500 mb-0.5">{data.home.code ?? data.home.name}</div><SystemSummary s={data.homeSystem} /></div>
+              </div>
+            </div>
+          )}
 
           {/* SHOOTOUT — who shot, and the result of each attempt */}
           <ShootoutView data={data} />

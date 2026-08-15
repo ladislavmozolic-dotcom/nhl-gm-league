@@ -105,6 +105,25 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
     buildLineGroups(game.homeTeamId), buildLineGroups(game.awayTeamId),
   ]);
 
+  // injuries that happened in THIS game (from the event stream) — timed, with cause
+  const injuryEvents = await prisma.gameEvent.findMany({
+    where: { gameId: game.id, type: "INJURY" }, orderBy: [{ period: "asc" }, { seconds: "asc" }],
+  });
+  const injIds = [...new Set(injuryEvents.flatMap((e) => [e.playerId, e.targetId]).filter((x): x is number => x != null))];
+  const injPlayers = injIds.length ? await prisma.player.findMany({ where: { id: { in: injIds } }, select: { id: true, name: true, slug: true } }) : [];
+  const injName = new Map(injPlayers.map((p) => [p.id, cleanName(p.name)]));
+  const injSlug = new Map(injPlayers.map((p) => [p.id, p.slug]));
+  const injuries = injuryEvents.map((e) => {
+    const m = (e.meta ?? {}) as { part?: string; mechanism?: string; severity?: string; days?: number };
+    return {
+      period: e.period, seconds: e.seconds, teamId: e.teamId,
+      playerName: e.playerId != null ? (injName.get(e.playerId) ?? "—") : "—",
+      playerSlug: e.playerId != null ? (injSlug.get(e.playerId) ?? null) : null,
+      part: m.part ?? "Injury", mechanism: m.mechanism ?? "—", severity: m.severity ?? "—", days: m.days ?? 0,
+      byName: e.targetId != null ? (injName.get(e.targetId) ?? null) : null,
+    };
+  });
+
   const data = {
     id: game.id,
     endedIn: game.endedIn ?? "REG",
@@ -147,6 +166,9 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
       period: p.period, seconds: p.seconds, teamId: p.teamId,
       playerName: p.playerName, type: p.type, minutes: p.minutes, severity: p.severity,
     })),
+    injuries,
+    homeSystem: (game.homeSystem as Record<string, string> | null) ?? null,
+    awaySystem: (game.awaySystem as Record<string, string> | null) ?? null,
     playByPlay: (game.playByPlay as unknown as PbpEvent[] | null) ?? [],
     shootout: ((game.shootout as unknown as ShootoutAttempt[] | null) ?? []).map((a) => ({
       ...a, teamCode: a.teamId === game.homeTeamId ? game.homeTeam.code : game.awayTeam.code,
