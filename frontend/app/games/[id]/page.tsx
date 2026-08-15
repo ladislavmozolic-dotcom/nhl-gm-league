@@ -96,6 +96,8 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
       shotsAgainst: s.shotsAgainst, saves: s.saves, goalsAgainst: s.goalsAgainst,
       conBefore: s.conBefore, conAfter: s.conAfter, fatigued: s.fatigued, decision: s.decision,
       xga: s.xga,
+      hdShotsAg: s.hdShotsAg, hdSaves: s.hdSaves, mdShotsAg: s.mdShotsAg, mdSaves: s.mdSaves,
+      ldShotsAg: s.ldShotsAg, ldSaves: s.ldSaves,
     }))
     .sort((a, b) => Number(b.started) - Number(a.started));
 
@@ -109,16 +111,18 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
     home: {
       ...teamMeta(game.homeTeam), goals: game.homeGoals ?? 0, shots: game.homeShots ?? 0,
       xg: game.homeXg ?? null, hd: game.homeHd ?? null,
-      ozPct: game.homeOzPct ?? null, shotSectors: game.homeShotSectors ?? [],
-      topShot: game.homeTopShot ?? null, topShotBy: game.homeTopShotBy ?? null,
+      ozPct: game.homeOzPct ?? null, nzPct: game.homeNzPct ?? null, dzPct: game.homeDzPct ?? null,
+      shotSectors: game.homeShotSectors ?? [],
+      topShot: game.homeTopShot ?? null, topShotBy: game.homeTopShotBy ?? null, avgShot: game.homeAvgShot ?? null,
       goalsByPeriod: game.homeGoalsByPeriod, shotsByPeriod: game.homeShotsByPeriod,
       skaters: skaters(game.homeTeamId), goalies: goalies(game.homeTeamId), lines: homeLines,
     },
     away: {
       ...teamMeta(game.awayTeam), goals: game.awayGoals ?? 0, shots: game.awayShots ?? 0,
       xg: game.awayXg ?? null, hd: game.awayHd ?? null,
-      ozPct: game.awayOzPct ?? null, shotSectors: game.awayShotSectors ?? [],
-      topShot: game.awayTopShot ?? null, topShotBy: game.awayTopShotBy ?? null,
+      ozPct: game.awayOzPct ?? null, nzPct: game.awayNzPct ?? null, dzPct: game.awayDzPct ?? null,
+      shotSectors: game.awayShotSectors ?? [],
+      topShot: game.awayTopShot ?? null, topShotBy: game.awayTopShotBy ?? null, avgShot: game.awayAvgShot ?? null,
       goalsByPeriod: game.awayGoalsByPeriod, shotsByPeriod: game.awayShotsByPeriod,
       skaters: skaters(game.awayTeamId), goalies: goalies(game.awayTeamId), lines: awayLines,
     },

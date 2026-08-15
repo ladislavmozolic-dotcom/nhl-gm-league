@@ -400,15 +400,21 @@ model Game {
   awayXg            Float?
   homeHd            Int?             // high-danger shots for
   awayHd            Int?
-  // NHL EDGE-style tracking
-  homeOzPct         Float?           // offensive-zone possession time %
+  // NHL EDGE-style tracking — zone occupancy % (OZ/NZ/DZ), sums ~100
+  homeOzPct         Float?
+  homeNzPct         Float?
+  homeDzPct         Float?
   awayOzPct         Float?
+  awayNzPct         Float?
+  awayDzPct         Float?
   homeShotSectors   Int[]            @default([]) // shots by [POINT,PERIMETER,CIRCLE,SLOT,NET_FRONT]
   awayShotSectors   Int[]            @default([])
   homeTopShot       Float?           // fastest shot (mph)
   awayTopShot       Float?
   homeTopShotBy     String?
   awayTopShotBy     String?
+  homeAvgShot       Float?           // average shot speed (mph)
+  awayAvgShot       Float?
   endedIn           String?          // REG | OT | SO
   otPeriods         Int?             @default(0) // sudden-death OT periods played (playoff marathons: 1=OT, 2=2OT…)
   winnerTeamId      Int?
@@ -735,6 +741,7 @@ model PlayerGameStat {
   conAfter      Int?
   xg            Float  @default(0) // individual expected goals (Phase 2 shot quality)
   hdShots       Int    @default(0) // high-danger shots (slot / net-front)
+  topShot       Float  @default(0) // fastest shot fired (mph) — EDGE
   game          Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
   player        Player @relation(fields: [playerId], references: [id])
 
@@ -756,6 +763,12 @@ model GoalieGameStat {
   fatigued     Boolean @default(false)
   decision     String? // W | L | OTL
   xga          Float   @default(0) // expected goals against faced → GSAx = xga - goalsAgainst
+  hdShotsAg    Int     @default(0) // EDGE: saves by shot danger
+  hdSaves      Int     @default(0)
+  mdShotsAg    Int     @default(0)
+  mdSaves      Int     @default(0)
+  ldShotsAg    Int     @default(0)
+  ldSaves      Int     @default(0)
   game         Game    @relation(fields: [gameId], references: [id], onDelete: Cascade)
   player       Player  @relation(fields: [playerId], references: [id])
 

@@ -3,6 +3,7 @@ import Link from "next/link";
 const TABS = [
   { key: "leaders", label: "Individual Leaders", href: "/stats/leaders" },
   { key: "advanced", label: "Advanced", href: "/stats/advanced" },
+  { key: "edge", label: "EDGE Tracking", href: "/stats/edge" },
   { key: "players", label: "Player Stats", href: "/stats/players" },
   { key: "goalies", label: "Goalie Stats", href: "/stats/goalies" },
   { key: "teams", label: "Team Stats", href: "/stats/teams" },

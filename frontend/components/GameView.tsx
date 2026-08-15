@@ -17,13 +17,15 @@ type Goalie = {
   shotsAgainst: number; saves: number; goalsAgainst: number;
   conBefore: number | null; conAfter: number | null; fatigued: boolean; decision: string | null;
   xga?: number;
+  hdShotsAg?: number; hdSaves?: number; mdShotsAg?: number; mdSaves?: number; ldShotsAg?: number; ldSaves?: number;
 };
 type LineGroup = { title: string; cols: string[]; units: { n: number; players: (string | null)[]; tactic?: { phy: number; df: number; of: number }; wanted?: number }[] };
 type Side = {
   teamId: number; name: string; slug: string; logoUrl: string | null; code?: string | null;
   goals: number; shots: number; goalsByPeriod: number[]; shotsByPeriod: number[];
   xg?: number | null; hd?: number | null;
-  ozPct?: number | null; shotSectors?: number[]; topShot?: number | null; topShotBy?: string | null;
+  ozPct?: number | null; nzPct?: number | null; dzPct?: number | null;
+  shotSectors?: number[]; topShot?: number | null; topShotBy?: string | null; avgShot?: number | null;
   skaters: Skater[]; goalies: Goalie[]; lines?: LineGroup[];
 };
 type GoalAssist = { name: string; slug: string | null; total: number | null };
@@ -318,23 +320,20 @@ function EdgePanel({ data }: { data: Data }) {
   const hasEdge = away.ozPct != null || home.ozPct != null || (away.topShot ?? 0) > 0;
   if (!hasEdge) return null;
 
-  // a two-sided share bar (away left, home right)
-  const ShareBar = ({ a, h, fmt }: { a: number; h: number; fmt: (n: number) => string }) => {
-    const tot = a + h || 1;
-    return (
-      <div className="flex items-center gap-2 text-xs">
-        <span className="w-16 text-right tabular-nums font-semibold">{fmt(a)}</span>
-        <div className="flex-1 flex h-2.5 rounded overflow-hidden bg-slate-800">
-          <div className="bg-sky-500/70" style={{ width: `${(a / tot) * 100}%` }} />
-          <div className="bg-rose-500/70" style={{ width: `${(h / tot) * 100}%` }} />
-        </div>
-        <span className="w-16 tabular-nums font-semibold">{fmt(h)}</span>
-      </div>
-    );
-  };
-
   const secA = away.shotSectors ?? [];
   const secH = home.shotSectors ?? [];
+  const gA = away.goalies.find((g) => g.started);
+  const gH = home.goalies.find((g) => g.started);
+  const svById = (g: Goalie | undefined, sh: number, sv: number) => (g && sh ? (sv / sh) * 100 : null);
+
+  // a stacked OZ/NZ/DZ zone-time bar for one team
+  const ZoneBar = ({ oz, nz, dz }: { oz: number; nz: number; dz: number }) => (
+    <div className="flex h-4 rounded overflow-hidden text-[9px] font-bold text-slate-900/80">
+      <div className="bg-emerald-500/80 flex items-center justify-center" style={{ width: `${oz}%` }}>{oz >= 12 ? `${oz.toFixed(0)}` : ""}</div>
+      <div className="bg-slate-500/70 flex items-center justify-center" style={{ width: `${nz}%` }}>{nz >= 12 ? `${nz.toFixed(0)}` : ""}</div>
+      <div className="bg-rose-500/70 flex items-center justify-center" style={{ width: `${dz}%` }}>{dz >= 12 ? `${dz.toFixed(0)}` : ""}</div>
+    </div>
+  );
 
   return (
     <div className="bg-slate-900/40 rounded-lg overflow-hidden border border-slate-800">
@@ -344,16 +343,37 @@ function EdgePanel({ data }: { data: Data }) {
       <div className="p-4 space-y-4">
         {away.ozPct != null && home.ozPct != null && (
           <div>
-            <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Offensive-zone time</div>
-            <ShareBar a={away.ozPct} h={home.ozPct} fmt={(n) => `${n.toFixed(0)}%`} />
+            <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-slate-500 mb-1">
+              <span>Zone time</span>
+              <span className="normal-case flex gap-3"><span className="text-emerald-400">■ Off</span><span className="text-slate-400">■ Neu</span><span className="text-rose-400">■ Def</span></span>
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2"><span className="w-10 text-xs text-slate-400">{away.code ?? "A"}</span><div className="flex-1"><ZoneBar oz={away.ozPct} nz={away.nzPct ?? 0} dz={away.dzPct ?? 0} /></div></div>
+              <div className="flex items-center gap-2"><span className="w-10 text-xs text-slate-400">{home.code ?? "H"}</span><div className="flex-1"><ZoneBar oz={home.ozPct} nz={home.nzPct ?? 0} dz={home.dzPct ?? 0} /></div></div>
+            </div>
           </div>
         )}
         {(away.topShot ?? 0) > 0 && (home.topShot ?? 0) > 0 && (
           <div>
-            <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Fastest shot</div>
+            <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Shot speed <span className="normal-case text-slate-600">· top / avg</span></div>
             <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="tabular-nums"><span className="text-lg font-bold">{away.topShot!.toFixed(1)}</span> <span className="text-slate-500">mph</span> <span className="text-slate-400 text-xs">{away.topShotBy}</span></div>
-              <div className="tabular-nums text-right"><span className="text-slate-400 text-xs">{home.topShotBy}</span> <span className="text-lg font-bold">{home.topShot!.toFixed(1)}</span> <span className="text-slate-500">mph</span></div>
+              <div className="tabular-nums"><span className="text-lg font-bold">{away.topShot!.toFixed(1)}</span> <span className="text-slate-500 text-xs">mph {away.topShotBy}</span>{away.avgShot != null && <span className="text-slate-500 text-xs"> · avg {away.avgShot.toFixed(0)}</span>}</div>
+              <div className="tabular-nums text-right">{home.avgShot != null && <span className="text-slate-500 text-xs">avg {home.avgShot.toFixed(0)} · </span>}<span className="text-slate-500 text-xs">{home.topShotBy} mph</span> <span className="text-lg font-bold">{home.topShot!.toFixed(1)}</span></div>
+            </div>
+          </div>
+        )}
+        {gA?.hdShotsAg != null && gH?.hdShotsAg != null && (
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Goalie save % by danger</div>
+            <div className="grid grid-cols-2 gap-4 text-xs">
+              {[[gA, away] as const, [gH, home] as const].map(([g, side], i) => (
+                <div key={i} className={i === 1 ? "text-right" : ""}>
+                  <div className="text-slate-400 mb-0.5">{g!.name}</div>
+                  <span className="text-amber-400">HD {svById(g, g!.hdShotsAg!, g!.hdSaves!)?.toFixed(0) ?? "—"}%</span>
+                  <span className="text-slate-500"> · MD {svById(g, g!.mdShotsAg!, g!.mdSaves!)?.toFixed(0) ?? "—"}%</span>
+                  <span className="text-slate-500"> · LD {svById(g, g!.ldShotsAg!, g!.ldSaves!)?.toFixed(0) ?? "—"}%</span>
+                </div>
+              ))}
             </div>
           </div>
         )}

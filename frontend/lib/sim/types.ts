@@ -132,6 +132,7 @@ export type PlayerLine = {
   conAfter: number;      // condition after the game (post workload drop)
   xg: number;            // individual expected goals (shot quality generated)
   hdShots: number;       // high-danger shots (slot / net-front)
+  topShotSpeed: number;  // fastest shot fired (mph) — EDGE
 };
 
 export type GoalieLine = {
@@ -148,6 +149,10 @@ export type GoalieLine = {
   fatigued: boolean;     // started on a back-to-back
   decision: "W" | "L" | "OTL" | null;
   xga: number;           // expected goals against (sum of faced shots' xG) → GSAx = xga - goalsAgainst
+  // EDGE: saves by shot danger (HD = slot/net-front, MD = circle, LD = point/perimeter)
+  hdShotsAg: number; hdSaves: number;
+  mdShotsAg: number; mdSaves: number;
+  ldShotsAg: number; ldSaves: number;
 };
 
 export type GoalEvent = {
@@ -195,12 +200,14 @@ export type TeamBox = {
   shotsByPeriod: number[];
   xgFor: number;         // team expected goals for (sum of its shots' xG)
   hdFor: number;         // high-danger shots for
-  // NHL EDGE-style tracking
-  ozTime: number;        // seconds of puck possession in the offensive zone
-  posTime: number;       // total seconds of puck possession (denominator for O-zone %)
+  // NHL EDGE-style tracking — absolute zone occupancy (ticks), summing to play time
+  ozTime: number;        // time the puck was in this team's OFFENSIVE zone
+  nzTime: number;        // ... neutral zone
+  dzTime: number;        // ... defensive zone
   shotSectors: number[]; // shots by sector [POINT, PERIMETER, CIRCLE, SLOT, NET_FRONT]
   topShotSpeed: number;  // fastest shot (mph)
   topShotBy: string;     // who fired it
+  shotSpeedSum: number;  // sum of shot speeds (÷ shots = avg mph)
   skaters: PlayerLine[];
   goalie: GoalieLine;             // the goalie who started
   backupGoalie: GoalieLine | null; // dressed, did not play (shows ending CON)

@@ -14,6 +14,16 @@ export type GameMeta = {
   gameNum?: number;  // game number within a playoff series
 };
 
+// EDGE zone occupancy → OZ/NZ/DZ percentages (sum ~100) for one side.
+function zonePct(side: "home" | "away", box: TeamBox) {
+  const tot = box.ozTime + box.nzTime + box.dzTime || 1;
+  return {
+    [`${side}OzPct`]: (box.ozTime / tot) * 100,
+    [`${side}NzPct`]: (box.nzTime / tot) * 100,
+    [`${side}DzPct`]: (box.dzTime / tot) * 100,
+  };
+}
+
 function skaterRows(box: TeamBox, gameId: number) {
   return box.skaters
     .filter((s) => s.goals || s.assists || s.shots || s.pim || s.plusMinus || s.hits || s.blocks || s.toi)
@@ -25,7 +35,7 @@ function skaterRows(box: TeamBox, gameId: number) {
       hits: s.hits, blocks: s.blocks,
       faceoffWins: s.faceoffWins, faceoffLosses: s.faceoffLosses, toi: s.toi,
       conBefore: Math.round(s.conBefore), conAfter: Math.round(s.conAfter),
-      xg: s.xg, hdShots: s.hdShots,
+      xg: s.xg, hdShots: s.hdShots, topShot: s.topShotSpeed,
     }));
 }
 
@@ -36,6 +46,8 @@ function goalieRows(box: TeamBox, gameId: number) {
     shotsAgainst: g.shotsAgainst, saves: g.saves, goalsAgainst: g.goalsAgainst,
     conBefore: g.conBefore, conAfter: g.conAfter, fatigued: g.fatigued,
     decision: g.decision, xga: g.xga,
+    hdShotsAg: g.hdShotsAg, hdSaves: g.hdSaves, mdShotsAg: g.mdShotsAg, mdSaves: g.mdSaves,
+    ldShotsAg: g.ldShotsAg, ldSaves: g.ldSaves,
   }));
 }
 
@@ -59,14 +71,16 @@ export async function saveGameResult(result: GameResult, meta: GameMeta = {}) {
     awayXg: result.away.xgFor,
     homeHd: result.home.hdFor,
     awayHd: result.away.hdFor,
-    homeOzPct: result.home.posTime ? (result.home.ozTime / result.home.posTime) * 100 : null,
-    awayOzPct: result.away.posTime ? (result.away.ozTime / result.away.posTime) * 100 : null,
+    ...zonePct("home", result.home),
+    ...zonePct("away", result.away),
     homeShotSectors: result.home.shotSectors,
     awayShotSectors: result.away.shotSectors,
     homeTopShot: result.home.topShotSpeed || null,
     awayTopShot: result.away.topShotSpeed || null,
     homeTopShotBy: result.home.topShotBy || null,
     awayTopShotBy: result.away.topShotBy || null,
+    homeAvgShot: result.home.shots ? result.home.shotSpeedSum / result.home.shots : null,
+    awayAvgShot: result.away.shots ? result.away.shotSpeedSum / result.away.shots : null,
     endedIn: result.endedIn,
     otPeriods: result.otPeriods,
     winnerTeamId: result.winner,

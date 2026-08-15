@@ -154,7 +154,7 @@ function newPlayerLine(s: SimSkater): PlayerLine {
     ppGoals: 0, shGoals: 0, gwg: 0, hits: 0, blocks: 0,
     faceoffWins: 0, faceoffLosses: 0, toi: 0,
     conBefore: s.con ?? 100, conAfter: s.con ?? 100,
-    xg: 0, hdShots: 0,
+    xg: 0, hdShots: 0, topShotSpeed: 0,
   };
 }
 
@@ -176,12 +176,14 @@ function initTeamBox(team: SimTeam): TeamBox {
     shotsAgainst: 0, saves: 0, goalsAgainst: 0, savePct: 0, toi: 0,
     conBefore: team.goalie.con, conAfter: team.goalie.con, fatigued: team.goalie.fatigued,
     decision: null, xga: 0,
+    hdShotsAg: 0, hdSaves: 0, mdShotsAg: 0, mdSaves: 0, ldShotsAg: 0, ldSaves: 0,
   };
   const backupGoalie: GoalieLine | null = team.backup ? {
     id: team.backup.id, name: team.backup.name, started: false,
     shotsAgainst: 0, saves: 0, goalsAgainst: 0, savePct: 0, toi: 0,
     conBefore: team.backup.con, conAfter: team.backup.con, fatigued: false,
     decision: null, xga: 0,
+    hdShotsAg: 0, hdSaves: 0, mdShotsAg: 0, mdSaves: 0, ldShotsAg: 0, ldSaves: 0,
   } : null;
   return {
     teamId: team.id, name: team.name, code: team.code,
@@ -189,7 +191,7 @@ function initTeamBox(team: SimTeam): TeamBox {
     faceoffWins: 0, faceoffLosses: 0, hits: 0, blocks: 0,
     goalsByPeriod: [0, 0, 0, 0], shotsByPeriod: [0, 0, 0, 0],
     xgFor: 0, hdFor: 0,
-    ozTime: 0, posTime: 0, shotSectors: [0, 0, 0, 0, 0], topShotSpeed: 0, topShotBy: "",
+    ozTime: 0, nzTime: 0, dzTime: 0, shotSectors: [0, 0, 0, 0, 0], topShotSpeed: 0, topShotBy: "", shotSpeedSum: 0,
     skaters: [], goalie, backupGoalie,
   };
 }
@@ -752,9 +754,15 @@ function simulatePeriodPossession(st: SimState, period: number) {
     }
 
     // ---- PLAY: run the decision tree for the carrier this tick ----
-    // EDGE: puck-possession zone time — one carried tick in each zone.
-    st.box[carrierTeam.id].posTime++;
-    if (zone === "OFF") st.box[carrierTeam.id].ozTime++;
+    // EDGE zone occupancy: the puck is in one absolute zone this tick. `zone` is
+    // relative to the carrier, so the carrier's OFF is the opponent's DEF, etc.
+    // Credit both teams so the OZ/NZ/DZ splits sum to play time.
+    {
+      const opp = other(carrierTeam);
+      if (zone === "OFF") { st.box[carrierTeam.id].ozTime++; st.box[opp.id].dzTime++; }
+      else if (zone === "DEF") { st.box[carrierTeam.id].dzTime++; st.box[opp.id].ozTime++; }
+      else { st.box[carrierTeam.id].nzTime++; st.box[opp.id].nzTime++; }
+    }
     const def = other(carrierTeam);
     const isHome = carrierTeam === home;
     const margin = st.box[carrierTeam.id].goals - st.box[def.id].goals;
@@ -828,13 +836,22 @@ function simulatePeriodPossession(st: SimState, period: number) {
       st.box[carrierTeam.id].xgFor += xg;
       if (hd) st.box[carrierTeam.id].hdFor++;
       gLine.xga += xg;
-      // EDGE: shot location distribution + shot speed (fastest tracked per team)
+      // EDGE: shot location distribution + shot speed (fastest + avg tracked per team)
       st.box[carrierTeam.id].shotSectors[sectorIndex(sector)]++;
       const mph = shotSpeed(rng, shotType, carrier.attrs.sc ?? 50);
+      st.box[carrierTeam.id].shotSpeedSum += mph;
+      const shooterLine = st.lines[carrierTeam.id][carrier.id];
+      if (mph > shooterLine.topShotSpeed) shooterLine.topShotSpeed = mph;
       if (mph > st.box[carrierTeam.id].topShotSpeed) {
         st.box[carrierTeam.id].topShotSpeed = mph;
         st.box[carrierTeam.id].topShotBy = carrier.name;
       }
+      // EDGE: goalie shots-faced by danger. Bucket on the ACTUAL chance danger
+      // (what drives conversion) so HD save% is realistically the lowest: a slot
+      // one-timer / rebound (danger≥1.5) = HD, a forward's carry look = MD, a point
+      // shot (danger~0.35) = LD.
+      const danger3: "hd" | "md" | "ld" = danger >= 1.5 ? "hd" : danger >= 0.6 ? "md" : "ld";
+      if (danger3 === "hd") gLine.hdShotsAg++; else if (danger3 === "md") gLine.mdShotsAg++; else gLine.ldShotsAg++;
       press++; // sustained pressure: screening / traffic / a tiring goalie
       const pressBonus = 1 + 0.06 * Math.min(press - 1, 4);
       const offMult = chemFactor(carrier.chem, carrier.roleFit) * moraleFactor(carrier.morale) * physFactor(carrier.weight) * fat(carrierTeam, carrier) * tOff.of * carrierTeam.coachOff;
@@ -869,6 +886,7 @@ function simulatePeriodPossession(st: SimState, period: number) {
         state = "FACEOFF"; setup = "carry"; continue;
       }
       gLine.saves++;
+      if (danger3 === "hd") gLine.hdSaves++; else if (danger3 === "md") gLine.mdSaves++; else gLine.ldSaves++;
       st.sink.emit({
         period, seconds: tick, type: "SAVE",
         teamId: def.id, teamCode: def.code,
@@ -1066,8 +1084,15 @@ function simulateFaceoffs(st: SimState) {
 function distributeCounting(st: SimState) {
   for (const team of [st.home, st.away]) {
     const roster = [...team.forwards, ...team.defense];
-    // hits
-    const hits = st.rng.poisson(LEAGUE.hitsPerTeam * (CFG.hitsPct / 100));
+    // hits — a physical team (high CK / heavy) throws noticeably more; centred on
+    // an average-checking club so the league total stays NHL-realistic (~21/team).
+    let hw = 0, wt = 0;
+    for (const r of roster) { hw += r.hitting * r.iceTime; wt += r.iceTime; }
+    const avgHit = wt ? hw / wt : 71;
+    // centred on the league-mean checking (~71 ice-weighted) so the average club
+    // sits at ~21 hits and physical/finesse teams spread ~16–27.
+    const hitFactor = Math.max(0.78, Math.min(1.4, 1 + (avgHit - 71) / 60));
+    const hits = st.rng.poisson(LEAGUE.hitsPerTeam * (CFG.hitsPct / 100) * hitFactor);
     for (let i = 0; i < hits; i++) {
       // heavier bodies throw more of the hits (physicality)
       const s = roster[st.rng.weighted(roster.map((r) => r.hitting * r.iceTime * physFactor(r.weight)))];
