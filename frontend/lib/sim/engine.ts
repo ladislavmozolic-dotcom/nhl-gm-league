@@ -1008,7 +1008,7 @@ function generateInjuries(st: SimState) {
     //    how heavy/chippy they are). Contact injuries land on forwards more.
     const oppHits = st.box[opp.id].hits;
     const physPressure = (opp.profile.ck / 66) * (opp.profile.weight / 92);
-    const hitLambda = 0.075 * scale * (oppHits / 21) * physPressure;
+    const hitLambda = 0.088 * scale * (oppHits / 21) * physPressure;
     for (let i = 0; i < st.rng.poisson(hitLambda); i++) {
       const cPool = fwd.length ? [...fwd, ...fwd, ...def] : pool; // forwards ~2x exposed
       const victim = cPool[st.rng.weighted(cPool.map((s) => fragility(s, true)))];
@@ -1016,7 +1016,7 @@ function generateInjuries(st: SimState) {
     }
 
     // 2) BLOCKED-SHOT injuries — blocking hard shots hurts hands/feet; D block most.
-    const blockLambda = 0.024 * scale * (st.box[team.id].blocks / 14);
+    const blockLambda = 0.028 * scale * (st.box[team.id].blocks / 14);
     for (let i = 0; i < st.rng.poisson(blockLambda); i++) {
       const bPool = def.length ? [...def, ...def, ...fwd] : pool;
       const victim = bPool[st.rng.weighted(bPool.map((s) => s.iceTime * (115 - s.attrs.du)))];
@@ -1024,7 +1024,7 @@ function generateInjuries(st: SimState) {
     }
 
     // 3) OVERUSE / non-contact — fatigue & durability driven (groin, knee).
-    const overuseLambda = 0.04 * scale;
+    const overuseLambda = 0.048 * scale;
     for (let i = 0; i < st.rng.poisson(overuseLambda); i++) {
       const victim = pool[st.rng.weighted(pool.map((s) => fragility(s)))];
       addInjury(st, team, victim, "Overuse");

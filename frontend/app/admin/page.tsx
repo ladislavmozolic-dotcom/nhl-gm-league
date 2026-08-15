@@ -9,6 +9,7 @@ export default function AdminPage() {
     { href: "/draft/lottery", title: "Draft Lottery", desc: "Draw the NHL-style lottery (16 non-playoff clubs, 2 weighted picks) to set round 1." },
     { href: "/admin/simulation", title: "Simulation Engine", desc: "Tune goals, shots, penalties, fights, goalie fatigue, playoff format, points." },
     { href: "/admin/sim-guide", title: "How the Sim Works", desc: "How chemistry forms and how every rating works together — a reference guide." },
+    { href: "/admin/calibration", title: "Calibration Lab", desc: "Grade the engine against NHL targets — rates, competitive balance, xG, EDGE, injuries." },
     { href: "/admin/finance", title: "Team Popularity", desc: "Set popularity — drives attendance and ticket revenue." },
     { href: "/admin/contracts", title: "Contracts", desc: "Edit player cap hits and contract terms." },
     { href: "/admin/positions", title: "Player Positions", desc: "Search a player and add/remove positions and shooting side." },
