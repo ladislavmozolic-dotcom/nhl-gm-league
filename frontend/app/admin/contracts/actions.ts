@@ -1,31 +1,28 @@
 "use server";
 
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { isAdmin } from "@/lib/auth";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-const prisma = new PrismaClient();
-
+/** Admin: set a player's salary (cap hit, in dollars) and contract length. When
+ *  the Agent signing flow lands it will write these automatically; this is the
+ *  manual override. Regenerates the display contract string too. */
 export async function updateContract(formData: FormData) {
-  const slug = formData.get("slug") as string;
-
-  const capHit = Number(formData.get("capHit"));
-  const contractYears = Number(
-    formData.get("contractYears")
-  );
-  const contractExpiry = Number(
-    formData.get("contractExpiry")
-  );
+  if (!(await isAdmin())) throw new Error("Only a league admin can edit contracts.");
+  const slug = String(formData.get("slug") ?? "");
+  const capHit = Math.max(0, Math.round(Number(formData.get("capHit")) || 0));
+  const contractYears = Math.max(0, Math.round(Number(formData.get("contractYears")) || 0));
+  const expiryRaw = formData.get("contractExpiry");
+  const contractExpiry = expiryRaw && String(expiryRaw).trim() ? Number(expiryRaw) : null;
+  // keep the shown contract string in sync (e.g. "9,000,000$ / 2yrs")
+  const contractText = capHit ? `${capHit.toLocaleString("en-US")}$ / ${contractYears}yr${contractYears === 1 ? "" : "s"}` : null;
 
   await prisma.player.update({
-    where: {
-      slug,
-    },
-    data: {
-      capHit,
-      contractYears,
-      contractExpiry,
-    },
+    where: { slug },
+    data: { capHit, contractYears, contractExpiry, contractText },
   });
 
-  redirect(`/admin/contracts/${slug}`);
+  for (const p of ["/admin/contracts", `/admin/contracts/${slug}`, "/salary-cap", `/players/${slug}`]) revalidatePath(p);
+  redirect(`/admin/contracts/${slug}?saved=1`);
 }

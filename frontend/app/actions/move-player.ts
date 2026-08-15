@@ -2,6 +2,8 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { canAddCapHit } from "@/lib/cap";
+import { money } from "@/lib/finance";
 
 export async function movePlayer(
   playerId: number,
@@ -24,6 +26,8 @@ export async function movePlayer(
   if (!player) return;
 
   if (rosterType === "AHL") {
+    // a one-way contract can't be buried in the minors
+    if (player.contractType === "ONE_WAY") return { ok: false, error: "One-way contract — cannot be sent to the farm." };
     const affiliateTeam = player.team.affiliateTeams?.[0];
 
     if (!affiliateTeam) return;
@@ -43,6 +47,13 @@ export async function movePlayer(
     const parentTeam = player.team.parentTeam;
 
     if (!parentTeam) return;
+
+    // in-season: a manual call-up must fit under the cap (ceiling incl. LTIR relief).
+    // The off-season +10% cushion is applied automatically inside canAddCapHit.
+    const cap = await canAddCapHit(parentTeam.id, player.capHit ?? 0);
+    if (!cap.ok) {
+      return { ok: false, error: `Call-up blocked — ${parentTeam.name} has ${money(cap.status.space)} of cap space, ${player.name}'s hit is ${money(player.capHit ?? 0)}. Send a player down or use LTIR relief.` };
+    }
 
     await prisma.player.update({
       where: {

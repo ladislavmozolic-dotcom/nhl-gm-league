@@ -1,0 +1,1145 @@
+// STHS-style game simulation engine (v2 — chronological / event-based).
+// Produces a full box score with timestamped goals & penalties, per-period
+// shots/goals, power plays tied to real penalty times, and rich per-player
+// stats (hits, blocks, faceoffs, TOI). Tuned to NHL-realistic output.
+
+import { RNG, fixtureSeed } from "./rng";
+import { generatePlayByPlay } from "./playbyplay";
+import { DEFAULT_SETTINGS, type EngineSettings } from "./settings";
+import type {
+  SimTeam, SimSkater, SimGoalie, GameResult, TeamBox, PlayerLine, GoalieLine,
+  GoalEvent, PenaltyEvent, InjuryEvent, ShootoutAttempt, LineTactic,
+} from "./types";
+
+const BODY_PARTS = ["Upper Body", "Lower Body", "Knee", "Shoulder", "Ankle", "Hand", "Groin", "Concussion"];
+const INJURY_BASE = 0.22; // expected injuries per team per game at 100% (~1 in 5 games) — keeps the farm call-up pipeline busy
+
+// Active tunable settings for the current game. Set at the top of simulateGame;
+// games run sequentially so a module-level value is safe. Defaults reproduce
+// the calibrated baseline.
+let CFG: EngineSettings = DEFAULT_SETTINGS;
+// The model's LEAGUE baselines are NHL-calibrated. AHL clubs have weaker goalies
+// (mean ~60 vs ~73) and weaker offense, and the ^2.2 goalie exponent over-rewards
+// shooters against those weaker keepers → inflated AHL scoring. Damp AHL goal
+// conversion so AHL point totals land in the real ~90-100 range, not ~130+.
+let AHL_GAME = false;
+const AHL_GOALS_MULT = 0.88; // tunable — lower = fewer AHL goals (keeps team totals ~2.8/gm, top scorer ~95)
+
+const PERIOD_SECONDS = 1200; // 20:00
+const OT_SECONDS = 300;      // 5:00 sudden death
+
+// League baselines the model is calibrated against (population means of THIS
+// dataset's ratings, so an avg-vs-avg matchup centers every factor at 1.0).
+const LEAGUE = {
+  avgOffense: 55,
+  avgDefense: 69.5,
+  avgGoalie: 84,
+  baseShots: 28.5,
+  baseConversion: 0.083,
+  homeShotBonus: 1.05,
+  homeConvBonus: 1.05,
+  penaltiesPerTeam: 3.2,   // penalties a team of avg discipline takes per game
+  ppConvBoost: 2.9,        // conversion multiplier on the power play
+  shConvPenalty: 0.45,     // conversion multiplier while shorthanded
+  hitsPerTeam: 21,
+  blocksPerTeam: 14,
+  faceoffsPerGame: 46,
+  fwdIcePool: 10800,       // total forward TOI seconds/game (3 on ice * 60min)
+  defIcePool: 7200,        // total defense TOI seconds/game (2 on ice * 60min)
+};
+
+// Super-linear involvement so elite players take a disproportionate share of
+// production (realistic star separation from a narrow rating spread).
+const involvement = (r: number) => Math.pow(r / 60, CFG.starExponent);
+
+// Condition (CON) effects on a goalie's effective save quality.
+//   e.g. CON 97 on a back-to-back: (1-0.045)*0.885 = 0.845 -> ~15% weaker.
+function effGoalieQuality(g: SimGoalie): number {
+  const conFactor = 1 - (100 - g.con) * CFG.conSlope;
+  // MO: a confident goalie steals games (higher effective quality), a shaky one
+  // lets in soft goals. Clamped so morale nudges but never dominates the card.
+  const moraleFactor = CFG.moraleEnabled
+    ? Math.max(0.95, Math.min(1.05, 1 + ((g.morale ?? CFG.moraleNeutral) - CFG.moraleNeutral) * CFG.moraleGoalieSlope))
+    : 1;
+  return g.quality * Math.max(0.4, conFactor) * (g.fatigued ? CFG.b2bFatigue : 1) * moraleFactor;
+}
+// Shot-load rule, driven by the goalie's durability (DU): workhorse (DU >= high)
+// goalies tolerate more shots before losing a CON point.
+function conDrop(shots: number, du: number): number {
+  if (du >= CFG.duHighThreshold) return shots <= CFG.conShotsHigh1 ? 1 : shots <= CFG.conShotsHigh2 ? 2 : 3;
+  return shots <= CFG.conShotsLow1 ? 1 : shots <= CFG.conShotsLow2 ? 2 : 3;
+}
+// Defensemen contribute to offense, but less than forwards. High-PA/SC D still
+// rise into the scoring race (a few crack the top 20), just not to the top.
+const D_SHOOT = 0.34;
+const D_ASSIST = 0.6;
+
+const PENALTY_TYPES: Array<[string, number]> = [
+  ["Tripping", 15], ["Hooking", 13], ["Slashing", 10], ["Holding", 10],
+  ["Interference", 9], ["Cross-checking", 9], ["Roughing", 8],
+  ["High-sticking", 7], ["Boarding", 3], ["Delay of game", 3],
+  ["Too many men", 2], ["Elbowing", 2],
+];
+// severe infractions that carry an added misconduct / game misconduct
+const SEVERE_TYPES = ["Boarding", "Cross-checking", "Checking to the head", "Slew-footing"];
+
+type Penalty = { team: number; start: number; end: number; expired: boolean };
+
+type SimState = {
+  rng: RNG;
+  home: SimTeam;
+  away: SimTeam;
+  box: Record<number, TeamBox>;
+  lines: Record<number, Record<number, PlayerLine>>;
+  goals: GoalEvent[];
+  penalties: PenaltyEvent[];
+  injuries: InjuryEvent[];
+  // momentum: a decaying per-team "hot streak" value, updated on goals
+  momentum: Record<number, number>;
+  momoTime: Record<number, number>; // abs game-seconds of last momentum update
+  momoTau: Record<number, number>;  // decay time-constant (LD extends it)
+  momoDip: Record<number, number>;  // momentum lost when this team concedes (EX softens it)
+  playoff: boolean;                 // playoff game — amplifies clutch
+  defChem: Record<number, number>;  // team's avg D-pair chemistry factor (a gelled, mixed pair shields better)
+  rivalry: boolean;                 // heated rivalry game — more fights, scrums, misconducts
+  pulled: Record<number, boolean>;  // has this team's starter been yanked for the backup
+  shootout: ShootoutAttempt[];      // shootout attempts (empty unless the game went to a shootout)
+};
+
+// The goalie currently in net for a team (backup if the starter was pulled).
+function liveGoalie(st: SimState, team: SimTeam): SimGoalie {
+  return st.pulled[team.id] && team.backup ? team.backup : team.goalie;
+}
+function liveGoalieLine(st: SimState, teamId: number): GoalieLine {
+  const box = st.box[teamId];
+  return st.pulled[teamId] && box.backupGoalie ? box.backupGoalie : box.goalie;
+}
+// After a goal, yank a shelled starter (enough goals + shots, save% too low).
+function maybePullGoalie(st: SimState, teamId: number) {
+  if (!CFG.pullGoalieEnabled || st.pulled[teamId]) return;
+  const box = st.box[teamId];
+  if (!box.backupGoalie) return;
+  const s = box.goalie;
+  if (s.goalsAgainst >= CFG.pullGoalieMinGoals && s.shotsAgainst >= CFG.pullGoalieMinShots
+      && s.saves / Math.max(1, s.shotsAgainst) < CFG.pullGoalieSvPct) {
+    st.pulled[teamId] = true;
+    box.backupGoalie.started = true;
+  }
+}
+
+function fmt(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function newPlayerLine(s: SimSkater): PlayerLine {
+  return {
+    id: s.id, name: s.name, position: s.position,
+    goals: 0, assists: 0, points: 0, shots: 0, pim: 0, plusMinus: 0,
+    ppGoals: 0, shGoals: 0, gwg: 0, hits: 0, blocks: 0,
+    faceoffWins: 0, faceoffLosses: 0, toi: 0,
+    conBefore: s.con ?? 100, conAfter: s.con ?? 100,
+  };
+}
+
+// Post-game skater conditioning. A heavy regulation workload shaves 1 CON point
+// (F >= fwdConMinutes, D >= defConMinutes). A playoff OT game is a marathon —
+// everyone is overworked, and each extra OT period costs another point, so a game
+// ending in the 1st OT leaves the value at 98, the 2nd OT at 97, and so on.
+function skaterConAfter(conBefore: number, toiSec: number, isDefense: boolean, otPeriods: number): number {
+  const mins = toiSec / 60;
+  const threshold = isDefense ? CFG.skaterDefConMinutes : CFG.skaterFwdConMinutes;
+  const overworked = otPeriods > 0 || mins >= threshold;
+  const drop = (overworked ? CFG.skaterConDrop : 0) + otPeriods * CFG.skaterOtDrop;
+  return Math.max(1, Math.min(100, conBefore - drop));
+}
+
+function initTeamBox(team: SimTeam): TeamBox {
+  const goalie: GoalieLine = {
+    id: team.goalie.id, name: team.goalie.name, started: true,
+    shotsAgainst: 0, saves: 0, goalsAgainst: 0, savePct: 0, toi: 0,
+    conBefore: team.goalie.con, conAfter: team.goalie.con, fatigued: team.goalie.fatigued,
+    decision: null,
+  };
+  const backupGoalie: GoalieLine | null = team.backup ? {
+    id: team.backup.id, name: team.backup.name, started: false,
+    shotsAgainst: 0, saves: 0, goalsAgainst: 0, savePct: 0, toi: 0,
+    conBefore: team.backup.con, conAfter: team.backup.con, fatigued: false,
+    decision: null,
+  } : null;
+  return {
+    teamId: team.id, name: team.name, code: team.code,
+    goals: 0, shots: 0, pim: 0, ppGoals: 0, ppOpp: 0,
+    faceoffWins: 0, faceoffLosses: 0, hits: 0, blocks: 0,
+    goalsByPeriod: [0, 0, 0, 0], shotsByPeriod: [0, 0, 0, 0],
+    skaters: [], goalie, backupGoalie,
+  };
+}
+
+// ---- team strength -> expected volume ---------------------------------------
+
+function expectedShots(off: SimTeam, def: SimTeam, isHome: boolean): number {
+  const offFactor = off.offenseRating / LEAGUE.avgOffense;
+  const defFactor = LEAGUE.avgDefense / def.defenseRating;
+  let shots = LEAGUE.baseShots * (0.55 + 0.45 * offFactor) * (0.6 + 0.4 * defFactor);
+  if (isHome) shots *= 1 + (LEAGUE.homeShotBonus - 1) * (CFG.homeAdvPct / 100);
+  return shots * (CFG.shotsPct / 100);
+}
+
+function conversion(
+  shooterFinishing: number, goalieQuality: number, isHome: boolean,
+  strength: "EV" | "PP" | "SH",
+): number {
+  // finishing amplified around the league mean so an elite finisher clearly out-scores
+  // a similar-looking one — the compressed ratings still separate the snipers.
+  const shooterMod = Math.pow(shooterFinishing / 60, 1.15);
+  // widen the goalie spread (^2.2) so an elite goalie reaches ~92% SV over a
+  // season and a weak one is clearly beatable, while the league average holds.
+  const goalieMod = Math.pow(LEAGUE.avgGoalie / goalieQuality, 2.2);
+  let p = LEAGUE.baseConversion * shooterMod * goalieMod * (CFG.goalsPct / 100) * (AHL_GAME ? AHL_GOALS_MULT : 1);
+  if (isHome) p *= 1 + (LEAGUE.homeConvBonus - 1) * (CFG.homeAdvPct / 100);
+  if (strength === "PP") p *= 1 + (LEAGUE.ppConvBoost - 1) * (CFG.powerPlayPct / 100);
+  else if (strength === "SH") p *= LEAGUE.shConvPenalty;
+  return Math.max(0.01, Math.min(0.6, p));
+}
+
+// ---- selection weights ------------------------------------------------------
+
+// Fatigue feedback: a skater below full CON loses a little effectiveness.
+// Default skaterConSlope is 0 (CON is tracked/shown only) — raise it in Admin to
+// make chronic overuse bite. e.g. slope 0.006 @ CON 95 => ~3% weaker.
+const conFactor = (con: number) => Math.max(0.5, 1 - (100 - (con ?? 100)) * CFG.skaterConSlope);
+
+// Line chemistry: penalty-only. A fully gelled unit (>= neutral) sims at full
+// strength (factor 1); a fresh or disrupted unit is scaled down toward
+// (1 - chemistryPenaltyPct). This suppresses new lines without inflating anyone,
+// so league-wide scoring stays calibrated.
+// Two penalties, both fading to 1 for an ideal unit: a STABILITY penalty that
+// shrinks as the line gels (chem -> neutral), and a structural ROLE penalty for
+// a role-redundant unit (three snipers / two offensive D) that never goes away.
+const chemFactor = (chem: number, roleFit = 1) => {
+  if (!CFG.chemistryEnabled) return 1;
+  const stability = (Math.max(0, CFG.chemistryNeutral - (chem ?? 100)) / Math.max(1, CFG.chemistryNeutral)) * CFG.chemistryPenaltyPct;
+  const role = (1 - (roleFit ?? 1)) * CFG.chemistryRolePenaltyPct;
+  return 1 - stability - role;
+};
+
+// ---- momentum ---------------------------------------------------------------
+// Ice-time-weighted average of a skater attribute (for team LD / EX).
+function iceAvgAttr(team: SimTeam, sel: (s: SimSkater) => number): number {
+  let sum = 0, wt = 0;
+  for (const s of [...team.forwards, ...team.defense]) { const it = s.iceTime || 0.05; sum += sel(s) * it; wt += it; }
+  return wt ? sum / wt : 50;
+}
+// Decay a team's momentum to the current game time (lazy, exponential) and return it.
+function momoNow(st: SimState, teamId: number, absT: number): number {
+  const tau = st.momoTau[teamId] || CFG.momentumDecaySec;
+  const last = st.momoTime[teamId] ?? absT;
+  const decayed = (st.momentum[teamId] ?? 0) * Math.exp(-Math.max(0, absT - last) / Math.max(1, tau));
+  st.momentum[teamId] = decayed;
+  st.momoTime[teamId] = absT;
+  return decayed;
+}
+// Conversion multiplier from the shooting team's current momentum.
+function momoBoost(st: SimState, teamId: number, absT: number): number {
+  if (!CFG.momentumEnabled) return 1;
+  const m = Math.max(-CFG.momentumMax, Math.min(CFG.momentumMax, momoNow(st, teamId, absT)));
+  return 1 + m * CFG.momentumBoostPct;
+}
+// A goal swings momentum: the scorer surges, the team that conceded sags.
+function momoOnGoal(st: SimState, scorerId: number, concederId: number, absT: number) {
+  if (!CFG.momentumEnabled) return;
+  const clamp = (v: number) => Math.max(-CFG.momentumMax, Math.min(CFG.momentumMax, v));
+  st.momentum[scorerId] = clamp(momoNow(st, scorerId, absT) + CFG.momentumGoalSpike);
+  st.momentum[concederId] = clamp(momoNow(st, concederId, absT) - (st.momoDip[concederId] ?? CFG.momentumConcedeDip));
+}
+
+// ---- clutch & morale --------------------------------------------------------
+// Clutch = poise in decisive moments, from experience + leadership + composure.
+const CLUTCH_MEAN = 68; // ~league mean of the EX/LD/PS blend → keeps clutch ~zero-sum
+const clutchRating = (s: SimSkater) =>
+  Math.max(20, Math.min(99, 0.45 * (s.attrs.ex ?? 50) + 0.30 * (s.attrs.ld ?? 50) + 0.25 * (s.attrs.ps ?? 50)));
+// Conversion multiplier for a shooter in a clutch situation (last minutes of a
+// tight 3rd, or overtime). Centered at the league-mean rating so high-clutch
+// players gain and low-clutch players lose without changing total scoring.
+function clutchFactor(st: SimState, shooter: SimSkater, period: number, tInPeriod: number, margin: number): number {
+  if (!CFG.clutchEnabled) return 1;
+  const inClutch = period >= 4 || (period === 3 && tInPeriod >= PERIOD_SECONDS - CFG.clutchWindowSec && Math.abs(margin) <= 1);
+  if (!inClutch) return 1;
+  const mult = CFG.clutchBoostPct * (st.playoff ? CFG.clutchPlayoffMult : 1);
+  return 1 + ((clutchRating(shooter) - CLUTCH_MEAN) / 40) * mult;
+}
+// Morale factor on a skater's effective offense (centered at moraleNeutral).
+// Hard-clamped to ±5% so a hot streak nudges but can never run away (morale also
+// feeds the shoot decision, so the effective swing is a touch larger than this).
+const moraleFactor = (morale: number) =>
+  CFG.moraleEnabled ? Math.max(0.95, Math.min(1.05, 1 + ((morale ?? CFG.moraleNeutral) - CFG.moraleNeutral) * CFG.moraleSlope)) : 1;
+// Physicality: a heavier body wins net-front / board battles → small conversion
+// edge. Centered on the league-mean weight so it's ~zero-sum across the league.
+const physFactor = (weight: number) =>
+  CFG.physicalityEnabled ? 1 + ((weight ?? CFG.physicalityMeanLbs) - CFG.physicalityMeanLbs) * CFG.physicalityPct : 1;
+
+function pickShooter(rng: RNG, team: SimTeam): SimSkater {
+  const pool = [...team.forwards, ...team.defense];
+  const weights = pool.map((s) =>
+    involvement((s.offense * 0.7 + s.playmaking * 0.3) * conFactor(s.con)) * s.iceTime * (s.isDefense ? D_SHOOT : 1));
+  return pool[rng.weighted(weights)];
+}
+
+function pickAssists(rng: RNG, team: SimTeam, scorerId: number): number[] {
+  const roll = rng.next();
+  // ~1.6 assists per goal (NHL-realistic): mostly 2, occasionally unassisted
+  const n = roll < 0.08 ? 0 : roll < 0.30 ? 1 : 2;
+  if (n === 0) return [];
+  const pool = [...team.forwards, ...team.defense].filter((s) => s.id !== scorerId);
+  const picked: number[] = [];
+  for (let i = 0; i < n && pool.length; i++) {
+    const weights = pool.map((s) =>
+      involvement(s.playmaking * conFactor(s.con)) * s.iceTime * (s.isDefense ? D_ASSIST : 1));
+    const idx = rng.weighted(weights);
+    picked.push(pool[idx].id);
+    pool.splice(idx, 1);
+  }
+  return picked;
+}
+
+function pickOnIce(rng: RNG, team: SimTeam): SimSkater[] {
+  const takeF = weightedSample(rng, team.forwards, 3);
+  const takeD = weightedSample(rng, team.defense, 2);
+  return [...takeF, ...takeD];
+}
+
+function weightedSample(rng: RNG, pool: SimSkater[], n: number): SimSkater[] {
+  const avail = [...pool];
+  const out: SimSkater[] = [];
+  for (let i = 0; i < n && avail.length; i++) {
+    const idx = rng.weighted(avail.map((s) => s.iceTime));
+    out.push(avail[idx]);
+    avail.splice(idx, 1);
+  }
+  return out;
+}
+
+// ---- goal recording ---------------------------------------------------------
+
+function recordGoal(
+  st: SimState, off: SimTeam, def: SimTeam, period: number, seconds: number,
+  strength: GoalEvent["strength"], emptyNet = false, explicitScorer?: SimSkater,
+) {
+  const scorer = explicitScorer ?? pickShooter(st.rng, off);
+  const assists = strength === "SO" ? [] : pickAssists(st.rng, off, scorer.id);
+  const offLines = st.lines[off.id];
+  const sl = offLines[scorer.id];
+  sl.goals++; sl.points++;
+  if (strength === "PP") sl.ppGoals++;
+  if (strength === "SH") sl.shGoals++;
+  const assistNames: string[] = [];
+  for (const aId of assists) {
+    offLines[aId].assists++; offLines[aId].points++;
+    assistNames.push(offLines[aId].name);
+  }
+  st.box[off.id].goals++;
+  if (strength === "PP") st.box[off.id].ppGoals++;
+  if (period <= 4) st.box[off.id].goalsByPeriod[period - 1]++;
+
+  if (strength === "EV") {
+    for (const s of pickOnIce(st.rng, off)) st.lines[off.id][s.id].plusMinus += 1;
+    for (const s of pickOnIce(st.rng, def)) st.lines[def.id][s.id].plusMinus -= 1;
+  }
+
+  st.goals.push({
+    period, seconds, time: fmt(seconds),
+    team: off.id, teamCode: off.code,
+    scorer: scorer.id, scorerName: scorer.name, scorerSeasonGoal: sl.goals,
+    assists, assistNames, strength, emptyNet,
+  });
+}
+
+// ---- penalties --------------------------------------------------------------
+
+function avgDiscipline(team: SimTeam): number {
+  const all = [...team.forwards, ...team.defense];
+  let sum = 0, wt = 0;
+  for (const s of all) { sum += s.discipline * s.iceTime; wt += s.iceTime; }
+  return wt ? sum / wt : 50;
+}
+
+function avgHitting(team: SimTeam): number {
+  const all = [...team.forwards, ...team.defense];
+  let sum = 0, wt = 0;
+  for (const s of all) { sum += s.hitting * s.iceTime; wt += s.iceTime; }
+  return wt ? sum / wt : 50;
+}
+
+function avgMorale(team: SimTeam): number {
+  const all = [...team.forwards, ...team.defense];
+  let sum = 0, wt = 0;
+  for (const s of all) { sum += (s.morale ?? CFG.moraleNeutral) * s.iceTime; wt += s.iceTime; }
+  return wt ? sum / wt : CFG.moraleNeutral;
+}
+
+/** Record a single penalty (adds PIM, and — unless offsetting — a PP for the opponent). */
+function addPenalty(
+  st: SimState, team: SimTeam, offender: SimSkater, period: number, at: number,
+  type: string, minutes: number, severity: string, givesPP = true,
+) {
+  st.lines[team.id][offender.id].pim += minutes;
+  st.box[team.id].pim += minutes;
+  if (givesPP) {
+    const opp = team.id === st.home.id ? st.away : st.home;
+    st.box[opp.id].ppOpp += 1;
+    active_push(st, { team: team.id, start: at, end: at + minutes * 60, expired: false });
+  }
+  st.penalties.push({
+    period, seconds: at, time: fmt(at), team: team.id, teamCode: team.code,
+    playerId: offender.id, playerName: offender.name, type, minutes, severity,
+  });
+}
+// active list is period-local; addPenalty pushes to it via a per-period ref
+let _activeRef: Penalty[] | null = null;
+function active_push(_st: SimState, p: Penalty) { _activeRef?.push(p); }
+
+function generatePenalties(st: SimState, team: SimTeam, period: number, active: Penalty[]) {
+  _activeRef = active;
+  if (!CFG.penaltiesEnabled) return;
+  // physicality raises the penalty rate (proxy for a high-PHY strategy)
+  const phyFactor = 0.85 + 0.3 * (avgHitting(team) / 65);
+  // frustration: a team down by two-plus reaches, hooks and slashes more (hidden DI drop)
+  const opp = st.home === team ? st.away : st.home;
+  const margin = st.box[team.id].goals - st.box[opp.id].goals;
+  const frustration = margin <= -3 ? 1.35 : margin <= -2 ? 1.15 : 1;
+  // MO: a low-morale room is frustrated and undisciplined → more penalty minutes
+  const moraleFrust = CFG.moraleEnabled ? 1 + Math.max(0, CFG.moraleNeutral - avgMorale(team)) * CFG.moraleFrustrationPct : 1;
+  const rival = st.rivalry ? CFG.rivalryPenaltyMult : 1;
+  // coach discipline: a disciplined bench (high PD) takes fewer penalties; a
+  // physical-style coach's team takes more.
+  const lambda = (LEAGUE.penaltiesPerTeam / 3) * (LEAGUE.avgDefense / Math.max(30, avgDiscipline(team))) * phyFactor * frustration * moraleFrust * team.coachDisc * rival * (CFG.penaltiesPct / 100);
+  const count = st.rng.poisson(lambda);
+  const pool = [...team.forwards, ...team.defense];
+  for (let i = 0; i < count; i++) {
+    const at = st.rng.int(PERIOD_SECONDS - 130);
+    const offender = pool[st.rng.weighted(pool.map((s) => (105 - s.discipline) * (0.5 + s.iceTime)))];
+    const type = PENALTY_TYPES[st.rng.weighted(PENALTY_TYPES.map((p) => p[1]))][0];
+    const roll = st.rng.next();
+    const minutes = type === "Slashing" && roll < 0.05 ? 4 : roll < 0.02 ? 5 : 2;
+    const severity = minutes === 4 ? "Double Minor" : minutes === 5 ? "Major" : "Minor";
+    addPenalty(st, team, offender, period, at, type, minutes, severity, true);
+    // severe infractions can carry an added misconduct (10) or game misconduct
+    if (SEVERE_TYPES.includes(type) && roll < 0.08) {
+      const gm = roll < 0.02;
+      addPenalty(st, team, offender, period, at, gm ? "Game Misconduct" : "Misconduct",
+        gm ? 20 : 10, gm ? "Game Misconduct" : "Misconduct", false);
+    }
+  }
+}
+
+/**
+ * Fights: driven by both teams' fighting (FG). Both combatants take a 5-minute
+ * major (offsetting — no power play). Occasionally a second bout breaks out at
+ * the same stoppage (a line brawl), adding roughing minors and a misconduct.
+ */
+function generateFights(st: SimState) {
+  const topFG = (t: SimTeam) => Math.max(...[...t.forwards, ...t.defense].map((s) => s.attrs.fg ?? 30));
+  const enforcerPick = (t: SimTeam) => {
+    const pool = [...t.forwards, ...t.defense];
+    return pool[st.rng.weighted(pool.map((s) => Math.pow(Math.max(1, (s.attrs.fg ?? 30) - 40), 2)))];
+  };
+  if (!CFG.fightsEnabled) return;
+  const fgHome = topFG(st.home), fgAway = topFG(st.away);
+  // base fight chance scales with the lower of the two teams' willingness; a
+  // rivalry game runs hot (far more likely to drop the gloves).
+  let p = (0.06 + 0.5 * Math.max(0, Math.min(fgHome, fgAway) - 55) / 45) * (CFG.fightsPct / 100);
+  if (st.rivalry) p *= CFG.rivalryFightMult;
+  if (!st.rng.chance(Math.min(0.85, p))) return;
+
+  const period = 1 + st.rng.int(3);
+  const at = 60 + st.rng.int(PERIOD_SECONDS - 120);
+  const h = enforcerPick(st.home), a = enforcerPick(st.away);
+  addPenalty(st, st.home, h, period, at, "Fighting", 5, "Major", false);
+  addPenalty(st, st.away, a, period, at, "Fighting", 5, "Major", false);
+
+  // line brawl: a second simultaneous bout + roughing minors + a misconduct (far likelier in a rivalry)
+  if (st.rng.chance(st.rivalry ? 0.4 : 0.12)) {
+    const h2 = enforcerPick(st.home), a2 = enforcerPick(st.away);
+    addPenalty(st, st.home, h2, period, at, "Fighting", 5, "Major", false);
+    addPenalty(st, st.away, a2, period, at, "Fighting", 5, "Major", false);
+    addPenalty(st, st.home, h2, period, at, "Roughing", 2, "Minor", false);
+    addPenalty(st, st.away, a2, period, at, "Roughing", 2, "Minor", false);
+    const instigator = st.rng.chance(0.5) ? st.home : st.away;
+    addPenalty(st, instigator, instigator.id === st.home.id ? h : a, period, at,
+      "Misconduct", 10, "Misconduct", false);
+  }
+}
+
+/**
+ * Extra emotional penalties (run once the score is final):
+ *  - a net-front scrum in a heated rivalry game → several roughing minors at once
+ *    for both teams, sometimes a 10-minute misconduct in the pileup;
+ *  - "abuse of official" — a frustrated player on a struggling team blows up and
+ *    draws a 10-minute misconduct (likelier the more his team is losing by).
+ */
+function generateHeatEvents(st: SimState) {
+  if (!CFG.penaltiesEnabled) return;
+  const scrummer = (t: SimTeam) => { const pool = [...t.forwards, ...t.defense]; return pool[st.rng.weighted(pool.map((s) => (s.attrs.fg ?? 30) + (105 - s.discipline)))]; };
+
+  if (st.rivalry && st.rng.chance(CFG.scrumChance)) {
+    const period = 1 + st.rng.int(3);
+    const at = 60 + st.rng.int(PERIOD_SECONDS - 120);
+    const nPer = 1 + st.rng.int(2); // 1–2 roughing minors per side
+    for (let k = 0; k < nPer; k++) {
+      addPenalty(st, st.home, scrummer(st.home), period, at, "Roughing", 2, "Minor", false);
+      addPenalty(st, st.away, scrummer(st.away), period, at, "Roughing", 2, "Minor", false);
+    }
+    if (st.rng.chance(0.4)) { const t = st.rng.chance(0.5) ? st.home : st.away; addPenalty(st, t, scrummer(t), period, at, "Misconduct", 10, "Misconduct", false); }
+  }
+
+  // donnybrook: a full line brawl erupts — several simultaneous fights, roughing
+  // minors and game misconducts. These are the rare 100+ PIM nights.
+  if (st.rivalry && st.rng.chance(CFG.brawlChance)) {
+    const period = 1 + st.rng.int(3);
+    const at = 120 + st.rng.int(PERIOD_SECONDS - 240);
+    const bouts = 3 + st.rng.int(2); // 3–4 fighting majors per side
+    for (let k = 0; k < bouts; k++) {
+      addPenalty(st, st.home, scrummer(st.home), period, at, "Fighting", 5, "Major", false);
+      addPenalty(st, st.away, scrummer(st.away), period, at, "Fighting", 5, "Major", false);
+    }
+    for (let k = 0; k < 2; k++) {
+      addPenalty(st, st.home, scrummer(st.home), period, at, "Roughing", 2, "Minor", false);
+      addPenalty(st, st.away, scrummer(st.away), period, at, "Roughing", 2, "Minor", false);
+    }
+    // game misconducts (20) to the instigators on each side
+    addPenalty(st, st.home, scrummer(st.home), period, at, "Game Misconduct", 20, "Game Misconduct", false);
+    addPenalty(st, st.away, scrummer(st.away), period, at, "Game Misconduct", 20, "Game Misconduct", false);
+    if (st.rng.chance(0.5)) { const t = st.rng.chance(0.5) ? st.home : st.away; addPenalty(st, t, scrummer(t), period, at, "Misconduct", 10, "Misconduct", false); }
+  }
+
+  for (const team of [st.home, st.away]) {
+    const opp = team === st.home ? st.away : st.home;
+    const trailBy = st.box[opp.id].goals - st.box[team.id].goals;
+    const frustration = trailBy >= 3 ? 2.5 : trailBy >= 2 ? 1.5 : 1;
+    if (st.rng.chance(CFG.abuseOfficialChance * frustration)) {
+      const pool = [...team.forwards, ...team.defense];
+      const off = pool[st.rng.weighted(pool.map((s) => 105 - s.discipline))];
+      const at = PERIOD_SECONDS - 60 - st.rng.int(600);
+      addPenalty(st, team, off, 3, at, "Misconduct (Abuse of official)", 10, "Misconduct", false);
+    }
+  }
+}
+
+/** Manpower situation for `team` at time t (within-period seconds). */
+function strengthAt(team: SimTeam, opp: SimTeam, t: number, active: Penalty[]): "EV" | "PP" | "SH" {
+  let mine = 0, theirs = 0;
+  for (const p of active) {
+    if (p.expired || t < p.start || t >= p.end) continue;
+    if (p.team === team.id) mine++; else if (p.team === opp.id) theirs++;
+  }
+  if (theirs > mine) return "PP";
+  if (mine > theirs) return "SH";
+  return "EV";
+}
+
+/** Expire the earliest-ending active penalty on `penalizedTeam` (PP goal ends it). */
+function expireOnePenalty(penalizedTeamId: number, t: number, active: Penalty[]) {
+  let best: Penalty | null = null;
+  for (const p of active) {
+    if (p.expired || p.team !== penalizedTeamId || t < p.start || t >= p.end) continue;
+    if (!best || p.end < best.end) best = p;
+  }
+  if (best) best.expired = true;
+}
+
+// ---- period simulation ------------------------------------------------------
+
+function simulatePeriod(st: SimState, period: number, homeShots: number, awayShots: number) {
+  const { home, away, rng } = st;
+  const active: Penalty[] = [];
+  generatePenalties(st, home, period, active);
+  generatePenalties(st, away, period, active);
+
+  type Shot = { team: SimTeam; opp: SimTeam; isHome: boolean; t: number };
+  const shots: Shot[] = [];
+  for (let i = 0; i < homeShots; i++) shots.push({ team: home, opp: away, isHome: true, t: rng.int(PERIOD_SECONDS) });
+  for (let i = 0; i < awayShots; i++) shots.push({ team: away, opp: home, isHome: false, t: rng.int(PERIOD_SECONDS) });
+  shots.sort((a, b) => a.t - b.t);
+
+  for (const shot of shots) {
+    const shooter = pickShooter(rng, shot.team);
+    const strength = strengthAt(shot.team, shot.opp, shot.t, active);
+    const absT = (period - 1) * PERIOD_SECONDS + shot.t;
+    const box = st.box[shot.team.id];
+    box.shots++;
+    if (period <= 4) box.shotsByPeriod[period - 1]++;
+    st.lines[shot.team.id][shooter.id].shots++;
+    st.box[shot.opp.id].goalie.shotsAgainst++;
+    const margin = st.box[shot.team.id].goals - st.box[shot.opp.id].goals;
+    // offense chemistry + morale and defense chemistry are symmetric direct factors
+    // on the final probability (offMult<=1, defShield>=1) so they cancel league-wide.
+    const offMult = chemFactor(shooter.chem, shooter.roleFit) * moraleFactor(shooter.morale) * physFactor(shooter.weight) * shot.team.coachOff;
+    const defShield = (2 - (st.defChem[shot.opp.id] ?? 1)) * shot.opp.coachDef; // poor/redundant D → opponent converts more
+    const ppMod = strength === "PP" ? shot.team.ppChem / shot.opp.pkChem : 1; // gelled PP1 vs gelled PK1
+    // off-position penalty is waived on special teams (STHS) — restore full offense
+    const shOff = strength !== "EV" ? shooter.offense / shooter.posPenalty : shooter.offense;
+    const p = conversion(shOff, effGoalieQuality(shot.opp.goalie), shot.isHome, strength)
+      * momoBoost(st, shot.team.id, absT)
+      * clutchFactor(st, shooter, period, shot.t, margin)
+      * offMult * defShield * ppMod;
+    if (rng.chance(p)) {
+      st.box[shot.opp.id].goalie.goalsAgainst++;
+      recordGoal(st, shot.team, shot.opp, period, shot.t, strength);
+      momoOnGoal(st, shot.team.id, shot.opp.id, absT);
+      if (strength === "PP") expireOnePenalty(shot.opp.id, shot.t, active);
+    } else {
+      st.box[shot.opp.id].goalie.saves++;
+    }
+  }
+}
+
+// ---- possession model (STHS-style sequential decision tree) -----------------
+// An opt-in alternative to the shot-volume model (CFG.engineModel === "possession").
+// Each possession is a chain of attribute micro-battles: zone entry (carrier SK
+// vs defender DF), a shoot/pass choice (SC vs PA), a block check (D DF vs SC), the
+// shot itself (SC vs goalie), and a rebound roll (goalie RB). Shots and goals are
+// EMERGENT. All the emotional/chemistry modifiers feed the same conversion step.
+function pickByAttr(rng: RNG, pool: SimSkater[], sel: (s: SimSkater) => number): SimSkater {
+  return pool[rng.weighted(pool.map((s) => Math.max(1, sel(s)) * (0.4 + s.iceTime)))];
+}
+function chunk<T>(arr: T[], n: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i + n <= arr.length; i += n) out.push(arr.slice(i, i + n));
+  return out.length ? out : [arr];
+}
+// Shift deployment for one team: forward lines & D pairs (manager units, else
+// depth-chart chunks), a current on-ice unit, and shift timers for fatigue.
+type ShiftState = {
+  fLines: SimSkater[][]; dPairs: SimSkater[][];
+  fIdx: number; dIdx: number; fElapsed: number; dElapsed: number;
+};
+function buildShifts(team: SimTeam): ShiftState {
+  const byId = new Map([...team.forwards, ...team.defense].map((s) => [s.id, s]));
+  const res = (isDef: boolean, size: number, fallback: SimSkater[]) => {
+    const u = team.units.filter((x) => x.isDef === isDef)
+      .map((x) => x.members.map((id) => byId.get(id)).filter((s): s is SimSkater => !!s))
+      .filter((l) => l.length >= size - 1);
+    return u.length ? u : chunk([...fallback].sort((a, b) => b.iceTime - a.iceTime), size);
+  };
+  return {
+    fLines: res(false, 3, team.forwards), dPairs: res(true, 2, team.defense),
+    fIdx: 0, dIdx: 0, fElapsed: 0, dElapsed: 0,
+  };
+}
+// Effective-attribute multiplier from a long shift; EN slows the drain. 1 = fresh.
+function fatigueMult(shiftSec: number, en: number): number {
+  if (CFG.inGameFatiguePct <= 0) return 1;
+  const over = Math.max(0, shiftSec - 40);           // legs stay fresh ~40s
+  const drop = Math.min(0.28, over / 65 * 0.28) * (1.3 - (en ?? 50) / 100) * (CFG.inGameFatiguePct / 100);
+  return Math.max(0.55, 1 - drop);
+}
+// Advance a team's shift timers by `dur`; rotate a unit off when its shift is up
+// (new unit weighted toward the top of the depth chart). Accrues TOI on the ice.
+function advanceShift(st: SimState, teamId: number, sh: ShiftState, dur: number, rng: RNG) {
+  sh.fElapsed += dur; sh.dElapsed += dur;
+  for (const s of sh.fLines[sh.fIdx] ?? []) st.lines[teamId][s.id].toi += dur;
+  for (const s of sh.dPairs[sh.dIdx] ?? []) st.lines[teamId][s.id].toi += dur;
+  const pick = (lines: SimSkater[][], cur: number) => {
+    if (lines.length <= 1) return 0;
+    const w = lines.map((_, i) => (i === cur ? 0 : [0.34, 0.28, 0.22, 0.16][i] ?? 0.1));
+    return rng.weighted(w);
+  };
+  if (sh.fElapsed >= 38 + rng.int(18)) { sh.fIdx = pick(sh.fLines, sh.fIdx); sh.fElapsed = 0; }
+  if (sh.dElapsed >= 42 + rng.int(20)) { sh.dIdx = pick(sh.dPairs, sh.dIdx); sh.dElapsed = 0; }
+}
+// Attribute match-up as a probability share A/(A+B) (STHS style), nudged toward
+// 0.5 so favourites don't run away (keeps upsets alive).
+function ratio(a: number, b: number, flatten = 0.55): number {
+  const r = a / Math.max(1, a + b);
+  return Math.max(0.04, Math.min(0.96, 0.5 + (r - 0.5) * flatten));
+}
+// Tactics tilt for a team at the current score margin (offense- vs defense-leaning),
+// from its GameStrategy. Returns {of, df} multipliers around 1.0.
+function tacticsMult(team: SimTeam, margin: number): { of: number; df: number } {
+  const s = team.strategy;
+  if (!s) return { of: 1, df: 1 };
+  const w = margin >= 2 ? s.winning2 : margin === 1 ? s.winning1 : margin <= -2 ? s.losing2 : margin === -1 ? s.losing1 : s.tied;
+  const tilt = (w.of + 1) / (w.of + w.df + 2); // 0..1, 0.5 = balanced
+  return { of: 0.9 + 0.2 * tilt, df: 0.9 + 0.2 * (1 - tilt) };
+}
+// Per-line deployment tactic → {of, df} multipliers around 1.0. Neutral CK1/DF2/OF2
+// gives exactly 1.0; an offensive line (high OF) presses harder, a checking/defensive
+// line (high DF) suppresses. Effect ~±8%, so a good line still needs the players.
+function lineTilt(t: LineTactic | undefined): { of: number; df: number } {
+  if (!t) return { of: 1, df: 1 };
+  const tilt = (t.of + 0.5) / (t.of + t.df + 1); // 0..1, CK1/DF2/OF2 → 2.5/5 = 0.5 (neutral)
+  return { of: 0.84 + 0.32 * tilt, df: 0.84 + 0.32 * (1 - tilt) };
+}
+
+// STHS-style 1-second tick state machine. Each tick the puck-carrier runs a
+// decision tree (keep vs turnover: SK vs DF; then pass vs shoot: SC vs PA; pass:
+// PA vs DF; shot: calibrated conversion + rebound RB). "Final skill" at every
+// node = base attribute × tactics × chemistry × morale × fatigue.
+function simulatePeriodPossession(st: SimState, period: number) {
+  const { home, away, rng } = st;
+  const active: Penalty[] = [];
+  generatePenalties(st, home, period, active);
+  generatePenalties(st, away, period, active);
+  const base = (period - 1) * PERIOD_SECONDS;
+  const shifts: Record<number, ShiftState> = { [home.id]: buildShifts(home), [away.id]: buildShifts(away) };
+  const other = (t: SimTeam) => (t === home ? away : home);
+
+  type St = "FACEOFF" | "PLAY";
+  let state: St = "FACEOFF";
+  let carrierTeam: SimTeam = home;
+  let carrier: SimSkater = home.forwards[0];
+  let zone: "DEF" | "NEU" | "OFF" = "NEU"; // relative to carrierTeam
+  let setup: "carry" | "pass" | "rebound" = "carry"; // how the current look arose → shot danger
+  let press = 0; // consecutive shots in one sustained possession → screening/rebound pressure
+
+  const onIceF = (team: SimTeam) => { const sh = shifts[team.id]; return sh.fLines[sh.fIdx] ?? team.forwards; };
+  const onIceD = (team: SimTeam) => { const sh = shifts[team.id]; return sh.dPairs[sh.dIdx] ?? team.defense; };
+  const fat = (team: SimTeam, s: SimSkater) => fatigueMult(shifts[team.id].fElapsed, s.attrs.en ?? 50);
+  const dfat = (team: SimTeam, s: SimSkater) => fatigueMult(shifts[team.id].dElapsed, s.attrs.en ?? 50);
+
+  for (let tick = 0; tick < PERIOD_SECONDS; tick++) {
+    advanceShift(st, home.id, shifts[home.id], 1, rng);
+    advanceShift(st, away.id, shifts[away.id], 1, rng);
+    const absT = base + tick;
+
+    if (state === "FACEOFF") {
+      // centers of the on-ice units contest the draw (FO vs FO)
+      const hC = onIceF(home).find((s) => s.isCenter) ?? onIceF(home)[0];
+      const aC = onIceF(away).find((s) => s.isCenter) ?? onIceF(away)[0];
+      const homeWin = rng.chance(ratio((hC.attrs.fo ?? 50) * fat(home, hC), (aC.attrs.fo ?? 50) * fat(away, aC), 0.8));
+      if (homeWin) { st.box[home.id].faceoffWins++; st.box[away.id].faceoffLosses++; st.lines[home.id][hC.id].faceoffWins++; st.lines[away.id][aC.id].faceoffLosses++; carrierTeam = home; carrier = hC; }
+      else { st.box[away.id].faceoffWins++; st.box[home.id].faceoffLosses++; st.lines[away.id][aC.id].faceoffWins++; st.lines[home.id][hC.id].faceoffLosses++; carrierTeam = away; carrier = aC; }
+      zone = "NEU"; state = "PLAY"; setup = "carry"; press = 0;
+      continue;
+    }
+
+    // ---- PLAY: run the decision tree for the carrier this tick ----
+    const def = other(carrierTeam);
+    const isHome = carrierTeam === home;
+    const margin = st.box[carrierTeam.id].goals - st.box[def.id].goals;
+    const tOff = tacticsMult(carrierTeam, margin), tDef = tacticsMult(def, -margin);
+    // per-line tactic: the attacking forward line's OF push and the defending pair's
+    // DF commitment tilt the battle (a top offensive line presses; a shut-down pair
+    // suppresses). Neutral CK1/DF2/OF2 → 1.0, no effect.
+    const atkTilt = lineTilt(carrierTeam.fwdTactics[shifts[carrierTeam.id].fIdx]);
+    const defTilt = lineTilt(def.defTactics[shifts[def.id].dIdx]);
+    const dman = pickByAttr(rng, onIceD(def).length ? onIceD(def) : def.defense, (s) => s.attrs.df ?? 50);
+    // score-effect: the team in front eases off, the trailing team presses (catch-up → fewer blowouts)
+    const catchUp = 1 - CFG.catchUpStrength * Math.max(-3, Math.min(3, margin));
+    // team edge: the higher-overall club wins more battles and controls play, so
+    // quality reliably tells over a season. Uses roster overall (the metric fans
+    // compare) and amplifies the (narrow) OV gap; scaled by possessionSkillPct —
+    // turn it down for more upsets, up for chalk.
+    const ovGap = carrierTeam.avgOV - def.avgOV;
+    const teamMult = Math.max(0.68, Math.min(1.32, 1 + ovGap * 0.035 * CFG.possessionSkillPct));
+
+    // final-skill helper: base × tactics × chemistry × morale × fatigue × score-effect × team edge
+    const atkSkill = (v: number, of = true) => v * (of ? tOff.of * atkTilt.of : 1) * chemFactor(carrier.chem, carrier.roleFit) * moraleFactor(carrier.morale) * fat(carrierTeam, carrier) * catchUp * teamMult;
+    const defSkill = (v: number) => v * tDef.df * defTilt.df * dfat(def, dman);
+
+    // 1) keep the puck vs. get stripped (SK vs DF) — a real challenge some ticks
+    if (rng.chance(0.09)) {
+      const keep = ratio(atkSkill(carrier.attrs.sk ?? 50), defSkill(dman.attrs.df ?? 50));
+      if (!rng.chance(keep)) { // turnover — defenders take over in their own zone
+        carrierTeam = def; carrier = pickByAttr(rng, onIceD(def).concat(onIceF(def)), (s) => (s.attrs.df ?? 50) + (s.attrs.pa ?? 50));
+        zone = "DEF"; setup = "carry"; press = 0; continue;
+      }
+    }
+
+    // 2) advance the puck toward the offensive zone (zone entry: SK vs DF+SK)
+    if (zone !== "OFF") {
+      if (rng.chance(0.28)) {
+        const gap = 0.6 * (dman.attrs.df ?? 50) + 0.4 * (dman.attrs.sk ?? 50);
+        if (rng.chance(ratio(atkSkill(carrier.attrs.sk ?? 50), defSkill(gap)))) { zone = zone === "DEF" ? "NEU" : "OFF"; setup = "carry"; }
+        else if (rng.chance(0.4)) { carrierTeam = def; carrier = pickByAttr(rng, onIceF(def), (s) => s.attrs.pa ?? 50); zone = "DEF"; setup = "carry"; press = 0; } // stuffed → turnover
+      }
+      continue;
+    }
+
+    // 3) in the O-zone: an offensive action fires some ticks (shoot vs pass: SC vs PA)
+    if (!rng.chance(0.29)) continue;
+    if (rng.chance(ratio(atkSkill(carrier.attrs.sc ?? 50), (carrier.attrs.pa ?? 50), 0.7))) {
+      // SHOT — blocked? (DF vs SC)
+      if (rng.chance(0.5 * ratio(defSkill(dman.attrs.df ?? 50), atkSkill(carrier.attrs.sc ?? 50)))) { setup = "carry"; continue; } // blocked
+      // shot danger: a D-man point shot is low, a one-timer off a pass or a rebound
+      // is high, a forward's own-rush shot is medium. Chemistry drives more passes
+      // → more high-danger looks, so gelled lines get better chances automatically.
+      const danger = carrier.isDefense ? 0.35 : setup === "pass" ? 1.75 : setup === "rebound" ? 1.6 : 1.0;
+      const strength = strengthAt(carrierTeam, def, tick, active);
+      const gLine = liveGoalieLine(st, def.id);
+      const gSim = liveGoalie(st, def);
+      st.box[carrierTeam.id].shots++;
+      if (period <= 4) st.box[carrierTeam.id].shotsByPeriod[period - 1]++;
+      st.lines[carrierTeam.id][carrier.id].shots++;
+      gLine.shotsAgainst++;
+      press++; // sustained pressure: screening / traffic / a tiring goalie
+      const pressBonus = 1 + 0.06 * Math.min(press - 1, 4);
+      const offMult = chemFactor(carrier.chem, carrier.roleFit) * moraleFactor(carrier.morale) * physFactor(carrier.weight) * fat(carrierTeam, carrier) * tOff.of * carrierTeam.coachOff;
+      const defShield = (2 - (st.defChem[def.id] ?? 1)) * (2 - dfat(def, dman)) * tDef.df * def.coachDef;
+      const ppMod = strength === "PP" ? carrierTeam.ppChem / def.pkChem : 1; // gelled PP1 vs gelled PK1
+      const shOff = strength !== "EV" ? carrier.offense / carrier.posPenalty : carrier.offense; // off-position waived on ST
+      const p = conversion(shOff, effGoalieQuality(gSim), isHome, strength) * danger * pressBonus
+        * momoBoost(st, carrierTeam.id, absT) * clutchFactor(st, carrier, period, tick, margin)
+        * offMult * defShield * catchUp * ppMod;
+      if (rng.chance(p)) {
+        gLine.goalsAgainst++;
+        recordGoal(st, carrierTeam, def, period, tick, strength, false, carrier);
+        momoOnGoal(st, carrierTeam.id, def.id, absT);
+        maybePullGoalie(st, def.id); // yank the starter if he's been shelled
+        if (strength === "PP") expireOnePenalty(def.id, tick, active);
+        state = "FACEOFF"; setup = "carry"; continue;
+      }
+      gLine.saves++;
+      const rb = gSim.attrs.rb ?? 50;
+      if (rng.chance(Math.max(0.05, 0.32 - rb / 300))) { carrier = pickByAttr(rng, onIceF(carrierTeam), (s) => involvement(s.attrs.sc ?? 50) * 60); setup = "rebound"; } // rebound in the slot (press stays → escalating danger)
+      else if (rng.chance(0.12)) { state = "FACEOFF"; setup = "carry"; press = 0; } // goalie freezes it → whistle
+      else { carrierTeam = def; carrier = pickByAttr(rng, onIceD(def).concat(onIceF(def)), (s) => s.attrs.pa ?? 50); zone = "DEF"; setup = "carry"; press = 0; } // covered & cleared, play on
+      continue;
+    }
+    // PASS — completed (PA vs DF) → puck to a linemate (sets up a one-timer); else intercepted
+    if (rng.chance(ratio(atkSkill(carrier.attrs.pa ?? 50), defSkill(dman.attrs.df ?? 50), 0.7))) {
+      carrier = pickByAttr(rng, onIceF(carrierTeam), (s) => involvement(0.6 * (s.attrs.sc ?? 50) + 0.4 * (s.attrs.sk ?? 50)) * 60);
+      setup = "pass";
+    } else {
+      carrierTeam = def; carrier = pickByAttr(rng, onIceD(def).concat(onIceF(def)), (s) => s.attrs.df ?? 50); zone = "DEF"; setup = "carry"; press = 0;
+    }
+  }
+}
+
+// ---- injuries ---------------------------------------------------------------
+
+/**
+ * Roll in-game injuries. Rate scales with the injury setting; a player's risk
+ * rises with ice time (exposure) and falls with durability (DU). Duration is
+ * mostly short, occasionally long-term (concussions skew longer).
+ */
+function generateInjuries(st: SimState) {
+  if (!CFG.injuriesEnabled) return;
+  for (const team of [st.home, st.away]) {
+    const lambda = INJURY_BASE * (CFG.injuryChancePct / 100);
+    const count = st.rng.poisson(lambda);
+    const pool = [...team.forwards, ...team.defense];
+    for (let i = 0; i < count; i++) {
+      // risk rises with ice time (exposure) and falls with durability (DU); a
+      // just-returned "rusty" skater (CON just at/under the 95 threshold) with low
+      // DU is far likelier to break down again — re-injury.
+      const victim = pool[st.rng.weighted(pool.map((s) => {
+        const fragility = s.con < 96 ? 1 + (96 - s.con) * (0.9 - s.attrs.du / 200) : 1;
+        return s.iceTime * (115 - s.attrs.du) * fragility;
+      }))];
+      const desc = BODY_PARTS[st.rng.int(BODY_PARTS.length)];
+      const roll = st.rng.next();
+      // more medium & long-term injuries: ~45% day-to-day, ~35% a couple weeks,
+      // ~20% long-term (up to ~2 months), concussions skew long.
+      let days = roll < 0.45 ? 1 + st.rng.int(5) : roll < 0.8 ? 6 + st.rng.int(14) : 20 + st.rng.int(45);
+      if (desc === "Concussion") days = Math.max(days, 10 + st.rng.int(28));
+      const period = 1 + st.rng.int(3);
+      const seconds = st.rng.int(PERIOD_SECONDS);
+      st.injuries.push({
+        period, seconds, time: fmt(seconds), teamId: team.id,
+        playerId: victim.id, playerName: victim.name, days, desc,
+      });
+    }
+  }
+}
+
+// ---- endgame (pulled goalie) ------------------------------------------------
+
+/**
+ * Final ~90s of regulation. A team trailing by 1–2 pulls its goalie for a 6th
+ * attacker: better odds to tie, but the leader can score into the empty net.
+ * Lifts the OT rate and produces realistic empty-net goals.
+ */
+function simulateEndgame(st: SimState) {
+  const { home, away, rng } = st;
+  let margin = st.box[home.id].goals - st.box[away.id].goals;
+  if (margin === 0 || Math.abs(margin) > 2) return;
+
+  const oneGoal = Math.abs(margin) === 1;
+  const trailing = margin < 0 ? home : away;
+  const leading = margin < 0 ? away : home;
+  const attempts = 2;
+  const tieP = (oneGoal ? 0.075 : 0.025) * (trailing.offenseRating / LEAGUE.avgOffense);
+  const engP = oneGoal ? 0.11 : 0.13;
+
+  for (let i = 0; i < attempts; i++) {
+    const t = 1120 + i * 30; // ~18:40 and ~19:10 of the 3rd
+    // empty-net goal for the leader (trailing team's net is empty)
+    if (rng.chance(engP)) {
+      st.box[leading.id].shots++;
+      st.box[leading.id].shotsByPeriod[2]++;
+      recordGoal(st, leading, trailing, 3, t, "EV", true);
+      return; // game iced
+    }
+    // 6-on-5 push for the trailing team
+    const shooter = pickShooter(rng, trailing);
+    st.box[trailing.id].shots++;
+    st.box[trailing.id].shotsByPeriod[2]++;
+    st.lines[trailing.id][shooter.id].shots++;
+    st.box[leading.id].goalie.shotsAgainst++;
+    if (rng.chance(tieP)) {
+      st.box[leading.id].goalie.goalsAgainst++;
+      recordGoal(st, trailing, leading, 3, t, "EV");
+      margin = st.box[home.id].goals - st.box[away.id].goals;
+      if (margin === 0) return; // tied it up -> heading to OT
+    } else {
+      st.box[leading.id].goalie.saves++;
+    }
+  }
+}
+
+// ---- overtime / shootout ----------------------------------------------------
+
+function simulateOvertime(st: SimState): { winner: number | null; seconds: number } {
+  const { home, away, rng } = st;
+  const step = 15;
+  for (let t = step; t <= OT_SECONDS; t += step) {
+    for (const [att, def, isHome] of [[home, away, true], [away, home, false]] as const) {
+      // 3-on-3 is wide open: elevated chance rate scaled by offense
+      const rate = 0.055 * (att.offenseRating / LEAGUE.avgOffense);
+      if (!rng.chance(rate)) continue;
+      const shooter = pickShooter(rng, att);
+      const gLine = liveGoalieLine(st, def.id);
+      st.box[att.id].shots++;
+      st.box[att.id].shotsByPeriod[3]++;
+      st.lines[att.id][shooter.id].shots++;
+      gLine.shotsAgainst++;
+      const p = conversion(shooter.offense, effGoalieQuality(liveGoalie(st, def)), isHome, "EV") * 2.2;
+      if (rng.chance(p)) {
+        gLine.goalsAgainst++;
+        recordGoal(st, att, def, 4, t, "EV");
+        return { winner: att.id, seconds: t };
+      }
+      gLine.saves++;
+    }
+  }
+  return { winner: null, seconds: OT_SECONDS };
+}
+
+function simulateShootout(st: SimState): number {
+  const { home, away, rng } = st;
+  // shooter order: the manager's list first (resolved to on-roster forwards),
+  // then the best remaining by penalty-shot + finishing.
+  const shooters = (t: SimTeam) => {
+    const byId = new Map([...t.forwards, ...t.defense].map((s) => [s.id, s]));
+    const picked = t.shootoutOrder.map((id) => byId.get(id)).filter((s): s is SimSkater => !!s);
+    const rest = [...t.forwards].filter((s) => !picked.includes(s)).sort((a, b) => (b.attrs.ps + b.offense) - (a.attrs.ps + a.offense));
+    return [...picked, ...rest].slice(0, 12);
+  };
+  const hS = shooters(home), aS = shooters(away);
+  let hG = 0, aG = 0;
+  // record an attempt: goal, save, or missed the net
+  const attempt = (shooter: SimSkater, def: SimTeam, round: number, team: SimTeam) => {
+    const p = 0.33 * (0.6 + 0.4 * (shooter.attrs.ps + shooter.offense) / 130)
+      * (LEAGUE.avgGoalie / effGoalieQuality(liveGoalie(st, def)));
+    const scored = rng.chance(Math.max(0.1, Math.min(0.6, p)));
+    const result: ShootoutAttempt["result"] = scored ? "goal" : rng.chance(0.28) ? "miss" : "save";
+    st.shootout.push({ round, teamId: team.id, shooterId: shooter.id, shooterName: shooter.name, result });
+    return scored;
+  };
+  for (let r = 0; r < 3; r++) {
+    if (attempt(hS[r % hS.length], away, r + 1, home)) hG++;
+    if (attempt(aS[r % aS.length], home, r + 1, away)) aG++;
+  }
+  let r = 3;
+  while (hG === aG && r < 20) {
+    if (attempt(hS[r % hS.length], away, r + 1, home)) hG++;
+    if (attempt(aS[r % aS.length], home, r + 1, away)) aG++;
+    r++;
+  }
+  const winner = hG >= aG ? home : away;
+  // the shootout winner is credited one goal for the final score
+  st.box[winner.id].goals++;
+  return winner.id;
+}
+
+// ---- faceoffs, hits, blocks, TOI -------------------------------------------
+
+function simulateFaceoffs(st: SimState) {
+  const centers = (t: SimTeam) => {
+    const c = t.forwards.filter((f) => f.isCenter);
+    return c.length ? c : t.forwards;
+  };
+  const hC = centers(st.home), aC = centers(st.away);
+  for (let i = 0; i < LEAGUE.faceoffsPerGame; i++) {
+    const h = hC[st.rng.weighted(hC.map((s) => s.iceTime))];
+    const a = aC[st.rng.weighted(aC.map((s) => s.iceTime))];
+    const pHome = h.faceoff / (h.faceoff + a.faceoff);
+    if (st.rng.chance(pHome)) {
+      st.box[st.home.id].faceoffWins++; st.box[st.away.id].faceoffLosses++;
+      st.lines[st.home.id][h.id].faceoffWins++; st.lines[st.away.id][a.id].faceoffLosses++;
+    } else {
+      st.box[st.away.id].faceoffWins++; st.box[st.home.id].faceoffLosses++;
+      st.lines[st.away.id][a.id].faceoffWins++; st.lines[st.home.id][h.id].faceoffLosses++;
+    }
+  }
+}
+
+function distributeCounting(st: SimState) {
+  for (const team of [st.home, st.away]) {
+    const roster = [...team.forwards, ...team.defense];
+    // hits
+    const hits = st.rng.poisson(LEAGUE.hitsPerTeam * (CFG.hitsPct / 100));
+    for (let i = 0; i < hits; i++) {
+      // heavier bodies throw more of the hits (physicality)
+      const s = roster[st.rng.weighted(roster.map((r) => r.hitting * r.iceTime * physFactor(r.weight)))];
+      st.lines[team.id][s.id].hits++; st.box[team.id].hits++;
+    }
+    // blocks (defense-heavy)
+    const blocks = st.rng.poisson(LEAGUE.blocksPerTeam);
+    for (let i = 0; i < blocks; i++) {
+      const s = roster[st.rng.weighted(roster.map((r) => r.blocking * r.iceTime * (r.isDefense ? 1.8 : 1)))];
+      st.lines[team.id][s.id].blocks++; st.box[team.id].blocks++;
+    }
+    // TOI from ice-time share
+    for (const s of team.forwards) st.lines[team.id][s.id].toi = Math.round(s.iceTime * LEAGUE.fwdIcePool);
+    for (const s of team.defense) st.lines[team.id][s.id].toi = Math.round(s.iceTime * LEAGUE.defIcePool);
+    st.box[team.id].goalie.toi = PERIOD_SECONDS * 3;
+  }
+}
+
+// ---- main -------------------------------------------------------------------
+
+export type SimOptions = { seed?: number; settings?: EngineSettings; noShootout?: boolean; rivalry?: boolean; league?: "NHL" | "AHL" };
+
+export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}): GameResult {
+  CFG = opts.settings ?? DEFAULT_SETTINGS;
+  AHL_GAME = opts.league === "AHL";
+  const seed = opts.seed ?? fixtureSeed(home.id, away.id);
+  const rng = new RNG(seed);
+
+  const st: SimState = {
+    rng, home, away,
+    box: { [home.id]: initTeamBox(home), [away.id]: initTeamBox(away) },
+    lines: { [home.id]: {}, [away.id]: {} },
+    goals: [], penalties: [], injuries: [],
+    momentum: {}, momoTime: {}, momoTau: {}, momoDip: {},
+    playoff: !!opts.noShootout, // playoff series sim OT until a goal — amplifies clutch
+    defChem: {},
+    rivalry: CFG.rivalryEnabled && !!opts.rivalry,
+    pulled: {},
+    shootout: [],
+  };
+  for (const team of [home, away]) {
+    for (const s of [...team.forwards, ...team.defense]) {
+      st.lines[team.id][s.id] = newPlayerLine(s);
+    }
+    // leadership stretches a hot streak; experience steadies a team that concedes
+    const ld = iceAvgAttr(team, (s) => s.attrs.ld ?? 50);
+    const ex = iceAvgAttr(team, (s) => s.attrs.ex ?? 50);
+    st.momentum[team.id] = 0;
+    st.momoTime[team.id] = 0;
+    st.momoTau[team.id] = CFG.momentumDecaySec * (0.75 + ld / 200);          // LD 50→1.0x, 90→1.2x
+    st.momoDip[team.id] = CFG.momentumConcedeDip * (1 - (ex - 50) / 250);    // EX 90→0.84x, 25→1.1x
+    // defensive shield: a gelled, role-diverse D pair suppresses goals against
+    const dc = team.defense.length
+      ? team.defense.reduce((t, d) => t + chemFactor(d.chem, d.roleFit), 0) / team.defense.length : 1;
+    st.defChem[team.id] = dc;
+  }
+
+  simulateFaceoffs(st);
+
+  const homeShotsTotal = Math.max(12, Math.round(rng.poisson(expectedShots(home, away, true))));
+  const awayShotsTotal = Math.max(12, Math.round(rng.poisson(expectedShots(away, home, false))));
+
+  for (let period = 1; period <= 3; period++) {
+    if (CFG.engineModel === "possession") { simulatePeriodPossession(st, period); continue; }
+    let hShare = period === 3 ? 0.34 : 0.33;
+    let hp = Math.round(homeShotsTotal * hShare);
+    let ap = Math.round(awayShotsTotal * hShare);
+
+    // Score effects in the 3rd: the trailing team presses, the leader sits back.
+    if (period === 3) {
+      const margin = st.box[home.id].goals - st.box[away.id].goals;
+      if (margin !== 0) {
+        const trailingIsHome = margin < 0;
+        const boost = Math.min(0.4, 0.17 + 0.06 * Math.abs(margin));
+        if (trailingIsHome) { hp = Math.round(hp * (1 + boost)); ap = Math.round(ap * (1 - boost * 0.5)); }
+        else { ap = Math.round(ap * (1 + boost)); hp = Math.round(hp * (1 - boost * 0.5)); }
+      }
+    }
+    simulatePeriod(st, period, hp, ap);
+  }
+
+  simulateEndgame(st);
+  generateFights(st);
+  generateHeatEvents(st);
+  generateInjuries(st);
+
+  let winnerId: number;
+  let endedIn: GameResult["endedIn"] = "REG";
+  let periods = 3;
+  let otPeriods = 0; // full sudden-death OT periods (playoff marathons)
+  const hG = st.box[home.id].goals, aG = st.box[away.id].goals;
+
+  if (hG === aG) {
+    if (opts.noShootout) {
+      // playoff sudden death: keep playing OT periods until someone scores
+      let w: number | null = null, guard = 0;
+      while (w == null && guard++ < 12) { w = simulateOvertime(st).winner; otPeriods++; }
+      winnerId = w ?? home.id; endedIn = "OT"; periods = 4;
+    } else {
+      const ot = simulateOvertime(st);
+      if (ot.winner != null) { winnerId = ot.winner; endedIn = "OT"; periods = 4; }
+      else { winnerId = simulateShootout(st); endedIn = "SO"; periods = 5; }
+    }
+  } else {
+    winnerId = hG > aG ? home.id : away.id;
+  }
+  const loserId = winnerId === home.id ? away.id : home.id;
+
+  distributeCounting(st);
+  finalizeBoxes(st, winnerId, endedIn, otPeriods);
+
+  st.goals.sort((a, b) => a.period - b.period || a.seconds - b.seconds);
+  st.penalties.sort((a, b) => a.period - b.period || a.seconds - b.seconds);
+
+  st.injuries.sort((a, b) => a.period - b.period || a.seconds - b.seconds);
+  const result: GameResult = {
+    home: st.box[home.id], away: st.box[away.id],
+    winner: winnerId, loser: loserId, endedIn, periods, otPeriods,
+    goals: st.goals, penalties: st.penalties, injuries: st.injuries, playByPlay: [], shootout: st.shootout, seed,
+  };
+  if (CFG.playByPlayEnabled) result.playByPlay = generatePlayByPlay(result, home, away);
+  return result;
+}
+
+function finalizeBoxes(st: SimState, winnerId: number, endedIn: GameResult["endedIn"], otPeriods: number) {
+  // game-winning goal: the goal that put the winner ahead to stay.
+  const winnerGoals = st.goals.filter((g) => g.team === winnerId && g.strength !== "SO");
+  const loserFinal = st.box[winnerId === st.home.id ? st.away.id : st.home.id].goals;
+  const gwgIndex = loserFinal; // the (loserFinal+1)-th winner goal is the GWG
+  const gwg = winnerGoals[gwgIndex];
+  if (gwg) st.lines[winnerId][gwg.scorer].gwg = 1;
+
+  for (const teamId of [st.home.id, st.away.id]) {
+    const team = teamId === st.home.id ? st.home : st.away;
+    const box = st.box[teamId];
+    box.skaters = Object.values(st.lines[teamId])
+      .sort((a, b) => b.points - a.points || b.goals - a.goals);
+    // post-game skater conditioning: heavy TOI (or a playoff OT marathon) drops CON
+    const defIds = new Set(team.defense.map((d) => d.id));
+    for (const sk of box.skaters) {
+      sk.conAfter = skaterConAfter(sk.conBefore, sk.toi, defIds.has(sk.id), otPeriods);
+    }
+    const g = box.goalie;
+    g.savePct = g.shotsAgainst ? g.saves / g.shotsAgainst : 0;
+    g.conAfter = Math.max(1, g.conBefore - conDrop(g.shotsAgainst, team.goalie.du));
+    // if the starter was pulled, the backup carries the rest of the game and takes
+    // the decision (goalie of record); otherwise the starter owns the result.
+    const bu = box.backupGoalie;
+    const decision: GoalieLine["decision"] = teamId === winnerId ? "W" : endedIn === "REG" ? "L" : "OTL";
+    if (st.pulled[teamId] && bu) {
+      bu.savePct = bu.shotsAgainst ? bu.saves / bu.shotsAgainst : 0;
+      bu.conAfter = Math.max(1, bu.conBefore - conDrop(bu.shotsAgainst, (team.backup ?? team.goalie).du));
+      bu.decision = decision;
+      g.decision = null; // pulled — no decision
+    } else {
+      g.decision = decision;
+    }
+  }
+}
+
+export { fmt as formatGameTime };

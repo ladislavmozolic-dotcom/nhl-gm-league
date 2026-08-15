@@ -4,8 +4,9 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       {
-        protocol: "https",
-        hostname: "assets.nhle.com",
+        protocol: 'https',
+        hostname: 'profinhl.cz',
+        pathname: '/**',
       },
     ],
   },

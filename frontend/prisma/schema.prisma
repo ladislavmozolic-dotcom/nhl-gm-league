@@ -7,108 +7,165 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Team {
-  id   Int     @id @default(autoincrement())
-  slug String  @unique
-  code String? @unique
-
+// STHS coach: a global team modifier (OF/DF/PD/EX + PH/LD) plus a coaching style
+// (Offensive / Defensive / Physical) that determines how well the team converts
+// the manager's tactics into results. One per team (NHL club and each farm club).
+model Coach {
+  id       Int     @id @default(autoincrement())
   name     String
-  logoUrl  String?
-  capacity Int?
+  country  String?
+  style    String  @default("Balanced") // Offensive | Defensive | Physical | Balanced
+  ph       Int     @default(75) // physical / hitting emphasis
+  df       Int     @default(75) // defense
+  of       Int     @default(75) // offense
+  pd       Int     @default(75) // discipline (fewer penalties)
+  ex       Int     @default(75) // experience (momentum / clutch / young-player poise)
+  ld       Int     @default(75) // leadership
+  overall  Int     @default(75)
+  age      Int?
+  salary   Int     @default(0)
+  contract Int     @default(0)
+  teamId   Int?    @unique // null = free agent (available to hire)
+  team     Team?   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+}
 
-  profinhlName   String? @unique
-  profinhlLogoId Int?
-
-  league String @default("NHL")
-
+model Team {
+  id                Int         @id @default(autoincrement())
+  slug              String      @unique
+  code              String?     @unique
+  name              String
+  logoUrl           String?
+  gm                String
+  arena             String
+  league            String      @default("NHL")
   eliteProspectsUrl String?
-
-  parentTeamId Int?
-  parentTeam   Team? @relation("Affiliates", fields: [parentTeamId], references: [id])
-
-  affiliateTeams Team[] @relation("Affiliates")
-  isAffiliate Boolean @default(false)
-
-  gm         String
-  arena      String
-  coach      String?
-  conference String?
-  division   String?
-
-  players Player[]
-
-  prospects Prospect[]
-
-  draftPicks DraftPick[]
+  parentTeamId      Int?
+  profinhlName      String?     @unique
+  profinhlLogoId    Int?
+  coach             String?
+  headCoach         Coach?      // STHS head coach (own coach per NHL club AND per farm club)
+  conference        String?
+  division          String?
+  capacity          Int?
+  isAffiliate       Boolean     @default(false)
+  profinhlId        Int?        @unique
+  arenaSections     Json?       // [{level,capacity,price}] — ticket pricing
+  bankAccount       Float       @default(50000000) // team funds; ticket revenue in, salaries out (recomputed by processFinances = startBank + ticket − salary + rewards + ledgerAdj)
+  ledgerAdj         Float       @default(0) // net of GM cash transactions (trades, buyouts, coach fines) that must survive each processFinances recompute
+  profinhlBank      Int?        // real ProfiNHL bank balance (scraped from profinhl Finance.php); used in ProfiNHL roster mode
+  popularity        Int         @default(100) // affects attendance / ticket revenue (admin-set)
+  rivalTeamIds      Int[]       @default([]) // rivalries — heated games (more fights, scrums, misconducts)
+  draftPicks        DraftPick[]
+  players           Player[]
+  prospects         Prospect[]
+  parentTeam        Team?       @relation("Affiliates", fields: [parentTeamId], references: [id])
+  affiliateTeams    Team[]      @relation("Affiliates")
+  homeGames         Game[]      @relation("HomeGames")
+  awayGames         Game[]      @relation("AwayGames")
+  lines             TeamLines?
+  passwordHash      String?
+  isAdmin           Boolean     @default(false) // this team's GM login also has league-admin powers (manage any team)
+  retainsBuyouts    Int         @default(0)     // net retention / buyout dead-money adjustment (± dollars); counts into the cap hit
+  gmEmail           String?
+  gmFirstName       String?
+  gmLastName        String?
+  gmNickname        String?     // shown in the top menu when this team's GM is signed in
+  lastLoginAt       DateTime?
 }
 
 model Player {
-  id   Int    @id @default(autoincrement())
-  slug String @unique
-
-  name      String
-  position  String
-  positions String?
-
-  nhlId  Int? @unique
-  number Int?
-
-  photoUrl String?
-
+  id                   Int           @id @default(autoincrement())
+  slug                 String        @unique
+  name                 String
+  position             String
+  positions            String?
+  nhlId                Int?          @unique
+  profinhlId           Int?          // ← PRIDANÉ
+  number               Int?
+  photoUrl             String?
   frozenPoolId         Int?
   frozenPoolUrl        String?
   frozenPoolPlayerSlug String?
-
-  birthDate   String?
-  birthPlace  String?
-  nationality String?
-
-  shoots String?
-
-  height String?
-  weight Int?
-
-  capWagesSlug String?
-
-  capHit         Float?
-  contractYears  Int?
-  contractExpiry Int?
-  waiverStatus   String? @default("NONE")
-
-  age Int?
-
-  overall      Int?
-  contractText String?
-  rosterType   String?
-  condition    Float?
-  onTradeBlock Boolean @default(false)
-
-  ck Int?
-  fg Int?
-  di Int?
-  sk Int?
-  st Int?
-  en Int?
-  du Int?
-  ph Int?
-  fo Int?
-  pa Int?
-  sc Int?
-  df Int?
-  ps Int?
-  ex Int?
-  ld Int?
-  mo Int?
-
-  isGoalie Boolean @default(false)
-
-  sourceType String?
-
-  teamId Int
-  team   Team @relation(fields: [teamId], references: [id])
-
-  skaterRating SkaterRating?
-  goalieRating GoalieRating?
+  birthDate            String?
+  birthPlace           String?
+  nationality          String?
+  shoots               String?
+  height               String?
+  weight               Int?
+  capWagesSlug         String?
+  capHit               Float?
+  contractYears        Int?
+  contractExpiry       Int?
+  age                  Int?
+  overall              Int?
+  contractText         String?
+  rosterType           String?
+  teamId               Int
+  ck                   Int?
+  condition            Float?
+  morale               Float?
+  df                   Int?
+  di                   Int?
+  du                   Int?
+  en                   Int?
+  ex                   Int?
+  fg                   Int?
+  fo                   Int?
+  ld                   Int?
+  mo                   Int?
+  pa                   Int?
+  ph                   Int?
+  ps                   Int?
+  sc                   Int?
+  sk                   Int?
+  st                   Int?
+  isGoalie             Boolean       @default(false)
+  sourceType           String?
+  onTradeBlock         Boolean       @default(false)
+  waiverStatus         String?       @default("NONE")
+  injuryDaysLeft       Int           @default(0)
+  injuryDesc           String?
+  captaincy            String?       // "C" | "A" | null
+  contractType         String?       // "ONE_WAY" | "TWO_WAY" (one-way can't be sent to farm)
+  profinhlTeamId       Int?          // snapshot of the ProfiNHL assignment (for roster switching)
+  profinhlRosterType   String?
+  realTeamId           Int?          // the player's real current NHL team (from the NHL API)
+  realFarmTeamId       Int?          // NHL parent org whose AHL affiliate this player is on (from theahl.com)
+  realCapHit           Int?          // real current NHL cap hit (from spotrac)
+  realContractText     String?
+  profinhlCapHit       Int?          // snapshot of the ProfiNHL cap hit (for roster switching)
+  realOnly             Boolean       @default(false) // exists only in the Real NHL dataset (real free agent); hidden in ProfiNHL mode
+  faDemandOverride     Int?          // Free Agent Frenzy: league Agent / admin hand-set contract demand ($ cap hit); overrides the computed market value
+  signPromiseLine      Int?          // deployment promised at signing: F line 1-4 / D pair 1-3 / G 1-2
+  signPromisePP        Boolean?      // power-play time promised at signing
+  signPromisePK        Boolean?      // penalty-kill time promised at signing
+  promiseWarnGame      Int?          // team games played when the player warned the GM his promise was broken (grace period start)
+  disgruntled          Boolean       @default(false) // promise broken past grace + unhappy: runtime -20% attributes + morale hit; cleared on trade
+  tradeRequested       Boolean       @default(false) // player has formally requested a trade (shown in Around The League)
+  ltir                 Boolean       @default(false) // parked on LTIR (played <10 games last season) — sits in prospects/reserve, off the cap
+  lastSeasonGP         Int?          // real last-season games played (imported from the Players Calculator / hockey-reference)
+  lastSeasonPts        Int?          // real last-season points (G + A) — feeds the FA demand engine's performance signal
+  lastSeasonSvPct      Float?        // real last-season goalie save % (from NHL.com) — feeds the ELC goalie bonus
+  lastSeasonAhlGP      Int?          // real last-season AHL games played (from theahl.com HockeyTech) — post-season roster reconciliation
+  lastSeasonG          Int?          // last-season goals / assists / hits / blocks — drive the Player Calculator param projection
+  lastSeasonA          Int?
+  lastSeasonHits       Int?
+  lastSeasonBlocks     Int?
+  curSeasonGP          Int?          // CURRENT real-season stats (empty in the off-season; projection activates at ~game 10)
+  curSeasonG           Int?
+  curSeasonA           Int?
+  curSeasonHits        Int?
+  curSeasonBlocks      Int?
+  curSeasonPM          Int?          // +/-  (DF input)
+  curSeasonTK          Int?          // takeaways (DF input)
+  curSeasonGV          Int?          // giveaways (DF input)
+  curSeasonShToi       Float?        // player short-handed TOI per game, seconds (DF input, NHL timeonice)
+  curSeasonTeamShToi   Float?        // team penalty-kill TOI per game, seconds (DF input, NHL penaltykill)
+  goalieRating         GoalieRating?
+  team                 Team          @relation(fields: [teamId], references: [id])
+  skaterRating         SkaterRating?
+  gameStats            PlayerGameStat[]
+  goalieGameStats      GoalieGameStat[]
 }
 
 model Transaction {
@@ -119,114 +176,545 @@ model Transaction {
 }
 
 model Trade {
-  id Int @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
+  fromTeamId  Int
+  toTeamId    Int
+  status      String   @default("PENDING") // PENDING | ACCEPTED | DECLINED | CANCELLED
+  condition   String?
+  respondedAt DateTime?
+  createdAt   DateTime @default(now())
+}
 
-  fromTeamId Int
-  toTeamId   Int
+model LeagueConfig {
+  id              Int      @id @default(1)
+  rosterMode      String   @default("profinhl") // profinhl | real
+  profinhlCapUpper Int     @default(85900000)
+  profinhlCapLower Int     @default(51500000)
+  realCapUpper    Int      @default(104000000) // real 2026-27 NHL upper limit
+  realCapLower    Int      @default(76500000)
+  faOpen          Boolean  @default(false) // Free Agent Frenzy window: manual override to force the window open (normally derived from the calendar)
+  faDay           Int      @default(0)     // Free Agent Frenzy round counter — advanced by admin/Agent to resolve standing offers
+  leagueDate      DateTime?                 // the league clock — a 365-day calendar starting July 1 19:00 (real free-agency open); null = not yet started
+  phaseOverride   String?                   // admin manual phase: "offseason" | "preseason" | "regular" | "playoffs" | "frenzy" · null = follow the calendar (see effectivePhase)
+  updatedAt       DateTime @updatedAt
+}
 
-  status String @default("PENDING")
-
+// Free Agent Frenzy: a standing contract offer from a team to a free agent.
+// Multiple teams bid on the same player; advancing the Frenzy Day makes each
+// unsigned player compare all his PENDING offers and pick the best (money + fit
+// + contention). Plain FK scalars (no relations) — joined manually, like Transaction.
+model FaOffer {
+  id        Int      @id @default(autoincrement())
+  playerId  Int
+  teamId    Int
+  salary    Int
+  years     Int
+  line      Int      @default(3)          // promised deployment: F line 1-4 · D pair 1-3 · G 1-2
+  pp        Boolean  @default(false)       // promised power-play time
+  pk        Boolean  @default(false)       // promised penalty-kill time
+  status    String   @default("PENDING") // PENDING | COUNTERED | SHORTLISTED | ACCEPTED | REJECTED | WITHDRAWN
+  round     Int      @default(0)          // frenzy round the offer was placed / last raised
+  counterSalary Int?                       // the player's counter (what he wants from this team) after a round
+  counterYears  Int?
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([playerId, teamId])            // one standing offer per team per player
+  @@index([playerId])
+  @@index([teamId])
+}
+
+model AutoSim {
+  id          Int      @id @default(1)
+  enabled     Boolean  @default(true)
+  hour        Int      @default(20) // Bratislava local hour
+  minute      Int      @default(30)
+  lastRunDate String?  // YYYY-MM-DD (Bratislava) of the last automatic run
+  updatedAt   DateTime @updatedAt
+}
+
+model NewsArticle {
+  id           Int            @id @default(autoincrement())
+  authorTeamId Int
+  title        String
+  bodyHtml     String
+  createdAt    DateTime       @default(now())
+  reactions    NewsReaction[]
+  comments     NewsComment[]
+}
+
+// A league-wide message from the commissioner (admin): shown on the home page above
+// the news and delivered to every GM's inbox (per-GM read state via AnnouncementRead).
+// An optional link renders as "click here" (or a custom label) taking GMs to a page.
+model CommissionerAnnouncement {
+  id        Int                @id @default(autoincrement())
+  body      String
+  linkUrl   String?
+  linkLabel String?            // shown for the link; defaults to "click here"
+  active    Boolean            @default(true)
+  createdAt DateTime           @default(now())
+  reads     AnnouncementRead[]
+}
+
+model AnnouncementRead {
+  id             Int                       @id @default(autoincrement())
+  announcementId Int
+  teamId         Int
+  readAt         DateTime                  @default(now())
+  announcement   CommissionerAnnouncement  @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+
+  @@unique([announcementId, teamId])
+}
+
+model NewsReaction {
+  id        Int         @id @default(autoincrement())
+  articleId Int
+  teamId    Int
+  kind      String // like | dislike | laugh | heart
+  createdAt DateTime    @default(now())
+  article   NewsArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, teamId])
+}
+
+model NewsComment {
+  id        Int         @id @default(autoincrement())
+  articleId Int
+  teamId    Int
+  body      String
+  createdAt DateTime    @default(now())
+  article   NewsArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+}
+
+model TradeCondition {
+  id          Int       @id @default(autoincrement())
+  tradeId     Int?
+  fromTeamId  Int
+  toTeamId    Int
+  description String
+  status      String    @default("PENDING") // PENDING | FULFILLED | EXPIRED
+  createdAt   DateTime  @default(now())
+  resolvedAt  DateTime?
 }
 
 model TradeAsset {
-  id Int @id @default(autoincrement())
-
-  tradeId Int
-
-  assetType String
-
-  playerId    Int?
-  prospectId  Int?
-  draftPickId Int?
-
-  cashAmount Float?
-
+  id           Int      @id @default(autoincrement())
+  tradeId      Int
+  assetType    String
+  playerId     Int?
+  prospectId   Int?
+  draftPickId  Int?
+  cashAmount   Float?
   retentionPct Float?
-
-  side String
-
-  createdAt DateTime @default(now())
-
+  side         String
+  createdAt    DateTime @default(now())
 }
 
 model SkaterRating {
-  id Int @id @default(autoincrement())
-
-  playerId Int    @unique
-  player   Player @relation(fields: [playerId], references: [id])
-
+  id        Int    @id @default(autoincrement())
+  playerId  Int    @unique
   condition Float?
-
-  ck Int?
-  fg Int?
-  di Int?
-  sk Int?
-  st Int?
-  en Int?
-  du Int?
-  ph Int?
-  fo Int?
-  pa Int?
-  sc Int?
-  df Int?
-  ps Int?
-  ex Int?
-  ld Int?
-  mo Int?
-
-  overall Int?
+  ck        Int?
+  fg        Int?
+  di        Int?
+  sk        Int?
+  st        Int?
+  en        Int?
+  du        Int?
+  ph        Int?
+  fo        Int?
+  pa        Int?
+  sc        Int?
+  df        Int?
+  ps        Int?
+  ex        Int?
+  ld        Int?
+  mo        Int?
+  overall   Int?
+  player    Player @relation(fields: [playerId], references: [id])
 }
 
 model GoalieRating {
-  id Int @id @default(autoincrement())
-
-  playerId Int    @unique
-  player   Player @relation(fields: [playerId], references: [id])
-
+  id        Int    @id @default(autoincrement())
+  playerId  Int    @unique
   condition Float?
-
-  sk Int?
-  du Int?
-  en Int?
-
-  sz Int?
-  ag Int?
-  rb Int?
-  sc Int?
-  hs Int?
-  rt Int?
-
-  ph Int?
-  ps Int?
-  ex Int?
-  ld Int?
-  mo Int?
-
-  overall Int?
+  sk        Int?
+  du        Int?
+  en        Int?
+  sz        Int?
+  ag        Int?
+  rb        Int?
+  sc        Int?
+  hs        Int?
+  rt        Int?
+  ph        Int?
+  ps        Int?
+  ex        Int?
+  ld        Int?
+  mo        Int?
+  overall   Int?
+  player    Player @relation(fields: [playerId], references: [id])
 }
 
 model Prospect {
-  id Int @id @default(autoincrement())
-
-  name String
-
-  draftYear Int?
-
+  id          Int    @id @default(autoincrement())
+  name        String
+  draftYear   Int?
   overallPick Int?
-
-  teamId Int
-  team   Team @relation(fields: [teamId], references: [id])
+  teamId      Int
+  source      String @default("profinhl") // profinhl | real
+  nhlId       Int?
+  position    String?
+  epUrl       String? // EliteProspects profile URL (scraped from profinhl ProspectReport)
+  team        Team   @relation(fields: [teamId], references: [id])
 }
 
 model DraftPick {
-  id Int @id @default(autoincrement())
-
-  year  Int
-  round Int
-
+  id          Int    @id @default(autoincrement())
+  year        Int
+  round       Int
+  teamId      Int
   ownerLogoId Int
+  source      String @default("profinhl") // profinhl | real
+  team        Team   @relation(fields: [teamId], references: [id])
+}
 
-  teamId Int
-  team   Team @relation(fields: [teamId], references: [id])
+model Game {
+  id                Int              @id @default(autoincrement())
+  season            String           @default("2026-27")
+  league            String           @default("NHL") // NHL | AHL
+  round             Int?             // scheduling round / day index
+  gameDate          DateTime?
+  homeTeamId        Int
+  awayTeamId        Int
+  status            String           @default("SCHEDULED") // SCHEDULED | FINAL
+  homeGoals         Int?
+  awayGoals         Int?
+  homeShots         Int?
+  awayShots         Int?
+  homeGoalsByPeriod Int[]            @default([])
+  awayGoalsByPeriod Int[]            @default([])
+  homeShotsByPeriod Int[]            @default([])
+  awayShotsByPeriod Int[]            @default([])
+  endedIn           String?          // REG | OT | SO
+  otPeriods         Int?             @default(0) // sudden-death OT periods played (playoff marathons: 1=OT, 2=2OT…)
+  winnerTeamId      Int?
+  seed              Int?
+  playByPlay        Json?
+  shootout          Json?            // shootout attempts (shooter, result) when the game went to SO
+  seriesId          Int?             // set for playoff games
+  gameNum           Int?             // game number within the series
+  playedAt          DateTime?
+  createdAt         DateTime         @default(now())
+  homeTeam          Team             @relation("HomeGames", fields: [homeTeamId], references: [id])
+  awayTeam          Team             @relation("AwayGames", fields: [awayTeamId], references: [id])
+  playerStats       PlayerGameStat[]
+  goalieStats       GoalieGameStat[]
+  goalEvents        GameGoal[]
+  penaltyEvents     GamePenalty[]
+
+  @@index([season, status])
+  @@index([homeTeamId])
+  @@index([awayTeamId])
+}
+
+model GameGoal {
+  id          Int      @id @default(autoincrement())
+  gameId      Int
+  period      Int
+  seconds     Int
+  teamId      Int
+  teamCode    String?
+  scorerId    Int
+  scorerName  String
+  assistIds   Int[]    @default([])
+  assistNames String[] @default([])
+  strength    String   // EV | PP | SH | SO
+  emptyNet    Boolean  @default(false)
+  game        Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@index([gameId])
+}
+
+model SimSettings {
+  id     Int  @id @default(1)
+  values Json
+}
+
+model Buyout {
+  id         Int      @id @default(autoincrement())
+  teamId     Int
+  playerId   Int?
+  playerName String
+  perYear    Int      // dead-money cap hit per season
+  years      Int      // number of seasons it applies
+  startYear  Int      // first season (e.g. 2026)
+  totalCost  Int      // debited from the team bank
+  inSeason   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  @@index([teamId])
+}
+
+model PlayoffSeries {
+  id             Int      @id @default(autoincrement())
+  season         String
+  league         String   @default("NHL") // NHL | AHL
+  round          Int      // 1=R1, 2=R2, 3=conf final, 4=cup final
+  conference     String?  // null for the cup final
+  slot           Int      // bracket position within the round
+  highSeedTeamId Int
+  lowSeedTeamId  Int
+  highSeed       Int
+  lowSeed        Int
+  highWins       Int      @default(0)
+  lowWins        Int      @default(0)
+  bestOf         Int      @default(7)
+  status         String   @default("ACTIVE") // ACTIVE | DONE
+  winnerTeamId   Int?
+  createdAt      DateTime @default(now())
+
+  @@index([season, round])
+}
+
+// Archived completed seasons — powers the History pages. Filled by the season-end archive.
+model SeasonRecord {
+  id               Int      @id @default(autoincrement())
+  season           String
+  league           String   @default("NHL")
+  championTeamId   Int?
+  runnerUpTeamId   Int?
+  presidentsTeamId Int?     // best regular-season record
+  createdAt        DateTime @default(now())
+
+  @@unique([season, league])
+}
+
+model SeasonAward {
+  id       Int     @id @default(autoincrement())
+  season   String
+  league   String  @default("NHL")
+  category String  // Hart | Art Ross | Rocket Richard | Norris | Vezina | Calder | Conn Smythe | Presidents
+  playerId Int?
+  playerName String?
+  teamId   Int?
+  detail   String? // e.g. "112 pts", "1.98 GAA"
+
+  @@index([season, league])
+}
+
+// GM award voting: some trophies (Hart, Norris, Vezina, Calder, Selke, Lady Byng,
+// Ted Lindsay, Conn Smythe, Jack Adams, GM of the Year) are decided by a GM ballot,
+// scored 5-4-3-2-1 (or 3-2-1). Teams with no human GM cast a stat-based AI ballot.
+// Real NHL Entry Draft class (imported from NHL Central Scouting rankings via the
+// NHL API, /v1/draft/rankings/{year}/{category}). One row per draft-eligible
+// prospect; draftedByTeamId is null until a club selects him in the Draft Room.
+model DraftProspect {
+  id              Int     @id @default(autoincrement())
+  draftYear       Int
+  source          String? // null/"profinhl" = this league's own draft · "real" = imported real NHL draft history (shown only in real-roster mode)
+  firstName       String
+  lastName        String
+  name            String  // "First Last" — display / matching
+  position        String  // C | LW | RW | D | G
+  shoots          String? // L | R
+  heightIn        Int?
+  weightLb        Int?
+  birthDate       String?
+  country         String?
+  amateurClub     String?
+  amateurLeague   String?
+  csRank          Int?    // NHL Central Scouting final rank (within its category)
+  category        Int     // 1 NA skater · 2 Intl skater · 3 NA goalie · 4 Intl goalie
+  ov              Int     // derived draft-day rating
+  potential       Int     // derived ceiling
+  draftedByTeamId Int?    // null = still available
+  overallPick     Int?    // set when selected
+  playerId        Int?    // the Player row created on selection
+  offBoard        Boolean @default(false) // GM-added pick, not on the scouting board
+  epLink          String? // EliteProspects link the GM supplied for an off-board pick
+  verified        Boolean @default(false) // admin confirmed an off-board pick is eligible
+
+  @@index([draftYear, draftedByTeamId])
+  @@index([draftYear, overallPick])
+}
+
+// Live Draft Room state. One row per draft year. The admin opens a round; picks
+// advance the pointer. (Real-time clock — deadlines/accelerate/defer — layered next.)
+model DraftState {
+  id          Int      @id @default(autoincrement())
+  year        Int      @unique
+  liveRound   Int      @default(0)  // the round currently open for picking (0 = none)
+  currentPick Int      @default(33) // next overall pick to make (R1 done = starts at 33)
+  status      String   @default("IDLE") // IDLE | LIVE | ROUND_DONE | DONE
+  onClockAt   DateTime?               // when the current team went on the clock
+  updatedAt   DateTime @updatedAt
+}
+
+// Admin-granted BONUS picks in extra rounds (8, 9, …) beyond the standard 7 — awarded
+// to clubs as prizes (best article, etc.). Ordered within a round by insertion (id).
+model DraftBonusPick {
+  id        Int      @id @default(autoincrement())
+  year      Int
+  round     Int      // 8, 9, … (extra rounds appended after round 7)
+  teamId    Int
+  reason    String?  // why it was awarded (e.g. "Article of the month")
+  source    String?  // null/"profinhl" | "real" — which roster world it belongs to
+  seq       Int      @default(0) // selection order within the round — set by the admin's Randomise draw (0 = not drawn yet)
+  createdAt DateTime @default(now())
+
+  @@index([year, round])
+}
+
+// GM live chat (draft room + future channels) — for trash talk and arranging trades.
+model ChatMessage {
+  id        Int      @id @default(autoincrement())
+  channel   String   @default("draft")
+  teamId    Int
+  text      String
+  createdAt DateTime @default(now())
+
+  @@index([channel, id])
+}
+
+// A pick whose team let the clock expire — moved to the end of the draft, in the
+// order they were missed. Resolved when that team finally selects.
+model DraftDeferral {
+  id         Int      @id @default(autoincrement())
+  year       Int
+  round      Int      // the round the missed pick belonged to
+  teamId     Int      // the club that must still select
+  sourcePick Int      // the base overall pick they let expire
+  createdAt  DateTime @default(now())
+
+  @@index([year])
+}
+
+// Result of an NHL-style draft lottery — the Round 1 order for a draft year.
+// Drawn once (random) and stored; the draft room reads it for round 1.
+model DraftLottery {
+  id         Int     @id @default(autoincrement())
+  year       Int
+  pick       Int     // 1-32 overall slot in round 1
+  teamId     Int
+  viaLottery Boolean @default(false) // true for the two lottery-won top picks
+  combo      String? // winning 4-ball combination for lottery picks, e.g. "3-7-9-14"
+  createdAt  DateTime @default(now())
+
+  @@unique([year, pick])
+  @@index([year])
+}
+
+// Live draft-lottery broadcast state. `startedAt` drives a time-synced reveal so
+// every online GM sees the same moment; offline GMs get the result + a replay.
+model DraftLotteryRun {
+  id        Int      @id @default(autoincrement())
+  year      Int      @unique
+  startedAt DateTime
+  status    String   @default("LIVE") // LIVE (broadcast running/finished) — cleared on reset
+}
+
+model AwardVoting {
+  id        Int      @id @default(autoincrement())
+  season    String
+  league    String   @default("NHL")
+  status    String   @default("OPEN") // OPEN | CLOSED | RESOLVED
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([season, league])
+}
+
+model AwardVote {
+  id          Int     @id @default(autoincrement())
+  season      String
+  league      String  @default("NHL")
+  category    String
+  voterTeamId Int     // the GM (team) who cast this ballot slot
+  rank        Int     // 1 = top pick
+  points      Int     // 5-4-3-2-1 (5 picks) or 3-2-1 (3 picks)
+  playerId    Int?    // player-based awards
+  teamId      Int?    // coach (Jack Adams) / GM (GM of the Year) awards — the subject team
+  isAi        Boolean @default(false) // stat-based auto-ballot vs a human GM's ballot
+
+  @@unique([season, league, category, voterTeamId, rank])
+  @@index([season, league, category])
+}
+
+model TeamLines {
+  id           Int      @id @default(autoincrement())
+  teamId       Int      @unique
+  forwardLines Json     @default("[]") // [{lw,c,rw,timePct}] x4
+  defensePairs Json     @default("[]") // [{ld,rd,timePct}] x3
+  ppUnits      Json     @default("[]") // legacy — special teams now in `situations`
+  pkUnits      Json     @default("[]") // legacy
+  situations   Json     @default("{}") // pp, fourVFour, pk4, pk3, overtime, others, lastMin
+  strategy     Json     @default("{}") // 5 game-states {phy,df,of} + goaliePull
+  chemistry    Json     @default("{}") // { [unitSignature]: value 0..100 } — line chemistry
+  updatedAt    DateTime @updatedAt
+  team         Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+}
+
+model GamePenalty {
+  id         Int    @id @default(autoincrement())
+  gameId     Int
+  period     Int
+  seconds    Int
+  teamId     Int
+  teamCode   String?
+  playerId   Int
+  playerName String
+  type       String
+  minutes    Int
+  severity   String
+  game       Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@index([gameId])
+}
+
+model PlayerGameStat {
+  id            Int    @id @default(autoincrement())
+  gameId        Int
+  playerId      Int
+  teamId        Int
+  goals         Int    @default(0)
+  assists       Int    @default(0)
+  points        Int    @default(0)
+  shots         Int    @default(0)
+  pim           Int    @default(0)
+  plusMinus     Int    @default(0)
+  ppGoals       Int    @default(0)
+  shGoals       Int    @default(0)
+  gwg           Int    @default(0)
+  hits          Int    @default(0)
+  blocks        Int    @default(0)
+  faceoffWins   Int    @default(0)
+  faceoffLosses Int    @default(0)
+  toi           Int    @default(0)
+  conBefore     Int?
+  conAfter      Int?
+  game          Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  player        Player @relation(fields: [playerId], references: [id])
+
+  @@unique([gameId, playerId])
+  @@index([playerId])
+}
+
+model GoalieGameStat {
+  id           Int     @id @default(autoincrement())
+  gameId       Int
+  playerId     Int
+  teamId       Int
+  started      Boolean @default(true)
+  shotsAgainst Int     @default(0)
+  saves        Int     @default(0)
+  goalsAgainst Int     @default(0)
+  conBefore    Int?
+  conAfter     Int?
+  fatigued     Boolean @default(false)
+  decision     String? // W | L | OTL
+  game         Game    @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  player       Player  @relation(fields: [playerId], references: [id])
+
+  @@unique([gameId, playerId])
+  @@index([playerId])
 }

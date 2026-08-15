@@ -1,0 +1,13 @@
+# dependencies
+node_modules/
+
+# next.js build output
+.next/
+frontend/.next/
+
+# OS / editor cruft
+.DS_Store
+*.swp
+
+# logs
+*.log

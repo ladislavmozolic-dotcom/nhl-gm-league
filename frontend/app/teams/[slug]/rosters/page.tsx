@@ -1,0 +1,43 @@
+import { prisma } from "@/lib/prisma";
+import { notFound, redirect } from "next/navigation";
+import { getTeamSession } from "@/lib/auth";
+import RosterMover from "@/components/RosterMover";
+import { saveRosterMoves } from "./actions";
+
+export const dynamic = "force-dynamic";
+
+export default async function RostersPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const team = await prisma.team.findUnique({
+    where: { slug },
+    include: { affiliateTeams: { select: { id: true, name: true } } },
+  });
+  if (!team) notFound();
+  const session = await getTeamSession();
+  if (session !== team.id) redirect(`/teams/${slug}/login`);
+
+  const affiliate = team.affiliateTeams[0] ?? null;
+  const orgTeamIds = [team.id, ...(affiliate ? [affiliate.id] : [])];
+
+  const players = await prisma.player.findMany({
+    where: { teamId: { in: orgTeamIds } },
+    select: { id: true, name: true, position: true, overall: true, isGoalie: true, rosterType: true, contractType: true, teamId: true },
+    orderBy: [{ isGoalie: "asc" }, { overall: "desc" }],
+  });
+
+  return (
+    <RosterMover
+      teamName={team.name}
+      teamSlug={slug}
+      affiliateName={affiliate?.name ?? "(no affiliate)"}
+      hasAffiliate={!!affiliate}
+      players={players.map((p) => ({
+        id: p.id, name: p.name, position: p.position, overall: p.overall ?? 0,
+        isGoalie: p.isGoalie,
+        side: p.rosterType === "AHL" ? "farm" : "pro",
+        contractType: (p.contractType as "ONE_WAY" | "TWO_WAY" | null) ?? null,
+      }))}
+      onSave={saveRosterMoves}
+    />
+  );
+}

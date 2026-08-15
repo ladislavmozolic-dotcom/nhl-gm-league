@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <linearGradient id="eastGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e3a5f;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0a1628;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <circle cx="100" cy="100" r="95" fill="url(#eastGrad)" stroke="#3b82f6" stroke-width="3"/>
+  <text x="100" y="85" text-anchor="middle" fill="#3b82f6" font-family="Arial Black, sans-serif" font-size="22" font-weight="900" letter-spacing="2">EASTERN</text>
+  <text x="100" y="120" text-anchor="middle" fill="#ffffff" font-family="Arial Black, sans-serif" font-size="28" font-weight="900" letter-spacing="1">CONFERENCE</text>
+  <path d="M60 140 L100 165 L140 140" fill="none" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

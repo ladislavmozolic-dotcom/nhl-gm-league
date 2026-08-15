@@ -1,0 +1,275 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Team {
+  id   Int     @id @default(autoincrement())
+  slug String  @unique
+  code String? @unique
+
+  name     String
+  logoUrl  String?
+  capacity Int?
+
+  profinhlName   String? @unique
+  profinhlLogoId Int?
+
+  profinhlId Int? @unique  // ← PRIDAJ TOTO — ID z profinhl.cz (ownerLogoId)
+
+  league String @default("NHL")
+
+  eliteProspectsUrl String?
+
+  parentTeamId Int?
+  parentTeam   Team? @relation("Affiliates", fields: [parentTeamId], references: [id])
+
+  affiliateTeams Team[] @relation("Affiliates")
+  isAffiliate Boolean @default(false)
+
+  gm         String
+  arena      String
+  coach      String?
+  conference String?
+  division   String?
+  homeGames     Game[]   @relation("HomeTeam")
+  awayGames     Game[]   @relation("AwayTeam")
+
+  players Player[]
+
+  prospects Prospect[]
+
+  draftPicks DraftPick[]
+  model Team {
+  id          Int      @id @default(autoincrement())
+  name        String
+  code        String?
+  logoUrl     String?
+  division    String?
+  conference  String?
+  isAffiliate Boolean  @default(false)
+  league      String   @default("NHL")  // ← pridaj toto
+  // ...
+}
+}
+
+model Player {
+  id   Int    @id @default(autoincrement())
+  slug String @unique
+
+  name      String
+  position  String
+  positions String?
+
+  nhlId  Int? @unique
+  number Int?
+
+  photoUrl      String?
+  age           Int?
+  position      String?   // C, LW, RW, D, G
+  contractText  String?   // "7,500,000$ / 2yrs"
+  capHit        Float?
+  contractYears Int?
+  isUfa         Boolean   @default(false)
+  isRfa         Boolean   @default(false)
+  hasNtc        Boolean   @default(false)
+  isCaptain     Boolean   @default(false)
+  isAssistant   Boolean   @default(false)
+  isRookie      Boolean   @default(false)
+  status        String    @default("active") // active, scratch, farm
+  
+
+  frozenPoolId         Int?
+  frozenPoolUrl        String?
+  frozenPoolPlayerSlug String?
+
+  birthDate   String?
+  birthPlace  String?
+  nationality String?
+
+  shoots String?
+
+  height String?
+  weight Int?
+
+  capWagesSlug String?
+
+  capHit         Float?
+  contractYears  Int?
+  contractExpiry Int?
+  waiverStatus   String? @default("NONE")
+
+  age Int?
+
+  overall      Int?
+  contractText String?
+  rosterType   String?
+  condition    Float?
+  onTradeBlock Boolean @default(false)
+
+  ck Int?
+  fg Int?
+  di Int?
+  sk Int?
+  st Int?
+  en Int?
+  du Int?
+  ph Int?
+  fo Int?
+  pa Int?
+  sc Int?
+  df Int?
+  ps Int?
+  ex Int?
+  ld Int?
+  mo Int?
+
+  isGoalie Boolean @default(false)
+
+  sourceType String?
+
+  teamId Int
+  team   Team @relation(fields: [teamId], references: [id])
+
+  skaterRating SkaterRating?
+  goalieRating GoalieRating?
+}
+
+model Transaction {
+  id        Int      @id @default(autoincrement())
+  type      String
+  message   String
+  createdAt DateTime @default(now())
+}
+
+model Trade {
+  id Int @id @default(autoincrement())
+
+  fromTeamId Int
+  toTeamId   Int
+
+  status String @default("PENDING")
+
+  createdAt DateTime @default(now())
+}
+
+model TradeAsset {
+  id Int @id @default(autoincrement())
+
+  tradeId Int
+
+  assetType String
+
+  playerId    Int?
+  prospectId  Int?
+  draftPickId Int?
+
+  cashAmount Float?
+
+  retentionPct Float?
+
+  side String
+
+  createdAt DateTime @default(now())
+
+}
+
+model SkaterRating {
+  id Int @id @default(autoincrement())
+
+  playerId Int    @unique
+  player   Player @relation(fields: [playerId], references: [id])
+
+  condition Float?
+
+  ck Int?
+  fg Int?
+  di Int?
+  sk Int?
+  st Int?
+  en Int?
+  du Int?
+  ph Int?
+  fo Int?
+  pa Int?
+  sc Int?
+  df Int?
+  ps Int?
+  ex Int?
+  ld Int?
+  mo Int?
+
+  overall Int?
+}
+
+model GoalieRating {
+  id Int @id @default(autoincrement())
+
+  playerId Int    @unique
+  player   Player @relation(fields: [playerId], references: [id])
+
+  condition Float?
+
+  sk Int?
+  du Int?
+  en Int?
+
+  sz Int?
+  ag Int?
+  rb Int?
+  sc Int?
+  hs Int?
+  rt Int?
+
+  ph Int?
+  ps Int?
+  ex Int?
+  ld Int?
+  mo Int?
+
+  overall Int?
+}
+
+model Prospect {
+  id Int @id @default(autoincrement())
+
+  name String
+
+  draftYear Int?
+
+  overallPick Int?
+
+  teamId Int
+  team   Team @relation(fields: [teamId], references: [id])
+}
+
+model DraftPick {
+  id Int @id @default(autoincrement())
+
+  year  Int
+  round Int
+
+  ownerLogoId Int
+
+  teamId Int
+  team   Team @relation(fields: [teamId], references: [id])
+}
+model Game {
+  id            Int      @id @default(autoincrement())
+  homeTeamId    Int
+  awayTeamId    Int
+  homeScore     Int?
+  awayScore     Int?
+  date          DateTime
+  status        String   @default("scheduled")
+  period        String?
+  timeRemaining String?
+  homeTeam      Team     @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam      Team     @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}

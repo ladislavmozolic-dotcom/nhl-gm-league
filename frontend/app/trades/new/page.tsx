@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import CreateTradeForm from "@/components/CreateTradeForm";
+import { PageHeader, Card } from "@/components/ui";
 
 export default async function NewTradePage() {
   const teams = await prisma.team.findMany({
@@ -12,16 +13,11 @@ export default async function NewTradePage() {
   });
 
   return (
-    <main
-      style={{
-        maxWidth: "1200px",
-        margin: "0 auto",
-        padding: "24px",
-      }}
-    >
-      <h1>Create Trade</h1>
-
-      <CreateTradeForm teams={teams} />
-    </main>
+    <div className="space-y-6 py-2">
+      <PageHeader title="Create Trade" subtitle="Build a new trade proposal" />
+      <Card>
+        <CreateTradeForm teams={teams} />
+      </Card>
+    </div>
   );
 }

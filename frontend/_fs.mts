@@ -1,0 +1,18 @@
+import { prisma } from "./lib/prisma";
+import { generateSchedule } from "./lib/sim/schedule";
+import { playScheduledGames, resetConditions } from "./lib/sim/season";
+import { runPlayoffs } from "./lib/sim/playoffs";
+import { archiveSeason } from "./lib/awards";
+import { skaterTotals } from "./lib/stats-server";
+const SEASON="2026-27";
+const ser=await prisma.playoffSeries.findMany({where:{season:SEASON},select:{id:true}});
+await prisma.game.deleteMany({where:{season:SEASON}}); if(ser.length)await prisma.playoffSeries.deleteMany({where:{season:SEASON}});
+await resetConditions(); await generateSchedule(SEASON,{gamesPerTeam:82}); await playScheduledGames({season:SEASON});
+const g=await prisma.game.findMany({where:{season:SEASON,status:"FINAL",seriesId:null},select:{homeGoals:true,awayGoals:true}});
+const tg=g.length,goals=g.reduce((a,x)=>a+(x.homeGoals??0)+(x.awayGoals??0),0)/tg;
+const sk=(await skaterTotals(SEASON,"NHL")).sort((a,b)=>b.points-a.points);
+console.log(`goals=${goals.toFixed(2)} | Scorers: ${sk.slice(0,3).map(x=>x.name.split(" ").pop()+" "+x.points).join(", ")}`);
+await runPlayoffs(SEASON,"NHL"); await runPlayoffs(SEASON,"AHL"); await archiveSeason(SEASON,"NHL"); await archiveSeason(SEASON,"AHL");
+const gm=await prisma.game.findFirst({where:{season:SEASON,status:"FINAL",seriesId:null},select:{id:true}});
+console.log(`archived | game ${gm?.id}`);
+process.exit(0);

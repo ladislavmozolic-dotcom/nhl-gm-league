@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { PageHeader, Card } from "@/components/ui";
 
 export default async function TradeBlockPage() {
   const players = await prisma.player.findMany({
@@ -15,80 +16,45 @@ export default async function TradeBlockPage() {
   });
 
   return (
-    <main
-      style={{
-        maxWidth: "1200px",
-        margin: "0 auto",
-        padding: "24px",
-        color: "white",
-      }}
-    >
-      <h1>Trade Block</h1>
+    <div className="space-y-6 py-2">
+      <PageHeader title="Trade Block" subtitle={`${players.length} player${players.length === 1 ? "" : "s"} available`} />
 
-      <table
-        style={{
-          width: "100%",
-          borderCollapse: "collapse",
-        }}
-      >
-        <thead>
-          <tr>
-            <th style={{ textAlign: "left", padding: "8px" }}>
-              Name
-            </th>
-
-            <th style={{ textAlign: "left", padding: "8px" }}>
-              Team
-            </th>
-
-            <th style={{ textAlign: "left", padding: "8px" }}>
-              Pos
-            </th>
-
-            <th style={{ textAlign: "left", padding: "8px" }}>
-              OVR
-            </th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {players.map((player) => (
-            <tr key={player.id}>
-              <td style={{ padding: "8px" }}>
-                <Link href={`/players/${player.id}`}>
-                  {player.name}
-                </Link>
-              </td>
-
-              <td style={{ padding: "8px" }}>
-                <Link href={`/teams/${player.team.slug}`}>
-                  {player.team.name}
-                </Link>
-              </td>
-
-              <td style={{ padding: "8px" }}>
-                {player.positions || player.position}
-              </td>
-
-              <td
-                style={{
-                  padding: "8px",
-                  color:
-                    (player.overall ?? 0) >= 80
-                      ? "#22c55e"
-                      : (player.overall ?? 0) >= 70
-                      ? "#eab308"
-                      : "#ef4444",
-                  fontWeight: "bold",
-                }}
-              >
-                {player.overall ?? "-"}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </main>
+      {players.length === 0 ? (
+        <Card>
+          <div className="p-8 text-center text-slate-500">No players on the trade block right now.</div>
+        </Card>
+      ) : (
+        <Card bodyClassName="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-800 bg-slate-800/30 text-slate-500 text-xs uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left font-medium">Name</th>
+                  <th className="px-4 py-3 text-left font-medium">Team</th>
+                  <th className="px-4 py-3 text-center font-medium">Pos</th>
+                  <th className="px-4 py-3 text-center font-medium">OVR</th>
+                </tr>
+              </thead>
+              <tbody>
+                {players.map((player) => (
+                  <tr key={player.id} className="border-b border-slate-800/40 hover:bg-slate-800/30 transition-colors last:border-0">
+                    <td className="px-4 py-3 font-medium">
+                      <Link href={`/players/${player.id}`} className="hover:text-blue-400 transition-colors">{player.name}</Link>
+                    </td>
+                    <td className="px-4 py-3 text-slate-400">
+                      <Link href={`/teams/${player.team.slug}`} className="hover:text-blue-400 transition-colors">{player.team.name}</Link>
+                    </td>
+                    <td className="px-4 py-3 text-center text-slate-400">{player.positions || player.position}</td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`font-bold ${(player.overall ?? 0) >= 80 ? "text-green-400" : (player.overall ?? 0) >= 70 ? "text-yellow-400" : "text-red-400"}`}>{player.overall ?? "-"}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+    </div>
   );
-  
 }

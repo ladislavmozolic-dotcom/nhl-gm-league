@@ -1,0 +1,126 @@
+// Persist a simulated GameResult into the DB: Game (with per-period linescore),
+// per-player stats, goalie stats, and timestamped goal & penalty events.
+
+import { prisma } from "../prisma";
+import type { GameResult, TeamBox } from "./types";
+
+export type GameMeta = {
+  season?: string;
+  league?: string;
+  round?: number;
+  gameDate?: Date;
+  gameId?: number;   // if set, updates a pre-scheduled Game row instead of creating
+  seriesId?: number; // playoff series link
+  gameNum?: number;  // game number within a playoff series
+};
+
+function skaterRows(box: TeamBox, gameId: number) {
+  return box.skaters
+    .filter((s) => s.goals || s.assists || s.shots || s.pim || s.plusMinus || s.hits || s.blocks || s.toi)
+    .map((s) => ({
+      gameId, playerId: s.id, teamId: box.teamId,
+      goals: s.goals, assists: s.assists, points: s.points,
+      shots: s.shots, pim: s.pim, plusMinus: s.plusMinus,
+      ppGoals: s.ppGoals, shGoals: s.shGoals, gwg: s.gwg,
+      hits: s.hits, blocks: s.blocks,
+      faceoffWins: s.faceoffWins, faceoffLosses: s.faceoffLosses, toi: s.toi,
+      conBefore: Math.round(s.conBefore), conAfter: Math.round(s.conAfter),
+    }));
+}
+
+function goalieRows(box: TeamBox, gameId: number) {
+  const lines = [box.goalie, ...(box.backupGoalie ? [box.backupGoalie] : [])];
+  return lines.map((g) => ({
+    gameId, playerId: g.id, teamId: box.teamId, started: g.started,
+    shotsAgainst: g.shotsAgainst, saves: g.saves, goalsAgainst: g.goalsAgainst,
+    conBefore: g.conBefore, conAfter: g.conAfter, fatigued: g.fatigued,
+    decision: g.decision,
+  }));
+}
+
+/**
+ * Save a completed game. If meta.gameId is provided, fills in that scheduled
+ * row; otherwise creates a new FINAL Game. Idempotent per gameId: re-saving
+ * replaces existing stat/event rows.
+ */
+export async function saveGameResult(result: GameResult, meta: GameMeta = {}) {
+  const finalFields = {
+    status: "FINAL",
+    homeGoals: result.home.goals,
+    awayGoals: result.away.goals,
+    homeShots: result.home.shots,
+    awayShots: result.away.shots,
+    homeGoalsByPeriod: result.home.goalsByPeriod,
+    awayGoalsByPeriod: result.away.goalsByPeriod,
+    homeShotsByPeriod: result.home.shotsByPeriod,
+    awayShotsByPeriod: result.away.shotsByPeriod,
+    endedIn: result.endedIn,
+    otPeriods: result.otPeriods,
+    winnerTeamId: result.winner,
+    seed: result.seed,
+    playByPlay: result.playByPlay,
+    shootout: result.shootout ?? [],
+    playedAt: new Date(),
+  };
+
+  const goalRows = (gameId: number) => result.goals.map((g) => ({
+    gameId, period: g.period, seconds: g.seconds,
+    teamId: g.team, teamCode: g.teamCode,
+    scorerId: g.scorer, scorerName: g.scorerName,
+    assistIds: g.assists, assistNames: g.assistNames,
+    strength: g.strength, emptyNet: g.emptyNet,
+  }));
+  const penaltyRows = (gameId: number) => result.penalties.map((p) => ({
+    gameId, period: p.period, seconds: p.seconds,
+    teamId: p.team, teamCode: p.teamCode,
+    playerId: p.playerId, playerName: p.playerName,
+    type: p.type, minutes: p.minutes, severity: p.severity,
+  }));
+
+  return prisma.$transaction(async (tx) => {
+    let gameId: number;
+
+    if (meta.gameId != null) {
+      // a pre-scheduled row: also stamp the calendar date (and round) so the
+      // Scores page can group by day and back-to-backs land on consecutive dates.
+      await tx.game.update({
+        where: { id: meta.gameId },
+        data: {
+          ...finalFields,
+          ...(meta.gameDate ? { gameDate: meta.gameDate } : {}),
+          ...(meta.round != null ? { round: meta.round } : {}),
+        },
+      });
+      gameId = meta.gameId;
+      await tx.playerGameStat.deleteMany({ where: { gameId } });
+      await tx.goalieGameStat.deleteMany({ where: { gameId } });
+      await tx.gameGoal.deleteMany({ where: { gameId } });
+      await tx.gamePenalty.deleteMany({ where: { gameId } });
+    } else {
+      const game = await tx.game.create({
+        data: {
+          season: meta.season ?? "2026-27",
+          league: meta.league ?? "NHL",
+          round: meta.round,
+          gameDate: meta.gameDate,
+          seriesId: meta.seriesId,
+          gameNum: meta.gameNum,
+          homeTeamId: result.home.teamId,
+          awayTeamId: result.away.teamId,
+          ...finalFields,
+        },
+      });
+      gameId = game.id;
+    }
+
+    const players = [...skaterRows(result.home, gameId), ...skaterRows(result.away, gameId)];
+    if (players.length) await tx.playerGameStat.createMany({ data: players });
+    await tx.goalieGameStat.createMany({
+      data: [...goalieRows(result.home, gameId), ...goalieRows(result.away, gameId)],
+    });
+    if (result.goals.length) await tx.gameGoal.createMany({ data: goalRows(gameId) });
+    if (result.penalties.length) await tx.gamePenalty.createMany({ data: penaltyRows(gameId) });
+
+    return gameId;
+  });
+}
