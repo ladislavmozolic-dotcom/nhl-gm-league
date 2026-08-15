@@ -55,6 +55,7 @@ model Team {
   profinhlBank      Int?        // real ProfiNHL bank balance (scraped from profinhl Finance.php); used in ProfiNHL roster mode
   popularity        Int         @default(100) // affects attendance / ticket revenue (admin-set)
   rivalTeamIds      Int[]       @default([]) // rivalries — heated games (more fights, scrums, misconducts)
+  needs             String[]    @default([]) // Trade Block: positions this team is shopping for (C/LW/RW/D/G)
   draftPicks        DraftPick[]
   players           Player[]
   prospects         Prospect[]
@@ -102,6 +103,8 @@ model Player {
   rosterType           String?
   retiredSeason        String?       // season the player retired (rosterType=RETIRED) — for Hall of Fame / career close
   hofSeason            String?       // season inducted into the Hall of Fame (null = not inducted)
+  onBlock              Boolean       @default(false) // GM has listed this player on the Trade Block
+  blockNote            String?       // GM's note on the Trade Block listing (asking price / context)
   teamId               Int
   ck                   Int?
   condition            Float?

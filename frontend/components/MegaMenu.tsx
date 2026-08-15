@@ -26,6 +26,7 @@ const menuItems: MenuItem[] = [
     href: "/trades",
     children: [
       { label: "Trade Room", href: "/trades/build" },
+      { label: "Trade Block", href: "/trade-block" },
       { label: "Trade tracker", href: "/trades" },
       { label: "Transactions", href: "/transactions" },
     ],
