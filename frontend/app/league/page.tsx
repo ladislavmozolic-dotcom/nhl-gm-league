@@ -40,7 +40,7 @@ export default async function LeagueDirectoryPage() {
                     </Link>
                   </td>
                   <td className="px-3 py-3 text-slate-400">{t.division ?? "—"}</td>
-                  <td className="px-3 py-3">{t.gm || <span className="text-slate-600">unassigned</span>}</td>
+                  <td className="px-3 py-3">{t.gm ? <Link href={`/gm/${t.slug}`} className="hover:text-blue-400 transition-colors">{t.gm}</Link> : <span className="text-slate-600">unassigned</span>}</td>
                   <td className="px-3 py-3 text-slate-400">{t.gmEmail || <span className="text-slate-600">—</span>}</td>
                   <td className="px-4 py-3 text-right text-slate-500 tabular-nums whitespace-nowrap">{fmtDate(t.lastLoginAt)}</td>
                 </tr>
