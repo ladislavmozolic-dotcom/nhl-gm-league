@@ -82,6 +82,16 @@ export type EngineSettings = {
   conRecoveryHighDu: number; // ... if DU >= duHighThreshold
   conSlope: number;          // save quality lost per CON point below 100
   b2bFatigue: number;        // save quality multiplier on a back-to-back
+  // "Any given night" variance — one form draw per team per game (survives the
+  // law of large numbers, unlike per-tick noise) so favourites don't run away.
+  gameVariancePct: number;   // 0 = deterministic, 100 = default spread, 200 = wild
+  nightSigmaGoalie: number;  // base sd of a goalie's hot/cold night (goals-against mult)
+  nightSigmaOff: number;     // base sd of a team's offensive night (goals-for mult)
+  // Parity — how far a talent gap runs away. 0 = raw talent (blowouts, long streaks),
+  // 100 = NHL-like (best beats worst ~72%, not 96%). Compresses shot volume + the
+  // goalie/defence/coaching conversion edge toward the mean; leaves shooter finishing
+  // alone so the scoring race keeps its spread.
+  parityPct: number;
   // Shot-load -> CON drop thresholds (<=t1 => -1, <=t2 => -2, else -3)
   conShotsLow1: number;      // normal goalie (DU < duHighThreshold)
   conShotsLow2: number;
@@ -158,6 +168,8 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   rewardPlayoff: 8000000, rewardCup: 3000000, rewardAhlCup: 4000000, rewardAhlFinalist: 2000000,
   duHighThreshold: 90, conRecovery: 1, conRecoveryHighDu: 2,
   conSlope: 0.015, b2bFatigue: 0.885,
+  gameVariancePct: 120, nightSigmaGoalie: 0.11, nightSigmaOff: 0.07,
+  parityPct: 100,
   conShotsLow1: 23, conShotsLow2: 32, conShotsHigh1: 27, conShotsHigh2: 34,
   skaterFwdConMinutes: 22, skaterDefConMinutes: 25, skaterConDrop: 1, skaterOtDrop: 1,
   skaterConRecovery: 1, skaterConSlope: 0,

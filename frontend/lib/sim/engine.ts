@@ -33,6 +33,20 @@ let CFG: EngineSettings = DEFAULT_SETTINGS;
 let AHL_GAME = false;
 const AHL_GOALS_MULT = 0.88; // tunable — lower = fewer AHL goals (keeps team totals ~2.8/gm, top scorer ~95)
 
+// ---- parity -----------------------------------------------------------------
+// Compress a talent gap so favourites don't run away over a season. Two knobs, both
+// scaled by CFG.parityPct (0 = raw talent, 100 = NHL-like). Centred on a neutral
+// anchor so the league-wide average is preserved — only the SPREAD narrows.
+const PARITY_VOL = 0.58;  // how much possession micro-battles flatten toward 50/50
+const PARITY_CONV = 0.65; // exponent compression on the goalie/defence conversion edge
+const AVG_FINISH = 52.9;  // ice-weighted league-mean shooter.offense — the parity anchor
+function parityAmt(): number { return Math.max(0, (CFG?.parityPct ?? 100) / 100); }
+// compress x toward `anchor` in log space: k=1 is unchanged, k<1 pulls toward anchor.
+function compressToward(x: number, anchor: number, k: number): number {
+  if (x <= 0 || anchor <= 0) return x;
+  return anchor * Math.pow(x / anchor, k);
+}
+
 const PERIOD_SECONDS = 1200; // 20:00
 const OT_SECONDS = 300;      // 5:00 sudden death
 
@@ -109,6 +123,8 @@ type SimState = {
   momoDip: Record<number, number>;  // momentum lost when this team concedes (EX softens it)
   playoff: boolean;                 // playoff game — amplifies clutch
   defChem: Record<number, number>;  // team's avg D-pair chemistry factor (a gelled, mixed pair shields better)
+  nightOff: Record<number, number>; // per-game offensive "form" (goals-for mult, mean 1)
+  nightDef: Record<number, number>; // per-game goalie "form" facing this team (goals-against mult on opp shots, mean 1)
   rivalry: boolean;                 // heated rivalry game — more fights, scrums, misconducts
   pulled: Record<number, boolean>;  // has this team's starter been yanked for the backup
   shootout: ShootoutAttempt[];      // shootout attempts (empty unless the game went to a shootout)
@@ -629,7 +645,8 @@ function simulatePeriod(st: SimState, period: number, homeShots: number, awaySho
     const p = conversion(shOff, effGoalieQuality(shot.opp.goalie), shot.isHome, strength)
       * momoBoost(st, shot.team.id, absT)
       * clutchFactor(st, shooter, period, shot.t, margin)
-      * offMult * defShield * ppMod;
+      * offMult * defShield * ppMod
+      * (st.nightOff[shot.team.id] ?? 1) * (st.nightDef[shot.opp.id] ?? 1); // any-given-night form
     if (rng.chance(p)) {
       st.box[shot.opp.id].goalie.goalsAgainst++;
       recordGoal(st, shot.team, shot.opp, period, shot.t, strength);
@@ -699,7 +716,10 @@ function advanceShift(st: SimState, teamId: number, sh: ShiftState, dur: number,
 // 0.5 so favourites don't run away (keeps upsets alive).
 function ratio(a: number, b: number, flatten = 0.55): number {
   const r = a / Math.max(1, a + b);
-  return Math.max(0.04, Math.min(0.96, 0.5 + (r - 0.5) * flatten));
+  // parity narrows the effective skill edge in each possession micro-battle, which
+  // (compounded over a game) compresses the shot-volume gap between mismatched teams.
+  const eff = flatten * (1 - PARITY_VOL * parityAmt());
+  return Math.max(0.04, Math.min(0.96, 0.5 + (r - 0.5) * eff));
 }
 // Tactics tilt for a team at the current score margin (offense- vs defense-leaning),
 // from its GameStrategy. Returns {of, df} multipliers around 1.0.
@@ -903,9 +923,20 @@ function simulatePeriodPossession(st: SimState, period: number) {
       const defTalent = Math.max(0.72, Math.min(1.3, 1 - (CFG.defenseTalentPct / 100) * (avgDefDf - 74) / 20));
       const ppMod = strength === "PP" ? (carrierTeam.ppChem / def.pkChem) * atkFx.ppConv * defFx.pkSuppress : 1; // gelled PP1 + PP formation vs gelled PK1 + PK structure
       const shOff = strength !== "EV" ? carrier.offense / carrier.posPenalty : carrier.offense; // off-position waived on ST
-      const p = conversion(shOff, effGoalieQuality(gSim), isHome, strength) * danger * pressBonus
+      // PARITY: compress the talent mismatch so favourites don't run away. The
+      // shooter×goalie conversion is pulled toward the SAME situation with a
+      // league-average shooter & keeper (danger/strength/home preserved), and the
+      // team defence/coaching/chem edge toward 1. Ranks are kept — only the spread
+      // narrows — so the scoring race and elite goalies still stand out.
+      const pk = 1 - PARITY_CONV * parityAmt();
+      const pTalent = conversion(shOff, effGoalieQuality(gSim), isHome, strength);
+      const pAnchor = conversion(AVG_FINISH, LEAGUE.avgGoalie, isHome, strength);
+      const pConv = compressToward(pTalent, pAnchor, pk);
+      const teamEdge = compressToward(offMult * defShield * defTalent, 1, pk);
+      const p = pConv * danger * pressBonus
         * momoBoost(st, carrierTeam.id, absT) * clutchFactor(st, carrier, period, tick, margin)
-        * offMult * defShield * defTalent * catchUp * ppMod;
+        * teamEdge * catchUp * ppMod
+        * (st.nightOff[carrierTeam.id] ?? 1) * (st.nightDef[def.id] ?? 1); // any-given-night form
       st.sink.emit({
         period, seconds: tick, type: "SHOT",
         teamId: carrierTeam.id, teamCode: carrierTeam.code,
@@ -1264,7 +1295,7 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     goals: [], penalties: [], injuries: [],
     momentum: {}, momoTime: {}, momoTau: {}, momoDip: {},
     playoff: !!opts.noShootout, // playoff series sim OT until a goal — amplifies clutch
-    defChem: {},
+    defChem: {}, nightOff: {}, nightDef: {},
     rivalry: CFG.rivalryEnabled && !!opts.rivalry,
     pulled: {},
     shootout: [],
@@ -1285,6 +1316,12 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     const dc = team.defense.length
       ? team.defense.reduce((t, d) => t + chemFactor(d.chem, d.roleFit), 0) / team.defense.length : 1;
     st.defChem[team.id] = dc;
+    // "any given night": one form draw per team per game. Correlated across every
+    // shot in the game (unlike per-tick noise, which averages out), so a hot goalie
+    // or a cold offence swings the whole result — that's where upsets come from.
+    const vScale = CFG.gameVariancePct / 100;
+    st.nightOff[team.id] = Math.max(0.7, Math.min(1.3, 1 + rng.gauss() * CFG.nightSigmaOff * vScale));
+    st.nightDef[team.id] = Math.max(0.7, Math.min(1.3, 1 - rng.gauss() * CFG.nightSigmaGoalie * vScale)); // <1 = goalie stole it
   }
 
   simulateFaceoffs(st);

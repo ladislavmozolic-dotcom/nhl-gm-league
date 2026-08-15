@@ -41,6 +41,14 @@ export class RNG {
     return k - 1;
   }
 
+  /** standard-normal sample (mean 0, sd 1) via Box–Muller */
+  gauss(): number {
+    let u = 0, v = 0;
+    while (u === 0) u = this.next();
+    while (v === 0) v = this.next();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  }
+
   /** pick an index weighted by the given weights */
   weighted(weights: number[]): number {
     let total = 0;
