@@ -3,7 +3,7 @@
 import { prisma } from "../prisma";
 import { buildSkater, buildGoalie, buildTeam } from "./ratings";
 import { simulateGame } from "./engine";
-import { loadTeamLines, autoLines, deployDistinct } from "./lines";
+import { loadTeamLines, loadTeamSystem, autoLines, deployDistinct } from "./lines";
 import type { SimTeam, SkaterAttrs, GoalieAttrs } from "./types";
 
 export * from "./types";
@@ -73,7 +73,9 @@ export async function loadSimTeam(teamId: number, rosterType?: string, opts?: { 
     while (skaterRows.length < MIN_SKATERS && rest.length) skaterRows.push(rest.shift()!);
   }
   // Manager lines (if set) — load now so their players are never trimmed below.
-  const dbLines = await loadTeamLines(teamId);
+  // The team system is loaded separately: a GM can set a system without editing
+  // lines, and loadTeamLines returns null when lines are empty.
+  const [dbLines, dbSystem] = await Promise.all([loadTeamLines(teamId), loadTeamSystem(teamId)]);
   // Cap the dressed lineup at exactly a legal 12 F + 6 D so every dressed skater
   // gets real ice (4 lines / 3 pairs). Without this, a deep roster or stacked
   // call-ups leave a 13th/14th forward sitting with a zero-ice, zero-point
@@ -176,6 +178,7 @@ export async function loadSimTeam(teamId: number, rosterType?: string, opts?: { 
     chemistry, chemBase: opts?.chemBase ?? 100, offPos: opts?.offPos,
     rivalTeamIds: (team as { rivalTeamIds?: number[] }).rivalTeamIds ?? [],
     coach: hc ? { style: hc.style, ph: hc.ph, df: hc.df, of: hc.of, pd: hc.pd, ex: hc.ex, ld: hc.ld } : null,
+    system: dbSystem,
   });
 }
 

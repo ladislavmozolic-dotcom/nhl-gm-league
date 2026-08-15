@@ -696,6 +696,7 @@ model TeamLines {
   pkUnits      Json     @default("[]") // legacy
   situations   Json     @default("{}") // pp, fourVFour, pk4, pk3, overtime, others, lastMin
   strategy     Json     @default("{}") // 5 game-states {phy,df,of} + goaliePull
+  system       Json?    // Phase 3 team-system dials { tempo, forecheck, puckStyle, dZone, preset }
   chemistry    Json     @default("{}") // { [unitSignature]: value 0..100 } — line chemistry
   updatedAt    DateTime @updatedAt
   team         Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)

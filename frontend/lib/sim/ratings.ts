@@ -11,6 +11,7 @@ import type {
 } from "./types";
 import type { TeamLinesData } from "./lines";
 import { buildUnits, depthChartUnits, playerChemistry, unitSignature } from "./chemistry";
+import { resolveTactics, mergeTactics, type RosterProfile, type TeamTactics } from "./tactics";
 
 const clamp = (v: number, lo = 20, hi = 99) => Math.max(lo, Math.min(hi, v));
 const w = (parts: Array<[number, number]>) => {
@@ -240,6 +241,7 @@ export function buildTeam(input: {
   offPos?: { wing: number; center: number; def: number; chemCap: number };
   rivalTeamIds?: number[];
   coach?: CoachInput;
+  system?: TeamTactics | null; // team-system dials loaded independently of lines
 }): SimTeam {
   const roster = input.lines
     ? assignIceTimeFromLines(input.skaters, input.lines)
@@ -327,6 +329,10 @@ export function buildTeam(input: {
     defenseRating *= 0.9 + 0.2 * (1 - ofTilt);
   }
 
+  // Phase 3 team system: ice-weighted roster profile → resolve the dials + fit.
+  const profile = rosterProfile(roster);
+  const tactics = resolveTactics(mergeTactics(input.system ?? input.lines?.system), profile);
+
   return {
     id: input.id,
     name: input.name,
@@ -350,7 +356,29 @@ export function buildTeam(input: {
     ...coachFactors(input.coach),
     fwdTactics: (input.lines?.forwardLines ?? []).map((l) => l.tactic ?? { phy: 1, df: 2, of: 2 }),
     defTactics: (input.lines?.defensePairs ?? []).map((p) => p.tactic ?? { phy: 1, df: 2, of: 2 }),
+    tactics,
+    profile,
   };
+}
+
+/** Ice-weighted average of the attributes the team-system fit reads. */
+function rosterProfile(roster: SimSkater[]): RosterProfile {
+  let wt = 0;
+  const acc = { sk: 0, en: 0, ck: 0, sc: 0, pa: 0, df: 0, st: 0, weight: 0 };
+  for (const s of roster) {
+    const w = s.iceTime || 1;
+    wt += w;
+    acc.sk += (s.attrs.sk ?? 50) * w;
+    acc.en += (s.attrs.en ?? 50) * w;
+    acc.ck += (s.attrs.ck ?? 50) * w;
+    acc.sc += (s.attrs.sc ?? 50) * w;
+    acc.pa += (s.attrs.pa ?? 50) * w;
+    acc.df += (s.attrs.df ?? 50) * w;
+    acc.st += (s.attrs.st ?? 50) * w;
+    acc.weight += (s.weight ?? 92) * w;
+  }
+  const d = wt || 1;
+  return { sk: acc.sk / d, en: acc.en / d, ck: acc.ck / d, sc: acc.sc / d, pa: acc.pa / d, df: acc.df / d, st: acc.st / d, weight: acc.weight / d };
 }
 
 // STHS coach → global team modifiers. Ratings sit ~75-92 (centered on 80), so a

@@ -46,8 +46,11 @@ const STRENGTH_MULT: Record<ShotStrength, number> = { EV: 1.0, PP: 1.15, SH: 0.8
 // one-timer, a rebound is a net-front scramble, a plain carry is a mid look.
 export function shotProfile(
   rng: RNG,
-  opts: { isDefense: boolean; setup: "carry" | "pass" | "rebound"; danger: number },
+  opts: { isDefense: boolean; setup: "carry" | "pass" | "rebound"; danger: number; dangerBias?: number },
 ): { sector: ShotSector; shotType: ShotType } {
+  // team-system chance quality (rush > 1 → more slot; shot-volume < 1 → more
+  // perimeter/point). Clamped so it nudges the mix rather than dominating it.
+  const bias = Math.max(0.7, Math.min(1.35, opts.dangerBias ?? 1));
   if (opts.isDefense) {
     return { sector: "POINT", shotType: rng.chance(0.55) ? "SLAP" : "WRIST" };
   }
@@ -56,15 +59,18 @@ export function shotProfile(
   }
   if (opts.setup === "pass") {
     // a cross-ice feed: usually a slot one-timer, sometimes off the circle
-    return rng.chance(0.72)
+    return rng.chance(Math.min(0.9, 0.72 * bias))
       ? { sector: "SLOT", shotType: "ONE_TIMER" }
       : { sector: "CIRCLE", shotType: rng.chance(0.5) ? "SNAP" : "ONE_TIMER" };
   }
   // plain carry — a forward's own-rush look: some drive the slot, most settle for
-  // a mid look off the circle, the rest fire from the perimeter.
+  // a mid look off the circle, the rest fire from the perimeter. The system's
+  // chance-quality bias shifts how many get to the slot.
+  const slotP = 0.3 * bias;
+  const circleP = slotP + 0.35;
   const r = rng.next();
-  if (r < 0.3) return { sector: "SLOT", shotType: rng.chance(0.5) ? "WRIST" : "SNAP" };
-  if (r < 0.65) return { sector: "CIRCLE", shotType: rng.chance(0.6) ? "WRIST" : "SNAP" };
+  if (r < slotP) return { sector: "SLOT", shotType: rng.chance(0.5) ? "WRIST" : "SNAP" };
+  if (r < circleP) return { sector: "CIRCLE", shotType: rng.chance(0.6) ? "WRIST" : "SNAP" };
   return { sector: "PERIMETER", shotType: rng.chance(0.7) ? "WRIST" : "BACKHAND" };
 }
 

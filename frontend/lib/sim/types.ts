@@ -3,6 +3,7 @@
 // A loader (index.ts) builds these from Prisma rows.
 
 import type { SimEvent } from "./events";
+import type { TacticsEffect, RosterProfile } from "./tactics";
 
 export type SkaterAttrs = {
   ck: number; fg: number; di: number; sk: number; st: number; en: number;
@@ -97,6 +98,8 @@ export type SimTeam = {
   coachEx: number;                 // experience 0..99 — steadies momentum / clutch late
   fwdTactics: LineTactic[];        // per forward-line tactic (aligned to the 4 lines)
   defTactics: LineTactic[];        // per defense-pair tactic (aligned to the 3 pairs)
+  tactics: TacticsEffect;          // Phase 3 team-system multipliers (resolved from dials + roster fit)
+  profile: RosterProfile;          // ice-weighted roster attribute averages (drives system fit)
 };
 
 /** Raw coach card passed into buildTeam. */

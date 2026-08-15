@@ -452,7 +452,7 @@ function generatePenalties(st: SimState, team: SimTeam, period: number, active: 
   const rival = st.rivalry ? CFG.rivalryPenaltyMult : 1;
   // coach discipline: a disciplined bench (high PD) takes fewer penalties; a
   // physical-style coach's team takes more.
-  const lambda = (LEAGUE.penaltiesPerTeam / 3) * (LEAGUE.avgDefense / Math.max(30, avgDiscipline(team))) * phyFactor * frustration * moraleFrust * team.coachDisc * rival * (CFG.penaltiesPct / 100);
+  const lambda = (LEAGUE.penaltiesPerTeam / 3) * (LEAGUE.avgDefense / Math.max(30, avgDiscipline(team))) * phyFactor * frustration * moraleFrust * team.coachDisc * rival * team.tactics.penaltyMult * (CFG.penaltiesPct / 100);
   const count = st.rng.poisson(lambda);
   const pool = [...team.forwards, ...team.defense];
   for (let i = 0; i < count; i++) {
@@ -734,8 +734,10 @@ function simulatePeriodPossession(st: SimState, period: number) {
 
   const onIceF = (team: SimTeam) => { const sh = shifts[team.id]; return sh.fLines[sh.fIdx] ?? team.forwards; };
   const onIceD = (team: SimTeam) => { const sh = shifts[team.id]; return sh.dPairs[sh.dIdx] ?? team.defense; };
-  const fat = (team: SimTeam, s: SimSkater) => fatigueMult(shifts[team.id].fElapsed, s.attrs.en ?? 50);
-  const dfat = (team: SimTeam, s: SimSkater) => fatigueMult(shifts[team.id].dElapsed, s.attrs.en ?? 50);
+  // team-system tactics multiply into the fatigue drain (fast tempo / aggressive
+  // forecheck tire a team faster).
+  const fat = (team: SimTeam, s: SimSkater) => fatigueMult(shifts[team.id].fElapsed * team.tactics.fatigue, s.attrs.en ?? 50);
+  const dfat = (team: SimTeam, s: SimSkater) => fatigueMult(shifts[team.id].dElapsed * team.tactics.fatigue, s.attrs.en ?? 50);
 
   for (let tick = 0; tick < PERIOD_SECONDS; tick++) {
     advanceShift(st, home.id, shifts[home.id], 1, rng);
@@ -789,9 +791,12 @@ function simulatePeriodPossession(st: SimState, period: number) {
     const atkSkill = (v: number, of = true) => v * (of ? tOff.of * atkTilt.of : 1) * chemFactor(carrier.chem, carrier.roleFit) * moraleFactor(carrier.morale) * fat(carrierTeam, carrier) * catchUp * teamMult;
     const defSkill = (v: number) => v * tDef.df * defTilt.df * dfat(def, dman);
 
-    // 1) keep the puck vs. get stripped (SK vs DF) — a real challenge some ticks
+    // 1) keep the puck vs. get stripped (SK vs DF) — a real challenge some ticks.
+    // the defending team's forecheck aggression (takeaway) forces a few more strips;
+    // a passive forecheck concedes possession. Contained to this node so it doesn't
+    // over-suppress the opponent (see tactics.ts).
     if (rng.chance(0.09)) {
-      const keep = ratio(atkSkill(carrier.attrs.sk ?? 50), defSkill(dman.attrs.df ?? 50));
+      const keep = Math.pow(ratio(atkSkill(carrier.attrs.sk ?? 50), defSkill(dman.attrs.df ?? 50)), def.tactics.takeaway);
       if (!rng.chance(keep)) { // turnover — defenders take over in their own zone
         carrierTeam = def; carrier = pickByAttr(rng, onIceD(def).concat(onIceF(def)), (s) => (s.attrs.df ?? 50) + (s.attrs.pa ?? 50)) ?? dman;
         zone = "DEF"; setup = "carry"; press = 0; continue;
@@ -808,15 +813,21 @@ function simulatePeriodPossession(st: SimState, period: number) {
       continue;
     }
 
-    // 3) in the O-zone: an offensive action fires some ticks (shoot vs pass: SC vs PA)
-    if (!rng.chance(0.29)) continue;
+    // 3) in the O-zone: an offensive action fires some ticks (shoot vs pass: SC vs PA).
+    // team-system tempo/style scales HOW OFTEN the carrier generates a chance, and the
+    // defender's posture scales how many it allows.
+    if (!rng.chance(0.29 * carrierTeam.tactics.shotRate * def.tactics.oppShotRate)) continue;
     if (rng.chance(ratio(atkSkill(carrier.attrs.sc ?? 50), (carrier.attrs.pa ?? 50), 0.7))) {
       // SHOT — blocked? (DF vs SC)
       if (rng.chance(0.5 * ratio(defSkill(dman.attrs.df ?? 50), atkSkill(carrier.attrs.sc ?? 50)))) { setup = "carry"; continue; } // blocked
       // shot danger: a D-man point shot is low, a one-timer off a pass or a rebound
       // is high, a forward's own-rush shot is medium. Chemistry drives more passes
       // → more high-danger looks, so gelled lines get better chances automatically.
-      const danger = carrier.isDefense ? 0.35 : setup === "pass" ? 1.75 : setup === "rebound" ? 1.6 : 1.0;
+      const baseDanger = carrier.isDefense ? 0.35 : setup === "pass" ? 1.75 : setup === "rebound" ? 1.6 : 1.0;
+      // team-system: rush raises chance danger, shot-volume lowers it (more but softer);
+      // the defending team's D-zone posture (collapse) suppresses danger.
+      const dangerBias = carrierTeam.tactics.dangerMix * def.tactics.oppDangerMult;
+      const danger = baseDanger * dangerBias;
       const strength = strengthAt(carrierTeam, def, tick, active);
       const gLine = liveGoalieLine(st, def.id);
       const gSim = liveGoalie(st, def);
@@ -828,7 +839,7 @@ function simulatePeriodPossession(st: SimState, period: number) {
       // goals (independent of shooter finishing / goalie quality). Accumulate the
       // xG into the shooter, his team, and the goalie facing it (→ GSAx).
       const strengthKey: ShotStrength = strength === "PP" ? "PP" : strength === "SH" ? "SH" : "EV";
-      const { sector, shotType } = shotProfile(rng, { isDefense: carrier.isDefense, setup, danger });
+      const { sector, shotType } = shotProfile(rng, { isDefense: carrier.isDefense, setup, danger, dangerBias });
       const xg = expectedGoal(rng, sector, shotType, strengthKey);
       const hd = isHighDanger(sector);
       st.lines[carrierTeam.id][carrier.id].xg += xg;

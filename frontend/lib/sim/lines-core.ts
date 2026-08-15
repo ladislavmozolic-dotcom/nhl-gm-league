@@ -2,6 +2,7 @@
 // client components (the line editor) and on the server.
 
 import type { GameStrategy } from "./types";
+import { mergeTactics, type TeamTactics } from "./tactics";
 
 import type { LineTactic } from "./types";
 export type { GameStrategy, StratWeights, LineTactic } from "./types";
@@ -36,6 +37,7 @@ export type TeamLinesData = {
   defensePairs: DefensePair[];
   situations: Situations;
   strategy: GameStrategy;
+  system?: TeamTactics; // Phase 3 team-system dials (undefined = balanced defaults)
 };
 
 export const DEFAULT_STRATEGY: GameStrategy = {
@@ -305,6 +307,7 @@ export function normalize(data: Partial<TeamLinesData>): TeamLinesData {
       lastMin: { ...base.lastMin, ...(s.lastMin ?? {}) },
     },
     strategy: { ...DEFAULT_STRATEGY, ...(data.strategy ?? {}) } as GameStrategy,
+    system: data.system ? mergeTactics(data.system) : undefined,
   };
 }
 
