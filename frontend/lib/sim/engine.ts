@@ -198,7 +198,7 @@ function conversion(
 ): number {
   // finishing amplified around the league mean so an elite finisher clearly out-scores
   // a similar-looking one — the compressed ratings still separate the snipers.
-  const shooterMod = Math.pow(shooterFinishing / 60, 1.15);
+  const shooterMod = Math.pow(shooterFinishing / 60, 1.7);
   // widen the goalie spread (^2.2) so an elite goalie reaches ~92% SV over a
   // season and a weak one is clearly beatable, while the league average holds.
   const goalieMod = Math.pow(LEAGUE.avgGoalie / goalieQuality, 2.2);
