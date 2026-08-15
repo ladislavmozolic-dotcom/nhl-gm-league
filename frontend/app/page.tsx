@@ -6,10 +6,11 @@ import { cleanName } from "@/lib/playerName";
 import { money } from "@/lib/finance";
 import NextSimCountdown from "@/components/home/NextSimCountdown";
 import { getLeagueClock } from "@/lib/calendar-server";
-import { daysUntilFrenzy, fmtLeagueDate } from "@/lib/calendar";
+import { fmtLeagueDate } from "@/lib/calendar";
 import { getTeamSession } from "@/lib/auth";
 import { activeAnnouncements } from "@/lib/announcements";
 import CommissionerBanner, { type BannerItem } from "@/components/CommissionerBanner";
+import { dailyDigest, latestDigestRound } from "@/lib/digest-server";
 
 export const dynamic = "force-dynamic";
 const SEASON = "2026-27";
@@ -59,6 +60,10 @@ export default async function HomePage() {
   const bannerItems: BannerItem[] = announcements.map((a) => ({
     id: a.id, body: a.body, linkUrl: a.linkUrl, linkLabel: a.linkLabel, date: fmtDate(a.createdAt), unread: me != null && !readIds.has(a.id),
   }));
+  // Tonight's Best — the nightly digest for the "Around the League" box
+  const digestRound = await latestDigestRound(SEASON);
+  const digest = digestRound ? await dailyDigest(SEASON, digestRound) : null;
+
   const leaderTeam = leader ? teamById.get(leader.teamId) : null;
   const topScorers = [...leaders].sort((a, b) => b.points - a.points).slice(0, 6);
   const enrich = (arr: typeof standings) => arr.map((t) => ({ ...t, code: t.code, logoUrl: teamById.get(t.teamId)?.logoUrl ?? null, slug: teamById.get(t.teamId)?.slug ?? null }));
@@ -109,11 +114,6 @@ export default async function HomePage() {
   const dateStr = (d: Date) => d.toLocaleDateString("sk-SK", { day: "numeric", month: "short" });
 
   const clock = await getLeagueClock();
-  const daysToFrenzy = daysUntilFrenzy(clock.date);
-  const alerts = await prisma.transaction.findMany({
-    where: { type: { in: ["TRADE_REQUEST", "PROMISE_WARNING", "CAP_WARNING"] } },
-    orderBy: { createdAt: "desc" }, take: 3, select: { message: true, type: true },
-  });
 
   return (
     <div className="py-2">
@@ -155,33 +155,31 @@ export default async function HomePage() {
           </div>
         </div>
 
-        {/* Around the League — news & the Free Agent Frenzy */}
-        <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg shadow-black/20">
-          <p className="text-xs uppercase tracking-wide text-slate-400 mb-2">Around the League</p>
-          {clock.frenzyOpen ? (
-            <Link href="/free-agents" className="block">
-              <span className="text-lg font-black text-amber-400">Free Agent Frenzy is OPEN</span>
-              <span className="block text-xs text-amber-300/80 mt-0.5">Day {clock.frenzyDay} / 7 · open the Board →</span>
-            </Link>
-          ) : (
-            <Link href="/free-agents" className="block">
-              <span className="text-lg font-black text-white">Free Agent Frenzy</span>
-              <span className="block text-xs text-slate-400 mt-0.5">{daysToFrenzy > 0 ? `starts in ${daysToFrenzy} day${daysToFrenzy === 1 ? "" : "s"}` : "opens July 1"} · Board →</span>
-            </Link>
-          )}
-          {alerts.length > 0 ? (
-            <div className="mt-2 space-y-1">
-              {alerts.slice(0, 2).map((a, i) => (
-                <p key={i} className={`text-xs truncate ${a.type === "TRADE_REQUEST" ? "text-red-400" : "text-amber-400/80"}`} title={a.message}>
-                  {a.type === "TRADE_REQUEST" ? "⇄ " : "⚠ "}{a.message}
-                </p>
-              ))}
+        {/* Tonight's Best — the story of the night, straight from our league */}
+        <Link href="/league/digest" className="block bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg shadow-black/20 hover:border-amber-500/40 transition-colors">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs uppercase tracking-wide text-amber-400">🌙 Tonight&apos;s Best</p>
+            <span className="text-xs text-slate-400">the story of the night →</span>
+          </div>
+          {digest && digest.gameCount > 0 ? (
+            <div className="space-y-1.5 text-sm">
+              {digest.gameOfNight && (
+                <p className="text-slate-200"><span className="text-amber-400">🌟</span> {digest.gameOfNight.away} {digest.gameOfNight.awayGoals}–{digest.gameOfNight.homeGoals} {digest.gameOfNight.home}{digest.gameOfNight.endedIn !== "REG" ? <span className="text-amber-400"> ({digest.gameOfNight.endedIn})</span> : ""} <span className="text-slate-500">· Game of the Night</span></p>
+              )}
+              {digest.playerOfNight && (
+                <p className="text-slate-200"><span className="text-sky-400">⭐</span> {digest.playerOfNight.name} <span className="text-slate-500">({digest.playerOfNight.team})</span> — {digest.playerOfNight.line}</p>
+              )}
+              {digest.bestGoalie && (
+                <p className="text-slate-200 truncate"><span className="text-emerald-400">🧤</span> {digest.bestGoalie.name} <span className="text-slate-500">({digest.bestGoalie.team})</span> — {digest.bestGoalie.line}</p>
+              )}
+              {!digest.gameOfNight && !digest.playerOfNight && !digest.bestGoalie && (
+                <p className="text-slate-500">Highlights appear here after each simulation.</p>
+              )}
             </div>
-          ) : highlights.length > 0 ? (
-            <p className="text-xs text-slate-500 mt-2 truncate" title={highlights[0]}>{highlights[0]}</p>
-          ) : null}
-          <Link href="/league/digest" className="block mt-2 text-xs text-amber-400 hover:underline">🌙 Tonight&apos;s Best — the story of the night →</Link>
-        </div>
+          ) : (
+            <p className="text-sm text-slate-500">The night&apos;s best — Game &amp; Player of the Night, upsets, biggest hits — appear here after each simulation.</p>
+          )}
+        </Link>
       </div>
 
       {/* 3 columns */}
@@ -200,13 +198,10 @@ export default async function HomePage() {
             </div>
           </Card>
 
-          <Card title="Tonight's Best" href="/league/digest" accent="text-amber-400">
+          <Card title="Highlights" href="/league/digest" accent="text-amber-400">
             {highlights.length ? (
-              <>
-                <ul className="space-y-2 text-sm text-slate-300">{highlights.slice(0, 4).map((h, i) => <li key={i}>{h}</li>)}</ul>
-                <Link href="/league/digest" className="block mt-2 text-xs text-amber-400 hover:underline">Game / Player / Best goalie of the night, upsets, biggest hit →</Link>
-              </>
-            ) : <p className="text-sm text-slate-500">The night&apos;s best — Game &amp; Player of the Night, upsets, biggest hits — appear here after each simulation. <Link href="/league/digest" className="text-amber-400 hover:underline">Open →</Link></p>}
+              <ul className="space-y-2 text-sm text-slate-300">{highlights.slice(0, 5).map((h, i) => <li key={i}>{h}</li>)}</ul>
+            ) : <p className="text-sm text-slate-500">Hat tricks and big nights appear here after each simulation.</p>}
           </Card>
 
           <Card title="Today's Birthdays" accent="text-pink-400">
