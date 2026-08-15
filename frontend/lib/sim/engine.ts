@@ -954,13 +954,16 @@ function severityOf(days: number): InjurySeverity {
   return "Day-to-Day";
 }
 
-// Roll a duration; contact/awkward injuries skew a bit longer, concussions longest.
+// Roll a duration. Calibrated to real NHL: MOST injuries are day-to-day (miss a
+// game or two), a chunk are week-to-week, few are multi-week, and season-enders
+// are rare. Avg ~11 days (~7 games missed at our schedule density).
 function injuryDays(st: SimState, mech: InjuryMechanism, part: string): number {
   const roll = st.rng.next();
-  let days = roll < 0.45 ? 1 + st.rng.int(5) : roll < 0.8 ? 6 + st.rng.int(14) : 20 + st.rng.int(45);
-  if (part === "Concussion") days = Math.max(days, 10 + st.rng.int(30));
-  if (mech === "Hit" || mech === "Collision") days = Math.round(days * 1.1);
-  if (st.rng.chance(0.015)) days = Math.max(days, 120 + st.rng.int(60)); // rare season-ender
+  let days = roll < 0.66 ? 1 + st.rng.int(6)          // day-to-day (1-6)
+    : roll < 0.92 ? 7 + st.rng.int(13)                 // week-to-week (7-19)
+    : roll < 0.985 ? 20 + st.rng.int(24)               // multi-week (20-43)
+    : 50 + st.rng.int(85);                             // long / season-ending (50-134)
+  if (part === "Concussion") days = Math.max(days, 8 + st.rng.int(24));
   return days;
 }
 
@@ -1013,7 +1016,7 @@ function generateInjuries(st: SimState) {
     //    how heavy/chippy they are). Contact injuries land on forwards more.
     const oppHits = st.box[opp.id].hits;
     const physPressure = (opp.profile.ck / 66) * (opp.profile.weight / 92);
-    const hitLambda = 0.088 * scale * (oppHits / 21) * physPressure;
+    const hitLambda = 0.26 * scale * (oppHits / 21) * physPressure;
     for (let i = 0; i < st.rng.poisson(hitLambda); i++) {
       const cPool = fwd.length ? [...fwd, ...fwd, ...def] : pool; // forwards ~2x exposed
       const victim = cPool[st.rng.weighted(cPool.map((s) => fragility(s, true)))];
@@ -1021,7 +1024,7 @@ function generateInjuries(st: SimState) {
     }
 
     // 2) BLOCKED-SHOT injuries — blocking hard shots hurts hands/feet; D block most.
-    const blockLambda = 0.028 * scale * (st.box[team.id].blocks / 14);
+    const blockLambda = 0.09 * scale * (st.box[team.id].blocks / 14);
     for (let i = 0; i < st.rng.poisson(blockLambda); i++) {
       const bPool = def.length ? [...def, ...def, ...fwd] : pool;
       const victim = bPool[st.rng.weighted(bPool.map((s) => s.iceTime * (115 - s.attrs.du)))];
@@ -1029,7 +1032,7 @@ function generateInjuries(st: SimState) {
     }
 
     // 3) OVERUSE / non-contact — fatigue & durability driven (groin, knee).
-    const overuseLambda = 0.036 * scale;
+    const overuseLambda = 0.20 * scale;
     for (let i = 0; i < st.rng.poisson(overuseLambda); i++) {
       const victim = pool[st.rng.weighted(pool.map((s) => fragility(s)))];
       addInjury(st, team, victim, "Overuse");
