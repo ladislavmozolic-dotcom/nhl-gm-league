@@ -82,6 +82,11 @@ export async function loadSimTeam(teamId: number, rosterType?: string, opts?: { 
   // boxscore row — which is exactly why 4th-liners showed 15-24 GP. Extra healthy
   // bodies are the pressbox scratches (worst-overall first); players named in the
   // manager's lines are always kept.
+  // Ids assigned to the 12 forward slots and 6 D slots for this game. A spare D
+  // promoted to cover wing lands in `deployFwdIds` (not by position) so the
+  // deployment step ices it as a forward — no double-shift.
+  let deployFwdIds: number[] = [];
+  let deployDefIds: number[] = [];
   {
     const keep = new Set<number>();
     if (dbLines) {
@@ -92,7 +97,23 @@ export async function loadSimTeam(teamId: number, rosterType?: string, opts?: { 
       (keep.has(b.id) ? 1 : 0) - (keep.has(a.id) ? 1 : 0) || (b.overall ?? 0) - (a.overall ?? 0);
     const fwds = skaterRows.filter((p) => !isDef(p.position)).sort(rank);
     const defs = skaterRows.filter((p) => isDef(p.position)).sort(rank);
-    skaterRows = [...fwds.slice(0, MIN_F), ...defs.slice(0, MIN_D)];
+    const dressedF = fwds.slice(0, MIN_F);
+    const dressedD = defs.slice(0, MIN_D);
+    // Guarantee 12 DIFFERENT forwards. If injuries + a thin farm leave the club
+    // short at forward, promote spare defencemen (7th+ D) and any leftover bodies
+    // to the empty wing slots — a D covering wing in a pinch, off-position but a
+    // real distinct body, so no forward ever double-shifts. (STHS: 12 different
+    // forwards every night.) Only a truly bare roster (<18 skaters total) can't.
+    if (dressedF.length < MIN_F) {
+      const used = new Set([...dressedF, ...dressedD].map((p) => p.id));
+      const spare = [...defs.slice(MIN_D), ...fwds.slice(MIN_F)]
+        .filter((p) => !used.has(p.id))
+        .sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0));
+      while (dressedF.length < MIN_F && spare.length) dressedF.push(spare.shift()!);
+    }
+    skaterRows = [...dressedF, ...dressedD];
+    deployFwdIds = dressedF.map((p) => p.id);
+    deployDefIds = dressedD.map((p) => p.id);
   }
   // A disgruntled player (unhappy his ice-time promise was broken, trade requested)
   // plays at −20% across the board with sunken morale, until he's traded or the
@@ -160,12 +181,9 @@ export async function loadSimTeam(teamId: number, rosterType?: string, opts?: { 
   // Guarantee a legal, fully-distinct 5v5 deployment (12 different forwards + 6
   // different D). Same helper the Lines display uses, so what's iced == what's
   // shown. See deployDistinct for the double-shift / thin-roster handling.
-  {
-    const byOv = (a: { overall: number | null }, b: { overall: number | null }) => (b.overall ?? 0) - (a.overall ?? 0);
-    const dressedF = skaterRows.filter((p) => !isDef(p.position)).sort(byOv).map((p) => p.id);
-    const dressedD = skaterRows.filter((p) => isDef(p.position)).sort(byOv).map((p) => p.id);
-    deployDistinct(lines, dressedF, dressedD);
-  }
+  // Deploy from the slot assignment computed above (spare-D-at-wing included in
+  // deployFwdIds), so what's iced is exactly 12 different forwards + 6 different D.
+  deployDistinct(lines, deployFwdIds, deployDefIds);
   // current line chemistry (unit signature -> value); unseen units start at chemBase
   let chemistry: Record<string, number> = {};
   {
