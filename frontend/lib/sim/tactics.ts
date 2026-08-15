@@ -47,23 +47,23 @@ export const NEUTRAL_EFFECT: TacticsEffect = {
 type Dial = Partial<Omit<TacticsEffect, "fit">>;
 
 const TEMPO_FX: Record<Tempo, Dial> = {
-  slow: { shotRate: 0.87, oppShotRate: 0.90, fatigue: 0.91 },
+  slow: { shotRate: 0.87, oppShotRate: 0.94, fatigue: 0.91 },
   balanced: {},
   fast: { shotRate: 1.14, oppShotRate: 1.11, fatigue: 1.13 },
 };
 const FORECHECK_FX: Record<Forecheck, Dial> = {
-  passive: { takeaway: 0.82, oppShotRate: 0.91, penaltyMult: 0.85, fatigue: 0.95 },
+  passive: { takeaway: 0.82, oppShotRate: 0.95, penaltyMult: 0.85, fatigue: 0.95 },
   balanced: {},
   aggressive: { takeaway: 1.22, shotRate: 1.07, oppShotRate: 1.14, penaltyMult: 1.28, fatigue: 1.14 },
 };
 const PUCK_FX: Record<PuckStyle, Dial> = {
   cycle: { shotRate: 1.11, dangerMix: 0.93 },
   balanced: {},
-  rush: { shotRate: 0.92, dangerMix: 1.18 },
+  rush: { shotRate: 0.92, dangerMix: 1.12 },
   shotVolume: { shotRate: 1.16, dangerMix: 0.84 },
 };
 const DZONE_FX: Record<DZone, Dial> = {
-  collapse: { oppDangerMult: 0.85, takeaway: 0.90 },
+  collapse: { oppDangerMult: 0.91, takeaway: 0.90 },
   balanced: {},
   aggressive: { oppDangerMult: 1.10, takeaway: 1.14, penaltyMult: 1.08 },
 };
