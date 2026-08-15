@@ -140,10 +140,16 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
     ));
   };
 
-  // one labelled 0-5 tactic stepper
+  // what each 0-5 tactic dial means (native hover tooltip)
+  const TAC_DESC: Record<string, string> = {
+    PHY: "Physical play (0-5): hitting, board battles and net-front presence. Higher = a heavier, more physical unit that forechecks and grinds.",
+    DF: "Defensive commitment (0-5): backchecking, shot-blocking and staying home. Higher = a shut-down unit that protects leads and suppresses chances.",
+    OF: "Offensive push (0-5): pinching, joining the rush and pressing for chances. Higher = an attacking unit that generates more but leaks more.",
+  };
+  // one labelled 0-5 tactic stepper — hover the label for what it means
   const TacStep = ({ label, value, onSet }: { label: string; value: number; onSet: (v: number) => void }) => (
     <div className="flex items-center gap-1.5">
-      <span className="text-[11px] uppercase tracking-wide text-slate-500 w-8">{label}</span>
+      <span title={TAC_DESC[label]} className="text-[11px] uppercase tracking-wide text-slate-500 w-8 cursor-help border-b border-dotted border-slate-600">{label}</span>
       <Stepper value={value} step={1} compact onChange={(v) => onSet(Math.max(0, Math.min(5, v as unknown as number)))} />
     </div>
   );
@@ -187,7 +193,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
               <TacStep label="OF" value={t.of} onSet={(v) => setFwdTac(i, "of", v)} />
               {bad && <span className="text-[11px] text-rose-400" title="PHY+DF+OF must total 5">PHY+DF+OF ≠ 5</span>}
               <div className="flex items-center gap-1.5 ml-auto">
-                <span className="text-[11px] uppercase tracking-wide text-slate-500">System</span>
+                <span title="Puck Style for this line only (empty = inherit the team system from Team → System). e.g. a Cycle 4th line under a Rush team." className="text-[11px] uppercase tracking-wide text-slate-500 cursor-help border-b border-dotted border-slate-600">System</span>
                 <SysSelect value={l.puck} opts={DIAL_LABELS.puckStyle} onChange={(v) => setFwdPuck(i, v as PuckStyle | "")} />
               </div>
             </div>
@@ -219,7 +225,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
               <TacStep label="OF" value={t.of} onSet={(v) => setDefTac(i, "of", v)} />
               {bad && <span className="text-[11px] text-rose-400" title="PHY+DF+OF must total 5">PHY+DF+OF ≠ 5</span>}
               <div className="flex items-center gap-1.5 ml-auto">
-                <span className="text-[11px] uppercase tracking-wide text-slate-500">System</span>
+                <span title="D-Zone for this pair only (empty = inherit the team system). e.g. a Collapse shut-down pair to defend a lead." className="text-[11px] uppercase tracking-wide text-slate-500 cursor-help border-b border-dotted border-slate-600">System</span>
                 <SysSelect value={p.dzone} opts={DIAL_LABELS.dZone} onChange={(v) => setDefDzone(i, v as DZone | "")} />
               </div>
             </div>
