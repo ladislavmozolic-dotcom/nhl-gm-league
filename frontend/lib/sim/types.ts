@@ -232,4 +232,5 @@ export type GameResult = {
   otPeriods: number;     // full sudden-death OT periods played (playoff marathons); 0 for REG/reg-season OT
   shootout: ShootoutAttempt[]; // shootout attempts in order (empty unless the game went to a shootout)
   seed: number;
+  engineVersion?: string;      // which engine produced this game (stamped on the Game row)
 };

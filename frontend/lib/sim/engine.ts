@@ -11,6 +11,11 @@ import type {
   GoalEvent, PenaltyEvent, InjuryEvent, ShootoutAttempt, LineTactic,
 } from "./types";
 
+// Engine version stamped on every simulated Game (for reproducibility, history and
+// calibration). The current (stable v1) engine is "1.0.0"; the next-gen rework will
+// ship as "2.x" behind the LeagueConfig.simEngine flag. See lib/sim/version.ts.
+export const ENGINE_VERSION = "1.0.0";
+
 const BODY_PARTS = ["Upper Body", "Lower Body", "Knee", "Shoulder", "Ankle", "Hand", "Groin", "Concussion"];
 const INJURY_BASE = 0.22; // expected injuries per team per game at 100% (~1 in 5 games) — keeps the farm call-up pipeline busy
 
@@ -1002,7 +1007,7 @@ function distributeCounting(st: SimState) {
 
 // ---- main -------------------------------------------------------------------
 
-export type SimOptions = { seed?: number; settings?: EngineSettings; noShootout?: boolean; rivalry?: boolean; league?: "NHL" | "AHL" };
+export type SimOptions = { seed?: number; settings?: EngineSettings; noShootout?: boolean; rivalry?: boolean; league?: "NHL" | "AHL"; engineVersion?: string };
 
 export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}): GameResult {
   CFG = opts.settings ?? DEFAULT_SETTINGS;
@@ -1101,6 +1106,7 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     home: st.box[home.id], away: st.box[away.id],
     winner: winnerId, loser: loserId, endedIn, periods, otPeriods,
     goals: st.goals, penalties: st.penalties, injuries: st.injuries, playByPlay: [], shootout: st.shootout, seed,
+    engineVersion: opts.engineVersion ?? ENGINE_VERSION,
   };
   if (CFG.playByPlayEnabled) result.playByPlay = generatePlayByPlay(result, home, away);
   return result;

@@ -196,6 +196,7 @@ model LeagueConfig {
   faDay           Int      @default(0)     // Free Agent Frenzy round counter — advanced by admin/Agent to resolve standing offers
   leagueDate      DateTime?                 // the league clock — a 365-day calendar starting July 1 19:00 (real free-agency open); null = not yet started
   phaseOverride   String?                   // admin manual phase: "offseason" | "preseason" | "regular" | "playoffs" | "frenzy" · null = follow the calendar (see effectivePhase)
+  simEngine       String   @default("current") // "current" (stable v1) | "nextgen" (v2 rework) — whole-league engine toggle, see lib/sim/version.ts
   updatedAt       DateTime @updatedAt
 }
 
@@ -399,6 +400,7 @@ model Game {
   otPeriods         Int?             @default(0) // sudden-death OT periods played (playoff marathons: 1=OT, 2=2OT…)
   winnerTeamId      Int?
   seed              Int?
+  engineVersion     String?          // sim engine that produced this game (e.g. "1.0.0")
   playByPlay        Json?
   shootout          Json?            // shootout attempts (shooter, result) when the game went to SO
   seriesId          Int?             // set for playoff games

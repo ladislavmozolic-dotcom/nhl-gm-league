@@ -1,8 +1,18 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { prisma } from "@/lib/prisma";
 import { saveSettings, mergeSettings, DEFAULT_SETTINGS, type EngineSettings } from "@/lib/sim/settings";
 import { isAdmin } from "@/lib/auth";
+
+/** Switch the whole league between the stable (current) and next-gen (v2) sim engine. */
+export async function setSimEngineAction(choice: "current" | "nextgen") {
+  if (!(await isAdmin())) return { ok: false as const, error: "Admin only." };
+  const simEngine = choice === "nextgen" ? "nextgen" : "current";
+  await prisma.leagueConfig.upsert({ where: { id: 1 }, update: { simEngine }, create: { id: 1, simEngine } });
+  revalidatePath("/admin/simulation");
+  return { ok: true as const };
+}
 
 export async function saveSimSettings(values: Partial<EngineSettings>) {
   if (!(await isAdmin())) throw new Error("Only a league admin can change the simulation settings.");

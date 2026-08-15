@@ -58,6 +58,7 @@ export async function saveGameResult(result: GameResult, meta: GameMeta = {}) {
     otPeriods: result.otPeriods,
     winnerTeamId: result.winner,
     seed: result.seed,
+    engineVersion: result.engineVersion ?? null,
     playByPlay: result.playByPlay,
     shootout: result.shootout ?? [],
     playedAt: new Date(),
