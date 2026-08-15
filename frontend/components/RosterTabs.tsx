@@ -10,11 +10,12 @@ export default function RosterTabs({ slug }: { slug: string }) {
   const tabs = [
     { label: "Roster", href: `/teams/${slug}/roster` },
     { label: "Depth Chart", href: `/teams/${slug}/depth-chart` },
+    { label: "Injuries", href: `/teams/${slug}/injuries` },
   ];
   return (
     <div className="flex items-center gap-2">
       {tabs.map((t) => {
-        const active = pathname === t.href;
+        const active = pathname === t.href || (t.href.endsWith("/injuries") && pathname.startsWith(t.href));
         return (
           <Link key={t.href} href={t.href}
             className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
