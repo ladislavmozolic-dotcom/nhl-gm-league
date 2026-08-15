@@ -711,8 +711,8 @@ function simulatePeriodPossession(st: SimState, period: number) {
 
     if (state === "FACEOFF") {
       // centers of the on-ice units contest the draw (FO vs FO)
-      const hC = onIceF(home).find((s) => s.isCenter) ?? onIceF(home)[0];
-      const aC = onIceF(away).find((s) => s.isCenter) ?? onIceF(away)[0];
+      const hC = onIceF(home).find((s) => s.isCenter) ?? onIceF(home)[0] ?? home.forwards[0] ?? home.defense[0];
+      const aC = onIceF(away).find((s) => s.isCenter) ?? onIceF(away)[0] ?? away.forwards[0] ?? away.defense[0];
       const homeWin = rng.chance(ratio((hC.attrs.fo ?? 50) * fat(home, hC), (aC.attrs.fo ?? 50) * fat(away, aC), 0.8));
       if (homeWin) { st.box[home.id].faceoffWins++; st.box[away.id].faceoffLosses++; st.lines[home.id][hC.id].faceoffWins++; st.lines[away.id][aC.id].faceoffLosses++; carrierTeam = home; carrier = hC; }
       else { st.box[away.id].faceoffWins++; st.box[home.id].faceoffLosses++; st.lines[away.id][aC.id].faceoffWins++; st.lines[home.id][hC.id].faceoffLosses++; carrierTeam = away; carrier = aC; }
@@ -730,7 +730,10 @@ function simulatePeriodPossession(st: SimState, period: number) {
     // suppresses). Neutral CK1/DF2/OF2 → 1.0, no effect.
     const atkTilt = lineTilt(carrierTeam.fwdTactics[shifts[carrierTeam.id].fIdx]);
     const defTilt = lineTilt(def.defTactics[shifts[def.id].dIdx]);
-    const dman = pickByAttr(rng, onIceD(def).length ? onIceD(def) : def.defense, (s) => s.attrs.df ?? 50);
+    // pick a defending skater; fall back to forwards if a (thin AHL) roster has no D
+    // on ice, and never let it be undefined — an empty pool would otherwise crash.
+    const dPool = onIceD(def).length ? onIceD(def) : def.defense.length ? def.defense : def.forwards;
+    const dman = pickByAttr(rng, dPool, (s) => s.attrs.df ?? 50) ?? dPool[0] ?? carrier;
     // score-effect: the team in front eases off, the trailing team presses (catch-up → fewer blowouts)
     const catchUp = 1 - CFG.catchUpStrength * Math.max(-3, Math.min(3, margin));
     // team edge: the higher-overall club wins more battles and controls play, so
@@ -748,7 +751,7 @@ function simulatePeriodPossession(st: SimState, period: number) {
     if (rng.chance(0.09)) {
       const keep = ratio(atkSkill(carrier.attrs.sk ?? 50), defSkill(dman.attrs.df ?? 50));
       if (!rng.chance(keep)) { // turnover — defenders take over in their own zone
-        carrierTeam = def; carrier = pickByAttr(rng, onIceD(def).concat(onIceF(def)), (s) => (s.attrs.df ?? 50) + (s.attrs.pa ?? 50));
+        carrierTeam = def; carrier = pickByAttr(rng, onIceD(def).concat(onIceF(def)), (s) => (s.attrs.df ?? 50) + (s.attrs.pa ?? 50)) ?? dman;
         zone = "DEF"; setup = "carry"; press = 0; continue;
       }
     }
@@ -758,7 +761,7 @@ function simulatePeriodPossession(st: SimState, period: number) {
       if (rng.chance(0.28)) {
         const gap = 0.6 * (dman.attrs.df ?? 50) + 0.4 * (dman.attrs.sk ?? 50);
         if (rng.chance(ratio(atkSkill(carrier.attrs.sk ?? 50), defSkill(gap)))) { zone = zone === "DEF" ? "NEU" : "OFF"; setup = "carry"; }
-        else if (rng.chance(0.4)) { carrierTeam = def; carrier = pickByAttr(rng, onIceF(def), (s) => s.attrs.pa ?? 50); zone = "DEF"; setup = "carry"; press = 0; } // stuffed → turnover
+        else if (rng.chance(0.4)) { carrierTeam = def; carrier = pickByAttr(rng, onIceF(def), (s) => s.attrs.pa ?? 50) ?? dman; zone = "DEF"; setup = "carry"; press = 0; } // stuffed → turnover
       }
       continue;
     }
@@ -798,17 +801,17 @@ function simulatePeriodPossession(st: SimState, period: number) {
       }
       gLine.saves++;
       const rb = gSim.attrs.rb ?? 50;
-      if (rng.chance(Math.max(0.05, 0.32 - rb / 300))) { carrier = pickByAttr(rng, onIceF(carrierTeam), (s) => involvement(s.attrs.sc ?? 50) * 60); setup = "rebound"; } // rebound in the slot (press stays → escalating danger)
+      if (rng.chance(Math.max(0.05, 0.32 - rb / 300))) { carrier = pickByAttr(rng, onIceF(carrierTeam), (s) => involvement(s.attrs.sc ?? 50) * 60) ?? carrier; setup = "rebound"; } // rebound in the slot (press stays → escalating danger)
       else if (rng.chance(0.12)) { state = "FACEOFF"; setup = "carry"; press = 0; } // goalie freezes it → whistle
-      else { carrierTeam = def; carrier = pickByAttr(rng, onIceD(def).concat(onIceF(def)), (s) => s.attrs.pa ?? 50); zone = "DEF"; setup = "carry"; press = 0; } // covered & cleared, play on
+      else { carrierTeam = def; carrier = pickByAttr(rng, onIceD(def).concat(onIceF(def)), (s) => s.attrs.pa ?? 50) ?? dman; zone = "DEF"; setup = "carry"; press = 0; } // covered & cleared, play on
       continue;
     }
     // PASS — completed (PA vs DF) → puck to a linemate (sets up a one-timer); else intercepted
     if (rng.chance(ratio(atkSkill(carrier.attrs.pa ?? 50), defSkill(dman.attrs.df ?? 50), 0.7))) {
-      carrier = pickByAttr(rng, onIceF(carrierTeam), (s) => involvement(0.6 * (s.attrs.sc ?? 50) + 0.4 * (s.attrs.sk ?? 50)) * 60);
+      carrier = pickByAttr(rng, onIceF(carrierTeam), (s) => involvement(0.6 * (s.attrs.sc ?? 50) + 0.4 * (s.attrs.sk ?? 50)) * 60) ?? carrier;
       setup = "pass";
     } else {
-      carrierTeam = def; carrier = pickByAttr(rng, onIceD(def).concat(onIceF(def)), (s) => s.attrs.df ?? 50); zone = "DEF"; setup = "carry"; press = 0;
+      carrierTeam = def; carrier = pickByAttr(rng, onIceD(def).concat(onIceF(def)), (s) => s.attrs.df ?? 50) ?? dman; zone = "DEF"; setup = "carry"; press = 0;
     }
   }
 }
