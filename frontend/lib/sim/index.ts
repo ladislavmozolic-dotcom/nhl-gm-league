@@ -97,20 +97,22 @@ export async function loadSimTeam(teamId: number, rosterType?: string, opts?: { 
       (keep.has(b.id) ? 1 : 0) - (keep.has(a.id) ? 1 : 0) || (b.overall ?? 0) - (a.overall ?? 0);
     const fwds = skaterRows.filter((p) => !isDef(p.position)).sort(rank);
     const defs = skaterRows.filter((p) => isDef(p.position)).sort(rank);
+    // Guarantee a FULLY DISTINCT lineup: 12 different forwards + 6 different D, so
+    // no NHL skater is iced in two units. FORWARDS come first (the priority: 12
+    // different forwards every night); each role fills by natural position, then
+    // tops up any shortfall from the leftover pool regardless of position — a
+    // spare D covers wing, a spare forward covers a pair, off-position but a real
+    // distinct body. Works whenever the club can dress 18 skaters (call-ups from
+    // the farm bring it there); only a genuinely depleted org (<18 healthy skaters
+    // across the whole system) falls back to a double-shift in deployDistinct.
     const dressedF = fwds.slice(0, MIN_F);
     const dressedD = defs.slice(0, MIN_D);
-    // Guarantee 12 DIFFERENT forwards. If injuries + a thin farm leave the club
-    // short at forward, promote spare defencemen (7th+ D) and any leftover bodies
-    // to the empty wing slots — a D covering wing in a pinch, off-position but a
-    // real distinct body, so no forward ever double-shifts. (STHS: 12 different
-    // forwards every night.) Only a truly bare roster (<18 skaters total) can't.
-    if (dressedF.length < MIN_F) {
-      const used = new Set([...dressedF, ...dressedD].map((p) => p.id));
-      const spare = [...defs.slice(MIN_D), ...fwds.slice(MIN_F)]
-        .filter((p) => !used.has(p.id))
-        .sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0));
-      while (dressedF.length < MIN_F && spare.length) dressedF.push(spare.shift()!);
-    }
+    const used = new Set([...dressedF, ...dressedD].map((p) => p.id));
+    const leftover = [...fwds.slice(MIN_F), ...defs.slice(MIN_D)]
+      .filter((p) => !used.has(p.id))
+      .sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0));
+    while (dressedF.length < MIN_F && leftover.length) { const p = leftover.shift()!; dressedF.push(p); used.add(p.id); }
+    while (dressedD.length < MIN_D && leftover.length) { const p = leftover.shift()!; dressedD.push(p); used.add(p.id); }
     skaterRows = [...dressedF, ...dressedD];
     deployFwdIds = dressedF.map((p) => p.id);
     deployDefIds = dressedD.map((p) => p.id);
