@@ -80,6 +80,7 @@ const menuItems: MenuItem[] = [
     children: [
       { label: "Tonight's Best", href: "/league/digest" },
       { label: "League Records", href: "/league/records" },
+      { label: "Audit Log", href: "/league/audit" },
       { label: "Team / GM", href: "/league" },
       { label: "Captains", href: "/captains" },
       { label: "Coaches", href: "/coaches" },

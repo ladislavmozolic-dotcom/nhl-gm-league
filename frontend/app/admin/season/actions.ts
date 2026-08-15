@@ -9,6 +9,7 @@ import { importCsvSchedule, importFromNhlApi } from "@/lib/sim/csv-schedule";
 import { processFinances } from "@/lib/finance-server";
 import { archiveSeason } from "@/lib/awards";
 import { isAdmin } from "@/lib/auth";
+import { commissionerName } from "@/lib/audit-server";
 import { loadSettings } from "@/lib/sim/settings";
 import { autoFillRosters } from "@/lib/roster-fill";
 import { getLeagueDate } from "@/lib/calendar-server";
@@ -53,7 +54,7 @@ export async function advanceLeagueDayAction() {
   let played = 0;
   if (dayGames.length && dayGames[0].round != null) {
     await autoFillRosters("NHL");
-    const r = await playScheduledGames({ season: SEASON, round: dayGames[0].round });
+    const r = await playScheduledGames({ season: SEASON, round: dayGames[0].round, actor: await commissionerName() });
     played = r.played;
     await processFinances(SEASON, "NHL");
   } else if (ph(next) === "regular" || ph(next) === "playoffs") {
@@ -141,7 +142,7 @@ export async function simNextDayAction() {
   });
   if (next?.round == null) return { played: 0, round: null as number | null, date: null as Date | null, done: true };
   await autoFillRosters("NHL"); // ensure every club owns a legal roster (durable, counts to cap)
-  const r = await playScheduledGames({ season: SEASON, round: next.round });
+  const r = await playScheduledGames({ season: SEASON, round: next.round, actor: await commissionerName() });
   await processFinances(SEASON, "NHL");
   for (const p of ["/schedule", "/standings", "/scores", "/stats/players", "/admin/season", "/finance"]) revalidatePath(p);
   return { played: r.played, round: next.round, date: next.gameDate, done: false };
@@ -220,7 +221,7 @@ export async function generateScheduleAction(gamesPerTeam: number) {
 
 export async function playSeasonAction() {
   await autoFillRosters("NHL"); // legal, cap-counted rosters before the run
-  const r = await playScheduledGames({ season: SEASON });
+  const r = await playScheduledGames({ season: SEASON, actor: await commissionerName() });
   await processFinances(SEASON, "NHL"); // ticket revenue in, salaries out
   revalidatePath("/admin/season");
   revalidatePath("/standings");

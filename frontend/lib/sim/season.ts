@@ -98,6 +98,7 @@ export type PlayOptions = {
   season?: string;
   round?: number;
   limit?: number;
+  actor?: string; // who triggered this sim (commissioner name / "Auto-sim") — for the audit log
   onGame?: (info: { gameId: number; home: string; away: string; hg: number; ag: number; endedIn: string }) => void;
 };
 
@@ -218,6 +219,7 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
   };
 
   let played = 0;
+  const playedIds: number[] = [];
   for (const gm of scheduled) {
     const round = gm.round ?? 0;
     if (round !== currentRound) { await advanceDay(Math.max(1, round - currentRound)); currentRound = round; }
@@ -286,6 +288,7 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
     }
 
     played++;
+    playedIds.push(gm.id);
     opts.onGame?.({
       gameId: gm.id, home: home.name, away: away.name,
       hg: result.home.goals, ag: result.away.goals, endedIn: result.endedIn,
@@ -305,6 +308,14 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
       updates.push(prisma.teamLines.update({ where: { teamId: team.id }, data: { chemistry: team.chemistry } }).catch(() => undefined));
   }
   await Promise.all(updates);
+
+  // audit trail: who simulated these games, with engine version + seed
+  try {
+    const { recordSimAudit } = await import("../audit-server");
+    await recordSimAudit(playedIds, opts.actor ?? "System");
+  } catch (e) {
+    console.error("[playScheduledGames] audit failed:", e);
+  }
 
   return { played };
 }

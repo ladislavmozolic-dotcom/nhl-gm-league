@@ -4,6 +4,7 @@ import GameView from "@/components/GameView";
 import type { PbpEvent, ShootoutAttempt } from "@/lib/sim/types";
 import { loadTeamLines, autoLines, deployDistinct } from "@/lib/sim/lines";
 import { cleanName } from "@/lib/playerName";
+import GameIntegrity from "@/components/GameIntegrity";
 
 // Build every line unit for the Lines tab — the manager's lines if set, else the
 // same position-aware auto lines the sim uses — resolved to player names.
@@ -176,5 +177,18 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
     })),
   };
 
-  return <GameView data={data} />;
+  return (
+    <>
+      <GameView data={data} />
+      {game.status === "FINAL" && (
+        <GameIntegrity
+          engineVersion={game.engineVersion}
+          seed={game.seed}
+          simCount={game.simCount}
+          lastSimBy={game.lastSimBy}
+          lastSimAt={game.lastSimAt ? game.lastSimAt.toISOString() : null}
+        />
+      )}
+    </>
+  );
 }

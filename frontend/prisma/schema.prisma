@@ -427,6 +427,9 @@ model Game {
   winnerTeamId      Int?
   seed              Int?
   engineVersion     String?          // sim engine that produced this game (e.g. "1.0.0")
+  simCount          Int              @default(0) // how many times this game has been simulated (>1 = re-simulated)
+  lastSimBy         String?          // who ran the most recent simulation (commissioner name / "Auto-sim")
+  lastSimAt         DateTime?        // when the most recent simulation ran
   playByPlay        Json?
   shootout          Json?            // shootout attempts (shooter, result) when the game went to SO
   seriesId          Int?             // set for playoff games
@@ -559,6 +562,28 @@ model SeasonAward {
 // Durable per-season stat archive — the foundation of Player Careers and Franchise
 // History. Written by archiveSeasonStats() when a season ends (before a reset wipes
 // the per-game rows). Regular season and playoffs are stored as separate rows.
+// Simulation Integrity — an immutable audit row per simulation of a game. Records
+// who ran it, the engine version + RNG seed (so results are reproducible and can't
+// be silently cherry-picked), and whether it was a re-simulation.
+model GameAudit {
+  id            Int      @id @default(autoincrement())
+  gameId        Int
+  season        String
+  league        String   @default("NHL")
+  action        String   // SIMULATE | RESIMULATE
+  byName        String   // commissioner / actor who triggered it
+  engineVersion String?
+  seed          Int?
+  homeTeamId    Int?
+  awayTeamId    Int?
+  homeGoals     Int?
+  awayGoals     Int?
+  createdAt     DateTime @default(now())
+
+  @@index([gameId])
+  @@index([createdAt])
+}
+
 model PlayerSeasonStat {
   id        Int     @id @default(autoincrement())
   playerId  Int

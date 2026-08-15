@@ -28,7 +28,7 @@ async function main() {
 
   console.log("Playing regular season…");
   let n = 0;
-  const { played } = await playScheduledGames({ season: SEASON, onGame: () => { if (++n % 200 === 0) process.stdout.write(`  …${n} games\r`); } });
+  const { played } = await playScheduledGames({ season: SEASON, actor: "Full-season resim", onGame: () => { if (++n % 200 === 0) process.stdout.write(`  …${n} games\r`); } });
   console.log(`\nPlayed ${played} regular-season games in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
 
   console.log("Running playoffs…");
