@@ -34,7 +34,8 @@ export async function franchiseDraftRecord(teamId: number): Promise<DraftRecord>
   let hits = 0, stars = 0;
   const list: DraftPickRow[] = picks.map((p) => {
     const pl = p.playerId != null ? pById.get(p.playerId) : undefined;
-    if (pl?.rosterType === "NHL") hits++;
+    // a "hit" = developed into NHL-calibre talent (on an NHL roster, or overall >= 78)
+    if (pl && (pl.rosterType === "NHL" || (pl.overall ?? 0) >= 78)) hits++;
     if (pl && (pl.overall ?? 0) >= 85) stars++;
     return { name: p.name, position: p.position, year: p.draftYear, round: Math.max(1, Math.ceil((p.overallPick ?? 1) / 32)), overallPick: p.overallPick ?? 0, ov: p.ov, potential: p.potential, playerSlug: pl?.slug ?? null, status: pl?.rosterType ?? null, overall: pl?.overall ?? null };
   });

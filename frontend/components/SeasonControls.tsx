@@ -11,6 +11,7 @@ type Actions = {
   runPlayoffsAction: () => Promise<{ champion: number | null }>;
   resetSeasonAction: () => Promise<void>;
   runRetirementsAction: () => Promise<{ retired: { name: string; age: number }[]; inducted: string[] }>;
+  developProspectsAction: () => Promise<{ created: number; developed: number; nowNhlCalibre: number; topGains: { name: string; from: number; to: number }[] }>;
   importNhlApiAction: () => Promise<ImportResult>;
   importCsvAction: (formData: FormData) => Promise<ImportResult>;
 };
@@ -121,6 +122,11 @@ export default function SeasonControls({ state, actions }: { state: State; actio
             onClick={() => { if (confirm("Retire aging players (age 38+) and induct any who clear the Hall of Fame bar? This changes rosters.")) run("retire", async () => { const r = await actions.runRetirementsAction(); setMsg(`${r.retired.length} retired${r.inducted.length ? ` · ${r.inducted.length} inducted: ${r.inducted.join(", ")}` : ""}.`); }); }} />
           <span className="text-xs text-slate-500">Aging players retire; Hall-of-Fame résumés get inducted.</span>
           <Link href="/hall-of-fame" className="text-xs text-slate-400 hover:text-blue-400 ml-auto">Hall of Fame →</Link>
+        </div>
+        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-slate-800/60">
+          <Btn id="develop" label="Develop prospects"
+            onClick={() => run("develop", async () => { const r = await actions.developProspectsAction(); setMsg(`${r.created ? `${r.created} new prospect players · ` : ""}${r.developed} developed · ${r.nowNhlCalibre} now NHL-calibre${r.topGains[0] ? ` · top: ${r.topGains[0].name} ${r.topGains[0].from}→${r.topGains[0].to}` : ""}.`); })} />
+          <span className="text-xs text-slate-500">Draft picks grow toward their potential (one step per offseason).</span>
         </div>
       </section>
 
