@@ -1044,11 +1044,12 @@ function generateInjuries(st: SimState) {
       // is bottomed out at the CON floor gets the "Fatigue" label below; the rest
       // are generic body injuries.
       const victim = pool[st.rng.weighted(pool.map((s) => s.iceTime * (115 - s.attrs.du)))];
-      // "Fatigue" only for a victim bottomed out at the CON floor (~95) — genuinely
-      // gassed from heavy minutes / double-shifts / a back-to-back, the exception a
-      // well-managed team mostly avoids. Everyone else is a generic Lower/Upper Body
-      // knock, reported vaguely like the real NHL.
-      addInjury(st, team, victim, victim.con < 95.5 ? "Fatigue" : "Non-contact");
+      // "Fatigue" only when the victim actually logged heavy minutes THIS game
+      // (≥25 min — a genuinely overplayed workhorse night); everyone else is a
+      // generic Lower/Upper Body knock, reported vaguely like the real NHL. Tied to
+      // real ice time (matches "played too many minutes"), not the flaky CON value.
+      const victimToi = st.lines[team.id][victim.id]?.toi ?? 0;
+      addInjury(st, team, victim, victimToi >= 1200 ? "Fatigue" : "Non-contact");
     }
 
     // 4) FIGHT injuries — a combatant (rare) tweaks a hand.

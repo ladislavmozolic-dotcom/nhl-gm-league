@@ -16,12 +16,18 @@ function assignDays(fixtures: Fixture[], teamIds: number[]): Fixture[] {
   const remaining = fixtures.map((f, i) => ({ ...f, i }));
   const out: Fixture[] = [];
   let day = 0;
-  const B2B_EVERY = 5; // ~1 in 5 eligible back-to-backs are allowed
+  const B2B_EVERY = 7; // ~1 in 7 eligible back-to-backs (real NHL is sparse)
+  // Spread to real NHL density (~2.2 days between a team's games): cap games/day
+  // so ~half the league sits each night → an ~82-game season lands over ~175 days
+  // and skaters actually recover between games (fewer worn-down / Fatigue injuries).
+  const targetSpan = 175;
+  const maxPerDay = Math.max(4, Math.ceil(fixtures.length / targetSpan));
 
   while (remaining.length && day < 400) {
     const playedToday = new Set<number>();
     let placed = 0;
     for (let k = 0; k < remaining.length; k++) {
+      if (placed >= maxPerDay) break;
       const fx = remaining[k];
       if (playedToday.has(fx.homeTeamId) || playedToday.has(fx.awayTeamId)) continue;
       const restH = day - (lastDay.get(fx.homeTeamId) ?? -10);
