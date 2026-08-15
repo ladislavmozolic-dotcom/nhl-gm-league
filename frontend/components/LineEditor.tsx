@@ -78,26 +78,29 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
   // ---------- reusable inputs ----------
   const Select = ({ value, onChange, pool }: { value: number | null; onChange: (v: number | null) => void; pool: Player[] }) => (
     <select value={value ?? ""} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
-      className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-sm">
+      className="w-full min-w-[132px] bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-sm">
       <option value="">— empty —</option>
       {value != null && !pool.some((p) => p.id === value) && <option value={value}>{nameOf(value)}</option>}
       {pool.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.overall})</option>)}
     </select>
   );
 
-  // number field with visibly separated − / + steppers (design request)
-  const Stepper = ({ value, onChange, min = 0, max = 99, step = 1, w = "w-14" }: {
-    value: number; onChange: (v: number) => void; min?: number; max?: number; step?: number; w?: string;
+  // number field with visibly separated − / + steppers. `compact` shrinks it for
+  // the 0-5 tactic cells so the player-name columns keep their width.
+  const Stepper = ({ value, onChange, min = 0, max = 99, step = 1, w = "w-14", compact = false }: {
+    value: number; onChange: (v: number) => void; min?: number; max?: number; step?: number; w?: string; compact?: boolean;
   }) => {
     const clamp = (v: number) => Math.max(min, Math.min(max, v));
+    const btn = compact ? "w-6 h-7 text-sm" : "w-7 h-8 text-base";
+    const inp = compact ? "w-8 px-1 py-1" : `${w} px-2 py-1.5`;
     return (
-      <div className="inline-flex items-center gap-2">
+      <div className={`inline-flex items-center ${compact ? "gap-1" : "gap-2"}`}>
         <button type="button" onClick={() => onChange(clamp(value - step))}
-          className="w-7 h-8 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-base leading-none">−</button>
+          className={`${btn} rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 leading-none`}>−</button>
         <input type="number" min={min} max={max} value={value} onChange={(e) => onChange(clamp(Number(e.target.value)))}
-          className={`${w} bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-sm text-center tabular-nums`} />
+          className={`${inp} bg-slate-900 border border-slate-700 rounded text-sm text-center tabular-nums`} />
         <button type="button" onClick={() => onChange(clamp(value + step))}
-          className="w-7 h-8 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-base leading-none">+</button>
+          className={`${btn} rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 leading-none`}>+</button>
       </div>
     );
   };
@@ -131,7 +134,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
     const tt = tac(t); const bad = tt.phy + tt.df + tt.of !== 5;
     return (["phy", "df", "of"] as const).map((k) => (
       <td key={k} className="px-1 py-1.5 text-center">
-        <Stepper value={tt[k]} step={1} onChange={(v) => onSet(k, Math.max(0, Math.min(5, v as unknown as number)))} />
+        <Stepper value={tt[k]} step={1} compact onChange={(v) => onSet(k, Math.max(0, Math.min(5, v as unknown as number)))} />
         {bad && k === "of" && <span className="ml-1 text-[10px] text-rose-400" title="PHY+DF+OF must total 5">≠5</span>}
       </td>
     ));
