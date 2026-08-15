@@ -103,6 +103,7 @@ const menuItems: MenuItem[] = [
     href: "/history",
     children: [
       { label: "League History", href: "/history" },
+      { label: "Hall of Fame", href: "/hall-of-fame" },
       { label: "Awards", href: "/awards" },
       { label: "Award Voting", href: "/awards/vote" },
     ],

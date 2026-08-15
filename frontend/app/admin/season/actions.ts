@@ -120,6 +120,16 @@ export async function autoFillRostersAction() {
   return { teams: filled.length, promoted: filled.reduce((t, x) => t + x.f + x.d + x.g, 0), detail: filled };
 }
 
+/** Admin: run offseason retirements — aging players retire, and any newly-retired
+ *  player with a Hall-of-Fame résumé is inducted. Part of season rollover. */
+export async function runRetirementsAction() {
+  if (!(await isAdmin())) throw new Error("Only a league admin can run retirements.");
+  const { runRetirements } = await import("@/lib/hof-server");
+  const res = await runRetirements("2026-27");
+  for (const p of ["/hall-of-fame", "/retired", "/teams", "/players/all", "/admin/season"]) revalidatePath(p);
+  return res;
+}
+
 /** Admin: simulate the NEXT scheduled day (one round) — a manual fallback if the
  *  nightly auto-sim fails, or for running practice sims day by day. */
 export async function simNextDayAction() {
