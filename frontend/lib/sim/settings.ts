@@ -17,6 +17,11 @@ export type EngineSettings = {
   // (many upsets, random standings); high = the better team dominates and the
   // stronger clubs reliably climb the standings over a season.
   possessionSkillPct: number;
+  // How much the DEFENCE in front of the goalie (on-ice defenders' DF) suppresses shot
+  // quality, on top of the goalie. 0 = goalie carries GA alone (old behaviour); higher =
+  // a strong blue line lowers goals-against even with an average keeper, and a weak one
+  // exposes an elite one. Calibration-neutral (centred on the league-average defender).
+  defenseTalentPct: number;
   catchUpStrength: number; // per-goal score-effect that pulls trailing teams back (curbs blowouts)
   // Game Options — percentage multipliers (100 = calibrated default)
   goalsPct: number;
@@ -132,7 +137,7 @@ export type EngineSettings = {
 };
 
 export const DEFAULT_SETTINGS: EngineSettings = {
-  engineModel: "possession", inGameFatiguePct: 100, possessionSkillPct: 0.85, catchUpStrength: 0.03,
+  engineModel: "possession", inGameFatiguePct: 100, possessionSkillPct: 0.85, defenseTalentPct: 35, catchUpStrength: 0.03,
   goalsPct: 100, shotsPct: 100, penaltiesPct: 100, hitsPct: 100,
   fightsPct: 100, powerPlayPct: 100, homeAdvPct: 100,
   pullGoalieEnabled: true, pullGoalieMinGoals: 6, pullGoalieMinShots: 15, pullGoalieSvPct: 0.80,

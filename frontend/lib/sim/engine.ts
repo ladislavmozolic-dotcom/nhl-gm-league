@@ -786,11 +786,17 @@ function simulatePeriodPossession(st: SimState, period: number) {
       const pressBonus = 1 + 0.06 * Math.min(press - 1, 4);
       const offMult = chemFactor(carrier.chem, carrier.roleFit) * moraleFactor(carrier.morale) * physFactor(carrier.weight) * fat(carrierTeam, carrier) * tOff.of * carrierTeam.coachOff;
       const defShield = (2 - (st.defChem[def.id] ?? 1)) * (2 - dfat(def, dman)) * tDef.df * def.coachDef;
+      // the DEFENCE in front of the goalie: a high-DF pair on the ice contests the lane
+      // and lowers shot quality (fewer goals), a weak pair gives it up — so goals-against
+      // reflects the blue line, not just the keeper. Centred on an average pair (~74 DF).
+      const dPair = onIceD(def);
+      const avgDefDf = dPair.length ? dPair.reduce((s, d) => s + (d.attrs.df ?? 50), 0) / dPair.length : (dman.attrs.df ?? 50);
+      const defTalent = Math.max(0.72, Math.min(1.3, 1 - (CFG.defenseTalentPct / 100) * (avgDefDf - 74) / 20));
       const ppMod = strength === "PP" ? carrierTeam.ppChem / def.pkChem : 1; // gelled PP1 vs gelled PK1
       const shOff = strength !== "EV" ? carrier.offense / carrier.posPenalty : carrier.offense; // off-position waived on ST
       const p = conversion(shOff, effGoalieQuality(gSim), isHome, strength) * danger * pressBonus
         * momoBoost(st, carrierTeam.id, absT) * clutchFactor(st, carrier, period, tick, margin)
-        * offMult * defShield * catchUp * ppMod;
+        * offMult * defShield * defTalent * catchUp * ppMod;
       if (rng.chance(p)) {
         gLine.goalsAgainst++;
         recordGoal(st, carrierTeam, def, period, tick, strength, false, carrier);
