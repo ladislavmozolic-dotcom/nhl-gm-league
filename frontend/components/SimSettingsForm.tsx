@@ -18,6 +18,7 @@ const GAME_OPTIONS: Array<{ key: keyof EngineSettings; label: string; hint: stri
   { key: "fightsPct", label: "Fights", hint: "fight frequency" },
   { key: "injuryChancePct", label: "Injuries", hint: "injury frequency" },
   { key: "homeAdvPct", label: "Home Advantage", hint: "home-ice edge" },
+  { key: "defenseTalentPct", label: "Defence Impact", hint: "how strongly the D in front lowers goals-against (0 = goalie only)" },
 ];
 
 export default function SimSettingsForm({ initial, onSave }: Props) {
