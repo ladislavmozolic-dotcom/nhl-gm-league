@@ -256,6 +256,7 @@ model FaOffer {
   counterYears  Int?
   grantClause String?                      // clause the GM offers to grant: NTC | NMC | M_NTC (→ signing discount)
   mNtcBreadth Int?                         // M-NTC list breadth the GM offers: 6 | 12 | 18 | 24 teams
+  twoWay    Boolean  @default(false)        // GM offers a two-way (AHL) deal rather than a one-way
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@unique([playerId, teamId])            // one standing offer per team per player

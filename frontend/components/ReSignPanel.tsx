@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { getInterestAction, extendContractAction, setFranchiseTagAction } from "@/app/free-agents/actions";
 import { Card } from "@/components/ui";
+import InfoTip from "@/components/InfoTip";
 import { cleanName } from "@/lib/playerName";
 import { clauseDiscount } from "@/lib/free-agency";
 
@@ -31,6 +32,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
   const [pk, setPk] = useState(false);
   const [grantClause, setGrantClause] = useState("");
   const [breadth, setBreadth] = useState(12);
+  const [twoWay, setTwoWay] = useState(false);
   const [done, setDone] = useState(false);
 
   useEffect(() => {
@@ -54,7 +56,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
     setMsg(null);
     const salary = Math.round(parseFloat(salaryM) * 1e6);
     if (!Number.isFinite(salary)) { setMsg({ t: "err", s: "Enter a salary." }); return; }
-    const r = await extendContractAction(player.id, teamId, salary, years, line, pp, pk, grantClause || null, grantClause === "M_NTC" ? breadth : null);
+    const r = await extendContractAction(player.id, teamId, salary, years, line, pp, pk, grantClause || null, grantClause === "M_NTC" ? breadth : null, twoWay);
     // don't refresh yet — that would unmount this modal before the confirmation shows;
     // refresh when the GM closes it (Done button).
     if (r.ok) { setResult({ salary: r.salary, years: r.years }); setDone(true); return; }
@@ -132,6 +134,13 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                   </div>
                 )}
                 <div>
+                  <label className="text-xs text-slate-400 block mb-1">Contract type<InfoTip text="One-way pays the same in the NHL or AHL. Two-way pays less on the farm — only AHL-caliber players (fringe / real farmhands) will accept it; an NHL regular wants a one-way." /></label>
+                  <div className="flex gap-1">
+                    <button type="button" onClick={() => setTwoWay(false)} className={`flex-1 py-1.5 rounded-lg text-sm font-semibold border ${!twoWay ? "bg-blue-600 text-white border-blue-500" : "bg-slate-800 text-slate-400 border-slate-700"}`}>One-way</button>
+                    <button type="button" onClick={() => setTwoWay(true)} className={`flex-1 py-1.5 rounded-lg text-sm font-semibold border ${twoWay ? "bg-blue-600 text-white border-blue-500" : "bg-slate-800 text-slate-400 border-slate-700"}`}>Two-way</button>
+                  </div>
+                </div>
+                <div>
                   <label className="text-xs text-slate-400 block mb-1">Grant a no-trade clause (he signs for less)</label>
                   <div className="flex gap-2 items-center flex-wrap">
                     <select value={grantClause} onChange={(e) => setGrantClause(e.target.value)} className="px-2 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-sm">
@@ -167,10 +176,13 @@ export default function ReSignPanel({ teamId, players, title, blurb, accent = "t
 }) {
   const [tagPending, startTag] = useTransition();
   const [tagged, setTagged] = useState<number | null>(players.find((p) => p.franchiseTag)?.id ?? null);
+  const [tagMsg, setTagMsg] = useState<string | null>(null);
   const toggleTag = (id: number) => startTag(async () => {
+    setTagMsg(null);
     const on = tagged !== id;
     const r = await setFranchiseTagAction(id, teamId, on);
     if (r.ok) setTagged(on ? id : null);
+    else setTagMsg(r.error ?? "Couldn't set the tag.");
   });
   // hold the OPEN PLAYER OBJECT, not just an id — the server action's revalidatePath
   // re-renders this list without the just-signed player, and a find(openId) would go
@@ -180,6 +192,13 @@ export default function ReSignPanel({ teamId, players, title, blurb, accent = "t
   return (
     <Card title={`${title ?? "Expiring Contracts"} (${players.length})`} accent={accent}>
       <p className="text-xs text-slate-500 mb-3">{blurb ?? "These players are entering the final year of their deal. Re-sign them before they reach free agency."}</p>
+      {group === "RFA" && (
+        <p className="text-xs text-slate-500 mb-2">
+          <span className="text-fuchsia-300 font-semibold">★ Franchise tag</span> (1 per club)
+          <InfoTip text="Tag one RFA as your Franchise player. A franchise RFA gets TWO re-sign rounds before rivals can submit offer sheets; every other RFA gets one round, then he's open to offer sheets. One tag per club at a time." />
+        </p>
+      )}
+      {tagMsg && <p className="text-xs text-rose-400 mb-2">{tagMsg}</p>}
       <div className="divide-y divide-slate-800/50">
         {players.map((p) => (
           <div key={p.id} className="flex items-center justify-between py-2 gap-3">

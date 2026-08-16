@@ -44,6 +44,7 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
   const [pk, setPk] = useState(false);
   const [grantClause, setGrantClause] = useState("");
   const [breadth, setBreadth] = useState(12);
+  const [twoWay, setTwoWay] = useState(false);
   const [liveAsk, setLiveAsk] = useState<Awaited<ReturnType<typeof getAskAtAction>>>(null);
 
   // the ask reacts to the promised role (a worse line / stripped PP-PK raises it)
@@ -84,7 +85,7 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
     const salary = Math.round(parseFloat(salaryM) * 1e6);
     if (!Number.isFinite(salary)) { setMsg({ t: "err", s: "Enter a salary." }); return; }
     start(async () => {
-      const r = await submitOfferAction(playerId, teamId, salary, years, line, pp, pk, grantClause || null, grantClause === "M_NTC" ? breadth : null);
+      const r = await submitOfferAction(playerId, teamId, salary, years, line, pp, pk, grantClause || null, grantClause === "M_NTC" ? breadth : null, twoWay);
       if (!r.ok) { setMsg({ t: "err", s: r.error }); return; }
       setMsg({ t: "ok", s: r.clears ? `Offer ${r.raised ? "raised" : "placed"} — clears his ask at your club. ✓` : `Offer ${r.raised ? "raised" : "placed"} — below his floor ${M(r.floor)}; he may pick a better one.` });
       load(teamId);
@@ -209,6 +210,13 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
                         <label className="flex items-center gap-2"><input type="checkbox" checked={pk} onChange={(e) => setPk(e.target.checked)} /> Penalty kill</label>
                       </div>
                     )}
+                    <div>
+                      <label className="text-xs text-slate-400 block mb-1">Contract type<InfoTip text="One-way pays the same in NHL or AHL. Two-way pays less on the farm — only AHL-caliber players accept it; an NHL regular wants a one-way." /></label>
+                      <div className="flex gap-1">
+                        <button type="button" onClick={() => setTwoWay(false)} className={`flex-1 py-1.5 rounded-lg text-sm font-semibold border ${!twoWay ? "bg-blue-600 text-white border-blue-500" : "bg-slate-800 text-slate-400 border-slate-700"}`}>One-way</button>
+                        <button type="button" onClick={() => setTwoWay(true)} className={`flex-1 py-1.5 rounded-lg text-sm font-semibold border ${twoWay ? "bg-blue-600 text-white border-blue-500" : "bg-slate-800 text-slate-400 border-slate-700"}`}>Two-way</button>
+                      </div>
+                    </div>
                     <div>
                       <label className="text-xs text-slate-400 block mb-1">Grant a no-trade clause (optional — he signs for less)</label>
                       <div className="flex gap-2 items-center flex-wrap">

@@ -88,7 +88,7 @@ export async function getPlayerOffersAction(playerId: number) {
 /** Place or raise a team's standing offer to a free agent (money + term + promised usage). */
 export async function submitOfferAction(
   playerId: number, teamId: number, salary: number, years: number, line: number, pp: boolean, pk: boolean,
-  grantClause?: string | null, mNtcBreadth?: number | null,
+  grantClause?: string | null, mNtcBreadth?: number | null, offerTwoWay?: boolean,
 ) {
   if (!(await canManageTeam(teamId))) return { ok: false as const, error: "You don't manage this team." };
   const clock = await getLeagueClock();
@@ -100,13 +100,17 @@ export async function submitOfferAction(
     return { ok: false as const, error: "This round opens for GMs tomorrow — the commissioner's office gets the first day." };
   }
 
-  const player = await prisma.player.findUnique({ where: { id: playerId }, select: { rosterType: true } });
+  const player = await prisma.player.findUnique({ where: { id: playerId }, select: { rosterType: true, overall: true, realFarmTeamId: true } });
   if (!player) return { ok: false as const, error: "Player not found." };
   if (player.rosterType && FREE.includes(player.rosterType)) {
     return { ok: false as const, error: "This player is not a free agent." };
   }
   if (salary < 775_000) return { ok: false as const, error: "Below the league minimum salary." };
   years = Math.max(1, Math.min(MAX_TERM, Math.round(years)));
+  // one-way vs two-way: an NHL regular won't accept a two-way
+  const twoWay = !!offerTwoWay;
+  const ahlCaliber = player.rosterType === "AHL" || player.realFarmTeamId != null || (player.overall ?? 70) < 72;
+  if (twoWay && !ahlCaliber) return { ok: false as const, error: "He's an NHL regular — he won't sign a two-way. Offer a one-way deal." };
 
   // cap check — committed cap hit + this offer must stay under the ceiling
   const cap = await loadLeagueCap();
@@ -141,8 +145,8 @@ export async function submitOfferAction(
 
   await prisma.faOffer.upsert({
     where: { playerId_teamId: { playerId, teamId } },
-    update: { salary, years, line: dep.line, pp, pk, status: newStatus, round: clock.frenzyRound, grantClause: clause, mNtcBreadth: breadth },
-    create: { playerId, teamId, salary, years, line: dep.line, pp, pk, round: clock.frenzyRound, grantClause: clause, mNtcBreadth: breadth },
+    update: { salary, years, line: dep.line, pp, pk, status: newStatus, round: clock.frenzyRound, grantClause: clause, mNtcBreadth: breadth, twoWay },
+    create: { playerId, teamId, salary, years, line: dep.line, pp, pk, round: clock.frenzyRound, grantClause: clause, mNtcBreadth: breadth, twoWay },
   });
   revalidatePath("/free-agents");
   return {
@@ -196,7 +200,7 @@ type FaOfferRow = Awaited<ReturnType<typeof prisma.faOffer.findMany>>[number];
 /** Execute a signing: move the player to the club on `o` at (salary × years),
  *  accept that offer, reject the rest, log it. Returns the club code. */
 async function signFaOffer(playerId: number, player: { name: string; age: number | null }, o: FaOfferRow, salary: number, years: number): Promise<string> {
-  const twoWay = (player.age ?? 27) <= 24 && salary <= 3_000_000;
+  const twoWay = o.twoWay ?? ((player.age ?? 27) <= 24 && salary <= 3_000_000);
   const expiry = CURRENT_SEASON_START + years;
   const clause = o.grantClause && ["NTC", "NMC", "M_NTC"].includes(o.grantClause) ? o.grantClause : null;
   const noTradeTeams = clause === "M_NTC" ? await weakestTeams(o.mNtcBreadth ?? 12, o.teamId) : [];
@@ -427,8 +431,6 @@ const fmtM = (n: number) => `$${(n / 1e6).toFixed(2)}M`;
  *  gets 2 re-sign rounds before he's exposed to offer sheets. Regular season only. */
 export async function setFranchiseTagAction(playerId: number, teamId: number, on: boolean) {
   if (!(await canManageTeam(teamId))) return { ok: false as const, error: "You don't manage this team." };
-  const phase = (await getLeagueClock()).phase;
-  if (phase !== "regular" && phase !== "playoffs") return { ok: false as const, error: "Franchise tags are set during the regular season." };
   const p = await prisma.player.findUnique({ where: { id: playerId }, select: { teamId: true, age: true } });
   if (!p) return { ok: false as const, error: "Player not found." };
   const org = await prisma.team.findUnique({ where: { id: teamId }, select: { affiliateTeams: { select: { id: true } } } });
@@ -450,11 +452,11 @@ export async function setFranchiseTagAction(playerId: number, teamId: number, on
  *  offer clears his team-specific floor + term, otherwise he counters with why. */
 export async function extendContractAction(
   playerId: number, teamId: number, salary: number, years: number, line: number, pp: boolean, pk: boolean,
-  grantClause?: string | null, mNtcBreadth?: number | null,
+  grantClause?: string | null, mNtcBreadth?: number | null, offerTwoWay?: boolean,
 ) {
   if (!(await canManageTeam(teamId))) return { ok: false as const, error: "You don't manage this team." };
   const player = await prisma.player.findUnique({
-    where: { id: playerId }, select: { teamId: true, contractYears: true, capHit: true, age: true, name: true, lastSeasonGP: true, resignRound: true, resignStatus: true, rosterType: true, franchiseTag: true },
+    where: { id: playerId }, select: { teamId: true, contractYears: true, capHit: true, age: true, name: true, lastSeasonGP: true, resignRound: true, resignStatus: true, rosterType: true, franchiseTag: true, overall: true, realFarmTeamId: true },
   });
   if (!player) return { ok: false as const, error: "Player not found." };
   // the club may re-sign its own NHL players AND its farm (AHL affiliate) players
@@ -462,6 +464,11 @@ export async function extendContractAction(
   const orgIds = [teamId, ...(org?.affiliateTeams.map((a) => a.id) ?? [])];
   if (!orgIds.includes(player.teamId)) return { ok: false as const, error: "That player isn't in your organization." };
   if ((player.contractYears ?? 99) > 1) return { ok: false as const, error: "He's not in the final year of his deal yet." };
+  // one-way vs two-way: an AHL-caliber player (real farmhand / fringe / already on the
+  // farm) is fine on a two-way; an NHL regular won't accept one — he wants a one-way.
+  const twoWay = !!offerTwoWay;
+  const ahlCaliber = player.rosterType === "AHL" || player.realFarmTeamId != null || (player.overall ?? 70) < 72;
+  if (twoWay && !ahlCaliber) return { ok: false as const, error: "He's an NHL regular — he won't sign a two-way. Offer him a one-way deal." };
   // you can only negotiate an extension once the regular season is underway (his
   // deal expires at the end of THIS season).
   const phase = (await getLeagueClock()).phase;
@@ -533,7 +540,7 @@ export async function extendContractAction(
   }
 
   const expiry = CURRENT_SEASON_START + years;
-  const twoWay = (player.age ?? 27) <= 24 && salary <= 3_000_000;
+  // twoWay already resolved from the GM's choice (offerTwoWay) above
   const noTradeTeams = clause === "M_NTC" ? await weakestTeams(breadth ?? 12, teamId) : [];
   await prisma.player.update({
     where: { id: playerId },
