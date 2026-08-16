@@ -846,6 +846,7 @@ model PlayerGameStat {
   topShot       Float  @default(0) // fastest shot fired (mph) — EDGE
   shifts        Int    @default(0) // shifts taken (Shift Quality)
   positiveShifts Int   @default(0) // shifts where on-ice net xG was positive → Positive Shift %
+  shotZones     Int[]  @default([]) // ALL shots by rink zone [POINT,PERIMETER,CIRCLE,SLOT,NET_FRONT] — full shot map
   game          Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
   player        Player @relation(fields: [playerId], references: [id])
 
@@ -873,6 +874,8 @@ model GoalieGameStat {
   mdSaves      Int     @default(0)
   ldShotsAg    Int     @default(0)
   ldSaves      Int     @default(0)
+  faceZones    Int[]   @default([]) // ALL shots faced by rink zone [POINT,PERIMETER,CIRCLE,SLOT,NET_FRONT]
+  saveZones    Int[]   @default([]) // ALL saves by rink zone — full save map
   game         Game    @relation(fields: [gameId], references: [id], onDelete: Cascade)
   player       Player  @relation(fields: [playerId], references: [id])
 

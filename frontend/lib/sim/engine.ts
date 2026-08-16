@@ -174,6 +174,7 @@ function newPlayerLine(s: SimSkater): PlayerLine {
     conBefore: s.con ?? 100, conAfter: s.con ?? 100,
     xg: 0, hdShots: 0, topShotSpeed: 0,
     shifts: 0, positiveShifts: 0,
+    shotZones: [0, 0, 0, 0, 0],
   };
 }
 
@@ -196,6 +197,7 @@ function initTeamBox(team: SimTeam): TeamBox {
     conBefore: team.goalie.con, conAfter: team.goalie.con, fatigued: team.goalie.fatigued,
     decision: null, xga: 0,
     hdShotsAg: 0, hdSaves: 0, mdShotsAg: 0, mdSaves: 0, ldShotsAg: 0, ldSaves: 0,
+    faceZones: [0, 0, 0, 0, 0], saveZones: [0, 0, 0, 0, 0],
   };
   const backupGoalie: GoalieLine | null = team.backup ? {
     id: team.backup.id, name: team.backup.name, started: false,
@@ -203,6 +205,7 @@ function initTeamBox(team: SimTeam): TeamBox {
     conBefore: team.backup.con, conAfter: team.backup.con, fatigued: false,
     decision: null, xga: 0,
     hdShotsAg: 0, hdSaves: 0, mdShotsAg: 0, mdSaves: 0, ldShotsAg: 0, ldSaves: 0,
+    faceZones: [0, 0, 0, 0, 0], saveZones: [0, 0, 0, 0, 0],
   } : null;
   return {
     teamId: team.id, name: team.name, code: team.code,
@@ -917,7 +920,10 @@ function simulatePeriodPossession(st: SimState, period: number) {
       if (hd) st.box[carrierTeam.id].hdFor++;
       gLine.xga += xg;
       // EDGE: shot location distribution + shot speed (fastest + avg tracked per team)
-      st.box[carrierTeam.id].shotSectors[sectorIndex(sector)]++;
+      const zi = sectorIndex(sector);
+      st.box[carrierTeam.id].shotSectors[zi]++;
+      st.lines[carrierTeam.id][carrier.id].shotZones[zi]++; // per-shooter full shot map (all zones)
+      gLine.faceZones[zi]++;                                 // per-goalie full save map (all zones)
       const mph = shotSpeed(rng, shotType, carrier.attrs.sc ?? 50);
       st.box[carrierTeam.id].shotSpeedSum += mph;
       const shooterLine = st.lines[carrierTeam.id][carrier.id];
@@ -982,6 +988,7 @@ function simulatePeriodPossession(st: SimState, period: number) {
         state = "FACEOFF"; setup = "carry"; continue;
       }
       gLine.saves++;
+      gLine.saveZones[zi]++; // per-goalie full save map (all zones)
       if (danger3 === "hd") gLine.hdSaves++; else if (danger3 === "md") gLine.mdSaves++; else gLine.ldSaves++;
       st.sink.emit({
         period, seconds: tick, type: "SAVE",

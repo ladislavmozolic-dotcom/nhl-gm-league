@@ -142,6 +142,7 @@ export type PlayerLine = {
   topShotSpeed: number;  // fastest shot fired (mph) — EDGE
   shifts: number;        // shifts taken (Shift Quality)
   positiveShifts: number;// shifts with a positive on-ice xG differential
+  shotZones: number[];   // ALL shots by rink zone [POINT,PERIMETER,CIRCLE,SLOT,NET_FRONT]
 };
 
 export type GoalieLine = {
@@ -162,6 +163,8 @@ export type GoalieLine = {
   hdShotsAg: number; hdSaves: number;
   mdShotsAg: number; mdSaves: number;
   ldShotsAg: number; ldSaves: number;
+  faceZones: number[];   // ALL shots faced by rink zone [POINT,PERIMETER,CIRCLE,SLOT,NET_FRONT]
+  saveZones: number[];   // ALL saves by rink zone — full save map
 };
 
 export type GoalEvent = {

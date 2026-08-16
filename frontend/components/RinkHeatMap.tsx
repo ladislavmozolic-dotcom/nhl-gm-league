@@ -91,7 +91,7 @@ export default function RinkHeatMap({ map }: { map: HeatMap }) {
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-[11px] text-slate-600">{isGoalie ? `${map.faced} high-danger shots faced · ${(map.svPct * 100).toFixed(1)}% saved` : `${map.total} tracked shots · ${map.goals} goals`} this season · rink danger zones from shot-location tracking (high-danger chances).</p>
+      <p className="mt-2 text-[11px] text-slate-600">{isGoalie ? `${map.faced} shots faced · ${(map.svPct * 100).toFixed(1)}% saved` : `${map.total} shots · ${map.goals} goals`} this season · every shot by rink zone (point, perimeter, circle, slot, net-front).</p>
     </Card>
   );
 }

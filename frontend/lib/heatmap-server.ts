@@ -56,37 +56,34 @@ export async function playerHeatMap(playerId: number): Promise<HeatMap> {
   if (!p) return null;
   const isGoalie = p.isGoalie || p.position === "G";
   const gameFilter = { season: SEASON, league: "NHL", status: "FINAL" as const, seriesId: null };
+  // zone arrays are stored in SECTORS order: [POINT, PERIMETER, CIRCLE, SLOT, NET_FRONT]
+  const ARR: Zone[] = ["POINT", "PERIMETER", "CIRCLE", "SLOT", "NET_FRONT"];
+  const sumZones = (arrs: number[][]): Map<Zone, number> => {
+    const m = new Map<Zone, number>(); for (const z of ZONES) m.set(z, 0);
+    for (const a of arrs) ARR.forEach((z, i) => m.set(z, (m.get(z) ?? 0) + (a[i] ?? 0)));
+    return m;
+  };
 
   if (isGoalie) {
-    // shots faced = SAVE events by this goalie + GOAL events against this goalie (targetId)
-    const [saveEv, goalEv] = await Promise.all([
-      prisma.gameEvent.findMany({ where: { type: "SAVE", playerId, game: gameFilter }, select: { sector: true } }),
-      prisma.gameEvent.findMany({ where: { type: "GOAL", targetId: playerId, game: gameFilter }, select: { sector: true } }),
-    ]);
-    // Only high-danger SAVE events persist, so a goalie's save data exists only for
-    // the danger zones (SLOT/NET_FRONT). Build faced = saves + goals-in-that-zone,
-    // and ONLY keep zones that have real save data — otherwise low-danger zones would
-    // show goals-only and a nonsense 0% save rate.
-    const savesBy = new Map<Zone, number>(), goalsBy = new Map<Zone, number>();
-    for (const e of saveEv) { const z = norm(e.sector); if (z) savesBy.set(z, (savesBy.get(z) ?? 0) + 1); }
-    for (const e of goalEv) { const z = norm(e.sector); if (z) goalsBy.set(z, (goalsBy.get(z) ?? 0) + 1); }
-    const cells = ZONES.filter((z) => (savesBy.get(z) ?? 0) > 0).map((z) => { const s = savesBy.get(z) ?? 0, f = s + (goalsBy.get(z) ?? 0); return { zone: z, faced: f, saves: s, svPct: f ? s / f : 0 }; });
+    // FULL save map from per-game zone tallies (every shot faced/saved, all zones)
+    const rows = await prisma.goalieGameStat.findMany({ where: { playerId, started: true, game: gameFilter }, select: { faceZones: true, saveZones: true } });
+    const facedBy = sumZones(rows.map((r) => r.faceZones));
+    const savesBy = sumZones(rows.map((r) => r.saveZones));
+    const cells = ZONES.map((z) => { const f = facedBy.get(z) ?? 0, s = savesBy.get(z) ?? 0; return { zone: z, faced: f, saves: s, svPct: f ? s / f : 0 }; }).filter((c) => c.faced > 0);
     const faced = cells.reduce((t, c) => t + c.faced, 0), saves = cells.reduce((t, c) => t + c.saves, 0);
     if (!faced) return null;
     return { kind: "goalie", faced, saves, svPct: faced ? saves / faced : 0, cells };
   }
 
-  const [shotEv, goalEv] = await Promise.all([
-    prisma.gameEvent.findMany({ where: { type: "SHOT", playerId, game: gameFilter }, select: { sector: true } }),
-    prisma.gameEvent.findMany({ where: { type: "GOAL", playerId, game: gameFilter }, select: { sector: true } }),
-  ]);
-  const shotsBy = new Map<Zone, number>(), goalsBy = new Map<Zone, number>();
-  for (const e of shotEv) { const z = norm(e.sector); if (z) shotsBy.set(z, (shotsBy.get(z) ?? 0) + 1); }
-  // a goal's shot is only persisted as SHOT if high-danger — add goals into the shot tally so shot% ≤ 100 and low-danger goals still map
-  for (const e of goalEv) { const z = norm(e.sector); if (z) { goalsBy.set(z, (goalsBy.get(z) ?? 0) + 1); if ((shotsBy.get(z) ?? 0) < (goalsBy.get(z) ?? 0)) shotsBy.set(z, goalsBy.get(z) ?? 0); } }
-  const cells = ZONES.map((z) => { const sh = shotsBy.get(z) ?? 0, g = goalsBy.get(z) ?? 0; return { zone: z, shots: sh, goals: g, shPct: sh ? g / sh : 0 }; });
+  // FULL shot map from per-game zone tallies; goals-by-zone from GOAL events
+  const rows = await prisma.playerGameStat.findMany({ where: { playerId, game: gameFilter }, select: { shotZones: true } });
+  const shotsBy = sumZones(rows.map((r) => r.shotZones));
+  const goalEv = await prisma.gameEvent.findMany({ where: { type: "GOAL", playerId, game: gameFilter }, select: { sector: true } });
+  const goalsBy = new Map<Zone, number>();
+  for (const e of goalEv) { const z = norm(e.sector); if (z) goalsBy.set(z, (goalsBy.get(z) ?? 0) + 1); }
+  const cells = ZONES.map((z) => { const sh = shotsBy.get(z) ?? 0, g = Math.min(sh, goalsBy.get(z) ?? 0); return { zone: z, shots: sh, goals: g, shPct: sh ? g / sh : 0 }; });
   const total = cells.reduce((t, c) => t + c.shots, 0), goals = cells.reduce((t, c) => t + c.goals, 0);
   if (!total) return null;
-  const topZone = [...cells].sort((a, b) => b.shots - a.shots)[0]?.shots ? [...cells].sort((a, b) => b.shots - a.shots)[0].zone : null;
-  return { kind: "skater", total, goals, cells, topZone };
+  const sorted = [...cells].sort((a, b) => b.shots - a.shots);
+  return { kind: "skater", total, goals, cells, topZone: sorted[0]?.shots ? sorted[0].zone : null };
 }

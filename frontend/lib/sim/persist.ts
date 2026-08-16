@@ -37,6 +37,7 @@ function skaterRows(box: TeamBox, gameId: number) {
       conBefore: Math.round(s.conBefore), conAfter: Math.round(s.conAfter),
       xg: s.xg, hdShots: s.hdShots, topShot: s.topShotSpeed,
       shifts: s.shifts, positiveShifts: s.positiveShifts,
+      shotZones: s.shotZones ?? [],
     }));
 }
 
@@ -49,6 +50,7 @@ function goalieRows(box: TeamBox, gameId: number) {
     decision: g.decision, xga: g.xga,
     hdShotsAg: g.hdShotsAg, hdSaves: g.hdSaves, mdShotsAg: g.mdShotsAg, mdSaves: g.mdSaves,
     ldShotsAg: g.ldShotsAg, ldSaves: g.ldSaves,
+    faceZones: g.faceZones ?? [], saveZones: g.saveZones ?? [],
   }));
 }
 
