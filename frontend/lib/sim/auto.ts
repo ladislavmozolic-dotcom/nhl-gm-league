@@ -5,8 +5,28 @@
 import { prisma } from "../prisma";
 import { playScheduledGames } from "./season";
 import { processFinances } from "../finance-server";
+import { getLeagueDate } from "../calendar-server";
+import { addDays, effectivePhase, frenzyRound } from "../calendar";
 
 const SEASON = "2026-27";
+
+/** Off-season only: advance the league clock one day and run any frenzy-round
+ *  transition it crosses (counters/shortlist on a weekly boundary; sign at the
+ *  window close). The regular season is driven by playNextSimDay, so this is a
+ *  no-op during regular / playoffs. */
+export async function advanceFrenzyDay() {
+  const cur = await getLeagueDate();
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { phaseOverride: true } });
+  const ph = (d: Date) => effectivePhase(d, cfg?.phaseOverride);
+  if (ph(cur) === "regular" || ph(cur) === "playoffs") return { advanced: false as const };
+  const next = addDays(cur, 1);
+  const { resolveFrenzy, processRoundEnd } = await import("../../app/free-agents/actions");
+  let signed = 0, roundEnded = 0;
+  if (ph(cur) === "frenzy" && ph(next) !== "frenzy") { signed = (await resolveFrenzy()).signed; }
+  else if (ph(cur) === "frenzy" && ph(next) === "frenzy" && frenzyRound(cur) !== frenzyRound(next)) { await processRoundEnd(frenzyRound(cur)); roundEnded = frenzyRound(cur); }
+  await prisma.leagueConfig.upsert({ where: { id: 1 }, update: { leagueDate: next }, create: { id: 1, leagueDate: next } });
+  return { advanced: true as const, date: next, signed, roundEnded };
+}
 
 /** Current wall-clock in Europe/Bratislava as { date: "YYYY-MM-DD", hour, minute }. */
 export function bratislavaNow(now = new Date()) {
@@ -58,6 +78,11 @@ export async function runAutoSimIfDue() {
 
   const res = await playNextSimDay();
   await prisma.autoSim.update({ where: { id: 1 }, data: { lastRunDate: date } });
-  if (res.played) console.log(`[auto-sim] ${date}: played round ${res.round} (${res.played} games)`);
-  return { ran: true, ...res };
+  if (res.played) { console.log(`[auto-sim] ${date}: played round ${res.round} (${res.played} games)`); return { ran: true, ...res }; }
+
+  // no games to play → off-season: advance the frenzy clock a day (auto-closes each
+  // round after 7 days and signs at the window close).
+  const fr = await advanceFrenzyDay();
+  if (fr.advanced) console.log(`[auto-sim] ${date}: off-season day → ${fr.date?.toISOString?.().slice(0, 10)}${fr.roundEnded ? ` (closed frenzy round ${fr.roundEnded})` : ""}${fr.signed ? ` (${fr.signed} signed)` : ""}`);
+  return { ran: true, ...res, frenzy: fr };
 }
