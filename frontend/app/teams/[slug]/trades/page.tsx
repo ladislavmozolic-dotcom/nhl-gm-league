@@ -2,6 +2,9 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card } from "@/components/ui";
+import { canManageTeam } from "@/lib/auth";
+import { teamRosterForBlock, matchesForTeam, type BlockPlayer } from "@/lib/trade-block-server";
+import TradeBlockManager from "@/components/TradeBlockManager";
 
 export const dynamic = "force-dynamic";
 const SEASON = "2026-27";
@@ -37,9 +40,44 @@ export default async function TeamTradesPage({ params }: { params: Promise<{ slu
   });
   const tById = new Map(teams.map((t) => [t.id, t]));
 
+  // Trade Block management lives here (a GM lists / unlists his own players).
+  const canManage = await canManageTeam(team.id);
+  const [mine, matches] = canManage
+    ? await Promise.all([teamRosterForBlock(team.id), matchesForTeam(team.id)])
+    : [null, null];
+  const money = (c: number | null) => (c != null ? `$${(c / 1_000_000).toFixed(1)}M` : "—");
+  const MatchRow = ({ p }: { p: BlockPlayer }) => (
+    <div className="flex items-center gap-3 px-3 py-2">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          {p.slug ? <Link href={`/players/${p.slug}`} className="text-sm font-semibold hover:text-blue-400 truncate">{p.name}</Link> : <span className="text-sm font-semibold truncate">{p.name}</span>}
+          <span className="text-[11px] text-slate-500">{p.position}</span>
+          <Link href={`/teams/${p.teamSlug}`} className="text-[11px] text-slate-500 hover:text-blue-400">{p.teamCode}</Link>
+        </div>
+        {p.note && <div className="text-[11px] text-amber-400/80 truncate">“{p.note}”</div>}
+      </div>
+      <div className="text-right shrink-0 text-xs text-slate-400"><span className="font-bold text-slate-200">{p.overall ?? "—"}</span> OV · {money(p.capHit)}</div>
+    </div>
+  );
+
+  const manageBlock = canManage && mine ? (
+    <>
+      {matches && matches.needs.length > 0 && matches.matches.length > 0 && (
+        <Card title="🎯 Matches for your needs" accent="text-sky-400">
+          <p className="text-xs text-slate-500 mb-2">Listed players around the league who fit your needs ({matches.needs.join(", ")}). Suggestions only.</p>
+          <div className="divide-y divide-slate-800/60">{matches.matches.map((p) => <MatchRow key={p.id} p={p} />)}</div>
+        </Card>
+      )}
+      <Card title="Manage your Trade Block" accent="text-amber-400">
+        <TradeBlockManager teamId={team.id} teamName={team.name} initialNeeds={mine.needs} players={mine.players} />
+      </Card>
+    </>
+  ) : null;
+
   if (trades.length === 0) {
     return (
       <div className="space-y-6">
+        {manageBlock}
         <Card title="Trades" accent="text-blue-400">
           <p className="text-slate-500 text-center py-8">No trades yet.</p>
         </Card>
@@ -61,6 +99,7 @@ export default async function TeamTradesPage({ params }: { params: Promise<{ slu
 
   return (
     <div className="space-y-6">
+      {manageBlock}
       <Card title="Trades" accent="text-blue-400" bodyClassName="p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

@@ -13,6 +13,7 @@ import CommissionerBanner, { type BannerItem } from "@/components/CommissionerBa
 import { dailyDigest, latestDigestRound } from "@/lib/digest-server";
 import { gmDashboard } from "@/lib/gm-dashboard-server";
 import SeasonDashboard from "@/components/SeasonDashboard";
+import { tradeBlockBoard } from "@/lib/trade-block-server";
 
 export const dynamic = "force-dynamic";
 const SEASON = "2026-27";
@@ -65,6 +66,10 @@ export default async function HomePage() {
   // Tonight's Best — the nightly digest for the "Around the League" box
   const digestRound = await latestDigestRound(SEASON);
   const digest = digestRound ? await dailyDigest(SEASON, digestRound) : null;
+
+  // Trade Block — who's available around the league (flat list for the home card)
+  const tbBoard = await tradeBlockBoard();
+  const tbListed = tbBoard.flatMap((t) => t.players);
 
   // GM command center — full-screen on first load of a session (for a logged-in GM)
   const dash = me != null ? await gmDashboard(me).catch(() => null) : null;
@@ -204,10 +209,19 @@ export default async function HomePage() {
             </div>
           </Card>
 
-          <Card title="Highlights" href="/league/digest" accent="text-amber-400">
-            {highlights.length ? (
-              <ul className="space-y-2 text-sm text-slate-300">{highlights.slice(0, 5).map((h, i) => <li key={i}>{h}</li>)}</ul>
-            ) : <p className="text-sm text-slate-500">Hat tricks and big nights appear here after each simulation.</p>}
+          <Card title="Trade Block" href="/trade-block" accent="text-amber-400">
+            {tbListed.length ? (
+              <div className="space-y-1.5 text-sm">
+                {tbListed.slice(0, 8).map((p) => (
+                  <div key={p.id} className="flex items-center gap-2">
+                    {p.slug ? <Link href={`/players/${p.slug}`} className="flex-1 truncate hover:text-blue-400">{p.name}</Link> : <span className="flex-1 truncate">{p.name}</span>}
+                    <span className="text-slate-500 text-xs">{p.position}</span>
+                    <span className="text-slate-500 text-xs">{p.teamCode}</span>
+                  </div>
+                ))}
+                {tbListed.length > 8 && <Link href="/trade-block" className="block text-xs text-blue-400 hover:underline pt-1">+ {tbListed.length - 8} more →</Link>}
+              </div>
+            ) : <p className="text-sm text-slate-500">No players on the block. GMs list players from their team&apos;s Trades page.</p>}
           </Card>
 
           <Card title="Today's Birthdays" accent="text-pink-400">

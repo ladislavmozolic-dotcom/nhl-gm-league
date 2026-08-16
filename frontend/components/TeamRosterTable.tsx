@@ -74,7 +74,12 @@ export function RosterSection({ title, players, accent, farm }: { title: string;
                     </td>
                     <td className="px-4 py-2.5 text-right whitespace-nowrap">
                       <span className={`font-semibold tabular-nums ${salary > 0 ? "text-white" : "text-slate-600"}`}>{fmtM(salary)}</span>
-                      {player.contractText && <p className="text-[10px] text-slate-500 tabular-nums">{player.contractText.replace(/^\s*[\d,]+\s*\$?\s*\/?\s*/, "").trim() || player.contractText}</p>}
+                      {(() => {
+                        // one uniform sub-line from whatever contract-text format we have
+                        const yr = player.contractText?.match(/(\d+)\s*yr/i)?.[1];
+                        const thru = player.contractText?.match(/through\s*(\d{4})/i)?.[1];
+                        return yr ? <p className="text-[10px] text-slate-500 tabular-nums">{yr} yr{yr === "1" ? "" : "s"}{thru ? ` · through ${thru}` : ""}</p> : null;
+                      })()}
                     </td>
                   </tr>
                 );
