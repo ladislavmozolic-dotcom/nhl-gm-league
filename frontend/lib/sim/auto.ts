@@ -54,6 +54,10 @@ export async function getAutoSim() {
 export async function playNextSimDay() {
   const next = await prisma.game.findFirst({ where: { season: SEASON, status: "SCHEDULED", round: { not: null } }, orderBy: [{ round: "asc" }], select: { round: true } });
   if (!next || next.round == null) return { played: 0, round: null as number | null };
+  // call up from the farm first — any club short of a legal 12F/6D/2G gets its
+  // best available AHL players promoted before the next game (no double-shifting).
+  const { autoFillRosters } = await import("../roster-fill");
+  await autoFillRosters("NHL");
   const r = await playScheduledGames({ season: SEASON, round: next.round, actor: "Auto-sim" });
   await processFinances(SEASON, "NHL");
   return { played: r.played, round: next.round };

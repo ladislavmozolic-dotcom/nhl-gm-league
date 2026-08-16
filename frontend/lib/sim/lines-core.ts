@@ -149,9 +149,11 @@ export function autoLines(skaters: Skater[], goalies: Goalie[] = []): TeamLinesD
 }
 
 /**
- * Fill every empty slot with the best available player, without duplicating a
- * player inside a single line/unit. A forward may appear in up to two forward
- * lines (affecting CON); other slots use each player at most once per section.
+ * Fill every empty slot with the best available player, each roster player used
+ * AT MOST ONCE across the four forward lines and the three D pairs — no
+ * double-shifting. If the roster is too thin to fill all twelve forward / six
+ * defence slots, the extra slots are left EMPTY (a call-up prompt) rather than
+ * repeating a body. Game-day completeness is handled separately by deployDistinct.
  */
 export function autoFill(data: TeamLinesData, skaters: Skater[], goalies: Goalie[] = []): TeamLinesData {
   const d = structuredClone(data);
@@ -160,33 +162,31 @@ export function autoFill(data: TeamLinesData, skaters: Skater[], goalies: Goalie
   const all = [...skaters].sort((a, b) => b.overall - a.overall);
   const gk = [...goalies].sort((a, b) => b.overall - a.overall);
 
-  // forwards: fill nulls; a forward may sit in at most 2 forward lines, never twice in one line
-  const fCount = new Map<number, number>();
-  for (const l of d.forwardLines) for (const id of [l.lw, l.c, l.rw]) if (id != null) fCount.set(id, (fCount.get(id) ?? 0) + 1);
-  const pickF = (line: ForwardLine) => {
-    const inLine = new Set([line.lw, line.c, line.rw].filter((x): x is number => x != null));
-    const p = fwd.find((f) => !inLine.has(f.id) && (fCount.get(f.id) ?? 0) < 2);
-    if (p) { fCount.set(p.id, (fCount.get(p.id) ?? 0) + 1); return p.id; }
+  // forwards: each forward appears at most once across all four lines
+  const fUsed = new Set<number>();
+  for (const l of d.forwardLines) for (const id of [l.lw, l.c, l.rw]) if (id != null) fUsed.add(id);
+  const pickF = () => {
+    const p = fwd.find((f) => !fUsed.has(f.id));
+    if (p) { fUsed.add(p.id); return p.id; }
     return null;
   };
   for (const line of d.forwardLines) {
-    if (line.lw == null) line.lw = pickF(line);
-    if (line.c == null) line.c = pickF(line);
-    if (line.rw == null) line.rw = pickF(line);
+    if (line.lw == null) line.lw = pickF();
+    if (line.c == null) line.c = pickF();
+    if (line.rw == null) line.rw = pickF();
   }
 
-  // defense: each blue-liner used once across the pairs, then reused if roster is thin
+  // defense: each blue-liner used at most once across the three pairs
   const dUsed = new Set<number>();
   for (const p of d.defensePairs) for (const id of [p.ld, p.rd]) if (id != null) dUsed.add(id);
-  const pickD = (pair: DefensePair) => {
-    const inPair = new Set([pair.ld, pair.rd].filter((x): x is number => x != null));
-    const p = def.find((x) => !dUsed.has(x.id) && !inPair.has(x.id)) ?? def.find((x) => !inPair.has(x.id));
+  const pickD = () => {
+    const p = def.find((x) => !dUsed.has(x.id));
     if (p) { dUsed.add(p.id); return p.id; }
     return null;
   };
   for (const pair of d.defensePairs) {
-    if (pair.ld == null) pair.ld = pickD(pair);
-    if (pair.rd == null) pair.rd = pickD(pair);
+    if (pair.ld == null) pair.ld = pickD();
+    if (pair.rd == null) pair.rd = pickD();
   }
 
   // generic unit filler: no duplicate within a unit; prefers `pool`, falls back to all skaters
