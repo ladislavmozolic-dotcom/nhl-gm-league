@@ -5,6 +5,11 @@
 
 export type TicketPricing = "LOW" | "STANDARD" | "PREMIUM";
 
+// League defaults (arena capacity and the season-ticket cap) — shared by the
+// season-ticket and attendance engines.
+export const DEFAULT_ARENA_CAPACITY = 18_500;
+export const DEFAULT_STH_CAP = 14_000;
+
 export type SeasonTicketInput = {
   capacity: number;          // arena capacity
   sthCap: number;            // max seats sold as season tickets
