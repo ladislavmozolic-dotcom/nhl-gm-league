@@ -31,6 +31,7 @@ export default function TeamSubNav({ slug, isGm, isAffiliate, farmSlug, parentSl
         { label: "Home", href: base },
         { label: "Roster", items: [
           { label: "Roster", href: `${base}/roster` },
+          { label: "Roster Moves", href: `${base}/rosters`, gm: true },
           { label: "Lines", href: `${base}/lines`, gm: true },
           { label: "System", href: `${base}/tactics`, gm: true },
         ] },
