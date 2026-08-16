@@ -58,8 +58,10 @@ export async function getInterestAction(playerId: number, teamId: number) {
 
 /** The player's ask at a SPECIFIC promised deployment (line + PP/PK) — a worse
  *  role / stripped special-teams raises it. Used to live-update the offer modal. */
-export async function getAskAtAction(playerId: number, teamId: number, line: number, pp: boolean, pk: boolean) {
-  const ev = await evaluateTeamOffer(playerId, teamId, 0, 1, { line: clampLine(line), pp, pk });
+export async function getAskAtAction(playerId: number, teamId: number, line: number, pp: boolean, pk: boolean, grantClause?: string | null, mNtcBreadth?: number | null) {
+  const clause = grantClause && ["NTC", "NMC", "M_NTC"].includes(grantClause) ? grantClause : null;
+  const breadth = clause === "M_NTC" ? ([6, 12, 18, 24].includes(mNtcBreadth ?? 0) ? mNtcBreadth! : 12) : null;
+  const ev = await evaluateTeamOffer(playerId, teamId, 0, 1, { line: clampLine(line), pp, pk }, undefined, undefined, undefined, { clause, breadth });
   if (!ev) return null;
   return { askSalary: ev.ask.salary, askYears: ev.ask.years, floor: ev.ask.floorSalary, minYears: ev.ask.minYears, maxYears: ev.ask.maxYears };
 }

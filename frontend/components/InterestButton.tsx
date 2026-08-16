@@ -45,14 +45,15 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
   const [breadth, setBreadth] = useState(12);
   const [liveAsk, setLiveAsk] = useState<Awaited<ReturnType<typeof getAskAtAction>>>(null);
 
-  // the ask reacts to the promised role: a worse line / stripped PP-PK raises it
+  // the ask reacts to the promised role (a worse line / stripped PP-PK raises it)
+  // AND to a granted clause (he signs for less)
   useEffect(() => {
     if (!teamId || !(info && info.ok)) return;
     let cancelled = false;
-    getAskAtAction(playerId, teamId, line, pp, pk).then((r) => { if (!cancelled) setLiveAsk(r); });
+    getAskAtAction(playerId, teamId, line, pp, pk, grantClause || null, grantClause === "M_NTC" ? breadth : null).then((r) => { if (!cancelled) setLiveAsk(r); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [line, pp, pk, teamId, info]);
+  }, [line, pp, pk, teamId, info, grantClause, breadth]);
 
   const load = (tid: number) => start(async () => {
     setMsg(null);
