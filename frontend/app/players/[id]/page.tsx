@@ -344,6 +344,8 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                     {rightInfo.map(([label, value]) => (
                       <InfoRow key={label} label={label} value={value} valueClass={label === "Overall" ? "text-yellow-400" : undefined} />
                     ))}
+                    {/* Current Form — derived, in the space under Overall */}
+                    <PlayerFormCard form={form} />
                   </div>
                 </div>
               </div>
@@ -373,8 +375,6 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
             </div>
           </div>
         </div>
-        {/* Current Form banner — derived, under the ratings/Overall strip */}
-        <PlayerFormCard form={form} />
       </Card>
 
       {/* ── SHOT / SAVE + DEFENSIVE HEAT MAPS ──────────────────────── */}
