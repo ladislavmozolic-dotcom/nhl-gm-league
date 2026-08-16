@@ -14,11 +14,12 @@ type Player = {
 // players can't be called up to the NHL roster.
 const NHL_MIN = 775_000;
 const isAhlOnly = (p: Player) => p.capHit > 0 && p.capHit < NHL_MIN;
+// OV badge in green, brighter the higher the rating.
 const ovColor = (ov: number) =>
-  ov >= 80 ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
-  : ov >= 70 ? "bg-sky-500/20 text-sky-300 border-sky-500/40"
-  : ov >= 60 ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
-  : "bg-slate-700/40 text-slate-400 border-slate-600/40";
+  ov >= 80 ? "bg-emerald-500/30 text-emerald-200 border-emerald-400/60"
+  : ov >= 70 ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+  : ov >= 60 ? "bg-emerald-600/12 text-emerald-400/90 border-emerald-600/30"
+  : "bg-emerald-700/10 text-emerald-500/70 border-emerald-700/25";
 type Props = {
   teamName: string; teamSlug: string; affiliateName: string; hasAffiliate: boolean;
   players: Player[]; onSave: (slug: string, rows: MoveRow[]) => Promise<void>;
