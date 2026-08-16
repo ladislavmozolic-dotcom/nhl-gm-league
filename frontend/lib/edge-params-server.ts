@@ -6,19 +6,27 @@
 
 import { prisma } from "./prisma";
 import { cleanName } from "./playerName";
-import { per60, blend, percentileOf, percentileToRating, EDGE_COMPOSITES } from "./edge-params";
+import { per60, blend, percentileOf, percentileToRating, EDGE_COMPOSITES, experienceFromAge, durabilityFromAvailability, leadershipFrom, EDGE_MO_DEFAULT } from "./edge-params";
+
+const CUR_SEASON_GAMES = 82; // real season length reference for durability
 
 const isDef = (pos = "") => /(^|\/)D(\/|$)/.test(pos) || pos === "D";
 
 type Row = {
   id: number; name: string; position: string; league: string; teamCode: string | null;
-  gp: number; metrics: Record<string, number | null>;
+  gp: number; mins: number; age: number | null; captaincy: string | null;
+  curGP: number; lastGP: number; metrics: Record<string, number | null>;
 };
 
 export type EdgeRow = {
   playerId: number; name: string; position: string; posGroup: "F" | "D"; league: string; teamCode: string | null;
-  ratings: Record<string, number>; // SC, PA, CK, DF, EN, FO, DI
+  ratings: Record<string, number>; // SC PA CK DF EN FO DI ST PH EX DU LD MO OV
 };
+
+// per-60 rate metrics get regressed toward the position mean by sample reliability;
+// direct measurements (ice time, weight, SH-TOI) do not.
+const REGRESS_KEYS = new Set(["g60", "a60", "sh60", "off60", "hit60", "blk60", "tk60", "gv60", "pm60", "pim60", "fo", "shpct"]);
+const REGRESS_K = 500; // minutes at which reliability = 0.5
 
 /** Per-60 metric blend (80% current / 20% prior real season) for one player. */
 function metricsFor(p: any): Record<string, number | null> {
@@ -30,27 +38,29 @@ function metricsFor(p: any): Record<string, number | null> {
   const sh60 = rate(p.curSeasonShots ?? 0, p.lastSeasonShots ?? 0);
   const gTot = blend(p.curSeasonG, p.lastSeasonG), shTot = blend(p.curSeasonShots, p.lastSeasonShots);
   return {
-    g60, a60, sh60,
+    g60, a60, sh60, off60: g60 + a60,
     shpct: shTot > 0 ? gTot / shTot : null,
     hit60: rate(p.curSeasonHits ?? 0, p.lastSeasonHits ?? 0),
     blk60: rate(p.curSeasonBlocks ?? 0, p.lastSeasonBlocks ?? 0),
     tk60: rate(p.curSeasonTK ?? 0, p.lastSeasonTK ?? 0),
+    gv60: rate(p.curSeasonGV ?? 0, p.lastSeasonGV ?? 0),
     pm60: rate(p.curSeasonPM ?? 0, p.lastSeasonPM ?? 0),
     pim60: rate(p.curSeasonPim ?? 0, p.lastSeasonPim ?? 0),
     shtoi: blend(p.curSeasonShToi, p.lastSeasonShToi),
     toi: blend(p.curSeasonToi, p.lastSeasonToi),
+    wt: p.weight ?? null,
     // faceoffs only meaningful for players who take them (centres); wingers ~0
     fo: blend(p.curSeasonFoPct, p.lastSeasonFoPct),
   };
 }
 
 const SEL = {
-  id: true, name: true, position: true, rosterType: true, teamId: true,
-  curSeasonGP: true, curSeasonToi: true, curSeasonG: true, curSeasonA: true, curSeasonShots: true,
+  id: true, name: true, position: true, rosterType: true, teamId: true, weight: true, age: true, captaincy: true,
+  curSeasonGP: true, curSeasonToi: true, curSeasonG: true, curSeasonA: true, curSeasonShots: true, curSeasonGV: true,
   curSeasonHits: true, curSeasonBlocks: true, curSeasonTK: true, curSeasonPM: true, curSeasonPim: true,
   curSeasonShToi: true, curSeasonFoPct: true,
   lastSeasonGP: true, lastSeasonToi: true, lastSeasonG: true, lastSeasonA: true, lastSeasonShots: true,
-  lastSeasonHits: true, lastSeasonBlocks: true, lastSeasonTK: true, lastSeasonPM: true, lastSeasonPim: true,
+  lastSeasonHits: true, lastSeasonBlocks: true, lastSeasonTK: true, lastSeasonGV: true, lastSeasonPM: true, lastSeasonPim: true,
   lastSeasonShToi: true, lastSeasonFoPct: true,
 } as const;
 
@@ -60,21 +70,42 @@ export async function edgeRatings(league = "NHL"): Promise<EdgeRow[]> {
   const teams = await prisma.team.findMany({ select: { id: true, code: true } });
   const codeById = new Map(teams.map((t) => [t.id, t.code]));
 
+  const minsOf = (p: any) => (p.curSeasonToi ?? 0) / 60 * (p.curSeasonGP ?? 0) + (p.lastSeasonToi ?? 0) / 60 * (p.lastSeasonGP ?? 0);
   const rows: Row[] = players.map((p) => ({
     id: p.id, name: cleanName(p.name), position: p.position ?? "", league,
     teamCode: p.teamId != null ? codeById.get(p.teamId) ?? null : null,
-    gp: (p.curSeasonGP ?? 0) + (p.lastSeasonGP ?? 0), metrics: metricsFor(p),
+    gp: (p.curSeasonGP ?? 0) + (p.lastSeasonGP ?? 0), mins: minsOf(p),
+    age: p.age ?? null, captaincy: p.captaincy ?? null,
+    curGP: p.curSeasonGP ?? 0, lastGP: p.lastSeasonGP ?? 0, metrics: metricsFor(p),
   }));
 
-  // build sorted-ascending populations per position group, per metric
   const groups: Record<"F" | "D", Row[]> = { F: [], D: [] };
   for (const r of rows) groups[isDef(r.position) ? "D" : "F"].push(r);
 
-  const pops: Record<"F" | "D", Record<string, number[]>> = { F: {}, D: {} };
   const metricKeys = [...new Set(Object.values(EDGE_COMPOSITES).flat().map((m) => m.key))];
+
+  // Sample-size regression: pull each rate metric toward the position mean by
+  // reliability = mins/(mins+K), so a 70-minute rookie can't post SC 99.
+  const means: Record<"F" | "D", Record<string, number>> = { F: {}, D: {} };
   for (const g of ["F", "D"] as const) {
     for (const k of metricKeys) {
-      pops[g][k] = groups[g].map((r) => r.metrics[k]).filter((v): v is number => v != null && !(k === "fo" && v === 0)).sort((a, b) => a - b);
+      const vals = groups[g].map((r) => r.metrics[k]).filter((v): v is number => v != null && !(k === "fo" && v === 0));
+      means[g][k] = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+    }
+  }
+  const reg = (r: Row, g: "F" | "D", k: string): number | null => {
+    const raw = r.metrics[k];
+    if (raw == null) return null;
+    if (!REGRESS_KEYS.has(k)) return raw;
+    const rel = r.mins / (r.mins + REGRESS_K);
+    return raw * rel + means[g][k] * (1 - rel);
+  };
+
+  // populations of REGRESSED values, per position group per metric
+  const pops: Record<"F" | "D", Record<string, number[]>> = { F: {}, D: {} };
+  for (const g of ["F", "D"] as const) {
+    for (const k of metricKeys) {
+      pops[g][k] = groups[g].map((r) => reg(r, g, k)).filter((v): v is number => v != null && !(k === "fo" && v === 0)).sort((a, b) => a - b);
     }
   }
 
@@ -82,18 +113,27 @@ export async function edgeRatings(league = "NHL"): Promise<EdgeRow[]> {
     const grp = isDef(r.position) ? "D" : "F";
     const ratings: Record<string, number> = {};
     for (const [param, metrics] of Object.entries(EDGE_COMPOSITES)) {
-      if (param === "FO" && grp === "D") continue; // D don't take faceoffs
+      if (param === "FO" && grp === "D") continue;
       let wsum = 0, wtot = 0;
       for (const m of metrics) {
-        const v = r.metrics[m.key];
+        const v = reg(r, grp, m.key);
         if (v == null) continue;
-        if (m.key === "fo" && v === 0) continue; // no faceoffs taken → not rated on FO
+        if (m.key === "fo" && v === 0) continue;
         let pct = percentileOf(v, pops[grp][m.key]);
         if (m.invert) pct = 1 - pct;
         wsum += pct * m.weight; wtot += m.weight;
       }
       if (wtot > 0) ratings[param] = percentileToRating(wsum / wtot);
     }
+    // direct / special parameters (not percentile composites)
+    const ex = experienceFromAge(r.age);
+    ratings.EX = ex;
+    ratings.DU = durabilityFromAvailability(r.curGP, CUR_SEASON_GAMES, r.lastGP);
+    ratings.LD = leadershipFrom(r.captaincy, ex);
+    ratings.MO = EDGE_MO_DEFAULT;
+    // OV — informative average of the computed on-ice ratings (never enters the sim)
+    const onIce = ["SC", "PA", "CK", "DF", "EN", "FO", "DI", "ST", "PH"].map((k) => ratings[k]).filter((v) => v != null);
+    if (onIce.length) ratings.OV = Math.round(onIce.reduce((a, b) => a + b, 0) / onIce.length);
     return { playerId: r.id, name: r.name, position: r.position, posGroup: grp, league: r.league, teamCode: r.teamCode, ratings };
   });
 

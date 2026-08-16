@@ -13,6 +13,12 @@ const PARAMS: { key: string; label: string; title: string }[] = [
   { key: "EN", label: "EN", title: "Endurance — ice time per game" },
   { key: "FO", label: "FO", title: "Faceoffs — win % (centres)" },
   { key: "DI", label: "DI", title: "Discipline — inverse of penalties/60" },
+  { key: "ST", label: "ST", title: "Strength — size + physical engagement (hits)" },
+  { key: "PH", label: "PH", title: "Puck handling — creation + takeaways, fewer giveaways (approx)" },
+  { key: "EX", label: "EX", title: "Experience — age curve (career-GP feed later)" },
+  { key: "DU", label: "DU", title: "Durability — games available vs possible" },
+  { key: "LD", label: "LD", title: "Leadership — captaincy + experience (commissioner may override)" },
+  { key: "OV", label: "OV", title: "Overall — informative average, never enters the sim" },
 ];
 
 export default async function EdgeCalculatorPage({ searchParams }: { searchParams: Promise<{ league?: string }> }) {

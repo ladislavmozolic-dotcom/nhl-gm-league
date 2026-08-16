@@ -61,7 +61,38 @@ export const EDGE_COMPOSITES: Record<string, Metric[]> = {
   FO: [{ key: "fo", weight: 1.0 }],
   // discipline — inverse of penalties per 60
   DI: [{ key: "pim60", weight: 1.0, invert: true }],
+  // strength — size + physical engagement (board/battle proxy: hits)
+  ST: [{ key: "wt", weight: 0.6 }, { key: "hit60", weight: 0.4 }],
+  // puck handling — creation + takeaways, penalised for giveaways (entry/carry
+  // tracking not in the feed yet, so this is a possession-events proxy)
+  PH: [{ key: "off60", weight: 0.5 }, { key: "tk60", weight: 0.2 }, { key: "gv60", weight: 0.3, invert: true }],
 };
+
+/** EX — experience, an absolute age curve (we lack career-GP totals). 1000-game
+ *  vet ≈ 95+, rookie ≈ 50-60. */
+export function experienceFromAge(age: number | null | undefined): number {
+  const a = age ?? 24;
+  if (a <= 20) return 52;
+  if (a >= 35) return 95;
+  return Math.round(52 + ((a - 20) / 15) * 43); // 20→52 … 35→95
+}
+
+/** DU — durability from availability (games played / possible), blended 80/20.
+ *  Kept off the floor so one lost season doesn't zero it. */
+export function durabilityFromAvailability(curGP: number, curPossible: number, lastGP: number): number {
+  const lastAvail = clamp(lastGP / 82, 0, 1);
+  const curAvail = curPossible > 0 ? clamp(curGP / curPossible, 0, 1) : lastAvail;
+  const avail = curPossible >= 20 ? curAvail * CUR_W + lastAvail * LAST_W : lastAvail;
+  return Math.round(clamp(55 + avail * 44, 45, 99));
+}
+
+/** LD — leadership from captaincy + experience (commissioner may override). */
+export function leadershipFrom(captaincy: string | null | undefined, ex: number): number {
+  const base = captaincy === "C" ? 86 : captaincy === "A" ? 78 : 68;
+  return Math.round(clamp(base + (ex - 70) * 0.2, 50, 99));
+}
+
+export const EDGE_MO_DEFAULT = 50; // morale starts at league default, then our universe moves it
 
 function clamp(x: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, x));
