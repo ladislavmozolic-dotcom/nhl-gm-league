@@ -9,6 +9,8 @@ import { playerCareer } from "@/lib/career-server";
 import PlayerCareerCard from "@/components/PlayerCareerCard";
 import { playerForm } from "@/lib/form-server";
 import PlayerFormCard from "@/components/PlayerFormCard";
+import { playerHeatMap } from "@/lib/heatmap-server";
+import RinkHeatMap from "@/components/RinkHeatMap";
 
 export const dynamic = "force-dynamic";
 
@@ -219,6 +221,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
 
   const career = await playerCareer(p.id);
   const form = await playerForm(p.id);
+  const heatMap = await playerHeatMap(p.id);
 
   const team = p.team as any;
   const teamCode: string = team?.code ?? team?.name ?? "—";
@@ -372,6 +375,9 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
 
       {/* ── CURRENT FORM (derived) vs MO (stored) ─────────────────── */}
       <PlayerFormCard form={form} />
+
+      {/* ── SHOT / SAVE HEAT MAP ───────────────────────────────────── */}
+      {heatMap && <RinkHeatMap map={heatMap} />}
 
       {/* ── PLAYER STATS ─────────────────────────────────────────── */}
       <Card title="Player Stats" bodyClassName="p-4">
