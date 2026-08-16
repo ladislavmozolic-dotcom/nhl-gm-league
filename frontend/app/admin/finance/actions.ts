@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { processFinances } from "@/lib/finance-server";
 import { importCoachSalariesFromProfinhl } from "@/lib/coach-import-server";
+import { importRetentionsFromProfinhl } from "@/lib/retention-import-server";
 import { isAdmin } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
@@ -20,5 +21,13 @@ export async function importCoachSalariesAction() {
   const r = await importCoachSalariesFromProfinhl();
   revalidatePath("/admin/finance");
   revalidatePath("/finance/dashboard");
+  return { ok: true as const, ...r };
+}
+
+/** Pull salary retentions from profinhl.cz/RetainedSalary.php onto matching players. */
+export async function importRetentionsAction() {
+  if (!(await isAdmin())) return { ok: false as const, error: "Commissioner only." };
+  const r = await importRetentionsFromProfinhl();
+  revalidatePath("/admin/finance");
   return { ok: true as const, ...r };
 }

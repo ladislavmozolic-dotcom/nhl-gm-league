@@ -21,9 +21,12 @@ export default async function AdminFinancePage() {
         right={<Link href="/admin" className="text-sm text-slate-400 hover:text-blue-400">← Admin</Link>}
       />
       <Card>
-        <div className="text-sm font-semibold mb-1">Coaching salaries</div>
-        <p className="text-xs text-slate-500 mb-3">Pull each club&apos;s head-coach salary (NHL + AHL) from profinhl.cz/Coaches.php and link the coach. Feeds the Detailed Finance coaching-expense line.</p>
-        <CoachImportButton />
+        <div className="text-sm font-semibold mb-1">Profinhl imports</div>
+        <p className="text-xs text-slate-500 mb-3">Pull head-coach salaries (NHL + AHL, feeds the coaching-expense line) and salary retentions (shown on player profiles as “Actual Salary after Retention”) from profinhl.cz.</p>
+        <div className="space-y-2">
+          <CoachImportButton kind="coaches" />
+          <CoachImportButton kind="retentions" />
+        </div>
       </Card>
       <PopularityEditor teams={teams} onSave={savePopularity} />
     </div>

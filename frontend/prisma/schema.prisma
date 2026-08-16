@@ -105,6 +105,7 @@ model Player {
   contractText         String?
   rosterType           String?
   scratched            Boolean       @default(false) // AHL org player beyond the active AHL roster — a healthy scratch, dresses nowhere
+  retainedSalary       Int           @default(0)     // salary retained by a former club (STHS retention/buyout) — imported from profinhl RetainedSalary.php
   retiredSeason        String?       // season the player retired (rosterType=RETIRED) — for Hall of Fame / career close
   hofSeason            String?       // season inducted into the Hall of Fame (null = not inducted)
   onBlock              Boolean       @default(false) // GM has listed this player on the Trade Block

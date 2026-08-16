@@ -252,10 +252,15 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     ["Status", status],
     [isGoalie ? "Catches" : "Shoots", p.shoots ?? "—"],
   ];
+  const retained = p.retainedSalary ?? 0;
   const rightInfo: [string, React.ReactNode][] = [
     ["Contract Length", p.contractYears != null ? `${p.contractYears} yr${p.contractYears === 1 ? "" : "s"}` : "—"],
     ["Type", contractType],
     ["Cap Hit", capHit],
+    ...(retained > 0 ? ([
+      ["Salary Retention", <span className="text-amber-300">−{`$${(retained / 1e6).toFixed(2)}M`} retained</span>],
+      ["Actual Salary after Retention", <b className="text-emerald-300">{`$${(Math.max(0, (p.capHit ?? 0) - retained) / 1e6).toFixed(2)}M`}</b>],
+    ] as [string, React.ReactNode][]) : []),
     ["Last Year Salary", p.capHit != null ? capHit : "—"],
     ["Overall", overall != null ? String(overall) : "—"],
   ];
