@@ -14,6 +14,11 @@ type Player = {
 // players can't be called up to the NHL roster.
 const NHL_MIN = 775_000;
 const isAhlOnly = (p: Player) => p.capHit > 0 && p.capHit < NHL_MIN;
+const ovColor = (ov: number) =>
+  ov >= 80 ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+  : ov >= 70 ? "bg-sky-500/20 text-sky-300 border-sky-500/40"
+  : ov >= 60 ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
+  : "bg-slate-700/40 text-slate-400 border-slate-600/40";
 type Props = {
   teamName: string; teamSlug: string; affiliateName: string; hasAffiliate: boolean;
   players: Player[]; onSave: (slug: string, rows: MoveRow[]) => Promise<void>;
@@ -58,6 +63,27 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
   if (proSkaters < ROSTER_LIMITS.proMinSkaters) warnings.push(`Pro short of ${ROSTER_LIMITS.proMinSkaters} skaters — the farm auto-fills at game time.`);
   if (goalies(pro) < ROSTER_LIMITS.proMinGoalies) warnings.push(`Pro short of ${ROSTER_LIMITS.proMinGoalies} goalies — the farm auto-fills at game time.`);
 
+  // Auto Roster — fill the NHL roster with the best available (18 skaters + 2
+  // goalies), keeping one-way players up; the next-best fill the AHL active roster
+  // (18+2); everyone else is scratched. AHL-only deals never go up.
+  const autoRoster = () => {
+    const byOV = (a: Player, b: Player) => b.overall - a.overall;
+    const sk = rows.filter((r) => !r.isGoalie);
+    const gk = rows.filter((r) => r.isGoalie);
+    const forcedUp = (p: Player) => p.contractType === "ONE_WAY" && !isAhlOnly(p);
+    const proPool = (pool: Player[], n: number) => {
+      const forced = pool.filter(forcedUp);
+      const rest = pool.filter((p) => !forcedUp(p) && !isAhlOnly(p)).sort(byOV);
+      return [...forced, ...rest].slice(0, Math.max(n, forced.length)).map((p) => p.id);
+    };
+    const proIds = new Set([...proPool(sk, ROSTER_LIMITS.proMinSkaters), ...proPool(gk, ROSTER_LIMITS.proMinGoalies)]);
+    const remSk = sk.filter((p) => !proIds.has(p.id)).sort(byOV);
+    const remGk = gk.filter((p) => !proIds.has(p.id)).sort(byOV);
+    const farmIds = new Set([...remSk.slice(0, 18), ...remGk.slice(0, 2)].map((p) => p.id));
+    setRows((prev) => prev.map((p) => ({ ...p, side: proIds.has(p.id) ? "pro" : farmIds.has(p.id) ? "farm" : "scratched" })));
+    setSaved(false); setErr(null);
+  };
+
   const save = () => start(async () => {
     setErr(null);
     try { await onSave(teamSlug, rows.map((r) => ({ id: r.id, side: r.side, contractType: r.contractType }))); setSaved(true); }
@@ -74,9 +100,11 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
     const oneWay = p.contractType === "ONE_WAY";
     const ahlOnly = isAhlOnly(p);
     return (
-      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-800/60 text-sm hover:bg-slate-800/30">
-        <span className="flex-1 min-w-0 truncate">{p.name}
-          <span className="text-slate-500 text-xs ml-1">{p.position} · {p.overall}</span>
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-slate-800/60 text-sm hover:bg-slate-800/30">
+        <span className={`shrink-0 w-9 text-center tabular-nums font-bold text-sm px-1 py-0.5 rounded border ${ovColor(p.overall)}`}>{p.overall}</span>
+        <span className="flex-1 min-w-0 truncate">
+          <span className="font-medium">{p.name}</span>
+          <span className="text-slate-500 text-xs ml-1.5">{p.position}</span>
         </span>
         {ahlOnly ? (
           <span title="Minor-league (AHL-only) contract — below the NHL minimum salary, can't be called up"
@@ -103,7 +131,7 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
         <div className="font-bold text-sm">{title}</div>
         <div className="text-[11px] text-slate-500">{sub}</div>
       </div>
-      <div className="max-h-[60vh] overflow-y-auto">
+      <div className="max-h-[68vh] overflow-y-auto">
         {list.length === 0 && <div className="px-3 py-3 text-slate-600 text-sm">empty</div>}
         {list.map((p) => <Row key={p.id} p={p} />)}
       </div>
@@ -116,7 +144,7 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
   );
 
   return (
-    <div className="max-w-4xl mx-auto px-4 pb-28">
+    <div className="w-full px-6 pb-28">
       <div className="mb-5">
         <h1 className="text-2xl font-bold">{teamName} — Rosters</h1>
         <div className="flex gap-3 text-sm mt-1">
@@ -143,10 +171,15 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 bg-slate-950/90 border-t border-slate-800 backdrop-blur px-4 py-3">
-        <div className="max-w-4xl mx-auto flex items-center gap-3">
+        <div className="w-full px-2 flex items-center gap-3">
           <button onClick={save} disabled={pending || blockers.length > 0}
             className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 font-semibold text-sm disabled:opacity-50">
             {pending ? "Saving…" : "Save rosters"}
+          </button>
+          <button onClick={autoRoster} disabled={pending}
+            className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 font-semibold text-sm disabled:opacity-50"
+            title="Fill the NHL roster with the best available (18+2), the rest to the farm, overflow scratched">
+            Auto Roster
           </button>
           {blockers.length > 0 && <span className="text-red-400 text-sm">Fix the cap/limit issue to save</span>}
           {saved && <span className="text-green-400 text-sm">✓ Saved</span>}
