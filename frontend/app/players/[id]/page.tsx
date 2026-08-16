@@ -14,6 +14,9 @@ import RinkHeatMap from "@/components/RinkHeatMap";
 import RinkDefenseMap from "@/components/RinkDefenseMap";
 import { goalieAnalytics } from "@/lib/goalie-analytics-server";
 import GoalieAnalyticsCard from "@/components/GoalieAnalyticsCard";
+import { starPowerForPlayer } from "@/lib/star-power-server";
+import { tierAccent } from "@/lib/star-power";
+import InfoTip from "@/components/InfoTip";
 
 export const dynamic = "force-dynamic";
 
@@ -227,6 +230,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   const heatMap = await playerHeatMap(p.id);
   const defenseMap = isGoalie ? null : await playerDefenseMap(p.id);
   const goalieStats = isGoalie ? await goalieAnalytics(p.id) : null;
+  const star = await starPowerForPlayer(p.id);
 
   const team = p.team as any;
   const teamCode: string = team?.code ?? team?.name ?? "—";
@@ -319,6 +323,12 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                   <span className="text-2xl md:text-3xl font-black text-slate-500">| #{p.number ?? "—"}</span>
                   {flag && <span className="text-2xl leading-none" title={p.nationality}>{flag}</span>}
                   {ptype && <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/30" title="Player type — derived from ratings">{ptype}</span>}
+                  {star && (
+                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-800/80 border border-slate-600/40 ${tierAccent(star.tier)}`}>
+                      ⭐ {star.tier} · {star.score}
+                      <InfoTip text={`Star Power — business & media value (no on-ice effect). Drives merchandise, jersey sales, fan interest, ticket demand and sponsorships.${star.reasons.length ? " " + star.reasons.join(" · ") + "." : ""}`} />
+                    </span>
+                  )}
                   <a href={`https://www.eliteprospects.com/search/player?q=${encodeURIComponent(cleanName(p.name))}`} target="_blank" rel="noopener noreferrer"
                     className="ml-auto inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-600/40 transition-colors">
                     EliteProspects <span aria-hidden>↗</span>

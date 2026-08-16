@@ -9,6 +9,7 @@ const TABS = [
   { key: "teams", label: "Team Stats", href: "/stats/teams" },
   { key: "franchise", label: "Franchise Leaders", href: "/stats/franchise" },
   { key: "career", label: "Career Stats", href: "/stats/career" },
+  { key: "star-power", label: "Star Power", href: "/stats/star-power" },
 ];
 
 export default function StatsTabs({ active, league = "NHL" }: { active: string; league?: string }) {
