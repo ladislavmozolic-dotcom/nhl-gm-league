@@ -11,6 +11,8 @@ import { getTeamSession } from "@/lib/auth";
 import { activeAnnouncements } from "@/lib/announcements";
 import CommissionerBanner, { type BannerItem } from "@/components/CommissionerBanner";
 import { dailyDigest, latestDigestRound } from "@/lib/digest-server";
+import { gmDashboard } from "@/lib/gm-dashboard-server";
+import SeasonDashboard from "@/components/SeasonDashboard";
 
 export const dynamic = "force-dynamic";
 const SEASON = "2026-27";
@@ -63,6 +65,9 @@ export default async function HomePage() {
   // Tonight's Best — the nightly digest for the "Around the League" box
   const digestRound = await latestDigestRound(SEASON);
   const digest = digestRound ? await dailyDigest(SEASON, digestRound) : null;
+
+  // GM command center — full-screen on first load of a session (for a logged-in GM)
+  const dash = me != null ? await gmDashboard(me).catch(() => null) : null;
 
   const leaderTeam = leader ? teamById.get(leader.teamId) : null;
   const topScorers = [...leaders].sort((a, b) => b.points - a.points).slice(0, 6);
@@ -117,6 +122,7 @@ export default async function HomePage() {
 
   return (
     <div className="py-2">
+      {dash && <SeasonDashboard data={dash} />}
       {/* Stat row */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
         <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg shadow-black/20">
