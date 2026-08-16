@@ -61,6 +61,13 @@ export async function processFinances(season = "2026-27", league = "NHL") {
   const realMode = cfg?.rosterMode === "real";
   const rewards = league === "NHL" ? await computeRewards(season) : new Map<number, number>();
 
+  // Detailed Finance: drive the bank off the fan-interest → demand → revenue model
+  // instead of the base ticket income (NHL only). Season net is pro-rated by how
+  // much of the 82-game season has been played.
+  const { loadSettings } = await import("./sim/settings");
+  const detailed = league === "NHL" && (await loadSettings()).financeMode === "detailed";
+  const detailedFin = detailed ? await (await import("./detailed-finance-server")).leagueDetailedFinance() : null;
+
   const updates: Promise<unknown>[] = [];
   for (const t of teams) {
     const [homeGames, totalGames] = await Promise.all([
@@ -69,18 +76,27 @@ export async function processFinances(season = "2026-27", league = "NHL") {
     ]);
     const st = stById.get(t.id);
     const startBank = realMode ? STARTING_BANK : (t.profinhlBank ?? STARTING_BANK);
-    const fin = computeTeamFinance({
-      popularity: t.popularity,
-      pointsPct: st?.pointsPct ?? 0.5,
-      selloutRevenue: selloutRevenue(getArenaSections(t)),
-      salary: t.players.reduce((s, p) => s + (p.capHit ?? 0), 0),
-      homeGamesPlayed: homeGames,
-      totalGamesPlayed: totalGames,
-      startingBank: startBank,
-    });
     const reward = rewards.get(t.id) ?? 0;
+
+    let bank: number;
+    const df = detailedFin?.get(t.id);
+    if (df) {
+      const progress = Math.min(1, totalGames / 82); // season fraction played
+      bank = startBank + df.net * progress;
+    } else {
+      const fin = computeTeamFinance({
+        popularity: t.popularity,
+        pointsPct: st?.pointsPct ?? 0.5,
+        selloutRevenue: selloutRevenue(getArenaSections(t)),
+        salary: t.players.reduce((s, p) => s + (p.capHit ?? 0), 0),
+        homeGamesPlayed: homeGames,
+        totalGamesPlayed: totalGames,
+        startingBank: startBank,
+      });
+      bank = fin.bankAccount;
+    }
     // ledgerAdj preserves GM cash moves (trades/buyouts/fines) across this recompute
-    updates.push(prisma.team.update({ where: { id: t.id }, data: { bankAccount: Math.round(fin.bankAccount + reward + (t.ledgerAdj ?? 0)) } }));
+    updates.push(prisma.team.update({ where: { id: t.id }, data: { bankAccount: Math.round(bank + reward + (t.ledgerAdj ?? 0)) } }));
   }
   await Promise.all(updates);
   return { teams: teams.length };

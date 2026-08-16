@@ -4,19 +4,48 @@
 // Merchandise and Sponsorship into one club P&L with plain-English reasons.
 
 import { prisma } from "./prisma";
-import { teamFanInterest } from "./fan-interest-server";
+import { teamFanInterest, leagueFanInterest } from "./fan-interest-server";
 import { teamSeasonTickets } from "./season-tickets-server";
 import { teamAttendance } from "./attendance-server";
 import { teamMerchandise, leagueMerch } from "./merchandise-server";
 import { teamSponsor } from "./sponsorship-server";
+import { allStarPowers } from "./star-power-server";
+import { seasonTickets, DEFAULT_ARENA_CAPACITY, DEFAULT_STH_CAP, type TicketPricing } from "./season-tickets";
+import { attendancePct } from "./attendance";
+import { teamMerch, jerseyUnits } from "./merchandise";
+import { clubRevenueLines, clubRevenueTotal, clubOverhead, type FinanceLine } from "./club-finance";
 
-const HOME_GAMES = 41;
-const SEASON_PRICE: Record<string, number> = { LOW: 2200, STANDARD: 2800, PREMIUM: 3600 };
-const SINGLE_PRICE: Record<string, number> = { LOW: 55, STANDARD: 75, PREMIUM: 95 };
-const LEAGUE_REVENUE = 17_000_000;
-const OVERHEAD = 30_000_000; // arena ops, staff, travel, etc.
+const asPricing = (s: string | null | undefined): TicketPricing => (s === "LOW" || s === "PREMIUM" ? s : "STANDARD");
 
-export type FinanceLine = { label: string; amount: number };
+/** Full-season detailed revenue & net income for EVERY NHL club, in a single pass
+ *  (one Fan-Interest + one Star-Power computation, shared). Used by processFinances
+ *  to drive the bank in detailed mode. Returns per-team season totals (not pro-rated). */
+export async function leagueDetailedFinance(): Promise<Map<number, { revenue: number; salary: number; net: number }>> {
+  const [fans, stars, teams] = await Promise.all([
+    leagueFanInterest(),
+    allStarPowers(),
+    prisma.team.findMany({ where: { league: "NHL", isAffiliate: false }, select: { id: true, ticketPricing: true, sponsorDeal: true, players: { where: { rosterType: "NHL" }, select: { capHit: true } } } }),
+  ]);
+  const jerseyByTeam = new Map<number, number>();
+  for (const s of stars) if (s.teamId != null) jerseyByTeam.set(s.teamId, (jerseyByTeam.get(s.teamId) ?? 0) + jerseyUnits(s.score));
+  const fanById = new Map(fans.map((f) => [f.teamId, f]));
+
+  const out = new Map<number, { revenue: number; salary: number; net: number }>();
+  for (const t of teams) {
+    const f = fanById.get(t.id);
+    if (!f) continue;
+    const pricing = asPricing(t.ticketPricing);
+    const st = seasonTickets({ capacity: DEFAULT_ARENA_CAPACITY, sthCap: DEFAULT_STH_CAP, fanInterest: f.interest, baselineInterest: f.baseline, pricing });
+    const avg = Math.round(attendancePct({ fanInterest: f.interest, pricing, sthFraction: st.sold / DEFAULT_ARENA_CAPACITY }) * DEFAULT_ARENA_CAPACITY);
+    const merch = teamMerch({ jerseyUnitsTotal: jerseyByTeam.get(t.id) ?? 0, fanInterest: f.interest, baselineInterest: f.baseline });
+    const deal = t.sponsorDeal as { aav?: number } | null;
+    const revenue = clubRevenueTotal({ pricing, sthSold: st.sold, avgAttendance: avg, fanInterest: f.interest, merchTotal: merch.total, sponsorAav: deal?.aav ?? 0 });
+    const salary = t.players.reduce((s, p) => s + (p.capHit ?? 0), 0);
+    out.set(t.id, { revenue, salary, net: revenue - salary - clubOverhead() });
+  }
+  return out;
+}
+
 export type TeamDashboard = {
   teamId: number; name: string;
   cash: number; revenue: number; expenses: number; profit: number;
@@ -35,25 +64,17 @@ export async function teamDashboard(teamId: number): Promise<TeamDashboard | nul
     prisma.player.findMany({ where: { teamId, rosterType: "NHL" }, select: { capHit: true } }),
   ]);
 
-  const pricing = team.ticketPricing ?? "STANDARD";
+  const pricing = asPricing(team.ticketPricing);
   const sold = st?.sold ?? 0;
   const avg = att?.avg ?? 0;
 
-  const seasonTicketRev = sold * (SEASON_PRICE[pricing] ?? 2800);
-  const gateRev = Math.max(0, avg - sold) * (SINGLE_PRICE[pricing] ?? 75) * HOME_GAMES;
-  const merchRev = merch?.total ?? 0;
-  const sponsorRev = sponsor?.deal?.aav ?? 0;
-
-  const revenueLines: FinanceLine[] = [
-    { label: "Season tickets", amount: seasonTicketRev },
-    { label: "Gate (single-game)", amount: gateRev },
-    { label: "Merchandise", amount: merchRev },
-    { label: "Sponsorship", amount: sponsorRev },
-    { label: "League revenue", amount: LEAGUE_REVENUE },
-  ];
+  const revenueLines: FinanceLine[] = clubRevenueLines({
+    pricing, sthSold: sold, avgAttendance: avg,
+    fanInterest: fan?.interest ?? 0, merchTotal: merch?.total ?? 0, sponsorAav: sponsor?.deal?.aav ?? 0,
+  });
   const revenue = revenueLines.reduce((t, l) => t + l.amount, 0);
   const salary = roster.reduce((t, p) => t + (p.capHit ?? 0), 0);
-  const expenses = salary + OVERHEAD;
+  const expenses = salary + clubOverhead();
   const profit = revenue - expenses;
 
   const merchRank = merchBoard.findIndex((m) => m.teamId === teamId) + 1;
