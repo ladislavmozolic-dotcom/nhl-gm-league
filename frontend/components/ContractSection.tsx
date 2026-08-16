@@ -6,6 +6,7 @@ import ElcApplyButton from "@/components/ElcApplyButton";
 import { computeELC } from "@/lib/elc";
 import { faPosGroup } from "@/lib/free-agency";
 import { loadSettings } from "@/lib/sim/settings";
+import { getLeagueClock } from "@/lib/calendar-server";
 import { cleanName } from "@/lib/playerName";
 
 // A player entering his final year is up for renewal. Status by age (our rule):
@@ -29,6 +30,9 @@ const META: Record<Group, { title: string; blurb: string; accent: string }> = {
 export default async function ContractSection({ teamId }: { teamId: number }) {
   const canManage = await canManageTeam(teamId);
   const franchiseEnabled = (await loadSettings()).faMode === "full";
+  // extensions only open once the regular season is underway (final contract year)
+  const phase = (await getLeagueClock()).phase;
+  const canNegotiate = phase === "regular" || phase === "playoffs";
   // include the club's AHL/farm players whose deals are up too
   const org = await prisma.team.findUnique({ where: { id: teamId }, select: { affiliateTeams: { select: { id: true } } } });
   const orgIds = [teamId, ...(org?.affiliateTeams.map((a) => a.id) ?? [])];
@@ -89,7 +93,7 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
 
       {(["UFA", "RFA"] as Group[]).map((g) =>
         groups[g].length === 0 ? null : canManage ? (
-          <ReSignPanel key={g} teamId={teamId} title={META[g].title} blurb={META[g].blurb} accent={META[g].accent} group={g} franchiseEnabled={franchiseEnabled}
+          <ReSignPanel key={g} teamId={teamId} title={META[g].title} blurb={META[g].blurb} accent={META[g].accent} group={g} franchiseEnabled={franchiseEnabled} canNegotiate={canNegotiate}
             players={groups[g].map((p) => ({ id: p.id, name: p.name, capHit: p.capHit, contractYears: p.contractYears, contractText: p.contractText, farm: p.rosterType === "AHL", franchiseTag: p.franchiseTag }))} />
         ) : (
           <Card key={g} title={`${META[g].title} (${groups[g].length})`} accent={META[g].accent}>

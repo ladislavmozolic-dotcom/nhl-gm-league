@@ -171,8 +171,8 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
   );
 }
 
-export default function ReSignPanel({ teamId, players, title, blurb, accent = "text-amber-400", group, franchiseEnabled = true }: {
-  teamId: number; players: ExpiringPlayer[]; title?: string; blurb?: string; accent?: string; group?: string; franchiseEnabled?: boolean;
+export default function ReSignPanel({ teamId, players, title, blurb, accent = "text-amber-400", group, franchiseEnabled = true, canNegotiate = true }: {
+  teamId: number; players: ExpiringPlayer[]; title?: string; blurb?: string; accent?: string; group?: string; franchiseEnabled?: boolean; canNegotiate?: boolean;
 }) {
   const [tagPending, startTag] = useTransition();
   const [tagged, setTagged] = useState<number | null>(players.find((p) => p.franchiseTag)?.id ?? null);
@@ -215,10 +215,17 @@ export default function ReSignPanel({ teamId, players, title, blurb, accent = "t
                   ★ {tagged === p.id ? "Franchise" : "Tag"}
                 </button>
               )}
-              <button onClick={() => setOpenPlayer(p)}
-                className="px-3 py-1 rounded-md bg-green-600/80 hover:bg-green-500 text-white text-xs font-semibold whitespace-nowrap">
-                Re-sign
-              </button>
+              {canNegotiate ? (
+                <button onClick={() => setOpenPlayer(p)}
+                  className="px-3 py-1 rounded-md bg-green-600/80 hover:bg-green-500 text-white text-xs font-semibold whitespace-nowrap">
+                  Re-sign
+                </button>
+              ) : (
+                <span title="Extensions open once the regular season starts — a player can only be re-signed during the final year of his deal."
+                  className="px-3 py-1 rounded-md bg-slate-800 text-slate-500 border border-slate-700 text-xs font-semibold whitespace-nowrap cursor-not-allowed">
+                  Unavailable
+                </span>
+              )}
             </div>
           </div>
         ))}

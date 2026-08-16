@@ -36,6 +36,12 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
   const scratched = rows.filter((r) => r.side === "scratched").sort(byName);
   const goalies = (l: Player[]) => l.filter((p) => p.isGoalie).length;
   const proSkaters = pro.length - goalies(pro);
+  const isDef = (pos: string) => /(^|\/)D(\/|$)/.test(pos) || pos === "D";
+  const fdg = (l: Player[]) => {
+    const g = l.filter((p) => p.isGoalie).length;
+    const d = l.filter((p) => !p.isGoalie && isDef(p.position)).length;
+    return `${l.length - g - d}F · ${d}D · ${g}G`;
+  };
 
   // is a move legal? (down = to the farm or the scratch list)
   const canMove = (p: Player, to: RosterSide) => {
@@ -119,7 +125,8 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
         <div className="flex items-center gap-1 shrink-0">
           {p.side !== "pro" && <MoveBtn p={p} to="pro" label="↑ Pro" />}
           {p.side !== "farm" && <MoveBtn p={p} to="farm" label={p.side === "pro" ? "↓ Farm" : "Dress"} />}
-          {p.side !== "scratched" && <MoveBtn p={p} to="scratched" label="Scratch" />}
+          {/* Scratch only from the active AHL roster — NHL players are never scratched here */}
+          {p.side === "farm" && <MoveBtn p={p} to="scratched" label="Scratch" />}
         </div>
       </div>
     );
@@ -164,9 +171,9 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Col title={`NHL — ${teamName}`} warn={pro.length > ROSTER_LIMITS.proMax || proSkaters < ROSTER_LIMITS.proMinSkaters || goalies(pro) < ROSTER_LIMITS.proMinGoalies}
-          sub={`${pro.length}/${ROSTER_LIMITS.proMax} · ${proSkaters} skaters · ${goalies(pro)} G (need 18+2)`} list={pro} />
+          sub={`${fdg(pro)} · ${pro.length}/${ROSTER_LIMITS.proMax} (need 12F·6D·2G)`} list={pro} />
         <Col title={`Farm — ${affiliateName}`} warn={farm.length > ROSTER_LIMITS.ahlMax}
-          sub={`${farm.length}/${ROSTER_LIMITS.ahlMax} active${farm.length > ROSTER_LIMITS.ahlMax ? " — scratch the overflow" : ""}`} list={farm} />
+          sub={`${fdg(farm)} · ${farm.length}/${ROSTER_LIMITS.ahlMax}${farm.length > ROSTER_LIMITS.ahlMax ? " — scratch the overflow" : " (need 12F·6D·2G)"}`} list={farm} />
         <Col title="Scratched" sub={`${scratched.length} healthy scratch${scratched.length === 1 ? "" : "es"} · org ${rows.length}/${ROSTER_LIMITS.orgMax}`} list={scratched} />
       </div>
 
