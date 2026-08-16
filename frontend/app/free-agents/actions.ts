@@ -432,13 +432,17 @@ export async function extendContractAction(
 ) {
   if (!(await canManageTeam(teamId))) return { ok: false as const, error: "You don't manage this team." };
   const player = await prisma.player.findUnique({
-    where: { id: playerId }, select: { teamId: true, contractYears: true, capHit: true, age: true, name: true },
+    where: { id: playerId }, select: { teamId: true, contractYears: true, capHit: true, age: true, name: true, lastSeasonGP: true, resignRound: true, resignStatus: true },
   });
   if (!player) return { ok: false as const, error: "Player not found." };
   if (player.teamId !== teamId) return { ok: false as const, error: "That player isn't on your team." };
-  if ((player.contractYears ?? 0) > 1) return { ok: false as const, error: "This contract isn't up for renewal yet." };
+  if ((player.contractYears ?? 0) > 0) return { ok: false as const, error: "He's still under contract — you can only re-sign him once his deal expires (0 years left)." };
   if (salary < 775_000) return { ok: false as const, error: "Below the league minimum salary." };
   years = Math.max(1, Math.min(MAX_TERM, Math.round(years)));
+
+  // negotiations may already be closed (walked to FA, or turned down → offer sheets)
+  if (player.resignStatus === "walkedToUFA") return { ok: false as const, closed: true, error: "He's testing free agency now — negotiations are over for this window." };
+  if (player.resignStatus === "osEligible") return { ok: false as const, closed: true, error: "He turned down your extension — after the season other clubs can submit offer sheets." };
 
   // cap check — replace his current hit with the new one (off-season +10% cushion, + LTIR relief)
   const cap = await loadLeagueCap();
@@ -454,14 +458,39 @@ export async function extendContractAction(
   const dep: Deployment = { line: clampLine(line), pp, pk };
   const ev = await evaluateTeamOffer(playerId, teamId, salary, years, dep, undefined, undefined, undefined, { clause, breadth });
   if (!ev) return { ok: false as const, error: "Could not value the player." };
+  const team = await prisma.team.findUnique({ where: { id: teamId }, select: { code: true, slug: true } });
+
   if (!ev.acceptable) {
-    let reason: string;
-    const moneyOk = salary >= ev.ask.floorSalary;
-    if (!moneyOk && (years < ev.ask.minYears || years > ev.ask.maxYears)) reason = `He wants more — around ${fmtM(ev.ask.floorSalary)} over ${ev.ask.minYears}-${ev.ask.maxYears}yr.`;
-    else if (!moneyOk) reason = `He wants more money — around ${fmtM(ev.ask.floorSalary)}.`;
-    else if (years > ev.ask.maxYears) reason = `He won't commit that long — ${ev.ask.maxYears}yr max at this role.`;
-    else reason = `He wants more security — at least ${ev.ask.minYears}yr.`;
-    return { ok: false as const, rejected: true, reason, floor: ev.ask.floorSalary, minYears: ev.ask.minYears, maxYears: ev.ask.maxYears };
+    // structured re-sign: you get 2 rounds. He counters after round 1; if the deal's
+    // still not there after round 2 — or he's a little-used/older player who'd rather
+    // test the market off a lowball — he walks (UFA → free agency, RFA → offer sheets).
+    const round = player.resignRound ?? 0;
+    const nextRound = round + 1;
+    const isUFA = (player.age ?? 27) >= 27;
+    const lowIce = player.lastSeasonGP != null && player.lastSeasonGP < 40;
+    const bigLowball = salary < ev.ask.floorSalary * 0.82;
+    const walk = nextRound > 2 || (round === 0 && bigLowball && (lowIce || isUFA));
+    if (walk) {
+      const status = isUFA ? "walkedToUFA" : "osEligible";
+      await prisma.player.update({ where: { id: playerId }, data: { resignStatus: status, resignRound: nextRound } });
+      if (team?.slug) revalidatePath(`/teams/${team.slug}/contracts`);
+      return {
+        ok: false as const, walked: true, toUFA: isUFA,
+        reason: nextRound > 2
+          ? "Two rounds and no deal — he'll test the market when the season ends."
+          : isUFA ? "That's well short — he'd rather test free agency than take it." : "He turned it down — he'll wait for offer sheets after the season.",
+      };
+    }
+    // he counters (kept fuzzy — you don't see his exact number, just a range)
+    const counterSalary = ev.ask.floorSalary;
+    const counterYears = Math.min(Math.max(years, ev.ask.minYears), ev.ask.maxYears);
+    await prisma.player.update({ where: { id: playerId }, data: { resignRound: nextRound, resignStatus: "countered", resignCounterSalary: counterSalary, resignCounterYears: counterYears } });
+    if (team?.slug) revalidatePath(`/teams/${team.slug}/contracts`);
+    return {
+      ok: false as const, rejected: true, round: nextRound,
+      reason: `Round ${nextRound} of 2 — he's countering around ${fmtM(counterSalary * 0.97)}–${fmtM(counterSalary * 1.06)} over ${counterYears}yr.${nextRound >= 2 ? " One more round before he walks." : ""}`,
+      floor: ev.ask.floorSalary, minYears: ev.ask.minYears, maxYears: ev.ask.maxYears,
+    };
   }
 
   const expiry = CURRENT_SEASON_START + years;
@@ -475,14 +504,14 @@ export async function extendContractAction(
       contractText: `$${salary.toLocaleString("en-US")} × ${years}yr (through ${expiry})`,
       signPromiseLine: dep.line, signPromisePP: pp, signPromisePK: pk,
       tradeClause: clause, noTradeTeams,
+      resignRound: 0, resignStatus: null, resignCounterSalary: null, resignCounterYears: null,
       disgruntled: false, tradeRequested: false, promiseWarnGame: null,
     },
   });
-  const team = await prisma.team.findUnique({ where: { id: teamId }, select: { code: true, slug: true } });
   await prisma.transaction.create({
     data: { type: "SIGNING", message: `${team?.code ?? "?"} re-signed ${player.name} — $${(salary / 1e6).toFixed(2)}M × ${years}yr` },
   });
-  if (team?.slug) revalidatePath(`/teams/${team.slug}/roster`);
+  if (team?.slug) { revalidatePath(`/teams/${team.slug}/roster`); revalidatePath(`/teams/${team.slug}/contracts`); }
   for (const p of ["/signings", "/finance"]) revalidatePath(p);
-  return { ok: true as const, salary, years };
+  return { ok: true as const, signed: true, salary, years, name: player.name };
 }

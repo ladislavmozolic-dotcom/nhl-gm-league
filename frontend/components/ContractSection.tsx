@@ -28,7 +28,7 @@ const META: Record<Group, { title: string; blurb: string; accent: string }> = {
 export default async function ContractSection({ teamId }: { teamId: number }) {
   const canManage = await canManageTeam(teamId);
   const expiring = await prisma.player.findMany({
-    where: { teamId, rosterType: "NHL", contractYears: { not: null, lte: 1 } },
+    where: { teamId, rosterType: "NHL", contractYears: { lte: 0 } },
     select: { id: true, name: true, age: true, capHit: true, contractYears: true, contractText: true, position: true, isGoalie: true, df: true, lastSeasonGP: true, lastSeasonPts: true, lastSeasonSvPct: true },
     orderBy: { capHit: "desc" },
   });

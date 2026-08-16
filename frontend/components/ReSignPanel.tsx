@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { getInterestAction, extendContractAction } from "@/app/free-agents/actions";
 import { Card } from "@/components/ui";
 import { cleanName } from "@/lib/playerName";
@@ -47,13 +48,17 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
   const i = info && info.ok ? info : null;
   const grp = i?.grp ?? "F";
 
+  const router = useRouter();
+  const [result, setResult] = useState<{ salary: number; years: number } | null>(null);
   const submit = () => start(async () => {
     setMsg(null);
     const salary = Math.round(parseFloat(salaryM) * 1e6);
     if (!Number.isFinite(salary)) { setMsg({ t: "err", s: "Enter a salary." }); return; }
     const r = await extendContractAction(player.id, teamId, salary, years, line, pp, pk, grantClause || null, grantClause === "M_NTC" ? breadth : null);
-    if (r.ok) { setMsg({ t: "ok", s: `Re-signed for ${M(r.salary)} × ${r.years}yr. ✓` }); setDone(true); return; }
-    setMsg({ t: "err", s: (r as any).rejected ? (r as any).reason : r.error });
+    if (r.ok) { setResult({ salary: r.salary, years: r.years }); setDone(true); router.refresh(); return; }
+    const rr = r as { walked?: boolean; rejected?: boolean; reason?: string; error?: string };
+    if (rr.walked) { setDone(true); setMsg({ t: "err", s: rr.reason ?? "He walked away." }); router.refresh(); return; }
+    setMsg({ t: "err", s: rr.rejected ? (rr.reason ?? "") : (rr.error ?? "Failed.") });
   });
 
   return (
@@ -65,9 +70,25 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
         </div>
         <p className="text-xs text-slate-500 mb-3">Current: {player.contractText ?? (player.capHit ? `${M(player.capHit)} × ${player.contractYears}yr` : "—")}</p>
 
+        {done && result && (
+          <div className="text-center py-6">
+            <div className="text-4xl mb-2">✅</div>
+            <div className="text-lg font-bold text-white">Re-signed {cleanName(player.name)}</div>
+            <div className="text-sm text-emerald-400 mt-1">{M(result.salary)} × {result.years}yr</div>
+            <button onClick={onClose} className="mt-5 px-6 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-sm font-semibold">Done</button>
+          </div>
+        )}
+        {done && !result && (
+          <div className="text-center py-6">
+            <div className="text-3xl mb-2">🚪</div>
+            <div className="text-sm text-amber-300">{msg?.s}</div>
+            <button onClick={onClose} className="mt-5 px-6 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-semibold">Close</button>
+          </div>
+        )}
+
         {pending && !i && <p className="text-slate-500 text-sm py-3">Loading…</p>}
 
-        {i && (
+        {!done && i && (
           <>
             <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-3 mb-3 text-sm">
               <p className="text-slate-300">Sees himself as your <b className="text-blue-300">{slotLabels[i.slot] ?? "—"}</b> · wants {i.wantPP ? "PP" : "no PP"} · {i.wantPK ? "PK" : "no PK"}</p>

@@ -150,7 +150,9 @@ export function termPremium(offerYears: number, preferredYears: number, age: num
   const extra = offerYears - preferredYears;
   if (extra <= 0) return 1;
   const a = age ?? 27;
-  const perYear = a >= 33 ? 0.14 : a >= 30 ? 0.09 : 0.05;
+  // U-shape: a YOUNG player charges a lot to lock up his prime years, an OLDER one
+  // charges for the risk of a long deal; a prime-age vet is the cheapest to extend.
+  const perYear = a <= 25 ? 0.13 : a >= 33 ? 0.15 : a >= 30 ? 0.10 : 0.07;
   return 1 + extra * perYear;
 }
 

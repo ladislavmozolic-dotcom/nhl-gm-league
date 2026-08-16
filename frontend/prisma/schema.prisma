@@ -144,6 +144,10 @@ model Player {
   profinhlCapHit       Int?          // snapshot of the ProfiNHL cap hit (for roster switching)
   realOnly             Boolean       @default(false) // exists only in the Real NHL dataset (real free agent); hidden in ProfiNHL mode
   faDemandOverride     Int?          // Free Agent Frenzy: league Agent / admin hand-set contract demand ($ cap hit); overrides the computed market value
+  resignRound          Int           @default(0)  // own-player re-sign: 0 = no offer yet, 1/2 = after that round's offer (max 2)
+  resignStatus         String?                     // null | open | countered | walkedToUFA | osEligible (RFA who declined → offer sheets)
+  resignCounterSalary  Int?                        // the player's counter in the current re-sign round
+  resignCounterYears   Int?
   signPromiseLine      Int?          // deployment promised at signing: F line 1-4 / D pair 1-3 / G 1-2
   signPromisePP        Boolean?      // power-play time promised at signing
   signPromisePK        Boolean?      // penalty-kill time promised at signing
