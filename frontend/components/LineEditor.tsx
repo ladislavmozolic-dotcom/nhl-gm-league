@@ -33,8 +33,10 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
 
   const byId = useMemo(() => new Map([...players, ...goalies].map((p) => [p.id, p])), [players, goalies]);
   const nameOf = (id: number | null) => (id == null ? "" : byId.get(id)?.name ?? `#${id}`);
-  const forwards = useMemo(() => players.filter((p) => !isD(p.position)), [players]);
-  const defense = useMemo(() => players.filter((p) => isD(p.position)), [players]);
+  const byName = (a: Player, b: Player) => a.name.localeCompare(b.name);
+  const forwards = useMemo(() => players.filter((p) => !isD(p.position)).sort(byName), [players]);
+  const defense = useMemo(() => players.filter((p) => isD(p.position)).sort(byName), [players]);
+  const goaliesByName = useMemo(() => [...goalies].sort(byName), [goalies]);
 
   // duplicates that matter: the same player twice inside ONE line/pair/unit
   const dupes = useMemo(() => {
@@ -368,8 +370,8 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
       {tab === "Others" && (
         <div className="space-y-6">
           <UnitBlock title="Goalies" head={["Role", "Goalie"]}>
-            <ORow label="Starter"><Select value={others.starter} onChange={(v) => setOther("starter", v)} pool={goalies} /></ORow>
-            <ORow label="Backup"><Select value={others.backup} onChange={(v) => setOther("backup", v)} pool={goalies} /></ORow>
+            <ORow label="Starter"><Select value={others.starter} onChange={(v) => setOther("starter", v)} pool={goaliesByName} /></ORow>
+            <ORow label="Backup"><Select value={others.backup} onChange={(v) => setOther("backup", v)} pool={goaliesByName} /></ORow>
           </UnitBlock>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <ListBlock title="Extra Forwards" values={others.extraForwards} pool={forwards} onSet={(i, v) => setOtherList("extraForwards", i, v)} Select={Select} />
