@@ -69,6 +69,7 @@ model Team {
   gmRole            String      @default("gm")  // gm | agent | co_comish | comish — league role (comish-tier gets a 1-day FA head-start)
   retainsBuyouts    Int         @default(0)     // net retention / buyout dead-money adjustment (± dollars); counts into the cap hit
   ticketPricing     String      @default("STANDARD") // Detailed Finance: LOW | STANDARD | PREMIUM — trades revenue-per-seat vs demand
+  sponsorDeal       Json?       // Detailed Finance: chosen main sponsorship { label, aav, years, bonuses:[{when,amount}] }
   gmEmail           String?
   gmFirstName       String?
   gmLastName        String?

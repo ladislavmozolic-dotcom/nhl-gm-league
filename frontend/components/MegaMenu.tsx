@@ -43,6 +43,7 @@ const menuItems: MenuItem[] = [
       { label: "Season Tickets", href: "/finance/season-tickets" },
       { label: "Attendance & Pricing", href: "/finance/attendance" },
       { label: "Merchandise", href: "/finance/merchandise" },
+      { label: "Sponsorship", href: "/finance/sponsorship" },
     ],
   },
   {
