@@ -4,7 +4,9 @@ import { notFound } from "next/navigation";
 import { Card } from "@/components/ui";
 import { canManageTeam } from "@/lib/auth";
 import { teamRosterForBlock, matchesForTeam, type BlockPlayer } from "@/lib/trade-block-server";
+import { cleanName } from "@/lib/playerName";
 import TradeBlockManager from "@/components/TradeBlockManager";
+import WaiverPlacer from "@/components/WaiverPlacer";
 
 export const dynamic = "force-dynamic";
 const SEASON = "2026-27";
@@ -40,11 +42,16 @@ export default async function TeamTradesPage({ params }: { params: Promise<{ slu
   });
   const tById = new Map(teams.map((t) => [t.id, t]));
 
-  // Trade Block management lives here (a GM lists / unlists his own players).
+  // Trade Block management + waiver placement live here (a GM manages his own club).
   const canManage = await canManageTeam(team.id);
-  const [mine, matches] = canManage
-    ? await Promise.all([teamRosterForBlock(team.id), matchesForTeam(team.id)])
-    : [null, null];
+  const [mine, matches, waiverRoster] = canManage
+    ? await Promise.all([
+        teamRosterForBlock(team.id),
+        matchesForTeam(team.id),
+        prisma.player.findMany({ where: { teamId: team.id, rosterType: "NHL" }, select: { id: true, name: true, position: true, capHit: true, tradeClause: true, waiverStatus: true }, orderBy: [{ capHit: "asc" }] }),
+      ])
+    : [null, null, null];
+  const waiverPlayers = (waiverRoster ?? []).map((p) => ({ id: p.id, name: cleanName(p.name), position: p.position ?? "", capHit: p.capHit ?? 0, clause: p.tradeClause, onWaivers: p.waiverStatus === "ON_WAIVERS" }));
   const money = (c: number | null) => (c != null ? `$${(c / 1_000_000).toFixed(1)}M` : "—");
   const MatchRow = ({ p }: { p: BlockPlayer }) => (
     <div className="flex items-center gap-3 px-3 py-2">
@@ -71,6 +78,7 @@ export default async function TeamTradesPage({ params }: { params: Promise<{ slu
       <Card title="Manage your Trade Block" accent="text-amber-400">
         <TradeBlockManager teamId={team.id} teamName={team.name} initialNeeds={mine.needs} players={mine.players} />
       </Card>
+      <WaiverPlacer teamId={team.id} players={waiverPlayers} />
     </>
   ) : null;
 

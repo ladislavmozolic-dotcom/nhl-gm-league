@@ -3,14 +3,12 @@
 import { useState, useTransition } from "react";
 import { Card } from "@/components/ui";
 import { money } from "@/lib/finance";
-import { placeOnWaiversAction, claimWaiverAction, cancelWaiverAction } from "@/app/waivers/actions";
+import { claimWaiverAction, cancelWaiverAction } from "@/app/waivers/actions";
 import type { WaiverRow } from "@/lib/waivers-server";
-
-type MyPlayer = { id: number; name: string; position: string; capHit: number; clause: string | null; onWaivers: boolean };
 
 const clauseTag = (c?: string | null) => c === "NMC" ? "NMC" : c === "M_NTC" ? "M-NTC" : c === "NTC" ? "NTC" : null;
 
-export default function WaiverWire({ waivers, myTeamId, myPlayers }: { waivers: WaiverRow[]; myTeamId: number | null; myPlayers: MyPlayer[] }) {
+export default function WaiverWire({ waivers, myTeamId }: { waivers: WaiverRow[]; myTeamId: number | null }) {
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<{ t: "ok" | "err"; s: string } | null>(null);
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>, okMsg: string) => start(async () => {
@@ -55,26 +53,6 @@ export default function WaiverWire({ waivers, myTeamId, myPlayers }: { waivers: 
         )}
         {msg && <div className={`mt-3 text-sm ${msg.t === "ok" ? "text-emerald-400" : "text-rose-400"}`}>{msg.s}</div>}
       </Card>
-
-      {myTeamId != null && myPlayers.length > 0 && (
-        <Card title="Place a player on waivers" accent="text-amber-400">
-          <p className="text-xs text-slate-500 mb-2">Expose one of your NHL players. He stays on your roster (and cap) until the window closes tomorrow.</p>
-          <div className="max-h-[46vh] overflow-y-auto divide-y divide-slate-800/60">
-            {myPlayers.map((p) => {
-              const nmc = p.clause === "NMC";
-              return (
-                <div key={p.id} className="py-2 flex items-center gap-3">
-                  <span className="flex-1 truncate text-sm">{p.name} <span className="text-slate-500 text-xs">{p.position}</span> <span className="text-slate-500 text-xs">{money(p.capHit)}</span></span>
-                  {p.onWaivers ? <span className="text-xs text-sky-400">on waivers</span>
-                    : nmc ? <span className="text-xs text-slate-600" title="No-movement clause">NMC — can't waive</span>
-                    : <button onClick={() => run(() => placeOnWaiversAction(p.id, myTeamId), `${p.name} placed on waivers.`)} disabled={pending}
-                        className="text-xs px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-40">Place on waivers</button>}
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-      )}
     </div>
   );
 }
