@@ -62,10 +62,10 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
     setInfo(i); setOffers(o);
     if (i.ok) {
       const ex = i.existing;
-      // if the player countered, pre-fill the form with his counter so the GM can match it
-      const startSalary = ex?.status === "COUNTERED" && ex.counterSalary ? ex.counterSalary : (ex?.salary ?? i.askSalary);
-      setSalaryM((startSalary / 1e6).toFixed(2));
-      setYears(ex?.status === "COUNTERED" && ex.counterYears ? ex.counterYears : (ex?.years ?? i.askYears));
+      // pre-fill only with the club's OWN previous offer; a fresh offer starts blank so
+      // the GM has to judge the range himself (we no longer hand him the exact ask).
+      setSalaryM(ex && ex.status !== "COUNTERED" ? (ex.salary / 1e6).toFixed(2) : "");
+      setYears(ex?.years ?? i.askYears);
       setLine(ex?.line ?? i.line);
       setPp(ex?.pp ?? i.wantPP);
       setPk(ex?.pk ?? i.wantPK);
@@ -164,17 +164,17 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
                     </p>
                   )}
                   {i.existing?.status === "COUNTERED" ? (
-                    <p className="mt-2 text-slate-200">He now wants <b className="text-amber-300">{M(i.existing.counterSalary ?? 0)} × {i.existing.counterYears}yr</b> <span className="text-slate-500">(floor {M((liveAsk ?? i).floor)})</span>
-                      <InfoTip text="His current number after countering your last offer. Match or beat it (at or above the floor) and he signs." />
+                    <p className="mt-2 text-slate-200">He countered around <b className="text-amber-300">{M((i.existing.counterSalary ?? 0) * 0.97)}–{M((i.existing.counterSalary ?? 0) * 1.06)}</b> <span className="text-slate-500">× {i.existing.counterYears}yr</span>
+                      <InfoTip text="His counter after your last offer — a rough range, his agent won't name an exact figure. Land in it (or above) and he signs." />
                     </p>
                   ) : (
                     <p className="mt-2 text-slate-200">
                       {liveAsk && (liveAsk.askSalary !== i.askSalary || liveAsk.askYears !== i.askYears)
-                        ? <>At <b className="text-slate-300">{slotLabels[["", "L1", "L2", "L3", "L4"][line] ?? ""] ?? `line ${line}`}</b>{!pp && i.wantPP ? ", no PP" : ""}{!pk && i.wantPK ? ", no PK" : ""} he wants </>
-                        : <>Asking </>}
-                      <b className="text-amber-300">{M((liveAsk ?? i).askSalary)} × {(liveAsk ?? i).askYears}yr</b>{" "}
-                      <span className="text-slate-500">(floor {M((liveAsk ?? i).floor)}, term {(liveAsk ?? i).minYears}-{(liveAsk ?? i).maxYears}yr)</span>
-                      <InfoTip text="Floor = the lowest cap hit he'll accept from your club for this role. Offer at or above it (within the term range) and he signs. The headline ask is his opening number; it eases toward the floor over the negotiation." />
+                        ? <>At <b className="text-slate-300">{slotLabels[["", "L1", "L2", "L3", "L4"][line] ?? ""] ?? `line ${line}`}</b>{!pp && i.wantPP ? ", no PP" : ""}{!pk && i.wantPK ? ", no PK" : ""} he&apos;s looking for </>
+                        : <>Looking for roughly </>}
+                      <b className="text-amber-300">{M((liveAsk ?? i).floor * 0.95)}–{M((liveAsk ?? i).askSalary * 1.08)}</b>{" "}
+                      <span className="text-slate-500">· term {(liveAsk ?? i).minYears}-{(liveAsk ?? i).maxYears}yr (longer = more)</span>
+                      <InfoTip text="A rough range — his agent won't name an exact floor, so you have to gauge the market. Offer in the range (or above) and he signs; a lowball draws a counter. Longer term costs more." />
                     </p>
                   )}
                 </div>
