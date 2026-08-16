@@ -33,7 +33,7 @@ function LineCard({ line }: { line: BuiltLine }) {
       </div>
 
       {/* chemistry + fit */}
-      <div className="grid grid-cols-2 gap-3 mb-3">
+      <div className="grid grid-cols-2 gap-3 mb-2">
         <div className="text-center bg-slate-800/40 rounded-lg py-2">
           <div className={`text-2xl font-black tabular-nums ${scoreTone(line.chemistry)}`}>{line.chemistry}</div>
           <div className="text-[10px] uppercase tracking-wide text-slate-500">Chemistry{line.gelled ? "" : " (proj)"}</div>
@@ -43,6 +43,19 @@ function LineCard({ line }: { line: BuiltLine }) {
           <div className="text-[10px] uppercase tracking-wide text-slate-500">Tactical Fit</div>
         </div>
       </div>
+
+      {/* pairwise bonds */}
+      {line.pairs.length > 1 && (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {line.pairs.map((b, i) => (
+            <span key={i} className="inline-flex items-center gap-1 rounded bg-slate-800/60 px-1.5 py-0.5 text-[11px]">
+              <span className="text-slate-400">{b.label}</span>
+              <span className={`font-bold tabular-nums ${scoreTone(b.value)}`}>{b.value}</span>
+              {!b.gelled && <span className="text-slate-600 text-[9px]">proj</span>}
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* offensive profile */}
       <div className="space-y-1 mb-3">

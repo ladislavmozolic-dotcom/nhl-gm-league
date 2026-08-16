@@ -5,16 +5,17 @@
 
 import { prisma } from "./prisma";
 import { loadTeamLines, autoLines } from "./sim/lines";
-import { unitSignature } from "./sim/chemistry";
+import { pairSig, unitChemistry } from "./sim/chemistry";
 import { cleanName } from "./playerName";
 
 type Attrs = { pa: number; sc: number; sk: number; ck: number; df: number; st: number; fo: number; weight: number };
 type P = { id: number; name: string; slug: string | null; position: string; shoots: string | null; overall: number; a: Attrs };
 export type LineSlot = { role: string; id: number | null; name: string | null; slug: string | null; overall: number | null; offSlot: boolean };
 export type LineProfile = { playmaking: number; shooting: number; transition: number; physical: number; defense: number };
+export type PairBond = { label: string; value: number; gelled: boolean };
 export type BuiltLine = {
   kind: "F" | "D"; index: number; slots: LineSlot[];
-  chemistry: number; gelled: boolean; tacticalFit: number; profile: LineProfile; summary: string;
+  chemistry: number; gelled: boolean; pairs: PairBond[]; tacticalFit: number; profile: LineProfile; summary: string;
 };
 export type TeamLineBuild = { forwards: BuiltLine[]; defense: BuiltLine[] } | null;
 
@@ -93,13 +94,22 @@ export async function teamLineBuilder(teamId: number, league = "NHL"): Promise<T
     a: { pa: r.pa ?? 50, sc: r.sc ?? 50, sk: r.sk ?? 50, ck: r.ck ?? 50, df: r.df ?? 50, st: r.st ?? 50, fo: r.fo ?? 50, weight: r.weight ?? 90 },
   }]));
 
-  const chemFor = (ids: (number | null | undefined)[], fit: number): { chemistry: number; gelled: boolean } => {
-    const members = ids.filter((x): x is number => x != null);
-    if (members.length < 2) return { chemistry: 0, gelled: false };
-    const stored = chem[unitSignature(members)];
-    if (stored != null) return { chemistry: clamp(stored), gelled: true };
-    // no shared history yet → a projected starting chemistry from how well it's built
-    return { chemistry: clamp(46 + fit * 0.18), gelled: false };
+  const base = 46;
+  // pairwise chemistry: each bond has its own value; the line's chemistry is the
+  // average of its bonds. A bond with no shared history yet is "projected" from fit.
+  const chemFor = (slots: { role: string; id: number | null }[], fit: number): { chemistry: number; gelled: boolean; pairs: PairBond[] } => {
+    const present = slots.filter((s) => s.id != null) as { role: string; id: number }[];
+    if (present.length < 2) return { chemistry: 0, gelled: false, pairs: [] };
+    const proj = clamp(base + fit * 0.18);
+    const pairs: PairBond[] = [];
+    for (let i = 0; i < present.length; i++) for (let j = i + 1; j < present.length; j++) {
+      const stored = chem[pairSig(present[i].id, present[j].id)];
+      pairs.push({ label: `${present[i].role}↔${present[j].role}`, value: stored != null ? clamp(stored) : proj, gelled: stored != null });
+    }
+    const members = present.map((s) => s.id);
+    const anyStored = pairs.some((p) => p.gelled);
+    const chemistry = anyStored ? clamp(unitChemistry(members, chem, base)) : proj;
+    return { chemistry, gelled: anyStored, pairs };
   };
 
   const forwards: BuiltLine[] = (lines.forwardLines ?? []).map((l, i) => {
@@ -110,8 +120,8 @@ export async function teamLineBuilder(teamId: number, league = "NHL"): Promise<T
       offSlot: !!p && !(roles[idx] === "C" ? /C|F/.test((p.position || "").toUpperCase()) : ((p.position || "").toUpperCase().includes(roles[idx]) || /\bW\b|F/.test((p.position || "").toUpperCase()))) }));
     const profile = profileOf(present);
     const tacticalFit = tacticalFitF(ps);
-    const { chemistry, gelled } = chemFor([l.lw, l.c, l.rw], tacticalFit);
-    return { kind: "F", index: i, slots, chemistry, gelled, tacticalFit, profile, summary: summaryOf(profile, "F") };
+    const { chemistry, gelled, pairs } = chemFor(slots.map((s) => ({ role: s.role, id: s.id })), tacticalFit);
+    return { kind: "F", index: i, slots, chemistry, gelled, pairs, tacticalFit, profile, summary: summaryOf(profile, "F") };
   });
 
   const defense: BuiltLine[] = (lines.defensePairs ?? []).map((l, i) => {
@@ -122,8 +132,8 @@ export async function teamLineBuilder(teamId: number, league = "NHL"): Promise<T
       offSlot: !!p && ((idx === 0 && p.shoots === "R") || (idx === 1 && p.shoots === "L")) }));
     const profile = profileOf(present);
     const tacticalFit = tacticalFitD(ps);
-    const { chemistry, gelled } = chemFor([l.ld, l.rd], tacticalFit);
-    return { kind: "D", index: i, slots, chemistry, gelled, tacticalFit, profile, summary: summaryOf(profile, "D") };
+    const { chemistry, gelled, pairs } = chemFor(slots.map((s) => ({ role: s.role, id: s.id })), tacticalFit);
+    return { kind: "D", index: i, slots, chemistry, gelled, pairs, tacticalFit, profile, summary: summaryOf(profile, "D") };
   });
 
   return { forwards, defense };

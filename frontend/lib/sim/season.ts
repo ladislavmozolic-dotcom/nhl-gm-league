@@ -13,6 +13,7 @@ import { simulateGame } from "./engine";
 import { saveGameResult } from "./persist";
 import { fixtureSeed } from "./rng";
 import { loadSettings, type EngineSettings } from "./settings";
+import { pairSig, unitPairs } from "./chemistry";
 import type { SimTeam, SimGoalie, TeamBox } from "./types";
 
 const DU_HIGH = 85; // durability at/above which CON recovers +2/day instead of +1
@@ -47,15 +48,30 @@ function syncChem(team: SimTeam, base: number) {
 function evolveChem(team: SimTeam, cfg: EngineSettings) {
   const dressed = new Set([...team.forwards, ...team.defense].map((s) => s.id));
   const slow = new Set(team.slowChem ?? []);
-  // 5v5 units + special-teams units (PP1/PK1) each gel on their own signature
-  for (const u of [...team.units, ...(team.stUnits ?? [])]) {
+  // 5v5 chemistry is PAIRWISE: each bond in an intact line/pair gels; bonds that
+  // weren't together this game fade SLOWLY (time-together memory — a re-united duo
+  // resumes near where it left off, not from scratch).
+  const together = new Set<string>();
+  for (const u of team.units) {
+    if (u.sig.includes(":")) continue;
+    const intact = u.members.every((id) => dressed.has(id));
+    if (!intact) continue;
+    const cap = slow.has(u.sig) ? cfg.offPosChemCap : 100;   // off-position unit never fully gels
+    for (const [a, b] of unitPairs(u.members)) {
+      const sig = pairSig(a, b); together.add(sig);
+      team.chemistry[sig] = Math.min(cap, (team.chemistry[sig] ?? cfg.chemistryBase) + cfg.chemistryGrowth);
+    }
+  }
+  const fade = Math.max(0.5, cfg.chemistryGrowth * 0.5);     // bonds fade SLOWER than they build → a re-united duo keeps most of its history
+  for (const key of Object.keys(team.chemistry)) {
+    if (key.includes(":") || together.has(key)) continue;    // ST unit key or a bond that played → skip
+    team.chemistry[key] = Math.max(cfg.chemistryBase, team.chemistry[key] - fade);
+  }
+  // special-teams units (PP1/PK1) keep their own unit-level gel/decay
+  for (const u of team.stUnits ?? []) {
     const intact = u.members.every((id) => dressed.has(id));
     const cur = team.chemistry[u.sig] ?? cfg.chemistryBase;
-    // an off-position unit never fully gels — its chemistry is capped
-    const cap = slow.has(u.sig) ? cfg.offPosChemCap : 100;
-    team.chemistry[u.sig] = intact
-      ? Math.min(cap, cur + cfg.chemistryGrowth)            // gelling together (capped if off-position)
-      : Math.max(cfg.chemistryBase, cur - cfg.chemistryDrop); // broken by injury/call-up
+    team.chemistry[u.sig] = intact ? Math.min(100, cur + cfg.chemistryGrowth) : Math.max(cfg.chemistryBase, cur - cfg.chemistryDrop);
   }
 }
 

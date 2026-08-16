@@ -14,6 +14,25 @@ export function unitSignature(ids: Array<number | null | undefined>): string {
   return ids.filter((x): x is number => x != null).sort((a, b) => a - b).join("-");
 }
 
+/** Chemistry is stored PAIRWISE (each 2-player bond has its own value with its own
+ *  time-together memory); a line's/pair's chemistry is the average of its bonds.
+ *  So splitting a gelled duo and re-uniting them later keeps their bond. */
+export function pairSig(a: number, b: number): string {
+  return a < b ? `${a}-${b}` : `${b}-${a}`;
+}
+/** Every 2-player bond within a unit (trio → 3 bonds, pair → 1). */
+export function unitPairs(members: number[]): [number, number][] {
+  const out: [number, number][] = [];
+  for (let i = 0; i < members.length; i++) for (let j = i + 1; j < members.length; j++) out.push([members[i], members[j]]);
+  return out;
+}
+/** A unit's chemistry = average of its pairwise bonds (defaults to base). */
+export function unitChemistry(members: number[], pairChem: Record<string, number>, base: number): number {
+  const pairs = unitPairs(members);
+  if (!pairs.length) return base;
+  return pairs.reduce((t, [a, b]) => t + (pairChem[pairSig(a, b)] ?? base), 0) / pairs.length;
+}
+
 /** The forward trios + defense pairs a team has set, as chemistry units. */
 export function buildUnits(lines: TeamLinesData | null | undefined): LineUnit[] {
   if (!lines) return [];
@@ -63,11 +82,13 @@ export function depthChartUnits(fwdIds: number[], defIds: number[]): LineUnit[] 
   return units;
 }
 
-/** playerId -> chemistry of the unit they belong to (defaults to 100 = no penalty). */
+/** playerId -> chemistry of the unit they belong to (defaults to 100 = no penalty).
+ *  5v5 units derive from their pairwise bonds; special-teams units (pp:/pk: sigs)
+ *  keep their own unit-level value (unchanged). */
 export function playerChemistry(units: LineUnit[], chem: Record<string, number>, base: number): Map<number, number> {
   const m = new Map<number, number>();
   for (const u of units) {
-    const v = chem[u.sig] ?? base;
+    const v = u.sig.includes(":") ? (chem[u.sig] ?? base) : unitChemistry(u.members, chem, base);
     for (const id of u.members) m.set(id, v);
   }
   return m;
