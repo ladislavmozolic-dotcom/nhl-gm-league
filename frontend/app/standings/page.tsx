@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { computeStandings, powerRanking } from "@/lib/sim/standings";
+import StandingsTable from "@/components/StandingsTable";
 import type { TeamStanding, PowerRow } from "@/lib/sim/standings";
 import { PageHeader, Card } from "@/components/ui";
 
@@ -66,7 +67,7 @@ export default async function StandingsPage({ searchParams }: { searchParams: Pr
         groups.map((g) => (
           <section key={g.title}>
             <h2 className={`text-lg font-bold ${g.color} mb-4`}>{g.title}</h2>
-            <StandingsTable teams={g.teams} meta={meta} />
+            <StandingsTable rows={g.teams.map((t) => ({ teamId: t.teamId, name: t.name, gp: t.gp, w: t.w, l: t.l, otl: t.otl, points: t.points, gf: t.gf, ga: t.ga, diff: t.diff, logoUrl: meta.get(t.teamId)?.logoUrl ?? null, slug: meta.get(t.teamId)?.slug ?? null }))} />
           </section>
         ))
       )}
@@ -83,44 +84,6 @@ function TeamCell({ id, name, meta }: { id: number; name: string; meta: TeamMeta
     </span>
   );
   return m?.slug ? <Link href={`/teams/${m.slug}`} className="hover:text-blue-400 transition-colors">{inner}</Link> : inner;
-}
-
-function StandingsTable({ teams, meta }: { teams: TeamStanding[]; meta: TeamMeta }) {
-  return (
-    <Card bodyClassName="p-0">
-      <div className="overflow-x-auto">
-      <table className="w-full text-sm min-w-[620px]">
-        <thead>
-          <tr className="border-b border-slate-800 bg-slate-800/30 text-slate-500 text-xs uppercase tracking-wider">
-            <th className="px-4 py-3 text-left font-medium">#</th>
-            <th className="px-4 py-3 text-left font-medium">Team</th>
-            {["GP", "W", "L", "OTL", "PTS", "GF", "GA", "Diff"].map((h) => (
-              <th key={h} className="px-3 py-3 text-center font-medium">{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {teams.map((t, i) => (
-            <tr key={t.teamId} className="border-b border-slate-800/40 hover:bg-slate-800/30 transition-colors last:border-0">
-              <td className="px-4 py-2.5 font-bold text-slate-500">{i + 1}</td>
-              <td className="px-4 py-2.5"><TeamCell id={t.teamId} name={t.name} meta={meta} /></td>
-              <td className="px-3 py-2.5 text-center text-slate-400 tabular-nums">{t.gp}</td>
-              <td className="px-3 py-2.5 text-center tabular-nums">{t.w}</td>
-              <td className="px-3 py-2.5 text-center tabular-nums">{t.l}</td>
-              <td className="px-3 py-2.5 text-center tabular-nums">{t.otl}</td>
-              <td className="px-3 py-2.5 text-center font-bold text-white tabular-nums">{t.points}</td>
-              <td className="px-3 py-2.5 text-center text-slate-400 tabular-nums">{t.gf}</td>
-              <td className="px-3 py-2.5 text-center text-slate-400 tabular-nums">{t.ga}</td>
-              <td className={`px-3 py-2.5 text-center tabular-nums ${t.diff > 0 ? "text-green-400" : t.diff < 0 ? "text-red-400" : "text-slate-400"}`}>
-                {t.diff > 0 ? `+${t.diff}` : t.diff}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      </div>
-    </Card>
-  );
 }
 
 function FormPips({ form }: { form: string }) {

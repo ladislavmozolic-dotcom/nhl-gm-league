@@ -4,8 +4,10 @@ import { prisma } from "@/lib/prisma";
 // Global score tracker shown at the top of every page — results only.
 // (Goal scorers / assists live on the game-detail scoreboard.)
 export default async function ScoreTracker() {
+  // NHL results only — the AHL has its own scores pages; this league-wide ticker
+  // shows the top league (and AHL clubs share NHL logos, so they don't belong here).
   const lastDay = await prisma.game.findFirst({
-    where: { status: "FINAL", seriesId: null, gameDate: { not: null } },
+    where: { status: "FINAL", seriesId: null, league: "NHL", gameDate: { not: null } },
     orderBy: { gameDate: "desc" },
     select: { gameDate: true },
   });
@@ -15,7 +17,7 @@ export default async function ScoreTracker() {
   const end = new Date(lastDay.gameDate); end.setHours(23, 59, 59, 999);
 
   const games = await prisma.game.findMany({
-    where: { status: "FINAL", seriesId: null, gameDate: { gte: start, lte: end } },
+    where: { status: "FINAL", seriesId: null, league: "NHL", gameDate: { gte: start, lte: end } },
     select: {
       id: true, league: true, homeGoals: true, awayGoals: true,
       homeTeam: { select: { code: true, logoUrl: true } }, awayTeam: { select: { code: true, logoUrl: true } },
