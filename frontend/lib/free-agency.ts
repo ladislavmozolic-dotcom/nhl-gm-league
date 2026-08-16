@@ -126,12 +126,36 @@ export type Demand = {
   anchor: number;       // comparable-median cap hit before adjustments
   comps: number;        // how many comparables backed the anchor
   overridden: boolean;  // Agent/admin set this by hand
+  willingness: number;  // morale/reputation multiplier on the ask (1 = neutral, >1 holding out, <1 eager)
 };
+
+// ---------------------------------------------------------------------------
+// Morale / reputation → willingness to sign. A happy player is EAGER (takes a
+// little less, signs sooner); an unhappy one holds out for more. A STAR (high
+// market rating = "reputation") has the leverage to lean on his mood hard; a
+// fringe player needs a job, so his mood barely moves the number.
+// ---------------------------------------------------------------------------
+export const MO_NEUTRAL = 70;
+export function willingnessFactor(morale: number | null | undefined, market: number): number {
+  if (morale == null) return 1;
+  const moodDelta = (MO_NEUTRAL - morale) / MO_NEUTRAL;             // >0 = unhappy → wants more
+  const reputation = Math.max(0, Math.min(1, (market - 55) / 35));  // rating 55→0 … 90→1 (star leverage)
+  const leverage = 0.55 + 0.65 * reputation;                       // fringe 0.55 … star 1.2
+  return Math.max(0.88, Math.min(1.16, 1 + moodDelta * 0.2 * leverage));
+}
+/** Short human note for the ask UI, e.g. "Unhappy — holding out (+9%)". */
+export function willingnessNote(w: number): string | null {
+  const pct = Math.round((w - 1) * 100);
+  if (pct >= 4) return `Unhappy — holding out (+${pct}%)`;
+  if (pct <= -4) return `Happy — eager to sign (${pct}%)`;
+  return null;
+}
 
 export function buildDemand(input: {
   market: number; grp: FaPos; age: number | null | undefined;
   anchor: number; comps: number;
   perf?: number | null; capGrowth?: number; override?: number | null; downSeason?: boolean;
+  morale?: number | null;
   round?: number;
 }): Demand {
   const { market, grp, age, anchor, comps } = input;
@@ -144,6 +168,9 @@ export function buildDemand(input: {
   } else {
     salary = anchor * trendFactor(age) * performanceFactor(input.perf) * (input.capGrowth ?? 1) * premium;
   }
+  // morale/reputation bends the ask (skipped when an admin override is set exact).
+  const willingness = overridden ? 1 : willingnessFactor(input.morale, market);
+  salary *= willingness;
   salary = Math.max(LEAGUE_MIN, Math.min(salary, 16_000_000));
   salary = Math.round(salary / 50_000) * 50_000;
 
@@ -159,7 +186,7 @@ export function buildDemand(input: {
   if (downSeason) { years = 1; maxYears = 1; minYears = 1; }
 
   const floorSalary = Math.round((salary * 0.92) / 50_000) * 50_000;
-  return { salary, years, floorSalary, minYears, maxYears, market, anchor, comps, overridden };
+  return { salary, years, floorSalary, minYears, maxYears, market, anchor, comps, overridden, willingness };
 }
 
 // ---------------------------------------------------------------------------

@@ -150,6 +150,11 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
                   <p className="text-slate-400 mt-1">
                     Wants {i.wantPP ? "PP time" : "no PP"} · {i.wantPK ? "PK time" : "no PK"}
                   </p>
+                  {i.moraleNote && (
+                    <p className={`mt-1 text-xs font-medium ${i.moraleNote.startsWith("Happy") ? "text-emerald-400" : "text-amber-400"}`}>
+                      {i.moraleNote.startsWith("Happy") ? "😀 " : "😕 "}{i.moraleNote}
+                    </p>
+                  )}
                   <p className="mt-2 text-slate-200">
                     {liveAsk && (liveAsk.askSalary !== i.askSalary || liveAsk.askYears !== i.askYears)
                       ? <>At <b className="text-slate-300">{slotLabels[["", "L1", "L2", "L3", "L4"][line] ?? ""] ?? `line ${line}`}</b>{!pp && i.wantPP ? ", no PP" : ""}{!pk && i.wantPK ? ", no PK" : ""} he wants </>

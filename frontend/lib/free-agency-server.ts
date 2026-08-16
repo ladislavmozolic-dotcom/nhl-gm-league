@@ -29,7 +29,7 @@ export async function loadLeagueCap(): Promise<LeagueCap> {
 
 const SEL = {
   id: true, isGoalie: true, position: true, age: true, capHit: true, rosterType: true,
-  sc: true, pa: true, df: true, sk: true, lastSeasonGP: true, lastSeasonPts: true,
+  sc: true, pa: true, df: true, sk: true, lastSeasonGP: true, lastSeasonPts: true, morale: true,
   goalieRating: { select: { ag: true, rb: true, sc: true, hs: true } },
 } as const;
 
@@ -50,7 +50,7 @@ export function isDownSeason(lastSeasonGP: number | null | undefined, fullGP: nu
 type PoolPlayer = {
   isGoalie: boolean; position: string | null; capHit: number | null;
   sc: number | null; pa: number | null; df: number | null; sk: number | null;
-  lastSeasonGP?: number | null; lastSeasonPts?: number | null;
+  lastSeasonGP?: number | null; lastSeasonPts?: number | null; morale?: number | null;
   goalieRating: { ag: number | null; rb: number | null; sc: number | null; hs: number | null } | null;
 };
 
@@ -97,7 +97,7 @@ function demandFromRow(
   const demand = buildDemand({
     market, grp, age: p.age, anchor, comps: count,
     override: p.faDemandOverride, capGrowth: 1, round,
-    downSeason: isDownSeason(p.lastSeasonGP, fullGP),
+    downSeason: isDownSeason(p.lastSeasonGP, fullGP), morale: p.morale,
   });
   return { demand, grp };
 }
@@ -162,7 +162,7 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
   const rnd = round ?? (await currentFrenzyRound());
   const { grp, market } = playerMarket(p as PoolPlayer);
   const { anchor, count } = anchorFromPool(marketPool, grp, market);
-  const base = buildDemand({ market, grp, age: p.age, anchor, comps: count, override: p.faDemandOverride, capGrowth: 1, round: rnd, downSeason: isDownSeason(p.lastSeasonGP, fullGP) });
+  const base = buildDemand({ market, grp, age: p.age, anchor, comps: count, override: p.faDemandOverride, capGrowth: 1, round: rnd, downSeason: isDownSeason(p.lastSeasonGP, fullGP), morale: p.morale });
 
   const ctx = await loadTeamContext(teamId, cmap);
   const { slot, line } = projectSlot(ctx, grp, market);

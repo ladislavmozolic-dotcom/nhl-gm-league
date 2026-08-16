@@ -52,10 +52,10 @@ export default function DraftAvailableBoard({ prospects, canPick, onClock }: { p
       </div>
       {msg && <div className={`text-sm px-3 py-2 rounded-lg ${msg.startsWith("✓") ? "bg-emerald-950/30 text-emerald-300" : "bg-red-950/30 text-red-300"}`}>{msg}</div>}
 
-      <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-x-auto">
+      <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-auto max-h-[520px]">
         <table className="w-full text-sm min-w-[560px]">
           <thead>
-            <tr className="text-xs text-slate-500 border-b border-slate-800 bg-slate-800/40">
+            <tr className="text-xs text-slate-500 border-b border-slate-800 [&>th]:sticky [&>th]:top-0 [&>th]:z-10 [&>th]:bg-slate-800">
               <th className="text-left px-3 py-2.5">Prospect</th>
               <th className="text-center px-2 py-2.5">Pos</th>
               <th className="text-left px-3 py-2.5">League</th>

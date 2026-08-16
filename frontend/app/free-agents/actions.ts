@@ -8,7 +8,7 @@ import { CURRENT_SEASON_START, capCeilingForPhase, ltirRelief } from "@/lib/fina
 import {
   loadMarketPool, teamContentionMap, teamAsk, evaluateTeamOffer, loadLeagueCap,
 } from "@/lib/free-agency-server";
-import { MAX_TERM, faPosGroup, type Deployment } from "@/lib/free-agency";
+import { MAX_TERM, faPosGroup, willingnessNote, type Deployment } from "@/lib/free-agency";
 import { computeELC } from "@/lib/elc";
 
 const FREE = ["NHL", "AHL", "RETIRED", "PROSPECT", "RELEASED"]; // not a signable free agent
@@ -47,6 +47,7 @@ export async function getInterestAction(playerId: number, teamId: number) {
     floor: info.ask.floorSalary,
     minYears: info.ask.minYears,
     maxYears: info.ask.maxYears,
+    moraleNote: willingnessNote(info.ask.willingness),
     round: (await getLeagueClock()).frenzyRound,
     existing: existing ? {
       salary: existing.salary, years: existing.years, line: existing.line, pp: existing.pp, pk: existing.pk,
