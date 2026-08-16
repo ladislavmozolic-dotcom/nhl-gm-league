@@ -10,7 +10,7 @@ import { teamAttendance } from "./attendance-server";
 import { teamMerchandise, leagueMerch } from "./merchandise-server";
 import { teamSponsor } from "./sponsorship-server";
 import { allStarPowers } from "./star-power-server";
-import { seasonTickets, DEFAULT_ARENA_CAPACITY, DEFAULT_STH_CAP, type TicketPricing } from "./season-tickets";
+import { seasonTickets, arenaFor, type TicketPricing } from "./season-tickets";
 import { attendancePct } from "./attendance";
 import { teamMerch, jerseyUnits } from "./merchandise";
 import { clubRevenueLines, clubRevenueTotal, clubOverhead, type FinanceLine } from "./club-finance";
@@ -24,7 +24,7 @@ export async function leagueDetailedFinance(): Promise<Map<number, { revenue: nu
   const [fans, stars, teams] = await Promise.all([
     leagueFanInterest(),
     allStarPowers(),
-    prisma.team.findMany({ where: { league: "NHL", isAffiliate: false }, select: { id: true, ticketPricing: true, sponsorDeal: true, players: { where: { rosterType: "NHL" }, select: { capHit: true } } } }),
+    prisma.team.findMany({ where: { league: "NHL", isAffiliate: false }, select: { id: true, ticketPricing: true, sponsorDeal: true, capacity: true, players: { where: { rosterType: "NHL" }, select: { capHit: true } } } }),
   ]);
   const jerseyByTeam = new Map<number, number>();
   for (const s of stars) if (s.teamId != null) jerseyByTeam.set(s.teamId, (jerseyByTeam.get(s.teamId) ?? 0) + jerseyUnits(s.score));
@@ -35,8 +35,9 @@ export async function leagueDetailedFinance(): Promise<Map<number, { revenue: nu
     const f = fanById.get(t.id);
     if (!f) continue;
     const pricing = asPricing(t.ticketPricing);
-    const st = seasonTickets({ capacity: DEFAULT_ARENA_CAPACITY, sthCap: DEFAULT_STH_CAP, fanInterest: f.interest, baselineInterest: f.baseline, pricing });
-    const avg = Math.round(attendancePct({ fanInterest: f.interest, pricing, sthFraction: st.sold / DEFAULT_ARENA_CAPACITY }) * DEFAULT_ARENA_CAPACITY);
+    const arena = arenaFor(t.capacity);
+    const st = seasonTickets({ capacity: arena.capacity, sthCap: arena.sthCap, fanInterest: f.interest, baselineInterest: f.baseline, pricing });
+    const avg = Math.round(attendancePct({ fanInterest: f.interest, pricing, sthFraction: st.sold / arena.capacity }) * arena.capacity);
     const merch = teamMerch({ jerseyUnitsTotal: jerseyByTeam.get(t.id) ?? 0, fanInterest: f.interest, baselineInterest: f.baseline });
     const deal = t.sponsorDeal as { aav?: number } | null;
     const revenue = clubRevenueTotal({ pricing, sthSold: st.sold, avgAttendance: avg, fanInterest: f.interest, merchTotal: merch.total, sponsorAav: deal?.aav ?? 0 });

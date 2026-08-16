@@ -9,6 +9,14 @@ export type TicketPricing = "LOW" | "STANDARD" | "PREMIUM";
 // season-ticket and attendance engines.
 export const DEFAULT_ARENA_CAPACITY = 18_500;
 export const DEFAULT_STH_CAP = 14_000;
+export const STH_SHARE = 0.78; // share of capacity a club can sell as season tickets
+
+/** A club's arena config: its real capacity (falling back to the default) and its
+ *  season-ticket cap derived from it. */
+export function arenaFor(capacity: number | null | undefined): { capacity: number; sthCap: number } {
+  const cap = capacity && capacity > 0 ? Math.round(capacity) : DEFAULT_ARENA_CAPACITY;
+  return { capacity: cap, sthCap: Math.round(cap * STH_SHARE) };
+}
 
 export type SeasonTicketInput = {
   capacity: number;          // arena capacity
