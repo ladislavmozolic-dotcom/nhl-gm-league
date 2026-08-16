@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import LinesNav from "@/components/LinesNav";
 import { autoFill, type TeamLinesData, type ForwardLine, type DefensePair, type SpecialUnit } from "@/lib/sim/lines-core";
 import { DIAL_LABELS, DIAL_DESC, mergeTactics, type PuckStyle, type DZone, type PpStyle, type PkStyle } from "@/lib/sim/tactics";
 import type { GameStrategy, StratWeights } from "@/lib/sim/types";
@@ -323,11 +324,8 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
 
   return (
     <div className="max-w-5xl mx-auto px-4 pb-28">
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-        <div>
-          <h1 className="text-2xl font-bold">{teamName} — Line Editor</h1>
-          <Link href={`/teams/${teamSlug}`} className="text-sm text-slate-400 hover:text-blue-400">← back to team</Link>
-        </div>
+      <div className="flex items-start justify-between mb-4 flex-wrap gap-2">
+        <LinesNav teamName={teamName} teamSlug={teamSlug} />
         <button onClick={auto} className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-semibold" title="Fill empty slots with the best available players">Auto Lines</button>
       </div>
 
