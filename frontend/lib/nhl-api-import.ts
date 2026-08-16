@@ -5,6 +5,7 @@
 // a handful of requests — never per page-load. Season is a parameter (seasonId).
 
 import { prisma } from "./prisma";
+import { cleanName } from "./playerName";
 
 const API = "https://api.nhle.com/stats/rest/en";
 const UA = "Mozilla/5.0 (compatible; ProfiNHL-League/1.0)";
@@ -51,6 +52,8 @@ async function skaterReport(report: string, seasonId: number): Promise<any[]> {
 export type NhlStatRow = {
   name: string; gp: number; g: number; a: number; hits: number; blocks: number;
   pm: number; tk: number; gv: number; shToi: number; teamShToi: number;
+  // Edge Parameters inputs (from the summary report)
+  toi: number; shots: number; pim: number; foPct: number; ppG: number;
 };
 
 export async function fetchNhlCurrentStats(seasonId: number): Promise<NhlStatRow[]> {
@@ -74,6 +77,8 @@ export async function fetchNhlCurrentStats(seasonId: number): Promise<NhlStatRow
       name: s.skaterFullName, gp: s.gamesPlayed ?? 0, g: s.goals ?? 0, a: s.assists ?? 0,
       hits: r?.hits ?? 0, blocks: r?.blockedShots ?? 0, tk: r?.takeaways ?? 0, gv: r?.giveaways ?? 0,
       pm: s.plusMinus ?? 0, shToi: t?.shTimeOnIcePerGame ?? 0, teamShToi,
+      toi: s.timeOnIcePerGame ?? 0, shots: s.shots ?? 0, pim: s.penaltyMinutes ?? 0,
+      foPct: s.faceoffWinPct ?? 0, ppG: s.ppGoals ?? 0,
     });
   }
   return rows;
@@ -107,7 +112,7 @@ export async function fetchNhlGoalieStats(seasonId: number): Promise<NhlGoalieRo
 }
 export async function importGoalieLastSeason(rows: NhlGoalieRow[]) {
   const goalies = await prisma.player.findMany({ where: { isGoalie: true }, select: { id: true, name: true } });
-  const idx = new Map(goalies.map((p) => [key(p.name), p.id]));
+  const idx = new Map(goalies.map((p) => [key(cleanName(p.name)), p.id]));
   let matched = 0;
   const unmatched: string[] = [];
   for (const row of rows) {
@@ -119,22 +124,33 @@ export async function importGoalieLastSeason(rows: NhlGoalieRow[]) {
   return { total: rows.length, matched, unmatched };
 }
 
-export async function importNhlCurrentStats(rows: NhlStatRow[]) {
+/** Write a season's skater stats into either the curSeason* (80% season, live) or
+ *  lastSeason* (20% season) fields — used by the Edge Parameters two-season blend. */
+export async function importNhlSkaterStats(rows: NhlStatRow[], target: "cur" | "last") {
   const players = await prisma.player.findMany({ select: { id: true, name: true } });
-  const idx = new Map(players.map((p) => [key(p.name), p.id]));
+  const idx = new Map(players.map((p) => [key(cleanName(p.name)), p.id]));
   let matched = 0; const unmatched: string[] = [];
   for (const row of rows) {
     const id = idx.get(key(row.name));
     if (id == null) { unmatched.push(row.name); continue; }
-    await prisma.player.update({
-      where: { id },
-      data: {
-        curSeasonGP: row.gp, curSeasonG: row.g, curSeasonA: row.a, curSeasonHits: row.hits,
-        curSeasonBlocks: row.blocks, curSeasonPM: row.pm, curSeasonTK: row.tk, curSeasonGV: row.gv,
-        curSeasonShToi: row.shToi, curSeasonTeamShToi: row.teamShToi,
-      },
-    });
+    const data = target === "cur"
+      ? {
+          curSeasonGP: row.gp, curSeasonG: row.g, curSeasonA: row.a, curSeasonHits: row.hits,
+          curSeasonBlocks: row.blocks, curSeasonPM: row.pm, curSeasonTK: row.tk, curSeasonGV: row.gv,
+          curSeasonShToi: row.shToi, curSeasonTeamShToi: row.teamShToi,
+          curSeasonToi: row.toi, curSeasonShots: row.shots, curSeasonPim: row.pim, curSeasonFoPct: row.foPct, curSeasonPpG: row.ppG,
+        }
+      : {
+          lastSeasonGP: row.gp, lastSeasonG: row.g, lastSeasonA: row.a, lastSeasonHits: row.hits, lastSeasonBlocks: row.blocks,
+          lastSeasonToi: row.toi, lastSeasonShots: row.shots, lastSeasonPim: row.pim, lastSeasonFoPct: row.foPct, lastSeasonPpG: row.ppG,
+          lastSeasonPM: row.pm, lastSeasonTK: row.tk, lastSeasonGV: row.gv, lastSeasonShToi: row.shToi,
+        };
+    await prisma.player.update({ where: { id }, data });
     matched++;
   }
   return { total: rows.length, matched, unmatched };
+}
+
+export async function importNhlCurrentStats(rows: NhlStatRow[]) {
+  return importNhlSkaterStats(rows, "cur");
 }

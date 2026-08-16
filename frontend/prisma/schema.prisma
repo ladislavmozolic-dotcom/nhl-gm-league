@@ -169,6 +169,16 @@ model Player {
   lastSeasonA          Int?
   lastSeasonHits       Int?
   lastSeasonBlocks     Int?
+  // Edge Parameters real-NHL inputs (24-25 = the 20% season). TOI in seconds/game.
+  lastSeasonToi        Float?
+  lastSeasonShots      Int?
+  lastSeasonPim        Int?
+  lastSeasonFoPct      Float?
+  lastSeasonPpG        Int?
+  lastSeasonPM         Int?
+  lastSeasonTK         Int?
+  lastSeasonGV         Int?
+  lastSeasonShToi      Float?
   curSeasonGP          Int?          // CURRENT real-season stats (empty in the off-season; projection activates at ~game 10)
   curSeasonG           Int?
   curSeasonA           Int?
@@ -179,6 +189,12 @@ model Player {
   curSeasonGV          Int?          // giveaways (DF input)
   curSeasonShToi       Float?        // player short-handed TOI per game, seconds (DF input, NHL timeonice)
   curSeasonTeamShToi   Float?        // team penalty-kill TOI per game, seconds (DF input, NHL penaltykill)
+  // Edge Parameters real-NHL inputs (25-26 = the 80% season, updates in-season)
+  curSeasonToi         Float?        // TOI per game, seconds (per-60 base)
+  curSeasonShots       Int?
+  curSeasonPim         Int?
+  curSeasonFoPct       Float?
+  curSeasonPpG         Int?
   goalieRating         GoalieRating?
   team                 Team          @relation(fields: [teamId], references: [id])
   skaterRating         SkaterRating?
