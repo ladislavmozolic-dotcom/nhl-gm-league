@@ -952,7 +952,11 @@ function simulatePeriodPossession(st: SimState, period: number) {
       // narrows — so the scoring race and elite goalies still stand out.
       const pk = 1 - PARITY_CONV * parityAmt();
       const pTalent = conversion(shOff, effGoalieQuality(gSim), isHome, strength);
-      const pAnchor = conversion(AVG_FINISH, LEAGUE.avgGoalie, isHome, strength);
+      // PARITY compresses only the GOALIE mismatch toward a league-average keeper —
+      // a team-level edge — while the SHOOTER's finishing is left FULL, so elite
+      // snipers still pile up goals (top scorers reach ~110-120) even as weak teams
+      // stay competitive. (Anchor keeps `shOff`, swaps only the goalie.)
+      const pAnchor = conversion(shOff, LEAGUE.avgGoalie, isHome, strength);
       const pConv = compressToward(pTalent, pAnchor, pk);
       const teamEdge = compressToward(offMult * defShield * defTalent, 1, pk);
       const p = pConv * danger * pressBonus

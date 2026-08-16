@@ -12,6 +12,8 @@ import PlayerFormCard from "@/components/PlayerFormCard";
 import { playerHeatMap, playerDefenseMap } from "@/lib/heatmap-server";
 import RinkHeatMap from "@/components/RinkHeatMap";
 import RinkDefenseMap from "@/components/RinkDefenseMap";
+import { goalieAnalytics } from "@/lib/goalie-analytics-server";
+import GoalieAnalyticsCard from "@/components/GoalieAnalyticsCard";
 
 export const dynamic = "force-dynamic";
 
@@ -224,6 +226,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   const form = await playerForm(p.id);
   const heatMap = await playerHeatMap(p.id);
   const defenseMap = isGoalie ? null : await playerDefenseMap(p.id);
+  const goalieStats = isGoalie ? await goalieAnalytics(p.id) : null;
 
   const team = p.team as any;
   const teamCode: string = team?.code ?? team?.name ?? "—";
@@ -376,6 +379,9 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
           </div>
         </div>
       </Card>
+
+      {/* ── GOALIE ANALYTICS CENTER ────────────────────────────────── */}
+      {goalieStats && <GoalieAnalyticsCard a={goalieStats} />}
 
       {/* ── SHOT / SAVE + DEFENSIVE HEAT MAPS ──────────────────────── */}
       {(heatMap || defenseMap) && (
