@@ -439,7 +439,13 @@ export async function extendContractAction(
   const org = await prisma.team.findUnique({ where: { id: teamId }, select: { affiliateTeams: { select: { id: true } } } });
   const orgIds = [teamId, ...(org?.affiliateTeams.map((a) => a.id) ?? [])];
   if (!orgIds.includes(player.teamId)) return { ok: false as const, error: "That player isn't in your organization." };
-  if ((player.contractYears ?? 0) > 0) return { ok: false as const, error: "He's still under contract — you can only re-sign him once his deal expires (0 years left)." };
+  if ((player.contractYears ?? 99) > 1) return { ok: false as const, error: "He's not in the final year of his deal yet." };
+  // you can only negotiate an extension once the regular season is underway (his
+  // deal expires at the end of THIS season).
+  const phase = (await getLeagueClock()).phase;
+  if (phase !== "regular" && phase !== "playoffs") {
+    return { ok: false as const, error: "Extensions open once the regular season starts — his deal expires at season's end." };
+  }
   if (salary < 775_000) return { ok: false as const, error: "Below the league minimum salary." };
   years = Math.max(1, Math.min(MAX_TERM, Math.round(years)));
 

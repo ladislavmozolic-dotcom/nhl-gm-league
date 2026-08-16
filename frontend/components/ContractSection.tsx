@@ -30,8 +30,9 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
   // include the club's AHL/farm players whose deals are up too
   const org = await prisma.team.findUnique({ where: { id: teamId }, select: { affiliateTeams: { select: { id: true } } } });
   const orgIds = [teamId, ...(org?.affiliateTeams.map((a) => a.id) ?? [])];
+  // players in the FINAL YEAR of their deal (1 left) or already expired (0)
   const expiring = await prisma.player.findMany({
-    where: { teamId: { in: orgIds }, rosterType: { in: ["NHL", "AHL"] }, contractYears: { lte: 0 } },
+    where: { teamId: { in: orgIds }, rosterType: { in: ["NHL", "AHL"] }, contractYears: { not: null, lte: 1 } },
     select: { id: true, name: true, age: true, capHit: true, contractYears: true, contractText: true, position: true, isGoalie: true, df: true, lastSeasonGP: true, lastSeasonPts: true, lastSeasonSvPct: true, rosterType: true },
     orderBy: { capHit: "desc" },
   });
