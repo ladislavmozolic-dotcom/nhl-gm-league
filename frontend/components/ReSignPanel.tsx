@@ -55,9 +55,11 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
     const salary = Math.round(parseFloat(salaryM) * 1e6);
     if (!Number.isFinite(salary)) { setMsg({ t: "err", s: "Enter a salary." }); return; }
     const r = await extendContractAction(player.id, teamId, salary, years, line, pp, pk, grantClause || null, grantClause === "M_NTC" ? breadth : null);
-    if (r.ok) { setResult({ salary: r.salary, years: r.years }); setDone(true); router.refresh(); return; }
+    // don't refresh yet — that would unmount this modal before the confirmation shows;
+    // refresh when the GM closes it (Done button).
+    if (r.ok) { setResult({ salary: r.salary, years: r.years }); setDone(true); return; }
     const rr = r as { walked?: boolean; rejected?: boolean; reason?: string; error?: string };
-    if (rr.walked) { setDone(true); setMsg({ t: "err", s: rr.reason ?? "He walked away." }); router.refresh(); return; }
+    if (rr.walked) { setDone(true); setMsg({ t: "err", s: rr.reason ?? "He walked away." }); return; }
     setMsg({ t: "err", s: rr.rejected ? (rr.reason ?? "") : (rr.error ?? "Failed.") });
   });
 
@@ -71,18 +73,21 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
         <p className="text-xs text-slate-500 mb-3">Current: {player.contractText ?? (player.capHit ? `${M(player.capHit)} × ${player.contractYears}yr` : "—")}</p>
 
         {done && result && (
-          <div className="text-center py-6">
-            <div className="text-4xl mb-2">✅</div>
-            <div className="text-lg font-bold text-white">Re-signed {cleanName(player.name)}</div>
-            <div className="text-sm text-emerald-400 mt-1">{M(result.salary)} × {result.years}yr</div>
-            <button onClick={onClose} className="mt-5 px-6 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-sm font-semibold">Done</button>
+          <div className="text-center py-8">
+            <div className="text-5xl mb-3">✅</div>
+            <div className="text-xs uppercase tracking-wide text-emerald-400/80">Contract signed</div>
+            <div className="text-2xl font-black text-white mt-1">{cleanName(player.name)}</div>
+            <div className="text-lg text-emerald-400 font-bold mt-1 tabular-nums">{M(result.salary)} × {result.years}yr</div>
+            <div className="text-xs text-slate-500 mt-1">stays with the club through {new Date().getUTCFullYear()}</div>
+            <button onClick={() => { router.refresh(); onClose(); }} className="mt-6 px-8 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-sm font-bold">Done</button>
           </div>
         )}
         {done && !result && (
-          <div className="text-center py-6">
-            <div className="text-3xl mb-2">🚪</div>
-            <div className="text-sm text-amber-300">{msg?.s}</div>
-            <button onClick={onClose} className="mt-5 px-6 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-semibold">Close</button>
+          <div className="text-center py-8">
+            <div className="text-4xl mb-2">🚪</div>
+            <div className="text-lg font-bold text-white">{cleanName(player.name)} walked away</div>
+            <div className="text-sm text-amber-300 mt-1 max-w-xs mx-auto">{msg?.s}</div>
+            <button onClick={() => { router.refresh(); onClose(); }} className="mt-6 px-8 py-2.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-semibold">Close</button>
           </div>
         )}
 
