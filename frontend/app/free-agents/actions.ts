@@ -107,9 +107,15 @@ export async function submitOfferAction(
   }
   if (salary < 775_000) return { ok: false as const, error: "Below the league minimum salary." };
   years = Math.max(1, Math.min(MAX_TERM, Math.round(years)));
-  // one-way vs two-way: an NHL regular won't accept a two-way
+  // one-way vs two-way: an established older player refuses — UNLESS the market has
+  // gone cold for him (round 2+ and he drew no round-1 offer), when he'll settle.
   const twoWay = !!offerTwoWay;
-  const twoWayErr = twoWayObjection(twoWay, player, years);
+  let relaxOlder = false;
+  if (twoWay && clock.frenzyRound >= 2) {
+    const r1 = await prisma.faOffer.count({ where: { playerId, round: 1, status: { in: ["PENDING", "COUNTERED", "SHORTLISTED", "ACCEPTED"] } } });
+    relaxOlder = r1 === 0;
+  }
+  const twoWayErr = twoWayObjection(twoWay, player, years, { relaxOlder });
   if (twoWayErr) return { ok: false as const, error: twoWayErr };
 
   // cap check — committed cap hit + this offer must stay under the ceiling

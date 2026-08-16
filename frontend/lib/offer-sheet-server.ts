@@ -108,7 +108,7 @@ export async function submitOfferSheetAction(
 
   const player = await prisma.player.findUnique({
     where: { id: playerId },
-    select: { name: true, teamId: true, overall: true, lastSeasonGP: true, franchiseTag: true, resignStatus: true, contractYears: true },
+    select: { name: true, teamId: true, age: true, overall: true, lastSeasonGP: true, franchiseTag: true, resignStatus: true, contractYears: true },
   });
   if (!player) return { ok: false, error: "Player not found." };
   if (player.teamId === fromTeamId) return { ok: false, error: "He's already yours — re-sign him on the Contracts page." };

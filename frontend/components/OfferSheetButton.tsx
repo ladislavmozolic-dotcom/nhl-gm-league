@@ -121,7 +121,7 @@ export default function OfferSheetButton({
               </div>
 
               <div>
-                <label className="text-xs text-slate-400 block mb-1">Contract type<InfoTip text="One-way pays the same in NHL or AHL. Two-way pays less on the farm — a player who logged 30+ NHL games last season won't accept one (he's an established NHLer, whatever his rating); those who do take a two-way take it only as a one-year deal." /></label>
+                <label className="text-xs text-slate-400 block mb-1">Contract type<InfoTip text="One-way pays the same in NHL or AHL. Two-way pays less on the farm — an established player past 25 (30+ NHL games last season) won't accept one, whatever his rating; young players sign two-ways freely. One year only." /></label>
                 <div className="flex gap-1">
                   <button type="button" onClick={() => setTwoWay(false)} className={`flex-1 py-1.5 rounded-lg text-sm font-semibold border ${!twoWay ? "bg-blue-600 text-white border-blue-500" : "bg-slate-800 text-slate-400 border-slate-700"}`}>One-way</button>
                   <button type="button" onClick={() => setTwoWay(true)} className={`flex-1 py-1.5 rounded-lg text-sm font-semibold border ${twoWay ? "bg-blue-600 text-white border-blue-500" : "bg-slate-800 text-slate-400 border-slate-700"}`}>Two-way</button>

@@ -167,20 +167,29 @@ export function clauseDiscount(clause?: string | null, breadth?: number | null):
   return 0;
 }
 
-/** Why a player would turn down a two-way offer (null = he'll take it). The
- *  deciding factor is real NHL games played, NOT rating: a player who logged more
- *  than 30 NHL games last season is an established NHLer and won't sign a two-way,
- *  whatever his overall (a proven role player at OV 58 still refuses). When we have
- *  no imported GP, fall back to overall. Anyone who does take a two-way takes it
- *  only as a one-year deal. */
+/** Why a player would turn down a two-way offer (null = he'll take it).
+ *
+ *  The barrier is real NHL games played, NOT rating, and it only applies to OLDER
+ *  players (26+): a player past 25 who logged more than 30 NHL games last season is
+ *  an established NHLer and won't sign a two-way, whatever his overall (a proven
+ *  role player at OV 58 still refuses). Young players are prospects — they go to the
+ *  farm on two-way/ELC deals freely. When we have no imported GP, fall back to
+ *  overall. Anyone who does take a two-way takes it only as a one-year deal.
+ *
+ *  `relaxOlder` lifts the older-player barrier — used on the open market from round
+ *  2 on, when a veteran who drew no round-1 interest will settle for a two-way. */
 export function twoWayObjection(
   twoWay: boolean,
-  p: { overall?: number | null; lastSeasonGP?: number | null },
+  p: { overall?: number | null; lastSeasonGP?: number | null; age?: number | null },
   years: number,
+  opts?: { relaxOlder?: boolean },
 ): string | null {
   if (!twoWay) return null;
-  const established = p.lastSeasonGP != null ? p.lastSeasonGP > 30 : (p.overall ?? 70) >= 72;
-  if (established) return "He played 30+ NHL games last season — he's an established NHLer and won't sign a two-way. Offer a one-way deal.";
+  const older = (p.age ?? 0) > 25;
+  const provenNhl = p.lastSeasonGP != null ? p.lastSeasonGP > 30 : (p.overall ?? 70) >= 72;
+  if (older && provenNhl && !opts?.relaxOlder) {
+    return "He's past 25 and played 30+ NHL games last season — an established NHLer won't sign a two-way. Offer a one-way deal.";
+  }
   if (years > 1) return "He'll take a two-way, but only as a one-year deal — set the term to 1 year.";
   return null;
 }
