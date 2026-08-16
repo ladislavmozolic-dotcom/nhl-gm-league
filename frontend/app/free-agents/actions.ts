@@ -185,6 +185,65 @@ export async function processRoundEndAction() {
   return { ok: true as const, ...r, round: clock.frenzyRound };
 }
 
+type FaOfferRow = Awaited<ReturnType<typeof prisma.faOffer.findMany>>[number];
+
+/** Execute a signing: move the player to the club on `o` at (salary × years),
+ *  accept that offer, reject the rest, log it. Returns the club code. */
+async function signFaOffer(playerId: number, player: { name: string; age: number | null }, o: FaOfferRow, salary: number, years: number): Promise<string> {
+  const twoWay = (player.age ?? 27) <= 24 && salary <= 3_000_000;
+  const expiry = CURRENT_SEASON_START + years;
+  const clause = o.grantClause && ["NTC", "NMC", "M_NTC"].includes(o.grantClause) ? o.grantClause : null;
+  const noTradeTeams = clause === "M_NTC" ? await weakestTeams(o.mNtcBreadth ?? 12, o.teamId) : [];
+  await prisma.player.update({
+    where: { id: playerId },
+    data: {
+      teamId: o.teamId, rosterType: "NHL",
+      capHit: salary, contractYears: years, contractExpiry: expiry,
+      contractType: twoWay ? "TWO_WAY" : "ONE_WAY",
+      contractText: `$${salary.toLocaleString("en-US")} × ${years}yr (through ${expiry})`,
+      signPromiseLine: o.line, signPromisePP: o.pp, signPromisePK: o.pk,
+      tradeClause: clause, noTradeTeams,
+      disgruntled: false, tradeRequested: false, promiseWarnGame: null,
+    },
+  });
+  // keep the signed round on the accepted offer (its `round`) for the signings report
+  await prisma.faOffer.update({ where: { id: o.id }, data: { status: "ACCEPTED", salary, years } });
+  await prisma.faOffer.updateMany({ where: { playerId, id: { not: o.id }, status: { in: ACTIVE } }, data: { status: "REJECTED" } });
+  const team = await prisma.team.findUnique({ where: { id: o.teamId }, select: { code: true } });
+  await prisma.transaction.create({
+    data: { type: "SIGNING", message: `${team?.code ?? "?"} signed ${player.name} — $${(salary / 1e6).toFixed(2)}M × ${years}yr` },
+  });
+  return team?.code ?? "?";
+}
+
+/** Best acceptable offer for a player at `judgeRound`; with `allowSoleFloor`, a lone
+ *  suitor whose offer fell short signs at the player's floor (cap-permitting). Signs
+ *  and returns a detail string, or null if nobody cleared his bar. */
+async function pickAndSign(
+  playerId: number, player: { name: string; age: number | null }, offers: FaOfferRow[],
+  judgeRound: number, pool: Awaited<ReturnType<typeof loadMarketPool>>, cmap: Awaited<ReturnType<typeof teamContentionMap>>,
+  allowSoleFloor: boolean,
+): Promise<string | null> {
+  let best: { offer: FaOfferRow; salary: number; years: number; utility: number } | null = null;
+  let soleEv: Awaited<ReturnType<typeof evaluateTeamOffer>> = null;
+  for (const o of offers) {
+    const ev = await evaluateTeamOffer(playerId, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, judgeRound, { clause: o.grantClause, breadth: o.mNtcBreadth });
+    if (offers.length === 1) soleEv = ev;
+    if (ev?.acceptable && (!best || ev.utility > best.utility)) best = { offer: o, salary: o.salary, years: o.years, utility: ev.utility };
+  }
+  if (!best && allowSoleFloor && offers.length === 1 && soleEv) {
+    const o = offers[0];
+    const askSalary = soleEv.ask.floorSalary;
+    const info = await teamCapInfo(o.teamId);
+    const cap = await loadLeagueCap();
+    const ceiling = capCeilingForPhase(cap.upper, (await getLeagueClock()).phase) + info.ltir;
+    if (info.committed + askSalary <= ceiling) best = { offer: o, salary: askSalary, years: Math.min(Math.max(o.years, soleEv.ask.minYears), soleEv.ask.maxYears), utility: 0 };
+  }
+  if (!best) return null;
+  const code = await signFaOffer(playerId, player, best.offer, best.salary, best.years);
+  return `${player.name} → ${code} ($${(best.salary / 1e6).toFixed(2)}M × ${best.years}yr)`;
+}
+
 /** Shared resolution used by the admin button and by the calendar when the window closes. */
 export async function resolveFrenzy(judgeRound = 3): Promise<{ signed: number; details: string[] }> {
   const pool = await loadMarketPool();
@@ -203,59 +262,9 @@ export async function resolveFrenzy(judgeRound = 3): Promise<{ signed: number; d
   for (const [playerId, offers] of byPlayer) {
     const player = await prisma.player.findUnique({ where: { id: playerId }, select: { name: true, rosterType: true, age: true } });
     if (!player || (player.rosterType && ["NHL", "AHL", "RETIRED"].includes(player.rosterType))) continue; // already signed / retired
-
-    let best: { offer: (typeof offers)[number]; utility: number } | null = null;
-    let soleEv: Awaited<ReturnType<typeof evaluateTeamOffer>> = null;
-    for (const o of offers) {
-      // judge each offer at the round being resolved (a mid-window "resolve now"
-      // uses the current, higher ask — not the final-week floor).
-      const ev = await evaluateTeamOffer(playerId, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, judgeRound, { clause: o.grantClause, breadth: o.mNtcBreadth });
-      if (offers.length === 1) soleEv = ev;
-      if (ev?.acceptable && (!best || ev.utility > best.utility)) best = { offer: o, utility: ev.utility };
-    }
-
-    // SOLE bidder whose offer fell short of his bar: rather than hold out, he signs
-    // with his only suitor at HIS requirement (floor), cap-permitting — he never
-    // signs for the club's lowball. (Multiple suitors → he keeps negotiating / picks
-    // the best acceptable above.)
-    if (!best && offers.length === 1 && soleEv) {
-      const o = offers[0];
-      const askSalary = soleEv.ask.floorSalary;
-      const info = await teamCapInfo(o.teamId);
-      const cap = await loadLeagueCap();
-      const ceiling = capCeilingForPhase(cap.upper, (await getLeagueClock()).phase) + info.ltir;
-      if (info.committed + askSalary <= ceiling) {
-        best = { offer: { ...o, salary: askSalary, years: Math.min(Math.max(o.years, soleEv.ask.minYears), soleEv.ask.maxYears) }, utility: 0 };
-      }
-    }
-
-    if (!best) continue; // holdout — no offer cleared his bar; offers stay pending
-
-    const o = best.offer;
-    const twoWay = (player.age ?? 27) <= 24 && o.salary <= 3_000_000;
-    const expiry = CURRENT_SEASON_START + o.years;
-    const clause = o.grantClause && ["NTC", "NMC", "M_NTC"].includes(o.grantClause) ? o.grantClause : null;
-    const noTradeTeams = clause === "M_NTC" ? await weakestTeams(o.mNtcBreadth ?? 12, o.teamId) : [];
-    await prisma.player.update({
-      where: { id: playerId },
-      data: {
-        teamId: o.teamId, rosterType: "NHL",
-        capHit: o.salary, contractYears: o.years, contractExpiry: expiry,
-        contractType: twoWay ? "TWO_WAY" : "ONE_WAY",
-        contractText: `$${o.salary.toLocaleString("en-US")} × ${o.years}yr (through ${expiry})`,
-        signPromiseLine: o.line, signPromisePP: o.pp, signPromisePK: o.pk,
-        tradeClause: clause, noTradeTeams,
-        disgruntled: false, tradeRequested: false, promiseWarnGame: null,
-      },
-    });
-    await prisma.faOffer.update({ where: { id: o.id }, data: { status: "ACCEPTED" } });
-    await prisma.faOffer.updateMany({ where: { playerId, id: { not: o.id }, status: { in: ACTIVE } }, data: { status: "REJECTED" } });
-    const team = await prisma.team.findUnique({ where: { id: o.teamId }, select: { code: true } });
-    await prisma.transaction.create({
-      data: { type: "SIGNING", message: `${team?.code ?? "?"} signed ${player.name} — $${(o.salary / 1e6).toFixed(2)}M × ${o.years}yr` },
-    });
-    details.push(`${player.name} → ${team?.code} ($${(o.salary / 1e6).toFixed(2)}M × ${o.years}yr)`);
-    signed++;
+    // best acceptable at the round being resolved; a lone suitor falls back to his floor
+    const detail = await pickAndSign(playerId, player, offers, judgeRound, pool, cmap, true);
+    if (detail) { details.push(detail); signed++; }
   }
   return { signed, details };
 }
@@ -266,7 +275,7 @@ export async function resolveFrenzy(judgeRound = 3): Promise<{ signed: number; d
  *    that club at round-2 value) and drops hopeless lowballs.
  *  - after round 2: he SHORTLISTS his best suitors and tells the rest he's moving on.
  *  Round 3 ends by `resolveFrenzy` signing the best shortlisted offer. */
-export async function processRoundEnd(endedRound: number): Promise<{ countered: number; eliminated: number; shortlisted: number }> {
+export async function processRoundEnd(endedRound: number): Promise<{ countered: number; eliminated: number; shortlisted: number; signed: number }> {
   const pool = await loadMarketPool();
   const cmap = await teamContentionMap();
   const nextRound = endedRound + 1;
@@ -274,11 +283,16 @@ export async function processRoundEnd(endedRound: number): Promise<{ countered: 
   const byPlayer = new Map<number, typeof offers>();
   for (const o of offers) { const a = byPlayer.get(o.playerId) ?? []; a.push(o); byPlayer.set(o.playerId, a); }
 
-  let countered = 0, eliminated = 0, shortlisted = 0;
+  let countered = 0, eliminated = 0, shortlisted = 0, signedNow = 0;
   for (const [playerId, list] of byPlayer) {
-    const player = await prisma.player.findUnique({ where: { id: playerId }, select: { name: true, rosterType: true } });
+    const player = await prisma.player.findUnique({ where: { id: playerId }, select: { name: true, rosterType: true, age: true } });
     if (!player || (player.rosterType && FREE.includes(player.rosterType))) continue;
     const name = player.name;
+
+    // if a standing offer already meets his ask at THIS round, he signs now
+    // (real 1st- / 2nd-round signings) — no waiting for the final week.
+    const signDetail = await pickAndSign(playerId, player, list, endedRound, pool, cmap, false);
+    if (signDetail) { signedNow++; continue; }
 
     // value every offer at the UPCOMING round
     const scored = [] as { o: (typeof list)[number]; ev: Awaited<ReturnType<typeof evaluateTeamOffer>> }[];
@@ -328,7 +342,7 @@ export async function processRoundEnd(endedRound: number): Promise<{ countered: 
       }
     }
   }
-  return { countered, eliminated, shortlisted };
+  return { countered, eliminated, shortlisted, signed: signedNow };
 }
 
 /** Compute + apply a player's Entry-Level Contract from the auto-formula
