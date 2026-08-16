@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { canManageTeam, getTeamSession, isAdmin } from "@/lib/auth";
+import { canManageTeam, getTeamSession, isAdmin, isComishTier } from "@/lib/auth";
 import { getLeagueClock } from "@/lib/calendar-server";
 import { CURRENT_SEASON_START, capCeilingForPhase, ltirRelief } from "@/lib/finance";
 import {
@@ -93,6 +93,12 @@ export async function submitOfferAction(
   if (!(await canManageTeam(teamId))) return { ok: false as const, error: "You don't manage this team." };
   const clock = await getLeagueClock();
   if (!clock.frenzyOpen) return { ok: false as const, error: "The free-agent market is closed." };
+  // comish-tier head-start: the first day of each round is the commissioner's
+  // office only (they bid before they can see anything), GMs join from day 2.
+  const dayInRound = clock.frenzyDay >= 1 ? ((clock.frenzyDay - 1) % 7) + 1 : 1;
+  if (dayInRound === 1 && !(await isComishTier())) {
+    return { ok: false as const, error: "This round opens for GMs tomorrow — the commissioner's office gets the first day." };
+  }
 
   const player = await prisma.player.findUnique({ where: { id: playerId }, select: { rosterType: true } });
   if (!player) return { ok: false as const, error: "Player not found." };

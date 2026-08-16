@@ -54,6 +54,15 @@ export async function isAdmin(): Promise<boolean> {
   return !!t?.isAdmin;
 }
 
+/** Comish-tier = commissioner (isAdmin) or a co-commissioner / league agent.
+ *  These roles get a one-day head-start each free-agent round. */
+export async function isComishTier(): Promise<boolean> {
+  const id = await getTeamSession();
+  if (id == null) return false;
+  const t = await prisma.team.findUnique({ where: { id }, select: { isAdmin: true, gmRole: true } });
+  return !!t?.isAdmin || ["comish", "co_comish", "agent"].includes(t?.gmRole ?? "gm");
+}
+
 /** May the current session manage `teamId`? True for that team's own GM, or for
  *  any admin GM (who can edit every team's lines/tactics from the Admin panel). */
 export async function canManageTeam(teamId: number): Promise<boolean> {

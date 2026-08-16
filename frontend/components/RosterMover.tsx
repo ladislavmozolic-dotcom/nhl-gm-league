@@ -19,8 +19,9 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const pro = rows.filter((r) => r.side === "pro");
-  const farm = rows.filter((r) => r.side === "farm");
+  const byName = (a: Player, b: Player) => a.name.localeCompare(b.name);
+  const pro = rows.filter((r) => r.side === "pro").sort(byName);
+  const farm = rows.filter((r) => r.side === "farm").sort(byName);
   const goalies = (l: Player[]) => l.filter((p) => p.isGoalie).length;
   const proSkaters = pro.length - goalies(pro);
 
