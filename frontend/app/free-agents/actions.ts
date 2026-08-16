@@ -15,6 +15,24 @@ const FREE = ["NHL", "AHL", "RETIRED", "PROSPECT", "RELEASED"]; // not a signabl
 const ACTIVE = ["PENDING", "COUNTERED", "SHORTLISTED"]; // an offer still in contention
 const SHORTLIST_SIZE = 3; // how many suitors a player keeps into the final week
 
+/** Why a player would turn down a two-way offer (null = he'll take it). An
+ *  AHL-caliber player accepts a two-way, but only ever as a one-year deal; an
+ *  NHL regular refuses outright; and a player past 25 who is NHL-ready enough
+ *  would rather test the market for a one-way than settle for a two-way. */
+function twoWayObjection(
+  twoWay: boolean,
+  p: { rosterType?: string | null; overall?: number | null; realFarmTeamId?: number | null; age?: number | null },
+  years: number,
+): string | null {
+  if (!twoWay) return null;
+  const ovr = p.overall ?? 70;
+  const ahlCaliber = p.rosterType === "AHL" || p.realFarmTeamId != null || ovr < 72;
+  if (!ahlCaliber) return "He's an NHL regular — he won't sign a two-way. Offer a one-way deal.";
+  if ((p.age ?? 0) > 25 && ovr >= 68) return "He's past 25 and NHL-ready enough to chase a one-way on the open market — he won't accept a two-way. Offer a one-way deal.";
+  if (years > 1) return "He'll take a two-way, but only as a one-year deal — set the term to 1 year.";
+  return null;
+}
+
 /** A team's committed NHL cap hit (+ retention/buyout dead money) and its LTIR
  *  relief (cap hits of skaters injured below CON 90). The effective ceiling is
  *  the phase ceiling + LTIR relief. */
@@ -100,7 +118,7 @@ export async function submitOfferAction(
     return { ok: false as const, error: "This round opens for GMs tomorrow — the commissioner's office gets the first day." };
   }
 
-  const player = await prisma.player.findUnique({ where: { id: playerId }, select: { rosterType: true, overall: true, realFarmTeamId: true } });
+  const player = await prisma.player.findUnique({ where: { id: playerId }, select: { rosterType: true, overall: true, realFarmTeamId: true, age: true } });
   if (!player) return { ok: false as const, error: "Player not found." };
   if (player.rosterType && FREE.includes(player.rosterType)) {
     return { ok: false as const, error: "This player is not a free agent." };
@@ -109,8 +127,8 @@ export async function submitOfferAction(
   years = Math.max(1, Math.min(MAX_TERM, Math.round(years)));
   // one-way vs two-way: an NHL regular won't accept a two-way
   const twoWay = !!offerTwoWay;
-  const ahlCaliber = player.rosterType === "AHL" || player.realFarmTeamId != null || (player.overall ?? 70) < 72;
-  if (twoWay && !ahlCaliber) return { ok: false as const, error: "He's an NHL regular — he won't sign a two-way. Offer a one-way deal." };
+  const twoWayErr = twoWayObjection(twoWay, player, years);
+  if (twoWayErr) return { ok: false as const, error: twoWayErr };
 
   // cap check — committed cap hit + this offer must stay under the ceiling
   const cap = await loadLeagueCap();
@@ -464,11 +482,6 @@ export async function extendContractAction(
   const orgIds = [teamId, ...(org?.affiliateTeams.map((a) => a.id) ?? [])];
   if (!orgIds.includes(player.teamId)) return { ok: false as const, error: "That player isn't in your organization." };
   if ((player.contractYears ?? 99) > 1) return { ok: false as const, error: "He's not in the final year of his deal yet." };
-  // one-way vs two-way: an AHL-caliber player (real farmhand / fringe / already on the
-  // farm) is fine on a two-way; an NHL regular won't accept one — he wants a one-way.
-  const twoWay = !!offerTwoWay;
-  const ahlCaliber = player.rosterType === "AHL" || player.realFarmTeamId != null || (player.overall ?? 70) < 72;
-  if (twoWay && !ahlCaliber) return { ok: false as const, error: "He's an NHL regular — he won't sign a two-way. Offer him a one-way deal." };
   // you can only negotiate an extension once the regular season is underway (his
   // deal expires at the end of THIS season).
   const phase = (await getLeagueClock()).phase;
@@ -477,6 +490,12 @@ export async function extendContractAction(
   }
   if (salary < 775_000) return { ok: false as const, error: "Below the league minimum salary." };
   years = Math.max(1, Math.min(MAX_TERM, Math.round(years)));
+  // one-way vs two-way: an AHL-caliber player is fine on a two-way; an NHL regular
+  // won't accept one, a two-way is only ever a one-year deal, and a player past 25
+  // would rather test the market than take a two-way.
+  const twoWay = !!offerTwoWay;
+  const twoWayErr = twoWayObjection(twoWay, player, years);
+  if (twoWayErr) return { ok: false as const, error: twoWayErr };
 
   // negotiations may already be closed (walked to FA, or turned down → offer sheets)
   if (player.resignStatus === "walkedToUFA") return { ok: false as const, closed: true, error: "He's testing free agency now — negotiations are over for this window." };

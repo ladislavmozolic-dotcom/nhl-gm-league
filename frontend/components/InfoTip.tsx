@@ -1,16 +1,38 @@
 "use client";
 
-import { useState, useId } from "react";
+import { useState, useId, useRef, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 
 // A small "ⓘ" that reveals a short explanation on hover / focus / tap. Use it
 // next to a heading, a column label, or a stat abbreviation to say what it means.
 //   <InfoTip text="Goals Saved Above Expected — save quality vs an average goalie." />
+//
+// The bubble is rendered into <body> with fixed positioning and clamped to the
+// viewport, so it never gets clipped by a Card's overflow or the screen edge.
 export default function InfoTip({ text, label }: { text: string; label?: string }) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const tipRef = useRef<HTMLSpanElement>(null);
   const id = useId();
+
+  useLayoutEffect(() => {
+    if (!open || !btnRef.current) return;
+    const b = btnRef.current.getBoundingClientRect();
+    const tw = tipRef.current?.offsetWidth ?? 260;
+    const th = tipRef.current?.offsetHeight ?? 44;
+    const m = 8; // keep this far from every viewport edge
+    const left = Math.max(m, Math.min(b.left + b.width / 2 - tw / 2, window.innerWidth - tw - m));
+    // prefer above; drop below if there isn't room up top
+    const above = b.top - th - 6 >= m;
+    const top = above ? b.top - th - 6 : Math.min(b.bottom + 6, window.innerHeight - th - m);
+    setPos({ left, top });
+  }, [open, text]);
+
   return (
     <span className="relative inline-flex items-center align-middle">
       <button
+        ref={btnRef}
         type="button"
         aria-label={label ?? "What does this mean?"}
         aria-describedby={open ? id : undefined}
@@ -23,14 +45,17 @@ export default function InfoTip({ text, label }: { text: string; label?: string 
       >
         i
       </button>
-      {open && (
+      {open && typeof document !== "undefined" && createPortal(
         <span
+          ref={tipRef}
           id={id}
           role="tooltip"
-          className="absolute left-1/2 bottom-full z-50 mb-1.5 -translate-x-1/2 w-max max-w-[260px] rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-normal normal-case tracking-normal text-slate-200 shadow-xl"
+          style={{ position: "fixed", left: pos?.left ?? -9999, top: pos?.top ?? -9999 }}
+          className="z-[100] w-max max-w-[280px] rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-normal normal-case tracking-normal text-slate-200 shadow-xl pointer-events-none"
         >
           {text}
-        </span>
+        </span>,
+        document.body,
       )}
     </span>
   );
