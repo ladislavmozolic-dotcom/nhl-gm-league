@@ -31,7 +31,9 @@ export function playerType(p: TypeInput): string | null {
   // by OFFENSE level (SC/PA) and PHYSICALITY (CK/ST), not offense-vs-defense.
   const S = n(sc), P = n(pa), D = n(df), C = n(ck), T = n(st);
   const off = Math.max(S, P);
-  const phys = (C + T) / 2;
+  // physicality is a CHECKING trait (CK), not raw strength — a strong but skilled
+  // winger (high ST) shouldn't read as a grinder, so ST only lightly contributes.
+  const phys = C * 0.75 + T * 0.25;
 
   if (isDefPos(p.position ?? "")) {
     if (off >= 68) return "Offensive Defenseman";
