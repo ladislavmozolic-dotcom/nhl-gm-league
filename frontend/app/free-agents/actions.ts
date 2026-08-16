@@ -153,7 +153,10 @@ export async function withdrawOfferAction(playerId: number, teamId: number) {
  *  7-day window closes, or manually by an admin. */
 export async function resolveFrenzyAction() {
   if (!(await isAdmin())) return { ok: false as const, error: "Only a league admin can resolve the frenzy." };
-  const result = await resolveFrenzy();
+  // a manual resolve judges at the CURRENT round (a round-1 resolve keeps the high
+  // ask, so nobody signs for a below-ask lowball); the natural window close is round 3.
+  const round = (await getLeagueClock()).frenzyRound || 3;
+  const result = await resolveFrenzy(round);
   for (const p of ["/free-agents", "/signings", "/teams", "/finance", "/calendar"]) revalidatePath(p);
   return { ok: true as const, ...result };
 }
@@ -165,12 +168,18 @@ export async function processRoundEndAction() {
   const clock = await getLeagueClock();
   if (!clock.frenzyOpen || clock.frenzyRound >= 3) return { ok: false as const, error: "Rounds run in weeks 1 and 2 — the final week resolves by signing." };
   const r = await processRoundEnd(clock.frenzyRound);
-  for (const p of ["/free-agents", "/signings"]) revalidatePath(p);
+  // the round is calendar-driven (a week each) — advance the clock a week so the
+  // frenzy visibly moves to the next round (off-season: no games to sim).
+  const { addDays } = await import("@/lib/calendar");
+  const { getLeagueDate } = await import("@/lib/calendar-server");
+  const next = addDays(await getLeagueDate(), 7);
+  await prisma.leagueConfig.upsert({ where: { id: 1 }, update: { leagueDate: next }, create: { id: 1, leagueDate: next } });
+  for (const p of ["/free-agents", "/signings", "/calendar", "/"]) revalidatePath(p);
   return { ok: true as const, ...r, round: clock.frenzyRound };
 }
 
 /** Shared resolution used by the admin button and by the calendar when the window closes. */
-export async function resolveFrenzy(): Promise<{ signed: number; details: string[] }> {
+export async function resolveFrenzy(judgeRound = 3): Promise<{ signed: number; details: string[] }> {
   const pool = await loadMarketPool();
   const cmap = await teamContentionMap();
   const pending = await prisma.faOffer.findMany({ where: { status: { in: ACTIVE } } });
@@ -189,10 +198,28 @@ export async function resolveFrenzy(): Promise<{ signed: number; details: string
     if (!player || (player.rosterType && ["NHL", "AHL", "RETIRED"].includes(player.rosterType))) continue; // already signed / retired
 
     let best: { offer: (typeof offers)[number]; utility: number } | null = null;
+    let soleEv: Awaited<ReturnType<typeof evaluateTeamOffer>> = null;
     for (const o of offers) {
-      // final week → he judges every offer at fair (round-3) value
-      const ev = await evaluateTeamOffer(playerId, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, 3, { clause: o.grantClause, breadth: o.mNtcBreadth });
+      // judge each offer at the round being resolved (a mid-window "resolve now"
+      // uses the current, higher ask — not the final-week floor).
+      const ev = await evaluateTeamOffer(playerId, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, judgeRound, { clause: o.grantClause, breadth: o.mNtcBreadth });
+      if (offers.length === 1) soleEv = ev;
       if (ev?.acceptable && (!best || ev.utility > best.utility)) best = { offer: o, utility: ev.utility };
+    }
+
+    // SOLE bidder whose offer fell short of his bar: rather than hold out, he signs
+    // with his only suitor at HIS requirement (floor), cap-permitting — he never
+    // signs for the club's lowball. (Multiple suitors → he keeps negotiating / picks
+    // the best acceptable above.)
+    if (!best && offers.length === 1 && soleEv) {
+      const o = offers[0];
+      const askSalary = soleEv.ask.floorSalary;
+      const info = await teamCapInfo(o.teamId);
+      const cap = await loadLeagueCap();
+      const ceiling = capCeilingForPhase(cap.upper, (await getLeagueClock()).phase) + info.ltir;
+      if (info.committed + askSalary <= ceiling) {
+        best = { offer: { ...o, salary: askSalary, years: Math.min(Math.max(o.years, soleEv.ask.minYears), soleEv.ask.maxYears) }, utility: 0 };
+      }
     }
 
     if (!best) continue; // holdout — no offer cleared his bar; offers stay pending

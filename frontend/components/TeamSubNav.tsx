@@ -34,11 +34,9 @@ export default function TeamSubNav({ slug, isGm, isAffiliate, farmSlug, parentSl
           { label: "Lines", href: `${base}/lines`, gm: true },
           { label: "System", href: `${base}/tactics`, gm: true },
         ] },
-        { label: "Schedule", items: [
-          { label: "Schedule", href: `${base}/schedule` },
-          { label: "Scores", href: `${base}/scores` },
-          { label: "Statistics", href: `${base}/stats` },
-        ] },
+        { label: "Schedule", href: `${base}/schedule` },
+        { label: "Scores", href: `${base}/scores` },
+        { label: "Statistics", href: `${base}/stats` },
         { label: "Contracts", items: [
           { label: "Free Agents", href: `${base}/free-agents`, gm: true },
           { label: "Team Contracts", href: `${base}/contracts`, gm: true },
