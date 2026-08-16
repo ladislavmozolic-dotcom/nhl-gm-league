@@ -71,7 +71,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
           <>
             <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-3 mb-3 text-sm">
               <p className="text-slate-300">Sees himself as your <b className="text-blue-300">{slotLabels[i.slot] ?? "—"}</b> · wants {i.wantPP ? "PP" : "no PP"} · {i.wantPK ? "PK" : "no PK"}</p>
-              <p className="mt-1 text-slate-200">Asking <b className="text-amber-300">{M(i.askSalary)} × {i.askYears}yr</b> <span className="text-slate-500">(floor {M(i.floor)}, {i.minYears}-{i.maxYears}yr)</span></p>
+              <p className="mt-1 text-slate-200">He&apos;s looking for roughly <b className="text-amber-300">{M(i.floor * 0.97)}–{M(i.askSalary * 1.08)}</b> <span className="text-slate-500">· term negotiable {i.minYears}-{i.maxYears}yr (more years = more money)</span></p>
               {i.moraleNote && <p className={`mt-1 text-xs font-medium ${i.moraleNote.startsWith("Happy") ? "text-emerald-400" : "text-amber-400"}`}>{i.moraleNote.startsWith("Happy") ? "😀 " : "😕 "}{i.moraleNote}</p>}
             </div>
 

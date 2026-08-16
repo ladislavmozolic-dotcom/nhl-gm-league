@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
-import { canManageTeam } from "@/lib/auth";
+import { isAdmin } from "@/lib/auth";
 import { loadSettings } from "@/lib/sim/settings";
 import { cleanName } from "@/lib/playerName";
 import ContractSection from "@/components/ContractSection";
@@ -15,9 +15,10 @@ export default async function TeamContractsPage({ params }: { params: Promise<{ 
   const team = await prisma.team.findUnique({ where: { slug }, select: { id: true } });
   if (!team) notFound();
 
-  const [canManage, settings] = await Promise.all([canManageTeam(team.id), loadSettings()]);
+  // clauses are anchored to the player at signing — only the commissioner edits them
+  const [admin, settings] = await Promise.all([isAdmin(), loadSettings()]);
   let clauseUi: { players: { id: number; name: string; position: string; clause: string | null; noTradeTeams: number[] }[]; teams: { id: number; code: string }[] } | null = null;
-  if (canManage && settings.clausesEnabled) {
+  if (admin && settings.clausesEnabled) {
     const [roster, teams] = await Promise.all([
       prisma.player.findMany({ where: { teamId: team.id, rosterType: "NHL" }, select: { id: true, name: true, position: true, tradeClause: true, noTradeTeams: true }, orderBy: [{ capHit: "desc" }] }),
       prisma.team.findMany({ where: { league: "NHL", isAffiliate: false }, select: { id: true, code: true }, orderBy: { code: "asc" } }),

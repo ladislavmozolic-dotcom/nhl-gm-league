@@ -143,6 +143,17 @@ export function willingnessFactor(morale: number | null | undefined, market: num
   const leverage = 0.55 + 0.65 * reputation;                       // fringe 0.55 … star 1.2
   return Math.max(0.88, Math.min(1.16, 1 + moodDelta * 0.2 * leverage));
 }
+/** Salary multiplier for the OFFERED term vs the player's sweet spot. More years
+ *  than he'd like → he wants a raise (steeper for older players who see the risk);
+ *  fewer years → no premium (he's happy to go short). Never a refusal. */
+export function termPremium(offerYears: number, preferredYears: number, age: number | null | undefined): number {
+  const extra = offerYears - preferredYears;
+  if (extra <= 0) return 1;
+  const a = age ?? 27;
+  const perYear = a >= 33 ? 0.14 : a >= 30 ? 0.09 : 0.05;
+  return 1 + extra * perYear;
+}
+
 /** Signing discount when the GM GRANTS a no-trade / no-movement clause: the
  *  player trades security for money, so he'll ink for a little less. NMC (full
  *  protection) is the biggest discount; M-NTC scales with how many teams the
@@ -186,15 +197,16 @@ export function buildDemand(input: {
   salary = Math.round(salary / 50_000) * 50_000;
 
   let years = wantedYears(market, grp, age);
-  const a = age ?? 27;
-  const hardYearCap = a >= 34 ? 2 : a >= 32 ? 3 : MAX_TERM;
-  let maxYears = Math.min(hardYearCap, years + (a >= 32 ? 0 : 1), MAX_TERM);
-  let minYears = grp === "G" ? Math.max(1, years - 1) : Math.max(1, years - 2);
+  // term is ALWAYS negotiable up to the league cap — a longer deal just costs more
+  // (see termPremium), the player never flat-refuses more years. He'll also go as
+  // short as 1 year. Preferred `years` is his sweet spot; min/max frame the range.
+  let maxYears = MAX_TERM;
+  let minYears = 1;
 
-  // coming off a down season (injury-hit / limited games) → he'd rather take a
-  // 1-year "prove-it" deal and hit the market again than lock in long at a low.
+  // coming off a down season (injury-hit / limited games) → his sweet spot is a
+  // 1-year "prove-it" deal, but he'll still take term if you pay the premium.
   const downSeason = input.downSeason ?? (input.perf != null && input.perf < 0.9);
-  if (downSeason) { years = 1; maxYears = 1; minYears = 1; }
+  if (downSeason) years = 1;
 
   const floorSalary = Math.round((salary * 0.92) / 50_000) * 50_000;
   return { salary, years, floorSalary, minYears, maxYears, market, anchor, comps, overridden, willingness };

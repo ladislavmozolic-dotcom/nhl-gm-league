@@ -6,7 +6,7 @@ import { getLeagueClock } from "./calendar-server";
 import { computeStandings } from "./sim/standings";
 import {
   faPosGroup, skaterMarket, goalieMarket, anchorFromPool, buildDemand,
-  slotForRank, slotToLine, desiredDeployment, deploymentDemand, offerUtility, offerAcceptable, clauseDiscount,
+  slotForRank, slotToLine, desiredDeployment, deploymentDemand, offerUtility, offerAcceptable, clauseDiscount, termPremium,
   type MarketRow, type Demand, type FaPos, type Contention, type Deployment, type Desired, type LineSlot,
 } from "./free-agency";
 
@@ -150,7 +150,7 @@ export function projectSlot(ctx: TeamContext, grp: FaPos, market: number): { slo
 
 export type TeamAsk = {
   grp: FaPos; base: Demand; slot: LineSlot; line: number;
-  contention: Contention; desired: Desired; ask: Demand;
+  contention: Contention; desired: Desired; ask: Demand; age: number | null;
 };
 
 /** The Interest feedback: what the player would want to sign at THIS club, given
@@ -171,7 +171,7 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
   // projected ask = the club gives him the role he projects into, plus the ST he wants
   const projDeploy: Deployment = { line, pp: desired.wantPP, pk: desired.wantPK };
   const ask = deploymentDemand(base, grp, projDeploy, desired, ctx.contention);
-  return { grp, base, slot, line, contention: ctx.contention, desired, ask };
+  return { grp, base, slot, line, contention: ctx.contention, desired, ask, age: p.age };
 }
 
 /** Evaluate a concrete offer (money + term + promised deployment) at a club. */
@@ -185,8 +185,11 @@ export async function evaluateTeamOffer(
   const raw = deploymentDemand(info.base, info.grp, deploy, info.desired, info.contention);
   // granting a clause lets him sign for less — discount his floor + headline ask.
   const disc = clauseDiscount(grant?.clause, grant?.breadth);
-  const ask: Demand = disc
-    ? { ...raw, floorSalary: Math.round((raw.floorSalary * (1 - disc)) / 50_000) * 50_000, salary: Math.round((raw.salary * (1 - disc)) / 50_000) * 50_000 }
+  // longer term than his sweet spot raises the price (always negotiable, never a refusal)
+  const tp = termPremium(years, raw.years, info.age);
+  const f = (1 - disc) * tp;
+  const ask: Demand = f !== 1
+    ? { ...raw, floorSalary: Math.round((raw.floorSalary * f) / 50_000) * 50_000, salary: Math.round((raw.salary * f) / 50_000) * 50_000 }
     : raw;
   const acceptable = offerAcceptable(ask, salary, years);
   const utility = offerUtility(salary, info.grp, deploy, info.desired, info.contention) + disc * raw.salary;
