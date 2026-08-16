@@ -218,6 +218,21 @@ export async function edgeGoalieRatings(league = "NHL"): Promise<EdgeRow[]> {
   });
 }
 
+/** Compute and PERSIST Edge ratings onto every player (Player.edgeRatings). Kept
+ *  separate from the STHS ck/sc/... fields the sim reads, so this is analytics only. */
+export async function persistEdgeRatings(): Promise<{ written: number }> {
+  const all: EdgeRow[] = [
+    ...(await edgeRatings("NHL")), ...(await edgeRatings("AHL")),
+    ...(await edgeGoalieRatings("NHL")),
+  ];
+  let written = 0;
+  for (const r of all) {
+    await prisma.player.update({ where: { id: r.playerId }, data: { edgeRatings: r.ratings as object } });
+    written++;
+  }
+  return { written };
+}
+
 /** Edge ratings for a single player (or null). */
 export async function edgeForPlayer(playerId: number): Promise<EdgeRow | null> {
   const p = await prisma.player.findUnique({ where: { id: playerId }, select: { rosterType: true, isGoalie: true } });

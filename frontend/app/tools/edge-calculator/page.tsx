@@ -4,6 +4,7 @@ import InfoTip from "@/components/InfoTip";
 import SortableTable, { type SortCol } from "@/components/SortableTable";
 import { edgeRatings, edgeGoalieRatings } from "@/lib/edge-params-server";
 import { RATING_BANDS } from "@/lib/edge-params";
+import EdgeTeamSelect from "@/components/EdgeTeamSelect";
 
 export const dynamic = "force-dynamic";
 
@@ -37,14 +38,16 @@ const PARAMS: { key: string; label: string; title: string }[] = [
   { key: "OV", label: "OV", title: "Overall — informative average, never enters the sim" },
 ];
 
-export default async function EdgeCalculatorPage({ searchParams }: { searchParams: Promise<{ type?: string }> }) {
-  const { type } = await searchParams;
+export default async function EdgeCalculatorPage({ searchParams }: { searchParams: Promise<{ type?: string; team?: string }> }) {
+  const { type, team } = await searchParams;
   const goalies = type === "goalies";
   const params = goalies ? GOALIE_PARAMS : PARAMS;
-  const rows = (goalies ? await edgeGoalieRatings("NHL") : await edgeRatings("NHL")).map((r) => ({
+  const all = (goalies ? await edgeGoalieRatings("NHL") : await edgeRatings("NHL")).map((r) => ({
     playerId: r.playerId, name: r.name, teamCode: r.teamCode, position: r.position,
     ...r.ratings,
   }));
+  const teamCodes = [...new Set(all.map((r) => r.teamCode).filter((c): c is string => !!c))].sort();
+  const rows = team ? all.filter((r) => r.teamCode === team) : all;
 
   const cols: SortCol[] = [
     { key: "name", label: "Player", kind: "player", sticky: true },
@@ -56,9 +59,10 @@ export default async function EdgeCalculatorPage({ searchParams }: { searchParam
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 space-y-5">
       <PageHeader title="Edge Parameters" subtitle="Ratings built from real NHL performance — relative, per-60" />
-      <div className="flex gap-1.5">
-        <Link href="/tools/edge-calculator" className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${!goalies ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-300"}`}>Skaters</Link>
-        <Link href="/tools/edge-calculator?type=goalies" className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${goalies ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-300"}`}>Goalies</Link>
+      <div className="flex gap-1.5 items-center flex-wrap">
+        <Link href={`/tools/edge-calculator${team ? `?team=${team}` : ""}`} className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${!goalies ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-300"}`}>Skaters</Link>
+        <Link href={`/tools/edge-calculator?type=goalies${team ? `&team=${team}` : ""}`} className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${goalies ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-300"}`}>Goalies</Link>
+        <span className="ml-2"><EdgeTeamSelect teams={teamCodes} value={team ?? ""} /></span>
       </div>
       <Card>
         <p className="text-sm text-slate-400">
@@ -76,7 +80,7 @@ export default async function EdgeCalculatorPage({ searchParams }: { searchParam
             <thead><tr className="text-slate-500 text-left"><th className="pr-3 py-1">Param</th>{RATING_BANDS.map((b) => <th key={b.label} className="px-2 py-1 text-right">{b.label}</th>)}</tr></thead>
             <tbody>
               {params.filter((p) => p.key !== "MO" && p.key !== "OV").map((p) => {
-                const vals = rows.map((r) => (r as any)[p.key]).filter((v) => v != null) as number[];
+                const vals = all.map((r) => (r as any)[p.key]).filter((v) => v != null) as number[];
                 return (
                   <tr key={p.key} className="border-t border-slate-800/50">
                     <td className="pr-3 py-1 font-semibold text-slate-300">{p.label}</td>
