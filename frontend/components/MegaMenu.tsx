@@ -86,7 +86,6 @@ const menuItems: MenuItem[] = [
       { label: "Captains", href: "/captains" },
       { label: "Coaches", href: "/coaches" },
       { label: "Signings", href: "/signings" },
-      { label: "Injuries", href: "/players/injuries" },
       { label: "Rules", href: "/rules" },
     ],
   },

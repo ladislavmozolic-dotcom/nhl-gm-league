@@ -22,3 +22,16 @@ export async function saveSystem(teamId: number, tactics: TeamTactics) {
   revalidatePath(`/teams`);
   return { ok: true };
 }
+
+/** Apply one Coach-Advice suggestion: flip a single dial on the current system. */
+export async function applyCoachSuggestionAction(teamId: number, dial: string, value: string) {
+  if (!(await canManageTeam(teamId))) return { ok: false as const, error: "not authorized" };
+  if (!["tempo", "forecheck", "puckStyle", "dZone"].includes(dial)) return { ok: false as const, error: "bad dial" };
+  const row = await prisma.teamLines.findUnique({ where: { teamId }, select: { system: true } });
+  const current = mergeTactics((row?.system as Partial<TeamTactics>) ?? null);
+  const clean = mergeTactics({ ...current, [dial]: value } as TeamTactics);
+  if (row) await prisma.teamLines.update({ where: { teamId }, data: { system: clean as object } });
+  else await prisma.teamLines.create({ data: { teamId, system: clean as object } });
+  revalidatePath(`/teams`);
+  return { ok: true as const };
+}
