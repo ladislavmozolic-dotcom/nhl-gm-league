@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { getTeamSession } from "@/lib/auth";
+import { canManageTeam } from "@/lib/auth";
 import { computeStandings } from "@/lib/sim/standings";
 import TeamSubNav from "@/components/TeamSubNav";
 
@@ -22,11 +22,12 @@ export default async function TeamLayout({
   const farmSlug = team.affiliateTeams[0]?.slug ?? null;
   const parentSlug = team.parentTeam?.slug ?? null;
 
-  const [session, standings] = await Promise.all([
-    getTeamSession(),
+  const [standings, canManage] = await Promise.all([
     computeStandings(SEASON, team.league).catch(() => []),
+    canManageTeam(team.id),
   ]);
-  const isGm = session === team.id;
+  // the parent NHL club's GM manages its farm too, so GM controls show there
+  const isGm = canManage;
 
   // this team's record + conference rank
   const row = standings.find((s: any) => s.teamId === team.id) as any;
