@@ -3,6 +3,7 @@ import { PageHeader, Card } from "@/components/ui";
 import InfoTip from "@/components/InfoTip";
 import SortableTable, { type SortCol } from "@/components/SortableTable";
 import { edgeRatings, edgeGoalieRatings } from "@/lib/edge-params-server";
+import { RATING_BANDS } from "@/lib/edge-params";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +67,31 @@ export default async function EdgeCalculatorPage({ searchParams }: { searchParam
           {" "}Separate from the STHS Parameters (kept for migration); the sim still runs on STHS for now.
         </p>
       </Card>
+      <Card>
+        <div className="text-[11px] uppercase tracking-wider text-slate-500 mb-2">Rating distribution
+          <InfoTip text="How many players fall in each rating band per parameter. If a band suddenly balloons (e.g. 100+ players at 90+), the curve or input data is off. A percentile is only a mid-step — the non-linear curve decides how rare 90/95/99 are." />
+        </div>
+        <div className="overflow-x-auto">
+          <table className="text-[12px] tabular-nums">
+            <thead><tr className="text-slate-500 text-left"><th className="pr-3 py-1">Param</th>{RATING_BANDS.map((b) => <th key={b.label} className="px-2 py-1 text-right">{b.label}</th>)}</tr></thead>
+            <tbody>
+              {params.filter((p) => p.key !== "MO" && p.key !== "OV").map((p) => {
+                const vals = rows.map((r) => (r as any)[p.key]).filter((v) => v != null) as number[];
+                return (
+                  <tr key={p.key} className="border-t border-slate-800/50">
+                    <td className="pr-3 py-1 font-semibold text-slate-300">{p.label}</td>
+                    {RATING_BANDS.map((b) => {
+                      const n = vals.filter((v) => v >= b.min && v <= b.max).length;
+                      return <td key={b.label} className={`px-2 py-1 text-right ${b.min >= 90 ? "text-emerald-300" : "text-slate-400"}`}>{n || "·"}</td>;
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
       <SortableTable cols={cols} rows={rows} initialSort="SC" minWidth={860} />
     </div>
   );

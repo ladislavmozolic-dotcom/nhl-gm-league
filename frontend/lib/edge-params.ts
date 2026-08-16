@@ -24,11 +24,42 @@ export function blend(cur: number | null | undefined, last: number | null | unde
   return 0;
 }
 
-/** Map a percentile (0..1, within position+league) to a 40–99 rating on the curve
- *  the user anchored: 99th→99, 75th→~88, 50th→~76, 25th→~65, bottom→~54. */
-export function percentileToRating(p: number): number {
-  return Math.round(clamp(54 + clamp(p, 0, 1) * 45, 40, 99));
+// Non-linear percentile→rating curves — a percentile is only a MID-STEP; how rare
+// 90/95/99 should be is set here per parameter (configurable anchor points), so
+// the database doesn't fill with inflated elites. SC is deliberately scarce
+// (90+ ≈ top 7%, 98-99 truly exceptional); PA a touch looser; others use DEFAULT.
+export type Anchor = [p: number, r: number]; // percentile 0..1 → rating
+const ends = (a: Anchor[]): Anchor[] => [[0, 50], ...a, [1, 99]];
+export const RATING_CURVES: Record<string, Anchor[]> = {
+  SC: ends([[0.10, 58], [0.25, 66], [0.50, 74], [0.70, 80], [0.85, 86], [0.93, 90], [0.97, 94], [0.99, 97], [0.997, 99]]),
+  PA: ends([[0.10, 58], [0.25, 66], [0.50, 74], [0.70, 80], [0.84, 86], [0.91, 90], [0.96, 94], [0.99, 97], [0.997, 99]]),
+  DEFAULT: ends([[0.10, 59], [0.25, 67], [0.50, 74], [0.70, 80], [0.85, 85], [0.93, 89], [0.97, 92], [0.99, 95], [0.997, 98]]),
+};
+
+/** Map a percentile (0..1) to a rating via the parameter's non-linear anchor curve. */
+export function ratingFromCurve(p: number, param = "DEFAULT"): number {
+  const a = RATING_CURVES[param] ?? RATING_CURVES.DEFAULT;
+  const x = clamp(p, 0, 1);
+  for (let i = 1; i < a.length; i++) {
+    if (x <= a[i][0]) {
+      const [p0, r0] = a[i - 1], [p1, r1] = a[i];
+      const t = p1 > p0 ? (x - p0) / (p1 - p0) : 0;
+      return Math.round(r0 + t * (r1 - r0));
+    }
+  }
+  return a[a.length - 1][1];
 }
+
+/** Rating bands for the distribution report / mental model. */
+export const RATING_BANDS: { label: string; min: number; max: number }[] = [
+  { label: "99", min: 99, max: 99 },
+  { label: "95–98", min: 95, max: 98 },
+  { label: "90–94", min: 90, max: 94 },
+  { label: "85–89", min: 85, max: 89 },
+  { label: "80–84", min: 80, max: 84 },
+  { label: "70–79", min: 70, max: 79 },
+  { label: "<70", min: 0, max: 69 },
+];
 
 /** Percentile (0..1) of `value` within a sorted-ascending population. */
 export function percentileOf(value: number, sortedAsc: number[]): number {

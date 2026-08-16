@@ -6,7 +6,7 @@
 
 import { prisma } from "./prisma";
 import { cleanName } from "./playerName";
-import { per60, blend, percentileOf, percentileToRating, EDGE_COMPOSITES, EDGE_GOALIE_COMPOSITES, experienceFromAge, durabilityFromAvailability, leadershipFrom, EDGE_MO_DEFAULT } from "./edge-params";
+import { per60, blend, percentileOf, ratingFromCurve, EDGE_COMPOSITES, EDGE_GOALIE_COMPOSITES, experienceFromAge, durabilityFromAvailability, leadershipFrom, EDGE_MO_DEFAULT } from "./edge-params";
 
 const CUR_SEASON_GAMES = 82; // real season length reference for durability
 
@@ -123,7 +123,7 @@ export async function edgeRatings(league = "NHL"): Promise<EdgeRow[]> {
         if (m.invert) pct = 1 - pct;
         wsum += pct * m.weight; wtot += m.weight;
       }
-      if (wtot > 0) ratings[param] = percentileToRating(wsum / wtot);
+      if (wtot > 0) ratings[param] = ratingFromCurve(wsum / wtot, param);
     }
     // direct / special parameters (not percentile composites)
     const ex = experienceFromAge(r.age);
@@ -205,7 +205,7 @@ export async function edgeGoalieRatings(league = "NHL"): Promise<EdgeRow[]> {
         if (m.invert) pct = 1 - pct;
         wsum += pct * m.weight; wtot += m.weight;
       }
-      if (wtot > 0) ratings[param] = percentileToRating(wsum / wtot);
+      if (wtot > 0) ratings[param] = ratingFromCurve(wsum / wtot, param);
     }
     const ex = experienceFromAge(r.age);
     ratings.EX = ex;
