@@ -36,6 +36,7 @@ export default function TeamSubNav({ slug, isGm, isAffiliate, farmSlug, parentSl
         { label: "Draft Picks", href: `${base}/draft-picks` },
         { label: "Salary", href: `${base}/salary` },
         { label: "Trades", href: `${base}/trades` },
+        { label: "Trade Block", href: `${base}/trade-block`, gm: true },
         // "Farm" jumps straight to the AHL affiliate's own hub (its slim menu), not a nested view
         { label: "Farm", href: farmSlug ? `/teams/${farmSlug}` : `${base}/farm` },
         { label: "History", href: `${base}/history` },
