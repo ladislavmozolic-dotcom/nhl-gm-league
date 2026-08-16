@@ -86,8 +86,7 @@ const menuItems: MenuItem[] = [
       { label: "Captains", href: "/captains" },
       { label: "Coaches", href: "/coaches" },
       { label: "Signings", href: "/signings" },
-      { label: "Current Injuries", href: "/players/injuries?view=current" },
-      { label: "All Injuries (season)", href: "/players/injuries?view=all" },
+      { label: "Injuries", href: "/players/injuries" },
       { label: "Rules", href: "/rules" },
     ],
   },
@@ -135,8 +134,7 @@ const menuItems: MenuItem[] = [
       { label: "Player Stats", href: "/stats/players?league=AHL" },
       { label: "Goalie Stats", href: "/stats/goalies?league=AHL" },
       { label: "Team Stats", href: "/stats/teams?league=AHL" },
-      { label: "Current Injuries", href: "/players/injuries?view=current&league=AHL" },
-      { label: "All Injuries (season)", href: "/players/injuries?view=all&league=AHL" },
+      { label: "Injuries", href: "/players/injuries?league=AHL" },
     ],
   },
 ];
@@ -221,7 +219,7 @@ export default function MegaMenu({ gm }: { gm?: { nickname: string; slug: string
                 )}
 
                 {item.mega && activeMenu === item.label && (
-                  <div className="absolute top-full right-0 mt-0.5 w-[600px] bg-[#0f1d32] border border-slate-700/40 rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50">
+                  <div className="absolute top-full left-0 mt-0.5 w-[600px] max-w-[calc(100vw-2rem)] bg-[#0f1d32] border border-slate-700/40 rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50">
                   <div className="p-5">
                     <div className="grid grid-cols-2 gap-8">
                       {/* Eastern */}
