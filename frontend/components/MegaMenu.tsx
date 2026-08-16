@@ -61,6 +61,7 @@ const menuItems: MenuItem[] = [
     children: [
       { label: "Skaters", href: "/free-agents" },
       { label: "Goalies", href: "/free-agents?type=goalies" },
+      { label: "Offer Sheets", href: "/offer-sheets" },
       { label: "Signings", href: "/signings" },
     ],
   },

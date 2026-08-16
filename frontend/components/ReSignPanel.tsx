@@ -2,12 +2,12 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { getInterestAction, extendContractAction } from "@/app/free-agents/actions";
+import { getInterestAction, extendContractAction, setFranchiseTagAction } from "@/app/free-agents/actions";
 import { Card } from "@/components/ui";
 import { cleanName } from "@/lib/playerName";
 import { clauseDiscount } from "@/lib/free-agency";
 
-type ExpiringPlayer = { id: number; name: string; capHit: number | null; contractYears: number | null; contractText: string | null; farm?: boolean };
+type ExpiringPlayer = { id: number; name: string; capHit: number | null; contractYears: number | null; contractText: string | null; farm?: boolean; franchiseTag?: boolean };
 
 const M = (n: number) => `$${(n / 1e6).toFixed(2)}M`;
 function lineOptions(grp: string) {
@@ -162,9 +162,16 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
   );
 }
 
-export default function ReSignPanel({ teamId, players, title, blurb, accent = "text-amber-400" }: {
-  teamId: number; players: ExpiringPlayer[]; title?: string; blurb?: string; accent?: string;
+export default function ReSignPanel({ teamId, players, title, blurb, accent = "text-amber-400", group }: {
+  teamId: number; players: ExpiringPlayer[]; title?: string; blurb?: string; accent?: string; group?: string;
 }) {
+  const [tagPending, startTag] = useTransition();
+  const [tagged, setTagged] = useState<number | null>(players.find((p) => p.franchiseTag)?.id ?? null);
+  const toggleTag = (id: number) => startTag(async () => {
+    const on = tagged !== id;
+    const r = await setFranchiseTagAction(id, teamId, on);
+    if (r.ok) setTagged(on ? id : null);
+  });
   // hold the OPEN PLAYER OBJECT, not just an id — the server action's revalidatePath
   // re-renders this list without the just-signed player, and a find(openId) would go
   // undefined and tear the modal down before its confirmation shows.
@@ -181,10 +188,19 @@ export default function ReSignPanel({ teamId, players, title, blurb, accent = "t
               {p.farm && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30">AHL</span>}
               <span className="text-xs text-slate-500 ml-2">{p.contractText ?? (p.capHit ? `${M(p.capHit)} × ${p.contractYears}yr` : "—")}</span>
             </div>
-            <button onClick={() => setOpenPlayer(p)}
-              className="px-3 py-1 rounded-md bg-green-600/80 hover:bg-green-500 text-white text-xs font-semibold whitespace-nowrap">
-              Re-sign
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              {group === "RFA" && (
+                <button onClick={() => toggleTag(p.id)} disabled={tagPending}
+                  title="Franchise RFA — gets 2 re-sign rounds before offer sheets (1 per club)"
+                  className={`px-2 py-1 rounded-md text-xs font-semibold whitespace-nowrap border ${tagged === p.id ? "bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/40" : "bg-slate-800 text-slate-400 border-slate-700 hover:text-fuchsia-300"} disabled:opacity-40`}>
+                  ★ {tagged === p.id ? "Franchise" : "Tag"}
+                </button>
+              )}
+              <button onClick={() => setOpenPlayer(p)}
+                className="px-3 py-1 rounded-md bg-green-600/80 hover:bg-green-500 text-white text-xs font-semibold whitespace-nowrap">
+                Re-sign
+              </button>
+            </div>
           </div>
         ))}
       </div>

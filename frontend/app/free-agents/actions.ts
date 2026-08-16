@@ -423,6 +423,28 @@ export async function applyAllElcAction() {
 const clampLine = (n: number) => Math.max(1, Math.min(4, Math.round(n)));
 const fmtM = (n: number) => `$${(n / 1e6).toFixed(2)}M`;
 
+/** Tag / untag an RFA as the club's Franchise player (1 per team). A franchise RFA
+ *  gets 2 re-sign rounds before he's exposed to offer sheets. Regular season only. */
+export async function setFranchiseTagAction(playerId: number, teamId: number, on: boolean) {
+  if (!(await canManageTeam(teamId))) return { ok: false as const, error: "You don't manage this team." };
+  const phase = (await getLeagueClock()).phase;
+  if (phase !== "regular" && phase !== "playoffs") return { ok: false as const, error: "Franchise tags are set during the regular season." };
+  const p = await prisma.player.findUnique({ where: { id: playerId }, select: { teamId: true, age: true } });
+  if (!p) return { ok: false as const, error: "Player not found." };
+  const org = await prisma.team.findUnique({ where: { id: teamId }, select: { affiliateTeams: { select: { id: true } } } });
+  const orgIds = [teamId, ...(org?.affiliateTeams.map((a) => a.id) ?? [])];
+  if (!orgIds.includes(p.teamId)) return { ok: false as const, error: "That player isn't in your organization." };
+  if ((p.age ?? 27) > 26) return { ok: false as const, error: "Only an RFA (26 or younger) can be franchise-tagged." };
+  if (on) {
+    await prisma.player.updateMany({ where: { teamId: { in: orgIds }, franchiseTag: true }, data: { franchiseTag: false } }); // one per club
+    await prisma.player.update({ where: { id: playerId }, data: { franchiseTag: true } });
+  } else {
+    await prisma.player.update({ where: { id: playerId }, data: { franchiseTag: false } });
+  }
+  revalidatePath(`/teams`);
+  return { ok: true as const };
+}
+
 /** Re-sign one of your OWN expiring players (contract up for renewal). Same engine
  *  as the frenzy, but a direct one-on-one negotiation: the player accepts if the
  *  offer clears his team-specific floor + term, otherwise he counters with why. */
@@ -432,7 +454,7 @@ export async function extendContractAction(
 ) {
   if (!(await canManageTeam(teamId))) return { ok: false as const, error: "You don't manage this team." };
   const player = await prisma.player.findUnique({
-    where: { id: playerId }, select: { teamId: true, contractYears: true, capHit: true, age: true, name: true, lastSeasonGP: true, resignRound: true, resignStatus: true, rosterType: true },
+    where: { id: playerId }, select: { teamId: true, contractYears: true, capHit: true, age: true, name: true, lastSeasonGP: true, resignRound: true, resignStatus: true, rosterType: true, franchiseTag: true },
   });
   if (!player) return { ok: false as const, error: "Player not found." };
   // the club may re-sign its own NHL players AND its farm (AHL affiliate) players
@@ -480,19 +502,23 @@ export async function extendContractAction(
     const round = player.resignRound ?? 0;
     const nextRound = round + 1;
     const isUFA = (player.age ?? 27) >= 27;
+    const isRFA = !isUFA;
+    // an RFA gets ONE round unless he's the club's Franchise tag (then 2); a UFA gets 2.
+    const maxRounds = isRFA && !player.franchiseTag ? 1 : 2;
     const lowIce = player.lastSeasonGP != null && player.lastSeasonGP < 40;
     const bigLowball = salary < ev.ask.floorSalary * 0.82;
-    const walk = nextRound > 2 || (round === 0 && bigLowball && (lowIce || isUFA));
+    const walk = nextRound > maxRounds || (round === 0 && bigLowball && (lowIce || isUFA));
     if (walk) {
-      const status = isUFA ? "walkedToUFA" : "osEligible";
+      // RFA → offer-sheet eligible; UFA → tests free agency
+      const status = isRFA ? "osEligible" : "walkedToUFA";
       await prisma.player.update({ where: { id: playerId }, data: { resignStatus: status, resignRound: nextRound } });
       // no revalidatePath here — it would tear down the open modal before its notice
       // shows; the client refreshes on Close.
       return {
-        ok: false as const, walked: true, toUFA: isUFA,
-        reason: nextRound > 2
-          ? "Two rounds and no deal — he'll test the market when the season ends."
-          : isUFA ? "That's well short — he'd rather test free agency than take it." : "He turned it down — he'll wait for offer sheets after the season.",
+        ok: false as const, walked: true, toUFA: !isRFA,
+        reason: isRFA
+          ? (player.franchiseTag ? "Two rounds and no deal — as your franchise RFA he's now open to offer sheets." : "No deal — negotiations pause; he'll be open to offer sheets, and further rounds resume after that period.")
+          : nextRound > maxRounds ? "Two rounds and no deal — he'll test the market when the season ends." : "That's well short — he'd rather test free agency than take it.",
       };
     }
     // he counters (kept fuzzy — you don't see his exact number, just a range)
@@ -501,7 +527,7 @@ export async function extendContractAction(
     await prisma.player.update({ where: { id: playerId }, data: { resignRound: nextRound, resignStatus: "countered", resignCounterSalary: counterSalary, resignCounterYears: counterYears } });
     return {
       ok: false as const, rejected: true, round: nextRound,
-      reason: `Round ${nextRound} of 2 — he's countering around ${fmtM(counterSalary * 0.97)}–${fmtM(counterSalary * 1.06)} over ${counterYears}yr.${nextRound >= 2 ? " One more round before he walks." : ""}`,
+      reason: `Round ${nextRound} of ${maxRounds} — he's countering around ${fmtM(counterSalary * 0.97)}–${fmtM(counterSalary * 1.06)} over ${counterYears}yr.${nextRound >= maxRounds ? " Last round before he walks." : ""}`,
       floor: ev.ask.floorSalary, minYears: ev.ask.minYears, maxYears: ev.ask.maxYears,
     };
   }

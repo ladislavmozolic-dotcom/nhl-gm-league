@@ -33,7 +33,7 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
   // players in the FINAL YEAR of their deal (1 left) or already expired (0)
   const expiring = await prisma.player.findMany({
     where: { teamId: { in: orgIds }, rosterType: { in: ["NHL", "AHL"] }, contractYears: { not: null, lte: 1 } },
-    select: { id: true, name: true, age: true, capHit: true, contractYears: true, contractText: true, position: true, isGoalie: true, df: true, lastSeasonGP: true, lastSeasonPts: true, lastSeasonSvPct: true, rosterType: true },
+    select: { id: true, name: true, age: true, capHit: true, contractYears: true, contractText: true, position: true, isGoalie: true, df: true, lastSeasonGP: true, lastSeasonPts: true, lastSeasonSvPct: true, rosterType: true, franchiseTag: true },
     orderBy: { capHit: "desc" },
   });
 
@@ -87,8 +87,8 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
 
       {(["UFA", "RFA"] as Group[]).map((g) =>
         groups[g].length === 0 ? null : canManage ? (
-          <ReSignPanel key={g} teamId={teamId} title={META[g].title} blurb={META[g].blurb} accent={META[g].accent}
-            players={groups[g].map((p) => ({ id: p.id, name: p.name, capHit: p.capHit, contractYears: p.contractYears, contractText: p.contractText, farm: p.rosterType === "AHL" }))} />
+          <ReSignPanel key={g} teamId={teamId} title={META[g].title} blurb={META[g].blurb} accent={META[g].accent} group={g}
+            players={groups[g].map((p) => ({ id: p.id, name: p.name, capHit: p.capHit, contractYears: p.contractYears, contractText: p.contractText, farm: p.rosterType === "AHL", franchiseTag: p.franchiseTag }))} />
         ) : (
           <Card key={g} title={`${META[g].title} (${groups[g].length})`} accent={META[g].accent}>
             <div className="divide-y divide-slate-800/50">
