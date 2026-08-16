@@ -167,6 +167,24 @@ export function clauseDiscount(clause?: string | null, breadth?: number | null):
   return 0;
 }
 
+/** Why a player would turn down a two-way offer (null = he'll take it). The
+ *  deciding factor is real NHL games played, NOT rating: a player who logged more
+ *  than 30 NHL games last season is an established NHLer and won't sign a two-way,
+ *  whatever his overall (a proven role player at OV 58 still refuses). When we have
+ *  no imported GP, fall back to overall. Anyone who does take a two-way takes it
+ *  only as a one-year deal. */
+export function twoWayObjection(
+  twoWay: boolean,
+  p: { overall?: number | null; lastSeasonGP?: number | null },
+  years: number,
+): string | null {
+  if (!twoWay) return null;
+  const established = p.lastSeasonGP != null ? p.lastSeasonGP > 30 : (p.overall ?? 70) >= 72;
+  if (established) return "He played 30+ NHL games last season — he's an established NHLer and won't sign a two-way. Offer a one-way deal.";
+  if (years > 1) return "He'll take a two-way, but only as a one-year deal — set the term to 1 year.";
+  return null;
+}
+
 /** Short human note for the ask UI, e.g. "Unhappy — holding out (+9%)". */
 export function willingnessNote(w: number): string | null {
   const pct = Math.round((w - 1) * 100);

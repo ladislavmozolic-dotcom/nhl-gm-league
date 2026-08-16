@@ -59,7 +59,8 @@ async function Board() {
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
             {settings.osCompTiers.map((t, i) => {
               const prev = i > 0 ? settings.osCompTiers[i - 1].maxAav : 0;
-              const range = t.maxAav === 0 ? `over ${M(prev)}` : i === 0 ? `≤ ${M(t.maxAav)}` : `${M(prev)}–${M(t.maxAav)}`;
+              // exclusive bands: ≤$1M, then >$1M–$3M, …, then >$8M
+              const range = t.maxAav === 0 ? `over ${M(prev)}` : i === 0 ? `≤ ${M(t.maxAav)}` : `over ${M(prev)}–${M(t.maxAav)}`;
               return (
                 <div key={i} className="rounded-lg bg-slate-800/50 border border-slate-700 px-2 py-2">
                   <div className="text-[11px] text-slate-400">{range}</div>

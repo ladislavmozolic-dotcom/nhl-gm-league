@@ -9,6 +9,7 @@
 import { prisma } from "./prisma";
 import { loadSettings } from "./sim/settings";
 import { compensationFor, compensationLabel } from "./offer-sheet";
+import { twoWayObjection } from "./free-agency";
 import { evaluateTeamOffer, weakestTeams, loadLeagueCap } from "./free-agency-server";
 import { canManageTeam } from "./auth";
 import { getLeagueClock } from "./calendar-server";
@@ -107,7 +108,7 @@ export async function submitOfferSheetAction(
 
   const player = await prisma.player.findUnique({
     where: { id: playerId },
-    select: { name: true, teamId: true, age: true, rosterType: true, overall: true, realFarmTeamId: true, franchiseTag: true, resignStatus: true, contractYears: true },
+    select: { name: true, teamId: true, overall: true, lastSeasonGP: true, franchiseTag: true, resignStatus: true, contractYears: true },
   });
   if (!player) return { ok: false, error: "Player not found." };
   if (player.teamId === fromTeamId) return { ok: false, error: "He's already yours — re-sign him on the Contracts page." };
@@ -116,12 +117,9 @@ export async function submitOfferSheetAction(
 
   const yrs = Math.max(1, Math.min(4, Math.round(years)));
   if (salary < 775_000) return { ok: false, error: "Below the league minimum salary." };
-  // two-way rules mirror the FA/extension flow
-  const ovr = player.overall ?? 70;
-  const ahlCaliber = player.rosterType === "AHL" || player.realFarmTeamId != null || ovr < 72;
-  if (twoWay && !ahlCaliber) return { ok: false, error: "He's an NHL regular — he won't sign a two-way." };
-  if (twoWay && (player.age ?? 0) > 25 && ovr >= 68) return { ok: false, error: "He's past 25 and NHL-ready — he won't accept a two-way." };
-  if (twoWay && yrs > 1) return { ok: false, error: "A two-way is a one-year deal — set the term to 1 year." };
+  // two-way rules mirror the FA/extension flow (based on real NHL games played)
+  const twoWayErr = twoWayObjection(twoWay, player, yrs);
+  if (twoWayErr) return { ok: false, error: twoWayErr };
 
   // cap room (off-season ceiling = cap + 10%)
   const cap = await loadLeagueCap();

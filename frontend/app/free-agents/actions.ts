@@ -8,30 +8,12 @@ import { CURRENT_SEASON_START, capCeilingForPhase, ltirRelief } from "@/lib/fina
 import {
   loadMarketPool, teamContentionMap, teamAsk, evaluateTeamOffer, loadLeagueCap, weakestTeams,
 } from "@/lib/free-agency-server";
-import { MAX_TERM, faPosGroup, willingnessNote, type Deployment } from "@/lib/free-agency";
+import { MAX_TERM, faPosGroup, willingnessNote, twoWayObjection, type Deployment } from "@/lib/free-agency";
 import { computeELC } from "@/lib/elc";
 
 const FREE = ["NHL", "AHL", "RETIRED", "PROSPECT", "RELEASED"]; // not a signable free agent
 const ACTIVE = ["PENDING", "COUNTERED", "SHORTLISTED"]; // an offer still in contention
 const SHORTLIST_SIZE = 3; // how many suitors a player keeps into the final week
-
-/** Why a player would turn down a two-way offer (null = he'll take it). An
- *  AHL-caliber player accepts a two-way, but only ever as a one-year deal; an
- *  NHL regular refuses outright; and a player past 25 who is NHL-ready enough
- *  would rather test the market for a one-way than settle for a two-way. */
-function twoWayObjection(
-  twoWay: boolean,
-  p: { rosterType?: string | null; overall?: number | null; realFarmTeamId?: number | null; age?: number | null },
-  years: number,
-): string | null {
-  if (!twoWay) return null;
-  const ovr = p.overall ?? 70;
-  const ahlCaliber = p.rosterType === "AHL" || p.realFarmTeamId != null || ovr < 72;
-  if (!ahlCaliber) return "He's an NHL regular — he won't sign a two-way. Offer a one-way deal.";
-  if ((p.age ?? 0) > 25 && ovr >= 68) return "He's past 25 and NHL-ready enough to chase a one-way on the open market — he won't accept a two-way. Offer a one-way deal.";
-  if (years > 1) return "He'll take a two-way, but only as a one-year deal — set the term to 1 year.";
-  return null;
-}
 
 /** A team's committed NHL cap hit (+ retention/buyout dead money) and its LTIR
  *  relief (cap hits of skaters injured below CON 90). The effective ceiling is
@@ -118,7 +100,7 @@ export async function submitOfferAction(
     return { ok: false as const, error: "This round opens for GMs tomorrow — the commissioner's office gets the first day." };
   }
 
-  const player = await prisma.player.findUnique({ where: { id: playerId }, select: { rosterType: true, overall: true, realFarmTeamId: true, age: true } });
+  const player = await prisma.player.findUnique({ where: { id: playerId }, select: { rosterType: true, overall: true, realFarmTeamId: true, age: true, lastSeasonGP: true } });
   if (!player) return { ok: false as const, error: "Player not found." };
   if (player.rosterType && FREE.includes(player.rosterType)) {
     return { ok: false as const, error: "This player is not a free agent." };
