@@ -1,10 +1,6 @@
 import { PageHeader, Card } from "@/components/ui";
-import InfoTip from "@/components/InfoTip";
-import { prisma } from "@/lib/prisma";
-import { getTeamSession, canManageTeam } from "@/lib/auth";
 import { loadSettings } from "@/lib/sim/settings";
-import { leagueSponsors, teamSponsor } from "@/lib/sponsorship-server";
-import SponsorPicker from "@/components/SponsorPicker";
+import { leagueSponsors } from "@/lib/sponsorship-server";
 
 export const dynamic = "force-dynamic";
 
@@ -13,22 +9,11 @@ const M = (n: number) => `$${(n / 1e6).toFixed(1)}M`;
 export default async function SponsorshipPage() {
   const [settings, board] = await Promise.all([loadSettings(), leagueSponsors()]);
 
-  const sessionId = await getTeamSession();
-  const myTeam = sessionId ? await prisma.team.findUnique({ where: { id: sessionId }, select: { id: true, league: true, isAffiliate: true } }) : null;
-  const mine = myTeam && myTeam.league === "NHL" && !myTeam.isAffiliate && (await canManageTeam(myTeam.id)) ? await teamSponsor(myTeam.id) : null;
-
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 space-y-5">
-      <PageHeader title="Sponsorship" subtitle="One preseason call — safety vs upside" />
+      <PageHeader title="Sponsorship" subtitle="League-wide sponsorship deals" />
       {settings.financeMode !== "detailed" && (
-        <Card><p className="text-sm text-amber-400/80">Part of the <b>Detailed Finance</b> system — switch it on in engine settings. Live preview below.</p></Card>
-      )}
-
-      {mine && (
-        <Card title="Your main sponsor" accent="text-sky-300">
-          <p className="text-sm text-slate-400 mb-3">Pick the deal that fits your club&apos;s ambitions.<InfoTip text="Offer size is set by your brand strength — Fan Interest and roster Star Power. A safe deal pays steady money; a long-term deal trades AAV for a big championship bonus; the one-year deal maximises cash now." /> {sponsor(mine.deal)}</p>
-          <SponsorPicker sponsor={mine} />
-        </Card>
+        <Card><p className="text-sm text-amber-400/80">Part of the <b>Detailed Finance</b> system — switch it on in engine settings. Sign your own deal in your club&apos;s Finance → Dashboard.</p></Card>
       )}
 
       <Card bodyClassName="p-0">
@@ -57,8 +42,4 @@ export default async function SponsorshipPage() {
       </Card>
     </div>
   );
-}
-
-function sponsor(deal: { aav: number; years: number } | null): string {
-  return deal ? `Current: $${(deal.aav / 1e6).toFixed(1)}M × ${deal.years}yr.` : "No sponsor signed yet.";
 }

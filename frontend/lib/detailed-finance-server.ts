@@ -13,7 +13,7 @@ import { allStarPowers } from "./star-power-server";
 import { seasonTickets, arenaFor, type TicketPricing } from "./season-tickets";
 import { attendancePct } from "./attendance";
 import { teamMerch, jerseyUnits } from "./merchandise";
-import { clubRevenueLines, clubRevenueTotal, clubOverhead, type FinanceLine } from "./club-finance";
+import { clubRevenueLines, clubRevenueTotal, clubOverhead, clubExpenseLines, type FinanceLine } from "./club-finance";
 
 const asPricing = (s: string | null | undefined): TicketPricing => (s === "LOW" || s === "PREMIUM" ? s : "STANDARD");
 
@@ -50,7 +50,7 @@ export async function leagueDetailedFinance(): Promise<Map<number, { revenue: nu
 export type TeamDashboard = {
   teamId: number; name: string;
   cash: number; revenue: number; expenses: number; profit: number;
-  revenueLines: FinanceLine[];
+  revenueLines: FinanceLine[]; expenseLines: FinanceLine[];
   fanInterest: number; fanDelta: number; attendancePct: number; attendanceRank: number;
   sthSold: number; sthCap: number; merchRank: number; topJersey: string | null;
   reasons: string[];
@@ -75,7 +75,8 @@ export async function teamDashboard(teamId: number): Promise<TeamDashboard | nul
   });
   const revenue = revenueLines.reduce((t, l) => t + l.amount, 0);
   const salary = roster.reduce((t, p) => t + (p.capHit ?? 0), 0);
-  const expenses = salary + clubOverhead();
+  const expenseLines = clubExpenseLines(salary);
+  const expenses = expenseLines.reduce((t, l) => t + l.amount, 0);
   const profit = revenue - expenses;
 
   const merchRank = merchBoard.findIndex((m) => m.teamId === teamId) + 1;
@@ -94,7 +95,7 @@ export async function teamDashboard(teamId: number): Promise<TeamDashboard | nul
 
   return {
     teamId, name: team.name,
-    cash: Math.round(team.bankAccount ?? 0), revenue, expenses, profit, revenueLines,
+    cash: Math.round(team.bankAccount ?? 0), revenue, expenses, profit, revenueLines, expenseLines,
     fanInterest: fan?.interest ?? 0, fanDelta: fan?.delta ?? 0,
     attendancePct: att?.pct ?? 0, attendanceRank: att?.rank ?? 0,
     sthSold: sold, sthCap: st?.sthCap ?? 0, merchRank, topJersey: merch?.topJersey ?? null,

@@ -49,12 +49,7 @@ export default function TeamSubNav({ slug, isGm, isAffiliate, farmSlug, parentSl
         ] },
         { label: "Finance", items: [
           { label: "Overview (bank)", href: `${base}/finance` },
-          { label: "Dashboard", href: "/finance/dashboard", gm: true },
-          { label: "Fan Interest", href: "/finance/fan-interest" },
-          { label: "Season Tickets", href: "/finance/season-tickets" },
-          { label: "Attendance & Pricing", href: "/finance/attendance", gm: true },
-          { label: "Merchandise", href: "/finance/merchandise" },
-          { label: "Sponsorship", href: "/finance/sponsorship", gm: true },
+          { label: "Dashboard & controls", href: "/finance/dashboard", gm: true },
         ] },
         { label: "Trades", items: [
           { label: "Trades", href: `${base}/trades` },

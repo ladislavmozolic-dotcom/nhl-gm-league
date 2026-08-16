@@ -1,9 +1,13 @@
 import Link from "next/link";
 import { PageHeader, Card } from "@/components/ui";
-import { getTeamSession } from "@/lib/auth";
+import { getTeamSession, canManageTeam } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { loadSettings } from "@/lib/sim/settings";
 import { teamDashboard } from "@/lib/detailed-finance-server";
+import { teamAttendance } from "@/lib/attendance-server";
+import { teamSponsor } from "@/lib/sponsorship-server";
+import PricingControl from "@/components/PricingControl";
+import SponsorPicker from "@/components/SponsorPicker";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +19,8 @@ export default async function FinanceDashboardPage() {
   const sessionId = await getTeamSession();
   const team = sessionId ? await prisma.team.findUnique({ where: { id: sessionId }, select: { id: true, slug: true } }) : null;
   const dash = team ? await teamDashboard(team.id) : null;
+  const canManage = team ? await canManageTeam(team.id) : false;
+  const [att, sponsor] = team && canManage ? await Promise.all([teamAttendance(team.id), teamSponsor(team.id)]) : [null, null];
 
   if (!dash) {
     return (
@@ -57,20 +63,34 @@ export default async function FinanceDashboardPage() {
               </div>
             ))}
             <div className="flex items-center justify-between text-sm border-t border-slate-800 pt-1.5 mt-1.5">
-              <span className="font-semibold">Total</span><span className="tabular-nums font-bold">{M(dash.revenue)}</span>
+              <span className="font-semibold">Total revenue</span><span className="tabular-nums font-bold text-emerald-300">{M(dash.revenue)}</span>
             </div>
           </div>
         </Card>
 
-        <Card title="Fan & business" accent="text-fuchsia-300">
-          <div className="grid grid-cols-2 gap-3">
-            {tile("Fan Interest", `${dash.fanInterest}`, `${dash.fanDelta >= 0 ? "↑" : "↓"}${Math.abs(dash.fanDelta)}`)}
-            {tile("Avg attendance", `${Math.round(dash.attendancePct * 100)}%`, `League #${dash.attendanceRank}`)}
-            {tile("Season tickets", N(dash.sthSold), `/ ${N(dash.sthCap)}`)}
-            {tile("Merch", `#${dash.merchRank}`, dash.topJersey ? `Top: ${dash.topJersey}` : undefined)}
+        <Card title="Expenses breakdown" accent="text-rose-300">
+          <div className="space-y-1.5">
+            {dash.expenseLines.map((l) => (
+              <div key={l.label} className="flex items-center justify-between text-sm">
+                <span className="text-slate-400">{l.label}</span>
+                <span className="tabular-nums font-semibold">{M(l.amount)}</span>
+              </div>
+            ))}
+            <div className="flex items-center justify-between text-sm border-t border-slate-800 pt-1.5 mt-1.5">
+              <span className="font-semibold">Total expenses</span><span className="tabular-nums font-bold text-rose-300">{M(dash.expenses)}</span>
+            </div>
           </div>
         </Card>
       </div>
+
+      <Card title="Fan & business" accent="text-fuchsia-300">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {tile("Fan Interest", `${dash.fanInterest}`, `${dash.fanDelta >= 0 ? "↑" : "↓"}${Math.abs(dash.fanDelta)}`)}
+          {tile("Avg attendance", `${Math.round(dash.attendancePct * 100)}%`, `League #${dash.attendanceRank}`)}
+          {tile("Season tickets", N(dash.sthSold), `/ ${N(dash.sthCap)}`)}
+          {tile("Merch", `#${dash.merchRank}`, dash.topJersey ? `Top: ${dash.topJersey}` : undefined)}
+        </div>
+      </Card>
 
       {dash.reasons.length > 0 && (
         <Card title="Why are finances moving?" accent="text-sky-300">
@@ -80,7 +100,24 @@ export default async function FinanceDashboardPage() {
         </Card>
       )}
 
-      <div className="flex flex-wrap gap-2 text-xs">
+      {/* Team controls — set as your club */}
+      {att && (
+        <Card title="Ticket pricing" accent="text-sky-300">
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_1.4fr] gap-4 items-center">
+            <div className="text-[13px] text-slate-400">Set what you charge — higher price earns more per seat but softens demand. Feeds attendance, season tickets and revenue.</div>
+            <PricingControl att={att} />
+          </div>
+        </Card>
+      )}
+      {sponsor && (
+        <Card title="Main sponsor" accent="text-emerald-300">
+          <p className="text-[13px] text-slate-400 mb-3">Pick the deal that fits your ambitions — offer size scales with your brand strength (Fan Interest + Star Power).</p>
+          <SponsorPicker sponsor={sponsor} />
+        </Card>
+      )}
+
+      <div className="flex flex-wrap gap-2 text-xs pt-1">
+        <span className="text-slate-500 py-1.5">League tables:</span>
         {[["Fan Interest", "/finance/fan-interest"], ["Season Tickets", "/finance/season-tickets"], ["Attendance", "/finance/attendance"], ["Merchandise", "/finance/merchandise"], ["Sponsorship", "/finance/sponsorship"]].map(([l, h]) => (
           <Link key={h} href={h} className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300">{l} →</Link>
         ))}
