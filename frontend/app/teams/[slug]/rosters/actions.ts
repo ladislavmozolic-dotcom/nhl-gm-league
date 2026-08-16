@@ -32,11 +32,10 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
   const illegalFarm = farm.find((m) => m.contractType === "ONE_WAY");
   if (illegalFarm) throw new Error("A one-way contract player cannot be sent to the farm.");
 
+  // Only HARD maxima block a save. Being under a minimum (short-handed pro roster)
+  // is allowed — the farm auto-fills the missing bodies before each game, and a
+  // call-up is usually the very move that fixes it.
   if (pro.length > ROSTER_LIMITS.proMax) throw new Error(`Pro roster over the ${ROSTER_LIMITS.proMax}-player cap limit.`);
-  const proSkaters = pro.length - goalies(pro);
-  if (proSkaters < ROSTER_LIMITS.proMinSkaters) throw new Error(`Pro roster needs at least ${ROSTER_LIMITS.proMinSkaters} skaters.`);
-  if (goalies(pro) < ROSTER_LIMITS.proMinGoalies) throw new Error(`Pro roster needs at least ${ROSTER_LIMITS.proMinGoalies} goalies.`);
-  // org-wide (NHL + AHL combined) limits
   if (valid.length > ROSTER_LIMITS.orgMax) throw new Error(`Organization over ${ROSTER_LIMITS.orgMax} players (NHL + AHL).`);
   if (goalies(valid) > ROSTER_LIMITS.orgMaxGoalies) throw new Error(`Organization can hold at most ${ROSTER_LIMITS.orgMaxGoalies} goalies (NHL + AHL).`);
 

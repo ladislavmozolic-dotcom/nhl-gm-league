@@ -35,12 +35,16 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
     { setRows((prev) => prev.map((r) => (r.id === id ? { ...r, contractType: ct } : r))); setSaved(false); };
 
   const orgGoalies = goalies(pro) + goalies(farm);
-  const problems: string[] = [];
-  if (pro.length > ROSTER_LIMITS.proMax) problems.push(`Pro over ${ROSTER_LIMITS.proMax} (cap limit).`);
-  if (proSkaters < ROSTER_LIMITS.proMinSkaters) problems.push(`Pro needs ≥ ${ROSTER_LIMITS.proMinSkaters} skaters.`);
-  if (goalies(pro) < ROSTER_LIMITS.proMinGoalies) problems.push(`Pro needs ≥ ${ROSTER_LIMITS.proMinGoalies} goalies.`);
-  if (rows.length > ROSTER_LIMITS.orgMax) problems.push(`Organization over ${ROSTER_LIMITS.orgMax} players.`);
-  if (orgGoalies > ROSTER_LIMITS.orgMaxGoalies) problems.push(`Organization over ${ROSTER_LIMITS.orgMaxGoalies} goalies.`);
+  // BLOCKERS — hard maxima you must never exceed (they'd be illegal to ice).
+  const blockers: string[] = [];
+  if (pro.length > ROSTER_LIMITS.proMax) blockers.push(`Pro over ${ROSTER_LIMITS.proMax} (cap limit).`);
+  if (rows.length > ROSTER_LIMITS.orgMax) blockers.push(`Organization over ${ROSTER_LIMITS.orgMax} players.`);
+  if (orgGoalies > ROSTER_LIMITS.orgMaxGoalies) blockers.push(`Organization over ${ROSTER_LIMITS.orgMaxGoalies} goalies.`);
+  // WARNINGS — being UNDER a minimum is allowed to save: the farm auto-fills the
+  // missing bodies at game time, and you often call a player up precisely to fix it.
+  const warnings: string[] = [];
+  if (proSkaters < ROSTER_LIMITS.proMinSkaters) warnings.push(`Pro short of ${ROSTER_LIMITS.proMinSkaters} skaters — the farm auto-fills at game time.`);
+  if (goalies(pro) < ROSTER_LIMITS.proMinGoalies) warnings.push(`Pro short of ${ROSTER_LIMITS.proMinGoalies} goalies — the farm auto-fills at game time.`);
 
   const save = () => start(async () => {
     setErr(null);
@@ -101,8 +105,11 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
         <p className="text-xs text-slate-500 mt-1">Move players between the pro (NHL) and farm (AHL) rosters. One-way contracts can't go to the farm.</p>
       </div>
 
-      {problems.length > 0 && (
-        <div className="mb-4 text-sm text-red-300 bg-red-950/40 border border-red-800/50 rounded-lg px-4 py-2">{problems.join(" ")}</div>
+      {blockers.length > 0 && (
+        <div className="mb-2 text-sm text-red-300 bg-red-950/40 border border-red-800/50 rounded-lg px-4 py-2">{blockers.join(" ")}</div>
+      )}
+      {warnings.length > 0 && (
+        <div className="mb-4 text-sm text-amber-300/90 bg-amber-950/30 border border-amber-800/40 rounded-lg px-4 py-2">{warnings.join(" ")}</div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -114,11 +121,11 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
 
       <div className="fixed bottom-0 left-0 right-0 bg-slate-950/90 border-t border-slate-800 backdrop-blur px-4 py-3">
         <div className="max-w-4xl mx-auto flex items-center gap-3">
-          <button onClick={save} disabled={pending || problems.length > 0}
+          <button onClick={save} disabled={pending || blockers.length > 0}
             className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 font-semibold text-sm disabled:opacity-50">
             {pending ? "Saving…" : "Save rosters"}
           </button>
-          {problems.length > 0 && <span className="text-red-400 text-sm">Fix issues to save</span>}
+          {blockers.length > 0 && <span className="text-red-400 text-sm">Fix the cap/limit issue to save</span>}
           {saved && <span className="text-green-400 text-sm">✓ Saved</span>}
           {err && <span className="text-red-400 text-sm">{err}</span>}
         </div>
