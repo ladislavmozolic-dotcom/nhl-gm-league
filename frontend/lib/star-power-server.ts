@@ -54,6 +54,23 @@ export async function starPowerForPlayer(playerId: number): Promise<{ score: num
   return { score: s.score, tier: s.tier, reasons: s.reasons };
 }
 
+/** Each NHL club's biggest star (max Star Power) — the marquee draw. */
+export async function teamStarPeaks(): Promise<Map<number, { score: number; tier: StarTier; name: string }>> {
+  const players = await prisma.player.findMany({
+    where: { rosterType: "NHL" },
+    select: { id: true, name: true, position: true, isGoalie: true, overall: true, age: true, teamId: true, lastSeasonPts: true, lastSeasonGP: true, lastSeasonSvPct: true },
+  });
+  const { career, awards } = await pedigree(players.map((p) => p.id));
+  const peaks = new Map<number, { score: number; tier: StarTier; name: string }>();
+  for (const p of players) {
+    if (p.teamId == null) continue;
+    const s = scoreOf(p, career.get(p.id) ?? 0, awards.get(p.id) ?? 0);
+    const cur = peaks.get(p.teamId);
+    if (!cur || s.score > cur.score) peaks.set(p.teamId, { score: s.score, tier: s.tier, name: cleanName(p.name) });
+  }
+  return peaks;
+}
+
 /** Top NHL players by star power, league-wide. */
 export async function leagueStarLeaderboard(limit = 50): Promise<StarRow[]> {
   const players = await prisma.player.findMany({
