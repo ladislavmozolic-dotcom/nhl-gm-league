@@ -31,7 +31,7 @@ function skaterRows(box: TeamBox, gameId: number) {
       gameId, playerId: s.id, teamId: box.teamId,
       goals: s.goals, assists: s.assists, points: s.points,
       shots: s.shots, pim: s.pim, plusMinus: s.plusMinus,
-      ppGoals: s.ppGoals, shGoals: s.shGoals, gwg: s.gwg,
+      ppGoals: s.ppGoals, shGoals: s.shGoals, ppAssists: s.ppAssists, shAssists: s.shAssists, gwg: s.gwg,
       hits: s.hits, blocks: s.blocks,
       faceoffWins: s.faceoffWins, faceoffLosses: s.faceoffLosses, toi: s.toi,
       conBefore: Math.round(s.conBefore), conAfter: Math.round(s.conAfter),

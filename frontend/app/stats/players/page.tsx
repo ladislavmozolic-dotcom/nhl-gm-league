@@ -23,11 +23,11 @@ const COLS: Col[] = [
   { key: "blocks", label: "SB", title: "Shots Blocked", num: true },
   { key: "mp", label: "MP", title: "Minutes Per Game (avg TOI)", num: true, format: "dec2" },
   { key: "ppGoals", label: "PPG", title: "Power-Play Goals", num: true },
-  { key: "ppa", label: "PPA", title: "Power-Play Assists (not tracked)", num: true, format: "dash" },
-  { key: "ppp", label: "PPP", title: "Power-Play Points (not tracked)", num: true, format: "dash" },
+  { key: "ppa", label: "PPA", title: "Power-Play Assists", num: true },
+  { key: "ppp", label: "PPP", title: "Power-Play Points (PPG + PPA)", num: true },
   { key: "shGoals", label: "PKG", title: "Short-Handed Goals", num: true },
-  { key: "pka", label: "PKA", title: "Short-Handed Assists (not tracked)", num: true, format: "dash" },
-  { key: "pkp", label: "PKP", title: "Short-Handed Points (not tracked)", num: true, format: "dash" },
+  { key: "pka", label: "PKA", title: "Short-Handed Assists", num: true },
+  { key: "pkp", label: "PKP", title: "Short-Handed Points (PKG + PKA)", num: true },
   { key: "p20", label: "P/20", title: "Points per 20 min", num: true, format: "dec2" },
 ];
 
@@ -40,7 +40,7 @@ export default async function PlayerStatsPage({ searchParams }: { searchParams: 
     pim: s.pim, hits: s.hits, shots: s.shots,
     shtPct: s.shots ? (s.goals / s.shots) * 100 : 0,
     blocks: s.blocks, mp: s.gp ? s.toi / s.gp / 60 : 0,
-    ppGoals: s.ppGoals, ppa: 0, ppp: 0, shGoals: s.shGoals, pka: 0, pkp: 0,
+    ppGoals: s.ppGoals, ppa: s.ppAssists, ppp: s.ppGoals + s.ppAssists, shGoals: s.shGoals, pka: s.shAssists, pkp: s.shGoals + s.shAssists,
     p20: s.toi ? (s.points * 1200) / s.toi : 0,
   }));
   return (
@@ -49,7 +49,6 @@ export default async function PlayerStatsPage({ searchParams }: { searchParams: 
       <StatsTabs active="players" league={league} />
       <p className="text-slate-400 text-sm">Click a header to sort; use Show / Hide Columns to customize.</p>
       <StatTable cols={COLS} rows={rows} initialSort="points" minWidth={1180} />
-      <p className="text-xs text-slate-600">PPA / PPP / PKA / PKP show “—” because the sim engine tracks power-play & short-handed <em>goals</em> but not yet the assists. Ask to enable per-strength assist tracking to fill these in.</p>
     </div>
   );
 }

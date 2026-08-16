@@ -9,7 +9,7 @@ export type SkaterTotal = {
   playerId: number; name: string; rookie: boolean; position: string; number: number | null;
   teamId: number | null; teamCode: string | null; teamSlug: string | null;
   gp: number; goals: number; assists: number; points: number; shots: number;
-  pim: number; plusMinus: number; ppGoals: number; shGoals: number; gwg: number;
+  pim: number; plusMinus: number; ppGoals: number; shGoals: number; ppAssists: number; shAssists: number; gwg: number;
   hits: number; blocks: number; toi: number;
   xg: number; hdShots: number; // Phase 2 shot quality
 };
@@ -39,7 +39,7 @@ export async function skaterTotals(season: string, league = "NHL", playoffs = fa
   const grouped = await prisma.playerGameStat.groupBy({
     by: ["playerId", "teamId"],
     where: { game: gameWhere({ season, league, playoffs }) },
-    _sum: { goals: true, assists: true, points: true, shots: true, pim: true, plusMinus: true, ppGoals: true, shGoals: true, gwg: true, hits: true, blocks: true, toi: true, xg: true, hdShots: true },
+    _sum: { goals: true, assists: true, points: true, shots: true, pim: true, plusMinus: true, ppGoals: true, shGoals: true, ppAssists: true, shAssists: true, gwg: true, hits: true, blocks: true, toi: true, xg: true, hdShots: true },
     _count: { _all: true },
   });
   const [players, teams] = await Promise.all([
@@ -55,7 +55,7 @@ export async function skaterTotals(season: string, league = "NHL", playoffs = fa
       playerId: g.playerId, name: cleanName(p?.name ?? "—"), rookie: isRookieName(p?.name ?? ""),
       position: p?.position ?? "—", number: p?.number ?? null, teamId: g.teamId ?? null, teamCode: t?.code ?? null, teamSlug: t?.slug ?? null,
       gp: g._count._all, goals: s.goals ?? 0, assists: s.assists ?? 0, points: s.points ?? 0, shots: s.shots ?? 0,
-      pim: s.pim ?? 0, plusMinus: s.plusMinus ?? 0, ppGoals: s.ppGoals ?? 0, shGoals: s.shGoals ?? 0, gwg: s.gwg ?? 0,
+      pim: s.pim ?? 0, plusMinus: s.plusMinus ?? 0, ppGoals: s.ppGoals ?? 0, shGoals: s.shGoals ?? 0, ppAssists: s.ppAssists ?? 0, shAssists: s.shAssists ?? 0, gwg: s.gwg ?? 0,
       hits: s.hits ?? 0, blocks: s.blocks ?? 0, toi: s.toi ?? 0,
       xg: s.xg ?? 0, hdShots: s.hdShots ?? 0,
     };

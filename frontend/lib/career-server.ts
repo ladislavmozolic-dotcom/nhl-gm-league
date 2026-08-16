@@ -24,14 +24,14 @@ export async function archiveSeasonStats(season: string, league = "NHL"): Promis
     // skaters
     const sg = await prisma.playerGameStat.groupBy({
       by: ["playerId", "teamId"], where: { gameId: { in: ids } },
-      _sum: { goals: true, assists: true, points: true, shots: true, pim: true, plusMinus: true, ppGoals: true, shGoals: true, gwg: true, hits: true, blocks: true },
+      _sum: { goals: true, assists: true, points: true, shots: true, pim: true, plusMinus: true, ppGoals: true, shGoals: true, ppAssists: true, shAssists: true, gwg: true, hits: true, blocks: true },
       _count: { _all: true },
     });
     for (const r of sg) {
       await prisma.playerSeasonStat.upsert({
         where: { playerId_season_league_isPlayoff: { playerId: r.playerId, season, league, isPlayoff } },
-        create: { playerId: r.playerId, season, league, isPlayoff, teamId: r.teamId, gp: r._count._all, goals: r._sum.goals ?? 0, assists: r._sum.assists ?? 0, points: r._sum.points ?? 0, shots: r._sum.shots ?? 0, pim: r._sum.pim ?? 0, plusMinus: r._sum.plusMinus ?? 0, ppGoals: r._sum.ppGoals ?? 0, shGoals: r._sum.shGoals ?? 0, gwg: r._sum.gwg ?? 0, hits: r._sum.hits ?? 0, blocks: r._sum.blocks ?? 0 },
-        update: { teamId: r.teamId, gp: r._count._all, goals: r._sum.goals ?? 0, assists: r._sum.assists ?? 0, points: r._sum.points ?? 0, shots: r._sum.shots ?? 0, pim: r._sum.pim ?? 0, plusMinus: r._sum.plusMinus ?? 0, ppGoals: r._sum.ppGoals ?? 0, shGoals: r._sum.shGoals ?? 0, gwg: r._sum.gwg ?? 0, hits: r._sum.hits ?? 0, blocks: r._sum.blocks ?? 0 },
+        create: { playerId: r.playerId, season, league, isPlayoff, teamId: r.teamId, gp: r._count._all, goals: r._sum.goals ?? 0, assists: r._sum.assists ?? 0, points: r._sum.points ?? 0, shots: r._sum.shots ?? 0, pim: r._sum.pim ?? 0, plusMinus: r._sum.plusMinus ?? 0, ppGoals: r._sum.ppGoals ?? 0, shGoals: r._sum.shGoals ?? 0, ppAssists: r._sum.ppAssists ?? 0, shAssists: r._sum.shAssists ?? 0, gwg: r._sum.gwg ?? 0, hits: r._sum.hits ?? 0, blocks: r._sum.blocks ?? 0 },
+        update: { teamId: r.teamId, gp: r._count._all, goals: r._sum.goals ?? 0, assists: r._sum.assists ?? 0, points: r._sum.points ?? 0, shots: r._sum.shots ?? 0, pim: r._sum.pim ?? 0, plusMinus: r._sum.plusMinus ?? 0, ppGoals: r._sum.ppGoals ?? 0, shGoals: r._sum.shGoals ?? 0, ppAssists: r._sum.ppAssists ?? 0, shAssists: r._sum.shAssists ?? 0, gwg: r._sum.gwg ?? 0, hits: r._sum.hits ?? 0, blocks: r._sum.blocks ?? 0 },
       });
       skaters++;
     }

@@ -169,7 +169,7 @@ function newPlayerLine(s: SimSkater): PlayerLine {
   return {
     id: s.id, name: s.name, position: s.position,
     goals: 0, assists: 0, points: 0, shots: 0, pim: 0, plusMinus: 0,
-    ppGoals: 0, shGoals: 0, gwg: 0, hits: 0, blocks: 0,
+    ppGoals: 0, shGoals: 0, ppAssists: 0, shAssists: 0, gwg: 0, hits: 0, blocks: 0,
     faceoffWins: 0, faceoffLosses: 0, toi: 0,
     conBefore: s.con ?? 100, conAfter: s.con ?? 100,
     xg: 0, hdShots: 0, topShotSpeed: 0,
@@ -387,6 +387,8 @@ function recordGoal(
   const assistNames: string[] = [];
   for (const aId of assists) {
     offLines[aId].assists++; offLines[aId].points++;
+    if (strength === "PP") offLines[aId].ppAssists++;
+    else if (strength === "SH") offLines[aId].shAssists++;
     assistNames.push(offLines[aId].name);
   }
   st.box[off.id].goals++;

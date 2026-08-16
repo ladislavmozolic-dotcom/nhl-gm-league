@@ -129,6 +129,8 @@ export type PlayerLine = {
   plusMinus: number;
   ppGoals: number;
   shGoals: number;
+  ppAssists: number;     // assists on power-play goals
+  shAssists: number;     // assists on short-handed goals
   gwg: number;           // game-winning goal (0/1)
   hits: number;
   blocks: number;
