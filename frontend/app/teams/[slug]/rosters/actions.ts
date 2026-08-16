@@ -19,7 +19,7 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
   const ids = moves.map((m) => m.id);
   const players = await prisma.player.findMany({
     where: { id: { in: ids }, teamId: { in: [team.id, affiliate.id] } },
-    select: { id: true, isGoalie: true },
+    select: { id: true, isGoalie: true, rosterType: true },
   });
   const byId = new Map(players.map((p) => [p.id, p]));
   const valid = moves.filter((m) => byId.has(m.id));
@@ -28,8 +28,11 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
   const farm = valid.filter((m) => m.side === "farm");
   const goalies = (list: MoveRow[]) => list.filter((m) => byId.get(m.id)!.isGoalie).length;
 
-  // rule: one-way contracts cannot be sent to the farm
-  const illegalFarm = farm.find((m) => m.contractType === "ONE_WAY");
+  // rule: a one-way contract can't be sent DOWN — but only block a NEW demotion
+  // (a player currently on the NHL roster moving to the farm). One-way players
+  // already sitting on the farm are grandfathered, so they don't block unrelated
+  // moves like a call-up.
+  const illegalFarm = farm.find((m) => m.contractType === "ONE_WAY" && byId.get(m.id)!.rosterType === "NHL");
   if (illegalFarm) throw new Error("A one-way contract player cannot be sent to the farm.");
 
   // Only HARD maxima block a save. Being under a minimum (short-handed pro roster)
