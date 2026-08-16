@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { getInterestAction, extendContractAction } from "@/app/free-agents/actions";
 import { Card } from "@/components/ui";
 import { cleanName } from "@/lib/playerName";
+import { clauseDiscount } from "@/lib/free-agency";
 
 type ExpiringPlayer = { id: number; name: string; capHit: number | null; contractYears: number | null; contractText: string | null };
 
@@ -27,6 +28,8 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
   const [line, setLine] = useState(2);
   const [pp, setPp] = useState(false);
   const [pk, setPk] = useState(false);
+  const [grantClause, setGrantClause] = useState("");
+  const [breadth, setBreadth] = useState(12);
   const [done, setDone] = useState(false);
 
   useEffect(() => {
@@ -48,7 +51,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
     setMsg(null);
     const salary = Math.round(parseFloat(salaryM) * 1e6);
     if (!Number.isFinite(salary)) { setMsg({ t: "err", s: "Enter a salary." }); return; }
-    const r = await extendContractAction(player.id, teamId, salary, years, line, pp, pk);
+    const r = await extendContractAction(player.id, teamId, salary, years, line, pp, pk, grantClause || null, grantClause === "M_NTC" ? breadth : null);
     if (r.ok) { setMsg({ t: "ok", s: `Re-signed for ${M(r.salary)} × ${r.years}yr. ✓` }); setDone(true); return; }
     setMsg({ t: "err", s: (r as any).rejected ? (r as any).reason : r.error });
   });
@@ -99,6 +102,23 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                     <label className="flex items-center gap-2"><input type="checkbox" checked={pk} onChange={(e) => setPk(e.target.checked)} /> Penalty kill</label>
                   </div>
                 )}
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Grant a no-trade clause (he signs for less)</label>
+                  <div className="flex gap-2 items-center flex-wrap">
+                    <select value={grantClause} onChange={(e) => setGrantClause(e.target.value)} className="px-2 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-sm">
+                      <option value="">No clause</option>
+                      <option value="NTC">NTC — no-trade</option>
+                      <option value="NMC">NMC — no-movement</option>
+                      <option value="M_NTC">M-NTC — modified</option>
+                    </select>
+                    {grantClause === "M_NTC" && (
+                      <select value={breadth} onChange={(e) => setBreadth(Number(e.target.value))} className="px-2 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-sm">
+                        {[6, 12, 18, 24].map((n) => <option key={n} value={n}>{n}-team list</option>)}
+                      </select>
+                    )}
+                    {grantClause && <span className="text-xs text-emerald-400">≈ {Math.round(clauseDiscount(grantClause, breadth) * 100)}% cheaper</span>}
+                  </div>
+                </div>
                 <button onClick={submit} disabled={pending}
                   className="w-full px-3 py-2 rounded-lg bg-green-600 hover:bg-green-500 disabled:opacity-50 text-sm font-semibold">
                   {pending ? "…" : "Offer extension"}

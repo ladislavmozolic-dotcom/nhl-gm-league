@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import {
   getInterestAction, getPlayerOffersAction, submitOfferAction, withdrawOfferAction, getAskAtAction,
 } from "@/app/free-agents/actions";
+import { clauseDiscount } from "@/lib/free-agency";
 
 export type InterestCtx = {
   frenzyOpen: boolean;
@@ -40,6 +41,8 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
   const [line, setLine] = useState(2);
   const [pp, setPp] = useState(false);
   const [pk, setPk] = useState(false);
+  const [grantClause, setGrantClause] = useState("");
+  const [breadth, setBreadth] = useState(12);
   const [liveAsk, setLiveAsk] = useState<Awaited<ReturnType<typeof getAskAtAction>>>(null);
 
   // the ask reacts to the promised role: a worse line / stripped PP-PK raises it
@@ -79,7 +82,7 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
     const salary = Math.round(parseFloat(salaryM) * 1e6);
     if (!Number.isFinite(salary)) { setMsg({ t: "err", s: "Enter a salary." }); return; }
     start(async () => {
-      const r = await submitOfferAction(playerId, teamId, salary, years, line, pp, pk);
+      const r = await submitOfferAction(playerId, teamId, salary, years, line, pp, pk, grantClause || null, grantClause === "M_NTC" ? breadth : null);
       if (!r.ok) { setMsg({ t: "err", s: r.error }); return; }
       setMsg({ t: "ok", s: r.clears ? `Offer ${r.raised ? "raised" : "placed"} — clears his ask at your club. ✓` : `Offer ${r.raised ? "raised" : "placed"} — below his floor ${M(r.floor)}; he may pick a better one.` });
       load(teamId);
@@ -191,6 +194,25 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
                         <label className="flex items-center gap-2"><input type="checkbox" checked={pk} onChange={(e) => setPk(e.target.checked)} /> Penalty kill</label>
                       </div>
                     )}
+                    <div>
+                      <label className="text-xs text-slate-400 block mb-1">Grant a no-trade clause (optional — he signs for less)</label>
+                      <div className="flex gap-2 items-center flex-wrap">
+                        <select value={grantClause} onChange={(e) => setGrantClause(e.target.value)}
+                          className="px-2 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-sm">
+                          <option value="">No clause</option>
+                          <option value="NTC">NTC — no-trade</option>
+                          <option value="NMC">NMC — no-movement</option>
+                          <option value="M_NTC">M-NTC — modified</option>
+                        </select>
+                        {grantClause === "M_NTC" && (
+                          <select value={breadth} onChange={(e) => setBreadth(Number(e.target.value))}
+                            className="px-2 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-sm">
+                            {[6, 12, 18, 24].map((n) => <option key={n} value={n}>{n}-team list</option>)}
+                          </select>
+                        )}
+                        {grantClause && <span className="text-xs text-emerald-400">≈ {Math.round(clauseDiscount(grantClause, breadth) * 100)}% cheaper to sign</span>}
+                      </div>
+                    </div>
                     <div className="flex gap-2">
                       <button onClick={submit} disabled={pending}
                         className="flex-1 px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-sm font-semibold">

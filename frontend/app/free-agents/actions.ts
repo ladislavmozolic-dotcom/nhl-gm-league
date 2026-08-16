@@ -6,7 +6,7 @@ import { canManageTeam, getTeamSession, isAdmin } from "@/lib/auth";
 import { getLeagueClock } from "@/lib/calendar-server";
 import { CURRENT_SEASON_START, capCeilingForPhase, ltirRelief } from "@/lib/finance";
 import {
-  loadMarketPool, teamContentionMap, teamAsk, evaluateTeamOffer, loadLeagueCap,
+  loadMarketPool, teamContentionMap, teamAsk, evaluateTeamOffer, loadLeagueCap, weakestTeams,
 } from "@/lib/free-agency-server";
 import { MAX_TERM, faPosGroup, willingnessNote, type Deployment } from "@/lib/free-agency";
 import { computeELC } from "@/lib/elc";
@@ -83,6 +83,7 @@ export async function getPlayerOffersAction(playerId: number) {
 /** Place or raise a team's standing offer to a free agent (money + term + promised usage). */
 export async function submitOfferAction(
   playerId: number, teamId: number, salary: number, years: number, line: number, pp: boolean, pk: boolean,
+  grantClause?: string | null, mNtcBreadth?: number | null,
 ) {
   if (!(await canManageTeam(teamId))) return { ok: false as const, error: "You don't manage this team." };
   const clock = await getLeagueClock();
@@ -111,15 +112,17 @@ export async function submitOfferAction(
       : `Over the off-season ceiling (cap +10%) — ${fmtM(ceiling - committed)} of room left, this offer is ${fmtM(salary)}. You must be cap-compliant by opening day.` };
   }
 
+  const clause = grantClause && ["NTC", "NMC", "M_NTC"].includes(grantClause) ? grantClause : null;
+  const breadth = clause === "M_NTC" ? ([6, 12, 18, 24].includes(mNtcBreadth ?? 0) ? mNtcBreadth! : 12) : null;
   const dep: Deployment = { line: clampLine(line), pp, pk };
-  const evalr = await evaluateTeamOffer(playerId, teamId, salary, years, dep);
+  const evalr = await evaluateTeamOffer(playerId, teamId, salary, years, dep, undefined, undefined, undefined, { clause, breadth });
   // a raise re-enters contention; a shortlisted offer stays shortlisted
   const newStatus = existing?.status === "SHORTLISTED" ? "SHORTLISTED" : "PENDING";
 
   await prisma.faOffer.upsert({
     where: { playerId_teamId: { playerId, teamId } },
-    update: { salary, years, line: dep.line, pp, pk, status: newStatus, round: clock.frenzyRound },
-    create: { playerId, teamId, salary, years, line: dep.line, pp, pk, round: clock.frenzyRound },
+    update: { salary, years, line: dep.line, pp, pk, status: newStatus, round: clock.frenzyRound, grantClause: clause, mNtcBreadth: breadth },
+    create: { playerId, teamId, salary, years, line: dep.line, pp, pk, round: clock.frenzyRound, grantClause: clause, mNtcBreadth: breadth },
   });
   revalidatePath("/free-agents");
   return {
@@ -181,7 +184,7 @@ export async function resolveFrenzy(): Promise<{ signed: number; details: string
     let best: { offer: (typeof offers)[number]; utility: number } | null = null;
     for (const o of offers) {
       // final week → he judges every offer at fair (round-3) value
-      const ev = await evaluateTeamOffer(playerId, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, 3);
+      const ev = await evaluateTeamOffer(playerId, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, 3, { clause: o.grantClause, breadth: o.mNtcBreadth });
       if (ev?.acceptable && (!best || ev.utility > best.utility)) best = { offer: o, utility: ev.utility };
     }
 
@@ -190,6 +193,8 @@ export async function resolveFrenzy(): Promise<{ signed: number; details: string
     const o = best.offer;
     const twoWay = (player.age ?? 27) <= 24 && o.salary <= 3_000_000;
     const expiry = CURRENT_SEASON_START + o.years;
+    const clause = o.grantClause && ["NTC", "NMC", "M_NTC"].includes(o.grantClause) ? o.grantClause : null;
+    const noTradeTeams = clause === "M_NTC" ? await weakestTeams(o.mNtcBreadth ?? 12, o.teamId) : [];
     await prisma.player.update({
       where: { id: playerId },
       data: {
@@ -198,6 +203,7 @@ export async function resolveFrenzy(): Promise<{ signed: number; details: string
         contractType: twoWay ? "TWO_WAY" : "ONE_WAY",
         contractText: `$${o.salary.toLocaleString("en-US")} × ${o.years}yr (through ${expiry})`,
         signPromiseLine: o.line, signPromisePP: o.pp, signPromisePK: o.pk,
+        tradeClause: clause, noTradeTeams,
         disgruntled: false, tradeRequested: false, promiseWarnGame: null,
       },
     });
@@ -235,7 +241,7 @@ export async function processRoundEnd(endedRound: number): Promise<{ countered: 
 
     // value every offer at the UPCOMING round
     const scored = [] as { o: (typeof list)[number]; ev: Awaited<ReturnType<typeof evaluateTeamOffer>> }[];
-    for (const o of list) scored.push({ o, ev: await evaluateTeamOffer(playerId, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, nextRound) });
+    for (const o of list) scored.push({ o, ev: await evaluateTeamOffer(playerId, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, nextRound, { clause: o.grantClause, breadth: o.mNtcBreadth }) });
 
     if (endedRound === 1) {
       // counter each team; drop the hopeless lowballs
@@ -346,6 +352,7 @@ const fmtM = (n: number) => `$${(n / 1e6).toFixed(2)}M`;
  *  offer clears his team-specific floor + term, otherwise he counters with why. */
 export async function extendContractAction(
   playerId: number, teamId: number, salary: number, years: number, line: number, pp: boolean, pk: boolean,
+  grantClause?: string | null, mNtcBreadth?: number | null,
 ) {
   if (!(await canManageTeam(teamId))) return { ok: false as const, error: "You don't manage this team." };
   const player = await prisma.player.findUnique({
@@ -366,8 +373,10 @@ export async function extendContractAction(
     return { ok: false as const, error: `Over the ceiling — you'd have ${fmtM(ceiling - committed)} of room, this deal is ${fmtM(salary)}.` };
   }
 
+  const clause = grantClause && ["NTC", "NMC", "M_NTC"].includes(grantClause) ? grantClause : null;
+  const breadth = clause === "M_NTC" ? ([6, 12, 18, 24].includes(mNtcBreadth ?? 0) ? mNtcBreadth! : 12) : null;
   const dep: Deployment = { line: clampLine(line), pp, pk };
-  const ev = await evaluateTeamOffer(playerId, teamId, salary, years, dep);
+  const ev = await evaluateTeamOffer(playerId, teamId, salary, years, dep, undefined, undefined, undefined, { clause, breadth });
   if (!ev) return { ok: false as const, error: "Could not value the player." };
   if (!ev.acceptable) {
     let reason: string;
@@ -381,6 +390,7 @@ export async function extendContractAction(
 
   const expiry = CURRENT_SEASON_START + years;
   const twoWay = (player.age ?? 27) <= 24 && salary <= 3_000_000;
+  const noTradeTeams = clause === "M_NTC" ? await weakestTeams(breadth ?? 12, teamId) : [];
   await prisma.player.update({
     where: { id: playerId },
     data: {
@@ -388,6 +398,7 @@ export async function extendContractAction(
       contractType: twoWay ? "TWO_WAY" : "ONE_WAY",
       contractText: `$${salary.toLocaleString("en-US")} × ${years}yr (through ${expiry})`,
       signPromiseLine: dep.line, signPromisePP: pp, signPromisePK: pk,
+      tradeClause: clause, noTradeTeams,
       disgruntled: false, tradeRequested: false, promiseWarnGame: null,
     },
   });

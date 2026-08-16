@@ -226,6 +226,8 @@ model FaOffer {
   round     Int      @default(0)          // frenzy round the offer was placed / last raised
   counterSalary Int?                       // the player's counter (what he wants from this team) after a round
   counterYears  Int?
+  grantClause String?                      // clause the GM offers to grant: NTC | NMC | M_NTC (→ signing discount)
+  mNtcBreadth Int?                         // M-NTC list breadth the GM offers: 6 | 12 | 18 | 24 teams
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@unique([playerId, teamId])            // one standing offer per team per player

@@ -143,6 +143,17 @@ export function willingnessFactor(morale: number | null | undefined, market: num
   const leverage = 0.55 + 0.65 * reputation;                       // fringe 0.55 … star 1.2
   return Math.max(0.88, Math.min(1.16, 1 + moodDelta * 0.2 * leverage));
 }
+/** Signing discount when the GM GRANTS a no-trade / no-movement clause: the
+ *  player trades security for money, so he'll ink for a little less. NMC (full
+ *  protection) is the biggest discount; M-NTC scales with how many teams the
+ *  list covers (6 → small … 24 → nearly a full NTC). */
+export function clauseDiscount(clause?: string | null, breadth?: number | null): number {
+  if (clause === "NMC") return 0.08;
+  if (clause === "NTC") return 0.05;
+  if (clause === "M_NTC") return Math.max(0.015, Math.min(0.075, 0.10 * ((breadth ?? 12) / 32)));
+  return 0;
+}
+
 /** Short human note for the ask UI, e.g. "Unhappy — holding out (+9%)". */
 export function willingnessNote(w: number): string | null {
   const pct = Math.round((w - 1) * 100);

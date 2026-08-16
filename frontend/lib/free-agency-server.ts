@@ -3,9 +3,10 @@
 
 import { prisma } from "./prisma";
 import { getLeagueClock } from "./calendar-server";
+import { computeStandings } from "./sim/standings";
 import {
   faPosGroup, skaterMarket, goalieMarket, anchorFromPool, buildDemand,
-  slotForRank, slotToLine, desiredDeployment, deploymentDemand, offerUtility, offerAcceptable,
+  slotForRank, slotToLine, desiredDeployment, deploymentDemand, offerUtility, offerAcceptable, clauseDiscount,
   type MarketRow, type Demand, type FaPos, type Contention, type Deployment, type Desired, type LineSlot,
 } from "./free-agency";
 
@@ -177,13 +178,26 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
 export async function evaluateTeamOffer(
   playerId: number, teamId: number, salary: number, years: number, deploy: Deployment,
   pool?: MarketRow[], cmap?: Map<number, Contention>, round?: number,
+  grant?: { clause?: string | null; breadth?: number | null },
 ): Promise<{ acceptable: boolean; ask: Demand; utility: number; base: TeamAsk } | null> {
   const info = await teamAsk(playerId, teamId, pool, cmap, round);
   if (!info) return null;
-  const ask = deploymentDemand(info.base, info.grp, deploy, info.desired, info.contention);
+  const raw = deploymentDemand(info.base, info.grp, deploy, info.desired, info.contention);
+  // granting a clause lets him sign for less — discount his floor + headline ask.
+  const disc = clauseDiscount(grant?.clause, grant?.breadth);
+  const ask: Demand = disc
+    ? { ...raw, floorSalary: Math.round((raw.floorSalary * (1 - disc)) / 50_000) * 50_000, salary: Math.round((raw.salary * (1 - disc)) / 50_000) * 50_000 }
+    : raw;
   const acceptable = offerAcceptable(ask, salary, years);
-  const utility = offerUtility(salary, info.grp, deploy, info.desired, info.contention);
+  const utility = offerUtility(salary, info.grp, deploy, info.desired, info.contention) + disc * raw.salary;
   return { acceptable, ask, utility, base: info };
+}
+
+/** The `n` weakest NHL teams by standings (excluding `exceptTeamId`) — the clubs a
+ *  player most wants to avoid, used to fill an M-NTC no-trade list of a given breadth. */
+export async function weakestTeams(n: number, exceptTeamId: number): Promise<number[]> {
+  const standings = await computeStandings();
+  return [...standings].reverse().map((s) => s.teamId).filter((id) => id !== exceptTeamId).slice(0, n);
 }
 
 /** Batch-value a set of players (e.g. the whole free-agent board) against one pool. */
