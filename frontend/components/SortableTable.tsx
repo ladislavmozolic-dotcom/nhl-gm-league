@@ -5,9 +5,10 @@ import Link from "next/link";
 import PlayerAvatar from "@/components/playerAvatar";
 import { cleanName } from "@/lib/playerName";
 import InterestButton, { type InterestCtx } from "@/components/InterestButton";
+import InfoTip from "@/components/InfoTip";
 
 export type ColKind = "player" | "team" | "num" | "money" | "ovr" | "years" | "text" | "ext" | "interest";
-export type SortCol = { key: string; label: string; kind?: ColKind; title?: string; sticky?: boolean };
+export type SortCol = { key: string; label: string; kind?: ColKind; title?: string; info?: string; sticky?: boolean };
 export type SortRow = Record<string, any>;
 
 const numeric = (k?: ColKind) => k === "num" || k === "money" || k === "ovr" || k === "years";
@@ -76,7 +77,7 @@ export default function SortableTable({ cols, rows, initialSort, minWidth = 720,
                 <th key={c.key} title={c.title}
                   className={`px-3 py-3 font-medium cursor-pointer hover:text-slate-200 whitespace-nowrap ${align(c)} ${c.sticky ? "sticky left-0 bg-slate-900 z-10 min-w-[160px]" : ""} ${active ? "text-blue-400" : ""}`}
                   onClick={() => onHeader(c)}>
-                  {c.label}
+                  {c.label}{c.info && <InfoTip text={c.info} />}
                   <span className="ml-0.5 inline-block w-2 text-[9px]">{active ? (dir === "desc" ? "▼" : "▲") : ""}</span>
                 </th>
               );

@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import InfoTip from "@/components/InfoTip";
 
 export type ColFormat = "plusMinus" | "plusDec1" | "pct3" | "dec1" | "dec2" | "jersey" | "dash";
 export type Col = {
   key: string; label: string; num?: boolean; frozen?: boolean;
   title?: string;         // tooltip (full stat name)
+  info?: string;          // richer explainer shown as a click/tap ⓘ in the header
   format?: ColFormat;     // display formatter (serializable); sorting always uses the raw value
   defaultHidden?: boolean; // start hidden — user reveals it via Show / Hide Columns
 };
@@ -68,7 +70,7 @@ export default function StatTable({ cols, rows, initialSort, minWidth = 720 }: {
               {visible.map((c) => (
                 <th key={c.key} onClick={() => click(c.key)} title={c.title}
                   className={`px-2.5 py-2.5 cursor-pointer hover:text-slate-200 select-none whitespace-nowrap ${c.num ? "text-right" : "text-left"}`}>
-                  {c.label}{arrow(c.key)}
+                  {c.label}{c.info && <InfoTip text={c.info} />}{arrow(c.key)}
                 </th>
               ))}
             </tr>

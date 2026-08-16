@@ -5,6 +5,7 @@ import {
   getInterestAction, getPlayerOffersAction, submitOfferAction, withdrawOfferAction, getAskAtAction,
 } from "@/app/free-agents/actions";
 import { clauseDiscount } from "@/lib/free-agency";
+import InfoTip from "@/components/InfoTip";
 
 export type InterestCtx = {
   frenzyOpen: boolean;
@@ -157,6 +158,7 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
                   {i.moraleNote && (
                     <p className={`mt-1 text-xs font-medium ${i.moraleNote.startsWith("Happy") ? "text-emerald-400" : "text-amber-400"}`}>
                       {i.moraleNote.startsWith("Happy") ? "😀 " : "😕 "}{i.moraleNote}
+                      <InfoTip text="Based on the player's morale (MO). An unhappy player holds out for more money than his baseline ask; a happy one signs for a little less. A bigger star swings this harder." />
                     </p>
                   )}
                   <p className="mt-2 text-slate-200">
@@ -165,6 +167,7 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
                       : <>Asking </>}
                     <b className="text-amber-300">{M((liveAsk ?? i).askSalary)} × {(liveAsk ?? i).askYears}yr</b>{" "}
                     <span className="text-slate-500">(floor {M((liveAsk ?? i).floor)}, term {(liveAsk ?? i).minYears}-{(liveAsk ?? i).maxYears}yr)</span>
+                    <InfoTip text="Floor = the lowest cap hit he'll accept from your club for this role. Offer at or above it (within the term range) and he signs. The headline ask is his opening number; it eases toward the floor over the negotiation." />
                   </p>
                 </div>
 

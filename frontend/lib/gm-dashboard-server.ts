@@ -102,25 +102,34 @@ export async function gmDashboard(teamId: number): Promise<GmDashboard | null> {
   const mine = forms.find((x) => x.teamId === teamId);
   const form = mine ? { last10: mine.last10, streakType: mine.streakType, streakLen: mine.streakLen, points: mine.points, gp: mine.gp } : null;
 
-  // LATEST — a couple of team storylines
+  // OFF-SEASON: no active schedule → the game-day panels (Team Form, recent-games
+  // storylines, the Coach's line read) are irrelevant; only off-season items show.
+  const isOffseason = !nextGame && clock.phase !== "regular" && clock.phase !== "playoffs";
+
+  // LATEST — a couple of team storylines (in-season only)
   const latest: string[] = [];
-  const gameIds = (await prisma.game.findMany({ where: { season: SEASON, league, status: "FINAL", seriesId: null, OR: [{ homeTeamId: teamId }, { awayTeamId: teamId }] }, orderBy: { round: "desc" }, take: 10, select: { id: true } })).map((x) => x.id);
-  if (gameIds.length) {
-    const topSk = await prisma.playerGameStat.groupBy({ by: ["playerId"], where: { teamId, gameId: { in: gameIds } }, _sum: { points: true, goals: true }, orderBy: { _sum: { points: "desc" } }, take: 1 });
-    if (topSk[0]?._sum.points) { const nm = (await prisma.player.findUnique({ where: { id: topSk[0].playerId }, select: { name: true } }))?.name; latest.push(`🔥 ${cleanName(nm ?? "")} — ${topSk[0]._sum.points} pts in the last ${gameIds.length}`); }
+  if (!isOffseason) {
+    const gameIds = (await prisma.game.findMany({ where: { season: SEASON, league, status: "FINAL", seriesId: null, OR: [{ homeTeamId: teamId }, { awayTeamId: teamId }] }, orderBy: { round: "desc" }, take: 10, select: { id: true } })).map((x) => x.id);
+    if (gameIds.length) {
+      const topSk = await prisma.playerGameStat.groupBy({ by: ["playerId"], where: { teamId, gameId: { in: gameIds } }, _sum: { points: true, goals: true }, orderBy: { _sum: { points: "desc" } }, take: 1 });
+      if (topSk[0]?._sum.points) { const nm = (await prisma.player.findUnique({ where: { id: topSk[0].playerId }, select: { name: true } }))?.name; latest.push(`🔥 ${cleanName(nm ?? "")} — ${topSk[0]._sum.points} pts in the last ${gameIds.length}`); }
+    }
+    if (starter) { const sp = await prisma.player.findFirst({ where: { teamId, name: starter.name }, select: { id: true } }); if (sp) { const ga = await goalieAnalytics(sp.id); if (ga) latest.push(`🧤 ${cleanName(starter.name)} — ${ga.last10.gsax >= 0 ? "+" : ""}${ga.last10.gsax} GSAx over his last ${ga.last10.gp}`); } }
+    if (form) latest.push(form.streakType === "W" && form.streakLen >= 3 ? `📈 ${form.streakLen}-game win streak` : form.streakType === "L" && form.streakLen >= 3 ? `📉 winless in ${form.streakLen}` : `record ${mine!.last10} in the last 10`);
   }
-  if (starter) { const sp = await prisma.player.findFirst({ where: { teamId, name: starter.name }, select: { id: true } }); if (sp) { const ga = await goalieAnalytics(sp.id); if (ga) latest.push(`🧤 ${cleanName(starter.name)} — ${ga.last10.gsax >= 0 ? "+" : ""}${ga.last10.gsax} GSAx over his last ${ga.last10.gp}`); } }
-  if (form) latest.push(form.streakType === "W" && form.streakLen >= 3 ? `📈 ${form.streakLen}-game win streak` : form.streakType === "L" && form.streakLen >= 3 ? `📉 winless in ${form.streakLen}` : `record ${mine!.last10} in the last 10`);
 
   // BRIEFING — short FM-style advisor notes from the staff, drawn from live data.
   const briefing: Briefing[] = [];
   const teamHref2 = `/teams/${team.slug}`;
-  // Coach — a struggling line, or a read on the room's form.
-  const weakLine = build?.forwards.filter((l) => l.gelled && l.chemistry < 66).sort((a, b) => a.chemistry - b.chemistry)[0];
-  if (weakLine) briefing.push({ dept: "Coach", icon: "🎛️", text: `Our line ${weakLine.index + 1} has struggled to click — chemistry down to ${weakLine.chemistry}.`, href: `${teamHref2}/lines/builder` });
-  else if (form && form.streakType === "L" && form.streakLen >= 3) briefing.push({ dept: "Coach", icon: "🎛️", text: `The room's flat — winless in ${form.streakLen}. Might be time to shake up the lines.`, href: `${teamHref2}/lines` });
-  else if (form && form.streakType === "W" && form.streakLen >= 3) briefing.push({ dept: "Coach", icon: "🎛️", text: `Lines are humming — riding a ${form.streakLen}-game heater. Keep them together.` });
-  else briefing.push({ dept: "Coach", icon: "🎛️", text: "Systems look settled — the group's in a good rhythm." });
+  // Coach — a struggling line / a read on the room's form. GAME-DAY only (a coach
+  // has nothing to report on lines in the off-season).
+  if (!isOffseason) {
+    const weakLine = build?.forwards.filter((l) => l.gelled && l.chemistry < 66).sort((a, b) => a.chemistry - b.chemistry)[0];
+    if (weakLine) briefing.push({ dept: "Coach", icon: "🎛️", text: `Our line ${weakLine.index + 1} has struggled to click — chemistry down to ${weakLine.chemistry}.`, href: `${teamHref2}/lines/builder` });
+    else if (form && form.streakType === "L" && form.streakLen >= 3) briefing.push({ dept: "Coach", icon: "🎛️", text: `The room's flat — winless in ${form.streakLen}. Might be time to shake up the lines.`, href: `${teamHref2}/lines` });
+    else if (form && form.streakType === "W" && form.streakLen >= 3) briefing.push({ dept: "Coach", icon: "🎛️", text: `Lines are humming — riding a ${form.streakLen}-game heater. Keep them together.` });
+    else briefing.push({ dept: "Coach", icon: "🎛️", text: "Systems look settled — the group's in a good rhythm." });
+  }
   // Medical — someone nearing a return, else injury load, else clean.
   const returning = roster.filter((p) => p.injuryDaysLeft > 0 && p.injuryDaysLeft <= 4).sort((a, b) => a.injuryDaysLeft - b.injuryDaysLeft)[0];
   const injuredCount = roster.filter((p) => p.injuryDaysLeft > 0).length;

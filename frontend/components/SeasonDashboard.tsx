@@ -63,7 +63,8 @@ export default function SeasonDashboard({ data }: { data: GmDashboard }) {
             </div>
             )}
 
-            {/* Team form + latest */}
+            {/* Team form + latest — game-day only (hidden in the off-season) */}
+            {data.mode === "season" && (
             <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5">
               <div className="text-xs uppercase tracking-wide text-slate-500 mb-2">Team Form</div>
               {data.form ? (
@@ -79,6 +80,7 @@ export default function SeasonDashboard({ data }: { data: GmDashboard }) {
                 </div>
               )}
             </div>
+            )}
           </div>
 
           {/* Briefing — FM-style staff notes from around the club */}
