@@ -71,6 +71,7 @@ export type EngineSettings = {
   retentionMaxPct: number;    // max salary a team can retain in a trade
   retentionMinSalary: number; // new team must carry at least this
   retentionMaxPlayers: number;// max retained players per team
+  clausesEnabled: boolean;    // enforce NTC / NMC / M-NTC contract clauses in trades (off = no-CBA league)
   rosterOverFinePerDay: number; // fine per excess player per day
   rewardPlayoff: number;      // to bank on making the playoffs
   rewardCup: number;          // Stanley Cup winner bonus
@@ -163,7 +164,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   playoffFormat: "division", playoffTeamsPerConf: 8, playoffBestOf: 7,
   salaryCapUpper: 85900000, salaryCapLower: 51500000,
   buyoutPctSeason: 50, buyoutPctOffseason: 35,
-  retentionMaxPct: 50, retentionMinSalary: 600000, retentionMaxPlayers: 3,
+  retentionMaxPct: 50, retentionMinSalary: 600000, retentionMaxPlayers: 3, clausesEnabled: true,
   rosterOverFinePerDay: 200000,
   rewardPlayoff: 8000000, rewardCup: 3000000, rewardAhlCup: 4000000, rewardAhlFinalist: 2000000,
   duHighThreshold: 90, conRecovery: 1, conRecoveryHighDu: 2,

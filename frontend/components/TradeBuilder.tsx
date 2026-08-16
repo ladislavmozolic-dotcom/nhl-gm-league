@@ -5,10 +5,12 @@ import Link from "next/link";
 import { money } from "@/lib/finance";
 import type { TradePackage } from "@/app/trades/build/actions";
 
-type Player = { id: number; name: string; position: string; capHit: number; farm: boolean };
+type Player = { id: number; name: string; position: string; capHit: number; farm: boolean; clause?: string | null; noTradeTeams?: number[] };
 type Pick = { id: number; label: string };
 type Assets = { players: Player[]; picks: Pick[]; prospects: Pick[] };
 type Team = { id: number; name: string };
+
+const clauseTag = (c?: string | null) => c === "NMC" ? "NMC" : c === "M_NTC" ? "M-NTC" : c === "NTC" ? "NTC" : null;
 
 export default function TradeBuilder({ me, opp, mine, theirs, onPropose }: {
   me: Team; opp: Team; mine: Assets; theirs: Assets;
@@ -22,7 +24,9 @@ export default function TradeBuilder({ me, opp, mine, theirs, onPropose }: {
   const [theirsPro, setTheirsPro] = useState<Set<number>>(new Set());
   const [mineCash, setMineCash] = useState(0);
   const [theirsCash, setTheirsCash] = useState(0);
+  const [waived, setWaived] = useState<Set<number>>(new Set());
   const [condition, setCondition] = useState("");
+  const toggleWaive = (id: number) => setWaived((w) => { const n = new Set(w); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -38,8 +42,8 @@ export default function TradeBuilder({ me, opp, mine, theirs, onPropose }: {
     const n = new Set(set); if (n.has(id)) n.delete(id); else n.add(id); setter(n); setMsg(null);
   };
 
-  const PlayerTable = ({ title, list, pmap, setPmap }: {
-    title: string; list: Player[]; pmap: Record<number, number>; setPmap: (v: Record<number, number>) => void;
+  const PlayerTable = ({ title, list, pmap, setPmap, destTeamId }: {
+    title: string; list: Player[]; pmap: Record<number, number>; setPmap: (v: Record<number, number>) => void; destTeamId: number;
   }) => (
     <div className="bg-slate-900/40 border border-slate-800 rounded-lg overflow-hidden">
       <div className="px-3 py-2 bg-slate-800/40 text-xs font-bold uppercase tracking-wide text-slate-400">{title} ({list.length})</div>
@@ -47,13 +51,23 @@ export default function TradeBuilder({ me, opp, mine, theirs, onPropose }: {
         {list.length === 0 && <div className="px-3 py-3 text-slate-600 text-sm">none</div>}
         {list.map((p) => {
           const on = p.id in pmap;
+          const tag = clauseTag(p.clause);
+          const needsWaiver = !!p.clause && (p.clause !== "M_NTC" || (p.noTradeTeams ?? []).includes(destTeamId));
           return (
             <div key={p.id} className={`px-3 py-2 ${on ? "bg-blue-950/30" : ""}`}>
               <label className="flex items-center gap-2.5 cursor-pointer">
                 <input type="checkbox" checked={on} onChange={() => togglePlayer(pmap, setPmap, p.id)} className="accent-blue-500 w-4 h-4" />
-                <span className="flex-1 truncate">{p.name} <span className="text-slate-500 text-xs">{p.position}</span></span>
+                <span className="flex-1 truncate">{p.name} <span className="text-slate-500 text-xs">{p.position}</span>{tag && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30">{tag}</span>}</span>
                 <span className="text-slate-400 tabular-nums text-sm">{money(p.capHit)}</span>
               </label>
+              {on && needsWaiver && (
+                <label className="flex items-center gap-2 mt-2 ml-6.5 text-xs cursor-pointer">
+                  <input type="checkbox" checked={waived.has(p.id)} onChange={() => toggleWaive(p.id)} className="accent-amber-500 w-3.5 h-3.5" />
+                  <span className={waived.has(p.id) ? "text-amber-300" : "text-rose-400"}>
+                    {waived.has(p.id) ? `Waives his ${tag} to be dealt` : `⚠ ${tag} — must waive to complete this trade`}
+                  </span>
+                </label>
+              )}
               {on && p.capHit > 0 && (
                 <div className="flex items-center gap-3 mt-2.5 ml-6.5 text-xs text-slate-400 flex-wrap">
                   <span className="font-medium">Salary Retention</span>
@@ -96,15 +110,15 @@ export default function TradeBuilder({ me, opp, mine, theirs, onPropose }: {
     </div>
   );
 
-  const Side = ({ team, assets, pmap, setPmap, pk, setPk, pro, setPro, cash, setCash }: {
+  const Side = ({ team, assets, pmap, setPmap, pk, setPk, pro, setPro, cash, setCash, destTeamId }: {
     team: Team; assets: Assets; pmap: Record<number, number>; setPmap: (v: Record<number, number>) => void;
     pk: Set<number>; setPk: (s: Set<number>) => void; pro: Set<number>; setPro: (s: Set<number>) => void;
-    cash: number; setCash: (n: number) => void;
+    cash: number; setCash: (n: number) => void; destTeamId: number;
   }) => (
     <div className="space-y-3">
       <div className="text-center font-bold">{team.name} sends</div>
-      <PlayerTable title="NHL players" list={assets.players.filter((p) => !p.farm)} pmap={pmap} setPmap={setPmap} />
-      <PlayerTable title="AHL players" list={assets.players.filter((p) => p.farm)} pmap={pmap} setPmap={setPmap} />
+      <PlayerTable title="NHL players" list={assets.players.filter((p) => !p.farm)} pmap={pmap} setPmap={setPmap} destTeamId={destTeamId} />
+      <PlayerTable title="AHL players" list={assets.players.filter((p) => p.farm)} pmap={pmap} setPmap={setPmap} destTeamId={destTeamId} />
       <CheckTable title="Prospects" icon="⭐" list={assets.prospects} sel={pro} setSel={setPro} />
       <CheckTable title="Draft picks" icon="🎫" list={assets.picks} sel={pk} setSel={setPk} />
       <div className="bg-slate-900/40 border border-slate-800 rounded-lg px-3 py-2.5 flex items-center gap-2 text-sm">
@@ -127,10 +141,10 @@ export default function TradeBuilder({ me, opp, mine, theirs, onPropose }: {
         toPlayers: Object.entries(theirsP).map(([id, pct]) => ({ playerId: Number(id), retentionPct: pct })),
         fromPicks: [...minePk], toPicks: [...theirsPk],
         fromProspects: [...minePro], toProspects: [...theirsPro],
-        fromCash: mineCash, toCash: theirsCash, condition,
+        fromCash: mineCash, toCash: theirsCash, condition, waived: [...waived],
       });
       setMsg(`Trade proposed to ${opp.name} (#${r.tradeId}). Awaiting their GM's response.`);
-      setMineP({}); setTheirsP({}); setMinePk(new Set()); setTheirsPk(new Set()); setMinePro(new Set()); setTheirsPro(new Set()); setMineCash(0); setTheirsCash(0);
+      setMineP({}); setTheirsP({}); setMinePk(new Set()); setTheirsPk(new Set()); setMinePro(new Set()); setTheirsPro(new Set()); setMineCash(0); setTheirsCash(0); setWaived(new Set());
     } catch (e) { setErr((e as Error).message); }
   });
 
@@ -144,8 +158,8 @@ export default function TradeBuilder({ me, opp, mine, theirs, onPropose }: {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Side team={me} assets={mine} pmap={mineP} setPmap={setMineP} pk={minePk} setPk={setMinePk} pro={minePro} setPro={setMinePro} cash={mineCash} setCash={setMineCash} />
-        <Side team={opp} assets={theirs} pmap={theirsP} setPmap={setTheirsP} pk={theirsPk} setPk={setTheirsPk} pro={theirsPro} setPro={setTheirsPro} cash={theirsCash} setCash={setTheirsCash} />
+        <Side team={me} assets={mine} pmap={mineP} setPmap={setMineP} pk={minePk} setPk={setMinePk} pro={minePro} setPro={setMinePro} cash={mineCash} setCash={setMineCash} destTeamId={opp.id} />
+        <Side team={opp} assets={theirs} pmap={theirsP} setPmap={setTheirsP} pk={theirsPk} setPk={setTheirsPk} pro={theirsPro} setPro={setTheirsPro} cash={theirsCash} setCash={setTheirsCash} destTeamId={me.id} />
       </div>
 
       <div className="mt-4">

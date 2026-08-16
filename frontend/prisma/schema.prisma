@@ -132,6 +132,8 @@ model Player {
   injuryDesc           String?
   captaincy            String?       // "C" | "A" | null
   contractType         String?       // "ONE_WAY" | "TWO_WAY" (one-way can't be sent to farm)
+  tradeClause          String?       // null | "NTC" (no-trade) | "NMC" (no-movement) | "M_NTC" (modified — blocks the teams in noTradeTeams)
+  noTradeTeams         Int[]         // for M_NTC: team ids the player won't accept a trade to
   profinhlTeamId       Int?          // snapshot of the ProfiNHL assignment (for roster switching)
   profinhlRosterType   String?
   realTeamId           Int?          // the player's real current NHL team (from the NHL API)
@@ -188,6 +190,7 @@ model Trade {
   condition   String?
   respondedAt DateTime?
   createdAt   DateTime @default(now())
+  waivedClauses Int[]  // player ids whose NTC/NMC/M-NTC was waived to allow this deal
 }
 
 model LeagueConfig {
