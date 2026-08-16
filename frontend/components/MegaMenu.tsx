@@ -40,6 +40,7 @@ const menuItems: MenuItem[] = [
       { label: "Finance (bank & income)", href: "/finance" },
       { label: "Salary Cap (Cap Central)", href: "/salary-cap" },
       { label: "Fan Interest", href: "/finance/fan-interest" },
+      { label: "Season Tickets", href: "/finance/season-tickets" },
     ],
   },
   {
