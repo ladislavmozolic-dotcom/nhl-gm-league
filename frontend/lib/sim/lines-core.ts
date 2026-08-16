@@ -95,8 +95,15 @@ type Goalie = { id: number; overall: number };
 
 const isLWpos = (p: string) => p.includes("LW") || /(^|\/)L(\/|$)/.test(p);
 const isRWpos = (p: string) => p.includes("RW") || /(^|\/)R(\/|$)/.test(p);
+const isGenericF = (p: string) => /(^|\/)F(\/|$)/.test(p); // a listed generic forward
 const isGenericW = (p: string) => /(^|\/)(W|F)(\/|$)/.test(p);
 const isWinger = (p: string) => isLWpos(p) || isRWpos(p) || isGenericW(p);
+// Slot eligibility — a player is only auto-placed where his listed position allows.
+// A pure centre ("C") never fills a wing; a pure winger never fills centre. A
+// generic F/W can slot anywhere up front.
+const canCenter = (p: string) => isC(p) || isGenericF(p);
+const canLeft = (p: string) => isLWpos(p) || isGenericW(p);
+const canRight = (p: string) => isRWpos(p) || isGenericW(p);
 // a forward's natural wing side (generic wingers / centers fall back to shoots)
 const wingSide = (s: Skater): "L" | "R" => {
   const p = (s.position || "").toUpperCase();
@@ -120,18 +127,22 @@ export function autoLines(skaters: Skater[], goalies: Goalie[] = []): TeamLinesD
     for (const p of pools) { const s = best(p); if (s) { used.add(s.id); return s.id; } }
     return null;
   };
-  const centers = fwd.filter((s) => isC(s.position));
-  const leftW = fwd.filter((s) => isWinger(s.position) && wingSide(s) === "L");
-  const rightW = fwd.filter((s) => isWinger(s.position) && wingSide(s) === "R");
+  const centers = fwd.filter((s) => canCenter(s.position));
+  const leftW = fwd.filter((s) => canLeft(s.position) && wingSide(s) === "L");
+  const rightW = fwd.filter((s) => canRight(s.position) && wingSide(s) === "R");
+  const anyLeft = fwd.filter((s) => canLeft(s.position));   // includes RW/LW & generic
+  const anyRight = fwd.filter((s) => canRight(s.position));
   const leftD = def.filter((s) => dSide(s) === "L");
   const rightD = def.filter((s) => dSide(s) === "R");
 
   const forwardLines: ForwardLine[] = [];
   for (let i = 0; i < 4; i++) {
-    // C first (protect natural centers), then wings on their side, then off-position from any forward
-    const c = take(centers, fwd);
-    const lw = take(leftW, rightW, fwd);
-    const rw = take(rightW, leftW, fwd);
+    // strictly position-aware: C only from centre-eligible, wings only from
+    // wing-eligible (natural side first). A slot with no eligible player stays
+    // empty — a call-up prompt — rather than icing a man out of position.
+    const c = take(centers);
+    const lw = take(leftW, anyLeft);
+    const rw = take(rightW, anyRight);
     forwardLines.push({ lw, c, rw, timePct: F_TIME[i], tactic: { ...F_TACTIC[i] } });
   }
   const defensePairs: DefensePair[] = [];
@@ -162,18 +173,23 @@ export function autoFill(data: TeamLinesData, skaters: Skater[], goalies: Goalie
   const all = [...skaters].sort((a, b) => b.overall - a.overall);
   const gk = [...goalies].sort((a, b) => b.overall - a.overall);
 
-  // forwards: each forward appears at most once across all four lines
+  // forwards: each forward appears at most once across all four lines, and only
+  // in a slot his listed position allows (a centre is never dropped onto a wing).
   const fUsed = new Set<number>();
   for (const l of d.forwardLines) for (const id of [l.lw, l.c, l.rw]) if (id != null) fUsed.add(id);
-  const pickF = () => {
-    const p = fwd.find((f) => !fUsed.has(f.id));
-    if (p) { fUsed.add(p.id); return p.id; }
+  const pickF = (...pools: Skater[][]) => {
+    for (const pool of pools) { const p = pool.find((f) => !fUsed.has(f.id)); if (p) { fUsed.add(p.id); return p.id; } }
     return null;
   };
+  const centers = fwd.filter((s) => canCenter(s.position));
+  const leftNatural = fwd.filter((s) => canLeft(s.position) && wingSide(s) === "L");
+  const rightNatural = fwd.filter((s) => canRight(s.position) && wingSide(s) === "R");
+  const anyLeft = fwd.filter((s) => canLeft(s.position));
+  const anyRight = fwd.filter((s) => canRight(s.position));
   for (const line of d.forwardLines) {
-    if (line.lw == null) line.lw = pickF();
-    if (line.c == null) line.c = pickF();
-    if (line.rw == null) line.rw = pickF();
+    if (line.c == null) line.c = pickF(centers);
+    if (line.lw == null) line.lw = pickF(leftNatural, anyLeft);
+    if (line.rw == null) line.rw = pickF(rightNatural, anyRight);
   }
 
   // defense: each blue-liner used at most once across the three pairs

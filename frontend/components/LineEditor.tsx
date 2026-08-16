@@ -94,7 +94,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
       className="w-full min-w-[132px] bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-sm">
       <option value="">— empty —</option>
       {value != null && !pool.some((p) => p.id === value) && <option value={value}>{nameOf(value)}</option>}
-      {pool.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.overall})</option>)}
+      {pool.map((p) => <option key={p.id} value={p.id}>{p.name} · {p.position} ({p.overall})</option>)}
     </select>
   );
 
