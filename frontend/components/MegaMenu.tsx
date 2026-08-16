@@ -27,6 +27,7 @@ const menuItems: MenuItem[] = [
     children: [
       { label: "Trade Room", href: "/trades/build" },
       { label: "Trade Block", href: "/trade-block" },
+      { label: "Waiver Wire", href: "/waivers" },
       { label: "Trade tracker", href: "/trades" },
       { label: "Transactions", href: "/transactions" },
     ],

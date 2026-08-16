@@ -194,6 +194,28 @@ model Trade {
   clauseFees  Json?    // [{ playerId, feeAmount, payTeamId }] — agent-set waiver fees the giving team pays the player
 }
 
+model Waiver {
+  id             Int      @id @default(autoincrement())
+  playerId       Int      @unique          // one active waiver per player
+  fromTeamId     Int                        // the club that placed him (pays him until resolution)
+  placedDay      Int                        // roundForDate(leagueDate) when placed — clears the next day
+  status         String   @default("ACTIVE") // ACTIVE | CLAIMED | CLEARED | CANCELLED
+  claimedByTeamId Int?
+  createdAt      DateTime @default(now())
+  resolvedAt     DateTime?
+  claims         WaiverClaim[]
+  @@index([status])
+}
+
+model WaiverClaim {
+  id        Int      @id @default(autoincrement())
+  waiverId  Int
+  teamId    Int
+  createdAt DateTime @default(now())
+  waiver    Waiver   @relation(fields: [waiverId], references: [id], onDelete: Cascade)
+  @@unique([waiverId, teamId])
+}
+
 model LeagueConfig {
   id              Int      @id @default(1)
   rosterMode      String   @default("profinhl") // profinhl | real

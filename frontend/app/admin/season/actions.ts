@@ -13,7 +13,8 @@ import { commissionerName } from "@/lib/audit-server";
 import { loadSettings } from "@/lib/sim/settings";
 import { autoFillRosters } from "@/lib/roster-fill";
 import { getLeagueDate } from "@/lib/calendar-server";
-import { addDays, utcDay, phaseFor, effectivePhase, PHASES, seasonOpen, defaultLeagueDate, frenzyRound } from "@/lib/calendar";
+import { addDays, utcDay, phaseFor, effectivePhase, PHASES, seasonOpen, defaultLeagueDate, frenzyRound, roundForDate } from "@/lib/calendar";
+import { processWaivers } from "@/lib/waivers-server";
 import { resolveFrenzy, processRoundEnd } from "@/app/free-agents/actions";
 import { checkPromises } from "@/lib/promises";
 import { autoImportUpcomingClass } from "@/lib/draft-class-import";
@@ -62,6 +63,8 @@ export async function advanceLeagueDayAction() {
   }
   // ice-time promise check (self-gates to the regular season past 1/3)
   const promises = await checkPromises();
+  // waivers: resolve any whose one-day window closed (claimed by priority, else clear to AHL)
+  const waivers = await processWaivers(roundForDate(next));
   // Free Agent Frenzy round transitions (3 weekly rounds). Crossing a week
   // boundary inside the window runs counters / shortlisting; leaving the window
   // (end of round 3) signs everyone's best offer.
@@ -85,8 +88,8 @@ export async function advanceLeagueDayAction() {
   await prisma.leagueConfig.upsert({
     where: { id: 1 }, update: { leagueDate: next }, create: { id: 1, leagueDate: next },
   });
-  for (const p of ["/calendar", "/schedule", "/standings", "/scores", "/admin/season", "/finance", "/free-agents", "/signings", "/"]) revalidatePath(p);
-  return { date: next, phase: ph(next), played, signed, warned: promises.warned, requested: promises.requested, capOffenders };
+  for (const p of ["/calendar", "/schedule", "/standings", "/scores", "/admin/season", "/finance", "/free-agents", "/signings", "/waivers", "/"]) revalidatePath(p);
+  return { date: next, phase: ph(next), played, signed, warned: promises.warned, requested: promises.requested, capOffenders, waiverClaims: waivers.claimed, waiverClears: waivers.cleared };
 }
 
 /** Admin: jump the league clock to an explicit date (YYYY-MM-DD). */
