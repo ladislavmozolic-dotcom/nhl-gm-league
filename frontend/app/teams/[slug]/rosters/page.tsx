@@ -20,7 +20,7 @@ export default async function RostersPage({ params }: { params: Promise<{ slug: 
 
   const players = await prisma.player.findMany({
     where: { teamId: { in: orgTeamIds } },
-    select: { id: true, name: true, position: true, overall: true, isGoalie: true, rosterType: true, contractType: true, capHit: true, teamId: true },
+    select: { id: true, name: true, position: true, overall: true, isGoalie: true, rosterType: true, contractType: true, capHit: true, scratched: true, teamId: true },
     orderBy: [{ isGoalie: "asc" }, { overall: "desc" }],
   });
 
@@ -33,7 +33,7 @@ export default async function RostersPage({ params }: { params: Promise<{ slug: 
       players={players.map((p) => ({
         id: p.id, name: p.name, position: p.position, overall: p.overall ?? 0,
         isGoalie: p.isGoalie,
-        side: p.rosterType === "AHL" ? "farm" : "pro",
+        side: (p.rosterType === "AHL" ? (p.scratched ? "scratched" : "farm") : "pro") as "pro" | "farm" | "scratched",
         contractType: (p.contractType as "ONE_WAY" | "TWO_WAY" | null) ?? null,
         capHit: p.capHit ?? 0,
       }))}

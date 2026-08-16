@@ -103,6 +103,7 @@ model Player {
   overall              Int?
   contractText         String?
   rosterType           String?
+  scratched            Boolean       @default(false) // AHL org player beyond the active AHL roster — a healthy scratch, dresses nowhere
   retiredSeason        String?       // season the player retired (rosterType=RETIRED) — for Hall of Fame / career close
   hofSeason            String?       // season inducted into the Hall of Fame (null = not inducted)
   onBlock              Boolean       @default(false) // GM has listed this player on the Trade Block

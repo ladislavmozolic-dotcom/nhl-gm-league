@@ -28,13 +28,18 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
   const byName = (a: Player, b: Player) => a.name.localeCompare(b.name);
   const pro = rows.filter((r) => r.side === "pro").sort(byName);
   const farm = rows.filter((r) => r.side === "farm").sort(byName);
+  const scratched = rows.filter((r) => r.side === "scratched").sort(byName);
   const goalies = (l: Player[]) => l.filter((p) => p.isGoalie).length;
   const proSkaters = pro.length - goalies(pro);
 
-  const move = (id: number, to: "pro" | "farm") => {
+  // is a move legal? (down = to the farm or the scratch list)
+  const canMove = (p: Player, to: RosterSide) => {
+    if (to === "pro") return !isAhlOnly(p);                             // minor-league deal can't be iced in the NHL
+    return p.contractType !== "ONE_WAY" || isAhlOnly(p);               // one-way can't be buried in the minors
+  };
+  const move = (id: number, to: RosterSide) => {
     const p = rows.find((r) => r.id === id)!;
-    if (to === "farm" && p.contractType === "ONE_WAY" && !isAhlOnly(p)) return; // one-way can't be buried
-    if (to === "pro" && isAhlOnly(p)) return; // AHL-only minor-league deal can't be called up
+    if (!canMove(p, to)) return;
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, side: to } : r)));
     setSaved(false); setErr(null);
   };
@@ -59,9 +64,14 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
     catch (e) { setErr((e as Error).message); }
   });
 
+  const MoveBtn = ({ p, to, label }: { p: Player; to: RosterSide; label: string }) => (
+    <button onClick={() => move(p.id, to)} disabled={!canMove(p, to)}
+      title={!canMove(p, to) ? (to === "pro" ? "AHL-only contract — can't be called up" : "One-way contracts can't be sent down") : ""}
+      className="text-[11px] px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-30 whitespace-nowrap">{label}</button>
+  );
+
   const Row = ({ p }: { p: Player }) => {
     const oneWay = p.contractType === "ONE_WAY";
-    const toFarm = p.side === "pro";
     const ahlOnly = isAhlOnly(p);
     return (
       <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-800/60 text-sm hover:bg-slate-800/30">
@@ -78,12 +88,11 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
             {oneWay ? "1-way" : "2-way"}
           </button>
         )}
-        <button onClick={() => move(p.id, toFarm ? "farm" : "pro")}
-          disabled={(toFarm && oneWay && !ahlOnly) || (!toFarm && ahlOnly)}
-          title={ahlOnly ? "AHL-only contract — can't be called up" : toFarm && oneWay ? "One-way contracts can't be sent to the farm" : ""}
-          className="text-xs px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-30">
-          {toFarm ? "→ Farm" : "→ Pro"}
-        </button>
+        <div className="flex items-center gap-1 shrink-0">
+          {p.side !== "pro" && <MoveBtn p={p} to="pro" label="↑ Pro" />}
+          {p.side !== "farm" && <MoveBtn p={p} to="farm" label={p.side === "pro" ? "↓ Farm" : "Dress"} />}
+          {p.side !== "scratched" && <MoveBtn p={p} to="scratched" label="Scratch" />}
+        </div>
       </div>
     );
   };
@@ -115,7 +124,7 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
           <Link href={`/teams/${teamSlug}/lines`} className="text-slate-400 hover:text-blue-400">Lines →</Link>
           <Link href={`/teams/${teamSlug}/roster/edit`} className="text-slate-400 hover:text-blue-400">Numbers &amp; captains →</Link>
         </div>
-        <p className="text-xs text-slate-500 mt-1">Move players between the pro (NHL) and farm (AHL) rosters. One-way contracts can't go to the farm.</p>
+        <p className="text-xs text-slate-500 mt-1">Move players across the NHL roster, the AHL (farm) roster and the Scratched list. One-way contracts can&apos;t be sent down; AHL-only minor-league deals can&apos;t be called up. <b>Scratched</b> = org players beyond the active AHL roster — they dress nowhere.</p>
       </div>
 
       {blockers.length > 0 && (
@@ -125,11 +134,12 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
         <div className="mb-4 text-sm text-amber-300/90 bg-amber-950/30 border border-amber-800/40 rounded-lg px-4 py-2">{warnings.join(" ")}</div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Col title={`Pro — ${teamName}`} warn={pro.length > ROSTER_LIMITS.proMax || proSkaters < ROSTER_LIMITS.proMinSkaters || goalies(pro) < ROSTER_LIMITS.proMinGoalies}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Col title={`NHL — ${teamName}`} warn={pro.length > ROSTER_LIMITS.proMax || proSkaters < ROSTER_LIMITS.proMinSkaters || goalies(pro) < ROSTER_LIMITS.proMinGoalies}
           sub={`${pro.length}/${ROSTER_LIMITS.proMax} · ${proSkaters} skaters · ${goalies(pro)} G (need 18+2)`} list={pro} />
-        <Col title={`Farm — ${affiliateName}`} warn={rows.length > ROSTER_LIMITS.orgMax || orgGoalies > ROSTER_LIMITS.orgMaxGoalies}
-          sub={`${farm.length} on farm · org ${rows.length}/${ROSTER_LIMITS.orgMax}, ${orgGoalies}/${ROSTER_LIMITS.orgMaxGoalies} G`} list={farm} />
+        <Col title={`Farm — ${affiliateName}`} warn={farm.length > ROSTER_LIMITS.ahlMax}
+          sub={`${farm.length}/${ROSTER_LIMITS.ahlMax} active${farm.length > ROSTER_LIMITS.ahlMax ? " — scratch the overflow" : ""}`} list={farm} />
+        <Col title="Scratched" sub={`${scratched.length} healthy scratch${scratched.length === 1 ? "" : "es"} · org ${rows.length}/${ROSTER_LIMITS.orgMax}`} list={scratched} />
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 bg-slate-950/90 border-t border-slate-800 backdrop-blur px-4 py-3">

@@ -38,8 +38,9 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
   // (a player currently on the NHL roster moving to the farm). One-way players
   // already sitting on the farm are grandfathered, so they don't block unrelated
   // moves like a call-up.
-  const illegalFarm = farm.find((m) => m.contractType === "ONE_WAY" && byId.get(m.id)!.rosterType === "NHL");
-  if (illegalFarm) throw new Error("A one-way contract player cannot be sent to the farm.");
+  const goingDown = valid.filter((m) => m.side === "farm" || m.side === "scratched");
+  const illegalFarm = goingDown.find((m) => m.contractType === "ONE_WAY" && byId.get(m.id)!.rosterType === "NHL");
+  if (illegalFarm) throw new Error("A one-way contract player cannot be sent down.");
 
   // Only HARD maxima block a save. Being under a minimum (short-handed pro roster)
   // is allowed — the farm auto-fills the missing bodies before each game, and a
@@ -54,6 +55,7 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
       data: {
         teamId: m.side === "pro" ? team.id : affiliate.id,
         rosterType: m.side === "pro" ? "NHL" : "AHL",
+        scratched: m.side === "scratched",
         contractType: m.contractType,
       },
     })));
