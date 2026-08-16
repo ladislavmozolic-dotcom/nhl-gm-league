@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { getTeamSession } from "@/lib/auth";
+import { canManageTeam } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { ROSTER_LIMITS, type MoveRow } from "@/lib/roster-rules";
 
@@ -11,8 +11,7 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
     include: { affiliateTeams: { select: { id: true } } },
   });
   if (!team) throw new Error("Team not found");
-  const session = await getTeamSession();
-  if (session !== team.id) throw new Error("Not authorized for this team");
+  if (!(await canManageTeam(team.id))) throw new Error("Not authorized for this team");
   const affiliate = team.affiliateTeams[0];
   if (!affiliate) throw new Error("Team has no affiliate to move players to");
 

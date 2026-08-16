@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { notFound, redirect } from "next/navigation";
-import { getTeamSession } from "@/lib/auth";
+import { canManageTeam } from "@/lib/auth";
 import RosterEditor from "@/components/RosterEditor";
 import { saveRoster } from "../actions";
 
@@ -10,8 +10,7 @@ export default async function RosterPage({ params }: { params: Promise<{ slug: s
   const { slug } = await params;
   const team = await prisma.team.findUnique({ where: { slug } });
   if (!team) notFound();
-  const session = await getTeamSession();
-  if (session !== team.id) redirect(`/teams/${slug}/login`);
+  if (!(await canManageTeam(team.id))) redirect(`/teams/${slug}/login`);
 
   const players = await prisma.player.findMany({
     where: { teamId: team.id, rosterType: "NHL" },

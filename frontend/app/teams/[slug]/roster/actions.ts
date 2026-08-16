@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { getTeamSession } from "@/lib/auth";
+import { canManageTeam } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
 export type RosterRow = { id: number; number: number | null; captaincy: "C" | "A" | null };
@@ -9,8 +9,7 @@ export type RosterRow = { id: number; number: number | null; captaincy: "C" | "A
 export async function saveRoster(slug: string, rows: RosterRow[]) {
   const team = await prisma.team.findUnique({ where: { slug }, select: { id: true } });
   if (!team) throw new Error("Team not found");
-  const session = await getTeamSession();
-  if (session !== team.id) throw new Error("Not authorized for this team");
+  if (!(await canManageTeam(team.id))) throw new Error("Not authorized for this team");
 
   // enforce 1 captain, max 2 alternates
   const caps = rows.filter((r) => r.captaincy === "C").length;

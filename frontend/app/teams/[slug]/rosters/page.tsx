@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { notFound, redirect } from "next/navigation";
-import { getTeamSession } from "@/lib/auth";
+import { canManageTeam } from "@/lib/auth";
 import RosterMover from "@/components/RosterMover";
 import { saveRosterMoves } from "./actions";
 
@@ -13,8 +13,7 @@ export default async function RostersPage({ params }: { params: Promise<{ slug: 
     include: { affiliateTeams: { select: { id: true, name: true } } },
   });
   if (!team) notFound();
-  const session = await getTeamSession();
-  if (session !== team.id) redirect(`/teams/${slug}/login`);
+  if (!(await canManageTeam(team.id))) redirect(`/teams/${slug}/login`);
 
   const affiliate = team.affiliateTeams[0] ?? null;
   const orgTeamIds = [team.id, ...(affiliate ? [affiliate.id] : [])];

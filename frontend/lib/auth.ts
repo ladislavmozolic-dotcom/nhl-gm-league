@@ -63,12 +63,18 @@ export async function isComishTier(): Promise<boolean> {
   return !!t?.isAdmin || ["comish", "co_comish", "agent"].includes(t?.gmRole ?? "gm");
 }
 
-/** May the current session manage `teamId`? True for that team's own GM, or for
- *  any admin GM (who can edit every team's lines/tactics from the Admin panel). */
+/** May the current session manage `teamId`? True for that team's own GM, for any
+ *  admin GM (who can edit every team from the Admin panel), or for the GM of the
+ *  parent NHL club when `teamId` is its AHL affiliate — the farm is managed with
+ *  the main club's login, not a separate one. */
 export async function canManageTeam(teamId: number): Promise<boolean> {
   const id = await getTeamSession();
   if (id == null) return false;
   if (id === teamId) return true;
-  const t = await prisma.team.findUnique({ where: { id }, select: { isAdmin: true } });
-  return !!t?.isAdmin;
+  const [me, target] = await Promise.all([
+    prisma.team.findUnique({ where: { id }, select: { isAdmin: true } }),
+    prisma.team.findUnique({ where: { id: teamId }, select: { parentTeamId: true } }),
+  ]);
+  if (me?.isAdmin) return true;
+  return target?.parentTeamId === id; // I'm the parent club of this affiliate
 }
