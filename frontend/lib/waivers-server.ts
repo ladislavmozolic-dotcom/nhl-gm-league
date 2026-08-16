@@ -44,6 +44,7 @@ export async function placeOnWaivers(playerId: number, actorTeamId: number): Pro
   if (p.teamId !== actorTeamId) return { ok: false, error: "That player isn't on your team." };
   if (p.rosterType !== "NHL") return { ok: false, error: "Only an NHL player goes through waivers." };
   const settings = await loadSettings();
+  if (!settings.waiversEnabled) return { ok: false, error: "Waivers are turned off in this league — send players down freely from the roster mover." };
   if (settings.clausesEnabled && p.tradeClause === "NMC") return { ok: false, error: `${cleanName(p.name)} has a no-movement clause — he can't be waived.` };
   const existing = await prisma.waiver.findUnique({ where: { playerId } });
   if (existing && existing.status === "ACTIVE") return { ok: false, error: "He's already on waivers." };

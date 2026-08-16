@@ -22,9 +22,11 @@ export async function advanceFrenzyDay() {
   const next = addDays(cur, 1);
   const { resolveFrenzy, processRoundEnd } = await import("../../app/free-agents/actions");
   let signed = 0, roundEnded = 0, osSigned = 0;
-  // offer sheets are decided by July 10 — resolve them once, as the clock crosses
-  // day 10 (or leaves the frenzy earlier).
-  if (ph(cur) === "frenzy" && frenzyDay(cur) <= 10 && (frenzyDay(next) > 10 || ph(next) !== "frenzy")) {
+  // offer sheets are decided by the commissioner-set day — resolve them once, as
+  // the clock crosses that day (or leaves the frenzy earlier).
+  const { loadSettings } = await import("../sim/settings");
+  const osDay = (await loadSettings()).osDecisionDay;
+  if (ph(cur) === "frenzy" && frenzyDay(cur) <= osDay && (frenzyDay(next) > osDay || ph(next) !== "frenzy")) {
     const { resolveOfferSheets } = await import("../offer-sheet-server");
     osSigned = (await resolveOfferSheets()).signed;
   }

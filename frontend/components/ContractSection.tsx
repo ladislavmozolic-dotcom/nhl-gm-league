@@ -5,6 +5,7 @@ import ReSignPanel from "@/components/ReSignPanel";
 import ElcApplyButton from "@/components/ElcApplyButton";
 import { computeELC } from "@/lib/elc";
 import { faPosGroup } from "@/lib/free-agency";
+import { loadSettings } from "@/lib/sim/settings";
 import { cleanName } from "@/lib/playerName";
 
 // A player entering his final year is up for renewal. Status by age (our rule):
@@ -27,6 +28,7 @@ const META: Record<Group, { title: string; blurb: string; accent: string }> = {
 
 export default async function ContractSection({ teamId }: { teamId: number }) {
   const canManage = await canManageTeam(teamId);
+  const franchiseEnabled = (await loadSettings()).faMode === "full";
   // include the club's AHL/farm players whose deals are up too
   const org = await prisma.team.findUnique({ where: { id: teamId }, select: { affiliateTeams: { select: { id: true } } } });
   const orgIds = [teamId, ...(org?.affiliateTeams.map((a) => a.id) ?? [])];
@@ -87,7 +89,7 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
 
       {(["UFA", "RFA"] as Group[]).map((g) =>
         groups[g].length === 0 ? null : canManage ? (
-          <ReSignPanel key={g} teamId={teamId} title={META[g].title} blurb={META[g].blurb} accent={META[g].accent} group={g}
+          <ReSignPanel key={g} teamId={teamId} title={META[g].title} blurb={META[g].blurb} accent={META[g].accent} group={g} franchiseEnabled={franchiseEnabled}
             players={groups[g].map((p) => ({ id: p.id, name: p.name, capHit: p.capHit, contractYears: p.contractYears, contractText: p.contractText, farm: p.rosterType === "AHL", franchiseTag: p.franchiseTag }))} />
         ) : (
           <Card key={g} title={`${META[g].title} (${groups[g].length})`} accent={META[g].accent}>

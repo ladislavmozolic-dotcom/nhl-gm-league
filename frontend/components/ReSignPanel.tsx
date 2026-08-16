@@ -171,8 +171,8 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
   );
 }
 
-export default function ReSignPanel({ teamId, players, title, blurb, accent = "text-amber-400", group }: {
-  teamId: number; players: ExpiringPlayer[]; title?: string; blurb?: string; accent?: string; group?: string;
+export default function ReSignPanel({ teamId, players, title, blurb, accent = "text-amber-400", group, franchiseEnabled = true }: {
+  teamId: number; players: ExpiringPlayer[]; title?: string; blurb?: string; accent?: string; group?: string; franchiseEnabled?: boolean;
 }) {
   const [tagPending, startTag] = useTransition();
   const [tagged, setTagged] = useState<number | null>(players.find((p) => p.franchiseTag)?.id ?? null);
@@ -192,7 +192,7 @@ export default function ReSignPanel({ teamId, players, title, blurb, accent = "t
   return (
     <Card title={`${title ?? "Expiring Contracts"} (${players.length})`} accent={accent}>
       <p className="text-xs text-slate-500 mb-3">{blurb ?? "These players are entering the final year of their deal. Re-sign them before they reach free agency."}</p>
-      {group === "RFA" && (
+      {group === "RFA" && franchiseEnabled && (
         <p className="text-xs text-slate-500 mb-2">
           <span className="text-fuchsia-300 font-semibold">★ Franchise tag</span> (1 per club)
           <InfoTip text="Tag one RFA as your Franchise player. A franchise RFA gets TWO re-sign rounds before rivals can submit offer sheets; every other RFA gets one round, then he's open to offer sheets. One tag per club at a time." />
@@ -208,7 +208,7 @@ export default function ReSignPanel({ teamId, players, title, blurb, accent = "t
               <span className="text-xs text-slate-500 ml-2">{p.contractText ?? (p.capHit ? `${M(p.capHit)} × ${p.contractYears}yr` : "—")}</span>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              {group === "RFA" && (
+              {group === "RFA" && franchiseEnabled && (
                 <button onClick={() => toggleTag(p.id)} disabled={tagPending}
                   title="Franchise RFA — gets 2 re-sign rounds before offer sheets (1 per club)"
                   className={`px-2 py-1 rounded-md text-xs font-semibold whitespace-nowrap border ${tagged === p.id ? "bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/40" : "bg-slate-800 text-slate-400 border-slate-700 hover:text-fuchsia-300"} disabled:opacity-40`}>

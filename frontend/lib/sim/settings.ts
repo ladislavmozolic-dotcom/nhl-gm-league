@@ -77,6 +77,19 @@ export type EngineSettings = {
   // final tier uses maxAav 0 as "no upper bound". picks = draft rounds owed.
   osCompEnabled: boolean;
   osCompTiers: { maxAav: number; picks: number[] }[];
+  // Free agency & RFA rules (commissioner-tunable limits)
+  faTwoWayOlderAge: number;   // players OVER this age hit the two-way barrier
+  faTwoWayNhlGpLimit: number; // > this many real NHL games last season = established NHLer (refuses a two-way)
+  faTwoWayMaxYears: number;   // longest term a player will sign on a two-way
+  faTwoWayRelaxRound: number; // frenzy round from which a cold-market veteran will settle for a two-way
+  rfaMaxAge: number;          // RFA / franchise-tag / offer-sheet age eligibility (≤ this)
+  osOpenDay: number;          // offer-sheet window opens (off-season day, July 1 = 1)
+  osCloseDay: number;         // offer-sheet window closes
+  osDecisionDay: number;      // offer sheets are decided by this day
+  // Pluggable league systems the commissioner picks
+  faMode: "full" | "simple";        // full = RFA/franchise/offer-sheets; simple = everyone a UFA to the open market
+  financeMode: "base" | "detailed";  // base = ticket-revenue finance; detailed = richer model (pending)
+  waiversEnabled: boolean;           // enforce the waiver wire (claims / re-entry) on demotions
   rosterOverFinePerDay: number; // fine per excess player per day
   rewardPlayoff: number;      // to bank on making the playoffs
   rewardCup: number;          // Stanley Cup winner bonus
@@ -178,6 +191,9 @@ export const DEFAULT_SETTINGS: EngineSettings = {
     { maxAav: 8000000, picks: [1, 1, 1] },  // ≤ $8M → three 1sts
     { maxAav: 0, picks: [1, 1, 1, 1] },     // > $8M → four 1sts
   ],
+  faTwoWayOlderAge: 25, faTwoWayNhlGpLimit: 30, faTwoWayMaxYears: 1, faTwoWayRelaxRound: 2,
+  rfaMaxAge: 26, osOpenDay: 1, osCloseDay: 8, osDecisionDay: 10,
+  faMode: "full", financeMode: "base", waiversEnabled: true,
   rosterOverFinePerDay: 200000,
   rewardPlayoff: 8000000, rewardCup: 3000000, rewardAhlCup: 4000000, rewardAhlFinalist: 2000000,
   duHighThreshold: 90, conRecovery: 1, conRecoveryHighDu: 2,

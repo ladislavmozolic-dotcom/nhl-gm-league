@@ -20,7 +20,18 @@ export default function OfferSheetsPage() {
 
 async function Board() {
   const [clock, settings] = await Promise.all([getLeagueClock(), loadSettings()]);
-  const osWindow = clock.frenzyOpen && clock.frenzyDay >= 1 && clock.frenzyDay <= 8;
+
+  // the simple free-agency system has no RFA rights / offer sheets
+  if (settings.faMode === "simple") {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-6 space-y-5">
+        <PageHeader title="Offer Sheets" subtitle="Restricted free agency" />
+        <Card><p className="text-sm text-slate-400">This league runs the <b>simple</b> free-agency system — there are no RFA rights, franchise tags or offer sheets. Every expiring player becomes an unrestricted free agent and tests the open market in the <b>Free Agent Frenzy</b>. The commissioner can switch to the full system in engine settings.</p></Card>
+      </div>
+    );
+  }
+
+  const osWindow = clock.frenzyOpen && clock.frenzyDay >= settings.osOpenDay && clock.frenzyDay <= settings.osCloseDay;
 
   // the acting club (the logged-in GM's NHL team)
   const sessionId = await getTeamSession();
@@ -31,7 +42,7 @@ async function Board() {
 
   // RFA-age (≤26) players whose deal is ending (final year / expired)
   const rfas = await prisma.player.findMany({
-    where: { rosterType: { in: ["NHL", "AHL"] }, age: { lte: 26 }, contractYears: { not: null, lte: 1 } },
+    where: { rosterType: { in: ["NHL", "AHL"] }, age: { lte: settings.rfaMaxAge }, contractYears: { not: null, lte: 1 } },
     select: { id: true, name: true, position: true, isGoalie: true, age: true, capHit: true, teamId: true, franchiseTag: true, resignStatus: true },
     orderBy: [{ capHit: "desc" }],
   });
@@ -48,8 +59,8 @@ async function Board() {
     <div className="mx-auto max-w-3xl px-4 py-6 space-y-5">
       <PageHeader title="Offer Sheets" subtitle="RFAs who may become available to rival clubs after the season" />
       <Card>
-        <p className="text-sm text-slate-400">Restricted free agents (26 or younger) whose contracts are ending. A club re-signs its RFA during the season; if it doesn&apos;t and the player isn&apos;t <b className="text-fuchsia-300">Franchise-tagged</b>, he opens up to <b className="text-emerald-300">offer sheets</b>. Rival clubs may submit an offer <b>July 1–8</b>; each player decides by July 10 — he takes the best offer that beats his own club and meets his ask, or declines (then his club can keep negotiating).</p>
-        {!osWindow && <p className="text-xs text-slate-500 mt-2">The offer-sheet window opens July 1.</p>}
+        <p className="text-sm text-slate-400">Restricted free agents ({settings.rfaMaxAge} or younger) whose contracts are ending. A club re-signs its RFA during the season; if it doesn&apos;t and the player isn&apos;t <b className="text-fuchsia-300">Franchise-tagged</b>, he opens up to <b className="text-emerald-300">offer sheets</b>. Rival clubs may submit an offer on <b>days {settings.osOpenDay}–{settings.osCloseDay}</b> of the off-season; each player decides by day {settings.osDecisionDay} — he takes the best offer that beats his own club and meets his ask, or declines (then his club can keep negotiating).</p>
+        {!osWindow && <p className="text-xs text-slate-500 mt-2">The offer-sheet window opens on day {settings.osOpenDay} of the off-season (July 1).</p>}
         {osWindow && !canOffer && <p className="text-xs text-amber-400/80 mt-2">Sign in as an NHL club to submit offer sheets.</p>}
       </Card>
 

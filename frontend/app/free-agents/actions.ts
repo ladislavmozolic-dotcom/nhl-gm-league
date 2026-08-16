@@ -9,7 +9,14 @@ import {
   loadMarketPool, teamContentionMap, teamAsk, evaluateTeamOffer, loadLeagueCap, weakestTeams,
 } from "@/lib/free-agency-server";
 import { MAX_TERM, faPosGroup, willingnessNote, twoWayObjection, type Deployment } from "@/lib/free-agency";
+import { loadSettings } from "@/lib/sim/settings";
 import { computeELC } from "@/lib/elc";
+
+/** Commissioner-tuned two-way thresholds, shaped for twoWayObjection's opts. */
+async function twoWayOpts(): Promise<{ olderAge: number; gpLimit: number; maxYears: number; relaxRound: number; faMode: "full" | "simple" }> {
+  const s = await loadSettings();
+  return { olderAge: s.faTwoWayOlderAge, gpLimit: s.faTwoWayNhlGpLimit, maxYears: s.faTwoWayMaxYears, relaxRound: s.faTwoWayRelaxRound, faMode: s.faMode };
+}
 
 const FREE = ["NHL", "AHL", "RETIRED", "PROSPECT", "RELEASED"]; // not a signable free agent
 const ACTIVE = ["PENDING", "COUNTERED", "SHORTLISTED"]; // an offer still in contention
@@ -110,12 +117,13 @@ export async function submitOfferAction(
   // one-way vs two-way: an established older player refuses — UNLESS the market has
   // gone cold for him (round 2+ and he drew no round-1 offer), when he'll settle.
   const twoWay = !!offerTwoWay;
+  const tw = await twoWayOpts();
   let relaxOlder = false;
-  if (twoWay && clock.frenzyRound >= 2) {
+  if (twoWay && clock.frenzyRound >= tw.relaxRound) {
     const r1 = await prisma.faOffer.count({ where: { playerId, round: 1, status: { in: ["PENDING", "COUNTERED", "SHORTLISTED", "ACCEPTED"] } } });
     relaxOlder = r1 === 0;
   }
-  const twoWayErr = twoWayObjection(twoWay, player, years, { relaxOlder });
+  const twoWayErr = twoWayObjection(twoWay, player, years, { relaxOlder, olderAge: tw.olderAge, gpLimit: tw.gpLimit, maxYears: tw.maxYears });
   if (twoWayErr) return { ok: false as const, error: twoWayErr };
 
   // cap check — committed cap hit + this offer must stay under the ceiling
@@ -437,12 +445,14 @@ const fmtM = (n: number) => `$${(n / 1e6).toFixed(2)}M`;
  *  gets 2 re-sign rounds before he's exposed to offer sheets. Regular season only. */
 export async function setFranchiseTagAction(playerId: number, teamId: number, on: boolean) {
   if (!(await canManageTeam(teamId))) return { ok: false as const, error: "You don't manage this team." };
+  const settings = await loadSettings();
+  if (settings.faMode === "simple") return { ok: false as const, error: "This league runs the simple free-agency system — no franchise tags or offer sheets." };
   const p = await prisma.player.findUnique({ where: { id: playerId }, select: { teamId: true, age: true } });
   if (!p) return { ok: false as const, error: "Player not found." };
   const org = await prisma.team.findUnique({ where: { id: teamId }, select: { affiliateTeams: { select: { id: true } } } });
   const orgIds = [teamId, ...(org?.affiliateTeams.map((a) => a.id) ?? [])];
   if (!orgIds.includes(p.teamId)) return { ok: false as const, error: "That player isn't in your organization." };
-  if ((p.age ?? 27) > 26) return { ok: false as const, error: "Only an RFA (26 or younger) can be franchise-tagged." };
+  if ((p.age ?? 27) > settings.rfaMaxAge) return { ok: false as const, error: `Only an RFA (${settings.rfaMaxAge} or younger) can be franchise-tagged.` };
   if (on) {
     await prisma.player.updateMany({ where: { teamId: { in: orgIds }, franchiseTag: true }, data: { franchiseTag: false } }); // one per club
     await prisma.player.update({ where: { id: playerId }, data: { franchiseTag: true } });
@@ -482,7 +492,8 @@ export async function extendContractAction(
   // won't accept one, a two-way is only ever a one-year deal, and a player past 25
   // would rather test the market than take a two-way.
   const twoWay = !!offerTwoWay;
-  const twoWayErr = twoWayObjection(twoWay, player, years);
+  const tw = await twoWayOpts();
+  const twoWayErr = twoWayObjection(twoWay, player, years, { olderAge: tw.olderAge, gpLimit: tw.gpLimit, maxYears: tw.maxYears });
   if (twoWayErr) return { ok: false as const, error: twoWayErr };
 
   // negotiations may already be closed (walked to FA, or turned down → offer sheets)
@@ -515,7 +526,8 @@ export async function extendContractAction(
     // test the market off a lowball — he walks (UFA → free agency, RFA → offer sheets).
     const round = player.resignRound ?? 0;
     const nextRound = round + 1;
-    const isUFA = (player.age ?? 27) >= 27;
+    // in the simple system there are no RFA rights — everyone tests free agency.
+    const isUFA = tw.faMode === "simple" || (player.age ?? 27) >= 27;
     const isRFA = !isUFA;
     // an RFA gets ONE round unless he's the club's Franchise tag (then 2); a UFA gets 2.
     const maxRounds = isRFA && !player.franchiseTag ? 1 : 2;

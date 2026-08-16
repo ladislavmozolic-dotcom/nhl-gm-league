@@ -183,6 +183,14 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
       </Card>
 
       <Card title="Finance & Salary Cap">
+        <label className="flex items-center justify-between gap-3 text-sm py-1 mb-2 border-b border-slate-800 pb-3">
+          <span className="text-slate-300">Finance system</span>
+          <select value={s.financeMode} onChange={(e) => set("financeMode", e.target.value as EngineSettings["financeMode"])}
+            className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm">
+            <option value="base">Base — ticket-revenue finance</option>
+            <option value="detailed">Detailed — fan interest, merch, sponsors (coming soon)</option>
+          </select>
+        </label>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
           <div>
             <NumField k="salaryCapUpper" label="Salary cap (upper)" step={100000} w="w-32" />
@@ -224,6 +232,35 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
               <span className="text-xs text-emerald-300 sm:text-right">{compensationLabel(t.picks)}</span>
             </div>
           ))}
+        </div>
+      </Card>
+
+      <Card title="Free agency & RFA">
+        <label className="flex items-center justify-between gap-3 text-sm py-1">
+          <span className="text-slate-300">Free-agency system</span>
+          <select value={s.faMode} onChange={(e) => set("faMode", e.target.value as EngineSettings["faMode"])}
+            className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm">
+            <option value="full">Full — RFA, franchise tags & offer sheets</option>
+            <option value="simple">Simple — everyone a UFA to the open market</option>
+          </select>
+        </label>
+        <p className="text-[11px] text-slate-500 mb-3">Simple mode drops RFA rights, franchise tags and offer sheets: every expiring player just tests the open market, and you re-sign your own before he gets there.</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
+          <div>
+            <div className="text-xs text-slate-500 mb-1">Two-way contracts</div>
+            <NumField k="faTwoWayOlderAge" label="Barrier applies over age" />
+            <NumField k="faTwoWayNhlGpLimit" label="NHL games = established" />
+            <NumField k="faTwoWayMaxYears" label="Max two-way term (yrs)" />
+            <NumField k="faTwoWayRelaxRound" label="Market relaxes from round" />
+          </div>
+          <div>
+            <div className="text-xs text-slate-500 mb-1">RFA / offer sheets</div>
+            <NumField k="rfaMaxAge" label="RFA max age (≤)" />
+            <NumField k="osOpenDay" label="Offer-sheet opens (day)" />
+            <NumField k="osCloseDay" label="Offer-sheet closes (day)" />
+            <NumField k="osDecisionDay" label="Offer-sheet decided by (day)" />
+            <div className="mt-1"><Toggle k="waiversEnabled" label="Enforce the waiver wire" /></div>
+          </div>
         </div>
       </Card>
 

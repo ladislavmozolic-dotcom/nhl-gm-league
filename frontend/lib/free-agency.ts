@@ -182,15 +182,21 @@ export function twoWayObjection(
   twoWay: boolean,
   p: { overall?: number | null; lastSeasonGP?: number | null; age?: number | null },
   years: number,
-  opts?: { relaxOlder?: boolean },
+  opts?: { relaxOlder?: boolean; olderAge?: number; gpLimit?: number; ovrFallback?: number; maxYears?: number },
 ): string | null {
   if (!twoWay) return null;
-  const older = (p.age ?? 0) > 25;
-  const provenNhl = p.lastSeasonGP != null ? p.lastSeasonGP > 30 : (p.overall ?? 70) >= 72;
+  const olderAge = opts?.olderAge ?? 25;
+  const gpLimit = opts?.gpLimit ?? 30;
+  const ovrFallback = opts?.ovrFallback ?? 72;
+  const maxYears = opts?.maxYears ?? 1;
+  const older = (p.age ?? 0) > olderAge;
+  const provenNhl = p.lastSeasonGP != null ? p.lastSeasonGP > gpLimit : (p.overall ?? 70) >= ovrFallback;
   if (older && provenNhl && !opts?.relaxOlder) {
-    return "He's past 25 and played 30+ NHL games last season — an established NHLer won't sign a two-way. Offer a one-way deal.";
+    return `He's past ${olderAge} and played ${gpLimit}+ NHL games last season — an established NHLer won't sign a two-way. Offer a one-way deal.`;
   }
-  if (years > 1) return "He'll take a two-way, but only as a one-year deal — set the term to 1 year.";
+  if (years > maxYears) {
+    return maxYears <= 1 ? "He'll take a two-way, but only as a one-year deal — set the term to 1 year." : `He'll take a two-way, but only up to ${maxYears} years.`;
+  }
   return null;
 }
 

@@ -102,9 +102,10 @@ export async function submitOfferSheetAction(
   grantClause?: string | null, mNtcBreadth?: number | null,
 ): Promise<Ok | Err> {
   if (!(await canManageTeam(fromTeamId))) return { ok: false, error: "You don't manage this team." };
+  const settings = await loadSettings();
   const clock = await getLeagueClock();
-  const inWindow = clock.frenzyOpen && clock.frenzyDay >= 1 && clock.frenzyDay <= 8;
-  if (!inWindow) return { ok: false, error: "The offer-sheet window is July 1–8." };
+  const inWindow = clock.frenzyOpen && clock.frenzyDay >= settings.osOpenDay && clock.frenzyDay <= settings.osCloseDay;
+  if (!inWindow) return { ok: false, error: `The offer-sheet window is day ${settings.osOpenDay}–${settings.osCloseDay} of the off-season.` };
 
   const player = await prisma.player.findUnique({
     where: { id: playerId },
@@ -117,8 +118,8 @@ export async function submitOfferSheetAction(
 
   const yrs = Math.max(1, Math.min(4, Math.round(years)));
   if (salary < 775_000) return { ok: false, error: "Below the league minimum salary." };
-  // two-way rules mirror the FA/extension flow (based on real NHL games played)
-  const twoWayErr = twoWayObjection(twoWay, player, yrs);
+  // two-way rules mirror the FA/extension flow (real NHL games, older players only)
+  const twoWayErr = twoWayObjection(twoWay, player, yrs, { olderAge: settings.faTwoWayOlderAge, gpLimit: settings.faTwoWayNhlGpLimit, maxYears: settings.faTwoWayMaxYears });
   if (twoWayErr) return { ok: false, error: twoWayErr };
 
   // cap room (off-season ceiling = cap + 10%)
@@ -130,7 +131,6 @@ export async function submitOfferSheetAction(
   }
 
   // compensation: the club must own its OWN original picks to pay
-  const settings = await loadSettings();
   const rounds = settings.osCompEnabled ? compensationFor(salary, settings.osCompTiers) : [];
   const reserved = await reservedPickIds(fromTeamId, playerId); // free up this club's own prior sheet on him
   const plan = await planPicks(fromTeamId, rounds, reserved);
