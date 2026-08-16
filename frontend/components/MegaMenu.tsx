@@ -41,6 +41,7 @@ const menuItems: MenuItem[] = [
       { label: "Salary Cap (Cap Central)", href: "/salary-cap" },
       { label: "Fan Interest", href: "/finance/fan-interest" },
       { label: "Season Tickets", href: "/finance/season-tickets" },
+      { label: "Attendance & Pricing", href: "/finance/attendance" },
     ],
   },
   {
