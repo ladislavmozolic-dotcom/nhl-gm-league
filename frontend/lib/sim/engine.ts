@@ -123,6 +123,7 @@ type SimState = {
   momoDip: Record<number, number>;  // momentum lost when this team concedes (EX softens it)
   playoff: boolean;                 // playoff game — amplifies clutch
   defChem: Record<number, number>;  // team's avg D-pair chemistry factor (a gelled, mixed pair shields better)
+  shiftXg: Record<number, number>;  // on-ice net xG accrued in a player's CURRENT shift (Shift Quality)
   nightOff: Record<number, number>; // per-game offensive "form" (goals-for mult, mean 1)
   nightDef: Record<number, number>; // per-game goalie "form" facing this team (goals-against mult on opp shots, mean 1)
   rivalry: boolean;                 // heated rivalry game — more fights, scrums, misconducts
@@ -172,6 +173,7 @@ function newPlayerLine(s: SimSkater): PlayerLine {
     faceoffWins: 0, faceoffLosses: 0, toi: 0,
     conBefore: s.con ?? 100, conAfter: s.con ?? 100,
     xg: 0, hdShots: 0, topShotSpeed: 0,
+    shifts: 0, positiveShifts: 0,
   };
 }
 
@@ -709,8 +711,26 @@ function advanceShift(st: SimState, teamId: number, sh: ShiftState, dur: number,
     const w = lines.map((_, i) => (i === cur ? 0 : [0.34, 0.28, 0.22, 0.16][i] ?? 0.1));
     return rng.weighted(w);
   };
-  if (sh.fElapsed >= 38 + rng.int(18)) { sh.fIdx = pick(sh.fLines, sh.fIdx); sh.fElapsed = 0; }
-  if (sh.dElapsed >= 42 + rng.int(20)) { sh.dIdx = pick(sh.dPairs, sh.dIdx); sh.dElapsed = 0; }
+  if (sh.fElapsed >= 38 + rng.int(18)) { flushShift(st, teamId, sh.fLines[sh.fIdx] ?? []); sh.fIdx = pick(sh.fLines, sh.fIdx); sh.fElapsed = 0; }
+  if (sh.dElapsed >= 42 + rng.int(20)) { flushShift(st, teamId, sh.dPairs[sh.dIdx] ?? []); sh.dIdx = pick(sh.dPairs, sh.dIdx); sh.dElapsed = 0; }
+}
+// A shift ends for these players: record it, and whether their on-ice xG differential
+// over the shift was positive (Shift Quality → Positive Shift %). Resets the accrual.
+function flushShift(st: SimState, teamId: number, players: SimSkater[]) {
+  for (const s of players) {
+    const line = st.lines[teamId]?.[s.id]; if (!line) continue;
+    const net = st.shiftXg[s.id] ?? 0;
+    // only "decisive" shifts (a chance went one way or the other) count toward the
+    // rate — quiet shifts with no chances are neutral, neither positive nor negative.
+    if (Math.abs(net) >= 0.01) { line.shifts++; if (net > 0) line.positiveShifts++; }
+    st.shiftXg[s.id] = 0;
+  }
+}
+// Credit a shot's xG to everyone on the ice: + for the shooting team, − for the
+// defending team (their current-shift accrual).
+function creditShiftXg(st: SimState, atk: SimSkater[], def: SimSkater[], xg: number) {
+  for (const s of atk) st.shiftXg[s.id] = (st.shiftXg[s.id] ?? 0) + xg;
+  for (const s of def) st.shiftXg[s.id] = (st.shiftXg[s.id] ?? 0) - xg;
 }
 // Attribute match-up as a probability share A/(A+B) (STHS style), nudged toward
 // 0.5 so favourites don't run away (keeps upsets alive).
@@ -889,6 +909,8 @@ function simulatePeriodPossession(st: SimState, period: number) {
       const { sector, shotType } = shotProfile(rng, { isDefense: carrier.isDefense, setup, danger, dangerBias });
       const xg = expectedGoal(rng, sector, shotType, strengthKey);
       const hd = isHighDanger(sector);
+      // Shift Quality: this chance's xG lifts the shooters' on-ice shift, dents the defenders'
+      creditShiftXg(st, [...onIceF(carrierTeam), ...onIceD(carrierTeam)], [...onIceF(def), ...onIceD(def)], xg);
       st.lines[carrierTeam.id][carrier.id].xg += xg;
       if (hd) st.lines[carrierTeam.id][carrier.id].hdShots++;
       st.box[carrierTeam.id].xgFor += xg;
@@ -980,6 +1002,8 @@ function simulatePeriodPossession(st: SimState, period: number) {
       carrierTeam = def; carrier = pickByAttr(rng, onIceD(def).concat(onIceF(def)), (s) => s.attrs.df ?? 50) ?? dman; zone = "DEF"; setup = "carry"; press = 0;
     }
   }
+  // period over — close out the on-ice players' final shift
+  for (const team of [home, away]) { flushShift(st, team.id, onIceF(team)); flushShift(st, team.id, onIceD(team)); }
 }
 
 // ---- injuries ---------------------------------------------------------------
@@ -1248,9 +1272,26 @@ function simulateFaceoffs(st: SimState) {
   }
 }
 
+// modeled rink-zone tendencies for defensive actions (not centimetre tracking):
+// where hits/blocks/takeaways typically happen. Per-player maps then vary by volume
+// and position (D block the point/slot; forwards hit along the boards).
+const HIT_ZONES: [string, number][] = [["PERIMETER", 46], ["NET_FRONT", 20], ["CIRCLE", 20], ["POINT", 8], ["SLOT", 6]];
+const BLOCK_ZONES: [string, number][] = [["SLOT", 35], ["POINT", 30], ["NET_FRONT", 20], ["PERIMETER", 10], ["CIRCLE", 5]];
+const TAKE_ZONES: [string, number][] = [["PERIMETER", 35], ["CIRCLE", 25], ["POINT", 20], ["SLOT", 10], ["NET_FRONT", 10]];
+const pickZone = (rng: RNG, table: [string, number][]) => table[rng.weighted(table.map((z) => z[1]))][0];
+
 function distributeCounting(st: SimState) {
   for (const team of [st.home, st.away]) {
     const roster = [...team.forwards, ...team.defense];
+    // emit a located defensive-action event (for the player heat maps). Counts stay
+    // exactly as calibrated below — only a modeled rink zone + time are attached.
+    const emitAction = (type: "HIT" | "BLOCK" | "TAKEAWAY", s: SimSkater, sector: string) => {
+      st.sink.emit({
+        period: 1 + st.rng.int(3), seconds: st.rng.int(PERIOD_SECONDS), type,
+        teamId: team.id, teamCode: team.code, playerId: s.id, playerName: s.name,
+        zone: "OFF", sector, importance: "NOTABLE",
+      });
+    };
     // hits — a physical team (high CK / heavy) throws noticeably more; centred on
     // an average-checking club so the league total stays NHL-realistic (~21/team).
     let hw = 0, wt = 0;
@@ -1264,12 +1305,20 @@ function distributeCounting(st: SimState) {
       // heavier bodies throw more of the hits (physicality)
       const s = roster[st.rng.weighted(roster.map((r) => r.hitting * r.iceTime * physFactor(r.weight)))];
       st.lines[team.id][s.id].hits++; st.box[team.id].hits++;
+      emitAction("HIT", s, pickZone(st.rng, HIT_ZONES));
     }
     // blocks (defense-heavy)
     const blocks = st.rng.poisson(LEAGUE.blocksPerTeam);
     for (let i = 0; i < blocks; i++) {
       const s = roster[st.rng.weighted(roster.map((r) => r.blocking * r.iceTime * (r.isDefense ? 1.8 : 1)))];
       st.lines[team.id][s.id].blocks++; st.box[team.id].blocks++;
+      emitAction("BLOCK", s, pickZone(st.rng, BLOCK_ZONES));
+    }
+    // takeaways (event-only, for the defensive map) — stick-checking, smart D/centres
+    const takeaways = st.rng.poisson(7); // ~7/team
+    for (let i = 0; i < takeaways; i++) {
+      const s = roster[st.rng.weighted(roster.map((r) => ((r.attrs.df ?? 50) + (r.attrs.sk ?? 50)) * r.iceTime))];
+      emitAction("TAKEAWAY", s, pickZone(st.rng, TAKE_ZONES));
     }
     // TOI from ice-time share
     for (const s of team.forwards) st.lines[team.id][s.id].toi = Math.round(s.iceTime * LEAGUE.fwdIcePool);
@@ -1295,7 +1344,7 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     goals: [], penalties: [], injuries: [],
     momentum: {}, momoTime: {}, momoTau: {}, momoDip: {},
     playoff: !!opts.noShootout, // playoff series sim OT until a goal — amplifies clutch
-    defChem: {}, nightOff: {}, nightDef: {},
+    defChem: {}, shiftXg: {}, nightOff: {}, nightDef: {},
     rivalry: CFG.rivalryEnabled && !!opts.rivalry,
     pulled: {},
     shootout: [],

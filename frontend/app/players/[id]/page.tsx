@@ -9,8 +9,9 @@ import { playerCareer } from "@/lib/career-server";
 import PlayerCareerCard from "@/components/PlayerCareerCard";
 import { playerForm } from "@/lib/form-server";
 import PlayerFormCard from "@/components/PlayerFormCard";
-import { playerHeatMap } from "@/lib/heatmap-server";
+import { playerHeatMap, playerDefenseMap } from "@/lib/heatmap-server";
 import RinkHeatMap from "@/components/RinkHeatMap";
+import RinkDefenseMap from "@/components/RinkDefenseMap";
 
 export const dynamic = "force-dynamic";
 
@@ -222,6 +223,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   const career = await playerCareer(p.id);
   const form = await playerForm(p.id);
   const heatMap = await playerHeatMap(p.id);
+  const defenseMap = isGoalie ? null : await playerDefenseMap(p.id);
 
   const team = p.team as any;
   const teamCode: string = team?.code ?? team?.name ?? "—";
@@ -375,8 +377,13 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         <PlayerFormCard form={form} />
       </Card>
 
-      {/* ── SHOT / SAVE HEAT MAP ───────────────────────────────────── */}
-      {heatMap && <RinkHeatMap map={heatMap} />}
+      {/* ── SHOT / SAVE + DEFENSIVE HEAT MAPS ──────────────────────── */}
+      {(heatMap || defenseMap) && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {heatMap && <RinkHeatMap map={heatMap} />}
+          {defenseMap && <RinkDefenseMap map={defenseMap} />}
+        </div>
+      )}
 
       {/* ── PLAYER STATS ─────────────────────────────────────────── */}
       <Card title="Player Stats" bodyClassName="p-4">

@@ -140,6 +140,8 @@ export type PlayerLine = {
   xg: number;            // individual expected goals (shot quality generated)
   hdShots: number;       // high-danger shots (slot / net-front)
   topShotSpeed: number;  // fastest shot fired (mph) — EDGE
+  shifts: number;        // shifts taken (Shift Quality)
+  positiveShifts: number;// shifts with a positive on-ice xG differential
 };
 
 export type GoalieLine = {

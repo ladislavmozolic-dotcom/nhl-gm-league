@@ -844,6 +844,8 @@ model PlayerGameStat {
   xg            Float  @default(0) // individual expected goals (Phase 2 shot quality)
   hdShots       Int    @default(0) // high-danger shots (slot / net-front)
   topShot       Float  @default(0) // fastest shot fired (mph) — EDGE
+  shifts        Int    @default(0) // shifts taken (Shift Quality)
+  positiveShifts Int   @default(0) // shifts where on-ice net xG was positive → Positive Shift %
   game          Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
   player        Player @relation(fields: [playerId], references: [id])
 

@@ -14,6 +14,7 @@ export default function PlayerFormCard({ form }: { form: PlayerForm }) {
         <>
           <span className="font-semibold text-slate-200">{form.goals} G — {form.assists} A — {form.points} PTS</span>
           <span className="text-xs text-slate-500 tabular-nums">{form.pointsPer60.toFixed(2)} P/60 · {form.xgPer60.toFixed(2)} xG/60 · {mmss(form.games ? form.toiSec / form.games : 0)} TOI/gm</span>
+          {form.positiveShiftPct != null && <span className="text-xs tabular-nums"><span className="text-slate-500">Positive shifts</span> <span className={form.positiveShiftPct >= 55 ? "text-emerald-400 font-semibold" : form.positiveShiftPct >= 45 ? "text-slate-300 font-semibold" : "text-rose-400 font-semibold"}>{form.positiveShiftPct}%</span></span>}
         </>
       ) : (
         <>

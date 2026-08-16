@@ -36,6 +36,7 @@ function skaterRows(box: TeamBox, gameId: number) {
       faceoffWins: s.faceoffWins, faceoffLosses: s.faceoffLosses, toi: s.toi,
       conBefore: Math.round(s.conBefore), conAfter: Math.round(s.conAfter),
       xg: s.xg, hdShots: s.hdShots, topShot: s.topShotSpeed,
+      shifts: s.shifts, positiveShifts: s.positiveShifts,
     }));
 }
 

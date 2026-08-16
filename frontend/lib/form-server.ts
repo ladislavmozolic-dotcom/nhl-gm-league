@@ -6,10 +6,12 @@
 import { prisma } from "./prisma";
 
 const LAST_N = 10;
+const SEASON = "2026-27";
 
 export type SkaterForm = {
   kind: "skater"; games: number; goals: number; assists: number; points: number;
   toiSec: number; xg: number; ppg: number; pointsPer60: number; xgPer60: number;
+  positiveShiftPct: number | null; // season Shift Quality (positive / decisive shifts)
   label: string; emoji: string; tone: string;
 };
 export type GoalieForm = {
@@ -73,9 +75,14 @@ export async function playerForm(playerId: number): Promise<PlayerForm> {
   const pointsPer60 = points / hours;
   const xgPer60 = xg / hours;
   const [, label, emoji, tone] = band(p.position === "D" ? D_BANDS : F_BANDS, pointsPer60);
+  // season Shift Quality (bigger sample than last-10): positive / decisive shifts
+  const agg = await prisma.playerGameStat.aggregate({ where: { playerId, game: { season: SEASON, league: "NHL", status: "FINAL", seriesId: null } }, _sum: { shifts: true, positiveShifts: true } });
+  const sh = agg._sum.shifts ?? 0, psh = agg._sum.positiveShifts ?? 0;
+  const positiveShiftPct = sh >= 10 ? +((psh / sh) * 100).toFixed(0) : null;
   return {
     kind: "skater", games: rows.length, goals, assists, points, toiSec, xg: +xg.toFixed(2),
     ppg: +(points / rows.length).toFixed(2), pointsPer60: +pointsPer60.toFixed(2), xgPer60: +xgPer60.toFixed(2),
+    positiveShiftPct,
     label, emoji, tone,
   };
 }
