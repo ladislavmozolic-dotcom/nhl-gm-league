@@ -77,6 +77,14 @@ export default function LineBuilderView({ build }: { build: TeamLineBuild }) {
   return (
     <div className="space-y-6">
       <p className="text-sm text-slate-500">Reads your current lines (from the Line Editor). Chemistry, tactical fit and the offensive profile are derived from the players — experiment before you sim.</p>
+
+      <details className="bg-slate-900/40 border border-slate-800 rounded-xl px-4 py-2 text-sm">
+        <summary className="cursor-pointer text-slate-300 font-medium select-none">How Chemistry &amp; Tactical Fit work</summary>
+        <div className="mt-2 space-y-2 text-slate-400 text-[13px] leading-snug">
+          <p><span className="font-semibold text-slate-300">🧪 Chemistry</span> — the average of the line&apos;s pairwise bonds (LW↔C, C↔RW, LW↔RW). Each bond <span className="text-emerald-400">grows</span> as those two play together and <span className="text-sky-400">fades slowly</span> when apart, so a split duo keeps most of its history when re-united (time-together memory). A brand-new combo has no shared history yet, so it shows a <span className="text-slate-300">projected</span> (&ldquo;proj&rdquo;) value from how well it&apos;s built; it climbs as they play. Capped lower if a player is off his natural position.</p>
+          <p><span className="font-semibold text-slate-300">♟️ Tactical Fit</span> — how well the line is <em>constructed</em> (no games needed): role diversity (a playmaker + sniper + grinder, or an offensive D + a shutdown D, scores high; three snipers or two identical D score low) × position &amp; handedness correctness (centre at C, wingers on their side; LD shoots left, RD shoots right). It updates the moment you change players.</p>
+        </div>
+      </details>
       <div>
         <div className="text-xs uppercase tracking-wide text-slate-400 mb-2">Forward Lines</div>
         <div className="grid gap-4 md:grid-cols-2">{build.forwards.map((l) => <LineCard key={`f${l.index}`} line={l} />)}</div>
