@@ -189,8 +189,11 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
                       </div>
                       <div>
                         <label className="text-xs text-slate-400 block mb-1">Term (years)</label>
-                        <input type="number" min="1" max="4" value={years} onChange={(e) => setYears(Number(e.target.value))}
-                          className="w-full px-2 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-sm tabular-nums" />
+                        <div className="flex items-center gap-1">
+                          <button type="button" onClick={() => setYears((y) => Math.max(1, y - 1))} className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-lg leading-none">−</button>
+                          <div className="flex-1 text-center py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-sm tabular-nums font-semibold">{years} yr</div>
+                          <button type="button" onClick={() => setYears((y) => Math.min(4, y + 1))} className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-lg leading-none">+</button>
+                        </div>
                       </div>
                     </div>
                     <div>

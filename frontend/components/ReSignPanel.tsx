@@ -111,8 +111,11 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                   </div>
                   <div>
                     <label className="text-xs text-slate-400 block mb-1">Term (years)</label>
-                    <input type="number" min="1" max="4" value={years} onChange={(e) => setYears(Number(e.target.value))}
-                      className="w-full px-2 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-sm tabular-nums" />
+                    <div className="flex items-center gap-1">
+                      <button type="button" onClick={() => setYears((y) => Math.max(1, y - 1))} className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-lg leading-none">−</button>
+                      <div className="flex-1 text-center py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-sm tabular-nums font-semibold">{years} yr</div>
+                      <button type="button" onClick={() => setYears((y) => Math.min(4, y + 1))} className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-lg leading-none">+</button>
+                    </div>
                   </div>
                 </div>
                 <div>
@@ -162,8 +165,11 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
 export default function ReSignPanel({ teamId, players, title, blurb, accent = "text-amber-400" }: {
   teamId: number; players: ExpiringPlayer[]; title?: string; blurb?: string; accent?: string;
 }) {
-  const [openId, setOpenId] = useState<number | null>(null);
-  if (players.length === 0) return null;
+  // hold the OPEN PLAYER OBJECT, not just an id — the server action's revalidatePath
+  // re-renders this list without the just-signed player, and a find(openId) would go
+  // undefined and tear the modal down before its confirmation shows.
+  const [openPlayer, setOpenPlayer] = useState<ExpiringPlayer | null>(null);
+  if (players.length === 0 && !openPlayer) return null;
   return (
     <Card title={`${title ?? "Expiring Contracts"} (${players.length})`} accent={accent}>
       <p className="text-xs text-slate-500 mb-3">{blurb ?? "These players are entering the final year of their deal. Re-sign them before they reach free agency."}</p>
@@ -174,14 +180,14 @@ export default function ReSignPanel({ teamId, players, title, blurb, accent = "t
               <span className="font-medium truncate">{cleanName(p.name)}</span>
               <span className="text-xs text-slate-500 ml-2">{p.contractText ?? (p.capHit ? `${M(p.capHit)} × ${p.contractYears}yr` : "—")}</span>
             </div>
-            <button onClick={() => setOpenId(p.id)}
+            <button onClick={() => setOpenPlayer(p)}
               className="px-3 py-1 rounded-md bg-green-600/80 hover:bg-green-500 text-white text-xs font-semibold whitespace-nowrap">
               Re-sign
             </button>
           </div>
         ))}
       </div>
-      {openId != null && <ReSignModal player={players.find((p) => p.id === openId)!} teamId={teamId} onClose={() => setOpenId(null)} />}
+      {openPlayer && <ReSignModal player={openPlayer} teamId={teamId} onClose={() => setOpenPlayer(null)} />}
     </Card>
   );
 }
