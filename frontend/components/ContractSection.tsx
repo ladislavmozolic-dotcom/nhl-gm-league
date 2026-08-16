@@ -27,9 +27,12 @@ const META: Record<Group, { title: string; blurb: string; accent: string }> = {
 
 export default async function ContractSection({ teamId }: { teamId: number }) {
   const canManage = await canManageTeam(teamId);
+  // include the club's AHL/farm players whose deals are up too
+  const org = await prisma.team.findUnique({ where: { id: teamId }, select: { affiliateTeams: { select: { id: true } } } });
+  const orgIds = [teamId, ...(org?.affiliateTeams.map((a) => a.id) ?? [])];
   const expiring = await prisma.player.findMany({
-    where: { teamId, rosterType: "NHL", contractYears: { lte: 0 } },
-    select: { id: true, name: true, age: true, capHit: true, contractYears: true, contractText: true, position: true, isGoalie: true, df: true, lastSeasonGP: true, lastSeasonPts: true, lastSeasonSvPct: true },
+    where: { teamId: { in: orgIds }, rosterType: { in: ["NHL", "AHL"] }, contractYears: { lte: 0 } },
+    select: { id: true, name: true, age: true, capHit: true, contractYears: true, contractText: true, position: true, isGoalie: true, df: true, lastSeasonGP: true, lastSeasonPts: true, lastSeasonSvPct: true, rosterType: true },
     orderBy: { capHit: "desc" },
   });
 
@@ -84,7 +87,7 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
       {(["UFA", "RFA"] as Group[]).map((g) =>
         groups[g].length === 0 ? null : canManage ? (
           <ReSignPanel key={g} teamId={teamId} title={META[g].title} blurb={META[g].blurb} accent={META[g].accent}
-            players={groups[g].map((p) => ({ id: p.id, name: p.name, capHit: p.capHit, contractYears: p.contractYears, contractText: p.contractText }))} />
+            players={groups[g].map((p) => ({ id: p.id, name: p.name, capHit: p.capHit, contractYears: p.contractYears, contractText: p.contractText, farm: p.rosterType === "AHL" }))} />
         ) : (
           <Card key={g} title={`${META[g].title} (${groups[g].length})`} accent={META[g].accent}>
             <div className="divide-y divide-slate-800/50">

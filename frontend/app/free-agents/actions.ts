@@ -432,10 +432,13 @@ export async function extendContractAction(
 ) {
   if (!(await canManageTeam(teamId))) return { ok: false as const, error: "You don't manage this team." };
   const player = await prisma.player.findUnique({
-    where: { id: playerId }, select: { teamId: true, contractYears: true, capHit: true, age: true, name: true, lastSeasonGP: true, resignRound: true, resignStatus: true },
+    where: { id: playerId }, select: { teamId: true, contractYears: true, capHit: true, age: true, name: true, lastSeasonGP: true, resignRound: true, resignStatus: true, rosterType: true },
   });
   if (!player) return { ok: false as const, error: "Player not found." };
-  if (player.teamId !== teamId) return { ok: false as const, error: "That player isn't on your team." };
+  // the club may re-sign its own NHL players AND its farm (AHL affiliate) players
+  const org = await prisma.team.findUnique({ where: { id: teamId }, select: { affiliateTeams: { select: { id: true } } } });
+  const orgIds = [teamId, ...(org?.affiliateTeams.map((a) => a.id) ?? [])];
+  if (!orgIds.includes(player.teamId)) return { ok: false as const, error: "That player isn't in your organization." };
   if ((player.contractYears ?? 0) > 0) return { ok: false as const, error: "He's still under contract — you can only re-sign him once his deal expires (0 years left)." };
   if (salary < 775_000) return { ok: false as const, error: "Below the league minimum salary." };
   years = Math.max(1, Math.min(MAX_TERM, Math.round(years)));
@@ -444,13 +447,17 @@ export async function extendContractAction(
   if (player.resignStatus === "walkedToUFA") return { ok: false as const, closed: true, error: "He's testing free agency now — negotiations are over for this window." };
   if (player.resignStatus === "osEligible") return { ok: false as const, closed: true, error: "He turned down your extension — after the season other clubs can submit offer sheets." };
 
-  // cap check — replace his current hit with the new one (off-season +10% cushion, + LTIR relief)
-  const cap = await loadLeagueCap();
-  const info = await teamCapInfo(teamId);
-  const committed = info.committed - (player.capHit ?? 0);
-  const ceiling = capCeilingForPhase(cap.upper, (await getLeagueClock()).phase) + info.ltir;
-  if (committed + salary > ceiling) {
-    return { ok: false as const, error: `Over the ceiling — you'd have ${fmtM(ceiling - committed)} of room, this deal is ${fmtM(salary)}.` };
+  // cap check — replace his current hit with the new one (off-season +10% cushion, + LTIR
+  // relief). Skipped for a FARM player: his deal sits on the AHL, off the NHL cap.
+  const onFarm = player.rosterType === "AHL";
+  if (!onFarm) {
+    const cap = await loadLeagueCap();
+    const info = await teamCapInfo(teamId);
+    const committed = info.committed - (player.capHit ?? 0);
+    const ceiling = capCeilingForPhase(cap.upper, (await getLeagueClock()).phase) + info.ltir;
+    if (committed + salary > ceiling) {
+      return { ok: false as const, error: `Over the ceiling — you'd have ${fmtM(ceiling - committed)} of room, this deal is ${fmtM(salary)}.` };
+    }
   }
 
   const clause = grantClause && ["NTC", "NMC", "M_NTC"].includes(grantClause) ? grantClause : null;
@@ -473,7 +480,8 @@ export async function extendContractAction(
     if (walk) {
       const status = isUFA ? "walkedToUFA" : "osEligible";
       await prisma.player.update({ where: { id: playerId }, data: { resignStatus: status, resignRound: nextRound } });
-      if (team?.slug) revalidatePath(`/teams/${team.slug}/contracts`);
+      // no revalidatePath here — it would tear down the open modal before its notice
+      // shows; the client refreshes on Close.
       return {
         ok: false as const, walked: true, toUFA: isUFA,
         reason: nextRound > 2
@@ -485,7 +493,6 @@ export async function extendContractAction(
     const counterSalary = ev.ask.floorSalary;
     const counterYears = Math.min(Math.max(years, ev.ask.minYears), ev.ask.maxYears);
     await prisma.player.update({ where: { id: playerId }, data: { resignRound: nextRound, resignStatus: "countered", resignCounterSalary: counterSalary, resignCounterYears: counterYears } });
-    if (team?.slug) revalidatePath(`/teams/${team.slug}/contracts`);
     return {
       ok: false as const, rejected: true, round: nextRound,
       reason: `Round ${nextRound} of 2 — he's countering around ${fmtM(counterSalary * 0.97)}–${fmtM(counterSalary * 1.06)} over ${counterYears}yr.${nextRound >= 2 ? " One more round before he walks." : ""}`,
@@ -511,7 +518,6 @@ export async function extendContractAction(
   await prisma.transaction.create({
     data: { type: "SIGNING", message: `${team?.code ?? "?"} re-signed ${player.name} — $${(salary / 1e6).toFixed(2)}M × ${years}yr` },
   });
-  if (team?.slug) { revalidatePath(`/teams/${team.slug}/roster`); revalidatePath(`/teams/${team.slug}/contracts`); }
-  for (const p of ["/signings", "/finance"]) revalidatePath(p);
+  // no revalidatePath — it would unmount the confirmation modal; client refreshes on Done.
   return { ok: true as const, signed: true, salary, years, name: player.name };
 }

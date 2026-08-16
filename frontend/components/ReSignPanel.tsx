@@ -7,7 +7,7 @@ import { Card } from "@/components/ui";
 import { cleanName } from "@/lib/playerName";
 import { clauseDiscount } from "@/lib/free-agency";
 
-type ExpiringPlayer = { id: number; name: string; capHit: number | null; contractYears: number | null; contractText: string | null };
+type ExpiringPlayer = { id: number; name: string; capHit: number | null; contractYears: number | null; contractText: string | null; farm?: boolean };
 
 const M = (n: number) => `$${(n / 1e6).toFixed(2)}M`;
 function lineOptions(grp: string) {
@@ -178,6 +178,7 @@ export default function ReSignPanel({ teamId, players, title, blurb, accent = "t
           <div key={p.id} className="flex items-center justify-between py-2 gap-3">
             <div className="min-w-0">
               <span className="font-medium truncate">{cleanName(p.name)}</span>
+              {p.farm && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30">AHL</span>}
               <span className="text-xs text-slate-500 ml-2">{p.contractText ?? (p.capHit ? `${M(p.capHit)} × ${p.contractYears}yr` : "—")}</span>
             </div>
             <button onClick={() => setOpenPlayer(p)}
