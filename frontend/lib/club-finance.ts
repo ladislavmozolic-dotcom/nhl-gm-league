@@ -42,26 +42,27 @@ export function clubRevenueTotal(i: ClubRevenueInput): number {
   return clubRevenueLines(i).reduce((t, l) => t + l.amount, 0);
 }
 
-// Fixed operating overhead, split into named lines (coaching is separate — it's
-// the real head-coach salaries, NHL + AHL).
+// Fixed operating overhead (arena, travel, admin) — coaching and the minor-league
+// affiliate are their own dynamic lines (real coach + AHL-roster salaries).
 const FIXED_OVERHEAD_LINES: { label: string; amount: number }[] = [
   { label: "Arena operations", amount: 14_000_000 },
   { label: "Team travel", amount: 7_000_000 },
-  { label: "Minor-league affiliate", amount: 8_000_000 },
   { label: "Admin & staff", amount: 10_000_000 },
 ];
-const FIXED_OVERHEAD = FIXED_OVERHEAD_LINES.reduce((t, l) => t + l.amount, 0); // 39M
+const FIXED_OVERHEAD = FIXED_OVERHEAD_LINES.reduce((t, l) => t + l.amount, 0); // 31M
 
-/** The club's season expenses, itemised — player salaries, the real head-coach
- *  salaries (NHL + AHL), and fixed operating overhead. */
-export function clubExpenseLines(salary: number, coachSalary: number): FinanceLine[] {
+/** The club's season expenses, itemised — NHL player salaries, real head-coach
+ *  salaries (NHL + AHL), the AHL affiliate payroll (its roster + scratched), and
+ *  fixed operating overhead. */
+export function clubExpenseLines(salary: number, coachSalary: number, ahlSalary: number): FinanceLine[] {
   return [
-    { label: "Player salaries", amount: salary },
+    { label: "Player salaries (NHL)", amount: salary },
     { label: "Coaching (NHL + AHL)", amount: coachSalary },
+    { label: "Minor-league affiliate", amount: ahlSalary },
     ...FIXED_OVERHEAD_LINES,
   ];
 }
 
-export function clubExpenseTotal(salary: number, coachSalary: number): number {
-  return salary + coachSalary + FIXED_OVERHEAD;
+export function clubExpenseTotal(salary: number, coachSalary: number, ahlSalary: number): number {
+  return salary + coachSalary + ahlSalary + FIXED_OVERHEAD;
 }
