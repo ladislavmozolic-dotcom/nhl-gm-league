@@ -292,10 +292,25 @@ export async function processRoundEnd(endedRound: number): Promise<{ countered: 
         }
       }
     } else if (endedRound === 2) {
-      // keep the top suitors by utility (must still clear his bar), drop the rest
-      const ranked = scored.filter((s) => s.ev).sort((a, b) => (b.ev!.utility) - (a.ev!.utility));
+      // a club "reacted" if it raised its offer in round 2 (a raise re-enters as
+      // PENDING / round≥2); one left untouched stays COUNTERED from round 1.
+      const reacted = (o: (typeof list)[number]) => o.status === "PENDING" || o.round >= 2;
+      const anyReacted = list.some(reacted);
+      // if ANYONE engaged, the clubs that ignored his counter are OUT; if nobody
+      // engaged, they all carry into round 3 (he has no one better to turn to).
+      const alive = anyReacted ? scored.filter((s) => reacted(s.o)) : scored;
+      if (anyReacted) {
+        for (const { o } of scored.filter((s) => !reacted(s.o))) {
+          const teamCode = (await prisma.team.findUnique({ where: { id: o.teamId }, select: { code: true } }))?.code ?? "?";
+          await prisma.faOffer.update({ where: { id: o.id }, data: { status: "REJECTED" } });
+          await prisma.transaction.create({ data: { type: "FA_NEGOTIATION", message: `${name} moved on — ${teamCode} didn't respond to his counter.` } });
+          eliminated++;
+        }
+      }
+      // shortlist the best of the clubs still in
+      const ranked = alive.filter((s) => s.ev).sort((a, b) => (b.ev!.utility) - (a.ev!.utility));
       const keep = new Set(ranked.slice(0, SHORTLIST_SIZE).map((s) => s.o.id));
-      for (const { o } of scored) {
+      for (const { o } of alive) {
         if (keep.has(o.id)) { await prisma.faOffer.update({ where: { id: o.id }, data: { status: "SHORTLISTED" } }); shortlisted++; }
         else {
           const teamCode = (await prisma.team.findUnique({ where: { id: o.teamId }, select: { code: true } }))?.code ?? "?";
