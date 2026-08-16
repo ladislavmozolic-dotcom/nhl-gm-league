@@ -6,7 +6,7 @@
 
 import { prisma } from "./prisma";
 import { cleanName } from "./playerName";
-import { per60, blend, percentileOf, percentileToRating, EDGE_COMPOSITES, experienceFromAge, durabilityFromAvailability, leadershipFrom, EDGE_MO_DEFAULT } from "./edge-params";
+import { per60, blend, percentileOf, percentileToRating, EDGE_COMPOSITES, EDGE_GOALIE_COMPOSITES, experienceFromAge, durabilityFromAvailability, leadershipFrom, EDGE_MO_DEFAULT } from "./edge-params";
 
 const CUR_SEASON_GAMES = 82; // real season length reference for durability
 
@@ -138,6 +138,84 @@ export async function edgeRatings(league = "NHL"): Promise<EdgeRow[]> {
   });
 
   return out;
+}
+
+// ---- Goalies ----
+
+type GM = { gp: number; shots: number; icetime: number; gsax: number; svPct: number; hdSv: number; mdSv: number; ldSv: number; hdGsax: number; rebCtrl: number };
+const heightCm = (h: string | null) => { const m = (h ?? "").match(/(\d+)\s*cm/); return m ? Number(m[1]) : null; };
+const GOALIE_REG_K = 700; // shots faced at which reliability = 0.5
+
+/** Edge ratings for every goalie in a league (MoneyPuck-driven; NHL only for now). */
+export async function edgeGoalieRatings(league = "NHL"): Promise<EdgeRow[]> {
+  const goalies = await prisma.player.findMany({
+    where: { rosterType: league, isGoalie: true },
+    select: { id: true, name: true, position: true, teamId: true, height: true, age: true, captaincy: true, goalieAdvanced: true, lastSeasonGP: true, curSeasonGP: true },
+  });
+  const teams = await prisma.team.findMany({ select: { id: true, code: true } });
+  const codeById = new Map(teams.map((t) => [t.id, t.code]));
+
+  type GR = { id: number; name: string; position: string; teamCode: string | null; age: number | null; captaincy: string | null; curGP: number; lastGP: number; shots: number; metrics: Record<string, number | null> };
+  const rows: GR[] = [];
+  for (const g of goalies) {
+    const adv = g.goalieAdvanced as { cur: GM | null; last: GM | null } | null;
+    if (!adv || (!adv.cur && !adv.last)) continue;
+    const c = adv.cur, l = adv.last;
+    const per60g = (m: GM | null) => (m && m.icetime > 0 ? (m.gsax / (m.icetime / 3600)) : null);
+    const bl = (sel: (m: GM) => number) => blend(c ? sel(c) : null, l ? sel(l) : null);
+    rows.push({
+      id: g.id, name: cleanName(g.name), position: "G",
+      teamCode: g.teamId != null ? codeById.get(g.teamId) ?? null : null,
+      age: g.age ?? null, captaincy: g.captaincy ?? null,
+      curGP: g.curSeasonGP ?? c?.gp ?? 0, lastGP: g.lastSeasonGP ?? l?.gp ?? 0,
+      shots: (c?.shots ?? 0) + (l?.shots ?? 0),
+      metrics: {
+        ldSv: bl((m) => m.ldSv), mdSv: bl((m) => m.mdSv), hdSv: bl((m) => m.hdSv),
+        gsax60: blend(per60g(c), per60g(l)), hdGsax: bl((m) => m.hdGsax), rebCtrl: bl((m) => m.rebCtrl),
+        icetime: bl((m) => m.icetime), sz: heightCm(g.height),
+      },
+    });
+  }
+
+  const metricKeys = [...new Set(Object.values(EDGE_GOALIE_COMPOSITES).flat().map((m) => m.key))];
+  const perfKeys = new Set(["ldSv", "mdSv", "hdSv", "gsax60", "hdGsax", "rebCtrl"]); // sample-regressed
+  const means: Record<string, number> = {};
+  for (const k of metricKeys) {
+    const vals = rows.map((r) => r.metrics[k]).filter((v): v is number => v != null);
+    means[k] = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+  }
+  const reg = (r: GR, k: string): number | null => {
+    const raw = r.metrics[k];
+    if (raw == null) return null;
+    if (!perfKeys.has(k)) return raw;
+    const rel = r.shots / (r.shots + GOALIE_REG_K);
+    return raw * rel + means[k] * (1 - rel);
+  };
+  const pops: Record<string, number[]> = {};
+  for (const k of metricKeys) pops[k] = rows.map((r) => reg(r, k)).filter((v): v is number => v != null).sort((a, b) => a - b);
+
+  return rows.map((r) => {
+    const ratings: Record<string, number> = {};
+    for (const [param, metrics] of Object.entries(EDGE_GOALIE_COMPOSITES)) {
+      let wsum = 0, wtot = 0;
+      for (const m of metrics) {
+        const v = reg(r, m.key);
+        if (v == null) continue;
+        let pct = percentileOf(v, pops[m.key]);
+        if (m.invert) pct = 1 - pct;
+        wsum += pct * m.weight; wtot += m.weight;
+      }
+      if (wtot > 0) ratings[param] = percentileToRating(wsum / wtot);
+    }
+    const ex = experienceFromAge(r.age);
+    ratings.EX = ex;
+    ratings.DU = durabilityFromAvailability(r.curGP, CUR_SEASON_GAMES, r.lastGP);
+    ratings.LD = leadershipFrom(r.captaincy, ex);
+    ratings.MO = EDGE_MO_DEFAULT;
+    const core = ["SC", "RT", "HS", "AG", "RB", "EN", "SZ"].map((k) => ratings[k]).filter((v) => v != null);
+    if (core.length) ratings.OV = Math.round(core.reduce((a, b) => a + b, 0) / core.length);
+    return { playerId: r.id, name: r.name, position: "G", posGroup: "F" as const, league, teamCode: r.teamCode, ratings };
+  });
 }
 
 /** Edge ratings for a single player (or null). */

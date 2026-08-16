@@ -195,6 +195,7 @@ model Player {
   curSeasonPim         Int?
   curSeasonFoPct       Float?
   curSeasonPpG         Int?
+  goalieAdvanced       Json?         // MoneyPuck goalie metrics for the Edge engine: { cur:{...}, last:{...} } — GSAx, danger SV% splits, rebound control, sample
   goalieRating         GoalieRating?
   team                 Team          @relation(fields: [teamId], references: [id])
   skaterRating         SkaterRating?

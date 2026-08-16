@@ -94,6 +94,25 @@ export function leadershipFrom(captaincy: string | null | undefined, ex: number)
 
 export const EDGE_MO_DEFAULT = 50; // morale starts at league default, then our universe moves it
 
+// Goalie composites (MoneyPuck-driven). The danger splits let the primary abilities
+// (SC / RT / HS / AG) genuinely differ instead of all tracking overall SV%.
+export const EDGE_GOALIE_COMPOSITES: Record<string, Metric[]> = {
+  // style control — positioning & consistency: low/med-danger stops + overall GSAx
+  SC: [{ key: "ldSv", weight: 0.4 }, { key: "mdSv", weight: 0.35 }, { key: "gsax60", weight: 0.25 }],
+  // reaction time — high-danger stops + goals saved above expected on them
+  RT: [{ key: "hdSv", weight: 0.6 }, { key: "hdGsax", weight: 0.4 }],
+  // hand speed — quick stops across the board, high-danger leaning
+  HS: [{ key: "hdSv", weight: 0.5 }, { key: "gsax60", weight: 0.5 }],
+  // agility — lateral / mid-range coverage
+  AG: [{ key: "mdSv", weight: 0.5 }, { key: "hdSv", weight: 0.5 }],
+  // rebound control — allowing fewer rebounds than expected
+  RB: [{ key: "rebCtrl", weight: 1.0 }],
+  // endurance — starter workload (ice time)
+  EN: [{ key: "icetime", weight: 1.0 }],
+  // size
+  SZ: [{ key: "sz", weight: 1.0 }],
+};
+
 function clamp(x: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, x));
 }
