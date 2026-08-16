@@ -20,7 +20,6 @@ export default function TeamSubNav({ slug, isGm, isAffiliate, farmSlug, parentSl
         { label: "Roster", href: `${base}/roster` },
         { label: "Schedule", href: `${base}/schedule` },
         { label: "Scores", href: `${base}/scores` },
-        { label: "Standings", href: `${base}/standings` },
         { label: "Statistics", href: `${base}/stats` },
         ...(parentSlug ? [{ label: "NHL Team", href: `/teams/${parentSlug}` }] : []),
       ]
@@ -29,7 +28,6 @@ export default function TeamSubNav({ slug, isGm, isAffiliate, farmSlug, parentSl
         { label: "Roster", href: `${base}/roster` },
         { label: "Schedule", href: `${base}/schedule` },
         { label: "Scores", href: `${base}/scores` },
-        { label: "Standings", href: `${base}/standings` },
         { label: "Statistics", href: `${base}/stats` },
         { label: "Lines", href: `${base}/lines`, gm: true },
         { label: "System", href: `${base}/tactics`, gm: true },
