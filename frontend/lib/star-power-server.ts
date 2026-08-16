@@ -71,8 +71,8 @@ export async function teamStarPeaks(): Promise<Map<number, { score: number; tier
   return peaks;
 }
 
-/** Top NHL players by star power, league-wide. */
-export async function leagueStarLeaderboard(limit = 50): Promise<StarRow[]> {
+/** Star power for every NHL player (unsorted), with team code. */
+export async function allStarPowers(): Promise<StarRow[]> {
   const players = await prisma.player.findMany({
     where: { rosterType: "NHL" },
     select: { id: true, name: true, position: true, isGoalie: true, overall: true, age: true, teamId: true, lastSeasonPts: true, lastSeasonGP: true, lastSeasonSvPct: true },
@@ -80,8 +80,7 @@ export async function leagueStarLeaderboard(limit = 50): Promise<StarRow[]> {
   const { career, awards } = await pedigree(players.map((p) => p.id));
   const teams = await prisma.team.findMany({ where: { league: "NHL" }, select: { id: true, code: true } });
   const codeById = new Map(teams.map((t) => [t.id, t.code]));
-
-  const rows: StarRow[] = players.map((p) => {
+  return players.map((p) => {
     const s = scoreOf(p, career.get(p.id) ?? 0, awards.get(p.id) ?? 0);
     return {
       playerId: p.id, name: cleanName(p.name), position: p.position, isGoalie: p.isGoalie,
@@ -89,6 +88,11 @@ export async function leagueStarLeaderboard(limit = 50): Promise<StarRow[]> {
       score: s.score, tier: s.tier, reasons: s.reasons,
     };
   });
+}
+
+/** Top NHL players by star power, league-wide. */
+export async function leagueStarLeaderboard(limit = 50): Promise<StarRow[]> {
+  const rows = await allStarPowers();
   rows.sort((a, b) => b.score - a.score);
   return rows.slice(0, limit);
 }
