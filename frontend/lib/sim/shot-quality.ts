@@ -52,6 +52,11 @@ export function shotProfile(
   // perimeter/point). Clamped so it nudges the mix rather than dominating it.
   const bias = Math.max(0.7, Math.min(1.35, opts.dangerBias ?? 1));
   if (opts.isDefense) {
+    // most are point shots, but an offensive D pinches / joins the rush for a better
+    // look — walking the line into the circle or sneaking to the slot backdoor.
+    const r = rng.next();
+    if (r < 0.07) return { sector: "SLOT", shotType: "ONE_TIMER" };            // backdoor / pinch to the slot
+    if (r < 0.20) return { sector: "CIRCLE", shotType: rng.chance(0.5) ? "SNAP" : "WRIST" }; // walks the line
     return { sector: "POINT", shotType: rng.chance(0.55) ? "SLAP" : "WRIST" };
   }
   if (opts.setup === "rebound") {

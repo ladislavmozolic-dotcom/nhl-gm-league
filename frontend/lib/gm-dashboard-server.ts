@@ -5,10 +5,12 @@
 
 import { prisma } from "./prisma";
 import { getLeagueClock } from "./calendar-server";
+import { daysBetween, SEASON_START_YEAR } from "./calendar";
 import { teamCapStatus } from "./cap";
 import { leagueForm } from "./digest-server";
 import { teamLineBuilder } from "./line-builder-server";
 import { goalieAnalytics } from "./goalie-analytics-server";
+import { draftSourceFilter } from "./prospect-dev-server";
 import { cleanName } from "./playerName";
 import { money } from "./finance";
 
@@ -18,11 +20,17 @@ const isDef = (p: string) => /(^|\/)D(\/|$)/.test(p.toUpperCase());
 const isG = (p: string) => /(^|\/)G(\/|$)/.test(p.toUpperCase());
 
 export type Attn = { icon: string; tone: string; text: string; href?: string };
+export type OffseasonInfo = { expiring: { name: string; slug: string | null }[]; freeAgents: number; recentMoves: string[] };
+export type BriefDept = "Coach" | "Medical" | "Scouting" | "League";
+export type Briefing = { dept: BriefDept; icon: string; text: string; href?: string };
 export type GmDashboard = {
+  mode: "season" | "offseason";
+  offseason?: OffseasonInfo;
   team: { name: string; slug: string; code: string | null };
   nextGame: { opp: string; oppSlug: string | null; when: string; home: boolean; gameId: number } | null;
   ready: { lines: boolean; roster: boolean; rosterNote: string; capSpace: number; capOk: boolean };
   attention: Attn[];
+  briefing: Briefing[];
   form: { last10: string; streakType: "W" | "L" | "OT" | null; streakLen: number; points: number; gp: number } | null;
   latest: string[];
 };
@@ -104,10 +112,59 @@ export async function gmDashboard(teamId: number): Promise<GmDashboard | null> {
   if (starter) { const sp = await prisma.player.findFirst({ where: { teamId, name: starter.name }, select: { id: true } }); if (sp) { const ga = await goalieAnalytics(sp.id); if (ga) latest.push(`🧤 ${cleanName(starter.name)} — ${ga.last10.gsax >= 0 ? "+" : ""}${ga.last10.gsax} GSAx over his last ${ga.last10.gp}`); } }
   if (form) latest.push(form.streakType === "W" && form.streakLen >= 3 ? `📈 ${form.streakLen}-game win streak` : form.streakType === "L" && form.streakLen >= 3 ? `📉 winless in ${form.streakLen}` : `record ${mine!.last10} in the last 10`);
 
-  return {
+  // BRIEFING — short FM-style advisor notes from the staff, drawn from live data.
+  const briefing: Briefing[] = [];
+  const teamHref2 = `/teams/${team.slug}`;
+  // Coach — a struggling line, or a read on the room's form.
+  const weakLine = build?.forwards.filter((l) => l.gelled && l.chemistry < 66).sort((a, b) => a.chemistry - b.chemistry)[0];
+  if (weakLine) briefing.push({ dept: "Coach", icon: "🎛️", text: `Our line ${weakLine.index + 1} has struggled to click — chemistry down to ${weakLine.chemistry}.`, href: `${teamHref2}/lines/builder` });
+  else if (form && form.streakType === "L" && form.streakLen >= 3) briefing.push({ dept: "Coach", icon: "🎛️", text: `The room's flat — winless in ${form.streakLen}. Might be time to shake up the lines.`, href: `${teamHref2}/lines` });
+  else if (form && form.streakType === "W" && form.streakLen >= 3) briefing.push({ dept: "Coach", icon: "🎛️", text: `Lines are humming — riding a ${form.streakLen}-game heater. Keep them together.` });
+  else briefing.push({ dept: "Coach", icon: "🎛️", text: "Systems look settled — the group's in a good rhythm." });
+  // Medical — someone nearing a return, else injury load, else clean.
+  const returning = roster.filter((p) => p.injuryDaysLeft > 0 && p.injuryDaysLeft <= 4).sort((a, b) => a.injuryDaysLeft - b.injuryDaysLeft)[0];
+  const injuredCount = roster.filter((p) => p.injuryDaysLeft > 0).length;
+  if (returning) briefing.push({ dept: "Medical", icon: "🏥", text: `${cleanName(returning.name)} is nearing a return — cleared for contact in ~${returning.injuryDaysLeft} day${returning.injuryDaysLeft === 1 ? "" : "s"}.`, href: returning.slug ? `/players/${returning.slug}` : undefined });
+  else if (injuredCount > 0) briefing.push({ dept: "Medical", icon: "🏥", text: `${injuredCount} on the shelf — none close to returning yet.`, href: `${teamHref2}/roster` });
+  else briefing.push({ dept: "Medical", icon: "🏥", text: "Clean bill of health — a full lineup available." });
+  // Scouting — a rising prospect in the system.
+  try {
+    const srcFilter = await draftSourceFilter();
+    const prospect = await prisma.draftProspect.findFirst({ where: { draftedByTeamId: teamId, ...srcFilter }, orderBy: { potential: "desc" }, select: { name: true, position: true, ov: true, potential: true } });
+    if (prospect) briefing.push({ dept: "Scouting", icon: "🔭", text: `Prospect ${cleanName(prospect.name)} (${prospect.position}) is tracking up — ceiling ${prospect.potential}, now grading ${prospect.ov}.`, href: `${teamHref2}/prospects` });
+    else briefing.push({ dept: "Scouting", icon: "🔭", text: "Scouts are quiet this week — no new risers in the system." });
+  } catch { briefing.push({ dept: "Scouting", icon: "🔭", text: "Scouts are quiet this week — no new risers in the system." }); }
+  // League — the next date on the calendar.
+  const y = SEASON_START_YEAR;
+  const deadline = new Date(Date.UTC(y + 1, 2, 3));   // ~Mar 3 trade deadline
+  const playoffs = new Date(Date.UTC(y + 1, 3, 15));  // Apr 15 playoffs
+  const draftDay = new Date(Date.UTC(y + 1, 5, 27));  // late-June entry draft
+  if (clock.phase === "regular") {
+    const dDl = daysBetween(now, deadline);
+    if (dDl >= 0 && dDl <= 30) briefing.push({ dept: "League", icon: "📰", text: `Trade deadline in ${dDl} day${dDl === 1 ? "" : "s"} — the market's warming up.`, href: "/trades" });
+    else { const dPo = daysBetween(now, playoffs); briefing.push({ dept: "League", icon: "📰", text: dPo > 0 ? `Playoffs begin in ${dPo} days — the race is tightening.` : "Playoff race is on — every point counts." }); }
+  } else if (clock.phase === "playoffs") briefing.push({ dept: "League", icon: "📰", text: "The playoffs are here — win or go home." });
+  else if (clock.frenzyOpen) briefing.push({ dept: "League", icon: "📰", text: "Free-agent frenzy is open — the market is moving fast.", href: "/free-agents" });
+  else { const dDr = daysBetween(now, draftDay); briefing.push({ dept: "League", icon: "📰", text: dDr > 0 && dDr < 120 ? `Entry Draft in ${dDr} days — scouts are finalising the board.` : "Off-season — build for next year.", href: "/draft" }); }
+
+  const base = {
     team: { name: team.name, slug: team.slug, code: team.code },
     nextGame,
     ready: { lines: linesOk, roster: rosterOk, rosterNote: rosterOk ? "Legal" : `Short ${gaps.join(", ")}`, capSpace, capOk },
-    attention, form, latest,
+    briefing, form, latest,
   };
+
+  // OFF-SEASON: no active schedule → drop the game-day panel, show offseason items
+  // (your unsigned/expiring players, free-agent pool, recent league moves).
+  if (!nextGame && clock.phase !== "regular" && clock.phase !== "playoffs") {
+    const [freeAgents, moves] = await Promise.all([
+      prisma.player.count({ where: { rosterType: { notIn: ["NHL", "AHL", "RETIRED", "PROSPECT", "RELEASED"] } } }),
+      prisma.transaction.findMany({ orderBy: { createdAt: "desc" }, take: 5, select: { message: true } }),
+    ]);
+    const expiring = roster.filter((p) => (p.contractYears ?? 9) <= 1 && (p.overall ?? 0) >= 55)
+      .map((p) => ({ name: cleanName(p.name), slug: p.slug }));
+    return { ...base, mode: "offseason", attention: [], offseason: { expiring, freeAgents, recentMoves: moves.map((m) => m.message) } };
+  }
+
+  return { ...base, mode: "season", attention };
 }

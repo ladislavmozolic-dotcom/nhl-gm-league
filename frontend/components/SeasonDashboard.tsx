@@ -28,12 +28,25 @@ export default function SeasonDashboard({ data }: { data: GmDashboard }) {
       <div className="min-h-full flex items-center justify-center p-4">
         <div className="w-full max-w-3xl">
           <div className="text-center mb-6">
-            <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Season Dashboard</div>
+            <div className="text-xs uppercase tracking-[0.2em] text-slate-500">{data.mode === "offseason" ? "Offseason" : "Season Dashboard"}</div>
             <h1 className="text-2xl sm:text-3xl font-black text-white mt-1">{greeting}, {data.team.code ?? data.team.name} GM</h1>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            {/* Next game + readiness */}
+            {data.mode === "offseason" && data.offseason ? (
+              /* Offseason — no game-day panel */
+              <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5">
+                <div className="text-xs uppercase tracking-wide text-slate-500 mb-2">Offseason</div>
+                <div className="text-sm text-slate-300 mb-2"><span className="text-amber-400 font-bold">{data.offseason.freeAgents}</span> free agents on the market — <Link href="/free-agents" onClick={dismiss} className="text-blue-400 hover:underline">the Board →</Link></div>
+                {data.offseason.expiring.length > 0 ? (
+                  <div className="border-t border-slate-800 pt-2">
+                    <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Your expiring contracts</div>
+                    {data.offseason.expiring.slice(0, 5).map((p, i) => <div key={i} className="text-sm">{p.slug ? <Link href={`/players/${p.slug}`} onClick={dismiss} className="hover:text-blue-400">{p.name}</Link> : p.name}</div>)}
+                  </div>
+                ) : <div className="text-sm text-emerald-400 border-t border-slate-800 pt-2">✅ No expiring contracts to worry about.</div>}
+              </div>
+            ) : (
+            /* Next game + readiness */
             <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5">
               <div className="text-xs uppercase tracking-wide text-slate-500 mb-2">Next Game</div>
               {data.nextGame ? (
@@ -48,6 +61,7 @@ export default function SeasonDashboard({ data }: { data: GmDashboard }) {
                 <Check ok={data.ready.capOk} label={`Cap ${data.ready.capSpace >= 0 ? `${money(data.ready.capSpace)} available` : `over by ${money(-data.ready.capSpace)}`}`} />
               </div>
             </div>
+            )}
 
             {/* Team form + latest */}
             <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5">
@@ -67,7 +81,26 @@ export default function SeasonDashboard({ data }: { data: GmDashboard }) {
             </div>
           </div>
 
-          {/* Attention */}
+          {/* Briefing — FM-style staff notes from around the club */}
+          {data.briefing && data.briefing.length > 0 && (
+            <div className="grid gap-3 sm:grid-cols-2 mt-4">
+              {data.briefing.map((b, i) => {
+                const body = (
+                  <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-4 h-full hover:border-slate-700 transition-colors">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-base">{b.icon}</span>
+                      <span className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">{b.dept}</span>
+                    </div>
+                    <div className="text-sm text-slate-200">{b.text}</div>
+                  </div>
+                );
+                return <div key={i}>{b.href ? <Link href={b.href} onClick={dismiss} className="block h-full">{body}</Link> : body}</div>;
+              })}
+            </div>
+          )}
+
+          {/* Attention (season only) */}
+          {data.mode === "season" && (
           <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 mt-4">
             <div className="text-xs uppercase tracking-wide text-amber-400 mb-2">Attention Required</div>
             {data.attention.length === 0 ? (
@@ -81,6 +114,15 @@ export default function SeasonDashboard({ data }: { data: GmDashboard }) {
               </div>
             )}
           </div>
+          )}
+
+          {/* Recent league moves (offseason) */}
+          {data.mode === "offseason" && data.offseason && data.offseason.recentMoves.length > 0 && (
+            <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 mt-4">
+              <div className="text-xs uppercase tracking-wide text-slate-400 mb-2">Around the League</div>
+              <div className="space-y-1">{data.offseason.recentMoves.map((m, i) => <div key={i} className="text-sm text-slate-300 truncate">{m}</div>)}</div>
+            </div>
+          )}
 
           <div className="text-center mt-6">
             <button onClick={dismiss} className="px-8 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-lg shadow-lg shadow-blue-900/30">Continue →</button>

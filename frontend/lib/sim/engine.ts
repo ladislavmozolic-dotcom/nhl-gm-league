@@ -235,9 +235,10 @@ function conversion(
   // finishing amplified around the league mean so an elite finisher clearly out-scores
   // a similar-looking one — the compressed ratings still separate the snipers.
   const shooterMod = Math.pow(shooterFinishing / 60, 1.7);
-  // widen the goalie spread (^2.2) so an elite goalie reaches ~92% SV over a
-  // season and a weak one is clearly beatable, while the league average holds.
-  const goalieMod = Math.pow(LEAGUE.avgGoalie / goalieQuality, 2.2);
+  // goalie spread (^1.9): an elite goalie tops out near ~92.5% SV over a season
+  // (real-world ceiling) rather than running away to 94%, and a weak one is clearly
+  // beatable, while the league average holds. (Was 2.2 → elite keepers too good.)
+  const goalieMod = Math.pow(LEAGUE.avgGoalie / goalieQuality, 1.9);
   let p = LEAGUE.baseConversion * shooterMod * goalieMod * (CFG.goalsPct / 100) * (AHL_GAME ? AHL_GOALS_MULT : 1);
   if (isHome) p *= 1 + (LEAGUE.homeConvBonus - 1) * (CFG.homeAdvPct / 100);
   if (strength === "PP") p *= 1 + (LEAGUE.ppConvBoost - 1) * (CFG.powerPlayPct / 100);
@@ -884,13 +885,40 @@ function simulatePeriodPossession(st: SimState, period: number) {
     // team-system tempo/style scales HOW OFTEN the carrier generates a chance, and the
     // defender's posture scales how many it allows.
     if (!rng.chance(0.29 * atkFx.shotRate * def.tactics.oppShotRate)) continue;
-    if (rng.chance(ratio(atkSkill(carrier.attrs.sc ?? 50), (carrier.attrs.pa ?? 50), 0.7))) {
-      // SHOT — blocked? (DF vs SC)
-      if (rng.chance(0.5 * ratio(defSkill(dman.attrs.df ?? 50), atkSkill(carrier.attrs.sc ?? 50)))) { setup = "carry"; continue; } // blocked
+    // Shoot-or-pass decision FIRST. A forward who elects to SHOOT sometimes walks
+    // the puck back to the point for a D one-timer instead — this is how D rack up
+    // their goals. But a forward who would PASS keeps the puck (→ his linemate's
+    // one-timer and the passer's assist survive), so the point shot only ever
+    // cannibalises a forward's own shot, never a scoring-chance pass play.
+    const wantsShot = rng.chance(ratio(atkSkill(carrier.attrs.sc ?? 50), (carrier.attrs.pa ?? 50), 0.7));
+    // A SNIPER shoots it himself; a lower-skill forward is the one who defers to the
+    // QB at the point. So the deferral rate falls with the carrier's shot (SC) — an
+    // 82+ sniper (McDavid) never gives it up, a grinder defers up to ~1/3 the time.
+    // This keeps the point shots (→ D goals) coming off DEPTH possessions instead of
+    // taxing the elite scorers' own looks, so the scoring race stays intact.
+    const deferRate = Math.max(0, Math.min(0.40, 0.40 * (85 - (carrier.attrs.sc ?? 50)) / 45));
+    // only a plain CARRY defers to the point — a forward who just took a cross-ice
+    // feed or a rebound shoots his high-danger look himself (never downgraded to a
+    // point shot), so the diversion adds D goals without destroying scoring chances.
+    const pointShot = wantsShot && !carrier.isDefense && zone === "OFF" && setup === "carry" && rng.chance(deferRate);
+    if (pointShot) { const d = pickByAttr(rng, onIceD(carrierTeam), (s) => Math.pow(involvement(0.62 * (s.attrs.sc ?? 50) + 0.38 * (s.attrs.pa ?? 50)), 3.0) * 60); if (d) carrier = d; } // elite offensive D quarterback the point → they get the goals (steep pick concentrates the top end)
+    if (wantsShot) {
+      // SHOT — blocked? (DF vs SC). A diverted point shot has traffic/a screen in
+      // front, so it's blocked less (and isn't judged by the D's weak SC) — this
+      // stops the diversion from leaking goals to blocks and keeps scoring neutral.
+      const blockP = pointShot ? 0.32 : 0.5 * ratio(defSkill(dman.attrs.df ?? 50), atkSkill(carrier.attrs.sc ?? 50));
+      if (rng.chance(blockP)) { setup = "carry"; continue; } // blocked
       // shot danger: a D-man point shot is low, a one-timer off a pass or a rebound
       // is high, a forward's own-rush shot is medium. Chemistry drives more passes
       // → more high-danger looks, so gelled lines get better chances automatically.
-      const baseDanger = carrier.isDefense ? 0.35 : setup === "pass" ? 1.75 : setup === "rebound" ? 1.6 : 1.0;
+      // a D's shot: the low POINT xG already reflects the long-range look, so the
+      // danger multiplier is near-neutral (was double-counting at 0.35 → almost no D
+      // goals). A pinching / rush-joining D gets a forward-like look.
+      // A DIVERTED point shot is a screened / tipped quality look (a forward gave up
+      // his own shot for it), so it converts near a forward's carry — the goal just
+      // moves from the F to the D, keeping league scoring neutral. An organic D dump
+      // from the point stays low.
+      const baseDanger = carrier.isDefense ? (pointShot ? 0.92 : 0.63) : setup === "pass" ? 1.75 : setup === "rebound" ? 1.6 : 1.0;
       // team-system: rush raises chance danger, shot-volume lowers it (more but softer);
       // the defending team's D-zone posture (collapse) suppresses danger.
       const dangerBias = atkFx.dangerMix * defFx.oppDangerMult;
@@ -965,7 +993,11 @@ function simulatePeriodPossession(st: SimState, period: number) {
       const pAnchor = conversion(shOff, LEAGUE.avgGoalie, isHome, strength);
       const pConv = compressToward(pTalent, pAnchor, pk);
       const teamEdge = compressToward(offMult * defShield * defTalent, 1, pk);
-      const p = pConv * danger * pressBonus
+      // a booming point shot rewards the D's SHOT rating (SC): an elite offensive D
+      // beats the keeper cleanly, a stay-at-home D rarely does. Centred so the mean
+      // D keeps the same total (only the SPREAD widens → a few elite D reach 20-25).
+      const pointFinish = pointShot ? Math.max(0.75, Math.min(1.5, 1 + 0.016 * ((carrier.attrs.sc ?? 50) - 58))) : 1;
+      const p = pConv * danger * pressBonus * pointFinish
         * momoBoost(st, carrierTeam.id, absT) * clutchFactor(st, carrier, period, tick, margin)
         * teamEdge * catchUp * ppMod
         * (st.nightOff[carrierTeam.id] ?? 1) * (st.nightDef[def.id] ?? 1); // any-given-night form
