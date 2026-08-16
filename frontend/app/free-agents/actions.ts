@@ -68,6 +68,9 @@ export async function getAskAtAction(playerId: number, teamId: number, line: num
 
 /** All standing offers on a player (open frenzy — GMs can see the competition). */
 export async function getPlayerOffersAction(playerId: number) {
+  // blind bidding: only the commissioner sees the competing offers; a GM never
+  // sees what other clubs have bid.
+  if (!(await isAdmin())) return [];
   const offers = await prisma.faOffer.findMany({
     where: { playerId, status: { in: ACTIVE } }, orderBy: { salary: "desc" },
   });
@@ -110,6 +113,10 @@ export async function submitOfferAction(
   // may continue; nobody new can join from round 2 onward.
   if (!existing && clock.frenzyRound > 1) {
     return { ok: false as const, error: "Bidding on this player closed after round 1 — only clubs already negotiating can raise their offer." };
+  }
+  // one offer per club per round — you get a single move each round, no rapid edits.
+  if (existing && existing.round === clock.frenzyRound && existing.status !== "REJECTED") {
+    return { ok: false as const, error: "You've already made your offer this round — wait for the next round to change it." };
   }
   const ceiling = capCeilingForPhase(cap.upper, clock.phase) + ltir;
   if (committed + salary > ceiling) {
