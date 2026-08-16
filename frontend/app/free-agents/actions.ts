@@ -474,7 +474,7 @@ export async function extendContractAction(
 ) {
   if (!(await canManageTeam(teamId))) return { ok: false as const, error: "You don't manage this team." };
   const player = await prisma.player.findUnique({
-    where: { id: playerId }, select: { teamId: true, contractYears: true, capHit: true, age: true, name: true, lastSeasonGP: true, resignRound: true, resignStatus: true, rosterType: true, franchiseTag: true, overall: true, realFarmTeamId: true },
+    where: { id: playerId }, select: { teamId: true, contractYears: true, capHit: true, age: true, name: true, lastSeasonGP: true, resignRound: true, resignStatus: true, resignOfferSalary: true, rosterType: true, franchiseTag: true, overall: true, realFarmTeamId: true },
   });
   if (!player) return { ok: false as const, error: "Player not found." };
   // the club may re-sign its own NHL players AND its farm (AHL affiliate) players
@@ -535,9 +535,11 @@ export async function extendContractAction(
     const bigLowball = salary < ev.ask.floorSalary * 0.82;
     const walk = nextRound > maxRounds || (round === 0 && bigLowball && (lowIce || isUFA));
     if (walk) {
-      // RFA → offer-sheet eligible; UFA → tests free agency
+      // RFA → offer-sheet eligible; UFA → tests free agency. Record the club's best
+      // standing offer — that's the number a rival's offer sheet must beat.
       const status = isRFA ? "osEligible" : "walkedToUFA";
-      await prisma.player.update({ where: { id: playerId }, data: { resignStatus: status, resignRound: nextRound } });
+      const bestOffer = Math.max(salary, player.resignOfferSalary ?? 0);
+      await prisma.player.update({ where: { id: playerId }, data: { resignStatus: status, resignRound: nextRound, resignOfferSalary: bestOffer } });
       // no revalidatePath here — it would tear down the open modal before its notice
       // shows; the client refreshes on Close.
       return {
@@ -550,7 +552,8 @@ export async function extendContractAction(
     // he counters (kept fuzzy — you don't see his exact number, just a range)
     const counterSalary = ev.ask.floorSalary;
     const counterYears = Math.min(Math.max(years, ev.ask.minYears), ev.ask.maxYears);
-    await prisma.player.update({ where: { id: playerId }, data: { resignRound: nextRound, resignStatus: "countered", resignCounterSalary: counterSalary, resignCounterYears: counterYears } });
+    const bestOffer = Math.max(salary, player.resignOfferSalary ?? 0);
+    await prisma.player.update({ where: { id: playerId }, data: { resignRound: nextRound, resignStatus: "countered", resignCounterSalary: counterSalary, resignCounterYears: counterYears, resignOfferSalary: bestOffer } });
     return {
       ok: false as const, rejected: true, round: nextRound,
       reason: `Round ${nextRound} of ${maxRounds} — he's countering around ${fmtM(counterSalary * 0.97)}–${fmtM(counterSalary * 1.06)} over ${counterYears}yr.${nextRound >= maxRounds ? " Last round before he walks." : ""}`,

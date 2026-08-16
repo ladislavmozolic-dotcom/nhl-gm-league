@@ -72,6 +72,11 @@ export type EngineSettings = {
   retentionMinSalary: number; // new team must carry at least this
   retentionMaxPlayers: number;// max retained players per team
   clausesEnabled: boolean;    // enforce NTC / NMC / M-NTC contract clauses in trades (off = no-CBA league)
+  // Offer-sheet compensation: draft-pick cost the poaching club pays the old
+  // club, by the offer-sheet's AAV. Tiers are ordered ascending by maxAav; the
+  // final tier uses maxAav 0 as "no upper bound". picks = draft rounds owed.
+  osCompEnabled: boolean;
+  osCompTiers: { maxAav: number; picks: number[] }[];
   rosterOverFinePerDay: number; // fine per excess player per day
   rewardPlayoff: number;      // to bank on making the playoffs
   rewardCup: number;          // Stanley Cup winner bonus
@@ -165,6 +170,14 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   salaryCapUpper: 85900000, salaryCapLower: 51500000,
   buyoutPctSeason: 50, buyoutPctOffseason: 35,
   retentionMaxPct: 50, retentionMinSalary: 600000, retentionMaxPlayers: 3, clausesEnabled: true,
+  osCompEnabled: true,
+  osCompTiers: [
+    { maxAav: 1000000, picks: [3] },        // ≤ $1M → a 3rd-round pick
+    { maxAav: 3000000, picks: [1, 3] },     // ≤ $3M → a 1st + 3rd
+    { maxAav: 5000000, picks: [1, 1] },     // ≤ $5M → two 1sts
+    { maxAav: 8000000, picks: [1, 1, 1] },  // ≤ $8M → three 1sts
+    { maxAav: 0, picks: [1, 1, 1, 1] },     // > $8M → four 1sts
+  ],
   rosterOverFinePerDay: 200000,
   rewardPlayoff: 8000000, rewardCup: 3000000, rewardAhlCup: 4000000, rewardAhlFinalist: 2000000,
   duHighThreshold: 90, conRecovery: 1, conRecoveryHighDu: 2,

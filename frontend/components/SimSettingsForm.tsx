@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import type { EngineSettings } from "@/lib/sim/settings";
 import { DEFAULT_SETTINGS } from "@/lib/sim/settings";
+import { compensationLabel } from "@/lib/offer-sheet";
 
 type Props = {
   initial: EngineSettings;
@@ -38,6 +39,17 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
 
   const save = () => start(async () => { await onSave(s); setSaved(true); });
   const reset = () => { setS(DEFAULT_SETTINGS); setSaved(false); };
+
+  // offer-sheet compensation tier editors
+  const setTierAav = (i: number, m: number) =>
+    set("osCompTiers", s.osCompTiers.map((t, j) => (j === i ? { ...t, maxAav: Math.max(0, Math.round(m * 1e6)) } : t)));
+  const setTierRound = (i: number, round: number, count: number) =>
+    set("osCompTiers", s.osCompTiers.map((t, j) => {
+      if (j !== i) return t;
+      const others = t.picks.filter((x) => x !== round);
+      const add = Array.from({ length: Math.max(0, Math.min(4, count)) }, () => round);
+      return { ...t, picks: [...others, ...add].sort((a, b) => a - b) };
+    }));
 
   const Slider = ({ k, label, hint }: { k: keyof EngineSettings; label: string; hint: string }) => (
     <div className="grid grid-cols-[150px_1fr_60px] items-center gap-3 py-1.5">
@@ -188,6 +200,30 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
             <NumField k="rewardCup" label="Reward: Cup winner" step={500000} w="w-32" />
             <NumField k="rewardAhlCup" label="Reward: Calder winner" step={500000} w="w-32" />
           </div>
+        </div>
+      </Card>
+
+      <Card title="Offer-sheet compensation">
+        <div className="mb-2"><Toggle k="osCompEnabled" label="Enforce offer-sheet draft-pick compensation" /></div>
+        <p className="text-[11px] text-slate-500 mb-3">Picks the poaching club owes the old club, by the offer sheet&apos;s yearly salary. AAV cap in $M (0 = the top open-ended tier). A club may only surrender its own original picks — the engine verifies ownership.</p>
+        <div className="space-y-2">
+          {s.osCompTiers.map((t, i) => (
+            <div key={i} className="grid grid-cols-1 sm:grid-cols-[130px_1fr_130px] items-center gap-2 border-b border-slate-800/60 pb-2">
+              <label className="flex items-center gap-2 text-xs text-slate-400">≤ AAV ($M)
+                <input type="number" step={0.5} min={0} value={(t.maxAav / 1e6).toString()} onChange={(e) => setTierAav(i, Number(e.target.value))}
+                  className="w-20 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-right tabular-nums" />
+              </label>
+              <div className="flex items-center gap-3 text-xs text-slate-400">
+                {[1, 2, 3].map((r) => (
+                  <label key={r} className="flex items-center gap-1">{r === 1 ? "1st" : r === 2 ? "2nd" : "3rd"}
+                    <input type="number" min={0} max={4} value={t.picks.filter((x) => x === r).length} onChange={(e) => setTierRound(i, r, Number(e.target.value))}
+                      className="w-12 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-right tabular-nums" />
+                  </label>
+                ))}
+              </div>
+              <span className="text-xs text-emerald-300 sm:text-right">{compensationLabel(t.picks)}</span>
+            </div>
+          ))}
         </div>
       </Card>
 

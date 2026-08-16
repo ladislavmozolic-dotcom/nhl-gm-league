@@ -149,6 +149,7 @@ model Player {
   resignStatus         String?                     // null | open | countered | walkedToUFA | osEligible (RFA who declined → offer sheets)
   resignCounterSalary  Int?                        // the player's counter in the current re-sign round
   resignCounterYears   Int?
+  resignOfferSalary    Int?                        // club's last standing re-sign offer (the AAV an offer sheet must beat)
   signPromiseLine      Int?          // deployment promised at signing: F line 1-4 / D pair 1-3 / G 1-2
   signPromisePP        Boolean?      // power-play time promised at signing
   signPromisePK        Boolean?      // penalty-kill time promised at signing
@@ -262,6 +263,33 @@ model FaOffer {
   @@unique([playerId, teamId])            // one standing offer per team per player
   @@index([playerId])
   @@index([teamId])
+}
+
+// A rival club's offer sheet on another team's RFA (once he's osEligible). The
+// player's AI decides by July 10: he signs it if it meets his demand AND beats
+// his own club's standing offer, else declines. When it's signed the submitting
+// club sends the compensation picks (reserved at submission) to the old club.
+model OfferSheet {
+  id          Int      @id @default(autoincrement())
+  playerId    Int
+  fromTeamId  Int                              // the club submitting the offer sheet
+  toTeamId    Int                              // the player's current club (gets compensation)
+  salary      Int
+  years       Int
+  twoWay      Boolean  @default(false)
+  line        Int      @default(3)
+  pp          Boolean  @default(false)
+  pk          Boolean  @default(false)
+  grantClause String?
+  mNtcBreadth Int?
+  compPickIds Int[]    @default([])            // DraftPick ids reserved as compensation (transferred on sign)
+  status      String   @default("PENDING")     // PENDING | ACCEPTED | DECLINED | WITHDRAWN
+  note        String?                          // player's decision note
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@unique([playerId, fromTeamId])             // one offer sheet per club per player
+  @@index([playerId])
+  @@index([fromTeamId])
 }
 
 model AutoSim {

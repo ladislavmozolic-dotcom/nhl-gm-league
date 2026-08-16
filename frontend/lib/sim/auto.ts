@@ -6,7 +6,7 @@ import { prisma } from "../prisma";
 import { playScheduledGames } from "./season";
 import { processFinances } from "../finance-server";
 import { getLeagueDate } from "../calendar-server";
-import { addDays, effectivePhase, frenzyRound } from "../calendar";
+import { addDays, effectivePhase, frenzyRound, frenzyDay } from "../calendar";
 
 const SEASON = "2026-27";
 
@@ -21,11 +21,17 @@ export async function advanceFrenzyDay() {
   if (ph(cur) === "regular" || ph(cur) === "playoffs") return { advanced: false as const };
   const next = addDays(cur, 1);
   const { resolveFrenzy, processRoundEnd } = await import("../../app/free-agents/actions");
-  let signed = 0, roundEnded = 0;
+  let signed = 0, roundEnded = 0, osSigned = 0;
+  // offer sheets are decided by July 10 — resolve them once, as the clock crosses
+  // day 10 (or leaves the frenzy earlier).
+  if (ph(cur) === "frenzy" && frenzyDay(cur) <= 10 && (frenzyDay(next) > 10 || ph(next) !== "frenzy")) {
+    const { resolveOfferSheets } = await import("../offer-sheet-server");
+    osSigned = (await resolveOfferSheets()).signed;
+  }
   if (ph(cur) === "frenzy" && ph(next) !== "frenzy") { signed = (await resolveFrenzy()).signed; }
   else if (ph(cur) === "frenzy" && ph(next) === "frenzy" && frenzyRound(cur) !== frenzyRound(next)) { await processRoundEnd(frenzyRound(cur)); roundEnded = frenzyRound(cur); }
   await prisma.leagueConfig.upsert({ where: { id: 1 }, update: { leagueDate: next }, create: { id: 1, leagueDate: next } });
-  return { advanced: true as const, date: next, signed, roundEnded };
+  return { advanced: true as const, date: next, signed, roundEnded, osSigned };
 }
 
 /** Current wall-clock in Europe/Bratislava as { date: "YYYY-MM-DD", hour, minute }. */
