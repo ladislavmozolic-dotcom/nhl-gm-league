@@ -66,6 +66,7 @@ export type EngineSettings = {
   // Finance
   salaryCapUpper: number;
   salaryCapLower: number;
+  startingCapital: number;    // uniform season-opening bank for every club
   buyoutPctSeason: number;    // % of salary as buyout dead-money (in-season)
   buyoutPctOffseason: number; // ... in the off-season
   retentionMaxPct: number;    // max salary a team can retain in a trade
@@ -180,7 +181,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   starExponent: 2.1,
   winPts: 2, otWinPts: 2, otLossPts: 1, lossPts: 0,
   playoffFormat: "division", playoffTeamsPerConf: 8, playoffBestOf: 7,
-  salaryCapUpper: 85900000, salaryCapLower: 51500000,
+  salaryCapUpper: 85900000, salaryCapLower: 51500000, startingCapital: 40000000,
   buyoutPctSeason: 50, buyoutPctOffseason: 35,
   retentionMaxPct: 50, retentionMinSalary: 600000, retentionMaxPlayers: 3, clausesEnabled: true,
   osCompEnabled: true,

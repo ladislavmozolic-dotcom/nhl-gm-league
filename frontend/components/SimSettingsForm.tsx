@@ -193,6 +193,7 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
         </label>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
           <div>
+            <NumField k="startingCapital" label="Starting capital / club" step={1000000} w="w-32" />
             <NumField k="salaryCapUpper" label="Salary cap (upper)" step={100000} w="w-32" />
             <NumField k="salaryCapLower" label="Salary floor (lower)" step={100000} w="w-32" />
             <NumField k="rosterOverFinePerDay" label="Over-roster fine / day" step={50000} w="w-32" />

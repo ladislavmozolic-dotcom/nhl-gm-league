@@ -56,16 +56,15 @@ export async function processFinances(season = "2026-27", league = "NHL") {
     prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true } }),
   ]);
   const stById = new Map(standings.map((s) => [s.teamId, s]));
-  // season-opening bank: real scraped balance in ProfiNHL mode, flat 50M otherwise
-  // (mirrors admin/rosters applyRosterMode init)
-  const realMode = cfg?.rosterMode === "real";
   const rewards = league === "NHL" ? await computeRewards(season) : new Map<number, number>();
 
-  // Detailed Finance: drive the bank off the fan-interest → demand → revenue model
-  // instead of the base ticket income (NHL only). Season net is pro-rated by how
-  // much of the 82-game season has been played.
+  // Season-opening bank: a uniform commissioner-set starting capital for every club
+  // (a level playing field). Detailed Finance then drives the bank off the fan-
+  // interest → demand → revenue model, pro-rated by how much of the season is played.
   const { loadSettings } = await import("./sim/settings");
-  const detailed = league === "NHL" && (await loadSettings()).financeMode === "detailed";
+  const settings = await loadSettings();
+  const startBankUniform = settings.startingCapital;
+  const detailed = league === "NHL" && settings.financeMode === "detailed";
   const detailedFin = detailed ? await (await import("./detailed-finance-server")).leagueDetailedFinance() : null;
 
   const updates: Promise<unknown>[] = [];
@@ -75,7 +74,7 @@ export async function processFinances(season = "2026-27", league = "NHL") {
       prisma.game.count({ where: { season, league, status: "FINAL", seriesId: null, OR: [{ homeTeamId: t.id }, { awayTeamId: t.id }] } }),
     ]);
     const st = stById.get(t.id);
-    const startBank = realMode ? STARTING_BANK : (t.profinhlBank ?? STARTING_BANK);
+    const startBank = startBankUniform;
     const reward = rewards.get(t.id) ?? 0;
 
     let bank: number;
