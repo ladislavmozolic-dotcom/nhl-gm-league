@@ -7,6 +7,8 @@ import { posGroup, ratingColor, ovColor } from "@/lib/ratingBands";
 import { playerType } from "@/lib/player-type";
 import { playerCareer } from "@/lib/career-server";
 import PlayerCareerCard from "@/components/PlayerCareerCard";
+import { playerForm } from "@/lib/form-server";
+import PlayerFormCard from "@/components/PlayerFormCard";
 
 export const dynamic = "force-dynamic";
 
@@ -216,6 +218,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   const hasAhl = isGoalie ? !!(gl.ahlReg || gl.ahlPo) : !!(sk.ahlReg || sk.ahlPo);
 
   const career = await playerCareer(p.id);
+  const form = await playerForm(p.id);
 
   const team = p.team as any;
   const teamCode: string = team?.code ?? team?.name ?? "—";
@@ -234,7 +237,6 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     ["Height", p.height || "—"],
     ["Weight", p.weight != null ? `${p.weight} kg` : "—"],
     ["Condition", `${Math.round(p.condition ?? 100)}%`],
-    ...(!isGoalie ? [["Morale", `${Math.round(p.morale ?? 75)}%`] as [string, React.ReactNode]] : []),
     ["Status", status],
     [isGoalie ? "Catches" : "Shoots", p.shoots ?? "—"],
   ];
@@ -367,6 +369,9 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
           </div>
         </div>
       </Card>
+
+      {/* ── CURRENT FORM (derived) vs MO (stored) ─────────────────── */}
+      <PlayerFormCard form={form} morale={isGoalie ? null : (p.morale ?? null)} />
 
       {/* ── PLAYER STATS ─────────────────────────────────────────── */}
       <Card title="Player Stats" bodyClassName="p-4">
