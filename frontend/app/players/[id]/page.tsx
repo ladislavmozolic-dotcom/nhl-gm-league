@@ -371,10 +371,9 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
             </div>
           </div>
         </div>
+        {/* Current Form banner — derived, under the ratings/Overall strip */}
+        <PlayerFormCard form={form} />
       </Card>
-
-      {/* ── CURRENT FORM (derived) vs MO (stored) ─────────────────── */}
-      <PlayerFormCard form={form} />
 
       {/* ── SHOT / SAVE HEAT MAP ───────────────────────────────────── */}
       {heatMap && <RinkHeatMap map={heatMap} />}
