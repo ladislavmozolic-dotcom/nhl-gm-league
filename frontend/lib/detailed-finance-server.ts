@@ -13,7 +13,7 @@ import { allStarPowers } from "./star-power-server";
 import { seasonTickets, arenaFor, type TicketPricing } from "./season-tickets";
 import { attendancePct } from "./attendance";
 import { teamMerch, jerseyUnits } from "./merchandise";
-import { clubRevenueLines, clubRevenueTotal, clubOverhead, clubExpenseLines, type FinanceLine } from "./club-finance";
+import { clubRevenueLines, clubRevenueTotal, clubExpenseLines, clubExpenseTotal, type FinanceLine } from "./club-finance";
 
 const asPricing = (s: string | null | undefined): TicketPricing => (s === "LOW" || s === "PREMIUM" ? s : "STANDARD");
 
@@ -24,7 +24,7 @@ export async function leagueDetailedFinance(): Promise<Map<number, { revenue: nu
   const [fans, stars, teams] = await Promise.all([
     leagueFanInterest(),
     allStarPowers(),
-    prisma.team.findMany({ where: { league: "NHL", isAffiliate: false }, select: { id: true, ticketPricing: true, sponsorDeal: true, capacity: true, players: { where: { rosterType: "NHL" }, select: { capHit: true } } } }),
+    prisma.team.findMany({ where: { league: "NHL", isAffiliate: false }, select: { id: true, ticketPricing: true, sponsorDeal: true, capacity: true, headCoach: { select: { salary: true } }, affiliateTeams: { select: { headCoach: { select: { salary: true } } } }, players: { where: { rosterType: "NHL" }, select: { capHit: true } } } }),
   ]);
   const jerseyByTeam = new Map<number, number>();
   for (const s of stars) if (s.teamId != null) jerseyByTeam.set(s.teamId, (jerseyByTeam.get(s.teamId) ?? 0) + jerseyUnits(s.score));
@@ -42,7 +42,8 @@ export async function leagueDetailedFinance(): Promise<Map<number, { revenue: nu
     const deal = t.sponsorDeal as { aav?: number } | null;
     const revenue = clubRevenueTotal({ pricing, sthSold: st.sold, avgAttendance: avg, fanInterest: f.interest, merchTotal: merch.total, sponsorAav: deal?.aav ?? 0 });
     const salary = t.players.reduce((s, p) => s + (p.capHit ?? 0), 0);
-    out.set(t.id, { revenue, salary, net: revenue - salary - clubOverhead() });
+    const coachSalary = (t.headCoach?.salary ?? 0) + t.affiliateTeams.reduce((s, a) => s + (a.headCoach?.salary ?? 0), 0);
+    out.set(t.id, { revenue, salary, net: revenue - clubExpenseTotal(salary, coachSalary) });
   }
   return out;
 }
@@ -57,7 +58,7 @@ export type TeamDashboard = {
 };
 
 export async function teamDashboard(teamId: number): Promise<TeamDashboard | null> {
-  const team = await prisma.team.findUnique({ where: { id: teamId }, select: { id: true, name: true, league: true, isAffiliate: true, bankAccount: true, ticketPricing: true } });
+  const team = await prisma.team.findUnique({ where: { id: teamId }, select: { id: true, name: true, league: true, isAffiliate: true, bankAccount: true, ticketPricing: true, headCoach: { select: { salary: true } }, affiliateTeams: { select: { headCoach: { select: { salary: true } } } } } });
   if (!team || team.league !== "NHL" || team.isAffiliate) return null;
 
   const [fan, st, att, merch, sponsor, merchBoard, roster] = await Promise.all([
@@ -75,7 +76,8 @@ export async function teamDashboard(teamId: number): Promise<TeamDashboard | nul
   });
   const revenue = revenueLines.reduce((t, l) => t + l.amount, 0);
   const salary = roster.reduce((t, p) => t + (p.capHit ?? 0), 0);
-  const expenseLines = clubExpenseLines(salary);
+  const coachSalary = (team.headCoach?.salary ?? 0) + team.affiliateTeams.reduce((s, a) => s + (a.headCoach?.salary ?? 0), 0);
+  const expenseLines = clubExpenseLines(salary, coachSalary);
   const expenses = expenseLines.reduce((t, l) => t + l.amount, 0);
   const profit = revenue - expenses;
 

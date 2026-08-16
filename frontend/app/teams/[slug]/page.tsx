@@ -24,6 +24,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
       prospects: { where: { source: rosterSource }, select: { id: true, name: true, position: true, draftYear: true } },
       affiliateTeams: { select: { id: true, name: true, slug: true, logoUrl: true, code: true, players: { select: { id: true } } } },
       parentTeam: true,
+      headCoach: { select: { name: true } },
     },
   });
   if (!team) return notFound();
@@ -132,7 +133,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
           <Card title="Team Info" accent="text-blue-400">
             <div className="space-y-2.5">
               <InfoRow label="General Manager" value={team.gm} />
-              <InfoRow label="Head Coach" value={team.coach || "TBD"} />
+              <InfoRow label="Head Coach" value={team.headCoach?.name || team.coach || "TBD"} />
               <InfoRow label="Conference" value={team.conference || "N/A"} />
               <InfoRow label="Division" value={team.division || "N/A"} />
               <InfoRow label="Arena" value={team.arena} />

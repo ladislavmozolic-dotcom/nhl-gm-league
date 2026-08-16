@@ -42,24 +42,26 @@ export function clubRevenueTotal(i: ClubRevenueInput): number {
   return clubRevenueLines(i).reduce((t, l) => t + l.amount, 0);
 }
 
-// Overhead split into named lines (sum = OVERHEAD).
-const OVERHEAD_LINES: { label: string; amount: number }[] = [
-  { label: "Coaching & hockey ops", amount: 9_000_000 },
+// Fixed operating overhead, split into named lines (coaching is separate — it's
+// the real head-coach salaries, NHL + AHL).
+const FIXED_OVERHEAD_LINES: { label: string; amount: number }[] = [
   { label: "Arena operations", amount: 14_000_000 },
   { label: "Team travel", amount: 7_000_000 },
   { label: "Minor-league affiliate", amount: 8_000_000 },
   { label: "Admin & staff", amount: 10_000_000 },
 ];
+const FIXED_OVERHEAD = FIXED_OVERHEAD_LINES.reduce((t, l) => t + l.amount, 0); // 39M
 
-/** The club's season expenses, itemised — player salaries plus operating overhead. */
-export function clubExpenseLines(salary: number): FinanceLine[] {
-  return [{ label: "Player salaries", amount: salary }, ...OVERHEAD_LINES];
+/** The club's season expenses, itemised — player salaries, the real head-coach
+ *  salaries (NHL + AHL), and fixed operating overhead. */
+export function clubExpenseLines(salary: number, coachSalary: number): FinanceLine[] {
+  return [
+    { label: "Player salaries", amount: salary },
+    { label: "Coaching (NHL + AHL)", amount: coachSalary },
+    ...FIXED_OVERHEAD_LINES,
+  ];
 }
 
-export function clubExpenseTotal(salary: number): number {
-  return salary + OVERHEAD;
-}
-
-export function clubOverhead(): number {
-  return OVERHEAD;
+export function clubExpenseTotal(salary: number, coachSalary: number): number {
+  return salary + coachSalary + FIXED_OVERHEAD;
 }

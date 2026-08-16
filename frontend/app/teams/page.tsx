@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/ui";
 export default async function TeamsPage() {
   const teams = await prisma.team.findMany({
     where: { parentTeamId: null },
-    include: { affiliateTeams: true },
+    include: { affiliateTeams: true, headCoach: { select: { name: true } } },
     orderBy: { name: "asc" },
   });
 
@@ -93,7 +93,7 @@ function TeamCard({ team }: { team: any }) {
 
         <div className="grid grid-cols-2 gap-2.5">
           <InfoBox label="General Manager" value={team.gm} />
-          <InfoBox label="Head Coach" value={team.coach || "TBD"} />
+          <InfoBox label="Head Coach" value={team.headCoach?.name || team.coach || "TBD"} />
           <InfoBox label="Arena" value={team.arena} />
           <InfoBox label="Capacity" value={team.capacity ? team.capacity.toLocaleString() : "N/A"} />
         </div>
