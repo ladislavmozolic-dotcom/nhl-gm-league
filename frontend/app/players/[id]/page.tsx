@@ -371,7 +371,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       </Card>
 
       {/* ── CURRENT FORM (derived) vs MO (stored) ─────────────────── */}
-      <PlayerFormCard form={form} morale={isGoalie ? null : (p.morale ?? null)} />
+      <PlayerFormCard form={form} />
 
       {/* ── PLAYER STATS ─────────────────────────────────────────── */}
       <Card title="Player Stats" bodyClassName="p-4">

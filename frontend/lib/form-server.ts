@@ -21,17 +21,17 @@ export type PlayerForm = SkaterForm | GoalieForm | null;
 
 // thresholds on points-per-60 (individual), by role — a D bar sits lower than a F's
 const F_BANDS: [number, string, string, string][] = [
-  [3.4, "Excellent", "🔥", "text-orange-400"], [2.4, "Hot", "😤", "text-amber-400"],
+  [3.4, "Excellent", "🔥", "text-orange-400"], [2.4, "Hot", "😎", "text-amber-400"],
   [1.5, "Steady", "➖", "text-slate-300"], [0.8, "Quiet", "🌡️", "text-sky-400"],
   [0, "Cold", "🧊", "text-blue-400"],
 ];
 const D_BANDS: [number, string, string, string][] = [
-  [1.9, "Excellent", "🔥", "text-orange-400"], [1.3, "Hot", "😤", "text-amber-400"],
+  [1.9, "Excellent", "🔥", "text-orange-400"], [1.3, "Hot", "😎", "text-amber-400"],
   [0.8, "Steady", "➖", "text-slate-300"], [0.4, "Quiet", "🌡️", "text-sky-400"],
   [0, "Cold", "🧊", "text-blue-400"],
 ];
 const G_BANDS: [number, string, string, string][] = [ // on save %
-  [0.930, "Excellent", "🔥", "text-orange-400"], [0.915, "Hot", "😤", "text-amber-400"],
+  [0.930, "Excellent", "🔥", "text-orange-400"], [0.915, "Hot", "😎", "text-amber-400"],
   [0.900, "Steady", "➖", "text-slate-300"], [0.885, "Shaky", "🌡️", "text-sky-400"],
   [0, "Cold", "🧊", "text-blue-400"],
 ];
