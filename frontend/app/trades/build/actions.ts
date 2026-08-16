@@ -15,6 +15,7 @@ export type TradePackage = {
   fromCash: number; toCash: number;
   condition: string;
   waived?: number[]; // player ids whose NTC/NMC/M-NTC clause is waived for this deal
+  clauseFees?: { playerId: number; feeAmount: number; payTeamId: number }[]; // agent waiver fees the giving team pays
 };
 
 type ClausePlayer = { id: number; name: string; tradeClause: string | null; noTradeTeams: number[] };
@@ -51,7 +52,7 @@ async function collectMoveOps(pkg: TradePackage) {
     select: { id: true, name: true, teamId: true, rosterType: true, capHit: true, contractYears: true, tradeClause: true, noTradeTeams: true },
   });
   const pById = new Map(players.map((p) => [p.id, p]));
-  const waived = new Set(pkg.waived ?? []);
+  const waived = new Set([...(pkg.waived ?? []), ...(pkg.clauseFees ?? []).map((f) => f.playerId)]);
 
   const maxPct = settings.retentionMaxPct;
   const retainedCount = [...pkg.fromPlayers, ...pkg.toPlayers].filter((p) => p.retentionPct > 0).length;
@@ -100,6 +101,16 @@ async function collectMoveOps(pkg: TradePackage) {
   for (const r of retentionRecords)
     ops.push(prisma.buyout.create({ data: { teamId: r.teamId, playerName: r.playerName, perYear: r.perYear, years: r.years, startYear: CURRENT_SEASON_START, totalCost: 0, inSeason: true } }));
 
+  // clause waiver fees — the player's OLD team pays him to waive his NTC/NMC/M-NTC.
+  // A bank/Finance hit only (NOT a cap hit); the new team still carries his full
+  // cap + salary, so he's effectively paid twice this season.
+  for (const f of pkg.clauseFees ?? []) {
+    if (!f.feeAmount) continue;
+    const pl = pById.get(f.playerId);
+    ops.push(prisma.team.update({ where: { id: f.payTeamId }, data: { bankAccount: { decrement: f.feeAmount }, ledgerAdj: { decrement: f.feeAmount } } }));
+    ops.push(prisma.transaction.create({ data: { type: "CLAUSE_WAIVER", message: `Paid ${pl?.name ?? "a player"} ${(f.feeAmount / 1_000_000).toFixed(2)}M to waive his no-trade clause.` } }));
+  }
+
   const fromNames = pkg.fromPlayers.map((p) => pById.get(p.playerId)?.name).filter(Boolean);
   const toNames = pkg.toPlayers.map((p) => pById.get(p.playerId)?.name).filter(Boolean);
   return { ops, fromTeam, toTeam, fromNames, toNames };
@@ -138,12 +149,12 @@ export async function proposeTrade(pkg: TradePackage) {
   if (settings.clausesEnabled) {
     const cp = await prisma.player.findMany({ where: { id: { in: [...pkg.fromPlayers, ...pkg.toPlayers].map((p) => p.playerId) } }, select: { id: true, name: true, tradeClause: true, noTradeTeams: true } });
     const byId = new Map(cp.map((p) => [p.id, p]));
-    const waived = new Set(pkg.waived ?? []);
+    const waived = new Set([...(pkg.waived ?? []), ...(pkg.clauseFees ?? []).map((f) => f.playerId)]);
     for (const p of pkg.fromPlayers) { const pl = byId.get(p.playerId); const b = pl && clauseBlock(pl, pkg.toTeamId, waived, true); if (b) throw new Error(b); }
     for (const p of pkg.toPlayers) { const pl = byId.get(p.playerId); const b = pl && clauseBlock(pl, pkg.fromTeamId, waived, true); if (b) throw new Error(b); }
   }
 
-  const trade = await prisma.trade.create({ data: { fromTeamId: pkg.fromTeamId, toTeamId: pkg.toTeamId, status: "PENDING", condition: pkg.condition || null, waivedClauses: pkg.waived ?? [] } });
+  const trade = await prisma.trade.create({ data: { fromTeamId: pkg.fromTeamId, toTeamId: pkg.toTeamId, status: "PENDING", condition: pkg.condition || null, waivedClauses: [...(pkg.waived ?? []), ...(pkg.clauseFees ?? []).map((f) => f.playerId)], clauseFees: (pkg.clauseFees ?? []) as object } });
   const rows: Array<{ tradeId: number; assetType: string; side: string; playerId?: number; prospectId?: number; draftPickId?: number; cashAmount?: number; retentionPct?: number }> = [];
   for (const p of pkg.fromPlayers) rows.push({ tradeId: trade.id, assetType: "PLAYER", side: "FROM", playerId: p.playerId, retentionPct: p.retentionPct || undefined });
   for (const p of pkg.toPlayers) rows.push({ tradeId: trade.id, assetType: "PLAYER", side: "TO", playerId: p.playerId, retentionPct: p.retentionPct || undefined });
@@ -199,6 +210,7 @@ export async function respondToTrade(tradeId: number, accept: boolean) {
 
   const pkg = await packageFromTrade(tradeId);
   pkg.waived = trade.waivedClauses ?? []; // carry the waivers agreed at proposal time
+  pkg.clauseFees = (trade.clauseFees as TradePackage["clauseFees"]) ?? [];
   const { ops, fromTeam, toTeam, fromNames, toNames } = await collectMoveOps(pkg);
   ops.push(prisma.trade.update({ where: { id: tradeId }, data: { status: "ACCEPTED", respondedAt: new Date() } }));
   ops.push(prisma.transaction.create({
@@ -223,6 +235,14 @@ export async function deleteTradeAction(tradeId: number) {
   ]);
   revalidatePath("/trades");
   return { ok: true, wasStatus: trade.status };
+}
+
+/** The clause agent's terms for moving `playerId` to `toTeamId` (fee to waive). */
+export async function clauseTermsAction(playerId: number, toTeamId: number) {
+  const settings = await loadSettings();
+  if (!settings.clausesEnabled) return null;
+  const { clauseTerms } = await import("@/lib/clause-agent-server");
+  return clauseTerms(playerId, toTeamId);
 }
 
 /** GM A cancels their own still-pending proposal. */

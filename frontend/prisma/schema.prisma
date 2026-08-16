@@ -191,6 +191,7 @@ model Trade {
   respondedAt DateTime?
   createdAt   DateTime @default(now())
   waivedClauses Int[]  // player ids whose NTC/NMC/M-NTC was waived to allow this deal
+  clauseFees  Json?    // [{ playerId, feeAmount, payTeamId }] — agent-set waiver fees the giving team pays the player
 }
 
 model LeagueConfig {

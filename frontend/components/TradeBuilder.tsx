@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { money } from "@/lib/finance";
-import type { TradePackage } from "@/app/trades/build/actions";
+import { clauseTermsAction, type TradePackage } from "@/app/trades/build/actions";
 
 type Player = { id: number; name: string; position: string; capHit: number; farm: boolean; clause?: string | null; noTradeTeams?: number[] };
 type Pick = { id: number; label: string };
@@ -24,9 +24,12 @@ export default function TradeBuilder({ me, opp, mine, theirs, onPropose }: {
   const [theirsPro, setTheirsPro] = useState<Set<number>>(new Set());
   const [mineCash, setMineCash] = useState(0);
   const [theirsCash, setTheirsCash] = useState(0);
-  const [waived, setWaived] = useState<Set<number>>(new Set());
   const [condition, setCondition] = useState("");
-  const toggleWaive = (id: number) => setWaived((w) => { const n = new Set(w); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  // clause agent: fetched terms per protected player + the fees the GM agrees to pay
+  type Terms = { feeAmount: number; feePct: number; fullPayout: boolean; reason: string; payTeamId: number };
+  const [terms, setTerms] = useState<Record<number, Terms | "loading">>({});
+  const [fees, setFees] = useState<Record<number, { feeAmount: number; payTeamId: number }>>({});
+  const agreeFee = (id: number, t: Terms) => setFees((f) => { const n = { ...f }; if (n[id]) delete n[id]; else n[id] = { feeAmount: t.feeAmount, payTeamId: t.payTeamId }; return n; });
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -36,14 +39,29 @@ export default function TradeBuilder({ me, opp, mine, theirs, onPropose }: {
     if (id in next) delete next[id]; else next[id] = 0;
     set(next); setMsg(null);
   };
+  // toggle a player and, for a protected one being ADDED, ask the clause agent for
+  // his waiver terms (destTeamId = where he'd go; ownerTeamId = who pays the fee).
+  const toggleClausePlayer = (map: Record<number, number>, set: (v: Record<number, number>) => void, p: Player, destTeamId: number, ownerTeamId: number) => {
+    const wasOn = p.id in map;
+    togglePlayer(map, set, p.id);
+    if (wasOn) { setFees((f) => { const n = { ...f }; delete n[p.id]; return n; }); setTerms((t) => { const n = { ...t }; delete n[p.id]; return n; }); return; }
+    const needs = !!p.clause && (p.clause !== "M_NTC" || (p.noTradeTeams ?? []).includes(destTeamId));
+    if (!needs) return;
+    setTerms((t) => ({ ...t, [p.id]: "loading" }));
+    clauseTermsAction(p.id, destTeamId).then((r) => {
+      if (!r) { setTerms((t) => { const n = { ...t }; delete n[p.id]; return n; }); return; }
+      setTerms((t) => ({ ...t, [p.id]: { feeAmount: r.feeAmount, feePct: r.feePct, fullPayout: r.fullPayout, reason: r.reason, payTeamId: ownerTeamId } }));
+      if (r.feeAmount === 0) setFees((f) => ({ ...f, [p.id]: { feeAmount: 0, payTeamId: ownerTeamId } }));
+    });
+  };
   const setRet = (map: Record<number, number>, set: (v: Record<number, number>) => void, id: number, pct: number) =>
     set({ ...map, [id]: Math.max(0, Math.min(50, pct)) });
   const togglePick = (set: Set<number>, setter: (s: Set<number>) => void, id: number) => {
     const n = new Set(set); if (n.has(id)) n.delete(id); else n.add(id); setter(n); setMsg(null);
   };
 
-  const PlayerTable = ({ title, list, pmap, setPmap, destTeamId }: {
-    title: string; list: Player[]; pmap: Record<number, number>; setPmap: (v: Record<number, number>) => void; destTeamId: number;
+  const PlayerTable = ({ title, list, pmap, setPmap, destTeamId, ownerTeamId }: {
+    title: string; list: Player[]; pmap: Record<number, number>; setPmap: (v: Record<number, number>) => void; destTeamId: number; ownerTeamId: number;
   }) => (
     <div className="bg-slate-900/40 border border-slate-800 rounded-lg overflow-hidden">
       <div className="px-3 py-2 bg-slate-800/40 text-xs font-bold uppercase tracking-wide text-slate-400">{title} ({list.length})</div>
@@ -56,18 +74,28 @@ export default function TradeBuilder({ me, opp, mine, theirs, onPropose }: {
           return (
             <div key={p.id} className={`px-3 py-2 ${on ? "bg-blue-950/30" : ""}`}>
               <label className="flex items-center gap-2.5 cursor-pointer">
-                <input type="checkbox" checked={on} onChange={() => togglePlayer(pmap, setPmap, p.id)} className="accent-blue-500 w-4 h-4" />
+                <input type="checkbox" checked={on} onChange={() => toggleClausePlayer(pmap, setPmap, p, destTeamId, ownerTeamId)} className="accent-blue-500 w-4 h-4" />
                 <span className="flex-1 truncate">{p.name} <span className="text-slate-500 text-xs">{p.position}</span>{tag && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30">{tag}</span>}</span>
                 <span className="text-slate-400 tabular-nums text-sm">{money(p.capHit)}</span>
               </label>
-              {on && needsWaiver && (
-                <label className="flex items-center gap-2 mt-2 ml-6.5 text-xs cursor-pointer">
-                  <input type="checkbox" checked={waived.has(p.id)} onChange={() => toggleWaive(p.id)} className="accent-amber-500 w-3.5 h-3.5" />
-                  <span className={waived.has(p.id) ? "text-amber-300" : "text-rose-400"}>
-                    {waived.has(p.id) ? `Waives his ${tag} to be dealt` : `⚠ ${tag} — must waive to complete this trade`}
-                  </span>
-                </label>
-              )}
+              {on && needsWaiver && (() => {
+                const t = terms[p.id];
+                if (!t || t === "loading") return <p className="mt-2 ml-6.5 text-xs text-slate-500">⚖ Checking with his agent…</p>;
+                const agreed = p.id in fees;
+                return (
+                  <div className="mt-2 ml-6.5 text-xs">
+                    <p className={t.feeAmount === 0 ? "text-emerald-400" : "text-amber-300"}>⚖ {t.reason}</p>
+                    {t.feeAmount > 0 && (
+                      <label className="flex items-center gap-2 mt-1 cursor-pointer">
+                        <input type="checkbox" checked={agreed} onChange={() => agreeFee(p.id, t)} className="accent-amber-500 w-3.5 h-3.5" />
+                        <span className={agreed ? "text-amber-300" : "text-rose-400"}>
+                          {agreed ? `Paying ${money(t.feeAmount)} to waive` : `${t.fullPayout ? "Full payout" : "Fee"} ${money(t.feeAmount)} (${t.feePct}%) — agree to pay`}
+                        </span>
+                      </label>
+                    )}
+                  </div>
+                );
+              })()}
               {on && p.capHit > 0 && (
                 <div className="flex items-center gap-3 mt-2.5 ml-6.5 text-xs text-slate-400 flex-wrap">
                   <span className="font-medium">Salary Retention</span>
@@ -117,8 +145,8 @@ export default function TradeBuilder({ me, opp, mine, theirs, onPropose }: {
   }) => (
     <div className="space-y-3">
       <div className="text-center font-bold">{team.name} sends</div>
-      <PlayerTable title="NHL players" list={assets.players.filter((p) => !p.farm)} pmap={pmap} setPmap={setPmap} destTeamId={destTeamId} />
-      <PlayerTable title="AHL players" list={assets.players.filter((p) => p.farm)} pmap={pmap} setPmap={setPmap} destTeamId={destTeamId} />
+      <PlayerTable title="NHL players" list={assets.players.filter((p) => !p.farm)} pmap={pmap} setPmap={setPmap} destTeamId={destTeamId} ownerTeamId={team.id} />
+      <PlayerTable title="AHL players" list={assets.players.filter((p) => p.farm)} pmap={pmap} setPmap={setPmap} destTeamId={destTeamId} ownerTeamId={team.id} />
       <CheckTable title="Prospects" icon="⭐" list={assets.prospects} sel={pro} setSel={setPro} />
       <CheckTable title="Draft picks" icon="🎫" list={assets.picks} sel={pk} setSel={setPk} />
       <div className="bg-slate-900/40 border border-slate-800 rounded-lg px-3 py-2.5 flex items-center gap-2 text-sm">
@@ -141,10 +169,12 @@ export default function TradeBuilder({ me, opp, mine, theirs, onPropose }: {
         toPlayers: Object.entries(theirsP).map(([id, pct]) => ({ playerId: Number(id), retentionPct: pct })),
         fromPicks: [...minePk], toPicks: [...theirsPk],
         fromProspects: [...minePro], toProspects: [...theirsPro],
-        fromCash: mineCash, toCash: theirsCash, condition, waived: [...waived],
+        fromCash: mineCash, toCash: theirsCash, condition,
+        waived: Object.keys(fees).map(Number),
+        clauseFees: Object.entries(fees).map(([id, v]) => ({ playerId: Number(id), feeAmount: v.feeAmount, payTeamId: v.payTeamId })),
       });
       setMsg(`Trade proposed to ${opp.name} (#${r.tradeId}). Awaiting their GM's response.`);
-      setMineP({}); setTheirsP({}); setMinePk(new Set()); setTheirsPk(new Set()); setMinePro(new Set()); setTheirsPro(new Set()); setMineCash(0); setTheirsCash(0); setWaived(new Set());
+      setMineP({}); setTheirsP({}); setMinePk(new Set()); setTheirsPk(new Set()); setMinePro(new Set()); setTheirsPro(new Set()); setMineCash(0); setTheirsCash(0); setFees({}); setTerms({});
     } catch (e) { setErr((e as Error).message); }
   });
 
