@@ -106,6 +106,11 @@ export async function submitOfferAction(
   if (existing && existing.status === "REJECTED") {
     return { ok: false as const, error: "The player has moved on — he's no longer negotiating with your club." };
   }
+  // round-lock: only clubs already in the negotiation (an offer placed in round 1)
+  // may continue; nobody new can join from round 2 onward.
+  if (!existing && clock.frenzyRound > 1) {
+    return { ok: false as const, error: "Bidding on this player closed after round 1 — only clubs already negotiating can raise their offer." };
+  }
   const ceiling = capCeilingForPhase(cap.upper, clock.phase) + ltir;
   if (committed + salary > ceiling) {
     const overSeason = clock.phase === "regular" || clock.phase === "playoffs";

@@ -135,8 +135,10 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
             {i && (
               <>
                 {i.existing?.status === "COUNTERED" && (
-                  <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-3 text-sm">
-                    <b className="text-blue-300">He countered.</b> He&apos;ll sign with you for <b className="text-amber-300">{M(i.existing.counterSalary ?? 0)} × {i.existing.counterYears}yr</b> — raise your offer to stay in it.
+                  <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-3 text-sm space-y-1">
+                    <div className="flex items-center justify-between"><span className="text-slate-400">Your offer</span><b className="text-slate-200 tabular-nums">{M(i.existing.salary)} × {i.existing.years}yr</b></div>
+                    <div className="flex items-center justify-between"><span className="text-blue-300 font-semibold">His counter</span><b className="text-amber-300 tabular-nums">{M(i.existing.counterSalary ?? 0)} × {i.existing.counterYears}yr</b></div>
+                    <p className="text-[11px] text-slate-500 pt-0.5">Match or beat his counter to stay in it.</p>
                   </div>
                 )}
                 {i.existing?.status === "SHORTLISTED" && (
@@ -161,14 +163,20 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
                       <InfoTip text="Based on the player's morale (MO). An unhappy player holds out for more money than his baseline ask; a happy one signs for a little less. A bigger star swings this harder." />
                     </p>
                   )}
-                  <p className="mt-2 text-slate-200">
-                    {liveAsk && (liveAsk.askSalary !== i.askSalary || liveAsk.askYears !== i.askYears)
-                      ? <>At <b className="text-slate-300">{slotLabels[["", "L1", "L2", "L3", "L4"][line] ?? ""] ?? `line ${line}`}</b>{!pp && i.wantPP ? ", no PP" : ""}{!pk && i.wantPK ? ", no PK" : ""} he wants </>
-                      : <>Asking </>}
-                    <b className="text-amber-300">{M((liveAsk ?? i).askSalary)} × {(liveAsk ?? i).askYears}yr</b>{" "}
-                    <span className="text-slate-500">(floor {M((liveAsk ?? i).floor)}, term {(liveAsk ?? i).minYears}-{(liveAsk ?? i).maxYears}yr)</span>
-                    <InfoTip text="Floor = the lowest cap hit he'll accept from your club for this role. Offer at or above it (within the term range) and he signs. The headline ask is his opening number; it eases toward the floor over the negotiation." />
-                  </p>
+                  {i.existing?.status === "COUNTERED" ? (
+                    <p className="mt-2 text-slate-200">He now wants <b className="text-amber-300">{M(i.existing.counterSalary ?? 0)} × {i.existing.counterYears}yr</b> <span className="text-slate-500">(floor {M((liveAsk ?? i).floor)})</span>
+                      <InfoTip text="His current number after countering your last offer. Match or beat it (at or above the floor) and he signs." />
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-slate-200">
+                      {liveAsk && (liveAsk.askSalary !== i.askSalary || liveAsk.askYears !== i.askYears)
+                        ? <>At <b className="text-slate-300">{slotLabels[["", "L1", "L2", "L3", "L4"][line] ?? ""] ?? `line ${line}`}</b>{!pp && i.wantPP ? ", no PP" : ""}{!pk && i.wantPK ? ", no PK" : ""} he wants </>
+                        : <>Asking </>}
+                      <b className="text-amber-300">{M((liveAsk ?? i).askSalary)} × {(liveAsk ?? i).askYears}yr</b>{" "}
+                      <span className="text-slate-500">(floor {M((liveAsk ?? i).floor)}, term {(liveAsk ?? i).minYears}-{(liveAsk ?? i).maxYears}yr)</span>
+                      <InfoTip text="Floor = the lowest cap hit he'll accept from your club for this role. Offer at or above it (within the term range) and he signs. The headline ask is his opening number; it eases toward the floor over the negotiation." />
+                    </p>
+                  )}
                 </div>
 
                 {canOffer ? (
