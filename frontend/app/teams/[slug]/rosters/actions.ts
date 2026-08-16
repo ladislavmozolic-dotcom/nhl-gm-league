@@ -19,10 +19,16 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
   const ids = moves.map((m) => m.id);
   const players = await prisma.player.findMany({
     where: { id: { in: ids }, teamId: { in: [team.id, affiliate.id] } },
-    select: { id: true, isGoalie: true, rosterType: true },
+    select: { id: true, isGoalie: true, rosterType: true, capHit: true },
   });
   const byId = new Map(players.map((p) => [p.id, p]));
   const valid = moves.filter((m) => byId.has(m.id));
+
+  // an AHL-only (minor-league) contract — below the NHL minimum — can't be iced in
+  // the NHL. Keep such a player on the farm no matter what the client requested.
+  const NHL_MIN = 775_000;
+  const isAhlOnly = (id: number) => { const c = byId.get(id)!.capHit ?? 0; return c > 0 && c < NHL_MIN; };
+  for (const m of valid) if (m.side === "pro" && isAhlOnly(m.id)) m.side = "farm";
 
   const pro = valid.filter((m) => m.side === "pro");
   const farm = valid.filter((m) => m.side === "farm");

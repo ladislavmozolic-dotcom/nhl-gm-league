@@ -7,7 +7,13 @@ import { ROSTER_LIMITS, type MoveRow } from "@/lib/roster-rules";
 type Player = {
   id: number; name: string; position: string; overall: number;
   isGoalie: boolean; side: "pro" | "farm"; contractType: "ONE_WAY" | "TWO_WAY" | null;
+  capHit: number;
 };
+
+// Below the NHL minimum salary → a minor-league (AHL-only) contract. These
+// players can't be called up to the NHL roster.
+const NHL_MIN = 775_000;
+const isAhlOnly = (p: Player) => p.capHit > 0 && p.capHit < NHL_MIN;
 type Props = {
   teamName: string; teamSlug: string; affiliateName: string; hasAffiliate: boolean;
   players: Player[]; onSave: (slug: string, rows: MoveRow[]) => Promise<void>;
@@ -27,7 +33,8 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
 
   const move = (id: number, to: "pro" | "farm") => {
     const p = rows.find((r) => r.id === id)!;
-    if (to === "farm" && p.contractType === "ONE_WAY") return; // blocked
+    if (to === "farm" && p.contractType === "ONE_WAY" && !isAhlOnly(p)) return; // one-way can't be buried
+    if (to === "pro" && isAhlOnly(p)) return; // AHL-only minor-league deal can't be called up
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, side: to } : r)));
     setSaved(false); setErr(null);
   };
@@ -55,19 +62,25 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
   const Row = ({ p }: { p: Player }) => {
     const oneWay = p.contractType === "ONE_WAY";
     const toFarm = p.side === "pro";
+    const ahlOnly = isAhlOnly(p);
     return (
       <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-800/60 text-sm hover:bg-slate-800/30">
         <span className="flex-1 min-w-0 truncate">{p.name}
           <span className="text-slate-500 text-xs ml-1">{p.position} · {p.overall}</span>
         </span>
-        <button onClick={() => setContract(p.id, oneWay ? "TWO_WAY" : "ONE_WAY")}
-          title="Toggle one-way / two-way contract"
-          className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${oneWay ? "border-amber-600/60 text-amber-400" : "border-slate-700 text-slate-400"}`}>
-          {oneWay ? "1-way" : "2-way"}
-        </button>
+        {ahlOnly ? (
+          <span title="Minor-league (AHL-only) contract — below the NHL minimum salary, can't be called up"
+            className="text-[10px] font-bold px-1.5 py-0.5 rounded border border-emerald-600/50 text-emerald-400">AHL only</span>
+        ) : (
+          <button onClick={() => setContract(p.id, oneWay ? "TWO_WAY" : "ONE_WAY")}
+            title="Toggle one-way / two-way contract"
+            className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${oneWay ? "border-amber-600/60 text-amber-400" : "border-slate-700 text-slate-400"}`}>
+            {oneWay ? "1-way" : "2-way"}
+          </button>
+        )}
         <button onClick={() => move(p.id, toFarm ? "farm" : "pro")}
-          disabled={toFarm && oneWay}
-          title={toFarm && oneWay ? "One-way contracts can't be sent to the farm" : ""}
+          disabled={(toFarm && oneWay && !ahlOnly) || (!toFarm && ahlOnly)}
+          title={ahlOnly ? "AHL-only contract — can't be called up" : toFarm && oneWay ? "One-way contracts can't be sent to the farm" : ""}
           className="text-xs px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-30">
           {toFarm ? "→ Farm" : "→ Pro"}
         </button>
