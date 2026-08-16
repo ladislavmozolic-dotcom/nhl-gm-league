@@ -63,7 +63,6 @@ export async function teamRosterForBlock(teamId: number): Promise<{ needs: strin
   const rows = await prisma.player.findMany({
     where: { teamId, rosterType: { in: ["NHL", "AHL"] } },
     select: { id: true, name: true, slug: true, position: true, overall: true, age: true, capHit: true, contractYears: true, onBlock: true, blockNote: true, team: { select: { code: true, name: true, slug: true } } },
-    orderBy: [{ onBlock: "desc" }, { overall: "desc" }],
   });
   return {
     needs: team?.needs ?? [],
@@ -71,6 +70,6 @@ export async function teamRosterForBlock(teamId: number): Promise<{ needs: strin
       id: p.id, name: cleanName(p.name), slug: p.slug, position: p.position, overall: p.overall, age: p.age,
       capHit: p.capHit, contractYears: p.contractYears, note: p.blockNote, onBlock: p.onBlock,
       teamId, teamCode: p.team?.code ?? null, teamName: p.team?.name ?? "", teamSlug: p.team?.slug ?? null,
-    })),
+    })).sort((a, b) => a.name.localeCompare(b.name)),
   };
 }
