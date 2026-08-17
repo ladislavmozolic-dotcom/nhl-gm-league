@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const TABS = [
   { href: "/admin", label: "Admin Panel", exact: true },
+  { href: "/admin/join-requests", label: "Žiadosti o vstup" },
   { href: "/admin/season", label: "Season Control" },
   { href: "/admin/simulation", label: "Simulation Engine" },
   { href: "/admin/team-lines", label: "Team Lines & Tactics" },

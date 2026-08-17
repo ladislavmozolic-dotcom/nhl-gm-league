@@ -29,7 +29,9 @@ export default async function RootLayout({
   // signed-in GM (per-team session) → show nickname + logout in the menu
   const teamId = await getTeamSession();
   const t = teamId ? await prisma.team.findUnique({ where: { id: teamId }, select: { slug: true, gmNickname: true, gm: true, isAdmin: true } }) : null;
-  const gm = t ? { nickname: t.gmNickname || t.gm || "GM", slug: t.slug, admin: t.isAdmin } : null;
+  // pending GM join requests → red badge in the menu (admins only)
+  const pendingJoins = t?.isAdmin ? await prisma.joinRequest.count({ where: { status: "pending" } }).catch(() => 0) : 0;
+  const gm = t ? { nickname: t.gmNickname || t.gm || "GM", slug: t.slug, admin: t.isAdmin, pendingJoins } : null;
   const site = await loadSiteConfig();
   const branding = site.branding;
   // published, in-menu custom pages become extra top-nav items (key "page:<slug>")

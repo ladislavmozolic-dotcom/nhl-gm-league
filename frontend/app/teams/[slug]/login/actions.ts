@@ -11,21 +11,31 @@ export async function login(formData: FormData) {
   if (!team) redirect("/teams");
 
   if (!team.passwordHash) {
-    // first sign-in creates the GM profile + sets the team password
+    // Team is unclaimed → this is a JOIN REQUEST, not an instant claim. The applicant's
+    // profile + password are stored on a pending JoinRequest; a league admin approves it
+    // (credentials then move onto the Team) before they can sign in.
     const firstName = String(formData.get("firstName") ?? "").trim();
     const lastName = String(formData.get("lastName") ?? "").trim();
     const nickname = String(formData.get("nickname") ?? "").trim();
     const gmEmail = String(formData.get("email") ?? "").trim();
+    const note = String(formData.get("note") ?? "").trim();
     if (password.length < 3) redirect(`/teams/${slug}/login?error=short`);
     if (!firstName || !lastName || !nickname || !gmEmail) redirect(`/teams/${slug}/login?error=profile`);
-    await prisma.team.update({
-      where: { id: team.id },
-      data: { passwordHash: hashPassword(password), gmFirstName: firstName, gmLastName: lastName, gmNickname: nickname, gmEmail },
+
+    // one pending request per team at a time (first come, first served)
+    const pending = await prisma.joinRequest.findFirst({ where: { teamId: team.id, status: "pending" } });
+    if (pending) redirect(`/teams/${slug}/login?error=pending`);
+
+    await prisma.joinRequest.create({
+      data: { teamId: team.id, firstName, lastName, nickname, email: gmEmail, note: note || null, passwordHash: hashPassword(password) },
     });
-  } else if (!verifyPassword(password, team.passwordHash)) {
-    redirect(`/teams/${slug}/login?error=wrong`);
+    redirect(`/teams/${slug}/login?submitted=1`);
   }
 
+  // Team is claimed → normal sign-in.
+  if (!verifyPassword(password, team.passwordHash)) {
+    redirect(`/teams/${slug}/login?error=wrong`);
+  }
   await prisma.team.update({ where: { id: team.id }, data: { lastLoginAt: new Date() } });
   await setTeamSession(team.id);
   redirect(`/teams/${slug}/lines`);

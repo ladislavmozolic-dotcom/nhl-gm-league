@@ -17,7 +17,7 @@ interface Team {
   division: string | null;
 }
 
-export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: string; slug: string; admin?: boolean } | null; items?: MenuItem[]; lang?: Lang }) {
+export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: string; slug: string; admin?: boolean; pendingJoins?: number } | null; items?: MenuItem[]; lang?: Lang }) {
   const menuItems = items ?? DEFAULT_MENU;
   const tr = (k: string) => t(lang, k);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
@@ -172,10 +172,13 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
             <div className="relative ml-1" onMouseEnter={() => setActiveMenu("__gm")} onMouseLeave={() => setActiveMenu(null)}>
               {gm ? (
                 <>
-                  <button className="px-2.5 py-1.5 text-[13px] font-semibold rounded-md text-blue-300 hover:bg-slate-800/40 flex items-center gap-1.5">
+                  <button className="relative px-2.5 py-1.5 text-[13px] font-semibold rounded-md text-blue-300 hover:bg-slate-800/40 flex items-center gap-1.5">
                     <span className="w-6 h-6 rounded-full bg-blue-600 grid place-items-center text-[11px] font-black text-white">{gm.nickname[0]?.toUpperCase()}</span>
                     {gm.nickname}
                     <span className="text-[9px] text-slate-500">▾</span>
+                    {gm.admin && (gm.pendingJoins ?? 0) > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center" title={`${gm.pendingJoins} nových žiadostí o vstup`}>{gm.pendingJoins}</span>
+                    )}
                   </button>
                   {activeMenu === "__gm" && (
                     <div className="absolute right-0 top-full pt-1 z-50">
@@ -189,6 +192,10 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
                           <div className="my-1 border-t border-slate-700/60" />
                           <div className="px-3 py-1 text-[10px] text-amber-500/80 uppercase tracking-wide">{tr("ui.admin")}</div>
                           <a href="/admin" className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">{tr("ui.adminPanel")}</a>
+                          <a href="/admin/join-requests" className="flex items-center justify-between px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">
+                            <span>Žiadosti o vstup</span>
+                            {(gm.pendingJoins ?? 0) > 0 && <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm.pendingJoins}</span>}
+                          </a>
                           <a href="/calendar" className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">League Calendar</a>
                           <a href="/admin/elc" className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">ELC Rookies</a>
                           <a href="/admin/roster-update" className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">Roster Update</a>
