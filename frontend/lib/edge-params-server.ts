@@ -140,6 +140,72 @@ export async function edgeRatings(league = "NHL"): Promise<EdgeRow[]> {
   return out;
 }
 
+// ---- AHL skaters (scoring only; TOI/hits/blocks aren't in the AHL feed) ----
+
+// AHL → NHL-equivalent translation so an AHL scoring title doesn't become SC 99:
+// scoring translates ~0.45×; penalties are ~league-neutral.
+const AHL_NHLE: Record<string, number> = { g: 0.45, a: 0.45, sh: 0.45, pim: 1.0 };
+const AHL_G_SEL = { id: true, name: true, position: true, teamId: true, weight: true, age: true, captaincy: true, curSeasonGP: true, curSeasonG: true, curSeasonA: true, curSeasonShots: true, curSeasonPim: true, lastSeasonGP: true, lastSeasonG: true, lastSeasonA: true, lastSeasonShots: true, lastSeasonPim: true } as const;
+
+/** AHL skater Edge ratings — scoring params (SC/PA/DI) built from per-GAME rates
+ *  translated to NHL-equivalent and percentiled against the NHL distribution, plus
+ *  ST/EX/DU/LD/MO from age/size. CK/DF/EN/FO/PH need data the AHL feed lacks. */
+export async function edgeAhlSkaterRatings(): Promise<EdgeRow[]> {
+  const [nhl, ahl, teams] = await Promise.all([
+    prisma.player.findMany({ where: { rosterType: "NHL", isGoalie: false }, select: AHL_G_SEL }),
+    prisma.player.findMany({ where: { rosterType: "AHL", isGoalie: false }, select: AHL_G_SEL }),
+    prisma.team.findMany({ select: { id: true, code: true } }),
+  ]);
+  const codeById = new Map(teams.map((t) => [t.id, t.code]));
+  const grp = (pos = "") => (isDef(pos) ? "D" : "F");
+  // per-GAME rate over both seasons combined
+  const perGp = (p: any, cur: string, last: string) => {
+    const gp = (p.curSeasonGP ?? 0) + (p.lastSeasonGP ?? 0);
+    return gp > 0 ? ((p[cur] ?? 0) + (p[last] ?? 0)) / gp : null;
+  };
+  const metricsOf = (p: any, nhle = false) => {
+    const f = (k: string) => nhle ? (AHL_NHLE[k] ?? 1) : 1;
+    return {
+      g: perGp(p, "curSeasonG", "lastSeasonG") as number | null,
+      a: perGp(p, "curSeasonA", "lastSeasonA") as number | null,
+      sh: perGp(p, "curSeasonShots", "lastSeasonShots") as number | null,
+      pim: perGp(p, "curSeasonPim", "lastSeasonPim") as number | null,
+      _f: f,
+    };
+  };
+  // NHL reference pools (per-GAME) per position group, per metric
+  const pools: Record<"F" | "D", Record<string, number[]>> = { F: {}, D: {} };
+  for (const g of ["F", "D"] as const) for (const k of ["g", "a", "sh", "pim"]) pools[g][k] = [];
+  for (const p of nhl) {
+    const g = grp(p.position ?? ""); const m = metricsOf(p);
+    for (const k of ["g", "a", "sh", "pim"]) { const v = (m as any)[k]; if (v != null) pools[g][k].push(v); }
+  }
+  for (const g of ["F", "D"] as const) for (const k of ["g", "a", "sh", "pim"]) pools[g][k].sort((a, b) => a - b);
+
+  // weight pool (AHL vs AHL) for ST
+  const wPool: Record<"F" | "D", number[]> = { F: [], D: [] };
+  for (const p of ahl) if (p.weight) wPool[grp(p.position ?? "")].push(p.weight);
+  for (const g of ["F", "D"] as const) wPool[g].sort((a, b) => a - b);
+
+  return ahl.map((p) => {
+    const g = grp(p.position ?? "");
+    const m = metricsOf(p, true); // NHL-equivalent
+    const pct = (k: string) => { const v = (m as any)[k] * m._f(k); return m[k as "g"] != null ? percentileOf(v, pools[g][k]) : null; };
+    const ratings: Record<string, number> = {};
+    const gp = pct("g"), sp = pct("sh"), ap = pct("a"), pp = pct("pim");
+    if (gp != null) ratings.SC = ratingFromCurve((gp * 0.7 + (sp ?? gp) * 0.3), "SC");
+    if (ap != null) ratings.PA = ratingFromCurve(ap, "PA");
+    if (pp != null) ratings.DI = ratingFromCurve(1 - pp, "DI");
+    if (p.weight != null && wPool[g].length) ratings.ST = ratingFromCurve(percentileOf(p.weight, wPool[g]), "DEFAULT");
+    const ex = experienceFromAge(p.age); ratings.EX = ex;
+    ratings.DU = durabilityFromAvailability(p.curSeasonGP ?? 0, CUR_SEASON_GAMES, p.lastSeasonGP ?? 0);
+    ratings.LD = leadershipFrom(p.captaincy, ex); ratings.MO = EDGE_MO_DEFAULT;
+    const core = ["SC", "PA", "DI", "ST"].map((k) => ratings[k]).filter((v) => v != null);
+    if (core.length) ratings.OV = Math.round(core.reduce((a, b) => a + b, 0) / core.length);
+    return { playerId: p.id, name: cleanName(p.name), position: p.position ?? "", posGroup: g, league: "AHL", teamCode: p.teamId != null ? codeById.get(p.teamId) ?? null : null, ratings };
+  });
+}
+
 // ---- Goalies ----
 
 type GM = { gp: number; shots: number; icetime: number; gsax: number; svPct: number; hdSv: number; mdSv: number; ldSv: number; hdGsax: number; rebCtrl: number };
@@ -222,7 +288,7 @@ export async function edgeGoalieRatings(league = "NHL"): Promise<EdgeRow[]> {
  *  separate from the STHS ck/sc/... fields the sim reads, so this is analytics only. */
 export async function persistEdgeRatings(): Promise<{ written: number }> {
   const all: EdgeRow[] = [
-    ...(await edgeRatings("NHL")), ...(await edgeRatings("AHL")),
+    ...(await edgeRatings("NHL")), ...(await edgeAhlSkaterRatings()),
     ...(await edgeGoalieRatings("NHL")),
   ];
   let written = 0;

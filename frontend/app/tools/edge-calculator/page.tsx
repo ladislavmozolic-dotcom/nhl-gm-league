@@ -2,7 +2,7 @@ import Link from "next/link";
 import { PageHeader, Card } from "@/components/ui";
 import InfoTip from "@/components/InfoTip";
 import SortableTable, { type SortCol } from "@/components/SortableTable";
-import { edgeRatings, edgeGoalieRatings } from "@/lib/edge-params-server";
+import { edgeRatings, edgeGoalieRatings, edgeAhlSkaterRatings } from "@/lib/edge-params-server";
 import { RATING_BANDS } from "@/lib/edge-params";
 import EdgeTeamSelect from "@/components/EdgeTeamSelect";
 
@@ -16,6 +16,17 @@ const GOALIE_PARAMS: { key: string; label: string; title: string }[] = [
   { key: "RB", label: "RB", title: "Rebound Control — fewer rebounds than expected (MoneyPuck)" },
   { key: "EN", label: "EN", title: "Endurance — starter workload (ice time)" },
   { key: "SZ", label: "SZ", title: "Size — height" },
+  { key: "EX", label: "EX", title: "Experience — age curve" },
+  { key: "DU", label: "DU", title: "Durability — availability" },
+  { key: "LD", label: "LD", title: "Leadership — captaincy + experience" },
+  { key: "OV", label: "OV", title: "Overall — informative average" },
+];
+
+const AHL_PARAMS: { key: string; label: string; title: string }[] = [
+  { key: "SC", label: "SC", title: "Scoring — AHL goals/shots translated to NHL-equivalent, vs NHL distribution" },
+  { key: "PA", label: "PA", title: "Passing — AHL assists translated to NHL-equivalent" },
+  { key: "DI", label: "DI", title: "Discipline — inverse of PIM per game" },
+  { key: "ST", label: "ST", title: "Strength — size (AHL feed lacks hits)" },
   { key: "EX", label: "EX", title: "Experience — age curve" },
   { key: "DU", label: "DU", title: "Durability — availability" },
   { key: "LD", label: "LD", title: "Leadership — captaincy + experience" },
@@ -41,8 +52,10 @@ const PARAMS: { key: string; label: string; title: string }[] = [
 export default async function EdgeCalculatorPage({ searchParams }: { searchParams: Promise<{ type?: string; team?: string }> }) {
   const { type, team } = await searchParams;
   const goalies = type === "goalies";
-  const params = goalies ? GOALIE_PARAMS : PARAMS;
-  const all = (goalies ? await edgeGoalieRatings("NHL") : await edgeRatings("NHL")).map((r) => ({
+  const ahl = type === "ahl";
+  const params = goalies ? GOALIE_PARAMS : ahl ? AHL_PARAMS : PARAMS;
+  const engine = goalies ? edgeGoalieRatings("NHL") : ahl ? edgeAhlSkaterRatings() : edgeRatings("NHL");
+  const all = (await engine).map((r) => ({
     playerId: r.playerId, name: r.name, teamCode: r.teamCode, position: r.position,
     ...r.ratings,
   }));
@@ -62,6 +75,7 @@ export default async function EdgeCalculatorPage({ searchParams }: { searchParam
       <div className="flex gap-1.5 items-center flex-wrap">
         <Link href={`/tools/edge-calculator${team ? `?team=${team}` : ""}`} className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${!goalies ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-300"}`}>Skaters</Link>
         <Link href={`/tools/edge-calculator?type=goalies${team ? `&team=${team}` : ""}`} className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${goalies ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-300"}`}>Goalies</Link>
+        <Link href={`/tools/edge-calculator?type=ahl${team ? `&team=${team}` : ""}`} className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${ahl ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-300"}`}>AHL Skaters</Link>
         <span className="ml-2"><EdgeTeamSelect teams={teamCodes} value={team ?? ""} /></span>
       </div>
       <Card>

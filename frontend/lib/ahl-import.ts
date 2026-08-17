@@ -39,6 +39,49 @@ export async function fetchAhlGp(seasonId = AHL_SEASON): Promise<AhlGpRow[]> {
   } finally { clearTimeout(timer); }
 }
 
+// AHL skater scoring (theahl.com feed only populates G/A/shots/PIM/PP/GP — TOI,
+// hits and blocks come back 0, so Edge can only derive scoring params for the AHL).
+export type AhlStatRow = { name: string; gp: number; g: number; a: number; shots: number; pim: number; ppG: number };
+export async function fetchAhlSkaterStats(seasonId: number): Promise<AhlStatRow[]> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 25_000);
+  try {
+    const res = await fetch(`${AHL}&view=skaters&season_id=${seasonId}&limit=3000`, { headers: { "User-Agent": UA }, signal: ctrl.signal });
+    if (!res.ok) throw new Error(`AHL feed HTTP ${res.status}`);
+    const rows = (await res.json())?.SiteKit?.Skaters ?? [];
+    return rows.map((r: any) => ({
+      name: r.name ?? `${r.first_name} ${r.last_name}`.trim(),
+      gp: Number(r.games_played ?? 0), g: Number(r.goals ?? 0), a: Number(r.assists ?? 0),
+      shots: Number(r.shots ?? 0), pim: Number(r.penalty_minutes ?? 0), ppG: Number(r.power_play_goals ?? 0),
+    }));
+  } finally { clearTimeout(timer); }
+}
+
+/** Write AHL scoring into the cur/last real-season fields for matched players. */
+export async function importAhlSkaterStats(rows: AhlStatRow[], target: "cur" | "last") {
+  // AHL-roster players only — never overwrite an NHL player's NHL stats
+  const players = await prisma.player.findMany({ where: { rosterType: "AHL", isGoalie: false }, select: { id: true, name: true } });
+  const full = new Map<string, number>(); const li = new Map<string, number>(); const liDup = new Set<string>();
+  for (const p of players) {
+    full.set(key(p.name), p.id);
+    const k = lastInitial(p.name);
+    if (k) { if (li.has(k)) liDup.add(k); else li.set(k, p.id); }
+  }
+  let matched = 0; const seen = new Set<number>();
+  for (const row of rows) {
+    let id = full.get(key(row.name));
+    if (id == null) { const k = lastInitial(row.name); if (k && !liDup.has(k) && li.has(k)) id = li.get(k)!; }
+    if (id == null || seen.has(id)) continue;
+    seen.add(id);
+    const d = target === "cur"
+      ? { curSeasonGP: row.gp, curSeasonG: row.g, curSeasonA: row.a, curSeasonShots: row.shots, curSeasonPim: row.pim, curSeasonPpG: row.ppG }
+      : { lastSeasonGP: row.gp, lastSeasonG: row.g, lastSeasonA: row.a, lastSeasonShots: row.shots, lastSeasonPim: row.pim, lastSeasonPpG: row.ppG };
+    await prisma.player.update({ where: { id }, data: d });
+    matched++;
+  }
+  return { total: rows.length, matched };
+}
+
 export async function importAhlGp(rows: AhlGpRow[]) {
   const players = await prisma.player.findMany({ select: { id: true, name: true } });
   const full = new Map<string, number>();
