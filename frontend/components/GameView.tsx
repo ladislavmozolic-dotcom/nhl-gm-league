@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { cleanName } from "@/lib/playerName";
 import type { GameReport, GameFlow } from "@/lib/game-report-server";
@@ -423,6 +424,7 @@ function EdgePanel({ data }: { data: Data }) {
 // ---- main view --------------------------------------------------------------
 export default function GameView({ data }: { data: Data }) {
   const [tab, setTab] = useState("summary");
+  const router = useRouter();
   const tabs = [
     { id: "summary", label: "Summary" },
     ...(data.story ? [{ id: "report", label: "Game Report" }] : []),
@@ -469,7 +471,10 @@ export default function GameView({ data }: { data: Data }) {
 
   return (
     <div className="max-w-5xl mx-auto px-4 space-y-6 pb-16">
-      <Link href="/schedule" className="text-sm text-slate-400 hover:text-blue-400">← Schedule</Link>
+      <button
+        onClick={() => { if (typeof window !== "undefined" && window.history.length > 1) router.back(); else router.push("/scores"); }}
+        className="text-sm text-slate-400 hover:text-blue-400"
+      >← Back</button>
 
       {/* scoreboard */}
       <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
