@@ -172,7 +172,7 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
     where,
     orderBy: [{ round: "asc" }, { id: "asc" }],
     ...(opts.limit ? { take: opts.limit } : {}),
-    select: { id: true, homeTeamId: true, awayTeamId: true, round: true, league: true },
+    select: { id: true, homeTeamId: true, awayTeamId: true, round: true, league: true, gameDate: true },
   });
 
   const settings = await loadSettings();
@@ -236,12 +236,13 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
 
   let played = 0;
   const playedIds: number[] = [];
+  const skippedIds: number[] = [];
   for (const gm of scheduled) {
     const round = gm.round ?? 0;
     if (round !== currentRound) { await advanceDay(Math.max(1, round - currentRound)); currentRound = round; }
 
     const [home, away] = await Promise.all([getTeam(gm.homeTeamId), getTeam(gm.awayTeamId)]);
-    if (!home || !away) continue; // couldn't load a roster -> skip this game
+    if (!home || !away) { skippedIds.push(gm.id); continue; } // roster won't load (e.g. farm w/o goalie) — mark no-contest below so it never blocks the day pointer
     for (const team of [home, away]) {
       const starter = chooseStarter(team, round - 1, gState);
       starter.fatigued = (gState.get(starter.id)?.lastStartRound ?? -99) === round - 1;
@@ -256,7 +257,7 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
     const seed = fixtureSeed(gm.homeTeamId, gm.awayTeamId, round);
     const rivalry = home.rivalTeamIds.includes(away.id) || away.rivalTeamIds.includes(home.id);
     const result = simulateGame(home, away, { seed, settings, rivalry, league: gm.league === "AHL" ? "AHL" : "NHL" });
-    await saveGameResult(result, { gameId: gm.id, season, gameDate: seasonDateFor(season, round) });
+    await saveGameResult(result, { gameId: gm.id, season, gameDate: gm.gameDate ?? seasonDateFor(season, round) });
 
     // coach fine: a team that racks up too many penalty minutes is fined by the league
     for (const box of [result.home, result.away]) {
@@ -308,6 +309,15 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
     opts.onGame?.({
       gameId: gm.id, home: home.name, away: away.name,
       hg: result.home.goals, ag: result.away.goals, endedIn: result.endedIn,
+    });
+  }
+
+  // games we couldn't sim (a roster wouldn't load) are marked FINAL 0-0 no-contests
+  // so the round always completes and "sim next day" never gets stuck on them.
+  if (skippedIds.length) {
+    await prisma.game.updateMany({
+      where: { id: { in: skippedIds } },
+      data: { status: "FINAL", homeGoals: 0, awayGoals: 0, endedIn: "REG", playedAt: new Date(), lastSimBy: "No contest (roster unavailable)" },
     });
   }
 
