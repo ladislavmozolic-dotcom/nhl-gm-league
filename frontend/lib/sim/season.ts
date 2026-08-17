@@ -192,11 +192,15 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
   if (opts.round != null) {
     const lastPlayed = await prisma.game.aggregate({ _max: { round: true }, where: { season, status: "FINAL", seriesId: null } });
     const restDays = lastPlayed._max.round != null ? Math.max(0, firstRound - lastPlayed._max.round) : 0;
-    if (restDays > 0) {
-      const goalieRec = restDays * 2;                                  // goalies recover ~2/day
-      const skaterRec = restDays * (settings.skaterConRecovery ?? 1);  // skaters per the tunable rate
+    const playingTeams = [...new Set(scheduled.flatMap((g) => [g.homeTeamId, g.awayTeamId]))];
+    if (restDays > 0 && playingTeams.length) {
+      // Only players who are actually RESTING recover — teams playing tonight are
+      // handled by the game itself (the starter's conAfter etc.), so a starter never
+      // gets a spurious rest-day bump on his own game day (which over-inflated CON).
+      const goalieRec = restDays * 1;                                 // goalies +1/rest day
+      const skaterRec = restDays * (settings.skaterConRecovery ?? 1);
       await prisma.$executeRawUnsafe(
-        `UPDATE "Player" SET condition = LEAST(100, condition + CASE WHEN "isGoalie" THEN ${goalieRec} ELSE ${skaterRec} END) WHERE "injuryDaysLeft" <= 0 AND condition < 100`
+        `UPDATE "Player" SET condition = LEAST(100, condition + CASE WHEN "isGoalie" THEN ${goalieRec} ELSE ${skaterRec} END) WHERE "injuryDaysLeft" <= 0 AND condition < 100 AND "teamId" NOT IN (${playingTeams.join(",")})`
       );
     }
   }
