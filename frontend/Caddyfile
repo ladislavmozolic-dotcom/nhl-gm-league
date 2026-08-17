@@ -1,10 +1,22 @@
 # Caddy auto-provisions a free Let's Encrypt HTTPS certificate for your domain and
 # reverse-proxies to the Next app. DOMAIN comes from the .env file.
 {$DOMAIN} {
-	reverse_proxy app:3000
 	encode gzip
-	# uploads can be large-ish; allow generous bodies for the Web Editor image upload
-	request_body {
-		max_size 10MB
+
+	# User-uploaded branding (logos/wordmarks) live in the shared `uploads` volume,
+	# mounted here at /srv/uploads. `next start` does NOT serve files added to
+	# public/ after the build, so Caddy serves /uploads/* straight from the volume.
+	handle /uploads/* {
+		root * /srv
+		file_server
+	}
+
+	# Everything else → the Next app.
+	handle {
+		reverse_proxy app:3000
+		# allow generous bodies for the Web Editor image upload
+		request_body {
+			max_size 10MB
+		}
 	}
 }

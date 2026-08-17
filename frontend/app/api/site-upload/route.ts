@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { writeFile } from "fs/promises";
+import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { randomBytes } from "crypto";
 import { isAdmin } from "@/lib/auth";
@@ -22,6 +22,8 @@ export async function POST(request: Request) {
 
   const name = `${randomBytes(8).toString("hex")}.${ext}`;
   const bytes = Buffer.from(await file.arrayBuffer());
-  await writeFile(join(process.cwd(), "public", "uploads", "site", name), bytes);
+  const dir = join(process.cwd(), "public", "uploads", "site");
+  await mkdir(dir, { recursive: true });   // ensure the dir exists (fresh volume shadows the image's)
+  await writeFile(join(dir, name), bytes);
   return NextResponse.json({ url: `/uploads/site/${name}` });
 }
