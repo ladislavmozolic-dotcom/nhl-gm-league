@@ -58,17 +58,26 @@ export default async function EdgeStatsPage({ searchParams }: { searchParams: Pr
   let rows: Record<string, string | number>[] = [];
   let cols = SKATER_COLS;
   let initialSort = "topShot";
+  let minNote = "";
 
   if (view === "skaters") {
     const sk = await skaterEdge(SEASON, league);
-    rows = sk.filter((s) => s.gp >= 10).map((s) => ({
+    // adaptive minimum: scales with the busiest skater so leaders show from the first
+    // games and the bar tightens to 10 GP as the season matures.
+    const maxGp = sk.reduce((m, s) => Math.max(m, s.gp), 0);
+    const skMin = Math.min(10, Math.max(1, Math.ceil(maxGp * 0.4)));
+    rows = sk.filter((s) => s.gp >= skMin).map((s) => ({
       name: s.name, teamCode: s.teamCode ?? "—", pos: s.position, gp: s.gp,
       topSkate: s.topSkateSpeed, bursts: s.bursts, miles: s.miles, topShot: s.topShot, hits: s.hits,
     }));
     cols = SKATER_COLS; initialSort = "topShot";
+    minNote = `Minimum ${skMin} GP (scales up to 10). Top Shot is tracked; Top Speed / bursts / distance are modelled.`;
   } else if (view === "goalies") {
     const gk = await goalieEdge(SEASON, league);
-    rows = gk.filter((g) => g.hdShotsAg + g.mdShotsAg + g.ldShotsAg >= 150).map((g) => ({
+    const maxSa = gk.reduce((m, g) => Math.max(m, g.hdShotsAg + g.mdShotsAg + g.ldShotsAg), 0);
+    const saMin = Math.min(150, Math.max(1, Math.ceil(maxSa * 0.4)));
+    minNote = `Minimum ${saMin} shots against (scales up to 150). Real NHL: HD ≈ .80, MD ≈ .92, LD ≈ .98.`;
+    rows = gk.filter((g) => g.hdShotsAg + g.mdShotsAg + g.ldShotsAg >= saMin).map((g) => ({
       name: g.name, teamCode: g.teamCode ?? "—", gp: g.gp, svPct: g.svPct,
       hdSv: g.hdSvPct, mdSv: g.mdSvPct, ldSv: g.ldSvPct, hdShotsAg: g.hdShotsAg,
     }));
@@ -106,8 +115,7 @@ export default async function EdgeStatsPage({ searchParams }: { searchParams: Pr
 
       <StatTable cols={cols} rows={rows} initialSort={initialSort} minWidth={820} />
 
-      {view === "skaters" && <p className="text-xs text-slate-600">Minimum 10 GP. Top Shot is tracked; Top Speed / bursts / distance are modelled.</p>}
-      {view === "goalies" && <p className="text-xs text-slate-600">Minimum 150 shots against. Real NHL: HD ≈ .80, MD ≈ .92, LD ≈ .98.</p>}
+      {minNote && <p className="text-xs text-slate-600">{minNote}</p>}
     </div>
   );
 }

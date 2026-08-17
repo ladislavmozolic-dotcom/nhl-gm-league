@@ -54,7 +54,12 @@ export default async function LeadersPage({ searchParams }: { searchParams: Prom
     { title: "Shots Blocked", rows: top(sk, (s) => s.blocks).map((s) => skRow(s, String(s.blocks))) },
   ];
 
-  const qualGk = gk.filter((g) => g.gp >= 10);
+  // Rate stats (SV%, GAA) need a sample, but early in the season a flat 10-GP gate
+  // hides everything. Scale the minimum with the league's busiest goalie so leaders
+  // show from the first games and the bar tightens to 10 GP as the season matures.
+  const maxGkGp = gk.reduce((m, g) => Math.max(m, g.gp), 0);
+  const gkMin = Math.min(10, Math.max(1, Math.ceil(maxGkGp * 0.4)));
+  const qualGk = gk.filter((g) => g.gp >= gkMin);
   const goalieCards: Array<{ title: string; rows: Row[] }> = [
     { title: "Wins", rows: top(gk, (g) => g.wins).map((g) => gkRow(g, String(g.wins))) },
     { title: "Save Percentage", rows: top(qualGk, (g) => g.svPct).map((g) => gkRow(g, g.svPct.toFixed(3).replace(/^0/, ""))) },
@@ -76,7 +81,7 @@ export default async function LeadersPage({ searchParams }: { searchParams: Prom
       </section>
 
       <section>
-        <SectionTitle accent="text-red-400">Goalie Leaders — min. 10 GP where noted</SectionTitle>
+        <SectionTitle accent="text-red-400">Goalie Leaders — min. {gkMin} GP where noted</SectionTitle>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {goalieCards.map((c) => <LeaderCard key={c.title} title={c.title} rows={c.rows} />)}
         </div>

@@ -39,8 +39,12 @@ export default async function AdvancedStatsPage({ searchParams }: { searchParams
   const league = (await searchParams).league === "AHL" ? "AHL" : "NHL";
   const [sk, gk] = await Promise.all([skaterTotals(SEASON, league), goalieTotals(SEASON, league)]);
 
+  // adaptive minimums — show from the early games, tighten as the sample grows
+  const skShotMin = Math.min(20, Math.max(1, Math.ceil(sk.reduce((m, s) => Math.max(m, s.shots), 0) * 0.4)));
+  const gkSaMin = Math.min(150, Math.max(1, Math.ceil(gk.reduce((m, g) => Math.max(m, g.shotsAgainst), 0) * 0.4)));
+
   const skaterRows = sk
-    .filter((s) => s.shots >= 20) // qualify by a minimum shot sample
+    .filter((s) => s.shots >= skShotMin)
     .map((s) => ({
       name: s.name, teamCode: s.teamCode ?? "—", pos: s.position, gp: s.gp,
       goals: s.goals, xg: s.xg, fin: s.goals - s.xg, hdShots: s.hdShots, shots: s.shots,
@@ -48,7 +52,7 @@ export default async function AdvancedStatsPage({ searchParams }: { searchParams
     }));
 
   const goalieRows = gk
-    .filter((g) => g.shotsAgainst >= 150) // qualify by workload
+    .filter((g) => g.shotsAgainst >= gkSaMin)
     .map((g) => ({
       name: g.name, teamCode: g.teamCode ?? "—", gp: g.gp, gsax: g.gsax, xga: g.xga,
       goalsAgainst: g.goalsAgainst, svPct: g.svPct, gaa: g.gaa, shotsAgainst: g.shotsAgainst,
@@ -67,13 +71,13 @@ export default async function AdvancedStatsPage({ searchParams }: { searchParams
       <section className="space-y-2">
         <h2 className="text-lg font-bold">Skaters — expected goals &amp; finishing</h2>
         <StatTable cols={SKATER_COLS} rows={skaterRows} initialSort="xg" minWidth={860} />
-        <p className="text-xs text-slate-600">Minimum 20 shots. G−xG above zero = finished better than an average shooter would from those spots.</p>
+        <p className="text-xs text-slate-600">Minimum {skShotMin} shots (scales up to 20). G−xG above zero = finished better than an average shooter would from those spots.</p>
       </section>
 
       <section className="space-y-2">
         <h2 className="text-lg font-bold">Goalies — goals saved above expected</h2>
         <StatTable cols={GOALIE_COLS} rows={goalieRows} initialSort="gsax" minWidth={760} />
-        <p className="text-xs text-slate-600">Minimum 150 shots against. GSAx above zero = stopped more than the shot quality faced would predict.</p>
+        <p className="text-xs text-slate-600">Minimum {gkSaMin} shots against (scales up to 150). GSAx above zero = stopped more than the shot quality faced would predict.</p>
       </section>
     </div>
   );

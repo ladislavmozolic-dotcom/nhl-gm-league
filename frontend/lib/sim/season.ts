@@ -18,6 +18,7 @@ import type { SimTeam, SimGoalie, TeamBox } from "./types";
 
 const DU_HIGH = 85; // durability at/above which CON recovers +2/day instead of +1
 export const PLAY_CON = 95; // a skater must be at CON >= 95 to dress (below = still hurt / rusty)
+const GOALIE_REST_CON = 97; // auto-rotation: a goalie under this CON on game day is spelled by the fresher one
 
 /** A hurt skater's CON, as a function of DAYS STILL TO GO. Calibrated to the
  *  league: 4-day (day-to-day) ≈ 94, a week ≈ 93, ~2 weeks ≈ 90, 3 months ≈ 50.
@@ -126,7 +127,7 @@ type GoalieState = { lastStartRound: number; starts: number };
  * goalie plays all 82 and CON stays healthy.
  */
 function chooseStarter(team: SimTeam, prevRound: number, state: Map<number, GoalieState>): SimGoalie {
-  return [...team.goalies]
+  const scored = [...team.goalies]
     .map((g) => {
       const startedYesterday = (state.get(g.id)?.lastStartRound ?? -99) === prevRound;
       // durable (DU>=86) goalies are worked harder: they rest less on a b2b and
@@ -149,8 +150,14 @@ function chooseStarter(team: SimTeam, prevRound: number, state: Map<number, Goal
       // backup mostly gets the second half of back-to-backs and rest days.
       const score = g.con * 0.15 + g.overall * 0.85 - b2bPenalty - tiredPenalty - load;
       return { g, score };
-    })
-    .sort((a, b) => b.score - a.score)[0].g;
+    });
+  // Auto-rotation: a goalie must be at CON >= GOALIE_REST_CON to start. If his CON has
+  // dipped below it, the fresher goalie gets the net — so no starter is ridden into the
+  // ground. If BOTH are below the bar (shouldn't happen once rest-day recovery tops
+  // them up), the freshest one starts anyway (can't forfeit for lack of a rested goalie).
+  const eligible = scored.filter((s) => s.g.con >= GOALIE_REST_CON);
+  if (eligible.length) return eligible.sort((a, b) => b.score - a.score)[0].g;
+  return scored.sort((a, b) => b.g.con - a.g.con)[0].g;
 }
 
 /** Map a scheduling round (day index) to a calendar date so the Scores page can
@@ -176,6 +183,23 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
   });
 
   const settings = await loadSettings();
+
+  // Off-day CON recovery: top up every healthy player for the days elapsed since the
+  // last games were played, BEFORE tonight's games. This runs even when you step one
+  // day at a time via "Sim Next Day" (which otherwise skipped recovery), so goalies
+  // reliably recharge on their rest days and both never sit stuck under the bar.
+  const firstRound = scheduled[0]?.round ?? 0;
+  if (opts.round != null) {
+    const lastPlayed = await prisma.game.aggregate({ _max: { round: true }, where: { season, status: "FINAL", seriesId: null } });
+    const restDays = lastPlayed._max.round != null ? Math.max(0, firstRound - lastPlayed._max.round) : 0;
+    if (restDays > 0) {
+      const goalieRec = restDays * 2;                                  // goalies recover ~2/day
+      const skaterRec = restDays * (settings.skaterConRecovery ?? 1);  // skaters per the tunable rate
+      await prisma.$executeRawUnsafe(
+        `UPDATE "Player" SET condition = LEAST(100, condition + CASE WHEN "isGoalie" THEN ${goalieRec} ELSE ${skaterRec} END) WHERE "injuryDaysLeft" <= 0 AND condition < 100`
+      );
+    }
+  }
   const cache = new Map<number, SimTeam | null>();
   // Season-long MORALE state that must SURVIVE a mid-season roster reload
   // (injuries force a reload, which otherwise re-reads stale morale from the DB
