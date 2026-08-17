@@ -1097,6 +1097,8 @@ function pickHitter(st: SimState, team: SimTeam): SimSkater {
 }
 
 function addInjury(st: SimState, team: SimTeam, victim: SimSkater, mech: InjuryMechanism, by?: SimSkater) {
+  // a player already hurt this game is out — he can't pick up a second injury
+  if (st.injuries.some((i) => i.playerId === victim.id)) return;
   const part = INJ_PARTS[mech][st.rng.int(INJ_PARTS[mech].length)];
   const days = injuryDays(st, mech, part);
   const period = 1 + st.rng.int(3);
