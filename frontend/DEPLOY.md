@@ -17,14 +17,18 @@ Celý deploy stojí na 3 volumoch, ktoré **prežijú každý redeploy**:
 
 ---
 
-## 1. Kód na GitHub (privátny repo)
-Na svojom Macu (v `frontend/`):
+## 1. Kód na GitHub
+Remote už je nastavený na `https://github.com/ladislavmozolic-dotcom/nhl-gm-league.git`.
+Na svojom Macu (v `frontend/`) len pushni najnovší stav:
 ```bash
-git remote -v            # over že máš remote; ak nie:
-# git remote add origin git@github.com:TVOJ-USER/profinhl.git
 git add -A && git commit -m "deploy setup" && git push
 ```
 > `.env` sa NEnahráva (je v `.gitignore`). Na server ho vytvoríš ručne (krok 5).
+>
+> **Ak je repo privátny**, server sa pri `git clone`/`git pull` bude pýtať prihlásenie.
+> Vytvor si na GitHube **Personal Access Token** (Settings → Developer settings →
+> Personal access tokens → *Fine-grained*, prístup len k tomuto repu, práva *Contents: Read*)
+> a použi ho namiesto hesla. Alebo daj repo na *Public* ak ti to neprekáža.
 
 ---
 
@@ -57,10 +61,11 @@ dig +short liga.tvojadomena.sk      # má vrátiť IP servera
 ## 4. Stiahni projekt na server
 ```bash
 cd /opt
-git clone git@github.com:TVOJ-USER/profinhl.git
-cd profinhl/frontend
+git clone https://github.com/ladislavmozolic-dotcom/nhl-gm-league.git
+cd nhl-gm-league/frontend
 chmod +x deploy.sh
 ```
+> Appka je v podpriečinku `frontend/` — všetky `docker compose` príkazy sa spúšťajú odtiaľ.
 
 ---
 
@@ -139,10 +144,10 @@ Daj si to do cronu (denne). Uploady sú vo volume `uploads` — zálohuj podobne
 ---
 
 ## 10. Druhá liga neskôr (cesta A)
-1. Skopíruj priečinok: `cp -r /opt/profinhl /opt/profinhl-liga2`
+1. Skopíruj priečinok: `cp -r /opt/nhl-gm-league /opt/liga2`
 2. Uprav `.env`: iný `DOMAIN` (`liga2.tvojadomena.sk`), iné DB heslo/názov
 3. Pridaj A záznam pre `liga2` v DNS
-4. `cd /opt/profinhl-liga2/frontend && docker compose -p liga2 up -d --build`
+4. `cd /opt/liga2/frontend && docker compose -p liga2 up -d --build`
 
 Každá liga = vlastná izolovaná DB + uploady + doména. Žiadne zmeny kódu.
 
