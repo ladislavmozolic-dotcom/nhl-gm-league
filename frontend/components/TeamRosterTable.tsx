@@ -24,7 +24,9 @@ export function groupRoster(players: any[]): Grouped {
   return {
     forwards: players.filter(isFwd),
     defense: players.filter(isDef),
-    goalies: players.filter((p) => p.isGoalie).map((p) => ({ ...p, ...(p.goalieRating ?? {}) })),
+    // spread goalieRating for the goalie attrs, but keep the live Player.condition
+    // (the sim writes CON to the Player row; goalieRating.condition is stale)
+    goalies: players.filter((p) => p.isGoalie).map((p) => ({ ...p, ...(p.goalieRating ?? {}), condition: p.condition })),
   };
 }
 
@@ -48,6 +50,7 @@ export function RosterSection({ title, players, accent, farm }: { title: string;
                 <th className="px-3 py-3 text-center font-medium w-12">Age</th>
                 {attrs.map((a) => <th key={a} className="px-2.5 py-3 text-center font-medium w-11">{a.toUpperCase()}</th>)}
                 <th className="px-3 py-3 text-center font-medium w-12">OVR</th>
+                <th className="px-3 py-3 text-center font-medium w-12" title="Condition — current fitness (100 = fresh)">CON</th>
                 <th className="px-4 py-3 text-right font-medium w-24">Salary</th>
               </tr>
             </thead>
@@ -76,6 +79,14 @@ export function RosterSection({ title, players, accent, farm }: { title: string;
                     {attrs.map((a) => <td key={a} className={`px-2.5 py-2.5 text-center tabular-nums ${ratingColor(grp, a, player[a])}`}>{player[a] ?? "—"}</td>)}
                     <td className="px-2 py-2 text-center">
                       <span className={`font-bold ${ovColor(grp, player.overall)}`}>{player.overall || "—"}</span>
+                    </td>
+                    <td className="px-3 py-2.5 text-center tabular-nums">
+                      {(() => {
+                        const con = player.condition == null ? null : Math.round(player.condition);
+                        if (con == null) return <span className="text-slate-600">—</span>;
+                        const c = con >= 92 ? "text-emerald-400" : con >= 80 ? "text-green-400" : con >= 65 ? "text-amber-400" : "text-red-400";
+                        return <span className={`font-semibold ${c}`}>{con}</span>;
+                      })()}
                     </td>
                     <td className="px-4 py-2.5 text-right whitespace-nowrap">
                       <span className={`font-semibold tabular-nums ${salary > 0 ? "text-white" : "text-slate-600"}`}>{fmtM(salary)}</span>
