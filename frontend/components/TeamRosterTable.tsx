@@ -63,6 +63,11 @@ export function RosterSection({ title, players, accent, farm }: { title: string;
                         <div className="min-w-0">
                           <Link href={`/players/${player.slug}`} className="font-medium text-sm hover:text-blue-400 transition-colors truncate block">{cleanName(player.name)}</Link>
                           {farm && player.affiliate && <p className="text-[10px] text-emerald-300/60">{player.affiliate.code || player.affiliate.name}</p>}
+                          {(player.injuryDaysLeft ?? 0) > 0 && (
+                            <p className="text-[10px] font-semibold text-red-400 flex items-center gap-1 whitespace-nowrap" title={player.injuryDesc || "Injured"}>
+                              <span aria-hidden>🤕</span> IR · {player.injuryDaysLeft}d{player.injuryDesc ? ` · ${player.injuryDesc}` : ""}
+                            </p>
+                          )}
                         </div>
                       </div>
                     </td>
