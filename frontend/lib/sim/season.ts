@@ -172,7 +172,7 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
     where,
     orderBy: [{ round: "asc" }, { id: "asc" }],
     ...(opts.limit ? { take: opts.limit } : {}),
-    select: { id: true, homeTeamId: true, awayTeamId: true, round: true, league: true, gameDate: true },
+    select: { id: true, homeTeamId: true, awayTeamId: true, round: true, league: true, gameDate: true, simCount: true },
   });
 
   const settings = await loadSettings();
@@ -254,7 +254,10 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
     syncChem(home, settings.chemistryBase);
     syncChem(away, settings.chemistryBase);
 
-    const seed = fixtureSeed(gm.homeTeamId, gm.awayTeamId, round);
+    // Seed folds in the game row id + its sim count, so a RE-SIM (simCount++) and a
+    // fresh schedule rebuild (new row id) each re-roll the result, while replaying
+    // the very same row unchanged stays reproducible.
+    const seed = fixtureSeed(gm.homeTeamId, gm.awayTeamId, round + (gm.simCount ?? 0) * 1_000_003 + gm.id * 7);
     const rivalry = home.rivalTeamIds.includes(away.id) || away.rivalTeamIds.includes(home.id);
     const result = simulateGame(home, away, { seed, settings, rivalry, league: gm.league === "AHL" ? "AHL" : "NHL" });
     await saveGameResult(result, { gameId: gm.id, season, gameDate: gm.gameDate ?? seasonDateFor(season, round) });
