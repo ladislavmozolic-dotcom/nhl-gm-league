@@ -36,9 +36,18 @@ export default async function RootLayout({
   const customPages = await prisma.customPage.findMany({ where: { published: true, inMenu: true }, orderBy: { order: "asc" }, select: { slug: true, title: true, menuLabel: true } }).catch(() => []);
   const extra = customPages.map((p) => ({ key: `page:${p.slug}`, label: p.menuLabel || p.title, href: `/p/${p.slug}` }));
   const lang = await getLang();
+  // which player-parameter calculator is active — only its Tools link shows
+  const lc = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { paramMode: true } }).catch(() => null);
+  const paramMode = lc?.paramMode === "edge" ? "edge" : "sths";
+  const hiddenCalc = paramMode === "edge" ? "/tools/player-calculator" : "/tools/edge-calculator";
   // translate the built-in top-nav labels (custom pages keep their own label)
-  const menu = effectiveMenu(site.menu as MenuOverrides | null, extra).map((m) =>
-    m.key.startsWith("page:") ? m : { ...m, label: translate(lang, `menu.${m.key}`) });
+  const menu = effectiveMenu(site.menu as MenuOverrides | null, extra).map((m) => {
+    const item = m.key.startsWith("page:") ? m : { ...m, label: translate(lang, `menu.${m.key}`) };
+    if (item.key === "tools" && item.children) {
+      return { ...item, children: item.children.filter((c) => c.href !== hiddenCalc) };
+    }
+    return item;
+  });
 
   return (
     <html lang="en">

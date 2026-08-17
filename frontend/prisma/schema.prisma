@@ -260,6 +260,7 @@ model LeagueConfig {
   leagueDate      DateTime?                 // the league clock — a 365-day calendar starting July 1 19:00 (real free-agency open); null = not yet started
   phaseOverride   String?                   // admin manual phase: "offseason" | "preseason" | "regular" | "playoffs" | "frenzy" · null = follow the calendar (see effectivePhase)
   simEngine       String   @default("current") // "current" (stable v1) | "nextgen" (v2 rework) — whole-league engine toggle, see lib/sim/version.ts
+  paramMode       String   @default("sths")    // "sths" | "edge" — which player-parameter calculator is active; only its Tools link is shown
   updatedAt       DateTime @updatedAt
 }
 
