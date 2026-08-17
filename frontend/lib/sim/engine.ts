@@ -1121,7 +1121,11 @@ function addInjury(st: SimState, team: SimTeam, victim: SimSkater, mech: InjuryM
 // average-physicality matchup so the season-long injury load is unchanged.
 function generateInjuries(st: SimState) {
   if (!CFG.injuriesEnabled) return;
-  const scale = CFG.injuryChancePct / 100;
+  // The neutral-matchup lambdas below (hit 0.26 + block 0.09 + non-contact 0.20)
+  // sum to ~0.55/team/game — 2.5× the documented target. Rescale them back to
+  // INJURY_BASE so 100% injuryChancePct means ~1 injury per 5 games per team.
+  const cal = INJURY_BASE / 0.55;
+  const scale = (CFG.injuryChancePct / 100) * cal;
   for (const team of [st.home, st.away]) {
     const opp = team === st.home ? st.away : st.home;
     const fwd = team.forwards, def = team.defense, pool = [...fwd, ...def];
