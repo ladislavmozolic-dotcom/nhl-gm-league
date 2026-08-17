@@ -44,7 +44,7 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
   // admin-awarded bonus picks (extra rounds)
   const bonusRaw = await prisma.draftBonusPick.findMany({ where: { year: DRAFT_YEAR, ...src }, orderBy: [{ round: "asc" }, { seq: "asc" }, { id: "asc" }], select: { id: true, round: true, teamId: true, reason: true, seq: true } });
   const bonusRows: BonusRow[] = bonusRaw.map((b) => ({ id: b.id, round: b.round, teamCode: teamOf.get(b.teamId)?.code ?? "—", reason: b.reason, seq: b.seq }));
-  const bonusTeams: BonusTeam[] = teams.map((t) => ({ id: t.id, code: t.code, name: t.name }));
+  const bonusTeams: BonusTeam[] = teams.map((t) => ({ id: t.id, code: t.code ?? "", name: t.name }));
   // original owner of any overall pick = the team at that fixed worst-first slot
   const originalOwnerOf = (overallPick: number) => revStd[(overallPick - 1) % PICKS_PER_ROUND];
   const state = stateRaw ?? { liveRound: 0, currentPick: 33, status: "IDLE" as string };

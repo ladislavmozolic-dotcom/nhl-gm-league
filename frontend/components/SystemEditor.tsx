@@ -2,24 +2,26 @@
 
 import { useState, useTransition, useMemo } from "react";
 import {
-  resolveTactics, PRESETS, DIAL_LABELS, DIAL_DESC, EFFECT_DESC, mergeTactics,
+  resolveTactics, PRESETS, DIAL_LABELS, EFFECT_DESC, mergeTactics,
   type TeamTactics, type RosterProfile, type Tempo, type Forecheck, type PuckStyle, type DZone,
 } from "@/lib/sim/tactics";
 import { saveSystem } from "@/app/teams/[slug]/tactics/actions";
+import { useT, useLang } from "@/components/LangProvider";
+import { dialLabel, dialDesc } from "@/lib/tactics-i18n";
 
 const DIALS = [
-  { key: "tempo", label: "Tempo", hint: "How fast you play — pace of the game" },
-  { key: "forecheck", label: "Forecheck", hint: "How hard you pressure the puck in the offensive & neutral zones" },
-  { key: "puckStyle", label: "Puck Style", hint: "How your offence generates chances" },
-  { key: "dZone", label: "D-Zone", hint: "How you defend your own end" },
+  { key: "tempo", labelKey: "sys.dTempo", hintKey: "sys.hintTempo" },
+  { key: "forecheck", labelKey: "sys.dForecheck", hintKey: "sys.hintForecheck" },
+  { key: "puckStyle", labelKey: "sys.dPuck", hintKey: "sys.hintPuck" },
+  { key: "dZone", labelKey: "sys.dDzone", hintKey: "sys.hintDzone" },
 ] as const;
 
-function fitLabel(fit: number): { text: string; cls: string } {
-  if (fit >= 1.06) return { text: "Excellent fit — your roster is built for this", cls: "text-emerald-400" };
-  if (fit >= 1.02) return { text: "Good fit", cls: "text-emerald-400" };
-  if (fit >= 0.98) return { text: "Neutral fit", cls: "text-slate-300" };
-  if (fit >= 0.94) return { text: "Below-average fit — you pay the cost for less reward", cls: "text-amber-400" };
-  return { text: "Poor fit — this system fights your roster", cls: "text-red-400" };
+function fitLabel(fit: number): { key: string; cls: string } {
+  if (fit >= 1.06) return { key: "sys.fitExcellent", cls: "text-emerald-400" };
+  if (fit >= 1.02) return { key: "sys.fitGood", cls: "text-emerald-400" };
+  if (fit >= 0.98) return { key: "sys.fitNeutral", cls: "text-slate-300" };
+  if (fit >= 0.94) return { key: "sys.fitBelow", cls: "text-amber-400" };
+  return { key: "sys.fitPoor", cls: "text-red-400" };
 }
 
 // a signed % chip for an effect multiplier
@@ -37,6 +39,8 @@ function Chip({ label, mult, invert = false, title }: { label: string; mult: num
 }
 
 export default function SystemEditor({ teamId, profile, initial, coachEx = 70 }: { teamId: number; profile: RosterProfile; initial: TeamTactics; coachEx?: number }) {
+  const tr = useT();
+  const lang = useLang();
   const [tac, setTac] = useState<TeamTactics>(mergeTactics(initial));
   const [saved, setSaved] = useState(false);
   const [pending, start] = useTransition();
@@ -53,13 +57,13 @@ export default function SystemEditor({ teamId, profile, initial, coachEx = 70 }:
       {/* dials + presets */}
       <div className="space-y-5">
         <div className="bg-slate-900/40 rounded-lg border border-slate-800 p-4 text-sm text-slate-400 space-y-1.5">
-          <p><span className="text-slate-200 font-semibold">Your team&apos;s identity.</span> Pick four dials (or a ready-made preset). Every dial has an upside and a real cost.</p>
-          <p><span className="text-emerald-400 font-semibold">System Fit</span> is the key: benefits scale with how well your roster suits the system, but the costs (fatigue, penalties, shots against) apply no matter what — so force a system your players can&apos;t run and you pay the price for little reward. A good coach (high EX) helps execute it.</p>
-          <p className="text-slate-500">All-<em>Balanced</em> = no effect, play it straight.</p>
+          <p><span className="text-slate-200 font-semibold">{tr("sys.identity")}</span> {tr("sys.intro1")}</p>
+          <p><span className="text-emerald-400 font-semibold">{tr("sys.fitName")}</span> {tr("sys.intro2")}</p>
+          <p className="text-slate-500">{tr("sys.balancedNote")}</p>
         </div>
 
         <div>
-          <div className="text-xs uppercase tracking-wide text-slate-500 mb-2">Presets <span className="normal-case text-slate-600">— one-click ready systems</span></div>
+          <div className="text-xs uppercase tracking-wide text-slate-500 mb-2">{tr("sys.presets")} <span className="normal-case text-slate-600">{tr("sys.presetsHint")}</span></div>
           <div className="flex flex-wrap gap-2">
             {Object.keys(PRESETS).map((name) => (
               <button key={name} onClick={() => applyPreset(name)}
@@ -75,21 +79,21 @@ export default function SystemEditor({ teamId, profile, initial, coachEx = 70 }:
         {DIALS.map((d) => {
           const opts = DIAL_LABELS[d.key];
           const val = tac[d.key] as string;
-          const desc = DIAL_DESC[d.key][val];
+          const desc = dialDesc(lang, d.key, val);
           return (
             <div key={d.key}>
               <div className="flex items-baseline justify-between mb-1.5">
-                <span className="font-semibold">{d.label}</span>
-                <span className="text-xs text-slate-500">{d.hint}</span>
+                <span className="font-semibold">{tr(d.labelKey)}</span>
+                <span className="text-xs text-slate-500">{tr(d.hintKey)}</span>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {Object.entries(opts).map(([k, lbl]) => (
+                {Object.keys(opts).map((k) => (
                   <button key={k}
                     onClick={() => set(d.key, k as Tempo & Forecheck & PuckStyle & DZone)}
                     className={`px-3 py-2 rounded-md text-sm font-medium border transition-colors ${
                       val === k ? "bg-blue-600 text-white border-blue-500" : "border-slate-700 text-slate-300 hover:bg-slate-800/60"
                     }`}>
-                    {lbl as string}
+                    {dialLabel(lang, d.key, k)}
                   </button>
                 ))}
               </div>
@@ -102,7 +106,7 @@ export default function SystemEditor({ teamId, profile, initial, coachEx = 70 }:
       {/* fit + effects + save */}
       <div className="space-y-4">
         <div className="bg-slate-900/40 rounded-lg border border-slate-800 p-4">
-          <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">System Fit</div>
+          <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">{tr("sys.fitName")}</div>
           <div className="flex items-baseline gap-2">
             <span className={`text-3xl font-black tabular-nums ${fl.cls}`}>{Math.round(eff.fit * 100)}</span>
             <span className="text-slate-500 text-sm">/ 100</span>
@@ -111,27 +115,27 @@ export default function SystemEditor({ teamId, profile, initial, coachEx = 70 }:
             <div className={`h-full ${eff.fit >= 1 ? "bg-emerald-500/70" : "bg-amber-500/70"}`}
               style={{ width: `${Math.max(0, Math.min(100, (eff.fit - 0.6) / 0.55 * 100))}%` }} />
           </div>
-          <p className={`text-xs mt-2 ${fl.cls}`}>{fl.text}</p>
-          <p className="text-[11px] text-slate-600 mt-1">How well your roster suits the chosen dials (100 = neutral). Higher = your players fit; lower = they don&apos;t.</p>
+          <p className={`text-xs mt-2 ${fl.cls}`}>{tr(fl.key)}</p>
+          <p className="text-[11px] text-slate-600 mt-1">{tr("sys.fitDesc")}</p>
         </div>
 
         <div className="bg-slate-900/40 rounded-lg border border-slate-800 p-4">
-          <div className="text-xs uppercase tracking-wide text-slate-500 mb-2">Projected effect <span className="normal-case text-slate-600">— vs a balanced system</span></div>
-          <Chip label="Your shot volume" mult={eff.shotRate} title={EFFECT_DESC.shotRate} />
-          <Chip label="Shots against" mult={eff.oppShotRate} invert title={EFFECT_DESC.oppShotRate} />
-          <Chip label="Your chance quality" mult={eff.dangerMix} title={EFFECT_DESC.dangerMix} />
-          <Chip label="Opponent chance quality" mult={eff.oppDangerMult} invert title={EFFECT_DESC.oppDangerMult} />
-          <Chip label="Forechecking pressure" mult={eff.takeaway} title={EFFECT_DESC.takeaway} />
-          <Chip label="Fatigue" mult={eff.fatigue} invert title={EFFECT_DESC.fatigue} />
-          <Chip label="Penalties taken" mult={eff.penaltyMult} invert title={EFFECT_DESC.penaltyMult} />
-          <p className="text-[11px] text-slate-600 mt-2">Green = helps you, red = hurts you. Hover a row for what it means.</p>
+          <div className="text-xs uppercase tracking-wide text-slate-500 mb-2">{tr("sys.projected")} <span className="normal-case text-slate-600">{tr("sys.projectedHint")}</span></div>
+          <Chip label={tr("sys.chipShotVol")} mult={eff.shotRate} title={EFFECT_DESC.shotRate} />
+          <Chip label={tr("sys.chipShotsAgainst")} mult={eff.oppShotRate} invert title={EFFECT_DESC.oppShotRate} />
+          <Chip label={tr("sys.chipChanceQ")} mult={eff.dangerMix} title={EFFECT_DESC.dangerMix} />
+          <Chip label={tr("sys.chipOppChanceQ")} mult={eff.oppDangerMult} invert title={EFFECT_DESC.oppDangerMult} />
+          <Chip label={tr("sys.chipForecheck")} mult={eff.takeaway} title={EFFECT_DESC.takeaway} />
+          <Chip label={tr("sys.chipFatigue")} mult={eff.fatigue} invert title={EFFECT_DESC.fatigue} />
+          <Chip label={tr("sys.chipPenalties")} mult={eff.penaltyMult} invert title={EFFECT_DESC.penaltyMult} />
+          <p className="text-[11px] text-slate-600 mt-2">{tr("sys.effectLegend")}</p>
         </div>
 
         <button onClick={save} disabled={pending}
           className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-semibold transition-colors">
-          {pending ? "Saving…" : saved ? "Saved ✓" : "Save System"}
+          {pending ? tr("sys.saving") : saved ? tr("sys.savedTick") : tr("sys.save")}
         </button>
-        <p className="text-xs text-slate-600">Benefits scale with fit; costs (fatigue, penalties, shots against) apply in full. Balanced dials = no effect.</p>
+        <p className="text-xs text-slate-600">{tr("sys.footer")}</p>
       </div>
     </div>
   );

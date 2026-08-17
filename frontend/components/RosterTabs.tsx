@@ -2,15 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useT } from "@/components/LangProvider";
 
 /** Secondary tabs that live UNDER Roster — Depth Chart is nested here rather than
  *  cluttering the team's top menu. */
 export default function RosterTabs({ slug }: { slug: string }) {
   const pathname = usePathname() || "";
+  const tr = useT();
   const tabs = [
-    { label: "Roster", href: `/teams/${slug}/roster` },
-    { label: "Depth Chart", href: `/teams/${slug}/depth-chart` },
-    { label: "Injuries", href: `/teams/${slug}/injuries` },
+    { label: tr("team.roster"), href: `/teams/${slug}/roster` },
+    { label: tr("team.depthChart"), href: `/teams/${slug}/depth-chart` },
+    { label: tr("team.injuries"), href: `/teams/${slug}/injuries` },
   ];
   return (
     <div className="flex items-center gap-2">

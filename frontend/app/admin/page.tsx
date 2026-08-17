@@ -1,38 +1,74 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/ui";
+import { getLang } from "@/lib/lang-server";
+import { t as tt } from "@/lib/i18n";
 
-export default function AdminPage() {
-  const cards = [
-    { href: "/admin/dashboard", title: "⭐ Commissioner Dashboard", desc: "Today at a glance — games ready, missing lines, illegal lineups, pending trades — and one-click Simulate Day." },
-    { href: "/admin/season", title: "Season Control", desc: "Generate the schedule, play the season, run the playoffs." },
-    { href: "/admin/announcements", title: "Commissioner Announcements", desc: "Post a league-wide message — reaches every GM's inbox and the home page." },
-    { href: "/admin/awards", title: "Award Voting", desc: "Open/close the GM award ballot, watch the running tally, resolve winners." },
-    { href: "/draft/lottery", title: "Draft Lottery", desc: "Draw the NHL-style lottery (16 non-playoff clubs, 2 weighted picks) to set round 1." },
-    { href: "/admin/simulation", title: "Simulation Engine", desc: "Tune goals, shots, penalties, fights, goalie fatigue, playoff format, points." },
-    { href: "/admin/sim-guide", title: "How the Sim Works", desc: "How chemistry forms and how every rating works together — a reference guide." },
-    { href: "/admin/calibration", title: "Calibration Lab", desc: "Grade the engine against NHL targets — rates, competitive balance, xG, EDGE, injuries." },
-    { href: "/admin/finance", title: "Team Popularity", desc: "Set popularity — drives attendance and ticket revenue." },
-    { href: "/admin/contracts", title: "Contracts", desc: "Edit player cap hits and contract terms." },
-    { href: "/admin/positions", title: "Player Positions", desc: "Search a player and add/remove positions and shooting side." },
-    { href: "/admin/ratings", title: "Player Ratings", desc: "Search a player and tune his ratings (OV, SC, PA…) — the sim reflects them directly." },
-    { href: "/admin/conditions", title: "Trade Conditions", desc: "Track conditional trade terms; trigger settlement once conditions are met." },
-    { href: "/admin/lines", title: "Line Submissions", desc: "See when each GM last submitted lines before the 20:30 simulation." },
-    { href: "/admin/team-lines", title: "Team Lines & Tactics", desc: "Open any club's line editor — set players, PHY/DF/OF tactics and ice-time for every team." },
-    { href: "/admin/rosters", title: "Roster Source", desc: "Start the season with ProfiNHL rosters or the real NHL rosters." },
-    { href: "/admin/real-drafts", title: "Real Draft Import", desc: "Load real NHL drafts (2019+) into real-roster Draft History." },
-  ];
+export const dynamic = "force-dynamic";
+
+type Item = { href: string; title: string; descKey: string };
+type Group = { titleKey: string; items: Item[] };
+
+const GROUPS: Group[] = [
+  {
+    titleKey: "admin.grpSeason",
+    items: [
+      { href: "/admin/dashboard", title: "⭐ Commissioner Dashboard", descKey: "admin.dashboard.d" },
+      { href: "/admin/season", title: "Season Control", descKey: "admin.season.d" },
+      { href: "/admin/simulation", title: "Simulation Engine", descKey: "admin.simulation.d" },
+      { href: "/admin/calibration", title: "Calibration Lab", descKey: "admin.calibration.d" },
+      { href: "/admin/sim-guide", title: "How the Sim Works", descKey: "admin.simGuide.d" },
+      { href: "/admin/lines", title: "Line Submissions", descKey: "admin.lines.d" },
+    ],
+  },
+  {
+    titleKey: "admin.grpRosters",
+    items: [
+      { href: "/admin/rosters", title: "Roster Source", descKey: "admin.rosters.d" },
+      { href: "/admin/team-lines", title: "Team Lines & Tactics", descKey: "admin.teamLines.d" },
+      { href: "/admin/contracts", title: "Contracts", descKey: "admin.contracts.d" },
+      { href: "/admin/positions", title: "Player Positions", descKey: "admin.positions.d" },
+      { href: "/admin/ratings", title: "Player Ratings", descKey: "admin.ratings.d" },
+      { href: "/admin/conditions", title: "Trade Conditions", descKey: "admin.conditions.d" },
+    ],
+  },
+  {
+    titleKey: "admin.grpFinance",
+    items: [
+      { href: "/admin/finance", title: "Team Popularity", descKey: "admin.finance.d" },
+      { href: "/draft/lottery", title: "Draft Lottery", descKey: "admin.lottery.d" },
+      { href: "/admin/real-drafts", title: "Real Draft Import", descKey: "admin.realDrafts.d" },
+    ],
+  },
+  {
+    titleKey: "admin.grpContent",
+    items: [
+      { href: "/admin/site-editor", title: "🎨 Web Editor", descKey: "admin.siteEditor.d" },
+      { href: "/admin/announcements", title: "Commissioner Announcements", descKey: "admin.announcements.d" },
+      { href: "/admin/awards", title: "Award Voting", descKey: "admin.awards.d" },
+    ],
+  },
+];
+
+export default async function AdminPage() {
+  const lang = await getLang();
+  const T = (k: string) => tt(lang, k);
   return (
-    <div className="space-y-6 py-2">
-      <PageHeader title="Admin Panel" subtitle="League operations — schedule, simulation, finance and roster tools." />
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {cards.map((c) => (
-          <Link key={c.href} href={c.href}
-            className="block bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 p-5 hover:border-slate-600 transition-colors">
-            <div className="font-bold mb-1">{c.title}</div>
-            <div className="text-sm text-slate-400">{c.desc}</div>
-          </Link>
-        ))}
-      </div>
+    <div className="mx-auto max-w-6xl px-4 py-2 space-y-8">
+      <PageHeader title="Admin Panel" subtitle={T("admin.subtitle")} />
+      {GROUPS.map((g) => (
+        <section key={g.titleKey} className="space-y-3">
+          <h2 className="text-[11px] font-bold uppercase tracking-widest text-slate-500">{T(g.titleKey)}</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {g.items.map((c) => (
+              <Link key={c.href} href={c.href}
+                className="group block bg-slate-900/70 border border-slate-800 rounded-xl p-4 hover:border-blue-500/60 hover:bg-slate-900 transition-colors">
+                <div className="font-semibold text-sm mb-1 group-hover:text-white">{c.title}</div>
+                <div className="text-[12px] text-slate-400 leading-snug">{T(c.descKey)}</div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ))}
     </div>
   );
 }

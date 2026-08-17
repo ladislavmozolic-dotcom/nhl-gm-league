@@ -398,7 +398,7 @@ function rosterProfile(roster: SimSkater[]): RosterProfile {
 // STHS coach → global team modifiers. Ratings sit ~75-92 (centered on 80), so a
 // point above/below 80 nudges the team card; a matching coaching STYLE adds a
 // little extra on top. Kept small so the roster stays the main driver.
-function coachFactors(c: CoachInput): { coachOff: number; coachDef: number; coachDisc: number; coachEx: number } {
+function coachFactors(c: CoachInput | undefined): { coachOff: number; coachDef: number; coachDisc: number; coachEx: number } {
   if (!c) return { coachOff: 1, coachDef: 1, coachDisc: 1, coachEx: 70 };
   // centered on the league-average coach rating (~84) so a better-than-average
   // bench helps and a worse one hurts, but the pool stays ~zero-sum (no league-

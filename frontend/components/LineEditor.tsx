@@ -4,7 +4,9 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import LinesNav from "@/components/LinesNav";
 import { autoFill, type TeamLinesData, type ForwardLine, type DefensePair, type SpecialUnit } from "@/lib/sim/lines-core";
-import { DIAL_LABELS, DIAL_DESC, mergeTactics, type PuckStyle, type DZone, type PpStyle, type PkStyle } from "@/lib/sim/tactics";
+import { DIAL_LABELS, mergeTactics, type PuckStyle, type DZone, type PpStyle, type PkStyle } from "@/lib/sim/tactics";
+import { useLang } from "@/components/LangProvider";
+import { dialLabel, dialDesc } from "@/lib/tactics-i18n";
 import type { GameStrategy, StratWeights } from "@/lib/sim/types";
 
 type Player = { id: number; name: string; position: string; overall: number };
@@ -26,6 +28,7 @@ const STATES: Array<{ key: keyof Omit<GameStrategy, "goaliePull">; label: string
 const TABS = ["Forward", "Defense", "PP", "4 vs 4", "PK4", "PK3", "Others", "Last Min", "Overtime", "Strategy"] as const;
 
 export default function LineEditor({ teamName, teamSlug, players, goalies, initial, onSave }: Props) {
+  const lang = useLang();
   const [data, setData] = useState<TeamLinesData>(initial);
   const [tab, setTab] = useState<(typeof TABS)[number]>("Forward");
   const [pending, start] = useTransition();
@@ -133,31 +136,32 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
   // attacking team, or a shut-down pair under an aggressive one.
   const setFwdPuck = (i: number, v: PuckStyle | "") => change((d) => { if (v) d.forwardLines[i].puck = v; else delete d.forwardLines[i].puck; });
   const setDefDzone = (i: number, v: DZone | "") => change((d) => { if (v) d.defensePairs[i].dzone = v; else delete d.defensePairs[i].dzone; });
-  const SysSelect = ({ value, opts, desc, onChange }: { value: string | undefined; opts: Record<string, string>; desc?: Record<string, string>; onChange: (v: string) => void }) => (
+  const inheritTxt = lang === "cs" ? "Zdediť tímový systém (nastav voľbu pre override len tejto formácie)" : "Inherit the team system (set an option to override just this line)";
+  const SysSelect = ({ value, dial, opts, onChange }: { value: string | undefined; dial: "puckStyle" | "dZone"; opts: Record<string, string>; onChange: (v: string) => void }) => (
     <select value={value ?? ""} onChange={(e) => onChange(e.target.value)}
-      title={value && desc?.[value] ? desc[value] : "Inherit the team system (set an option to override just this line)"}
+      title={value ? dialDesc(lang, dial, value) : inheritTxt}
       className={`bg-slate-800 border rounded px-1.5 py-1 text-xs cursor-help ${value ? "border-sky-600 text-sky-300" : "border-slate-700 text-slate-400"}`}>
-      <option value="" title="Inherit the team system (from Team → System)">Team</option>
-      {Object.entries(opts).filter(([k]) => k !== "balanced").map(([k, lbl]) => <option key={k} value={k} title={desc?.[k]}>{lbl}</option>)}
+      <option value="" title={inheritTxt}>{lang === "cs" ? "Tím" : "Team"}</option>
+      {Object.keys(opts).filter((k) => k !== "balanced").map((k) => <option key={k} value={k} title={dialDesc(lang, dial, k)}>{dialLabel(lang, dial, k)}</option>)}
     </select>
   );
   // team-level special-teams formation (stored on data.system, persisted with lines)
   const setStyle = (k: "ppStyle" | "pkStyle", v: string) => change((d) => { d.system = { ...mergeTactics(d.system), [k]: v as PpStyle & PkStyle }; });
   const FormationPicker = (k: "ppStyle" | "pkStyle", label: string) => {
-    const opts = DIAL_LABELS[k]; const desc = DIAL_DESC[k];
+    const opts = DIAL_LABELS[k];
     const val = (mergeTactics(data.system) as Record<string, string>)[k] ?? "balanced";
     return (
       <div className="mb-3 bg-slate-900/40 border border-slate-800 rounded-lg p-3">
-        <div className="flex items-baseline gap-2 mb-1.5"><span className="text-sm font-semibold">{label}</span><span className="text-xs text-slate-500">classic NHL systems — hover an option for what it does</span></div>
+        <div className="flex items-baseline gap-2 mb-1.5"><span className="text-sm font-semibold">{label}</span><span className="text-xs text-slate-500">{lang === "cs" ? "klasické NHL systémy — nájdi kurzorom na voľbu" : "classic NHL systems — hover an option for what it does"}</span></div>
         <div className="flex flex-wrap gap-1.5">
-          {Object.entries(opts).map(([kk, lbl]) => (
-            <button key={kk} type="button" title={desc?.[kk]} onClick={() => setStyle(k, kk)}
+          {Object.keys(opts).map((kk) => (
+            <button key={kk} type="button" title={dialDesc(lang, k, kk)} onClick={() => setStyle(k, kk)}
               className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors cursor-help ${
                 val === kk ? "bg-blue-600 text-white border-blue-500" : "border-slate-700 text-slate-300 hover:bg-slate-800/60"
-              }`}>{lbl as string}</button>
+              }`}>{dialLabel(lang, k, kk)}</button>
           ))}
         </div>
-        <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{desc?.[val]}</p>
+        <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{dialDesc(lang, k, val)}</p>
       </div>
     );
   };
@@ -228,7 +232,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
               {bad && <span className="text-[11px] text-rose-400" title="PHY+DF+OF must total 5">PHY+DF+OF ≠ 5</span>}
               <div className="flex items-center gap-1.5 ml-auto">
                 <span title="Puck Style for this line only (empty = inherit the team system from Team → System). e.g. a Cycle 4th line under a Rush team." className="text-[11px] uppercase tracking-wide text-slate-500 cursor-help border-b border-dotted border-slate-600">System</span>
-                <SysSelect value={l.puck} opts={DIAL_LABELS.puckStyle} desc={DIAL_DESC.puckStyle} onChange={(v) => setFwdPuck(i, v as PuckStyle | "")} />
+                <SysSelect value={l.puck} dial="puckStyle" opts={DIAL_LABELS.puckStyle} onChange={(v) => setFwdPuck(i, v as PuckStyle | "")} />
               </div>
             </div>
           </div>
@@ -260,7 +264,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
               {bad && <span className="text-[11px] text-rose-400" title="PHY+DF+OF must total 5">PHY+DF+OF ≠ 5</span>}
               <div className="flex items-center gap-1.5 ml-auto">
                 <span title="D-Zone for this pair only (empty = inherit the team system). e.g. a Collapse shut-down pair to defend a lead." className="text-[11px] uppercase tracking-wide text-slate-500 cursor-help border-b border-dotted border-slate-600">System</span>
-                <SysSelect value={p.dzone} opts={DIAL_LABELS.dZone} desc={DIAL_DESC.dZone} onChange={(v) => setDefDzone(i, v as DZone | "")} />
+                <SysSelect value={p.dzone} dial="dZone" opts={DIAL_LABELS.dZone} onChange={(v) => setDefDzone(i, v as DZone | "")} />
               </div>
             </div>
           </div>

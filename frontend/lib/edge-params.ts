@@ -78,10 +78,12 @@ export function percentileOf(value: number, sortedAsc: number[]): number {
 // by the server per player.
 export type Metric = { key: string; weight: number; invert?: boolean };
 export const EDGE_COMPOSITES: Record<string, Metric[]> = {
-  // scoring — goals lead; shots + finishing support (no xG/high-danger in feed yet)
-  SC: [{ key: "g60", weight: 0.6 }, { key: "sh60", weight: 0.25 }, { key: "shpct", weight: 0.15 }],
-  // passing — assists per 60 (primary-assist / xA refinement later, not in feed yet)
-  PA: [{ key: "a60", weight: 1.0 }],
+  // scoring — an offensive-THREAT rating (matches how STHS "SC" reads): per-game goal
+  // production leads, plus a slice of playmaking so two-way offensive stars (McDavid:
+  // 48G but 90A) aren't buried under pure snipers; per-60 keeps the efficiency check.
+  SC: [{ key: "gpg", weight: 0.42 }, { key: "g60", weight: 0.2 }, { key: "apg", weight: 0.15 }, { key: "sh60", weight: 0.13 }, { key: "shpct", weight: 0.10 }],
+  // passing — assists per 60 leads, per-game assists add volume (playmaking totals)
+  PA: [{ key: "a60", weight: 0.6 }, { key: "apg", weight: 0.4 }],
   // checking — hits per 60
   CK: [{ key: "hit60", weight: 1.0 }],
   // defense — blocks, PK usage, takeaways, +/- (F vs F, D vs D handled by grouping)
@@ -97,6 +99,15 @@ export const EDGE_COMPOSITES: Record<string, Metric[]> = {
   // puck handling — creation + takeaways, penalised for giveaways (entry/carry
   // tracking not in the feed yet, so this is a possession-events proxy)
   PH: [{ key: "off60", weight: 0.5 }, { key: "tk60", weight: 0.2 }, { key: "gv60", weight: 0.3, invert: true }],
+  // fighting — penalty-minute load + physical engagement (no fighting-major feed, so
+  // PIM/hits stand in: enforcers accrue both)
+  FG: [{ key: "pim60", weight: 0.6 }, { key: "hit60", weight: 0.4 }],
+  // penalty shot / breakaway — finishing skill + offensive touch (shootout/breakaway
+  // conversion tracks finishers)
+  PS: [{ key: "shpct", weight: 0.5 }, { key: "off60", weight: 0.3 }, { key: "g60", weight: 0.2 }],
+  // skating — real NHL EDGE tracking (top speed + speed bursts), the dominant signal;
+  // ice-time is only a fallback for the handful of skaters missing EDGE data.
+  SK: [{ key: "spd", weight: 0.8 }, { key: "toi", weight: 0.2 }],
 };
 
 /** EX — experience, an absolute age curve (we lack career-GP totals). 1000-game

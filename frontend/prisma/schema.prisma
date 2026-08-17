@@ -196,6 +196,9 @@ model Player {
   curSeasonFoPct       Float?
   curSeasonPpG         Int?
   goalieAdvanced       Json?         // MoneyPuck goalie metrics for the Edge engine: { cur:{...}, last:{...} } — GSAx, danger SV% splits, rebound control, sample
+  ahlStats             Json?         // AHL scoring for the Edge engine, imported for ANY player who played the AHL (incl. NHL-roster call-ups like Kaliyev) so it never overwrites their NHL cur/last fields: { cur:{gp,g,a,sh,pim,ppG}, last:{...} }
+  edgeSpeed            Json?         // NHL EDGE player-tracking percentiles (api-web skater-detail) for the SK param: { cur:{spd,brst,dist}, last:{...} } — speedMax / burstsOver20 / distance percentiles (0-1)
+  mpSkater             Json?         // MoneyPuck advanced skater totals per season for the SC/PA V1 model: { "2025":{gp,toi,g,ixg,a1,a2,sh,ong,ppa1}, "2024":{...}, "2023":{...} } — ixG/primary-assists/on-ice-goals, icetime in seconds
   edgeRatings          Json?         // persisted Edge Parameters (analytics; separate from the STHS ck/sc/... the sim uses)
   goalieRating         GoalieRating?
   team                 Team          @relation(fields: [teamId], references: [id])
@@ -258,6 +261,65 @@ model LeagueConfig {
   phaseOverride   String?                   // admin manual phase: "offseason" | "preseason" | "regular" | "playoffs" | "frenzy" · null = follow the calendar (see effectivePhase)
   simEngine       String   @default("current") // "current" (stable v1) | "nextgen" (v2 rework) — whole-league engine toggle, see lib/sim/version.ts
   updatedAt       DateTime @updatedAt
+}
+
+// Web Editor — admin-editable site customization (single row, id=1). Branding is
+// scalar; menu / homepage blocks are JSON so their shape can evolve without a
+// migration. See lib/site-config.ts for defaults + the merged loader.
+model SiteConfig {
+  id          Int      @id @default(1)
+  // Branding
+  leagueName  String   @default("ProfiNHL")
+  tagline     String   @default("CZ & SK Online Hockey Manager")
+  logoUrl     String?
+  nameImageUrl String?  // banner wordmark image — shown INSTEAD of the leagueName text when set
+  // Banner layout — sizes in px, arrangement of logo vs name
+  logoHeight  Int      @default(56)
+  nameHeight  Int      @default(56)
+  bannerAlign String   @default("center") // left | center | right
+  bannerLayout String  @default("row")    // row (side by side) | stack (logo above name)
+  logoFirst   Boolean  @default(true)      // logo before the name, or name first
+  bannerHeight Int     @default(0)         // fixed banner band height in px (0 = auto-fit content)
+  socialLinks Json?                        // [{ type: "facebook"|"instagram"|..., url }] shown in the banner corner
+  accentColor String   @default("#60a5fa") // header/tagline accent (was blue-400)
+  bgColor     String   @default("#0a1628") // page background
+  footerText  String?
+  // Theme tokens — remapped onto the app's common Tailwind classes site-wide
+  surfaceColor String  @default("#0f172a") // cards / cells (bg-slate-900)
+  surface2Color String @default("#1e293b") // inputs / secondary surfaces (bg-slate-800)
+  borderColor String   @default("#1e293b") // borders (border-slate-800/700)
+  text2Color  String   @default("#94a3b8") // secondary text (text-slate-400)
+  text3Color  String   @default("#64748b") // muted text (text-slate-500)
+  radiusPx    Int      @default(12)        // corner roundness
+  fontKey     String   @default("inter")   // body font stack key (see lib/site-theme.ts)
+  // Menu — [{ key, label, href, visible, order, children:[{label,href,visible}] }]
+  menu        Json?
+  // Homepage — [{ type, visible, order, config }]
+  homeBlocks  Json?
+  updatedAt   DateTime @updatedAt
+}
+
+// Web Editor — a saved appearance template (a named snapshot of the look: colours +
+// banner layout, NOT the logo/name content). Users apply/switch between them.
+model SiteTemplate {
+  id        Int      @id @default(autoincrement())
+  name      String
+  style     Json     // { accentColor, bgColor, bannerAlign, bannerLayout, logoFirst, logoHeight, nameHeight }
+  createdAt DateTime @default(now())
+}
+
+// Web Editor — admin-authored content pages rendered at /p/{slug} (markdown body).
+model CustomPage {
+  id        Int      @id @default(autoincrement())
+  slug      String   @unique
+  title     String
+  body      String   @default("") // markdown
+  published Boolean  @default(false)
+  inMenu    Boolean  @default(false)
+  menuLabel String?  // label in the nav (defaults to title)
+  order     Int      @default(0)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
 }
 
 // Free Agent Frenzy: a standing contract offer from a team to a free agent.

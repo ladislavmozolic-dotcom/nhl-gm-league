@@ -2,6 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useT } from "@/components/LangProvider";
+
+// English label → i18n key (labels stay English as stable React keys; only display translates)
+const LABEL_KEY: Record<string, string> = {
+  "Home": "team.home", "Roster": "team.roster", "Lines": "team.lines", "System": "team.system",
+  "Schedule": "team.schedule", "Scores": "team.scores", "Statistics": "team.statistics", "NHL Team": "team.nhlTeam",
+  "Roster Moves": "team.rosterMoves", "Contracts": "team.contracts", "Free Agents": "team.freeAgents",
+  "Team Contracts": "team.teamContracts", "Salary Cap": "team.salaryCap", "Finance": "team.finance",
+  "Overview (bank)": "team.overviewBank", "Dashboard & controls": "team.dashboardControls", "Trades": "team.trades",
+  "Trade Block": "team.tradeBlock", "Prospects": "team.prospects", "Draft Picks": "team.draftPicks",
+  "Rivals": "team.rivals", "Farm": "team.farm", "History": "team.history", "Team DNA": "team.dna",
+};
 
 type Item = { label: string; href: string; gm?: boolean };
 type Group = { label: string; items: Item[] };
@@ -16,6 +28,8 @@ const isGroup = (e: Entry): e is Group => "items" in e;
  */
 export default function TeamSubNav({ slug, isGm, isAffiliate, farmSlug, parentSlug }: { slug: string; isGm: boolean; isAffiliate?: boolean; farmSlug?: string | null; parentSlug?: string | null }) {
   const pathname = usePathname() || "";
+  const tr = useT();
+  const L = (label: string) => (LABEL_KEY[label] ? tr(LABEL_KEY[label]) : label);
   const base = `/teams/${slug}`;
 
   const entries: Entry[] = isAffiliate
@@ -84,7 +98,7 @@ export default function TeamSubNav({ slug, isGm, isAffiliate, farmSlug, parentSl
             const active = isActive(e.href);
             return (
               <Link key={e.label} href={e.href} className={linkCls(active)}>
-                {e.label}{e.gm && <span className="ml-1 text-[9px] text-slate-500 align-top">GM</span>}
+                {L(e.label)}{e.gm && <span className="ml-1 text-[9px] text-slate-500 align-top">GM</span>}
               </Link>
             );
           }
@@ -94,7 +108,7 @@ export default function TeamSubNav({ slug, isGm, isAffiliate, farmSlug, parentSl
           return (
             <div key={e.label} className="relative group">
               <button type="button" className={`${linkCls(groupActive)} inline-flex items-center gap-1`}>
-                {e.label}<span className="text-[8px] text-slate-500">▼</span>
+                {L(e.label)}<span className="text-[8px] text-slate-500">▼</span>
               </button>
               <div className="absolute left-0 top-full z-40 hidden group-hover:block group-focus-within:block min-w-[180px] rounded-lg border border-slate-700 bg-slate-900 shadow-xl py-1">
                 {items.map((it) => {
@@ -102,7 +116,7 @@ export default function TeamSubNav({ slug, isGm, isAffiliate, farmSlug, parentSl
                   return (
                     <Link key={it.label} href={it.href}
                       className={`block px-4 py-2 text-sm whitespace-nowrap ${active ? "text-blue-400 bg-slate-800/60" : "text-slate-300 hover:bg-slate-800/60 hover:text-white"}`}>
-                      {it.label}{it.gm && <span className="ml-1 text-[9px] text-slate-500 align-top">GM</span>}
+                      {L(it.label)}{it.gm && <span className="ml-1 text-[9px] text-slate-500 align-top">GM</span>}
                     </Link>
                   );
                 })}

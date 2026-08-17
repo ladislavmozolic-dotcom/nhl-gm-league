@@ -3,6 +3,9 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { DEFAULT_MENU, type MenuItem } from "@/lib/menu-config";
+import { t, type Lang } from "@/lib/i18n";
+import LangSwitcher from "@/components/LangSwitcher";
 
 interface Team {
   id: number;
@@ -14,138 +17,9 @@ interface Team {
   division: string | null;
 }
 
-type MenuItem = { label: string; href: string; mega?: boolean; children?: { label: string; href: string }[] };
-
-const menuItems: MenuItem[] = [
-  { label: "Home", href: "/" },
-  { label: "Scores", href: "/scores" },
-  { label: "Standings", href: "/standings" },
-  { label: "Schedule", href: "/schedule" },
-  {
-    label: "Trades",
-    href: "/trades",
-    children: [
-      { label: "Trade Room", href: "/trades/build" },
-      { label: "Trade Block", href: "/trade-block" },
-      { label: "Waiver Wire", href: "/waivers" },
-      { label: "Trade tracker", href: "/trades" },
-      { label: "Transactions", href: "/transactions" },
-    ],
-  },
-  { label: "Teams", href: "#", mega: true },
-  {
-    label: "Finance",
-    href: "/finance",
-    children: [
-      { label: "Finance (bank & income)", href: "/finance" },
-      { label: "Salary Cap (Cap Central)", href: "/salary-cap" },
-      { label: "Fan Interest — league", href: "/finance/fan-interest" },
-      { label: "Season Tickets — league", href: "/finance/season-tickets" },
-      { label: "Attendance — league", href: "/finance/attendance" },
-      { label: "Merchandise — league", href: "/finance/merchandise" },
-      { label: "Sponsorships — league", href: "/finance/sponsorship" },
-    ],
-  },
-  {
-    label: "Stats",
-    href: "/stats",
-    children: [
-      { label: "Individual Leaders", href: "/stats/leaders" },
-      { label: "Advanced Stats", href: "/stats/advanced" },
-      { label: "EDGE Tracking", href: "/stats/edge" },
-      { label: "Player Stats", href: "/stats/players" },
-      { label: "Goalie Stats", href: "/stats/goalies" },
-      { label: "Team Stats", href: "/stats/teams" },
-      { label: "Franchise Leaders", href: "/stats/franchise" },
-      { label: "Player Career Stats", href: "/stats/career" },
-    ],
-  },
-  {
-    label: "Free Agent Frenzy",
-    href: "/free-agents",
-    children: [
-      { label: "Skaters", href: "/free-agents" },
-      { label: "Goalies", href: "/free-agents?type=goalies" },
-      { label: "Offer Sheets", href: "/offer-sheets" },
-      { label: "Signings", href: "/signings" },
-    ],
-  },
-  {
-    label: "Players",
-    href: "/players/injuries",
-    children: [
-      { label: "Injury Report", href: "/players/injuries" },
-      { label: "Hot & Cold Players", href: "/players/hot-cold" },
-      { label: "Three Stars", href: "/players/three-stars" },
-      { label: "Contracts", href: "/players/contracts" },
-      { label: "All Players", href: "/players/all" },
-    ],
-  },
-  {
-    label: "League",
-    href: "/league",
-    children: [
-      { label: "Tonight's Best", href: "/league/digest" },
-      { label: "League Records", href: "/league/records" },
-      { label: "Audit Log", href: "/league/audit" },
-      { label: "Team / GM", href: "/league" },
-      { label: "Captains", href: "/captains" },
-      { label: "Coaches", href: "/coaches" },
-      { label: "Signings", href: "/signings" },
-      { label: "Rules", href: "/rules" },
-    ],
-  },
-  {
-    label: "Entry Draft",
-    href: "/draft",
-    children: [
-      { label: "Draft Lottery", href: "/draft/lottery" },
-      { label: "Draft Room", href: "/draft/room" },
-      { label: "Upcoming Draft", href: "/draft" },
-      { label: "Draft History", href: "/draft/history" },
-    ],
-  },
-  {
-    label: "History",
-    href: "/history",
-    children: [
-      { label: "League History", href: "/history" },
-      { label: "Hall of Fame", href: "/hall-of-fame" },
-      { label: "Awards", href: "/awards" },
-      { label: "Award Voting", href: "/awards/vote" },
-    ],
-  },
-  {
-    label: "Tools",
-    href: "/tools/all-rosters",
-    children: [
-      { label: "All Rosters", href: "/tools/all-rosters" },
-      { label: "Player Compare", href: "/tools/compare" },
-      { label: "Cap Calculator", href: "/tools/cap-calculator" },
-      { label: "STHS Parameters (calculator)", href: "/tools/player-calculator" },
-      { label: "Edge Parameters (calculator)", href: "/tools/edge-calculator" },
-      { label: "Player Data Refresh", href: "/tools/player-data" },
-    ],
-  },
-  {
-    label: "AHL",
-    href: "/ahl",
-    children: [
-      { label: "AHL Teams", href: "/ahl" },
-      { label: "AHL Standings", href: "/standings?league=AHL" },
-      { label: "AHL Schedule", href: "/schedule?league=AHL" },
-      { label: "AHL Scores", href: "/scores?league=AHL" },
-      { label: "Individual Leaders", href: "/stats/leaders?league=AHL" },
-      { label: "EDGE Tracking", href: "/stats/edge?league=AHL" },
-      { label: "Player Stats", href: "/stats/players?league=AHL" },
-      { label: "Goalie Stats", href: "/stats/goalies?league=AHL" },
-      { label: "Team Stats", href: "/stats/teams?league=AHL" },
-      { label: "Injuries", href: "/players/injuries?league=AHL" },
-    ],
-  },
-];
-
-export default function MegaMenu({ gm }: { gm?: { nickname: string; slug: string; admin?: boolean } | null }) {
+export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: string; slug: string; admin?: boolean } | null; items?: MenuItem[]; lang?: Lang }) {
+  const menuItems = items ?? DEFAULT_MENU;
+  const tr = (k: string) => t(lang, k);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
   const [scrolled, setScrolled] = useState(false);
@@ -160,12 +34,12 @@ export default function MegaMenu({ gm }: { gm?: { nickname: string; slug: string
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const nhlTeams = teams.filter((t) => t.id <= 33);
-  const eastern = nhlTeams.filter((t) =>
-    t.conference?.includes("Eastern")
+  const nhlTeams = teams.filter((tm) => tm.id <= 33);
+  const eastern = nhlTeams.filter((tm) =>
+    tm.conference?.includes("Eastern")
   );
-  const western = nhlTeams.filter((t) =>
-    t.conference?.includes("Western")
+  const western = nhlTeams.filter((tm) =>
+    tm.conference?.includes("Western")
   );
 
   return (
@@ -182,15 +56,15 @@ export default function MegaMenu({ gm }: { gm?: { nickname: string; slug: string
           <div className="flex items-center gap-0.5 flex-wrap">
             {menuItems.map((item) => (
               <div
-                key={item.label}
+                key={item.key}
                 className="relative"
-                onMouseEnter={() => setActiveMenu(item.label)}
+                onMouseEnter={() => setActiveMenu(item.key)}
                 onMouseLeave={() => setActiveMenu(null)}
               >
                 {item.mega ? (
                   <button
                     className={`px-2.5 py-1.5 text-[13px] font-semibold rounded-md transition-all ${
-                      activeMenu === item.label
+                      activeMenu === item.key
                         ? "text-white bg-slate-700/60"
                         : "text-slate-400 hover:text-white hover:bg-slate-800/40"
                     }`}
@@ -201,7 +75,7 @@ export default function MegaMenu({ gm }: { gm?: { nickname: string; slug: string
                   <Link
                     href={item.href}
                     className={`px-2.5 py-1.5 text-[13px] font-semibold rounded-md transition-all whitespace-nowrap ${
-                      activeMenu === item.label
+                      activeMenu === item.key
                         ? "text-white bg-slate-700/60"
                         : "text-slate-400 hover:text-white hover:bg-slate-800/40"
                     }`}
@@ -210,7 +84,7 @@ export default function MegaMenu({ gm }: { gm?: { nickname: string; slug: string
                   </Link>
                 )}
 
-                {item.children && activeMenu === item.label && (
+                {item.children && activeMenu === item.key && (
                   <div className="absolute top-full left-0 mt-0.5 w-52 bg-[#0f1d32] border border-slate-700/40 rounded-lg shadow-2xl shadow-black/50 overflow-hidden py-1.5 z-50">
                     {item.children.map((child) => (
                       <Link
@@ -224,7 +98,7 @@ export default function MegaMenu({ gm }: { gm?: { nickname: string; slug: string
                   </div>
                 )}
 
-                {item.mega && activeMenu === item.label && (
+                {item.mega && activeMenu === item.key && (
                   <div className="absolute top-full left-0 mt-0.5 w-[600px] max-w-[calc(100vw-2rem)] bg-[#0f1d32] border border-slate-700/40 rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50">
                   <div className="p-5">
                     <div className="grid grid-cols-2 gap-8">
@@ -304,16 +178,17 @@ export default function MegaMenu({ gm }: { gm?: { nickname: string; slug: string
                     <span className="text-[9px] text-slate-500">▾</span>
                   </button>
                   {activeMenu === "__gm" && (
-                    <div className="absolute right-0 top-full mt-1 w-52 bg-[#0e1e35] border border-slate-700 rounded-lg shadow-xl shadow-black/40 py-1 z-50">
-                      <div className="px-3 py-1 text-[10px] text-slate-500 uppercase tracking-wide">Signed in</div>
-                      <a href={`/teams/${gm.slug}`} className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">My team</a>
-                      <a href={`/teams/${gm.slug}/profile`} className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">Profile</a>
-                      <a href={`/teams/${gm.slug}/lines`} className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">Lines &amp; tactics</a>
+                    <div className="absolute right-0 top-full pt-1 z-50">
+                    <div className="w-52 bg-[#0e1e35] border border-slate-700 rounded-lg shadow-xl shadow-black/40 py-1">
+                      <div className="px-3 py-1 text-[10px] text-slate-500 uppercase tracking-wide">{tr("ui.signedIn")}</div>
+                      <a href={`/teams/${gm.slug}`} className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">{tr("ui.myTeam")}</a>
+                      <a href={`/teams/${gm.slug}/profile`} className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">{tr("ui.profile")}</a>
+                      <a href={`/teams/${gm.slug}/lines`} className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">{tr("ui.linesTactics")}</a>
                       {gm.admin && (
                         <>
                           <div className="my-1 border-t border-slate-700/60" />
-                          <div className="px-3 py-1 text-[10px] text-amber-500/80 uppercase tracking-wide">Admin</div>
-                          <a href="/admin" className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">Admin Panel</a>
+                          <div className="px-3 py-1 text-[10px] text-amber-500/80 uppercase tracking-wide">{tr("ui.admin")}</div>
+                          <a href="/admin" className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">{tr("ui.adminPanel")}</a>
                           <a href="/calendar" className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">League Calendar</a>
                           <a href="/admin/elc" className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">ELC Rookies</a>
                           <a href="/admin/roster-update" className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">Roster Update</a>
@@ -323,13 +198,22 @@ export default function MegaMenu({ gm }: { gm?: { nickname: string; slug: string
                         </>
                       )}
                       <div className="my-1 border-t border-slate-700/60" />
-                      <a href="/login" className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">Switch team</a>
-                      <a href={`/teams/${gm.slug}/logout`} className="block px-3 py-1.5 text-sm text-red-400 hover:bg-slate-800">Log out</a>
+                      <div className="px-3 py-1.5 flex items-center justify-between gap-2">
+                        <span className="text-sm text-slate-300">{tr("ui.language")}</span>
+                        <LangSwitcher lang={lang} />
+                      </div>
+                      <div className="my-1 border-t border-slate-700/60" />
+                      <a href="/login" className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">{tr("ui.switchTeam")}</a>
+                      <a href={`/teams/${gm.slug}/logout`} className="block px-3 py-1.5 text-sm text-red-400 hover:bg-slate-800">{tr("ui.logout")}</a>
+                    </div>
                     </div>
                   )}
                 </>
               ) : (
-                <Link href="/login" className="px-2.5 py-1.5 text-[13px] font-semibold rounded-md text-slate-400 hover:text-white hover:bg-slate-800/40 inline-block">GM Login</Link>
+                <span className="flex items-center gap-1.5">
+                  <LangSwitcher lang={lang} />
+                  <Link href="/login" className="px-2.5 py-1.5 text-[13px] font-semibold rounded-md text-slate-400 hover:text-white hover:bg-slate-800/40 inline-block">{tr("ui.gmLogin")}</Link>
+                </span>
               )}
             </div>
           </div>

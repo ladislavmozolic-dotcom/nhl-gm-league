@@ -3,6 +3,7 @@
 // roster reconciliation. Season 90 = 2025-26 Regular.
 
 import { prisma } from "./prisma";
+import { epSearchName } from "./playerName";
 
 const AHL = "https://lscluster.hockeytech.com/feed/index.php?feed=modulekit&client_code=ahl&key=50c2cd9b5e18e390&fmt=json&lang=en";
 const UA = "Mozilla/5.0 (compatible; ProfiNHL-League/1.0)";
@@ -57,26 +58,27 @@ export async function fetchAhlSkaterStats(seasonId: number): Promise<AhlStatRow[
   } finally { clearTimeout(timer); }
 }
 
-/** Write AHL scoring into the cur/last real-season fields for matched players. */
+/** Write AHL scoring into the dedicated `ahlStats` JSON for matched players.
+ *  ANY skater is eligible (not just rosterType AHL): a 40-goal AHL scorer who now
+ *  sits on an NHL roster (Kaliyev) or is a UFA still belongs in the AHL Edge pool —
+ *  writing to `ahlStats` (never cur/last) keeps his NHL stats intact. FULL-NAME
+ *  match only: the last+initial fuzzy collides (Colin White C → Colton White D). */
 export async function importAhlSkaterStats(rows: AhlStatRow[], target: "cur" | "last") {
-  // AHL-roster players only — never overwrite an NHL player's NHL stats
-  const players = await prisma.player.findMany({ where: { rosterType: "AHL", isGoalie: false }, select: { id: true, name: true } });
-  const full = new Map<string, number>(); const li = new Map<string, number>(); const liDup = new Set<string>();
-  for (const p of players) {
-    full.set(key(p.name), p.id);
-    const k = lastInitial(p.name);
-    if (k) { if (li.has(k)) liDup.add(k); else li.set(k, p.id); }
-  }
+  const players = await prisma.player.findMany({ where: { isGoalie: false }, select: { id: true, name: true, ahlStats: true } });
+  const byId = new Map(players.map((p) => [p.id, p]));
+  const full = new Map<string, number>();
+  // epSearchName strips captaincy (''A''), rookie (R), and clause tags that would
+  // otherwise leak stray letters into the key (Martin Frk ''A'' → …frka ≠ …frk).
+  for (const p of players) { const k = key(epSearchName(p.name)); if (!full.has(k)) full.set(k, p.id); } // first wins; dupes are rare
   let matched = 0; const seen = new Set<number>();
   for (const row of rows) {
-    let id = full.get(key(row.name));
-    if (id == null) { const k = lastInitial(row.name); if (k && !liDup.has(k) && li.has(k)) id = li.get(k)!; }
+    const id = full.get(key(epSearchName(row.name)));
     if (id == null || seen.has(id)) continue;
     seen.add(id);
-    const d = target === "cur"
-      ? { curSeasonGP: row.gp, curSeasonG: row.g, curSeasonA: row.a, curSeasonShots: row.shots, curSeasonPim: row.pim, curSeasonPpG: row.ppG }
-      : { lastSeasonGP: row.gp, lastSeasonG: row.g, lastSeasonA: row.a, lastSeasonShots: row.shots, lastSeasonPim: row.pim, lastSeasonPpG: row.ppG };
-    await prisma.player.update({ where: { id }, data: d });
+    const cur = (byId.get(id)!.ahlStats as any) ?? {};
+    const stat = { gp: row.gp, g: row.g, a: row.a, sh: row.shots, pim: row.pim, ppG: row.ppG };
+    const ahlStats = target === "cur" ? { ...cur, cur: stat } : { ...cur, last: stat };
+    await prisma.player.update({ where: { id }, data: { ahlStats } });
     matched++;
   }
   return { total: rows.length, matched };

@@ -33,18 +33,22 @@ const AHL_PARAMS: { key: string; label: string; title: string }[] = [
   { key: "OV", label: "OV", title: "Overall — informative average" },
 ];
 
+// STHS's 15 rated skater attributes + OV (MO/morale is dynamic, starts at 50).
 const PARAMS: { key: string; label: string; title: string }[] = [
-  { key: "SC", label: "SC", title: "Scoring — goals/60, shots/60, finishing (percentile vs position)" },
-  { key: "PA", label: "PA", title: "Passing — assists/60" },
+  { key: "SK", label: "SK", title: "Skating — real NHL EDGE tracking: top speed + speed bursts over 20mph (percentiles)" },
   { key: "CK", label: "CK", title: "Checking — hits/60" },
-  { key: "DF", label: "DF", title: "Defense — blocks/60, PK usage, takeaways, +/-" },
-  { key: "EN", label: "EN", title: "Endurance — ice time per game" },
-  { key: "FO", label: "FO", title: "Faceoffs — win % (centres)" },
+  { key: "FG", label: "FG", title: "Fighting — penalty-minute load + hits (no fighting-major feed)" },
   { key: "DI", label: "DI", title: "Discipline — inverse of penalties/60" },
   { key: "ST", label: "ST", title: "Strength — size + physical engagement (hits)" },
-  { key: "PH", label: "PH", title: "Puck handling — creation + takeaways, fewer giveaways (approx)" },
-  { key: "EX", label: "EX", title: "Experience — age curve (career-GP feed later)" },
+  { key: "EN", label: "EN", title: "Endurance — ice time per game" },
   { key: "DU", label: "DU", title: "Durability — games available vs possible" },
+  { key: "PH", label: "PH", title: "Puck handling — creation + takeaways, fewer giveaways (approx)" },
+  { key: "FO", label: "FO", title: "Faceoffs — win % (centres)" },
+  { key: "PA", label: "PA", title: "Passing — assists/60" },
+  { key: "SC", label: "SC", title: "Scoring — goals/60, shots/60, finishing" },
+  { key: "DF", label: "DF", title: "Defense — blocks/60, PK usage, takeaways, +/- (position-specific)" },
+  { key: "PS", label: "PS", title: "Penalty shot — finishing + offensive touch (breakaway conversion)" },
+  { key: "EX", label: "EX", title: "Experience — age curve (career-GP feed later)" },
   { key: "LD", label: "LD", title: "Leadership — captaincy + experience (commissioner may override)" },
   { key: "OV", label: "OV", title: "Overall — informative average, never enters the sim" },
 ];
@@ -80,8 +84,8 @@ export default async function EdgeCalculatorPage({ searchParams }: { searchParam
       </div>
       <Card>
         <p className="text-sm text-slate-400">
-          Each rating is a player&apos;s <b>percentile</b> among peers at his position (F vs F, D vs D), on a <b>per-60</b> basis, blended <b>80%</b> this real season (2025-26) + <b>20%</b> last (2024-25) — so ratings stay stable as the NHL scoring environment shifts.
-          <InfoTip text="Relative-to-NHL (not '40 goals = SC 90'): 99th percentile → 99, ~75th → 88, average → ~76, bottom → ~55. Composites: SC = goals/60 + shots/60 + finishing; PA = assists/60; CK = hits/60; DF = blocks/60 + PK usage + takeaways + plus/minus; EN = TOI/game; FO = faceoff %; DI = inverse penalties/60. Updates as the real season progresses. xG / high-danger / EDGE-speed refinements come when a feed is available." />
+          Ratings are built from real performance — <b>per-60</b>, blended <b>80%</b> this real season (2025-26) + <b>20%</b> last (2024-25) — then <b>calibrated onto the STHS value scale</b> so they read like your existing parameters (SC forward-max ~74, D-max ~61; DF higher for D; overall 50-70). A player keeps his live, data-driven <b>rank</b> but takes the STHS value at that rank.
+          <InfoTip text="Two numbers per player. Ability Rating (shown here) is on the STHS scale — what the engine would use. Position Percentile (posPct, e.g. 'Scoring 99th among D') is the analytics number for the profile. SC uses a common F+D scale (a D shooting from the point is lifted slightly as a shot-quality proxy); DF/FO are position-specific. Composites: SC = goals/60 + shots/60 + finishing; PA = assists/60; CK = hits/60; DF = blocks/60 + PK + takeaways + plus/minus; EN = TOI/game; FO = faceoff %; DI = inverse penalties/60. Updates as the season progresses." />
           {" "}Separate from the STHS Parameters (kept for migration); the sim still runs on STHS for now.
         </p>
       </Card>

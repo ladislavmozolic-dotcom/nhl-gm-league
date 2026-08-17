@@ -14,17 +14,22 @@ import { dailyDigest, latestDigestRound } from "@/lib/digest-server";
 import { gmDashboard } from "@/lib/gm-dashboard-server";
 import SeasonDashboard from "@/components/SeasonDashboard";
 import { tradeBlockBoard } from "@/lib/trade-block-server";
+import { loadSiteConfig } from "@/lib/site-config";
+import { renderMarkdown } from "@/lib/markdown";
+import type { HomeBlock } from "@/app/admin/site-editor/actions";
+import { getLang } from "@/lib/lang-server";
+import { t as tt } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 const SEASON = "2026-27";
 
-function Card({ title, children, href, accent }: { title?: string; children: React.ReactNode; href?: string; accent?: string }) {
+function Card({ title, children, href, accent, viewLabel = "view →" }: { title?: string; children: React.ReactNode; href?: string; accent?: string; viewLabel?: string }) {
   return (
     <div className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 overflow-hidden">
       {title && (
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-800 bg-slate-800/30">
           <h2 className={`text-sm font-bold uppercase tracking-wide ${accent ?? "text-slate-200"}`}>{title}</h2>
-          {href && <Link href={href} className="text-xs text-slate-400 hover:text-blue-400">view →</Link>}
+          {href && <Link href={href} className="text-xs text-slate-400 hover:text-blue-400">{viewLabel}</Link>}
         </div>
       )}
       <div className="p-4">{children}</div>
@@ -43,11 +48,14 @@ function Stat({ label, value, sub, color }: { label: string; value: string; sub?
 }
 
 export default async function HomePage() {
+  // free-agent filter mirrors /free-agents: skaters, and realOnly hidden in ProfiNHL mode
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 } });
+  const faWhere = { rosterType: { notIn: ["NHL", "AHL", "RETIRED", "PROSPECT", "RELEASED"] }, isGoalie: false, ...(cfg?.rosterMode === "real" ? {} : { realOnly: false }) };
   const [standings, leaders, faCount, faTop, articlesRaw, teams] = await Promise.all([
     computeStandings(SEASON, "NHL"),
     skaterTotals(SEASON, "NHL"),
-    prisma.player.count({ where: { rosterType: { notIn: ["NHL", "AHL", "RETIRED", "PROSPECT", "RELEASED"] } } }),
-    prisma.player.findMany({ where: { rosterType: { notIn: ["NHL", "AHL", "RETIRED", "PROSPECT", "RELEASED"] } }, select: { id: true, name: true, position: true, overall: true, slug: true }, orderBy: { overall: "desc" }, take: 6 }),
+    prisma.player.count({ where: faWhere }),
+    prisma.player.findMany({ where: faWhere, select: { id: true, name: true, position: true, overall: true, slug: true }, orderBy: { overall: "desc" }, take: 6 }),
     prisma.newsArticle.findMany({ orderBy: { createdAt: "desc" }, take: 6, include: { _count: { select: { comments: true, reactions: true } } } }),
     prisma.team.findMany({ select: { id: true, name: true, logoUrl: true, gm: true, slug: true } }),
   ]);
@@ -124,21 +132,34 @@ export default async function HomePage() {
   const dateStr = (d: Date) => d.toLocaleDateString("sk-SK", { day: "numeric", month: "short" });
 
   const clock = await getLeagueClock();
+  const lang = await getLang();
+  const T = (k: string) => tt(lang, k);
+  const homeBlocks = ((await loadSiteConfig()).homeBlocks as HomeBlock[] | null ?? []).filter((b) => b.visible && (b.title?.trim() || b.body?.trim()));
 
   return (
     <div className="py-2">
+      {homeBlocks.length > 0 && (
+        <div className="space-y-4 mb-6">
+          {homeBlocks.map((b) => (
+            <div key={b.id} className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg shadow-black/20">
+              {b.title?.trim() && <h2 className="text-lg font-bold mb-2">{b.title}</h2>}
+              {b.body?.trim() && <div className="text-slate-300 text-sm" dangerouslySetInnerHTML={{ __html: renderMarkdown(b.body) }} />}
+            </div>
+          ))}
+        </div>
+      )}
       {dash && <SeasonDashboard data={dash} />}
       {/* Stat row */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
         <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg shadow-black/20">
-          <p className="text-xs uppercase tracking-wide text-slate-400 mb-2">Next Simulation</p>
+          <p className="text-xs uppercase tracking-wide text-slate-400 mb-2">{T("home.nextSim")}</p>
           <NextSimCountdown />
           <p className="text-xs text-slate-500 mt-2">{fmtLeagueDate(clock.date)} · <span className="text-slate-400">{clock.phaseLabel}</span></p>
         </div>
 
         {/* 3 Stars of the Day */}
         <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg shadow-black/20">
-          <p className="text-xs uppercase tracking-wide text-slate-400 mb-2">3 Stars of the Day</p>
+          <p className="text-xs uppercase tracking-wide text-slate-400 mb-2">{T("home.threeStars")}</p>
           {stars.length === 0 ? <p className="text-sm text-slate-500">After the next sim.</p> : (
             <div className="space-y-1.5">
               {stars.map((s, i) => (
@@ -155,13 +176,13 @@ export default async function HomePage() {
 
         {/* League Leader — logo only */}
         <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg shadow-black/20 flex flex-col">
-          <p className="text-xs uppercase tracking-wide text-slate-400 mb-2">League Leader</p>
+          <p className="text-xs uppercase tracking-wide text-slate-400 mb-2">{T("home.leagueLeader")}</p>
           <div className="flex items-center gap-3 flex-1">
             {leaderTeam?.logoUrl ? <img src={leaderTeam.logoUrl} alt={leader?.name ?? ""} title={leader?.name ?? ""} className="w-14 h-14 object-contain" />
               : <span className="text-lg font-black text-white">{leader?.name ?? "—"}</span>}
             <div>
               <p className="text-2xl font-black text-white leading-none">{leader?.points ?? 0}</p>
-              <p className="text-xs text-slate-400 mt-0.5">points</p>
+              <p className="text-xs text-slate-400 mt-0.5">{T("ui.points")}</p>
             </div>
           </div>
         </div>
@@ -169,8 +190,8 @@ export default async function HomePage() {
         {/* Tonight's Best — the story of the night, straight from our league */}
         <Link href="/league/digest" className="block bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg shadow-black/20 hover:border-amber-500/40 transition-colors">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-xs uppercase tracking-wide text-amber-400">🌙 Tonight&apos;s Best</p>
-            <span className="text-xs text-slate-400">the story of the night →</span>
+            <p className="text-xs uppercase tracking-wide text-amber-400">🌙 {T("home.tonightsBest")}</p>
+            <span className="text-xs text-slate-400">{T("home.storyOfNight")}</span>
           </div>
           {digest && digest.gameCount > 0 ? (
             <div className="space-y-1.5 text-sm">
@@ -197,7 +218,7 @@ export default async function HomePage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* LEFT */}
         <div className="lg:col-span-3 space-y-6">
-          <Card title="Scoring Leaders" href="/stats/leaders" accent="text-blue-400">
+          <Card title={T("home.scoringLeaders")} href="/stats/leaders" accent="text-blue-400" viewLabel={T("ui.viewAll")}>
             <div className="space-y-2">
               {topScorers.map((s, i) => (
                 <div key={s.playerId} className="flex items-center gap-2 text-sm">
@@ -209,7 +230,7 @@ export default async function HomePage() {
             </div>
           </Card>
 
-          <Card title="Trade Block" href="/trade-block" accent="text-amber-400">
+          <Card title={T("home.tradeBlock")} href="/trade-block" accent="text-amber-400" viewLabel={T("ui.viewAll")}>
             {tbListed.length ? (
               <div className="space-y-1.5 text-sm">
                 {tbListed.slice(0, 8).map((p) => (
@@ -221,10 +242,10 @@ export default async function HomePage() {
                 ))}
                 {tbListed.length > 8 && <Link href="/trade-block" className="block text-xs text-blue-400 hover:underline pt-1">+ {tbListed.length - 8} more →</Link>}
               </div>
-            ) : <p className="text-sm text-slate-500">No players on the block. GMs list players from their team&apos;s Trades page.</p>}
+            ) : <p className="text-sm text-slate-500">{T("home.noTradeBlock")}</p>}
           </Card>
 
-          <Card title="Today's Birthdays" accent="text-pink-400">
+          <Card title={T("home.birthdays")} accent="text-pink-400">
             <BirthdaysList />
           </Card>
         </div>
@@ -233,11 +254,11 @@ export default async function HomePage() {
         <div className="lg:col-span-6 space-y-4">
           <CommissionerBanner items={bannerItems} signedIn={me != null} />
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold">Latest Article</h2>
-            <Link href="/news/create" className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg font-medium">+ Add Article</Link>
+            <h2 className="text-lg font-bold">{T("home.latestArticle")}</h2>
+            <Link href="/news/create" className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg font-medium">{T("home.addArticle")}</Link>
           </div>
           {articlesRaw.length === 0 && (
-            <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-8 text-center text-slate-500">No news yet. Sign in as a GM and write the first article.</div>
+            <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-8 text-center text-slate-500">{T("home.noNews")}</div>
           )}
           {articlesRaw.map((a) => {
             const author = teamById.get(a.authorTeamId);
@@ -266,14 +287,14 @@ export default async function HomePage() {
 
         {/* RIGHT */}
         <div className="lg:col-span-3 space-y-6">
-          <Card title="Standings" href="/standings" accent="text-blue-400">
+          <Card title={T("menu.standings")} href="/standings" accent="text-blue-400" viewLabel={T("ui.viewAll")}>
             <div className="space-y-4">
-              <MiniStandings title="Eastern" color="text-blue-400" rows={east} />
-              <MiniStandings title="Western" color="text-red-400" rows={west} />
+              <MiniStandings title={T("home.eastern")} color="text-blue-400" rows={east} />
+              <MiniStandings title={T("home.western")} color="text-red-400" rows={west} />
             </div>
           </Card>
 
-          <Card title="Free Agents" href="/free-agents" accent="text-green-400">
+          <Card title={T("home.freeAgents")} href="/free-agents" accent="text-green-400" viewLabel={T("ui.viewAll")}>
             {faTop.length ? (
               <div className="space-y-2">
                 {faTop.map((p) => (
@@ -286,9 +307,9 @@ export default async function HomePage() {
             ) : <p className="text-sm text-slate-500">No unsigned players right now.</p>}
           </Card>
 
-          <Card title="Quick Links">
+          <Card title={T("home.quickLinks")}>
             <div className="grid grid-cols-2 gap-2 text-sm">
-              {[["Scores", "/scores"], ["Standings", "/standings"], ["Trades", "/trades"], ["Stats", "/stats/leaders"], ["Playoffs", "/playoffs"], ["All Rosters", "/tools/all-rosters"]].map(([l, h]) => (
+              {[[T("menu.scores"), "/scores"], [T("menu.standings"), "/standings"], [T("menu.trades"), "/trades"], [T("menu.stats"), "/stats/leaders"], [T("ui.playoffs"), "/playoffs"], [T("ui.allRosters"), "/tools/all-rosters"]].map(([l, h]) => (
                 <Link key={h} href={h} className="px-3 py-2 rounded-lg bg-slate-800/60 hover:bg-slate-700 text-center text-slate-300">{l}</Link>
               ))}
             </div>
@@ -352,12 +373,17 @@ async function BirthdaysList() {
   if (born.length === 0) return <p className="text-sm text-slate-500">No birthdays today.</p>;
   return (
     <div className="space-y-2">
-      {born.slice(0, 8).map((p) => (
-        <div key={p.id} className="flex items-center gap-2 text-sm">
-          <span>🎂</span><span className="flex-1 truncate">{cleanName(p.name)}</span>
-          <span className="text-slate-500 text-xs">{p.team?.code}</span>
-        </div>
-      ))}
+      {born.slice(0, 8).map((p) => {
+        const birthYear = Number((p.birthDate ?? "").slice(0, 4));
+        const age = birthYear > 1900 ? today.getFullYear() - birthYear : null; // turns this age today
+        return (
+          <div key={p.id} className="flex items-center gap-2 text-sm">
+            <span>🎂</span>
+            <span className="flex-1 truncate">{cleanName(p.name)}{age != null && <span className="text-slate-500"> · {age} y/o</span>}</span>
+            <span className="text-slate-500 text-xs">{p.team?.code}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -178,12 +178,12 @@ export async function restDayAction() {
   return { ok: true, skRec };
 }
 
+// Used as a <form action>, so it must return void (Next validates this at build time).
 export async function archiveSeasonAction() {
-  const nhl = await archiveSeason(SEASON, "NHL");
+  await archiveSeason(SEASON, "NHL");
   await archiveSeason(SEASON, "AHL");
   revalidatePath("/admin/season");
   revalidatePath("/history");
-  return { champion: nhl.championTeamId, awards: nhl.awards.length };
 }
 
 /** Off-season step: import the upcoming draft class (NHL Central Scouting) so the next

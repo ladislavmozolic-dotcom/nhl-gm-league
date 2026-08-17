@@ -409,7 +409,7 @@ function recordGoal(
 
   st.sink.emit({
     period, seconds, type: "GOAL",
-    teamId: off.id, teamCode: off.code,
+    teamId: off.id, teamCode: off.code ?? undefined,
     playerId: scorer.id, playerName: scorer.name,
     targetId: liveGoalie(st, def).id, targetName: liveGoalie(st, def).name,
     zone: "OFF", sector: shot?.sector, shotType: shot?.shotType, xg: shot?.xg,
@@ -460,7 +460,7 @@ function addPenalty(
   });
   st.sink.emit({
     period, seconds: at, type: "PENALTY",
-    teamId: team.id, teamCode: team.code,
+    teamId: team.id, teamCode: team.code ?? undefined,
     playerId: offender.id, playerName: offender.name,
     importance: minutes >= 5 ? "MAJOR" : "NOTABLE",
     meta: { penalty: type, minutes, severity, givesPP },
@@ -1005,11 +1005,11 @@ function simulatePeriodPossession(st: SimState, period: number) {
         * (st.nightOff[carrierTeam.id] ?? 1) * (st.nightDef[def.id] ?? 1); // any-given-night form
       st.sink.emit({
         period, seconds: tick, type: "SHOT",
-        teamId: carrierTeam.id, teamCode: carrierTeam.code,
+        teamId: carrierTeam.id, teamCode: carrierTeam.code ?? undefined,
         playerId: carrier.id, playerName: carrier.name,
         targetId: gSim.id, targetName: gSim.name,
         zone: "OFF", sector, shotType,
-        strength: strength === "SO" ? "EV" : strength as SimEvent["strength"], xg,
+        strength: strength as SimEvent["strength"], xg,
         importance: hd ? "NOTABLE" : "MINOR",
         meta: { danger, setup, mph: Math.round(mph) },
       });
@@ -1026,7 +1026,7 @@ function simulatePeriodPossession(st: SimState, period: number) {
       if (danger3 === "hd") gLine.hdSaves++; else if (danger3 === "md") gLine.mdSaves++; else gLine.ldSaves++;
       st.sink.emit({
         period, seconds: tick, type: "SAVE",
-        teamId: def.id, teamCode: def.code,
+        teamId: def.id, teamCode: def.code ?? undefined,
         playerId: gSim.id, playerName: gSim.name,
         targetId: carrier.id, targetName: carrier.name,
         zone: "OFF", sector, shotType, xg,
@@ -1333,7 +1333,7 @@ function distributeCounting(st: SimState) {
     const emitAction = (type: "HIT" | "BLOCK" | "TAKEAWAY", s: SimSkater, sector: string) => {
       st.sink.emit({
         period: 1 + st.rng.int(3), seconds: st.rng.int(PERIOD_SECONDS), type,
-        teamId: team.id, teamCode: team.code, playerId: s.id, playerName: s.name,
+        teamId: team.id, teamCode: team.code ?? undefined, playerId: s.id, playerName: s.name,
         zone: "OFF", sector, importance: "NOTABLE",
       });
     };

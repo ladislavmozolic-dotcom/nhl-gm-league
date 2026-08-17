@@ -59,7 +59,7 @@ export function SectionTitle({ children, count, accent, action }: { children: Re
   );
 }
 
-export function PageHeader({ title, subtitle, right }: { title: string; subtitle?: string; right?: React.ReactNode }) {
+export function PageHeader({ title, subtitle, right }: { title: string; subtitle?: React.ReactNode; right?: React.ReactNode }) {
   return (
     <div className="flex items-end justify-between gap-4">
       <div>

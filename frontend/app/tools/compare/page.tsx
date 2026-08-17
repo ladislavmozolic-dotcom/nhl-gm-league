@@ -23,7 +23,7 @@ export default async function ComparePage() {
     ...(p.goalieRating ?? {}), // goalie-only attrs (sz/ag/rb/hs/rt) live on GoalieRating
     id: p.id, name: cleanName(p.name), position: p.position, teamCode: p.teamId ? codeById.get(p.teamId) ?? null : null,
     age: p.age, overall: p.overall, contractText: p.contractText, condition: p.condition, goalie: p.isGoalie,
-  });
+  } as ComparePlayer);
   const all = rows.map(toCP);
   const skaters = all.filter((p) => !p.goalie);
   const goalies = all.filter((p) => p.goalie);

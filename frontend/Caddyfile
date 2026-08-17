@@ -1,0 +1,10 @@
+# Caddy auto-provisions a free Let's Encrypt HTTPS certificate for your domain and
+# reverse-proxies to the Next app. DOMAIN comes from the .env file.
+{$DOMAIN} {
+	reverse_proxy app:3000
+	encode gzip
+	# uploads can be large-ish; allow generous bodies for the Web Editor image upload
+	request_body {
+		max_size 10MB
+	}
+}

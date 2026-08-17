@@ -128,8 +128,8 @@ export async function projectAllSkaters(): Promise<{ rows: ProjSkater[]; active:
     const projected: Record<ParamKey, number | null> = { ck: p.ck, sc: p.sc, pa: p.pa, df: p.df };
     if (active) {
       for (const s of SPEC) {
-        const lastR = rate(p[s.last] as number, p.lastSeasonGP);
-        const curR = rate(p[s.cur] as number, p.curSeasonGP);
+        const lastR = rate(Number(p[s.last] ?? 0), Number(p.lastSeasonGP ?? 0));
+        const curR = rate(Number(p[s.cur] ?? 0), Number(p.curSeasonGP ?? 0));
         let blended: number | null = null;
         if (lastR != null && curR != null) blended = LAST_WEIGHT * lastR + CUR_WEIGHT * curR;
         else blended = curR ?? lastR;

@@ -4,9 +4,10 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { ROSTER_LIMITS, type MoveRow } from "@/lib/roster-rules";
 
+type RosterSide = "pro" | "farm" | "scratched";
 type Player = {
   id: number; name: string; position: string; overall: number;
-  isGoalie: boolean; side: "pro" | "farm"; contractType: "ONE_WAY" | "TWO_WAY" | null;
+  isGoalie: boolean; side: RosterSide; contractType: "ONE_WAY" | "TWO_WAY" | null;
   capHit: number;
 };
 

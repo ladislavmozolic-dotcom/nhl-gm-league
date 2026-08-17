@@ -96,7 +96,7 @@ export async function teamDna(teamId: number): Promise<TeamDna | null> {
     if (s && s.gp > 0) record = `${s.w}-${s.l}-${s.otl} · ${s.points} pts`;
   } catch { /* preseason: no record yet */ }
 
-  const blurb = `Built around its ${strength.toLowerCase()}${barOf(weakness) < 35 ? `, with ${weakness.toLowerCase()} the clear area to address` : ""}. Identity emerges from the roster — no manual bonus.`;
+  const blurb = `Built around its ${strength.toLowerCase()}${barOf(weakness as Dim) < 35 ? `, with ${weakness.toLowerCase()} the clear area to address` : ""}. Identity emerges from the roster — no manual bonus.`;
 
   return { bars, identity, blurb, strength, weakness, record };
 }

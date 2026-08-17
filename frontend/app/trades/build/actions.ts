@@ -1,5 +1,6 @@
 "use server";
 
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getTeamSession, isAdmin } from "@/lib/auth";
 import { loadSettings } from "@/lib/sim/settings";
@@ -58,7 +59,7 @@ async function collectMoveOps(pkg: TradePackage) {
   const retainedCount = [...pkg.fromPlayers, ...pkg.toPlayers].filter((p) => p.retentionPct > 0).length;
   if (retainedCount > settings.retentionMaxPlayers) throw new Error(`Max ${settings.retentionMaxPlayers} retained players per trade.`);
 
-  const ops: Promise<unknown>[] = [];
+  const ops: Prisma.PrismaPromise<unknown>[] = [];
   const retentionRecords: Array<{ teamId: number; playerName: string; perYear: number; years: number }> = [];
 
   const movePlayers = (list: TradePlayer[], fromOrg: OrgTeam, toNhlId: number, toAffId: number | null) => {
