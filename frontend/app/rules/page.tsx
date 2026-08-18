@@ -133,7 +133,8 @@ const SECTIONS: Sec[] = [
     groups: [
       { points: [
         "Waivers can be turned on or off by the commissioner.",
-        "When on: exposed players clear a one-day window; claims go by reverse-standings priority, otherwise the player clears to the AHL. Entry-level players are typically waiver-exempt.",
+        "When on: exposed players clear a one-day window; claims go by reverse-standings priority, otherwise the player clears to the AHL.",
+        "Waiver-exempt: players on an ELC or a two-way contract can be sent to the farm directly. A one-way / veteran player must clear the wire first — the roster mover blocks a direct bury-to-the-farm and points you to the Waiver Wire.",
       ] },
     ],
   },
@@ -294,7 +295,8 @@ const SECTIONS_CS: Sec[] = [
     groups: [
       { points: [
         "Waivery může komisař zapnout nebo vypnout.",
-        "Když jsou zapnuté: vystavení hráči projdou jednodenním oknem; nároky jdou podle obráceného pořadí tabulky, jinak hráč propadne do AHL. Hráči na nováčkovské smlouvě jsou obvykle z waiverů vyňati.",
+        "Když jsou zapnuté: vystavení hráči projdou jednodenním oknem; nároky jdou podle obráceného pořadí tabulky, jinak hráč propadne do AHL.",
+        "Výjimka z waiverů: hráči na ELC nebo dvoucestné (two-way) smlouvě se dají poslat na farmu přímo. Jednocestný / veteránský hráč musí nejdřív projít wire — roster mover přímé zakopání na farmu zablokuje a odkáže tě na Waiver Wire.",
       ] },
     ],
   },

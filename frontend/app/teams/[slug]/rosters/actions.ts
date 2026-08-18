@@ -22,7 +22,7 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
   const ids = moves.map((m) => m.id);
   const players = await prisma.player.findMany({
     where: { id: { in: ids }, teamId: { in: [team.id, affiliate.id] } },
-    select: { id: true, isGoalie: true, rosterType: true, capHit: true },
+    select: { id: true, isGoalie: true, rosterType: true, capHit: true, contractType: true, contractText: true },
   });
   const byId = new Map(players.map((p) => [p.id, p]));
   const valid = moves.filter((m) => byId.has(m.id));
@@ -45,12 +45,16 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
   const illegalFarm = goingDown.find((m) => m.contractType === "ONE_WAY" && byId.get(m.id)!.rosterType === "NHL");
   if (illegalFarm) throw new Error("A one-way contract player cannot be sent down.");
 
-  // waivers ON → an NHL player must clear the waiver wire before he drops. Block a
-  // direct bury-to-the-farm from the roster mover and point the GM at the wire.
+  // waivers ON → a non-exempt NHL player must clear the waiver wire before he drops.
+  // ELC and two-way contracts are waiver-exempt (sent down freely).
   const settings = await loadSettings();
   if (settings.waiversEnabled) {
-    const buried = goingDown.find((m) => byId.get(m.id)!.rosterType === "NHL");
-    if (buried) throw new Error("Waivers are on — expose NHL players on the Waiver Wire before sending them down (they can't skip the wire).");
+    const buried = goingDown.find((m) => {
+      const p = byId.get(m.id)!;
+      const exempt = p.contractType === "TWO_WAY" || /ELC/i.test(p.contractText ?? "");
+      return p.rosterType === "NHL" && !exempt;
+    });
+    if (buried) throw new Error("Waivers are on — one-way / veteran NHL players must clear the Waiver Wire before going down (ELC & two-way players are exempt).");
   }
 
   // Only HARD maxima block a save. Being under a minimum (short-handed pro roster)

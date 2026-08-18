@@ -29,11 +29,12 @@ export async function movePlayer(
   if (rosterType === "AHL") {
     // a one-way contract can't be buried in the minors
     if (player.contractType === "ONE_WAY") return { ok: false, error: "One-way contract — cannot be sent to the farm." };
-    // when waivers are ON, an NHL player must clear the waiver wire before he drops —
-    // no burying him straight to the farm.
+    // when waivers are ON, a non-exempt NHL player must clear the waiver wire before
+    // he drops. ELC and two-way contracts are waiver-exempt (sent down freely).
     if (player.rosterType === "NHL") {
       const settings = await loadSettings();
-      if (settings.waiversEnabled) return { ok: false, error: `Waivers are on — ${player.name} must be exposed on the waiver wire before he can be sent down.` };
+      const exempt = player.contractType === "TWO_WAY" || /ELC/i.test(player.contractText ?? "");
+      if (settings.waiversEnabled && !exempt) return { ok: false, error: `Waivers are on — ${player.name} must clear the waiver wire before he can be sent down (ELC & two-way players are exempt).` };
     }
     const affiliateTeam = player.team.affiliateTeams?.[0];
 
