@@ -214,6 +214,7 @@ export function buildDemand(input: {
   perf?: number | null; capGrowth?: number; override?: number | null; downSeason?: boolean;
   morale?: number | null;
   round?: number;
+  currentSalary?: number | null; // his existing cap hit — the opening ask won't come in under it
 }): Demand {
   const { market, grp, age, anchor, comps } = input;
   const premium = roundPremium(input.round ?? 1); // default = opening ask (high)
@@ -228,6 +229,12 @@ export function buildDemand(input: {
   // morale/reputation bends the ask (skipped when an admin override is set exact).
   const willingness = overridden ? 1 : willingnessFactor(input.morale, market);
   salary *= willingness;
+  // opening ask (round 1) never comes in UNDER his current pay — a re-signing player
+  // wants at least a small raise, and more when he's producing (perf > 1).
+  if (!overridden && (input.round ?? 1) <= 1 && input.currentSalary && input.currentSalary > 0) {
+    const raise = 1.03 + Math.max(0, (input.perf ?? 1) - 1) * 0.6;
+    salary = Math.max(salary, input.currentSalary * raise);
+  }
   salary = Math.max(LEAGUE_MIN, Math.min(salary, 16_000_000));
   salary = Math.round(salary / 50_000) * 50_000;
 

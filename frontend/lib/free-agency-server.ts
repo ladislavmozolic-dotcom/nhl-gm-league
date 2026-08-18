@@ -118,7 +118,7 @@ function demandFromRow(
   const demand = buildDemand({
     market, grp, age: p.age, anchor, comps: count,
     override: p.faDemandOverride, capGrowth: 1, round,
-    downSeason: isDownSeason(p.lastSeasonGP, fullGP), morale: p.morale,
+    downSeason: isDownSeason(p.lastSeasonGP, fullGP), morale: p.morale, currentSalary: p.capHit,
   });
   // a manual override is the commissioner's word — never soften it
   return { demand: p.faDemandOverride != null ? demand : scaleDemand(demand, stale), grp };
@@ -177,16 +177,18 @@ export type TeamAsk = {
 /** The Interest feedback: what the player would want to sign at THIS club, given
  *  the role he projects into there + whether the club is a contender. */
 export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow[], cmap?: Map<number, Contention>, round?: number): Promise<TeamAsk | null> {
-  const p = await prisma.player.findUnique({ where: { id: playerId }, select: { ...SEL, age: true, faDemandOverride: true, df: true } });
+  const p = await prisma.player.findUnique({ where: { id: playerId }, select: { ...SEL, age: true, faDemandOverride: true, df: true, teamId: true } });
   if (!p) return null;
   const marketPool = pool ?? (await loadMarketPool());
   const fullGP = await leagueFullGP();
   const rnd = round ?? (await currentFrenzyRound());
   const { grp, market } = playerMarket(p as PoolPlayer);
   const { anchor, count } = anchorFromPool(marketPool, grp, market);
-  const rawBase = buildDemand({ market, grp, age: p.age, anchor, comps: count, override: p.faDemandOverride, capGrowth: 1, round: rnd, downSeason: isDownSeason(p.lastSeasonGP, fullGP), morale: p.morale });
-  // unsigned FAs soften their ask as the season wears on (skip a commish override)
-  const base = p.faDemandOverride != null ? rawBase : scaleDemand(rawBase, await faStaleFactor());
+  const rawBase = buildDemand({ market, grp, age: p.age, anchor, comps: count, override: p.faDemandOverride, capGrowth: 1, round: rnd, downSeason: isDownSeason(p.lastSeasonGP, fullGP), morale: p.morale, currentSalary: p.capHit });
+  // A player re-signing with his OWN club is NOT stale on the open market — no season
+  // decay. The "nobody's biting" softening only applies to unsigned market UFAs.
+  const isOwn = p.teamId === teamId;
+  const base = p.faDemandOverride != null ? rawBase : scaleDemand(rawBase, isOwn ? 1 : await faStaleFactor());
 
   const ctx = await loadTeamContext(teamId, cmap);
   const { slot, line } = projectSlot(ctx, grp, market);
