@@ -177,7 +177,11 @@ export async function submitOfferAction(
   // standing offer around; just tell the GM what it'll take.
   if (win.immediate) {
     if (evalr?.acceptable) {
-      await signFaOffer(playerId, { name: player.name, age: player.age }, offer, salary, years);
+      const code = await signFaOffer(playerId, { name: player.name, age: player.age }, offer, salary, years, player.teamId ?? undefined);
+      if (code === null) {
+        await prisma.faOffer.deleteMany({ where: { playerId, teamId } });
+        return { ok: false as const, error: "Another club just signed this player." };
+      }
       revalidatePath("/free-agents");
       revalidatePath(`/teams`);
       return { ok: true as const, signed: true as const, clears: true as const };
@@ -242,23 +246,28 @@ type FaOfferRow = Awaited<ReturnType<typeof prisma.faOffer.findMany>>[number];
 
 /** Execute a signing: move the player to the club on `o` at (salary × years),
  *  accept that offer, reject the rest, log it. Returns the club code. */
-async function signFaOffer(playerId: number, player: { name: string; age: number | null }, o: FaOfferRow, salary: number, years: number): Promise<string> {
+async function signFaOffer(playerId: number, player: { name: string; age: number | null }, o: FaOfferRow, salary: number, years: number, expectedTeamId?: number): Promise<string | null> {
   const twoWay = o.twoWay ?? ((player.age ?? 27) <= 24 && salary <= 3_000_000);
   const expiry = CURRENT_SEASON_START + years;
   const clause = o.grantClause && ["NTC", "NMC", "M_NTC"].includes(o.grantClause) ? o.grantClause : null;
   const noTradeTeams = clause === "M_NTC" ? await weakestTeams(o.mNtcBreadth ?? 12, o.teamId) : [];
-  await prisma.player.update({
-    where: { id: playerId },
-    data: {
-      teamId: o.teamId, rosterType: "NHL",
-      capHit: salary, contractYears: years, contractExpiry: expiry,
-      contractType: twoWay ? "TWO_WAY" : "ONE_WAY",
-      contractText: `$${salary.toLocaleString("en-US")} × ${years}yr (through ${expiry})`,
-      signPromiseLine: o.line, signPromisePP: o.pp, signPromisePK: o.pk,
-      tradeClause: clause, noTradeTeams,
-      disgruntled: false, tradeRequested: false, promiseWarnGame: null,
-    },
-  });
+  const data = {
+    teamId: o.teamId, rosterType: "NHL",
+    capHit: salary, contractYears: years, contractExpiry: expiry,
+    contractType: twoWay ? "TWO_WAY" : "ONE_WAY",
+    contractText: `$${salary.toLocaleString("en-US")} × ${years}yr (through ${expiry})`,
+    signPromiseLine: o.line, signPromisePP: o.pp, signPromisePK: o.pk,
+    tradeClause: clause, noTradeTeams,
+    disgruntled: false, tradeRequested: false, promiseWarnGame: null,
+  };
+  // race guard (in-season immediate path): only sign if the player is still where he
+  // was when we evaluated — a simultaneous signing by another club would have moved him.
+  if (expectedTeamId !== undefined) {
+    const res = await prisma.player.updateMany({ where: { id: playerId, teamId: expectedTeamId }, data });
+    if (res.count === 0) return null; // lost the race — already signed elsewhere
+  } else {
+    await prisma.player.update({ where: { id: playerId }, data });
+  }
   // keep the signed round on the accepted offer (its `round`) for the signings report
   await prisma.faOffer.update({ where: { id: o.id }, data: { status: "ACCEPTED", salary, years } });
   await prisma.faOffer.updateMany({ where: { playerId, id: { not: o.id }, status: { in: ACTIVE } }, data: { status: "REJECTED" } });
@@ -294,6 +303,7 @@ async function pickAndSign(
   }
   if (!best) return null;
   const code = await signFaOffer(playerId, player, best.offer, best.salary, best.years);
+  if (code === null) return null; // already signed elsewhere (shouldn't happen in the single-threaded resolver)
   return `${player.name} → ${code} ($${(best.salary / 1e6).toFixed(2)}M × ${best.years}yr)`;
 }
 

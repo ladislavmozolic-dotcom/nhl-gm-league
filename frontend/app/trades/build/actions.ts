@@ -87,6 +87,25 @@ async function collectMoveOps(pkg: TradePackage) {
   movePlayers(pkg.fromPlayers, fromTeam, pkg.toTeamId, toAff);
   movePlayers(pkg.toPlayers, toTeam, pkg.fromTeamId, fromAff);
 
+  // Ownership guard for picks & prospects — re-checked HERE at accept time so an asset
+  // that changed hands since the proposal can't be yanked out of its current owner.
+  // (Players are already guarded in movePlayers above.)
+  const fromOrgIds = orgIds(fromTeam), toOrgIds = orgIds(toTeam);
+  const allPickIds = [...pkg.fromPicks, ...pkg.toPicks];
+  if (allPickIds.length) {
+    const picks = await prisma.draftPick.findMany({ where: { id: { in: allPickIds } }, select: { id: true, teamId: true } });
+    const pkById = new Map(picks.map((p) => [p.id, p]));
+    for (const id of pkg.fromPicks) { const pk = pkById.get(id); if (!pk || !fromOrgIds.includes(pk.teamId)) throw new Error("A draft pick in this trade is no longer owned by the offering team."); }
+    for (const id of pkg.toPicks) { const pk = pkById.get(id); if (!pk || !toOrgIds.includes(pk.teamId)) throw new Error("A requested draft pick is no longer owned by the other team."); }
+  }
+  const allProspectIds = [...(pkg.fromProspects ?? []), ...(pkg.toProspects ?? [])];
+  if (allProspectIds.length) {
+    const pros = await prisma.prospect.findMany({ where: { id: { in: allProspectIds } }, select: { id: true, teamId: true } });
+    const prById = new Map(pros.map((p) => [p.id, p]));
+    for (const id of pkg.fromProspects ?? []) { const pr = prById.get(id); if (!pr || !fromOrgIds.includes(pr.teamId)) throw new Error("A prospect in this trade is no longer owned by the offering team."); }
+    for (const id of pkg.toProspects ?? []) { const pr = prById.get(id); if (!pr || !toOrgIds.includes(pr.teamId)) throw new Error("A requested prospect is no longer owned by the other team."); }
+  }
+
   for (const id of pkg.fromPicks) ops.push(prisma.draftPick.update({ where: { id }, data: { teamId: pkg.toTeamId } }));
   for (const id of pkg.toPicks) ops.push(prisma.draftPick.update({ where: { id }, data: { teamId: pkg.fromTeamId } }));
   for (const id of pkg.fromProspects ?? []) ops.push(prisma.prospect.update({ where: { id }, data: { teamId: pkg.toTeamId } }));
@@ -129,6 +148,19 @@ async function assertOwnership(pkg: TradePackage) {
   const players = await prisma.player.findMany({ where: { id: { in: [...pkg.fromPlayers, ...pkg.toPlayers].map((p) => p.playerId) } }, select: { id: true, teamId: true } });
   for (const p of pkg.fromPlayers) { const pl = players.find((x) => x.id === p.playerId); if (!pl || !fromOrg.includes(pl.teamId ?? -1)) throw new Error("A player you offered is not on your team."); }
   for (const p of pkg.toPlayers) { const pl = players.find((x) => x.id === p.playerId); if (!pl || !toOrg.includes(pl.teamId ?? -1)) throw new Error("A requested player is not on the other team."); }
+
+  const pickIds = [...pkg.fromPicks, ...pkg.toPicks];
+  if (pickIds.length) {
+    const picks = await prisma.draftPick.findMany({ where: { id: { in: pickIds } }, select: { id: true, teamId: true } });
+    for (const id of pkg.fromPicks) { const pk = picks.find((x) => x.id === id); if (!pk || !fromOrg.includes(pk.teamId)) throw new Error("A draft pick you offered is not owned by your team."); }
+    for (const id of pkg.toPicks) { const pk = picks.find((x) => x.id === id); if (!pk || !toOrg.includes(pk.teamId)) throw new Error("A requested draft pick is not owned by the other team."); }
+  }
+  const prospectIds = [...(pkg.fromProspects ?? []), ...(pkg.toProspects ?? [])];
+  if (prospectIds.length) {
+    const pros = await prisma.prospect.findMany({ where: { id: { in: prospectIds } }, select: { id: true, teamId: true } });
+    for (const id of pkg.fromProspects ?? []) { const pr = pros.find((x) => x.id === id); if (!pr || !fromOrg.includes(pr.teamId)) throw new Error("A prospect you offered is not owned by your team."); }
+    for (const id of pkg.toProspects ?? []) { const pr = pros.find((x) => x.id === id); if (!pr || !toOrg.includes(pr.teamId)) throw new Error("A requested prospect is not owned by the other team."); }
+  }
   return { fromTeam, toTeam };
 }
 

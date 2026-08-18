@@ -10,12 +10,17 @@ export default async function TransactionsPage() {
   ]);
 
   // messages embed team names / codes as free text — match them so we can show logos.
-  const withLogo = teams.filter((t) => t.logoUrl);
+  // codes can contain regex metachars (e.g. "T.B", "N.J"), so escape before matching.
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const PSEUDO = new Set(["UFA", "RFA", "FA"]); // free-agent pools, not real clubs
+  const withLogo = teams
+    .filter((t) => t.logoUrl && !(t.code && PSEUDO.has(t.code)))
+    .map((t) => ({ ...t, codeRe: t.code ? new RegExp(`\\b${esc(t.code)}\\b`) : null }));
   const logosFor = (msg: string) => {
     const hits: { id: number; code: string | null; logoUrl: string | null }[] = [];
     for (const t of withLogo) {
-      const byName = t.name && msg.includes(t.name);
-      const byCode = t.code && new RegExp(`\\b${t.code}\\b`).test(msg);
+      const byName = !!t.name && msg.includes(t.name);
+      const byCode = !!t.codeRe && t.codeRe.test(msg);
       if (byName || byCode) hits.push(t);
     }
     return hits.slice(0, 3);

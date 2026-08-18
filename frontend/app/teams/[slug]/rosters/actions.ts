@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { canManageTeam } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { ROSTER_LIMITS, type MoveRow } from "@/lib/roster-rules";
+import { canAddCapHit } from "@/lib/cap";
+import { money } from "@/lib/finance";
 
 export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
   const team = await prisma.team.findUnique({
@@ -48,6 +50,21 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
   if (pro.length > ROSTER_LIMITS.proMax) throw new Error(`Pro roster over the ${ROSTER_LIMITS.proMax}-player cap limit.`);
   if (valid.length > ROSTER_LIMITS.orgMax) throw new Error(`Organization over ${ROSTER_LIMITS.orgMax} players (NHL + AHL).`);
   if (goalies(valid) > ROSTER_LIMITS.orgMaxGoalies) throw new Error(`Organization can hold at most ${ROSTER_LIMITS.orgMaxGoalies} goalies (NHL + AHL).`);
+
+  // salary cap: the NET new NHL salary from this batch (call-ups minus send-downs)
+  // must fit under the ceiling — same rule the single-player call-up enforces.
+  let netAdd = 0;
+  for (const m of valid) {
+    const p = byId.get(m.id)!;
+    const toNhl = m.side === "pro";
+    const wasNhl = p.rosterType === "NHL";
+    if (toNhl && !wasNhl) netAdd += p.capHit ?? 0;       // call-up adds cap
+    else if (!toNhl && wasNhl) netAdd -= p.capHit ?? 0;  // send-down frees cap
+  }
+  if (netAdd > 0) {
+    const cap = await canAddCapHit(team.id, netAdd);
+    if (!cap.ok) throw new Error(`Call-ups blocked — ${team.name} has ${money(cap.status.space)} of cap space, this batch adds ${money(netAdd)}. Send a player down first.`);
+  }
 
   await prisma.$transaction(valid.map((m) =>
     prisma.player.update({

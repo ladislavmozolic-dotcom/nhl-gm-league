@@ -214,6 +214,11 @@ export async function resolveOfferSheets(): Promise<{ signed: number; declined: 
 
   let signed = 0, declined = 0;
   const details: string[] = [];
+  // cap enforcement at resolution: a club can win multiple offer sheets in one pass —
+  // each must fit under the ceiling given what it has ALREADY committed (incl. earlier
+  // wins this run, which are persisted as we go). teamCapInfo reflects those live.
+  const cap = await loadLeagueCap();
+  const phase = (await getLeagueClock()).phase;
 
   for (const [playerId, sheets] of byPlayer) {
     const player = await prisma.player.findUnique({
@@ -237,6 +242,11 @@ export async function resolveOfferSheets(): Promise<{ signed: number; declined: 
       // re-verify the poaching club still owns those original picks
       const stillOwned = await picksStillOwned(os.fromTeamId, os.compPickIds);
       if (!stillOwned) continue;
+      // cap gate: the club must fit this salary on top of what it has already committed
+      // (including any offer sheet it already won earlier in this same resolution pass).
+      const info = await teamCapInfo(os.fromTeamId);
+      const ceiling = capCeilingForPhase(cap.upper, phase) + info.ltir;
+      if (info.committed + os.salary > ceiling) continue;
       if (!winner || ev.utility > winner.utility) winner = { os, utility: ev.utility };
     }
 

@@ -6,6 +6,7 @@ import { getTeamSession } from "@/lib/auth";
 import { loadBranding, loadSiteConfig } from "@/lib/site-config";
 import { themeCss } from "@/lib/site-theme";
 import { effectiveMenu, type MenuOverrides } from "@/lib/menu-config";
+import { loadSettings } from "@/lib/sim/settings";
 import { getLang } from "@/lib/lang-server";
 import { t as translate } from "@/lib/i18n";
 import ScoreTracker from "@/components/ScoreTracker";
@@ -44,11 +45,28 @@ export default async function RootLayout({
   const lc = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { paramMode: true } }).catch(() => null);
   const paramMode = lc?.paramMode === "edge" ? "edge" : "sths";
   const hiddenCalc = paramMode === "edge" ? "/tools/player-calculator" : "/tools/edge-calculator";
+  // base finance → hide the Detailed-Finance league pages from the League ▸ Finance submenu
+  const settings = await loadSettings().catch(() => null);
+  const detailedFinance = settings?.financeMode === "detailed";
+  const DETAILED_FINANCE_HREFS = new Set(["/finance/fan-interest", "/finance/season-tickets", "/finance/attendance", "/finance/merchandise", "/finance/sponsorship"]);
+  // Finance moved from a top-level item into League ▸ Finance — honour a legacy
+  // "hide finance" override so admins who hid it before the move keep it hidden.
+  const financeHidden = new Set(((site.menu as MenuOverrides | null)?.hidden) ?? []).has("finance");
   // translate the built-in top-nav labels (custom pages keep their own label)
   const menu = effectiveMenu(site.menu as MenuOverrides | null, extra).map((m) => {
     const item = m.key.startsWith("page:") ? m : { ...m, label: translate(lang, `menu.${m.key}`) };
     if (item.key === "tools" && item.children) {
       return { ...item, children: item.children.filter((c) => c.href !== hiddenCalc) };
+    }
+    if (item.key === "league" && item.children) {
+      return {
+        ...item,
+        children: item.children
+          .filter((c) => !(financeHidden && c.href === "/finance")) // legacy hide-finance → drop the whole Finance submenu
+          .map((c) =>
+            c.children ? { ...c, children: detailedFinance ? c.children : c.children.filter((sub) => !DETAILED_FINANCE_HREFS.has(sub.href)) } : c
+          ),
+      };
     }
     return item;
   });

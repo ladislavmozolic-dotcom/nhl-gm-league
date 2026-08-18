@@ -31,7 +31,7 @@ export async function autoFillRosters(league = "NHL"): Promise<RosterFill[]> {
     if (!needF && !needD && !needG) continue;
 
     const pool = await prisma.player.findMany({
-      where: { teamId: { in: affIds } },
+      where: { teamId: { in: affIds }, injuryDaysLeft: { lte: 0 } }, // only promote healthy bodies
       orderBy: { overall: "desc" },
       select: { id: true, isGoalie: true, position: true },
     });
@@ -55,8 +55,10 @@ export async function fillAhlFromScratched(): Promise<RosterFill[]> {
   const teams = await prisma.team.findMany({ where: { league: "AHL" }, select: { id: true, name: true } });
   const filled: RosterFill[] = [];
   for (const team of teams) {
+    // only HEALTHY dressed players count — an injured "active" can't play, so we must
+    // still activate a healthy scratch to replace him (else the game skips to 0-0).
     const active = await prisma.player.findMany({
-      where: { teamId: team.id, rosterType: "AHL", scratched: false },
+      where: { teamId: team.id, rosterType: "AHL", scratched: false, injuryDaysLeft: { lte: 0 } },
       select: { isGoalie: true, position: true },
     });
     const nF = active.filter((p) => !p.isGoalie && !isDef(p.position ?? "")).length;
@@ -66,7 +68,7 @@ export async function fillAhlFromScratched(): Promise<RosterFill[]> {
     if (!needF && !needD && !needG) continue;
 
     const bench = await prisma.player.findMany({
-      where: { teamId: team.id, rosterType: "AHL", scratched: true },
+      where: { teamId: team.id, rosterType: "AHL", scratched: true, injuryDaysLeft: { lte: 0 } }, // healthy scratches only
       orderBy: { overall: "desc" },
       select: { id: true, isGoalie: true, position: true },
     });

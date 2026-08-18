@@ -682,7 +682,7 @@ model ForumThread {
   id         Int      @id @default(autoincrement())
   teamId     Int      // author
   title      String
-  category   String   @default("general") // general | trades | league | offtopic
+  category   String   @default("discussion") // discussion | trades | offtopic | comish
   pinned     Boolean  @default(false)
   createdAt  DateTime @default(now())
   lastPostAt DateTime @default(now())

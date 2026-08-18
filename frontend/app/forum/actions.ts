@@ -37,9 +37,13 @@ export async function replyToThread(threadId: number, body: string) {
 export async function toggleReaction(postId: number, emoji: string) {
   const me = await getTeamSession();
   if (!me) return { ok: false as const };
-  const existing = await prisma.forumReaction.findUnique({ where: { postId_teamId_emoji: { postId, teamId: me, emoji } } });
-  if (existing) await prisma.forumReaction.delete({ where: { id: existing.id } });
-  else await prisma.forumReaction.create({ data: { postId, teamId: me, emoji } });
+  // race-safe toggle: remove if present; if nothing was removed, add it (a concurrent
+  // double-click can lose the create to the unique constraint — swallow that P2002).
+  const removed = await prisma.forumReaction.deleteMany({ where: { postId, teamId: me, emoji } });
+  if (removed.count === 0) {
+    try { await prisma.forumReaction.create({ data: { postId, teamId: me, emoji } }); }
+    catch { /* concurrent create already won — leave it reacted */ }
+  }
   const post = await prisma.forumPost.findUnique({ where: { id: postId }, select: { threadId: true } });
   if (post) revalidatePath(`/forum/${post.threadId}`);
   return { ok: true as const };

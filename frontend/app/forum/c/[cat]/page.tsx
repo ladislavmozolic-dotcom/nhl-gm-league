@@ -16,8 +16,9 @@ const ago = (d: Date) => {
   return `${Math.floor(s / 86400)}d ago`;
 };
 
-export default async function CategoryPage({ params }: { params: Promise<{ cat: string }> }) {
+export default async function CategoryPage({ params, searchParams }: { params: Promise<{ cat: string }>; searchParams: Promise<{ error?: string }> }) {
   const { cat } = await params;
+  const { error } = await searchParams;
   if (!(CATEGORIES as readonly string[]).includes(cat)) notFound();
   const category = cat as Category;
   const m = CAT_META[category];
@@ -35,6 +36,9 @@ export default async function CategoryPage({ params }: { params: Promise<{ cat: 
   return (
     <div className="space-y-5 py-2 max-w-4xl">
       <PageHeader title={m.label} subtitle={m.desc} right={<Link href="/forum" className="text-sm text-slate-400 hover:text-blue-400">← Board index</Link>} />
+
+      {error === "admin" && <Card><p className="text-center text-amber-400 text-sm py-2">Do tohto podfóra môže vlákna zakladať len komisár.</p></Card>}
+      {error === "empty" && <Card><p className="text-center text-rose-400 text-sm py-2">Vlákno musí mať názov aj text.</p></Card>}
 
       {canPost && (
         <Card title="Nové vlákno" accent="text-emerald-400">

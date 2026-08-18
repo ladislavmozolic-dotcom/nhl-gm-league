@@ -360,6 +360,13 @@ function pickOnIce(rng: RNG, team: SimTeam): SimSkater[] {
   return [...takeF, ...takeD];
 }
 
+/** Snapshot a fresh weighted on-ice unit for a team into st.currentOnIce. Used by the
+ *  endgame / OT simple models, which don't run the shift loop, so recordGoal doesn't
+ *  reuse the stale end-of-3rd unit for their goals + +/-. */
+function setFreshUnit(st: SimState, team: SimTeam) {
+  st.currentOnIce[team.id] = { f: weightedSample(st.rng, team.forwards, 3), d: weightedSample(st.rng, team.defense, 2) };
+}
+
 function weightedSample(rng: RNG, pool: SimSkater[], n: number): SimSkater[] {
   const avail = [...pool];
   const out: SimSkater[] = [];
@@ -401,7 +408,8 @@ function recordGoal(
   // filled from the ice-time-weighted pool. Drives the play-by-play display and +/-.
   const skPool = [...off.forwards, ...off.defense];
   const isD = (s: SimSkater) => off.defense.some((d) => d.id === s.id);
-  const fSlots = strength === "PP" ? 4 : 3;
+  // on-ice skater counts by strength: EV 3F+2D(5), PP 4F+1D(5), SH 2F+2D(4 — a man down).
+  const fSlots = strength === "PP" ? 4 : strength === "SH" ? 2 : 3;
   const dSlots = strength === "PP" ? 1 : 2;
   const onF: SimSkater[] = [], onD: SimSkater[] = [];
   const seenOn = new Set<number>();
@@ -422,8 +430,10 @@ function recordGoal(
   for (const s of weightedSample(st.rng, off.defense, off.defense.length)) addOn(s);
   const onFor = [...onF, ...onD];
   // conceding side: the team's real on-ice line + pair (a modelled unit if not tracked).
+  // They defend a man UP on a PP goal (they're on the PK: 2F+2D), else full 3F+2D.
   const defIce = st.currentOnIce[def.id];
-  const onAgainst = defIce && defIce.f.length && defIce.d.length ? [...defIce.f.slice(0, 3), ...defIce.d.slice(0, 2)] : pickOnIce(st.rng, def);
+  const defFN = strength === "PP" ? 2 : 3;
+  const onAgainst = defIce && defIce.f.length && defIce.d.length ? [...defIce.f.slice(0, defFN), ...defIce.d.slice(0, 2)] : pickOnIce(st.rng, def);
 
   // +/- : even-strength AND short-handed goals count (real NHL rule); PP and SO don't.
   if (strength === "EV" || strength === "SH") {
@@ -1298,6 +1308,7 @@ function simulateEndgame(st: SimState) {
     if (rng.chance(engP)) {
       st.box[leading.id].shots++;
       st.box[leading.id].shotsByPeriod[2]++;
+      setFreshUnit(st, leading); setFreshUnit(st, trailing);
       recordGoal(st, leading, trailing, 3, t, "EV", true);
       return; // game iced
     }
@@ -1309,6 +1320,7 @@ function simulateEndgame(st: SimState) {
     st.box[leading.id].goalie.shotsAgainst++;
     if (rng.chance(tieP)) {
       st.box[leading.id].goalie.goalsAgainst++;
+      setFreshUnit(st, trailing); setFreshUnit(st, leading);
       recordGoal(st, trailing, leading, 3, t, "EV");
       margin = st.box[home.id].goals - st.box[away.id].goals;
       if (margin === 0) return; // tied it up -> heading to OT
@@ -1337,6 +1349,7 @@ function simulateOvertime(st: SimState): { winner: number | null; seconds: numbe
       const p = conversion(shooter.offense, effGoalieQuality(liveGoalie(st, def)), isHome, "EV") * 2.2;
       if (rng.chance(p)) {
         gLine.goalsAgainst++;
+        setFreshUnit(st, att); setFreshUnit(st, def);
         recordGoal(st, att, def, 4, t, "EV");
         return { winner: att.id, seconds: t };
       }

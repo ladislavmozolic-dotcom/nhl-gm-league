@@ -11,7 +11,9 @@ export async function sendDm(toTeamId: number, body: string, tradeUrl?: string |
   const text = body.trim();
   if (!text) return { ok: false as const, error: "Empty message." };
   if (toTeamId === from) return { ok: false as const, error: "You can't message yourself." };
-  await prisma.dmMessage.create({ data: { fromTeamId: from, toTeamId, body: text.slice(0, 2000), tradeUrl: tradeUrl || null } });
+  // only allow an internal trade link — never an arbitrary/`javascript:` URL rendered as a clickable link
+  const safeTradeUrl = tradeUrl && /^\/trades\//.test(tradeUrl) ? tradeUrl : null;
+  await prisma.dmMessage.create({ data: { fromTeamId: from, toTeamId, body: text.slice(0, 2000), tradeUrl: safeTradeUrl } });
   revalidatePath("/messages");
   return { ok: true as const };
 }
