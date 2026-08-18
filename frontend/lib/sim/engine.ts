@@ -4,6 +4,7 @@
 // stats (hits, blocks, faceoffs, TOI). Tuned to NHL-realistic output.
 
 import { RNG, fixtureSeed } from "./rng";
+import { cleanName } from "../playerName";
 import { generatePlayByPlay } from "./playbyplay";
 import { DEFAULT_SETTINGS, type EngineSettings } from "./settings";
 import { EventSink, type SimEvent } from "./events";
@@ -865,7 +866,16 @@ function simulatePeriodPossession(st: SimState, period: number) {
   const prevUnit: Record<number, { f: number; d: number }> = {
     [home.id]: { f: -1, d: -1 }, [away.id]: { f: -1, d: -1 },
   };
-  const unitNames = (line: SimSkater[]) => line.map((s) => (s.isCenter ? `${s.name} (C)` : s.name));
+  // forwards → LW · C · RW (one designated centre in the middle; extra natural
+  // centres show as wings); defence → the pair as-is. Names are cleaned of the
+  // captaincy / clause tags baked into the DB name string.
+  const fwdNames = (line: SimSkater[]) => {
+    const pivot = line.find((s) => s.isCenter) ?? null;
+    const wings = line.filter((s) => s !== pivot);
+    const order = pivot ? [wings[0], pivot, wings[1], ...wings.slice(2)].filter(Boolean) as SimSkater[] : line;
+    return order.map((s) => `${cleanName(s.name)}${s === pivot ? " (C)" : ""}`);
+  };
+  const defNames = (line: SimSkater[]) => line.map((s) => cleanName(s.name));
   const announceChange = (team: SimTeam, tick: number) => {
     if (!CFG.playByPlayEnabled) return;
     const sh = shifts[team.id];
@@ -874,7 +884,7 @@ function simulatePeriodPossession(st: SimState, period: number) {
       st.sink.emit({
         period, seconds: tick, type: "LINE_CHANGE", teamId: team.id, teamCode: team.code ?? undefined,
         importance: "MINOR",
-        meta: { unit: kind, lineNo: idx + 1, names: unitNames(line) },
+        meta: { unit: kind, lineNo: idx + 1, names: kind === "F" ? fwdNames(line) : defNames(line) },
       });
     };
     if (sh.fIdx !== prevUnit[team.id].f) { emitUnit("F", sh.fIdx, sh.fLines[sh.fIdx] ?? []); prevUnit[team.id].f = sh.fIdx; }
