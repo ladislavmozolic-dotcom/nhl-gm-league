@@ -126,6 +126,7 @@ type SimState = {
   defChem: Record<number, number>;  // team's avg D-pair chemistry factor (a gelled, mixed pair shields better)
   currentOnIce: Record<number, { f: SimSkater[]; d: SimSkater[] }>; // the line + pair on the ice right now (for goal on-ice sets + accurate +/-)
   carryPenalties: Penalty[]; // penalties still running when a period ends → carry the remaining time into the next period
+  misconducts: { playerId: number; teamId: number; period: number; start: number; end: number }[]; // 10/20-min misconducts — player sits (no PP), a sub takes his spot
   shiftXg: Record<number, number>;  // on-ice net xG accrued in a player's CURRENT shift (Shift Quality)
   nightOff: Record<number, number>; // per-game offensive "form" (goals-for mult, mean 1)
   nightDef: Record<number, number>; // per-game goalie "form" facing this team (goals-against mult on opp shots, mean 1)
@@ -339,12 +340,13 @@ function pickShooter(rng: RNG, team: SimTeam): SimSkater {
   return pool[rng.weighted(weights)];
 }
 
-function pickAssists(rng: RNG, team: SimTeam, scorerId: number): number[] {
+function pickAssists(rng: RNG, onIce: SimSkater[], scorerId: number): number[] {
   const roll = rng.next();
   // ~1.6 assists per goal (NHL-realistic): mostly 2, occasionally unassisted
   const n = roll < 0.08 ? 0 : roll < 0.30 ? 1 : 2;
   if (n === 0) return [];
-  const pool = [...team.forwards, ...team.defense].filter((s) => s.id !== scorerId);
+  // assists come ONLY from the players who were on the ice for the goal
+  const pool = onIce.filter((s) => s.id !== scorerId);
   const picked: number[] = [];
   for (let i = 0; i < n && pool.length; i++) {
     const weights = pool.map((s) =>
@@ -419,7 +421,13 @@ function recordGoal(
   shot?: { sector: string; shotType: string; xg: number },
 ) {
   const scorer = explicitScorer ?? pickShooter(st.rng, off);
-  const assists = strength === "SO" ? [] : pickAssists(st.rng, off, scorer.id);
+  // The on-ice set for this goal IS the actual unit that was on the ice (from the shift
+  // model — the same players the play-by-play shows). Assists come only from them, and
+  // this drives the +/-. So nobody off the ice is ever credited or shown on the goal.
+  const offIce = st.currentOnIce[off.id];
+  let onFor: SimSkater[] = offIce && (offIce.f.length || offIce.d.length) ? [...offIce.f, ...offIce.d] : pickOnIce(st.rng, off);
+  if (!onFor.some((s) => s.id === scorer.id)) onFor = [scorer, ...onFor].slice(0, 5); // guarantee the scorer is on the ice
+  const assists = strength === "SO" ? [] : pickAssists(st.rng, onFor, scorer.id);
   const offLines = st.lines[off.id];
   const sl = offLines[scorer.id];
   sl.goals++; sl.points++;
@@ -436,37 +444,9 @@ function recordGoal(
   if (strength === "PP") st.box[off.id].ppGoals++;
   if (period <= 4) st.box[off.id].goalsByPeriod[period - 1]++;
 
-  // On-ice unit — a positionally-correct 5 (3F + 2D at even strength; a PP runs 4F + 1D).
-  // The scorer + assisters slot into their F/D spots (they were out there); the rest is
-  // filled from the ice-time-weighted pool. Drives the play-by-play display and +/-.
-  const skPool = [...off.forwards, ...off.defense];
-  const isD = (s: SimSkater) => off.defense.some((d) => d.id === s.id);
-  // on-ice skater counts by strength: EV 3F+2D(5), PP 4F+1D(5), SH 2F+2D(4 — a man down).
-  const fSlots = strength === "PP" ? 4 : strength === "SH" ? 2 : 3;
-  const dSlots = strength === "PP" ? 1 : 2;
-  const onF: SimSkater[] = [], onD: SimSkater[] = [];
-  const seenOn = new Set<number>();
-  const addOn = (s?: SimSkater) => {
-    if (!s || seenOn.has(s.id)) return;
-    const d = isD(s);
-    if (d ? onD.length >= dSlots : onF.length >= fSlots) return;
-    seenOn.add(s.id); (d ? onD : onF).push(s);
-  };
-  // scoring side: the scorer + assisters slot in, the rest is the ACTUAL line/pair that
-  // was on the ice (a real C + wings, a real pair) — with a weighted backstop if short.
-  const offIce = st.currentOnIce[off.id];
-  addOn(scorer);
-  for (const aId of assists) addOn(skPool.find((s) => s.id === aId));
-  for (const s of offIce?.f ?? []) addOn(s);
-  for (const s of offIce?.d ?? []) addOn(s);
-  for (const s of weightedSample(st.rng, off.forwards, off.forwards.length)) addOn(s);
-  for (const s of weightedSample(st.rng, off.defense, off.defense.length)) addOn(s);
-  const onFor = [...onF, ...onD];
-  // conceding side: the team's real on-ice line + pair (a modelled unit if not tracked).
-  // They defend a man UP on a PP goal (they're on the PK: 2F+2D), else full 3F+2D.
+  // conceding side: the real unit that was on the ice against (PK unit on a PP goal, etc.).
   const defIce = st.currentOnIce[def.id];
-  const defFN = strength === "PP" ? 2 : 3;
-  const onAgainst = defIce && defIce.f.length && defIce.d.length ? [...defIce.f.slice(0, defFN), ...defIce.d.slice(0, 2)] : pickOnIce(st.rng, def);
+  const onAgainst: SimSkater[] = defIce && (defIce.f.length || defIce.d.length) ? [...defIce.f, ...defIce.d] : pickOnIce(st.rng, def);
 
   // +/- : even-strength AND short-handed goals count (real NHL rule); PP and SO don't.
   if (strength === "EV" || strength === "SH") {
@@ -531,6 +511,11 @@ function addPenalty(
     const opp = team.id === st.home.id ? st.away : st.home;
     st.box[opp.id].ppOpp += 1;
     active_push(st, { team: team.id, start: at, end: at + minutes * 60, expired: false });
+  }
+  // a misconduct (10) / game misconduct (20) puts the player in the box — no PP, but he
+  // can't take the ice for that time, so a teammate rotates into his spot.
+  if (/Misconduct/i.test(type)) {
+    st.misconducts.push({ playerId: offender.id, teamId: team.id, period, start: at, end: at + minutes * 60 });
   }
   st.penalties.push({
     period, seconds: at, time: fmt(at), team: team.id, teamCode: team.code,
@@ -898,17 +883,28 @@ function simulatePeriodPossession(st: SimState, period: number) {
   const ST_SHIFT = 35;
   const stShift: Record<number, { idx: number; elapsed: number }> = { [home.id]: { idx: 0, elapsed: 0 }, [away.id]: { idx: 0, elapsed: 0 } };
   const stIdx = (team: SimTeam, units: StUnit[]) => stShift[team.id].idx % Math.max(1, units.length);
+  // a player serving a 10/20-min misconduct can't take the ice — swap in a teammate at
+  // his spot for the duration (curTick is the live clock within the period).
+  let curTick = 0;
+  const subMis = (team: SimTeam, unit: SimSkater[], isDefUnit: boolean): SimSkater[] => {
+    if (!st.misconducts.length) return unit;
+    const benched = new Set(st.misconducts.filter((m) => m.teamId === team.id && m.period === period && curTick >= m.start && curTick < m.end).map((m) => m.playerId));
+    if (!benched.size || !unit.some((s) => benched.has(s.id))) return unit;
+    const pool = (isDefUnit ? team.defense : team.forwards).filter((s) => !benched.has(s.id) && !unit.some((u) => u.id === s.id));
+    let pi = 0;
+    return unit.map((s) => (benched.has(s.id) ? (pool[pi++] ?? s) : s));
+  };
   const onIceF = (team: SimTeam) => {
     const s = curStr[team.id];
-    if (s === "PP") { const u = stUnit[team.id].pp[stIdx(team, stUnit[team.id].pp)]; if (u?.f.length) return u.f; }
-    if (s === "SH") { const u = stUnit[team.id].pk[stIdx(team, stUnit[team.id].pk)]; if (u?.f.length) return u.f; }
-    const sh = shifts[team.id]; return sh.fLines[sh.fIdx] ?? team.forwards;
+    if (s === "PP") { const u = stUnit[team.id].pp[stIdx(team, stUnit[team.id].pp)]; if (u?.f.length) return subMis(team, u.f, false); }
+    if (s === "SH") { const u = stUnit[team.id].pk[stIdx(team, stUnit[team.id].pk)]; if (u?.f.length) return subMis(team, u.f, false); }
+    const sh = shifts[team.id]; return subMis(team, sh.fLines[sh.fIdx] ?? team.forwards, false);
   };
   const onIceD = (team: SimTeam) => {
     const s = curStr[team.id];
-    if (s === "PP") { const u = stUnit[team.id].pp[stIdx(team, stUnit[team.id].pp)]; if (u?.d.length) return u.d; }
-    if (s === "SH") { const u = stUnit[team.id].pk[stIdx(team, stUnit[team.id].pk)]; if (u?.d.length) return u.d; }
-    const sh = shifts[team.id]; return sh.dPairs[sh.dIdx] ?? team.defense;
+    if (s === "PP") { const u = stUnit[team.id].pp[stIdx(team, stUnit[team.id].pp)]; if (u?.d.length) return subMis(team, u.d, true); }
+    if (s === "SH") { const u = stUnit[team.id].pk[stIdx(team, stUnit[team.id].pk)]; if (u?.d.length) return subMis(team, u.d, true); }
+    const sh = shifts[team.id]; return subMis(team, sh.dPairs[sh.dIdx] ?? team.defense, true);
   };
   // team-system tactics multiply into the fatigue drain (fast tempo / aggressive
   // forecheck tire a team faster).
@@ -958,6 +954,7 @@ function simulatePeriodPossession(st: SimState, period: number) {
   announceChange(home, 0); announceChange(away, 0);
 
   for (let tick = 0; tick < PERIOD_SECONDS; tick++) {
+    curTick = tick; // for misconduct-box substitution inside onIceF/onIceD
     advanceShift(st, home.id, shifts[home.id], 1, rng);
     advanceShift(st, away.id, shifts[away.id], 1, rng);
     // resolve the man-advantage FIRST so the on-ice snapshot uses PP/PK units
@@ -1583,7 +1580,7 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     goals: [], penalties: [], injuries: [],
     momentum: {}, momoTime: {}, momoTau: {}, momoDip: {},
     playoff: !!opts.noShootout, // playoff series sim OT until a goal — amplifies clutch
-    defChem: {}, currentOnIce: {}, carryPenalties: [], shiftXg: {}, nightOff: {}, nightDef: {},
+    defChem: {}, currentOnIce: {}, carryPenalties: [], misconducts: [], shiftXg: {}, nightOff: {}, nightDef: {},
     rivalry: CFG.rivalryEnabled && !!opts.rivalry,
     pulled: {},
     shootout: [],
