@@ -17,7 +17,7 @@ interface Team {
   division: string | null;
 }
 
-export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: string; slug: string; admin?: boolean; pendingJoins?: number } | null; items?: MenuItem[]; lang?: Lang }) {
+export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: string; slug: string; admin?: boolean; pendingJoins?: number; unreadDm?: number } | null; items?: MenuItem[]; lang?: Lang }) {
   const menuItems = items ?? DEFAULT_MENU;
   const tr = (k: string) => t(lang, k);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
@@ -176,8 +176,8 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
                     <span className="w-6 h-6 rounded-full bg-blue-600 grid place-items-center text-[11px] font-black text-white">{gm.nickname[0]?.toUpperCase()}</span>
                     {gm.nickname}
                     <span className="text-[9px] text-slate-500">▾</span>
-                    {gm.admin && (gm.pendingJoins ?? 0) > 0 && (
-                      <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center" title={`${gm.pendingJoins} nových žiadostí o vstup`}>{gm.pendingJoins}</span>
+                    {(((gm.admin ? (gm.pendingJoins ?? 0) : 0)) + (gm.unreadDm ?? 0)) > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center" title="Nové upozornenia">{(gm.admin ? (gm.pendingJoins ?? 0) : 0) + (gm.unreadDm ?? 0)}</span>
                     )}
                   </button>
                   {activeMenu === "__gm" && (
@@ -187,6 +187,10 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
                       <a href={`/teams/${gm.slug}`} className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">{tr("ui.myTeam")}</a>
                       <a href={`/teams/${gm.slug}/profile`} className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">{tr("ui.profile")}</a>
                       <a href={`/teams/${gm.slug}/lines`} className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">{tr("ui.linesTactics")}</a>
+                      <a href="/messages" className="flex items-center justify-between px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">
+                        <span>💬 Messages</span>
+                        {(gm.unreadDm ?? 0) > 0 && <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm.unreadDm}</span>}
+                      </a>
                       {gm.admin && (
                         <>
                           <div className="my-1 border-t border-slate-700/60" />

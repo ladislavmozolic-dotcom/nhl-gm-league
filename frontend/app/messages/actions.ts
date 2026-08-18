@@ -1,0 +1,62 @@
+"use server";
+
+import { prisma } from "@/lib/prisma";
+import { getTeamSession } from "@/lib/auth";
+import { revalidatePath } from "next/cache";
+
+/** Send a DM to another team (as the signed-in GM's team). */
+export async function sendDm(toTeamId: number, body: string, tradeUrl?: string | null) {
+  const from = await getTeamSession();
+  if (!from) return { ok: false as const, error: "Sign in as a GM to send messages." };
+  const text = body.trim();
+  if (!text) return { ok: false as const, error: "Empty message." };
+  if (toTeamId === from) return { ok: false as const, error: "You can't message yourself." };
+  await prisma.dmMessage.create({ data: { fromTeamId: from, toTeamId, body: text.slice(0, 2000), tradeUrl: tradeUrl || null } });
+  revalidatePath("/messages");
+  return { ok: true as const };
+}
+
+/** The full thread with `otherTeamId`, marking their messages to me as read. */
+export async function getConversation(otherTeamId: number) {
+  const from = await getTeamSession();
+  if (!from) return { ok: false as const, me: null, messages: [] as ConversationMsg[] };
+  await prisma.dmMessage.updateMany({ where: { fromTeamId: otherTeamId, toTeamId: from, readAt: null }, data: { readAt: new Date() } });
+  const rows = await prisma.dmMessage.findMany({
+    where: { OR: [{ fromTeamId: from, toTeamId: otherTeamId }, { fromTeamId: otherTeamId, toTeamId: from }] },
+    orderBy: { id: "asc" },
+    select: { id: true, fromTeamId: true, body: true, tradeUrl: true, readAt: true, createdAt: true },
+  });
+  const messages: ConversationMsg[] = rows.map((r) => ({
+    id: r.id, mine: r.fromTeamId === from, body: r.body, tradeUrl: r.tradeUrl,
+    read: r.readAt != null, at: r.createdAt.toISOString(),
+  }));
+  return { ok: true as const, me: from, messages };
+}
+export type ConversationMsg = { id: number; mine: boolean; body: string; tradeUrl: string | null; read: boolean; at: string };
+
+/** Every other GM team + unread count from them (for the conversation list). */
+export async function listConversations() {
+  const from = await getTeamSession();
+  if (!from) return { ok: false as const, me: null, teams: [] as ConvTeam[] };
+  const teams = await prisma.team.findMany({
+    where: { league: "NHL", isAffiliate: false, id: { not: from } },
+    select: { id: true, name: true, code: true, logoUrl: true, gmNickname: true, passwordHash: true },
+    orderBy: { name: "asc" },
+  });
+  const unread = await prisma.dmMessage.groupBy({ by: ["fromTeamId"], where: { toTeamId: from, readAt: null }, _count: { _all: true } });
+  const unreadMap = new Map(unread.map((u) => [u.fromTeamId, u._count._all]));
+  const out: ConvTeam[] = teams.map((t) => ({
+    id: t.id, name: t.name, code: t.code, logoUrl: t.logoUrl,
+    gm: t.gmNickname, hasGm: !!t.passwordHash, unread: unreadMap.get(t.id) ?? 0,
+  }));
+  out.sort((a, b) => b.unread - a.unread || Number(b.hasGm) - Number(a.hasGm) || a.name.localeCompare(b.name));
+  return { ok: true as const, me: from, teams: out };
+}
+export type ConvTeam = { id: number; name: string; code: string | null; logoUrl: string | null; gm: string | null; hasGm: boolean; unread: number };
+
+/** Total unread DMs for the signed-in GM (menu badge). */
+export async function unreadDmCount(): Promise<number> {
+  const from = await getTeamSession();
+  if (!from) return 0;
+  return prisma.dmMessage.count({ where: { toTeamId: from, readAt: null } });
+}
