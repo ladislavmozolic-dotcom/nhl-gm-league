@@ -5,10 +5,10 @@ import { PageHeader, Card } from "@/components/ui";
 import { getTeamSession } from "@/lib/auth";
 import ForumReply from "@/components/ForumReply";
 import ForumReactions from "@/components/ForumReactions";
+import { catOk, CAT_META } from "../categories";
 
 export const dynamic = "force-dynamic";
 
-const CAT_LABEL: Record<string, string> = { general: "General", trades: "Trade Talk", league: "League", offtopic: "Off-topic" };
 const fmt = (d: Date) => d.toLocaleString("sk-SK", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 export default async function ThreadPage({ params }: { params: Promise<{ id: string }> }) {
@@ -30,13 +30,14 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
     },
   });
   if (!thread) notFound();
+  const cat = catOk(thread.category);
 
   return (
     <div className="space-y-4 py-2 max-w-3xl">
       <PageHeader
         title={thread.title}
-        subtitle={`${CAT_LABEL[thread.category] ?? thread.category} · ${thread.posts.length} post${thread.posts.length === 1 ? "" : "s"}`}
-        right={<Link href="/forum" className="text-sm text-slate-400 hover:text-blue-400">← Forum</Link>}
+        subtitle={`${CAT_META[cat].label} · ${thread.posts.length} post${thread.posts.length === 1 ? "" : "s"}`}
+        right={<Link href={`/forum/c/${cat}`} className="text-sm text-slate-400 hover:text-blue-400">← {CAT_META[cat].label}</Link>}
       />
 
       <div className="space-y-3">

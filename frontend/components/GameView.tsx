@@ -321,7 +321,7 @@ function PbpView({ data, full }: { data: Data; full: boolean }) {
           <h3 className="font-bold text-lg mb-2">{label(p)}</h3>
           <div className="space-y-0.5">
             {byPeriod.get(p)!.map((e, i) => (
-              <div key={i} className={`text-sm flex gap-3 ${e.kind === "goal" ? "text-amber-300 font-semibold" : e.kind === "fight" ? "text-red-400" : e.kind === "injury" ? "text-rose-400" : e.kind === "penalty" ? "text-orange-300" : "text-slate-300"}`}>
+              <div key={i} className={`text-sm flex gap-3 ${e.kind === "goal" ? "text-amber-300 font-semibold" : e.kind === "fight" ? "text-red-400" : e.kind === "injury" ? "text-rose-400" : e.kind === "penalty" ? "text-orange-300" : e.kind === "change" ? "text-sky-500/70 italic" : "text-slate-300"}`}>
                 <span className="tabular-nums text-slate-500 w-12 shrink-0">{e.time}</span>
                 <span>{e.text}{full && e.teamId != null && <span className="text-slate-600"> ({teamCode(e.teamId)})</span>}</span>
               </div>

@@ -1,4 +1,5 @@
 import { PageHeader, Card } from "@/components/ui";
+import { getLang } from "@/lib/lang-server";
 
 export const metadata = { title: "League Rules" };
 
@@ -164,22 +165,191 @@ const SECTIONS: Sec[] = [
   },
 ];
 
-export default function RulesPage() {
+// ---- Czech rulebook (shown when the site language is Czech) ------------------
+const SECTIONS_CS: Sec[] = [
+  {
+    id: "season", title: "1 · Sezóna a simulace",
+    intro: "Liga hraje reálný rozpis NHL a komisař ji simuluje den po dni.",
+    groups: [
+      { points: [
+        "Základní část používá skutečný rozpis NHL (~84 zápasů na tým). Zápasy se hrají po jednom dni ze stránky Schedule (Sim Next Day). Aktuální den je zvýrazněný a tlačítko Sim zůstává připnuté nahoře.",
+        "Každý zápas rozhoduje engine řízený událostmi: střely, kvalita střel (očekávané góly podle zóny kluziště), kvalita brankáře, přesilovky a oslabení, chemie linek, trénink, únava a náhodné výkyvy formy „každý večer je jiný“ — odtud pramení překvapení.",
+        "Výsledky jsou reprodukovatelné: stejný zápas se odsimuluje stejně. Opětovná simulace zápasu nebo přegenerování rozpisu jej přehodí (nový los). Každá simulace se zapisuje do Audit Logu (kdo/kdy/seed); re-simulace je označena.",
+        "Rozptyl zápasů (Game Variance) může nastavit komisař (výchozí ~108 %). Vyšší = divočejší večery; nižší = těsnější výsledky podle papíru.",
+      ] },
+    ],
+  },
+  {
+    id: "rosters", title: "2 · Soupisky a farma",
+    groups: [
+      { h: "Aktivní soupiska", points: [
+        "Legální sestava nastupuje s 12 útočníky, 6 obránci a 2 brankáři. Na NHL soupisce může být až 23 hráčů.",
+        "Pokud má klub méně než 12Ú / 6O / 2B, simulace před dalším zápasem povolá nejlepší dostupné hráče z farmy na NHL soupisku — trvale (počítají se do stropu a zůstanou, dokud je nepošlete dolů).",
+      ] },
+      { h: "AHL farma", points: [
+        "Každý NHL klub má AHL afilaci. Rozpis AHL kopíruje rozpis NHL (afilace se potkají, když se potkají jejich mateřské kluby).",
+        "AHL soupisky spravuje GM mateřského klubu přes svůj login. Farmářsky způsobilí jsou hráči se stropem pod ~775 tis. $.",
+        "Když povolání do NHL nechají farmu bez legální sestavy, farma automaticky aktivuje vlastní zdravé škrtnuté (scratch) hráče, aby se její zápasy odsimulovaly.",
+      ] },
+    ],
+  },
+  {
+    id: "con", title: "3 · Kondice (CON), únava a zranění",
+    groups: [
+      { h: "Kondice", points: [
+        "Každý hráč má hodnotu CON (0–100). Klesá tím, jak hraje, a obnovuje se ve dnech volna (bruslaři i brankáři ~+1–2 za den volna). CON je vidět na soupisce; zranění hráči ukazují živou desetinnou hodnotu.",
+        "Bruslař musí mít CON ≥ 95, aby mohl nastoupit — pod touto hranicí je stále zraněný nebo rozházený a sedí.",
+      ] },
+      { h: "Zranění", points: [
+        "Zranění pramení z fyzické hry: tvrdé hity, zblokované střely, bitky a bezkontaktní úrazy. Tvrdý, důrazný soupeř vám zraní více hráčů.",
+        "Četnost je nastavena na ~1 zranění na ~5–6 zápasů na tým. Většina je den-ode-dne (1–6 dní); některá jsou týden-od-týdne; dlouhodobá zranění a konec sezony jsou vzácná.",
+        "Hráč se nemůže zranit dvakrát v jednom zápase. Zranění se hojí o jeden den za každý uplynulý den, ať už postupujete den po dni nebo necháte tým odpočívat. Seznam zraněných každého týmu je na jeho stránce (Injury Report).",
+      ] },
+    ],
+  },
+  {
+    id: "goalies", title: "4 · Brankáři",
+    groups: [
+      { points: [
+        "Automatická rotace: brankář musí mít v den zápasu CON ≥ 98, aby chytal. Pokud jeho CON klesl pod tuto hranici, dostane branku svěžejší brankář — takže žádná jednička není udřená. (Jsou-li oba pod hranicí, chytá stejně ten nejsvěžejší.)",
+        "Chytání ve dvou zápasech po sobě činí brankářův večer nevyzpytatelnějším (větší výkyvy). Brankáři si CON obnovují ve dnech volna.",
+        "Forma brankáře na daný večer (v pohodě / mimo) ovlivní celý zápas — chytající gólman krade výhry, mimoformový dostane naloženo.",
+      ] },
+    ],
+  },
+  {
+    id: "stats", title: "5 · Statistiky",
+    groups: [
+      { points: [
+        "Statistiky sezony jsou rozdělené na bloky NHL a AHL, každý se základní částí a play-off. Hráč, který nastoupí v obou ligách, ukazuje obojí.",
+        "Kariéra počítá pouze NHL (AHL je zvlášť pod Player Stats).",
+        "Game Log (na hráče, NHL) vypisuje každý zápas: soupeře, výsledek a kompletní bodovou řádku — klikněte na řádek pro box score.",
+        "Plus/Minus se řídí reálným pravidlem: počítají se góly v plné síle A v oslabení (střelec a jeho spoluhráči na ledě dostanou +1, inkasující strana −1). Góly v přesilovce se nepočítají.",
+        "U každého gólu se zaznamenává, kdo byl na ledě pro a proti (zobrazeno v play-by-play box score).",
+        "Žebříčky (SV %, GAA, Edge, pokročilé) používají minimální vzorek, který roste, jak sezona zraje, takže lídři se ukazují už od prvních zápasů.",
+      ] },
+    ],
+  },
+  {
+    id: "cap", title: "6 · Platový strop a finance",
+    groups: [
+      { points: [
+        "Každý klub musí zůstat pod platovým stropem. Strop a jeho spodní hranici nastavuje komisař (hodnoty profinhl nebo reálné NHL).",
+        "V mezisezoně má strop +10% rezervu; v den startu platí přísný strop a nevyhovující kluby dostanou veřejné varování a musí snížit platy.",
+        "LTIR: hráč odložený na dlouhodobou marodku jde ze stropu ven. Odkupy (buyouts) a zadržený plat se evidují v účetnictví klubu.",
+      ] },
+    ],
+  },
+  {
+    id: "fa", title: "7 · Volní hráči (Free Agency)",
+    intro: "Jak a kdy můžete podepsat volné hráče, závisí na fázi roku.",
+    groups: [
+      { h: "Mezisezona — Free Agent Frenzy (červenec)", points: [
+        "Frenzy je založené na nabídkách ve třech týdenních kolech. GM předkládají nabídky (peníze + délka + role + speciální formace); hráč zváží všechny zájemce a při uzavření kola podepíše nejlepší volbu.",
+        "První den každého kola je náskok komisařské kanceláře; GM se přidají od druhého dne. Od 2. kola mohou na hráče dál přihazovat jen kluby, které s ním už jednají.",
+        "Obousměrná vs jednosměrná smlouva, udělené klauzule o nevyměnitelnosti (sleva) i délka smlouvy formují jeho požadavek.",
+      ] },
+      { h: "Základní část — otevřený trh", points: [
+        "Otevření jsou jak vaši vlastní UFA, tak volný trh. Přijatelná nabídka podepíše hráče okamžitě — bez čekání na den uzávěrky. Když nedosáhnete, řekne vám, co to bude stát.",
+        "Nepodepsaný volný hráč zmírňuje své požadavky, čím dál je sezona (nikdo nebere) — až zhruba o −45 % v pozdní části roku.",
+      ] },
+      { h: "Play-off", points: [
+        "Můžete prodloužit VLASTNÍ končící UFA (okamžitě), ale volný trh je zavřený.",
+      ] },
+    ],
+  },
+  {
+    id: "rfa", title: "8 · RFA, nabídkové listiny a franšízové tagy",
+    groups: [
+      { points: [
+        "Chránění volní hráči (RFA) musí dostat nabídku (tender); jejich vlastní klub má kola na prodloužení, než jsou vystaveni.",
+        "Nabídkové listiny (offer sheets) jsou povolené proti kompenzačnímu žebříčku, který edituje komisař — podepisující klub odevzdá své původní volby v draftu dle stupně, ověřeno ligou.",
+        "Každý klub může udělit jeden franšízový tag, který otagovanému hráči koupí dvě kola na prodloužení, než se k němu dostanou nabídkové listiny.",
+        "(Liga může místo toho jet „jednoduchý“ systém volných hráčů, kde všichni testují trh a nejsou žádné tagy ani nabídkové listiny — nastavuje komisař.)",
+      ] },
+    ],
+  },
+  {
+    id: "contracts", title: "9 · Smlouvy a klauzule",
+    groups: [
+      { points: [
+        "Smlouvy mají strop (cap hit) a délku. Obousměrné smlouvy platí méně na farmě; zavedený hráč po 25. roce ji nevezme (kromě usazujícího se veterána v pozdní fázi Frenzy).",
+        "Klauzule o nevyměnitelnosti / nehnutelnosti jsou reálné: NTC, NMC a modifikované NTC (hráčem jmenovaný seznam 6/12/18/24 týmů). Udělení klauzule podepíše hráče o něco levněji.",
+        "Hráč s klauzulí musí souhlasit s výměnou, která se jí dotýká (může být poplatek agentovi), dle nastavení klauzulí v lize.",
+      ] },
+    ],
+  },
+  {
+    id: "trades", title: "10 · Výměny (trejdy)",
+    groups: [
+      { points: [
+        "Výměny stavíte v Trade Builderu (hráči, prospekti a volby v draftu). Můžete ji spustit rovnou z chatu s GM přes „Propose trade“.",
+        "Zadržení platu je podporováno. Klauzule o nevyměnitelnosti / nehnutelnosti se musí respektovat — chráněný hráč musí souhlasit.",
+        "Podle nastavení ligy mohou výměny vyžadovat schválení komisařem. Každá výměna se loguje.",
+      ] },
+    ],
+  },
+  {
+    id: "waivers", title: "11 · Waivery",
+    groups: [
+      { points: [
+        "Waivery může komisař zapnout nebo vypnout.",
+        "Když jsou zapnuté: vystavení hráči projdou jednodenním oknem; nároky jdou podle obráceného pořadí tabulky, jinak hráč propadne do AHL. Hráči na nováčkovské smlouvě jsou obvykle z waiverů vyňati.",
+      ] },
+    ],
+  },
+  {
+    id: "draft", title: "12 · Vstupní draft",
+    groups: [
+      { points: [
+        "Pořadí draftu se řídí obráceným pořadím tabulky, s ověřitelnou loterií ve stylu NHL (14 míčků / 1001 kombinací) pro nejvyšší volby.",
+        "Draft Room podporuje živé draftování, ruční řízení fází, admin bonusová kola a volby mimo seznam (off-board). Reálná draftová třída NHL se importuje pro aktuální ročník.",
+      ] },
+    ],
+  },
+  {
+    id: "awards", title: "13 · Ocenění",
+    groups: [
+      { points: [
+        "Statistické trofeje (produktivita, výhry atd.) se udělují automaticky. Zbytek (Hart, Norris, Vezina, Calder, Selke a další) rozhoduje hlasování GM; kluby bez lidského GM odevzdají hlasování řízené statistikami (AI).",
+        "Historie sezon, rekordy a týmová síň trofejí jsou pod History / League.",
+      ] },
+    ],
+  },
+  {
+    id: "messages", title: "14 · Zprávy",
+    groups: [
+      { points: [
+        "GM si mohou psát přímé zprávy ze záložky Messages — historie chatu, emoji, potvrzení doručeno ✓ / přečteno ✓✓ a tlačítko Propose trade, které otevře Trade Builder proti danému GM. Odznak upozorní na nové zprávy.",
+      ] },
+    ],
+  },
+];
+
+const RULES_T = {
+  en: { title: "League Rules", subtitle: "How everything works — the full rulebook for UNHL.", note: "Some values (cap, variance, injury rate, FA/waivers systems) are commissioner-tunable and may differ per league." },
+  cs: { title: "Pravidla ligy", subtitle: "Jak všechno funguje — kompletní pravidla UNHL.", note: "Některé hodnoty (strop, rozptyl, četnost zranění, systémy FA/waiverů) může ladit komisař a mohou se lišit podle ligy." },
+};
+
+export default async function RulesPage() {
+  const lang = await getLang();
+  const sections = lang === "cs" ? SECTIONS_CS : SECTIONS;
+  const tr = lang === "cs" ? RULES_T.cs : RULES_T.en;
   return (
     <div className="space-y-6 py-2 max-w-4xl">
-      <PageHeader title="League Rules" subtitle="How everything works — the full rulebook for UNHL." />
+      <PageHeader title={tr.title} subtitle={tr.subtitle} />
 
       {/* quick index */}
       <Card>
         <div className="flex flex-wrap gap-2">
-          {SECTIONS.map((s) => (
+          {sections.map((s) => (
             <a key={s.id} href={`#${s.id}`} className="text-xs px-2.5 py-1 rounded-full bg-slate-800/70 text-slate-300 hover:bg-blue-600 hover:text-white transition-colors">{s.title}</a>
           ))}
         </div>
       </Card>
 
       <div className="space-y-5">
-        {SECTIONS.map((s) => (
+        {sections.map((s) => (
           <section key={s.id} id={s.id} className="scroll-mt-24">
             <Card title={s.title} accent="text-blue-400">
               {s.intro && <p className="text-sm text-slate-400 mb-3">{s.intro}</p>}
@@ -200,7 +370,7 @@ export default function RulesPage() {
         ))}
       </div>
 
-      <p className="text-xs text-slate-500 text-center pb-4">Some values (cap, variance, injury rate, FA/waivers systems) are commissioner-tunable and may differ per league.</p>
+      <p className="text-xs text-slate-500 text-center pb-4">{tr.note}</p>
     </div>
   );
 }

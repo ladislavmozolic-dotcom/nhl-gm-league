@@ -85,16 +85,41 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
                 )}
 
                 {item.children && activeMenu === item.key && (
-                  <div className="absolute top-full left-0 mt-0.5 w-52 bg-[#0f1d32] border border-slate-700/40 rounded-lg shadow-2xl shadow-black/50 overflow-hidden py-1.5 z-50">
-                    {item.children.map((child) => (
-                      <Link
-                        key={child.label}
-                        href={child.href}
-                        className="block px-4 py-2 text-[13px] text-slate-300 hover:text-white hover:bg-slate-700/40 transition-colors"
-                      >
-                        {child.label}
-                      </Link>
-                    ))}
+                  <div className="absolute top-full left-0 mt-0.5 w-52 bg-[#0f1d32] border border-slate-700/40 rounded-lg shadow-2xl shadow-black/50 py-1.5 z-50">
+                    {item.children.map((child) =>
+                      child.children && child.children.length ? (
+                        <div key={child.label} className="relative group/sub">
+                          <Link
+                            href={child.href}
+                            className="flex items-center justify-between px-4 py-2 text-[13px] text-slate-300 hover:text-white hover:bg-slate-700/40 transition-colors"
+                          >
+                            {child.label}
+                            <span className="text-[9px] text-slate-500 group-hover/sub:text-white">▸</span>
+                          </Link>
+                          <div className="absolute left-full top-0 -ml-0.5 pl-1 w-60 hidden group-hover/sub:block z-50">
+                            <div className="bg-[#0f1d32] border border-slate-700/40 rounded-lg shadow-2xl shadow-black/50 py-1.5">
+                              {child.children.map((sub) => (
+                                <Link
+                                  key={sub.label}
+                                  href={sub.href}
+                                  className="block px-4 py-2 text-[13px] text-slate-300 hover:text-white hover:bg-slate-700/40 transition-colors"
+                                >
+                                  {sub.label}
+                                </Link>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <Link
+                          key={child.label}
+                          href={child.href}
+                          className="block px-4 py-2 text-[13px] text-slate-300 hover:text-white hover:bg-slate-700/40 transition-colors"
+                        >
+                          {child.label}
+                        </Link>
+                      )
+                    )}
                   </div>
                 )}
 

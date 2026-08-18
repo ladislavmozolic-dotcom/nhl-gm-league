@@ -233,7 +233,7 @@ export type TeamBox = {
 
 export type PbpKind =
   | "faceoff" | "shot" | "save" | "goal" | "miss" | "block" | "hit"
-  | "icing" | "offside" | "penalty" | "fight" | "injury" | "period";
+  | "icing" | "offside" | "penalty" | "fight" | "injury" | "period" | "change";
 
 export type PbpEvent = {
   period: number;

@@ -1,10 +1,10 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { getTeamSession } from "@/lib/auth";
+import { getTeamSession, isAdmin } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { catOk } from "./categories";
+import { catOk, CAT_META } from "./categories";
 
 /** Start a new thread (with its opening post). */
 export async function createThread(formData: FormData) {
@@ -12,8 +12,9 @@ export async function createThread(formData: FormData) {
   if (!me) return;
   const title = String(formData.get("title") ?? "").trim().slice(0, 140);
   const body = String(formData.get("body") ?? "").trim().slice(0, 5000);
-  const category = catOk(String(formData.get("category") ?? "general"));
-  if (!title || !body) redirect("/forum?error=empty");
+  const category = catOk(String(formData.get("category") ?? "discussion"));
+  if (CAT_META[category].adminOnly && !(await isAdmin())) redirect(`/forum/c/${category}?error=admin`);
+  if (!title || !body) redirect(`/forum/c/${category}?error=empty`);
   const thread = await prisma.forumThread.create({ data: { teamId: me, title, category, posts: { create: { teamId: me, body } } } });
   redirect(`/forum/${thread.id}`);
 }

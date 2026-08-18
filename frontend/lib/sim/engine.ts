@@ -850,9 +850,33 @@ function simulatePeriodPossession(st: SimState, period: number) {
 
   const killedPens = new Set<Penalty>(); // penalties that expired without a PP goal → PK momentum
 
+  // remember which units were on the ice, so we can announce a change when a
+  // fresh forward line / D pair hops the boards.
+  const prevUnit: Record<number, { f: number; d: number }> = {
+    [home.id]: { f: -1, d: -1 }, [away.id]: { f: -1, d: -1 },
+  };
+  const unitNames = (line: SimSkater[]) => line.map((s) => (s.isCenter ? `${s.name} (C)` : s.name));
+  const announceChange = (team: SimTeam, tick: number) => {
+    if (!CFG.playByPlayEnabled) return;
+    const sh = shifts[team.id];
+    const emitUnit = (kind: "F" | "D", idx: number, line: SimSkater[]) => {
+      if (!line.length) return;
+      st.sink.emit({
+        period, seconds: tick, type: "LINE_CHANGE", teamId: team.id, teamCode: team.code ?? undefined,
+        importance: "MINOR",
+        meta: { unit: kind, lineNo: idx + 1, names: unitNames(line) },
+      });
+    };
+    if (sh.fIdx !== prevUnit[team.id].f) { emitUnit("F", sh.fIdx, sh.fLines[sh.fIdx] ?? []); prevUnit[team.id].f = sh.fIdx; }
+    if (sh.dIdx !== prevUnit[team.id].d) { emitUnit("D", sh.dIdx, sh.dPairs[sh.dIdx] ?? []); prevUnit[team.id].d = sh.dIdx; }
+  };
+  // opening units for this period
+  announceChange(home, 0); announceChange(away, 0);
+
   for (let tick = 0; tick < PERIOD_SECONDS; tick++) {
     advanceShift(st, home.id, shifts[home.id], 1, rng);
     advanceShift(st, away.id, shifts[away.id], 1, rng);
+    announceChange(home, tick); announceChange(away, tick);
     // snapshot the real line + pair on the ice, so a goal records the actual unit
     st.currentOnIce[home.id] = { f: onIceF(home), d: onIceD(home) };
     st.currentOnIce[away.id] = { f: onIceF(away), d: onIceD(away) };

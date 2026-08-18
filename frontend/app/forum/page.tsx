@@ -1,14 +1,9 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { PageHeader, Card } from "@/components/ui";
-import { getTeamSession } from "@/lib/auth";
-import { createThread } from "./actions";
-import { CATEGORIES } from "./categories";
+import { CATEGORIES, CAT_META } from "./categories";
 
 export const dynamic = "force-dynamic";
-
-const CAT_LABEL: Record<string, string> = { general: "General", trades: "Trade Talk", league: "League", offtopic: "Off-topic" };
-const CAT_COLOR: Record<string, string> = { general: "text-blue-400", trades: "text-emerald-400", league: "text-amber-400", offtopic: "text-slate-400" };
 
 const ago = (d: Date) => {
   const s = Math.floor((Date.now() - d.getTime()) / 1000);
@@ -18,63 +13,52 @@ const ago = (d: Date) => {
   return `${Math.floor(s / 86400)}d ago`;
 };
 
-export default async function ForumPage({ searchParams }: { searchParams: Promise<{ cat?: string }> }) {
-  const { cat } = await searchParams;
-  const me = await getTeamSession();
-  const where = cat && CATEGORIES.includes(cat as never) ? { category: cat } : {};
-  const threads = await prisma.forumThread.findMany({
-    where,
-    orderBy: [{ pinned: "desc" }, { lastPostAt: "desc" }],
-    take: 100,
-    select: { id: true, title: true, category: true, pinned: true, lastPostAt: true, team: { select: { code: true, name: true, logoUrl: true, gmNickname: true } }, _count: { select: { posts: true } } },
-  });
+export default async function ForumPage() {
+  const cats = await Promise.all(CATEGORIES.map(async (cat) => {
+    const [topics, posts, last] = await Promise.all([
+      prisma.forumThread.count({ where: { category: cat } }),
+      prisma.forumPost.count({ where: { thread: { category: cat } } }),
+      prisma.forumPost.findFirst({
+        where: { thread: { category: cat } },
+        orderBy: { id: "desc" },
+        select: { createdAt: true, thread: { select: { id: true, title: true } }, team: { select: { code: true, gmNickname: true } } },
+      }),
+    ]);
+    return { cat, topics, posts, last };
+  }));
 
   return (
     <div className="space-y-5 py-2 max-w-4xl">
-      <PageHeader title="League Forum" subtitle="Public discussion for every GM — trade talk, debates, off-topic." />
-
-      <div className="flex flex-wrap gap-2">
-        <Link href="/forum" className={`text-xs px-3 py-1.5 rounded-full ${!cat ? "bg-blue-600 text-white" : "bg-slate-800/70 text-slate-300 hover:bg-slate-700"}`}>All</Link>
-        {CATEGORIES.map((c) => (
-          <Link key={c} href={`/forum?cat=${c}`} className={`text-xs px-3 py-1.5 rounded-full ${cat === c ? "bg-blue-600 text-white" : "bg-slate-800/70 text-slate-300 hover:bg-slate-700"}`}>{CAT_LABEL[c]}</Link>
-        ))}
-      </div>
-
-      {me && (
-        <Card title="Start a thread" accent="text-emerald-400">
-          <form action={createThread} className="space-y-2.5">
-            <div className="flex gap-2">
-              <input name="title" required maxLength={140} placeholder="Thread title…" className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-blue-500" />
-              <select name="category" className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200">
-                {CATEGORIES.map((c) => <option key={c} value={c}>{CAT_LABEL[c]}</option>)}
-              </select>
-            </div>
-            <textarea name="body" required rows={3} maxLength={5000} placeholder="What's on your mind?" className="w-full resize-none bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-blue-500" />
-            <div className="flex justify-end">
-              <button className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold">Post thread</button>
-            </div>
-          </form>
-        </Card>
-      )}
+      <PageHeader title="League Forum" subtitle="Board index — pick a sub-forum." />
 
       <Card bodyClassName="p-0">
-        {threads.length === 0 ? (
-          <p className="text-center text-slate-500 py-10 text-sm">No threads yet{cat ? " in this category" : ""} — start one above.</p>
-        ) : threads.map((t) => (
-          <Link key={t.id} href={`/forum/${t.id}`} className="flex items-center gap-3 px-4 py-3 border-b border-slate-800/60 last:border-0 hover:bg-slate-800/30 transition-colors">
-            {t.team.logoUrl && <img src={t.team.logoUrl} alt="" className="w-8 h-8 object-contain shrink-0" />}
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                {t.pinned && <span className="text-amber-400 text-xs" title="Pinned">📌</span>}
-                <span className="text-sm font-semibold text-slate-100 truncate">{t.title}</span>
+        <div className="hidden sm:flex items-center px-4 py-2 text-[10px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
+          <span className="flex-1">Forum</span>
+          <span className="w-16 text-center">Topics</span>
+          <span className="w-16 text-center">Posts</span>
+          <span className="w-48">Last post</span>
+        </div>
+        {cats.map(({ cat, topics, posts, last }) => {
+          const m = CAT_META[cat];
+          return (
+            <div key={cat} className="flex items-center gap-3 px-4 py-3.5 border-b border-slate-800/60 last:border-0 hover:bg-slate-800/20 transition-colors">
+              <div className="min-w-0 flex-1">
+                <Link href={`/forum/c/${cat}`} className={`font-bold ${m.color} hover:underline`}>{m.label}</Link>
+                <div className="text-xs text-slate-500">{m.desc}{m.adminOnly && <span className="ml-1.5 text-amber-500/70">· len komisár zakladá</span>}</div>
               </div>
-              <div className="text-[11px] text-slate-500 truncate">
-                <span className={CAT_COLOR[t.category]}>{CAT_LABEL[t.category] ?? t.category}</span> · by {t.team.gmNickname || t.team.code || t.team.name} · {ago(t.lastPostAt)}
+              <span className="hidden sm:block w-16 text-center text-sm text-slate-300 tabular-nums">{topics}</span>
+              <span className="hidden sm:block w-16 text-center text-sm text-slate-300 tabular-nums">{posts}</span>
+              <div className="hidden sm:block w-48 text-[11px] text-slate-500 truncate">
+                {last ? (
+                  <>
+                    <Link href={`/forum/${last.thread.id}`} className="text-slate-300 hover:text-blue-400 block truncate">{last.thread.title}</Link>
+                    by {last.team.gmNickname || last.team.code || "GM"} · {ago(last.createdAt)}
+                  </>
+                ) : <span className="text-slate-600">No posts yet</span>}
               </div>
             </div>
-            <span className="text-xs text-slate-500 tabular-nums shrink-0">{t._count.posts} 💬</span>
-          </Link>
-        ))}
+          );
+        })}
       </Card>
     </div>
   );

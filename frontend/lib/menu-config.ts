@@ -3,7 +3,7 @@
 // new menu item added in code still appears until an admin hides it. Custom pages
 // (Module 4) are appended as extra items with key "page:<slug>".
 
-export type MenuChild = { label: string; href: string };
+export type MenuChild = { label: string; href: string; children?: MenuChild[] };
 export type MenuItem = { key: string; label: string; href: string; mega?: boolean; children?: MenuChild[] };
 
 export const DEFAULT_MENU: MenuItem[] = [
@@ -19,15 +19,6 @@ export const DEFAULT_MENU: MenuItem[] = [
     { label: "Transactions", href: "/transactions" },
   ] },
   { key: "teams", label: "Teams", href: "#", mega: true },
-  { key: "finance", label: "Finance", href: "/finance", children: [
-    { label: "Finance (bank & income)", href: "/finance" },
-    { label: "Salary Cap (Cap Central)", href: "/salary-cap" },
-    { label: "Fan Interest — league", href: "/finance/fan-interest" },
-    { label: "Season Tickets — league", href: "/finance/season-tickets" },
-    { label: "Attendance — league", href: "/finance/attendance" },
-    { label: "Merchandise — league", href: "/finance/merchandise" },
-    { label: "Sponsorships — league", href: "/finance/sponsorship" },
-  ] },
   { key: "stats", label: "Stats", href: "/stats", children: [
     { label: "Individual Leaders", href: "/stats/leaders" },
     { label: "Advanced Stats", href: "/stats/advanced" },
@@ -53,6 +44,15 @@ export const DEFAULT_MENU: MenuItem[] = [
   ] },
   { key: "league", label: "League", href: "/league", children: [
     { label: "📖 Rules", href: "/rules" },
+    { label: "💰 Finance", href: "/finance", children: [
+      { label: "Finance (bank & income)", href: "/finance" },
+      { label: "Salary Cap (Cap Central)", href: "/salary-cap" },
+      { label: "Fan Interest — league", href: "/finance/fan-interest" },
+      { label: "Season Tickets — league", href: "/finance/season-tickets" },
+      { label: "Attendance — league", href: "/finance/attendance" },
+      { label: "Merchandise — league", href: "/finance/merchandise" },
+      { label: "Sponsorships — league", href: "/finance/sponsorship" },
+    ] },
     { label: "Tonight's Best", href: "/league/digest" },
     { label: "League Records", href: "/league/records" },
     { label: "Audit Log", href: "/league/audit" },
@@ -60,7 +60,6 @@ export const DEFAULT_MENU: MenuItem[] = [
     { label: "Captains", href: "/captains" },
     { label: "Coaches", href: "/coaches" },
     { label: "Signings", href: "/signings" },
-    { label: "Rules", href: "/rules" },
   ] },
   { key: "draft", label: "Entry Draft", href: "/draft", children: [
     { label: "Draft Lottery", href: "/draft/lottery" },

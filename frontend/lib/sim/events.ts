@@ -26,7 +26,8 @@ export type EventType =
   | "GOALIE_PULL"
   | "EMPTY_NET"
   | "FIGHT"
-  | "INJURY";
+  | "INJURY"
+  | "LINE_CHANGE"; // a fresh forward line / D pair hops the boards
 
 // Rising importance — controls what gets persisted and how loud the PBP is.
 export type Importance = "MINOR" | "NOTABLE" | "MAJOR" | "HIGHLIGHT";

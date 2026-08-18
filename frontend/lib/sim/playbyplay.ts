@@ -198,6 +198,11 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
         const m = e.meta as { penalty?: string; minutes?: number; severity?: string } | undefined;
         if (m?.penalty === "Fighting") continue; // paired into a fight line below
         add(p, e.seconds, tId, "penalty", `${e.playerName} penalty for ${m?.penalty ?? "infraction"} (${m?.minutes ?? 2} min, ${m?.severity ?? "Minor"}).`, true);
+      } else if (e.type === "LINE_CHANGE") {
+        const m = e.meta as { unit?: string; lineNo?: number; names?: string[] } | undefined;
+        const who = e.teamCode ?? sideOf(e.teamId ?? home.id).name;
+        const label = m?.unit === "D" ? `D-pair ${m?.lineNo ?? ""}` : `Line ${m?.lineNo ?? ""}`;
+        add(p, e.seconds, tId, "change", `${who} — ${label.trim()} on: ${(m?.names ?? []).join(", ")}.`);
       }
     }
 
