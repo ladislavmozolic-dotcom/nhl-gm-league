@@ -60,7 +60,11 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
         }
       />
 
-      {admin && <DaySimControls />}
+      {admin && (
+        <div className="sticky top-14 z-30 -mx-4 px-4 py-2 bg-[#0a1628] border-b border-slate-800/50">
+          <DaySimControls />
+        </div>
+      )}
       {admin && currentId != null && <ScrollToCurrent />}
 
       <Card bodyClassName="p-0">
@@ -91,7 +95,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
                     </span>
                   </div>
                 );
-                const anchor = g.id === currentId ? { id: "current-day", className: "scroll-mt-28 ring-1 ring-inset ring-blue-500/30 bg-blue-500/[0.04]" } : {};
+                const anchor = g.id === currentId ? { id: "current-day", className: "scroll-mt-36 ring-1 ring-inset ring-blue-500/30 bg-blue-500/[0.04]" } : {};
                 return isFinal ? (
                   <Link key={g.id} href={`/games/${g.id}`} className="block">{row}</Link>
                 ) : (
