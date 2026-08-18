@@ -14,7 +14,9 @@ type Player = {
 // Below the NHL minimum salary → a minor-league (AHL-only) contract. These
 // players can't be called up to the NHL roster.
 const NHL_MIN = 775_000;
-const isAhlOnly = (p: Player) => p.capHit > 0 && p.capHit < NHL_MIN;
+// "AHL only" = a genuine minor-league deal (below the NHL minimum AND no NHL contract
+// type). A two-way / one-way player is NHL-eligible even at a low cap hit → callable.
+const isAhlOnly = (p: Player) => p.capHit > 0 && p.capHit < NHL_MIN && p.contractType !== "ONE_WAY" && p.contractType !== "TWO_WAY";
 // OV badge in green, brighter the higher the rating.
 const ovColor = (ov: number) =>
   ov >= 80 ? "bg-emerald-500/30 text-emerald-200 border-emerald-400/60"

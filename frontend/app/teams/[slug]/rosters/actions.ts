@@ -30,7 +30,10 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
   // an AHL-only (minor-league) contract — below the NHL minimum — can't be iced in
   // the NHL. Keep such a player on the farm no matter what the client requested.
   const NHL_MIN = 775_000;
-  const isAhlOnly = (id: number) => { const c = byId.get(id)!.capHit ?? 0; return c > 0 && c < NHL_MIN; };
+  // "AHL only" = a genuine minor-league deal (below the NHL minimum AND no NHL contract
+  // type). A two-way / one-way player is NHL-eligible even with a low cap hit, so he is
+  // NOT AHL-only and CAN be called up.
+  const isAhlOnly = (id: number) => { const p = byId.get(id)!; const c = p.capHit ?? 0; return c > 0 && c < NHL_MIN && p.contractType !== "ONE_WAY" && p.contractType !== "TWO_WAY"; };
   for (const m of valid) if (m.side === "pro" && isAhlOnly(m.id)) m.side = "farm";
 
   const pro = valid.filter((m) => m.side === "pro");
@@ -43,8 +46,10 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
   // moves like a call-up.
   // use the DB contract type, NOT the client's — flipping the 1-way badge in the UI must
   // not let a one-way player be buried on the farm.
+  // an AHL-only (sub-NHL-minimum) contract is farm-bound no matter what — it overrides
+  // any stale one-way flag, so it never triggers the send-down blocks below.
   const goingDown = valid.filter((m) => m.side === "farm" || m.side === "scratched");
-  const illegalFarm = goingDown.find((m) => byId.get(m.id)!.contractType === "ONE_WAY" && byId.get(m.id)!.rosterType === "NHL");
+  const illegalFarm = goingDown.find((m) => byId.get(m.id)!.contractType === "ONE_WAY" && byId.get(m.id)!.rosterType === "NHL" && !isAhlOnly(m.id));
   if (illegalFarm) return { ok: false as const, error: `${byId.get(illegalFarm.id)!.name} has a one-way contract — he can't be sent down. Keep him on the NHL roster.` };
 
   // waivers ON → a non-exempt NHL player must clear the waiver wire before he drops.
@@ -53,7 +58,7 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
   if (settings.waiversEnabled) {
     const buried = goingDown.find((m) => {
       const p = byId.get(m.id)!;
-      const exempt = p.contractType === "TWO_WAY" || /ELC/i.test(p.contractText ?? "");
+      const exempt = p.contractType === "TWO_WAY" || isAhlOnly(m.id) || /ELC/i.test(p.contractText ?? "");
       return p.rosterType === "NHL" && !exempt;
     });
     if (buried) return { ok: false as const, error: `Waivers are on — ${byId.get(buried.id)!.name} must clear the Waiver Wire before going down (ELC & two-way players are exempt).` };
