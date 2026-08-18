@@ -18,7 +18,7 @@ import type { SimTeam, SimGoalie, TeamBox } from "./types";
 
 const DU_HIGH = 85; // durability at/above which CON recovers +2/day instead of +1
 export const PLAY_CON = 95; // a skater must be at CON >= 95 to dress (below = still hurt / rusty)
-const GOALIE_REST_CON = 97; // auto-rotation: a goalie under this CON on game day is spelled by the fresher one
+const GOALIE_REST_CON = 98; // auto-rotation: a goalie below this CON on game day is spelled by the fresher one (so CON 97 → backup starts)
 
 /** A hurt skater's CON, as a function of DAYS STILL TO GO. Calibrated to the
  *  league: 4-day (day-to-day) ≈ 94, a week ≈ 93, ~2 weeks ≈ 90, 3 months ≈ 50.
