@@ -52,6 +52,7 @@ export const DEFAULT_MENU: MenuItem[] = [
     { label: "All Players", href: "/players/all" },
   ] },
   { key: "league", label: "League", href: "/league", children: [
+    { label: "📖 Rules", href: "/rules" },
     { label: "Tonight's Best", href: "/league/digest" },
     { label: "League Records", href: "/league/records" },
     { label: "Audit Log", href: "/league/audit" },

@@ -395,16 +395,26 @@ function recordGoal(
   if (strength === "PP") st.box[off.id].ppGoals++;
   if (period <= 4) st.box[off.id].goalsByPeriod[period - 1]++;
 
-  // On-ice units. The scoring side is the scorer + his assisters (they were out
-  // there), filled to a 5-skater unit from the ice-time-weighted pool; the conceding
-  // side is the modelled defending unit. Used for the play-by-play display and +/-.
+  // On-ice unit — a positionally-correct 5 (3F + 2D at even strength; a PP runs 4F + 1D).
+  // The scorer + assisters slot into their F/D spots (they were out there); the rest is
+  // filled from the ice-time-weighted pool. Drives the play-by-play display and +/-.
   const skPool = [...off.forwards, ...off.defense];
-  const onFor: SimSkater[] = [];
+  const isD = (s: SimSkater) => off.defense.some((d) => d.id === s.id);
+  const fSlots = strength === "PP" ? 4 : 3;
+  const dSlots = strength === "PP" ? 1 : 2;
+  const onF: SimSkater[] = [], onD: SimSkater[] = [];
   const seenOn = new Set<number>();
-  const addOn = (s?: SimSkater) => { if (s && !seenOn.has(s.id)) { seenOn.add(s.id); onFor.push(s); } };
+  const addOn = (s?: SimSkater) => {
+    if (!s || seenOn.has(s.id)) return;
+    const d = isD(s);
+    if (d ? onD.length >= dSlots : onF.length >= fSlots) return;
+    seenOn.add(s.id); (d ? onD : onF).push(s);
+  };
   addOn(scorer);
   for (const aId of assists) addOn(skPool.find((s) => s.id === aId));
-  for (const s of pickOnIce(st.rng, off)) { if (onFor.length >= 5) break; addOn(s); }
+  for (const s of weightedSample(st.rng, off.forwards, Math.min(off.forwards.length, fSlots + 3))) addOn(s);
+  for (const s of weightedSample(st.rng, off.defense, Math.min(off.defense.length, dSlots + 2))) addOn(s);
+  const onFor = [...onF, ...onD];
   const onAgainst = pickOnIce(st.rng, def);
 
   // +/- : even-strength AND short-handed goals count (real NHL rule); PP and SO don't.
