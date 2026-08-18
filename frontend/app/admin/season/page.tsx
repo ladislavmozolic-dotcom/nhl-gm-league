@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import SeasonControls from "@/components/SeasonControls";
 import { generateScheduleAction, playSeasonAction, runPlayoffsAction, resetSeasonAction, importNhlApiAction, importCsvAction, archiveSeasonAction, runRetirementsAction, developProspectsAction } from "./actions";
+import RunAiGmButton from "@/components/RunAiGmButton";
 import { PageHeader, Card } from "@/components/ui";
 import PrepareNextDraftButton from "@/components/PrepareNextDraftButton";
 import PhaseControl from "@/components/PhaseControl";
@@ -44,6 +45,17 @@ export default async function SeasonAdminPage() {
         state={{ played, scheduled, playoffSeries, champion: champ?.name ?? null }}
         actions={{ generateScheduleAction, playSeasonAction, runPlayoffsAction, resetSeasonAction, runRetirementsAction, developProspectsAction, importNhlApiAction, importCsvAction }}
       />
+
+      <Card title="AI GM (GM-less clubs)" accent="text-cyan-400">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <p className="text-sm text-slate-400 max-w-xl">
+            Every club with <span className="text-slate-200">no registered GM</span> is run by the AI GM: it picks a roster-fit
+            tactical system, keeps a legal lineup, and sheds movable salary (two-way / ELC) to get <span className="text-slate-200">cap-compliant</span>.
+            It never trades or signs free agents. This runs automatically before each simulated day — press to run it now.
+          </p>
+          <RunAiGmButton />
+        </div>
+      </Card>
 
       <Card title="Archive season → History" accent="text-amber-400">
         <div className="flex items-center justify-between gap-4 flex-wrap">

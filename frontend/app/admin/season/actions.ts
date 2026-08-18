@@ -12,6 +12,7 @@ import { isAdmin } from "@/lib/auth";
 import { commissionerName } from "@/lib/audit-server";
 import { loadSettings } from "@/lib/sim/settings";
 import { autoFillRosters, fillAhlFromScratched } from "@/lib/roster-fill";
+import { aiGmDaily } from "@/lib/ai-gm";
 import { getLeagueDate } from "@/lib/calendar-server";
 import { addDays, utcDay, phaseFor, effectivePhase, PHASES, seasonOpen, defaultLeagueDate, frenzyRound, roundForDate } from "@/lib/calendar";
 import { processWaivers } from "@/lib/waivers-server";
@@ -54,6 +55,7 @@ export async function advanceLeagueDayAction() {
   });
   let played = 0;
   if (dayGames.length && dayGames[0].round != null) {
+    await aiGmDaily();            // AI GM sets tactics + cap-compliance for GM-less clubs
     await autoFillRosters("NHL");
     await fillAhlFromScratched();
     const r = await playScheduledGames({ season: SEASON, round: dayGames[0].round, actor: await commissionerName() });
@@ -125,6 +127,17 @@ export async function autoFillRostersAction() {
   return { teams: filled.length, promoted: filled.reduce((t, x) => t + x.f + x.d + x.g, 0), detail: filled };
 }
 
+/** Admin: run the AI GM now for every club with no registered GM — sets a roster-fit
+ *  tactical system, keeps rosters legal, and sheds movable salary to get cap-compliant.
+ *  Never trades or signs. (Also runs automatically before each simulated day.) */
+export async function runAiGmAction() {
+  if (!(await isAdmin())) throw new Error("Only a league admin can run the AI GM.");
+  const { runAiGm } = await import("@/lib/ai-gm");
+  const res = await runAiGm();
+  for (const p of ["/teams", "/league", "/finance", "/admin/season"]) revalidatePath(p);
+  return res;
+}
+
 /** Admin: run offseason retirements — aging players retire, and any newly-retired
  *  player with a Hall-of-Fame résumé is inducted. Part of season rollover. */
 export async function runRetirementsAction() {
@@ -155,6 +168,7 @@ export async function simNextDayAction() {
     select: { round: true, gameDate: true },
   });
   if (next?.round == null) return { played: 0, round: null as number | null, date: null as Date | null, done: true };
+  await aiGmDaily();            // AI GM sets tactics + cap-compliance for GM-less clubs
   await autoFillRosters("NHL"); // ensure every club owns a legal roster (durable, counts to cap)
   await fillAhlFromScratched(); // farms activate healthy scratches so their games sim
   const r = await playScheduledGames({ season: SEASON, round: next.round, actor: await commissionerName() });
@@ -235,6 +249,7 @@ export async function generateScheduleAction(gamesPerTeam: number) {
 }
 
 export async function playSeasonAction() {
+  await aiGmDaily();            // AI GM sets tactics + cap-compliance for GM-less clubs
   await autoFillRosters("NHL"); // legal, cap-counted rosters before the run
   await fillAhlFromScratched();
   const r = await playScheduledGames({ season: SEASON, actor: await commissionerName() });

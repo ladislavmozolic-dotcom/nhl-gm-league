@@ -57,6 +57,8 @@ export async function playNextSimDay() {
   // call up from the farm first — any club short of a legal 12F/6D/2G gets its
   // best available AHL players promoted before the next game (no double-shifting).
   const { autoFillRosters } = await import("../roster-fill");
+  const { aiGmDaily } = await import("../ai-gm");
+  await aiGmDaily();            // AI GM sets tactics + cap-compliance for GM-less clubs
   await autoFillRosters("NHL");
   const r = await playScheduledGames({ season: SEASON, round: next.round, actor: "Auto-sim" });
   await processFinances(SEASON, "NHL");
