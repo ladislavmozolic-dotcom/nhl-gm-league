@@ -168,6 +168,9 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
               </div>
             ))}
 
+            {/* Forum — public discussion, visible to everyone */}
+            <Link href="/forum" className="px-2.5 py-1.5 text-[13px] font-semibold rounded-md text-slate-400 hover:text-white hover:bg-slate-800/40 whitespace-nowrap">🗣️ Forum</Link>
+
             {/* Messages — top-nav so a signed-in GM sees new-message badge right away */}
             {gm && (
               <Link href="/messages" className="relative px-2.5 py-1.5 text-[13px] font-semibold rounded-md text-slate-400 hover:text-white hover:bg-slate-800/40 whitespace-nowrap flex items-center gap-1">
