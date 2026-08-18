@@ -33,11 +33,11 @@ async function buildLineGroups(teamId: number) {
   return [
     { title: "5 vs 5 Forward", cols: ["Left Wing", "Center", "Right Wing"], units: ld.forwardLines.map((l, i) => ({ n: i + 1, players: [nm(l.lw), nm(l.c), nm(l.rw)], tactic: l.tactic ?? NT, wanted: l.timePct })) },
     { title: "5 vs 5 Defense", cols: ["Left D", "Right D"], units: ld.defensePairs.map((p, i) => ({ n: i + 1, players: [nm(p.ld), nm(p.rd)], tactic: p.tactic ?? NT, wanted: p.timePct })) },
-    { title: "Power Play", cols: ["", "", "", "", ""], units: s.pp.map((u, i) => ({ n: i + 1, players: u.players.map(nm), tactic: u.tactic ?? { phy: 0, df: 1, of: 4 }, wanted: u.timePct })) },
-    { title: "Penalty Kill (4)", cols: ["", "", "", ""], units: s.pk4.map((u, i) => ({ n: i + 1, players: u.players.map(nm), tactic: u.tactic ?? { phy: 1, df: 4, of: 0 }, wanted: u.timePct })) },
-    { title: "Penalty Kill (3)", cols: ["", "", ""], units: s.pk3.map((u, i) => ({ n: i + 1, players: u.players.map(nm), tactic: u.tactic ?? { phy: 1, df: 4, of: 0 }, wanted: u.timePct })) },
-    { title: "4 vs 4", cols: ["", "", "", ""], units: s.fourVFour.map((u, i) => ({ n: i + 1, players: u.players.map(nm), tactic: u.tactic ?? NT, wanted: u.timePct })) },
-    { title: "Overtime (3 vs 3)", cols: ["", "", ""], units: s.overtime.map((u, i) => ({ n: i + 1, players: u.players.map(nm), tactic: u.tactic ?? { phy: 0, df: 1, of: 4 }, wanted: u.timePct })) },
+    { title: "Power Play", cols: ["F1", "F2", "F3", "D1", "D2"], units: s.pp.map((u, i) => ({ n: i + 1, players: u.players.map(nm), tactic: u.tactic ?? { phy: 0, df: 1, of: 4 }, wanted: u.timePct })) },
+    { title: "Penalty Kill (4)", cols: ["F1", "F2", "D1", "D2"], units: s.pk4.map((u, i) => ({ n: i + 1, players: u.players.map(nm), tactic: u.tactic ?? { phy: 1, df: 4, of: 0 }, wanted: u.timePct })) },
+    { title: "Penalty Kill (3)", cols: ["F1", "D1", "D2"], units: s.pk3.map((u, i) => ({ n: i + 1, players: u.players.map(nm), tactic: u.tactic ?? { phy: 1, df: 4, of: 0 }, wanted: u.timePct })) },
+    { title: "4 vs 4", cols: ["F1", "F2", "D1", "D2"], units: s.fourVFour.map((u, i) => ({ n: i + 1, players: u.players.map(nm), tactic: u.tactic ?? NT, wanted: u.timePct })) },
+    { title: "Overtime (3 vs 3)", cols: ["OT1", "OT2", "OT3"], units: s.overtime.map((u, i) => ({ n: i + 1, players: u.players.map(nm), tactic: u.tactic ?? { phy: 0, df: 1, of: 4 }, wanted: u.timePct })) },
   ];
 }
 
