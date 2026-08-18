@@ -48,6 +48,25 @@ export function isDownSeason(lastSeasonGP: number | null | undefined, fullGP: nu
   return fullGP > 0 && lastSeasonGP != null && lastSeasonGP > 0 && lastSeasonGP < 0.6 * fullGP;
 }
 
+/** A free agent still unsigned once the season is underway softens his asking price
+ *  the deeper it gets (nobody's biting → he lowers his demands). 1 = no discount
+ *  (off-season / Frenzy, which has its own round-by-round softening); down to ~0.55
+ *  late in the year. */
+export async function faStaleFactor(): Promise<number> {
+  const clock = await getLeagueClock();
+  if (clock.phase !== "regular" && clock.phase !== "playoffs") return 1;
+  const agg = await prisma.game.aggregate({ _max: { round: true }, where: { season: "2026-27", status: "FINAL", league: "NHL", seriesId: null } });
+  const dayIdx = agg._max.round ?? 0;              // game-days played this season
+  const progress = Math.min(1, dayIdx / 60);        // ~60 game-days ≈ deep into the year
+  return Math.max(0.55, 1 - 0.45 * progress);
+}
+
+const round50k = (v: number) => Math.max(775_000, Math.round(v / 50_000) * 50_000);
+function scaleDemand(d: Demand, f: number): Demand {
+  if (f >= 1) return d;
+  return { ...d, salary: round50k(d.salary * f), floorSalary: round50k(d.floorSalary * f) };
+}
+
 type PoolPlayer = {
   isGoalie: boolean; position: string | null; capHit: number | null;
   sc: number | null; pa: number | null; df: number | null; sk: number | null;
@@ -86,12 +105,13 @@ export async function demandForPlayerId(playerId: number, pool?: MarketRow[]): P
   const marketPool = pool ?? (await loadMarketPool());
   const fullGP = await leagueFullGP();
   const round = await currentFrenzyRound();
-  return demandFromRow(p as PoolPlayer & { age: number | null; faDemandOverride: number | null }, marketPool, fullGP, round);
+  const stale = await faStaleFactor();
+  return demandFromRow(p as PoolPlayer & { age: number | null; faDemandOverride: number | null }, marketPool, fullGP, round, stale);
 }
 
 function demandFromRow(
   p: PoolPlayer & { age: number | null; faDemandOverride: number | null },
-  pool: MarketRow[], fullGP: number, round: number,
+  pool: MarketRow[], fullGP: number, round: number, stale = 1,
 ): DemandFor {
   const { grp, market } = playerMarket(p);
   const { anchor, count } = anchorFromPool(pool, grp, market);
@@ -100,7 +120,8 @@ function demandFromRow(
     override: p.faDemandOverride, capGrowth: 1, round,
     downSeason: isDownSeason(p.lastSeasonGP, fullGP), morale: p.morale,
   });
-  return { demand, grp };
+  // a manual override is the commissioner's word — never soften it
+  return { demand: p.faDemandOverride != null ? demand : scaleDemand(demand, stale), grp };
 }
 
 // --- Team context: contention tier + where a free agent slots on a given club ---
@@ -163,7 +184,9 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
   const rnd = round ?? (await currentFrenzyRound());
   const { grp, market } = playerMarket(p as PoolPlayer);
   const { anchor, count } = anchorFromPool(marketPool, grp, market);
-  const base = buildDemand({ market, grp, age: p.age, anchor, comps: count, override: p.faDemandOverride, capGrowth: 1, round: rnd, downSeason: isDownSeason(p.lastSeasonGP, fullGP), morale: p.morale });
+  const rawBase = buildDemand({ market, grp, age: p.age, anchor, comps: count, override: p.faDemandOverride, capGrowth: 1, round: rnd, downSeason: isDownSeason(p.lastSeasonGP, fullGP), morale: p.morale });
+  // unsigned FAs soften their ask as the season wears on (skip a commish override)
+  const base = p.faDemandOverride != null ? rawBase : scaleDemand(rawBase, await faStaleFactor());
 
   const ctx = await loadTeamContext(teamId, cmap);
   const { slot, line } = projectSlot(ctx, grp, market);
@@ -211,7 +234,8 @@ export async function demandForPlayers(
   const marketPool = pool ?? (await loadMarketPool());
   const fullGP = await leagueFullGP();
   const round = await currentFrenzyRound();
+  const stale = await faStaleFactor();
   const out = new Map<number, DemandFor>();
-  for (const p of players) out.set(p.id, demandFromRow(p, marketPool, fullGP, round));
+  for (const p of players) out.set(p.id, demandFromRow(p, marketPool, fullGP, round, stale));
   return out;
 }
