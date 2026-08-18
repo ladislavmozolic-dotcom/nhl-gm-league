@@ -721,13 +721,33 @@ type ShiftState = {
   fLines: SimSkater[][]; dPairs: SimSkater[][];
   fIdx: number; dIdx: number; fElapsed: number; dElapsed: number;
 };
+// Position-valid forward lines from the depth chart: each line gets a center (C or
+// M-NTC utility C), then wings fill it to 3 — so no line ices 3 wings with no centre.
+function buildForwardLines(fwds: SimSkater[]): SimSkater[][] {
+  const sorted = [...fwds].sort((a, b) => b.iceTime - a.iceTime);
+  const centers = sorted.filter((s) => s.isCenter);
+  const wings = sorted.filter((s) => !s.isCenter);
+  const nLines = Math.max(1, Math.min(4, Math.ceil(sorted.length / 3)));
+  const lines: SimSkater[][] = Array.from({ length: nLines }, (_, i) => (centers[i] ? [centers[i]] : []));
+  const extras = [...wings, ...centers.slice(nLines)].sort((a, b) => b.iceTime - a.iceTime);
+  let li = 0;
+  for (const s of extras) {
+    let guard = 0;
+    while (lines[li].length >= 3 && guard++ < nLines) li = (li + 1) % nLines;
+    if (lines[li].length < 3) lines[li].push(s);
+    li = (li + 1) % nLines;
+  }
+  return lines.filter((l) => l.length >= 2);
+}
+
 function buildShifts(team: SimTeam): ShiftState {
   const byId = new Map([...team.forwards, ...team.defense].map((s) => [s.id, s]));
   const res = (isDef: boolean, size: number, fallback: SimSkater[]) => {
     const u = team.units.filter((x) => x.isDef === isDef)
       .map((x) => x.members.map((id) => byId.get(id)).filter((s): s is SimSkater => !!s))
       .filter((l) => l.length >= size - 1);
-    return u.length ? u : chunk([...fallback].sort((a, b) => b.iceTime - a.iceTime), size);
+    if (u.length) return u;
+    return isDef ? chunk([...fallback].sort((a, b) => b.iceTime - a.iceTime), size) : buildForwardLines(fallback);
   };
   return {
     fLines: res(false, 3, team.forwards), dPairs: res(true, 2, team.defense),
