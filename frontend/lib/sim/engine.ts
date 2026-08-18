@@ -793,8 +793,8 @@ function fatigueMult(shiftSec: number, en: number): number {
 // (new unit weighted toward the top of the depth chart). Accrues TOI on the ice.
 function advanceShift(st: SimState, teamId: number, sh: ShiftState, dur: number, rng: RNG) {
   sh.fElapsed += dur; sh.dElapsed += dur;
-  for (const s of sh.fLines[sh.fIdx] ?? []) st.lines[teamId][s.id].toi += dur;
-  for (const s of sh.dPairs[sh.dIdx] ?? []) st.lines[teamId][s.id].toi += dur;
+  // TOI is accrued in the possession tick loop against the ACTUAL on-ice unit (which
+  // is the PP/PK unit during a man-advantage) — not here against the rotating line.
   const pick = (lines: SimSkater[][], cur: number) => {
     if (lines.length <= 1) return 0;
     const w = lines.map((_, i) => (i === cur ? 0 : [0.34, 0.28, 0.22, 0.16][i] ?? 0.1));
@@ -969,12 +969,16 @@ function simulatePeriodPossession(st: SimState, period: number) {
     st.currentOnIce[home.id] = { f: onIceF(home), d: onIceD(home) };
     st.currentOnIce[away.id] = { f: onIceF(away), d: onIceD(away) };
     announceChange(home, tick); announceChange(away, tick);
-    // PP / PK time-on-ice: credit the players actually out there this second
+    // time-on-ice, one second per tick, for the players ACTUALLY out there — total TOI
+    // plus the PP / PK split, so TOI = ES + PP + PK and always covers the ST time.
     for (const team of [home, away]) {
       const s = curStr[team.id];
-      if (s === "EV") continue;
       const oi = st.currentOnIce[team.id];
-      for (const p of [...oi.f, ...oi.d]) { const pl = st.lines[team.id][p.id]; if (pl) { if (s === "PP") pl.ppToi += 1; else pl.pkToi += 1; } }
+      for (const p of [...oi.f, ...oi.d]) {
+        const pl = st.lines[team.id][p.id]; if (!pl) continue;
+        pl.toi += 1;
+        if (s === "PP") pl.ppToi += 1; else if (s === "SH") pl.pkToi += 1;
+      }
     }
     const absT = base + tick;
 
@@ -1556,9 +1560,11 @@ function distributeCounting(st: SimState) {
       const s = roster[st.rng.weighted(roster.map((r) => ((r.attrs.df ?? 50) + (r.attrs.sk ?? 50)) * r.iceTime))];
       emitAction("TAKEAWAY", s, pickZone(st.rng, TAKE_ZONES));
     }
-    // TOI from ice-time share
-    for (const s of team.forwards) st.lines[team.id][s.id].toi = Math.round(s.iceTime * LEAGUE.fwdIcePool);
-    for (const s of team.defense) st.lines[team.id][s.id].toi = Math.round(s.iceTime * LEAGUE.defIcePool);
+    // TOI from ice-time share — ONLY as a fallback for the volume model. The possession
+    // engine already accrued real per-second TOI (= ES + PP + PK) in the tick loop, so
+    // don't clobber it (that made TOI come in under a player's PK time).
+    for (const s of team.forwards) { const pl = st.lines[team.id][s.id]; if (!pl.toi) pl.toi = Math.round(s.iceTime * LEAGUE.fwdIcePool); }
+    for (const s of team.defense) { const pl = st.lines[team.id][s.id]; if (!pl.toi) pl.toi = Math.round(s.iceTime * LEAGUE.defIcePool); }
     st.box[team.id].goalie.toi = PERIOD_SECONDS * 3;
   }
 }
