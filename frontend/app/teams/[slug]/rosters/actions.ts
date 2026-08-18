@@ -13,16 +13,16 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
     where: { slug },
     include: { affiliateTeams: { select: { id: true } } },
   });
-  if (!team) throw new Error("Team not found");
-  if (!(await canManageTeam(team.id))) throw new Error("Not authorized for this team");
+  if (!team) return { ok: false as const, error: "Team not found." };
+  if (!(await canManageTeam(team.id))) return { ok: false as const, error: "You don't manage this team." };
   const affiliate = team.affiliateTeams[0];
-  if (!affiliate) throw new Error("Team has no affiliate to move players to");
+  if (!affiliate) return { ok: false as const, error: "This team has no AHL affiliate to move players to." };
 
   // load real player rows for validation (position/goalie can't be spoofed by client)
   const ids = moves.map((m) => m.id);
   const players = await prisma.player.findMany({
     where: { id: { in: ids }, teamId: { in: [team.id, affiliate.id] } },
-    select: { id: true, isGoalie: true, rosterType: true, capHit: true, contractType: true, contractText: true },
+    select: { id: true, name: true, isGoalie: true, rosterType: true, capHit: true, contractType: true, contractText: true },
   });
   const byId = new Map(players.map((p) => [p.id, p]));
   const valid = moves.filter((m) => byId.has(m.id));
@@ -45,7 +45,7 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
   // not let a one-way player be buried on the farm.
   const goingDown = valid.filter((m) => m.side === "farm" || m.side === "scratched");
   const illegalFarm = goingDown.find((m) => byId.get(m.id)!.contractType === "ONE_WAY" && byId.get(m.id)!.rosterType === "NHL");
-  if (illegalFarm) throw new Error("A one-way contract player cannot be sent down.");
+  if (illegalFarm) return { ok: false as const, error: `${byId.get(illegalFarm.id)!.name} has a one-way contract — he can't be sent down. Keep him on the NHL roster.` };
 
   // waivers ON → a non-exempt NHL player must clear the waiver wire before he drops.
   // ELC and two-way contracts are waiver-exempt (sent down freely).
@@ -56,15 +56,15 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
       const exempt = p.contractType === "TWO_WAY" || /ELC/i.test(p.contractText ?? "");
       return p.rosterType === "NHL" && !exempt;
     });
-    if (buried) throw new Error("Waivers are on — one-way / veteran NHL players must clear the Waiver Wire before going down (ELC & two-way players are exempt).");
+    if (buried) return { ok: false as const, error: `Waivers are on — ${byId.get(buried.id)!.name} must clear the Waiver Wire before going down (ELC & two-way players are exempt).` };
   }
 
   // Only HARD maxima block a save. Being under a minimum (short-handed pro roster)
   // is allowed — the farm auto-fills the missing bodies before each game, and a
   // call-up is usually the very move that fixes it.
-  if (pro.length > ROSTER_LIMITS.proMax) throw new Error(`Pro roster over the ${ROSTER_LIMITS.proMax}-player cap limit.`);
-  if (valid.length > ROSTER_LIMITS.orgMax) throw new Error(`Organization over ${ROSTER_LIMITS.orgMax} players (NHL + AHL).`);
-  if (goalies(valid) > ROSTER_LIMITS.orgMaxGoalies) throw new Error(`Organization can hold at most ${ROSTER_LIMITS.orgMaxGoalies} goalies (NHL + AHL).`);
+  if (pro.length > ROSTER_LIMITS.proMax) return { ok: false as const, error: `Pro roster over the ${ROSTER_LIMITS.proMax}-player limit.` };
+  if (valid.length > ROSTER_LIMITS.orgMax) return { ok: false as const, error: `Organization over ${ROSTER_LIMITS.orgMax} players (NHL + AHL).` };
+  if (goalies(valid) > ROSTER_LIMITS.orgMaxGoalies) return { ok: false as const, error: `Organization can hold at most ${ROSTER_LIMITS.orgMaxGoalies} goalies (NHL + AHL).` };
 
   // salary cap: the NET new NHL salary from this batch (call-ups minus send-downs)
   // must fit under the ceiling — same rule the single-player call-up enforces.
@@ -78,7 +78,7 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
   }
   if (netAdd > 0) {
     const cap = await canAddCapHit(team.id, netAdd);
-    if (!cap.ok) throw new Error(`Call-ups blocked — ${team.name} has ${money(cap.status.space)} of cap space, this batch adds ${money(netAdd)}. Send a player down first.`);
+    if (!cap.ok) return { ok: false as const, error: `Call-ups blocked — ${team.name} has ${money(cap.status.space)} of cap space, this batch adds ${money(netAdd)}. Send a player down first.` };
   }
 
   await prisma.$transaction(valid.map((m) =>
@@ -95,4 +95,5 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
 
   revalidatePath(`/teams/${slug}/rosters`);
   revalidatePath(`/teams/${slug}`);
+  return { ok: true as const };
 }

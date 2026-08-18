@@ -23,7 +23,7 @@ const ovColor = (ov: number) =>
   : "bg-emerald-700/10 text-emerald-500/70 border-emerald-700/25";
 type Props = {
   teamName: string; teamSlug: string; affiliateName: string; hasAffiliate: boolean;
-  players: Player[]; onSave: (slug: string, rows: MoveRow[]) => Promise<void>;
+  players: Player[]; onSave: (slug: string, rows: MoveRow[]) => Promise<{ ok: boolean; error?: string } | void>;
 };
 
 export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffiliate, players, onSave }: Props) {
@@ -92,8 +92,11 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
 
   const save = () => start(async () => {
     setErr(null);
-    try { await onSave(teamSlug, rows.map((r) => ({ id: r.id, side: r.side, contractType: r.contractType }))); setSaved(true); }
-    catch (e) { setErr((e as Error).message); }
+    try {
+      const r = await onSave(teamSlug, rows.map((m) => ({ id: m.id, side: m.side, contractType: m.contractType })));
+      if (r && !r.ok) setErr(r.error ?? "Couldn't save the roster.");
+      else setSaved(true);
+    } catch (e) { setErr((e as Error).message); }
   });
 
   const MoveBtn = ({ p, to, label }: { p: Player; to: RosterSide; label: string }) => (

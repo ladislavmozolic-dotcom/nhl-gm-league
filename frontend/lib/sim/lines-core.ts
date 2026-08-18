@@ -77,6 +77,9 @@ const OT_TACTIC: LineTactic = { phy: 0, df: 1, of: 4 };
 const isD = (p: string) => /(^|\/)D(\/|$)/.test(p) || p === "D";
 const isC = (p: string) => /(^|\/)C(\/|$)/.test(p) || p === "C";
 const nSlots = (n: number): (number | null)[] => Array.from({ length: n }, () => null);
+/** Coerce a slot list to exactly `n` slots (keep filled ids, pad with null, drop extra). */
+const fitSlots = (arr: (number | null)[] | undefined, n: number): (number | null)[] =>
+  Array.from({ length: n }, (_, i) => (arr && i < arr.length ? arr[i] : null));
 
 export function emptySituations(): Situations {
   return {
@@ -86,7 +89,7 @@ export function emptySituations(): Situations {
     pk3: [{ players: nSlots(3), timePct: 60, tactic: { ...PK_TACTIC } }, { players: nSlots(3), timePct: 40, tactic: { ...PK_TACTIC } }],
     overtime: [{ players: nSlots(3), timePct: 60, tactic: { ...OT_TACTIC } }, { players: nSlots(3), timePct: 40, tactic: { ...OT_TACTIC } }],
     others: { starter: null, backup: null, extraForwards: nSlots(3), extraDefense: nSlots(3), subPP: null, subPK1: null, subPK2: null, shootout: nSlots(5) },
-    lastMin: { off: nSlots(6), def: nSlots(6) },
+    lastMin: { off: nSlots(6), def: nSlots(5) }, // off = pulled goalie (6 skaters); def = goalie in net (5)
   };
 }
 
@@ -330,7 +333,11 @@ export function normalize(data: Partial<TeamLinesData>): TeamLinesData {
       pp: spec(s.pp, base.pp, "PP"), fourVFour: spec(s.fourVFour, base.fourVFour, "44"), pk4: spec(s.pk4, base.pk4, "PK"),
       pk3: spec(s.pk3, base.pk3, "PK"), overtime: spec(s.overtime, base.overtime, "OT"),
       others: { ...base.others, ...(s.others ?? {}) },
-      lastMin: { ...base.lastMin, ...(s.lastMin ?? {}) },
+      // off = pulled goalie (6 skaters); def = goalie in net (5). Coerce legacy 6-slot def.
+      lastMin: {
+        off: fitSlots(s.lastMin?.off ?? base.lastMin.off, 6),
+        def: fitSlots(s.lastMin?.def ?? base.lastMin.def, 5),
+      },
     },
     strategy: { ...DEFAULT_STRATEGY, ...(data.strategy ?? {}) } as GameStrategy,
     system: data.system ? mergeTactics(data.system) : undefined,
