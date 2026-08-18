@@ -11,7 +11,7 @@ import { archiveSeason } from "@/lib/awards";
 import { isAdmin } from "@/lib/auth";
 import { commissionerName } from "@/lib/audit-server";
 import { loadSettings } from "@/lib/sim/settings";
-import { autoFillRosters } from "@/lib/roster-fill";
+import { autoFillRosters, fillAhlFromScratched } from "@/lib/roster-fill";
 import { getLeagueDate } from "@/lib/calendar-server";
 import { addDays, utcDay, phaseFor, effectivePhase, PHASES, seasonOpen, defaultLeagueDate, frenzyRound, roundForDate } from "@/lib/calendar";
 import { processWaivers } from "@/lib/waivers-server";
@@ -55,6 +55,7 @@ export async function advanceLeagueDayAction() {
   let played = 0;
   if (dayGames.length && dayGames[0].round != null) {
     await autoFillRosters("NHL");
+    await fillAhlFromScratched();
     const r = await playScheduledGames({ season: SEASON, round: dayGames[0].round, actor: await commissionerName() });
     played = r.played;
     await processFinances(SEASON, "NHL");
@@ -155,6 +156,7 @@ export async function simNextDayAction() {
   });
   if (next?.round == null) return { played: 0, round: null as number | null, date: null as Date | null, done: true };
   await autoFillRosters("NHL"); // ensure every club owns a legal roster (durable, counts to cap)
+  await fillAhlFromScratched(); // farms activate healthy scratches so their games sim
   const r = await playScheduledGames({ season: SEASON, round: next.round, actor: await commissionerName() });
   await processFinances(SEASON, "NHL");
   for (const p of ["/schedule", "/standings", "/scores", "/stats/players", "/admin/season", "/finance"]) revalidatePath(p);
@@ -234,6 +236,7 @@ export async function generateScheduleAction(gamesPerTeam: number) {
 
 export async function playSeasonAction() {
   await autoFillRosters("NHL"); // legal, cap-counted rosters before the run
+  await fillAhlFromScratched();
   const r = await playScheduledGames({ season: SEASON, actor: await commissionerName() });
   await processFinances(SEASON, "NHL"); // ticket revenue in, salaries out
   revalidatePath("/admin/season");

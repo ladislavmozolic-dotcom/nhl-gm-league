@@ -254,6 +254,15 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   const teamCode: string = team?.code ?? team?.name ?? "—";
   const backHref = team ? `/teams/${team.slug}` : "/free-agents";
 
+  // The NHL club he actually played his NHL games for (a call-up's current club may be
+  // his AHL farm) — used as the team on the "NHL Seasons" block.
+  const nhlTeamId = isGoalie
+    ? (goalieLog[0] ? (goalieLog[0].goalsAgainst === (goalieLog[0].game.awayGoals ?? -1) ? goalieLog[0].game.homeTeamId : goalieLog[0].game.awayTeamId) : null)
+    : (skaterLog.length ? [...skaterLog.reduce((m, r) => m.set(r.teamId, (m.get(r.teamId) ?? 0) + 1), new Map<number, number>()).entries()].sort((a, b) => b[1] - a[1])[0][0] : null);
+  const nhlTeam = nhlTeamId && nhlTeamId !== team?.id
+    ? await prisma.team.findUnique({ where: { id: nhlTeamId }, select: { code: true, name: true, slug: true, logoUrl: true } })
+    : null;
+
   // Bio field values
   const flag = natFlag(p.nationality);
   const status = p.injuryDaysLeft > 0 ? "Injured" : (p.rosterType ?? "—");
@@ -302,6 +311,17 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       </span>
     ) : (
       <span className="text-slate-600">—</span>
+    );
+
+  // team shown on the NHL block: the NHL club he suited up for (falls back to current)
+  const NhlTeamCell = () =>
+    nhlTeam ? (
+      <span className="inline-flex items-center gap-1.5">
+        {nhlTeam.logoUrl && <img src={nhlTeam.logoUrl} alt="" className="w-4 h-4 object-contain" />}
+        <span className="font-medium">{nhlTeam.code ?? nhlTeam.name}</span>
+      </span>
+    ) : (
+      <TeamCell />
     );
 
   const pm = (v: number) => (v > 0 ? `+${v}` : String(v));
@@ -429,7 +449,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         <ProfileStatsTabs
           season={hasNhl || hasAhl ? (
             <div className="space-y-6">
-              {hasNhl && <StatBlock league="NHL" cols={isGoalie ? GL_COLS : SK_COLS} reg={isGoalie ? gl.nhlReg : sk.nhlReg} po={isGoalie ? gl.nhlPo : sk.nhlPo} cellsOf={isGoalie ? glCells : skCells} team={<TeamCell />} />}
+              {hasNhl && <StatBlock league="NHL" cols={isGoalie ? GL_COLS : SK_COLS} reg={isGoalie ? gl.nhlReg : sk.nhlReg} po={isGoalie ? gl.nhlPo : sk.nhlPo} cellsOf={isGoalie ? glCells : skCells} team={<NhlTeamCell />} />}
               {hasAhl && <StatBlock league="AHL" cols={isGoalie ? GL_COLS : SK_COLS} reg={isGoalie ? gl.ahlReg : sk.ahlReg} po={isGoalie ? gl.ahlPo : sk.ahlPo} cellsOf={isGoalie ? glCells : skCells} team={<TeamCell />} />}
             </div>
           ) : (

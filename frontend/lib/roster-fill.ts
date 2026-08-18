@@ -47,3 +47,37 @@ export async function autoFillRosters(league = "NHL"): Promise<RosterFill[]> {
   }
   return filled;
 }
+
+/** AHL farms can't draw from a lower league — when NHL call-ups leave them short of a
+ *  legal lineup, activate their own healthy SCRATCHES (scratched → dressed) so their
+ *  games actually simulate instead of being skipped. */
+export async function fillAhlFromScratched(): Promise<RosterFill[]> {
+  const teams = await prisma.team.findMany({ where: { league: "AHL" }, select: { id: true, name: true } });
+  const filled: RosterFill[] = [];
+  for (const team of teams) {
+    const active = await prisma.player.findMany({
+      where: { teamId: team.id, rosterType: "AHL", scratched: false },
+      select: { isGoalie: true, position: true },
+    });
+    const nF = active.filter((p) => !p.isGoalie && !isDef(p.position ?? "")).length;
+    const nD = active.filter((p) => !p.isGoalie && isDef(p.position ?? "")).length;
+    const nG = active.filter((p) => p.isGoalie).length;
+    const needF = Math.max(0, MIN_F - nF), needD = Math.max(0, MIN_D - nD), needG = Math.max(0, MIN_G - nG);
+    if (!needF && !needD && !needG) continue;
+
+    const bench = await prisma.player.findMany({
+      where: { teamId: team.id, rosterType: "AHL", scratched: true },
+      orderBy: { overall: "desc" },
+      select: { id: true, isGoalie: true, position: true },
+    });
+    const takeF = bench.filter((p) => !p.isGoalie && !isDef(p.position ?? "")).slice(0, needF);
+    const takeD = bench.filter((p) => !p.isGoalie && isDef(p.position ?? "")).slice(0, needD);
+    const takeG = bench.filter((p) => p.isGoalie).slice(0, needG);
+    const ids = [...takeF, ...takeD, ...takeG].map((p) => p.id);
+    if (!ids.length) continue;
+
+    await prisma.player.updateMany({ where: { id: { in: ids } }, data: { scratched: false } });
+    filled.push({ team: team.name, f: takeF.length, d: takeD.length, g: takeG.length });
+  }
+  return filled;
+}
