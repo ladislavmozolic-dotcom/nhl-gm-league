@@ -33,7 +33,7 @@ type Side = {
   skaters: Skater[]; goalies: Goalie[]; lines?: LineGroup[];
 };
 type GoalAssist = { name: string; slug: string | null; total: number | null };
-type GoalE = { period: number; seconds: number; teamId: number; scorerName: string; scorerSlug?: string | null; scorerSeasonGoal?: number; assistNames: string[]; assists?: GoalAssist[]; strength: string; emptyNet: boolean };
+type GoalE = { period: number; seconds: number; teamId: number; scorerName: string; scorerSlug?: string | null; scorerSeasonGoal?: number; assistNames: string[]; assists?: GoalAssist[]; strength: string; emptyNet: boolean; onIceForNames?: string[]; onIceAgainstNames?: string[] };
 type PenE = { period: number; seconds: number; teamId: number; playerName: string; type: string; minutes: number; severity: string };
 type PbpE = { period: number; seconds: number; time: string; teamId: number | null; kind: string; text: string; major: boolean };
 type ShootoutE = { round: number; teamId: number; teamCode: string | null; shooterName: string; shooterSlug: string | null; result: "goal" | "save" | "miss" };
@@ -533,6 +533,12 @@ export default function GameView({ data }: { data: Data }) {
                                 <span key={j}>{a.slug ? <Link href={`/players/${a.slug}`} className="hover:text-blue-400">{cleanName(a.name)}</Link> : cleanName(a.name)}{a.total != null && <span className="text-amber-400/70"> ({a.total})</span>}{j < g.assists!.length - 1 ? ", " : ""}</span>
                               ))}</span>
                             ) : !g.emptyNet && <span className="text-slate-600"> (unassisted)</span>}
+                            {(g.onIceForNames?.length || g.onIceAgainstNames?.length) ? (
+                              <div className="mt-0.5 text-[10px] text-slate-500 leading-relaxed">
+                                {g.onIceForNames?.length ? <><span className="text-emerald-400/70 font-semibold">ON+</span> {g.onIceForNames.map(cleanName).join(", ")}</> : null}
+                                {g.onIceAgainstNames?.length ? <><span className="text-red-400/60 font-semibold ml-2">ON−</span> {g.onIceAgainstNames.map(cleanName).join(", ")}</> : null}
+                              </div>
+                            ) : null}
                           </div>
                         );
                       })}

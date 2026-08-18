@@ -395,9 +395,22 @@ function recordGoal(
   if (strength === "PP") st.box[off.id].ppGoals++;
   if (period <= 4) st.box[off.id].goalsByPeriod[period - 1]++;
 
-  if (strength === "EV") {
-    for (const s of pickOnIce(st.rng, off)) st.lines[off.id][s.id].plusMinus += 1;
-    for (const s of pickOnIce(st.rng, def)) st.lines[def.id][s.id].plusMinus -= 1;
+  // On-ice units. The scoring side is the scorer + his assisters (they were out
+  // there), filled to a 5-skater unit from the ice-time-weighted pool; the conceding
+  // side is the modelled defending unit. Used for the play-by-play display and +/-.
+  const skPool = [...off.forwards, ...off.defense];
+  const onFor: SimSkater[] = [];
+  const seenOn = new Set<number>();
+  const addOn = (s?: SimSkater) => { if (s && !seenOn.has(s.id)) { seenOn.add(s.id); onFor.push(s); } };
+  addOn(scorer);
+  for (const aId of assists) addOn(skPool.find((s) => s.id === aId));
+  for (const s of pickOnIce(st.rng, off)) { if (onFor.length >= 5) break; addOn(s); }
+  const onAgainst = pickOnIce(st.rng, def);
+
+  // +/- : even-strength AND short-handed goals count (real NHL rule); PP and SO don't.
+  if (strength === "EV" || strength === "SH") {
+    for (const s of onFor) st.lines[off.id][s.id].plusMinus += 1;
+    for (const s of onAgainst) st.lines[def.id][s.id].plusMinus -= 1;
   }
 
   st.goals.push({
@@ -405,6 +418,10 @@ function recordGoal(
     team: off.id, teamCode: off.code,
     scorer: scorer.id, scorerName: scorer.name, scorerSeasonGoal: sl.goals,
     assists, assistNames, strength, emptyNet,
+    onIceForIds: strength === "SO" ? [] : onFor.map((s) => s.id),
+    onIceForNames: strength === "SO" ? [] : onFor.map((s) => s.name),
+    onIceAgainstIds: strength === "SO" ? [] : onAgainst.map((s) => s.id),
+    onIceAgainstNames: strength === "SO" ? [] : onAgainst.map((s) => s.name),
   });
 
   st.sink.emit({

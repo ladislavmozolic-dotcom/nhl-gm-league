@@ -102,6 +102,8 @@ export async function saveGameResult(result: GameResult, meta: GameMeta = {}) {
     scorerId: g.scorer, scorerName: g.scorerName,
     assistIds: g.assists, assistNames: g.assistNames,
     strength: g.strength, emptyNet: g.emptyNet,
+    onIceForIds: g.onIceForIds, onIceForNames: g.onIceForNames,
+    onIceAgainstIds: g.onIceAgainstIds, onIceAgainstNames: g.onIceAgainstNames,
   }));
   const penaltyRows = (gameId: number) => result.penalties.map((p) => ({
     gameId, period: p.period, seconds: p.seconds,

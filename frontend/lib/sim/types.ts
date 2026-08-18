@@ -182,6 +182,10 @@ export type GoalEvent = {
   assistNames: string[];
   strength: "EV" | "PP" | "SH" | "SO";
   emptyNet: boolean;     // scored into an empty net (goalie pulled)
+  onIceForIds: number[];      // skaters on ice for the scoring team
+  onIceForNames: string[];
+  onIceAgainstIds: number[];  // skaters on ice for the conceding team
+  onIceAgainstNames: string[];
 };
 
 export type PenaltyEvent = {

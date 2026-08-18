@@ -164,6 +164,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
           return { name: g.assistNames[i] ?? "", slug: slugById.get(aid) ?? null, total: (priorAssistMap.get(aid) ?? 0) + ra };
         }),
         strength: g.strength, emptyNet: g.emptyNet,
+        onIceForNames: g.onIceForNames, onIceAgainstNames: g.onIceAgainstNames,
       };
     }),
     penalties: game.penaltyEvents.map((p) => ({

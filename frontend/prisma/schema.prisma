@@ -633,6 +633,10 @@ model GameGoal {
   assistNames String[] @default([])
   strength    String   // EV | PP | SH | SO
   emptyNet    Boolean  @default(false)
+  onIceForIds      Int[]    @default([]) // skaters on ice for the scoring team (scorer + linemates)
+  onIceForNames    String[] @default([])
+  onIceAgainstIds  Int[]    @default([]) // skaters on ice for the conceding team
+  onIceAgainstNames String[] @default([])
   game        Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
 
   @@index([gameId])
