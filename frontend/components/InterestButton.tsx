@@ -37,6 +37,7 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
   const [offers, setOffers] = useState<Offers>([]);
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<{ t: "ok" | "err"; s: string } | null>(null);
+  const [result, setResult] = useState<{ t: "ok" | "err"; s: string } | null>(null); // post-offer response — shown as a dialog you dismiss with Continue
 
   // offer form
   const [salaryM, setSalaryM] = useState("");
@@ -88,14 +89,14 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
     if (!Number.isFinite(salary)) { setMsg({ t: "err", s: "Enter a salary." }); return; }
     start(async () => {
       const r = await submitOfferAction(playerId, teamId, salary, years, line, pp, pk, grantClause || null, grantClause === "M_NTC" ? breadth : null, twoWay);
-      if (!r.ok) { setMsg({ t: "err", s: r.error }); return; }
+      if (!r.ok) { setResult({ t: "err", s: r.error }); return; }
       if ("signed" in r && r.signed) {
-        setMsg({ t: "ok", s: `${name} signed! ✅` });
+        setResult({ t: "ok", s: `✅ ${name} signed!` });
       } else if ("signed" in r && r.signed === false) {
-        setMsg({ t: "ok", s: `Below his ask — he wants at least ${M("floor" in r ? r.floor : 0)}. Raise the offer to sign him now.` });
+        setResult({ t: "err", s: `Below his ask — he wants at least ${M("floor" in r ? r.floor : 0)}. Raise the offer to sign him now.` });
       } else {
         const raised = "raised" in r && r.raised;
-        setMsg({ t: "ok", s: r.clears ? `Offer ${raised ? "raised" : "placed"} — clears his ask at your club. ✓` : `Offer ${raised ? "raised" : "placed"} — below his floor ${M("floor" in r ? r.floor : 0)}; he may pick a better one.` });
+        setResult({ t: "ok", s: r.clears ? `Offer ${raised ? "raised" : "placed"} — clears his ask at your club. ✓` : `Offer ${raised ? "raised" : "placed"} — below his floor ${M("floor" in r ? r.floor : 0)}; he may pick a better one.` });
       }
       load(teamId);
     });
@@ -116,6 +117,16 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
 
   return (
     <>
+      {result && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 px-4" onClick={() => setResult(null)}>
+          <div className="w-full max-w-sm rounded-2xl border border-slate-700 bg-[#0e1e35] p-6 shadow-2xl shadow-black/50" onClick={(e) => e.stopPropagation()}>
+            <div className={`text-2xl mb-2 ${result.t === "ok" ? "text-emerald-400" : "text-amber-400"}`}>{result.t === "ok" ? "✓" : "!"}</div>
+            <p className="text-sm text-slate-200 leading-relaxed">{result.s}</p>
+            <button onClick={() => setResult(null)} autoFocus
+              className="mt-5 w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 font-semibold text-sm text-white">Continue</button>
+          </div>
+        </div>
+      )}
       <button onClick={openModal} disabled={!ctx.frenzyOpen}
         title={ctx.frenzyOpen ? "Register interest / make an offer" : "Free-agent market is closed"}
         className={`px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap ${ctx.frenzyOpen ? "bg-amber-600/80 hover:bg-amber-500 text-white" : "bg-slate-800 text-slate-600 cursor-not-allowed"}`}>
