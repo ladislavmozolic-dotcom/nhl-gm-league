@@ -14,6 +14,7 @@ type Skater = {
   goals: number; assists: number; points: number; shots: number; pim: number;
   plusMinus: number; ppGoals: number; shGoals: number; gwg: number;
   hits: number; blocks: number; faceoffWins: number; faceoffLosses: number; toi: number;
+  ppToi?: number; pkToi?: number;
   conAfter: number | null; xg?: number; hdShots?: number;
 };
 type Goalie = {
@@ -183,7 +184,7 @@ function GoalieBlock({ side }: { side: Side }) {
 }
 
 function SkaterTable({ side }: { side: Side }) {
-  const H = ["G", "A", "P", "+/-", "S", "xG", "PIM", "HIT", "BLK", "FO", "TOI", "CON"];
+  const H = ["G", "A", "P", "+/-", "S", "xG", "PIM", "HIT", "BLK", "FO", "TOI", "PP", "PK", "CON"];
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm min-w-[600px]">
@@ -211,6 +212,8 @@ function SkaterTable({ side }: { side: Side }) {
                 <td className="px-2 text-right tabular-nums text-slate-300">{s.blocks}</td>
                 <td className="px-2 text-right tabular-nums text-slate-400">{fo}</td>
                 <td className="px-2 text-right tabular-nums text-slate-400">{mmss(s.toi)}</td>
+                <td className="px-2 text-right tabular-nums text-emerald-400/80" title="Power-play TOI">{s.ppToi ? mmss(s.ppToi) : "—"}</td>
+                <td className="px-2 text-right tabular-nums text-sky-400/80" title="Penalty-kill TOI">{s.pkToi ? mmss(s.pkToi) : "—"}</td>
                 <td className={`px-2 text-right tabular-nums ${s.conAfter != null && s.conAfter < 100 ? "text-amber-400" : "text-slate-600"}`}>{s.conAfter ?? "—"}</td>
               </tr>
             );

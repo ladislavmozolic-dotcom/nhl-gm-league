@@ -137,6 +137,8 @@ export type PlayerLine = {
   faceoffWins: number;
   faceoffLosses: number;
   toi: number;           // time on ice, seconds
+  ppToi: number;         // power-play time on ice, seconds (real per-tick, PP unit)
+  pkToi: number;         // penalty-kill time on ice, seconds (real per-tick, PK unit)
   conBefore: number;     // condition at puck drop
   conAfter: number;      // condition after the game (post workload drop)
   xg: number;            // individual expected goals (shot quality generated)

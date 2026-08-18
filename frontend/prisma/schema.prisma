@@ -1080,6 +1080,8 @@ model PlayerGameStat {
   faceoffWins   Int    @default(0)
   faceoffLosses Int    @default(0)
   toi           Int    @default(0)
+  ppToi         Int    @default(0) // power-play time on ice (seconds)
+  pkToi         Int    @default(0) // penalty-kill time on ice (seconds)
   conBefore     Int?
   conAfter      Int?
   xg            Float  @default(0) // individual expected goals (Phase 2 shot quality)

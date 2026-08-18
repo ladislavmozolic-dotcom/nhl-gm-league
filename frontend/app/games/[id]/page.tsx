@@ -67,7 +67,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
       goals: s.goals, assists: s.assists, points: s.points, shots: s.shots, pim: s.pim,
       plusMinus: s.plusMinus, ppGoals: s.ppGoals, shGoals: s.shGoals, gwg: s.gwg,
       hits: s.hits, blocks: s.blocks, faceoffWins: s.faceoffWins, faceoffLosses: s.faceoffLosses,
-      toi: s.toi, conAfter: s.conAfter, xg: s.xg, hdShots: s.hdShots,
+      toi: s.toi, ppToi: s.ppToi, pkToi: s.pkToi, conAfter: s.conAfter, xg: s.xg, hdShots: s.hdShots,
     }))
     .sort((a, b) => b.points - a.points || b.goals - a.goals || b.toi - a.toi);
 
