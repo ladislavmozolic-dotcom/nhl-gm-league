@@ -236,6 +236,7 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
                           <a href="/admin/elc" className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">ELC Rookies</a>
                           <a href="/admin/roster-update" className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">Roster Update</a>
                           <a href="/admin/season" className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">Season Control</a>
+                          <a href="/admin/signings" className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">Latest Signings</a>
                           <a href="/admin/simulation" className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">Simulation Engine</a>
                           <a href="/admin/team-lines" className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">Team Lines &amp; Tactics</a>
                         </>

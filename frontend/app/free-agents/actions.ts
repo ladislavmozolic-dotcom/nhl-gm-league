@@ -251,6 +251,8 @@ async function signFaOffer(playerId: number, player: { name: string; age: number
   const expiry = CURRENT_SEASON_START + years;
   const clause = o.grantClause && ["NTC", "NMC", "M_NTC"].includes(o.grantClause) ? o.grantClause : null;
   const noTradeTeams = clause === "M_NTC" ? await weakestTeams(o.mNtcBreadth ?? 12, o.teamId) : [];
+  // snapshot the pre-signing contract so an admin can revert this signing later
+  const prev = await prisma.player.findUnique({ where: { id: playerId }, select: { capHit: true, contractYears: true, contractExpiry: true, contractType: true, tradeClause: true, noTradeTeams: true, rosterType: true, teamId: true, contractText: true } });
   const data = {
     teamId: o.teamId, rosterType: "NHL",
     capHit: salary, contractYears: years, contractExpiry: expiry,
@@ -272,6 +274,12 @@ async function signFaOffer(playerId: number, player: { name: string; age: number
   await prisma.faOffer.update({ where: { id: o.id }, data: { status: "ACCEPTED", salary, years } });
   await prisma.faOffer.updateMany({ where: { playerId, id: { not: o.id }, status: { in: ACTIVE } }, data: { status: "REJECTED" } });
   const team = await prisma.team.findUnique({ where: { id: o.teamId }, select: { code: true } });
+  await prisma.signingLog.create({ data: {
+    playerId, playerName: player.name, teamCode: team?.code ?? null, kind: "SIGN", salary, years,
+    prevCapHit: prev?.capHit != null ? Math.round(prev.capHit) : null, prevYears: prev?.contractYears ?? null, prevExpiry: prev?.contractExpiry ?? null,
+    prevType: prev?.contractType ?? null, prevClause: prev?.tradeClause ?? null, prevNoTrade: prev?.noTradeTeams ?? [],
+    prevRosterType: prev?.rosterType ?? null, prevTeamId: prev?.teamId ?? null, prevContractText: prev?.contractText ?? null,
+  } });
   await prisma.transaction.create({
     data: { type: "SIGNING", message: `${team?.code ?? "?"} signed ${player.name} — $${(salary / 1e6).toFixed(2)}M × ${years}yr` },
   });
@@ -619,6 +627,8 @@ export async function extendContractAction(
   await prisma.transaction.create({
     data: { type: "SIGNING", message: `${team?.code ?? "?"} extended ${player.name} — $${(salary / 1e6).toFixed(2)}M × ${years}yr (from ${fromSeason})` },
   });
+  // revertible record — an EXTEND revert just clears the ext fields (current deal untouched)
+  await prisma.signingLog.create({ data: { playerId, playerName: player.name, teamCode: team?.code ?? null, kind: "EXTEND", salary, years } });
   // no revalidatePath — it would unmount the confirmation modal; client refreshes on Done.
   return { ok: true as const, signed: true, salary, years, name: player.name };
 }

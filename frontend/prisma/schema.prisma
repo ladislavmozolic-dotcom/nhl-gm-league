@@ -228,6 +228,31 @@ model Transaction {
   createdAt DateTime @default(now())
 }
 
+// A revertible record of every UFA signing / extension, with the pre-signing
+// contract snapshot so an admin can undo it from the "Latest Signings" page.
+model SigningLog {
+  id             Int      @id @default(autoincrement())
+  playerId       Int
+  playerName     String
+  teamCode       String?
+  kind           String   // "EXTEND" (deferred) | "SIGN" (immediate)
+  salary         Int
+  years          Int
+  reverted       Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  // pre-signing snapshot (used to restore on revert)
+  prevCapHit     Int?
+  prevYears      Int?
+  prevExpiry     Int?
+  prevType       String?
+  prevClause     String?
+  prevNoTrade    Int[]    @default([])
+  prevRosterType String?
+  prevTeamId     Int?
+  prevContractText String?
+  @@index([createdAt])
+}
+
 model Trade {
   id          Int      @id @default(autoincrement())
   fromTeamId  Int
