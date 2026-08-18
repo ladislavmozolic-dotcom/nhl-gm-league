@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import SeasonControls from "@/components/SeasonControls";
 import { generateScheduleAction, playSeasonAction, runPlayoffsAction, resetSeasonAction, importNhlApiAction, importCsvAction, archiveSeasonAction, runRetirementsAction, developProspectsAction } from "./actions";
 import RunAiGmButton from "@/components/RunAiGmButton";
+import RestartSeasonButton from "@/components/RestartSeasonButton";
 import { PageHeader, Card } from "@/components/ui";
 import PrepareNextDraftButton from "@/components/PrepareNextDraftButton";
 import PhaseControl from "@/components/PhaseControl";
@@ -45,6 +46,17 @@ export default async function SeasonAdminPage() {
         state={{ played, scheduled, playoffSeries, champion: champ?.name ?? null }}
         actions={{ generateScheduleAction, playSeasonAction, runPlayoffsAction, resetSeasonAction, runRetirementsAction, developProspectsAction, importNhlApiAction, importCsvAction }}
       />
+
+      <Card title="Restart season (keep schedule)" accent="text-rose-400">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <p className="text-sm text-slate-400 max-w-xl">
+            Revert every game to <span className="text-slate-200">unplayed</span> on the same fixtures — results, per-game stats,
+            standings and playoffs wiped, conditions &amp; injuries reset. The <span className="text-slate-200">schedule stays</span>,
+            so you can sim from day 1 again to watch the game flow and AI GM activity. Rosters are left as they are.
+          </p>
+          <RestartSeasonButton />
+        </div>
+      </Card>
 
       <Card title="AI GM (GM-less clubs)" accent="text-cyan-400">
         <div className="flex items-center justify-between gap-4 flex-wrap">

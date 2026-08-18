@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { generateSchedule } from "@/lib/sim/schedule";
 import { playScheduledGames, resetConditions, updateInjuryCon } from "@/lib/sim/season";
@@ -267,6 +268,47 @@ export async function runPlayoffsAction() {
   revalidatePath("/admin/season");
   revalidatePath("/playoffs");
   return { champion: nhl.championTeamId };
+}
+
+/** Restart the season but KEEP the schedule: every game reverts to SCHEDULED with
+ *  its results wiped (and all derived per-game stats deleted), playoffs cleared, and
+ *  player conditions/injuries reset — so you can sim from day 1 again on the exact
+ *  same fixtures. Rosters are left as-is. */
+export async function restartSeasonAction() {
+  if (!(await isAdmin())) throw new Error("Only a league admin can restart the season.");
+  const games = await prisma.game.findMany({ where: { season: SEASON }, select: { id: true } });
+  const ids = games.map((g) => g.id);
+  if (ids.length) {
+    await prisma.$transaction([
+      prisma.playerGameStat.deleteMany({ where: { gameId: { in: ids } } }),
+      prisma.goalieGameStat.deleteMany({ where: { gameId: { in: ids } } }),
+      prisma.gameGoal.deleteMany({ where: { gameId: { in: ids } } }),
+      prisma.gamePenalty.deleteMany({ where: { gameId: { in: ids } } }),
+      prisma.gameEvent.deleteMany({ where: { gameId: { in: ids } } }),
+    ]);
+  }
+  // drop playoff games + series entirely (they're recreated at playoff time)
+  await prisma.game.deleteMany({ where: { season: SEASON, seriesId: { not: null } } });
+  await prisma.playoffSeries.deleteMany({ where: { season: SEASON } });
+  await prisma.gameAudit.deleteMany({ where: { season: SEASON } }); // clear the sim-integrity log for a fresh run
+  // revert every remaining (regular-season) game to an unplayed SCHEDULED state
+  await prisma.game.updateMany({
+    where: { season: SEASON },
+    data: {
+      status: "SCHEDULED", homeGoals: null, awayGoals: null, homeShots: null, awayShots: null,
+      homeGoalsByPeriod: [], awayGoalsByPeriod: [], homeShotsByPeriod: [], awayShotsByPeriod: [],
+      homeXg: null, awayXg: null, homeHd: null, awayHd: null,
+      homeOzPct: null, homeNzPct: null, homeDzPct: null, awayOzPct: null, awayNzPct: null, awayDzPct: null,
+      homeShotSectors: [], awayShotSectors: [],
+      homeTopShot: null, awayTopShot: null, homeTopShotBy: null, awayTopShotBy: null, homeAvgShot: null, awayAvgShot: null,
+      homeSystem: Prisma.DbNull, awaySystem: Prisma.DbNull, endedIn: null, otPeriods: 0, winnerTeamId: null,
+      seed: null, simCount: 0, lastSimBy: null, lastSimAt: null, playByPlay: Prisma.DbNull, shootout: Prisma.DbNull, playedAt: null,
+    },
+  });
+  await prisma.leagueConfig.update({ where: { id: 1 }, data: { phaseOverride: null } }).catch(() => {});
+  await resetConditions(); // CON back to 100, clear injuries
+  for (const p of ["/admin/season", "/standings", "/schedule", "/scores", "/stats/players", "/stats/goalies", "/playoffs", "/finance"]) revalidatePath(p);
+  return { games: ids.length };
 }
 
 export async function resetSeasonAction() {
