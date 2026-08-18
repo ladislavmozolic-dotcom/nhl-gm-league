@@ -8,7 +8,9 @@ import { clauseDiscount } from "@/lib/free-agency";
 import InfoTip from "@/components/InfoTip";
 
 export type InterestCtx = {
-  frenzyOpen: boolean;
+  frenzyOpen: boolean;          // FA market open (Frenzy, regular season, or playoffs)
+  immediate?: boolean;          // in-season: an acceptable offer signs on the spot
+  ownOnly?: boolean;            // playoffs: only a club's own UFAs
   actingTeamId: number | null;
   teams: { id: number; code: string; name: string }[];
 };
@@ -87,7 +89,14 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
     start(async () => {
       const r = await submitOfferAction(playerId, teamId, salary, years, line, pp, pk, grantClause || null, grantClause === "M_NTC" ? breadth : null, twoWay);
       if (!r.ok) { setMsg({ t: "err", s: r.error }); return; }
-      setMsg({ t: "ok", s: r.clears ? `Offer ${r.raised ? "raised" : "placed"} — clears his ask at your club. ✓` : `Offer ${r.raised ? "raised" : "placed"} — below his floor ${M(r.floor)}; he may pick a better one.` });
+      if ("signed" in r && r.signed) {
+        setMsg({ t: "ok", s: `${name} signed! ✅` });
+      } else if ("signed" in r && r.signed === false) {
+        setMsg({ t: "ok", s: `Below his ask — he wants at least ${M("floor" in r ? r.floor : 0)}. Raise the offer to sign him now.` });
+      } else {
+        const raised = "raised" in r && r.raised;
+        setMsg({ t: "ok", s: r.clears ? `Offer ${raised ? "raised" : "placed"} — clears his ask at your club. ✓` : `Offer ${raised ? "raised" : "placed"} — below his floor ${M("floor" in r ? r.floor : 0)}; he may pick a better one.` });
+      }
       load(teamId);
     });
   };

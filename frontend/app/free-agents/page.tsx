@@ -59,7 +59,7 @@ export default async function FreeAgentsPage({
       ? await prisma.team.findMany({ where: { league: "NHL" }, select: { id: true, code: true, name: true }, orderBy: { name: "asc" } })
       : await prisma.team.findMany({ where: { id: sessionTeamId }, select: { id: true, code: true, name: true } });
     const actingTeamId = teams.some((t) => t.id === sessionTeamId) ? sessionTeamId : (teams[0]?.id ?? null);
-    interestCtx = { frenzyOpen: clock.frenzyOpen, actingTeamId, teams: teams.map((t) => ({ ...t, code: t.code ?? "" })) };
+    interestCtx = { frenzyOpen: clock.faWindow.open, immediate: clock.faWindow.immediate, ownOnly: clock.faWindow.ownOnly, actingTeamId, teams: teams.map((t) => ({ ...t, code: t.code ?? "" })) };
   }
 
   const attrs = isGoalie ? GOALIE_ATTRS : SKATER_ATTRS;
@@ -124,6 +124,8 @@ export default async function FreeAgentsPage({
         frenzyRound={clock.frenzyRound}
         phaseLabel={clock.phaseLabel}
         isAdmin={admin}
+        inSeasonOpen={!clock.frenzyOpen && clock.faWindow.open}
+        ownOnly={clock.faWindow.ownOnly}
       />
 
       <div className="flex items-center gap-2">

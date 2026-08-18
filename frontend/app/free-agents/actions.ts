@@ -99,18 +99,25 @@ export async function submitOfferAction(
 ) {
   if (!(await canManageTeam(teamId))) return { ok: false as const, error: "You don't manage this team." };
   const clock = await getLeagueClock();
-  if (!clock.frenzyOpen) return { ok: false as const, error: "The free-agent market is closed." };
-  // comish-tier head-start: the first day of each round is the commissioner's
-  // office only (they bid before they can see anything), GMs join from day 2.
-  const dayInRound = clock.frenzyDay >= 1 ? ((clock.frenzyDay - 1) % 7) + 1 : 1;
-  if (dayInRound === 1 && !(await isComishTier())) {
-    return { ok: false as const, error: "This round opens for GMs tomorrow — the commissioner's office gets the first day." };
+  const win = clock.faWindow;
+  if (!win.open) return { ok: false as const, error: "The free-agent market is closed." };
+  // comish-tier head-start (July Frenzy only): the first day of each round is the
+  // commissioner's office only (they bid before they can see anything), GMs join day 2.
+  if (!win.immediate) {
+    const dayInRound = clock.frenzyDay >= 1 ? ((clock.frenzyDay - 1) % 7) + 1 : 1;
+    if (dayInRound === 1 && !(await isComishTier())) {
+      return { ok: false as const, error: "This round opens for GMs tomorrow — the commissioner's office gets the first day." };
+    }
   }
 
-  const player = await prisma.player.findUnique({ where: { id: playerId }, select: { rosterType: true, overall: true, realFarmTeamId: true, age: true, lastSeasonGP: true } });
+  const player = await prisma.player.findUnique({ where: { id: playerId }, select: { name: true, rosterType: true, overall: true, realFarmTeamId: true, age: true, lastSeasonGP: true, teamId: true } });
   if (!player) return { ok: false as const, error: "Player not found." };
   if (player.rosterType && FREE.includes(player.rosterType)) {
     return { ok: false as const, error: "This player is not a free agent." };
+  }
+  // playoffs: a club may only re-sign its OWN pending UFAs, not shop the market.
+  if (win.ownOnly && player.teamId !== teamId) {
+    return { ok: false as const, error: "During the playoffs you can only re-sign your own UFAs — the open market is closed." };
   }
   if (salary < 775_000) return { ok: false as const, error: "Below the league minimum salary." };
   years = Math.max(1, Math.min(MAX_TERM, Math.round(years)));
@@ -133,14 +140,16 @@ export async function submitOfferAction(
   if (existing && existing.status === "REJECTED") {
     return { ok: false as const, error: "The player has moved on — he's no longer negotiating with your club." };
   }
-  // round-lock: only clubs already in the negotiation (an offer placed in round 1)
-  // may continue; nobody new can join from round 2 onward.
-  if (!existing && clock.frenzyRound > 1) {
-    return { ok: false as const, error: "Bidding on this player closed after round 1 — only clubs already negotiating can raise their offer." };
-  }
-  // one offer per club per round — you get a single move each round, no rapid edits.
-  if (existing && existing.round === clock.frenzyRound && existing.status !== "REJECTED") {
-    return { ok: false as const, error: "You've already made your offer this round — wait for the next round to change it." };
+  // round-lock (July Frenzy only): only clubs already in the negotiation (an offer
+  // placed in round 1) may continue; nobody new joins from round 2 onward. In-season
+  // signing is immediate, so there are no rounds to lock.
+  if (!win.immediate) {
+    if (!existing && clock.frenzyRound > 1) {
+      return { ok: false as const, error: "Bidding on this player closed after round 1 — only clubs already negotiating can raise their offer." };
+    }
+    if (existing && existing.round === clock.frenzyRound && existing.status !== "REJECTED") {
+      return { ok: false as const, error: "You've already made your offer this round — wait for the next round to change it." };
+    }
   }
   const ceiling = capCeilingForPhase(cap.upper, clock.phase) + ltir;
   if (committed + salary > ceiling) {
@@ -157,11 +166,31 @@ export async function submitOfferAction(
   // a raise re-enters contention; a shortlisted offer stays shortlisted
   const newStatus = existing?.status === "SHORTLISTED" ? "SHORTLISTED" : "PENDING";
 
-  await prisma.faOffer.upsert({
+  const offer = await prisma.faOffer.upsert({
     where: { playerId_teamId: { playerId, teamId } },
     update: { salary, years, line: dep.line, pp, pk, status: newStatus, round: clock.frenzyRound, grantClause: clause, mNtcBreadth: breadth, twoWay },
     create: { playerId, teamId, salary, years, line: dep.line, pp, pk, round: clock.frenzyRound, grantClause: clause, mNtcBreadth: breadth, twoWay },
   });
+
+  // In-season (regular / playoffs): sign IMMEDIATELY if the terms clear the player's
+  // bar — no waiting for a Frenzy Day. If the offer falls short, we don't keep a
+  // standing offer around; just tell the GM what it'll take.
+  if (win.immediate) {
+    if (evalr?.acceptable) {
+      await signFaOffer(playerId, { name: player.name, age: player.age }, offer, salary, years);
+      revalidatePath("/free-agents");
+      revalidatePath(`/teams`);
+      return { ok: true as const, signed: true as const, clears: true as const };
+    }
+    await prisma.faOffer.deleteMany({ where: { playerId, teamId } });
+    revalidatePath("/free-agents");
+    return {
+      ok: true as const, signed: false as const, clears: false as const,
+      floor: evalr?.ask.floorSalary ?? 0,
+      askYears: evalr ? { min: evalr.ask.minYears, max: evalr.ask.maxYears } : null,
+    };
+  }
+
   revalidatePath("/free-agents");
   return {
     ok: true as const,

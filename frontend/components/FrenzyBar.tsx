@@ -3,8 +3,9 @@
 import { useState, useTransition } from "react";
 import { resolveFrenzyAction, processRoundEndAction } from "@/app/free-agents/actions";
 
-export default function FrenzyBar({ frenzyOpen, frenzyDay, frenzyRound, phaseLabel, isAdmin }: {
+export default function FrenzyBar({ frenzyOpen, frenzyDay, frenzyRound, phaseLabel, isAdmin, inSeasonOpen = false, ownOnly = false }: {
   frenzyOpen: boolean; frenzyDay: number; frenzyRound: number; phaseLabel: string; isAdmin: boolean;
+  inSeasonOpen?: boolean; ownOnly?: boolean;
 }) {
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<{ t: "ok" | "err"; s: string } | null>(null);
@@ -26,18 +27,23 @@ export default function FrenzyBar({ frenzyOpen, frenzyDay, frenzyRound, phaseLab
   });
 
   return (
-    <div className={`rounded-xl px-4 py-3 border ${frenzyOpen ? "bg-amber-500/10 border-amber-500/30" : "bg-slate-900/60 border-slate-800"}`}>
+    <div className={`rounded-xl px-4 py-3 border ${frenzyOpen ? "bg-amber-500/10 border-amber-500/30" : inSeasonOpen ? "bg-emerald-500/10 border-emerald-500/30" : "bg-slate-900/60 border-slate-800"}`}>
       <div className="flex items-center gap-3 flex-wrap">
-        <span className={`inline-block w-2.5 h-2.5 rounded-full ${frenzyOpen ? "bg-amber-400 animate-pulse" : "bg-slate-600"}`} />
+        <span className={`inline-block w-2.5 h-2.5 rounded-full ${frenzyOpen ? "bg-amber-400 animate-pulse" : inSeasonOpen ? "bg-emerald-400 animate-pulse" : "bg-slate-600"}`} />
         <span className="text-sm font-semibold">
-          {frenzyOpen ? `Market OPEN — Round ${frenzyRound} / 3 (day ${frenzyDay}/21)` : `Market closed — ${phaseLabel}`}
+          {frenzyOpen ? `Market OPEN — Round ${frenzyRound} / 3 (day ${frenzyDay}/21)`
+            : inSeasonOpen ? `In-season signings OPEN — ${phaseLabel}`
+            : `Market closed — ${phaseLabel}`}
         </span>
         <span className="text-xs text-slate-500">
           {frenzyOpen
             ? (frenzyRound <= 1 ? "Week 1: players ask high — table offers to open the bidding."
               : frenzyRound === 2 ? "Week 2: asks are softening — sharpen your offer."
               : "Final week: best offer (money + role + team) wins at close.")
-            : "Signings open July 1 (advance the League Calendar)."}
+            : inSeasonOpen
+              ? (ownOnly ? "Playoffs: you may re-sign your OWN UFAs only — an acceptable offer signs on the spot."
+                : "Sign your own UFAs and the open market — an acceptable offer signs immediately.")
+              : "Signings open July 1 (advance the League Calendar)."}
         </span>
         {isAdmin && frenzyOpen && (
           <div className="ml-auto flex items-center gap-2">
