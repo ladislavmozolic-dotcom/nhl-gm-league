@@ -388,17 +388,32 @@ function resolveStUnits(team: SimTeam): { pp: StUnit[]; pk: StUnit[] } {
   const df = (s: SimSkater) => s.attrs.df ?? 50;
   const ppF = [...team.forwards].sort((a, b) => (b.offense ?? skill(b)) - (a.offense ?? skill(a)));
   const ppD = [...team.defense].sort((a, b) => skill(b) - skill(a));
-  const pkF = [...team.forwards].sort((a, b) => df(b) - df(a));
-  const pkD = [...team.defense].sort((a, b) => df(b) - df(a));
+  // PK forwards: the most DEFENSIVE forwards, and NOT the power-play forwards (both PP
+  // units), so the same line never plays both the PP and the PK. Fall back to PP bodies
+  // only on a roster too thin to staff a separate kill.
+  const ppFwdUsed = new Set(ppF.slice(0, 6).map((s) => s.id));
+  const byDf = (a: SimSkater, b: SimSkater) => df(b) - df(a);
+  const pkF = [
+    ...[...team.forwards].filter((s) => !ppFwdUsed.has(s.id)).sort(byDf),
+    ...[...team.forwards].filter((s) => ppFwdUsed.has(s.id)).sort(byDf),
+  ];
+  const pkD = [...team.defense].sort(byDf);
   const ppTier = (t: number): StUnit => ({ f: ppF.slice(t * 3, t * 3 + 3), d: ppD.slice(t * 2, t * 2 + 2) });
   const pkTier = (t: number): StUnit => ({ f: pkF.slice(t * 2, t * 2 + 2), d: pkD.slice(t * 2, t * 2 + 2) });
   const findU = (prefix: string): StUnit | null => { const u = team.stUnits.find((x) => x.sig.startsWith(prefix)); return u ? split(u.members) : null; };
   const nonEmpty = (u: StUnit) => u.f.length > 0 || u.d.length > 0;
-  const pick = (set: StUnit | null, fb: StUnit): StUnit => (set && nonEmpty(set) ? set : fb);
-  const pp1 = pick(findU("pp:"), ppTier(0));
-  const pp2 = pick(findU("pp2:"), nonEmpty(ppTier(1)) ? ppTier(1) : pp1);
-  const pk1 = pick(findU("pk:"), pkTier(0));
-  const pk2 = pick(findU("pk2:"), nonEmpty(pkTier(1)) ? pkTier(1) : pk1);
+  const ids = (u: StUnit | null) => (u ? [...u.f, ...u.d].map((s) => s.id).sort((a, b) => a - b).join(",") : "");
+  const sameIds = (a: StUnit | null, b: StUnit | null) => ids(a).length > 0 && ids(a) === ids(b);
+  // honour manager-set units ONLY when they're genuinely distinct — the auto-fill made
+  // PP1===PP2 and PK===PP for every non-hand-set club, so those fall back to sensible,
+  // distinct roster tiers (PP by playmaking, PK by defence).
+  const pp1s = findU("pp:"), pp2s = findU("pp2:"), pk1s = findU("pk:"), pk2s = findU("pk2:");
+  const ppOk = !!pp1s && !!pp2s && nonEmpty(pp1s) && nonEmpty(pp2s) && !sameIds(pp1s, pp2s);
+  const pp1 = ppOk ? pp1s! : ppTier(0);
+  const pp2 = ppOk ? pp2s! : (nonEmpty(ppTier(1)) ? ppTier(1) : ppTier(0));
+  const pkOk = !!pk1s && !!pk2s && nonEmpty(pk1s) && nonEmpty(pk2s) && !sameIds(pk1s, pk2s) && !sameIds(pk1s, pp1s);
+  const pk1 = pkOk ? pk1s! : pkTier(0);
+  const pk2 = pkOk ? pk2s! : (nonEmpty(pkTier(1)) ? pkTier(1) : pkTier(0));
   return { pp: [pp1, pp2], pk: [pk1, pk2] };
 }
 
