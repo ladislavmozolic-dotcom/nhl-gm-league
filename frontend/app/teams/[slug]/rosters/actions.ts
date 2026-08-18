@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { ROSTER_LIMITS, type MoveRow } from "@/lib/roster-rules";
 import { canAddCapHit } from "@/lib/cap";
 import { money } from "@/lib/finance";
+import { loadSettings } from "@/lib/sim/settings";
 
 export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
   const team = await prisma.team.findUnique({
@@ -43,6 +44,14 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
   const goingDown = valid.filter((m) => m.side === "farm" || m.side === "scratched");
   const illegalFarm = goingDown.find((m) => m.contractType === "ONE_WAY" && byId.get(m.id)!.rosterType === "NHL");
   if (illegalFarm) throw new Error("A one-way contract player cannot be sent down.");
+
+  // waivers ON → an NHL player must clear the waiver wire before he drops. Block a
+  // direct bury-to-the-farm from the roster mover and point the GM at the wire.
+  const settings = await loadSettings();
+  if (settings.waiversEnabled) {
+    const buried = goingDown.find((m) => byId.get(m.id)!.rosterType === "NHL");
+    if (buried) throw new Error("Waivers are on — expose NHL players on the Waiver Wire before sending them down (they can't skip the wire).");
+  }
 
   // Only HARD maxima block a save. Being under a minimum (short-handed pro roster)
   // is allowed — the farm auto-fills the missing bodies before each game, and a

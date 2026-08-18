@@ -185,6 +185,26 @@ export async function proposeTrade(pkg: TradePackage) {
     const waived = new Set([...(pkg.waived ?? []), ...(pkg.clauseFees ?? []).map((f) => f.playerId)]);
     for (const p of pkg.fromPlayers) { const pl = byId.get(p.playerId); const b = pl && clauseBlock(pl, pkg.toTeamId, waived, true); if (b) throw new Error(b); }
     for (const p of pkg.toPlayers) { const pl = byId.get(p.playerId); const b = pl && clauseBlock(pl, pkg.fromTeamId, waived, true); if (b) throw new Error(b); }
+
+    // A waived clause must actually be CONSENTED/PAID for — the server recomputes the
+    // agent fee so a crafted payload can't waive a clause for free. Only blocking
+    // destinations need consent; a fee of 0 (a clear step up) waives for nothing.
+    const { clauseTerms } = await import("@/lib/clause-agent-server");
+    const feeBy = new Map((pkg.clauseFees ?? []).map((f) => [f.playerId, f]));
+    const requireConsent = async (playerId: number, destTeamId: number, giverTeamId: number) => {
+      const pl = byId.get(playerId);
+      if (!pl?.tradeClause) return;
+      const blocks = pl.tradeClause === "M_NTC" ? (pl.noTradeTeams ?? []).includes(destTeamId) : true;
+      if (!blocks) return; // clause doesn't touch this destination → no waiver needed
+      const terms = await clauseTerms(playerId, destTeamId);
+      const required = terms?.feeAmount ?? 0;
+      if (required <= 0) return; // he waives for free
+      const paid = feeBy.get(playerId);
+      if (!paid || paid.feeAmount < required || paid.payTeamId !== giverTeamId)
+        throw new Error(`${pl.name} won't waive his clause for free — the agent fee is $${(required / 1e6).toFixed(2)}M, paid by the club dealing him.`);
+    };
+    for (const p of pkg.fromPlayers) await requireConsent(p.playerId, pkg.toTeamId, pkg.fromTeamId);
+    for (const p of pkg.toPlayers) await requireConsent(p.playerId, pkg.fromTeamId, pkg.toTeamId);
   }
 
   const trade = await prisma.trade.create({ data: { fromTeamId: pkg.fromTeamId, toTeamId: pkg.toTeamId, status: "PENDING", condition: pkg.condition || null, waivedClauses: [...(pkg.waived ?? []), ...(pkg.clauseFees ?? []).map((f) => f.playerId)], clauseFees: (pkg.clauseFees ?? []) as object } });
