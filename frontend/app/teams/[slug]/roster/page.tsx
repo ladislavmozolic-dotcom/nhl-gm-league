@@ -37,6 +37,22 @@ export default async function TeamRosterPage({ params }: { params: Promise<{ slu
     : null;
   const admin = await isAdmin();
 
+  // who is actually dressed in the current lineup? Everyone else on the roster
+  // (healthy scratches, players left out of the lines, and the injured) drops to
+  // the Non-roster section so the main tables show the iced team only.
+  const lines = await prisma.teamLines.findUnique({
+    where: { teamId: team.id },
+    select: { forwardLines: true, defensePairs: true, situations: true },
+  });
+  const dressed = new Set<number>();
+  if (lines) {
+    for (const l of (lines.forwardLines as any[]) ?? []) for (const id of [l?.lw, l?.c, l?.rw]) if (id != null) dressed.add(id);
+    for (const p of (lines.defensePairs as any[]) ?? []) for (const id of [p?.ld, p?.rd]) if (id != null) dressed.add(id);
+    const others = (lines.situations as any)?.others;
+    if (others?.starter != null) dressed.add(others.starter);
+    if (others?.backup != null) dressed.add(others.backup);
+  }
+
   return (
     <div className="space-y-6">
       <RosterTabs slug={slug} />
@@ -51,7 +67,7 @@ export default async function TeamRosterPage({ params }: { params: Promise<{ slu
           {admin && affiliate && <div className="mt-2"><AutoFillButton /></div>}
         </div>
       )}
-      <RosterView players={team.players} />
+      <RosterView players={team.players} dressedIds={[...dressed]} />
     </div>
   );
 }
