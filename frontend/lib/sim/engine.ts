@@ -125,6 +125,7 @@ type SimState = {
   playoff: boolean;                 // playoff game — amplifies clutch
   defChem: Record<number, number>;  // team's avg D-pair chemistry factor (a gelled, mixed pair shields better)
   currentOnIce: Record<number, { f: SimSkater[]; d: SimSkater[] }>; // the line + pair on the ice right now (for goal on-ice sets + accurate +/-)
+  carryPenalties: Penalty[]; // penalties still running when a period ends → carry the remaining time into the next period
   shiftXg: Record<number, number>;  // on-ice net xG accrued in a player's CURRENT shift (Shift Quality)
   nightOff: Record<number, number>; // per-game offensive "form" (goals-for mult, mean 1)
   nightDef: Record<number, number>; // per-game goalie "form" facing this team (goals-against mult on opp shots, mean 1)
@@ -369,33 +370,34 @@ function setFreshUnit(st: SimState, team: SimTeam) {
 }
 
 type StUnit = { f: SimSkater[]; d: SimSkater[] };
-/** Resolve a club's special-teams personnel — its PP unit and PK unit — split into
- *  forwards + defence. Uses the manager-set / auto-filled PP1 & PK1 (team.stUnits)
- *  when present, else builds a sensible unit from the roster: PP = top playmakers +
- *  an offensive point man; PK = the best defensive forwards + shut-down D. So during
- *  a man-advantage the RIGHT players are on the ice — not a random rotating line. */
-function resolveStUnits(team: SimTeam): { pp: StUnit; pk: StUnit } {
+/** Resolve a club's special-teams personnel — TWO PP units and TWO PK units, split
+ *  into forwards + defence — so the sim can rotate PP1↔PP2 and PK1↔PK2 on ~35s shifts
+ *  (nobody kills a 2-minute penalty for the full two minutes). Uses the manager-set /
+ *  auto-filled units (team.stUnits: pp/pp2/pk/pk2) when present, else builds sensible
+ *  tiers from the roster: PP by playmaking, PK by defensive rating. */
+function resolveStUnits(team: SimTeam): { pp: StUnit[]; pk: StUnit[] } {
   const byId = new Map([...team.forwards, ...team.defense].map((s) => [s.id, s]));
   const isD = (s: SimSkater) => team.defense.some((d) => d.id === s.id);
   const split = (ids: number[]): StUnit => {
     const players = ids.map((id) => byId.get(id)).filter((s): s is SimSkater => !!s);
     return { f: players.filter((s) => !isD(s)), d: players.filter(isD) };
   };
-  const topF = (n: number, key: (s: SimSkater) => number) => [...team.forwards].sort((a, b) => key(b) - key(a)).slice(0, n);
-  const topD = (n: number, key: (s: SimSkater) => number) => [...team.defense].sort((a, b) => key(b) - key(a)).slice(0, n);
   const skill = (s: SimSkater) => (s.attrs.sc ?? 50) + (s.attrs.pa ?? 50);
   const df = (s: SimSkater) => s.attrs.df ?? 50;
-  const ppFallback: StUnit = { f: topF(3, (s) => s.offense ?? skill(s)), d: topD(2, skill) };
-  const pkFallback: StUnit = { f: topF(2, df), d: topD(2, df) };
-  const setU = team.stUnits.find((u) => u.sig.startsWith("pp:"));
-  const pkU = team.stUnits.find((u) => u.sig.startsWith("pk:"));
-  const ppSet = setU ? split(setU.members) : null;
-  const pkSet = pkU ? split(pkU.members) : null;
-  const pick = (set: StUnit | null, fb: StUnit): StUnit => ({
-    f: set && set.f.length ? set.f : fb.f,
-    d: set && set.d.length ? set.d : fb.d,
-  });
-  return { pp: pick(ppSet, ppFallback), pk: pick(pkSet, pkFallback) };
+  const ppF = [...team.forwards].sort((a, b) => (b.offense ?? skill(b)) - (a.offense ?? skill(a)));
+  const ppD = [...team.defense].sort((a, b) => skill(b) - skill(a));
+  const pkF = [...team.forwards].sort((a, b) => df(b) - df(a));
+  const pkD = [...team.defense].sort((a, b) => df(b) - df(a));
+  const ppTier = (t: number): StUnit => ({ f: ppF.slice(t * 3, t * 3 + 3), d: ppD.slice(t * 2, t * 2 + 2) });
+  const pkTier = (t: number): StUnit => ({ f: pkF.slice(t * 2, t * 2 + 2), d: pkD.slice(t * 2, t * 2 + 2) });
+  const findU = (prefix: string): StUnit | null => { const u = team.stUnits.find((x) => x.sig.startsWith(prefix)); return u ? split(u.members) : null; };
+  const nonEmpty = (u: StUnit) => u.f.length > 0 || u.d.length > 0;
+  const pick = (set: StUnit | null, fb: StUnit): StUnit => (set && nonEmpty(set) ? set : fb);
+  const pp1 = pick(findU("pp:"), ppTier(0));
+  const pp2 = pick(findU("pp2:"), nonEmpty(ppTier(1)) ? ppTier(1) : pp1);
+  const pk1 = pick(findU("pk:"), pkTier(0));
+  const pk2 = pick(findU("pk2:"), nonEmpty(pkTier(1)) ? pkTier(1) : pk1);
+  return { pp: [pp1, pp2], pk: [pk1, pk2] };
 }
 
 function weightedSample(rng: RNG, pool: SimSkater[], n: number): SimSkater[] {
@@ -868,6 +870,9 @@ function lineTilt(t: LineTactic | undefined): { of: number; df: number } {
 function simulatePeriodPossession(st: SimState, period: number) {
   const { home, away, rng } = st;
   const active: Penalty[] = [];
+  // carry over the remaining time of any penalty still running at the last buzzer
+  for (const cp of st.carryPenalties) active.push({ ...cp });
+  st.carryPenalties = [];
   generatePenalties(st, home, period, active);
   generatePenalties(st, away, period, active);
   const base = (period - 1) * PERIOD_SECONDS;
@@ -885,18 +890,24 @@ function simulatePeriodPossession(st: SimState, period: number) {
   // special-teams personnel + the live man-advantage state per team. During a PP a
   // club ices its PP unit; shorthanded, its PK unit — so shots, goals, +/- and TOI
   // all go to the RIGHT players, not whatever line happened to be rotating.
-  const stUnit: Record<number, { pp: StUnit; pk: StUnit }> = { [home.id]: resolveStUnits(home), [away.id]: resolveStUnits(away) };
+  const stUnit: Record<number, { pp: StUnit[]; pk: StUnit[] }> = { [home.id]: resolveStUnits(home), [away.id]: resolveStUnits(away) };
   const curStr: Record<number, "EV" | "PP" | "SH"> = { [home.id]: "EV", [away.id]: "EV" };
+  // special-teams shift rotation: which unit (0 = PP1/PK1, 1 = PP2/PK2) is out, and how
+  // long it has been out. Real ST shifts run ~35s, so PP1/PP2 (and PK1/PK2) alternate
+  // instead of one unit killing the whole penalty. Resets to unit 1 when back to even.
+  const ST_SHIFT = 35;
+  const stShift: Record<number, { idx: number; elapsed: number }> = { [home.id]: { idx: 0, elapsed: 0 }, [away.id]: { idx: 0, elapsed: 0 } };
+  const stIdx = (team: SimTeam, units: StUnit[]) => stShift[team.id].idx % Math.max(1, units.length);
   const onIceF = (team: SimTeam) => {
     const s = curStr[team.id];
-    if (s === "PP" && stUnit[team.id].pp.f.length) return stUnit[team.id].pp.f;
-    if (s === "SH" && stUnit[team.id].pk.f.length) return stUnit[team.id].pk.f;
+    if (s === "PP") { const u = stUnit[team.id].pp[stIdx(team, stUnit[team.id].pp)]; if (u?.f.length) return u.f; }
+    if (s === "SH") { const u = stUnit[team.id].pk[stIdx(team, stUnit[team.id].pk)]; if (u?.f.length) return u.f; }
     const sh = shifts[team.id]; return sh.fLines[sh.fIdx] ?? team.forwards;
   };
   const onIceD = (team: SimTeam) => {
     const s = curStr[team.id];
-    if (s === "PP" && stUnit[team.id].pp.d.length) return stUnit[team.id].pp.d;
-    if (s === "SH" && stUnit[team.id].pk.d.length) return stUnit[team.id].pk.d;
+    if (s === "PP") { const u = stUnit[team.id].pp[stIdx(team, stUnit[team.id].pp)]; if (u?.d.length) return u.d; }
+    if (s === "SH") { const u = stUnit[team.id].pk[stIdx(team, stUnit[team.id].pk)]; if (u?.d.length) return u.d; }
     const sh = shifts[team.id]; return sh.dPairs[sh.dIdx] ?? team.defense;
   };
   // team-system tactics multiply into the fatigue drain (fast tempo / aggressive
@@ -924,8 +935,8 @@ function simulatePeriodPossession(st: SimState, period: number) {
   const defNames = (line: SimSkater[]) => line.map((s) => cleanName(s.name));
   const unitLabel = (team: SimTeam, kind: "F" | "D") => {
     const s = curStr[team.id];
-    if (s === "PP") return "PP1";
-    if (s === "SH") return "PK1";
+    if (s === "PP") return `PP${stIdx(team, stUnit[team.id].pp) + 1}`;
+    if (s === "SH") return `PK${stIdx(team, stUnit[team.id].pk) + 1}`;
     const sh = shifts[team.id];
     return kind === "F" ? `Line ${sh.fIdx + 1}` : `D-pair ${sh.dIdx + 1}`;
   };
@@ -952,6 +963,12 @@ function simulatePeriodPossession(st: SimState, period: number) {
     // resolve the man-advantage FIRST so the on-ice snapshot uses PP/PK units
     curStr[home.id] = strengthAt(home, away, tick, active);
     curStr[away.id] = strengthAt(away, home, tick, active);
+    // rotate special-teams units on ~35s shifts; reset to unit 1 back at even strength
+    for (const team of [home, away]) {
+      const shf = stShift[team.id];
+      if (curStr[team.id] === "EV") { shf.idx = 0; shf.elapsed = 0; }
+      else if (++shf.elapsed >= ST_SHIFT) { shf.idx ^= 1; shf.elapsed = 0; }
+    }
     st.currentOnIce[home.id] = { f: onIceF(home), d: onIceD(home) };
     st.currentOnIce[away.id] = { f: onIceF(away), d: onIceD(away) };
     announceChange(home, tick); announceChange(away, tick);
@@ -1213,6 +1230,10 @@ function simulatePeriodPossession(st: SimState, period: number) {
   }
   // period over — close out the on-ice players' final shift
   for (const team of [home, away]) { flushShift(st, team.id, onIceF(team)); flushShift(st, team.id, onIceD(team)); }
+  // any penalty still running at the buzzer carries its remaining time to next period
+  st.carryPenalties = active
+    .filter((p) => !p.expired && p.end > PERIOD_SECONDS)
+    .map((p) => ({ team: p.team, start: 0, end: p.end - PERIOD_SECONDS, expired: false }));
 }
 
 // ---- injuries ---------------------------------------------------------------
@@ -1562,7 +1583,7 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     goals: [], penalties: [], injuries: [],
     momentum: {}, momoTime: {}, momoTau: {}, momoDip: {},
     playoff: !!opts.noShootout, // playoff series sim OT until a goal — amplifies clutch
-    defChem: {}, currentOnIce: {}, shiftXg: {}, nightOff: {}, nightDef: {},
+    defChem: {}, currentOnIce: {}, carryPenalties: [], shiftXg: {}, nightOff: {}, nightDef: {},
     rivalry: CFG.rivalryEnabled && !!opts.rivalry,
     pulled: {},
     shootout: [],
