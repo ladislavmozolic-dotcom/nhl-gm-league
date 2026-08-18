@@ -20,7 +20,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
   const team = await prisma.team.findUnique({
     where: { slug },
     include: {
-      players: { orderBy: { overall: "desc" }, select: { id: true, isGoalie: true, position: true, age: true, capHit: true, contractText: true, name: true, slug: true, photoUrl: true, captaincy: true, nationality: true } },
+      players: { orderBy: { overall: "desc" }, select: { id: true, isGoalie: true, position: true, age: true, capHit: true, contractText: true, name: true, slug: true, photoUrl: true, captaincy: true, nationality: true, injuryDaysLeft: true, injuryDesc: true } },
       prospects: { where: { source: rosterSource }, select: { id: true, name: true, position: true, draftYear: true } },
       affiliateTeams: { select: { id: true, name: true, slug: true, logoUrl: true, code: true, players: { select: { id: true } } } },
       parentTeam: true,
@@ -37,6 +37,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
   const capPct = Math.min(100, capCeiling ? (totalCap / capCeiling) * 100 : 0);
   const avgAge = proCount ? (team.players.reduce((s, p) => s + (p.age || 0), 0) / proCount).toFixed(1) : "0";
   const captains = team.players.filter((p) => p.captaincy === "C" || p.captaincy === "A").sort((a) => (a.captaincy === "C" ? -1 : 1));
+  const injured = team.players.filter((p) => (p.injuryDaysLeft ?? 0) > 0).sort((a, b) => (b.injuryDaysLeft ?? 0) - (a.injuryDaysLeft ?? 0));
 
   const gmLinks = [
     ["Rosters (GM)", `/teams/${team.slug}/rosters`],
@@ -130,6 +131,23 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
 
         {/* SIDEBAR */}
         <div className="lg:col-span-4 space-y-6">
+          <Card title="🏥 Injury Report" accent="text-red-400">
+            {injured.length === 0 ? (
+              <p className="text-sm text-slate-500 py-3 text-center">No injuries — full strength.</p>
+            ) : (
+              <div className="space-y-2">
+                {injured.map((p) => (
+                  <div key={p.id} className="flex items-center gap-2.5">
+                    <span className="text-xs text-slate-500 w-9 shrink-0 text-center">{p.position}</span>
+                    <Link href={`/players/${p.slug}`} className="text-sm font-medium text-slate-200 hover:text-blue-400 truncate flex-1">{cleanName(p.name)}</Link>
+                    <span className="text-[11px] text-red-300/90 truncate max-w-[130px] text-right">{p.injuryDesc || "Injured"}</span>
+                    <span className="text-[11px] font-semibold text-red-400 tabular-nums w-10 text-right shrink-0">{p.injuryDaysLeft}d</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+
           <Card title="Team Info" accent="text-blue-400">
             <div className="space-y-2.5">
               <InfoRow label="General Manager" value={team.gm} />
