@@ -43,16 +43,26 @@ export async function listConversations() {
     select: { id: true, name: true, code: true, logoUrl: true, gmNickname: true, passwordHash: true },
     orderBy: { name: "asc" },
   });
-  const unread = await prisma.dmMessage.groupBy({ by: ["fromTeamId"], where: { toTeamId: from, readAt: null }, _count: { _all: true } });
+  const [unread, sent, recv] = await Promise.all([
+    prisma.dmMessage.groupBy({ by: ["fromTeamId"], where: { toTeamId: from, readAt: null }, _count: { _all: true } }),
+    prisma.dmMessage.groupBy({ by: ["toTeamId"], where: { fromTeamId: from }, _max: { id: true } }),
+    prisma.dmMessage.groupBy({ by: ["fromTeamId"], where: { toTeamId: from }, _max: { id: true } }),
+  ]);
   const unreadMap = new Map(unread.map((u) => [u.fromTeamId, u._count._all]));
+  // last message id per conversation (either direction) → recency sort
+  const lastMap = new Map<number, number>();
+  for (const s of sent) lastMap.set(s.toTeamId, Math.max(lastMap.get(s.toTeamId) ?? 0, s._max.id ?? 0));
+  for (const r of recv) lastMap.set(r.fromTeamId, Math.max(lastMap.get(r.fromTeamId) ?? 0, r._max.id ?? 0));
   const out: ConvTeam[] = teams.map((t) => ({
     id: t.id, name: t.name, code: t.code, logoUrl: t.logoUrl,
-    gm: t.gmNickname, hasGm: !!t.passwordHash, unread: unreadMap.get(t.id) ?? 0,
+    gm: t.gmNickname, hasGm: !!t.passwordHash, unread: unreadMap.get(t.id) ?? 0, lastId: lastMap.get(t.id) ?? 0,
   }));
-  out.sort((a, b) => b.unread - a.unread || Number(b.hasGm) - Number(a.hasGm) || a.name.localeCompare(b.name));
+  // active conversations (most recent message) float to the top; then teams you've
+  // never messaged (GMs first, alphabetical).
+  out.sort((a, b) => b.lastId - a.lastId || Number(b.hasGm) - Number(a.hasGm) || a.name.localeCompare(b.name));
   return { ok: true as const, me: from, teams: out };
 }
-export type ConvTeam = { id: number; name: string; code: string | null; logoUrl: string | null; gm: string | null; hasGm: boolean; unread: number };
+export type ConvTeam = { id: number; name: string; code: string | null; logoUrl: string | null; gm: string | null; hasGm: boolean; unread: number; lastId: number };
 
 /** Total unread DMs for the signed-in GM (menu badge). */
 export async function unreadDmCount(): Promise<number> {
