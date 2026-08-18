@@ -3,6 +3,7 @@ import Link from "next/link";
 import { PageHeader, Card } from "@/components/ui";
 import { isAdmin } from "@/lib/auth";
 import DaySimControls from "@/components/DaySimControls";
+import ScrollToCurrent from "@/components/ScrollToCurrent";
 
 export const dynamic = "force-dynamic";
 const SEASON = "2026-27";
@@ -22,6 +23,9 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
   const played = games.filter((g) => g.status === "FINAL").length;
   const otherLeague = league === "AHL" ? "NHL" : "AHL";
   const admin = await isAdmin();
+  // the current day = the first not-yet-played game; admins jump here after a sim,
+  // GMs land at the top and scroll down.
+  const currentId = games.find((g) => g.status !== "FINAL")?.id;
 
   // global game number + group games by month
   const numById = new Map(games.map((g, i) => [g.id, i + 1]));
@@ -57,6 +61,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
       />
 
       {admin && <DaySimControls />}
+      {admin && currentId != null && <ScrollToCurrent />}
 
       <Card bodyClassName="p-0">
         {months.length === 0 && <p className="text-slate-500 text-center py-10">No games scheduled yet.</p>}
@@ -86,10 +91,11 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
                     </span>
                   </div>
                 );
+                const anchor = g.id === currentId ? { id: "current-day", className: "scroll-mt-28 ring-1 ring-inset ring-blue-500/30 bg-blue-500/[0.04]" } : {};
                 return isFinal ? (
                   <Link key={g.id} href={`/games/${g.id}`} className="block">{row}</Link>
                 ) : (
-                  <div key={g.id}>{row}</div>
+                  <div key={g.id} {...anchor}>{row}</div>
                 );
               })}
             </div>
