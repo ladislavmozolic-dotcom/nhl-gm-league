@@ -56,8 +56,6 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, side: to } : r)));
     setSaved(false); setErr(null);
   };
-  const setContract = (id: number, ct: "ONE_WAY" | "TWO_WAY" | null) =>
-    { setRows((prev) => prev.map((r) => (r.id === id ? { ...r, contractType: ct } : r))); setSaved(false); };
 
   const orgGoalies = goalies(pro) + goalies(farm);
   // BLOCKERS — hard maxima you must never exceed (they'd be illegal to ice).
@@ -118,11 +116,10 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
           <span title="Minor-league (AHL-only) contract — below the NHL minimum salary, can't be called up"
             className="text-[10px] font-bold px-1.5 py-0.5 rounded border border-emerald-600/50 text-emerald-400">AHL only</span>
         ) : (
-          <button onClick={() => setContract(p.id, oneWay ? "TWO_WAY" : "ONE_WAY")}
-            title="Toggle one-way / two-way contract"
+          <span title={oneWay ? "One-way contract — can't be sent to the farm" : "Two-way contract — can be sent to the farm"}
             className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${oneWay ? "border-amber-600/60 text-amber-400" : "border-slate-700 text-slate-400"}`}>
             {oneWay ? "1-way" : "2-way"}
-          </button>
+          </span>
         )}
         <div className="flex items-center gap-1 shrink-0">
           {p.side !== "pro" && <MoveBtn p={p} to="pro" label="↑ Pro" />}

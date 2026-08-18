@@ -41,8 +41,10 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
   // (a player currently on the NHL roster moving to the farm). One-way players
   // already sitting on the farm are grandfathered, so they don't block unrelated
   // moves like a call-up.
+  // use the DB contract type, NOT the client's — flipping the 1-way badge in the UI must
+  // not let a one-way player be buried on the farm.
   const goingDown = valid.filter((m) => m.side === "farm" || m.side === "scratched");
-  const illegalFarm = goingDown.find((m) => m.contractType === "ONE_WAY" && byId.get(m.id)!.rosterType === "NHL");
+  const illegalFarm = goingDown.find((m) => byId.get(m.id)!.contractType === "ONE_WAY" && byId.get(m.id)!.rosterType === "NHL");
   if (illegalFarm) throw new Error("A one-way contract player cannot be sent down.");
 
   // waivers ON → a non-exempt NHL player must clear the waiver wire before he drops.
@@ -86,7 +88,8 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
         teamId: m.side === "pro" ? team.id : affiliate.id,
         rosterType: m.side === "pro" ? "NHL" : "AHL",
         scratched: m.side === "scratched",
-        contractType: m.contractType,
+        // contractType is a contract term — the roster mover does NOT change it (no
+        // flipping 1-way → 2-way to bury a player).
       },
     })));
 
