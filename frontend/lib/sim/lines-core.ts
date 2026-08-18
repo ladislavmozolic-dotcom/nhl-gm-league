@@ -12,7 +12,7 @@ export const NEUTRAL_TACTIC: LineTactic = { phy: 1, df: 2, of: 2 };
 export type ForwardLine = { lw: number | null; c: number | null; rw: number | null; timePct: number; tactic?: LineTactic; puck?: PuckStyle };
 export type DefensePair = { ld: number | null; rd: number | null; timePct: number; tactic?: LineTactic; dzone?: DZone };
 /** A generic ordered special-teams / situational unit (slots + ice-time share + tactic). */
-export type SpecialUnit = { players: (number | null)[]; timePct: number; tactic?: LineTactic };
+export type SpecialUnit = { players: (number | null)[]; timePct: number; tactic?: LineTactic; dTactic?: LineTactic };
 export type Others = {
   starter: number | null; backup: number | null;
   extraForwards: (number | null)[]; // 3

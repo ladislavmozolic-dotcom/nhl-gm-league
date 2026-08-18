@@ -74,6 +74,8 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
     ...data.forwardLines.map((l) => tSum(l.tactic)),
     ...data.defensePairs.map((p) => tSum(p.tactic)),
     ...([data.situations.pp, data.situations.pk4, data.situations.pk3, data.situations.fourVFour, data.situations.overtime].flatMap((us) => us.map((u) => tSum(u.tactic)))),
+    // the split-unit DEFENSE game plans (PP/PK4/PK3/4v4) must also total 5
+    ...([data.situations.pp, data.situations.pk4, data.situations.pk3, data.situations.fourVFour].flatMap((us) => us.map((u) => tSum(u.dTactic)))),
   ].some((s) => s !== 5);
   const invalid = dupes.length > 0 || badTime.length > 0 || badTactics.length > 0 || badLineTactics;
 
@@ -167,6 +169,10 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
   };
   const setUnitTac = (key: keyof TeamLinesData["situations"] & string, ui: number, k: "phy" | "df" | "of", v: number) =>
     change((d) => { const u = (d.situations[key] as SpecialUnit[])[ui]; u.tactic = { ...tac(u.tactic), [k]: v }; });
+  // the DEFENSE game plan of a special-teams unit (its own PHY/DF/OF, parallel to the
+  // forwards' tactic on the same unit).
+  const setUnitDTac = (key: keyof TeamLinesData["situations"] & string, ui: number, k: "phy" | "df" | "of", v: number) =>
+    change((d) => { const u = (d.situations[key] as SpecialUnit[])[ui]; u.dTactic = { ...tac(u.dTactic), [k]: v }; });
   // three PHY/DF/OF steppers for one unit's tactic (clamped 0..5, red when the row ≠ 5)
   const TacCells = ({ t, onSet }: { t?: { phy: number; df: number; of: number }; onSet: (k: "phy" | "df" | "of", v: number) => void }) => {
     const tt = tac(t); const bad = tt.phy + tt.df + tt.of !== 5;
@@ -318,13 +324,14 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
             </tr>
           ))}
         </UnitBlock>
-        <UnitBlock title={`${title} — Defense`} head={["Unit", ...Array.from({ length: nD }, (_, i) => `D${i + 1}`)]}>
+        <UnitBlock title={`${title} — Defense`} head={["Unit", ...Array.from({ length: nD }, (_, i) => `D${i + 1}`), "PHY", "DF", "OF"]}>
           {units.map((u, ui) => (
             <tr key={ui} className="border-b border-slate-800/60">
               <td className="px-2 py-1.5 text-slate-500">{ui + 1}</td>
               {Array.from({ length: nD }).map((_, si) => (
                 <td key={si} className="px-2"><Select value={u.players[nF + si]} onChange={(v) => setUnit(key, ui, nF + si, v)} pool={defense} /></td>
               ))}
+              <TacCells t={u.dTactic} onSet={(k, v) => setUnitDTac(key, ui, k, v)} />
             </tr>
           ))}
         </UnitBlock>
