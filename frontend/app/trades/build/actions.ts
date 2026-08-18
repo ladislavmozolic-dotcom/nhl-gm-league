@@ -75,7 +75,7 @@ async function collectMoveOps(pkg: TradePackage) {
       let capHit = pl.capHit ?? 0;
       if (tp.retentionPct > 0 && capHit) {
         const pct = Math.min(maxPct, tp.retentionPct);
-        const retained = Math.round((capHit * pct / 100) / 100000) * 100000;
+        const retained = Math.round((capHit * pct / 100) / 50000) * 50000; // 50k granularity (½ of 8.1M = 4.05M)
         const newCap = capHit - retained;
         if (newCap < settings.retentionMinSalary) throw new Error(`Retention would drop ${pl.name} below the ${settings.retentionMinSalary.toLocaleString()} floor.`);
         capHit = newCap;

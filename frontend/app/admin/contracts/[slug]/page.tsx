@@ -43,8 +43,8 @@ export default async function ContractEditPage({
           <form action={updateContract} className="space-y-4">
             <input type="hidden" name="slug" value={player.slug} />
             <div>
-              <label className="block text-xs uppercase tracking-wide text-slate-400 mb-1">Cap Hit — full-season salary in $ (e.g. 9000000)</label>
-              <input type="number" step="100000" min="0" name="capHit" defaultValue={player.capHit ?? ""} className={inputCls} />
+              <label className="block text-xs uppercase tracking-wide text-slate-400 mb-1">Cap Hit — full-season salary in $ (50k steps, e.g. 4050000)</label>
+              <input type="number" step="50000" min="0" name="capHit" defaultValue={player.capHit ?? ""} className={inputCls} />
             </div>
             <div>
               <label className="block text-xs uppercase tracking-wide text-slate-400 mb-1">Contract Length (years left)</label>
