@@ -199,7 +199,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   rewardPlayoff: 8000000, rewardCup: 3000000, rewardAhlCup: 4000000, rewardAhlFinalist: 2000000,
   duHighThreshold: 90, conRecovery: 1, conRecoveryHighDu: 2,
   conSlope: 0.015, b2bFatigue: 0.885,
-  gameVariancePct: 120, nightSigmaGoalie: 0.11, nightSigmaOff: 0.07,
+  gameVariancePct: 108, nightSigmaGoalie: 0.11, nightSigmaOff: 0.07,
   parityPct: 100,
   conShotsLow1: 23, conShotsLow2: 32, conShotsHigh1: 27, conShotsHigh2: 34,
   skaterFwdConMinutes: 22, skaterDefConMinutes: 25, skaterConDrop: 1, skaterOtDrop: 1,

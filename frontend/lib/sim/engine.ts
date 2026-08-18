@@ -1420,14 +1420,14 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     // shot in the game (unlike per-tick noise, which averages out), so a hot goalie
     // or a cold offence swings the whole result — that's where upsets come from.
     const vScale = CFG.gameVariancePct / 100;
-    st.nightOff[team.id] = Math.max(0.7, Math.min(1.3, 1 + rng.gauss() * CFG.nightSigmaOff * vScale));
+    st.nightOff[team.id] = Math.max(0.76, Math.min(1.24, 1 + rng.gauss() * CFG.nightSigmaOff * vScale));
     // A tired starter (on a back-to-back, or worn-down CON) doesn't get a flat rating
     // cut — instead his night is more VOLATILE (wider swing): rebound control, reads
     // and positioning execution waver, so he's likelier to have an off night. That's
     // the GM's cue to rest him / start the backup. CON still feeds effGoalieQuality.
     const g = team.goalie;
     const tired = (g?.fatigued ? 1.5 : 1) * (g && (g.con ?? 100) < 95 ? 1.35 : 1);
-    st.nightDef[team.id] = Math.max(0.62, Math.min(1.38, 1 - rng.gauss() * CFG.nightSigmaGoalie * vScale * tired)); // <1 = goalie stole it; tired = wider boom/bust
+    st.nightDef[team.id] = Math.max(0.66, Math.min(1.28, 1 - rng.gauss() * CFG.nightSigmaGoalie * vScale * tired)); // <1 = goalie stole it; tired = wider boom/bust
   }
 
   simulateFaceoffs(st);
