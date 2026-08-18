@@ -2,7 +2,8 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { PageHeader, Card } from "@/components/ui";
 import { getTeamSession } from "@/lib/auth";
-import { createThread, CATEGORIES } from "./actions";
+import { createThread } from "./actions";
+import { CATEGORIES } from "./categories";
 
 export const dynamic = "force-dynamic";
 

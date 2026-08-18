@@ -123,6 +123,7 @@ type SimState = {
   momoDip: Record<number, number>;  // momentum lost when this team concedes (EX softens it)
   playoff: boolean;                 // playoff game — amplifies clutch
   defChem: Record<number, number>;  // team's avg D-pair chemistry factor (a gelled, mixed pair shields better)
+  currentOnIce: Record<number, { f: SimSkater[]; d: SimSkater[] }>; // the line + pair on the ice right now (for goal on-ice sets + accurate +/-)
   shiftXg: Record<number, number>;  // on-ice net xG accrued in a player's CURRENT shift (Shift Quality)
   nightOff: Record<number, number>; // per-game offensive "form" (goals-for mult, mean 1)
   nightDef: Record<number, number>; // per-game goalie "form" facing this team (goals-against mult on opp shots, mean 1)
@@ -410,12 +411,19 @@ function recordGoal(
     if (d ? onD.length >= dSlots : onF.length >= fSlots) return;
     seenOn.add(s.id); (d ? onD : onF).push(s);
   };
+  // scoring side: the scorer + assisters slot in, the rest is the ACTUAL line/pair that
+  // was on the ice (a real C + wings, a real pair) — with a weighted backstop if short.
+  const offIce = st.currentOnIce[off.id];
   addOn(scorer);
   for (const aId of assists) addOn(skPool.find((s) => s.id === aId));
-  for (const s of weightedSample(st.rng, off.forwards, Math.min(off.forwards.length, fSlots + 3))) addOn(s);
-  for (const s of weightedSample(st.rng, off.defense, Math.min(off.defense.length, dSlots + 2))) addOn(s);
+  for (const s of offIce?.f ?? []) addOn(s);
+  for (const s of offIce?.d ?? []) addOn(s);
+  for (const s of weightedSample(st.rng, off.forwards, off.forwards.length)) addOn(s);
+  for (const s of weightedSample(st.rng, off.defense, off.defense.length)) addOn(s);
   const onFor = [...onF, ...onD];
-  const onAgainst = pickOnIce(st.rng, def);
+  // conceding side: the team's real on-ice line + pair (a modelled unit if not tracked).
+  const defIce = st.currentOnIce[def.id];
+  const onAgainst = defIce && defIce.f.length && defIce.d.length ? [...defIce.f.slice(0, 3), ...defIce.d.slice(0, 2)] : pickOnIce(st.rng, def);
 
   // +/- : even-strength AND short-handed goals count (real NHL rule); PP and SO don't.
   if (strength === "EV" || strength === "SH") {
@@ -825,6 +833,9 @@ function simulatePeriodPossession(st: SimState, period: number) {
   for (let tick = 0; tick < PERIOD_SECONDS; tick++) {
     advanceShift(st, home.id, shifts[home.id], 1, rng);
     advanceShift(st, away.id, shifts[away.id], 1, rng);
+    // snapshot the real line + pair on the ice, so a goal records the actual unit
+    st.currentOnIce[home.id] = { f: onIceF(home), d: onIceD(home) };
+    st.currentOnIce[away.id] = { f: onIceF(away), d: onIceD(away) };
     const absT = base + tick;
 
     // PK KILL momentum: a penalty that runs its full time (not ended by a PP goal)
@@ -1422,7 +1433,7 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     goals: [], penalties: [], injuries: [],
     momentum: {}, momoTime: {}, momoTau: {}, momoDip: {},
     playoff: !!opts.noShootout, // playoff series sim OT until a goal — amplifies clutch
-    defChem: {}, shiftXg: {}, nightOff: {}, nightDef: {},
+    defChem: {}, currentOnIce: {}, shiftXg: {}, nightOff: {}, nightDef: {},
     rivalry: CFG.rivalryEnabled && !!opts.rivalry,
     pulled: {},
     shootout: [],

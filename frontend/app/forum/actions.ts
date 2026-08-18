@@ -4,9 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getTeamSession } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-
-export const CATEGORIES = ["general", "trades", "league", "offtopic"] as const;
-const catOk = (c: string) => (CATEGORIES as readonly string[]).includes(c) ? c : "general";
+import { catOk } from "./categories";
 
 /** Start a new thread (with its opening post). */
 export async function createThread(formData: FormData) {
