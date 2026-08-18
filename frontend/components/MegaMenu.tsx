@@ -168,6 +168,14 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
               </div>
             ))}
 
+            {/* Messages — top-nav so a signed-in GM sees new-message badge right away */}
+            {gm && (
+              <Link href="/messages" className="relative px-2.5 py-1.5 text-[13px] font-semibold rounded-md text-slate-400 hover:text-white hover:bg-slate-800/40 whitespace-nowrap flex items-center gap-1">
+                💬 Messages
+                {(gm.unreadDm ?? 0) > 0 && <span className="min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm.unreadDm}</span>}
+              </Link>
+            )}
+
             {/* GM login / signed-in profile (with logout) */}
             <div className="relative ml-1" onMouseEnter={() => setActiveMenu("__gm")} onMouseLeave={() => setActiveMenu(null)}>
               {gm ? (
@@ -176,8 +184,8 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
                     <span className="w-6 h-6 rounded-full bg-blue-600 grid place-items-center text-[11px] font-black text-white">{gm.nickname[0]?.toUpperCase()}</span>
                     {gm.nickname}
                     <span className="text-[9px] text-slate-500">▾</span>
-                    {(((gm.admin ? (gm.pendingJoins ?? 0) : 0)) + (gm.unreadDm ?? 0)) > 0 && (
-                      <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center" title="Nové upozornenia">{(gm.admin ? (gm.pendingJoins ?? 0) : 0) + (gm.unreadDm ?? 0)}</span>
+                    {gm.admin && (gm.pendingJoins ?? 0) > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center" title={`${gm.pendingJoins} nových žiadostí o vstup`}>{gm.pendingJoins}</span>
                     )}
                   </button>
                   {activeMenu === "__gm" && (
@@ -187,10 +195,6 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
                       <a href={`/teams/${gm.slug}`} className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">{tr("ui.myTeam")}</a>
                       <a href={`/teams/${gm.slug}/profile`} className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">{tr("ui.profile")}</a>
                       <a href={`/teams/${gm.slug}/lines`} className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">{tr("ui.linesTactics")}</a>
-                      <a href="/messages" className="flex items-center justify-between px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">
-                        <span>💬 Messages</span>
-                        {(gm.unreadDm ?? 0) > 0 && <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm.unreadDm}</span>}
-                      </a>
                       {gm.admin && (
                         <>
                           <div className="my-1 border-t border-slate-700/60" />
