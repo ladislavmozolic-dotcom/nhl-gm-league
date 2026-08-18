@@ -9,7 +9,7 @@ import { useLang } from "@/components/LangProvider";
 import { dialLabel, dialDesc } from "@/lib/tactics-i18n";
 import type { GameStrategy, StratWeights } from "@/lib/sim/types";
 
-type Player = { id: number; name: string; position: string; overall: number };
+type Player = { id: number; name: string; position: string; overall: number; injured?: boolean };
 type Props = {
   teamName: string; teamSlug: string;
   players: Player[]; goalies: Player[];
@@ -89,7 +89,8 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
     const d = structuredClone(data);
     d.forwardLines.forEach((l) => { l.lw = null; l.c = null; l.rw = null; });
     d.defensePairs.forEach((p) => { p.ld = null; p.rd = null; });
-    setData(autoFill(d, players, goalies));
+    // don't auto-dress injured players
+    setData(autoFill(d, players.filter((p) => !p.injured), goalies.filter((p) => !p.injured)));
     setSaved(false);
   };
 
@@ -99,7 +100,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
       className="w-full min-w-[132px] bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-sm">
       <option value="">— empty —</option>
       {value != null && !pool.some((p) => p.id === value) && <option value={value}>{nameOf(value)}</option>}
-      {pool.map((p) => <option key={p.id} value={p.id}>{p.name} · {p.position} ({p.overall})</option>)}
+      {pool.map((p) => <option key={p.id} value={p.id} disabled={p.injured}>{p.name} · {p.position} ({p.overall}){p.injured ? " 🤕 INJ" : ""}</option>)}
     </select>
   );
 

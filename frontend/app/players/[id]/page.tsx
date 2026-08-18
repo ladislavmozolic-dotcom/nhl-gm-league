@@ -241,7 +241,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   const gameSel = { id: true, gameDate: true, homeTeamId: true, awayTeamId: true, homeGoals: true, awayGoals: true, homeTeam: { select: { code: true } }, awayTeam: { select: { code: true } } };
   const skaterLog = isGoalie ? [] : await prisma.playerGameStat.findMany({
     where: { playerId: p.id, game: nhlGL },
-    select: { teamId: true, goals: true, assists: true, points: true, shots: true, pim: true, plusMinus: true, hits: true, blocks: true, toi: true, game: { select: gameSel } },
+    select: { teamId: true, goals: true, assists: true, points: true, shots: true, pim: true, plusMinus: true, hits: true, blocks: true, toi: true, ppToi: true, pkToi: true, game: { select: gameSel } },
     orderBy: { game: { gameDate: "desc" } },
   });
   const goalieLog = isGoalie ? await prisma.goalieGameStat.findMany({

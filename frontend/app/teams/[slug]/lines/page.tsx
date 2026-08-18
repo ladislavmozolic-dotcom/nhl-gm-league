@@ -19,17 +19,17 @@ export default async function LinesPage({ params }: { params: Promise<{ slug: st
   const [skaterRows, goalieRows] = await Promise.all([
     prisma.player.findMany({
       where: { teamId: team.id, rosterType, isGoalie: false },
-      select: { id: true, name: true, position: true, overall: true },
+      select: { id: true, name: true, position: true, overall: true, injuryDaysLeft: true },
       orderBy: { overall: "desc" },
     }),
     prisma.player.findMany({
       where: { teamId: team.id, rosterType, isGoalie: true },
-      select: { id: true, name: true, position: true, overall: true },
+      select: { id: true, name: true, position: true, overall: true, injuryDaysLeft: true },
       orderBy: { overall: "desc" },
     }),
   ]);
-  const players = skaterRows.map((p) => ({ id: p.id, name: p.name, position: p.position, overall: p.overall ?? 0 }));
-  const goalies = goalieRows.map((p) => ({ id: p.id, name: p.name, position: "G", overall: p.overall ?? 0 }));
+  const players = skaterRows.map((p) => ({ id: p.id, name: p.name, position: p.position, overall: p.overall ?? 0, injured: (p.injuryDaysLeft ?? 0) > 0 }));
+  const goalies = goalieRows.map((p) => ({ id: p.id, name: p.name, position: "G", overall: p.overall ?? 0, injured: (p.injuryDaysLeft ?? 0) > 0 }));
 
   const saved = await loadTeamLines(team.id);
   const lines = saved ?? autoLines(players, goalies);

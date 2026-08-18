@@ -5,7 +5,7 @@ type GameSel = {
   homeGoals: number | null; awayGoals: number | null;
   homeTeam: { code: string | null }; awayTeam: { code: string | null };
 };
-type SkRow = { teamId: number; goals: number; assists: number; points: number; shots: number; pim: number; plusMinus: number; hits: number; blocks: number; toi: number; game: GameSel };
+type SkRow = { teamId: number; goals: number; assists: number; points: number; shots: number; pim: number; plusMinus: number; hits: number; blocks: number; toi: number; ppToi?: number; pkToi?: number; game: GameSel };
 type GlRow = { shotsAgainst: number; saves: number; goalsAgainst: number; decision: string | null; game: GameSel };
 
 const fmtDate = (d: Date | null) => (d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }) : "—");
@@ -36,7 +36,7 @@ export default function PlayerGameLog({ isGoalie, skater, goalie }: { isGoalie: 
             <th className={th}>Result</th>
             {isGoalie
               ? <>{["Dec", "SA", "SV", "GA", "SV%"].map((c) => <th key={c} className={th}>{c}</th>)}</>
-              : <>{["G", "A", "P", "+/-", "S", "PIM", "HIT", "BLK", "TOI"].map((c) => <th key={c} className={th}>{c}</th>)}</>}
+              : <>{["G", "A", "P", "+/-", "S", "PIM", "HIT", "BLK", "TOI", "PP", "PK"].map((c) => <th key={c} className={th}>{c}</th>)}</>}
           </tr>
         </thead>
         <tbody>
@@ -74,6 +74,8 @@ export default function PlayerGameLog({ isGoalie, skater, goalie }: { isGoalie: 
                 <td className="px-2.5 py-1.5 text-center tabular-nums">{r.hits}</td>
                 <td className="px-2.5 py-1.5 text-center tabular-nums">{r.blocks}</td>
                 <td className="px-2.5 py-1.5 text-center tabular-nums text-slate-400">{mmss(r.toi)}</td>
+                <td className="px-2.5 py-1.5 text-center tabular-nums text-emerald-400/80">{r.ppToi ? mmss(r.ppToi) : "—"}</td>
+                <td className="px-2.5 py-1.5 text-center tabular-nums text-sky-400/80">{r.pkToi ? mmss(r.pkToi) : "—"}</td>
               </tr>
             );
           })}
