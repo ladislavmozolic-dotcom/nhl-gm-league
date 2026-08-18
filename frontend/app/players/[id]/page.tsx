@@ -7,6 +7,8 @@ import { posGroup, ratingColor, ovColor } from "@/lib/ratingBands";
 import { playerType } from "@/lib/player-type";
 import { playerCareer } from "@/lib/career-server";
 import PlayerCareerCard from "@/components/PlayerCareerCard";
+import ProfileStatsTabs from "@/components/ProfileStatsTabs";
+import PlayerGameLog from "@/components/PlayerGameLog";
 import { playerForm } from "@/lib/form-server";
 import PlayerFormCard from "@/components/PlayerFormCard";
 import { playerHeatMap, playerDefenseMap } from "@/lib/heatmap-server";
@@ -225,12 +227,28 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   const hasNhl = isGoalie ? !!(gl.nhlReg || gl.nhlPo) : !!(sk.nhlReg || sk.nhlPo);
   const hasAhl = isGoalie ? !!(gl.ahlReg || gl.ahlPo) : !!(sk.ahlReg || sk.ahlPo);
 
-  const career = await playerCareer(p.id);
+  const careerAll = await playerCareer(p.id);
+  // Career = NHL only (AHL is shown split under "Player Stats"; career tracks the show)
+  const career = { ...careerAll, skater: careerAll.skater.filter((r) => r.league === "NHL"), goalie: careerAll.goalie.filter((r) => r.league === "NHL") };
   const form = await playerForm(p.id);
   const heatMap = await playerHeatMap(p.id);
   const defenseMap = isGoalie ? null : await playerDefenseMap(p.id);
   const goalieStats = isGoalie ? await goalieAnalytics(p.id) : null;
   const star = await starPowerForPlayer(p.id);
+
+  // NHL game-by-game log (regular season)
+  const nhlGL = { season: SEASON, status: "FINAL" as const, league: "NHL", seriesId: null };
+  const gameSel = { id: true, gameDate: true, homeTeamId: true, awayTeamId: true, homeGoals: true, awayGoals: true, homeTeam: { select: { code: true } }, awayTeam: { select: { code: true } } };
+  const skaterLog = isGoalie ? [] : await prisma.playerGameStat.findMany({
+    where: { playerId: p.id, game: nhlGL },
+    select: { teamId: true, goals: true, assists: true, points: true, shots: true, pim: true, plusMinus: true, hits: true, blocks: true, toi: true, game: { select: gameSel } },
+    orderBy: { game: { gameDate: "desc" } },
+  });
+  const goalieLog = isGoalie ? await prisma.goalieGameStat.findMany({
+    where: { playerId: p.id, started: true, game: nhlGL },
+    select: { shotsAgainst: true, saves: true, goalsAgainst: true, decision: true, game: { select: gameSel } },
+    orderBy: { game: { gameDate: "desc" } },
+  }) : [];
 
   const team = p.team as any;
   const teamCode: string = team?.code ?? team?.name ?? "—";
@@ -406,16 +424,19 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         </div>
       )}
 
-      {/* ── PLAYER STATS ─────────────────────────────────────────── */}
-      <Card title="Player Stats" bodyClassName="p-4">
-        {hasNhl || hasAhl ? (
-          <div className="space-y-6">
-            {hasNhl && <StatBlock league="NHL" cols={isGoalie ? GL_COLS : SK_COLS} reg={isGoalie ? gl.nhlReg : sk.nhlReg} po={isGoalie ? gl.nhlPo : sk.nhlPo} cellsOf={isGoalie ? glCells : skCells} team={<TeamCell />} />}
-            {hasAhl && <StatBlock league="AHL" cols={isGoalie ? GL_COLS : SK_COLS} reg={isGoalie ? gl.ahlReg : sk.ahlReg} po={isGoalie ? gl.ahlPo : sk.ahlPo} cellsOf={isGoalie ? glCells : skCells} team={<TeamCell />} />}
-          </div>
-        ) : (
-          <div className="py-8 text-center text-slate-500">No games played in {SEASON}.</div>
-        )}
+      {/* ── PLAYER STATS (Season / Game Log tabs) ─────────────────── */}
+      <Card bodyClassName="p-0">
+        <ProfileStatsTabs
+          season={hasNhl || hasAhl ? (
+            <div className="space-y-6">
+              {hasNhl && <StatBlock league="NHL" cols={isGoalie ? GL_COLS : SK_COLS} reg={isGoalie ? gl.nhlReg : sk.nhlReg} po={isGoalie ? gl.nhlPo : sk.nhlPo} cellsOf={isGoalie ? glCells : skCells} team={<TeamCell />} />}
+              {hasAhl && <StatBlock league="AHL" cols={isGoalie ? GL_COLS : SK_COLS} reg={isGoalie ? gl.ahlReg : sk.ahlReg} po={isGoalie ? gl.ahlPo : sk.ahlPo} cellsOf={isGoalie ? glCells : skCells} team={<TeamCell />} />}
+            </div>
+          ) : (
+            <div className="py-8 text-center text-slate-500">No games played in {SEASON}.</div>
+          )}
+          gameLog={<PlayerGameLog isGoalie={isGoalie} skater={skaterLog} goalie={goalieLog} />}
+        />
       </Card>
 
       {/* ── CAREER ─────────────────────────────────────────────────── */}
