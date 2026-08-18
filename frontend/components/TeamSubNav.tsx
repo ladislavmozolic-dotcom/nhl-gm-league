@@ -13,6 +13,7 @@ const LABEL_KEY: Record<string, string> = {
   "Overview (bank)": "team.overviewBank", "Dashboard & controls": "team.dashboardControls", "Trades": "team.trades",
   "Trade Block": "team.tradeBlock", "Prospects": "team.prospects", "Draft Picks": "team.draftPicks",
   "Rivals": "team.rivals", "Farm": "team.farm", "History": "team.history", "Team DNA": "team.dna",
+  "Depth Chart": "team.depthChart", "Injuries": "team.injuries",
 };
 
 type Item = { label: string; href: string; gm?: boolean };
@@ -37,6 +38,8 @@ export default function TeamSubNav({ slug, isGm, isAffiliate, farmSlug, parentSl
         { label: "Home", href: base },
         { label: "Roster", items: [
           { label: "Roster", href: `${base}/roster` },
+          { label: "Depth Chart", href: `${base}/depth-chart` },
+          { label: "Injuries", href: `${base}/injuries` },
           { label: "Lines", href: `${base}/lines`, gm: true },
           { label: "System", href: `${base}/tactics`, gm: true },
         ] },
@@ -49,6 +52,8 @@ export default function TeamSubNav({ slug, isGm, isAffiliate, farmSlug, parentSl
         { label: "Home", href: base },
         { label: "Roster", items: [
           { label: "Roster", href: `${base}/roster` },
+          { label: "Depth Chart", href: `${base}/depth-chart` },
+          { label: "Injuries", href: `${base}/injuries` },
           { label: "Roster Moves", href: `${base}/rosters`, gm: true },
           { label: "Lines", href: `${base}/lines`, gm: true },
           { label: "System", href: `${base}/tactics`, gm: true },
