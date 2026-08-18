@@ -11,6 +11,13 @@
 		file_server
 	}
 
+	# Player mug photos — 264 MB of static PNGs, too big for git, so they live on the
+	# host (/opt/mugs → /srv/mugs) and Caddy serves them directly.
+	handle /mugs/* {
+		root * /srv
+		file_server
+	}
+
 	# Everything else → the Next app.
 	handle {
 		reverse_proxy app:3000

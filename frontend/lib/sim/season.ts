@@ -193,6 +193,15 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
     const lastPlayed = await prisma.game.aggregate({ _max: { round: true }, where: { season, status: "FINAL", seriesId: null } });
     const restDays = lastPlayed._max.round != null ? Math.max(0, firstRound - lastPlayed._max.round) : 0;
     const playingTeams = [...new Set(scheduled.flatMap((g) => [g.homeTeamId, g.awayTeamId]))];
+    if (restDays > 0) {
+      // Heal active injuries for the days elapsed — days pass for EVERYONE, so this must
+      // run even when stepping one round at a time via "Sim Next Day" (advanceDay only
+      // fired on an in-call round change, so day-by-day sims never healed → injuries piled
+      // up all season). Then re-derive injured skaters' CON and clear the healed ones.
+      await prisma.player.updateMany({ where: { injuryDaysLeft: { gt: 0 } }, data: { injuryDaysLeft: { decrement: restDays } } });
+      await prisma.player.updateMany({ where: { injuryDaysLeft: { lt: 0 } }, data: { injuryDaysLeft: 0 } });
+      await updateInjuryCon();
+    }
     if (restDays > 0 && playingTeams.length) {
       // Only players who are actually RESTING recover — teams playing tonight are
       // handled by the game itself (the starter's conAfter etc.), so a starter never

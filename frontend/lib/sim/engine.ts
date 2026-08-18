@@ -20,7 +20,7 @@ import type {
 export const ENGINE_VERSION = "1.0.0";
 
 const BODY_PARTS = ["Upper Body", "Lower Body", "Knee", "Shoulder", "Ankle", "Hand", "Groin", "Concussion"];
-const INJURY_BASE = 0.22; // expected injuries per team per game at 100% (~1 in 5 games) — keeps the farm call-up pipeline busy
+const INJURY_BASE = 0.18; // expected injuries per team per game at 100% (~1 in 5.5 games)
 
 // Active tunable settings for the current game. Set at the top of simulateGame;
 // games run sequentially so a module-level value is safe. Defaults reproduce
@@ -1099,10 +1099,10 @@ function severityOf(days: number): InjurySeverity {
 // are rare. Avg ~11 days (~7 games missed at our schedule density).
 function injuryDays(st: SimState, mech: InjuryMechanism, part: string): number {
   const roll = st.rng.next();
-  let days = roll < 0.66 ? 1 + st.rng.int(6)          // day-to-day (1-6)
-    : roll < 0.92 ? 7 + st.rng.int(13)                 // week-to-week (7-19)
-    : roll < 0.985 ? 20 + st.rng.int(24)               // multi-week (20-43)
-    : 50 + st.rng.int(85);                             // long / season-ending (50-134)
+  let days = roll < 0.70 ? 1 + st.rng.int(6)          // day-to-day (1-6)
+    : roll < 0.93 ? 7 + st.rng.int(13)                 // week-to-week (7-19)
+    : roll < 0.99 ? 20 + st.rng.int(20)                // multi-week (20-39)
+    : 42 + st.rng.int(38);                             // long / season-ending (42-79)
   if (part === "Concussion") days = Math.max(days, 8 + st.rng.int(24));
   return days;
 }

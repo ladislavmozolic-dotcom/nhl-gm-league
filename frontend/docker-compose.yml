@@ -50,6 +50,7 @@ services:
       - caddy_data:/data
       - caddy_config:/config
       - uploads:/srv/uploads:ro   # serve user-uploaded logos/wordmarks directly
+      - /opt/mugs:/srv/mugs:ro    # player mug photos (static, host-provided; too big for git)
 
 volumes:
   pgdata:
