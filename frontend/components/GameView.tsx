@@ -21,6 +21,7 @@ type Goalie = {
   id: number; name: string; slug: string | null; started: boolean;
   shotsAgainst: number; saves: number; goalsAgainst: number;
   conBefore: number | null; conAfter: number | null; fatigued: boolean; decision: string | null;
+  record?: { w: number; l: number; otl: number };
   xga?: number;
   hdShotsAg?: number; hdSaves?: number; mdShotsAg?: number; mdSaves?: number; ldShotsAg?: number; ldSaves?: number;
 };
@@ -162,6 +163,9 @@ function GoalieBlock({ side }: { side: Side }) {
           <div key={g.id} className="flex items-center justify-between text-sm py-1.5 border-b border-slate-800/60">
             <span className="flex items-center gap-2">
               <Link href={`/players/${g.slug ?? g.id}`} className="font-semibold hover:text-blue-400">{g.name}</Link>
+              {g.record && (g.record.w + g.record.l + g.record.otl > 0) && (
+                <span className="text-[11px] text-slate-500 tabular-nums" title="Season record W-L-OTL (through this game)">{g.record.w}-{g.record.l}-{g.record.otl}</span>
+              )}
               {!g.started && <span className="text-[10px] uppercase text-slate-500 border border-slate-700 rounded px-1">backup</span>}
               {g.fatigued && <span className="text-[10px] uppercase text-amber-500 border border-amber-700/50 rounded px-1">b2b</span>}
             </span>
