@@ -177,7 +177,7 @@ export async function loadSimTeam(teamId: number, rosterType?: string, opts?: { 
   // at C, wingers on their natural side, D by shooting hand — off-position only
   // when a slot can't be filled). Either way the sim deploys realistic units.
   const lines = dbLines ?? autoLines(
-    skaterRows.map((p) => ({ id: p.id, position: p.position ?? "C", overall: p.overall ?? 50, shoots: p.shoots })),
+    skaterRows.map((p) => ({ id: p.id, position: p.position ?? "C", overall: p.overall ?? 50, shoots: p.shoots, df: p.df })),
     goalieRows.map((g) => ({ id: g.id, overall: g.overall ?? 50 })),
   );
   // Guarantee a legal, fully-distinct 5v5 deployment (12 different forwards + 6

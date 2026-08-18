@@ -9,7 +9,7 @@ import { useLang } from "@/components/LangProvider";
 import { dialLabel, dialDesc } from "@/lib/tactics-i18n";
 import type { GameStrategy, StratWeights } from "@/lib/sim/types";
 
-type Player = { id: number; name: string; position: string; overall: number; injured?: boolean };
+type Player = { id: number; name: string; position: string; overall: number; injured?: boolean; df?: number | null };
 type Props = {
   teamName: string; teamSlug: string;
   players: Player[]; goalies: Player[];

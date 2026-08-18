@@ -90,7 +90,7 @@ export function emptySituations(): Situations {
   };
 }
 
-type Skater = { id: number; position: string; overall: number; shoots?: string | null };
+type Skater = { id: number; position: string; overall: number; shoots?: string | null; df?: number | null };
 type Goalie = { id: number; overall: number };
 
 const isLWpos = (p: string) => p.includes("LW") || /(^|\/)L(\/|$)/.test(p);
@@ -216,21 +216,31 @@ export function autoFill(data: TeamLinesData, skaters: Skater[], goalies: Goalie
       }
     }
   };
-  // PP / 4v4 / PK4: first slots forwards, last two defense
-  const splitFill = (units: SpecialUnit[], nF: number) => {
+  // PP / 4v4 / PK4: first slots forwards, last two defense. `fPool`/`dPool` are
+  // pre-ordered for the role (PP by scoring, PK by defence). Players are deduped
+  // ACROSS the units of the group so unit 1 and unit 2 are always different players,
+  // and any ids in `usedF` (e.g. the PP forwards) are kept off the PK.
+  const splitFill = (units: SpecialUnit[], nF: number, fPool: Skater[], dPool: Skater[], usedF = new Set<number>()) => {
+    const usedD = new Set<number>();
     for (const u of units) {
-      const inUnit = new Set(u.players.filter((x): x is number => x != null));
+      // seed the used sets with any hand-set players already in the unit
+      u.players.forEach((id, i) => { if (id != null) (i < nF ? usedF : usedD).add(id); });
       for (let i = 0; i < u.players.length; i++) {
         if (u.players[i] != null) continue;
-        const pref = i < nF ? fwd : def;
-        const p = pref.find((x) => !inUnit.has(x.id)) ?? all.find((x) => !inUnit.has(x.id));
-        if (p) { u.players[i] = p.id; inUnit.add(p.id); }
+        const pool = i < nF ? fPool : dPool, used = i < nF ? usedF : usedD;
+        const p = pool.find((x) => !used.has(x.id)) ?? all.find((x) => !used.has(x.id));
+        if (p) { u.players[i] = p.id; used.add(p.id); }
       }
     }
   };
-  splitFill(d.situations.pp, 3);
-  splitFill(d.situations.fourVFour, 2);
-  splitFill(d.situations.pk4, 2);
+  const dfKey = (s: Skater) => s.df ?? 0;
+  const fwdByDf = [...fwd].sort((a, b) => dfKey(b) - dfKey(a)); // defensive forwards first (for the PK)
+  const defByDf = [...def].sort((a, b) => dfKey(b) - dfKey(a));
+  splitFill(d.situations.pp, 3, fwd, def);           // PP: best forwards (overall) + best D
+  splitFill(d.situations.fourVFour, 2, fwd, def);
+  // PK: prefer the most defensive forwards, and NOT the PP forwards (both PP units)
+  const ppFwds = new Set(d.situations.pp.flatMap((u) => u.players.slice(0, 3)).filter((x): x is number => x != null));
+  splitFill(d.situations.pk4, 2, fwdByDf, defByDf, new Set(ppFwds));
   fillUnits(d.situations.pk3, def.length >= 2 ? def : all);
   fillUnits(d.situations.overtime, all);
 
