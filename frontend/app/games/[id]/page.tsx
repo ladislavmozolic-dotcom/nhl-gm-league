@@ -77,9 +77,11 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
   // "prior" = games earlier in the season than this one. Order by `round` (the
   // scheduling day) — gameDate isn't always set, which used to make this count
   // the whole season, so a game-1 scorer showed a 30-goal total.
+  // running season goal/assist totals must stay within THIS game's league — an NHL box
+  // score shows NHL totals, an AHL box score shows AHL totals (not the two combined).
   const priorGame = game.round != null
-    ? { status: "FINAL" as const, seriesId: null, season: game.season, round: { lt: game.round } }
-    : { status: "FINAL" as const, seriesId: null, season: game.season, id: { lt: game.id } };
+    ? { status: "FINAL" as const, seriesId: null, season: game.season, league: game.league, round: { lt: game.round } }
+    : { status: "FINAL" as const, seriesId: null, season: game.season, league: game.league, id: { lt: game.id } };
   const [priorGoals, priorAssists, involved] = await Promise.all([
     scorerIds.length ? prisma.gameGoal.groupBy({ by: ["scorerId"], where: { scorerId: { in: scorerIds }, game: priorGame }, _count: { _all: true } }) : Promise.resolve([]),
     assistIds.length ? prisma.playerGameStat.groupBy({ by: ["playerId"], where: { playerId: { in: assistIds }, game: priorGame }, _sum: { assists: true } }) : Promise.resolve([]),
