@@ -61,8 +61,8 @@ const LEAGUE = {
   baseConversion: 0.083,
   homeShotBonus: 1.05,
   homeConvBonus: 1.05,
-  penaltiesPerTeam: 3.2,   // penalties a team of avg discipline takes per game
-  ppConvBoost: 2.9,        // conversion multiplier on the power play
+  penaltiesPerTeam: 2.85,  // penalties a team of avg discipline takes per game (tuned: ~3.0 PP opps/team/game, NHL-realistic — was 3.2 giving ~3.6)
+  ppConvBoost: 3.1,        // conversion multiplier on the power play (tuned: PP% ~21%, NHL-realistic — was 2.9 giving ~18.4%)
   shConvPenalty: 0.45,     // conversion multiplier while shorthanded
   hitsPerTeam: 21,
   blocksPerTeam: 14,
