@@ -106,6 +106,14 @@ model Player {
   capHit               Float?
   contractYears        Int?
   contractExpiry       Int?
+  // deferred EXTENSION: a re-signed pending-UFA finishes his current deal this season,
+  // and this new contract activates at the next-season rollover (doesn't touch the cap now).
+  extCapHit            Int?
+  extYears             Int?
+  extContractType      String?
+  extClause            String?
+  extNoTradeTeams      Int[]         @default([])
+  extText              String?
   age                  Int?
   overall              Int?
   contractText         String?

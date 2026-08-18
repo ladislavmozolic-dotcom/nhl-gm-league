@@ -600,23 +600,24 @@ export async function extendContractAction(
     };
   }
 
-  const expiry = CURRENT_SEASON_START + years;
-  // twoWay already resolved from the GM's choice (offerTwoWay) above
+  // A re-signed pending-UFA finishes THIS season on his current (old) cap hit; the new
+  // deal is a deferred EXTENSION that activates at the next-season rollover. So we do
+  // NOT touch capHit/contractYears/contractExpiry now — only store the extension.
+  const fromSeason = CURRENT_SEASON_START + 1;
   const noTradeTeams = clause === "M_NTC" ? await weakestTeams(breadth ?? 12, teamId) : [];
   await prisma.player.update({
     where: { id: playerId },
     data: {
-      capHit: salary, contractYears: years, contractExpiry: expiry,
-      contractType: twoWay ? "TWO_WAY" : "ONE_WAY",
-      contractText: `$${salary.toLocaleString("en-US")} × ${years}yr (through ${expiry})`,
+      extCapHit: salary, extYears: years, extContractType: twoWay ? "TWO_WAY" : "ONE_WAY",
+      extClause: clause, extNoTradeTeams: noTradeTeams,
+      extText: `$${salary.toLocaleString("en-US")} × ${years}yr — extension from ${fromSeason}`,
       signPromiseLine: dep.line, signPromisePP: pp, signPromisePK: pk,
-      tradeClause: clause, noTradeTeams,
-      resignRound: 0, resignStatus: null, resignCounterSalary: null, resignCounterYears: null,
+      resignRound: 0, resignStatus: "extended", resignCounterSalary: null, resignCounterYears: null,
       disgruntled: false, tradeRequested: false, promiseWarnGame: null,
     },
   });
   await prisma.transaction.create({
-    data: { type: "SIGNING", message: `${team?.code ?? "?"} re-signed ${player.name} — $${(salary / 1e6).toFixed(2)}M × ${years}yr` },
+    data: { type: "SIGNING", message: `${team?.code ?? "?"} extended ${player.name} — $${(salary / 1e6).toFixed(2)}M × ${years}yr (from ${fromSeason})` },
   });
   // no revalidatePath — it would unmount the confirmation modal; client refreshes on Done.
   return { ok: true as const, signed: true, salary, years, name: player.name };
