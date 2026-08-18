@@ -13,29 +13,52 @@ export default function Messenger({ initialTeams, initialActive }: { initialTeam
   const [text, setText] = useState("");
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [sending, setSending] = useState(false);
-  const endRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const atBottomRef = useRef(true);   // is the chat scrolled to the bottom?
+  const stickBottomRef = useRef(true); // force-stick to bottom on the next render (open / send)
 
   const activeTeam = teams.find((t) => t.id === active) ?? null;
 
+  // Only replace state when something actually changed, so an unchanged 5s poll never
+  // re-renders (and never nudges the scroll).
   const loadConvo = useCallback(async (id: number) => {
     const r = await getConversation(id);
-    if (r.ok) setMsgs(r.messages);
+    if (!r.ok) return;
+    setMsgs((prev) => {
+      const same = prev.length === r.messages.length && prev.every((m, i) => m.id === r.messages[i].id && m.read === r.messages[i].read);
+      return same ? prev : r.messages;
+    });
   }, []);
 
   const refreshList = useCallback(async () => {
     const r = await listConversations();
-    if (r.ok) setTeams(r.teams);
+    if (r.ok) setTeams((prev) => {
+      const same = prev.length === r.teams.length && prev.every((t, i) => t.id === r.teams[i].id && t.unread === r.teams[i].unread);
+      return same ? prev : r.teams;
+    });
   }, []);
 
   // poll the open conversation + the list every 5s
   useEffect(() => {
     if (active == null) return;
+    stickBottomRef.current = true; // opening a chat lands at the bottom
     loadConvo(active);
     const t = setInterval(() => { loadConvo(active); refreshList(); }, 5000);
     return () => clearInterval(t);
   }, [active, loadConvo, refreshList]);
 
-  useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [msgs]);
+  // Scroll ONLY the chat container (never the page), and only when you were already at
+  // the bottom (or just opened/sent) — reading older messages won't yank you down.
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    if (stickBottomRef.current || atBottomRef.current) { el.scrollTop = el.scrollHeight; stickBottomRef.current = false; }
+  }, [msgs]);
+
+  const onListScroll = () => {
+    const el = listRef.current;
+    if (el) atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+  };
 
   const open = (id: number) => {
     setActive(id);
@@ -49,7 +72,7 @@ export default function Messenger({ initialTeams, initialActive }: { initialTeam
     setSending(true);
     const r = await sendDm(active, b, tradeUrl);
     setSending(false);
-    if (r.ok) { setText(""); setEmojiOpen(false); await loadConvo(active); }
+    if (r.ok) { setText(""); setEmojiOpen(false); stickBottomRef.current = true; await loadConvo(active); }
   };
 
   const fmtTime = (iso: string) => new Date(iso).toLocaleString("sk-SK", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -82,7 +105,7 @@ export default function Messenger({ initialTeams, initialActive }: { initialTeam
               <Link href={`/trades/build?opp=${activeTeam.id}`} className="px-3 py-1.5 rounded-lg bg-emerald-600/80 hover:bg-emerald-500 text-white text-xs font-semibold whitespace-nowrap">🔁 Propose trade</Link>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+            <div ref={listRef} onScroll={onListScroll} className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
               {msgs.length === 0 && <p className="text-center text-slate-600 text-sm py-8">No messages yet — say hi 👋</p>}
               {msgs.map((m) => (
                 <div key={m.id} className={`flex ${m.mine ? "justify-end" : "justify-start"}`}>
@@ -96,7 +119,6 @@ export default function Messenger({ initialTeams, initialActive }: { initialTeam
                   </div>
                 </div>
               ))}
-              <div ref={endRef} />
             </div>
 
             <div className="border-t border-slate-800 p-3 relative">
