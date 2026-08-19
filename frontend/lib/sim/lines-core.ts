@@ -208,14 +208,17 @@ export function autoFill(data: TeamLinesData, skaters: Skater[], goalies: Goalie
     if (pair.rd == null) pair.rd = pickD();
   }
 
-  // generic unit filler: no duplicate within a unit; prefers `pool`, falls back to all skaters
+  // generic unit filler: dedups ACROSS every unit of the group (so unit 1 and
+  // unit 2 never share a player — e.g. OT1 vs OT2), preferring `pool` then all
+  // skaters. Hand-set players are kept and seed the used set.
   const fillUnits = (units: SpecialUnit[], pool: Skater[]) => {
+    const used = new Set<number>();
+    for (const u of units) for (const id of u.players) if (id != null) used.add(id);
     for (const u of units) {
-      const inUnit = new Set(u.players.filter((x): x is number => x != null));
       for (let i = 0; i < u.players.length; i++) {
         if (u.players[i] != null) continue;
-        const p = pool.find((x) => !inUnit.has(x.id)) ?? all.find((x) => !inUnit.has(x.id));
-        if (p) { u.players[i] = p.id; inUnit.add(p.id); }
+        const p = pool.find((x) => !used.has(x.id)) ?? all.find((x) => !used.has(x.id));
+        if (p) { u.players[i] = p.id; used.add(p.id); }
       }
     }
   };
@@ -244,7 +247,9 @@ export function autoFill(data: TeamLinesData, skaters: Skater[], goalies: Goalie
   // PK: prefer the most defensive forwards, and NOT the PP forwards (both PP units)
   const ppFwds = new Set(d.situations.pp.flatMap((u) => u.players.slice(0, 3)).filter((x): x is number => x != null));
   splitFill(d.situations.pk4, 2, fwdByDf, defByDf, new Set(ppFwds));
-  fillUnits(d.situations.pk3, def.length >= 2 ? def : all);
+  // PK3 (3-on-5) = 1 defensive forward + 2 defencemen, deduped across both units.
+  splitFill(d.situations.pk3, 1, fwdByDf, defByDf, new Set(ppFwds));
+  // Overtime (3-on-3): 3 skaters per unit, unit 1 ≠ unit 2.
   fillUnits(d.situations.overtime, all);
 
   // others

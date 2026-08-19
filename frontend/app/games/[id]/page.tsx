@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import GameView from "@/components/GameView";
 import type { PbpEvent, ShootoutAttempt } from "@/lib/sim/types";
-import { loadTeamLines, autoLines, deployDistinct } from "@/lib/sim/lines";
+import { loadTeamLines, autoLines, autoFill, deployDistinct } from "@/lib/sim/lines";
 import { cleanName } from "@/lib/playerName";
 import GameIntegrity from "@/components/GameIntegrity";
 import { gameStory } from "@/lib/game-report-server";
@@ -15,10 +15,13 @@ async function buildLineGroups(teamId: number) {
   });
   const nameOf = new Map(roster.map((p) => [p.id, cleanName(p.name)]));
   const skaters = roster.filter((p) => !p.isGoalie);
-  const ld = (await loadTeamLines(teamId)) ?? autoLines(
-    skaters.map((p) => ({ id: p.id, position: p.position ?? "C", overall: p.overall ?? 50, shoots: p.shoots })),
-    roster.filter((p) => p.isGoalie).map((p) => ({ id: p.id, overall: p.overall ?? 50 })),
-  );
+  const skIn = skaters.map((p) => ({ id: p.id, position: p.position ?? "C", overall: p.overall ?? 50, shoots: p.shoots }));
+  const gkIn = roster.filter((p) => p.isGoalie).map((p) => ({ id: p.id, overall: p.overall ?? 50 }));
+  // Manager lines if set, else position-aware auto lines. Either way run autoFill
+  // so empty special-teams slots (PP/PK/4v4/OT) get a proper, deduped lineup — the
+  // stored situations can be empty, and each unit must be distinct (no OT1 = OT2,
+  // no 3 defencemen on PK3). Manager-set slots are preserved (autoFill fills only nulls).
+  const ld = autoFill((await loadTeamLines(teamId)) ?? autoLines(skIn, gkIn), skIn, gkIn);
   // Show exactly what the sim iced: 12 different forwards + 6 different D. A
   // manager double-shift (a star in two lines) is resolved to the real depth
   // players so line 4 never mirrors line 1.
