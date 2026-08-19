@@ -806,7 +806,7 @@ function fatigueMult(shiftSec: number, en: number): number {
 }
 // Advance a team's shift timers by `dur`; rotate a unit off when its shift is up
 // (new unit weighted toward the top of the depth chart). Accrues TOI on the ice.
-function advanceShift(st: SimState, teamId: number, sh: ShiftState, dur: number, rng: RNG) {
+function advanceShift(st: SimState, teamId: number, sh: ShiftState, dur: number, rng: RNG, hold = false) {
   sh.fElapsed += dur; sh.dElapsed += dur;
   // TOI is accrued in the possession tick loop against the ACTUAL on-ice unit (which
   // is the PP/PK unit during a man-advantage) — not here against the rotating line.
@@ -815,6 +815,10 @@ function advanceShift(st: SimState, teamId: number, sh: ShiftState, dur: number,
     const w = lines.map((_, i) => (i === cur ? 0 : [0.34, 0.28, 0.22, 0.16][i] ?? 0.1));
     return rng.weighted(w);
   };
+  // `hold` = this team is carrying the puck up ice — real teams don't change lines
+  // mid-rush. Keep the shift out (elapsed still climbs, so it swaps the instant the
+  // puck is away) so the scorer always matches the line on the ice for the goal.
+  if (hold) return;
   if (sh.fElapsed >= 38 + rng.int(18)) { flushShift(st, teamId, sh.fLines[sh.fIdx] ?? []); sh.fIdx = pick(sh.fLines, sh.fIdx); sh.fElapsed = 0; }
   if (sh.dElapsed >= 42 + rng.int(20)) { flushShift(st, teamId, sh.dPairs[sh.dIdx] ?? []); sh.dIdx = pick(sh.dPairs, sh.dIdx); sh.dElapsed = 0; }
 }
@@ -970,8 +974,11 @@ function simulatePeriodPossession(st: SimState, period: number) {
 
   for (let tick = 0; tick < PERIOD_SECONDS; tick++) {
     curTick = tick; // for misconduct-box substitution inside onIceF/onIceD
-    advanceShift(st, home.id, shifts[home.id], 1, rng);
-    advanceShift(st, away.id, shifts[away.id], 1, rng);
+    // hold a team's line change while it is carrying the puck up ice (not in its own
+    // zone) — no mid-rush changes, so the scorer always matches the on-ice unit.
+    const carrying = (team: SimTeam) => state === "PLAY" && carrierTeam.id === team.id && zone !== "DEF";
+    advanceShift(st, home.id, shifts[home.id], 1, rng, carrying(home));
+    advanceShift(st, away.id, shifts[away.id], 1, rng, carrying(away));
     // resolve the man-advantage FIRST so the on-ice snapshot uses PP/PK units
     curStr[home.id] = strengthAt(home, away, tick, active);
     curStr[away.id] = strengthAt(away, home, tick, active);
