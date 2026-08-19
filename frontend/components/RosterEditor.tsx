@@ -8,9 +8,10 @@ type Player = { id: number; name: string; position: string; number: number | nul
 type Props = {
   teamName: string; teamSlug: string; players: Player[];
   onSave: (slug: string, rows: RosterRow[]) => Promise<void>;
+  embedded?: boolean; // true when rendered under LinesNav (hide the own title/back links)
 };
 
-export default function RosterEditor({ teamName, teamSlug, players, onSave }: Props) {
+export default function RosterEditor({ teamName, teamSlug, players, onSave, embedded = false }: Props) {
   const [rows, setRows] = useState<Player[]>(players);
   const [pending, start] = useTransition();
   const [saved, setSaved] = useState(false);
@@ -92,17 +93,24 @@ export default function RosterEditor({ teamName, teamSlug, players, onSave }: Pr
   const goalies = rows.filter((r) => r.isGoalie);
 
   return (
-    <div className="max-w-3xl mx-auto px-4 pb-28">
-      <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
-        <div>
-          <h1 className="text-2xl font-bold">{teamName} — Roster Management</h1>
-          <div className="flex gap-3 text-sm mt-1">
-            <Link href={`/teams/${teamSlug}`} className="text-slate-400 hover:text-blue-400">← team</Link>
-            <Link href={`/teams/${teamSlug}/lines`} className="text-slate-400 hover:text-blue-400">Line editor →</Link>
-          </div>
+    <div className={embedded ? "pb-28" : "max-w-3xl mx-auto px-4 pb-28"}>
+      {embedded ? (
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <p className="text-sm text-slate-400">Set jersey <b className="text-slate-200">numbers</b> and the <b className="text-slate-200">captain (C)</b> / <b className="text-slate-200">alternates (A)</b>.</p>
+          <div className="text-xs text-slate-500">Captain: {caps}/1 · Alternates: {alts}/2</div>
         </div>
-        <div className="text-xs text-slate-500">Captain: {caps}/1 · Alternates: {alts}/2</div>
-      </div>
+      ) : (
+        <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
+          <div>
+            <h1 className="text-2xl font-bold">{teamName} — Roster Management</h1>
+            <div className="flex gap-3 text-sm mt-1">
+              <Link href={`/teams/${teamSlug}`} className="text-slate-400 hover:text-blue-400">← team</Link>
+              <Link href={`/teams/${teamSlug}/lines`} className="text-slate-400 hover:text-blue-400">Line editor →</Link>
+            </div>
+          </div>
+          <div className="text-xs text-slate-500">Captain: {caps}/1 · Alternates: {alts}/2</div>
+        </div>
+      )}
 
       {problems.length > 0 && (
         <div className="mb-4 text-sm text-red-300 bg-red-950/40 border border-red-800/50 rounded-lg px-4 py-2">
