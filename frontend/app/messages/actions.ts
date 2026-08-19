@@ -76,6 +76,21 @@ export async function listConversations() {
     id: t.id, name: t.name, code: t.code, logoUrl: t.logoUrl,
     gm: t.gmNickname, hasGm: !!t.passwordHash, unread: unreadMap.get(t.id) ?? 0, lastId: lastMap.get(t.id) ?? 0,
   }));
+  // Also surface non-NHL conversation partners the club has actually exchanged DMs with —
+  // notably the "Free Agents" club (the FA/agent that DMs offer counters & signings). Without
+  // this they'd count as unread (a notification pops) but have no thread to open.
+  const baseIds = new Set(teams.map((t) => t.id));
+  const extraIds = [...new Set([...lastMap.keys(), ...unreadMap.keys()])].filter((id) => id !== from && !baseIds.has(id));
+  if (extraIds.length) {
+    const extra = await prisma.team.findMany({ where: { id: { in: extraIds } }, select: { id: true, name: true, code: true, logoUrl: true, gmNickname: true, league: true } });
+    for (const t of extra) {
+      const isFa = t.league === "FA";
+      out.push({
+        id: t.id, name: isFa ? "Free Agent Frenzy" : t.name, code: isFa ? "FA" : t.code, logoUrl: t.logoUrl,
+        gm: isFa ? "Agent" : t.gmNickname, hasGm: true, unread: unreadMap.get(t.id) ?? 0, lastId: lastMap.get(t.id) ?? 0,
+      });
+    }
+  }
   // active conversations (most recent message) float to the top; then teams you've
   // never messaged (GMs first, alphabetical).
   out.sort((a, b) => b.lastId - a.lastId || Number(b.hasGm) - Number(a.hasGm) || a.name.localeCompare(b.name));
