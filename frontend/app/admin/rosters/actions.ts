@@ -2,7 +2,21 @@
 
 import { prisma } from "@/lib/prisma";
 import { loadSettings, saveSettings } from "@/lib/sim/settings";
+import { isAdmin } from "@/lib/auth";
+import { importRealRosters } from "@/lib/real-roster-import";
 import { revalidatePath } from "next/cache";
+
+/** Admin: fill in missing `realTeamId`s from the live NHL rosters so players the
+ *  original real-roster load missed (name-suffix mismatches) stop landing in UFA
+ *  when the league runs on Real NHL Rosters. Places matched players immediately if
+ *  already in real mode (no bank/ledger reset). */
+export async function fillRealTeamsAction() {
+  if (!(await isAdmin())) return { ok: false as const, error: "Only a league admin can do this." };
+  const r = await importRealRosters({ onlyMissing: true });
+  if (!r.ok) return r;
+  for (const p of ["/admin/rosters", "/free-agents", "/teams", "/tools/all-rosters"]) revalidatePath(p);
+  return r;
+}
 
 /**
  * Switch which roster the league uses. Reversible via the ProfiNHL snapshot.

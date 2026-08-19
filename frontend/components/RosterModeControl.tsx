@@ -1,19 +1,27 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { applyRosterMode } from "@/app/admin/rosters/actions";
+import { applyRosterMode, fillRealTeamsAction } from "@/app/admin/rosters/actions";
 
 export default function RosterModeControl({ mode, realCount, profinhlCount, profinhlCap, realCap, realCapCount }: {
   mode: string; realCount: number; profinhlCount: number; profinhlCap: string; realCap: string; realCapCount: number;
 }) {
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
+  const [fillMsg, setFillMsg] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<null | "profinhl" | "real">(null);
 
   const apply = (m: "profinhl" | "real") => start(async () => {
     setMsg(null); setConfirm(null);
     const r = await applyRosterMode(m);
     setMsg(`Applied ${r.mode === "real" ? "Real NHL" : "ProfiNHL"} rosters.`);
+  });
+
+  const fill = () => start(async () => {
+    setFillMsg(null);
+    const r = await fillRealTeamsAction();
+    if (!r.ok) { setFillMsg(`⚠ ${r.error}`); return; }
+    setFillMsg(`✅ Matched ${r.matched} player${r.matched === 1 ? "" : "s"} to their real NHL team from ${r.rostersFetched} rosters${r.placed ? " (placed onto teams)" : ""}. ${r.unmatchedCount} still unmatched (not on any current NHL roster).`);
   });
 
   const Btn = ({ m, label, desc, active }: { m: "profinhl" | "real"; label: string; desc: string; active: boolean }) => (
@@ -45,6 +53,16 @@ export default function RosterModeControl({ mode, realCount, profinhlCount, prof
       </div>
       {msg && <p className="text-green-400 text-sm mt-3">{msg}</p>}
       <p className="text-xs text-slate-500 mt-3">Switching reassigns every player&apos;s team. It&apos;s reversible (the ProfiNHL assignment is snapshotted). Do this before generating a new season&apos;s schedule.</p>
+
+      <div className="mt-5 rounded-xl border border-slate-800 bg-slate-900/40 p-4">
+        <h3 className="font-bold text-sm mb-1">Fix missing real teams</h3>
+        <p className="text-xs text-slate-400 mb-3">Some players (e.g. Marner, Wilson, Kopitar) had no real NHL team on file — names with suffixes like <code>&apos;&apos;A&apos;&apos;</code> / <code>(NTC)</code> broke the original match, so they land in Free Agency under Real rosters. This re-matches them against the live NHL rosters and fills their real team. In Real mode it also ices them immediately (no bank reset).</p>
+        <button onClick={fill} disabled={pending}
+          className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold disabled:opacity-50">
+          {pending ? "Matching…" : "Fill missing real teams from NHL.com"}
+        </button>
+        {fillMsg && <p className={`text-sm mt-3 ${fillMsg.startsWith("⚠") ? "text-rose-400" : "text-emerald-400"}`}>{fillMsg}</p>}
+      </div>
     </div>
   );
 }
