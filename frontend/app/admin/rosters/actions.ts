@@ -92,42 +92,54 @@ export async function normalizeAllRostersAction() {
     where: { league: "NHL", isAffiliate: false },
     include: { affiliateTeams: { select: { id: true } } },
   });
-  let done = 0, sentDown = 0;
+  const dressedOf = (lines: ReturnType<typeof autoLines>) => {
+    const s = new Set<number>();
+    for (const l of lines.forwardLines) for (const id of [l.lw, l.c, l.rw]) if (id != null) s.add(id);
+    for (const p of lines.defensePairs) for (const id of [p.ld, p.rd]) if (id != null) s.add(id);
+    const g = lines.situations.others;
+    if (g.starter != null) s.add(g.starter);
+    if (g.backup != null) s.add(g.backup);
+    return s;
+  };
+  const toSk = (p: { id: number; position: string | null; overall: number | null; shoots: string | null }) => ({ id: p.id, position: p.position ?? "C", overall: p.overall ?? 50, shoots: p.shoots });
+
+  let done = 0, sentDown = 0, scratched = 0;
   for (const team of teams) {
     const aff = team.affiliateTeams[0];
     if (!aff) continue;
     const orgIds = [team.id, aff.id];
-    // auto lines from the HEALTHY org players (injured aren't dressed or demoted)
     const org = await prisma.player.findMany({
       where: { teamId: { in: orgIds } },
-      select: { id: true, position: true, overall: true, isGoalie: true, shoots: true, injuryDaysLeft: true },
+      select: { id: true, position: true, overall: true, isGoalie: true, shoots: true, injuryDaysLeft: true, contractType: true },
     });
     const healthy = org.filter((p) => (p.injuryDaysLeft ?? 0) <= 0);
-    const skaters = healthy.filter((p) => !p.isGoalie).map((p) => ({ id: p.id, position: p.position ?? "C", overall: p.overall ?? 50, shoots: p.shoots }));
-    const goalies = healthy.filter((p) => p.isGoalie).map((p) => ({ id: p.id, overall: p.overall ?? 50 }));
-    const lines = autoLines(skaters, goalies);
-    const dressed = new Set<number>();
-    for (const l of lines.forwardLines) for (const id of [l.lw, l.c, l.rw]) if (id != null) dressed.add(id);
-    for (const p of lines.defensePairs) for (const id of [p.ld, p.rd]) if (id != null) dressed.add(id);
-    const g = lines.situations.others;
-    if (g.starter != null) dressed.add(g.starter);
-    if (g.backup != null) dressed.add(g.backup);
+
+    // NHL = the best auto-lined 20 PLUS every one-way player (one-way can't be sent down).
+    const nhlLines = autoLines(healthy.filter((p) => !p.isGoalie).map(toSk), healthy.filter((p) => p.isGoalie).map(toSk));
+    const nhl = dressedOf(nhlLines);
+    for (const p of healthy) if (p.contractType === "ONE_WAY") nhl.add(p.id);
+
+    // farm = the rest; dress the best 20 there, the remainder are healthy scratches.
+    const farmPool = healthy.filter((p) => !nhl.has(p.id));
+    const farmLines = autoLines(farmPool.filter((p) => !p.isGoalie).map(toSk), farmPool.filter((p) => p.isGoalie).map(toSk));
+    const farmActive = dressedOf(farmLines);
+    const nhlIds = [...nhl];
+    const farmActiveIds = farmPool.filter((p) => farmActive.has(p.id)).map((p) => p.id);
+    const farmScratchIds = farmPool.filter((p) => !farmActive.has(p.id)).map((p) => p.id);
 
     await prisma.$transaction([
-      // dressed → NHL roster
-      prisma.player.updateMany({ where: { id: { in: [...dressed] } }, data: { teamId: team.id, rosterType: "NHL", scratched: false } }),
-      // every other HEALTHY org player → the farm (injured stay put on the NHL roster)
-      prisma.player.updateMany({
-        where: { teamId: { in: orgIds }, id: { notIn: [...dressed] }, injuryDaysLeft: { lte: 0 } },
-        data: { teamId: aff.id, rosterType: "AHL", scratched: false },
-      }),
+      prisma.player.updateMany({ where: { id: { in: nhlIds } }, data: { teamId: team.id, rosterType: "NHL", scratched: false } }),
+      prisma.player.updateMany({ where: { id: { in: farmActiveIds } }, data: { teamId: aff.id, rosterType: "AHL", scratched: false } }),
+      prisma.player.updateMany({ where: { id: { in: farmScratchIds } }, data: { teamId: aff.id, rosterType: "AHL", scratched: true } }),
     ]);
-    await saveTeamLines(team.id, lines);
-    sentDown += Math.max(0, healthy.length - dressed.size);
+    await saveTeamLines(team.id, nhlLines);
+    await saveTeamLines(aff.id, farmLines);
+    sentDown += farmActiveIds.length + farmScratchIds.length;
+    scratched += farmScratchIds.length;
     done++;
   }
   for (const p of ["/teams", "/tools/all-rosters", "/admin/rosters"]) revalidatePath(p);
-  return { ok: true as const, teams: done, sentDown };
+  return { ok: true as const, teams: done, sentDown, scratched };
 }
 
 export async function getRosterConfig() {

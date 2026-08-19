@@ -14,7 +14,7 @@ export default function NormalizeRostersButton() {
     setMsg(null); setConfirm(false);
     const r = await normalizeAllRostersAction();
     if (!r.ok) { setMsg({ ok: false, text: r.error }); return; }
-    setMsg({ ok: true, text: `Done — auto-lined ${r.teams} teams and sent ${r.sentDown} players to the farms.` });
+    setMsg({ ok: true, text: `Done — auto-lined ${r.teams} teams, ${r.sentDown} players to the farms (${r.scratched} scratched). One-way players kept on the NHL roster.` });
   });
 
   return (

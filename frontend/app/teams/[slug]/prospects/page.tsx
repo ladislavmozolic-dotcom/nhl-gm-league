@@ -23,7 +23,18 @@ export default async function TeamProspectsPage({ params }: { params: Promise<{ 
   });
   const epUrl = (name: string) => `https://www.eliteprospects.com/search/player?q=${encodeURIComponent(epSearchName(name))}`;
 
-  if (team.prospects.length === 0 && reserve.length === 0) {
+  // drop prospects who are already on the org roster (NHL or AHL) — a dressing
+  // player isn't a prospect even if EliteProspects still lists him "in the system".
+  const orgPlayers = await prisma.player.findMany({
+    where: { OR: [{ teamId: team.id }, { team: { parentTeamId: team.id } }], rosterType: { in: ["NHL", "AHL"] } },
+    select: { name: true },
+  });
+  const rosterNames = new Set(orgPlayers.map((p) => cleanName(p.name).toLowerCase()));
+  const prospects = team.prospects
+    .filter((p) => !rosterNames.has(cleanName(p.name).toLowerCase()))
+    .sort((a, b) => cleanName(a.name).localeCompare(cleanName(b.name)));
+
+  if (prospects.length === 0 && reserve.length === 0) {
     return <Card><p className="text-slate-500 text-center py-8">No prospects.</p></Card>;
   }
 
@@ -57,8 +68,8 @@ export default async function TeamProspectsPage({ params }: { params: Promise<{ 
         </>
       )}
 
-      {team.prospects.length > 0 && (<>
-      <SectionTitle count={team.prospects.length}>Draft Prospects</SectionTitle>
+      {prospects.length > 0 && (<>
+      <SectionTitle count={prospects.length}>Draft Prospects</SectionTitle>
       <Card bodyClassName="p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -72,7 +83,7 @@ export default async function TeamProspectsPage({ params }: { params: Promise<{ 
               </tr>
             </thead>
             <tbody>
-              {team.prospects.map((p) => (
+              {prospects.map((p) => (
                 <tr key={p.id} className="border-b border-slate-800/40 hover:bg-slate-800/30 transition-colors last:border-0">
                   <td className="px-4 py-3 font-medium"><a href={(p as any).epUrl ?? epUrl(p.name)} target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 inline-flex items-center gap-1">{cleanName(p.name)}<span className="text-[9px] text-slate-500" aria-hidden>↗</span></a></td>
                   <td className="px-4 py-3 text-center text-slate-400">{(p as any).position || "—"}</td>

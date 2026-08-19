@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import RosterTable, { type RosterPlayer } from "@/components/RosterTable";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { money } from "@/lib/finance";
+import { cleanName } from "@/lib/playerName";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +53,14 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
   const farm = full.affiliateTeams[0]?.players ?? [];
   const farmSkaters = [...farm.filter(isFwd), ...farm.filter(isDef)];
   const farmGoalies = farm.filter((p) => p.isGoalie);
+
+  // Prospects, alphabetical, WITHOUT anyone already on the NHL or AHL roster — a
+  // player who's dressing (e.g. Florian Xhekaj, Sasha Pastujov) is a roster player,
+  // not a prospect, even if EliteProspects still lists him "in the system".
+  const rosterNames = new Set([...full.players, ...farm].map((p) => cleanName(p.name).toLowerCase()));
+  const prospects = full.prospects
+    .filter((p) => !rosterNames.has(cleanName(p.name).toLowerCase()))
+    .sort((a, b) => cleanName(a.name).localeCompare(cleanName(b.name)));
 
   const conditions = await prisma.tradeCondition.findMany({
     where: { OR: [{ fromTeamId: team.id }, { toTeamId: team.id }] },
@@ -103,8 +112,8 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
                 <th className="px-4 py-3 text-left font-medium">Prospect</th><th className="px-4 py-3 text-center font-medium">Draft Year</th><th className="px-4 py-3 text-center font-medium">Overall Pick</th>
               </tr></thead>
               <tbody>
-                {full.prospects.length === 0 && <tr><td colSpan={3} className="px-4 py-3 text-slate-600">no prospects</td></tr>}
-                {full.prospects.map((p) => (
+                {prospects.length === 0 && <tr><td colSpan={3} className="px-4 py-3 text-slate-600">no prospects</td></tr>}
+                {prospects.map((p) => (
                   <tr key={p.id} className="border-b border-slate-800/40 hover:bg-slate-800/30 transition-colors last:border-0">
                     <td className="px-4 py-3 font-medium">{p.name}</td>
                     <td className="px-4 py-3 text-center text-slate-400 tabular-nums">{p.draftYear ?? "—"}</td>
