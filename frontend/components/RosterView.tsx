@@ -19,7 +19,10 @@ export default function RosterView({ players, dressedIds }: { players: any[]; dr
   // not iced in the current lineup. They come out of the main tables and list
   // together below the goalies.
   const dressed = useMemo(() => new Set(dressedIds ?? []), [dressedIds]);
-  const hasLines = dressed.size > 0;
+  // "lines are set" only if at least one SKATER is dressed — a lineup with just the
+  // two goalies filled (empty forward/defense lines) must NOT flag every skater as
+  // non-roster.
+  const hasLines = filtered.some((p) => !p.isGoalie && dressed.has(p.id));
   const isNonRoster = (p: any) => (p.injuryDaysLeft ?? 0) > 0 || (hasLines && !dressed.has(p.id));
   const active = filtered.filter((p) => !isNonRoster(p));
   const nonRoster = filtered.filter(isNonRoster);
