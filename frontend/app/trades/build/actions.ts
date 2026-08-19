@@ -436,8 +436,10 @@ export async function respondToTrade(tradeId: number, accept: boolean) {
 
   if (!accept) {
     await prisma.trade.update({ where: { id: tradeId }, data: { status: "DECLINED", respondedAt: new Date() } });
-    await prisma.transaction.create({ data: { type: "TRADE", message: `Trade #${tradeId} was declined.` } });
-    revalidatePath("/trades");
+    // tell the proposer privately (a pending proposal is private → no public log)
+    const decliner = (await prisma.team.findUnique({ where: { id: trade.toTeamId }, select: { name: true } }))?.name ?? "The other club";
+    await prisma.dmMessage.create({ data: { fromTeamId: trade.toTeamId, toTeamId: trade.fromTeamId, body: `❌ ${decliner} declined your trade proposal (#${tradeId}).`, tradeUrl: `/trades/${tradeId}` } }).catch(() => {});
+    revalidatePath("/trades"); revalidatePath("/messages");
     return { status: "DECLINED" as const };
   }
 
@@ -450,7 +452,9 @@ export async function respondToTrade(tradeId: number, accept: boolean) {
     data: { type: "TRADE", message: `${fromTeam.name} traded ${fromNames.join(", ") || "assets"} to ${toTeam.name} for ${toNames.join(", ") || "assets"}.` },
   }));
   await prisma.$transaction(ops);
-  revalidatePath("/trades"); revalidatePath("/salary-cap"); revalidatePath("/finance");
+  // let the proposer know their deal went through
+  await prisma.dmMessage.create({ data: { fromTeamId: trade.toTeamId, toTeamId: trade.fromTeamId, body: `✅ ${toTeam.name} accepted your trade (#${tradeId}) — it's done.`, tradeUrl: `/trades/${tradeId}` } }).catch(() => {});
+  revalidatePath("/trades"); revalidatePath("/salary-cap"); revalidatePath("/finance"); revalidatePath("/messages");
   return { status: "ACCEPTED" as const };
 }
 
