@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { loadSettings, saveSettings } from "@/lib/sim/settings";
 import { isAdmin } from "@/lib/auth";
-import { importRealRosters, importRealCapHits } from "@/lib/real-roster-import";
+import { importRealRosters, importRealCapHits, importRealProspects } from "@/lib/real-roster-import";
 import { revalidatePath } from "next/cache";
 
 /** Admin: fill in missing `realTeamId`s from the live NHL rosters so players the
@@ -26,6 +26,16 @@ export async function fillRealCapsAction() {
   const r = await importRealCapHits();
   if (!r.ok) return r;
   for (const p of ["/admin/rosters", "/finance", "/salary-cap", "/teams"]) revalidatePath(p);
+  return r;
+}
+
+/** Admin: rebuild the real-source prospect pool per team from EliteProspects'
+ *  "in the system" pages (fixes clubs that had few or zero real prospects). */
+export async function fillRealProspectsAction() {
+  if (!(await isAdmin())) return { ok: false as const, error: "Only a league admin can do this." };
+  const r = await importRealProspects();
+  if (!r.ok) return r;
+  for (const p of ["/admin/rosters", "/tools/all-rosters", "/draft"]) revalidatePath(p);
   return r;
 }
 

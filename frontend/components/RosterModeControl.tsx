@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { applyRosterMode, fillRealTeamsAction, fillRealCapsAction } from "@/app/admin/rosters/actions";
+import { applyRosterMode, fillRealTeamsAction, fillRealCapsAction, fillRealProspectsAction } from "@/app/admin/rosters/actions";
 
 export default function RosterModeControl({ mode, realCount, profinhlCount, profinhlCap, realCap, realCapCount }: {
   mode: string; realCount: number; profinhlCount: number; profinhlCap: string; realCap: string; realCapCount: number;
@@ -29,6 +29,13 @@ export default function RosterModeControl({ mode, realCount, profinhlCount, prof
     const r = await fillRealCapsAction();
     if (!r.ok) { setFillMsg(`⚠ ${r.error}`); return; }
     setFillMsg(`✅ Real cap hits from CapWages: ${r.updated} of ${r.total} rostered players updated (${r.fetched} salaries fetched)${r.placed ? " — live cap hits set" : ""}.`);
+  });
+
+  const fillProspects = () => start(async () => {
+    setFillMsg(null);
+    const r = await fillRealProspectsAction();
+    if (!r.ok) { setFillMsg(`⚠ ${r.error}`); return; }
+    setFillMsg(`✅ Rebuilt real prospects from EliteProspects: ${r.inserted} across ${r.teamsDone} teams.`);
   });
 
   const Btn = ({ m, label, desc, active }: { m: "profinhl" | "real"; label: string; desc: string; active: boolean }) => (
@@ -73,6 +80,11 @@ export default function RosterModeControl({ mode, realCount, profinhlCount, prof
             className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm font-semibold disabled:opacity-50"
             title="Pull real cap hits from CapWages — takes ~1-2 minutes">
             {pending ? "Working…" : "Fill real cap hits from CapWages"}
+          </button>
+          <button onClick={fillProspects} disabled={pending}
+            className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm font-semibold disabled:opacity-50"
+            title="Rebuild real prospects per team from EliteProspects — takes ~30s">
+            {pending ? "Working…" : "Rebuild prospects from EliteProspects"}
           </button>
         </div>
         {fillMsg && <p className={`text-sm mt-3 ${fillMsg.startsWith("⚠") ? "text-rose-400" : "text-emerald-400"}`}>{fillMsg}</p>}

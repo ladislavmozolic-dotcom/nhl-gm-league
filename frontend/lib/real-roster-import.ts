@@ -42,6 +42,57 @@ async function mapPool<T, R>(items: T[], concurrency: number, fn: (t: T) => Prom
   return out;
 }
 
+// EliteProspects NHL team ids → our team code (EP ids are stable).
+const EP_TEAMS: Array<[number, string, string]> = [
+  [1580, "anaheim-ducks", "ANA"], [52, "boston-bruins", "BOS"], [53, "buffalo-sabres", "BUF"], [54, "calgary-flames", "CGY"],
+  [55, "carolina-hurricanes", "CAR"], [56, "chicago-blackhawks", "CHI"], [57, "colorado-avalanche", "COL"], [58, "columbus-blue-jackets", "CBJ"],
+  [59, "dallas-stars", "DAL"], [60, "detroit-red-wings", "DET"], [61, "edmonton-oilers", "EDM"], [62, "florida-panthers", "FLA"],
+  [79, "los-angeles-kings", "LAK"], [63, "minnesota-wild", "MIN"], [64, "montreal-canadiens", "MTL"], [65, "nashville-predators", "NSH"],
+  [66, "new-jersey-devils", "NJD"], [67, "new-york-islanders", "NYI"], [68, "new-york-rangers", "NYR"], [69, "ottawa-senators", "OTT"],
+  [70, "philadelphia-flyers", "PHI"], [71, "pittsburgh-penguins", "PIT"], [73, "san-jose-sharks", "SJS"], [27336, "seattle-kraken", "SEA"],
+  [74, "st-louis-blues", "STL"], [75, "tampa-bay-lightning", "TBL"], [76, "toronto-maple-leafs", "TOR"], [40261, "utah-mammoth", "UTA"],
+  [77, "vancouver-canucks", "VAN"], [22211, "vegas-golden-knights", "VGK"], [78, "washington-capitals", "WSH"], [9966, "winnipeg-jets", "WPG"],
+];
+const unesc = (s: string) => s.replace(/&amp;/g, "&").replace(/&#x27;/g, "'").replace(/&#039;/g, "'").replace(/&quot;/g, '"');
+
+/**
+ * Rebuild the real-source prospect pool from EliteProspects' "in the system" page
+ * for every club — the original NHL-rankings import left many teams with few or no
+ * prospects (DET/VAN/UTA had 0). Replaces `source:"real"` prospects per team.
+ */
+export async function importRealProspects() {
+  const teams = await prisma.team.findMany({ where: { league: "NHL", isAffiliate: false }, select: { id: true, code: true } });
+  const codeToId = new Map(teams.map((t) => [t.code, t.id]));
+  const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)";
+  let inserted = 0, teamsDone = 0;
+  const perTeam: Record<string, number> = {};
+  for (const [epId, slug, code] of EP_TEAMS) {
+    const tid = codeToId.get(code);
+    if (!tid) continue;
+    let html: string | null = null;
+    for (let i = 0; i < 4 && !html; i++) {
+      try { const r = await fetch(`https://www.eliteprospects.com/team/${epId}/${slug}/in-the-system`, { headers: { "User-Agent": UA }, cache: "no-store" }); if (r.ok) html = await r.text(); } catch { /* retry */ }
+      if (!html) await sleep(700 * (i + 1));
+    }
+    if (!html) continue;
+    const re = /\/player\/(\d+)\/([a-z0-9-]+)"[^>]*>\s*([^<>]{2,40}?)\s*</g;
+    const seen = new Map<string, { name: string; epUrl: string }>();
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(html))) {
+      const [, pid, pslug, raw] = m;
+      const name = unesc(raw).trim();
+      if (name && !/^\d+$/.test(name) && name.includes(" ") && !seen.has(pid)) seen.set(pid, { name, epUrl: `https://www.eliteprospects.com/player/${pid}/${pslug}` });
+    }
+    const list = [...seen.values()];
+    await prisma.prospect.deleteMany({ where: { teamId: tid, source: "real" } });
+    if (list.length) await prisma.prospect.createMany({ data: list.map((p) => ({ name: p.name, teamId: tid, source: "real", epUrl: p.epUrl })) });
+    inserted += list.length; teamsDone++; perTeam[code] = list.length;
+    await sleep(500);
+  }
+  if (teamsDone === 0) return { ok: false as const, error: "Could not reach EliteProspects." };
+  return { ok: true as const, inserted, teamsDone, perTeam };
+}
+
 /**
  * Pull each rostered player's REAL cap hit from CapWages (capwages.com) and store it
  * in `realCapHit` — and, when the league is in real mode, the live `capHit` too so
