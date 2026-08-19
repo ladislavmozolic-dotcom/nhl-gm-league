@@ -10,6 +10,7 @@ import { loadSettings } from "@/lib/sim/settings";
 import { getLang } from "@/lib/lang-server";
 import { t as translate } from "@/lib/i18n";
 import ScoreTracker from "@/components/ScoreTracker";
+import MessageNotifier from "@/components/MessageNotifier";
 import SiteBanner from "@/components/SiteBanner";
 import MegaMenu from "@/components/MegaMenu";
 import SiteFooter from "@/components/SiteFooter";
@@ -82,6 +83,7 @@ export default async function RootLayout({
       >
         <LangProvider lang={lang}>
           <ScoreTracker />
+          {gm && <MessageNotifier initialUnread={gm.unreadDm} />}
           <SiteBanner branding={branding} />
           <MegaMenu gm={gm} items={menu} lang={lang} />
           <main className="pt-4 pb-16 max-w-[1400px] mx-auto px-4 w-full flex-1">{children}</main>

@@ -4,6 +4,23 @@ import { prisma } from "@/lib/prisma";
 import { getTeamSession } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
+/** Lightweight unread-DM info for the signed-in GM — polled by the global notifier
+ *  so a new message pops a notification + refreshes the page even when idle. */
+export async function unreadDmInfo(): Promise<{ ok: boolean; count: number; from?: string }> {
+  const me = await getTeamSession();
+  if (me == null) return { ok: false, count: 0 };
+  const count = await prisma.dmMessage.count({ where: { toTeamId: me, readAt: null } });
+  let from: string | undefined;
+  if (count > 0) {
+    const latest = await prisma.dmMessage.findFirst({
+      where: { toTeamId: me, readAt: null }, orderBy: { id: "desc" },
+      select: { fromTeam: { select: { code: true, name: true } } },
+    });
+    from = latest?.fromTeam?.code || latest?.fromTeam?.name || undefined;
+  }
+  return { ok: true, count, from };
+}
+
 /** Send a DM to another team (as the signed-in GM's team). */
 export async function sendDm(toTeamId: number, body: string, tradeUrl?: string | null) {
   const from = await getTeamSession();
