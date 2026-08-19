@@ -104,8 +104,8 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
             <div className="divide-y divide-slate-800/50">
               {groups[g].map((p) => (
                 <div key={p.id} className="flex items-center justify-between py-2 text-sm">
-                  <span className="font-medium">{p.name}</span>
-                  <span className="text-xs text-slate-500">{p.contractText ?? (p.capHit ? `$${(p.capHit / 1e6).toFixed(2)}M × ${p.contractYears}yr` : "—")}</span>
+                  <span className="font-medium">{cleanName(p.name)}</span>
+                  <span className="text-xs text-slate-500">{p.capHit ? `$${(p.capHit / 1e6).toFixed(2)}M · last year` : "—"}</span>
                 </div>
               ))}
             </div>

@@ -72,7 +72,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
           <h3 className="text-lg font-bold">Re-sign {cleanName(player.name)}</h3>
           <button onClick={onClose} className="text-slate-500 hover:text-slate-200 text-xl leading-none">×</button>
         </div>
-        <p className="text-xs text-slate-500 mb-3">Current: {player.contractText ?? (player.capHit ? `${M(player.capHit)} × ${player.contractYears}yr` : "—")}</p>
+        <p className="text-xs text-slate-500 mb-3">Current: {player.capHit ? `${M(player.capHit)} · last year` : "—"}</p>
 
         {done && result && (
           <div className="text-center py-8">
@@ -205,7 +205,10 @@ export default function ReSignPanel({ teamId, players, title, blurb, accent = "t
             <div className="min-w-0">
               <span className="font-medium truncate">{cleanName(p.name)}</span>
               {p.farm && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30">AHL</span>}
-              <span className="text-xs text-slate-500 ml-2">{p.contractText ?? (p.capHit ? `${M(p.capHit)} × ${p.contractYears}yr` : "—")}</span>
+              {/* show the REAL current deal (cap hit) — the stored contractText is a stale
+                  profinhl string that can misrepresent the term; everyone here is in their
+                  final year by the query filter, so label it plainly. */}
+              <span className="text-xs text-slate-500 ml-2">{p.capHit ? `${M(p.capHit)} · last year` : "—"}</span>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {group === "RFA" && franchiseEnabled && (
