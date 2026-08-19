@@ -64,6 +64,22 @@ export default function TradeActions({ tradeId, role, admin }: { tradeId: number
                   <div className="text-sm font-bold">{ai.verdict}</div>
                   <div className="text-xs mt-1 text-slate-400">{ai.fromName}: {ai.meGives} hodnoty daných · {ai.meGets} získaných</div>
                 </div>
+                <div className="grid grid-cols-2 gap-3 mb-4 text-xs">
+                  {([[ai.fromName, ai.fromItems], [ai.toName, ai.toItems]] as const).map(([nm, items], k) => (
+                    <div key={k} className="bg-slate-800/30 rounded-lg p-2.5">
+                      <div className="font-bold text-slate-300 mb-1">{nm} dáva:</div>
+                      {items.length === 0 ? <div className="text-slate-600">— nič —</div> : items.map((it, i) => (
+                        <div key={i} className="flex justify-between gap-2 border-b border-slate-800/50 py-0.5 last:border-0"><span className="text-slate-300">{it.label}</span><span className="text-slate-500 tabular-nums">{it.value}</span></div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+                {ai.fit.length > 0 && (
+                  <div className="mb-3">
+                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Zapadnutie do tímu</div>
+                    <ul className="space-y-1">{ai.fit.map((f, i) => <li key={i} className="text-sm text-slate-200 flex gap-2"><span className="text-sky-400">▸</span><span dangerouslySetInnerHTML={{ __html: f }} /></li>)}</ul>
+                  </div>
+                )}
                 <ul className="space-y-1.5 mb-3">
                   {ai.reasoning.map((r, i) => <li key={i} className="text-sm text-slate-200 flex gap-2"><span className="text-violet-400">•</span><span dangerouslySetInnerHTML={{ __html: r }} /></li>)}
                 </ul>

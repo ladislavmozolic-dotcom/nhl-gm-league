@@ -32,7 +32,7 @@ const playerValue = (overall: number, age: number | null) => {
  *  for each club (cap, age). Pure heuristic (no external AI). Symmetric, so both
  *  the proposing and the reviewing GM see the same read. */
 export async function analyzeTradeAction(pkg: TradePackage): Promise<
-  { ok: false; error: string } | { ok: true; fromName: string; toName: string; meGives: number; meGets: number; verdict: string; tilt: "even" | "from" | "to"; reasoning: string[] }
+  { ok: false; error: string } | { ok: true; fromName: string; toName: string; meGives: number; meGets: number; verdict: string; tilt: "even" | "from" | "to"; reasoning: string[]; fromItems: { label: string; value: number }[]; toItems: { label: string; value: number }[]; fit: string[] }
 > {
   const [fromTeam, toTeam] = await Promise.all([
     prisma.team.findUnique({ where: { id: pkg.fromTeamId }, select: { name: true } }),
@@ -45,7 +45,7 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
   const pById = new Map(players.map((p) => [p.id, p]));
   const picks = await prisma.draftPick.findMany({ where: { id: { in: [...pkg.fromPicks, ...pkg.toPicks] } }, select: { id: true, year: true, round: true } });
   const kById = new Map(picks.map((k) => [k.id, k]));
-  const prospects = await prisma.prospect.findMany({ where: { id: { in: [...pkg.fromProspects, ...pkg.toProspects] } }, select: { id: true, overallPick: true } });
+  const prospects = await prisma.prospect.findMany({ where: { id: { in: [...pkg.fromProspects, ...pkg.toProspects] } }, select: { id: true, name: true, overallPick: true } });
   const prById = new Map(prospects.map((p) => [p.id, p]));
 
   const yearDisc = (year: number) => Math.max(0.6, 1 - Math.max(0, year - CURRENT_SEASON_START) * 0.08);
@@ -59,6 +59,19 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
 
   const meGives = sideValue(pkg.fromPlayers, pkg.fromPicks, pkg.fromProspects, pkg.fromCash);
   const meGets = sideValue(pkg.toPlayers, pkg.toPicks, pkg.toProspects, pkg.toCash);
+
+  // itemised breakdown of every selected asset per side
+  const clean = (s: string) => s.replace(/''[A-Za-z]''|\s*\([^)]*\)/g, "").trim();
+  const sideItems = (pls: TradePlayer[], pk: number[], pr: number[], cash: number): { label: string; value: number }[] => {
+    const out: { label: string; value: number }[] = [];
+    for (const x of pls) { const p = pById.get(x.playerId); out.push({ label: `${p ? clean(p.name) : `#${x.playerId}`}${p?.overall ? ` (${p.overall} OV${p.position ? `, ${p.position}` : ""})` : ""}${x.retentionPct ? ` · ${x.retentionPct}% ret.` : ""}`, value: playerValue(p?.overall ?? 45, p?.age ?? null) }); }
+    for (const id of pk) { const k = kById.get(id); out.push({ label: k ? `Pick ${k.year} R${k.round}` : `Pick #${id}`, value: kv(id) }); }
+    for (const id of pr) { const p = prById.get(id); out.push({ label: `Prospekt: ${p ? clean(p.name) : `#${id}`}`, value: prv(id) }); }
+    if (cash > 0) out.push({ label: `Cash $${cash.toLocaleString("en-US")}`, value: cashV(cash) });
+    return out;
+  };
+  const fromItems = sideItems(pkg.fromPlayers, pkg.fromPicks, pkg.fromProspects, pkg.fromCash);
+  const toItems = sideItems(pkg.toPlayers, pkg.toPicks, pkg.toProspects, pkg.toCash);
   const bal = meGets - meGives;
   const pct = bal / Math.max(1, (meGives + meGets) / 2);
   const tilt: "even" | "from" | "to" = Math.abs(pct) < 0.12 ? "even" : bal > 0 ? "from" : "to";
@@ -85,7 +98,35 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
   if (retained.length) reasoning.push(`Retencia: ${retained.length} hráč(ov) so zadržaným platom — mení reálny cap náklad.`);
   reasoning.push(tilt === "even" ? "Doporučenie: férová výmena, dá sa akceptovať." : `Doporučenie: ${winner} z nej ťaží — druhá strana by mala pridať hodnotu alebo zvážiť odmietnutie.`);
 
-  return { ok: true, fromName: fromTeam.name, toName: toTeam.name, meGives, meGets, verdict, tilt, reasoning };
+  // roster-fit: where would each incoming player slot on his NEW club, and does he
+  // fill a need there? (fromPlayers go TO toTeam; toPlayers go TO fromTeam)
+  const grp = (pos: string | null) => { const P = (pos ?? "").toUpperCase(); if (/G/.test(P)) return "G"; if (/(^|\/)D(\/|$)|^D$/.test(P)) return "D"; if (/C/.test(P)) return "C"; return "W"; };
+  const [fromRoster, toRoster] = await Promise.all([
+    prisma.player.findMany({ where: { teamId: pkg.fromTeamId, rosterType: "NHL" }, select: { overall: true, position: true, isGoalie: true } }),
+    prisma.player.findMany({ where: { teamId: pkg.toTeamId, rosterType: "NHL" }, select: { overall: true, position: true, isGoalie: true } }),
+  ]);
+  const grpLabel: Record<string, string> = { C: "centra", W: "krídla", D: "obrancu", G: "brankára" };
+  const slotFor = (g: string, slot: number) => {
+    if (g === "G") return slot === 1 ? "brankársku jednotku" : "brankársku dvojku";
+    if (g === "D") return slot <= 2 ? "1. obranný pár" : slot <= 4 ? "top-4 obranu" : slot <= 6 ? "3. obranný pár" : "7. obrancu / farmu";
+    return slot <= 3 ? "elitnú lajnu" : slot <= 6 ? "top-6 útok" : slot <= 9 ? "3. lajnu" : slot <= 12 ? "4. lajnu" : "13. útočníka / farmu";
+  };
+  const fit: string[] = [];
+  const analyzeFit = (movers: TradePlayer[], destRoster: { overall: number | null; position: string | null; isGoalie: boolean }[], destName: string) => {
+    for (const x of movers) {
+      const p = pById.get(x.playerId); if (!p) continue;
+      const g = grp(p.position); const ov = p.overall ?? 45;
+      const same = destRoster.filter((r) => grp(r.position) === g);
+      const better = same.filter((r) => (r.overall ?? 0) > ov).length;
+      const goodAt = same.filter((r) => (r.overall ?? 0) >= 55).length;
+      const need = (g === "C" && goodAt < 3) || (g === "W" && goodAt < 6) || (g === "D" && goodAt < 5) || (g === "G" && goodAt < 2);
+      fit.push(`→ <b>${destName}</b>: ${clean(p.name)} (${ov} OV) by obsadil <b>${slotFor(g, better + 1)}</b>${need ? ` — <b>kryje slabšie miesto na poste ${grpLabel[g]}</b>` : ""}.`);
+    }
+  };
+  analyzeFit(pkg.fromPlayers, toRoster, toTeam.name);
+  analyzeFit(pkg.toPlayers, fromRoster, fromTeam.name);
+
+  return { ok: true, fromName: fromTeam.name, toName: toTeam.name, meGives, meGets, verdict, tilt, reasoning, fromItems, toItems, fit };
 }
 
 /** Analyse an already-proposed trade by id — so the reviewing GM can verify it
