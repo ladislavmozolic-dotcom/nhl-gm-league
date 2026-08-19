@@ -111,7 +111,7 @@ export default async function TradePage({ params }: { params: Promise<{ id: stri
 
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <p className="text-xs text-slate-600">{trade.createdAt.toLocaleDateString("sk-SK", { day: "numeric", month: "long", year: "numeric" })}</p>
-          {(role || admin) && <TradeActions tradeId={trade.id} role={role} admin={admin} />}
+          {(role || admin) && <TradeActions tradeId={trade.id} role={role} admin={admin} pending={trade.status === "PENDING"} />}
         </div>
         {!role && !admin && trade.status === "PENDING" && (
           <p className="text-xs text-slate-500 mt-3">Sign in as {toTeam?.name ?? "the receiving club"} to accept or decline this proposal.</p>

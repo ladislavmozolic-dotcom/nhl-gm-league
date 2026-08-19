@@ -151,7 +151,7 @@ function TradeCard({ trade, action, admin }: {
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-xs text-slate-600">{trade.createdAt.toLocaleDateString("sk-SK", { day: "numeric", month: "long", year: "numeric" })}</p>
-        {(action || admin) && <TradeActions tradeId={trade.id} role={action} admin={admin} />}
+        {(action || admin) && <TradeActions tradeId={trade.id} role={action} admin={admin} pending={trade.status === "PENDING"} />}
       </div>
     </div>
   );

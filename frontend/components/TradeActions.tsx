@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { respondToTrade, cancelTrade, deleteTradeAction, analyzeTradeByIdAction } from "@/app/trades/build/actions";
 
-export default function TradeActions({ tradeId, role, admin }: { tradeId: number; role?: "receiver" | "proposer" | null; admin?: boolean }) {
+export default function TradeActions({ tradeId, role, admin, pending: isPending }: { tradeId: number; role?: "receiver" | "proposer" | null; admin?: boolean; pending?: boolean }) {
   const [pending, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
   const [aiPending, aiStart] = useTransition();
@@ -34,6 +34,21 @@ export default function TradeActions({ tradeId, role, admin }: { tradeId: number
           {pending ? "…" : "Cancel proposal"}
         </button>
       ) : null}
+      {/* Commissioner override — approve/decline on the receiving GM's behalf (a GM who
+          couldn't confirm his own trade). Only for a still-pending trade, and only when
+          the comish isn't already the receiver (who has the normal buttons above). */}
+      {admin && isPending && role !== "receiver" && (
+        <>
+          <button onClick={() => run(() => respondToTrade(tradeId, true))} disabled={pending}
+            className="px-4 py-1.5 rounded-lg bg-fuchsia-700 hover:bg-fuchsia-600 text-white text-sm font-semibold disabled:opacity-40" title="Commissioner: approve this trade on the receiving GM's behalf">
+            {pending ? "…" : "★ Approve (Comish)"}
+          </button>
+          <button onClick={() => run(() => respondToTrade(tradeId, false))} disabled={pending}
+            className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-semibold disabled:opacity-40" title="Commissioner: decline this trade">
+            Decline (Comish)
+          </button>
+        </>
+      )}
       {admin && (
         <button
           onClick={() => { if (confirm("Delete this trade record? This removes it entirely (does not reverse an already-applied deal).")) run(() => deleteTradeAction(tradeId)); }}

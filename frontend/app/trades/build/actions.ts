@@ -432,7 +432,10 @@ export async function respondToTrade(tradeId: number, accept: boolean) {
   const trade = await prisma.trade.findUnique({ where: { id: tradeId } });
   if (!trade) throw new Error("Trade not found");
   if (trade.status !== "PENDING") throw new Error("This trade is no longer pending.");
-  if (session !== trade.toTeamId) throw new Error("Only the receiving GM can respond to this trade.");
+  // the receiving GM responds; the commissioner may respond on his behalf (e.g. a GM
+  // who couldn't confirm it himself).
+  const admin = await isAdmin();
+  if (session !== trade.toTeamId && !admin) throw new Error("Only the receiving GM (or the commissioner) can respond to this trade.");
 
   if (!accept) {
     await prisma.trade.update({ where: { id: tradeId }, data: { status: "DECLINED", respondedAt: new Date() } });

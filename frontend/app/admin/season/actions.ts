@@ -178,8 +178,11 @@ export async function simNextDayAction() {
   await fillAhlFromScratched(); // farms activate healthy scratches so their games sim
   const r = await playScheduledGames({ season: SEASON, round: next.round, actor: await commissionerName() });
   await processFinances(SEASON, "NHL");
-  for (const p of ["/schedule", "/standings", "/scores", "/stats/players", "/admin/season", "/finance"]) revalidatePath(p);
-  return { played: r.played, round: next.round, date: next.gameDate, done: false };
+  // resolve any in-season UFA deliberation window that's come due — so signings progress
+  // even when the season is moved via game-sim (not just the calendar's Advance Day).
+  const inSeasonFa = await resolveInSeasonWindows(await getLeagueDate());
+  for (const p of ["/schedule", "/standings", "/scores", "/stats/players", "/admin/season", "/finance", "/free-agents", "/signings"]) revalidatePath(p);
+  return { played: r.played, round: next.round, date: next.gameDate, done: false, signed: inSeasonFa.signed };
 }
 
 const DRAFT_ROUNDS = [1, 2, 3, 4, 5, 6, 7];
