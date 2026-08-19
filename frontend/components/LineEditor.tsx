@@ -46,6 +46,8 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
   const byName = (a: Player, b: Player) => a.name.localeCompare(b.name);
   const forwards = useMemo(() => players.filter((p) => !isD(p.position)).sort(byName), [players]);
   const defense = useMemo(() => players.filter((p) => isD(p.position)).sort(byName), [players]);
+  // PP point slots accept a forward too (4F–1D power play) — defencemen listed first
+  const ppPointPool = useMemo(() => [...defense, ...forwards], [defense, forwards]);
   const goaliesByName = useMemo(() => [...goalies].sort(byName), [goalies]);
 
   // duplicates that matter: the same player twice inside ONE line/pair/unit
@@ -316,12 +318,13 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
   // style) — wider dropdowns so full names read cleanly. The first `nF` slots are
   // forwards, the next `nD` are defense. Tactic (PHY/DF/OF) + Time % live on the
   // forwards table (one game plan per unit); the defense table shows the pairing.
-  const SplitUnitSection = (key: "pp" | "fourVFour" | "pk4" | "pk3", title: string, fLabels: string[], dLabels: string[]) => {
+  const SplitUnitSection = (key: "pp" | "fourVFour" | "pk4" | "pk3", title: string, fLabels: string[], dLabels: string[], dPool: Player[] = defense, dHint?: string) => {
     const units = data.situations[key];
     const nF = fLabels.length, nD = dLabels.length;
     return (
       <div className="space-y-4">
         <p className="text-xs text-slate-500 px-1">💡 Put a real <strong className="text-slate-300">C</strong> in the <strong className="text-slate-300">C</strong> spot — the sim uses a center from the unit to take the faceoff (his <strong>FO</strong> rating decides the draw). No center on the unit = a winger takes it with a weak FO.</p>
+        {dHint && <p className="text-xs text-slate-500 px-1">{dHint}</p>}
         <UnitBlock title={`${title} — Forwards`} head={["Unit", ...fLabels, "PHY", "DF", "OF", "Time %"]} timeTotal={timeSum(units)}>
           {units.map((u, ui) => (
             <tr key={ui} className="border-b border-slate-800/60">
@@ -339,7 +342,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
             <tr key={ui} className="border-b border-slate-800/60">
               <td className="px-2 py-1.5 text-slate-500">{ui + 1}</td>
               {Array.from({ length: nD }).map((_, si) => (
-                <td key={si} className="px-2"><Select value={u.players[nF + si]} onChange={(v) => setUnit(key, ui, nF + si, v)} pool={defense} /></td>
+                <td key={si} className="px-2"><Select value={u.players[nF + si]} onChange={(v) => setUnit(key, ui, nF + si, v)} pool={dPool} /></td>
               ))}
               <TacCells t={u.dTactic} onSet={(k, v) => setUnitDTac(key, ui, k, v)} />
             </tr>
@@ -428,7 +431,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
 
       {tab === "Forward" && <>{ForwardSection}<p className="text-xs text-slate-500 mt-2 px-1">💡 <strong>System</strong>: give a line its own Puck Style (else it inherits the team system from <em>Team → System</em>). E.g. set your 4th line to <em>Cycle</em> while the team runs <em>Rush</em>. Tempo &amp; Forecheck stay team-wide.</p></>}
       {tab === "Defense" && <>{DefenseSection}<p className="text-xs text-slate-500 mt-2 px-1">💡 <strong>System</strong>: give a pair its own D-Zone (else it inherits the team system). E.g. a <em>Collapse</em> shut-down pair for defending a lead.</p></>}
-      {tab === "PP" && <>{FormationPicker("ppStyle", "Power-play formation")}{SplitUnitSection("pp", "Power Play (5 on 4)", ["LW", "C", "RW"], ["LD", "RD"])}</>}
+      {tab === "PP" && <>{FormationPicker("ppStyle", "Power-play formation")}{SplitUnitSection("pp", "Power Play (5 on 4)", ["LW", "C", "RW"], ["LD", "RD"], ppPointPool, "💡 Na presilovke môžeš do modrej (LD/RD) dať aj útočníka — dropdown ponúka obrancov aj útočníkov, takže sa dá hrať 4 útočníci + 1 obranca.")}</>}
       {tab === "4 vs 4" && SplitUnitSection("fourVFour", "4 vs 4", ["C", "W"], ["LD", "RD"])}
       {tab === "PK4" && <>{FormationPicker("pkStyle", "Penalty-kill structure")}{SplitUnitSection("pk4", "Penalty Kill (4 on 5)", ["C", "W"], ["LD", "RD"])}</>}
       {tab === "PK3" && SplitUnitSection("pk3", "Penalty Kill (3 on 5)", ["C"], ["LD", "RD"])}
