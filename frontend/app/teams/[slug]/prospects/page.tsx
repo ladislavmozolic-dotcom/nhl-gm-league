@@ -29,9 +29,10 @@ export default async function TeamProspectsPage({ params }: { params: Promise<{ 
     where: { OR: [{ teamId: team.id }, { team: { parentTeamId: team.id } }], rosterType: { in: ["NHL", "AHL"] } },
     select: { name: true },
   });
-  const rosterNames = new Set(orgPlayers.map((p) => cleanName(p.name).toLowerCase()));
+  const pKey = (n: string) => epSearchName(n).toLowerCase();
+  const rosterNames = new Set(orgPlayers.map((p) => pKey(p.name)));
   const prospects = team.prospects
-    .filter((p) => !rosterNames.has(cleanName(p.name).toLowerCase()))
+    .filter((p) => !rosterNames.has(pKey(p.name)))
     .sort((a, b) => cleanName(a.name).localeCompare(cleanName(b.name)));
 
   if (prospects.length === 0 && reserve.length === 0) {

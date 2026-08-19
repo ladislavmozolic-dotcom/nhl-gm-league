@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import RosterTable, { type RosterPlayer } from "@/components/RosterTable";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { money } from "@/lib/finance";
-import { cleanName } from "@/lib/playerName";
+import { cleanName, epSearchName } from "@/lib/playerName";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,7 @@ const ROUNDS = [1, 2, 3, 4, 5, 6, 7];
 export default async function AllRostersPage({ searchParams }: { searchParams: Promise<{ team?: string }> }) {
   const teams = await prisma.team.findMany({
     where: { league: "NHL", isAffiliate: false },
-    select: { id: true, name: true, code: true, slug: true, logoUrl: true },
+    select: { id: true, name: true, code: true, slug: true, logoUrl: true, profinhlLogoId: true },
     orderBy: { name: "asc" },
   });
   if (teams.length === 0) return <div className="py-2">No teams.</div>;
@@ -35,6 +35,8 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
   if (!full) return <div className="py-2">Team not found.</div>;
 
   const logoById = new Map(teams.map((t) => [t.id, t]));
+  // draft picks carry ownerLogoId = the owner's profinhlLogoId (1-32 ordinal), NOT team.id
+  const logoByProfinhl = new Map(teams.map((t) => [t.profinhlLogoId, t]));
   const realMode = cfg?.rosterMode === "real";
   // goalie-only attrs (sz/ag/rb/hs/rt) live on GoalieRating — merge them onto the row.
   // In Real NHL Rosters mode show the REAL contract (cap hit) so the column isn't a
@@ -57,9 +59,12 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
   // Prospects, alphabetical, WITHOUT anyone already on the NHL or AHL roster — a
   // player who's dressing (e.g. Florian Xhekaj, Sasha Pastujov) is a roster player,
   // not a prospect, even if EliteProspects still lists him "in the system".
-  const rosterNames = new Set([...full.players, ...farm].map((p) => cleanName(p.name).toLowerCase()));
+  // normalise for matching: epSearchName strips (R)/''A''/(NTC) suffixes so a roster
+  // player "Rutger McGroarty (R)" matches the prospect "Rutger McGroarty".
+  const pKey = (n: string) => epSearchName(n).toLowerCase();
+  const rosterNames = new Set([...full.players, ...farm].map((p) => pKey(p.name)));
   const prospects = full.prospects
-    .filter((p) => !rosterNames.has(cleanName(p.name).toLowerCase()))
+    .filter((p) => !rosterNames.has(pKey(p.name)))
     .sort((a, b) => cleanName(a.name).localeCompare(cleanName(b.name)));
 
   const conditions = await prisma.tradeCondition.findMany({
@@ -146,7 +151,7 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
                         <td key={round} className="px-2 py-3 text-center">
                           <div className="flex items-center justify-center gap-1">
                             {picks.map((pk) => {
-                              const owner = logoById.get(pk.ownerLogoId);
+                              const owner = logoByProfinhl.get(pk.ownerLogoId);
                               return owner?.logoUrl
                                 ? <img key={pk.id} src={owner.logoUrl} alt={owner.code ?? ""} title={owner.name} className="w-6 h-6 object-contain" />
                                 : <span key={pk.id} className="text-[10px] text-slate-500">{owner?.code ?? "•"}</span>;
