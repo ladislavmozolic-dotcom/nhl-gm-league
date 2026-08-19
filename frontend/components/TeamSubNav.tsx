@@ -71,13 +71,11 @@ export default function TeamSubNav({ slug, isGm, isAffiliate, farmSlug, parentSl
         { label: "Schedule", href: `${base}/schedule` },
         { label: "Scores", href: `${base}/scores` },
         { label: "Statistics", href: `${base}/stats` },
-        { label: "Contracts", items: [
-          { label: "Free Agents", href: `${base}/free-agents`, gm: true },
-          { label: "Team Contracts", href: `${base}/contracts`, gm: true },
+        { label: "Finance & Contracts", items: [
           { label: "Salary Cap", href: `${base}/salary` },
-        ] },
-        { label: "Finance", items: [
-          { label: "Overview (bank)", href: `${base}/finance` },
+          { label: "Team Contracts", href: `${base}/contracts`, gm: true },
+          { label: "Free Agents", href: `${base}/free-agents`, gm: true },
+          { label: "Arena & Tickets", href: `${base}/finance` },
           { label: "Dashboard & controls", href: "/finance/dashboard", gm: true },
         ] },
         { label: "Trades", items: [
