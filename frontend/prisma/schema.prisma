@@ -643,6 +643,8 @@ model Game {
   seed              Int?
   engineVersion     String?          // sim engine that produced this game (e.g. "1.0.0")
   simCount          Int              @default(0) // how many times this game has been simulated (>1 = re-simulated)
+  attendance        Int?             // actual crowd at this (home) game, stored at sim time
+  gate              Int?             // actual ticket gate revenue for this game, stored at sim time
   lastSimBy         String?          // who ran the most recent simulation (commissioner name / "Auto-sim")
   lastSimAt         DateTime?        // when the most recent simulation ran
   playByPlay        Json?

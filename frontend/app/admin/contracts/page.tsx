@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { PageHeader, Card } from "@/components/ui";
-import { money } from "@/lib/finance";
+import { money, seasonLabel, CURRENT_SEASON_START } from "@/lib/finance";
 import { isAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -61,7 +61,9 @@ export default async function AdminContractsPage({ searchParams }: { searchParam
                   <td className="px-3 py-3 text-slate-400">{player.team.code ?? player.team.name}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{player.capHit ? money(player.capHit) : "—"}</td>
                   <td className="px-4 py-3 text-center text-slate-400">{player.contractYears ?? "—"}</td>
-                  <td className="px-4 py-3 text-center text-slate-400">{player.contractExpiry ?? "—"}</td>
+                  {/* Expiry = last season under contract, derived from years remaining (the
+                      stored contractExpiry is stale for imported deals). */}
+                  <td className="px-4 py-3 text-center text-slate-400">{player.contractYears && player.contractYears > 0 ? seasonLabel(CURRENT_SEASON_START + player.contractYears - 1) : "—"}</td>
                   <td className="px-4 py-3 text-right">
                     <Link href={`/admin/contracts/${player.slug}`} className="text-blue-400 hover:text-blue-300">Edit</Link>
                   </td>

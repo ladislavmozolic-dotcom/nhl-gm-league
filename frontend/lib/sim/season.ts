@@ -14,6 +14,8 @@ import { saveGameResult } from "./persist";
 import { fixtureSeed } from "./rng";
 import { loadSettings, type EngineSettings } from "./settings";
 import { pairSig, unitPairs } from "./chemistry";
+import { computeStandings } from "./standings";
+import { getArenaSections, selloutRevenue, attendanceRate } from "../finance";
 import type { SimTeam, SimGoalie, TeamBox } from "./types";
 
 const DU_HIGH = 85; // durability at/above which CON recovers +2/day instead of +1
@@ -271,6 +273,27 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
     injuredTeams = new Set(stillHurt.map((r) => r.teamId));
   };
 
+  // Attendance/gate context — computed once per call. Base draw per club from
+  // popularity + record (as of now) + opponent quality; arena sellout sets the gate.
+  // Stored on each home game so the crowd figure is a real, locked-in record.
+  const attStandings = await computeStandings(season, "NHL").catch(() => [] as Awaited<ReturnType<typeof computeStandings>>);
+  const pctBy = new Map(attStandings.map((s) => [s.teamId, s.pointsPct]));
+  const finTeams = await prisma.team.findMany({ where: { league: "NHL" }, select: { id: true, popularity: true, capacity: true, arenaSections: true } });
+  const finBy = new Map(finTeams.map((t) => {
+    const secs = getArenaSections(t);
+    return [t.id, { pop: t.popularity ?? 100, capacity: secs.reduce((a, x) => a + x.capacity, 0), sellout: selloutRevenue(secs) }];
+  }));
+  const storeAttendance = async (gm: { id: number; homeTeamId: number; awayTeamId: number; league: string | null }) => {
+    if (gm.league === "AHL") return;
+    const fin = finBy.get(gm.homeTeamId);
+    if (!fin || fin.capacity <= 0) return;
+    const base = attendanceRate(fin.pop, pctBy.get(gm.homeTeamId) ?? 0.5);
+    const jitter = (((gm.id * 2654435761) >>> 0) % 1000) / 1000;
+    const oppDraw = ((pctBy.get(gm.awayTeamId) ?? 0.5) - 0.5) * 0.10;
+    const frac = Math.max(0.4, Math.min(1, base * (1 + (jitter - 0.5) * 0.08 + oppDraw)));
+    await prisma.game.update({ where: { id: gm.id }, data: { attendance: Math.round(fin.capacity * frac), gate: Math.round(frac * fin.sellout) } });
+  };
+
   let played = 0;
   const playedIds: number[] = [];
   const skippedIds: number[] = [];
@@ -298,6 +321,7 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
     const rivalry = home.rivalTeamIds.includes(away.id) || away.rivalTeamIds.includes(home.id);
     const result = simulateGame(home, away, { seed, settings, rivalry, league: gm.league === "AHL" ? "AHL" : "NHL" });
     await saveGameResult(result, { gameId: gm.id, season, gameDate: gm.gameDate ?? seasonDateFor(season, round) });
+    await storeAttendance(gm); // lock in the real crowd + gate for this home game
 
     // coach fine: a team that racks up too many penalty minutes is fined by the league
     for (const box of [result.home, result.away]) {

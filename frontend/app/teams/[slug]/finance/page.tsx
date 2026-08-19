@@ -29,7 +29,7 @@ export default async function FinancePage({ params }: { params: Promise<{ slug: 
 
   const homeFinals = await prisma.game.findMany({
     where: { season: SEASON, status: "FINAL", homeTeamId: team.id, seriesId: null },
-    select: { id: true, gameDate: true, awayTeamId: true, homeGoals: true, awayGoals: true, homeShots: true },
+    select: { id: true, gameDate: true, awayTeamId: true, homeGoals: true, awayGoals: true, attendance: true, gate: true },
     orderBy: [{ gameDate: "asc" }, { id: "asc" }],
   });
   const oppIds = [...new Set(homeFinals.map((g) => g.awayTeamId))];
@@ -39,12 +39,18 @@ export default async function FinancePage({ params }: { params: Promise<{ slug: 
   const oppRate = new Map(standings.map((s) => [s.teamId, s.pointsPct]));
 
   const homeGames: HomeGame[] = homeFinals.map((g) => {
-    const jitter = (((g.id * 2654435761) >>> 0) % 1000) / 1000; // 0..1, stable per game
-    const oppDraw = ((oppRate.get(g.awayTeamId) ?? 0.5) - 0.5) * 0.10; // ±5% by visitor quality
-    const factor = 1 + (jitter - 0.5) * 0.08 + oppDraw;               // ±4% jitter + opp draw
-    const frac = Math.max(0.4, Math.min(1, baseRate * factor));
-    const attended = Math.round(capacity * frac);
-    const gate = Math.round(frac * sellout);
+    // prefer the REAL attendance stored at sim time; fall back to the model for games
+    // played before attendance tracking existed.
+    let attended: number, gate: number;
+    if (g.attendance != null && g.gate != null) {
+      attended = g.attendance; gate = g.gate;
+    } else {
+      const jitter = (((g.id * 2654435761) >>> 0) % 1000) / 1000;
+      const oppDraw = ((oppRate.get(g.awayTeamId) ?? 0.5) - 0.5) * 0.10;
+      const frac = Math.max(0.4, Math.min(1, baseRate * (1 + (jitter - 0.5) * 0.08 + oppDraw)));
+      attended = Math.round(capacity * frac); gate = Math.round(frac * sellout);
+    }
+    const frac = capacity > 0 ? attended / capacity : 0;
     const hg = g.homeGoals ?? 0, ag = g.awayGoals ?? 0;
     const result = hg > ag ? "W" : hg < ag ? "L" : "T";
     const o = oppBy.get(g.awayTeamId);
