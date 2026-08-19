@@ -2,21 +2,18 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { ROSTER_LIMITS, type MoveRow } from "@/lib/roster-rules";
+import { ROSTER_LIMITS, isNhlSide, type MoveRow, type RosterSide } from "@/lib/roster-rules";
 
-type RosterSide = "pro" | "farm" | "scratched";
 type Player = {
   id: number; name: string; position: string; overall: number;
   isGoalie: boolean; side: RosterSide; contractType: "ONE_WAY" | "TWO_WAY" | null;
   capHit: number;
 };
 
-// Below the NHL minimum salary → a minor-league (AHL-only) contract. These
-// players can't be called up to the NHL roster.
+// Below the NHL minimum salary → a minor-league (AHL-only) contract. Such a player
+// (incl. every $100k farm deal) can NEVER be on the NHL roster — dressed OR scratched.
 const NHL_MIN = 775_000;
-// "AHL only" = a genuine minor-league deal (below the NHL minimum AND no NHL contract
-// type). A two-way / one-way player is NHL-eligible even at a low cap hit → callable.
-const isAhlOnly = (p: Player) => p.capHit > 0 && p.capHit < NHL_MIN && p.contractType !== "ONE_WAY" && p.contractType !== "TWO_WAY";
+const isAhlOnly = (p: Player) => p.capHit > 0 && p.capHit < NHL_MIN;
 // OV badge in green, brighter the higher the rating.
 const ovColor = (ov: number) =>
   ov >= 80 ? "bg-emerald-500/30 text-emerald-200 border-emerald-400/60"
@@ -35,9 +32,9 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
   const [err, setErr] = useState<string | null>(null);
 
   const byName = (a: Player, b: Player) => a.name.localeCompare(b.name);
-  const pro = rows.filter((r) => r.side === "pro").sort(byName);
-  const farm = rows.filter((r) => r.side === "farm").sort(byName);
-  const scratched = rows.filter((r) => r.side === "scratched").sort(byName);
+  const of = (s: RosterSide) => rows.filter((r) => r.side === s).sort(byName);
+  const pro = of("pro"), proScratched = of("pro-scratched"), farm = of("farm"), farmScratched = of("farm-scratched");
+  const nhlRoster = rows.filter((r) => isNhlSide(r.side)); // dressed + scratched → cap + 23-limit
   const goalies = (l: Player[]) => l.filter((p) => p.isGoalie).length;
   const proSkaters = pro.length - goalies(pro);
   const isDef = (pos: string) => /(^|\/)D(\/|$)/.test(pos) || pos === "D";
@@ -47,10 +44,11 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
     return `${l.length - g - d}F · ${d}D · ${g}G`;
   };
 
-  // is a move legal? (down = to the farm or the scratch list)
+  // is a move legal? onto the NHL roster (dressed or scratched) an AHL-only deal can
+  // never go; down to the farm a one-way contract can never go (unless it's AHL-only).
   const canMove = (p: Player, to: RosterSide) => {
-    if (to === "pro") return !isAhlOnly(p);                             // minor-league deal can't be iced in the NHL
-    return p.contractType !== "ONE_WAY" || isAhlOnly(p);               // one-way can't be buried in the minors
+    if (isNhlSide(to)) return !isAhlOnly(p);
+    return p.contractType !== "ONE_WAY" || isAhlOnly(p);
   };
   const move = (id: number, to: RosterSide) => {
     const p = rows.find((r) => r.id === id)!;
@@ -59,21 +57,21 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
     setSaved(false); setErr(null);
   };
 
-  const orgGoalies = goalies(pro) + goalies(farm);
+  const orgGoalies = goalies(nhlRoster) + goalies(farm) + goalies(farmScratched);
   // BLOCKERS — hard maxima you must never exceed (they'd be illegal to ice).
   const blockers: string[] = [];
-  if (pro.length > ROSTER_LIMITS.proMax) blockers.push(`Pro over ${ROSTER_LIMITS.proMax} (cap limit).`);
+  if (nhlRoster.length > ROSTER_LIMITS.proMax) blockers.push(`NHL roster over ${ROSTER_LIMITS.proMax} (dressed + scratched).`);
   if (rows.length > ROSTER_LIMITS.orgMax) blockers.push(`Organization over ${ROSTER_LIMITS.orgMax} players.`);
   if (orgGoalies > ROSTER_LIMITS.orgMaxGoalies) blockers.push(`Organization over ${ROSTER_LIMITS.orgMaxGoalies} goalies.`);
   // WARNINGS — being UNDER a minimum is allowed to save: the farm auto-fills the
   // missing bodies at game time, and you often call a player up precisely to fix it.
   const warnings: string[] = [];
-  if (proSkaters < ROSTER_LIMITS.proMinSkaters) warnings.push(`Pro short of ${ROSTER_LIMITS.proMinSkaters} skaters — the farm auto-fills at game time.`);
-  if (goalies(pro) < ROSTER_LIMITS.proMinGoalies) warnings.push(`Pro short of ${ROSTER_LIMITS.proMinGoalies} goalies — the farm auto-fills at game time.`);
+  if (proSkaters < ROSTER_LIMITS.proMinSkaters) warnings.push(`Dressed NHL short of ${ROSTER_LIMITS.proMinSkaters} skaters — the farm auto-fills at game time.`);
+  if (goalies(pro) < ROSTER_LIMITS.proMinGoalies) warnings.push(`Dressed NHL short of ${ROSTER_LIMITS.proMinGoalies} goalies — the farm auto-fills at game time.`);
 
-  // Auto Roster — fill the NHL roster with the best available (18 skaters + 2
-  // goalies), keeping one-way players up; the next-best fill the AHL active roster
-  // (18+2); everyone else is scratched. AHL-only deals never go up.
+  // Auto Roster — dress the best available 20 (18 skaters + 2 goalies), keeping one-way
+  // players up; the next-best fill the AHL active roster (18+2); everyone else is farm-
+  // scratched. AHL-only deals never go up. NHL scratches stay empty (dress exactly 20).
   const autoRoster = () => {
     const byOV = (a: Player, b: Player) => b.overall - a.overall;
     const sk = rows.filter((r) => !r.isGoalie);
@@ -88,7 +86,7 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
     const remSk = sk.filter((p) => !proIds.has(p.id)).sort(byOV);
     const remGk = gk.filter((p) => !proIds.has(p.id)).sort(byOV);
     const farmIds = new Set([...remSk.slice(0, 18), ...remGk.slice(0, 2)].map((p) => p.id));
-    setRows((prev) => prev.map((p) => ({ ...p, side: proIds.has(p.id) ? "pro" : farmIds.has(p.id) ? "farm" : "scratched" })));
+    setRows((prev) => prev.map((p) => ({ ...p, side: proIds.has(p.id) ? "pro" : farmIds.has(p.id) ? "farm" : "farm-scratched" })));
     setSaved(false); setErr(null);
   };
 
@@ -103,7 +101,7 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
 
   const MoveBtn = ({ p, to, label }: { p: Player; to: RosterSide; label: string }) => (
     <button onClick={() => move(p.id, to)} disabled={!canMove(p, to)}
-      title={!canMove(p, to) ? (to === "pro" ? "AHL-only contract — can't be called up" : "One-way contracts can't be sent down") : ""}
+      title={!canMove(p, to) ? (isNhlSide(to) ? "AHL-only / $100k contract — can't be on the NHL roster" : "One-way contracts can't be sent down") : ""}
       className="text-[11px] px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-30 whitespace-nowrap">{label}</button>
   );
 
@@ -127,10 +125,14 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
           </span>
         )}
         <div className="flex items-center gap-1 shrink-0">
-          {p.side !== "pro" && <MoveBtn p={p} to="pro" label="↑ Pro" />}
-          {p.side !== "farm" && <MoveBtn p={p} to="farm" label={p.side === "pro" ? "↓ Farm" : "Dress"} />}
-          {/* Scratch only from the active AHL roster — NHL players are never scratched here */}
-          {p.side === "farm" && <MoveBtn p={p} to="scratched" label="Scratch" />}
+          {/* dressed NHL: scratch or send down */}
+          {p.side === "pro" && <><MoveBtn p={p} to="pro-scratched" label="Scratch" /><MoveBtn p={p} to="farm" label="↓ Farm" /></>}
+          {/* NHL scratch: dress or send down */}
+          {p.side === "pro-scratched" && <><MoveBtn p={p} to="pro" label="Dress" /><MoveBtn p={p} to="farm" label="↓ Farm" /></>}
+          {/* AHL active: call up or scratch */}
+          {p.side === "farm" && <><MoveBtn p={p} to="pro" label="↑ Pro" /><MoveBtn p={p} to="farm-scratched" label="Scratch" /></>}
+          {/* AHL scratch: call up or dress on the farm */}
+          {p.side === "farm-scratched" && <><MoveBtn p={p} to="pro" label="↑ Pro" /><MoveBtn p={p} to="farm" label="Dress" /></>}
         </div>
       </div>
     );
@@ -142,7 +144,7 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
         <div className="font-bold text-sm">{title}</div>
         <div className="text-[11px] text-slate-500">{sub}</div>
       </div>
-      <div className="max-h-[68vh] overflow-y-auto">
+      <div className="max-h-[42vh] overflow-y-auto">
         {list.length === 0 && <div className="px-3 py-3 text-slate-600 text-sm">empty</div>}
         {list.map((p) => <Row key={p.id} p={p} />)}
       </div>
@@ -163,7 +165,7 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
           <Link href={`/teams/${teamSlug}/lines`} className="text-slate-400 hover:text-blue-400">Lines →</Link>
           <Link href={`/teams/${teamSlug}/roster/edit`} className="text-slate-400 hover:text-blue-400">Numbers &amp; captains →</Link>
         </div>
-        <p className="text-xs text-slate-500 mt-1">Move players across the NHL roster, the AHL (farm) roster and the Scratched list. One-way contracts can&apos;t be sent down; AHL-only minor-league deals can&apos;t be called up. <b>Scratched</b> = org players beyond the active AHL roster — they dress nowhere.</p>
+        <p className="text-xs text-slate-500 mt-1">Choose which <b>20 dress</b> (NHL) vs the healthy scratches, and manage the farm. One-way contracts can&apos;t be sent down; AHL-only / $100k minor-league deals can&apos;t be called up. <b>NHL Scratched</b> still count against the cap; <b>Farm Scratched</b> dress nowhere.</p>
       </div>
 
       {blockers.length > 0 && (
@@ -173,12 +175,20 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
         <div className="mb-4 text-sm text-amber-300/90 bg-amber-950/30 border border-amber-800/40 rounded-lg px-4 py-2">{warnings.join(" ")}</div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Col title={`NHL — ${teamName}`} warn={pro.length > ROSTER_LIMITS.proMax || proSkaters < ROSTER_LIMITS.proMinSkaters || goalies(pro) < ROSTER_LIMITS.proMinGoalies}
-          sub={`${fdg(pro)} · ${pro.length}/${ROSTER_LIMITS.proMax} (need 12F·6D·2G)`} list={pro} />
-        <Col title={`Farm — ${affiliateName}`} warn={farm.length > ROSTER_LIMITS.ahlMax}
+      {/* NHL row */}
+      <div className="text-[11px] uppercase tracking-wider text-slate-500 mb-1.5">NHL — {teamName}</div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+        <Col title={`NHL Dressed`} warn={nhlRoster.length > ROSTER_LIMITS.proMax || proSkaters < ROSTER_LIMITS.proMinSkaters || goalies(pro) < ROSTER_LIMITS.proMinGoalies}
+          sub={`${fdg(pro)} · ${pro.length} dressed (need 12F·6D·2G) · NHL roster ${nhlRoster.length}/${ROSTER_LIMITS.proMax}`} list={pro} />
+        <Col title="NHL Scratched" sub={`${proScratched.length} healthy scratch${proScratched.length === 1 ? "" : "es"} · still on the cap`} list={proScratched} />
+      </div>
+
+      {/* Farm row */}
+      <div className="text-[11px] uppercase tracking-wider text-slate-500 mb-1.5">Farm — {affiliateName}</div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Col title="Farm Dressed" warn={farm.length > ROSTER_LIMITS.ahlMax}
           sub={`${fdg(farm)} · ${farm.length}/${ROSTER_LIMITS.ahlMax}${farm.length > ROSTER_LIMITS.ahlMax ? " — scratch the overflow" : " (need 12F·6D·2G)"}`} list={farm} />
-        <Col title="Scratched" sub={`${scratched.length} healthy scratch${scratched.length === 1 ? "" : "es"} · org ${rows.length}/${ROSTER_LIMITS.orgMax}`} list={scratched} />
+        <Col title="Farm Scratched" sub={`${farmScratched.length} scratch${farmScratched.length === 1 ? "" : "es"} · org ${rows.length}/${ROSTER_LIMITS.orgMax}`} list={farmScratched} />
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 bg-slate-950/90 border-t border-slate-800 backdrop-blur px-4 py-3">
@@ -189,7 +199,7 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
           </button>
           <button onClick={autoRoster} disabled={pending}
             className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 font-semibold text-sm disabled:opacity-50"
-            title="Fill the NHL roster with the best available (18+2), the rest to the farm, overflow scratched">
+            title="Dress the best available 20 (18+2), the rest to the farm, overflow scratched">
             Auto Roster
           </button>
           {blockers.length > 0 && <span className="text-red-400 text-sm">Fix the cap/limit issue to save</span>}

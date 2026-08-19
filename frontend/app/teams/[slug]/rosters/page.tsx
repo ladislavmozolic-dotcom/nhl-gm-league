@@ -33,7 +33,7 @@ export default async function RostersPage({ params }: { params: Promise<{ slug: 
       players={players.map((p) => ({
         id: p.id, name: p.name, position: p.position, overall: p.overall ?? 0,
         isGoalie: p.isGoalie,
-        side: (p.rosterType === "AHL" ? (p.scratched ? "scratched" : "farm") : "pro") as "pro" | "farm" | "scratched",
+        side: (p.rosterType === "AHL" ? (p.scratched ? "farm-scratched" : "farm") : (p.scratched ? "pro-scratched" : "pro")) as "pro" | "pro-scratched" | "farm" | "farm-scratched",
         contractType: (p.contractType as "ONE_WAY" | "TWO_WAY" | null) ?? null,
         capHit: p.capHit ?? 0,
       }))}

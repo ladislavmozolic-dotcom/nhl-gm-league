@@ -56,6 +56,13 @@ export async function movePlayer(
 
     if (!parentTeam) return;
 
+    // a minor-league (sub-NHL-minimum) contract — every $100k farm deal included — can
+    // never be called up, whatever its contract-type tag. A sub-minimum cap hit is an
+    // AHL salary, so the "Pro" button is a no-op for these players.
+    const NHL_MIN = 775_000;
+    const hit = player.capHit ?? 0;
+    if (hit > 0 && hit < NHL_MIN) return { ok: false, error: `${player.name} is on a minor-league contract (${money(hit)}) — below the NHL minimum, can't be called up.` };
+
     // in-season: a manual call-up must fit under the cap (ceiling incl. LTIR relief).
     // The off-season +10% cushion is applied automatically inside canAddCapHit.
     const cap = await canAddCapHit(parentTeam.id, player.capHit ?? 0);

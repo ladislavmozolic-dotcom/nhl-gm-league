@@ -51,6 +51,26 @@ export default async function TeamRosterPage({ params }: { params: Promise<{ slu
     const others = (lines.situations as any)?.others;
     if (others?.starter != null) dressed.add(others.starter);
     if (others?.backup != null) dressed.add(others.backup);
+
+    // The saved lineup can go stale after roster moves — it may still list players who
+    // were sent down or traded away (ghost ids) and omit newly called-up ones, wrongly
+    // pushing real roster players into "non-roster". Drop the ghosts, then mirror the
+    // sim's auto-fill: promote the best healthy, un-slotted players until the dressed
+    // minimum (12F / 6D / 2G) is met. On a roster bigger than 20 this also yields a
+    // sensible default dressed 20 — the leftover healthy players become the scratches.
+    const byIdRoster = new Map(roster.map((p) => [p.id, p]));
+    for (const id of [...dressed]) { const rp = byIdRoster.get(id); if (!rp || rp.scratched) dressed.delete(id); } // drop ghosts + explicit scratches
+    const bucketOf = (p: (typeof roster)[number]) => (p.isGoalie ? "G" : isDefPos(p.position ?? "") ? "D" : "F");
+    const minNeed: Record<"F" | "D" | "G", number> = { F: 12, D: 6, G: 2 };
+    const have: Record<"F" | "D" | "G", number> = { F: 0, D: 0, G: 0 };
+    // a healthy, un-scratched player is eligible to be promoted into the dressed 20
+    const healthy = roster.filter((p) => (p.injuryDaysLeft ?? 0) === 0 && !p.scratched); // roster is overall-desc
+    for (const p of healthy) if (dressed.has(p.id)) have[bucketOf(p)]++;
+    for (const b of ["F", "D", "G"] as const)
+      for (const p of healthy) {
+        if (have[b] >= minNeed[b]) break;
+        if (bucketOf(p) === b && !dressed.has(p.id)) { dressed.add(p.id); have[b]++; }
+      }
   }
 
   return (

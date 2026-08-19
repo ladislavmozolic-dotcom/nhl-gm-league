@@ -35,7 +35,9 @@ export async function loadSimTeam(teamId: number, rosterType?: string, opts?: { 
   const rt = rosterType ?? (team.league === "AHL" ? "AHL" : "NHL");
 
   const players = await prisma.player.findMany({
-    where: { teamId, rosterType: rt, injuryDaysLeft: { lte: 0 } }, // injured players don't dress
+    // injured and healthy-scratched players don't dress (the GM's roster-mover scratches
+    // — NHL or AHL — sit out; the affiliate auto-fill below covers any resulting shortfall)
+    where: { teamId, rosterType: rt, injuryDaysLeft: { lte: 0 }, scratched: false },
     include: { goalieRating: true },
   });
 
