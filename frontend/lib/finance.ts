@@ -169,8 +169,11 @@ export const TOTAL_GAMES = 84;
  * building; an unpopular, losing team draws fewer fans (less ticket revenue).
  */
 export function attendanceRate(popularity: number, pointsPct: number): number {
-  const raw = 0.75 + (popularity - 100) / 100 * 0.15 + (pointsPct - 0.5) * 0.5;
-  return Math.max(0.5, Math.min(1.0, raw));
+  // Market POPULARITY is the dominant driver — a hockey mecca (Montreal, Toronto…)
+  // packs the building nearly every night regardless of the standings, while a soft
+  // market lives and dies by the record. Record still matters, just less than market.
+  const raw = 0.85 + (popularity - 100) / 100 * 0.7 + (pointsPct - 0.5) * 0.35;
+  return Math.max(0.6, Math.min(1.0, raw));
 }
 
 // ---- buyouts ("vyplatený zo zmluvy") ---------------------------------------
