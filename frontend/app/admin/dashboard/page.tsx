@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/ui";
 import { commishToday, type TeamFlag } from "@/lib/commissioner-server";
 import SimulateDayButton from "@/components/SimulateDayButton";
 import GmRoleManager from "@/components/GmRoleManager";
+import GmTeamReassign from "@/components/GmTeamReassign";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -99,10 +100,27 @@ export default async function CommissionerDashboard() {
         </div>
       )}
 
-      <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-4">
-        <div className="text-xs uppercase tracking-wide text-slate-400 mb-2">League Roles</div>
-        <GmRoleManager teams={(await prisma.team.findMany({ where: { league: "NHL", isAffiliate: false }, select: { id: true, name: true, gmRole: true, gmNickname: true }, orderBy: { name: "asc" } }))} />
-      </div>
+      {await (async () => {
+        const teams = await prisma.team.findMany({
+          where: { league: "NHL", isAffiliate: false },
+          select: { id: true, name: true, gmRole: true, gmNickname: true, passwordHash: true },
+          orderBy: { name: "asc" },
+        });
+        const roleRows = teams.map((t) => ({ id: t.id, name: t.name, gmRole: t.gmRole, gmNickname: t.gmNickname }));
+        const reassignRows = teams.map((t) => ({ id: t.id, name: t.name, gmNickname: t.gmNickname, hasGm: !!t.passwordHash }));
+        return (
+          <>
+            <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-4">
+              <div className="text-xs uppercase tracking-wide text-slate-400 mb-2">Reassign GM to another team</div>
+              <GmTeamReassign teams={reassignRows} />
+            </div>
+            <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-4">
+              <div className="text-xs uppercase tracking-wide text-slate-400 mb-2">League Roles</div>
+              <GmRoleManager teams={roleRows} />
+            </div>
+          </>
+        );
+      })()}
 
       <div className="flex flex-wrap gap-3 text-sm">
         <Link href="/league/audit" className="text-slate-400 hover:text-blue-400">🔒 Audit Log →</Link>

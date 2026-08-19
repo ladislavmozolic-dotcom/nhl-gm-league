@@ -178,6 +178,20 @@ export async function simNextDayAction() {
   return { played: r.played, round: next.round, date: next.gameDate, done: false };
 }
 
+/** Admin: simulate several scheduled days in one go (a longer testing block).
+ *  Loops simNextDayAction, stopping early when the season runs out of games. */
+export async function simNextDaysAction(days: number) {
+  if (!(await isAdmin())) throw new Error("Only a league admin can run the simulation.");
+  const n = Math.max(1, Math.min(30, Math.round(days || 1)));
+  let played = 0, daysRun = 0, lastRound: number | null = null, lastDate: Date | null = null;
+  for (let i = 0; i < n; i++) {
+    const r = await simNextDayAction();
+    if (r.done) return { played, days: daysRun, round: lastRound, date: lastDate, done: true };
+    played += r.played; daysRun++; lastRound = r.round; lastDate = r.date;
+  }
+  return { played, days: daysRun, round: lastRound, date: lastDate, done: false };
+}
+
 /** Admin: a day off — recover conditioning (CON) and heal injuries by one day,
  *  without playing any games. Pair with Sim Day to pace CON like a real schedule. */
 export async function restDayAction() {

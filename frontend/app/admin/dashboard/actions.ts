@@ -18,3 +18,36 @@ export async function setGmRoleAction(teamId: number, role: string) {
   revalidatePath("/admin/dashboard");
   return { ok: true as const };
 }
+
+// the fields that together make up a GM's login/identity — everything that moves
+// when a manager takes over a different franchise. The roster stays put; only the
+// person controlling the club changes.
+const GM_FIELDS = [
+  "passwordHash", "isAdmin", "gmRole", "gmEmail", "gmFirstName", "gmLastName", "gmNickname", "lastLoginAt",
+] as const;
+type GmSeat = Record<(typeof GM_FIELDS)[number], unknown>;
+const pickGm = (t: GmSeat): GmSeat => Object.fromEntries(GM_FIELDS.map((k) => [k, t[k]])) as GmSeat;
+const blankGm: GmSeat = { passwordHash: null, isAdmin: false, gmRole: "gm", gmEmail: null, gmFirstName: null, gmLastName: null, gmNickname: null, lastLoginAt: null };
+
+/** Move an active GM (login + identity) from one club to another. If the destination
+ *  already has a GM the two seats are SWAPPED; otherwise the source is left vacant. */
+export async function reassignGmTeamAction(fromTeamId: number, toTeamId: number) {
+  if (!(await isAdmin())) return { ok: false as const, error: "Commissioner only." };
+  if (fromTeamId === toTeamId) return { ok: false as const, error: "Pick a different destination team." };
+  const teams = await prisma.team.findMany({
+    where: { id: { in: [fromTeamId, toTeamId] } },
+    select: { id: true, name: true, passwordHash: true, isAdmin: true, gmRole: true, gmEmail: true, gmFirstName: true, gmLastName: true, gmNickname: true, lastLoginAt: true },
+  });
+  const from = teams.find((t) => t.id === fromTeamId);
+  const to = teams.find((t) => t.id === toTeamId);
+  if (!from || !to) return { ok: false as const, error: "Team not found." };
+  if (!from.passwordHash) return { ok: false as const, error: `${from.name} has no active GM to move.` };
+
+  const swapped = !!to.passwordHash;
+  await prisma.$transaction([
+    prisma.team.update({ where: { id: toTeamId }, data: pickGm(from) as never }),
+    prisma.team.update({ where: { id: fromTeamId }, data: (swapped ? pickGm(to) : blankGm) as never }),
+  ]);
+  revalidatePath("/admin/dashboard");
+  return { ok: true as const, swapped, from: from.name, to: to.name };
+}
