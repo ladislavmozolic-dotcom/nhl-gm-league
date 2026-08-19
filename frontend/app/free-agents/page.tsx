@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import PlayerLink from "@/components/PlayerLink";
 import Link from "next/link";
 import { PageHeader, Card } from "@/components/ui";
 import SortableTable, { type SortCol } from "@/components/SortableTable";
@@ -149,7 +150,7 @@ export default async function FreeAgentsPage({
           <div className="flex flex-wrap gap-2">
             {deliberating.map((d) => (
               <span key={d.id} className="text-xs rounded-lg border border-slate-700 bg-slate-900/60 px-2.5 py-1">
-                <b className="text-slate-200">{d.name}</b>
+                <b className="text-slate-200"><PlayerLink id={d.id} name={d.name} clean={false} /></b>
                 <span className="text-slate-500"> · {d.offers} offer{d.offers === 1 ? "" : "s"} · {d.countered ? "countered, " : ""}decides in {d.days}d</span>
               </span>
             ))}

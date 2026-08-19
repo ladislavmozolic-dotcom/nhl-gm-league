@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import PlayerLink from "@/components/PlayerLink";
 import { canManageTeam } from "@/lib/auth";
 import { Card } from "@/components/ui";
 import ReSignPanel from "@/components/ReSignPanel";
@@ -79,7 +80,7 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
               return (
                 <div key={p.id} className="flex items-center justify-between py-2 gap-3 text-sm">
                   <div className="min-w-0">
-                    <span className="font-medium">{cleanName(p.name)}</span>
+                    <PlayerLink id={p.id} name={p.name} className="font-medium" />
                     <span className="text-xs text-slate-500 ml-2">
                       {c.eligible ? (<>
                         ELC: $0.90M + ${(c.bonus / 1e6).toFixed(2)}M bonus = <b className="text-green-400">${(c.capHit / 1e6).toFixed(2)}M</b> × {c.years}yr
@@ -104,7 +105,7 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
             <div className="divide-y divide-slate-800/50">
               {groups[g].map((p) => (
                 <div key={p.id} className="flex items-center justify-between py-2 text-sm">
-                  <span className="font-medium">{cleanName(p.name)}</span>
+                  <PlayerLink id={p.id} name={p.name} className="font-medium" />
                   <span className="text-xs text-slate-500">{p.capHit ? `$${(p.capHit / 1e6).toFixed(2)}M · last year` : "—"}</span>
                 </div>
               ))}

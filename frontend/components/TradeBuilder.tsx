@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import PlayerLink from "@/components/PlayerLink";
 import Link from "next/link";
 import { money } from "@/lib/finance";
 import { clauseTermsAction, analyzeTradeAction, type TradePackage } from "@/app/trades/build/actions";
@@ -75,7 +76,7 @@ export default function TradeBuilder({ me, opp, mine, theirs, onPropose }: {
             <div key={p.id} className={`px-3 py-2 ${on ? "bg-blue-950/30" : ""}`}>
               <label className="flex items-center gap-2.5 cursor-pointer">
                 <input type="checkbox" checked={on} onChange={() => toggleClausePlayer(pmap, setPmap, p, destTeamId, ownerTeamId)} className="accent-blue-500 w-4 h-4" />
-                <span className="flex-1 truncate">{p.name} <span className="text-slate-500 text-xs">{p.position}</span>{tag && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30">{tag}</span>}</span>
+                <span className="flex-1 truncate"><PlayerLink id={p.id} name={p.name} /> <span className="text-slate-500 text-xs">{p.position}</span>{tag && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30">{tag}</span>}</span>
                 <span className="text-slate-400 tabular-nums text-sm">{money(p.capHit)}</span>
               </label>
               {on && needsWaiver && (() => {

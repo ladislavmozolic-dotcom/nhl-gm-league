@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import PlayerLink from "@/components/PlayerLink";
 import { useRouter } from "next/navigation";
 import { getInterestAction, extendContractAction, setFranchiseTagAction } from "@/app/free-agents/actions";
 import { Card } from "@/components/ui";
@@ -203,7 +204,7 @@ export default function ReSignPanel({ teamId, players, title, blurb, accent = "t
         {players.map((p) => (
           <div key={p.id} className="flex items-center justify-between py-2 gap-3">
             <div className="min-w-0">
-              <span className="font-medium truncate">{cleanName(p.name)}</span>
+              <PlayerLink id={p.id} name={p.name} className="font-medium truncate" />
               {p.farm && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30">AHL</span>}
               {/* show the REAL current deal (cap hit) — the stored contractText is a stale
                   profinhl string that can misrepresent the term; everyone here is in their

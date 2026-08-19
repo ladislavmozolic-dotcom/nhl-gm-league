@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PlayerLink from "@/components/PlayerLink";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { loadSettings } from "@/lib/sim/settings";
@@ -69,7 +70,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
       const cells = playerCapYears(p, CURRENT_SEASON_START, SPAN);
       return (
         <tr key={p.id} className="border-b border-slate-800/60 hover:bg-slate-800/30">
-          <td className="px-3 py-1.5">{p.name}</td>
+          <td className="px-3 py-1.5"><PlayerLink id={p.id} name={p.name} /></td>
           <td className="px-2 py-1.5 text-center text-slate-500 text-xs">{p.position}</td>
           <td className="px-2 py-1.5 text-center text-slate-400 tabular-nums">{p.age ?? "—"}</td>
           <td className="px-3 py-1.5 text-right tabular-nums font-medium">{p.capHit ? money(p.capHit) : "—"}</td>

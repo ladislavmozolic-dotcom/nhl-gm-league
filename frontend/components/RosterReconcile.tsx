@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import PlayerLink from "@/components/PlayerLink";
 import { cleanName } from "@/lib/playerName";
 import { refreshAhlGpAction, applyReconcileOneAction, applyAllReconcileAction } from "@/app/admin/roster-update/actions";
 
@@ -68,7 +69,7 @@ export default function RosterReconcile({ rows }: { rows: Row[] }) {
           <tbody>
             {rows.map((r) => (
               <tr key={r.id} className="border-b border-slate-800/40 hover:bg-slate-800/30">
-                <td className="px-3 py-1.5 font-medium">{cleanName(r.name)}</td>
+                <td className="px-3 py-1.5 font-medium"><PlayerLink id={r.id} name={r.name} /></td>
                 <td className="px-2 py-1.5 text-center text-slate-400">{r.teamCode}</td>
                 <td className="px-2 py-1.5 text-center tabular-nums">{r.age}</td>
                 <td className="px-2 py-1.5 text-center text-slate-500">{r.rosterType}</td>

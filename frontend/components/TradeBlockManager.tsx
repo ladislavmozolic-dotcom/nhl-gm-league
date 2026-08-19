@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import PlayerLink from "@/components/PlayerLink";
 import { setPlayerBlockAction, setTeamNeedsAction } from "@/app/trade-block/actions";
 import { NEED_POSITIONS, type BlockPlayer } from "@/lib/trade-block-server";
 
@@ -57,7 +58,7 @@ export default function TradeBlockManager({ teamId, teamName, initialNeeds, play
                 {r.onBlock ? "LISTED" : "List"}
               </button>
               <div className="w-40 shrink-0 min-w-0">
-                <div className="truncate text-sm font-medium">{r.name}</div>
+                <div className="truncate text-sm font-medium"><PlayerLink id={r.id} name={r.name} /></div>
                 <div className="text-[11px] text-slate-500">{r.position} · {r.overall ?? "—"} OV{r.age ? ` · ${r.age}y` : ""}</div>
               </div>
               <input

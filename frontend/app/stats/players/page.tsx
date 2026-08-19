@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 const SEASON = "2026-27";
 
 const COLS: Col[] = [
-  { key: "name", label: "Player", title: "Player Name", frozen: true },
+  { key: "name", label: "Player", title: "Player Name", frozen: true, link: true },
   { key: "teamCode", label: "Team", title: "Team" },
   { key: "number", label: "#", title: "Jersey Number", num: true, format: "jersey" },
   { key: "position", label: "POS", title: "Position" },
@@ -35,7 +35,7 @@ export default async function PlayerStatsPage({ searchParams }: { searchParams: 
   const league = (await searchParams).league === "AHL" ? "AHL" : "NHL";
   const sk = await skaterTotals(SEASON, league);
   const rows = sk.map((s) => ({
-    name: s.name, teamCode: s.teamCode ?? "—", number: s.number ?? 0, position: s.position, gp: s.gp,
+    _pid: s.playerId, name: s.name, teamCode: s.teamCode ?? "—", number: s.number ?? 0, position: s.position, gp: s.gp,
     goals: s.goals, assists: s.assists, points: s.points, plusMinus: s.plusMinus,
     pim: s.pim, hits: s.hits, shots: s.shots,
     shtPct: s.shots ? (s.goals / s.shots) * 100 : 0,

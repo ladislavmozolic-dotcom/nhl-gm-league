@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PlayerLink from "@/components/PlayerLink";
 import { prisma } from "@/lib/prisma";
 import { cleanName, captaincyFromName } from "@/lib/playerName";
 import { PageHeader, Card } from "@/components/ui";
@@ -37,13 +38,13 @@ export default async function CaptainsPage() {
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wide text-amber-400">Captain</span>
                 {t.captain ? (
-                  <p className="text-sm">{cleanName(t.captain.name)} <span className="text-slate-500 text-xs">{t.captain.position}</span></p>
+                  <p className="text-sm"><PlayerLink id={t.captain.id} name={t.captain.name} /> <span className="text-slate-500 text-xs">{t.captain.position}</span></p>
                 ) : <p className="text-sm text-slate-600">—</p>}
               </div>
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Assistants</span>
                 {t.assistants.length ? t.assistants.map((a) => (
-                  <p key={a.id} className="text-sm">{cleanName(a.name)} <span className="text-slate-500 text-xs">{a.position}</span></p>
+                  <p key={a.id} className="text-sm"><PlayerLink id={a.id} name={a.name} /> <span className="text-slate-500 text-xs">{a.position}</span></p>
                 )) : <p className="text-sm text-slate-600">—</p>}
               </div>
             </div>

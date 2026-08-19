@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PlayerLink from "@/components/PlayerLink";
 import { prisma } from "@/lib/prisma";
 import { computeStandings } from "@/lib/sim/standings";
 import { skaterTotals } from "@/lib/stats-server";
@@ -299,7 +300,7 @@ export default async function HomePage() {
               <div className="space-y-2">
                 {faTop.map((p) => (
                   <div key={p.id} className="flex items-center gap-2 text-sm">
-                    <span className="flex-1 truncate">{cleanName(p.name)} <span className="text-slate-500 text-xs">{p.position}</span></span>
+                    <span className="flex-1 truncate"><PlayerLink slug={p.slug} id={p.id} name={p.name} /> <span className="text-slate-500 text-xs">{p.position}</span></span>
                     <span className="text-slate-400 tabular-nums">{p.overall ?? "—"}</span>
                   </div>
                 ))}
@@ -379,7 +380,7 @@ async function BirthdaysList() {
         return (
           <div key={p.id} className="flex items-center gap-2 text-sm">
             <span>🎂</span>
-            <span className="flex-1 truncate">{cleanName(p.name)}{age != null && <span className="text-slate-500"> · {age} y/o</span>}</span>
+            <span className="flex-1 truncate"><PlayerLink id={p.id} name={p.name} />{age != null && <span className="text-slate-500"> · {age} y/o</span>}</span>
             <span className="text-slate-500 text-xs">{p.team?.code}</span>
           </div>
         );

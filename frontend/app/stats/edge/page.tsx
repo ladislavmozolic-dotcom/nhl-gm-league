@@ -15,7 +15,7 @@ const VIEWS: { key: View; label: string }[] = [
 ];
 
 const SKATER_COLS: Col[] = [
-  { key: "name", label: "Player", title: "Player", frozen: true },
+  { key: "name", label: "Player", title: "Player", frozen: true, link: true },
   { key: "teamCode", label: "Team", title: "Team" },
   { key: "pos", label: "Pos", title: "Position" },
   { key: "gp", label: "GP", title: "Games Played", num: true },
@@ -27,7 +27,7 @@ const SKATER_COLS: Col[] = [
 ];
 
 const GOALIE_COLS: Col[] = [
-  { key: "name", label: "Goalie", title: "Goalie", frozen: true },
+  { key: "name", label: "Goalie", title: "Goalie", frozen: true, link: true },
   { key: "teamCode", label: "Team", title: "Team" },
   { key: "gp", label: "GP", title: "Games Played", num: true },
   { key: "svPct", label: "SV%", title: "Overall Save %", num: true, format: "pct3" },
@@ -67,7 +67,7 @@ export default async function EdgeStatsPage({ searchParams }: { searchParams: Pr
     const maxGp = sk.reduce((m, s) => Math.max(m, s.gp), 0);
     const skMin = Math.min(10, Math.max(1, Math.ceil(maxGp * 0.4)));
     rows = sk.filter((s) => s.gp >= skMin).map((s) => ({
-      name: s.name, teamCode: s.teamCode ?? "—", pos: s.position, gp: s.gp,
+      _pid: s.playerId, name: s.name, teamCode: s.teamCode ?? "—", pos: s.position, gp: s.gp,
       topSkate: s.topSkateSpeed, bursts: s.bursts, miles: s.miles, topShot: s.topShot, hits: s.hits,
     }));
     cols = SKATER_COLS; initialSort = "topShot";
@@ -78,7 +78,7 @@ export default async function EdgeStatsPage({ searchParams }: { searchParams: Pr
     const saMin = Math.min(150, Math.max(1, Math.ceil(maxSa * 0.4)));
     minNote = `Minimum ${saMin} shots against (scales up to 150). Real NHL: HD ≈ .80, MD ≈ .92, LD ≈ .98.`;
     rows = gk.filter((g) => g.hdShotsAg + g.mdShotsAg + g.ldShotsAg >= saMin).map((g) => ({
-      name: g.name, teamCode: g.teamCode ?? "—", gp: g.gp, svPct: g.svPct,
+      _pid: g.playerId, name: g.name, teamCode: g.teamCode ?? "—", gp: g.gp, svPct: g.svPct,
       hdSv: g.hdSvPct, mdSv: g.mdSvPct, ldSv: g.ldSvPct, hdShotsAg: g.hdShotsAg,
     }));
     cols = GOALIE_COLS; initialSort = "hdSv";

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PlayerLink from "@/components/PlayerLink";
 import { skaterTotals, goalieTotals, type SkaterTotal, type GoalieTotal } from "@/lib/stats-server";
 import StatsTabs from "@/components/StatsTabs";
 import { Card, PageHeader, SectionTitle } from "@/components/ui";
@@ -17,7 +18,7 @@ function LeaderCard({ title, rows }: { title: string; rows: Row[] }) {
           <div key={r.playerId} className="flex items-center gap-2 px-4 py-1.5 text-sm hover:bg-slate-800/30 transition-colors">
             <span className={`w-5 text-right tabular-nums ${i === 0 ? "text-amber-400 font-bold" : "text-slate-500"}`}>{i + 1}</span>
             <span className="flex-1 truncate">
-              {r.name}
+              <PlayerLink id={r.playerId} name={r.name} clean={false} />
               {r.teamCode && <span className="text-slate-500 text-xs ml-1.5">{r.teamCode}</span>}
             </span>
             <span className="tabular-nums font-semibold">{r.value}</span>

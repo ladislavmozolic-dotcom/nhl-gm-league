@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PlayerLink from "@/components/PlayerLink";
 import { isAdmin } from "@/lib/auth";
 import { PageHeader, Card } from "@/components/ui";
 import { previewLeagueElc } from "@/app/free-agents/actions";
@@ -48,7 +49,7 @@ export default async function ElcAdminPage() {
             <tbody>
               {list.map((r) => (
                 <tr key={r.id} className="border-b border-slate-800/40 hover:bg-slate-800/30">
-                  <td className="px-3 py-1.5 font-medium">{cleanName(r.name)}</td>
+                  <td className="px-3 py-1.5 font-medium"><PlayerLink id={r.id} name={r.name} /></td>
                   <td className="px-2 py-1.5 text-center text-slate-400">{r.teamCode}</td>
                   <td className="px-2 py-1.5 text-center tabular-nums">{r.age}</td>
                   <td className="px-2 py-1.5 text-center text-slate-400">{r.pos}</td>

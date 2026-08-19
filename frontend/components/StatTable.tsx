@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import InfoTip from "@/components/InfoTip";
 
 export type ColFormat = "plusMinus" | "plusDec1" | "pct3" | "dec1" | "dec2" | "jersey" | "dash";
@@ -10,6 +11,7 @@ export type Col = {
   info?: string;          // richer explainer shown as a click/tap ⓘ in the header
   format?: ColFormat;     // display formatter (serializable); sorting always uses the raw value
   defaultHidden?: boolean; // start hidden — user reveals it via Show / Hide Columns
+  link?: boolean;         // render this cell as a player link (uses row._slug ?? row._pid)
 };
 
 function render(v: number | string, format?: ColFormat): string {
@@ -80,7 +82,9 @@ export default function StatTable({ cols, rows, initialSort, minWidth = 720 }: {
               <tr key={i} className="border-b border-slate-800/60 hover:bg-slate-800/30">
                 {visible.map((c) => (
                   <td key={c.key} className={`px-2.5 py-2 ${c.num ? "text-right tabular-nums" : ""} ${c.frozen ? "font-medium" : c.num ? "text-slate-300" : "text-slate-400"}`}>
-                    {render(r[c.key], c.format)}
+                    {c.link && (r._slug || r._pid) != null && (r._slug || r._pid) !== ""
+                      ? <Link href={`/players/${r._slug || r._pid}`} className="hover:text-blue-400 transition-colors">{render(r[c.key], c.format)}</Link>
+                      : render(r[c.key], c.format)}
                   </td>
                 ))}
               </tr>

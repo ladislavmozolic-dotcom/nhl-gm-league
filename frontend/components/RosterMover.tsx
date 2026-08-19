@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import PlayerLink from "@/components/PlayerLink";
 import Link from "next/link";
 import { ROSTER_LIMITS, isNhlSide, type MoveRow, type RosterSide } from "@/lib/roster-rules";
 
@@ -112,7 +113,7 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-slate-800/60 text-sm hover:bg-slate-800/30">
         <span className={`shrink-0 w-9 text-center tabular-nums font-bold text-sm px-1 py-0.5 rounded border ${ovColor(p.overall)}`}>{p.overall}</span>
         <span className="flex-1 min-w-0 truncate">
-          <span className="font-medium">{p.name}</span>
+          <PlayerLink id={p.id} name={p.name} className="font-medium" />
           <span className="text-slate-500 text-xs ml-1.5">{p.position}</span>
         </span>
         {ahlOnly ? (

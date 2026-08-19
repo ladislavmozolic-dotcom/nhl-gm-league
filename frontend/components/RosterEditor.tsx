@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import PlayerLink from "@/components/PlayerLink";
 import Link from "next/link";
 import type { RosterRow } from "@/app/teams/[slug]/roster/actions";
 
@@ -66,7 +67,7 @@ export default function RosterEditor({ teamName, teamSlug, players, onSave, embe
                     className={`w-16 bg-slate-900 border rounded px-2 py-1 text-right tabular-nums ${p.number != null && dupNums.has(p.number) ? "border-red-500 text-red-300" : "border-slate-700"}`} />
                 </td>
                 <td className="px-3 py-1.5">
-                  {p.name}
+                  <PlayerLink id={p.id} name={p.name} />
                   {p.captaincy && <span className="ml-1.5 text-[10px] font-bold text-amber-400">{p.captaincy}</span>}
                 </td>
                 <td className="px-2 py-1.5 text-slate-500 text-xs">{p.position}</td>

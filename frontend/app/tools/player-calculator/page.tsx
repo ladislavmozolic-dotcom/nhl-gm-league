@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PlayerLink from "@/components/PlayerLink";
 import { prisma } from "@/lib/prisma";
 import { PageHeader, Card } from "@/components/ui";
 import { projectAllSkaters, LAST_WEIGHT, CUR_WEIGHT, ACTIVATE_AT_GP } from "@/lib/param-projection";
@@ -65,7 +66,7 @@ export default async function PlayerCalculatorPage({ searchParams }: { searchPar
             <tbody>
               {mine.map((r) => (
                 <tr key={r.id} className="border-b border-slate-800/40 hover:bg-slate-800/30">
-                  <td className="px-3 py-1.5 font-medium sticky left-0 bg-slate-900">{cleanName(r.name)}</td>
+                  <td className="px-3 py-1.5 font-medium sticky left-0 bg-slate-900"><PlayerLink id={r.id} name={r.name} /></td>
                   <td className="px-2 py-1.5 text-center text-slate-400">{r.position}</td>
                   <td className="px-2 py-1.5 text-center tabular-nums">
                     {active ? (
