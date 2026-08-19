@@ -114,8 +114,9 @@ export async function makePickAction(prospectId: number) {
 
   // the prospect joins the club's system — mirror the draft class into a Prospect
   // row (same shape as the completed round 1), tagged to the active roster source.
-  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true } });
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true, draftTestMode: true } });
   const source = cfg?.rosterMode === "real" ? "real" : "profinhl";
+  const testMode = !!cfg?.draftTestMode; // testing: advance the board but don't write the player onto the team
 
   const nextPick = s.currentPick + 1;
   const deferralCount = await prisma.draftDeferral.count({ where: { year: YEAR } });
@@ -127,11 +128,38 @@ export async function makePickAction(prospectId: number) {
   const roundDone = !slot.deferred && !done && nextPick <= lastScheduled && !!nextSlot && nextSlot.round !== slot.round;
   await prisma.$transaction([
     prisma.draftProspect.update({ where: { id: prospectId }, data: { draftedByTeamId: slot.pickerTeamId, overallPick: s.currentPick } }),
-    prisma.prospect.create({ data: { name: prospect.name, position: prospect.position, draftYear: YEAR, overallPick: s.currentPick, teamId: slot.pickerTeamId, source } }),
+    // in test mode the pick shows on the board but the player is NOT written onto the
+    // club (no Prospect row) — reset the board to re-run the draft with the same names.
+    ...(testMode ? [] : [prisma.prospect.create({ data: { name: prospect.name, position: prospect.position, draftYear: YEAR, overallPick: s.currentPick, teamId: slot.pickerTeamId, source } })]),
     prisma.draftState.update({ where: { year: YEAR }, data: { currentPick: nextPick, onClockAt: (roundDone || done) ? null : new Date(), status: done ? "DONE" : roundDone ? "ROUND_DONE" : "LIVE" } }),
   ]);
   revalidatePath("/draft/room");
   return { ok: true, roundDone, done };
+}
+
+/** Admin: flip draft "test mode" — picks advance the board but don't write players
+ *  onto teams. Handy while testing the draft flow without polluting rosters. */
+export async function toggleDraftTestModeAction() {
+  if (!(await isAdmin())) return { ok: false as const, error: "Admin only." };
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { draftTestMode: true } });
+  const v = !cfg?.draftTestMode;
+  await prisma.leagueConfig.update({ where: { id: 1 }, data: { draftTestMode: v } });
+  revalidatePath("/draft/room");
+  return { ok: true as const, testMode: v };
+}
+
+/** Admin: reset the draft board for the current year — un-draft every prospect and
+ *  rewind the clock so the same names can be re-drafted. Does NOT delete any Prospect
+ *  rows already written onto teams (clear those via Roster tools if needed). */
+export async function resetDraftBoardAction() {
+  if (!(await isAdmin())) return { ok: false as const, error: "Admin only." };
+  const YEAR = await currentDraftYear();
+  const un = await prisma.draftProspect.updateMany({ where: { draftYear: YEAR }, data: { draftedByTeamId: null } });
+  await prisma.draftDeferral.deleteMany({ where: { year: YEAR } });
+  await prisma.chatMessage.deleteMany({ where: { channel: { contains: "draft" } } }); // clear the draft chat too
+  await prisma.draftState.upsert({ where: { year: YEAR }, create: { year: YEAR, currentPick: 1, status: "ROUND_DONE" }, update: { currentPick: 1, status: "ROUND_DONE", onClockAt: null } });
+  revalidatePath("/draft/room");
+  return { ok: true as const, unDrafted: un.count };
 }
 
 /** The on-the-clock GM drafts a player who ISN'T on the scouting board — a custom pick.

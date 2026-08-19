@@ -6,6 +6,7 @@ import { effectiveOrder, reverseStandingsOrder, PICKS_PER_ROUND } from "@/lib/dr
 import { countryFlag } from "@/lib/flags";
 import DraftAvailableBoard, { type BoardProspect } from "@/components/DraftAvailableBoard";
 import DraftRoundStarter from "@/components/DraftRoundStarter";
+import DraftTestControls from "@/components/DraftTestControls";
 import DraftChat from "@/components/DraftChat";
 import DraftPickTimer from "@/components/DraftPickTimer";
 import EpHoverName from "@/components/EpHoverName";
@@ -37,6 +38,7 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
     isAdmin(),
     getTeamSession(),
   ]);
+  const dcfg = admin ? await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { draftTestMode: true } }) : null;
   const teamOf = new Map(teams.map((t) => [t.id, t]));
   // off-board (GM-added) picks — admins verify their eligibility
   const offBoardRaw = await prisma.draftProspect.findMany({ where: { draftYear: DRAFT_YEAR, offBoard: true, ...src }, orderBy: { overallPick: "asc" }, select: { id: true, name: true, position: true, birthDate: true, epLink: true, verified: true, overallPick: true, draftedByTeamId: true } });
@@ -109,6 +111,7 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
         })}
       </div>
 
+      {admin && <DraftTestControls testMode={!!dcfg?.draftTestMode} />}
       {admin && <BonusPickManager teams={bonusTeams} bonus={bonusRows} />}
 
       {fullView ? (
