@@ -123,8 +123,24 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
       fit.push(`→ <b>${destName}</b>: ${clean(p.name)} (${ov} OV) by obsadil <b>${slotFor(g, better + 1)}</b>${need ? ` — <b>kryje slabšie miesto na poste ${grpLabel[g]}</b>` : ""}.`);
     }
   };
+  // outgoing impact: what does a club LOSE by dealing this player away? (his roster
+  // still includes him, so his slot there tells us if he was a key piece or depth.)
+  const analyzeOut = (movers: TradePlayer[], ownRoster: { overall: number | null; position: string | null; isGoalie: boolean }[], teamName: string) => {
+    for (const x of movers) {
+      const p = pById.get(x.playerId); if (!p) continue;
+      const g = grp(p.position); const ov = p.overall ?? 45;
+      const same = ownRoster.filter((r) => grp(r.position) === g);
+      const better = same.filter((r) => (r.overall ?? 0) > ov).length;
+      const goodLeft = same.filter((r) => (r.overall ?? 0) >= 55).length - (ov >= 55 ? 1 : 0);
+      const key = (g === "G" && better === 0) || (g === "D" && better < 4) || ((g === "C" || g === "W") && better < 6);
+      const thin = (g === "C" && goodLeft < 2) || (g === "W" && goodLeft < 5) || (g === "D" && goodLeft < 4) || (g === "G" && goodLeft < 1);
+      fit.push(`← <b>${teamName}</b> stráca ${clean(p.name)} (${ov} OV, ${slotFor(g, better + 1)})${key ? ` — <b>kľúčový hráč, oslabí ${grpLabel[g]}</b>${thin ? " (vznikne diera)" : ""}` : " — hĺbka, odchod výrazne nebolí"}.`);
+    }
+  };
   analyzeFit(pkg.fromPlayers, toRoster, toTeam.name);
+  analyzeOut(pkg.fromPlayers, fromRoster, fromTeam.name);
   analyzeFit(pkg.toPlayers, fromRoster, fromTeam.name);
+  analyzeOut(pkg.toPlayers, toRoster, toTeam.name);
 
   return { ok: true, fromName: fromTeam.name, toName: toTeam.name, meGives, meGets, verdict, tilt, reasoning, fromItems, toItems, fit };
 }
