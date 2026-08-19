@@ -160,6 +160,8 @@ model Player {
   realCapHit           Int?          // real current NHL cap hit (from spotrac)
   realContractText     String?
   profinhlCapHit       Int?          // snapshot of the ProfiNHL cap hit (for roster switching)
+  realTradeClause      String?       // real NTC/NMC/M_NTC (from CapWages) — used in Real NHL mode
+  profinhlTradeClause  String?       // snapshot of the ProfiNHL clause (for roster switching)
   realOnly             Boolean       @default(false) // exists only in the Real NHL dataset (real free agent); hidden in ProfiNHL mode
   faDemandOverride     Int?          // Free Agent Frenzy: league Agent / admin hand-set contract demand ($ cap hit); overrides the computed market value
   franchiseTag         Boolean       @default(false) // RFA tagged as the club's Franchise player (1/team) → gets 2 re-sign rounds before offer sheets

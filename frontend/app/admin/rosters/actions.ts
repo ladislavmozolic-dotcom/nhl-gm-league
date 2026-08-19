@@ -52,12 +52,12 @@ export async function applyRosterMode(mode: "profinhl" | "real") {
   const cfg = await getRosterConfig();
 
   if (mode === "profinhl") {
-    await prisma.$executeRawUnsafe(`UPDATE "Player" SET "teamId"="profinhlTeamId", "rosterType"=COALESCE("profinhlRosterType",'NHL'), "capHit"="profinhlCapHit" WHERE "profinhlTeamId" IS NOT NULL`);
+    await prisma.$executeRawUnsafe(`UPDATE "Player" SET "teamId"="profinhlTeamId", "rosterType"=COALESCE("profinhlRosterType",'NHL'), "capHit"="profinhlCapHit", "tradeClause"="profinhlTradeClause" WHERE "profinhlTeamId" IS NOT NULL`);
     // ProfiNHL mode: real scraped bank balances (fallback 50M); reset the transaction ledger
     await prisma.$executeRawUnsafe(`UPDATE "Team" SET "bankAccount"=COALESCE("profinhlBank", 50000000), "ledgerAdj"=0`);
   } else {
-    // NHL 23-man roster
-    await prisma.$executeRawUnsafe(`UPDATE "Player" SET "teamId"="realTeamId", "rosterType"='NHL', "capHit"=COALESCE("realCapHit","profinhlCapHit") WHERE "realTeamId" IS NOT NULL`);
+    // NHL 23-man roster — real cap hit AND real clause (kept separate from ProfiNHL)
+    await prisma.$executeRawUnsafe(`UPDATE "Player" SET "teamId"="realTeamId", "rosterType"='NHL', "capHit"=COALESCE("realCapHit","profinhlCapHit"), "tradeClause"="realTradeClause" WHERE "realTeamId" IS NOT NULL`);
     // AHL farm → the parent org's affiliate team
     const affiliates = await prisma.team.findMany({ where: { isAffiliate: true, parentTeamId: { not: null } }, select: { id: true, parentTeamId: true } });
     for (const aff of affiliates)

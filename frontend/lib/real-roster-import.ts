@@ -121,23 +121,37 @@ export async function importRealCapHits() {
   }
   if (!names.length) return { ok: false as const, error: "Could not reach the NHL roster API." };
 
-  // 3) cap hit per player from CapWages (bounded concurrency)
+  // clause from CapWages "terms": NMC / NTC / M-NTC (else no clause)
+  const clauseOf = (raw: string | null | undefined): string | null => {
+    const t = (raw ?? "").toUpperCase();
+    if (!t) return null;
+    if (t.includes("M") && t.includes("NTC")) return "M_NTC";
+    if (t.includes("NMC")) return "NMC";
+    if (t.includes("NTC")) return "NTC";
+    return null;
+  };
+
+  // 3) cap hit + clause per player from CapWages (bounded concurrency)
   const caps = await mapPool([...new Set(names)], 6, async (nm) => {
     const j = await fetchJson(`https://capwages.com/_next/data/${buildId}/players/${capwagesSlug(nm)}.json`);
-    const m = j ? JSON.stringify(j).match(/"capHit":"(\$[0-9,]+)"/) : null;
-    return { nm, cap: m ? dollars(m[1]) : null };
+    const s = j ? JSON.stringify(j) : "";
+    const m = s.match(/"capHit":"(\$[0-9,]+)"/);
+    const tm = s.match(/"terms":"([^"]*)"/);
+    return { nm, cap: m ? dollars(m[1]) : null, clause: clauseOf(tm?.[1]) };
   });
   const exact = new Map<string, number>();
   const fi = new Map<string, number[]>();
+  const clauseByName = new Map<string, string | null>();
   let fetched = 0;
-  for (const { nm, cap } of caps) {
+  for (const { nm, cap, clause } of caps) {
     if (cap == null) continue;
     fetched++;
     exact.set(norm(nm), cap);
+    clauseByName.set(norm(nm), clause);
     const f = fiKeyOf(norm(nm)); if (f) (fi.get(f) ?? fi.set(f, []).get(f)!).push(cap);
   }
 
-  // 4) write realCapHit on our rostered players (+ live capHit in real mode)
+  // 4) write realCapHit + realTradeClause (+ live capHit/tradeClause in real mode)
   const realMode = (await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true } }))?.rosterMode === "real";
   const players = await prisma.player.findMany({ where: { realTeamId: { not: null } }, select: { id: true, name: true } });
   let updated = 0;
@@ -146,7 +160,8 @@ export async function importRealCapHits() {
     let cap = exact.get(key);
     if (cap == null) { const arr = fi.get(fiKeyOf(key)); if (arr && arr.length === 1) cap = arr[0]; }
     if (cap == null) continue;
-    await prisma.player.update({ where: { id: pl.id }, data: { realCapHit: cap, ...(realMode ? { capHit: cap } : {}) } });
+    const clause = clauseByName.get(key) ?? null;
+    await prisma.player.update({ where: { id: pl.id }, data: { realCapHit: cap, realTradeClause: clause, ...(realMode ? { capHit: cap, tradeClause: clause } : {}) } });
     updated++;
   }
   return { ok: true as const, fetched, updated, total: players.length, placed: realMode };
