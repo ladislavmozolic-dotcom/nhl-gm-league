@@ -4,8 +4,13 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import type { ArenaSection } from "@/lib/finance";
 
+export type HomeGame = {
+  id: number; date: string; oppCode: string; oppLogo: string | null;
+  result: "W" | "L" | "T"; gf: number; ga: number; attended: number; pct: number; gate: number;
+};
 type Props = {
   teamName: string; teamSlug: string; arena: string; sections: ArenaSection[];
+  capacity?: number; baseRatePct?: number; homeGames?: HomeGame[];
   onSave: (slug: string, prices: number[]) => Promise<void>;
 };
 
@@ -28,11 +33,19 @@ const RINGS: { level: string; si: number; x: number; y: number; w: number; h: nu
 const RINK = { x: 132, y: 122, w: 176, h: 76, rx: 20 };
 const CX = RINK.x + RINK.w / 2; // 220
 
-export default function FinanceEditor({ teamName, teamSlug, arena, sections, onSave }: Props) {
+export default function FinanceEditor({ teamName, teamSlug, arena, sections, capacity, baseRatePct, homeGames = [], onSave }: Props) {
   const [prices, setPrices] = useState<number[]>(sections.map((s) => s.price));
   const [pending, start] = useTransition();
   const [saved, setSaved] = useState(false);
   const [hover, setHover] = useState<number | null>(null);
+
+  // home-gate tracker aggregates
+  const played = homeGames.length;
+  const totalGate = homeGames.reduce((t, g) => t + g.gate, 0);
+  const avgPct = played ? homeGames.reduce((t, g) => t + g.pct, 0) / played : (baseRatePct ?? 0);
+  const avgCrowd = played ? Math.round(homeGames.reduce((t, g) => t + g.attended, 0) / played) : 0;
+  const best = homeGames.reduce<HomeGame | null>((b, g) => (!b || g.attended > b.attended ? g : b), null);
+  const fmtK = (n: number) => n >= 1_000_000 ? `$${(n / 1e6).toFixed(2)}M` : `$${n.toLocaleString()}`;
 
   const setPrice = (i: number, v: number) => {
     setPrices((prev) => prev.map((p, j) => (j === i ? v : p)));
@@ -52,6 +65,22 @@ export default function FinanceEditor({ teamName, teamSlug, arena, sections, onS
           <Link href={`/teams/${teamSlug}/lines`} className="text-slate-400 hover:text-blue-400">Lines →</Link>
         </div>
         <p className="text-sm text-slate-500 mt-1">{arena} · capacity {totalCap.toLocaleString()} · set the price per section — a full house earns the sellout revenue below.</p>
+      </div>
+
+      {/* season-to-date home-gate summary */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        {[
+          { k: "Avg attendance", v: `${Math.round(avgPct * 100)}%`, sub: `of ${(capacity ?? totalCap).toLocaleString()}` },
+          { k: "Avg crowd", v: avgCrowd ? avgCrowd.toLocaleString() : "—", sub: `${played} home game${played === 1 ? "" : "s"}` },
+          { k: "Home gate (season)", v: fmtK(totalGate), sub: "ticket revenue so far" },
+          { k: "Best crowd", v: best ? best.attended.toLocaleString() : "—", sub: best ? `vs ${best.oppCode}` : "—" },
+        ].map((s) => (
+          <div key={s.k} className="rounded-xl border border-slate-800 bg-slate-900/50 px-4 py-3">
+            <div className="text-[11px] uppercase tracking-wider text-slate-500">{s.k}</div>
+            <div className="text-xl font-black text-slate-100 tabular-nums mt-0.5">{s.v}</div>
+            <div className="text-[11px] text-slate-500">{s.sub}</div>
+          </div>
+        ))}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
@@ -125,6 +154,54 @@ export default function FinanceEditor({ teamName, teamSlug, arena, sections, onS
           </div>
         </div>
       </div>
+
+      {/* ---- Home-game gate tracker ---- */}
+      {homeGames.length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-lg font-bold text-slate-200 mb-1">Home games — who showed up</h2>
+          <p className="text-sm text-slate-500 mb-3">Attendance &amp; gate for every home date this season (draw = popularity + record + opponent).</p>
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/40 overflow-x-auto">
+            <table className="w-full text-sm min-w-[560px]">
+              <thead>
+                <tr className="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-800 bg-slate-800/30">
+                  <th className="text-left px-4 py-2.5 font-medium">Date</th>
+                  <th className="text-left px-3 py-2.5 font-medium">Opponent</th>
+                  <th className="text-center px-3 py-2.5 font-medium">Result</th>
+                  <th className="text-left px-3 py-2.5 font-medium w-[34%]">Attendance</th>
+                  <th className="text-right px-4 py-2.5 font-medium">Gate</th>
+                </tr>
+              </thead>
+              <tbody>
+                {homeGames.map((g) => {
+                  const rc = g.result === "W" ? "text-emerald-400" : g.result === "L" ? "text-rose-400" : "text-slate-400";
+                  const barCol = g.pct >= 0.97 ? "#10b981" : g.pct >= 0.85 ? "#3b82f6" : g.pct >= 0.7 ? "#f59e0b" : "#ef4444";
+                  return (
+                    <tr key={g.id} className="border-b border-slate-800/50 hover:bg-slate-800/30">
+                      <td className="px-4 py-2 text-slate-400 tabular-nums whitespace-nowrap">{g.date}</td>
+                      <td className="px-3 py-2">
+                        <span className="inline-flex items-center gap-1.5">
+                          {g.oppLogo && <img src={g.oppLogo} alt="" className="w-5 h-5 object-contain" />}
+                          <span className="text-slate-200">{g.oppCode}</span>
+                        </span>
+                      </td>
+                      <td className={`px-3 py-2 text-center font-semibold tabular-nums ${rc}`}>{g.result} {g.gf}-{g.ga}</td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-2 rounded-full bg-slate-800 overflow-hidden">
+                            <div className="h-full rounded-full" style={{ width: `${Math.round(g.pct * 100)}%`, background: barCol }} />
+                          </div>
+                          <span className="text-xs text-slate-400 tabular-nums w-24 text-right">{g.attended.toLocaleString()} · {Math.round(g.pct * 100)}%</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2 text-right tabular-nums text-green-400">{fmtK(g.gate)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
