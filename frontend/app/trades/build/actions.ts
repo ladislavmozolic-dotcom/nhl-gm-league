@@ -396,7 +396,12 @@ export async function proposeTrade(pkg: TradePackage) {
   if (pkg.condition?.trim())
     await prisma.tradeCondition.create({ data: { tradeId: trade.id, fromTeamId: pkg.fromTeamId, toTeamId: pkg.toTeamId, description: pkg.condition.trim(), status: "PENDING" } });
   await prisma.transaction.create({ data: { type: "TRADE", message: `${fromTeam.name} proposed a trade to ${toTeam.name}. Awaiting response.` } });
-  revalidatePath("/trades");
+  // DM the receiving GM so it pops a notification and links straight to the proposal
+  // (the trade page has Accept / Decline). This is how the receiver hears about it.
+  await prisma.dmMessage.create({
+    data: { fromTeamId: pkg.fromTeamId, toTeamId: pkg.toTeamId, body: `📩 ${fromTeam.name} sent you a trade proposal — open it to review, then Accept or Decline.`, tradeUrl: `/trades/${trade.id}` },
+  }).catch(() => {});
+  revalidatePath("/trades"); revalidatePath("/messages");
   return { tradeId: trade.id };
 }
 
