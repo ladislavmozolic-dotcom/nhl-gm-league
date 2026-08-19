@@ -6,6 +6,7 @@ import RunAiGmButton from "@/components/RunAiGmButton";
 import RestartSeasonButton from "@/components/RestartSeasonButton";
 import { PageHeader, Card } from "@/components/ui";
 import PrepareNextDraftButton from "@/components/PrepareNextDraftButton";
+import DraftPickControls from "@/components/DraftPickControls";
 import PhaseControl from "@/components/PhaseControl";
 import { getLeagueClock } from "@/lib/calendar-server";
 
@@ -92,6 +93,11 @@ export default async function SeasonAdminPage() {
           </p>
           <PrepareNextDraftButton />
         </div>
+      </Card>
+
+      <Card title="Draft-pick horizon" accent="text-blue-400">
+        <p className="text-sm text-slate-400 mb-3 max-w-xl">Give every club its <b>own</b> picks (all 7 rounds) for a rolling 5-year window — no real-NHL trades. Shown on each team&apos;s <span className="text-slate-200">Draft Picks</span> page and in <span className="text-slate-200">All Rosters</span>. Run <b>Roll draft year forward</b> once per season so the horizon always stays 5 years out.</p>
+        <DraftPickControls />
       </Card>
     </div>
   );

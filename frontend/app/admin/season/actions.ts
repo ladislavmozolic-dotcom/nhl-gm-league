@@ -178,6 +178,38 @@ export async function simNextDayAction() {
   return { played: r.played, round: next.round, date: next.gameDate, done: false };
 }
 
+const DRAFT_ROUNDS = [1, 2, 3, 4, 5, 6, 7];
+
+/** Admin: give every club its OWN draft picks (all 7 rounds) for the next
+ *  `years` drafts — no real-NHL trades. Replaces the real-source pick set. */
+export async function resetOwnDraftPicksAction(years = 5) {
+  if (!(await isAdmin())) return { ok: false as const, error: "Admin only." };
+  const teams = await prisma.team.findMany({ where: { league: "NHL", isAffiliate: false }, select: { id: true, profinhlLogoId: true } });
+  const agg = await prisma.draftPick.aggregate({ where: { source: "real" }, _min: { year: true } });
+  const base = agg._min.year ?? 2026;
+  const yearList = Array.from({ length: years }, (_, i) => base + i);
+  await prisma.draftPick.deleteMany({ where: { source: "real" } });
+  const data = teams.flatMap((t) => yearList.flatMap((y) => DRAFT_ROUNDS.map((r) => ({ teamId: t.id, year: y, round: r, ownerLogoId: t.profinhlLogoId ?? 0, source: "real" }))));
+  await prisma.draftPick.createMany({ data });
+  for (const p of ["/tools/all-rosters", "/teams", "/draft"]) revalidatePath(p);
+  return { ok: true as const, years: yearList, created: data.length };
+}
+
+/** Admin: roll the draft-pick window forward one season — drop the earliest
+ *  (just-drafted) year and add a fresh year of own picks for every club, so the
+ *  league always sits on a rolling 5-year horizon. */
+export async function rollDraftYearForwardAction() {
+  if (!(await isAdmin())) return { ok: false as const, error: "Admin only." };
+  const agg = await prisma.draftPick.aggregate({ where: { source: "real" }, _min: { year: true }, _max: { year: true } });
+  if (agg._min.year == null || agg._max.year == null) return { ok: false as const, error: "No draft picks to roll — reset them first." };
+  const teams = await prisma.team.findMany({ where: { league: "NHL", isAffiliate: false }, select: { id: true, profinhlLogoId: true } });
+  const dropped = agg._min.year, added = agg._max.year + 1;
+  await prisma.draftPick.deleteMany({ where: { source: "real", year: dropped } });
+  await prisma.draftPick.createMany({ data: teams.flatMap((t) => DRAFT_ROUNDS.map((r) => ({ teamId: t.id, year: added, round: r, ownerLogoId: t.profinhlLogoId ?? 0, source: "real" }))) });
+  for (const p of ["/tools/all-rosters", "/teams", "/draft"]) revalidatePath(p);
+  return { ok: true as const, dropped, added };
+}
+
 /** Admin: simulate several scheduled days in one go (a longer testing block).
  *  Loops simNextDayAction, stopping early when the season runs out of games. */
 export async function simNextDaysAction(days: number) {
