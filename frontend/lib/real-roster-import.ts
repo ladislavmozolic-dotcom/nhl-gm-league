@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import { epSearchName } from "./playerName";
+import { MAX_TERM } from "./free-agency";
 
 // The NHL API's current-roster endpoint is the authoritative "who plays where"
 // — one call per club returns the real 23-man roster. We match our players to it
@@ -169,9 +170,12 @@ export async function importRealCapHits() {
     if (cap == null) continue;
     const clause = clauseByName.get(key) ?? null;
     const years = yearsByName.get(key) ?? null; // CapWages years remaining (null = unknown)
+    // store the true remaining term in realContractYears, but our league caps contract
+    // LENGTH at MAX_TERM (4) — a real 8-year deal is carried as a 4-year deal here.
+    const leagueYears = years != null ? Math.min(years, MAX_TERM) : null;
     await prisma.player.update({ where: { id: pl.id }, data: {
       realCapHit: cap, realTradeClause: clause, realContractYears: years,
-      ...(realMode ? { capHit: cap, tradeClause: clause, ...(years != null ? { contractYears: years } : {}) } : {}),
+      ...(realMode ? { capHit: cap, tradeClause: clause, ...(leagueYears != null ? { contractYears: leagueYears } : {}) } : {}),
     } });
     updated++;
   }

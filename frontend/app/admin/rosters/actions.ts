@@ -57,7 +57,7 @@ export async function applyRosterMode(mode: "profinhl" | "real") {
     await prisma.$executeRawUnsafe(`UPDATE "Team" SET "bankAccount"=COALESCE("profinhlBank", 50000000), "ledgerAdj"=0`);
   } else {
     // NHL 23-man roster — real cap hit AND real clause (kept separate from ProfiNHL)
-    await prisma.$executeRawUnsafe(`UPDATE "Player" SET "teamId"="realTeamId", "rosterType"='NHL', "capHit"=COALESCE("realCapHit","profinhlCapHit"), "tradeClause"="realTradeClause", "contractYears"=COALESCE("realContractYears","contractYears") WHERE "realTeamId" IS NOT NULL`);
+    await prisma.$executeRawUnsafe(`UPDATE "Player" SET "teamId"="realTeamId", "rosterType"='NHL', "capHit"=COALESCE("realCapHit","profinhlCapHit"), "tradeClause"="realTradeClause", "contractYears"=LEAST(COALESCE("realContractYears","contractYears"), 4) WHERE "realTeamId" IS NOT NULL`);
     // AHL farm → the parent org's affiliate team
     const affiliates = await prisma.team.findMany({ where: { isAffiliate: true, parentTeamId: { not: null } }, select: { id: true, parentTeamId: true } });
     for (const aff of affiliates)
