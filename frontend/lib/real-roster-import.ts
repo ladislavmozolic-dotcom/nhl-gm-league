@@ -137,21 +137,28 @@ export async function importRealCapHits() {
     const s = j ? JSON.stringify(j) : "";
     const m = s.match(/"capHit":"(\$[0-9,]+)"/);
     const tm = s.match(/"terms":"([^"]*)"/);
-    return { nm, cap: m ? dollars(m[1]) : null, clause: clauseOf(tm?.[1]) };
+    // years left on the deal, e.g. "yearsRemaining":"5 UFA" → 5 (0 = expiring / UFA-RFA now)
+    const yr = s.match(/"yearsRemaining":"\s*(\d+)/);
+    return { nm, cap: m ? dollars(m[1]) : null, clause: clauseOf(tm?.[1]), years: yr ? Number(yr[1]) : null };
   });
   const exact = new Map<string, number>();
   const fi = new Map<string, number[]>();
   const clauseByName = new Map<string, string | null>();
+  const yearsByName = new Map<string, number | null>();
   let fetched = 0;
-  for (const { nm, cap, clause } of caps) {
+  for (const { nm, cap, clause, years } of caps) {
     if (cap == null) continue;
     fetched++;
     exact.set(norm(nm), cap);
     clauseByName.set(norm(nm), clause);
+    yearsByName.set(norm(nm), years);
     const f = fiKeyOf(norm(nm)); if (f) (fi.get(f) ?? fi.set(f, []).get(f)!).push(cap);
   }
 
-  // 4) write realCapHit + realTradeClause (+ live capHit/tradeClause in real mode)
+  // 4) write realCapHit + realContractYears + realTradeClause (+ live capHit/contractYears/
+  //    tradeClause in real mode). The term is what keeps a multi-year deal (e.g. Caufield
+  //    signed through 2030-31) OUT of the re-sign list — before, every real deal imported
+  //    with only its cap hit and a stale 1-year length looked like it was expiring.
   const realMode = (await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true } }))?.rosterMode === "real";
   const players = await prisma.player.findMany({ where: { realTeamId: { not: null } }, select: { id: true, name: true } });
   let updated = 0;
@@ -161,7 +168,11 @@ export async function importRealCapHits() {
     if (cap == null) { const arr = fi.get(fiKeyOf(key)); if (arr && arr.length === 1) cap = arr[0]; }
     if (cap == null) continue;
     const clause = clauseByName.get(key) ?? null;
-    await prisma.player.update({ where: { id: pl.id }, data: { realCapHit: cap, realTradeClause: clause, ...(realMode ? { capHit: cap, tradeClause: clause } : {}) } });
+    const years = yearsByName.get(key) ?? null; // CapWages years remaining (null = unknown)
+    await prisma.player.update({ where: { id: pl.id }, data: {
+      realCapHit: cap, realTradeClause: clause, realContractYears: years,
+      ...(realMode ? { capHit: cap, tradeClause: clause, ...(years != null ? { contractYears: years } : {}) } : {}),
+    } });
     updated++;
   }
   return { ok: true as const, fetched, updated, total: players.length, placed: realMode };

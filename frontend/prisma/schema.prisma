@@ -158,6 +158,7 @@ model Player {
   realTeamId           Int?          // the player's real current NHL team (from the NHL API)
   realFarmTeamId       Int?          // NHL parent org whose AHL affiliate this player is on (from theahl.com)
   realCapHit           Int?          // real current NHL cap hit (from spotrac)
+  realContractYears    Int?          // real years remaining on the deal (from CapWages)
   realContractText     String?
   profinhlCapHit       Int?          // snapshot of the ProfiNHL cap hit (for roster switching)
   realTradeClause      String?       // real NTC/NMC/M_NTC (from CapWages) — used in Real NHL mode
