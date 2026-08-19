@@ -42,7 +42,7 @@ export default function FrenzyBar({ frenzyOpen, frenzyDay, frenzyRound, phaseLab
               : "Final week: best offer (money + role + team) wins at close.")
             : inSeasonOpen
               ? (ownOnly ? "Playoffs: you may re-sign your OWN UFAs only — an acceptable offer signs on the spot."
-                : "Sign your own UFAs and the open market — an acceptable offer signs immediately.")
+                : "Open market: an offer opens a 7-day window — the UFA weighs every club's bid, then counters, and signs a few days later.")
               : "Signings open July 1 (advance the League Calendar)."}
         </span>
         {isAdmin && frenzyOpen && (
