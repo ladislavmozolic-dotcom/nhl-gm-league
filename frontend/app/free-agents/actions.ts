@@ -375,45 +375,72 @@ async function clearFaWindow(playerId: number) {
 
 /** In-season UFA market resolver — runs on each day advance. For every free agent whose
  *  deliberation window has closed:
- *   • phase 1 (collected offers for a week): sign the best offer that clears his bar; if
- *     none clears, COUNTER every remaining bidder (his ask) and give them a few days to
- *     match — dropping the hopeless lowballs.
+ *   • phase 1 (collected offers for a week): he does NOT sign yet — he COUNTERS every
+ *     serious bidder (asks for their best) and opens the match window; hopeless lowballs
+ *     are dropped. Each bidder is DM'd his counter.
  *   • phase 2 (match window elapsed): sign the best offer (a lone suitor falls back to his
- *     floor); if nobody met his ask, the window closes and he stays on the market.
+ *     floor); the winning GM + every other bidder are notified by DM. If nobody met his
+ *     ask, he stays on the market.
  *  Only human-GM offers exist here — AI clubs don't bid the in-season market. */
 export async function resolveInSeasonWindows(asOf: Date): Promise<{ signed: number; countered: number; details: string[] }> {
   const due = await prisma.player.findMany({
     where: { faDecisionAt: { not: null, lte: asOf }, rosterType: { notIn: FREE } },
-    select: { id: true, name: true, age: true, faCountered: true },
+    select: { id: true, name: true, age: true, faCountered: true, teamId: true },
   });
   if (due.length === 0) return { signed: 0, countered: 0, details: [] };
   const pool = await loadMarketPool();
   const cmap = await teamContentionMap();
   let signed = 0, countered = 0; const details: string[] = [];
+  const nice = (s: string) => s.replace(/''[A-Za-z]''|\s*\([^)]*\)/g, "").trim();
+  const agentDm = async (fromFa: number, toTeamId: number, body: string) => {
+    await prisma.dmMessage.create({ data: { fromTeamId: fromFa, toTeamId, body, tradeUrl: "/free-agents" } }).catch(() => {});
+  };
   for (const p of due) {
     const offers = await prisma.faOffer.findMany({ where: { playerId: p.id, status: { in: ACTIVE } } });
     if (offers.length === 0) { await clearFaWindow(p.id); continue; }
     const player = { name: p.name, age: p.age };
+    const faId = p.teamId; // "Free Agents" holding club → the agent's DM sender
+    const nm = nice(p.name);
     if (!p.faCountered) {
-      // week's up: sign the best acceptable at his (still high) ask, else counter everyone.
-      const detail = await pickAndSign(p.id, player, offers, 1, pool, cmap, false);
-      if (detail) { details.push(detail); signed++; await clearFaWindow(p.id); continue; }
+      // Phase 1 — the player does NOT sign on the spot even if an offer clears. He counters
+      // every serious bidder ("submit your best") and gives them the match window; hopeless
+      // lowballs are dropped. This guarantees a real second round.
+      let kept = 0;
       for (const o of offers) {
         const ev = await evaluateTeamOffer(p.id, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, 2, { clause: o.grantClause, breadth: o.mNtcBreadth });
         if (!ev) continue;
-        if (o.salary < ev.ask.floorSalary * 0.6) await prisma.faOffer.update({ where: { id: o.id }, data: { status: "REJECTED" } });
-        else { await prisma.faOffer.update({ where: { id: o.id }, data: { status: "COUNTERED", counterSalary: ev.ask.salary, counterYears: ev.ask.years } }); countered++; }
+        if (o.salary < ev.ask.floorSalary * 0.6) {
+          await prisma.faOffer.update({ where: { id: o.id }, data: { status: "REJECTED" } });
+          await agentDm(faId, o.teamId, `❌ ${nm}'s camp passed on your offer — it wasn't close to his value.`);
+        } else {
+          await prisma.faOffer.update({ where: { id: o.id }, data: { status: "COUNTERED", counterSalary: ev.ask.salary, counterYears: ev.ask.years } });
+          countered++; kept++;
+          await agentDm(faId, o.teamId, `📩 ${nm} is weighing multiple offers — he decides in ${IN_SEASON_MATCH_DAYS} days. Put in your BEST offer: he's looking for about $${(ev.ask.salary / 1e6).toFixed(2)}M × ${ev.ask.years}yr. Raise your offer to stay in it.`);
+        }
       }
-      const left = await prisma.faOffer.count({ where: { playerId: p.id, status: { in: ACTIVE } } });
-      if (left > 0) {
+      if (kept > 0) {
         await prisma.player.update({ where: { id: p.id }, data: { faCountered: true, faDecisionAt: addDays(asOf, IN_SEASON_MATCH_DAYS) } });
-        await prisma.transaction.create({ data: { type: "FA_NEGOTIATION", message: `${p.name} countered his suitors — they have ${IN_SEASON_MATCH_DAYS} days to match before he signs.` } });
+        await prisma.transaction.create({ data: { type: "FA_NEGOTIATION", message: `${nm} is deciding between multiple offers — his suitors have ${IN_SEASON_MATCH_DAYS} days to submit their best.` } });
       } else await clearFaWindow(p.id);
     } else {
-      // match window closed: sign the best (lone suitor → his floor). Otherwise he stays out.
+      // Phase 2 — match window closed: he signs the best (a lone suitor → his floor). Notify
+      // the winning GM (a message that pops on their screen) and every other bidder.
+      const bidders = [...new Set(offers.map((o) => o.teamId))];
       const detail = await pickAndSign(p.id, player, offers, 3, pool, cmap, true);
-      if (detail) { details.push(detail); signed++; }
-      else await prisma.faOffer.updateMany({ where: { playerId: p.id, status: { in: ACTIVE } }, data: { status: "REJECTED" } });
+      if (detail) {
+        details.push(detail); signed++;
+        const after = await prisma.player.findUnique({ where: { id: p.id }, select: { teamId: true } });
+        const winner = after?.teamId ?? null;
+        const names = new Map((await prisma.team.findMany({ where: { id: { in: [...bidders, winner ?? -1] } }, select: { id: true, name: true } })).map((t) => [t.id, t.name]));
+        const winnerName = (winner != null && names.get(winner)) || "his new club";
+        for (const tid of bidders) {
+          if (tid === winner) await agentDm(faId, tid, `✅ ${nm} has SIGNED with you! He accepted your offer over the other clubs.`);
+          else await agentDm(faId, tid, `🚫 ${nm} signed with ${winnerName} — he passed on your offer.`);
+        }
+      } else {
+        await prisma.faOffer.updateMany({ where: { playerId: p.id, status: { in: ACTIVE } }, data: { status: "REJECTED" } });
+        for (const tid of bidders) await agentDm(faId, tid, `${nm} didn't sign anyone — no offer met his ask. He stays on the market.`);
+      }
       await clearFaWindow(p.id);
     }
   }
