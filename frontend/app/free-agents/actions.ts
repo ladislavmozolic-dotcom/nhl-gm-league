@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { canManageTeam, getTeamSession, isAdmin, isComishTier } from "@/lib/auth";
 import { getLeagueClock, getLeagueDate } from "@/lib/calendar-server";
 import { addDays } from "@/lib/calendar";
-import { CURRENT_SEASON_START, capCeilingForPhase, ltirRelief } from "@/lib/finance";
+import { CURRENT_SEASON_START, capCeilingForPhase, ltirRelief, accruedCapSpace } from "@/lib/finance";
 import {
   loadMarketPool, teamContentionMap, teamAsk, evaluateTeamOffer, loadLeagueCap, weakestTeams,
 } from "@/lib/free-agency-server";
@@ -174,13 +174,19 @@ export async function submitOfferAction(
   if (win.immediate && !win.ownOnly && player.faCountered && !existing) {
     return { ok: false as const, error: "He's already deciding among his current suitors — bidding is closed to new clubs." };
   }
+  // Cap is a SOFT gate for offers: we DON'T block a bid that would exceed it — the GM can
+  // make it and just gets a heads-up that, IF the player accepts, he'd be over the cap.
+  // Projected in-season cap space (banked by staying under the cap) extends the room a club
+  // can plan around, so a bid covered by accrued savings warns only lightly.
   const ceiling = capCeilingForPhase(cap.upper, clock.phase) + ltir;
-  if (committed + salary > ceiling) {
-    const overSeason = clock.phase === "regular" || clock.phase === "playoffs";
-    return { ok: false as const, error: overSeason
-      ? `Over the cap — you have ${fmtM(cap.upper - committed)} of space, this offer is ${fmtM(salary)}.`
-      : `Over the off-season ceiling (cap +10%) — ${fmtM(ceiling - committed)} of room left, this offer is ${fmtM(salary)}. You must be cap-compliant by opening day.` };
-  }
+  const gp = await prisma.game.count({ where: { season: "2026-27", status: "FINAL", OR: [{ homeTeamId: teamId }, { awayTeamId: teamId }] } });
+  const accrued = accruedCapSpace(Math.max(0, ceiling - committed), gp).actual;
+  const projected = ceiling + accrued;
+  let capWarning: string | null = null;
+  if (committed + salary > projected)
+    capWarning = `⚠️ If he accepts, you'd be about ${fmtM(committed + salary - ceiling)} over the cap — even counting projected in-season space (~${fmtM(accrued)}). You'll need to shed salary before he signs.`;
+  else if (committed + salary > ceiling)
+    capWarning = `Heads up: this uses your projected in-season cap space — ${fmtM(committed + salary - ceiling)} over the current ceiling, covered by ~${fmtM(accrued)} of accrued room.`;
 
   const clause = grantClause && ["NTC", "NMC", "M_NTC"].includes(grantClause) ? grantClause : null;
   const breadth = clause === "M_NTC" ? ([6, 12, 18, 24].includes(mNtcBreadth ?? 0) ? mNtcBreadth! : 12) : null;
@@ -209,7 +215,7 @@ export async function submitOfferAction(
     revalidatePath("/free-agents");
     return {
       ok: true as const, deliberating: true as const, raised: !!existing,
-      decisionAt: decideAt.toISOString(), countered: player.faCountered,
+      decisionAt: decideAt.toISOString(), countered: player.faCountered, capWarning,
       clears: evalr?.acceptable ?? false,
       floor: evalr?.ask.floorSalary ?? 0,
       askYears: evalr ? { min: evalr.ask.minYears, max: evalr.ask.maxYears } : null,
@@ -226,12 +232,12 @@ export async function submitOfferAction(
       }
       revalidatePath("/free-agents");
       revalidatePath(`/teams`);
-      return { ok: true as const, signed: true as const, clears: true as const };
+      return { ok: true as const, signed: true as const, clears: true as const, capWarning };
     }
     await prisma.faOffer.deleteMany({ where: { playerId, teamId } });
     revalidatePath("/free-agents");
     return {
-      ok: true as const, signed: false as const, clears: false as const,
+      ok: true as const, signed: false as const, clears: false as const, capWarning,
       floor: evalr?.ask.floorSalary ?? 0,
       askYears: evalr ? { min: evalr.ask.minYears, max: evalr.ask.maxYears } : null,
     };
@@ -239,7 +245,7 @@ export async function submitOfferAction(
 
   revalidatePath("/free-agents");
   return {
-    ok: true as const,
+    ok: true as const, capWarning,
     raised: !!existing,
     clears: evalr?.acceptable ?? false,
     floor: evalr?.ask.floorSalary ?? 0,

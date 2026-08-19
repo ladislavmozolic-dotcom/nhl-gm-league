@@ -103,6 +103,8 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
         const raised = "raised" in r && r.raised;
         setResult({ t: "ok", s: r.clears ? `Offer ${raised ? "raised" : "placed"} — clears his ask at your club. ✓` : `Offer ${raised ? "raised" : "placed"} — below his floor ${M("floor" in r ? r.floor : 0)}; he may pick a better one.` });
       }
+      // over-cap? the offer still went through — append the soft cap warning.
+      if ("capWarning" in r && r.capWarning) setResult((prev) => (prev ? { ...prev, s: `${prev.s}  ${r.capWarning}` } : { t: "ok", s: r.capWarning as string }));
       load(teamId);
     });
   };
