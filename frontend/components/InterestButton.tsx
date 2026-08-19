@@ -281,12 +281,19 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
                   <div className="mt-4">
                     <div className="text-xs uppercase tracking-wider text-slate-500 mb-1">Standing offers ({offers.length})</div>
                     <div className="space-y-1">
-                      {offers.map((o) => (
-                        <div key={o.teamId} className="flex items-center justify-between text-sm bg-slate-800/40 rounded px-2 py-1">
-                          <span className="font-semibold">{o.teamCode}</span>
-                          <span className="tabular-nums text-slate-300">{M(o.salary)} × {o.years}yr · L{o.line}{o.pp ? " PP" : ""}{o.pk ? " PK" : ""}</span>
-                        </div>
-                      ))}
+                      {offers.map((o) => {
+                        const fmt = (iso: string) => new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+                        const raised = o.updatedAt !== o.placedAt;
+                        return (
+                          <div key={o.teamId} className="flex items-center justify-between gap-3 text-sm bg-slate-800/40 rounded px-2 py-1">
+                            <span className="font-semibold shrink-0">{o.teamCode}</span>
+                            <span className="tabular-nums text-slate-300 flex-1 text-right">{M(o.salary)} × {o.years}yr · L{o.line}{o.pp ? " PP" : ""}{o.pk ? " PK" : ""}</span>
+                            <span className="text-[11px] text-slate-500 shrink-0 whitespace-nowrap" title={raised ? `Placed ${fmt(o.placedAt)} · raised ${fmt(o.updatedAt)}` : `Placed ${fmt(o.placedAt)}`}>
+                              🕒 {fmt(o.updatedAt)}{raised ? " (raised)" : ""}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

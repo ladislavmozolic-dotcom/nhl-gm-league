@@ -94,6 +94,8 @@ export async function getPlayerOffersAction(playerId: number) {
   return offers.map((o) => ({
     teamId: o.teamId, teamCode: codeOf.get(o.teamId) ?? "?",
     salary: o.salary, years: o.years, line: o.line, pp: o.pp, pk: o.pk,
+    placedAt: o.createdAt.toISOString(),   // when the offer first landed
+    updatedAt: o.updatedAt.toISOString(),  // last raised/changed
   }));
 }
 
