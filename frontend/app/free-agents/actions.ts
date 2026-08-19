@@ -3,7 +3,8 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { canManageTeam, getTeamSession, isAdmin, isComishTier } from "@/lib/auth";
-import { getLeagueClock } from "@/lib/calendar-server";
+import { getLeagueClock, getLeagueDate } from "@/lib/calendar-server";
+import { addDays } from "@/lib/calendar";
 import { CURRENT_SEASON_START, capCeilingForPhase, ltirRelief } from "@/lib/finance";
 import {
   loadMarketPool, teamContentionMap, teamAsk, evaluateTeamOffer, loadLeagueCap, weakestTeams,
@@ -19,6 +20,10 @@ async function twoWayOpts(): Promise<{ olderAge: number; gpLimit: number; maxYea
 }
 
 const FREE = ["NHL", "AHL", "RETIRED", "PROSPECT", "RELEASED"]; // not a signable free agent
+// In-season UFA market mirrors the summer frenzy in miniature, PER PLAYER: he collects
+// offers for a week, then counters the bidders and gives them a few days to match.
+const IN_SEASON_COLLECT_DAYS = 7;
+const IN_SEASON_MATCH_DAYS = 3;
 const ACTIVE = ["PENDING", "COUNTERED", "SHORTLISTED"]; // an offer still in contention
 const SHORTLIST_SIZE = 3; // how many suitors a player keeps into the final week
 
@@ -110,7 +115,7 @@ export async function submitOfferAction(
     }
   }
 
-  const player = await prisma.player.findUnique({ where: { id: playerId }, select: { name: true, rosterType: true, overall: true, realFarmTeamId: true, age: true, lastSeasonGP: true, teamId: true } });
+  const player = await prisma.player.findUnique({ where: { id: playerId }, select: { name: true, rosterType: true, overall: true, realFarmTeamId: true, age: true, lastSeasonGP: true, teamId: true, faDecisionAt: true, faCountered: true } });
   if (!player) return { ok: false as const, error: "Player not found." };
   if (player.rosterType && FREE.includes(player.rosterType)) {
     return { ok: false as const, error: "This player is not a free agent." };
@@ -151,6 +156,11 @@ export async function submitOfferAction(
       return { ok: false as const, error: "You've already made your offer this round — wait for the next round to change it." };
     }
   }
+  // In-season counter phase: once he's countered his suitors, no NEW club may jump in —
+  // only clubs already negotiating can raise to match (mirrors the July round-lock).
+  if (win.immediate && !win.ownOnly && player.faCountered && !existing) {
+    return { ok: false as const, error: "He's already deciding among his current suitors — bidding is closed to new clubs." };
+  }
   const ceiling = capCeilingForPhase(cap.upper, clock.phase) + ltir;
   if (committed + salary > ceiling) {
     const overSeason = clock.phase === "regular" || clock.phase === "playoffs";
@@ -172,9 +182,26 @@ export async function submitOfferAction(
     create: { playerId, teamId, salary, years, line: dep.line, pp, pk, round: clock.frenzyRound, grantClause: clause, mNtcBreadth: breadth, twoWay },
   });
 
-  // In-season (regular / playoffs): sign IMMEDIATELY if the terms clear the player's
-  // bar — no waiting for a Frenzy Day. If the offer falls short, we don't keep a
-  // standing offer around; just tell the GM what it'll take.
+  // In-season OPEN MARKET: he does NOT sign on the spot. He takes a week to weigh the
+  // offers (more clubs can bid in that time); when the window closes he counters the
+  // bidders and gives them a few days to match, then signs the best — the summer UFA
+  // market in miniature, per player. The standing offer is kept for the resolver.
+  if (win.immediate && !win.ownOnly) {
+    if (!player.faDecisionAt) {
+      await prisma.player.update({ where: { id: playerId }, data: { faDecisionAt: addDays(await getLeagueDate(), IN_SEASON_COLLECT_DAYS), faCountered: false } });
+    }
+    const decideAt = player.faDecisionAt ?? addDays(await getLeagueDate(), IN_SEASON_COLLECT_DAYS);
+    revalidatePath("/free-agents");
+    return {
+      ok: true as const, deliberating: true as const, raised: !!existing,
+      decisionAt: decideAt.toISOString(), countered: player.faCountered,
+      clears: evalr?.acceptable ?? false,
+      floor: evalr?.ask.floorSalary ?? 0,
+      askYears: evalr ? { min: evalr.ask.minYears, max: evalr.ask.maxYears } : null,
+    };
+  }
+
+  // Playoffs "own UFAs only" re-sign: immediate — it's your own player, no competition.
   if (win.immediate) {
     if (evalr?.acceptable) {
       const code = await signFaOffer(playerId, { name: player.name, age: player.age }, offer, salary, years, player.teamId ?? undefined);
@@ -338,6 +365,57 @@ export async function resolveFrenzy(judgeRound = 3): Promise<{ signed: number; d
     if (detail) { details.push(detail); signed++; }
   }
   return { signed, details };
+}
+
+async function clearFaWindow(playerId: number) {
+  await prisma.player.update({ where: { id: playerId }, data: { faDecisionAt: null, faCountered: false } });
+}
+
+/** In-season UFA market resolver — runs on each day advance. For every free agent whose
+ *  deliberation window has closed:
+ *   • phase 1 (collected offers for a week): sign the best offer that clears his bar; if
+ *     none clears, COUNTER every remaining bidder (his ask) and give them a few days to
+ *     match — dropping the hopeless lowballs.
+ *   • phase 2 (match window elapsed): sign the best offer (a lone suitor falls back to his
+ *     floor); if nobody met his ask, the window closes and he stays on the market.
+ *  Only human-GM offers exist here — AI clubs don't bid the in-season market. */
+export async function resolveInSeasonWindows(asOf: Date): Promise<{ signed: number; countered: number; details: string[] }> {
+  const due = await prisma.player.findMany({
+    where: { faDecisionAt: { not: null, lte: asOf }, rosterType: { notIn: FREE } },
+    select: { id: true, name: true, age: true, faCountered: true },
+  });
+  if (due.length === 0) return { signed: 0, countered: 0, details: [] };
+  const pool = await loadMarketPool();
+  const cmap = await teamContentionMap();
+  let signed = 0, countered = 0; const details: string[] = [];
+  for (const p of due) {
+    const offers = await prisma.faOffer.findMany({ where: { playerId: p.id, status: { in: ACTIVE } } });
+    if (offers.length === 0) { await clearFaWindow(p.id); continue; }
+    const player = { name: p.name, age: p.age };
+    if (!p.faCountered) {
+      // week's up: sign the best acceptable at his (still high) ask, else counter everyone.
+      const detail = await pickAndSign(p.id, player, offers, 1, pool, cmap, false);
+      if (detail) { details.push(detail); signed++; await clearFaWindow(p.id); continue; }
+      for (const o of offers) {
+        const ev = await evaluateTeamOffer(p.id, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, 2, { clause: o.grantClause, breadth: o.mNtcBreadth });
+        if (!ev) continue;
+        if (o.salary < ev.ask.floorSalary * 0.6) await prisma.faOffer.update({ where: { id: o.id }, data: { status: "REJECTED" } });
+        else { await prisma.faOffer.update({ where: { id: o.id }, data: { status: "COUNTERED", counterSalary: ev.ask.salary, counterYears: ev.ask.years } }); countered++; }
+      }
+      const left = await prisma.faOffer.count({ where: { playerId: p.id, status: { in: ACTIVE } } });
+      if (left > 0) {
+        await prisma.player.update({ where: { id: p.id }, data: { faCountered: true, faDecisionAt: addDays(asOf, IN_SEASON_MATCH_DAYS) } });
+        await prisma.transaction.create({ data: { type: "FA_NEGOTIATION", message: `${p.name} countered his suitors — they have ${IN_SEASON_MATCH_DAYS} days to match before he signs.` } });
+      } else await clearFaWindow(p.id);
+    } else {
+      // match window closed: sign the best (lone suitor → his floor). Otherwise he stays out.
+      const detail = await pickAndSign(p.id, player, offers, 3, pool, cmap, true);
+      if (detail) { details.push(detail); signed++; }
+      else await prisma.faOffer.updateMany({ where: { playerId: p.id, status: { in: ACTIVE } }, data: { status: "REJECTED" } });
+      await clearFaWindow(p.id);
+    }
+  }
+  return { signed, countered, details };
 }
 
 /** End-of-round processing for the multi-week frenzy. Called when the calendar

@@ -17,7 +17,7 @@ import { aiGmDaily } from "@/lib/ai-gm";
 import { getLeagueDate } from "@/lib/calendar-server";
 import { addDays, utcDay, phaseFor, effectivePhase, PHASES, seasonOpen, defaultLeagueDate, frenzyRound, roundForDate } from "@/lib/calendar";
 import { processWaivers } from "@/lib/waivers-server";
-import { resolveFrenzy, processRoundEnd } from "@/app/free-agents/actions";
+import { resolveFrenzy, processRoundEnd, resolveInSeasonWindows } from "@/app/free-agents/actions";
 import { checkPromises } from "@/lib/promises";
 import { autoImportUpcomingClass } from "@/lib/draft-class-import";
 import { leagueCapCompliance } from "@/lib/cap";
@@ -79,6 +79,10 @@ export async function advanceLeagueDayAction() {
   } else if (ph(cur) === "frenzy" && ph(next) === "frenzy" && frenzyRound(cur) !== frenzyRound(next)) {
     await processRoundEnd(frenzyRound(cur));
   }
+  // in-season UFA market: resolve any player whose 7-day deliberation (or 3-day match)
+  // window has closed — sign the best offer, or counter the bidders for a few more days.
+  const inSeasonFa = await resolveInSeasonWindows(next);
+  signed += inSeasonFa.signed;
   // opening-day cap compliance: the +10% summer cushion expires — every club must
   // now sit under the strict ceiling. Non-compliant clubs get a public warning.
   let capOffenders = 0;

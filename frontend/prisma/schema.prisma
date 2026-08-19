@@ -167,6 +167,8 @@ model Player {
   faDemandOverride     Int?          // Free Agent Frenzy: league Agent / admin hand-set contract demand ($ cap hit); overrides the computed market value
   franchiseTag         Boolean       @default(false) // RFA tagged as the club's Franchise player (1/team) → gets 2 re-sign rounds before offer sheets
   resignRound          Int           @default(0)  // own-player re-sign: 0 = no offer yet, 1/2 = after that round's offer (max 2)
+  faDecisionAt         DateTime?     // in-season UFA market: when his deliberation window resolves (collect offers 7d → counter 3d → sign)
+  faCountered          Boolean       @default(false) // in-season UFA market: he has issued counters (phase 2 — bidders match, then he signs)
   resignStatus         String?                     // null | open | countered | walkedToUFA | osEligible (RFA who declined → offer sheets)
   resignCounterSalary  Int?                        // the player's counter in the current re-sign round
   resignCounterYears   Int?

@@ -90,7 +90,11 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
     start(async () => {
       const r = await submitOfferAction(playerId, teamId, salary, years, line, pp, pk, grantClause || null, grantClause === "M_NTC" ? breadth : null, twoWay);
       if (!r.ok) { setResult({ t: "err", s: r.error }); return; }
-      if ("signed" in r && r.signed) {
+      if ("deliberating" in r && r.deliberating) {
+        const when = new Date(r.decisionAt).toLocaleDateString();
+        const raised = "raised" in r && r.raised;
+        setResult({ t: "ok", s: `${raised ? "Offer raised" : "Offer placed"} — ${name} is taking time to weigh his offers${r.countered ? " and has already countered his suitors (match to stay in it)" : ""}. He'll decide around ${when}; other clubs can keep bidding until then.${r.clears ? " Your terms clear his ask. ✓" : ""}` });
+      } else if ("signed" in r && r.signed) {
         setResult({ t: "ok", s: `✅ ${name} signed!` });
       } else if ("signed" in r && r.signed === false) {
         setResult({ t: "err", s: `Below his ask — he wants at least ${M("floor" in r ? r.floor : 0)}. Raise the offer to sign him now.` });

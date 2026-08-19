@@ -4,7 +4,8 @@ import { PageHeader, Card } from "@/components/ui";
 import SortableTable, { type SortCol } from "@/components/SortableTable";
 import { posGroup, ratingColor, ovColor } from "@/lib/ratingBands";
 import { demandForPlayers, loadMarketPool } from "@/lib/free-agency-server";
-import { getLeagueClock } from "@/lib/calendar-server";
+import { getLeagueClock, getLeagueDate } from "@/lib/calendar-server";
+import { cleanName } from "@/lib/playerName";
 import { getTeamSession, isAdmin } from "@/lib/auth";
 import type { InterestCtx } from "@/components/InterestButton";
 import FrenzyBar from "@/components/FrenzyBar";
@@ -61,6 +62,20 @@ export default async function FreeAgentsPage({
     const actingTeamId = teams.some((t) => t.id === sessionTeamId) ? sessionTeamId : (teams[0]?.id ?? null);
     interestCtx = { frenzyOpen: clock.faWindow.open, immediate: clock.faWindow.immediate, ownOnly: clock.faWindow.ownOnly, actingTeamId, teams: teams.map((t) => ({ ...t, code: t.code ?? "" })) };
   }
+
+  // in-season deliberation: free agents currently weighing offers (7-day window, then
+  // a counter round). Show who's deciding + how many clubs are in + days left.
+  const deliberators = freeAgents.filter((p: any) => p.faDecisionAt);
+  const leagueDate = await getLeagueDate();
+  const offerCounts = deliberators.length
+    ? await prisma.faOffer.groupBy({ by: ["playerId"], where: { playerId: { in: deliberators.map((p) => p.id) }, status: { in: ["PENDING", "COUNTERED", "SHORTLISTED"] } }, _count: true })
+    : [];
+  const offerCountBy = new Map(offerCounts.map((o) => [o.playerId, o._count]));
+  const deliberating = deliberators.map((p: any) => ({
+    id: p.id, name: cleanName(p.name),
+    days: Math.max(0, Math.ceil((new Date(p.faDecisionAt).getTime() - leagueDate.getTime()) / 86400000)),
+    offers: offerCountBy.get(p.id) ?? 0, countered: p.faCountered,
+  })).sort((a, b) => a.days - b.days);
 
   const attrs = isGoalie ? GOALIE_ATTRS : SKATER_ATTRS;
   const cols: SortCol[] = [
@@ -127,6 +142,21 @@ export default async function FreeAgentsPage({
         inSeasonOpen={!clock.frenzyOpen && clock.faWindow.open}
         ownOnly={clock.faWindow.ownOnly}
       />
+
+      {deliberating.length > 0 && (
+        <div className="rounded-xl border border-amber-700/40 bg-amber-950/20 px-4 py-3">
+          <div className="text-xs font-bold uppercase tracking-wider text-amber-400/90 mb-1.5">🕒 Weighing offers ({deliberating.length})</div>
+          <div className="flex flex-wrap gap-2">
+            {deliberating.map((d) => (
+              <span key={d.id} className="text-xs rounded-lg border border-slate-700 bg-slate-900/60 px-2.5 py-1">
+                <b className="text-slate-200">{d.name}</b>
+                <span className="text-slate-500"> · {d.offers} offer{d.offers === 1 ? "" : "s"} · {d.countered ? "countered, " : ""}decides in {d.days}d</span>
+              </span>
+            ))}
+          </div>
+          <p className="text-[11px] text-slate-500 mt-2">In-season UFAs take a week to weigh their offers (more clubs can bid), then counter the bidders — they sign a few days later. Get your offer in before the clock runs out.</p>
+        </div>
+      )}
 
       <div className="flex items-center gap-2">
         {tab("skaters", "Skaters")}
