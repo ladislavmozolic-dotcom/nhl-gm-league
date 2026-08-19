@@ -99,6 +99,17 @@ export async function getPlayerOffersAction(playerId: number) {
   }));
 }
 
+/** Full bid history on a player — every offer/raise, oldest first. Commissioner only
+ *  (blind bidding: a GM never sees rivals' bids). */
+export async function getBidHistoryAction(playerId: number) {
+  if (!(await isAdmin())) return [];
+  const bids = await prisma.faBid.findMany({ where: { playerId }, orderBy: { id: "asc" } });
+  if (bids.length === 0) return [];
+  const teams = await prisma.team.findMany({ where: { id: { in: [...new Set(bids.map((b) => b.teamId))] } }, select: { id: true, code: true } });
+  const codeOf = new Map(teams.map((t) => [t.id, t.code]));
+  return bids.map((b) => ({ teamCode: codeOf.get(b.teamId) ?? "?", salary: b.salary, years: b.years, at: b.createdAt.toISOString() }));
+}
+
 /** Place or raise a team's standing offer to a free agent (money + term + promised usage). */
 export async function submitOfferAction(
   playerId: number, teamId: number, salary: number, years: number, line: number, pp: boolean, pk: boolean,
@@ -183,6 +194,8 @@ export async function submitOfferAction(
     update: { salary, years, line: dep.line, pp, pk, status: newStatus, round: clock.frenzyRound, grantClause: clause, mNtcBreadth: breadth, twoWay },
     create: { playerId, teamId, salary, years, line: dep.line, pp, pk, round: clock.frenzyRound, grantClause: clause, mNtcBreadth: breadth, twoWay },
   });
+  // append every bid/raise to the running log (FaOffer keeps only the latest standing offer)
+  await prisma.faBid.create({ data: { playerId, teamId, salary, years, round: clock.frenzyRound } }).catch(() => {});
 
   // In-season OPEN MARKET: he does NOT sign on the spot. He takes a week to weigh the
   // offers (more clubs can bid in that time); when the window closes he counters the

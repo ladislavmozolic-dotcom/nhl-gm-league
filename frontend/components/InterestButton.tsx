@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import {
-  getInterestAction, getPlayerOffersAction, submitOfferAction, withdrawOfferAction, getAskAtAction,
+  getInterestAction, getPlayerOffersAction, submitOfferAction, withdrawOfferAction, getAskAtAction, getBidHistoryAction,
 } from "@/app/free-agents/actions";
 import { clauseDiscount } from "@/lib/free-agency";
 import InfoTip from "@/components/InfoTip";
@@ -35,6 +35,7 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
   const [teamId, setTeamId] = useState<number | null>(ctx.actingTeamId);
   const [info, setInfo] = useState<Interest | null>(null);
   const [offers, setOffers] = useState<Offers>([]);
+  const [history, setHistory] = useState<Awaited<ReturnType<typeof getBidHistoryAction>>>([]);
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<{ t: "ok" | "err"; s: string } | null>(null);
   const [result, setResult] = useState<{ t: "ok" | "err"; s: string } | null>(null); // post-offer response — shown as a dialog you dismiss with Continue
@@ -62,8 +63,8 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
 
   const load = (tid: number) => start(async () => {
     setMsg(null);
-    const [i, o] = await Promise.all([getInterestAction(playerId, tid), getPlayerOffersAction(playerId)]);
-    setInfo(i); setOffers(o);
+    const [i, o, h] = await Promise.all([getInterestAction(playerId, tid), getPlayerOffersAction(playerId), getBidHistoryAction(playerId)]);
+    setInfo(i); setOffers(o); setHistory(h);
     if (i.ok) {
       const ex = i.existing;
       // pre-fill only with the club's OWN previous offer; a fresh offer starts blank so
@@ -294,6 +295,20 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
                           </div>
                         );
                       })}
+                    </div>
+                  </div>
+                )}
+                {history.length > 0 && (
+                  <div className="mt-4">
+                    <div className="text-xs uppercase tracking-wider text-slate-500 mb-1">Bid history ({history.length})</div>
+                    <div className="space-y-0.5 max-h-40 overflow-y-auto">
+                      {history.map((b, i) => (
+                        <div key={i} className="flex items-center justify-between gap-3 text-xs bg-slate-800/30 rounded px-2 py-1">
+                          <span className="font-semibold shrink-0">{b.teamCode}</span>
+                          <span className="tabular-nums text-slate-300 flex-1 text-right">{M(b.salary)} × {b.years}yr</span>
+                          <span className="text-[11px] text-slate-500 shrink-0 whitespace-nowrap">{new Date(b.at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}

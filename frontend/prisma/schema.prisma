@@ -417,6 +417,20 @@ model FaOffer {
   @@index([teamId])
 }
 
+// Append-only bid log — every offer/raise a club submits on a free agent, kept as a
+// running history (the FaOffer row only holds the LATEST standing offer). Commissioner
+// can review the full bidding trail on a player.
+model FaBid {
+  id        Int      @id @default(autoincrement())
+  playerId  Int
+  teamId    Int
+  salary    Int
+  years     Int
+  round     Int      @default(0)
+  createdAt DateTime @default(now())
+  @@index([playerId, id])
+}
+
 // A rival club's offer sheet on another team's RFA (once he's osEligible). The
 // player's AI decides by July 10: he signs it if it meets his demand AND beats
 // his own club's standing offer, else declines. When it's signed the submitting
