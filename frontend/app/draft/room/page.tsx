@@ -38,7 +38,8 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
     isAdmin(),
     getTeamSession(),
   ]);
-  const dcfg = admin ? await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { draftTestMode: true } }) : null;
+  const lcfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { draftTestMode: true } });
+  const testMode = !!lcfg?.draftTestMode;
   const teamOf = new Map(teams.map((t) => [t.id, t]));
   // off-board (GM-added) picks — admins verify their eligibility
   const offBoardRaw = await prisma.draftProspect.findMany({ where: { draftYear: DRAFT_YEAR, offBoard: true, ...src }, orderBy: { overallPick: "asc" }, select: { id: true, name: true, position: true, birthDate: true, epLink: true, verified: true, overallPick: true, draftedByTeamId: true } });
@@ -69,7 +70,8 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
   const currentSlot = order.find((p) => p.overallPick === state.currentPick);
   const isLiveRound = state.status === "LIVE" && state.liveRound === round;
   const onClockTeam = currentSlot ? teamOf.get(currentSlot.pickerTeamId) : undefined;
-  const canPick = isLiveRound && !!currentSlot && (admin || me === currentSlot.pickerTeamId);
+  // in test mode ANY signed-in GM can pick (even off-turn) so everyone can rehearse
+  const canPick = isLiveRound && !!currentSlot && (admin || me === currentSlot.pickerTeamId || (testMode && me != null));
   // pick deadline: on-the-clock time + allotted minutes (20 for R1/deferred, 30 R2-7)
   const PICK_MINUTES = currentSlot?.deferred || currentSlot?.round === 1 ? 20 : 30;
   const pickDeadline = isLiveRound && stateRaw?.onClockAt ? new Date(new Date(stateRaw.onClockAt).getTime() + PICK_MINUTES * 60000).toISOString() : null;
@@ -111,7 +113,13 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
         })}
       </div>
 
-      {admin && <DraftTestControls testMode={!!dcfg?.draftTestMode} />}
+      {admin && <DraftTestControls testMode={testMode} />}
+      {testMode && (
+        <div className="rounded-xl border border-emerald-700/40 bg-emerald-950/20 px-4 py-3 text-sm">
+          <span className="font-bold text-emerald-300">🧪 Test režim</span>
+          <span className="text-slate-300"> — draft je nanečisto. <b>Ktorýkoľvek prihlásený GM</b> môže skúsiť picknúť hráča z boardu alebo pridať hráča mimo boardu, aj keď nie je na rade — výber sa <b>nezapíše na tím</b>. Vľavo je celé poradie tímov, uprostred mená (aj z 1. kola). Admin otvorí kolo tlačidlom nižšie a môže kedykoľvek resetovať board.</span>
+        </div>
+      )}
       {admin && <BonusPickManager teams={bonusTeams} bonus={bonusRows} />}
 
       {fullView ? (

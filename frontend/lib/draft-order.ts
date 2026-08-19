@@ -21,8 +21,9 @@ export type OrderPick = {
 
 /** Full pick order for rounds 2-7 of a draft year. */
 export async function draftOrder(year: number, season = "2026-27"): Promise<OrderPick[]> {
-  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true } });
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true, draftTestMode: true } });
   const source = cfg?.rosterMode === "real" ? "real" : "profinhl";
+  const testMode = !!cfg?.draftTestMode;
 
   const bonusSource = source === "real" ? { source: "real" } : { OR: [{ source: null }, { source: "profinhl" }] };
   const [standings, teams, picks, lottery, bonus] = await Promise.all([
@@ -50,6 +51,17 @@ export async function draftOrder(year: number, season = "2026-27"): Promise<Orde
 
   // worst-first slot order
   const slotOrder = [...standings].reverse().map((s) => s.teamId);
+
+  // Test-mode sandbox: with no committed lottery, synthesize a round-1 order from
+  // reverse standings so GMs can rehearse the whole draft including round 1. In
+  // production (test mode off) round 1 stays reserved for the lottery, untouched.
+  if (testMode && lottery.length === 0) {
+    slotOrder.forEach((originalTeamId, slot) => {
+      const logo = logoOf.get(originalTeamId);
+      const owner = logo != null ? ownerByRoundLogo.get(`1:${logo}`) : undefined;
+      out.push({ overallPick: slot + 1, round: 1, slotInRound: slot, pickerTeamId: owner ?? originalTeamId, originalTeamId });
+    });
+  }
 
   for (let round = 2; round <= 7; round++) {
     slotOrder.forEach((originalTeamId, slot) => {

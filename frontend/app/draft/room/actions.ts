@@ -76,8 +76,12 @@ export async function startRoundAction(round: number) {
   if (round < 1) return { ok: false, error: "Invalid round." };
   const YEAR = await currentDraftYear();
   if (round === 1) {
-    const lot = await prisma.draftLottery.count({ where: { year: YEAR } });
-    if (lot === 0) return { ok: false, error: "Draw the Draft Lottery first — it sets round 1." };
+    const [lot, tcfg] = await Promise.all([
+      prisma.draftLottery.count({ where: { year: YEAR } }),
+      prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { draftTestMode: true } }),
+    ]);
+    // in test mode round 1 runs on a synthesized reverse-standings order (see draftOrder)
+    if (lot === 0 && !tcfg?.draftTestMode) return { ok: false, error: "Draw the Draft Lottery first — it sets round 1." };
   }
   // the round's pick range comes from the order (base rounds are 32-wide; bonus
   // rounds 8+ are however many picks the admin awarded)
@@ -106,17 +110,16 @@ export async function makePickAction(prospectId: number) {
 
   const admin = await isAdmin();
   const me = await getTeamSession();
-  if (!admin && me !== slot.pickerTeamId) return { ok: false, error: "It's not your pick." };
+  // testing: advance the board but don't write the player onto the team — and let ANY
+  // signed-in GM make the pick (even off-turn) so everyone can rehearse the flow.
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true, draftTestMode: true } });
+  const source = cfg?.rosterMode === "real" ? "real" : "profinhl";
+  const testMode = !!cfg?.draftTestMode;
+  if (!admin && me !== slot.pickerTeamId && !(testMode && me != null)) return { ok: false, error: "It's not your pick." };
 
   const prospect = await prisma.draftProspect.findUnique({ where: { id: prospectId }, select: { id: true, draftedByTeamId: true, draftYear: true, name: true, position: true } });
   if (!prospect || prospect.draftYear !== YEAR) return { ok: false, error: "Unknown prospect." };
   if (prospect.draftedByTeamId != null) return { ok: false, error: "Already drafted." };
-
-  // the prospect joins the club's system — mirror the draft class into a Prospect
-  // row (same shape as the completed round 1), tagged to the active roster source.
-  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true, draftTestMode: true } });
-  const source = cfg?.rosterMode === "real" ? "real" : "profinhl";
-  const testMode = !!cfg?.draftTestMode; // testing: advance the board but don't write the player onto the team
 
   const nextPick = s.currentPick + 1;
   const deferralCount = await prisma.draftDeferral.count({ where: { year: YEAR } });
@@ -177,7 +180,9 @@ export async function makeOffBoardPickAction(input: { name: string; birthDate: s
 
   const admin = await isAdmin();
   const me = await getTeamSession();
-  if (!admin && me !== slot.pickerTeamId) return { ok: false, error: "It's not your pick." };
+  const testCfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { draftTestMode: true } });
+  const testMode = !!testCfg?.draftTestMode; // any signed-in GM may add off-board picks while rehearsing
+  if (!admin && me !== slot.pickerTeamId && !(testMode && me != null)) return { ok: false, error: "It's not your pick." };
 
   const name = input.name?.trim().replace(/\s+/g, " ").slice(0, 80);
   if (!name || name.length < 2) return { ok: false, error: "Enter the player's full name." };
