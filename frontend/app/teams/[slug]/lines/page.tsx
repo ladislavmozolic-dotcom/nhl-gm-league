@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { loadTeamLines, autoLines } from "@/lib/sim/lines";
 import { canManageTeam } from "@/lib/auth";
 import LineEditor from "@/components/LineEditor";
-import { saveLines } from "./actions";
+import { saveLines, suggestLinesAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +42,7 @@ export default async function LinesPage({ params }: { params: Promise<{ slug: st
       goalies={goalies}
       initial={lines}
       onSave={saveLines}
+      onSuggest={suggestLinesAction}
     />
   );
 }

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { money } from "@/lib/finance";
-import { clauseTermsAction, type TradePackage } from "@/app/trades/build/actions";
+import { clauseTermsAction, analyzeTradeAction, type TradePackage } from "@/app/trades/build/actions";
 
 type Player = { id: number; name: string; position: string; capHit: number; farm: boolean; clause?: string | null; noTradeTeams?: number[] };
 type Pick = { id: number; label: string };
@@ -180,6 +180,19 @@ export default function TradeBuilder({ me, opp, mine, theirs, onPropose }: {
 
   const count = Object.keys(mineP).length + Object.keys(theirsP).length + minePk.size + theirsPk.size + minePro.size + theirsPro.size + (mineCash ? 1 : 0) + (theirsCash ? 1 : 0);
 
+  // AI GM Assistance — value + fit analysis of the current package
+  const [aiPending, aiStart] = useTransition();
+  const [ai, setAi] = useState<Awaited<ReturnType<typeof analyzeTradeAction>> | null>(null);
+  const runAnalyze = () => aiStart(async () => {
+    setAi(await analyzeTradeAction({
+      fromTeamId: me.id, toTeamId: opp.id,
+      fromPlayers: Object.entries(mineP).map(([id, pct]) => ({ playerId: Number(id), retentionPct: pct })),
+      toPlayers: Object.entries(theirsP).map(([id, pct]) => ({ playerId: Number(id), retentionPct: pct })),
+      fromPicks: [...minePk], toPicks: [...theirsPk], fromProspects: [...minePro], toProspects: [...theirsPro],
+      fromCash: mineCash, toCash: theirsCash, condition,
+    }));
+  });
+
   return (
     <div className="max-w-5xl mx-auto px-4 pb-28">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
@@ -198,11 +211,44 @@ export default function TradeBuilder({ me, opp, mine, theirs, onPropose }: {
           className="mt-1 w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm" placeholder="e.g. 2027 4th-rounder becomes a 3rd if the player scores 20 goals" />
       </div>
 
+      {ai && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setAi(null)}>
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-bold flex items-center gap-2">🤖 AI GM Assistance — analýza výmeny</h3>
+              <button onClick={() => setAi(null)} className="text-slate-400 hover:text-white text-xl leading-none">×</button>
+            </div>
+            {!ai.ok ? (
+              <p className="text-rose-400 text-sm">{ai.error}</p>
+            ) : (
+              <>
+                <div className={`rounded-xl px-4 py-3 mb-4 border ${ai.tilt === "even" ? "bg-emerald-950/30 border-emerald-800/50 text-emerald-300" : "bg-amber-950/30 border-amber-800/50 text-amber-300"}`}>
+                  <div className="text-sm font-bold">{ai.verdict}</div>
+                  <div className="text-xs mt-1 text-slate-400">{ai.fromName}: {ai.meGives} hodnoty daných · {ai.meGets} získaných</div>
+                </div>
+                <ul className="space-y-1.5 mb-4">
+                  {ai.reasoning.map((r, i) => (
+                    <li key={i} className="text-sm text-slate-200 flex gap-2"><span className="text-violet-400">•</span><span dangerouslySetInnerHTML={{ __html: r }} /></li>
+                  ))}
+                </ul>
+                <p className="text-[11px] text-slate-500 mb-3">Heuristická analýza podľa overall, veku, cap hitu a hodnoty pickov — orientačná, nie záväzná.</p>
+                <button onClick={() => setAi(null)} className="px-5 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 font-semibold text-sm">Zavrieť</button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="fixed bottom-0 left-0 right-0 bg-slate-950/90 border-t border-slate-800 backdrop-blur px-4 py-3">
         <div className="max-w-5xl mx-auto flex items-center gap-3">
           <button onClick={submit} disabled={pending || count === 0}
             className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 font-semibold text-sm disabled:opacity-40">
             {pending ? "Sending…" : "Propose trade"}
+          </button>
+          <button onClick={runAnalyze} disabled={aiPending || count === 0}
+            className="px-5 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold text-sm disabled:opacity-40"
+            title="AI GM Assistance — vyhodnotí hodnotu a zmysel výmeny">
+            {aiPending ? "Analyzujem…" : "🤖 AI Helper"}
           </button>
           <span className="text-xs text-slate-500">{count} asset{count === 1 ? "" : "s"} in trade</span>
           {msg && <span className="text-green-400 text-sm">{msg}</span>}

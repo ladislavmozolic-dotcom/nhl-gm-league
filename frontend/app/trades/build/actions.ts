@@ -19,6 +19,97 @@ export type TradePackage = {
   clauseFees?: { playerId: number; feeAmount: number; payTeamId: number }[]; // agent waiver fees the giving team pays
 };
 
+// ---- AI GM Assistance: trade analysis -------------------------------------
+const pickRoundValue: Record<number, number> = { 1: 800, 2: 350, 3: 150, 4: 80, 5: 40, 6: 25, 7: 15 };
+const playerValue = (overall: number, age: number | null) => {
+  let v = Math.pow(Math.max(1, overall - 35), 2);            // 40→25, 55→400, 70→1225, 85→2500
+  const a = age ?? 27;
+  v *= a <= 23 ? 1.15 : a <= 28 ? 1.0 : a <= 32 ? 0.85 : 0.68; // youth premium, veteran discount
+  return Math.round(v);
+};
+
+/** Analyse a proposed trade — value per side, whether it's balanced, and the fit
+ *  for each club (cap, age). Pure heuristic (no external AI). Symmetric, so both
+ *  the proposing and the reviewing GM see the same read. */
+export async function analyzeTradeAction(pkg: TradePackage): Promise<
+  { ok: false; error: string } | { ok: true; fromName: string; toName: string; meGives: number; meGets: number; verdict: string; tilt: "even" | "from" | "to"; reasoning: string[] }
+> {
+  const [fromTeam, toTeam] = await Promise.all([
+    prisma.team.findUnique({ where: { id: pkg.fromTeamId }, select: { name: true } }),
+    prisma.team.findUnique({ where: { id: pkg.toTeamId }, select: { name: true } }),
+  ]);
+  if (!fromTeam || !toTeam) return { ok: false, error: "Team not found." };
+
+  const pidAll = [...pkg.fromPlayers, ...pkg.toPlayers].map((p) => p.playerId);
+  const players = await prisma.player.findMany({ where: { id: { in: pidAll } }, select: { id: true, name: true, overall: true, age: true, capHit: true, position: true } });
+  const pById = new Map(players.map((p) => [p.id, p]));
+  const picks = await prisma.draftPick.findMany({ where: { id: { in: [...pkg.fromPicks, ...pkg.toPicks] } }, select: { id: true, year: true, round: true } });
+  const kById = new Map(picks.map((k) => [k.id, k]));
+  const prospects = await prisma.prospect.findMany({ where: { id: { in: [...pkg.fromProspects, ...pkg.toProspects] } }, select: { id: true, overallPick: true } });
+  const prById = new Map(prospects.map((p) => [p.id, p]));
+
+  const yearDisc = (year: number) => Math.max(0.6, 1 - Math.max(0, year - CURRENT_SEASON_START) * 0.08);
+  const kv = (id: number) => { const k = kById.get(id); return k ? Math.round((pickRoundValue[k.round] ?? 15) * yearDisc(k.year)) : 0; };
+  const prv = (id: number) => { const p = prById.get(id); return p?.overallPick ? Math.max(60, 300 - p.overallPick * 1.5) : 120; };
+  const cashV = (c: number) => Math.round((c / 1_000_000) * 30);
+
+  const sideValue = (pls: TradePlayer[], pk: number[], pr: number[], cash: number) =>
+    pls.reduce((s, x) => s + playerValue(pById.get(x.playerId)?.overall ?? 45, pById.get(x.playerId)?.age ?? null), 0)
+    + pk.reduce((s, id) => s + kv(id), 0) + pr.reduce((s, id) => s + prv(id), 0) + cashV(cash);
+
+  const meGives = sideValue(pkg.fromPlayers, pkg.fromPicks, pkg.fromProspects, pkg.fromCash);
+  const meGets = sideValue(pkg.toPlayers, pkg.toPicks, pkg.toProspects, pkg.toCash);
+  const bal = meGets - meGives;
+  const pct = bal / Math.max(1, (meGives + meGets) / 2);
+  const tilt: "even" | "from" | "to" = Math.abs(pct) < 0.12 ? "even" : bal > 0 ? "from" : "to";
+  const winner = tilt === "from" ? fromTeam.name : toTeam.name;
+  const verdict = tilt === "even" ? "Vyrovnaná výmena — hodnotovo férová pre oba tímy."
+    : `${Math.abs(pct) > 0.30 ? "Výrazne" : "Mierne"} v prospech ${winner}.`;
+
+  // fit reasoning
+  const reasoning: string[] = [];
+  const capOf = (pls: TradePlayer[]) => pls.reduce((s, x) => s + (pById.get(x.playerId)?.capHit ?? 0), 0);
+  const capIn = capOf(pkg.toPlayers), capOut = capOf(pkg.fromPlayers);
+  const capDelta = capIn - capOut;
+  const fmt = (n: number) => `$${Math.abs(Math.round(n)).toLocaleString("en-US")}`;
+  reasoning.push(`Hodnota: <b>${fromTeam.name}</b> dáva ${meGives}, dostáva ${meGets} bodov hodnoty.`);
+  if (capDelta > 0) reasoning.push(`Cap: <b>${fromTeam.name}</b> si pridá ${fmt(capDelta)} na plate (${toTeam.name} uvoľní).`);
+  else if (capDelta < 0) reasoning.push(`Cap: <b>${fromTeam.name}</b> uvoľní ${fmt(capDelta)} platu.`);
+  const ages = (pls: TradePlayer[]) => { const a = pls.map((x) => pById.get(x.playerId)?.age).filter((x): x is number => x != null); return a.length ? a.reduce((s, x) => s + x, 0) / a.length : null; };
+  const ageIn = ages(pkg.toPlayers), ageOut = ages(pkg.fromPlayers);
+  if (ageIn != null && ageOut != null) {
+    const d = ageIn - ageOut;
+    if (Math.abs(d) >= 1.5) reasoning.push(`Vek: <b>${fromTeam.name}</b> ${d < 0 ? "omladzuje" : "starne"} (priemer prichádzajúcich ${ageIn.toFixed(1)} vs odchádzajúcich ${ageOut.toFixed(1)}).`);
+  }
+  const retained = [...pkg.fromPlayers, ...pkg.toPlayers].filter((p) => p.retentionPct > 0);
+  if (retained.length) reasoning.push(`Retencia: ${retained.length} hráč(ov) so zadržaným platom — mení reálny cap náklad.`);
+  reasoning.push(tilt === "even" ? "Doporučenie: férová výmena, dá sa akceptovať." : `Doporučenie: ${winner} z nej ťaží — druhá strana by mala pridať hodnotu alebo zvážiť odmietnutie.`);
+
+  return { ok: true, fromName: fromTeam.name, toName: toTeam.name, meGives, meGets, verdict, tilt, reasoning };
+}
+
+/** Analyse an already-proposed trade by id — so the reviewing GM can verify it
+ *  before accepting. Reconstructs the package from the stored assets. */
+export async function analyzeTradeByIdAction(tradeId: number) {
+  const trade = await prisma.trade.findUnique({ where: { id: tradeId }, select: { fromTeamId: true, toTeamId: true, condition: true } });
+  if (!trade) return { ok: false as const, error: "Trade not found." };
+  const assets = await prisma.tradeAsset.findMany({ where: { tradeId } });
+  const F = (s: string) => assets.filter((a) => a.side === s);
+  const pkg: TradePackage = {
+    fromTeamId: trade.fromTeamId, toTeamId: trade.toTeamId,
+    fromPlayers: F("FROM").filter((a) => a.playerId).map((a) => ({ playerId: a.playerId!, retentionPct: a.retentionPct ?? 0 })),
+    toPlayers: F("TO").filter((a) => a.playerId).map((a) => ({ playerId: a.playerId!, retentionPct: a.retentionPct ?? 0 })),
+    fromPicks: F("FROM").filter((a) => a.draftPickId).map((a) => a.draftPickId!),
+    toPicks: F("TO").filter((a) => a.draftPickId).map((a) => a.draftPickId!),
+    fromProspects: F("FROM").filter((a) => a.prospectId).map((a) => a.prospectId!),
+    toProspects: F("TO").filter((a) => a.prospectId).map((a) => a.prospectId!),
+    fromCash: F("FROM").reduce((s, a) => s + (a.cashAmount ?? 0), 0),
+    toCash: F("TO").reduce((s, a) => s + (a.cashAmount ?? 0), 0),
+    condition: trade.condition ?? "",
+  };
+  return analyzeTradeAction(pkg);
+}
+
 type ClausePlayer = { id: number; name: string; tradeClause: string | null; noTradeTeams: number[] };
 /** A blocking reason if this player's clause forbids a move to `destTeamId`, else null. */
 function clauseBlock(pl: ClausePlayer, destTeamId: number, waived: Set<number>, enabled: boolean): string | null {

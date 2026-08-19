@@ -10,11 +10,13 @@ import { dialLabel, dialDesc } from "@/lib/tactics-i18n";
 import type { GameStrategy, StratWeights } from "@/lib/sim/types";
 
 type Player = { id: number; name: string; position: string; overall: number; injured?: boolean; df?: number | null };
+type SuggestResult = { ok: false; error: string } | { ok: true; lines: TeamLinesData; system: string; rationale: string[] };
 type Props = {
   teamName: string; teamSlug: string;
   players: Player[]; goalies: Player[];
   initial: TeamLinesData;
   onSave: (slug: string, data: TeamLinesData) => Promise<void>;
+  onSuggest?: (slug: string) => Promise<SuggestResult>;
 };
 
 const isD = (p: string) => /(^|\/)D(\/|$)/.test(p) || p === "D";
@@ -27,12 +29,17 @@ const STATES: Array<{ key: keyof Omit<GameStrategy, "goaliePull">; label: string
 ];
 const TABS = ["Forward", "Defense", "PP", "4 vs 4", "PK4", "PK3", "Others", "Last Min", "Overtime", "Strategy"] as const;
 
-export default function LineEditor({ teamName, teamSlug, players, goalies, initial, onSave }: Props) {
+export default function LineEditor({ teamName, teamSlug, players, goalies, initial, onSave, onSuggest }: Props) {
   const lang = useLang();
   const [data, setData] = useState<TeamLinesData>(initial);
   const [tab, setTab] = useState<(typeof TABS)[number]>("Forward");
   const [pending, start] = useTransition();
   const [saved, setSaved] = useState(false);
+  // AI GM Assistance — a suggested lineup + tactics the GM can Apply or discard
+  const [aiPending, aiStart] = useTransition();
+  const [ai, setAi] = useState<SuggestResult | null>(null);
+  const runAi = () => aiStart(async () => { if (onSuggest) setAi(await onSuggest(teamSlug)); });
+  const applyAi = () => { if (ai?.ok) { setData(ai.lines); setSaved(false); setAi(null); } };
 
   const byId = useMemo(() => new Map([...players, ...goalies].map((p) => [p.id, p])), [players, goalies]);
   const nameOf = (id: number | null) => (id == null ? "" : byId.get(id)?.name ?? `#${id}`);
@@ -352,8 +359,44 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
     <div className="max-w-5xl mx-auto px-4 pb-28">
       <div className="flex items-start justify-between mb-4 flex-wrap gap-2">
         <LinesNav teamName={teamName} teamSlug={teamSlug} />
-        <button onClick={auto} className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-semibold" title="Rebuild the lineup with the best available players (keeps your tactics & ice-time)">Auto Lines</button>
+        <div className="flex items-center gap-2">
+          {onSuggest && (
+            <button onClick={runAi} disabled={aiPending}
+              className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-sm font-semibold disabled:opacity-50"
+              title="AI GM Assistance — navrhne zostavy, taktiku a systém podľa tvojich hráčov">
+              {aiPending ? "Analyzujem…" : "🤖 AI Helper"}
+            </button>
+          )}
+          <button onClick={auto} className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-semibold" title="Rebuild the lineup with the best available players (keeps your tactics & ice-time)">Auto Lines</button>
+        </div>
       </div>
+
+      {ai && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setAi(null)}>
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-bold flex items-center gap-2">🤖 AI GM Assistance</h3>
+              <button onClick={() => setAi(null)} className="text-slate-400 hover:text-white text-xl leading-none">×</button>
+            </div>
+            {!ai.ok ? (
+              <p className="text-rose-400 text-sm">{ai.error}</p>
+            ) : (
+              <>
+                <p className="text-sm text-slate-400 mb-3">Návrh zostáv, taktiky a systému podľa parametrov tvojich hráčov. Môžeš ho prijať (nahradí aktuálne nastavenie, uložíš cez <b>Save Lines</b>) alebo zrušiť.</p>
+                <ul className="space-y-1.5 mb-4">
+                  {ai.rationale.map((r, i) => (
+                    <li key={i} className="text-sm text-slate-200 flex gap-2"><span className="text-violet-400">•</span><span dangerouslySetInnerHTML={{ __html: r }} /></li>
+                  ))}
+                </ul>
+                <div className="flex items-center gap-3">
+                  <button onClick={applyAi} className="px-5 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 font-semibold text-sm">Prijať návrh</button>
+                  <button onClick={() => setAi(null)} className="px-5 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 font-semibold text-sm">Zrušiť</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {dupes.length > 0 && (
         <div className="mb-3 text-sm text-red-300 bg-red-950/40 border border-red-800/50 rounded-lg px-4 py-2">
