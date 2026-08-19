@@ -124,16 +124,24 @@ function demandFromRow(
   if (p.faDemandOverride != null) return { demand, grp };
   const scaled = scaleDemand(demand, stale);
   // Veteran floor: a genuine NHL player — real games last season, UFA-age — doesn't sign
-  // for the league minimum. Even a declining depth vet (Jarnkrok, Hayes, Dumba) commands
-  // ~$1M+. Scrubs with no NHL role fall below the GP bar and keep their low ask.
+  // for the league minimum. And the floor is SEASON-AWARE: early in the year the market is
+  // fresh and a declining vet (Jarnkrok, Hayes, Dumba) holds out for real money (~$2.25M);
+  // as he stays unsigned it eases toward ~$1M by mid/late season. Derived from the same
+  // `stale` progress signal (1.0 opening night → 0.55 deep in the year). Scrubs with no
+  // NHL role fall below the GP bar and keep their low ask.
   const isNhlVet = (p.lastSeasonGP ?? 0) >= 10 && (p.age == null || p.age >= 27);
-  if (isNhlVet && scaled.floorSalary < VET_FLOOR) {
-    scaled.floorSalary = VET_FLOOR;
-    scaled.salary = Math.max(scaled.salary, VET_FLOOR);
+  if (isNhlVet) {
+    const t = Math.max(0, Math.min(1, (stale - 0.55) / 0.45)); // 1 at opening night → 0 late
+    const vetFloor = Math.round((VET_FLOOR_LATE + (VET_FLOOR_EARLY - VET_FLOOR_LATE) * t) / 50_000) * 50_000;
+    if (scaled.floorSalary < vetFloor) {
+      scaled.floorSalary = vetFloor;
+      scaled.salary = Math.max(scaled.salary, vetFloor);
+    }
   }
   return { demand: scaled, grp };
 }
-const VET_FLOOR = 1_000_000;
+const VET_FLOOR_EARLY = 2_250_000; // opening-night floor for an NHL veteran UFA
+const VET_FLOOR_LATE = 1_000_000;  // deep-in-the-season floor (market's gone cold)
 
 // --- Team context: contention tier + where a free agent slots on a given club ---
 
