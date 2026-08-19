@@ -5,10 +5,11 @@ import { getTeamSession } from "@/lib/auth";
 import TradeBuilder from "@/components/TradeBuilder";
 import { proposeTrade } from "./actions";
 import { PageHeader, Card } from "@/components/ui";
+import { cleanName } from "@/lib/playerName";
 
 export const dynamic = "force-dynamic";
 
-async function teamAssets(teamId: number) {
+async function teamAssets(teamId: number, prospectSource: "real" | "profinhl") {
   const org = await prisma.team.findUnique({ where: { id: teamId }, select: { affiliateTeams: { select: { id: true } } } });
   const affIds = org?.affiliateTeams.map((a) => a.id) ?? [];
   const [players, picks, prospects] = await Promise.all([
@@ -18,12 +19,13 @@ async function teamAssets(teamId: number) {
       orderBy: [{ rosterType: "asc" }, { capHit: "desc" }],
     }),
     prisma.draftPick.findMany({ where: { teamId }, orderBy: [{ year: "asc" }, { round: "asc" }] }),
-    prisma.prospect.findMany({ where: { teamId }, orderBy: [{ overallPick: "asc" }, { name: "asc" }] }),
+    prisma.prospect.findMany({ where: { teamId, source: prospectSource }, orderBy: [{ overallPick: "asc" }, { name: "asc" }] }),
   ]);
+  const byName = <T extends { name: string }>(a: T, b: T) => cleanName(a.name).localeCompare(cleanName(b.name), "sk");
   return {
-    players: players.map((p) => ({ id: p.id, name: p.name, position: p.position, capHit: p.capHit ?? 0, farm: p.rosterType === "AHL", clause: p.tradeClause, noTradeTeams: p.noTradeTeams })),
+    players: players.slice().sort(byName).map((p) => ({ id: p.id, name: p.name, position: p.position, capHit: p.capHit ?? 0, farm: p.rosterType === "AHL", clause: p.tradeClause, noTradeTeams: p.noTradeTeams })),
     picks: picks.map((p) => ({ id: p.id, label: `${p.year} R${p.round}` })),
-    prospects: prospects.map((p) => ({ id: p.id, label: p.draftYear || p.overallPick ? `${p.name} (${p.draftYear ?? "?"}${p.overallPick ? ` #${p.overallPick}` : ""})` : p.name })),
+    prospects: prospects.slice().sort(byName).map((p) => ({ id: p.id, label: p.draftYear || p.overallPick ? `${p.name} (${p.draftYear ?? "?"}${p.overallPick ? ` #${p.overallPick}` : ""})` : p.name })),
   };
 }
 
@@ -59,7 +61,9 @@ export default async function TradeBuildPage({ searchParams }: { searchParams: P
     );
   }
 
-  const [mine, theirs] = await Promise.all([teamAssets(myTeam.id), teamAssets(oppTeam.id)]);
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true } });
+  const prospectSource = cfg?.rosterMode === "real" ? "real" : "profinhl";
+  const [mine, theirs] = await Promise.all([teamAssets(myTeam.id, prospectSource), teamAssets(oppTeam.id, prospectSource)]);
 
   return (
     <TradeBuilder
