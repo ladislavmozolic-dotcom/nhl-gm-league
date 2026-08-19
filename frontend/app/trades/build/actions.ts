@@ -395,7 +395,8 @@ export async function proposeTrade(pkg: TradePackage) {
   await prisma.tradeAsset.createMany({ data: rows });
   if (pkg.condition?.trim())
     await prisma.tradeCondition.create({ data: { tradeId: trade.id, fromTeamId: pkg.fromTeamId, toTeamId: pkg.toTeamId, description: pkg.condition.trim(), status: "PENDING" } });
-  await prisma.transaction.create({ data: { type: "TRADE", message: `${fromTeam.name} proposed a trade to ${toTeam.name}. Awaiting response.` } });
+  // NB: no public transaction here — a pending proposal is private (only the two clubs
+  // + commissioner see it). The completed deal is logged publicly on accept.
   // DM the receiving GM so it pops a notification and links straight to the proposal
   // (the trade page has Accept / Decline). This is how the receiver hears about it.
   await prisma.dmMessage.create({

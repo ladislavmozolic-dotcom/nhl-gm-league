@@ -48,7 +48,10 @@ export default async function TradesPage() {
     fromLabels: labelsFor(t.id, "FROM"),
     toLabels: labelsFor(t.id, "TO"),
   }));
-  const pending = enriched.filter((t) => t.status === "PENDING");
+  // A PENDING proposal is PRIVATE — only the two clubs involved (and the commissioner)
+  // see it until it's accepted/declined. Completed deals are public history for everyone.
+  const canSeePending = (t: { fromTeamId: number; toTeamId: number }) => admin || session === t.fromTeamId || session === t.toTeamId;
+  const pending = enriched.filter((t) => t.status === "PENDING" && canSeePending(t));
   const history = enriched.filter((t) => t.status !== "PENDING");
 
   return (

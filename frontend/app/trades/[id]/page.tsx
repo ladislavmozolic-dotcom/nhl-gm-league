@@ -40,6 +40,17 @@ export default async function TradePage({ params }: { params: Promise<{ id: stri
     );
   }
 
+  // a PENDING proposal is private — only the two clubs + commissioner may view it
+  const involved = session === trade.fromTeamId || session === trade.toTeamId;
+  if (trade.status === "PENDING" && !involved && !admin) {
+    return (
+      <div className="py-10 text-center space-y-2">
+        <p className="text-slate-400">This trade proposal is private — only the clubs involved can see it until it&apos;s completed.</p>
+        <Link href="/trades" className="text-blue-400 hover:text-blue-300 text-sm">← all trades</Link>
+      </div>
+    );
+  }
+
   const [fromTeam, toTeam, assets] = await Promise.all([
     prisma.team.findUnique({ where: { id: trade.fromTeamId }, select: { name: true, code: true, logoUrl: true } }),
     prisma.team.findUnique({ where: { id: trade.toTeamId }, select: { name: true, code: true, logoUrl: true } }),
