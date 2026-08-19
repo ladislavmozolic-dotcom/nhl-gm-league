@@ -35,10 +35,17 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
   const logoById = new Map(teams.map((t) => [t.id, t]));
   // goalie-only attrs (sz/ag/rb/hs/rt) live on GoalieRating — merge them onto the row
   const toRP = (p: (typeof full.players)[number]): RosterPlayer => ({ ...(p as unknown as RosterPlayer), ...(p.goalieRating ?? {}) });
-  const skaters = full.players.filter((p) => !p.isGoalie);
+  // forwards first (best → worst), then defensemen, then goalies — the players
+  // arrive already ordered by overall desc, so filtering preserves that within each group.
+  const isDefPos = (pos: string) => /(^|\/)D(\/|$)/.test(pos) || pos === "D";
+  const isFwd = (p: (typeof full.players)[number]) => !p.isGoalie && !isDefPos(p.position ?? "");
+  const isDef = (p: (typeof full.players)[number]) => !p.isGoalie && isDefPos(p.position ?? "");
+  const forwards = full.players.filter(isFwd);
+  const defense = full.players.filter(isDef);
   const goalies = full.players.filter((p) => p.isGoalie);
   const farm = full.affiliateTeams[0]?.players ?? [];
-  const farmSkaters = farm.filter((p) => !p.isGoalie);
+  const farmForwards = farm.filter((p) => !p.isGoalie && !isDefPos(p.position ?? ""));
+  const farmDefense = farm.filter((p) => !p.isGoalie && isDefPos(p.position ?? ""));
   const farmGoalies = farm.filter((p) => p.isGoalie);
 
   const conditions = await prisma.tradeCondition.findMany({
@@ -72,13 +79,15 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
 
       <div>
         <SectionTitle accent="text-blue-400">NHL Roster</SectionTitle>
-        <RosterTable title="Skaters" players={skaters.map(toRP)} />
+        <RosterTable title="Forwards" players={forwards.map(toRP)} />
+        <RosterTable title="Defensemen" players={defense.map(toRP)} />
         <RosterTable title="Goalies" players={goalies.map(toRP)} goalie />
       </div>
 
       <div>
         <SectionTitle accent="text-emerald-300">AHL Roster {full.affiliateTeams[0] ? `— ${full.affiliateTeams[0].name}` : ""}</SectionTitle>
-        <RosterTable title="Skaters" players={farmSkaters.map(toRP)} />
+        <RosterTable title="Forwards" players={farmForwards.map(toRP)} />
+        <RosterTable title="Defensemen" players={farmDefense.map(toRP)} />
         <RosterTable title="Goalies" players={farmGoalies.map(toRP)} goalie />
       </div>
 

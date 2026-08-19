@@ -10,7 +10,7 @@ const fmtDate = (d: Date | null) =>
 export default async function LeagueDirectoryPage() {
   const teams = await prisma.team.findMany({
     where: { league: "NHL", isAffiliate: false },
-    select: { id: true, name: true, code: true, logoUrl: true, slug: true, conference: true, division: true, gm: true, gmEmail: true, lastLoginAt: true, passwordHash: true },
+    select: { id: true, name: true, code: true, logoUrl: true, slug: true, conference: true, division: true, gm: true, gmNickname: true, gmFirstName: true, gmLastName: true, gmEmail: true, lastLoginAt: true, passwordHash: true },
     orderBy: [{ conference: "asc" }, { division: "asc" }, { name: "asc" }],
   });
 
@@ -42,7 +42,7 @@ export default async function LeagueDirectoryPage() {
                   <td className="px-3 py-3 text-slate-400">{t.division ?? "—"}</td>
                   <td className="px-3 py-3">
                     {t.passwordHash
-                      ? <Link href={`/gm/${t.slug}`} className="hover:text-blue-400 transition-colors">{t.gm}</Link>
+                      ? <Link href={`/gm/${t.slug}`} className="hover:text-blue-400 transition-colors">{t.gmNickname || [t.gmFirstName, t.gmLastName].filter(Boolean).join(" ").trim() || t.gm}</Link>
                       : <span className="inline-flex items-center gap-1.5 text-cyan-400" title="No registered GM — run by the AI GM">🤖 AI GM</span>}
                   </td>
                   <td className="px-3 py-3 text-slate-400">{t.gmEmail || <span className="text-slate-600">—</span>}</td>
