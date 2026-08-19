@@ -405,17 +405,28 @@ export async function resolveInSeasonWindows(asOf: Date): Promise<{ signed: numb
       // Phase 1 — the player does NOT sign on the spot even if an offer clears. He counters
       // every serious bidder ("submit your best") and gives them the match window; hopeless
       // lowballs are dropped. This guarantees a real second round.
+      // Evaluate all offers first, then leverage the competition: with multiple bids the
+      // counter is anchored ABOVE the best standing offer (never below it) — a bidding war
+      // pushes his price UP, it never asks for less than someone already offered.
+      const round50k = (v: number) => Math.max(775_000, Math.round(v / 50_000) * 50_000);
+      const evd = [] as { o: (typeof offers)[number]; ev: Awaited<ReturnType<typeof evaluateTeamOffer>> }[];
+      for (const o of offers) evd.push({ o, ev: await evaluateTeamOffer(p.id, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, 2, { clause: o.grantClause, breadth: o.mNtcBreadth }) });
+      const serious = evd.filter((x) => x.ev && x.o.salary >= x.ev.ask.floorSalary * 0.6);
+      const bestOffer = serious.reduce((m, x) => Math.max(m, x.o.salary), 0);
+      const leverage = serious.length >= 3 ? 1.10 : serious.length >= 2 ? 1.05 : 1.0; // more suitors → push higher
       let kept = 0;
-      for (const o of offers) {
-        const ev = await evaluateTeamOffer(p.id, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, 2, { clause: o.grantClause, breadth: o.mNtcBreadth });
+      for (const { o, ev } of evd) {
         if (!ev) continue;
         if (o.salary < ev.ask.floorSalary * 0.6) {
           await prisma.faOffer.update({ where: { id: o.id }, data: { status: "REJECTED" } });
           await agentDm(faId, o.teamId, `❌ ${nm}'s camp passed on your offer — it wasn't close to his value.`);
         } else {
-          await prisma.faOffer.update({ where: { id: o.id }, data: { status: "COUNTERED", counterSalary: ev.ask.salary, counterYears: ev.ask.years } });
+          // want: at least his value, at least the top bid × leverage, and always a raise
+          // over this club's own offer — capped so it stays sane in a bidding war.
+          const want = round50k(Math.min(Math.max(ev.ask.salary, bestOffer * leverage, o.salary * 1.03), bestOffer * 1.20));
+          await prisma.faOffer.update({ where: { id: o.id }, data: { status: "COUNTERED", counterSalary: want, counterYears: ev.ask.years } });
           countered++; kept++;
-          await agentDm(faId, o.teamId, `📩 ${nm} is weighing multiple offers — he decides in ${IN_SEASON_MATCH_DAYS} days. Put in your BEST offer: he's looking for about $${(ev.ask.salary / 1e6).toFixed(2)}M × ${ev.ask.years}yr. Raise your offer to stay in it.`);
+          await agentDm(faId, o.teamId, `📩 ${nm} is weighing multiple offers — he decides in ${IN_SEASON_MATCH_DAYS} days. Put in your BEST offer: he wants about $${(want / 1e6).toFixed(2)}M × ${ev.ask.years}yr${serious.length >= 2 ? ` (other clubs are in — top bid $${(bestOffer / 1e6).toFixed(2)}M)` : ""}. Raise to stay in it.`);
         }
       }
       if (kept > 0) {
