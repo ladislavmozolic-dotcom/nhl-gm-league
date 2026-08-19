@@ -36,9 +36,13 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
   // include the club's AHL/farm players whose deals are up too
   const org = await prisma.team.findUnique({ where: { id: teamId }, select: { affiliateTeams: { select: { id: true } } } });
   const orgIds = [teamId, ...(org?.affiliateTeams.map((a) => a.id) ?? [])];
-  // players in the FINAL YEAR of their deal (1 left) or already expired (0)
+  // players in the FINAL YEAR of their deal (1 left) or already expired (0). Minor-league
+  // ($100k, sub-NHL-minimum) farm deals are excluded — they renew automatically every
+  // off-season (a farm body who makes the NHL simply signs an ELC), so a GM never has to
+  // re-sign them and they don't clutter this list.
+  const NHL_MIN = 775_000;
   const expiring = await prisma.player.findMany({
-    where: { teamId: { in: orgIds }, rosterType: { in: ["NHL", "AHL"] }, contractYears: { not: null, lte: 1 } },
+    where: { teamId: { in: orgIds }, rosterType: { in: ["NHL", "AHL"] }, contractYears: { not: null, lte: 1 }, NOT: { capHit: { gt: 0, lt: NHL_MIN } } },
     select: { id: true, name: true, age: true, capHit: true, contractYears: true, contractText: true, position: true, isGoalie: true, df: true, lastSeasonGP: true, lastSeasonPts: true, lastSeasonSvPct: true, rosterType: true, franchiseTag: true },
     orderBy: { capHit: "desc" },
   });

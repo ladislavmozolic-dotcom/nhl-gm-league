@@ -245,8 +245,22 @@ export async function restDayAction() {
 export async function archiveSeasonAction() {
   await archiveSeason(SEASON, "NHL");
   await archiveSeason(SEASON, "AHL");
+  await autoRenewFarmDeals();
   revalidatePath("/admin/season");
   revalidatePath("/history");
+}
+
+/** Off-season: minor-league ($100k, sub-NHL-minimum) farm deals renew automatically —
+ *  they're placeholder contracts, not real re-sign candidates (a farm body who cracks
+ *  the NHL just signs an ELC). Re-stamp any that are down to their last year back to an
+ *  8-year term so they never expire onto the free-agent market or clutter re-sign lists. */
+export async function autoRenewFarmDeals() {
+  const NHL_MIN = 775_000;
+  const r = await prisma.player.updateMany({
+    where: { capHit: { gt: 0, lt: NHL_MIN }, OR: [{ contractYears: null }, { contractYears: { lte: 1 } }] },
+    data: { contractYears: 8 },
+  });
+  return { renewed: r.count };
 }
 
 /** Off-season step: import the upcoming draft class (NHL Central Scouting) so the next
