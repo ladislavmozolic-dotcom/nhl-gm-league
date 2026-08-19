@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { loadSettings, saveSettings } from "@/lib/sim/settings";
 import { isAdmin } from "@/lib/auth";
 import { importRealRosters, importRealCapHits, importRealProspects } from "@/lib/real-roster-import";
+import { autoLines } from "@/lib/sim/lines-core";
+import { saveTeamLines } from "@/lib/sim/lines";
 import { revalidatePath } from "next/cache";
 
 /** Admin: fill in missing `realTeamId`s from the live NHL rosters so players the
@@ -76,6 +78,56 @@ export async function applyRosterMode(mode: "profinhl" | "real") {
   revalidatePath("/admin/rosters"); revalidatePath("/teams"); revalidatePath("/tools/all-rosters");
   revalidatePath("/free-agents"); revalidatePath("/finance"); revalidatePath("/salary-cap");
   return { mode, capUpper: settings.salaryCapUpper };
+}
+
+/**
+ * League-wide reset: for every NHL club, build position-aware auto lines from the
+ * whole org (NHL + farm), keep exactly those dressed players on the NHL roster, and
+ * send every other healthy player down to the affiliate. Injured players are left
+ * untouched (they stay on the NHL roster / IR). Saves the auto lines for each team.
+ */
+export async function normalizeAllRostersAction() {
+  if (!(await isAdmin())) return { ok: false as const, error: "Only a league admin can do this." };
+  const teams = await prisma.team.findMany({
+    where: { league: "NHL", isAffiliate: false },
+    include: { affiliateTeams: { select: { id: true } } },
+  });
+  let done = 0, sentDown = 0;
+  for (const team of teams) {
+    const aff = team.affiliateTeams[0];
+    if (!aff) continue;
+    const orgIds = [team.id, aff.id];
+    // auto lines from the HEALTHY org players (injured aren't dressed or demoted)
+    const org = await prisma.player.findMany({
+      where: { teamId: { in: orgIds } },
+      select: { id: true, position: true, overall: true, isGoalie: true, shoots: true, injuryDaysLeft: true },
+    });
+    const healthy = org.filter((p) => (p.injuryDaysLeft ?? 0) <= 0);
+    const skaters = healthy.filter((p) => !p.isGoalie).map((p) => ({ id: p.id, position: p.position ?? "C", overall: p.overall ?? 50, shoots: p.shoots }));
+    const goalies = healthy.filter((p) => p.isGoalie).map((p) => ({ id: p.id, overall: p.overall ?? 50 }));
+    const lines = autoLines(skaters, goalies);
+    const dressed = new Set<number>();
+    for (const l of lines.forwardLines) for (const id of [l.lw, l.c, l.rw]) if (id != null) dressed.add(id);
+    for (const p of lines.defensePairs) for (const id of [p.ld, p.rd]) if (id != null) dressed.add(id);
+    const g = lines.situations.others;
+    if (g.starter != null) dressed.add(g.starter);
+    if (g.backup != null) dressed.add(g.backup);
+
+    await prisma.$transaction([
+      // dressed → NHL roster
+      prisma.player.updateMany({ where: { id: { in: [...dressed] } }, data: { teamId: team.id, rosterType: "NHL", scratched: false } }),
+      // every other HEALTHY org player → the farm (injured stay put on the NHL roster)
+      prisma.player.updateMany({
+        where: { teamId: { in: orgIds }, id: { notIn: [...dressed] }, injuryDaysLeft: { lte: 0 } },
+        data: { teamId: aff.id, rosterType: "AHL", scratched: false },
+      }),
+    ]);
+    await saveTeamLines(team.id, lines);
+    sentDown += Math.max(0, healthy.length - dressed.size);
+    done++;
+  }
+  for (const p of ["/teams", "/tools/all-rosters", "/admin/rosters"]) revalidatePath(p);
+  return { ok: true as const, teams: done, sentDown };
 }
 
 export async function getRosterConfig() {

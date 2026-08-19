@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getRosterConfig } from "./actions";
 import RosterModeControl from "@/components/RosterModeControl";
+import NormalizeRostersButton from "@/components/NormalizeRostersButton";
 import { money } from "@/lib/finance";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +35,8 @@ export default async function AdminRostersPage() {
         <Stat label="Real NHL cap" value={money(cfg.realCapUpper)} />
       </div>
       <p className="text-xs text-slate-500 mt-4">Real rosters &amp; cap hits are from the NHL API + spotrac by <code>nhlId</code>/name. Cap ceiling is applied to <code>SimSettings</code> on switch.</p>
+
+      <NormalizeRostersButton />
     </div>
   );
 }
