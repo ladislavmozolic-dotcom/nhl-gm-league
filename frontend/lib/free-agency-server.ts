@@ -121,8 +121,19 @@ function demandFromRow(
     downSeason: isDownSeason(p.lastSeasonGP, fullGP), morale: p.morale, currentSalary: p.capHit,
   });
   // a manual override is the commissioner's word — never soften it
-  return { demand: p.faDemandOverride != null ? demand : scaleDemand(demand, stale), grp };
+  if (p.faDemandOverride != null) return { demand, grp };
+  const scaled = scaleDemand(demand, stale);
+  // Veteran floor: a genuine NHL player — real games last season, UFA-age — doesn't sign
+  // for the league minimum. Even a declining depth vet (Jarnkrok, Hayes, Dumba) commands
+  // ~$1M+. Scrubs with no NHL role fall below the GP bar and keep their low ask.
+  const isNhlVet = (p.lastSeasonGP ?? 0) >= 10 && (p.age == null || p.age >= 27);
+  if (isNhlVet && scaled.floorSalary < VET_FLOOR) {
+    scaled.floorSalary = VET_FLOOR;
+    scaled.salary = Math.max(scaled.salary, VET_FLOOR);
+  }
+  return { demand: scaled, grp };
 }
+const VET_FLOOR = 1_000_000;
 
 // --- Team context: contention tier + where a free agent slots on a given club ---
 
