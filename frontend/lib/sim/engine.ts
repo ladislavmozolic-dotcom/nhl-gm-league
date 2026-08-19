@@ -186,11 +186,15 @@ function newPlayerLine(s: SimSkater): PlayerLine {
 // (F >= fwdConMinutes, D >= defConMinutes). A playoff OT game is a marathon —
 // everyone is overworked, and each extra OT period costs another point, so a game
 // ending in the 1st OT leaves the value at 98, the 2nd OT at 97, and so on.
-function skaterConAfter(conBefore: number, toiSec: number, isDefense: boolean, otPeriods: number): number {
+function skaterConAfter(conBefore: number, toiSec: number, isDefense: boolean, otPeriods: number, pkUnits = 0): number {
   const mins = toiSec / 60;
   const threshold = isDefense ? CFG.skaterDefConMinutes : CFG.skaterFwdConMinutes;
   const overworked = otPeriods > 0 || mins >= threshold;
-  const drop = (overworked ? CFG.skaterConDrop : 0) + otPeriods * CFG.skaterOtDrop;
+  let drop = (overworked ? CFG.skaterConDrop : 0) + otPeriods * CFG.skaterOtDrop;
+  // Penalty-kill is high-effort → it costs extra CON: +10% for a player on one PK unit,
+  // +30% if he's stacked on BOTH PK units. Felt even when he's not otherwise overworked.
+  const pkExtra = pkUnits >= 2 ? 0.30 : pkUnits === 1 ? 0.10 : 0;
+  if (pkExtra > 0) drop = drop > 0 ? drop * (1 + pkExtra) : CFG.skaterConDrop * pkExtra;
   return Math.max(1, Math.min(100, conBefore - drop));
 }
 
@@ -1739,10 +1743,13 @@ function finalizeBoxes(st: SimState, winnerId: number, endedIn: GameResult["ende
     const box = st.box[teamId];
     box.skaters = Object.values(st.lines[teamId])
       .sort((a, b) => b.points - a.points || b.goals - a.goals);
-    // post-game skater conditioning: heavy TOI (or a playoff OT marathon) drops CON
+    // post-game skater conditioning: heavy TOI (or a playoff OT marathon) drops CON,
+    // plus an extra hit for penalty-kill duty (more for a player on both PK units).
     const defIds = new Set(team.defense.map((d) => d.id));
+    const pkCount = new Map<number, number>();
+    for (const u of resolveStUnits(team).pk) for (const s of [...(u.f ?? []), ...(u.d ?? [])]) pkCount.set(s.id, (pkCount.get(s.id) ?? 0) + 1);
     for (const sk of box.skaters) {
-      sk.conAfter = skaterConAfter(sk.conBefore, sk.toi, defIds.has(sk.id), otPeriods);
+      sk.conAfter = skaterConAfter(sk.conBefore, sk.toi, defIds.has(sk.id), otPeriods, pkCount.get(sk.id) ?? 0);
     }
     const g = box.goalie;
     g.savePct = g.shotsAgainst ? g.saves / g.shotsAgainst : 0;
