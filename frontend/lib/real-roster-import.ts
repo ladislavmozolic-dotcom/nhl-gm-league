@@ -15,6 +15,92 @@ const NHL_ABBREVS = [
 const norm = (s: string) =>
   epSearchName(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z ]/g, " ").replace(/\s{2,}/g, " ").trim();
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// CapWages player slug: lower-case, accents stripped, every non-alphanumeric run → a
+// single hyphen (so "Ryan O'Reilly" → ryan-o-reilly, "J.J. Moser" → j-j-moser).
+const capwagesSlug = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+const dollars = (s: string) => { const n = parseInt(s.replace(/[^0-9]/g, ""), 10); return Number.isFinite(n) ? n : null; };
+const fiKeyOf = (n: string) => { const p = n.split(" "); return p.length >= 2 ? `${p[0][0]} ${p[p.length - 1]}` : ""; };
+
+async function fetchJson(url: string): Promise<unknown | null> {
+  for (let i = 0; i < 4; i++) {
+    try {
+      const r = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" }, cache: "no-store" });
+      if (r.ok) return await r.json();
+      if (r.status === 404) return null;
+    } catch { /* retry */ }
+    await sleep(500 * (i + 1));
+  }
+  return null;
+}
+async function mapPool<T, R>(items: T[], concurrency: number, fn: (t: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let idx = 0;
+  await Promise.all(Array.from({ length: concurrency }, async () => {
+    while (idx < items.length) { const k = idx++; out[k] = await fn(items[k]); }
+  }));
+  return out;
+}
+
+/**
+ * Pull each rostered player's REAL cap hit from CapWages (capwages.com) and store it
+ * in `realCapHit` — and, when the league is in real mode, the live `capHit` too so
+ * salaries match reality. Names come from the NHL rosters (which match CapWages'
+ * naming), matched back to our players by normalised name (+ initial/last fallback).
+ */
+export async function importRealCapHits() {
+  // 1) current CapWages buildId (its _next/data path is versioned)
+  let buildId = "";
+  try {
+    const html = await (await fetch("https://capwages.com/players/mitch-marner", { headers: { "User-Agent": "Mozilla/5.0" }, cache: "no-store" })).text();
+    buildId = (html.match(/"buildId":"([^"]+)"/) ?? [])[1] ?? "";
+  } catch { /* handled below */ }
+  if (!buildId) return { ok: false as const, error: "Could not read CapWages (buildId not found)." };
+
+  // 2) NHL roster names (match CapWages naming: "Mitch", "J.J.", …)
+  const names: string[] = [];
+  for (const ab of NHL_ABBREVS) {
+    const d = (await fetchJson(`https://api-web.nhle.com/v1/roster/${ab}/current`)) as Record<string, Array<{ firstName?: { default?: string }; lastName?: { default?: string } }>> | null;
+    if (!d) continue;
+    for (const g of ["forwards", "defensemen", "goalies"]) for (const p of d[g] ?? []) {
+      const nm = `${p.firstName?.default ?? ""} ${p.lastName?.default ?? ""}`.trim();
+      if (nm) names.push(nm);
+    }
+    await sleep(150);
+  }
+  if (!names.length) return { ok: false as const, error: "Could not reach the NHL roster API." };
+
+  // 3) cap hit per player from CapWages (bounded concurrency)
+  const caps = await mapPool([...new Set(names)], 6, async (nm) => {
+    const j = await fetchJson(`https://capwages.com/_next/data/${buildId}/players/${capwagesSlug(nm)}.json`);
+    const m = j ? JSON.stringify(j).match(/"capHit":"(\$[0-9,]+)"/) : null;
+    return { nm, cap: m ? dollars(m[1]) : null };
+  });
+  const exact = new Map<string, number>();
+  const fi = new Map<string, number[]>();
+  let fetched = 0;
+  for (const { nm, cap } of caps) {
+    if (cap == null) continue;
+    fetched++;
+    exact.set(norm(nm), cap);
+    const f = fiKeyOf(norm(nm)); if (f) (fi.get(f) ?? fi.set(f, []).get(f)!).push(cap);
+  }
+
+  // 4) write realCapHit on our rostered players (+ live capHit in real mode)
+  const realMode = (await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true } }))?.rosterMode === "real";
+  const players = await prisma.player.findMany({ where: { realTeamId: { not: null } }, select: { id: true, name: true } });
+  let updated = 0;
+  for (const pl of players) {
+    const key = norm(pl.name);
+    let cap = exact.get(key);
+    if (cap == null) { const arr = fi.get(fiKeyOf(key)); if (arr && arr.length === 1) cap = arr[0]; }
+    if (cap == null) continue;
+    await prisma.player.update({ where: { id: pl.id }, data: { realCapHit: cap, ...(realMode ? { capHit: cap } : {}) } });
+    updated++;
+  }
+  return { ok: true as const, fetched, updated, total: players.length, placed: realMode };
+}
+
 type Options = { onlyMissing?: boolean; placeIfRealMode?: boolean };
 
 /**

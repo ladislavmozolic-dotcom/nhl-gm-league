@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { loadSettings, saveSettings } from "@/lib/sim/settings";
 import { isAdmin } from "@/lib/auth";
-import { importRealRosters } from "@/lib/real-roster-import";
+import { importRealRosters, importRealCapHits } from "@/lib/real-roster-import";
 import { revalidatePath } from "next/cache";
 
 /** Admin: fill in missing `realTeamId`s from the live NHL rosters so players the
@@ -15,6 +15,17 @@ export async function fillRealTeamsAction() {
   const r = await importRealRosters({ onlyMissing: true });
   if (!r.ok) return r;
   for (const p of ["/admin/rosters", "/free-agents", "/teams", "/tools/all-rosters"]) revalidatePath(p);
+  return r;
+}
+
+/** Admin: pull real cap hits from CapWages into `realCapHit` (and live `capHit` in
+ *  real mode) so player salaries match reality. Takes ~1-2 min (one lookup per
+ *  rostered player). */
+export async function fillRealCapsAction() {
+  if (!(await isAdmin())) return { ok: false as const, error: "Only a league admin can do this." };
+  const r = await importRealCapHits();
+  if (!r.ok) return r;
+  for (const p of ["/admin/rosters", "/finance", "/salary-cap", "/teams"]) revalidatePath(p);
   return r;
 }
 
