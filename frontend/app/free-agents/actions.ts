@@ -426,7 +426,7 @@ export async function resolveInSeasonWindows(asOf: Date): Promise<{ signed: numb
           const want = round50k(Math.min(Math.max(ev.ask.salary, bestOffer * leverage, o.salary * 1.03), bestOffer * 1.20));
           await prisma.faOffer.update({ where: { id: o.id }, data: { status: "COUNTERED", counterSalary: want, counterYears: ev.ask.years } });
           countered++; kept++;
-          await agentDm(faId, o.teamId, `📩 ${nm} is weighing multiple offers — he decides in ${IN_SEASON_MATCH_DAYS} days. Put in your BEST offer: he wants about $${(want / 1e6).toFixed(2)}M × ${ev.ask.years}yr${serious.length >= 2 ? ` (other clubs are in — top bid $${(bestOffer / 1e6).toFixed(2)}M)` : ""}. Raise to stay in it.`);
+          await agentDm(faId, o.teamId, `📩 ${nm} is weighing multiple offers — he decides in ${IN_SEASON_MATCH_DAYS} days. Put in your BEST offer: he wants about $${(want / 1e6).toFixed(2)}M × ${ev.ask.years}yr${serious.length >= 2 ? " (other clubs are also in — bidding is blind)" : ""}. Raise to stay in it.`);
         }
       }
       if (kept > 0) {
