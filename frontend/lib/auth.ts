@@ -70,11 +70,14 @@ export async function isComishTier(): Promise<boolean> {
 export async function canManageTeam(teamId: number): Promise<boolean> {
   const id = await getTeamSession();
   if (id == null) return false;
-  if (id === teamId) return true;
   const [me, target] = await Promise.all([
-    prisma.team.findUnique({ where: { id }, select: { isAdmin: true } }),
+    prisma.team.findUnique({ where: { id }, select: { isAdmin: true, passwordHash: true } }),
     prisma.team.findUnique({ where: { id: teamId }, select: { parentTeamId: true } }),
   ]);
-  if (me?.isAdmin) return true;
+  // a session whose team has been vacated (its GM was reassigned elsewhere) is
+  // stale — treat it as logged out so the manager re-signs in at their new club.
+  if (!me?.passwordHash) return false;
+  if (id === teamId) return true;
+  if (me.isAdmin) return true;
   return target?.parentTeamId === id; // I'm the parent club of this affiliate
 }
