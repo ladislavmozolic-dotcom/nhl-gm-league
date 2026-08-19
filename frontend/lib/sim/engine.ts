@@ -371,6 +371,18 @@ function setFreshUnit(st: SimState, team: SimTeam) {
   st.currentOnIce[team.id] = { f: weightedSample(st.rng, team.forwards, 3), d: weightedSample(st.rng, team.defense, 2) };
 }
 
+/** Overtime is 3-on-3: a fresh unit of THREE skaters (~2F + 1D), not the regulation five.
+ *  Includes `keep` (the scorer) so the play-by-play on-ice set matches the goal. */
+function setFreshUnitOT(st: SimState, team: SimTeam, keep?: SimSkater) {
+  let f = weightedSample(st.rng, team.forwards, 2);
+  let d = weightedSample(st.rng, team.defense, 1);
+  if (keep) {
+    if (keep.isDefense) { if (!d.some((s) => s.id === keep.id)) d = [keep]; }
+    else if (!f.some((s) => s.id === keep.id)) f = [keep, ...f].slice(0, 2);
+  }
+  st.currentOnIce[team.id] = { f, d };
+}
+
 type StUnit = { f: SimSkater[]; d: SimSkater[] };
 /** Resolve a club's special-teams personnel — TWO PP units and TWO PK units, split
  *  into forwards + defence — so the sim can rotate PP1↔PP2 and PK1↔PK2 on ~35s shifts
@@ -1465,8 +1477,8 @@ function simulateOvertime(st: SimState): { winner: number | null; seconds: numbe
       const p = conversion(shooter.offense, effGoalieQuality(liveGoalie(st, def)), isHome, "EV") * 2.2;
       if (rng.chance(p)) {
         gLine.goalsAgainst++;
-        setFreshUnit(st, att); setFreshUnit(st, def);
-        recordGoal(st, att, def, 4, t, "EV");
+        setFreshUnitOT(st, att, shooter); setFreshUnitOT(st, def); // 3-on-3 on-ice sets
+        recordGoal(st, att, def, 4, t, "EV", false, shooter);
         return { winner: att.id, seconds: t };
       }
       gLine.saves++;
