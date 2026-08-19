@@ -59,12 +59,17 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
   // Prospects, alphabetical, WITHOUT anyone already on the NHL or AHL roster — a
   // player who's dressing (e.g. Florian Xhekaj, Sasha Pastujov) is a roster player,
   // not a prospect, even if EliteProspects still lists him "in the system".
-  // normalise for matching: epSearchName strips (R)/''A''/(NTC) suffixes so a roster
-  // player "Rutger McGroarty (R)" matches the prospect "Rutger McGroarty".
-  const pKey = (n: string) => epSearchName(n).toLowerCase();
-  const rosterNames = new Set([...full.players, ...farm].map((p) => pKey(p.name)));
+  // A player is NOT a prospect if he's on this org's roster OR he already graduated
+  // by the games-played rule (≥10 NHL, ≥15 AHL, or ≥5 AHL for goalies) anywhere.
+  // pKey strips (R)/''A''/(NTC) suffixes AND accents so names match reliably.
+  const pKey = (n: string) => epSearchName(n).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+  const graduated = await prisma.player.findMany({
+    where: { OR: [{ lastSeasonGP: { gte: 10 } }, { lastSeasonAhlGP: { gte: 15 } }, { AND: [{ isGoalie: true }, { lastSeasonAhlGP: { gte: 5 } }] }] },
+    select: { name: true },
+  });
+  const notProspect = new Set([...full.players, ...farm, ...graduated].map((p) => pKey(p.name)));
   const prospects = full.prospects
-    .filter((p) => !rosterNames.has(pKey(p.name)))
+    .filter((p) => !notProspect.has(pKey(p.name)))
     .sort((a, b) => cleanName(a.name).localeCompare(cleanName(b.name)));
 
   const conditions = await prisma.tradeCondition.findMany({

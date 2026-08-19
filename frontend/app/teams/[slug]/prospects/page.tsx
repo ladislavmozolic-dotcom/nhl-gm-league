@@ -23,13 +23,18 @@ export default async function TeamProspectsPage({ params }: { params: Promise<{ 
   });
   const epUrl = (name: string) => `https://www.eliteprospects.com/search/player?q=${encodeURIComponent(epSearchName(name))}`;
 
-  // drop prospects who are already on the org roster (NHL or AHL) — a dressing
-  // player isn't a prospect even if EliteProspects still lists him "in the system".
+  // A player is NOT a prospect if he's on this org's roster OR he already graduated
+  // by the games-played rule (≥10 NHL, ≥15 AHL, ≥5 AHL for goalies) anywhere.
   const orgPlayers = await prisma.player.findMany({
-    where: { OR: [{ teamId: team.id }, { team: { parentTeamId: team.id } }], rosterType: { in: ["NHL", "AHL"] } },
+    where: {
+      OR: [
+        { AND: [{ OR: [{ teamId: team.id }, { team: { parentTeamId: team.id } }] }, { rosterType: { in: ["NHL", "AHL"] } }] },
+        { lastSeasonGP: { gte: 10 } }, { lastSeasonAhlGP: { gte: 15 } }, { AND: [{ isGoalie: true }, { lastSeasonAhlGP: { gte: 5 } }] },
+      ],
+    },
     select: { name: true },
   });
-  const pKey = (n: string) => epSearchName(n).toLowerCase();
+  const pKey = (n: string) => epSearchName(n).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
   const rosterNames = new Set(orgPlayers.map((p) => pKey(p.name)));
   const prospects = team.prospects
     .filter((p) => !rosterNames.has(pKey(p.name)))
