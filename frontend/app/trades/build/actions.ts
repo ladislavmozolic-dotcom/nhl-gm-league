@@ -20,7 +20,6 @@ export type TradePackage = {
 };
 
 // ---- AI GM Assistance: trade analysis -------------------------------------
-const pickRoundValue: Record<number, number> = { 1: 800, 2: 350, 3: 150, 4: 80, 5: 40, 6: 25, 7: 15 };
 const playerValue = (overall: number, age: number | null) => {
   let v = Math.pow(Math.max(1, overall - 35), 2);            // 40→25, 55→400, 70→1225, 85→2500
   const a = age ?? 27;
@@ -40,17 +39,45 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
   ]);
   if (!fromTeam || !toTeam) return { ok: false, error: "Team not found." };
 
+  const clean = (s: string) => s.replace(/''[A-Za-z]''|\s*\([^)]*\)/g, "").trim();
+  const norm = (s: string) => clean(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+
   const pidAll = [...pkg.fromPlayers, ...pkg.toPlayers].map((p) => p.playerId);
   const players = await prisma.player.findMany({ where: { id: { in: pidAll } }, select: { id: true, name: true, overall: true, age: true, capHit: true, position: true } });
   const pById = new Map(players.map((p) => [p.id, p]));
-  const picks = await prisma.draftPick.findMany({ where: { id: { in: [...pkg.fromPicks, ...pkg.toPicks] } }, select: { id: true, year: true, round: true } });
-  const kById = new Map(picks.map((k) => [k.id, k]));
-  const prospects = await prisma.prospect.findMany({ where: { id: { in: [...pkg.fromProspects, ...pkg.toProspects] } }, select: { id: true, name: true, overallPick: true } });
-  const prById = new Map(prospects.map((p) => [p.id, p]));
+
+  // --- draft-order-aware picks: value follows the estimated slot the pick lands at,
+  //     and (if we have a board for that year) the name likely picked there. ------
+  const { reverseStandingsOrder } = await import("@/lib/draft-order");
+  const order = await reverseStandingsOrder().catch(() => [] as number[]);
+  const N = order.length || 32;
+  const slotOfTeam = new Map<number, number>();           // teamId -> slot in a round (worst = 1)
+  order.forEach((tid, i) => slotOfTeam.set(tid, i + 1));
+  const kById = new Map((await prisma.draftPick.findMany({ where: { id: { in: [...pkg.fromPicks, ...pkg.toPicks] } }, select: { id: true, year: true, round: true, ownerLogoId: true } })).map((k) => [k.id, k]));
+  const teamByLogo = new Map((await prisma.team.findMany({ where: { profinhlLogoId: { in: [...kById.values()].map((k) => k.ownerLogoId).filter(Boolean) } }, select: { id: true, profinhlLogoId: true } })).map((t) => [t.profinhlLogoId!, t.id]));
+  const boards = new Map<number, string[]>();             // draftYear -> names by projected overall slot
+  for (const y of [...new Set([...kById.values()].map((k) => k.year))]) {
+    const b = await prisma.draftProspect.findMany({ where: { draftYear: y }, orderBy: [{ ov: "desc" }, { potential: "desc" }], select: { name: true } });
+    if (b.length) boards.set(y, b.map((x) => x.name));
+  }
+  const slotOfPick = (k: { round: number; ownerLogoId: number }) => {
+    const inRound = (teamByLogo.get(k.ownerLogoId) && slotOfTeam.get(teamByLogo.get(k.ownerLogoId)!)) || Math.ceil(N / 2);
+    return (k.round - 1) * N + inRound;
+  };
+  const pickValueBySlot = (slot: number) => Math.round(1000 * Math.exp(-slot / 42)); // #1≈976, #16≈684, R2≈316, R3≈147
+
+  // --- prospects: value by CEILING (potential) when a scouting-board entry matches -
+  const prById = new Map((await prisma.prospect.findMany({ where: { id: { in: [...pkg.fromProspects, ...pkg.toProspects] } }, select: { id: true, name: true, overallPick: true, draftYear: true, position: true } })).map((p) => [p.id, p]));
+  const dpAll = await prisma.draftProspect.findMany({ where: { draftYear: { in: [...new Set([...prById.values()].map((p) => p.draftYear).filter((y): y is number => y != null))] } }, select: { name: true, ov: true, potential: true, draftYear: true } });
+  const dpByKey = new Map(dpAll.map((d) => [`${d.draftYear}:${norm(d.name)}`, d]));
+  const potOf = (p: { name: string; draftYear: number | null }) => (p.draftYear != null ? dpByKey.get(`${p.draftYear}:${norm(p.name)}`) ?? null : null);
+  const prospectValueByPot = (pot: number) => Math.round(Math.pow(Math.max(1, pot - 35), 2) * 0.7); // ceiling, bust-discounted
 
   const yearDisc = (year: number) => Math.max(0.6, 1 - Math.max(0, year - CURRENT_SEASON_START) * 0.08);
-  const kv = (id: number) => { const k = kById.get(id); return k ? Math.round((pickRoundValue[k.round] ?? 15) * yearDisc(k.year)) : 0; };
-  const prv = (id: number) => { const p = prById.get(id); return p?.overallPick ? Math.max(60, 300 - p.overallPick * 1.5) : 120; };
+  const kv = (id: number) => { const k = kById.get(id); return k ? Math.round(pickValueBySlot(slotOfPick(k)) * yearDisc(k.year)) : 0; };
+  const kLabel = (id: number) => { const k = kById.get(id); if (!k) return `Pick #${id}`; const slot = slotOfPick(k); const proj = boards.get(k.year)?.[slot - 1]; return `Pick ${k.year} R${k.round} (odhad #${slot})${proj ? ` → ${clean(proj)}` : ""}`; };
+  const prv = (id: number) => { const p = prById.get(id); if (!p) return 100; const dp = potOf(p); if (dp) return Math.max(60, prospectValueByPot(dp.potential)); return p.overallPick ? Math.max(50, pickValueBySlot(p.overallPick)) : 100; };
+  const prLabel = (id: number) => { const p = prById.get(id); if (!p) return `Prospekt #${id}`; const dp = potOf(p); const tail = dp ? ` · potenciál ${dp.potential}${dp.ov ? `/${dp.ov} OV` : ""}` : p.overallPick ? ` · draft #${p.overallPick}` : ""; return `Prospekt: ${clean(p.name)}${p.position ? ` (${p.position})` : ""}${tail}`; };
   const cashV = (c: number) => Math.round((c / 1_000_000) * 30);
 
   const sideValue = (pls: TradePlayer[], pk: number[], pr: number[], cash: number) =>
@@ -61,12 +88,11 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
   const meGets = sideValue(pkg.toPlayers, pkg.toPicks, pkg.toProspects, pkg.toCash);
 
   // itemised breakdown of every selected asset per side
-  const clean = (s: string) => s.replace(/''[A-Za-z]''|\s*\([^)]*\)/g, "").trim();
   const sideItems = (pls: TradePlayer[], pk: number[], pr: number[], cash: number): { label: string; value: number }[] => {
     const out: { label: string; value: number }[] = [];
     for (const x of pls) { const p = pById.get(x.playerId); out.push({ label: `${p ? clean(p.name) : `#${x.playerId}`}${p?.overall ? ` (${p.overall} OV${p.position ? `, ${p.position}` : ""})` : ""}${x.retentionPct ? ` · ${x.retentionPct}% ret.` : ""}`, value: playerValue(p?.overall ?? 45, p?.age ?? null) }); }
-    for (const id of pk) { const k = kById.get(id); out.push({ label: k ? `Pick ${k.year} R${k.round}` : `Pick #${id}`, value: kv(id) }); }
-    for (const id of pr) { const p = prById.get(id); out.push({ label: `Prospekt: ${p ? clean(p.name) : `#${id}`}`, value: prv(id) }); }
+    for (const id of pk) out.push({ label: kLabel(id), value: kv(id) });
+    for (const id of pr) out.push({ label: prLabel(id), value: prv(id) });
     if (cash > 0) out.push({ label: `Cash $${cash.toLocaleString("en-US")}`, value: cashV(cash) });
     return out;
   };
