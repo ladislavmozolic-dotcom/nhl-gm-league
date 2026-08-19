@@ -26,25 +26,37 @@ type Options = { onlyMissing?: boolean; placeIfRealMode?: boolean };
 export async function importRealRosters(opts: Options = {}) {
   const { onlyMissing = true, placeIfRealMode = true } = opts;
 
-  // 1) build normalisedName -> abbrev from the live NHL rosters
-  const nameToAbbrev = new Map<string, string>();
+  // first-initial + last-name key, e.g. "m marner" — the fallback that bridges
+  // nickname spellings (NHL "Mitch Marner" vs our "Mitchell Marner").
+  const fiKey = (n: string) => { const p = n.split(" "); return p.length >= 2 ? `${p[0][0]} ${p[p.length - 1]}` : ""; };
+
+  // 1) build name maps from the live NHL rosters, retrying each club (the API
+  //    rate-limits a burst of 32 quick calls).
+  const nameToAbbrev = new Map<string, string>();          // exact normalised name -> abbrev
+  const fiToAbbrevs = new Map<string, Set<string>>();      // "m marner" -> {abbrev,…}
   let rostersFetched = 0;
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
   for (const ab of NHL_ABBREVS) {
-    try {
-      const res = await fetch(`https://api-web.nhle.com/v1/roster/${ab}/current`, { cache: "no-store" });
-      if (!res.ok) continue;
-      const data = (await res.json()) as Record<string, Array<{ firstName?: { default?: string }; lastName?: { default?: string } }>>;
-      rostersFetched++;
-      for (const group of ["forwards", "defensemen", "goalies"]) {
-        for (const p of data[group] ?? []) {
-          const full = `${p.firstName?.default ?? ""} ${p.lastName?.default ?? ""}`;
-          const key = norm(full);
-          if (key) nameToAbbrev.set(key, ab);
-        }
-      }
-    } catch {
-      /* skip a club that fails to fetch */
+    let data: Record<string, Array<{ firstName?: { default?: string }; lastName?: { default?: string } }>> | null = null;
+    for (let attempt = 0; attempt < 5 && !data; attempt++) {
+      try {
+        const res = await fetch(`https://api-web.nhle.com/v1/roster/${ab}/current`, { cache: "no-store" });
+        if (res.ok) data = await res.json();
+      } catch { /* retry */ }
+      if (!data) await sleep(600 * (attempt + 1));
     }
+    if (!data) continue;
+    rostersFetched++;
+    for (const group of ["forwards", "defensemen", "goalies"]) {
+      for (const p of data[group] ?? []) {
+        const key = norm(`${p.firstName?.default ?? ""} ${p.lastName?.default ?? ""}`);
+        if (!key) continue;
+        nameToAbbrev.set(key, ab);
+        const fk = fiKey(key);
+        if (fk) (fiToAbbrevs.get(fk) ?? fiToAbbrevs.set(fk, new Set()).get(fk)!).add(ab);
+      }
+    }
+    await sleep(200);
   }
   if (rostersFetched === 0) return { ok: false as const, error: "Could not reach the NHL roster API (0 clubs fetched)." };
 
@@ -62,7 +74,11 @@ export async function importRealRosters(opts: Options = {}) {
   let matched = 0;
   const unmatched: string[] = [];
   for (const pl of players) {
-    const ab = nameToAbbrev.get(norm(pl.name));
+    const key = norm(pl.name);
+    // exact name first; else a first-initial+last-name match, but only when that
+    // key is unique across the whole league (no risk of the wrong club).
+    let ab = nameToAbbrev.get(key);
+    if (!ab) { const set = fiToAbbrevs.get(fiKey(key)); if (set && set.size === 1) ab = [...set][0]; }
     const tid = ab ? codeToId.get(ab) : undefined;
     if (!tid) { unmatched.push(pl.name); continue; }
     await prisma.player.update({
