@@ -45,8 +45,8 @@ export default function TradeActions({ tradeId, role, admin }: { tradeId: number
       {(role === "receiver" || role === "proposer" || admin) && (
         <button onClick={analyze} disabled={aiPending}
           className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-sm font-semibold disabled:opacity-40"
-          title="AI GM Assistance — over hodnotu a zmysel výmeny pred rozhodnutím">
-          {aiPending ? "Analyzujem…" : "🤖 AI Helper"}
+          title="GM Assist — over hodnotu a zmysel výmeny pred rozhodnutím">
+          {aiPending ? "Analyzujem…" : "🤖 GM Assist"}
         </button>
       )}
       {err && <span className="text-red-400 text-xs">{err}</span>}
@@ -55,7 +55,7 @@ export default function TradeActions({ tradeId, role, admin }: { tradeId: number
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setAi(null)}>
           <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-bold flex items-center gap-2">🤖 AI GM Assistance — analýza výmeny</h3>
+              <h3 className="text-lg font-bold flex items-center gap-2">🤖 GM Assist — analýza výmeny</h3>
               <button onClick={() => setAi(null)} className="text-slate-400 hover:text-white text-xl leading-none">×</button>
             </div>
             {!ai.ok ? <p className="text-rose-400 text-sm">{ai.error}</p> : (

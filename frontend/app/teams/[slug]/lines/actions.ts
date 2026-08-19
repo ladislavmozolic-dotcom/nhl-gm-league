@@ -69,7 +69,8 @@ export async function suggestLinesAction(slug: string): Promise<{ ok: false; err
     else if (def >= 66) { t = { phy: 1, df: 4, of: 0 }; why = "shut-down pár (vysoké DF)"; }
     else { t = { phy: 1, df: 3, of: 1 }; why = "obranný pár"; }
     p.tactic = { phy: clamp(t.phy), df: clamp(t.df), of: clamp(t.of) };
-    rationale.push(`${i + 1}. obranný pár: ${why} → PHY ${p.tactic.phy} / DF ${p.tactic.df} / OF ${p.tactic.of}`);
+    const dnames = pair.map((x) => cleanName(x.name).split(" ").pop()).join("-");
+    rationale.push(`${i + 1}. obranný pár (${dnames}): ${why} → PHY ${p.tactic.phy} / DF ${p.tactic.df} / OF ${p.tactic.of}`);
   });
 
   // team system — the preset whose fit is highest for this roster

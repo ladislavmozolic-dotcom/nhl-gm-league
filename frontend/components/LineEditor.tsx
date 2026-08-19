@@ -35,7 +35,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
   const [tab, setTab] = useState<(typeof TABS)[number]>("Forward");
   const [pending, start] = useTransition();
   const [saved, setSaved] = useState(false);
-  // AI GM Assistance — a suggested lineup + tactics the GM can Apply or discard
+  // GM Assist — a suggested lineup + tactics the GM can Apply or discard
   const [aiPending, aiStart] = useTransition();
   const [ai, setAi] = useState<SuggestResult | null>(null);
   const runAi = () => aiStart(async () => { if (onSuggest) setAi(await onSuggest(teamSlug)); });
@@ -363,8 +363,8 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
           {onSuggest && (
             <button onClick={runAi} disabled={aiPending}
               className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-sm font-semibold disabled:opacity-50"
-              title="AI GM Assistance — navrhne zostavy, taktiku a systém podľa tvojich hráčov">
-              {aiPending ? "Analyzujem…" : "🤖 AI Helper"}
+              title="GM Assist — navrhne zostavy, taktiku a systém podľa tvojich hráčov">
+              {aiPending ? "Analyzujem…" : "🤖 GM Assist"}
             </button>
           )}
           <button onClick={auto} className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-semibold" title="Rebuild the lineup with the best available players (keeps your tactics & ice-time)">Auto Lines</button>
@@ -375,7 +375,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setAi(null)}>
           <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-bold flex items-center gap-2">🤖 AI GM Assistance</h3>
+              <h3 className="text-lg font-bold flex items-center gap-2">🤖 GM Assist</h3>
               <button onClick={() => setAi(null)} className="text-slate-400 hover:text-white text-xl leading-none">×</button>
             </div>
             {!ai.ok ? (
