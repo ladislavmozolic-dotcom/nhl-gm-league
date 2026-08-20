@@ -21,6 +21,7 @@ function LeaderCard({ title, rows }: { title: string; rows: Row[] }) {
               <PlayerLink id={r.playerId} name={r.name} clean={false} />
               {r.teamCode && <span className="text-slate-500 text-xs ml-1.5">{r.teamCode}</span>}
             </span>
+            {r.sub && <span className="tabular-nums text-[10px] text-slate-500 shrink-0">{r.sub}</span>}
             <span className="tabular-nums font-semibold">{r.value}</span>
           </div>
         ))}
@@ -30,7 +31,7 @@ function LeaderCard({ title, rows }: { title: string; rows: Row[] }) {
 }
 
 const top = <T,>(arr: T[], key: (t: T) => number, n = 10) => [...arr].sort((a, b) => key(b) - key(a)).slice(0, n);
-const skRow = (s: SkaterTotal, value: string): Row => ({ playerId: s.playerId, name: s.name, teamCode: s.teamCode, teamSlug: s.teamSlug, value });
+const skRow = (s: SkaterTotal, value: string, sub?: string): Row => ({ playerId: s.playerId, name: s.name, teamCode: s.teamCode, teamSlug: s.teamSlug, value, sub });
 const gkRow = (g: GoalieTotal, value: string): Row => ({ playerId: g.playerId, name: g.name, teamCode: g.teamCode, teamSlug: g.teamSlug, value });
 
 export default async function LeadersPage({ searchParams }: { searchParams: Promise<{ league?: string }> }) {
@@ -39,9 +40,9 @@ export default async function LeadersPage({ searchParams }: { searchParams: Prom
   const mins = (toi: number) => Math.round(toi / 60);
 
   const skaterCards: Array<{ title: string; rows: Row[] }> = [
-    { title: "Goals", rows: top(sk, (s) => s.goals).map((s) => skRow(s, String(s.goals))) },
-    { title: "Assists", rows: top(sk, (s) => s.assists).map((s) => skRow(s, String(s.assists))) },
-    { title: "Points", rows: top(sk, (s) => s.points).map((s) => skRow(s, String(s.points))) },
+    { title: "Goals", rows: top(sk, (s) => s.goals).map((s) => skRow(s, String(s.goals), `${s.gp} GP`)) },
+    { title: "Assists", rows: top(sk, (s) => s.assists).map((s) => skRow(s, String(s.assists), `${s.gp} GP`)) },
+    { title: "Points", rows: top(sk, (s) => s.points).map((s) => skRow(s, String(s.points), `${s.goals}G+${s.assists}A`)) },
     { title: "Defensemen (points)", rows: top(sk.filter((s) => s.position.includes("D")), (s) => s.points).map((s) => skRow(s, String(s.points))) },
     { title: "Rookies (points)", rows: top(sk.filter((s) => s.rookie), (s) => s.points).map((s) => skRow(s, String(s.points))) },
     { title: "Plus / Minus", rows: top(sk, (s) => s.plusMinus).map((s) => skRow(s, (s.plusMinus > 0 ? "+" : "") + s.plusMinus)) },
