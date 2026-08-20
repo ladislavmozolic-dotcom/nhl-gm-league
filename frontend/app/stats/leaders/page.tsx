@@ -68,20 +68,18 @@ export default async function LeadersPage({ searchParams }: { searchParams: Prom
     { title: "Shots Blocked", rows: top(sk, (s) => s.blocks).map((s) => skRow(s, String(s.blocks), `${s.gp} GP`)) },
   ];
 
-  // Rate stats (SV%, GAA) need a sample that scales with season progress, so a hot
-  // 2-3 game backup doesn't top the leaderboard at mid-season. The required share of
-  // a goalie's OWN team games ramps linearly: ~10% at the half (42 GP → 4+ GP), ~20%
-  // at a full 84-game season (→ 17 GP). Early on (<10 team games) the gate is ~1, so
-  // we still see everyone. minGP = 0.20 · teamGP² / FULL.
-  const FULL = 84;
+  // Rate stats (SV%, GAA) need a sample so a hot 2-3 game backup doesn't top the
+  // leaderboard. A goalie must have played at least 20% of his OWN team's games:
+  // 84 GP season → ~17 GP, 42 GP → ~8 GP. Early on (<10 team games) 20% is ~1-2, so
+  // we still see everyone with a couple of starts.
+  const QUAL_PCT = 0.2;
   const gkMinFor = (tid: number | null) => {
     const tg = (tid != null ? teamGP.get(tid) : 0) ?? 0;
-    return Math.max(1, Math.round((0.2 * tg * tg) / FULL));
+    return Math.max(1, Math.round(QUAL_PCT * tg));
   };
   const qualGk = gk.filter((g) => g.gp >= gkMinFor(g.teamId));
   const maxTeamGP = Math.max(0, ...teamGP.values());
-  const repMin = Math.max(1, Math.round((0.2 * maxTeamGP * maxTeamGP) / FULL));
-  const repPct = maxTeamGP ? Math.round((repMin / maxTeamGP) * 100) : 0;
+  const repMin = Math.max(1, Math.round(QUAL_PCT * maxTeamGP));
   const goalieCards: Array<{ title: string; rows: Row[] }> = [
     { title: "Wins", rows: top(gk, (g) => g.wins).map((g) => gkRow(g, String(g.wins), `${g.gp} GP`)) },
     { title: "Save Percentage", rows: top(qualGk, (g) => g.svPct).map((g) => gkRow(g, g.svPct.toFixed(3).replace(/^0/, ""), `${g.gp} GP`)) },
@@ -103,7 +101,7 @@ export default async function LeadersPage({ searchParams }: { searchParams: Prom
       </section>
 
       <section>
-        <SectionTitle accent="text-red-400">Goalie Leaders — SV%/GAA need ~{repPct}% of team games ({repMin}+ GP) as the season matures</SectionTitle>
+        <SectionTitle accent="text-red-400">Goalie Leaders — SV%/GAA need ≥20% of team games ({repMin}+ GP)</SectionTitle>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {goalieCards.map((c) => <LeaderCard key={c.title} title={c.title} rows={c.rows} />)}
         </div>
