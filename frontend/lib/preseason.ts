@@ -7,11 +7,13 @@
 import { prisma } from "./prisma";
 import { loadSimTeam, fixtureSeed } from "./sim";
 import { simulateGame } from "./sim/engine";
+import { saveGameResult } from "./sim/persist";
 import { syncChem } from "./sim/season";
 import { loadSettings } from "./sim/settings";
 import type { SimTeam } from "./sim/types";
+import { PRE_SEASON } from "./phase";
 
-export const PRE_SEASON = "2026-27-PRE";
+export { PRE_SEASON };
 export const PRE_ROUNDS = 6;
 const YEAR = 2026;
 const DAY = 86_400_000;
@@ -102,20 +104,12 @@ export async function playPreseason(): Promise<{ played: number }> {
     const seed = fixtureSeed(gm.homeTeamId, gm.awayTeamId, (gm.round ?? 0) + gm.id * 7);
     const rivalry = home.rivalTeamIds.includes(away.id) || away.rivalTeamIds.includes(home.id);
     const result = simulateGame(home, away, { seed, settings, rivalry, league: "NHL" });
-    await prisma.game.update({
-      where: { id: gm.id },
-      data: {
-        status: "FINAL",
-        homeGoals: result.home.goals, awayGoals: result.away.goals,
-        homeShots: result.home.shots, awayShots: result.away.shots,
-        homeGoalsByPeriod: result.home.goalsByPeriod, awayGoalsByPeriod: result.away.goalsByPeriod,
-        homeShotsByPeriod: result.home.shotsByPeriod, awayShotsByPeriod: result.away.shotsByPeriod,
-        endedIn: result.endedIn, otPeriods: result.otPeriods, winnerTeamId: result.winner,
-        seed: result.seed, engineVersion: result.engineVersion ?? null,
-        playByPlay: result.playByPlay, shootout: result.shootout ?? [],
-        gameDate: gm.gameDate ?? preseasonDate(gm.round ?? 0), playedAt: new Date(),
-      },
-    });
+    // Full box score (players, goalies, goals, penalties, events) is persisted under the
+    // PRE season string → complete pre-season stats/standings/scoreboard, while every
+    // player-profile / career / regular-season aggregation (keyed on the regular season
+    // string) ignores it. NO Player condition/injury/morale side-effects — that lives in
+    // playScheduledGames, which we deliberately don't call here. Purely exhibition.
+    await saveGameResult(result, { gameId: gm.id, season: PRE_SEASON, gameDate: gm.gameDate ?? preseasonDate(gm.round ?? 0), round: gm.round ?? 0 });
     played++;
   }
   return { played };

@@ -1,10 +1,11 @@
 import { skaterTotals } from "@/lib/stats-server";
 import StatsTabs from "@/components/StatsTabs";
+import PhaseTabs from "@/components/PhaseTabs";
+import { seasonForPhase } from "@/lib/phase";
 import StatTable, { type Col } from "@/components/StatTable";
 import { PageHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
-const SEASON = "2026-27";
 
 const COLS: Col[] = [
   { key: "name", label: "Player", title: "Player Name", frozen: true, link: true },
@@ -31,8 +32,11 @@ const COLS: Col[] = [
   { key: "p20", label: "P/20", title: "Points per 20 min", num: true, format: "dec2" },
 ];
 
-export default async function PlayerStatsPage({ searchParams }: { searchParams: Promise<{ league?: string }> }) {
-  const league = (await searchParams).league === "AHL" ? "AHL" : "NHL";
+export default async function PlayerStatsPage({ searchParams }: { searchParams: Promise<{ league?: string; phase?: string }> }) {
+  const sp = await searchParams;
+  const league = sp.league === "AHL" ? "AHL" : "NHL";
+  const phase: "pre" | "regular" = sp.phase === "pre" && league === "NHL" ? "pre" : "regular";
+  const SEASON = seasonForPhase(phase);
   const sk = await skaterTotals(SEASON, league);
   const rows = sk.map((s) => ({
     _pid: s.playerId, name: s.name, teamCode: s.teamCode ?? "—", _teamSlug: s.teamSlug ?? "", _teamLogo: s.teamLogo ?? "", number: s.number ?? 0, position: s.position, gp: s.gp,
@@ -45,9 +49,10 @@ export default async function PlayerStatsPage({ searchParams }: { searchParams: 
   }));
   return (
     <div className="space-y-6 py-2">
-      <PageHeader title="Statistics" subtitle={`All skaters — ${league} ${SEASON} regular season`} />
+      <PageHeader title="Statistics" subtitle={`All skaters — ${league} ${phase === "pre" ? "pre-season (exhibition)" : "regular season"}`} />
       <StatsTabs active="players" league={league} />
-      <p className="text-slate-400 text-sm">Click a header to sort; use Show / Hide Columns to customize.</p>
+      <PhaseTabs active={phase} league={league} basePath="/stats/players" showPlayoffs={false} />
+      <p className="text-slate-400 text-sm">Click a header to sort; use Show / Hide Columns to customize.{phase === "pre" ? " Pre-season stats don't count toward profiles/careers." : ""}</p>
       <StatTable cols={COLS} rows={rows} initialSort="points" minWidth={1180} />
     </div>
   );

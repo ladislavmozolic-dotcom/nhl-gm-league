@@ -3,10 +3,11 @@ import { prisma } from "@/lib/prisma";
 import PlayerLink from "@/components/PlayerLink";
 import { skaterTotals, goalieTotals, type SkaterTotal, type GoalieTotal } from "@/lib/stats-server";
 import StatsTabs from "@/components/StatsTabs";
+import PhaseTabs from "@/components/PhaseTabs";
+import { seasonForPhase } from "@/lib/phase";
 import { Card, PageHeader, SectionTitle } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
-const SEASON = "2026-27";
 
 type Row = { playerId: number; name: string; teamCode: string | null; teamSlug: string | null; teamLogo: string | null; value: string; sub?: string };
 
@@ -40,8 +41,11 @@ const top = <T,>(arr: T[], key: (t: T) => number, n = 10) => [...arr].sort((a, b
 const skRow = (s: SkaterTotal, value: string, sub?: string): Row => ({ playerId: s.playerId, name: s.name, teamCode: s.teamCode, teamSlug: s.teamSlug, teamLogo: s.teamLogo, value, sub });
 const gkRow = (g: GoalieTotal, value: string, sub?: string): Row => ({ playerId: g.playerId, name: g.name, teamCode: g.teamCode, teamSlug: g.teamSlug, teamLogo: g.teamLogo, value, sub });
 
-export default async function LeadersPage({ searchParams }: { searchParams: Promise<{ league?: string }> }) {
-  const league = (await searchParams).league === "AHL" ? "AHL" : "NHL";
+export default async function LeadersPage({ searchParams }: { searchParams: Promise<{ league?: string; phase?: string }> }) {
+  const sp = await searchParams;
+  const league = sp.league === "AHL" ? "AHL" : "NHL";
+  const phase: "pre" | "regular" = sp.phase === "pre" && league === "NHL" ? "pre" : "regular";
+  const SEASON = seasonForPhase(phase);
   const [sk, gk, finals] = await Promise.all([
     skaterTotals(SEASON, league),
     goalieTotals(SEASON, league),
@@ -97,6 +101,8 @@ export default async function LeadersPage({ searchParams }: { searchParams: Prom
     <div className="space-y-6 py-2">
       <PageHeader title="Statistics" subtitle="League leaders across skaters and goalies" />
       <StatsTabs active="leaders" league={league} />
+      <PhaseTabs active={phase} league={league} basePath="/stats/leaders" showPlayoffs={false} />
+      {phase === "pre" && <p className="text-xs text-amber-400/90">Pre-season (exhibition) — these stats don&apos;t count toward player profiles or careers.</p>}
 
       <section>
         <SectionTitle accent="text-blue-400">Skater Leaders — {league} {SEASON}</SectionTitle>

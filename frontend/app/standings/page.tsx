@@ -5,25 +5,28 @@ import { playoffRace, type RaceConference, type RaceTeam } from "@/lib/playoff-r
 import StandingsTable from "@/components/StandingsTable";
 import type { TeamStanding, PowerRow } from "@/lib/sim/standings";
 import { PageHeader, Card } from "@/components/ui";
+import PhaseTabs from "@/components/PhaseTabs";
+import { seasonForPhase } from "@/lib/phase";
 
 export const dynamic = "force-dynamic";
-const SEASON = "2026-27";
 type View = "league" | "conference" | "division" | "power" | "race";
 type TeamMeta = Map<number, { logoUrl: string | null; slug: string }>;
 
-export default async function StandingsPage({ searchParams }: { searchParams: Promise<{ league?: string; view?: string }> }) {
+export default async function StandingsPage({ searchParams }: { searchParams: Promise<{ league?: string; view?: string; phase?: string }> }) {
   const sp = await searchParams;
   const league = sp.league === "AHL" ? "AHL" : "NHL";
+  const phase: "pre" | "regular" = sp.phase === "pre" && league === "NHL" ? "pre" : "regular";
+  const SEASON = seasonForPhase(phase);
   const view: View = sp.view === "league" || sp.view === "division" || sp.view === "power" || sp.view === "race" ? sp.view : "conference";
   const [standings, power, teams, race] = await Promise.all([
     computeStandings(SEASON, league),
     powerRanking(SEASON, league, 10),
     prisma.team.findMany({ select: { id: true, logoUrl: true, slug: true } }),
-    view === "race" ? playoffRace(SEASON, league) : Promise.resolve([] as RaceConference[]),
+    view === "race" && phase !== "pre" ? playoffRace(SEASON, league) : Promise.resolve([] as RaceConference[]),
   ]);
   const meta: TeamMeta = new Map(teams.map((t) => [t.id, { logoUrl: t.logoUrl, slug: t.slug }]));
   const played = standings.reduce((t, s) => t + s.gp, 0) / 2;
-  const q = (v: View) => `/standings?${league === "AHL" ? "league=AHL&" : ""}view=${v}`;
+  const q = (v: View) => `/standings?${league === "AHL" ? "league=AHL&" : ""}${phase === "pre" ? "phase=pre&" : ""}view=${v}`;
 
   // group into sections based on the selected view
   const groups: { title: string; color: string; teams: TeamStanding[] }[] = [];
@@ -46,20 +49,21 @@ export default async function StandingsPage({ searchParams }: { searchParams: Pr
   );
 
   return (
-    <div className="space-y-8 py-2">
+    <div className="space-y-6 py-2">
       <PageHeader
-        title={`${league} Standings`}
-        subtitle={`${SEASON} • ${played} games played`}
+        title={`${league} ${phase === "pre" ? "Pre-season " : ""}Standings`}
+        subtitle={`${played} games played${phase === "pre" ? " · exhibition — does not count" : ""}`}
         right={
           <div className="flex gap-2 flex-wrap">
             <Tab v="league" label="League" />
             <Tab v="conference" label="Conference" />
             <Tab v="division" label="Division" />
             <Tab v="power" label="⚡ Power Ranking" />
-            <Tab v="race" label="🎯 Playoff Race" />
+            {phase !== "pre" && <Tab v="race" label="🎯 Playoff Race" />}
           </div>
         }
       />
+      <PhaseTabs active={phase} league={league} basePath="/standings" />
 
       {view === "race" ? (
         <section className="space-y-8">

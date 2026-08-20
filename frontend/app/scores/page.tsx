@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui";
+import PhaseTabs from "@/components/PhaseTabs";
+import { seasonForPhase, normalizePhase } from "@/lib/phase";
 
 export const dynamic = "force-dynamic";
-const SEASON = "2026-27";
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 const pretty = (d: Date) => d.toLocaleDateString("sk-SK", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
@@ -37,10 +38,13 @@ function ScoreCard({ g }: { g: GameRow }) {
   );
 }
 
-export default async function ScoresPage({ searchParams }: { searchParams: Promise<{ date?: string; league?: string }> }) {
+export default async function ScoresPage({ searchParams }: { searchParams: Promise<{ date?: string; league?: string; phase?: string }> }) {
   const sp = await searchParams;
-  const onlyAhl = sp.league === "AHL";
+  const phase = normalizePhase(sp.phase) === "pre" ? "pre" : "regular"; // scoreboard: pre or regular (playoffs → /playoffs)
+  const SEASON = seasonForPhase(phase);
+  const onlyAhl = sp.league === "AHL" && phase !== "pre"; // pre-season is NHL-only
   const leagueFilter = onlyAhl ? { league: "AHL" } : {};
+  const qPhase = phase === "pre" ? "&phase=pre" : "";
   const dates = await prisma.game.findMany({
     where: { season: SEASON, status: "FINAL", seriesId: null, gameDate: { not: null }, ...leagueFilter },
     select: { gameDate: true }, distinct: ["gameDate"], orderBy: { gameDate: "asc" },
@@ -49,7 +53,12 @@ export default async function ScoresPage({ searchParams }: { searchParams: Promi
   const uniqueDays = [...new Set(dayList)];
 
   if (uniqueDays.length === 0) {
-    return <div className="space-y-6 py-2"><PageHeader title="Scores" subtitle="No games have been simulated yet." /></div>;
+    return (
+      <div className="space-y-4 py-2">
+        <PageHeader title={phase === "pre" ? "Pre-season Scores" : "Scores"} subtitle="No games have been simulated yet." />
+        <PhaseTabs active={phase} league={onlyAhl ? "AHL" : "NHL"} basePath="/scores" />
+      </div>
+    );
   }
 
   const date = sp.date;
@@ -79,14 +88,15 @@ export default async function ScoresPage({ searchParams }: { searchParams: Promi
         title={`${onlyAhl ? "AHL " : ""}Scores`}
         right={
           <div className="flex items-center gap-2">
-            {prev ? <Link href={`/scores?date=${prev}${qLeague}`} className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm">← Prev</Link>
+            {prev ? <Link href={`/scores?date=${prev}${qLeague}${qPhase}`} className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm">← Prev</Link>
               : <span className="px-3 py-1.5 rounded-lg bg-slate-900 text-slate-700 text-sm">← Prev</span>}
-            {next ? <Link href={`/scores?date=${next}${qLeague}`} className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm">Next →</Link>
+            {next ? <Link href={`/scores?date=${next}${qLeague}${qPhase}`} className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm">Next →</Link>
               : <span className="px-3 py-1.5 rounded-lg bg-slate-900 text-slate-700 text-sm">Next →</span>}
           </div>
         }
       />
-      <p className="text-slate-400 text-sm mt-1 mb-6 capitalize">{pretty(new Date(current + "T12:00:00"))}</p>
+      <div className="mt-2 mb-4"><PhaseTabs active={phase} league={onlyAhl ? "AHL" : "NHL"} basePath="/scores" /></div>
+      <p className="text-slate-400 text-sm mb-6 capitalize">{pretty(new Date(current + "T12:00:00"))}{phase === "pre" ? " · Pre-season (exhibition)" : ""}</p>
 
       {!onlyAhl && (
         <section className="mb-8">
@@ -97,12 +107,14 @@ export default async function ScoresPage({ searchParams }: { searchParams: Promi
         </section>
       )}
 
-      <section>
-        <h2 className="text-lg font-bold text-emerald-400 mb-3 flex items-center gap-2"><span className="w-2 h-2 bg-emerald-500 rounded-full" /> AHL <span className="text-slate-500 font-normal text-sm">({ahl.length})</span></h2>
-        {ahl.length === 0 ? <p className="text-slate-600 text-sm">No AHL games.</p> : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">{ahl.map((g) => <ScoreCard key={g.id} g={g} />)}</div>
-        )}
-      </section>
+      {phase !== "pre" && (
+        <section>
+          <h2 className="text-lg font-bold text-emerald-400 mb-3 flex items-center gap-2"><span className="w-2 h-2 bg-emerald-500 rounded-full" /> AHL <span className="text-slate-500 font-normal text-sm">({ahl.length})</span></h2>
+          {ahl.length === 0 ? <p className="text-slate-600 text-sm">No AHL games.</p> : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">{ahl.map((g) => <ScoreCard key={g.id} g={g} />)}</div>
+          )}
+        </section>
+      )}
     </div>
   );
 }

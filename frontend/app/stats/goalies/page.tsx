@@ -1,10 +1,11 @@
 import { goalieTotals } from "@/lib/stats-server";
 import StatsTabs from "@/components/StatsTabs";
+import PhaseTabs from "@/components/PhaseTabs";
+import { seasonForPhase } from "@/lib/phase";
 import StatTable, { type Col } from "@/components/StatTable";
 import { PageHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
-const SEASON = "2026-27";
 
 const COLS: Col[] = [
   { key: "name", label: "Goalie", title: "Goalie Name", frozen: true, link: true },
@@ -32,8 +33,11 @@ const COLS: Col[] = [
   { key: "s3", label: "S3", title: "Shootout round 3 (not tracked)", num: true, format: "dash" },
 ];
 
-export default async function GoalieStatsPage({ searchParams }: { searchParams: Promise<{ league?: string }> }) {
-  const league = (await searchParams).league === "AHL" ? "AHL" : "NHL";
+export default async function GoalieStatsPage({ searchParams }: { searchParams: Promise<{ league?: string; phase?: string }> }) {
+  const sp = await searchParams;
+  const league = sp.league === "AHL" ? "AHL" : "NHL";
+  const phase: "pre" | "regular" = sp.phase === "pre" && league === "NHL" ? "pre" : "regular";
+  const SEASON = seasonForPhase(phase);
   const gk = await goalieTotals(SEASON, league);
   const rows = gk.map((g) => ({
     _pid: g.playerId, name: g.name, teamCode: g.teamCode ?? "—", _teamSlug: g.teamSlug ?? "", _teamLogo: g.teamLogo ?? "", gp: g.gp, wins: g.wins, losses: g.losses, otl: g.otl,
@@ -43,9 +47,10 @@ export default async function GoalieStatsPage({ searchParams }: { searchParams: 
   }));
   return (
     <div className="space-y-6 py-2">
-      <PageHeader title="Statistics" subtitle={`All goalies — ${league} ${SEASON} regular season`} />
+      <PageHeader title="Statistics" subtitle={`All goalies — ${league} ${phase === "pre" ? "pre-season (exhibition)" : "regular season"}`} />
       <StatsTabs active="goalies" league={league} />
-      <p className="text-slate-400 text-sm">Click a header to sort; use Show / Hide Columns to customize.</p>
+      <PhaseTabs active={phase} league={league} basePath="/stats/goalies" showPlayoffs={false} />
+      <p className="text-slate-400 text-sm">Click a header to sort; use Show / Hide Columns to customize.{phase === "pre" ? " Pre-season stats don't count toward profiles/careers." : ""}</p>
       <StatTable cols={COLS} rows={rows} initialSort="wins" minWidth={1160} />
       <p className="text-xs text-slate-600">Columns showing “—” (PIM, A, EG, PS %, PSA, ST, BG, S1–S3) are stat fields the sim engine doesn’t record yet — hide them with Show / Hide Columns, or ask to add shootout & penalty-shot tracking.</p>
     </div>
