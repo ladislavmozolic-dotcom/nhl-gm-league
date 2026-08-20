@@ -12,15 +12,20 @@ export default async function CaptainsPage() {
     select: {
       id: true, name: true, code: true, logoUrl: true, slug: true, conference: true,
       players: {
-        where: { rosterType: "NHL", OR: [{ name: { contains: "''C''" } }, { name: { contains: "''A''" } }] },
-        select: { id: true, name: true, position: true },
+        where: { rosterType: "NHL", OR: [{ captaincy: { not: null } }, { name: { contains: "''C''" } }, { name: { contains: "''A''" } }] },
+        select: { id: true, name: true, position: true, captaincy: true },
       },
     },
     orderBy: { name: "asc" },
   });
 
   const cards = teams.map((t) => {
-    const marked = t.players.map((p) => ({ ...p, role: captaincyFromName(p.name) }));
+    // The GM-set `captaincy` field is the source of truth. Only when NO player on the
+    // club has it set do we fall back to the letters embedded in the imported name.
+    const hasField = t.players.some((p) => p.captaincy === "C" || p.captaincy === "A");
+    const roleOf = (p: { captaincy: string | null; name: string }) =>
+      hasField ? (p.captaincy as "C" | "A" | null) : captaincyFromName(p.name);
+    const marked = t.players.map((p) => ({ ...p, role: roleOf(p) }));
     return { ...t, captain: marked.find((p) => p.role === "C"), assistants: marked.filter((p) => p.role === "A") };
   });
 

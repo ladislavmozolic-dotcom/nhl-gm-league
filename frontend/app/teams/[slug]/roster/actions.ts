@@ -28,4 +28,6 @@ export async function saveRoster(slug: string, rows: RosterRow[]) {
   );
   revalidatePath(`/teams/${slug}/roster`);
   revalidatePath(`/teams/${slug}`);
+  revalidatePath(`/teams/${slug}/lines/captains`);
+  revalidatePath("/captains");
 }

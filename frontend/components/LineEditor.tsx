@@ -9,7 +9,7 @@ import { useLang } from "@/components/LangProvider";
 import { dialLabel, dialDesc } from "@/lib/tactics-i18n";
 import type { GameStrategy, StratWeights } from "@/lib/sim/types";
 
-type Player = { id: number; name: string; position: string; overall: number; injured?: boolean; df?: number | null };
+type Player = { id: number; name: string; position: string; overall: number; injured?: boolean; df?: number | null; con?: number };
 type SuggestResult = { ok: false; error: string } | { ok: true; lines: TeamLinesData; system: string; rationale: string[] };
 type Props = {
   teamName: string; teamSlug: string;
@@ -109,7 +109,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
       className="w-full min-w-[132px] bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-sm">
       <option value="">— empty —</option>
       {value != null && !pool.some((p) => p.id === value) && <option value={value}>{nameOf(value)}</option>}
-      {pool.map((p) => <option key={p.id} value={p.id} disabled={p.injured}>{p.name} · {p.position} ({p.overall}){p.injured ? " 🤕 INJ" : ""}</option>)}
+      {pool.map((p) => <option key={p.id} value={p.id} disabled={p.injured}>{p.name} · {p.position} ({p.overall}){p.con != null ? ` · CON ${p.con}%${p.con < 90 ? " ⚠️" : ""}` : ""}{p.injured ? " 🤕 INJ" : ""}</option>)}
     </select>
   );
 
