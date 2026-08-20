@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { notFound, redirect } from "next/navigation";
 import { getTeamSession } from "@/lib/auth";
-import { getArenaSections, selloutRevenue, attendanceRate } from "@/lib/finance";
+import { getArenaSections, selloutRevenue, attendanceRate, priceAttendanceFactor } from "@/lib/finance";
 import { computeStandings } from "@/lib/sim/standings";
 import FinanceEditor, { type HomeGame } from "@/components/FinanceEditor";
 import { saveTicketPrices } from "./actions";
@@ -25,7 +25,7 @@ export default async function FinancePage({ params }: { params: Promise<{ slug: 
   // (opponent draw + a small stable jitter) gives each night a plausible, varying crowd.
   const standings = await computeStandings(SEASON, "NHL");
   const myStanding = standings.find((s) => s.teamId === team.id);
-  const baseRate = attendanceRate(team.popularity ?? 100, myStanding?.pointsPct ?? 0.5);
+  const baseRate = attendanceRate(team.popularity ?? 100, myStanding?.pointsPct ?? 0.5) * priceAttendanceFactor(sections); // cheaper tickets → more fans
 
   const homeFinals = await prisma.game.findMany({
     where: { season: SEASON, status: "FINAL", homeTeamId: team.id, seriesId: null },

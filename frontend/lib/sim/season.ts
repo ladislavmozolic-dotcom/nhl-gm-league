@@ -15,7 +15,7 @@ import { fixtureSeed } from "./rng";
 import { loadSettings, type EngineSettings } from "./settings";
 import { pairSig, unitPairs } from "./chemistry";
 import { computeStandings } from "./standings";
-import { getArenaSections, selloutRevenue, attendanceRate } from "../finance";
+import { getArenaSections, selloutRevenue, attendanceRate, priceAttendanceFactor } from "../finance";
 import type { SimTeam, SimGoalie, TeamBox } from "./types";
 
 const DU_HIGH = 85; // durability at/above which CON recovers +2/day instead of +1
@@ -281,13 +281,13 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
   const finTeams = await prisma.team.findMany({ where: { league: "NHL" }, select: { id: true, popularity: true, capacity: true, arenaSections: true } });
   const finBy = new Map(finTeams.map((t) => {
     const secs = getArenaSections(t);
-    return [t.id, { pop: t.popularity ?? 100, capacity: secs.reduce((a, x) => a + x.capacity, 0), sellout: selloutRevenue(secs) }];
+    return [t.id, { pop: t.popularity ?? 100, capacity: secs.reduce((a, x) => a + x.capacity, 0), sellout: selloutRevenue(secs), pf: priceAttendanceFactor(secs) }];
   }));
   const storeAttendance = async (gm: { id: number; homeTeamId: number; awayTeamId: number; league: string | null }) => {
     if (gm.league === "AHL") return;
     const fin = finBy.get(gm.homeTeamId);
     if (!fin || fin.capacity <= 0) return;
-    const base = attendanceRate(fin.pop, pctBy.get(gm.homeTeamId) ?? 0.5);
+    const base = attendanceRate(fin.pop, pctBy.get(gm.homeTeamId) ?? 0.5) * fin.pf; // cheaper tickets → more fans
     const jitter = (((gm.id * 2654435761) >>> 0) % 1000) / 1000;
     const oppDraw = ((pctBy.get(gm.awayTeamId) ?? 0.5) - 0.5) * 0.10;
     const frac = Math.max(0.4, Math.min(1, base * (1 + (jitter - 0.5) * 0.08 + oppDraw)));

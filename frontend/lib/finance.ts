@@ -26,6 +26,21 @@ export function selloutRevenue(sections: ArenaSection[]): number {
   return sections.reduce((t, s) => t + s.capacity * s.price, 0);
 }
 
+/** Ticket-price effect on attendance: cheaper seats than the default draw MORE fans,
+ *  pricier seats fewer. Returns a multiplier (~1.15 for deep discounts … 0.82 for steep
+ *  premiums; 1.0 at default pricing). Compares the club's price-per-seat to the defaults. */
+export function priceAttendanceFactor(sections: ArenaSection[]): number {
+  let cur = 0, def = 0;
+  for (const s of sections) {
+    const i = LEVELS.indexOf(s.level);
+    const dp = i >= 0 ? DEFAULT_PRICE[i] : s.price;
+    cur += s.capacity * s.price; def += s.capacity * dp;
+  }
+  if (def <= 0) return 1;
+  const idx = cur / def; // 1 = default pricing, <1 cheaper, >1 pricier
+  return Math.max(0.82, Math.min(1.15, 1 + (1 - idx) * 0.6));
+}
+
 // ---- salary cap ------------------------------------------------------------
 
 export const CURRENT_SEASON_START = 2026; // 2026-27

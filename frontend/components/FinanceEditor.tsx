@@ -64,7 +64,7 @@ export default function FinanceEditor({ teamName, teamSlug, arena, sections, cap
           <Link href={`/teams/${teamSlug}/salary`} className="text-slate-400 hover:text-blue-400">Salary Cap →</Link>
           <Link href={`/teams/${teamSlug}/lines`} className="text-slate-400 hover:text-blue-400">Lines →</Link>
         </div>
-        <p className="text-sm text-slate-500 mt-1">{arena} · capacity {totalCap.toLocaleString()} · set the price per section — a full house earns the sellout revenue below.</p>
+        <p className="text-sm text-slate-500 mt-1">{arena} · capacity {totalCap.toLocaleString()} · set the price per section. <b className="text-slate-300">Lower prices draw more fans</b> (fuller building, less per seat); higher prices earn more per ticket but thin the crowd.</p>
       </div>
 
       {/* season-to-date home-gate summary */}
