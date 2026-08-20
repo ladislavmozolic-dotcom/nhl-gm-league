@@ -11,7 +11,6 @@ export const DEFAULT_MENU: MenuItem[] = [
   { key: "scores", label: "Scores", href: "/scores" },
   { key: "standings", label: "Standings", href: "/standings" },
   { key: "schedule", label: "Schedule", href: "/schedule" },
-  { key: "preseason", label: "Pre-season", href: "/preseason" },
   { key: "trades", label: "Trades", href: "/trades", children: [
     { label: "🔁 Trade Room", href: "/trades/build" },
     { label: "🧱 Trade Block", href: "/trade-block" },

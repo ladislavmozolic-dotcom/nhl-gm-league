@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/ui";
 import { commishToday, type TeamFlag } from "@/lib/commissioner-server";
 import SimulateDayButton from "@/components/SimulateDayButton";
 import GmRoleManager from "@/components/GmRoleManager";
+import AiModeManager from "@/components/AiModeManager";
 import GmTeamReassign from "@/components/GmTeamReassign";
 import { prisma } from "@/lib/prisma";
 
@@ -103,11 +104,12 @@ export default async function CommissionerDashboard() {
       {await (async () => {
         const teams = await prisma.team.findMany({
           where: { league: "NHL", isAffiliate: false },
-          select: { id: true, name: true, gmRole: true, gmNickname: true, passwordHash: true },
+          select: { id: true, name: true, gmRole: true, gmNickname: true, passwordHash: true, aiMode: true },
           orderBy: { name: "asc" },
         });
         const roleRows = teams.map((t) => ({ id: t.id, name: t.name, gmRole: t.gmRole, gmNickname: t.gmNickname }));
         const reassignRows = teams.map((t) => ({ id: t.id, name: t.name, gmNickname: t.gmNickname, hasGm: !!t.passwordHash }));
+        const aiRows = teams.filter((t) => !t.passwordHash).map((t) => ({ id: t.id, name: t.name, aiMode: t.aiMode }));
         return (
           <>
             <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-4">
@@ -117,6 +119,10 @@ export default async function CommissionerDashboard() {
             <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-4">
               <div className="text-xs uppercase tracking-wide text-slate-400 mb-2">League Roles</div>
               <GmRoleManager teams={roleRows} />
+            </div>
+            <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-4">
+              <div className="text-xs uppercase tracking-wide text-slate-400 mb-2">AI GM mode (GM-less clubs)</div>
+              <AiModeManager teams={aiRows} />
             </div>
           </>
         );

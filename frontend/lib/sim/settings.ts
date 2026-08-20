@@ -73,6 +73,7 @@ export type EngineSettings = {
   retentionMinSalary: number; // new team must carry at least this
   retentionMaxPlayers: number;// max retained players per team
   clausesEnabled: boolean;    // enforce NTC / NMC / M-NTC contract clauses in trades (off = no-CBA league)
+  aiTradesEnabled: boolean;   // master switch: let Advanced-AI clubs negotiate trades with human GMs (accept/decline/counter + initiate)
   // Offer-sheet compensation: draft-pick cost the poaching club pays the old
   // club, by the offer-sheet's AAV. Tiers are ordered ascending by maxAav; the
   // final tier uses maxAav 0 as "no upper bound". picks = draft rounds owed.
@@ -183,7 +184,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   playoffFormat: "division", playoffTeamsPerConf: 8, playoffBestOf: 7,
   salaryCapUpper: 85900000, salaryCapLower: 51500000, startingCapital: 40000000,
   buyoutPctSeason: 50, buyoutPctOffseason: 35,
-  retentionMaxPct: 50, retentionMinSalary: 600000, retentionMaxPlayers: 3, clausesEnabled: true,
+  retentionMaxPct: 50, retentionMinSalary: 600000, retentionMaxPlayers: 3, clausesEnabled: true, aiTradesEnabled: true,
   osCompEnabled: true,
   osCompTiers: [
     { maxAav: 1000000, picks: [3] },        // ≤ $1M → a 3rd-round pick

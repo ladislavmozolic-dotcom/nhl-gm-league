@@ -98,6 +98,12 @@ export async function aiGmDaily(): Promise<{ managed: number; details: string[] 
     const cap = await enforceCap(t.id);
     if (cap) details.push(cap);
   }
+  // Advanced-AI clubs also negotiate incoming trade proposals from human GMs.
+  try {
+    const { aiGmTradesDaily } = await import("./ai-gm-trades");
+    const tr = await aiGmTradesDaily();
+    details.push(...tr.details);
+  } catch { /* trade pass is best-effort — never block the daily AI run */ }
   return { managed: teams.length, details };
 }
 

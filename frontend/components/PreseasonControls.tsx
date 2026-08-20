@@ -34,6 +34,7 @@ export default function PreseasonControls({ scheduled, played }: { scheduled: nu
         {pending && <span className="text-xs text-slate-500">working…</span>}
       </div>
       {msg && <p className="text-sm text-emerald-400">{msg}</p>}
+      <a href="/preseason" className="inline-block text-xs text-sky-400 hover:underline">View pre-season schedule &amp; results →</a>
     </div>
   );
 }

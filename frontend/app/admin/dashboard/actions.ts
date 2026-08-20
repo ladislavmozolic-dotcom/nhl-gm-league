@@ -19,6 +19,16 @@ export async function setGmRoleAction(teamId: number, role: string) {
   return { ok: true as const };
 }
 
+/** Commissioner sets a GM-less club's AI mode: "base" (lineups/cap only) or
+ *  "advanced" (also negotiates trades with human GMs). */
+export async function setAiModeAction(teamId: number, mode: string) {
+  if (!(await isAdmin())) return { ok: false as const, error: "Commissioner only." };
+  if (mode !== "base" && mode !== "advanced") return { ok: false as const, error: "Unknown mode." };
+  await prisma.team.update({ where: { id: teamId }, data: { aiMode: mode } });
+  revalidatePath("/admin/dashboard");
+  return { ok: true as const };
+}
+
 // the fields that together make up a GM's login/identity — everything that moves
 // when a manager takes over a different franchise. The roster stays put; only the
 // person controlling the club changes.
