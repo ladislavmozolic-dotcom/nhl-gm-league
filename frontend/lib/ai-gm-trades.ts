@@ -36,7 +36,9 @@ async function computeThresholds(): Promise<Thresholds> {
 const isStar = (ov: number, isGoalie: boolean, th: Thresholds) => ov >= (isGoalie ? th.gkStar : th.skStar);
 const isFranchise = (ov: number, isGoalie: boolean, th: Thresholds) => ov >= (isGoalie ? th.gkFranchise : th.skFranchise);
 
-type Decision = { action: "accept" | "decline" | "counter"; reason: string; counter?: TradePackage; counterNote?: string };
+type DecisionDetail = { aiGets: number; aiGives: number; ratio: number; need: number; star?: string; franchise?: string };
+type Decision = { action: "accept" | "decline" | "counter"; reason: string; counter?: TradePackage; counterNote?: string; detail?: DecisionDetail };
+const whyText = (dt?: DecisionDetail) => dt ? `Their read: ~${dt.aiGets} value received vs ~${dt.aiGives} given up (×${dt.ratio}; they wanted at least ×${dt.need})` : "";
 
 /** Decide how an advanced-AI receiving club responds to one pending proposal. */
 async function decide(tradeId: number, aiTeamId: number, contention: Contention, th: Thresholds): Promise<Decision> {
@@ -87,17 +89,18 @@ async function decide(tradeId: number, aiTeamId: number, contention: Contention,
   const fillsNeed = inP.some((p) => needs.has(grp(p.position)));
   if (fillsNeed) T -= 0.05;
   T = Math.max(0.9, T);
+  const detail: DecisionDetail = { aiGets, aiGives, ratio: +ratio.toFixed(2), need: +T.toFixed(2), star: star ? clean(star.name) : undefined, franchise: franchise ? clean(franchise.name) : undefined };
 
-  if (ratio >= T) return { action: "accept", reason: `value ${aiGets} vs ${aiGives} (×${ratio.toFixed(2)} ≥ ${T.toFixed(2)})` };
+  if (ratio >= T) return { action: "accept", reason: `value ${aiGets} vs ${aiGives} (×${ratio.toFixed(2)} ≥ ${T.toFixed(2)})`, detail };
 
-  // Close but short → counter (ask them to add a pick), unless a star is involved and
-  // the gap is large (then just decline — the AI holds firm on its core).
+  // Close but short → counter (ask them to add a pick), unless a franchise piece is
+  // involved and the gap is large (then just decline — the AI holds firm on its core).
   const closeEnough = ratio >= T * 0.78;
   if (closeEnough && !(franchise && ratio < T * 0.9)) {
     const counter = await buildCounter(pkg, aiGives * T - aiGets);
-    if (counter) return { action: "counter", reason: `short (×${ratio.toFixed(2)} < ${T.toFixed(2)}) — counter for more`, counter, counterNote: star ? `${clean(star.name)} is a core piece — the ask has to be higher.` : "Close, but the value needs to come up a touch." };
+    if (counter) return { action: "counter", reason: `short (×${ratio.toFixed(2)} < ${T.toFixed(2)}) — counter for more`, counter, counterNote: star ? `${clean(star.name)} is a core piece — the ask has to be higher.` : "Close, but the value needs to come up a touch.", detail };
   }
-  return { action: "decline", reason: `too light (×${ratio.toFixed(2)} < ${T.toFixed(2)})` };
+  return { action: "decline", reason: `too light (×${ratio.toFixed(2)} < ${T.toFixed(2)})`, detail };
 }
 
 /** Build a counter: keep the same swap, but ask the OTHER club to add one draft pick
@@ -163,11 +166,12 @@ export async function aiGmTradesDaily(): Promise<{ handled: number; details: str
         details.push(`${aiName} ACCEPTED #${tr.id} (${d.reason})`);
       } else if (d.action === "counter" && d.counter) {
         await prisma.trade.update({ where: { id: tr.id }, data: { status: "DECLINED", respondedAt: new Date() } });
-        const { tradeId } = await createTradeRecord(d.counter, { fromName: ai.name, toName: humanName, dmBody: `🔄 ${ai.name} countered your offer (was #${tr.id}). ${d.counterNote ?? ""} Open the new proposal to review.` });
+        const { tradeId } = await createTradeRecord(d.counter, { fromName: ai.name, toName: humanName, dmBody: `🔄 ${ai.name} countered your offer (was #${tr.id}). ${d.counterNote ?? ""} ${whyText(d.detail)} Open the new proposal to review.` });
         details.push(`${aiName} COUNTERED #${tr.id} → #${tradeId} (${d.reason})`);
       } else {
         await prisma.trade.update({ where: { id: tr.id }, data: { status: "DECLINED", respondedAt: new Date() } });
-        await prisma.dmMessage.create({ data: { fromTeamId: tr.toTeamId, toTeamId: tr.fromTeamId, body: `❌ ${ai.name} declined your trade proposal (#${tr.id}) — the return didn't fit what they're looking for.`, tradeUrl: `/trades/${tr.id}` } }).catch(() => {});
+        const core = d.detail?.franchise ? ` ${d.detail.franchise} is a cornerstone they hold firm on, so it wasn't close enough to negotiate.` : d.detail?.star ? ` ${d.detail.star} is a core piece — the return had to be higher.` : " It was too light to counter.";
+        await prisma.dmMessage.create({ data: { fromTeamId: tr.toTeamId, toTeamId: tr.fromTeamId, body: `❌ ${ai.name} declined your trade (#${tr.id}). ${whyText(d.detail)}.${core}`, tradeUrl: `/trades/${tr.id}` } }).catch(() => {});
         details.push(`${aiName} DECLINED #${tr.id} (${d.reason})`);
       }
       handled++;
