@@ -48,11 +48,12 @@ export default async function TradesPage() {
     fromLabels: labelsFor(t.id, "FROM"),
     toLabels: labelsFor(t.id, "TO"),
   }));
-  // A PENDING proposal is PRIVATE — only the two clubs involved (and the commissioner)
-  // see it until it's accepted/declined. Completed deals are public history for everyone.
-  const canSeePending = (t: { fromTeamId: number; toTeamId: number }) => admin || session === t.fromTeamId || session === t.toTeamId;
-  const pending = enriched.filter((t) => t.status === "PENDING" && canSeePending(t));
-  const history = enriched.filter((t) => t.status !== "PENDING");
+  // Only COMPLETED deals are public league history. Pending proposals AND declined /
+  // cancelled trades are private — visible only to the two involved clubs (+ commissioner),
+  // where they carry full detail in the team Trade Tracker.
+  const involvedOrAdmin = (t: { fromTeamId: number; toTeamId: number }) => admin || session === t.fromTeamId || session === t.toTeamId;
+  const pending = enriched.filter((t) => t.status === "PENDING" && involvedOrAdmin(t));
+  const history = enriched.filter((t) => t.status === "ACCEPTED" || t.status === "COMPLETED" || ((t.status === "DECLINED" || t.status === "CANCELLED") && involvedOrAdmin(t)));
 
   return (
     <div className="space-y-8 py-2">

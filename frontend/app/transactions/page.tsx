@@ -7,7 +7,17 @@ export const dynamic = "force-dynamic";
 // claims, call-ups, buyouts. In-progress noise (proposed/awaiting trades, FA
 // negotiation, trade requests, cap/promise warnings) is kept out.
 export const TX_NOISE = ["FA_NEGOTIATION", "TRADE_REQUEST", "PROMISE_WARNING", "CAP_WARNING", "TRADE_BLOCK"];
-export const TX_WHERE = { type: { notIn: TX_NOISE }, NOT: { message: { contains: "proposed a trade" } } };
+export const TX_WHERE = {
+  type: { notIn: TX_NOISE },
+  // drop in-progress / negative trade chatter — proposals, awaiting, declines & cancels
+  // live only in the involved clubs' Trade Tracker, with full detail.
+  NOT: { OR: [
+    { message: { contains: "proposed a trade" } },
+    { message: { contains: "Awaiting response" } },
+    { message: { contains: "was declined" } },
+    { message: { contains: "was cancelled" } },
+  ] },
+};
 
 export default async function TransactionsPage() {
   const [transactions, teams] = await Promise.all([

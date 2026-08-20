@@ -26,6 +26,8 @@ const GROUPS: Group[] = [
       { href: "/admin/rosters", title: "Roster Source", descKey: "admin.rosters.d" },
       { href: "/admin/team-lines", title: "Team Lines & Tactics", descKey: "admin.teamLines.d" },
       { href: "/admin/contracts", title: "Contracts", descKey: "admin.contracts.d" },
+      { href: "/admin/trades", title: "Completed Trades", descKey: "admin.trades.d" },
+      { href: "/admin/signings", title: "Latest Signings", descKey: "admin.signings.d" },
       { href: "/admin/positions", title: "Player Positions", descKey: "admin.positions.d" },
       { href: "/admin/ratings", title: "Player Ratings", descKey: "admin.ratings.d" },
       { href: "/admin/conditions", title: "Trade Conditions", descKey: "admin.conditions.d" },
