@@ -18,12 +18,15 @@ export const PRE_ROUNDS = 6;
 const YEAR = 2026;
 const DAY = 86_400_000;
 
-/** Round r (0..5) → a calendar date, spaced two days apart, ending Sep 30
- *  (the day before the Oct 1 regular-season face-off). */
-function preseasonDate(round: number): Date {
+/** Round r (0..5) → a calendar date, two days apart. With a chosen start day the
+ *  first round is that day; otherwise it defaults to ending Sep 30 (the eve of the
+ *  Oct 1 regular-season face-off). */
+function preseasonDate(round: number, start?: Date): Date {
+  if (start) return new Date(utcMidnight(start) + round * 2 * DAY);
   const last = Date.UTC(YEAR, 8, 30); // Sep 30
   return new Date(last - (PRE_ROUNDS - 1 - round) * 2 * DAY);
 }
+const utcMidnight = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
 export function preseasonDateFor(round: number) { return preseasonDate(round); }
 
 /** Circle-method round-robin: each team plays once per round, a fresh opponent
@@ -49,28 +52,39 @@ function buildRounds(ids: number[], numRounds: number): [number, number][][] {
   return rounds;
 }
 
-/** (Re)build the pre-season schedule. Wipes any existing pre-season games. */
-export async function generatePreseason(): Promise<{ games: number; teams: number; rounds: number }> {
+/** (Re)build the pre-season schedule (6 rounds, a rest day between each). Wipes any
+ *  existing pre-season games. `startDate` sets the exact face-off day of round 1. */
+export async function generatePreseason(startDate?: Date): Promise<{ games: number; teams: number; rounds: number; firstDate: Date; lastDate: Date }> {
   const teams = await prisma.team.findMany({ where: { league: "NHL", isAffiliate: false }, select: { id: true }, orderBy: { id: "asc" } });
   const ids = teams.map((t) => t.id);
-  if (ids.length < 2) return { games: 0, teams: ids.length, rounds: 0 };
+  if (ids.length < 2) return { games: 0, teams: ids.length, rounds: 0, firstDate: preseasonDate(0, startDate), lastDate: preseasonDate(PRE_ROUNDS - 1, startDate) };
 
   await prisma.game.deleteMany({ where: { season: PRE_SEASON } });
   const rounds = buildRounds(ids, PRE_ROUNDS);
   const rows = rounds.flatMap((pairs, r) =>
     pairs.map(([home, away]) => ({
-      season: PRE_SEASON, league: "NHL", round: r, gameDate: preseasonDate(r),
+      season: PRE_SEASON, league: "NHL", round: r, gameDate: preseasonDate(r, startDate),
       homeTeamId: home, awayTeamId: away, status: "SCHEDULED",
     })));
   await prisma.game.createMany({ data: rows });
-  return { games: rows.length, teams: ids.length, rounds: rounds.length };
+  return { games: rows.length, teams: ids.length, rounds: rounds.length, firstDate: preseasonDate(0, startDate), lastDate: preseasonDate(PRE_ROUNDS - 1, startDate) };
 }
 
-/** Simulate every scheduled pre-season game. Score-only persistence. */
+/** Simulate the pre-season games due on one calendar day (for the calendar day-loop). */
+export async function playPreseasonDay(dayStart: Date, dayEnd: Date): Promise<{ played: number }> {
+  return simPreseason({ season: PRE_SEASON, status: "SCHEDULED", gameDate: { gte: dayStart, lt: dayEnd } });
+}
+
+/** Simulate every scheduled pre-season game at once (admin "Simulate all"). */
 export async function playPreseason(): Promise<{ played: number }> {
+  return simPreseason({ season: PRE_SEASON, status: "SCHEDULED" });
+}
+
+/** Shared pre-season simmer — full box score, no profile/career/condition impact. */
+async function simPreseason(where: object): Promise<{ played: number }> {
   const settings = await loadSettings();
   const scheduled = await prisma.game.findMany({
-    where: { season: PRE_SEASON, status: "SCHEDULED" },
+    where,
     orderBy: [{ round: "asc" }, { id: "asc" }],
     select: { id: true, round: true, gameDate: true, homeTeamId: true, awayTeamId: true },
   });

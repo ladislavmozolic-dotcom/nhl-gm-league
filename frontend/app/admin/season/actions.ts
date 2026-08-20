@@ -17,7 +17,7 @@ import { aiGmDaily } from "@/lib/ai-gm";
 import { getLeagueDate } from "@/lib/calendar-server";
 import { addDays, utcDay, phaseFor, effectivePhase, PHASES, seasonOpen, defaultLeagueDate, frenzyRound, roundForDate } from "@/lib/calendar";
 import { processWaivers } from "@/lib/waivers-server";
-import { generatePreseason, playPreseason } from "@/lib/preseason";
+import { generatePreseason, playPreseason, playPreseasonDay, PRE_SEASON } from "@/lib/preseason";
 import { resolveFrenzy, processRoundEnd, resolveInSeasonWindows } from "@/app/free-agents/actions";
 import { checkPromises } from "@/lib/promises";
 import { autoImportUpcomingClass } from "@/lib/draft-class-import";
@@ -56,8 +56,11 @@ export async function advanceLeagueDayAction() {
     select: { round: true }, orderBy: { round: "asc" },
   });
   let played = 0;
+  // AI GM runs EVERY day — tactics, cap compliance, and Advanced-AI trade negotiation
+  // (accept/decline/counter/offer) — regardless of whether games are scheduled, so a
+  // human's proposal to an AI club gets answered even in the off-season or schedule gaps.
+  await aiGmDaily();
   if (dayGames.length && dayGames[0].round != null) {
-    await aiGmDaily();            // AI GM sets tactics + cap-compliance for GM-less clubs
     await autoFillRosters("NHL");
     await fillAhlFromScratched();
     const r = await playScheduledGames({ season: SEASON, round: dayGames[0].round, actor: await commissionerName() });
@@ -65,6 +68,15 @@ export async function advanceLeagueDayAction() {
     await processFinances(SEASON, "NHL");
   } else if (ph(next) === "regular" || ph(next) === "playoffs") {
     await recoverOneDay();
+  }
+  // Pre-season games scheduled for this day play out too (exhibition; own season
+  // string, so they never touch standings/stats/careers). Lets the calendar roll the
+  // whole pre-season out day-by-day before the regular season begins.
+  const preDue = await prisma.game.count({ where: { season: PRE_SEASON, status: "SCHEDULED", gameDate: { gte: start, lt: end } } });
+  if (preDue > 0) {
+    await autoFillRosters("NHL").catch(() => {});
+    const pr = await playPreseasonDay(start, end);
+    played += pr.played;
   }
   // ice-time promise check (self-gates to the regular season past 1/3)
   const promises = await checkPromises();
@@ -310,12 +322,13 @@ export async function importCsvAction(formData: FormData) {
   return r;
 }
 
-export async function generatePreseasonAction() {
+export async function generatePreseasonAction(startISO?: string) {
   if (!(await isAdmin())) throw new Error("Only a league admin can generate the pre-season.");
-  const r = await generatePreseason();
+  const start = startISO ? new Date(startISO + "T00:00:00.000Z") : undefined;
+  const r = await generatePreseason(start && !isNaN(start.getTime()) ? start : undefined);
   revalidatePath("/admin/season");
   revalidatePath("/preseason");
-  return r;
+  return { games: r.games, teams: r.teams, rounds: r.rounds, firstDate: r.firstDate.toISOString().slice(0, 10), lastDate: r.lastDate.toISOString().slice(0, 10) };
 }
 
 export async function simPreseasonAction() {
