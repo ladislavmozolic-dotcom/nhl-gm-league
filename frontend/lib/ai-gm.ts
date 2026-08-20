@@ -103,7 +103,7 @@ export async function aiGmDaily(): Promise<{ managed: number; details: string[] 
     const { aiGmTradesDaily } = await import("./ai-gm-trades");
     const tr = await aiGmTradesDaily();
     details.push(...tr.details);
-  } catch { /* trade pass is best-effort — never block the daily AI run */ }
+  } catch (e) { details.push(`AI trades error: ${(e as Error).message}`); } // surface, but never block the daily run
   return { managed: teams.length, details };
 }
 
