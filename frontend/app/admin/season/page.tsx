@@ -8,19 +8,23 @@ import { PageHeader, Card } from "@/components/ui";
 import PrepareNextDraftButton from "@/components/PrepareNextDraftButton";
 import DraftPickControls from "@/components/DraftPickControls";
 import PhaseControl from "@/components/PhaseControl";
+import PreseasonControls from "@/components/PreseasonControls";
 import { getLeagueClock } from "@/lib/calendar-server";
+import { PRE_SEASON } from "@/lib/preseason";
 
 export const dynamic = "force-dynamic";
 const SEASON = "2026-27";
 
 export default async function SeasonAdminPage() {
-  const [played, scheduled, playoffSeries, finalDone, clock, cfg] = await Promise.all([
+  const [played, scheduled, playoffSeries, finalDone, clock, cfg, preScheduled, prePlayed] = await Promise.all([
     prisma.game.count({ where: { season: SEASON, status: "FINAL", seriesId: null } }),
     prisma.game.count({ where: { season: SEASON, status: "SCHEDULED" } }),
     prisma.playoffSeries.count({ where: { season: SEASON } }),
     prisma.playoffSeries.findFirst({ where: { season: SEASON, round: 4, status: "DONE" }, select: { winnerTeamId: true } }),
     getLeagueClock(),
     prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { phaseOverride: true } }),
+    prisma.game.count({ where: { season: PRE_SEASON, status: "SCHEDULED" } }),
+    prisma.game.count({ where: { season: PRE_SEASON, status: "FINAL" } }),
   ]);
   const champ = finalDone?.winnerTeamId
     ? await prisma.team.findUnique({ where: { id: finalDone.winnerTeamId }, select: { name: true } })
@@ -41,6 +45,10 @@ export default async function SeasonAdminPage() {
           <p className="text-sm text-slate-400">Set the phase manually — Off-season, Pre-season, Regular season or Playoffs — or leave it on <span className="text-slate-200">Auto</span> to follow the calendar. Leagues don&apos;t all run on the real dates.</p>
           <PhaseControl current={clock.phase} label={clock.phaseLabel} override={cfg?.phaseOverride ?? null} />
         </div>
+      </Card>
+
+      <Card title="Pre-season (exhibition)" accent="text-sky-400">
+        <PreseasonControls scheduled={preScheduled} played={prePlayed} />
       </Card>
 
       <SeasonControls

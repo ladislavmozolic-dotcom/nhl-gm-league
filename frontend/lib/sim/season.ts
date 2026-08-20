@@ -43,7 +43,7 @@ export async function updateInjuryCon() {
 }
 
 // ---- line chemistry: sync onto skaters before a game, evolve after ----------
-function syncChem(team: SimTeam, base: number) {
+export function syncChem(team: SimTeam, base: number) {
   const map = new Map<number, number>();
   for (const u of team.units) { const v = team.chemistry[u.sig] ?? base; for (const id of u.members) map.set(id, v); }
   for (const s of [...team.forwards, ...team.defense]) s.chem = map.get(s.id) ?? 100;

@@ -17,6 +17,7 @@ import { aiGmDaily } from "@/lib/ai-gm";
 import { getLeagueDate } from "@/lib/calendar-server";
 import { addDays, utcDay, phaseFor, effectivePhase, PHASES, seasonOpen, defaultLeagueDate, frenzyRound, roundForDate } from "@/lib/calendar";
 import { processWaivers } from "@/lib/waivers-server";
+import { generatePreseason, playPreseason } from "@/lib/preseason";
 import { resolveFrenzy, processRoundEnd, resolveInSeasonWindows } from "@/app/free-agents/actions";
 import { checkPromises } from "@/lib/promises";
 import { autoImportUpcomingClass } from "@/lib/draft-class-import";
@@ -306,6 +307,22 @@ export async function importCsvAction(formData: FormData) {
   const r = await importCsvSchedule(text, SEASON);
   revalidatePath("/admin/season");
   revalidatePath("/schedule");
+  return r;
+}
+
+export async function generatePreseasonAction() {
+  if (!(await isAdmin())) throw new Error("Only a league admin can generate the pre-season.");
+  const r = await generatePreseason();
+  revalidatePath("/admin/season");
+  revalidatePath("/preseason");
+  return r;
+}
+
+export async function simPreseasonAction() {
+  if (!(await isAdmin())) throw new Error("Only a league admin can simulate the pre-season.");
+  const r = await playPreseason();
+  revalidatePath("/admin/season");
+  revalidatePath("/preseason");
   return r;
 }
 
