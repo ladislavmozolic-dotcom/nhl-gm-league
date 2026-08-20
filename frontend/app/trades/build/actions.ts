@@ -7,16 +7,12 @@ import { loadSettings } from "@/lib/sim/settings";
 import { CURRENT_SEASON_START } from "@/lib/finance";
 import { revalidatePath } from "next/cache";
 import { clauseBlock, assertOwnership, packageFromTrade, executeAcceptedTrade, createTradeRecord, type TradePlayer, type TradePackage } from "@/lib/trade-exec";
+import { playerValue } from "@/lib/trade-value";
 
 export type { TradePlayer, TradePackage } from "@/lib/trade-exec";
 
 // ---- AI GM Assistance: trade analysis -------------------------------------
-const playerValue = (overall: number, age: number | null) => {
-  let v = Math.pow(Math.max(1, overall - 35), 2);            // 40→25, 55→400, 70→1225, 85→2500
-  const a = age ?? 27;
-  v *= a <= 23 ? 1.15 : a <= 28 ? 1.0 : a <= 32 ? 0.85 : 0.68; // youth premium, veteran discount
-  return Math.round(v);
-};
+// player trade-value heuristic (shared with the AI GM) — see lib/trade-value.ts
 
 /** Analyse a proposed trade — value per side, whether it's balanced, and the fit
  *  for each club (cap, age). Pure heuristic (no external AI). Symmetric, so both

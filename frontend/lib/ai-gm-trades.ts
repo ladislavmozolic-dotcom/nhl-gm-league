@@ -11,6 +11,7 @@ import { teamContentionMap } from "./free-agency-server";
 import type { Contention } from "./free-agency";
 import { packageFromTrade, executeAcceptedTrade, createTradeRecord, type TradePackage } from "./trade-exec";
 import { analyzeTradeAction } from "@/app/trades/build/actions";
+import { playerValue } from "@/lib/trade-value";
 import { getLeagueDate } from "./calendar-server";
 import { roundForDate } from "./calendar";
 
@@ -255,12 +256,6 @@ export async function aiGmTradesDaily(): Promise<{ handled: number; details: str
 }
 
 // ---- Stage 2: proactive AI-initiated offers to HUMAN clubs -------------------
-const playerValue = (overall: number, age: number | null) => {
-  let v = Math.pow(Math.max(1, overall - 35), 2);
-  const a = age ?? 27;
-  v *= a <= 23 ? 1.15 : a <= 28 ? 1.0 : a <= 32 ? 0.85 : 0.68;
-  return Math.round(v);
-};
 const GOOD_OV = 55;
 const NEED_THRESH: Record<string, number> = { C: 3, W: 6, D: 5, G: 2 };
 
