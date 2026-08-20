@@ -81,10 +81,15 @@ export default async function HomePage() {
   const tbBoard = await tradeBlockBoard();
   const tbListed = tbBoard.flatMap((t) => t.players);
 
+  // Trade Tracker — the latest completed trades around the league
+  const recentTrades = await prisma.transaction.findMany({
+    where: { type: "TRADE" }, orderBy: { createdAt: "desc" }, take: 6,
+    select: { id: true, message: true, createdAt: true },
+  });
+
   // GM command center — full-screen on first load of a session (for a logged-in GM)
   const dash = me != null ? await gmDashboard(me).catch(() => null) : null;
 
-  const leaderTeam = leader ? teamById.get(leader.teamId) : null;
   const topScorers = [...leaders].sort((a, b) => b.points - a.points).slice(0, 6);
   const scorerMeta = new Map((await prisma.player.findMany({
     where: { id: { in: topScorers.map((s) => s.playerId) } },
@@ -180,18 +185,25 @@ export default async function HomePage() {
           )}
         </div>
 
-        {/* League Leader — logo only */}
-        <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg shadow-black/20 flex flex-col">
-          <p className="text-xs uppercase tracking-wide text-slate-400 mb-2">{T("home.leagueLeader")}</p>
-          <div className="flex items-center gap-3 flex-1">
-            {leaderTeam?.logoUrl ? <img src={leaderTeam.logoUrl} alt={leader?.name ?? ""} title={leader?.name ?? ""} className="w-14 h-14 object-contain" />
-              : <span className="text-lg font-black text-white">{leader?.name ?? "—"}</span>}
-            <div>
-              <p className="text-2xl font-black text-white leading-none">{leader?.points ?? 0}</p>
-              <p className="text-xs text-slate-400 mt-0.5">{T("ui.points")}</p>
-            </div>
+        {/* Trade Tracker — the latest completed deals around the league */}
+        <Link href="/trades" className="block bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg shadow-black/20 hover:border-blue-500/40 transition-colors">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs uppercase tracking-wide text-blue-400">🔁 Trade Tracker</p>
+            <span className="text-xs text-slate-400">{T("ui.viewAll")}</span>
           </div>
-        </div>
+          {recentTrades.length ? (
+            <ul className="space-y-1.5 text-sm">
+              {recentTrades.map((t) => (
+                <li key={t.id} className="text-slate-200 leading-snug flex gap-2">
+                  <span className="text-blue-400 shrink-0">•</span>
+                  <span className="min-w-0"><span className="line-clamp-2">{t.message}</span> <span className="text-slate-500 text-xs">{fmtDate(t.createdAt)}</span></span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-slate-500">No trades yet — completed deals show up here.</p>
+          )}
+        </Link>
 
         {/* Tonight's Best — the story of the night, straight from our league */}
         <Link href="/league/digest" className="block bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg shadow-black/20 hover:border-amber-500/40 transition-colors">
