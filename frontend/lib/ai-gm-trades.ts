@@ -118,13 +118,16 @@ export async function aiGmTradesDaily(): Promise<{ handled: number; details: str
   });
   if (!aiTeams.length) return { handled: 0, details: [] };
   const aiById = new Map(aiTeams.map((t) => [t.id, t]));
-  const contention = await teamContentionMap().catch(() => new Map());
+  const contention = await teamContentionMap().catch(() => new Map<number, Contention>());
 
-  const pending = await prisma.trade.findMany({
+  // AI GMs only deal with REAL (human) GMs — never with each other. Skip any
+  // incoming proposal whose sender is itself an AI-run club (defensive).
+  const aiAll = new Set((await prisma.team.findMany({ where: { passwordHash: null }, select: { id: true } })).map((t) => t.id));
+  const pending = (await prisma.trade.findMany({
     where: { status: "PENDING", toTeamId: { in: aiTeams.map((t) => t.id) } },
     orderBy: { createdAt: "asc" },
     select: { id: true, fromTeamId: true, toTeamId: true },
-  });
+  })).filter((t) => !aiAll.has(t.fromTeamId));
 
   const details: string[] = [];
   let handled = 0;
@@ -154,5 +157,101 @@ export async function aiGmTradesDaily(): Promise<{ handled: number; details: str
       details.push(`${aiName} could not process #${tr.id}: ${(e as Error).message}`);
     }
   }
+
+  // Proactive offers (opt-in) — Advanced-AI clubs shop their needs to HUMAN clubs.
+  if (settings.aiInitiateTrades) {
+    try {
+      const init = await aiGmInitiateTrades(aiTeams, contention);
+      details.push(...init);
+      handled += init.length;
+    } catch { /* best-effort */ }
+  }
   return { handled, details };
+}
+
+// ---- Stage 2: proactive AI-initiated offers to HUMAN clubs -------------------
+const playerValue = (overall: number, age: number | null) => {
+  let v = Math.pow(Math.max(1, overall - 35), 2);
+  const a = age ?? 27;
+  v *= a <= 23 ? 1.15 : a <= 28 ? 1.0 : a <= 32 ? 0.85 : 0.68;
+  return Math.round(v);
+};
+const GOOD_OV = 55;
+const NEED_THRESH: Record<string, number> = { C: 3, W: 6, D: 5, G: 2 };
+
+type RosterP = { id: number; name: string; overall: number | null; age: number | null; position: string | null; injuryDaysLeft: number; tradeClause: string | null; rosterType: string | null };
+
+/** For each advanced-AI club: find its biggest positional NEED, find a fair, clause-
+ *  clean player on a HUMAN club that fills it, and offer surplus + a spare pick of
+ *  matching value. One offer per club per run; skips clubs it's already courting. */
+async function aiGmInitiateTrades(aiTeams: { id: number; name: string; code: string | null }[], contention: Map<number, Contention>): Promise<string[]> {
+  const out: string[] = [];
+  const humanTeams = await prisma.team.findMany({ where: { passwordHash: { not: null }, league: "NHL", isAffiliate: false }, select: { id: true, name: true } });
+  if (!humanTeams.length) return out; // nobody to trade with
+
+  for (const ai of aiTeams) {
+    try {
+      // rate-limit: at most 2 outstanding AI-initiated proposals, one courtship per human
+      const mine = await prisma.trade.findMany({ where: { status: "PENDING", fromTeamId: ai.id }, select: { toTeamId: true } });
+      if (mine.length >= 2) continue;
+      const courting = new Set(mine.map((t) => t.toTeamId));
+
+      const roster: RosterP[] = await prisma.player.findMany({ where: { teamId: ai.id, rosterType: "NHL" }, select: { id: true, name: true, overall: true, age: true, position: true, injuryDaysLeft: true, tradeClause: true, rosterType: true } });
+      const good = (g: string) => roster.filter((p) => grp(p.position) === g && (p.overall ?? 0) >= GOOD_OV);
+      // biggest need
+      let needPos: string | null = null, worst = 0;
+      for (const g of ["C", "W", "D", "G"]) { const def = NEED_THRESH[g] - good(g).length; if (def > worst) { worst = def; needPos = g; } }
+      if (!needPos) continue; // roster is full at every position → no shopping
+
+      // AI's tradeable surplus: extra bodies at DEEP positions (never a clause/star piece)
+      const surplus = roster
+        .filter((p) => p.injuryDaysLeft <= 0 && !p.tradeClause && (p.overall ?? 0) < STAR_OV && good(grp(p.position)).length > NEED_THRESH[grp(p.position)])
+        .sort((a, b) => (a.overall ?? 0) - (b.overall ?? 0));
+      if (!surplus.length) continue;
+      const chip = surplus[surplus.length - 1]; // best surplus piece as the centrepiece
+      const chipVal = playerValue(chip.overall ?? 45, chip.age);
+
+      // a spare late pick to sweeten (least valuable owned pick)
+      const picks = await prisma.draftPick.findMany({ where: { teamId: ai.id }, select: { id: true, round: true } });
+      const roughPick = (round: number) => Math.round(1000 * Math.exp(-((round - 1) * 32 + 16) / 42));
+      const sparePick = picks.map((p) => ({ id: p.id, v: roughPick(p.round) })).sort((a, b) => a.v - b.v)[0] ?? null;
+      const capacity = chipVal + (sparePick?.v ?? 0);
+
+      // find the best clause-clean target at the need position on a human club we can afford
+      let best: { target: RosterP; humanId: number; humanName: string; val: number } | null = null;
+      for (const h of humanTeams) {
+        if (courting.has(h.id)) continue;
+        const cand: RosterP[] = await prisma.player.findMany({ where: { teamId: h.id, rosterType: "NHL", injuryDaysLeft: { lte: 0 }, tradeClause: null }, select: { id: true, name: true, overall: true, age: true, position: true, injuryDaysLeft: true, tradeClause: true, rosterType: true } });
+        for (const c of cand) {
+          if (grp(c.position) !== needPos) continue;
+          const ov = c.overall ?? 0;
+          if (ov < GOOD_OV || ov >= FRANCHISE_OV) continue;       // real upgrade, not an untouchable
+          if (ov <= (good(needPos)[0]?.overall ?? 0)) continue;   // must beat our best there
+          const val = playerValue(ov, c.age);
+          if (val > capacity * 1.15) continue;                    // can't afford a fair offer
+          if (!best || ov > (best.target.overall ?? 0)) best = { target: c, humanId: h.id, humanName: h.name, val };
+        }
+      }
+      if (!best) continue;
+
+      // assemble a fair package: chip, plus the spare pick if it meaningfully closes the gap
+      const givePicks = sparePick && chipVal < best.val * 0.92 ? [sparePick.id] : [];
+      const pkg: TradePackage = {
+        fromTeamId: ai.id, toTeamId: best.humanId,
+        fromPlayers: [{ playerId: chip.id, retentionPct: 0 }], toPlayers: [{ playerId: best.target.id, retentionPct: 0 }],
+        fromPicks: givePicks, toPicks: [], fromProspects: [], toProspects: [], fromCash: 0, toCash: 0, condition: "",
+      };
+      // fairness gate: AI gives roughly target value (fair..slightly generous), never a big overpay
+      const analysis = await analyzeTradeAction(pkg);
+      if (!analysis.ok) continue;
+      const aiGives = analysis.meGives, human = analysis.meGets; // AI is "from"
+      if (aiGives < human * 0.95 || aiGives > human * 1.2) continue;
+
+      const concept = contention.get(ai.id) ?? "middle";
+      const note = concept === "contender" ? "We're pushing for a Cup run and need help down the middle/back." : concept === "rebuild" ? "We're building for the future and like your player's fit." : "We think this is a fair hockey trade for both clubs.";
+      const { tradeId } = await createTradeRecord(pkg, { fromName: ai.name, toName: best.humanName, dmBody: `📨 ${ai.name} wants to make a deal — they're offering ${clean(chip.name)}${givePicks.length ? " + a pick" : ""} for ${clean(best.target.name)}. ${note} Open to review, then Accept / Decline / counter.` });
+      out.push(`${ai.code ?? ai.name} OFFERED ${clean(chip.name)}→${best.humanName} for ${clean(best.target.name)} (#${tradeId})`);
+    } catch { /* skip this club on any error */ }
+  }
+  return out;
 }

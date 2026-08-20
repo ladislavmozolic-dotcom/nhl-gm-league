@@ -262,6 +262,7 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
             <NumField k="osDecisionDay" label="Offer-sheet decided by (day)" />
             <div className="mt-1"><Toggle k="waiversEnabled" label="Enforce the waiver wire" /></div>
             <div className="mt-1"><Toggle k="aiTradesEnabled" label="Advanced AI GM negotiates trades" /></div>
+            <div className="mt-1"><Toggle k="aiInitiateTrades" label="Advanced AI GM initiates trade offers" /></div>
           </div>
         </div>
       </Card>
