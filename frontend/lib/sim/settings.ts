@@ -185,7 +185,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   playoffFormat: "division", playoffTeamsPerConf: 8, playoffBestOf: 7,
   salaryCapUpper: 85900000, salaryCapLower: 51500000, startingCapital: 40000000,
   buyoutPctSeason: 50, buyoutPctOffseason: 35,
-  retentionMaxPct: 50, retentionMinSalary: 600000, retentionMaxPlayers: 3, clausesEnabled: true, aiTradesEnabled: true, aiInitiateTrades: true,
+  retentionMaxPct: 50, retentionMinSalary: 600000, retentionMaxPlayers: 3, clausesEnabled: true, aiTradesEnabled: true, aiInitiateTrades: false,
   osCompEnabled: true,
   osCompTiers: [
     { maxAav: 1000000, picks: [3] },        // ≤ $1M → a 3rd-round pick
