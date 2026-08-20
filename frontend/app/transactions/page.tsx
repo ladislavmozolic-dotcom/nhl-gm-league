@@ -3,9 +3,15 @@ import { PageHeader, Card } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
+// The league feed shows only COMPLETED moves — signings, executed trades, waiver
+// claims, call-ups, buyouts. In-progress noise (proposed/awaiting trades, FA
+// negotiation, trade requests, cap/promise warnings) is kept out.
+export const TX_NOISE = ["FA_NEGOTIATION", "TRADE_REQUEST", "PROMISE_WARNING", "CAP_WARNING", "TRADE_BLOCK"];
+export const TX_WHERE = { type: { notIn: TX_NOISE }, NOT: { message: { contains: "proposed a trade" } } };
+
 export default async function TransactionsPage() {
   const [transactions, teams] = await Promise.all([
-    prisma.transaction.findMany({ take: 50, orderBy: { createdAt: "desc" } }),
+    prisma.transaction.findMany({ where: TX_WHERE, take: 50, orderBy: { createdAt: "desc" } }),
     prisma.team.findMany({ select: { id: true, name: true, code: true, logoUrl: true } }),
   ]);
 

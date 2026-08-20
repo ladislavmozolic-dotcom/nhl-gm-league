@@ -79,7 +79,8 @@ export default function TeamSubNav({ slug, isGm, isAffiliate, farmSlug, parentSl
           { label: "Dashboard & controls", href: "/finance/dashboard", gm: true },
         ] },
         { label: "Trades", items: [
-          { label: "Trades", href: `${base}/trades` },
+          { label: "Trade Tracker", href: `${base}/trades` },
+          { label: "Transactions", href: `${base}/transactions` },
           { label: "Trade Block", href: `${base}/trade-block`, gm: true },
         ] },
         { label: "Prospects", items: [

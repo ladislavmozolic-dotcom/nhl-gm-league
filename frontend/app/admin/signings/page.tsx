@@ -35,7 +35,7 @@ export default async function AdminSigningsPage() {
               <tbody>
                 {logs.map((l) => (
                   <tr key={l.id} className={`border-b border-slate-800/40 last:border-0 ${l.reverted ? "opacity-40" : "hover:bg-slate-800/30"}`}>
-                    <td className="px-4 py-3 font-medium">{cleanName(l.playerName)}</td>
+                    <td className="px-4 py-3 font-medium"><Link href={`/admin/bids/${l.playerId}`} className="hover:text-blue-400" title="View the full bidding trail">{cleanName(l.playerName)}</Link></td>
                     <td className="px-3 py-3 text-slate-400">{l.teamCode ?? "—"}</td>
                     <td className="px-3 py-3">
                       {l.kind === "EXTEND"
