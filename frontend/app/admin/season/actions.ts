@@ -5,7 +5,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { generateSchedule } from "@/lib/sim/schedule";
 import { playScheduledGames, resetConditions, updateInjuryCon } from "@/lib/sim/season";
-import { runPlayoffs } from "@/lib/sim/playoffs";
+import { runPlayoffs, startPlayoffs, advancePlayoffDay } from "@/lib/sim/playoffs";
 import { importCsvSchedule, importFromNhlApi } from "@/lib/sim/csv-schedule";
 import { processFinances } from "@/lib/finance-server";
 import { archiveSeason } from "@/lib/awards";
@@ -52,7 +52,7 @@ export async function advanceLeagueDayAction() {
   const next = addDays(cur, 1);
   const start = utcDay(next), end = addDays(next, 1);
   const dayGames = await prisma.game.findMany({
-    where: { season: SEASON, status: "SCHEDULED", gameDate: { gte: start, lt: end } },
+    where: { season: SEASON, status: "SCHEDULED", seriesId: null, gameDate: { gte: start, lt: end } },
     select: { round: true }, orderBy: { round: "asc" },
   });
   let played = 0;
@@ -77,6 +77,16 @@ export async function advanceLeagueDayAction() {
     await autoFillRosters("NHL").catch(() => {});
     const pr = await playPreseasonDay(start, end);
     played += pr.played;
+  }
+  // Playoff games scheduled for today play out (day-by-day, no back-to-backs). When a
+  // round finishes, the next round is seeded & scheduled automatically.
+  const poDue = await prisma.game.count({ where: { season: SEASON, seriesId: { not: null }, status: "SCHEDULED", gameDate: { gte: start, lt: end } } });
+  if (poDue > 0) {
+    await autoFillRosters("NHL").catch(() => {});
+    for (const lg of ["NHL", "AHL"] as const) {
+      const po = await advancePlayoffDay(SEASON, lg, start, end);
+      played += po.played;
+    }
   }
   // ice-time promise check (self-gates to the regular season past 1/3)
   const promises = await checkPromises();
@@ -365,6 +375,21 @@ export async function runPlayoffsAction() {
   revalidatePath("/admin/season");
   revalidatePath("/playoffs");
   return { champion: nhl.championTeamId };
+}
+
+/** Day-by-day playoffs: seed the bracket and schedule round 1 on a chosen start day
+ *  (2-day cadence → no team plays back-to-back). Advancing the league day plays it out
+ *  and seeds each next round automatically. */
+export async function startPlayoffsScheduledAction(startISO?: string) {
+  if (!(await isAdmin())) throw new Error("Only a league admin can start the playoffs.");
+  const d = startISO ? new Date(startISO + "T00:00:00.000Z") : undefined;
+  const start = d && !isNaN(d.getTime()) ? d : undefined;
+  const nhl = await startPlayoffs(SEASON, "NHL", start);
+  await startPlayoffs(SEASON, "AHL", start);
+  await prisma.leagueConfig.upsert({ where: { id: 1 }, update: { phaseOverride: "playoffs" }, create: { id: 1, phaseOverride: "playoffs" } });
+  revalidatePath("/admin/season");
+  revalidatePath("/playoffs");
+  return { series: nhl.series, firstDate: nhl.firstDate.toISOString().slice(0, 10) };
 }
 
 /** Restart the season but KEEP the schedule: every game reverts to SCHEDULED with

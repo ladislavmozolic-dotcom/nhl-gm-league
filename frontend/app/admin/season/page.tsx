@@ -9,6 +9,7 @@ import PrepareNextDraftButton from "@/components/PrepareNextDraftButton";
 import DraftPickControls from "@/components/DraftPickControls";
 import PhaseControl from "@/components/PhaseControl";
 import PreseasonControls from "@/components/PreseasonControls";
+import PlayoffStartControls from "@/components/PlayoffStartControls";
 import { getLeagueClock } from "@/lib/calendar-server";
 import { PRE_SEASON } from "@/lib/preseason";
 
@@ -49,6 +50,10 @@ export default async function SeasonAdminPage() {
 
       <Card title="Pre-season (exhibition)" accent="text-sky-400">
         <PreseasonControls scheduled={preScheduled} played={prePlayed} />
+      </Card>
+
+      <Card title="Playoffs (day-by-day)" accent="text-orange-400">
+        <PlayoffStartControls />
       </Card>
 
       <SeasonControls

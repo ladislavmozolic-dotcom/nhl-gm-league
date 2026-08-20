@@ -191,6 +191,97 @@ export async function runPlayoffs(season = "2026-27", league = "NHL",
   return { ...seed, championTeamId: final?.winnerTeamId ?? null };
 }
 
+// ---- Day-by-day playoffs (calendar-driven, no back-to-backs) ----------------
+const DAY_MS = 86_400_000;
+const utcMidnight = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+
+/** Schedule every potential game of a round's series on a 2-day cadence (games k of
+ *  ALL series fall on the same day, days two apart → no team ever plays twice in a
+ *  row). Extra games past a clinch are removed when the series ends. */
+export async function schedulePlayoffRound(season: string, league: string, round: number, firstDate: Date) {
+  const series = await prisma.playoffSeries.findMany({ where: { season, league, round }, orderBy: { slot: "asc" } });
+  const base = utcMidnight(firstDate);
+  const rows: { season: string; league: string; round: number; seriesId: number; gameNum: number; gameDate: Date; homeTeamId: number; awayTeamId: number; status: string }[] = [];
+  for (const s of series) {
+    for (let g = 0; g < s.bestOf; g++) {
+      const highHome = HOME_2211[g] ?? true;
+      rows.push({
+        season, league, round, seriesId: s.id, gameNum: g + 1,
+        gameDate: new Date(base + g * 2 * DAY_MS),
+        homeTeamId: highHome ? s.highSeedTeamId : s.lowSeedTeamId,
+        awayTeamId: highHome ? s.lowSeedTeamId : s.highSeedTeamId,
+        status: "SCHEDULED",
+      });
+    }
+  }
+  if (rows.length) await prisma.game.createMany({ data: rows });
+  return { games: rows.length, firstDate: new Date(base), lastDate: new Date(base + (Math.max(...series.map((s) => s.bestOf), 1) - 1) * 2 * DAY_MS) };
+}
+
+/** Seed the bracket AND schedule round 1 on a chosen start day. Day-advance then
+ *  plays it out; rounds advance automatically as series finish. */
+export async function startPlayoffs(season = "2026-27", league = "NHL", startDate?: Date) {
+  const seeded = await seedPlayoffs(season, { league });
+  const first = startDate ?? new Date(Date.UTC(parseInt(season.slice(0, 4), 10) || 2026, 9, 1) + 200 * DAY_MS);
+  const sched = await schedulePlayoffRound(season, league, 1, first);
+  return { ...seeded, firstDate: sched.firstDate };
+}
+
+/** Play the playoff games due on one calendar day, update series, and — when the
+ *  active round is complete — seed & schedule the next round (after a short break).
+ *  Returns games played and, if the Cup was decided, the champion id. */
+export async function advancePlayoffDay(season: string, league: string, dayStart: Date, dayEnd: Date): Promise<{ played: number; championTeamId: number | null; roundAdvanced: number | null }> {
+  const settings = await loadSettings();
+  const due = await prisma.game.findMany({
+    where: { season, league, seriesId: { not: null }, status: "SCHEDULED", gameDate: { gte: dayStart, lt: dayEnd } },
+    orderBy: [{ seriesId: "asc" }, { gameNum: "asc" }],
+    select: { id: true, seriesId: true, gameNum: true, gameDate: true },
+  });
+  let played = 0;
+  const teamCache = new Map<number, Awaited<ReturnType<typeof loadSimTeam>>>();
+  const getTeam = async (id: number) => teamCache.get(id) ?? teamCache.set(id, await loadSimTeam(id)).get(id)!;
+
+  for (const g of due) {
+    const s = await prisma.playoffSeries.findUnique({ where: { id: g.seriesId! } });
+    if (!s) continue;
+    const need = Math.ceil(s.bestOf / 2);
+    if (s.status === "DONE" || s.highWins >= need || s.lowWins >= need) {
+      await prisma.game.delete({ where: { id: g.id } }).catch(() => {}); // decided → drop the extra
+      continue;
+    }
+    const highHome = HOME_2211[(g.gameNum ?? 1) - 1] ?? true;
+    const [high, low] = await Promise.all([getTeam(s.highSeedTeamId), getTeam(s.lowSeedTeamId)]);
+    const home = highHome ? high : low, away = highHome ? low : high;
+    const seed = fixtureSeed(s.id * 101 + (g.gameNum ?? 1), s.highSeedTeamId, s.round);
+    const result = simulateGame(home, away, { seed, settings, noShootout: true });
+    await saveGameResult(result, { gameId: g.id, season, league, round: s.round, seriesId: s.id, gameNum: g.gameNum ?? 1, gameDate: g.gameDate ?? dayStart });
+    const hiW = s.highWins + (result.winner === s.highSeedTeamId ? 1 : 0);
+    const loW = s.lowWins + (result.winner === s.lowSeedTeamId ? 1 : 0);
+    const done = hiW >= need || loW >= need;
+    await prisma.playoffSeries.update({ where: { id: s.id }, data: { highWins: hiW, lowWins: loW, ...(done ? { status: "DONE", winnerTeamId: hiW >= need ? s.highSeedTeamId : s.lowSeedTeamId } : {}) } });
+    if (done) await prisma.game.deleteMany({ where: { seriesId: s.id, status: "SCHEDULED" } }); // clear the unneeded remainder
+    played++;
+  }
+
+  // If the active (highest) round is fully decided, advance + schedule the next round.
+  let championTeamId: number | null = null, roundAdvanced: number | null = null;
+  const all = await prisma.playoffSeries.findMany({ where: { season, league }, select: { round: true, status: true, winnerTeamId: true } });
+  if (all.length) {
+    const maxRound = Math.max(...all.map((s) => s.round));
+    const inRound = all.filter((s) => s.round === maxRound);
+    if (inRound.every((s) => s.status === "DONE")) {
+      if (maxRound >= 4) championTeamId = inRound[0]?.winnerTeamId ?? null;
+      else {
+        await advanceRound(season, maxRound, league);
+        // next round starts after a 3-day break from today
+        await schedulePlayoffRound(season, league, maxRound + 1, new Date(utcMidnight(dayStart) + 3 * DAY_MS));
+        roundAdvanced = maxRound + 1;
+      }
+    }
+  }
+  return { played, championTeamId, roundAdvanced };
+}
+
 export type BracketTeam = { id: number; name: string; slug: string; logoUrl: string | null; code: string | null };
 /** One played game inside a series (for the per-series game log on the bracket). */
 export type BracketGame = {
