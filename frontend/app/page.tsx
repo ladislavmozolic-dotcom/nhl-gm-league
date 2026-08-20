@@ -1,5 +1,6 @@
 import Link from "next/link";
 import PlayerLink from "@/components/PlayerLink";
+import PlayerAvatar from "@/components/playerAvatar";
 import { prisma } from "@/lib/prisma";
 import { computeStandings } from "@/lib/sim/standings";
 import { skaterTotals } from "@/lib/stats-server";
@@ -85,6 +86,10 @@ export default async function HomePage() {
 
   const leaderTeam = leader ? teamById.get(leader.teamId) : null;
   const topScorers = [...leaders].sort((a, b) => b.points - a.points).slice(0, 6);
+  const scorerMeta = new Map((await prisma.player.findMany({
+    where: { id: { in: topScorers.map((s) => s.playerId) } },
+    select: { id: true, photoUrl: true, slug: true },
+  })).map((p) => [p.id, p]));
   const enrich = (arr: typeof standings) => arr.map((t) => ({ ...t, code: t.code, logoUrl: teamById.get(t.teamId)?.logoUrl ?? null, slug: teamById.get(t.teamId)?.slug ?? null }));
   const east = enrich(standings.filter((s) => s.conference?.toLowerCase().includes("eastern")));
   const west = enrich(standings.filter((s) => s.conference?.toLowerCase().includes("western")));
@@ -221,13 +226,20 @@ export default async function HomePage() {
         <div className="lg:col-span-3 space-y-6">
           <Card title={T("home.scoringLeaders")} href="/stats/leaders" accent="text-blue-400" viewLabel={T("ui.viewAll")}>
             <div className="space-y-2">
-              {topScorers.map((s, i) => (
-                <div key={s.playerId} className="flex items-center gap-2 text-sm">
-                  <span className="w-4 text-slate-500 text-xs">{i + 1}</span>
-                  <span className="flex-1 truncate">{s.name} <span className="text-slate-500 text-xs">{s.teamCode}</span></span>
-                  <span className="font-bold tabular-nums">{s.points}</span>
-                </div>
-              ))}
+              {topScorers.map((s, i) => {
+                const meta = scorerMeta.get(s.playerId);
+                return (
+                  <div key={s.playerId} className="flex items-center gap-2 text-sm">
+                    <span className="w-4 text-slate-500 text-xs">{i + 1}</span>
+                    <PlayerAvatar src={meta?.photoUrl ?? null} alt={s.name} size={26} />
+                    <span className="flex-1 truncate">
+                      <PlayerLink slug={meta?.slug ?? undefined} id={s.playerId} name={s.name} clean={false} />
+                      {" "}<span className="text-slate-500 text-xs">{s.teamCode}</span>
+                    </span>
+                    <span className="font-bold tabular-nums">{s.points}</span>
+                  </div>
+                );
+              })}
             </div>
           </Card>
 
