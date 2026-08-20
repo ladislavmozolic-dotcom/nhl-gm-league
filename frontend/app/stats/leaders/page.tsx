@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { prisma } from "@/lib/prisma";
 import PlayerLink from "@/components/PlayerLink";
 import { skaterTotals, goalieTotals, type SkaterTotal, type GoalieTotal } from "@/lib/stats-server";
 import StatsTabs from "@/components/StatsTabs";
@@ -36,8 +37,19 @@ const gkRow = (g: GoalieTotal, value: string, sub?: string): Row => ({ playerId:
 
 export default async function LeadersPage({ searchParams }: { searchParams: Promise<{ league?: string }> }) {
   const league = (await searchParams).league === "AHL" ? "AHL" : "NHL";
-  const [sk, gk] = await Promise.all([skaterTotals(SEASON, league), goalieTotals(SEASON, league)]);
+  const [sk, gk, finals] = await Promise.all([
+    skaterTotals(SEASON, league),
+    goalieTotals(SEASON, league),
+    prisma.game.findMany({ where: { season: SEASON, league, status: "FINAL" }, select: { homeTeamId: true, awayTeamId: true } }),
+  ]);
   const mins = (toi: number) => Math.round(toi / 60);
+
+  // Games each team has completed → drives the rate-stat (SV%, GAA) qualifier.
+  const teamGP = new Map<number, number>();
+  for (const g of finals) {
+    teamGP.set(g.homeTeamId, (teamGP.get(g.homeTeamId) ?? 0) + 1);
+    teamGP.set(g.awayTeamId, (teamGP.get(g.awayTeamId) ?? 0) + 1);
+  }
 
   const skaterCards: Array<{ title: string; rows: Row[] }> = [
     { title: "Goals", rows: top(sk, (s) => s.goals).map((s) => skRow(s, String(s.goals), `${s.gp} GP`)) },
@@ -56,12 +68,20 @@ export default async function LeadersPage({ searchParams }: { searchParams: Prom
     { title: "Shots Blocked", rows: top(sk, (s) => s.blocks).map((s) => skRow(s, String(s.blocks), `${s.gp} GP`)) },
   ];
 
-  // Rate stats (SV%, GAA) need a sample, but early in the season a flat 10-GP gate
-  // hides everything. Scale the minimum with the league's busiest goalie so leaders
-  // show from the first games and the bar tightens to 10 GP as the season matures.
-  const maxGkGp = gk.reduce((m, g) => Math.max(m, g.gp), 0);
-  const gkMin = Math.min(10, Math.max(1, Math.ceil(maxGkGp * 0.4)));
-  const qualGk = gk.filter((g) => g.gp >= gkMin);
+  // Rate stats (SV%, GAA) need a sample that scales with season progress, so a hot
+  // 2-3 game backup doesn't top the leaderboard at mid-season. The required share of
+  // a goalie's OWN team games ramps linearly: ~10% at the half (42 GP → 4+ GP), ~20%
+  // at a full 84-game season (→ 17 GP). Early on (<10 team games) the gate is ~1, so
+  // we still see everyone. minGP = 0.20 · teamGP² / FULL.
+  const FULL = 84;
+  const gkMinFor = (tid: number | null) => {
+    const tg = (tid != null ? teamGP.get(tid) : 0) ?? 0;
+    return Math.max(1, Math.round((0.2 * tg * tg) / FULL));
+  };
+  const qualGk = gk.filter((g) => g.gp >= gkMinFor(g.teamId));
+  const maxTeamGP = Math.max(0, ...teamGP.values());
+  const repMin = Math.max(1, Math.round((0.2 * maxTeamGP * maxTeamGP) / FULL));
+  const repPct = maxTeamGP ? Math.round((repMin / maxTeamGP) * 100) : 0;
   const goalieCards: Array<{ title: string; rows: Row[] }> = [
     { title: "Wins", rows: top(gk, (g) => g.wins).map((g) => gkRow(g, String(g.wins), `${g.gp} GP`)) },
     { title: "Save Percentage", rows: top(qualGk, (g) => g.svPct).map((g) => gkRow(g, g.svPct.toFixed(3).replace(/^0/, ""), `${g.gp} GP`)) },
@@ -83,7 +103,7 @@ export default async function LeadersPage({ searchParams }: { searchParams: Prom
       </section>
 
       <section>
-        <SectionTitle accent="text-red-400">Goalie Leaders — min. {gkMin} GP where noted</SectionTitle>
+        <SectionTitle accent="text-red-400">Goalie Leaders — SV%/GAA need ~{repPct}% of team games ({repMin}+ GP) as the season matures</SectionTitle>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {goalieCards.map((c) => <LeaderCard key={c.title} title={c.title} rows={c.rows} />)}
         </div>
