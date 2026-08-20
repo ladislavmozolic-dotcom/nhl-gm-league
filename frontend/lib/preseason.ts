@@ -79,7 +79,7 @@ export async function playPreseason(): Promise<{ played: number }> {
   const getTeam = async (id: number) => {
     if (cache.has(id)) return cache.get(id) ?? null;
     try {
-      const t = await loadSimTeam(id, undefined, { chemBase: settings.chemistryBase });
+      const t = await loadSimTeam(id, undefined, { chemBase: settings.chemistryBase, offPos: { wing: settings.offPosWingPct, center: settings.offPosCenterPct, def: settings.offPosDefPct, chemCap: settings.offPosChemCap } });
       cache.set(id, t); return t;
     } catch { cache.set(id, null); return null; }
   };
