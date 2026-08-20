@@ -1,4 +1,5 @@
 import Link from "next/link";
+import BackLink from "@/components/BackLink";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { cleanName } from "@/lib/playerName";
@@ -330,10 +331,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
 
   return (
     <div className="space-y-6 py-2">
-      <Link href={backHref} className="inline-flex items-center text-sm text-slate-400 hover:text-white transition-colors">
-        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-        {team ? team.name : "Free Agents"}
-      </Link>
+      <BackLink fallback={backHref} label={team ? team.name : "Free Agents"} />
 
       {/* ── PLAYER BIO ─────────────────────────────────────────────── */}
       <Card title="Player Bio" bodyClassName="p-0">

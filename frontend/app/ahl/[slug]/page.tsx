@@ -1,4 +1,5 @@
 import Link from "next/link";
+import BackLink from "@/components/BackLink";
 import { prisma } from "../../../lib/prisma";
 import PlayerAvatar from "@/components/playerAvatar";
 import { cleanName } from "@/lib/playerName";
@@ -44,10 +45,7 @@ export default async function AhlTeamDetailPage({
   return (
     <div className="space-y-6 py-2">
       {/* BACK LINK */}
-      <Link href="/ahl" className="inline-flex items-center text-sm text-slate-400 hover:text-white transition-colors">
-        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-        Back to AHL Teams
-      </Link>
+      <BackLink fallback="/ahl" label="Back to AHL Teams" />
 
       {/* HERO */}
       <section className="relative rounded-2xl overflow-hidden border border-slate-700/40 bg-gradient-to-r from-[#0a1f14] via-[#134e3a] to-[#0a1f14] shadow-lg shadow-black/30">

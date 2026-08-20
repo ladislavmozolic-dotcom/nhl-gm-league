@@ -32,7 +32,7 @@ function LeaderCard({ title, rows }: { title: string; rows: Row[] }) {
 
 const top = <T,>(arr: T[], key: (t: T) => number, n = 10) => [...arr].sort((a, b) => key(b) - key(a)).slice(0, n);
 const skRow = (s: SkaterTotal, value: string, sub?: string): Row => ({ playerId: s.playerId, name: s.name, teamCode: s.teamCode, teamSlug: s.teamSlug, value, sub });
-const gkRow = (g: GoalieTotal, value: string): Row => ({ playerId: g.playerId, name: g.name, teamCode: g.teamCode, teamSlug: g.teamSlug, value });
+const gkRow = (g: GoalieTotal, value: string, sub?: string): Row => ({ playerId: g.playerId, name: g.name, teamCode: g.teamCode, teamSlug: g.teamSlug, value, sub });
 
 export default async function LeadersPage({ searchParams }: { searchParams: Promise<{ league?: string }> }) {
   const league = (await searchParams).league === "AHL" ? "AHL" : "NHL";
@@ -43,17 +43,17 @@ export default async function LeadersPage({ searchParams }: { searchParams: Prom
     { title: "Goals", rows: top(sk, (s) => s.goals).map((s) => skRow(s, String(s.goals), `${s.gp} GP`)) },
     { title: "Assists", rows: top(sk, (s) => s.assists).map((s) => skRow(s, String(s.assists), `${s.gp} GP`)) },
     { title: "Points", rows: top(sk, (s) => s.points).map((s) => skRow(s, String(s.points), `${s.goals}G+${s.assists}A`)) },
-    { title: "Defensemen (points)", rows: top(sk.filter((s) => s.position.includes("D")), (s) => s.points).map((s) => skRow(s, String(s.points))) },
-    { title: "Rookies (points)", rows: top(sk.filter((s) => s.rookie), (s) => s.points).map((s) => skRow(s, String(s.points))) },
-    { title: "Plus / Minus", rows: top(sk, (s) => s.plusMinus).map((s) => skRow(s, (s.plusMinus > 0 ? "+" : "") + s.plusMinus)) },
-    { title: "Minutes Played", rows: top(sk, (s) => s.toi).map((s) => skRow(s, String(mins(s.toi)))) },
-    { title: "Penalty Minutes", rows: top(sk, (s) => s.pim).map((s) => skRow(s, String(s.pim))) },
-    { title: "Shots", rows: top(sk, (s) => s.shots).map((s) => skRow(s, String(s.shots))) },
-    { title: "Power-Play Goals", rows: top(sk, (s) => s.ppGoals).map((s) => skRow(s, String(s.ppGoals))) },
-    { title: "Short-Handed Goals", rows: top(sk, (s) => s.shGoals).map((s) => skRow(s, String(s.shGoals))) },
-    { title: "Game-Winning Goals", rows: top(sk, (s) => s.gwg).map((s) => skRow(s, String(s.gwg))) },
-    { title: "Hits", rows: top(sk, (s) => s.hits).map((s) => skRow(s, String(s.hits))) },
-    { title: "Shots Blocked", rows: top(sk, (s) => s.blocks).map((s) => skRow(s, String(s.blocks))) },
+    { title: "Defensemen (points)", rows: top(sk.filter((s) => s.position.includes("D")), (s) => s.points).map((s) => skRow(s, String(s.points), `${s.goals}G+${s.assists}A`)) },
+    { title: "Rookies (points)", rows: top(sk.filter((s) => s.rookie), (s) => s.points).map((s) => skRow(s, String(s.points), `${s.goals}G+${s.assists}A`)) },
+    { title: "Plus / Minus", rows: top(sk, (s) => s.plusMinus).map((s) => skRow(s, (s.plusMinus > 0 ? "+" : "") + s.plusMinus, `${s.gp} GP`)) },
+    { title: "Minutes Played", rows: top(sk, (s) => s.toi).map((s) => skRow(s, String(mins(s.toi)), `${s.gp} GP`)) },
+    { title: "Penalty Minutes", rows: top(sk, (s) => s.pim).map((s) => skRow(s, String(s.pim), `${s.gp} GP`)) },
+    { title: "Shots", rows: top(sk, (s) => s.shots).map((s) => skRow(s, String(s.shots), `${s.gp} GP`)) },
+    { title: "Power-Play Goals", rows: top(sk, (s) => s.ppGoals).map((s) => skRow(s, String(s.ppGoals), `${s.gp} GP`)) },
+    { title: "Short-Handed Goals", rows: top(sk, (s) => s.shGoals).map((s) => skRow(s, String(s.shGoals), `${s.gp} GP`)) },
+    { title: "Game-Winning Goals", rows: top(sk, (s) => s.gwg).map((s) => skRow(s, String(s.gwg), `${s.gp} GP`)) },
+    { title: "Hits", rows: top(sk, (s) => s.hits).map((s) => skRow(s, String(s.hits), `${s.gp} GP`)) },
+    { title: "Shots Blocked", rows: top(sk, (s) => s.blocks).map((s) => skRow(s, String(s.blocks), `${s.gp} GP`)) },
   ];
 
   // Rate stats (SV%, GAA) need a sample, but early in the season a flat 10-GP gate
@@ -63,11 +63,11 @@ export default async function LeadersPage({ searchParams }: { searchParams: Prom
   const gkMin = Math.min(10, Math.max(1, Math.ceil(maxGkGp * 0.4)));
   const qualGk = gk.filter((g) => g.gp >= gkMin);
   const goalieCards: Array<{ title: string; rows: Row[] }> = [
-    { title: "Wins", rows: top(gk, (g) => g.wins).map((g) => gkRow(g, String(g.wins))) },
-    { title: "Save Percentage", rows: top(qualGk, (g) => g.svPct).map((g) => gkRow(g, g.svPct.toFixed(3).replace(/^0/, ""))) },
-    { title: "Goals-Against Average", rows: top(qualGk, (g) => -g.gaa).map((g) => gkRow(g, g.gaa.toFixed(2))) },
-    { title: "Minutes Played", rows: top(gk, (g) => g.toiMin).map((g) => gkRow(g, String(g.toiMin))) },
-    { title: "Shutouts", rows: top(gk, (g) => g.shutouts).map((g) => gkRow(g, String(g.shutouts))) },
+    { title: "Wins", rows: top(gk, (g) => g.wins).map((g) => gkRow(g, String(g.wins), `${g.gp} GP`)) },
+    { title: "Save Percentage", rows: top(qualGk, (g) => g.svPct).map((g) => gkRow(g, g.svPct.toFixed(3).replace(/^0/, ""), `${g.gp} GP`)) },
+    { title: "Goals-Against Average", rows: top(qualGk, (g) => -g.gaa).map((g) => gkRow(g, g.gaa.toFixed(2), `${g.gp} GP`)) },
+    { title: "Minutes Played", rows: top(gk, (g) => g.toiMin).map((g) => gkRow(g, String(g.toiMin), `${g.gp} GP`)) },
+    { title: "Shutouts", rows: top(gk, (g) => g.shutouts).map((g) => gkRow(g, String(g.shutouts), `${g.gp} GP`)) },
   ];
 
   return (
