@@ -307,7 +307,7 @@ export function teamDemand(base: Demand, slot: LineSlot, c: Contention): Demand 
  *  $-equivalent terms — so a contender's 1st-line offer can beat a bigger cheque
  *  from a rebuild's 3rd line. */
 export function contentionBonus(c: Contention): number {
-  return c === "contender" ? 1_000_000 : c === "rebuild" ? -800_000 : 0;
+  return c === "contender" ? 500_000 : c === "rebuild" ? -400_000 : 0;
 }
 /** Would the player sign this offer at this club at all? (clears team-specific floor + term.) */
 export function offerAcceptable(td: Demand, offerSalary: number, offerYears: number): boolean {
