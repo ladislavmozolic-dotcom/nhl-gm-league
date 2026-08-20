@@ -78,14 +78,32 @@ export async function getAskAtAction(playerId: number, teamId: number, line: num
   return { askSalary: ev.ask.salary, askYears: ev.ask.years, floor: ev.ask.floorSalary, minYears: ev.ask.minYears, maxYears: ev.ask.maxYears };
 }
 
+/** Who (if anyone) may see the competing offers, and whose offers stay hidden from them.
+ *  Only admin-tier (commissioner / co-commissioner) see the blind market. The TOP
+ *  commissioner sees everything; a co-commissioner sees every offer EXCEPT the
+ *  commissioner's own bid (his own club's offers are always visible to himself). */
+async function offerViewMask(): Promise<{ hide: Set<number> } | null> {
+  const id = await getTeamSession();
+  if (id == null) return null;
+  const me = await prisma.team.findUnique({ where: { id }, select: { isAdmin: true, gmRole: true } });
+  if (!me || !(me.isAdmin || me.gmRole === "comish" || me.gmRole === "co_comish")) return null;
+  const hide = new Set<number>();
+  if (me.gmRole !== "comish") { // co-commissioner: the commissioner's own bid is hidden
+    const comish = await prisma.team.findMany({ where: { gmRole: "comish" }, select: { id: true } });
+    for (const t of comish) if (t.id !== id) hide.add(t.id);
+  }
+  return { hide };
+}
+
 /** All standing offers on a player (open frenzy — GMs can see the competition). */
 export async function getPlayerOffersAction(playerId: number) {
-  // blind bidding: only the commissioner sees the competing offers; a GM never
-  // sees what other clubs have bid.
-  if (!(await isAdmin())) return [];
-  const offers = await prisma.faOffer.findMany({
+  // blind bidding: only the commissioner tier sees the competing offers; a plain GM never
+  // sees what other clubs have bid, and a co-commissioner can't see the commissioner's bid.
+  const mask = await offerViewMask();
+  if (!mask) return [];
+  const offers = (await prisma.faOffer.findMany({
     where: { playerId, status: { in: ACTIVE } }, orderBy: { salary: "desc" },
-  });
+  })).filter((o) => !mask.hide.has(o.teamId));
   if (offers.length === 0) return [];
   const teams = await prisma.team.findMany({
     where: { id: { in: offers.map((o) => o.teamId) } }, select: { id: true, code: true },
@@ -102,8 +120,9 @@ export async function getPlayerOffersAction(playerId: number) {
 /** Full bid history on a player — every offer/raise, oldest first. Commissioner only
  *  (blind bidding: a GM never sees rivals' bids). */
 export async function getBidHistoryAction(playerId: number) {
-  if (!(await isAdmin())) return [];
-  const bids = await prisma.faBid.findMany({ where: { playerId }, orderBy: { id: "asc" } });
+  const mask = await offerViewMask();
+  if (!mask) return [];
+  const bids = (await prisma.faBid.findMany({ where: { playerId }, orderBy: { id: "asc" } })).filter((b) => !mask.hide.has(b.teamId));
   if (bids.length === 0) return [];
   const teams = await prisma.team.findMany({ where: { id: { in: [...new Set(bids.map((b) => b.teamId))] } }, select: { id: true, code: true } });
   const codeOf = new Map(teams.map((t) => [t.id, t.code]));
