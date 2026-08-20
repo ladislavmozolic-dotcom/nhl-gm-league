@@ -105,35 +105,88 @@ async function decide(tradeId: number, aiTeamId: number, contention: Contention,
   // involved and the gap is large (then just decline — the AI holds firm on its core).
   const closeEnough = ratio >= T * 0.78;
   if (closeEnough && !(franchise && ratio < T * 0.9)) {
-    const counter = await buildCounter(pkg, aiGives * T - aiGets);
-    if (counter) return { action: "counter", reason: `short (×${ratio.toFixed(2)} < ${T.toFixed(2)}) — counter for more`, counter, counterNote: star ? `${clean(star.name)} is a core piece — the ask has to be higher.` : "Close, but the value needs to come up a touch.", detail };
+    const c = await buildCounter(pkg, th, { aiId: aiTeamId, humanId: pkg.fromTeamId, aiGives, aiGets, T, starName: star ? clean(star.name) : undefined });
+    if (c) return { action: "counter", reason: `short (×${ratio.toFixed(2)} < ${T.toFixed(2)}) — counter`, counter: c.pkg, counterNote: c.note, detail };
   }
   return { action: "decline", reason: `too light (×${ratio.toFixed(2)} < ${T.toFixed(2)})`, detail };
 }
 
-/** Build a counter: keep the same swap, but ask the OTHER club to add one draft pick
- *  that best covers the value gap. Returns null if they have no spare pick. */
-async function buildCounter(orig: TradePackage, gapValue: number): Promise<TradePackage | null> {
-  const human = orig.fromTeamId; // the club that proposed (AI is orig.toTeamId)
-  const humanTeam = await prisma.team.findUnique({ where: { id: human }, select: { affiliateTeams: { select: { id: true } } } });
-  const orgIds = [human, ...(humanTeam?.affiliateTeams.map((a) => a.id) ?? [])];
-  const owned = await prisma.draftPick.findMany({ where: { teamId: { in: orgIds }, id: { notIn: orig.fromPicks } }, select: { id: true, round: true } });
-  if (!owned.length) return null;
-  // rough value: earlier rounds worth more; pick the smallest pick that covers the gap,
-  // else the most valuable available.
-  const roughVal = (round: number) => Math.round(1000 * Math.exp(-((round - 1) * 32 + 16) / 42));
-  const sorted = owned.map((p) => ({ id: p.id, v: roughVal(p.round) })).sort((a, b) => a.v - b.v);
-  const pick = sorted.find((p) => p.v >= gapValue) ?? sorted[sorted.length - 1];
-  // Counter = AI proposes: AI gives its original outgoing, asks for the human's original
-  // outgoing PLUS the extra pick. Sides flip (AI becomes the "from" proposer).
+const roughPickVal = (round: number) => Math.round(1000 * Math.exp(-((round - 1) * 32 + 16) / 42));
+
+/** Build a REAL counter — the AI looks at its own roster and the other club's assets:
+ *  • if the club asked for a player the AI protects (star/franchise), the AI keeps him
+ *    and offers a lesser same-position piece instead ("we won't move X, but we'll do Y");
+ *  • otherwise it keeps the framework but asks the club to ADD value (a pick, then a
+ *    depth player) until the deal is fair for the AI.
+ *  Sides flip (AI becomes the proposer). Returns the package + a human note, or null. */
+async function buildCounter(orig: TradePackage, th: Thresholds, ctx: { aiId: number; humanId: number; aiGives: number; aiGets: number; T: number; starName?: string }): Promise<{ pkg: TradePackage; note: string } | null> {
+  const need = ctx.aiGives * ctx.T;           // value the AI wants to receive
+  const P = (id: number, ret = 0) => ({ playerId: id, retentionPct: ret });
+  const aiOrg = await orgIdsOf(ctx.aiId), humanOrg = await orgIdsOf(ctx.humanId);
+
+  // players the club asked FOR (AI's outgoing) and what it OFFERED (AI's incoming)
+  const askedIds = orig.toPlayers.map((p) => p.playerId);
+  const asked = await prisma.player.findMany({ where: { id: { in: askedIds } }, select: { id: true, name: true, overall: true, position: true, isGoalie: true } });
+  const protectedOne = asked.find((p) => isStar(p.overall ?? 0, p.isGoalie, th)); // one the AI won't move cheaply
+
+  // ---- Option A: STAR SWAP — keep the protected player, offer a lesser same-pos piece
+  if (protectedOne) {
+    const g = grp(protectedOne.position);
+    const roster = await prisma.player.findMany({ where: { teamId: { in: aiOrg }, rosterType: "NHL" }, select: { id: true, name: true, overall: true, age: true, position: true, isGoalie: true, tradeClause: true, injuryDaysLeft: true } });
+    const humanOfferVal = ctx.aiGets; // value of what the club offered
+    // best movable, non-protected same-position alternative whose value is ≤ the club's offer
+    const alt = roster
+      .filter((p) => grp(p.position) === g && p.id !== protectedOne.id && !p.tradeClause && (p.injuryDaysLeft ?? 0) <= 0 && !isStar(p.overall ?? 0, p.isGoalie, th))
+      .map((p) => ({ p, v: playerValue(p.overall ?? 45, p.age) }))
+      .filter((x) => x.v <= humanOfferVal * 1.12)
+      .sort((a, b) => b.v - a.v)[0];
+    if (alt) {
+      const others = orig.toPlayers.filter((p) => p.playerId !== protectedOne.id); // any other requested (non-star) pieces stay
+      return {
+        pkg: {
+          fromTeamId: ctx.aiId, toTeamId: ctx.humanId,
+          fromPlayers: [P(alt.p.id), ...others], toPlayers: orig.fromPlayers,
+          fromPicks: orig.toPicks, toPicks: orig.fromPicks,
+          fromProspects: orig.toProspects ?? [], toProspects: orig.fromProspects ?? [],
+          fromCash: orig.toCash, toCash: orig.fromCash, condition: "",
+        },
+        note: `we're not moving ${clean(protectedOne.name)} — but we'd do ${clean(alt.p.name)} for that package.`,
+      };
+    }
+  }
+
+  // ---- Option B: ASK FOR MORE — keep the framework, request extra value to reach fair
+  const askExtraPicks: number[] = [];
+  let gap = need - ctx.aiGets;
+  const ownedPicks = (await prisma.draftPick.findMany({ where: { teamId: { in: humanOrg }, id: { notIn: orig.fromPicks } }, select: { id: true, round: true } }))
+    .map((p) => ({ id: p.id, v: roughPickVal(p.round) })).sort((a, b) => a.v - b.v);
+  for (const pk of ownedPicks) { if (gap <= 0) break; askExtraPicks.push(pk.id); gap -= pk.v; }
+  // still short? ask for a depth player from the club (lowest-value NHL body not already in the deal)
+  const askExtraPlayers: number[] = [];
+  if (gap > 0) {
+    const inDeal = new Set(orig.fromPlayers.map((p) => p.playerId));
+    const depth = (await prisma.player.findMany({ where: { teamId: { in: humanOrg }, rosterType: "NHL", tradeClause: null, injuryDaysLeft: { lte: 0 } }, select: { id: true, name: true, overall: true, age: true, isGoalie: true } }))
+      .filter((p) => !inDeal.has(p.id) && !isStar(p.overall ?? 0, p.isGoalie, th))
+      .map((p) => ({ p, v: playerValue(p.overall ?? 45, p.age) }))
+      .filter((x) => x.v >= gap * 0.6).sort((a, b) => a.v - b.v)[0];
+    if (depth) { askExtraPlayers.push(depth.p.id); gap -= depth.v; }
+  }
+  if (!askExtraPicks.length && !askExtraPlayers.length) return null; // nothing to ask → can't close it
   return {
-    fromTeamId: orig.toTeamId, toTeamId: orig.fromTeamId,
-    fromPlayers: orig.toPlayers, toPlayers: orig.fromPlayers,
-    fromPicks: orig.toPicks, toPicks: [...orig.fromPicks, pick.id],
-    fromProspects: orig.toProspects ?? [], toProspects: orig.fromProspects ?? [],
-    fromCash: orig.toCash, toCash: orig.fromCash,
-    condition: "",
+    pkg: {
+      fromTeamId: ctx.aiId, toTeamId: ctx.humanId,
+      fromPlayers: orig.toPlayers, toPlayers: [...orig.fromPlayers, ...askExtraPlayers.map((id) => P(id))],
+      fromPicks: orig.toPicks, toPicks: [...orig.fromPicks, ...askExtraPicks],
+      fromProspects: orig.toProspects ?? [], toProspects: orig.fromProspects ?? [],
+      fromCash: orig.toCash, toCash: orig.fromCash, condition: "",
+    },
+    note: `the framework works, but we'd need you to add ${askExtraPlayers.length ? "a bit more (a player + " : "a bit more ("}${askExtraPicks.length ? "a pick" : "value"}) to get it done.`,
   };
+}
+
+async function orgIdsOf(teamId: number): Promise<number[]> {
+  const t = await prisma.team.findUnique({ where: { id: teamId }, select: { affiliateTeams: { select: { id: true } } } });
+  return [teamId, ...(t?.affiliateTeams.map((a) => a.id) ?? [])];
 }
 
 /** The daily Advanced-AI trade pass. For every advanced-AI club, work through the
@@ -174,7 +227,7 @@ export async function aiGmTradesDaily(): Promise<{ handled: number; details: str
         details.push(`${aiName} ACCEPTED #${tr.id} (${d.reason})`);
       } else if (d.action === "counter" && d.counter) {
         await prisma.trade.update({ where: { id: tr.id }, data: { status: "DECLINED", respondedAt: new Date() } });
-        const { tradeId } = await createTradeRecord(d.counter, { fromName: ai.name, toName: humanName, dmBody: `🔄 ${ai.name} likes the framework but needs a bit more to get it done${d.counterNote ? ` — ${d.counterNote}` : ""} Here's our counter — open it to review, Accept or Decline.` });
+        const { tradeId } = await createTradeRecord(d.counter, { fromName: ai.name, toName: humanName, dmBody: `🔄 ${ai.name} sent you a counter-offer (on #${tr.id}) — ${d.counterNote ?? "we'd need a bit more."} Open it to review, Accept or Decline.` });
         details.push(`${aiName} COUNTERED #${tr.id} → #${tradeId} (${d.reason})`);
       } else {
         await prisma.trade.update({ where: { id: tr.id }, data: { status: "DECLINED", respondedAt: new Date() } });
