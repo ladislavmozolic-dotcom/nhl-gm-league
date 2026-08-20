@@ -57,12 +57,12 @@ const LEAGUE = {
   avgOffense: 55,
   avgDefense: 69.5,
   avgGoalie: 84,
-  baseShots: 28.5,
-  baseConversion: 0.083,
+  baseShots: 27.5,          // tuned down (~32 → ~30 shots/team; real NHL ~29-30)
+  baseConversion: 0.090,    // tuned up (SV% ~91.5% → ~90.7%, goals ~2.7 → ~2.9/team; real SV% ~90.5-91)
   homeShotBonus: 1.05,
   homeConvBonus: 1.05,
   penaltiesPerTeam: 2.85,  // penalties a team of avg discipline takes per game (tuned: ~3.0 PP opps/team/game, NHL-realistic — was 3.2 giving ~3.6)
-  ppConvBoost: 3.1,        // conversion multiplier on the power play (tuned: PP% ~21%, NHL-realistic — was 2.9 giving ~18.4%)
+  ppConvBoost: 2.85,       // PP conversion multiplier (lowered from 3.1 to keep PP% ~21% after the baseConversion bump)
   shConvPenalty: 0.45,     // conversion multiplier while shorthanded
   hitsPerTeam: 21,
   blocksPerTeam: 14,
@@ -243,10 +243,10 @@ function conversion(
   // finishing amplified around the league mean so an elite finisher clearly out-scores
   // a similar-looking one — the compressed ratings still separate the snipers.
   const shooterMod = Math.pow(shooterFinishing / 60, 1.7);
-  // goalie spread (^1.9): an elite goalie tops out near ~92.5% SV over a season
-  // (real-world ceiling) rather than running away to 94%, and a weak one is clearly
-  // beatable, while the league average holds. (Was 2.2 → elite keepers too good.)
-  const goalieMod = Math.pow(LEAGUE.avgGoalie / goalieQuality, 1.9);
+  // goalie spread (^1.7): tightens the top so an elite keeper tops out ~92.5% SV over a
+  // season (real ceiling) instead of running to ~94%, and slightly narrows the band.
+  // (2.2 → elite too good; 1.9 still let mid-season elites reach 94%; now 1.7.)
+  const goalieMod = Math.pow(LEAGUE.avgGoalie / goalieQuality, 1.7);
   let p = LEAGUE.baseConversion * shooterMod * goalieMod * (CFG.goalsPct / 100) * (AHL_GAME ? AHL_GOALS_MULT : 1);
   if (isHome) p *= 1 + (LEAGUE.homeConvBonus - 1) * (CFG.homeAdvPct / 100);
   if (strength === "PP") p *= 1 + (LEAGUE.ppConvBoost - 1) * (CFG.powerPlayPct / 100);
