@@ -11,7 +11,7 @@ export default async function LeagueDirectoryPage() {
   const teams = await prisma.team.findMany({
     where: { league: "NHL", isAffiliate: false },
     select: { id: true, name: true, code: true, logoUrl: true, slug: true, conference: true, division: true, gm: true, gmNickname: true, gmFirstName: true, gmLastName: true, gmEmail: true, lastLoginAt: true, passwordHash: true },
-    orderBy: [{ conference: "asc" }, { division: "asc" }, { name: "asc" }],
+    orderBy: [{ name: "asc" }],
   });
 
   return (
