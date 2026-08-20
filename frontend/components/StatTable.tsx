@@ -12,6 +12,7 @@ export type Col = {
   format?: ColFormat;     // display formatter (serializable); sorting always uses the raw value
   defaultHidden?: boolean; // start hidden — user reveals it via Show / Hide Columns
   link?: boolean;         // render this cell as a player link (uses row._slug ?? row._pid)
+  team?: boolean;         // render as team badge: logo (row._teamLogo) + code, linking to /teams/(row._teamSlug)
 };
 
 function render(v: number | string, format?: ColFormat): string {
@@ -82,7 +83,19 @@ export default function StatTable({ cols, rows, initialSort, minWidth = 720 }: {
               <tr key={i} className="border-b border-slate-800/60 hover:bg-slate-800/30">
                 {visible.map((c) => (
                   <td key={c.key} className={`px-2.5 py-2 ${c.num ? "text-right tabular-nums" : ""} ${c.frozen ? "font-medium" : c.num ? "text-slate-300" : "text-slate-400"}`}>
-                    {c.link && (r._slug || r._pid) != null && (r._slug || r._pid) !== ""
+                    {c.team ? (
+                      r._teamSlug ? (
+                        <Link href={`/teams/${r._teamSlug}`} className="inline-flex items-center gap-1.5 hover:text-blue-400 transition-colors">
+                          {r._teamLogo && <img src={String(r._teamLogo)} alt="" className="w-5 h-5 object-contain shrink-0" />}
+                          <span>{render(r[c.key], c.format)}</span>
+                        </Link>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5">
+                          {r._teamLogo && <img src={String(r._teamLogo)} alt="" className="w-5 h-5 object-contain shrink-0" />}
+                          <span>{render(r[c.key], c.format)}</span>
+                        </span>
+                      )
+                    ) : c.link && (r._slug || r._pid) != null && (r._slug || r._pid) !== ""
                       ? <Link href={`/players/${r._slug || r._pid}`} className="hover:text-blue-400 transition-colors">{render(r[c.key], c.format)}</Link>
                       : render(r[c.key], c.format)}
                   </td>

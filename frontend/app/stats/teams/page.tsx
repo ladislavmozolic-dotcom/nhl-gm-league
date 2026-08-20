@@ -9,7 +9,7 @@ const SEASON = "2026-27";
 // Base columns (shown by default) mirror the old Team Stats view; the rest are
 // available through the Show / Hide Columns filter.
 const COLS: Col[] = [
-  { key: "name", label: "Team", title: "Team", frozen: true },
+  { key: "name", label: "Team", title: "Team", frozen: true, team: true },
   { key: "gp", label: "GP", title: "Games Played", num: true },
   { key: "w", label: "W", title: "Wins", num: true },
   { key: "l", label: "L", title: "Losses", num: true },
@@ -44,7 +44,7 @@ export default async function TeamStatsPage({ searchParams }: { searchParams: Pr
   const league = (await searchParams).league === "AHL" ? "AHL" : "NHL";
   const teams = await teamStatTotals(SEASON, league);
   const rows = teams.map((t) => ({
-    name: t.name, gp: t.gp, w: t.w, l: t.l, otl: t.otl, points: t.points,
+    name: t.name, _teamSlug: t.slug ?? "", _teamLogo: t.logoUrl ?? "", gp: t.gp, w: t.w, l: t.l, otl: t.otl, points: t.points,
     gf: t.gf, ga: t.ga, diff: t.diff, gfPerGame: t.gfPerGame, gaPerGame: t.gaPerGame,
     rw: t.rw, otw: t.otw, sow: t.sow, sol: t.sol, pct: t.pct,
     shotsFor: t.shotsFor, shotsAgainst: t.shotsAgainst, sfPerGame: t.sfPerGame, saPerGame: t.saPerGame,

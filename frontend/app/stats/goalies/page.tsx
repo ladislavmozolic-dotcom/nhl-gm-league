@@ -8,7 +8,7 @@ const SEASON = "2026-27";
 
 const COLS: Col[] = [
   { key: "name", label: "Goalie", title: "Goalie Name", frozen: true, link: true },
-  { key: "teamCode", label: "Team", title: "Team" },
+  { key: "teamCode", label: "Team", title: "Team", team: true },
   { key: "gp", label: "GP", title: "Games Played", num: true },
   { key: "wins", label: "W", title: "Wins", num: true },
   { key: "losses", label: "L", title: "Losses", num: true },
@@ -36,7 +36,7 @@ export default async function GoalieStatsPage({ searchParams }: { searchParams: 
   const league = (await searchParams).league === "AHL" ? "AHL" : "NHL";
   const gk = await goalieTotals(SEASON, league);
   const rows = gk.map((g) => ({
-    _pid: g.playerId, name: g.name, teamCode: g.teamCode ?? "—", gp: g.gp, wins: g.wins, losses: g.losses, otl: g.otl,
+    _pid: g.playerId, name: g.name, teamCode: g.teamCode ?? "—", _teamSlug: g.teamSlug ?? "", _teamLogo: g.teamLogo ?? "", gp: g.gp, wins: g.wins, losses: g.losses, otl: g.otl,
     svPct: g.svPct, gaa: g.gaa, mp: g.toiMin, pim: 0, shutouts: g.shutouts,
     goalsAgainst: g.goalsAgainst, shotsAgainst: g.shotsAgainst, saves: g.saves,
     a: 0, eg: 0, psPct: 0, psa: 0, st: 0, bg: 0, s1: 0, s2: 0, s3: 0,

@@ -8,7 +8,7 @@ import { Card, PageHeader, SectionTitle } from "@/components/ui";
 export const dynamic = "force-dynamic";
 const SEASON = "2026-27";
 
-type Row = { playerId: number; name: string; teamCode: string | null; teamSlug: string | null; value: string; sub?: string };
+type Row = { playerId: number; name: string; teamCode: string | null; teamSlug: string | null; teamLogo: string | null; value: string; sub?: string };
 
 function LeaderCard({ title, rows }: { title: string; rows: Row[] }) {
   return (
@@ -20,7 +20,12 @@ function LeaderCard({ title, rows }: { title: string; rows: Row[] }) {
             <span className={`w-5 text-right tabular-nums ${i === 0 ? "text-amber-400 font-bold" : "text-slate-500"}`}>{i + 1}</span>
             <span className="flex-1 truncate">
               <PlayerLink id={r.playerId} name={r.name} clean={false} />
-              {r.teamCode && <span className="text-slate-500 text-xs ml-1.5">{r.teamCode}</span>}
+              {r.teamCode && (
+                <Link href={r.teamSlug ? `/teams/${r.teamSlug}` : "#"} className="inline-flex items-center gap-1 ml-1.5 align-middle text-slate-500 text-xs hover:text-blue-400 transition-colors">
+                  {r.teamLogo && <img src={r.teamLogo} alt="" className="w-4 h-4 object-contain shrink-0" />}
+                  {r.teamCode}
+                </Link>
+              )}
             </span>
             {r.sub && <span className="tabular-nums text-[10px] text-slate-500 shrink-0">{r.sub}</span>}
             <span className="tabular-nums font-semibold">{r.value}</span>
@@ -32,8 +37,8 @@ function LeaderCard({ title, rows }: { title: string; rows: Row[] }) {
 }
 
 const top = <T,>(arr: T[], key: (t: T) => number, n = 10) => [...arr].sort((a, b) => key(b) - key(a)).slice(0, n);
-const skRow = (s: SkaterTotal, value: string, sub?: string): Row => ({ playerId: s.playerId, name: s.name, teamCode: s.teamCode, teamSlug: s.teamSlug, value, sub });
-const gkRow = (g: GoalieTotal, value: string, sub?: string): Row => ({ playerId: g.playerId, name: g.name, teamCode: g.teamCode, teamSlug: g.teamSlug, value, sub });
+const skRow = (s: SkaterTotal, value: string, sub?: string): Row => ({ playerId: s.playerId, name: s.name, teamCode: s.teamCode, teamSlug: s.teamSlug, teamLogo: s.teamLogo, value, sub });
+const gkRow = (g: GoalieTotal, value: string, sub?: string): Row => ({ playerId: g.playerId, name: g.name, teamCode: g.teamCode, teamSlug: g.teamSlug, teamLogo: g.teamLogo, value, sub });
 
 export default async function LeadersPage({ searchParams }: { searchParams: Promise<{ league?: string }> }) {
   const league = (await searchParams).league === "AHL" ? "AHL" : "NHL";

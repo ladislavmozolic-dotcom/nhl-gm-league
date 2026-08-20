@@ -43,7 +43,14 @@ export default async function StarPowerPage() {
                     <Link href={`/players/${r.playerId}`} className="font-semibold hover:text-blue-400">{r.name}</Link>
                     <span className="ml-1.5 text-[11px] text-slate-500">{r.position}</span>
                   </td>
-                  <td className="px-2 py-2 text-slate-400">{r.teamCode ?? "—"}</td>
+                  <td className="px-2 py-2 text-slate-400">
+                    {r.teamCode ? (
+                      <Link href={r.teamSlug ? `/teams/${r.teamSlug}` : "#"} className="inline-flex items-center gap-1.5 hover:text-blue-400 transition-colors">
+                        {r.teamLogo && <img src={r.teamLogo} alt="" className="w-5 h-5 object-contain shrink-0" />}
+                        <span>{r.teamCode}</span>
+                      </Link>
+                    ) : "—"}
+                  </td>
                   <td className={`px-2 py-2 font-semibold ${tierAccent(r.tier)}`}>{r.tier}</td>
                   <td className="px-2 py-2 text-right">
                     <div className="inline-flex items-center gap-2">

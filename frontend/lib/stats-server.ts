@@ -7,7 +7,7 @@ import { computeStandings } from "./sim/standings";
 
 export type SkaterTotal = {
   playerId: number; name: string; rookie: boolean; position: string; number: number | null;
-  teamId: number | null; teamCode: string | null; teamSlug: string | null;
+  teamId: number | null; teamCode: string | null; teamSlug: string | null; teamLogo: string | null;
   gp: number; goals: number; assists: number; points: number; shots: number;
   pim: number; plusMinus: number; ppGoals: number; shGoals: number; ppAssists: number; shAssists: number; gwg: number;
   hits: number; blocks: number; toi: number;
@@ -15,7 +15,7 @@ export type SkaterTotal = {
 };
 
 export type GoalieTotal = {
-  playerId: number; name: string; teamId: number | null; teamCode: string | null; teamSlug: string | null;
+  playerId: number; name: string; teamId: number | null; teamCode: string | null; teamSlug: string | null; teamLogo: string | null;
   gp: number; wins: number; losses: number; otl: number; shutouts: number;
   shotsAgainst: number; saves: number; goalsAgainst: number; toiMin: number;
   svPct: number; gaa: number;
@@ -27,7 +27,7 @@ const gameWhere = ({ season, league, playoffs }: GameFilter) =>
   ({ season, league, status: "FINAL", ...(playoffs ? { seriesId: { not: null } } : { seriesId: null }) });
 
 async function teamLookup() {
-  const teams = await prisma.team.findMany({ select: { id: true, code: true, slug: true, name: true } });
+  const teams = await prisma.team.findMany({ select: { id: true, code: true, slug: true, name: true, logoUrl: true } });
   return new Map(teams.map((t) => [t.id, t]));
 }
 
@@ -53,7 +53,7 @@ export async function skaterTotals(season: string, league = "NHL", playoffs = fa
     const s = g._sum;
     return {
       playerId: g.playerId, name: cleanName(p?.name ?? "—"), rookie: isRookieName(p?.name ?? ""),
-      position: p?.position ?? "—", number: p?.number ?? null, teamId: g.teamId ?? null, teamCode: t?.code ?? null, teamSlug: t?.slug ?? null,
+      position: p?.position ?? "—", number: p?.number ?? null, teamId: g.teamId ?? null, teamCode: t?.code ?? null, teamSlug: t?.slug ?? null, teamLogo: t?.logoUrl ?? null,
       gp: g._count._all, goals: s.goals ?? 0, assists: s.assists ?? 0, points: s.points ?? 0, shots: s.shots ?? 0,
       pim: s.pim ?? 0, plusMinus: s.plusMinus ?? 0, ppGoals: s.ppGoals ?? 0, shGoals: s.shGoals ?? 0, ppAssists: s.ppAssists ?? 0, shAssists: s.shAssists ?? 0, gwg: s.gwg ?? 0,
       hits: s.hits ?? 0, blocks: s.blocks ?? 0, toi: s.toi ?? 0,
@@ -67,7 +67,7 @@ export async function goalieTotals(season: string, league = "NHL", playoffs = fa
     where: { game: gameWhere({ season, league, playoffs }) },
     select: { playerId: true, teamId: true, shotsAgainst: true, saves: true, goalsAgainst: true, decision: true, started: true, xga: true },
   });
-  type Acc = Omit<GoalieTotal, "name" | "teamCode" | "teamSlug" | "svPct" | "gaa"> & { teamId: number | null };
+  type Acc = Omit<GoalieTotal, "name" | "teamCode" | "teamSlug" | "teamLogo" | "svPct" | "gaa"> & { teamId: number | null };
   // key by (goalie, team-played-for) so a called-up farm goalie who covered an
   // NHL club's crease shows under THAT club, not his AHL parent.
   const acc = new Map<string, Acc>();
@@ -96,7 +96,7 @@ export async function goalieTotals(season: string, league = "NHL", playoffs = fa
     const t = a.teamId ? teams.get(a.teamId) : null;
     const svPct = a.shotsAgainst ? a.saves / a.shotsAgainst : 0;
     const gaa = a.toiMin ? (a.goalsAgainst * 60) / a.toiMin : 0;
-    return { ...a, name: cleanName(p?.name ?? "—"), teamCode: t?.code ?? null, teamSlug: t?.slug ?? null, svPct, gaa, gsax: a.xga - a.goalsAgainst };
+    return { ...a, name: cleanName(p?.name ?? "—"), teamCode: t?.code ?? null, teamSlug: t?.slug ?? null, teamLogo: t?.logoUrl ?? null, svPct, gaa, gsax: a.xga - a.goalsAgainst };
   });
 }
 
@@ -111,7 +111,7 @@ const burstsPerGame = (sk: number) => Math.max(0, (sk - 72) / 3.5); // 22+ mph b
 const milesPerGame = (toiSecPerGame: number) => (toiSecPerGame / 60) * 0.155;
 
 export type SkaterEdge = {
-  playerId: number; name: string; position: string; teamCode: string | null; teamSlug: string | null;
+  playerId: number; name: string; position: string; teamCode: string | null; teamSlug: string | null; teamLogo: string | null;
   gp: number; toi: number; topShot: number; hits: number;
   topSkateSpeed: number; bursts: number; miles: number; sk: number;
 };
@@ -140,7 +140,7 @@ export async function skaterEdge(season: string, league = "NHL"): Promise<Skater
     const toi = g._sum.toi ?? 0;
     return {
       playerId: g.playerId, name: cleanName(p?.name ?? "—"), position: p?.position ?? "—",
-      teamCode: t?.code ?? null, teamSlug: t?.slug ?? null,
+      teamCode: t?.code ?? null, teamSlug: t?.slug ?? null, teamLogo: t?.logoUrl ?? null,
       gp, toi, topShot: g._max.topShot ?? 0, hits: g._sum.hits ?? 0,
       topSkateSpeed: skateTopSpeed(sk, g.playerId), bursts: Math.round(burstsPerGame(sk) * gp),
       miles: gp ? milesPerGame(toi / gp) * gp : 0, sk,
@@ -149,7 +149,7 @@ export async function skaterEdge(season: string, league = "NHL"): Promise<Skater
 }
 
 export type GoalieEdge = {
-  playerId: number; name: string; teamCode: string | null; teamSlug: string | null;
+  playerId: number; name: string; teamCode: string | null; teamSlug: string | null; teamLogo: string | null;
   gp: number; hdSvPct: number; mdSvPct: number; ldSvPct: number;
   hdShotsAg: number; mdShotsAg: number; ldShotsAg: number; svPct: number;
 };
@@ -180,7 +180,7 @@ export async function goalieEdge(season: string, league = "NHL"): Promise<Goalie
     const t = a.teamId ? teams.get(a.teamId) : null;
     return {
       playerId: a.playerId, name: cleanName(pById.get(a.playerId)?.name ?? "—"),
-      teamCode: t?.code ?? null, teamSlug: t?.slug ?? null, gp: a.gp,
+      teamCode: t?.code ?? null, teamSlug: t?.slug ?? null, teamLogo: t?.logoUrl ?? null, gp: a.gp,
       hdSvPct: a.hdA ? a.hdS / a.hdA : 0, mdSvPct: a.mdA ? a.mdS / a.mdA : 0, ldSvPct: a.ldA ? a.ldS / a.ldA : 0,
       hdShotsAg: a.hdA, mdShotsAg: a.mdA, ldShotsAg: a.ldA, svPct: a.sa ? a.sv / a.sa : 0,
     };
@@ -188,7 +188,7 @@ export async function goalieEdge(season: string, league = "NHL"): Promise<Goalie
 }
 
 export type TeamEdge = {
-  teamId: number; name: string; code: string | null; slug: string | null;
+  teamId: number; name: string; code: string | null; slug: string | null; logoUrl: string | null;
   gp: number; ozPct: number; nzPct: number; dzPct: number;
   avgShot: number; topShot: number; hitsPerGame: number; avgSkateSpeed: number;
 };
@@ -227,7 +227,7 @@ export async function teamEdge(season: string, league = "NHL"): Promise<TeamEdge
     const t = teamRows.get(a.teamId);
     const sk = skByTeam.get(a.teamId);
     return {
-      teamId: a.teamId, name: t?.name ?? "—", code: t?.code ?? null, slug: t?.slug ?? null,
+      teamId: a.teamId, name: t?.name ?? "—", code: t?.code ?? null, slug: t?.slug ?? null, logoUrl: t?.logoUrl ?? null,
       gp: a.gp, ozPct: a.gp ? a.oz / a.gp : 0, nzPct: a.gp ? a.nz / a.gp : 0, dzPct: a.gp ? a.dz / a.gp : 0,
       avgShot: a.gp ? a.avgShot / a.gp : 0, topShot: a.topShot,
       hitsPerGame: a.gp ? (hitByTeam.get(a.teamId) ?? 0) / a.gp : 0,
@@ -237,7 +237,7 @@ export async function teamEdge(season: string, league = "NHL"): Promise<TeamEdge
 }
 
 export type TeamStatTotal = {
-  teamId: number; name: string; code: string | null; slug: string | null;
+  teamId: number; name: string; code: string | null; slug: string | null; logoUrl: string | null;
   gp: number; w: number; l: number; otw: number; otl: number; sow: number; sol: number; rw: number;
   points: number; pct: number; gf: number; ga: number; diff: number;
   gfPerGame: number; gaPerGame: number;
@@ -260,9 +260,10 @@ export async function teamStatTotals(season: string, league = "NHL"): Promise<Te
       where: { game: { season, league, status: "FINAL", seriesId: null } },
       _sum: { goals: true, assists: true, pim: true, hits: true, blocks: true, ppGoals: true, shGoals: true },
     }),
-    prisma.team.findMany({ select: { id: true, slug: true } }),
+    prisma.team.findMany({ select: { id: true, slug: true, logoUrl: true } }),
   ]);
   const slugById = new Map(teams.map((t) => [t.id, t.slug]));
+  const logoById = new Map(teams.map((t) => [t.id, t.logoUrl]));
   const pAgg = new Map(playerAgg.map((p) => [p.teamId, p._sum]));
 
   type Ext = { shotsFor: number; shotsAgainst: number; shutouts: number; otw: number; sow: number; otl: number; sol: number };
@@ -287,7 +288,7 @@ export async function teamStatTotals(season: string, league = "NHL"): Promise<Te
     const pa = pAgg.get(s.teamId);
     const gp = s.gp || 1;
     return {
-      teamId: s.teamId, name: s.name, code: s.code, slug: slugById.get(s.teamId) ?? null,
+      teamId: s.teamId, name: s.name, code: s.code, slug: slugById.get(s.teamId) ?? null, logoUrl: logoById.get(s.teamId) ?? null,
       gp: s.gp, w: s.w, l: s.l, otw: e.otw, otl: s.otl, sow: e.sow, sol: e.sol, rw: s.rw,
       points: s.points, pct: s.pointsPct, gf: s.gf, ga: s.ga, diff: s.diff,
       gfPerGame: s.gf / gp, gaPerGame: s.ga / gp,

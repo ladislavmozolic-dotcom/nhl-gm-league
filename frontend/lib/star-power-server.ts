@@ -9,7 +9,7 @@ import { cleanName } from "./playerName";
 
 export type StarRow = {
   playerId: number; name: string; position: string; isGoalie: boolean;
-  teamId: number | null; teamCode: string | null;
+  teamId: number | null; teamCode: string | null; teamSlug: string | null; teamLogo: string | null;
   score: number; tier: StarTier; reasons: string[];
 };
 
@@ -78,13 +78,14 @@ export async function allStarPowers(): Promise<StarRow[]> {
     select: { id: true, name: true, position: true, isGoalie: true, overall: true, age: true, teamId: true, lastSeasonPts: true, lastSeasonGP: true, lastSeasonSvPct: true },
   });
   const { career, awards } = await pedigree(players.map((p) => p.id));
-  const teams = await prisma.team.findMany({ where: { league: "NHL" }, select: { id: true, code: true } });
-  const codeById = new Map(teams.map((t) => [t.id, t.code]));
+  const teams = await prisma.team.findMany({ where: { league: "NHL" }, select: { id: true, code: true, slug: true, logoUrl: true } });
+  const teamById = new Map(teams.map((t) => [t.id, t]));
   return players.map((p) => {
     const s = scoreOf(p, career.get(p.id) ?? 0, awards.get(p.id) ?? 0);
+    const t = p.teamId != null ? teamById.get(p.teamId) : null;
     return {
       playerId: p.id, name: cleanName(p.name), position: p.position, isGoalie: p.isGoalie,
-      teamId: p.teamId, teamCode: p.teamId != null ? codeById.get(p.teamId) ?? null : null,
+      teamId: p.teamId, teamCode: t?.code ?? null, teamSlug: t?.slug ?? null, teamLogo: t?.logoUrl ?? null,
       score: s.score, tier: s.tier, reasons: s.reasons,
     };
   });

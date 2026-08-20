@@ -11,7 +11,7 @@ const SEASON = "2026-27";
 // per-shot xG (see lib/sim/shot-quality.ts).
 const SKATER_COLS: Col[] = [
   { key: "name", label: "Player", title: "Player Name", frozen: true, link: true },
-  { key: "teamCode", label: "Team", title: "Team" },
+  { key: "teamCode", label: "Team", title: "Team", team: true },
   { key: "pos", label: "Pos", title: "Position" },
   { key: "gp", label: "GP", title: "Games Played", num: true },
   { key: "goals", label: "G", title: "Goals", num: true },
@@ -25,7 +25,7 @@ const SKATER_COLS: Col[] = [
 
 const GOALIE_COLS: Col[] = [
   { key: "name", label: "Goalie", title: "Goalie Name", frozen: true, link: true },
-  { key: "teamCode", label: "Team", title: "Team" },
+  { key: "teamCode", label: "Team", title: "Team", team: true },
   { key: "gp", label: "GP", title: "Games Played", num: true },
   { key: "gsax", label: "GSAx", title: "Goals Saved Above Expected (xGA − GA)", info: "Goals Saved Above Expected — expected goals against minus goals actually allowed. The single best measure of goalie quality: positive = he's stealing games, negative = letting in ones he shouldn't.", num: true, format: "plusDec1" },
   { key: "xga", label: "xGA", title: "Expected Goals Against faced", info: "Expected Goals Against — how many goals an average goalie would have allowed on the shots he faced. Compare to actual GA to judge him.", num: true, format: "dec1" },
@@ -46,7 +46,7 @@ export default async function AdvancedStatsPage({ searchParams }: { searchParams
   const skaterRows = sk
     .filter((s) => s.shots >= skShotMin)
     .map((s) => ({
-      _pid: s.playerId, name: s.name, teamCode: s.teamCode ?? "—", pos: s.position, gp: s.gp,
+      _pid: s.playerId, name: s.name, teamCode: s.teamCode ?? "—", _teamSlug: s.teamSlug ?? "", _teamLogo: s.teamLogo ?? "", pos: s.position, gp: s.gp,
       goals: s.goals, xg: s.xg, fin: s.goals - s.xg, hdShots: s.hdShots, shots: s.shots,
       shPct: s.shots ? (s.goals / s.shots) * 100 : 0, points: s.points,
     }));
@@ -54,7 +54,7 @@ export default async function AdvancedStatsPage({ searchParams }: { searchParams
   const goalieRows = gk
     .filter((g) => g.shotsAgainst >= gkSaMin)
     .map((g) => ({
-      _pid: g.playerId, name: g.name, teamCode: g.teamCode ?? "—", gp: g.gp, gsax: g.gsax, xga: g.xga,
+      _pid: g.playerId, name: g.name, teamCode: g.teamCode ?? "—", _teamSlug: g.teamSlug ?? "", _teamLogo: g.teamLogo ?? "", gp: g.gp, gsax: g.gsax, xga: g.xga,
       goalsAgainst: g.goalsAgainst, svPct: g.svPct, gaa: g.gaa, shotsAgainst: g.shotsAgainst,
     }));
 

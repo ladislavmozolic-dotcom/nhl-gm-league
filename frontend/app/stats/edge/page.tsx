@@ -16,7 +16,7 @@ const VIEWS: { key: View; label: string }[] = [
 
 const SKATER_COLS: Col[] = [
   { key: "name", label: "Player", title: "Player", frozen: true, link: true },
-  { key: "teamCode", label: "Team", title: "Team" },
+  { key: "teamCode", label: "Team", title: "Team", team: true },
   { key: "pos", label: "Pos", title: "Position" },
   { key: "gp", label: "GP", title: "Games Played", num: true },
   { key: "topSkate", label: "Top Speed", title: "Top skating speed, mph (modelled from SK rating)", num: true, format: "dec1" },
@@ -28,7 +28,7 @@ const SKATER_COLS: Col[] = [
 
 const GOALIE_COLS: Col[] = [
   { key: "name", label: "Goalie", title: "Goalie", frozen: true, link: true },
-  { key: "teamCode", label: "Team", title: "Team" },
+  { key: "teamCode", label: "Team", title: "Team", team: true },
   { key: "gp", label: "GP", title: "Games Played", num: true },
   { key: "svPct", label: "SV%", title: "Overall Save %", num: true, format: "pct3" },
   { key: "hdSv", label: "HD SV%", title: "High-danger save % (slot / net-front)", num: true, format: "pct3" },
@@ -38,7 +38,7 @@ const GOALIE_COLS: Col[] = [
 ];
 
 const TEAM_COLS: Col[] = [
-  { key: "name", label: "Team", title: "Team", frozen: true },
+  { key: "name", label: "Team", title: "Team", frozen: true, team: true },
   { key: "gp", label: "GP", title: "Games Played", num: true },
   { key: "ozPct", label: "OZ%", title: "Offensive-zone time %", num: true, format: "dec1" },
   { key: "nzPct", label: "NZ%", title: "Neutral-zone time %", num: true, format: "dec1" },
@@ -67,7 +67,7 @@ export default async function EdgeStatsPage({ searchParams }: { searchParams: Pr
     const maxGp = sk.reduce((m, s) => Math.max(m, s.gp), 0);
     const skMin = Math.min(10, Math.max(1, Math.ceil(maxGp * 0.4)));
     rows = sk.filter((s) => s.gp >= skMin).map((s) => ({
-      _pid: s.playerId, name: s.name, teamCode: s.teamCode ?? "—", pos: s.position, gp: s.gp,
+      _pid: s.playerId, name: s.name, teamCode: s.teamCode ?? "—", _teamSlug: s.teamSlug ?? "", _teamLogo: s.teamLogo ?? "", pos: s.position, gp: s.gp,
       topSkate: s.topSkateSpeed, bursts: s.bursts, miles: s.miles, topShot: s.topShot, hits: s.hits,
     }));
     cols = SKATER_COLS; initialSort = "topShot";
@@ -78,14 +78,14 @@ export default async function EdgeStatsPage({ searchParams }: { searchParams: Pr
     const saMin = Math.min(150, Math.max(1, Math.ceil(maxSa * 0.4)));
     minNote = `Minimum ${saMin} shots against (scales up to 150). Real NHL: HD ≈ .80, MD ≈ .92, LD ≈ .98.`;
     rows = gk.filter((g) => g.hdShotsAg + g.mdShotsAg + g.ldShotsAg >= saMin).map((g) => ({
-      _pid: g.playerId, name: g.name, teamCode: g.teamCode ?? "—", gp: g.gp, svPct: g.svPct,
+      _pid: g.playerId, name: g.name, teamCode: g.teamCode ?? "—", _teamSlug: g.teamSlug ?? "", _teamLogo: g.teamLogo ?? "", gp: g.gp, svPct: g.svPct,
       hdSv: g.hdSvPct, mdSv: g.mdSvPct, ldSv: g.ldSvPct, hdShotsAg: g.hdShotsAg,
     }));
     cols = GOALIE_COLS; initialSort = "hdSv";
   } else {
     const te = await teamEdge(SEASON, league);
     rows = te.map((t) => ({
-      name: t.name, gp: t.gp, ozPct: t.ozPct, nzPct: t.nzPct, dzPct: t.dzPct,
+      name: t.name, _teamSlug: t.slug ?? "", _teamLogo: t.logoUrl ?? "", gp: t.gp, ozPct: t.ozPct, nzPct: t.nzPct, dzPct: t.dzPct,
       avgShot: t.avgShot, topShot: t.topShot, hitsPg: t.hitsPerGame, skate: t.avgSkateSpeed,
     }));
     cols = TEAM_COLS; initialSort = "ozPct";

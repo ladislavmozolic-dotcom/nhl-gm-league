@@ -7,13 +7,13 @@ import { cleanName } from "./playerName";
 
 export type CurrentInjury = {
   playerId: number; name: string; slug: string | null; position: string;
-  teamId: number | null; teamCode: string | null; teamName: string | null; teamSlug: string | null; league: string | null;
+  teamId: number | null; teamCode: string | null; teamName: string | null; teamSlug: string | null; teamLogo: string | null; league: string | null;
   desc: string; daysLeft: number;
 };
 
 export type SeasonInjury = {
   id: number; playerId: number | null; name: string; slug: string | null;
-  teamId: number | null; teamCode: string | null; teamName: string | null; teamSlug: string | null;
+  teamId: number | null; teamCode: string | null; teamName: string | null; teamSlug: string | null; teamLogo: string | null;
   part: string; mechanism: string; severity: string; days: number;
   byName: string | null; gameId: number; gameDate: Date | null; round: number | null;
 };
@@ -25,12 +25,12 @@ export async function currentInjuries(opts?: { teamId?: number; league?: string 
       ...(opts?.teamId ? { teamId: opts.teamId } : {}),
       ...(opts?.league ? { team: { league: opts.league } } : {}),
     },
-    include: { team: { select: { id: true, code: true, name: true, slug: true, league: true } } },
+    include: { team: { select: { id: true, code: true, name: true, slug: true, logoUrl: true, league: true } } },
     orderBy: { injuryDaysLeft: "desc" },
   });
   return rows.map((p) => ({
     playerId: p.id, name: cleanName(p.name), slug: p.slug, position: p.position ?? "—",
-    teamId: p.team?.id ?? null, teamCode: p.team?.code ?? null, teamName: p.team?.name ?? null, teamSlug: p.team?.slug ?? null, league: p.team?.league ?? null,
+    teamId: p.team?.id ?? null, teamCode: p.team?.code ?? null, teamName: p.team?.name ?? null, teamSlug: p.team?.slug ?? null, teamLogo: p.team?.logoUrl ?? null, league: p.team?.league ?? null,
     desc: p.injuryDesc ?? "Injury", daysLeft: p.injuryDaysLeft,
   }));
 }
@@ -50,7 +50,7 @@ export async function seasonInjuries(season: string, opts?: { teamId?: number; l
   const teamIds = [...new Set(events.map((e) => e.teamId).filter((x): x is number => x != null))];
   const [players, teams] = await Promise.all([
     prisma.player.findMany({ where: { id: { in: playerIds } }, select: { id: true, name: true, slug: true } }),
-    prisma.team.findMany({ where: { id: { in: teamIds } }, select: { id: true, code: true, name: true, slug: true } }),
+    prisma.team.findMany({ where: { id: { in: teamIds } }, select: { id: true, code: true, name: true, slug: true, logoUrl: true } }),
   ]);
   const pById = new Map(players.map((p) => [p.id, p]));
   const tById = new Map(teams.map((t) => [t.id, t]));
@@ -60,7 +60,7 @@ export async function seasonInjuries(season: string, opts?: { teamId?: number; l
     const t = e.teamId != null ? tById.get(e.teamId) : null;
     return {
       id: e.id, playerId: e.playerId, name: p ? cleanName(p.name) : (e.playerId != null ? "—" : "—"), slug: p?.slug ?? null,
-      teamId: e.teamId, teamCode: t?.code ?? null, teamName: t?.name ?? null, teamSlug: t?.slug ?? null,
+      teamId: e.teamId, teamCode: t?.code ?? null, teamName: t?.name ?? null, teamSlug: t?.slug ?? null, teamLogo: t?.logoUrl ?? null,
       part: m.part ?? "Injury", mechanism: m.mechanism ?? "—", severity: m.severity ?? "—", days: m.days ?? 0,
       byName: e.targetId != null ? (pById.get(e.targetId) ? cleanName(pById.get(e.targetId)!.name) : null) : null,
       gameId: e.game.id, gameDate: e.game.gameDate, round: e.game.round,

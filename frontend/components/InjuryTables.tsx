@@ -26,7 +26,7 @@ export function CurrentInjuryTable({ rows, showTeam = true }: { rows: CurrentInj
           {rows.map((p) => (
             <tr key={p.playerId} className="border-b border-slate-800/50 hover:bg-slate-800/30">
               <td className="px-3 py-2"><Link href={`/players/${p.slug ?? p.playerId}`} className="hover:text-blue-400 font-medium">{p.name}</Link></td>
-              {showTeam && <td className="px-3 py-2">{p.teamSlug ? <Link href={`/teams/${p.teamSlug}`} className="text-slate-400 hover:text-blue-400">{p.teamCode ?? p.teamName}</Link> : "—"}</td>}
+              {showTeam && <td className="px-3 py-2">{p.teamSlug ? <Link href={`/teams/${p.teamSlug}`} className="inline-flex items-center gap-1.5 text-slate-400 hover:text-blue-400">{p.teamLogo && <img src={p.teamLogo} alt="" className="w-5 h-5 object-contain shrink-0" />}{p.teamCode ?? p.teamName}</Link> : "—"}</td>}
               <td className="px-3 py-2 text-slate-500">{p.position}</td>
               <td className="px-3 py-2 text-slate-300">{p.desc}</td>
               <td className="px-3 py-2 text-right tabular-nums font-semibold text-amber-400">{p.daysLeft}</td>
@@ -58,7 +58,7 @@ export function SeasonInjuryTable({ rows, showTeam = true }: { rows: SeasonInjur
           {rows.map((r) => (
             <tr key={r.id} className="border-b border-slate-800/50 hover:bg-slate-800/30">
               <td className="px-3 py-2"><Link href={`/players/${r.slug ?? r.playerId}`} className="hover:text-blue-400 font-medium">{r.name}</Link></td>
-              {showTeam && <td className="px-3 py-2">{r.teamSlug ? <Link href={`/teams/${r.teamSlug}`} className="text-slate-400 hover:text-blue-400 whitespace-nowrap">{r.teamCode ?? r.teamName}</Link> : "—"}</td>}
+              {showTeam && <td className="px-3 py-2">{r.teamSlug ? <Link href={`/teams/${r.teamSlug}`} className="inline-flex items-center gap-1.5 text-slate-400 hover:text-blue-400 whitespace-nowrap">{r.teamLogo && <img src={r.teamLogo} alt="" className="w-5 h-5 object-contain shrink-0" />}{r.teamCode ?? r.teamName}</Link> : "—"}</td>}
               <td className="px-3 py-2 text-slate-300">{r.part}</td>
               <td className="px-3 py-2 text-slate-400">{MECH_ICON[r.mechanism] ?? ""} {r.mechanism}{r.byName ? <span className="text-slate-600"> · by {r.byName}</span> : ""}</td>
               <td className={`px-3 py-2 ${sevCls(r.severity)}`}>{r.severity}</td>
