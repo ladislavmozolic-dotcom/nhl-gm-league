@@ -194,83 +194,98 @@ export default function TradeBuilder({ me, opp, mine, theirs, onPropose }: {
     }));
   });
 
+  // live "who gives what" summary for the middle column
+  const nameP = (a: Assets, id: number) => a.players.find((p) => p.id === id)?.name ?? `#${id}`;
+  const labelPk = (a: Assets, id: number) => a.picks.find((p) => p.id === id)?.label ?? `Pick #${id}`;
+  const labelPro = (a: Assets, id: number) => a.prospects.find((p) => p.id === id)?.label ?? `Prospect #${id}`;
+  const sideSummary = (a: Assets, pmap: Record<number, number>, pk: Set<number>, pro: Set<number>, cash: number): string[] => {
+    const items: string[] = [];
+    for (const [id, pct] of Object.entries(pmap)) items.push(`🏒 ${nameP(a, +id)}${pct ? ` · ${pct}% ret.` : ""}`);
+    for (const id of pk) items.push(`🎫 ${labelPk(a, id)}`);
+    for (const id of pro) items.push(`⭐ ${labelPro(a, id)}`);
+    if (cash > 0) items.push(`💵 ${money(cash)}`);
+    return items;
+  };
+  const mineSummary = sideSummary(mine, mineP, minePk, minePro, mineCash);
+  const theirsSummary = sideSummary(theirs, theirsP, theirsPk, theirsPro, theirsCash);
+
+  const SummaryBox = ({ name, items, accent }: { name: string; items: string[]; accent: string }) => (
+    <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-2.5">
+      <div className={`text-[11px] font-bold uppercase tracking-wide mb-1.5 ${accent}`}>{name} sends</div>
+      {items.length === 0
+        ? <div className="text-slate-600 text-xs italic">nothing selected yet</div>
+        : <ul className="space-y-1 text-sm text-slate-200">{items.map((t, i) => <li key={i} className="truncate">{t}</li>)}</ul>}
+    </div>
+  );
+
   return (
-    <div className="max-w-5xl mx-auto px-4 pb-28">
+    <div className="max-w-6xl mx-auto px-4 pb-10">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
         <h1 className="text-2xl font-bold">Trade Room</h1>
         <Link href="/trades/build" className="text-sm text-slate-400 hover:text-blue-400">change team</Link>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px_1fr] gap-4 items-start">
         <Side team={me} assets={mine} pmap={mineP} setPmap={setMineP} pk={minePk} setPk={setMinePk} pro={minePro} setPro={setMinePro} cash={mineCash} setCash={setMineCash} destTeamId={opp.id} />
-        <Side team={opp} assets={theirs} pmap={theirsP} setPmap={setTheirsP} pk={theirsPk} setPk={setTheirsPk} pro={theirsPro} setPro={setTheirsPro} cash={theirsCash} setCash={setTheirsCash} destTeamId={me.id} />
-      </div>
 
-      <div className="mt-4">
-        <label className="text-sm text-slate-400">Condition (optional)</label>
-        <textarea value={condition} onChange={(e) => setCondition(e.target.value)} rows={2}
-          className="mt-1 w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm" placeholder="e.g. 2027 4th-rounder becomes a 3rd if the player scores 20 goals" />
-      </div>
+        {/* MIDDLE — live summary, conditions, Propose + GM Assist */}
+        <div className="lg:sticky lg:top-4 space-y-3">
+          <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-3 space-y-3 shadow-lg">
+            <div className="text-center text-sm font-bold uppercase tracking-wider text-slate-300">Trade summary</div>
+            <SummaryBox name={me.name} items={mineSummary} accent="text-blue-400" />
+            <div className="flex items-center justify-center text-slate-500">⇅</div>
+            <SummaryBox name={opp.name} items={theirsSummary} accent="text-red-400" />
 
-      {ai && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setAi(null)}>
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-bold flex items-center gap-2">🤖 GM Assist — analýza výmeny</h3>
-              <button onClick={() => setAi(null)} className="text-slate-400 hover:text-white text-xl leading-none">×</button>
+            <div>
+              <label className="text-xs text-slate-400">Condition (optional)</label>
+              <textarea value={condition} onChange={(e) => setCondition(e.target.value)} rows={2}
+                className="mt-1 w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-sm" placeholder="e.g. 2027 4th becomes a 3rd if he scores 20 goals" />
             </div>
-            {!ai.ok ? (
-              <p className="text-rose-400 text-sm">{ai.error}</p>
-            ) : (
-              <>
-                <div className={`rounded-xl px-4 py-3 mb-4 border ${ai.tilt === "even" ? "bg-emerald-950/30 border-emerald-800/50 text-emerald-300" : "bg-amber-950/30 border-amber-800/50 text-amber-300"}`}>
-                  <div className="text-sm font-bold">{ai.verdict}</div>
-                  <div className="text-xs mt-1 text-slate-400">{ai.fromName}: {ai.meGives} hodnoty daných · {ai.meGets} získaných</div>
-                </div>
-                <div className="grid grid-cols-2 gap-3 mb-4 text-xs">
-                  {([[ai.fromName, ai.fromItems], [ai.toName, ai.toItems]] as const).map(([nm, items], k) => (
-                    <div key={k} className="bg-slate-800/30 rounded-lg p-2.5">
-                      <div className="font-bold text-slate-300 mb-1">{nm} dáva:</div>
-                      {items.length === 0 ? <div className="text-slate-600">— nič —</div> : items.map((it, i) => (
-                        <div key={i} className="flex justify-between gap-2 border-b border-slate-800/50 py-0.5 last:border-0"><span className="text-slate-300">{it.label}</span><span className="text-slate-500 tabular-nums">{it.value}</span></div>
-                      ))}
+
+            <div className="flex flex-col gap-2">
+              <button onClick={submit} disabled={pending || count === 0}
+                className="w-full px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 font-semibold text-sm disabled:opacity-40">
+                {pending ? "Sending…" : `Propose trade${count ? ` (${count})` : ""}`}
+              </button>
+              <button onClick={runAnalyze} disabled={aiPending || count === 0}
+                className="w-full px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold text-sm disabled:opacity-40"
+                title="GM Assist — vyhodnotí hodnotu a zmysel výmeny">
+                {aiPending ? "Analyzujem…" : "🤖 GM Assist"}
+              </button>
+            </div>
+            {msg && <p className="text-green-400 text-sm">{msg}</p>}
+            {err && <p className="text-red-400 text-sm">{err}</p>}
+
+            {/* GM Assist result — inline in this column */}
+            {ai && (
+              <div className="border-t border-slate-800 pt-3">
+                {!ai.ok ? (
+                  <p className="text-rose-400 text-sm">{ai.error}</p>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-bold flex items-center gap-1.5">🤖 GM Assist</h3>
+                      <button onClick={() => setAi(null)} className="text-slate-500 hover:text-white text-lg leading-none">×</button>
                     </div>
-                  ))}
-                </div>
-                {ai.fit.length > 0 && (
-                  <div className="mb-3">
-                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Zapadnutie do tímu</div>
-                    <ul className="space-y-1">{ai.fit.map((f, i) => <li key={i} className="text-sm text-slate-200 flex gap-2"><span className="text-sky-400">▸</span><span dangerouslySetInnerHTML={{ __html: f }} /></li>)}</ul>
+                    <div className={`rounded-lg px-3 py-2 border ${ai.tilt === "even" ? "bg-emerald-950/30 border-emerald-800/50 text-emerald-300" : "bg-amber-950/30 border-amber-800/50 text-amber-300"}`}>
+                      <div className="text-sm font-bold">{ai.verdict}</div>
+                      <div className="text-[11px] mt-1 text-slate-400">{ai.fromName}: {ai.meGives} daných · {ai.meGets} získaných</div>
+                    </div>
+                    {ai.fit.length > 0 && (
+                      <ul className="space-y-1">{ai.fit.map((f, i) => <li key={i} className="text-xs text-slate-200 flex gap-1.5"><span className="text-sky-400 shrink-0">▸</span><span dangerouslySetInnerHTML={{ __html: f }} /></li>)}</ul>
+                    )}
+                    <ul className="space-y-1">
+                      {ai.reasoning.map((r, i) => <li key={i} className="text-xs text-slate-300 flex gap-1.5"><span className="text-violet-400 shrink-0">•</span><span dangerouslySetInnerHTML={{ __html: r }} /></li>)}
+                    </ul>
+                    <p className="text-[10px] text-slate-500">Heuristika (overall, vek, cap, hodnota pickov) — orientačná.</p>
                   </div>
                 )}
-                <ul className="space-y-1.5 mb-4">
-                  {ai.reasoning.map((r, i) => (
-                    <li key={i} className="text-sm text-slate-200 flex gap-2"><span className="text-violet-400">•</span><span dangerouslySetInnerHTML={{ __html: r }} /></li>
-                  ))}
-                </ul>
-                <p className="text-[11px] text-slate-500 mb-3">Heuristická analýza podľa overall, veku, cap hitu a hodnoty pickov — orientačná, nie záväzná.</p>
-                <button onClick={() => setAi(null)} className="px-5 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 font-semibold text-sm">Zavrieť</button>
-              </>
+              </div>
             )}
           </div>
         </div>
-      )}
 
-      <div className="fixed bottom-0 left-0 right-0 bg-slate-950/90 border-t border-slate-800 backdrop-blur px-4 py-3">
-        <div className="max-w-5xl mx-auto flex items-center gap-3">
-          <button onClick={submit} disabled={pending || count === 0}
-            className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 font-semibold text-sm disabled:opacity-40">
-            {pending ? "Sending…" : "Propose trade"}
-          </button>
-          <button onClick={runAnalyze} disabled={aiPending || count === 0}
-            className="px-5 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold text-sm disabled:opacity-40"
-            title="GM Assist — vyhodnotí hodnotu a zmysel výmeny">
-            {aiPending ? "Analyzujem…" : "🤖 GM Assist"}
-          </button>
-          <span className="text-xs text-slate-500">{count} asset{count === 1 ? "" : "s"} in trade</span>
-          {msg && <span className="text-green-400 text-sm">{msg}</span>}
-          {err && <span className="text-red-400 text-sm">{err}</span>}
-        </div>
+        <Side team={opp} assets={theirs} pmap={theirsP} setPmap={setTheirsP} pk={theirsPk} setPk={setTheirsPk} pro={theirsPro} setPro={setTheirsPro} cash={theirsCash} setCash={setTheirsCash} destTeamId={me.id} />
       </div>
     </div>
   );
