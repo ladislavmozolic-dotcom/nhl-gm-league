@@ -81,9 +81,10 @@ export default async function HomePage() {
   const tbBoard = await tradeBlockBoard();
   const tbListed = tbBoard.flatMap((t) => t.players);
 
-  // Trade Tracker — the latest completed trades around the league
+  // Trade Tracker — only COMPLETED deals (the accepted-trade message reads "X traded
+  // … to Y for …"); excludes proposed/declined/revoked noise. Latest 3.
   const recentTrades = await prisma.transaction.findMany({
-    where: { type: "TRADE" }, orderBy: { createdAt: "desc" }, take: 6,
+    where: { type: "TRADE", message: { contains: "traded" } }, orderBy: { createdAt: "desc" }, take: 3,
     select: { id: true, message: true, createdAt: true },
   });
 

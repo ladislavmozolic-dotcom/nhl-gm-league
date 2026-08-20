@@ -200,8 +200,8 @@ export async function executeAcceptedTrade(tradeId: number) {
 /** Create a PENDING Trade + its TradeAssets + the notification DM. The auth/clause-
  *  consent checks are the CALLER's responsibility (the human action does them; the AI
  *  only builds clause-clean packages). Returns the new trade id. */
-export async function createTradeRecord(pkg: TradePackage, opts: { fromName: string; toName: string; dmBody?: string; aiFrom?: boolean } ) {
-  const trade = await prisma.trade.create({ data: { fromTeamId: pkg.fromTeamId, toTeamId: pkg.toTeamId, status: "PENDING", condition: pkg.condition || null, waivedClauses: [...(pkg.waived ?? []), ...(pkg.clauseFees ?? []).map((f) => f.playerId)], clauseFees: (pkg.clauseFees ?? []) as object } });
+export async function createTradeRecord(pkg: TradePackage, opts: { fromName: string; toName: string; dmBody?: string; aiFrom?: boolean; leagueDay?: number } ) {
+  const trade = await prisma.trade.create({ data: { fromTeamId: pkg.fromTeamId, toTeamId: pkg.toTeamId, status: "PENDING", condition: pkg.condition || null, leagueDay: opts.leagueDay ?? null, waivedClauses: [...(pkg.waived ?? []), ...(pkg.clauseFees ?? []).map((f) => f.playerId)], clauseFees: (pkg.clauseFees ?? []) as object } });
   const rows: Array<{ tradeId: number; assetType: string; side: string; playerId?: number; prospectId?: number; draftPickId?: number; cashAmount?: number; retentionPct?: number }> = [];
   for (const p of pkg.fromPlayers) rows.push({ tradeId: trade.id, assetType: "PLAYER", side: "FROM", playerId: p.playerId, retentionPct: p.retentionPct || undefined });
   for (const p of pkg.toPlayers) rows.push({ tradeId: trade.id, assetType: "PLAYER", side: "TO", playerId: p.playerId, retentionPct: p.retentionPct || undefined });

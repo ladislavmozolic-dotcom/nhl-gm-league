@@ -267,6 +267,7 @@ model Trade {
   condition   String?
   respondedAt DateTime?
   createdAt   DateTime @default(now())
+  leagueDay   Int?     // league-calendar day the trade was created (throttles AI-initiated offers)
   waivedClauses Int[]  // player ids whose NTC/NMC/M-NTC was waived to allow this deal
   clauseFees  Json?    // [{ playerId, feeAmount, payTeamId }] — agent-set waiver fees the giving team pays the player
 }
