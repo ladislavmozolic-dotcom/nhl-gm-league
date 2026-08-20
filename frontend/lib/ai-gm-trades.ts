@@ -12,15 +12,32 @@ import type { Contention } from "./free-agency";
 import { packageFromTrade, executeAcceptedTrade, createTradeRecord, type TradePackage } from "./trade-exec";
 import { analyzeTradeAction } from "@/app/trades/build/actions";
 
-const STAR_OV = 82;        // a clear top-line / top-pair player — protected
-const FRANCHISE_OV = 88;   // a franchise cornerstone — heavily protected
 const clean = (s: string) => s.replace(/\s*\([^)]*\)/g, "").trim();
 const grp = (pos: string | null) => { const P = (pos ?? "").toUpperCase(); if (/G/.test(P)) return "G"; if (/(^|\/)D(\/|$)|^D$/.test(P)) return "D"; if (/C/.test(P)) return "C"; return "W"; };
+
+// "Star" / "franchise" are RELATIVE to this league's own OV spread (our overalls top
+// out far below the 82/88 of a real-NHL scale), computed from percentiles, and
+// separately for skaters vs goalies (goalies sit on a higher OV band).
+type Thresholds = { skStar: number; skFranchise: number; gkStar: number; gkFranchise: number };
+async function computeThresholds(): Promise<Thresholds> {
+  const pull = async (isGoalie: boolean) => (await prisma.player.findMany({ where: { rosterType: "NHL", isGoalie, overall: { not: null } }, select: { overall: true } }))
+    .map((x) => x.overall ?? 0).filter(Boolean).sort((a, b) => b - a);
+  const at = (arr: number[], q: number) => arr.length ? arr[Math.min(arr.length - 1, Math.floor(arr.length * q))] : 999;
+  const sk = await pull(false), gk = await pull(true);
+  return {
+    skStar: at(sk, 0.06),       // top ~6% of skaters = a star
+    skFranchise: at(sk, 0.015), // top ~1.5% = a franchise cornerstone
+    gkStar: at(gk, 0.10),       // fewer goalies → top ~10% = a star starter
+    gkFranchise: at(gk, 0.03),
+  };
+}
+const isStar = (ov: number, isGoalie: boolean, th: Thresholds) => ov >= (isGoalie ? th.gkStar : th.skStar);
+const isFranchise = (ov: number, isGoalie: boolean, th: Thresholds) => ov >= (isGoalie ? th.gkFranchise : th.skFranchise);
 
 type Decision = { action: "accept" | "decline" | "counter"; reason: string; counter?: TradePackage; counterNote?: string };
 
 /** Decide how an advanced-AI receiving club responds to one pending proposal. */
-async function decide(tradeId: number, aiTeamId: number, contention: Contention): Promise<Decision> {
+async function decide(tradeId: number, aiTeamId: number, contention: Contention, th: Thresholds): Promise<Decision> {
   const pkg = await packageFromTrade(tradeId);
   if (pkg.toTeamId !== aiTeamId) return { action: "decline", reason: "not addressed to this club" };
 
@@ -36,7 +53,7 @@ async function decide(tradeId: number, aiTeamId: number, contention: Contention)
   const outIds = pkg.toPlayers.map((p) => p.playerId);
   const inIds = pkg.fromPlayers.map((p) => p.playerId);
   const [outP, inP, team] = await Promise.all([
-    prisma.player.findMany({ where: { id: { in: outIds } }, select: { id: true, name: true, overall: true, age: true, position: true } }),
+    prisma.player.findMany({ where: { id: { in: outIds } }, select: { id: true, name: true, overall: true, age: true, position: true, isGoalie: true } }),
     prisma.player.findMany({ where: { id: { in: inIds } }, select: { id: true, overall: true, age: true, position: true } }),
     prisma.team.findUnique({ where: { id: aiTeamId }, select: { needs: true } }),
   ]);
@@ -46,8 +63,8 @@ async function decide(tradeId: number, aiTeamId: number, contention: Contention)
   const outAge = avg(outP.map((p) => p.age)), inAge = avg(inP.map((p) => p.age));
   const givesPicksProspects = pkg.toPicks.length + (pkg.toProspects?.length ?? 0) > 0;
   const getsPicksProspects = pkg.fromPicks.length + (pkg.fromProspects?.length ?? 0) > 0;
-  const star = outP.find((p) => (p.overall ?? 0) >= STAR_OV);
-  const franchise = outP.find((p) => (p.overall ?? 0) >= FRANCHISE_OV);
+  const star = outP.find((p) => isStar(p.overall ?? 0, p.isGoalie, th));
+  const franchise = outP.find((p) => isFranchise(p.overall ?? 0, p.isGoalie, th));
 
   // --- required value ratio (T): the AI wants at least T× value back ------------
   let T = 1.05; // baseline: a small win, so it never gets fleeced
@@ -119,6 +136,7 @@ export async function aiGmTradesDaily(): Promise<{ handled: number; details: str
   if (!aiTeams.length) return { handled: 0, details: [] };
   const aiById = new Map(aiTeams.map((t) => [t.id, t]));
   const contention = await teamContentionMap().catch(() => new Map<number, Contention>());
+  const th = await computeThresholds();
 
   // AI GMs only deal with REAL (human) GMs — never with each other. Skip any
   // incoming proposal whose sender is itself an AI-run club (defensive).
@@ -135,7 +153,7 @@ export async function aiGmTradesDaily(): Promise<{ handled: number; details: str
     const ai = aiById.get(tr.toTeamId)!;
     const aiName = ai.code ?? ai.name;
     try {
-      const d = await decide(tr.id, tr.toTeamId, contention.get(tr.toTeamId) ?? "middle");
+      const d = await decide(tr.id, tr.toTeamId, contention.get(tr.toTeamId) ?? "middle", th);
       const humanName = (await prisma.team.findUnique({ where: { id: tr.fromTeamId }, select: { name: true } }))?.name ?? "the other club";
       if (d.action === "accept") {
         const { fromTeam, toTeam, fromNames, toNames } = await executeAcceptedTrade(tr.id);
@@ -161,7 +179,7 @@ export async function aiGmTradesDaily(): Promise<{ handled: number; details: str
   // Proactive offers (opt-in) — Advanced-AI clubs shop their needs to HUMAN clubs.
   if (settings.aiInitiateTrades) {
     try {
-      const init = await aiGmInitiateTrades(aiTeams, contention);
+      const init = await aiGmInitiateTrades(aiTeams, contention, th);
       details.push(...init);
       handled += init.length;
     } catch { /* best-effort */ }
@@ -184,7 +202,7 @@ type RosterP = { id: number; name: string; overall: number | null; age: number |
 /** For each advanced-AI club: find its biggest positional NEED, find a fair, clause-
  *  clean player on a HUMAN club that fills it, and offer surplus + a spare pick of
  *  matching value. One offer per club per run; skips clubs it's already courting. */
-async function aiGmInitiateTrades(aiTeams: { id: number; name: string; code: string | null }[], contention: Map<number, Contention>): Promise<string[]> {
+async function aiGmInitiateTrades(aiTeams: { id: number; name: string; code: string | null }[], contention: Map<number, Contention>, th: Thresholds): Promise<string[]> {
   const out: string[] = [];
   const humanTeams = await prisma.team.findMany({ where: { passwordHash: { not: null }, league: "NHL", isAffiliate: false }, select: { id: true, name: true } });
   if (!humanTeams.length) return out; // nobody to trade with
@@ -205,7 +223,7 @@ async function aiGmInitiateTrades(aiTeams: { id: number; name: string; code: str
 
       // AI's tradeable surplus: extra bodies at DEEP positions (never a clause/star piece)
       const surplus = roster
-        .filter((p) => p.injuryDaysLeft <= 0 && !p.tradeClause && (p.overall ?? 0) < STAR_OV && good(grp(p.position)).length > NEED_THRESH[grp(p.position)])
+        .filter((p) => p.injuryDaysLeft <= 0 && !p.tradeClause && !isStar(p.overall ?? 0, grp(p.position) === "G", th) && good(grp(p.position)).length > NEED_THRESH[grp(p.position)])
         .sort((a, b) => (a.overall ?? 0) - (b.overall ?? 0));
       if (!surplus.length) continue;
       const chip = surplus[surplus.length - 1]; // best surplus piece as the centrepiece
@@ -225,7 +243,7 @@ async function aiGmInitiateTrades(aiTeams: { id: number; name: string; code: str
         for (const c of cand) {
           if (grp(c.position) !== needPos) continue;
           const ov = c.overall ?? 0;
-          if (ov < GOOD_OV || ov >= FRANCHISE_OV) continue;       // real upgrade, not an untouchable
+          if (ov < GOOD_OV || isFranchise(ov, needPos === "G", th)) continue; // real upgrade, not an untouchable
           if (ov <= (good(needPos)[0]?.overall ?? 0)) continue;   // must beat our best there
           const val = playerValue(ov, c.age);
           if (val > capacity * 1.15) continue;                    // can't afford a fair offer
