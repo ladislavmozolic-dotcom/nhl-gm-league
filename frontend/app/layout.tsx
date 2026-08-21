@@ -22,7 +22,24 @@ const inter = Inter({ subsets: ["latin"] });
 
 export async function generateMetadata(): Promise<Metadata> {
   const b = await loadBranding();
-  return { title: `${b.leagueName} — ${b.tagline}`, description: b.tagline };
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://unhl.eu";
+  const title = `${b.leagueName} — ${b.tagline}`;
+  // the uploaded site logo (Admin → Web Editor → Branding) drives the browser-tab
+  // favicon AND the link-preview image, so a shared link shows OUR logo — not the
+  // team logos a scraper would otherwise scrape off the page.
+  const logo = b.logoUrl || b.nameImageUrl || null;
+  return {
+    metadataBase: new URL(siteUrl),
+    title,
+    description: b.tagline,
+    applicationName: b.leagueName,
+    ...(logo ? { icons: { icon: logo, shortcut: logo, apple: logo } } : {}),
+    openGraph: {
+      type: "website", url: siteUrl, siteName: b.leagueName, title, description: b.tagline,
+      ...(logo ? { images: [{ url: logo }] } : {}),
+    },
+    twitter: { card: logo ? "summary_large_image" : "summary", title, description: b.tagline, ...(logo ? { images: [logo] } : {}) },
+  };
 }
 
 export default async function RootLayout({
