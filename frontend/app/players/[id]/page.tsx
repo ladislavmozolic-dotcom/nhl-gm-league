@@ -89,11 +89,13 @@ function formatDOB(birthDate: string | null | undefined): string {
 function aggSkater(rows: {
   goals: number; assists: number; points: number; shots: number; pim: number;
   plusMinus: number; ppGoals: number; shGoals: number; gwg: number;
-  hits: number; blocks: number; faceoffWins: number; faceoffLosses: number; toi: number;
+  hits: number; blocks: number; faceoffWins: number; faceoffLosses: number; toi: number; ppToi: number; pkToi: number;
 }[]) {
   const gp = rows.length;
   const sum = (k: keyof (typeof rows)[number]) => rows.reduce((s, r) => s + (r[k] as number), 0);
   const goals = sum("goals"), shots = sum("shots"), fw = sum("faceoffWins"), fl = sum("faceoffLosses"), toi = sum("toi"), points = sum("points");
+  // TOI splits (seconds): even-strength = total − PP − PK. Shown as per-game averages.
+  const ppToi = sum("ppToi"), pkToi = sum("pkToi"), evToi = Math.max(0, toi - ppToi - pkToi);
   return {
     gp,
     g: goals, a: sum("assists"), pts: points, pm: sum("plusMinus"), pim: sum("pim"),
@@ -102,6 +104,9 @@ function aggSkater(rows: {
     hits: sum("hits"), bks: sum("blocks"),
     foPct: fw + fl ? (fw / (fw + fl)) * 100 : null,
     toi: gp ? mmss(toi / gp) : "—",
+    evToi: gp ? mmss(evToi / gp) : "—",
+    ppToi: gp ? mmss(ppToi / gp) : "—",
+    pkToi: gp ? mmss(pkToi / gp) : "—",
     pPg: gp ? points / gp : 0,
   };
 }
@@ -137,8 +142,12 @@ const pmFmt = (v: number) => (v > 0 ? `+${v}` : String(v));
 const pctFmt = (v: number | null, d = 1) => (v == null ? "—" : v.toFixed(d));
 const svpFmt = (v: number | null) => (v == null ? "—" : v.toFixed(3).replace(/^0/, ""));
 
-const SK_COLS = ["GP", "G", "A", "PTS", "+/-", "PIM", "PPG", "SHG", "GWG", "S", "S%", "HITS", "BKS", "FO%", "TOI", "P/PG"];
-const skCells = (a: SkAgg) => [a.gp, a.g, a.a, a.pts, pmFmt(a.pm), a.pim, a.ppg, a.shg, a.gwg, a.s, pctFmt(a.sPct), a.hits, a.bks, a.foPct == null ? "—" : a.foPct.toFixed(1), a.toi, a.pPg.toFixed(2)];
+const COL_TITLES: Record<string, string> = {
+  TOI: "Average total time on ice per game", EV: "Average even-strength ice time per game",
+  PP: "Average power-play ice time per game", PK: "Average penalty-kill ice time per game",
+};
+const SK_COLS = ["GP", "G", "A", "PTS", "+/-", "PIM", "PPG", "SHG", "GWG", "S", "S%", "HITS", "BKS", "FO%", "TOI", "EV", "PP", "PK", "P/PG"];
+const skCells = (a: SkAgg) => [a.gp, a.g, a.a, a.pts, pmFmt(a.pm), a.pim, a.ppg, a.shg, a.gwg, a.s, pctFmt(a.sPct), a.hits, a.bks, a.foPct == null ? "—" : a.foPct.toFixed(1), a.toi, a.evToi, a.ppToi, a.pkToi, a.pPg.toFixed(2)];
 const GL_COLS = ["GP", "W", "L", "OTL", "SV%", "GAA", "SO", "SA", "SV", "GA", "TOI"];
 const glCells = (a: GlAgg) => [a.gp, a.w, a.l, a.otl, svpFmt(a.svPct), a.gaa.toFixed(2), a.so, a.sa, a.sv, a.ga, a.toi];
 
@@ -151,7 +160,7 @@ function StatBlock({ league, cols, reg, po, cellsOf, team }: {
     <thead><tr className={headRowCls}>
       <th className="px-3 py-2.5 text-left font-medium">Season</th>
       <th className="px-3 py-2.5 text-left font-medium">Team</th>
-      {cols.map((h) => <th key={h} className="px-3 py-2.5 text-right font-medium whitespace-nowrap">{h}</th>)}
+      {cols.map((h) => <th key={h} title={COL_TITLES[h]} className={`px-3 py-2.5 text-right font-medium whitespace-nowrap ${COL_TITLES[h] ? "cursor-help" : ""}`}>{h}</th>)}
     </tr></thead>
   );
   const Row = ({ label, a, bold, accent, teamNode }: { label: string; a: any; bold?: boolean; accent?: boolean; teamNode: React.ReactNode }) => (
@@ -211,7 +220,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       where: { playerId: p.id, game: { season: SEASON, status: "FINAL" } },
       select: {
         goals: true, assists: true, points: true, shots: true, pim: true, plusMinus: true,
-        ppGoals: true, shGoals: true, gwg: true, hits: true, blocks: true, faceoffWins: true, faceoffLosses: true, toi: true,
+        ppGoals: true, shGoals: true, gwg: true, hits: true, blocks: true, faceoffWins: true, faceoffLosses: true, toi: true, ppToi: true, pkToi: true,
         game: { select: { league: true, seriesId: true } },
       },
     });
