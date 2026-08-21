@@ -79,7 +79,7 @@ export const DEFAULT_MENU: MenuItem[] = [
     { label: "🗂️ All Rosters", href: "/tools/all-rosters" },
     { label: "⚖️ Player Compare", href: "/tools/compare" },
     { label: "🧮 Cap Calculator", href: "/tools/cap-calculator" },
-    { label: "🎚️ STHS Parameters (calculator)", href: "/tools/player-calculator" },
+    { label: "🎚️ Parameters (calculator)", href: "/tools/player-calculator" },
     { label: "🎛️ Edge Parameters (calculator)", href: "/tools/edge-calculator" },
     { label: "🔄 Player Data Refresh", href: "/tools/player-data" },
   ] },

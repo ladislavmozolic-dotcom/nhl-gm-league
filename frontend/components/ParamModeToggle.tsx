@@ -10,7 +10,7 @@ export default function ParamModeToggle({ mode }: { mode: "sths" | "edge" }) {
   const set = (c: "sths" | "edge") => start(async () => { await setParamModeAction(c); router.refresh(); });
 
   const opts: { key: "sths" | "edge"; label: string; sub: string }[] = [
-    { key: "sths", label: "STHS Parameters", sub: "Classic stats → ratings calculator" },
+    { key: "sths", label: "Parameters", sub: "Classic stats → ratings calculator" },
     { key: "edge", label: "NHL Edge Parameters", sub: "Tracking-data (Edge) calculator" },
   ];
 
