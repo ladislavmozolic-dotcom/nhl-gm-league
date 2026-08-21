@@ -59,6 +59,7 @@ model Team {
   draftPicks        DraftPick[]
   players           Player[]
   prospects         Prospect[]
+  draftRankings     DraftRanking[]
   parentTeam        Team?       @relation("Affiliates", fields: [parentTeamId], references: [id])
   affiliateTeams    Team[]      @relation("Affiliates")
   homeGames         Game[]      @relation("HomeGames")
@@ -997,9 +998,29 @@ model DraftProspect {
   offBoard        Boolean @default(false) // GM-added pick, not on the scouting board
   epLink          String? // EliteProspects link the GM supplied for an off-board pick
   verified        Boolean @default(false) // admin confirmed an off-board pick is eligible
+  rankings        DraftRanking[]
 
   @@index([draftYear, draftedByTeamId])
   @@index([draftYear, overallPick])
+}
+
+// A GM's PRIVATE scouting board + draft queue for a given prospect. `rank` orders
+// the queue (1 = take first; 0 = on the board but not yet slotted into the queue).
+// The Draft Room's auto-pick pulls the highest still-available ranked prospect.
+model DraftRanking {
+  id              Int           @id @default(autoincrement())
+  teamId          Int
+  team            Team          @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  draftProspectId Int
+  prospect        DraftProspect @relation(fields: [draftProspectId], references: [id], onDelete: Cascade)
+  rank            Int           @default(0) // queue order (1 = first); 0 = board-only
+  tier            String? // optional GM grade (e.g. "A" / "must-draft")
+  note            String? // GM scouting note
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([teamId, draftProspectId])
+  @@index([teamId])
 }
 
 // Live Draft Room state. One row per draft year. The admin opens a round; picks

@@ -58,6 +58,70 @@ export async function processDraftClockAction() {
   return { advanced: true, deferred: willDefer };
 }
 
+/** Safety net: when the on-clock pick is within its final `AUTO_LEAD_MS`, auto-draft
+ *  the on-clock club's highest still-available QUEUED prospect (from its GM's private
+ *  Draft Rankings). Empty queue → best available on the board. Any viewer's timer may
+ *  call it; an atomic guard makes exactly one caller act. If nothing is draftable it
+ *  falls back to the deferral path. Prevents missed picks. */
+const AUTO_LEAD_MS = 10_000; // fire ~10s before the deadline
+export async function autoPickIfExpiringAction() {
+  const YEAR = await currentDraftYear();
+  const s = await getState(YEAR);
+  if (s.status !== "LIVE" || !s.onClockAt) return { acted: false as const };
+  const order = await effectiveOrder(YEAR);
+  const slot = order.find((p) => p.overallPick === s.currentPick);
+  if (!slot) return { acted: false as const };
+
+  const minutes = pickMinutes(slot.round, slot.deferred);
+  const deadline = new Date(s.onClockAt).getTime() + minutes * 60000;
+  if (Date.now() < deadline - AUTO_LEAD_MS) return { acted: false as const }; // not in the final window yet
+
+  const src = await currentDraftSourceWhere();
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true, draftTestMode: true } });
+  const source = cfg?.rosterMode === "real" ? "real" : "profinhl";
+  const testMode = !!cfg?.draftTestMode;
+
+  // 1) on-clock club's top still-available queued prospect
+  const queued = await prisma.draftRanking.findMany({
+    where: { teamId: slot.pickerTeamId, rank: { gt: 0 }, prospect: { draftYear: YEAR, draftedByTeamId: null, ...src } },
+    orderBy: { rank: "asc" }, take: 1,
+    select: { prospect: { select: { id: true, name: true, position: true } } },
+  });
+  let target: { id: number; name: string; position: string } | null = queued[0]?.prospect ?? null;
+  // 2) fallback: best available on the board (ceiling → rating → CS rank)
+  if (!target) {
+    target = await prisma.draftProspect.findFirst({
+      where: { draftYear: YEAR, draftedByTeamId: null, ...src },
+      orderBy: [{ potential: "desc" }, { ov: "desc" }, { csRank: "asc" }, { id: "asc" }],
+      select: { id: true, name: true, position: true },
+    });
+  }
+  if (!target) return { acted: false as const }; // nothing draftable — let the 0s backstop defer
+
+  const nextPick = s.currentPick + 1;
+  const deferralCount = await prisma.draftDeferral.count({ where: { year: YEAR } });
+  const lastScheduled = order.filter((p) => !p.deferred).reduce((m, p) => Math.max(m, p.overallPick), LAST_BASE_PICK);
+  const maxPick = lastScheduled + deferralCount;
+  const nextSlot = order.find((p) => p.overallPick === nextPick);
+  const done = nextPick > maxPick;
+  const roundDone = !slot.deferred && !done && nextPick <= lastScheduled && !!nextSlot && nextSlot.round !== slot.round;
+
+  const res = await prisma.$transaction(async (tx) => {
+    // atomic guard: only the caller that flips this exact pick proceeds
+    const upd = await tx.draftState.updateMany({
+      where: { year: YEAR, currentPick: s.currentPick, status: "LIVE" },
+      data: { currentPick: nextPick, onClockAt: (roundDone || done) ? null : new Date(), status: done ? "DONE" : roundDone ? "ROUND_DONE" : "LIVE" },
+    });
+    if (upd.count === 0) return { acted: false as const };
+    const took = await tx.draftProspect.updateMany({ where: { id: target!.id, draftedByTeamId: null }, data: { draftedByTeamId: slot.pickerTeamId, overallPick: s.currentPick } });
+    if (took.count === 0) return { acted: false as const };
+    if (!testMode) await tx.prospect.create({ data: { name: target!.name, position: target!.position, draftYear: YEAR, overallPick: s.currentPick, teamId: slot.pickerTeamId, source } });
+    return { acted: true as const };
+  });
+  if (res.acted) revalidatePath("/draft/room");
+  return { ...res, picked: res.acted ? target.name : undefined };
+}
+
 /** A signed-in GM posts a chat message to the draft room. */
 export async function postChatAction(text: string, channel = "draft") {
   const teamId = await getTeamSession();
@@ -129,13 +193,21 @@ export async function makePickAction(prospectId: number) {
   const done = nextPick > maxPick;
   // a round (base or bonus) finishes when the next scheduled pick is a new round → wait for the admin
   const roundDone = !slot.deferred && !done && nextPick <= lastScheduled && !!nextSlot && nextSlot.round !== slot.round;
-  await prisma.$transaction([
-    prisma.draftProspect.update({ where: { id: prospectId }, data: { draftedByTeamId: slot.pickerTeamId, overallPick: s.currentPick } }),
+  const res = await prisma.$transaction(async (tx) => {
+    // atomic guard against a race with the auto-pick (or another caller) on this same pick
+    const upd = await tx.draftState.updateMany({
+      where: { year: YEAR, currentPick: s.currentPick, status: "LIVE" },
+      data: { currentPick: nextPick, onClockAt: (roundDone || done) ? null : new Date(), status: done ? "DONE" : roundDone ? "ROUND_DONE" : "LIVE" },
+    });
+    if (upd.count === 0) return { ok: false as const, error: "That pick was just made — refresh." };
+    const took = await tx.draftProspect.updateMany({ where: { id: prospectId, draftedByTeamId: null }, data: { draftedByTeamId: slot.pickerTeamId, overallPick: s.currentPick } });
+    if (took.count === 0) return { ok: false as const, error: "Already drafted." };
     // in test mode the pick shows on the board but the player is NOT written onto the
     // club (no Prospect row) — reset the board to re-run the draft with the same names.
-    ...(testMode ? [] : [prisma.prospect.create({ data: { name: prospect.name, position: prospect.position, draftYear: YEAR, overallPick: s.currentPick, teamId: slot.pickerTeamId, source } })]),
-    prisma.draftState.update({ where: { year: YEAR }, data: { currentPick: nextPick, onClockAt: (roundDone || done) ? null : new Date(), status: done ? "DONE" : roundDone ? "ROUND_DONE" : "LIVE" } }),
-  ]);
+    if (!testMode) await tx.prospect.create({ data: { name: prospect.name, position: prospect.position, draftYear: YEAR, overallPick: s.currentPick, teamId: slot.pickerTeamId, source } });
+    return { ok: true as const };
+  });
+  if (!res.ok) return res;
   revalidatePath("/draft/room");
   return { ok: true, roundDone, done };
 }

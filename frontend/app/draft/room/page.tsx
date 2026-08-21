@@ -5,6 +5,7 @@ import { getTeamSession, isAdmin } from "@/lib/auth";
 import { effectiveOrder, reverseStandingsOrder, PICKS_PER_ROUND } from "@/lib/draft-order";
 import { countryFlag } from "@/lib/flags";
 import DraftAvailableBoard, { type BoardProspect } from "@/components/DraftAvailableBoard";
+import DraftQueuePanel, { type QueueItem } from "@/components/DraftQueuePanel";
 import DraftRoundStarter from "@/components/DraftRoundStarter";
 import DraftTestControls from "@/components/DraftTestControls";
 import DraftChat from "@/components/DraftChat";
@@ -85,6 +86,16 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
   const board: BoardProspect[] = availableRaw.map((p) => ({
     id: p.id, name: p.name, position: p.position, country: p.country, shoots: p.shoots, amateurLeague: p.amateurLeague, amateurClub: p.amateurClub, flag: countryFlag(p.country),
     heightIn: p.heightIn, weightLb: p.weightLb,
+  }));
+
+  // the signed-in GM's own draft queue for this class, filtered to still-available players
+  const availableIds = new Set(availableRaw.map((p) => p.id));
+  const myQueue: QueueItem[] = me == null ? [] : (await prisma.draftRanking.findMany({
+    where: { teamId: me, rank: { gt: 0 }, prospect: { draftYear: DRAFT_YEAR, draftedByTeamId: null, ...src } },
+    orderBy: { rank: "asc" },
+    select: { rank: true, tier: true, note: true, prospect: { select: { id: true, name: true, position: true, country: true } } },
+  })).filter((r) => availableIds.has(r.prospect.id)).map((r) => ({
+    prospectId: r.prospect.id, rank: r.rank, name: r.prospect.name, position: r.prospect.position, flag: countryFlag(r.prospect.country), tier: r.tier, note: r.note,
   }));
 
   return (
@@ -256,6 +267,7 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
             </div>
 
             <div className="space-y-3">
+              {me != null && <DraftQueuePanel queue={myQueue} canPick={canPick} />}
               <DraftAvailableBoard prospects={board} canPick={canPick} onClock={currentSlot && onClockTeam ? { teamName: onClockTeam.name, teamLogo: onClockTeam.logoUrl, pick: state.currentPick } : undefined} />
               {canPick && currentSlot && <OffBoardPickForm pick={state.currentPick} />}
               {admin && <OffBoardVerifyPanel picks={offBoardPicks} />}
