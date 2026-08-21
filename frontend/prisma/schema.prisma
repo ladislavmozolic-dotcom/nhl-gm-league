@@ -735,10 +735,13 @@ model SimSettings {
   values Json
 }
 
-// Login audit — one row per successful GM sign-in, with IP + rough geolocation.
+// Access audit — GM sign-ins (type "gm") AND general visits (type "visit", one per
+// browser per day, registered or guest), each with IP + rough geolocation.
 model LoginLog {
   id        Int      @id @default(autoincrement())
-  teamId    Int?
+  type      String   @default("gm") // gm | visit
+  teamId    Int?     // the signed-in GM's club, if any (null = guest)
+  path      String?  // landing path (for visits)
   ip        String?
   country   String?
   region    String?

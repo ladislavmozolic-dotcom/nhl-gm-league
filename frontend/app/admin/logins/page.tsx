@@ -23,14 +23,15 @@ export default async function LoginsPage() {
 
   return (
     <div className="space-y-4 py-2">
-      <PageHeader title="Login Audit" subtitle="Every GM sign-in — time, IP and rough location." right={<Link href="/admin" className="text-sm text-slate-400 hover:text-blue-400">← Admin</Link>} />
+      <PageHeader title="Access Audit" subtitle="GM sign-ins and site visits — time, IP and rough location." right={<Link href="/admin" className="text-sm text-slate-400 hover:text-blue-400">← Admin</Link>} />
       <Card bodyClassName="p-0">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[820px]">
+          <table className="w-full text-sm min-w-[900px]">
             <thead>
               <tr className="border-b border-slate-800 bg-slate-800/30 text-slate-500 text-xs uppercase tracking-wider">
                 <th className="px-3 py-2.5 text-left">When</th>
-                <th className="px-3 py-2.5 text-left">Team · GM</th>
+                <th className="px-3 py-2.5 text-left">Type</th>
+                <th className="px-3 py-2.5 text-left">Who</th>
                 <th className="px-3 py-2.5 text-left">IP</th>
                 <th className="px-3 py-2.5 text-left">Location</th>
                 <th className="px-3 py-2.5 text-left">ISP</th>
@@ -38,14 +39,16 @@ export default async function LoginsPage() {
               </tr>
             </thead>
             <tbody>
-              {logs.length === 0 && <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-500">No sign-ins recorded yet.</td></tr>}
+              {logs.length === 0 && <tr><td colSpan={7} className="px-4 py-6 text-center text-slate-500">Nothing recorded yet.</td></tr>}
               {logs.map((l) => {
                 const t = l.teamId != null ? tById.get(l.teamId) : null;
                 const loc = [l.city, l.region, l.country].filter(Boolean).join(", ") || "—";
+                const isGm = l.type === "gm";
                 return (
                   <tr key={l.id} className="border-b border-slate-800/40 hover:bg-slate-800/30 last:border-0">
                     <td className="px-3 py-2 text-slate-400 whitespace-nowrap tabular-nums">{fmt(l.createdAt)}</td>
-                    <td className="px-3 py-2">{t ? <><span className="font-semibold">{t.code}</span> <span className="text-slate-500 text-xs">{t.gmNickname || t.gm || t.name}</span></> : <span className="text-slate-500">#{l.teamId ?? "?"}</span>}</td>
+                    <td className="px-3 py-2"><span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isGm ? "bg-emerald-500/20 text-emerald-300" : "bg-slate-600/30 text-slate-300"}`}>{isGm ? "GM login" : "visit"}</span></td>
+                    <td className="px-3 py-2">{t ? <><span className="font-semibold">{t.code}</span> <span className="text-slate-500 text-xs">{t.gmNickname || t.gm || t.name}</span></> : <span className="text-slate-500">{l.path ? <span className="font-mono text-xs">{l.path}</span> : "guest"}</span>}</td>
                     <td className="px-3 py-2 font-mono text-xs text-slate-300">{l.ip ?? "—"}</td>
                     <td className="px-3 py-2 text-slate-300">{loc}</td>
                     <td className="px-3 py-2 text-slate-400 text-xs truncate max-w-[220px]" title={l.isp ?? ""}>{l.isp ?? "—"}</td>
@@ -57,7 +60,7 @@ export default async function LoginsPage() {
           </table>
         </div>
       </Card>
-      <p className="text-xs text-slate-600">Location is a best-effort lookup from the IP (via ip-api) at sign-in time — city-level and approximate.</p>
+      <p className="text-xs text-slate-600">Visits are logged once per browser per day (registered or guest). Location is a best-effort IP lookup (ip-api) — city-level and approximate.</p>
     </div>
   );
 }

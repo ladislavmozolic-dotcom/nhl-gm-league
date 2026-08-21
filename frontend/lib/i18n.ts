@@ -89,7 +89,7 @@ export const DICT: Dict = {
   "admin.siteEditor.d": { en: "Customize the site — branding, theme & colours, menu, homepage, custom pages.", cs: "Prispôsob stránku — branding, téma & farby, menu, domovská stránka, vlastné stránky." },
   "admin.announcements.d": { en: "Post a league-wide message — reaches every GM and the home page.", cs: "Zverejni správu pre celú ligu — dorazí každému GM aj na domovskú stránku." },
   "admin.awards.d": { en: "Open/close the award ballot, watch the tally, resolve winners.", cs: "Otvor/zatvor hlasovanie o cenách, sleduj priebeh, vyhlás víťazov." },
-  "admin.logins.d": { en: "Who signed in, from which IP, and roughly where.", cs: "Kto sa prihlásil, z akej IP a približne odkiaľ." },
+  "admin.logins.d": { en: "All sign-ins & visits — who, IP, and roughly where.", cs: "Kto sa prihlásil, z akej IP a približne odkiaľ." },
   // Team sub-nav
   "team.home": { en: "Home", cs: "Domov", de: "Start", ru: "Главная" },
   "team.roster": { en: "Roster", cs: "Soupiska", de: "Kader", ru: "Состав" },
