@@ -16,6 +16,7 @@ export type WeeklyDigest = {
   topScorer: { id: number; name: string; slug: string | null; team: string | null; teamLogo: string | null; g: number; a: number; pts: number; gp: number } | null;
   bestGoalie: { id: number; name: string; slug: string | null; team: string | null; teamLogo: string | null; gp: number; svPct: number; record: string } | null;
   stars: StarRow[];
+  gmOfPeriod: { rank: number; gm: string; ai: boolean; team: string; code: string | null; slug: string | null; logo: string | null; w: number; l: number; otl: number; points: number }[];
   surprise: { code: string | null; name: string; slug: string | null; logo: string | null; w: number; l: number; otl: number; overallRank: number } | null;
   tradeOfWeek: string | null;
 } | null;
@@ -35,10 +36,10 @@ export async function weeklyDigest(round?: number, span: number = WEEK): Promise
     where: { season: SEASON, league: "NHL", status: "FINAL", seriesId: null, round: { gte: from, lte: to } },
     select: { id: true, homeTeamId: true, awayTeamId: true, homeGoals: true, awayGoals: true, endedIn: true },
   });
-  if (!games.length) return { weekNo, roundFrom: from, roundTo: to, games: 0, span, teamOfWeek: null, topScorer: null, bestGoalie: null, stars: [], surprise: null, tradeOfWeek: null };
+  if (!games.length) return { weekNo, roundFrom: from, roundTo: to, games: 0, span, teamOfWeek: null, topScorer: null, bestGoalie: null, stars: [], gmOfPeriod: [], surprise: null, tradeOfWeek: null };
   const winIds = games.map((g) => g.id);
 
-  const teams = await prisma.team.findMany({ where: { league: "NHL", isAffiliate: false }, select: { id: true, code: true, name: true, slug: true, logoUrl: true } });
+  const teams = await prisma.team.findMany({ where: { league: "NHL", isAffiliate: false }, select: { id: true, code: true, name: true, slug: true, logoUrl: true, gm: true, gmNickname: true, passwordHash: true } });
   const tm = new Map(teams.map((t) => [t.id, t]));
 
   // team week records
@@ -55,6 +56,7 @@ export async function weeklyDigest(round?: number, span: number = WEEK): Promise
   const ranked = [...rec.entries()].map(([id, r]) => ({ id, ...r })).sort((x, y) => y.points - x.points || (y.gf - y.ga) - (x.gf - x.ga));
   const tow = ranked[0];
   const teamOfWeek = tow ? { code: tm.get(tow.id)?.code ?? null, name: tm.get(tow.id)?.name ?? "?", slug: tm.get(tow.id)?.slug ?? null, logo: tm.get(tow.id)?.logoUrl ?? null, w: tow.w, l: tow.l, otl: tow.otl, points: tow.points, gf: tow.gf, ga: tow.ga } : null;
+  const gmOfPeriod = ranked.slice(0, 3).map((r, i) => { const t = tm.get(r.id); const ai = !t?.passwordHash; return { rank: i + 1, gm: ai ? "AI GM" : (t?.gmNickname || t?.gm || "GM"), ai, team: t?.name ?? "?", code: t?.code ?? null, slug: t?.slug ?? null, logo: t?.logoUrl ?? null, w: r.w, l: r.l, otl: r.otl, points: r.points }; });
 
   // top scorer
   const sk = await prisma.playerGameStat.groupBy({ by: ["playerId"], where: { gameId: { in: winIds } }, _sum: { goals: true, assists: true, points: true }, _count: { _all: true } });
@@ -103,7 +105,7 @@ export async function weeklyDigest(round?: number, span: number = WEEK): Promise
   // trade of the week — the latest completed deal
   const tr = await prisma.transaction.findFirst({ where: { type: "TRADE", message: { contains: "traded" } }, orderBy: { createdAt: "desc" }, select: { message: true } });
 
-  return { weekNo, roundFrom: from, roundTo: to, games: games.length, span, teamOfWeek, topScorer, bestGoalie, stars, surprise, tradeOfWeek: tr?.message ?? null };
+  return { weekNo, roundFrom: from, roundTo: to, games: games.length, span, teamOfWeek, topScorer, bestGoalie, stars, gmOfPeriod, surprise, tradeOfWeek: tr?.message ?? null };
 }
 
 /** Auto-post the weekly recap to human GMs' Messages + a public news line, once per
