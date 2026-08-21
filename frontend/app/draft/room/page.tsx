@@ -88,15 +88,15 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
     heightIn: p.heightIn, weightLb: p.weightLb,
   }));
 
-  // the signed-in GM's own draft queue for this class, filtered to still-available players
-  const availableIds = new Set(availableRaw.map((p) => p.id));
+  // the signed-in GM's own draft queue for this class — still-available board prospects
+  // AND custom off-board entries — in rank order.
   const myQueue: QueueItem[] = me == null ? [] : (await prisma.draftRanking.findMany({
-    where: { teamId: me, rank: { gt: 0 }, prospect: { draftYear: DRAFT_YEAR, draftedByTeamId: null, ...src } },
+    where: { teamId: me, rank: { gt: 0 }, OR: [{ prospect: { draftYear: DRAFT_YEAR, draftedByTeamId: null, ...src } }, { draftProspectId: null, customYear: DRAFT_YEAR }] },
     orderBy: { rank: "asc" },
-    select: { rank: true, tier: true, note: true, prospect: { select: { id: true, name: true, position: true, country: true } } },
-  })).filter((r) => availableIds.has(r.prospect.id)).map((r) => ({
-    prospectId: r.prospect.id, rank: r.rank, name: r.prospect.name, position: r.prospect.position, flag: countryFlag(r.prospect.country), tier: r.tier, note: r.note,
-  }));
+    select: { id: true, rank: true, tier: true, note: true, customName: true, customPos: true, prospect: { select: { id: true, name: true, position: true, country: true } } },
+  })).map((r) => r.prospect
+    ? { rankingId: r.id, prospectId: r.prospect.id, custom: false, rank: r.rank, name: r.prospect.name, position: r.prospect.position, flag: countryFlag(r.prospect.country), tier: r.tier, note: r.note }
+    : { rankingId: r.id, prospectId: null, custom: true, rank: r.rank, name: r.customName ?? "—", position: r.customPos ?? "—", flag: "✍️", tier: r.tier, note: r.note });
 
   return (
     <div className="py-2">

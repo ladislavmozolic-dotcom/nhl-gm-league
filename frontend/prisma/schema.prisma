@@ -1008,16 +1008,22 @@ model DraftProspect {
 // the queue (1 = take first; 0 = on the board but not yet slotted into the queue).
 // The Draft Room's auto-pick pulls the highest still-available ranked prospect.
 model DraftRanking {
-  id              Int           @id @default(autoincrement())
+  id              Int            @id @default(autoincrement())
   teamId          Int
-  team            Team          @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  draftProspectId Int
-  prospect        DraftProspect @relation(fields: [draftProspectId], references: [id], onDelete: Cascade)
-  rank            Int           @default(0) // queue order (1 = first); 0 = board-only
+  team            Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  draftProspectId Int? // null = a custom, off-board player the GM typed in (see custom* below)
+  prospect        DraftProspect? @relation(fields: [draftProspectId], references: [id], onDelete: Cascade)
+  // off-board custom entry (draftProspectId null): a player NOT on the scouting board
+  customName      String?
+  customPos       String? // C | LW | RW | D | G
+  customEp        String? // EliteProspects link
+  customBirth     String? // YYYY-MM-DD (optional; enables the ≤23 age gate when picked)
+  customYear      Int? // draft class this custom entry belongs to
+  rank            Int            @default(0) // queue order (1 = first); 0 = board-only
   tier            String? // optional GM grade (e.g. "A" / "must-draft")
   note            String? // GM scouting note
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   @@unique([teamId, draftProspectId])
   @@index([teamId])

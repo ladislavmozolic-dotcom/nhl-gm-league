@@ -23,6 +23,46 @@ async function getState(year: number) {
   return s;
 }
 
+type OrderSlot = { overallPick: number; round: number; deferred?: boolean };
+/** Commit an OFF-BOARD selection (a custom player not on the scouting board): create
+ *  the DraftProspect (flagged offBoard/unverified) + the club's Prospect row + an admin
+ *  notice, advancing the clock under the same atomic currentPick guard as makePickAction.
+ *  Caller must have already validated the on-clock slot + permission + eligibility. */
+async function commitOffBoard(pickerTeamId: number, expectPick: number, YEAR: number, order: OrderSlot[], source: string,
+  data: { name: string; position: string; birthDate: string | null; epLink: string | null }) {
+  const slot = order.find((p) => p.overallPick === expectPick);
+  if (!slot) return { ok: false as const, error: "Draft is complete." };
+  const nextPick = expectPick + 1;
+  const deferralCount = await prisma.draftDeferral.count({ where: { year: YEAR } });
+  const lastScheduled = order.filter((p) => !p.deferred).reduce((m, p) => Math.max(m, p.overallPick), LAST_BASE_PICK);
+  const maxPick = lastScheduled + deferralCount;
+  const nextSlot = order.find((p) => p.overallPick === nextPick);
+  const done = nextPick > maxPick;
+  const roundDone = !slot.deferred && !done && nextPick <= lastScheduled && !!nextSlot && nextSlot.round !== slot.round;
+  const parts = data.name.split(" ");
+  const firstName = parts[0];
+  const lastName = parts.slice(1).join(" ") || parts[0];
+  const picker = await prisma.team.findUnique({ where: { id: pickerTeamId }, select: { code: true } });
+  const res = await prisma.$transaction(async (tx) => {
+    const upd = await tx.draftState.updateMany({
+      where: { year: YEAR, currentPick: expectPick, status: "LIVE" },
+      data: { currentPick: nextPick, onClockAt: (roundDone || done) ? null : new Date(), status: done ? "DONE" : roundDone ? "ROUND_DONE" : "LIVE" },
+    });
+    if (upd.count === 0) return { ok: false as const, error: "That pick was just made — refresh." };
+    await tx.draftProspect.create({ data: {
+      draftYear: YEAR, source, firstName, lastName, name: data.name, position: data.position, birthDate: data.birthDate,
+      category: data.position === "G" ? 3 : 1, ov: 50, potential: 65, offBoard: true, epLink: data.epLink, verified: false,
+      draftedByTeamId: pickerTeamId, overallPick: expectPick,
+    } });
+    await tx.prospect.create({ data: { name: data.name, position: data.position, draftYear: YEAR, overallPick: expectPick, teamId: pickerTeamId, source } });
+    await tx.transaction.create({ data: { type: "DRAFT_OFF_BOARD", message: `${picker?.code ?? "A club"} used pick #${expectPick} on off-board player ${data.name}${data.birthDate ? ` (b. ${data.birthDate})` : ""} (${data.position}) — admin please verify eligibility.${data.epLink ? ` EP: ${data.epLink}` : ""}` } });
+    return { ok: true as const };
+  });
+  if (!res.ok) return res;
+  revalidatePath("/draft/room");
+  return { ok: true as const, roundDone, done };
+}
+
 /** Advance the clock if the current pick's timer has expired: the missed club's
  *  pick is moved to the end of the draft (deferred) and the next club goes up.
  *  Safe to call from any viewer — it only acts when genuinely expired. */
@@ -79,16 +119,25 @@ export async function autoPickIfExpiringAction() {
   const src = await currentDraftSourceWhere();
   const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true, draftTestMode: true } });
   const source = cfg?.rosterMode === "real" ? "real" : "profinhl";
-  const testMode = !!cfg?.draftTestMode;
 
-  // 1) on-clock club's top still-available queued prospect
-  const queued = await prisma.draftRanking.findMany({
-    where: { teamId: slot.pickerTeamId, rank: { gt: 0 }, prospect: { draftYear: YEAR, draftedByTeamId: null, ...src } },
+  // 1) on-clock club's highest usable queued entry — a still-available board prospect
+  //    OR a custom off-board entry — in rank order.
+  const qrows = await prisma.draftRanking.findMany({
+    where: { teamId: slot.pickerTeamId, rank: { gt: 0 }, OR: [{ prospect: { draftYear: YEAR, draftedByTeamId: null, ...src } }, { draftProspectId: null, customYear: YEAR }] },
     orderBy: { rank: "asc" }, take: 1,
-    select: { prospect: { select: { id: true, name: true, position: true } } },
+    include: { prospect: { select: { id: true, name: true, position: true } } },
   });
-  let target: { id: number; name: string; position: string } | null = queued[0]?.prospect ?? null;
-  // 2) fallback: best available on the board (ceiling → rating → CS rank)
+  const top = qrows[0];
+  // 1a) custom entry at the top of the queue → off-board pick, then drop the ranking row
+  if (top && top.draftProspectId == null && top.customName) {
+    const res = await commitOffBoard(slot.pickerTeamId, s.currentPick, YEAR, order, source,
+      { name: top.customName, position: top.customPos ?? "C", birthDate: top.customBirth, epLink: top.customEp });
+    if (res.ok) await prisma.draftRanking.deleteMany({ where: { id: top.id } });
+    return { acted: res.ok, picked: res.ok ? top.customName : undefined };
+  }
+
+  // 2) board prospect: the top queued one, else best available (ceiling → rating → CS rank)
+  let target: { id: number; name: string; position: string } | null = top?.prospect ?? null;
   if (!target) {
     target = await prisma.draftProspect.findFirst({
       where: { draftYear: YEAR, draftedByTeamId: null, ...src },
@@ -98,6 +147,7 @@ export async function autoPickIfExpiringAction() {
   }
   if (!target) return { acted: false as const }; // nothing draftable — let the 0s backstop defer
 
+  const testMode = !!cfg?.draftTestMode;
   const nextPick = s.currentPick + 1;
   const deferralCount = await prisma.draftDeferral.count({ where: { year: YEAR } });
   const lastScheduled = order.filter((p) => !p.deferred).reduce((m, p) => Math.max(m, p.overallPick), LAST_BASE_PICK);
@@ -297,6 +347,45 @@ export async function makeOffBoardPickAction(input: { name: string; birthDate: s
   ]);
   revalidatePath("/draft/room");
   return { ok: true, roundDone, done };
+}
+
+/** Draft a CUSTOM entry straight from the on-clock GM's Draft Rankings queue (a player
+ *  the GM added off-board with an EP link). Same eligibility path as a manual off-board
+ *  pick; the ranking row is consumed on success. */
+export async function pickCustomFromRankingAction(rankingId: number) {
+  const YEAR = await currentDraftYear();
+  const s = await getState(YEAR);
+  if (s.status !== "LIVE") return { ok: false, error: "The draft isn't live." };
+  const order = await effectiveOrder(YEAR);
+  const slot = order.find((p) => p.overallPick === s.currentPick);
+  if (!slot) return { ok: false, error: "Draft is complete." };
+  if (!slot.deferred && slot.round !== s.liveRound) return { ok: false, error: "That pick isn't in the open round." };
+
+  const admin = await isAdmin();
+  const me = await getTeamSession();
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true, draftTestMode: true } });
+  const testMode = !!cfg?.draftTestMode;
+  const source = cfg?.rosterMode === "real" ? "real" : "profinhl";
+  if (!admin && me !== slot.pickerTeamId && !(testMode && me != null)) return { ok: false, error: "It's not your pick." };
+
+  const r = await prisma.draftRanking.findUnique({ where: { id: rankingId }, select: { id: true, teamId: true, customName: true, customPos: true, customEp: true, customBirth: true, draftProspectId: true } });
+  if (!r || r.draftProspectId != null || !r.customName) return { ok: false, error: "Not a custom board entry." };
+  if (!admin && !(testMode && me != null) && r.teamId !== slot.pickerTeamId) return { ok: false, error: "That entry isn't yours." };
+
+  // age gate (≤23 on draft day) only when a birth date was supplied
+  if (r.customBirth) {
+    const bd = new Date(`${r.customBirth}T00:00:00Z`);
+    if (!isNaN(bd.getTime())) {
+      const draftDay = await getLeagueDate();
+      const turns24 = new Date(Date.UTC(bd.getUTCFullYear() + 24, bd.getUTCMonth(), bd.getUTCDate()));
+      if (draftDay.getTime() >= turns24.getTime()) return { ok: false, error: "Player is over 23 on draft day — not eligible." };
+    }
+  }
+
+  const res = await commitOffBoard(slot.pickerTeamId, s.currentPick, YEAR, order, source,
+    { name: r.customName, position: r.customPos ?? "C", birthDate: r.customBirth, epLink: r.customEp });
+  if (res.ok) await prisma.draftRanking.deleteMany({ where: { id: rankingId } });
+  return res;
 }
 
 /** Admin marks an off-board pick verified (eligible). */

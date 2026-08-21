@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useTransition, useRef } from "react";
-import { addToBoardAction, removeFromBoardAction, updateNoteAction, saveQueueOrderAction, searchProspectsAction, type SearchHit } from "@/app/draft/rankings/actions";
+import { addToBoardAction, addCustomToBoardAction, removeRankingAction, updateNoteAction, saveQueueOrderAction, searchProspectsAction, type SearchHit } from "@/app/draft/rankings/actions";
 import type { BoardRow } from "@/lib/draft-rankings-server";
 
 const posColor: Record<string, string> = { C: "text-sky-400", LW: "text-emerald-400", RW: "text-emerald-400", D: "text-amber-400", G: "text-rose-400" };
+const POSES = ["C", "LW", "RW", "D", "G"];
 
 function Note({ row, onSave, disabled }: { row: BoardRow; onSave: (note: string, tier: string) => void; disabled: boolean }) {
   const [note, setNote] = useState(row.note ?? "");
@@ -30,43 +31,52 @@ export default function DraftBoardManager({ year, years, rows, canEdit }: { year
   const [hits, setHits] = useState<SearchHit[] | null>(null);
   const [searching, setSearching] = useState(false);
   const seq = useRef(0);
+  // custom off-board add form
+  const [cName, setCName] = useState("");
+  const [cPos, setCPos] = useState("C");
+  const [cEp, setCEp] = useState("");
+  const [cBirth, setCBirth] = useState("");
+  const [showCustom, setShowCustom] = useState(false);
 
-  const persistQueue = (next: BoardRow[]) => { setQueue(next); start(async () => { await saveQueueOrderAction(next.map((r) => r.prospectId)); }); };
-
-  const move = (i: number, dir: -1 | 1) => {
-    const j = i + dir; if (j < 0 || j >= queue.length) return;
-    const next = [...queue]; [next[i], next[j]] = [next[j], next[i]]; persistQueue(next);
-  };
-  const toQueue = (row: BoardRow) => { setBench((b) => b.filter((x) => x.prospectId !== row.prospectId)); persistQueue([...queue, { ...row, rank: queue.length + 1 }]); };
-  const toBench = (row: BoardRow) => { const next = queue.filter((x) => x.prospectId !== row.prospectId); setBench((b) => [{ ...row, rank: 0 }, ...b]); persistQueue(next); };
+  const persistQueue = (next: BoardRow[]) => { setQueue(next); start(async () => { await saveQueueOrderAction(next.map((r) => r.id)); }); };
+  const move = (i: number, dir: -1 | 1) => { const j = i + dir; if (j < 0 || j >= queue.length) return; const next = [...queue]; [next[i], next[j]] = [next[j], next[i]]; persistQueue(next); };
+  const toQueue = (row: BoardRow) => { setBench((b) => b.filter((x) => x.id !== row.id)); persistQueue([...queue, { ...row, rank: queue.length + 1 }]); };
+  const toBench = (row: BoardRow) => { const next = queue.filter((x) => x.id !== row.id); setBench((b) => [{ ...row, rank: 0 }, ...b]); persistQueue(next); };
   const removeRow = (row: BoardRow) => {
-    setQueue((Q) => { const next = Q.filter((x) => x.prospectId !== row.prospectId); if (Q.some((x) => x.prospectId === row.prospectId)) start(async () => { await saveQueueOrderAction(next.map((r) => r.prospectId)); }); return next; });
-    setBench((b) => b.filter((x) => x.prospectId !== row.prospectId));
-    start(async () => { await removeFromBoardAction(row.prospectId); });
+    const inQueue = queue.some((x) => x.id === row.id);
+    const next = queue.filter((x) => x.id !== row.id);
+    setQueue(next); setBench((b) => b.filter((x) => x.id !== row.id));
+    start(async () => { await removeRankingAction(row.id); if (inQueue) await saveQueueOrderAction(next.map((r) => r.id)); });
   };
   const saveNote = (row: BoardRow, note: string, tier: string) => {
-    const patch = (arr: BoardRow[]) => arr.map((x) => x.prospectId === row.prospectId ? { ...x, note: note || null, tier: tier || null } : x);
+    const patch = (arr: BoardRow[]) => arr.map((x) => x.id === row.id ? { ...x, note: note || null, tier: tier || null } : x);
     setQueue(patch); setBench(patch);
-    start(async () => { await updateNoteAction(row.prospectId, note, tier); });
+    start(async () => { await updateNoteAction(row.id, note, tier); });
   };
 
-  const runSearch = () => {
-    const id = ++seq.current; setSearching(true);
-    start(async () => { const r = await searchProspectsAction(year, q); if (id === seq.current) { setHits(r.hits ?? []); setSearching(false); } });
-  };
-  const add = (hit: SearchHit) => {
+  const runSearch = () => { const id = ++seq.current; setSearching(true); start(async () => { const r = await searchProspectsAction(year, q); if (id === seq.current) { setHits(r.hits ?? []); setSearching(false); } }); };
+  const addHit = (hit: SearchHit) => start(async () => {
+    const r = await addToBoardAction(hit.id); if (!r.ok) return;
     setHits((h) => h ? h.map((x) => x.id === hit.id ? { ...x, onBoard: true } : x) : h);
-    setBench((b) => b.some((x) => x.prospectId === hit.id) ? b : [{ prospectId: hit.id, rank: 0, tier: null, note: null, name: hit.name, position: hit.position, country: hit.country, amateurLeague: hit.amateurLeague, amateurClub: null, shoots: null, heightIn: null, weightLb: null, ov: hit.ov, potential: hit.potential, csRank: hit.csRank, flag: hit.flag, drafted: hit.drafted, draftedByCode: null }, ...b]);
-    start(async () => { await addToBoardAction(hit.id); });
-  };
+    setBench((b) => b.some((x) => x.prospectId === hit.id) ? b : [{ id: r.id, prospectId: hit.id, custom: false, rank: 0, tier: null, note: null, name: hit.name, position: hit.position, country: hit.country, amateurLeague: hit.amateurLeague, amateurClub: null, shoots: null, heightIn: null, weightLb: null, ov: hit.ov, potential: hit.potential, csRank: hit.csRank, epLink: null, flag: hit.flag, drafted: hit.drafted, draftedByCode: null }, ...b]);
+  });
+  const addCustom = () => start(async () => {
+    const r = await addCustomToBoardAction({ year, name: cName, position: cPos, epLink: cEp, birthDate: cBirth });
+    if (!r.ok) { alert(r.error); return; }
+    setBench((b) => [{ id: r.id, prospectId: null, custom: true, rank: 0, tier: null, note: null, name: cName.trim(), position: cPos, country: null, amateurLeague: null, amateurClub: null, shoots: null, heightIn: null, weightLb: null, ov: null, potential: null, csRank: null, epLink: cEp.trim() || null, flag: "✍️", drafted: false, draftedByCode: null }, ...b]);
+    setCName(""); setCEp(""); setCBirth(""); setCPos("C"); setShowCustom(false);
+  });
 
   const Meta = ({ r }: { r: BoardRow }) => (
-    <span className="text-[11px] text-slate-500">OV {r.ov} · CEIL {r.potential}{r.csRank ? ` · CS#${r.csRank}` : ""}{r.amateurLeague ? ` · ${r.amateurLeague}` : ""}{r.drafted ? <span className="text-red-400/80"> · DRAFTED{r.draftedByCode ? ` ${r.draftedByCode}` : ""}</span> : ""}</span>
+    <span className="text-[11px] text-slate-500">
+      {r.custom
+        ? <>custom off-board{r.epLink ? <> · <a href={r.epLink} target="_blank" rel="noreferrer" className="text-blue-400 hover:underline">EP ↗</a></> : ""}</>
+        : <>OV {r.ov} · CEIL {r.potential}{r.csRank ? ` · CS#${r.csRank}` : ""}{r.amateurLeague ? ` · ${r.amateurLeague}` : ""}{r.drafted ? <span className="text-red-400/80"> · DRAFTED{r.draftedByCode ? ` ${r.draftedByCode}` : ""}</span> : ""}</>}
+    </span>
   );
 
   return (
     <div className="space-y-6">
-      {/* year selector */}
       {years.length > 1 && (
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-xs text-slate-500 mr-1">Draft class:</span>
@@ -84,9 +94,9 @@ export default function DraftBoardManager({ year, years, rows, canEdit }: { year
             <span className="text-[11px] text-slate-500">auto-pick order</span>
           </div>
           <div className="rounded-xl border border-slate-800 bg-slate-900/40 divide-y divide-slate-800/60">
-            {queue.length === 0 && <p className="px-3 py-6 text-center text-slate-600 text-sm">Queue is empty. Add players from your board (→) or search below. When your pick nears the clock, the top still-available player here is auto-drafted.</p>}
+            {queue.length === 0 && <p className="px-3 py-6 text-center text-slate-600 text-sm">Queue is empty. Add players from your watchlist (→) or the search below. When your pick nears the clock, the top still-available player here is auto-drafted.</p>}
             {queue.map((r, i) => (
-              <div key={r.prospectId} className="px-3 py-2">
+              <div key={r.id} className="px-3 py-2">
                 <div className="flex items-center gap-2">
                   <span className="w-6 text-center text-sm font-black text-blue-400 tabular-nums">{i + 1}</span>
                   <span className="mr-0.5">{r.flag}</span>
@@ -97,7 +107,7 @@ export default function DraftBoardManager({ year, years, rows, canEdit }: { year
                     <span className="ml-auto flex items-center gap-1">
                       <button onClick={() => move(i, -1)} disabled={pending || i === 0} className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30 text-xs">▲</button>
                       <button onClick={() => move(i, 1)} disabled={pending || i === queue.length - 1} className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30 text-xs">▼</button>
-                      <button onClick={() => toBench(r)} disabled={pending} title="Move to board (un-queue)" className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs">board</button>
+                      <button onClick={() => toBench(r)} disabled={pending} title="Move to watchlist" className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs">list</button>
                       <button onClick={() => removeRow(r)} disabled={pending} title="Remove" className="px-2 py-0.5 rounded bg-rose-950/50 hover:bg-rose-900/50 text-rose-300 text-xs">✕</button>
                     </span>
                   )}
@@ -108,13 +118,13 @@ export default function DraftBoardManager({ year, years, rows, canEdit }: { year
           </div>
         </section>
 
-        {/* BOARD / WATCHLIST */}
+        {/* WATCHLIST */}
         <section>
           <h2 className="text-sm font-bold uppercase tracking-wide text-slate-300 mb-2">📋 Watchlist <span className="text-slate-600 font-normal">({bench.length})</span></h2>
           <div className="rounded-xl border border-slate-800 bg-slate-900/40 divide-y divide-slate-800/60 max-h-[520px] overflow-y-auto">
-            {bench.length === 0 && <p className="px-3 py-6 text-center text-slate-600 text-sm">Scouted players you haven&apos;t queued yet show here. Search below to add prospects.</p>}
+            {bench.length === 0 && <p className="px-3 py-6 text-center text-slate-600 text-sm">Scouted players you haven&apos;t queued yet show here. Search or add a custom player below.</p>}
             {bench.map((r) => (
-              <div key={r.prospectId} className="px-3 py-2">
+              <div key={r.id} className="px-3 py-2">
                 <div className="flex items-center gap-2">
                   <span className="mr-0.5">{r.flag}</span>
                   <span className="font-medium text-slate-100 truncate">{r.name}</span>
@@ -136,8 +146,8 @@ export default function DraftBoardManager({ year, years, rows, canEdit }: { year
 
       {/* SEARCH & ADD */}
       {canEdit && (
-        <section>
-          <h2 className="text-sm font-bold uppercase tracking-wide text-slate-300 mb-2">🔎 Add players</h2>
+        <section className="space-y-3">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-slate-300">🔎 Add players</h2>
           <div className="flex gap-2">
             <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && runSearch()}
               placeholder="Search the draft class by name, league or club…"
@@ -145,19 +155,42 @@ export default function DraftBoardManager({ year, years, rows, canEdit }: { year
             <button onClick={runSearch} disabled={pending || q.trim().length < 2} className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-sm font-semibold">{searching ? "…" : "Search"}</button>
           </div>
           {hits != null && (
-            <div className="mt-2 rounded-xl border border-slate-800 bg-slate-900/40 divide-y divide-slate-800/60 max-h-[360px] overflow-y-auto">
-              {hits.length === 0 && <p className="px-3 py-4 text-center text-slate-600 text-sm">No matches in the {year} class.</p>}
+            <div className="rounded-xl border border-slate-800 bg-slate-900/40 divide-y divide-slate-800/60 max-h-[360px] overflow-y-auto">
+              {hits.length === 0 && <p className="px-3 py-4 text-center text-slate-600 text-sm">No matches in the {year} class. Not on the board? Add a custom player below.</p>}
               {hits.map((h) => (
                 <div key={h.id} className="flex items-center gap-2 px-3 py-2">
                   <span>{h.flag}</span>
                   <span className="font-medium text-slate-100 truncate">{h.name}</span>
                   <span className={`text-xs font-semibold ${posColor[h.position] ?? "text-slate-400"}`}>{h.position}</span>
                   <span className="text-[11px] text-slate-500 truncate">OV {h.ov} · CEIL {h.potential}{h.amateurLeague ? ` · ${h.amateurLeague}` : ""}{h.drafted ? " · drafted" : ""}</span>
-                  <button onClick={() => add(h)} disabled={pending || h.onBoard} className="ml-auto px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-semibold">{h.onBoard ? "on board" : "+ Add"}</button>
+                  <button onClick={() => addHit(h)} disabled={pending || h.onBoard} className="ml-auto px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-semibold">{h.onBoard ? "on board" : "+ Add"}</button>
                 </div>
               ))}
             </div>
           )}
+
+          {/* custom off-board player */}
+          <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-3">
+            <button onClick={() => setShowCustom((v) => !v)} className="text-sm font-semibold text-slate-300 flex items-center gap-1.5">
+              <span className={`text-[8px] text-slate-500 transition-transform ${showCustom ? "rotate-90" : ""}`}>▶</span> ✍️ Add a player NOT on the board (custom)
+            </button>
+            {showCustom && (
+              <div className="mt-3 space-y-2">
+                <div className="flex flex-wrap gap-2">
+                  <input value={cName} onChange={(e) => setCName(e.target.value)} placeholder="Full name *" className="flex-1 min-w-[180px] bg-slate-950/60 border border-slate-800 rounded px-2.5 py-1.5 text-sm text-slate-200 placeholder:text-slate-600 outline-none focus:border-blue-500/50" />
+                  <select value={cPos} onChange={(e) => setCPos(e.target.value)} className="bg-slate-950/60 border border-slate-800 rounded px-2.5 py-1.5 text-sm text-slate-200 outline-none focus:border-blue-500/50">
+                    {POSES.map((p) => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <input value={cEp} onChange={(e) => setCEp(e.target.value)} placeholder="EliteProspects link (https://…)" className="flex-1 min-w-[180px] bg-slate-950/60 border border-slate-800 rounded px-2.5 py-1.5 text-sm text-slate-200 placeholder:text-slate-600 outline-none focus:border-blue-500/50" />
+                  <input value={cBirth} onChange={(e) => setCBirth(e.target.value)} placeholder="Birth date YYYY-MM-DD" className="w-44 bg-slate-950/60 border border-slate-800 rounded px-2.5 py-1.5 text-sm text-slate-200 placeholder:text-slate-600 outline-none focus:border-blue-500/50" />
+                  <button onClick={addCustom} disabled={pending || cName.trim().length < 2} className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-sm font-semibold">Add</button>
+                </div>
+                <p className="text-[11px] text-slate-600">Saved to your board with the EP link. When you draft him in the room, he&apos;s added as an off-board pick for the commissioner to verify eligibility. Birth date is optional but lets the ≤23 age check run automatically.</p>
+              </div>
+            )}
+          </div>
         </section>
       )}
     </div>

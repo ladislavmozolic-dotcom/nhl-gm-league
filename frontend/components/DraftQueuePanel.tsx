@@ -2,21 +2,22 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { makePickAction } from "@/app/draft/room/actions";
+import { makePickAction, pickCustomFromRankingAction } from "@/app/draft/room/actions";
 
-export type QueueItem = { prospectId: number; rank: number; name: string; position: string; flag: string; tier: string | null; note: string | null };
+export type QueueItem = { rankingId: number; prospectId: number | null; custom: boolean; rank: number; name: string; position: string; flag: string; tier: string | null; note: string | null };
 
 const posColor: Record<string, string> = { C: "text-sky-400", LW: "text-emerald-400", RW: "text-emerald-400", D: "text-amber-400", G: "text-rose-400" };
 
-/** The signed-in GM's own draft queue (available players only), shown in the room for
- *  quick picking. Top of this list is what the auto-pick takes if the clock runs out. */
+/** The signed-in GM's own draft queue (available players + custom off-board entries),
+ *  shown in the room for quick picking. Top of this list is what the auto-pick takes
+ *  if the clock runs out. */
 export default function DraftQueuePanel({ queue, canPick }: { queue: QueueItem[]; canPick: boolean }) {
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
-  const pick = (id: number, name: string) => start(async () => {
+  const pick = (it: QueueItem) => start(async () => {
     setMsg(null);
-    const r = await makePickAction(id);
-    setMsg(r.ok ? `✓ Drafted ${name}` : (r.error ?? "Failed."));
+    const r = it.custom ? await pickCustomFromRankingAction(it.rankingId) : await makePickAction(it.prospectId!);
+    setMsg(r.ok ? `✓ Drafted ${it.name}` : (r.error ?? "Failed."));
   });
 
   return (
@@ -31,13 +32,14 @@ export default function DraftQueuePanel({ queue, canPick }: { queue: QueueItem[]
       ) : (
         <div className="divide-y divide-blue-900/30 max-h-[260px] overflow-y-auto">
           {queue.map((it, i) => (
-            <div key={it.prospectId} className="flex items-center gap-2 px-3 py-1.5">
+            <div key={it.rankingId} className="flex items-center gap-2 px-3 py-1.5">
               <span className="w-5 text-center text-xs font-black text-blue-400 tabular-nums">{i + 1}</span>
               <span>{it.flag}</span>
               <span className="text-sm text-slate-100 truncate" title={it.note ?? undefined}>{it.name}</span>
               <span className={`text-xs font-semibold ${posColor[it.position] ?? "text-slate-400"}`}>{it.position}</span>
+              {it.custom && <span className="text-[9px] font-bold px-1 rounded bg-slate-700/50 text-slate-300" title="Custom off-board entry — commissioner verifies eligibility">OFF-BOARD</span>}
               {it.tier && <span className="text-[10px] font-bold px-1 rounded bg-amber-500/15 text-amber-300">{it.tier}</span>}
-              {canPick && <button onClick={() => pick(it.prospectId, it.name)} disabled={pending} className="ml-auto px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-xs font-semibold">Pick</button>}
+              {canPick && <button onClick={() => pick(it)} disabled={pending} className="ml-auto px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-xs font-semibold">Pick</button>}
             </div>
           ))}
         </div>
