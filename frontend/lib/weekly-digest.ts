@@ -9,31 +9,33 @@ import { computeStandings } from "./sim/standings";
 const SEASON = "2026-27";
 const WEEK = 7;
 
+export type StarRow = { rank: number; id: number; name: string; slug: string | null; team: string | null; teamLogo: string | null; line: string; isGoalie: boolean };
 export type WeeklyDigest = {
-  weekNo: number; roundFrom: number; roundTo: number; games: number;
+  weekNo: number; roundFrom: number; roundTo: number; games: number; span: number;
   teamOfWeek: { code: string | null; name: string; slug: string | null; logo: string | null; w: number; l: number; otl: number; points: number; gf: number; ga: number } | null;
   topScorer: { id: number; name: string; slug: string | null; team: string | null; teamLogo: string | null; g: number; a: number; pts: number; gp: number } | null;
   bestGoalie: { id: number; name: string; slug: string | null; team: string | null; teamLogo: string | null; gp: number; svPct: number; record: string } | null;
+  stars: StarRow[];
   surprise: { code: string | null; name: string; slug: string | null; logo: string | null; w: number; l: number; otl: number; overallRank: number } | null;
   tradeOfWeek: string | null;
 } | null;
 
-async function windowFor(round?: number) {
+async function windowFor(span: number, round?: number) {
   const agg = await prisma.game.aggregate({ where: { season: SEASON, league: "NHL", status: "FINAL", seriesId: null }, _max: { round: true } });
   const to = round ?? agg._max.round;
   if (to == null) return null;
-  return { from: Math.max(0, to - (WEEK - 1)), to, weekNo: Math.floor(to / WEEK) + 1 };
+  return { from: Math.max(0, to - (span - 1)), to, weekNo: Math.floor(to / span) + 1 };
 }
 
-export async function weeklyDigest(round?: number): Promise<WeeklyDigest> {
-  const win = await windowFor(round);
+export async function weeklyDigest(round?: number, span: number = WEEK): Promise<WeeklyDigest> {
+  const win = await windowFor(span, round);
   if (!win) return null;
   const { from, to, weekNo } = win;
   const games = await prisma.game.findMany({
     where: { season: SEASON, league: "NHL", status: "FINAL", seriesId: null, round: { gte: from, lte: to } },
     select: { id: true, homeTeamId: true, awayTeamId: true, homeGoals: true, awayGoals: true, endedIn: true },
   });
-  if (!games.length) return { weekNo, roundFrom: from, roundTo: to, games: 0, teamOfWeek: null, topScorer: null, bestGoalie: null, surprise: null, tradeOfWeek: null };
+  if (!games.length) return { weekNo, roundFrom: from, roundTo: to, games: 0, span, teamOfWeek: null, topScorer: null, bestGoalie: null, stars: [], surprise: null, tradeOfWeek: null };
   const winIds = games.map((g) => g.id);
 
   const teams = await prisma.team.findMany({ where: { league: "NHL", isAffiliate: false }, select: { id: true, code: true, name: true, slug: true, logoUrl: true } });
@@ -77,6 +79,20 @@ export async function weeklyDigest(round?: number): Promise<WeeklyDigest> {
     bestGoalie = { id: bg.id, name: cleanName(pl?.name ?? "?"), slug: pl?.slug ?? null, team: pl?.team?.code ?? null, teamLogo: pl?.team?.logoUrl ?? null, gp: bg.gp, svPct: bg.svPct, record: `${wins}-${losses}` };
   }
 
+  // ---- 3 Stars of the week: top scorers by points; an elite goalie week takes the 3rd star ----
+  const topSk = sk.filter((r) => (r._sum.points ?? 0) > 0).sort((a, b) => (b._sum.points ?? 0) - (a._sum.points ?? 0)).slice(0, 3);
+  const skMeta = new Map((await prisma.player.findMany({ where: { id: { in: topSk.map((r) => r.playerId) } }, select: { id: true, name: true, slug: true, team: { select: { code: true, logoUrl: true } } } })).map((p) => [p.id, p]));
+  const stars: StarRow[] = topSk.map((r, i) => {
+    const m = skMeta.get(r.playerId);
+    return { rank: i + 1, id: r.playerId, name: cleanName(m?.name ?? "?"), slug: m?.slug ?? null, team: m?.team?.code ?? null, teamLogo: m?.team?.logoUrl ?? null, line: `${r._sum.points ?? 0} pts · ${r._sum.goals ?? 0}G ${r._sum.assists ?? 0}A`, isGoalie: false };
+  });
+  const eliteGoalie = bestGoalie && bestGoalie.svPct >= 0.935 && bestGoalie.gp >= 2;
+  if (eliteGoalie && bestGoalie) {
+    const gStar: StarRow = { rank: 3, id: bestGoalie.id, name: bestGoalie.name, slug: bestGoalie.slug, team: bestGoalie.team, teamLogo: bestGoalie.teamLogo, line: `${bestGoalie.svPct.toFixed(3).replace(/^0/, "")} SV% · ${bestGoalie.record} · ${bestGoalie.gp} GP`, isGoalie: true };
+    if (stars.length >= 3) stars[2] = gStar; else stars.push(gStar);
+    stars.forEach((s, i) => (s.rank = i + 1));
+  }
+
   // surprise: a bottom-half (overall) club with a strong week
   const standings = await computeStandings(SEASON, "NHL");
   const overallRank = new Map(standings.map((s, i) => [s.teamId, i + 1]));
@@ -87,7 +103,7 @@ export async function weeklyDigest(round?: number): Promise<WeeklyDigest> {
   // trade of the week — the latest completed deal
   const tr = await prisma.transaction.findFirst({ where: { type: "TRADE", message: { contains: "traded" } }, orderBy: { createdAt: "desc" }, select: { message: true } });
 
-  return { weekNo, roundFrom: from, roundTo: to, games: games.length, teamOfWeek, topScorer, bestGoalie, surprise, tradeOfWeek: tr?.message ?? null };
+  return { weekNo, roundFrom: from, roundTo: to, games: games.length, span, teamOfWeek, topScorer, bestGoalie, stars, surprise, tradeOfWeek: tr?.message ?? null };
 }
 
 /** Auto-post the weekly recap to human GMs' Messages + a public news line, once per
