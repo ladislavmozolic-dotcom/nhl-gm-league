@@ -18,6 +18,7 @@ import { getLeagueDate } from "@/lib/calendar-server";
 import { addDays, utcDay, phaseFor, effectivePhase, PHASES, seasonOpen, defaultLeagueDate, frenzyRound, roundForDate } from "@/lib/calendar";
 import { processWaivers } from "@/lib/waivers-server";
 import { generatePreseason, playPreseason, playPreseasonDay, PRE_SEASON } from "@/lib/preseason";
+import { postWeeklyIfDue } from "@/lib/weekly-digest";
 import { resolveFrenzy, processRoundEnd, resolveInSeasonWindows } from "@/app/free-agents/actions";
 import { checkPromises } from "@/lib/promises";
 import { autoImportUpcomingClass } from "@/lib/draft-class-import";
@@ -88,6 +89,8 @@ export async function advanceLeagueDayAction() {
       played += po.played;
     }
   }
+  // weekly newsletter — auto-posts once when a 7-round week completes (self-dedupes)
+  await postWeeklyIfDue(roundForDate(next)).catch(() => {});
   // ice-time promise check (self-gates to the regular season past 1/3)
   const promises = await checkPromises();
   // waivers: resolve any whose one-day window closed (claimed by priority, else clear to AHL)

@@ -308,6 +308,7 @@ model LeagueConfig {
   simEngine       String   @default("current") // "current" (stable v1) | "nextgen" (v2 rework) — whole-league engine toggle, see lib/sim/version.ts
   paramMode       String   @default("sths")    // "sths" | "edge" — which player-parameter calculator is active; only its Tools link is shown
   draftTestMode   Boolean  @default(false)     // testing: a draft pick advances the board but does NOT write the player onto the team (no Prospect row), so names stay for re-testing
+  lastWeeklyWeek  Int?                          // last week index whose weekly newsletter was auto-posted (dedupe)
   updatedAt       DateTime @updatedAt
 }
 

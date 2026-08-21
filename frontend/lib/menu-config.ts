@@ -54,6 +54,7 @@ export const DEFAULT_MENU: MenuItem[] = [
       { label: "🤝 Sponsorships — league", href: "/finance/sponsorship" },
     ] },
     { label: "🌟 Tonight's Best", href: "/league/digest" },
+    { label: "📰 Weekly Newsletter", href: "/league/weekly" },
     { label: "🎯 Milestone Watch", href: "/league/milestones" },
     { label: "🏆 League Records", href: "/league/records" },
     { label: "🔍 Audit Log", href: "/league/audit" },
