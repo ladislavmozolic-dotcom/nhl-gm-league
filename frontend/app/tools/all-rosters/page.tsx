@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import RosterTable, { type RosterPlayer } from "@/components/RosterTable";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { money } from "@/lib/finance";
-import { cleanName, epSearchName } from "@/lib/playerName";
+import { cleanName, epSearchName, captaincyFromName } from "@/lib/playerName";
 
 export const dynamic = "force-dynamic";
 
@@ -41,8 +41,12 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
   // goalie-only attrs (sz/ag/rb/hs/rt) live on GoalieRating — merge them onto the row.
   // In Real NHL Rosters mode show the REAL contract (cap hit) so the column isn't a
   // profinhl/real mix — capHit already holds the real value in that mode.
-  const toRP = (p: (typeof full.players)[number]): RosterPlayer => {
-    const row = { ...(p as unknown as RosterPlayer), ...(p.goalieRating ?? {}) };
+  // captaincy: GM-set field is the source of truth; fall back to the legacy name
+  // marker only for a club that never set the field (matches League → Captains).
+  const nhlHasField = full.players.some((p) => p.captaincy === "C" || p.captaincy === "A");
+  const farmHasField = (full.affiliateTeams[0]?.players ?? []).some((p) => p.captaincy === "C" || p.captaincy === "A");
+  const toRP = (p: (typeof full.players)[number], hasField: boolean): RosterPlayer => {
+    const row = { ...(p as unknown as RosterPlayer), ...(p.goalieRating ?? {}), capRole: hasField ? (p.captaincy ?? null) : captaincyFromName(p.name) };
     return realMode ? { ...row, contractText: p.capHit ? money(p.capHit) : (row.contractText ?? null) } : row;
   };
   // one skaters table: forwards first (best → worst), then defensemen, then goalies.
@@ -103,14 +107,14 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
 
       <div>
         <SectionTitle accent="text-blue-400">NHL Roster</SectionTitle>
-        <RosterTable title="Skaters" players={skaters.map(toRP)} />
-        <RosterTable title="Goalies" players={goalies.map(toRP)} goalie />
+        <RosterTable title="Skaters" players={skaters.map((p) => toRP(p, nhlHasField))} />
+        <RosterTable title="Goalies" players={goalies.map((p) => toRP(p, nhlHasField))} goalie />
       </div>
 
       <div>
         <SectionTitle accent="text-emerald-300">AHL Roster {full.affiliateTeams[0] ? `— ${full.affiliateTeams[0].name}` : ""}</SectionTitle>
-        <RosterTable title="Skaters" players={farmSkaters.map(toRP)} />
-        <RosterTable title="Goalies" players={farmGoalies.map(toRP)} goalie />
+        <RosterTable title="Skaters" players={farmSkaters.map((p) => toRP(p, farmHasField))} />
+        <RosterTable title="Goalies" players={farmGoalies.map((p) => toRP(p, farmHasField))} goalie />
       </div>
 
       <div>

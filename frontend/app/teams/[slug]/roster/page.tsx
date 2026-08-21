@@ -4,6 +4,7 @@ import RosterView from "@/components/RosterView";
 import { isAdmin } from "@/lib/auth";
 import AutoFillButton from "@/components/AutoFillButton";
 import RosterTabs from "@/components/RosterTabs";
+import { captaincyFromName } from "@/lib/playerName";
 
 export const dynamic = "force-dynamic";
 
@@ -73,6 +74,12 @@ export default async function TeamRosterPage({ params }: { params: Promise<{ slu
       }
   }
 
+  // captaincy: the GM-set `captaincy` field is the source of truth. Fall back to the
+  // legacy name marker (''C''/''A'') ONLY for a club that has never set the field, so
+  // teams the GM already edited show exactly what he chose (matches League → Captains).
+  const capHasField = team.players.some((p) => p.captaincy === "C" || p.captaincy === "A");
+  const rosterWithCap = team.players.map((p) => ({ ...p, capRole: capHasField ? p.captaincy : captaincyFromName(p.name) }));
+
   return (
     <div className="space-y-6">
       <RosterTabs slug={slug} />
@@ -87,7 +94,7 @@ export default async function TeamRosterPage({ params }: { params: Promise<{ slu
           {admin && affiliate && <div className="mt-2"><AutoFillButton /></div>}
         </div>
       )}
-      <RosterView players={team.players} dressedIds={[...dressed]} />
+      <RosterView players={rosterWithCap} dressedIds={[...dressed]} />
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { cleanName, captaincyFromName } from "@/lib/playerName";
+import { cleanName } from "@/lib/playerName";
 
 export type RosterPlayer = Record<string, number | string | null> & {
   id: number; name: string; position: string | null; slug?: string | null; age: number | null; overall: number | null; contractText: string | null; condition: number | null;
@@ -57,7 +57,7 @@ export default function RosterTable({ title, players, goalie = false }: { title:
           <tbody>
             {rows.length === 0 && <tr><td colSpan={cols.length} className="px-3 py-3 text-slate-600">no players</td></tr>}
             {rows.map((p) => {
-              const cap = captaincyFromName(p.name);
+              const cap = (p.capRole as string | null) ?? null;
               return (
                 <tr key={p.id} className="border-b border-slate-800/60 hover:bg-slate-800/30">
                   <td className="px-2 py-1.5 text-left sticky left-0 bg-slate-900/60 backdrop-blur whitespace-nowrap">
