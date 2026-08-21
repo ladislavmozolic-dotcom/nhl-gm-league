@@ -52,9 +52,10 @@ export default async function TeamHistoryPage({ params }: { params: Promise<{ sl
   const runnersUp = records.filter((r) => r.runnerUpTeamId === team.id);
   const presidents = records.filter((r) => r.presidentsTeamId === team.id);
 
-  const Trophy = ({ n, label, seasons, tone }: { n: number; label: string; seasons: string[]; tone: string }) => (
-    <div className="bg-slate-800/40 rounded-xl p-4 text-center">
-      <div className={`text-3xl font-black ${tone}`}>{n}</div>
+  const Trophy = ({ n, label, seasons, tone, icon }: { n: number; label: string; seasons: string[]; tone: string; icon: string }) => (
+    <div className="relative bg-slate-800/40 rounded-xl p-4 text-center overflow-hidden">
+      <div className="text-2xl leading-none mb-1" aria-hidden>{icon}</div>
+      <div className={`text-3xl font-black ${tone} ${n > 0 ? "" : "opacity-40"}`}>{n}</div>
       <div className="text-xs uppercase tracking-wide text-slate-400 mt-1">{label}</div>
       {seasons.length > 0 && <div className="text-[11px] text-slate-500 mt-1">{seasons.join(", ")}</div>}
     </div>
@@ -62,58 +63,109 @@ export default async function TeamHistoryPage({ params }: { params: Promise<{ sl
 
   const at = fh.allTime;
   const pct = at.gp ? ((at.wins * 2 + at.otl) / (at.gp * 2) * 100).toFixed(1) : "0.0";
-  const LeaderList = ({ title, rows, unit }: { title: string; rows: FranchiseLeader[]; unit: string }) => (
-    <div>
-      <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1.5">{title}</div>
-      {rows.length === 0 ? <p className="text-sm text-slate-600">—</p> : (
-        <ol className="space-y-1">
-          {rows.map((l, i) => (
-            <li key={i} className="flex items-center gap-2 text-sm">
-              <span className="w-4 text-slate-600 text-xs">{i + 1}</span>
-              {l.slug ? <Link href={`/players/${l.slug}`} className="flex-1 truncate hover:text-blue-400">{l.name}</Link> : <span className="flex-1 truncate">{l.name}</span>}
-              <span className="tabular-nums font-semibold">{l.display ?? l.value}{l.display ? null : <span className="text-slate-500 text-xs ml-0.5">{unit}</span>}</span>
-            </li>
-          ))}
-        </ol>
-      )}
-    </div>
-  );
+
+  const LC: Record<string, { val: string; bar: string }> = {
+    amber: { val: "text-amber-300", bar: "bg-amber-400/70" },
+    blue: { val: "text-blue-300", bar: "bg-blue-400/70" },
+    sky: { val: "text-sky-300", bar: "bg-sky-400/70" },
+    emerald: { val: "text-emerald-300", bar: "bg-emerald-400/70" },
+    violet: { val: "text-violet-300", bar: "bg-violet-400/70" },
+    rose: { val: "text-rose-300", bar: "bg-rose-400/70" },
+  };
+  const medalCls = (i: number) =>
+    i === 0 ? "bg-amber-400/20 text-amber-300 ring-1 ring-amber-400/40"
+      : i === 1 ? "bg-slate-300/15 text-slate-200 ring-1 ring-slate-400/30"
+        : i === 2 ? "bg-orange-500/15 text-orange-300 ring-1 ring-orange-500/30"
+          : "text-slate-500 ring-1 ring-transparent";
+
+  const LeaderCard = ({ title, icon, rows, unit, color, bars = true }: { title: string; icon: string; rows: FranchiseLeader[]; unit: string; color: string; bars?: boolean }) => {
+    const c = LC[color] ?? LC.blue;
+    const max = rows.length ? Math.max(...rows.map((r) => r.value)) : 0;
+    return (
+      <div className="rounded-xl border border-slate-800 bg-slate-900/40 overflow-hidden">
+        <div className="flex items-center gap-2 px-3.5 py-2.5 border-b border-slate-800/70 bg-slate-800/25">
+          <span className="text-base leading-none" aria-hidden>{icon}</span>
+          <span className="text-[11px] font-bold uppercase tracking-wide text-slate-300">{title}</span>
+        </div>
+        {rows.length === 0 ? (
+          <p className="px-3.5 py-5 text-sm text-slate-600 text-center">—</p>
+        ) : (
+          <ol className="divide-y divide-slate-800/50">
+            {rows.map((l, i) => {
+              const w = bars && max > 0 ? Math.max(6, Math.round((l.value / max) * 100)) : 0;
+              return (
+                <li key={i} className={`px-3 py-2 ${i === 0 ? "bg-gradient-to-r from-amber-500/[0.06] to-transparent" : ""}`}>
+                  <div className="flex items-center gap-2.5 text-sm">
+                    <span className={`grid place-items-center w-5 h-5 shrink-0 rounded-full text-[10px] font-bold tabular-nums ${medalCls(i)}`}>{i + 1}</span>
+                    {l.slug ? <Link href={`/players/${l.slug}`} className="flex-1 truncate hover:text-blue-400">{l.name}</Link> : <span className="flex-1 truncate">{l.name}</span>}
+                    <span className={`tabular-nums font-bold ${i === 0 ? c.val : "text-slate-200"}`}>{l.display ?? l.value}{l.display ? null : <span className="text-slate-500 text-[10px] ml-0.5 font-normal">{unit}</span>}</span>
+                  </div>
+                  {bars && (
+                    <div className="mt-1.5 ml-[30px] h-1 rounded-full bg-slate-800 overflow-hidden">
+                      <div className={`h-full rounded-full ${c.bar}`} style={{ width: `${w}%` }} />
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-3 gap-3">
-        <Trophy n={champs.length} label={champs.some((c) => c.league === "AHL") ? "Cups" : "Stanley Cups"} tone="text-amber-400" seasons={champs.map((c) => c.season)} />
-        <Trophy n={runnersUp.length} label="Finals Losses" tone="text-slate-300" seasons={runnersUp.map((c) => c.season)} />
-        <Trophy n={presidents.length} label="Best Records" tone="text-green-400" seasons={presidents.map((c) => c.season)} />
+        <Trophy n={champs.length} icon="🏆" label={champs.some((c) => c.league === "AHL") ? "Cups" : "Stanley Cups"} tone="text-amber-400" seasons={champs.map((c) => c.season)} />
+        <Trophy n={runnersUp.length} icon="🥈" label="Finals Losses" tone="text-slate-300" seasons={runnersUp.map((c) => c.season)} />
+        <Trophy n={presidents.length} icon="🎖️" label="Best Records" tone="text-green-400" seasons={presidents.map((c) => c.season)} />
       </div>
 
       <Card title="All-Time Record" accent="text-blue-400">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-          <div><div className="text-2xl font-black text-white">{at.seasons}</div><div className="text-[11px] uppercase tracking-wide text-slate-500">Seasons</div></div>
-          <div><div className="text-2xl font-black text-white tabular-nums">{at.wins}-{at.losses}-{at.otl}</div><div className="text-[11px] uppercase tracking-wide text-slate-500">Record ({pct}%)</div></div>
-          <div><div className="text-2xl font-black text-white tabular-nums">{at.points}</div><div className="text-[11px] uppercase tracking-wide text-slate-500">Points</div></div>
-          <div><div className="text-2xl font-black text-white tabular-nums">{at.gf}<span className="text-slate-500 text-base">/</span>{at.ga}</div><div className="text-[11px] uppercase tracking-wide text-slate-500">GF / GA</div></div>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
+          <div className="rounded-xl bg-slate-800/40 border border-slate-800/60 p-3.5">
+            <div className="text-lg leading-none mb-1" aria-hidden>📅</div>
+            <div className="text-2xl font-black text-white tabular-nums">{at.seasons}</div>
+            <div className="text-[11px] uppercase tracking-wide text-slate-500 mt-0.5">Seasons</div>
+          </div>
+          <div className="rounded-xl bg-slate-800/40 border border-slate-800/60 p-3.5 sm:col-span-2">
+            <div className="text-lg leading-none mb-1" aria-hidden>⚔️</div>
+            <div className="text-2xl font-black text-white tabular-nums">{at.wins}-{at.losses}-{at.otl}</div>
+            <div className="text-[11px] uppercase tracking-wide text-slate-500 mt-0.5">Record · {pct}%</div>
+            <div className="mt-2 h-1.5 rounded-full bg-slate-900 overflow-hidden"><div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-emerald-400" style={{ width: `${Math.min(100, Number(pct))}%` }} /></div>
+          </div>
+          <div className="rounded-xl bg-slate-800/40 border border-slate-800/60 p-3.5">
+            <div className="text-lg leading-none mb-1" aria-hidden>⭐</div>
+            <div className="text-2xl font-black text-white tabular-nums">{at.points}</div>
+            <div className="text-[11px] uppercase tracking-wide text-slate-500 mt-0.5">Points</div>
+          </div>
+          <div className="rounded-xl bg-slate-800/40 border border-slate-800/60 p-3.5">
+            <div className="text-lg leading-none mb-1" aria-hidden>🥅</div>
+            <div className="text-2xl font-black text-white tabular-nums">{at.gf}<span className="text-slate-500 text-base">/</span>{at.ga}</div>
+            <div className="text-[11px] uppercase tracking-wide text-slate-500 mt-0.5">GF / GA</div>
+          </div>
         </div>
       </Card>
 
       <Card title="Franchise Leaders" accent="text-amber-400">
         <div className="space-y-5">
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-wide text-slate-300 mb-2.5">Skaters</div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
-              <LeaderList title="Points" rows={fh.leaders.points} unit="P" />
-              <LeaderList title="Goals" rows={fh.leaders.goals} unit="G" />
-              <LeaderList title="Assists" rows={fh.leaders.assists} unit="A" />
-              <LeaderList title="Games Played" rows={fh.leaders.games} unit="GP" />
+            <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-300 mb-2.5"><span aria-hidden>🏒</span> Skaters</div>
+            <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+              <LeaderCard title="Points" icon="📈" rows={fh.leaders.points} unit="P" color="amber" />
+              <LeaderCard title="Goals" icon="🚨" rows={fh.leaders.goals} unit="G" color="rose" />
+              <LeaderCard title="Assists" icon="🎯" rows={fh.leaders.assists} unit="A" color="blue" />
+              <LeaderCard title="Games Played" icon="📅" rows={fh.leaders.games} unit="GP" color="violet" />
             </div>
           </div>
           <div className="border-t border-slate-800 pt-4">
-            <div className="text-[11px] font-bold uppercase tracking-wide text-slate-300 mb-2.5">Goalies</div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
-              <LeaderList title="Wins" rows={fh.leaders.wins} unit="W" />
-              <LeaderList title="Shutouts" rows={fh.leaders.shutouts} unit="SO" />
-              <LeaderList title={`GAA (min ${10} GP)`} rows={fh.leaders.gaa} unit="" />
-              <LeaderList title={`SV% (min ${10} GP)`} rows={fh.leaders.savePct} unit="" />
+            <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-300 mb-2.5"><span aria-hidden>🥅</span> Goalies</div>
+            <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+              <LeaderCard title="Wins" icon="🏆" rows={fh.leaders.wins} unit="W" color="amber" />
+              <LeaderCard title="Shutouts" icon="🧱" rows={fh.leaders.shutouts} unit="SO" color="sky" />
+              <LeaderCard title="GAA · min 10 GP" icon="🛡️" rows={fh.leaders.gaa} unit="" color="emerald" bars={false} />
+              <LeaderCard title="SV% · min 10 GP" icon="🧤" rows={fh.leaders.savePct} unit="" color="emerald" bars={false} />
             </div>
           </div>
         </div>
