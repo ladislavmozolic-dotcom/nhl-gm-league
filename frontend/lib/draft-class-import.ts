@@ -17,21 +17,26 @@ const UA = { "User-Agent": "Mozilla/5.0" };
 // Room" becomes "2027 Draft Room" on its own when the 26/27 season is over.
 const leagueYearOf = (d: Date) => (d.getUTCMonth() >= 6 ? d.getUTCFullYear() : d.getUTCFullYear() - 1);
 
-/** The draft currently RUN in-app (this league year's). Derived from the clock. */
+/** The draft this season points at — the one held at the END of the current league
+ *  year (e.g. the 2026-27 season's draft is the 2027 draft). It rolls forward on its
+ *  own: once the clock passes July 1 into the next league year, this becomes next year.
+ *  Derived purely from the clock, so no manual bump is needed each season. */
 export async function currentDraftYear(): Promise<number> {
-  return leagueYearOf(await getLeagueDate());
+  return leagueYearOf(await getLeagueDate()) + 1;
 }
-/** The NEXT draft GMs scout for (its class auto-imports when NHL publishes it). */
+/** The draft AFTER the current one — a look-ahead class GMs can start scouting early
+ *  (its class auto-imports when NHL Central Scouting publishes it). */
 export async function nextDraftYear(): Promise<number> {
   return (await currentDraftYear()) + 1;
 }
 
-/** Import the upcoming draft class when NHL Central Scouting has published it (no-op
- *  until it's out; refreshes each run as midterm→final rankings are released). */
+/** Import the draft classes GMs need — this season's draft (the live Room) and the
+ *  look-ahead class after it — whenever NHL Central Scouting has published them (no-op
+ *  until they're out; refreshes each run as midterm→final rankings are released). */
 export async function autoImportUpcomingClass(): Promise<{ year: number; imported: number }> {
-  const year = await nextDraftYear();
-  const r = await importDraftClass(year);
-  return { year, imported: r.imported };
+  const [cur, nxt] = await Promise.all([currentDraftYear(), nextDraftYear()]);
+  const [rc, rn] = await Promise.all([importDraftClass(cur), importDraftClass(nxt)]);
+  return { year: cur, imported: rc.imported + rn.imported };
 }
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 
