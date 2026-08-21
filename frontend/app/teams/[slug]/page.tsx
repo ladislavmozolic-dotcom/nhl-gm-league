@@ -151,7 +151,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
           <Card title="Team Info" accent="text-blue-400">
             <div className="space-y-2.5">
               <InfoRow label="General Manager" value={team.passwordHash ? (team.gmNickname || [team.gmFirstName, team.gmLastName].filter(Boolean).join(" ").trim() || team.gm) : "🤖 AI GM"} />
-              <InfoRow label="Head Coach" value={team.headCoach?.name || team.coach || "TBD"} />
+              <InfoRow label="Head Coach" value={<Link href={`/teams/${slug}/coach`} className="hover:text-blue-400">{team.headCoach?.name || team.coach || "TBD"} <span className="text-slate-500 text-xs">· manage</span></Link>} />
               <InfoRow label="Conference" value={team.conference || "N/A"} />
               <InfoRow label="Division" value={team.division || "N/A"} />
               <InfoRow label="Arena" value={team.arena} />

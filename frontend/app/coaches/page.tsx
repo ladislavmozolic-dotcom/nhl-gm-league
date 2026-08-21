@@ -57,7 +57,7 @@ export default async function CoachesPage({ searchParams }: { searchParams: Prom
       </div>
 
       {view === "FA" && (
-        <p className="text-xs text-slate-400 px-1">Unsigned coaches available to hire. A GM can sign one to replace their current NHL or farm bench boss — sorted by overall.</p>
+        <p className="text-xs text-slate-400 px-1">Unsigned coaches available to hire, sorted by overall. Hire or fire from your club&apos;s <span className="text-slate-300">Team → Head Coach</span> page — firing pays out the coach&apos;s full remaining contract (salary × years) from the bank.</p>
       )}
 
       <Card bodyClassName="p-0">
