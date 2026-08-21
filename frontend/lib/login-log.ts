@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { prisma } from "./prisma";
 
 const isPrivate = (ip: string) => /^(10\.|127\.|::1|localhost|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(ip);
+const isBot = (ua: string) => /bot|crawl|spider|slurp|GoogleOther|bingbot|Applebot|facebookexternalhit|GPTBot|ClaudeBot|CCBot|Bytespider|SemrushBot|AhrefsBot|PetalBot|Amazonbot|DuckDuckBot|YandexBot/i.test(ua);
 
 /** Log one access event (a GM sign-in or a visit) with IP + best-effort geolocation.
  *  Never throws — auditing must not block anything. */
@@ -11,6 +12,7 @@ export async function logAccess(opts: { type: "gm" | "visit"; teamId?: number | 
     const fwd = (h.get("x-forwarded-for") || h.get("x-real-ip") || "").split(",")[0].trim();
     const ip = fwd || null;
     const userAgent = (h.get("user-agent") || "").slice(0, 300) || null;
+    if (opts.type === "visit" && userAgent && isBot(userAgent)) return; // don't clutter the audit with crawlers
     let geo: { country?: string; regionName?: string; city?: string; isp?: string } = {};
     if (ip && !isPrivate(ip)) {
       geo = await fetch(`http://ip-api.com/json/${ip}?fields=country,regionName,city,isp`, { signal: AbortSignal.timeout(2500) })
