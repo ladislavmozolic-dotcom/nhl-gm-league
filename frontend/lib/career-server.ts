@@ -159,14 +159,18 @@ async function liveGoalie(playerId: number, season: string, league: string, isPl
 // ---------- franchise history ----------
 
 export type FranchiseSeason = { season: string; gp: number; wins: number; losses: number; otl: number; points: number; gf: number; ga: number; finish: number | null; playoffResult: string | null };
-export type FranchiseLeader = { name: string; slug: string | null; value: number };
+export type FranchiseLeader = { name: string; slug: string | null; value: number; display?: string };
+export type FranchiseLeaders = {
+  points: FranchiseLeader[]; goals: FranchiseLeader[]; assists: FranchiseLeader[]; games: FranchiseLeader[];
+  wins: FranchiseLeader[]; shutouts: FranchiseLeader[]; gaa: FranchiseLeader[]; savePct: FranchiseLeader[];
+};
 export type FranchiseHistory = {
   seasons: FranchiseSeason[];
   allTime: { gp: number; wins: number; losses: number; otl: number; points: number; gf: number; ga: number; seasons: number };
   championships: string[];   // seasons won
   finals: string[];          // seasons lost in final
   presidents: string[];      // seasons as best regular-season team
-  leaders: { points: FranchiseLeader[]; goals: FranchiseLeader[]; wins: FranchiseLeader[] };
+  leaders: FranchiseLeaders;
 };
 
 export async function franchiseHistory(teamId: number, league = "NHL"): Promise<FranchiseHistory> {
@@ -195,29 +199,48 @@ export async function franchiseHistory(teamId: number, league = "NHL"): Promise<
   return { seasons, allTime, championships, finals, presidents, leaders };
 }
 
-// All-time franchise scoring/goalie leaders = archived per-season sums (for this
+// All-time franchise skater + goalie leaders = archived per-season sums (for this
 // team) + the live active season, combined per player.
-async function franchiseLeaders(teamId: number, league: string): Promise<FranchiseHistory["leaders"]> {
-  const pts = new Map<number, number>(), gls = new Map<number, number>(), wins = new Map<number, number>();
-  const add = (m: Map<number, number>, id: number, v: number) => m.set(id, (m.get(id) ?? 0) + v);
+type SkAcc = { gp: number; g: number; a: number; pts: number };
+type GlAcc = { gp: number; w: number; so: number; sa: number; sv: number; ga: number };
+const GOALIE_RATE_MIN_GP = 10; // min games to qualify for GAA / SV% leaderboards
 
-  const archS = await prisma.playerSeasonStat.findMany({ where: { teamId, league, isPlayoff: false, season: { not: ACTIVE_SEASON } }, select: { playerId: true, points: true, goals: true } });
-  for (const r of archS) { add(pts, r.playerId, r.points); add(gls, r.playerId, r.goals); }
-  const archG = await prisma.goalieSeasonStat.findMany({ where: { teamId, league, isPlayoff: false, season: { not: ACTIVE_SEASON } }, select: { playerId: true, wins: true } });
-  for (const r of archG) add(wins, r.playerId, r.wins);
+async function franchiseLeaders(teamId: number, league: string): Promise<FranchiseLeaders> {
+  const sk = new Map<number, SkAcc>(), gl = new Map<number, GlAcc>();
+  const skAdd = (id: number, d: SkAcc) => { const c = sk.get(id) ?? { gp: 0, g: 0, a: 0, pts: 0 }; c.gp += d.gp; c.g += d.g; c.a += d.a; c.pts += d.pts; sk.set(id, c); };
+  const glAdd = (id: number, d: GlAcc) => { const c = gl.get(id) ?? { gp: 0, w: 0, so: 0, sa: 0, sv: 0, ga: 0 }; c.gp += d.gp; c.w += d.w; c.so += d.so; c.sa += d.sa; c.sv += d.sv; c.ga += d.ga; gl.set(id, c); };
+
+  // archived (finished) seasons
+  const archS = await prisma.playerSeasonStat.findMany({ where: { teamId, league, isPlayoff: false, season: { not: ACTIVE_SEASON } }, select: { playerId: true, gp: true, goals: true, assists: true, points: true } });
+  for (const r of archS) skAdd(r.playerId, { gp: r.gp, g: r.goals, a: r.assists, pts: r.points });
+  const archG = await prisma.goalieSeasonStat.findMany({ where: { teamId, league, isPlayoff: false, season: { not: ACTIVE_SEASON } }, select: { playerId: true, gp: true, wins: true, shutouts: true, shotsAgainst: true, saves: true, goalsAgainst: true } });
+  for (const r of archG) glAdd(r.playerId, { gp: r.gp, w: r.wins, so: r.shutouts, sa: r.shotsAgainst, sv: r.saves, ga: r.goalsAgainst });
 
   // live active season for this team
   const liveIds = await prisma.game.findMany({ where: { season: ACTIVE_SEASON, league, status: "FINAL", seriesId: null }, select: { id: true } });
   const gameIds = liveIds.map((g) => g.id);
   if (gameIds.length) {
-    const sg = await prisma.playerGameStat.groupBy({ by: ["playerId"], where: { teamId, gameId: { in: gameIds } }, _sum: { points: true, goals: true } });
-    for (const r of sg) { add(pts, r.playerId, r._sum.points ?? 0); add(gls, r.playerId, r._sum.goals ?? 0); }
-    const gg = await prisma.goalieGameStat.findMany({ where: { teamId, started: true, decision: "W", gameId: { in: gameIds } }, select: { playerId: true } });
-    for (const r of gg) add(wins, r.playerId, 1);
+    const sg = await prisma.playerGameStat.groupBy({ by: ["playerId"], where: { teamId, gameId: { in: gameIds } }, _sum: { goals: true, assists: true, points: true }, _count: { _all: true } });
+    for (const r of sg) skAdd(r.playerId, { gp: r._count._all, g: r._sum.goals ?? 0, a: r._sum.assists ?? 0, pts: r._sum.points ?? 0 });
+    const gg = await prisma.goalieGameStat.findMany({ where: { teamId, started: true, gameId: { in: gameIds } }, select: { playerId: true, shotsAgainst: true, saves: true, goalsAgainst: true, decision: true } });
+    const liveGl = new Map<number, GlAcc>();
+    for (const r of gg) { const c = liveGl.get(r.playerId) ?? { gp: 0, w: 0, so: 0, sa: 0, sv: 0, ga: 0 }; c.gp++; c.sa += r.shotsAgainst; c.sv += r.saves; c.ga += r.goalsAgainst; if (r.decision === "W") c.w++; if (r.goalsAgainst === 0) c.so++; liveGl.set(r.playerId, c); }
+    for (const [id, c] of liveGl) glAdd(id, c);
   }
 
-  const ids = [...new Set([...pts.keys(), ...gls.keys(), ...wins.keys()])];
+  const ids = [...new Set([...sk.keys(), ...gl.keys()])];
   const names = new Map((await prisma.player.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, slug: true } })).map((p) => [p.id, p]));
-  const top = (m: Map<number, number>) => [...m.entries()].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([id, v]) => ({ name: cleanName(names.get(id)?.name ?? "?"), slug: names.get(id)?.slug ?? null, value: v }));
-  return { points: top(pts), goals: top(gls), wins: top(wins) };
+  const meta = (id: number) => ({ name: cleanName(names.get(id)?.name ?? "?"), slug: names.get(id)?.slug ?? null });
+  const topSk = (val: (s: SkAcc) => number) => [...sk.entries()].filter(([, s]) => val(s) > 0).sort((a, b) => val(b[1]) - val(a[1])).slice(0, 5).map(([id, s]) => ({ ...meta(id), value: val(s) }));
+  const topGl = (val: (g: GlAcc) => number) => [...gl.entries()].filter(([, g]) => val(g) > 0).sort((a, b) => val(b[1]) - val(a[1])).slice(0, 5).map(([id, g]) => ({ ...meta(id), value: val(g) }));
+  // rate leaders (lower GAA / higher SV% is better) — need a minimum sample
+  let quals = [...gl.entries()].filter(([, g]) => g.gp >= GOALIE_RATE_MIN_GP && g.sa > 0);
+  if (quals.length === 0) quals = [...gl.entries()].filter(([, g]) => g.gp > 0 && g.sa > 0); // young franchise fallback
+  const gaa = quals.map(([id, g]) => ({ id, v: g.ga / g.gp })).sort((a, b) => a.v - b.v).slice(0, 5).map((x) => ({ ...meta(x.id), value: Math.round(x.v * 100) / 100, display: x.v.toFixed(2) }));
+  const savePct = quals.map(([id, g]) => ({ id, v: g.sv / g.sa })).sort((a, b) => b.v - a.v).slice(0, 5).map((x) => ({ ...meta(x.id), value: Math.round(x.v * 1000) / 1000, display: x.v.toFixed(3).replace(/^0/, "") }));
+
+  return {
+    points: topSk((s) => s.pts), goals: topSk((s) => s.g), assists: topSk((s) => s.a), games: topSk((s) => s.gp),
+    wins: topGl((g) => g.w), shutouts: topGl((g) => g.so), gaa, savePct,
+  };
 }

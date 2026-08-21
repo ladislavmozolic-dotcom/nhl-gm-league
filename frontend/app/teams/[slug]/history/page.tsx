@@ -71,7 +71,7 @@ export default async function TeamHistoryPage({ params }: { params: Promise<{ sl
             <li key={i} className="flex items-center gap-2 text-sm">
               <span className="w-4 text-slate-600 text-xs">{i + 1}</span>
               {l.slug ? <Link href={`/players/${l.slug}`} className="flex-1 truncate hover:text-blue-400">{l.name}</Link> : <span className="flex-1 truncate">{l.name}</span>}
-              <span className="tabular-nums font-semibold">{l.value}<span className="text-slate-500 text-xs ml-0.5">{unit}</span></span>
+              <span className="tabular-nums font-semibold">{l.display ?? l.value}{l.display ? null : <span className="text-slate-500 text-xs ml-0.5">{unit}</span>}</span>
             </li>
           ))}
         </ol>
@@ -97,10 +97,25 @@ export default async function TeamHistoryPage({ params }: { params: Promise<{ sl
       </Card>
 
       <Card title="Franchise Leaders" accent="text-amber-400">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-          <LeaderList title="Points" rows={fh.leaders.points} unit="P" />
-          <LeaderList title="Goals" rows={fh.leaders.goals} unit="G" />
-          <LeaderList title="Wins (Goalie)" rows={fh.leaders.wins} unit="W" />
+        <div className="space-y-5">
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-wide text-slate-300 mb-2.5">Skaters</div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+              <LeaderList title="Points" rows={fh.leaders.points} unit="P" />
+              <LeaderList title="Goals" rows={fh.leaders.goals} unit="G" />
+              <LeaderList title="Assists" rows={fh.leaders.assists} unit="A" />
+              <LeaderList title="Games Played" rows={fh.leaders.games} unit="GP" />
+            </div>
+          </div>
+          <div className="border-t border-slate-800 pt-4">
+            <div className="text-[11px] font-bold uppercase tracking-wide text-slate-300 mb-2.5">Goalies</div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+              <LeaderList title="Wins" rows={fh.leaders.wins} unit="W" />
+              <LeaderList title="Shutouts" rows={fh.leaders.shutouts} unit="SO" />
+              <LeaderList title={`GAA (min ${10} GP)`} rows={fh.leaders.gaa} unit="" />
+              <LeaderList title={`SV% (min ${10} GP)`} rows={fh.leaders.savePct} unit="" />
+            </div>
+          </div>
         </div>
       </Card>
 
