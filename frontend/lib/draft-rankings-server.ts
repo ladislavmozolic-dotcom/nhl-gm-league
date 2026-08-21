@@ -13,10 +13,11 @@ export type BoardRow = {
   drafted: boolean; draftedByCode: string | null;
 };
 
-/** Draft years that have an importable class for the current source (nearest first). */
+/** Draft years still worth scouting for the current source — i.e. classes that still
+ *  have UNDRAFTED prospects (a fully-drafted historical class is dropped). Ascending. */
 export async function scoutingYears(): Promise<number[]> {
   const src = await currentDraftSourceWhere();
-  const rows = await prisma.draftProspect.findMany({ where: { ...src }, select: { draftYear: true }, distinct: ["draftYear"], orderBy: { draftYear: "asc" } });
+  const rows = await prisma.draftProspect.findMany({ where: { draftedByTeamId: null, ...src }, select: { draftYear: true }, distinct: ["draftYear"], orderBy: { draftYear: "asc" } });
   return rows.map((r) => r.draftYear);
 }
 

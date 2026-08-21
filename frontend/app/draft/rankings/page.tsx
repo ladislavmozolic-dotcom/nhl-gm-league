@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getTeamSession } from "@/lib/auth";
 import { PageHeader, Card } from "@/components/ui";
 import { scoutingYears, loadBoard } from "@/lib/draft-rankings-server";
+import { currentDraftYear, nextDraftYear } from "@/lib/draft-class-import";
 import DraftBoardManager from "@/components/DraftBoardManager";
 
 export const dynamic = "force-dynamic";
@@ -32,8 +33,12 @@ export default async function DraftRankingsPage({ searchParams }: { searchParams
       </div>
     );
   }
+  // default to the nearest UPCOMING draft (the one being drafted, or the next class),
+  // not the oldest historical class that happens to still have undrafted names.
+  const [cur, nxt] = await Promise.all([currentDraftYear(), nextDraftYear()]);
+  const preferred = [nxt, cur].find((y) => years.includes(y)) ?? years[years.length - 1];
   const wanted = Number(sp.year);
-  const year = years.includes(wanted) ? wanted : years[0];
+  const year = years.includes(wanted) ? wanted : preferred;
   const rows = await loadBoard(teamId, year);
 
   return (
