@@ -56,7 +56,7 @@ async function replaceSeasonGames(season: string, rows: ScheduleRow[]) {
   await prisma.game.deleteMany({ where: { season } });
   if (series.length) await prisma.playoffSeries.deleteMany({ where: { season } });
   await prisma.player.updateMany({ where: { isGoalie: true, team: { league: "NHL" } }, data: { condition: 100 } });
-  await prisma.player.updateMany({ where: { team: { league: "NHL" } }, data: { injuryDaysLeft: 0, injuryDesc: null } });
+  await prisma.player.updateMany({ where: { team: { league: "NHL" } }, data: { injuryDaysLeft: 0, injuryDesc: null, injurySeverity: null } });
   await prisma.game.createMany({ data: rows });
 }
 

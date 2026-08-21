@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { notFound, redirect } from "next/navigation";
 import { loadTeamLines, autoLines } from "@/lib/sim/lines";
+import { loadSettings } from "@/lib/sim/settings";
 import { canManageTeam } from "@/lib/auth";
 import LineEditor from "@/components/LineEditor";
 import { saveLines, suggestLinesAction } from "./actions";
@@ -34,6 +35,13 @@ export default async function LinesPage({ params }: { params: Promise<{ slug: st
   const saved = await loadTeamLines(team.id);
   const lines = saved ?? autoLines(players, goalies);
 
+  // line chemistry (pairwise bonds) + settings for the "gelled" thresholds
+  const [linesRow, settings] = await Promise.all([
+    prisma.teamLines.findUnique({ where: { teamId: team.id }, select: { chemistry: true } }),
+    loadSettings(),
+  ]);
+  const chemistry = (linesRow?.chemistry as Record<string, number> | null) ?? {};
+
   return (
     <LineEditor
       teamName={team.name}
@@ -41,6 +49,10 @@ export default async function LinesPage({ params }: { params: Promise<{ slug: st
       players={players}
       goalies={goalies}
       initial={lines}
+      chemistry={chemistry}
+      chemBase={settings.chemistryBase}
+      chemNeutral={settings.chemistryNeutral}
+      chemEnabled={settings.chemistryEnabled}
       onSave={saveLines}
       onSuggest={suggestLinesAction}
     />

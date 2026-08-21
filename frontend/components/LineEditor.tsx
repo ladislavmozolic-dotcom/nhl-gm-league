@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import LinesNav from "@/components/LinesNav";
 import { autoFill, type TeamLinesData, type ForwardLine, type DefensePair, type SpecialUnit } from "@/lib/sim/lines-core";
+import { unitChemistry } from "@/lib/sim/chemistry";
 import { DIAL_LABELS, mergeTactics, type PuckStyle, type DZone, type PpStyle, type PkStyle } from "@/lib/sim/tactics";
 import { useLang } from "@/components/LangProvider";
 import { dialLabel, dialDesc } from "@/lib/tactics-i18n";
@@ -15,6 +16,10 @@ type Props = {
   teamName: string; teamSlug: string;
   players: Player[]; goalies: Player[];
   initial: TeamLinesData;
+  chemistry?: Record<string, number>;
+  chemBase?: number;
+  chemNeutral?: number;
+  chemEnabled?: boolean;
   onSave: (slug: string, data: TeamLinesData) => Promise<void>;
   onSuggest?: (slug: string) => Promise<SuggestResult>;
 };
@@ -29,7 +34,7 @@ const STATES: Array<{ key: keyof Omit<GameStrategy, "goaliePull">; label: string
 ];
 const TABS = ["Forward", "Defense", "PP", "4 vs 4", "PK4", "PK3", "Others", "Last Min", "Overtime", "Strategy"] as const;
 
-export default function LineEditor({ teamName, teamSlug, players, goalies, initial, onSave, onSuggest }: Props) {
+export default function LineEditor({ teamName, teamSlug, players, goalies, initial, chemistry, chemBase = 35, chemNeutral = 70, chemEnabled = true, onSave, onSuggest }: Props) {
   const lang = useLang();
   const [data, setData] = useState<TeamLinesData>(initial);
   const [tab, setTab] = useState<(typeof TABS)[number]>("Forward");
@@ -49,6 +54,29 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
   // PP point slots accept a forward too (4F–1D power play) — defencemen listed first
   const ppPointPool = useMemo(() => [...defense, ...forwards], [defense, forwards]);
   const goaliesByName = useMemo(() => [...goalies].sort(byName), [goalies]);
+
+  // Line chemistry — a 0..100 bond that grows while a unit stays intact and drops
+  // when it's broken. Fully gelled at `chemNeutral` (no sim penalty); below that a
+  // fresh/disrupted unit is slightly suppressed. Shown per line so the GM can see
+  // which trios/pairs have jelled and which are still finding their game.
+  const chemMap = chemistry ?? {};
+  const ChemBadge = ({ ids }: { ids: (number | null)[] }) => {
+    if (!chemEnabled) return null;
+    const members = ids.filter((x): x is number => x != null);
+    if (members.length < 2) return null;
+    const v = unitChemistry(members, chemMap, chemBase);
+    const r = Math.round(v);
+    const gelled = v >= chemNeutral;
+    const building = v >= chemNeutral * 0.6;
+    const cls = gelled ? "bg-emerald-500/20 text-emerald-300" : building ? "bg-sky-500/20 text-sky-300" : "bg-amber-500/20 text-amber-300";
+    const label = gelled ? "Gelled" : building ? "Building" : "Fresh";
+    return (
+      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${cls} cursor-help`}
+        title={`Line chemistry ${r}/100 — fully gelled at ${chemNeutral}. A unit gains chemistry each game it stays intact and loses it when broken by an injury or call-up. Below gelled, the unit sims at a small penalty.`}>
+        🧪 {r} · {label}
+      </span>
+    );
+  };
 
   // duplicates that matter: the same player twice inside ONE line/pair/unit
   const dupes = useMemo(() => {
@@ -233,7 +261,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
         return (
           <div key={i} className="bg-slate-900/40 border border-slate-800 rounded-lg p-3 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-bold text-slate-300">Line {i + 1}</span>
+              <div className="flex items-center gap-2"><span className="text-sm font-bold text-slate-300">Line {i + 1}</span><ChemBadge ids={[l.lw, l.c, l.rw]} /></div>
               <div className="flex items-center gap-2"><span className="text-[11px] uppercase tracking-wide text-slate-500">Time</span><Stepper value={l.timePct} step={1} onChange={(v) => setFwd(i, "timePct", v as unknown as number)} /><span className="text-slate-500 text-sm">%</span></div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -266,7 +294,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
         return (
           <div key={i} className="bg-slate-900/40 border border-slate-800 rounded-lg p-3 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-bold text-slate-300">Pair {i + 1}</span>
+              <div className="flex items-center gap-2"><span className="text-sm font-bold text-slate-300">Pair {i + 1}</span><ChemBadge ids={[p.ld, p.rd]} /></div>
               <div className="flex items-center gap-2"><span className="text-[11px] uppercase tracking-wide text-slate-500">Time</span><Stepper value={p.timePct} step={1} onChange={(v) => setDef(i, "timePct", v as unknown as number)} /><span className="text-slate-500 text-sm">%</span></div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

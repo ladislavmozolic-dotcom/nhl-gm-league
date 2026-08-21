@@ -18,6 +18,7 @@ import RinkDefenseMap from "@/components/RinkDefenseMap";
 import { goalieAnalytics } from "@/lib/goalie-analytics-server";
 import GoalieAnalyticsCard from "@/components/GoalieAnalyticsCard";
 import { starPowerForPlayer } from "@/lib/star-power-server";
+import { onLtir, money } from "@/lib/finance";
 import { tierAccent } from "@/lib/star-power";
 import InfoTip from "@/components/InfoTip";
 
@@ -461,14 +462,27 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       <PlayerCareerCard career={career} />
 
       {/* ── INJURY ─────────────────────────────────────────────────── */}
-      {p.injuryDaysLeft > 0 && (
+      {p.injuryDaysLeft > 0 && (() => {
+        const sev: string = p.injurySeverity ?? (p.injuryDaysLeft >= 120 ? "Season-ending" : p.injuryDaysLeft >= 45 ? "Long-term" : p.injuryDaysLeft >= 20 ? "Multi-week" : p.injuryDaysLeft >= 7 ? "Week-to-Week" : "Day-to-Day");
+        const sevCls = sev === "Season-ending" ? "text-red-500 font-bold" : sev === "Long-term" ? "text-red-400" : sev === "Multi-week" ? "text-orange-400" : sev === "Week-to-Week" ? "text-amber-400" : "text-slate-400";
+        const eta = p.injuryDaysLeft <= 6 ? `${p.injuryDaysLeft}d` : p.injuryDaysLeft < 14 ? "~1 week" : p.injuryDaysLeft < 45 ? `~${Math.round(p.injuryDaysLeft / 7)} weeks` : p.injuryDaysLeft < 120 ? `~${Math.round(p.injuryDaysLeft / 30)} months` : "out for the season";
+        const ltir = onLtir({ capHit: p.capHit, injuryDaysLeft: p.injuryDaysLeft, condition: p.condition, isGoalie: p.isGoalie });
+        return (
         <Card title="Injury" accent="text-red-400">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-300">{p.injuryDesc || "Injured"}</span>
-            <span className="text-xs text-slate-500">{p.injuryDaysLeft} days left</span>
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-300">{p.injuryDesc || "Injured"}</span>
+              <span className={`text-xs font-semibold ${sevCls}`}>{sev}</span>
+            </div>
+            <div className="flex items-center justify-between text-xs text-slate-500">
+              <span>Est. return: <span className="text-amber-400 font-semibold">{eta}</span> <span className="text-slate-600">({p.injuryDaysLeft} days)</span></span>
+              {ltir
+                ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300" title={`On LTIR — the club may exceed the cap by his ${money(p.capHit ?? 0)} hit to call up a replacement.`}>LTIR · +{money(p.capHit ?? 0)}</span>
+                : (sev === "Multi-week" ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-300">IR</span> : null)}
+            </div>
           </div>
         </Card>
-      )}
+      );})()}
     </div>
   );
 }

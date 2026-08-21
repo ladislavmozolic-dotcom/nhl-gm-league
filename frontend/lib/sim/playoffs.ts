@@ -73,7 +73,7 @@ export async function seedPlayoffs(season = "2026-27",
     await prisma.game.deleteMany({ where: { seriesId: { in: old.map((s) => s.id) } } });
     await prisma.playoffSeries.deleteMany({ where: { season, league } });
   }
-  await prisma.player.updateMany({ where: { team: { league } }, data: { condition: 100, injuryDaysLeft: 0, injuryDesc: null } });
+  await prisma.player.updateMany({ where: { team: { league } }, data: { condition: 100, injuryDaysLeft: 0, injuryDesc: null, injurySeverity: null } });
 
   const standings = await computeStandings(season, league);
   const confs = [...new Set(standings.map((s) => s.conference).filter(Boolean))] as string[];

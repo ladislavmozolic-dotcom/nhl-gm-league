@@ -38,7 +38,11 @@ export async function updateInjuryCon() {
     `UPDATE "Player" SET condition = GREATEST(45, ROUND((${PLAY_CON} - 0.1866 * POWER("injuryDaysLeft", 1.22))::numeric, 2)) WHERE "injuryDaysLeft" > 0 AND "isGoalie" = false`,
   );
   await prisma.$executeRawUnsafe(
-    `UPDATE "Player" SET condition = ${PLAY_CON}, "injuryDesc" = NULL WHERE "injuryDaysLeft" <= 0 AND "injuryDesc" IS NOT NULL AND "isGoalie" = false`,
+    `UPDATE "Player" SET condition = ${PLAY_CON}, "injuryDesc" = NULL, "injurySeverity" = NULL WHERE "injuryDaysLeft" <= 0 AND "injuryDesc" IS NOT NULL AND "isGoalie" = false`,
+  );
+  // healed goalies (or anyone left over) — clear the injury note/severity, CON handled elsewhere
+  await prisma.$executeRawUnsafe(
+    `UPDATE "Player" SET "injuryDesc" = NULL, "injurySeverity" = NULL WHERE "injuryDaysLeft" <= 0 AND "injurySeverity" IS NOT NULL`,
   );
 }
 
@@ -362,7 +366,7 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
     for (const inj of result.injuries) {
       await prisma.player.update({
         where: { id: inj.playerId },
-        data: { injuryDaysLeft: inj.days, injuryDesc: `${inj.desc} (${inj.mechanism})`, condition: injuryConTarget(inj.days) },
+        data: { injuryDaysLeft: inj.days, injuryDesc: `${inj.desc} (${inj.mechanism})`, injurySeverity: inj.severity, condition: injuryConTarget(inj.days) },
       });
       cache.delete(inj.teamId);
       injuredTeams.add(inj.teamId);
@@ -416,6 +420,6 @@ export async function resetConditions() {
   // baseline morale (MO 50 — everyone even; it diverges over the season)
   await prisma.player.updateMany({
     where: { team: { league: "NHL" } },
-    data: { condition: 100, morale: 50, injuryDaysLeft: 0, injuryDesc: null },
+    data: { condition: 100, morale: 50, injuryDaysLeft: 0, injuryDesc: null, injurySeverity: null },
   });
 }

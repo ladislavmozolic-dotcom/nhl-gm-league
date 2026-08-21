@@ -4,11 +4,13 @@
 
 import { prisma } from "./prisma";
 import { cleanName } from "./playerName";
+import { onLtir } from "./finance";
 
 export type CurrentInjury = {
   playerId: number; name: string; slug: string | null; position: string;
   teamId: number | null; teamCode: string | null; teamName: string | null; teamSlug: string | null; teamLogo: string | null; league: string | null;
-  desc: string; daysLeft: number;
+  desc: string; daysLeft: number; severity: string;
+  isGoalie: boolean; capHit: number; onLtir: boolean; // onLtir = injury drives cap relief (skater, CON < 90)
 };
 
 export type SeasonInjury = {
@@ -17,6 +19,15 @@ export type SeasonInjury = {
   part: string; mechanism: string; severity: string; days: number;
   byName: string | null; gameId: number; gameDate: Date | null; round: number | null;
 };
+
+/** Fallback severity from remaining days (legacy rows with no persisted severity). */
+function severityFromDays(days: number): string {
+  if (days >= 120) return "Season-ending";
+  if (days >= 45) return "Long-term";
+  if (days >= 20) return "Multi-week";
+  if (days >= 7) return "Week-to-Week";
+  return "Day-to-Day";
+}
 
 export async function currentInjuries(opts?: { teamId?: number; league?: string }): Promise<CurrentInjury[]> {
   const rows = await prisma.player.findMany({
@@ -31,7 +42,9 @@ export async function currentInjuries(opts?: { teamId?: number; league?: string 
   return rows.map((p) => ({
     playerId: p.id, name: cleanName(p.name), slug: p.slug, position: p.position ?? "—",
     teamId: p.team?.id ?? null, teamCode: p.team?.code ?? null, teamName: p.team?.name ?? null, teamSlug: p.team?.slug ?? null, teamLogo: p.team?.logoUrl ?? null, league: p.team?.league ?? null,
-    desc: p.injuryDesc ?? "Injury", daysLeft: p.injuryDaysLeft,
+    desc: p.injuryDesc ?? "Injury", daysLeft: p.injuryDaysLeft, severity: p.injurySeverity ?? severityFromDays(p.injuryDaysLeft),
+    isGoalie: p.isGoalie, capHit: p.capHit ?? 0,
+    onLtir: onLtir({ capHit: p.capHit, injuryDaysLeft: p.injuryDaysLeft, condition: p.condition, isGoalie: p.isGoalie }),
   }));
 }
 
