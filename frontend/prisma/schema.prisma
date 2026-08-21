@@ -735,6 +735,21 @@ model SimSettings {
   values Json
 }
 
+// Login audit — one row per successful GM sign-in, with IP + rough geolocation.
+model LoginLog {
+  id        Int      @id @default(autoincrement())
+  teamId    Int?
+  ip        String?
+  country   String?
+  region    String?
+  city      String?
+  isp       String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 // League forum — public discussion threads for every GM.
 model ForumThread {
   id         Int      @id @default(autoincrement())

@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { verifyPassword, hashPassword, setTeamSession } from "@/lib/auth";
+import { recordLogin } from "@/lib/login-log";
 import { redirect } from "next/navigation";
 
 export async function login(formData: FormData) {
@@ -37,6 +38,7 @@ export async function login(formData: FormData) {
     redirect(`/teams/${slug}/login?error=wrong`);
   }
   await prisma.team.update({ where: { id: team.id }, data: { lastLoginAt: new Date() } });
+  await recordLogin(team.id); // audit: IP + geolocation
   await setTeamSession(team.id);
   redirect(`/teams/${slug}/lines`);
 }

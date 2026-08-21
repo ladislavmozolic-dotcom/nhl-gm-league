@@ -47,6 +47,7 @@ const GROUPS: Group[] = [
       { href: "/admin/site-editor", title: "🎨 Web Editor", descKey: "admin.siteEditor.d" },
       { href: "/admin/announcements", title: "Commissioner Announcements", descKey: "admin.announcements.d" },
       { href: "/admin/awards", title: "Award Voting", descKey: "admin.awards.d" },
+      { href: "/admin/logins", title: "🔐 Login Audit", descKey: "admin.logins.d" },
     ],
   },
 ];
