@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { loadTeamLines, autoLines } from "@/lib/sim/lines";
 import { loadSettings } from "@/lib/sim/settings";
 import { canManageTeam } from "@/lib/auth";
+import { cleanName, captaincyFromName } from "@/lib/playerName";
 import LineEditor from "@/components/LineEditor";
 import { saveLines, suggestLinesAction } from "./actions";
 
@@ -20,17 +21,21 @@ export default async function LinesPage({ params }: { params: Promise<{ slug: st
   const [skaterRows, goalieRows] = await Promise.all([
     prisma.player.findMany({
       where: { teamId: team.id, rosterType, isGoalie: false },
-      select: { id: true, name: true, position: true, overall: true, injuryDaysLeft: true, df: true, condition: true },
+      select: { id: true, name: true, position: true, overall: true, injuryDaysLeft: true, df: true, condition: true, captaincy: true },
       orderBy: { overall: "desc" },
     }),
     prisma.player.findMany({
       where: { teamId: team.id, rosterType, isGoalie: true },
-      select: { id: true, name: true, position: true, overall: true, injuryDaysLeft: true, condition: true },
+      select: { id: true, name: true, position: true, overall: true, injuryDaysLeft: true, condition: true, captaincy: true },
       orderBy: { overall: "desc" },
     }),
   ]);
-  const players = skaterRows.map((p) => ({ id: p.id, name: p.name, position: p.position, overall: p.overall ?? 0, injured: (p.injuryDaysLeft ?? 0) > 0, df: p.df, con: Math.round(p.condition ?? 100) }));
-  const goalies = goalieRows.map((p) => ({ id: p.id, name: p.name, position: "G", overall: p.overall ?? 0, injured: (p.injuryDaysLeft ?? 0) > 0, con: Math.round(p.condition ?? 100) }));
+  // captaincy: GM-set `captaincy` field is the source of truth; fall back to the legacy
+  // name marker only for a club that never set it (matches Rosters / League → Captains).
+  const capHasField = [...skaterRows, ...goalieRows].some((p) => p.captaincy === "C" || p.captaincy === "A");
+  const capOf = (p: { captaincy: string | null; name: string }) => (capHasField ? ((p.captaincy as "C" | "A" | null) ?? null) : captaincyFromName(p.name));
+  const players = skaterRows.map((p) => ({ id: p.id, name: cleanName(p.name), position: p.position, overall: p.overall ?? 0, injured: (p.injuryDaysLeft ?? 0) > 0, df: p.df, con: Math.round(p.condition ?? 100), cap: capOf(p) }));
+  const goalies = goalieRows.map((p) => ({ id: p.id, name: cleanName(p.name), position: "G", overall: p.overall ?? 0, injured: (p.injuryDaysLeft ?? 0) > 0, con: Math.round(p.condition ?? 100), cap: capOf(p) }));
 
   const saved = await loadTeamLines(team.id);
   const lines = saved ?? autoLines(players, goalies);
