@@ -86,6 +86,7 @@ export default function TeamSubNav({ slug, isGm, isAffiliate, farmSlug, parentSl
         { label: "Prospects", items: [
           { label: "Prospects", href: `${base}/prospects` },
           { label: "Draft Picks", href: `${base}/draft-picks` },
+          { label: "Draft Rankings", href: "/draft/rankings", gm: true },
         ] },
         { label: "Rivals", href: `${base}/rivals`, gm: true },
         { label: "Farm", href: farmSlug ? `/teams/${farmSlug}` : `${base}/farm` },
