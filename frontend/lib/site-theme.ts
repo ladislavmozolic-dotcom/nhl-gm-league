@@ -42,14 +42,19 @@ export function fontStack(key: string): string {
 
 // opacity variants observed in the codebase, mapped with color-mix so the "glassy" look survives
 const OPACITIES = [70, 60, 50, 40, 30];
-function surfaceRules(cls: string, varName: string): string {
-  let css = `.${cls}{background-color:var(${varName})!important}`;
-  for (const o of OPACITIES) css += `.${cls}\\/${o}{background-color:color-mix(in srgb,var(${varName}) ${o}%,transparent)!important}`;
+// NOTE: every var() carries a FALLBACK colour. Without it, if `--surface` ever fails to
+// resolve (a stale cached stylesheet, a forced-colours/contrast mode, a dark-mode browser
+// extension), `background-color:var(--surface)` collapses to `transparent` — and because
+// the rule is !important it beats Tailwind's own opaque default, so panels (e.g. the nav
+// dropdowns) go see-through and the page shows through them. The fallback keeps them solid.
+function surfaceRules(cls: string, varName: string, fb: string): string {
+  let css = `.${cls}{background-color:var(${varName},${fb})!important}`;
+  for (const o of OPACITIES) css += `.${cls}\\/${o}{background-color:color-mix(in srgb,var(${varName},${fb}) ${o}%,transparent)!important}`;
   return css;
 }
-function borderRules(cls: string, varName: string): string {
-  let css = `.${cls}{border-color:var(${varName})!important}`;
-  for (const o of OPACITIES) css += `.${cls}\\/${o}{border-color:color-mix(in srgb,var(${varName}) ${o}%,transparent)!important}`;
+function borderRules(cls: string, varName: string, fb: string): string {
+  let css = `.${cls}{border-color:var(${varName},${fb})!important}`;
+  for (const o of OPACITIES) css += `.${cls}\\/${o}{border-color:color-mix(in srgb,var(${varName},${fb}) ${o}%,transparent)!important}`;
   return css;
 }
 
@@ -60,14 +65,14 @@ export function themeCss(t: Theme): string {
     `:root{--surface:${t.surfaceColor};--surface-2:${t.surface2Color};--border:${t.borderColor};--text-2:${t.text2Color};--text-3:${t.text3Color};--radius:${t.radiusPx}px;--accent:${t.accentColor}}`,
     font ? `body{font-family:${font}!important}` : "",
     // surfaces
-    surfaceRules("bg-slate-900", "--surface"),
-    surfaceRules("bg-slate-800", "--surface-2"),
+    surfaceRules("bg-slate-900", "--surface", t.surfaceColor),
+    surfaceRules("bg-slate-800", "--surface-2", t.surface2Color),
     // borders
-    borderRules("border-slate-800", "--border"),
-    borderRules("border-slate-700", "--border"),
+    borderRules("border-slate-800", "--border", t.borderColor),
+    borderRules("border-slate-700", "--border", t.borderColor),
     // text
-    `.text-slate-400{color:var(--text-2)!important}`,
-    `.text-slate-500{color:var(--text-3)!important}`,
+    `.text-slate-400{color:var(--text-2,${t.text2Color})!important}`,
+    `.text-slate-500{color:var(--text-3,${t.text3Color})!important}`,
     // radius
     `.rounded-lg{border-radius:var(--radius)!important}.rounded-xl{border-radius:var(--radius)!important}.rounded-2xl{border-radius:calc(var(--radius) + 4px)!important}`,
   ].join("");
