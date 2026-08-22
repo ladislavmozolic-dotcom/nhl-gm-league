@@ -7,7 +7,9 @@ import { posGroup, ratingColor, ovColor } from "@/lib/ratingBands";
 import { demandForPlayers, loadMarketPool } from "@/lib/free-agency-server";
 import { getLeagueClock, getLeagueDate } from "@/lib/calendar-server";
 import { cleanName } from "@/lib/playerName";
-import { getTeamSession, isAdmin } from "@/lib/auth";
+import { getTeamSession, isAdmin, isComishTier } from "@/lib/auth";
+import { loadSettings } from "@/lib/sim/settings";
+import FaSignLockToggle from "@/components/FaSignLockToggle";
 import type { InterestCtx } from "@/components/InterestButton";
 import FrenzyBar from "@/components/FrenzyBar";
 
@@ -54,7 +56,9 @@ export default async function FreeAgentsPage({
   const demands = await demandForPlayers(freeAgents as any, pool);
 
   // signing context: who am I acting for, and is the market open?
-  const [clock, sessionTeamId, admin] = await Promise.all([getLeagueClock(), getTeamSession(), isAdmin()]);
+  const [clock, sessionTeamId, admin, comishTier, faSettings] = await Promise.all([getLeagueClock(), getTeamSession(), isAdmin(), isComishTier(), loadSettings()]);
+  const isComish = admin || comishTier;
+  const faSignLock = faSettings.faSignLock;
   let interestCtx: InterestCtx | null = null;
   if (sessionTeamId != null) {
     const teams = admin
@@ -133,6 +137,8 @@ export default async function FreeAgentsPage({
           </Link>
         ) : undefined}
       />
+
+      <FaSignLockToggle locked={faSignLock} comish={isComish} />
 
       <FrenzyBar
         frenzyOpen={clock.frenzyOpen}

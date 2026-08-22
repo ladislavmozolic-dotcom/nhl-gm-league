@@ -10,7 +10,7 @@ import {
   loadMarketPool, teamContentionMap, teamAsk, evaluateTeamOffer, loadLeagueCap, weakestTeams,
 } from "@/lib/free-agency-server";
 import { MAX_TERM, faPosGroup, willingnessNote, twoWayObjection, type Deployment } from "@/lib/free-agency";
-import { loadSettings } from "@/lib/sim/settings";
+import { loadSettings, saveSettings } from "@/lib/sim/settings";
 import { computeELC } from "@/lib/elc";
 
 /** Commissioner-tuned two-way thresholds, shaped for twoWayObjection's opts. */
@@ -95,6 +95,15 @@ async function offerViewMask(): Promise<{ hide: Set<number> } | null> {
   return { hide };
 }
 
+/** Commissioner toggle: lock / unlock UFA signings for ordinary GMs. */
+export async function setFaSignLockAction(lock: boolean) {
+  if (!(await isAdmin()) && !(await isComishTier())) return { ok: false as const, error: "Commissioner only." };
+  const s = await loadSettings();
+  await saveSettings({ ...s, faSignLock: lock });
+  for (const p of ["/free-agents", "/teams"]) revalidatePath(p);
+  return { ok: true as const, locked: lock };
+}
+
 /** All standing offers on a player (open frenzy — GMs can see the competition). */
 export async function getPlayerOffersAction(playerId: number) {
   // blind bidding: only the commissioner tier sees the competing offers; a plain GM never
@@ -135,6 +144,11 @@ export async function submitOfferAction(
   grantClause?: string | null, mNtcBreadth?: number | null, offerTwoWay?: boolean,
 ) {
   if (!(await canManageTeam(teamId))) return { ok: false as const, error: "You don't manage this team." };
+  // commissioner lock: UFA signings can be temporarily closed to ordinary GMs
+  const lockSettings = await loadSettings();
+  if (lockSettings.faSignLock && !(await isAdmin()) && !(await isComishTier())) {
+    return { ok: false as const, error: "🔒 UFA podpisy sú momentálne zamknuté komisárom." };
+  }
   const clock = await getLeagueClock();
   const win = clock.faWindow;
   if (!win.open) return { ok: false as const, error: "The free-agent market is closed." };

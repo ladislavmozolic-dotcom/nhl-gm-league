@@ -91,6 +91,7 @@ export type EngineSettings = {
   osDecisionDay: number;      // offer sheets are decided by this day
   // Pluggable league systems the commissioner picks
   faMode: "full" | "simple";        // full = RFA/franchise/offer-sheets; simple = everyone a UFA to the open market
+  faSignLock: boolean;               // when true, ordinary GMs can't sign UFAs (commissioner-only); a comish toggle unlocks it
   financeMode: "base" | "detailed";  // base = ticket-revenue finance; detailed = richer model (pending)
   waiversEnabled: boolean;           // enforce the waiver wire (claims / re-entry) on demotions
   rosterOverFinePerDay: number; // fine per excess player per day
@@ -196,7 +197,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   ],
   faTwoWayOlderAge: 25, faTwoWayNhlGpLimit: 30, faTwoWayMaxYears: 1, faTwoWayRelaxRound: 2,
   rfaMaxAge: 26, osOpenDay: 1, osCloseDay: 8, osDecisionDay: 10,
-  faMode: "full", financeMode: "base", waiversEnabled: true,
+  faMode: "full", faSignLock: true, financeMode: "base", waiversEnabled: true,
   rosterOverFinePerDay: 200000,
   rewardPlayoff: 8000000, rewardCup: 3000000, rewardAhlCup: 4000000, rewardAhlFinalist: 2000000,
   duHighThreshold: 90, conRecovery: 1, conRecoveryHighDu: 2,
