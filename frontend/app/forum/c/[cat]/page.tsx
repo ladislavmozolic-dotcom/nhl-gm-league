@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { PageHeader, Card } from "@/components/ui";
 import { getTeamSession, isAdmin } from "@/lib/auth";
-import { createThread } from "../../actions";
+import { createThread, markForumSeen } from "../../actions";
 import { CATEGORIES, CAT_META, type Category } from "../../categories";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +22,7 @@ export default async function CategoryPage({ params, searchParams }: { params: P
   if (!(CATEGORIES as readonly string[]).includes(cat)) notFound();
   const category = cat as Category;
   const m = CAT_META[category];
+  await markForumSeen();
   const [me, admin, threads] = await Promise.all([
     getTeamSession(), isAdmin(),
     prisma.forumThread.findMany({
@@ -34,7 +35,7 @@ export default async function CategoryPage({ params, searchParams }: { params: P
   const canPost = me != null && (!m.adminOnly || admin);
 
   return (
-    <div className="space-y-5 py-2 max-w-4xl">
+    <div className="space-y-5 py-2 max-w-5xl">
       <PageHeader title={m.label} subtitle={m.desc} right={<Link href="/forum" className="text-sm text-slate-400 hover:text-blue-400">← Board index</Link>} />
 
       {error === "admin" && <Card><p className="text-center text-amber-400 text-sm py-2">Do tohto podfóra môže vlákna zakladať len komisár.</p></Card>}

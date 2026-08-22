@@ -83,6 +83,7 @@ model Team {
   gmLastName        String?
   gmNickname        String?     // shown in the top menu when this team's GM is signed in
   lastLoginAt       DateTime?
+  forumSeenAt       DateTime?   // last time this GM viewed the forum — drives the "new posts" menu badge
 }
 
 model Player {
@@ -777,6 +778,7 @@ model ForumPost {
   teamId    Int      // author
   body      String
   createdAt DateTime @default(now())
+  editedAt  DateTime? // set when the author edits the post
   thread    ForumThread     @relation(fields: [threadId], references: [id], onDelete: Cascade)
   team      Team            @relation(fields: [teamId], references: [id], onDelete: Cascade)
   reactions ForumReaction[]

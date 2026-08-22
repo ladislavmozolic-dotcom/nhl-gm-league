@@ -17,7 +17,7 @@ interface Team {
   division: string | null;
 }
 
-export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: string; slug: string; admin?: boolean; pendingJoins?: number; unreadDm?: number } | null; items?: MenuItem[]; lang?: Lang }) {
+export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: string; slug: string; admin?: boolean; pendingJoins?: number; unreadDm?: number; forumNew?: number } | null; items?: MenuItem[]; lang?: Lang }) {
   const menuItems = items ?? DEFAULT_MENU;
   const tr = (k: string) => t(lang, k);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
@@ -193,8 +193,11 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
               </div>
             ))}
 
-            {/* Forum — public discussion, visible to everyone */}
-            <Link href="/forum" className="px-2.5 py-1.5 text-[13px] font-semibold rounded-md text-slate-400 hover:text-white hover:bg-slate-800/40 whitespace-nowrap">🗣️ Forum</Link>
+            {/* Forum — public discussion, visible to everyone; badge = new posts for a signed-in GM */}
+            <Link href="/forum" className="relative px-2.5 py-1.5 text-[13px] font-semibold rounded-md text-slate-400 hover:text-white hover:bg-slate-800/40 whitespace-nowrap inline-flex items-center gap-1">
+              🗣️ Forum
+              {(gm?.forumNew ?? 0) > 0 && <span className="min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm!.forumNew}</span>}
+            </Link>
 
             {/* Messages — top-nav so a signed-in GM sees new-message badge right away */}
             {gm && (

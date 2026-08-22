@@ -33,6 +33,46 @@ export async function replyToThread(threadId: number, body: string) {
   return { ok: true as const };
 }
 
+/** Edit a post — author or a league admin only. */
+export async function editPost(postId: number, body: string) {
+  const me = await getTeamSession();
+  if (!me) return { ok: false as const, error: "Sign in as a GM." };
+  const text = body.trim();
+  if (!text) return { ok: false as const, error: "Empty post." };
+  const post = await prisma.forumPost.findUnique({ where: { id: postId }, select: { teamId: true, threadId: true } });
+  if (!post) return { ok: false as const, error: "Post not found." };
+  if (post.teamId !== me && !(await isAdmin())) return { ok: false as const, error: "Not your post." };
+  await prisma.forumPost.update({ where: { id: postId }, data: { body: text.slice(0, 5000), editedAt: new Date() } });
+  revalidatePath(`/forum/${post.threadId}`);
+  return { ok: true as const };
+}
+
+/** Delete a post — author or admin. If it was the thread's last post, remove the thread too. */
+export async function deletePost(postId: number) {
+  const me = await getTeamSession();
+  if (!me) return { ok: false as const, error: "Sign in as a GM." };
+  const post = await prisma.forumPost.findUnique({ where: { id: postId }, select: { teamId: true, threadId: true } });
+  if (!post) return { ok: false as const, error: "Post not found." };
+  if (post.teamId !== me && !(await isAdmin())) return { ok: false as const, error: "Not your post." };
+  await prisma.forumPost.delete({ where: { id: postId } });
+  const left = await prisma.forumPost.count({ where: { threadId: post.threadId } });
+  if (left === 0) {
+    const thr = await prisma.forumThread.findUnique({ where: { id: post.threadId }, select: { category: true } });
+    await prisma.forumThread.delete({ where: { id: post.threadId } }).catch(() => {});
+    revalidatePath("/forum");
+    return { ok: true as const, threadDeleted: true, category: thr?.category ?? null };
+  }
+  revalidatePath(`/forum/${post.threadId}`);
+  return { ok: true as const, threadDeleted: false };
+}
+
+/** Mark the forum as "seen" for the signed-in GM (clears the new-posts menu badge). */
+export async function markForumSeen() {
+  const me = await getTeamSession();
+  if (!me) return;
+  await prisma.team.update({ where: { id: me }, data: { forumSeenAt: new Date() } }).catch(() => {});
+}
+
 /** Toggle an emoji reaction on a post (add if absent, remove if present). */
 export async function toggleReaction(postId: number, emoji: string) {
   const me = await getTeamSession();

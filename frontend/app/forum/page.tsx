@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { PageHeader, Card } from "@/components/ui";
 import { CATEGORIES, CAT_META } from "./categories";
+import { markForumSeen } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ const ago = (d: Date) => {
 };
 
 export default async function ForumPage() {
+  await markForumSeen();
   const cats = await Promise.all(CATEGORIES.map(async (cat) => {
     const [topics, posts, last] = await Promise.all([
       prisma.forumThread.count({ where: { category: cat } }),
@@ -28,7 +30,7 @@ export default async function ForumPage() {
   }));
 
   return (
-    <div className="space-y-5 py-2 max-w-4xl">
+    <div className="space-y-5 py-2 max-w-5xl">
       <PageHeader title="League Forum" subtitle="Board index — pick a sub-forum." />
 
       <Card bodyClassName="p-0">
