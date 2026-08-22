@@ -40,5 +40,5 @@ export async function login(formData: FormData) {
   await prisma.team.update({ where: { id: team.id }, data: { lastLoginAt: new Date() } });
   await recordLogin(team.id); // audit: IP + geolocation
   await setTeamSession(team.id);
-  redirect(`/teams/${slug}/lines`);
+  redirect(`/teams/${slug}/roster`);
 }
