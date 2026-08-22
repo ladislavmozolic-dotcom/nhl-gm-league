@@ -92,8 +92,12 @@ export default async function RootLayout({
   });
 
   return (
-    <html lang="en">
+    <html lang="en" style={{ colorScheme: "dark" }}>
       <head>
+        {/* Tell the browser the site is ALREADY dark, so Chrome's "Auto Dark Mode / Force
+            Dark" (a built-in flag, not an extension) doesn't re-darken it — that re-processing
+            is what turned panels transparent and light text near-black for some GMs. */}
+        <meta name="color-scheme" content="dark" />
         <style dangerouslySetInnerHTML={{ __html: themeCss(site.theme) }} />
       </head>
       <body

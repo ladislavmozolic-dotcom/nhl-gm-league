@@ -1,6 +1,10 @@
 @import "tailwindcss";
 
 :root {
+  /* The app is a dark UI. Declaring the scheme opts OUT of Chrome's Auto/Force Dark Mode
+     re-processing (which was making panels transparent and light text near-invisible for
+     some users). form controls & scrollbars also render dark-native. */
+  color-scheme: dark;
   --background: #ffffff;
   --foreground: #171717;
 }
