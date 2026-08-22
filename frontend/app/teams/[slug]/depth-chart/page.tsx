@@ -5,6 +5,7 @@ import { cleanName } from "@/lib/playerName";
 import { Card } from "@/components/ui";
 import { ovColor, posGroup } from "@/lib/ratingBands";
 import RosterTabs from "@/components/RosterTabs";
+import { canManageTeam } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -68,7 +69,7 @@ export default async function DepthChartPage({ params }: { params: Promise<{ slu
 
   return (
     <div className="space-y-4">
-      <RosterTabs slug={slug} />
+      <RosterTabs slug={slug} isGm={await canManageTeam(team.id)} />
       <div className="flex items-center gap-4 text-[11px] text-slate-400">
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" /> NHL</span>
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500/70" /> AHL / farm</span>

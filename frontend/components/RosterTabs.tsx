@@ -6,11 +6,12 @@ import { useT } from "@/components/LangProvider";
 
 /** Secondary tabs that live UNDER Roster — Depth Chart is nested here rather than
  *  cluttering the team's top menu. */
-export default function RosterTabs({ slug }: { slug: string }) {
+export default function RosterTabs({ slug, isGm = false }: { slug: string; isGm?: boolean }) {
   const pathname = usePathname() || "";
   const tr = useT();
   const tabs = [
     { label: tr("team.roster"), href: `/teams/${slug}/roster` },
+    ...(isGm ? [{ label: tr("team.lines"), href: `/teams/${slug}/lines` }] : []),
     { label: tr("team.depthChart"), href: `/teams/${slug}/depth-chart` },
     { label: tr("team.injuries"), href: `/teams/${slug}/injuries` },
   ];

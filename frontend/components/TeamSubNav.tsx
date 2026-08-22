@@ -105,7 +105,7 @@ export default function TeamSubNav({ slug, isGm, isAffiliate, farmSlug, parentSl
     `shrink-0 px-3 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${active ? "border-blue-500 text-white" : "border-transparent text-slate-400 hover:text-white hover:border-slate-600"}`;
 
   return (
-    <nav ref={navRef} className="border-y border-slate-800 bg-slate-900/60 backdrop-blur -mx-4 px-4">
+    <nav ref={navRef} className="relative z-30 border-y border-slate-800 bg-slate-900/60 backdrop-blur -mx-4 px-4">
       <div className="flex flex-wrap items-center gap-1">
         {entries.map((e) => {
           if (!isGroup(e)) {

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { Card } from "@/components/ui";
 import RosterTabs from "@/components/RosterTabs";
+import { canManageTeam } from "@/lib/auth";
 import { currentInjuries, seasonInjuries } from "@/lib/injuries-server";
 import { CurrentInjuryTable, SeasonInjuryTable } from "@/components/InjuryTables";
 
@@ -28,7 +29,7 @@ export default async function TeamInjuriesPage({ params, searchParams }: { param
 
   return (
     <div className="space-y-4">
-      <RosterTabs slug={slug} />
+      <RosterTabs slug={slug} isGm={await canManageTeam(team.id)} />
       <div className="flex gap-2">
         <Tab id="current" label="Current Injuries" />
         <Tab id="all" label="All Injuries (season)" />

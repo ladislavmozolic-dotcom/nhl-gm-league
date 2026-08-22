@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import RosterView from "@/components/RosterView";
-import { isAdmin } from "@/lib/auth";
+import { isAdmin, canManageTeam } from "@/lib/auth";
 import AutoFillButton from "@/components/AutoFillButton";
 import RosterTabs from "@/components/RosterTabs";
 import { captaincyFromName } from "@/lib/playerName";
@@ -37,6 +37,7 @@ export default async function TeamRosterPage({ params }: { params: Promise<{ slu
     ? await prisma.team.findFirst({ where: { parentTeamId: team.id }, select: { name: true } })
     : null;
   const admin = await isAdmin();
+  const isGm = await canManageTeam(team.id);
 
   // who is actually dressed in the current lineup? Everyone else on the roster
   // (healthy scratches, players left out of the lines, and the injured) drops to
@@ -82,7 +83,7 @@ export default async function TeamRosterPage({ params }: { params: Promise<{ slu
 
   return (
     <div className="space-y-6">
-      <RosterTabs slug={slug} />
+      <RosterTabs slug={slug} isGm={isGm} />
       {short.length > 0 && (
         <div className="text-sm text-amber-200 bg-amber-950/25 border border-amber-800/40 rounded-lg px-4 py-2.5">
           <div>
