@@ -129,9 +129,13 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
                 {prospects.length === 0 && <tr><td colSpan={3} className="px-4 py-3 text-slate-600">no prospects</td></tr>}
                 {prospects.map((p) => (
                   <tr key={p.id} className="border-b border-slate-800/40 hover:bg-slate-800/30 transition-colors last:border-0">
-                    <td className="px-4 py-3 font-medium">{p.name}</td>
-                    <td className="px-4 py-3 text-center text-slate-400 tabular-nums">{p.draftYear ?? "—"}</td>
-                    <td className="px-4 py-3 text-center text-slate-400 tabular-nums">{p.overallPick ?? "—"}</td>
+                    <td className="px-4 py-3 font-medium">{cleanName(p.name)}</td>
+                    {(p as any).undrafted && !p.draftYear ? (
+                      <td colSpan={2} className="px-4 py-3 text-center text-slate-500 italic">Undrafted</td>
+                    ) : (<>
+                      <td className="px-4 py-3 text-center text-slate-400 tabular-nums">{p.draftYear ?? "—"}</td>
+                      <td className="px-4 py-3 text-center text-slate-400 tabular-nums">{p.overallPick ? `#${p.overallPick}` : "—"}</td>
+                    </>)}
                   </tr>
                 ))}
               </tbody>

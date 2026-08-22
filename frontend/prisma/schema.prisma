@@ -605,6 +605,7 @@ model Prospect {
   nhlId       Int?
   position    String?
   epUrl       String? // EliteProspects profile URL (scraped from profinhl ProspectReport)
+  undrafted   Boolean @default(false) // confirmed to have gone undrafted (real NHL) — shows "Undrafted" instead of "—"
   team        Team   @relation(fields: [teamId], references: [id])
 }
 

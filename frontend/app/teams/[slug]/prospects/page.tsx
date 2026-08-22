@@ -93,9 +93,13 @@ export default async function TeamProspectsPage({ params }: { params: Promise<{ 
                 <tr key={p.id} className="border-b border-slate-800/40 hover:bg-slate-800/30 transition-colors last:border-0">
                   <td className="px-4 py-3 font-medium"><a href={(p as any).epUrl ?? epUrl(p.name)} target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 inline-flex items-center gap-1">{cleanName(p.name)}<span className="text-[9px] text-slate-500" aria-hidden>↗</span></a></td>
                   <td className="px-4 py-3 text-center text-slate-400">{(p as any).position || "—"}</td>
-                  <td className="px-4 py-3 text-center text-slate-400">{p.draftYear || "—"}</td>
-                  <td className="px-4 py-3 text-center text-slate-400">{p.overallPick ? `R${Math.ceil(p.overallPick / 32)}` : "—"}</td>
-                  <td className="px-4 py-3 text-center text-slate-400">{p.overallPick ? `#${p.overallPick}` : "—"}</td>
+                  {(p as any).undrafted && !p.draftYear ? (
+                    <td colSpan={3} className="px-4 py-3 text-center text-slate-500 italic">Undrafted</td>
+                  ) : (<>
+                    <td className="px-4 py-3 text-center text-slate-400">{p.draftYear || "—"}</td>
+                    <td className="px-4 py-3 text-center text-slate-400">{p.overallPick ? `R${Math.ceil(p.overallPick / 32)}` : "—"}</td>
+                    <td className="px-4 py-3 text-center text-slate-400">{p.overallPick ? `#${p.overallPick}` : "—"}</td>
+                  </>)}
                 </tr>
               ))}
             </tbody>
