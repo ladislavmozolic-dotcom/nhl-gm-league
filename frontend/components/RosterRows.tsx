@@ -63,7 +63,7 @@ export default function RosterRows({ players, attrs, isGoalie, farm }: { players
                   <div className="flex items-center gap-2">
                     <PlayerAvatar src={player.photoUrl} alt={player.name} size={32} />
                     <div className="min-w-0">
-                      <Link href={`/players/${player.slug}`} className="font-medium text-sm hover:text-blue-400 transition-colors truncate block">
+                      <Link href={`/players/${player.slug}`} className="font-medium text-sm text-white hover:text-blue-400 transition-colors truncate block">
                         {cleanName(player.name)}
                         {(player.capRole ?? player.captaincy) && <span className={`ml-1 text-[10px] font-bold ${(player.capRole ?? player.captaincy) === "C" ? "text-amber-400" : "text-slate-400"}`}>({player.capRole ?? player.captaincy})</span>}
                       </Link>

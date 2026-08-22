@@ -61,7 +61,7 @@ export default function RosterTable({ title, players, goalie = false }: { title:
               return (
                 <tr key={p.id} className="border-b border-slate-800/60 hover:bg-slate-800/30">
                   <td className="px-2 py-1.5 text-left sticky left-0 bg-slate-900/60 backdrop-blur whitespace-nowrap">
-                    {p.slug ? <Link href={`/players/${p.slug}`} className="hover:text-blue-400 font-medium">{cleanName(p.name)}</Link> : <span className="font-medium">{cleanName(p.name)}</span>}
+                    {p.slug ? <Link href={`/players/${p.slug}`} className="text-white hover:text-blue-400 font-medium">{cleanName(p.name)}</Link> : <span className="text-white font-medium">{cleanName(p.name)}</span>}
                     {cap && <span className={`ml-1 text-[9px] font-bold ${cap === "C" ? "text-amber-400" : "text-slate-400"}`}>({cap})</span>}
                   </td>
                   <td className="px-2 py-1.5 text-center text-slate-400">{p.position ?? "—"}</td>

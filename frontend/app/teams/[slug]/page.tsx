@@ -196,7 +196,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
                 {captains.map((c) => (
                   <div key={c.id} className="flex items-center gap-2 text-sm">
                     <PlayerAvatar src={c.photoUrl} alt={c.name} size={28} />
-                    <Link href={`/players/${c.slug}`} className="flex-1 truncate hover:text-blue-400">{cleanName(c.name)}</Link>
+                    <Link href={`/players/${c.slug}`} className="flex-1 truncate text-white hover:text-blue-400">{cleanName(c.name)}</Link>
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${c.captaincy === "C" ? "bg-yellow-500/20 text-yellow-400" : "bg-slate-600/30 text-slate-300"}`}>{c.captaincy}</span>
                   </div>
                 ))}
@@ -232,9 +232,9 @@ function LeaderTile({ label, player, value }: { label: string; player?: { name: 
         <div className="flex-1 min-w-0 p-3 flex flex-col justify-center">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</p>
           {player ? (
-            <Link href={`/players/${player.slug}`} className="text-sm font-semibold hover:text-blue-400 transition-colors truncate block">{cleanName(player.name)}</Link>
+            <Link href={`/players/${player.slug}`} className="text-sm font-semibold text-white hover:text-blue-400 transition-colors truncate block">{cleanName(player.name)}</Link>
           ) : <span className="text-sm text-slate-500">—</span>}
-          <p className="text-2xl font-black leading-none mt-1">{value}</p>
+          <p className="text-2xl font-black leading-none mt-1 text-white">{value}</p>
         </div>
       </div>
     </div>
