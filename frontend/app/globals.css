@@ -1,12 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  /* The app is a dark UI. Declaring the scheme opts OUT of Chrome's Auto/Force Dark Mode
-     re-processing (which was making panels transparent and light text near-invisible for
-     some users). form controls & scrollbars also render dark-native. */
+  /* The app is ALWAYS a dark UI, so the base tokens must be dark REGARDLESS of the
+     viewer's OS light/dark preference. Previously these defaulted to light (#fff /
+     #171717) and only flipped to dark under prefers-color-scheme:dark — so a viewer in
+     LIGHT mode got body{color:#171717} (dark text). Because that unlayered body rule
+     beats Tailwind's layered .text-white, every inherited-colour label/name rendered
+     near-black on the dark background and vanished. Dark defaults fix it for everyone. */
   color-scheme: dark;
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0a1628;
+  --foreground: #ededed;
 }
 
 @theme inline {
