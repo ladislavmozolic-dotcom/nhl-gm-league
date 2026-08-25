@@ -21,16 +21,34 @@ const ovColor = (ov: number) =>
   : ov >= 70 ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
   : ov >= 60 ? "bg-emerald-600/12 text-emerald-400/90 border-emerald-600/30"
   : "bg-emerald-700/10 text-emerald-500/70 border-emerald-700/25";
+// a $100k minor-league deal is the only contract that can be released to UFA
+const isReleasable = (p: Player) => p.capHit === 100_000;
+
 type Props = {
   teamName: string; teamSlug: string; affiliateName: string; hasAffiliate: boolean;
   players: Player[]; onSave: (slug: string, rows: MoveRow[]) => Promise<{ ok: boolean; error?: string } | void>;
+  onRelease: (slug: string, playerId: number) => Promise<{ ok: boolean; error?: string; name?: string }>;
 };
 
-export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffiliate, players, onSave }: Props) {
+export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffiliate, players, onSave, onRelease }: Props) {
   const [rows, setRows] = useState<Player[]>(players);
   const [pending, start] = useTransition();
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+
+  const release = (p: Player) => {
+    if (!isReleasable(p)) return;
+    if (!confirm(`Release ${p.name} to the UFA market? He leaves your organization and any GM can sign him.`)) return;
+    start(async () => {
+      setErr(null); setNote(null);
+      try {
+        const r = await onRelease(teamSlug, p.id);
+        if (!r.ok) setErr(r.error ?? "Couldn't release the player.");
+        else { setRows((prev) => prev.filter((x) => x.id !== p.id)); setNote(`${r.name ?? p.name} released to UFA.`); }
+      } catch (e) { setErr((e as Error).message); }
+    });
+  };
 
   const byName = (a: Player, b: Player) => a.name.localeCompare(b.name);
   const of = (s: RosterSide) => rows.filter((r) => r.side === s).sort(byName);
@@ -132,8 +150,13 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
           {p.side === "pro-scratched" && <><MoveBtn p={p} to="pro" label="Dress" /><MoveBtn p={p} to="farm" label="↓ Farm" /></>}
           {/* AHL active: call up or scratch */}
           {p.side === "farm" && <><MoveBtn p={p} to="pro" label="↑ Pro" /><MoveBtn p={p} to="farm-scratched" label="Scratch" /></>}
-          {/* AHL scratch: call up or dress on the farm */}
-          {p.side === "farm-scratched" && <><MoveBtn p={p} to="pro" label="↑ Pro" /><MoveBtn p={p} to="farm" label="Dress" /></>}
+          {/* AHL scratch: call up, dress on the farm, or release a $100k deal to UFA */}
+          {p.side === "farm-scratched" && <>
+            <MoveBtn p={p} to="pro" label="↑ Pro" /><MoveBtn p={p} to="farm" label="Dress" />
+            <button onClick={() => release(p)} disabled={!isReleasable(p) || pending}
+              title={isReleasable(p) ? "Release this $100k minor-league player to the UFA market" : "Only a $100k minor-league contract can be released"}
+              className="text-[11px] px-2 py-0.5 rounded bg-red-900/70 hover:bg-red-800 text-red-200 disabled:opacity-25 whitespace-nowrap">Release</button>
+          </>}
         </div>
       </div>
     );
@@ -166,7 +189,7 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
           <Link href={`/teams/${teamSlug}/lines`} className="text-slate-400 hover:text-blue-400">Lines →</Link>
           <Link href={`/teams/${teamSlug}/roster/edit`} className="text-slate-400 hover:text-blue-400">Numbers &amp; captains →</Link>
         </div>
-        <p className="text-xs text-slate-500 mt-1">Choose which <b>20 dress</b> (NHL) vs the healthy scratches, and manage the farm. One-way contracts can&apos;t be sent down; AHL-only / $100k minor-league deals can&apos;t be called up. <b>NHL Scratched</b> still count against the cap; <b>Farm Scratched</b> dress nowhere.</p>
+        <p className="text-xs text-slate-500 mt-1">Choose which <b>20 dress</b> (NHL) vs the healthy scratches, and manage the farm. One-way contracts can&apos;t be sent down; AHL-only / $100k minor-league deals can&apos;t be called up. <b>NHL Scratched</b> still count against the cap; <b>Farm Scratched</b> dress nowhere. A <b>$100k</b> minor-league player can be <b>Released</b> from Farm Scratched straight to the UFA market.</p>
       </div>
 
       {blockers.length > 0 && (
@@ -205,6 +228,7 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
           </button>
           {blockers.length > 0 && <span className="text-red-400 text-sm">Fix the cap/limit issue to save</span>}
           {saved && <span className="text-green-400 text-sm">✓ Saved</span>}
+          {note && <span className="text-amber-300 text-sm">{note}</span>}
           {err && <span className="text-red-400 text-sm">{err}</span>}
         </div>
       </div>

@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { notFound, redirect } from "next/navigation";
 import { canManageTeam } from "@/lib/auth";
 import RosterMover from "@/components/RosterMover";
-import { saveRosterMoves } from "./actions";
+import { saveRosterMoves, releasePlayer } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +19,9 @@ export default async function RostersPage({ params }: { params: Promise<{ slug: 
   const orgTeamIds = [team.id, ...(affiliate ? [affiliate.id] : [])];
 
   const players = await prisma.player.findMany({
-    where: { teamId: { in: orgTeamIds } },
+    // only real roster players (NHL/AHL) — released UFAs, prospects and retirees keep a
+    // team id (schema requires one) but must never surface in the roster manager.
+    where: { teamId: { in: orgTeamIds }, rosterType: { in: ["NHL", "AHL"] } },
     select: { id: true, name: true, position: true, overall: true, isGoalie: true, rosterType: true, contractType: true, capHit: true, scratched: true, teamId: true },
     orderBy: [{ isGoalie: "asc" }, { overall: "desc" }],
   });
@@ -38,6 +40,7 @@ export default async function RostersPage({ params }: { params: Promise<{ slug: 
         capHit: p.capHit ?? 0,
       }))}
       onSave={saveRosterMoves}
+      onRelease={releasePlayer}
     />
   );
 }

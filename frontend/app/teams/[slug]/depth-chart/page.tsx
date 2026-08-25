@@ -46,7 +46,7 @@ export default async function DepthChartPage({ params }: { params: Promise<{ slu
   const affIds = affiliates.map((a) => a.id);
 
   const rows = await prisma.player.findMany({
-    where: { teamId: { in: [team.id, ...affIds] } },
+    where: { teamId: { in: [team.id, ...affIds] }, rosterType: { in: ["NHL", "AHL"] } },
     select: {
       id: true, name: true, slug: true, position: true, overall: true, isGoalie: true,
       shoots: true, teamId: true, injuryDaysLeft: true, goalieRating: { select: { overall: true } },

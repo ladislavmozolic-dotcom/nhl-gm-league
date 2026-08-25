@@ -101,3 +101,35 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
   revalidatePath(`/teams/${slug}`);
   return { ok: true as const };
 }
+
+/** Release a $100k minor-league (AHL-only) player to the UFA market. Only a $100k
+ *  farm contract qualifies — real minor-league deals ($100k–775k) and NHL players
+ *  can't be released this way. The player keeps his team id (schema requires one)
+ *  but rosterType "UFA" drops him off every roster/depth view and onto the FA market. */
+export async function releasePlayer(slug: string, playerId: number) {
+  const team = await prisma.team.findUnique({
+    where: { slug },
+    include: { affiliateTeams: { select: { id: true } } },
+  });
+  if (!team) return { ok: false as const, error: "Team not found." };
+  if (!(await canManageTeam(team.id))) return { ok: false as const, error: "You don't manage this team." };
+  const orgIds = [team.id, ...team.affiliateTeams.map((a) => a.id)];
+
+  const player = await prisma.player.findFirst({
+    where: { id: playerId, teamId: { in: orgIds } },
+    select: { id: true, name: true, capHit: true },
+  });
+  if (!player) return { ok: false as const, error: "Player isn't in your organization." };
+  if (player.capHit !== 100_000) return { ok: false as const, error: "Only a $100k minor-league contract can be released." };
+
+  await prisma.player.update({
+    where: { id: player.id },
+    data: { rosterType: "UFA", scratched: false, captaincy: null },
+  });
+
+  revalidatePath(`/teams/${slug}/rosters`);
+  revalidatePath(`/teams/${slug}`);
+  revalidatePath(`/teams/${slug}/depth-chart`);
+  revalidatePath("/free-agents");
+  return { ok: true as const, name: player.name };
+}
