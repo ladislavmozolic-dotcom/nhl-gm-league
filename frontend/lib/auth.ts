@@ -63,6 +63,15 @@ export async function isComishTier(): Promise<boolean> {
   return !!t?.isAdmin || ["comish", "co_comish", "agent"].includes(t?.gmRole ?? "gm");
 }
 
+/** Commission = the commissioner (isAdmin) or a (co-)commissioner. These may review and
+ *  Accept / Decline / Modify a rookie GM's trades. Excludes plain "agent". */
+export async function isCommission(): Promise<boolean> {
+  const id = await getTeamSession();
+  if (id == null) return false;
+  const t = await prisma.team.findUnique({ where: { id }, select: { isAdmin: true, gmRole: true } });
+  return !!t?.isAdmin || ["comish", "co_comish"].includes(t?.gmRole ?? "gm");
+}
+
 /** May the current session manage `teamId`? True for that team's own GM, for any
  *  admin GM (who can edit every team from the Admin panel), or for the GM of the
  *  parent NHL club when `teamId` is its AHL affiliate — the farm is managed with

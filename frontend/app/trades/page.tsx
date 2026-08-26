@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { getTeamSession, isAdmin } from "@/lib/auth";
+import { getTeamSession, isAdmin, isCommission } from "@/lib/auth";
 import { money } from "@/lib/finance";
 import TradeActions from "@/components/TradeActions";
 import { PageHeader } from "@/components/ui";
@@ -10,12 +10,14 @@ export const dynamic = "force-dynamic";
 type AssetLabel = { text: string };
 
 export default async function TradesPage() {
-  const [session, admin, trades, teams] = await Promise.all([
+  const [session, admin, commission, trades, teams] = await Promise.all([
     getTeamSession(),
     isAdmin(),
+    isCommission(),
     prisma.trade.findMany({ take: 60, orderBy: { createdAt: "desc" } }),
-    prisma.team.findMany({ select: { id: true, name: true, code: true, logoUrl: true } }),
+    prisma.team.findMany({ select: { id: true, name: true, code: true, logoUrl: true, rookieGm: true } }),
   ]);
+  const commishQueue = await prisma.trade.count({ where: { status: { in: ["AWAITING_COMMISH", "MODIFIED"] } } });
   const teamById = new Map(teams.map((t) => [t.id, t]));
   const assets = await prisma.tradeAsset.findMany({ where: { tradeId: { in: trades.map((t) => t.id) } } });
 
@@ -53,6 +55,8 @@ export default async function TradesPage() {
   // where they carry full detail in the team Trade Tracker.
   const involvedOrAdmin = (t: { fromTeamId: number; toTeamId: number }) => admin || session === t.fromTeamId || session === t.toTeamId;
   const pending = enriched.filter((t) => t.status === "PENDING" && involvedOrAdmin(t));
+  const IN_REVIEW = ["AWAITING_COMMISH", "MODIFY", "MODIFIED"];
+  const inReview = enriched.filter((t) => IN_REVIEW.includes(t.status) && involvedOrAdmin(t));
   const history = enriched.filter((t) => t.status === "ACCEPTED" || t.status === "COMPLETED" || ((t.status === "DECLINED" || t.status === "CANCELLED") && involvedOrAdmin(t)));
 
   return (
@@ -62,6 +66,24 @@ export default async function TradesPage() {
         subtitle="Proposals and completed deals"
         right={session ? <Link href="/trades/build" className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 font-semibold text-sm">Propose a trade</Link> : undefined}
       />
+
+      {commission && (
+        <Link href="/trades/commish" className="flex items-center justify-between rounded-2xl border border-amber-700/50 bg-amber-950/25 px-5 py-3 hover:bg-amber-950/40 transition-colors">
+          <span className="text-sm font-semibold text-amber-200">🕵️ Trade Commission — review rookie-GM trades</span>
+          <span className="text-xs font-bold rounded-full px-3 py-1 bg-amber-500/20 text-amber-300">{commishQueue} awaiting →</span>
+        </Link>
+      )}
+
+      {inReview.length > 0 && (
+        <section>
+          <h2 className="text-lg font-bold text-amber-400 mb-4 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" /> With the Commission
+          </h2>
+          <div className="grid gap-4">
+            {inReview.map((t) => <TradeCard key={t.id} trade={t} action={null} admin={admin} />)}
+          </div>
+        </section>
+      )}
 
       <section>
         <h2 className="text-lg font-bold text-yellow-400 mb-4 flex items-center gap-2">
@@ -97,14 +119,18 @@ const STATUS_STYLE: Record<string, string> = {
   DECLINED: "bg-red-500/20 text-red-400",
   CANCELLED: "bg-slate-600/30 text-slate-400",
   COMPLETED: "bg-green-500/20 text-green-400",
+  AWAITING_COMMISH: "bg-amber-500/20 text-amber-300",
+  MODIFY: "bg-sky-500/20 text-sky-300",
+  MODIFIED: "bg-fuchsia-500/20 text-fuchsia-300",
+  REVERTED: "bg-slate-600/30 text-slate-400",
 };
 
-function TeamHead({ team }: { team?: { name: string; code: string | null; logoUrl: string | null } }) {
+function TeamHead({ team }: { team?: { name: string; code: string | null; logoUrl: string | null; rookieGm?: boolean } }) {
   return (
     <div className="flex items-center gap-2">
       {team?.logoUrl ? <img src={team.logoUrl} alt="" className="w-8 h-8 object-contain" />
         : <div className="w-8 h-8 bg-slate-800 rounded-full grid place-items-center text-xs font-bold text-slate-500">{team?.code || "?"}</div>}
-      <span className="text-sm font-medium hidden sm:inline">{team?.name || "Unknown"}</span>
+      <span className="text-sm font-medium hidden sm:inline">{team?.name || "Unknown"}{team?.rookieGm ? <span className="text-[10px] font-bold text-rose-400 ml-1" title="Rookie GM — trades need commission approval">(R)</span> : null}</span>
     </div>
   );
 }
@@ -125,8 +151,8 @@ function AssetList({ team, labels }: { team?: { name: string }; labels: { text: 
 function TradeCard({ trade, action, admin }: {
   trade: {
     id: number; status: string; condition: string | null; createdAt: Date;
-    fromTeam?: { name: string; code: string | null; logoUrl: string | null };
-    toTeam?: { name: string; code: string | null; logoUrl: string | null };
+    fromTeam?: { name: string; code: string | null; logoUrl: string | null; rookieGm?: boolean };
+    toTeam?: { name: string; code: string | null; logoUrl: string | null; rookieGm?: boolean };
     fromLabels: { text: string }[]; toLabels: { text: string }[];
   };
   action: "receiver" | "proposer" | null;
@@ -149,6 +175,9 @@ function TradeCard({ trade, action, admin }: {
       </div>
 
       {trade.condition && <p className="text-xs text-amber-300/80 mb-3">📎 {trade.condition}</p>}
+      {trade.status === "AWAITING_COMMISH" && <p className="text-xs text-amber-300/80 mb-3">🕵️ Agreed by both GMs — awaiting commission approval (rookie-GM oversight).</p>}
+      {trade.status === "MODIFY" && <p className="text-xs text-sky-300/90 mb-3">✏️ The commission asked to rebalance this deal — <Link href={`/trades/build?edit=${trade.id}`} className="underline font-semibold">edit &amp; resubmit →</Link></p>}
+      {trade.status === "MODIFIED" && <p className="text-xs text-fuchsia-300/90 mb-3">✏️ Modified by the GM — back with the commission for a final Accept/Decline.</p>}
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-xs text-slate-600">{trade.createdAt.toLocaleDateString("sk-SK", { day: "numeric", month: "long", year: "numeric" })}</p>

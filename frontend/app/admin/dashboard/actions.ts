@@ -19,6 +19,15 @@ export async function setGmRoleAction(teamId: number, role: string) {
   return { ok: true as const };
 }
 
+/** Commissioner flags/unflags a club's GM as a rookie (R) — his trades then need
+ *  commission approval before they execute. */
+export async function setRookieGmAction(teamId: number, rookie: boolean) {
+  if (!(await isAdmin())) return { ok: false as const, error: "Commissioner only." };
+  await prisma.team.update({ where: { id: teamId }, data: { rookieGm: rookie } });
+  revalidatePath("/admin/dashboard");
+  return { ok: true as const };
+}
+
 /** Commissioner sets a GM-less club's AI mode: "base" (lineups/cap only) or
  *  "advanced" (also negotiates trades with human GMs). */
 export async function setAiModeAction(teamId: number, mode: string) {

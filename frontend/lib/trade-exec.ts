@@ -184,7 +184,8 @@ export async function packageFromTrade(tradeId: number): Promise<TradePackage> {
 export async function executeAcceptedTrade(tradeId: number) {
   const trade = await prisma.trade.findUnique({ where: { id: tradeId } });
   if (!trade) throw new Error("Trade not found");
-  if (trade.status !== "PENDING") throw new Error("This trade is no longer pending.");
+  // executable straight from a GM accept (PENDING) or after commission review of a rookie deal
+  if (!["PENDING", "AWAITING_COMMISH", "MODIFIED"].includes(trade.status)) throw new Error("This trade is no longer pending.");
   const pkg = await packageFromTrade(tradeId);
   pkg.waived = trade.waivedClauses ?? [];
   pkg.clauseFees = (trade.clauseFees as TradePackage["clauseFees"]) ?? [];

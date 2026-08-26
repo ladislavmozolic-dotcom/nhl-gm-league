@@ -3,7 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { getTeamSession } from "@/lib/auth";
 import TradeBuilder from "@/components/TradeBuilder";
-import { proposeTrade } from "./actions";
+import { proposeTrade, resubmitModifiedTrade } from "./actions";
+import { packageFromTrade, type TradePackage } from "@/lib/trade-exec";
 import { PageHeader, Card } from "@/components/ui";
 import { cleanName } from "@/lib/playerName";
 
@@ -29,11 +30,42 @@ async function teamAssets(teamId: number, prospectSource: "real" | "profinhl") {
   };
 }
 
-export default async function TradeBuildPage({ searchParams }: { searchParams: Promise<{ opp?: string }> }) {
+export default async function TradeBuildPage({ searchParams }: { searchParams: Promise<{ opp?: string; edit?: string }> }) {
   const session = await getTeamSession();
   if (!session) redirect("/login");
   const myTeam = await prisma.team.findUnique({ where: { id: session }, select: { id: true, name: true, logoUrl: true, slug: true } });
   if (!myTeam) redirect("/login");
+
+  const cfgSrc = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true } });
+  const src = cfgSrc?.rosterMode === "real" ? "real" : "profinhl";
+
+  // ── MODIFY mode: a rookie GM re-opens a trade the commission asked to rebalance ──
+  const { edit } = await searchParams;
+  const editId = edit ? Number(edit) : null;
+  if (editId) {
+    const trade = await prisma.trade.findUnique({ where: { id: editId } });
+    if (!trade || trade.status !== "MODIFY" || (session !== trade.fromTeamId && session !== trade.toTeamId)) redirect("/trades");
+    const [fromT, toT] = await Promise.all([
+      prisma.team.findUnique({ where: { id: trade!.fromTeamId }, select: { id: true, name: true } }),
+      prisma.team.findUnique({ where: { id: trade!.toTeamId }, select: { id: true, name: true } }),
+    ]);
+    const [mine, theirs] = await Promise.all([teamAssets(fromT!.id, src), teamAssets(toT!.id, src)]);
+    const pkg = await packageFromTrade(editId);
+    const initial = {
+      mineP: Object.fromEntries(pkg.fromPlayers.map((p) => [p.playerId, p.retentionPct || 0])),
+      theirsP: Object.fromEntries(pkg.toPlayers.map((p) => [p.playerId, p.retentionPct || 0])),
+      minePk: pkg.fromPicks, theirsPk: pkg.toPicks, minePro: pkg.fromProspects, theirsPro: pkg.toProspects,
+      mineCash: pkg.fromCash, theirsCash: pkg.toCash, condition: pkg.condition,
+    };
+    async function submitEdit(p: TradePackage) { "use server"; const r = await resubmitModifiedTrade(p, editId!); return { tradeId: r.tradeId }; }
+    return (
+      <div className="space-y-4 py-2">
+        <PageHeader title={`Modify trade #${editId}`} subtitle={`${fromT!.name} ↔ ${toT!.name} — the commission asked you to rebalance this deal. Adjust the assets and resubmit for review.`} />
+        {trade!.commishNote && <Card><p className="text-sm text-amber-300">✏️ Commission note: {trade!.commishNote}</p></Card>}
+        <TradeBuilder me={{ id: fromT!.id, name: fromT!.name }} opp={{ id: toT!.id, name: toT!.name }} mine={mine} theirs={theirs} initial={initial} submitLabel="Resubmit to commission" onPropose={submitEdit} />
+      </div>
+    );
+  }
 
   const teams = await prisma.team.findMany({
     where: { league: "NHL", isAffiliate: false, id: { not: myTeam.id } },

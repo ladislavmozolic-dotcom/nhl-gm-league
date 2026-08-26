@@ -13,19 +13,26 @@ type Team = { id: number; name: string };
 
 const clauseTag = (c?: string | null) => c === "NMC" ? "NMC" : c === "M_NTC" ? "M-NTC" : c === "NTC" ? "NTC" : null;
 
-export default function TradeBuilder({ me, opp, mine, theirs, onPropose }: {
+export type TradeBuilderInitial = {
+  mineP?: Record<number, number>; theirsP?: Record<number, number>;
+  minePk?: number[]; theirsPk?: number[]; minePro?: number[]; theirsPro?: number[];
+  mineCash?: number; theirsCash?: number; condition?: string;
+};
+
+export default function TradeBuilder({ me, opp, mine, theirs, onPropose, initial, submitLabel }: {
   me: Team; opp: Team; mine: Assets; theirs: Assets;
   onPropose: (pkg: TradePackage) => Promise<{ tradeId: number }>;
+  initial?: TradeBuilderInitial; submitLabel?: string;
 }) {
-  const [mineP, setMineP] = useState<Record<number, number>>({});   // playerId -> retention%
-  const [theirsP, setTheirsP] = useState<Record<number, number>>({});
-  const [minePk, setMinePk] = useState<Set<number>>(new Set());
-  const [theirsPk, setTheirsPk] = useState<Set<number>>(new Set());
-  const [minePro, setMinePro] = useState<Set<number>>(new Set());
-  const [theirsPro, setTheirsPro] = useState<Set<number>>(new Set());
-  const [mineCash, setMineCash] = useState(0);
-  const [theirsCash, setTheirsCash] = useState(0);
-  const [condition, setCondition] = useState("");
+  const [mineP, setMineP] = useState<Record<number, number>>(initial?.mineP ?? {});   // playerId -> retention%
+  const [theirsP, setTheirsP] = useState<Record<number, number>>(initial?.theirsP ?? {});
+  const [minePk, setMinePk] = useState<Set<number>>(new Set(initial?.minePk ?? []));
+  const [theirsPk, setTheirsPk] = useState<Set<number>>(new Set(initial?.theirsPk ?? []));
+  const [minePro, setMinePro] = useState<Set<number>>(new Set(initial?.minePro ?? []));
+  const [theirsPro, setTheirsPro] = useState<Set<number>>(new Set(initial?.theirsPro ?? []));
+  const [mineCash, setMineCash] = useState(initial?.mineCash ?? 0);
+  const [theirsCash, setTheirsCash] = useState(initial?.theirsCash ?? 0);
+  const [condition, setCondition] = useState(initial?.condition ?? "");
   // clause agent: fetched terms per protected player + the fees the GM agrees to pay
   type Terms = { feeAmount: number; feePct: number; fullPayout: boolean; reason: string; payTeamId: number };
   const [terms, setTerms] = useState<Record<number, Terms | "loading">>({});
@@ -245,7 +252,7 @@ export default function TradeBuilder({ me, opp, mine, theirs, onPropose }: {
             <div className="flex flex-col gap-2">
               <button onClick={submit} disabled={pending || count === 0}
                 className="w-full px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 font-semibold text-sm disabled:opacity-40">
-                {pending ? "Sending…" : `Propose trade${count ? ` (${count})` : ""}`}
+                {pending ? "Sending…" : `${submitLabel ?? "Propose trade"}${count ? ` (${count})` : ""}`}
               </button>
               <button onClick={runAnalyze} disabled={aiPending || count === 0}
                 className="w-full px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold text-sm disabled:opacity-40"

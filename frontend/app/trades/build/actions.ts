@@ -2,7 +2,7 @@
 
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getTeamSession, isAdmin } from "@/lib/auth";
+import { getTeamSession, isAdmin, isCommission } from "@/lib/auth";
 import { loadSettings } from "@/lib/sim/settings";
 import { CURRENT_SEASON_START } from "@/lib/finance";
 import { revalidatePath } from "next/cache";
@@ -248,11 +248,114 @@ export async function respondToTrade(tradeId: number, accept: boolean) {
     return { status: "DECLINED" as const };
   }
 
+  // ROOKIE OVERSIGHT: if either club is a rookie GM, the accepted deal doesn't execute —
+  // it goes to the commission for Accept / Decline / Modify.
+  const clubs = await prisma.team.findMany({ where: { id: { in: [trade.fromTeamId, trade.toTeamId] } }, select: { id: true, name: true, rookieGm: true } });
+  if (clubs.some((c) => c.rookieGm)) {
+    await prisma.trade.update({ where: { id: tradeId }, data: { status: "AWAITING_COMMISH", respondedAt: new Date() } });
+    await notifyCommission(`🕵️ Trade #${tradeId} (${clubs.map((c) => c.name).join(" ↔ ")}) — a rookie GM deal is awaiting commission review.`, tradeId);
+    const fromName = clubs.find((c) => c.id === trade.fromTeamId)?.name ?? "?";
+    for (const tid of [trade.fromTeamId, trade.toTeamId])
+      await prisma.dmMessage.create({ data: { fromTeamId: trade.toTeamId, toTeamId: tid, body: `🕵️ Trade #${tradeId} was agreed and sent to the commission for approval (rookie-GM oversight).`, tradeUrl: `/trades/${tradeId}` } }).catch(() => {});
+    void fromName;
+    revalidatePath("/trades"); revalidatePath("/trades/commish"); revalidatePath("/messages");
+    return { status: "AWAITING_COMMISH" as const };
+  }
+
   const { fromTeam, toTeam } = await executeAcceptedTrade(tradeId);
   // let the proposer know their deal went through
   await prisma.dmMessage.create({ data: { fromTeamId: trade.toTeamId, toTeamId: trade.fromTeamId, body: `✅ ${toTeam.name} accepted your trade (#${tradeId}) — it's done.`, tradeUrl: `/trades/${tradeId}` } }).catch(() => {});
   revalidatePath("/trades"); revalidatePath("/salary-cap"); revalidatePath("/finance"); revalidatePath("/messages");
   return { status: "ACCEPTED" as const };
+}
+
+/** DM every commission member (comish/co-comish + admin GMs) about a rookie trade. */
+async function notifyCommission(body: string, tradeId: number) {
+  const comishTeams = await prisma.team.findMany({
+    where: { OR: [{ isAdmin: true }, { gmRole: { in: ["comish", "co_comish"] } }], passwordHash: { not: null } },
+    select: { id: true },
+  });
+  for (const c of comishTeams)
+    await prisma.dmMessage.create({ data: { fromTeamId: c.id, toTeamId: c.id, body, tradeUrl: `/trades/${tradeId}` } }).catch(() => {});
+}
+
+/** Commission reviews a rookie trade: accept (execute), decline (kill), or modify (send
+ *  it back to the rookie to rebalance). Comish / co-comish / admin only. */
+export async function commishRespondTrade(tradeId: number, action: "accept" | "decline" | "modify", note?: string) {
+  if (!(await isCommission())) throw new Error("Only a commission member can review rookie trades.");
+  const trade = await prisma.trade.findUnique({ where: { id: tradeId } });
+  if (!trade) throw new Error("Trade not found.");
+  if (!["AWAITING_COMMISH", "MODIFIED"].includes(trade.status)) throw new Error("This trade isn't awaiting commission review.");
+  const clubs = await prisma.team.findMany({ where: { id: { in: [trade.fromTeamId, trade.toTeamId] } }, select: { id: true, name: true, rookieGm: true } });
+  const nameOf = (id: number) => clubs.find((c) => c.id === id)?.name ?? "?";
+
+  if (action === "accept") {
+    const { fromTeam, toTeam } = await executeAcceptedTrade(tradeId);
+    for (const tid of [trade.fromTeamId, trade.toTeamId])
+      await prisma.dmMessage.create({ data: { fromTeamId: tid, toTeamId: tid, body: `✅ Commission APPROVED trade #${tradeId} — ${fromTeam.name} ↔ ${toTeam.name} is done.`, tradeUrl: `/trades/${tradeId}` } }).catch(() => {});
+    revalidatePath("/trades"); revalidatePath("/trades/commish"); revalidatePath("/salary-cap"); revalidatePath("/finance"); revalidatePath("/messages");
+    return { status: "ACCEPTED" as const };
+  }
+  if (action === "decline") {
+    await prisma.trade.update({ where: { id: tradeId }, data: { status: "DECLINED", respondedAt: new Date(), commishNote: note || null } });
+    for (const tid of [trade.fromTeamId, trade.toTeamId])
+      await prisma.dmMessage.create({ data: { fromTeamId: tid, toTeamId: tid, body: `❌ Commission DECLINED trade #${tradeId}.${note ? ` — ${note}` : ""}`, tradeUrl: `/trades/${tradeId}` } }).catch(() => {});
+    revalidatePath("/trades"); revalidatePath("/trades/commish"); revalidatePath("/messages");
+    return { status: "DECLINED" as const };
+  }
+  // modify → back to the rookie GM(s) to rebalance, with the commission's note
+  await prisma.trade.update({ where: { id: tradeId }, data: { status: "MODIFY", commishNote: note || null } });
+  const rookieClub = clubs.find((c) => c.rookieGm) ?? clubs.find((c) => c.id === trade.fromTeamId)!;
+  await prisma.dmMessage.create({ data: { fromTeamId: rookieClub.id, toTeamId: rookieClub.id, body: `✏️ Commission asked to MODIFY trade #${tradeId} (${nameOf(trade.fromTeamId)} ↔ ${nameOf(trade.toTeamId)}).${note ? ` Note: ${note}` : ""} Open it and adjust the assets, then resubmit.`, tradeUrl: `/trades/build?edit=${tradeId}` } }).catch(() => {});
+  revalidatePath("/trades"); revalidatePath("/trades/commish"); revalidatePath("/messages");
+  return { status: "MODIFY" as const };
+}
+
+/** A rookie GM resubmits a trade the commission asked to modify — replaces the assets on
+ *  the SAME trade record and marks it MODIFIED (back to the commission for Accept/Decline). */
+export async function resubmitModifiedTrade(pkg: TradePackage, tradeId: number) {
+  const session = await getTeamSession();
+  const trade = await prisma.trade.findUnique({ where: { id: tradeId } });
+  if (!trade) throw new Error("Trade not found.");
+  if (trade.status !== "MODIFY") throw new Error("This trade isn't open for modification.");
+  if (session !== trade.fromTeamId && session !== trade.toTeamId) throw new Error("Only a club on this trade can modify it.");
+  if (pkg.fromTeamId !== trade.fromTeamId || pkg.toTeamId !== trade.toTeamId) throw new Error("Trade teams can't change.");
+  const hasAssets = pkg.fromPlayers.length || pkg.toPlayers.length || pkg.fromPicks.length || pkg.toPicks.length || (pkg.fromProspects?.length ?? 0) || (pkg.toProspects?.length ?? 0) || pkg.fromCash || pkg.toCash;
+  if (!hasAssets) throw new Error("Add at least one asset.");
+  await assertOwnership(pkg);
+
+  // clause consent (same as proposeTrade)
+  const settings = await loadSettings();
+  if (settings.clausesEnabled) {
+    const cp = await prisma.player.findMany({ where: { id: { in: [...pkg.fromPlayers, ...pkg.toPlayers].map((p) => p.playerId) } }, select: { id: true, name: true, tradeClause: true, noTradeTeams: true } });
+    const byId = new Map(cp.map((p) => [p.id, p]));
+    const waived = new Set([...(pkg.waived ?? []), ...(pkg.clauseFees ?? []).map((f) => f.playerId)]);
+    for (const p of pkg.fromPlayers) { const pl = byId.get(p.playerId); const b = pl && clauseBlock(pl, pkg.toTeamId, waived, true); if (b) throw new Error(b); }
+    for (const p of pkg.toPlayers) { const pl = byId.get(p.playerId); const b = pl && clauseBlock(pl, pkg.fromTeamId, waived, true); if (b) throw new Error(b); }
+  }
+
+  // replace the stored assets on the same record
+  const rows: Array<{ tradeId: number; assetType: string; side: string; playerId?: number; prospectId?: number; draftPickId?: number; cashAmount?: number; retentionPct?: number }> = [];
+  for (const p of pkg.fromPlayers) rows.push({ tradeId, assetType: "PLAYER", side: "FROM", playerId: p.playerId, retentionPct: p.retentionPct || undefined });
+  for (const p of pkg.toPlayers) rows.push({ tradeId, assetType: "PLAYER", side: "TO", playerId: p.playerId, retentionPct: p.retentionPct || undefined });
+  for (const id of pkg.fromProspects ?? []) rows.push({ tradeId, assetType: "PROSPECT", side: "FROM", prospectId: id });
+  for (const id of pkg.toProspects ?? []) rows.push({ tradeId, assetType: "PROSPECT", side: "TO", prospectId: id });
+  for (const id of pkg.fromPicks) rows.push({ tradeId, assetType: "PICK", side: "FROM", draftPickId: id });
+  for (const id of pkg.toPicks) rows.push({ tradeId, assetType: "PICK", side: "TO", draftPickId: id });
+  if (pkg.fromCash) rows.push({ tradeId, assetType: "CASH", side: "FROM", cashAmount: pkg.fromCash });
+  if (pkg.toCash) rows.push({ tradeId, assetType: "CASH", side: "TO", cashAmount: pkg.toCash });
+  await prisma.$transaction([
+    prisma.tradeAsset.deleteMany({ where: { tradeId } }),
+    prisma.tradeAsset.createMany({ data: rows }),
+    prisma.trade.update({ where: { id: tradeId }, data: {
+      status: "MODIFIED", condition: pkg.condition || null,
+      waivedClauses: [...(pkg.waived ?? []), ...(pkg.clauseFees ?? []).map((f) => f.playerId)],
+      clauseFees: (pkg.clauseFees ?? []) as object,
+    } }),
+  ]);
+  await notifyCommission(`✏️ Trade #${tradeId} was MODIFIED by the GM and is back for commission review.`, tradeId);
+  revalidatePath("/trades"); revalidatePath("/trades/commish"); revalidatePath("/messages");
+  return { tradeId, status: "MODIFIED" as const };
 }
 
 /** Commissioner REVOKES a completed (ACCEPTED) trade — reverses the asset moves:

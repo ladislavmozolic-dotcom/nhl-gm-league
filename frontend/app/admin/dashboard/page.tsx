@@ -104,10 +104,10 @@ export default async function CommissionerDashboard() {
       {await (async () => {
         const teams = await prisma.team.findMany({
           where: { league: "NHL", isAffiliate: false },
-          select: { id: true, name: true, gmRole: true, gmNickname: true, passwordHash: true, aiMode: true },
+          select: { id: true, name: true, gmRole: true, gmNickname: true, passwordHash: true, aiMode: true, rookieGm: true },
           orderBy: { name: "asc" },
         });
-        const roleRows = teams.map((t) => ({ id: t.id, name: t.name, gmRole: t.gmRole, gmNickname: t.gmNickname }));
+        const roleRows = teams.map((t) => ({ id: t.id, name: t.name, gmRole: t.gmRole, gmNickname: t.gmNickname, rookieGm: t.rookieGm }));
         const reassignRows = teams.map((t) => ({ id: t.id, name: t.name, gmNickname: t.gmNickname, hasGm: !!t.passwordHash }));
         const aiRows = teams.filter((t) => !t.passwordHash).map((t) => ({ id: t.id, name: t.name, aiMode: t.aiMode }));
         return (
