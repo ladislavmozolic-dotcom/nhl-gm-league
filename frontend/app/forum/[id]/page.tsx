@@ -50,7 +50,7 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
   });
 
   return (
-    <div className="space-y-4 py-2 max-w-4xl">
+    <div className="space-y-4 py-2 max-w-5xl">
       <PageHeader
         title={thread.title}
         subtitle={`${CAT_META[cat].label} · ${posts.length} príspevk${posts.length === 1 ? "" : "ov"}`}

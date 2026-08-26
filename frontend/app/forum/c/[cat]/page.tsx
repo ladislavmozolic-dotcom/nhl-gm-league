@@ -35,8 +35,12 @@ export default async function CategoryPage({ params, searchParams }: { params: P
   const canPost = me != null && (!m.adminOnly || admin);
 
   return (
-    <div className="space-y-5 py-2 max-w-5xl">
-      <PageHeader title={m.label} subtitle={m.desc} right={<Link href="/forum" className="text-sm text-slate-400 hover:text-blue-400">← Board index</Link>} />
+    <div className="space-y-5 py-2">
+      <PageHeader
+        title={<span className="flex items-center gap-2.5"><span className="text-3xl">{m.icon}</span>{m.label}</span>}
+        subtitle={m.desc}
+        right={<Link href="/forum" className="text-sm text-slate-400 hover:text-blue-400 whitespace-nowrap">← Board index</Link>}
+      />
 
       {error === "admin" && <Card><p className="text-center text-amber-400 text-sm py-2">Do tohto podfóra môže vlákna zakladať len komisár.</p></Card>}
       {error === "empty" && <Card><p className="text-center text-rose-400 text-sm py-2">Vlákno musí mať názov aj text.</p></Card>}
@@ -45,9 +49,9 @@ export default async function CategoryPage({ params, searchParams }: { params: P
         <Card title="Nové vlákno" accent="text-emerald-400">
           <form action={createThread} className="space-y-2.5">
             <input type="hidden" name="category" value={category} />
-            <input name="title" required maxLength={140} placeholder="Názov vlákna…" className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-blue-500" />
-            <textarea name="body" required rows={3} maxLength={5000} placeholder="Text…" className="w-full resize-none bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-blue-500" />
-            <div className="flex justify-end"><button className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold">Pridať vlákno</button></div>
+            <input name="title" required maxLength={140} placeholder="Názov vlákna…" className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-blue-500" />
+            <textarea name="body" required rows={3} maxLength={5000} placeholder="Text…" className="w-full resize-none bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-blue-500" />
+            <div className="flex justify-end"><button className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold">Pridať vlákno</button></div>
           </form>
         </Card>
       )}
@@ -55,23 +59,37 @@ export default async function CategoryPage({ params, searchParams }: { params: P
         <Card><p className="text-center text-slate-500 text-sm py-3">Do Comish Corner môže zakladať vlákna len komisár. Odpovedať môžeš.</p></Card>
       )}
 
-      <Card bodyClassName="p-0">
-        {threads.length === 0 ? (
-          <p className="text-center text-slate-500 py-10 text-sm">Zatiaľ žiadne vlákna.</p>
-        ) : threads.map((t) => (
-          <Link key={t.id} href={`/forum/${t.id}`} className="flex items-center gap-3 px-4 py-3 border-b border-slate-800/60 last:border-0 hover:bg-slate-800/30 transition-colors">
-            {t.team.logoUrl && <img src={t.team.logoUrl} alt="" className="w-8 h-8 object-contain shrink-0" />}
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                {t.pinned && <span className="text-amber-400 text-xs" title="Pinned">📌</span>}
-                <span className="text-sm font-semibold text-slate-100 truncate">{t.title}</span>
+      {threads.length === 0 ? (
+        <Card><p className="text-center text-slate-500 py-12 text-sm">Zatiaľ žiadne vlákna — buď prvý. 👆</p></Card>
+      ) : (
+        <div className="space-y-2.5">
+          {threads.map((t) => (
+            <Link
+              key={t.id}
+              href={`/forum/${t.id}`}
+              className={`group flex items-center gap-4 rounded-2xl border bg-slate-900/70 px-4 sm:px-5 py-4 shadow-lg shadow-black/20 transition-all hover:-translate-y-0.5 hover:shadow-xl ${t.pinned ? "border-amber-500/40 bg-amber-950/10" : "border-slate-800 hover:border-slate-600"}`}
+            >
+              {t.team.logoUrl
+                ? <img src={t.team.logoUrl} alt="" className="w-12 h-12 object-contain shrink-0" />
+                : <div className="w-12 h-12 rounded-full bg-slate-800 grid place-items-center text-sm text-slate-400 shrink-0">{(t.team.gmNickname || t.team.code || "?").slice(0, 2)}</div>}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  {t.pinned && <span className="text-amber-400 text-sm shrink-0" title="Pripnuté">📌</span>}
+                  <span className="text-base font-bold text-slate-100 truncate group-hover:text-white">{t.title}</span>
+                </div>
+                <div className="text-xs text-slate-500 truncate mt-0.5">
+                  {t.team.gmNickname || t.team.code || t.team.name} · posledná aktivita {ago(t.lastPostAt)}
+                </div>
               </div>
-              <div className="text-[11px] text-slate-500 truncate">by {t.team.gmNickname || t.team.code || t.team.name} · {ago(t.lastPostAt)}</div>
-            </div>
-            <span className="text-xs text-slate-500 tabular-nums shrink-0">{t._count.posts} 💬</span>
-          </Link>
-        ))}
-      </Card>
+              <div className="shrink-0 flex flex-col items-center gap-0.5 rounded-xl bg-slate-800/60 border border-slate-700/50 px-3.5 py-2 min-w-[64px]">
+                <span className="text-lg font-black text-slate-100 leading-none tabular-nums">{t._count.posts}</span>
+                <span className="text-[10px] uppercase tracking-wider text-slate-500">{t._count.posts === 1 ? "post" : "postov"}</span>
+              </div>
+              <span className="hidden sm:block text-slate-600 text-xl group-hover:text-slate-300 transition-colors shrink-0">→</span>
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
