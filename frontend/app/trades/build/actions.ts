@@ -272,7 +272,7 @@ export async function respondToTrade(tradeId: number, accept: boolean) {
 /** DM every commission member (comish/co-comish + admin GMs) about a rookie trade. */
 async function notifyCommission(body: string, tradeId: number) {
   const comishTeams = await prisma.team.findMany({
-    where: { OR: [{ isAdmin: true }, { gmRole: { in: ["comish", "co_comish"] } }], passwordHash: { not: null } },
+    where: { OR: [{ isAdmin: true }, { gmRole: { in: ["comish", "co_comish", "trade_comish"] } }], passwordHash: { not: null } },
     select: { id: true },
   });
   for (const c of comishTeams)

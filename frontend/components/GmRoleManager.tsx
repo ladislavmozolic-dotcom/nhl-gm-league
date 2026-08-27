@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { setGmRoleAction, setRookieGmAction } from "@/app/admin/dashboard/actions";
 
 type Row = { id: number; name: string; gmRole: string; gmNickname: string | null; rookieGm?: boolean };
-const ROLES: [string, string][] = [["gm", "GM"], ["agent", "Agent"], ["co_comish", "Co-Commissioner"], ["comish", "Commissioner"]];
+const ROLES: [string, string][] = [["gm", "GM"], ["agent", "Agent"], ["trade_comish", "Trade Comish"], ["co_comish", "Co-Commissioner"], ["comish", "Commissioner"]];
 
 export default function GmRoleManager({ teams }: { teams: Row[] }) {
   const [rows, setRows] = useState(teams);
@@ -24,7 +24,7 @@ export default function GmRoleManager({ teams }: { teams: Row[] }) {
   });
   return (
     <div>
-      <p className="text-xs text-slate-500 mb-2">Commissioner &amp; Co-Commissioner get full admin powers; comish-tier (incl. Agent) get a 1-day free-agency head-start each round.</p>
+      <p className="text-xs text-slate-500 mb-2">Commissioner &amp; Co-Commissioner get full admin powers; comish-tier (incl. Agent) get a 1-day free-agency head-start each round. <b>Trade Comish</b> only reviews rookie-GM trades (Accept/Decline/Modify at Trades → Trade Commission) — no other admin powers.</p>
       <div className="max-h-[50vh] overflow-y-auto divide-y divide-slate-800/60">
         {rows.map((t) => (
           <div key={t.id} className="flex items-center gap-3 py-1.5">

@@ -69,7 +69,7 @@ export async function isCommission(): Promise<boolean> {
   const id = await getTeamSession();
   if (id == null) return false;
   const t = await prisma.team.findUnique({ where: { id }, select: { isAdmin: true, gmRole: true } });
-  return !!t?.isAdmin || ["comish", "co_comish"].includes(t?.gmRole ?? "gm");
+  return !!t?.isAdmin || ["comish", "co_comish", "trade_comish"].includes(t?.gmRole ?? "gm");
 }
 
 /** May the current session manage `teamId`? True for that team's own GM, for any

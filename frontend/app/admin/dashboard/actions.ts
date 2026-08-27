@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { isAdmin } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
-const ROLES = ["gm", "agent", "co_comish", "comish"];
+const ROLES = ["gm", "agent", "trade_comish", "co_comish", "comish"];
 
 /** Commissioner assigns a league role to a club's GM seat. Comish also flips the
  *  isAdmin flag so co-commissioners get full commissioner powers. */
