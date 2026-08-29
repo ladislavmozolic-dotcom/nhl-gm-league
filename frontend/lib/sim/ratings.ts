@@ -322,12 +322,13 @@ export function buildTeam(input: {
   const profile = rosterProfile(roster);
   const teamTac = mergeTactics(input.system ?? input.lines?.system);
   const coachEx = input.coach?.ex ?? 70;
-  const tactics = resolveTactics(teamTac, profile, coachEx);
+  const coachStyle = input.coach?.style;
+  const tactics = resolveTactics(teamTac, profile, coachEx, coachStyle);
   // Per-line overrides: a forward line's Puck Style / a D pair's D-Zone (else team).
   const fwdLineFx = (input.lines?.forwardLines ?? []).map((l) =>
-    resolveLineTactics(teamTac, profile, coachEx, { puckStyle: l.puck }));
+    resolveLineTactics(teamTac, profile, coachEx, { puckStyle: l.puck }, coachStyle));
   const defPairFx = (input.lines?.defensePairs ?? []).map((p) =>
-    resolveLineTactics(teamTac, profile, coachEx, { dZone: p.dzone }));
+    resolveLineTactics(teamTac, profile, coachEx, { dZone: p.dzone }, coachStyle));
 
   return {
     id: input.id,
@@ -384,8 +385,8 @@ function rosterProfile(roster: SimSkater[]): RosterProfile {
 // STHS coach → global team modifiers. Ratings sit ~75-92 (centered on 80), so a
 // point above/below 80 nudges the team card; a matching coaching STYLE adds a
 // little extra on top. Kept small so the roster stays the main driver.
-function coachFactors(c: CoachInput | undefined): { coachOff: number; coachDef: number; coachDisc: number; coachEx: number } {
-  if (!c) return { coachOff: 1, coachDef: 1, coachDisc: 1, coachEx: 70 };
+function coachFactors(c: CoachInput | undefined): { coachOff: number; coachDef: number; coachDisc: number; coachEx: number; coachPhy: number; coachLd: number } {
+  if (!c) return { coachOff: 1, coachDef: 1, coachDisc: 1, coachEx: 70, coachPhy: 1, coachLd: 1 };
   // centered on the league-average coach rating (~84) so a better-than-average
   // bench helps and a worse one hurts, but the pool stays ~zero-sum (no league-
   // wide scoring inflation just because coaches are rated in the 80s).
@@ -399,5 +400,10 @@ function coachFactors(c: CoachInput | undefined): { coachOff: number; coachDef: 
     // high discipline (PD) → fewer penalties; a physical style pushes the other way
     coachDisc: Math.max(0.8, Math.min(1.2, 1 - (c.pd - 84) / 20 * 0.10 + stylePhy)),
     coachEx: c.ex,
+    // PH (physical) → the bench's hitting rate, on top of the roster's own checking
+    // profile. LD (leadership) → dampens the momentum swing after conceding, on top
+    // of the existing player-leadership effect on momoTau (same idea, from the bench).
+    coachPhy: Math.max(0.85, Math.min(1.2, 1 + per(c.ph) * 1.4)),
+    coachLd: Math.max(0.85, Math.min(1.1, 1 - (c.ld - 84) / 20 * 0.06)),
   };
 }

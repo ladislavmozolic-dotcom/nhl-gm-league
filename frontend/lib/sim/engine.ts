@@ -21,7 +21,6 @@ import type {
 // ship as "2.x" behind the LeagueConfig.simEngine flag. See lib/sim/version.ts.
 export const ENGINE_VERSION = "1.0.0";
 
-const BODY_PARTS = ["Upper Body", "Lower Body", "Knee", "Shoulder", "Ankle", "Hand", "Groin", "Concussion"];
 const INJURY_BASE = 0.18; // expected injuries per team per game at 100% (~1 in 5.5 games)
 
 // Active tunable settings for the current game. Set at the top of simulateGame;
@@ -51,7 +50,7 @@ function compressToward(x: number, anchor: number, k: number): number {
 
 const PERIOD_SECONDS = 1200; // 20:00
 const OT_SECONDS = 300;      // 5:00 sudden death
-const EMPTY_NET_WINDOW = 120; // seconds left in the 3rd when a trailing team may pull the goalie
+const EMPTY_NET_WINDOW = 120; // fallback seconds-left window when a team has no strategy.goaliePull.pullSec set
 
 // League baselines the model is calibrated against (population means of THIS
 // dataset's ratings, so an avg-vs-avg matchup centers every factor at 1.0).
@@ -69,6 +68,7 @@ const LEAGUE = {
   hitsPerTeam: 21,
   blocksPerTeam: 14,
   faceoffsPerGame: 46,
+  zoneEntriesPerTeam: 50,  // controlled + dump-in entries, real NHL-tracked ballpark
   fwdIcePool: 10800,       // total forward TOI seconds/game (3 on ice * 60min)
   defIcePool: 7200,        // total defense TOI seconds/game (2 on ice * 60min)
 };
@@ -135,6 +135,8 @@ type SimState = {
   rivalry: boolean;                 // heated rivalry game — more fights, scrums, misconducts
   pulled: Record<number, boolean>;  // has this team's starter been yanked for the backup
   emptyNet: Record<number, boolean>; // trailing late in reg. — goalie pulled for the extra attacker (both engines)
+  onPp: Record<number, boolean>;    // is this team currently on the power play (for PP_START/PP_END events)
+  injured: Set<number>;             // skater ids hurt so far this game — benched for the rest of it, live from the tick they went down
   shootout: ShootoutAttempt[];      // shootout attempts (empty unless the game went to a shootout)
   sink: EventSink;                  // next-gen typed event stream (v2)
 };
@@ -154,13 +156,20 @@ function liveGoalieLine(st: SimState, teamId: number): GoalieLine {
   return st.pulled[teamId] && box.backupGoalie ? box.backupGoalie : box.goalie;
 }
 // After a goal, yank a shelled starter (enough goals + shots, save% too low).
-function maybePullGoalie(st: SimState, teamId: number) {
+// minGoals/savePctUnder come from the team's own GameStrategy.goaliePull dial when
+// set (GM's call); minShots (sample-size floor) stays a league-wide CFG setting —
+// there's no per-team dial for it.
+function maybePullGoalie(st: SimState, team: SimTeam) {
+  const teamId = team.id;
   if (!CFG.pullGoalieEnabled || st.pulled[teamId]) return;
   const box = st.box[teamId];
   if (!box.backupGoalie) return;
   const s = box.goalie;
-  if (s.goalsAgainst >= CFG.pullGoalieMinGoals && s.shotsAgainst >= CFG.pullGoalieMinShots
-      && s.saves / Math.max(1, s.shotsAgainst) < CFG.pullGoalieSvPct) {
+  const gp = team.strategy?.goaliePull;
+  const minGoals = gp?.minGoals ?? CFG.pullGoalieMinGoals;
+  const svPct = gp ? gp.savePctUnder / 100 : CFG.pullGoalieSvPct;
+  if (s.goalsAgainst >= minGoals && s.shotsAgainst >= CFG.pullGoalieMinShots
+      && s.saves / Math.max(1, s.shotsAgainst) < svPct) {
     st.pulled[teamId] = true;
     box.backupGoalie.started = true;
   }
@@ -375,7 +384,14 @@ function pickOnIce(rng: RNG, team: SimTeam): SimSkater[] {
  *  endgame / OT simple models, which don't run the shift loop, so recordGoal doesn't
  *  reuse the stale end-of-3rd unit for their goals + +/-. */
 function setFreshUnit(st: SimState, team: SimTeam) {
-  st.currentOnIce[team.id] = { f: weightedSample(st.rng, team.forwards, 3), d: weightedSample(st.rng, team.defense, 2) };
+  // simulateEndgame's extra empty-net attempts don't run through the tick loop's
+  // onIceF/onIceD/subMis, so they need their own exclusion of anyone hurt this game.
+  const fwd = team.forwards.filter((s) => !st.injured.has(s.id));
+  const def = team.defense.filter((s) => !st.injured.has(s.id));
+  st.currentOnIce[team.id] = {
+    f: weightedSample(st.rng, fwd.length ? fwd : team.forwards, 3),
+    d: weightedSample(st.rng, def.length ? def : team.defense, 2),
+  };
 }
 
 /** Overtime is 3-on-3: a fresh unit of THREE skaters (~2F + 1D), not the regulation five.
@@ -454,7 +470,13 @@ function recordGoal(
   strength: GoalEvent["strength"], emptyNet = false, explicitScorer?: SimSkater,
   shot?: { sector: string; shotType: string; xg: number },
 ) {
-  const scorer = explicitScorer ?? pickShooter(st.rng, off);
+  // when no explicit scorer is passed (the endgame's synthetic extra-attempt
+  // model — OT always passes one), fall back to a shooter excluding anyone
+  // hurt this game, so a benched player can't be the one who scores.
+  const healthyOff = st.injured.size
+    ? { ...off, forwards: off.forwards.filter((s) => !st.injured.has(s.id)), defense: off.defense.filter((s) => !st.injured.has(s.id)) }
+    : off;
+  const scorer = explicitScorer ?? pickShooter(st.rng, (healthyOff.forwards.length || healthyOff.defense.length) ? healthyOff : off);
   // The on-ice set for this goal IS the actual unit that was on the ice (from the shift
   // model — the same players the play-by-play shows). Assists come only from them, and
   // this drives the +/-. So nobody off the ice is ever credited or shown on the goal.
@@ -583,7 +605,12 @@ function generatePenalties(st: SimState, team: SimTeam, period: number, active: 
   // physical-style coach's team takes more.
   const lambda = (LEAGUE.penaltiesPerTeam / 3) * (LEAGUE.avgDefense / Math.max(30, avgDiscipline(team))) * phyFactor * frustration * moraleFrust * team.coachDisc * rival * team.tactics.penaltyMult * (CFG.penaltiesPct / 100);
   const count = st.rng.poisson(lambda);
-  const pool = [...team.forwards, ...team.defense];
+  // exclude anyone already hurt (from an earlier period) — can't take a penalty
+  // once he's out of the game. A player hurt LATER in this same period can still
+  // be picked here (this runs before that period's ticks — unavoidable, same as
+  // any other pre-period generation), but the cross-period case is now closed.
+  const pool = [...team.forwards, ...team.defense].filter((s) => !st.injured.has(s.id));
+  if (!pool.length) return;
   for (let i = 0; i < count; i++) {
     const at = st.rng.int(PERIOD_SECONDS - 130);
     const offender = pool[st.rng.weighted(pool.map((s) => (105 - s.discipline) * (0.5 + s.iceTime)))];
@@ -606,21 +633,31 @@ function generatePenalties(st: SimState, team: SimTeam, period: number, active: 
  * major (offsetting — no power play). Occasionally a second bout breaks out at
  * the same stoppage (a line brawl), adding roughing minors and a misconduct.
  */
-function generateFights(st: SimState) {
-  const topFG = (t: SimTeam) => Math.max(...[...t.forwards, ...t.defense].map((s) => s.attrs.fg ?? 30));
+// Scoped to ONE period (called once per period, right after that period's tick
+// loop) rather than a single once-per-game roll — so a fight's injury (see
+// generateFightInjuries) can actually bench the player for the periods still to
+// come, instead of being decided after the whole game is already simulated.
+// A chippy game can now produce more than one bout across different periods,
+// which is realistic (previously capped at exactly one fight, ever).
+function generateFights(st: SimState, period: number) {
+  // st.injured reflects everyone hurt in EARLIER periods (this period's tick loop
+  // just ran) — a player already hurt can't be the one who drops the gloves.
+  const active = (t: SimTeam) => [...t.forwards, ...t.defense].filter((s) => !st.injured.has(s.id));
+  const topFG = (t: SimTeam) => Math.max(0, ...active(t).map((s) => s.attrs.fg ?? 30));
   const enforcerPick = (t: SimTeam) => {
-    const pool = [...t.forwards, ...t.defense];
+    const pool = active(t);
     return pool[st.rng.weighted(pool.map((s) => Math.pow(Math.max(1, (s.attrs.fg ?? 30) - 40), 2)))];
   };
-  if (!CFG.fightsEnabled) return;
+  if (!CFG.fightsEnabled || !active(st.home).length || !active(st.away).length) return;
   const fgHome = topFG(st.home), fgAway = topFG(st.away);
   // base fight chance scales with the lower of the two teams' willingness; a
-  // rivalry game runs hot (far more likely to drop the gloves).
-  let p = (0.06 + 0.5 * Math.max(0, Math.min(fgHome, fgAway) - 55) / 45) * (CFG.fightsPct / 100);
+  // rivalry game runs hot (far more likely to drop the gloves). Divided by 3 —
+  // rolled independently each period now instead of once for the whole game —
+  // so the per-GAME rate stays roughly the same as before this rework.
+  let p = (0.06 + 0.5 * Math.max(0, Math.min(fgHome, fgAway) - 55) / 45) * (CFG.fightsPct / 100) / 3;
   if (st.rivalry) p *= CFG.rivalryFightMult;
   if (!st.rng.chance(Math.min(0.85, p))) return;
 
-  const period = 1 + st.rng.int(3);
   const at = 60 + st.rng.int(PERIOD_SECONDS - 120);
   const h = enforcerPick(st.home), a = enforcerPick(st.away);
   addPenalty(st, st.home, h, period, at, "Fighting", 5, "Major", false);
@@ -640,18 +677,27 @@ function generateFights(st: SimState) {
 }
 
 /**
- * Extra emotional penalties (run once the score is final):
+ * Extra emotional penalties. Scoped to ONE period (called once per period, right
+ * after that period's tick loop — see generateFights' header comment for why):
  *  - a net-front scrum in a heated rivalry game → several roughing minors at once
  *    for both teams, sometimes a 10-minute misconduct in the pileup;
+ *  - a donnybrook → several simultaneous fights (each can injure, just like
+ *    generateFights' bouts — same generateFightInjuries call picks them up);
  *  - "abuse of official" — a frustrated player on a struggling team blows up and
  *    draws a 10-minute misconduct (likelier the more his team is losing by).
+ *    Kept as a period-3-only, late-game event (its original intent), using the
+ *    score AS OF this period rather than the final score (which isn't final yet
+ *    at this point in period 3 — after simulatePeriodPossession, so it's already
+ *    the effectively-final regulation score by then anyway).
  */
-function generateHeatEvents(st: SimState) {
-  if (!CFG.penaltiesEnabled) return;
-  const scrummer = (t: SimTeam) => { const pool = [...t.forwards, ...t.defense]; return pool[st.rng.weighted(pool.map((s) => (s.attrs.fg ?? 30) + (105 - s.discipline)))]; };
+function generateHeatEvents(st: SimState, period: number) {
+  // st.injured reflects everyone hurt in EARLIER periods (and this one's tick loop).
+  const active = (t: SimTeam) => [...t.forwards, ...t.defense].filter((s) => !st.injured.has(s.id));
+  if (!CFG.penaltiesEnabled || !active(st.home).length || !active(st.away).length) return;
+  const scrummer = (t: SimTeam) => { const pool = active(t); return pool[st.rng.weighted(pool.map((s) => (s.attrs.fg ?? 30) + (105 - s.discipline)))]; };
 
-  if (st.rivalry && st.rng.chance(CFG.scrumChance)) {
-    const period = 1 + st.rng.int(3);
+  // /3 — rolled independently each period now instead of once for the whole game.
+  if (st.rivalry && st.rng.chance(CFG.scrumChance / 3)) {
     const at = 60 + st.rng.int(PERIOD_SECONDS - 120);
     const nPer = 1 + st.rng.int(2); // 1–2 roughing minors per side
     for (let k = 0; k < nPer; k++) {
@@ -663,8 +709,7 @@ function generateHeatEvents(st: SimState) {
 
   // donnybrook: a full line brawl erupts — several simultaneous fights, roughing
   // minors and game misconducts. These are the rare 100+ PIM nights.
-  if (st.rivalry && st.rng.chance(CFG.brawlChance)) {
-    const period = 1 + st.rng.int(3);
+  if (st.rivalry && st.rng.chance(CFG.brawlChance / 3)) {
     const at = 120 + st.rng.int(PERIOD_SECONDS - 240);
     const bouts = 3 + st.rng.int(2); // 3–4 fighting majors per side
     for (let k = 0; k < bouts; k++) {
@@ -681,12 +726,13 @@ function generateHeatEvents(st: SimState) {
     if (st.rng.chance(0.5)) { const t = st.rng.chance(0.5) ? st.home : st.away; addPenalty(st, t, scrummer(t), period, at, "Misconduct", 10, "Misconduct", false); }
   }
 
+  if (period !== 3) return;
   for (const team of [st.home, st.away]) {
     const opp = team === st.home ? st.away : st.home;
     const trailBy = st.box[opp.id].goals - st.box[team.id].goals;
     const frustration = trailBy >= 3 ? 2.5 : trailBy >= 2 ? 1.5 : 1;
     if (st.rng.chance(CFG.abuseOfficialChance * frustration)) {
-      const pool = [...team.forwards, ...team.defense];
+      const pool = active(team);
       const off = pool[st.rng.weighted(pool.map((s) => 105 - s.discipline))];
       const at = PERIOD_SECONDS - 60 - st.rng.int(600);
       addPenalty(st, team, off, 3, at, "Misconduct (Abuse of official)", 10, "Misconduct", false);
@@ -921,12 +967,17 @@ function simulatePeriodPossession(st: SimState, period: number) {
   const ST_SHIFT = 35;
   const stShift: Record<number, { idx: number; elapsed: number }> = { [home.id]: { idx: 0, elapsed: 0 }, [away.id]: { idx: 0, elapsed: 0 } };
   const stIdx = (team: SimTeam, units: StUnit[]) => stShift[team.id].idx % Math.max(1, units.length);
-  // a player serving a 10/20-min misconduct can't take the ice — swap in a teammate at
-  // his spot for the duration (curTick is the live clock within the period).
+  // a player serving a 10/20-min misconduct, OR already injured this game, can't
+  // take the ice — swap in a teammate at his spot (misconducts: for the penalty
+  // duration; injuries: permanently, for the rest of the game — checked live every
+  // tick, so a player who just went down is excluded starting the very next call).
   let curTick = 0;
   const subMis = (team: SimTeam, unit: SimSkater[], isDefUnit: boolean): SimSkater[] => {
-    if (!st.misconducts.length) return unit;
-    const benched = new Set(st.misconducts.filter((m) => m.teamId === team.id && m.period === period && curTick >= m.start && curTick < m.end).map((m) => m.playerId));
+    const misBenched = st.misconducts.length
+      ? st.misconducts.filter((m) => m.teamId === team.id && m.period === period && curTick >= m.start && curTick < m.end).map((m) => m.playerId)
+      : [];
+    if (!misBenched.length && !st.injured.size) return unit;
+    const benched = new Set([...misBenched, ...st.injured]);
     if (!benched.size || !unit.some((s) => benched.has(s.id))) return unit;
     const pool = (isDefUnit ? team.defense : team.forwards).filter((s) => !benched.has(s.id) && !unit.some((u) => u.id === s.id));
     let pi = 0;
@@ -984,9 +1035,15 @@ function simulatePeriodPossession(st: SimState, period: number) {
         meta: { unit: kind, label, names: kind === "F" ? fwdNames(line) : defNames(line) },
       });
     };
+    // Re-announce on any PERSONNEL change, not just a label/unit change — a mid-shift
+    // injury (or misconduct) subs a fresh body into the SAME "Line 2" / "D-pair 3"
+    // slot via subMis, and without this the stale pre-injury names would sit in the
+    // PBP unchanged until the line next rotates naturally.
+    const fUnit = onIceF(team), dUnit = onIceD(team);
     const fLab = unitLabel(team, "F"), dLab = unitLabel(team, "D");
-    if (fLab !== prevUnit[team.id].f) { emit("F", fLab, onIceF(team)); prevUnit[team.id].f = fLab; }
-    if (dLab !== prevUnit[team.id].d) { emit("D", dLab, onIceD(team)); prevUnit[team.id].d = dLab; }
+    const fKey = `${fLab}:${fUnit.map((s) => s.id).join(",")}`, dKey = `${dLab}:${dUnit.map((s) => s.id).join(",")}`;
+    if (fKey !== prevUnit[team.id].f) { emit("F", fLab, fUnit); prevUnit[team.id].f = fKey; }
+    if (dKey !== prevUnit[team.id].d) { emit("D", dLab, dUnit); prevUnit[team.id].d = dKey; }
   };
   // opening units for this period
   announceChange(home, 0); announceChange(away, 0);
@@ -1001,6 +1058,19 @@ function simulatePeriodPossession(st: SimState, period: number) {
     // resolve the man-advantage FIRST so the on-ice snapshot uses PP/PK units
     curStr[home.id] = strengthAt(home, away, tick, active);
     curStr[away.id] = strengthAt(away, home, tick, active);
+    // PP_START/PP_END: fire when a team's strength crosses into/out of "PP". Game-level
+    // st.onPp (not reset per period) so a penalty carried into the next period doesn't
+    // fire a spurious duplicate pair at the intermission boundary.
+    for (const team of [home, away]) {
+      const onPp = curStr[team.id] === "PP";
+      if (onPp !== !!st.onPp[team.id]) {
+        st.onPp[team.id] = onPp;
+        st.sink.emit({
+          period, seconds: tick, type: onPp ? "PP_START" : "PP_END",
+          teamId: team.id, teamCode: team.code ?? undefined, importance: "NOTABLE",
+        });
+      }
+    }
     // rotate special-teams units on ~35s shifts; reset to unit 1 back at even strength
     for (const team of [home, away]) {
       const shf = stShift[team.id];
@@ -1009,6 +1079,17 @@ function simulatePeriodPossession(st: SimState, period: number) {
     }
     st.currentOnIce[home.id] = { f: onIceF(home), d: onIceD(home) };
     st.currentOnIce[away.id] = { f: onIceF(away), d: onIceD(away) };
+    // live injury roll against whoever is actually on the ice this tick — see
+    // maybeInjureOnIce's header comment for why this replaced the old post-game pass.
+    const hurtHome = maybeInjureOnIce(st, home, away, [...st.currentOnIce[home.id].f, ...st.currentOnIce[home.id].d], period, tick);
+    const hurtAway = maybeInjureOnIce(st, away, home, [...st.currentOnIce[away.id].f, ...st.currentOnIce[away.id].d], period, tick);
+    // if the player who just went down is the one carrying the puck THIS instant,
+    // the play can't continue on him — force a stoppage (same reset as after a
+    // goal) instead of letting him keep the puck for however long his possession
+    // would otherwise have run.
+    if (hurtHome.some((s) => s.id === carrier.id) || hurtAway.some((s) => s.id === carrier.id)) {
+      state = "FACEOFF"; setup = "carry"; press = 0;
+    }
     announceChange(home, tick); announceChange(away, tick);
     // Empty net: a team trailing late in regulation, at even strength, may pull the
     // goalie for an extra attacker. Real mechanic for BOTH engines (not a v2-only
@@ -1018,7 +1099,8 @@ function simulatePeriodPossession(st: SimState, period: number) {
     for (const team of [home, away]) {
       const opp = team === home ? away : home;
       const trailBy = st.box[opp.id].goals - st.box[team.id].goals;
-      const eligible = period === 3 && curStr[team.id] === "EV" && trailBy >= 1 && trailBy <= 3 && PERIOD_SECONDS - tick <= EMPTY_NET_WINDOW;
+      const pullWindow = team.strategy?.goaliePull?.pullSec ?? EMPTY_NET_WINDOW;
+      const eligible = period === 3 && curStr[team.id] === "EV" && trailBy >= 1 && trailBy <= 3 && PERIOD_SECONDS - tick <= pullWindow;
       if (eligible !== !!st.emptyNet[team.id]) {
         st.emptyNet[team.id] = eligible;
         st.sink.emit({
@@ -1272,7 +1354,7 @@ function simulatePeriodPossession(st: SimState, period: number) {
         gLine.goalsAgainst++;
         recordGoal(st, carrierTeam, def, period, tick, strength, defEmptyNet, carrier, { sector, shotType, xg });
         momoOnGoal(st, carrierTeam.id, def.id, absT);
-        maybePullGoalie(st, def.id); // yank the starter if he's been shelled
+        maybePullGoalie(st, def); // yank the starter if he's been shelled
         if (strength === "PP") expireOnePenalty(def.id, tick, active);
         state = "FACEOFF"; setup = "carry"; continue;
       }
@@ -1289,7 +1371,13 @@ function simulatePeriodPossession(st: SimState, period: number) {
         meta: { danger, setup },
       });
       const rb = gSim.attrs.rb ?? 50;
-      if (rng.chance(Math.max(0.05, 0.32 - rb / 300))) { carrier = pickByAttr(rng, onIceF(carrierTeam), (s) => involvement(s.attrs.sc ?? 50) * 60) ?? carrier; setup = "rebound"; } // rebound in the slot (press stays → escalating danger)
+      if (rng.chance(Math.max(0.05, 0.32 - rb / 300))) {
+        carrier = pickByAttr(rng, onIceF(carrierTeam), (s) => involvement(s.attrs.sc ?? 50) * 60) ?? carrier; setup = "rebound"; // rebound in the slot (press stays → escalating danger)
+        st.sink.emit({
+          period, seconds: tick, type: "REBOUND", teamId: carrierTeam.id, teamCode: carrierTeam.code ?? undefined,
+          playerId: carrier.id, playerName: carrier.name, zone: "OFF", importance: "NOTABLE",
+        });
+      }
       else if (rng.chance(0.12)) { state = "FACEOFF"; setup = "carry"; press = 0; } // goalie freezes it → whistle
       else { carrierTeam = def; carrier = pickByAttr(rng, onIceD(def).concat(onIceF(def)), (s) => s.attrs.pa ?? 50) ?? dman; zone = "DEF"; setup = "carry"; press = 0; } // covered & cleared, play on
       continue;
@@ -1336,6 +1424,14 @@ function severityOf(days: number): InjurySeverity {
   return "Day-to-Day";
 }
 
+// Mechanism-specific duration skew, applied on top of the base curve below. A
+// fight tweak (cut, sore hand) is almost always short — real tilts rarely put a
+// guy out long-term; a soft-tissue fatigue knock heals faster than blunt trauma;
+// a full-speed collision runs slightly WORSE than a standard open-ice hit.
+const MECH_DAYS_SKEW: Record<InjuryMechanism, number> = {
+  "Hit": 1, "Collision": 1.05, "Blocked shot": 0.9, "Fight": 0.45, "Fatigue": 0.8, "Non-contact": 0.95,
+};
+
 // Roll a duration. Calibrated to real NHL: MOST injuries are day-to-day (miss a
 // game or two), a chunk are week-to-week, few are multi-week, and season-enders
 // are rare. Avg ~11 days (~7 games missed at our schedule density).
@@ -1345,6 +1441,7 @@ function injuryDays(st: SimState, mech: InjuryMechanism, part: string): number {
     : roll < 0.93 ? 7 + st.rng.int(13)                 // week-to-week (7-19)
     : roll < 0.99 ? 20 + st.rng.int(20)                // multi-week (20-39)
     : 42 + st.rng.int(38);                             // long / season-ending (42-79)
+  days = Math.max(1, Math.round(days * MECH_DAYS_SKEW[mech]));
   if (part === "Concussion") days = Math.max(days, 8 + st.rng.int(24));
   return days;
 }
@@ -1355,13 +1452,11 @@ function pickHitter(st: SimState, team: SimTeam): SimSkater {
   return pool[st.rng.weighted(pool.map((s) => s.hitting * s.iceTime * physFactor(s.weight)))] ?? pool[0];
 }
 
-function addInjury(st: SimState, team: SimTeam, victim: SimSkater, mech: InjuryMechanism, by?: SimSkater) {
+function addInjury(st: SimState, team: SimTeam, victim: SimSkater, mech: InjuryMechanism, period: number, seconds: number, by?: SimSkater) {
   // a player already hurt this game is out — he can't pick up a second injury
   if (st.injuries.some((i) => i.playerId === victim.id)) return;
   const part = INJ_PARTS[mech][st.rng.int(INJ_PARTS[mech].length)];
   const days = injuryDays(st, mech, part);
-  const period = 1 + st.rng.int(3);
-  const seconds = st.rng.int(PERIOD_SECONDS);
   st.injuries.push({
     period, seconds, time: fmt(seconds), teamId: team.id,
     playerId: victim.id, playerName: victim.name, days, desc: part,
@@ -1376,75 +1471,70 @@ function addInjury(st: SimState, team: SimTeam, victim: SimSkater, mech: InjuryM
 }
 
 // Injuries are driven by the physical play, not a flat random roll: a heavy,
-// chippy opponent that out-hits you injures more of your players (STHS's
-// light-vs-heavy hit calc); blocking hard shots hurts your D; the rest is
-// overuse (fatigue/durability). Total rate stays ~INJURY_BASE at a neutral,
-// average-physicality matchup so the season-long injury load is unchanged.
-function generateInjuries(st: SimState) {
+// chippy opponent injures more of your players (STHS's light-vs-heavy hit calc);
+// blocking hard shots hurts D more; the rest is overuse (fatigue/durability).
+// Rolled LIVE, every tick, against the skaters actually on the ice right now —
+// NOT a post-game statistical pass — so the moment a player goes down, subMis
+// (checked on every onIceF/onIceD call) excludes him starting the very next
+// tick. Ice time falls out of this for free: a player who's out there more
+// racks up more per-tick rolls, same as real injury-exposure risk.
+function maybeInjureOnIce(st: SimState, team: SimTeam, opp: SimTeam, onIce: SimSkater[], period: number, tick: number): SimSkater[] {
+  const hurt: SimSkater[] = [];
+  if (!CFG.injuriesEnabled || !onIce.length) return hurt;
+  // Same calibration anchor the old per-game model used: the three shares below
+  // (contact 0.26, blocked-shot 0.09, wear 0.20) sum to ~0.55/team/game at a
+  // neutral matchup — rescaled to INJURY_BASE so 100% injuryChancePct still means
+  // ~1 injury per 5 games per team, same target as before this rework.
+  const cal = INJURY_BASE / 0.55;
+  const scale = (CFG.injuryChancePct / 100) * cal;
+  const physPressure = (opp.profile.ck / 66) * (opp.profile.weight / 92);
+  const ticksPerGame = PERIOD_SECONDS * 3;
+  for (const s of onIce) {
+    if (st.injured.has(s.id)) continue;
+    const rust = s.con < 96 ? 1 + (96 - s.con) * (0.9 - s.attrs.du / 200) : 1;
+    const light = Math.max(0.7, (100 - Math.max(0, s.weight - 82)) / 100 + 0.15); // a light frame absorbs a big hit worse
+    const duFactor = (115 - s.attrs.du) / 65; // DU 50→1.0x, DU 90→0.38x, DU 20→1.46x
+    const contactShare = 0.26 * physPressure * light; // Hit/Collision — opponent's chippiness
+    const blockShare = s.isDefense ? 0.09 * 1.6 : 0.09 * 0.5; // Blocked shot — D block most
+    const wearShare = 0.20; // Non-contact / Fatigue — flat, overuse-driven
+    const lambdaPerGame = (contactShare + blockShare + wearShare) * scale * duFactor;
+    const hazard = Math.min(0.02, (lambdaPerGame / ticksPerGame) * rust);
+    if (!st.rng.chance(hazard)) continue;
+    const total = contactShare + blockShare + wearShare;
+    const r = st.rng.next() * total;
+    let mech: InjuryMechanism;
+    let by: SimSkater | undefined;
+    if (r < contactShare) { mech = st.rng.chance(0.15) ? "Collision" : "Hit"; by = pickHitter(st, opp); }
+    else if (r < contactShare + blockShare) { mech = "Blocked shot"; }
+    else {
+      const toi = st.lines[team.id][s.id]?.toi ?? 0;
+      // "Fatigue" only when he's genuinely logged heavy minutes THIS game so far
+      // (≥20 min — overplayed workhorse); everyone else is a generic vague knock.
+      mech = toi >= 1200 ? "Fatigue" : "Non-contact";
+    }
+    addInjury(st, team, s, mech, period, tick, by);
+    st.injured.add(s.id);
+    hurt.push(s);
+  }
+  return hurt;
+}
+
+// FIGHT injuries stay a post-hoc pass, tied to generateFights() (itself a
+// post-hoc, end-of-game system) — a combatant (rare) tweaks a hand.
+function generateFightInjuries(st: SimState, period: number) {
   if (!CFG.injuriesEnabled) return;
-  // The neutral-matchup lambdas below (hit 0.26 + block 0.09 + non-contact 0.20)
-  // sum to ~0.55/team/game — 2.5× the documented target. Rescale them back to
-  // INJURY_BASE so 100% injuryChancePct means ~1 injury per 5 games per team.
   const cal = INJURY_BASE / 0.55;
   const scale = (CFG.injuryChancePct / 100) * cal;
   for (const team of [st.home, st.away]) {
-    const opp = team === st.home ? st.away : st.home;
-    const fwd = team.forwards, def = team.defense, pool = [...fwd, ...def];
+    const pool = [...team.forwards, ...team.defense];
     if (!pool.length) continue;
-
-    // fragility weight: exposure (ice time) × low durability × rusty return × lighter
-    // frame (a light player absorbs a big hit worse).
-    const fragility = (s: SimSkater, hitTarget = false) => {
-      const rust = s.con < 96 ? 1 + (96 - s.con) * (0.9 - s.attrs.du / 200) : 1;
-      const light = hitTarget ? Math.max(0.7, (100 - Math.max(0, s.weight - 82)) / 100 + 0.15) : 1;
-      return s.iceTime * (115 - s.attrs.du) * rust * light;
-    };
-
-    // 1) HIT injuries — scaled by the opponent's physical pressure (their hits ×
-    //    how heavy/chippy they are). Contact injuries land on forwards more.
-    const oppHits = st.box[opp.id].hits;
-    const physPressure = (opp.profile.ck / 66) * (opp.profile.weight / 92);
-    const hitLambda = 0.26 * scale * (oppHits / 21) * physPressure;
-    for (let i = 0; i < st.rng.poisson(hitLambda); i++) {
-      const cPool = fwd.length ? [...fwd, ...fwd, ...def] : pool; // forwards ~2x exposed
-      const victim = cPool[st.rng.weighted(cPool.map((s) => fragility(s, true)))];
-      addInjury(st, team, victim, st.rng.chance(0.15) ? "Collision" : "Hit", pickHitter(st, opp));
-    }
-
-    // 2) BLOCKED-SHOT injuries — blocking hard shots hurts hands/feet; D block most.
-    const blockLambda = 0.09 * scale * (st.box[team.id].blocks / 14);
-    for (let i = 0; i < st.rng.poisson(blockLambda); i++) {
-      const bPool = def.length ? [...def, ...def, ...fwd] : pool;
-      const victim = bPool[st.rng.weighted(bPool.map((s) => s.iceTime * (115 - s.attrs.du)))];
-      addInjury(st, team, victim, "Blocked shot");
-    }
-
-    // 3) NON-CONTACT — a lower/upper-body knock, reported vaguely like the real NHL.
-    //    It's labelled "Fatigue" ONLY when the victim is genuinely worn down (CON < 95
-    //    from heavy minutes / double-shifts / a back-to-back); otherwise it's just a
-    //    generic Lower/Upper Body injury. Victim weighted toward the most-played and
-    //    most tired skaters either way.
-    const nonContactLambda = 0.20 * scale;
-    for (let i = 0; i < st.rng.poisson(nonContactLambda); i++) {
-      // spread across the roster by exposure (ice time) + fragility (low DU); NOT
-      // over-weighted to the tired, so a non-contact knock can hit anyone. Whoever
-      // is bottomed out at the CON floor gets the "Fatigue" label below; the rest
-      // are generic body injuries.
-      const victim = pool[st.rng.weighted(pool.map((s) => s.iceTime * (115 - s.attrs.du)))];
-      // "Fatigue" only when the victim actually logged heavy minutes THIS game
-      // (≥25 min — a genuinely overplayed workhorse night); everyone else is a
-      // generic Lower/Upper Body knock, reported vaguely like the real NHL. Tied to
-      // real ice time (matches "played too many minutes"), not the flaky CON value.
-      const victimToi = st.lines[team.id][victim.id]?.toi ?? 0;
-      addInjury(st, team, victim, victimToi >= 1200 ? "Fatigue" : "Non-contact");
-    }
-
-    // 4) FIGHT injuries — a combatant (rare) tweaks a hand.
-    const fighters = st.penalties.filter((p) => p.team === team.id && p.type === "Fighting");
+    const fighters = st.penalties.filter((p) => p.team === team.id && p.type === "Fighting" && p.period === period);
     for (const f of fighters) {
+      if (st.injured.has(f.playerId)) continue;
       if (st.rng.chance(0.06 * scale)) {
         const victim = pool.find((s) => s.id === f.playerId) ?? pool[0];
-        addInjury(st, team, victim, "Fight");
+        addInjury(st, team, victim, "Fight", f.period, f.seconds);
+        st.injured.add(victim.id);
       }
     }
   }
@@ -1591,18 +1681,25 @@ function simulateFaceoffs(st: SimState) {
 const HIT_ZONES: [string, number][] = [["PERIMETER", 46], ["NET_FRONT", 20], ["CIRCLE", 20], ["POINT", 8], ["SLOT", 6]];
 const BLOCK_ZONES: [string, number][] = [["SLOT", 35], ["POINT", 30], ["NET_FRONT", 20], ["PERIMETER", 10], ["CIRCLE", 5]];
 const TAKE_ZONES: [string, number][] = [["PERIMETER", 35], ["CIRCLE", 25], ["POINT", 20], ["SLOT", 10], ["NET_FRONT", 10]];
+// missed shots skew farther out than the general shot mix (a point shot or a bad-angle
+// perimeter look is far likelier to sail wide than a tap-in from the slot).
+const MISS_ZONES: [string, number][] = [["PERIMETER", 38], ["POINT", 27], ["CIRCLE", 20], ["SLOT", 11], ["NET_FRONT", 4]];
+const ENTRY_LANES: [string, number][] = [["LEFT WING", 33], ["RIGHT WING", 33], ["CENTER", 34]];
+const ENTRY_TYPES: [string, number][] = [["carry", 50], ["dump", 35], ["pass", 15]];
 const pickZone = (rng: RNG, table: [string, number][]) => table[rng.weighted(table.map((z) => z[1]))][0];
 
 function distributeCounting(st: SimState) {
   for (const team of [st.home, st.away]) {
-    const roster = [...team.forwards, ...team.defense];
+    // exclude anyone hurt this game — he can't rack up a HIT/BLOCK/TAKEAWAY/MISS/
+    // ZONE_ENTRY after leaving the ice (this runs post-game, so st.injured is final).
+    const roster = [...team.forwards, ...team.defense].filter((s) => !st.injured.has(s.id));
     // emit a located defensive-action event (for the player heat maps). Counts stay
     // exactly as calibrated below — only a modeled rink zone + time are attached.
-    const emitAction = (type: "HIT" | "BLOCK" | "TAKEAWAY", s: SimSkater, sector: string) => {
+    const emitAction = (type: "HIT" | "BLOCK" | "TAKEAWAY" | "MISS" | "ZONE_ENTRY", s: SimSkater, sector: string, meta?: Record<string, unknown>) => {
       st.sink.emit({
         period: 1 + st.rng.int(3), seconds: st.rng.int(PERIOD_SECONDS), type,
         teamId: team.id, teamCode: team.code ?? undefined, playerId: s.id, playerName: s.name,
-        zone: "OFF", sector, importance: "NOTABLE",
+        zone: "OFF", sector, importance: "NOTABLE", meta,
       });
     };
     // hits — a physical team (high CK / heavy) throws noticeably more; centred on
@@ -1613,7 +1710,7 @@ function distributeCounting(st: SimState) {
     // centred on the league-mean checking (~71 ice-weighted) so the average club
     // sits at ~21 hits and physical/finesse teams spread ~16–27.
     const hitFactor = Math.max(0.78, Math.min(1.4, 1 + (avgHit - 71) / 60));
-    const hits = st.rng.poisson(LEAGUE.hitsPerTeam * (CFG.hitsPct / 100) * hitFactor);
+    const hits = st.rng.poisson(LEAGUE.hitsPerTeam * (CFG.hitsPct / 100) * hitFactor * team.coachPhy);
     for (let i = 0; i < hits; i++) {
       // heavier bodies throw more of the hits (physicality)
       const s = roster[st.rng.weighted(roster.map((r) => r.hitting * r.iceTime * physFactor(r.weight)))];
@@ -1632,6 +1729,25 @@ function distributeCounting(st: SimState) {
     for (let i = 0; i < takeaways; i++) {
       const s = roster[st.rng.weighted(roster.map((r) => ((r.attrs.df ?? 50) + (r.attrs.sk ?? 50)) * r.iceTime))];
       emitAction("TAKEAWAY", s, pickZone(st.rng, TAKE_ZONES));
+    }
+    // missed shots (wide / off the iron) — event-only, same as HIT/BLOCK/TAKEAWAY:
+    // scaled off THIS game's actual shots-on-goal total (real NHL: missed shots run
+    // ~35-40% of SOG) so it stays realistic for both a high- and a low-volume game,
+    // but never touches st.box[team].shots — the calibrated SOG stat is untouched.
+    const misses = st.rng.poisson(st.box[team.id].shots * 0.38);
+    for (let i = 0; i < misses; i++) {
+      const s = roster[st.rng.weighted(roster.map((r) => Math.pow((r.offense * 0.7 + r.playmaking * 0.3) / 60, 2) * r.iceTime * (r.isDefense ? 0.35 : 1)))];
+      emitAction("MISS", s, pickZone(st.rng, MISS_ZONES));
+    }
+    // controlled offensive-zone entries — event-only (for the player heat maps),
+    // calibrated to a fixed league rate rather than derived from the tick loop's
+    // internal zone-transition churn: the GIVEAWAY lesson (280 events/game from
+    // wiring an internal per-tick branch) applies here too, so this stays a
+    // decoupled statistical count like HIT/BLOCK/TAKEAWAY/MISS above, not a live hook.
+    const entries = st.rng.poisson(LEAGUE.zoneEntriesPerTeam);
+    for (let i = 0; i < entries; i++) {
+      const s = roster[st.rng.weighted(roster.map((r) => ((r.attrs.sk ?? 50) * 0.6 + r.offense * 0.4) * r.iceTime * (r.isDefense ? 0.3 : 1)))];
+      emitAction("ZONE_ENTRY", s, pickZone(st.rng, ENTRY_LANES), { entryType: pickZone(st.rng, ENTRY_TYPES) });
     }
     // TOI from ice-time share — ONLY as a fallback for the volume model. The possession
     // engine already accrued real per-second TOI (= ES + PP + PK) in the tick loop, so
@@ -1663,6 +1779,8 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     rivalry: CFG.rivalryEnabled && !!opts.rivalry,
     pulled: {},
     emptyNet: {},
+    onPp: {},
+    injured: new Set(),
     shootout: [],
     sink: new EventSink(),
   };
@@ -1676,7 +1794,7 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     st.momentum[team.id] = 0;
     st.momoTime[team.id] = 0;
     st.momoTau[team.id] = CFG.momentumDecaySec * (0.75 + ld / 200);          // LD 50→1.0x, 90→1.2x
-    st.momoDip[team.id] = CFG.momentumConcedeDip * (1 - (ex - 50) / 250);    // EX 90→0.84x, 25→1.1x
+    st.momoDip[team.id] = CFG.momentumConcedeDip * (1 - (ex - 50) / 250) * team.coachLd; // EX 90→0.84x, 25→1.1x; coach LD softens further
     // defensive shield: a gelled, role-diverse D pair suppresses goals against
     const dc = team.defense.length
       ? team.defense.reduce((t, d) => t + chemFactor(d.chem, d.roleFit), 0) / team.defense.length : 1;
@@ -1701,7 +1819,16 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
   const awayShotsTotal = Math.max(12, Math.round(rng.poisson(expectedShots(away, home, false))));
 
   for (let period = 1; period <= 3; period++) {
-    if (CFG.engineModel === "possession") { simulatePeriodPossession(st, period); continue; }
+    if (CFG.engineModel === "possession") {
+      simulatePeriodPossession(st, period);
+      // fights/scrums/donnybrooks + their injuries, scoped to THIS period (not the
+      // whole game post-hoc) — so a fight-injury in period 1 can actually bench the
+      // player for periods 2-3, same live-injury guarantee as Hit/Collision/etc.
+      generateFights(st, period);
+      generateHeatEvents(st, period);
+      generateFightInjuries(st, period);
+      continue;
+    }
     let hShare = period === 3 ? 0.34 : 0.33;
     let hp = Math.round(homeShotsTotal * hShare);
     let ap = Math.round(awayShotsTotal * hShare);
@@ -1720,8 +1847,11 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
   }
 
   simulateEndgame(st);
-  generateFights(st);
-  generateHeatEvents(st);
+  // legacy "volume" model only — the possession model already generated these
+  // per-period, live, inside the loop above (including their injuries).
+  if (CFG.engineModel !== "possession") {
+    for (let p = 1; p <= 3; p++) { generateFights(st, p); generateHeatEvents(st, p); generateFightInjuries(st, p); }
+  }
 
   let winnerId: number;
   let endedIn: GameResult["endedIn"] = "REG";
@@ -1746,7 +1876,6 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
   const loserId = winnerId === home.id ? away.id : home.id;
 
   distributeCounting(st);
-  generateInjuries(st); // after hits/blocks are tallied — physical play drives injuries (Phase 4)
   finalizeBoxes(st, winnerId, endedIn, otPeriods);
 
   st.goals.sort((a, b) => a.period - b.period || a.seconds - b.seconds);

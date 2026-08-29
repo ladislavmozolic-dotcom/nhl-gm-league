@@ -97,6 +97,8 @@ export type SimTeam = {
   coachDef: number;                // team defense multiplier (coach DF + defensive style)
   coachDisc: number;               // penalty-rate multiplier (<1 = disciplined bench, fewer PIM)
   coachEx: number;                 // experience 0..99 — steadies momentum / clutch late
+  coachPhy: number;                // hitting-rate multiplier (coach PH — a physical bench hits more)
+  coachLd: number;                 // <1 = a strong-leadership bench softens the momentum dip after conceding
   fwdTactics: LineTactic[];        // per forward-line tactic (aligned to the 4 lines)
   defTactics: LineTactic[];        // per defense-pair tactic (aligned to the 3 pairs)
   tactics: TacticsEffect;          // Phase 3 team-system multipliers (resolved from dials + roster fit)
@@ -234,7 +236,7 @@ export type TeamBox = {
 };
 
 export type PbpKind =
-  | "faceoff" | "shot" | "save" | "goal" | "miss" | "block" | "hit" | "takeaway"
+  | "faceoff" | "shot" | "save" | "goal" | "miss" | "block" | "hit" | "takeaway" | "rebound" | "entry"
   | "icing" | "offside" | "penalty" | "fight" | "injury" | "period" | "change";
 
 export type PbpEvent = {

@@ -150,6 +150,31 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
     };
   });
 
+  // High-danger shot map: every GOAL (always persisted, importance HIGHLIGHT) plus
+  // every high-danger non-scoring SHOT (importance NOTABLE only when hd — most
+  // ordinary shots are MINOR and never make it into GameEvent, so this is NOT the
+  // full shot volume; see the "Shot Locations" bar chart below for that). SHOT and
+  // its GOAL twin share the same period/seconds/teamId — a GOAL doesn't duplicate
+  // the SHOT row, it replaces its outcome.
+  const shotEvents = await prisma.gameEvent.findMany({
+    where: { gameId: game.id, type: { in: ["SHOT", "GOAL"] }, sector: { not: null } },
+    orderBy: [{ period: "asc" }, { seconds: "asc" }],
+  });
+  const shotPlayerIds = [...new Set(shotEvents.map((e) => e.playerId).filter((x): x is number => x != null))];
+  const shotPlayers = shotPlayerIds.length ? await prisma.player.findMany({ where: { id: { in: shotPlayerIds } }, select: { id: true, name: true } }) : [];
+  const shotPlayerName = new Map(shotPlayers.map((p) => [p.id, cleanName(p.name)]));
+  // A HD goal has BOTH a SHOT row (NOTABLE, since hd) and a GOAL row (always
+  // HIGHLIGHT) at the same instant — use the GOAL row and skip its SHOT twin so
+  // it isn't plotted twice; a non-HD goal has ONLY the GOAL row (its SHOT was
+  // MINOR, never persisted), so this also recovers those, not just HD ones.
+  const goalKeys = new Set(shotEvents.filter((e) => e.type === "GOAL").map((e) => `${e.period}:${e.seconds}:${e.teamId}`));
+  const shotDots = (teamId: number) => shotEvents
+    .filter((e) => e.teamId === teamId && (e.type === "GOAL" || !goalKeys.has(`${e.period}:${e.seconds}:${e.teamId}`)))
+    .map((e) => ({
+      sector: e.sector as string, xg: e.xg, goal: e.type === "GOAL",
+      playerName: e.playerId != null ? (shotPlayerName.get(e.playerId) ?? null) : null,
+    }));
+
   const story = game.status === "FINAL" ? await gameStory(game.id).catch(() => null) : null;
 
   const data = {
@@ -163,6 +188,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
       topShot: game.homeTopShot ?? null, topShotBy: game.homeTopShotBy ?? null, avgShot: game.homeAvgShot ?? null,
       goalsByPeriod: game.homeGoalsByPeriod, shotsByPeriod: game.homeShotsByPeriod,
       skaters: skaters(game.homeTeamId), goalies: goalies(game.homeTeamId), lines: homeLines,
+      shotDots: shotDots(game.homeTeamId),
     },
     away: {
       ...teamMeta(game.awayTeam), goals: game.awayGoals ?? 0, shots: game.awayShots ?? 0,
@@ -172,6 +198,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
       topShot: game.awayTopShot ?? null, topShotBy: game.awayTopShotBy ?? null, avgShot: game.awayAvgShot ?? null,
       goalsByPeriod: game.awayGoalsByPeriod, shotsByPeriod: game.awayShotsByPeriod,
       skaters: skaters(game.awayTeamId), goalies: goalies(game.awayTeamId), lines: awayLines,
+      shotDots: shotDots(game.awayTeamId),
     },
     homeTeamId: game.homeTeamId,
     awayTeamId: game.awayTeamId,

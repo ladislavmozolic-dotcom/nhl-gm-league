@@ -141,12 +141,31 @@ export function systemFit(p: RosterProfile, t: TeamTactics): number {
   return parts.reduce((s, v) => s + v, 0) / parts.length;
 }
 
+// A coach's own disposition (STYLE — his personal identity, separate from the
+// system dials the GM actually installs) nudges how naturally he gets the most
+// out of a matching system, and creates a little friction when asked to run
+// something that clashes with it — the same "fit" idea as the roster, but for
+// the man behind the bench. Small on purpose: the system + roster stay the
+// main drivers, this is a tiebreaker-scale nudge (mirrors coachEx's ±0.09 max).
+function styleFit(style: string | undefined, t: TeamTactics): number {
+  if (!style || style === "Balanced") return 0;
+  const offensive = t.tempo === "fast" || t.puckStyle === "rush" || t.puckStyle === "shotVolume";
+  const defensive = t.dZone === "collapse" || t.forecheck === "passive";
+  const physical = t.forecheck === "aggressive" || t.dZone === "aggressive";
+  if (style === "Offensive") return offensive ? 0.025 : defensive ? -0.02 : 0;
+  if (style === "Defensive") return defensive ? 0.025 : offensive ? -0.02 : 0;
+  if (style === "Physical") return physical ? 0.025 : 0;
+  return 0;
+}
+
 /** Resolve the four dials + roster fit into engine multipliers. A coach's
  *  experience (EX 0..99, ~70 neutral) helps execute the system — a veteran bench
- *  boss lifts a shaky fit, a rookie can't get as much out of a demanding one. */
-export function resolveTactics(t: TeamTactics, profile: RosterProfile, coachEx = 70): TacticsEffect {
+ *  boss lifts a shaky fit, a rookie can't get as much out of a demanding one.
+ *  His STYLE (separate from EX) adds a small bonus when the system matches his
+ *  own identity, and a little friction when it doesn't. */
+export function resolveTactics(t: TeamTactics, profile: RosterProfile, coachEx = 70, coachStyle?: string): TacticsEffect {
   const rawFit = systemFit(profile, t);
-  const fit = Math.max(0.6, Math.min(1.18, rawFit + (coachEx - 70) * 0.003));
+  const fit = Math.max(0.6, Math.min(1.18, rawFit + (coachEx - 70) * 0.003 + styleFit(coachStyle, t)));
   const eff: TacticsEffect = { ...NEUTRAL_EFFECT, fit };
   const apply = (d: Dial) => {
     for (const k of Object.keys(d) as (keyof Dial)[]) {
@@ -181,9 +200,10 @@ export function mergeTactics(partial: Partial<TeamTactics> | null | undefined): 
 export function resolveLineTactics(
   team: TeamTactics, profile: RosterProfile, coachEx: number,
   override: { puckStyle?: PuckStyle; dZone?: DZone },
+  coachStyle?: string,
 ): TacticsEffect {
-  if (!override.puckStyle && !override.dZone) return resolveTactics(team, profile, coachEx);
-  return resolveTactics({ ...team, ...override }, profile, coachEx);
+  if (!override.puckStyle && !override.dZone) return resolveTactics(team, profile, coachEx, coachStyle);
+  return resolveTactics({ ...team, ...override }, profile, coachEx, coachStyle);
 }
 
 // Human-readable labels for the UI.

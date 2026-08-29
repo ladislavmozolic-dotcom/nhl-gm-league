@@ -32,6 +32,7 @@ type Side = {
   xg?: number | null; hd?: number | null;
   ozPct?: number | null; nzPct?: number | null; dzPct?: number | null;
   shotSectors?: number[]; topShot?: number | null; topShotBy?: string | null; avgShot?: number | null;
+  shotDots?: { sector: string; xg: number | null; goal: boolean; playerName: string | null }[];
   skaters: Skater[]; goalies: Goalie[]; lines?: LineGroup[];
 };
 type GoalAssist = { name: string; slug: string | null; total: number | null };
@@ -337,6 +338,98 @@ function PbpView({ data, full }: { data: Data; full: boolean }) {
         </div>
       ))}
       {events.length === 0 && <p className="text-slate-500">No play-by-play recorded for this game.</p>}
+    </div>
+  );
+}
+
+// ---- shot chart --------------------------------------------------------------
+// Deterministic [0,1) float from a string — used to jitter dots inside a sector's
+// zone so 40 shots don't stack into 5 dots. Must be stable server↔client (this
+// component is "use client" but still SSRs first), so Math.random() would cause
+// a hydration mismatch — a string hash keeps the same value both passes.
+function hashUnit(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h >>> 0) / 4294967296;
+}
+// Half-rink zones (net near the bottom, blue line at the top) the 5 tracked
+// sectors map onto. PERIMETER and CIRCLE each have a left/right cluster; which
+// side a given dot lands on is picked by hash, not tracked by the sim (the
+// sector data has no left/right distinction).
+const SHOT_ZONES: Record<string, { cx: number; cy: number; rx: number; ry: number }[]> = {
+  POINT: [{ cx: 100, cy: 34, rx: 58, ry: 14 }],
+  PERIMETER: [{ cx: 28, cy: 108, rx: 15, ry: 58 }, { cx: 172, cy: 108, rx: 15, ry: 58 }],
+  CIRCLE: [{ cx: 64, cy: 128, rx: 19, ry: 19 }, { cx: 136, cy: 128, rx: 19, ry: 19 }],
+  SLOT: [{ cx: 100, cy: 154, rx: 30, ry: 24 }],
+  NET_FRONT: [{ cx: 100, cy: 189, rx: 17, ry: 10 }],
+};
+
+function HalfRink() {
+  return (
+    <g stroke="currentColor" className="text-slate-700" fill="none" strokeWidth="1.2">
+      <rect x="8" y="6" width="184" height="204" rx="26" />
+      <line x1="8" y1="42" x2="192" y2="42" className="text-sky-800/70" strokeWidth="1.6" />
+      <circle cx="64" cy="128" r="19" />
+      <circle cx="136" cy="128" r="19" />
+      <circle cx="100" cy="197" r="15" className="text-slate-800" strokeDasharray="2 2" />
+      <rect x="90" y="203" width="20" height="8" className="text-slate-500" fill="currentColor" fillOpacity="0.25" />
+    </g>
+  );
+}
+
+function ShotChartPanel({ data }: { data: Data }) {
+  const away = data.away.shotDots ?? [], home = data.home.shotDots ?? [];
+  if (away.length === 0 && home.length === 0) return null;
+
+  const Dots = ({ dots, side }: { dots: NonNullable<Side["shotDots"]>; side: "away" | "home" }) => (
+    <>
+      {dots.map((d, i) => {
+        const zones = SHOT_ZONES[d.sector];
+        if (!zones) return null;
+        const key = `${d.sector}-${i}-${d.playerName ?? ""}`;
+        const zone = zones[zones.length > 1 && hashUnit(key + "z") < 0.5 ? 0 : zones.length - 1];
+        const cx = zone.cx + (hashUnit(key + "x") * 2 - 1) * zone.rx;
+        const cy = zone.cy + (hashUnit(key + "y") * 2 - 1) * zone.ry;
+        const color = d.goal ? "text-amber-400" : side === "home" ? "text-rose-400" : "text-sky-400";
+        return (
+          <g key={i} className={color}>
+            {d.goal ? (
+              <circle cx={cx} cy={cy} r="4.2" fill="currentColor" stroke="#0f172a" strokeWidth="1" />
+            ) : (
+              <circle cx={cx} cy={cy} r="2.6" fill="currentColor" fillOpacity="0.55" />
+            )}
+            <title>{d.playerName ?? "Unknown"}{d.goal ? " — GOAL" : ""}{d.xg != null ? ` — xG ${d.xg.toFixed(2)}` : ""}</title>
+          </g>
+        );
+      })}
+    </>
+  );
+
+  const Rink = ({ dots, side, name }: { dots: NonNullable<Side["shotDots"]>; side: "away" | "home"; name: string }) => (
+    <div className="flex-1 min-w-[220px]">
+      <div className={`text-center text-xs font-bold uppercase tracking-wide mb-1 ${side === "home" ? "text-rose-400" : "text-sky-400"}`}>{name}</div>
+      <svg viewBox="0 0 200 214" className="w-full max-w-[280px] mx-auto">
+        <HalfRink />
+        <Dots dots={dots} side={side} />
+      </svg>
+    </div>
+  );
+
+  return (
+    <div className="bg-slate-900/40 rounded-lg overflow-hidden border border-slate-800">
+      <div className="px-4 py-2 text-xs font-bold text-slate-400 bg-slate-800/60 uppercase tracking-wide flex items-center gap-2">
+        <span className="text-amber-400">◆</span> High-Danger Shot Map
+        <span className="ml-auto normal-case font-normal text-slate-500 flex items-center gap-3">
+          <span><span className="text-amber-400">●</span> Goal</span>
+          <span><span className="text-sky-400">●</span> {data.away.name}</span>
+          <span><span className="text-rose-400">●</span> {data.home.name}</span>
+        </span>
+      </div>
+      <p className="px-4 pt-3 text-[11px] text-slate-500">Every goal, plus every high-danger scoring chance — not the full shot volume (see Shot Locations below for the complete zone breakdown).</p>
+      <div className="p-4 flex flex-wrap gap-4">
+        <Rink dots={away} side="away" name={data.away.name} />
+        <Rink dots={home} side="home" name={data.home.name} />
+      </div>
     </div>
   );
 }
@@ -654,6 +747,7 @@ export default function GameView({ data }: { data: Data }) {
 
       {tab === "stats" && (
         <div className="space-y-10">
+          <ShotChartPanel data={data} />
           <div className="space-y-4"><h2 className="text-xl font-bold">{data.away.name}</h2><SkaterTable side={data.away} /><GoalieBlock side={data.away} /></div>
           <div className="space-y-4"><h2 className="text-xl font-bold">{data.home.name}</h2><SkaterTable side={data.home} /><GoalieBlock side={data.home} /></div>
         </div>

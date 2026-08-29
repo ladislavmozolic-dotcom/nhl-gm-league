@@ -6,11 +6,37 @@
 // it falls back to the legacy post-hoc reconstruction.
 
 import { RNG } from "./rng";
-import type { GameResult, SimTeam, SimSkater, PbpEvent, PbpKind } from "./types";
+import type { GameResult, SimTeam, SimSkater, PbpEvent, PbpKind, InjuryEvent } from "./types";
 import type { SimEvent } from "./events";
 
 const PERIOD_SECONDS = 1200;
 const fmt = (s: number) => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, "0")}`;
+
+// Mechanism-flavoured injury narration — shares `desc` (a bare body-part label
+// like "Knee", kept short because the same field also fills a table column
+// elsewhere in the UI) but wraps it in a sentence that reads like a real
+// broadcast note instead of a mechanical "injured — Knee (collision)" template.
+function injuryLine(inj: InjuryEvent): string {
+  const part = inj.desc.toLowerCase();
+  const article = /^[aeiou]/.test(part) ? "an" : "a";
+  const hurt = part === "concussion" ? "a concussion" : `${article} ${part} injury`;
+  const sev = `${inj.severity}, out ~${inj.days} day${inj.days === 1 ? "" : "s"}`;
+  switch (inj.mechanism) {
+    case "Hit":
+      return `${inj.playerName} is shaken up on a hit${inj.byName ? ` from ${inj.byName}` : ""} and leaves with ${hurt} — ${sev}.`;
+    case "Collision":
+      return `${inj.playerName} goes down hard in a collision — ${hurt}, ${sev}.`;
+    case "Blocked shot":
+      return `${inj.playerName} blocks a shot and can't continue — ${hurt}, ${sev}.`;
+    case "Fight":
+      return `${inj.playerName} banged up in the tilt${inj.byName ? ` with ${inj.byName}` : ""} — ${hurt}, ${sev}.`;
+    case "Fatigue":
+      return `${inj.playerName} pulled after a heavy shift load — ${hurt}, ${sev}.`;
+    case "Non-contact":
+    default:
+      return `${inj.playerName} leaves the game with ${hurt} — ${sev}.`;
+  }
+}
 
 const centers = (t: SimTeam) => {
   const c = t.forwards.filter((f) => f.isCenter);
@@ -115,7 +141,7 @@ function legacyPlayByPlay(result: GameResult, home: SimTeam, away: SimTeam): Pbp
     }
     // injuries
     for (const inj of result.injuries.filter((x) => x.period === p)) {
-      add(p, inj.seconds, inj.teamId, "injury", `${inj.playerName} injured — ${inj.desc}${inj.mechanism === "Hit" && inj.byName ? ` (hit by ${inj.byName})` : inj.mechanism === "Non-contact" ? "" : ` (${inj.mechanism.toLowerCase()})`} — ${inj.severity}, out ~${inj.days} day${inj.days === 1 ? "" : "s"}.`, true);
+      add(p, inj.seconds, inj.teamId, "injury", injuryLine(inj), true);
     }
 
     add(p, PERIOD_SECONDS, null, "period", `End of the ${p}${["st", "nd", "rd"][p - 1]} period.`, true);
@@ -140,9 +166,21 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
   const sideOf = (teamId: number) => (teamId === home.id ? home : away);
   const oppOf = (teamId: number) => (teamId === home.id ? away : home);
   const goalieName = (teamId: number) => (teamId === home.id ? result.home.goalie.name : result.away.goalie.name);
-  const center = (t: SimTeam) => { const c = centers(t); return c[rng.weighted(c.map((s) => s.iceTime))]; };
-  const anySkater = (t: SimTeam) => { const p = pool(t); return p[rng.weighted(p.map((s) => s.iceTime))]; };
-  const hitter = (t: SimTeam) => { const p = pool(t); return p[rng.weighted(p.map((s) => s.hitting * s.iceTime))]; };
+  // Icings/offsides/the v1 hit-filler/faceoff-fallback aren't tied to a real
+  // stream event — they're atmospheric colour, placed at a random or synthetic
+  // time. Without this they could (and did) still pick a player after his real
+  // recorded INJURY time. availableAt gives the roster minus anyone hurt by then.
+  const availableAt = (t: SimTeam, p: number, seconds: number) => {
+    const hurt = new Set(result.injuries.filter((inj) => inj.period < p || (inj.period === p && inj.seconds <= seconds)).map((inj) => inj.playerId));
+    const live = pool(t).filter((s) => !hurt.has(s.id));
+    return live.length ? live : pool(t);
+  };
+  const center = (t: SimTeam, p: number, seconds: number) => {
+    const live = new Set(availableAt(t, p, seconds).map((s) => s.id));
+    const c = centers(t).filter((s) => live.has(s.id));
+    const pick = c.length ? c : availableAt(t, p, seconds);
+    return pick[rng.weighted(pick.map((s) => s.iceTime))];
+  };
 
   const events: PbpEvent[] = [];
   const add = (period: number, seconds: number, teamId: number | null, kind: PbpKind, text: string, major = false) =>
@@ -162,7 +200,7 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
       add(p, 1, realOpeningFo.teamId ?? null, "faceoff",
         `${realOpeningFo.playerName ?? "?"} wins face-off versus ${realOpeningFo.targetName ?? "?"} in neutral zone.`);
     } else {
-      const fc = center(home), fa = center(away);
+      const fc = center(home, p, 1), fa = center(away, p, 1);
       const homeWins = rng.chance(fc.faceoff / (fc.faceoff + fa.faceoff));
       add(p, 1, (homeWins ? home : away).id, "faceoff",
         `${(homeWins ? fc : fa).name} wins face-off versus ${(homeWins ? fa : fc).name} in neutral zone.`);
@@ -181,22 +219,36 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
       const hitCount = Math.round(((result.home.hits ?? 0) + (result.away.hits ?? 0)) / 3 / maxRegPeriod);
       for (let i = 0; i < hitCount; i++) {
         const t = sideOf(rng.chance(0.5) ? home.id : away.id);
-        add(p, rt(), t.id, "hit", `${anySkater(oppOf(t.id)).name} is hit by ${hitter(t).name} and loses puck.`);
+        const sec = rt();
+        const victims = availableAt(oppOf(t.id), p, sec), hitters = availableAt(t, p, sec);
+        const victim = victims[rng.weighted(victims.map((s) => s.iceTime))];
+        const hit = hitters[rng.weighted(hitters.map((s) => s.hitting * s.iceTime))];
+        add(p, sec, t.id, "hit", `${victim.name} is hit by ${hit.name} and loses puck.`);
       }
     }
-    for (let i = 0; i < 2 + rng.int(3); i++) { const t = rng.chance(0.5) ? home : away; add(p, rt(), t.id, "icing", `Icing by ${anySkater(t).name}.`); }
+    for (let i = 0; i < 2 + rng.int(3); i++) {
+      const t = rng.chance(0.5) ? home : away;
+      const sec = rt();
+      const pl = availableAt(t, p, sec);
+      add(p, sec, t.id, "icing", `Icing by ${pl[rng.weighted(pl.map((s) => s.iceTime))].name}.`);
+    }
     for (let i = 0; i < 1 + rng.int(3); i++) { const t = rng.chance(0.5) ? home : away; add(p, rt(), t.id, "offside", `Off-side.`); }
 
     // real events this period, in order
-    for (const e of stream.filter((x) => x.period === p)) {
+    const periodEvents = stream.filter((x) => x.period === p);
+    for (const e of periodEvents) {
       const tId = e.teamId ?? null;
       if (e.type === "SHOT") {
         // a SHOT immediately followed by its GOAL is narrated by the GOAL line
         continue;
       } else if (e.type === "SAVE") {
         const shooterName = e.targetName ?? "?";
-        add(p, e.seconds, oppOf(e.teamId ?? home.id).id, "shot", `Shot by ${shooterName}.`);
-        add(p, e.seconds, e.teamId ?? null, "save", `Stopped by ${e.playerName ?? goalieName(e.teamId ?? home.id)} ${rng.chance(0.5) ? "without a rebound" : "with a rebound"}.`);
+        const shooterTeamId = oppOf(e.teamId ?? home.id).id;
+        // a real REBOUND event at the same instant (same attacking team) means the
+        // puck stayed live — reflect that in the flavour text instead of a coin flip.
+        const hadRebound = periodEvents.some((x) => x.type === "REBOUND" && x.seconds === e.seconds && x.teamId === shooterTeamId);
+        add(p, e.seconds, shooterTeamId, "shot", `Shot by ${shooterName}.`);
+        add(p, e.seconds, e.teamId ?? null, "save", `Stopped by ${e.playerName ?? goalieName(e.teamId ?? home.id)} ${hadRebound ? "with a rebound" : "without a rebound"}.`);
       } else if (e.type === "GOAL") {
         const so = (e.meta as { so?: boolean } | undefined)?.so;
         if (so) continue; // shootout handled below
@@ -210,7 +262,7 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
         if (!gameOver) {
           const nextFo = isNextGen ? stream.find((x) => x.period === p && x.type === "FACEOFF" && x.seconds > e.seconds) : undefined;
           if (nextFo) add(p, e.seconds + 1, nextFo.teamId ?? null, "faceoff", `${nextFo.playerName ?? "?"} wins face-off versus ${nextFo.targetName ?? "?"} in neutral zone.`);
-          else add(p, e.seconds + 1, null, "faceoff", `${center(home).name} wins face-off versus ${center(away).name} in neutral zone.`);
+          else add(p, e.seconds + 1, null, "faceoff", `${center(home, p, e.seconds).name} wins face-off versus ${center(away, p, e.seconds).name} in neutral zone.`);
         }
       } else if (e.type === "PENALTY") {
         const m = e.meta as { penalty?: string; minutes?: number; severity?: string } | undefined;
@@ -227,6 +279,18 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
         add(p, e.seconds, tId, "block", `${e.playerName ?? "?"} blocks a shot.`);
       } else if (isNextGen && e.type === "TAKEAWAY") {
         add(p, e.seconds, tId, "takeaway", `${e.playerName ?? "?"} strips the puck with a takeaway.`);
+      } else if (isNextGen && e.type === "REBOUND") {
+        add(p, e.seconds, tId, "rebound", `${e.playerName ?? "?"} pounces on the rebound.`);
+      } else if (isNextGen && e.type === "PP_START") {
+        add(p, e.seconds, tId, "change", `${e.teamCode ?? sideOf(e.teamId ?? home.id).name} power play begins.`);
+      } else if (isNextGen && e.type === "PP_END") {
+        add(p, e.seconds, tId, "change", `${e.teamCode ?? sideOf(e.teamId ?? home.id).name} power play is over.`);
+      } else if (isNextGen && e.type === "MISS") {
+        add(p, e.seconds, tId, "miss", `Shot by ${e.playerName ?? "?"}. Shot Misses the Net.`);
+      } else if (isNextGen && e.type === "ZONE_ENTRY") {
+        const entryType = (e.meta as { entryType?: string } | undefined)?.entryType;
+        const verb = entryType === "dump" ? "dumps the puck into the zone" : entryType === "pass" ? "feeds a pass into the zone" : "carries the puck into the zone";
+        add(p, e.seconds, tId, "entry", `${e.playerName ?? "?"} ${verb}.`);
       } else if (isNextGen && e.type === "GOALIE_PULL") {
         const pulled = (e.meta as { pulled?: boolean } | undefined)?.pulled;
         add(p, e.seconds, tId, "change",
@@ -243,7 +307,7 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
     }
     // injuries
     for (const inj of result.injuries.filter((x) => x.period === p)) {
-      add(p, inj.seconds, inj.teamId, "injury", `${inj.playerName} injured — ${inj.desc}${inj.mechanism === "Hit" && inj.byName ? ` (hit by ${inj.byName})` : inj.mechanism === "Non-contact" ? "" : ` (${inj.mechanism.toLowerCase()})`} — ${inj.severity}, out ~${inj.days} day${inj.days === 1 ? "" : "s"}.`, true);
+      add(p, inj.seconds, inj.teamId, "injury", injuryLine(inj), true);
     }
 
     // no end-of-period line once a sudden-death OT goal has ended the game
