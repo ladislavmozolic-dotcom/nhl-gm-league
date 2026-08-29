@@ -11,6 +11,7 @@ import type {
 } from "./types";
 import type { TeamLinesData } from "./lines";
 import { buildUnits, buildStUnits, depthChartUnits, playerChemistry, unitSignature } from "./chemistry";
+import { roleFitOf as roleFitPure } from "./role-fit";
 import { resolveTactics, resolveLineTactics, mergeTactics, type RosterProfile, type TeamTactics } from "./tactics";
 
 const clamp = (v: number, lo = 20, hi = 99) => Math.max(lo, Math.min(hi, v));
@@ -184,26 +185,11 @@ export function teamDefense(skaters: SimSkater[]): number {
   return wt ? sum / wt : 50;
 }
 
-// Role diversity of a unit (0..1). STHS rewards complementary roles: a forward
-// line wants a playmaking C + a sniper + a grinder; a D pair wants an offensive
-// quarterback + a stay-at-home defender. Three of the same type clash → low fit.
+// Role diversity of a unit — shared with the Line Editor UI (role-fit.ts, so the
+// live badge a GM sees while building lines matches exactly what the sim rewards
+// via chemFactor below).
 function roleFitOf(members: SimSkater[], isDef: boolean): number {
-  if (members.length < 2) return 1;
-  const roleOf = (s: SimSkater): string => {
-    const a = s.attrs;
-    if (isDef) {
-      const off = 0.5 * (a.pa ?? 50) + 0.3 * (a.sk ?? 50) + 0.2 * (a.sc ?? 50);
-      const def = 0.5 * (a.df ?? 50) + 0.3 * (a.st ?? 50) + 0.2 * (a.ck ?? 50);
-      return off >= def ? "OFD" : "DFD";
-    }
-    const play = 0.6 * (a.pa ?? 50) + 0.4 * (a.fo ?? 50);
-    const snipe = 0.6 * (a.sc ?? 50) + 0.4 * (a.sk ?? 50);
-    const grind = 0.5 * (a.ck ?? 50) + 0.3 * (a.df ?? 50) + 0.2 * (a.st ?? 50);
-    return play >= snipe && play >= grind ? "PLAY" : snipe >= grind ? "SNIPE" : "GRIND";
-  };
-  const distinct = new Set(members.map(roleOf)).size;
-  if (isDef) return distinct >= 2 ? 1 : 0.4;                 // pair: mixed = 1, redundant = 0.4
-  return distinct >= 3 ? 1 : distinct === 2 ? 0.6 : 0.25;   // trio: 3 roles = 1, 2 = 0.6, 1 = 0.25
+  return roleFitPure(members.map((s) => s.attrs), isDef);
 }
 
 // A player's natural positions (LW/C/RW for forwards; LD or RD for a D by shoots).

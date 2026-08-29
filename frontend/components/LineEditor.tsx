@@ -5,12 +5,16 @@ import Link from "next/link";
 import LinesNav from "@/components/LinesNav";
 import { autoFill, type TeamLinesData, type ForwardLine, type DefensePair, type SpecialUnit } from "@/lib/sim/lines-core";
 import { unitChemistry } from "@/lib/sim/chemistry";
+import { roleFitOf } from "@/lib/sim/role-fit";
 import { DIAL_LABELS, mergeTactics, type PuckStyle, type DZone, type PpStyle, type PkStyle } from "@/lib/sim/tactics";
 import { useLang } from "@/components/LangProvider";
 import { dialLabel, dialDesc } from "@/lib/tactics-i18n";
 import type { GameStrategy, StratWeights } from "@/lib/sim/types";
 
-type Player = { id: number; name: string; position: string; overall: number; injured?: boolean; df?: number | null; con?: number; cap?: "C" | "A" | null };
+type Player = {
+  id: number; name: string; position: string; overall: number; injured?: boolean; df?: number | null; con?: number; cap?: "C" | "A" | null;
+  pa?: number | null; sk?: number | null; sc?: number | null; ck?: number | null; fo?: number | null; st?: number | null;
+};
 type SuggestResult = { ok: false; error: string } | { ok: true; lines: TeamLinesData; system: string; rationale: string[] };
 type Props = {
   teamName: string; teamSlug: string;
@@ -74,6 +78,25 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${cls} cursor-help`}
         title={`Line chemistry ${r}/100 — fully gelled at ${chemNeutral}. A unit gains chemistry each game it stays intact and loses it when broken by an injury or call-up. Below gelled, the unit sims at a small penalty.`}>
         🧪 {r} · {label}
+      </span>
+    );
+  };
+
+  // Role Fit — STHS rewards a complementary mix (a line wants a playmaker + a
+  // sniper + a grinder; a pair wants an offensive + a stay-at-home D). Computed
+  // live from the current line-up so a GM sees it while dragging players around,
+  // before saving — same real formula the sim uses (feeds chemFactor).
+  const RoleFitBadge = ({ ids, isDef }: { ids: (number | null)[]; isDef: boolean }) => {
+    const members = ids.filter((x): x is number => x != null).map((id) => byId.get(id)).filter((p): p is Player => !!p);
+    if (members.length < 2) return null;
+    const fit = roleFitOf(members, isDef);
+    const good = fit >= 1;
+    const cls = good ? "bg-emerald-500/20 text-emerald-300" : fit >= 0.6 ? "bg-sky-500/20 text-sky-300" : "bg-amber-500/20 text-amber-300";
+    const label = good ? "Ideal mix" : fit >= 0.6 ? "Decent mix" : "Redundant";
+    return (
+      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${cls} cursor-help`}
+        title={`Role fit — ${isDef ? "a pair wants one offensive + one stay-at-home D" : "a line wants a playmaker + a sniper + a grinder"}. Same-role players clash and sim at reduced offense.`}>
+        ⚙ {label}
       </span>
     );
   };
@@ -261,7 +284,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
         return (
           <div key={i} className="bg-slate-900/40 border border-slate-800 rounded-lg p-3 space-y-3">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2"><span className="text-sm font-bold text-slate-300">Line {i + 1}</span><ChemBadge ids={[l.lw, l.c, l.rw]} /></div>
+              <div className="flex items-center gap-2"><span className="text-sm font-bold text-slate-300">Line {i + 1}</span><ChemBadge ids={[l.lw, l.c, l.rw]} /><RoleFitBadge ids={[l.lw, l.c, l.rw]} isDef={false} /></div>
               <div className="flex items-center gap-2"><span className="text-[11px] uppercase tracking-wide text-slate-500">Time</span><Stepper value={l.timePct} step={1} onChange={(v) => setFwd(i, "timePct", v as unknown as number)} /><span className="text-slate-500 text-sm">%</span></div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -294,7 +317,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
         return (
           <div key={i} className="bg-slate-900/40 border border-slate-800 rounded-lg p-3 space-y-3">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2"><span className="text-sm font-bold text-slate-300">Pair {i + 1}</span><ChemBadge ids={[p.ld, p.rd]} /></div>
+              <div className="flex items-center gap-2"><span className="text-sm font-bold text-slate-300">Pair {i + 1}</span><ChemBadge ids={[p.ld, p.rd]} /><RoleFitBadge ids={[p.ld, p.rd]} isDef={true} /></div>
               <div className="flex items-center gap-2"><span className="text-[11px] uppercase tracking-wide text-slate-500">Time</span><Stepper value={p.timePct} step={1} onChange={(v) => setDef(i, "timePct", v as unknown as number)} /><span className="text-slate-500 text-sm">%</span></div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
