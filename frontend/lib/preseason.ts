@@ -10,6 +10,7 @@ import { simulateGame } from "./sim/engine";
 import { saveGameResult } from "./sim/persist";
 import { syncChem } from "./sim/season";
 import { loadSettings } from "./sim/settings";
+import { activeSimEngine, engineVersionFor } from "./sim/version";
 import type { SimTeam } from "./sim/types";
 import { PRE_SEASON } from "./phase";
 
@@ -83,6 +84,7 @@ export async function playPreseason(): Promise<{ played: number }> {
 /** Shared pre-season simmer — full box score, no profile/career/condition impact. */
 async function simPreseason(where: object): Promise<{ played: number }> {
   const settings = await loadSettings();
+  const engineVersion = engineVersionFor(await activeSimEngine());
   const scheduled = await prisma.game.findMany({
     where,
     orderBy: [{ round: "asc" }, { id: "asc" }],
@@ -117,7 +119,7 @@ async function simPreseason(where: object): Promise<{ played: number }> {
     }
     const seed = fixtureSeed(gm.homeTeamId, gm.awayTeamId, (gm.round ?? 0) + gm.id * 7);
     const rivalry = home.rivalTeamIds.includes(away.id) || away.rivalTeamIds.includes(home.id);
-    const result = simulateGame(home, away, { seed, settings, rivalry, league: "NHL" });
+    const result = simulateGame(home, away, { seed, settings, rivalry, league: "NHL", engineVersion });
     // Full box score (players, goalies, goals, penalties, events) is persisted under the
     // PRE season string → complete pre-season stats/standings/scoreboard, while every
     // player-profile / career / regular-season aggregation (keyed on the regular season

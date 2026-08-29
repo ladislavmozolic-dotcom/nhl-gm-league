@@ -13,6 +13,7 @@ import { simulateGame } from "./engine";
 import { saveGameResult } from "./persist";
 import { fixtureSeed } from "./rng";
 import { loadSettings, type EngineSettings } from "./settings";
+import { activeSimEngine, engineVersionFor } from "./version";
 import { pairSig, unitPairs } from "./chemistry";
 import { computeStandings } from "./standings";
 import { getArenaSections, selloutRevenue, attendanceRate, priceAttendanceFactor } from "../finance";
@@ -189,6 +190,7 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
   });
 
   const settings = await loadSettings();
+  const engineVersion = engineVersionFor(await activeSimEngine());
 
   // Off-day CON recovery: top up every healthy player for the days elapsed since the
   // last games were played, BEFORE tonight's games. This runs even when you step one
@@ -323,7 +325,7 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
     // the very same row unchanged stays reproducible.
     const seed = fixtureSeed(gm.homeTeamId, gm.awayTeamId, round + (gm.simCount ?? 0) * 1_000_003 + gm.id * 7);
     const rivalry = home.rivalTeamIds.includes(away.id) || away.rivalTeamIds.includes(home.id);
-    const result = simulateGame(home, away, { seed, settings, rivalry, league: gm.league === "AHL" ? "AHL" : "NHL" });
+    const result = simulateGame(home, away, { seed, settings, rivalry, league: gm.league === "AHL" ? "AHL" : "NHL", engineVersion });
     await saveGameResult(result, { gameId: gm.id, season, gameDate: gm.gameDate ?? seasonDateFor(season, round) });
     await storeAttendance(gm); // lock in the real crowd + gate for this home game
 

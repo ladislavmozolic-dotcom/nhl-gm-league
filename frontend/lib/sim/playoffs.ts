@@ -7,6 +7,7 @@ import { simulateGame } from "./engine";
 import { saveGameResult } from "./persist";
 import { fixtureSeed } from "./rng";
 import { loadSettings } from "./settings";
+import { activeSimEngine, engineVersionFor } from "./version";
 import { computeStandings } from "./standings";
 
 const ROUND_NAMES: Record<number, string> = {
@@ -105,6 +106,7 @@ export async function playSeries(seriesId: number, season: string) {
   const s = await prisma.playoffSeries.findUnique({ where: { id: seriesId } });
   if (!s || s.status === "DONE") return;
   const settings = await loadSettings();
+  const engineVersion = engineVersionFor(await activeSimEngine());
   const [high, low] = await Promise.all([loadSimTeam(s.highSeedTeamId), loadSimTeam(s.lowSeedTeamId)]);
   const need = Math.ceil(s.bestOf / 2);
   let hiW = s.highWins, loW = s.lowWins;
@@ -115,7 +117,7 @@ export async function playSeries(seriesId: number, season: string) {
     const home = highHome ? high : low;
     const away = highHome ? low : high;
     const seed = fixtureSeed(seriesId * 101 + gameNum, s.highSeedTeamId, s.round);
-    const result = simulateGame(home, away, { seed, settings, noShootout: true });
+    const result = simulateGame(home, away, { seed, settings, noShootout: true, engineVersion });
     // date the game so it lands on the schedule: playoffs open after the regular
     // season (~day 200), each round two weeks later, series games every other day.
     const year = parseInt(season.slice(0, 4), 10) || 2026;
@@ -232,6 +234,7 @@ export async function startPlayoffs(season = "2026-27", league = "NHL", startDat
  *  Returns games played and, if the Cup was decided, the champion id. */
 export async function advancePlayoffDay(season: string, league: string, dayStart: Date, dayEnd: Date): Promise<{ played: number; championTeamId: number | null; roundAdvanced: number | null }> {
   const settings = await loadSettings();
+  const engineVersion = engineVersionFor(await activeSimEngine());
   const due = await prisma.game.findMany({
     where: { season, league, seriesId: { not: null }, status: "SCHEDULED", gameDate: { gte: dayStart, lt: dayEnd } },
     orderBy: [{ seriesId: "asc" }, { gameNum: "asc" }],
@@ -253,7 +256,7 @@ export async function advancePlayoffDay(season: string, league: string, dayStart
     const [high, low] = await Promise.all([getTeam(s.highSeedTeamId), getTeam(s.lowSeedTeamId)]);
     const home = highHome ? high : low, away = highHome ? low : high;
     const seed = fixtureSeed(s.id * 101 + (g.gameNum ?? 1), s.highSeedTeamId, s.round);
-    const result = simulateGame(home, away, { seed, settings, noShootout: true });
+    const result = simulateGame(home, away, { seed, settings, noShootout: true, engineVersion });
     await saveGameResult(result, { gameId: g.id, season, league, round: s.round, seriesId: s.id, gameNum: g.gameNum ?? 1, gameDate: g.gameDate ?? dayStart });
     const hiW = s.highWins + (result.winner === s.highSeedTeamId ? 1 : 0);
     const loW = s.lowWins + (result.winner === s.lowSeedTeamId ? 1 : 0);

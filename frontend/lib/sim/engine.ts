@@ -9,6 +9,7 @@ import { generatePlayByPlay } from "./playbyplay";
 import { DEFAULT_SETTINGS, type EngineSettings } from "./settings";
 import { EventSink, type SimEvent } from "./events";
 import { shotProfile, expectedGoal, isHighDanger, shotSpeed, sectorIndex, type ShotStrength } from "./shot-quality";
+import { ENGINE_V2 } from "./version";
 import type {
   SimTeam, SimSkater, SimGoalie, GameResult, TeamBox, PlayerLine, GoalieLine,
   GoalEvent, PenaltyEvent, InjuryEvent, ShootoutAttempt, LineTactic,
@@ -50,6 +51,7 @@ function compressToward(x: number, anchor: number, k: number): number {
 
 const PERIOD_SECONDS = 1200; // 20:00
 const OT_SECONDS = 300;      // 5:00 sudden death
+const EMPTY_NET_WINDOW = 120; // seconds left in the 3rd when a trailing team may pull the goalie
 
 // League baselines the model is calibrated against (population means of THIS
 // dataset's ratings, so an avg-vs-avg matchup centers every factor at 1.0).
@@ -132,6 +134,7 @@ type SimState = {
   nightDef: Record<number, number>; // per-game goalie "form" facing this team (goals-against mult on opp shots, mean 1)
   rivalry: boolean;                 // heated rivalry game — more fights, scrums, misconducts
   pulled: Record<number, boolean>;  // has this team's starter been yanked for the backup
+  emptyNet: Record<number, boolean>; // trailing late in reg. — goalie pulled for the extra attacker (both engines)
   shootout: ShootoutAttempt[];      // shootout attempts (empty unless the game went to a shootout)
   sink: EventSink;                  // next-gen typed event stream (v2)
 };
@@ -1007,6 +1010,23 @@ function simulatePeriodPossession(st: SimState, period: number) {
     st.currentOnIce[home.id] = { f: onIceF(home), d: onIceD(home) };
     st.currentOnIce[away.id] = { f: onIceF(away), d: onIceD(away) };
     announceChange(home, tick); announceChange(away, tick);
+    // Empty net: a team trailing late in regulation, at even strength, may pull the
+    // goalie for an extra attacker. Real mechanic for BOTH engines (not a v2-only
+    // presentation choice) — the actual shot-probability effect lives at the SHOT
+    // resolution below (attackerEmptyNet / defEmptyNet). Re-evaluated every tick so
+    // scoring back or the period ending un-pulls automatically.
+    for (const team of [home, away]) {
+      const opp = team === home ? away : home;
+      const trailBy = st.box[opp.id].goals - st.box[team.id].goals;
+      const eligible = period === 3 && curStr[team.id] === "EV" && trailBy >= 1 && trailBy <= 3 && PERIOD_SECONDS - tick <= EMPTY_NET_WINDOW;
+      if (eligible !== !!st.emptyNet[team.id]) {
+        st.emptyNet[team.id] = eligible;
+        st.sink.emit({
+          period, seconds: tick, type: "GOALIE_PULL", teamId: team.id, teamCode: team.code ?? undefined,
+          importance: "NOTABLE", meta: { pulled: eligible },
+        });
+      }
+    }
     // time-on-ice, one second per tick, for the players ACTUALLY out there — total TOI
     // plus the PP / PK split, so TOI = ES + PP + PK and always covers the ST time.
     for (const team of [home, away]) {
@@ -1036,6 +1056,14 @@ function simulatePeriodPossession(st: SimState, period: number) {
       const homeWin = rng.chance(ratio((hC.attrs.fo ?? 50) * fat(home, hC), (aC.attrs.fo ?? 50) * fat(away, aC), 0.8));
       if (homeWin) { st.box[home.id].faceoffWins++; st.box[away.id].faceoffLosses++; st.lines[home.id][hC.id].faceoffWins++; st.lines[away.id][aC.id].faceoffLosses++; carrierTeam = home; carrier = hC; }
       else { st.box[away.id].faceoffWins++; st.box[home.id].faceoffLosses++; st.lines[away.id][aC.id].faceoffWins++; st.lines[home.id][hC.id].faceoffLosses++; carrierTeam = away; carrier = aC; }
+      const foWinner = homeWin ? hC : aC, foLoser = homeWin ? aC : hC;
+      st.sink.emit({
+        period, seconds: tick, type: "FACEOFF",
+        teamId: carrierTeam.id, teamCode: carrierTeam.code ?? undefined,
+        playerId: foWinner.id, playerName: foWinner.name,
+        targetId: foLoser.id, targetName: foLoser.name,
+        zone: "NEU", importance: "MINOR",
+      });
       zone = "NEU"; state = "PLAY"; setup = "carry"; press = 0;
       continue;
     }
@@ -1219,10 +1247,17 @@ function simulatePeriodPossession(st: SimState, period: number) {
       // beats the keeper cleanly, a stay-at-home D rarely does. Centred so the mean
       // D keeps the same total (only the SPREAD widens → a few elite D reach 20-25).
       const pointFinish = pointShot ? Math.max(0.75, Math.min(1.5, 1 + 0.016 * ((carrier.attrs.sc ?? 50) - 58))) : 1;
-      const p = pConv * danger * pressBonus * pointFinish
+      let p = pConv * danger * pressBonus * pointFinish
         * momoBoost(st, carrierTeam.id, absT) * clutchFactor(st, carrier, period, tick, margin)
         * teamEdge * catchUp * ppMod
         * (st.nightOff[carrierTeam.id] ?? 1) * (st.nightDef[def.id] ?? 1); // any-given-night form
+      // Empty net (both engines — a real missing mechanic, not a v2 presentation
+      // choice; see st.emptyNet below). carrierTeam pulled: 6-on-5 pressure. def
+      // pulled: an open net — a shot on target goes in almost every time.
+      const attackerEmptyNet = st.emptyNet[carrierTeam.id] === true;
+      const defEmptyNet = st.emptyNet[def.id] === true;
+      if (attackerEmptyNet) p *= 1.22;
+      if (defEmptyNet) p = 0.82;
       st.sink.emit({
         period, seconds: tick, type: "SHOT",
         teamId: carrierTeam.id, teamCode: carrierTeam.code ?? undefined,
@@ -1235,7 +1270,7 @@ function simulatePeriodPossession(st: SimState, period: number) {
       });
       if (rng.chance(p)) {
         gLine.goalsAgainst++;
-        recordGoal(st, carrierTeam, def, period, tick, strength, false, carrier, { sector, shotType, xg });
+        recordGoal(st, carrierTeam, def, period, tick, strength, defEmptyNet, carrier, { sector, shotType, xg });
         momoOnGoal(st, carrierTeam.id, def.id, absT);
         maybePullGoalie(st, def.id); // yank the starter if he's been shelled
         if (strength === "PP") expireOnePenalty(def.id, tick, active);
@@ -1627,6 +1662,7 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     defChem: {}, currentOnIce: {}, carryPenalties: [], misconducts: [], shiftXg: {}, nightOff: {}, nightDef: {},
     rivalry: CFG.rivalryEnabled && !!opts.rivalry,
     pulled: {},
+    emptyNet: {},
     shootout: [],
     sink: new EventSink(),
   };
@@ -1726,7 +1762,7 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     homeSystem: home.teamTactics,
     awaySystem: away.teamTactics,
   };
-  if (CFG.playByPlayEnabled) result.playByPlay = generatePlayByPlay(result, home, away, st.sink.all());
+  if (CFG.playByPlayEnabled) result.playByPlay = generatePlayByPlay(result, home, away, st.sink.all(), result.engineVersion === ENGINE_V2);
   return result;
 }
 

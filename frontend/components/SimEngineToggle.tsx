@@ -11,7 +11,7 @@ export default function SimEngineToggle({ engine }: { engine: "current" | "nextg
 
   const opts: { key: "current" | "nextgen"; label: string; sub: string }[] = [
     { key: "current", label: "Current (v1)", sub: "Stable, calibrated engine" },
-    { key: "nextgen", label: "Next-Gen (v2)", sub: "Event-driven rework — in development" },
+    { key: "nextgen", label: "Next-Gen (v2)", sub: "Same sim math — richer play-by-play (real hits/blocks/takeaways)" },
   ];
 
   return (
@@ -40,7 +40,7 @@ export default function SimEngineToggle({ engine }: { engine: "current" | "nextg
         })}
       </div>
       {engine === "nextgen" && (
-        <div className="text-xs text-amber-400/90">Next-gen is still in development — leagues currently run the current engine regardless. This toggle is being wired up as the v2 engine is built.</div>
+        <div className="text-xs text-sky-400/90">Next-gen is active: identical results (same seed → same score, same box score) — only the play-by-play narrates real hits, blocks and takeaways instead of flavour text. More next-gen upgrades land here over time.</div>
       )}
     </div>
   );
