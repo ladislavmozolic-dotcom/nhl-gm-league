@@ -1100,7 +1100,13 @@ function simulatePeriodPossession(st: SimState, period: number) {
       const opp = team === home ? away : home;
       const trailBy = st.box[opp.id].goals - st.box[team.id].goals;
       const pullWindow = team.strategy?.goaliePull?.pullSec ?? EMPTY_NET_WINDOW;
-      const eligible = period === 3 && curStr[team.id] === "EV" && trailBy >= 1 && trailBy <= 3 && PERIOD_SECONDS - tick <= pullWindow;
+      // real coaches pull much more readily down 1 than down 3 — a 2-goal deficit
+      // gets pulled later/more cautiously, a 3-goal deficit is a last-minute-only
+      // gamble. Taper the window instead of treating all 3 deficits alike: a
+      // wide-open down-3 pull for the full 2 minutes was creating a lot of the
+      // engine's excess blowout rate (a real, but too-generous, empty-net dagger).
+      const trailWindow = trailBy === 1 ? pullWindow : trailBy === 2 ? pullWindow * 0.7 : pullWindow * 0.35;
+      const eligible = period === 3 && curStr[team.id] === "EV" && trailBy >= 1 && trailBy <= 3 && PERIOD_SECONDS - tick <= trailWindow;
       if (eligible !== !!st.emptyNet[team.id]) {
         st.emptyNet[team.id] = eligible;
         st.sink.emit({
