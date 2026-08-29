@@ -14,15 +14,16 @@ export type FoundRating = {
 export async function searchRatings(query: string): Promise<FoundRating[]> {
   const q = query.trim();
   if (q.length < 2) return [];
+  const fieldSelect = Object.fromEntries(SKATER_FIELDS.map((f) => [f, true]));
   const rows = await prisma.player.findMany({
     where: { name: { contains: q, mode: "insensitive" }, isGoalie: false },
-    select: { id: true, name: true, isGoalie: true, team: { select: { name: true } }, overall: true, sc: true, pa: true, sk: true, df: true, ck: true, st: true, fo: true, ex: true, ld: true },
+    select: { id: true, name: true, isGoalie: true, team: { select: { name: true } }, ...fieldSelect },
     take: 30,
     orderBy: { overall: "desc" },
   });
   return rows.map((r) => ({
     id: r.id, name: cleanName(r.name), teamName: r.team?.name ?? null, isGoalie: r.isGoalie,
-    values: { overall: r.overall, sc: r.sc, pa: r.pa, sk: r.sk, df: r.df, ck: r.ck, st: r.st, fo: r.fo, ex: r.ex, ld: r.ld },
+    values: Object.fromEntries(SKATER_FIELDS.map((f) => [f, (r as unknown as Record<string, number | null>)[f]])),
   }));
 }
 

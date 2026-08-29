@@ -4,7 +4,10 @@ import { useState, useTransition } from "react";
 import { searchRatings, savePlayerRatings, type FoundRating } from "@/app/admin/ratings/actions";
 import { SKATER_FIELDS } from "@/lib/skater-fields";
 
-const LABEL: Record<string, string> = { overall: "OV", sc: "SC", pa: "PA", sk: "SK", df: "DF", ck: "CK", st: "ST", fo: "FO", ex: "EX", ld: "LD" };
+const LABEL: Record<string, string> = {
+  overall: "OV", ck: "CK", fg: "FG", di: "DI", sk: "SK", st: "ST", en: "EN", du: "DU",
+  ph: "PH", fo: "FO", pa: "PA", sc: "SC", df: "DF", ps: "PS", ex: "EX", ld: "LD", mo: "MO",
+};
 
 function Row({ p }: { p: FoundRating }) {
   const [v, setV] = useState<Record<string, number>>(() => {
@@ -16,23 +19,27 @@ function Row({ p }: { p: FoundRating }) {
   const save = () => start(async () => { await savePlayerRatings(p.id, v); setSaved(true); });
 
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5 border-b border-slate-800/60">
-      <div className="w-44 min-w-44">
-        <div className="text-sm font-semibold text-slate-100 truncate">{p.name}</div>
-        <div className="text-[11px] text-slate-500 truncate">{p.teamName ?? "—"}</div>
+    <div className="py-3 border-b border-slate-800/60">
+      <div className="flex items-center gap-2 mb-2">
+        <div className="min-w-0">
+          <span className="text-sm font-semibold text-slate-100">{p.name}</span>
+          <span className="text-[11px] text-slate-500 ml-2">{p.teamName ?? "—"}</span>
+        </div>
+        <button onClick={save} disabled={pending}
+          className="ml-auto shrink-0 px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-xs font-semibold disabled:opacity-50">
+          {pending ? "Saving…" : "Save"}
+        </button>
+        {saved && <span className="text-green-400 text-xs shrink-0">✓</span>}
       </div>
-      {SKATER_FIELDS.map((f) => (
-        <label key={f} className="flex flex-col items-center">
-          <span className={`text-[10px] font-bold uppercase ${f === "overall" ? "text-blue-400" : "text-slate-500"}`}>{LABEL[f]}</span>
-          <input type="number" min={20} max={99} value={v[f]} onChange={(e) => set(f, Number(e.target.value))}
-            className={`w-12 text-center tabular-nums bg-slate-900 border rounded px-1 py-1 text-sm ${f === "overall" ? "border-blue-700 font-bold" : "border-slate-700"}`} />
-        </label>
-      ))}
-      <button onClick={save} disabled={pending}
-        className="ml-auto px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-xs font-semibold disabled:opacity-50">
-        {pending ? "Saving…" : "Save"}
-      </button>
-      {saved && <span className="text-green-400 text-xs">✓</span>}
+      <div className="flex flex-wrap gap-x-3 gap-y-2">
+        {SKATER_FIELDS.map((f) => (
+          <label key={f} className="flex flex-col items-center">
+            <span className={`text-[10px] font-bold uppercase ${f === "overall" ? "text-blue-400" : "text-slate-500"}`}>{LABEL[f]}</span>
+            <input type="number" min={20} max={99} value={v[f]} onChange={(e) => set(f, Number(e.target.value))}
+              className={`w-12 text-center tabular-nums bg-slate-900 border rounded px-1 py-1 text-sm ${f === "overall" ? "border-blue-700 font-bold" : "border-slate-700"}`} />
+          </label>
+        ))}
+      </div>
     </div>
   );
 }
@@ -56,7 +63,8 @@ export default function RatingsEditor() {
         {rows.map((p) => <Row key={p.id} p={p} />)}
       </div>
       <p className="text-[11px] text-slate-500">
-        SC scoring · PA passing · SK skating · DF defense · CK checking · ST strength · FO faceoffs · EX experience · LD leadership.
+        CK checking · FG fighting · DI discipline · SK skating · ST strength · EN endurance · DU durability · PH puck handling ·
+        FO faceoffs · PA passing · SC scoring · DF defense · PS penalty shot · EX experience · LD leadership · MO morale.
         These drive the sim directly — raise an elite&apos;s SC/PA/OV to make him lead the scoring, or a team&apos;s OVs to climb the standings.
       </p>
     </div>
