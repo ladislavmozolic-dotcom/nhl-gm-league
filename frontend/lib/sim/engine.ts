@@ -1286,7 +1286,18 @@ function simulatePeriodPossession(st: SimState, period: number) {
     if (zone !== "OFF") {
       if (rng.chance(0.28)) {
         const gap = 0.6 * (dman.attrs.df ?? 50) + 0.4 * (dman.attrs.sk ?? 50);
-        if (rng.chance(ratio(atkSkill(carrier.attrs.sk ?? 50), defSkill(gap)))) { zone = zone === "DEF" ? "NEU" : "OFF"; setup = "carry"; }
+        if (rng.chance(ratio(atkSkill(carrier.attrs.sk ?? 50), defSkill(gap)))) {
+          // a real, live ZONE_ENTRY — NEU->OFF only (matches the real-hockey stat:
+          // crossing into the ATTACKING zone; DEF->NEU is a breakout, not tracked).
+          if (zone === "NEU") {
+            st.sink.emit({
+              period, seconds: tick, type: "ZONE_ENTRY", teamId: carrierTeam.id, teamCode: carrierTeam.code ?? undefined,
+              playerId: carrier.id, playerName: carrier.name, zone: "OFF", importance: "NOTABLE",
+              meta: { entryType: "carry" },
+            });
+          }
+          zone = zone === "DEF" ? "NEU" : "OFF"; setup = "carry";
+        }
         else if (rng.chance(0.4)) { carrierTeam = def; carrier = pickByAttr(rng, onIceF(def), (s) => s.attrs.pa ?? 50) ?? dman; zone = "DEF"; setup = "carry"; press = 0; } // stuffed → turnover
       }
       continue;
@@ -1842,15 +1853,17 @@ function distributeCounting(st: SimState) {
       const s = roster[st.rng.weighted(roster.map((r) => Math.pow((r.offense * 0.7 + r.playmaking * 0.3) / 60, 2) * r.iceTime * (r.isDefense ? 0.35 : 1)))];
       emitAction("MISS", s, pickZone(st.rng, MISS_ZONES));
     }
-    // controlled offensive-zone entries — event-only (for the player heat maps),
-    // calibrated to a fixed league rate rather than derived from the tick loop's
-    // internal zone-transition churn: the GIVEAWAY lesson (280 events/game from
-    // wiring an internal per-tick branch) applies here too, so this stays a
-    // decoupled statistical count like HIT/BLOCK/TAKEAWAY/MISS above, not a live hook.
-    const entries = st.rng.poisson(LEAGUE.zoneEntriesPerTeam);
-    for (let i = 0; i < entries; i++) {
-      const s = roster[st.rng.weighted(roster.map((r) => ((r.attrs.sk ?? 50) * 0.6 + r.offense * 0.4) * r.iceTime * (r.isDefense ? 0.3 : 1)))];
-      emitAction("ZONE_ENTRY", s, pickZone(st.rng, ENTRY_LANES), { entryType: pickZone(st.rng, ENTRY_TYPES) });
+    // controlled offensive-zone entries — the possession model now emits these for
+    // REAL, live, from the actual NEU->OFF transition in the tick loop's zone-entry
+    // decision (see the "advance the puck toward the offensive zone" block above).
+    // This statistical fallback only fires for the legacy "volume" engine model,
+    // which has no tick loop / zone concept of its own to hook a live version into.
+    if (CFG.engineModel !== "possession") {
+      const entries = st.rng.poisson(LEAGUE.zoneEntriesPerTeam);
+      for (let i = 0; i < entries; i++) {
+        const s = roster[st.rng.weighted(roster.map((r) => ((r.attrs.sk ?? 50) * 0.6 + r.offense * 0.4) * r.iceTime * (r.isDefense ? 0.3 : 1)))];
+        emitAction("ZONE_ENTRY", s, pickZone(st.rng, ENTRY_LANES), { entryType: pickZone(st.rng, ENTRY_TYPES) });
+      }
     }
     // TOI from ice-time share — ONLY as a fallback for the volume model. The possession
     // engine already accrued real per-second TOI (= ES + PP + PK) in the tick loop, so
