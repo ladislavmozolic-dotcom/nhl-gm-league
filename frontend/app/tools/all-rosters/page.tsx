@@ -26,10 +26,12 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
   const full = await prisma.team.findUnique({
     where: { id: team.id },
     include: {
-      players: { orderBy: { overall: "desc" }, include: { goalieRating: true } },
+      // rosterType-filtered — a player parked as PROSPECT/UFA/RETIRED/RELEASED keeps
+      // his teamId (schema requires one) but must never show as an active roster player.
+      players: { where: { rosterType: "NHL" }, orderBy: { overall: "desc" }, include: { goalieRating: true } },
       prospects: { where: { source: prospectSource }, orderBy: [{ name: "asc" }] },
       draftPicks: { where: { source: prospectSource }, orderBy: [{ year: "asc" }, { round: "asc" }] },
-      affiliateTeams: { include: { players: { orderBy: { overall: "desc" }, include: { goalieRating: true } } } },
+      affiliateTeams: { include: { players: { where: { rosterType: "AHL" }, orderBy: { overall: "desc" }, include: { goalieRating: true } } } },
     },
   });
   if (!full) return <div className="py-2">Team not found.</div>;
