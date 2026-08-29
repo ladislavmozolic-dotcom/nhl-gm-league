@@ -21,7 +21,7 @@ import type {
 // ship as "2.x" behind the LeagueConfig.simEngine flag. See lib/sim/version.ts.
 export const ENGINE_VERSION = "1.0.0";
 
-const INJURY_BASE = 0.18; // expected injuries per team per game at 100% (~1 in 5.5 games)
+const INJURY_BASE = 0.24; // expected injuries per team per game at 100% (~1 in 4.2 games) — calibration-lab target is 0.45-0.62/team/game; retuned after the live per-tick rework (was 0.18, landed at 0.40 in the lab)
 
 // Active tunable settings for the current game. Set at the top of simulateGame;
 // games run sequentially so a module-level value is safe. Defaults reproduce
