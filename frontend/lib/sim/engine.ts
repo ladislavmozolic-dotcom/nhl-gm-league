@@ -51,6 +51,11 @@ function compressToward(x: number, anchor: number, k: number): number {
 const PERIOD_SECONDS = 1200; // 20:00
 const OT_SECONDS = 300;      // 5:00 sudden death
 const EMPTY_NET_WINDOW = 120; // fallback seconds-left window when a team has no strategy.goaliePull.pullSec set
+// The shot-attempt trigger rate is scaled up by this so post-MISS on-goal (SOG)
+// volume matches the pre-MISS calibrated rate — see the MISS check in the O-zone
+// shot-resolution branch. Tune empirically against the Calibration Lab if the
+// MISS probability formula there ever changes; not derived from a closed form.
+const MISS_COMPENSATION = 1.38;
 
 // League baselines the model is calibrated against (population means of THIS
 // dataset's ratings, so an avg-vs-avg matchup centers every factor at 1.0).
@@ -1305,8 +1310,11 @@ function simulatePeriodPossession(st: SimState, period: number) {
 
     // 3) in the O-zone: an offensive action fires some ticks (shoot vs pass: SC vs PA).
     // team-system tempo/style scales HOW OFTEN the carrier generates a chance, and the
-    // defender's posture scales how many it allows.
-    if (!rng.chance(0.29 * atkFx.shotRate * def.tactics.oppShotRate)) continue;
+    // defender's posture scales how many it allows. Scaled up by MISS_COMPENSATION —
+    // a fraction of these attempts now sail wide (see the MISS check below) instead
+    // of always reaching the net, so the upstream rate is boosted to keep the actual
+    // on-goal (SOG) rate the calibration is tuned against unchanged.
+    if (!rng.chance(0.29 * atkFx.shotRate * def.tactics.oppShotRate * MISS_COMPENSATION)) continue;
     // Shoot-or-pass decision FIRST. A forward who elects to SHOOT sometimes walks
     // the puck back to the point for a D one-timer instead — this is how D rack up
     // their goals. But a forward who would PASS keeps the puck (→ his linemate's
@@ -1330,6 +1338,20 @@ function simulatePeriodPossession(st: SimState, period: number) {
       // stops the diversion from leaking goals to blocks and keeps scoring neutral.
       const blockP = pointShot ? 0.32 : 0.5 * ratio(defSkill(dman.attrs.df ?? 50), atkSkill(carrier.attrs.sc ?? 50));
       if (rng.chance(blockP)) { setup = "carry"; continue; } // blocked
+      // MISS — sails wide or off the iron, before it ever reaches the net (so it
+      // does NOT count toward st.box[...].shots or xG — those stay SOG-only, exactly
+      // as calibrated). A longer point shot misses more than an in-tight look; a
+      // sharper shooter (SC) hits the target more often. MISS_COMPENSATION above
+      // keeps the resulting SOG rate at its pre-MISS calibrated level.
+      const missP = pointShot ? 0.34 : Math.max(0.14, 0.27 - ((carrier.attrs.sc ?? 50) - 50) * 0.003);
+      if (rng.chance(missP)) {
+        st.sink.emit({
+          period, seconds: tick, type: "MISS", teamId: carrierTeam.id, teamCode: carrierTeam.code ?? undefined,
+          playerId: carrier.id, playerName: carrier.name, zone: "OFF",
+          sector: pointShot ? "POINT" : undefined, importance: "NOTABLE",
+        });
+        setup = "carry"; continue; // stays live off the end boards / behind the net
+      }
       // shot danger: a D-man point shot is low, a one-timer off a pass or a rebound
       // is high, a forward's own-rush shot is medium. Chemistry drives more passes
       // → more high-danger looks, so gelled lines get better chances automatically.
@@ -1844,14 +1866,16 @@ function distributeCounting(st: SimState) {
       const s = roster[st.rng.weighted(roster.map((r) => ((r.attrs.df ?? 50) + (r.attrs.sk ?? 50)) * r.iceTime))];
       emitAction("TAKEAWAY", s, pickZone(st.rng, TAKE_ZONES));
     }
-    // missed shots (wide / off the iron) — event-only, same as HIT/BLOCK/TAKEAWAY:
-    // scaled off THIS game's actual shots-on-goal total (real NHL: missed shots run
-    // ~35-40% of SOG) so it stays realistic for both a high- and a low-volume game,
-    // but never touches st.box[team].shots — the calibrated SOG stat is untouched.
-    const misses = st.rng.poisson(st.box[team.id].shots * 0.38);
-    for (let i = 0; i < misses; i++) {
-      const s = roster[st.rng.weighted(roster.map((r) => Math.pow((r.offense * 0.7 + r.playmaking * 0.3) / 60, 2) * r.iceTime * (r.isDefense ? 0.35 : 1)))];
-      emitAction("MISS", s, pickZone(st.rng, MISS_ZONES));
+    // missed shots (wide / off the iron) — the possession model now emits these for
+    // REAL, live, from the O-zone shot-resolution branch (see MISS_COMPENSATION and
+    // the MISS check right after the block-check above). This statistical fallback
+    // only fires for the legacy "volume" engine model, same as ZONE_ENTRY below.
+    if (CFG.engineModel !== "possession") {
+      const misses = st.rng.poisson(st.box[team.id].shots * 0.38);
+      for (let i = 0; i < misses; i++) {
+        const s = roster[st.rng.weighted(roster.map((r) => Math.pow((r.offense * 0.7 + r.playmaking * 0.3) / 60, 2) * r.iceTime * (r.isDefense ? 0.35 : 1)))];
+        emitAction("MISS", s, pickZone(st.rng, MISS_ZONES));
+      }
     }
     // controlled offensive-zone entries — the possession model now emits these for
     // REAL, live, from the actual NEU->OFF transition in the tick loop's zone-entry
