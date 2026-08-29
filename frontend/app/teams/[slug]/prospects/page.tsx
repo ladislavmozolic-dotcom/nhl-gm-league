@@ -16,6 +16,7 @@ export default async function TeamProspectsPage({ params }: { params: Promise<{ 
   if (!team) notFound();
 
   // players moved to the reserve list by the post-season roster reconciliation
+  // (or manually, by the Comish/Co-Comish, from Admin > Contracts)
   const reserve = await prisma.player.findMany({
     where: { teamId: team.id, rosterType: "PROSPECT" },
     select: { id: true, name: true, position: true, age: true, ltir: true },

@@ -63,6 +63,16 @@ export async function isComishTier(): Promise<boolean> {
   return !!t?.isAdmin || ["comish", "co_comish", "agent"].includes(t?.gmRole ?? "gm");
 }
 
+/** The commissioner (isAdmin) or the co-commissioner only — excludes agent/trade_comish.
+ *  Gates admin-panel roster overrides (LTIR, Send to Prospects) that move real cap
+ *  space, so it deliberately stays narrower than isCommission()/isComishTier(). */
+export async function isComishOrCoComish(): Promise<boolean> {
+  const id = await getTeamSession();
+  if (id == null) return false;
+  const t = await prisma.team.findUnique({ where: { id }, select: { isAdmin: true, gmRole: true } });
+  return !!t?.isAdmin || t?.gmRole === "co_comish";
+}
+
 /** Commission = the commissioner (isAdmin) or a (co-)commissioner. These may review and
  *  Accept / Decline / Modify a rookie GM's trades. Excludes plain "agent". */
 export async function isCommission(): Promise<boolean> {

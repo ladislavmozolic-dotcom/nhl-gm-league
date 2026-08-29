@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "/Users/mozolicladislav/ManagerApp/gratuityos", "run", "dev"],
       "port": 3100
+    },
+    {
+      "name": "nhl-gm-league",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "/Users/mozolicladislav/ManagerApp/nhl-gm-league/frontend", "run", "dev"],
+      "port": 3000
     }
   ]
 }

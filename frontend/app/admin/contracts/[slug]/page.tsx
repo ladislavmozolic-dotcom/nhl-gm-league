@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { updateContract } from "../actions";
+import { updateContract, markLtir, sendToProspects, activateFromReserve } from "../actions";
 import { PageHeader, Card } from "@/components/ui";
 import { money } from "@/lib/finance";
+import { isComishOrCoComish } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -14,10 +15,13 @@ export default async function ContractEditPage({
 }) {
   const { slug } = await params;
   const saved = (await searchParams).saved === "1";
-  const player = await prisma.player.findFirst({
-    where: { slug },
-    select: { id: true, name: true, slug: true, position: true, capHit: true, contractYears: true, contractExpiry: true, contractText: true, team: { select: { name: true } } },
-  });
+  const [player, canOverride] = await Promise.all([
+    prisma.player.findFirst({
+      where: { slug },
+      select: { id: true, name: true, slug: true, position: true, capHit: true, contractYears: true, contractExpiry: true, contractText: true, rosterType: true, ltir: true, team: { select: { name: true } } },
+    }),
+    isComishOrCoComish(),
+  ]);
 
   if (!player) {
     return (
@@ -64,6 +68,45 @@ export default async function ContractEditPage({
             <div className="flex justify-between py-2"><span className="text-slate-400">Years Left</span><span className="tabular-nums">{player.contractYears ?? "—"}</span></div>
             <div className="flex justify-between py-2"><span className="text-slate-400">Expiry</span><span className="tabular-nums">{player.contractExpiry ?? "—"}</span></div>
             <div className="flex justify-between py-2"><span className="text-slate-400">Shown as</span><span className="text-slate-300">{player.contractText ?? "—"}</span></div>
+          </div>
+        </Card>
+
+        <Card title="Roster Status">
+          <div className="space-y-3 text-sm">
+            <div className="flex justify-between py-1">
+              <span className="text-slate-400">Status</span>
+              <span className="font-semibold">
+                {player.rosterType === "PROSPECT" ? "Reserve / Prospects" : (player.rosterType ?? "—")}
+                {player.ltir && <span className="ml-2 text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/10 ring-1 ring-amber-500/30 rounded px-1.5 py-0.5">LTIR</span>}
+              </span>
+            </div>
+            {!canOverride && (
+              <p className="text-xs text-amber-300 bg-amber-950/30 border border-amber-800/50 rounded-lg px-3 py-2">
+                Only the Comish or Co-Comish can change this.
+              </p>
+            )}
+            {canOverride && player.rosterType === "PROSPECT" ? (
+              <div className="flex flex-wrap gap-2">
+                <form action={activateFromReserve.bind(null, slug, "NHL")}>
+                  <button type="submit" className="text-xs px-3 py-1.5 rounded-lg bg-emerald-900/70 hover:bg-emerald-800 text-emerald-200 font-medium">↑ Activate to NHL</button>
+                </form>
+                <form action={activateFromReserve.bind(null, slug, "AHL")}>
+                  <button type="submit" className="text-xs px-3 py-1.5 rounded-lg bg-slate-700/70 hover:bg-slate-600 text-slate-200 font-medium">↑ Activate to AHL</button>
+                </form>
+              </div>
+            ) : canOverride && (
+              <div className="flex flex-wrap gap-2">
+                <form action={markLtir.bind(null, slug)}>
+                  <button type="submit" className="text-xs px-3 py-1.5 rounded-lg bg-sky-900/70 hover:bg-sky-800 text-sky-200 font-medium">Mark LTIR</button>
+                </form>
+                <form action={sendToProspects.bind(null, slug)}>
+                  <button type="submit" className="text-xs px-3 py-1.5 rounded-lg bg-slate-700/70 hover:bg-slate-600 text-slate-200 font-medium">Send to Prospects</button>
+                </form>
+              </div>
+            )}
+            <p className="text-[11px] text-slate-500">
+              <b>Mark LTIR</b> — injured, off the cap, parked in reserve. <b>Send to Prospects</b> — left the active roster but may return (no injury implication). Both move him to the team&apos;s Reserve List; use the activate buttons to bring him back.
+            </p>
           </div>
         </Card>
       </div>
