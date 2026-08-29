@@ -283,14 +283,15 @@ export async function archiveSeasonAction() {
   revalidatePath("/history");
 }
 
-/** Off-season: minor-league ($100k, sub-NHL-minimum) farm deals renew automatically —
- *  they're placeholder contracts, not real re-sign candidates (a farm body who cracks
- *  the NHL just signs an ELC). Re-stamp any that are down to their last year back to an
- *  8-year term so they never expire onto the free-agent market or clutter re-sign lists. */
+/** Off-season: minor-league ($100k) farm deals renew automatically — they're
+ *  placeholder contracts, not real re-sign candidates (a farm body who cracks the
+ *  NHL just signs an ELC). Re-stamp any that are down to their last year back to an
+ *  8-year term so they never expire onto the free-agent market or clutter re-sign lists.
+ *  Real two-way deals below the NHL minimum (e.g. $600k-774k) are NOT farm deals — they
+ *  re-sign normally like any other contract. */
 export async function autoRenewFarmDeals() {
-  const NHL_MIN = 775_000;
   const r = await prisma.player.updateMany({
-    where: { capHit: { gt: 0, lt: NHL_MIN }, OR: [{ contractYears: null }, { contractYears: { lte: 1 } }] },
+    where: { capHit: 100_000, OR: [{ contractYears: null }, { contractYears: { lte: 1 } }] },
     data: { contractYears: 8 },
   });
   return { renewed: r.count };

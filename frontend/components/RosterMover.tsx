@@ -11,10 +11,10 @@ type Player = {
   capHit: number;
 };
 
-// Below the NHL minimum salary → a minor-league (AHL-only) contract. Such a player
-// (incl. every $100k farm deal) can NEVER be on the NHL roster — dressed OR scratched.
-const NHL_MIN = 775_000;
-const isAhlOnly = (p: Player) => p.capHit > 0 && p.capHit < NHL_MIN;
+// Exactly the $100k farm deal → a minor-league (AHL-only) contract. Such a player
+// can NEVER be on the NHL roster — dressed OR scratched. Anything else (including a
+// two-way deal well below the real NHL minimum) is governed by contractType instead.
+const isAhlOnly = (p: Player) => p.capHit === 100_000;
 // OV badge in green, brighter the higher the rating.
 const ovColor = (ov: number) =>
   ov >= 80 ? "bg-emerald-500/30 text-emerald-200 border-emerald-400/60"

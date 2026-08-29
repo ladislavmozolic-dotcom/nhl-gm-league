@@ -27,12 +27,12 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
   const byId = new Map(players.map((p) => [p.id, p]));
   const valid = moves.filter((m) => byId.has(m.id));
 
-  // an AHL-only (minor-league) contract — below the NHL minimum, incl. every $100k farm
-  // deal — can't be on the NHL roster at all (dressed OR scratched). Keep him on the farm
-  // no matter what the client requested. This is contract-type agnostic: a sub-minimum
-  // cap hit is a minor-league salary, so even a two-way tag can't call him up.
-  const NHL_MIN = 775_000;
-  const isAhlOnly = (id: number) => { const p = byId.get(id)!; const c = p.capHit ?? 0; return c > 0 && c < NHL_MIN; };
+  // an AHL-only (minor-league) contract — exactly the $100k farm deal — can't be on
+  // the NHL roster at all (dressed OR scratched). Keep him on the farm no matter what
+  // the client requested. Anything else, including a two-way deal well below the real
+  // NHL minimum ($600k-774k), is governed by contractType like every other player —
+  // ONE_WAY/TWO_WAY, not the cap hit, decides whether he can be sent down.
+  const isAhlOnly = (id: number) => { const p = byId.get(id)!; return (p.capHit ?? 0) === 100_000; };
   for (const m of valid) if (isNhlSide(m.side) && isAhlOnly(m.id)) m.side = "farm";
 
   const nhlRoster = valid.filter((m) => isNhlSide(m.side)); // dressed + scratched → cap + 23-limit
@@ -45,8 +45,8 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
   // moves like a call-up.
   // use the DB contract type, NOT the client's — flipping the 1-way badge in the UI must
   // not let a one-way player be buried on the farm.
-  // an AHL-only (sub-NHL-minimum) contract is farm-bound no matter what — it overrides
-  // any stale one-way flag, so it never triggers the send-down blocks below.
+  // an AHL-only ($100k) contract is farm-bound no matter what — it overrides any
+  // stale one-way flag, so it never triggers the send-down blocks below.
   const goingDown = valid.filter((m) => !isNhlSide(m.side)); // ending on the AHL (farm or farm-scratched)
   const illegalFarm = goingDown.find((m) => byId.get(m.id)!.contractType === "ONE_WAY" && byId.get(m.id)!.rosterType === "NHL" && !isAhlOnly(m.id));
   if (illegalFarm) return { ok: false as const, error: `${byId.get(illegalFarm.id)!.name} has a one-way contract — he can't be sent down. Keep him on the NHL roster.` };

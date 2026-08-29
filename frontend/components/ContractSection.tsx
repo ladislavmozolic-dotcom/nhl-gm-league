@@ -38,17 +38,17 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
   const org = await prisma.team.findUnique({ where: { id: teamId }, select: { affiliateTeams: { select: { id: true } } } });
   const orgIds = [teamId, ...(org?.affiliateTeams.map((a) => a.id) ?? [])];
   // players in the FINAL YEAR of their deal (1 left) or already expired (0). Minor-league
-  // ($100k, sub-NHL-minimum) farm deals are excluded — they renew automatically every
-  // off-season (a farm body who makes the NHL simply signs an ELC), so a GM never has to
-  // re-sign them and they don't clutter this list.
+  // ($100k) farm deals are excluded — they renew automatically every off-season (a farm
+  // body who makes the NHL simply signs an ELC), so a GM never has to re-sign them and
+  // they don't clutter this list. A real two-way deal below the NHL minimum (e.g.
+  // $600k-774k) is NOT a farm deal — it belongs in this list like any other contract.
   // PRE-LAUNCH: while we're only running PRACTICE sims, show ONLY already-expired deals
   // (0 years) — the 1-year "final year" group only appeared because a practice season was
   // started, and would confuse GMs pre-launch. Flip to true when the real season begins.
   const SHOW_FINAL_YEAR = false;
   const yearsFilter = SHOW_FINAL_YEAR ? { not: null, lte: 1 } : { equals: 0 };
-  const NHL_MIN = 775_000;
   const expiring = await prisma.player.findMany({
-    where: { teamId: { in: orgIds }, rosterType: { in: ["NHL", "AHL"] }, contractYears: yearsFilter, NOT: { capHit: { gt: 0, lt: NHL_MIN } } },
+    where: { teamId: { in: orgIds }, rosterType: { in: ["NHL", "AHL"] }, contractYears: yearsFilter, NOT: { capHit: 100_000 } },
     select: { id: true, name: true, age: true, capHit: true, contractYears: true, contractText: true, position: true, isGoalie: true, df: true, lastSeasonGP: true, lastSeasonPts: true, lastSeasonSvPct: true, rosterType: true, franchiseTag: true },
     orderBy: { capHit: "desc" },
   });
