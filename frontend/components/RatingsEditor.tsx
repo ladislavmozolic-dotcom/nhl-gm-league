@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { searchRatings, savePlayerRatings, SKATER_FIELDS, type FoundRating } from "@/app/admin/ratings/actions";
+import { searchRatings, savePlayerRatings, type FoundRating } from "@/app/admin/ratings/actions";
+import { SKATER_FIELDS } from "@/lib/skater-fields";
 
 const LABEL: Record<string, string> = { overall: "OV", sc: "SC", pa: "PA", sk: "SK", df: "DF", ck: "CK", st: "ST", fo: "FO", ex: "EX", ld: "LD" };
 

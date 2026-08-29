@@ -3,9 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { cleanName } from "@/lib/playerName";
-
-export const SKATER_FIELDS = ["overall", "sc", "pa", "sk", "df", "ck", "st", "fo", "ex", "ld"] as const;
-export type SkaterField = (typeof SKATER_FIELDS)[number];
+import { SKATER_FIELDS } from "@/lib/skater-fields";
 
 export type FoundRating = {
   id: number; name: string; teamName: string | null; isGoalie: boolean;
