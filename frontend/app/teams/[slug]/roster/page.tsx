@@ -79,7 +79,10 @@ export default async function TeamRosterPage({ params }: { params: Promise<{ slu
   // legacy name marker (''C''/''A'') ONLY for a club that has never set the field, so
   // teams the GM already edited show exactly what he chose (matches League → Captains).
   const capHasField = team.players.some((p) => p.captaincy === "C" || p.captaincy === "A");
-  const rosterWithCap = team.players.map((p) => ({ ...p, capRole: capHasField ? p.captaincy : captaincyFromName(p.name) }));
+  // roster (not team.players) — a player parked as PROSPECT/UFA/RETIRED/RELEASED
+  // keeps this teamId (schema requires one) but must never show up here, dressed
+  // or in the Non-Roster section, once he's off the active NHL/AHL roster.
+  const rosterWithCap = roster.map((p) => ({ ...p, capRole: capHasField ? p.captaincy : captaincyFromName(p.name) }));
 
   return (
     <div className="space-y-6">

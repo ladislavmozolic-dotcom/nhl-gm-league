@@ -20,7 +20,10 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
   const team = await prisma.team.findUnique({
     where: { slug },
     include: {
-      players: { orderBy: { overall: "desc" }, select: { id: true, isGoalie: true, position: true, age: true, capHit: true, contractText: true, name: true, slug: true, photoUrl: true, captaincy: true, nationality: true, injuryDaysLeft: true, injuryDesc: true } },
+      // rosterType-filtered — a player parked as PROSPECT/UFA/RETIRED/RELEASED keeps
+      // this teamId (schema requires one) but must never count toward roster size,
+      // cap total, captains or injured list once he's off the active roster.
+      players: { where: { rosterType: { in: ["NHL", "AHL"] } }, orderBy: { overall: "desc" }, select: { id: true, isGoalie: true, position: true, age: true, capHit: true, contractText: true, name: true, slug: true, photoUrl: true, captaincy: true, nationality: true, injuryDaysLeft: true, injuryDesc: true } },
       prospects: { where: { source: rosterSource }, select: { id: true, name: true, position: true, draftYear: true } },
       affiliateTeams: { select: { id: true, name: true, slug: true, logoUrl: true, code: true, players: { select: { id: true } } } },
       parentTeam: true,

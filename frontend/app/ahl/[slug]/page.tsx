@@ -18,7 +18,10 @@ export default async function AhlTeamDetailPage({
     },
     include: {
       parentTeam: true,
+      // rosterType-filtered — a player parked as PROSPECT/UFA/RETIRED/RELEASED keeps
+      // this teamId (schema requires one) but must never show as an active AHL player.
       players: {
+        where: { rosterType: "AHL" },
         orderBy: {
           name: "asc",
         },
