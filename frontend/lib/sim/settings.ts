@@ -173,7 +173,7 @@ export type EngineSettings = {
 };
 
 export const DEFAULT_SETTINGS: EngineSettings = {
-  engineModel: "possession", inGameFatiguePct: 100, possessionSkillPct: 0.85, defenseTalentPct: 35, catchUpStrength: 0.03,
+  engineModel: "possession", inGameFatiguePct: 100, possessionSkillPct: 0.85, defenseTalentPct: 35, catchUpStrength: 0.07,
   goalsPct: 98, shotsPct: 100, penaltiesPct: 100, hitsPct: 100,
   fightsPct: 100, powerPlayPct: 100, homeAdvPct: 100, homeLastChangePct: 100,
   pullGoalieEnabled: true, pullGoalieMinGoals: 6, pullGoalieMinShots: 15, pullGoalieSvPct: 0.80,
