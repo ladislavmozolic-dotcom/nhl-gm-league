@@ -26,7 +26,10 @@ export default async function AdminContractsPage({ searchParams }: { searchParam
       <PageHeader
         title="Contract Management"
         subtitle="Set a player's salary (cap hit) and contract length. Manual override until Agent signing writes it automatically."
-        right={<Link href="/admin" className="text-sm text-slate-400 hover:text-blue-400">← Admin</Link>}
+        right={<div className="flex items-center gap-4">
+          <Link href="/admin/contracts/new" className="text-sm text-emerald-400 hover:text-emerald-300 font-semibold">+ Add Player</Link>
+          <Link href="/admin" className="text-sm text-slate-400 hover:text-blue-400">← Admin</Link>
+        </div>}
       />
 
       {!admin && (

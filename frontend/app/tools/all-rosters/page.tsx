@@ -78,14 +78,17 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
     .filter((p) => !notProspect.has(pKey(p.name)))
     .sort((a, b) => cleanName(a.name).localeCompare(cleanName(b.name)));
 
-  // Reserve List — players parked off the active roster via Mark LTIR / Send to
-  // Prospects (rosterType "PROSPECT"). Separate from the Prospect model's draft
-  // prospects below; matches the section on /teams/[slug]/prospects.
-  const reserve = await prisma.player.findMany({
+  // Players parked off the active roster via Mark LTIR / Send to Prospects
+  // (rosterType "PROSPECT"), split by the ltir flag — matches the two sections
+  // on /teams/[slug]/prospects. Separate from the Prospect model's draft
+  // prospects below.
+  const offRoster = await prisma.player.findMany({
     where: { teamId: team.id, rosterType: "PROSPECT" },
     select: { id: true, name: true, position: true, age: true, ltir: true },
     orderBy: { name: "asc" },
   });
+  const reserve = offRoster.filter((p) => p.ltir);
+  const prospectPool = offRoster.filter((p) => !p.ltir);
 
   const conditions = await prisma.tradeCondition.findMany({
     where: { OR: [{ fromTeamId: team.id }, { toTeamId: team.id }] },
@@ -128,9 +131,8 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
         <RosterTable title="Goalies" players={farmGoalies.map((p) => toRP(p, farmHasField))} goalie />
       </div>
 
-      {reserve.length > 0 && (
-        <div>
-          <SectionTitle accent="text-amber-300">Reserve List</SectionTitle>
+      {(reserve.length > 0 || prospectPool.length > 0) && (() => {
+        const OffRosterTable = ({ rows }: { rows: typeof offRoster }) => (
           <Card bodyClassName="p-0">
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[420px]">
@@ -140,9 +142,9 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
                   <th className="px-4 py-3 text-center font-medium">Age</th>
                 </tr></thead>
                 <tbody>
-                  {reserve.map((p) => (
+                  {rows.map((p) => (
                     <tr key={p.id} className="border-b border-slate-800/40 hover:bg-slate-800/30 transition-colors last:border-0">
-                      <td className="px-4 py-3 font-medium">{cleanName(p.name)}{p.ltir && <span className="ml-2 text-[9px] font-semibold uppercase tracking-wider text-amber-400 bg-amber-500/10 ring-1 ring-amber-500/30 rounded px-1.5 py-0.5">LTIR</span>}</td>
+                      <td className="px-4 py-3 font-medium">{cleanName(p.name)}</td>
                       <td className="px-4 py-3 text-center text-slate-400">{p.position || "—"}</td>
                       <td className="px-4 py-3 text-center text-slate-400">{p.age ?? "—"}</td>
                     </tr>
@@ -151,8 +153,24 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
               </table>
             </div>
           </Card>
-        </div>
-      )}
+        );
+        return (
+          <>
+            {reserve.length > 0 && (
+              <div>
+                <SectionTitle accent="text-amber-300">Reserve List <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-400/80">LTIR · off the cap</span></SectionTitle>
+                <OffRosterTable rows={reserve} />
+              </div>
+            )}
+            {prospectPool.length > 0 && (
+              <div>
+                <SectionTitle accent="text-blue-400">Prospect Pool <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">left the NHL — e.g. Europe</span></SectionTitle>
+                <OffRosterTable rows={prospectPool} />
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       <div>
         <SectionTitle accent="text-blue-400">Prospects</SectionTitle>

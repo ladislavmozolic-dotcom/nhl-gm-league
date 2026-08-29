@@ -4,6 +4,7 @@ import { updateContract, markLtir, sendToProspects, activateFromReserve } from "
 import { PageHeader, Card } from "@/components/ui";
 import { money } from "@/lib/finance";
 import { isComishOrCoComish } from "@/lib/auth";
+import DeletePlayerButton from "@/components/DeletePlayerButton";
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +77,7 @@ export default async function ContractEditPage({
             <div className="flex justify-between py-1">
               <span className="text-slate-400">Status</span>
               <span className="font-semibold">
-                {player.rosterType === "PROSPECT" ? "Reserve / Prospects" : (player.rosterType ?? "—")}
+                {player.rosterType === "PROSPECT" ? (player.ltir ? "Reserve List" : "Prospect Pool") : (player.rosterType ?? "—")}
                 {player.ltir && <span className="ml-2 text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/10 ring-1 ring-amber-500/30 rounded px-1.5 py-0.5">LTIR</span>}
               </span>
             </div>
@@ -105,10 +106,19 @@ export default async function ContractEditPage({
               </div>
             )}
             <p className="text-[11px] text-slate-500">
-              <b>Mark LTIR</b> — injured, off the cap, parked in reserve. <b>Send to Prospects</b> — left the active roster but may return (no injury implication). Both move him to the team&apos;s Reserve List; use the activate buttons to bring him back.
+              <b>Mark LTIR</b> — injured, off the cap, parked in the Reserve List. <b>Send to Prospects</b> — left the NHL by choice (e.g. a move to Europe), no injury implication, parked in the Prospect Pool. Both are off the cap; use the activate buttons to bring him back.
             </p>
           </div>
         </Card>
+
+        {canOverride && (
+          <Card title="Danger Zone">
+            <div className="space-y-2">
+              <p className="text-[11px] text-slate-500">Permanently remove this player from the database — irreversible. His game history, contract and ratings are gone for good.</p>
+              <DeletePlayerButton slug={player.slug} name={player.name} />
+            </div>
+          </Card>
+        )}
       </div>
     </div>
   );

@@ -15,13 +15,17 @@ export default async function TeamProspectsPage({ params }: { params: Promise<{ 
   });
   if (!team) notFound();
 
-  // players moved to the reserve list by the post-season roster reconciliation
-  // (or manually, by the Comish/Co-Comish, from Admin > Contracts)
-  const reserve = await prisma.player.findMany({
+  // players moved off the active roster by the post-season roster reconciliation
+  // (or manually, by the Comish/Co-Comish, from Admin > Contracts). Split by the
+  // ltir flag: Reserve List = injured, off the cap, expected back; Prospect Pool =
+  // left the NHL by choice (e.g. a move to Europe), no injury implication.
+  const offRoster = await prisma.player.findMany({
     where: { teamId: team.id, rosterType: "PROSPECT" },
     select: { id: true, name: true, position: true, age: true, ltir: true },
     orderBy: { name: "asc" },
   });
+  const reserve = offRoster.filter((p) => p.ltir);
+  const prospectPool = offRoster.filter((p) => !p.ltir);
   const epUrl = (name: string) => `https://www.eliteprospects.com/search/player?q=${encodeURIComponent(epSearchName(name))}`;
 
   // A player is NOT a prospect if he's on this org's roster OR he already graduated
@@ -41,37 +45,48 @@ export default async function TeamProspectsPage({ params }: { params: Promise<{ 
     .filter((p) => !rosterNames.has(pKey(p.name)))
     .sort((a, b) => cleanName(a.name).localeCompare(cleanName(b.name)));
 
-  if (prospects.length === 0 && reserve.length === 0) {
+  if (prospects.length === 0 && reserve.length === 0 && prospectPool.length === 0) {
     return <Card><p className="text-slate-500 text-center py-8">No prospects.</p></Card>;
   }
+
+  const OffRosterTable = ({ rows }: { rows: typeof offRoster }) => (
+    <Card bodyClassName="p-0">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-800 text-slate-500 text-xs uppercase tracking-wider bg-slate-800/30">
+              <th className="px-4 py-3 text-left font-medium">Player</th>
+              <th className="px-4 py-3 text-center font-medium">Pos</th>
+              <th className="px-4 py-3 text-center font-medium">Age</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((p) => (
+              <tr key={p.id} className="border-b border-slate-800/40 hover:bg-slate-800/30 transition-colors last:border-0">
+                <td className="px-4 py-3 font-medium"><a href={epUrl(p.name)} target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 inline-flex items-center gap-1">{cleanName(p.name)}<span className="text-[9px] text-slate-500" aria-hidden>↗</span></a></td>
+                <td className="px-4 py-3 text-center text-slate-400">{p.position || "—"}</td>
+                <td className="px-4 py-3 text-center text-slate-400">{p.age ?? "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
 
   return (
     <div className="space-y-4">
       {reserve.length > 0 && (
         <>
-          <SectionTitle count={reserve.length} accent="text-blue-400">Reserve List</SectionTitle>
-          <Card bodyClassName="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-800 text-slate-500 text-xs uppercase tracking-wider bg-slate-800/30">
-                    <th className="px-4 py-3 text-left font-medium">Player</th>
-                    <th className="px-4 py-3 text-center font-medium">Pos</th>
-                    <th className="px-4 py-3 text-center font-medium">Age</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reserve.map((p) => (
-                    <tr key={p.id} className="border-b border-slate-800/40 hover:bg-slate-800/30 transition-colors last:border-0">
-                      <td className="px-4 py-3 font-medium"><a href={epUrl(p.name)} target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 inline-flex items-center gap-1">{cleanName(p.name)}<span className="text-[9px] text-slate-500" aria-hidden>↗</span></a>{p.ltir && <span className="ml-2 text-[9px] font-semibold uppercase tracking-wider text-amber-400 bg-amber-500/10 ring-1 ring-amber-500/30 rounded px-1.5 py-0.5">LTIR</span>}</td>
-                      <td className="px-4 py-3 text-center text-slate-400">{p.position || "—"}</td>
-                      <td className="px-4 py-3 text-center text-slate-400">{p.age ?? "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+          <SectionTitle count={reserve.length} accent="text-amber-400">Reserve List <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-400/80">LTIR · off the cap</span></SectionTitle>
+          <OffRosterTable rows={reserve} />
+        </>
+      )}
+
+      {prospectPool.length > 0 && (
+        <>
+          <SectionTitle count={prospectPool.length} accent="text-blue-400">Prospect Pool <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">left the NHL — e.g. Europe</span></SectionTitle>
+          <OffRosterTable rows={prospectPool} />
         </>
       )}
 
