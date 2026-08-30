@@ -91,6 +91,17 @@ export async function listConversations() {
       });
     }
   }
+  // System/commission notifications (rookie-GM trade oversight etc.) are delivered as
+  // a DM a team sends to ITSELF, since there's no separate notifications table — but
+  // `id !== from` above means a GM's own team is never in the list, so these piled up
+  // in the unread badge with no thread to ever open or mark read. Surface them as a
+  // synthetic "League Notifications" entry, same trick as the FA pseudo-team above.
+  if ((lastMap.get(from) ?? 0) > 0 || (unreadMap.get(from) ?? 0) > 0) {
+    out.push({
+      id: from, name: "League Notifications", code: "SYS", logoUrl: null,
+      gm: "System", hasGm: true, unread: unreadMap.get(from) ?? 0, lastId: lastMap.get(from) ?? 0,
+    });
+  }
   // active conversations (most recent message) float to the top; then teams you've
   // never messaged (GMs first, alphabetical).
   out.sort((a, b) => b.lastId - a.lastId || Number(b.hasGm) - Number(a.hasGm) || a.name.localeCompare(b.name));
