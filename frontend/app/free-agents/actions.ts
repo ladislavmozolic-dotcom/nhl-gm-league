@@ -697,11 +697,12 @@ export async function extendContractAction(
   const orgIds = [teamId, ...(org?.affiliateTeams.map((a) => a.id) ?? [])];
   if (!orgIds.includes(player.teamId)) return { ok: false as const, error: "That player isn't in your organization." };
   if ((player.contractYears ?? 99) > 1) return { ok: false as const, error: "He's not in the final year of his deal yet." };
-  // you can only negotiate an extension once the regular season is underway (his
-  // deal expires at the end of THIS season).
+  // A club can negotiate its own pending UFA/RFA any time except during the Free
+  // Agent Frenzy itself, which has its own dedicated offer/counter flow for players
+  // who've actually reached the open market.
   const phase = (await getLeagueClock()).phase;
-  if (phase !== "regular" && phase !== "playoffs") {
-    return { ok: false as const, error: "Extensions open once the regular season starts — his deal expires at season's end." };
+  if (phase === "frenzy") {
+    return { ok: false as const, error: "Extensions are closed during the Free Agent Frenzy — use the market offer flow instead." };
   }
   if (salary < 775_000) return { ok: false as const, error: "Below the league minimum salary." };
   years = Math.max(1, Math.min(MAX_TERM, Math.round(years)));

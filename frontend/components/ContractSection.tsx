@@ -31,9 +31,12 @@ const META: Record<Group, { title: string; blurb: string; accent: string }> = {
 export default async function ContractSection({ teamId }: { teamId: number }) {
   const canManage = await canManageTeam(teamId);
   const franchiseEnabled = (await loadSettings()).faMode === "full";
-  // extensions only open once the regular season is underway (final contract year)
+  // A club can negotiate its OWN pending UFA/RFA at any time — that's the whole
+  // point of the exclusive window a team holds before a player reaches the open
+  // market. Blocked only during the Free Agent Frenzy itself, which has its own
+  // dedicated offer/counter flow for players who've actually reached free agency.
   const phase = (await getLeagueClock()).phase;
-  const canNegotiate = phase === "regular" || phase === "playoffs";
+  const canNegotiate = phase !== "frenzy";
   // include the club's AHL/farm players whose deals are up too
   const org = await prisma.team.findUnique({ where: { id: teamId }, select: { affiliateTeams: { select: { id: true } } } });
   const orgIds = [teamId, ...(org?.affiliateTeams.map((a) => a.id) ?? [])];
