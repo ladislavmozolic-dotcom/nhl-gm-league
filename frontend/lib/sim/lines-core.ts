@@ -27,7 +27,7 @@ export type Situations = {
   fourVFour: SpecialUnit[]; // 2 units × 4 slots (2F + 2D)
   pk4: SpecialUnit[];       // 2 units × 4 slots (2F + 2D)
   pk3: SpecialUnit[];       // 2 units × 3 slots
-  overtime: SpecialUnit[];  // 2 units × 3 slots (3 vs 3)
+  overtime: SpecialUnit[];  // 3 units × 3 slots (3 vs 3)
   others: Others;
   lastMin: LastMin;
 };
@@ -87,7 +87,11 @@ export function emptySituations(): Situations {
     fourVFour: [{ players: nSlots(4), timePct: 60, tactic: { ...EV44_TACTIC } }, { players: nSlots(4), timePct: 40, tactic: { ...EV44_TACTIC } }],
     pk4: [{ players: nSlots(4), timePct: 60, tactic: { ...PK_TACTIC } }, { players: nSlots(4), timePct: 40, tactic: { ...PK_TACTIC } }],
     pk3: [{ players: nSlots(3), timePct: 60, tactic: { ...PK_TACTIC } }, { players: nSlots(3), timePct: 40, tactic: { ...PK_TACTIC } }],
-    overtime: [{ players: nSlots(3), timePct: 60, tactic: { ...OT_TACTIC } }, { players: nSlots(3), timePct: 40, tactic: { ...OT_TACTIC } }],
+    overtime: [
+      { players: nSlots(3), timePct: 45, tactic: { ...OT_TACTIC } },
+      { players: nSlots(3), timePct: 33, tactic: { ...OT_TACTIC } },
+      { players: nSlots(3), timePct: 22, tactic: { ...OT_TACTIC } },
+    ],
     others: { starter: null, backup: null, extraForwards: nSlots(3), extraDefense: nSlots(3), subPP: null, subPK1: null, subPK2: null, shootout: nSlots(5) },
     lastMin: { off: nSlots(6), def: nSlots(5) }, // off = pulled goalie (6 skaters); def = goalie in net (5)
   };
@@ -329,8 +333,12 @@ const withTactic = <T extends { tactic?: LineTactic }>(u: T, t: LineTactic): T =
 export function normalize(data: Partial<TeamLinesData>): TeamLinesData {
   const base = emptySituations();
   const s = (data.situations ?? {}) as Partial<Situations>;
-  const spec = (arr: SpecialUnit[] | undefined, fallback: SpecialUnit[], kind: "PP" | "PK" | "44" | "OT") =>
-    (arr ?? fallback).map((u) => withTactic(u, defaultTactic(kind)));
+  const spec = (arr: SpecialUnit[] | undefined, fallback: SpecialUnit[], kind: "PP" | "PK" | "44" | "OT") => {
+    // pad a legacy/short saved array up to the current default count (e.g. an
+    // OT array saved back when there were only 2 units) instead of dropping it.
+    const src = arr && arr.length ? (arr.length < fallback.length ? [...arr, ...fallback.slice(arr.length)] : arr) : fallback;
+    return src.map((u) => withTactic(u, defaultTactic(kind)));
+  };
   return {
     forwardLines: (data.forwardLines?.length ? data.forwardLines : []).map((l, i) => withTactic(l, defaultTactic("F", i))),
     defensePairs: (data.defensePairs?.length ? data.defensePairs : []).map((p, i) => withTactic(p, defaultTactic("D", i))),

@@ -355,11 +355,14 @@ const moraleFactor = (morale: number) =>
 const physFactor = (weight: number) =>
   CFG.physicalityEnabled ? 1 + ((weight ?? CFG.physicalityMeanLbs) - CFG.physicalityMeanLbs) * CFG.physicalityPct : 1;
 
-function pickShooter(rng: RNG, team: SimTeam): SimSkater {
-  const pool = [...team.forwards, ...team.defense];
+function pickShooterFromPool(rng: RNG, pool: SimSkater[]): SimSkater {
   const weights = pool.map((s) =>
     involvement((s.offense * 0.7 + s.playmaking * 0.3) * conFactor(s.con)) * s.iceTime * (s.isDefense ? D_SHOOT : 1));
   return pool[rng.weighted(weights)];
+}
+
+function pickShooter(rng: RNG, team: SimTeam): SimSkater {
+  return pickShooterFromPool(rng, [...team.forwards, ...team.defense]);
 }
 
 function pickAssists(rng: RNG, onIce: SimSkater[], scorerId: number): number[] {
@@ -458,6 +461,38 @@ function resolveStUnits(team: SimTeam): { pp: StUnit[]; pk: StUnit[] } {
   const pk1 = pkOk ? pk1s! : pkTier(0);
   const pk2 = pkOk ? pk2s! : (nonEmpty(pkTier(1)) ? pkTier(1) : pkTier(0));
   return { pp: [pp1, pp2], pk: [pk1, pk2] };
+}
+
+/** Resolve a club's 3-on-3 overtime personnel — THREE trios so a team actually rotates
+ *  the bench in OT (top trio gets the most ice, down to the 3rd) instead of shooting from
+ *  the whole healthy roster on every attempt. Same pattern as resolveStUnits: honour the
+ *  manager-set / auto-filled units (team.stUnits: ot/ot2/ot3) when genuinely distinct, else
+ *  build tiers from the roster by offense (OT is wide-open, so the best scorers lead). */
+function resolveOtUnits(team: SimTeam): StUnit[] {
+  const byId = new Map([...team.forwards, ...team.defense].map((s) => [s.id, s]));
+  const isD = (s: SimSkater) => team.defense.some((d) => d.id === s.id);
+  const split = (ids: number[]): StUnit => {
+    const players = ids.map((id) => byId.get(id)).filter((s): s is SimSkater => !!s);
+    return { f: players.filter((s) => !isD(s)), d: players.filter(isD) };
+  };
+  const skill = (s: SimSkater) => (s.attrs.sc ?? 50) + (s.attrs.pa ?? 50);
+  const otF = [...team.forwards].sort((a, b) => (b.offense ?? skill(b)) - (a.offense ?? skill(a)));
+  const otD = [...team.defense].sort((a, b) => skill(b) - skill(a));
+  const otTier = (t: number): StUnit => ({ f: otF.slice(t * 2, t * 2 + 2), d: otD.slice(t, t + 1) });
+  const findU = (prefix: string): StUnit | null => { const u = team.stUnits.find((x) => x.sig.startsWith(prefix)); return u ? split(u.members) : null; };
+  const nonEmpty = (u: StUnit) => u.f.length + u.d.length >= 2; // at least 2 bodies to be a usable trio
+  const ids = (u: StUnit | null) => (u ? [...u.f, ...u.d].map((s) => s.id).sort((a, b) => a - b).join(",") : "");
+  const sameIds = (a: StUnit | null, b: StUnit | null) => ids(a).length > 0 && ids(a) === ids(b);
+  const [ot1s, ot2s, ot3s] = [findU("ot:"), findU("ot2:"), findU("ot3:")];
+  const allSet = !!ot1s && !!ot2s && !!ot3s && nonEmpty(ot1s) && nonEmpty(ot2s) && nonEmpty(ot3s);
+  const distinct = allSet && !sameIds(ot1s, ot2s) && !sameIds(ot1s, ot3s) && !sameIds(ot2s, ot3s);
+  if (distinct) return [ot1s!, ot2s!, ot3s!];
+  // fallback: tiered by offense, cascading to tier 0 if the roster's too thin for a
+  // genuinely distinct 3rd trio (rare — most clubs carry plenty of forwards/D for this).
+  const t0 = otTier(0);
+  const t1 = nonEmpty(otTier(1)) ? otTier(1) : t0;
+  const t2 = nonEmpty(otTier(2)) ? otTier(2) : t1;
+  return [t0, t1, t2];
 }
 
 function weightedSample(rng: RNG, pool: SimSkater[], n: number): SimSkater[] {
@@ -1768,33 +1803,54 @@ function simulateEndgame(st: SimState) {
 
 // ---- overtime / shootout ----------------------------------------------------
 
+// Top OT trio sees the most ice, down to the 3rd — mirrors the depth-weighted
+// shift pattern used for 5-on-5 forward lines (advanceShift's `pick`).
+const OT_UNIT_WEIGHTS = [0.5, 0.32, 0.18];
+
 function simulateOvertime(st: SimState): { winner: number | null; seconds: number } {
   const { home, away, rng } = st;
   const step = 15;
-  // healthy(team): a team's forwards/defense minus anyone hurt this game — OT has
-  // no persistent on-ice unit the way 5-on-5 does (each shot draws from the whole
-  // roster), so this is the injury guard for shooter/unit selection below.
-  const healthy = (team: SimTeam): SimTeam => (!st.injured.size ? team : {
-    ...team, forwards: team.forwards.filter((s) => !st.injured.has(s.id)), defense: team.defense.filter((s) => !st.injured.has(s.id)),
-  });
+  // Three rotating trios per team (resolveOtUnits: manager-set OT lines when
+  // genuinely distinct, else roster tiers by offense) instead of sampling the
+  // whole healthy roster fresh on every attempt — mirrors how 5-on-5 lines and
+  // PP/PK units rotate the bench rather than picking from all 18 skaters.
+  const otUnits: Record<number, StUnit[]> = { [home.id]: resolveOtUnits(home), [away.id]: resolveOtUnits(away) };
+  const otIdx: Record<number, number> = { [home.id]: 0, [away.id]: 0 };
+  const deployOt = (team: SimTeam) => {
+    const unit = otUnits[team.id][otIdx[team.id]];
+    const f = unit.f.filter((s) => !st.injured.has(s.id));
+    const d = unit.d.filter((s) => !st.injured.has(s.id));
+    if (f.length || d.length) st.currentOnIce[team.id] = { f, d };
+    else setFreshUnitOT(st, team); // the whole deployed trio is hurt (rare) — sample fresh from who's left
+  };
+  const rotateOt = (team: SimTeam) => {
+    const units = otUnits[team.id];
+    if (units.length > 1) {
+      const w = OT_UNIT_WEIGHTS.map((x, i) => (i === otIdx[team.id] ? 0 : x));
+      otIdx[team.id] = rng.weighted(w);
+    }
+    deployOt(team);
+  };
+  deployOt(home); deployOt(away);
   for (let t = step; t <= OT_SECONDS; t += step) {
-    // live injuries in OT too: no persistent on-ice unit exists to check every
-    // tick against (unlike 5-on-5's onIceF/onIceD), so sample a plausible on-ice
-    // trio each 15-second interval and roll it the same way — intervalSec scales
-    // the hazard to cover the real time this call represents.
+    // bench change every 15s, same cadence the injury roll already used —
+    // rotate BEFORE the injury check so it rolls against whoever is actually
+    // deployed this interval, not last interval's trio.
+    rotateOt(home); rotateOt(away);
     for (const team of [home, away]) {
       const opp = team === home ? away : home;
-      const sampleF = weightedSample(rng, healthy(team).forwards, 2);
-      const sampleD = weightedSample(rng, healthy(team).defense, 1);
-      maybeInjureOnIce(st, team, opp, [...sampleF, ...sampleD], 4, t, step);
+      const oi = st.currentOnIce[team.id];
+      maybeInjureOnIce(st, team, opp, [...oi.f, ...oi.d], 4, t, step);
     }
     for (const [att, def, isHome] of [[home, away, true], [away, home, false]] as const) {
       // 3-on-3 is wide open: elevated chance rate scaled by offense
       const rate = 0.055 * (att.offenseRating / LEAGUE.avgOffense);
       if (!rng.chance(rate)) continue;
-      const attHealthy = healthy(att);
-      if (!attHealthy.forwards.length && !attHealthy.defense.length) continue;
-      const shooter = pickShooter(rng, attHealthy);
+      // the injury roll just above can hurt someone from this very on-ice set,
+      // so re-filter rather than trusting deployOt's snapshot from this tick.
+      const attOnIce = [...st.currentOnIce[att.id].f, ...st.currentOnIce[att.id].d].filter((s) => !st.injured.has(s.id));
+      if (!attOnIce.length) continue;
+      const shooter = pickShooterFromPool(rng, attOnIce);
       const gLine = liveGoalieLine(st, def.id);
       st.box[att.id].shots++;
       st.box[att.id].shotsByPeriod[3]++;
@@ -1803,7 +1859,9 @@ function simulateOvertime(st: SimState): { winner: number | null; seconds: numbe
       const p = conversion(shooter.offense, effGoalieQuality(liveGoalie(st, def)), isHome, "EV") * 2.2;
       if (rng.chance(p)) {
         gLine.goalsAgainst++;
-        setFreshUnitOT(st, att, shooter); setFreshUnitOT(st, def); // 3-on-3 on-ice sets
+        // st.currentOnIce already holds the real deployed trio for both teams
+        // this interval — recordGoal reads it directly for assists/+/-, same
+        // as 5-on-5, instead of re-randomizing a set after the fact.
         recordGoal(st, att, def, 4, t, "EV", false, shooter);
         return { winner: att.id, seconds: t };
       }
