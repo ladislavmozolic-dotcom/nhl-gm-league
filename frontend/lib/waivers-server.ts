@@ -12,7 +12,7 @@ import { computeStandings } from "./sim/standings";
 import { cleanName } from "./playerName";
 
 export type WaiverRow = {
-  id: number; playerId: number; playerName: string; position: string; capHit: number;
+  id: number; playerId: number; playerName: string; playerSlug: string | null; position: string; capHit: number;
   fromTeamId: number; fromCode: string; placedDay: number; clause: string | null;
   claims: { teamId: number; code: string }[];
 };
@@ -21,7 +21,7 @@ export type WaiverRow = {
 export async function activeWaivers(): Promise<WaiverRow[]> {
   const waivers = await prisma.waiver.findMany({ where: { status: "ACTIVE" }, orderBy: { createdAt: "desc" }, include: { claims: true } });
   if (waivers.length === 0) return [];
-  const players = await prisma.player.findMany({ where: { id: { in: waivers.map((w) => w.playerId) } }, select: { id: true, name: true, position: true, capHit: true, tradeClause: true } });
+  const players = await prisma.player.findMany({ where: { id: { in: waivers.map((w) => w.playerId) } }, select: { id: true, name: true, slug: true, position: true, capHit: true, tradeClause: true } });
   const pById = new Map(players.map((p) => [p.id, p]));
   const teamIds = new Set<number>();
   for (const w of waivers) { teamIds.add(w.fromTeamId); w.claims.forEach((c) => teamIds.add(c.teamId)); }
@@ -30,7 +30,7 @@ export async function activeWaivers(): Promise<WaiverRow[]> {
   return waivers.map((w) => {
     const p = pById.get(w.playerId);
     return {
-      id: w.id, playerId: w.playerId, playerName: cleanName(p?.name ?? ""), position: p?.position ?? "", capHit: p?.capHit ?? 0,
+      id: w.id, playerId: w.playerId, playerName: cleanName(p?.name ?? ""), playerSlug: p?.slug ?? null, position: p?.position ?? "", capHit: p?.capHit ?? 0,
       fromTeamId: w.fromTeamId, fromCode: code.get(w.fromTeamId) ?? "?", placedDay: w.placedDay, clause: p?.tradeClause ?? null,
       claims: w.claims.map((c) => ({ teamId: c.teamId, code: code.get(c.teamId) ?? "?" })),
     };

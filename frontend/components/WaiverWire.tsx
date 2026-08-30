@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { Card } from "@/components/ui";
 import { money } from "@/lib/finance";
 import { claimWaiverAction, cancelWaiverAction } from "@/app/waivers/actions";
@@ -32,7 +33,11 @@ export default function WaiverWire({ waivers, myTeamId }: { waivers: WaiverRow[]
               return (
                 <div key={w.id} className="py-2.5 flex items-center gap-3 flex-wrap">
                   <div className="flex-1 min-w-[180px]">
-                    <span className="font-medium">{w.playerName}</span> <span className="text-slate-500 text-xs">{w.position}</span>
+                    {w.playerSlug ? (
+                      <Link href={`/players/${w.playerSlug}`} className="font-medium text-white hover:text-blue-400">{w.playerName}</Link>
+                    ) : (
+                      <span className="font-medium">{w.playerName}</span>
+                    )} <span className="text-slate-500 text-xs">{w.position}</span>
                     {tag && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30">{tag}</span>}
                     <span className="ml-2 text-xs text-slate-500">from <b className="text-slate-400">{w.fromCode}</b> · {money(w.capHit)}</span>
                   </div>
