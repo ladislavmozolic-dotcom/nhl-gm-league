@@ -6,6 +6,7 @@ import { cleanName } from "@/lib/playerName";
 
 export type RosterPlayer = Record<string, number | string | null> & {
   id: number; name: string; position: string | null; slug?: string | null; age: number | null; overall: number | null; contractText: string | null; condition: number | null;
+  contractType?: string | null; // "ONE_WAY" | "TWO_WAY" | null
 };
 
 const SKATER_ATTRS = ["ck", "fg", "di", "sk", "st", "en", "du", "ph", "fo", "pa", "sc", "df", "ps", "ex", "ld", "mo"];
@@ -69,7 +70,11 @@ export default function RosterTable({ title, players, goalie = false }: { title:
                   {attrs.map((a) => <td key={a} className="px-2 py-1.5 text-center tabular-nums text-slate-300">{(p[a] as number | null) ?? "—"}</td>)}
                   <td className={`px-2 py-1.5 text-center tabular-nums font-bold ${(p.overall ?? 0) >= 80 ? "text-green-400" : (p.overall ?? 0) >= 70 ? "text-blue-400" : (p.overall ?? 0) >= 60 ? "text-yellow-400" : "text-slate-300"}`}>{p.overall ?? "—"}</td>
                   <td className="px-2 py-1.5 text-center text-slate-400 tabular-nums">{p.age ?? "—"}</td>
-                  <td className="px-2 py-1.5 text-right text-slate-400 whitespace-nowrap">{p.contractText ?? "—"}</td>
+                  <td className="px-2 py-1.5 text-right text-slate-400 whitespace-nowrap">
+                    {p.contractText ?? "—"}
+                    {p.contractType === "ONE_WAY" && <span className="ml-1 text-[9px] font-bold text-emerald-400">1W</span>}
+                    {p.contractType === "TWO_WAY" && <span className="ml-1 text-[9px] font-bold text-amber-400">2W</span>}
+                  </td>
                 </tr>
               );
             })}
