@@ -102,7 +102,7 @@ function conDrop(shots: number, du: number): number {
 // Defensemen contribute to offense, but less than forwards. High-PA/SC D still
 // rise into the scoring race (a few crack the top 20), just not to the top.
 const D_SHOOT = 0.34;
-const D_ASSIST = 0.6;
+const D_ASSIST = 0.29;
 
 const PENALTY_TYPES: Array<[string, number]> = [
   ["Tripping", 15], ["Hooking", 13], ["Slashing", 10], ["Holding", 10],
