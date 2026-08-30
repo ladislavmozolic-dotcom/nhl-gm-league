@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { advanceLeagueDayAction } from "@/app/admin/season/actions";
+import { friendlyActionError } from "@/lib/client/action-error";
 
 export default function SimulateDayButton({ gamesReady }: { gamesReady: number }) {
   const [pending, start] = useTransition();
@@ -17,7 +18,7 @@ export default function SimulateDayButton({ gamesReady }: { gamesReady: number }
       setMsg(r.played ? `✅ Simulated ${r.played} game${r.played === 1 ? "" : "s"} — advanced to ${d}.` : `Advanced to ${d} (${r.phase}) — no games scheduled.`);
       router.refresh();
     } catch (e) {
-      setMsg(`⚠ ${e instanceof Error ? e.message : "Failed to simulate."}`);
+      setMsg(friendlyActionError(e));
     }
   });
 

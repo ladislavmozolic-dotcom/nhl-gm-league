@@ -1,8 +1,9 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { setPhaseOverrideAction } from "@/app/admin/season/actions";
+import { friendlyActionError } from "@/lib/client/action-error";
 
 const OPTIONS = [
   { key: "offseason", label: "Off-season" },
@@ -14,7 +15,12 @@ const OPTIONS = [
 export default function PhaseControl({ current, override, label }: { current: string; override: string | null; label: string }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const set = (p: string | null) => start(async () => { await setPhaseOverrideAction(p); router.refresh(); });
+  const [err, setErr] = useState<string | null>(null);
+  const set = (p: string | null) => start(async () => {
+    setErr(null);
+    try { await setPhaseOverrideAction(p); router.refresh(); }
+    catch (e) { setErr(friendlyActionError(e)); }
+  });
 
   return (
     <div className="flex flex-col gap-2">
@@ -36,6 +42,7 @@ export default function PhaseControl({ current, override, label }: { current: st
           ? " · pinned by admin — automatic daily sim is paused while a phase is pinned"
           : " · following the calendar — scheduled games auto-simulate every day at 20:30 Europe/Bratislava"}
       </div>
+      {err && <div className="text-xs text-red-400">{err}</div>}
     </div>
   );
 }

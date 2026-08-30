@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { restartSeasonAction } from "@/app/admin/season/actions";
+import { friendlyActionError } from "@/lib/client/action-error";
 
 export default function RestartSeasonButton() {
   const [pending, start] = useTransition();
@@ -14,8 +15,12 @@ export default function RestartSeasonButton() {
         onClick={() => {
           if (!confirm("Restart the season?\n\nEvery game reverts to unplayed (results, stats, standings wiped), playoffs cleared, conditions/injuries reset. The SCHEDULE is kept. Rosters are left as-is. This cannot be undone.")) return;
           start(async () => {
-            const r = await restartSeasonAction();
-            setMsg(`Season restarted — ${r.games} games back to SCHEDULED. Sim day 1 whenever you're ready.`);
+            try {
+              const r = await restartSeasonAction();
+              setMsg(`Season restarted — ${r.games} games back to SCHEDULED. Sim day 1 whenever you're ready.`);
+            } catch (e) {
+              setMsg(friendlyActionError(e));
+            }
           });
         }}
         className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 disabled:opacity-50 font-semibold text-sm whitespace-nowrap"

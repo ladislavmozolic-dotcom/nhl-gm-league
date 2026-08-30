@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import { friendlyActionError } from "@/lib/client/action-error";
 
 type ImportResult = { imported: number; days: number; errors: string[] };
 type State = { played: number; scheduled: number; playoffSeries: number; champion: string | null };
@@ -30,7 +31,7 @@ export default function SeasonControls({ state, actions }: { state: State; actio
   const run = (name: string, fn: () => Promise<void>) => {
     setRunning(name); setMsg(null);
     start(async () => {
-      try { await fn(); } catch (e) { setMsg(`Error: ${(e as Error).message}`); }
+      try { await fn(); } catch (e) { setMsg(friendlyActionError(e)); }
       finally { setRunning(null); }
     });
   };
