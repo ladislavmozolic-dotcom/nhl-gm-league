@@ -14,6 +14,16 @@ const STATUS_STYLE: Record<string, string> = {
   DECLINED: "bg-red-500/20 text-red-400",
   CANCELLED: "bg-slate-600/30 text-slate-400",
   COMPLETED: "bg-green-500/20 text-green-400",
+  AWAITING_COMMISH: "bg-amber-500/20 text-amber-300",
+  MODIFY: "bg-sky-500/20 text-sky-300",
+  MODIFIED: "bg-fuchsia-500/20 text-fuchsia-300",
+};
+// Rookie-GM oversight statuses read as a raw enum otherwise ("AWAITING_COMMISH") —
+// spell out what's actually happening for the GM looking at their own trade.
+const STATUS_LABEL: Record<string, string> = {
+  AWAITING_COMMISH: "Waiting for Trade Comish to approve / decline",
+  MODIFY: "Sent back to you by the Trade Comish — rebalance and resubmit",
+  MODIFIED: "Resubmitted — waiting for Trade Comish review",
 };
 
 function TeamHead({ team }: { team?: { name: string | null; code: string | null; logoUrl: string | null } | null }) {
@@ -60,28 +70,45 @@ export default async function TradePage({ params }: { params: Promise<{ id: stri
   const [players, prospects, picks] = await Promise.all([
     prisma.player.findMany({ where: { id: { in: assets.filter((a) => a.playerId).map((a) => a.playerId!) } }, select: { id: true, name: true } }),
     prisma.prospect.findMany({ where: { id: { in: assets.filter((a) => a.prospectId).map((a) => a.prospectId!) } }, select: { id: true, name: true } }),
-    prisma.draftPick.findMany({ where: { id: { in: assets.filter((a) => a.draftPickId).map((a) => a.draftPickId!) } }, select: { id: true, year: true, round: true } }),
+    prisma.draftPick.findMany({ where: { id: { in: assets.filter((a) => a.draftPickId).map((a) => a.draftPickId!) } }, select: { id: true, year: true, round: true, ownerLogoId: true } }),
   ]);
   const pName = new Map(players.map((p) => [p.id, p.name]));
   const proName = new Map(prospects.map((p) => [p.id, p.name]));
-  const pickLabel = new Map(picks.map((p) => [p.id, `${p.year} R${p.round}`]));
-  const labelsFor = (side: "FROM" | "TO") =>
-    assets.filter((a) => a.side === side).map((a) => {
-      if (a.assetType === "PLAYER") return `${cleanName(pName.get(a.playerId ?? -1) ?? "Player")}${a.retentionPct ? ` (${a.retentionPct}% ret.)` : ""}`;
-      if (a.assetType === "PROSPECT") return `⭐ ${cleanName(proName.get(a.prospectId ?? -1) ?? "Prospect")}`;
-      if (a.assetType === "PICK") return `🎫 ${pickLabel.get(a.draftPickId ?? -1) ?? "Pick"}`;
-      if (a.assetType === "CASH") return `💵 ${money(a.cashAmount ?? 0)}`;
-      return a.assetType;
+  // A pick's ownerLogoId is the ORIGINAL team it belongs to — not necessarily who
+  // currently holds it (it may already have changed hands once via an earlier trade).
+  // "2027 R3" alone doesn't say whose pick it is, so show that team's logo alongside.
+  const origTeams = picks.length
+    ? await prisma.team.findMany({ where: { profinhlLogoId: { in: picks.map((p) => p.ownerLogoId).filter((x): x is number => x != null) } }, select: { profinhlLogoId: true, code: true, name: true, logoUrl: true } })
+    : [];
+  const teamByLogoId = new Map(origTeams.map((t) => [t.profinhlLogoId, t]));
+  const pickInfo = new Map(picks.map((p) => [p.id, { label: `${p.year} R${p.round}`, origTeam: teamByLogoId.get(p.ownerLogoId) ?? null }]));
+  type Item = { text: string; logoUrl?: string | null };
+  const labelsFor = (side: "FROM" | "TO"): Item[] =>
+    assets.filter((a) => a.side === side).map((a): Item => {
+      if (a.assetType === "PLAYER") return { text: `${cleanName(pName.get(a.playerId ?? -1) ?? "Player")}${a.retentionPct ? ` (${a.retentionPct}% ret.)` : ""}` };
+      if (a.assetType === "PROSPECT") return { text: `⭐ ${cleanName(proName.get(a.prospectId ?? -1) ?? "Prospect")}` };
+      if (a.assetType === "PICK") {
+        const info = pickInfo.get(a.draftPickId ?? -1);
+        const orig = info?.origTeam;
+        return { text: `🎫 ${info?.label ?? "Pick"}${orig ? ` (${orig.code ?? orig.name})` : ""}`, logoUrl: orig?.logoUrl };
+      }
+      if (a.assetType === "CASH") return { text: `💵 ${money(a.cashAmount ?? 0)}` };
+      return { text: a.assetType };
     });
   const fromLabels = labelsFor("FROM"), toLabels = labelsFor("TO");
   const role = session === trade.toTeamId ? "receiver" : session === trade.fromTeamId ? "proposer" : null;
 
-  const Side = ({ team, labels }: { team?: { name: string | null } | null; labels: string[] }) => (
+  const Side = ({ team, labels }: { team?: { name: string | null } | null; labels: Item[] }) => (
     <div className="flex-1 min-w-0">
       <p className="text-xs text-slate-500 mb-1.5">{team?.name || "Team"} sends</p>
       {labels.length === 0 ? <p className="text-slate-600 text-sm">nothing</p> : (
         <div className="flex flex-wrap gap-1.5">
-          {labels.map((l, i) => <span key={i} className="text-sm bg-slate-800 px-2.5 py-1 rounded text-slate-100">{l}</span>)}
+          {labels.map((l, i) => (
+            <span key={i} className="text-sm bg-slate-800 px-2.5 py-1 rounded text-slate-100 inline-flex items-center gap-1.5">
+              {l.logoUrl && <img src={l.logoUrl} alt="" className="w-4 h-4 object-contain shrink-0" />}
+              {l.text}
+            </span>
+          ))}
         </div>
       )}
     </div>
@@ -98,7 +125,7 @@ export default async function TradePage({ params }: { params: Promise<{ id: stri
             <span className="text-slate-600 text-lg">⇄</span>
             <TeamHead team={toTeam} />
           </div>
-          <span className={`text-xs font-bold px-3 py-1 rounded-full ${STATUS_STYLE[trade.status] ?? "bg-slate-700 text-slate-300"}`}>{trade.status}</span>
+          <span className={`text-xs font-bold px-3 py-1 rounded-full ${STATUS_STYLE[trade.status] ?? "bg-slate-700 text-slate-300"}`}>{STATUS_LABEL[trade.status] ?? trade.status}</span>
         </div>
 
         <div className="bg-slate-950/50 rounded-lg p-4 mb-3 flex gap-4 flex-col sm:flex-row">

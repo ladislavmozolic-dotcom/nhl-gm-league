@@ -229,7 +229,14 @@ export async function proposeTrade(pkg: TradePackage) {
   }
 
   const { tradeId } = await createTradeRecord(pkg, { fromName: fromTeam.name, toName: toTeam.name });
-  revalidatePath("/trades"); revalidatePath("/messages");
+  // Rookie-GM oversight: let the commission know a rookie-involving trade exists the
+  // moment it's proposed, not just once it's accepted — early visibility, nothing to
+  // act on yet (the other GM still has to respond first).
+  const rookieClubs = await prisma.team.findMany({ where: { id: { in: [pkg.fromTeamId, pkg.toTeamId] }, rookieGm: true }, select: { id: true } });
+  if (rookieClubs.length) {
+    await notifyCommission(`👀 Trade #${tradeId} (${fromTeam.name} ↔ ${toTeam.name}) was just proposed — a rookie GM is involved. No action yet, just visible on Trade Commission.`, tradeId);
+  }
+  revalidatePath("/trades"); revalidatePath("/trades/commish"); revalidatePath("/messages");
   return { tradeId };
 }
 
@@ -291,6 +298,12 @@ export async function commishRespondTrade(tradeId: number, action: "accept" | "d
   const trade = await prisma.trade.findUnique({ where: { id: tradeId } });
   if (!trade) throw new Error("Trade not found.");
   if (!["AWAITING_COMMISH", "MODIFIED"].includes(trade.status)) throw new Error("This trade isn't awaiting commission review.");
+  // Conflict of interest: a commission member on ONE SIDE of this trade can't be the
+  // one who approves/declines/modifies it — needs a different commission member.
+  const actingTeamId = await getTeamSession();
+  if (actingTeamId != null && (actingTeamId === trade.fromTeamId || actingTeamId === trade.toTeamId)) {
+    throw new Error("You're a club on this trade — a different Trade Comish member has to review it.");
+  }
   const clubs = await prisma.team.findMany({ where: { id: { in: [trade.fromTeamId, trade.toTeamId] } }, select: { id: true, name: true, rookieGm: true } });
   const nameOf = (id: number) => clubs.find((c) => c.id === id)?.name ?? "?";
 

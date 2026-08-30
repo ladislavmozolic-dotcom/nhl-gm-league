@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
-type AssetLabel = { text: string };
+type AssetLabel = { text: string; logoUrl?: string | null };
 
 export default async function TradesPage() {
   const [session, admin, commission, trades, teams] = await Promise.all([
@@ -28,17 +28,27 @@ export default async function TradesPage() {
   const [players, prospects, picks] = await Promise.all([
     prisma.player.findMany({ where: { id: { in: playerIds } }, select: { id: true, name: true } }),
     prisma.prospect.findMany({ where: { id: { in: prospectIds } }, select: { id: true, name: true } }),
-    prisma.draftPick.findMany({ where: { id: { in: pickIds } }, select: { id: true, year: true, round: true } }),
+    prisma.draftPick.findMany({ where: { id: { in: pickIds } }, select: { id: true, year: true, round: true, ownerLogoId: true } }),
   ]);
   const pName = new Map(players.map((p) => [p.id, p.name]));
   const proName = new Map(prospects.map((p) => [p.id, p.name]));
-  const pickLabel = new Map(picks.map((p) => [p.id, `${p.year} R${p.round}`]));
+  // ownerLogoId = the pick's ORIGINAL team (not necessarily current holder) — show
+  // that team's logo/code so "2027 R3" doesn't leave the reader guessing whose pick it is.
+  const origTeams = picks.length
+    ? await prisma.team.findMany({ where: { profinhlLogoId: { in: picks.map((p) => p.ownerLogoId).filter((x): x is number => x != null) } }, select: { profinhlLogoId: true, code: true, name: true, logoUrl: true } })
+    : [];
+  const teamByLogoId = new Map(origTeams.map((t) => [t.profinhlLogoId, t]));
+  const pickInfo = new Map(picks.map((p) => [p.id, { label: `${p.year} R${p.round}`, origTeam: teamByLogoId.get(p.ownerLogoId) ?? null }]));
 
   const labelsFor = (tradeId: number, side: "FROM" | "TO"): AssetLabel[] =>
     assets.filter((a) => a.tradeId === tradeId && a.side === side).map((a) => {
       if (a.assetType === "PLAYER") return { text: `${pName.get(a.playerId ?? -1) ?? "Player"}${a.retentionPct ? ` (${a.retentionPct}% ret.)` : ""}` };
       if (a.assetType === "PROSPECT") return { text: `⭐ ${proName.get(a.prospectId ?? -1) ?? "Prospect"}` };
-      if (a.assetType === "PICK") return { text: `🎫 ${pickLabel.get(a.draftPickId ?? -1) ?? "Pick"}` };
+      if (a.assetType === "PICK") {
+        const info = pickInfo.get(a.draftPickId ?? -1);
+        const orig = info?.origTeam;
+        return { text: `🎫 ${info?.label ?? "Pick"}${orig ? ` (${orig.code ?? orig.name})` : ""}`, logoUrl: orig?.logoUrl };
+      }
       if (a.assetType === "CASH") return { text: `💵 ${money(a.cashAmount ?? 0)}` };
       return { text: a.assetType };
     });
@@ -135,13 +145,18 @@ function TeamHead({ team }: { team?: { name: string; code: string | null; logoUr
   );
 }
 
-function AssetList({ team, labels }: { team?: { name: string }; labels: { text: string }[] }) {
+function AssetList({ team, labels }: { team?: { name: string }; labels: AssetLabel[] }) {
   return (
     <div className="flex-1 min-w-0">
       <p className="text-xs text-slate-500 mb-1">{team?.name || "Team"} sends</p>
       {labels.length === 0 ? <p className="text-slate-600 text-sm">nothing</p> : (
         <div className="flex flex-wrap gap-1.5">
-          {labels.map((l, i) => <span key={i} className="text-xs bg-slate-800 px-2 py-1 rounded text-slate-200">{l.text}</span>)}
+          {labels.map((l, i) => (
+            <span key={i} className="text-xs bg-slate-800 px-2 py-1 rounded text-slate-200 inline-flex items-center gap-1">
+              {l.logoUrl && <img src={l.logoUrl} alt="" className="w-3.5 h-3.5 object-contain shrink-0" />}
+              {l.text}
+            </span>
+          ))}
         </div>
       )}
     </div>
