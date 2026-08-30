@@ -11,7 +11,7 @@ import { teamContentionMap } from "./free-agency-server";
 import type { Contention } from "./free-agency";
 import { packageFromTrade, executeAcceptedTrade, createTradeRecord, type TradePackage } from "./trade-exec";
 import { analyzeTradeAction } from "@/app/trades/build/actions";
-import { playerValue } from "@/lib/trade-value";
+import { playerValue, pickValueBySlot } from "@/lib/trade-value";
 import { getLeagueDate } from "./calendar-server";
 import { roundForDate } from "./calendar";
 
@@ -112,9 +112,11 @@ async function decide(tradeId: number, aiTeamId: number, contention: Contention,
   return { action: "decline", reason: `too light (×${ratio.toFixed(2)} < ${T.toFixed(2)})`, detail };
 }
 
-// Same curve as analyzeTradeAction's pickValueBySlot (decay 60, not 42) — rounds 1-3
-// hold real trade value, matching direct user feedback on GM Assist's numbers.
-const roughPickVal = (round: number) => Math.round(1000 * Math.exp(-((round - 1) * 32 + 16) / 60));
+// The AI GM doesn't know a pick's real draft-order slot, so it assumes a mid-round
+// (16th) position — same shared curve as analyzeTradeAction's pickValueBySlot
+// (lib/trade-value.ts), so the two never drift apart the way two hand-duplicated
+// formulas would.
+const roughPickVal = (round: number) => pickValueBySlot((round - 1) * 32 + 16);
 
 /** Build a REAL counter — the AI looks at its own roster and the other club's assets:
  *  • if the club asked for a player the AI protects (star/franchise), the AI keeps him

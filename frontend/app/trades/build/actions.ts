@@ -7,7 +7,7 @@ import { loadSettings } from "@/lib/sim/settings";
 import { CURRENT_SEASON_START } from "@/lib/finance";
 import { revalidatePath } from "next/cache";
 import { clauseBlock, assertOwnership, packageFromTrade, executeAcceptedTrade, createTradeRecord, type TradePlayer, type TradePackage } from "@/lib/trade-exec";
-import { playerValue } from "@/lib/trade-value";
+import { playerValue, pickValueBySlot } from "@/lib/trade-value";
 
 export type { TradePlayer, TradePackage } from "@/lib/trade-exec";
 
@@ -51,10 +51,6 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
     const inRound = (teamByLogo.get(k.ownerLogoId) && slotOfTeam.get(teamByLogo.get(k.ownerLogoId)!)) || Math.ceil(N / 2);
     return (k.round - 1) * N + inRound;
   };
-  // Decay of 60 (not 42) so the first 3 rounds hold real trade value — user feedback:
-  // GM Assist was undervaluing rounds 2-3 (a 2nd-rounder showed ~similar to a mid-3rd).
-  const pickValueBySlot = (slot: number) => Math.round(1000 * Math.exp(-slot / 60)); // #1≈983, #16≈766, R1end≈587, R2≈344-577, R3≈202-338
-
   // --- prospects: value by CEILING (potential) when a scouting-board entry matches -
   const prById = new Map((await prisma.prospect.findMany({ where: { id: { in: [...pkg.fromProspects, ...pkg.toProspects] } }, select: { id: true, name: true, overallPick: true, draftYear: true, position: true } })).map((p) => [p.id, p]));
   const dpAll = await prisma.draftProspect.findMany({ where: { draftYear: { in: [...new Set([...prById.values()].map((p) => p.draftYear).filter((y): y is number => y != null))] } }, select: { name: true, ov: true, potential: true, draftYear: true } });
