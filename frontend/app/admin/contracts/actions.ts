@@ -59,17 +59,19 @@ export async function createPlayer(formData: FormData) {
 export async function updateContract(formData: FormData) {
   if (!(await isAdmin())) throw new Error("Only a league admin can edit contracts.");
   const slug = String(formData.get("slug") ?? "");
-  // salaries move in 50k steps (so a half-retained deal lands cleanly, e.g. 8.1M → 4.05M)
-  const capHit = Math.max(0, Math.round((Number(formData.get("capHit")) || 0) / 50000) * 50000);
+  // any exact dollar amount — real contracts aren't all round 50k multiples (e.g. $1,325,000)
+  const capHit = Math.max(0, Math.round(Number(formData.get("capHit")) || 0));
   const contractYears = Math.max(0, Math.round(Number(formData.get("contractYears")) || 0));
   const expiryRaw = formData.get("contractExpiry");
   const contractExpiry = expiryRaw && String(expiryRaw).trim() ? Number(expiryRaw) : null;
+  const contractTypeRaw = String(formData.get("contractType") ?? "");
+  const contractType = contractTypeRaw === "ONE_WAY" || contractTypeRaw === "TWO_WAY" ? contractTypeRaw : null;
   // keep the shown contract string in sync (e.g. "9,000,000$ / 2yrs")
   const contractText = capHit ? `${capHit.toLocaleString("en-US")}$ / ${contractYears}yr${contractYears === 1 ? "" : "s"}` : null;
 
   await prisma.player.update({
     where: { slug },
-    data: { capHit, contractYears, contractExpiry, contractText },
+    data: { capHit, contractYears, contractExpiry, contractText, contractType },
   });
 
   for (const p of ["/admin/contracts", `/admin/contracts/${slug}`, "/salary-cap", `/players/${slug}`]) revalidatePath(p);

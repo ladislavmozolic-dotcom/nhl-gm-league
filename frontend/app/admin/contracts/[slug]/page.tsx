@@ -19,7 +19,7 @@ export default async function ContractEditPage({
   const [player, canOverride] = await Promise.all([
     prisma.player.findFirst({
       where: { slug },
-      select: { id: true, name: true, slug: true, position: true, capHit: true, contractYears: true, contractExpiry: true, contractText: true, rosterType: true, ltir: true, team: { select: { name: true } } },
+      select: { id: true, name: true, slug: true, position: true, capHit: true, contractYears: true, contractExpiry: true, contractText: true, contractType: true, rosterType: true, ltir: true, team: { select: { name: true } } },
     }),
     isComishOrCoComish(),
   ]);
@@ -48,8 +48,8 @@ export default async function ContractEditPage({
           <form action={updateContract} className="space-y-4">
             <input type="hidden" name="slug" value={player.slug} />
             <div>
-              <label className="block text-xs uppercase tracking-wide text-slate-400 mb-1">Cap Hit — full-season salary in $ (50k steps, e.g. 4050000)</label>
-              <input type="number" step="50000" min="0" name="capHit" defaultValue={player.capHit ?? ""} className={inputCls} />
+              <label className="block text-xs uppercase tracking-wide text-slate-400 mb-1">Cap Hit — full-season salary in $, any exact amount (e.g. 1325000)</label>
+              <input type="number" step="1" min="0" name="capHit" defaultValue={player.capHit ?? ""} className={inputCls} />
             </div>
             <div>
               <label className="block text-xs uppercase tracking-wide text-slate-400 mb-1">Contract Length (years left)</label>
@@ -58,6 +58,14 @@ export default async function ContractEditPage({
             <div>
               <label className="block text-xs uppercase tracking-wide text-slate-400 mb-1">Expiry year (optional)</label>
               <input type="number" name="contractExpiry" defaultValue={player.contractExpiry ?? ""} className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-xs uppercase tracking-wide text-slate-400 mb-1">Contract Type</label>
+              <select name="contractType" defaultValue={player.contractType ?? ""} className={inputCls}>
+                <option value="">— Unset</option>
+                <option value="ONE_WAY">One-way (full salary in the NHL or AHL)</option>
+                <option value="TWO_WAY">Two-way (lower salary if sent to the AHL)</option>
+              </select>
             </div>
             <button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium">Save Contract</button>
           </form>
@@ -68,6 +76,7 @@ export default async function ContractEditPage({
             <div className="flex justify-between py-2"><span className="text-slate-400">Cap Hit</span><span className="tabular-nums font-semibold">{player.capHit ? money(player.capHit) : "—"}</span></div>
             <div className="flex justify-between py-2"><span className="text-slate-400">Years Left</span><span className="tabular-nums">{player.contractYears ?? "—"}</span></div>
             <div className="flex justify-between py-2"><span className="text-slate-400">Expiry</span><span className="tabular-nums">{player.contractExpiry ?? "—"}</span></div>
+            <div className="flex justify-between py-2"><span className="text-slate-400">Contract Type</span><span className="text-slate-300">{player.contractType === "ONE_WAY" ? "One-way" : player.contractType === "TWO_WAY" ? "Two-way" : "—"}</span></div>
             <div className="flex justify-between py-2"><span className="text-slate-400">Shown as</span><span className="text-slate-300">{player.contractText ?? "—"}</span></div>
           </div>
         </Card>
