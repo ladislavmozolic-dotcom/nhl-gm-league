@@ -6,6 +6,9 @@ import { loadSettings } from "@/lib/sim/settings";
 import { teamDashboard } from "@/lib/detailed-finance-server";
 import { teamAttendance } from "@/lib/attendance-server";
 import { teamSponsor } from "@/lib/sponsorship-server";
+import { computeStandings } from "@/lib/sim/standings";
+import { getArenaSections, selloutRevenue, computeTeamFinance } from "@/lib/finance";
+import { REGULAR_SEASON } from "@/lib/phase";
 import PricingControl from "@/components/PricingControl";
 import SponsorPicker from "@/components/SponsorPicker";
 
@@ -20,7 +23,35 @@ export default async function FinanceDashboardPage() {
   const team = sessionId ? await prisma.team.findUnique({ where: { id: sessionId }, select: { id: true, slug: true } }) : null;
   const dash = team ? await teamDashboard(team.id) : null;
   const canManage = team ? await canManageTeam(team.id) : false;
-  const [att, sponsor] = team && canManage ? await Promise.all([teamAttendance(team.id), teamSponsor(team.id)]) : [null, null];
+  const detailed = settings.financeMode === "detailed";
+  const [att, sponsor] = team && canManage && detailed ? await Promise.all([teamAttendance(team.id), teamSponsor(team.id)]) : [null, null];
+
+  // Basic mode: the actual bank-driving model is just gate revenue (home games,
+  // scaled by attendance) minus salaries — the same calc used by /finance and
+  // processFinances. No sense showing the hypothetical fan-interest/sponsorship/
+  // merch breakdown when that system isn't the one moving the club's real cash.
+  let basic: { revenue: number; expenses: number; result: number } | null = null;
+  if (dash && !detailed) {
+    const [teamFin, standings, homeGames, totalGames] = await Promise.all([
+      prisma.team.findUnique({ where: { id: dash.teamId }, select: { popularity: true, capacity: true, arenaSections: true, players: { where: { rosterType: "NHL" }, select: { capHit: true } } } }),
+      computeStandings(REGULAR_SEASON, "NHL"),
+      prisma.game.count({ where: { season: REGULAR_SEASON, league: "NHL", status: "FINAL", seriesId: null, homeTeamId: dash.teamId } }),
+      prisma.game.count({ where: { season: REGULAR_SEASON, league: "NHL", status: "FINAL", seriesId: null, OR: [{ homeTeamId: dash.teamId }, { awayTeamId: dash.teamId }] } }),
+    ]);
+    if (teamFin) {
+      const st = standings.find((s) => s.teamId === dash.teamId);
+      const fin = computeTeamFinance({
+        popularity: teamFin.popularity,
+        pointsPct: st?.pointsPct ?? 0.5,
+        selloutRevenue: selloutRevenue(getArenaSections(teamFin)),
+        salary: teamFin.players.reduce((s, p) => s + (p.capHit ?? 0), 0),
+        homeGamesPlayed: homeGames,
+        totalGamesPlayed: totalGames,
+        startingBank: settings.startingCapital,
+      });
+      basic = { revenue: fin.projectedIncome, expenses: fin.projectedExpenses, result: fin.projectedResult };
+    }
+  }
 
   if (!dash) {
     return (
@@ -41,18 +72,20 @@ export default async function FinanceDashboardPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 space-y-5">
-      <PageHeader title={`${dash.name} — Finances`} subtitle="Detailed Finance dashboard" />
-      {settings.financeMode !== "detailed" && (
-        <Card><p className="text-sm text-amber-400/80">Preview — the <b>Detailed Finance</b> system isn&apos;t active. Switch it on in engine settings.</p></Card>
-      )}
+      <PageHeader title={`${dash.name} — Finances`} subtitle={detailed ? "Detailed Finance dashboard" : "Finances"} />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {tile("Cash", M(dash.cash))}
-        {tile("Revenue", M(dash.revenue))}
-        {tile("Expenses", M(dash.expenses))}
-        {tile("Projected profit", M(dash.profit), undefined, dash.profit >= 0 ? "text-emerald-300" : "text-rose-300")}
+        {tile(detailed ? "Revenue" : "Revenue (gate)", M(detailed ? dash.revenue : basic?.revenue ?? 0))}
+        {tile(detailed ? "Expenses" : "Expenses (salaries)", M(detailed ? dash.expenses : basic?.expenses ?? 0))}
+        {tile("Projected profit", M(detailed ? dash.profit : basic?.result ?? 0), undefined, (detailed ? dash.profit : basic?.result ?? 0) >= 0 ? "text-emerald-300" : "text-rose-300")}
       </div>
 
+      {!detailed && (
+        <Card><p className="text-sm text-slate-400">Basic finance: gate revenue from home games minus player salaries. Turn on <b>Detailed Finance</b> in engine settings for the full fan-interest → demand → revenue model (season tickets, sponsorship, merchandise breakdowns).</p></Card>
+      )}
+
+      {detailed && (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <Card title="Revenue breakdown" accent="text-emerald-300">
           <div className="space-y-1.5">
@@ -82,7 +115,9 @@ export default async function FinanceDashboardPage() {
           </div>
         </Card>
       </div>
+      )}
 
+      {detailed && (
       <Card title="Fan & business" accent="text-fuchsia-300">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {tile("Fan Interest", `${dash.fanInterest}`, `${dash.fanDelta >= 0 ? "↑" : "↓"}${Math.abs(dash.fanDelta)}`)}
@@ -91,8 +126,9 @@ export default async function FinanceDashboardPage() {
           {tile("Merch", `#${dash.merchRank}`, dash.topJersey ? `Top: ${dash.topJersey}` : undefined)}
         </div>
       </Card>
+      )}
 
-      {dash.reasons.length > 0 && (
+      {detailed && dash.reasons.length > 0 && (
         <Card title="Why are finances moving?" accent="text-sky-300">
           <ul className="text-sm text-slate-300 space-y-1">
             {dash.reasons.map((r, i) => <li key={i}>· {r}</li>)}
