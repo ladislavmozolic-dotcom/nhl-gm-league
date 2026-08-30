@@ -30,6 +30,7 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       NODE_ENV: production
+      CRON_SECRET: ${CRON_SECRET}   # protects /api/cron/advance-day (the 20:30 auto-sim trigger)
     volumes:
       - uploads:/app/public/uploads   # persist admin-uploaded logos/wordmarks
     expose:
