@@ -2,6 +2,7 @@ import { skaterTotals } from "@/lib/stats-server";
 import StatsTabs from "@/components/StatsTabs";
 import PhaseTabs from "@/components/PhaseTabs";
 import { seasonForPhase } from "@/lib/phase";
+import { defaultStatsPhase } from "@/lib/calendar-server";
 import StatTable, { type Col } from "@/components/StatTable";
 import { PageHeader } from "@/components/ui";
 
@@ -35,7 +36,12 @@ const COLS: Col[] = [
 export default async function PlayerStatsPage({ searchParams }: { searchParams: Promise<{ league?: string; phase?: string }> }) {
   const sp = await searchParams;
   const league = sp.league === "AHL" ? "AHL" : "NHL";
-  const phase: "pre" | "regular" = sp.phase === "pre" && league === "NHL" ? "pre" : "regular";
+  // Explicit ?phase= always wins (lets a visitor look at either view manually);
+  // otherwise default to whatever the live league clock says right now — the page
+  // auto-shows pre-season stats for the duration of the pre-season phase.
+  const explicit = sp.phase === "pre" || sp.phase === "regular" ? sp.phase : null;
+  const auto = league === "NHL" ? await defaultStatsPhase() : "regular";
+  const phase: "pre" | "regular" = league !== "NHL" ? "regular" : explicit ?? (auto === "playoffs" ? "regular" : auto);
   const SEASON = seasonForPhase(phase);
   const sk = await skaterTotals(SEASON, league);
   const rows = sk.map((s) => ({

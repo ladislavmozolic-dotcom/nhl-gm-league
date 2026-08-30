@@ -5,6 +5,7 @@ import { skaterTotals, goalieTotals, type SkaterTotal, type GoalieTotal } from "
 import StatsTabs from "@/components/StatsTabs";
 import PhaseTabs from "@/components/PhaseTabs";
 import { seasonForPhase } from "@/lib/phase";
+import { defaultStatsPhase } from "@/lib/calendar-server";
 import { Card, PageHeader, SectionTitle } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -44,7 +45,9 @@ const gkRow = (g: GoalieTotal, value: string, sub?: string): Row => ({ playerId:
 export default async function LeadersPage({ searchParams }: { searchParams: Promise<{ league?: string; phase?: string }> }) {
   const sp = await searchParams;
   const league = sp.league === "AHL" ? "AHL" : "NHL";
-  const phase: "pre" | "regular" = sp.phase === "pre" && league === "NHL" ? "pre" : "regular";
+  const explicit = sp.phase === "pre" || sp.phase === "regular" ? sp.phase : null;
+  const auto = league === "NHL" ? await defaultStatsPhase() : "regular";
+  const phase: "pre" | "regular" = league !== "NHL" ? "regular" : explicit ?? (auto === "playoffs" ? "regular" : auto);
   const SEASON = seasonForPhase(phase);
   const [sk, gk, finals] = await Promise.all([
     skaterTotals(SEASON, league),

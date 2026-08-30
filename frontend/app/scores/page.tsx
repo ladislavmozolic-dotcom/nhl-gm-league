@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui";
 import PhaseTabs from "@/components/PhaseTabs";
 import { seasonForPhase, normalizePhase } from "@/lib/phase";
+import { defaultStatsPhase } from "@/lib/calendar-server";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +41,10 @@ function ScoreCard({ g }: { g: GameRow }) {
 
 export default async function ScoresPage({ searchParams }: { searchParams: Promise<{ date?: string; league?: string; phase?: string }> }) {
   const sp = await searchParams;
-  const phase = normalizePhase(sp.phase) === "pre" ? "pre" : "regular"; // scoreboard: pre or regular (playoffs → /playoffs)
+  // Explicit ?phase= always wins; otherwise default to the live league clock so
+  // the scoreboard auto-shows pre-season games for the duration of that phase.
+  const auto = sp.phase ? null : await defaultStatsPhase();
+  const phase = sp.phase ? (normalizePhase(sp.phase) === "pre" ? "pre" : "regular") : (auto === "pre" ? "pre" : "regular"); // scoreboard: pre or regular (playoffs → /playoffs)
   const SEASON = seasonForPhase(phase);
   const onlyAhl = sp.league === "AHL" && phase !== "pre"; // pre-season is NHL-only
   const leagueFilter = onlyAhl ? { league: "AHL" } : {};

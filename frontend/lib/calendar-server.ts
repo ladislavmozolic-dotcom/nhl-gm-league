@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import { defaultLeagueDate, phaseFor, effectivePhase, frenzyDay, frenzyRound, isFrenzyOpen, PHASE_LABEL, type Phase } from "./calendar";
+import type { Phase as StatsPhase } from "./phase";
 
 /** The current league-clock date (defaults to July 1 if the league hasn't started). */
 export async function getLeagueDate(): Promise<Date> {
@@ -38,4 +39,12 @@ export async function getLeagueClock(): Promise<LeagueClock> {
     faForced,
     faWindow,
   };
+}
+
+/** Which stats-view phase ("pre" | "regular" | "playoffs") the site should default
+ *  to right now, purely from the live league clock — pages that support an explicit
+ *  ?phase= override still let a visitor look at either view regardless of this. */
+export async function defaultStatsPhase(): Promise<StatsPhase> {
+  const { phase } = await getLeagueClock();
+  return phase === "preseason" ? "pre" : phase === "playoffs" ? "playoffs" : "regular";
 }

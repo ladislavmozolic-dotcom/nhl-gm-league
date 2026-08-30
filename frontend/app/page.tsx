@@ -7,8 +7,9 @@ import { skaterTotals } from "@/lib/stats-server";
 import { cleanName } from "@/lib/playerName";
 import { money } from "@/lib/finance";
 import NextSimCountdown from "@/components/home/NextSimCountdown";
-import { getLeagueClock } from "@/lib/calendar-server";
+import { getLeagueClock, defaultStatsPhase } from "@/lib/calendar-server";
 import { fmtLeagueDate } from "@/lib/calendar";
+import { PRE_SEASON } from "@/lib/phase";
 import { getTeamSession } from "@/lib/auth";
 import { activeAnnouncements } from "@/lib/announcements";
 import CommissionerBanner, { type BannerItem } from "@/components/CommissionerBanner";
@@ -50,12 +51,18 @@ function Stat({ label, value, sub, color }: { label: string; value: string; sub?
 }
 
 export default async function HomePage() {
+  // Pre-season fully takes over the scoreboard/standings/leaders sections of the
+  // home page for the duration of that phase — SEASON itself stays the regular-
+  // season string for systems not (yet) pre-season-aware (digest, finance).
+  const statsPhase = await defaultStatsPhase();
+  const isPreseason = statsPhase === "pre";
+  const activeSeason = isPreseason ? PRE_SEASON : SEASON;
   // free-agent filter mirrors /free-agents: skaters, and realOnly hidden in ProfiNHL mode
   const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 } });
   const faWhere = { rosterType: { notIn: ["NHL", "AHL", "RETIRED", "PROSPECT", "RELEASED"] }, isGoalie: false, ...(cfg?.rosterMode === "real" ? {} : { realOnly: false }) };
   const [standings, leaders, faCount, faTop, articlesRaw, teams] = await Promise.all([
-    computeStandings(SEASON, "NHL"),
-    skaterTotals(SEASON, "NHL"),
+    computeStandings(activeSeason, "NHL"),
+    skaterTotals(activeSeason, "NHL"),
     prisma.player.count({ where: faWhere }),
     prisma.player.findMany({ where: faWhere, select: { id: true, name: true, position: true, overall: true, slug: true }, orderBy: { overall: "desc" }, take: 6 }),
     prisma.newsArticle.findMany({ orderBy: { createdAt: "desc" }, take: 6, include: { _count: { select: { comments: true, reactions: true } } } }),
@@ -101,7 +108,7 @@ export default async function HomePage() {
   const west = enrich(standings.filter((s) => s.conference?.toLowerCase().includes("western")));
 
   // latest simulated day → scoreboard ticker + highlights
-  const lastDay = await prisma.game.findFirst({ where: { season: SEASON, status: "FINAL", seriesId: null, gameDate: { not: null } }, orderBy: { gameDate: "desc" }, select: { gameDate: true } });
+  const lastDay = await prisma.game.findFirst({ where: { season: activeSeason, status: "FINAL", seriesId: null, gameDate: { not: null } }, orderBy: { gameDate: "desc" }, select: { gameDate: true } });
   let ticker: { id: number; league: string; hg: number | null; ag: number | null; home: any; away: any }[] = [];
   let highlights: string[] = [];
   let stars: { name: string; teamCode: string; logoUrl: string | null; g: number; a: number; pts: number }[] = [];
@@ -111,14 +118,14 @@ export default async function HomePage() {
     const start = new Date(d); start.setHours(0, 0, 0, 0);
     const end = new Date(d); end.setHours(23, 59, 59, 999);
     const games = await prisma.game.findMany({
-      where: { season: SEASON, status: "FINAL", seriesId: null, gameDate: { gte: start, lte: end } },
+      where: { season: activeSeason, status: "FINAL", seriesId: null, gameDate: { gte: start, lte: end } },
       select: { id: true, league: true, homeGoals: true, awayGoals: true, homeTeam: { select: { code: true, logoUrl: true } }, awayTeam: { select: { code: true, logoUrl: true } } },
       orderBy: { id: "asc" },
     });
     ticker = games.map((g) => ({ id: g.id, league: g.league, hg: g.homeGoals, ag: g.awayGoals, home: g.homeTeam, away: g.awayTeam }));
 
     const stats = await prisma.playerGameStat.findMany({
-      where: { game: { gameDate: { gte: start, lte: end }, status: "FINAL", season: SEASON, league: "NHL" } },
+      where: { game: { gameDate: { gte: start, lte: end }, status: "FINAL", season: activeSeason, league: "NHL" } },
       select: { playerId: true, goals: true, assists: true, points: true },
     });
     dayGoals = stats.reduce((t, s) => t + s.goals, 0);
@@ -237,7 +244,7 @@ export default async function HomePage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* LEFT */}
         <div className="lg:col-span-3 space-y-6">
-          <Card title={T("home.scoringLeaders")} href="/stats/leaders" accent="text-blue-400" viewLabel={T("ui.viewAll")}>
+          <Card title={isPreseason ? `${T("home.scoringLeaders")} (Pre-season)` : T("home.scoringLeaders")} href="/stats/leaders" accent="text-blue-400" viewLabel={T("ui.viewAll")}>
             <div className="space-y-2">
               {topScorers.map((s, i) => {
                 const meta = scorerMeta.get(s.playerId);
@@ -313,7 +320,7 @@ export default async function HomePage() {
 
         {/* RIGHT */}
         <div className="lg:col-span-3 space-y-6">
-          <Card title={T("menu.standings")} href="/standings" accent="text-blue-400" viewLabel={T("ui.viewAll")}>
+          <Card title={isPreseason ? `${T("menu.standings")} (Pre-season)` : T("menu.standings")} href="/standings" accent="text-blue-400" viewLabel={T("ui.viewAll")}>
             <div className="space-y-4">
               <MiniStandings title={T("home.eastern")} color="text-blue-400" rows={east} />
               <MiniStandings title={T("home.western")} color="text-red-400" rows={west} />

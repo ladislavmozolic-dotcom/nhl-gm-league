@@ -4,6 +4,7 @@ import { PageHeader, Card } from "@/components/ui";
 import { isAdmin } from "@/lib/auth";
 import DaySimControls from "@/components/DaySimControls";
 import ScrollToCurrent from "@/components/ScrollToCurrent";
+import { PRE_SEASON } from "@/lib/phase";
 
 export const dynamic = "force-dynamic";
 const SEASON = "2026-27";
@@ -15,24 +16,46 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
   const { league: leagueParam } = await searchParams;
   const league = leagueParam === "AHL" ? "AHL" : "NHL";
 
-  const games = await prisma.game.findMany({
-    where: { season: SEASON, league, seriesId: null },
-    orderBy: [{ round: "asc" }, { gameDate: "asc" }, { id: "asc" }],
-    include: { homeTeam: { select: { code: true, name: true, logoUrl: true } }, awayTeam: { select: { code: true, name: true, logoUrl: true } } },
-  });
+  const [games, admin, leagueCfg] = await Promise.all([
+    prisma.game.findMany({
+      where: { season: SEASON, league, seriesId: null },
+      orderBy: [{ round: "asc" }, { gameDate: "asc" }, { id: "asc" }],
+      include: { homeTeam: { select: { code: true, name: true, logoUrl: true } }, awayTeam: { select: { code: true, name: true, logoUrl: true } } },
+    }),
+    isAdmin(),
+    prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { preseasonPublic: true } }),
+  ]);
   const played = games.filter((g) => g.status === "FINAL").length;
   const otherLeague = league === "AHL" ? "NHL" : "AHL";
-  const admin = await isAdmin();
   // the current day = the first not-yet-played game; admins jump here after a sim,
   // GMs land at the top and scroll down.
   const currentId = games.find((g) => g.status !== "FINAL")?.id;
 
-  // global game number + group games by month
+  // global game number for the REGULAR season only — pre-season games below are
+  // merged into the same chronological timeline but never take a #N slot, so the
+  // official numbering is unaffected by whether pre-season happens to be showing.
   const numById = new Map(games.map((g, i) => [g.id, i + 1]));
+
+  // Pre-season (NHL only) merges into the same timeline, right before the regular
+  // season it leads into — same visibility rule as the dedicated /preseason page:
+  // admin-only until LeagueConfig.preseasonPublic is on.
+  const preGames = league === "NHL" && (admin || leagueCfg?.preseasonPublic)
+    ? await prisma.game.findMany({
+        where: { season: PRE_SEASON },
+        orderBy: [{ round: "asc" }, { id: "asc" }],
+        include: { homeTeam: { select: { code: true, name: true, logoUrl: true } }, awayTeam: { select: { code: true, name: true, logoUrl: true } } },
+      })
+    : [];
+
+  const allGames = [...preGames.map((g) => ({ ...g, isPre: true as const })), ...games.map((g) => ({ ...g, isPre: false as const }))]
+    .sort((a, b) => (a.gameDate?.getTime() ?? 0) - (b.gameDate?.getTime() ?? 0));
+
+  // group games by month (pre-season's own dates fall naturally right before the
+  // regular-season opener, so they slot into the timeline with no special-casing)
   const monthKey = (d: Date | null) => (d ? `${d.getUTCFullYear()}-${d.getUTCMonth()}` : "tbd");
   const monthLabel = (d: Date | null) => (d ? d.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" }) : "Unscheduled");
-  const months: { key: string; label: string; games: typeof games }[] = [];
-  for (const g of games) {
+  const months: { key: string; label: string; games: typeof allGames }[] = [];
+  for (const g of allGames) {
     const k = monthKey(g.gameDate);
     let m = months[months.length - 1];
     if (!m || m.key !== k) { m = { key: k, label: monthLabel(g.gameDate), games: [] }; months.push(m); }
@@ -82,8 +105,10 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
                 const isFinal = g.status === "FINAL";
                 const tag = g.endedIn && g.endedIn !== "REG" ? g.endedIn : "";
                 const row = (
-                  <div className="flex items-center gap-3 px-3 sm:px-4 py-2.5 hover:bg-slate-800/30 transition-colors">
-                    <span className="text-[11px] text-slate-600 tabular-nums w-8 shrink-0">#{numById.get(g.id)}</span>
+                  <div className={`flex items-center gap-3 px-3 sm:px-4 py-2.5 hover:bg-slate-800/30 transition-colors ${g.isPre ? "bg-sky-950/20" : ""}`}>
+                    <span className={`text-[11px] tabular-nums w-8 shrink-0 ${g.isPre ? "text-sky-500 font-semibold" : "text-slate-600"}`}>
+                      {g.isPre ? "PRE" : `#${numById.get(g.id)}`}
+                    </span>
                     <span className="text-[11px] text-slate-500 w-14 shrink-0">{fmtDate(g.gameDate)}</span>
                     <div className="flex-1 grid grid-cols-[1fr_auto_1fr] items-center gap-2 min-w-0">
                       <TeamSide t={g.awayTeam} score={isFinal ? g.awayGoals : null} win={awayWin} align="right" />

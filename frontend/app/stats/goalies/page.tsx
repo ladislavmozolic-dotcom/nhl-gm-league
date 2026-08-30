@@ -2,6 +2,7 @@ import { goalieTotals } from "@/lib/stats-server";
 import StatsTabs from "@/components/StatsTabs";
 import PhaseTabs from "@/components/PhaseTabs";
 import { seasonForPhase } from "@/lib/phase";
+import { defaultStatsPhase } from "@/lib/calendar-server";
 import StatTable, { type Col } from "@/components/StatTable";
 import { PageHeader } from "@/components/ui";
 
@@ -36,7 +37,9 @@ const COLS: Col[] = [
 export default async function GoalieStatsPage({ searchParams }: { searchParams: Promise<{ league?: string; phase?: string }> }) {
   const sp = await searchParams;
   const league = sp.league === "AHL" ? "AHL" : "NHL";
-  const phase: "pre" | "regular" = sp.phase === "pre" && league === "NHL" ? "pre" : "regular";
+  const explicit = sp.phase === "pre" || sp.phase === "regular" ? sp.phase : null;
+  const auto = league === "NHL" ? await defaultStatsPhase() : "regular";
+  const phase: "pre" | "regular" = league !== "NHL" ? "regular" : explicit ?? (auto === "playoffs" ? "regular" : auto);
   const SEASON = seasonForPhase(phase);
   const gk = await goalieTotals(SEASON, league);
   const rows = gk.map((g) => ({

@@ -7,6 +7,7 @@ import type { TeamStanding, PowerRow } from "@/lib/sim/standings";
 import { PageHeader, Card } from "@/components/ui";
 import PhaseTabs from "@/components/PhaseTabs";
 import { seasonForPhase } from "@/lib/phase";
+import { defaultStatsPhase } from "@/lib/calendar-server";
 
 export const dynamic = "force-dynamic";
 type View = "league" | "conference" | "division" | "power" | "race";
@@ -15,7 +16,9 @@ type TeamMeta = Map<number, { logoUrl: string | null; slug: string }>;
 export default async function StandingsPage({ searchParams }: { searchParams: Promise<{ league?: string; view?: string; phase?: string }> }) {
   const sp = await searchParams;
   const league = sp.league === "AHL" ? "AHL" : "NHL";
-  const phase: "pre" | "regular" = sp.phase === "pre" && league === "NHL" ? "pre" : "regular";
+  const explicit = sp.phase === "pre" || sp.phase === "regular" ? sp.phase : null;
+  const auto = league === "NHL" ? await defaultStatsPhase() : "regular";
+  const phase: "pre" | "regular" = league !== "NHL" ? "regular" : explicit ?? (auto === "playoffs" ? "regular" : auto);
   const SEASON = seasonForPhase(phase);
   const view: View = sp.view === "league" || sp.view === "division" || sp.view === "power" || sp.view === "race" ? sp.view : "conference";
   const [standings, power, teams, race] = await Promise.all([
