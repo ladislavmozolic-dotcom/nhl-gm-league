@@ -51,7 +51,9 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
     const inRound = (teamByLogo.get(k.ownerLogoId) && slotOfTeam.get(teamByLogo.get(k.ownerLogoId)!)) || Math.ceil(N / 2);
     return (k.round - 1) * N + inRound;
   };
-  const pickValueBySlot = (slot: number) => Math.round(1000 * Math.exp(-slot / 42)); // #1≈976, #16≈684, R2≈316, R3≈147
+  // Decay of 60 (not 42) so the first 3 rounds hold real trade value — user feedback:
+  // GM Assist was undervaluing rounds 2-3 (a 2nd-rounder showed ~similar to a mid-3rd).
+  const pickValueBySlot = (slot: number) => Math.round(1000 * Math.exp(-slot / 60)); // #1≈983, #16≈766, R1end≈587, R2≈344-577, R3≈202-338
 
   // --- prospects: value by CEILING (potential) when a scouting-board entry matches -
   const prById = new Map((await prisma.prospect.findMany({ where: { id: { in: [...pkg.fromProspects, ...pkg.toProspects] } }, select: { id: true, name: true, overallPick: true, draftYear: true, position: true } })).map((p) => [p.id, p]));
@@ -63,7 +65,10 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
   const yearDisc = (year: number) => Math.max(0.6, 1 - Math.max(0, year - CURRENT_SEASON_START) * 0.08);
   const kv = (id: number) => { const k = kById.get(id); return k ? Math.round(pickValueBySlot(slotOfPick(k)) * yearDisc(k.year)) : 0; };
   const kLabel = (id: number) => { const k = kById.get(id); if (!k) return `Pick #${id}`; const slot = slotOfPick(k); const proj = boards.get(k.year)?.[slot - 1]; return `Pick ${k.year} R${k.round} (odhad #${slot})${proj ? ` → ${clean(proj)}` : ""}`; };
-  const prv = (id: number) => { const p = prById.get(id); if (!p) return 100; const dp = potOf(p); if (dp) return Math.max(60, prospectValueByPot(dp.potential)); return p.overallPick ? Math.max(50, pickValueBySlot(p.overallPick)) : 100; };
+  // 250 (not 100) for a prospect with no scouting-board match AND no known draft
+  // slot — a rare gap-data case, but 100 undersold even an unranked/undrafted
+  // prospect against picks/players that never fall that low elsewhere.
+  const prv = (id: number) => { const p = prById.get(id); if (!p) return 250; const dp = potOf(p); if (dp) return Math.max(60, prospectValueByPot(dp.potential)); return p.overallPick ? Math.max(50, pickValueBySlot(p.overallPick)) : 250; };
   const prLabel = (id: number) => { const p = prById.get(id); if (!p) return `Prospekt #${id}`; const dp = potOf(p); const tail = dp ? ` · potenciál ${dp.potential}${dp.ov ? `/${dp.ov} OV` : ""}` : p.overallPick ? ` · draft #${p.overallPick}` : ""; return `Prospekt: ${clean(p.name)}${p.position ? ` (${p.position})` : ""}${tail}`; };
   const cashV = (c: number) => Math.round((c / 1_000_000) * 30);
 

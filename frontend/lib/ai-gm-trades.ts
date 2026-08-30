@@ -112,7 +112,9 @@ async function decide(tradeId: number, aiTeamId: number, contention: Contention,
   return { action: "decline", reason: `too light (×${ratio.toFixed(2)} < ${T.toFixed(2)})`, detail };
 }
 
-const roughPickVal = (round: number) => Math.round(1000 * Math.exp(-((round - 1) * 32 + 16) / 42));
+// Same curve as analyzeTradeAction's pickValueBySlot (decay 60, not 42) — rounds 1-3
+// hold real trade value, matching direct user feedback on GM Assist's numbers.
+const roughPickVal = (round: number) => Math.round(1000 * Math.exp(-((round - 1) * 32 + 16) / 60));
 
 /** Build a REAL counter — the AI looks at its own roster and the other club's assets:
  *  • if the club asked for a player the AI protects (star/franchise), the AI keeps him
@@ -312,7 +314,7 @@ async function aiGmInitiateTrades(aiTeams: { id: number; name: string; code: str
 
       // a spare late pick to sweeten (least valuable owned pick)
       const picks = await prisma.draftPick.findMany({ where: { teamId: ai.id }, select: { id: true, round: true } });
-      const roughPick = (round: number) => Math.round(1000 * Math.exp(-((round - 1) * 32 + 16) / 42));
+      const roughPick = (round: number) => Math.round(1000 * Math.exp(-((round - 1) * 32 + 16) / 60));
       const sparePick = picks.map((p) => ({ id: p.id, v: roughPick(p.round) })).sort((a, b) => a.v - b.v)[0] ?? null;
       const capacity = chipVal + (sparePick?.v ?? 0);
 
