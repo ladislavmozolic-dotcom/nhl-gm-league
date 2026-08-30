@@ -868,6 +868,25 @@ model SeasonRecord {
   @@unique([season, league])
 }
 
+// Pre-season snapshot, taken at archiveSeason() time — pre-season games live under
+// a single fixed Game.season string (lib/phase.ts PRE_SEASON), wiped and rebuilt
+// every year by the Off-season cascade, so this is the only durable record of a
+// given year's exhibition results once the next year's schedule overwrites it.
+// Keyed on the REGULAR season it preceded, not on its own (non-yearly) season string.
+model SeasonPreseasonRecord {
+  id              Int      @id @default(autoincrement())
+  season          String   // the regular season this pre-season led into, e.g. "2026-27"
+  league          String   @default("NHL")
+  gamesPlayed     Int
+  bestTeamId      Int?     // best pre-season W-L(-OTL) record
+  topScorerId     Int?
+  topScorerName   String?
+  topScorerPoints Int?
+  createdAt       DateTime @default(now())
+
+  @@unique([season, league])
+}
+
 model SeasonAward {
   id       Int     @id @default(autoincrement())
   season   String

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { computeStandings } from "@/lib/sim/standings";
 import { skaterTotals, goalieTotals } from "@/lib/stats-server";
 import { getBracket } from "@/lib/sim/playoffs";
+import { PRE_SEASON } from "@/lib/phase";
 
 export type AwardRow = { category: string; playerId?: number; playerName?: string; teamId?: number; detail?: string };
 export type SeasonAwards = {
@@ -108,6 +109,27 @@ export async function computeSeasonAwards(season: string, league = "NHL"): Promi
   return { championTeamId: f.championTeamId, runnerUpTeamId: f.runnerUpTeamId, presidentsTeamId: f.presidentsTeamId, awards };
 }
 
+/** Snapshot whatever pre-season data currently exists (NHL only — pre-season has no
+ *  AHL slate) into a durable per-year record, since the pre-season Game rows
+ *  themselves live under one fixed season string and get wiped by next year's
+ *  Off-season cascade. Best-effort: silently no-ops if nothing was ever generated. */
+async function archivePreseasonSnapshot(season: string, league: string) {
+  if (league !== "NHL") return;
+  const games = await prisma.game.count({ where: { season: PRE_SEASON, status: "FINAL" } });
+  if (!games) return;
+  const [standings, scorers] = await Promise.all([
+    computeStandings(PRE_SEASON, league).catch(() => []),
+    skaterTotals(PRE_SEASON, league).catch(() => []),
+  ]);
+  const bestTeamId = standings[0]?.teamId ?? null;
+  const top = [...scorers].sort((a, b) => b.points - a.points || b.goals - a.goals)[0];
+  await prisma.seasonPreseasonRecord.upsert({
+    where: { season_league: { season, league } },
+    update: { gamesPlayed: games, bestTeamId, topScorerId: top?.playerId ?? null, topScorerName: top?.name ?? null, topScorerPoints: top?.points ?? null },
+    create: { season, league, gamesPlayed: games, bestTeamId, topScorerId: top?.playerId ?? null, topScorerName: top?.name ?? null, topScorerPoints: top?.points ?? null },
+  });
+}
+
 /** Persist a season's awards + record. Replaces any existing entry for that season/league. */
 export async function archiveSeason(season: string, league = "NHL") {
   const a = await computeSeasonAwards(season, league);
@@ -129,6 +151,12 @@ export async function archiveSeason(season: string, league = "NHL") {
     await archiveSeasonStats(season, league);
   } catch (e) {
     console.error("[archiveSeason] archiveSeasonStats failed:", e);
+  }
+  // Best-effort, same reasoning: capture pre-season before it's overwritten.
+  try {
+    await archivePreseasonSnapshot(season, league);
+  } catch (e) {
+    console.error("[archiveSeason] archivePreseasonSnapshot failed:", e);
   }
   return a;
 }
