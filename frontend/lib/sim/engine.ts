@@ -1043,6 +1043,24 @@ function tacticsMult(team: SimTeam, margin: number): { of: number; df: number } 
   const tilt = (w.of + 1) / (w.of + w.df + 2); // 0..1, 0.5 = balanced
   return { of: 0.9 + 0.2 * tilt, df: 0.9 + 0.2 * (1 - tilt) };
 }
+// v2-only: the "protect the lead" defensive shell. GameStrategy's winning1/winning2
+// (tacticsMult, both engines) already tilts a leading team's of/df BALANCE — this is
+// a different, SYSTEM-level effect: real coaches don't just lean more defensive when
+// up late, they visibly change HOW they play (safe puck management, no risky
+// pinches, dump-and-chase) regardless of their base system's tempo/style. That
+// system-level shift doesn't exist anywhere else — `team.tactics` is resolved once
+// per game and never revisited. Only fires inside the final 5 minutes of regulation
+// (period 3) while up 1 or 2 (a 3+ lead is already comfortable; OT is a separate,
+// coarser 3-on-3 model this tick loop never runs). Intensity ramps 0→1 as the clock
+// runs out, so it's a gradual tightening, not a sudden switch.
+const LATE_SHELL_WINDOW = 300; // final 5 minutes of the 3rd
+function lateShellShotMult(period: number, secondsIntoPeriod: number, marginForTeam: number): number {
+  if (period !== 3 || marginForTeam < 1 || marginForTeam > 2) return 1;
+  const secLeft = PERIOD_SECONDS - secondsIntoPeriod;
+  if (secLeft > LATE_SHELL_WINDOW) return 1;
+  const intensity = 1 - Math.max(0, secLeft) / LATE_SHELL_WINDOW;
+  return 1 - 0.12 * intensity; // up to 12% fewer shot attempts right at the horn
+}
 // Per-line deployment tactic → {of, df} multipliers around 1.0. Neutral CK1/DF2/OF2
 // gives exactly 1.0; an offensive line (high OF) presses harder, a checking/defensive
 // line (high DF) suppresses. Effect ~±8%, so a good line still needs the players.
@@ -1359,7 +1377,8 @@ function simulatePeriodPossession(st: SimState, period: number) {
     // a fraction of these attempts now sail wide (see the MISS check below) instead
     // of always reaching the net, so the upstream rate is boosted to keep the actual
     // on-goal (SOG) rate the calibration is tuned against unchanged.
-    if (!rng.chance(0.29 * atkFx.shotRate * def.tactics.oppShotRate * MISS_COMPENSATION)) continue;
+    const lateShell = st.isNextGen ? lateShellShotMult(period, tick, margin) : 1;
+    if (!rng.chance(0.29 * atkFx.shotRate * def.tactics.oppShotRate * MISS_COMPENSATION * lateShell)) continue;
     // Shoot-or-pass decision FIRST. A forward who elects to SHOOT sometimes walks
     // the puck back to the point for a D one-timer instead — this is how D rack up
     // their goals. But a forward who would PASS keeps the puck (→ his linemate's
