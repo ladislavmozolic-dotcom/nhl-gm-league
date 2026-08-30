@@ -16,6 +16,35 @@ import { PRE_SEASON } from "@/lib/preseason";
 export const dynamic = "force-dynamic";
 const SEASON = "2026-27";
 
+// The 20:30 Europe/Bratislava cron should fire once every ~24h while in Auto mode.
+// A 26h threshold gives it a comfortable grace window (DST transitions, a slow tick,
+// a few minutes of clock skew) before flagging it as actually stuck.
+const STALE_HOURS = 26;
+
+/** Visible health check for the automatic daily-sim cron (lib/season-cron.ts) — so a
+ *  silently-failed cron (server down at 20:30, crontab lost on a box rebuild, etc.)
+ *  shows up here on next admin visit instead of only being noticed when someone
+ *  wonders why the standings haven't moved in days. */
+function AutoAdvanceHealth({ pinned, lastRun }: { pinned: boolean; lastRun: Date | null }) {
+  if (pinned) {
+    return <p className="text-xs text-slate-500">⏸ Automatic daily sim is paused — a phase is pinned manually.</p>;
+  }
+  if (!lastRun) {
+    return <p className="text-xs text-amber-400">⚠ Automatic daily sim hasn&apos;t run yet since this was set up.</p>;
+  }
+  const hoursAgo = (Date.now() - lastRun.getTime()) / 3_600_000;
+  const when = lastRun.toLocaleString("en-US", { timeZone: "Europe/Bratislava", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  if (hoursAgo > STALE_HOURS) {
+    return (
+      <p className="text-xs text-red-400">
+        ⚠ Automatic daily sim hasn&apos;t run in {Math.round(hoursAgo)}h (last: {when} Bratislava). Check the server crontab
+        and <code className="text-red-300">/var/log/unhl-cron.log</code> — see DEPLOY.md §10b.
+      </p>
+    );
+  }
+  return <p className="text-xs text-emerald-400">✓ Automatic daily sim last ran {when} Bratislava ({Math.round(hoursAgo)}h ago).</p>;
+}
+
 export default async function SeasonAdminPage() {
   const [played, scheduled, playoffSeries, finalDone, clock, cfg, preScheduled, prePlayed] = await Promise.all([
     prisma.game.count({ where: { season: SEASON, status: "FINAL", seriesId: null } }),
@@ -23,7 +52,7 @@ export default async function SeasonAdminPage() {
     prisma.playoffSeries.count({ where: { season: SEASON } }),
     prisma.playoffSeries.findFirst({ where: { season: SEASON, round: 4, status: "DONE" }, select: { winnerTeamId: true } }),
     getLeagueClock(),
-    prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { phaseOverride: true } }),
+    prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { phaseOverride: true, lastAutoAdvance: true } }),
     prisma.game.count({ where: { season: PRE_SEASON, status: "SCHEDULED" } }),
     prisma.game.count({ where: { season: PRE_SEASON, status: "FINAL" } }),
   ]);
@@ -45,6 +74,7 @@ export default async function SeasonAdminPage() {
         <div className="space-y-2">
           <p className="text-sm text-slate-400">Set the phase manually — Off-season, Pre-season, Regular season or Playoffs — or leave it on <span className="text-slate-200">Auto</span> to follow the calendar. Leagues don&apos;t all run on the real dates.</p>
           <PhaseControl current={clock.phase} label={clock.phaseLabel} override={cfg?.phaseOverride ?? null} />
+          <AutoAdvanceHealth pinned={!!cfg?.phaseOverride} lastRun={cfg?.lastAutoAdvance ?? null} />
         </div>
       </Card>
 
