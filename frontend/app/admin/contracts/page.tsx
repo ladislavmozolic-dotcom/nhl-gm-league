@@ -11,7 +11,10 @@ export default async function AdminContractsPage({ searchParams }: { searchParam
   const [players, admin] = await Promise.all([
     prisma.player.findMany({
       where: {
-        team: { league: "NHL" },
+        // A farmed player's teamId points DIRECTLY at his AHL affiliate (not the NHL
+        // parent with a flag) — league:"NHL" alone silently hid every player currently
+        // assigned to the farm. Both leagues here are always someone's real NHL org.
+        team: { league: { in: ["NHL", "AHL"] } },
         ...(q ? { name: { contains: q, mode: "insensitive" } } : {}),
       },
       select: { id: true, name: true, slug: true, position: true, capHit: true, contractYears: true, contractExpiry: true, team: { select: { name: true, code: true } } },
@@ -61,7 +64,7 @@ export default async function AdminContractsPage({ searchParams }: { searchParam
               {players.map((player) => (
                 <tr key={player.id} className="border-b border-slate-800/40 hover:bg-slate-800/30 transition-colors last:border-0">
                   <td className="px-4 py-3 font-medium">{player.name} <span className="text-slate-600 text-xs">{player.position}</span></td>
-                  <td className="px-3 py-3 text-slate-400">{player.team.code ?? player.team.name}</td>
+                  <td className="px-3 py-3 text-slate-400">{player.team.code || player.team.name}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{player.capHit ? money(player.capHit) : "—"}</td>
                   <td className="px-4 py-3 text-center text-slate-400">{player.contractYears ?? "—"}</td>
                   {/* Expiry = last season under contract, derived from years remaining (the
