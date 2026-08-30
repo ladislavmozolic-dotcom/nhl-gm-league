@@ -52,7 +52,7 @@ export default async function SeasonAdminPage() {
     prisma.playoffSeries.count({ where: { season: SEASON } }),
     prisma.playoffSeries.findFirst({ where: { season: SEASON, round: 4, status: "DONE" }, select: { winnerTeamId: true } }),
     getLeagueClock(),
-    prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { phaseOverride: true, lastAutoAdvance: true } }),
+    prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { phaseOverride: true, lastAutoAdvance: true, preseasonPublic: true } }),
     prisma.game.count({ where: { season: PRE_SEASON, status: "SCHEDULED" } }),
     prisma.game.count({ where: { season: PRE_SEASON, status: "FINAL" } }),
   ]);
@@ -79,7 +79,7 @@ export default async function SeasonAdminPage() {
       </Card>
 
       <Card title="Pre-season (exhibition)" accent="text-sky-400">
-        <PreseasonControls scheduled={preScheduled} played={prePlayed} />
+        <PreseasonControls scheduled={preScheduled} played={prePlayed} isPublic={!!cfg?.preseasonPublic} />
       </Card>
 
       <Card title="Playoffs (day-by-day)" accent="text-orange-400">

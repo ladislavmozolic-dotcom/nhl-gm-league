@@ -16,9 +16,14 @@ export default function PhaseControl({ current, override, label }: { current: st
   const router = useRouter();
   const [pending, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const set = (p: string | null) => start(async () => {
-    setErr(null);
-    try { await setPhaseOverrideAction(p); router.refresh(); }
+    setErr(null); setInfo(null);
+    try {
+      const r = await setPhaseOverrideAction(p);
+      if (r.preseasonMsg) setInfo(r.preseasonMsg);
+      router.refresh();
+    }
     catch (e) { setErr(friendlyActionError(e)); }
   });
 
@@ -43,6 +48,7 @@ export default function PhaseControl({ current, override, label }: { current: st
           : " · following the calendar — scheduled games auto-simulate every day at 20:30 Europe/Bratislava"}
       </div>
       {err && <div className="text-xs text-red-400">{err}</div>}
+      {info && <div className="text-xs text-sky-400">{info}</div>}
     </div>
   );
 }

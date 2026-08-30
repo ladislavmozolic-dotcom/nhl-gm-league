@@ -17,7 +17,7 @@ import { aiGmDaily } from "@/lib/ai-gm";
 import { getLeagueDate } from "@/lib/calendar-server";
 import { addDays, utcDay, phaseFor, effectivePhase, PHASES, seasonOpen, defaultLeagueDate, frenzyRound, roundForDate } from "@/lib/calendar";
 import { processWaivers } from "@/lib/waivers-server";
-import { generatePreseason, playPreseason, playPreseasonDay, PRE_SEASON } from "@/lib/preseason";
+import { generatePreseason, playPreseason, playPreseasonDay, computeAutoPreseasonStart, PRE_SEASON } from "@/lib/preseason";
 import { postWeeklyIfDue } from "@/lib/weekly-digest";
 import { resolveFrenzy, processRoundEnd, resolveInSeasonWindows } from "@/app/free-agents/actions";
 import { checkPromises } from "@/lib/promises";
@@ -322,8 +322,29 @@ export async function setPhaseOverrideAction(phase: string | null) {
   if (!(await isAdmin())) return { ok: false as const, error: "Admin only." };
   if (phase !== null && !(PHASES as string[]).includes(phase)) return { ok: false as const, error: "Invalid phase." };
   await prisma.leagueConfig.upsert({ where: { id: 1 }, update: { phaseOverride: phase }, create: { id: 1, phaseOverride: phase } });
+  // Pinning "Off-season" cascades: (re)build the exhibition schedule so its last
+  // round lands exactly 3 days before the real regular-season opener — but only
+  // when it's safe (no pre-season game has actually been played yet; a wipe+redo
+  // would otherwise erase real results) and there's a regular-season schedule to
+  // count back from at all. Stays admin-only visible (LeagueConfig.preseasonPublic)
+  // until the admin explicitly makes it public — this cascade never flips that flag.
+  let preseasonMsg: string | undefined;
+  if (phase === "offseason") {
+    const played = await prisma.game.count({ where: { season: PRE_SEASON, status: "FINAL" } });
+    if (played > 0) {
+      preseasonMsg = "Pre-season already has played games — left the existing schedule untouched.";
+    } else {
+      const start = await computeAutoPreseasonStart();
+      if (!start) {
+        preseasonMsg = "No regular-season schedule yet to count back from — pre-season not (re)generated.";
+      } else {
+        const r = await generatePreseason(start);
+        preseasonMsg = `Pre-season (re)generated: ${r.games} games, ${r.firstDate.toDateString()} → ${r.lastDate.toDateString()} (admin-only until you make it public).`;
+      }
+    }
+  }
   for (const p of ["/", "/admin/season", "/calendar", "/free-agents", "/schedule", "/standings", "/scores"]) revalidatePath(p);
-  return { ok: true as const };
+  return { ok: true as const, preseasonMsg };
 }
 
 export async function importNhlApiAction() {
@@ -350,6 +371,16 @@ export async function generatePreseasonAction(startISO?: string) {
   revalidatePath("/admin/season");
   revalidatePath("/preseason");
   return { games: r.games, teams: r.teams, rounds: r.rounds, firstDate: r.firstDate.toISOString().slice(0, 10), lastDate: r.lastDate.toISOString().slice(0, 10) };
+}
+
+/** Admin: show/hide the pre-season schedule on the public /preseason page. Season
+ *  Control's own preview always shows it to admins regardless of this flag. */
+export async function setPreseasonPublicAction(pub: boolean) {
+  if (!(await isAdmin())) throw new Error("Only a league admin can change this.");
+  await prisma.leagueConfig.upsert({ where: { id: 1 }, update: { preseasonPublic: pub }, create: { id: 1, preseasonPublic: pub } });
+  revalidatePath("/admin/season");
+  revalidatePath("/preseason");
+  return { preseasonPublic: pub };
 }
 
 export async function simPreseasonAction() {

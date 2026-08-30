@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { PageHeader, Card } from "@/components/ui";
 import { preseasonSchedule, type PreGameRow } from "@/lib/preseason";
+import { prisma } from "@/lib/prisma";
+import { isAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +37,20 @@ function GameCard({ g }: { g: PreGameRow }) {
 }
 
 export default async function PreseasonPage() {
-  const { rounds, hasSchedule } = await preseasonSchedule();
+  const [{ rounds, hasSchedule }, cfg, admin] = await Promise.all([
+    preseasonSchedule(),
+    prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { preseasonPublic: true } }),
+    isAdmin(),
+  ]);
+
+  if (hasSchedule && !cfg?.preseasonPublic && !admin) {
+    return (
+      <div className="space-y-6 py-2">
+        <PageHeader title="Pre-season" subtitle="Exhibition games before the regular season — results don't count in the standings or stats." />
+        <Card><p className="text-sm text-slate-400">Pre-season schedule isn&apos;t public yet — check back soon.</p></Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 py-2">

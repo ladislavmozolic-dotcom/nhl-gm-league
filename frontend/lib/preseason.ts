@@ -12,12 +12,16 @@ import { syncChem } from "./sim/season";
 import { loadSettings } from "./sim/settings";
 import { activeSimEngine, engineVersionFor } from "./sim/version";
 import type { SimTeam } from "./sim/types";
-import { PRE_SEASON } from "./phase";
+import { PRE_SEASON, REGULAR_SEASON } from "./phase";
 
 export { PRE_SEASON };
 export const PRE_ROUNDS = 6;
 const YEAR = 2026;
 const DAY = 86_400_000;
+// Round 5 (the last exhibition round) should land this many days before the
+// REAL first regular-season game — not the hardcoded Oct 1 calendar constant,
+// since an imported real schedule can face off on a different date.
+const PRESEASON_GAP_DAYS = 3;
 
 /** Round r (0..5) → a calendar date, two days apart. With a chosen start day the
  *  first round is that day; otherwise it defaults to ending Sep 30 (the eve of the
@@ -51,6 +55,20 @@ function buildRounds(ids: number[], numRounds: number): [number, number][][] {
     order = [fixed, ...rest];
   }
   return rounds;
+}
+
+/** Round 1's face-off day so the LAST exhibition round lands exactly
+ *  PRESEASON_GAP_DAYS before the real first regular-season game — computed from the
+ *  actual schedule (imported or generated), not the hardcoded Oct 1 constant. Returns
+ *  null if the regular-season schedule doesn't exist yet (nothing to count back from). */
+export async function computeAutoPreseasonStart(): Promise<Date | null> {
+  const first = await prisma.game.findFirst({
+    where: { season: REGULAR_SEASON, seriesId: null },
+    orderBy: { gameDate: "asc" }, select: { gameDate: true },
+  });
+  if (!first?.gameDate) return null;
+  // round 5 (last) = start + 5*2 days, so start = target - 10 days
+  return new Date(utcMidnight(first.gameDate) - PRESEASON_GAP_DAYS * DAY - (PRE_ROUNDS - 1) * 2 * DAY);
 }
 
 /** (Re)build the pre-season schedule (6 rounds, a rest day between each). Wipes any

@@ -315,6 +315,7 @@ model LeagueConfig {
   draftTestMode   Boolean  @default(false)     // testing: a draft pick advances the board but does NOT write the player onto the team (no Prospect row), so names stay for re-testing
   lastWeeklyWeek  Int?                          // last week index whose weekly newsletter was auto-posted (dedupe)
   lastAutoAdvance DateTime?                     // real-clock timestamp of the last cron-triggered league-day advance (dedupes multiple 20:30 Europe/Bratislava cron ticks to one per real day)
+  preseasonPublic Boolean  @default(false)      // is the auto-generated pre-season schedule visible on the public /preseason page yet? Admins always see it in Season Control regardless.
   updatedAt       DateTime @updatedAt
 }
 
