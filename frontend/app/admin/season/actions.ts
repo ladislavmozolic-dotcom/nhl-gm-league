@@ -42,11 +42,12 @@ async function recoverOneDay() {
   await updateInjuryCon();
 }
 
-/** Admin: advance the league clock by one calendar day. If games are scheduled
- *  that date, they are played; a regular-season off-day recovers CON; the
- *  off-season simply moves the date forward (Free Agent Frenzy lives here). */
-export async function advanceLeagueDayAction() {
-  if (!(await isAdmin())) throw new Error("Only a league admin can advance the league day.");
+/** Core of "advance the league clock by one calendar day" — shared by the admin
+ *  button (`advanceLeagueDayAction`, auth-checked) and the automatic 20:30
+ *  Europe/Bratislava cron trigger (`lib/season-cron.ts`, secret-token-checked).
+ *  If games are scheduled that date, they are played; a regular-season off-day
+ *  recovers CON; the off-season simply moves the date forward (Frenzy lives here). */
+export async function advanceLeagueDayCore() {
   const cur = await getLeagueDate();
   const cfg0 = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { phaseOverride: true } });
   const ph = (d: Date) => effectivePhase(d, cfg0?.phaseOverride); // admin can pin the phase manually
@@ -124,6 +125,12 @@ export async function advanceLeagueDayAction() {
   });
   for (const p of ["/calendar", "/schedule", "/standings", "/scores", "/admin/season", "/finance", "/free-agents", "/signings", "/waivers", "/"]) revalidatePath(p);
   return { date: next, phase: ph(next), played, signed, warned: promises.warned, requested: promises.requested, capOffenders, waiverClaims: waivers.claimed, waiverClears: waivers.cleared };
+}
+
+/** Admin: advance the league clock by one calendar day (manual button). */
+export async function advanceLeagueDayAction() {
+  if (!(await isAdmin())) throw new Error("Only a league admin can advance the league day.");
+  return advanceLeagueDayCore();
 }
 
 /** Admin: jump the league clock to an explicit date (YYYY-MM-DD). */

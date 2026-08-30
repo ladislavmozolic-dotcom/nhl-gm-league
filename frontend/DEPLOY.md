@@ -143,6 +143,37 @@ Daj si to do cronu (denne). Uploady sú vo volume `uploads` — zálohuj podobne
 
 ---
 
+## 10b. Automatický denný beh ("Auto (calendar)")
+
+Keď je na `/admin/season` fáza nastavená na **Auto (calendar)** (t.j. `phaseOverride`
+je `null`), liga sa od 2026-08-30 posúva **sama** — každý deň o **20:30 (Europe/
+Bratislava, s DST)** odohrá naplánované zápasy toho dňa presne tak, ako by admin
+klikol "Simulate Day". Manuálne pripnutá fáza (Off-season/Pre-season/Regular
+season/Playoffs tlačidlo) toto pozastaví — admin má vtedy plnú ručnú kontrolu.
+
+**Jednorazové nastavenie na serveri:**
+1. Vygeneruj náhodný secret a pridaj ho do `.env`:
+   ```bash
+   openssl rand -hex 32
+   nano .env    # pridaj riadok: CRON_SECRET=vygenerovany-secret
+   ```
+2. `./deploy.sh` (načíta nový `.env`).
+3. Pridaj crontab (beží každých 5 minút, ale reálne niečo urobí len raz denne
+   v 20:30-20:39 bratislavského času — časové pásmo si server-side kód rieši sám
+   cez `Intl`/DST, cron nemusí poznať časové pásmo):
+   ```bash
+   crontab -e
+   ```
+   pridaj riadok (nahraď `TVOJ_SECRET` hodnotou z kroku 1):
+   ```
+   */5 * * * * curl -fsS -X POST https://TVOJA_DOMENA/api/cron/advance-day -H "Authorization: Bearer TVOJ_SECRET" >> /var/log/unhl-cron.log 2>&1
+   ```
+
+Over: `tail -f /var/log/unhl-cron.log` okolo 20:30 — mal by sa objaviť JSON
+`{"ran":true,...}` presne raz za deň (ostatné behy vrátia `{"ran":false,"reason":"..."}`).
+
+---
+
 ## 10. Druhá liga neskôr (cesta A)
 1. Skopíruj priečinok: `cp -r /opt/nhl-gm-league /opt/liga2`
 2. Uprav `.env`: iný `DOMAIN` (`liga2.tvojadomena.sk`), iné DB heslo/názov

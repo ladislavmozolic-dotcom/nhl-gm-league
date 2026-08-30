@@ -32,7 +32,9 @@ export default function PhaseControl({ current, override, label }: { current: st
       </div>
       <div className="text-xs text-slate-500">
         Current phase: <span className="text-slate-300 font-medium">{label}</span>
-        {override ? " · pinned by admin" : " · following the calendar"}
+        {override
+          ? " · pinned by admin — automatic daily sim is paused while a phase is pinned"
+          : " · following the calendar — scheduled games auto-simulate every day at 20:30 Europe/Bratislava"}
       </div>
     </div>
   );
