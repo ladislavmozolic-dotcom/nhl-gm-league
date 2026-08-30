@@ -182,6 +182,60 @@ export async function importRealCapHits() {
   return { ok: true as const, fetched, updated, total: players.length, placed: realMode };
 }
 
+/**
+ * Fill real cap hits for players `importRealCapHits` never reaches: it only builds
+ * its candidate list from each club's CURRENT 23-man NHL roster (the NHL API), so
+ * anyone on an AHL assignment, IR, or otherwise off that day's active roster is
+ * skipped entirely and stays at whatever placeholder value they were seeded with
+ * (often $0 or a token amount) — a genuine data gap, not the deliberate profinhl
+ * salary scale that active NHL-rostered players intentionally carry. This looks
+ * each gap player up on CapWages directly by their OWN name instead of relying on
+ * the active-roster scrape (so it also reaches players `realTeamId` was never set
+ * for — that field comes from the same active-roster-only scrape and has the exact
+ * same AHL/farm blind spot), and — unlike importRealCapHits — writes the live
+ * capHit/contractYears/tradeClause unconditionally (not gated on real mode), since
+ * there's no legitimate profinhl value here to preserve.
+ */
+export async function importRealCapHitsForGaps() {
+  let buildId = "";
+  try {
+    const html = await (await fetch("https://capwages.com/players/mitch-marner", { headers: { "User-Agent": "Mozilla/5.0" }, cache: "no-store" })).text();
+    buildId = (html.match(/"buildId":"([^"]+)"/) ?? [])[1] ?? "";
+  } catch { /* handled below */ }
+  if (!buildId) return { ok: false as const, error: "Could not read CapWages (buildId not found)." };
+
+  const clauseOf = (raw: string | null | undefined): string | null => {
+    const t = (raw ?? "").toUpperCase();
+    if (!t) return null;
+    if (t.includes("M") && t.includes("NTC")) return "M_NTC";
+    if (t.includes("NMC")) return "NMC";
+    if (t.includes("NTC")) return "NTC";
+    return null;
+  };
+
+  const gaps = await prisma.player.findMany({ where: { rosterType: { in: ["NHL", "AHL"] }, realCapHit: null }, select: { id: true, name: true } });
+  const results = await mapPool(gaps, 6, async (pl) => {
+    const j = await fetchJson(`https://capwages.com/_next/data/${buildId}/players/${capwagesSlug(pl.name)}.json`);
+    const s = j ? JSON.stringify(j) : "";
+    const m = s.match(/"capHit":"(\$[0-9,]+)"/);
+    const tm = s.match(/"terms":"([^"]*)"/);
+    const yr = s.match(/"yearsRemaining":"\s*(\d+)/);
+    return { pl, cap: m ? dollars(m[1]) : null, clause: clauseOf(tm?.[1]), years: yr ? Number(yr[1]) : null };
+  });
+
+  let updated = 0;
+  for (const { pl, cap, clause, years } of results) {
+    if (cap == null) continue;
+    const leagueYears = years != null ? Math.min(years, MAX_TERM) : null;
+    await prisma.player.update({ where: { id: pl.id }, data: {
+      realCapHit: cap, realTradeClause: clause, realContractYears: years,
+      capHit: cap, tradeClause: clause, ...(leagueYears != null ? { contractYears: leagueYears } : {}),
+    } });
+    updated++;
+  }
+  return { ok: true as const, checked: gaps.length, updated, stillMissing: gaps.length - updated };
+}
+
 type Options = { onlyMissing?: boolean; placeIfRealMode?: boolean };
 
 /**

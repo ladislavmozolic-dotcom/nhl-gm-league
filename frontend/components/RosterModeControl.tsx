@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { applyRosterMode, fillRealTeamsAction, fillRealCapsAction, fillRealProspectsAction } from "@/app/admin/rosters/actions";
+import { applyRosterMode, fillRealTeamsAction, fillRealCapsAction, fillRealCapsForGapsAction, fillRealProspectsAction } from "@/app/admin/rosters/actions";
 
 export default function RosterModeControl({ mode, realCount, profinhlCount, profinhlCap, realCap, realCapCount }: {
   mode: string; realCount: number; profinhlCount: number; profinhlCap: string; realCap: string; realCapCount: number;
@@ -29,6 +29,13 @@ export default function RosterModeControl({ mode, realCount, profinhlCount, prof
     const r = await fillRealCapsAction();
     if (!r.ok) { setFillMsg(`⚠ ${r.error}`); return; }
     setFillMsg(`✅ Real cap hits from CapWages: ${r.updated} of ${r.total} rostered players updated (${r.fetched} salaries fetched)${r.placed ? " — live cap hits set" : ""}.`);
+  });
+
+  const fillCapsGaps = () => start(async () => {
+    setFillMsg(null);
+    const r = await fillRealCapsForGapsAction();
+    if (!r.ok) { setFillMsg(`⚠ ${r.error}`); return; }
+    setFillMsg(`✅ Real cap hits for farm/gap players (direct CapWages lookup): ${r.updated} of ${r.checked} fixed, ${r.stillMissing} still not found on CapWages.`);
   });
 
   const fillProspects = () => start(async () => {
@@ -80,6 +87,11 @@ export default function RosterModeControl({ mode, realCount, profinhlCount, prof
             className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm font-semibold disabled:opacity-50"
             title="Pull real cap hits from CapWages — takes ~1-2 minutes">
             {pending ? "Working…" : "Fill real cap hits from CapWages"}
+          </button>
+          <button onClick={fillCapsGaps} disabled={pending}
+            className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm font-semibold disabled:opacity-50"
+            title="Direct CapWages lookup for AHL/farm players the roster-scan misses — takes a few minutes">
+            {pending ? "Working…" : "Fill real caps for farm/gap players"}
           </button>
           <button onClick={fillProspects} disabled={pending}
             className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm font-semibold disabled:opacity-50"

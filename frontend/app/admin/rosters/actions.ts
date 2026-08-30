@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { loadSettings, saveSettings } from "@/lib/sim/settings";
 import { isAdmin } from "@/lib/auth";
-import { importRealRosters, importRealCapHits, importRealProspects } from "@/lib/real-roster-import";
+import { importRealRosters, importRealCapHits, importRealCapHitsForGaps, importRealProspects } from "@/lib/real-roster-import";
 import { autoLines } from "@/lib/sim/lines-core";
 import { saveTeamLines } from "@/lib/sim/lines";
 import { revalidatePath } from "next/cache";
@@ -28,6 +28,20 @@ export async function fillRealCapsAction() {
   const r = await importRealCapHits();
   if (!r.ok) return r;
   for (const p of ["/admin/rosters", "/finance", "/salary-cap", "/teams"]) revalidatePath(p);
+  return r;
+}
+
+/** Admin: fill real cap hits for players `fillRealCapsAction` never reaches — it
+ *  only looks at each club's CURRENT 23-man NHL roster, so anyone on an AHL
+ *  assignment (e.g. a two-way backup goalie) is skipped and stays at whatever
+ *  placeholder value they were seeded with. Looks each one up on CapWages
+ *  directly by name and writes the live cap hit unconditionally (there's no
+ *  legitimate profinhl value to protect here — it was never set). */
+export async function fillRealCapsForGapsAction() {
+  if (!(await isAdmin())) return { ok: false as const, error: "Only a league admin can do this." };
+  const r = await importRealCapHitsForGaps();
+  if (!r.ok) return r;
+  for (const p of ["/admin/rosters", "/finance", "/salary-cap", "/teams", "/tools/all-rosters"]) revalidatePath(p);
   return r;
 }
 
