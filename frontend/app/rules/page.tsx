@@ -164,6 +164,41 @@ const SECTIONS: Sec[] = [
       ] },
     ],
   },
+  {
+    id: "attributes", title: "15 · Player & Goalie Attributes",
+    intro: "Every skater and goalie carries a set of STHS-style attribute ratings (roughly 20–99). These are what the sim engine actually reads every game — here's what each one does.",
+    groups: [
+      { h: "Skaters", points: [
+        "SC — Scoring: the main driver of a skater's shooting/finishing ability. The biggest factor in who scores goals.",
+        "PA — Passing: the main driver of playmaking. The biggest factor in who picks up assists, and whether a pass under pressure is completed or picked off.",
+        "PH — Puckhandling: feeds both scoring and playmaking, and matters on zone entries and protecting the puck.",
+        "SK — Skating: feeds scoring, playmaking and defense a little each, and softens how hard fatigue bites during a shift.",
+        "DF — Defense: the main attribute that suppresses the opponent's scoring chances. Also the primary shot-blocking stat and what a defender relies on to break up a pass.",
+        "CK — Checking: drives a player's hitting rate and feeds his defense rating. A heavier-hitting, more physical team causes more injuries to its opponents.",
+        "ST — Strength: feeds defense, hitting and shot-blocking. Matters most in board and net-front battles.",
+        "FO — Faceoffs: direct faceoff win rate — who starts a shift with the puck.",
+        "DI — Discipline: higher means fewer penalties taken.",
+        "FG — Fighting: decides who drops the gloves and who wins a fight. Doesn't affect any other in-game stat.",
+        "PS — Penalty Shot: shootout / penalty-shot conversion chance, and a slice of a player's \"clutch\" rating (see below).",
+        "EX — Experience: the single biggest piece of a player's clutch rating — poise in a tight third period or overtime.",
+        "LD — Leadership: the rest of the clutch rating, and it dampens the team's momentum swing right after conceding a goal.",
+        "MO — Morale: unlike the others, this is a live 1–100 mood value that drifts with wins, ice time and production, and nudges performance game to game rather than staying fixed.",
+        "DU — Durability: lowers a player's injury chance and severity, and how much a still-recovering (low-CON) player is penalized before he's fully back.",
+        "EN — Endurance: how fast a player tires within a game — low endurance fades harder on long shifts and in the third period.",
+      ] },
+      { h: "Goalies", points: [
+        "AG (Agility), RB (Rebound control), SZ (Size), HS (Hand speed), RT (Reflexes), SC (Style) and PH (Puckhandling) blend together into a goalie's overall save quality — AG and RB carry the most weight, PH the least.",
+        "RB — Rebound control also directly lowers the odds that a save kicks out a dangerous rebound chance right back at the shooter.",
+        "DU — Durability sets how many shots a goalie can face before losing a CON point — a workhorse tolerates a heavier workload before tiring.",
+        "MO — Morale is a live value for goalies too: a confident goalie steals games, a shaky one lets in soft ones — worth up to about ±5% on his save quality that night.",
+        "CON still gates who starts (must be ≥98 on game day, see §4) and scales save quality directly. EN/SK/PS/EX/LD are shown on a goalie's card but aren't separately weighted in the save-quality formula above.",
+      ] },
+      { h: "Also worth knowing", points: [
+        "OV (Overall) is a single summary number. It decides automatic ice time/depth charts whenever you haven't set lines manually, and (stretched for realistic team-to-team separation) roughly represents overall team quality.",
+        "CON (Condition) is covered in §3 — it's not a fixed attribute, it's the live fatigue/health value that drops as a player plays and recovers on rest days.",
+      ] },
+    ],
+  },
 ];
 
 // ---- Czech rulebook (shown when the site language is Czech) ------------------
@@ -323,6 +358,41 @@ const SECTIONS_CS: Sec[] = [
     groups: [
       { points: [
         "GM si mohou psát přímé zprávy ze záložky Messages — historie chatu, emoji, potvrzení doručeno ✓ / přečteno ✓✓ a tlačítko Propose trade, které otevře Trade Builder proti danému GM. Odznak upozorní na nové zprávy.",
+      ] },
+    ],
+  },
+  {
+    id: "attributes", title: "15 · Atributy hráčů a brankářů",
+    intro: "Každý hráč i brankář má sadu atributů ve stylu STHS (zhruba 20–99). Přesně tyto hodnoty čte simulační engine každý zápas — zde je, co která dělá.",
+    groups: [
+      { h: "Bruslaři", points: [
+        "SC — Scoring (střelba): hlavní faktor střelecké/zakončovací síly hráče. Nejvíc rozhoduje o tom, kdo dává góly.",
+        "PA — Passing (přihrávky): hlavní faktor tvořivosti. Nejvíc rozhoduje o tom, kdo sbírá asistence, a zda přihrávka pod tlakem projde, nebo je zachycena.",
+        "PH — Puckhandling (vedení puku): přispívá jak ke střelbě, tak k přihrávkám, a záleží na něm i při vjezdech do útočného pásma a ochraně puku.",
+        "SK — Skating (bruslení): přispívá trochu ke střelbě, přihrávkám i obraně a zmírňuje, jak moc se projeví únava během střídání.",
+        "DF — Defense (obrana): hlavní atribut, který snižuje kvalitu soupeřových šancí. Je to i hlavní statistika pro blokování střel a přerušení přihrávky.",
+        "CK — Checking (bodyčeky): řídí četnost hitů hráče a přispívá k jeho obraně. Fyzičtější, tvrději hrající tým způsobí soupeři víc zranění.",
+        "ST — Strength (síla): přispívá k obraně, hitům a blokování střel. Nejvíc se projeví v soubojích u mantinelu a před brankou.",
+        "FO — Faceoffs (vhazování): přímá úspěšnost na buly — kdo začíná střídání s pukem.",
+        "DI — Discipline (disciplína): vyšší hodnota znamená méně vyloučení.",
+        "FG — Fighting (rvačky): rozhoduje, kdo se pustí do bitky a kdo ji vyhraje. Na žádnou jinou herní statistiku nemá vliv.",
+        "PS — Penalty Shot (nájezdy): úspěšnost v nájezdech / trestných střílení a zároveň část hráčova hodnocení „clutch“ (viz níže).",
+        "EX — Experience (zkušenost): jednoznačně největší složka hráčova „clutch“ hodnocení — klid v koncovce třetí třetiny nebo v prodloužení.",
+        "LD — Leadership (vedení kabiny): zbytek clutch hodnocení, a zároveň tlumí výkyv momenta týmu hned po obdrženém gólu.",
+        "MO — Morale (nálada): na rozdíl od ostatních jde o živou hodnotu 1–100, která se mění podle výher, ledového času a produktivity a ovlivňuje výkon zápas od zápasu, místo aby byla pevná.",
+        "DU — Durability (odolnost): snižuje riziko a závažnost zranění a to, jak moc je penalizovaný ještě se zotavující hráč (nízké CON), než je zpátky na 100 %.",
+        "EN — Endurance (vytrvalost): jak rychle hráč v zápase unaví — nízká vytrvalost se projeví hůř na dlouhých střídáních a ve třetí třetině.",
+      ] },
+      { h: "Brankáři", points: [
+        "AG (obratnost), RB (kontrola odrazů), SZ (velikost), HS (rychlost rukou), RT (reflexy), SC (styl) a PH (vedení puku) se dohromady mísí do celkové kvality zákroků brankáře — AG a RB mají největší váhu, PH nejmenší.",
+        "RB — kontrola odrazů zároveň přímo snižuje šanci, že zákrok vyprodukuje nebezpečný dorážecí odraz zpátky na střelce.",
+        "DU — odolnost určuje, kolik střel brankář ustojí, než ztratí bod CON — „koňský“ brankář unese větší zátěž, než se unaví.",
+        "MO — nálada je živá hodnota i u brankářů: sebevědomý brankář krade zápasy, nejistý pouští laciné góly — rozdíl až zhruba ±5 % v kvalitě zákroků daný večer.",
+        "CON stále rozhoduje, kdo chytá (musí být ≥98 v den zápasu, viz §4) a přímo škáluje kvalitu zákroků. EN/SK/PS/EX/LD jsou na kartě brankáře vidět, ale ve výše uvedeném vzorci kvality zákroků nemají samostatnou váhu.",
+      ] },
+      { h: "Dobré vědět", points: [
+        "OV (Overall/celkové hodnocení) je jedno souhrnné číslo. Rozhoduje o automatickém rozdělení ledového času/sestavy, kdykoli si linky nenastavíte ručně, a (uměle roztažené pro reálný rozdíl mezi týmy) zhruba vyjadřuje celkovou kvalitu týmu.",
+        "CON (kondice) je popsaná v §3 — není to pevný atribut, ale živá hodnota únavy/zdraví, která klesá hraním a obnovuje se ve dnech volna.",
       ] },
     ],
   },
