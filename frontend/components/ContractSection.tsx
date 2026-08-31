@@ -51,8 +51,13 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
   // regular season or playoffs begins, both groups show.
   const SHOW_FINAL_YEAR = phase === "regular" || phase === "playoffs";
   const yearsFilter = SHOW_FINAL_YEAR ? { not: null, lte: 1 } : { equals: 0 };
+  // A player who already accepted a deferred extension (resignStatus "extended") has a
+  // deal waiting to activate at next season's rollover — his CURRENT contractYears
+  // hasn't moved yet (deliberately, so this season's cap stays correct), but he isn't
+  // actually "up for renewal" anymore from the GM's point of view, so he drops off here
+  // the moment the offer is accepted rather than lingering until the rollover happens.
   const expiring = await prisma.player.findMany({
-    where: { teamId: { in: orgIds }, rosterType: { in: ["NHL", "AHL"] }, contractYears: yearsFilter, NOT: { capHit: 100_000 } },
+    where: { teamId: { in: orgIds }, rosterType: { in: ["NHL", "AHL"] }, contractYears: yearsFilter, NOT: { capHit: 100_000 }, resignStatus: { not: "extended" } },
     select: { id: true, name: true, age: true, capHit: true, contractYears: true, contractText: true, position: true, isGoalie: true, df: true, lastSeasonGP: true, lastSeasonPts: true, lastSeasonSvPct: true, rosterType: true, franchiseTag: true },
     orderBy: { capHit: "desc" },
   });

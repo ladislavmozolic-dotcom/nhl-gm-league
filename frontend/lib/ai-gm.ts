@@ -82,11 +82,12 @@ async function enforceCap(teamId: number): Promise<string | null> {
 }
 
 /** The daily AI-GM pass: refresh each GM-less club's tactical system from its
- *  current roster and keep it cap-compliant. Cheap & idempotent — hooked into the
- *  sim-day loop so AI tactics + cap track the roster. Never trades or signs. */
+ *  current roster, keep it cap-compliant, and keep its active roster legally
+ *  staffed (call up from the farm / activate scratches). Cheap & idempotent —
+ *  hooked into the sim-day loop so AI tactics + cap + roster track the roster
+ *  automatically, with no admin click needed. Never trades or signs. */
 export async function aiGmDaily(): Promise<{ managed: number; details: string[] }> {
-  // NHL clubs only — the AHL farm stays legal via the day-loop fills; it doesn't
-  // need its own persisted tactics (and its parent may be human-managed).
+  // NHL clubs with no human GM.
   const teams = await prisma.team.findMany({
     where: { passwordHash: null, league: "NHL", isAffiliate: false },
     select: { id: true, name: true, code: true },
@@ -98,20 +99,32 @@ export async function aiGmDaily(): Promise<{ managed: number; details: string[] 
     const cap = await enforceCap(t.id);
     if (cap) details.push(cap);
   }
+  // AHL affiliates whose PARENT club has no human GM either — nobody sets their
+  // lines by hand, so they need the same tactics treatment as their NHL side.
+  const aiAhl = await prisma.team.findMany({
+    where: { league: "AHL", parentTeam: { passwordHash: null } },
+    select: { id: true, code: true, name: true },
+  });
+  for (const t of aiAhl) {
+    const sys = await manageOne(t.id, "AHL");
+    if (sys) details.push(`${t.code ?? t.name} (AHL): ${sys}`);
+  }
+  // Roster legality — call up from the farm / activate scratches wherever a club
+  // (GM-run or not) has dropped below a legal active roster. Only acts when a
+  // roster is genuinely short, so it's a no-op for every properly-staffed club.
+  await autoFillRosters("NHL").catch(() => []);
+  await fillAhlFromScratched().catch(() => []);
   // Advanced-AI clubs also negotiate incoming trade proposals from human GMs.
   try {
     const { aiGmTradesDaily } = await import("./ai-gm-trades");
     const tr = await aiGmTradesDaily();
     details.push(...tr.details);
   } catch (e) { details.push(`AI trades error: ${(e as Error).message}`); } // surface, but never block the daily run
-  return { managed: teams.length, details };
+  return { managed: teams.length + aiAhl.length, details };
 }
 
-/** Full AI-GM pass (admin action): the daily pass PLUS keeping rosters legal
- *  (promote healthy farmhands when short; activate healthy AHL scratches). */
+/** Manual admin trigger ("Run AI GM now") — identical to the automatic daily
+ *  pass, just invoked on demand instead of waiting for the next sim day. */
 export async function runAiGm(): Promise<{ managed: number; details: string[] }> {
-  const res = await aiGmDaily();
-  await autoFillRosters("NHL").catch(() => []);
-  await fillAhlFromScratched().catch(() => []);
-  return res;
+  return aiGmDaily();
 }

@@ -147,9 +147,12 @@ export function autoLines(skaters: Skater[], goalies: Goalie[] = []): TeamLinesD
     // strictly position-aware: C only from centre-eligible, wings only from
     // wing-eligible (natural side first). A slot with no eligible player stays
     // empty — a call-up prompt — rather than icing a man out of position.
-    const c = take(centers);
-    const lw = take(leftW, anyLeft);
-    const rw = take(rightW, anyRight);
+    // last-resort fallback: once every position-eligible player for this slot is
+    // used up, take the best remaining forward regardless of listed position —
+    // an empty slot with bodies still on the bench reads as a bug, not "no fit".
+    const c = take(centers, fwd);
+    const lw = take(leftW, anyLeft, fwd);
+    const rw = take(rightW, anyRight, fwd);
     forwardLines.push({ lw, c, rw, timePct: F_TIME[i], tactic: { ...F_TACTIC[i] } });
   }
   const defensePairs: DefensePair[] = [];
@@ -194,9 +197,10 @@ export function autoFill(data: TeamLinesData, skaters: Skater[], goalies: Goalie
   const anyLeft = fwd.filter((s) => canLeft(s.position));
   const anyRight = fwd.filter((s) => canRight(s.position));
   for (const line of d.forwardLines) {
-    if (line.c == null) line.c = pickF(centers);
-    if (line.lw == null) line.lw = pickF(leftNatural, anyLeft);
-    if (line.rw == null) line.rw = pickF(rightNatural, anyRight);
+    // same last-resort fallback as autoLines: an off-position body beats an empty slot.
+    if (line.c == null) line.c = pickF(centers, fwd);
+    if (line.lw == null) line.lw = pickF(leftNatural, anyLeft, fwd);
+    if (line.rw == null) line.rw = pickF(rightNatural, anyRight, fwd);
   }
 
   // defense: each blue-liner used at most once across the three pairs
