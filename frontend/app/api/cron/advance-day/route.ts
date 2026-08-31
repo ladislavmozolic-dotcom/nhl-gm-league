@@ -3,7 +3,7 @@
 // once per real day). Protected by a shared secret since it mutates league state
 // (plays games, moves money, resolves waivers) with no user session behind it.
 import { NextRequest, NextResponse } from "next/server";
-import { autoAdvanceIfDue } from "@/lib/season-cron";
+import { autoAdvanceIfDue, autoOpenFrenzyIfDue } from "@/lib/season-cron";
 
 export async function POST(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -14,6 +14,7 @@ export async function POST(req: NextRequest) {
   // dev-only escape hatch so the 20:30 window can be exercised locally without
   // waiting for the clock — never available in production (NODE_ENV check).
   const nowOverride = process.env.NODE_ENV !== "production" ? req.nextUrl.searchParams.get("now") : null;
-  const result = await autoAdvanceIfDue(nowOverride ? new Date(nowOverride) : undefined);
-  return NextResponse.json(result);
+  const now = nowOverride ? new Date(nowOverride) : new Date();
+  const [result, frenzy] = await Promise.all([autoAdvanceIfDue(now), autoOpenFrenzyIfDue(now)]);
+  return NextResponse.json({ ...result, frenzy });
 }

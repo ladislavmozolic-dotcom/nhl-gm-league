@@ -318,6 +318,7 @@ model LeagueConfig {
   preseasonPublic Boolean  @default(false)      // is the auto-generated pre-season schedule visible on the public /preseason page yet? Admins always see it in Season Control regardless.
   preseasonPhaseAt DateTime?                    // admin-configurable real date the "preseason" phase begins (Auto mode only) — null = derive from the generated pre-season schedule's first game, else the hardcoded Sep 21 fallback. See lib/calendar-server.ts resolvePhaseThresholds.
   regularPhaseAt  DateTime?                     // admin-configurable real date the "regular" phase begins (Auto mode only) — null = derive from the regular-season schedule's first game, else the hardcoded Oct 1 fallback.
+  frenzyAutoOpenAt DateTime?                    // admin-configurable real moment to auto-flip faOpen=true (force the Free Agent Frenzy window open for every GM) — a one-shot trigger, checked every cron tick (lib/season-cron.ts autoOpenFrenzyIfDue) and cleared to null once it fires, so a later manual close of faOpen sticks.
   updatedAt       DateTime @updatedAt
 }
 

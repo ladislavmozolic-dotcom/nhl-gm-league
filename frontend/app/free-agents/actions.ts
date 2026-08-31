@@ -116,6 +116,21 @@ export async function setFaEarlyAccessAction(on: boolean) {
   return { ok: true as const, on };
 }
 
+/** Commissioner: schedule (or clear, passing null) a one-shot real moment for the
+ *  Free Agent Frenzy window to auto-open for every GM — checked every ~5 minutes by
+ *  the same cron that drives the daily league-day advance (lib/season-cron.ts
+ *  autoOpenFrenzyIfDue). Pass a full ISO datetime (with timezone offset), not just a
+ *  date, since this fires at a specific time of day, not once-per-day like the
+ *  20:30 sim trigger. */
+export async function setFrenzyAutoOpenAction(iso: string | null) {
+  if (!(await isAdmin()) && !(await isComishTier())) return { ok: false as const, error: "Commissioner only." };
+  const at = iso ? new Date(iso) : null;
+  if (iso && (!at || isNaN(at.getTime()))) return { ok: false as const, error: "Invalid date/time." };
+  await prisma.leagueConfig.update({ where: { id: 1 }, data: { frenzyAutoOpenAt: at } });
+  for (const p of ["/free-agents", "/", "/admin/season"]) revalidatePath(p);
+  return { ok: true as const, at };
+}
+
 /** All standing offers on a player (open frenzy — GMs can see the competition). */
 export async function getPlayerOffersAction(playerId: number) {
   // blind bidding: only the commissioner tier sees the competing offers; a plain GM never

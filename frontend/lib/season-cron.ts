@@ -49,3 +49,21 @@ export async function autoAdvanceIfDue(now: Date = new Date()): Promise<AutoAdva
   await prisma.leagueConfig.update({ where: { id: 1 }, data: { lastAutoAdvance: now } });
   return { ran: true, ...result };
 }
+
+export type FrenzyAutoOpenResult = { opened: false; reason: string } | { opened: true };
+
+/** Called by /api/cron/advance-day alongside autoAdvanceIfDue, every ~5 minutes.
+ *  One-shot trigger: as soon as real "now" reaches the admin-set
+ *  LeagueConfig.frenzyAutoOpenAt, force the Free Agent Frenzy window open for
+ *  every GM (faOpen=true) — no wall-clock window to land in like the 20:30
+ *  game-sim trigger, it fires on the very next tick after the target moment.
+ *  Clears frenzyAutoOpenAt once fired so it never re-fires, and so a later
+ *  manual close of faOpen (an admin turning the market back off) sticks. */
+export async function autoOpenFrenzyIfDue(now: Date = new Date()): Promise<FrenzyAutoOpenResult> {
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { frenzyAutoOpenAt: true, faOpen: true } });
+  if (!cfg?.frenzyAutoOpenAt) return { opened: false, reason: "no auto-open time set" };
+  if (cfg.faOpen) { await prisma.leagueConfig.update({ where: { id: 1 }, data: { frenzyAutoOpenAt: null } }); return { opened: false, reason: "already open — cleared the stale trigger" }; }
+  if (now.getTime() < cfg.frenzyAutoOpenAt.getTime()) return { opened: false, reason: `not due until ${cfg.frenzyAutoOpenAt.toISOString()}` };
+  await prisma.leagueConfig.update({ where: { id: 1 }, data: { faOpen: true, frenzyAutoOpenAt: null } });
+  return { opened: true };
+}
