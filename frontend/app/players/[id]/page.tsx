@@ -304,6 +304,12 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     ] as [string, React.ReactNode][]) : []),
     ["Last Year Salary", p.capHit != null ? capHit : "—"],
     ["Overall", overall != null ? String(overall) : "—"],
+    // A signed deferred extension (resignStatus "extended") doesn't touch capHit/
+    // contractYears until next season's rollover — surface it here so it's visible
+    // somewhere the moment it's accepted, instead of looking like nothing happened.
+    ...(p.resignStatus === "extended" && p.extCapHit != null ? ([
+      ["Signed Extension", <span className="text-emerald-300">{p.extText ?? `$${(p.extCapHit / 1e6).toFixed(2)}M × ${p.extYears}yr`}</span>],
+    ] as [string, React.ReactNode][]) : []),
   ];
 
   const InfoRow = ({ label, value, valueClass }: { label: string; value: React.ReactNode; valueClass?: string }) => (
