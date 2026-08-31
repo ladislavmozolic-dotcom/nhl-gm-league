@@ -12,13 +12,20 @@ import { cleanName } from "@/lib/playerName";
 
 // A player entering his final year is up for renewal. Status by age (our rule):
 // under 26 at June 30 → RFA, 26+ → UFA; the youngest cheap deals are still ELC
-// (entry-level — an auto-contract formula will handle those).
+// (entry-level — an auto-contract formula will handle those) — UNLESS he's
+// already well past his entry deal despite the young age (e.g. a age-21
+// player already on his SECOND contract): the real max ELC term is 3 years,
+// so 3+ real pro seasons already on file (`mpSkater`) means his entry-level
+// window has already elapsed and this renewal is a real 2nd contract, not
+// a first-time rookie activation — route him through normal RFA negotiation
+// instead of re-offering the flat entry-level formula.
 type Group = "ELC" | "RFA" | "UFA";
 // ProfiNHL Čl. 32: RFA = contract expiring and 26-or-younger at June 30; UFA = 27+.
-// The very youngest (entry-level age) are still on an ELC auto-formula.
-function statusOf(age: number | null): Group {
+// The very youngest (entry-level age) are still on an ELC auto-formula, unless
+// they've already burned through a full ELC term's worth of real seasons.
+function statusOf(age: number | null, seasonsOnFile: number): Group {
   const a = age ?? 27;
-  if (a <= 21) return "ELC";
+  if (a <= 21 && seasonsOnFile < 3) return "ELC";
   return a <= 26 ? "RFA" : "UFA";
 }
 
@@ -58,9 +65,10 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
   // the moment the offer is accepted rather than lingering until the rollover happens.
   const expiring = await prisma.player.findMany({
     where: { teamId: { in: orgIds }, rosterType: { in: ["NHL", "AHL"] }, contractYears: yearsFilter, NOT: { capHit: 100_000 }, resignStatus: { not: "extended" } },
-    select: { id: true, name: true, age: true, capHit: true, contractYears: true, contractText: true, position: true, isGoalie: true, df: true, lastSeasonGP: true, lastSeasonPts: true, lastSeasonSvPct: true, rosterType: true, franchiseTag: true },
+    select: { id: true, name: true, age: true, capHit: true, contractYears: true, contractText: true, position: true, isGoalie: true, df: true, lastSeasonGP: true, lastSeasonPts: true, lastSeasonSvPct: true, rosterType: true, franchiseTag: true, mpSkater: true },
     orderBy: { capHit: "desc" },
   });
+  const seasonsOnFile = (mp: unknown) => (mp && typeof mp === "object" ? Object.keys(mp as object).length : 0);
 
   if (expiring.length === 0) {
     return (
@@ -71,7 +79,7 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
   }
 
   const groups: Record<Group, typeof expiring> = { UFA: [], RFA: [], ELC: [] };
-  for (const p of expiring) groups[statusOf(p.age)].push(p);
+  for (const p of expiring) groups[statusOf(p.age, seasonsOnFile(p.mpSkater))].push(p);
 
   return (
     <div className="space-y-4">
