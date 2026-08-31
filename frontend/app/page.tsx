@@ -17,6 +17,7 @@ import { dailyDigest, latestDigestRound } from "@/lib/digest-server";
 import { gmDashboard } from "@/lib/gm-dashboard-server";
 import SeasonDashboard from "@/components/SeasonDashboard";
 import { tradeBlockBoard } from "@/lib/trade-block-server";
+import { activeWaivers } from "@/lib/waivers-server";
 import { loadSiteConfig } from "@/lib/site-config";
 import { renderMarkdown } from "@/lib/markdown";
 import type { HomeBlock } from "@/app/admin/site-editor/actions";
@@ -87,6 +88,9 @@ export default async function HomePage() {
   // Trade Block — who's available around the league (flat list for the home card)
   const tbBoard = await tradeBlockBoard();
   const tbListed = tbBoard.flatMap((t) => t.players);
+
+  // Waiver Wire — who's currently exposed, so it's on-screen without a click
+  const waivers = await activeWaivers();
 
   // Trade Tracker — only COMPLETED deals (the accepted-trade message reads "X traded
   // … to Y for …"); excludes proposed/declined/revoked noise. Latest 3.
@@ -276,6 +280,21 @@ export default async function HomePage() {
                 {tbListed.length > 8 && <Link href="/trade-block" className="block text-xs text-blue-400 hover:underline pt-1">+ {tbListed.length - 8} more →</Link>}
               </div>
             ) : <p className="text-sm text-slate-500">{T("home.noTradeBlock")}</p>}
+          </Card>
+
+          <Card title={T("home.waiverWire")} href="/waivers" accent="text-sky-400" viewLabel={T("ui.viewAll")}>
+            {waivers.length ? (
+              <div className="space-y-1.5 text-sm">
+                {waivers.slice(0, 8).map((w) => (
+                  <div key={w.id} className="flex items-center gap-2">
+                    {w.playerSlug ? <Link href={`/players/${w.playerSlug}`} className="flex-1 truncate hover:text-blue-400">{w.playerName}</Link> : <span className="flex-1 truncate">{w.playerName}</span>}
+                    <span className="text-slate-500 text-xs">{w.position}</span>
+                    <span className="text-slate-500 text-xs">{w.fromCode}</span>
+                  </div>
+                ))}
+                {waivers.length > 8 && <Link href="/waivers" className="block text-xs text-blue-400 hover:underline pt-1">+ {waivers.length - 8} more →</Link>}
+              </div>
+            ) : <p className="text-sm text-slate-500">{T("home.noWaivers")}</p>}
           </Card>
 
           <Card title={T("home.birthdays")} accent="text-pink-400">

@@ -55,6 +55,8 @@ export const DICT: Dict = {
   "home.scoringLeaders": { en: "Scoring Leaders", cs: "Produktivita", de: "Scorer-Wertung", ru: "Бомбардиры" },
   "home.tradeBlock": { en: "Trade Block", cs: "Na trhu", de: "Transferliste", ru: "На обмен" },
   "home.noTradeBlock": { en: "No players on the block. GMs list players from their team's Trades page.", cs: "Žádní hráči na trhu. GM je přidávají ze stránky Výměny svého týmu.", de: "Keine Spieler auf der Liste. GMs listen Spieler über die Transfer-Seite ihres Teams.", ru: "Нет игроков на обмен. GM добавляют их со страницы обменов своей команды." },
+  "home.waiverWire": { en: "Waiver Wire", cs: "Waiver wire", de: "Waiver Wire", ru: "Драфт отказов" },
+  "home.noWaivers": { en: "Nobody is on waivers right now.", cs: "Momentálně nikdo není na listině waiver.", de: "Aktuell steht niemand auf der Waiver-Liste.", ru: "Сейчас никто не находится на драфте отказов." },
   "home.birthdays": { en: "Today's Birthdays", cs: "Dnešní narozeniny", de: "Heutige Geburtstage", ru: "Дни рождения сегодня" },
   "home.latestArticle": { en: "Latest Article", cs: "Poslední článek", de: "Neuester Artikel", ru: "Последняя статья" },
   "home.addArticle": { en: "+ Add Article", cs: "+ Přidat článek", de: "+ Artikel", ru: "+ Статья" },
