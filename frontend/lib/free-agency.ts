@@ -74,7 +74,10 @@ export function roundPremium(round: number, priorBidders?: number): number {
   const scheduled = round === 2 ? 1.10 : 1.0; // moderate interest (exactly one bidder) — unchanged
   if (priorBidders == null || priorBidders === 1) return scheduled;
   if (priorBidders === 0) return scheduled * 0.85; // nobody bit — drop the ask to draw interest
-  return round === 2 ? 1.25 : 1.15; // 2+ bidders — a real bidding war pushes the price UP instead
+  // 2+ bidders — a real bidding war means the actual OFFERS already came in above his
+  // ask, so this premium only needs to be a small extra nudge on top of that, not a
+  // second big jump of its own: round === 2 ? 1.10 : 1.05.
+  return round === 2 ? 1.10 : 1.05;
 }
 
 /** The market anchor for a player: median cap hit of comparably-rated signings
