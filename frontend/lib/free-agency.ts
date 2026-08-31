@@ -62,12 +62,19 @@ export function percentile(xs: number[], p: number): number {
  *  team-friendly / cost-controlled deals). */
 export const ANCHOR_PCTL = 0.62;
 
-/** UFA negotiations open HIGH (players test the market) and come down over the
- *  three weekly rounds toward fair value — round 1 asks ~+20%, round 3 is fair. */
-export function roundPremium(round: number): number {
-  if (round <= 1) return 1.20;
-  if (round === 2) return 1.10;
-  return 1.0; // round 3 = final week, fair value
+/** UFA negotiations open HIGH (players test the market) — round 1 asks ~+20%.
+ *  From round 2 on, the direction depends on what actually happened last round,
+ *  not a blind decay: nobody bit → he comes down further to attract offers;
+ *  real competition (2+ clubs bidding) → he holds firm or climbs, same as a real
+ *  auction. `priorBidders` = distinct clubs with an active bid in the PRECEDING
+ *  round; omit it (e.g. no bid data available) to fall back to the flat schedule
+ *  moderate-interest case (exactly what round 2/3 already used to do). */
+export function roundPremium(round: number, priorBidders?: number): number {
+  if (round <= 1) return 1.20; // opening ask — no bid history yet to react to
+  const scheduled = round === 2 ? 1.10 : 1.0; // moderate interest (exactly one bidder) — unchanged
+  if (priorBidders == null || priorBidders === 1) return scheduled;
+  if (priorBidders === 0) return scheduled * 0.85; // nobody bit — drop the ask to draw interest
+  return round === 2 ? 1.25 : 1.15; // 2+ bidders — a real bidding war pushes the price UP instead
 }
 
 /** The market anchor for a player: median cap hit of comparably-rated signings
@@ -214,10 +221,11 @@ export function buildDemand(input: {
   perf?: number | null; capGrowth?: number; override?: number | null; downSeason?: boolean;
   morale?: number | null;
   round?: number;
+  priorBidders?: number; // distinct clubs that bid on him in the round before this one
   currentSalary?: number | null; // his existing cap hit — the opening ask won't come in under it
 }): Demand {
   const { market, grp, age, anchor, comps } = input;
-  const premium = roundPremium(input.round ?? 1); // default = opening ask (high)
+  const premium = roundPremium(input.round ?? 1, input.priorBidders); // default = opening ask (high)
   let salary: number;
   let overridden = false;
   if (input.override && input.override > 0) {

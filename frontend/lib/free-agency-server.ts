@@ -48,6 +48,18 @@ export function isDownSeason(lastSeasonGP: number | null | undefined, fullGP: nu
   return fullGP > 0 && lastSeasonGP != null && lastSeasonGP > 0 && lastSeasonGP < 0.6 * fullGP;
 }
 
+/** Distinct clubs with an active bid on each player in the round BEFORE `round`
+ *  (i.e. round-1) — the signal roundPremium uses to soften a cold player's ask or
+ *  let a contested one climb. Empty for round 1 (no prior round exists yet). One
+ *  batched query for however many players are asked about at once. */
+async function priorRoundBidderCounts(playerIds: number[], round: number): Promise<Map<number, number>> {
+  const out = new Map<number, number>();
+  if (round <= 1 || playerIds.length === 0) return out;
+  const rows = await prisma.faBid.groupBy({ by: ["playerId", "teamId"], where: { playerId: { in: playerIds }, round: round - 1 } });
+  for (const r of rows) out.set(r.playerId, (out.get(r.playerId) ?? 0) + 1);
+  return out;
+}
+
 /** A free agent still unsigned once the season is underway softens his asking price
  *  the deeper it gets (nobody's biting → he lowers his demands). 1 = no discount
  *  (off-season / Frenzy, which has its own round-by-round softening); down to ~0.55
@@ -106,18 +118,19 @@ export async function demandForPlayerId(playerId: number, pool?: MarketRow[]): P
   const fullGP = await leagueFullGP();
   const round = await currentFrenzyRound();
   const stale = await faStaleFactor();
-  return demandFromRow(p as PoolPlayer & { age: number | null; faDemandOverride: number | null }, marketPool, fullGP, round, stale);
+  const priorBidders = (await priorRoundBidderCounts([playerId], round)).get(playerId);
+  return demandFromRow(p as PoolPlayer & { id: number; age: number | null; faDemandOverride: number | null }, marketPool, fullGP, round, stale, priorBidders);
 }
 
 function demandFromRow(
-  p: PoolPlayer & { age: number | null; faDemandOverride: number | null },
-  pool: MarketRow[], fullGP: number, round: number, stale = 1,
+  p: PoolPlayer & { id: number; age: number | null; faDemandOverride: number | null },
+  pool: MarketRow[], fullGP: number, round: number, stale = 1, priorBidders?: number,
 ): DemandFor {
   const { grp, market } = playerMarket(p);
   const { anchor, count } = anchorFromPool(pool, grp, market);
   const demand = buildDemand({
     market, grp, age: p.age, anchor, comps: count,
-    override: p.faDemandOverride, capGrowth: 1, round,
+    override: p.faDemandOverride, capGrowth: 1, round, priorBidders,
     downSeason: isDownSeason(p.lastSeasonGP, fullGP), morale: p.morale, currentSalary: p.capHit,
   });
   // a manual override is the commissioner's word — never soften it
@@ -201,9 +214,10 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
   const marketPool = pool ?? (await loadMarketPool());
   const fullGP = await leagueFullGP();
   const rnd = round ?? (await currentFrenzyRound());
+  const priorBidders = (await priorRoundBidderCounts([playerId], rnd)).get(playerId);
   const { grp, market } = playerMarket(p as PoolPlayer);
   const { anchor, count } = anchorFromPool(marketPool, grp, market);
-  const rawBase = buildDemand({ market, grp, age: p.age, anchor, comps: count, override: p.faDemandOverride, capGrowth: 1, round: rnd, downSeason: isDownSeason(p.lastSeasonGP, fullGP), morale: p.morale, currentSalary: p.capHit });
+  const rawBase = buildDemand({ market, grp, age: p.age, anchor, comps: count, override: p.faDemandOverride, capGrowth: 1, round: rnd, priorBidders, downSeason: isDownSeason(p.lastSeasonGP, fullGP), morale: p.morale, currentSalary: p.capHit });
   // A player re-signing with his OWN club is NOT stale on the open market — no season
   // decay. The "nobody's biting" softening only applies to unsigned market UFAs.
   const isOwn = p.teamId === teamId;
@@ -256,7 +270,8 @@ export async function demandForPlayers(
   const fullGP = await leagueFullGP();
   const round = await currentFrenzyRound();
   const stale = await faStaleFactor();
+  const priorBidders = await priorRoundBidderCounts(players.map((p) => p.id), round);
   const out = new Map<number, DemandFor>();
-  for (const p of players) out.set(p.id, demandFromRow(p, marketPool, fullGP, round, stale));
+  for (const p of players) out.set(p.id, demandFromRow(p, marketPool, fullGP, round, stale, priorBidders.get(p.id)));
   return out;
 }
