@@ -61,13 +61,20 @@ export default async function FreeAgentsPage({
   const [clock, sessionTeamId, admin, comishTier, faSettings] = await Promise.all([getLeagueClock(), getTeamSession(), isAdmin(), isComishTier(), loadSettings()]);
   const isComish = admin || comishTier;
   const faSignLock = faSettings.faSignLock;
+  // The comish-tier early-access toggle only ever reached submitOfferAction — the
+  // UI's own idea of "is the market open" (interestCtx, the FrenzyBar status line)
+  // still came straight from clock.faWindow, so a comish with early access on saw
+  // the Interest button behave as if the market were still closed to them too.
+  // Mirror the exact same override shape the server action uses.
+  const faOverrideForMe = isComish && faSettings.faEarlyAccess && !clock.faWindow.open;
+  const effWindow = faOverrideForMe ? { open: true, immediate: true, ownOnly: false } : clock.faWindow;
   let interestCtx: InterestCtx | null = null;
   if (sessionTeamId != null) {
     const teams = admin
       ? await prisma.team.findMany({ where: { league: "NHL" }, select: { id: true, code: true, name: true }, orderBy: { name: "asc" } })
       : await prisma.team.findMany({ where: { id: sessionTeamId }, select: { id: true, code: true, name: true } });
     const actingTeamId = teams.some((t) => t.id === sessionTeamId) ? sessionTeamId : (teams[0]?.id ?? null);
-    interestCtx = { frenzyOpen: clock.faWindow.open, immediate: clock.faWindow.immediate, ownOnly: clock.faWindow.ownOnly, actingTeamId, teams: teams.map((t) => ({ ...t, code: t.code ?? "" })) };
+    interestCtx = { frenzyOpen: effWindow.open, immediate: effWindow.immediate, ownOnly: effWindow.ownOnly, actingTeamId, teams: teams.map((t) => ({ ...t, code: t.code ?? "" })) };
   }
 
   // in-season deliberation: free agents currently weighing offers (7-day window, then
@@ -150,8 +157,8 @@ export default async function FreeAgentsPage({
         frenzyRound={clock.frenzyRound}
         phaseLabel={clock.phaseLabel}
         isAdmin={admin}
-        inSeasonOpen={!clock.frenzyOpen && clock.faWindow.open}
-        ownOnly={clock.faWindow.ownOnly}
+        inSeasonOpen={!clock.frenzyOpen && effWindow.open}
+        ownOnly={effWindow.ownOnly}
       />
 
       {deliberating.length > 0 && (
