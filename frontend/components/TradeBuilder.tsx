@@ -7,7 +7,7 @@ import { money } from "@/lib/finance";
 import { clauseTermsAction, analyzeTradeAction, type TradePackage } from "@/app/trades/build/actions";
 
 type Player = { id: number; name: string; position: string; capHit: number; farm: boolean; clause?: string | null; noTradeTeams?: number[] };
-type Pick = { id: number; label: string };
+type Pick = { id: number; label: string; logoUrl?: string | null };
 type Assets = { players: Player[]; picks: Pick[]; prospects: Pick[] };
 type Team = { id: number; name: string };
 
@@ -139,6 +139,7 @@ export default function TradeBuilder({ me, opp, mine, theirs, onPropose, initial
         {list.map((it) => (
           <label key={it.id} className={`flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer ${sel.has(it.id) ? "bg-blue-950/30" : ""}`}>
             <input type="checkbox" checked={sel.has(it.id)} onChange={() => togglePick(sel, setSel, it.id)} className="accent-blue-500 w-4 h-4" />
+            {it.logoUrl && <img src={it.logoUrl} alt="" className="w-4 h-4 object-contain shrink-0" />}
             <span className="text-slate-300">{icon} {it.label}</span>
           </label>
         ))}
