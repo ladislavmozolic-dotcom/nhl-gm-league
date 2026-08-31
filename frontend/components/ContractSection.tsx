@@ -45,10 +45,11 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
   // body who makes the NHL simply signs an ELC), so a GM never has to re-sign them and
   // they don't clutter this list. A real two-way deal below the NHL minimum (e.g.
   // $600k-774k) is NOT a farm deal — it belongs in this list like any other contract.
-  // PRE-LAUNCH: while we're only running PRACTICE sims, show ONLY already-expired deals
-  // (0 years) — the 1-year "final year" group only appeared because a practice season was
-  // started, and would confuse GMs pre-launch. Flip to true when the real season begins.
-  const SHOW_FINAL_YEAR = false;
+  // Before the regular season actually starts (pre-season/off-season/frenzy), show ONLY
+  // already-expired deals (0 years) — the 1-year "final year" group only makes sense once
+  // a real season is underway (so a "1 year left" deal genuinely means this season). Once
+  // regular season or playoffs begins, both groups show.
+  const SHOW_FINAL_YEAR = phase === "regular" || phase === "playoffs";
   const yearsFilter = SHOW_FINAL_YEAR ? { not: null, lte: 1 } : { equals: 0 };
   const expiring = await prisma.player.findMany({
     where: { teamId: { in: orgIds }, rosterType: { in: ["NHL", "AHL"] }, contractYears: yearsFilter, NOT: { capHit: 100_000 } },
