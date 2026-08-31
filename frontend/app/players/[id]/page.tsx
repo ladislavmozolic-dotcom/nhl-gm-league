@@ -21,6 +21,8 @@ import { starPowerForPlayer } from "@/lib/star-power-server";
 import { onLtir, money } from "@/lib/finance";
 import { tierAccent } from "@/lib/star-power";
 import InfoTip from "@/components/InfoTip";
+import { playerTradeHistory } from "@/lib/trade-history-server";
+import PlayerTradeHistoryCard from "@/components/PlayerTradeHistoryCard";
 
 export const dynamic = "force-dynamic";
 
@@ -245,6 +247,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   const heatMap = await playerHeatMap(p.id);
   const defenseMap = isGoalie ? null : await playerDefenseMap(p.id);
   const goalieStats = isGoalie ? await goalieAnalytics(p.id) : null;
+  const tradeHistory = await playerTradeHistory(p.id);
   const star = await starPowerForPlayer(p.id);
 
   // NHL game-by-game log (regular season)
@@ -473,6 +476,9 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
 
       {/* ── CAREER ─────────────────────────────────────────────────── */}
       <PlayerCareerCard career={career} />
+
+      {/* ── TRADE HISTORY ──────────────────────────────────────────── */}
+      <PlayerTradeHistoryCard playerName={cleanName(p.name)} history={tradeHistory} />
 
       {/* ── INJURY ─────────────────────────────────────────────────── */}
       {p.injuryDaysLeft > 0 && (() => {
