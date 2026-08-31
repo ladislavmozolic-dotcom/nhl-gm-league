@@ -152,6 +152,11 @@ export async function submitOfferAction(
   const clock = await getLeagueClock();
   const win = clock.faWindow;
   if (!win.open) return { ok: false as const, error: "The free-agent market is closed." };
+  // comish-tier head-start: the market opens for everyone tomorrow — the commissioner's
+  // office may already act on it today, since they already see the whole field of offers.
+  if (win.previewOnly && !(await isComishTier())) {
+    return { ok: false as const, error: "The market opens tomorrow — the commissioner's office gets today." };
+  }
   // comish-tier head-start (July Frenzy only): the first day of each round is the
   // commissioner's office only (they bid before they can see anything), GMs join day 2.
   if (!win.immediate) {
