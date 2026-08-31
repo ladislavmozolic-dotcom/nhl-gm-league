@@ -113,18 +113,28 @@ export async function advanceLeagueDayCore() {
   // opening-day cap compliance: the +10% summer cushion expires — every club must
   // now sit under the strict ceiling. Non-compliant clubs get a public warning.
   let capOffenders = 0;
+  // opening-day free agency: anyone whose contract already expired (0 years left)
+  // and who nobody re-signed during the off-season/Frenzy window hits the open
+  // market the moment regular season starts — same $100k-farm-filler exclusion
+  // ContractSection uses (those aren't real deals GMs are expected to act on).
+  let expiredToUfa = 0;
   if (ph(cur) !== "regular" && ph(next) === "regular") {
     const offenders = await leagueCapCompliance("regular");
     capOffenders = offenders.filter((o) => o.over > 0).length;
     for (const o of offenders) {
       if (o.over > 0) await prisma.transaction.create({ data: { type: "CAP_WARNING", message: `${o.code} is over the salary cap by ${money(o.over)} on opening day — must shed salary to be compliant.` } });
     }
+    const swept = await prisma.player.updateMany({
+      where: { rosterType: { in: ["NHL", "AHL"] }, contractYears: 0, NOT: { capHit: 100_000 } },
+      data: { rosterType: "UFA", scratched: false, captaincy: null },
+    });
+    expiredToUfa = swept.count;
   }
   await prisma.leagueConfig.upsert({
     where: { id: 1 }, update: { leagueDate: next }, create: { id: 1, leagueDate: next },
   });
   for (const p of ["/calendar", "/schedule", "/standings", "/scores", "/admin/season", "/finance", "/free-agents", "/signings", "/waivers", "/"]) revalidatePath(p);
-  return { date: next, phase: ph(next), played, signed, warned: promises.warned, requested: promises.requested, capOffenders, waiverClaims: waivers.claimed, waiverClears: waivers.cleared };
+  return { date: next, phase: ph(next), played, signed, warned: promises.warned, requested: promises.requested, capOffenders, expiredToUfa, waiverClaims: waivers.claimed, waiverClears: waivers.cleared };
 }
 
 /** Admin: advance the league clock by one calendar day (manual button). */
