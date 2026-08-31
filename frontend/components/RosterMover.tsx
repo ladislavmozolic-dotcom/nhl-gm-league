@@ -8,7 +8,7 @@ import { ROSTER_LIMITS, isNhlSide, type MoveRow, type RosterSide } from "@/lib/r
 type Player = {
   id: number; name: string; position: string; overall: number;
   isGoalie: boolean; side: RosterSide; contractType: "ONE_WAY" | "TWO_WAY" | null;
-  capHit: number;
+  capHit: number; onWaivers?: boolean;
 };
 
 // Exactly the $100k farm deal → a minor-league (AHL-only) contract. Such a player
@@ -28,9 +28,10 @@ type Props = {
   teamName: string; teamSlug: string; affiliateName: string; hasAffiliate: boolean;
   players: Player[]; onSave: (slug: string, rows: MoveRow[]) => Promise<{ ok: boolean; error?: string } | void>;
   onRelease: (slug: string, playerId: number) => Promise<{ ok: boolean; error?: string; name?: string }>;
+  onWaiver: (slug: string, playerId: number) => Promise<{ ok: boolean; error?: string }>;
 };
 
-export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffiliate, players, onSave, onRelease }: Props) {
+export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffiliate, players, onSave, onRelease, onWaiver }: Props) {
   const [rows, setRows] = useState<Player[]>(players);
   const [pending, start] = useTransition();
   const [saved, setSaved] = useState(false);
@@ -46,6 +47,18 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
         const r = await onRelease(teamSlug, p.id);
         if (!r.ok) setErr(r.error ?? "Couldn't release the player.");
         else { setRows((prev) => prev.filter((x) => x.id !== p.id)); setNote(`${r.name ?? p.name} released to UFA.`); }
+      } catch (e) { setErr((e as Error).message); }
+    });
+  };
+
+  const waiver = (p: Player) => {
+    if (!confirm(`Put ${p.name} on waivers? Any club can claim him during a one-day window; if unclaimed, he clears to your AHL affiliate.`)) return;
+    start(async () => {
+      setErr(null); setNote(null);
+      try {
+        const r = await onWaiver(teamSlug, p.id);
+        if (!r.ok) setErr(r.error ?? "Couldn't place him on waivers.");
+        else { setRows((prev) => prev.map((x) => (x.id === p.id ? { ...x, onWaivers: true } : x))); setNote(`${p.name} placed on waivers.`); }
       } catch (e) { setErr((e as Error).message); }
     });
   };
@@ -144,10 +157,29 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
           </span>
         )}
         <div className="flex items-center gap-1 shrink-0">
-          {/* dressed NHL: scratch or send down */}
-          {p.side === "pro" && <><MoveBtn p={p} to="pro-scratched" label="Scratch" /><MoveBtn p={p} to="farm" label="↓ Farm" /></>}
-          {/* NHL scratch: dress or send down */}
-          {p.side === "pro-scratched" && <><MoveBtn p={p} to="pro" label="Dress" /><MoveBtn p={p} to="farm" label="↓ Farm" /></>}
+          {/* a one-way player already on the wire: nothing left to do here but wait */}
+          {oneWay && p.onWaivers && (p.side === "pro" || p.side === "pro-scratched") && (
+            <span title="Waiting for the one-day waiver window to close — check the Waivers page"
+              className="text-[10px] font-bold px-1.5 py-0.5 rounded border border-amber-600/50 text-amber-400 whitespace-nowrap">⏳ On Waivers</span>
+          )}
+          {/* dressed NHL: scratch, and send down (a one-way deal goes through waivers instead) */}
+          {p.side === "pro" && <>
+            <MoveBtn p={p} to="pro-scratched" label="Scratch" />
+            {oneWay && !ahlOnly
+              ? (!p.onWaivers && <button onClick={() => waiver(p)} disabled={pending}
+                  title="One-way contracts must clear waivers before they can be sent to the farm"
+                  className="text-[11px] px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-30 whitespace-nowrap">Farm/Waivers</button>)
+              : <MoveBtn p={p} to="farm" label="↓ Farm" />}
+          </>}
+          {/* NHL scratch: dress, and send down (same one-way → waivers rule) */}
+          {p.side === "pro-scratched" && <>
+            <MoveBtn p={p} to="pro" label="Dress" />
+            {oneWay && !ahlOnly
+              ? (!p.onWaivers && <button onClick={() => waiver(p)} disabled={pending}
+                  title="One-way contracts must clear waivers before they can be sent to the farm"
+                  className="text-[11px] px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-30 whitespace-nowrap">Farm/Waivers</button>)
+              : <MoveBtn p={p} to="farm" label="↓ Farm" />}
+          </>}
           {/* AHL active: call up or scratch */}
           {p.side === "farm" && <><MoveBtn p={p} to="pro" label="↑ Pro" /><MoveBtn p={p} to="farm-scratched" label="Scratch" /></>}
           {/* AHL scratch: call up, dress on the farm, or release a $100k deal to UFA */}
@@ -189,7 +221,7 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
           <Link href={`/teams/${teamSlug}/lines`} className="text-slate-400 hover:text-blue-400">Lines →</Link>
           <Link href={`/teams/${teamSlug}/roster/edit`} className="text-slate-400 hover:text-blue-400">Numbers &amp; captains →</Link>
         </div>
-        <p className="text-xs text-slate-500 mt-1">Choose which <b>20 dress</b> (NHL) vs the healthy scratches, and manage the farm. One-way contracts can&apos;t be sent down; AHL-only / $100k minor-league deals can&apos;t be called up. <b>NHL Scratched</b> still count against the cap; <b>Farm Scratched</b> dress nowhere. A <b>$100k</b> minor-league player can be <b>Released</b> from Farm Scratched straight to the UFA market.</p>
+        <p className="text-xs text-slate-500 mt-1">Choose which <b>20 dress</b> (NHL) vs the healthy scratches, and manage the farm. One-way contracts can&apos;t be sent down directly — put them on <b>Farm/Waivers</b> instead; AHL-only / $100k minor-league deals can&apos;t be called up. <b>NHL Scratched</b> still count against the cap; <b>Farm Scratched</b> dress nowhere. A <b>$100k</b> minor-league player can be <b>Released</b> from Farm Scratched straight to the UFA market.</p>
       </div>
 
       {blockers.length > 0 && (

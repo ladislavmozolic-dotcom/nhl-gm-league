@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { notFound, redirect } from "next/navigation";
 import { canManageTeam } from "@/lib/auth";
 import RosterMover from "@/components/RosterMover";
-import { saveRosterMoves, releasePlayer } from "./actions";
+import { saveRosterMoves, releasePlayer, placeOnWaiversFromRoster } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +22,7 @@ export default async function RostersPage({ params }: { params: Promise<{ slug: 
     // only real roster players (NHL/AHL) — released UFAs, prospects and retirees keep a
     // team id (schema requires one) but must never surface in the roster manager.
     where: { teamId: { in: orgTeamIds }, rosterType: { in: ["NHL", "AHL"] } },
-    select: { id: true, name: true, position: true, overall: true, isGoalie: true, rosterType: true, contractType: true, capHit: true, scratched: true, teamId: true },
+    select: { id: true, name: true, position: true, overall: true, isGoalie: true, rosterType: true, contractType: true, capHit: true, scratched: true, teamId: true, waiverStatus: true },
     orderBy: [{ isGoalie: "asc" }, { overall: "desc" }],
   });
 
@@ -38,9 +38,11 @@ export default async function RostersPage({ params }: { params: Promise<{ slug: 
         side: (p.rosterType === "AHL" ? (p.scratched ? "farm-scratched" : "farm") : (p.scratched ? "pro-scratched" : "pro")) as "pro" | "pro-scratched" | "farm" | "farm-scratched",
         contractType: (p.contractType as "ONE_WAY" | "TWO_WAY" | null) ?? null,
         capHit: p.capHit ?? 0,
+        onWaivers: p.waiverStatus === "ON_WAIVERS",
       }))}
       onSave={saveRosterMoves}
       onRelease={releasePlayer}
+      onWaiver={placeOnWaiversFromRoster}
     />
   );
 }

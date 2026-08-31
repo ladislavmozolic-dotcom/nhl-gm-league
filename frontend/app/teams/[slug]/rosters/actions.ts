@@ -7,6 +7,7 @@ import { ROSTER_LIMITS, isNhlSide, isScratchSide, type MoveRow } from "@/lib/ros
 import { canAddCapHit } from "@/lib/cap";
 import { money } from "@/lib/finance";
 import { loadSettings } from "@/lib/sim/settings";
+import { placeOnWaivers } from "@/lib/waivers-server";
 
 export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
   const team = await prisma.team.findUnique({
@@ -132,4 +133,20 @@ export async function releasePlayer(slug: string, playerId: number) {
   revalidatePath(`/teams/${slug}/depth-chart`);
   revalidatePath("/free-agents");
   return { ok: true as const, name: player.name };
+}
+
+/** A one-way NHL player can't be sent straight to the farm (real hockey: he has to
+ *  clear waivers first) — this puts him on the waiver wire from the roster mover
+ *  itself instead of making the GM go find the separate Waivers page. Same
+ *  eligibility rules as placeOnWaivers (NMC blocks it, waivers must be enabled). */
+export async function placeOnWaiversFromRoster(slug: string, playerId: number) {
+  const team = await prisma.team.findUnique({ where: { slug }, select: { id: true } });
+  if (!team) return { ok: false as const, error: "Team not found." };
+  if (!(await canManageTeam(team.id))) return { ok: false as const, error: "You don't manage this team." };
+  const r = await placeOnWaivers(playerId, team.id);
+  if (r.ok) {
+    revalidatePath(`/teams/${slug}/rosters`);
+    revalidatePath("/waivers");
+  }
+  return r;
 }
