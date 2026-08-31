@@ -14,8 +14,8 @@ import { commissionerName } from "@/lib/audit-server";
 import { loadSettings } from "@/lib/sim/settings";
 import { autoFillRosters, fillAhlFromScratched } from "@/lib/roster-fill";
 import { aiGmDaily } from "@/lib/ai-gm";
-import { getLeagueDate } from "@/lib/calendar-server";
-import { addDays, utcDay, phaseFor, effectivePhase, PHASES, seasonOpen, defaultLeagueDate, frenzyRound, roundForDate } from "@/lib/calendar";
+import { getLeagueDate, computePhase } from "@/lib/calendar-server";
+import { addDays, utcDay, PHASES, seasonOpen, defaultLeagueDate, frenzyRound, roundForDate } from "@/lib/calendar";
 import { processWaivers } from "@/lib/waivers-server";
 import { generatePreseason, playPreseason, playPreseasonDay, computeAutoPreseasonStart, PRE_SEASON } from "@/lib/preseason";
 import { postWeeklyIfDue } from "@/lib/weekly-digest";
@@ -50,8 +50,11 @@ async function recoverOneDay() {
 export async function advanceLeagueDayCore() {
   const cur = await getLeagueDate();
   const cfg0 = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { phaseOverride: true } });
-  const ph = (d: Date) => effectivePhase(d, cfg0?.phaseOverride); // admin can pin the phase manually
   const next = addDays(cur, 1);
+  // computed once, up front — every phCur/phNext reference below reuses these
+  // (DB-aware: honors the manual pin, else the configured/schedule-derived thresholds)
+  const phCur = await computePhase(cur, cfg0?.phaseOverride);
+  const phNext = await computePhase(next, cfg0?.phaseOverride);
   const start = utcDay(next), end = addDays(next, 1);
   const dayGames = await prisma.game.findMany({
     where: { season: SEASON, status: "SCHEDULED", seriesId: null, gameDate: { gte: start, lt: end } },
@@ -68,7 +71,7 @@ export async function advanceLeagueDayCore() {
     const r = await playScheduledGames({ season: SEASON, round: dayGames[0].round, actor: await commissionerName() });
     played = r.played;
     await processFinances(SEASON, "NHL");
-  } else if (ph(next) === "regular" || ph(next) === "playoffs") {
+  } else if (phNext === "regular" || phNext === "playoffs") {
     await recoverOneDay();
   }
   // Pre-season games scheduled for this day play out too (exhibition; own season
@@ -100,10 +103,10 @@ export async function advanceLeagueDayCore() {
   // boundary inside the window runs counters / shortlisting; leaving the window
   // (end of round 3) signs everyone's best offer.
   let signed = 0;
-  if (ph(cur) === "frenzy" && ph(next) !== "frenzy") {
+  if (phCur === "frenzy" && phNext !== "frenzy") {
     const r = await resolveFrenzy();
     signed = r.signed;
-  } else if (ph(cur) === "frenzy" && ph(next) === "frenzy" && frenzyRound(cur) !== frenzyRound(next)) {
+  } else if (phCur === "frenzy" && phNext === "frenzy" && frenzyRound(cur) !== frenzyRound(next)) {
     await processRoundEnd(frenzyRound(cur));
   }
   // in-season UFA market: resolve any player whose 7-day deliberation (or 3-day match)
@@ -118,7 +121,7 @@ export async function advanceLeagueDayCore() {
   // market the moment regular season starts — same $100k-farm-filler exclusion
   // ContractSection uses (those aren't real deals GMs are expected to act on).
   let expiredToUfa = 0;
-  if (ph(cur) !== "regular" && ph(next) === "regular") {
+  if (phCur !== "regular" && phNext === "regular") {
     const offenders = await leagueCapCompliance("regular");
     capOffenders = offenders.filter((o) => o.over > 0).length;
     for (const o of offenders) {
@@ -134,7 +137,7 @@ export async function advanceLeagueDayCore() {
     where: { id: 1 }, update: { leagueDate: next }, create: { id: 1, leagueDate: next },
   });
   for (const p of ["/calendar", "/schedule", "/standings", "/scores", "/admin/season", "/finance", "/free-agents", "/signings", "/waivers", "/"]) revalidatePath(p);
-  return { date: next, phase: ph(next), played, signed, warned: promises.warned, requested: promises.requested, capOffenders, expiredToUfa, waiverClaims: waivers.claimed, waiverClears: waivers.cleared };
+  return { date: next, phase: phNext, played, signed, warned: promises.warned, requested: promises.requested, capOffenders, expiredToUfa, waiverClaims: waivers.claimed, waiverClears: waivers.cleared };
 }
 
 /** Admin: advance the league clock by one calendar day (manual button). */
@@ -152,7 +155,8 @@ export async function setLeagueDateAction(iso: string) {
     where: { id: 1 }, update: { leagueDate: utcDay(d) }, create: { id: 1, leagueDate: utcDay(d) },
   });
   for (const p of ["/calendar", "/schedule", "/admin/season", "/free-agents"]) revalidatePath(p);
-  return { ok: true, date: utcDay(d), phase: phaseFor(d) };
+  const cfgP = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { phaseOverride: true } });
+  return { ok: true, date: utcDay(d), phase: await computePhase(d, cfgP?.phaseOverride) };
 }
 
 /** Admin: (re)start the league clock at July 1 — the Free Agent Frenzy open. */
@@ -163,7 +167,8 @@ export async function startLeagueClockAction() {
     where: { id: 1 }, update: { leagueDate: d }, create: { id: 1, leagueDate: d },
   });
   for (const p of ["/calendar", "/schedule", "/admin/season", "/free-agents"]) revalidatePath(p);
-  return { date: d, phase: phaseFor(d) };
+  const cfgS = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { phaseOverride: true } });
+  return { date: d, phase: await computePhase(d, cfgS?.phaseOverride) };
 }
 
 /** Admin: durably promote farm players onto any NHL club short of 12F/6D/2G, so
@@ -355,6 +360,27 @@ export async function setPhaseOverrideAction(phase: string | null) {
   }
   for (const p of ["/", "/admin/season", "/calendar", "/free-agents", "/schedule", "/standings", "/scores"]) revalidatePath(p);
   return { ok: true as const, preseasonMsg };
+}
+
+/** Admin: set (or clear, passing null) the real dates the "preseason" and "regular"
+ *  phases begin — only used while the phase follows the calendar (Auto mode); a
+ *  pinned phase ignores these entirely. Clearing a date falls back to the generated
+ *  schedule's own first game, or the old fixed calendar-year default if there's no
+ *  schedule yet. Playoffs isn't set here — it always follows the regular season's
+ *  last scheduled game. See lib/calendar-server.ts resolvePhaseThresholds. */
+export async function setPhaseDatesAction(preseasonAt: string | null, regularAt: string | null) {
+  if (!(await isAdmin())) return { ok: false as const, error: "Admin only." };
+  const parse = (iso: string | null) => (iso ? new Date(iso + "T00:00:00Z") : null);
+  const pre = parse(preseasonAt), reg = parse(regularAt);
+  if ((preseasonAt && isNaN(pre!.getTime())) || (regularAt && isNaN(reg!.getTime()))) {
+    return { ok: false as const, error: "Invalid date." };
+  }
+  await prisma.leagueConfig.upsert({
+    where: { id: 1 }, update: { preseasonPhaseAt: pre, regularPhaseAt: reg },
+    create: { id: 1, preseasonPhaseAt: pre, regularPhaseAt: reg },
+  });
+  for (const p of ["/", "/admin/season", "/calendar", "/free-agents", "/schedule", "/standings", "/scores"]) revalidatePath(p);
+  return { ok: true as const };
 }
 
 export async function importNhlApiAction() {

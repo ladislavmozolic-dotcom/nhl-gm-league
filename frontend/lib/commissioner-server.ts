@@ -4,8 +4,8 @@
 // The less manual work to run a day, the more likely a league migrates here.
 
 import { prisma } from "./prisma";
-import { getLeagueDate } from "./calendar-server";
-import { addDays, utcDay, effectivePhase } from "./calendar";
+import { getLeagueDate, computePhase } from "./calendar-server";
+import { addDays, utcDay } from "./calendar";
 import { leagueCapCompliance } from "./cap";
 
 const SEASON = "2026-27";
@@ -30,7 +30,7 @@ export async function commishToday(): Promise<CommishToday> {
   const cur = await getLeagueDate();
   const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { phaseOverride: true } });
   const next = addDays(cur, 1);
-  const phase = effectivePhase(next, cfg?.phaseOverride);
+  const phase = await computePhase(next, cfg?.phaseOverride);
   const start = utcDay(next), end = addDays(next, 1);
 
   const [dayGames, teams, lines, capOff, pendingTrades, nhlPlayers] = await Promise.all([

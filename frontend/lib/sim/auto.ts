@@ -5,8 +5,8 @@
 import { prisma } from "../prisma";
 import { playScheduledGames } from "./season";
 import { processFinances } from "../finance-server";
-import { getLeagueDate } from "../calendar-server";
-import { addDays, effectivePhase, frenzyRound, frenzyDay } from "../calendar";
+import { getLeagueDate, computePhase } from "../calendar-server";
+import { addDays, frenzyRound, frenzyDay } from "../calendar";
 
 const SEASON = "2026-27";
 
@@ -17,21 +17,22 @@ const SEASON = "2026-27";
 export async function advanceFrenzyDay() {
   const cur = await getLeagueDate();
   const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { phaseOverride: true } });
-  const ph = (d: Date) => effectivePhase(d, cfg?.phaseOverride);
-  if (ph(cur) === "regular" || ph(cur) === "playoffs") return { advanced: false as const };
+  const phCur = await computePhase(cur, cfg?.phaseOverride);
+  if (phCur === "regular" || phCur === "playoffs") return { advanced: false as const };
   const next = addDays(cur, 1);
+  const phNext = await computePhase(next, cfg?.phaseOverride);
   const { resolveFrenzy, processRoundEnd } = await import("../../app/free-agents/actions");
   let signed = 0, roundEnded = 0, osSigned = 0;
   // offer sheets are decided by the commissioner-set day — resolve them once, as
   // the clock crosses that day (or leaves the frenzy earlier).
   const { loadSettings } = await import("../sim/settings");
   const osDay = (await loadSettings()).osDecisionDay;
-  if (ph(cur) === "frenzy" && frenzyDay(cur) <= osDay && (frenzyDay(next) > osDay || ph(next) !== "frenzy")) {
+  if (phCur === "frenzy" && frenzyDay(cur) <= osDay && (frenzyDay(next) > osDay || phNext !== "frenzy")) {
     const { resolveOfferSheets } = await import("../offer-sheet-server");
     osSigned = (await resolveOfferSheets()).signed;
   }
-  if (ph(cur) === "frenzy" && ph(next) !== "frenzy") { signed = (await resolveFrenzy()).signed; }
-  else if (ph(cur) === "frenzy" && ph(next) === "frenzy" && frenzyRound(cur) !== frenzyRound(next)) { await processRoundEnd(frenzyRound(cur)); roundEnded = frenzyRound(cur); }
+  if (phCur === "frenzy" && phNext !== "frenzy") { signed = (await resolveFrenzy()).signed; }
+  else if (phCur === "frenzy" && phNext === "frenzy" && frenzyRound(cur) !== frenzyRound(next)) { await processRoundEnd(frenzyRound(cur)); roundEnded = frenzyRound(cur); }
   await prisma.leagueConfig.upsert({ where: { id: 1 }, update: { leagueDate: next }, create: { id: 1, leagueDate: next } });
   return { advanced: true as const, date: next, signed, roundEnded, osSigned };
 }

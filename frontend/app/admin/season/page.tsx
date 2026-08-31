@@ -8,6 +8,7 @@ import { PageHeader, Card } from "@/components/ui";
 import PrepareNextDraftButton from "@/components/PrepareNextDraftButton";
 import DraftPickControls from "@/components/DraftPickControls";
 import PhaseControl from "@/components/PhaseControl";
+import PhaseDatesControl from "@/components/PhaseDatesControl";
 import PreseasonControls from "@/components/PreseasonControls";
 import PlayoffStartControls from "@/components/PlayoffStartControls";
 import { getLeagueClock } from "@/lib/calendar-server";
@@ -52,7 +53,7 @@ export default async function SeasonAdminPage() {
     prisma.playoffSeries.count({ where: { season: SEASON } }),
     prisma.playoffSeries.findFirst({ where: { season: SEASON, round: 4, status: "DONE" }, select: { winnerTeamId: true } }),
     getLeagueClock(),
-    prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { phaseOverride: true, lastAutoAdvance: true, preseasonPublic: true } }),
+    prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { phaseOverride: true, lastAutoAdvance: true, preseasonPublic: true, preseasonPhaseAt: true, regularPhaseAt: true } }),
     prisma.game.count({ where: { season: PRE_SEASON, status: "SCHEDULED" } }),
     prisma.game.count({ where: { season: PRE_SEASON, status: "FINAL" } }),
   ]);
@@ -75,6 +76,9 @@ export default async function SeasonAdminPage() {
           <p className="text-sm text-slate-400">Set the phase manually — Off-season, Pre-season, Regular season or Playoffs — or leave it on <span className="text-slate-200">Auto</span> to follow the calendar. Leagues don&apos;t all run on the real dates.</p>
           <PhaseControl current={clock.phase} label={clock.phaseLabel} override={cfg?.phaseOverride ?? null} />
           <AutoAdvanceHealth pinned={!!cfg?.phaseOverride} lastRun={cfg?.lastAutoAdvance ?? null} />
+          <div className="pt-2 border-t border-slate-800">
+            <PhaseDatesControl preseasonAt={cfg?.preseasonPhaseAt?.toISOString() ?? null} regularAt={cfg?.regularPhaseAt?.toISOString() ?? null} />
+          </div>
         </div>
       </Card>
 

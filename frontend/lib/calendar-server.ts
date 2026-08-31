@@ -1,11 +1,56 @@
 import { prisma } from "./prisma";
-import { defaultLeagueDate, phaseFor, effectivePhase, frenzyDay, frenzyRound, isFrenzyOpen, addDays, PHASE_LABEL, type Phase } from "./calendar";
+import {
+  defaultLeagueDate, frenzyDay, frenzyRound, isFrenzyOpen, addDays, utcDay,
+  seasonOpen, FRENZY_WINDOW_DAYS, SEASON_START_YEAR, PHASES, PHASE_LABEL, type Phase,
+} from "./calendar";
+import { PRE_SEASON, REGULAR_SEASON } from "./phase";
 import type { Phase as StatsPhase } from "./phase";
 
 /** The current league-clock date (defaults to July 1 if the league hasn't started). */
 export async function getLeagueDate(): Promise<Date> {
   const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { leagueDate: true } });
   return cfg?.leagueDate ?? defaultLeagueDate();
+}
+
+/** Real-date thresholds the "preseason"/"regular"/"playoffs" phases begin at, resolved
+ *  in priority order for each: (1) the admin-configured LeagueConfig field (Season
+ *  Control), (2) derived from the actual generated schedule (its first — or for
+ *  playoffs, the day after its last — game), (3) the old fixed calendar-year fallback,
+ *  for a brand-new league with no schedule yet. Playoffs has no configurable field of
+ *  its own — it always follows directly from when the regular season's games run out. */
+export async function resolvePhaseThresholds(year = SEASON_START_YEAR): Promise<{ preseasonAt: Date; regularAt: Date; playoffsAt: Date }> {
+  const [cfg, firstPre, firstReg, lastReg] = await Promise.all([
+    prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { preseasonPhaseAt: true, regularPhaseAt: true } }),
+    prisma.game.findFirst({ where: { season: PRE_SEASON }, orderBy: { gameDate: "asc" }, select: { gameDate: true } }),
+    prisma.game.findFirst({ where: { season: REGULAR_SEASON, league: "NHL", seriesId: null }, orderBy: { gameDate: "asc" }, select: { gameDate: true } }),
+    prisma.game.findFirst({ where: { season: REGULAR_SEASON, league: "NHL", seriesId: null }, orderBy: { gameDate: "desc" }, select: { gameDate: true } }),
+  ]);
+  const preseasonAt = cfg?.preseasonPhaseAt ?? firstPre?.gameDate ?? new Date(Date.UTC(year, 8, 21)); // Sep 21 fallback
+  const regularAt = cfg?.regularPhaseAt ?? firstReg?.gameDate ?? new Date(Date.UTC(year, 9, 1));       // Oct 1 fallback
+  const playoffsAt = lastReg?.gameDate ? addDays(lastReg.gameDate, 1) : new Date(Date.UTC(year + 1, 3, 15)); // Apr 15 fallback
+  return { preseasonAt, regularAt, playoffsAt };
+}
+
+/** DB-aware phase computation — the one to use for "what phase is it right now" /
+ *  "what phase does day X fall in" anywhere live-clock logic needs it (the sim day
+ *  loop, opening-day sweeps, the Frenzy round transition, commissioner tools). The
+ *  plain `effectivePhase`/`phaseFor` in ./calendar stay as the pure, schedule-blind
+ *  fallback (still fine for a one-off "what would date X be under the OLD fixed
+ *  calendar" utility, but not for anything driving real season progression). */
+export async function computePhase(date: Date, override?: string | null): Promise<Phase> {
+  if (override && (PHASES as string[]).includes(override)) return override as Phase;
+  const d = utcDay(date).getTime();
+  const open = seasonOpen().getTime();
+  const frenzyEnd = addDays(seasonOpen(), FRENZY_WINDOW_DAYS).getTime();
+  const finals = new Date(Date.UTC(SEASON_START_YEAR + 1, 5, 20)).getTime(); // Jun 20 — unchanged, not asked to be configurable
+  if (d >= open && d < frenzyEnd) return "frenzy";
+  const { preseasonAt, regularAt, playoffsAt } = await resolvePhaseThresholds();
+  const pre = utcDay(preseasonAt).getTime(), reg = utcDay(regularAt).getTime(), po = utcDay(playoffsAt).getTime();
+  if (d >= frenzyEnd && d < pre) return "offseason";
+  if (d >= pre && d < reg) return "preseason";
+  if (d >= reg && d < po) return "regular";
+  if (d >= po && d < finals) return "playoffs";
+  return "offseason";
 }
 
 export type LeagueClock = {
@@ -34,7 +79,7 @@ function faWindowFor(phase: Phase, frenzyOpen: boolean): { open: boolean; immedi
 export async function getLeagueClock(): Promise<LeagueClock> {
   const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { leagueDate: true, faOpen: true, phaseOverride: true } });
   const date = cfg?.leagueDate ?? defaultLeagueDate();
-  const phase = effectivePhase(date, cfg?.phaseOverride);
+  const phase = await computePhase(date, cfg?.phaseOverride);
   const faForced = !!cfg?.faOpen;
   const frenzyOpen = faForced || isFrenzyOpen(date);
   const today = faWindowFor(phase, frenzyOpen);
@@ -46,7 +91,7 @@ export async function getLeagueClock(): Promise<LeagueClock> {
   let faWindow: LeagueClock["faWindow"] = { ...today, previewOnly: false };
   if (!today.open) {
     const tomorrow = addDays(date, 1);
-    const tomorrowPhase = effectivePhase(tomorrow, cfg?.phaseOverride);
+    const tomorrowPhase = await computePhase(tomorrow, cfg?.phaseOverride);
     const tomorrowFrenzyOpen = faForced || isFrenzyOpen(tomorrow);
     const preview = faWindowFor(tomorrowPhase, tomorrowFrenzyOpen);
     if (preview.open) faWindow = { ...preview, previewOnly: true };
