@@ -6,10 +6,11 @@
 
 import { prisma } from "./prisma";
 import { loadSettings } from "./sim/settings";
-import { getLeagueDate } from "./calendar-server";
+import { getLeagueDate, computePhase } from "./calendar-server";
 import { roundForDate } from "./calendar";
 import { computeStandings } from "./sim/standings";
 import { cleanName } from "./playerName";
+import type { Phase } from "./calendar";
 
 export type WaiverRow = {
   id: number; playerId: number; playerName: string; playerSlug: string | null; position: string; capHit: number;
@@ -69,11 +70,13 @@ export async function claimWaiver(waiverId: number, teamId: number): Promise<{ o
   return { ok: true };
 }
 
-/** The placing club pulls a player back before the window closes. */
+/** The placing club pulls a player back before the window closes — only while
+ *  nobody has claimed him yet; once a claim lands, the pull-back locks out. */
 export async function cancelWaiver(waiverId: number, actorTeamId: number): Promise<{ ok: boolean; error?: string }> {
-  const w = await prisma.waiver.findUnique({ where: { id: waiverId }, select: { id: true, fromTeamId: true, playerId: true, status: true } });
+  const w = await prisma.waiver.findUnique({ where: { id: waiverId }, select: { id: true, fromTeamId: true, playerId: true, status: true, _count: { select: { claims: true } } } });
   if (!w || w.status !== "ACTIVE") return { ok: false, error: "That waiver is no longer active." };
   if (w.fromTeamId !== actorTeamId) return { ok: false, error: "Only the placing club can pull him back." };
+  if (w._count.claims > 0) return { ok: false, error: "He's already been claimed — you can't pull him back now." };
   await prisma.$transaction([
     prisma.waiverClaim.deleteMany({ where: { waiverId } }),
     prisma.waiver.update({ where: { id: waiverId }, data: { status: "CANCELLED", resolvedAt: new Date() } }),
@@ -83,15 +86,22 @@ export async function cancelWaiver(waiverId: number, actorTeamId: number): Promi
 }
 
 /** Resolve every waiver whose one-day window has closed (placedDay < currentDay).
- *  Claimed → the worst-standings claimant gets him (NHL); else he clears to the
- *  placing club's AHL affiliate. Called from the calendar day-advance. */
-export async function processWaivers(currentDay: number): Promise<{ claimed: number; cleared: number; details: string[] }> {
+ *  Claimed → in the regular season/playoffs, the worst-standings claimant gets
+ *  him (real waiver-priority logic only makes sense once standings mean
+ *  something); any other phase (off-season, Frenzy, preseason) instead uses a
+ *  claim-order queue — whichever claiming club has gone longest without
+ *  winning a contested claim gets him (ties broken by who claimed first), and
+ *  the winner drops to the back of that line for next time. Unclaimed players
+ *  clear to the placing club's AHL affiliate. Called from the calendar
+ *  day-advance. */
+export async function processWaivers(currentDay: number, phase: Phase): Promise<{ claimed: number; cleared: number; details: string[] }> {
   const due = await prisma.waiver.findMany({ where: { status: "ACTIVE", placedDay: { lt: currentDay } }, include: { claims: true } });
   if (due.length === 0) return { claimed: 0, cleared: 0, details: [] };
 
-  const standings = await computeStandings();
+  const useStandings = phase === "regular" || phase === "playoffs";
+  const standings = useStandings ? await computeStandings() : [];
   const priority = new Map(standings.map((s, i) => [s.teamId, i])); // index 0 = best; higher = worse (claim priority)
-  const teams = await prisma.team.findMany({ select: { id: true, code: true, parentTeamId: true, affiliateTeams: { select: { id: true } } } });
+  const teams = await prisma.team.findMany({ select: { id: true, code: true, parentTeamId: true, affiliateTeams: { select: { id: true } }, lastWaiverClaimAt: true } });
   const tById = new Map(teams.map((t) => [t.id, t]));
   const details: string[] = [];
   let claimed = 0, cleared = 0;
@@ -100,14 +110,30 @@ export async function processWaivers(currentDay: number): Promise<{ claimed: num
     const player = await prisma.player.findUnique({ where: { id: w.playerId }, select: { name: true, capHit: true } });
     const name = cleanName(player?.name ?? "");
     if (w.claims.length > 0) {
-      // worst standings (highest priority index) wins; tie → earliest claim
-      const winner = [...w.claims].sort((a, b) => (priority.get(b.teamId) ?? -1) - (priority.get(a.teamId) ?? -1) || a.id - b.id)[0];
+      const winner = useStandings
+        // worst standings (highest priority index) wins; tie → earliest claim
+        ? [...w.claims].sort((a, b) => (priority.get(b.teamId) ?? -1) - (priority.get(a.teamId) ?? -1) || a.id - b.id)[0]
+        // claim-order queue: never-claimed/longest-idle club first, tie → earliest claim this round
+        : [...w.claims].sort((a, b) => {
+            const la = tById.get(a.teamId)?.lastWaiverClaimAt ?? null;
+            const lb = tById.get(b.teamId)?.lastWaiverClaimAt ?? null;
+            if (la === null && lb === null) return a.createdAt.getTime() - b.createdAt.getTime() || a.id - b.id;
+            if (la === null) return -1;
+            if (lb === null) return 1;
+            return la.getTime() - lb.getTime() || a.createdAt.getTime() - b.createdAt.getTime();
+          })[0];
       await prisma.$transaction([
         // a new organization just claimed him — the old club's trade-block listing doesn't carry over
         prisma.player.update({ where: { id: w.playerId }, data: { teamId: winner.teamId, rosterType: "NHL", waiverStatus: "NONE", captaincy: null, onBlock: false, blockNote: null } }),
         prisma.waiver.update({ where: { id: w.id }, data: { status: "CLAIMED", claimedByTeamId: winner.teamId, resolvedAt: new Date() } }),
+        // move the winner to the back of the claim-order queue for next time (harmless in-season, since standings decide there anyway)
+        prisma.team.update({ where: { id: winner.teamId }, data: { lastWaiverClaimAt: new Date() } }),
         prisma.transaction.create({ data: { type: "WAIVER", message: `${tById.get(winner.teamId)?.code ?? "A club"} claimed ${name} off waivers from ${tById.get(w.fromTeamId)?.code ?? "?"}.` } }),
       ]);
+      // keep the in-memory queue state current so a second waiver resolved in this
+      // same batch also sees this club as just-claimed, not its stale pre-batch spot
+      const wTeam = tById.get(winner.teamId);
+      if (wTeam) wTeam.lastWaiverClaimAt = new Date();
       claimed++; details.push(`${name} → ${tById.get(winner.teamId)?.code} (claimed)`);
     } else {
       // cleared → drop to the placing club's AHL affiliate (if any)

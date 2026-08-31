@@ -56,6 +56,7 @@ model Team {
   popularity        Int         @default(100) // affects attendance / ticket revenue (admin-set)
   rivalTeamIds      Int[]       @default([]) // rivalries — heated games (more fights, scrums, misconducts)
   needs             String[]    @default([]) // Trade Block: positions this team is shopping for (C/LW/RW/D/G)
+  lastWaiverClaimAt DateTime?   // when this club last won a contested waiver claim outside the regular season/playoffs — null (or oldest) sorts first for the next contested claim, so a club that just claimed drops to the back of the line. Ignored in-season, where reverse standings decide priority instead.
   draftPicks        DraftPick[]
   players           Player[]
   prospects         Prospect[]

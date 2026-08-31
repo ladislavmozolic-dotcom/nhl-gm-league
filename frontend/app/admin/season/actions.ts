@@ -98,7 +98,7 @@ export async function advanceLeagueDayCore() {
   // ice-time promise check (self-gates to the regular season past 1/3)
   const promises = await checkPromises();
   // waivers: resolve any whose one-day window closed (claimed by priority, else clear to AHL)
-  const waivers = await processWaivers(roundForDate(next));
+  const waivers = await processWaivers(roundForDate(next), phNext);
   // Free Agent Frenzy round transitions (3 weekly rounds). Crossing a week
   // boundary inside the window runs counters / shortlisting; leaving the window
   // (end of round 3) signs everyone's best offer.

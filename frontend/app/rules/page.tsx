@@ -133,7 +133,8 @@ const SECTIONS: Sec[] = [
     groups: [
       { points: [
         "Waivers can be turned on or off by the commissioner.",
-        "When on: exposed players clear a one-day window; claims go by reverse-standings priority, otherwise the player clears to the AHL.",
+        "When on: exposed players clear a one-day window. In the regular season/playoffs, competing claims go by reverse-standings priority; outside that (off-season, Frenzy, preseason — where standings don't mean anything yet), priority instead follows a claim-order queue — whichever claiming club has gone longest without winning a claim gets him, and it then drops to the back of the line for next time. An unclaimed player clears to the AHL.",
+        "Once a claim is in, the placing club can no longer pull the player back off waivers.",
         "Waiver-exempt: players on an ELC or a two-way contract can be sent to the farm directly. A one-way / veteran player must clear the wire first — the roster mover blocks a direct bury-to-the-farm and points you to the Waiver Wire.",
       ] },
     ],
@@ -330,7 +331,8 @@ const SECTIONS_CS: Sec[] = [
     groups: [
       { points: [
         "Waivery může komisař zapnout nebo vypnout.",
-        "Když jsou zapnuté: vystavení hráči projdou jednodenním oknem; nároky jdou podle obráceného pořadí tabulky, jinak hráč propadne do AHL.",
+        "Když jsou zapnuté: vystavení hráči projdou jednodenním oknem. V základní části a play-off jdou souběžné nároky podle obráceného pořadí tabulky; mimo to (mezisezona, Frenzy, přípravka — kde tabulka ještě nic neznamená) rozhoduje místo toho pořadová fronta nároků — hráče dostane klub, který nejdéle nevyhrál žádný nárok, a po výhře se přesune na konec fronty. Nenárokovaný hráč propadne do AHL.",
+        "Jakmile je nárok podaný, klub, který hráče vystavil, ho už nemůže stáhnout zpět.",
         "Výjimka z waiverů: hráči na ELC nebo dvoucestné (two-way) smlouvě se dají poslat na farmu přímo. Jednocestný / veteránský hráč musí nejdřív projít wire — roster mover přímé zakopání na farmu zablokuje a odkáže tě na Waiver Wire.",
       ] },
     ],
