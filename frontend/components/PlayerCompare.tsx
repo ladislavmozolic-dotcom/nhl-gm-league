@@ -57,9 +57,10 @@ function SlotPicker({ pool, value, onPick, onClear }: {
   );
 }
 
-export default function PlayerCompare({ skaters, goalies }: { skaters: ComparePlayer[]; goalies: ComparePlayer[] }) {
-  const [mode, setMode] = useState<"skaters" | "goalies">("skaters");
-  const [sel, setSel] = useState<(ComparePlayer | null)[]>([null, null, null, null, null]);
+export default function PlayerCompare({ skaters, goalies, initialId }: { skaters: ComparePlayer[]; goalies: ComparePlayer[]; initialId?: number | null }) {
+  const initial = initialId != null ? [...skaters, ...goalies].find((p) => p.id === initialId) ?? null : null;
+  const [mode, setMode] = useState<"skaters" | "goalies">(initial?.goalie ? "goalies" : "skaters");
+  const [sel, setSel] = useState<(ComparePlayer | null)[]>([initial, null, null, null, null]);
   const pool = mode === "skaters" ? skaters : goalies;
   const attrs = mode === "skaters" ? SKATER_ATTRS : GOALIE_ATTRS;
   const chosen = sel.map((s) => (s && s.goalie === (mode === "goalies") ? s : null));

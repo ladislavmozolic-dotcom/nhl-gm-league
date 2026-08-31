@@ -380,8 +380,12 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                       <InfoTip text={`Star Power — business & media value (no on-ice effect). Drives merchandise, jersey sales, fan interest, ticket demand and sponsorships.${star.reasons.length ? " " + star.reasons.join(" · ") + "." : ""}`} />
                     </span>
                   )}
-                  <a href={`https://www.eliteprospects.com/search/player?q=${encodeURIComponent(cleanName(p.name))}`} target="_blank" rel="noopener noreferrer"
+                  <Link href={`/tools/compare?p=${p.id}`}
                     className="ml-auto inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-600/40 transition-colors">
+                    ⚖ Player Comparison
+                  </Link>
+                  <a href={`https://www.eliteprospects.com/search/player?q=${encodeURIComponent(cleanName(p.name))}`} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-600/40 transition-colors">
                     EliteProspects <span aria-hidden>↗</span>
                   </a>
                 </div>

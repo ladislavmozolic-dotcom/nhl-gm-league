@@ -4,7 +4,9 @@ import { cleanName } from "@/lib/playerName";
 
 export const dynamic = "force-dynamic";
 
-export default async function ComparePage() {
+export default async function ComparePage({ searchParams }: { searchParams: Promise<{ p?: string }> }) {
+  const { p: pParam } = await searchParams;
+  const initialId = pParam ? Number(pParam) : null;
   const [rows, teams] = await Promise.all([
     prisma.player.findMany({
       where: { rosterType: { in: ["NHL", "AHL"] } },
@@ -28,5 +30,5 @@ export default async function ComparePage() {
   const skaters = all.filter((p) => !p.goalie);
   const goalies = all.filter((p) => p.goalie);
 
-  return <div className="py-2"><PlayerCompare skaters={skaters} goalies={goalies} /></div>;
+  return <div className="py-2"><PlayerCompare skaters={skaters} goalies={goalies} initialId={initialId} /></div>;
 }
