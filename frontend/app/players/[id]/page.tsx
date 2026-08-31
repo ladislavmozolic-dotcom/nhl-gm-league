@@ -2,7 +2,7 @@ import Link from "next/link";
 import BackLink from "@/components/BackLink";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { cleanName } from "@/lib/playerName";
+import { cleanName, epProfileUrl } from "@/lib/playerName";
 import { Card } from "@/components/ui";
 import { posGroup, ratingColor, ovColor } from "@/lib/ratingBands";
 import { playerType } from "@/lib/player-type";
@@ -387,7 +387,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                     className="ml-auto inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-600/40 transition-colors">
                     ⚖ Player Comparison
                   </Link>
-                  <a href={`https://www.eliteprospects.com/search/player?q=${encodeURIComponent(cleanName(p.name))}`} target="_blank" rel="noopener noreferrer"
+                  <a href={epProfileUrl(p.name)} target="_blank" rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-600/40 transition-colors">
                     EliteProspects <span aria-hidden>↗</span>
                   </a>

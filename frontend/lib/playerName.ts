@@ -33,3 +33,11 @@ export function displayName(name: string): string {
 export function epSearchName(name: string): string {
   return name.replace(/''[A-Za-z]''|"[A-Za-z]"|\s*\([^)]*\)/g, "").replace(/\s{2,}/g, " ").trim();
 }
+
+/** A link that lands directly on a player's EliteProspects profile instead of EP's own
+ *  search-results page — EP's `/search/player?q=` never auto-picks the top hit, but
+ *  DuckDuckGo's "\" bang (jump straight to the #1 organic result) reliably does, and EP's
+ *  own profile is consistently that #1 result for "<name> eliteprospects player". */
+export function epProfileUrl(name: string): string {
+  return `https://duckduckgo.com/?q=${encodeURIComponent("\\" + epSearchName(name) + " eliteprospects player")}`;
+}

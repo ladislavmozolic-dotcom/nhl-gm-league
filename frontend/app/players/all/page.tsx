@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { PageHeader, Card } from "@/components/ui";
 import SortableTable, { type SortCol, type SortRow } from "@/components/SortableTable";
 import { posGroup, ratingColor, ovColor } from "@/lib/ratingBands";
+import { epProfileUrl } from "@/lib/playerName";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +45,7 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
     ];
     rows = prospects.map((p) => ({
       _id: p.id, name: p.name, pos: (p as any).position,
-      epUrl: (p as any).epUrl ?? `https://www.eliteprospects.com/search/player?q=${encodeURIComponent(p.name)}`,
+      epUrl: (p as any).epUrl ?? epProfileUrl(p.name),
       teamCode: p.team?.code, teamSlug: p.team?.slug, teamLogo: p.team?.logoUrl,
       year: p.draftYear, pick: p.overallPick,
     }));

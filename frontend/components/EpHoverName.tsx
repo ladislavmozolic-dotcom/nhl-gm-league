@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { epSearchName } from "@/lib/playerName";
+import { epProfileUrl } from "@/lib/playerName";
 
 export type HoverPlayer = {
   name: string;
@@ -15,8 +15,6 @@ export type HoverPlayer = {
   amateurClub?: string | null;
 };
 
-// DuckDuckGo "\" (ducky) bang → jumps to the top result = the player's EP profile.
-const epUrl = (name: string) => `https://duckduckgo.com/?q=${encodeURIComponent("\\" + epSearchName(name) + " eliteprospects player")}`;
 const fmtHeight = (h?: number | null) => (h ? `${Math.floor(h / 12)}'${h % 12}"` : null);
 
 export default function EpHoverName({ player, children, className }: { player: HoverPlayer; children: React.ReactNode; className?: string }) {
@@ -46,7 +44,7 @@ export default function EpHoverName({ player, children, className }: { player: H
       {children}
       {pos && (
         <a
-          href={epUrl(player.name)} target="_blank" rel="noopener noreferrer"
+          href={epProfileUrl(player.name)} target="_blank" rel="noopener noreferrer"
           onMouseEnter={() => { if (hideT.current) clearTimeout(hideT.current); }}
           onMouseLeave={leave}
           style={{ position: "fixed", left: Math.min(pos.x + 14, vw - 360), top: Math.min(pos.y, vh - 240), zIndex: 60 }}

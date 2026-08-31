@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
-import { cleanName, epSearchName } from "@/lib/playerName";
+import { cleanName, epSearchName, epProfileUrl } from "@/lib/playerName";
 import { Card, SectionTitle } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -26,7 +26,7 @@ export default async function TeamProspectsPage({ params }: { params: Promise<{ 
   });
   const reserve = offRoster.filter((p) => p.ltir);
   const prospectPool = offRoster.filter((p) => !p.ltir);
-  const epUrl = (name: string) => `https://www.eliteprospects.com/search/player?q=${encodeURIComponent(epSearchName(name))}`;
+  const epUrl = epProfileUrl;
 
   // A player is NOT a prospect if he's on this org's roster OR he already graduated
   // by the games-played rule (≥10 NHL, ≥15 AHL, ≥5 AHL for goalies) anywhere.
