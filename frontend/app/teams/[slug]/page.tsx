@@ -25,7 +25,10 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
       // cap total, captains or injured list once he's off the active roster.
       players: { where: { rosterType: { in: ["NHL", "AHL"] } }, orderBy: { overall: "desc" }, select: { id: true, isGoalie: true, position: true, age: true, capHit: true, contractText: true, name: true, slug: true, photoUrl: true, captaincy: true, nationality: true, injuryDaysLeft: true, injuryDesc: true } },
       prospects: { where: { source: rosterSource }, select: { id: true, name: true, position: true, draftYear: true } },
-      affiliateTeams: { select: { id: true, name: true, slug: true, logoUrl: true, code: true, players: { select: { id: true } } } },
+      // same rosterType filter as the parent's own `players` above — a released/
+      // waived/prospect-parked farm player keeps this teamId too, and must not
+      // keep counting toward the farm size after he's off the active AHL roster.
+      affiliateTeams: { select: { id: true, name: true, slug: true, logoUrl: true, code: true, players: { where: { rosterType: "AHL" }, select: { id: true } } } },
       parentTeam: true,
       headCoach: { select: { name: true } },
     },
@@ -186,6 +189,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
 
           <Card title="Roster Info" accent="text-blue-400">
             <div className="space-y-2.5">
+              <InfoRow label="Total players" value={`${proCount + farmCount} players`} />
               <InfoRow label="Pro roster" value={`${proCount} players`} />
               {farmCount > 0 && <InfoRow label="Farm" value={`${farmCount} players`} />}
               <InfoRow label="Prospects" value={String(team.prospects.length)} />
