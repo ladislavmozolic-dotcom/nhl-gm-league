@@ -82,7 +82,9 @@ export async function collectMoveOps(pkg: TradePackage) {
         capHit = newCap;
         retentionRecords.push({ teamId: fromOrg.id, playerName: `${pl.name} (retained)`, perYear: retained, years: Math.max(1, pl.contractYears ?? 1) });
       }
-      ops.push(prisma.player.update({ where: { id: pl.id }, data: { teamId: destId, rosterType: destRoster, capHit, captaincy: null } }));
+      // being shopped was the OLD club's decision — it doesn't carry over to whoever
+      // just acquired him, so clear the trade-block flag on every trade.
+      ops.push(prisma.player.update({ where: { id: pl.id }, data: { teamId: destId, rosterType: destRoster, capHit, captaincy: null, onBlock: false, blockNote: null } }));
     }
   };
   movePlayers(pkg.fromPlayers, fromTeam, pkg.toTeamId, toAff);

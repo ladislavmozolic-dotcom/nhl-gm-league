@@ -103,7 +103,8 @@ export async function processWaivers(currentDay: number): Promise<{ claimed: num
       // worst standings (highest priority index) wins; tie → earliest claim
       const winner = [...w.claims].sort((a, b) => (priority.get(b.teamId) ?? -1) - (priority.get(a.teamId) ?? -1) || a.id - b.id)[0];
       await prisma.$transaction([
-        prisma.player.update({ where: { id: w.playerId }, data: { teamId: winner.teamId, rosterType: "NHL", waiverStatus: "NONE", captaincy: null } }),
+        // a new organization just claimed him — the old club's trade-block listing doesn't carry over
+        prisma.player.update({ where: { id: w.playerId }, data: { teamId: winner.teamId, rosterType: "NHL", waiverStatus: "NONE", captaincy: null, onBlock: false, blockNote: null } }),
         prisma.waiver.update({ where: { id: w.id }, data: { status: "CLAIMED", claimedByTeamId: winner.teamId, resolvedAt: new Date() } }),
         prisma.transaction.create({ data: { type: "WAIVER", message: `${tById.get(winner.teamId)?.code ?? "A club"} claimed ${name} off waivers from ${tById.get(w.fromTeamId)?.code ?? "?"}.` } }),
       ]);
