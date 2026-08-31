@@ -689,7 +689,7 @@ export async function extendContractAction(
 ) {
   if (!(await canManageTeam(teamId))) return { ok: false as const, error: "You don't manage this team." };
   const player = await prisma.player.findUnique({
-    where: { id: playerId }, select: { teamId: true, contractYears: true, capHit: true, age: true, name: true, lastSeasonGP: true, resignRound: true, resignStatus: true, resignOfferSalary: true, rosterType: true, franchiseTag: true, overall: true, realFarmTeamId: true },
+    where: { id: playerId }, select: { teamId: true, contractYears: true, capHit: true, contractExpiry: true, contractType: true, tradeClause: true, noTradeTeams: true, contractText: true, age: true, name: true, lastSeasonGP: true, resignRound: true, resignStatus: true, resignOfferSalary: true, rosterType: true, franchiseTag: true, overall: true, realFarmTeamId: true },
   });
   if (!player) return { ok: false as const, error: "Player not found." };
   // the club may re-sign its own NHL players AND its farm (AHL affiliate) players
@@ -785,27 +785,33 @@ export async function extendContractAction(
     };
   }
 
-  // A re-signed pending-UFA finishes THIS season on his current (old) cap hit; the new
-  // deal is a deferred EXTENSION that activates at the next-season rollover. So we do
-  // NOT touch capHit/contractYears/contractExpiry now — only store the extension.
-  const fromSeason = CURRENT_SEASON_START + 1;
+  // The new deal replaces the current one immediately — salary/term update the
+  // moment the offer is accepted, same as any other signing (no deferred-extension
+  // delay to next season's rollover).
+  const expiry = CURRENT_SEASON_START + years;
   const noTradeTeams = clause === "M_NTC" ? await weakestTeams(breadth ?? 12, teamId) : [];
+  const contractText = `$${salary.toLocaleString("en-US")} × ${years}yr (through ${expiry})`;
   await prisma.player.update({
     where: { id: playerId },
     data: {
-      extCapHit: salary, extYears: years, extContractType: twoWay ? "TWO_WAY" : "ONE_WAY",
-      extClause: clause, extNoTradeTeams: noTradeTeams,
-      extText: `$${salary.toLocaleString("en-US")} × ${years}yr — extension from ${fromSeason}`,
+      capHit: salary, contractYears: years, contractExpiry: expiry,
+      contractType: twoWay ? "TWO_WAY" : "ONE_WAY", tradeClause: clause, noTradeTeams, contractText,
+      extCapHit: null, extYears: null, extContractType: null, extClause: null, extNoTradeTeams: [], extText: null,
       signPromiseLine: dep.line, signPromisePP: pp, signPromisePK: pk,
-      resignRound: 0, resignStatus: "extended", resignCounterSalary: null, resignCounterYears: null,
+      resignRound: 0, resignStatus: null, resignCounterSalary: null, resignCounterYears: null,
       disgruntled: false, tradeRequested: false, promiseWarnGame: null,
     },
   });
   await prisma.transaction.create({
-    data: { type: "SIGNING", message: `${team?.code ?? "?"} extended ${player.name} — $${(salary / 1e6).toFixed(2)}M × ${years}yr (from ${fromSeason})` },
+    data: { type: "SIGNING", message: `${team?.code ?? "?"} re-signed ${player.name} — $${(salary / 1e6).toFixed(2)}M × ${years}yr` },
   });
-  // revertible record — an EXTEND revert just clears the ext fields (current deal untouched)
-  await prisma.signingLog.create({ data: { playerId, playerName: player.name, teamCode: team?.code ?? null, kind: "EXTEND", salary, years } });
+  // revertible record — restores the exact prior contract snapshot on revert
+  await prisma.signingLog.create({ data: {
+    playerId, playerName: player.name, teamCode: team?.code ?? null, kind: "EXTEND", salary, years,
+    prevCapHit: player.capHit, prevYears: player.contractYears, prevExpiry: player.contractExpiry,
+    prevType: player.contractType, prevClause: player.tradeClause, prevNoTrade: player.noTradeTeams,
+    prevRosterType: player.rosterType, prevTeamId: player.teamId, prevContractText: player.contractText,
+  } });
   // no revalidatePath — it would unmount the confirmation modal; client refreshes on Done.
   return { ok: true as const, signed: true, salary, years, name: player.name };
 }

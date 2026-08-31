@@ -10,25 +10,20 @@ export async function revertSigningAction(logId: number) {
   const log = await prisma.signingLog.findUnique({ where: { id: logId } });
   if (!log || log.reverted) return { ok: false as const, error: "Already reverted or not found." };
 
-  if (log.kind === "EXTEND") {
-    // a deferred extension never touched the current contract — just drop the future deal
-    await prisma.player.update({
-      where: { id: log.playerId },
-      data: { extCapHit: null, extYears: null, extContractType: null, extClause: null, extNoTradeTeams: [], extText: null, resignStatus: null, resignRound: 0 },
-    });
-  } else {
-    // an immediate signing overwrote the contract — restore the snapshot
-    await prisma.player.update({
-      where: { id: log.playerId },
-      data: {
-        capHit: log.prevCapHit ?? 0, contractYears: log.prevYears, contractExpiry: log.prevExpiry,
-        contractType: log.prevType, tradeClause: log.prevClause, noTradeTeams: log.prevNoTrade,
-        rosterType: log.prevRosterType ?? "NHL", teamId: log.prevTeamId ?? undefined,
-        contractText: log.prevContractText,
-        extCapHit: null, extYears: null, extContractType: null, extClause: null, extNoTradeTeams: [], extText: null,
-        resignStatus: null, resignRound: 0,
-      },
-    });
+  // both an immediate signing and a re-sign/extension now overwrite the contract
+  // right away — restore the pre-signing snapshot either way.
+  await prisma.player.update({
+    where: { id: log.playerId },
+    data: {
+      capHit: log.prevCapHit ?? 0, contractYears: log.prevYears, contractExpiry: log.prevExpiry,
+      contractType: log.prevType, tradeClause: log.prevClause, noTradeTeams: log.prevNoTrade,
+      rosterType: log.prevRosterType ?? "NHL", teamId: log.prevTeamId ?? undefined,
+      contractText: log.prevContractText,
+      extCapHit: null, extYears: null, extContractType: null, extClause: null, extNoTradeTeams: [], extText: null,
+      resignStatus: null, resignRound: 0,
+    },
+  });
+  if (log.kind !== "EXTEND") {
     // drop the accepted FA offer so the player is a free agent again
     await prisma.faOffer.deleteMany({ where: { playerId: log.playerId, status: "ACCEPTED" } }).catch(() => {});
   }
