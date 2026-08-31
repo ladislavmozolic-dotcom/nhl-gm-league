@@ -10,6 +10,7 @@ import { cleanName } from "@/lib/playerName";
 import { getTeamSession, isAdmin, isComishTier } from "@/lib/auth";
 import { loadSettings } from "@/lib/sim/settings";
 import FaSignLockToggle from "@/components/FaSignLockToggle";
+import FaEarlyAccessToggle from "@/components/FaEarlyAccessToggle";
 import type { InterestCtx } from "@/components/InterestButton";
 import FrenzyBar from "@/components/FrenzyBar";
 
@@ -139,6 +140,7 @@ export default async function FreeAgentsPage({
       />
 
       <FaSignLockToggle locked={faSignLock} comish={isComish} />
+      <FaEarlyAccessToggle on={faSettings.faEarlyAccess} comish={isComish} marketOpen={clock.faWindow.open && !clock.faWindow.previewOnly} />
 
       <FrenzyBar
         frenzyOpen={clock.frenzyOpen}

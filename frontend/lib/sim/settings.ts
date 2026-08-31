@@ -92,6 +92,7 @@ export type EngineSettings = {
   // Pluggable league systems the commissioner picks
   faMode: "full" | "simple";        // full = RFA/franchise/offer-sheets; simple = everyone a UFA to the open market
   faSignLock: boolean;               // when true, ordinary GMs can't sign UFAs (commissioner-only); a comish toggle unlocks it
+  faEarlyAccess: boolean;            // when true, comish-tier may submit UFA-market offers even while the market is closed to everyone else (a manual head start ahead of a planned phase change — the date-driven preview in getLeagueClock only fires when the phase follows the real calendar unpinned, which most leagues don't run on)
   financeMode: "base" | "detailed";  // base = ticket-revenue finance; detailed = richer model (pending)
   waiversEnabled: boolean;           // enforce the waiver wire (claims / re-entry) on demotions
   rosterOverFinePerDay: number; // fine per excess player per day
@@ -197,7 +198,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   ],
   faTwoWayOlderAge: 25, faTwoWayNhlGpLimit: 30, faTwoWayMaxYears: 1, faTwoWayRelaxRound: 2,
   rfaMaxAge: 26, osOpenDay: 1, osCloseDay: 8, osDecisionDay: 10,
-  faMode: "full", faSignLock: true, financeMode: "base", waiversEnabled: true,
+  faMode: "full", faSignLock: true, faEarlyAccess: false, financeMode: "base", waiversEnabled: true,
   rosterOverFinePerDay: 200000,
   rewardPlayoff: 8000000, rewardCup: 3000000, rewardAhlCup: 4000000, rewardAhlFinalist: 2000000,
   duHighThreshold: 90, conRecovery: 1, conRecoveryHighDu: 2,

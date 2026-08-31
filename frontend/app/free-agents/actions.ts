@@ -104,6 +104,18 @@ export async function setFaSignLockAction(lock: boolean) {
   return { ok: true as const, locked: lock };
 }
 
+/** Commissioner toggle: let comish-tier submit UFA-market offers even while the
+ *  market is closed to everyone else — a manual head start for leagues that pin
+ *  the phase by hand rather than following the real calendar (where the
+ *  date-driven preview in getLeagueClock never has a "tomorrow" to look ahead to). */
+export async function setFaEarlyAccessAction(on: boolean) {
+  if (!(await isAdmin()) && !(await isComishTier())) return { ok: false as const, error: "Commissioner only." };
+  const s = await loadSettings();
+  await saveSettings({ ...s, faEarlyAccess: on });
+  for (const p of ["/free-agents", "/teams"]) revalidatePath(p);
+  return { ok: true as const, on };
+}
+
 /** All standing offers on a player (open frenzy — GMs can see the competition). */
 export async function getPlayerOffersAction(playerId: number) {
   // blind bidding: only the commissioner tier sees the competing offers; a plain GM never
@@ -150,8 +162,18 @@ export async function submitOfferAction(
     return { ok: false as const, error: "🔒 UFA podpisy sú momentálne zamknuté komisárom." };
   }
   const clock = await getLeagueClock();
-  const win = clock.faWindow;
-  if (!win.open) return { ok: false as const, error: "The free-agent market is closed." };
+  let win = clock.faWindow;
+  if (!win.open) {
+    // Manual comish head start (faEarlyAccess) — for leagues that pin the phase by
+    // hand rather than following the real calendar, where getLeagueClock's date-driven
+    // "tomorrow" preview has nothing to look ahead to. Comish-tier acts as if the
+    // standard in-season market were already open; everyone else stays locked out.
+    if (lockSettings.faEarlyAccess && (await isComishTier())) {
+      win = { open: true, immediate: true, ownOnly: false, previewOnly: true };
+    } else {
+      return { ok: false as const, error: "The free-agent market is closed." };
+    }
+  }
   // comish-tier head-start: the market opens for everyone tomorrow — the commissioner's
   // office may already act on it today, since they already see the whole field of offers.
   if (win.previewOnly && !(await isComishTier())) {
