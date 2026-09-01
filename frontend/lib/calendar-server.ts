@@ -100,7 +100,10 @@ export async function getLeagueClock(): Promise<LeagueClock> {
   return {
     date, phase, phaseLabel: PHASE_LABEL[phase],
     frenzyOpen,
-    frenzyDay: frenzyDay(date),
+    // faForced fallback matches frenzyRound below — a force-opened market
+    // (frenzyAutoOpenAt, outside the real July window) has no real calendar day to
+    // read, so it reads as day 1 rather than "closed" (0), same as frenzyRound does.
+    frenzyDay: isFrenzyOpen(date) ? frenzyDay(date) : (faForced ? 1 : 0),
     frenzyRound: isFrenzyOpen(date) ? frenzyRound(date) : (faForced ? 1 : 0),
     faForced,
     faWindow,

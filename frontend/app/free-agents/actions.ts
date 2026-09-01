@@ -196,7 +196,12 @@ export async function submitOfferAction(
   }
   // comish-tier head-start (July Frenzy only): the first day of each round is the
   // commissioner's office only (they bid before they can see anything), GMs join day 2.
-  if (!win.immediate) {
+  // This is purely a real-calendar-day head start, so it's skipped entirely when the
+  // market was FORCE-opened (clock.faForced, e.g. frenzyAutoOpenAt on a league that
+  // doesn't run on the real July dates) — the real calendar day never advances in
+  // that case, so `dayInRound` would read as "day 1" forever, permanently locking
+  // every ordinary GM out of a market the commissioner deliberately opened for them.
+  if (!win.immediate && !clock.faForced) {
     const dayInRound = clock.frenzyDay >= 1 ? ((clock.frenzyDay - 1) % 7) + 1 : 1;
     if (dayInRound === 1 && !(await isComishTier())) {
       return { ok: false as const, error: "This round opens for GMs tomorrow — the commissioner's office gets the first day." };
