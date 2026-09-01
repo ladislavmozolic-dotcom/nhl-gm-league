@@ -38,15 +38,23 @@ export async function activeWaivers(): Promise<WaiverRow[]> {
   });
 }
 
+// Flat cap-hit ceiling for a waiver placement — a simple stand-in for real NHL
+// waiver-exemption rules (age/games-played based) until something more nuanced is
+// built. A player above this is too valuable to realistically clear waivers to the
+// farm this way, so the placement is blocked outright rather than let it happen and
+// almost certainly get claimed.
+const WAIVER_CAP_HIT_LIMIT = 1_500_000;
+
 /** Place a player on waivers. NMC blocks it; NTC is allowed. */
 export async function placeOnWaivers(playerId: number, actorTeamId: number): Promise<{ ok: boolean; error?: string }> {
-  const p = await prisma.player.findUnique({ where: { id: playerId }, select: { teamId: true, rosterType: true, tradeClause: true, name: true } });
+  const p = await prisma.player.findUnique({ where: { id: playerId }, select: { teamId: true, rosterType: true, tradeClause: true, name: true, capHit: true } });
   if (!p) return { ok: false, error: "Player not found." };
   if (p.teamId !== actorTeamId) return { ok: false, error: "That player isn't on your team." };
   if (p.rosterType !== "NHL") return { ok: false, error: "Only an NHL player goes through waivers." };
   const settings = await loadSettings();
   if (!settings.waiversEnabled) return { ok: false, error: "Waivers are turned off in this league — send players down freely from the roster mover." };
   if (settings.clausesEnabled && p.tradeClause === "NMC") return { ok: false, error: `${cleanName(p.name)} has a no-movement clause — he can't be waived.` };
+  if ((p.capHit ?? 0) > WAIVER_CAP_HIT_LIMIT) return { ok: false, error: `${cleanName(p.name)} carries a $${(WAIVER_CAP_HIT_LIMIT / 1e6).toFixed(1)}M+ cap hit — too valuable to waive to the farm.` };
   const existing = await prisma.waiver.findUnique({ where: { playerId } });
   if (existing && existing.status === "ACTIVE") return { ok: false, error: "He's already on waivers." };
   const day = roundForDate(await getLeagueDate());
