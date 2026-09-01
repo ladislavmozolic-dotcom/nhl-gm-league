@@ -142,10 +142,19 @@ export default async function FreeAgentsPage({
       <PageHeader
         title="Free Agent Frenzy"
         subtitle="Off-season market — open-market value from sim-weighted comparables"
-        right={retiredCount > 0 ? (
-          <Link href="/retired" className="text-sm text-slate-400 hover:text-blue-400 whitespace-nowrap">
-            Retired players ({retiredCount}) →
-          </Link>
+        right={(retiredCount > 0 || isComish) ? (
+          <div className="flex items-center gap-4">
+            {isComish && (
+              <Link href="/free-agents/offers" className="text-sm text-amber-400 hover:text-amber-300 whitespace-nowrap font-semibold">
+                🔒 All active offers →
+              </Link>
+            )}
+            {retiredCount > 0 && (
+              <Link href="/retired" className="text-sm text-slate-400 hover:text-blue-400 whitespace-nowrap">
+                Retired players ({retiredCount}) →
+              </Link>
+            )}
+          </div>
         ) : undefined}
       />
 

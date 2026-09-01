@@ -173,6 +173,45 @@ export async function getBidHistoryAction(playerId: number) {
   return bids.map((b) => ({ teamCode: codeOf.get(b.teamId) ?? "?", salary: b.salary, years: b.years, at: b.createdAt.toISOString() }));
 }
 
+/** Every free agent currently carrying at least one active offer, with who's
+ *  bidding and for what — the commission's full-market view (the on-page
+ *  "Weighing offers" list only ever showed in-season deliberators, a narrow
+ *  slice; this covers Frenzy round bids and in-season offers alike, since both
+ *  write to the same FaOffer table). Comish-tier only, same blind-bidding mask
+ *  as every other offer-visibility action (a co-commissioner never sees the
+ *  commissioner's own bid). */
+export async function getAllActiveOffersAction() {
+  const mask = await offerViewMask();
+  if (!mask) return { ok: false as const, error: "Commissioner or co-commissioner only." };
+  const offers = (await prisma.faOffer.findMany({
+    where: { status: { in: ACTIVE } }, orderBy: [{ playerId: "asc" }, { salary: "desc" }],
+  })).filter((o) => !mask.hide.has(o.teamId));
+  if (offers.length === 0) return { ok: true as const, players: [] };
+  const playerIds = [...new Set(offers.map((o) => o.playerId))];
+  const teamIds = [...new Set(offers.map((o) => o.teamId))];
+  const [players, teams] = await Promise.all([
+    prisma.player.findMany({ where: { id: { in: playerIds } }, select: { id: true, name: true, slug: true, position: true, isGoalie: true } }),
+    prisma.team.findMany({ where: { id: { in: teamIds } }, select: { id: true, code: true } }),
+  ]);
+  const pById = new Map(players.map((p) => [p.id, p]));
+  const codeOf = new Map(teams.map((t) => [t.id, t.code]));
+  const byPlayer = new Map<number, typeof offers>();
+  for (const o of offers) byPlayer.set(o.playerId, [...(byPlayer.get(o.playerId) ?? []), o]);
+  const result = [...byPlayer.entries()].map(([playerId, os]) => {
+    const p = pById.get(playerId);
+    return {
+      playerId, name: p?.name ?? "?", slug: p?.slug ?? null, position: p?.position ?? "", isGoalie: p?.isGoalie ?? false,
+      offers: os.map((o) => ({
+        teamId: o.teamId, teamCode: codeOf.get(o.teamId) ?? "?", salary: o.salary, years: o.years,
+        line: o.line, pp: o.pp, pk: o.pk, round: o.round, status: o.status,
+        placedAt: o.createdAt.toISOString(), updatedAt: o.updatedAt.toISOString(),
+      })),
+    };
+  }).filter((p) => p.offers.length > 0); // a hidden comish-only offer can leave a co-comish's view empty for that player
+  result.sort((a, b) => Math.max(...b.offers.map((o) => o.salary)) - Math.max(...a.offers.map((o) => o.salary)));
+  return { ok: true as const, players: result };
+}
+
 /** Place or raise a team's standing offer to a free agent (money + term + promised usage). */
 export async function submitOfferAction(
   playerId: number, teamId: number, salary: number, years: number, line: number, pp: boolean, pk: boolean,
