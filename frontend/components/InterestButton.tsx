@@ -6,6 +6,7 @@ import {
 } from "@/app/free-agents/actions";
 import { clauseDiscount } from "@/lib/free-agency";
 import InfoTip from "@/components/InfoTip";
+import { friendlyActionError } from "@/lib/client/action-error";
 
 export type InterestCtx = {
   frenzyOpen: boolean;          // FA market open (Frenzy, regular season, or playoffs)
@@ -89,7 +90,13 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
     const salary = Math.round(parseFloat(salaryM) * 1e6);
     if (!Number.isFinite(salary)) { setMsg({ t: "err", s: "Enter a salary." }); return; }
     start(async () => {
-      const r = await submitOfferAction(playerId, teamId, salary, years, line, pp, pk, grantClause || null, grantClause === "M_NTC" ? breadth : null, twoWay);
+      let r: Awaited<ReturnType<typeof submitOfferAction>>;
+      try {
+        r = await submitOfferAction(playerId, teamId, salary, years, line, pp, pk, grantClause || null, grantClause === "M_NTC" ? breadth : null, twoWay);
+      } catch (e) {
+        setResult({ t: "err", s: friendlyActionError(e) });
+        return;
+      }
       if (!r.ok) { setResult({ t: "err", s: r.error }); return; }
       if ("deliberating" in r && r.deliberating) {
         const when = new Date(r.decisionAt).toLocaleDateString();
