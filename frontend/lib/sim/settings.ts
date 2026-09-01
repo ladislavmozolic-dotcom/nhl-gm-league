@@ -83,8 +83,12 @@ export type EngineSettings = {
   // Free agency & RFA rules (commissioner-tunable limits)
   faTwoWayOlderAge: number;   // players OVER this age hit the two-way barrier
   faTwoWayNhlGpLimit: number; // > this many real NHL games last season = established NHLer (refuses a two-way)
-  faTwoWayMaxYears: number;   // longest term a player will sign on a two-way
-  faTwoWayRelaxRound: number; // frenzy round from which a cold-market veteran will settle for a two-way
+  faTwoWayMaxYears: number;   // the "prove it" term an established NHLer settles for once relaxed (round/weak) — usually 1
+  faTwoWayRelaxRound: number; // frenzy round from which a cold-market OLDER veteran will settle for a two-way
+  faTwoWayWeakOverall: number; // established player's overall AT OR BELOW this = fringe/4th-line caliber
+  faTwoWayWeakRound: number;  // frenzy round from which a cold-market WEAK (any age) established player settles
+  faTwoWayAhlMaxYears: number;   // max two-way term for a player with NO real NHL games last season (pure farm)
+  faTwoWayFewGpMaxYears: number; // max two-way term for a player with SOME NHL games (below faTwoWayNhlGpLimit)
   rfaMaxAge: number;          // RFA / franchise-tag / offer-sheet age eligibility (≤ this)
   osOpenDay: number;          // offer-sheet window opens (off-season day, July 1 = 1)
   osCloseDay: number;         // offer-sheet window closes
@@ -197,6 +201,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
     { maxAav: 0, picks: [1, 1, 1, 1] },     // > $8M → four 1sts
   ],
   faTwoWayOlderAge: 25, faTwoWayNhlGpLimit: 30, faTwoWayMaxYears: 1, faTwoWayRelaxRound: 2,
+  faTwoWayWeakOverall: 55, faTwoWayWeakRound: 3, faTwoWayAhlMaxYears: 3, faTwoWayFewGpMaxYears: 2,
   rfaMaxAge: 26, osOpenDay: 1, osCloseDay: 8, osDecisionDay: 10,
   faMode: "full", faSignLock: true, faEarlyAccess: false, financeMode: "base", waiversEnabled: true,
   rosterOverFinePerDay: 200000,

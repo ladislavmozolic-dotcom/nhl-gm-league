@@ -179,31 +179,58 @@ export function clauseDiscount(clause?: string | null, breadth?: number | null):
 
 /** Why a player would turn down a two-way offer (null = he'll take it).
  *
- *  The barrier is real NHL games played, NOT rating, and it only applies to OLDER
- *  players (26+): a player past 25 who logged more than 30 NHL games last season is
- *  an established NHLer and won't sign a two-way, whatever his overall (a proven
- *  role player at OV 58 still refuses). Young players are prospects — they go to the
- *  farm on two-way/ELC deals freely. When we have no imported GP, fall back to
- *  overall. Anyone who does take a two-way takes it only as a one-year deal.
+ *  The established-NHLer barrier is real NHL games played, NOT rating: anyone who
+ *  logged more than `gpLimit` (30) games last season is proven and refuses a
+ *  two-way outright — UNLESS the market's gone cold for him and one of two
+ *  separate relaxations has kicked in (each settles him for a single "prove it"
+ *  year, `opts.maxYears`, default 1):
+ *    - `relaxOlder` (round `faTwoWayRelaxRound`, default 2): he's over `olderAge`
+ *      (25) — an aging veteran with nowhere left to go.
+ *    - `relaxWeak` (round `faTwoWayWeakRound`, default 3): whatever his age, his
+ *      overall is at/below `weakOverall` (55) — fringe/4th-line caliber, a real
+ *      NHLer only in the sense that he's dressed a lot of games, not that he's
+ *      any good. A genuinely good established player never takes a two-way, no
+ *      matter how many rounds pass.
+ *  When we have no imported GP, fall back to overall (`ovrFallback`, 72) to guess
+ *  "established" at all — with no GP on file there's nothing to grade him weak on
+ *  either, so only the age relaxation can apply to him.
  *
- *  `relaxOlder` lifts the older-player barrier — used on the open market from round
- *  2 on, when a veteran who drew no round-1 interest will settle for a two-way. */
+ *  A player who ISN'T established yet takes a two-way freely, no round gating —
+ *  but for how long scales with how far he is from the NHL: no real NHL games at
+ *  all (pure farm/never played) goes up to `ahlMaxYears` (3); some games below
+ *  `gpLimit` (a real but brief NHL look) goes up to `fewGpMaxYears` (2). */
 export function twoWayObjection(
   twoWay: boolean,
   p: { overall?: number | null; lastSeasonGP?: number | null; age?: number | null },
   years: number,
-  opts?: { relaxOlder?: boolean; olderAge?: number; gpLimit?: number; ovrFallback?: number; maxYears?: number },
+  opts?: {
+    relaxOlder?: boolean; relaxWeak?: boolean;
+    olderAge?: number; gpLimit?: number; ovrFallback?: number; weakOverall?: number;
+    maxYears?: number; ahlMaxYears?: number; fewGpMaxYears?: number;
+  },
 ): string | null {
   if (!twoWay) return null;
   const olderAge = opts?.olderAge ?? 25;
   const gpLimit = opts?.gpLimit ?? 30;
   const ovrFallback = opts?.ovrFallback ?? 72;
-  const maxYears = opts?.maxYears ?? 1;
+  const weakOverall = opts?.weakOverall ?? 55;
+  const proveItYears = opts?.maxYears ?? 1;
+  const gp = p.lastSeasonGP;
   const older = (p.age ?? 0) > olderAge;
-  const provenNhl = p.lastSeasonGP != null ? p.lastSeasonGP > gpLimit : (p.overall ?? 70) >= ovrFallback;
-  if (older && provenNhl && !opts?.relaxOlder) {
-    return `He's past ${olderAge} and played ${gpLimit}+ NHL games last season — an established NHLer won't sign a two-way. Offer a one-way deal.`;
+  const provenNhl = gp != null ? gp > gpLimit : (p.overall ?? 70) >= ovrFallback;
+
+  if (provenNhl) {
+    const weak = gp != null && (p.overall ?? ovrFallback) <= weakOverall;
+    if (older ? !opts?.relaxOlder : !(weak && opts?.relaxWeak)) {
+      return older
+        ? `He's past ${olderAge} and played ${gpLimit}+ NHL games last season — an established NHLer won't sign a two-way. Offer a one-way deal.`
+        : `He's an established NHLer — won't sign a two-way. Offer a one-way deal.`;
+    }
+    // reachable only via relaxOlder or relaxWeak — always just the one prove-it year
+    return years > proveItYears ? "He'll take a two-way, but only as a one-year deal — set the term to 1 year." : null;
   }
+
+  const maxYears = gp == null || gp === 0 ? (opts?.ahlMaxYears ?? 3) : (opts?.fewGpMaxYears ?? 2);
   if (years > maxYears) {
     return maxYears <= 1 ? "He'll take a two-way, but only as a one-year deal — set the term to 1 year." : `He'll take a two-way, but only up to ${maxYears} years.`;
   }

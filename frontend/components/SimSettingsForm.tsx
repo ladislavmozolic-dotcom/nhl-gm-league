@@ -251,8 +251,12 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
             <div className="text-xs text-slate-500 mb-1">Two-way contracts</div>
             <NumField k="faTwoWayOlderAge" label="Barrier applies over age" />
             <NumField k="faTwoWayNhlGpLimit" label="NHL games = established" />
-            <NumField k="faTwoWayMaxYears" label="Max two-way term (yrs)" />
-            <NumField k="faTwoWayRelaxRound" label="Market relaxes from round" />
+            <NumField k="faTwoWayAhlMaxYears" label="Max term — no NHL games (yrs)" />
+            <NumField k="faTwoWayFewGpMaxYears" label="Max term — a few NHL games (yrs)" />
+            <NumField k="faTwoWayMaxYears" label="Max term — relaxed established (yrs)" />
+            <NumField k="faTwoWayRelaxRound" label="Older veteran relaxes from round" />
+            <NumField k="faTwoWayWeakOverall" label="Weak/4th-line overall at or below" />
+            <NumField k="faTwoWayWeakRound" label="Weak established relaxes from round" />
           </div>
           <div>
             <div className="text-xs text-slate-500 mb-1">RFA / offer sheets</div>

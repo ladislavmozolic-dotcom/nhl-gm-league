@@ -14,9 +14,17 @@ import { loadSettings, saveSettings } from "@/lib/sim/settings";
 import { computeELC } from "@/lib/elc";
 
 /** Commissioner-tuned two-way thresholds, shaped for twoWayObjection's opts. */
-async function twoWayOpts(): Promise<{ olderAge: number; gpLimit: number; maxYears: number; relaxRound: number; faMode: "full" | "simple" }> {
+async function twoWayOpts(): Promise<{
+  olderAge: number; gpLimit: number; maxYears: number; relaxRound: number;
+  weakOverall: number; weakRound: number; ahlMaxYears: number; fewGpMaxYears: number;
+  faMode: "full" | "simple";
+}> {
   const s = await loadSettings();
-  return { olderAge: s.faTwoWayOlderAge, gpLimit: s.faTwoWayNhlGpLimit, maxYears: s.faTwoWayMaxYears, relaxRound: s.faTwoWayRelaxRound, faMode: s.faMode };
+  return {
+    olderAge: s.faTwoWayOlderAge, gpLimit: s.faTwoWayNhlGpLimit, maxYears: s.faTwoWayMaxYears, relaxRound: s.faTwoWayRelaxRound,
+    weakOverall: s.faTwoWayWeakOverall, weakRound: s.faTwoWayWeakRound, ahlMaxYears: s.faTwoWayAhlMaxYears, fewGpMaxYears: s.faTwoWayFewGpMaxYears,
+    faMode: s.faMode,
+  };
 }
 
 const FREE = ["NHL", "AHL", "RETIRED", "PROSPECT", "RELEASED", "NONROSTER"]; // not a signable free agent
@@ -219,16 +227,24 @@ export async function submitOfferAction(
   }
   if (salary < 775_000) return { ok: false as const, error: "Below the league minimum salary." };
   years = Math.max(1, Math.min(MAX_TERM, Math.round(years)));
-  // one-way vs two-way: an established older player refuses — UNLESS the market has
-  // gone cold for him (round 2+ and he drew no round-1 offer), when he'll settle.
+  // one-way vs two-way: an established player refuses — UNLESS the market has gone
+  // cold for him (no round-1 offer at all) and either relaxation round has arrived:
+  // an OLDER veteran settles from round `relaxRound` (2); any age, a WEAK/4th-line
+  // established player settles from the later round `weakRound` (3) — a genuinely
+  // good established player keeps refusing no matter how many rounds pass.
   const twoWay = !!offerTwoWay;
   const tw = await twoWayOpts();
-  let relaxOlder = false;
+  let relaxOlder = false, relaxWeak = false;
   if (twoWay && clock.frenzyRound >= tw.relaxRound) {
     const r1 = await prisma.faOffer.count({ where: { playerId, round: 1, status: { in: ["PENDING", "COUNTERED", "SHORTLISTED", "ACCEPTED"] } } });
-    relaxOlder = r1 === 0;
+    const cold = r1 === 0;
+    relaxOlder = cold;
+    relaxWeak = cold && clock.frenzyRound >= tw.weakRound;
   }
-  const twoWayErr = twoWayObjection(twoWay, player, years, { relaxOlder, olderAge: tw.olderAge, gpLimit: tw.gpLimit, maxYears: tw.maxYears });
+  const twoWayErr = twoWayObjection(twoWay, player, years, {
+    relaxOlder, relaxWeak, olderAge: tw.olderAge, gpLimit: tw.gpLimit, weakOverall: tw.weakOverall,
+    maxYears: tw.maxYears, ahlMaxYears: tw.ahlMaxYears, fewGpMaxYears: tw.fewGpMaxYears,
+  });
   if (twoWayErr) return { ok: false as const, error: twoWayErr };
 
   // cap check — committed cap hit + this offer must stay under the ceiling
@@ -764,7 +780,13 @@ export async function extendContractAction(
   // would rather test the market than take a two-way.
   const twoWay = !!offerTwoWay;
   const tw = await twoWayOpts();
-  const twoWayErr = twoWayObjection(twoWay, player, years, { olderAge: tw.olderAge, gpLimit: tw.gpLimit, maxYears: tw.maxYears });
+  // no round-based relaxation here — re-signing your own player isn't a market-round
+  // negotiation, so an established player (older or weak) still just refuses outright;
+  // the AHL-only/few-games tiers still apply for a not-yet-established player.
+  const twoWayErr = twoWayObjection(twoWay, player, years, {
+    olderAge: tw.olderAge, gpLimit: tw.gpLimit, weakOverall: tw.weakOverall,
+    maxYears: tw.maxYears, ahlMaxYears: tw.ahlMaxYears, fewGpMaxYears: tw.fewGpMaxYears,
+  });
   if (twoWayErr) return { ok: false as const, error: twoWayErr };
 
   // negotiations may already be closed (walked to FA, or turned down → offer sheets)

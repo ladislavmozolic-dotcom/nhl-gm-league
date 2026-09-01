@@ -118,8 +118,13 @@ export async function submitOfferSheetAction(
 
   const yrs = Math.max(1, Math.min(4, Math.round(years)));
   if (salary < 775_000) return { ok: false, error: "Below the league minimum salary." };
-  // two-way rules mirror the FA/extension flow (real NHL games, older players only)
-  const twoWayErr = twoWayObjection(twoWay, player, yrs, { olderAge: settings.faTwoWayOlderAge, gpLimit: settings.faTwoWayNhlGpLimit, maxYears: settings.faTwoWayMaxYears });
+  // two-way rules mirror the FA/extension flow (real NHL games, older players only —
+  // an RFA target is by definition already an active NHL/AHL player, so the AHL-only/
+  // few-games tiers still cover a young call-up type here too)
+  const twoWayErr = twoWayObjection(twoWay, player, yrs, {
+    olderAge: settings.faTwoWayOlderAge, gpLimit: settings.faTwoWayNhlGpLimit, weakOverall: settings.faTwoWayWeakOverall,
+    maxYears: settings.faTwoWayMaxYears, ahlMaxYears: settings.faTwoWayAhlMaxYears, fewGpMaxYears: settings.faTwoWayFewGpMaxYears,
+  });
   if (twoWayErr) return { ok: false, error: twoWayErr };
 
   // cap room (off-season ceiling = cap + 10%)
