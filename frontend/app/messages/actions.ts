@@ -45,8 +45,16 @@ export async function getConversation(otherTeamId: number) {
     orderBy: { id: "asc" },
     select: { id: true, fromTeamId: true, body: true, tradeUrl: true, readAt: true, createdAt: true },
   });
+  // The "League Notifications" thread (otherTeamId === from) is a team messaging
+  // ITSELF — `sendDm` blocks a genuine self-message, so every row in it is always a
+  // system notification, never something the GM actually typed. Render it as
+  // incoming, not as the GM's own outgoing bubble (which `fromTeamId === from` would
+  // otherwise say, since sender and recipient are the same team here) — that made a
+  // real trade-commission alert look like the GM's own sent message with a
+  // confusing "read" checkmark under it, easy to skim straight past.
+  const isSystemThread = otherTeamId === from;
   const messages: ConversationMsg[] = rows.map((r) => ({
-    id: r.id, mine: r.fromTeamId === from, body: r.body, tradeUrl: r.tradeUrl,
+    id: r.id, mine: !isSystemThread && r.fromTeamId === from, body: r.body, tradeUrl: r.tradeUrl,
     read: r.readAt != null, at: r.createdAt.toISOString(),
   }));
   return { ok: true as const, me: from, messages };
