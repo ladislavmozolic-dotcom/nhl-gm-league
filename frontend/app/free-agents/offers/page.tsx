@@ -1,14 +1,20 @@
 import Link from "next/link";
 import { PageHeader, Card } from "@/components/ui";
 import PlayerLink from "@/components/PlayerLink";
+import PlayerAvatar from "@/components/playerAvatar";
 import { money } from "@/lib/finance";
 import { getAllActiveOffersAction } from "@/app/free-agents/actions";
 
 export const dynamic = "force-dynamic";
 
-const STATUS_LABEL: Record<string, string> = {
-  PENDING: "Pending", COUNTERED: "Countered", SHORTLISTED: "Shortlisted", ACCEPTED: "Accepted",
+const STATUS: Record<string, { label: string; cls: string }> = {
+  PENDING: { label: "Pending", cls: "bg-slate-700/60 text-slate-300 border-slate-600/60" },
+  COUNTERED: { label: "Countered", cls: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
+  SHORTLISTED: { label: "Shortlisted", cls: "bg-blue-500/15 text-blue-400 border-blue-500/30" },
+  ACCEPTED: { label: "Accepted", cls: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
 };
+
+const ovColor = (v: number | null) => v == null ? "text-slate-500" : v >= 80 ? "text-emerald-400" : v >= 70 ? "text-blue-400" : v >= 60 ? "text-amber-400" : "text-slate-400";
 
 export default async function AllOffersPage() {
   const r = await getAllActiveOffersAction();
@@ -24,53 +30,57 @@ export default async function AllOffersPage() {
       {!r.ok ? (
         <Card><p className="text-sm text-rose-400">🔒 {r.error}</p></Card>
       ) : r.players.length === 0 ? (
-        <Card><p className="text-sm text-slate-500">Nobody has an active offer right now.</p></Card>
+        <Card><p className="text-sm text-slate-500 text-center py-6">Nobody has an active offer right now.</p></Card>
       ) : (
-        <Card bodyClassName="p-0">
-          <div className="divide-y divide-slate-800/60">
-            {r.players.map((p) => (
-              <div key={p.playerId} className="px-4 py-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <PlayerLink name={p.name} slug={p.slug} id={p.playerId} className="font-semibold text-white" />
-                  <span className="text-xs text-slate-500">{p.position}</span>
-                  <span className="text-xs text-slate-600 ml-auto">{p.offers.length} offer{p.offers.length === 1 ? "" : "s"}</span>
+        <div className="space-y-4">
+          {r.players.map((p) => {
+            const top = p.offers[0];
+            return (
+              <div key={p.playerId} className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 overflow-hidden">
+                <div className="flex items-center gap-3 px-4 py-3 bg-slate-800/40 border-b border-slate-800">
+                  <PlayerAvatar src={p.photoUrl} alt={p.name} size={40} />
+                  <div className="min-w-0 flex-1">
+                    <PlayerLink name={p.name} slug={p.slug} id={p.playerId} className="font-bold text-white text-[15px]" />
+                    <div className="text-xs text-slate-500 flex items-center gap-2">
+                      <span>{p.position}</span>
+                      {p.overall != null && <span className={ovColor(p.overall)}>OV {p.overall}</span>}
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="text-[10px] uppercase tracking-wide text-slate-500">Top offer</div>
+                    <div className="text-lg font-black text-emerald-400 leading-tight">{money(top.salary)}</div>
+                  </div>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="text-slate-500 uppercase tracking-wide">
-                        <th className="text-left font-medium py-1 pr-3">Team</th>
-                        <th className="text-right font-medium py-1 pr-3">Salary</th>
-                        <th className="text-center font-medium py-1 pr-3">Years</th>
-                        {!p.isGoalie && <th className="text-center font-medium py-1 pr-3">Line</th>}
-                        {!p.isGoalie && <th className="text-center font-medium py-1 pr-3">PP/PK</th>}
-                        <th className="text-center font-medium py-1 pr-3">Round</th>
-                        <th className="text-center font-medium py-1 pr-3">Status</th>
-                        <th className="text-right font-medium py-1">Updated</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {p.offers.map((o, i) => (
-                        <tr key={i} className="border-t border-slate-800/40">
-                          <td className="py-1.5 pr-3 font-semibold text-slate-200">{o.teamCode}</td>
-                          <td className="py-1.5 pr-3 text-right tabular-nums text-emerald-400">{money(o.salary)}</td>
-                          <td className="py-1.5 pr-3 text-center text-slate-400">{o.years}</td>
-                          {!p.isGoalie && <td className="py-1.5 pr-3 text-center text-slate-400">{o.line}</td>}
-                          {!p.isGoalie && <td className="py-1.5 pr-3 text-center text-slate-400">{o.pp ? "PP" : ""}{o.pp && o.pk ? "/" : ""}{o.pk ? "PK" : ""}{!o.pp && !o.pk ? "—" : ""}</td>}
-                          <td className="py-1.5 pr-3 text-center text-slate-400">{o.round || "—"}</td>
-                          <td className="py-1.5 pr-3 text-center text-slate-400">{STATUS_LABEL[o.status] ?? o.status}</td>
-                          <td className="py-1.5 text-right text-slate-500">{new Date(o.updatedAt).toLocaleString("sk-SK", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+
+                <div className="divide-y divide-slate-800/50">
+                  {p.offers.map((o, i) => {
+                    const st = STATUS[o.status] ?? { label: o.status, cls: "bg-slate-700/60 text-slate-300 border-slate-600/60" };
+                    return (
+                      <div key={i} className={`flex items-center gap-3 px-4 py-2.5 ${i === 0 ? "bg-emerald-500/[0.04]" : ""}`}>
+                        {o.teamLogo ? (
+                          <img src={o.teamLogo} alt="" className="w-6 h-6 object-contain shrink-0" />
+                        ) : (
+                          <div className="w-6 h-6 rounded-full bg-slate-800 shrink-0" />
+                        )}
+                        <div className="w-12 shrink-0 font-bold text-slate-200 text-sm">{o.teamCode}</div>
+                        <div className="flex-1 flex items-center gap-3 text-xs text-slate-400 flex-wrap">
+                          <span className="font-semibold text-slate-200 tabular-nums">{money(o.salary)}</span>
+                          <span>× {o.years}yr</span>
+                          {!p.isGoalie && <span className="text-slate-600">Line {o.line}{(o.pp || o.pk) && ` · ${[o.pp && "PP", o.pk && "PK"].filter(Boolean).join("/")}`}</span>}
+                          <span className="text-slate-600">Round {o.round || "—"}</span>
+                        </div>
+                        <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border shrink-0 ${st.cls}`}>{st.label}</span>
+                        <span className="text-[10px] text-slate-600 shrink-0 hidden sm:inline">{new Date(o.updatedAt).toLocaleString("sk-SK", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-            ))}
-          </div>
-        </Card>
+            );
+          })}
+        </div>
       )}
-      <p className="text-xs text-slate-500 px-1">Sorted by each player's highest offer. Blind bidding still applies to a co-commissioner: the commissioner's own bids never show here.</p>
+      <p className="text-xs text-slate-500 px-1">Sorted by each player's highest offer, leading bid highlighted. Blind bidding still applies to a co-commissioner: the commissioner's own bids never show here.</p>
     </div>
   );
 }

@@ -190,19 +190,20 @@ export async function getAllActiveOffersAction() {
   const playerIds = [...new Set(offers.map((o) => o.playerId))];
   const teamIds = [...new Set(offers.map((o) => o.teamId))];
   const [players, teams] = await Promise.all([
-    prisma.player.findMany({ where: { id: { in: playerIds } }, select: { id: true, name: true, slug: true, position: true, isGoalie: true } }),
-    prisma.team.findMany({ where: { id: { in: teamIds } }, select: { id: true, code: true } }),
+    prisma.player.findMany({ where: { id: { in: playerIds } }, select: { id: true, name: true, slug: true, position: true, isGoalie: true, photoUrl: true, overall: true } }),
+    prisma.team.findMany({ where: { id: { in: teamIds } }, select: { id: true, code: true, logoUrl: true } }),
   ]);
   const pById = new Map(players.map((p) => [p.id, p]));
-  const codeOf = new Map(teams.map((t) => [t.id, t.code]));
+  const teamById = new Map(teams.map((t) => [t.id, t]));
   const byPlayer = new Map<number, typeof offers>();
   for (const o of offers) byPlayer.set(o.playerId, [...(byPlayer.get(o.playerId) ?? []), o]);
   const result = [...byPlayer.entries()].map(([playerId, os]) => {
     const p = pById.get(playerId);
     return {
       playerId, name: p?.name ?? "?", slug: p?.slug ?? null, position: p?.position ?? "", isGoalie: p?.isGoalie ?? false,
+      photoUrl: p?.photoUrl ?? null, overall: p?.overall ?? null,
       offers: os.map((o) => ({
-        teamId: o.teamId, teamCode: codeOf.get(o.teamId) ?? "?", salary: o.salary, years: o.years,
+        teamId: o.teamId, teamCode: teamById.get(o.teamId)?.code ?? "?", teamLogo: teamById.get(o.teamId)?.logoUrl ?? null, salary: o.salary, years: o.years,
         line: o.line, pp: o.pp, pk: o.pk, round: o.round, status: o.status,
         placedAt: o.createdAt.toISOString(), updatedAt: o.updatedAt.toISOString(),
       })),
