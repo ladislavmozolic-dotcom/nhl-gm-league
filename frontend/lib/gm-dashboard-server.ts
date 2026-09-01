@@ -167,7 +167,7 @@ export async function gmDashboard(teamId: number): Promise<GmDashboard | null> {
   // (your unsigned/expiring players, free-agent pool, recent league moves).
   if (!nextGame && clock.phase !== "regular" && clock.phase !== "playoffs") {
     const [freeAgents, moves] = await Promise.all([
-      prisma.player.count({ where: { rosterType: { notIn: ["NHL", "AHL", "RETIRED", "PROSPECT", "RELEASED"] } } }),
+      prisma.player.count({ where: { rosterType: { notIn: ["NHL", "AHL", "RETIRED", "PROSPECT", "RELEASED", "NONROSTER"] } } }),
       prisma.transaction.findMany({ orderBy: { createdAt: "desc" }, take: 5, select: { message: true } }),
     ]);
     const expiring = roster.filter((p) => (p.contractYears ?? 9) <= 1 && (p.overall ?? 0) >= 55)

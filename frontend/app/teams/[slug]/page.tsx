@@ -24,6 +24,10 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
       // this teamId (schema requires one) but must never count toward roster size,
       // cap total, captains or injured list once he's off the active roster.
       players: { where: { rosterType: { in: ["NHL", "AHL"] } }, orderBy: { overall: "desc" }, select: { id: true, isGoalie: true, position: true, age: true, capHit: true, contractText: true, name: true, slug: true, photoUrl: true, captaincy: true, nationality: true, injuryDaysLeft: true, injuryDesc: true } },
+      // NOT counted in players above (deliberately excluded from roster size/cap) — an
+      // RFA-age player benched at regular-season opening day for staying unsigned
+      // (sweepUnsignedRfasToNonRoster). Fetched separately just for a visibility count.
+      _count: { select: { players: { where: { rosterType: "NONROSTER" } } } },
       prospects: { where: { source: rosterSource }, select: { id: true, name: true, position: true, draftYear: true } },
       // same rosterType filter as the parent's own `players` above — a released/
       // waived/prospect-parked farm player keeps this teamId too, and must not
@@ -192,6 +196,13 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
               <InfoRow label="Total players" value={`${proCount + farmCount} players`} />
               <InfoRow label="Pro roster" value={`${proCount} players`} />
               {farmCount > 0 && <InfoRow label="Farm" value={`${farmCount} players`} />}
+              {team._count.players > 0 && (
+                <InfoRow label="Non-roster" value={
+                  <Link href={`/teams/${team.slug}/contracts`} className="text-amber-400 hover:text-amber-300">
+                    {team._count.players} unsigned RFA{team._count.players === 1 ? "" : "s"} →
+                  </Link>
+                } />
+              )}
               <InfoRow label="Prospects" value={String(team.prospects.length)} />
               <InfoRow label="Avg age" value={String(avgAge)} />
             </div>

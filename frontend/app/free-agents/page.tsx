@@ -35,10 +35,12 @@ export default async function FreeAgentsPage({
   const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 } });
   const isReal = cfg?.rosterMode === "real";
 
-  // free agents = players not on an active NHL/AHL roster and not retired
+  // free agents = players not on an active NHL/AHL roster and not retired. NONROSTER
+  // (an RFA benched for staying unsigned past regular-season opening day) is
+  // deliberately excluded too — he's restricted to his own club, not open market.
   const freeAgents = await prisma.player.findMany({
     where: {
-      rosterType: { notIn: ["NHL", "AHL", "RETIRED", "PROSPECT", "RELEASED"] },
+      rosterType: { notIn: ["NHL", "AHL", "RETIRED", "PROSPECT", "RELEASED", "NONROSTER"] },
       isGoalie,
       // real-dataset-only players (real free agents) are hidden in ProfiNHL mode
       ...(isReal ? {} : { realOnly: false }),

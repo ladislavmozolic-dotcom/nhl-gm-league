@@ -61,7 +61,10 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
   // A re-signed player's contractYears updates immediately on acceptance, so he
   // naturally drops off this list as soon as the new deal no longer matches yearsFilter.
   const expiring = await prisma.player.findMany({
-    where: { teamId: { in: orgIds }, rosterType: { in: ["NHL", "AHL"] }, contractYears: yearsFilter, NOT: { capHit: 100_000 } },
+    // NONROSTER: an RFA-age player benched at regular-season opening day for staying
+    // unsigned (see sweepUnsignedRfasToNonRoster) — still owned by this club and must
+    // stay visible here, since re-signing him is the ONLY way he gets un-benched.
+    where: { teamId: { in: orgIds }, rosterType: { in: ["NHL", "AHL", "NONROSTER"] }, contractYears: yearsFilter, NOT: { capHit: 100_000 } },
     select: { id: true, name: true, age: true, capHit: true, contractYears: true, contractText: true, position: true, isGoalie: true, df: true, lastSeasonGP: true, lastSeasonPts: true, lastSeasonSvPct: true, rosterType: true, franchiseTag: true, mpSkater: true },
     orderBy: { capHit: "desc" },
   });

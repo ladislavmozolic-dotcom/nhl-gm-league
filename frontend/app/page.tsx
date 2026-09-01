@@ -60,7 +60,7 @@ export default async function HomePage() {
   const activeSeason = isPreseason ? PRE_SEASON : SEASON;
   // free-agent filter mirrors /free-agents: skaters, and realOnly hidden in ProfiNHL mode
   const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 } });
-  const faWhere = { rosterType: { notIn: ["NHL", "AHL", "RETIRED", "PROSPECT", "RELEASED"] }, isGoalie: false, ...(cfg?.rosterMode === "real" ? {} : { realOnly: false }) };
+  const faWhere = { rosterType: { notIn: ["NHL", "AHL", "RETIRED", "PROSPECT", "RELEASED", "NONROSTER"] }, isGoalie: false, ...(cfg?.rosterMode === "real" ? {} : { realOnly: false }) };
   const [standings, leaders, faCount, faTop, articlesRaw, teams] = await Promise.all([
     computeStandings(activeSeason, "NHL"),
     skaterTotals(activeSeason, "NHL"),

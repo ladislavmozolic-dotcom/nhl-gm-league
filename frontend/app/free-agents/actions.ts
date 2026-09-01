@@ -19,7 +19,7 @@ async function twoWayOpts(): Promise<{ olderAge: number; gpLimit: number; maxYea
   return { olderAge: s.faTwoWayOlderAge, gpLimit: s.faTwoWayNhlGpLimit, maxYears: s.faTwoWayMaxYears, relaxRound: s.faTwoWayRelaxRound, faMode: s.faMode };
 }
 
-const FREE = ["NHL", "AHL", "RETIRED", "PROSPECT", "RELEASED"]; // not a signable free agent
+const FREE = ["NHL", "AHL", "RETIRED", "PROSPECT", "RELEASED", "NONROSTER"]; // not a signable free agent
 // In-season UFA market mirrors the summer frenzy in miniature, PER PLAYER: he collects
 // offers for a week, then counters the bidders and gives them a few days to match.
 const IN_SEASON_COLLECT_DAYS = 7;
@@ -833,9 +833,16 @@ export async function extendContractAction(
   const expiry = CURRENT_SEASON_START + years;
   const noTradeTeams = clause === "M_NTC" ? await weakestTeams(breadth ?? 12, teamId) : [];
   const contractText = `$${salary.toLocaleString("en-US")} × ${years}yr (through ${expiry})`;
+  // Non-roster release: an RFA benched at regular-season opening day for staying
+  // unsigned (sweepUnsignedRfasToNonRoster) is usable again the moment his own club
+  // actually re-signs him — back onto the active NHL roster (a GM can send him to
+  // the farm afterward via the roster mover like any other player, same as a fresh
+  // signing would be).
+  const releaseNonRoster = player.rosterType === "NONROSTER" ? { rosterType: "NHL" } : {};
   await prisma.player.update({
     where: { id: playerId },
     data: {
+      ...releaseNonRoster,
       capHit: salary, contractYears: years, contractExpiry: expiry,
       contractType: twoWay ? "TWO_WAY" : "ONE_WAY", tradeClause: clause, noTradeTeams, contractText,
       extCapHit: null, extYears: null, extContractType: null, extClause: null, extNoTradeTeams: [], extText: null,

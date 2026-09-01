@@ -20,7 +20,7 @@ import { processWaivers } from "@/lib/waivers-server";
 import { generatePreseason, playPreseason, playPreseasonDay, computeAutoPreseasonStart, PRE_SEASON } from "@/lib/preseason";
 import { postWeeklyIfDue } from "@/lib/weekly-digest";
 import { resolveFrenzy, processRoundEnd, resolveInSeasonWindows } from "@/app/free-agents/actions";
-import { sweepExpiredContractsToUfa } from "@/lib/free-agency-server";
+import { sweepExpiredContractsToUfa, sweepUnsignedRfasToNonRoster } from "@/lib/free-agency-server";
 import { checkPromises } from "@/lib/promises";
 import { autoImportUpcomingClass } from "@/lib/draft-class-import";
 import { leagueCapCompliance } from "@/lib/cap";
@@ -142,6 +142,10 @@ export async function simulateLeagueDay(day: Date) {
       if (o.over > 0) await prisma.transaction.create({ data: { type: "CAP_WARNING", message: `${o.code} is over the salary cap by ${money(o.over)} on opening day — must shed salary to be compliant.` } });
     }
     expiredToUfa += await sweepExpiredContractsToUfa();
+    // RFA-age players never re-signed by their own club through the whole off-season
+    // get benched (Non-roster), not dumped into the open UFA pool — see
+    // sweepUnsignedRfasToNonRoster's own doc comment for why.
+    await sweepUnsignedRfasToNonRoster();
   }
   for (const p of ["/calendar", "/schedule", "/standings", "/scores", "/admin/season", "/finance", "/free-agents", "/signings", "/waivers", "/"]) revalidatePath(p);
   return { date: day, phase: phToday, played, signed, warned: promises.warned, requested: promises.requested, capOffenders, expiredToUfa, waiverClaims: waivers.claimed, waiverClears: waivers.cleared };

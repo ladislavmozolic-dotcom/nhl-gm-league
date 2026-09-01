@@ -276,19 +276,66 @@ export async function demandForPlayers(
   return out;
 }
 
+// RFA cutoff age — matches submitOfferAction's own `(player.age ?? 27) >= 27` line
+// exactly (the one place this threshold was previously hardcoded); a league running
+// the "simple" faMode has no RFA restriction at all, everyone tests the open market.
+const UFA_AGE = 27;
+
+/** Every NHL/AHL player whose contract has run dry (0 years, not a $100k farm-filler
+ *  placeholder) — split into UFA-age and RFA-age buckets by the same rule
+ *  submitOfferAction uses. Shared by both sweep functions below so they always
+ *  agree on exactly who's affected. */
+async function expiredContractCandidates(): Promise<{ ufaIds: number[]; rfaIds: number[] }> {
+  const { loadSettings } = await import("./sim/settings");
+  const [settings, candidates] = await Promise.all([
+    loadSettings(),
+    prisma.player.findMany({
+      where: { rosterType: { in: ["NHL", "AHL"] }, contractYears: 0, NOT: { capHit: 100_000 } },
+      select: { id: true, age: true },
+    }),
+  ]);
+  const isUfaAge = (age: number | null) => settings.faMode === "simple" || (age ?? UFA_AGE) >= UFA_AGE;
+  return {
+    ufaIds: candidates.filter((p) => isUfaAge(p.age)).map((p) => p.id),
+    rfaIds: candidates.filter((p) => !isUfaAge(p.age)).map((p) => p.id),
+  };
+}
+
 /** A player whose contract has run out (0 years left) but who nobody re-signed
  *  stays parked on his old club's roster (rosterType NHL/AHL) until this runs —
  *  the market pages and Frenzy demand engine only ever look at rosterType: UFA,
  *  so without this he's simply invisible to every other GM, not just unsigned.
- *  Excludes the $100k farm-filler placeholder contracts (ContractSection's own
- *  exclusion) — those aren't real deals a GM is expected to act on. Idempotent:
- *  safe to call from every point a market window opens (regular-season opening
- *  day, a Frenzy round starting — calendar-driven or admin-forced) since the
- *  rosterType filter naturally excludes anyone already swept. */
+ *  UFA-age (or every player under "simple" faMode) only — an RFA-age player must
+ *  NOT be dumped into the open UFA pool this way, since restricted free agency has
+ *  its own structured tender/re-sign/offer-sheet flow (see submitOfferAction);
+ *  he's left exactly where he is (see sweepUnsignedRfasToNonRoster for his own
+ *  treatment). Excludes the $100k farm-filler placeholder contracts (ContractSection's
+ *  own exclusion) — those aren't real deals a GM is expected to act on. Idempotent:
+ *  safe to call from every point a market window opens (regular-season opening day,
+ *  a Frenzy round starting — calendar-driven or admin-forced) since the rosterType
+ *  filter naturally excludes anyone already swept. */
 export async function sweepExpiredContractsToUfa(): Promise<number> {
-  const swept = await prisma.player.updateMany({
-    where: { rosterType: { in: ["NHL", "AHL"] }, contractYears: 0, NOT: { capHit: 100_000 } },
-    data: { rosterType: "UFA", scratched: false, captaincy: null },
-  });
+  const { ufaIds } = await expiredContractCandidates();
+  if (!ufaIds.length) return 0;
+  const swept = await prisma.player.updateMany({ where: { id: { in: ufaIds } }, data: { rosterType: "UFA", scratched: false, captaincy: null } });
+  return swept.count;
+}
+
+/** Regular-season opening day ONLY: an RFA-age player whose contract ran out and
+ *  who his own club never re-signed (through the whole off-season + Frenzy) gets
+ *  benched — rosterType "NONROSTER" — instead of becoming a plain open UFA. He
+ *  stays owned by his club (ContractSection's re-sign query includes NONROSTER
+ *  specifically so his own GM can still act on him), but no longer counts toward
+ *  the legal 12F/6D/2G roster (autoFillRosters' count query only matches "NHL"/
+ *  "AHL") and can never be selected into a game-day lineup (loadSimTeam's query is
+ *  the same). The moment his own GM successfully extends him, extendContractAction
+ *  restores rosterType to a real roster status and he's usable again. Deliberately
+ *  NOT called at Frenzy-opening — an RFA stays normally negotiable by his own club
+ *  all through the off-season/Frenzy; only unsigned regular-season opening day
+ *  benches him. */
+export async function sweepUnsignedRfasToNonRoster(): Promise<number> {
+  const { rfaIds } = await expiredContractCandidates();
+  if (!rfaIds.length) return 0;
+  const swept = await prisma.player.updateMany({ where: { id: { in: rfaIds } }, data: { rosterType: "NONROSTER", scratched: false, captaincy: null } });
   return swept.count;
 }
