@@ -42,20 +42,25 @@ async function recoverOneDay() {
   await updateInjuryCon();
 }
 
-/** Core of "advance the league clock by one calendar day" — shared by the admin
- *  button (`advanceLeagueDayAction`, auth-checked) and the automatic 20:30
- *  Europe/Bratislava cron trigger (`lib/season-cron.ts`, secret-token-checked).
- *  If games are scheduled that date, they are played; a regular-season off-day
- *  recovers CON; the off-season simply moves the date forward (Frenzy lives here). */
-export async function advanceLeagueDayCore() {
-  const cur = await getLeagueDate();
+/** Plays out league day `day` — the games/CON-recovery/Frenzy-transition/waiver/
+ *  cap-compliance bookkeeping for that ONE calendar day — WITHOUT touching
+ *  `LeagueConfig.leagueDate` itself. Shared by the admin "Advance Day" button
+ *  (`advanceLeagueDayCore`, which bumps the pointer first, then calls this) and
+ *  the automatic 20:30 Europe/Bratislava cron trigger (`lib/season-cron.ts`),
+ *  which only calls this once `leagueDate` already equals `day` — separately
+ *  advanced at real midnight by that same file's day-rollover check, so the
+ *  displayed calendar date tracks real time even though games only get
+ *  simulated in the evening. If games are scheduled that date, they are
+ *  played; a regular-season off-day recovers CON; the off-season simply lets
+ *  the date move (Frenzy lives here). */
+export async function simulateLeagueDay(day: Date) {
+  const yesterday = addDays(day, -1);
   const cfg0 = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { phaseOverride: true } });
-  const next = addDays(cur, 1);
-  // computed once, up front — every phCur/phNext reference below reuses these
+  // computed once, up front — every phYesterday/phToday reference below reuses these
   // (DB-aware: honors the manual pin, else the configured/schedule-derived thresholds)
-  const phCur = await computePhase(cur, cfg0?.phaseOverride);
-  const phNext = await computePhase(next, cfg0?.phaseOverride);
-  const start = utcDay(next), end = addDays(next, 1);
+  const phYesterday = await computePhase(yesterday, cfg0?.phaseOverride);
+  const phToday = await computePhase(day, cfg0?.phaseOverride);
+  const start = utcDay(day), end = addDays(day, 1);
   const dayGames = await prisma.game.findMany({
     where: { season: SEASON, status: "SCHEDULED", seriesId: null, gameDate: { gte: start, lt: end } },
     select: { round: true }, orderBy: { round: "asc" },
@@ -71,7 +76,7 @@ export async function advanceLeagueDayCore() {
     const r = await playScheduledGames({ season: SEASON, round: dayGames[0].round, actor: await commissionerName() });
     played = r.played;
     await processFinances(SEASON, "NHL");
-  } else if (phNext === "regular" || phNext === "playoffs") {
+  } else if (phToday === "regular" || phToday === "playoffs") {
     await recoverOneDay();
   }
   // Pre-season games scheduled for this day play out too (exhibition; own season
@@ -94,24 +99,24 @@ export async function advanceLeagueDayCore() {
     }
   }
   // weekly newsletter — auto-posts once when a 7-round week completes (self-dedupes)
-  await postWeeklyIfDue(roundForDate(next)).catch(() => {});
+  await postWeeklyIfDue(roundForDate(day)).catch(() => {});
   // ice-time promise check (self-gates to the regular season past 1/3)
   const promises = await checkPromises();
   // waivers: resolve any whose one-day window closed (claimed by priority, else clear to AHL)
-  const waivers = await processWaivers(roundForDate(next), phNext);
+  const waivers = await processWaivers(roundForDate(day), phToday);
   // Free Agent Frenzy round transitions (3 weekly rounds). Crossing a week
   // boundary inside the window runs counters / shortlisting; leaving the window
   // (end of round 3) signs everyone's best offer.
   let signed = 0;
-  if (phCur === "frenzy" && phNext !== "frenzy") {
+  if (phYesterday === "frenzy" && phToday !== "frenzy") {
     const r = await resolveFrenzy();
     signed = r.signed;
-  } else if (phCur === "frenzy" && phNext === "frenzy" && frenzyRound(cur) !== frenzyRound(next)) {
-    await processRoundEnd(frenzyRound(cur));
+  } else if (phYesterday === "frenzy" && phToday === "frenzy" && frenzyRound(yesterday) !== frenzyRound(day)) {
+    await processRoundEnd(frenzyRound(yesterday));
   }
   // in-season UFA market: resolve any player whose 7-day deliberation (or 3-day match)
   // window has closed — sign the best offer, or counter the bidders for a few more days.
-  const inSeasonFa = await resolveInSeasonWindows(next);
+  const inSeasonFa = await resolveInSeasonWindows(day);
   signed += inSeasonFa.signed;
   // opening-day cap compliance: the +10% summer cushion expires — every club must
   // now sit under the strict ceiling. Non-compliant clubs get a public warning.
@@ -121,7 +126,7 @@ export async function advanceLeagueDayCore() {
   // market the moment regular season starts — same $100k-farm-filler exclusion
   // ContractSection uses (those aren't real deals GMs are expected to act on).
   let expiredToUfa = 0;
-  if (phCur !== "regular" && phNext === "regular") {
+  if (phYesterday !== "regular" && phToday === "regular") {
     const offenders = await leagueCapCompliance("regular");
     capOffenders = offenders.filter((o) => o.over > 0).length;
     for (const o of offenders) {
@@ -133,11 +138,18 @@ export async function advanceLeagueDayCore() {
     });
     expiredToUfa = swept.count;
   }
-  await prisma.leagueConfig.upsert({
-    where: { id: 1 }, update: { leagueDate: next }, create: { id: 1, leagueDate: next },
-  });
   for (const p of ["/calendar", "/schedule", "/standings", "/scores", "/admin/season", "/finance", "/free-agents", "/signings", "/waivers", "/"]) revalidatePath(p);
-  return { date: next, phase: phNext, played, signed, warned: promises.warned, requested: promises.requested, capOffenders, expiredToUfa, waiverClaims: waivers.claimed, waiverClears: waivers.cleared };
+  return { date: day, phase: phToday, played, signed, warned: promises.warned, requested: promises.requested, capOffenders, expiredToUfa, waiverClaims: waivers.claimed, waiverClears: waivers.cleared };
+}
+
+/** Admin "Advance Day": bumps the league clock to tomorrow, then plays that day
+ *  out immediately — one atomic, deliberate step (unlike the automatic cron,
+ *  which lets the calendar flip at real midnight and only simulates in the
+ *  20:30 window; see `lib/season-cron.ts`). */
+export async function advanceLeagueDayCore() {
+  const next = addDays(await getLeagueDate(), 1);
+  await prisma.leagueConfig.upsert({ where: { id: 1 }, update: { leagueDate: next }, create: { id: 1, leagueDate: next } });
+  return simulateLeagueDay(next);
 }
 
 /** Admin: advance the league clock by one calendar day (manual button). */

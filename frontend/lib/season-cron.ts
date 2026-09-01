@@ -3,8 +3,24 @@
 // (calendar)" selected on /admin/season) — an admin who manually pins a phase is
 // actively steering the league by hand, so the clock pauses too rather than
 // second-guessing them.
+//
+// Two DELIBERATELY SEPARATE triggers share the calendar day, matching real
+// hockey (the date changes at midnight; that night's games are played in the
+// evening) — this used to be one combined step at 20:30, which meant the
+// displayed "current day" silently sat on YESTERDAY's date for the ~20 hours
+// between midnight and the evening sim:
+//   1. `simulateDayIfDue` — the 20:30-20:40 window, unchanged — plays whatever
+//      is scheduled for the CURRENT `leagueDate` and runs that day's
+//      bookkeeping (Frenzy transitions, waivers, cap compliance, ...).
+//   2. `rolloverLeagueDateIfDue` — checked on every tick, no time window —
+//      once real Bratislava time has moved into the next calendar day AND
+//      today's evening sim has already completed (`lastSimulatedDay` equals
+//      `leagueDate`), bumps `leagueDate` forward by exactly one day so the
+//      displayed date tracks real time immediately, without waiting for
+//      tonight's game-sim window.
 import { prisma } from "./prisma";
-import { advanceLeagueDayCore } from "@/app/admin/season/actions";
+import { simulateLeagueDay } from "@/app/admin/season/actions";
+import { addDays } from "./calendar";
 
 const TZ = "Europe/Bratislava";
 const TRIGGER_HOUR = 20;
@@ -24,35 +40,62 @@ function bratislavaParts(d: Date): { dateStr: string; hour: number; minute: numb
   return { dateStr: `${parts.year}-${parts.month}-${parts.day}`, hour: Number(parts.hour), minute: Number(parts.minute) };
 }
 
+/** `d` (always UTC-midnight-normalized, see lib/calendar.ts `utcDay`) formatted the
+ *  same "YYYY-MM-DD" way as `bratislavaParts` so the two are directly comparable. */
+const isoDateStr = (d: Date) => d.toISOString().slice(0, 10);
+
 export type AutoAdvanceResult =
   | { ran: false; reason: string }
-  | ({ ran: true } & Awaited<ReturnType<typeof advanceLeagueDayCore>>);
+  | ({ ran: true } & Awaited<ReturnType<typeof simulateLeagueDay>>);
 
-/** Called by /api/cron/advance-day roughly every 5 minutes. Advances the league day
- *  by exactly one (never batches multiple days, even after downtime — a missed
+/** Called by /api/cron/advance-day roughly every 5 minutes. Plays out the CURRENT
+ *  `leagueDate` (never batches multiple days, even after downtime — a missed
  *  20:30 window just gets caught up gradually, one real day at a time, so an admin
- *  is never surprised by a pile of games simulating at once), at most once per real
- *  calendar day, only inside the 20:30-20:40 Europe/Bratislava window. */
-export async function autoAdvanceIfDue(now: Date = new Date()): Promise<AutoAdvanceResult> {
-  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { phaseOverride: true, lastAutoAdvance: true } });
+ *  is never surprised by a pile of games simulating at once), at most once per
+ *  league day, only inside the 20:30-20:40 Europe/Bratislava window. Does NOT
+ *  advance `leagueDate` itself — see `rolloverLeagueDateIfDue` below. */
+export async function simulateDayIfDue(now: Date = new Date()): Promise<AutoAdvanceResult> {
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { phaseOverride: true, leagueDate: true, lastSimulatedDay: true } });
   if (cfg?.phaseOverride) return { ran: false, reason: `phase is manually pinned to "${cfg.phaseOverride}", not following the calendar` };
+  if (!cfg?.leagueDate) return { ran: false, reason: "league clock hasn't started" };
 
-  const { dateStr, hour, minute } = bratislavaParts(now);
+  const { hour, minute } = bratislavaParts(now);
   if (!(hour === TRIGGER_HOUR && minute >= TRIGGER_MINUTE && minute < TRIGGER_MINUTE + WINDOW_MINUTES)) {
     return { ran: false, reason: `outside the ${TRIGGER_HOUR}:${TRIGGER_MINUTE} Europe/Bratislava window (now ${hour}:${String(minute).padStart(2, "0")})` };
   }
 
-  const lastDateStr = cfg?.lastAutoAdvance ? bratislavaParts(cfg.lastAutoAdvance).dateStr : null;
-  if (lastDateStr === dateStr) return { ran: false, reason: "already advanced today" };
+  if (cfg.lastSimulatedDay?.getTime() === cfg.leagueDate.getTime()) return { ran: false, reason: "today's league day is already simulated" };
 
-  const result = await advanceLeagueDayCore();
-  await prisma.leagueConfig.update({ where: { id: 1 }, data: { lastAutoAdvance: now } });
+  const result = await simulateLeagueDay(cfg.leagueDate);
+  await prisma.leagueConfig.update({ where: { id: 1 }, data: { lastSimulatedDay: cfg.leagueDate } });
   return { ran: true, ...result };
+}
+
+export type RolloverResult = { rolled: false; reason: string } | { rolled: true; to: Date };
+
+/** Called by /api/cron/advance-day on every tick (no time window — the goal is to
+ *  catch real midnight within one ~5-minute poll). Advances the DISPLAYED
+ *  `leagueDate` by exactly one day once real Bratislava time has moved past it —
+ *  but only once that day's evening sim has actually completed
+ *  (`lastSimulatedDay` matches), so the calendar can never skip a day whose
+ *  games haven't been played (e.g. after cron downtime, it just waits). */
+export async function rolloverLeagueDateIfDue(now: Date = new Date()): Promise<RolloverResult> {
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { phaseOverride: true, leagueDate: true, lastSimulatedDay: true } });
+  if (cfg?.phaseOverride) return { rolled: false, reason: `phase is manually pinned to "${cfg.phaseOverride}", not following the calendar` };
+  if (!cfg?.leagueDate) return { rolled: false, reason: "league clock hasn't started" };
+  if (cfg.lastSimulatedDay?.getTime() !== cfg.leagueDate.getTime()) return { rolled: false, reason: "today's league day hasn't been simulated yet" };
+
+  const todayStr = bratislavaParts(now).dateStr;
+  if (todayStr <= isoDateStr(cfg.leagueDate)) return { rolled: false, reason: "not yet a new Europe/Bratislava day" };
+
+  const to = addDays(cfg.leagueDate, 1);
+  await prisma.leagueConfig.update({ where: { id: 1 }, data: { leagueDate: to } });
+  return { rolled: true, to };
 }
 
 export type FrenzyAutoOpenResult = { opened: false; reason: string } | { opened: true };
 
-/** Called by /api/cron/advance-day alongside autoAdvanceIfDue, every ~5 minutes.
+/** Called by /api/cron/advance-day alongside the two triggers above, every ~5 minutes.
  *  One-shot trigger: as soon as real "now" reaches the admin-set
  *  LeagueConfig.frenzyAutoOpenAt, force the Free Agent Frenzy window open for
  *  every GM (faOpen=true) — no wall-clock window to land in like the 20:30

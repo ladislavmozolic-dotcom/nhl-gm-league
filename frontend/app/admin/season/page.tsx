@@ -17,33 +17,37 @@ import { PRE_SEASON } from "@/lib/preseason";
 export const dynamic = "force-dynamic";
 const SEASON = "2026-27";
 
-// The 20:30 Europe/Bratislava cron should fire once every ~24h while in Auto mode.
-// A 26h threshold gives it a comfortable grace window (DST transitions, a slow tick,
-// a few minutes of clock skew) before flagging it as actually stuck.
-const STALE_HOURS = 26;
+// The evening sim advances `lastSimulatedDay` by one league day per real day while in
+// Auto mode. Since that field is day-granularity (not a precise timestamp — the
+// calendar can now roll over at midnight independently of the 20:30 sim, see
+// lib/season-cron.ts), staleness is measured in whole days behind real time, not
+// hours: 0-1 days behind is the normal steady state (today's window just hasn't
+// fired yet), 2+ means at least one full evening window was missed with no catch-up.
+const STALE_DAYS = 2;
 
 /** Visible health check for the automatic daily-sim cron (lib/season-cron.ts) — so a
  *  silently-failed cron (server down at 20:30, crontab lost on a box rebuild, etc.)
  *  shows up here on next admin visit instead of only being noticed when someone
  *  wonders why the standings haven't moved in days. */
-function AutoAdvanceHealth({ pinned, lastRun }: { pinned: boolean; lastRun: Date | null }) {
+function AutoAdvanceHealth({ pinned, lastSimDay }: { pinned: boolean; lastSimDay: Date | null }) {
   if (pinned) {
     return <p className="text-xs text-slate-500">⏸ Automatic daily sim is paused — a phase is pinned manually.</p>;
   }
-  if (!lastRun) {
+  if (!lastSimDay) {
     return <p className="text-xs text-amber-400">⚠ Automatic daily sim hasn&apos;t run yet since this was set up.</p>;
   }
-  const hoursAgo = (Date.now() - lastRun.getTime()) / 3_600_000;
-  const when = lastRun.toLocaleString("en-US", { timeZone: "Europe/Bratislava", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-  if (hoursAgo > STALE_HOURS) {
+  const todayUtc = Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate());
+  const daysAgo = Math.round((todayUtc - lastSimDay.getTime()) / 86_400_000);
+  const when = lastSimDay.toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric" });
+  if (daysAgo >= STALE_DAYS) {
     return (
       <p className="text-xs text-red-400">
-        ⚠ Automatic daily sim hasn&apos;t run in {Math.round(hoursAgo)}h (last: {when} Bratislava). Check the server crontab
+        ⚠ Automatic daily sim hasn&apos;t run in {daysAgo} days (last simulated league day: {when}). Check the server crontab
         and <code className="text-red-300">/var/log/unhl-cron.log</code> — see DEPLOY.md §10b.
       </p>
     );
   }
-  return <p className="text-xs text-emerald-400">✓ Automatic daily sim last ran {when} Bratislava ({Math.round(hoursAgo)}h ago).</p>;
+  return <p className="text-xs text-emerald-400">✓ Automatic daily sim is current — last simulated league day {when} ({daysAgo === 0 ? "today" : "yesterday"}).</p>;
 }
 
 export default async function SeasonAdminPage() {
@@ -53,7 +57,7 @@ export default async function SeasonAdminPage() {
     prisma.playoffSeries.count({ where: { season: SEASON } }),
     prisma.playoffSeries.findFirst({ where: { season: SEASON, round: 4, status: "DONE" }, select: { winnerTeamId: true } }),
     getLeagueClock(),
-    prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { phaseOverride: true, lastAutoAdvance: true, preseasonPublic: true, preseasonPhaseAt: true, regularPhaseAt: true } }),
+    prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { phaseOverride: true, lastSimulatedDay: true, preseasonPublic: true, preseasonPhaseAt: true, regularPhaseAt: true } }),
     prisma.game.count({ where: { season: PRE_SEASON, status: "SCHEDULED" } }),
     prisma.game.count({ where: { season: PRE_SEASON, status: "FINAL" } }),
   ]);
@@ -75,7 +79,7 @@ export default async function SeasonAdminPage() {
         <div className="space-y-2">
           <p className="text-sm text-slate-400">Set the phase manually — Off-season, Pre-season, Regular season or Playoffs — or leave it on <span className="text-slate-200">Auto</span> to follow the calendar. Leagues don&apos;t all run on the real dates.</p>
           <PhaseControl current={clock.phase} label={clock.phaseLabel} override={cfg?.phaseOverride ?? null} />
-          <AutoAdvanceHealth pinned={!!cfg?.phaseOverride} lastRun={cfg?.lastAutoAdvance ?? null} />
+          <AutoAdvanceHealth pinned={!!cfg?.phaseOverride} lastSimDay={cfg?.lastSimulatedDay ?? null} />
           <div className="pt-2 border-t border-slate-800">
             <PhaseDatesControl preseasonAt={cfg?.preseasonPhaseAt?.toISOString() ?? null} regularAt={cfg?.regularPhaseAt?.toISOString() ?? null} />
           </div>
