@@ -21,6 +21,7 @@
 import { prisma } from "./prisma";
 import { simulateLeagueDay } from "@/app/admin/season/actions";
 import { addDays } from "./calendar";
+import { sweepExpiredContractsToUfa } from "./free-agency-server";
 
 const TZ = "Europe/Bratislava";
 const TRIGGER_HOUR = 20;
@@ -93,7 +94,7 @@ export async function rolloverLeagueDateIfDue(now: Date = new Date()): Promise<R
   return { rolled: true, to };
 }
 
-export type FrenzyAutoOpenResult = { opened: false; reason: string } | { opened: true };
+export type FrenzyAutoOpenResult = { opened: false; reason: string } | { opened: true; expiredToUfa: number };
 
 /** Called by /api/cron/advance-day alongside the two triggers above, every ~5 minutes.
  *  One-shot trigger: as soon as real "now" reaches the admin-set
@@ -101,12 +102,17 @@ export type FrenzyAutoOpenResult = { opened: false; reason: string } | { opened:
  *  every GM (faOpen=true) — no wall-clock window to land in like the 20:30
  *  game-sim trigger, it fires on the very next tick after the target moment.
  *  Clears frenzyAutoOpenAt once fired so it never re-fires, and so a later
- *  manual close of faOpen (an admin turning the market back off) sticks. */
+ *  manual close of faOpen (an admin turning the market back off) sticks.
+ *  Also runs the same expired-contract → UFA sweep the calendar-driven Frenzy
+ *  opening gets in `simulateLeagueDay` — a forced-open market should make an
+ *  unresigned expired player available too, not just one whose old contract
+ *  happens to fall inside the real July window. */
 export async function autoOpenFrenzyIfDue(now: Date = new Date()): Promise<FrenzyAutoOpenResult> {
   const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { frenzyAutoOpenAt: true, faOpen: true } });
   if (!cfg?.frenzyAutoOpenAt) return { opened: false, reason: "no auto-open time set" };
   if (cfg.faOpen) { await prisma.leagueConfig.update({ where: { id: 1 }, data: { frenzyAutoOpenAt: null } }); return { opened: false, reason: "already open — cleared the stale trigger" }; }
   if (now.getTime() < cfg.frenzyAutoOpenAt.getTime()) return { opened: false, reason: `not due until ${cfg.frenzyAutoOpenAt.toISOString()}` };
   await prisma.leagueConfig.update({ where: { id: 1 }, data: { faOpen: true, frenzyAutoOpenAt: null } });
-  return { opened: true };
+  const expiredToUfa = await sweepExpiredContractsToUfa();
+  return { opened: true, expiredToUfa };
 }

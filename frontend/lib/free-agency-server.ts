@@ -275,3 +275,20 @@ export async function demandForPlayers(
   for (const p of players) out.set(p.id, demandFromRow(p, marketPool, fullGP, round, stale, priorBidders.get(p.id)));
   return out;
 }
+
+/** A player whose contract has run out (0 years left) but who nobody re-signed
+ *  stays parked on his old club's roster (rosterType NHL/AHL) until this runs —
+ *  the market pages and Frenzy demand engine only ever look at rosterType: UFA,
+ *  so without this he's simply invisible to every other GM, not just unsigned.
+ *  Excludes the $100k farm-filler placeholder contracts (ContractSection's own
+ *  exclusion) — those aren't real deals a GM is expected to act on. Idempotent:
+ *  safe to call from every point a market window opens (regular-season opening
+ *  day, a Frenzy round starting — calendar-driven or admin-forced) since the
+ *  rosterType filter naturally excludes anyone already swept. */
+export async function sweepExpiredContractsToUfa(): Promise<number> {
+  const swept = await prisma.player.updateMany({
+    where: { rosterType: { in: ["NHL", "AHL"] }, contractYears: 0, NOT: { capHit: 100_000 } },
+    data: { rosterType: "UFA", scratched: false, captaincy: null },
+  });
+  return swept.count;
+}

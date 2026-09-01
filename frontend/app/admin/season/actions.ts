@@ -20,6 +20,7 @@ import { processWaivers } from "@/lib/waivers-server";
 import { generatePreseason, playPreseason, playPreseasonDay, computeAutoPreseasonStart, PRE_SEASON } from "@/lib/preseason";
 import { postWeeklyIfDue } from "@/lib/weekly-digest";
 import { resolveFrenzy, processRoundEnd, resolveInSeasonWindows } from "@/app/free-agents/actions";
+import { sweepExpiredContractsToUfa } from "@/lib/free-agency-server";
 import { checkPromises } from "@/lib/promises";
 import { autoImportUpcomingClass } from "@/lib/draft-class-import";
 import { leagueCapCompliance } from "@/lib/cap";
@@ -108,11 +109,20 @@ export async function simulateLeagueDay(day: Date) {
   // boundary inside the window runs counters / shortlisting; leaving the window
   // (end of round 3) signs everyone's best offer.
   let signed = 0;
+  let expiredToUfa = 0;
   if (phYesterday === "frenzy" && phToday !== "frenzy") {
     const r = await resolveFrenzy();
     signed = r.signed;
   } else if (phYesterday === "frenzy" && phToday === "frenzy" && frenzyRound(yesterday) !== frenzyRound(day)) {
     await processRoundEnd(frenzyRound(yesterday));
+  }
+  // Frenzy opening (calendar-driven, e.g. the real July 1 window) — anyone whose
+  // contract already ran out and nobody re-signed becomes available the moment the
+  // market opens, same as the regular-season opening-day sweep below (the admin-
+  // forced open via frenzyAutoOpenAt gets the same treatment separately, right when
+  // it fires — see lib/season-cron.ts).
+  if (phYesterday !== "frenzy" && phToday === "frenzy") {
+    expiredToUfa += await sweepExpiredContractsToUfa();
   }
   // in-season UFA market: resolve any player whose 7-day deliberation (or 3-day match)
   // window has closed — sign the best offer, or counter the bidders for a few more days.
@@ -123,20 +133,15 @@ export async function simulateLeagueDay(day: Date) {
   let capOffenders = 0;
   // opening-day free agency: anyone whose contract already expired (0 years left)
   // and who nobody re-signed during the off-season/Frenzy window hits the open
-  // market the moment regular season starts — same $100k-farm-filler exclusion
-  // ContractSection uses (those aren't real deals GMs are expected to act on).
-  let expiredToUfa = 0;
+  // market the moment regular season starts too (on top of the Frenzy-opening sweep
+  // above — idempotent, so re-running it here just catches anyone who expired since).
   if (phYesterday !== "regular" && phToday === "regular") {
     const offenders = await leagueCapCompliance("regular");
     capOffenders = offenders.filter((o) => o.over > 0).length;
     for (const o of offenders) {
       if (o.over > 0) await prisma.transaction.create({ data: { type: "CAP_WARNING", message: `${o.code} is over the salary cap by ${money(o.over)} on opening day — must shed salary to be compliant.` } });
     }
-    const swept = await prisma.player.updateMany({
-      where: { rosterType: { in: ["NHL", "AHL"] }, contractYears: 0, NOT: { capHit: 100_000 } },
-      data: { rosterType: "UFA", scratched: false, captaincy: null },
-    });
-    expiredToUfa = swept.count;
+    expiredToUfa += await sweepExpiredContractsToUfa();
   }
   for (const p of ["/calendar", "/schedule", "/standings", "/scores", "/admin/season", "/finance", "/free-agents", "/signings", "/waivers", "/"]) revalidatePath(p);
   return { date: day, phase: phToday, played, signed, warned: promises.warned, requested: promises.requested, capOffenders, expiredToUfa, waiverClaims: waivers.claimed, waiverClears: waivers.cleared };
