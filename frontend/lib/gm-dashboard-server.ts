@@ -136,10 +136,27 @@ export async function gmDashboard(teamId: number): Promise<GmDashboard | null> {
   if (returning) briefing.push({ dept: "Medical", icon: "🏥", text: `${cleanName(returning.name)} is nearing a return — cleared for contact in ~${returning.injuryDaysLeft} day${returning.injuryDaysLeft === 1 ? "" : "s"}.`, href: returning.slug ? `/players/${returning.slug}` : undefined });
   else if (injuredCount > 0) briefing.push({ dept: "Medical", icon: "🏥", text: `${injuredCount} on the shelf — none close to returning yet.`, href: `${teamHref2}/roster` });
   else briefing.push({ dept: "Medical", icon: "🏥", text: "Clean bill of health — a full lineup available." });
-  // Scouting — a rising prospect in the system.
+  // Scouting — a rising prospect in the system. draftedByTeamId is a historical
+  // fact (who drafted him, EVER) — it does NOT mean he's still ours: he may have
+  // long since graduated to a full NHL roster spot (not a "prospect" anymore) or
+  // been traded away entirely. DraftProspect.playerId (meant to link to the real
+  // Player row created on selection) is unpopulated for this league's imported
+  // draft history, so match by name instead — only a candidate whose CURRENT
+  // Player row is still on this team AND still rosterType "PROSPECT" is a genuine
+  // rising prospect worth bragging about here (caught live: EDM's dashboard was
+  // touting Dylan Holloway, who's actually an established STL player).
   try {
     const srcFilter = await draftSourceFilter();
-    const prospect = await prisma.draftProspect.findFirst({ where: { draftedByTeamId: teamId, ...srcFilter }, orderBy: { potential: "desc" }, select: { name: true, position: true, ov: true, potential: true } });
+    const candidates = await prisma.draftProspect.findMany({
+      where: { draftedByTeamId: teamId, ...srcFilter },
+      orderBy: { potential: "desc" }, take: 25,
+      select: { name: true, position: true, ov: true, potential: true },
+    });
+    const players = candidates.length
+      ? await prisma.player.findMany({ where: { teamId, rosterType: "PROSPECT" }, select: { id: true, name: true } })
+      : [];
+    const stillOurs = new Set(players.map((p) => cleanName(p.name).toLowerCase()));
+    const prospect = candidates.find((c) => stillOurs.has(cleanName(c.name).toLowerCase()));
     if (prospect) briefing.push({ dept: "Scouting", icon: "🔭", text: `Prospect ${cleanName(prospect.name)} (${prospect.position}) is tracking up — ceiling ${prospect.potential}, now grading ${prospect.ov}.`, href: `${teamHref2}/prospects` });
     else briefing.push({ dept: "Scouting", icon: "🔭", text: "Scouts are quiet this week — no new risers in the system." });
   } catch { briefing.push({ dept: "Scouting", icon: "🔭", text: "Scouts are quiet this week — no new risers in the system." }); }
