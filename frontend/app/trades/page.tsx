@@ -145,7 +145,7 @@ function TeamHead({ team }: { team?: { name: string; code: string | null; logoUr
   );
 }
 
-function AssetList({ team, labels, verb }: { team?: { name: string }; labels: AssetLabel[]; verb: "sends" | "receives" }) {
+function AssetList({ team, labels, verb }: { team?: { name: string }; labels: AssetLabel[]; verb: "sends" | "received" }) {
   return (
     <div className="flex-1 min-w-0">
       <p className="text-xs text-slate-500 mb-1">{team?.name || "Team"} {verb}</p>
@@ -191,8 +191,8 @@ function TradeCard({ trade, action, admin }: {
         const done = trade.status === "ACCEPTED" || trade.status === "COMPLETED";
         return (
           <div className="bg-slate-950/50 rounded-lg p-3 mb-3 flex gap-4">
-            <AssetList team={trade.fromTeam} labels={done ? trade.toLabels : trade.fromLabels} verb={done ? "receives" : "sends"} />
-            <AssetList team={trade.toTeam} labels={done ? trade.fromLabels : trade.toLabels} verb={done ? "receives" : "sends"} />
+            <AssetList team={trade.fromTeam} labels={done ? trade.toLabels : trade.fromLabels} verb={done ? "received" : "sends"} />
+            <AssetList team={trade.toTeam} labels={done ? trade.fromLabels : trade.toLabels} verb={done ? "received" : "sends"} />
           </div>
         );
       })()}
