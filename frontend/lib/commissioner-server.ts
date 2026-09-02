@@ -7,6 +7,7 @@ import { prisma } from "./prisma";
 import { getLeagueDate, computePhase } from "./calendar-server";
 import { addDays, utcDay } from "./calendar";
 import { leagueCapCompliance } from "./cap";
+import { MIN_GOALIE_OV } from "./goalie-rule";
 
 const SEASON = "2026-27";
 const MIN_F = 12, MIN_D = 6, MIN_G = 2;
@@ -18,6 +19,7 @@ export type CommishToday = {
   missingLines: TeamFlag[];
   shortLineups: TeamFlag[];   // below 12F/6D/2G healthy → needs a call-up
   capOffenders: TeamFlag[];
+  noWorthyGoalie: TeamFlag[]; // no NHL-roster goalie rated MIN_GOALIE_OV+
   pendingTrades: number;
   injuredActive: number;      // injured players still on NHL rosters
 };
@@ -39,15 +41,18 @@ export async function commishToday(): Promise<CommishToday> {
     prisma.teamLines.findMany({ select: { teamId: true, forwardLines: true } }),
     leagueCapCompliance(phase === "regular" ? "regular" : undefined).catch(() => []),
     prisma.trade.count({ where: { status: "PENDING" } }),
-    prisma.player.findMany({ where: { rosterType: "NHL", team: { league: "NHL" } }, select: { teamId: true, position: true, injuryDaysLeft: true } }),
+    prisma.player.findMany({ where: { rosterType: "NHL", team: { league: "NHL" } }, select: { teamId: true, position: true, injuryDaysLeft: true, overall: true, isGoalie: true } }),
   ]);
 
   const linesByTeam = new Map(lines.map((l) => [l.teamId, Array.isArray(l.forwardLines) ? (l.forwardLines as unknown[]).length : 0]));
   const roster = new Map<number, { f: number; d: number; g: number; injured: number }>();
   for (const t of teams) roster.set(t.id, { f: 0, d: 0, g: 0, injured: 0 });
+  const worthyGoalie = new Map<number, boolean>();
+  for (const t of teams) worthyGoalie.set(t.id, false);
   let injuredActive = 0;
   for (const p of nhlPlayers) {
     const r = roster.get(p.teamId); if (!r) continue;
+    if (p.isGoalie && (p.overall ?? 0) >= MIN_GOALIE_OV) worthyGoalie.set(p.teamId, true);
     if (p.injuryDaysLeft > 0) { r.injured++; injuredActive++; continue; } // injured don't dress
     if (isG(p.position)) r.g++; else if (isDef(p.position)) r.d++; else if (isFwd(p.position)) r.f++;
   }
@@ -67,10 +72,14 @@ export async function commishToday(): Promise<CommishToday> {
     .filter((o) => o.over > 0)
     .map((o) => { const t = teams.find((x) => x.id === o.teamId); return { teamId: o.teamId, code: o.code, name: t?.name ?? o.code ?? "", slug: t?.slug ?? null, detail: `$${(o.over / 1_000_000).toFixed(2)}M over` }; });
 
+  const noWorthyGoalie: TeamFlag[] = teams
+    .filter((t) => !worthyGoalie.get(t.id))
+    .map((t) => ({ teamId: t.id, code: t.code, name: t.name, slug: t.slug, detail: `no goalie ${MIN_GOALIE_OV}+ OV` }));
+
   return {
     leagueDate: cur.toISOString(), nextDate: next.toISOString(), phase,
     gamesReady: dayGames.length,
     matchups: dayGames.slice(0, 16).map((g) => ({ away: g.awayTeam.code ?? g.awayTeam.name, home: g.homeTeam.code ?? g.homeTeam.name })),
-    missingLines, shortLineups, capOffenders, pendingTrades, injuredActive,
+    missingLines, shortLineups, capOffenders, noWorthyGoalie, pendingTrades, injuredActive,
   };
 }

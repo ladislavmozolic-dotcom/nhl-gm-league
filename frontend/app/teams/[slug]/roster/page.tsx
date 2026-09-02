@@ -5,6 +5,7 @@ import { isAdmin, canManageTeam } from "@/lib/auth";
 import AutoFillButton from "@/components/AutoFillButton";
 import RosterTabs from "@/components/RosterTabs";
 import { captaincyFromName } from "@/lib/playerName";
+import { hasWorthyGoalie, MIN_GOALIE_OV } from "@/lib/goalie-rule";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,10 @@ export default async function TeamRosterPage({ params }: { params: Promise<{ slu
     nD < 6 ? `${6 - nD}D` : null,
     nG < 2 ? `${2 - nG}G` : null,
   ].filter(Boolean);
+  // League rule: every club needs at least one goalie rated MIN_GOALIE_OV+ before
+  // the season — advisory only (matches the cap/lineup warnings above it), see
+  // lib/goalie-rule.ts.
+  const noWorthyGoalie = rt === "NHL" && !hasWorthyGoalie(roster.filter((p) => p.isGoalie));
   const affiliate = team.league === "NHL"
     ? await prisma.team.findFirst({ where: { parentTeamId: team.id }, select: { name: true } })
     : null;
@@ -96,6 +101,11 @@ export default async function TeamRosterPage({ params }: { params: Promise<{ slu
               : <> Missing <b>{short.join(" · ")}</b> — add players to field a full lineup.</>}
           </div>
           {admin && affiliate && <div className="mt-2"><AutoFillButton /></div>}
+        </div>
+      )}
+      {noWorthyGoalie && (
+        <div className="text-sm text-red-200 bg-red-950/25 border border-red-800/40 rounded-lg px-4 py-2.5">
+          <b>🥅 No goalie rated {MIN_GOALIE_OV}+ OV.</b> League rule: every club must carry at least one goalie at {MIN_GOALIE_OV}+ overall before the season — until you do, this roster isn't game-ready. Sign, trade for, or call up a qualifying goalie.
         </div>
       )}
       <RosterView players={rosterWithCap} dressedIds={[...dressed]} />
