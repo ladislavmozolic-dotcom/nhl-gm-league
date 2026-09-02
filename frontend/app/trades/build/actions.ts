@@ -8,7 +8,7 @@ import { CURRENT_SEASON_START } from "@/lib/finance";
 import { revalidatePath } from "next/cache";
 import { clauseBlock, assertOwnership, packageFromTrade, executeAcceptedTrade, createTradeRecord, type TradePlayer, type TradePackage } from "@/lib/trade-exec";
 import { playerValue, pickValueBySlot } from "@/lib/trade-value";
-import { hasWorthyGoalie, MIN_GOALIE_OV } from "@/lib/goalie-rule";
+import { hasWorthyGoalie } from "@/lib/goalie-rule";
 
 export type { TradePlayer, TradePackage } from "@/lib/trade-exec";
 
@@ -31,7 +31,7 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
   const norm = (s: string) => clean(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
   const pidAll = [...pkg.fromPlayers, ...pkg.toPlayers].map((p) => p.playerId);
-  const players = await prisma.player.findMany({ where: { id: { in: pidAll } }, select: { id: true, name: true, overall: true, age: true, capHit: true, position: true, isGoalie: true } });
+  const players = await prisma.player.findMany({ where: { id: { in: pidAll } }, select: { id: true, name: true, overall: true, age: true, capHit: true, position: true, isGoalie: true, lastSeasonGP: true, lastSeasonSvPct: true } });
   const pById = new Map(players.map((p) => [p.id, p]));
 
   // --- draft-order-aware picks: value follows the estimated slot the pick lands at,
@@ -117,8 +117,8 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
   // fill a need there? (fromPlayers go TO toTeam; toPlayers go TO fromTeam)
   const grp = (pos: string | null) => { const P = (pos ?? "").toUpperCase(); if (/G/.test(P)) return "G"; if (/(^|\/)D(\/|$)|^D$/.test(P)) return "D"; if (/C/.test(P)) return "C"; return "W"; };
   const [fromRoster, toRoster] = await Promise.all([
-    prisma.player.findMany({ where: { teamId: pkg.fromTeamId, rosterType: "NHL" }, select: { id: true, overall: true, position: true, isGoalie: true } }),
-    prisma.player.findMany({ where: { teamId: pkg.toTeamId, rosterType: "NHL" }, select: { id: true, overall: true, position: true, isGoalie: true } }),
+    prisma.player.findMany({ where: { teamId: pkg.fromTeamId, rosterType: "NHL" }, select: { id: true, overall: true, position: true, isGoalie: true, lastSeasonGP: true, lastSeasonSvPct: true } }),
+    prisma.player.findMany({ where: { teamId: pkg.toTeamId, rosterType: "NHL" }, select: { id: true, overall: true, position: true, isGoalie: true, lastSeasonGP: true, lastSeasonSvPct: true } }),
   ]);
   const grpLabel: Record<string, string> = { C: "centra", W: "krídla", D: "obrancu", G: "brankára" };
   const slotFor = (g: string, slot: number) => {
@@ -157,17 +157,17 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
   analyzeFit(pkg.toPlayers, fromRoster, fromTeam.name);
   analyzeOut(pkg.toPlayers, toRoster, toTeam.name);
 
-  // League rule: every club needs a goalie rated MIN_GOALIE_OV+ (lib/goalie-rule.ts).
-  // Advisory only — doesn't block the trade — but flag a side that would lose its
-  // last qualifying goalie in this deal.
+  // League rule: every club needs a "worthy" goalie (lib/goalie-rule.ts). Advisory
+  // only — doesn't block the trade — but flag a side that would lose its last
+  // qualifying goalie in this deal.
   const outFromIds = new Set(pkg.fromPlayers.map((p) => p.playerId));
   const outToIds = new Set(pkg.toPlayers.map((p) => p.playerId));
   const incomingToFrom = pkg.toPlayers.map((p) => pById.get(p.playerId)).filter((p): p is NonNullable<typeof p> => !!p?.isGoalie);
   const incomingToTo = pkg.fromPlayers.map((p) => pById.get(p.playerId)).filter((p): p is NonNullable<typeof p> => !!p?.isGoalie);
   const postFromGoalies = [...fromRoster.filter((r) => r.isGoalie && !outFromIds.has(r.id)), ...incomingToFrom];
   const postToGoalies = [...toRoster.filter((r) => r.isGoalie && !outToIds.has(r.id)), ...incomingToTo];
-  if (!hasWorthyGoalie(postFromGoalies)) fit.push(`⚠️ <b>${fromTeam.name}</b> by po tomto trejde nemal žiadneho brankára s OV ${MIN_GOALIE_OV}+ — podľa pravidiel ligy jeho súpiska nie je pripravená na zápas.`);
-  if (!hasWorthyGoalie(postToGoalies)) fit.push(`⚠️ <b>${toTeam.name}</b> by po tomto trejde nemal žiadneho brankára s OV ${MIN_GOALIE_OV}+ — podľa pravidiel ligy jeho súpiska nie je pripravená na zápas.`);
+  if (!hasWorthyGoalie(postFromGoalies)) fit.push(`⚠️ <b>${fromTeam.name}</b> by po tomto trejde nemal žiadneho dostojného brankára — podľa pravidiel ligy jeho súpiska nie je pripravená na zápas.`);
+  if (!hasWorthyGoalie(postToGoalies)) fit.push(`⚠️ <b>${toTeam.name}</b> by po tomto trejde nemal žiadneho dostojného brankára — podľa pravidiel ligy jeho súpiska nie je pripravená na zápas.`);
 
   return { ok: true, fromName: fromTeam.name, toName: toTeam.name, meGives, meGets, verdict, tilt, reasoning, fromItems, toItems, fit };
 }

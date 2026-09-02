@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { cleanName } from "@/lib/playerName";
+import { isWorthyGoalie } from "@/lib/goalie-rule";
 
 export type RosterPlayer = Record<string, number | string | null> & {
   id: number; name: string; position: string | null; slug?: string | null; age: number | null; overall: number | null; contractText: string | null; condition: number | null;
@@ -77,11 +78,13 @@ export default function RosterTable({ title, players, goalie = false }: { title:
             {rows.length === 0 && <tr><td colSpan={cols.length} className="px-3 py-3 text-slate-600">no players</td></tr>}
             {rows.map((p) => {
               const cap = (p.capRole as string | null) ?? null;
+              const worthy = goalie && isWorthyGoalie({ overall: p.overall, lastSeasonGP: p.lastSeasonGP as number | null, lastSeasonSvPct: p.lastSeasonSvPct as number | null });
               return (
                 <tr key={p.id} className="border-b border-slate-800/60 hover:bg-slate-800/30">
                   <td className="px-2 py-1.5 text-left sticky left-0 bg-slate-900/60 backdrop-blur whitespace-nowrap">
                     {p.slug ? <Link href={`/players/${p.slug}`} className="text-white hover:text-blue-400 font-medium">{cleanName(p.name)}</Link> : <span className="text-white font-medium">{cleanName(p.name)}</span>}
                     {cap && <span className={`ml-1 text-[9px] font-bold ${cap === "C" ? "text-amber-400" : "text-slate-400"}`}>({cap})</span>}
+                    {worthy && <span className="ml-1 text-green-400" title="Worthy goalie — meets the league's minimum-goalie rule">●</span>}
                   </td>
                   <td className="px-2 py-1.5 text-center text-slate-400">{p.position ?? "—"}</td>
                   <td className="px-2 py-1.5 text-center text-slate-400 tabular-nums">{p.condition != null ? Number(p.condition).toFixed(0) : "—"}</td>

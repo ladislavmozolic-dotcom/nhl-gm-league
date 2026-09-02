@@ -5,6 +5,7 @@ import Link from "next/link";
 import PlayerAvatar from "@/components/playerAvatar";
 import { cleanName } from "@/lib/playerName";
 import { posGroup, ratingColor, ovColor } from "@/lib/ratingBands";
+import { isWorthyGoalie } from "@/lib/goalie-rule";
 
 const parseCap = (t: string | null) => { if (!t) return 0; const m = t.match(/[\d,]+/); return m ? parseInt(m[0].replace(/,/g, ""), 10) : 0; };
 const salaryOf = (p: any) => p.capHit || parseCap(p.contractText);
@@ -66,6 +67,7 @@ export default function RosterRows({ players, attrs, isGoalie, farm }: { players
                       <Link href={`/players/${player.slug}`} className="font-medium text-sm text-white hover:text-blue-400 transition-colors truncate block">
                         {cleanName(player.name)}
                         {(player.capRole ?? player.captaincy) && <span className={`ml-1 text-[10px] font-bold ${(player.capRole ?? player.captaincy) === "C" ? "text-amber-400" : "text-slate-400"}`}>({player.capRole ?? player.captaincy})</span>}
+                        {isGoalie && isWorthyGoalie(player) && <span className="ml-1 text-green-400" title="Worthy goalie — meets the league's minimum-goalie rule">●</span>}
                       </Link>
                       {farm && player.affiliate && <p className="text-[10px] text-emerald-300/60">{player.affiliate.code || player.affiliate.name}</p>}
                       {(player.injuryDaysLeft ?? 0) > 0 && (

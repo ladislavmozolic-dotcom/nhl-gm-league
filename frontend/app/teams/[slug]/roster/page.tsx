@@ -5,7 +5,7 @@ import { isAdmin, canManageTeam } from "@/lib/auth";
 import AutoFillButton from "@/components/AutoFillButton";
 import RosterTabs from "@/components/RosterTabs";
 import { captaincyFromName } from "@/lib/playerName";
-import { hasWorthyGoalie, MIN_GOALIE_OV } from "@/lib/goalie-rule";
+import { hasWorthyGoalie, MIN_GOALIE_OV, MIN_GOALIE_GP, MIN_GOALIE_GP_SVPCT } from "@/lib/goalie-rule";
 
 export const dynamic = "force-dynamic";
 
@@ -105,7 +105,7 @@ export default async function TeamRosterPage({ params }: { params: Promise<{ slu
       )}
       {noWorthyGoalie && (
         <div className="text-sm text-red-200 bg-red-950/25 border border-red-800/40 rounded-lg px-4 py-2.5">
-          <b>🥅 No goalie rated {MIN_GOALIE_OV}+ OV.</b> League rule: every club must carry at least one goalie at {MIN_GOALIE_OV}+ overall before the season — until you do, this roster isn't game-ready. Sign, trade for, or call up a qualifying goalie.
+          <b>🥅 No worthy goalie.</b> League rule: every club must carry at least one goalie who is either {MIN_GOALIE_OV}+ overall, started {MIN_GOALIE_GP}+ real games last season, or started more than {MIN_GOALIE_GP_SVPCT} real games at a save % above 90 — until you do, this roster isn't game-ready. Sign, trade for, or call up a qualifying goalie.
         </div>
       )}
       <RosterView players={rosterWithCap} dressedIds={[...dressed]} />

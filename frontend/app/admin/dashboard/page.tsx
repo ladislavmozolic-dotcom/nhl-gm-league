@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { isAdmin } from "@/lib/auth";
 import { PageHeader } from "@/components/ui";
 import { commishToday, type TeamFlag } from "@/lib/commissioner-server";
-import { MIN_GOALIE_OV } from "@/lib/goalie-rule";
 import SimulateDayButton from "@/components/SimulateDayButton";
 import GmRoleManager from "@/components/GmRoleManager";
 import AiModeManager from "@/components/AiModeManager";
@@ -74,7 +73,7 @@ export default async function CommissionerDashboard() {
             {check(t.missingLines.length === 0, "Lines set for every team", `${t.missingLines.length} team(s) without lines — the sim uses position-aware auto lines`)}
             {check(t.capOffenders.length === 0, "Every team cap-compliant", `${t.capOffenders.length} team(s) over the cap`)}
             {check(t.shortLineups.length === 0, "Rosters legal (12F / 6D / 2G)", `${t.shortLineups.length} team(s) short — auto call-ups will fill them`)}
-            {check(t.noWorthyGoalie.length === 0, `Every team has a ${MIN_GOALIE_OV}+ OV goalie`, `${t.noWorthyGoalie.length} team(s) with no goalie ${MIN_GOALIE_OV}+ OV — not season-ready`)}
+            {check(t.noWorthyGoalie.length === 0, "Every team has a worthy goalie", `${t.noWorthyGoalie.length} team(s) with no worthy goalie — not season-ready`)}
             {check(true, "Goalies assigned (starter picked by fatigue)", "")}
           </div>
           <div className="md:text-right">
@@ -90,7 +89,7 @@ export default async function CommissionerDashboard() {
           <FlagList title="⚠ Short / illegal lineups" flags={t.shortLineups} tone="text-red-400" />
           <FlagList title="Missing lines" flags={t.missingLines} tone="text-amber-400" />
           <FlagList title="Over the cap" flags={t.capOffenders} tone="text-red-400" />
-          <FlagList title={`🥅 No ${MIN_GOALIE_OV}+ OV goalie`} flags={t.noWorthyGoalie} tone="text-red-400" />
+          <FlagList title="🥅 No worthy goalie" flags={t.noWorthyGoalie} tone="text-red-400" />
         </div>
       )}
 
