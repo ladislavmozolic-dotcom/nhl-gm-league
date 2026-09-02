@@ -57,25 +57,29 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
   useEffect(() => {
     if (!teamId || !(info && info.ok)) return;
     let cancelled = false;
-    getAskAtAction(playerId, teamId, line, pp, pk, grantClause || null, grantClause === "M_NTC" ? breadth : null).then((r) => { if (!cancelled) setLiveAsk(r); });
+    getAskAtAction(playerId, teamId, line, pp, pk, grantClause || null, grantClause === "M_NTC" ? breadth : null)
+      .then((r) => { if (!cancelled) setLiveAsk(r); })
+      .catch(() => { /* a stale-deployment failure here just leaves the last-known ask showing */ });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [line, pp, pk, teamId, info, grantClause, breadth]);
 
   const load = (tid: number) => start(async () => {
     setMsg(null);
-    const [i, o, h] = await Promise.all([getInterestAction(playerId, tid), getPlayerOffersAction(playerId), getBidHistoryAction(playerId)]);
-    setInfo(i); setOffers(o); setHistory(h);
-    if (i.ok) {
-      const ex = i.existing;
-      // pre-fill only with the club's OWN previous offer; a fresh offer starts blank so
-      // the GM has to judge the range himself (we no longer hand him the exact ask).
-      setSalaryM(ex && ex.status !== "COUNTERED" ? (ex.salary / 1e6).toFixed(2) : "");
-      setYears(ex?.years ?? i.askYears);
-      setLine(ex?.line ?? i.line);
-      setPp(ex?.pp ?? i.wantPP);
-      setPk(ex?.pk ?? i.wantPK);
-    }
+    try {
+      const [i, o, h] = await Promise.all([getInterestAction(playerId, tid), getPlayerOffersAction(playerId), getBidHistoryAction(playerId)]);
+      setInfo(i); setOffers(o); setHistory(h);
+      if (i.ok) {
+        const ex = i.existing;
+        // pre-fill only with the club's OWN previous offer; a fresh offer starts blank so
+        // the GM has to judge the range himself (we no longer hand him the exact ask).
+        setSalaryM(ex && ex.status !== "COUNTERED" ? (ex.salary / 1e6).toFixed(2) : "");
+        setYears(ex?.years ?? i.askYears);
+        setLine(ex?.line ?? i.line);
+        setPp(ex?.pp ?? i.wantPP);
+        setPk(ex?.pk ?? i.wantPK);
+      }
+    } catch (e) { setMsg({ t: "err", s: friendlyActionError(e) }); }
   });
 
   const openModal = () => {
@@ -119,9 +123,11 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
   const withdraw = () => {
     if (!teamId) return;
     start(async () => {
-      await withdrawOfferAction(playerId, teamId);
-      setMsg({ t: "ok", s: "Offer withdrawn." });
-      load(teamId);
+      try {
+        await withdrawOfferAction(playerId, teamId);
+        setMsg({ t: "ok", s: "Offer withdrawn." });
+        load(teamId);
+      } catch (e) { setMsg({ t: "err", s: friendlyActionError(e) }); }
     });
   };
 

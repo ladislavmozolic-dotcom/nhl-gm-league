@@ -8,6 +8,7 @@ import { Card } from "@/components/ui";
 import InfoTip from "@/components/InfoTip";
 import { cleanName } from "@/lib/playerName";
 import { clauseDiscount } from "@/lib/free-agency";
+import { friendlyActionError } from "@/lib/client/action-error";
 
 type ExpiringPlayer = { id: number; name: string; capHit: number | null; contractYears: number | null; contractText: string | null; farm?: boolean; franchiseTag?: boolean };
 
@@ -38,12 +39,14 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
 
   useEffect(() => {
     start(async () => {
-      const i = await getInterestAction(player.id, teamId);
-      setInfo(i);
-      if (i.ok) {
-        setSalaryM((i.askSalary / 1e6).toFixed(2)); setYears(i.askYears);
-        setLine(i.line); setPp(i.wantPP); setPk(i.wantPK);
-      }
+      try {
+        const i = await getInterestAction(player.id, teamId);
+        setInfo(i);
+        if (i.ok) {
+          setSalaryM((i.askSalary / 1e6).toFixed(2)); setYears(i.askYears);
+          setLine(i.line); setPp(i.wantPP); setPk(i.wantPK);
+        }
+      } catch (e) { setMsg({ t: "err", s: friendlyActionError(e) }); }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -57,7 +60,10 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
     setMsg(null);
     const salary = Math.round(parseFloat(salaryM) * 1e6);
     if (!Number.isFinite(salary)) { setMsg({ t: "err", s: "Enter a salary." }); return; }
-    const r = await extendContractAction(player.id, teamId, salary, years, line, pp, pk, grantClause || null, grantClause === "M_NTC" ? breadth : null, twoWay);
+    let r: Awaited<ReturnType<typeof extendContractAction>>;
+    try {
+      r = await extendContractAction(player.id, teamId, salary, years, line, pp, pk, grantClause || null, grantClause === "M_NTC" ? breadth : null, twoWay);
+    } catch (e) { setMsg({ t: "err", s: friendlyActionError(e) }); return; }
     // don't refresh yet — that would unmount this modal before the confirmation shows;
     // refresh when the GM closes it (Done button).
     if (r.ok) { setResult({ salary: r.salary, years: r.years }); setDone(true); return; }
@@ -181,9 +187,11 @@ export default function ReSignPanel({ teamId, players, title, blurb, accent = "t
   const toggleTag = (id: number) => startTag(async () => {
     setTagMsg(null);
     const on = tagged !== id;
-    const r = await setFranchiseTagAction(id, teamId, on);
-    if (r.ok) setTagged(on ? id : null);
-    else setTagMsg(r.error ?? "Couldn't set the tag.");
+    try {
+      const r = await setFranchiseTagAction(id, teamId, on);
+      if (r.ok) setTagged(on ? id : null);
+      else setTagMsg(r.error ?? "Couldn't set the tag.");
+    } catch (e) { setTagMsg(friendlyActionError(e)); }
   });
   // hold the OPEN PLAYER OBJECT, not just an id — the server action's revalidatePath
   // re-renders this list without the just-signed player, and a find(openId) would go
