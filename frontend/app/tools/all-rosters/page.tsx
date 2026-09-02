@@ -49,7 +49,7 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
   const farmHasField = (full.affiliateTeams[0]?.players ?? []).some((p) => p.captaincy === "C" || p.captaincy === "A");
   const toRP = (p: (typeof full.players)[number], hasField: boolean): RosterPlayer => {
     const row = { ...(p as unknown as RosterPlayer), ...(p.goalieRating ?? {}), capRole: hasField ? (p.captaincy ?? null) : captaincyFromName(p.name) };
-    return realMode ? { ...row, contractText: p.capHit ? money(p.capHit) : (row.contractText ?? null) } : row;
+    return realMode ? { ...row, contractText: p.capHit ? money(p.capHit) : (row.contractText ?? null), contractYears: p.realContractYears ?? row.contractYears ?? null } : row;
   };
   // one skaters table: forwards first (best → worst), then defensemen, then goalies.
   // Players arrive ordered by overall desc, so filtering preserves that within each group.

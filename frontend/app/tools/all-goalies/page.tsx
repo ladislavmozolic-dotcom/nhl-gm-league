@@ -40,7 +40,7 @@ export default async function AllGoaliesPage({ searchParams }: { searchParams: P
   const farmHasField = farm.some((p) => p.captaincy === "C" || p.captaincy === "A");
   const toRP = (p: (typeof full.players)[number], hasField: boolean): RosterPlayer => {
     const row = { ...(p as unknown as RosterPlayer), ...(p.goalieRating ?? {}), capRole: hasField ? (p.captaincy ?? null) : captaincyFromName(p.name) };
-    return realMode ? { ...row, contractText: p.capHit ? money(p.capHit) : (row.contractText ?? null) } : row;
+    return realMode ? { ...row, contractText: p.capHit ? money(p.capHit) : (row.contractText ?? null), contractYears: p.realContractYears ?? row.contractYears ?? null } : row;
   };
 
   return (
