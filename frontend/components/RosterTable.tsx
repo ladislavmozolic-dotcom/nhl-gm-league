@@ -52,7 +52,12 @@ export default function RosterTable({ title, players, goalie = false }: { title:
           own — never actually scrolling — box). So instead this div is its OWN
           bounded scroll panel (max-height + overflow-y-auto for real), and the
           thead sticks to ITS top, which does work reliably. */}
-      <div className="bg-slate-900/40 border-x border-b border-slate-800 rounded-b-lg overflow-auto max-h-[70vh]">
+      {/* A fixed pixel height (not a vh-based one) — a typical ~23-player roster
+          only barely exceeds 70vh, so its own internal scroll range was a few px,
+          making the sticky header's benefit unnoticeable in practice. A shorter,
+          fixed cap reliably needs scrolling (and so a visibly-working sticky
+          header) for any roster length, not just an exceptionally long one. */}
+      <div className="bg-slate-900/40 border-x border-b border-slate-800 rounded-b-lg overflow-auto max-h-[460px]">
         <table className="w-full text-xs" style={{ minWidth: 980 }}>
           <thead>
             {/* sticky to the scroll panel's own top (see above) — the first cell

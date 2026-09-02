@@ -74,7 +74,10 @@ export default function SortableTable({ cols, rows, initialSort, minWidth = 720,
           the thead sticks to ITS top — which does work reliably, and also sidesteps
           this table's own Card ancestor (overflow-hidden) that would otherwise
           clip page-relative stickiness anyway. */}
-      <div className="overflow-auto max-h-[70vh]">
+      {/* A fixed pixel height, not vh-based — see RosterTable's identical note: a
+          viewport-relative cap barely triggers on a moderate-length list, making
+          the sticky header's benefit unnoticeable in practice. */}
+      <div className="overflow-auto max-h-[560px]">
       <table className="w-full text-sm" style={{ minWidth }}>
         <thead>
           {/* sticky to the scroll panel's own top (see above) — solid background so
