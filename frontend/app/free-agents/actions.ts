@@ -330,9 +330,13 @@ export async function submitOfferAction(
     return { ok: false as const, error: "The player has moved on — he's no longer negotiating with your club." };
   }
   // round-lock (July Frenzy only): only clubs already in the negotiation (an offer
-  // placed in round 1) may continue; nobody new joins from round 2 onward. In-season
-  // signing is immediate, so there are no rounds to lock.
-  if (!win.immediate) {
+  // placed in round 1) may continue; nobody new joins from round 2 onward. Keyed off
+  // the game PHASE, not win.immediate — the commissioner's faEarlyAccess head start
+  // (see above) also sets win.immediate=true to get past the "market closed" wall,
+  // but it's still round-based Frenzy negotiation underneath, so one offer per round
+  // must still hold there too. Only the regular-season / playoffs immediate market is
+  // genuinely round-less (continuous re-negotiation is the intended behavior there).
+  if (clock.phase !== "regular" && clock.phase !== "playoffs") {
     if (!existing && clock.frenzyRound > 1) {
       return { ok: false as const, error: "Bidding on this player closed after round 1 — only clubs already negotiating can raise their offer." };
     }
