@@ -100,7 +100,7 @@ export default async function TradePage({ params }: { params: Promise<{ id: stri
 
   const Side = ({ team, labels }: { team?: { name: string | null } | null; labels: Item[] }) => (
     <div className="flex-1 min-w-0">
-      <p className="text-xs text-slate-500 mb-1.5">{team?.name || "Team"} sends</p>
+      <p className="text-xs text-slate-500 mb-1.5">{team?.name || "Team"} receives</p>
       {labels.length === 0 ? <p className="text-slate-600 text-sm">nothing</p> : (
         <div className="flex flex-wrap gap-1.5">
           {labels.map((l, i) => (
@@ -129,9 +129,11 @@ export default async function TradePage({ params }: { params: Promise<{ id: stri
         </div>
 
         <div className="bg-slate-950/50 rounded-lg p-4 mb-3 flex gap-4 flex-col sm:flex-row">
-          <Side team={fromTeam} labels={fromLabels} />
+          {/* under each team's own name, show what THAT team receives — the other
+              side's outgoing assets — matching how a real trade graphic reads */}
+          <Side team={fromTeam} labels={toLabels} />
           <span className="hidden sm:block text-slate-700 self-center">⇄</span>
-          <Side team={toTeam} labels={toLabels} />
+          <Side team={toTeam} labels={fromLabels} />
         </div>
 
         {trade.condition && <p className="text-xs text-amber-300/80 mb-3">📎 {trade.condition}</p>}
