@@ -45,13 +45,24 @@ export default function RosterTable({ title, players, goalie = false }: { title:
   return (
     <div className="mb-6">
       <div className="bg-slate-800/60 border border-slate-700 rounded-t-lg px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-slate-300">{title}</div>
-      <div className="bg-slate-900/40 border-x border-b border-slate-800 rounded-b-lg overflow-x-auto">
+      {/* A horizontally-scrolling ancestor (overflow-x-auto) forces overflow-y to
+          compute as "auto" too on that SAME element, by CSS spec — no override
+          escapes it, not even an explicit overflow-y-visible. That breaks
+          position:sticky against the page (it'd only ever stick within this div's
+          own — never actually scrolling — box). So instead this div is its OWN
+          bounded scroll panel (max-height + overflow-y-auto for real), and the
+          thead sticks to ITS top, which does work reliably. */}
+      <div className="bg-slate-900/40 border-x border-b border-slate-800 rounded-b-lg overflow-auto max-h-[70vh]">
         <table className="w-full text-xs" style={{ minWidth: 980 }}>
           <thead>
-            <tr className="text-[10px] text-slate-500 border-b border-slate-800 bg-slate-800/30 select-none">
+            {/* sticky to the scroll panel's own top (see above) — the first cell
+                ALSO stays sticky horizontally, same as its column body — a sticky
+                corner. Solid background — a translucent one would let rows
+                scrolling underneath show through. */}
+            <tr className="text-[10px] text-slate-500 border-b border-slate-800 bg-slate-900 sticky top-0 z-10 select-none">
               {cols.map((c, i) => (
                 <th key={c.key} onClick={() => click(c)} title="Sort"
-                  className={`px-2 py-1.5 whitespace-nowrap cursor-pointer hover:text-slate-200 ${sort?.key === c.key ? "text-blue-400" : ""} ${i === 0 ? "text-left sticky left-0 bg-slate-800/40 min-w-[150px]" : i === cols.length - 1 ? "text-right" : "text-center"}`}>{c.label}{arrow(c.key)}</th>
+                  className={`px-2 py-1.5 whitespace-nowrap cursor-pointer hover:text-slate-200 ${sort?.key === c.key ? "text-blue-400" : ""} ${i === 0 ? "text-left sticky left-0 z-10 bg-slate-900 min-w-[150px]" : i === cols.length - 1 ? "text-right" : "text-center"}`}>{c.label}{arrow(c.key)}</th>
               ))}
             </tr>
           </thead>

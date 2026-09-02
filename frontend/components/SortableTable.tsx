@@ -67,10 +67,19 @@ export default function SortableTable({ cols, rows, initialSort, minWidth = 720,
         </div>
         {query && <span className="text-xs text-slate-500">{filtered.length} match{filtered.length === 1 ? "" : "es"}</span>}
       </div>
-      <div className="overflow-x-auto">
+      {/* A horizontally-scrolling ancestor (overflow-x-auto) forces overflow-y to
+          compute "auto" too on that SAME element by CSS spec — no override escapes
+          it. That breaks position:sticky against the page. So this div is instead
+          its OWN bounded scroll panel (max-height + a real overflow-y-auto), and
+          the thead sticks to ITS top — which does work reliably, and also sidesteps
+          this table's own Card ancestor (overflow-hidden) that would otherwise
+          clip page-relative stickiness anyway. */}
+      <div className="overflow-auto max-h-[70vh]">
       <table className="w-full text-sm" style={{ minWidth }}>
         <thead>
-          <tr className="bg-slate-800/30 border-b border-slate-800 text-slate-500 text-[11px] uppercase tracking-wider select-none">
+          {/* sticky to the scroll panel's own top (see above) — solid background so
+              rows scrolling underneath don't show through. */}
+          <tr className="bg-slate-900 sticky top-0 z-10 border-b border-slate-800 text-slate-500 text-[11px] uppercase tracking-wider select-none">
             {cols.map((c) => {
               const active = sort === c.key;
               return (
