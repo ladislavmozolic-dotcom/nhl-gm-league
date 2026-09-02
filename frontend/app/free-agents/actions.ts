@@ -162,14 +162,23 @@ export async function getPlayerOffersAction(playerId: number) {
   }));
 }
 
-/** Last time each team actually raised its bid on a player, from the append-only
- *  FaBid log — NOT FaOffer.updatedAt, which Prisma bumps on every `.update()`
- *  including the round-processing status flips (COUNTERED/SHORTLISTED/REJECTED)
- *  that touch a standing offer without the GM changing a single term. */
+/** Last time each team actually raised its bid on a player — NOT FaOffer.updatedAt
+ *  (Prisma bumps that on every `.update()`, including round-processing status
+ *  flips like COUNTERED/SHORTLISTED/REJECTED that never touched a term), and NOT
+ *  just the latest FaBid row either — a team can resubmit at the FrenzyRound
+ *  boundary with identical money/term (nothing actually raised), which still
+ *  appends a FaBid row. Only count it as raised when the logged bids for that
+ *  team actually contain more than one distinct (salary, years) pair; otherwise
+ *  the offer's placedAt (FaOffer.createdAt, its true original moment) stands. */
 async function lastRaisedAtByTeam(playerId: number, teamIds: number[]): Promise<Map<number, string>> {
-  const bids = await prisma.faBid.findMany({ where: { playerId, teamId: { in: teamIds } }, orderBy: { id: "asc" }, select: { teamId: true, createdAt: true } });
+  const bids = await prisma.faBid.findMany({ where: { playerId, teamId: { in: teamIds } }, orderBy: { id: "asc" }, select: { teamId: true, salary: true, years: true, createdAt: true } });
+  const byTeam = new Map<number, typeof bids>();
+  for (const b of bids) byTeam.set(b.teamId, [...(byTeam.get(b.teamId) ?? []), b]);
   const m = new Map<number, string>();
-  for (const b of bids) m.set(b.teamId, b.createdAt.toISOString()); // ascending — last write per team wins
+  for (const [teamId, list] of byTeam) {
+    const distinct = new Set(list.map((b) => `${b.salary}:${b.years}`));
+    if (distinct.size > 1) m.set(teamId, list[list.length - 1].createdAt.toISOString());
+  }
   return m;
 }
 
@@ -209,9 +218,17 @@ export async function getAllActiveOffersAction() {
   const teamById = new Map(teams.map((t) => [t.id, t]));
   const byPlayer = new Map<number, typeof offers>();
   for (const o of offers) byPlayer.set(o.playerId, [...(byPlayer.get(o.playerId) ?? []), o]);
-  const allBids = await prisma.faBid.findMany({ where: { playerId: { in: playerIds } }, orderBy: { id: "asc" }, select: { playerId: true, teamId: true, createdAt: true } });
-  const lastRaisedAt = new Map<string, string>(); // `${playerId}:${teamId}` -> iso, ascending so last write per pair wins
-  for (const b of allBids) lastRaisedAt.set(`${b.playerId}:${b.teamId}`, b.createdAt.toISOString());
+  // last GENUINE raise per player+team — only when the logged bids actually contain
+  // more than one distinct (salary, years) pair (see lastRaisedAtByTeam above for why
+  // a lone resubmit with identical terms doesn't count).
+  const allBids = await prisma.faBid.findMany({ where: { playerId: { in: playerIds } }, orderBy: { id: "asc" }, select: { playerId: true, teamId: true, salary: true, years: true, createdAt: true } });
+  const byPair = new Map<string, typeof allBids>();
+  for (const b of allBids) { const k = `${b.playerId}:${b.teamId}`; byPair.set(k, [...(byPair.get(k) ?? []), b]); }
+  const lastRaisedAt = new Map<string, string>();
+  for (const [key, list] of byPair) {
+    const distinct = new Set(list.map((b) => `${b.salary}:${b.years}`));
+    if (distinct.size > 1) lastRaisedAt.set(key, list[list.length - 1].createdAt.toISOString());
+  }
   const result = [...byPlayer.entries()].map(([playerId, os]) => {
     const p = pById.get(playerId);
     return {
