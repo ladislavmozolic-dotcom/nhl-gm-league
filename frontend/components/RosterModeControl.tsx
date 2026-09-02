@@ -21,7 +21,7 @@ export default function RosterModeControl({ mode, realCount, profinhlCount, prof
     setFillMsg(null);
     const r = await fillRealTeamsAction();
     if (!r.ok) { setFillMsg(`⚠ ${r.error}`); return; }
-    setFillMsg(`✅ Matched ${r.matched} player${r.matched === 1 ? "" : "s"} to their real NHL team from ${r.rostersFetched} rosters${r.placed ? " (placed onto teams)" : ""}. ${r.unmatchedCount} still unmatched (not on any current NHL roster).`);
+    setFillMsg(`✅ Matched ${r.matched} player${r.matched === 1 ? "" : "s"} to their real NHL team from ${r.rostersFetched} rosters${r.placed ? " (placed onto teams)" : ""}. ${r.unmatchedCount} still unmatched (not on any current NHL roster).${r.skippedActive ? ` ${r.skippedActive} left untouched — an active free-agent offer/deliberation on file, not silently overwritten.` : ""}`);
   });
 
   const fillCaps = () => start(async () => {

@@ -289,10 +289,22 @@ export async function importRealRosters(opts: Options = {}) {
   const realMode = placeIfRealMode && (await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true } }))?.rosterMode === "real";
   const players = await prisma.player.findMany({
     where: onlyMissing ? { realTeamId: null } : {},
-    select: { id: true, name: true },
+    select: { id: true, name: true, rosterType: true, faDecisionAt: true },
   });
+  // A UFA currently under real in-game negotiation (a standing offer, or mid
+  // deliberation) must NOT be silently overwritten by this real-world snapshot —
+  // his own club's/rivals' actual offers are real GM decisions this league has
+  // already made, and this importer has no way to log or explain undoing them (no
+  // Transaction/SigningLog, unlike every real signing path). Traced a real incident
+  // from exactly this: a UFA with an active $5.5M offer got placed onto his live
+  // real-life team with zero trace, twice, each time this import ran. Placing is
+  // still correct for a UFA with no live activity — that's the tool's whole point.
+  const activeOfferIds = new Set(
+    (await prisma.faOffer.groupBy({ by: ["playerId"], where: { playerId: { in: players.map((p) => p.id) }, status: { in: ["PENDING", "COUNTERED", "SHORTLISTED"] } } }))
+      .map((o) => o.playerId),
+  );
 
-  let matched = 0;
+  let matched = 0, skippedActive = 0;
   const unmatched: string[] = [];
   for (const pl of players) {
     const key = norm(pl.name);
@@ -302,13 +314,16 @@ export async function importRealRosters(opts: Options = {}) {
     if (!ab) { const set = fiToAbbrevs.get(fiKey(key)); if (set && set.size === 1) ab = [...set][0]; }
     const tid = ab ? codeToId.get(ab) : undefined;
     if (!tid) { unmatched.push(pl.name); continue; }
+    const underNegotiation = pl.rosterType === "UFA" && (activeOfferIds.has(pl.id) || pl.faDecisionAt != null);
     await prisma.player.update({
       where: { id: pl.id },
-      // set the real team; if we're live in real mode, also ice him now (no finance reset)
-      data: { realTeamId: tid, ...(realMode ? { teamId: tid, rosterType: "NHL" } : {}) },
+      // set the real team; if we're live in real mode AND he's not mid-negotiation,
+      // also ice him now (no finance reset)
+      data: { realTeamId: tid, ...(realMode && !underNegotiation ? { teamId: tid, rosterType: "NHL" } : {}) },
     });
+    if (underNegotiation) skippedActive++;
     matched++;
   }
 
-  return { ok: true as const, matched, unmatchedCount: unmatched.length, unmatched: unmatched.slice(0, 60), rostersFetched, placed: realMode };
+  return { ok: true as const, matched, unmatchedCount: unmatched.length, unmatched: unmatched.slice(0, 60), rostersFetched, placed: realMode, skippedActive };
 }
