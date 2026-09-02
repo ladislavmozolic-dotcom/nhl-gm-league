@@ -3,6 +3,7 @@
 import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { replyToThread } from "@/app/forum/actions";
+import { friendlyActionError } from "@/lib/client/action-error";
 
 export default function ForumReply({ threadId }: { threadId: number }) {
   const [text, setText] = useState("");
@@ -26,9 +27,11 @@ export default function ForumReply({ threadId }: { threadId: number }) {
   const submit = () => {
     if (!text.trim()) return;
     start(async () => {
-      const r = await replyToThread(threadId, text);
-      if (!r.ok) { setErr(r.error); return; }
-      setText(""); setErr(""); router.refresh();
+      try {
+        const r = await replyToThread(threadId, text);
+        if (!r.ok) { setErr(r.error); return; }
+        setText(""); setErr(""); router.refresh();
+      } catch (e) { setErr(friendlyActionError(e)); }
     });
   };
 

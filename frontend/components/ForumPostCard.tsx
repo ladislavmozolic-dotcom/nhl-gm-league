@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui";
 import ForumReactions from "@/components/ForumReactions";
 import { editPost, deletePost } from "@/app/forum/actions";
+import { friendlyActionError } from "@/lib/client/action-error";
 
 export type PostReact = { emoji: string; count: number; mine: boolean };
 export type ForumPostView = {
@@ -30,16 +31,20 @@ export default function ForumPostCard({ post, canReact }: { post: ForumPostView;
   const saveEdit = () => {
     if (!draft.trim()) return;
     start(async () => {
-      const r = await editPost(post.id, draft);
-      if (!r.ok) { setErr(r.error); return; }
-      setEditing(false); setErr(""); router.refresh();
+      try {
+        const r = await editPost(post.id, draft);
+        if (!r.ok) { setErr(r.error); return; }
+        setEditing(false); setErr(""); router.refresh();
+      } catch (e) { setErr(friendlyActionError(e)); }
     });
   };
   const doDelete = () => start(async () => {
-    const r = await deletePost(post.id);
-    if (!r.ok) { setErr(r.error); return; }
-    if (r.threadDeleted) router.push(r.category ? `/forum/c/${r.category}` : "/forum");
-    else router.refresh();
+    try {
+      const r = await deletePost(post.id);
+      if (!r.ok) { setErr(r.error); return; }
+      if (r.threadDeleted) router.push(r.category ? `/forum/c/${r.category}` : "/forum");
+      else router.refresh();
+    } catch (e) { setErr(friendlyActionError(e)); }
   });
 
   const btn = "text-[11px] font-semibold px-2 py-1 rounded hover:bg-slate-800 transition-colors";

@@ -26,7 +26,7 @@ export default function ForumReactions({ postId, initial, canReact }: { postId: 
       return [...prev, { emoji, count: 1, mine: true }];
     });
     setOpen(false);
-    start(async () => { await toggleReaction(postId, emoji); });
+    start(async () => { try { await toggleReaction(postId, emoji); } catch { /* optimistic UI already applied — a stale-deploy failure here isn't worth surfacing */ } });
   };
 
   return (
