@@ -101,9 +101,21 @@ export async function cancelWaiver(waiverId: number, actorTeamId: number): Promi
  *  winning a contested claim gets him (ties broken by who claimed first), and
  *  the winner drops to the back of that line for next time. Unclaimed players
  *  clear to the placing club's AHL affiliate. Called from the calendar
- *  day-advance. */
+ *  day-advance.
+ *
+ *  Also resolves anything ACTIVE for more than 48 real hours regardless of its
+ *  placedDay, as a safety net: placedDay is an index computed from the league
+ *  clock (roundForDate) at the moment a player was waived, so a transient
+ *  league-date corruption (it's happened — leagueDate briefly fast-forwarded
+ *  months ahead during a testing session) can permanently strand a waiver on a
+ *  placedDay index the calendar will never catch up to again, silently, with
+ *  no error anywhere. createdAt is a real wall-clock timestamp immune to that. */
 export async function processWaivers(currentDay: number, phase: Phase): Promise<{ claimed: number; cleared: number; details: string[] }> {
-  const due = await prisma.waiver.findMany({ where: { status: "ACTIVE", placedDay: { lt: currentDay } }, include: { claims: true } });
+  const staleCutoff = new Date(Date.now() - 48 * 3600 * 1000);
+  const due = await prisma.waiver.findMany({
+    where: { status: "ACTIVE", OR: [{ placedDay: { lt: currentDay } }, { createdAt: { lt: staleCutoff } }] },
+    include: { claims: true },
+  });
   if (due.length === 0) return { claimed: 0, cleared: 0, details: [] };
 
   const useStandings = phase === "regular" || phase === "playoffs";
