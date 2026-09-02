@@ -20,6 +20,8 @@ import { LangProvider } from "@/components/LangProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata(): Promise<Metadata> {
   const b = await loadBranding();
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://unhl.eu";
