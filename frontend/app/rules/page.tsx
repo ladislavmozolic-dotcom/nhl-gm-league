@@ -95,6 +95,11 @@ const SECTIONS: Sec[] = [
       { h: "Playoffs", points: [
         "You may re-sign your OWN pending UFAs (immediate), but the open market is closed.",
       ] },
+      { h: "Two-way contracts — who'll actually sign one", points: [
+        "No real NHL games last season (a pure farm player): he'll take a two-way up to 3 years, any round.",
+        "Some NHL games, but not enough to count as established: up to 2 years, any round.",
+        "An established NHL player (well past the \"prospect\" games-played mark) refuses a two-way outright — UNLESS the market's gone cold for him (he drew no offer at all in round 1), in which case one of two things can bring him around, always for a single 1-year \"prove it\" deal: he's older (past the league's set age) and settles from round 2; or he isn't older but grades out as fringe/4th-line caliber and settles from round 3. A genuinely good established player keeps refusing a two-way no matter how many rounds pass — offer him a one-way instead.",
+      ] },
     ],
   },
   {
@@ -112,9 +117,26 @@ const SECTIONS: Sec[] = [
     id: "contracts", title: "9 · Contracts & Clauses",
     groups: [
       { points: [
-        "Contracts have a cap hit and a term. Two-way deals pay less on the farm; an established player past 25 won't take one (except a settling veteran late in the Frenzy).",
-        "No-trade / no-move clauses are real: NTC, NMC and modified-NTC (a player-named list of 6/12/18/24 teams). Granting a clause signs the player for a little less.",
-        "A player with a clause must consent to a trade that touches it (an agent fee may apply), per the league's clause settings.",
+        "Every contract has a cap hit and a term (years). Two-way deals pay the league minimum on the farm and less overall; an established player past 25 won't sign one (except a settling veteran late in the Frenzy).",
+      ] },
+      { h: "NTC vs NMC vs Modified-NTC — what each actually protects", points: [
+        "NTC (No-Trade Clause) — blocks ANY trade without the player's consent. He can still be exposed to waivers.",
+        "NMC (No-Movement Clause) — full protection: blocks a trade AND blocks waivers. The strongest, and priced accordingly (see below).",
+        "Modified-NTC — the player names a list of 6, 12, 18 or 24 teams; a trade to any club NOT on that list needs no consent at all. A bigger list costs the club more when signing him.",
+      ] },
+      { h: "Granting a clause: the signing discount", points: [
+        "A player takes a little less money for the security: NMC ≈ 8% off, NTC ≈ 5% off, Modified-NTC scales with the list size (a 6-team list barely moves the needle; a 24-team list is nearly as valuable to him as a full NTC).",
+      ] },
+      { h: "Trading a protected player: the agent fee", points: [
+        "A club dealing a clause player needs his consent — decided automatically by comparing his new situation (role + team strength) to his old one, and it costs real money out of the DEALING club's bank, on top of his salary:",
+        [
+          "A clear step up (better role and/or a stronger team) — he waives for free.",
+          "A lateral move — a token ~15% of his remaining salary (cap hit × years left).",
+          "A step down — the fee scales up with how much worse it is, well past 20%.",
+          "A clear downgrade — he wants his ENTIRE remaining salary paid out to approve it.",
+          "NMC carries a further +25 percentage points on top of the NTC/step-down math — the strongest clause is the hardest (and priciest) to move.",
+          "Modified-NTC is simpler: free if the destination isn't on his list, full remaining salary if it is.",
+        ],
       ] },
     ],
   },
@@ -131,11 +153,21 @@ const SECTIONS: Sec[] = [
   {
     id: "waivers", title: "11 · Waivers",
     groups: [
-      { points: [
+      { h: "Who needs to clear waivers", points: [
         "Waivers can be turned on or off by the commissioner.",
-        "When on: exposed players clear a one-day window. In the regular season/playoffs, competing claims go by reverse-standings priority; outside that (off-season, Frenzy, preseason — where standings don't mean anything yet), priority instead follows a claim-order queue — whichever claiming club has gone longest without winning a claim gets him, and it then drops to the back of the line for next time. An unclaimed player clears to the AHL.",
-        "Once a claim is in, the placing club can no longer pull the player back off waivers.",
-        "Waiver-exempt: players on an ELC or a two-way contract can be sent to the farm directly. A one-way / veteran player must clear the wire first — the roster mover blocks a direct bury-to-the-farm and points you to the Waiver Wire.",
+        "Waiver-exempt: a player on an ELC or a two-way contract can be sent to the farm directly, no waivers needed.",
+        "A one-way / veteran player must clear the wire first — the roster mover blocks a direct bury-to-the-farm and points you to the Waiver Wire instead.",
+        "A cap hit above $1.5M currently can't be placed on waivers at all — too valuable to realistically waive to the farm this way (a commissioner-tunable limit).",
+        "An NMC blocks waivers outright; an NTC does not.",
+      ] },
+      { h: "The one-day window", points: [
+        "Any club can claim an exposed player within a one-day window.",
+        "Once a claim lands, the placing club can no longer pull him back — the Pull-back button locks the moment the first claim comes in.",
+        "Unclaimed after the window closes → he clears to the placing club's own AHL affiliate.",
+      ] },
+      { h: "Multiple claims — who wins him", points: [
+        "Regular season / playoffs: reverse-standings priority — the worst team in the league gets him.",
+        "Off-season, Frenzy, preseason (standings don't mean anything yet): a claim-order queue instead — whichever claiming club has gone the longest without winning a contested claim gets him (ties broken by whoever claimed first), and the winner then drops to the back of that line for next time. So a club that just won a claim won't win the next contested one too, even if it claims first — a club that's never claimed (or claimed longest ago) jumps the queue.",
       ] },
     ],
   },
@@ -293,6 +325,11 @@ const SECTIONS_CS: Sec[] = [
       { h: "Play-off", points: [
         "Můžete prodloužit VLASTNÍ končící UFA (okamžitě), ale volný trh je zavřený.",
       ] },
+      { h: "Obousměrné smlouvy — kdo takovou vůbec podepíše", points: [
+        "Žádné reálné zápasy v NHL minulou sezonu (čistě farmářský hráč): vezme obousměrnou smlouvu až na 3 roky, v jakémkoliv kole.",
+        "Pár zápasů v NHL, ale ne dost na to, aby se počítal za zavedeného: až na 2 roky, v jakémkoliv kole.",
+        "Zavedený hráč NHL (jasně za hranicí „prospekta“) obousměrnou smlouvu odmítne rovnou — LEDAŽE by o něj trh úplně vychladl (v 1. kole nedostal žádnou nabídku); pak ho může obměkčit jedna ze dvou věcí, vždy jen na 1 rok „na zkoušku“: je starší (nad věkovou hranicí ligy) a povolí od 2. kola; nebo není starší, ale hodnotově patří spíš do 4. lajny a povolí od 3. kola. Opravdu dobrý zavedený hráč odmítá obousměrnou smlouvu bez ohledu na to, kolik kol uplyne — nabídněte mu radši jednosměrnou.",
+      ] },
     ],
   },
   {
@@ -310,9 +347,26 @@ const SECTIONS_CS: Sec[] = [
     id: "contracts", title: "9 · Smlouvy a klauzule",
     groups: [
       { points: [
-        "Smlouvy mají strop (cap hit) a délku. Obousměrné smlouvy platí méně na farmě; zavedený hráč po 25. roce ji nevezme (kromě usazujícího se veterána v pozdní fázi Frenzy).",
-        "Klauzule o nevyměnitelnosti / nehnutelnosti jsou reálné: NTC, NMC a modifikované NTC (hráčem jmenovaný seznam 6/12/18/24 týmů). Udělení klauzule podepíše hráče o něco levněji.",
-        "Hráč s klauzulí musí souhlasit s výměnou, která se jí dotýká (může být poplatek agentovi), dle nastavení klauzulí v lize.",
+        "Každá smlouva má strop (cap hit) a délku (roky). Obousměrné smlouvy platí na farmě ligové minimum a celkově méně; zavedený hráč po 25. roce takovou nevezme (kromě usazujícího se veterána v pozdní fázi Frenzy).",
+      ] },
+      { h: "NTC vs. NMC vs. modifikovaná NTC — co která opravdu chrání", points: [
+        "NTC (no-trade clause) — blokuje JAKOUKOLIV výměnu bez hráčova souhlasu. Na waivery ho ale poslat můžete.",
+        "NMC (no-movement clause) — plná ochrana: blokuje výměnu I waivery. Nejsilnější, a podle toho i oceněná (viz níže).",
+        "Modifikovaná NTC — hráč jmenuje seznam 6, 12, 18 nebo 24 týmů; výměna ke klubu, který na seznamu NENÍ, souhlas vůbec nepotřebuje. Delší seznam stojí klub při podpisu víc.",
+      ] },
+      { h: "Udělení klauzule: sleva při podpisu", points: [
+        "Hráč vezme za tu jistotu o něco méně peněz: NMC ≈ sleva 8 %, NTC ≈ sleva 5 %, modifikovaná NTC se odvíjí od délky seznamu (6 týmů se skoro nepozná, 24 týmů má pro něj skoro stejnou cenu jako plná NTC).",
+      ] },
+      { h: "Výměna chráněného hráče: poplatek agentovi", points: [
+        "Klub, co chráněného hráče vyměňuje, potřebuje jeho souhlas — rozhoduje se automaticky porovnáním nové situace (role + síla týmu) s tou starou, a stojí to reálné peníze z rozpočtu VYMĚŇUJÍCÍHO klubu navíc k jeho platu:",
+        [
+          "Jasné zlepšení (lepší role a/nebo silnější tým) — souhlasí zdarma.",
+          "Boční přesun — symbolický poplatek ~15 % ze zbývajícího platu (cap hit × zbývající roky).",
+          "Zhoršení — poplatek roste podle toho, o kolik je to horší, klidně přes 20 %.",
+          "Jasné zhoršení — chce vyplatit CELÝ zbývající plat, aby souhlasil.",
+          "NMC přidává dalších +25 procentních bodů navíc k výpočtu NTC/zhoršení — nejsilnější klauzule se hýbe nejhůř (a nejdráž).",
+          "Modifikovaná NTC je jednodušší: zdarma, pokud cíl není na seznamu; celý zbývající plat, pokud je.",
+        ],
       ] },
     ],
   },
@@ -329,11 +383,21 @@ const SECTIONS_CS: Sec[] = [
   {
     id: "waivers", title: "11 · Waivery",
     groups: [
-      { points: [
+      { h: "Kdo musí projít waivery", points: [
         "Waivery může komisař zapnout nebo vypnout.",
-        "Když jsou zapnuté: vystavení hráči projdou jednodenním oknem. V základní části a play-off jdou souběžné nároky podle obráceného pořadí tabulky; mimo to (mezisezona, Frenzy, přípravka — kde tabulka ještě nic neznamená) rozhoduje místo toho pořadová fronta nároků — hráče dostane klub, který nejdéle nevyhrál žádný nárok, a po výhře se přesune na konec fronty. Nenárokovaný hráč propadne do AHL.",
-        "Jakmile je nárok podaný, klub, který hráče vystavil, ho už nemůže stáhnout zpět.",
-        "Výjimka z waiverů: hráči na ELC nebo dvoucestné (two-way) smlouvě se dají poslat na farmu přímo. Jednocestný / veteránský hráč musí nejdřív projít wire — roster mover přímé zakopání na farmu zablokuje a odkáže tě na Waiver Wire.",
+        "Výjimka z waiverů: hráč na ELC nebo dvoucestné (two-way) smlouvě jde na farmu rovnou, waivery nepotřebuje.",
+        "Jednocestný / veteránský hráč musí nejdřív projít wire — roster mover přímé zakopání na farmu zablokuje a odkáže tě na Waiver Wire.",
+        "Strop nad 1,5M $ momentálně nejde na waivery poslat vůbec — příliš cenný hráč na to, aby takhle reálně propadl na farmu (limit, který může komisař upravit).",
+        "NMC blokuje waivery úplně; NTC ne.",
+      ] },
+      { h: "Jednodenní okno", points: [
+        "Vystaveného hráče může kterýkoliv klub nárokovat během jednodenního okna.",
+        "Jakmile je nárok podaný, klub, který hráče vystavil, ho už nemůže stáhnout zpět — tlačítko Pull-back se zamkne hned po prvním nároku.",
+        "Nenárokovaný hráč po uzavření okna propadne do AHL afiliace klubu, který ho vystavil.",
+      ] },
+      { h: "Víc nároků najednou — kdo ho dostane", points: [
+        "Základní část / play-off: rozhoduje obrácené pořadí tabulky — dostane ho nejhorší tým v lize.",
+        "Mezisezona, Frenzy, přípravka (tabulka ještě nic neznamená): místo toho pořadová fronta nároků — hráče dostane klub, který nejdéle nevyhrál žádný souběžný nárok (při shodě rozhoduje, kdo nárokoval první), a vítěz se pak přesune na konec fronty pro příště. Klub, co právě vyhrál nárok, tak nevyhraje ten další souběžný, i kdyby nárokoval první — klub, co nikdy nenárokoval (nebo nejdéle), frontu přeskočí.",
       ] },
     ],
   },
