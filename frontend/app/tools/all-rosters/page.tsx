@@ -101,7 +101,9 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
 
   return (
     <div className="space-y-6 py-2">
-      <PageHeader title="All Rosters" subtitle="Complete rosters, prospects, picks and conditions for every club." />
+      <PageHeader title="All Rosters" subtitle="Complete rosters, prospects, picks and conditions for every club."
+        right={<Link href="/players/all?type=goalies" className="text-sm px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-blue-600 text-slate-300 hover:text-white transition-colors whitespace-nowrap">🥅 All Goalies</Link>}
+      />
 
       {/* team logo switcher */}
       <div className="flex flex-wrap gap-1.5 border border-slate-800 bg-slate-900/70 rounded-2xl p-2 sticky top-14 z-20 backdrop-blur shadow-lg shadow-black/20">
