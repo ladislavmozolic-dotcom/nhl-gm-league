@@ -204,7 +204,7 @@ export async function getAllActiveOffersAction() {
       photoUrl: p?.photoUrl ?? null, overall: p?.overall ?? null,
       offers: os.map((o) => ({
         teamId: o.teamId, teamCode: teamById.get(o.teamId)?.code ?? "?", teamLogo: teamById.get(o.teamId)?.logoUrl ?? null, salary: o.salary, years: o.years,
-        line: o.line, pp: o.pp, pk: o.pk, round: o.round, status: o.status,
+        line: o.line, pp: o.pp, pk: o.pk, round: o.round, status: o.status, twoWay: !!o.twoWay,
         placedAt: o.createdAt.toISOString(), updatedAt: o.updatedAt.toISOString(),
       })),
     };

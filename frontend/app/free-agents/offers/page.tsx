@@ -66,6 +66,9 @@ export default async function AllOffersPage() {
                         <div className="flex-1 flex items-center gap-3 text-xs text-slate-400 flex-wrap">
                           <span className="font-semibold text-slate-200 tabular-nums">{money(o.salary)}</span>
                           <span>× {o.years}yr</span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${o.twoWay ? "border-slate-700 text-slate-400" : "border-amber-600/60 text-amber-400"}`}>
+                            {o.twoWay ? "2-way" : "1-way"}
+                          </span>
                           {!p.isGoalie && <span className="text-slate-600">Line {o.line}{(o.pp || o.pk) && ` · ${[o.pp && "PP", o.pk && "PK"].filter(Boolean).join("/")}`}</span>}
                           <span className="text-slate-600">Round {o.round || "—"}</span>
                         </div>
