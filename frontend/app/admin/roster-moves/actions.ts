@@ -40,3 +40,48 @@ export async function adminTransferPlayer(playerId: number, toTeamId: number) {
   revalidatePath("/", "layout");
   return { ok: true as const };
 }
+
+/** Same commissioner override, for a draft pick — just reassigns current
+ *  ownership (teamId). ownerLogoId (who ORIGINALLY held the pick, shown on
+ *  every "2027 R3"-style label even after it's changed hands) is deliberately
+ *  left untouched, same as a real trade. */
+export async function adminTransferPick(pickId: number, toTeamId: number) {
+  if (!(await isAdmin())) return { ok: false as const, error: "Admin only." };
+  const [pick, toTeam] = await Promise.all([
+    prisma.draftPick.findUnique({ where: { id: pickId }, select: { id: true, year: true, round: true, teamId: true } }),
+    prisma.team.findUnique({ where: { id: toTeamId }, select: { id: true, name: true } }),
+  ]);
+  if (!pick) return { ok: false as const, error: "Pick not found." };
+  if (!toTeam) return { ok: false as const, error: "Team not found." };
+  const fromTeam = await prisma.team.findUnique({ where: { id: pick.teamId }, select: { name: true } });
+  await prisma.$transaction([
+    prisma.draftPick.update({ where: { id: pickId }, data: { teamId: toTeamId } }),
+    prisma.transaction.create({
+      data: { type: "TRADE", message: `[Admin] ${pick.year} Round ${pick.round} pick moved from ${fromTeam?.name ?? "?"} to ${toTeam.name}.` },
+    }),
+  ]);
+  revalidatePath("/admin/roster-moves");
+  revalidatePath("/", "layout");
+  return { ok: true as const };
+}
+
+/** Same commissioner override, for a prospect. */
+export async function adminTransferProspect(prospectId: number, toTeamId: number) {
+  if (!(await isAdmin())) return { ok: false as const, error: "Admin only." };
+  const [prospect, toTeam] = await Promise.all([
+    prisma.prospect.findUnique({ where: { id: prospectId }, select: { id: true, name: true, teamId: true } }),
+    prisma.team.findUnique({ where: { id: toTeamId }, select: { id: true, name: true } }),
+  ]);
+  if (!prospect) return { ok: false as const, error: "Prospect not found." };
+  if (!toTeam) return { ok: false as const, error: "Team not found." };
+  const fromTeam = await prisma.team.findUnique({ where: { id: prospect.teamId }, select: { name: true } });
+  await prisma.$transaction([
+    prisma.prospect.update({ where: { id: prospectId }, data: { teamId: toTeamId } }),
+    prisma.transaction.create({
+      data: { type: "TRADE", message: `[Admin] Prospect ${prospect.name} moved from ${fromTeam?.name ?? "?"} to ${toTeam.name}.` },
+    }),
+  ]);
+  revalidatePath("/admin/roster-moves");
+  revalidatePath("/", "layout");
+  return { ok: true as const };
+}

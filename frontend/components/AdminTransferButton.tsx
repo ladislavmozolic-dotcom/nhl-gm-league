@@ -2,18 +2,21 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { adminTransferPlayer } from "@/app/admin/roster-moves/actions";
 
-export default function AdminTransferButton({ playerId, playerName, toTeamId, toTeamName }: { playerId: number; playerName: string; toTeamId: number; toTeamName: string }) {
+export default function AdminTransferButton({ id, label, toTeamId, toTeamName, action, confirmVerb = "Move" }: {
+  id: number; label: string; toTeamId: number; toTeamName: string;
+  action: (id: number, toTeamId: number) => Promise<{ ok: boolean; error?: string }>;
+  confirmVerb?: string;
+}) {
   const [pending, start] = useTransition();
   const router = useRouter();
   return (
     <button
       disabled={pending}
       onClick={() => {
-        if (!confirm(`Move ${playerName} to ${toTeamName}? This bypasses the trade system entirely — no consent, no cap check.`)) return;
+        if (!confirm(`${confirmVerb} ${label} to ${toTeamName}? This bypasses the trade system entirely — no consent, no cap check.`)) return;
         start(async () => {
-          const r = await adminTransferPlayer(playerId, toTeamId);
+          const r = await action(id, toTeamId);
           if (!r.ok) { alert(r.error); return; }
           router.refresh();
         });
