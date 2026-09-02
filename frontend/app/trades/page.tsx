@@ -145,10 +145,10 @@ function TeamHead({ team }: { team?: { name: string; code: string | null; logoUr
   );
 }
 
-function AssetList({ team, labels }: { team?: { name: string }; labels: AssetLabel[] }) {
+function AssetList({ team, labels, verb }: { team?: { name: string }; labels: AssetLabel[]; verb: "sends" | "receives" }) {
   return (
     <div className="flex-1 min-w-0">
-      <p className="text-xs text-slate-500 mb-1">{team?.name || "Team"} receives</p>
+      <p className="text-xs text-slate-500 mb-1">{team?.name || "Team"} {verb}</p>
       {labels.length === 0 ? <p className="text-slate-600 text-sm">nothing</p> : (
         <div className="flex flex-wrap gap-1.5">
           {labels.map((l, i) => (
@@ -184,12 +184,18 @@ function TradeCard({ trade, action, admin }: {
         <span className={`text-xs font-bold px-3 py-1 rounded-full ${STATUS_STYLE[trade.status] ?? "bg-slate-700 text-slate-300"}`}>{trade.status}</span>
       </div>
 
-      <div className="bg-slate-950/50 rounded-lg p-3 mb-3 flex gap-4">
-        {/* under each team's own name/logo, show what THAT team receives — the
-            other side's outgoing assets — matching how a real trade graphic reads */}
-        <AssetList team={trade.fromTeam} labels={trade.toLabels} />
-        <AssetList team={trade.toTeam} labels={trade.fromLabels} />
-      </div>
+      {/* "Receives" (and the swapped-side layout) only makes sense once a trade is
+          actually done — a still-pending proposal hasn't given either club anything
+          yet, so it keeps reading as "X sends" under its own name. */}
+      {(() => {
+        const done = trade.status === "ACCEPTED" || trade.status === "COMPLETED";
+        return (
+          <div className="bg-slate-950/50 rounded-lg p-3 mb-3 flex gap-4">
+            <AssetList team={trade.fromTeam} labels={done ? trade.toLabels : trade.fromLabels} verb={done ? "receives" : "sends"} />
+            <AssetList team={trade.toTeam} labels={done ? trade.fromLabels : trade.toLabels} verb={done ? "receives" : "sends"} />
+          </div>
+        );
+      })()}
 
       {trade.condition && <p className="text-xs text-amber-300/80 mb-3">📎 {trade.condition}</p>}
       {trade.status === "AWAITING_COMMISH" && <p className="text-xs text-amber-300/80 mb-3">🕵️ Agreed by both GMs — awaiting commission approval (rookie-GM oversight).</p>}
