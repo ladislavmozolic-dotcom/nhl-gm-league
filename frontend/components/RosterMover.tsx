@@ -37,6 +37,7 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [sortMode, setSortMode] = useState<"name" | "ov">("name");
 
   const release = (p: Player) => {
     if (!isReleasable(p)) return;
@@ -64,7 +65,8 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
   };
 
   const byName = (a: Player, b: Player) => a.name.localeCompare(b.name);
-  const of = (s: RosterSide) => rows.filter((r) => r.side === s).sort(byName);
+  const byOV = (a: Player, b: Player) => b.overall - a.overall || a.name.localeCompare(b.name);
+  const of = (s: RosterSide) => rows.filter((r) => r.side === s).sort(sortMode === "ov" ? byOV : byName);
   const pro = of("pro"), proScratched = of("pro-scratched"), farm = of("farm"), farmScratched = of("farm-scratched");
   const nhlRoster = rows.filter((r) => isNhlSide(r.side)); // dressed + scratched → cap + 23-limit
   const goalies = (l: Player[]) => l.filter((p) => p.isGoalie).length;
@@ -215,7 +217,14 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
   return (
     <div className="w-full px-6 pb-28">
       <div className="mb-5">
-        <h1 className="text-2xl font-bold">{teamName} — Rosters</h1>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h1 className="text-2xl font-bold">{teamName} — Rosters</h1>
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className="text-slate-500 mr-0.5">Sort</span>
+            <button onClick={() => setSortMode("name")} className={`px-2.5 py-1 rounded-md font-semibold transition-colors ${sortMode === "name" ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-400 hover:text-slate-200"}`}>A–Z</button>
+            <button onClick={() => setSortMode("ov")} className={`px-2.5 py-1 rounded-md font-semibold transition-colors ${sortMode === "ov" ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-400 hover:text-slate-200"}`}>OV</button>
+          </div>
+        </div>
         <div className="flex gap-3 text-sm mt-1">
           <Link href={`/teams/${teamSlug}`} className="text-slate-400 hover:text-blue-400">← team</Link>
           <Link href={`/teams/${teamSlug}/lines`} className="text-slate-400 hover:text-blue-400">Lines →</Link>
