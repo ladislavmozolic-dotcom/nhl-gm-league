@@ -2,13 +2,31 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { isAdmin } from "@/lib/auth";
-import { PageHeader } from "@/components/ui";
-import RosterMover from "@/components/RosterMover";
-import { saveRosterMoves, releasePlayer, placeOnWaiversFromRoster } from "@/app/teams/[slug]/rosters/actions";
+import { PageHeader, Card } from "@/components/ui";
+import PlayerLink from "@/components/PlayerLink";
+import AdminTransferButton from "@/components/AdminTransferButton";
+import TeamPicker from "@/components/TeamPicker";
+import { money } from "@/lib/finance";
+import { cleanName } from "@/lib/playerName";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminRosterMovesPage({ searchParams }: { searchParams: Promise<{ team?: string }> }) {
+async function orgRoster(teamId: number) {
+  const team = await prisma.team.findUnique({
+    where: { id: teamId },
+    include: { affiliateTeams: { select: { id: true, name: true } } },
+  });
+  if (!team) return null;
+  const orgIds = [team.id, ...team.affiliateTeams.map((a) => a.id)];
+  const players = await prisma.player.findMany({
+    where: { teamId: { in: orgIds }, rosterType: { in: ["NHL", "AHL"] } },
+    select: { id: true, name: true, slug: true, position: true, overall: true, isGoalie: true, capHit: true, rosterType: true },
+    orderBy: [{ rosterType: "asc" }, { overall: "desc" }],
+  });
+  return { team, players };
+}
+
+export default async function AdminRosterMovesPage({ searchParams }: { searchParams: Promise<{ a?: string; b?: string }> }) {
   if (!(await isAdmin())) redirect("/login");
 
   const teams = await prisma.team.findMany({
@@ -16,61 +34,73 @@ export default async function AdminRosterMovesPage({ searchParams }: { searchPar
     select: { id: true, name: true, code: true, slug: true, logoUrl: true },
     orderBy: { name: "asc" },
   });
-  if (teams.length === 0) return <div className="py-2">No teams.</div>;
+  if (teams.length < 2) return <div className="py-2">Need at least two teams.</div>;
 
-  const wanted = (await searchParams).team;
-  const team = teams.find((t) => t.slug === wanted) ?? teams[0];
+  const sp = await searchParams;
+  const teamA = teams.find((t) => t.slug === sp.a) ?? teams[0];
+  const teamB = teams.find((t) => t.slug === sp.b) ?? teams[1];
 
-  const full = await prisma.team.findUnique({
-    where: { id: team.id },
-    include: { affiliateTeams: { select: { id: true, name: true } } },
-  });
-  if (!full) return <div className="py-2">Team not found.</div>;
-  const affiliate = full.affiliateTeams[0] ?? null;
-  const orgTeamIds = [team.id, ...(affiliate ? [affiliate.id] : [])];
+  const [orgA, orgB] = await Promise.all([orgRoster(teamA.id), orgRoster(teamB.id)]);
+  if (!orgA || !orgB) return <div className="py-2">Team not found.</div>;
 
-  const players = await prisma.player.findMany({
-    // only real roster players (NHL/AHL) — released UFAs, prospects and retirees keep a
-    // team id (schema requires one) but must never surface in the roster manager.
-    where: { teamId: { in: orgTeamIds }, rosterType: { in: ["NHL", "AHL"] } },
-    select: { id: true, name: true, position: true, overall: true, isGoalie: true, rosterType: true, contractType: true, capHit: true, scratched: true, teamId: true, waiverStatus: true },
-    orderBy: [{ isGoalie: "asc" }, { overall: "desc" }],
-  });
+  const Column = ({ org, other }: { org: NonNullable<typeof orgA>; other: NonNullable<typeof orgA> }) => (
+    <Card bodyClassName="p-0">
+      <div className="overflow-x-auto max-h-[560px] overflow-y-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="sticky top-0 z-10 bg-slate-900 text-[10px] text-slate-500 uppercase tracking-wider border-b border-slate-800">
+              <th className="px-3 py-2 text-left">Player</th>
+              <th className="px-2 py-2 text-center">Pos</th>
+              <th className="px-2 py-2 text-center">OV</th>
+              <th className="px-2 py-2 text-center">Level</th>
+              <th className="px-2 py-2 text-right">Cap Hit</th>
+              <th className="px-3 py-2 text-right"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {org.players.length === 0 && <tr><td colSpan={6} className="px-3 py-4 text-slate-600">no players</td></tr>}
+            {org.players.map((p) => (
+              <tr key={p.id} className="border-b border-slate-800/40 hover:bg-slate-800/30">
+                <td className="px-3 py-1.5 font-medium whitespace-nowrap">
+                  <PlayerLink id={p.id} name={p.name} slug={p.slug} />
+                </td>
+                <td className="px-2 py-1.5 text-center text-slate-400">{p.position ?? (p.isGoalie ? "G" : "—")}</td>
+                <td className="px-2 py-1.5 text-center tabular-nums font-bold text-emerald-400">{p.overall ?? "—"}</td>
+                <td className="px-2 py-1.5 text-center text-slate-500">{p.rosterType}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums text-slate-400">{p.capHit ? money(p.capHit) : "—"}</td>
+                <td className="px-3 py-1.5 text-right">
+                  <AdminTransferButton playerId={p.id} playerName={cleanName(p.name)} toTeamId={other.team.id} toTeamName={other.team.code ?? other.team.name} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
 
   return (
     <div className="space-y-6 py-2">
-      <PageHeader title="Roster Moves — All Clubs" subtitle="Commissioner override: manage any club's dress/scratch/farm/waivers, same tools its own GM has."
+      <PageHeader title="Roster Moves — Move Players Between Clubs" subtitle="Commissioner override: transfer any player between two organizations directly — no trade proposal, no consent, no cap check."
         right={<Link href="/admin" className="text-sm text-slate-400 hover:text-blue-400 whitespace-nowrap">← Admin</Link>}
       />
 
-      {/* team logo switcher — same mechanism as All Rosters / All Goalies */}
-      <div className="flex flex-wrap gap-1.5 border border-slate-800 bg-slate-900/70 rounded-2xl p-2 sticky top-14 z-20 backdrop-blur shadow-lg shadow-black/20">
-        {teams.map((t) => (
-          <Link key={t.id} href={`/admin/roster-moves?team=${t.slug}`} title={t.name}
-            className={`p-1 rounded transition-colors ${t.id === team.id ? "bg-blue-600/30 ring-1 ring-blue-500" : "hover:bg-slate-800"}`}>
-            {t.logoUrl ? <img src={t.logoUrl} alt={t.code ?? ""} className="w-7 h-7 object-contain" />
-              : <span className="w-7 h-7 grid place-items-center text-[10px] text-slate-400">{t.code}</span>}
-          </Link>
-        ))}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            {teamA.logoUrl && <img src={teamA.logoUrl} alt="" className="w-8 h-8 object-contain" />}
+            <TeamPicker side="a" current={teamA.slug} teams={teams} />
+          </div>
+          <Column org={orgA} other={orgB} />
+        </div>
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            {teamB.logoUrl && <img src={teamB.logoUrl} alt="" className="w-8 h-8 object-contain" />}
+            <TeamPicker side="b" current={teamB.slug} teams={teams} />
+          </div>
+          <Column org={orgB} other={orgA} />
+        </div>
       </div>
-
-      <RosterMover
-        teamName={full.name}
-        teamSlug={full.slug}
-        affiliateName={affiliate?.name ?? "(no affiliate)"}
-        hasAffiliate={!!affiliate}
-        players={players.map((p) => ({
-          id: p.id, name: p.name, position: p.position, overall: p.overall ?? 0,
-          isGoalie: p.isGoalie,
-          side: (p.rosterType === "AHL" ? (p.scratched ? "farm-scratched" : "farm") : (p.scratched ? "pro-scratched" : "pro")) as "pro" | "pro-scratched" | "farm" | "farm-scratched",
-          contractType: (p.contractType as "ONE_WAY" | "TWO_WAY" | null) ?? null,
-          capHit: p.capHit ?? 0,
-          onWaivers: p.waiverStatus === "ON_WAIVERS",
-        }))}
-        onSave={saveRosterMoves}
-        onRelease={releasePlayer}
-        onWaiver={placeOnWaiversFromRoster}
-      />
     </div>
   );
 }

@@ -78,7 +78,7 @@ export const DICT: Dict = {
   "admin.simGuide.d": { en: "How chemistry forms and how ratings work together — a reference guide.", cs: "Ako vzniká chémia a ako spolupracujú ratingy — referenčný sprievodca." },
   "admin.lines.d": { en: "When each GM last submitted lines before the simulation.", cs: "Kedy naposledy každý GM odovzdal zostavy pred simuláciou." },
   "admin.rosters.d": { en: "Start the season with ProfiNHL rosters or the real NHL rosters.", cs: "Začni sezónu s ProfiNHL súpiskami alebo reálnymi NHL súpiskami." },
-  "admin.rosterMoves.d": { en: "Pick any club and dress/scratch/farm/waive — the same tools its own GM has.", cs: "Vyber ľubovoľný klub a nastav sestavu/farmu/waiver — rovnaké nástroje ako má jeho vlastný GM." },
+  "admin.rosterMoves.d": { en: "Pick two clubs and move any player directly between them — no trade proposal needed.", cs: "Vyber dva kluby a presuň medzi nimi hráča priamo — bez ponuky výmeny." },
   "admin.teamLines.d": { en: "Open any club's line editor — players, tactics, ice-time.", cs: "Otvor editor zostáv ľubovoľného klubu — hráči, taktiky, ice-time." },
   "admin.contracts.d": { en: "Edit player cap hits and contract terms.", cs: "Uprav cap hity a podmienky kontraktov hráčov." },
   "admin.trades.d": { en: "Every completed trade — revoke one to return all assets.", cs: "Všetky dokončené výmeny — revoke vráti všetky aktíva." },
