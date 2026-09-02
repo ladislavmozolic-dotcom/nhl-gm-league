@@ -153,12 +153,24 @@ export async function getPlayerOffersAction(playerId: number) {
     where: { id: { in: offers.map((o) => o.teamId) } }, select: { id: true, code: true },
   });
   const codeOf = new Map(teams.map((t) => [t.id, t.code]));
+  const lastRaisedAt = await lastRaisedAtByTeam(playerId, offers.map((o) => o.teamId));
   return offers.map((o) => ({
     teamId: o.teamId, teamCode: codeOf.get(o.teamId) ?? "?",
     salary: o.salary, years: o.years, line: o.line, pp: o.pp, pk: o.pk,
     placedAt: o.createdAt.toISOString(),   // when the offer first landed
-    updatedAt: o.updatedAt.toISOString(),  // last raised/changed
+    updatedAt: lastRaisedAt.get(o.teamId) ?? o.createdAt.toISOString(),  // last ACTUAL raise (FaBid log) — o.updatedAt itself also bumps on unrelated status transitions (COUNTERED/SHORTLISTED/REJECTED during round processing), which would falsely flag an untouched offer as "raised"
   }));
+}
+
+/** Last time each team actually raised its bid on a player, from the append-only
+ *  FaBid log — NOT FaOffer.updatedAt, which Prisma bumps on every `.update()`
+ *  including the round-processing status flips (COUNTERED/SHORTLISTED/REJECTED)
+ *  that touch a standing offer without the GM changing a single term. */
+async function lastRaisedAtByTeam(playerId: number, teamIds: number[]): Promise<Map<number, string>> {
+  const bids = await prisma.faBid.findMany({ where: { playerId, teamId: { in: teamIds } }, orderBy: { id: "asc" }, select: { teamId: true, createdAt: true } });
+  const m = new Map<number, string>();
+  for (const b of bids) m.set(b.teamId, b.createdAt.toISOString()); // ascending — last write per team wins
+  return m;
 }
 
 /** Full bid history on a player — every offer/raise, oldest first. Commissioner only
@@ -197,6 +209,9 @@ export async function getAllActiveOffersAction() {
   const teamById = new Map(teams.map((t) => [t.id, t]));
   const byPlayer = new Map<number, typeof offers>();
   for (const o of offers) byPlayer.set(o.playerId, [...(byPlayer.get(o.playerId) ?? []), o]);
+  const allBids = await prisma.faBid.findMany({ where: { playerId: { in: playerIds } }, orderBy: { id: "asc" }, select: { playerId: true, teamId: true, createdAt: true } });
+  const lastRaisedAt = new Map<string, string>(); // `${playerId}:${teamId}` -> iso, ascending so last write per pair wins
+  for (const b of allBids) lastRaisedAt.set(`${b.playerId}:${b.teamId}`, b.createdAt.toISOString());
   const result = [...byPlayer.entries()].map(([playerId, os]) => {
     const p = pById.get(playerId);
     return {
@@ -205,7 +220,10 @@ export async function getAllActiveOffersAction() {
       offers: os.map((o) => ({
         teamId: o.teamId, teamCode: teamById.get(o.teamId)?.code ?? "?", teamLogo: teamById.get(o.teamId)?.logoUrl ?? null, salary: o.salary, years: o.years,
         line: o.line, pp: o.pp, pk: o.pk, round: o.round, status: o.status, twoWay: !!o.twoWay,
-        placedAt: o.createdAt.toISOString(), updatedAt: o.updatedAt.toISOString(),
+        // last ACTUAL raise (FaBid log), not o.updatedAt — that also bumps on
+        // round-processing status flips (COUNTERED/SHORTLISTED/REJECTED) that
+        // never touched the GM's terms, which would falsely read as "raised"
+        placedAt: o.createdAt.toISOString(), updatedAt: lastRaisedAt.get(`${playerId}:${o.teamId}`) ?? o.createdAt.toISOString(),
       })),
     };
   }).filter((p) => p.offers.length > 0); // a hidden comish-only offer can leave a co-comish's view empty for that player
