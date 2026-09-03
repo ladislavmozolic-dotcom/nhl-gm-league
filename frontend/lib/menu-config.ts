@@ -63,7 +63,7 @@ export const DEFAULT_MENU: MenuItem[] = [
     { label: "🎓 Coaches", href: "/coaches" },
     { label: "✍️ Signings", href: "/signings" },
   ] },
-  { key: "draft", label: "Entry Draft", href: "/draft", children: [
+  { key: "draft", label: "Entry Draft", href: "/draft/room", children: [
     { label: "🎰 Draft Lottery", href: "/draft/lottery" },
     { label: "🎯 Draft Room", href: "/draft/room" },
     { label: "📅 Upcoming Draft", href: "/draft" },
