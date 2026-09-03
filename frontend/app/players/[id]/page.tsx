@@ -264,7 +264,14 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     orderBy: { game: { gameDate: "desc" } },
   }) : [];
 
-  const team = p.team as any;
+  // teamId always points somewhere (schema requires it, even for a free agent — it's
+  // his last club before hitting the market), so p.team alone can't tell "on a roster"
+  // from "used to be here". Match the exact rosterType set /free-agents itself treats
+  // as a signable free agent (UFA/RFA and friends) — those show "Free Agent", not a
+  // stale team.
+  const NOT_FREE_AGENT = ["NHL", "AHL", "RETIRED", "PROSPECT", "RELEASED", "NONROSTER"];
+  const isFreeAgent = p.rosterType != null && !NOT_FREE_AGENT.includes(p.rosterType);
+  const team = isFreeAgent ? null : (p.team as any);
   const teamCode: string = team?.code ?? team?.name ?? "—";
   const backHref = team ? `/teams/${team.slug}` : "/free-agents";
 
