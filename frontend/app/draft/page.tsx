@@ -1,14 +1,14 @@
 import { prisma } from "@/lib/prisma";
 import { PageHeader, Card } from "@/components/ui";
 import { countryFlag } from "@/lib/flags";
-import { nextDraftYear } from "@/lib/draft-class-import";
+import { currentDraftYear } from "@/lib/draft-class-import";
 import { currentDraftSourceWhere } from "@/lib/draft-source";
 import DraftAvailableBoard, { type BoardProspect } from "@/components/DraftAvailableBoard";
 
 export const dynamic = "force-dynamic";
 
 export default async function UpcomingDraftPage() {
-  const year = await nextDraftYear();
+  const year = await currentDraftYear();
   const up = await prisma.draftProspect.findMany({
     where: { draftYear: year, draftedByTeamId: null, ...(await currentDraftSourceWhere()) },
     orderBy: [{ potential: "desc" }, { ov: "desc" }],
@@ -35,7 +35,7 @@ export default async function UpcomingDraftPage() {
             <p className="text-sm text-slate-500 max-w-lg mx-auto">
               NHL Central Scouting releases the {year} rankings during the season — a mid-term list around January, the final ranking in the spring. The league imports and refreshes them automatically, and the first prospects will show up here as soon as they&apos;re out.
             </p>
-            <p className="text-xs text-slate-600">The {year} draft becomes the live Draft Room once the {year - 1}-{String(year).slice(2)} season ends.</p>
+            <p className="text-xs text-slate-600">This board fills in with the same {year} class the live Draft Room uses — browse it here early, then pick from it there.</p>
           </div>
         </Card>
       )}
