@@ -3,7 +3,7 @@
 // salaries out over the schedule. Idempotent — sets the balance.
 
 import { prisma } from "./prisma";
-import { getArenaSections, selloutRevenue, computeTeamFinance, STARTING_BANK } from "./finance";
+import { getArenaSections, selloutRevenue, computeTeamFinance, projectedPointsPct, STARTING_BANK } from "./finance";
 import { computeStandings } from "./sim/standings";
 import { loadSettings } from "./sim/settings";
 
@@ -85,7 +85,7 @@ export async function processFinances(season = "2026-27", league = "NHL") {
     } else {
       const fin = computeTeamFinance({
         popularity: t.popularity,
-        pointsPct: st?.pointsPct ?? 0.5,
+        pointsPct: projectedPointsPct(st),
         selloutRevenue: selloutRevenue(getArenaSections(t)),
         salary: t.players.reduce((s, p) => s + (p.capHit ?? 0), 0),
         homeGamesPlayed: homeGames,

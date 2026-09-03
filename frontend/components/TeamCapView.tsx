@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { loadSettings } from "@/lib/sim/settings";
 import { computeStandings } from "@/lib/sim/standings";
 import {
-  getArenaSections, selloutRevenue, computeTeamFinance, teamCapSummary,
+  getArenaSections, selloutRevenue, computeTeamFinance, teamCapSummary, projectedPointsPct,
   playerCapYears, deadMoneyForYear, money, CURRENT_SEASON_START, seasonLabel,
   accruedCapSpace, SEASON_GAMES, ltirRelief, capCeilingForPhase,
 } from "@/lib/finance";
@@ -42,10 +42,11 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   const isGm = session === team.id;
   const st = standings.find((s) => s.teamId === team.id);
   const fin = computeTeamFinance({
-    popularity: team.popularity, pointsPct: st?.pointsPct ?? 0.5,
+    popularity: team.popularity, pointsPct: projectedPointsPct(st),
     selloutRevenue: selloutRevenue(getArenaSections(team)),
     salary: team.players.reduce((s, p) => s + (p.capHit ?? 0), 0),
     homeGamesPlayed: homeGames, totalGamesPlayed: totalGames,
+    startingBank: settings.startingCapital,
   });
   const years = Array.from({ length: SPAN }, (_, i) => CURRENT_SEASON_START + i);
   const cap = teamCapSummary(team.players, settings, team.retainsBuyouts);

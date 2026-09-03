@@ -191,6 +191,16 @@ export function attendanceRate(popularity: number, pointsPct: number): number {
   return Math.max(0.6, Math.min(1.0, raw));
 }
 
+/** A team with zero games played has a raw pointsPct of 0 (computeStandings' only
+ *  honest option — 0 points from 0 games), which attendanceRate would otherwise
+ *  read as a winless, last-place record and tank the whole league's preseason
+ *  revenue projection before a single puck drops. Treat "hasn't played yet" as a
+ *  neutral .500 assumption instead — every other pointsPct consumer (sorting
+ *  standings, etc.) keeps using the raw 0, only the finance projection needs this. */
+export function projectedPointsPct(st: { pointsPct: number; gp: number } | null | undefined): number {
+  return st && st.gp > 0 ? st.pointsPct : 0.5;
+}
+
 // ---- buyouts ("vyplatený zo zmluvy") ---------------------------------------
 
 /**

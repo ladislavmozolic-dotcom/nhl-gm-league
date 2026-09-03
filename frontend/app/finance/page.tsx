@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { loadSettings } from "@/lib/sim/settings";
 import { computeStandings } from "@/lib/sim/standings";
-import { getArenaSections, selloutRevenue, computeTeamFinance, money, STARTING_BANK } from "@/lib/finance";
+import { getArenaSections, selloutRevenue, computeTeamFinance, projectedPointsPct, money } from "@/lib/finance";
 import FinanceTable, { type FinanceRow } from "@/components/FinanceTable";
 import { PageHeader } from "@/components/ui";
 
@@ -9,12 +9,12 @@ export const dynamic = "force-dynamic";
 const SEASON = "2026-27";
 
 export default async function FinancePage() {
-  const [teams, settings, standings, homeCounts, cfg] = await Promise.all([
+  const [teams, settings, standings, homeCounts] = await Promise.all([
     prisma.team.findMany({
       where: { league: "NHL", isAffiliate: false },
       select: {
         id: true, name: true, slug: true, logoUrl: true, popularity: true,
-        capacity: true, arenaSections: true, profinhlBank: true, ledgerAdj: true,
+        capacity: true, arenaSections: true, ledgerAdj: true,
         players: { where: { rosterType: "NHL" }, select: { capHit: true } },
       },
     }),
@@ -25,19 +25,20 @@ export default async function FinancePage() {
       where: { season: SEASON, league: "NHL", status: "FINAL", seriesId: null },
       _count: { _all: true },
     }),
-    prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true } }),
   ]);
   const stById = new Map(standings.map((s) => [s.teamId, s]));
-  const realMode = cfg?.rosterMode === "real";
   const homeById = new Map(homeCounts.map((h) => [h.homeTeamId, h._count._all]));
 
   const rows: FinanceRow[] = teams.map((t) => {
     const st = stById.get(t.id);
-    const startBank = realMode ? STARTING_BANK : (t.profinhlBank ?? STARTING_BANK);
+    // the league's actual configured starting capital — matches what processFinances
+    // (the function that sets the real team.bankAccount) uses, not the legacy
+    // realMode/profinhlBank fallback this used to read, which could disagree with it.
+    const startBank = settings.startingCapital;
     const ledger = t.ledgerAdj ?? 0; // GM cash moves (trades/buyouts/fines) on top of ticket/salary
     const fin = computeTeamFinance({
       popularity: t.popularity,
-      pointsPct: st?.pointsPct ?? 0.5,
+      pointsPct: projectedPointsPct(st),
       selloutRevenue: selloutRevenue(getArenaSections(t)),
       salary: t.players.reduce((s, p) => s + (p.capHit ?? 0), 0),
       homeGamesPlayed: homeById.get(t.id) ?? 0,

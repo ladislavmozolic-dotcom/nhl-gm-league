@@ -7,7 +7,7 @@ import { teamDashboard } from "@/lib/detailed-finance-server";
 import { teamAttendance } from "@/lib/attendance-server";
 import { teamSponsor } from "@/lib/sponsorship-server";
 import { computeStandings } from "@/lib/sim/standings";
-import { getArenaSections, selloutRevenue, computeTeamFinance } from "@/lib/finance";
+import { getArenaSections, selloutRevenue, computeTeamFinance, projectedPointsPct } from "@/lib/finance";
 import { REGULAR_SEASON } from "@/lib/phase";
 import PricingControl from "@/components/PricingControl";
 import SponsorPicker from "@/components/SponsorPicker";
@@ -42,7 +42,7 @@ export default async function FinanceDashboardPage() {
       const st = standings.find((s) => s.teamId === dash.teamId);
       const fin = computeTeamFinance({
         popularity: teamFin.popularity,
-        pointsPct: st?.pointsPct ?? 0.5,
+        pointsPct: projectedPointsPct(st),
         selloutRevenue: selloutRevenue(getArenaSections(teamFin)),
         salary: teamFin.players.reduce((s, p) => s + (p.capHit ?? 0), 0),
         homeGamesPlayed: homeGames,
