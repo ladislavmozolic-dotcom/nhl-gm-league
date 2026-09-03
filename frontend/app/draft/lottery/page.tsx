@@ -2,14 +2,17 @@ import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui";
 import { isAdmin, getTeamSession } from "@/lib/auth";
 import { lotteryTeams, LOTTERY_ODDS_PCT, lotteryBlocks, seasonForDraftYear } from "@/lib/draft-lottery";
-import { nextDraftYear } from "@/lib/draft-class-import";
+import { currentDraftYear } from "@/lib/draft-class-import";
 import LotteryBroadcast, { type OddsRow } from "@/components/LotteryBroadcast";
 import LotteryVerify, { type VerifyBlock } from "@/components/LotteryVerify";
 
 export const dynamic = "force-dynamic";
 
 export default async function DraftLotteryPage() {
-  const year = await nextDraftYear();
+  // The lottery determines draft order for the draft happening at THIS season's end
+  // (currentDraftYear), run off THIS season's standings — not nextDraftYear's, whose
+  // season hasn't been played yet and would have no games to draw a lottery order from.
+  const year = await currentDraftYear();
   const [{ nonPlayoff }, teams, admin, me] = await Promise.all([
     lotteryTeams(seasonForDraftYear(year)),
     prisma.team.findMany({ where: { league: "NHL", isAffiliate: false }, select: { id: true, code: true, name: true, logoUrl: true } }),
