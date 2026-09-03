@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { getTeamSession, isAdmin } from "@/lib/auth";
+import { getTeamSession, isAdmin, isCommission } from "@/lib/auth";
 import { money } from "@/lib/finance";
 import { cleanName } from "@/lib/playerName";
 import { PageHeader } from "@/components/ui";
@@ -39,7 +39,7 @@ function TeamHead({ team }: { team?: { name: string | null; code: string | null;
 export default async function TradePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const tradeId = Number(id);
-  const [session, admin] = await Promise.all([getTeamSession(), isAdmin()]);
+  const [session, admin, commission] = await Promise.all([getTeamSession(), isAdmin(), isCommission()]);
   const trade = Number.isFinite(tradeId) ? await prisma.trade.findUnique({ where: { id: tradeId } }) : null;
   if (!trade) {
     return (
@@ -50,9 +50,12 @@ export default async function TradePage({ params }: { params: Promise<{ id: stri
     );
   }
 
-  // a PENDING proposal is private — only the two clubs + commissioner may view it
+  // a PENDING proposal is private — only the two clubs + commission (comish/co-comish/
+  // trade-comish) may view it. The old check only exempted isAdmin(), not commission-tier
+  // roles — a trade-comish GM (not the league admin) got the same "private" wall as
+  // anyone else, even though their whole job is overseeing pending rookie-GM trades.
   const involved = session === trade.fromTeamId || session === trade.toTeamId;
-  if (trade.status === "PENDING" && !involved && !admin) {
+  if (trade.status === "PENDING" && !involved && !admin && !commission) {
     return (
       <div className="py-10 text-center space-y-2">
         <p className="text-slate-400">This trade proposal is private — only the clubs involved can see it until it&apos;s completed.</p>
