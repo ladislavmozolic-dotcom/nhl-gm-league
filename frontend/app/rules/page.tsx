@@ -163,7 +163,7 @@ const SECTIONS: Sec[] = [
       ] },
       { h: "The one-day window", points: [
         "Any club can claim an exposed player within a one-day window.",
-        "Once a claim lands, the placing club can no longer pull him back — the Pull-back button locks the moment the first claim comes in.",
+        "Waiving a player is final — there's no pull-back. Once he's placed on the wire, the placing club can't reverse it, claim or no claim.",
         "Unclaimed after the window closes → he clears to the placing club's own AHL affiliate.",
       ] },
       { h: "Multiple claims — who wins him", points: [
@@ -394,7 +394,7 @@ const SECTIONS_CS: Sec[] = [
       ] },
       { h: "Jednodenní okno", points: [
         "Vystaveného hráče může kterýkoliv klub nárokovat během jednodenního okna.",
-        "Jakmile je nárok podaný, klub, který hráče vystavil, ho už nemůže stáhnout zpět — tlačítko Pull-back se zamkne hned po prvním nároku.",
+        "Vystavení na waivery je definitivní — žádné stažení zpět. Jakmile je hráč na wire, klub ho už nemůže vzít zpět, ať nárok padne nebo ne.",
         "Nenárokovaný hráč po uzavření okna propadne do AHL afiliace klubu, který ho vystavil.",
       ] },
       { h: "Víc nároků najednou — kdo ho dostane", points: [

@@ -78,21 +78,6 @@ export async function claimWaiver(waiverId: number, teamId: number): Promise<{ o
   return { ok: true };
 }
 
-/** The placing club pulls a player back before the window closes — only while
- *  nobody has claimed him yet; once a claim lands, the pull-back locks out. */
-export async function cancelWaiver(waiverId: number, actorTeamId: number): Promise<{ ok: boolean; error?: string }> {
-  const w = await prisma.waiver.findUnique({ where: { id: waiverId }, select: { id: true, fromTeamId: true, playerId: true, status: true, _count: { select: { claims: true } } } });
-  if (!w || w.status !== "ACTIVE") return { ok: false, error: "That waiver is no longer active." };
-  if (w.fromTeamId !== actorTeamId) return { ok: false, error: "Only the placing club can pull him back." };
-  if (w._count.claims > 0) return { ok: false, error: "He's already been claimed — you can't pull him back now." };
-  await prisma.$transaction([
-    prisma.waiverClaim.deleteMany({ where: { waiverId } }),
-    prisma.waiver.update({ where: { id: waiverId }, data: { status: "CANCELLED", resolvedAt: new Date() } }),
-    prisma.player.update({ where: { id: w.playerId }, data: { waiverStatus: "NONE" } }),
-  ]);
-  return { ok: true };
-}
-
 /** Resolve every waiver whose one-day window has closed (placedDay < currentDay).
  *  Claimed → in the regular season/playoffs, the worst-standings claimant gets
  *  him (real waiver-priority logic only makes sense once standings mean

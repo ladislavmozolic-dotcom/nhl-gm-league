@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui";
 import { money } from "@/lib/finance";
-import { claimWaiverAction, cancelWaiverAction } from "@/app/waivers/actions";
+import { claimWaiverAction } from "@/app/waivers/actions";
 import type { WaiverRow } from "@/lib/waivers-server";
 
 const clauseTag = (c?: string | null) => c === "NMC" ? "NMC" : c === "M_NTC" ? "M-NTC" : c === "NTC" ? "NTC" : null;
@@ -25,7 +25,7 @@ export default function WaiverWire({ waivers, myTeamId, inSeason }: { waivers: W
           A player must clear waivers before he can be sent to the AHL. Any club can claim him within a one-day window; if more than one does, {inSeason
             ? <>the <b>worst team in the standings gets priority</b></>
             : <>outside the regular season/playoffs, priority follows a <b>claim-order queue</b> — whichever claiming club has gone longest without winning a claim gets him, and it then drops to the back of the line</>
-          }. Unclaimed players clear and drop to the affiliate. An <b>NMC blocks waivers</b>; an NTC does not. Once a claim lands, the placing club can no longer pull him back.
+          }. Unclaimed players clear and drop to the affiliate. An <b>NMC blocks waivers</b>; an NTC does not. Waiving a player is final — there's no pull-back, claim or no claim.
         </p>
         {waivers.length === 0 ? (
           <p className="text-sm text-slate-500">No players are on waivers right now.</p>
@@ -50,9 +50,7 @@ export default function WaiverWire({ waivers, myTeamId, inSeason }: { waivers: W
                     {w.claims.length > 0 ? <>claims: {w.claims.map((c) => c.code).join(", ")}</> : "no claims yet"}
                   </div>
                   {myTeamId != null && (mine ? (
-                    <button onClick={() => run(() => cancelWaiverAction(w.id, myTeamId), "Pulled back.")} disabled={pending || w.claims.length > 0}
-                      title={w.claims.length > 0 ? "Already claimed — can't pull back now" : undefined}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-40">Pull back</button>
+                    <span className="text-xs text-slate-600 italic" title="Waiving is final — there's no pull-back">no action</span>
                   ) : (
                     <button onClick={() => run(() => claimWaiverAction(w.id, myTeamId), "Claim submitted.")} disabled={pending || alreadyClaimed}
                       className="text-xs px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 disabled:opacity-40">{alreadyClaimed ? "Claimed ✓" : "Claim"}</button>
