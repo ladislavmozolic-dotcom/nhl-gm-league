@@ -175,7 +175,7 @@ function TradeCard({ trade, action, admin }: {
 }) {
   return (
     <div className="bg-slate-900/70 rounded-2xl border border-slate-800 shadow-lg shadow-black/20 p-5">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-3">
           <TeamHead team={trade.fromTeam} />
           <span className="text-slate-600 text-lg">⇄</span>
@@ -183,6 +183,9 @@ function TradeCard({ trade, action, admin }: {
         </div>
         <span className={`text-xs font-bold px-3 py-1 rounded-full ${STATUS_STYLE[trade.status] ?? "bg-slate-700 text-slate-300"}`}>{trade.status}</span>
       </div>
+      {/* fromTeam is always the club whose GM clicked "Propose a trade" — proposeTrade
+          requires session === fromTeamId, so this is a reliable "who initiated it" signal. */}
+      <p className="text-xs text-slate-500 mb-3">Proposed by <span className="text-slate-300 font-semibold">{trade.fromTeam?.name ?? "?"}</span></p>
 
       {/* "Receives" (and the swapped-side layout) only makes sense once a trade is
           actually done — a still-pending proposal hasn't given either club anything

@@ -53,7 +53,7 @@ function TradeCard({ t, sum, teams, myTeamId, actionable }: { t: Row["t"]; sum: 
   return (
     <Card key={t.id}>
       <div className="flex items-center justify-between mb-3">
-        <span className="text-xs text-slate-500">Trade #{t.id}</span>
+        <span className="text-xs text-slate-500">Trade #{t.id} · Proposed by <span className="text-slate-300 font-semibold">{from?.name ?? "?"}</span></span>
         <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${st.cls}`}>{st.txt}</span>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
