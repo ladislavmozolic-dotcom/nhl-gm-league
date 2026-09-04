@@ -12,7 +12,6 @@
 // fields) is untouched: the calculator never covered them, so there's no formula to
 // rerun for them.
 
-import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { SPEC, lookup, posOf, projectDFFromRates, SEASON_GAMES, type Pos } from "./param-projection";
 
@@ -68,15 +67,21 @@ function seasonRates(m: MpAll): SeasonRates | null {
 
 export type RecomputeResult = { updated: number; skipped: number };
 
-/** Recompute unhlCk/unhlSc/unhlPa/unhlDf for every skater with MoneyPuck data, using
- *  the calculator's exact formulas on a 5/15/80-weighted 3-season blend. Each
- *  season's own rate is first regressed toward the position mean by that season's
- *  own games played (see REGRESS_K above), THEN blended with the fixed weights —
- *  regressing only the total combined sample isn't enough to catch a tiny
- *  dominant-weight season sitting alongside real full seasons elsewhere. */
+/** Recompute unhlCk/unhlSc/unhlPa/unhlDf for every skater, using the calculator's
+ *  exact formulas on a 5/15/80-weighted 3-season blend wherever MoneyPuck data
+ *  exists. Each season's own rate is first regressed toward the position mean by
+ *  that season's own games played (see REGRESS_K above), THEN blended with the
+ *  fixed weights — regressing only the total combined sample isn't enough to catch
+ *  a tiny dominant-weight season sitting alongside real full seasons elsewhere.
+ *  Queries EVERY skater, not just ones with MoneyPuck data on file: a player with
+ *  none (an 18-year-old rookie with no real NHL history yet, a name MoneyPuck
+ *  doesn't have at all) falls straight into the totalGp<MIN_GP branch below and
+ *  gets a plain unboosted STHS copy — otherwise he'd keep whatever stale value he
+ *  had from before this recompute ever ran, which reads as a real (but wrong)
+ *  number sitting right next to genuinely recomputed teammates. */
 export async function recomputeUnhlFromCalculator(): Promise<RecomputeResult> {
   const players = await prisma.player.findMany({
-    where: { isGoalie: false, mpSkater: { not: Prisma.DbNull } },
+    where: { isGoalie: false },
     select: { id: true, position: true, ck: true, sc: true, pa: true, df: true, mpSkater: true },
   });
 
