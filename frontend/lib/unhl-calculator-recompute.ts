@@ -28,17 +28,21 @@ const MIN_GP = 10;
 // carrying 80% of the blend weight; regressing it toward what a typical F/D posts
 // (reliability = seasonGp/(seasonGp+K)) is what actually tames it, since a
 // total-games gate can't tell "104 real games" from "1 hot game + 103 cold ones
-// spread across other seasons" apart. K=20 ≈ a quarter-season.
-const REGRESS_K = 20;
-// A second, outer anchor: the calculator's own output for a player with a real but
-// modest combined sample (e.g. 20-40 games spread thin across three seasons) still
-// tends toward the LEAGUE-wide position mean once each season gets regressed —
-// which systematically pulls a genuine depth player up toward what a full-time
-// NHLer posts, since the pool mean doesn't know he's a 4th-liner. His own current
-// STHS rating already encodes that role, so blend the calculator's number with it
-// (same idea as DF's built-in 80/20 blend with the existing DF, generalized to a
-// reliability that scales with how much real sample actually backs the recompute).
-const ANCHOR_K = 60;
+// spread across other seasons" apart. K=8: a real ~80-game season is barely
+// touched (reliability ≈0.91), a 1-5 game cameo still gets pulled hard toward the
+// mean (reliability ≈0.11-0.38) — this only needs to catch genuine cameos, not
+// discount full seasons.
+const REGRESS_K = 8;
+// A second, outer anchor: the calculator's own output for a player with a modest
+// combined sample still deserves some pull toward his existing STHS rating (a
+// depth player's small real sample shouldn't drift him toward the league-wide
+// mean, which doesn't know he's a 4th-liner) — but this must fade out, not stay
+// flat, once the sample is substantial: K=25 puts a player with a full 3-season
+// (~240 GP) sample at reliability ≈0.91 (the calculator's own number dominates),
+// while a single partial season (~40 GP) still leans on STHS (≈0.62). The old
+// K=60 kept even 240-GP players around 0.80, which — stacked with the per-season
+// regression above — made a real 3-season recompute barely move off STHS at all.
+const ANCHOR_K = 25;
 const anchorToSths = (calc: number, sths: number | null, totalGp: number): number => {
   if (sths == null) return calc;
   const rel = totalGp / (totalGp + ANCHOR_K);
@@ -199,4 +203,25 @@ export async function recomputeUnhlFromCalculator(): Promise<RecomputeResult> {
     if (writes.length) await prisma.$transaction(writes);
   }
   return { updated, skipped };
+}
+
+// ---- Non-calculator params: lower the flat boost from +5% to +1% -----------
+// UNHL was originally seeded as every STHS value × 1.05 (capped at 99), across
+// ALL params. CK/SC/PA/DF now come from the real recompute above instead — this
+// fixes the REST (no formula exists for them, same for every goalie param) down
+// to a much smaller ×1.01, recomputed fresh from the live STHS number each time
+// so repeated runs don't compound the boost.
+const SKATER_FLAT_KEYS = ["di", "du", "en", "ex", "fg", "fo", "ld", "mo", "ph", "ps", "sk", "st", "overall"] as const;
+const GOALIE_FLAT_KEYS = ["sk", "du", "en", "sz", "ag", "rb", "sc", "hs", "rt", "ph", "ps", "ex", "ld", "mo", "overall"] as const;
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const BOOST = 1.01;
+
+/** Re-seed every UNHL param the calculator doesn't cover at STHS × 1.01 (was
+ *  ×1.05) — skaters' CK/SC/PA/DF are left alone (they're computed above). */
+export async function applyUnhlFlatBoost(): Promise<{ skaters: number; goalies: number }> {
+  const skaterSet = SKATER_FLAT_KEYS.map((k) => `"unhl${cap(k)}" = LEAST(99, ROUND(${k} * ${BOOST}))`).join(", ");
+  const skaters = await prisma.$executeRawUnsafe(`UPDATE "Player" SET ${skaterSet} WHERE "isGoalie" = false`);
+  const goalieSet = GOALIE_FLAT_KEYS.map((k) => `"unhl${cap(k)}" = LEAST(99, ROUND(${k} * ${BOOST}))`).join(", ");
+  const goalies = await prisma.$executeRawUnsafe(`UPDATE "GoalieRating" SET ${goalieSet}`);
+  return { skaters, goalies };
 }
