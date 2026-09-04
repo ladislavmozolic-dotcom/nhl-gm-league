@@ -27,18 +27,22 @@ function sortVal(row: SortRow, c: SortCol) {
  * logos while letting any column sort in one click (numeric desc / text asc,
  * toggling on repeat click).
  */
-/** CSV-escape one cell: wrap in quotes and double up embedded quotes whenever the
- *  value contains a comma, quote, or newline (RFC 4180). */
-function csvCell(v: unknown): string {
-  const s = v == null ? "" : String(v);
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+/** The raw value for one cell, in export order (player/team resolve to plain text,
+ *  numeric columns stay numbers so Excel sorts/filters them as numbers, not text). */
+function exportCell(r: SortRow, c: SortCol): string | number {
+  if (c.kind === "player" || c.kind === "ext") return cleanName(r.name ?? "");
+  if (c.kind === "team") return r.teamCode ?? "";
+  if (c.kind === "money") return Number(r[c.key] ?? 0);
+  if (numeric(c.kind)) { const v = r[c.key]; return v == null || v === "" ? "" : Number(v); }
+  return r[c.key] ?? "";
 }
 
 export default function SortableTable({ cols, rows, initialSort, minWidth = 720, interestCtx, csvFilename }: {
   cols: SortCol[]; rows: SortRow[]; initialSort?: string; minWidth?: number; interestCtx?: InterestCtx;
-  /** Set to show an "Export CSV" button that downloads the CURRENTLY sorted/filtered
-   *  rows (player/team text columns + every numeric/text column, in the same order
-   *  as on screen) under this filename. */
+  /** Set to show an "Export Excel" button that downloads the CURRENTLY sorted/
+   *  filtered rows as a formatted .xlsx — real columns (numbers stay numbers),
+   *  sized to fit their content, autofilter dropdowns on every column so Excel/
+   *  Sheets can sort or filter the file the moment it opens. */
   csvFilename?: string;
 }) {
   const [sort, setSort] = useState<string | null>(initialSort ?? null);
@@ -68,30 +72,35 @@ export default function SortableTable({ cols, rows, initialSort, minWidth = 720,
   const query = q.trim().toLowerCase();
   const filtered = query ? sorted.filter((r) => (r.name ?? "").toString().toLowerCase().includes(query)) : sorted;
 
-  const exportCsv = () => {
-    const header = cols.map((c) => csvCell(c.label)).join(",");
-    const lines = filtered.map((r) => cols.map((c) => {
-      if (c.kind === "player" || c.kind === "ext") return csvCell(cleanName(r.name ?? ""));
-      if (c.kind === "team") return csvCell(r.teamCode ?? "");
-      if (c.kind === "money") return csvCell(r[c.key] ?? 0);
-      return csvCell(r[c.key] ?? "");
-    }).join(","));
-    const blob = new Blob([[header, ...lines].join("\n")], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = `${csvFilename ?? "export"}.csv`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  const exportExcel = async () => {
+    const XLSX = await import("xlsx");
+    const aoa: (string | number)[][] = [
+      cols.map((c) => c.label),
+      ...filtered.map((r) => cols.map((c) => exportCell(r, c))),
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    // Column widths sized to the longer of the header or its widest cell (capped so
+    // a full player name doesn't blow the sheet out), so nothing opens truncated.
+    ws["!cols"] = cols.map((c, i) => {
+      const longest = aoa.reduce((m, row) => Math.max(m, String(row[i] ?? "").length), c.label.length);
+      return { wch: Math.min(Math.max(longest + 2, 6), 28) };
+    });
+    // Header dropdowns (Excel/Sheets native sort + filter) over the full data range.
+    const lastCol = XLSX.utils.encode_col(cols.length - 1);
+    ws["!autofilter"] = { ref: `A1:${lastCol}${aoa.length}` };
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Parameters");
+    XLSX.writeFile(wb, `${csvFilename ?? "export"}.xlsx`);
   };
 
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 px-1">
         {csvFilename && (
-          <button onClick={exportCsv} title="Download the table exactly as sorted/filtered right now"
+          <button onClick={() => void exportExcel()} title="Download the table as a formatted, sortable/filterable Excel file"
             className="ml-auto order-last flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-blue-600 text-slate-300 hover:text-white transition-colors whitespace-nowrap">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" /></svg>
-            Export CSV
+            Export Excel
           </button>
         )}
         <div className="relative">
