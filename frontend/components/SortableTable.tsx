@@ -27,8 +27,19 @@ function sortVal(row: SortRow, c: SortCol) {
  * logos while letting any column sort in one click (numeric desc / text asc,
  * toggling on repeat click).
  */
-export default function SortableTable({ cols, rows, initialSort, minWidth = 720, interestCtx }: {
+/** CSV-escape one cell: wrap in quotes and double up embedded quotes whenever the
+ *  value contains a comma, quote, or newline (RFC 4180). */
+function csvCell(v: unknown): string {
+  const s = v == null ? "" : String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+export default function SortableTable({ cols, rows, initialSort, minWidth = 720, interestCtx, csvFilename }: {
   cols: SortCol[]; rows: SortRow[]; initialSort?: string; minWidth?: number; interestCtx?: InterestCtx;
+  /** Set to show an "Export CSV" button that downloads the CURRENTLY sorted/filtered
+   *  rows (player/team text columns + every numeric/text column, in the same order
+   *  as on screen) under this filename. */
+  csvFilename?: string;
 }) {
   const [sort, setSort] = useState<string | null>(initialSort ?? null);
   const [dir, setDir] = useState<"asc" | "desc">("desc");
@@ -57,9 +68,32 @@ export default function SortableTable({ cols, rows, initialSort, minWidth = 720,
   const query = q.trim().toLowerCase();
   const filtered = query ? sorted.filter((r) => (r.name ?? "").toString().toLowerCase().includes(query)) : sorted;
 
+  const exportCsv = () => {
+    const header = cols.map((c) => csvCell(c.label)).join(",");
+    const lines = filtered.map((r) => cols.map((c) => {
+      if (c.kind === "player" || c.kind === "ext") return csvCell(cleanName(r.name ?? ""));
+      if (c.kind === "team") return csvCell(r.teamCode ?? "");
+      if (c.kind === "money") return csvCell(r[c.key] ?? 0);
+      return csvCell(r[c.key] ?? "");
+    }).join(","));
+    const blob = new Blob([[header, ...lines].join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `${csvFilename ?? "export"}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 px-1">
+        {csvFilename && (
+          <button onClick={exportCsv} title="Download the table exactly as sorted/filtered right now"
+            className="ml-auto order-last flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-blue-600 text-slate-300 hover:text-white transition-colors whitespace-nowrap">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" /></svg>
+            Export CSV
+          </button>
+        )}
         <div className="relative">
           <svg className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z" /></svg>
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search player…"
