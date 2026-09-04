@@ -94,13 +94,13 @@ export const EDGE_COMPOSITES: Record<string, Metric[]> = {
   PA: [{ key: "a60", weight: 0.5 }, { key: "a605v5", weight: 0.5 }],
   // checking — hits per 60
   CK: [{ key: "hit60", weight: 1.0 }],
-  // defense (Next Gen spec) — on-ice xGA/60 at 5-on-5 (the bulk of a season) plus
-  // on-ice xGA/60 shorthanded, both inverted (fewer expected goals against while
-  // you're out there is better). True team-relative (on-ice minus off-ice) needs
-  // off-ice TOI splits MoneyPuck doesn't publish per-player, so this uses the
-  // on-ice rate directly — still a real defensive-impact signal, just not
-  // adjusted for what the rest of the roster does without you on the ice.
-  DF: [{ key: "oxga5v5", weight: 0.85, invert: true }, { key: "oxgapk", weight: 0.15, invert: true }],
+  // defense (Next Gen spec) — TRUE relative xGA/60: on-ice rate minus the rate the
+  // rest of the roster allows in the same situation with this player OFF the ice
+  // (team totals minus his own, from MoneyPuck's team + player CSVs). 5-on-5 (the
+  // bulk of a season) weighted heavier than shorthanded; both inverted (a smaller/
+  // more negative Rel xGA — fewer expected goals against while you're out there,
+  // relative to your bench — is better).
+  DF: [{ key: "relxga5v5", weight: 0.85, invert: true }, { key: "relxgapk", weight: 0.15, invert: true }],
   // endurance — ice time per game
   EN: [{ key: "toi", weight: 1.0 }],
   // faceoffs — win % (sample-adjusted by the server)

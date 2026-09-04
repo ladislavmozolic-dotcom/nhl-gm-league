@@ -243,7 +243,7 @@ model Player {
   goalieAdvanced       Json?         // MoneyPuck goalie metrics for the Edge engine: { cur:{...}, last:{...} } — GSAx, danger SV% splits, rebound control, sample
   ahlStats             Json?         // AHL scoring for the Edge engine, imported for ANY player who played the AHL (incl. NHL-roster call-ups like Kaliyev) so it never overwrites their NHL cur/last fields: { cur:{gp,g,a,sh,pim,ppG}, last:{...} }
   edgeSpeed            Json?         // NHL EDGE player-tracking percentiles (api-web skater-detail) for the SK param: { cur:{spd,brst,dist}, last:{...} } — speedMax / burstsOver20 / distance percentiles (0-1)
-  mpSkater             Json?         // MoneyPuck advanced skater totals per season for the Next Gen Parameters: { "2025":{gp,toi,g,ixg,a1,a2,sh,ong,ppa1,toi5v5,a1_5v5,a2_5v5,onIceAxg5v5,toi4v5,onIceAxg4v5}, "2024":{...}, "2023":{...} } — ixG/primary-assists/on-ice-goals + 5v5/PK situational splits, icetime in seconds
+  mpSkater             Json?         // MoneyPuck advanced skater totals per season for the Next Gen Parameters: { "2025":{gp,toi,g,ixg,a1,a2,sh,ong,ppa1,toi5v5,a1_5v5,a2_5v5,onIceAxg5v5,toi4v5,onIceAxg4v5,offIceAxg5v5,offIceToi5v5,offIceAxg4v5,offIceToi4v5}, "2024":{...}, "2023":{...} } — ixG/primary-assists/on-ice-goals + 5v5/PK on-ice AND off-ice (team-without-him) splits for true relative xGA, icetime in seconds
   careerGP             Json?         // NHL API career totals (api-web player landing) for the Next Gen EXPERIENCE param: { reg: number, po: number } — regular-season and playoff games played, career-to-date
   edgeRatings          Json?         // persisted Edge Parameters (analytics; separate from the STHS ck/sc/... the sim uses)
   goalieRating         GoalieRating?
