@@ -3,8 +3,8 @@
 // Recompute UNHL Parameters' CK/SC/PA/DF from the ORIGINAL STHS calculator formulas
 // (lib/calc-tables.ts + lib/param-projection.ts — the exact lookup tables extracted
 // from the ProfiNHL "Players Calculator" workbook), but blended across THREE real
-// seasons instead of the tool's normal cur/last pair: 2023-24 = 5%, 2024-25 = 15%,
-// 2025-26 = 80%. Source stats come from the MoneyPuck skater import (Player.mpSkater,
+// seasons instead of the tool's normal cur/last pair: 2023-24 = 5%, 2024-25 = 17.5%,
+// 2025-26 = 77.5%. Source stats come from the MoneyPuck skater import (Player.mpSkater,
 // already fetched for all three seasons for the Next Gen engine). No extra boost is
 // applied — this is a straight recompute of the calculator's own params, nothing more.
 //
@@ -15,7 +15,7 @@
 import { prisma } from "./prisma";
 import { SPEC, lookup, posOf, projectDFFromRates, SEASON_GAMES, type Pos } from "./param-projection";
 
-const SEASON_WEIGHT: Record<string, number> = { "2023": 0.05, "2024": 0.15, "2025": 0.80 };
+const SEASON_WEIGHT: Record<string, number> = { "2023": 0.05, "2024": 0.175, "2025": 0.775 };
 // A cup-of-coffee season (e.g. 1 GP) produces an unsustainable per-game rate that
 // the calculator's lookup tables clamp straight to their ceiling — matches
 // param-projection.ts's own ACTIVATE_AT_GP=10 threshold for "enough of a sample to
