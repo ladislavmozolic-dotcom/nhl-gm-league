@@ -330,10 +330,11 @@ export async function commishRespondTrade(tradeId: number, action: "accept" | "d
     revalidatePath("/trades"); revalidatePath("/trades/commish"); revalidatePath("/messages");
     return { status: "DECLINED" as const };
   }
-  // modify → back to the rookie GM(s) to rebalance, with the commission's note
+  // modify → back to BOTH clubs to rebalance (resubmitModifiedTrade allows either side
+  // to do it, not just the rookie), with the commission's note
   await prisma.trade.update({ where: { id: tradeId }, data: { status: "MODIFY", commishNote: note || null } });
-  const rookieClub = clubs.find((c) => c.rookieGm) ?? clubs.find((c) => c.id === trade.fromTeamId)!;
-  await prisma.dmMessage.create({ data: { fromTeamId: rookieClub.id, toTeamId: rookieClub.id, body: `✏️ Commission asked to MODIFY trade #${tradeId} (${nameOf(trade.fromTeamId)} ↔ ${nameOf(trade.toTeamId)}).${note ? ` Note: ${note}` : ""} Open it and adjust the assets, then resubmit.`, tradeUrl: `/trades/build?edit=${tradeId}` } }).catch(() => {});
+  for (const tid of [trade.fromTeamId, trade.toTeamId])
+    await prisma.dmMessage.create({ data: { fromTeamId: tid, toTeamId: tid, body: `✏️ Commission asked to MODIFY trade #${tradeId} (${nameOf(trade.fromTeamId)} ↔ ${nameOf(trade.toTeamId)}).${note ? ` Note: ${note}` : ""} Open it and adjust the assets, then resubmit.`, tradeUrl: `/trades/build?edit=${tradeId}` } }).catch(() => {});
   revalidatePath("/trades"); revalidatePath("/trades/commish"); revalidatePath("/messages");
   return { status: "MODIFY" as const };
 }
