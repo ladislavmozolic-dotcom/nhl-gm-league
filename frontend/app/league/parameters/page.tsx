@@ -4,7 +4,7 @@ import { PageHeader, Card } from "@/components/ui";
 import SortableTable, { type SortCol, type SortRow } from "@/components/SortableTable";
 import { ratingColor, ovColor, posGroup } from "@/lib/ratingBands";
 import { isLoggedIn } from "@/lib/auth";
-import { edgeRatings, edgeGoalieRatings, edgeAhlSkaterRatings } from "@/lib/edge-params-server";
+import { edgeRatings, edgeGoalieRatings, edgeAhlSkaterRatings, type EdgeRow } from "@/lib/edge-params-server";
 import { SKATER_PARAM_LABELS, GOALIE_PARAM_LABELS, SKATER_PARAM_ORDER, GOALIE_PARAM_ORDER } from "@/lib/param-labels";
 
 export const dynamic = "force-dynamic";
@@ -48,7 +48,18 @@ export default async function LeagueParametersPage({ searchParams }: { searchPar
       // AHL goalies have no MoneyPuck-driven data source, so the Next Gen formula
       // only ever covers NHL netminders — skaters get an AHL-specific (simpler)
       // translation instead, so both leagues show up on that tab.
-      const edge = isGoalie ? await edgeGoalieRatings("NHL", true) : [...await edgeRatings("NHL", true), ...await edgeAhlSkaterRatings(true)];
+      let edge: EdgeRow[];
+      if (isGoalie) {
+        edge = await edgeGoalieRatings("NHL", true);
+      } else {
+        const nhl = await edgeRatings("NHL", true);
+        // edgeAhlSkaterRatings() covers everyone with AHL stats on file, including a
+        // current NHL call-up — drop those here so he isn't listed twice (once per
+        // branch) with the same row id, which corrupts the sortable table.
+        const nhlIds = new Set(nhl.map((r) => r.playerId));
+        const ahl = (await edgeAhlSkaterRatings(true)).filter((r) => !nhlIds.has(r.playerId));
+        edge = [...nhl, ...ahl];
+      }
       const ids = edge.map((r) => r.playerId);
       const meta = await prisma.player.findMany({
         where: { id: { in: ids } },
