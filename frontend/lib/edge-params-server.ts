@@ -27,7 +27,7 @@ export type EdgeRow = {
 
 // per-60 rate metrics get regressed toward the position mean by sample reliability;
 // direct measurements (ice time, weight, SH-TOI) do not.
-const REGRESS_KEYS = new Set(["g60", "a60", "sh60", "gpg", "apg", "off60", "hit60", "blk60", "tk60", "gv60", "pm60", "pim60", "fo", "shpct"]);
+const REGRESS_KEYS = new Set(["g60", "a60", "sh60", "gpg", "apg", "off60", "hit60", "blk60", "tk60", "gv60", "pm60", "pim60", "fo", "shpct", "gxg60", "a605v5", "oxga5v5", "oxgapk"]);
 const REGRESS_K = 500; // minutes at which reliability = 0.5
 
 /** Per-60 metric blend (80% current / 20% prior real season) for one player. */
@@ -66,14 +66,30 @@ function metricsFor(p: any): Record<string, number | null> {
     wt: p.weight ?? null,
     // faceoffs only meaningful for players who take them (centres); wingers ~0
     fo: blend(p.curSeasonFoPct, p.lastSeasonFoPct),
-    // NHL EDGE skating: top-speed + speed-burst percentiles (already 0-1), the real
-    // SK signal. spdMax weighted over burst count. NULL (not 0) when the player has no
-    // EDGE tracking, so SK falls back to the ice-time proxy instead of bottoming out.
-    spd: (() => {
+    // NHL EDGE skating (Next Gen SK): speed-burst percentile (already 0-1) — the ONLY
+    // burst stat NHL EDGE publishes (burstsOver20, no separate 18+/22+). NULL (not 0)
+    // when the player has no EDGE tracking, so SK is simply skipped for him rather
+    // than bottoming out.
+    brst20: (() => {
       const es = (p.edgeSpeed as any) ?? {};
       const c = es.cur ?? {}, l = es.last ?? {};
-      if (c.spd == null && l.spd == null && c.brst == null && l.brst == null) return null;
-      return blend(c.spd, l.spd) * 0.6 + blend(c.brst, l.brst) * 0.4;
+      if (c.brst == null && l.brst == null) return null;
+      return blend(c.brst, l.brst);
+    })(),
+    // Next Gen EXPERIENCE: career games played (career-to-date, not just cur/last
+    // season) from the NHL API. NULL when the player has no imported careerGP yet.
+    regGP: (p.careerGP as any)?.reg ?? null,
+    poGP: (p.careerGP as any)?.po ?? null,
+    // Next Gen SC/PA/DF sub-metrics — MoneyPuck situational splits.
+    ...(() => {
+      const w = mpWeighted(p.mpSkater);
+      if (!w) return { gxg60: null, a605v5: null, oxga5v5: null, oxgapk: null };
+      return {
+        gxg60: per60Sec(w.g - w.ixg, w.toi),
+        a605v5: per60Sec(w.a1_5v5 + w.a2_5v5, w.toi5v5),
+        oxga5v5: per60Sec(w.onIceAxg5v5, w.toi5v5),
+        oxgapk: per60Sec(w.onIceAxg4v5, w.toi4v5),
+      };
     })(),
   };
 }
@@ -85,70 +101,31 @@ const SEL = {
   curSeasonShToi: true, curSeasonFoPct: true,
   lastSeasonGP: true, lastSeasonToi: true, lastSeasonG: true, lastSeasonA: true, lastSeasonShots: true,
   lastSeasonHits: true, lastSeasonBlocks: true, lastSeasonTK: true, lastSeasonGV: true, lastSeasonPM: true, lastSeasonPim: true,
-  lastSeasonShToi: true, lastSeasonFoPct: true, edgeSpeed: true, mpSkater: true,
+  lastSeasonShToi: true, lastSeasonFoPct: true, edgeSpeed: true, mpSkater: true, careerGP: true,
 } as const;
 
-// ---- SC / PA V1 (MoneyPuck-driven: finishing-vs-xG, ixG, primary assists) ----------
+// ---- MoneyPuck situational blend (Next Gen: G-xG, 5v5 passing, on-ice xGA) --------
 const MP_W: Record<string, number> = { "2025": 0.80, "2024": 0.20 }; // 2 seasons (25-26 / 24-25)
 
-/** 3-season recency-weighted MoneyPuck totals for one player (weights renormalised
+type MpWeighted = {
+  g: number; ixg: number; toi: number; sh: number; a1: number; a2: number; ppa1: number; ong: number; gp: number;
+  toi5v5: number; a1_5v5: number; a2_5v5: number; onIceAxg5v5: number; toi4v5: number; onIceAxg4v5: number;
+};
+/** 2-season recency-weighted MoneyPuck totals for one player (weights renormalised
  *  over the seasons actually present, so a rate = weighted goals / weighted TOI and a
  *  one-season player still gets a full-season sample for reliability). */
-function mpWeighted(mp: any): null | { g: number; ixg: number; toi: number; sh: number; a1: number; a2: number; ppa1: number; ong: number; gp: number } {
+function mpWeighted(mp: any): MpWeighted | null {
   if (!mp) return null;
   const present = Object.keys(MP_W).filter((y) => mp[y]?.toi > 0);
   if (!present.length) return null;
   const totW = present.reduce((s, y) => s + MP_W[y], 0);
-  const acc = { g: 0, ixg: 0, toi: 0, sh: 0, a1: 0, a2: 0, ppa1: 0, ong: 0, gp: 0 };
-  for (const y of present) { const w = MP_W[y] / totW, s = mp[y]; for (const k of Object.keys(acc) as (keyof typeof acc)[]) acc[k] += (s[k] ?? 0) * w; }
+  const acc: MpWeighted = { g: 0, ixg: 0, toi: 0, sh: 0, a1: 0, a2: 0, ppa1: 0, ong: 0, gp: 0, toi5v5: 0, a1_5v5: 0, a2_5v5: 0, onIceAxg5v5: 0, toi4v5: 0, onIceAxg4v5: 0 };
+  for (const y of present) { const w = MP_W[y] / totW, s = mp[y]; for (const k of Object.keys(acc) as (keyof MpWeighted)[]) acc[k] += (s[k] ?? 0) * w; }
   return acc;
 }
+/** Rate per 60 minutes from a season-total value and TOI in SECONDS. */
+const per60Sec = (value: number, seconds: number): number | null => (seconds > 0 ? (value / seconds) * 3600 : null);
 
-type ScPa = { SC: number; PA: number; scPct: number; paPct: number };
-/** SC/PA — clean 2-concept model (no stat counted twice). Volume is one absolute-total
- *  term; the second term is a QUALITY RATIO (finishing / primary-assist share), not a
- *  re-normalised copy of the same volume. Both on the combined F+D scale, curved, then
- *  STHS-calibrated. Returns intermediate ratings + within-position percentiles (UI). */
-function scPaV1(rows: { id: number; grp: "F" | "D"; mp: any }[]): Map<number, ScPa> {
-  const SC_VOL = 0.85, PA_VOL = 0.80; // volume weight; the rest is the quality ratio
-  type M = { gtot: number; fin: number; atot: number; pshare: number };
-  const raw = new Map<number, { grp: "F" | "D"; m: M; ashots: number }>();
-  for (const r of rows) {
-    const w = mpWeighted(r.mp); if (!w) continue;
-    // finishing skill: log(goals / expected goals), regressed to league-avg 0 by shots
-    const fin = Math.log((w.g + 0.5) / (w.ixg + 0.5)) * (w.sh / (w.sh + 200));
-    const atot = w.a1 + w.a2;
-    // primary-assist share = quality of the playmaking (direct vs secondary), a ratio
-    const pshareRaw = atot > 0 ? w.a1 / atot : 0;
-    raw.set(r.id, { grp: r.grp, m: { gtot: w.g, fin, atot, pshare: pshareRaw }, ashots: atot });
-  }
-  // regress primary-share toward the position mean by assist sample (small samples → mean)
-  const PSHARE_K = 20; // assists at which reliability = 0.5
-  const pshareMean: Record<"F" | "D", number> = { F: 0, D: 0 };
-  for (const g of ["F", "D"] as const) { const v = [...raw.values()].filter((r) => r.grp === g).map((r) => r.m.pshare); pshareMean[g] = v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0.5; }
-  for (const r of raw.values()) { const rel = r.ashots / (r.ashots + PSHARE_K); r.m.pshare = r.m.pshare * rel + pshareMean[r.grp] * (1 - rel); }
-
-  // percentile pools — combined (absolute SC/PA scale) + per-position (analytics)
-  const keys: (keyof M)[] = ["gtot", "fin", "atot", "pshare"];
-  const all: Record<string, number[]> = {}, pos: Record<"F" | "D", Record<string, number[]>> = { F: {}, D: {} };
-  for (const k of keys) { all[k] = []; pos.F[k] = []; pos.D[k] = []; }
-  for (const v of raw.values()) for (const k of keys) { all[k].push(v.m[k]); pos[v.grp][k].push(v.m[k]); }
-  for (const k of keys) { all[k].sort((a, b) => a - b); pos.F[k].sort((a, b) => a - b); pos.D[k].sort((a, b) => a - b); }
-
-  const out = new Map<number, ScPa>();
-  for (const [id, v] of raw) {
-    const pa = (k: keyof M) => percentileOf(v.m[k], all[k]);
-    const pp = (k: keyof M) => percentileOf(v.m[k], pos[v.grp][k]);
-    // SC = total goals (volume, the goal-total leaderboard) + finishing (skill ratio)
-    const scC = SC_VOL * pa("gtot") + (1 - SC_VOL) * pa("fin");
-    // PA = total assists (volume) + primary-assist share (playmaking quality ratio)
-    const paC = PA_VOL * pa("atot") + (1 - PA_VOL) * pa("pshare");
-    const scP = SC_VOL * pp("gtot") + (1 - SC_VOL) * pp("fin");
-    const paP = PA_VOL * pp("atot") + (1 - PA_VOL) * pp("pshare");
-    out.set(id, { SC: ratingFromCurve(scC, "SC"), PA: ratingFromCurve(paC, "PA"), scPct: Math.round(scP * 100), paPct: Math.round(paP * 100) });
-  }
-  return out;
-}
 
 // ---- STHS-scale calibration ----------------------------------------------
 // Edge's percentile engine centres every param at ~74 and lets scoring run to 99.
@@ -293,6 +270,7 @@ export async function edgeRatings(league = "NHL", calibrate = true): Promise<Edg
   // scorer onto ~82-90 while leaving forwards (whose position ≈ the absolute pool)
   // essentially unchanged. β applied to D only.
   const SC_POS_BLEND = 0.55;
+  const onIceKeys = ["SC", "PA", "CK", "DF", "EN", "FO", "DI", "ST", "PH", "FG", "PS", "SK"];
 
   const out: EdgeRow[] = rows.map((r) => {
     const grp = isDef(r.position) ? "D" : "F";
@@ -316,26 +294,16 @@ export async function edgeRatings(league = "NHL", calibrate = true): Promise<Edg
       }
       if (wtot > 0) { ratings[param] = ratingFromCurve(wsum / wtot, param); posPct[param] = Math.round((wposSum / wtot) * 100); }
     }
-    // direct / special parameters (not percentile composites)
-    const ex = experienceFromAge(r.age);
-    ratings.EX = ex;
+    // EX comes from the composite loop above (career GP); fall back to the age curve
+    // only for a player with no imported careerGP at all.
+    if (ratings.EX == null) ratings.EX = experienceFromAge(r.age);
     ratings.DU = durabilityFromAvailability(r.curGP, CUR_SEASON_GAMES, r.lastGP);
-    ratings.LD = leadershipFrom(r.captaincy, ex);
+    ratings.LD = leadershipFrom(r.captaincy, ratings.EX);
     ratings.MO = EDGE_MO_DEFAULT;
+    const onIce = onIceKeys.map((k) => ratings[k]).filter((x) => x != null);
+    if (onIce.length) ratings.OV = Math.round(onIce.reduce((a, b) => a + b, 0) / onIce.length);
     return { playerId: r.id, name: r.name, position: r.position, posGroup: grp, league: r.league, teamCode: r.teamCode, ratings, posPct };
   });
-
-  // SC/PA V1 override — MoneyPuck finishing-vs-xG + primary-assist model (3-season).
-  // Replaces the box-score composite for every player who has MoneyPuck data; the rest
-  // keep the box-score SC/PA. Recompute OV afterward so it reflects the new SC/PA.
-  const scpa = scPaV1(players.map((p) => ({ id: p.id, grp: isDef(p.position ?? "") ? "D" as const : "F" as const, mp: (p as any).mpSkater })));
-  const onIceKeys = ["SC", "PA", "CK", "DF", "EN", "FO", "DI", "ST", "PH", "FG", "PS", "SK"];
-  for (const r of out) {
-    const v = scpa.get(r.playerId);
-    if (v) { r.ratings.SC = v.SC; r.ratings.PA = v.PA; if (r.posPct) { r.posPct.SC = v.scPct; r.posPct.PA = v.paPct; } }
-    const onIce = onIceKeys.map((k) => r.ratings[k]).filter((x) => x != null);
-    if (onIce.length) r.ratings.OV = Math.round(onIce.reduce((a, b) => a + b, 0) / onIce.length);
-  }
 
   if (calibrate) calibrateSkaters(out, await sthsSkaterRef({ rosterType: league, isGoalie: false }));
   return out;
@@ -460,7 +428,7 @@ const GOALIE_REG_K = 700; // shots faced at which reliability = 0.5
 export async function edgeGoalieRatings(league = "NHL", calibrate = true): Promise<EdgeRow[]> {
   const goalies = await prisma.player.findMany({
     where: { rosterType: league, isGoalie: true },
-    select: { id: true, name: true, position: true, teamId: true, height: true, age: true, captaincy: true, goalieAdvanced: true, lastSeasonGP: true, curSeasonGP: true },
+    select: { id: true, name: true, position: true, teamId: true, height: true, age: true, captaincy: true, goalieAdvanced: true, lastSeasonGP: true, curSeasonGP: true, careerGP: true },
   });
   const teams = await prisma.team.findMany({ select: { id: true, code: true } });
   const codeById = new Map(teams.map((t) => [t.id, t.code]));
@@ -483,6 +451,7 @@ export async function edgeGoalieRatings(league = "NHL", calibrate = true): Promi
         ldSv: bl((m) => m.ldSv), mdSv: bl((m) => m.mdSv), hdSv: bl((m) => m.hdSv),
         gsax60: blend(per60g(c), per60g(l)), hdGsax: bl((m) => m.hdGsax), rebCtrl: bl((m) => m.rebCtrl),
         icetime: bl((m) => m.icetime), sz: heightCm(g.height),
+        regGP: (g.careerGP as any)?.reg ?? null, poGP: (g.careerGP as any)?.po ?? null,
       },
     });
   }
@@ -517,10 +486,9 @@ export async function edgeGoalieRatings(league = "NHL", calibrate = true): Promi
       }
       if (wtot > 0) ratings[param] = ratingFromCurve(wsum / wtot, param);
     }
-    const ex = experienceFromAge(r.age);
-    ratings.EX = ex;
+    if (ratings.EX == null) ratings.EX = experienceFromAge(r.age);
     ratings.DU = durabilityFromAvailability(r.curGP, CUR_SEASON_GAMES, r.lastGP);
-    ratings.LD = leadershipFrom(r.captaincy, ex);
+    ratings.LD = leadershipFrom(r.captaincy, ratings.EX);
     ratings.MO = EDGE_MO_DEFAULT;
     const core = ["SC", "RT", "HS", "AG", "RB", "EN", "SZ"].map((k) => ratings[k]).filter((v) => v != null);
     if (core.length) ratings.OV = Math.round(core.reduce((a, b) => a + b, 0) / core.length);

@@ -81,21 +81,34 @@ export const EDGE_COMPOSITES: Record<string, Metric[]> = {
   // scoring — an offensive-THREAT rating (matches how STHS "SC" reads): per-game goal
   // production leads, plus a slice of playmaking so two-way offensive stars (McDavid:
   // 48G but 90A) aren't buried under pure snipers; per-60 keeps the efficiency check.
-  SC: [{ key: "gpg", weight: 0.42 }, { key: "g60", weight: 0.2 }, { key: "apg", weight: 0.15 }, { key: "sh60", weight: 0.13 }, { key: "shpct", weight: 0.10 }],
-  // passing — assists per 60 leads, per-game assists add volume (playmaking totals)
-  PA: [{ key: "a60", weight: 0.6 }, { key: "apg", weight: 0.4 }],
+  // scoring (Next Gen spec) — goals/60 in all situations + goals above expected
+  // (G-xG, per-60), even weight. Volume + finishing skill, no stat double-counted.
+  // g60 is the existing box-score rate (broad coverage); gxg60 needs MoneyPuck xG
+  // and is simply skipped for the rare player without it.
+  SC: [{ key: "g60", weight: 0.5 }, { key: "gxg60", weight: 0.5 }],
+  // passing (Next Gen spec) — assists/60 in all situations + assists/60 at 5-on-5,
+  // even weight. All-situations captures PP playmaking too; the 5v5 split isolates
+  // even-strength distributing so a QB-of-the-PP alone doesn't inflate the rating.
+  // a60 is the existing box-score rate (broad coverage); a605v5 needs MoneyPuck's
+  // situational split and is simply skipped for the rare player without it.
+  PA: [{ key: "a60", weight: 0.5 }, { key: "a605v5", weight: 0.5 }],
   // checking — hits per 60
   CK: [{ key: "hit60", weight: 1.0 }],
-  // defense — blocks, PK usage, takeaways, +/- (F vs F, D vs D handled by grouping)
-  DF: [{ key: "blk60", weight: 0.4 }, { key: "shtoi", weight: 0.3 }, { key: "tk60", weight: 0.2 }, { key: "pm60", weight: 0.1 }],
+  // defense (Next Gen spec) — on-ice xGA/60 at 5-on-5 (the bulk of a season) plus
+  // on-ice xGA/60 shorthanded, both inverted (fewer expected goals against while
+  // you're out there is better). True team-relative (on-ice minus off-ice) needs
+  // off-ice TOI splits MoneyPuck doesn't publish per-player, so this uses the
+  // on-ice rate directly — still a real defensive-impact signal, just not
+  // adjusted for what the rest of the roster does without you on the ice.
+  DF: [{ key: "oxga5v5", weight: 0.85, invert: true }, { key: "oxgapk", weight: 0.15, invert: true }],
   // endurance — ice time per game
   EN: [{ key: "toi", weight: 1.0 }],
   // faceoffs — win % (sample-adjusted by the server)
   FO: [{ key: "fo", weight: 1.0 }],
   // discipline — inverse of penalties per 60
   DI: [{ key: "pim60", weight: 1.0, invert: true }],
-  // strength — size + physical engagement (board/battle proxy: hits)
-  ST: [{ key: "wt", weight: 0.6 }, { key: "hit60", weight: 0.4 }],
+  // strength (Next Gen spec) — body weight, full stop.
+  ST: [{ key: "wt", weight: 1.0 }],
   // puck handling — creation + takeaways, penalised for giveaways (entry/carry
   // tracking not in the feed yet, so this is a possession-events proxy)
   PH: [{ key: "off60", weight: 0.5 }, { key: "tk60", weight: 0.2 }, { key: "gv60", weight: 0.3, invert: true }],
@@ -105,13 +118,19 @@ export const EDGE_COMPOSITES: Record<string, Metric[]> = {
   // penalty shot / breakaway — finishing skill + offensive touch (shootout/breakaway
   // conversion tracks finishers)
   PS: [{ key: "shpct", weight: 0.5 }, { key: "off60", weight: 0.3 }, { key: "g60", weight: 0.2 }],
-  // skating — real NHL EDGE tracking (top speed + speed bursts), the dominant signal;
-  // ice-time is only a fallback for the handful of skaters missing EDGE data.
-  SK: [{ key: "spd", weight: 0.8 }, { key: "toi", weight: 0.2 }],
+  // skating (Next Gen spec) — real NHL EDGE speed-burst count (20+ mph), full stop.
+  // NHL EDGE only publishes ONE burst threshold publicly (burstsOver20) — no 18+/22+
+  // breakdown exists to split by, despite that being the original ask. metricsFor()
+  // still falls back to ice-time for the handful of skaters missing EDGE data.
+  SK: [{ key: "brst20", weight: 1.0 }],
+  // experience (Next Gen spec) — career games played, regular season + playoffs.
+  EX: [{ key: "regGP", weight: 0.7 }, { key: "poGP", weight: 0.3 }],
 };
 
-/** EX — experience, an absolute age curve (we lack career-GP totals). 1000-game
- *  vet ≈ 95+, rookie ≈ 50-60. */
+/** EX fallback — an absolute age curve, used only when a player has no imported
+ *  careerGP data at all (see EDGE_COMPOSITES.EX / EDGE_GOALIE_COMPOSITES.EX for the
+ *  primary Next Gen formula: career regular-season + playoff games played).
+ *  1000-game vet ≈ 95+, rookie ≈ 50-60. */
 export function experienceFromAge(age: number | null | undefined): number {
   const a = age ?? 24;
   if (a <= 20) return 52;
@@ -153,6 +172,8 @@ export const EDGE_GOALIE_COMPOSITES: Record<string, Metric[]> = {
   EN: [{ key: "icetime", weight: 1.0 }],
   // size
   SZ: [{ key: "sz", weight: 1.0 }],
+  // experience (Next Gen spec) — career games played, regular season + playoffs.
+  EX: [{ key: "regGP", weight: 0.7 }, { key: "poGP", weight: 0.3 }],
 };
 
 function clamp(x: number, lo: number, hi: number): number {
