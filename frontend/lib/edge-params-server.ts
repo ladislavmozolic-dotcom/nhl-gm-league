@@ -526,3 +526,96 @@ export async function edgeForPlayer(playerId: number): Promise<EdgeRow | null> {
   const all = await edgeRatings(p.rosterType ?? "NHL");
   return all.find((r) => r.playerId === playerId) ?? null;
 }
+
+// ---- Promote a parameter set to LIVE ---------------------------------------
+// Overwrites the actual ck/fg/di/.../overall fields — the ones the simulation and
+// every roster/player page already read — with a chosen set's values. Nothing else
+// about a player (contract, roster spot, team, etc.) is touched.
+
+export type ParamSet = "sths" | "unhl" | "nextgen";
+const PROMOTE_SKATER_KEYS = ["ck", "df", "di", "du", "en", "ex", "fg", "fo", "ld", "mo", "pa", "ph", "ps", "sc", "sk", "st"] as const;
+const PROMOTE_GOALIE_KEYS = ["sk", "du", "en", "sz", "ag", "rb", "sc", "hs", "rt", "ph", "ps", "ex", "ld", "mo"] as const;
+const promoteCap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** Snapshot every player/goalie's CURRENT live values into sthsBackup — but only
+ *  where no backup exists yet, so a second promotion never overwrites the true
+ *  original STHS numbers with an already-promoted intermediate state. */
+async function backupLiveIfNeeded(): Promise<void> {
+  const skaterCols = PROMOTE_SKATER_KEYS.map((k) => `'${k}', ${k}`).join(", ");
+  await prisma.$executeRawUnsafe(`UPDATE "Player" SET "sthsBackup" = jsonb_build_object(${skaterCols}, 'overall', overall) WHERE "sthsBackup" IS NULL AND "isGoalie" = false`);
+  const goalieCols = PROMOTE_GOALIE_KEYS.map((k) => `'${k}', ${k}`).join(", ");
+  await prisma.$executeRawUnsafe(`UPDATE "GoalieRating" SET "sthsBackup" = jsonb_build_object(${goalieCols}, 'overall', overall) WHERE "sthsBackup" IS NULL`);
+}
+
+async function promoteFlatSet(prefix: "unhl"): Promise<{ skaters: number; goalies: number }> {
+  await backupLiveIfNeeded();
+  const skaterSet = PROMOTE_SKATER_KEYS.map((k) => `${k} = "${prefix}${promoteCap(k)}"`).join(", ");
+  const skaters = await prisma.$executeRawUnsafe(`UPDATE "Player" SET ${skaterSet}, overall = "${prefix}Overall" WHERE "isGoalie" = false`);
+  const goalieSet = PROMOTE_GOALIE_KEYS.map((k) => `${k} = "${prefix}${promoteCap(k)}"`).join(", ");
+  const goalies = await prisma.$executeRawUnsafe(`UPDATE "GoalieRating" SET ${goalieSet}, overall = "${prefix}Overall"`);
+  return { skaters, goalies };
+}
+
+async function restoreSthsSet(): Promise<{ skaters: number; goalies: number }> {
+  const skaterSet = PROMOTE_SKATER_KEYS.map((k) => `${k} = ("sthsBackup"->>'${k}')::int`).join(", ");
+  const skaters = await prisma.$executeRawUnsafe(`UPDATE "Player" SET ${skaterSet}, overall = ("sthsBackup"->>'overall')::int WHERE "sthsBackup" IS NOT NULL AND "isGoalie" = false`);
+  const goalieSet = PROMOTE_GOALIE_KEYS.map((k) => `${k} = ("sthsBackup"->>'${k}')::int`).join(", ");
+  const goalies = await prisma.$executeRawUnsafe(`UPDATE "GoalieRating" SET ${goalieSet}, overall = ("sthsBackup"->>'overall')::int WHERE "sthsBackup" IS NOT NULL`);
+  return { skaters, goalies };
+}
+
+/** Promote Next Gen to live: computes fresh ratings right now (NHL + AHL skaters,
+ *  NHL goalies) and writes them into the live fields. AHL goalies have no Next Gen
+ *  formula yet, so theirs are left untouched. A missing individual sub-rating (e.g.
+ *  a player with no MoneyPuck match) leaves that ONE field untouched rather than
+ *  blanking it — everything else about him still promotes normally. */
+async function promoteNextGenSet(): Promise<{ skaters: number; goalies: number; note: string }> {
+  await backupLiveIfNeeded();
+  const [nhlSkaters, ahlSkaters, nhlGoalies] = await Promise.all([
+    edgeRatings("NHL", true), edgeAhlSkaterRatings(true), edgeGoalieRatings("NHL", true),
+  ]);
+  const allSkaters = [...nhlSkaters, ...ahlSkaters];
+  const CHUNK = 100;
+  let skaters = 0;
+  for (let i = 0; i < allSkaters.length; i += CHUNK) {
+    const chunk = allSkaters.slice(i, i + CHUNK);
+    await prisma.$transaction(chunk.map((r) => prisma.player.update({
+      where: { id: r.playerId },
+      data: {
+        ck: r.ratings.CK ?? undefined, df: r.ratings.DF ?? undefined, di: r.ratings.DI ?? undefined, du: r.ratings.DU ?? undefined,
+        en: r.ratings.EN ?? undefined, ex: r.ratings.EX ?? undefined, fg: r.ratings.FG ?? undefined, fo: r.ratings.FO ?? undefined,
+        ld: r.ratings.LD ?? undefined, mo: r.ratings.MO ?? undefined, pa: r.ratings.PA ?? undefined, ph: r.ratings.PH ?? undefined,
+        ps: r.ratings.PS ?? undefined, sc: r.ratings.SC ?? undefined, sk: r.ratings.SK ?? undefined, st: r.ratings.ST ?? undefined,
+        overall: r.ratings.OV ?? undefined,
+      },
+    })));
+    skaters += chunk.length;
+  }
+  const goalieRows = await prisma.player.findMany({ where: { isGoalie: true, rosterType: "NHL" }, select: { id: true, goalieRating: { select: { id: true } } } });
+  const grIdByPlayer = new Map(goalieRows.filter((g) => g.goalieRating).map((g) => [g.id, g.goalieRating!.id]));
+  let goalies = 0;
+  for (let i = 0; i < nhlGoalies.length; i += CHUNK) {
+    const chunk = nhlGoalies.slice(i, i + CHUNK).filter((r) => grIdByPlayer.has(r.playerId));
+    await prisma.$transaction(chunk.map((r) => prisma.goalieRating.update({
+      where: { id: grIdByPlayer.get(r.playerId)! },
+      data: {
+        sk: r.ratings.SK ?? undefined, du: r.ratings.DU ?? undefined, en: r.ratings.EN ?? undefined, sz: r.ratings.SZ ?? undefined,
+        ag: r.ratings.AG ?? undefined, rb: r.ratings.RB ?? undefined, sc: r.ratings.SC ?? undefined, hs: r.ratings.HS ?? undefined,
+        rt: r.ratings.RT ?? undefined, ph: r.ratings.PH ?? undefined, ps: r.ratings.PS ?? undefined, ex: r.ratings.EX ?? undefined,
+        ld: r.ratings.LD ?? undefined, mo: r.ratings.MO ?? undefined, overall: r.ratings.OV ?? undefined,
+      },
+    })));
+    goalies += chunk.length;
+  }
+  return { skaters, goalies, note: "AHL goalies have no Next Gen formula yet — their live ratings were left unchanged." };
+}
+
+/** Switch the league's LIVE parameter set — what the simulation and every roster/
+ *  player page actually read. Admin-gated at the call site (app/admin/simulation/
+ *  actions.ts). Backs up the true original STHS values on first use so "sths" can
+ *  always be restored later. */
+export async function promoteParamSet(target: ParamSet): Promise<{ skaters: number; goalies: number; note?: string }> {
+  if (target === "sths") return restoreSthsSet();
+  if (target === "unhl") return promoteFlatSet("unhl");
+  return promoteNextGenSet();
+}

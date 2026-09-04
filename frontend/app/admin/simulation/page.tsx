@@ -16,7 +16,7 @@ export default async function SimulationAdminPage() {
     activeSimEngine(),
     prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { paramMode: true } }),
   ]);
-  const paramMode = lc?.paramMode === "edge" ? "edge" : "sths";
+  const paramMode = lc?.paramMode === "edge" ? "nextgen" : lc?.paramMode === "unhl" ? "unhl" : "sths";
   return (
     <div className="space-y-6 py-2">
       <PageHeader

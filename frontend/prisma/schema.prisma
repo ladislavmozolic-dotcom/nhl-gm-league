@@ -168,6 +168,11 @@ model Player {
   unhlSk               Int?
   unhlSt               Int?
   unhlOverall          Int?
+  // Snapshot of the live CK/FG/DI/... values taken the FIRST time this player's live
+  // set is ever promoted away from STHS (see app/admin/simulation/actions.ts
+  // promoteParamSetAction) — lets the commissioner switch the whole league's live
+  // parameters back to the original STHS numbers later without losing them.
+  sthsBackup           Json?
   isGoalie             Boolean       @default(false)
   sourceType           String?
   onTradeBlock         Boolean       @default(false)
@@ -639,6 +644,9 @@ model GoalieRating {
   unhlLd      Int?
   unhlMo      Int?
   unhlOverall Int?
+  // Snapshot of the live SK/DU/EN/... values taken the FIRST time this goalie's live
+  // set is ever promoted away from STHS — see Player.sthsBackup.
+  sthsBackup  Json?
   player    Player @relation(fields: [playerId], references: [id])
 }
 
