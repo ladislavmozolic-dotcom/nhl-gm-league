@@ -148,6 +148,26 @@ model Player {
   sc                   Int?
   sk                   Int?
   st                   Int?
+  // UNHL Parameters — a second, independently-editable rating set (skaters), seeded
+  // from the values above but tracked separately so it can diverge and drive its own
+  // tools without touching the primary CK/FG/DI/... set everything else already uses.
+  unhlCk               Int?
+  unhlDf               Int?
+  unhlDi               Int?
+  unhlDu               Int?
+  unhlEn               Int?
+  unhlEx               Int?
+  unhlFg               Int?
+  unhlFo               Int?
+  unhlLd               Int?
+  unhlMo               Int?
+  unhlPa               Int?
+  unhlPh               Int?
+  unhlPs               Int?
+  unhlSc               Int?
+  unhlSk               Int?
+  unhlSt               Int?
+  unhlOverall          Int?
   isGoalie             Boolean       @default(false)
   sourceType           String?
   onTradeBlock         Boolean       @default(false)
@@ -601,6 +621,23 @@ model GoalieRating {
   ld        Int?
   mo        Int?
   overall   Int?
+  // UNHL Parameters — a second, independently-editable rating set (goalies), seeded
+  // from the values above (see Player.unhl* for the skater side of the same set).
+  unhlSk      Int?
+  unhlDu      Int?
+  unhlEn      Int?
+  unhlSz      Int?
+  unhlAg      Int?
+  unhlRb      Int?
+  unhlSc      Int?
+  unhlHs      Int?
+  unhlRt      Int?
+  unhlPh      Int?
+  unhlPs      Int?
+  unhlEx      Int?
+  unhlLd      Int?
+  unhlMo      Int?
+  unhlOverall Int?
   player    Player @relation(fields: [playerId], references: [id])
 }
 
