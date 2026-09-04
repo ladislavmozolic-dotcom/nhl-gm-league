@@ -33,6 +33,7 @@ type MpRow = {
   offIceAxg5v5: number; offIceToi5v5: number;                          // team-without-him, 5v5 (Defense: true Rel)
   offIceAxg4v5: number; offIceToi4v5: number;                          // team-without-him, PK (Defense: true Rel)
   onIceGa5v5: number; offIceGa5v5: number;                             // actual (not expected) on-ice/off-ice GA, 5v5
+  hits: number; tk: number; gv: number; blk: number; onGaAll: number;  // box-score counts (UNHL calculator recompute)
 };
 
 function parseCsv(text: string): string[][] {
@@ -76,8 +77,9 @@ async function fetchSeason(year: number): Promise<Map<string, MpRow>> {
   const iName = col("name"), iTeam = col("team"), iSit = col("situation"), iGP = col("games_played"), iTOI = col("icetime");
   const iG = col("I_F_goals"), iXG = col("I_F_xGoals"), iA1 = col("I_F_primaryAssists"), iA2 = col("I_F_secondaryAssists");
   const iSh = col("I_F_shotsOnGoal"), iOnG = col("OnIce_F_goals"), iOnAxg = col("OnIce_A_xGoals"), iOnGa = col("OnIce_A_goals");
+  const iHits = col("I_F_hits"), iTk = col("I_F_takeaways"), iGv = col("I_F_giveaways"), iBlk = col("shotsBlockedByPlayer");
   const num = (r: string[], i: number) => { const v = Number(r[i]); return Number.isFinite(v) ? v : 0; };
-  const blank = (): MpRow => ({ gp: 0, toi: 0, g: 0, ixg: 0, a1: 0, a2: 0, sh: 0, ong: 0, ppa1: 0, toi5v5: 0, a1_5v5: 0, a2_5v5: 0, onIceAxg5v5: 0, toi4v5: 0, onIceAxg4v5: 0, offIceAxg5v5: 0, offIceToi5v5: 0, offIceAxg4v5: 0, offIceToi4v5: 0, onIceGa5v5: 0, offIceGa5v5: 0 });
+  const blank = (): MpRow => ({ gp: 0, toi: 0, g: 0, ixg: 0, a1: 0, a2: 0, sh: 0, ong: 0, ppa1: 0, toi5v5: 0, a1_5v5: 0, a2_5v5: 0, onIceAxg5v5: 0, toi4v5: 0, onIceAxg4v5: 0, offIceAxg5v5: 0, offIceToi5v5: 0, offIceAxg4v5: 0, offIceToi4v5: 0, onIceGa5v5: 0, offIceGa5v5: 0, hits: 0, tk: 0, gv: 0, blk: 0, onGaAll: 0 });
   const out = new Map<string, MpRow>();
   for (const r of rows.slice(1)) {
     const sit = r[iSit];
@@ -89,6 +91,8 @@ async function fetchSeason(year: number): Promise<Map<string, MpRow>> {
     if (sit === "all") {
       m.gp = num(r, iGP); m.toi = num(r, iTOI); m.g = num(r, iG); m.ixg = num(r, iXG);
       m.a1 = num(r, iA1); m.a2 = num(r, iA2); m.sh = num(r, iSh); m.ong = num(r, iOnG);
+      m.hits = num(r, iHits); m.tk = num(r, iTk); m.gv = num(r, iGv); m.blk = num(r, iBlk);
+      m.onGaAll = num(r, iOnGa); // same "OnIce_A_goals" column, this row is the all-situations one
     } else if (sit === "5on4") { // PP primary assists only
       m.ppa1 = num(r, iA1);
     } else if (sit === "5on5" || sit === "4on5") {

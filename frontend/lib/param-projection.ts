@@ -34,11 +34,11 @@ export function gamesMissedPenalty(gp: number, seasonGames = SEASON_GAMES): numb
   return 0;
 }
 
-type Pos = "F" | "D";
-const posOf = (position: string | null): Pos =>
+export type Pos = "F" | "D";
+export const posOf = (position: string | null): Pos =>
   /\bD\b/.test((position ?? "").toUpperCase()) || ((position ?? "").toUpperCase().includes("D") && !/[CW]/.test((position ?? "").toUpperCase())) ? "D" : "F";
 
-const SPEC = [
+export const SPEC = [
   { key: "ck", last: "lastSeasonHits", cur: "curSeasonHits", F: ck_F, D: ck_D },
   { key: "sc", last: "lastSeasonG", cur: "curSeasonG", F: sc_F, D: sc_D },
   { key: "pa", last: "lastSeasonA", cur: "curSeasonA", F: pa_F, D: pa_D },
@@ -56,7 +56,7 @@ function tableBounds(t: CalcTable) {
   return b;
 }
 /** VLOOKUP-exact on cents key, clamped to the table's range (the tables are contiguous). */
-function lookup(t: CalcTable, ratePerGame: number): number {
+export function lookup(t: CalcTable, ratePerGame: number): number {
   const cents = Math.round(ratePerGame * 100);
   const { lo, hi } = tableBounds(t);
   return t[Math.max(lo, Math.min(hi, cents))];
@@ -73,25 +73,35 @@ const DF_W = { F: { sh: 65, pm: 10, tg: 5, blk: 20 }, D: { sh: 55, pm: 10, tg: 5
 export type DFInputs = {
   gp: number; shToi: number; teamShToi: number; plusMinus: number; blocks: number; tk: number; gv: number; currentDF: number;
 };
-/** The calculator's exact DF pipeline: usage/PK-share + blocks + +/- + take-give →
- *  composite → current-season DF rating → blended 80/20 with the existing DF → cap. */
-export function projectDF(pos: Pos, i: DFInputs): number | null {
-  if (!i.gp || i.gp <= 0 || !i.teamShToi || i.teamShToi <= 0 || i.currentDF == null) return null;
+export type DFRates = { shRatio: number; blkPG: number; plusMinus: number; tk: number; gv: number; currentDF: number };
+/** The calculator's exact DF pipeline from already-derived rates: usage/PK-share +
+ *  blocks/GP + +/- + take-give → composite → current-season DF rating → blended
+ *  80/20 with the existing DF → cap. Split out from projectDF() so a caller who
+ *  blends raw inputs across multiple seasons (unequal weights) can feed in the
+ *  blended RATES directly instead of a single season's raw TOI/blocks/GP. */
+export function projectDFFromRates(pos: Pos, r: DFRates): number {
   const t = pos === "D"
     ? { sh: df_sh_D, pm: df_pm_D, blk: df_blk_D, tg: df_tg_D, pts: df_pts_D }
     : { sh: df_sh_F, pm: df_pm_F, blk: df_blk_F, tg: df_tg_F, pts: df_pts_F };
-  const shRatio = i.shToi / i.teamShToi;                    // player PK-time share
-  const blkPG = i.blocks / i.gp;
-  const tgRatio = i.gv > 0 ? i.tk / i.gv : (i.tk > 0 ? 7 : 0);
-  const CU = lookupKey(t.sh, Math.round(shRatio * 100));
-  const CY = lookupKey(t.pm, Math.round(i.plusMinus));
-  const DD = lookupKey(t.blk, Math.round(blkPG * 100));
+  const tgRatio = r.gv > 0 ? r.tk / r.gv : (r.tk > 0 ? 7 : 0);
+  const CU = lookupKey(t.sh, Math.round(r.shRatio * 100));
+  const CY = lookupKey(t.pm, Math.round(r.plusMinus));
+  const DD = lookupKey(t.blk, Math.round(r.blkPG * 100));
   const DI = lookupKey(t.tg, Math.round(tgRatio * 100));
   const w = DF_W[pos];
   const DK = Math.round(((CU * w.sh + CY * w.pm + DI * w.tg + DD * w.blk) / 100) * 10) / 10; // 1 dp
   const DP = lookupKey(t.pts, Math.round(DK * 100));
-  const DQ = Math.round((DP * 80 + i.currentDF * 20) / 100);
+  const DQ = Math.round((DP * 80 + r.currentDF * 20) / 100);
   return Math.min(DQ, 85);
+}
+/** The calculator's exact DF pipeline: usage/PK-share + blocks + +/- + take-give →
+ *  composite → current-season DF rating → blended 80/20 with the existing DF → cap. */
+export function projectDF(pos: Pos, i: DFInputs): number | null {
+  if (!i.gp || i.gp <= 0 || !i.teamShToi || i.teamShToi <= 0 || i.currentDF == null) return null;
+  return projectDFFromRates(pos, {
+    shRatio: i.shToi / i.teamShToi, blkPG: i.blocks / i.gp,
+    plusMinus: i.plusMinus, tk: i.tk, gv: i.gv, currentDF: i.currentDF,
+  });
 }
 
 export type ProjSkater = {
