@@ -42,7 +42,7 @@ export default async function AllGoaliesPage({ searchParams }: { searchParams: P
   const farm = full.affiliateTeams[0]?.players ?? [];
   const farmHasField = farm.some((p) => p.captaincy === "C" || p.captaincy === "A");
   const toRP = (p: (typeof full.players)[number], hasField: boolean): RosterPlayer => {
-    const row = { ...(p as unknown as RosterPlayer), ...(p.goalieRating ?? {}), capRole: hasField ? (p.captaincy ?? null) : captaincyFromName(p.name) };
+    const row = { ...(p as unknown as RosterPlayer), ...((p.goalieRating ?? {}) as unknown as Record<string, number | null>), capRole: hasField ? (p.captaincy ?? null) : captaincyFromName(p.name) };
     const out = realMode ? { ...row, contractText: p.capHit ? money(p.capHit) : (row.contractText ?? null) } : row;
     return redactAttrs(out, !loggedIn);
   };
