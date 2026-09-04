@@ -25,7 +25,7 @@ export default async function GmProfilePage({ params }: { params: Promise<{ slug
   return (
     <div className="space-y-6 py-2">
       <PageHeader
-        title={gm.gmName}
+        title={<span>{gm.gmName}{gm.rookieGm && <span className="text-sm font-bold text-rose-400 ml-2 align-middle" title="Rookie GM — new to the league">(R)</span>}</span>}
         subtitle={<span>General Manager · <Link href={`/teams/${gm.teamSlug}`} className="text-blue-400 hover:underline">{gm.teamName}</Link>{gm.since ? ` · since ${gm.since}` : ""}</span>}
         right={gm.logoUrl ? <img src={gm.logoUrl} alt="" className="w-12 h-12 object-contain" /> : undefined}
       />
