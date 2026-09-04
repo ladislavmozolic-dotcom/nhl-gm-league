@@ -11,7 +11,7 @@ export default function ParamModeToggle({ mode }: { mode: "sths" | "edge" }) {
 
   const opts: { key: "sths" | "edge"; label: string; sub: string }[] = [
     { key: "sths", label: "Parameters", sub: "Classic stats → ratings calculator" },
-    { key: "edge", label: "NHL Edge Parameters", sub: "Tracking-data (Edge) calculator" },
+    { key: "edge", label: "Next Gen Parameters", sub: "Tracking-data (Next Gen) calculator" },
   ];
 
   return (

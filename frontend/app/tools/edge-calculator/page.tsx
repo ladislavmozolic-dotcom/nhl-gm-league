@@ -75,7 +75,7 @@ export default async function EdgeCalculatorPage({ searchParams }: { searchParam
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 space-y-5">
-      <PageHeader title="Edge Parameters" subtitle="Ratings built from real NHL performance — relative, per-60" />
+      <PageHeader title="Next Gen Parameters" subtitle="Ratings built from real NHL performance — relative, per-60" />
       <div className="flex gap-1.5 items-center flex-wrap">
         <Link href={`/tools/edge-calculator${team ? `?team=${team}` : ""}`} className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${!goalies ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-300"}`}>Skaters</Link>
         <Link href={`/tools/edge-calculator?type=goalies${team ? `&team=${team}` : ""}`} className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${goalies ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-300"}`}>Goalies</Link>

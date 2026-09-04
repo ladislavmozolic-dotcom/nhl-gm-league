@@ -80,7 +80,7 @@ export const DEFAULT_MENU: MenuItem[] = [
     { label: "⚖️ Player Compare", href: "/tools/compare" },
     { label: "🧮 Cap Calculator", href: "/tools/cap-calculator" },
     { label: "🎚️ Parameters (calculator)", href: "/tools/player-calculator" },
-    { label: "🎛️ Edge Parameters (calculator)", href: "/tools/edge-calculator" },
+    { label: "🎛️ Next Gen Parameters (calculator)", href: "/tools/edge-calculator" },
     { label: "🔄 Player Data Refresh", href: "/tools/player-data" },
   ] },
   { key: "ahl", label: "AHL", href: "/ahl", children: [
