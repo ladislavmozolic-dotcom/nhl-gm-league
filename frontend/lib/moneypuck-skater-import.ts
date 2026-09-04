@@ -22,8 +22,26 @@ const UA = "Mozilla/5.0 (compatible; ProfiNHL-League/1.0)";
 export const MP_SEASONS = [2025, 2024, 2023] as const; // 25-26, 24-25, 23-24
 
 const SPECIAL: Record<string, string> = { "ø": "o", "æ": "ae", "œ": "oe", "ß": "ss", "đ": "d", "ł": "l", "ð": "d", "þ": "th" };
+// First-name nickname variants (MoneyPuck's formal names vs. our shorter/alt forms)
+// → canonical form — same map as lib/player-stats-import.ts's FIRST_ALIAS. Without
+// this, "Jacob Middleton" (our DB) never matches MoneyPuck's "Jake Middleton" and
+// silently keeps whatever stale value he had before any recompute — which then
+// looks like a real (but wrong) result sitting next to genuinely recomputed players.
+const FIRST_ALIAS: Record<string, string> = {
+  mitchell: "mitch", alexander: "alex", aleksander: "alex", alexei: "alex", aleksei: "alex", alexey: "alex", aleksey: "alex",
+  william: "will", zachary: "zach", zack: "zach", joshua: "josh", matthew: "matt", benjamin: "ben",
+  cameron: "cam", fyodor: "fedor", nicholas: "nick", nicklaus: "nick", nikolai: "nik", nikolaj: "nik",
+  maxime: "max", maximilian: "max", maxim: "max", maksim: "max", samuel: "sam", jacob: "jake", joseph: "joe",
+  michael: "mike", mikey: "mike", christopher: "chris", theodore: "theo",
+  dmitri: "dmitry", dmitrii: "dmitry", dmitriy: "dmitry", dima: "dmitry",
+  yegor: "egor", jegor: "egor", evgenii: "evgeny", evgeni: "evgeny", sergey: "sergei", andrey: "andrei",
+  daniil: "danil", grigori: "grigory", grigorii: "grigory", vasili: "vasily", vasiliy: "vasily",
+};
 function key(name: string): string {
-  return cleanName(name).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[øæœßđłðþ]/g, (c) => SPECIAL[c] ?? c).replace(/[^a-z]/g, "");
+  const norm = cleanName(name).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[øæœßđłðþ]/g, (c) => SPECIAL[c] ?? c);
+  const words = norm.split(/[^a-z]+/).filter(Boolean);
+  if (words.length && FIRST_ALIAS[words[0]]) words[0] = FIRST_ALIAS[words[0]];
+  return words.join("");
 }
 
 type MpRow = {
