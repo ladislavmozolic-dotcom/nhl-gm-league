@@ -94,13 +94,21 @@ export const EDGE_COMPOSITES: Record<string, Metric[]> = {
   PA: [{ key: "a60", weight: 0.5 }, { key: "a605v5", weight: 0.5 }],
   // checking — hits per 60
   CK: [{ key: "hit60", weight: 1.0 }],
-  // defense (Next Gen spec) — TRUE relative xGA/60: on-ice rate minus the rate the
-  // rest of the roster allows in the same situation with this player OFF the ice
-  // (team totals minus his own, from MoneyPuck's team + player CSVs). 5-on-5 (the
-  // bulk of a season) weighted heavier than shorthanded; both inverted (a smaller/
-  // more negative Rel xGA — fewer expected goals against while you're out there,
-  // relative to your bench — is better).
-  DF: [{ key: "relxga5v5", weight: 0.85, invert: true }, { key: "relxgapk", weight: 0.15, invert: true }],
+  // defense (Next Gen spec) — six-way blend: TRUE relative xGA/GA at 5v5 (on-ice
+  // rate minus the rate the rest of the roster allows with this player OFF the ice,
+  // from MoneyPuck's team + player CSVs) carries most of the weight, relative
+  // shorthanded xGA adds context, plain (non-relative) on-ice xGA/GA at 5v5 anchor
+  // it to an absolute level, and blocks/60 (all situations, box score) round it out.
+  // All the against/allowed metrics are inverted (fewer goals/expected goals while
+  // you're on the ice is better); blocks is not (more is better).
+  DF: [
+    { key: "relxga5v5", weight: 0.40, invert: true },
+    { key: "relga5v5", weight: 0.15, invert: true },
+    { key: "relxgapk", weight: 0.15, invert: true },
+    { key: "axga5v5", weight: 0.20, invert: true },
+    { key: "aga5v5", weight: 0.07, invert: true },
+    { key: "blk60", weight: 0.03 },
+  ],
   // endurance — ice time per game
   EN: [{ key: "toi", weight: 1.0 }],
   // faceoffs — win % (sample-adjusted by the server)

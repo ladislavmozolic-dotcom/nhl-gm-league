@@ -4,7 +4,7 @@ import { PageHeader, Card } from "@/components/ui";
 import SortableTable, { type SortCol, type SortRow } from "@/components/SortableTable";
 import { ratingColor, ovColor, posGroup } from "@/lib/ratingBands";
 import { isLoggedIn } from "@/lib/auth";
-import { edgeRatings, edgeGoalieRatings } from "@/lib/edge-params-server";
+import { edgeRatings, edgeGoalieRatings, edgeAhlSkaterRatings } from "@/lib/edge-params-server";
 import { SKATER_PARAM_LABELS, GOALIE_PARAM_LABELS, SKATER_PARAM_ORDER, GOALIE_PARAM_ORDER } from "@/lib/param-labels";
 
 export const dynamic = "force-dynamic";
@@ -45,7 +45,10 @@ export default async function LeagueParametersPage({ searchParams }: { searchPar
     ];
 
     if (set === "nextgen") {
-      const edge = isGoalie ? await edgeGoalieRatings("NHL", true) : await edgeRatings("NHL", true);
+      // AHL goalies have no MoneyPuck-driven data source, so the Next Gen formula
+      // only ever covers NHL netminders — skaters get an AHL-specific (simpler)
+      // translation instead, so both leagues show up on that tab.
+      const edge = isGoalie ? await edgeGoalieRatings("NHL", true) : [...await edgeRatings("NHL", true), ...await edgeAhlSkaterRatings(true)];
       const ids = edge.map((r) => r.playerId);
       const meta = await prisma.player.findMany({
         where: { id: { in: ids } },
@@ -74,7 +77,7 @@ export default async function LeagueParametersPage({ searchParams }: { searchPar
       const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
       if (!isGoalie) {
         const players = await prisma.player.findMany({
-          where: { rosterType: "NHL", isGoalie: false },
+          where: { rosterType: { in: ["NHL", "AHL"] }, isGoalie: false },
           select: {
             id: true, name: true, slug: true, photoUrl: true, position: true,
             team: { select: { code: true, slug: true, logoUrl: true } },
@@ -98,7 +101,7 @@ export default async function LeagueParametersPage({ searchParams }: { searchPar
         });
       } else {
         const goalies = await prisma.player.findMany({
-          where: { rosterType: "NHL", isGoalie: true },
+          where: { rosterType: { in: ["NHL", "AHL"] }, isGoalie: true },
           select: {
             id: true, name: true, slug: true, photoUrl: true, position: true,
             team: { select: { code: true, slug: true, logoUrl: true } },
@@ -158,7 +161,10 @@ export default async function LeagueParametersPage({ searchParams }: { searchPar
           </div>
           <Card bodyClassName="p-0">
             <div className="p-4">
-              <p className="text-xs text-slate-500 mb-3">{count} {pos} · hover the ⓘ on a column to see what it stands for</p>
+              <p className="text-xs text-slate-500 mb-3">
+                {count} {pos} · hover the ⓘ on a column to see what it stands for
+                {set === "nextgen" && pos === "goalies" && " · AHL goalies aren't shown here — the Next Gen formula needs real NHL shot data that doesn't exist for them"}
+              </p>
               <SortableTable cols={cols} rows={rows} initialSort="ov" minWidth={1400} csvFilename={`${set}-parameters-${pos}`} />
             </div>
           </Card>

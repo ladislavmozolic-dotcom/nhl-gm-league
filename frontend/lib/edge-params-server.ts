@@ -27,7 +27,7 @@ export type EdgeRow = {
 
 // per-60 rate metrics get regressed toward the position mean by sample reliability;
 // direct measurements (ice time, weight, SH-TOI) do not.
-const REGRESS_KEYS = new Set(["g60", "a60", "sh60", "gpg", "apg", "off60", "hit60", "blk60", "tk60", "gv60", "pm60", "pim60", "fo", "shpct", "gxg60", "a605v5", "relxga5v5", "relxgapk"]);
+const REGRESS_KEYS = new Set(["g60", "a60", "sh60", "gpg", "apg", "off60", "hit60", "blk60", "tk60", "gv60", "pm60", "pim60", "fo", "shpct", "gxg60", "a605v5", "relxga5v5", "relxgapk", "axga5v5", "aga5v5", "relga5v5"]);
 const REGRESS_K = 500; // minutes at which reliability = 0.5
 
 /** Per-60 metric blend (80% current / 20% prior real season) for one player. */
@@ -80,19 +80,24 @@ function metricsFor(p: any): Record<string, number | null> {
     // season) from the NHL API. NULL when the player has no imported careerGP yet.
     regGP: (p.careerGP as any)?.reg ?? null,
     poGP: (p.careerGP as any)?.po ?? null,
-    // Next Gen SC/PA/DF sub-metrics — MoneyPuck situational splits. DF is TRUE
-    // relative xGA: on-ice rate minus the rate the rest of the roster allows in the
-    // same situation while this player is OFF the ice (team totals minus his own).
+    // Next Gen SC/PA/DF sub-metrics — MoneyPuck situational splits. relxga5v5/relxgapk/
+    // relga5v5 are TRUE relative rates: on-ice rate minus the rate the rest of the
+    // roster allows in the same situation while this player is OFF the ice (team
+    // totals minus his own). axga5v5/aga5v5 are the plain (non-relative) on-ice rates.
     ...(() => {
       const w = mpWeighted(p.mpSkater);
-      if (!w) return { gxg60: null, a605v5: null, relxga5v5: null, relxgapk: null };
+      if (!w) return { gxg60: null, a605v5: null, relxga5v5: null, relxgapk: null, axga5v5: null, aga5v5: null, relga5v5: null };
       const onXga5v5 = per60Sec(w.onIceAxg5v5, w.toi5v5), offXga5v5 = per60Sec(w.offIceAxg5v5, w.offIceToi5v5);
       const onXgaPk = per60Sec(w.onIceAxg4v5, w.toi4v5), offXgaPk = per60Sec(w.offIceAxg4v5, w.offIceToi4v5);
+      const onGa5v5 = per60Sec(w.onIceGa5v5, w.toi5v5), offGa5v5 = per60Sec(w.offIceGa5v5, w.offIceToi5v5);
       return {
         gxg60: per60Sec(w.g - w.ixg, w.toi),
         a605v5: per60Sec(w.a1_5v5 + w.a2_5v5, w.toi5v5),
         relxga5v5: onXga5v5 != null && offXga5v5 != null ? onXga5v5 - offXga5v5 : null,
         relxgapk: onXgaPk != null && offXgaPk != null ? onXgaPk - offXgaPk : null,
+        axga5v5: onXga5v5,
+        aga5v5: onGa5v5,
+        relga5v5: onGa5v5 != null && offGa5v5 != null ? onGa5v5 - offGa5v5 : null,
       };
     })(),
   };
@@ -115,6 +120,7 @@ type MpWeighted = {
   g: number; ixg: number; toi: number; sh: number; a1: number; a2: number; ppa1: number; ong: number; gp: number;
   toi5v5: number; a1_5v5: number; a2_5v5: number; onIceAxg5v5: number; toi4v5: number; onIceAxg4v5: number;
   offIceAxg5v5: number; offIceToi5v5: number; offIceAxg4v5: number; offIceToi4v5: number;
+  onIceGa5v5: number; offIceGa5v5: number;
 };
 /** 2-season recency-weighted MoneyPuck totals for one player (weights renormalised
  *  over the seasons actually present, so a rate = weighted goals / weighted TOI and a
@@ -124,7 +130,7 @@ function mpWeighted(mp: any): MpWeighted | null {
   const present = Object.keys(MP_W).filter((y) => mp[y]?.toi > 0);
   if (!present.length) return null;
   const totW = present.reduce((s, y) => s + MP_W[y], 0);
-  const acc: MpWeighted = { g: 0, ixg: 0, toi: 0, sh: 0, a1: 0, a2: 0, ppa1: 0, ong: 0, gp: 0, toi5v5: 0, a1_5v5: 0, a2_5v5: 0, onIceAxg5v5: 0, toi4v5: 0, onIceAxg4v5: 0, offIceAxg5v5: 0, offIceToi5v5: 0, offIceAxg4v5: 0, offIceToi4v5: 0 };
+  const acc: MpWeighted = { g: 0, ixg: 0, toi: 0, sh: 0, a1: 0, a2: 0, ppa1: 0, ong: 0, gp: 0, toi5v5: 0, a1_5v5: 0, a2_5v5: 0, onIceAxg5v5: 0, toi4v5: 0, onIceAxg4v5: 0, offIceAxg5v5: 0, offIceToi5v5: 0, offIceAxg4v5: 0, offIceToi4v5: 0, onIceGa5v5: 0, offIceGa5v5: 0 };
   for (const y of present) { const w = MP_W[y] / totW, s = mp[y]; for (const k of Object.keys(acc) as (keyof MpWeighted)[]) acc[k] += (s[k] ?? 0) * w; }
   return acc;
 }
@@ -282,7 +288,6 @@ export async function edgeRatings(league = "NHL", calibrate = true): Promise<Edg
     const ratings: Record<string, number> = {};
     const posPct: Record<string, number> = {}; // analytics: percentile within own position
     for (const [param, metrics] of Object.entries(EDGE_COMPOSITES)) {
-      if (param === "FO" && grp === "D") continue;
       const usePos = POS_SPECIFIC.has(param);
       const scBlend = param === "SC" && grp === "D" ? SC_POS_BLEND : 0;
       let wsum = 0, wtot = 0, wposSum = 0;
@@ -311,6 +316,11 @@ export async function edgeRatings(league = "NHL", calibrate = true): Promise<Edg
   });
 
   if (calibrate) calibrateSkaters(out, await sthsSkaterRef({ rosterType: league, isGoalie: false }));
+  // Floor rather than blank: a rookie with no MoneyPuck match yet (DF) or a
+  // defenseman who's never taken a draw (FO) reads as a genuine 32, not a dash.
+  const FLOOR_KEYS = ["DF", "FO"] as const;
+  const FLOOR = 32;
+  for (const r of out) for (const k of FLOOR_KEYS) if (r.ratings[k] == null) r.ratings[k] = FLOOR;
   return out;
 }
 

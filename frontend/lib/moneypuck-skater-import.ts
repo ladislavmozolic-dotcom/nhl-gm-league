@@ -32,22 +32,23 @@ type MpRow = {
   toi4v5: number; onIceAxg4v5: number;                                 // penalty-kill split (Defense)
   offIceAxg5v5: number; offIceToi5v5: number;                          // team-without-him, 5v5 (Defense: true Rel)
   offIceAxg4v5: number; offIceToi4v5: number;                          // team-without-him, PK (Defense: true Rel)
+  onIceGa5v5: number; offIceGa5v5: number;                             // actual (not expected) on-ice/off-ice GA, 5v5
 };
 
 function parseCsv(text: string): string[][] {
   return text.trim().split(/\r?\n/).map((line) => line.split(","));
 }
 
-type TeamTotals = { xga5v5: number; toi5v5: number; xga4v5: number; toi4v5: number };
+type TeamTotals = { xga5v5: number; toi5v5: number; xga4v5: number; toi4v5: number; ga5v5: number };
 
-/** Team-wide xGoalsAgainst + iceTime by situation, one season. */
+/** Team-wide xGoalsAgainst/goalsAgainst + iceTime by situation, one season. */
 async function fetchTeamTotals(year: number): Promise<Map<string, TeamTotals>> {
   const res = await fetch(`https://moneypuck.com/moneypuck/playerData/seasonSummary/${year}/regular/teams.csv`, { headers: { "User-Agent": UA } });
   if (!res.ok) throw new Error(`MoneyPuck teams ${year} HTTP ${res.status}`);
   const rows = parseCsv(await res.text());
   const head = rows[0];
   const col = (name: string) => head.indexOf(name);
-  const iTeam = col("team"), iSit = col("situation"), iTOI = col("iceTime"), iXga = col("xGoalsAgainst");
+  const iTeam = col("team"), iSit = col("situation"), iTOI = col("iceTime"), iXga = col("xGoalsAgainst"), iGa = col("goalsAgainst");
   const num = (r: string[], i: number) => { const v = Number(r[i]); return Number.isFinite(v) ? v : 0; };
   const out = new Map<string, TeamTotals>();
   for (const r of rows.slice(1)) {
@@ -55,8 +56,8 @@ async function fetchTeamTotals(year: number): Promise<Map<string, TeamTotals>> {
     if (sit !== "5on5" && sit !== "4on5") continue;
     const team = r[iTeam];
     let t = out.get(team);
-    if (!t) { t = { xga5v5: 0, toi5v5: 0, xga4v5: 0, toi4v5: 0 }; out.set(team, t); }
-    if (sit === "5on5") { t.xga5v5 = num(r, iXga); t.toi5v5 = num(r, iTOI); }
+    if (!t) { t = { xga5v5: 0, toi5v5: 0, xga4v5: 0, toi4v5: 0, ga5v5: 0 }; out.set(team, t); }
+    if (sit === "5on5") { t.xga5v5 = num(r, iXga); t.toi5v5 = num(r, iTOI); t.ga5v5 = num(r, iGa); }
     else { t.xga4v5 = num(r, iXga); t.toi4v5 = num(r, iTOI); }
   }
   return out;
@@ -74,9 +75,9 @@ async function fetchSeason(year: number): Promise<Map<string, MpRow>> {
   const col = (name: string) => head.indexOf(name);
   const iName = col("name"), iTeam = col("team"), iSit = col("situation"), iGP = col("games_played"), iTOI = col("icetime");
   const iG = col("I_F_goals"), iXG = col("I_F_xGoals"), iA1 = col("I_F_primaryAssists"), iA2 = col("I_F_secondaryAssists");
-  const iSh = col("I_F_shotsOnGoal"), iOnG = col("OnIce_F_goals"), iOnAxg = col("OnIce_A_xGoals");
+  const iSh = col("I_F_shotsOnGoal"), iOnG = col("OnIce_F_goals"), iOnAxg = col("OnIce_A_xGoals"), iOnGa = col("OnIce_A_goals");
   const num = (r: string[], i: number) => { const v = Number(r[i]); return Number.isFinite(v) ? v : 0; };
-  const blank = (): MpRow => ({ gp: 0, toi: 0, g: 0, ixg: 0, a1: 0, a2: 0, sh: 0, ong: 0, ppa1: 0, toi5v5: 0, a1_5v5: 0, a2_5v5: 0, onIceAxg5v5: 0, toi4v5: 0, onIceAxg4v5: 0, offIceAxg5v5: 0, offIceToi5v5: 0, offIceAxg4v5: 0, offIceToi4v5: 0 });
+  const blank = (): MpRow => ({ gp: 0, toi: 0, g: 0, ixg: 0, a1: 0, a2: 0, sh: 0, ong: 0, ppa1: 0, toi5v5: 0, a1_5v5: 0, a2_5v5: 0, onIceAxg5v5: 0, toi4v5: 0, onIceAxg4v5: 0, offIceAxg5v5: 0, offIceToi5v5: 0, offIceAxg4v5: 0, offIceToi4v5: 0, onIceGa5v5: 0, offIceGa5v5: 0 });
   const out = new Map<string, MpRow>();
   for (const r of rows.slice(1)) {
     const sit = r[iSit];
@@ -96,8 +97,12 @@ async function fetchSeason(year: number): Promise<Map<string, MpRow>> {
       // off-ice = (team total − this player's on-ice) / (team icetime − his icetime) —
       // the rate the rest of the roster allows in this situation without him on the ice.
       if (sit === "5on5") {
-        m.toi5v5 = toi; m.onIceAxg5v5 = onAxg;
-        if (t) { m.offIceAxg5v5 = Math.max(0, t.xga5v5 - onAxg); m.offIceToi5v5 = Math.max(0, t.toi5v5 - toi); }
+        const onGa = num(r, iOnGa);
+        m.toi5v5 = toi; m.onIceAxg5v5 = onAxg; m.onIceGa5v5 = onGa;
+        if (t) {
+          m.offIceAxg5v5 = Math.max(0, t.xga5v5 - onAxg); m.offIceToi5v5 = Math.max(0, t.toi5v5 - toi);
+          m.offIceGa5v5 = Math.max(0, t.ga5v5 - onGa);
+        }
       } else {
         m.toi4v5 = toi; m.onIceAxg4v5 = onAxg;
         if (t) { m.offIceAxg4v5 = Math.max(0, t.xga4v5 - onAxg); m.offIceToi4v5 = Math.max(0, t.toi4v5 - toi); }
