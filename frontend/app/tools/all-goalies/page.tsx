@@ -4,6 +4,8 @@ import RosterTable, { type RosterPlayer } from "@/components/RosterTable";
 import { PageHeader, SectionTitle } from "@/components/ui";
 import { money } from "@/lib/finance";
 import { captaincyFromName } from "@/lib/playerName";
+import { isLoggedIn } from "@/lib/auth";
+import { redactAttrs } from "@/lib/player-attrs";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +34,7 @@ export default async function AllGoaliesPage({ searchParams }: { searchParams: P
   });
   if (!full) return <div className="py-2">Team not found.</div>;
 
+  const loggedIn = await isLoggedIn();
   // goalie-only attrs (sz/ag/rb/hs/rt) live on GoalieRating — merge them onto the row.
   // captaincy: GM-set field is the source of truth; fall back to the legacy name
   // marker only for a club that never set the field (matches League → Captains).
@@ -40,7 +43,8 @@ export default async function AllGoaliesPage({ searchParams }: { searchParams: P
   const farmHasField = farm.some((p) => p.captaincy === "C" || p.captaincy === "A");
   const toRP = (p: (typeof full.players)[number], hasField: boolean): RosterPlayer => {
     const row = { ...(p as unknown as RosterPlayer), ...(p.goalieRating ?? {}), capRole: hasField ? (p.captaincy ?? null) : captaincyFromName(p.name) };
-    return realMode ? { ...row, contractText: p.capHit ? money(p.capHit) : (row.contractText ?? null) } : row;
+    const out = realMode ? { ...row, contractText: p.capHit ? money(p.capHit) : (row.contractText ?? null) } : row;
+    return redactAttrs(out, !loggedIn);
   };
 
   return (
@@ -67,12 +71,12 @@ export default async function AllGoaliesPage({ searchParams }: { searchParams: P
 
       <div>
         <SectionTitle accent="text-blue-400">NHL Goalies</SectionTitle>
-        <RosterTable title="Goalies" players={full.players.map((p) => toRP(p, nhlHasField))} goalie />
+        <RosterTable title="Goalies" players={full.players.map((p) => toRP(p, nhlHasField))} goalie hideAttrs={!loggedIn} />
       </div>
 
       <div>
         <SectionTitle accent="text-emerald-300">AHL Goalies {full.affiliateTeams[0] ? `— ${full.affiliateTeams[0].name}` : ""}</SectionTitle>
-        <RosterTable title="Goalies" players={farm.map((p) => toRP(p, farmHasField))} goalie />
+        <RosterTable title="Goalies" players={farm.map((p) => toRP(p, farmHasField))} goalie hideAttrs={!loggedIn} />
       </div>
     </div>
   );

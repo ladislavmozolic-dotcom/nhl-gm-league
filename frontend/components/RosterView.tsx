@@ -6,7 +6,7 @@ import { cleanName } from "@/lib/playerName";
 import { Card } from "@/components/ui";
 
 /** Client roster with a name-search box over the Forwards/Defensemen/Goalies tables. */
-export default function RosterView({ players, dressedIds }: { players: any[]; dressedIds?: number[] }) {
+export default function RosterView({ players, dressedIds, hideAttrs = false }: { players: any[]; dressedIds?: number[]; hideAttrs?: boolean }) {
   const [q, setQ] = useState("");
   const query = q.trim().toLowerCase();
 
@@ -45,17 +45,17 @@ export default function RosterView({ players, dressedIds }: { players: any[]; dr
         <Card><p className="text-slate-500 text-center py-8">No players match “{q}”.</p></Card>
       ) : (
         <div className="space-y-6">
-          {g.forwards.length > 0 && <RosterSection title="Forwards" players={g.forwards} />}
-          {g.defense.length > 0 && <RosterSection title="Defensemen" players={g.defense} />}
-          {g.goalies.length > 0 && <RosterSection title="Goalies" players={g.goalies} />}
+          {g.forwards.length > 0 && <RosterSection title="Forwards" players={g.forwards} hideAttrs={hideAttrs} />}
+          {g.defense.length > 0 && <RosterSection title="Defensemen" players={g.defense} hideAttrs={hideAttrs} />}
+          {g.goalies.length > 0 && <RosterSection title="Goalies" players={g.goalies} hideAttrs={hideAttrs} />}
           {nonRoster.length > 0 && (
             <div className="space-y-4">
               <div className="px-1 pt-2 border-t border-slate-800">
                 <p className="text-xs text-slate-500 pt-3">Injured or not in the current lineup — dressed players show above.</p>
               </div>
-              {gn.forwards.length > 0 && <RosterSection title="Non-roster · Forwards" players={gn.forwards} />}
-              {gn.defense.length > 0 && <RosterSection title="Non-roster · Defensemen" players={gn.defense} />}
-              {gn.goalies.length > 0 && <RosterSection title="Non-roster · Goalies" players={gn.goalies} />}
+              {gn.forwards.length > 0 && <RosterSection title="Non-roster · Forwards" players={gn.forwards} hideAttrs={hideAttrs} />}
+              {gn.defense.length > 0 && <RosterSection title="Non-roster · Defensemen" players={gn.defense} hideAttrs={hideAttrs} />}
+              {gn.goalies.length > 0 && <RosterSection title="Non-roster · Goalies" players={gn.goalies} hideAttrs={hideAttrs} />}
             </div>
           )}
         </div>

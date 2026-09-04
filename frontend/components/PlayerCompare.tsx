@@ -57,7 +57,7 @@ function SlotPicker({ pool, value, onPick, onClear }: {
   );
 }
 
-export default function PlayerCompare({ skaters, goalies, initialId }: { skaters: ComparePlayer[]; goalies: ComparePlayer[]; initialId?: number | null }) {
+export default function PlayerCompare({ skaters, goalies, initialId, hideAttrs = false }: { skaters: ComparePlayer[]; goalies: ComparePlayer[]; initialId?: number | null; hideAttrs?: boolean }) {
   const initial = initialId != null ? [...skaters, ...goalies].find((p) => p.id === initialId) ?? null : null;
   const [mode, setMode] = useState<"skaters" | "goalies">(initial?.goalie ? "goalies" : "skaters");
   const [sel, setSel] = useState<(ComparePlayer | null)[]>([initial, null, null, null, null]);
@@ -122,8 +122,16 @@ export default function PlayerCompare({ skaters, goalies, initialId }: { skaters
             <Row label="Team" k="teamCode" highlight={false} />
             <Row label="Age" k="age" highlight={false} />
             <Row label="Condition" k="condition" />
-            <tr className="border-b border-slate-800 bg-slate-800/20"><td colSpan={6} className="px-3 py-1 text-[10px] uppercase tracking-wider text-slate-500">Attributes</td></tr>
-            {attrs.map(([k, label]) => <Row key={k} label={label} k={k} />)}
+            {hideAttrs ? (
+              <tr className="border-b border-slate-800 bg-slate-800/20">
+                <td colSpan={6} className="px-3 py-2 text-xs text-slate-500">🔒 Sign in as a GM to see full player attributes.</td>
+              </tr>
+            ) : (
+              <>
+                <tr className="border-b border-slate-800 bg-slate-800/20"><td colSpan={6} className="px-3 py-1 text-[10px] uppercase tracking-wider text-slate-500">Attributes</td></tr>
+                {attrs.map(([k, label]) => <Row key={k} label={label} k={k} />)}
+              </>
+            )}
             <Row label="Contract" k="contractText" highlight={false} />
           </tbody>
         </table>

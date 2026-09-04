@@ -93,7 +93,7 @@ export default async function FreeAgentsPage({
     offers: offerCountBy.get(p.id) ?? 0, countered: p.faCountered,
   })).sort((a, b) => a.days - b.days);
 
-  const attrs = isGoalie ? GOALIE_ATTRS : SKATER_ATTRS;
+  const attrs = sessionTeamId != null ? (isGoalie ? GOALIE_ATTRS : SKATER_ATTRS) : [];
   const cols: SortCol[] = [
     { key: "name", label: "Player", kind: "player", sticky: true },
     { key: "pos", label: "Pos", kind: "text" },

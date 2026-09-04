@@ -4,6 +4,7 @@ import { PageHeader, Card } from "@/components/ui";
 import SortableTable, { type SortCol, type SortRow } from "@/components/SortableTable";
 import { posGroup, ratingColor, ovColor } from "@/lib/ratingBands";
 import { epProfileUrl } from "@/lib/playerName";
+import { isLoggedIn } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ const GOALIE_ATTRS = ["sk", "du", "en", "sz", "ag", "rb", "sc", "hs", "rt", "ph"
 export default async function AllRostersPage({ searchParams }: { searchParams: Promise<{ type?: string }> }) {
   const raw = (await searchParams).type;
   const type: TabType = raw === "goalies" || raw === "prospects" ? raw : "players";
-  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 } });
+  const [cfg, loggedIn] = await Promise.all([prisma.leagueConfig.findUnique({ where: { id: 1 } }), isLoggedIn()]);
 
   let cols: SortCol[] = [];
   let rows: SortRow[] = [];
@@ -52,7 +53,7 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
     initialSort = "pick";
   } else {
     const isGoalie = type === "goalies";
-    const attrs = isGoalie ? GOALIE_ATTRS : SKATER_ATTRS;
+    const attrs = loggedIn ? (isGoalie ? GOALIE_ATTRS : SKATER_ATTRS) : [];
     const players = await prisma.player.findMany({
       where: { isGoalie, rosterType: { in: ["NHL", "AHL"] } },
       include: { team: { select: { code: true, slug: true, logoUrl: true } }, goalieRating: true },

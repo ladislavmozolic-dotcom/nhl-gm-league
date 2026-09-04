@@ -2,6 +2,7 @@ import Link from "next/link";
 import BackLink from "@/components/BackLink";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { isLoggedIn } from "@/lib/auth";
 import { cleanName, epProfileUrl } from "@/lib/playerName";
 import { Card } from "@/components/ui";
 import { posGroup, ratingColor, ovColor } from "@/lib/ratingBands";
@@ -194,7 +195,7 @@ function StatBlock({ league, cols, reg, po, cellsOf, team }: {
 
 export default async function PlayerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const p = (await getPlayer(id)) as any;
+  const [p, loggedIn] = await Promise.all([getPlayer(id) as Promise<any>, isLoggedIn()]);
   const isGoalie: boolean = p.isGoalie || p.position === "G";
   const ratings = isGoalie ? { ...(p.goalieRating ?? {}) } : p;
   const attrs = isGoalie ? GOALIE_ATTRS : SKATER_ATTRS;
@@ -437,7 +438,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         <div className="border-t border-slate-800 bg-slate-900">
           <div className="overflow-x-auto">
             <div className="flex min-w-max">
-              {attrs.map((a) => {
+              {loggedIn ? attrs.map((a) => {
                 const val = ratings[a.key] as number | null | undefined;
                 return (
                   <div key={a.key} className="flex-1 min-w-[52px] text-center px-2 py-2.5 border-r border-slate-800">
@@ -445,7 +446,11 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                     <div className={`text-lg font-semibold tabular-nums leading-tight ${ratingColor(grp, a.key, val)}`}>{val ?? "—"}</div>
                   </div>
                 );
-              })}
+              }) : (
+                <div className="flex-1 min-w-[240px] text-center px-3 py-2.5 text-xs text-slate-500">
+                  🔒 <Link href="/login" className="text-blue-400 hover:underline">Sign in as a GM</Link> to see full player attributes.
+                </div>
+              )}
               <div className="min-w-[64px] text-center px-2 py-2.5 bg-slate-800/60 border-l border-slate-700">
                 <div className="text-[10px] font-bold text-slate-400 tracking-wide">OV</div>
                 <div className={`text-lg font-black tabular-nums leading-tight ${ovColor(grp, overall)}`}>{overall ?? "—"}</div>

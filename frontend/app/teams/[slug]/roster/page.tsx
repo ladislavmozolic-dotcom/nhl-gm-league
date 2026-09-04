@@ -1,11 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import RosterView from "@/components/RosterView";
-import { isAdmin, canManageTeam } from "@/lib/auth";
+import { isAdmin, canManageTeam, isLoggedIn } from "@/lib/auth";
 import AutoFillButton from "@/components/AutoFillButton";
 import RosterTabs from "@/components/RosterTabs";
 import { captaincyFromName } from "@/lib/playerName";
 import { hasWorthyGoalie, MIN_GOALIE_OV, MIN_GOALIE_GP, MIN_GOALIE_GP_SVPCT } from "@/lib/goalie-rule";
+import { redactAttrs } from "@/lib/player-attrs";
 
 export const dynamic = "force-dynamic";
 
@@ -87,7 +88,8 @@ export default async function TeamRosterPage({ params }: { params: Promise<{ slu
   // roster (not team.players) — a player parked as PROSPECT/UFA/RETIRED/RELEASED
   // keeps this teamId (schema requires one) but must never show up here, dressed
   // or in the Non-Roster section, once he's off the active NHL/AHL roster.
-  const rosterWithCap = roster.map((p) => ({ ...p, capRole: capHasField ? p.captaincy : captaincyFromName(p.name) }));
+  const loggedIn = await isLoggedIn();
+  const rosterWithCap = roster.map((p) => redactAttrs({ ...p, capRole: capHasField ? p.captaincy : captaincyFromName(p.name) }, !loggedIn));
 
   return (
     <div className="space-y-6">
@@ -108,7 +110,7 @@ export default async function TeamRosterPage({ params }: { params: Promise<{ slu
           <b>🥅 No worthy goalie.</b> League rule: every club must carry at least one goalie who is either {MIN_GOALIE_OV}+ overall, started {MIN_GOALIE_GP}+ real games last season, or started more than {MIN_GOALIE_GP_SVPCT} real games at a save % above 90 — until you do, this roster isn't game-ready. Sign, trade for, or call up a qualifying goalie.
         </div>
       )}
-      <RosterView players={rosterWithCap} dressedIds={[...dressed]} />
+      <RosterView players={rosterWithCap} dressedIds={[...dressed]} hideAttrs={!loggedIn} />
     </div>
   );
 }

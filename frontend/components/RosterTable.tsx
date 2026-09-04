@@ -16,13 +16,13 @@ const GOALIE_ATTRS = ["sk", "du", "en", "sz", "ag", "rb", "sc", "hs", "rt", "ph"
 
 type Col = { key: string; label: string; num: boolean };
 
-export default function RosterTable({ title, players, goalie = false }: { title: string; players: RosterPlayer[]; goalie?: boolean }) {
+export default function RosterTable({ title, players, goalie = false, hideAttrs = false }: { title: string; players: RosterPlayer[]; goalie?: boolean; hideAttrs?: boolean }) {
   const attrs = goalie ? GOALIE_ATTRS : SKATER_ATTRS;
   const cols: Col[] = [
     { key: "name", label: goalie ? "Goalie" : "Player", num: false },
     { key: "position", label: "Pos", num: false },
     { key: "condition", label: "CON", num: true },
-    ...attrs.map((a) => ({ key: a, label: a.toUpperCase(), num: true })),
+    ...(hideAttrs ? [] : attrs.map((a) => ({ key: a, label: a.toUpperCase(), num: true }))),
     { key: "overall", label: "OV", num: true },
     { key: "age", label: "Age", num: true },
     { key: "contractYears", label: "Yrs", num: true },
@@ -88,7 +88,7 @@ export default function RosterTable({ title, players, goalie = false }: { title:
                   </td>
                   <td className="px-2 py-1.5 text-center text-slate-400">{p.position ?? "—"}</td>
                   <td className="px-2 py-1.5 text-center text-slate-400 tabular-nums">{p.condition != null ? Number(p.condition).toFixed(0) : "—"}</td>
-                  {attrs.map((a) => <td key={a} className="px-2 py-1.5 text-center tabular-nums text-slate-300">{(p[a] as number | null) ?? "—"}</td>)}
+                  {!hideAttrs && attrs.map((a) => <td key={a} className="px-2 py-1.5 text-center tabular-nums text-slate-300">{(p[a] as number | null) ?? "—"}</td>)}
                   <td className={`px-2 py-1.5 text-center tabular-nums font-bold ${(p.overall ?? 0) >= 80 ? "text-green-400" : (p.overall ?? 0) >= 70 ? "text-blue-400" : (p.overall ?? 0) >= 60 ? "text-yellow-400" : "text-slate-300"}`}>{p.overall ?? "—"}</td>
                   <td className="px-2 py-1.5 text-center text-slate-400 tabular-nums">{p.age ?? "—"}</td>
                   <td className="px-2 py-1.5 text-center text-slate-400 tabular-nums">{p.contractYears != null ? `${p.contractYears}yr` : "—"}</td>

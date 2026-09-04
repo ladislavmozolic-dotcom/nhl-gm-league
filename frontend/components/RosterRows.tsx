@@ -14,13 +14,13 @@ const fmtM = (v: number) => (v > 0 ? `$${(v / 1_000_000).toFixed(2)}M` : "—");
 type Col = { key: string; label: string; num: boolean };
 
 /** The interactive (click-to-sort) roster table body for one section. */
-export default function RosterRows({ players, attrs, isGoalie, farm }: { players: any[]; attrs: string[]; isGoalie: boolean; farm?: boolean }) {
+export default function RosterRows({ players, attrs, isGoalie, farm, hideAttrs = false }: { players: any[]; attrs: string[]; isGoalie: boolean; farm?: boolean; hideAttrs?: boolean }) {
   const cols: Col[] = [
     { key: "name", label: "Player", num: false },
     { key: "position", label: "Pos", num: false },
     { key: "age", label: "Age", num: true },
     { key: "condition", label: "CON", num: true },
-    ...attrs.map((a) => ({ key: a, label: a.toUpperCase(), num: true })),
+    ...(hideAttrs ? [] : attrs.map((a) => ({ key: a, label: a.toUpperCase(), num: true }))),
     { key: "overall", label: "OVR", num: true },
     { key: "salary", label: "Salary", num: true },
   ];
@@ -88,7 +88,7 @@ export default function RosterRows({ players, attrs, isGoalie, farm }: { players
                     return <span className={`font-semibold ${c}`}>{con.toFixed(2).replace(".", ",")}</span>;
                   })()}
                 </td>
-                {attrs.map((a) => <td key={a} className={`px-2.5 py-2.5 text-center tabular-nums ${ratingColor(grp, a, player[a])}`}>{player[a] ?? "—"}</td>)}
+                {!hideAttrs && attrs.map((a) => <td key={a} className={`px-2.5 py-2.5 text-center tabular-nums ${ratingColor(grp, a, player[a])}`}>{player[a] ?? "—"}</td>)}
                 <td className="px-2 py-2 text-center"><span className={`font-bold ${ovColor(grp, player.overall)}`}>{player.overall || "—"}</span></td>
                 <td className="px-4 py-2.5 text-right whitespace-nowrap">
                   <span className={`font-semibold tabular-nums ${salary > 0 ? "text-white" : "text-slate-600"}`}>{fmtM(salary)}</span>

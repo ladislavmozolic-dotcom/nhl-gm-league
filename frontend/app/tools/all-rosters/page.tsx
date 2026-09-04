@@ -4,6 +4,8 @@ import RosterTable, { type RosterPlayer } from "@/components/RosterTable";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { money } from "@/lib/finance";
 import { cleanName, epSearchName, captaincyFromName } from "@/lib/playerName";
+import { isLoggedIn } from "@/lib/auth";
+import { redactAttrs } from "@/lib/player-attrs";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +38,7 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
   });
   if (!full) return <div className="py-2">Team not found.</div>;
 
+  const loggedIn = await isLoggedIn();
   const logoById = new Map(teams.map((t) => [t.id, t]));
   // draft picks carry ownerLogoId = the owner's profinhlLogoId (1-32 ordinal), NOT team.id
   const logoByProfinhl = new Map(teams.map((t) => [t.profinhlLogoId, t]));
@@ -49,7 +52,8 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
   const farmHasField = (full.affiliateTeams[0]?.players ?? []).some((p) => p.captaincy === "C" || p.captaincy === "A");
   const toRP = (p: (typeof full.players)[number], hasField: boolean): RosterPlayer => {
     const row = { ...(p as unknown as RosterPlayer), ...(p.goalieRating ?? {}), capRole: hasField ? (p.captaincy ?? null) : captaincyFromName(p.name) };
-    return realMode ? { ...row, contractText: p.capHit ? money(p.capHit) : (row.contractText ?? null) } : row;
+    const out = realMode ? { ...row, contractText: p.capHit ? money(p.capHit) : (row.contractText ?? null) } : row;
+    return redactAttrs(out, !loggedIn);
   };
   // one skaters table: forwards first (best → worst), then defensemen, then goalies.
   // Players arrive ordered by overall desc, so filtering preserves that within each group.
@@ -123,14 +127,14 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
 
       <div>
         <SectionTitle accent="text-blue-400">NHL Roster</SectionTitle>
-        <RosterTable title="Skaters" players={skaters.map((p) => toRP(p, nhlHasField))} />
-        <RosterTable title="Goalies" players={goalies.map((p) => toRP(p, nhlHasField))} goalie />
+        <RosterTable title="Skaters" players={skaters.map((p) => toRP(p, nhlHasField))} hideAttrs={!loggedIn} />
+        <RosterTable title="Goalies" players={goalies.map((p) => toRP(p, nhlHasField))} goalie hideAttrs={!loggedIn} />
       </div>
 
       <div>
         <SectionTitle accent="text-emerald-300">AHL Roster {full.affiliateTeams[0] ? `— ${full.affiliateTeams[0].name}` : ""}</SectionTitle>
-        <RosterTable title="Skaters" players={farmSkaters.map((p) => toRP(p, farmHasField))} />
-        <RosterTable title="Goalies" players={farmGoalies.map((p) => toRP(p, farmHasField))} goalie />
+        <RosterTable title="Skaters" players={farmSkaters.map((p) => toRP(p, farmHasField))} hideAttrs={!loggedIn} />
+        <RosterTable title="Goalies" players={farmGoalies.map((p) => toRP(p, farmHasField))} goalie hideAttrs={!loggedIn} />
       </div>
 
       {(reserve.length > 0 || prospectPool.length > 0) && (() => {

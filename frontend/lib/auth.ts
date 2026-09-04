@@ -46,6 +46,13 @@ export async function clearTeamSession(): Promise<void> {
   (await cookies()).delete(COOKIE);
 }
 
+/** True for any signed-in GM (any team), false for an anonymous visitor. Used to
+ *  gate player attribute ratings (CK/FG/DI/SK/...) — visible to any logged-in GM,
+ *  hidden from the public. */
+export async function isLoggedIn(): Promise<boolean> {
+  return (await getTeamSession()) != null;
+}
+
 /** True if the signed-in GM's team carries the league-admin flag. */
 export async function isAdmin(): Promise<boolean> {
   const id = await getTeamSession();
