@@ -13,11 +13,10 @@ import { getLeagueClock } from "@/lib/calendar-server";
 import { getTeamSession } from "@/lib/auth";
 import BuyoutButton from "@/components/BuyoutButton";
 import { buyoutPlayer } from "@/app/finance/[slug]/actions";
-import { teamCapCommitted } from "@/lib/cap";
 
 const SEASON = "2026-27";
 const SPAN = 8;
-type CP = { id: number; name: string; position: string; age: number | null; isGoalie: boolean; capHit: number | null; contractYears: number | null };
+type CP = { id: number; name: string; position: string; age: number | null; isGoalie: boolean; capHit: number | null; contractYears: number | null; retainedSalary?: number | null };
 
 /** Shared salary-cap / finance view for a team — used by /finance/[slug] and /teams/[slug]/salary. */
 export default async function TeamCapView({ slug }: { slug: string }) {
@@ -32,14 +31,13 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   if (!team) notFound();
   const farm = team.affiliateTeams[0]?.players ?? [];
 
-  const [settings, session, buyouts, standings, homeGames, totalGames, gamesScheduled, capInfo] = await Promise.all([
+  const [settings, session, buyouts, standings, homeGames, totalGames, gamesScheduled] = await Promise.all([
     loadSettings(), getTeamSession(),
     prisma.buyout.findMany({ where: { teamId: team.id }, select: { id: true, playerId: true, playerName: true, perYear: true, startYear: true, years: true, totalCost: true } }),
     computeStandings(SEASON, "NHL"),
     prisma.game.count({ where: { season: SEASON, league: "NHL", status: "FINAL", seriesId: null, homeTeamId: team.id } }),
     prisma.game.count({ where: { season: SEASON, league: "NHL", status: "FINAL", seriesId: null, OR: [{ homeTeamId: team.id }, { awayTeamId: team.id }] } }),
     prisma.game.count({ where: { season: SEASON, league: "NHL", seriesId: null, OR: [{ homeTeamId: team.id }, { awayTeamId: team.id }] } }),
-    teamCapCommitted(team.id),
   ]);
   const isGm = session === team.id;
   // The Buyout table doubles up: a real buyout debits the bank (totalCost > 0);
@@ -58,7 +56,13 @@ export default async function TeamCapView({ slug }: { slug: string }) {
     startingBank: settings.startingCapital,
   });
   const years = Array.from({ length: SPAN }, (_, i) => CURRENT_SEASON_START + i);
-  const cap = teamCapSummary(team.players, settings, capInfo.retainsBuyouts);
+  // Each player's own Cap Hit is shown net of any retention someone else pays
+  // (see CapRows), so Total Salaries here is the sum of those same net numbers —
+  // "Buyouts" is just this club's own dead money (real buyouts + salary IT
+  // retains on players it traded away), so nothing gets counted twice.
+  const netPlayersForCap = team.players.map((p) => ({ capHit: Math.max(0, (p.capHit ?? 0) - (p.retainedSalary ?? 0)) }));
+  const buyoutsDeadMoney = deadMoneyForYear(buyouts, CURRENT_SEASON_START);
+  const cap = teamCapSummary(netPlayersForCap, settings, buyoutsDeadMoney);
   // Projected Cap Space = biggest full-season cap hit a club can still add and
   // stay legal — unused cap banks each game, so it grows toward the deadline.
   const accrued = accruedCapSpace(cap.capSpace, totalGames, gamesScheduled || 82);
@@ -80,13 +84,17 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   );
   const CapRows = ({ list, gm }: { list: CP[]; gm: boolean }) => (
     <>{list.map((p) => {
-      const cells = playerCapYears(p, CURRENT_SEASON_START, SPAN);
+      // A player this club acquired with retention only counts against it for
+      // the post-retention share — the retaining club carries the rest (shown
+      // on ITS page as Dead Cap, not repeated here).
+      const netCapHit = Math.max(0, (p.capHit ?? 0) - (p.retainedSalary ?? 0));
+      const cells = playerCapYears({ ...p, capHit: netCapHit }, CURRENT_SEASON_START, SPAN);
       return (
         <tr key={p.id} className="border-b border-slate-800/60 hover:bg-slate-800/30">
           <td className="px-3 py-1.5"><PlayerLink id={p.id} name={p.name} /></td>
           <td className="px-2 py-1.5 text-center text-slate-500 text-xs">{p.position}</td>
           <td className="px-2 py-1.5 text-center text-slate-400 tabular-nums">{p.age ?? "—"}</td>
-          <td className="px-3 py-1.5 text-right tabular-nums font-medium">{p.capHit ? money(p.capHit) : "—"}</td>
+          <td className="px-3 py-1.5 text-right tabular-nums font-medium">{netCapHit ? money(netCapHit) : "—"}</td>
           {cells.map((c, i) => <td key={i} className="px-3 py-1.5 text-right tabular-nums">{c.salary != null ? <span className="text-green-400">{money(c.salary)}</span> : c.status ? <Badge s={c.status} /> : ""}</td>)}
           {gm && <td className="px-2 py-1.5 text-right">{p.capHit && p.contractYears ? <BuyoutButton slug={slug} playerId={p.id} playerName={p.name} onBuyout={buyoutPlayer} /> : null}</td>}
         </tr>
@@ -114,9 +122,9 @@ export default async function TeamCapView({ slug }: { slug: string }) {
           {isGm && <Link href={`/teams/${slug}/finance`} className="text-xs text-blue-400 hover:underline">Ticket prices →</Link>}
         </div>
         <div className="text-sm grid grid-cols-2 gap-x-6 gap-y-1 tabular-nums">
-          <span className="text-slate-400">Total Salaries</span><span className="text-right">{money(cap.totalSalaries)}</span>
-          <span className="text-slate-400">Retains &amp; Buyouts</span><span className="text-right">{cap.retainsBuyouts ? money(cap.retainsBuyouts) : "—"}</span>
-          <span className="text-slate-400" title="Total Salaries + Retains & Buyouts">Actual Cap Hit</span><span className="text-right font-semibold">{money(cap.capHit)}</span>
+          <span className="text-slate-400" title="Sum of each player's Cap Hit — already net of any retention someone else pays">Total Salaries</span><span className="text-right">{money(cap.totalSalaries)}</span>
+          <span className="text-slate-400" title="This club's own dead money — real buyouts plus salary it retains on players it traded away (see Dead Cap below)">Buyouts</span><span className="text-right">{cap.retainsBuyouts ? money(cap.retainsBuyouts) : "—"}</span>
+          <span className="text-slate-400" title="Total Salaries + Buyouts">Actual Cap Hit</span><span className="text-right font-semibold">{money(cap.capHit)}</span>
           <span className="text-slate-400" title={`Ceiling ${money(cap.upper)} − Actual Cap Hit`}>Actual Cap Space</span><span className={`text-right font-semibold ${cap.capSpace < 0 ? "text-red-400" : "text-green-400"}`}>{money(cap.capSpace)}</span>
           <span className="text-slate-400" title="Max total cap hit you may carry for the rest of the season">Projected Cap Hit</span><span className="text-right tabular-nums text-slate-200">{money(maxCapHit)}</span>
           <span className="text-slate-400" title={`Biggest full-season cap hit you can still add and stay legal — unused cap banks each game (grows toward the deadline). ${accrued.played}/${gamesScheduled || 82} GP.`}>
