@@ -34,7 +34,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
 
   const [settings, session, buyouts, standings, homeGames, totalGames, gamesScheduled, capInfo] = await Promise.all([
     loadSettings(), getTeamSession(),
-    prisma.buyout.findMany({ where: { teamId: team.id }, select: { id: true, playerName: true, perYear: true, startYear: true, years: true } }),
+    prisma.buyout.findMany({ where: { teamId: team.id }, select: { id: true, playerId: true, playerName: true, perYear: true, startYear: true, years: true, totalCost: true } }),
     computeStandings(SEASON, "NHL"),
     prisma.game.count({ where: { season: SEASON, league: "NHL", status: "FINAL", seriesId: null, homeTeamId: team.id } }),
     prisma.game.count({ where: { season: SEASON, league: "NHL", status: "FINAL", seriesId: null, OR: [{ homeTeamId: team.id }, { awayTeamId: team.id }] } }),
@@ -42,6 +42,11 @@ export default async function TeamCapView({ slug }: { slug: string }) {
     teamCapCommitted(team.id),
   ]);
   const isGm = session === team.id;
+  // The Buyout table doubles up: a real buyout debits the bank (totalCost > 0);
+  // a trade-retention record (totalCost = 0) is dead cap only — the player is
+  // gone from this roster, but this club still carries part of his cap hit.
+  const realBuyouts = buyouts.filter((b) => b.totalCost > 0);
+  const retentions = buyouts.filter((b) => b.totalCost === 0);
   const st = standings.find((s) => s.teamId === team.id);
   const fin = computeTeamFinance({
     popularity: team.popularity, pointsPct: projectedPointsPct(st),
@@ -156,7 +161,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
           <Thead gm={isGm} />
           <tbody>
             <CapRows list={team.players} gm={isGm} />
-            {buyouts.map((b) => (
+            {realBuyouts.map((b) => (
               <tr key={`b${b.id}`} className="border-b border-slate-800/60 bg-red-950/10">
                 <td className="px-3 py-1.5 text-slate-400 italic">{b.playerName} <span className="text-[10px] text-red-400">(bought out)</span></td><td /><td />
                 <td className="px-3 py-1.5 text-right text-red-300 tabular-nums">{money(b.perYear)}</td>
@@ -167,6 +172,33 @@ export default async function TeamCapView({ slug }: { slug: string }) {
           </tbody>
         </table>
       </div>
+
+      {/* Dead cap — retained salary on players this club no longer rosters */}
+      {retentions.length > 0 && (
+        <div className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 overflow-x-auto -mt-2">
+          <div className="px-4 py-2.5 bg-slate-800/30 border-b border-slate-800 text-xs font-bold uppercase tracking-wide text-slate-400">Dead Cap — salary retained on traded players</div>
+          <table className="w-full text-sm min-w-[720px]">
+            <thead>
+              <tr className="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-800 bg-slate-800/30">
+                <th className="text-left px-3 py-2 font-medium">Player</th>
+                <th className="text-right px-3 py-2 font-medium">Retained</th>
+                {years.map((y) => <th key={y} className="text-right px-3 py-2 whitespace-nowrap">{seasonLabel(y)}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {retentions.map((r) => (
+                <tr key={`r${r.id}`} className="border-b border-slate-800/60 hover:bg-slate-800/30">
+                  <td className="px-3 py-1.5">
+                    {r.playerId ? <PlayerLink id={r.playerId} name={r.playerName} /> : <span className="italic text-slate-400">{r.playerName}</span>}
+                  </td>
+                  <td className="px-3 py-1.5 text-right text-amber-300 tabular-nums font-medium">{money(r.perYear)}</td>
+                  {years.map((y, i) => <td key={i} className="px-3 py-1.5 text-right tabular-nums">{y >= r.startYear && y < r.startYear + r.years ? <span className="text-amber-300">{money(r.perYear)}</span> : ""}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Farm cap table */}
       <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400">Farm Roster ({farm.length})</h2>
