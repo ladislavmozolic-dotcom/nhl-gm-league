@@ -79,20 +79,27 @@ export async function applyReconcileOne(id: number): Promise<boolean> {
     select: {
       rosterType: true, age: true, position: true, isGoalie: true, contractType: true, capHit: true, df: true,
       lastSeasonGP: true, lastSeasonAhlGP: true, lastSeasonPts: true, lastSeasonSvPct: true,
-      team: { select: { parentTeamId: true } },
+      team: { select: { parentTeamId: true, affiliateTeams: { select: { id: true }, take: 1 } } },
     },
   });
   if (!p) return false;
   const { action } = reconcilePlayer({ rosterType: p.rosterType, age: p.age, contractType: p.contractType, capHit: p.capHit, nhlGP: p.lastSeasonGP ?? 0, ahlGP: p.lastSeasonAhlGP ?? 0, isGoalie: p.isGoalie });
+  // `parent` = current team's parent (meaningful when currently AT an affiliate,
+  // e.g. AHL→NHL or AHL→PROSPECT); `affiliateId` = current team's own affiliate
+  // (meaningful when currently at the NHL club itself, e.g. PROSPECT→AHL). A
+  // player must always move teamId to match rosterType — leaving him AHL-tagged
+  // at a non-affiliate teamId (or PROSPECT-tagged at an affiliate's teamId)
+  // makes him invisible to both the NHL and AHL roster queries.
   const parent = p.team?.parentTeamId;
+  const affiliateId = p.team?.affiliateTeams?.[0]?.id;
   if (action === "DELETE") {
     await prisma.player.update({ where: { id }, data: { rosterType: "RELEASED" } });
   } else if (action === "TO_PROSPECTS") {
-    await prisma.player.update({ where: { id }, data: { rosterType: "PROSPECT" } });
+    await prisma.player.update({ where: { id }, data: { rosterType: "PROSPECT", ...(parent ? { teamId: parent } : {}) } });
   } else if (action === "LTIR_PROSPECT") {
     // park in the reserve list flagged LTIR; PROSPECT rosterType already drops him
     // out of every cap/roster query, so his hit no longer counts.
-    await prisma.player.update({ where: { id }, data: { rosterType: "PROSPECT", ltir: true } });
+    await prisma.player.update({ where: { id }, data: { rosterType: "PROSPECT", ltir: true, ...(parent ? { teamId: parent } : {}) } });
   } else if (action === "ACTIVATE_NHL") {
     await prisma.player.update({ where: { id }, data: { rosterType: "NHL", ...(parent ? { teamId: parent } : {}) } });
   } else if (action === "ACTIVATE_NHL_ELC") {
@@ -106,9 +113,12 @@ export async function applyReconcileOne(id: number): Promise<boolean> {
       contractText: `$${c.base.toLocaleString("en-US")} + $${c.bonus.toLocaleString("en-US")} bonus × ${c.years}yr (ELC, through ${expiry})`,
     } });
   } else if (action === "ACTIVATE_AHL") {
-    // prospect earned an AHL role → farm contract at $100k
+    // prospect earned an AHL role → farm contract at $100k, moved onto the
+    // org's actual AHL affiliate roster (was sitting at the parent's teamId
+    // as a PROSPECT, same as ACTIVATE_NHL moves the other way).
     await prisma.player.update({ where: { id }, data: {
-      rosterType: "AHL", capHit: 100_000, contractType: "TWO_WAY", contractText: "$100,000 × 1yr (farm)",
+      rosterType: "AHL", ...(affiliateId ? { teamId: affiliateId } : {}),
+      capHit: 100_000, contractType: "TWO_WAY", contractText: "$100,000 × 1yr (farm)",
     } });
   } else return false;
   return true;
