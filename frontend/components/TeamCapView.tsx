@@ -57,12 +57,15 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   });
   const years = Array.from({ length: SPAN }, (_, i) => CURRENT_SEASON_START + i);
   // Each player's own Cap Hit is shown net of any retention someone else pays
-  // (see CapRows), so Total Salaries here is the sum of those same net numbers —
-  // "Buyouts" is just this club's own dead money (real buyouts + salary IT
-  // retains on players it traded away), so nothing gets counted twice.
+  // (see CapRows), so Total Salaries here is the sum of those same net numbers.
+  // The rest of this club's own dead money splits into two lines matching the
+  // tables below: real buyouts, and Dead Cap (salary it retains on players it
+  // traded away) — kept apart since a retention isn't a buyout, but both still
+  // count toward the Actual Cap Hit.
   const netPlayersForCap = team.players.map((p) => ({ capHit: Math.max(0, (p.capHit ?? 0) - (p.retainedSalary ?? 0)) }));
-  const buyoutsDeadMoney = deadMoneyForYear(buyouts, CURRENT_SEASON_START);
-  const cap = teamCapSummary(netPlayersForCap, settings, buyoutsDeadMoney);
+  const realBuyoutsDeadMoney = deadMoneyForYear(realBuyouts, CURRENT_SEASON_START);
+  const deadCapAmount = deadMoneyForYear(retentions, CURRENT_SEASON_START);
+  const cap = teamCapSummary(netPlayersForCap, settings, realBuyoutsDeadMoney + deadCapAmount);
   // Projected Cap Space = biggest full-season cap hit a club can still add and
   // stay legal — unused cap banks each game, so it grows toward the deadline.
   const accrued = accruedCapSpace(cap.capSpace, totalGames, gamesScheduled || 82);
@@ -123,8 +126,9 @@ export default async function TeamCapView({ slug }: { slug: string }) {
         </div>
         <div className="text-sm grid grid-cols-2 gap-x-6 gap-y-1 tabular-nums">
           <span className="text-slate-400" title="Sum of each player's Cap Hit — already net of any retention someone else pays">Total Salaries</span><span className="text-right">{money(cap.totalSalaries)}</span>
-          <span className="text-slate-400" title="This club's own dead money — real buyouts plus salary it retains on players it traded away (see Dead Cap below)">Buyouts</span><span className="text-right">{cap.retainsBuyouts ? money(cap.retainsBuyouts) : "—"}</span>
-          <span className="text-slate-400" title="Total Salaries + Buyouts">Actual Cap Hit</span><span className="text-right font-semibold">{money(cap.capHit)}</span>
+          <span className="text-slate-400" title="Dead money from this club's own player buyouts">Buyouts</span><span className="text-right">{realBuyoutsDeadMoney ? money(realBuyoutsDeadMoney) : "—"}</span>
+          <span className="text-slate-400" title="Salary this club retains on players it traded away (see Dead Cap below) — not a buyout, but still counts against its cap">Dead Cap</span><span className="text-right">{deadCapAmount ? money(deadCapAmount) : "—"}</span>
+          <span className="text-slate-400" title="Total Salaries + Buyouts + Dead Cap">Actual Cap Hit</span><span className="text-right font-semibold">{money(cap.capHit)}</span>
           <span className="text-slate-400" title={`Ceiling ${money(cap.upper)} − Actual Cap Hit`}>Actual Cap Space</span><span className={`text-right font-semibold ${cap.capSpace < 0 ? "text-red-400" : "text-green-400"}`}>{money(cap.capSpace)}</span>
           <span className="text-slate-400" title="Max total cap hit you may carry for the rest of the season">Projected Cap Hit</span><span className="text-right tabular-nums text-slate-200">{money(maxCapHit)}</span>
           <span className="text-slate-400" title={`Biggest full-season cap hit you can still add and stay legal — unused cap banks each game (grows toward the deadline). ${accrued.played}/${gamesScheduled || 82} GP.`}>
