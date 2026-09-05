@@ -12,14 +12,13 @@ export default function ParamModeToggle({ mode }: { mode: Mode }) {
   const [msg, setMsg] = useState<string | null>(null);
 
   const opts: { key: Mode; label: string; sub: string }[] = [
-    { key: "sths", label: "STHS Parameters", sub: "The classic set — restores the original numbers" },
     { key: "unhl", label: "UNHL Parameters", sub: "The independently-tuned copy" },
     { key: "nextgen", label: "Next Gen Parameters", sub: "Computed fresh from real NHL performance" },
   ];
 
   const set = (c: Mode) => {
     const o = opts.find((x) => x.key === c)!;
-    if (!confirm(`Switch the LIVE league to ${o.label}?\n\nThis overwrites every player's and goalie's ratings right now — what the simulation and every roster/player page show — for the whole league. It does not touch contracts, rosters, or anything else. The original STHS numbers are kept safe and can always be restored by switching back to STHS.`)) return;
+    if (!confirm(`Switch the LIVE league to ${o.label}?\n\nThis overwrites every player's and goalie's ratings right now — what the simulation and every roster/player page show — for the whole league. It does not touch contracts, rosters, or anything else.`)) return;
     setMsg(null);
     start(async () => {
       const r = await setParamModeAction(c);
@@ -38,7 +37,7 @@ export default function ParamModeToggle({ mode }: { mode: Mode }) {
           <div className="text-xs text-slate-500">Overwrites every player's ratings league-wide — what the sim and every page read. Switch whenever you decide; nothing runs on its own.</div>
         </div>
       </div>
-      <div className="grid gap-2 sm:grid-cols-3">
+      <div className="grid gap-2 sm:grid-cols-2">
         {opts.map((o) => {
           const active = mode === o.key;
           return (

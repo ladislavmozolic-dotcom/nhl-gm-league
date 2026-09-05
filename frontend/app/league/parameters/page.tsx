@@ -9,12 +9,11 @@ import { SKATER_PARAM_LABELS, GOALIE_PARAM_LABELS, SKATER_PARAM_ORDER, GOALIE_PA
 
 export const dynamic = "force-dynamic";
 
-type SetKey = "sths" | "unhl" | "nextgen";
+type SetKey = "unhl" | "nextgen";
 type PosKey = "skaters" | "goalies";
 
 const SETS: { key: SetKey; label: string; blurb: string }[] = [
-  { key: "sths", label: "STHS Parameters", blurb: "The classic set — what actually drives the simulation today." },
-  { key: "unhl", label: "UNHL Parameters", blurb: "A second, independently-editable copy of the STHS set (seeded from it, now diverging)." },
+  { key: "unhl", label: "UNHL Parameters", blurb: "The league's editable rating set." },
   { key: "nextgen", label: "Next Gen Parameters", blurb: "Built live from real NHL performance data — Passing, Scoring, Defense and Skating are formula-driven; not wired into the live site or the sim." },
 ];
 
@@ -22,7 +21,7 @@ export default async function LeagueParametersPage({ searchParams }: { searchPar
   const loggedIn = await isLoggedIn();
 
   const sp = await searchParams;
-  const set: SetKey = sp.set === "unhl" || sp.set === "nextgen" ? sp.set : "sths";
+  const set: SetKey = sp.set === "nextgen" ? "nextgen" : "unhl";
   const pos: PosKey = sp.pos === "goalies" ? "goalies" : "skaters";
   const active = SETS.find((s) => s.key === set)!;
 
