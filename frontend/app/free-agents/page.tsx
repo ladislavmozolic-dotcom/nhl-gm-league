@@ -14,6 +14,7 @@ import FaEarlyAccessToggle from "@/components/FaEarlyAccessToggle";
 import FrenzyAutoOpenControl from "@/components/FrenzyAutoOpenControl";
 import type { InterestCtx } from "@/components/InterestButton";
 import FrenzyBar from "@/components/FrenzyBar";
+import { isWorthyGoalie } from "@/lib/goalie-rule";
 
 export const dynamic = "force-dynamic";
 
@@ -110,12 +111,14 @@ export default async function FreeAgentsPage({
     const ovr = isGoalie ? p.goalieRating?.overall ?? p.overall : p.overall;
     const grp = isGoalie ? ("G" as const) : posGroup(p.position, false);
     const d = demands.get(p.id)?.demand;
+    const worthy = isGoalie && isWorthyGoalie({ overall: ovr, lastSeasonGP: p.lastSeasonGP, lastSeasonSvPct: p.lastSeasonSvPct });
     return {
       _id: p.id, name: p.name, slug: p.slug, photo: p.photoUrl,
       pos: p.position, age: p.age,
       ...Object.fromEntries(attrs.map((a) => [a, rr[a]])),
       ...Object.fromEntries(attrs.map((a) => [`_c_${a}`, ratingColor(grp, a, rr[a])])),
       ovr, _c_ovr: ovColor(grp, ovr), lspts: p.lastSeasonPts ?? 0, demand: d?.salary ?? 0, term: d?.years ?? 0,
+      ...(worthy ? { _badge: <span className="ml-1 text-green-400" title="Worthy goalie — meets the league's minimum-goalie rule">●</span> } : {}),
     };
   });
 

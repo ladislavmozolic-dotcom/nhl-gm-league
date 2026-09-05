@@ -152,6 +152,7 @@ export default function SortableTable({ cols, rows, initialSort, minWidth = 720,
                         {row.slug
                           ? <Link href={`/players/${row.slug}`} className="font-medium hover:text-blue-400 transition-colors truncate block">{cleanName(row.name ?? "")}</Link>
                           : <span className="font-medium truncate">{cleanName(row.name ?? "")}</span>}
+                        {row._badge as React.ReactNode}
                       </div>
                     </td>
                   );
