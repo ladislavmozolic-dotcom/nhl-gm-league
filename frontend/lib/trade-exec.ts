@@ -8,6 +8,16 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { loadSettings } from "@/lib/sim/settings";
 import { CURRENT_SEASON_START } from "@/lib/finance";
+import { getLeagueDate } from "@/lib/calendar-server";
+import { roundForDate, daysBetween } from "@/lib/calendar";
+
+/** In-season days between two league dates (off-season time doesn't count) —
+ *  the NHL's real "75-day rule" for a 2nd retention on the same contract.
+ *  Only correct within one season; a retention that straddles a season
+ *  boundary is a rare enough edge case that we don't special-case it here. */
+function regularSeasonDaysBetween(d1: Date, d2: Date): number {
+  return Math.max(0, Math.max(0, roundForDate(d2)) - Math.max(0, roundForDate(d1)));
+}
 
 export type TradePlayer = { playerId: number; retentionPct: number };
 export type TradePackage = {
@@ -39,10 +49,11 @@ export const orgIds = (t: OrgTeam) => [t.id, ...t.affiliateTeams.map((a) => a.id
  * retention rules — throws on any violation. Shared by accept-time execution.
  */
 export async function collectMoveOps(pkg: TradePackage) {
-  const [fromTeam, toTeam, settings] = await Promise.all([
+  const [fromTeam, toTeam, settings, nowLeagueDate] = await Promise.all([
     prisma.team.findUnique({ where: { id: pkg.fromTeamId }, select: { id: true, name: true, bankAccount: true, affiliateTeams: { select: { id: true } } } }),
     prisma.team.findUnique({ where: { id: pkg.toTeamId }, select: { id: true, name: true, bankAccount: true, affiliateTeams: { select: { id: true } } } }),
     loadSettings(),
+    getLeagueDate(),
   ]);
   if (!fromTeam || !toTeam) throw new Error("Team not found");
   const fromAff = fromTeam.affiliateTeams[0]?.id ?? null;
@@ -55,6 +66,24 @@ export async function collectMoveOps(pkg: TradePackage) {
   });
   const pById = new Map(players.map((p) => [p.id, p]));
   const waived = new Set([...(pkg.waived ?? []), ...(pkg.clauseFees ?? []).map((f) => f.playerId)]);
+
+  // Every past trade-retention record (totalCost=0 marks retention, not a real
+  // buyout) for the players in this deal — feeds the "max 2 retentions per
+  // contract" + "75-day cooldown before a 2nd" + "1-year no-reacquire by a
+  // club that retained on him" rules below.
+  const retentionHistory = allPlayerIds.length
+    ? await prisma.buyout.findMany({
+        where: { playerId: { in: allPlayerIds }, totalCost: 0 },
+        select: { playerId: true, teamId: true, perYear: true, years: true, startYear: true, leagueDate: true, createdAt: true },
+        orderBy: { createdAt: "asc" },
+      })
+    : [];
+  const retentionHistoryByPlayer = new Map<number, typeof retentionHistory>();
+  for (const r of retentionHistory) {
+    const arr = retentionHistoryByPlayer.get(r.playerId!) ?? [];
+    arr.push(r);
+    retentionHistoryByPlayer.set(r.playerId!, arr);
+  }
 
   const maxPct = settings.retentionMaxPct;
   const retainedCount = [...pkg.fromPlayers, ...pkg.toPlayers].filter((p) => p.retentionPct > 0).length;
@@ -70,6 +99,23 @@ export async function collectMoveOps(pkg: TradePackage) {
       if (!pl || !fromOrgIds.includes(pl.teamId ?? -1)) throw new Error("A player is no longer on the expected team.");
       const block = clauseBlock(pl, toNhlId, waived, settings.clausesEnabled);
       if (block) throw new Error(block);
+
+      const history = retentionHistoryByPlayer.get(pl.id) ?? [];
+      // Rule: a club that retained salary on this player can't reacquire him
+      // (trade or waivers) for retentionReacquireBanDays, unless the specific
+      // contract it retained on has since fully run out.
+      const stillBlocked = history.find((r) => {
+        if (r.teamId !== toNhlId) return false;
+        const expired = CURRENT_SEASON_START >= r.startYear + r.years;
+        if (expired) return false;
+        const since = daysBetween(r.leagueDate ?? r.createdAt, nowLeagueDate);
+        return since < settings.retentionReacquireBanDays;
+      });
+      if (stillBlocked) {
+        const daysLeft = settings.retentionReacquireBanDays - daysBetween(stillBlocked.leagueDate ?? stillBlocked.createdAt, nowLeagueDate);
+        throw new Error(`${pl.name} can't rejoin a club that retained his salary yet — ${daysLeft} day(s) left on that ban.`);
+      }
+
       const toFarm = pl.rosterType === "AHL";
       const destId = toFarm ? (toAffId ?? toNhlId) : toNhlId;
       const destRoster = toFarm && toAffId ? "AHL" : "NHL";
@@ -81,6 +127,14 @@ export async function collectMoveOps(pkg: TradePackage) {
       const capHit = pl.capHit ?? 0;
       let retainedSalary = pl.retainedSalary ?? 0;
       if (tp.retentionPct > 0 && capHit) {
+        if (history.length >= settings.retentionMaxPerContract) throw new Error(`${pl.name}'s contract has already been retained ${history.length} time(s) — no further retention is allowed.`);
+        if (history.length > 0) {
+          const last = history[history.length - 1];
+          const elapsed = regularSeasonDaysBetween(last.leagueDate ?? last.createdAt, nowLeagueDate);
+          if (elapsed < settings.retentionCooldownDays) {
+            throw new Error(`A 2nd retention on ${pl.name}'s contract needs ${settings.retentionCooldownDays - elapsed} more in-season day(s) since the first.`);
+          }
+        }
         const pct = Math.min(maxPct, tp.retentionPct);
         const retained = Math.round((capHit * pct / 100) / 50000) * 50000;
         const netCap = capHit - retained;
@@ -128,7 +182,7 @@ export async function collectMoveOps(pkg: TradePackage) {
   }
 
   for (const r of retentionRecords)
-    ops.push(prisma.buyout.create({ data: { teamId: r.teamId, playerId: r.playerId, playerName: r.playerName, perYear: r.perYear, years: r.years, startYear: CURRENT_SEASON_START, totalCost: 0, inSeason: true } }));
+    ops.push(prisma.buyout.create({ data: { teamId: r.teamId, playerId: r.playerId, playerName: r.playerName, perYear: r.perYear, years: r.years, startYear: CURRENT_SEASON_START, totalCost: 0, inSeason: true, leagueDate: nowLeagueDate } }));
 
   for (const f of pkg.clauseFees ?? []) {
     if (!f.feeAmount) continue;

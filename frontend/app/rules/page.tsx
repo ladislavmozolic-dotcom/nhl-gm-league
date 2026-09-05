@@ -146,8 +146,14 @@ const SECTIONS: Sec[] = [
     groups: [
       { points: [
         "Build trades in the Trade Builder (players, prospects and draft picks). You can start one straight from a GM's chat via 'Propose trade'.",
-        "Salary retention is supported. No-trade / no-move clauses must be respected — a protected player has to consent.",
+        "No-trade / no-move clauses must be respected — a protected player has to consent.",
         "Depending on league settings, trades may require commissioner approval. Every trade is logged.",
+      ] },
+      { h: "Salary retention", points: [
+        "A club may retain up to the league's max % of a player's cap hit in a trade — the acquiring club only carries the reduced cap hit; the retaining club carries the retained slice as dead money for the rest of that contract.",
+        "Re-traded again, no further retention: once acquired, a club can deal him again at any time without adding retention of its own — the ORIGINAL retaining club keeps paying its share until that contract runs out, no matter how many more times he's traded.",
+        "Re-traded again WITH more retention (double retention): one contract can carry retention at most twice, ever. A 2nd retention on the same contract can't be applied until 75 in-season days have passed since the first (off-season days don't count) — this closes off the old same-day 'retention broker' trick at the trade deadline.",
+        "Returning to a club that retained on him: a club that retained salary on a player can't reacquire him — by trade or off waivers — for a full year (365 days) from that trade, unless the specific contract it retained on has since fully expired or been bought out.",
       ] },
     ],
   },

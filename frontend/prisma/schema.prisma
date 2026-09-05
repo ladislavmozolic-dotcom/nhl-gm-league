@@ -877,11 +877,14 @@ model Buyout {
   perYear    Int      // dead-money cap hit per season
   years      Int      // number of seasons it applies
   startYear  Int      // first season (e.g. 2026)
-  totalCost  Int      // debited from the team bank
+  totalCost  Int      // debited from the team bank — 0 marks a trade-retention record, not a real buyout
   inSeason   Boolean  @default(true)
+  leagueDate DateTime? // in-LEAGUE date this was recorded (not createdAt's real wall-clock time) —
+                        // lets retention cooldown/re-acquire rules count in-league days correctly
   createdAt  DateTime @default(now())
 
   @@index([teamId])
+  @@index([playerId])
 }
 
 model PlayoffSeries {

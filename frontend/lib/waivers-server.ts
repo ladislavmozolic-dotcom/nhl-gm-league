@@ -7,9 +7,10 @@
 import { prisma } from "./prisma";
 import { loadSettings } from "./sim/settings";
 import { getLeagueDate, computePhase } from "./calendar-server";
-import { roundForDate } from "./calendar";
+import { roundForDate, daysBetween } from "./calendar";
 import { computeStandings } from "./sim/standings";
 import { cleanName } from "./playerName";
+import { CURRENT_SEASON_START } from "./finance";
 import type { Phase } from "./calendar";
 
 export type WaiverRow = {
@@ -74,6 +75,27 @@ export async function claimWaiver(waiverId: number, teamId: number): Promise<{ o
   const w = await prisma.waiver.findUnique({ where: { id: waiverId } });
   if (!w || w.status !== "ACTIVE") return { ok: false, error: "That waiver is no longer active." };
   if (w.fromTeamId === teamId) return { ok: false, error: "You can't claim your own player." };
+
+  // Same rule as a trade: a club that retained salary on this player can't get
+  // him back (trade OR waivers) until the ban has run out, unless the specific
+  // contract it retained on has since fully expired.
+  const settings = await loadSettings();
+  const history = await prisma.buyout.findMany({
+    where: { playerId: w.playerId, teamId, totalCost: 0 },
+    select: { startYear: true, years: true, leagueDate: true, createdAt: true },
+  });
+  if (history.length) {
+    const nowLeagueDate = await getLeagueDate();
+    const stillBlocked = history.find((r) => {
+      if (CURRENT_SEASON_START >= r.startYear + r.years) return false; // that contract's retention has run out
+      return daysBetween(r.leagueDate ?? r.createdAt, nowLeagueDate) < settings.retentionReacquireBanDays;
+    });
+    if (stillBlocked) {
+      const daysLeft = settings.retentionReacquireBanDays - daysBetween(stillBlocked.leagueDate ?? stillBlocked.createdAt, nowLeagueDate);
+      return { ok: false, error: `Your club retained salary on this player — ${daysLeft} day(s) left before you can reclaim him.` };
+    }
+  }
+
   await prisma.waiverClaim.upsert({ where: { waiverId_teamId: { waiverId, teamId } }, create: { waiverId, teamId }, update: {} });
   return { ok: true };
 }

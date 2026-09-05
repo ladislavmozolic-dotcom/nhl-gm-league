@@ -204,6 +204,9 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
             <NumField k="retentionMaxPct" label="Retention max %" />
             <NumField k="retentionMinSalary" label="Retention min salary" step={50000} w="w-32" />
             <NumField k="retentionMaxPlayers" label="Max retained players" />
+            <NumField k="retentionMaxPerContract" label="Max retentions per contract" />
+            <NumField k="retentionCooldownDays" label="Days before a 2nd retention" />
+            <NumField k="retentionReacquireBanDays" label="Days before re-acquiring a retained-on player" step={5} w="w-32" />
             <div className="mt-1"><Toggle k="clausesEnabled" label="Enforce NTC / NMC / M-NTC clauses" /></div>
             <NumField k="rewardPlayoff" label="Reward: playoff berth" step={500000} w="w-32" />
             <NumField k="rewardCup" label="Reward: Cup winner" step={500000} w="w-32" />

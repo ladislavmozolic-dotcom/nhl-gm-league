@@ -72,6 +72,9 @@ export type EngineSettings = {
   retentionMaxPct: number;    // max salary a team can retain in a trade
   retentionMinSalary: number; // new team must carry at least this
   retentionMaxPlayers: number;// max retained players per team
+  retentionMaxPerContract: number; // max number of times ONE contract may ever carry retention (NHL: 2)
+  retentionCooldownDays: number;   // in-season days that must pass before a 2nd retention on the same contract (NHL's 75-day rule)
+  retentionReacquireBanDays: number; // days a club that retained on a player must wait before reacquiring him (trade or waivers) — NHL: 365
   clausesEnabled: boolean;    // enforce NTC / NMC / M-NTC contract clauses in trades (off = no-CBA league)
   aiTradesEnabled: boolean;   // master switch: let Advanced-AI clubs negotiate trades with human GMs (accept/decline/counter + initiate)
   aiInitiateTrades: boolean;  // let Advanced-AI clubs PROACTIVELY offer trades to human GMs (scouts needs; rate-limited)
@@ -191,7 +194,9 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   playoffFormat: "division", playoffTeamsPerConf: 8, playoffBestOf: 7,
   salaryCapUpper: 85900000, salaryCapLower: 51500000, startingCapital: 40000000,
   buyoutPctSeason: 50, buyoutPctOffseason: 35,
-  retentionMaxPct: 50, retentionMinSalary: 600000, retentionMaxPlayers: 3, clausesEnabled: true, aiTradesEnabled: true, aiInitiateTrades: false,
+  retentionMaxPct: 50, retentionMinSalary: 600000, retentionMaxPlayers: 3,
+  retentionMaxPerContract: 2, retentionCooldownDays: 75, retentionReacquireBanDays: 365,
+  clausesEnabled: true, aiTradesEnabled: true, aiInitiateTrades: false,
   osCompEnabled: true,
   osCompTiers: [
     { maxAav: 1000000, picks: [3] },        // ≤ $1M → a 3rd-round pick
