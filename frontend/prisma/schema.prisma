@@ -266,6 +266,8 @@ model Transaction {
                  // player's Transaction History can be queried directly instead
                  // of text-matching `message` — older rows predating this field
                  // stay null and just won't surface there.
+  teamId    Int? // the club the event is about (e.g. who placed/claimed a
+                 // waiver) — lets Transaction History show a team chip/logo.
   createdAt DateTime @default(now())
   @@index([playerId])
 }

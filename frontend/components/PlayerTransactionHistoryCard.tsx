@@ -23,6 +23,12 @@ export default function PlayerTransactionHistoryCard({ history }: { history: Pla
             <div className="flex items-start gap-2">
               <span className="text-sm shrink-0">{ICON[e.kind]}</span>
               <span className="text-sm text-slate-200">{e.message}</span>
+              {e.team && (
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-300 shrink-0">
+                  {e.team.logoUrl && <img src={e.team.logoUrl} alt="" className="w-4 h-4 object-contain" />}
+                  {e.team.code ?? e.team.name}
+                </span>
+              )}
             </div>
             <span className="text-xs text-slate-500 whitespace-nowrap shrink-0">{e.date.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}</span>
           </div>

@@ -160,27 +160,41 @@ export async function pickIdsWithTradeHistory(pickIds: number[]): Promise<Set<nu
   return new Set(rows.map((r) => r.draftPickId!));
 }
 
-export type PlayerEventEntry = { id: string; date: Date; kind: "TRADE_BLOCK" | "WAIVER" | "SIGNING"; message: string };
+export type PlayerEventEntry = { id: string; date: Date; kind: "TRADE_BLOCK" | "WAIVER" | "SIGNING"; message: string; team: TradeHistoryTeam | null };
 
 /** Everything else that happened to a player outside of trades: trade-block
  *  adds/removes, waiver placements/claims/clears, and contract signings or
- *  extensions — newest first. Trade-block/waiver events only exist from the
- *  point Transaction.playerId started being recorded; older rows are null and
- *  won't surface here. Signings go back further since SigningLog always had
- *  a playerId column. */
+ *  extensions — newest first, each tagged with the club it happened at.
+ *  Trade-block/waiver events only exist from the point Transaction.playerId/
+ *  teamId started being recorded; older rows are null and won't surface here
+ *  (or show without a team chip). Signings go back further since SigningLog
+ *  always had a playerId column, and its team is resolved from teamCode. */
 export async function playerTransactionHistory(playerId: number): Promise<PlayerEventEntry[]> {
   const [txs, signings] = await Promise.all([
     prisma.transaction.findMany({ where: { playerId, type: { in: ["TRADE_BLOCK", "WAIVER"] } }, orderBy: { createdAt: "desc" } }),
     prisma.signingLog.findMany({ where: { playerId }, orderBy: { createdAt: "desc" } }),
   ]);
+  const teamIds = [...new Set(txs.map((t) => t.teamId).filter((x): x is number => x != null))];
+  const teamCodes = [...new Set(signings.map((s) => s.teamCode).filter((x): x is string => !!x))];
+  const [teamsById, teamsByCode] = await Promise.all([
+    teamIds.length ? prisma.team.findMany({ where: { id: { in: teamIds } }, select: { id: true, name: true, code: true, logoUrl: true } }) : Promise.resolve([]),
+    teamCodes.length ? prisma.team.findMany({ where: { code: { in: teamCodes } }, select: { code: true, name: true, logoUrl: true } }) : Promise.resolve([]),
+  ]);
+  const teamById = new Map(teamsById.map((t) => [t.id, t]));
+  const teamByCode = new Map(teamsByCode.map((t) => [t.code, t]));
+
   const events: PlayerEventEntry[] = [
-    ...txs.map((t): PlayerEventEntry => ({ id: `tx${t.id}`, date: t.createdAt, kind: t.type as "TRADE_BLOCK" | "WAIVER", message: t.message })),
+    ...txs.map((t): PlayerEventEntry => ({
+      id: `tx${t.id}`, date: t.createdAt, kind: t.type as "TRADE_BLOCK" | "WAIVER", message: t.message,
+      team: t.teamId != null ? (teamById.get(t.teamId) ?? null) : null,
+    })),
     ...signings.map((s): PlayerEventEntry => {
       const term = `${money(s.salary)}/yr × ${s.years} yr${s.years === 1 ? "" : "s"}`;
       const verb = s.kind === "EXTEND" ? "Extended" : "Signed";
       return {
         id: `sl${s.id}`, date: s.createdAt, kind: "SIGNING",
-        message: s.reverted ? `${verb} (${term}) — later reverted` : `${verb} ${s.teamCode ? `by ${s.teamCode} ` : ""}for ${term}`,
+        message: s.reverted ? `${verb} (${term}) — later reverted` : `${verb} for ${term}`,
+        team: s.teamCode ? (teamByCode.get(s.teamCode) ?? { name: s.teamCode, code: s.teamCode, logoUrl: null }) : null,
       };
     }),
   ];

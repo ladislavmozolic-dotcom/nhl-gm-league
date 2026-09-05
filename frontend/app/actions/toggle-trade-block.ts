@@ -28,6 +28,7 @@ if (!player) return;
     data: {
       type: "TRADE_BLOCK",
       playerId,
+      teamId: player.teamId,
       message: value
         ? `${player.name} added to trade block`
         : `${player.name} removed from trade block`,

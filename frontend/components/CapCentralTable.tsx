@@ -6,7 +6,7 @@ import { money } from "@/lib/finance";
 
 export type CapRow = {
   id: number; name: string; slug: string; logoUrl: string | null; gp: number; gamesTotal: number;
-  count: number; totalSalaries: number; retainsBuyouts: number;
+  count: number; totalSalaries: number; buyouts: number; deadCap: number;
   capHit: number; capSpace: number; projCapHit: number; projCapSpace: number;
   underFloorBy: number;
 };
@@ -14,9 +14,10 @@ export type CapRow = {
 type Col = { key: keyof CapRow; label: string; money?: boolean; space?: boolean; title?: string };
 const COLS: Col[] = [
   { key: "count", label: "Players in Salary Cap" },
-  { key: "totalSalaries", label: "Total Salaries", money: true },
-  { key: "retainsBuyouts", label: "Retains & Buyouts", money: true, title: "Dead money from buyouts / retained salary — counts into the cap hit" },
-  { key: "capHit", label: "Actual Cap Hit", money: true, title: "Total Salaries + Retains & Buyouts" },
+  { key: "totalSalaries", label: "Total Salaries", money: true, title: "Sum of each player's Cap Hit — already net of any retention someone else pays" },
+  { key: "buyouts", label: "Buyouts", money: true, title: "Dead money from this club's own player buyouts" },
+  { key: "deadCap", label: "Dead Cap", money: true, title: "Salary this club retains on players it traded away — not a buyout, but still counts against its cap" },
+  { key: "capHit", label: "Actual Cap Hit", money: true, title: "Total Salaries + Buyouts + Dead Cap" },
   { key: "capSpace", label: "Actual Cap Space", money: true, space: true, title: "Upper ceiling − Actual Cap Hit (can be negative)" },
   { key: "projCapHit", label: "Projected Cap Hit", money: true, title: "Max total cap hit you may carry for the rest of the season" },
   { key: "projCapSpace", label: "Projected Cap Space", money: true, space: true, title: "The biggest full-season cap hit you can still add and stay legal — unused cap banks each game, so it grows toward the deadline." },
@@ -55,7 +56,8 @@ export default function CapCentralTable({ rows }: { rows: CapRow[] }) {
               </td>
               <td className="px-3 py-2.5 text-right tabular-nums text-slate-400">{t.count}</td>
               <td className="px-3 py-2.5 text-right tabular-nums">{money(t.totalSalaries)}</td>
-              <td className="px-3 py-2.5 text-right tabular-nums text-slate-400">{t.retainsBuyouts ? money(t.retainsBuyouts) : "—"}</td>
+              <td className="px-3 py-2.5 text-right tabular-nums text-slate-400">{t.buyouts ? money(t.buyouts) : "—"}</td>
+              <td className="px-3 py-2.5 text-right tabular-nums text-slate-400">{t.deadCap ? money(t.deadCap) : "—"}</td>
               <td className={`px-3 py-2.5 text-right tabular-nums font-semibold ${t.capSpace < 0 ? "text-red-400" : ""}`}>{money(t.capHit)}</td>
               <td className={`px-3 py-2.5 text-right tabular-nums ${t.capSpace < 0 ? "text-red-400" : "text-green-400"}`}>{money(t.capSpace)}</td>
               <td className="px-3 py-2.5 text-right tabular-nums text-slate-300">{money(t.projCapHit)}</td>

@@ -65,7 +65,7 @@ export async function placeOnWaivers(playerId: number, actorTeamId: number): Pro
       : prisma.waiver.create({ data: { playerId, fromTeamId: actorTeamId, placedDay: day } }),
     prisma.waiverClaim.deleteMany({ where: { waiver: { playerId } } }),
     prisma.player.update({ where: { id: playerId }, data: { waiverStatus: "ON_WAIVERS" } }),
-    prisma.transaction.create({ data: { type: "WAIVER", playerId, message: `${cleanName(p.name)} was placed on waivers.` } }),
+    prisma.transaction.create({ data: { type: "WAIVER", playerId, teamId: actorTeamId, message: `${cleanName(p.name)} was placed on waivers.` } }),
   ]);
   return { ok: true };
 }
@@ -155,7 +155,7 @@ export async function processWaivers(currentDay: number, phase: Phase): Promise<
         prisma.waiver.update({ where: { id: w.id }, data: { status: "CLAIMED", claimedByTeamId: winner.teamId, resolvedAt: new Date() } }),
         // move the winner to the back of the claim-order queue for next time (harmless in-season, since standings decide there anyway)
         prisma.team.update({ where: { id: winner.teamId }, data: { lastWaiverClaimAt: new Date() } }),
-        prisma.transaction.create({ data: { type: "WAIVER", playerId: w.playerId, message: `${tById.get(winner.teamId)?.code ?? "A club"} claimed ${name} off waivers from ${tById.get(w.fromTeamId)?.code ?? "?"}.` } }),
+        prisma.transaction.create({ data: { type: "WAIVER", playerId: w.playerId, teamId: winner.teamId, message: `${tById.get(winner.teamId)?.code ?? "A club"} claimed ${name} off waivers from ${tById.get(w.fromTeamId)?.code ?? "?"}.` } }),
       ]);
       // keep the in-memory queue state current so a second waiver resolved in this
       // same batch also sees this club as just-claimed, not its stale pre-batch spot
@@ -168,7 +168,7 @@ export async function processWaivers(currentDay: number, phase: Phase): Promise<
       await prisma.$transaction([
         prisma.player.update({ where: { id: w.playerId }, data: affiliate ? { teamId: affiliate, rosterType: "AHL", waiverStatus: "CLEARED" } : { waiverStatus: "CLEARED" } }),
         prisma.waiver.update({ where: { id: w.id }, data: { status: "CLEARED", resolvedAt: new Date() } }),
-        prisma.transaction.create({ data: { type: "WAIVER", playerId: w.playerId, message: `${name} cleared waivers${affiliate ? " and was assigned to the AHL" : ""}.` } }),
+        prisma.transaction.create({ data: { type: "WAIVER", playerId: w.playerId, teamId: w.fromTeamId, message: `${name} cleared waivers${affiliate ? " and was assigned to the AHL" : ""}.` } }),
       ]);
       cleared++; details.push(`${name} cleared${affiliate ? " → AHL" : ""}`);
     }
