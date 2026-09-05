@@ -25,13 +25,17 @@ export default function SiteBanner({ branding }: { branding: Branding }) {
   const fixed = branding.bannerHeight > 0;
   const social = branding.socialLinks ?? [];
 
+  // maxHeight (not a fixed height) + width:auto lets the browser shrink BOTH
+  // dimensions to fit a narrow mobile viewport without cropping — a fixed
+  // height combined with the intrinsic aspect ratio ignored max-width and
+  // let the wordmark run off the right edge of the screen.
   const logo = branding.logoUrl ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img key="logo" src={branding.logoUrl} alt="" className="w-auto object-contain shrink-0 max-h-full" style={{ height: branding.logoHeight }} />
+    <img key="logo" src={branding.logoUrl} alt="" className="w-auto max-w-full object-contain shrink-0" style={{ maxHeight: branding.logoHeight, height: "auto" }} />
   ) : null;
   const name = branding.nameImageUrl ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img key="name" src={branding.nameImageUrl} alt={branding.leagueName} className="w-auto max-w-full object-contain max-h-full" style={{ height: branding.nameHeight }} />
+    <img key="name" src={branding.nameImageUrl} alt={branding.leagueName} className="w-auto max-w-full object-contain" style={{ maxHeight: branding.nameHeight, height: "auto" }} />
   ) : (
     <div key="name" className="text-center">
       <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight italic leading-none">{branding.leagueName}</h1>

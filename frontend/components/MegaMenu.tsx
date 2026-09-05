@@ -17,12 +17,27 @@ interface Team {
   division: string | null;
 }
 
+// Loose shape shared by MenuItem (top level) and MenuChild (nested) so the
+// mobile accordion can recurse into either without caring which one it got.
+type NavNode = { key?: string; label: string; href: string; mega?: boolean; children?: NavNode[] };
+
 export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: string; slug: string; admin?: boolean; pendingJoins?: number; unreadDm?: number; forumNew?: number } | null; items?: MenuItem[]; lang?: Lang }) {
   const menuItems = items ?? DEFAULT_MENU;
   const tr = (k: string) => t(lang, k);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
   const [scrolled, setScrolled] = useState(false);
+  // Mobile drawer — hover doesn't exist on touch, so nested items (e.g. League
+  // → Finance → Salary Cap) need their own tap-to-expand accordion state
+  // instead of reusing the desktop hover-flyout logic above.
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [openPaths, setOpenPaths] = useState<Set<string>>(new Set());
+  const closeMobile = () => { setMobileOpen(false); setOpenPaths(new Set()); };
+  const togglePath = (path: string) => setOpenPaths((prev) => {
+    const next = new Set(prev);
+    if (next.has(path)) next.delete(path); else next.add(path);
+    return next;
+  });
 
   useEffect(() => {
     fetch("/api/teams")
@@ -42,6 +57,62 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
     tm.conference?.includes("Western")
   );
 
+  const TeamsMobileList = ({ pad }: { pad: number }) => (
+    <div className="pb-1">
+      <div className="text-[10px] uppercase tracking-widest text-blue-400 font-bold pt-1.5 pb-1" style={{ paddingLeft: pad }}>Eastern Conference</div>
+      {eastern.map((tm) => (
+        <Link key={tm.id} href={`/teams/${tm.slug}`} onClick={closeMobile} className="flex items-center gap-2 py-2 text-[13px] text-slate-300 hover:text-white" style={{ paddingLeft: pad }}>
+          {tm.logoUrl && <img src={tm.logoUrl} alt="" className="w-5 h-5 object-contain shrink-0" />}
+          {tm.name}
+        </Link>
+      ))}
+      <div className="text-[10px] uppercase tracking-widest text-red-400 font-bold pt-2 pb-1" style={{ paddingLeft: pad }}>Western Conference</div>
+      {western.map((tm) => (
+        <Link key={tm.id} href={`/teams/${tm.slug}`} onClick={closeMobile} className="flex items-center gap-2 py-2 text-[13px] text-slate-300 hover:text-white" style={{ paddingLeft: pad }}>
+          {tm.logoUrl && <img src={tm.logoUrl} alt="" className="w-5 h-5 object-contain shrink-0" />}
+          {tm.name}
+        </Link>
+      ))}
+    </div>
+  );
+
+  // One row per node, recursing into `children` (or the Teams mega-list) as an
+  // indented accordion section — tap the chevron to expand, tap the label to
+  // navigate (a "#" href, i.e. the desktop-only "Teams" trigger, toggles instead).
+  const MobileNode = ({ node, path, depth }: { node: NavNode; path: string; depth: number }) => {
+    const hasKids = (!!node.children && node.children.length > 0) || node.mega;
+    const isOpen = openPaths.has(path);
+    const pad = 12 + depth * 16;
+    const toggleOnly = node.href === "#";
+    return (
+      <div className={depth === 0 ? "border-b border-slate-800/60" : ""}>
+        <div className="flex items-center">
+          {toggleOnly ? (
+            <button type="button" onClick={() => togglePath(path)} className="flex-1 text-left py-2.5 text-[14px] text-slate-200" style={{ paddingLeft: pad }}>
+              {node.label}
+            </button>
+          ) : (
+            <Link href={node.href} onClick={closeMobile} className="flex-1 py-2.5 text-[14px] text-slate-200" style={{ paddingLeft: pad }}>
+              {node.label}
+            </Link>
+          )}
+          {hasKids && (
+            <button type="button" onClick={() => togglePath(path)} aria-label="Toggle submenu" className="px-3.5 py-2.5 text-slate-500 hover:text-white">
+              <span className={`inline-block transition-transform ${isOpen ? "rotate-180" : ""}`}>▾</span>
+            </button>
+          )}
+        </div>
+        {hasKids && isOpen && (
+          <div className="pb-1">
+            {node.mega ? <TeamsMobileList pad={pad + 16} /> : node.children!.map((c) => (
+              <MobileNode key={c.label} node={c} path={`${path}/${c.label}`} depth={depth + 1} />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <nav
       className={`sticky top-0 z-50 border-b border-slate-700/30 transition-all duration-300 ${
@@ -51,9 +122,24 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
       }`}
     >
       <div className="max-w-[1400px] mx-auto px-4">
-        <div className="flex items-center h-14">
-          {/* Menu */}
-          <div className="flex items-center gap-0.5 flex-wrap">
+        <div className="flex items-center h-14 gap-1.5">
+          {/* Mobile: hamburger toggle for the drawer below */}
+          <button
+            type="button"
+            onClick={() => (mobileOpen ? closeMobile() : setMobileOpen(true))}
+            aria-label="Toggle menu"
+            aria-expanded={mobileOpen}
+            className="md:hidden w-9 h-9 grid place-items-center rounded-md text-slate-300 hover:text-white hover:bg-slate-800/40 shrink-0"
+          >
+            {mobileOpen ? (
+              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" d="M6 6l12 12M18 6L6 18" /></svg>
+            ) : (
+              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" d="M4 6h16M4 12h16M4 18h16" /></svg>
+            )}
+          </button>
+
+          {/* Menu — desktop only; mobile gets the tap-to-expand drawer below */}
+          <div className="hidden md:flex items-center gap-0.5 flex-wrap flex-1">
             {menuItems.map((item) => (
               <div
                 key={item.key}
@@ -264,7 +350,88 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
               )}
             </div>
           </div>
+
+          {/* Mobile-only compact right side — always reachable without opening the drawer */}
+          <div className="md:hidden flex items-center gap-1.5 ml-auto">
+            <LangSwitcher lang={lang} />
+            {gm ? (
+              <Link href={`/teams/${gm.slug}`} className="relative w-8 h-8 rounded-full bg-blue-600 grid place-items-center text-[12px] font-black text-white shrink-0">
+                {gm.nickname[0]?.toUpperCase()}
+                {((gm.unreadDm ?? 0) > 0 || (gm.admin && (gm.pendingJoins ?? 0) > 0)) && (
+                  <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-red-600 border border-[#0a1628]" />
+                )}
+              </Link>
+            ) : (
+              <Link href="/login" className="px-2.5 py-1.5 text-[12px] font-semibold rounded-md text-slate-300 hover:text-white hover:bg-slate-800/40 whitespace-nowrap">{tr("ui.gmLogin")}</Link>
+            )}
+          </div>
         </div>
+
+        {/* Mobile drawer — tap-to-expand accordion (hover has no touch equivalent) */}
+        {mobileOpen && (
+          <div className="md:hidden border-t border-slate-700/40 -mx-4 px-0 max-h-[calc(100vh-3.5rem)] overflow-y-auto bg-[#0a1628]">
+            {menuItems.map((item) => (
+              <MobileNode key={item.key} node={item} path={item.key} depth={0} />
+            ))}
+
+            <div className="border-t border-slate-700/60 my-1" />
+            <Link href="/forum" onClick={closeMobile} className="flex items-center gap-1.5 py-2.5 px-3 text-[14px] text-slate-200">
+              🗣️ Forum
+              {(gm?.forumNew ?? 0) > 0 && <span className="min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm!.forumNew}</span>}
+            </Link>
+            {gm && (
+              <Link href="/messages" onClick={closeMobile} className="flex items-center gap-1.5 py-2.5 px-3 text-[14px] text-slate-200">
+                💬 Messages
+                {(gm.unreadDm ?? 0) > 0 && <span className="min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm.unreadDm}</span>}
+              </Link>
+            )}
+
+            <div className="border-t border-slate-700/60 my-1" />
+            {gm ? (
+              <>
+                <div className="px-3 py-2 flex items-center gap-2 text-slate-300">
+                  <span className="w-7 h-7 rounded-full bg-blue-600 grid place-items-center text-[12px] font-black text-white shrink-0">{gm.nickname[0]?.toUpperCase()}</span>
+                  <span className="text-[14px] font-semibold">{gm.nickname}</span>
+                </div>
+                <Link href={`/teams/${gm.slug}`} onClick={closeMobile} className="block py-2 px-3 pl-11 text-[13px] text-slate-300">{tr("ui.myTeam")}</Link>
+                <Link href={`/teams/${gm.slug}/profile`} onClick={closeMobile} className="block py-2 px-3 pl-11 text-[13px] text-slate-300">{tr("ui.profile")}</Link>
+                <Link href={`/teams/${gm.slug}/lines`} onClick={closeMobile} className="block py-2 px-3 pl-11 text-[13px] text-slate-300">{tr("ui.linesTactics")}</Link>
+                {gm.admin && (
+                  <MobileNode
+                    path="__admin"
+                    depth={0}
+                    node={{
+                      label: `⚙️ ${tr("ui.admin")}${(gm.pendingJoins ?? 0) > 0 ? ` (${gm.pendingJoins})` : ""}`,
+                      href: "#",
+                      children: [
+                        { label: tr("ui.adminPanel"), href: "/admin" },
+                        { label: "Žiadosti o vstup", href: "/admin/join-requests" },
+                        { label: "League Calendar", href: "/calendar" },
+                        { label: "ELC Rookies", href: "/admin/elc" },
+                        { label: "Roster Update", href: "/admin/roster-update" },
+                        { label: "Season Control", href: "/admin/season" },
+                        { label: "Latest Signings", href: "/admin/signings" },
+                        { label: "Simulation Engine", href: "/admin/simulation" },
+                        { label: "Team Lines & Tactics", href: "/admin/team-lines" },
+                      ],
+                    }}
+                  />
+                )}
+                <div className="border-t border-slate-700/60 my-1" />
+                <Link href="/login" onClick={closeMobile} className="block py-2.5 px-3 text-[13px] text-slate-300">{tr("ui.switchTeam")}</Link>
+                <Link href={`/teams/${gm.slug}/logout`} onClick={closeMobile} className="block py-2.5 px-3 text-[13px] text-red-400">{tr("ui.logout")}</Link>
+              </>
+            ) : (
+              <Link href="/login" onClick={closeMobile} className="block py-2.5 px-3 text-[14px] font-semibold text-blue-300">{tr("ui.gmLogin")}</Link>
+            )}
+
+            <div className="border-t border-slate-700/60 my-1" />
+            <div className="px-3 py-2.5 flex items-center justify-between gap-2">
+              <span className="text-sm text-slate-300">{tr("ui.language")}</span>
+              <LangSwitcher lang={lang} />
+            </div>
+          </div>
+        )}
       </div>
     </nav>
   );
