@@ -13,6 +13,7 @@ import { getLeagueClock } from "@/lib/calendar-server";
 import { getTeamSession } from "@/lib/auth";
 import BuyoutButton from "@/components/BuyoutButton";
 import { buyoutPlayer } from "@/app/finance/[slug]/actions";
+import { teamCapCommitted } from "@/lib/cap";
 
 const SEASON = "2026-27";
 const SPAN = 8;
@@ -23,21 +24,22 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   const team = await prisma.team.findUnique({
     where: { slug },
     select: {
-      id: true, name: true, logoUrl: true, arena: true, popularity: true, arenaSections: true, capacity: true, bankAccount: true, retainsBuyouts: true,
-      players: { where: { rosterType: "NHL" }, select: { id: true, name: true, position: true, age: true, isGoalie: true, capHit: true, contractYears: true, injuryDaysLeft: true, condition: true }, orderBy: [{ isGoalie: "asc" }, { capHit: "desc" }] },
+      id: true, name: true, logoUrl: true, arena: true, popularity: true, arenaSections: true, capacity: true, bankAccount: true,
+      players: { where: { rosterType: "NHL" }, select: { id: true, name: true, position: true, age: true, isGoalie: true, capHit: true, retainedSalary: true, contractYears: true, injuryDaysLeft: true, condition: true }, orderBy: [{ isGoalie: "asc" }, { capHit: "desc" }] },
       affiliateTeams: { select: { players: { where: { rosterType: "AHL" }, select: { id: true, name: true, position: true, age: true, isGoalie: true, capHit: true, contractYears: true }, orderBy: [{ isGoalie: "asc" }, { capHit: "desc" }] } } },
     },
   });
   if (!team) notFound();
   const farm = team.affiliateTeams[0]?.players ?? [];
 
-  const [settings, session, buyouts, standings, homeGames, totalGames, gamesScheduled] = await Promise.all([
+  const [settings, session, buyouts, standings, homeGames, totalGames, gamesScheduled, capInfo] = await Promise.all([
     loadSettings(), getTeamSession(),
     prisma.buyout.findMany({ where: { teamId: team.id }, select: { id: true, playerName: true, perYear: true, startYear: true, years: true } }),
     computeStandings(SEASON, "NHL"),
     prisma.game.count({ where: { season: SEASON, league: "NHL", status: "FINAL", seriesId: null, homeTeamId: team.id } }),
     prisma.game.count({ where: { season: SEASON, league: "NHL", status: "FINAL", seriesId: null, OR: [{ homeTeamId: team.id }, { awayTeamId: team.id }] } }),
     prisma.game.count({ where: { season: SEASON, league: "NHL", seriesId: null, OR: [{ homeTeamId: team.id }, { awayTeamId: team.id }] } }),
+    teamCapCommitted(team.id),
   ]);
   const isGm = session === team.id;
   const st = standings.find((s) => s.teamId === team.id);
@@ -49,12 +51,15 @@ export default async function TeamCapView({ slug }: { slug: string }) {
     startingBank: settings.startingCapital,
   });
   const years = Array.from({ length: SPAN }, (_, i) => CURRENT_SEASON_START + i);
-  const cap = teamCapSummary(team.players, settings, team.retainsBuyouts);
+  const cap = teamCapSummary(team.players, settings, capInfo.retainsBuyouts);
   // Projected Cap Space = biggest full-season cap hit a club can still add and
   // stay legal — unused cap banks each game, so it grows toward the deadline.
   const accrued = accruedCapSpace(cap.capSpace, totalGames, gamesScheduled || 82);
   const maxCapHit = cap.capHit + accrued.actual; // Projected Cap Hit — max the club may carry for the rest
-  const ltir = ltirRelief(team.players); // cap relief from skaters on LTIR (injured, CON < 90)
+  // LTIR relief is based on what this club actually carries for the injured player
+  // (net of any retention it benefits from), matching `cap.capHit` above.
+  const ltirRoster = team.players.map((p) => ({ ...p, capHit: Math.max(0, (p.capHit ?? 0) - (p.retainedSalary ?? 0)) }));
+  const ltir = ltirRelief(ltirRoster); // cap relief from skaters on LTIR (injured, CON < 90)
   const { phase } = await getLeagueClock();
   const effectiveCeiling = capCeilingForPhase(cap.upper, phase) + ltir;
   const overBy = Math.max(0, cap.capHit - effectiveCeiling);
