@@ -302,6 +302,33 @@ model Trade {
   leagueDay   Int?     // league-calendar day the trade was created (throttles AI-initiated offers)
   waivedClauses Int[]  // player ids whose NTC/NMC/M-NTC was waived to allow this deal
   clauseFees  Json?    // [{ playerId, feeAmount, payTeamId }] — agent-set waiver fees the giving team pays the player
+  groupId     Int?     // set only for one leg of a 3-team TradeGroup — a one-directional
+                        // asset move (fromTeamId → toTeamId only; the "TO" side of THIS
+                        // row stays empty, this team's return comes via a different leg)
+  @@index([groupId])
+}
+
+// A 3-team trade is 3 one-directional Trade "legs" sharing a groupId (A→C, B→A,
+// C→B) — each leg reuses the normal Trade/TradeAsset machinery (clause checks,
+// retention rules, ownership) unchanged. The group only executes once every
+// team involved has said yes; if anyone declines, all 3 legs are cancelled together.
+model TradeGroup {
+  id             Int       @id @default(autoincrement())
+  proposerTeamId Int
+  status         String    @default("PENDING") // PENDING | ACCEPTED | DECLINED | CANCELLED | AWAITING_COMMISH
+  commishNote    String?
+  createdAt      DateTime  @default(now())
+  respondedAt    DateTime?
+}
+
+model TradeGroupResponse {
+  id          Int       @id @default(autoincrement())
+  groupId     Int
+  teamId      Int
+  status      String    @default("PENDING") // PENDING | ACCEPTED | DECLINED
+  respondedAt DateTime?
+  @@unique([groupId, teamId])
+  @@index([groupId])
 }
 
 model Waiver {

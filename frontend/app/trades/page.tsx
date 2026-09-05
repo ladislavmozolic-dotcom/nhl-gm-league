@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getTeamSession, isAdmin, isCommission } from "@/lib/auth";
 import { money } from "@/lib/finance";
 import TradeActions from "@/components/TradeActions";
+import TradeGroupActions from "@/components/TradeGroupActions";
 import { PageHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +15,10 @@ export default async function TradesPage() {
     getTeamSession(),
     isAdmin(),
     isCommission(),
-    prisma.trade.findMany({ take: 60, orderBy: { createdAt: "desc" } }),
+    // 3-team trade legs (groupId set) are shown separately below, with their own
+    // group-level accept/decline — they'd render wrong here as an incomplete
+    // one-directional "2-team" card.
+    prisma.trade.findMany({ where: { groupId: null }, take: 60, orderBy: { createdAt: "desc" } }),
     prisma.team.findMany({ select: { id: true, name: true, code: true, logoUrl: true, rookieGm: true } }),
   ]);
   const commishQueue = await prisma.trade.count({ where: { status: { in: ["AWAITING_COMMISH", "MODIFIED"] } } });
@@ -69,6 +73,48 @@ export default async function TradesPage() {
   const inReview = enriched.filter((t) => IN_REVIEW.includes(t.status) && involvedOrAdmin(t));
   const history = enriched.filter((t) => t.status === "ACCEPTED" || t.status === "COMPLETED" || ((t.status === "DECLINED" || t.status === "CANCELLED") && involvedOrAdmin(t)));
 
+  // ---- 3-team trade groups (separate from the 2-team Trade rows above) ----
+  const groups = await prisma.tradeGroup.findMany({ where: { status: { in: ["PENDING", "AWAITING_COMMISH"] } }, orderBy: { createdAt: "desc" } });
+  const groupIds = groups.map((g) => g.id);
+  const [groupLegs, groupResponses] = groupIds.length
+    ? await Promise.all([
+        prisma.trade.findMany({ where: { groupId: { in: groupIds } } }),
+        prisma.tradeGroupResponse.findMany({ where: { groupId: { in: groupIds } } }),
+      ])
+    : [[], []];
+  const groupLegAssets = groupLegs.length ? await prisma.tradeAsset.findMany({ where: { tradeId: { in: groupLegs.map((l) => l.id) } } }) : [];
+  const glPlayerIds = groupLegAssets.filter((a) => a.playerId).map((a) => a.playerId!) as number[];
+  const glProspectIds = groupLegAssets.filter((a) => a.prospectId).map((a) => a.prospectId!) as number[];
+  const glPickIds = groupLegAssets.filter((a) => a.draftPickId).map((a) => a.draftPickId!) as number[];
+  const [glPlayers, glProspects, glPicks] = await Promise.all([
+    prisma.player.findMany({ where: { id: { in: glPlayerIds } }, select: { id: true, name: true } }),
+    prisma.prospect.findMany({ where: { id: { in: glProspectIds } }, select: { id: true, name: true } }),
+    prisma.draftPick.findMany({ where: { id: { in: glPickIds } }, select: { id: true, year: true, round: true } }),
+  ]);
+  const glPName = new Map(glPlayers.map((p) => [p.id, p.name]));
+  const glProName = new Map(glProspects.map((p) => [p.id, p.name]));
+  const glPickLabel = new Map(glPicks.map((p) => [p.id, `${p.year} R${p.round}`]));
+  const legAssetLabels = (legId: number): string[] => groupLegAssets.filter((a) => a.tradeId === legId).map((a) => {
+    if (a.assetType === "PLAYER") return glPName.get(a.playerId ?? -1) ?? "Player";
+    if (a.assetType === "PROSPECT") return `⭐ ${glProName.get(a.prospectId ?? -1) ?? "Prospect"}`;
+    if (a.assetType === "PICK") return `🎫 ${glPickLabel.get(a.draftPickId ?? -1) ?? "Pick"}`;
+    if (a.assetType === "CASH") return `💵 ${money(a.cashAmount ?? 0)}`;
+    return a.assetType;
+  });
+  const myGroupIds = session ? groupResponses.filter((r) => r.teamId === session).map((r) => r.groupId) : [];
+  const enrichedGroups = groups
+    .filter((g) => admin || myGroupIds.includes(g.id))
+    .map((g) => {
+      const legs = groupLegs.filter((l) => l.groupId === g.id).map((l) => ({
+        ...l, fromTeam: teamById.get(l.fromTeamId), toTeam: teamById.get(l.toTeamId), assetLabels: legAssetLabels(l.id),
+      }));
+      const responses = groupResponses.filter((r) => r.groupId === g.id).map((r) => ({ ...r, team: teamById.get(r.teamId) }));
+      const myResponse = session ? responses.find((r) => r.teamId === session) : undefined;
+      return { ...g, legs, responses, myResponse };
+    });
+  const pendingGroups = enrichedGroups.filter((g) => g.status === "PENDING");
+  const commishGroups = enrichedGroups.filter((g) => g.status === "AWAITING_COMMISH");
+
   return (
     <div className="space-y-8 py-2">
       <PageHeader
@@ -84,21 +130,38 @@ export default async function TradesPage() {
         </Link>
       )}
 
-      {inReview.length > 0 && (
+      {(inReview.length > 0 || commishGroups.length > 0) && (
         <section>
           <h2 className="text-lg font-bold text-amber-400 mb-4 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" /> With the Commission
           </h2>
           <div className="grid gap-4">
             {inReview.map((t) => <TradeCard key={t.id} trade={t} action={null} admin={admin} />)}
+            {commishGroups.map((g) => <TradeGroupCard key={`g${g.id}`} group={g} canRespond={admin} isCommishReview />)}
+          </div>
+        </section>
+      )}
+
+      {pendingGroups.length > 0 && (
+        <section>
+          <h2 className="text-lg font-bold text-sky-400 mb-4 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-sky-500 animate-pulse" /> 3-Team Trades
+          </h2>
+          <div className="grid gap-4">
+            {pendingGroups.map((g) => (
+              <TradeGroupCard key={g.id} group={g} canRespond={admin || g.myResponse?.status === "PENDING"} />
+            ))}
           </div>
         </section>
       )}
 
       <section>
-        <h2 className="text-lg font-bold text-yellow-400 mb-4 flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" /> Pending Proposals
-        </h2>
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <h2 className="text-lg font-bold text-yellow-400 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" /> Pending Proposals
+          </h2>
+          {session && <Link href="/trades/build3" className="text-xs text-slate-400 hover:text-blue-400">+ Add a 3rd team →</Link>}
+        </div>
         {pending.length === 0 ? (
           <div className="bg-slate-900/70 rounded-2xl border border-slate-800 shadow-lg shadow-black/20 p-8 text-center text-slate-500">No pending trades</div>
         ) : (
@@ -208,6 +271,62 @@ function TradeCard({ trade, action, admin }: {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-xs text-slate-600">{trade.createdAt.toLocaleDateString("sk-SK", { day: "numeric", month: "long", year: "numeric" })}</p>
         {(action || admin) && <TradeActions tradeId={trade.id} role={action} admin={admin} pending={trade.status === "PENDING"} />}
+      </div>
+    </div>
+  );
+}
+
+type EnrichedLeg = {
+  id: number; fromTeam?: { name: string; code: string | null; logoUrl: string | null };
+  toTeam?: { name: string; code: string | null; logoUrl: string | null }; assetLabels: string[];
+};
+type EnrichedResponse = { teamId: number; status: string; team?: { name: string; code: string | null } };
+
+function TradeGroupCard({ group, canRespond, isCommishReview }: {
+  group: { id: number; status: string; legs: EnrichedLeg[]; responses: EnrichedResponse[]; createdAt: Date };
+  canRespond: boolean; isCommishReview?: boolean;
+}) {
+  return (
+    <div className="bg-slate-900/70 rounded-2xl border border-sky-800/40 shadow-lg shadow-black/20 p-5">
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {group.legs.map((l, i) => (
+            <span key={l.id} className="flex items-center gap-1.5 text-sm">
+              {l.fromTeam?.logoUrl && <img src={l.fromTeam.logoUrl} alt="" className="w-6 h-6 object-contain" />}
+              <span className="font-medium">{l.fromTeam?.code ?? l.fromTeam?.name ?? "?"}</span>
+              {i < group.legs.length - 1 && <span className="text-slate-600">→</span>}
+              {i === group.legs.length - 1 && <span className="text-slate-600">→ {l.toTeam?.code ?? l.toTeam?.name ?? "?"}</span>}
+            </span>
+          ))}
+        </div>
+        <span className={`text-xs font-bold px-3 py-1 rounded-full ${group.status === "AWAITING_COMMISH" ? "bg-amber-500/20 text-amber-300" : "bg-sky-500/20 text-sky-300"}`}>
+          {group.status === "AWAITING_COMMISH" ? "AWAITING COMMISH" : "3-TEAM · PENDING"}
+        </span>
+      </div>
+
+      <div className="bg-slate-950/50 rounded-lg p-3 mb-3 space-y-2">
+        {group.legs.map((l) => (
+          <div key={l.id} className="flex items-center gap-2 text-sm flex-wrap">
+            <span className="text-slate-400 shrink-0">{l.fromTeam?.name ?? "?"} sends</span>
+            {l.assetLabels.length === 0 ? <span className="text-slate-600">nothing</span> : l.assetLabels.map((t, i) => (
+              <span key={i} className="text-xs bg-slate-800 px-2 py-1 rounded text-slate-200">{t}</span>
+            ))}
+            <span className="text-slate-500 shrink-0">→ {l.toTeam?.name ?? "?"}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap mb-3 text-xs">
+        {group.responses.map((r) => (
+          <span key={r.teamId} className={`px-2 py-1 rounded-full font-semibold ${r.status === "ACCEPTED" ? "bg-emerald-500/20 text-emerald-300" : r.status === "DECLINED" ? "bg-rose-500/20 text-rose-300" : "bg-slate-700/50 text-slate-400"}`}>
+            {r.team?.code ?? r.team?.name ?? "?"}: {r.status}
+          </span>
+        ))}
+      </div>
+
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-xs text-slate-600">{group.createdAt.toLocaleDateString("sk-SK", { day: "numeric", month: "long", year: "numeric" })}</p>
+        <TradeGroupActions groupId={group.id} canRespond={canRespond} isCommishReview={isCommishReview} />
       </div>
     </div>
   );

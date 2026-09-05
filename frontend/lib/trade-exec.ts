@@ -278,8 +278,8 @@ export async function executeAcceptedTrade(tradeId: number) {
 /** Create a PENDING Trade + its TradeAssets + the notification DM. The auth/clause-
  *  consent checks are the CALLER's responsibility (the human action does them; the AI
  *  only builds clause-clean packages). Returns the new trade id. */
-export async function createTradeRecord(pkg: TradePackage, opts: { fromName: string; toName: string; dmBody?: string; aiFrom?: boolean; leagueDay?: number } ) {
-  const trade = await prisma.trade.create({ data: { fromTeamId: pkg.fromTeamId, toTeamId: pkg.toTeamId, status: "PENDING", condition: pkg.condition || null, leagueDay: opts.leagueDay ?? null, waivedClauses: [...(pkg.waived ?? []), ...(pkg.clauseFees ?? []).map((f) => f.playerId)], clauseFees: (pkg.clauseFees ?? []) as object } });
+export async function createTradeRecord(pkg: TradePackage, opts: { fromName: string; toName: string; dmBody?: string; aiFrom?: boolean; leagueDay?: number; groupId?: number; skipDm?: boolean } ) {
+  const trade = await prisma.trade.create({ data: { fromTeamId: pkg.fromTeamId, toTeamId: pkg.toTeamId, status: "PENDING", condition: pkg.condition || null, leagueDay: opts.leagueDay ?? null, groupId: opts.groupId ?? null, waivedClauses: [...(pkg.waived ?? []), ...(pkg.clauseFees ?? []).map((f) => f.playerId)], clauseFees: (pkg.clauseFees ?? []) as object } });
   const rows: Array<{ tradeId: number; assetType: string; side: string; playerId?: number; prospectId?: number; draftPickId?: number; cashAmount?: number; retentionPct?: number }> = [];
   for (const p of pkg.fromPlayers) rows.push({ tradeId: trade.id, assetType: "PLAYER", side: "FROM", playerId: p.playerId, retentionPct: p.retentionPct || undefined });
   for (const p of pkg.toPlayers) rows.push({ tradeId: trade.id, assetType: "PLAYER", side: "TO", playerId: p.playerId, retentionPct: p.retentionPct || undefined });
@@ -292,8 +292,37 @@ export async function createTradeRecord(pkg: TradePackage, opts: { fromName: str
   await prisma.tradeAsset.createMany({ data: rows });
   if (pkg.condition?.trim())
     await prisma.tradeCondition.create({ data: { tradeId: trade.id, fromTeamId: pkg.fromTeamId, toTeamId: pkg.toTeamId, description: pkg.condition.trim(), status: "PENDING" } });
-  await prisma.dmMessage.create({
-    data: { fromTeamId: pkg.fromTeamId, toTeamId: pkg.toTeamId, body: opts.dmBody ?? `📩 ${opts.fromName} sent you a trade proposal — open it to review, then Accept or Decline.`, tradeUrl: `/trades/${trade.id}` },
-  }).catch(() => {});
+  if (!opts.skipDm) {
+    await prisma.dmMessage.create({
+      data: { fromTeamId: pkg.fromTeamId, toTeamId: pkg.toTeamId, body: opts.dmBody ?? `📩 ${opts.fromName} sent you a trade proposal — open it to review, then Accept or Decline.`, tradeUrl: `/trades/${trade.id}` },
+    }).catch(() => {});
+  }
   return { tradeId: trade.id };
+}
+
+/** Execute every leg of a 3-team TradeGroup together, in one transaction — either
+ *  all 3 asset moves happen or none do. Called once every involved team has said
+ *  yes (see respondToTradeGroupAction). */
+export async function executeTradeGroup(groupId: number) {
+  const legs = await prisma.trade.findMany({ where: { groupId } });
+  if (!legs.length) throw new Error("Trade group has no legs.");
+  const teamIds = [...new Set(legs.flatMap((l) => [l.fromTeamId, l.toTeamId]))];
+  const teams = await prisma.team.findMany({ where: { id: { in: teamIds } }, select: { id: true, name: true } });
+  const nameOf = (id: number) => teams.find((t) => t.id === id)?.name ?? "?";
+
+  const allOps: Prisma.PrismaPromise<unknown>[] = [];
+  const legSummaries: string[] = [];
+  for (const leg of legs) {
+    const pkg = await packageFromTrade(leg.id);
+    pkg.waived = leg.waivedClauses ?? [];
+    pkg.clauseFees = (leg.clauseFees as TradePackage["clauseFees"]) ?? [];
+    const { ops, fromTeam, toTeam, fromNames } = await collectMoveOps(pkg);
+    allOps.push(...ops);
+    allOps.push(prisma.trade.update({ where: { id: leg.id }, data: { status: "ACCEPTED", respondedAt: new Date() } }));
+    legSummaries.push(`${fromTeam.name} sent ${fromNames.join(", ") || "assets"} to ${toTeam.name}`);
+  }
+  allOps.push(prisma.tradeGroup.update({ where: { id: groupId }, data: { status: "ACCEPTED", respondedAt: new Date() } }));
+  allOps.push(prisma.transaction.create({ data: { type: "TRADE", message: `3-team trade (${teams.map((t) => t.name).join(", ")}): ${legSummaries.join("; ")}.` } }));
+  await prisma.$transaction(allOps);
+  return { teamNames: teams.map((t) => t.name), nameOf };
 }

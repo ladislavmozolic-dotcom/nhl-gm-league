@@ -254,6 +254,7 @@ export async function respondToTrade(tradeId: number, accept: boolean) {
   const session = await getTeamSession();
   const trade = await prisma.trade.findUnique({ where: { id: tradeId } });
   if (!trade) throw new Error("Trade not found");
+  if (trade.groupId != null) throw new Error("This is a leg of a 3-team trade — respond to the trade group instead.");
   if (trade.status !== "PENDING") throw new Error("This trade is no longer pending.");
   // the receiving GM responds; the commissioner may respond on his behalf (e.g. a GM
   // who couldn't confirm it himself).
@@ -306,6 +307,7 @@ export async function commishRespondTrade(tradeId: number, action: "accept" | "d
   if (!(await isCommission())) throw new Error("Only a commission member can review rookie trades.");
   const trade = await prisma.trade.findUnique({ where: { id: tradeId } });
   if (!trade) throw new Error("Trade not found.");
+  if (trade.groupId != null) throw new Error("This is a leg of a 3-team trade — review the trade group instead.");
   if (!["AWAITING_COMMISH", "MODIFIED"].includes(trade.status)) throw new Error("This trade isn't awaiting commission review.");
   // Conflict of interest: a commission member on ONE SIDE of this trade can't be the
   // one who approves/declines/modifies it — needs a different commission member.
