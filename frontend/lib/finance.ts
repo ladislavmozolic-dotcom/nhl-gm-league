@@ -217,6 +217,15 @@ export function buyoutTerms(
   return { perYear, years, totalCost: perYear * years, pct };
 }
 
+// A parent club still pays real money for its farm team's roster, but only
+// contracts worth actually budgeting for — cheap two-way/entry deals are
+// rounding error. This never touches the NHL salary cap; it only drains
+// the bank, same as NHL salaries do.
+export const FARM_SALARY_THRESHOLD = 100_000;
+export function farmSalaryExpense(players: Array<{ capHit: number | null }>): number {
+  return players.reduce((s, p) => s + ((p.capHit ?? 0) > FARM_SALARY_THRESHOLD ? (p.capHit ?? 0) : 0), 0);
+}
+
 export type TeamFinance = {
   popularity: number; attendance: number;
   actualIncome: number; projectedIncome: number;

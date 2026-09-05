@@ -3,7 +3,7 @@
 // salaries out over the schedule. Idempotent — sets the balance.
 
 import { prisma } from "./prisma";
-import { getArenaSections, selloutRevenue, computeTeamFinance, projectedPointsPct, STARTING_BANK } from "./finance";
+import { getArenaSections, selloutRevenue, computeTeamFinance, projectedPointsPct, farmSalaryExpense, STARTING_BANK } from "./finance";
 import { computeStandings } from "./sim/standings";
 import { loadSettings } from "./sim/settings";
 
@@ -50,6 +50,7 @@ export async function processFinances(season = "2026-27", league = "NHL") {
         id: true, capacity: true, arenaSections: true, popularity: true,
         profinhlBank: true, ledgerAdj: true,
         players: { where: { rosterType: league }, select: { capHit: true, retainedSalary: true } },
+        affiliateTeams: { select: { players: { where: { rosterType: "AHL" }, select: { capHit: true } } } },
       },
     }),
     computeStandings(season, league),
@@ -88,8 +89,11 @@ export async function processFinances(season = "2026-27", league = "NHL") {
         pointsPct: projectedPointsPct(st),
         selloutRevenue: selloutRevenue(getArenaSections(t)),
         // real dollars owed by THIS club — a player it acquired with retention
-        // only costs it the post-retention share; the retaining club carries the rest.
-        salary: t.players.reduce((s, p) => s + Math.max(0, (p.capHit ?? 0) - (p.retainedSalary ?? 0)), 0),
+        // only costs it the post-retention share; the retaining club carries the
+        // rest. Farm (AHL) contracts above the budgeting threshold drain the bank
+        // too, same as NHL salaries, but never touch the NHL cap.
+        salary: t.players.reduce((s, p) => s + Math.max(0, (p.capHit ?? 0) - (p.retainedSalary ?? 0)), 0)
+          + farmSalaryExpense(t.affiliateTeams.flatMap((a) => a.players)),
         homeGamesPlayed: homeGames,
         totalGamesPlayed: totalGames,
         startingBank: startBank,

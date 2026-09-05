@@ -7,7 +7,7 @@ import { computeStandings } from "@/lib/sim/standings";
 import {
   getArenaSections, selloutRevenue, computeTeamFinance, teamCapSummary, projectedPointsPct,
   playerCapYears, deadMoneyForYear, money, CURRENT_SEASON_START, seasonLabel,
-  accruedCapSpace, SEASON_GAMES, ltirRelief, capCeilingForPhase,
+  accruedCapSpace, SEASON_GAMES, ltirRelief, capCeilingForPhase, farmSalaryExpense,
 } from "@/lib/finance";
 import { getLeagueClock } from "@/lib/calendar-server";
 import { getTeamSession } from "@/lib/auth";
@@ -46,12 +46,15 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   const realBuyouts = buyouts.filter((b) => b.totalCost > 0);
   const retentions = buyouts.filter((b) => b.totalCost === 0);
   const st = standings.find((s) => s.teamId === team.id);
+  // Farm (AHL) contracts worth budgeting for drain the bank like NHL salaries do,
+  // but never touch the NHL cap — kept entirely out of every cap figure below.
+  const farmExpense = farmSalaryExpense(farm);
   const fin = computeTeamFinance({
     popularity: team.popularity, pointsPct: projectedPointsPct(st),
     selloutRevenue: selloutRevenue(getArenaSections(team)),
     // real dollars this club owes — a retained acquisition only costs it the
     // post-retention share; the retaining club carries the rest.
-    salary: team.players.reduce((s, p) => s + Math.max(0, (p.capHit ?? 0) - (p.retainedSalary ?? 0)), 0),
+    salary: team.players.reduce((s, p) => s + Math.max(0, (p.capHit ?? 0) - (p.retainedSalary ?? 0)), 0) + farmExpense,
     homeGamesPlayed: homeGames, totalGamesPlayed: totalGames,
     startingBank: settings.startingCapital,
   });
@@ -82,8 +85,8 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   const Badge = ({ s }: { s: "UFA" | "RFA" }) => (
     <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${s === "UFA" ? "bg-red-600 text-white" : "bg-blue-600 text-white"}`}>{s}</span>
   );
-  const FRow = ({ k, v, cls = "" }: { k: string; v: string; cls?: string }) => (
-    <div className="flex justify-between px-4 py-2 border-b border-slate-800/60 text-sm"><span className="text-slate-400">{k}</span><span className={`tabular-nums ${cls}`}>{v}</span></div>
+  const FRow = ({ k, v, cls = "", title }: { k: string; v: string; cls?: string; title?: string }) => (
+    <div className="flex justify-between px-4 py-2 border-b border-slate-800/60 text-sm" title={title}><span className="text-slate-400">{k}</span><span className={`tabular-nums ${cls}`}>{v}</span></div>
   );
   const CapRows = ({ list, gm }: { list: CP[]; gm: boolean }) => (
     <>{list.map((p) => {
@@ -156,6 +159,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
         <div className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 overflow-hidden">
           <div className="px-4 py-2.5 bg-slate-800/30 border-b border-slate-800 text-xs font-bold uppercase tracking-wide text-slate-400">Expenses (salaries)</div>
           <FRow k="Actual" v={money(fin.actualExpenses)} /><FRow k="Projected" v={money(fin.projectedExpenses)} cls="text-slate-400" />
+          <FRow k="of which Farm (AHL)" v={farmExpense ? money(farmExpense) : "—"} cls="text-slate-500" title="Farm contracts over $100K — drains the bank like an NHL salary, but never counts against the NHL cap" />
         </div>
         <div className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 overflow-hidden">
           <div className="px-4 py-2.5 bg-slate-800/30 border-b border-slate-800 text-xs font-bold uppercase tracking-wide text-slate-400">Result</div>
