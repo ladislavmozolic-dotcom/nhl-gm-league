@@ -102,12 +102,26 @@ export default async function HomePage() {
     where: { type: "TRADE", message: { contains: "traded" } }, orderBy: { createdAt: "desc" }, take: 3,
     select: { id: true, message: true, createdAt: true },
   });
+  const titleCase = (s: string) => s.replace(/\w\S*/g, (w) => w[0] + w.slice(1).toLowerCase());
   const recentTrades = recentTradesRaw.map((tr) => {
     const fromTeam = teams.find((t) => tr.message.startsWith(`${t.name} traded`)) ?? null;
     const toIdx = tr.message.indexOf(" to ");
     const afterTo = toIdx >= 0 ? tr.message.slice(toIdx + 4) : "";
     const toTeam = teams.find((t) => afterTo.startsWith(t.name)) ?? null;
-    return { ...tr, fromLogo: fromTeam?.logoUrl ?? null, toLogo: toTeam?.logoUrl ?? null };
+    // Pull the assets each side gave up out of the fixed template too, so the
+    // team names/logos can sit as their own row and the players/picks read as
+    // a quieter detail line underneath instead of one long run-on sentence.
+    let fromAssets: string | null = null, toAssets: string | null = null;
+    if (fromTeam && toTeam && toIdx >= 0) {
+      fromAssets = tr.message.slice(fromTeam.name.length, toIdx).replace(/^\s*traded\s*/, "").trim();
+      toAssets = afterTo.slice(toTeam.name.length).replace(/^\s*for\s*/, "").replace(/\.\s*$/, "").trim();
+    }
+    return {
+      ...tr,
+      from: fromTeam ? { name: titleCase(fromTeam.name), logoUrl: fromTeam.logoUrl, slug: fromTeam.slug } : null,
+      to: toTeam ? { name: titleCase(toTeam.name), logoUrl: toTeam.logoUrl, slug: toTeam.slug } : null,
+      fromAssets, toAssets,
+    };
   });
 
   // GM command center — full-screen on first load of a session (for a logged-in GM)
@@ -217,14 +231,32 @@ export default async function HomePage() {
             <span className="text-xs text-slate-400">{T("ui.viewAll")}</span>
           </div>
           {recentTrades.length ? (
-            <ul className="space-y-1.5 text-sm">
+            <ul className="space-y-2.5">
               {recentTrades.map((t) => (
-                <li key={t.id} className="text-slate-200 leading-snug flex gap-2">
-                  <span className="shrink-0 flex items-center gap-1">
-                    {t.fromLogo ? <img src={t.fromLogo} alt="" className="w-4 h-4 object-contain" /> : <span className="text-blue-400">•</span>}
-                    {t.toLogo && <img src={t.toLogo} alt="" className="w-4 h-4 object-contain" />}
-                  </span>
-                  <span className="min-w-0"><span className="line-clamp-2">{t.message}</span> <span className="text-slate-500 text-xs">{fmtDate(t.createdAt)}</span></span>
+                <li key={t.id}>
+                  <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-100">
+                    {t.from ? (
+                      <span className="flex items-center gap-1.5 min-w-0">
+                        {t.from.logoUrl && <img src={t.from.logoUrl} alt="" className="w-4 h-4 object-contain shrink-0" />}
+                        <span className="truncate">{t.from.name}</span>
+                      </span>
+                    ) : <span className="text-blue-400">•</span>}
+                    {t.to && (
+                      <>
+                        <span className="text-slate-500 shrink-0 text-xs">⇄</span>
+                        <span className="flex items-center gap-1.5 min-w-0">
+                          {t.to.logoUrl && <img src={t.to.logoUrl} alt="" className="w-4 h-4 object-contain shrink-0" />}
+                          <span className="truncate">{t.to.name}</span>
+                        </span>
+                      </>
+                    )}
+                    <span className="ml-auto shrink-0 text-slate-500 text-[11px] font-normal tabular-nums">{fmtDate(t.createdAt)}</span>
+                  </div>
+                  <p className="text-slate-400 text-xs mt-0.5 line-clamp-2">
+                    {t.fromAssets && t.toAssets
+                      ? <>gave <span className="text-slate-300">{t.fromAssets}</span> for <span className="text-slate-300">{t.toAssets}</span></>
+                      : t.message}
+                  </p>
                 </li>
               ))}
             </ul>
