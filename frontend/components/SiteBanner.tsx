@@ -21,7 +21,11 @@ function SocialIcon({ type }: { type: string }) {
 // optional fixed band height, and optional social links in the corner.
 export default function SiteBanner({ branding }: { branding: Branding }) {
   const justify = branding.bannerAlign === "left" ? "justify-start" : branding.bannerAlign === "right" ? "justify-end" : "justify-center";
-  const dir = branding.bannerLayout === "stack" ? "flex-col" : "flex-row";
+  // The logo and wordmark side by side are each sized for a desktop-width row —
+  // together they're wider than a phone screen no matter how far either one
+  // individually shrinks. So mobile always stacks them regardless of the admin's
+  // chosen desktop layout, which only takes effect from the sm breakpoint up.
+  const dir = `flex-col ${branding.bannerLayout === "stack" ? "sm:flex-col" : "sm:flex-row"}`;
   const fixed = branding.bannerHeight > 0;
   const social = branding.socialLinks ?? [];
 
@@ -46,8 +50,14 @@ export default function SiteBanner({ branding }: { branding: Branding }) {
 
   return (
     <div className="bg-gradient-to-r from-[#0a1628] via-[#1e3a5f] to-[#0a1628] border-b border-slate-700/40 overflow-hidden">
-      <div className={`max-w-[1400px] mx-auto px-4 relative flex items-center ${fixed ? "" : "py-4"}`} style={fixed ? { height: branding.bannerHeight } : undefined}>
-        <Link href="/" className={`flex items-center gap-4 w-full ${dir} ${justify}`}>{parts}</Link>
+      {/* A fixed banner height is sized for the admin's desktop row layout — on
+          mobile the logo+wordmark stack instead (see `dir` above) and need
+          room to grow, so the fixed height only applies from sm up. */}
+      <div
+        className={`max-w-[1400px] mx-auto px-4 relative flex items-center ${fixed ? "py-3 sm:py-0 h-auto sm:h-[var(--banner-h)]" : "py-4"}`}
+        style={fixed ? ({ ["--banner-h" as string]: `${branding.bannerHeight}px` } as React.CSSProperties) : undefined}
+      >
+        <Link href="/" className={`flex items-center gap-2 sm:gap-4 w-full ${dir} ${justify}`}>{parts}</Link>
         {social.length > 0 && (
           <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2.5">
             {social.map((s, i) => (
