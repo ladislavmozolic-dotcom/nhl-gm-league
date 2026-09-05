@@ -94,9 +94,20 @@ export default async function HomePage() {
 
   // Trade Tracker — only COMPLETED deals (the accepted-trade message reads "X traded
   // … to Y for …"); excludes proposed/declined/revoked noise. Latest 3.
-  const recentTrades = await prisma.transaction.findMany({
+  // The message is our own fixed template ("<fromTeam.name> traded … to <toTeam.name>
+  // for …"), not user input — Transaction has no team FK, so pull the two logos back
+  // out by matching each team's full name against that known shape rather than
+  // adding a schema column just for this.
+  const recentTradesRaw = await prisma.transaction.findMany({
     where: { type: "TRADE", message: { contains: "traded" } }, orderBy: { createdAt: "desc" }, take: 3,
     select: { id: true, message: true, createdAt: true },
+  });
+  const recentTrades = recentTradesRaw.map((tr) => {
+    const fromTeam = teams.find((t) => tr.message.startsWith(`${t.name} traded`)) ?? null;
+    const toIdx = tr.message.indexOf(" to ");
+    const afterTo = toIdx >= 0 ? tr.message.slice(toIdx + 4) : "";
+    const toTeam = teams.find((t) => afterTo.startsWith(t.name)) ?? null;
+    return { ...tr, fromLogo: fromTeam?.logoUrl ?? null, toLogo: toTeam?.logoUrl ?? null };
   });
 
   // GM command center — full-screen on first load of a session (for a logged-in GM)
@@ -209,7 +220,10 @@ export default async function HomePage() {
             <ul className="space-y-1.5 text-sm">
               {recentTrades.map((t) => (
                 <li key={t.id} className="text-slate-200 leading-snug flex gap-2">
-                  <span className="text-blue-400 shrink-0">•</span>
+                  <span className="shrink-0 flex items-center gap-1">
+                    {t.fromLogo ? <img src={t.fromLogo} alt="" className="w-4 h-4 object-contain" /> : <span className="text-blue-400">•</span>}
+                    {t.toLogo && <img src={t.toLogo} alt="" className="w-4 h-4 object-contain" />}
+                  </span>
                   <span className="min-w-0"><span className="line-clamp-2">{t.message}</span> <span className="text-slate-500 text-xs">{fmtDate(t.createdAt)}</span></span>
                 </li>
               ))}
