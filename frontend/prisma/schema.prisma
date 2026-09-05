@@ -262,7 +262,12 @@ model Transaction {
   id        Int      @id @default(autoincrement())
   type      String
   message   String
+  playerId  Int? // set for player-scoped events (TRADE_BLOCK, WAIVER) so a
+                 // player's Transaction History can be queried directly instead
+                 // of text-matching `message` — older rows predating this field
+                 // stay null and just won't surface there.
   createdAt DateTime @default(now())
+  @@index([playerId])
 }
 
 // A revertible record of every UFA signing / extension, with the pre-signing

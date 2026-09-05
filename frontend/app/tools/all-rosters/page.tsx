@@ -6,6 +6,9 @@ import { money } from "@/lib/finance";
 import { cleanName, epSearchName, captaincyFromName } from "@/lib/playerName";
 import { isLoggedIn } from "@/lib/auth";
 import { redactAttrs } from "@/lib/player-attrs";
+import { pickIdsWithTradeHistory } from "@/lib/trade-history-server";
+import { getPickTradeHistoryAction } from "@/app/actions/pick-trade-history";
+import PickTradeBadge from "@/components/PickTradeBadge";
 
 export const dynamic = "force-dynamic";
 
@@ -102,6 +105,7 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
 
   const years = [...new Set(full.draftPicks.map((p) => p.year))].sort();
   const pickAt = (year: number, round: number) => full.draftPicks.filter((p) => p.year === year && p.round === round);
+  const tradedPickIds = await pickIdsWithTradeHistory(full.draftPicks.map((p) => p.id));
 
   return (
     <div className="space-y-6 py-2">
@@ -226,9 +230,18 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
                           <div className="flex items-center justify-center gap-1">
                             {picks.map((pk) => {
                               const owner = logoByProfinhl.get(pk.ownerLogoId);
-                              return owner?.logoUrl
-                                ? <img key={pk.id} src={owner.logoUrl} alt={owner.code ?? ""} title={owner.name} className="w-6 h-6 object-contain" />
-                                : <span key={pk.id} className="text-[10px] text-slate-500">{owner?.code ?? "•"}</span>;
+                              return (
+                                <PickTradeBadge
+                                  key={pk.id}
+                                  pickId={pk.id}
+                                  teamName={owner?.name ?? "?"}
+                                  code={owner?.code ?? "•"}
+                                  logoUrl={owner?.logoUrl ?? null}
+                                  size={24}
+                                  clickable={tradedPickIds.has(pk.id)}
+                                  fetchHistory={getPickTradeHistoryAction}
+                                />
+                              );
                             })}
                           </div>
                         </td>

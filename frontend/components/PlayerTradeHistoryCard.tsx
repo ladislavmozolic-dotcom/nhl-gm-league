@@ -29,7 +29,13 @@ function AssetList({ items, highlight }: { items: TradeHistoryAssetItem[]; highl
 }
 
 export default function PlayerTradeHistoryCard({ playerName, history }: { playerName: string; history: TradeHistoryEntry[] }) {
-  if (!history.length) return null;
+  if (!history.length) {
+    return (
+      <Card title="Trade History">
+        <p className="text-sm text-slate-500">Never traded.</p>
+      </Card>
+    );
+  }
   return (
     <Card title="Trade History">
       <div className="space-y-4">
@@ -51,11 +57,11 @@ export default function PlayerTradeHistoryCard({ playerName, history }: { player
             </div>
             <div className="grid sm:grid-cols-2 gap-3">
               <div>
-                <p className="text-[10px] uppercase tracking-wide text-slate-600 mb-1">{h.fromTeam?.name ?? "Team"} sent</p>
+                <p className="text-[10px] uppercase tracking-wide text-slate-600 mb-1">{h.toTeam?.name ?? "Team"} received</p>
                 <AssetList items={h.fromLabels} highlight={playerName} />
               </div>
               <div>
-                <p className="text-[10px] uppercase tracking-wide text-slate-600 mb-1">{h.toTeam?.name ?? "Team"} sent</p>
+                <p className="text-[10px] uppercase tracking-wide text-slate-600 mb-1">{h.fromTeam?.name ?? "Team"} received</p>
                 <AssetList items={h.toLabels} highlight={playerName} />
               </div>
             </div>

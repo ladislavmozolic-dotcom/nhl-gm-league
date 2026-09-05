@@ -1,6 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { Card, SectionTitle } from "@/components/ui";
+import { pickIdsWithTradeHistory } from "@/lib/trade-history-server";
+import { getPickTradeHistoryAction } from "@/app/actions/pick-trade-history";
+import PickTradeBadge from "@/components/PickTradeBadge";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +22,7 @@ export default async function TeamDraftPicksPage({ params }: { params: Promise<{
   }
 
   const allTeams = await prisma.team.findMany({ select: { id: true, profinhlLogoId: true, logoUrl: true, name: true, code: true } });
+  const tradedPickIds = await pickIdsWithTradeHistory(team.draftPicks.map((p) => p.id));
   const draftPickMap = new Map<string, typeof team.draftPicks>();
   team.draftPicks.forEach((pick) => {
     const key = `${pick.year}-${pick.round}`;
@@ -51,9 +55,16 @@ export default async function TeamDraftPicksPage({ params }: { params: Promise<{
                           {picks.map((pick, idx) => {
                             const ownerTeam = allTeams.find((t) => t.profinhlLogoId === pick.ownerLogoId);
                             return (
-                              <div key={idx} className="flex flex-col items-center gap-0.5" title={ownerTeam?.name || "?"}>
-                                {ownerTeam?.logoUrl ? <img src={ownerTeam.logoUrl} alt={ownerTeam.name} className="w-8 h-8 object-contain" />
-                                  : <div className="w-8 h-8 bg-slate-800 rounded-full flex items-center justify-center text-[10px] font-bold text-slate-500">{pick.ownerLogoId}</div>}
+                              <div key={idx} className="flex flex-col items-center gap-0.5">
+                                <PickTradeBadge
+                                  pickId={pick.id}
+                                  teamName={ownerTeam?.name || "?"}
+                                  code={ownerTeam?.code || String(pick.ownerLogoId)}
+                                  logoUrl={ownerTeam?.logoUrl ?? null}
+                                  size={32}
+                                  clickable={tradedPickIds.has(pick.id)}
+                                  fetchHistory={getPickTradeHistoryAction}
+                                />
                                 <span className="text-[9px] text-slate-600">{ownerTeam?.code || "?"}</span>
                               </div>
                             );
