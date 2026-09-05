@@ -46,7 +46,9 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   const fin = computeTeamFinance({
     popularity: team.popularity, pointsPct: projectedPointsPct(st),
     selloutRevenue: selloutRevenue(getArenaSections(team)),
-    salary: team.players.reduce((s, p) => s + (p.capHit ?? 0), 0),
+    // real dollars this club owes — a retained acquisition only costs it the
+    // post-retention share; the retaining club carries the rest.
+    salary: team.players.reduce((s, p) => s + Math.max(0, (p.capHit ?? 0) - (p.retainedSalary ?? 0)), 0),
     homeGamesPlayed: homeGames, totalGamesPlayed: totalGames,
     startingBank: settings.startingCapital,
   });

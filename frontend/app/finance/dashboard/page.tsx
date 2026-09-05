@@ -33,7 +33,7 @@ export default async function FinanceDashboardPage() {
   let basic: { revenue: number; expenses: number; result: number } | null = null;
   if (dash && !detailed) {
     const [teamFin, standings, homeGames, totalGames] = await Promise.all([
-      prisma.team.findUnique({ where: { id: dash.teamId }, select: { popularity: true, capacity: true, arenaSections: true, players: { where: { rosterType: "NHL" }, select: { capHit: true } } } }),
+      prisma.team.findUnique({ where: { id: dash.teamId }, select: { popularity: true, capacity: true, arenaSections: true, players: { where: { rosterType: "NHL" }, select: { capHit: true, retainedSalary: true } } } }),
       computeStandings(REGULAR_SEASON, "NHL"),
       prisma.game.count({ where: { season: REGULAR_SEASON, league: "NHL", status: "FINAL", seriesId: null, homeTeamId: dash.teamId } }),
       prisma.game.count({ where: { season: REGULAR_SEASON, league: "NHL", status: "FINAL", seriesId: null, OR: [{ homeTeamId: dash.teamId }, { awayTeamId: dash.teamId }] } }),
@@ -44,7 +44,7 @@ export default async function FinanceDashboardPage() {
         popularity: teamFin.popularity,
         pointsPct: projectedPointsPct(st),
         selloutRevenue: selloutRevenue(getArenaSections(teamFin)),
-        salary: teamFin.players.reduce((s, p) => s + (p.capHit ?? 0), 0),
+        salary: teamFin.players.reduce((s, p) => s + Math.max(0, (p.capHit ?? 0) - (p.retainedSalary ?? 0)), 0),
         homeGamesPlayed: homeGames,
         totalGamesPlayed: totalGames,
         startingBank: settings.startingCapital,

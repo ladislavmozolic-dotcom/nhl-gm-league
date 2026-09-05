@@ -49,7 +49,7 @@ export async function processFinances(season = "2026-27", league = "NHL") {
       select: {
         id: true, capacity: true, arenaSections: true, popularity: true,
         profinhlBank: true, ledgerAdj: true,
-        players: { where: { rosterType: league }, select: { capHit: true } },
+        players: { where: { rosterType: league }, select: { capHit: true, retainedSalary: true } },
       },
     }),
     computeStandings(season, league),
@@ -87,7 +87,9 @@ export async function processFinances(season = "2026-27", league = "NHL") {
         popularity: t.popularity,
         pointsPct: projectedPointsPct(st),
         selloutRevenue: selloutRevenue(getArenaSections(t)),
-        salary: t.players.reduce((s, p) => s + (p.capHit ?? 0), 0),
+        // real dollars owed by THIS club — a player it acquired with retention
+        // only costs it the post-retention share; the retaining club carries the rest.
+        salary: t.players.reduce((s, p) => s + Math.max(0, (p.capHit ?? 0) - (p.retainedSalary ?? 0)), 0),
         homeGamesPlayed: homeGames,
         totalGamesPlayed: totalGames,
         startingBank: startBank,

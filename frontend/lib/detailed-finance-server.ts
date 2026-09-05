@@ -24,7 +24,7 @@ export async function leagueDetailedFinance(): Promise<Map<number, { revenue: nu
   const [fans, stars, teams] = await Promise.all([
     leagueFanInterest(),
     allStarPowers(),
-    prisma.team.findMany({ where: { league: "NHL", isAffiliate: false }, select: { id: true, ticketPricing: true, sponsorDeal: true, capacity: true, headCoach: { select: { salary: true } }, affiliateTeams: { select: { headCoach: { select: { salary: true } }, players: { where: { rosterType: "AHL" }, select: { capHit: true } } } }, players: { where: { rosterType: "NHL" }, select: { capHit: true } } } }),
+    prisma.team.findMany({ where: { league: "NHL", isAffiliate: false }, select: { id: true, ticketPricing: true, sponsorDeal: true, capacity: true, headCoach: { select: { salary: true } }, affiliateTeams: { select: { headCoach: { select: { salary: true } }, players: { where: { rosterType: "AHL" }, select: { capHit: true } } } }, players: { where: { rosterType: "NHL" }, select: { capHit: true, retainedSalary: true } } } }),
   ]);
   const jerseyByTeam = new Map<number, number>();
   for (const s of stars) if (s.teamId != null) jerseyByTeam.set(s.teamId, (jerseyByTeam.get(s.teamId) ?? 0) + jerseyUnits(s.score));
@@ -41,7 +41,9 @@ export async function leagueDetailedFinance(): Promise<Map<number, { revenue: nu
     const merch = teamMerch({ jerseyUnitsTotal: jerseyByTeam.get(t.id) ?? 0, fanInterest: f.interest, baselineInterest: f.baseline });
     const deal = t.sponsorDeal as { aav?: number } | null;
     const revenue = clubRevenueTotal({ pricing, sthSold: st.sold, avgAttendance: avg, fanInterest: f.interest, merchTotal: merch.total, sponsorAav: deal?.aav ?? 0 });
-    const salary = t.players.reduce((s, p) => s + (p.capHit ?? 0), 0);
+    // real dollars this club owes — a retained acquisition only costs it the
+    // post-retention share; the retaining club carries the rest.
+    const salary = t.players.reduce((s, p) => s + Math.max(0, (p.capHit ?? 0) - (p.retainedSalary ?? 0)), 0);
     const coachSalary = (t.headCoach?.salary ?? 0) + t.affiliateTeams.reduce((s, a) => s + (a.headCoach?.salary ?? 0), 0);
     const ahlSalary = t.affiliateTeams.reduce((s, a) => s + a.players.reduce((x, p) => x + (p.capHit ?? 0), 0), 0);
     out.set(t.id, { revenue, salary, net: revenue - clubExpenseTotal(salary, coachSalary, ahlSalary) });
@@ -64,7 +66,7 @@ export async function teamDashboard(teamId: number): Promise<TeamDashboard | nul
 
   const [fan, st, att, merch, sponsor, merchBoard, roster] = await Promise.all([
     teamFanInterest(teamId), teamSeasonTickets(teamId), teamAttendance(teamId), teamMerchandise(teamId), teamSponsor(teamId), leagueMerch(),
-    prisma.player.findMany({ where: { teamId, rosterType: "NHL" }, select: { capHit: true } }),
+    prisma.player.findMany({ where: { teamId, rosterType: "NHL" }, select: { capHit: true, retainedSalary: true } }),
   ]);
 
   const pricing = asPricing(team.ticketPricing);
@@ -76,7 +78,7 @@ export async function teamDashboard(teamId: number): Promise<TeamDashboard | nul
     fanInterest: fan?.interest ?? 0, merchTotal: merch?.total ?? 0, sponsorAav: sponsor?.deal?.aav ?? 0,
   });
   const revenue = revenueLines.reduce((t, l) => t + l.amount, 0);
-  const salary = roster.reduce((t, p) => t + (p.capHit ?? 0), 0);
+  const salary = roster.reduce((t, p) => t + Math.max(0, (p.capHit ?? 0) - (p.retainedSalary ?? 0)), 0);
   const coachSalary = (team.headCoach?.salary ?? 0) + team.affiliateTeams.reduce((s, a) => s + (a.headCoach?.salary ?? 0), 0);
   const ahlSalary = team.affiliateTeams.reduce((s, a) => s + a.players.reduce((x, p) => x + (p.capHit ?? 0), 0), 0);
   const expenseLines = clubExpenseLines(salary, coachSalary, ahlSalary);

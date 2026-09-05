@@ -15,7 +15,7 @@ export default async function FinancePage() {
       select: {
         id: true, name: true, slug: true, logoUrl: true, popularity: true,
         capacity: true, arenaSections: true, ledgerAdj: true,
-        players: { where: { rosterType: "NHL" }, select: { capHit: true } },
+        players: { where: { rosterType: "NHL" }, select: { capHit: true, retainedSalary: true } },
       },
     }),
     loadSettings(),
@@ -40,7 +40,7 @@ export default async function FinancePage() {
       popularity: t.popularity,
       pointsPct: projectedPointsPct(st),
       selloutRevenue: selloutRevenue(getArenaSections(t)),
-      salary: t.players.reduce((s, p) => s + (p.capHit ?? 0), 0),
+      salary: t.players.reduce((s, p) => s + Math.max(0, (p.capHit ?? 0) - (p.retainedSalary ?? 0)), 0),
       homeGamesPlayed: homeById.get(t.id) ?? 0,
       totalGamesPlayed: st?.gp ?? 0,
       startingBank: startBank,
