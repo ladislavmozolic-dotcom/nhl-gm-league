@@ -193,7 +193,14 @@ export default function TradeBuilder3({ me, teamB, teamC, assetsA, assetsB, asse
 
   const count = playersA.size + playersB.size + playersC.size + picksA.size + picksB.size + picksC.size + prospectsA.size + prospectsB.size + prospectsC.size + (cashA ? 1 : 0) + (cashB ? 1 : 0) + (cashC ? 1 : 0);
   const destsChosen = destA != null && destB != null && destC != null;
-  const formsCycle = destsChosen && destA !== me.id && destB !== teamB.id && destC !== teamC.id;
+  // A valid 3-way cycle needs the 3 chosen destinations to be a genuine
+  // permutation of the 3 clubs — no self-sends, AND no two clubs picking the
+  // same destination (which would leave a 3rd club receiving nothing). With
+  // only 3 clubs, "3 distinct destinations, none of them yourself" is exactly
+  // the 2 valid cycles (A→B→C→A or A→C→B→A) — there's no other shape it could take.
+  const noSelfSend = destsChosen && destA !== me.id && destB !== teamB.id && destC !== teamC.id;
+  const distinctDests = destsChosen && new Set([destA, destB, destC]).size === 3;
+  const formsCycle = noSelfSend && distinctDests;
 
   const submit = () => start(async () => {
     setErr(null); setMsg(null);
@@ -241,7 +248,8 @@ export default function TradeBuilder3({ me, teamB, teamC, assetsA, assetsB, asse
 
       <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-4 space-y-2">
         {!destsChosen && <p className="text-sm text-amber-300">Pick a destination for all 3 clubs first.</p>}
-        {destsChosen && !formsCycle && <p className="text-sm text-rose-400">A club can't send to itself — pick a different destination.</p>}
+        {destsChosen && !noSelfSend && <p className="text-sm text-rose-400">A club can't send to itself — pick a different destination.</p>}
+        {destsChosen && noSelfSend && !distinctDests && <p className="text-sm text-rose-400">Two clubs can't send to the same destination — that would leave the third club with nothing coming in. Each of the 3 destinations must be different.</p>}
         <button onClick={submit} disabled={pending || count === 0 || !formsCycle}
           className="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 font-semibold text-sm disabled:opacity-40">
           {pending ? "Sending…" : `Propose 3-team trade${count ? ` (${count})` : ""}`}
