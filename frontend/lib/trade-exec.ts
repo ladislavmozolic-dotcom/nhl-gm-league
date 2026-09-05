@@ -51,7 +51,7 @@ export async function collectMoveOps(pkg: TradePackage) {
   const allPlayerIds = [...pkg.fromPlayers, ...pkg.toPlayers].map((p) => p.playerId);
   const players = await prisma.player.findMany({
     where: { id: { in: allPlayerIds } },
-    select: { id: true, name: true, teamId: true, rosterType: true, capHit: true, contractYears: true, tradeClause: true, noTradeTeams: true },
+    select: { id: true, name: true, teamId: true, rosterType: true, capHit: true, retainedSalary: true, contractYears: true, tradeClause: true, noTradeTeams: true },
   });
   const pById = new Map(players.map((p) => [p.id, p]));
   const waived = new Set([...(pkg.waived ?? []), ...(pkg.clauseFees ?? []).map((f) => f.playerId)]);
@@ -61,7 +61,7 @@ export async function collectMoveOps(pkg: TradePackage) {
   if (retainedCount > settings.retentionMaxPlayers) throw new Error(`Max ${settings.retentionMaxPlayers} retained players per trade.`);
 
   const ops: Prisma.PrismaPromise<unknown>[] = [];
-  const retentionRecords: Array<{ teamId: number; playerName: string; perYear: number; years: number }> = [];
+  const retentionRecords: Array<{ teamId: number; playerId: number; playerName: string; perYear: number; years: number }> = [];
 
   const movePlayers = (list: TradePlayer[], fromOrg: OrgTeam, toNhlId: number, toAffId: number | null) => {
     const fromOrgIds = orgIds(fromOrg);
@@ -73,18 +73,24 @@ export async function collectMoveOps(pkg: TradePackage) {
       const toFarm = pl.rosterType === "AHL";
       const destId = toFarm ? (toAffId ?? toNhlId) : toNhlId;
       const destRoster = toFarm && toAffId ? "AHL" : "NHL";
-      let capHit = pl.capHit ?? 0;
+      // capHit is the player's own TRUE salary and never changes because of who's
+      // paying part of it — retention is tracked separately (retainedSalary, the
+      // slice a former club keeps carrying) so his profile/contract always reads
+      // right, and the acquiring club's cap total nets it out at the team level
+      // (see lib/cap.ts teamCapCommitted).
+      const capHit = pl.capHit ?? 0;
+      let retainedSalary = pl.retainedSalary ?? 0;
       if (tp.retentionPct > 0 && capHit) {
         const pct = Math.min(maxPct, tp.retentionPct);
         const retained = Math.round((capHit * pct / 100) / 50000) * 50000;
-        const newCap = capHit - retained;
-        if (newCap < settings.retentionMinSalary) throw new Error(`Retention would drop ${pl.name} below the ${settings.retentionMinSalary.toLocaleString()} floor.`);
-        capHit = newCap;
-        retentionRecords.push({ teamId: fromOrg.id, playerName: `${pl.name} (retained)`, perYear: retained, years: Math.max(1, pl.contractYears ?? 1) });
+        const netCap = capHit - retained;
+        if (netCap < settings.retentionMinSalary) throw new Error(`Retention would drop ${pl.name} below the ${settings.retentionMinSalary.toLocaleString()} floor.`);
+        retainedSalary = retained;
+        retentionRecords.push({ teamId: fromOrg.id, playerId: pl.id, playerName: `${pl.name} (retained)`, perYear: retained, years: Math.max(1, pl.contractYears ?? 1) });
       }
       // being shopped was the OLD club's decision — it doesn't carry over to whoever
       // just acquired him, so clear the trade-block flag on every trade.
-      ops.push(prisma.player.update({ where: { id: pl.id }, data: { teamId: destId, rosterType: destRoster, capHit, captaincy: null, onBlock: false, blockNote: null } }));
+      ops.push(prisma.player.update({ where: { id: pl.id }, data: { teamId: destId, rosterType: destRoster, capHit, retainedSalary, captaincy: null, onBlock: false, blockNote: null } }));
     }
   };
   movePlayers(pkg.fromPlayers, fromTeam, pkg.toTeamId, toAff);
@@ -118,7 +124,7 @@ export async function collectMoveOps(pkg: TradePackage) {
   }
 
   for (const r of retentionRecords)
-    ops.push(prisma.buyout.create({ data: { teamId: r.teamId, playerName: r.playerName, perYear: r.perYear, years: r.years, startYear: CURRENT_SEASON_START, totalCost: 0, inSeason: true } }));
+    ops.push(prisma.buyout.create({ data: { teamId: r.teamId, playerId: r.playerId, playerName: r.playerName, perYear: r.perYear, years: r.years, startYear: CURRENT_SEASON_START, totalCost: 0, inSeason: true } }));
 
   for (const f of pkg.clauseFees ?? []) {
     if (!f.feeAmount) continue;

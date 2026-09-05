@@ -6,6 +6,7 @@ import { canManageTeam, getTeamSession, isAdmin, isComishTier } from "@/lib/auth
 import { getLeagueClock, getLeagueDate } from "@/lib/calendar-server";
 import { addDays } from "@/lib/calendar";
 import { CURRENT_SEASON_START, capCeilingForPhase, ltirRelief, accruedCapSpace } from "@/lib/finance";
+import { teamCapCommitted } from "@/lib/cap";
 import {
   loadMarketPool, teamContentionMap, teamAsk, evaluateTeamOffer, loadLeagueCap, weakestTeams,
 } from "@/lib/free-agency-server";
@@ -39,12 +40,14 @@ const SHORTLIST_SIZE = 3; // how many suitors a player keeps into the final week
  *  relief (cap hits of skaters injured below CON 90). The effective ceiling is
  *  the phase ceiling + LTIR relief. */
 async function teamCapInfo(teamId: number): Promise<{ committed: number; ltir: number }> {
-  const roster = await prisma.player.findMany({
-    where: { teamId, rosterType: "NHL" }, select: { capHit: true, injuryDaysLeft: true, condition: true, isGoalie: true },
-  });
-  const salaries = roster.reduce((t, p) => t + (p.capHit ?? 0), 0);
-  const team = await prisma.team.findUnique({ where: { id: teamId }, select: { retainsBuyouts: true } });
-  return { committed: salaries + (team?.retainsBuyouts ?? 0), ltir: ltirRelief(roster) };
+  const [roster, capInfo] = await Promise.all([
+    prisma.player.findMany({
+      where: { teamId, rosterType: "NHL" }, select: { capHit: true, retainedSalary: true, injuryDaysLeft: true, condition: true, isGoalie: true },
+    }),
+    teamCapCommitted(teamId),
+  ]);
+  const ltirRoster = roster.map((p) => ({ ...p, capHit: Math.max(0, (p.capHit ?? 0) - (p.retainedSalary ?? 0)) }));
+  return { committed: capInfo.committed, ltir: ltirRelief(ltirRoster) };
 }
 
 /** Interest feedback: what this player wants to sign at a given club right now. */

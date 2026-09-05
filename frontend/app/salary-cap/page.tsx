@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { loadSettings } from "@/lib/sim/settings";
 import { teamCapCentral, money } from "@/lib/finance";
+import { teamCapCommitted } from "@/lib/cap";
 import { computeStandings } from "@/lib/sim/standings";
 import CapCentralTable, { type CapRow } from "@/components/CapCentralTable";
 import { PageHeader } from "@/components/ui";
@@ -13,7 +14,7 @@ export default async function SalaryCapPage() {
     prisma.team.findMany({
       where: { league: "NHL", isAffiliate: false },
       select: {
-        id: true, name: true, slug: true, logoUrl: true, retainsBuyouts: true,
+        id: true, name: true, slug: true, logoUrl: true,
         players: { where: { rosterType: "NHL" }, select: { capHit: true } },
       },
     }),
@@ -26,12 +27,16 @@ export default async function SalaryCapPage() {
   const gamesTotalById = new Map<number, number>();
   for (const g of schedule) { for (const id of [g.homeTeamId, g.awayTeamId]) gamesTotalById.set(id, (gamesTotalById.get(id) ?? 0) + 1); }
 
-  const rows: CapRow[] = teams.map((t) => {
+  // retainsBuyouts is computed live (never cached): negative when this club is
+  // getting relief from a trade retention it benefits from, positive when it's
+  // carrying its own buyout/retention dead money this season.
+  const rows: CapRow[] = await Promise.all(teams.map(async (t) => {
     const gp = gpById.get(t.id) ?? 0;
     const gamesTotal = gamesTotalById.get(t.id) || 82;
-    const c = teamCapCentral(t.players, t.retainsBuyouts, { salaryCapUpper: settings.salaryCapUpper, salaryCapLower: settings.salaryCapLower }, { gamesPlayed: gp, gamesTotal });
+    const { retainsBuyouts } = await teamCapCommitted(t.id);
+    const c = teamCapCentral(t.players, retainsBuyouts, { salaryCapUpper: settings.salaryCapUpper, salaryCapLower: settings.salaryCapLower }, { gamesPlayed: gp, gamesTotal });
     return { id: t.id, name: t.name, slug: t.slug, logoUrl: t.logoUrl, gp, gamesTotal, ...c };
-  });
+  }));
 
   return (
     <div className="space-y-6 py-2">
