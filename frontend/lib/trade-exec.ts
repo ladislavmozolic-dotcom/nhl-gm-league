@@ -98,16 +98,20 @@ export async function collectMoveOps(pkg: TradePackage) {
 
   const fromOrgIds = orgIds(fromTeam), toOrgIds = orgIds(toTeam);
   const allPickIds = [...pkg.fromPicks, ...pkg.toPicks];
+  const picks = allPickIds.length
+    ? await prisma.draftPick.findMany({ where: { id: { in: allPickIds } }, select: { id: true, teamId: true, year: true, round: true } })
+    : [];
+  const pkById = new Map(picks.map((p) => [p.id, p]));
   if (allPickIds.length) {
-    const picks = await prisma.draftPick.findMany({ where: { id: { in: allPickIds } }, select: { id: true, teamId: true } });
-    const pkById = new Map(picks.map((p) => [p.id, p]));
     for (const id of pkg.fromPicks) { const pk = pkById.get(id); if (!pk || !fromOrgIds.includes(pk.teamId)) throw new Error("A draft pick in this trade is no longer owned by the offering team."); }
     for (const id of pkg.toPicks) { const pk = pkById.get(id); if (!pk || !toOrgIds.includes(pk.teamId)) throw new Error("A requested draft pick is no longer owned by the other team."); }
   }
   const allProspectIds = [...(pkg.fromProspects ?? []), ...(pkg.toProspects ?? [])];
+  const pros = allProspectIds.length
+    ? await prisma.prospect.findMany({ where: { id: { in: allProspectIds } }, select: { id: true, teamId: true, name: true } })
+    : [];
+  const prById = new Map(pros.map((p) => [p.id, p]));
   if (allProspectIds.length) {
-    const pros = await prisma.prospect.findMany({ where: { id: { in: allProspectIds } }, select: { id: true, teamId: true } });
-    const prById = new Map(pros.map((p) => [p.id, p]));
     for (const id of pkg.fromProspects ?? []) { const pr = prById.get(id); if (!pr || !fromOrgIds.includes(pr.teamId)) throw new Error("A prospect in this trade is no longer owned by the offering team."); }
     for (const id of pkg.toProspects ?? []) { const pr = prById.get(id); if (!pr || !toOrgIds.includes(pr.teamId)) throw new Error("A requested prospect is no longer owned by the other team."); }
   }
@@ -133,8 +137,19 @@ export async function collectMoveOps(pkg: TradePackage) {
     ops.push(prisma.transaction.create({ data: { type: "CLAUSE_WAIVER", message: `Paid ${pl?.name ?? "a player"} ${(f.feeAmount / 1_000_000).toFixed(2)}M to waive his no-trade clause.` } }));
   }
 
-  const fromNames = pkg.fromPlayers.map((p) => pById.get(p.playerId)?.name).filter(Boolean) as string[];
-  const toNames = pkg.toPlayers.map((p) => pById.get(p.playerId)?.name).filter(Boolean) as string[];
+  // Full asset labels (not just players) so the trade log never falls back to
+  // a bare "assets" placeholder when a side is all picks/prospects/cash.
+  const ordinal = (n: number) => `${n}${n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th"}`;
+  const assetLabels = (pls: TradePlayer[], pickIds: number[], prospectIds: number[], cash: number): string[] => {
+    const out: string[] = [];
+    for (const p of pls) { const nm = pById.get(p.playerId)?.name; if (nm) out.push(nm); }
+    for (const id of pickIds) { const pk = pkById.get(id); if (pk) out.push(`${pk.year} ${ordinal(pk.round)}-round pick`); }
+    for (const id of prospectIds) { const pr = prById.get(id); if (pr) out.push(pr.name); }
+    if (cash) out.push(`$${cash.toLocaleString("en-US")} cash`);
+    return out;
+  };
+  const fromNames = assetLabels(pkg.fromPlayers, pkg.fromPicks, pkg.fromProspects ?? [], pkg.fromCash);
+  const toNames = assetLabels(pkg.toPlayers, pkg.toPicks, pkg.toProspects ?? [], pkg.toCash);
   return { ops, fromTeam, toTeam, fromNames, toNames };
 }
 

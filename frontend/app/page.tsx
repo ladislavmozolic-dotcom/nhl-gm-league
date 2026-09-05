@@ -254,7 +254,7 @@ export default async function HomePage() {
                   </div>
                   <p className="text-slate-400 text-xs mt-0.5 line-clamp-2">
                     {t.fromAssets && t.toAssets
-                      ? <>gave <span className="text-slate-300">{t.fromAssets}</span> for <span className="text-slate-300">{t.toAssets}</span></>
+                      ? <>traded <span className="text-slate-300">{t.fromAssets}</span> for <span className="text-slate-300">{t.toAssets}</span></>
                       : t.message}
                   </p>
                 </li>
