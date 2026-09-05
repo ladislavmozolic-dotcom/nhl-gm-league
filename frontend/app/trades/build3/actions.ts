@@ -9,10 +9,17 @@ import { clauseBlock, assertOwnership, createTradeRecord, executeTradeGroup, typ
 /** One one-directional asset move: `fromTeamId`'s listed assets go to `toTeamId`.
  *  A 3-team trade is exactly 3 of these forming a closed cycle (A→C, B→A, C→B) —
  *  each of the 3 clubs sends to exactly one other club and receives from exactly
- *  one other club. V1 doesn't support salary retention or clause-protected
- *  players in a 3-way deal (no fee-negotiation UI for 3 parties yet) — those
- *  still go through the normal 2-team Trade Room. */
-export type GroupLeg = { fromTeamId: number; toTeamId: number; playerIds: number[]; pickIds: number[]; prospectIds: number[]; cash: number };
+ *  one other club. `retentions` is playerId → % retained by fromTeamId (same
+ *  rules as a 2-team trade — max/min %, the double-retention cap, the 75-day
+ *  cooldown, all enforced by collectMoveOps per leg exactly as before).
+ *  `clauseFees` covers a clause-protected player: the agent-set fee fromTeamId
+ *  agrees to pay to waive it (recomputed and verified server-side, same as the
+ *  2-team flow — a client can't waive one for free by lying about the amount). */
+export type GroupLeg = {
+  fromTeamId: number; toTeamId: number; playerIds: number[]; pickIds: number[]; prospectIds: number[]; cash: number;
+  retentions?: Record<number, number>;
+  clauseFees?: { playerId: number; feeAmount: number }[];
+};
 
 async function notifyCommissionGroup(body: string) {
   const comishTeams = await prisma.team.findMany({
@@ -48,11 +55,13 @@ export async function proposeTradeGroupAction(legs: GroupLeg[]) {
 
   const pkgs: TradePackage[] = legs.map((l) => ({
     fromTeamId: l.fromTeamId, toTeamId: l.toTeamId,
-    fromPlayers: l.playerIds.map((id) => ({ playerId: id, retentionPct: 0 })), toPlayers: [],
+    fromPlayers: l.playerIds.map((id) => ({ playerId: id, retentionPct: l.retentions?.[id] ?? 0 })), toPlayers: [],
     fromPicks: l.pickIds, toPicks: [],
     fromProspects: l.prospectIds, toProspects: [],
     fromCash: l.cash, toCash: 0,
     condition: "",
+    waived: (l.clauseFees ?? []).map((f) => f.playerId),
+    clauseFees: (l.clauseFees ?? []).map((f) => ({ playerId: f.playerId, feeAmount: f.feeAmount, payTeamId: l.fromTeamId })),
   }));
 
   const settings = await loadSettings();
@@ -62,10 +71,29 @@ export async function proposeTradeGroupAction(legs: GroupLeg[]) {
     teamNames.set(fromTeam.id, fromTeam.name); teamNames.set(toTeam.id, toTeam.name);
     if (settings.clausesEnabled && pkg.fromPlayers.length) {
       const cp = await prisma.player.findMany({ where: { id: { in: pkg.fromPlayers.map((p) => p.playerId) } }, select: { id: true, name: true, tradeClause: true, noTradeTeams: true } });
+      const byId = new Map(cp.map((p) => [p.id, p]));
+      const waived = new Set(pkg.waived ?? []);
       for (const p of pkg.fromPlayers) {
-        const pl = cp.find((x) => x.id === p.playerId);
-        const b = pl && clauseBlock(pl, pkg.toTeamId, new Set(), true);
-        if (b) throw new Error(`${b} 3-team deals don't support clause waivers yet — leave him out, or move him in a separate 2-team trade.`);
+        const pl = byId.get(p.playerId);
+        const b = pl && clauseBlock(pl, pkg.toTeamId, waived, true);
+        if (b) throw new Error(b);
+      }
+      // A waived clause must actually be CONSENTED/PAID for — recompute the agent
+      // fee server-side (same as the 2-team flow) so a crafted payload can't waive
+      // one for free.
+      const { clauseTerms } = await import("@/lib/clause-agent-server");
+      const feeBy = new Map((pkg.clauseFees ?? []).map((f) => [f.playerId, f]));
+      for (const p of pkg.fromPlayers) {
+        const pl = byId.get(p.playerId);
+        if (!pl?.tradeClause) continue;
+        const blocks = pl.tradeClause === "M_NTC" ? (pl.noTradeTeams ?? []).includes(pkg.toTeamId) : true;
+        if (!blocks) continue;
+        const terms = await clauseTerms(p.playerId, pkg.toTeamId);
+        const required = terms?.feeAmount ?? 0;
+        if (required <= 0) continue;
+        const paid = feeBy.get(p.playerId);
+        if (!paid || paid.feeAmount < required || paid.payTeamId !== pkg.fromTeamId)
+          throw new Error(`${pl.name} won't waive his clause for free — the agent fee is $${(required / 1e6).toFixed(2)}M, paid by the club dealing him.`);
       }
     }
   }
