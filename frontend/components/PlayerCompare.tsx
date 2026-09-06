@@ -10,7 +10,7 @@ export type ComparePlayer = Record<string, number | string | null> & {
 const SKATER_ATTRS: Array<[string, string]> = [
   ["ck", "Checking"], ["fg", "Fighting"], ["di", "Discipline"], ["sk", "Skating"], ["st", "Strength"],
   ["en", "Endurance"], ["du", "Durability"], ["ph", "Puck Handling"], ["fo", "Faceoffs"], ["pa", "Passing"],
-  ["sc", "Scoring"], ["df", "Defense"], ["ps", "Positioning"], ["ex", "Experience"], ["ld", "Leadership"], ["mo", "Morale"],
+  ["sc", "Scoring"], ["df", "Defense"], ["ps", "Penalty Shot / Breakaway"], ["ex", "Experience"], ["ld", "Leadership"], ["mo", "Morale"],
 ];
 const GOALIE_ATTRS: Array<[string, string]> = [
   ["sk", "Skating"], ["du", "Durability"], ["en", "Endurance"], ["sz", "Size"], ["ag", "Agility"],
