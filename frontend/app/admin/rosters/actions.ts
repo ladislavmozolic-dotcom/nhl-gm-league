@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { loadSettings, saveSettings } from "@/lib/sim/settings";
 import { isAdmin } from "@/lib/auth";
 import { importRealRosters, importRealCapHits, importRealCapHitsForGaps, importRealProspects } from "@/lib/real-roster-import";
+import { CURRENT_SEASON_START } from "@/lib/finance";
 import { autoLines } from "@/lib/sim/lines-core";
 import { saveTeamLines } from "@/lib/sim/lines";
 import { revalidatePath } from "next/cache";
@@ -71,7 +72,7 @@ export async function applyRosterMode(mode: "profinhl" | "real") {
     await prisma.$executeRawUnsafe(`UPDATE "Team" SET "bankAccount"=COALESCE("profinhlBank", 50000000), "ledgerAdj"=0`);
   } else {
     // NHL 23-man roster — real cap hit AND real clause (kept separate from ProfiNHL)
-    await prisma.$executeRawUnsafe(`UPDATE "Player" SET "teamId"="realTeamId", "rosterType"='NHL', "capHit"=COALESCE("realCapHit","profinhlCapHit"), "tradeClause"="realTradeClause", "contractYears"=LEAST(COALESCE("realContractYears","contractYears"), 4) WHERE "realTeamId" IS NOT NULL`);
+    await prisma.$executeRawUnsafe(`UPDATE "Player" SET "teamId"="realTeamId", "rosterType"='NHL', "capHit"=COALESCE("realCapHit","profinhlCapHit"), "tradeClause"="realTradeClause", "contractYears"=LEAST(COALESCE("realContractYears","contractYears"), 4), "contractExpiry"=${CURRENT_SEASON_START}+LEAST(COALESCE("realContractYears","contractYears"), 4) WHERE "realTeamId" IS NOT NULL`);
     // AHL farm → the parent org's affiliate team
     const affiliates = await prisma.team.findMany({ where: { isAffiliate: true, parentTeamId: { not: null } }, select: { id: true, parentTeamId: true } });
     for (const aff of affiliates)

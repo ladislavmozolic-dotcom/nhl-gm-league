@@ -24,7 +24,7 @@ import { sweepExpiredContractsToUfa, sweepUnsignedRfasToNonRoster } from "@/lib/
 import { checkPromises } from "@/lib/promises";
 import { autoImportUpcomingClass } from "@/lib/draft-class-import";
 import { leagueCapCompliance } from "@/lib/cap";
-import { money } from "@/lib/finance";
+import { money, computeContractExpiry } from "@/lib/finance";
 
 const SEASON = "2026-27";
 
@@ -335,7 +335,7 @@ export async function archiveSeasonAction() {
 export async function autoRenewFarmDeals() {
   const r = await prisma.player.updateMany({
     where: { capHit: 100_000, OR: [{ contractYears: null }, { contractYears: { lte: 1 } }] },
-    data: { contractYears: 8 },
+    data: { contractYears: 8, contractExpiry: computeContractExpiry(8) },
   });
   return { renewed: r.count };
 }

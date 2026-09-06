@@ -47,6 +47,11 @@ export const CURRENT_SEASON_START = 2026; // 2026-27
 export const seasonLabel = (startYear: number) =>
   `${startYear}-${String((startYear + 1) % 100).padStart(2, "0")}`;
 
+/** A contract's expiry season, derived from years remaining — the single
+ *  source of truth every contractYears write should use instead of trusting
+ *  a separately-typed Player.contractExpiry to stay in sync by hand. */
+export const computeContractExpiry = (years: number, from = CURRENT_SEASON_START) => from + years;
+
 export type CapPlayer = { capHit: number | null; contractYears: number | null; age: number | null };
 
 /** Per-year cap for a player over `span` seasons: salary while under contract,

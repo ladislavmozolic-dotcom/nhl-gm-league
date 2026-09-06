@@ -5,6 +5,7 @@ import { isAdmin, isComishOrCoComish } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { SKATER_FIELDS } from "@/lib/skater-fields";
+import { computeContractExpiry } from "@/lib/finance";
 
 const slugify = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 
@@ -37,7 +38,7 @@ export async function createPlayer(formData: FormData) {
     nationality: str("nationality"), shoots: str("shoots"),
     height: heightCm ? `${heightCm} cm` : null, weight: num("weightKg"),
     birthDate: str("birthDate"), number: num("number"),
-    capHit, contractYears, contractType: str("contractType"),
+    capHit, contractYears, contractExpiry: contractYears ? computeContractExpiry(contractYears) : null, contractType: str("contractType"),
     contractText: capHit ? `${capHit.toLocaleString("en-US")}$ / ${contractYears ?? 0}yr${contractYears === 1 ? "" : "s"}` : null,
     condition: 100, morale: 50,
   };
@@ -62,8 +63,9 @@ export async function updateContract(formData: FormData) {
   // any exact dollar amount — real contracts aren't all round 50k multiples (e.g. $1,325,000)
   const capHit = Math.max(0, Math.round(Number(formData.get("capHit")) || 0));
   const contractYears = Math.max(0, Math.round(Number(formData.get("contractYears")) || 0));
-  const expiryRaw = formData.get("contractExpiry");
-  const contractExpiry = expiryRaw && String(expiryRaw).trim() ? Number(expiryRaw) : null;
+  // Derived from years, not hand-typed — a separately-editable field was the
+  // reason it kept drifting stale (e.g. after just editing Contract Length).
+  const contractExpiry = contractYears > 0 ? computeContractExpiry(contractYears) : null;
   const contractTypeRaw = String(formData.get("contractType") ?? "");
   const contractType = contractTypeRaw === "ONE_WAY" || contractTypeRaw === "TWO_WAY" ? contractTypeRaw : null;
   // keep the shown contract string in sync (e.g. "9,000,000$ / 2yrs")

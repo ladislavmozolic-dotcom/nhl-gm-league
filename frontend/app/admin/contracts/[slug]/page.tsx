@@ -56,8 +56,8 @@ export default async function ContractEditPage({
               <input type="number" min="0" max="8" name="contractYears" defaultValue={player.contractYears ?? ""} className={inputCls} />
             </div>
             <div>
-              <label className="block text-xs uppercase tracking-wide text-slate-400 mb-1">Expiry year (optional)</label>
-              <input type="number" name="contractExpiry" defaultValue={player.contractExpiry ?? ""} className={inputCls} />
+              <label className="block text-xs uppercase tracking-wide text-slate-400 mb-1">Expiry year — auto-calculated from Contract Length, no need to set by hand</label>
+              <input type="number" className={`${inputCls} opacity-60 cursor-not-allowed`} value={player.contractExpiry ?? ""} disabled readOnly />
             </div>
             <div>
               <label className="block text-xs uppercase tracking-wide text-slate-400 mb-1">Contract Type</label>
