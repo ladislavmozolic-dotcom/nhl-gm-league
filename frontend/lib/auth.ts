@@ -10,6 +10,19 @@ const COOKIE = "team_session";
 const SECRET = process.env.AUTH_SECRET ?? "profinhl-dev-secret-change-me";
 const SALT = process.env.AUTH_SALT ?? "profinhl-salt";
 
+// Caddy serves BOTH unhl.eu and www.unhl.eu on the same site block with no
+// canonical redirect between them (see the server's Caddyfile — DOMAIN="unhl.eu
+// www.unhl.eu"), so a visitor can land on either host at any time (a shared
+// link, a bookmark, a notification click). Without an explicit `domain` a
+// cookie is host-only — set while on unhl.eu, it's invisible on www.unhl.eu and
+// vice versa, so a GM could log in on one host and look "logged out" the
+// moment any link (e.g. a message notification) takes them to the other,
+// looping forever since each re-login only re-sets the cookie for whichever
+// host they happened to be on. A leading dot shares it across both. Only
+// applied in production — a literal `.unhl.eu` domain attribute is invalid
+// (and silently rejected by the browser) on localhost during dev.
+const COOKIE_DOMAIN = process.env.NODE_ENV === "production" ? ".unhl.eu" : undefined;
+
 export function hashPassword(password: string): string {
   return createHash("sha256").update(SALT + password).digest("hex");
 }
@@ -30,6 +43,7 @@ export async function setTeamSession(teamId: number): Promise<void> {
   const token = `${value}.${sign(value)}`;
   (await cookies()).set(COOKIE, token, {
     httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 30,
+    secure: process.env.NODE_ENV === "production", domain: COOKIE_DOMAIN,
   });
 }
 
@@ -43,7 +57,9 @@ export async function getTeamSession(): Promise<number | null> {
 }
 
 export async function clearTeamSession(): Promise<void> {
-  (await cookies()).delete(COOKIE);
+  // must match the domain/path it was set with, or the browser silently keeps
+  // the real cookie and this just no-ops against a cookie that never existed.
+  (await cookies()).delete({ name: COOKIE, path: "/", domain: COOKIE_DOMAIN });
 }
 
 /** True for any signed-in GM (any team), false for an anonymous visitor. Used to
