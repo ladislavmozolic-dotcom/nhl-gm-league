@@ -1,7 +1,27 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { resolveFrenzyAction, processRoundEndAction } from "@/app/free-agents/actions";
+import { frenzyRoundCloseUtcMs } from "@/lib/sim-clock";
+
+/** Compact "closes in Xd HH:MM:SS" ticker — same math/trigger time as the home
+ *  page's Next Simulation countdown, just rendered inline for the bar's height.
+ *  Doesn't know about an admin closing the round early via the button below
+ *  until the page reloads (same caveat the sim countdown already has). */
+function RoundCloseTicker({ frenzyRound, frenzyDay }: { frenzyRound: number; frenzyDay: number }) {
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => { setNow(new Date()); const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, []);
+  if (!now) return null;
+  const rem = Math.max(0, frenzyRoundCloseUtcMs(now, frenzyRound, frenzyDay) - now.getTime());
+  const d = Math.floor(rem / 86_400_000);
+  const h = Math.floor((rem % 86_400_000) / 3.6e6), m = Math.floor((rem % 3.6e6) / 6e4), s = Math.floor((rem % 6e4) / 1000);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    <span className="text-xs font-semibold text-amber-300 tabular-nums whitespace-nowrap">
+      Round {frenzyRound} closes in {d > 0 && `${d}d `}{pad(h)}:{pad(m)}:{pad(s)}
+    </span>
+  );
+}
 
 export default function FrenzyBar({ frenzyOpen, frenzyDay, frenzyRound, phaseLabel, isAdmin, inSeasonOpen = false, ownOnly = false }: {
   frenzyOpen: boolean; frenzyDay: number; frenzyRound: number; phaseLabel: string; isAdmin: boolean;
@@ -35,6 +55,7 @@ export default function FrenzyBar({ frenzyOpen, frenzyDay, frenzyRound, phaseLab
             : inSeasonOpen ? `In-season signings OPEN — ${phaseLabel}`
             : `Market closed — ${phaseLabel}`}
         </span>
+        {frenzyOpen && <RoundCloseTicker frenzyRound={frenzyRound} frenzyDay={frenzyDay} />}
         <span className="text-xs text-slate-500">
           {frenzyOpen
             ? (frenzyRound <= 1 ? "Week 1: players ask high — table offers to open the bidding."

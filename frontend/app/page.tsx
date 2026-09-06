@@ -200,10 +200,13 @@ export default async function HomePage() {
       {/* Stat row */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
         <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg shadow-black/20">
-          {!(cfg?.frenzyAutoOpenAt && cfg.frenzyAutoOpenAt.getTime() > Date.now()) && (
+          {!(cfg?.frenzyAutoOpenAt && cfg.frenzyAutoOpenAt.getTime() > Date.now()) && !clock.frenzyOpen && (
             <p className="text-xs uppercase tracking-wide text-slate-400 mb-2">{T("home.nextSim")}</p>
           )}
-          <NextSimCountdown frenzyAt={cfg?.frenzyAutoOpenAt?.toISOString() ?? null} />
+          <NextSimCountdown
+            frenzyAt={cfg?.frenzyAutoOpenAt?.toISOString() ?? null}
+            frenzyOpen={clock.frenzyOpen} frenzyRound={clock.frenzyRound} frenzyDay={clock.frenzyDay}
+          />
           <p className="text-xs text-slate-500 mt-2">{fmtLeagueDate(clock.date)} · <span className="text-slate-400">{clock.phaseLabel}</span></p>
         </div>
 
