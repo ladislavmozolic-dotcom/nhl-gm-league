@@ -210,7 +210,7 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
                 )}
 
                 {item.mega && activeMenu === item.key && (
-                  <div className="absolute top-full left-0 mt-0.5 w-[600px] max-w-[calc(100vw-2rem)] bg-[#0f1d32] border border-slate-700/40 rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50">
+                  <div className="absolute top-full left-0 mt-0.5 w-[720px] max-w-[calc(100vw-2rem)] bg-[#0f1d32] border border-slate-700/40 rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50">
                   <div className="p-5">
                     <div className="grid grid-cols-2 gap-8">
                       {/* Eastern */}
@@ -219,23 +219,23 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
                           <span className="w-2 h-2 bg-blue-500 rounded-full" />
                           Eastern Conference
                         </h3>
-                        <div className="grid grid-cols-2 gap-1">
+                        <div className="grid grid-cols-1 gap-1">
                           {eastern.map((team) => (
                             <Link
                               key={team.id}
                               href={`/teams/${team.slug}`}
-                              className="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-700/40 transition-colors"
+                              className="flex items-center gap-2.5 px-2 py-1.5 rounded hover:bg-slate-700/40 transition-colors"
                             >
                               {team.logoUrl && (
                                 <Image
                                   src={team.logoUrl}
                                   alt={team.code ?? ""}
-                                  width={18}
-                                  height={18}
+                                  width={20}
+                                  height={20}
                                   className="object-contain shrink-0"
                                 />
                               )}
-                              <span className="text-[12px] text-slate-300 hover:text-white truncate">
+                              <span className="text-sm text-slate-300 hover:text-white whitespace-nowrap">
                                 {team.name}
                               </span>
                             </Link>
@@ -249,23 +249,23 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
                           <span className="w-2 h-2 bg-red-500 rounded-full" />
                           Western Conference
                         </h3>
-                        <div className="grid grid-cols-2 gap-1">
+                        <div className="grid grid-cols-1 gap-1">
                           {western.map((team) => (
                             <Link
                               key={team.id}
                               href={`/teams/${team.slug}`}
-                              className="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-700/40 transition-colors"
+                              className="flex items-center gap-2.5 px-2 py-1.5 rounded hover:bg-slate-700/40 transition-colors"
                             >
                               {team.logoUrl && (
                                 <Image
                                   src={team.logoUrl}
                                   alt={team.code ?? ""}
-                                  width={18}
-                                  height={18}
+                                  width={20}
+                                  height={20}
                                   className="object-contain shrink-0"
                                 />
                               )}
-                              <span className="text-[12px] text-slate-300 hover:text-white truncate">
+                              <span className="text-sm text-slate-300 hover:text-white whitespace-nowrap">
                                 {team.name}
                               </span>
                             </Link>
