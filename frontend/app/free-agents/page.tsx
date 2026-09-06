@@ -173,6 +173,7 @@ export default async function FreeAgentsPage({
         isAdmin={admin}
         inSeasonOpen={!clock.frenzyOpen && effWindow.open}
         ownOnly={effWindow.ownOnly}
+        frenzyRoundStartedAt={clock.frenzyRoundStartedAt}
       />
 
       {deliberating.length > 0 && (

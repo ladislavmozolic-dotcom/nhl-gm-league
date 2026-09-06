@@ -56,6 +56,11 @@ export async function computePhase(date: Date, override?: string | null): Promis
 export type LeagueClock = {
   date: Date; phase: Phase; phaseLabel: string;
   frenzyOpen: boolean; frenzyDay: number; frenzyRound: number; faForced: boolean;
+  // Real wall-clock moment the current round began — set only when the round's
+  // start/advance isn't driven by the real July calendar (see the field's own
+  // schema comment). Countdown UIs prefer this + 7 days over the day/round
+  // index math above whenever it's present.
+  frenzyRoundStartedAt: string | null;
   // Broader FA-signing window: the July Frenzy is offer-based; the regular season
   // signs UFAs immediately (own + market); playoffs allow immediate signings but
   // only of a club's OWN UFAs; off-season outside the Frenzy is closed.
@@ -77,7 +82,7 @@ function faWindowFor(phase: Phase, frenzyOpen: boolean): { open: boolean; immedi
 
 /** Everything the UI needs about "what day is it in the league". */
 export async function getLeagueClock(): Promise<LeagueClock> {
-  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { leagueDate: true, faOpen: true, phaseOverride: true } });
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { leagueDate: true, faOpen: true, phaseOverride: true, frenzyRoundStartedAt: true } });
   const date = cfg?.leagueDate ?? defaultLeagueDate();
   const phase = await computePhase(date, cfg?.phaseOverride);
   const faForced = !!cfg?.faOpen;
@@ -106,6 +111,7 @@ export async function getLeagueClock(): Promise<LeagueClock> {
     frenzyDay: isFrenzyOpen(date) ? frenzyDay(date) : (faForced ? 1 : 0),
     frenzyRound: isFrenzyOpen(date) ? frenzyRound(date) : (faForced ? 1 : 0),
     faForced,
+    frenzyRoundStartedAt: faForced ? (cfg?.frenzyRoundStartedAt?.toISOString() ?? null) : null,
     faWindow,
   };
 }

@@ -206,6 +206,7 @@ export default async function HomePage() {
           <NextSimCountdown
             frenzyAt={cfg?.frenzyAutoOpenAt?.toISOString() ?? null}
             frenzyOpen={clock.frenzyOpen} frenzyRound={clock.frenzyRound} frenzyDay={clock.frenzyDay}
+            frenzyRoundStartedAt={clock.frenzyRoundStartedAt}
           />
           <p className="text-xs text-slate-500 mt-2">{fmtLeagueDate(clock.date)} · <span className="text-slate-400">{clock.phaseLabel}</span></p>
         </div>

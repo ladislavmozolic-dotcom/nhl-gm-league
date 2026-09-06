@@ -112,7 +112,7 @@ export async function autoOpenFrenzyIfDue(now: Date = new Date()): Promise<Frenz
   if (!cfg?.frenzyAutoOpenAt) return { opened: false, reason: "no auto-open time set" };
   if (cfg.faOpen) { await prisma.leagueConfig.update({ where: { id: 1 }, data: { frenzyAutoOpenAt: null } }); return { opened: false, reason: "already open — cleared the stale trigger" }; }
   if (now.getTime() < cfg.frenzyAutoOpenAt.getTime()) return { opened: false, reason: `not due until ${cfg.frenzyAutoOpenAt.toISOString()}` };
-  await prisma.leagueConfig.update({ where: { id: 1 }, data: { faOpen: true, frenzyAutoOpenAt: null } });
+  await prisma.leagueConfig.update({ where: { id: 1 }, data: { faOpen: true, frenzyAutoOpenAt: null, frenzyRoundStartedAt: now } });
   const expiredToUfa = await sweepExpiredContractsToUfa();
   return { opened: true, expiredToUfa };
 }

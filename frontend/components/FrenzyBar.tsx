@@ -8,11 +8,11 @@ import { frenzyRoundCloseUtcMs } from "@/lib/sim-clock";
  *  page's Next Simulation countdown, just rendered inline for the bar's height.
  *  Doesn't know about an admin closing the round early via the button below
  *  until the page reloads (same caveat the sim countdown already has). */
-function RoundCloseTicker({ frenzyRound, frenzyDay }: { frenzyRound: number; frenzyDay: number }) {
+function RoundCloseTicker({ frenzyRound, frenzyDay, frenzyRoundStartedAt }: { frenzyRound: number; frenzyDay: number; frenzyRoundStartedAt?: string | null }) {
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => { setNow(new Date()); const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, []);
   if (!now) return null;
-  const rem = Math.max(0, frenzyRoundCloseUtcMs(now, frenzyRound, frenzyDay) - now.getTime());
+  const rem = Math.max(0, frenzyRoundCloseUtcMs(now, frenzyRound, frenzyDay, frenzyRoundStartedAt) - now.getTime());
   const d = Math.floor(rem / 86_400_000);
   const h = Math.floor((rem % 86_400_000) / 3.6e6), m = Math.floor((rem % 3.6e6) / 6e4), s = Math.floor((rem % 6e4) / 1000);
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -23,9 +23,9 @@ function RoundCloseTicker({ frenzyRound, frenzyDay }: { frenzyRound: number; fre
   );
 }
 
-export default function FrenzyBar({ frenzyOpen, frenzyDay, frenzyRound, phaseLabel, isAdmin, inSeasonOpen = false, ownOnly = false }: {
+export default function FrenzyBar({ frenzyOpen, frenzyDay, frenzyRound, phaseLabel, isAdmin, inSeasonOpen = false, ownOnly = false, frenzyRoundStartedAt }: {
   frenzyOpen: boolean; frenzyDay: number; frenzyRound: number; phaseLabel: string; isAdmin: boolean;
-  inSeasonOpen?: boolean; ownOnly?: boolean;
+  inSeasonOpen?: boolean; ownOnly?: boolean; frenzyRoundStartedAt?: string | null;
 }) {
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<{ t: "ok" | "err"; s: string } | null>(null);
@@ -55,7 +55,7 @@ export default function FrenzyBar({ frenzyOpen, frenzyDay, frenzyRound, phaseLab
             : inSeasonOpen ? `In-season signings OPEN — ${phaseLabel}`
             : `Market closed — ${phaseLabel}`}
         </span>
-        {frenzyOpen && <RoundCloseTicker frenzyRound={frenzyRound} frenzyDay={frenzyDay} />}
+        {frenzyOpen && <RoundCloseTicker frenzyRound={frenzyRound} frenzyDay={frenzyDay} frenzyRoundStartedAt={frenzyRoundStartedAt} />}
         <span className="text-xs text-slate-500">
           {frenzyOpen
             ? (frenzyRound <= 1 ? "Week 1: players ask high — table offers to open the bidding."

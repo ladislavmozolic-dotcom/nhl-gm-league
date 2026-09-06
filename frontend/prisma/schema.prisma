@@ -380,6 +380,7 @@ model LeagueConfig {
   preseasonPhaseAt DateTime?                    // admin-configurable real date the "preseason" phase begins (Auto mode only) — null = derive from the generated pre-season schedule's first game, else the hardcoded Sep 21 fallback. See lib/calendar-server.ts resolvePhaseThresholds.
   regularPhaseAt  DateTime?                     // admin-configurable real date the "regular" phase begins (Auto mode only) — null = derive from the regular-season schedule's first game, else the hardcoded Oct 1 fallback.
   frenzyAutoOpenAt DateTime?                    // admin-configurable real moment to auto-flip faOpen=true (force the Free Agent Frenzy window open for every GM) — a one-shot trigger, checked every cron tick (lib/season-cron.ts autoOpenFrenzyIfDue) and cleared to null once it fires, so a later manual close of faOpen sticks.
+  frenzyRoundStartedAt DateTime?                // real wall-clock moment the CURRENT frenzy round began — set when autoOpenFrenzyIfDue flips faOpen=true and again each time processRoundEndAction advances to the next round. A force-opened market has no real calendar day to derive "round closes in" from (getLeagueClock reads day/round as a flat 1 while forced), so the round-close countdown counts 7 real days from this instead; null when the frenzy is running purely off the real July calendar, where the calendar-day math already works.
   updatedAt       DateTime @updatedAt
 }
 

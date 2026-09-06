@@ -13,13 +13,19 @@ export function nextSimUtcMs(now: Date): number {
   return now.getTime() + (target.getTime() - brat.getTime());
 }
 
-/** A Frenzy round is 7 in-game days; the league clock advances one in-game day
- *  per daily trigger, so "round N closes" is just the trigger `7*round - day`
- *  ticks from now (0 = the very next trigger closes it today). An admin can
- *  still close a round early via the manual button — this doesn't know about
- *  that until the page reloads, same caveat as the sim countdown not knowing
- *  about a manual re-sim. */
-export function frenzyRoundCloseUtcMs(now: Date, frenzyRound: number, frenzyDay: number): number {
+/** A Frenzy round is 7 days. When the market is running off the real July
+ *  calendar, the league clock advances one in-game day per daily trigger, so
+ *  "round N closes" is the trigger `7*round - day` ticks from now (0 = the
+ *  very next trigger closes it today). But a FORCE-opened market (faOpen, any
+ *  time of year) has no calendar day to derive that from — `roundStartedAt`
+ *  (real wall-clock ISO instant the round began, from LeagueConfig.
+ *  frenzyRoundStartedAt) is the actual source of truth there: round closes
+ *  exactly 7 real days after it started, independent of the daily tick. An
+ *  admin can still close a round early via the manual button — this doesn't
+ *  know about that until the page reloads, same caveat as the sim countdown
+ *  not knowing about a manual re-sim. */
+export function frenzyRoundCloseUtcMs(now: Date, frenzyRound: number, frenzyDay: number, roundStartedAt?: string | null): number {
+  if (roundStartedAt) return new Date(roundStartedAt).getTime() + 7 * 86_400_000;
   const ticksLeft = Math.max(0, 7 * frenzyRound - frenzyDay);
   return nextSimUtcMs(now) + ticksLeft * 86_400_000;
 }

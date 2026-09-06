@@ -21,8 +21,8 @@ const ZONES = [
  *  `frenzyOpen`/`frenzyRound`/`frenzyDay` = the market is currently open — takes
  *  priority over the plain daily-sim countdown (but not over a still-pending
  *  `frenzyAt`) and counts down to when the CURRENT round closes instead. */
-export default function NextSimCountdown({ frenzyAt, frenzyOpen, frenzyRound, frenzyDay }: {
-  frenzyAt?: string | null; frenzyOpen?: boolean; frenzyRound?: number; frenzyDay?: number;
+export default function NextSimCountdown({ frenzyAt, frenzyOpen, frenzyRound, frenzyDay, frenzyRoundStartedAt }: {
+  frenzyAt?: string | null; frenzyOpen?: boolean; frenzyRound?: number; frenzyDay?: number; frenzyRoundStartedAt?: string | null;
 }) {
   const [now, setNow] = useState<Date | null>(null);
   const [zone, setZone] = useState("Europe/Bratislava");
@@ -32,7 +32,7 @@ export default function NextSimCountdown({ frenzyAt, frenzyOpen, frenzyRound, fr
   const frenzyMs = frenzyAt ? new Date(frenzyAt).getTime() : null;
   const frenzyPending = frenzyMs != null && frenzyMs > now.getTime();
   const roundActive = !frenzyPending && frenzyOpen && frenzyRound != null && frenzyDay != null;
-  const targetMs = frenzyPending ? frenzyMs! : roundActive ? frenzyRoundCloseUtcMs(now, frenzyRound!, frenzyDay!) : nextSimUtcMs(now);
+  const targetMs = frenzyPending ? frenzyMs! : roundActive ? frenzyRoundCloseUtcMs(now, frenzyRound!, frenzyDay!, frenzyRoundStartedAt) : nextSimUtcMs(now);
   const rem = Math.max(0, targetMs - now.getTime());
   const d = Math.floor(rem / 86_400_000);
   const h = Math.floor((rem % 86_400_000) / 3.6e6), m = Math.floor((rem % 3.6e6) / 6e4), s = Math.floor((rem % 6e4) / 1000);
