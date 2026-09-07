@@ -23,7 +23,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
       // rosterType-filtered — a player parked as PROSPECT/UFA/RETIRED/RELEASED keeps
       // this teamId (schema requires one) but must never count toward roster size,
       // cap total, captains or injured list once he's off the active roster.
-      players: { where: { rosterType: { in: ["NHL", "AHL"] } }, orderBy: { overall: "desc" }, select: { id: true, isGoalie: true, position: true, age: true, capHit: true, contractText: true, name: true, slug: true, photoUrl: true, captaincy: true, nationality: true, injuryDaysLeft: true, injuryDesc: true } },
+      players: { where: { rosterType: { in: ["NHL", "AHL"] } }, orderBy: { overall: "desc" }, select: { id: true, isGoalie: true, position: true, age: true, capHit: true, retainedSalary: true, contractText: true, name: true, slug: true, photoUrl: true, captaincy: true, nationality: true, injuryDaysLeft: true, injuryDesc: true } },
       // NOT counted in players above (deliberately excluded from roster size/cap) — an
       // RFA-age player benched at regular-season opening day for staying unsigned
       // (sweepUnsignedRfasToNonRoster). Fetched separately just for a visibility count.
@@ -42,7 +42,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
   const isNhl = team.league === "NHL" && !team.isAffiliate;
   const proCount = team.players.length;
   const farmCount = team.affiliateTeams.reduce((s, a) => s + a.players.length, 0);
-  const totalCap = team.players.reduce((s, p) => s + salaryOf(p), 0);
+  const totalCap = team.players.reduce((s, p) => s + Math.max(0, salaryOf(p) - (p.retainedSalary ?? 0)), 0);
   const capSpace = capCeiling - totalCap;
   const capPct = Math.min(100, capCeiling ? (totalCap / capCeiling) * 100 : 0);
   const avgAge = proCount ? (team.players.reduce((s, p) => s + (p.age || 0), 0) / proCount).toFixed(1) : "0";
