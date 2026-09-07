@@ -368,7 +368,7 @@ export async function previewRoundOutcomeForTeam(id: number): Promise<number> {
     if (!ev) continue;
     const bestSalary = Math.max(...list.map((o) => o.salary));
     const soleOffer = list.length === 1;
-    const outclassed = !soleOffer && my.salary < bestSalary * 0.75 && my.salary < ev.ask.salary;
+    const outclassed = !soleOffer && my.salary < bestSalary * 0.75;
     let body: string;
     if (my.salary < ev.ask.floorSalary * 0.6 || outclassed) {
       body = `👀 Preview (round 1 hasn't closed yet): ${nm} would pass on your offer right now — ${outclassed ? "another club's offer is well ahead of yours" : "it isn't close to his value"}.`;
@@ -866,7 +866,7 @@ export async function processRoundEnd(endedRound: number): Promise<{ countered: 
       for (const { o, ev } of scored) {
         if (!ev) continue;
         const teamCode = (await prisma.team.findUnique({ where: { id: o.teamId }, select: { code: true } }))?.code ?? "?";
-        const outclassed = !soleOffer && o.salary < bestSalary * 0.75 && o.salary < ev.ask.salary;
+        const outclassed = !soleOffer && o.salary < bestSalary * 0.75;
         if (o.salary < ev.ask.floorSalary * 0.6 || outclassed) {
           await prisma.faOffer.update({ where: { id: o.id }, data: { status: "REJECTED" } });
           const reason = outclassed ? "another club's offer was well ahead of yours" : "it wasn't close to his value";
