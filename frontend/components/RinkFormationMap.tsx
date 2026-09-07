@@ -24,13 +24,17 @@ export default function RinkFormationMap({ roles, players }: { roles: FormationR
         {/* faceoff circles */}
         <circle cx="24" cy="46" r="11" fill="none" stroke="#334155" strokeWidth="0.8" />
         <circle cx="76" cy="46" r="11" fill="none" stroke="#334155" strokeWidth="0.8" />
+        {/* role.y: 0 = goal line, 100 = blue line — the goal sits at the TOP of
+            this drawing (svg y=8), so role.y maps to svg y DIRECTLY (no
+            inversion): a low role.y (net-front) stays near the top, a high
+            role.y (point) lands near the blue line at the bottom. */}
         {assigned.map(({ role, player }) => (
           <g key={role.key}>
-            <circle cx={role.x} cy={100 - role.y} r="6.5" fill={player ? "#1d4ed8" : "#1e293b"} stroke="#93c5fd" strokeWidth="0.6" />
-            <text x={role.x} y={100 - role.y + 1.8} textAnchor="middle" fontSize="5" fill="#e2e8f0" fontWeight="700">
+            <circle cx={role.x} cy={role.y} r="6.5" fill={player ? "#1d4ed8" : "#1e293b"} stroke="#93c5fd" strokeWidth="0.6" />
+            <text x={role.x} y={role.y + 1.8} textAnchor="middle" fontSize="5" fill="#e2e8f0" fontWeight="700">
               {player ? player.name.split(" ").slice(-1)[0].slice(0, 8) : "—"}
             </text>
-            <text x={role.x} y={100 - role.y - 9} textAnchor="middle" fontSize="3.6" fill="#94a3b8">{role.label}</text>
+            <text x={role.x} y={role.y - 9} textAnchor="middle" fontSize="3.6" fill="#94a3b8">{role.label}</text>
           </g>
         ))}
       </svg>
