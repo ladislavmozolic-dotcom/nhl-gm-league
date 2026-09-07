@@ -2,7 +2,7 @@
 
 import { assignRoles, type FormationRole, type RoleAttrs } from "@/lib/sim/formation-layout";
 
-type SlotPlayer = { id: number; name: string; sc: number; pa: number; st: number };
+type SlotPlayer = { id: number; name: string; sc: number; pa: number; st: number; isD: boolean };
 
 /** Offensive-zone rink diagram showing where each of the GM's chosen PP/PK
  *  personnel would line up for the selected formation — the role each player

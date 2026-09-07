@@ -54,12 +54,18 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
 
   const byId = useMemo(() => new Map([...players, ...goalies].map((p) => [p.id, p])), [players, goalies]);
   const nameOf = (id: number | null) => (id == null ? "" : byId.get(id)?.name ?? `#${id}`);
-  // formation-map feed: the unit's chosen personnel with the attrs the role-fit needs
-  const slotPlayers = (ids: (number | null)[]) => ids
-    .filter((id): id is number => id != null)
-    .map((id) => byId.get(id))
-    .filter((p): p is Player => !!p)
-    .map((p) => ({ id: p.id, name: p.name, sc: p.sc ?? 50, pa: p.pa ?? 50, st: p.st ?? 50 }));
+  // formation-map feed: the unit's chosen personnel with the attrs the role-fit
+  // needs, tagged by which PERSONNEL SLOT they're in (not their real position)
+  // — dStartIndex is where the D slots start in `ids` (PP: LW,C,RW,LD,RD → 3;
+  // PK4: C,W,LD,RD → 2). The picker lets a forward fill an LD/RD slot for a
+  // 4F+1D unit, and that's deliberate (a GM choosing who mans the point), so
+  // formation roles like Point must key off the slot, not the player's own
+  // listed position.
+  const slotPlayers = (ids: (number | null)[], dStartIndex: number) => ids
+    .map((id, i) => (id == null ? null : { id, isD: i >= dStartIndex }))
+    .filter((x): x is { id: number; isD: boolean } => x != null)
+    .map((x) => { const p = byId.get(x.id); return p ? { id: p.id, name: p.name, sc: p.sc ?? 50, pa: p.pa ?? 50, st: p.st ?? 50, isD: x.isD } : null; })
+    .filter((p): p is { id: number; name: string; sc: number; pa: number; st: number; isD: boolean } => !!p);
   const byName = (a: Player, b: Player) => a.name.localeCompare(b.name);
   const forwards = useMemo(() => players.filter((p) => !isD(p.position)).sort(byName), [players]);
   const defense = useMemo(() => players.filter((p) => isD(p.position)).sort(byName), [players]);
@@ -490,9 +496,9 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
 
       {tab === "Forward" && <>{ForwardSection}<p className="text-xs text-slate-500 mt-2 px-1">💡 <strong>System</strong>: give a line its own Puck Style (else it inherits the team system from <em>Team → System</em>). E.g. set your 4th line to <em>Cycle</em> while the team runs <em>Rush</em>. Tempo &amp; Forecheck stay team-wide.</p></>}
       {tab === "Defense" && <>{DefenseSection}<p className="text-xs text-slate-500 mt-2 px-1">💡 <strong>System</strong>: give a pair its own D-Zone (else it inherits the team system). E.g. a <em>Collapse</em> shut-down pair for defending a lead.</p></>}
-      {tab === "PP" && <>{FormationPicker("ppStyle", "Power-play formation")}<RinkFormationMap roles={PP_LAYOUTS[(mergeTactics(data.system).ppStyle ?? "balanced") as PpStyle]} players={slotPlayers(data.situations.pp[0]?.players ?? [])} />{SplitUnitSection("pp", "Power Play (5 on 4)", ["LW", "C", "RW"], ["LD", "RD"], ppPointPool, "💡 Na presilovke môžeš do modrej (LD/RD) dať aj útočníka — dropdown ponúka obrancov aj útočníkov, takže sa dá hrať 4 útočníci + 1 obranca.")}</>}
+      {tab === "PP" && <>{FormationPicker("ppStyle", "Power-play formation")}<RinkFormationMap roles={PP_LAYOUTS[(mergeTactics(data.system).ppStyle ?? "balanced") as PpStyle]} players={slotPlayers(data.situations.pp[0]?.players ?? [], 3)} />{SplitUnitSection("pp", "Power Play (5 on 4)", ["LW", "C", "RW"], ["LD", "RD"], ppPointPool, "💡 Na presilovke môžeš do modrej (LD/RD) dať aj útočníka — dropdown ponúka obrancov aj útočníkov, takže sa dá hrať 4 útočníci + 1 obranca.")}</>}
       {tab === "4 vs 4" && SplitUnitSection("fourVFour", "4 vs 4", ["C", "W"], ["LD", "RD"])}
-      {tab === "PK4" && <>{FormationPicker("pkStyle", "Penalty-kill structure")}<RinkFormationMap roles={PK_LAYOUTS[(mergeTactics(data.system).pkStyle ?? "balanced") as PkStyle]} players={slotPlayers(data.situations.pk4[0]?.players ?? [])} />{SplitUnitSection("pk4", "Penalty Kill (4 on 5)", ["C", "W"], ["LD", "RD"])}</>}
+      {tab === "PK4" && <>{FormationPicker("pkStyle", "Penalty-kill structure")}<RinkFormationMap roles={PK_LAYOUTS[(mergeTactics(data.system).pkStyle ?? "balanced") as PkStyle]} players={slotPlayers(data.situations.pk4[0]?.players ?? [], 2)} />{SplitUnitSection("pk4", "Penalty Kill (4 on 5)", ["C", "W"], ["LD", "RD"])}</>}
       {tab === "PK3" && SplitUnitSection("pk3", "Penalty Kill (3 on 5)", ["C"], ["LD", "RD"])}
       {tab === "Overtime" && UnitSection("overtime", "Overtime (3 vs 3)", ["OT1", "OT2", "OT3"], () => players)}
 
