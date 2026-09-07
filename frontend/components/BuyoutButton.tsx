@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 
 export default function BuyoutButton({ slug, playerId, playerName, onBuyout }: {
   slug: string; playerId: number; playerName: string;
-  onBuyout: (slug: string, playerId: number, inSeason: boolean) => Promise<void>;
+  onBuyout: (slug: string, playerId: number) => Promise<void>;
 }) {
   const [pending, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
@@ -13,7 +13,7 @@ export default function BuyoutButton({ slug, playerId, playerName, onBuyout }: {
     if (!confirm(`Buy out ${playerName}? Dead-money cap over 2× the remaining years and the cost is debited from your bank.`)) return;
     start(async () => {
       setErr(null);
-      try { await onBuyout(slug, playerId, true); }
+      try { await onBuyout(slug, playerId); }
       catch (e) { setErr((e as Error).message); }
     });
   };

@@ -3,11 +3,17 @@
 import { prisma } from "@/lib/prisma";
 import { getTeamSession } from "@/lib/auth";
 import { loadSettings } from "@/lib/sim/settings";
+import { getLeagueClock } from "@/lib/calendar-server";
 import { buyoutTerms, CURRENT_SEASON_START } from "@/lib/finance";
 import { revalidatePath } from "next/cache";
 
-/** Buy a player out of his contract ("vyplatený zo zmluvy"). GM-only. */
-export async function buyoutPlayer(slug: string, playerId: number, inSeason = true) {
+/** Buy a player out of his contract ("vyplatený zo zmluvy"). GM-only.
+ *  inSeason (which buyout % applies) is derived from the league's actual
+ *  current phase, not a client-supplied flag — it used to be hardcoded true
+ *  by the only caller (BuyoutButton), so an off-season buyout was silently
+ *  charged the in-season rate. Regular season/playoffs = in-season; frenzy/
+ *  preseason/off-season = the cheaper off-season rate. */
+export async function buyoutPlayer(slug: string, playerId: number) {
   const team = await prisma.team.findUnique({ where: { slug }, select: { id: true } });
   if (!team) throw new Error("Team not found");
   const session = await getTeamSession();
@@ -20,6 +26,8 @@ export async function buyoutPlayer(slug: string, playerId: number, inSeason = tr
   if (!player) throw new Error("Player not on this team's NHL roster");
   if (!player.capHit || !player.contractYears) throw new Error("Player has no contract to buy out");
 
+  const { phase } = await getLeagueClock();
+  const inSeason = phase === "regular" || phase === "playoffs";
   const settings = await loadSettings();
   const terms = buyoutTerms(player.capHit, player.contractYears, inSeason, settings);
 
