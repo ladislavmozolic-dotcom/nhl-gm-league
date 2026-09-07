@@ -20,7 +20,7 @@ interface Team {
 // mobile accordion can recurse into either without caring which one it got.
 type NavNode = { key?: string; label: string; href: string; mega?: boolean; children?: NavNode[] };
 
-export default function MegaMenu({ gm, items, lang = "en", light = false }: { gm?: { nickname: string; slug: string; admin?: boolean; pendingJoins?: number; unreadDm?: number; forumNew?: number } | null; items?: MenuItem[]; lang?: Lang; light?: boolean }) {
+export default function MegaMenu({ gm, items, lang = "en", light = false, hideForum = false }: { gm?: { nickname: string; slug: string; admin?: boolean; pendingJoins?: number; unreadDm?: number; forumNew?: number } | null; items?: MenuItem[]; lang?: Lang; light?: boolean; hideForum?: boolean }) {
   const menuItems = items ?? DEFAULT_MENU;
   const tr = (k: string) => t(lang, k);
 
@@ -312,10 +312,12 @@ export default function MegaMenu({ gm, items, lang = "en", light = false }: { gm
             ))}
 
             {/* Forum — public discussion, visible to everyone; badge = new posts for a signed-in GM */}
-            <Link href="/forum" className={`relative px-2.5 py-1.5 text-[13px] font-semibold rounded-md whitespace-nowrap inline-flex items-center gap-1 ${linkIdle}`}>
-              🗣️ Forum
-              {(gm?.forumNew ?? 0) > 0 && <span className="min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm!.forumNew}</span>}
-            </Link>
+            {!hideForum && (
+              <Link href="/forum" className={`relative px-2.5 py-1.5 text-[13px] font-semibold rounded-md whitespace-nowrap inline-flex items-center gap-1 ${linkIdle}`}>
+                🗣️ Forum
+                {(gm?.forumNew ?? 0) > 0 && <span className="min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm!.forumNew}</span>}
+              </Link>
+            )}
 
             {/* Messages — top-nav so a signed-in GM sees new-message badge right away */}
             {gm && (
@@ -407,10 +409,12 @@ export default function MegaMenu({ gm, items, lang = "en", light = false }: { gm
             ))}
 
             <div className={`border-t ${dividerLine} my-1`} />
-            <Link href="/forum" onClick={closeMobile} className={`flex items-center gap-1.5 py-2.5 px-3 text-[14px] ${mobileText}`}>
-              🗣️ Forum
-              {(gm?.forumNew ?? 0) > 0 && <span className="min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm!.forumNew}</span>}
-            </Link>
+            {!hideForum && (
+              <Link href="/forum" onClick={closeMobile} className={`flex items-center gap-1.5 py-2.5 px-3 text-[14px] ${mobileText}`}>
+                🗣️ Forum
+                {(gm?.forumNew ?? 0) > 0 && <span className="min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm!.forumNew}</span>}
+              </Link>
+            )}
             {gm && (
               <Link href="/messages" onClick={closeMobile} className={`flex items-center gap-1.5 py-2.5 px-3 text-[14px] ${mobileText}`}>
                 💬 Messages

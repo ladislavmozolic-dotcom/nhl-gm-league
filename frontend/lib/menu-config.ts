@@ -103,6 +103,16 @@ export type MenuOverrides = { order?: string[]; hidden?: string[] };
 /** Merge admin overrides onto the default menu: saved order first (its keys in order),
  *  then any newer default items not yet in the saved order, minus hidden keys.
  *  `extra` = custom-page items (Module 4) to append. */
+// A child (nested dropdown link) has no stable `key` of its own, so it's hidden
+// by its `href` instead — the admin-set `hidden` array can hold either a
+// top-level MenuItem.key (hides the whole dropdown) or a child's href (hides
+// just that one row, wherever it's nested, e.g. "/waivers" or "/league/audit").
+function filterHiddenChildren(children: MenuChild[], hidden: Set<string>): MenuChild[] {
+  return children
+    .filter((c) => !hidden.has(c.href))
+    .map((c) => (c.children ? { ...c, children: filterHiddenChildren(c.children, hidden) } : c));
+}
+
 export function effectiveMenu(cfg: MenuOverrides | null | undefined, extra: MenuItem[] = []): MenuItem[] {
   const all = [...DEFAULT_MENU, ...extra];
   const byKey = new Map(all.map((m) => [m.key, m]));
@@ -112,7 +122,7 @@ export function effectiveMenu(cfg: MenuOverrides | null | undefined, extra: Menu
   const out: MenuItem[] = [];
   for (const k of order) { const m = byKey.get(k); if (m) { out.push(m); seen.add(k); } }
   for (const m of all) if (!seen.has(m.key)) out.push(m); // new items keep default position (appended)
-  return out.filter((m) => !hidden.has(m.key));
+  return out.filter((m) => !hidden.has(m.key)).map((m) => (m.children ? { ...m, children: filterHiddenChildren(m.children, hidden) } : m));
 }
 
 /** The full ordered list WITH hidden flags — for the editor UI. */

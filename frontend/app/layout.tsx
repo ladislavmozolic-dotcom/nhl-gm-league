@@ -75,7 +75,9 @@ export default async function RootLayout({
   const DETAILED_FINANCE_HREFS = new Set(["/finance/fan-interest", "/finance/season-tickets", "/finance/attendance", "/finance/merchandise", "/finance/sponsorship"]);
   // Finance moved from a top-level item into League ▸ Finance — honour a legacy
   // "hide finance" override so admins who hid it before the move keep it hidden.
-  const financeHidden = new Set(((site.menu as MenuOverrides | null)?.hidden) ?? []).has("finance");
+  const menuHidden = new Set(((site.menu as MenuOverrides | null)?.hidden) ?? []);
+  const financeHidden = menuHidden.has("finance");
+  const hideForum = menuHidden.has("forum");
   // translate the built-in top-nav labels (custom pages keep their own label)
   const menu = effectiveMenu(site.menu as MenuOverrides | null, extra).map((m) => {
     const item = m.key.startsWith("page:") ? m : { ...m, label: translate(lang, `menu.${m.key}`) };
@@ -96,7 +98,7 @@ export default async function RootLayout({
   });
 
   return (
-    <html lang="en" style={{ colorScheme: "dark" }}>
+    <html lang="en" style={{ colorScheme: isLightColor(site.theme.bgColor) ? "light" : "dark" }}>
       <head>
         {/* Tell the browser the site is ALREADY dark, so Chrome's "Auto Dark Mode / Force
             Dark" (a built-in flag, not an extension) doesn't re-darken it — that re-processing
@@ -114,7 +116,7 @@ export default async function RootLayout({
           {gm && <MessageNotifier initialUnread={gm.unreadDm} />}
           {gm && <TradeSuccessOverlay />}
           <SiteBanner branding={branding} />
-          <MegaMenu gm={gm} items={menu} lang={lang} light={branding.navLight} />
+          <MegaMenu gm={gm} items={menu} lang={lang} light={branding.navLight} hideForum={hideForum} />
           <main className="pt-4 pb-16 max-w-[1400px] mx-auto px-4 w-full flex-1">{children}</main>
           <SiteFooter branding={branding} />
         </LangProvider>
