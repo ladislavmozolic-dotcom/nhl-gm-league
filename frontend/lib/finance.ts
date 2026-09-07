@@ -217,7 +217,7 @@ export function buyoutTerms(
   cfg: { buyoutPctSeason: number; buyoutPctOffseason: number },
 ) {
   const pct = inSeason ? cfg.buyoutPctSeason : cfg.buyoutPctOffseason;
-  const perYear = Math.round(salary * pct / 100);
+  const perYear = Math.round((salary * pct / 100) / 500) * 500;
   const years = Math.max(1, remainingYears * 2);
   return { perYear, years, totalCost: perYear * years, pct };
 }

@@ -136,7 +136,7 @@ export async function collectMoveOps(pkg: TradePackage) {
           }
         }
         const pct = Math.min(maxPct, tp.retentionPct);
-        const retained = Math.round(capHit * pct / 100);
+        const retained = Math.round((capHit * pct / 100) / 500) * 500;
         const netCap = capHit - retained;
         if (netCap < settings.retentionMinSalary) throw new Error(`Retention would drop ${pl.name} below the ${settings.retentionMinSalary.toLocaleString()} floor.`);
         retainedSalary = retained;
