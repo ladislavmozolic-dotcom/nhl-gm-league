@@ -14,7 +14,7 @@ export type ClauseType = "NTC" | "NMC" | "M_NTC";
 export type ClauseVerdict = {
   clause: ClauseType;
   feePct: number;       // % of remaining salary the OLD team pays him to waive
-  feeAmount: number;    // $ = feePct × remaining (rounded to 50k)
+  feeAmount: number;    // $ = feePct × remaining
   fullPayout: boolean;  // he demands his entire remaining salary (100%)
   remaining: number;    // capHit × remaining years
   improvement: number;  // −1 (clear downgrade) … +1 (clear upgrade)
@@ -29,7 +29,7 @@ export function clauseVerdict(input: {
   toTeamId: number; noTradeTeams: number[];
 }): ClauseVerdict {
   const remaining = Math.max(0, (input.capHit || 0) * Math.max(1, input.contractYears || 1));
-  const round50 = (n: number) => Math.round(n / 50_000) * 50_000;
+  const dollars = (n: number) => Math.round(n);
 
   // situation delta: a lower line number on the new team is a better role; a
   // higher points% is a better team. Blend the two into −1..+1.
@@ -40,7 +40,7 @@ export function clauseVerdict(input: {
   const mk = (feePct: number, fullPayout: boolean, reason: string): ClauseVerdict => {
     feePct = Math.max(0, Math.min(100, Math.round(feePct)));
     if (fullPayout) feePct = 100;
-    return { clause: input.clause, feePct, feeAmount: round50((feePct / 100) * remaining), fullPayout: feePct >= 100, remaining, improvement, reason };
+    return { clause: input.clause, feePct, feeAmount: dollars((feePct / 100) * remaining), fullPayout: feePct >= 100, remaining, improvement, reason };
   };
 
   // M-NTC: only the teams on his list are blocked; anywhere else he'll report free.
