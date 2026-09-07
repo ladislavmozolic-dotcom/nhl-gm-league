@@ -54,6 +54,20 @@ async function faPoolTeamId(): Promise<number> {
  *  "raise your offer" link lands on the exact Interest widget, not a bare page. */
 const faFocusUrl = (playerId: number, isGoalie: boolean) => `/free-agents?focus=${playerId}${isGoalie ? "&type=goalies" : ""}`;
 
+const round50k = (v: number) => Math.max(775_000, Math.round(v / 50_000) * 50_000);
+/** What a player counters a bidder for, with genuine competition pushing the
+ *  price UP: never below what that club already has standing, and — once 2+
+ *  offers are genuinely live (same 0.75x band the outclassed check uses) —
+ *  never below the field leader's salary × a leverage factor that grows with
+ *  how many clubs are seriously in it, so a bidding war raises his ask instead
+ *  of a per-offer evaluation occasionally landing BELOW a club's own bid. */
+function competitiveAsk(baseAsk: number, myBid: number, list: { salary: number }[]): number {
+  const bestOffer = Math.max(...list.map((o) => o.salary));
+  const liveCount = list.filter((o) => o.salary >= bestOffer * 0.75).length;
+  const leverage = liveCount >= 3 ? 1.10 : liveCount >= 2 ? 1.05 : 1.0;
+  return round50k(Math.min(Math.max(baseAsk, bestOffer * leverage, myBid * 1.03), bestOffer * 1.20));
+}
+
 /** A team's committed NHL cap hit (+ retention/buyout dead money) and its LTIR
  *  relief (cap hits of skaters injured below CON 90). The effective ceiling is
  *  the phase ceiling + LTIR relief. */
@@ -373,7 +387,8 @@ export async function previewRoundOutcomeForTeam(id: number): Promise<number> {
     if (my.salary < ev.ask.floorSalary * 0.6 || outclassed) {
       body = `👀 Preview (round 1 hasn't closed yet): ${nm} would pass on your offer right now — ${outclassed ? "another club's offer is well ahead of yours" : "it isn't close to his value"}.`;
     } else {
-      body = `👀 Preview (round 1 hasn't closed yet): ${nm} would counter — he wants about $${(ev.ask.salary / 1e6).toFixed(2)}M × ${ev.ask.years}yr${soleOffer ? "" : " (other clubs are also in)"}. You have time to raise before the real close.`;
+      const want = competitiveAsk(ev.ask.salary, my.salary, list);
+      body = `👀 Preview (round 1 hasn't closed yet): ${nm} would counter — he wants about $${(want / 1e6).toFixed(2)}M × ${ev.ask.years}yr${soleOffer ? "" : " (other clubs are also in)"}. You have time to raise before the real close.`;
     }
     await prisma.dmMessage.create({ data: { fromTeamId: faId, toTeamId: id, body, tradeUrl: url } }).catch(() => {});
     previewed++;
@@ -874,11 +889,12 @@ export async function processRoundEnd(endedRound: number): Promise<{ countered: 
           await agentDm(o.teamId, `❌ ${name}'s camp passed on your offer — ${reason}.`, playerId, player.isGoalie);
           eliminated++;
         } else {
-          await prisma.faOffer.update({ where: { id: o.id }, data: { status: "COUNTERED", counterSalary: ev.ask.salary, counterYears: ev.ask.years } });
+          const want = competitiveAsk(ev.ask.salary, o.salary, list);
+          await prisma.faOffer.update({ where: { id: o.id }, data: { status: "COUNTERED", counterSalary: want, counterYears: ev.ask.years } });
           countered++;
           const msg = soleOffer
-            ? `📩 ${name} isn't ready to sign at that price yet — he wants about $${(ev.ask.salary / 1e6).toFixed(2)}M × ${ev.ask.years}yr. Raise your offer to close the deal.`
-            : `📩 ${name} is weighing multiple offers. Put in your BEST offer: he wants about $${(ev.ask.salary / 1e6).toFixed(2)}M × ${ev.ask.years}yr (other clubs are also in — bidding is blind). Raise to stay in it.`;
+            ? `📩 ${name} isn't ready to sign at that price yet — he wants about $${(want / 1e6).toFixed(2)}M × ${ev.ask.years}yr. Raise your offer to close the deal.`
+            : `📩 ${name} is weighing multiple offers. Put in your BEST offer: he wants about $${(want / 1e6).toFixed(2)}M × ${ev.ask.years}yr (other clubs are also in — bidding is blind). Raise to stay in it.`;
           await agentDm(o.teamId, msg, playerId, player.isGoalie);
         }
       }
