@@ -111,11 +111,20 @@ export async function getAskAtAction(playerId: number, teamId: number, line: num
  *  Only admin-tier (commissioner / co-commissioner) see the blind market. The TOP
  *  commissioner sees everything; a co-commissioner sees every offer EXCEPT the
  *  commissioner's own bid (his own club's offers are always visible to himself). */
-async function offerViewMask(): Promise<{ hide: Set<number> } | null> {
+async function offerViewMask(playerId?: number): Promise<{ hide: Set<number> } | null> {
   const id = await getTeamSession();
   if (id == null) return null;
   const me = await prisma.team.findUnique({ where: { id }, select: { isAdmin: true, gmRole: true } });
   if (!me || !(me.isAdmin || me.gmRole === "comish" || me.gmRole === "co_comish")) return null;
+  // Conflict of interest: a commish/co-commish who is ALSO bidding on this exact
+  // player (as a club) loses the admin view of it entirely — bidding stays blind
+  // for them here too, same as an ordinary GM, so their office can't use the
+  // full-market view to see what they're up against on a player they themselves
+  // want. This check is per-player and only kicks in when one is given.
+  if (playerId != null) {
+    const ownBid = await prisma.faOffer.findFirst({ where: { playerId, teamId: id, status: { in: ACTIVE } }, select: { id: true } });
+    if (ownBid) return null;
+  }
   const hide = new Set<number>();
   if (me.gmRole !== "comish") { // co-commissioner: the commissioner's own bid is hidden
     const comish = await prisma.team.findMany({ where: { gmRole: "comish" }, select: { id: true } });
@@ -164,7 +173,7 @@ export async function setFrenzyAutoOpenAction(iso: string | null) {
 export async function getPlayerOffersAction(playerId: number) {
   // blind bidding: only the commissioner tier sees the competing offers; a plain GM never
   // sees what other clubs have bid, and a co-commissioner can't see the commissioner's bid.
-  const mask = await offerViewMask();
+  const mask = await offerViewMask(playerId);
   if (!mask) return [];
   const offers = (await prisma.faOffer.findMany({
     where: { playerId, status: { in: ACTIVE } }, orderBy: { salary: "desc" },
@@ -206,7 +215,7 @@ async function lastRaisedAtByTeam(playerId: number, teamIds: number[]): Promise<
 /** Full bid history on a player — every offer/raise, oldest first. Commissioner only
  *  (blind bidding: a GM never sees rivals' bids). */
 export async function getBidHistoryAction(playerId: number) {
-  const mask = await offerViewMask();
+  const mask = await offerViewMask(playerId);
   if (!mask) return [];
   const bids = (await prisma.faBid.findMany({ where: { playerId }, orderBy: { id: "asc" } })).filter((b) => !mask.hide.has(b.teamId));
   if (bids.length === 0) return [];
@@ -225,9 +234,16 @@ export async function getBidHistoryAction(playerId: number) {
 export async function getAllActiveOffersAction() {
   const mask = await offerViewMask();
   if (!mask) return { ok: false as const, error: "Commissioner or co-commissioner only." };
+  // conflict of interest, market-wide: drop every player the viewer's own club is
+  // ALSO bidding on — same rule getPlayerOffersAction applies per-player, so the
+  // full-market view can't be used to peek at competition on a player they want.
+  const myTeamId = await getTeamSession();
+  const myBidPlayerIds = myTeamId != null
+    ? new Set((await prisma.faOffer.findMany({ where: { teamId: myTeamId, status: { in: ACTIVE } }, select: { playerId: true } })).map((o) => o.playerId))
+    : new Set<number>();
   const offers = (await prisma.faOffer.findMany({
     where: { status: { in: ACTIVE } }, orderBy: [{ playerId: "asc" }, { salary: "desc" }],
-  })).filter((o) => !mask.hide.has(o.teamId));
+  })).filter((o) => !mask.hide.has(o.teamId) && !myBidPlayerIds.has(o.playerId));
   if (offers.length === 0) return { ok: true as const, players: [] };
   const playerIds = [...new Set(offers.map((o) => o.playerId))];
   const teamIds = [...new Set(offers.map((o) => o.teamId))];
@@ -722,13 +738,20 @@ export async function processRoundEnd(endedRound: number): Promise<{ countered: 
       // suitor (no "other clubs" framing — he's just not at that price yet) vs
       // genuine competition (bidding is blind, raise to stay in it).
       const soleOffer = list.length === 1;
+      // A club sitting well behind the actual leading bid doesn't get invited to a
+      // "raise to stay in it" match round either — he's not stringing along an
+      // also-ran, he's just going with whoever's closest. Below-own-floor (already
+      // hopeless) OR clearly behind the best standing offer both eliminate.
+      const bestSalary = Math.max(...list.map((o) => o.salary));
       for (const { o, ev } of scored) {
         if (!ev) continue;
         const teamCode = (await prisma.team.findUnique({ where: { id: o.teamId }, select: { code: true } }))?.code ?? "?";
-        if (o.salary < ev.ask.floorSalary * 0.6) {
+        const outclassed = !soleOffer && o.salary < bestSalary * 0.75 && o.salary < ev.ask.salary;
+        if (o.salary < ev.ask.floorSalary * 0.6 || outclassed) {
           await prisma.faOffer.update({ where: { id: o.id }, data: { status: "REJECTED" } });
-          await prisma.transaction.create({ data: { type: "FA_NEGOTIATION", message: `${name} passed on ${teamCode}'s offer — not close to his value.` } });
-          await agentDm(o.teamId, `❌ ${name}'s camp passed on your offer — it wasn't close to his value.`, playerId, player.isGoalie);
+          const reason = outclassed ? "another club's offer was well ahead of yours" : "it wasn't close to his value";
+          await prisma.transaction.create({ data: { type: "FA_NEGOTIATION", message: `${name} passed on ${teamCode}'s offer — ${outclassed ? "another club was well ahead" : "not close to his value"}.` } });
+          await agentDm(o.teamId, `❌ ${name}'s camp passed on your offer — ${reason}.`, playerId, player.isGoalie);
           eliminated++;
         } else {
           await prisma.faOffer.update({ where: { id: o.id }, data: { status: "COUNTERED", counterSalary: ev.ask.salary, counterYears: ev.ask.years } });
