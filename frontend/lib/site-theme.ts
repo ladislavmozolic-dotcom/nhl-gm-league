@@ -84,15 +84,21 @@ export function themeCss(t: Theme): string {
     borderRules("border-slate-700", "--border", t.borderColor),
     // text — the near-white shades used for headings/values that don't rely on
     // the inherited body colour (text-slate-400/500 are the more muted tones
-    // used for secondary/caption text). Plain `text-white` is deliberately left
-    // alone: it's also how ~100 colour-coded buttons and badges (bg-blue-600
-    // text-white etc.) keep readable contrast on their own saturated background,
-    // and a blanket remap would break every one of them under a light theme.
+    // used for secondary/caption text).
     `.text-slate-100{color:var(--text,${t.textColor})!important}`,
     `.text-slate-200{color:var(--text,${t.textColor})!important}`,
     `.text-slate-300{color:var(--text,${t.textColor})!important}`,
     `.text-slate-400{color:var(--text-2,${t.text2Color})!important}`,
     `.text-slate-500{color:var(--text-3,${t.text3Color})!important}`,
+    // Plain `text-white` (player-name links, table cells, headings — hundreds of
+    // call sites across the app) needs to flip with the theme same as the shades
+    // above, EXCEPT the ~100 colour-coded buttons/badges (bg-blue-600 text-white
+    // etc.) that rely on literal white for contrast against their own saturated
+    // background. Those always pair a `bg-*` utility with `text-white` in the
+    // SAME class string, so excluding any element whose class list contains
+    // "bg-" catches them without having to touch each of the ~90 button call
+    // sites individually.
+    `[class~="text-white"]:not([class*="bg-"]){color:var(--text,${t.textColor})!important}`,
     // radius
     `.rounded-lg{border-radius:var(--radius)!important}.rounded-xl{border-radius:var(--radius)!important}.rounded-2xl{border-radius:calc(var(--radius) + 4px)!important}`,
   ].join("");
