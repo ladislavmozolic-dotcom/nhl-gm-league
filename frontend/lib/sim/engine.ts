@@ -8,7 +8,7 @@ import { cleanName } from "../playerName";
 import { generatePlayByPlay } from "./playbyplay";
 import { DEFAULT_SETTINGS, type EngineSettings } from "./settings";
 import { EventSink, type SimEvent } from "./events";
-import { shotProfile, expectedGoal, isHighDanger, shotSpeed, sectorIndex, type ShotStrength } from "./shot-quality";
+import { shotProfile, ppShotProfile, expectedGoal, isHighDanger, shotSpeed, sectorIndex, type ShotStrength } from "./shot-quality";
 import { ENGINE_V2 } from "./version";
 import type {
   SimTeam, SimSkater, SimGoalie, GameResult, TeamBox, PlayerLine, GoalieLine,
@@ -851,16 +851,22 @@ function generateHeatEvents(st: SimState, period: number) {
   }
 }
 
-/** Manpower situation for `team` at time t (within-period seconds). */
-function strengthAt(team: SimTeam, opp: SimTeam, t: number, active: Penalty[]): "EV" | "PP" | "SH" {
+/** Manpower situation for `team` at time t (within-period seconds), plus the
+ *  actual skater differential — a 5-on-3 (diff 2) is far more dangerous than a
+ *  plain 5-on-4 (diff 1), which strengthAt's plain EV/PP/SH tri-state can't
+ *  distinguish on its own. */
+function strengthDiffAt(team: SimTeam, opp: SimTeam, t: number, active: Penalty[]): { state: "EV" | "PP" | "SH"; diff: number } {
   let mine = 0, theirs = 0;
   for (const p of active) {
     if (p.expired || t < p.start || t >= p.end) continue;
     if (p.team === team.id) mine++; else if (p.team === opp.id) theirs++;
   }
-  if (theirs > mine) return "PP";
-  if (mine > theirs) return "SH";
-  return "EV";
+  const diff = theirs - mine;
+  return { state: diff > 0 ? "PP" : diff < 0 ? "SH" : "EV", diff: Math.abs(diff) };
+}
+/** Manpower situation for `team` at time t (within-period seconds). */
+function strengthAt(team: SimTeam, opp: SimTeam, t: number, active: Penalty[]): "EV" | "PP" | "SH" {
+  return strengthDiffAt(team, opp, t, active).state;
 }
 
 /** Expire the earliest-ending active penalty on `penalizedTeam` (PP goal ends it). */
@@ -1469,7 +1475,9 @@ function simulatePeriodPossession(st: SimState, period: number) {
       // danger when defending (away team carrying → home defends).
       const lastChange = !isHome ? 1 - 0.035 * (CFG.homeLastChangePct / 100) : 1;
       const danger = baseDanger * dangerBias * lastChange;
-      const strength = strengthAt(carrierTeam, def, tick, active);
+      const strengthInfo = strengthDiffAt(carrierTeam, def, tick, active);
+      const strength = strengthInfo.state;
+      const manAdv3 = strength === "PP" && strengthInfo.diff >= 2; // true 5-on-3 (or better)
       const gLine = liveGoalieLine(st, def.id);
       const gSim = liveGoalie(st, def);
       st.box[carrierTeam.id].shots++;
@@ -1480,7 +1488,13 @@ function simulatePeriodPossession(st: SimState, period: number) {
       // goals (independent of shooter finishing / goalie quality). Accumulate the
       // xG into the shooter, his team, and the goalie facing it (→ GSAx).
       const strengthKey: ShotStrength = strength === "PP" ? "PP" : strength === "SH" ? "SH" : "EV";
-      const { sector, shotType } = shotProfile(rng, { isDefense: carrier.isDefense, setup, danger, dangerBias });
+      // On the power play, the team's chosen formation (Umbrella/1-3-1/Overload)
+      // drives WHERE the shot comes from, not just a flat conversion bump — a
+      // 1-3-1 team's shot chart should visibly lean on slot one-timers, an
+      // Umbrella's on point shots + net-front traffic. EV/SH shots are untouched.
+      const { sector, shotType } = strength === "PP"
+        ? ppShotProfile(rng, carrierTeam.teamTactics.ppStyle ?? "balanced", { isDefense: carrier.isDefense, setup, manAdv3 })
+        : shotProfile(rng, { isDefense: carrier.isDefense, setup, danger, dangerBias });
       const xg = expectedGoal(rng, sector, shotType, strengthKey);
       const hd = isHighDanger(sector);
       // Shift Quality: this chance's xG lifts the shooters' on-ice shift, dents the defenders'
@@ -1520,7 +1534,10 @@ function simulatePeriodPossession(st: SimState, period: number) {
       const dPair = onIceD(def);
       const avgDefDf = dPair.length ? dPair.reduce((s, d) => s + (d.attrs.df ?? 50), 0) / dPair.length : (dman.attrs.df ?? 50);
       const defTalent = Math.max(0.72, Math.min(1.3, 1 - (CFG.defenseTalentPct / 100) * (avgDefDf - 74) / 20));
-      const ppMod = strength === "PP" ? (carrierTeam.ppChem / def.pkChem) * atkFx.ppConv * defFx.pkSuppress : 1; // gelled PP1 + PP formation vs gelled PK1 + PK structure
+      // a true 5-on-3 is far more dangerous than a plain 5-on-4 — the extra open
+      // ice on top of the formation/chemistry edge, not a replacement for it.
+      const manAdvMult = manAdv3 ? 1.35 : 1;
+      const ppMod = strength === "PP" ? (carrierTeam.ppChem / def.pkChem) * atkFx.ppConv * defFx.pkSuppress * manAdvMult : 1; // gelled PP1 + PP formation vs gelled PK1 + PK structure
       const shOff = strength !== "EV" ? carrier.offense / carrier.posPenalty : carrier.offense; // off-position waived on ST
       // PARITY: compress the talent mismatch so favourites don't run away. The
       // shooter×goalie conversion is pulled toward the SAME situation with a

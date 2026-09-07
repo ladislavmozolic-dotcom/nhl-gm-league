@@ -12,6 +12,7 @@
 // season and GSAx centres on zero for an average keeper.
 
 import type { RNG } from "./rng";
+import type { PpStyle } from "./tactics";
 
 export type ShotSector = "POINT" | "PERIMETER" | "CIRCLE" | "SLOT" | "NET_FRONT";
 export type ShotType = "SLAP" | "WRIST" | "SNAP" | "BACKHAND" | "TIP" | "ONE_TIMER";
@@ -77,6 +78,37 @@ export function shotProfile(
   if (r < slotP) return { sector: "SLOT", shotType: rng.chance(0.5) ? "WRIST" : "SNAP" };
   if (r < circleP) return { sector: "CIRCLE", shotType: rng.chance(0.6) ? "WRIST" : "SNAP" };
   return { sector: "PERIMETER", shotType: rng.chance(0.7) ? "WRIST" : "BACKHAND" };
+}
+
+// Formation-specific shot-location mix for a power play — each classic PP
+// structure puts the puck in a different place, not just "more of it": 1-3-1
+// lives on the flank one-timer through the slot, Umbrella works it from the
+// point with net-front traffic, Overload grinds it low for a net-front/backdoor
+// look. This REPLACES the generic carry/pass zone roll for a PP shot (a
+// rebound scramble stays generic — a loose puck doesn't care about formation).
+// manAdv3 (a true 5-on-3) pushes every formation further toward its own
+// high-danger signature — the extra open ice amplifies whatever look it hunts.
+const PP_FORMATION_MIX: Record<PpStyle, { netFrontP: number; slotP: number; oneTimerP: number }> = {
+  balanced: { netFrontP: 0.16, slotP: 0.34, oneTimerP: 0.55 },
+  umbrella: { netFrontP: 0.26, slotP: 0.24, oneTimerP: 0.45 },   // point shots + screens/tips up front
+  "131": { netFrontP: 0.12, slotP: 0.50, oneTimerP: 0.80 },      // the flank seam one-timer
+  overload: { netFrontP: 0.30, slotP: 0.28, oneTimerP: 0.45 },   // low cycle, net-front / backdoor
+};
+
+export function ppShotProfile(
+  rng: RNG,
+  style: PpStyle,
+  opts: { isDefense: boolean; setup: "carry" | "pass" | "rebound"; manAdv3?: boolean },
+): { sector: ShotSector; shotType: ShotType } {
+  if (opts.isDefense || opts.setup === "rebound") return shotProfile(rng, { isDefense: opts.isDefense, setup: opts.setup, danger: 1 });
+  const mix = PP_FORMATION_MIX[style] ?? PP_FORMATION_MIX.balanced;
+  const boost = opts.manAdv3 ? 1.25 : 1; // extra space on a 5-on-3 sharpens whatever look the formation hunts
+  const netFrontP = Math.min(0.45, mix.netFrontP * boost);
+  const slotP = Math.min(0.7, mix.slotP * boost);
+  const r = rng.next();
+  if (r < netFrontP) return { sector: "NET_FRONT", shotType: rng.chance(0.5) ? "TIP" : "WRIST" };
+  if (r < netFrontP + slotP) return { sector: "SLOT", shotType: rng.chance(mix.oneTimerP) ? "ONE_TIMER" : "SNAP" };
+  return { sector: "CIRCLE", shotType: rng.chance(0.5) ? "SNAP" : "WRIST" };
 }
 
 /** Expected goals for a shot from `sector` of `shotType` at `strength`, with mild jitter. */
