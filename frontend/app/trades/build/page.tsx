@@ -26,8 +26,8 @@ export default async function TradeBuildPage({ searchParams }: { searchParams: P
     const trade = await prisma.trade.findUnique({ where: { id: editId } });
     if (!trade || trade.status !== "MODIFY" || (session !== trade.fromTeamId && session !== trade.toTeamId)) redirect("/trades");
     const [fromT, toT] = await Promise.all([
-      prisma.team.findUnique({ where: { id: trade!.fromTeamId }, select: { id: true, name: true } }),
-      prisma.team.findUnique({ where: { id: trade!.toTeamId }, select: { id: true, name: true } }),
+      prisma.team.findUnique({ where: { id: trade!.fromTeamId }, select: { id: true, name: true, logoUrl: true } }),
+      prisma.team.findUnique({ where: { id: trade!.toTeamId }, select: { id: true, name: true, logoUrl: true } }),
     ]);
     const [mine, theirs] = await Promise.all([teamAssets(fromT!.id, src), teamAssets(toT!.id, src)]);
     const pkg = await packageFromTrade(editId);
@@ -42,14 +42,14 @@ export default async function TradeBuildPage({ searchParams }: { searchParams: P
       <div className="space-y-4 py-2">
         <PageHeader title={`Modify trade #${editId}`} subtitle={`${fromT!.name} ↔ ${toT!.name} — the commission asked you to rebalance this deal. Adjust the assets and resubmit for review.`} />
         {trade!.commishNote && <Card><p className="text-sm text-amber-300">✏️ Commission note: {trade!.commishNote}</p></Card>}
-        <TradeBuilder me={{ id: fromT!.id, name: fromT!.name }} opp={{ id: toT!.id, name: toT!.name }} mine={mine} theirs={theirs} initial={initial} submitLabel="Resubmit to commission" onPropose={submitEdit} />
+        <TradeBuilder me={{ id: fromT!.id, name: fromT!.name, logoUrl: fromT!.logoUrl }} opp={{ id: toT!.id, name: toT!.name, logoUrl: toT!.logoUrl }} mine={mine} theirs={theirs} initial={initial} submitLabel="Resubmit to commission" onPropose={submitEdit} />
       </div>
     );
   }
 
   const teams = await prisma.team.findMany({
     where: { league: "NHL", isAffiliate: false, id: { not: myTeam.id } },
-    select: { id: true, name: true }, orderBy: { name: "asc" },
+    select: { id: true, name: true, logoUrl: true }, orderBy: { name: "asc" },
   });
 
   const { opp } = await searchParams;
@@ -62,13 +62,15 @@ export default async function TradeBuildPage({ searchParams }: { searchParams: P
         <PageHeader title="Trade Room" subtitle={`You are ${myTeam.name}. Pick a team to trade with.`}
           right={<Link href="/trades/build3" className="text-sm text-slate-400 hover:text-blue-400">+ Add a 3rd team</Link>} />
         <Card>
-          <form className="flex gap-3">
-            <select name="opp" defaultValue="" className="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-2">
-              <option value="" disabled>Select a team…</option>
-              {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-            <button className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 font-semibold text-sm">Open</button>
-          </form>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {teams.map((t) => (
+              <Link key={t.id} href={`/trades/build?opp=${t.id}`}
+                className="flex items-center gap-3 bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 px-4 py-3 hover:border-slate-600 transition-colors">
+                {t.logoUrl && <img src={t.logoUrl} alt="" className="w-8 h-8 object-contain shrink-0" />}
+                <span className="font-medium text-sm">{t.name}</span>
+              </Link>
+            ))}
+          </div>
         </Card>
       </div>
     );
@@ -80,8 +82,8 @@ export default async function TradeBuildPage({ searchParams }: { searchParams: P
 
   return (
     <TradeBuilder
-      me={{ id: myTeam.id, name: myTeam.name }}
-      opp={{ id: oppTeam.id, name: oppTeam.name }}
+      me={{ id: myTeam.id, name: myTeam.name, logoUrl: myTeam.logoUrl }}
+      opp={{ id: oppTeam.id, name: oppTeam.name, logoUrl: oppTeam.logoUrl }}
       mine={mine}
       theirs={theirs}
       onPropose={proposeTrade}

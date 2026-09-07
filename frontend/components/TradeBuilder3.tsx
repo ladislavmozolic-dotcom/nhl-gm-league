@@ -10,7 +10,7 @@ import { proposeTradeGroupAction, type GroupLeg } from "@/app/trades/build3/acti
 type Player = { id: number; name: string; position: string; capHit: number; farm: boolean; clause?: string | null; noTradeTeams?: number[] };
 type Pick = { id: number; label: string; logoUrl?: string | null };
 type Assets = { players: Player[]; picks: Pick[]; prospects: Pick[] };
-type Team = { id: number; name: string };
+type Team = { id: number; name: string; logoUrl?: string | null };
 type Terms = { feeAmount: number; feePct: number; fullPayout: boolean; reason: string };
 
 const clauseTag = (c?: string | null) => c === "NMC" ? "NMC" : c === "M_NTC" ? "M-NTC" : c === "NTC" ? "NTC" : null;
@@ -53,7 +53,10 @@ function TeamColumn({ team, others, assets, dest, setDest, playerIds, setPlayerI
 
   return (
     <div className="space-y-3 bg-slate-900/40 border border-slate-800 rounded-xl p-3">
-      <div className="text-center font-bold">{team.name} sends</div>
+      <div className="flex items-center justify-center gap-2 font-bold">
+        {team.logoUrl && <img src={team.logoUrl} alt="" className="w-6 h-6 object-contain shrink-0" />}
+        {team.name} sends
+      </div>
       <div className="flex items-center gap-2 justify-center text-sm">
         <span className="text-slate-400">to</span>
         <select value={dest ?? ""} onChange={(e) => setDest(e.target.value ? Number(e.target.value) : null)}

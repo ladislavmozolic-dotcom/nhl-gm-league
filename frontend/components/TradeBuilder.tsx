@@ -9,7 +9,7 @@ import { clauseTermsAction, analyzeTradeAction, type TradePackage } from "@/app/
 type Player = { id: number; name: string; position: string; capHit: number; farm: boolean; clause?: string | null; noTradeTeams?: number[] };
 type Pick = { id: number; label: string; logoUrl?: string | null };
 type Assets = { players: Player[]; picks: Pick[]; prospects: Pick[] };
-type Team = { id: number; name: string };
+type Team = { id: number; name: string; logoUrl?: string | null };
 
 const clauseTag = (c?: string | null) => c === "NMC" ? "NMC" : c === "M_NTC" ? "M-NTC" : c === "NTC" ? "NTC" : null;
 
@@ -153,7 +153,10 @@ export default function TradeBuilder({ me, opp, mine, theirs, onPropose, initial
     cash: number; setCash: (n: number) => void; destTeamId: number;
   }) => (
     <div className="space-y-3">
-      <div className="text-center font-bold">{team.name} sends</div>
+      <div className="flex items-center justify-center gap-2 font-bold">
+        {team.logoUrl && <img src={team.logoUrl} alt="" className="w-6 h-6 object-contain shrink-0" />}
+        {team.name} sends
+      </div>
       <PlayerTable title="NHL players" list={assets.players.filter((p) => !p.farm)} pmap={pmap} setPmap={setPmap} destTeamId={destTeamId} ownerTeamId={team.id} />
       <PlayerTable title="AHL players" list={assets.players.filter((p) => p.farm)} pmap={pmap} setPmap={setPmap} destTeamId={destTeamId} ownerTeamId={team.id} />
       <CheckTable title="Prospects" icon="⭐" list={assets.prospects} sel={pro} setSel={setPro} />
@@ -217,9 +220,12 @@ export default function TradeBuilder({ me, opp, mine, theirs, onPropose, initial
   const mineSummary = sideSummary(mine, mineP, minePk, minePro, mineCash);
   const theirsSummary = sideSummary(theirs, theirsP, theirsPk, theirsPro, theirsCash);
 
-  const SummaryBox = ({ name, items, accent }: { name: string; items: string[]; accent: string }) => (
+  const SummaryBox = ({ name, logoUrl, items, accent }: { name: string; logoUrl?: string | null; items: string[]; accent: string }) => (
     <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-2.5">
-      <div className={`text-[11px] font-bold uppercase tracking-wide mb-1.5 ${accent}`}>{name} sends</div>
+      <div className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide mb-1.5 ${accent}`}>
+        {logoUrl && <img src={logoUrl} alt="" className="w-4 h-4 object-contain shrink-0" />}
+        {name} sends
+      </div>
       {items.length === 0
         ? <div className="text-slate-600 text-xs italic">nothing selected yet</div>
         : <ul className="space-y-1 text-sm text-slate-200">{items.map((t, i) => <li key={i} className="truncate">{t}</li>)}</ul>}
@@ -240,9 +246,9 @@ export default function TradeBuilder({ me, opp, mine, theirs, onPropose, initial
         <div className="lg:sticky lg:top-4 space-y-3">
           <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-3 space-y-3 shadow-lg">
             <div className="text-center text-sm font-bold uppercase tracking-wider text-slate-300">Trade summary</div>
-            <SummaryBox name={me.name} items={mineSummary} accent="text-blue-400" />
+            <SummaryBox name={me.name} logoUrl={me.logoUrl} items={mineSummary} accent="text-blue-400" />
             <div className="flex items-center justify-center text-slate-500">⇅</div>
-            <SummaryBox name={opp.name} items={theirsSummary} accent="text-red-400" />
+            <SummaryBox name={opp.name} logoUrl={opp.logoUrl} items={theirsSummary} accent="text-red-400" />
 
             <div>
               <label className="text-xs text-slate-400">Condition (optional)</label>

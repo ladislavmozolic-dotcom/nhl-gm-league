@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getTeamSession } from "@/lib/auth";
 import { teamAssets } from "@/lib/trade-assets";
 import TradeBuilder3 from "@/components/TradeBuilder3";
+import TeamSelect from "@/components/TeamSelect";
 import { PageHeader, Card } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -11,12 +12,12 @@ export const dynamic = "force-dynamic";
 export default async function TradeBuild3Page({ searchParams }: { searchParams: Promise<{ b?: string; c?: string }> }) {
   const session = await getTeamSession();
   if (!session) redirect("/login");
-  const myTeam = await prisma.team.findUnique({ where: { id: session }, select: { id: true, name: true } });
+  const myTeam = await prisma.team.findUnique({ where: { id: session }, select: { id: true, name: true, logoUrl: true } });
   if (!myTeam) redirect("/login");
 
   const teams = await prisma.team.findMany({
     where: { league: "NHL", isAffiliate: false, id: { not: myTeam.id } },
-    select: { id: true, name: true }, orderBy: { name: "asc" },
+    select: { id: true, name: true, logoUrl: true }, orderBy: { name: "asc" },
   });
 
   const { b, c } = await searchParams;
@@ -35,14 +36,8 @@ export default async function TradeBuild3Page({ searchParams }: { searchParams: 
         />
         <Card>
           <form className="flex flex-col sm:flex-row gap-3">
-            <select name="b" defaultValue={bId ?? ""} className="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-2">
-              <option value="" disabled>Club B…</option>
-              {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-            <select name="c" defaultValue={cId ?? ""} className="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-2">
-              <option value="" disabled>Club C…</option>
-              {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
+            <TeamSelect name="b" placeholder="Club B…" teams={teams} defaultValue={bId} />
+            <TeamSelect name="c" placeholder="Club C…" teams={teams} defaultValue={cId} />
             <button className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 font-semibold text-sm whitespace-nowrap">Open</button>
           </form>
           {bId && cId && teamB === null && <p className="text-rose-400 text-sm mt-2">Pick two different clubs.</p>}
