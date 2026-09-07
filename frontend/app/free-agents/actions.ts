@@ -285,6 +285,86 @@ export async function getAllActiveOffersAction() {
   return { ok: true as const, players: result };
 }
 
+/** Comish-tier only, READ-ONLY: DMs the caller's own team what round 1 WOULD do
+ *  to each of its standing offers if it closed right now — sign / counter (with
+ *  the amount) / pass. Nothing is written: no FaOffer status changes, no
+ *  signings, no eliminations, for the caller OR anyone else, and no other
+ *  bidder is notified. This exists because a comish/co-comish gets a one-day
+ *  head start PLACING offers ahead of ordinary GMs (see the round-lock in
+ *  submitOfferAction) — without this they'd have no way to know where they
+ *  stand until the real close, a day after everyone else finds out. The actual
+ *  binding round close (processRoundEnd) still runs for the whole league
+ *  together at its normal time; this only lets the two commissioner offices
+ *  see the outcome early so they can raise before then — it changes nothing
+ *  about what the real close decides, or when anyone else's offers resolve. */
+export async function previewMyRoundOutcomeAction() {
+  const id = await getTeamSession();
+  if (id == null) return { ok: false as const, error: "Sign in first." };
+  const me = await prisma.team.findUnique({ where: { id }, select: { isAdmin: true, gmRole: true } });
+  if (!me || !(me.isAdmin || me.gmRole === "comish" || me.gmRole === "co_comish")) {
+    return { ok: false as const, error: "Commissioner or co-commissioner only." };
+  }
+  const clock = await getLeagueClock();
+  if (!clock.frenzyOpen || clock.frenzyRound !== 1) return { ok: false as const, error: "Only meaningful during round 1." };
+  const previewed = await previewRoundOutcomeForTeam(id);
+  return { ok: true as const, previewed };
+}
+
+/** The actual read-only preview logic behind previewMyRoundOutcomeAction, split
+ *  out so it can run for a specific team id (e.g. both commissioner offices at
+ *  once) without a live session. */
+export async function previewRoundOutcomeForTeam(id: number): Promise<number> {
+  const myOffers = await prisma.faOffer.findMany({ where: { teamId: id, status: { in: ACTIVE } } });
+  if (myOffers.length === 0) return 0;
+
+  const pool = await loadMarketPool();
+  const cmap = await teamContentionMap();
+  const faId = await faPoolTeamId();
+  const nice = (s: string) => s.replace(/''[A-Za-z]''|\s*\([^)]*\)/g, "").trim();
+  let previewed = 0;
+  for (const my of myOffers) {
+    const player = await prisma.player.findUnique({ where: { id: my.playerId }, select: { name: true, isGoalie: true, rosterType: true } });
+    if (!player || (player.rosterType && FREE.includes(player.rosterType))) continue;
+    const list = await prisma.faOffer.findMany({ where: { playerId: my.playerId, status: { in: ACTIVE } } });
+    const nm = nice(player.name);
+    const url = faFocusUrl(my.playerId, player.isGoalie);
+
+    // would he sign right now? (same "best acceptable offer" test pickAndSign
+    // uses at round 1 — a lone suitor does NOT fall back to his floor this
+    // early, matching processRoundEnd's allowSoleFloor=false)
+    let bestAcceptable: { teamId: number; utility: number } | null = null;
+    for (const o of list) {
+      const ev = await evaluateTeamOffer(my.playerId, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, 1, { clause: o.grantClause, breadth: o.mNtcBreadth });
+      if (ev?.acceptable && (!bestAcceptable || ev.utility > bestAcceptable.utility)) bestAcceptable = { teamId: o.teamId, utility: ev.utility };
+    }
+    if (bestAcceptable) {
+      const body = bestAcceptable.teamId === id
+        ? `👀 Preview (round 1 hasn't closed yet): ${nm} would SIGN with you right now at your standing offer.`
+        : `👀 Preview (round 1 hasn't closed yet): another club's offer on ${nm} would be accepted over yours right now.`;
+      await prisma.dmMessage.create({ data: { fromTeamId: faId, toTeamId: id, body, tradeUrl: url } }).catch(() => {});
+      previewed++;
+      continue;
+    }
+
+    // not an outright sign — would he counter, or cut this offer as outclassed?
+    const ev = await evaluateTeamOffer(my.playerId, id, my.salary, my.years, { line: my.line, pp: my.pp, pk: my.pk }, pool, cmap, 2, { clause: my.grantClause, breadth: my.mNtcBreadth });
+    if (!ev) continue;
+    const bestSalary = Math.max(...list.map((o) => o.salary));
+    const soleOffer = list.length === 1;
+    const outclassed = !soleOffer && my.salary < bestSalary * 0.75 && my.salary < ev.ask.salary;
+    let body: string;
+    if (my.salary < ev.ask.floorSalary * 0.6 || outclassed) {
+      body = `👀 Preview (round 1 hasn't closed yet): ${nm} would pass on your offer right now — ${outclassed ? "another club's offer is well ahead of yours" : "it isn't close to his value"}.`;
+    } else {
+      body = `👀 Preview (round 1 hasn't closed yet): ${nm} would counter — he wants about $${(ev.ask.salary / 1e6).toFixed(2)}M × ${ev.ask.years}yr${soleOffer ? "" : " (other clubs are also in)"}. You have time to raise before the real close.`;
+    }
+    await prisma.dmMessage.create({ data: { fromTeamId: faId, toTeamId: id, body, tradeUrl: url } }).catch(() => {});
+    previewed++;
+  }
+  revalidatePath("/free-agents");
+  return previewed;
+}
+
 /** Place or raise a team's standing offer to a free agent (money + term + promised usage). */
 export async function submitOfferAction(
   playerId: number, teamId: number, salary: number, years: number, line: number, pp: boolean, pk: boolean,
