@@ -15,6 +15,7 @@ export async function saveBranding(form: FormData) {
   const accentColor = str("accentColor") || "#60a5fa";
   const bgColor = str("bgColor") || "#0a1628";
   const footerText = str("footerText") || null;
+  const navLight = str("navLight") === "true";
   const clampPx = (k: string, d: number) => Math.max(20, Math.min(240, Number(form.get(k)) || d));
   const logoHeight = clampPx("logoHeight", 56);
   const nameHeight = clampPx("nameHeight", 56);
@@ -29,7 +30,7 @@ export async function saveBranding(form: FormData) {
     if (Array.isArray(parsed)) socialLinks = parsed.filter((s) => s && typeof s.url === "string" && /^https?:\/\//i.test(s.url)).slice(0, 12).map((s) => ({ type: String(s.type || "web"), url: String(s.url) }));
   } catch { /* ignore malformed */ }
 
-  const data = { leagueName, tagline, logoUrl, nameImageUrl, logoHeight, nameHeight, bannerAlign, bannerLayout, logoFirst, bannerHeight, socialLinks, accentColor, bgColor, footerText };
+  const data = { leagueName, tagline, logoUrl, nameImageUrl, logoHeight, nameHeight, bannerAlign, bannerLayout, logoFirst, bannerHeight, socialLinks, accentColor, bgColor, footerText, navLight };
   await prisma.siteConfig.upsert({ where: { id: 1 }, update: data, create: { id: 1, ...data } });
   // branding is in the root layout → revalidate the whole site
   revalidatePath("/", "layout");

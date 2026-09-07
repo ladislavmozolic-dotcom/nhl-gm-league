@@ -428,6 +428,7 @@ model SiteConfig {
   accentColor String   @default("#60a5fa") // header/tagline accent (was blue-400)
   bgColor     String   @default("#0a1628") // page background
   footerText  String?
+  navLight    Boolean  @default(false)     // white/light nav bar instead of the default dark one
   // Theme tokens — remapped onto the app's common Tailwind classes site-wide
   surfaceColor String  @default("#0f172a") // cards / cells (bg-slate-900)
   surface2Color String @default("#1e293b") // inputs / secondary surfaces (bg-slate-800)

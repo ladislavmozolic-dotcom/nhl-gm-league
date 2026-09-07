@@ -20,9 +20,45 @@ interface Team {
 // mobile accordion can recurse into either without caring which one it got.
 type NavNode = { key?: string; label: string; href: string; mega?: boolean; children?: NavNode[] };
 
-export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: string; slug: string; admin?: boolean; pendingJoins?: number; unreadDm?: number; forumNew?: number } | null; items?: MenuItem[]; lang?: Lang }) {
+export default function MegaMenu({ gm, items, lang = "en", light = false }: { gm?: { nickname: string; slug: string; admin?: boolean; pendingJoins?: number; unreadDm?: number; forumNew?: number } | null; items?: MenuItem[]; lang?: Lang; light?: boolean }) {
   const menuItems = items ?? DEFAULT_MENU;
   const tr = (k: string) => t(lang, k);
+
+  // Two colour "slots" swapped wholesale by the admin-set `light` toggle (Web
+  // Editor → Branding → "Svetlé menu") — kept local to this component so the
+  // default dark nav (used by every other league on this codebase) is
+  // byte-for-byte unchanged when the flag is off.
+  const navSurface = light ? "bg-white/95" : "bg-[#0a1628]/95";
+  const navSurfaceIdle = light ? "bg-white/90" : "bg-[#0a1628]/80";
+  const navShadow = light ? "shadow-lg shadow-slate-300/50" : "shadow-lg shadow-black/30";
+  const navBorder = light ? "border-slate-200" : "border-slate-700/30";
+  const hamburgerBtn = light ? "text-slate-500 hover:text-slate-900 hover:bg-slate-100" : "text-slate-300 hover:text-white hover:bg-slate-800/40";
+  const linkIdle = light ? "text-slate-600 hover:text-slate-900 hover:bg-slate-100" : "text-slate-400 hover:text-white hover:bg-slate-800/40";
+  const linkActive = light ? "text-slate-900 bg-slate-200/70" : "text-white bg-slate-700/60";
+  const panelBg = light ? "bg-white border-slate-200" : "bg-[#0f1d32] border-slate-700/40";
+  const panelShadow = light ? "shadow-2xl shadow-slate-300/60" : "shadow-2xl shadow-black/50";
+  const panelLinkText = light ? "text-slate-700 hover:text-slate-900" : "text-slate-300 hover:text-white";
+  const panelLinkHoverBg = light ? "hover:bg-slate-100" : "hover:bg-slate-700/40";
+  const chevronText = light ? "text-slate-400 group-hover/sub:text-slate-900" : "text-slate-500 group-hover/sub:text-white";
+  const confBlue = light ? "text-blue-600" : "text-blue-400";
+  const confRed = light ? "text-red-600" : "text-red-400";
+  const gmPanelBg = light ? "bg-white border-slate-200" : "bg-[#0e1e35] border-slate-700";
+  const gmPanelDivider = light ? "border-slate-200" : "border-slate-700/60";
+  const gmPanelMuted = light ? "text-slate-400" : "text-slate-500";
+  const gmPanelTextColor = light ? "text-slate-700" : "text-slate-300";
+  const gmPanelHoverBg = light ? "hover:bg-slate-100" : "hover:bg-slate-800";
+  const gmPanelText = `${gmPanelTextColor} ${gmPanelHoverBg}`;
+  const gmLoginText = light ? "text-blue-700" : "text-blue-300";
+  const gmNameBtnHover = light ? "hover:bg-slate-100" : "hover:bg-slate-800/40";
+  const mobileBg = light ? "bg-white" : "bg-[#0a1628]";
+  const mobileDivider = light ? "border-slate-200" : "border-slate-800/60";
+  const mobileText = light ? "text-slate-700" : "text-slate-200";
+  const mobileMuted = light ? "text-slate-400 hover:text-slate-900" : "text-slate-500 hover:text-white";
+  const mobileTeamText = light ? "text-slate-600 hover:text-slate-900" : "text-slate-300 hover:text-white";
+  const dividerLine = light ? "border-slate-200" : "border-slate-700/60";
+  const mobileGmMuted = light ? "text-slate-600" : "text-slate-300";
+  const mobileGmSwitch = light ? "text-blue-700" : "text-blue-300";
+  const badgeRing = light ? "border-white" : "border-[#0a1628]";
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
   const [scrolled, setScrolled] = useState(false);
@@ -58,16 +94,16 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
 
   const TeamsMobileList = ({ pad }: { pad: number }) => (
     <div className="pb-1">
-      <div className="text-[10px] uppercase tracking-widest text-blue-400 font-bold pt-1.5 pb-1" style={{ paddingLeft: pad }}>Eastern Conference</div>
+      <div className={`text-[10px] uppercase tracking-widest ${confBlue} font-bold pt-1.5 pb-1`} style={{ paddingLeft: pad }}>Eastern Conference</div>
       {eastern.map((tm) => (
-        <Link key={tm.id} href={`/teams/${tm.slug}`} onClick={closeMobile} className="flex items-center gap-2 py-2 text-[13px] text-slate-300 hover:text-white" style={{ paddingLeft: pad }}>
+        <Link key={tm.id} href={`/teams/${tm.slug}`} onClick={closeMobile} className={`flex items-center gap-2 py-2 text-[13px] ${mobileTeamText}`} style={{ paddingLeft: pad }}>
           {tm.logoUrl && <img src={tm.logoUrl} alt="" className="w-5 h-5 object-contain shrink-0" />}
           {tm.name}
         </Link>
       ))}
-      <div className="text-[10px] uppercase tracking-widest text-red-400 font-bold pt-2 pb-1" style={{ paddingLeft: pad }}>Western Conference</div>
+      <div className={`text-[10px] uppercase tracking-widest ${confRed} font-bold pt-2 pb-1`} style={{ paddingLeft: pad }}>Western Conference</div>
       {western.map((tm) => (
-        <Link key={tm.id} href={`/teams/${tm.slug}`} onClick={closeMobile} className="flex items-center gap-2 py-2 text-[13px] text-slate-300 hover:text-white" style={{ paddingLeft: pad }}>
+        <Link key={tm.id} href={`/teams/${tm.slug}`} onClick={closeMobile} className={`flex items-center gap-2 py-2 text-[13px] ${mobileTeamText}`} style={{ paddingLeft: pad }}>
           {tm.logoUrl && <img src={tm.logoUrl} alt="" className="w-5 h-5 object-contain shrink-0" />}
           {tm.name}
         </Link>
@@ -84,19 +120,20 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
     const pad = 12 + depth * 16;
     const toggleOnly = node.href === "#";
     return (
-      <div className={depth === 0 ? "border-b border-slate-800/60" : ""}>
+      <div className={depth === 0 ? `border-b ${mobileDivider}` : ""}>
         <div className="flex items-center">
           {toggleOnly ? (
-            <button type="button" onClick={() => togglePath(path)} className="flex-1 text-left py-2.5 text-[14px] text-slate-200" style={{ paddingLeft: pad }}>
+            <button type="button" onClick={() => togglePath(path)} className={`flex-1 text-left py-2.5 text-[14px] ${mobileText}`} style={{ paddingLeft: pad }}>
               {node.label}
             </button>
           ) : (
-            <Link href={node.href} onClick={closeMobile} className="flex-1 py-2.5 text-[14px] text-slate-200" style={{ paddingLeft: pad }}>
+            <Link href={node.href} onClick={closeMobile} className={`flex-1 py-2.5 text-[14px] ${mobileText}`} style={{ paddingLeft: pad }}>
               {node.label}
             </Link>
           )}
           {hasKids && (
-            <button type="button" onClick={() => togglePath(path)} aria-label="Toggle submenu" className="px-3.5 py-2.5 text-slate-500 hover:text-white">
+            <button type="button" onClick={() => togglePath(path)} aria-label="Toggle submenu" className={`px-3.5 py-2.5 ${mobileMuted}`}>
+
               <span className={`inline-block transition-transform ${isOpen ? "rotate-180" : ""}`}>▾</span>
             </button>
           )}
@@ -114,10 +151,10 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
 
   return (
     <nav
-      className={`sticky top-0 z-50 border-b border-slate-700/30 transition-all duration-300 ${
+      className={`sticky top-0 z-50 border-b ${navBorder} transition-all duration-300 ${
         scrolled
-          ? "bg-[#0a1628]/95 backdrop-blur-xl shadow-lg shadow-black/30"
-          : "bg-[#0a1628]/80 backdrop-blur-md"
+          ? `${navSurface} backdrop-blur-xl ${navShadow}`
+          : `${navSurfaceIdle} backdrop-blur-md`
       }`}
     >
       <div className="max-w-[1400px] mx-auto px-4">
@@ -128,7 +165,7 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
             onClick={() => (mobileOpen ? closeMobile() : setMobileOpen(true))}
             aria-label="Toggle menu"
             aria-expanded={mobileOpen}
-            className="md:hidden w-9 h-9 grid place-items-center rounded-md text-slate-300 hover:text-white hover:bg-slate-800/40 shrink-0"
+            className={`md:hidden w-9 h-9 grid place-items-center rounded-md shrink-0 ${hamburgerBtn}`}
           >
             {mobileOpen ? (
               <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" d="M6 6l12 12M18 6L6 18" /></svg>
@@ -149,9 +186,7 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
                 {item.mega ? (
                   <button
                     className={`px-2.5 py-1.5 text-[13px] font-semibold rounded-md transition-all ${
-                      activeMenu === item.key
-                        ? "text-white bg-slate-700/60"
-                        : "text-slate-400 hover:text-white hover:bg-slate-800/40"
+                      activeMenu === item.key ? linkActive : linkIdle
                     }`}
                   >
                     {item.label}
@@ -160,9 +195,7 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
                   <Link
                     href={item.href}
                     className={`px-2.5 py-1.5 text-[13px] font-semibold rounded-md transition-all whitespace-nowrap ${
-                      activeMenu === item.key
-                        ? "text-white bg-slate-700/60"
-                        : "text-slate-400 hover:text-white hover:bg-slate-800/40"
+                      activeMenu === item.key ? linkActive : linkIdle
                     }`}
                   >
                     {item.label}
@@ -170,24 +203,24 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
                 )}
 
                 {item.children && activeMenu === item.key && (
-                  <div className="absolute top-full left-0 mt-0.5 w-52 bg-[#0f1d32] border border-slate-700/40 rounded-lg shadow-2xl shadow-black/50 py-1.5 z-50">
+                  <div className={`absolute top-full left-0 mt-0.5 w-52 border rounded-lg py-1.5 z-50 ${panelBg} ${panelShadow}`}>
                     {item.children.map((child) =>
                       child.children && child.children.length ? (
                         <div key={child.label} className="relative group/sub">
                           <Link
                             href={child.href}
-                            className="flex items-center justify-between px-4 py-2 text-[13px] text-slate-300 hover:text-white hover:bg-slate-700/40 transition-colors"
+                            className={`flex items-center justify-between px-4 py-2 text-[13px] transition-colors ${panelLinkText} ${panelLinkHoverBg}`}
                           >
                             {child.label}
-                            <span className="text-[9px] text-slate-500 group-hover/sub:text-white">▸</span>
+                            <span className={`text-[9px] ${chevronText}`}>▸</span>
                           </Link>
                           <div className="absolute left-full top-0 -ml-0.5 pl-1 w-60 hidden group-hover/sub:block z-50">
-                            <div className="bg-[#0f1d32] border border-slate-700/40 rounded-lg shadow-2xl shadow-black/50 py-1.5">
+                            <div className={`border rounded-lg py-1.5 ${panelBg} ${panelShadow}`}>
                               {child.children.map((sub) => (
                                 <Link
                                   key={sub.label}
                                   href={sub.href}
-                                  className="block px-4 py-2 text-[13px] text-slate-300 hover:text-white hover:bg-slate-700/40 transition-colors"
+                                  className={`block px-4 py-2 text-[13px] transition-colors ${panelLinkText} ${panelLinkHoverBg}`}
                                 >
                                   {sub.label}
                                 </Link>
@@ -199,7 +232,7 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
                         <Link
                           key={child.label}
                           href={child.href}
-                          className="block px-4 py-2 text-[13px] text-slate-300 hover:text-white hover:bg-slate-700/40 transition-colors"
+                          className={`block px-4 py-2 text-[13px] transition-colors ${panelLinkText} ${panelLinkHoverBg}`}
                         >
                           {child.label}
                         </Link>
@@ -209,12 +242,12 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
                 )}
 
                 {item.mega && activeMenu === item.key && (
-                  <div className="absolute top-full left-0 mt-0.5 w-[720px] max-w-[calc(100vw-2rem)] bg-[#0f1d32] border border-slate-700/40 rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50">
+                  <div className={`absolute top-full left-0 mt-0.5 w-[720px] max-w-[calc(100vw-2rem)] border rounded-xl overflow-hidden z-50 ${panelBg} ${panelShadow}`}>
                   <div className="p-5">
                     <div className="grid grid-cols-2 gap-8">
                       {/* Eastern */}
                       <div>
-                        <h3 className="text-blue-400 font-bold text-[11px] uppercase tracking-widest mb-3 flex items-center gap-2">
+                        <h3 className={`font-bold text-[11px] uppercase tracking-widest mb-3 flex items-center gap-2 ${confBlue}`}>
                           <span className="w-2 h-2 bg-blue-500 rounded-full" />
                           Eastern Conference
                         </h3>
@@ -223,7 +256,7 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
                             <Link
                               key={team.id}
                               href={`/teams/${team.slug}`}
-                              className="flex items-center gap-2.5 px-2 py-1.5 rounded hover:bg-slate-700/40 transition-colors"
+                              className={`flex items-center gap-2.5 px-2 py-1.5 rounded transition-colors ${panelLinkHoverBg}`}
                             >
                               {team.logoUrl && (
                                 <img
@@ -234,7 +267,7 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
                                   className="object-contain shrink-0"
                                 />
                               )}
-                              <span className="text-sm text-slate-300 hover:text-white whitespace-nowrap">
+                              <span className={`text-sm whitespace-nowrap ${panelLinkText}`}>
                                 {team.name}
                               </span>
                             </Link>
@@ -244,7 +277,7 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
 
                       {/* Western */}
                       <div>
-                        <h3 className="text-red-400 font-bold text-[11px] uppercase tracking-widest mb-3 flex items-center gap-2">
+                        <h3 className={`font-bold text-[11px] uppercase tracking-widest mb-3 flex items-center gap-2 ${confRed}`}>
                           <span className="w-2 h-2 bg-red-500 rounded-full" />
                           Western Conference
                         </h3>
@@ -253,7 +286,7 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
                             <Link
                               key={team.id}
                               href={`/teams/${team.slug}`}
-                              className="flex items-center gap-2.5 px-2 py-1.5 rounded hover:bg-slate-700/40 transition-colors"
+                              className={`flex items-center gap-2.5 px-2 py-1.5 rounded transition-colors ${panelLinkHoverBg}`}
                             >
                               {team.logoUrl && (
                                 <img
@@ -264,7 +297,7 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
                                   className="object-contain shrink-0"
                                 />
                               )}
-                              <span className="text-sm text-slate-300 hover:text-white whitespace-nowrap">
+                              <span className={`text-sm whitespace-nowrap ${panelLinkText}`}>
                                 {team.name}
                               </span>
                             </Link>
@@ -279,14 +312,14 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
             ))}
 
             {/* Forum — public discussion, visible to everyone; badge = new posts for a signed-in GM */}
-            <Link href="/forum" className="relative px-2.5 py-1.5 text-[13px] font-semibold rounded-md text-slate-400 hover:text-white hover:bg-slate-800/40 whitespace-nowrap inline-flex items-center gap-1">
+            <Link href="/forum" className={`relative px-2.5 py-1.5 text-[13px] font-semibold rounded-md whitespace-nowrap inline-flex items-center gap-1 ${linkIdle}`}>
               🗣️ Forum
               {(gm?.forumNew ?? 0) > 0 && <span className="min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm!.forumNew}</span>}
             </Link>
 
             {/* Messages — top-nav so a signed-in GM sees new-message badge right away */}
             {gm && (
-              <Link href="/messages" className="relative px-2.5 py-1.5 text-[13px] font-semibold rounded-md text-slate-400 hover:text-white hover:bg-slate-800/40 whitespace-nowrap flex items-center gap-1">
+              <Link href="/messages" className={`relative px-2.5 py-1.5 text-[13px] font-semibold rounded-md whitespace-nowrap flex items-center gap-1 ${linkIdle}`}>
                 💬 Messages
                 {(gm.unreadDm ?? 0) > 0 && <span className="min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm.unreadDm}</span>}
               </Link>
@@ -296,47 +329,47 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
             <div className="relative ml-1" onMouseEnter={() => setActiveMenu("__gm")} onMouseLeave={() => setActiveMenu(null)}>
               {gm ? (
                 <>
-                  <button className="relative px-2.5 py-1.5 text-[13px] font-semibold rounded-md text-blue-300 hover:bg-slate-800/40 flex items-center gap-1.5">
+                  <button className={`relative px-2.5 py-1.5 text-[13px] font-semibold rounded-md flex items-center gap-1.5 ${gmLoginText} ${gmNameBtnHover}`}>
                     <span className="w-6 h-6 rounded-full bg-blue-600 grid place-items-center text-[11px] font-black text-white">{gm.nickname[0]?.toUpperCase()}</span>
                     {gm.nickname}
-                    <span className="text-[9px] text-slate-500">▾</span>
+                    <span className={`text-[9px] ${gmPanelMuted}`}>▾</span>
                     {gm.admin && (gm.pendingJoins ?? 0) > 0 && (
                       <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center" title={`${gm.pendingJoins} nových žiadostí o vstup`}>{gm.pendingJoins}</span>
                     )}
                   </button>
                   {activeMenu === "__gm" && (
                     <div className="absolute right-0 top-full pt-1 z-50">
-                    <div className="w-52 bg-[#0e1e35] border border-slate-700 rounded-lg shadow-xl shadow-black/40 py-1">
-                      <div className="px-3 py-1 text-[10px] text-slate-500 uppercase tracking-wide">{tr("ui.signedIn")}</div>
-                      <a href={`/teams/${gm.slug}`} className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">{tr("ui.myTeam")}</a>
-                      <a href={`/teams/${gm.slug}/profile`} className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">{tr("ui.profile")}</a>
-                      <a href={`/teams/${gm.slug}/lines`} className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">{tr("ui.linesTactics")}</a>
+                    <div className={`w-52 border rounded-lg py-1 ${gmPanelBg} ${light ? "shadow-xl shadow-slate-300/60" : "shadow-xl shadow-black/40"}`}>
+                      <div className={`px-3 py-1 text-[10px] uppercase tracking-wide ${gmPanelMuted}`}>{tr("ui.signedIn")}</div>
+                      <a href={`/teams/${gm.slug}`} className={`block px-3 py-1.5 text-sm ${gmPanelText}`}>{tr("ui.myTeam")}</a>
+                      <a href={`/teams/${gm.slug}/profile`} className={`block px-3 py-1.5 text-sm ${gmPanelText}`}>{tr("ui.profile")}</a>
+                      <a href={`/teams/${gm.slug}/lines`} className={`block px-3 py-1.5 text-sm ${gmPanelText}`}>{tr("ui.linesTactics")}</a>
                       {gm.admin && (
                         <>
-                          <div className="my-1 border-t border-slate-700/60" />
+                          <div className={`my-1 border-t ${gmPanelDivider}`} />
                           <div className="px-3 py-1 text-[10px] text-amber-500/80 uppercase tracking-wide">{tr("ui.admin")}</div>
-                          <a href="/admin" className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">{tr("ui.adminPanel")}</a>
-                          <a href="/admin/join-requests" className="flex items-center justify-between px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">
+                          <a href="/admin" className={`block px-3 py-1.5 text-sm ${gmPanelText}`}>{tr("ui.adminPanel")}</a>
+                          <a href="/admin/join-requests" className={`flex items-center justify-between px-3 py-1.5 text-sm ${gmPanelText}`}>
                             <span>Žiadosti o vstup</span>
                             {(gm.pendingJoins ?? 0) > 0 && <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm.pendingJoins}</span>}
                           </a>
-                          <a href="/calendar" className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">League Calendar</a>
-                          <a href="/admin/elc" className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">ELC Rookies</a>
-                          <a href="/admin/roster-update" className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">Roster Update</a>
-                          <a href="/admin/season" className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">Season Control</a>
-                          <a href="/admin/signings" className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">Latest Signings</a>
-                          <a href="/admin/simulation" className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">Simulation Engine</a>
-                          <a href="/admin/team-lines" className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">Team Lines &amp; Tactics</a>
+                          <a href="/calendar" className={`block px-3 py-1.5 text-sm ${gmPanelText}`}>League Calendar</a>
+                          <a href="/admin/elc" className={`block px-3 py-1.5 text-sm ${gmPanelText}`}>ELC Rookies</a>
+                          <a href="/admin/roster-update" className={`block px-3 py-1.5 text-sm ${gmPanelText}`}>Roster Update</a>
+                          <a href="/admin/season" className={`block px-3 py-1.5 text-sm ${gmPanelText}`}>Season Control</a>
+                          <a href="/admin/signings" className={`block px-3 py-1.5 text-sm ${gmPanelText}`}>Latest Signings</a>
+                          <a href="/admin/simulation" className={`block px-3 py-1.5 text-sm ${gmPanelText}`}>Simulation Engine</a>
+                          <a href="/admin/team-lines" className={`block px-3 py-1.5 text-sm ${gmPanelText}`}>Team Lines &amp; Tactics</a>
                         </>
                       )}
-                      <div className="my-1 border-t border-slate-700/60" />
+                      <div className={`my-1 border-t ${gmPanelDivider}`} />
                       <div className="px-3 py-1.5 flex items-center justify-between gap-2">
-                        <span className="text-sm text-slate-300">{tr("ui.language")}</span>
+                        <span className={`text-sm ${gmPanelTextColor}`}>{tr("ui.language")}</span>
                         <LangSwitcher lang={lang} />
                       </div>
-                      <div className="my-1 border-t border-slate-700/60" />
-                      <a href="/login" className="block px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800">{tr("ui.switchTeam")}</a>
-                      <a href={`/teams/${gm.slug}/logout`} className="block px-3 py-1.5 text-sm text-red-400 hover:bg-slate-800">{tr("ui.logout")}</a>
+                      <div className={`my-1 border-t ${gmPanelDivider}`} />
+                      <a href="/login" className={`block px-3 py-1.5 text-sm ${gmPanelText}`}>{tr("ui.switchTeam")}</a>
+                      <a href={`/teams/${gm.slug}/logout`} className={`block px-3 py-1.5 text-sm text-red-400 ${gmPanelHoverBg}`}>{tr("ui.logout")}</a>
                     </div>
                     </div>
                   )}
@@ -344,7 +377,7 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
               ) : (
                 <span className="flex items-center gap-1.5">
                   <LangSwitcher lang={lang} />
-                  <Link href="/login" className="px-2.5 py-1.5 text-[13px] font-semibold rounded-md text-slate-400 hover:text-white hover:bg-slate-800/40 inline-block">{tr("ui.gmLogin")}</Link>
+                  <Link href="/login" className={`px-2.5 py-1.5 text-[13px] font-semibold rounded-md inline-block ${linkIdle}`}>{tr("ui.gmLogin")}</Link>
                 </span>
               )}
             </div>
@@ -357,44 +390,44 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
               <Link href={`/teams/${gm.slug}`} className="relative w-8 h-8 rounded-full bg-blue-600 grid place-items-center text-[12px] font-black text-white shrink-0">
                 {gm.nickname[0]?.toUpperCase()}
                 {((gm.unreadDm ?? 0) > 0 || (gm.admin && (gm.pendingJoins ?? 0) > 0)) && (
-                  <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-red-600 border border-[#0a1628]" />
+                  <span className={`absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-red-600 border ${badgeRing}`} />
                 )}
               </Link>
             ) : (
-              <Link href="/login" className="px-2.5 py-1.5 text-[12px] font-semibold rounded-md text-slate-300 hover:text-white hover:bg-slate-800/40 whitespace-nowrap">{tr("ui.gmLogin")}</Link>
+              <Link href="/login" className={`px-2.5 py-1.5 text-[12px] font-semibold rounded-md whitespace-nowrap ${linkIdle}`}>{tr("ui.gmLogin")}</Link>
             )}
           </div>
         </div>
 
         {/* Mobile drawer — tap-to-expand accordion (hover has no touch equivalent) */}
         {mobileOpen && (
-          <div className="md:hidden border-t border-slate-700/40 -mx-4 px-0 max-h-[calc(100vh-3.5rem)] overflow-y-auto bg-[#0a1628]">
+          <div className={`md:hidden border-t ${navBorder} -mx-4 px-0 max-h-[calc(100vh-3.5rem)] overflow-y-auto ${mobileBg}`}>
             {menuItems.map((item) => (
               <MobileNode key={item.key} node={item} path={item.key} depth={0} />
             ))}
 
-            <div className="border-t border-slate-700/60 my-1" />
-            <Link href="/forum" onClick={closeMobile} className="flex items-center gap-1.5 py-2.5 px-3 text-[14px] text-slate-200">
+            <div className={`border-t ${dividerLine} my-1`} />
+            <Link href="/forum" onClick={closeMobile} className={`flex items-center gap-1.5 py-2.5 px-3 text-[14px] ${mobileText}`}>
               🗣️ Forum
               {(gm?.forumNew ?? 0) > 0 && <span className="min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm!.forumNew}</span>}
             </Link>
             {gm && (
-              <Link href="/messages" onClick={closeMobile} className="flex items-center gap-1.5 py-2.5 px-3 text-[14px] text-slate-200">
+              <Link href="/messages" onClick={closeMobile} className={`flex items-center gap-1.5 py-2.5 px-3 text-[14px] ${mobileText}`}>
                 💬 Messages
                 {(gm.unreadDm ?? 0) > 0 && <span className="min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm.unreadDm}</span>}
               </Link>
             )}
 
-            <div className="border-t border-slate-700/60 my-1" />
+            <div className={`border-t ${dividerLine} my-1`} />
             {gm ? (
               <>
-                <div className="px-3 py-2 flex items-center gap-2 text-slate-300">
+                <div className={`px-3 py-2 flex items-center gap-2 ${mobileGmMuted}`}>
                   <span className="w-7 h-7 rounded-full bg-blue-600 grid place-items-center text-[12px] font-black text-white shrink-0">{gm.nickname[0]?.toUpperCase()}</span>
                   <span className="text-[14px] font-semibold">{gm.nickname}</span>
                 </div>
-                <Link href={`/teams/${gm.slug}`} onClick={closeMobile} className="block py-2 px-3 pl-11 text-[13px] text-slate-300">{tr("ui.myTeam")}</Link>
-                <Link href={`/teams/${gm.slug}/profile`} onClick={closeMobile} className="block py-2 px-3 pl-11 text-[13px] text-slate-300">{tr("ui.profile")}</Link>
-                <Link href={`/teams/${gm.slug}/lines`} onClick={closeMobile} className="block py-2 px-3 pl-11 text-[13px] text-slate-300">{tr("ui.linesTactics")}</Link>
+                <Link href={`/teams/${gm.slug}`} onClick={closeMobile} className={`block py-2 px-3 pl-11 text-[13px] ${mobileGmMuted}`}>{tr("ui.myTeam")}</Link>
+                <Link href={`/teams/${gm.slug}/profile`} onClick={closeMobile} className={`block py-2 px-3 pl-11 text-[13px] ${mobileGmMuted}`}>{tr("ui.profile")}</Link>
+                <Link href={`/teams/${gm.slug}/lines`} onClick={closeMobile} className={`block py-2 px-3 pl-11 text-[13px] ${mobileGmMuted}`}>{tr("ui.linesTactics")}</Link>
                 {gm.admin && (
                   <MobileNode
                     path="__admin"
@@ -416,17 +449,17 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
                     }}
                   />
                 )}
-                <div className="border-t border-slate-700/60 my-1" />
-                <Link href="/login" onClick={closeMobile} className="block py-2.5 px-3 text-[13px] text-slate-300">{tr("ui.switchTeam")}</Link>
+                <div className={`border-t ${dividerLine} my-1`} />
+                <Link href="/login" onClick={closeMobile} className={`block py-2.5 px-3 text-[13px] ${mobileGmMuted}`}>{tr("ui.switchTeam")}</Link>
                 <Link href={`/teams/${gm.slug}/logout`} onClick={closeMobile} className="block py-2.5 px-3 text-[13px] text-red-400">{tr("ui.logout")}</Link>
               </>
             ) : (
-              <Link href="/login" onClick={closeMobile} className="block py-2.5 px-3 text-[14px] font-semibold text-blue-300">{tr("ui.gmLogin")}</Link>
+              <Link href="/login" onClick={closeMobile} className={`block py-2.5 px-3 text-[14px] font-semibold ${mobileGmSwitch}`}>{tr("ui.gmLogin")}</Link>
             )}
 
-            <div className="border-t border-slate-700/60 my-1" />
+            <div className={`border-t ${dividerLine} my-1`} />
             <div className="px-3 py-2.5 flex items-center justify-between gap-2">
-              <span className="text-sm text-slate-300">{tr("ui.language")}</span>
+              <span className={`text-sm ${mobileGmMuted}`}>{tr("ui.language")}</span>
               <LangSwitcher lang={lang} />
             </div>
           </div>

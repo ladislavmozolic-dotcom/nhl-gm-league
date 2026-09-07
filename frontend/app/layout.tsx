@@ -114,7 +114,7 @@ export default async function RootLayout({
           {gm && <MessageNotifier initialUnread={gm.unreadDm} />}
           {gm && <TradeSuccessOverlay />}
           <SiteBanner branding={branding} />
-          <MegaMenu gm={gm} items={menu} lang={lang} />
+          <MegaMenu gm={gm} items={menu} lang={lang} light={branding.navLight} />
           <main className="pt-4 pb-16 max-w-[1400px] mx-auto px-4 w-full flex-1">{children}</main>
           <SiteFooter branding={branding} />
         </LangProvider>

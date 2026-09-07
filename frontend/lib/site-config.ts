@@ -23,6 +23,7 @@ export type Branding = {
   accentColor: string;
   bgColor: string;
   footerText: string | null;
+  navLight: boolean; // white/light nav bar instead of the default dark one
 };
 
 export const BRANDING_DEFAULTS: Branding = {
@@ -40,6 +41,7 @@ export const BRANDING_DEFAULTS: Branding = {
   accentColor: "#60a5fa",
   bgColor: "#0a1628",
   footerText: null,
+  navLight: false,
 };
 
 export type SiteConfig = {
@@ -78,6 +80,7 @@ export async function loadSiteConfig(): Promise<SiteConfig> {
       accentColor: row?.accentColor ?? BRANDING_DEFAULTS.accentColor,
       bgColor: row?.bgColor ?? BRANDING_DEFAULTS.bgColor,
       footerText: row?.footerText ?? BRANDING_DEFAULTS.footerText,
+      navLight: (row as { navLight?: boolean } | null)?.navLight ?? BRANDING_DEFAULTS.navLight,
     },
     menu: (row?.menu as unknown) ?? null,
     homeBlocks: (row?.homeBlocks as unknown) ?? null,
