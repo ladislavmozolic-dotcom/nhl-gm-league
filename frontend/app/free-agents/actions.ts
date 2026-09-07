@@ -463,10 +463,15 @@ export async function processRoundEndAction() {
   const { addDays } = await import("@/lib/calendar");
   const { getLeagueDate } = await import("@/lib/calendar-server");
   const next = addDays(await getLeagueDate(), 7);
-  // reset the real-time round-close countdown too — matters when the market is
-  // force-opened (clock.frenzyOpen via faOpen, not the real July calendar), where
-  // getLeagueClock has no calendar day to derive "round closes in" from.
-  await prisma.leagueConfig.upsert({ where: { id: 1 }, update: { leagueDate: next, frenzyRoundStartedAt: new Date() }, create: { id: 1, leagueDate: next, frenzyRoundStartedAt: new Date() } });
+  // reset the real-time round-close countdown, and advance the tracked round
+  // number too — both matter when the market is force-opened (clock.frenzyOpen
+  // via faOpen, not the real July calendar), where getLeagueClock has no
+  // calendar day to derive either from.
+  await prisma.leagueConfig.upsert({
+    where: { id: 1 },
+    update: { leagueDate: next, frenzyRoundStartedAt: new Date(), frenzyForcedRound: { increment: 1 } },
+    create: { id: 1, leagueDate: next, frenzyRoundStartedAt: new Date(), frenzyForcedRound: 2 },
+  });
   for (const p of ["/free-agents", "/signings", "/calendar", "/"]) revalidatePath(p);
   return { ok: true as const, ...r, round: clock.frenzyRound };
 }

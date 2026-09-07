@@ -9,6 +9,39 @@ import { getLeagueDate, computePhase } from "../calendar-server";
 import { addDays, frenzyRound, frenzyDay } from "../calendar";
 
 const SEASON = "2026-27";
+const FRENZY_ROUND_MS = 7 * 86_400_000;
+
+/** Checked on every scheduler tick (unlike runAutoSimIfDue, which only fires
+ *  once a day at the configured sim time) — a FORCE-opened Frenzy round (faOpen,
+ *  outside the real July calendar window) runs on its own real 7-day clock
+ *  (LeagueConfig.frenzyRoundStartedAt), independent of the daily calendar tick
+ *  that advances a calendar-driven Frenzy. It needs checking this often so it
+ *  actually closes close to the instant the round-close countdown promises,
+ *  instead of drifting to the next daily sim tick. A no-op for a calendar-
+ *  driven Frenzy (frenzyRoundStartedAt stays null there — see its schema
+ *  comment) or when the market isn't force-opened at all. */
+export async function checkFrenzyRoundCloseIfDue() {
+  const cfg = await prisma.leagueConfig.findUnique({
+    where: { id: 1 }, select: { faOpen: true, frenzyRoundStartedAt: true, frenzyForcedRound: true },
+  });
+  if (!cfg?.faOpen || !cfg.frenzyRoundStartedAt) return { closed: false as const };
+  if (Date.now() - cfg.frenzyRoundStartedAt.getTime() < FRENZY_ROUND_MS) return { closed: false as const };
+
+  const round = cfg.frenzyForcedRound;
+  const { resolveFrenzy, processRoundEnd } = await import("../../app/free-agents/actions");
+  if (round >= 3) {
+    // final week's 7 days are up — resolve standing offers and close the market,
+    // same as leaving the real July window would.
+    const r = await resolveFrenzy();
+    await prisma.leagueConfig.update({ where: { id: 1 }, data: { faOpen: false, frenzyRoundStartedAt: null, frenzyForcedRound: 1 } });
+    console.log(`[auto-frenzy] force-opened market resolved after round 3 — ${r.signed} signed`);
+    return { closed: true as const, finalClose: true as const, signed: r.signed };
+  }
+  await processRoundEnd(round);
+  await prisma.leagueConfig.update({ where: { id: 1 }, data: { frenzyRoundStartedAt: new Date(), frenzyForcedRound: round + 1 } });
+  console.log(`[auto-frenzy] force-opened round ${round} closed automatically`);
+  return { closed: true as const, finalClose: false as const, round };
+}
 
 /** Off-season only: advance the league clock one day and run any frenzy-round
  *  transition it crosses (counters/shortlist on a weekly boundary; sign at the

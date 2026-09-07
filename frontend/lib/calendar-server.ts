@@ -82,7 +82,7 @@ function faWindowFor(phase: Phase, frenzyOpen: boolean): { open: boolean; immedi
 
 /** Everything the UI needs about "what day is it in the league". */
 export async function getLeagueClock(): Promise<LeagueClock> {
-  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { leagueDate: true, faOpen: true, phaseOverride: true, frenzyRoundStartedAt: true } });
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { leagueDate: true, faOpen: true, phaseOverride: true, frenzyRoundStartedAt: true, frenzyForcedRound: true } });
   const date = cfg?.leagueDate ?? defaultLeagueDate();
   const phase = await computePhase(date, cfg?.phaseOverride);
   const faForced = !!cfg?.faOpen;
@@ -109,7 +109,10 @@ export async function getLeagueClock(): Promise<LeagueClock> {
     // (frenzyAutoOpenAt, outside the real July window) has no real calendar day to
     // read, so it reads as day 1 rather than "closed" (0), same as frenzyRound does.
     frenzyDay: isFrenzyOpen(date) ? frenzyDay(date) : (faForced ? 1 : 0),
-    frenzyRound: isFrenzyOpen(date) ? frenzyRound(date) : (faForced ? 1 : 0),
+    // frenzyForcedRound tracks which week a force-opened market is actually in
+    // (bumped by the "Close round" button and the automatic 7-day check) — the
+    // real calendar has nothing to derive this from while forced.
+    frenzyRound: isFrenzyOpen(date) ? frenzyRound(date) : (faForced ? (cfg?.frenzyForcedRound ?? 1) : 0),
     faForced,
     frenzyRoundStartedAt: faForced ? (cfg?.frenzyRoundStartedAt?.toISOString() ?? null) : null,
     faWindow,

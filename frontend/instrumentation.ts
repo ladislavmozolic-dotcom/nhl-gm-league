@@ -6,10 +6,11 @@ export async function register() {
   if (g.__autoSimStarted) return;
   g.__autoSimStarted = true;
 
-  const { runAutoSimIfDue, runDraftImportIfDue } = await import("./lib/sim/auto");
+  const { runAutoSimIfDue, runDraftImportIfDue, checkFrenzyRoundCloseIfDue } = await import("./lib/sim/auto");
   const tick = () => {
     runAutoSimIfDue().catch((e) => console.error("[auto-sim] error", e));
     runDraftImportIfDue().catch((e) => console.error("[auto-draft] error", e));
+    checkFrenzyRoundCloseIfDue().catch((e) => console.error("[auto-frenzy] error", e));
   };
   setTimeout(tick, 8000);          // catch-up shortly after boot
   setInterval(tick, 60_000);       // then check every minute
