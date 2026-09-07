@@ -79,6 +79,14 @@ export function themeCss(t: Theme): string {
     // surfaces
     surfaceRules("bg-slate-900", "--surface", t.surfaceColor),
     surfaceRules("bg-slate-800", "--surface-2", t.surface2Color),
+    // A handful of dropdown/modal panels (team pickers, reaction pickers, the
+    // language switcher...) hardcode one of these three hex values instead of
+    // the bg-slate-800/900 classes above, so they never got the surface remap
+    // — under a light theme they stayed dark navy while their own text (now
+    // correctly remapped to a dark colour by the rules below) went dark-on-dark.
+    `.bg-\\[\\#0a1628\\]{background-color:var(--surface,${t.surfaceColor})!important}`,
+    `.bg-\\[\\#0f1d32\\]{background-color:var(--surface-2,${t.surface2Color})!important}`,
+    `.bg-\\[\\#0e1e35\\]{background-color:var(--surface-2,${t.surface2Color})!important}`,
     // borders
     borderRules("border-slate-800", "--border", t.borderColor),
     borderRules("border-slate-700", "--border", t.borderColor),
@@ -99,6 +107,13 @@ export function themeCss(t: Theme): string {
     // "bg-" catches them without having to touch each of the ~90 button call
     // sites individually.
     `[class~="text-white"]:not([class*="bg-"]){color:var(--text,${t.textColor})!important}`,
+    // A couple of "hero" panels (the site banner, the player-bio header) paint a
+    // fixed dark navy backdrop — a dramatic action-shot photo treatment that's
+    // meant to stay dark no matter the site's chosen theme, unlike ordinary
+    // cards. Their own text (`text-white`/`text-slate-*`) must stay light even
+    // under a light theme, so `.theme-dark-scope` resets the vars those rules
+    // above read from, for everything nested inside one of these panels.
+    `.theme-dark-scope{--text:#f1f5f9;--text-2:#94a3b8;--text-3:#64748b}`,
     // radius
     `.rounded-lg{border-radius:var(--radius)!important}.rounded-xl{border-radius:var(--radius)!important}.rounded-2xl{border-radius:calc(var(--radius) + 4px)!important}`,
   ].join("");

@@ -49,7 +49,7 @@ export default function SiteBanner({ branding }: { branding: Branding }) {
   const parts = branding.logoFirst ? [logo, name] : [name, logo];
 
   return (
-    <div className="bg-gradient-to-r from-[#0a1628] via-[#1e3a5f] to-[#0a1628] border-b border-slate-700/40 overflow-hidden">
+    <div className="theme-dark-scope bg-gradient-to-r from-[#0a1628] via-[#1e3a5f] to-[#0a1628] border-b border-slate-700/40 overflow-hidden">
       {/* A fixed banner height is sized for the admin's desktop row layout — on
           mobile the logo+wordmark stack instead (see `dir` above) and need
           room to grow, so the fixed height only applies from sm up. */}

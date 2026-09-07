@@ -360,7 +360,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
 
       {/* ── PLAYER BIO ─────────────────────────────────────────────── */}
       <Card title="Player Bio" bodyClassName="p-0">
-        <div className="relative overflow-hidden bg-gradient-to-r from-[#0a1628] via-[#1e3a5f] to-[#0a1628]">
+        <div className="theme-dark-scope relative overflow-hidden bg-gradient-to-r from-[#0a1628] via-[#1e3a5f] to-[#0a1628]">
           {/* player action shot (NHL CDN) as the background; hidden gracefully if none */}
           {p.nhlId && (
             <img src={`https://assets.nhle.com/mugs/actionshots/1296x729/${p.nhlId}.jpg`} alt=""
