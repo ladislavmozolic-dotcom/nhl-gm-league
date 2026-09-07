@@ -15,20 +15,30 @@ export type RoleAttrs = { sc: number; pa: number; st: number };
 
 const w = (sc: number, pa: number, st: number) => (a: RoleAttrs) => a.sc * sc + a.pa * pa + a.st * st;
 
+// Balanced has no signature (DIAL_DESC: "No signature power play") — it isn't
+// a real tactical shape, so it must not pretend to be one. No attribute
+// reassignment either (fit is a flat 0 for every role): the 5 slots just show
+// each player where he actually sits in the PP personnel picker below
+// (LW/C/RW/LD/RD, in that order), in a neutral standard alignment.
+const NO_FIT = () => 0;
 export const PP_LAYOUTS: Record<PpStyle, FormationRole[]> = {
   balanced: [
-    { key: "r1", label: "Left Wing", x: 26, y: 55, fit: w(0.5, 0.5, 0) },
-    { key: "r2", label: "Slot", x: 50, y: 38, fit: w(0.6, 0.4, 0) },
-    { key: "r3", label: "Right Wing", x: 74, y: 55, fit: w(0.5, 0.5, 0) },
-    { key: "r4", label: "Left Point", x: 30, y: 84, fit: w(0.6, 0.2, 0.2) },
-    { key: "r5", label: "Right Point", x: 70, y: 84, fit: w(0.6, 0.2, 0.2) },
+    { key: "r1", label: "LW", x: 26, y: 55, fit: NO_FIT },
+    { key: "r2", label: "C", x: 50, y: 38, fit: NO_FIT },
+    { key: "r3", label: "RW", x: 74, y: 55, fit: NO_FIT },
+    { key: "r4", label: "LD", x: 30, y: 84, fit: NO_FIT },
+    { key: "r5", label: "RD", x: 70, y: 84, fit: NO_FIT },
   ],
+  // Real 1-2-2 shape (per NHL coaching references): one point up top, two
+  // half-walls at the tops of the circles, and TWO players low — one at the
+  // net front, one working below the goal line/around the crease — not a
+  // single "bumper" in the middle.
   umbrella: [
-    { key: "r1", label: "Point", x: 50, y: 84, fit: w(0.8, 0.2, 0) },
-    { key: "r2", label: "Left Wing", x: 26, y: 62, fit: w(0.5, 0.5, 0) },
-    { key: "r3", label: "Right Wing", x: 74, y: 62, fit: w(0.5, 0.5, 0) },
-    { key: "r4", label: "Bumper", x: 50, y: 46, fit: w(0.5, 0.5, 0) },
-    { key: "r5", label: "Net-Front", x: 50, y: 18, fit: w(0, 0.2, 0.8) },
+    { key: "r1", label: "Point", x: 50, y: 84, fit: w(0.7, 0.3, 0) },
+    { key: "r2", label: "Left Half-Wall", x: 24, y: 58, fit: w(0.5, 0.5, 0) },
+    { key: "r3", label: "Right Half-Wall", x: 76, y: 58, fit: w(0.5, 0.5, 0) },
+    { key: "r4", label: "Net-Front", x: 34, y: 20, fit: w(0, 0.2, 0.8) },
+    { key: "r5", label: "Below the Goal Line", x: 68, y: 14, fit: w(0.3, 0.4, 0.3) },
   ],
   "131": [
     { key: "r1", label: "Point", x: 50, y: 84, fit: w(0.2, 0.8, 0) },
@@ -47,11 +57,13 @@ export const PP_LAYOUTS: Record<PpStyle, FormationRole[]> = {
 };
 
 export const PK_LAYOUTS: Record<PkStyle, FormationRole[]> = {
+  // Standard penalty kill has no signature either — plain positions, no
+  // attribute reassignment, same reasoning as the PP's balanced above.
   balanced: [
-    { key: "r1", label: "Forward", x: 32, y: 52, fit: w(0, 0.3, 0.3) },
-    { key: "r2", label: "Forward", x: 68, y: 52, fit: w(0, 0.3, 0.3) },
-    { key: "r3", label: "Left D", x: 32, y: 80, fit: w(0, 0, 0.6) },
-    { key: "r4", label: "Right D", x: 68, y: 80, fit: w(0, 0, 0.6) },
+    { key: "r1", label: "C", x: 32, y: 52, fit: NO_FIT },
+    { key: "r2", label: "W", x: 68, y: 52, fit: NO_FIT },
+    { key: "r3", label: "LD", x: 32, y: 80, fit: NO_FIT },
+    { key: "r4", label: "RD", x: 68, y: 80, fit: NO_FIT },
   ],
   box: [
     { key: "r1", label: "Left Top", x: 34, y: 40, fit: w(0, 0.2, 0.4) },
