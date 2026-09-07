@@ -292,7 +292,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   const flag = natFlag(p.nationality);
   const status = p.injuryDaysLeft > 0 ? "Injured" : (p.rosterType ?? "—");
   const contractType = p.contractType === "TWO_WAY" ? "Two-Way" : p.contractType === "ONE_WAY" ? "One-Way" : "—";
-  const capHit = p.capHit != null ? `$${(p.capHit / 1_000_000).toFixed(2)}M` : "—";
+  const capHit = p.capHit != null ? money(p.capHit) : "—";
 
   const leftInfo: [string, React.ReactNode][] = [
     ["Position", p.position ?? "—"],
@@ -312,7 +312,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     ["Cap Hit", capHit],
     ...(retained > 0 ? ([
       ["Salary Retention", <span className="text-amber-300">{retainedPct}% retained</span>],
-      ["Actual Salary after Retention", <b className="text-emerald-300">{`$${(Math.max(0, (p.capHit ?? 0) - retained) / 1e6).toFixed(2)}M`}</b>],
+      ["Actual Salary after Retention", <b className="text-emerald-300">{money(Math.max(0, (p.capHit ?? 0) - retained))}</b>],
     ] as [string, React.ReactNode][]) : []),
     ["Last Year Salary", p.capHit != null ? capHit : "—"],
     ["Overall", overall != null ? String(overall) : "—"],
