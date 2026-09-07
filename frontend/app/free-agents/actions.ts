@@ -335,9 +335,14 @@ export async function previewRoundOutcomeForTeam(id: number): Promise<number> {
     // acceptable offer wins; failing that, a genuinely UNCONTESTED player (one
     // standing offer, period) still signs at his floor — round-lock means no
     // new club can join once this round closes, so there's nobody left to wait
-    // for (matches processRoundEnd's allowSoleFloor=true).
+    // for (matches processRoundEnd's allowSoleFloor=true). But if 2+ offers are
+    // genuinely close (same 0.75x band as the outclassed check below), that's
+    // real competition, not a snap decision — predict a counter instead of a
+    // sign, matching processRoundEnd's own liveCount gate.
+    const liveSalary = Math.max(...list.map((o) => o.salary));
+    const liveCount = list.filter((o) => o.salary >= liveSalary * 0.75).length;
     let bestAcceptable: { teamId: number; utility: number } | null = null;
-    for (const o of list) {
+    if (liveCount < 2) for (const o of list) {
       const ev = await evaluateTeamOffer(my.playerId, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, 1, { clause: o.grantClause, breadth: o.mNtcBreadth });
       if (ev?.acceptable && (!bestAcceptable || ev.utility > bestAcceptable.utility)) bestAcceptable = { teamId: o.teamId, utility: ev.utility };
     }
@@ -822,7 +827,15 @@ export async function processRoundEnd(endedRound: number): Promise<{ countered: 
     // the bid undercuts it): round-lock already means nobody new can join once
     // this round closes, so there's no reason to string an uncontested player
     // along through more rounds hoping for competition that can't arrive.
-    const signDetail = await pickAndSign(playerId, player, list, endedRound, pool, cmap, true);
+    // BUT an instant sign only fires when the winning offer is clearly ahead —
+    // if 2+ standing offers are genuinely close (same "outclassed" 0.75x band
+    // used below to cut a laggard), that's a real bidding situation, not a
+    // snap decision: skip straight to the counter phase for everyone instead
+    // of letting one club's slightly-better fit end it before the other even
+    // gets a chance to raise.
+    const liveSalary = Math.max(...list.map((o) => o.salary));
+    const liveCount = list.filter((o) => o.salary >= liveSalary * 0.75).length;
+    const signDetail = liveCount >= 2 ? null : await pickAndSign(playerId, player, list, endedRound, pool, cmap, true);
     if (signDetail) {
       signedNow++;
       const after = await prisma.player.findUnique({ where: { id: playerId }, select: { teamId: true } });
