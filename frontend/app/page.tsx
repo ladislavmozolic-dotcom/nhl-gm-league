@@ -45,7 +45,7 @@ function Stat({ label, value, sub, color }: { label: string; value: string; sub?
   return (
     <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg shadow-black/20">
       <p className="text-xs uppercase tracking-wide text-slate-400 mb-2">{label}</p>
-      <p className={`text-2xl font-black ${color ?? "text-white"} leading-none`}>{value}</p>
+      <p className={`text-2xl font-black ${color ?? "text-slate-100"} leading-none`}>{value}</p>
       {sub && <p className="text-sm text-slate-400 mt-1">{sub}</p>}
     </div>
   );

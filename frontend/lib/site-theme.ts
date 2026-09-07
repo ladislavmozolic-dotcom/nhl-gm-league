@@ -7,6 +7,7 @@ export type Theme = {
   surfaceColor: string;
   surface2Color: string;
   borderColor: string;
+  textColor: string;
   text2Color: string;
   text3Color: string;
   radiusPx: number;
@@ -19,6 +20,7 @@ export const THEME_DEFAULTS: Theme = {
   surfaceColor: "#0f172a",
   surface2Color: "#1e293b",
   borderColor: "#1e293b",
+  textColor: "#ffffff",
   text2Color: "#94a3b8",
   text3Color: "#64748b",
   radiusPx: 12,
@@ -38,6 +40,16 @@ export const FONTS: { key: string; name: string; stack: string }[] = [
 
 export function fontStack(key: string): string {
   return FONTS.find((f) => f.key === key)?.stack ?? "";
+}
+
+/** True for a light/near-white colour — drives the `<meta color-scheme>` so a
+ *  light-themed league (e.g. the ProfiNHL clone) gets normal native form
+ *  controls (checkboxes, scrollbars) instead of the app's default dark ones. */
+export function isLightColor(hex: string): boolean {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i.exec(hex);
+  if (!m) return false;
+  const [r, g, b] = m.slice(1).map((h) => parseInt(h, 16));
+  return (0.299 * r + 0.587 * g + 0.114 * b) > 160;
 }
 
 // opacity variants observed in the codebase, mapped with color-mix so the "glassy" look survives
@@ -62,7 +74,7 @@ function borderRules(cls: string, varName: string, fb: string): string {
 export function themeCss(t: Theme): string {
   const font = fontStack(t.fontKey);
   return [
-    `:root{--surface:${t.surfaceColor};--surface-2:${t.surface2Color};--border:${t.borderColor};--text-2:${t.text2Color};--text-3:${t.text3Color};--radius:${t.radiusPx}px;--accent:${t.accentColor}}`,
+    `:root{--surface:${t.surfaceColor};--surface-2:${t.surface2Color};--border:${t.borderColor};--text:${t.textColor};--text-2:${t.text2Color};--text-3:${t.text3Color};--radius:${t.radiusPx}px;--accent:${t.accentColor}}`,
     font ? `body{font-family:${font}!important}` : "",
     // surfaces
     surfaceRules("bg-slate-900", "--surface", t.surfaceColor),
@@ -70,7 +82,15 @@ export function themeCss(t: Theme): string {
     // borders
     borderRules("border-slate-800", "--border", t.borderColor),
     borderRules("border-slate-700", "--border", t.borderColor),
-    // text
+    // text — the near-white shades used for headings/values that don't rely on
+    // the inherited body colour (text-slate-400/500 are the more muted tones
+    // used for secondary/caption text). Plain `text-white` is deliberately left
+    // alone: it's also how ~100 colour-coded buttons and badges (bg-blue-600
+    // text-white etc.) keep readable contrast on their own saturated background,
+    // and a blanket remap would break every one of them under a light theme.
+    `.text-slate-100{color:var(--text,${t.textColor})!important}`,
+    `.text-slate-200{color:var(--text,${t.textColor})!important}`,
+    `.text-slate-300{color:var(--text,${t.textColor})!important}`,
     `.text-slate-400{color:var(--text-2,${t.text2Color})!important}`,
     `.text-slate-500{color:var(--text-3,${t.text3Color})!important}`,
     // radius

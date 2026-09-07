@@ -53,7 +53,7 @@ export async function saveTheme(t: Theme) {
   const hex = (v: string, d: string) => (/^#[0-9a-fA-F]{3,8}$/.test(v) ? v : d);
   const data = {
     surfaceColor: hex(t.surfaceColor, "#0f172a"), surface2Color: hex(t.surface2Color, "#1e293b"),
-    borderColor: hex(t.borderColor, "#1e293b"), text2Color: hex(t.text2Color, "#94a3b8"),
+    borderColor: hex(t.borderColor, "#1e293b"), textColor: hex(t.textColor, "#ffffff"), text2Color: hex(t.text2Color, "#94a3b8"),
     text3Color: hex(t.text3Color, "#64748b"), radiusPx: Math.max(0, Math.min(28, Number(t.radiusPx) || 12)),
     fontKey: String(t.fontKey || "inter"), accentColor: hex(t.accentColor, "#60a5fa"), bgColor: hex(t.bgColor, "#0a1628"),
   };

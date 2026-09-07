@@ -433,6 +433,7 @@ model SiteConfig {
   surfaceColor String  @default("#0f172a") // cards / cells (bg-slate-900)
   surface2Color String @default("#1e293b") // inputs / secondary surfaces (bg-slate-800)
   borderColor String   @default("#1e293b") // borders (border-slate-800/700)
+  textColor   String   @default("#ffffff") // body base + headings/values (text-slate-100/200/300, body text)
   text2Color  String   @default("#94a3b8") // secondary text (text-slate-400)
   text3Color  String   @default("#64748b") // muted text (text-slate-500)
   radiusPx    Int      @default(12)        // corner roundness

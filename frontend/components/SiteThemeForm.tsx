@@ -33,7 +33,7 @@ export default function SiteThemeForm({ theme }: { theme: Theme }) {
         <div className="p-5" style={{ background: t.bgColor, fontFamily: font || undefined }}>
           <div className="text-[10px] uppercase tracking-widest mb-3" style={{ color: t.text3Color }}>Živý náhľad</div>
           <div className="p-4 mb-3" style={{ background: t.surfaceColor, border: `1px solid ${t.borderColor}`, borderRadius: radius + 4 }}>
-            <div className="text-lg font-bold text-white mb-1">Nadpis karty</div>
+            <div className="text-lg font-bold mb-1" style={{ color: t.textColor }}>Nadpis karty</div>
             <div className="text-sm mb-2" style={{ color: t.text2Color }}>Sekundárny text — popis alebo label.</div>
             <div className="text-xs mb-3" style={{ color: t.text3Color }}>Tlmený text — poznámka, dátum.</div>
             <div className="flex gap-2 items-center">
@@ -53,6 +53,7 @@ export default function SiteThemeForm({ theme }: { theme: Theme }) {
         {swatch("Karty / bunky", "surfaceColor")}
         {swatch("Inputy / sekundárne plochy", "surface2Color")}
         {swatch("Orámovanie", "borderColor")}
+        {swatch("Hlavný text", "textColor")}
         {swatch("Sekundárny text", "text2Color")}
         {swatch("Tlmený text", "text3Color")}
         {swatch("Akcentová farba", "accentColor")}

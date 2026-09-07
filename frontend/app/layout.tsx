@@ -4,7 +4,7 @@ import "./globals.css";
 import { prisma } from "@/lib/prisma";
 import { getTeamSession } from "@/lib/auth";
 import { loadBranding, loadSiteConfig } from "@/lib/site-config";
-import { themeCss } from "@/lib/site-theme";
+import { themeCss, isLightColor } from "@/lib/site-theme";
 import { effectiveMenu, type MenuOverrides } from "@/lib/menu-config";
 import { loadSettings } from "@/lib/sim/settings";
 import { getLang } from "@/lib/lang-server";
@@ -101,12 +101,12 @@ export default async function RootLayout({
         {/* Tell the browser the site is ALREADY dark, so Chrome's "Auto Dark Mode / Force
             Dark" (a built-in flag, not an extension) doesn't re-darken it — that re-processing
             is what turned panels transparent and light text near-black for some GMs. */}
-        <meta name="color-scheme" content="dark" />
+        <meta name="color-scheme" content={isLightColor(site.theme.bgColor) ? "light" : "dark"} />
         <style dangerouslySetInnerHTML={{ __html: themeCss(site.theme) }} />
       </head>
       <body
-        className={`${inter.className} text-white min-h-screen flex flex-col`}
-        style={{ background: branding.bgColor, ["--accent" as string]: branding.accentColor } as React.CSSProperties}
+        className={`${inter.className} min-h-screen flex flex-col`}
+        style={{ background: branding.bgColor, color: site.theme.textColor, ["--accent" as string]: branding.accentColor } as React.CSSProperties}
       >
         <LangProvider lang={lang}>
           <ScoreTracker />

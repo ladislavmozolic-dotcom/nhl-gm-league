@@ -28,7 +28,7 @@ export default function NextSimCountdown({ frenzyAt, frenzyOpen, frenzyRound, fr
   const [zone, setZone] = useState("Europe/Bratislava");
   useEffect(() => { setNow(new Date()); const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, []);
 
-  if (!now) return <div className="text-3xl font-black text-white tabular-nums">--:--:--</div>;
+  if (!now) return <div className="text-3xl font-black text-slate-100 tabular-nums">--:--:--</div>;
   const frenzyMs = frenzyAt ? new Date(frenzyAt).getTime() : null;
   const frenzyPending = frenzyMs != null && frenzyMs > now.getTime();
   const roundActive = !frenzyPending && frenzyOpen && frenzyRound != null && frenzyDay != null;
@@ -43,7 +43,7 @@ export default function NextSimCountdown({ frenzyAt, frenzyOpen, frenzyRound, fr
     <div>
       {frenzyPending && <p className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wide mb-1">Free Agent Frenzy open in</p>}
       {roundActive && <p className="text-[11px] font-semibold text-amber-400 uppercase tracking-wide mb-1">Frenzy Round {frenzyRound} closes in</p>}
-      <p className="text-3xl font-black text-white tabular-nums leading-none">{d > 0 && `${d}d `}{pad(h)}:{pad(m)}:{pad(s)}</p>
+      <p className="text-3xl font-black text-slate-100 tabular-nums leading-none">{d > 0 && `${d}d `}{pad(h)}:{pad(m)}:{pad(s)}</p>
       <div className="flex items-center justify-between gap-2 mt-2">
         <p className="text-xs text-slate-400">{frenzyPending ? "Opens" : roundActive ? "Closes" : "Sim"} at {targetLabel}</p>
         <select value={zone} onChange={(e) => setZone(e.target.value)}

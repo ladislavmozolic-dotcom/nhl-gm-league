@@ -55,7 +55,7 @@ function themeFrom(row: Record<string, unknown> | null): Theme {
   const g = <K extends keyof Theme>(k: K): Theme[K] => (row?.[k] as Theme[K]) ?? THEME_DEFAULTS[k];
   return {
     surfaceColor: g("surfaceColor"), surface2Color: g("surface2Color"), borderColor: g("borderColor"),
-    text2Color: g("text2Color"), text3Color: g("text3Color"), radiusPx: g("radiusPx"), fontKey: g("fontKey"),
+    textColor: g("textColor"), text2Color: g("text2Color"), text3Color: g("text3Color"), radiusPx: g("radiusPx"), fontKey: g("fontKey"),
     accentColor: g("accentColor"), bgColor: g("bgColor"),
   };
 }
