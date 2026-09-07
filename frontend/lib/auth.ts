@@ -2,7 +2,7 @@
 // hockey sim: a signed cookie holds the logged-in teamId. Passwords are salted
 // SHA-256 hashes. Not production-grade security — good enough to gate line edits.
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createHmac, createHash, timingSafeEqual } from "crypto";
 import { prisma } from "./prisma";
 
@@ -45,13 +45,26 @@ export async function setTeamSession(teamId: number): Promise<void> {
     httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 30,
     secure: process.env.NODE_ENV === "production", domain: COOKIE_DOMAIN,
   });
+  // TEMP DEBUG — remove once the mobile logout-loop report is confirmed fixed.
+  try {
+    const h = await headers();
+    console.log(`[auth-debug] setTeamSession team=${teamId} host=${h.get("host")} ua=${(h.get("user-agent") ?? "").slice(0, 80)}`);
+  } catch { /* ignore */ }
 }
 
 export async function getTeamSession(): Promise<number | null> {
   const token = (await cookies()).get(COOKIE)?.value;
+  // TEMP DEBUG — remove once the mobile logout-loop report is confirmed fixed.
+  try {
+    const h = await headers();
+    console.log(`[auth-debug] getTeamSession host=${h.get("host")} referer=${h.get("referer") ?? "?"} hasCookie=${!!token} cookieLen=${token?.length ?? 0} ua=${(h.get("user-agent") ?? "").slice(0, 80)}`);
+  } catch { /* ignore */ }
   if (!token) return null;
   const [value, sig] = token.split(".");
-  if (!value || !sig || sign(value) !== sig) return null;
+  if (!value || !sig || sign(value) !== sig) {
+    console.log(`[auth-debug] getTeamSession INVALID token (bad format or signature mismatch)`);
+    return null;
+  }
   const id = Number(value);
   return Number.isFinite(id) ? id : null;
 }
