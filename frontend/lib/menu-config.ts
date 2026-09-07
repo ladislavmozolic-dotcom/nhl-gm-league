@@ -33,7 +33,7 @@ export const DEFAULT_MENU: MenuItem[] = [
     { label: "🏒 Skaters", href: "/free-agents" },
     { label: "🥅 Goalies", href: "/free-agents?type=goalies" },
     { label: "📄 Offer Sheets", href: "/offer-sheets" },
-    { label: "✍️ Signings", href: "/signings" },
+    { label: "✍️ Signed Free Agents", href: "/signings" },
   ] },
   { key: "players", label: "Players", href: "/players/injuries", children: [
     { label: "🏥 Injury Report", href: "/players/injuries" },

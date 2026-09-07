@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import PlayerAvatar from "@/components/playerAvatar";
 import { cleanName } from "@/lib/playerName";
@@ -37,17 +37,29 @@ function exportCell(r: SortRow, c: SortCol): string | number {
   return r[c.key] ?? "";
 }
 
-export default function SortableTable({ cols, rows, initialSort, minWidth = 720, interestCtx, csvFilename }: {
+export default function SortableTable({ cols, rows, initialSort, minWidth = 720, interestCtx, csvFilename, focusId }: {
   cols: SortCol[]; rows: SortRow[]; initialSort?: string; minWidth?: number; interestCtx?: InterestCtx;
   /** Set to show an "Export Excel" button that downloads the CURRENTLY sorted/
    *  filtered rows as a formatted .xlsx — real columns (numbers stay numbers),
    *  sized to fit their content, autofilter dropdowns on every column so Excel/
    *  Sheets can sort or filter the file the moment it opens. */
   csvFilename?: string;
+  /** row._id to scroll to + briefly highlight on mount — a DM's "raise your offer"
+   *  link lands here instead of a generic page link. */
+  focusId?: number;
 }) {
   const [sort, setSort] = useState<string | null>(initialSort ?? null);
   const [dir, setDir] = useState<"asc" | "desc">("desc");
   const [q, setQ] = useState("");
+  const [highlighted, setHighlighted] = useState(focusId != null);
+
+  useEffect(() => {
+    if (focusId == null) return;
+    const el = document.getElementById(`fa-row-${focusId}`);
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const t = setTimeout(() => setHighlighted(false), 2500);
+    return () => clearTimeout(t);
+  }, [focusId]);
 
   const sorted = useMemo(() => {
     if (!sort) return rows;
@@ -141,7 +153,8 @@ export default function SortableTable({ cols, rows, initialSort, minWidth = 720,
         </thead>
         <tbody>
           {filtered.map((row, i) => (
-            <tr key={row._id ?? i} className="border-b border-slate-800/40 hover:bg-slate-800/30 transition-colors last:border-0">
+            <tr key={row._id ?? i} id={row._id != null ? `fa-row-${row._id}` : undefined}
+              className={`border-b border-slate-800/40 hover:bg-slate-800/30 transition-colors last:border-0 ${highlighted && row._id === focusId ? "bg-amber-500/20" : ""}`}>
               {cols.map((c) => {
                 const base = `px-3 py-2 ${align(c)}`;
                 if (c.kind === "player") {

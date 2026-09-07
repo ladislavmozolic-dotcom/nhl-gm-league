@@ -27,11 +27,12 @@ const ovrColor = (v: number) => (v >= 80 ? "text-green-400" : v >= 70 ? "text-bl
 export default async function FreeAgentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ type?: string }>;
+  searchParams: Promise<{ type?: string; focus?: string }>;
 }) {
   const sp = await searchParams;
   const type: FAType = sp.type === "goalies" ? "goalies" : "skaters";
   const isGoalie = type === "goalies";
+  const focusId = sp.focus ? Number(sp.focus) : undefined;
 
   const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 } });
   const isReal = cfg?.rosterMode === "real";
@@ -207,7 +208,7 @@ export default async function FreeAgentsPage({
         </Card>
       ) : (
         <Card bodyClassName="p-2">
-          <SortableTable cols={cols} rows={rows} initialSort="demand" minWidth={isGoalie ? 950 : 1050} interestCtx={interestCtx ?? undefined} />
+          <SortableTable cols={cols} rows={rows} initialSort="demand" minWidth={isGoalie ? 950 : 1050} interestCtx={interestCtx ?? undefined} focusId={focusId} />
           <p className="text-[11px] text-slate-600 px-2 pt-1">Click any column to sort. <b>Market</b> is the player&apos;s open-market value — the median cap hit of comparably-rated signed players (weighted by the attributes the sim rewards: SC/PA for forwards, DF/PA for defense, AG/RB for goalies), adjusted for age &amp; trajectory. His actual asking price at <em>your</em> club (role &amp; contention) shows on <b>Interest</b>.</p>
         </Card>
       )}

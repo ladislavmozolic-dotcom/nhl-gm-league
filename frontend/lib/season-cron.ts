@@ -113,6 +113,15 @@ export async function autoOpenFrenzyIfDue(now: Date = new Date()): Promise<Frenz
   if (cfg.faOpen) { await prisma.leagueConfig.update({ where: { id: 1 }, data: { frenzyAutoOpenAt: null } }); return { opened: false, reason: "already open — cleared the stale trigger" }; }
   if (now.getTime() < cfg.frenzyAutoOpenAt.getTime()) return { opened: false, reason: `not due until ${cfg.frenzyAutoOpenAt.toISOString()}` };
   await prisma.leagueConfig.update({ where: { id: 1 }, data: { faOpen: true, frenzyAutoOpenAt: null, frenzyRoundStartedAt: now } });
+  // A comish-tier "early access" bid placed BEFORE this open (market fully closed,
+  // no Frenzy yet) routes through the continuous in-season negotiation model
+  // (Player.faDecisionAt — collect a week, then counter) since that's the only
+  // window faEarlyAccess can act on ahead of time. Now that Frenzy is genuinely
+  // open, those same standing offers belong in the round-based system instead —
+  // clear the in-season state (never touches the FaOffer rows themselves) so
+  // processRoundEnd/resolveFrenzy pick them up like every other Frenzy offer,
+  // instead of resolving early on their own day-count clock.
+  await prisma.player.updateMany({ where: { faDecisionAt: { not: null } }, data: { faDecisionAt: null, faCountered: false } });
   const expiredToUfa = await sweepExpiredContractsToUfa();
   return { opened: true, expiredToUfa };
 }
