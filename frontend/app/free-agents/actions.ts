@@ -320,6 +320,8 @@ export async function previewRoundOutcomeForTeam(id: number): Promise<number> {
   const pool = await loadMarketPool();
   const cmap = await teamContentionMap();
   const faId = await faPoolTeamId();
+  const clock = await getLeagueClock();
+  const cap = await loadLeagueCap();
   const nice = (s: string) => s.replace(/''[A-Za-z]''|\s*\([^)]*\)/g, "").trim();
   let previewed = 0;
   for (const my of myOffers) {
@@ -329,18 +331,28 @@ export async function previewRoundOutcomeForTeam(id: number): Promise<number> {
     const nm = nice(player.name);
     const url = faFocusUrl(my.playerId, player.isGoalie);
 
-    // would he sign right now? (same "best acceptable offer" test pickAndSign
-    // uses at round 1 — a lone suitor does NOT fall back to his floor this
-    // early, matching processRoundEnd's allowSoleFloor=false)
+    // would he sign right now? Same test pickAndSign uses at round close: best
+    // acceptable offer wins; failing that, a genuinely UNCONTESTED player (one
+    // standing offer, period) still signs at his floor — round-lock means no
+    // new club can join once this round closes, so there's nobody left to wait
+    // for (matches processRoundEnd's allowSoleFloor=true).
     let bestAcceptable: { teamId: number; utility: number } | null = null;
     for (const o of list) {
       const ev = await evaluateTeamOffer(my.playerId, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, 1, { clause: o.grantClause, breadth: o.mNtcBreadth });
       if (ev?.acceptable && (!bestAcceptable || ev.utility > bestAcceptable.utility)) bestAcceptable = { teamId: o.teamId, utility: ev.utility };
     }
+    if (!bestAcceptable && list.length === 1) {
+      const soleEv = await evaluateTeamOffer(my.playerId, id, my.salary, my.years, { line: my.line, pp: my.pp, pk: my.pk }, pool, cmap, 1, { clause: my.grantClause, breadth: my.mNtcBreadth });
+      if (soleEv) {
+        const info = await teamCapInfo(id);
+        const ceiling = capCeilingForPhase(cap.upper, clock.phase) + info.ltir;
+        if (info.committed + soleEv.ask.floorSalary <= ceiling) bestAcceptable = { teamId: id, utility: 0 };
+      }
+    }
     if (bestAcceptable) {
       const body = bestAcceptable.teamId === id
-        ? `👀 Preview (round 1 hasn't closed yet): ${nm} would SIGN with you right now at your standing offer.`
-        : `👀 Preview (round 1 hasn't closed yet): another club's offer on ${nm} would be accepted over yours right now.`;
+        ? `👀 Preview (round 1 hasn't closed yet): ${nm} would SIGN with you right now${list.length === 1 ? " — you're his only offer" : ""}.`
+        : `👀 Preview (round 1 hasn't closed yet): ${nm} would sign elsewhere right now — your offer would be rejected.`;
       await prisma.dmMessage.create({ data: { fromTeamId: faId, toTeamId: id, body, tradeUrl: url } }).catch(() => {});
       previewed++;
       continue;
@@ -805,9 +817,24 @@ export async function processRoundEnd(endedRound: number): Promise<{ countered: 
     const name = player.name;
 
     // if a standing offer already meets his ask at THIS round, he signs now
-    // (real 1st- / 2nd-round signings) — no waiting for the final week.
-    const signDetail = await pickAndSign(playerId, player, list, endedRound, pool, cmap, false);
-    if (signDetail) { signedNow++; continue; }
+    // (real 1st- / 2nd-round signings) — no waiting for the final week. A SOLE
+    // bidder always gets his man here too (allowSoleFloor=true, at his floor if
+    // the bid undercuts it): round-lock already means nobody new can join once
+    // this round closes, so there's no reason to string an uncontested player
+    // along through more rounds hoping for competition that can't arrive.
+    const signDetail = await pickAndSign(playerId, player, list, endedRound, pool, cmap, true);
+    if (signDetail) {
+      signedNow++;
+      const after = await prisma.player.findUnique({ where: { id: playerId }, select: { teamId: true } });
+      const winner = after?.teamId ?? null;
+      const bidders = [...new Set(list.map((o) => o.teamId))];
+      const winnerTeam = winner != null ? await prisma.team.findUnique({ where: { id: winner }, select: { code: true } }) : null;
+      for (const tid of bidders) {
+        if (tid === winner) await agentDm(tid, `✅ ${name} has SIGNED with you!`, playerId, player.isGoalie);
+        else await agentDm(tid, `🚫 ${name} signed with ${winnerTeam?.code ?? "another club"} — your offer is rejected.`, playerId, player.isGoalie);
+      }
+      continue;
+    }
 
     // value every offer at the UPCOMING round
     const scored = [] as { o: (typeof list)[number]; ev: Awaited<ReturnType<typeof evaluateTeamOffer>> }[];
