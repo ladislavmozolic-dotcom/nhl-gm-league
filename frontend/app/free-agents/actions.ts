@@ -383,9 +383,15 @@ export async function previewRoundOutcomeForTeam(id: number): Promise<number> {
     const bestSalary = Math.max(...list.map((o) => o.salary));
     const soleOffer = list.length === 1;
     const outclassed = !soleOffer && my.salary < bestSalary * 0.75;
+    const closeRace = !soleOffer && list.filter((x) => x.salary >= bestSalary * 0.90).length >= 2;
     let body: string;
     if (my.salary < ev.ask.floorSalary * 0.6 || outclassed) {
       body = `👀 Preview (round 1 hasn't closed yet): ${nm} would pass on your offer right now — ${outclassed ? "another club's offer is well ahead of yours" : "it isn't close to his value"}.`;
+    } else if (!soleOffer && !closeRace) {
+      const isLeader = my.salary === bestSalary;
+      body = isLeader
+        ? `👀 Preview (round 1 hasn't closed yet): your offer on ${nm} is currently the best on the table. You can wait for his decision, or raise it if you're worried another club might try to top you.`
+        : `👀 Preview (round 1 hasn't closed yet): another club has a better offer on ${nm} right now. You have room to improve yours if you want to stay in it.`;
     } else {
       const want = competitiveAsk(ev.ask.salary, my.salary, list);
       body = `👀 Preview (round 1 hasn't closed yet): ${nm} would counter — he wants about $${(want / 1e6).toFixed(2)}M × ${ev.ask.years}yr${soleOffer ? "" : " (other clubs are also in)"}. You have time to raise before the real close.`;
@@ -878,6 +884,14 @@ export async function processRoundEnd(endedRound: number): Promise<{ countered: 
       // also-ran, he's just going with whoever's closest. Below-own-floor (already
       // hopeless) OR clearly behind the best standing offer both eliminate.
       const bestSalary = Math.max(...list.map((o) => o.salary));
+      // A genuine close race (2+ offers within 10% of the leader) still gets the
+      // numeric leverage-driven counter below — real competition, handled as
+      // before. Otherwise there's one clear leader: he gets an informational
+      // "you're ahead" note (no forced raise, no number), and every trailing-
+      // but-not-outclassed offer gets told he has a better offer WITHOUT a
+      // dollar hint — "blind" the way an actual counter should stay, instead of
+      // handing every bidder the exact target to clear.
+      const closeRace = !soleOffer && list.filter((x) => x.salary >= bestSalary * 0.90).length >= 2;
       for (const { o, ev } of scored) {
         if (!ev) continue;
         const teamCode = (await prisma.team.findUnique({ where: { id: o.teamId }, select: { code: true } }))?.code ?? "?";
@@ -888,6 +902,14 @@ export async function processRoundEnd(endedRound: number): Promise<{ countered: 
           await prisma.transaction.create({ data: { type: "FA_NEGOTIATION", message: `${name} passed on ${teamCode}'s offer — ${outclassed ? "another club was well ahead" : "not close to his value"}.` } });
           await agentDm(o.teamId, `❌ ${name}'s camp passed on your offer — ${reason}.`, playerId, player.isGoalie);
           eliminated++;
+        } else if (!soleOffer && !closeRace) {
+          const isLeader = o.salary === bestSalary;
+          await prisma.faOffer.update({ where: { id: o.id }, data: { status: "COUNTERED", counterSalary: null, counterYears: null } });
+          countered++;
+          const msg = isLeader
+            ? `🥇 Your offer on ${name} is currently the best on the table. You can wait for his decision, or raise it if you're worried another club might try to top you.`
+            : `📩 Another club has a better offer on ${name} right now. You have room to improve yours if you want to stay in it.`;
+          await agentDm(o.teamId, msg, playerId, player.isGoalie);
         } else {
           const want = competitiveAsk(ev.ask.salary, o.salary, list);
           await prisma.faOffer.update({ where: { id: o.id }, data: { status: "COUNTERED", counterSalary: want, counterYears: ev.ask.years } });
