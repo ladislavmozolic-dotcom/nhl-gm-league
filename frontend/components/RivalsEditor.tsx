@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Image from "next/image";
 import { saveRivals } from "@/app/teams/[slug]/rivals/actions";
 
 type T = { id: number; name: string; code: string | null; logoUrl: string | null; division: string | null };
@@ -38,7 +37,7 @@ export default function RivalsEditor({ teamId, teams, initial }: { teamId: numbe
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-left transition-colors ${on
                     ? "bg-red-600/20 border-red-500/50 text-white"
                     : "bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-600"}`}>
-                  {t.logoUrl && <Image src={t.logoUrl} alt="" width={22} height={22} className="object-contain shrink-0" />}
+                  {t.logoUrl && <img src={t.logoUrl} alt="" width={22} height={22} className="object-contain shrink-0" />}
                   <span className="text-sm truncate">{t.name}</span>
                   {on && <span className="ml-auto text-red-400 text-xs">🔥</span>}
                 </button>

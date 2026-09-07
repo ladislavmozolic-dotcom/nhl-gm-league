@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { DEFAULT_MENU, type MenuItem } from "@/lib/menu-config";
 import { t, type Lang } from "@/lib/i18n";
 import LangSwitcher from "@/components/LangSwitcher";
@@ -227,7 +226,7 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
                               className="flex items-center gap-2.5 px-2 py-1.5 rounded hover:bg-slate-700/40 transition-colors"
                             >
                               {team.logoUrl && (
-                                <Image
+                                <img
                                   src={team.logoUrl}
                                   alt={team.code ?? ""}
                                   width={20}
@@ -257,7 +256,7 @@ export default function MegaMenu({ gm, items, lang = "en" }: { gm?: { nickname: 
                               className="flex items-center gap-2.5 px-2 py-1.5 rounded hover:bg-slate-700/40 transition-colors"
                             >
                               {team.logoUrl && (
-                                <Image
+                                <img
                                   src={team.logoUrl}
                                   alt={team.code ?? ""}
                                   width={20}

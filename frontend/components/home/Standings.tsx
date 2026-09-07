@@ -51,7 +51,7 @@ function StandingsTable({ teams }: { teams: TeamRow[] }) {
               >
                 <div className="flex items-center gap-2 min-w-0">
                   {team.logoUrl ? (
-                    <Image
+                    <img
                       src={team.logoUrl}
                       alt={team.name}
                       width={22}
