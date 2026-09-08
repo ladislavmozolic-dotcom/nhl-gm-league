@@ -757,17 +757,11 @@ async function pickAndSign(
   for (const o of offers) {
     const ev = await evaluateTeamOffer(playerId, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, judgeRound, { clause: o.grantClause, breadth: o.mNtcBreadth });
     if (offers.length === 1) soleEv = ev;
-    if (!ev?.acceptable) continue;
-    // A club already over the cap (or that this exact signing would push over)
-    // can't actually carry the contract — skip it as a candidate winner rather
-    // than handing him a deal the team isn't legally allowed to have. He just
-    // goes to the next-best (real) offer instead; a shut-out bidder gets the
-    // same "signed elsewhere, your offer is rejected" DM every other loser
-    // gets, so there's nothing special-cased to communicate here.
-    const info = await teamCapInfo(o.teamId);
-    const ceiling = capCeilingForPhase(cap.upper, clockPhase) + info.ltir;
-    if (info.committed + o.salary > ceiling) continue;
-    if (!best || ev.utility > best.utility) best = { offer: o, salary: o.salary, years: o.years, utility: ev.utility };
+    // A club already over the cap can still win a signing here — same as real
+    // hockey, going over on a signing is legal in the moment; the club just
+    // has to get back under the ceiling by the real compliance deadline
+    // (trades, buyouts, waivers). Not something this picker enforces.
+    if (ev?.acceptable && (!best || ev.utility > best.utility)) best = { offer: o, salary: o.salary, years: o.years, utility: ev.utility };
   }
   if (!best && allowSoleFloor && offers.length === 1 && soleEv) {
     // A lone bidder below his floor still signs him — waiting on nobody-else's
