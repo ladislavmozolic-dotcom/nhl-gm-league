@@ -5,6 +5,14 @@ import Link from "next/link";
 import { DEFAULT_MENU, type MenuItem } from "@/lib/menu-config";
 import { t, type Lang } from "@/lib/i18n";
 import LangSwitcher from "@/components/LangSwitcher";
+import { REMEMBER_TOKEN_KEY } from "@/lib/session-resume-shared";
+
+// A deliberate logout must drop the localStorage remember-token too, or SessionResume
+// (mounted on the very next page, once it sees no GM) would silently log the GM right
+// back in with it.
+function clearRememberToken() {
+  try { localStorage.removeItem(REMEMBER_TOKEN_KEY); } catch { /* ignore */ }
+}
 
 interface Team {
   id: number;
@@ -371,7 +379,7 @@ export default function MegaMenu({ gm, items, lang = "en", light = false, hideFo
                       </div>
                       <div className={`my-1 border-t ${gmPanelDivider}`} />
                       <a href="/login" className={`block px-3 py-1.5 text-sm ${gmPanelText}`}>{tr("ui.switchTeam")}</a>
-                      <a href={`/teams/${gm.slug}/logout`} className={`block px-3 py-1.5 text-sm text-red-400 ${gmPanelHoverBg}`}>{tr("ui.logout")}</a>
+                      <a href={`/teams/${gm.slug}/logout`} onClick={clearRememberToken} className={`block px-3 py-1.5 text-sm text-red-400 ${gmPanelHoverBg}`}>{tr("ui.logout")}</a>
                     </div>
                     </div>
                   )}
@@ -455,7 +463,7 @@ export default function MegaMenu({ gm, items, lang = "en", light = false, hideFo
                 )}
                 <div className={`border-t ${dividerLine} my-1`} />
                 <Link href="/login" onClick={closeMobile} className={`block py-2.5 px-3 text-[13px] ${mobileGmMuted}`}>{tr("ui.switchTeam")}</Link>
-                <Link href={`/teams/${gm.slug}/logout`} onClick={closeMobile} className="block py-2.5 px-3 text-[13px] text-red-400">{tr("ui.logout")}</Link>
+                <Link href={`/teams/${gm.slug}/logout`} onClick={() => { closeMobile(); clearRememberToken(); }} className="block py-2.5 px-3 text-[13px] text-red-400">{tr("ui.logout")}</Link>
               </>
             ) : (
               <Link href="/login" onClick={closeMobile} className={`block py-2.5 px-3 text-[14px] font-semibold ${mobileGmSwitch}`}>{tr("ui.gmLogin")}</Link>

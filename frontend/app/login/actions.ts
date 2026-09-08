@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyPassword, setTeamSession } from "@/lib/auth";
 import { recordLogin } from "@/lib/login-log";
 
-export type DirectLoginResult = { ok: true; redirectTo: string } | { ok: false; error: string };
+export type DirectLoginResult = { ok: true; redirectTo: string; rememberToken: string } | { ok: false; error: string };
 
 /** Direct GM sign-in — no team picking. The GM types their email or nickname + password;
  *  we find their (already-claimed) club and drop them straight onto its roster.
@@ -36,6 +36,6 @@ export async function directLogin(formData: FormData): Promise<DirectLoginResult
 
   await prisma.team.update({ where: { id: match.id }, data: { lastLoginAt: new Date() } });
   await recordLogin(match.id); // audit: IP + geolocation
-  await setTeamSession(match.id);
-  return { ok: true, redirectTo: `/teams/${match.slug}/roster` };
+  const rememberToken = await setTeamSession(match.id);
+  return { ok: true, redirectTo: `/teams/${match.slug}/roster`, rememberToken };
 }

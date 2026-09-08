@@ -11,6 +11,7 @@ import { getLang } from "@/lib/lang-server";
 import { t as translate } from "@/lib/i18n";
 import ScoreTracker from "@/components/ScoreTracker";
 import MessageNotifier from "@/components/MessageNotifier";
+import SessionResume from "@/components/SessionResume";
 import TradeSuccessOverlay from "@/components/TradeSuccessOverlay";
 import VisitBeacon from "@/components/VisitBeacon";
 import SiteBanner from "@/components/SiteBanner";
@@ -129,6 +130,7 @@ export default async function RootLayout({
           <VisitBeacon />
           {gm && <MessageNotifier initialUnread={gm.unreadDm} />}
           {gm && <TradeSuccessOverlay />}
+          {!gm && <SessionResume />}
           <SiteBanner branding={branding} />
           <MegaMenu gm={gm} items={menu} lang={lang} light={branding.navLight} hideForum={hideForum} />
           <main className="pt-4 pb-16 max-w-[1400px] mx-auto px-4 w-full flex-1">{children}</main>

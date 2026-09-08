@@ -50,9 +50,30 @@ function sign(value: string): string {
   return createHmac("sha256", SECRET).update(value).digest("hex");
 }
 
-export async function setTeamSession(teamId: number): Promise<void> {
+/** Builds the same signed "teamId.signature" value the session cookie carries.
+ *  Exported so the login action can also hand it to the client for the
+ *  localStorage remember-token fallback (see SessionResume.tsx) — it's the
+ *  exact same credential, just given a second delivery channel that isn't
+ *  subject to whatever iOS Safari does to drop the httpOnly cookie mid-session. */
+export function buildSessionToken(teamId: number): string {
   const value = String(teamId);
-  const token = `${value}.${sign(value)}`;
+  return `${value}.${sign(value)}`;
+}
+
+/** The inverse of buildSessionToken — verifies a token's signature and returns
+ *  the teamId it encodes, or null if malformed/tampered. Used both by
+ *  getTeamSession() (reading the cookie) and the /api/auth/resume route
+ *  (reading the localStorage remember-token). */
+export function verifySessionToken(token: string | undefined | null): number | null {
+  if (!token) return null;
+  const [value, sig] = token.split(".");
+  if (!value || !sig || sign(value) !== sig) return null;
+  const id = Number(value);
+  return Number.isFinite(id) ? id : null;
+}
+
+export async function setTeamSession(teamId: number): Promise<string> {
+  const token = buildSessionToken(teamId);
   (await cookies()).set(COOKIE, token, {
     httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 30,
     secure: process.env.NODE_ENV === "production", domain: COOKIE_DOMAIN,
@@ -62,6 +83,7 @@ export async function setTeamSession(teamId: number): Promise<void> {
     const h = await headers();
     console.log(`[auth-debug] setTeamSession team=${teamId} host=${h.get("host")} ua=${(h.get("user-agent") ?? "").slice(0, 80)}`);
   } catch { /* ignore */ }
+  return token;
 }
 
 // Memoized per request (React's cache()) — isAdmin()/isComishTier()/canManageTeam()/etc.

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { directLogin } from "@/app/login/actions";
+import { REMEMBER_TOKEN_KEY } from "@/lib/session-resume-shared";
 
 /** Same GM sign-in form as before, just no longer a plain `<form action={directLogin}>` —
  *  see directLogin's own comment for why: on success this does a real
@@ -15,8 +16,14 @@ export default function LoginForm({ initialError }: { initialError?: string }) {
   const submit = (formData: FormData) => start(async () => {
     setError(false);
     const r = await directLogin(formData);
-    if (r.ok) window.location.href = r.redirectTo;
-    else setError(true);
+    if (r.ok) {
+      // Belt-and-suspenders alongside the httpOnly cookie: some iOS Safari sessions
+      // drop that cookie mid-browse for reasons we haven't pinned down yet (see
+      // SessionResume.tsx). Stashing the same signed token in localStorage lets the
+      // app silently re-establish the cookie instead of bouncing the GM to /login.
+      try { localStorage.setItem(REMEMBER_TOKEN_KEY, r.rememberToken); } catch { /* storage unavailable — the fallback just won't apply */ }
+      window.location.href = r.redirectTo;
+    } else setError(true);
   });
 
   return (
