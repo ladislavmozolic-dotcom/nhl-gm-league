@@ -3,29 +3,38 @@
 import { useEffect, useRef, useState } from "react";
 import { t, type Lang } from "@/lib/i18n";
 
-/** "Install app" button for Add-to-Home-Screen. Renders nothing once the site is
- *  already running standalone (installed), or on a browser that offers no install
- *  path we can act on. Android/Chrome gets a real one-tap install via
- *  `beforeinstallprompt`; iOS Safari has no such API, so tapping there just shows
- *  the "Share → Add to Home Screen" instructions Apple requires doing manually. */
+type HintKind = "ios" | "macSafari" | "android";
+
+/** "Install app" button for Add-to-Home-Screen / Add-to-Dock. Renders nothing once
+ *  the site is already running standalone (installed), or on a browser that offers
+ *  no install path we can act on. Android/Chrome (incl. Chrome/Edge on a Mac) gets a
+ *  real one-tap install via `beforeinstallprompt`; Safari has no such API on either
+ *  iOS or macOS, so tapping there just shows the manual steps (Share → Add to Home
+ *  Screen on iOS, File → Add to Dock on macOS) — that's the only way Apple allows it
+ *  to happen. */
 export default function InstallAppButton({ lang = "en", className }: { lang?: Lang; className?: string }) {
   const [visible, setVisible] = useState(false);
-  const [isIOS, setIsIOS] = useState(false);
+  const [hintKind, setHintKind] = useState<HintKind>("android");
   const [showHint, setShowHint] = useState(false);
   const deferredPrompt = useRef<{ prompt: () => void; userChoice: Promise<unknown> } | null>(null);
 
   useEffect(() => {
     const nav = window.navigator as Navigator & { standalone?: boolean };
+    const ua = nav.userAgent;
     const standalone = window.matchMedia("(display-mode: standalone)").matches || nav.standalone === true;
     if (standalone) return;
 
-    const iOS = /iPad|iPhone|iPod/.test(nav.userAgent) && !("MSStream" in window);
-    setIsIOS(iOS);
-    if (iOS) setVisible(true);
+    const isIOS = /iPad|iPhone|iPod/.test(ua) && !("MSStream" in window);
+    // Chrome/Edge/Opera on a Mac also match "Safari" in their UA string — only a
+    // real Safari (no Chromium browser token present) needs the manual Add-to-Dock hint.
+    const isMacSafari = /Macintosh/.test(ua) && /Safari/.test(ua) && !/Chrome|CriOS|Edg|OPR/.test(ua);
+    if (isIOS) { setHintKind("ios"); setVisible(true); }
+    else if (isMacSafari) { setHintKind("macSafari"); setVisible(true); }
 
     const onBeforeInstall = (e: Event) => {
       e.preventDefault();
       deferredPrompt.current = e as unknown as { prompt: () => void; userChoice: Promise<unknown> };
+      setHintKind("android");
       setVisible(true);
     };
     window.addEventListener("beforeinstallprompt", onBeforeInstall);
@@ -45,12 +54,14 @@ export default function InstallAppButton({ lang = "en", className }: { lang?: La
     setShowHint((v) => !v);
   };
 
+  const hintKey = hintKind === "ios" ? "ui.installHintIOS" : hintKind === "macSafari" ? "ui.installHintMac" : "ui.installHintAndroid";
+
   return (
     <div className="relative">
       <button onClick={onClick} className={className}>📲 {t(lang, "ui.installApp")}</button>
       {showHint && (
         <div className="absolute z-50 top-full mt-1 left-0 w-64 rounded-lg border border-slate-700 bg-slate-900 text-slate-200 text-xs p-3 shadow-xl">
-          {t(lang, isIOS ? "ui.installHintIOS" : "ui.installHintAndroid")}
+          {t(lang, hintKey)}
           <button onClick={() => setShowHint(false)} className="block mt-2 text-blue-400 text-xs font-semibold">OK</button>
         </div>
       )}

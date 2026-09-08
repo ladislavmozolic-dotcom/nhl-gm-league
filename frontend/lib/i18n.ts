@@ -40,6 +40,12 @@ export const DICT: Dict = {
     de: 'Tippen Sie unten in Safari auf „Teilen" (Quadrat mit Pfeil) und dann auf „Zum Home-Bildschirm".',
     ru: 'Нажмите кнопку "Поделиться" внизу Safari, затем "На экран «Домой»".',
   },
+  "ui.installHintMac": {
+    en: 'In the Safari menu bar, click File → Add to Dock.',
+    cs: 'V liště Safari klikněte na Soubor → Přidat do Docku.',
+    de: 'Klicken Sie in der Safari-Menüleiste auf Ablage → Zum Dock hinzufügen.',
+    ru: 'В строке меню Safari нажмите Файл → Добавить в Dock.',
+  },
   "ui.installHintAndroid": {
     en: 'Open the browser menu (⋮) and tap "Add to Home screen" or "Install app".',
     cs: 'Otevřete nabídku prohlížeče (⋮) a klepněte na "Přidat na plochu" nebo "Instalovat aplikaci".',
