@@ -18,14 +18,18 @@ export default async function LinesPage({ params }: { params: Promise<{ slug: st
   if (!(await canManageTeam(team.id))) redirect(`/teams/${slug}/login`);
 
   const rosterType = team.league === "AHL" ? "AHL" : "NHL";
+  // scratched = a healthy scratch (pro-scratched for NHL, farm-scratched for AHL) —
+  // not in tonight's lineup at all, so he has no business showing up as a pickable
+  // option for a forward line / D pair / PP-PK slot here. Roster Moves is where a
+  // GM decides who's dressed vs scratched; Lines only arranges the dressed players.
   const [skaterRows, goalieRows] = await Promise.all([
     prisma.player.findMany({
-      where: { teamId: team.id, rosterType, isGoalie: false },
+      where: { teamId: team.id, rosterType, isGoalie: false, scratched: false },
       select: { id: true, name: true, position: true, overall: true, injuryDaysLeft: true, df: true, condition: true, captaincy: true, pa: true, sk: true, sc: true, ck: true, fo: true, st: true },
       orderBy: { overall: "desc" },
     }),
     prisma.player.findMany({
-      where: { teamId: team.id, rosterType, isGoalie: true },
+      where: { teamId: team.id, rosterType, isGoalie: true, scratched: false },
       select: { id: true, name: true, position: true, overall: true, injuryDaysLeft: true, condition: true, captaincy: true },
       orderBy: { overall: "desc" },
     }),

@@ -80,7 +80,7 @@ function tacticalFitD(pair: (P | null)[]): number {
 export async function teamLineBuilder(teamId: number, league = "NHL"): Promise<TeamLineBuild> {
   const rosterType = league === "AHL" ? "AHL" : "NHL";
   const rows = await prisma.player.findMany({
-    where: { teamId, rosterType, isGoalie: false },
+    where: { teamId, rosterType, isGoalie: false, scratched: false },
     select: { id: true, name: true, slug: true, position: true, shoots: true, overall: true, pa: true, sc: true, sk: true, ck: true, df: true, st: true, fo: true, weight: true },
   });
   if (!rows.length) return null;
