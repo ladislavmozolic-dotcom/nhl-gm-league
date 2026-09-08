@@ -19,6 +19,11 @@ export default function InstallAppButton({ lang = "en", className }: { lang?: La
   const deferredPrompt = useRef<{ prompt: () => void; userChoice: Promise<unknown> } | null>(null);
 
   useEffect(() => {
+    // Chrome/Edge won't fire `beforeinstallprompt` below without a registered service
+    // worker that has a fetch handler — sw.js deliberately does nothing else. register()
+    // is idempotent, so mounting this twice (desktop nav + mobile drawer) is harmless.
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+
     const nav = window.navigator as Navigator & { standalone?: boolean };
     const ua = nav.userAgent;
     const standalone = window.matchMedia("(display-mode: standalone)").matches || nav.standalone === true;
