@@ -347,6 +347,16 @@ export function buildTeam(input: {
     const style = u.style ?? teamTac.pkStyle ?? "balanced";
     for (const id of u.players) if (id != null) pkUnitStyleByPlayer.set(id, style as PkStyle);
   }
+  // Separate map for the 5-on-3 kill (its own personnel, PK3 tab) — kept apart
+  // from pkUnitStyleByPlayer above rather than merged in, since the SAME player
+  // often sits on both the 4-on-5 AND 5-on-3 units with a different style on
+  // each; the engine picks whichever map applies via the live skater diff
+  // (manAdv3), so neither one may silently overwrite the other here.
+  const pk3UnitStyleByPlayer = new Map<number, PkStyle>();
+  for (const u of input.lines?.situations?.pk3 ?? []) {
+    const style = u.style ?? teamTac.pkStyle ?? "balanced";
+    for (const id of u.players) if (id != null) pk3UnitStyleByPlayer.set(id, style as PkStyle);
+  }
 
   return {
     id: input.id,
@@ -376,6 +386,7 @@ export function buildTeam(input: {
     teamTactics: teamTac,
     ppUnitStyleByPlayer,
     pkUnitStyleByPlayer,
+    pk3UnitStyleByPlayer,
     profile,
     fwdLineFx,
     defPairFx,

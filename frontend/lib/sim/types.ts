@@ -105,6 +105,7 @@ export type SimTeam = {
   teamTactics: TeamTactics;        // the raw dials the GM set (for display / scouting)
   ppUnitStyleByPlayer: Map<number, PpStyle>; // playerId -> that PP unit's own formation (falls back to teamTactics.ppStyle)
   pkUnitStyleByPlayer: Map<number, PkStyle>; // playerId -> that PK unit's own structure (falls back to teamTactics.pkStyle)
+  pk3UnitStyleByPlayer: Map<number, PkStyle>; // playerId -> that PK3 (5-on-3) unit's own structure — separate map, since a true 5-on-3 uses its own personnel/formation, not a trimmed PK4 unit
   profile: RosterProfile;          // ice-weighted roster attribute averages (drives system fit)
   fwdLineFx: TacticsEffect[];      // per forward-line effect (team system + the line's own Puck Style override)
   defPairFx: TacticsEffect[];      // per defence-pair effect (team system + the pair's own D-Zone override)
