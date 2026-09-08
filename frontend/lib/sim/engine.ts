@@ -1410,24 +1410,31 @@ function simulatePeriodPossession(st: SimState, period: number) {
     // final-skill helper: base × tactics × chemistry × morale × fatigue × score-effect × team edge
     const atkSkill = (v: number, of = true) => v * (of ? tOff.of * atkTilt.of : 1) * chemFactor(carrier.chem, carrier.roleFit) * moraleFactor(carrier.morale) * fat(carrierTeam, carrier) * catchUp * teamMult;
     const defSkill = (v: number) => v * tDef.df * defTilt.df * dfat(def, dman);
+    // puck-protection: SK still leads (skating/hands to evade pressure), but PH
+    // (stickhandling) is now a real secondary factor in keeping it on the tape.
+    const puckHandle = (s: SimSkater) => 0.65 * (s.attrs.sk ?? 50) + 0.35 * (s.attrs.ph ?? 50);
+    // puck-winning: DF still leads (positioning/stick), but CK (physical play) is
+    // now a real second factor in who actually comes away with a contested puck
+    // — not just a hitting/injury stat.
+    const puckWin = (s: SimSkater) => 0.55 * (s.attrs.df ?? 50) + 0.45 * (s.attrs.ck ?? 50);
 
-    // 1) keep the puck vs. get stripped (SK vs DF) — a real challenge some ticks.
-    // the defending team's forecheck aggression (takeaway) forces a few more strips;
-    // a passive forecheck concedes possession. Contained to this node so it doesn't
-    // over-suppress the opponent (see tactics.ts).
+    // 1) keep the puck vs. get stripped (SK+PH vs DF+CK) — a real challenge some
+    // ticks. the defending team's forecheck aggression (takeaway) forces a few
+    // more strips; a passive forecheck concedes possession. Contained to this
+    // node so it doesn't over-suppress the opponent (see tactics.ts).
     if (rng.chance(0.09)) {
-      const keep = Math.pow(ratio(atkSkill(carrier.attrs.sk ?? 50), defSkill(dman.attrs.df ?? 50)), defFx.takeaway);
+      const keep = Math.pow(ratio(atkSkill(puckHandle(carrier)), defSkill(puckWin(dman))), defFx.takeaway);
       if (!rng.chance(keep)) { // turnover — defenders take over in their own zone
         carrierTeam = def; carrier = pickByAttr(rng, onIceD(def).concat(onIceF(def)), (s) => (s.attrs.df ?? 50) + (s.attrs.pa ?? 50)) ?? dman;
         zone = "DEF"; setup = "carry"; press = 0; continue;
       }
     }
 
-    // 2) advance the puck toward the offensive zone (zone entry: SK vs DF+SK)
+    // 2) advance the puck toward the offensive zone (zone entry: SK+PH vs DF+SK)
     if (zone !== "OFF") {
       if (rng.chance(0.28)) {
         const gap = 0.6 * (dman.attrs.df ?? 50) + 0.4 * (dman.attrs.sk ?? 50);
-        if (rng.chance(ratio(atkSkill(carrier.attrs.sk ?? 50), defSkill(gap)))) {
+        if (rng.chance(ratio(atkSkill(puckHandle(carrier)), defSkill(gap)))) {
           // a real, live ZONE_ENTRY — NEU->OFF only (matches the real-hockey stat:
           // crossing into the ATTACKING zone; DEF->NEU is a breakout, not tracked).
           if (zone === "NEU") {
