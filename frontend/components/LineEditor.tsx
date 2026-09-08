@@ -413,35 +413,66 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
   // style) — wider dropdowns so full names read cleanly. The first `nF` slots are
   // forwards, the next `nD` are defense. Tactic (PHY/DF/OF) + Time % live on the
   // forwards table (one game plan per unit); the defense table shows the pairing.
-  const SplitUnitSection = (key: "pp" | "fourVFour" | "pk4" | "pk3", title: string, fLabels: string[], dLabels: string[], dPool: Player[] = defense, dHint?: string) => {
+  // `roleInfo`, when given (pp / pk4 — the two unit kinds with a real formation
+  // system), replaces the old fixed LW/C/RW/LD/RD-style labels with each slot's
+  // actual role name under THAT unit's own chosen tactic (Point, Net-Front,
+  // Corner, …) — a slot no longer pretends to be a fixed real-hockey position;
+  // it's just "whoever plays that spot in this formation" (the sim itself
+  // assigns who plays it, by attribute fit — see formation-layout.ts).
+  const SplitUnitSection = (
+    key: "pp" | "fourVFour" | "pk4" | "pk3", title: string, fLabels: string[], dLabels: string[],
+    dPool: Player[] = defense, dHint?: string,
+    roleInfo?: { dial: "ppStyle" | "pkStyle"; layouts: Record<string, FormationRole[]> },
+  ) => {
     const units = data.situations[key];
     const nF = fLabels.length, nD = dLabels.length;
+    const roleLabelsFor = (ui: number): string[] | null => {
+      if (!roleInfo) return null;
+      const teamDefault = ((mergeTactics(data.system) as Record<string, string>)[roleInfo.dial]) ?? "balanced";
+      const effective = (units[ui] as SpecialUnit).style ?? teamDefault;
+      const roles = roleInfo.layouts[effective] ?? roleInfo.layouts.balanced;
+      return roles.map((r) => r.label);
+    };
     return (
       <div className="space-y-4">
-        <p className="text-xs text-slate-500 px-1">💡 Put a real <strong className="text-slate-300">C</strong> in the <strong className="text-slate-300">C</strong> spot — the sim uses a center from the unit to take the faceoff (his <strong>FO</strong> rating decides the draw). No center on the unit = a winger takes it with a weak FO.</p>
+        <p className="text-xs text-slate-500 px-1">💡 {roleInfo
+          ? "Rola pod menom hráča ukazuje, koho miesto na ľade v aktuálne zvolenej taktike zaberá (mení sa podľa PP/PK formation vyššie). O buly sa vždy automaticky pokúša hráč s najvyšším FO na ľade — bez ohľadu na to, kde je zaradený."
+          : "Buly berie automaticky hráč s najvyšším FO na ľade, bez ohľadu na pozíciu/slot."}</p>
         {dHint && <p className="text-xs text-slate-500 px-1">{dHint}</p>}
         <UnitBlock title={`${title} — Forwards`} head={["Unit", ...fLabels, "PHY", "DF", "OF", "Time %"]} timeTotal={timeSum(units)}>
-          {units.map((u, ui) => (
+          {units.map((u, ui) => {
+            const roleLabels = roleLabelsFor(ui);
+            return (
             <tr key={ui} className="border-b border-slate-800/60">
               <td className="px-2 py-1.5 text-slate-500">{ui + 1}</td>
               {Array.from({ length: nF }).map((_, si) => (
-                <td key={si} className="px-2"><Select value={u.players[si]} onChange={(v) => setUnit(key, ui, si, v)} pool={forwards} /></td>
+                <td key={si} className="px-2 align-top">
+                  {roleLabels && <div className="text-[10px] font-semibold uppercase tracking-wide text-sky-400/80 mb-0.5">{roleLabels[si]}</div>}
+                  <Select value={u.players[si]} onChange={(v) => setUnit(key, ui, si, v)} pool={forwards} />
+                </td>
               ))}
               <TacCells t={u.tactic} onSet={(k, v) => setUnitTac(key, ui, k, v)} />
               <td className="px-2 py-1.5 text-right"><Stepper value={u.timePct} step={5} onChange={(v) => setUnitTime(key, ui, v)} /></td>
             </tr>
-          ))}
+            );
+          })}
         </UnitBlock>
         <UnitBlock title={`${title} — Defense`} head={["Unit", ...dLabels, "PHY", "DF", "OF"]}>
-          {units.map((u, ui) => (
+          {units.map((u, ui) => {
+            const roleLabels = roleLabelsFor(ui);
+            return (
             <tr key={ui} className="border-b border-slate-800/60">
               <td className="px-2 py-1.5 text-slate-500">{ui + 1}</td>
               {Array.from({ length: nD }).map((_, si) => (
-                <td key={si} className="px-2"><Select value={u.players[nF + si]} onChange={(v) => setUnit(key, ui, nF + si, v)} pool={dPool} /></td>
+                <td key={si} className="px-2 align-top">
+                  {roleLabels && <div className="text-[10px] font-semibold uppercase tracking-wide text-rose-400/80 mb-0.5">{roleLabels[nF + si]}</div>}
+                  <Select value={u.players[nF + si]} onChange={(v) => setUnit(key, ui, nF + si, v)} pool={dPool} />
+                </td>
               ))}
               <TacCells t={u.dTactic} onSet={(k, v) => setUnitDTac(key, ui, k, v)} />
             </tr>
-          ))}
+            );
+          })}
         </UnitBlock>
       </div>
     );
@@ -532,7 +563,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
           <UnitFormationBlock unitKey="pp" ui={0} dial="ppStyle" label="PP1" layouts={PP_LAYOUTS} dStartIndex={3} accent="#3b82f6" />
           <UnitFormationBlock unitKey="pp" ui={1} dial="ppStyle" label="PP2" layouts={PP_LAYOUTS} dStartIndex={3} accent="#a855f7" />
         </div>
-        {SplitUnitSection("pp", "Power Play (5 on 4)", ["LW", "C", "RW"], ["LD", "RD"], ppPointPool, "💡 Na presilovke môžeš do modrej (LD/RD) dať aj útočníka — dropdown ponúka obrancov aj útočníkov, takže sa dá hrať 4 útočníci + 1 obranca.")}
+        {SplitUnitSection("pp", "Power Play (5 on 4)", ["F1", "F2", "F3"], ["D1", "D2"], ppPointPool, "💡 Na presilovke môžeš do modrej (D1/D2) dať aj útočníka — dropdown ponúka obrancov aj útočníkov, takže sa dá hrať 4 útočníci + 1 obranca.", { dial: "ppStyle", layouts: PP_LAYOUTS })}
       </>}
       {tab === "4 vs 4" && SplitUnitSection("fourVFour", "4 vs 4", ["C", "W"], ["LD", "RD"])}
       {tab === "PK4" && <>
@@ -541,7 +572,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
           <UnitFormationBlock unitKey="pk4" ui={0} dial="pkStyle" label="PK1" layouts={PK_LAYOUTS} dStartIndex={2} accent="#ef4444" />
           <UnitFormationBlock unitKey="pk4" ui={1} dial="pkStyle" label="PK2" layouts={PK_LAYOUTS} dStartIndex={2} accent="#f97316" />
         </div>
-        {SplitUnitSection("pk4", "Penalty Kill (4 on 5)", ["C", "W"], ["LD", "RD"])}
+        {SplitUnitSection("pk4", "Penalty Kill (4 on 5)", ["F1", "F2"], ["D1", "D2"], defense, undefined, { dial: "pkStyle", layouts: PK_LAYOUTS })}
       </>}
       {tab === "PK3" && SplitUnitSection("pk3", "Penalty Kill (3 on 5)", ["C"], ["LD", "RD"])}
       {tab === "Overtime" && UnitSection("overtime", "Overtime (3 vs 3)", ["OT1", "OT2", "OT3"], () => players)}

@@ -1320,9 +1320,14 @@ function simulatePeriodPossession(st: SimState, period: number) {
       // a scrum at the whistle, before the draw — the natural real-hockey moment
       // for a fight to break out (see maybeStartFight's header comment)
       maybeStartFight(st, home, away, period, tick);
-      // centers of the on-ice units contest the draw (FO vs FO)
-      const hC = onIceF(home).find((s) => s.isCenter) ?? onIceF(home)[0] ?? home.forwards[0] ?? home.defense[0];
-      const aC = onIceF(away).find((s) => s.isCenter) ?? onIceF(away)[0] ?? away.forwards[0] ?? away.defense[0];
+      // whoever on the ice has the best FO takes the draw — not "the C slot":
+      // a real listed C on the bench doesn't help if a winger with better
+      // hands in the circle is the one actually deployed on this unit, and a
+      // PP/PK personnel slot is no longer treated as a fixed real position at
+      // all (see the Line Editor's per-unit formation roles).
+      const bestFo = (pool: SimSkater[]) => pool.length ? pool.reduce((best, s) => ((s.attrs.fo ?? 50) > (best.attrs.fo ?? 50) ? s : best)) : null;
+      const hC = bestFo(onIceF(home)) ?? bestFo(onIceD(home)) ?? home.forwards[0] ?? home.defense[0];
+      const aC = bestFo(onIceF(away)) ?? bestFo(onIceD(away)) ?? away.forwards[0] ?? away.defense[0];
       const homeWin = rng.chance(ratio((hC.attrs.fo ?? 50) * fat(home, hC), (aC.attrs.fo ?? 50) * fat(away, aC), 0.8));
       if (homeWin) { st.box[home.id].faceoffWins++; st.box[away.id].faceoffLosses++; st.lines[home.id][hC.id].faceoffWins++; st.lines[away.id][aC.id].faceoffLosses++; carrierTeam = home; carrier = hC; }
       else { st.box[away.id].faceoffWins++; st.box[home.id].faceoffLosses++; st.lines[away.id][aC.id].faceoffWins++; st.lines[home.id][hC.id].faceoffLosses++; carrierTeam = away; carrier = aC; }
