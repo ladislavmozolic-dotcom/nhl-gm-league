@@ -7,7 +7,7 @@ import { autoFill, type TeamLinesData, type ForwardLine, type DefensePair, type 
 import { unitChemistry } from "@/lib/sim/chemistry";
 import { roleFitOf } from "@/lib/sim/role-fit";
 import { DIAL_LABELS, mergeTactics, type PuckStyle, type DZone, type PpStyle, type PkStyle } from "@/lib/sim/tactics";
-import { PP_LAYOUTS, PK_LAYOUTS, PK3_LAYOUTS, assignRoles, type FormationRole } from "@/lib/sim/formation-layout";
+import { PP_LAYOUTS, PK_LAYOUTS, PK3_LAYOUTS, type FormationRole } from "@/lib/sim/formation-layout";
 import RinkFormationMap from "@/components/RinkFormationMap";
 import { useLang } from "@/components/LangProvider";
 import { dialLabel, dialDesc } from "@/lib/tactics-i18n";
@@ -54,18 +54,24 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
 
   const byId = useMemo(() => new Map([...players, ...goalies].map((p) => [p.id, p])), [players, goalies]);
   const nameOf = (id: number | null) => (id == null ? "" : byId.get(id)?.name ?? `#${id}`);
-  // formation-map feed: the unit's chosen personnel with the attrs the role-fit
-  // needs, tagged by which PERSONNEL SLOT they're in (not their real position)
-  // — dStartIndex is where the D slots start in `ids` (PP: LW,C,RW,LD,RD → 3;
-  // PK4: C,W,LD,RD → 2). The picker lets a forward fill an LD/RD slot for a
-  // 4F+1D unit, and that's deliberate (a GM choosing who mans the point), so
-  // formation roles like Point must key off the slot, not the player's own
-  // listed position.
+  // formation-map feed: the unit's chosen personnel, tagged by which
+  // PERSONNEL SLOT they're in (not their real position) — dStartIndex is
+  // where the D slots start in `ids` (PP: F1,F2,F3,D1,D2 → 3; PK4: F1,F2,
+  // D1,D2 → 2; PK3: F1,D1,D2 → 1). The picker lets a forward fill a D slot
+  // for a 4F+1D unit, and that's deliberate (a GM choosing who mans the
+  // point), so the "D" badge on the diagram keys off the slot, not the
+  // player's own listed position.
   const slotPlayers = (ids: (number | null)[], dStartIndex: number) => ids
     .map((id, i) => (id == null ? null : { id, isD: i >= dStartIndex }))
-    .filter((x): x is { id: number; isD: boolean } => x != null)
-    .map((x) => { const p = byId.get(x.id); return p ? { id: p.id, name: p.name, sc: p.sc ?? 50, pa: p.pa ?? 50, st: p.st ?? 50, isD: x.isD } : null; })
-    .filter((p): p is { id: number; name: string; sc: number; pa: number; st: number; isD: boolean } => !!p);
+    .filter((x): x is { id: number; isD: boolean } => x != null);
+  // Same idea, but INDEX-ALIGNED with `ids` (nulls kept as empty seats) — the
+  // diagram's role[i] is a fixed seat tied to slot i (see formation-layout.ts),
+  // so the player array handed to it must line up 1:1, not be compacted.
+  const slotPlayersFixed = (ids: (number | null)[], dStartIndex: number) => ids.map((id, i) => {
+    if (id == null) return null;
+    const p = byId.get(id);
+    return p ? { id: p.id, name: p.name, isD: i >= dStartIndex } : null;
+  });
   const byName = (a: Player, b: Player) => a.name.localeCompare(b.name);
   const forwards = useMemo(() => players.filter((p) => !isD(p.position)).sort(byName), [players]);
   const defense = useMemo(() => players.filter((p) => isD(p.position)).sort(byName), [players]);
@@ -267,7 +273,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
           <SysSelect value={unit?.style} dial={dial} opts={DIAL_LABELS[dial]} onChange={(v) => setUnitStyle(unitKey, ui, v)} />
         </div>
         <div className="p-3">
-          <RinkFormationMap roles={layouts[effective] ?? layouts.balanced} players={slotPlayers(unit?.players ?? [], dStartIndex)} accent={accent} />
+          <RinkFormationMap roles={layouts[effective] ?? layouts.balanced} players={slotPlayersFixed(unit?.players ?? [], dStartIndex)} accent={accent} />
         </div>
       </div>
     );
@@ -413,34 +419,27 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
   // style) — wider dropdowns so full names read cleanly. The first `nF` slots are
   // forwards, the next `nD` are defense. Tactic (PHY/DF/OF) + Time % live on the
   // forwards table (one game plan per unit); the defense table shows the pairing.
-  // `roleInfo`, when given (pp / pk4 — the two unit kinds with a real formation
-  // system), replaces the old fixed LW/C/RW/LD/RD-style labels with each slot's
-  // actual role name under THAT unit's own chosen tactic (Point, Net-Front,
-  // Corner, …) — a slot no longer pretends to be a fixed real-hockey position;
-  // it's just "whoever plays that spot in this formation" (the sim itself
-  // assigns who plays it, by attribute fit — see formation-layout.ts).
+  // `roleInfo`, when given (pp / pk4 / pk3 — the unit kinds with a real
+  // formation system), replaces the old fixed LW/C/RW/LD/RD-style labels
+  // with each SLOT's fixed role name under THAT unit's own chosen tactic
+  // (Point, Net-Front, Corner, …) — a seat's role never changes just because
+  // the GM swapped who occupies it (see formation-layout.ts's header
+  // comment for why this is a fixed slot→role mapping, not an attribute-fit
+  // reassignment).
   const SplitUnitSection = (
     key: "pp" | "fourVFour" | "pk4" | "pk3", title: string, fLabels: string[], dLabels: string[],
     dPool: Player[] = defense, dHint?: string,
-    roleInfo?: { dial: "ppStyle" | "pkStyle"; layouts: Record<string, FormationRole[]>; dStartIndex: number },
+    roleInfo?: { dial: "ppStyle" | "pkStyle"; layouts: Record<string, FormationRole[]> },
   ) => {
     const units = data.situations[key];
     const nF = fLabels.length, nD = dLabels.length;
-    // Same optimal-fit assignment the rink diagram uses (assignRoles), not just
-    // "whichever role sits at this slot's array index" — a slot's role can move
-    // to a DIFFERENT player than its raw picker position once the DP reassigns
-    // by attribute fit (e.g. a real D dropped in an F slot still plays Point),
-    // so the caption has to be looked up by PLAYER, exactly like the diagram.
-    const roleAssignFor = (ui: number) => {
+    const rolesFor = (ui: number): FormationRole[] | null => {
       if (!roleInfo) return null;
       const unit = units[ui] as SpecialUnit;
       const teamDefault = ((mergeTactics(data.system) as Record<string, string>)[roleInfo.dial]) ?? "balanced";
       const effective = unit.style ?? teamDefault;
-      const roles = roleInfo.layouts[effective] ?? roleInfo.layouts.balanced;
-      return assignRoles(roles, slotPlayers(unit.players ?? [], roleInfo.dStartIndex));
+      return roleInfo.layouts[effective] ?? roleInfo.layouts.balanced;
     };
-    const roleLabelFor = (assign: ReturnType<typeof roleAssignFor>, playerId: number | null) =>
-      assign?.find((a) => a.player?.id === playerId)?.role.label ?? null;
     return (
       <div className="space-y-4">
         <p className="text-xs text-slate-500 px-1">💡 {roleInfo
@@ -449,13 +448,13 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
         {dHint && <p className="text-xs text-slate-500 px-1">{dHint}</p>}
         <UnitBlock title={`${title} — Forwards`} head={["Unit", ...fLabels, "PHY", "DF", "OF", "Time %"]} timeTotal={timeSum(units)}>
           {units.map((u, ui) => {
-            const assign = roleAssignFor(ui);
+            const roles = rolesFor(ui);
             return (
             <tr key={ui} className="border-b border-slate-800/60">
               <td className="px-2 py-1.5 text-slate-500">{ui + 1}</td>
               {Array.from({ length: nF }).map((_, si) => (
                 <td key={si} className="px-2 align-top">
-                  {assign && <div className="text-[10px] font-semibold uppercase tracking-wide text-sky-400/80 mb-0.5">{roleLabelFor(assign, u.players[si]) ?? "—"}</div>}
+                  {roles && <div className="text-[10px] font-semibold uppercase tracking-wide text-sky-400/80 mb-0.5">{roles[si]?.label ?? "—"}</div>}
                   <Select value={u.players[si]} onChange={(v) => setUnit(key, ui, si, v)} pool={forwards} />
                 </td>
               ))}
@@ -467,13 +466,13 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
         </UnitBlock>
         <UnitBlock title={`${title} — Defense`} head={["Unit", ...dLabels, "PHY", "DF", "OF"]}>
           {units.map((u, ui) => {
-            const assign = roleAssignFor(ui);
+            const roles = rolesFor(ui);
             return (
             <tr key={ui} className="border-b border-slate-800/60">
               <td className="px-2 py-1.5 text-slate-500">{ui + 1}</td>
               {Array.from({ length: nD }).map((_, si) => (
                 <td key={si} className="px-2 align-top">
-                  {assign && <div className="text-[10px] font-semibold uppercase tracking-wide text-rose-400/80 mb-0.5">{roleLabelFor(assign, u.players[nF + si]) ?? "—"}</div>}
+                  {roles && <div className="text-[10px] font-semibold uppercase tracking-wide text-rose-400/80 mb-0.5">{roles[nF + si]?.label ?? "—"}</div>}
                   <Select value={u.players[nF + si]} onChange={(v) => setUnit(key, ui, nF + si, v)} pool={dPool} />
                 </td>
               ))}
@@ -571,7 +570,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
           <UnitFormationBlock unitKey="pp" ui={0} dial="ppStyle" label="PP1" layouts={PP_LAYOUTS} dStartIndex={3} accent="#3b82f6" />
           <UnitFormationBlock unitKey="pp" ui={1} dial="ppStyle" label="PP2" layouts={PP_LAYOUTS} dStartIndex={3} accent="#a855f7" />
         </div>
-        {SplitUnitSection("pp", "Power Play (5 on 4)", ["F1", "F2", "F3"], ["D1", "D2"], ppPointPool, "💡 Na presilovke môžeš do modrej (D1/D2) dať aj útočníka — dropdown ponúka obrancov aj útočníkov, takže sa dá hrať 4 útočníci + 1 obranca.", { dial: "ppStyle", layouts: PP_LAYOUTS, dStartIndex: 3 })}
+        {SplitUnitSection("pp", "Power Play (5 on 4)", ["F1", "F2", "F3"], ["D1", "D2"], ppPointPool, "💡 Na presilovke môžeš do modrej (D1/D2) dať aj útočníka — dropdown ponúka obrancov aj útočníkov, takže sa dá hrať 4 útočníci + 1 obranca.", { dial: "ppStyle", layouts: PP_LAYOUTS })}
       </>}
       {tab === "4 vs 4" && SplitUnitSection("fourVFour", "4 vs 4", ["C", "W"], ["LD", "RD"])}
       {tab === "PK4" && <>
@@ -580,7 +579,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
           <UnitFormationBlock unitKey="pk4" ui={0} dial="pkStyle" label="PK1" layouts={PK_LAYOUTS} dStartIndex={2} accent="#ef4444" />
           <UnitFormationBlock unitKey="pk4" ui={1} dial="pkStyle" label="PK2" layouts={PK_LAYOUTS} dStartIndex={2} accent="#f97316" />
         </div>
-        {SplitUnitSection("pk4", "Penalty Kill (4 on 5)", ["F1", "F2"], ["D1", "D2"], defense, undefined, { dial: "pkStyle", layouts: PK_LAYOUTS, dStartIndex: 2 })}
+        {SplitUnitSection("pk4", "Penalty Kill (4 on 5)", ["F1", "F2"], ["D1", "D2"], defense, undefined, { dial: "pkStyle", layouts: PK_LAYOUTS })}
       </>}
       {tab === "PK3" && <>
         <p className="text-xs text-slate-500 px-1 mb-3">Zdieľa systém (Box/Diamond/Aggressive) s PK4 — pri 3 hráčoch niet 4. rohu, takže sa mení hlavne to, ako vysoko/agresívne hrá útočník. Zmeň to na karte <strong className="text-slate-300">PK4</strong> vyššie.</p>
@@ -588,7 +587,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
           <UnitFormationBlock unitKey="pk3" ui={0} dial="pkStyle" label="PK3-1" layouts={PK3_LAYOUTS} dStartIndex={1} accent="#facc15" />
           <UnitFormationBlock unitKey="pk3" ui={1} dial="pkStyle" label="PK3-2" layouts={PK3_LAYOUTS} dStartIndex={1} accent="#eab308" />
         </div>
-        {SplitUnitSection("pk3", "Penalty Kill (3 on 5)", ["F1"], ["D1", "D2"], defense, undefined, { dial: "pkStyle", layouts: PK3_LAYOUTS, dStartIndex: 1 })}
+        {SplitUnitSection("pk3", "Penalty Kill (3 on 5)", ["F1"], ["D1", "D2"], defense, undefined, { dial: "pkStyle", layouts: PK3_LAYOUTS })}
       </>}
       {tab === "Overtime" && UnitSection("overtime", "Overtime (3 vs 3)", ["OT1", "OT2", "OT3"], () => players)}
 

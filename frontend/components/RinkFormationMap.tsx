@@ -1,17 +1,19 @@
 "use client";
 
-import { assignRoles, type FormationRole, type RoleAttrs } from "@/lib/sim/formation-layout";
+import type { FormationRole } from "@/lib/sim/formation-layout";
 
-type SlotPlayer = { id: number; name: string; sc: number; pa: number; st: number; isD: boolean };
+type SlotPlayer = { id: number; name: string; isD: boolean } | null;
 
 /** Offensive-zone rink diagram showing where each of the GM's chosen PP/PK
- *  personnel would line up for the selected formation — the role each player
- *  gets is picked by best attribute fit (see formation-layout.ts), the same
- *  idea the sim engine itself uses to shape a PP formation's shot mix. Purely
- *  illustrative: it mirrors what the engine tends to do, it doesn't feed it.
+ *  personnel lines up for the selected formation — role[i] is a FIXED seat
+ *  tied to personnel slot i (see formation-layout.ts's header comment), so
+ *  `players` must be index-aligned with `roles` (a `null` entry is an empty
+ *  seat), not a compacted list of just the filled ones. Purely illustrative:
+ *  it mirrors what the picker table shows, it doesn't feed the sim engine —
+ *  that reads the team/unit's chosen STYLE directly, not this per-seat map.
  *  `accent` tints the pucks/ring so PP1/PP2/PK1/PK2 read apart at a glance. */
 export default function RinkFormationMap({ roles, players, accent = "#2563eb" }: { roles: FormationRole[]; players: SlotPlayer[]; accent?: string }) {
-  const assigned = assignRoles<SlotPlayer & RoleAttrs>(roles, players as (SlotPlayer & RoleAttrs)[]);
+  const assigned = roles.map((role, i) => ({ role, player: players[i] ?? null }));
   const gid = `puckGrad-${accent.replace("#", "")}`;
   const iid = `iceGrad-${accent.replace("#", "")}`;
 
@@ -70,7 +72,7 @@ export default function RinkFormationMap({ roles, players, accent = "#2563eb" }:
           </g>
         ))}
       </svg>
-      {players.length === 0 && <p className="text-xs text-slate-500 text-center py-2">Pick your personnel above to see the formation.</p>}
+      {players.every((p) => !p) && <p className="text-xs text-slate-500 text-center py-2">Pick your personnel above to see the formation.</p>}
     </div>
   );
 }
