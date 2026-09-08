@@ -10,18 +10,15 @@ const COOKIE = "team_session";
 const SECRET = process.env.AUTH_SECRET ?? "profinhl-dev-secret-change-me";
 const SALT = process.env.AUTH_SALT ?? "profinhl-salt";
 
-// Caddy serves BOTH unhl.eu and www.unhl.eu on the same site block with no
-// canonical redirect between them (see the server's Caddyfile — DOMAIN="unhl.eu
-// www.unhl.eu"), so a visitor can land on either host at any time (a shared
-// link, a bookmark, a notification click). Without an explicit `domain` a
-// cookie is host-only — set while on unhl.eu, it's invisible on www.unhl.eu and
-// vice versa, so a GM could log in on one host and look "logged out" the
-// moment any link (e.g. a message notification) takes them to the other,
-// looping forever since each re-login only re-sets the cookie for whichever
-// host they happened to be on. A leading dot shares it across both. Only
-// applied in production — a literal `.unhl.eu` domain attribute is invalid
-// (and silently rejected by the browser) on localhost during dev.
-const COOKIE_DOMAIN = process.env.NODE_ENV === "production" ? ".unhl.eu" : undefined;
+// www.unhl.eu now 301-redirects to the bare apex at the Caddy level (see the
+// server's Caddyfile), so real traffic only ever lands on unhl.eu itself —
+// the cookie no longer needs to span two hosts. A plain host-only cookie (no
+// `domain` attribute) is the most standard, widely-compatible shape; a
+// leading-dot domain-scoped cookie was tried first (when both hosts were
+// served identically) but iOS Safari kept losing the session regardless, so
+// removing this extra variable is worth doing even without a confirmed
+// mechanism — it can only make the cookie's handling more conventional.
+const COOKIE_DOMAIN = undefined;
 
 export function hashPassword(password: string): string {
   return createHash("sha256").update(SALT + password).digest("hex");
