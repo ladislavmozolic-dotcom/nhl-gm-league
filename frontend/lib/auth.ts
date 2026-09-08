@@ -20,6 +20,26 @@ const SALT = process.env.AUTH_SALT ?? "profinhl-salt";
 // mechanism — it can only make the cookie's handling more conventional.
 const COOKIE_DOMAIN = undefined;
 
+// From 2026-09-06 19:44 to 2026-09-08 09:05 the cookie above was set with
+// `domain: ".unhl.eu"` (commit 515fc10) before being reverted to host-only
+// (commit 2a32598). Anyone who logged in during that ~37h window is still
+// carrying that old `.unhl.eu`-scoped cookie in their browser — same name,
+// still a validly-signed token (the secret didn't change), so it doesn't fail
+// verification, it just now coexists with the new host-only cookie. Two
+// same-named cookies for the same effective host is exactly the kind of thing
+// WebKit/iOS Safari handles inconsistently (this is the leading suspect for
+// the mobile logout-loop reports). Proactively expire the legacy one on every
+// opportunity we get write access to cookies, so it clears out of affected
+// browsers without needing a fresh login.
+async function clearLegacyDomainCookie(): Promise<void> {
+  try {
+    (await cookies()).delete({ name: COOKIE, path: "/", domain: ".unhl.eu" });
+  } catch {
+    // not in a Server Action / Route Handler (e.g. called during a Server
+    // Component render) — cookies are read-only here, nothing to clean up yet.
+  }
+}
+
 export function hashPassword(password: string): string {
   return createHash("sha256").update(SALT + password).digest("hex");
 }
@@ -42,6 +62,7 @@ export async function setTeamSession(teamId: number): Promise<void> {
     httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 30,
     secure: process.env.NODE_ENV === "production", domain: COOKIE_DOMAIN,
   });
+  await clearLegacyDomainCookie();
   // TEMP DEBUG — remove once the mobile logout-loop report is confirmed fixed.
   try {
     const h = await headers();
@@ -50,11 +71,14 @@ export async function setTeamSession(teamId: number): Promise<void> {
 }
 
 export async function getTeamSession(): Promise<number | null> {
+  await clearLegacyDomainCookie();
   const token = (await cookies()).get(COOKIE)?.value;
   // TEMP DEBUG — remove once the mobile logout-loop report is confirmed fixed.
   try {
     const h = await headers();
-    console.log(`[auth-debug] getTeamSession host=${h.get("host")} referer=${h.get("referer") ?? "?"} hasCookie=${!!token} cookieLen=${token?.length ?? 0} ua=${(h.get("user-agent") ?? "").slice(0, 80)}`);
+    const rawCookieHeader = h.get("cookie") ?? "";
+    const dupeCount = rawCookieHeader.split(";").filter((c) => c.trim().startsWith(`${COOKIE}=`)).length;
+    console.log(`[auth-debug] getTeamSession host=${h.get("host")} referer=${h.get("referer") ?? "?"} hasCookie=${!!token} cookieLen=${token?.length ?? 0} rawCookieMatches=${dupeCount} ua=${(h.get("user-agent") ?? "").slice(0, 80)}`);
   } catch { /* ignore */ }
   if (!token) return null;
   const [value, sig] = token.split(".");
