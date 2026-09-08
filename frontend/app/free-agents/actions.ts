@@ -770,11 +770,20 @@ async function pickAndSign(
     if (!best || ev.utility > best.utility) best = { offer: o, salary: o.salary, years: o.years, utility: ev.utility };
   }
   if (!best && allowSoleFloor && offers.length === 1 && soleEv) {
+    // A lone bidder below his floor still signs him — waiting on nobody-else's
+    // competing offer to justify a higher price makes no sense when there IS
+    // no competition — but he signs at the CLUB's own bid, not marked up to
+    // his full floor ask, as long as that bid isn't an unreasonable lowball
+    // (below half his floor). A bid that thin doesn't sign at all; he stays
+    // on the market for now (his own ask erodes round over round the longer
+    // he goes unsigned, via the usual demand-decay elsewhere).
     const o = offers[0];
-    const askSalary = soleEv.ask.floorSalary;
-    const info = await teamCapInfo(o.teamId);
-    const ceiling = capCeilingForPhase(cap.upper, clockPhase) + info.ltir;
-    if (info.committed + askSalary <= ceiling) best = { offer: o, salary: askSalary, years: Math.min(Math.max(o.years, soleEv.ask.minYears), soleEv.ask.maxYears), utility: 0 };
+    const floorSalary = soleEv.ask.floorSalary;
+    if (o.salary >= floorSalary * 0.5) {
+      const info = await teamCapInfo(o.teamId);
+      const ceiling = capCeilingForPhase(cap.upper, clockPhase) + info.ltir;
+      if (info.committed + o.salary <= ceiling) best = { offer: o, salary: o.salary, years: Math.min(Math.max(o.years, soleEv.ask.minYears), soleEv.ask.maxYears), utility: 0 };
+    }
   }
   if (!best) return null;
   const code = await signFaOffer(playerId, player, best.offer, best.salary, best.years);
