@@ -13,3 +13,12 @@ export const ROSTER_LIMITS = {
   ahlMax: 20, // active AHL roster (18 skaters + 2 goalies); extra bodies go to Scratched
   orgMax: 55, orgMaxGoalies: 8, // NHL + AHL combined
 };
+
+// Flat cap-hit ceiling for a waiver placement (lib/waivers-server.ts) — a
+// simple stand-in for real NHL waiver-exemption rules until something more
+// nuanced is built. A player above this is too valuable to realistically
+// clear waivers to the farm, so placeOnWaivers blocks it outright server-side
+// — and the roster-mover UI (RosterMover.tsx) reads this SAME constant to
+// disable the Farm/Waivers button for him instead of offering an action
+// that's always going to fail.
+export const WAIVER_CAP_HIT_LIMIT = 1_500_000;

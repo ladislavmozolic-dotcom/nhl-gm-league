@@ -11,6 +11,7 @@ import { roundForDate, daysBetween } from "./calendar";
 import { computeStandings } from "./sim/standings";
 import { cleanName } from "./playerName";
 import { CURRENT_SEASON_START } from "./finance";
+import { WAIVER_CAP_HIT_LIMIT } from "./roster-rules";
 import type { Phase } from "./calendar";
 
 export type WaiverRow = {
@@ -38,13 +39,6 @@ export async function activeWaivers(): Promise<WaiverRow[]> {
     };
   });
 }
-
-// Flat cap-hit ceiling for a waiver placement — a simple stand-in for real NHL
-// waiver-exemption rules (age/games-played based) until something more nuanced is
-// built. A player above this is too valuable to realistically clear waivers to the
-// farm this way, so the placement is blocked outright rather than let it happen and
-// almost certainly get claimed.
-const WAIVER_CAP_HIT_LIMIT = 1_500_000;
 
 /** Place a player on waivers. NMC blocks it; NTC is allowed. */
 export async function placeOnWaivers(playerId: number, actorTeamId: number): Promise<{ ok: boolean; error?: string }> {

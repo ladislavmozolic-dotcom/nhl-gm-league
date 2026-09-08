@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import PlayerLink from "@/components/PlayerLink";
 import Link from "next/link";
-import { ROSTER_LIMITS, isNhlSide, type MoveRow, type RosterSide } from "@/lib/roster-rules";
+import { ROSTER_LIMITS, WAIVER_CAP_HIT_LIMIT, isNhlSide, type MoveRow, type RosterSide } from "@/lib/roster-rules";
 
 type Player = {
   id: number; name: string; position: string; overall: number;
@@ -142,6 +142,10 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
   const Row = ({ p }: { p: Player }) => {
     const oneWay = p.contractType === "ONE_WAY";
     const ahlOnly = isAhlOnly(p);
+    // mirrors placeOnWaivers' own server-side gate (lib/waivers-server.ts) — a
+    // player this expensive would always be rejected on click, so the button
+    // is disabled here instead of offering an action that can't succeed.
+    const tooExpensive = p.capHit > WAIVER_CAP_HIT_LIMIT;
     return (
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-slate-800/60 text-sm hover:bg-slate-800/30">
         <span className={`shrink-0 w-9 text-center tabular-nums font-bold text-sm px-1 py-0.5 rounded border ${ovColor(p.overall)}`}>{p.overall}</span>
@@ -168,8 +172,8 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
           {p.side === "pro" && <>
             <MoveBtn p={p} to="pro-scratched" label="Scratch" />
             {oneWay && !ahlOnly
-              ? (!p.onWaivers && <button onClick={() => waiver(p)} disabled={pending}
-                  title="One-way contracts must clear waivers before they can be sent to the farm"
+              ? (!p.onWaivers && <button onClick={() => waiver(p)} disabled={pending || tooExpensive}
+                  title={tooExpensive ? `Too valuable to clear waivers (over $${(WAIVER_CAP_HIT_LIMIT / 1e6).toFixed(1)}M cap hit) — he can't be sent to the farm` : "One-way contracts must clear waivers before they can be sent to the farm"}
                   className="text-[11px] px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-30 whitespace-nowrap">Farm/Waivers</button>)
               : <MoveBtn p={p} to="farm" label="↓ Farm" />}
           </>}
@@ -177,8 +181,8 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
           {p.side === "pro-scratched" && <>
             <MoveBtn p={p} to="pro" label="Dress" />
             {oneWay && !ahlOnly
-              ? (!p.onWaivers && <button onClick={() => waiver(p)} disabled={pending}
-                  title="One-way contracts must clear waivers before they can be sent to the farm"
+              ? (!p.onWaivers && <button onClick={() => waiver(p)} disabled={pending || tooExpensive}
+                  title={tooExpensive ? `Too valuable to clear waivers (over $${(WAIVER_CAP_HIT_LIMIT / 1e6).toFixed(1)}M cap hit) — he can't be sent to the farm` : "One-way contracts must clear waivers before they can be sent to the farm"}
                   className="text-[11px] px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-30 whitespace-nowrap">Farm/Waivers</button>)
               : <MoveBtn p={p} to="farm" label="↓ Farm" />}
           </>}
@@ -230,7 +234,7 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
           <Link href={`/teams/${teamSlug}/lines`} className="text-slate-400 hover:text-blue-400">Lines →</Link>
           <Link href={`/teams/${teamSlug}/roster/edit`} className="text-slate-400 hover:text-blue-400">Numbers &amp; captains →</Link>
         </div>
-        <p className="text-xs text-slate-500 mt-1">Choose which <b>20 dress</b> (NHL) vs the healthy scratches, and manage the farm. One-way contracts can&apos;t be sent down directly — put them on <b>Farm/Waivers</b> instead; AHL-only / $100k minor-league deals can&apos;t be called up. <b>NHL Scratched</b> still count against the cap; <b>Farm Scratched</b> dress nowhere. A <b>$100k</b> minor-league player can be <b>Released</b> from Farm Scratched straight to the UFA market.</p>
+        <p className="text-xs text-slate-500 mt-1">Choose which <b>20 dress</b> (NHL) vs the healthy scratches, and manage the farm. One-way contracts can&apos;t be sent down directly — put them on <b>Farm/Waivers</b> instead (a player over <b>${(WAIVER_CAP_HIT_LIMIT / 1e6).toFixed(1)}M</b> cap hit is too valuable to clear waivers, so that button is disabled for him); AHL-only / $100k minor-league deals can&apos;t be called up. <b>NHL Scratched</b> still count against the cap; <b>Farm Scratched</b> dress nowhere. A <b>$100k</b> minor-league player can be <b>Released</b> from Farm Scratched straight to the UFA market.</p>
       </div>
 
       {blockers.length > 0 && (
