@@ -43,10 +43,36 @@ export async function checkFrenzyRoundCloseIfDue() {
   return { closed: true as const, finalClose: false as const, round };
 }
 
+/** Checked on every scheduler tick, same as checkFrenzyRoundCloseIfDue above —
+ *  a player who got at least one offer when a round closed is on his OWN
+ *  real-time FRENZY_DECISION_DAYS-day clock (Player.faDecisionAt, set by
+ *  processRoundEnd), independent of the weekly round timer entirely. This
+ *  needs the same frequent, real-timestamp check so the Agent settles him
+ *  close to the actual deadline instead of drifting to the next daily tick.
+ *  Gated on faOpen: resolveInSeasonWindows (the separate regular-season/
+ *  playoffs UFA market) reuses these exact same Player fields for its own
+ *  7-day-collect/3-day-match cycle — without this gate, a player mid-way
+ *  through THAT window would also get swept up here on the very next tick
+ *  and double-resolved. Frenzy force-open and the in-season market are
+ *  mutually exclusive in normal operation (faOpen is cleared before regular
+ *  season begins), so this keeps the two mechanisms from ever colliding. */
+export async function checkFrenzyDecisionsIfDue() {
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { faOpen: true } });
+  if (!cfg?.faOpen) return { signed: 0, unsigned: 0 };
+  const { resolveFrenzyDecisions } = await import("../../app/free-agents/actions");
+  const r = await resolveFrenzyDecisions(new Date());
+  if (r.signed || r.unsigned) console.log(`[auto-frenzy] decision windows resolved — ${r.signed} signed, ${r.unsigned} stayed unsigned`);
+  return r;
+}
+
 /** Off-season only: advance the league clock one day and run any frenzy-round
- *  transition it crosses (counters/shortlist on a weekly boundary; sign at the
- *  window close). The regular season is driven by playNextSimDay, so this is a
- *  no-op during regular / playoffs. */
+ *  transition it crosses (starts each bid player's individual decision window
+ *  at a weekly boundary) and resolve any decision window that's since
+ *  elapsed. Calendar-driven, once-daily — coarser than the force-opened
+ *  path's 60-second real-time check (checkFrenzy*IfDue, above), which is the
+ *  active path today, but still correct on its own once-a-day cadence. The
+ *  regular season is driven by playNextSimDay, so this is a no-op during
+ *  regular / playoffs. */
 export async function advanceFrenzyDay() {
   const cur = await getLeagueDate();
   const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { phaseOverride: true } });
@@ -54,8 +80,13 @@ export async function advanceFrenzyDay() {
   if (phCur === "regular" || phCur === "playoffs") return { advanced: false as const };
   const next = addDays(cur, 1);
   const phNext = await computePhase(next, cfg?.phaseOverride);
-  const { resolveFrenzy, processRoundEnd } = await import("../../app/free-agents/actions");
+  const { resolveFrenzy, processRoundEnd, resolveFrenzyDecisions } = await import("../../app/free-agents/actions");
   let signed = 0, roundEnded = 0, osSigned = 0;
+  // individual decision windows (set by a PRIOR processRoundEnd call) resolve
+  // on this same once-daily calendar tick — coarser than the force-opened
+  // path's 60-second check, but still correct: a window that elapsed since
+  // yesterday's tick gets picked up today.
+  signed += (await resolveFrenzyDecisions(new Date())).signed;
   // offer sheets are decided by the commissioner-set day — resolve them once, as
   // the clock crosses that day (or leaves the frenzy earlier).
   const { loadSettings } = await import("../sim/settings");

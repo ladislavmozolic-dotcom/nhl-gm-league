@@ -41,9 +41,7 @@ export default function FrenzyBar({ frenzyOpen, frenzyDay, frenzyRound, phaseLab
     setMsg(null);
     const r = await processRoundEndAction();
     if (!r.ok) { setMsg({ t: "err", s: r.error }); return; }
-    setMsg({ t: "ok", s: r.round === 1
-      ? `Round 1 closed — ${r.countered} counter-offer${r.countered === 1 ? "" : "s"} sent, ${r.eliminated} lowball${r.eliminated === 1 ? "" : "s"} dropped.`
-      : `Round 2 closed — ${r.shortlisted} offer${r.shortlisted === 1 ? "" : "s"} shortlisted, ${r.eliminated} club${r.eliminated === 1 ? "" : "s"} told he's moving on.` });
+    setMsg({ t: "ok", s: `Round ${r.round} closed — ${r.decided} player${r.decided === 1 ? "" : "s"} now deciding among their suitors (3 days), ${r.signed} signed instantly, ${r.eliminated} lowball offer${r.eliminated === 1 ? "" : "s"} dropped.` });
   });
 
   return (

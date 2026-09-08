@@ -204,9 +204,13 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
                       <InfoTip text="Based on the player's morale (MO). An unhappy player holds out for more money than his baseline ask; a happy one signs for a little less. A bigger star swings this harder." />
                     </p>
                   )}
-                  {i.existing?.status === "COUNTERED" ? (
-                    <p className="mt-2 text-slate-200">He countered around <b className="text-amber-300">{M((i.existing.counterSalary ?? 0) * 0.97)}–{M((i.existing.counterSalary ?? 0) * 1.06)}</b> <span className="text-slate-500">× {i.existing.counterYears}yr</span>
+                  {i.existing?.status === "COUNTERED" && i.existing.counterSalary != null ? (
+                    <p className="mt-2 text-slate-200">He countered around <b className="text-amber-300">{M(i.existing.counterSalary * 0.97)}–{M(i.existing.counterSalary * 1.06)}</b> <span className="text-slate-500">× {i.existing.counterYears}yr</span>
                       <InfoTip text="His counter after your last offer — a rough range, his agent won't name an exact figure. Land in it (or above) and he signs." />
+                    </p>
+                  ) : i.existing?.status === "COUNTERED" ? (
+                    <p className="mt-2 text-slate-200 text-amber-300">He&apos;s weighing his suitors — no exact number given, check your messages for where you stand.
+                      <InfoTip text="Blind bidding: his agent won't name a figure when there's real competition or a clear leader. Raise if you want to improve your odds." />
                     </p>
                   ) : (
                     <p className="mt-2 text-slate-200">

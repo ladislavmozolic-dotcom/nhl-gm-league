@@ -34,7 +34,11 @@ const FREE = ["NHL", "AHL", "RETIRED", "PROSPECT", "RELEASED", "NONROSTER"]; // 
 const IN_SEASON_COLLECT_DAYS = 7;
 const IN_SEASON_MATCH_DAYS = 3;
 const ACTIVE = ["PENDING", "COUNTERED", "SHORTLISTED"]; // an offer still in contention
-const SHORTLIST_SIZE = 3; // how many suitors a player keeps into the final week
+// A Frenzy round no longer cascades a bid player into the NEXT weekly round —
+// the moment he gets his first offer, his suitors get this many real days to
+// submit their best before the Agent judges the field and signs him. Only a
+// player who got NO offer at all this round remains open for a future round.
+const FRENZY_DECISION_DAYS = 3;
 
 let faPoolTeamIdCache: number | null | undefined;
 /** The "Free Agents" holding club — the fixed identity every player's "agent" DM
@@ -484,16 +488,21 @@ export async function submitOfferAction(
   if (existing && existing.status === "REJECTED") {
     return { ok: false as const, error: "The player has moved on — he's no longer negotiating with your club." };
   }
-  // round-lock (July Frenzy only): only clubs already in the negotiation (an offer
-  // placed in round 1) may continue; nobody new joins from round 2 onward. Keyed off
-  // the game PHASE, not win.immediate — the commissioner's faEarlyAccess head start
-  // (see above) also sets win.immediate=true to get past the "market closed" wall,
-  // but it's still round-based Frenzy negotiation underneath, so one offer per round
-  // must still hold there too. Only the regular-season / playoffs immediate market is
-  // genuinely round-less (continuous re-negotiation is the intended behavior there).
+  // round-lock (July Frenzy only): once a player has AT LEAST ONE standing
+  // offer, he's in his own individual FRENZY_DECISION_DAYS-day window
+  // (Player.faDecisionAt — see processRoundEnd) and the field is closed to
+  // new entrants, though an existing bidder can still raise. A player who's
+  // never had any offer stays open to a fresh bid in ANY round — he only
+  // ever carries forward because nobody's bid on him yet, so there's no
+  // negotiation in progress to protect. Keyed off the game PHASE, not
+  // win.immediate — the commissioner's faEarlyAccess head start (see above)
+  // also sets win.immediate=true to get past the "market closed" wall, but
+  // it's still round-based Frenzy negotiation underneath. Only the regular-
+  // season / playoffs immediate market is genuinely round-less (continuous
+  // re-negotiation is the intended behavior there).
   if (clock.phase !== "regular" && clock.phase !== "playoffs") {
-    if (!existing && clock.frenzyRound > 1) {
-      return { ok: false as const, error: "Bidding on this player closed after round 1 — only clubs already negotiating can raise their offer." };
+    if (!existing && player.faDecisionAt != null) {
+      return { ok: false as const, error: "He's already deciding among his current suitors — bidding is closed to new clubs." };
     }
     if (existing && existing.round === clock.frenzyRound && existing.status !== "REJECTED") {
       return { ok: false as const, error: "You've already made your offer this round — wait for the next round to change it." };
@@ -818,13 +827,17 @@ export async function resolveInSeasonWindows(asOf: Date): Promise<{ signed: numb
   return { signed, countered, details };
 }
 
-/** End-of-round processing for the multi-week frenzy. Called when the calendar
- *  crosses a weekly round boundary (or by the admin button).
- *  - after round 1: the player COUNTERS each standing offer (what he wants from
- *    that club at round-2 value) and drops hopeless lowballs.
- *  - after round 2: he SHORTLISTS his best suitors and tells the rest he's moving on.
- *  Round 3 ends by `resolveFrenzy` signing the best shortlisted offer. */
-export async function processRoundEnd(endedRound: number): Promise<{ countered: number; eliminated: number; shortlisted: number; signed: number }> {
+/** End-of-round processing for the force-opened frenzy. Called when a round's
+ *  real-time clock elapses (or by the admin button). A player who gets AT
+ *  LEAST ONE offer this round does NOT cascade into the next weekly round —
+ *  hopeless/outclassed offers are cut immediately, and every surviving offer
+ *  starts a shared FRENZY_DECISION_DAYS-day window (Player.faDecisionAt),
+ *  judged individually by resolveFrenzyDecisions once it elapses. Only a
+ *  player who got NO offer at all this round stays open and carries into the
+ *  next round (see submitOfferAction's round-lock: a fresh club may bid on an
+ *  untouched player any round; once he has a faDecisionAt, new entrants are
+ *  shut out — existing bidders can still raise). */
+export async function processRoundEnd(endedRound: number): Promise<{ decided: number; eliminated: number; signed: number }> {
   const pool = await loadMarketPool();
   const cmap = await teamContentionMap();
   const faId = await faPoolTeamId();
@@ -832,28 +845,26 @@ export async function processRoundEnd(endedRound: number): Promise<{ countered: 
     await prisma.dmMessage.create({ data: { fromTeamId: faId, toTeamId, body, tradeUrl: faFocusUrl(playerId, isGoalie) } }).catch(() => {});
   };
   const nextRound = endedRound + 1;
-  const offers = await prisma.faOffer.findMany({ where: { status: { in: ACTIVE } } });
+  // players already mid-way through a PREVIOUS round's individual decision
+  // window are on their own clock — a later round's close must never re-touch
+  // their still-active offers.
+  const inDecision = await prisma.player.findMany({ where: { faDecisionAt: { not: null } }, select: { id: true } });
+  const offers = await prisma.faOffer.findMany({ where: { status: { in: ACTIVE }, playerId: { notIn: inDecision.map((p) => p.id) } } });
   const byPlayer = new Map<number, typeof offers>();
   for (const o of offers) { const a = byPlayer.get(o.playerId) ?? []; a.push(o); byPlayer.set(o.playerId, a); }
 
-  let countered = 0, eliminated = 0, shortlisted = 0, signedNow = 0;
+  let decided = 0, eliminated = 0, signedNow = 0;
   for (const [playerId, list] of byPlayer) {
     const player = await prisma.player.findUnique({ where: { id: playerId }, select: { name: true, rosterType: true, age: true, isGoalie: true } });
     if (!player || (player.rosterType && FREE.includes(player.rosterType))) continue;
     const name = player.name;
 
-    // if a standing offer already meets his ask at THIS round, he signs now
-    // (real 1st- / 2nd-round signings) — no waiting for the final week. A SOLE
-    // bidder always gets his man here too (allowSoleFloor=true, at his floor if
-    // the bid undercuts it): round-lock already means nobody new can join once
-    // this round closes, so there's no reason to string an uncontested player
-    // along through more rounds hoping for competition that can't arrive.
-    // BUT an instant sign only fires when the winning offer is clearly ahead —
-    // if 2+ standing offers are genuinely close (same "outclassed" 0.75x band
-    // used below to cut a laggard), that's a real bidding situation, not a
-    // snap decision: skip straight to the counter phase for everyone instead
-    // of letting one club's slightly-better fit end it before the other even
-    // gets a chance to raise.
+    // if a standing offer already meets his ask at THIS round, he signs now —
+    // no waiting on a decision window for something that's already a clear
+    // yes. A sole/dominant bidder (liveCount<2) gets allowSoleFloor=true (at
+    // his floor if the bid undercuts it); 2+ genuinely live offers skip
+    // straight to the shared decision window below instead of an instant
+    // utility tiebreak deciding real competition on the spot.
     const liveSalary = Math.max(...list.map((o) => o.salary));
     const liveCount = list.filter((o) => o.salary >= liveSalary * 0.75).length;
     const signDetail = liveCount >= 2 ? null : await pickAndSign(playerId, player, list, endedRound, pool, cmap, true);
@@ -870,92 +881,98 @@ export async function processRoundEnd(endedRound: number): Promise<{ countered: 
       continue;
     }
 
-    // value every offer at the UPCOMING round
+    // value every offer, drop the hopeless lowballs, and start a shared
+    // FRENZY_DECISION_DAYS-day window for everyone who survives instead of
+    // waiting for a future round — resolveFrenzyDecisions judges the field
+    // the moment it elapses.
     const scored = [] as { o: (typeof list)[number]; ev: Awaited<ReturnType<typeof evaluateTeamOffer>> }[];
     for (const o of list) scored.push({ o, ev: await evaluateTeamOffer(playerId, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, nextRound, { clause: o.grantClause, breadth: o.mNtcBreadth }) });
 
-    if (endedRound === 1) {
-      // counter each team; drop the hopeless lowballs. Wording differs for a lone
-      // suitor (no "other clubs" framing — he's just not at that price yet) vs
-      // genuine competition (bidding is blind, raise to stay in it).
-      const soleOffer = list.length === 1;
-      // A club sitting well behind the actual leading bid doesn't get invited to a
-      // "raise to stay in it" match round either — he's not stringing along an
-      // also-ran, he's just going with whoever's closest. Below-own-floor (already
-      // hopeless) OR clearly behind the best standing offer both eliminate.
-      const bestSalary = Math.max(...list.map((o) => o.salary));
-      // A genuine close race (2+ offers within 10% of the leader) still gets the
-      // numeric leverage-driven counter below — real competition, handled as
-      // before. Otherwise there's one clear leader: he gets an informational
-      // "you're ahead" note (no forced raise, no number), and every trailing-
-      // but-not-outclassed offer gets told he has a better offer WITHOUT a
-      // dollar hint — "blind" the way an actual counter should stay, instead of
-      // handing every bidder the exact target to clear.
-      const closeRace = !soleOffer && list.filter((x) => x.salary >= bestSalary * 0.90).length >= 2;
-      for (const { o, ev } of scored) {
-        if (!ev) continue;
-        const teamCode = (await prisma.team.findUnique({ where: { id: o.teamId }, select: { code: true } }))?.code ?? "?";
-        const outclassed = !soleOffer && o.salary < bestSalary * 0.75;
-        if (o.salary < ev.ask.floorSalary * 0.6 || outclassed) {
-          await prisma.faOffer.update({ where: { id: o.id }, data: { status: "REJECTED" } });
-          const reason = outclassed ? "another club's offer was well ahead of yours" : "it wasn't close to his value";
-          await prisma.transaction.create({ data: { type: "FA_NEGOTIATION", message: `${name} passed on ${teamCode}'s offer — ${outclassed ? "another club was well ahead" : "not close to his value"}.` } });
-          await agentDm(o.teamId, `❌ ${name}'s camp passed on your offer — ${reason}.`, playerId, player.isGoalie);
-          eliminated++;
-        } else if (!soleOffer && !closeRace) {
-          const isLeader = o.salary === bestSalary;
-          await prisma.faOffer.update({ where: { id: o.id }, data: { status: "COUNTERED", counterSalary: null, counterYears: null } });
-          countered++;
-          const msg = isLeader
-            ? `🥇 Your offer on ${name} is currently the best on the table. You can wait for his decision, or raise it if you're worried another club might try to top you.`
-            : `📩 Another club has a better offer on ${name} right now. You have room to improve yours if you want to stay in it.`;
-          await agentDm(o.teamId, msg, playerId, player.isGoalie);
-        } else {
-          const want = competitiveAsk(ev.ask.salary, o.salary, list);
-          await prisma.faOffer.update({ where: { id: o.id }, data: { status: "COUNTERED", counterSalary: want, counterYears: ev.ask.years } });
-          countered++;
-          const msg = soleOffer
-            ? `📩 ${name} isn't ready to sign at that price yet — he wants about $${(want / 1e6).toFixed(2)}M × ${ev.ask.years}yr. Raise your offer to close the deal.`
-            : `📩 ${name} is weighing multiple offers. Put in your BEST offer: he wants about $${(want / 1e6).toFixed(2)}M × ${ev.ask.years}yr (other clubs are also in — bidding is blind). Raise to stay in it.`;
-          await agentDm(o.teamId, msg, playerId, player.isGoalie);
-        }
-      }
-    } else if (endedRound === 2) {
-      // a club "reacted" if it raised its offer in round 2 (a raise re-enters as
-      // PENDING / round≥2); one left untouched stays COUNTERED from round 1.
-      const reacted = (o: (typeof list)[number]) => o.status === "PENDING" || o.round >= 2;
-      const anyReacted = list.some(reacted);
-      // if ANYONE engaged, the clubs that ignored his counter are OUT; if nobody
-      // engaged, they all carry into round 3 (he has no one better to turn to).
-      const alive = anyReacted ? scored.filter((s) => reacted(s.o)) : scored;
-      if (anyReacted) {
-        for (const { o } of scored.filter((s) => !reacted(s.o))) {
-          const teamCode = (await prisma.team.findUnique({ where: { id: o.teamId }, select: { code: true } }))?.code ?? "?";
-          await prisma.faOffer.update({ where: { id: o.id }, data: { status: "REJECTED" } });
-          await prisma.transaction.create({ data: { type: "FA_NEGOTIATION", message: `${name} moved on — ${teamCode} didn't respond to his counter.` } });
-          await agentDm(o.teamId, `🚫 ${name} moved on — you didn't respond to his counter in time.`, playerId, player.isGoalie);
-          eliminated++;
-        }
-      }
-      // shortlist the best of the clubs still in
-      const ranked = alive.filter((s) => s.ev).sort((a, b) => (b.ev!.utility) - (a.ev!.utility));
-      const keep = new Set(ranked.slice(0, SHORTLIST_SIZE).map((s) => s.o.id));
-      for (const { o } of alive) {
-        if (keep.has(o.id)) {
-          await prisma.faOffer.update({ where: { id: o.id }, data: { status: "SHORTLISTED" } });
-          await agentDm(o.teamId, `📋 ${name} kept you on his shortlist for the final week. Raise your offer if you want to improve your odds.`, playerId, player.isGoalie);
-          shortlisted++;
-        } else {
-          const teamCode = (await prisma.team.findUnique({ where: { id: o.teamId }, select: { code: true } }))?.code ?? "?";
-          await prisma.faOffer.update({ where: { id: o.id }, data: { status: "REJECTED" } });
-          await prisma.transaction.create({ data: { type: "FA_NEGOTIATION", message: `${name} is continuing with other clubs — ${teamCode} is out.` } });
-          await agentDm(o.teamId, `🚫 ${name} is continuing with other clubs — you're out.`, playerId, player.isGoalie);
-          eliminated++;
-        }
+    const soleOffer = list.length === 1;
+    const bestSalary = Math.max(...list.map((o) => o.salary));
+    const closeRace = !soleOffer && list.filter((x) => x.salary >= bestSalary * 0.90).length >= 2;
+    let survivors = 0;
+    for (const { o, ev } of scored) {
+      if (!ev) continue;
+      const teamCode = (await prisma.team.findUnique({ where: { id: o.teamId }, select: { code: true } }))?.code ?? "?";
+      const outclassed = !soleOffer && o.salary < bestSalary * 0.75;
+      if (o.salary < ev.ask.floorSalary * 0.6 || outclassed) {
+        await prisma.faOffer.update({ where: { id: o.id }, data: { status: "REJECTED" } });
+        const reason = outclassed ? "another club's offer was well ahead of yours" : "it wasn't close to his value";
+        await prisma.transaction.create({ data: { type: "FA_NEGOTIATION", message: `${name} passed on ${teamCode}'s offer — ${outclassed ? "another club was well ahead" : "not close to his value"}.` } });
+        await agentDm(o.teamId, `❌ ${name}'s camp passed on your offer — ${reason}.`, playerId, player.isGoalie);
+        eliminated++;
+      } else if (!soleOffer && !closeRace) {
+        const isLeader = o.salary === bestSalary;
+        await prisma.faOffer.update({ where: { id: o.id }, data: { status: "COUNTERED", counterSalary: null, counterYears: null } });
+        survivors++;
+        const msg = isLeader
+          ? `🥇 Your offer on ${name} is currently the best on the table. You have ${FRENZY_DECISION_DAYS} days — raise it if you're worried another club might try to top you.`
+          : `📩 Another club has a better offer on ${name} right now. You have ${FRENZY_DECISION_DAYS} days to improve yours if you want to stay in it.`;
+        await agentDm(o.teamId, msg, playerId, player.isGoalie);
+      } else {
+        const want = competitiveAsk(ev.ask.salary, o.salary, list);
+        await prisma.faOffer.update({ where: { id: o.id }, data: { status: "COUNTERED", counterSalary: want, counterYears: ev.ask.years } });
+        survivors++;
+        const msg = soleOffer
+          ? `📩 ${name} isn't ready to sign at that price yet — he wants about $${(want / 1e6).toFixed(2)}M × ${ev.ask.years}yr. You have ${FRENZY_DECISION_DAYS} days to raise your offer.`
+          : `📩 ${name} is weighing multiple offers. Put in your BEST offer within ${FRENZY_DECISION_DAYS} days: he wants about $${(want / 1e6).toFixed(2)}M × ${ev.ask.years}yr (other clubs are also in — bidding is blind).`;
+        await agentDm(o.teamId, msg, playerId, player.isGoalie);
       }
     }
+    if (survivors > 0) {
+      await prisma.player.update({ where: { id: playerId }, data: { faDecisionAt: new Date(Date.now() + FRENZY_DECISION_DAYS * 86_400_000), faCountered: true } });
+      await prisma.transaction.create({ data: { type: "FA_NEGOTIATION", message: `${name} is deciding between his suitors — the Agent settles it in ${FRENZY_DECISION_DAYS} days.` } });
+      decided++;
+    }
   }
-  return { countered, eliminated, shortlisted, signed: signedNow };
+  return { decided, eliminated, signed: signedNow };
+}
+
+/** Resolves every player whose individual FRENZY_DECISION_DAYS-day window
+ *  (started by processRoundEnd, above) has elapsed. Checked on the same
+ *  real-time tick as checkFrenzyRoundCloseIfDue (lib/sim/auto.ts) — NOT the
+ *  once-daily calendar cron — so it fires close to the actual deadline
+ *  instead of drifting to the next day's sim. Signs the best standing offer
+ *  (a lone survivor falls back to his floor, matching resolveFrenzy's own
+ *  final-close logic); every other bidder is notified either way. */
+export async function resolveFrenzyDecisions(asOf: Date = new Date()): Promise<{ signed: number; unsigned: number }> {
+  const due = await prisma.player.findMany({
+    where: { faDecisionAt: { not: null, lte: asOf }, rosterType: { notIn: FREE } },
+    select: { id: true, name: true, age: true, isGoalie: true },
+  });
+  if (due.length === 0) return { signed: 0, unsigned: 0 };
+  const pool = await loadMarketPool();
+  const cmap = await teamContentionMap();
+  const faId = await faPoolTeamId();
+  const agentDm = async (toTeamId: number, body: string, playerId: number, isGoalie: boolean) => {
+    await prisma.dmMessage.create({ data: { fromTeamId: faId, toTeamId, body, tradeUrl: faFocusUrl(playerId, isGoalie) } }).catch(() => {});
+  };
+  const nice = (s: string) => s.replace(/''[A-Za-z]''|\s*\([^)]*\)/g, "").trim();
+  let signed = 0, unsigned = 0;
+  for (const p of due) {
+    const offers = await prisma.faOffer.findMany({ where: { playerId: p.id, status: { in: ACTIVE } } });
+    const nm = nice(p.name);
+    if (offers.length === 0) { await prisma.player.update({ where: { id: p.id }, data: { faDecisionAt: null, faCountered: false } }); continue; }
+    const bidders = [...new Set(offers.map((o) => o.teamId))];
+    const detail = await pickAndSign(p.id, { name: p.name, age: p.age }, offers, 3, pool, cmap, true);
+    if (detail) {
+      signed++;
+      const after = await prisma.player.findUnique({ where: { id: p.id }, select: { teamId: true } });
+      const winner = after?.teamId ?? null;
+      const winnerTeam = winner != null ? await prisma.team.findUnique({ where: { id: winner }, select: { code: true } }) : null;
+      for (const tid of bidders) {
+        if (tid === winner) await agentDm(tid, `✅ ${nm} has SIGNED with you!`, p.id, p.isGoalie);
+        else await agentDm(tid, `🚫 ${nm} signed with ${winnerTeam?.code ?? "another club"} — your offer is rejected.`, p.id, p.isGoalie);
+      }
+    } else {
+      unsigned++;
+      await prisma.faOffer.updateMany({ where: { playerId: p.id, status: { in: ACTIVE } }, data: { status: "REJECTED" } });
+      for (const tid of bidders) await agentDm(tid, `${nm} didn't sign anyone — no offer met his ask. He stays on the market.`, p.id, p.isGoalie);
+    }
+    await prisma.player.update({ where: { id: p.id }, data: { faDecisionAt: null, faCountered: false } });
+  }
+  return { signed, unsigned };
 }
 
 /** Compute + apply a player's Entry-Level Contract from the auto-formula
