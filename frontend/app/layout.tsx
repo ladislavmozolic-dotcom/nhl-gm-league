@@ -12,6 +12,7 @@ import { t as translate } from "@/lib/i18n";
 import ScoreTracker from "@/components/ScoreTracker";
 import MessageNotifier from "@/components/MessageNotifier";
 import SessionResume from "@/components/SessionResume";
+import PullToRefresh from "@/components/PullToRefresh";
 import TradeSuccessOverlay from "@/components/TradeSuccessOverlay";
 import VisitBeacon from "@/components/VisitBeacon";
 import SiteBanner from "@/components/SiteBanner";
@@ -128,6 +129,7 @@ export default async function RootLayout({
         <LangProvider lang={lang}>
           <ScoreTracker />
           <VisitBeacon />
+          <PullToRefresh />
           {gm && <MessageNotifier initialUnread={gm.unreadDm} />}
           {gm && <TradeSuccessOverlay />}
           {!gm && <SessionResume />}
