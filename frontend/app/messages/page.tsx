@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/ui";
 import { getTeamSession } from "@/lib/auth";
 import { listConversations } from "./actions";
 import Messenger from "@/components/Messenger";
+import SessionResume from "@/components/SessionResume";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,11 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
   if (!me) {
     return (
       <div className="space-y-6 py-2">
+        {/* Messages is a soft (client-side) navigation from every other page, so the root
+            layout — where SessionResume normally lives — doesn't re-render to notice the
+            session died; mounting it directly here means a GM whose cookie just dropped
+            gets silently signed back in within a moment instead of staring at this wall. */}
+        <SessionResume />
         <PageHeader title="Messages" subtitle="Direct messages between GMs" />
         <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-10 text-center text-slate-400">
           Sign in as a GM to use the message board. <Link href="/login" className="text-blue-400 hover:underline">Sign in →</Link>
