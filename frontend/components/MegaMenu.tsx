@@ -6,6 +6,7 @@ import { DEFAULT_MENU, type MenuItem } from "@/lib/menu-config";
 import { t, type Lang } from "@/lib/i18n";
 import LangSwitcher from "@/components/LangSwitcher";
 import { REMEMBER_TOKEN_KEY } from "@/lib/session-resume-shared";
+import InstallAppButton from "@/components/InstallAppButton";
 
 // A deliberate logout must drop the localStorage remember-token too, or SessionResume
 // (mounted on the very next page, once it sees no GM) would silently log the GM right
@@ -335,6 +336,8 @@ export default function MegaMenu({ gm, items, lang = "en", light = false, hideFo
               </Link>
             )}
 
+            <InstallAppButton lang={lang} className={`px-2.5 py-1.5 text-[13px] font-semibold rounded-md whitespace-nowrap ${linkIdle}`} />
+
             {/* GM login / signed-in profile (with logout) */}
             <div className="relative ml-1" onMouseEnter={() => setActiveMenu("__gm")} onMouseLeave={() => setActiveMenu(null)}>
               {gm ? (
@@ -429,6 +432,7 @@ export default function MegaMenu({ gm, items, lang = "en", light = false, hideFo
                 {(gm.unreadDm ?? 0) > 0 && <span className="min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm.unreadDm}</span>}
               </Link>
             )}
+            <InstallAppButton lang={lang} className={`w-full flex items-center gap-1.5 py-2.5 px-3 text-[14px] text-left ${mobileText}`} />
 
             <div className={`border-t ${dividerLine} my-1`} />
             {gm ? (

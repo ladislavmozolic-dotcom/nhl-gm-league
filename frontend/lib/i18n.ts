@@ -33,6 +33,19 @@ export const DICT: Dict = {
   "menu.ahl": { en: "AHL", cs: "AHL", de: "AHL", ru: "АХЛ" },
   // common UI
   "ui.gmLogin": { en: "GM Login", cs: "Přihlášení GM", de: "GM-Login", ru: "Вход GM" },
+  "ui.installApp": { en: "Install app", cs: "Nainstalovat appku", de: "App installieren", ru: "Установить приложение" },
+  "ui.installHintIOS": {
+    en: 'Tap the Share button (square with an arrow) at the bottom of Safari, then "Add to Home Screen".',
+    cs: 'Klepněte na tlačítko Sdílet (čtverec se šipkou) dole v Safari a pak na "Přidat na plochu".',
+    de: 'Tippen Sie unten in Safari auf „Teilen" (Quadrat mit Pfeil) und dann auf „Zum Home-Bildschirm".',
+    ru: 'Нажмите кнопку "Поделиться" внизу Safari, затем "На экран «Домой»".',
+  },
+  "ui.installHintAndroid": {
+    en: 'Open the browser menu (⋮) and tap "Add to Home screen" or "Install app".',
+    cs: 'Otevřete nabídku prohlížeče (⋮) a klepněte na "Přidat na plochu" nebo "Instalovat aplikaci".',
+    de: 'Öffnen Sie das Browsermenü (⋮) und tippen Sie auf „Zum Startbildschirm hinzufügen".',
+    ru: 'Откройте меню браузера (⋮) и нажмите "Установить приложение".',
+  },
   "ui.myTeam": { en: "My team", cs: "Můj tým", de: "Mein Team", ru: "Моя команда" },
   "ui.profile": { en: "Profile", cs: "Profil", de: "Profil", ru: "Профиль" },
   "ui.logout": { en: "Log out", cs: "Odhlásit", de: "Abmelden", ru: "Выйти" },
