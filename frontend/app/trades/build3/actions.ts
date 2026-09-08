@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getTeamSession, isAdmin, isCommission } from "@/lib/auth";
 import { loadSettings } from "@/lib/sim/settings";
 import { revalidatePath } from "next/cache";
-import { clauseBlock, assertOwnership, createTradeRecord, executeTradeGroup, type TradePackage } from "@/lib/trade-exec";
+import { clauseBlock, assertOwnership, createTradeRecord, executeTradeGroup, collectMoveOps, type TradePackage } from "@/lib/trade-exec";
 
 /** One one-directional asset move: `fromTeamId`'s listed assets go to `toTeamId`.
  *  A 3-team trade is exactly 3 of these forming a closed cycle (A→C, B→A, C→B) —
@@ -97,6 +97,14 @@ export async function proposeTradeGroupAction(legs: GroupLeg[]) {
       }
     }
   }
+
+  // Dry-run each leg through the same validated executor accept-time uses
+  // (retention cooldown, max retentions per contract, the reacquire ban…) —
+  // this comment's own header claimed that was already enforced "as before",
+  // but nothing here actually called it, so an invalid leg could sail into
+  // every other club's inbox looking normal and only fail once someone got
+  // around to accepting the group.
+  for (const pkg of pkgs) await collectMoveOps(pkg);
 
   const group = await prisma.tradeGroup.create({ data: { proposerTeamId: session, status: "PENDING" } });
   await prisma.tradeGroupResponse.createMany({

@@ -6,7 +6,7 @@ import { getTeamSession, isAdmin, isCommission } from "@/lib/auth";
 import { loadSettings } from "@/lib/sim/settings";
 import { CURRENT_SEASON_START } from "@/lib/finance";
 import { revalidatePath } from "next/cache";
-import { clauseBlock, assertOwnership, packageFromTrade, executeAcceptedTrade, createTradeRecord, type TradePlayer, type TradePackage } from "@/lib/trade-exec";
+import { clauseBlock, assertOwnership, packageFromTrade, executeAcceptedTrade, createTradeRecord, collectMoveOps, type TradePlayer, type TradePackage } from "@/lib/trade-exec";
 import { playerValue, pickValueBySlot } from "@/lib/trade-value";
 import { hasWorthyGoalie } from "@/lib/goalie-rule";
 
@@ -236,6 +236,15 @@ export async function proposeTrade(pkg: TradePackage) {
     for (const p of pkg.fromPlayers) await requireConsent(p.playerId, pkg.toTeamId, pkg.fromTeamId);
     for (const p of pkg.toPlayers) await requireConsent(p.playerId, pkg.fromTeamId, pkg.toTeamId);
   }
+
+  // Dry-run the SAME validated executor accept-time uses (retention cooldown,
+  // max retentions per contract, the reacquire ban, retention-floor/cap
+  // checks…) so a deal that would fail at accept can't even be proposed —
+  // it just throws here, we never use the returned ops. Without this, a
+  // trade like "retain again on a contract still inside its 75-day cooldown"
+  // sailed straight into the other GM's inbox looking perfectly normal, only
+  // to (silently) fail whenever they got around to accepting it.
+  await collectMoveOps(pkg);
 
   const { tradeId } = await createTradeRecord(pkg, { fromName: fromTeam.name, toName: toTeam.name });
   // Rookie-GM oversight: let the commission know a rookie-involving trade exists the

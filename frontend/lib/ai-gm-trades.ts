@@ -9,7 +9,7 @@ import { prisma } from "./prisma";
 import { loadSettings } from "./sim/settings";
 import { teamContentionMap } from "./free-agency-server";
 import type { Contention } from "./free-agency";
-import { packageFromTrade, executeAcceptedTrade, createTradeRecord, type TradePackage } from "./trade-exec";
+import { packageFromTrade, executeAcceptedTrade, createTradeRecord, collectMoveOps, type TradePackage } from "./trade-exec";
 import { analyzeTradeAction } from "@/app/trades/build/actions";
 import { playerValue, pickValueBySlot } from "@/lib/trade-value";
 import { getLeagueDate } from "./calendar-server";
@@ -231,6 +231,11 @@ export async function aiGmTradesDaily(): Promise<{ handled: number; details: str
         await prisma.dmMessage.create({ data: { fromTeamId: tr.toTeamId, toTeamId: tr.fromTeamId, body: `✅ ${toTeam.name} accepted your trade (#${tr.id}) — ${fromTeam.name} gets ${toNames.join(", ") || "assets"}, you get ${fromNames.join(", ") || "assets"}. It's done.`, tradeUrl: `/trades/${tr.id}` } }).catch(() => {});
         details.push(`${aiName} ACCEPTED #${tr.id} (${d.reason})`);
       } else if (d.action === "counter" && d.counter) {
+        // same dry-run the human trade builder now does — a counter that would
+        // actually fail (e.g. more retention than the 75-day cooldown allows)
+        // throws here and falls into the catch below (declines #tr.id cleanly)
+        // instead of sending an offer that looks fine but can never be accepted.
+        await collectMoveOps(d.counter);
         await prisma.trade.update({ where: { id: tr.id }, data: { status: "DECLINED", respondedAt: new Date() } });
         const { tradeId } = await createTradeRecord(d.counter, { fromName: ai.name, toName: humanName, dmBody: `🔄 ${ai.name} sent you a counter-offer (on #${tr.id}) — ${d.counterNote ?? "we'd need a bit more."} Open it to review, Accept or Decline.` });
         details.push(`${aiName} COUNTERED #${tr.id} → #${tradeId} (${d.reason})`);
@@ -355,6 +360,7 @@ async function aiGmInitiateTrades(aiTeams: { id: number; name: string; code: str
 
       const concept = contention.get(ai.id) ?? "middle";
       const note = concept === "contender" ? "We're pushing for a Cup run and need help down the middle/back." : concept === "rebuild" ? "We're building for the future and like your player's fit." : "We think this is a fair hockey trade for both clubs.";
+      await collectMoveOps(pkg); // same dry-run validation as everywhere else — falls into the catch below on any violation
       const { tradeId } = await createTradeRecord(pkg, { fromName: ai.name, toName: best.humanName, leagueDay: today, dmBody: `📨 ${ai.name} wants to make a deal — they're offering ${clean(chip.name)}${givePicks.length ? " + a pick" : ""} for ${clean(best.target.name)}. ${note} Open to review, then Accept / Decline / counter.` });
       out.push(`${ai.code ?? ai.name} OFFERED ${clean(chip.name)}→${best.humanName} for ${clean(best.target.name)} (#${tradeId})`);
     } catch { /* skip this club on any error */ }
