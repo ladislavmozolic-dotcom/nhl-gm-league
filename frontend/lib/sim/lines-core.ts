@@ -2,7 +2,7 @@
 // client components (the line editor) and on the server.
 
 import type { GameStrategy } from "./types";
-import { mergeTactics, type TeamTactics, type PuckStyle, type DZone } from "./tactics";
+import { mergeTactics, type TeamTactics, type PuckStyle, type DZone, type PpStyle, type PkStyle } from "./tactics";
 
 import type { LineTactic } from "./types";
 export type { GameStrategy, StratWeights, LineTactic } from "./types";
@@ -12,7 +12,11 @@ export const NEUTRAL_TACTIC: LineTactic = { phy: 1, df: 2, of: 2 };
 export type ForwardLine = { lw: number | null; c: number | null; rw: number | null; timePct: number; tactic?: LineTactic; puck?: PuckStyle };
 export type DefensePair = { ld: number | null; rd: number | null; timePct: number; tactic?: LineTactic; dzone?: DZone };
 /** A generic ordered special-teams / situational unit (slots + ice-time share + tactic). */
-export type SpecialUnit = { players: (number | null)[]; timePct: number; tactic?: LineTactic; dTactic?: LineTactic };
+// `style` overrides the team's ppStyle/pkStyle (see tactics.ts) for THIS unit
+// only — unset = inherit the team's system dial, same pattern as a forward
+// line's `puck` / a D pair's `dzone` override below. Only meaningful on `pp`
+// (PpStyle) and `pk4` (PkStyle) units; other unit kinds just never set it.
+export type SpecialUnit = { players: (number | null)[]; timePct: number; tactic?: LineTactic; dTactic?: LineTactic; style?: PpStyle | PkStyle };
 export type Others = {
   starter: number | null; backup: number | null;
   extraForwards: (number | null)[]; // 3

@@ -12,7 +12,7 @@ import type {
 import type { TeamLinesData } from "./lines";
 import { buildUnits, buildStUnits, depthChartUnits, playerChemistry, unitSignature } from "./chemistry";
 import { roleFitOf as roleFitPure } from "./role-fit";
-import { resolveTactics, resolveLineTactics, mergeTactics, type RosterProfile, type TeamTactics } from "./tactics";
+import { resolveTactics, resolveLineTactics, mergeTactics, type RosterProfile, type TeamTactics, type PpStyle } from "./tactics";
 
 const clamp = (v: number, lo = 20, hi = 99) => Math.max(lo, Math.min(hi, v));
 const w = (parts: Array<[number, number]>) => {
@@ -329,6 +329,16 @@ export function buildTeam(input: {
     resolveLineTactics(teamTac, profile, coachEx, { puckStyle: l.puck }, coachStyle));
   const defPairFx = (input.lines?.defensePairs ?? []).map((p) =>
     resolveLineTactics(teamTac, profile, coachEx, { dZone: p.dzone }, coachStyle));
+  // PP unit-level formation override (else the team's ppStyle): each of the 2
+  // PP units can run its own signature (a 1-3-1 PP1, an Umbrella PP2), same
+  // "inherit unless set" idea as the line-level Puck Style/D-Zone overrides
+  // above. Keyed by playerId so the shot-generation site can look up whoever
+  // actually has the puck without needing to know which unit is on the ice.
+  const ppUnitStyleByPlayer = new Map<number, PpStyle>();
+  for (const u of input.lines?.situations?.pp ?? []) {
+    const style = u.style ?? teamTac.ppStyle ?? "balanced";
+    for (const id of u.players) if (id != null) ppUnitStyleByPlayer.set(id, style as PpStyle);
+  }
 
   return {
     id: input.id,
@@ -356,6 +366,7 @@ export function buildTeam(input: {
     defTactics: (input.lines?.defensePairs ?? []).map((p) => p.tactic ?? { phy: 1, df: 2, of: 2 }),
     tactics,
     teamTactics: teamTac,
+    ppUnitStyleByPlayer,
     profile,
     fwdLineFx,
     defPairFx,

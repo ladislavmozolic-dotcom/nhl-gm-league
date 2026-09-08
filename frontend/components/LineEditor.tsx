@@ -7,7 +7,7 @@ import { autoFill, type TeamLinesData, type ForwardLine, type DefensePair, type 
 import { unitChemistry } from "@/lib/sim/chemistry";
 import { roleFitOf } from "@/lib/sim/role-fit";
 import { DIAL_LABELS, mergeTactics, type PuckStyle, type DZone, type PpStyle, type PkStyle } from "@/lib/sim/tactics";
-import { PP_LAYOUTS, PK_LAYOUTS } from "@/lib/sim/formation-layout";
+import { PP_LAYOUTS, PK_LAYOUTS, type FormationRole } from "@/lib/sim/formation-layout";
 import RinkFormationMap from "@/components/RinkFormationMap";
 import { useLang } from "@/components/LangProvider";
 import { dialLabel, dialDesc } from "@/lib/tactics-i18n";
@@ -214,7 +214,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
   const setFwdPuck = (i: number, v: PuckStyle | "") => change((d) => { if (v) d.forwardLines[i].puck = v; else delete d.forwardLines[i].puck; });
   const setDefDzone = (i: number, v: DZone | "") => change((d) => { if (v) d.defensePairs[i].dzone = v; else delete d.defensePairs[i].dzone; });
   const inheritTxt = lang === "cs" ? "Zdediť tímový systém (nastav voľbu pre override len tejto formácie)" : "Inherit the team system (set an option to override just this line)";
-  const SysSelect = ({ value, dial, opts, onChange }: { value: string | undefined; dial: "puckStyle" | "dZone"; opts: Record<string, string>; onChange: (v: string) => void }) => (
+  const SysSelect = ({ value, dial, opts, onChange }: { value: string | undefined; dial: "puckStyle" | "dZone" | "ppStyle" | "pkStyle"; opts: Record<string, string>; onChange: (v: string) => void }) => (
     <select value={value ?? ""} onChange={(e) => onChange(e.target.value)}
       title={value ? dialDesc(lang, dial, value) : inheritTxt}
       className={`bg-slate-800 border rounded px-1.5 py-1 text-xs cursor-help ${value ? "border-sky-600 text-sky-300" : "border-slate-700 text-slate-400"}`}>
@@ -239,6 +239,28 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
           ))}
         </div>
         <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{dialDesc(lang, k, val)}</p>
+      </div>
+    );
+  };
+  // per-unit formation override (empty = inherit the team's ppStyle/pkStyle) —
+  // same "Team" pattern as SysSelect above, so PP1 can run 1-3-1 while PP2
+  // runs Umbrella, or PK1 a Box while PK2 presses in a Diamond.
+  const setUnitStyle = (key: "pp" | "pk4", ui: number, v: string) =>
+    change((d) => { const u = (d.situations[key] as SpecialUnit[])[ui]; if (v) u.style = v as PpStyle & PkStyle; else delete u.style; });
+  const UnitFormationBlock = ({ unitKey, ui, dial, label, layouts, dStartIndex }: {
+    unitKey: "pp" | "pk4"; ui: number; dial: "ppStyle" | "pkStyle"; label: string;
+    layouts: Record<string, FormationRole[]>; dStartIndex: number;
+  }) => {
+    const unit = (data.situations[unitKey] as SpecialUnit[])[ui];
+    const teamDefault = ((mergeTactics(data.system) as Record<string, string>)[dial]) ?? "balanced";
+    const effective = unit?.style ?? teamDefault;
+    return (
+      <div className="mb-3 bg-slate-900/40 border border-slate-800 rounded-lg p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-sm font-semibold">{label}</span>
+          <SysSelect value={unit?.style} dial={dial} opts={DIAL_LABELS[dial]} onChange={(v) => setUnitStyle(unitKey, ui, v)} />
+        </div>
+        <RinkFormationMap roles={layouts[effective] ?? layouts.balanced} players={slotPlayers(unit?.players ?? [], dStartIndex)} />
       </div>
     );
   };
@@ -496,9 +518,23 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
 
       {tab === "Forward" && <>{ForwardSection}<p className="text-xs text-slate-500 mt-2 px-1">💡 <strong>System</strong>: give a line its own Puck Style (else it inherits the team system from <em>Team → System</em>). E.g. set your 4th line to <em>Cycle</em> while the team runs <em>Rush</em>. Tempo &amp; Forecheck stay team-wide.</p></>}
       {tab === "Defense" && <>{DefenseSection}<p className="text-xs text-slate-500 mt-2 px-1">💡 <strong>System</strong>: give a pair its own D-Zone (else it inherits the team system). E.g. a <em>Collapse</em> shut-down pair for defending a lead.</p></>}
-      {tab === "PP" && <>{FormationPicker("ppStyle", "Power-play formation")}<RinkFormationMap roles={PP_LAYOUTS[(mergeTactics(data.system).ppStyle ?? "balanced") as PpStyle]} players={slotPlayers(data.situations.pp[0]?.players ?? [], 3)} />{SplitUnitSection("pp", "Power Play (5 on 4)", ["LW", "C", "RW"], ["LD", "RD"], ppPointPool, "💡 Na presilovke môžeš do modrej (LD/RD) dať aj útočníka — dropdown ponúka obrancov aj útočníkov, takže sa dá hrať 4 útočníci + 1 obranca.")}</>}
+      {tab === "PP" && <>
+        {FormationPicker("ppStyle", "Power-play formation (team default)")}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <UnitFormationBlock unitKey="pp" ui={0} dial="ppStyle" label="PP1" layouts={PP_LAYOUTS} dStartIndex={3} />
+          <UnitFormationBlock unitKey="pp" ui={1} dial="ppStyle" label="PP2" layouts={PP_LAYOUTS} dStartIndex={3} />
+        </div>
+        {SplitUnitSection("pp", "Power Play (5 on 4)", ["LW", "C", "RW"], ["LD", "RD"], ppPointPool, "💡 Na presilovke môžeš do modrej (LD/RD) dať aj útočníka — dropdown ponúka obrancov aj útočníkov, takže sa dá hrať 4 útočníci + 1 obranca.")}
+      </>}
       {tab === "4 vs 4" && SplitUnitSection("fourVFour", "4 vs 4", ["C", "W"], ["LD", "RD"])}
-      {tab === "PK4" && <>{FormationPicker("pkStyle", "Penalty-kill structure")}<RinkFormationMap roles={PK_LAYOUTS[(mergeTactics(data.system).pkStyle ?? "balanced") as PkStyle]} players={slotPlayers(data.situations.pk4[0]?.players ?? [], 2)} />{SplitUnitSection("pk4", "Penalty Kill (4 on 5)", ["C", "W"], ["LD", "RD"])}</>}
+      {tab === "PK4" && <>
+        {FormationPicker("pkStyle", "Penalty-kill structure (team default)")}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <UnitFormationBlock unitKey="pk4" ui={0} dial="pkStyle" label="PK1" layouts={PK_LAYOUTS} dStartIndex={2} />
+          <UnitFormationBlock unitKey="pk4" ui={1} dial="pkStyle" label="PK2" layouts={PK_LAYOUTS} dStartIndex={2} />
+        </div>
+        {SplitUnitSection("pk4", "Penalty Kill (4 on 5)", ["C", "W"], ["LD", "RD"])}
+      </>}
       {tab === "PK3" && SplitUnitSection("pk3", "Penalty Kill (3 on 5)", ["C"], ["LD", "RD"])}
       {tab === "Overtime" && UnitSection("overtime", "Overtime (3 vs 3)", ["OT1", "OT2", "OT3"], () => players)}
 

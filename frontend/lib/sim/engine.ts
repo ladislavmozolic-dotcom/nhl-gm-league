@@ -1493,7 +1493,7 @@ function simulatePeriodPossession(st: SimState, period: number) {
       // 1-3-1 team's shot chart should visibly lean on slot one-timers, an
       // Umbrella's on point shots + net-front traffic. EV/SH shots are untouched.
       const { sector, shotType } = strength === "PP"
-        ? ppShotProfile(rng, carrierTeam.teamTactics.ppStyle ?? "balanced", { isDefense: carrier.isDefense, setup, manAdv3 })
+        ? ppShotProfile(rng, carrierTeam.ppUnitStyleByPlayer.get(carrier.id) ?? carrierTeam.teamTactics.ppStyle ?? "balanced", { isDefense: carrier.isDefense, setup, manAdv3 })
         : shotProfile(rng, { isDefense: carrier.isDefense, setup, danger, dangerBias });
       const xg = expectedGoal(rng, sector, shotType, strengthKey);
       const hd = isHighDanger(sector);
