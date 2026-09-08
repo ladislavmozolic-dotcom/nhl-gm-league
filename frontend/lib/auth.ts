@@ -2,6 +2,7 @@
 // hockey sim: a signed cookie holds the logged-in teamId. Passwords are salted
 // SHA-256 hashes. Not production-grade security — good enough to gate line edits.
 
+import { cache } from "react";
 import { cookies, headers } from "next/headers";
 import { createHmac, createHash, timingSafeEqual } from "crypto";
 import { prisma } from "./prisma";
@@ -23,22 +24,16 @@ const COOKIE_DOMAIN = undefined;
 // From 2026-09-06 19:44 to 2026-09-08 09:05 the cookie above was set with
 // `domain: ".unhl.eu"` (commit 515fc10) before being reverted to host-only
 // (commit 2a32598). Anyone who logged in during that ~37h window is still
-// carrying that old `.unhl.eu`-scoped cookie in their browser — same name,
-// still a validly-signed token (the secret didn't change), so it doesn't fail
-// verification, it just now coexists with the new host-only cookie. Two
-// same-named cookies for the same effective host is exactly the kind of thing
-// WebKit/iOS Safari handles inconsistently (this is the leading suspect for
-// the mobile logout-loop reports). Proactively expire the legacy one on every
-// opportunity we get write access to cookies, so it clears out of affected
-// browsers without needing a fresh login.
-async function clearLegacyDomainCookie(): Promise<void> {
-  try {
-    (await cookies()).delete({ name: COOKIE, path: "/", domain: ".unhl.eu" });
-  } catch {
-    // not in a Server Action / Route Handler (e.g. called during a Server
-    // Component render) — cookies are read-only here, nothing to clean up yet.
-  }
-}
+// carrying that old `.unhl.eu`-scoped cookie in their browser alongside the
+// new host-only one — a real lead worth investigating further, but a same-name
+// cleanup delete turned out to be unsafe to fire from getTeamSession()/
+// setTeamSession(): Next's cookies() response jar keys its internal map by
+// cookie NAME ONLY (not name+domain), so a delete() for "team_session" can
+// clobber an in-flight real login cookie write for "team_session" elsewhere in
+// the same response/action, regardless of call order — this shipped for a few
+// minutes and broke login outright. Don't reintroduce a same-name delete on
+// this hot path without a way to isolate it from the real cookie write (e.g.
+// a dedicated one-off Route Handler hit outside the login flow).
 
 export function hashPassword(password: string): string {
   return createHash("sha256").update(SALT + password).digest("hex");
@@ -62,7 +57,6 @@ export async function setTeamSession(teamId: number): Promise<void> {
     httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 30,
     secure: process.env.NODE_ENV === "production", domain: COOKIE_DOMAIN,
   });
-  await clearLegacyDomainCookie();
   // TEMP DEBUG — remove once the mobile logout-loop report is confirmed fixed.
   try {
     const h = await headers();
@@ -70,8 +64,10 @@ export async function setTeamSession(teamId: number): Promise<void> {
   } catch { /* ignore */ }
 }
 
-export async function getTeamSession(): Promise<number | null> {
-  await clearLegacyDomainCookie();
+// Memoized per request (React's cache()) — isAdmin()/isComishTier()/canManageTeam()/etc.
+// all call this, so a page that uses a few of them would otherwise re-read + re-verify the
+// same cookie several times over.
+export const getTeamSession = cache(async (): Promise<number | null> => {
   const token = (await cookies()).get(COOKIE)?.value;
   // TEMP DEBUG — remove once the mobile logout-loop report is confirmed fixed.
   try {
@@ -88,7 +84,7 @@ export async function getTeamSession(): Promise<number | null> {
   }
   const id = Number(value);
   return Number.isFinite(id) ? id : null;
-}
+});
 
 export async function clearTeamSession(): Promise<void> {
   // must match the domain/path it was set with, or the browser silently keeps
