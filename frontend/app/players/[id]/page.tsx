@@ -19,7 +19,7 @@ import RinkDefenseMap from "@/components/RinkDefenseMap";
 import { goalieAnalytics } from "@/lib/goalie-analytics-server";
 import GoalieAnalyticsCard from "@/components/GoalieAnalyticsCard";
 import { starPowerForPlayer } from "@/lib/star-power-server";
-import { onLtir, money } from "@/lib/finance";
+import { onLtir, money, CURRENT_SEASON_START, seasonLabel } from "@/lib/finance";
 import { tierAccent } from "@/lib/star-power";
 import InfoTip from "@/components/InfoTip";
 import { playerTradeHistory, playerTransactionHistory } from "@/lib/trade-history-server";
@@ -306,8 +306,17 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   ];
   const retained = p.retainedSalary ?? 0;
   const retainedPct = retained > 0 && p.capHit ? Math.round((retained / p.capHit) * 100) : 0;
+  // "Until" = the last season his CURRENT deal actually covers; "Expiry Status" =
+  // what he becomes the moment after that — same UFA/RFA age-27 cutoff the team
+  // cap page already uses (playerCapYears in lib/finance.ts), just read directly
+  // off his own contractYears/age instead of walking a whole multi-year table.
+  const contractYearsN = p.contractYears ?? 0;
+  const untilYear = contractYearsN > 0 ? seasonLabel(CURRENT_SEASON_START + contractYearsN - 1) : null;
+  const expiryStatus = contractYearsN > 0 ? ((p.age ?? 0) + contractYearsN >= 27 ? "UFA" : "RFA") : null;
   const rightInfo: [string, React.ReactNode][] = [
     ["Contract Length", p.contractYears != null ? `${p.contractYears} yr${p.contractYears === 1 ? "" : "s"}` : "—"],
+    ["Until", untilYear ?? "—"],
+    ["Expiry Status", expiryStatus ? <span className={expiryStatus === "UFA" ? "text-red-400" : "text-blue-400"}>{expiryStatus}</span> : "—"],
     ["Type", contractType],
     ["Cap Hit", capHit],
     ...(retained > 0 ? ([
