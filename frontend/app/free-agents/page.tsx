@@ -95,6 +95,21 @@ export default async function FreeAgentsPage({
     offers: offerCountBy.get(p.id) ?? 0, countered: p.faCountered,
   })).sort((a, b) => a.days - b.days);
 
+  // A club that got shut out of a decided player's round (no offer of its own
+  // on him) shouldn't see him on the open market at all — he isn't actually
+  // biddable (submitOfferAction's round-lock rejects a fresh entrant), and
+  // leaving him listed with a live "Sign" button just invited a confusing
+  // rejection. Whoever already HAS a stake (own an offer) still needs to see
+  // him — that's how they track/raise it — so only THEM keep the row.
+  const actingTeamId = interestCtx?.actingTeamId ?? sessionTeamId;
+  const myDeciderIds = actingTeamId != null && deliberators.length
+    ? new Set((await prisma.faOffer.findMany({
+        where: { playerId: { in: deliberators.map((p) => p.id) }, teamId: actingTeamId, status: { in: ["PENDING", "COUNTERED", "SHORTLISTED", "ACCEPTED"] } },
+        select: { playerId: true },
+      })).map((o) => o.playerId))
+    : new Set<number>();
+  const listedFreeAgents = freeAgents.filter((p: any) => !p.faDecisionAt || myDeciderIds.has(p.id));
+
   const attrs = sessionTeamId != null ? (isGoalie ? GOALIE_ATTRS : SKATER_ATTRS) : [];
   const cols: SortCol[] = [
     { key: "name", label: "Player", kind: "player", sticky: true },
@@ -107,7 +122,7 @@ export default async function FreeAgentsPage({
     ...(interestCtx ? [{ key: "interest", label: "Sign", kind: "interest" as const, title: "Register interest / make an offer" }] : []),
     ...attrs.map((a) => ({ key: a, label: a.toUpperCase(), kind: "num" as const })),
   ];
-  const rows = freeAgents.map((p) => {
+  const rows = listedFreeAgents.map((p) => {
     const rr: any = isGoalie ? { ...p, ...(p.goalieRating ?? {}) } : p;
     const ovr = isGoalie ? p.goalieRating?.overall ?? p.overall : p.overall;
     const grp = isGoalie ? ("G" as const) : posGroup(p.position, false);

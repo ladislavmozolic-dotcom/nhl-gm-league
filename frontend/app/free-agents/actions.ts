@@ -891,7 +891,14 @@ export async function processRoundEnd(endedRound: number): Promise<{ decided: nu
   // window are on their own clock — a later round's close must never re-touch
   // their still-active offers.
   const inDecision = await prisma.player.findMany({ where: { faDecisionAt: { not: null } }, select: { id: true } });
-  const offers = await prisma.faOffer.findMany({ where: { status: { in: ACTIVE }, playerId: { notIn: inDecision.map((p) => p.id) } } });
+  // round: { gte: 1 } — a round=0 offer was placed OUTSIDE the Frenzy (the
+  // separate in-season market, where clock.frenzyRound reads 0; see
+  // getLeagueClock) or is a stale leftover from before this offer's round was
+  // ever properly set. Either way it was never actually part of any Frenzy
+  // round and must not get swept into one just because it's still PENDING —
+  // that's exactly what mixed an old pre-Frenzy offer into today's round
+  // close and confused the field for a completely unrelated new bidder.
+  const offers = await prisma.faOffer.findMany({ where: { status: { in: ACTIVE }, round: { gte: 1 }, playerId: { notIn: inDecision.map((p) => p.id) } } });
   const byPlayer = new Map<number, typeof offers>();
   for (const o of offers) { const a = byPlayer.get(o.playerId) ?? []; a.push(o); byPlayer.set(o.playerId, a); }
 
