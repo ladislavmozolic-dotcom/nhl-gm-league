@@ -126,7 +126,13 @@ export function assignRoles<T extends { id: number }>(
   for (let r = 0; r < n; r++) {
     for (let mask = 0; mask < full; mask++) {
       if (dp[r][mask] === NEG) continue;
-      if (dp[r][mask] > dp[r + 1][mask]) { dp[r + 1][mask] = dp[r][mask]; choice[r + 1][mask] = -1; } // role left unfilled
+      // Leaving a role unfilled is a last resort (a genuine player shortage),
+      // never a way to dodge a bad-but-real fit score — every real player on
+      // the ice plays SOMEWHERE, even the worst-suited spot left. A heavy
+      // penalty keeps this option out of reach unless there's truly nobody
+      // left to assign (fitOf's realistic range is roughly -90..+140).
+      const leaveScore = dp[r][mask] - 1000;
+      if (leaveScore > dp[r + 1][mask]) { dp[r + 1][mask] = leaveScore; choice[r + 1][mask] = -1; } // role left unfilled
       for (let p = 0; p < m; p++) {
         if (mask & (1 << p)) continue;
         const nextMask = mask | (1 << p);

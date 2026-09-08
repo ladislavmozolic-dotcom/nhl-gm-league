@@ -247,20 +247,28 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
   // runs Umbrella, or PK1 a Box while PK2 presses in a Diamond.
   const setUnitStyle = (key: "pp" | "pk4", ui: number, v: string) =>
     change((d) => { const u = (d.situations[key] as SpecialUnit[])[ui]; if (v) u.style = v as PpStyle & PkStyle; else delete u.style; });
-  const UnitFormationBlock = ({ unitKey, ui, dial, label, layouts, dStartIndex }: {
+  const UnitFormationBlock = ({ unitKey, ui, dial, label, layouts, dStartIndex, accent }: {
     unitKey: "pp" | "pk4"; ui: number; dial: "ppStyle" | "pkStyle"; label: string;
-    layouts: Record<string, FormationRole[]>; dStartIndex: number;
+    layouts: Record<string, FormationRole[]>; dStartIndex: number; accent: string;
   }) => {
     const unit = (data.situations[unitKey] as SpecialUnit[])[ui];
     const teamDefault = ((mergeTactics(data.system) as Record<string, string>)[dial]) ?? "balanced";
     const effective = unit?.style ?? teamDefault;
+    const filled = slotPlayers(unit?.players ?? [], dStartIndex).length;
+    const total = unit?.players?.length ?? 0;
     return (
-      <div className="mb-3 bg-slate-900/40 border border-slate-800 rounded-lg p-3">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-sm font-semibold">{label}</span>
+      <div className="rounded-xl border border-slate-800 bg-gradient-to-b from-slate-900/60 to-slate-900/20 overflow-hidden">
+        <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-slate-800/80" style={{ borderTopColor: accent, boxShadow: `inset 0 2px 0 0 ${accent}` }}>
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: accent }} />
+            <span className="text-sm font-bold tracking-wide">{label}</span>
+            <span className="text-[10px] text-slate-500 tabular-nums">{filled}/{total || "–"}</span>
+          </div>
           <SysSelect value={unit?.style} dial={dial} opts={DIAL_LABELS[dial]} onChange={(v) => setUnitStyle(unitKey, ui, v)} />
         </div>
-        <RinkFormationMap roles={layouts[effective] ?? layouts.balanced} players={slotPlayers(unit?.players ?? [], dStartIndex)} />
+        <div className="p-3">
+          <RinkFormationMap roles={layouts[effective] ?? layouts.balanced} players={slotPlayers(unit?.players ?? [], dStartIndex)} accent={accent} />
+        </div>
       </div>
     );
   };
@@ -520,18 +528,18 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
       {tab === "Defense" && <>{DefenseSection}<p className="text-xs text-slate-500 mt-2 px-1">💡 <strong>System</strong>: give a pair its own D-Zone (else it inherits the team system). E.g. a <em>Collapse</em> shut-down pair for defending a lead.</p></>}
       {tab === "PP" && <>
         {FormationPicker("ppStyle", "Power-play formation (team default)")}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <UnitFormationBlock unitKey="pp" ui={0} dial="ppStyle" label="PP1" layouts={PP_LAYOUTS} dStartIndex={3} />
-          <UnitFormationBlock unitKey="pp" ui={1} dial="ppStyle" label="PP2" layouts={PP_LAYOUTS} dStartIndex={3} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <UnitFormationBlock unitKey="pp" ui={0} dial="ppStyle" label="PP1" layouts={PP_LAYOUTS} dStartIndex={3} accent="#3b82f6" />
+          <UnitFormationBlock unitKey="pp" ui={1} dial="ppStyle" label="PP2" layouts={PP_LAYOUTS} dStartIndex={3} accent="#a855f7" />
         </div>
         {SplitUnitSection("pp", "Power Play (5 on 4)", ["LW", "C", "RW"], ["LD", "RD"], ppPointPool, "💡 Na presilovke môžeš do modrej (LD/RD) dať aj útočníka — dropdown ponúka obrancov aj útočníkov, takže sa dá hrať 4 útočníci + 1 obranca.")}
       </>}
       {tab === "4 vs 4" && SplitUnitSection("fourVFour", "4 vs 4", ["C", "W"], ["LD", "RD"])}
       {tab === "PK4" && <>
         {FormationPicker("pkStyle", "Penalty-kill structure (team default)")}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <UnitFormationBlock unitKey="pk4" ui={0} dial="pkStyle" label="PK1" layouts={PK_LAYOUTS} dStartIndex={2} />
-          <UnitFormationBlock unitKey="pk4" ui={1} dial="pkStyle" label="PK2" layouts={PK_LAYOUTS} dStartIndex={2} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <UnitFormationBlock unitKey="pk4" ui={0} dial="pkStyle" label="PK1" layouts={PK_LAYOUTS} dStartIndex={2} accent="#ef4444" />
+          <UnitFormationBlock unitKey="pk4" ui={1} dial="pkStyle" label="PK2" layouts={PK_LAYOUTS} dStartIndex={2} accent="#f97316" />
         </div>
         {SplitUnitSection("pk4", "Penalty Kill (4 on 5)", ["C", "W"], ["LD", "RD"])}
       </>}
