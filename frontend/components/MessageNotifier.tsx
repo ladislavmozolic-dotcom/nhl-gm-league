@@ -70,6 +70,12 @@ export default function MessageNotifier({ initialUnread }: { initialUnread: numb
           n.onclick = () => { window.focus(); window.location.href = "/messages"; };
         }
         router.refresh();
+      } else if (r.count < lastRef.current) {
+        // count went DOWN (read elsewhere — another tab, another device, or Messenger's
+        // own read-marking hasn't reached this poll yet) — no notification, but still
+        // refresh so a stuck-lit nav badge catches up within one tick instead of staying
+        // wrong until something else happens to trigger a refresh.
+        router.refresh();
       }
       lastRef.current = r.count;
     };

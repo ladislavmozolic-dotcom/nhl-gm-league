@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { sendDm, getConversation, listConversations, type ConversationMsg, type ConvTeam } from "@/app/messages/actions";
 
 const EMOJIS = ["👍", "😂", "🔥", "🏒", "🥅", "💰", "🤝", "🤔", "😅", "😎", "👀", "🙌", "❌", "✅", "😱", "🎯", "💪", "🍺", "🫡", "🤯"];
 
 export default function Messenger({ initialTeams, initialActive }: { initialTeams: ConvTeam[]; initialActive: number | null }) {
+  const router = useRouter();
   const [teams, setTeams] = useState<ConvTeam[]>(initialTeams);
   const [active, setActive] = useState<number | null>(initialActive);
   const [msgs, setMsgs] = useState<ConversationMsg[]>([]);
@@ -42,10 +44,15 @@ export default function Messenger({ initialTeams, initialActive }: { initialTeam
   useEffect(() => {
     if (active == null) return;
     stickBottomRef.current = true; // opening a chat lands at the bottom
-    loadConvo(active);
+    // getConversation() marks the other GM's messages as read server-side, but the
+    // unread badge in the top nav comes from the root layout, which (like the rest of
+    // the app) doesn't re-render on this soft navigation — router.refresh() re-fetches
+    // it so the badge clears right away instead of staying lit until something else
+    // happens to trigger a refresh.
+    loadConvo(active).then(() => router.refresh());
     const t = setInterval(() => { loadConvo(active); refreshList(); }, 5000);
     return () => clearInterval(t);
-  }, [active, loadConvo, refreshList]);
+  }, [active, loadConvo, refreshList, router]);
 
   // Scroll ONLY the chat container (never the page), and only when you were already at
   // the bottom (or just opened/sent) — reading older messages won't yank you down.
