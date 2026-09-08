@@ -11,6 +11,14 @@ export type CapStatus = {
   committed: number; ltir: number; ceiling: number; space: number;
   floor: number; underFloorBy: number; overBy: number;
   phase: string; cushioned: boolean; compliant: boolean;
+  // `space` is measured against `ceiling`, which off-season includes the
+  // +10% compliance grace (OFFSEASON_CUSHION) — real, but not spendable room:
+  // a GM who signs up to it is still meaningfully over the real cap, just not
+  // in violation yet. `strictSpace` is the same figure against the actual,
+  // uncushioned league ceiling — what Cap Central calls "Actual Cap Space".
+  // Anywhere this gets shown to a GM as "how much can I spend" should read
+  // strictSpace, not space, or it silently overstates room by the cushion.
+  strictSpace: number;
 };
 
 /** A team's live cap-relevant totals, split the way Cap Central shows them:
@@ -56,6 +64,7 @@ export async function teamCapStatus(teamId: number, phaseOverride?: string): Pro
     overBy: Math.max(0, committed - ceiling),
     phase, cushioned: phase !== "regular" && phase !== "playoffs",
     compliant: committed <= ceiling && committed >= floor,
+    strictSpace: cap.upper + ltir - committed,
   };
 }
 

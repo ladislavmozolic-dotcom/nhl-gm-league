@@ -68,7 +68,11 @@ export async function gmDashboard(teamId: number): Promise<GmDashboard | null> {
   const gaps: string[] = [];
   if (f < 12) gaps.push(`${12 - f} F`); if (d < 6) gaps.push(`${6 - d} D`); if (g < 2) gaps.push(`${2 - g} G`);
   const rosterOk = gaps.length === 0;
-  const capSpace = cap?.space ?? 0;
+  // strictSpace, not the off-season-cushioned `space` — a GM logging in should
+  // see the same real, uncushioned "Actual Cap Space" Cap Central shows, not a
+  // number inflated by the +10% off-season compliance grace (capOk below still
+  // correctly uses the cushioned ceiling, since that grace is real for THAT check).
+  const capSpace = cap?.strictSpace ?? 0;
   const capOk = cap ? cap.compliant : true;
 
   // ATTENTION
