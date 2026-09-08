@@ -7,11 +7,11 @@ type HintKind = "ios" | "macSafari" | "android";
 
 /** "Install app" button for Add-to-Home-Screen / Add-to-Dock. Renders nothing once
  *  the site is already running standalone (installed), or on a browser that offers
- *  no install path we can act on. Android/Chrome (incl. Chrome/Edge on a Mac) gets a
- *  real one-tap install via `beforeinstallprompt`; Safari has no such API on either
- *  iOS or macOS, so tapping there just shows the manual steps (Share → Add to Home
- *  Screen on iOS, File → Add to Dock on macOS) — that's the only way Apple allows it
- *  to happen. */
+ *  no install path we can act on. Chrome/Edge (incl. on a Mac) gets a real one-tap
+ *  install via `beforeinstallprompt` — a Chromium-only API Firefox has never
+ *  implemented on any platform. Safari (iOS or macOS) and Firefox (Android only —
+ *  Firefox Desktop dropped PWA installation entirely) fall back to manual steps
+ *  instead, since that's the only way each of them allows it to happen. */
 export default function InstallAppButton({ lang = "en", className }: { lang?: Lang; className?: string }) {
   const [visible, setVisible] = useState(false);
   const [hintKind, setHintKind] = useState<HintKind>("android");
@@ -33,8 +33,13 @@ export default function InstallAppButton({ lang = "en", className }: { lang?: La
     // Chrome/Edge/Opera on a Mac also match "Safari" in their UA string — only a
     // real Safari (no Chromium browser token present) needs the manual Add-to-Dock hint.
     const isMacSafari = /Macintosh/.test(ua) && /Safari/.test(ua) && !/Chrome|CriOS|Edg|OPR/.test(ua);
+    // Firefox never fires beforeinstallprompt on any platform. On Android it still has
+    // its own manual "Install" menu item (same steps as the generic Android hint below);
+    // on desktop it has no install path at all as of this writing, so nothing to show.
+    const isFirefoxAndroid = /Firefox/.test(ua) && /Android/.test(ua);
     if (isIOS) { setHintKind("ios"); setVisible(true); }
     else if (isMacSafari) { setHintKind("macSafari"); setVisible(true); }
+    else if (isFirefoxAndroid) { setHintKind("android"); setVisible(true); }
 
     const onBeforeInstall = (e: Event) => {
       e.preventDefault();
