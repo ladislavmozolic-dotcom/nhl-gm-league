@@ -67,7 +67,7 @@ export default async function HomePage() {
     prisma.player.count({ where: faWhere }),
     prisma.player.findMany({ where: faWhere, select: { id: true, name: true, position: true, overall: true, slug: true }, orderBy: { overall: "desc" }, take: 6 }),
     prisma.newsArticle.findMany({ orderBy: { createdAt: "desc" }, take: 6, include: { _count: { select: { comments: true, reactions: true } } } }),
-    prisma.team.findMany({ select: { id: true, name: true, logoUrl: true, gm: true, slug: true } }),
+    prisma.team.findMany({ select: { id: true, name: true, code: true, logoUrl: true, gm: true, slug: true } }),
   ]);
   const teamById = new Map(teams.map((t) => [t.id, t]));
   const leader = standings[0];
@@ -118,8 +118,8 @@ export default async function HomePage() {
     }
     return {
       ...tr,
-      from: fromTeam ? { name: titleCase(fromTeam.name), logoUrl: fromTeam.logoUrl, slug: fromTeam.slug } : null,
-      to: toTeam ? { name: titleCase(toTeam.name), logoUrl: toTeam.logoUrl, slug: toTeam.slug } : null,
+      from: fromTeam ? { name: titleCase(fromTeam.name), code: fromTeam.code ?? titleCase(fromTeam.name), logoUrl: fromTeam.logoUrl, slug: fromTeam.slug } : null,
+      to: toTeam ? { name: titleCase(toTeam.name), code: toTeam.code ?? titleCase(toTeam.name), logoUrl: toTeam.logoUrl, slug: toTeam.slug } : null,
       fromAssets, toAssets,
     };
   });
@@ -240,17 +240,17 @@ export default async function HomePage() {
                 <li key={t.id}>
                   <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-100">
                     {t.from ? (
-                      <span className="flex items-center gap-1.5 min-w-0">
+                      <span className="flex items-center gap-1.5 min-w-0" title={t.from.name}>
                         {t.from.logoUrl && <img src={t.from.logoUrl} alt="" className="w-4 h-4 object-contain shrink-0" />}
-                        <span className="truncate">{t.from.name}</span>
+                        <span className="truncate">{t.from.code}</span>
                       </span>
                     ) : <span className="text-blue-400">•</span>}
                     {t.to && (
                       <>
                         <span className="text-slate-500 shrink-0 text-xs">⇄</span>
-                        <span className="flex items-center gap-1.5 min-w-0">
+                        <span className="flex items-center gap-1.5 min-w-0" title={t.to.name}>
                           {t.to.logoUrl && <img src={t.to.logoUrl} alt="" className="w-4 h-4 object-contain shrink-0" />}
-                          <span className="truncate">{t.to.name}</span>
+                          <span className="truncate">{t.to.code}</span>
                         </span>
                       </>
                     )}
