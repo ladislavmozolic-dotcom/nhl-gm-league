@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { prisma } from "@/lib/prisma";
@@ -35,13 +35,23 @@ export async function generateMetadata(): Promise<Metadata> {
     title,
     description: b.tagline,
     applicationName: b.leagueName,
-    ...(logo ? { icons: { icon: logo, shortcut: logo, apple: logo } } : {}),
+    // the browser-tab favicon uses the raw uploaded logo (any shape/transparency is
+    // fine there); the iOS home-screen icon needs a flattened, padded, solid-background
+    // square or Safari renders the transparent parts black — that's the generated
+    // /icons/apple-touch-icon.png, not the raw logo.
+    ...(logo ? { icons: { icon: logo, shortcut: logo, apple: "/icons/apple-touch-icon.png" } } : { icons: { apple: "/icons/apple-touch-icon.png" } }),
+    appleWebApp: { capable: true, title: b.leagueName, statusBarStyle: "black-translucent" },
     openGraph: {
       type: "website", url: siteUrl, siteName: b.leagueName, title, description: b.tagline,
       ...(logo ? { images: [{ url: logo }] } : {}),
     },
     twitter: { card: logo ? "summary_large_image" : "summary", title, description: b.tagline, ...(logo ? { images: [logo] } : {}) },
   };
+}
+
+export async function generateViewport(): Promise<Viewport> {
+  const b = await loadBranding();
+  return { width: "device-width", initialScale: 1, themeColor: b.bgColor };
 }
 
 export default async function RootLayout({
@@ -104,6 +114,10 @@ export default async function RootLayout({
             Dark" (a built-in flag, not an extension) doesn't re-darken it — that re-processing
             is what turned panels transparent and light text near-black for some GMs. */}
         <meta name="color-scheme" content={isLightColor(site.theme.bgColor) ? "light" : "dark"} />
+        {/* Next's `appleWebApp` metadata field only emits the modern "mobile-web-app-capable"
+            tag — iOS Safari's Add to Home Screen still keys off the older Apple-prefixed one
+            to drop the browser chrome, so it's added explicitly here. */}
+        <meta name="apple-mobile-web-app-capable" content="yes" />
         <style dangerouslySetInnerHTML={{ __html: themeCss(site.theme) }} />
       </head>
       <body
