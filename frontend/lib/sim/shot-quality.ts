@@ -12,7 +12,7 @@
 // season and GSAx centres on zero for an average keeper.
 
 import type { RNG } from "./rng";
-import type { PpStyle } from "./tactics";
+import type { PpStyle, PkStyle } from "./tactics";
 
 export type ShotSector = "POINT" | "PERIMETER" | "CIRCLE" | "SLOT" | "NET_FRONT";
 export type ShotType = "SLAP" | "WRIST" | "SNAP" | "BACKHAND" | "TIP" | "ONE_TIMER";
@@ -95,16 +95,35 @@ const PP_FORMATION_MIX: Record<PpStyle, { netFrontP: number; slotP: number; oneT
   overload: { netFrontP: 0.30, slotP: 0.28, oneTimerP: 0.45 },   // low cycle, net-front / backdoor
 };
 
+// The DEFENDING PK structure reshapes the attacker's zone mix on top of its
+// own formation — real coaching intent, not just a flat conversion tax:
+//   Box     protects the middle across the board — pushes everything toward
+//           the perimeter/circle, both net-front and slot suppressed evenly.
+//   Diamond denies the seam pass specifically (its point man pressures, and
+//           the two flanks cut the cross-ice lane) — sharply down on SLOT,
+//           but only one D fronts the net, so NET_FRONT traffic goes UP.
+//   Aggressive hunts the puck high — when it's NOT beaten the shot never
+//           develops (already the lowest pkSuppress), but a beaten
+//           aggressive kill has nobody left to contest what gets through —
+//           the shots that DO happen skew more dangerous, not less.
+const PK_ZONE_ADJUST: Record<PkStyle, { netFront: number; slot: number }> = {
+  balanced: { netFront: 1, slot: 1 },
+  box: { netFront: 0.82, slot: 0.85 },
+  diamond: { netFront: 1.2, slot: 0.7 },
+  aggressive: { netFront: 1.15, slot: 1.1 },
+};
+
 export function ppShotProfile(
   rng: RNG,
   style: PpStyle,
-  opts: { isDefense: boolean; setup: "carry" | "pass" | "rebound"; manAdv3?: boolean },
+  opts: { isDefense: boolean; setup: "carry" | "pass" | "rebound"; manAdv3?: boolean; pkStyle?: PkStyle },
 ): { sector: ShotSector; shotType: ShotType } {
   if (opts.isDefense || opts.setup === "rebound") return shotProfile(rng, { isDefense: opts.isDefense, setup: opts.setup, danger: 1 });
   const mix = PP_FORMATION_MIX[style] ?? PP_FORMATION_MIX.balanced;
   const boost = opts.manAdv3 ? 1.25 : 1; // extra space on a 5-on-3 sharpens whatever look the formation hunts
-  const netFrontP = Math.min(0.45, mix.netFrontP * boost);
-  const slotP = Math.min(0.7, mix.slotP * boost);
+  const pkAdj = PK_ZONE_ADJUST[opts.pkStyle ?? "balanced"] ?? PK_ZONE_ADJUST.balanced;
+  const netFrontP = Math.min(0.5, mix.netFrontP * boost * pkAdj.netFront);
+  const slotP = Math.min(0.75, mix.slotP * boost * pkAdj.slot);
   const r = rng.next();
   if (r < netFrontP) return { sector: "NET_FRONT", shotType: rng.chance(0.5) ? "TIP" : "WRIST" };
   if (r < netFrontP + slotP) return { sector: "SLOT", shotType: rng.chance(mix.oneTimerP) ? "ONE_TIMER" : "SNAP" };

@@ -1491,9 +1491,16 @@ function simulatePeriodPossession(st: SimState, period: number) {
       // On the power play, the team's chosen formation (Umbrella/1-3-1/Overload)
       // drives WHERE the shot comes from, not just a flat conversion bump — a
       // 1-3-1 team's shot chart should visibly lean on slot one-timers, an
-      // Umbrella's on point shots + net-front traffic. EV/SH shots are untouched.
+      // Umbrella's on point shots + net-front traffic. The DEFENDING PK's own
+      // structure (its actual on-ice unit, via dman — the defender fronting
+      // this shift) reshapes that mix further (Diamond denies the seam but
+      // leaks net-front; Box suppresses evenly; Aggressive is boom-or-bust).
+      // EV/SH shots are untouched.
       const { sector, shotType } = strength === "PP"
-        ? ppShotProfile(rng, carrierTeam.ppUnitStyleByPlayer.get(carrier.id) ?? carrierTeam.teamTactics.ppStyle ?? "balanced", { isDefense: carrier.isDefense, setup, manAdv3 })
+        ? ppShotProfile(rng, carrierTeam.ppUnitStyleByPlayer.get(carrier.id) ?? carrierTeam.teamTactics.ppStyle ?? "balanced", {
+            isDefense: carrier.isDefense, setup, manAdv3,
+            pkStyle: def.pkUnitStyleByPlayer.get(dman.id) ?? def.teamTactics.pkStyle ?? "balanced",
+          })
         : shotProfile(rng, { isDefense: carrier.isDefense, setup, danger, dangerBias });
       const xg = expectedGoal(rng, sector, shotType, strengthKey);
       const hd = isHighDanger(sector);

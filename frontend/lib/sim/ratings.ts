@@ -12,7 +12,7 @@ import type {
 import type { TeamLinesData } from "./lines";
 import { buildUnits, buildStUnits, depthChartUnits, playerChemistry, unitSignature } from "./chemistry";
 import { roleFitOf as roleFitPure } from "./role-fit";
-import { resolveTactics, resolveLineTactics, mergeTactics, type RosterProfile, type TeamTactics, type PpStyle } from "./tactics";
+import { resolveTactics, resolveLineTactics, mergeTactics, type RosterProfile, type TeamTactics, type PpStyle, type PkStyle } from "./tactics";
 
 const clamp = (v: number, lo = 20, hi = 99) => Math.max(lo, Math.min(hi, v));
 const w = (parts: Array<[number, number]>) => {
@@ -339,6 +339,14 @@ export function buildTeam(input: {
     const style = u.style ?? teamTac.ppStyle ?? "balanced";
     for (const id of u.players) if (id != null) ppUnitStyleByPlayer.set(id, style as PpStyle);
   }
+  // Same idea for the PK: which structure THIS unit's own defenders run, so
+  // the shot-generation site can pick the actual on-ice kill's formation
+  // instead of always the team default.
+  const pkUnitStyleByPlayer = new Map<number, PkStyle>();
+  for (const u of input.lines?.situations?.pk4 ?? []) {
+    const style = u.style ?? teamTac.pkStyle ?? "balanced";
+    for (const id of u.players) if (id != null) pkUnitStyleByPlayer.set(id, style as PkStyle);
+  }
 
   return {
     id: input.id,
@@ -367,6 +375,7 @@ export function buildTeam(input: {
     tactics,
     teamTactics: teamTac,
     ppUnitStyleByPlayer,
+    pkUnitStyleByPlayer,
     profile,
     fwdLineFx,
     defPairFx,

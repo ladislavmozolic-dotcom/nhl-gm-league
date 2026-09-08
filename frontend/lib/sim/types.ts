@@ -3,7 +3,7 @@
 // A loader (index.ts) builds these from Prisma rows.
 
 import type { SimEvent } from "./events";
-import type { TacticsEffect, RosterProfile, TeamTactics, PpStyle } from "./tactics";
+import type { TacticsEffect, RosterProfile, TeamTactics, PpStyle, PkStyle } from "./tactics";
 
 export type SkaterAttrs = {
   ck: number; fg: number; di: number; sk: number; st: number; en: number;
@@ -104,6 +104,7 @@ export type SimTeam = {
   tactics: TacticsEffect;          // Phase 3 team-system multipliers (resolved from dials + roster fit)
   teamTactics: TeamTactics;        // the raw dials the GM set (for display / scouting)
   ppUnitStyleByPlayer: Map<number, PpStyle>; // playerId -> that PP unit's own formation (falls back to teamTactics.ppStyle)
+  pkUnitStyleByPlayer: Map<number, PkStyle>; // playerId -> that PK unit's own structure (falls back to teamTactics.pkStyle)
   profile: RosterProfile;          // ice-weighted roster attribute averages (drives system fit)
   fwdLineFx: TacticsEffect[];      // per forward-line effect (team system + the line's own Puck Style override)
   defPairFx: TacticsEffect[];      // per defence-pair effect (team system + the pair's own D-Zone override)
