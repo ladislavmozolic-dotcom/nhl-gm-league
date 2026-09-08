@@ -585,14 +585,23 @@ export async function submitOfferAction(
   const evalr = await evaluateTeamOffer(playerId, teamId, salary, years, dep, undefined, undefined, undefined, { clause, breadth });
   // a raise re-enters contention; a shortlisted offer stays shortlisted
   const newStatus = existing?.status === "SHORTLISTED" ? "SHORTLISTED" : "PENDING";
+  // A raise on a player ALREADY in his individual decision window keeps the
+  // round that actually opened that window (existing.round) instead of
+  // whatever weekly round happens to be current — the 3-day window is
+  // deliberately decoupled from the round clock (submitOfferAction's own
+  // round-lock comment above), so a raise made an hour after the NEXT round
+  // opened is still part of the round-1 process, not a fresh round-2 entry.
+  // A brand-new offer (no existing row, or the player isn't deciding) always
+  // takes the current round — that's genuinely when it was first placed.
+  const roundToStamp = (existing && player.faDecisionAt != null) ? existing.round : clock.frenzyRound;
 
   const offer = await prisma.faOffer.upsert({
     where: { playerId_teamId: { playerId, teamId } },
-    update: { salary, years, line: dep.line, pp, pk, status: newStatus, round: clock.frenzyRound, grantClause: clause, mNtcBreadth: breadth, twoWay },
-    create: { playerId, teamId, salary, years, line: dep.line, pp, pk, round: clock.frenzyRound, grantClause: clause, mNtcBreadth: breadth, twoWay },
+    update: { salary, years, line: dep.line, pp, pk, status: newStatus, round: roundToStamp, grantClause: clause, mNtcBreadth: breadth, twoWay },
+    create: { playerId, teamId, salary, years, line: dep.line, pp, pk, round: roundToStamp, grantClause: clause, mNtcBreadth: breadth, twoWay },
   });
   // append every bid/raise to the running log (FaOffer keeps only the latest standing offer)
-  await prisma.faBid.create({ data: { playerId, teamId, salary, years, round: clock.frenzyRound } }).catch(() => {});
+  await prisma.faBid.create({ data: { playerId, teamId, salary, years, round: roundToStamp } }).catch(() => {});
 
   // In-season OPEN MARKET: he does NOT sign on the spot. He takes a week to weigh the
   // offers (more clubs can bid in that time); when the window closes he counters the
