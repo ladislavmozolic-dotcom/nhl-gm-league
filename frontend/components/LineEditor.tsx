@@ -7,7 +7,7 @@ import { autoFill, type TeamLinesData, type ForwardLine, type DefensePair, type 
 import { unitChemistry } from "@/lib/sim/chemistry";
 import { roleFitOf } from "@/lib/sim/role-fit";
 import { DIAL_LABELS, mergeTactics, type PuckStyle, type DZone, type PpStyle, type PkStyle } from "@/lib/sim/tactics";
-import { PP_LAYOUTS, PK_LAYOUTS, type FormationRole } from "@/lib/sim/formation-layout";
+import { PP_LAYOUTS, PK_LAYOUTS, PK3_LAYOUTS, type FormationRole } from "@/lib/sim/formation-layout";
 import RinkFormationMap from "@/components/RinkFormationMap";
 import { useLang } from "@/components/LangProvider";
 import { dialLabel, dialDesc } from "@/lib/tactics-i18n";
@@ -245,10 +245,10 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
   // per-unit formation override (empty = inherit the team's ppStyle/pkStyle) —
   // same "Team" pattern as SysSelect above, so PP1 can run 1-3-1 while PP2
   // runs Umbrella, or PK1 a Box while PK2 presses in a Diamond.
-  const setUnitStyle = (key: "pp" | "pk4", ui: number, v: string) =>
+  const setUnitStyle = (key: "pp" | "pk4" | "pk3", ui: number, v: string) =>
     change((d) => { const u = (d.situations[key] as SpecialUnit[])[ui]; if (v) u.style = v as PpStyle & PkStyle; else delete u.style; });
   const UnitFormationBlock = ({ unitKey, ui, dial, label, layouts, dStartIndex, accent }: {
-    unitKey: "pp" | "pk4"; ui: number; dial: "ppStyle" | "pkStyle"; label: string;
+    unitKey: "pp" | "pk4" | "pk3"; ui: number; dial: "ppStyle" | "pkStyle"; label: string;
     layouts: Record<string, FormationRole[]>; dStartIndex: number; accent: string;
   }) => {
     const unit = (data.situations[unitKey] as SpecialUnit[])[ui];
@@ -574,7 +574,14 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
         </div>
         {SplitUnitSection("pk4", "Penalty Kill (4 on 5)", ["F1", "F2"], ["D1", "D2"], defense, undefined, { dial: "pkStyle", layouts: PK_LAYOUTS })}
       </>}
-      {tab === "PK3" && SplitUnitSection("pk3", "Penalty Kill (3 on 5)", ["C"], ["LD", "RD"])}
+      {tab === "PK3" && <>
+        <p className="text-xs text-slate-500 px-1 mb-3">Zdieľa systém (Box/Diamond/Aggressive) s PK4 — pri 3 hráčoch niet 4. rohu, takže sa mení hlavne to, ako vysoko/agresívne hrá útočník. Zmeň to na karte <strong className="text-slate-300">PK4</strong> vyššie.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <UnitFormationBlock unitKey="pk3" ui={0} dial="pkStyle" label="PK3-1" layouts={PK3_LAYOUTS} dStartIndex={1} accent="#facc15" />
+          <UnitFormationBlock unitKey="pk3" ui={1} dial="pkStyle" label="PK3-2" layouts={PK3_LAYOUTS} dStartIndex={1} accent="#eab308" />
+        </div>
+        {SplitUnitSection("pk3", "Penalty Kill (3 on 5)", ["F1"], ["D1", "D2"], defense, undefined, { dial: "pkStyle", layouts: PK3_LAYOUTS })}
+      </>}
       {tab === "Overtime" && UnitSection("overtime", "Overtime (3 vs 3)", ["OT1", "OT2", "OT3"], () => players)}
 
       {tab === "Others" && (

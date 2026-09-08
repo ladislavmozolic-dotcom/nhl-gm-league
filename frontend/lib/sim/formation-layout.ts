@@ -104,6 +104,33 @@ export const PK_LAYOUTS: Record<PkStyle, FormationRole[]> = {
   ],
 };
 
+// A 5-on-3 kill is always physically a triangle (1F + 2D — there's no 4th man
+// to make a real box/diamond shape), so the four pkStyle picks don't change
+// the SHAPE here the way they do at 4-on-5 — they change how high/aggressive
+// the lone forward plays, which is the one real tactical knob left at 3 men.
+export const PK3_LAYOUTS: Record<PkStyle, FormationRole[]> = {
+  balanced: [
+    { key: "r1", label: "C", x: 50, y: 46, fit: NO_FIT },
+    { key: "r2", label: "LD", x: 32, y: 82, fit: NO_FIT },
+    { key: "r3", label: "RD", x: 68, y: 82, fit: NO_FIT },
+  ],
+  box: [
+    { key: "r1", label: "Top (protect middle)", x: 50, y: 42, fit: w(0, 0.3, 0.3, F_ROLE) },
+    { key: "r2", label: "Left D", x: 32, y: 80, fit: w(0, 0, 0.6, D_ROLE) },
+    { key: "r3", label: "Right D", x: 68, y: 80, fit: w(0, 0, 0.6, D_ROLE) },
+  ],
+  diamond: [
+    { key: "r1", label: "Top (read passes)", x: 50, y: 36, fit: w(0.1, 0.2, 0.2, F_ROLE) },
+    { key: "r2", label: "Left D", x: 30, y: 82, fit: w(0, 0, 0.6, D_ROLE) },
+    { key: "r3", label: "Right D", x: 70, y: 82, fit: w(0, 0, 0.6, D_ROLE) },
+  ],
+  aggressive: [
+    { key: "r1", label: "Pressure F", x: 50, y: 24, fit: w(0.1, 0, 0.2, F_ROLE) },
+    { key: "r2", label: "Left D", x: 32, y: 76, fit: w(0, 0, 0.5, D_ROLE) },
+    { key: "r3", label: "Right D", x: 68, y: 76, fit: w(0, 0, 0.5, D_ROLE) },
+  ],
+};
+
 /** Optimal role assignment (maximizes TOTAL fit across all roles at once), via
  *  bitmask DP over the player set — cheap at n<=5 (2^5 = 32 states). A simple
  *  greedy that fills roles in array order is order-dependent: whichever role
