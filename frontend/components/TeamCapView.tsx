@@ -15,8 +15,16 @@ import BuyoutButton from "@/components/BuyoutButton";
 import { buyoutPlayer } from "@/app/finance/[slug]/actions";
 
 const SEASON = "2026-27";
-const SPAN = 8;
+const SPAN = 5;
 type CP = { id: number; name: string; position: string; age: number | null; isGoalie: boolean; capHit: number | null; contractYears: number | null; retainedSalary?: number | null };
+const isD = (pos: string) => /(^|\/)D(\/|$)/.test(pos) || pos === "D";
+/** capwages-style split: Forwards / Defense / Goalies as their own groups
+ *  instead of one flat cap-hit-sorted list. */
+const splitByPos = (list: CP[]) => ({
+  forwards: list.filter((p) => !p.isGoalie && !isD(p.position)),
+  defense: list.filter((p) => !p.isGoalie && isD(p.position)),
+  goalies: list.filter((p) => p.isGoalie),
+});
 
 /** Shared salary-cap / finance view for a team — used by /finance/[slug] and /teams/[slug]/salary. */
 export default async function TeamCapView({ slug }: { slug: string }) {
@@ -116,6 +124,22 @@ export default async function TeamCapView({ slug }: { slug: string }) {
       </tr>
     </thead>
   );
+  const groupCapHit = (list: CP[]) => list.reduce((s, p) => s + Math.max(0, (p.capHit ?? 0) - (p.retainedSalary ?? 0)), 0);
+  // capwages-style position group: its own header (name, count, subtotal) + table.
+  const PosGroup = ({ title, list, gm }: { title: string; list: CP[]; gm: boolean }) => (
+    <div className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 overflow-x-auto">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-slate-800/30 border-b border-slate-800">
+        <span className="text-xs font-bold uppercase tracking-wide text-slate-400">{title} ({list.length})</span>
+        <span className="text-xs text-slate-500 tabular-nums">{list.length > 0 ? money(groupCapHit(list)) : "—"}</span>
+      </div>
+      <table className="w-full text-sm min-w-[960px]">
+        <Thead gm={gm} />
+        <tbody>
+          {list.length > 0 ? <CapRows list={list} gm={gm} /> : <tr><td colSpan={4 + SPAN + (gm ? 1 : 0)} className="px-3 py-3 text-slate-600 text-sm">None on this roster.</td></tr>}
+        </tbody>
+      </table>
+    </div>
+  );
 
   return (
     <div className="space-y-5">
@@ -170,24 +194,43 @@ export default async function TeamCapView({ slug }: { slug: string }) {
 
       <div className="text-xs text-slate-500">▲ Upper limit: {money(cap.upper)} · ▼ Lower limit: {money(cap.lower)}</div>
 
-      {/* NHL cap table */}
+      {/* NHL cap table — split by position, capwages-style */}
       <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400">NHL Roster ({team.players.length})</h2>
-      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 overflow-x-auto -mt-2">
-        <table className="w-full text-sm min-w-[960px]">
-          <Thead gm={isGm} />
-          <tbody>
-            <CapRows list={team.players} gm={isGm} />
-            {realBuyouts.map((b) => (
-              <tr key={`b${b.id}`} className="border-b border-slate-800/60 bg-red-950/10">
-                <td className="px-3 py-1.5 text-slate-400 italic">{b.playerName} <span className="text-[10px] text-red-400">(bought out)</span></td><td /><td />
-                <td className="px-3 py-1.5 text-right text-red-300 tabular-nums">{money(b.perYear)}</td>
-                {years.map((y, i) => <td key={i} className="px-3 py-1.5 text-right tabular-nums">{y >= b.startYear && y < b.startYear + b.years ? <span className="text-red-300">{money(b.perYear)}</span> : ""}</td>)}
-                {isGm && <td />}
+      {(() => {
+        const g = splitByPos(team.players);
+        return (
+          <div className="space-y-4 -mt-2">
+            <PosGroup title="Forwards" list={g.forwards} gm={isGm} />
+            <PosGroup title="Defense" list={g.defense} gm={isGm} />
+            <PosGroup title="Goalies" list={g.goalies} gm={isGm} />
+          </div>
+        );
+      })()}
+
+      {/* Buyouts — dead money from this club's own bought-out contracts */}
+      {realBuyouts.length > 0 && (
+        <div className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 overflow-x-auto">
+          <div className="px-4 py-2.5 bg-slate-800/30 border-b border-slate-800 text-xs font-bold uppercase tracking-wide text-slate-400">Buyouts</div>
+          <table className="w-full text-sm min-w-[720px]">
+            <thead>
+              <tr className="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-800 bg-slate-800/30">
+                <th className="text-left px-3 py-2 font-medium">Player</th>
+                <th className="text-right px-3 py-2 font-medium">Cap Hit</th>
+                {years.map((y) => <th key={y} className="text-right px-3 py-2 whitespace-nowrap">{seasonLabel(y)}</th>)}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {realBuyouts.map((b) => (
+                <tr key={`b${b.id}`} className="border-b border-slate-800/60 bg-red-950/10">
+                  <td className="px-3 py-1.5 text-slate-400 italic">{b.playerName} <span className="text-[10px] text-red-400">(bought out)</span></td>
+                  <td className="px-3 py-1.5 text-right text-red-300 tabular-nums">{money(b.perYear)}</td>
+                  {years.map((y, i) => <td key={i} className="px-3 py-1.5 text-right tabular-nums">{y >= b.startYear && y < b.startYear + b.years ? <span className="text-red-300">{money(b.perYear)}</span> : ""}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Dead cap — retained salary on players this club no longer rosters */}
       {retentions.length > 0 && (
@@ -216,17 +259,18 @@ export default async function TeamCapView({ slug }: { slug: string }) {
         </div>
       )}
 
-      {/* Farm cap table */}
+      {/* Farm cap table — same position split */}
       <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400">Farm Roster ({farm.length})</h2>
-      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 overflow-x-auto -mt-2">
-        <table className="w-full text-sm min-w-[960px]">
-          <Thead gm={false} />
-          <tbody>
-            <CapRows list={farm} gm={false} />
-            {farm.length === 0 && <tr><td colSpan={4 + SPAN} className="px-3 py-3 text-slate-600 text-sm">No farm roster.</td></tr>}
-          </tbody>
-        </table>
-      </div>
+      {(() => {
+        const g = splitByPos(farm);
+        return (
+          <div className="space-y-4 -mt-2">
+            <PosGroup title="Forwards" list={g.forwards} gm={false} />
+            <PosGroup title="Defense" list={g.defense} gm={false} />
+            <PosGroup title="Goalies" list={g.goalies} gm={false} />
+          </div>
+        );
+      })()}
     </div>
   );
 }
