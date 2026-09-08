@@ -135,12 +135,20 @@ export async function collectMoveOps(pkg: TradePackage) {
             throw new Error(`A 2nd retention on ${pl.name}'s contract needs ${settings.retentionCooldownDays - elapsed} more in-season day(s) since the first.`);
           }
         }
+        // A 2nd (or 3rd) retention is a % of what the SENDING club has actually
+        // been paying (capHit net of any EARLIER retention still owed by a prior
+        // club) — same "Salary after Retention" figure shown everywhere else —
+        // not a fresh % of his full original salary. And it's ADDITIVE: the
+        // earlier retaining club(s) keep covering their own slice forever, so
+        // the acquiring club's new retainedSalary is the old amount plus this
+        // trade's new one, never a replacement of it.
+        const netBefore = capHit - retainedSalary;
         const pct = Math.min(maxPct, tp.retentionPct);
-        const retained = Math.round((capHit * pct / 100) / 500) * 500;
-        const netCap = capHit - retained;
+        const newSlice = Math.round((netBefore * pct / 100) / 500) * 500;
+        const netCap = netBefore - newSlice;
         if (netCap < settings.retentionMinSalary) throw new Error(`Retention would drop ${pl.name} below the ${settings.retentionMinSalary.toLocaleString()} floor.`);
-        retainedSalary = retained;
-        retentionRecords.push({ teamId: fromOrg.id, playerId: pl.id, playerName: `${pl.name} (retained)`, perYear: retained, years: Math.max(1, pl.contractYears ?? 1) });
+        retainedSalary += newSlice;
+        retentionRecords.push({ teamId: fromOrg.id, playerId: pl.id, playerName: `${pl.name} (retained)`, perYear: newSlice, years: Math.max(1, pl.contractYears ?? 1) });
       }
       // being shopped was the OLD club's decision — it doesn't carry over to whoever
       // just acquired him, so clear the trade-block flag on every trade.

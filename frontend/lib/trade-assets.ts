@@ -9,7 +9,7 @@ export async function teamAssets(teamId: number, prospectSource: "real" | "profi
   const [players, picks, prospects] = await Promise.all([
     prisma.player.findMany({
       where: { OR: [{ teamId, rosterType: "NHL" }, { teamId: { in: affIds }, rosterType: "AHL" }] },
-      select: { id: true, name: true, position: true, capHit: true, contractYears: true, rosterType: true, tradeClause: true, noTradeTeams: true },
+      select: { id: true, name: true, position: true, capHit: true, retainedSalary: true, contractYears: true, rosterType: true, tradeClause: true, noTradeTeams: true },
       orderBy: [{ rosterType: "asc" }, { capHit: "desc" }],
     }),
     prisma.draftPick.findMany({ where: { teamId }, orderBy: [{ year: "asc" }, { round: "asc" }] }),
@@ -26,7 +26,13 @@ export async function teamAssets(teamId: number, prospectSource: "real" | "profi
 
   const byName = <T extends { name: string }>(a: T, b: T) => cleanName(a.name).localeCompare(cleanName(b.name), "sk");
   return {
-    players: players.slice().sort(byName).map((p) => ({ id: p.id, name: p.name, position: p.position, capHit: p.capHit ?? 0, farm: p.rosterType === "AHL", clause: p.tradeClause, noTradeTeams: p.noTradeTeams })),
+    // `capHit` here is what THIS club actually pays — net of any retention it
+    // already benefits from (a player someone else is already partly paying
+    // for) — same net figure the team cap page shows as "Salary after
+    // Retention". A fresh retention slider in the trade builder multiplies
+    // against this, so retaining MORE on an already-retained player is a % of
+    // what's left, not the player's full original salary (see trade-exec.ts).
+    players: players.slice().sort(byName).map((p) => ({ id: p.id, name: p.name, position: p.position, capHit: Math.max(0, (p.capHit ?? 0) - (p.retainedSalary ?? 0)), farm: p.rosterType === "AHL", clause: p.tradeClause, noTradeTeams: p.noTradeTeams })),
     picks: picks.map((p) => {
       const orig = teamByLogoId.get(p.ownerLogoId);
       return { id: p.id, label: `${p.year} R${p.round}${orig ? ` (${orig.code ?? orig.name})` : ""}`, logoUrl: orig?.logoUrl ?? null };
