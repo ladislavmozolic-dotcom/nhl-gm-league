@@ -9,7 +9,7 @@ import { getLeagueDate, computePhase } from "../calendar-server";
 import { addDays, frenzyRound, frenzyDay } from "../calendar";
 
 const SEASON = "2026-27";
-const FRENZY_ROUND_MS = 7 * 86_400_000;
+const FRENZY_ROUND_MS = 4 * 86_400_000;
 
 /** Checked on every scheduler tick (unlike runAutoSimIfDue, which only fires
  *  once a day at the configured sim time) — a FORCE-opened Frenzy round (faOpen,
