@@ -53,7 +53,7 @@ export default async function AllOffersPage({ searchParams }: { searchParams: Pr
 
       {r.ok && r.namesOnly && (
         <Card bodyClassName="p-3">
-          <p className="text-sm text-amber-400">🔒 Fresh-round blackout (first 24h): you can see which players/teams are in play, but not the dollar figures yet.</p>
+          <p className="text-sm text-amber-400">🔒 Fresh-round blackout (first 24h): dollar figures for THIS round's offers are withheld — everything already decided in an earlier round still shows in full.</p>
         </Card>
       )}
 
@@ -64,7 +64,8 @@ export default async function AllOffersPage({ searchParams }: { searchParams: Pr
       ) : (
         <div className="space-y-4">
           {players.map((p) => {
-            const top = p.offers[0];
+            const knownSalaries = p.offers.map((o) => o.salary).filter((s): s is number => s != null);
+            const topKnown = knownSalaries.length ? Math.max(...knownSalaries) : null;
             return (
               <div key={p.playerId} className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 overflow-hidden">
                 <div className="flex items-center gap-3 px-4 py-3 bg-slate-800/40 border-b border-slate-800">
@@ -77,8 +78,8 @@ export default async function AllOffersPage({ searchParams }: { searchParams: Pr
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <div className="text-[10px] uppercase tracking-wide text-slate-500">{r.namesOnly ? "Offers" : "Top offer"}</div>
-                    <div className="text-lg font-black text-emerald-400 leading-tight">{r.namesOnly ? p.offers.length : money(top.salary!)}</div>
+                    <div className="text-[10px] uppercase tracking-wide text-slate-500">{topKnown != null ? "Top offer" : "Offers"}</div>
+                    <div className="text-lg font-black text-emerald-400 leading-tight">{topKnown != null ? money(topKnown) : p.offers.length}</div>
                   </div>
                 </div>
 
@@ -86,7 +87,7 @@ export default async function AllOffersPage({ searchParams }: { searchParams: Pr
                   {p.offers.map((o, i) => {
                     const st = STATUS[o.status] ?? { label: o.status, cls: "bg-slate-700/60 text-slate-300 border-slate-600/60" };
                     return (
-                      <div key={i} className={`flex items-center gap-3 px-4 py-2.5 ${i === 0 && !r.namesOnly ? "bg-emerald-500/[0.04]" : ""}`}>
+                      <div key={i} className={`flex items-center gap-3 px-4 py-2.5 ${i === 0 ? "bg-emerald-500/[0.04]" : ""}`}>
                         {o.teamLogo ? (
                           <img src={o.teamLogo} alt="" className="w-6 h-6 object-contain shrink-0" />
                         ) : (
@@ -94,11 +95,11 @@ export default async function AllOffersPage({ searchParams }: { searchParams: Pr
                         )}
                         <div className="w-12 shrink-0 font-bold text-slate-200 text-sm">{o.teamCode}</div>
                         <div className="flex-1 flex items-center gap-3 text-xs text-slate-400 flex-wrap">
-                          {r.namesOnly ? (
+                          {o.salary == null ? (
                             <span className="text-slate-600 italic">value hidden</span>
                           ) : (
                             <>
-                              <span className="font-semibold text-slate-200 tabular-nums">{money(o.salary!)}</span>
+                              <span className="font-semibold text-slate-200 tabular-nums">{money(o.salary)}</span>
                               <span>× {o.years}yr</span>
                               <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${o.twoWay ? "border-slate-700 text-slate-400" : "border-amber-600/60 text-amber-400"}`}>
                                 {o.twoWay ? "2-way" : "1-way"}
