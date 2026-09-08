@@ -79,6 +79,12 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
   // bigger/more physical forward manning the point on the kill) — defencemen
   // listed first.
   const stPointPool = useMemo(() => [...defense, ...forwards], [defense, forwards]);
+  // And the reverse: a PP/PK forward slot accepts a defenseman too — a role
+  // like Net Coverage/Net-Front is a fixed SEAT (see formation-layout.ts),
+  // not a real-position restriction, so a GM who wants a rangy D down low
+  // instead of a forward can just put him in that seat directly. Forwards
+  // listed first, matching the F-table's usual order.
+  const allSkatersPool = useMemo(() => [...forwards, ...defense], [forwards, defense]);
   const goaliesByName = useMemo(() => [...goalies].sort(byName), [goalies]);
 
   // Line chemistry — a 0..100 bond that grows while a unit stays intact and drops
@@ -432,6 +438,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
     key: "pp" | "fourVFour" | "pk4" | "pk3", title: string, fLabels: string[], dLabels: string[],
     dPool: Player[] = defense, dHint?: string,
     roleInfo?: { dial: "ppStyle" | "pkStyle"; layouts: Record<string, FormationRole[]> },
+    fPool: Player[] = forwards,
   ) => {
     const units = data.situations[key];
     const nF = fLabels.length, nD = dLabels.length;
@@ -457,7 +464,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
               {Array.from({ length: nF }).map((_, si) => (
                 <td key={si} className="px-2 align-top">
                   {roles && <div className="text-[10px] font-semibold uppercase tracking-wide text-sky-400/80 mb-0.5">{roles[si]?.label ?? "—"}</div>}
-                  <Select value={u.players[si]} onChange={(v) => setUnit(key, ui, si, v)} pool={forwards} />
+                  <Select value={u.players[si]} onChange={(v) => setUnit(key, ui, si, v)} pool={fPool} />
                 </td>
               ))}
               <TacCells t={u.tactic} onSet={(k, v) => setUnitTac(key, ui, k, v)} />
@@ -572,7 +579,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
           <UnitFormationBlock unitKey="pp" ui={0} dial="ppStyle" label="PP1" layouts={PP_LAYOUTS} dStartIndex={3} accent="#3b82f6" />
           <UnitFormationBlock unitKey="pp" ui={1} dial="ppStyle" label="PP2" layouts={PP_LAYOUTS} dStartIndex={3} accent="#a855f7" />
         </div>
-        {SplitUnitSection("pp", "Power Play (5 on 4)", ["F1", "F2", "F3"], ["D1", "D2"], stPointPool, "💡 Na presilovke môžeš do modrej (D1/D2) dať aj útočníka — dropdown ponúka obrancov aj útočníkov, takže sa dá hrať 4 útočníci + 1 obranca.", { dial: "ppStyle", layouts: PP_LAYOUTS })}
+        {SplitUnitSection("pp", "Power Play (5 on 4)", ["F1", "F2", "F3"], ["D1", "D2"], stPointPool, "💡 Ktorýkoľvek slot môže mať útočníka aj obrancu — dropdown ponúka oboje, takže sa dá hrať aj 4 útočníci + 1 obranca alebo naopak.", { dial: "ppStyle", layouts: PP_LAYOUTS }, allSkatersPool)}
       </>}
       {tab === "4 vs 4" && SplitUnitSection("fourVFour", "4 vs 4", ["C", "W"], ["LD", "RD"])}
       {tab === "PK4" && <>
@@ -581,7 +588,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
           <UnitFormationBlock unitKey="pk4" ui={0} dial="pkStyle" label="PK1" layouts={PK_LAYOUTS} dStartIndex={2} accent="#ef4444" />
           <UnitFormationBlock unitKey="pk4" ui={1} dial="pkStyle" label="PK2" layouts={PK_LAYOUTS} dStartIndex={2} accent="#f97316" />
         </div>
-        {SplitUnitSection("pk4", "Penalty Kill (4 on 5)", ["F1", "F2"], ["D1", "D2"], stPointPool, "💡 Na oslabení môžeš do modrej (D1/D2) dať aj útočníka — dropdown ponúka obrancov aj útočníkov.", { dial: "pkStyle", layouts: PK_LAYOUTS })}
+        {SplitUnitSection("pk4", "Penalty Kill (4 on 5)", ["F1", "F2"], ["D1", "D2"], stPointPool, "💡 Ktorýkoľvek slot môže mať útočníka aj obrancu — napr. ak chceš mať na role Net Coverage/Net-Front obrancu namiesto útočníka, jednoducho ho daj do toho F slotu.", { dial: "pkStyle", layouts: PK_LAYOUTS }, allSkatersPool)}
       </>}
       {tab === "PK3" && <>
         <p className="text-xs text-slate-500 px-1 mb-3">Zdieľa systém (Box/Diamond/Aggressive) s PK4 — pri 3 hráčoch niet 4. rohu, takže sa mení hlavne to, ako vysoko/agresívne hrá útočník. Zmeň to na karte <strong className="text-slate-300">PK4</strong> vyššie.</p>
@@ -589,7 +596,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
           <UnitFormationBlock unitKey="pk3" ui={0} dial="pkStyle" label="PK3-1" layouts={PK3_LAYOUTS} dStartIndex={1} accent="#facc15" />
           <UnitFormationBlock unitKey="pk3" ui={1} dial="pkStyle" label="PK3-2" layouts={PK3_LAYOUTS} dStartIndex={1} accent="#eab308" />
         </div>
-        {SplitUnitSection("pk3", "Penalty Kill (3 on 5)", ["F1"], ["D1", "D2"], stPointPool, "💡 Aj pri 5na3 môžeš do modrej (D1/D2) dať útočníka — dropdown ponúka obrancov aj útočníkov.", { dial: "pkStyle", layouts: PK3_LAYOUTS })}
+        {SplitUnitSection("pk3", "Penalty Kill (3 on 5)", ["F1"], ["D1", "D2"], stPointPool, "💡 Ktorýkoľvek slot môže mať útočníka aj obrancu — dropdown ponúka oboje na oboch pozíciách.", { dial: "pkStyle", layouts: PK3_LAYOUTS }, allSkatersPool)}
       </>}
       {tab === "Overtime" && UnitSection("overtime", "Overtime (3 vs 3)", ["OT1", "OT2", "OT3"], () => players)}
 
