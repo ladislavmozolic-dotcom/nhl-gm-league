@@ -13,17 +13,26 @@ import type { PpStyle, PkStyle } from "./tactics";
 export type FormationRole = { key: string; label: string; x: number; y: number; fit: (a: RoleAttrs) => number };
 export type RoleAttrs = { sc: number; pa: number; st: number; isD: boolean };
 
-// dPref: +1 = this role wants whoever's in a D personnel slot (LD/RD on PP,
-// LD/RD on PK), -1 = wants a forward slot (LW/C/RW on PP, C/W on PK), 0 =
-// no preference. The bonus dominates the sc/pa/st spread (0..99 scale, max
-// weighted contribution ~99) so e.g. Point reliably goes to whoever's on the
-// blue line in the personnel picker, not just whoever has the highest PA —
-// a real 1-3-1/Umbrella/Overload point is manned by the unit's D (or the
-// forward the GM deliberately dropped into the LD/RD slot for exactly that
-// job — the picker already lets a forward play there).
-const D_BONUS = 40;
-const w = (sc: number, pa: number, st: number, dPref: 0 | 1 | -1 = 0) =>
-  (a: RoleAttrs) => a.sc * sc + a.pa * pa + a.st * st + (dPref === 0 ? 0 : dPref * (a.isD ? D_BONUS : -D_BONUS));
+// dBias: added when the candidate is in a D personnel slot (LD/RD on PP,
+// LD/RD on PK); 0 = no preference. Dominates the sc/pa/st spread (0..99
+// scale, max weighted contribution ~99) so e.g. Point reliably goes to
+// whoever's on the blue line in the personnel picker, not just whoever has
+// the highest PA — a real 1-3-1/Umbrella/Overload point is manned by the
+// unit's D (or the forward the GM deliberately dropped into the LD/RD slot
+// for exactly that job — the picker already lets a forward play there).
+// Graduated, not just +/-: with only one "Point" role but two D personnel
+// slots, a genuine 2-D unit's SECOND defenceman still has to land somewhere
+// among the forward roles — Half-Wall is a real spot for a 2nd/offensive D
+// in a lot of systems, so its penalty is mild; Net-Front and Bumper (the
+// one-timer finisher) are the most forward-exclusive jobs on the ice, so
+// their penalty is much steeper, keeping a stray D out of them whenever a
+// forward is available for either.
+const w = (sc: number, pa: number, st: number, dBias = 0) =>
+  (a: RoleAttrs) => a.sc * sc + a.pa * pa + a.st * st + (a.isD ? dBias : 0);
+const POINT = 45, HALF_WALL = -18, FINISH = -55, LOW_FORWARD = -35;
+// PK is a clean 2-forward/2-defence split either way (no "leftover" case like
+// the PP's second D), so a flat bias per side is enough.
+const D_ROLE = 40, F_ROLE = -40;
 
 // Balanced has no signature (DIAL_DESC: "No signature power play") — it isn't
 // a real tactical shape, so it must not pretend to be one. No attribute
@@ -44,25 +53,25 @@ export const PP_LAYOUTS: Record<PpStyle, FormationRole[]> = {
   // net front, one working below the goal line/around the crease — not a
   // single "bumper" in the middle.
   umbrella: [
-    { key: "r1", label: "Point", x: 50, y: 84, fit: w(0.7, 0.3, 0, 1) },
-    { key: "r2", label: "Left Half-Wall", x: 24, y: 58, fit: w(0.5, 0.5, 0, -1) },
-    { key: "r3", label: "Right Half-Wall", x: 76, y: 58, fit: w(0.5, 0.5, 0, -1) },
-    { key: "r4", label: "Net-Front", x: 34, y: 20, fit: w(0, 0.2, 0.8, -1) },
-    { key: "r5", label: "Below the Goal Line", x: 68, y: 14, fit: w(0.3, 0.4, 0.3, -1) },
+    { key: "r1", label: "Point", x: 50, y: 84, fit: w(0.7, 0.3, 0, POINT) },
+    { key: "r2", label: "Left Half-Wall", x: 24, y: 58, fit: w(0.5, 0.5, 0, HALF_WALL) },
+    { key: "r3", label: "Right Half-Wall", x: 76, y: 58, fit: w(0.5, 0.5, 0, HALF_WALL) },
+    { key: "r4", label: "Net-Front", x: 34, y: 20, fit: w(0, 0.2, 0.8, FINISH) },
+    { key: "r5", label: "Below the Goal Line", x: 68, y: 14, fit: w(0.3, 0.4, 0.3, LOW_FORWARD) },
   ],
   "131": [
-    { key: "r1", label: "Point", x: 50, y: 84, fit: w(0.2, 0.8, 0, 1) },
-    { key: "r2", label: "Left Half-Wall", x: 22, y: 58, fit: w(0.5, 0.5, 0, -1) },
-    { key: "r3", label: "Right Half-Wall", x: 78, y: 58, fit: w(0.5, 0.5, 0, -1) },
-    { key: "r4", label: "Bumper (one-timer)", x: 50, y: 40, fit: w(0.75, 0.25, 0, -1) },
-    { key: "r5", label: "Net-Front", x: 50, y: 16, fit: w(0, 0.2, 0.8, -1) },
+    { key: "r1", label: "Point", x: 50, y: 84, fit: w(0.2, 0.8, 0, POINT) },
+    { key: "r2", label: "Left Half-Wall", x: 22, y: 58, fit: w(0.5, 0.5, 0, HALF_WALL) },
+    { key: "r3", label: "Right Half-Wall", x: 78, y: 58, fit: w(0.5, 0.5, 0, HALF_WALL) },
+    { key: "r4", label: "Bumper (one-timer)", x: 50, y: 40, fit: w(0.75, 0.25, 0, FINISH) },
+    { key: "r5", label: "Net-Front", x: 50, y: 16, fit: w(0, 0.2, 0.8, FINISH) },
   ],
   overload: [
-    { key: "r1", label: "Point", x: 62, y: 82, fit: w(0.2, 0.6, 0.2, 1) },
-    { key: "r2", label: "Half-Boards", x: 28, y: 60, fit: w(0.2, 0.6, 0.2, -1) },
-    { key: "r3", label: "Corner", x: 16, y: 34, fit: w(0.2, 0.5, 0.5, -1) },
-    { key: "r4", label: "Net-Front", x: 50, y: 18, fit: w(0, 0.2, 0.8, -1) },
-    { key: "r5", label: "Backdoor", x: 78, y: 30, fit: w(0.75, 0.15, 0, -1) },
+    { key: "r1", label: "Point", x: 62, y: 82, fit: w(0.2, 0.6, 0.2, POINT) },
+    { key: "r2", label: "Half-Boards", x: 28, y: 60, fit: w(0.2, 0.6, 0.2, HALF_WALL) },
+    { key: "r3", label: "Corner", x: 16, y: 34, fit: w(0.2, 0.5, 0.5, LOW_FORWARD) },
+    { key: "r4", label: "Net-Front", x: 50, y: 18, fit: w(0, 0.2, 0.8, FINISH) },
+    { key: "r5", label: "Backdoor", x: 78, y: 30, fit: w(0.75, 0.15, 0, FINISH) },
   ],
 };
 
@@ -76,22 +85,22 @@ export const PK_LAYOUTS: Record<PkStyle, FormationRole[]> = {
     { key: "r4", label: "RD", x: 68, y: 80, fit: NO_FIT },
   ],
   box: [
-    { key: "r1", label: "Left Top", x: 34, y: 40, fit: w(0, 0.2, 0.4, -1) },
-    { key: "r2", label: "Right Top", x: 66, y: 40, fit: w(0, 0.2, 0.4, -1) },
-    { key: "r3", label: "Left D", x: 34, y: 78, fit: w(0, 0, 0.6, 1) },
-    { key: "r4", label: "Right D", x: 66, y: 78, fit: w(0, 0, 0.6, 1) },
+    { key: "r1", label: "Left Top", x: 34, y: 40, fit: w(0, 0.2, 0.4, F_ROLE) },
+    { key: "r2", label: "Right Top", x: 66, y: 40, fit: w(0, 0.2, 0.4, F_ROLE) },
+    { key: "r3", label: "Left D", x: 34, y: 78, fit: w(0, 0, 0.6, D_ROLE) },
+    { key: "r4", label: "Right D", x: 66, y: 78, fit: w(0, 0, 0.6, D_ROLE) },
   ],
   diamond: [
-    { key: "r1", label: "Top (pressure)", x: 50, y: 32, fit: w(0.1, 0.2, 0.2, -1) },
-    { key: "r2", label: "Left Wing", x: 24, y: 60, fit: w(0, 0.2, 0.4, -1) },
-    { key: "r3", label: "Right Wing", x: 76, y: 60, fit: w(0, 0.2, 0.4, -1) },
-    { key: "r4", label: "Bottom (net)", x: 50, y: 82, fit: w(0, 0, 0.6, 1) },
+    { key: "r1", label: "Top (pressure)", x: 50, y: 32, fit: w(0.1, 0.2, 0.2, F_ROLE) },
+    { key: "r2", label: "Left Wing", x: 24, y: 60, fit: w(0, 0.2, 0.4, F_ROLE) },
+    { key: "r3", label: "Right Wing", x: 76, y: 60, fit: w(0, 0.2, 0.4, F_ROLE) },
+    { key: "r4", label: "Bottom (net)", x: 50, y: 82, fit: w(0, 0, 0.6, D_ROLE) },
   ],
   aggressive: [
-    { key: "r1", label: "Pressure F", x: 40, y: 26, fit: w(0.1, 0, 0.2, -1) },
-    { key: "r2", label: "Pressure F", x: 60, y: 26, fit: w(0.1, 0, 0.2, -1) },
-    { key: "r3", label: "Left D", x: 32, y: 70, fit: w(0, 0, 0.5, 1) },
-    { key: "r4", label: "Right D", x: 68, y: 70, fit: w(0, 0, 0.5, 1) },
+    { key: "r1", label: "Pressure F", x: 40, y: 26, fit: w(0.1, 0, 0.2, F_ROLE) },
+    { key: "r2", label: "Pressure F", x: 60, y: 26, fit: w(0.1, 0, 0.2, F_ROLE) },
+    { key: "r3", label: "Left D", x: 32, y: 70, fit: w(0, 0, 0.5, D_ROLE) },
+    { key: "r4", label: "Right D", x: 68, y: 70, fit: w(0, 0, 0.5, D_ROLE) },
   ],
 };
 
