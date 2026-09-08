@@ -134,6 +134,18 @@ async function offerViewMask(playerId?: number): Promise<{ hide: Set<number> } |
   if (id == null) return null;
   const me = await prisma.team.findUnique({ where: { id }, select: { isAdmin: true, gmRole: true } });
   if (!me || !(me.isAdmin || me.gmRole === "comish" || me.gmRole === "co_comish")) return null;
+  // Fresh-round blackout: for the first 24 REAL hours after a force-opened
+  // round starts, the commissioner's office sees NOTHING at all through this
+  // admin view — not even on a player they have no stake in. Without this, a
+  // comish/co-comish could open a player's Interest widget before placing
+  // their own bid and simply read off what everyone else is offering, using
+  // their day-1 head start (submitOfferAction's dayInRound===1 gate) to
+  // scout the field risk-free. Only meaningful for a force-opened market
+  // (faOpen) — a calendar-driven round has no real-time start to measure.
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { faOpen: true, frenzyRoundStartedAt: true } });
+  if (cfg?.faOpen && cfg.frenzyRoundStartedAt && Date.now() - cfg.frenzyRoundStartedAt.getTime() < 24 * 60 * 60 * 1000) {
+    return null;
+  }
   // Conflict of interest: a commish/co-commish who is ALSO bidding on this exact
   // player (as a club) loses the admin view of it entirely — bidding stays blind
   // for them here too, same as an ordinary GM, so their office can't use the
