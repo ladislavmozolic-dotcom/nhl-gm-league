@@ -16,8 +16,25 @@ const STATUS: Record<string, { label: string; cls: string }> = {
 
 const ovColor = (v: number | null) => v == null ? "text-slate-500" : v >= 80 ? "text-emerald-400" : v >= 70 ? "text-blue-400" : v >= 60 ? "text-amber-400" : "text-slate-400";
 
-export default async function AllOffersPage() {
+export default async function AllOffersPage({ searchParams }: { searchParams: Promise<{ round?: string }> }) {
   const r = await getAllActiveOffersAction();
+  const roundParam = (await searchParams).round;
+  const round = [1, 2, 3].includes(Number(roundParam)) ? Number(roundParam) : 0; // 0 = All
+
+  const allPlayers = r.ok ? r.players : [];
+  const counts = [1, 2, 3].map((rd) => allPlayers.filter((p) => p.offers.some((o) => (o.round || 1) === rd)).length);
+  const players = round === 0
+    ? allPlayers
+    : allPlayers
+        .map((p) => ({ ...p, offers: p.offers.filter((o) => (o.round || 1) === round) }))
+        .filter((p) => p.offers.length > 0);
+
+  const Tab = ({ label, rd }: { label: string; rd: number }) => (
+    <Link href={rd === 0 ? "/free-agents/offers" : `/free-agents/offers?round=${rd}`}
+      className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${round === rd ? "bg-blue-600 text-white" : "border border-slate-700 text-slate-400 hover:bg-slate-800"}`}>
+      {label} {rd > 0 && <span className="text-xs opacity-70">({counts[rd - 1]})</span>}
+    </Link>
+  );
 
   return (
     <div className="space-y-6 py-2 max-w-4xl">
@@ -27,13 +44,26 @@ export default async function AllOffersPage() {
         right={<Link href="/free-agents" className="text-sm text-slate-400 hover:text-blue-400">← Free Agent Frenzy</Link>}
       />
 
+      {r.ok && (
+        <div className="flex gap-2 flex-wrap">
+          <Tab label="All" rd={0} />
+          {[1, 2, 3].map((rd) => <Tab key={rd} label={`Round ${rd}`} rd={rd} />)}
+        </div>
+      )}
+
+      {r.ok && r.namesOnly && (
+        <Card bodyClassName="p-3">
+          <p className="text-sm text-amber-400">🔒 Fresh-round blackout (first 24h): you can see which players/teams are in play, but not the dollar figures yet.</p>
+        </Card>
+      )}
+
       {!r.ok ? (
         <Card><p className="text-sm text-rose-400">🔒 {r.error}</p></Card>
-      ) : r.players.length === 0 ? (
-        <Card><p className="text-sm text-slate-500 text-center py-6">Nobody has an active offer right now.</p></Card>
+      ) : players.length === 0 ? (
+        <Card><p className="text-sm text-slate-500 text-center py-6">{round === 0 ? "Nobody has an active offer right now." : `Nobody has an active offer in round ${round}.`}</p></Card>
       ) : (
         <div className="space-y-4">
-          {r.players.map((p) => {
+          {players.map((p) => {
             const top = p.offers[0];
             return (
               <div key={p.playerId} className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 overflow-hidden">
@@ -47,8 +77,8 @@ export default async function AllOffersPage() {
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <div className="text-[10px] uppercase tracking-wide text-slate-500">Top offer</div>
-                    <div className="text-lg font-black text-emerald-400 leading-tight">{money(top.salary)}</div>
+                    <div className="text-[10px] uppercase tracking-wide text-slate-500">{r.namesOnly ? "Offers" : "Top offer"}</div>
+                    <div className="text-lg font-black text-emerald-400 leading-tight">{r.namesOnly ? p.offers.length : money(top.salary!)}</div>
                   </div>
                 </div>
 
@@ -56,7 +86,7 @@ export default async function AllOffersPage() {
                   {p.offers.map((o, i) => {
                     const st = STATUS[o.status] ?? { label: o.status, cls: "bg-slate-700/60 text-slate-300 border-slate-600/60" };
                     return (
-                      <div key={i} className={`flex items-center gap-3 px-4 py-2.5 ${i === 0 ? "bg-emerald-500/[0.04]" : ""}`}>
+                      <div key={i} className={`flex items-center gap-3 px-4 py-2.5 ${i === 0 && !r.namesOnly ? "bg-emerald-500/[0.04]" : ""}`}>
                         {o.teamLogo ? (
                           <img src={o.teamLogo} alt="" className="w-6 h-6 object-contain shrink-0" />
                         ) : (
@@ -64,11 +94,17 @@ export default async function AllOffersPage() {
                         )}
                         <div className="w-12 shrink-0 font-bold text-slate-200 text-sm">{o.teamCode}</div>
                         <div className="flex-1 flex items-center gap-3 text-xs text-slate-400 flex-wrap">
-                          <span className="font-semibold text-slate-200 tabular-nums">{money(o.salary)}</span>
-                          <span>× {o.years}yr</span>
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${o.twoWay ? "border-slate-700 text-slate-400" : "border-amber-600/60 text-amber-400"}`}>
-                            {o.twoWay ? "2-way" : "1-way"}
-                          </span>
+                          {r.namesOnly ? (
+                            <span className="text-slate-600 italic">value hidden</span>
+                          ) : (
+                            <>
+                              <span className="font-semibold text-slate-200 tabular-nums">{money(o.salary!)}</span>
+                              <span>× {o.years}yr</span>
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${o.twoWay ? "border-slate-700 text-slate-400" : "border-amber-600/60 text-amber-400"}`}>
+                                {o.twoWay ? "2-way" : "1-way"}
+                              </span>
+                            </>
+                          )}
                           {!p.isGoalie && <span className="text-slate-600">Line {o.line}{(o.pp || o.pk) && ` · ${[o.pp && "PP", o.pk && "PK"].filter(Boolean).join("/")}`}</span>}
                           <span className="text-slate-600">Round {o.round || "—"}</span>
                         </div>

@@ -136,12 +136,16 @@ async function offerViewMask(playerId?: number): Promise<{ hide: Set<number> } |
   if (!me || !(me.isAdmin || me.gmRole === "comish" || me.gmRole === "co_comish")) return null;
   // Fresh-round blackout: for the first 24 REAL hours after a force-opened
   // round starts, the commissioner's office sees NOTHING at all through this
-  // admin view — not even on a player they have no stake in. Without this, a
-  // comish/co-comish could open a player's Interest widget before placing
-  // their own bid and simply read off what everyone else is offering, using
-  // their day-1 head start (submitOfferAction's dayInRound===1 gate) to
-  // scout the field risk-free. Only meaningful for a force-opened market
-  // (faOpen) — a calendar-driven round has no real-time start to measure.
+  // per-player admin view — not even on a player they have no stake in.
+  // Without this, a comish/co-comish could open a player's Interest widget
+  // before placing their own bid and simply read off what everyone else is
+  // offering, using their day-1 head start (submitOfferAction's
+  // dayInRound===1 gate) to scout the field risk-free. Only meaningful for a
+  // force-opened market (faOpen) — a calendar-driven round has no real-time
+  // start to measure. (The market-wide "All Active Offers" list has its own,
+  // milder blackout — see offerViewMaskForMarketList below — since showing
+  // WHICH players/teams are in play there, without dollar figures, isn't the
+  // same information leak as a per-player breakdown.)
   const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { faOpen: true, frenzyRoundStartedAt: true } });
   if (cfg?.faOpen && cfg.frenzyRoundStartedAt && Date.now() - cfg.frenzyRoundStartedAt.getTime() < 24 * 60 * 60 * 1000) {
     return null;
@@ -161,6 +165,28 @@ async function offerViewMask(playerId?: number): Promise<{ hide: Set<number> } |
     for (const t of comish) if (t.id !== id) hide.add(t.id);
   }
   return { hide };
+}
+
+/** Same admin/comish-tier gate and comish-vs-co-comish hide-set as offerViewMask,
+ *  but for the market-wide "All Active Offers" list only — during the first 24h
+ *  fresh-round blackout, instead of hiding everything, it flags `namesOnly` so
+ *  getAllActiveOffersAction still returns which players/teams have an offer in
+ *  (real market activity, not exploitable on its own) while stripping every
+ *  dollar figure. Regular blind-bidding conflict-of-interest still applies —
+ *  the caller's own actively-bid-on players are filtered out by the caller. */
+async function offerViewMaskForMarketList(): Promise<{ hide: Set<number>; namesOnly: boolean } | null> {
+  const id = await getTeamSession();
+  if (id == null) return null;
+  const me = await prisma.team.findUnique({ where: { id }, select: { isAdmin: true, gmRole: true } });
+  if (!me || !(me.isAdmin || me.gmRole === "comish" || me.gmRole === "co_comish")) return null;
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { faOpen: true, frenzyRoundStartedAt: true } });
+  const namesOnly = !!(cfg?.faOpen && cfg.frenzyRoundStartedAt && Date.now() - cfg.frenzyRoundStartedAt.getTime() < 24 * 60 * 60 * 1000);
+  const hide = new Set<number>();
+  if (me.gmRole !== "comish") {
+    const comish = await prisma.team.findMany({ where: { gmRole: "comish" }, select: { id: true } });
+    for (const t of comish) if (t.id !== id) hide.add(t.id);
+  }
+  return { hide, namesOnly };
 }
 
 /** Commissioner toggle: lock / unlock UFA signings for ordinary GMs. */
@@ -262,7 +288,7 @@ export async function getBidHistoryAction(playerId: number) {
  *  as every other offer-visibility action (a co-commissioner never sees the
  *  commissioner's own bid). */
 export async function getAllActiveOffersAction() {
-  const mask = await offerViewMask();
+  const mask = await offerViewMaskForMarketList();
   if (!mask) return { ok: false as const, error: "Commissioner or co-commissioner only." };
   // conflict of interest, market-wide: drop every player the viewer's own club is
   // ALSO bidding on — same rule getPlayerOffersAction applies per-player, so the
@@ -302,7 +328,11 @@ export async function getAllActiveOffersAction() {
       playerId, name: p?.name ?? "?", slug: p?.slug ?? null, position: p?.position ?? "", isGoalie: p?.isGoalie ?? false,
       photoUrl: p?.photoUrl ?? null, overall: p?.overall ?? null,
       offers: os.map((o) => ({
-        teamId: o.teamId, teamCode: teamById.get(o.teamId)?.code ?? "?", teamLogo: teamById.get(o.teamId)?.logoUrl ?? null, salary: o.salary, years: o.years,
+        teamId: o.teamId, teamCode: teamById.get(o.teamId)?.code ?? "?", teamLogo: teamById.get(o.teamId)?.logoUrl ?? null,
+        // fresh-round blackout: dollar figures are withheld for the first 24h —
+        // everything else (who's bidding, line/PP/PK role, round, status) still
+        // shows, since that's real market activity rather than a leaked number.
+        salary: mask.namesOnly ? null : o.salary, years: mask.namesOnly ? null : o.years,
         line: o.line, pp: o.pp, pk: o.pk, round: o.round, status: o.status, twoWay: !!o.twoWay,
         // last ACTUAL raise (FaBid log), not o.updatedAt — that also bumps on
         // round-processing status flips (COUNTERED/SHORTLISTED/REJECTED) that
@@ -311,8 +341,8 @@ export async function getAllActiveOffersAction() {
       })),
     };
   }).filter((p) => p.offers.length > 0); // a hidden comish-only offer can leave a co-comish's view empty for that player
-  result.sort((a, b) => Math.max(...b.offers.map((o) => o.salary)) - Math.max(...a.offers.map((o) => o.salary)));
-  return { ok: true as const, players: result };
+  result.sort((a, b) => Math.max(...b.offers.map((o) => o.salary ?? 0)) - Math.max(...a.offers.map((o) => o.salary ?? 0)));
+  return { ok: true as const, players: result, namesOnly: mask.namesOnly };
 }
 
 /** Comish-tier only, READ-ONLY: DMs the caller's own team what round 1 WOULD do
