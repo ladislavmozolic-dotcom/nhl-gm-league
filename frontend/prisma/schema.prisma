@@ -340,12 +340,20 @@ model TradeGroupResponse {
 
 model Waiver {
   id             Int      @id @default(autoincrement())
-  playerId       Int      @unique          // one active waiver per player
+  playerId       Int      @unique          // one active waiver per player — a player waived again reuses this same row
   fromTeamId     Int                        // the club that placed him (pays him until resolution)
   placedDay      Int                        // roundForDate(leagueDate) when placed — clears the next day
   status         String   @default("ACTIVE") // ACTIVE | CLAIMED | CLEARED | CANCELLED
   claimedByTeamId Int?
   createdAt      DateTime @default(now())
+  // Real wall-clock moment of the CURRENT placement — refreshed every time
+  // placeOnWaivers reuses this row for a repeat trip. createdAt is set once,
+  // forever, by Prisma's @default(now()); processWaivers' 48h stale-safety-net
+  // was reading createdAt, so any player who'd EVER been waived before (more
+  // than 48h ago) got resolved almost instantly on his next trip instead of
+  // waiting out the real one-day window, since his original placement already
+  // looked "stuck" by that check. placedAt is what the safety net reads now.
+  placedAt       DateTime @default(now())
   resolvedAt     DateTime?
   claims         WaiverClaim[]
   @@index([status])

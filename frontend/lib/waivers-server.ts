@@ -59,10 +59,11 @@ export async function placeOnWaivers(playerId: number, actorTeamId: number): Pro
   const existing = await prisma.waiver.findUnique({ where: { playerId } });
   if (existing && existing.status === "ACTIVE") return { ok: false, error: "He's already on waivers." };
   const day = roundForDate(await getLeagueDate());
+  const now = new Date();
   await prisma.$transaction([
     existing
-      ? prisma.waiver.update({ where: { playerId }, data: { status: "ACTIVE", fromTeamId: actorTeamId, placedDay: day, claimedByTeamId: null, resolvedAt: null } })
-      : prisma.waiver.create({ data: { playerId, fromTeamId: actorTeamId, placedDay: day } }),
+      ? prisma.waiver.update({ where: { playerId }, data: { status: "ACTIVE", fromTeamId: actorTeamId, placedDay: day, placedAt: now, claimedByTeamId: null, resolvedAt: null } })
+      : prisma.waiver.create({ data: { playerId, fromTeamId: actorTeamId, placedDay: day, placedAt: now } }),
     prisma.waiverClaim.deleteMany({ where: { waiver: { playerId } } }),
     prisma.player.update({ where: { id: playerId }, data: { waiverStatus: "ON_WAIVERS" } }),
     prisma.transaction.create({ data: { type: "WAIVER", playerId, teamId: actorTeamId, message: `${cleanName(p.name)} was placed on waivers.` } }),
@@ -116,11 +117,15 @@ export async function claimWaiver(waiverId: number, teamId: number): Promise<{ o
  *  league-date corruption (it's happened — leagueDate briefly fast-forwarded
  *  months ahead during a testing session) can permanently strand a waiver on a
  *  placedDay index the calendar will never catch up to again, silently, with
- *  no error anywhere. createdAt is a real wall-clock timestamp immune to that. */
+ *  no error anywhere. placedAt is a real wall-clock timestamp immune to that —
+ *  and, unlike createdAt, it's refreshed every time this row is reused for a
+ *  repeat trip (one Waiver row per player, ever), so a player waived a second
+ *  time doesn't inherit his FIRST placement's age and get resolved almost
+ *  instantly by this safety net instead of waiting out the real one-day window. */
 export async function processWaivers(currentDay: number, phase: Phase): Promise<{ claimed: number; cleared: number; details: string[] }> {
   const staleCutoff = new Date(Date.now() - 48 * 3600 * 1000);
   const due = await prisma.waiver.findMany({
-    where: { status: "ACTIVE", OR: [{ placedDay: { lt: currentDay } }, { createdAt: { lt: staleCutoff } }] },
+    where: { status: "ACTIVE", OR: [{ placedDay: { lt: currentDay } }, { placedAt: { lt: staleCutoff } }] },
     include: { claims: true },
   });
   if (due.length === 0) return { claimed: 0, cleared: 0, details: [] };
