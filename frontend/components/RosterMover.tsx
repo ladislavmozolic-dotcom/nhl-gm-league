@@ -79,9 +79,14 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
   };
 
   // is a move legal? onto the NHL roster (dressed or scratched) an AHL-only deal can
-  // never go; down to the farm a one-way contract can never go (unless it's AHL-only).
+  // never go; a one-way contract can never move DOWN to the farm FROM the NHL side
+  // (unless it's AHL-only) — that needs to clear waivers first (the Farm/Waivers
+  // button), not a direct move. But once he's already ON the farm, toggling him
+  // between Farm and Farm Scratched isn't "being sent down" at all — he's already
+  // there — so that restriction must not block a farm-internal dress/scratch move.
   const canMove = (p: Player, to: RosterSide) => {
     if (isNhlSide(to)) return !isAhlOnly(p);
+    if (!isNhlSide(p.side)) return true;
     return p.contractType !== "ONE_WAY" || isAhlOnly(p);
   };
   const move = (id: number, to: RosterSide) => {
