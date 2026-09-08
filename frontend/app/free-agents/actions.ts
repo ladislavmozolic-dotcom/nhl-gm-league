@@ -750,19 +750,30 @@ async function pickAndSign(
   judgeRound: number, pool: Awaited<ReturnType<typeof loadMarketPool>>, cmap: Awaited<ReturnType<typeof teamContentionMap>>,
   allowSoleFloor: boolean,
 ): Promise<string | null> {
+  const cap = await loadLeagueCap();
+  const clockPhase = (await getLeagueClock()).phase;
   let best: { offer: FaOfferRow; salary: number; years: number; utility: number } | null = null;
   let soleEv: Awaited<ReturnType<typeof evaluateTeamOffer>> = null;
   for (const o of offers) {
     const ev = await evaluateTeamOffer(playerId, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, judgeRound, { clause: o.grantClause, breadth: o.mNtcBreadth });
     if (offers.length === 1) soleEv = ev;
-    if (ev?.acceptable && (!best || ev.utility > best.utility)) best = { offer: o, salary: o.salary, years: o.years, utility: ev.utility };
+    if (!ev?.acceptable) continue;
+    // A club already over the cap (or that this exact signing would push over)
+    // can't actually carry the contract — skip it as a candidate winner rather
+    // than handing him a deal the team isn't legally allowed to have. He just
+    // goes to the next-best (real) offer instead; a shut-out bidder gets the
+    // same "signed elsewhere, your offer is rejected" DM every other loser
+    // gets, so there's nothing special-cased to communicate here.
+    const info = await teamCapInfo(o.teamId);
+    const ceiling = capCeilingForPhase(cap.upper, clockPhase) + info.ltir;
+    if (info.committed + o.salary > ceiling) continue;
+    if (!best || ev.utility > best.utility) best = { offer: o, salary: o.salary, years: o.years, utility: ev.utility };
   }
   if (!best && allowSoleFloor && offers.length === 1 && soleEv) {
     const o = offers[0];
     const askSalary = soleEv.ask.floorSalary;
     const info = await teamCapInfo(o.teamId);
-    const cap = await loadLeagueCap();
-    const ceiling = capCeilingForPhase(cap.upper, (await getLeagueClock()).phase) + info.ltir;
+    const ceiling = capCeilingForPhase(cap.upper, clockPhase) + info.ltir;
     if (info.committed + askSalary <= ceiling) best = { offer: o, salary: askSalary, years: Math.min(Math.max(o.years, soleEv.ask.minYears), soleEv.ask.maxYears), utility: 0 };
   }
   if (!best) return null;
