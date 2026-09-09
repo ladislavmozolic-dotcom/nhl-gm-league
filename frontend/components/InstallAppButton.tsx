@@ -70,7 +70,7 @@ export default function InstallAppButton({ lang = "en", className }: { lang?: La
     <div className="relative">
       <button onClick={onClick} className={className}>📲 {t(lang, "ui.installApp")}</button>
       {showHint && (
-        <div className="absolute z-50 top-full mt-1 left-0 w-64 rounded-lg border border-slate-700 bg-slate-900 text-slate-200 text-xs p-3 shadow-xl">
+        <div className="absolute z-50 top-full mt-1 right-0 w-64 rounded-lg border border-slate-700 bg-slate-900 text-slate-200 text-xs p-3 shadow-xl">
           {t(lang, hintKey)}
           <button onClick={() => setShowHint(false)} className="block mt-2 text-blue-400 text-xs font-semibold">OK</button>
         </div>

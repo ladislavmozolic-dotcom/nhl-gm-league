@@ -336,8 +336,6 @@ export default function MegaMenu({ gm, items, lang = "en", light = false, hideFo
               </Link>
             )}
 
-            <InstallAppButton lang={lang} className={`px-2.5 py-1.5 text-[13px] font-semibold rounded-md whitespace-nowrap ${linkIdle}`} />
-
             {/* GM login / signed-in profile (with logout) */}
             <div className="relative ml-1" onMouseEnter={() => setActiveMenu("__gm")} onMouseLeave={() => setActiveMenu(null)}>
               {gm ? (
@@ -394,6 +392,8 @@ export default function MegaMenu({ gm, items, lang = "en", light = false, hideFo
                 </span>
               )}
             </div>
+
+            <InstallAppButton lang={lang} className={`px-2.5 py-1.5 text-[13px] font-semibold rounded-md whitespace-nowrap ${linkIdle}`} />
           </div>
 
           {/* Mobile-only compact right side — always reachable without opening the drawer */}
