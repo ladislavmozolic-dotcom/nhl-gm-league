@@ -161,11 +161,16 @@ export default async function FreeAgentsPage({
       <PageHeader
         title="Free Agent Frenzy"
         subtitle="Off-season market — open-market value from sim-weighted comparables"
-        right={(retiredCount > 0 || isComish) ? (
+        right={(retiredCount > 0 || isComish || sessionTeamId != null) ? (
           <div className="flex items-center gap-4">
             {isComish && (
               <Link href="/free-agents/offers" className="text-sm text-amber-400 hover:text-amber-300 whitespace-nowrap font-semibold">
                 🔒 All active offers →
+              </Link>
+            )}
+            {sessionTeamId != null && (
+              <Link href="/free-agents/my-offers" className="text-sm text-blue-400 hover:text-blue-300 whitespace-nowrap font-semibold">
+                My active offers →
               </Link>
             )}
             {retiredCount > 0 && (

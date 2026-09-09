@@ -355,6 +355,44 @@ export async function getAllActiveOffersAction() {
   return { ok: true as const, players: result, namesOnly: mask.namesOnly };
 }
 
+/** Every active offer the caller's OWN club currently has standing — a plain GM
+ *  couldn't see the "All active offers" list (comish-only, blind bidding) so had no
+ *  way to review what he'd already bid. This is just his own data, no blind-bidding
+ *  concern applies: no masking, open to any logged-in team. */
+export async function getMyActiveOffersAction() {
+  const teamId = await getTeamSession();
+  if (teamId == null) return { ok: false as const, error: "Log in as a team to see your offers." };
+  const offers = await prisma.faOffer.findMany({
+    where: { teamId, status: { in: ACTIVE } }, orderBy: { updatedAt: "desc" },
+  });
+  if (offers.length === 0) return { ok: true as const, offers: [] };
+  const playerIds = offers.map((o) => o.playerId);
+  const players = await prisma.player.findMany({
+    where: { id: { in: playerIds } },
+    select: { id: true, name: true, slug: true, position: true, isGoalie: true, photoUrl: true, overall: true },
+  });
+  const pById = new Map(players.map((p) => [p.id, p]));
+  const raisedByPlayer = new Map<number, string>();
+  const allBids = await prisma.faBid.findMany({ where: { teamId, playerId: { in: playerIds } }, orderBy: { id: "asc" }, select: { playerId: true, salary: true, years: true, createdAt: true } });
+  const byPlayerBids = new Map<number, typeof allBids>();
+  for (const b of allBids) byPlayerBids.set(b.playerId, [...(byPlayerBids.get(b.playerId) ?? []), b]);
+  for (const [playerId, list] of byPlayerBids) {
+    const distinct = new Set(list.map((b) => `${b.salary}:${b.years}`));
+    if (distinct.size > 1) raisedByPlayer.set(playerId, list[list.length - 1].createdAt.toISOString());
+  }
+  const result = offers.map((o) => {
+    const p = pById.get(o.playerId);
+    return {
+      playerId: o.playerId, name: p?.name ?? "?", slug: p?.slug ?? null, position: p?.position ?? "", isGoalie: p?.isGoalie ?? false,
+      photoUrl: p?.photoUrl ?? null, overall: p?.overall ?? null,
+      salary: o.salary, years: o.years, line: o.line, pp: o.pp, pk: o.pk, round: o.round, status: o.status, twoWay: !!o.twoWay,
+      counterSalary: o.counterSalary, counterYears: o.counterYears,
+      placedAt: o.createdAt.toISOString(), updatedAt: raisedByPlayer.get(o.playerId) ?? o.createdAt.toISOString(),
+    };
+  });
+  return { ok: true as const, offers: result };
+}
+
 /** Comish-tier only, READ-ONLY: DMs the caller's own team what round 1 WOULD do
  *  to each of its standing offers if it closed right now — sign / counter (with
  *  the amount) / pass. Nothing is written: no FaOffer status changes, no
