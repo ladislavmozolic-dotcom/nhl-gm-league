@@ -90,7 +90,17 @@ export async function rolloverLeagueDateIfDue(now: Date = new Date()): Promise<R
   if (todayStr <= isoDateStr(cfg.leagueDate)) return { rolled: false, reason: "not yet a new Europe/Bratislava day" };
 
   const to = addDays(cfg.leagueDate, 1);
-  await prisma.leagueConfig.update({ where: { id: 1 }, data: { leagueDate: to } });
+  await prisma.$transaction([
+    prisma.leagueConfig.update({ where: { id: 1 }, data: { leagueDate: to } }),
+    // Player.age is a stored column (every UFA/AI-GM/ELC calc reads it directly rather
+    // than deriving it live), so it has to be kept in sync itself — a birthday that
+    // passes without this left every such player a year young until someone noticed.
+    prisma.$executeRaw`
+      UPDATE "Player" SET age = date_part('year', age(${to}::date, "birthDate"::date))::int
+      WHERE "birthDate" IS NOT NULL
+        AND age IS DISTINCT FROM date_part('year', age(${to}::date, "birthDate"::date))::int
+    `,
+  ]);
   return { rolled: true, to };
 }
 
