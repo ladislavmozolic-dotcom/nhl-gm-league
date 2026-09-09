@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { isAdmin, getTeamSession } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { sendWelcomeEmail } from "@/lib/email";
 
 async function adminName(): Promise<string> {
   const id = await getTeamSession();
@@ -18,7 +19,7 @@ export async function approveJoinRequest(formData: FormData) {
   const req = await prisma.joinRequest.findUnique({ where: { id } });
   if (!req || req.status !== "pending") { revalidatePath("/admin/join-requests"); return; }
 
-  const team = await prisma.team.findUnique({ where: { id: req.teamId }, select: { passwordHash: true } });
+  const team = await prisma.team.findUnique({ where: { id: req.teamId }, select: { passwordHash: true, name: true, slug: true } });
   const who = await adminName();
 
   if (team?.passwordHash) {
@@ -42,6 +43,8 @@ export async function approveJoinRequest(formData: FormData) {
   ]);
   revalidatePath("/admin/join-requests");
   revalidatePath("/", "layout");
+  // best-effort welcome mail — never let a provider hiccup block the approval itself
+  if (team) void sendWelcomeEmail({ to: req.email, gmName: req.nickname || req.firstName, teamName: team.name, teamSlug: team.slug });
 }
 
 /** Reject a join request. */
