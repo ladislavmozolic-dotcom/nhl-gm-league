@@ -6,7 +6,7 @@ import { getTeamSession, isAdmin, isCommission } from "@/lib/auth";
 import { loadSettings } from "@/lib/sim/settings";
 import { CURRENT_SEASON_START } from "@/lib/finance";
 import { revalidatePath } from "next/cache";
-import { clauseBlock, assertOwnership, packageFromTrade, executeAcceptedTrade, createTradeRecord, collectMoveOps, type TradePlayer, type TradePackage } from "@/lib/trade-exec";
+import { clauseBlock, assertOwnership, packageFromTrade, executeAcceptedTrade, createTradeRecord, collectMoveOps, reverseTradeOps, type TradePlayer, type TradePackage } from "@/lib/trade-exec";
 import { playerValue, pickValueBySlot } from "@/lib/trade-value";
 import { hasWorthyGoalie } from "@/lib/goalie-rule";
 
@@ -408,59 +408,40 @@ export async function revokeTradeAction(tradeId: number) {
   if (!trade) return { ok: false as const, error: "Trade not found." };
   if (trade.status !== "ACCEPTED") return { ok: false as const, error: "Only a completed (accepted) trade can be revoked." };
 
-  const [fromTeam, toTeam] = await Promise.all([
-    prisma.team.findUnique({ where: { id: trade.fromTeamId }, select: { id: true, name: true, affiliateTeams: { select: { id: true } } } }),
-    prisma.team.findUnique({ where: { id: trade.toTeamId }, select: { id: true, name: true, affiliateTeams: { select: { id: true } } } }),
-  ]);
-  if (!fromTeam || !toTeam) return { ok: false as const, error: "Team not found." };
-  const affOf = (t: typeof fromTeam) => t.affiliateTeams[0]?.id ?? t.id;
-  const assets = await prisma.tradeAsset.findMany({ where: { tradeId } });
-  const ops: Prisma.PrismaPromise<unknown>[] = [];
-  let moved = 0;
-
-  // FROM assets went to `to` — send them back to `from`; TO assets went to `from` — back to `to`.
-  for (const a of assets) {
-    const home = a.side === "FROM" ? fromTeam : toTeam;   // original owner
-    if (a.assetType === "PLAYER" && a.playerId) {
-      const pl = await prisma.player.findUnique({ where: { id: a.playerId }, select: { rosterType: true } });
-      if (!pl) continue;
-      const destId = pl.rosterType === "AHL" ? affOf(home) : home.id;
-      ops.push(prisma.player.update({ where: { id: a.playerId }, data: { teamId: destId, captaincy: null } }));
-      moved++;
-    } else if (a.assetType === "PICK" && a.draftPickId) {
-      ops.push(prisma.draftPick.update({ where: { id: a.draftPickId }, data: { teamId: home.id } })); moved++;
-    } else if (a.assetType === "PROSPECT" && a.prospectId) {
-      ops.push(prisma.prospect.update({ where: { id: a.prospectId }, data: { teamId: home.id } })); moved++;
-    }
-  }
-  // reverse the cash (from paid net to `to`)
-  const net = (assets.filter((a) => a.side === "FROM").reduce((s, a) => s + (a.cashAmount ?? 0), 0))
-            - (assets.filter((a) => a.side === "TO").reduce((s, a) => s + (a.cashAmount ?? 0), 0));
-  if (net !== 0) {
-    ops.push(prisma.team.update({ where: { id: trade.fromTeamId }, data: { bankAccount: { increment: net }, ledgerAdj: { increment: net } } }));
-    ops.push(prisma.team.update({ where: { id: trade.toTeamId }, data: { bankAccount: { decrement: net }, ledgerAdj: { decrement: net } } }));
-  }
+  const { ops, fromTeam, toTeam, moved } = await reverseTradeOps(tradeId);
   ops.push(prisma.trade.update({ where: { id: tradeId }, data: { status: "REVERTED", respondedAt: new Date() } }));
+  // a reverted deal never happened — pull its "X traded ... to Y" line out of the
+  // home page's Trade Tracker (which just reads Transaction, blind to Trade.status)
+  ops.push(prisma.transaction.deleteMany({ where: { tradeId, type: "TRADE" } }));
   ops.push(prisma.transaction.create({ data: { type: "TRADE", message: `Commissioner revoked the ${fromTeam.name} ↔ ${toTeam.name} trade — assets returned.` } }));
   await prisma.$transaction(ops);
-  for (const p of ["/trades", "/admin/trades", "/salary-cap", "/finance", "/teams"]) revalidatePath(p);
+  for (const p of ["/trades", "/admin/trades", "/salary-cap", "/finance", "/teams", "/"]) revalidatePath(p);
   return { ok: true as const, moved };
 }
 
 /** Commissioner deletes a trade entirely (and its assets/conditions). For clearing
- *  spam, duplicates, or a mistaken proposal. Does NOT reverse an already-applied
- *  ACCEPTED trade's roster moves — it only removes the record. */
+ *  spam, duplicates, or a mistaken proposal. An already-applied ACCEPTED trade has
+ *  its roster/pick/cash moves undone first (same reversal Revoke uses) and its
+ *  Trade Tracker line removed, so Delete on a completed deal behaves like a full
+ *  undo rather than just erasing the paperwork while the players stay traded. */
 export async function deleteTradeAction(tradeId: number) {
   if (!(await isAdmin())) throw new Error("Only the commissioner can delete trades.");
   const trade = await prisma.trade.findUnique({ where: { id: tradeId }, select: { id: true, status: true } });
   if (!trade) throw new Error("Trade not found.");
-  await prisma.$transaction([
-    prisma.tradeAsset.deleteMany({ where: { tradeId } }),
-    prisma.tradeCondition.deleteMany({ where: { tradeId } }),
-    prisma.trade.delete({ where: { id: tradeId } }),
-  ]);
-  revalidatePath("/trades");
-  return { ok: true, wasStatus: trade.status };
+  const ops: Prisma.PrismaPromise<unknown>[] = [];
+  let moved = 0;
+  if (trade.status === "ACCEPTED") {
+    const rev = await reverseTradeOps(tradeId);
+    ops.push(...rev.ops);
+    moved = rev.moved;
+    ops.push(prisma.transaction.deleteMany({ where: { tradeId, type: "TRADE" } }));
+  }
+  ops.push(prisma.tradeAsset.deleteMany({ where: { tradeId } }));
+  ops.push(prisma.tradeCondition.deleteMany({ where: { tradeId } }));
+  ops.push(prisma.trade.delete({ where: { id: tradeId } }));
+  await prisma.$transaction(ops);
+  for (const p of ["/trades", "/admin/trades", "/salary-cap", "/finance", "/teams", "/"]) revalidatePath(p);
+  return { ok: true, wasStatus: trade.status, moved };
 }
 
 /** The most recent completed (ACCEPTED) trade involving the logged-in club, within

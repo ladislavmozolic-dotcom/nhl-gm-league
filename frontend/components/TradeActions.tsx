@@ -51,7 +51,7 @@ export default function TradeActions({ tradeId, role, admin, pending: isPending 
       )}
       {admin && (
         <button
-          onClick={() => { if (confirm("Delete this trade record? This removes it entirely (does not reverse an already-applied deal).")) run(() => deleteTradeAction(tradeId)); }}
+          onClick={() => { if (confirm("Delete this trade record? A completed deal is fully undone first — players, picks and cash go back to their original teams — then the record is removed.")) run(() => deleteTradeAction(tradeId)); }}
           disabled={pending}
           className="px-3 py-1.5 rounded-lg bg-red-900/40 border border-red-800/50 hover:bg-red-900/60 text-red-300 text-sm font-semibold disabled:opacity-40" title="Commissioner: delete this trade">
           {pending ? "…" : "🗑 Delete"}

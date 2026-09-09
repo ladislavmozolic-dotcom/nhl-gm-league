@@ -268,8 +268,13 @@ model Transaction {
                  // stay null and just won't surface there.
   teamId    Int? // the club the event is about (e.g. who placed/claimed a
                  // waiver) — lets Transaction History show a team chip/logo.
+  tradeId   Int? // links a "X traded ... to Y" row back to the Trade it describes
+                 // (2-team accept path only — a 3-team group's one summary line
+                 // can't point at a single leg) — lets deleting/revoking that Trade
+                 // also retract the line from the home page's Trade Tracker.
   createdAt DateTime @default(now())
   @@index([playerId])
+  @@index([tradeId])
 }
 
 // A revertible record of every UFA signing / extension, with the pre-signing

@@ -277,7 +277,7 @@ export async function executeAcceptedTrade(tradeId: number) {
   const { ops, fromTeam, toTeam, fromNames, toNames } = await collectMoveOps(pkg);
   ops.push(prisma.trade.update({ where: { id: tradeId }, data: { status: "ACCEPTED", respondedAt: new Date() } }));
   ops.push(prisma.transaction.create({
-    data: { type: "TRADE", message: `${fromTeam.name} traded ${fromNames.join(", ") || "assets"} to ${toTeam.name} for ${toNames.join(", ") || "assets"}.` },
+    data: { type: "TRADE", tradeId, message: `${fromTeam.name} traded ${fromNames.join(", ") || "assets"} to ${toTeam.name} for ${toNames.join(", ") || "assets"}.` },
   }));
   await prisma.$transaction(ops);
   return { fromTeam, toTeam, fromNames, toNames };
@@ -306,6 +306,53 @@ export async function createTradeRecord(pkg: TradePackage, opts: { fromName: str
     }).catch(() => {});
   }
   return { tradeId: trade.id };
+}
+
+/** Build the ops that undo an ACCEPTED trade's already-applied asset moves — shared
+ *  by the commissioner's Revoke (marks the trade REVERTED) and Delete (removes the
+ *  record entirely) actions, so both give assets back the exact same way instead of
+ *  Delete silently leaving them wherever the trade sent them. Caller adds its own
+ *  trade status/removal + Transaction bookkeeping on top of these ops. */
+export async function reverseTradeOps(tradeId: number): Promise<{
+  ops: Prisma.PrismaPromise<unknown>[];
+  fromTeam: { id: number; name: string }; toTeam: { id: number; name: string };
+  moved: number;
+}> {
+  const trade = await prisma.trade.findUnique({ where: { id: tradeId } });
+  if (!trade) throw new Error("Trade not found.");
+  const [fromTeam, toTeam] = await Promise.all([
+    prisma.team.findUnique({ where: { id: trade.fromTeamId }, select: { id: true, name: true, affiliateTeams: { select: { id: true } } } }),
+    prisma.team.findUnique({ where: { id: trade.toTeamId }, select: { id: true, name: true, affiliateTeams: { select: { id: true } } } }),
+  ]);
+  if (!fromTeam || !toTeam) throw new Error("Team not found.");
+  const affOf = (t: typeof fromTeam) => t.affiliateTeams[0]?.id ?? t.id;
+  const assets = await prisma.tradeAsset.findMany({ where: { tradeId } });
+  const ops: Prisma.PrismaPromise<unknown>[] = [];
+  let moved = 0;
+
+  // FROM assets went to `to` — send them back to `from`; TO assets went to `from` — back to `to`.
+  for (const a of assets) {
+    const home = a.side === "FROM" ? fromTeam : toTeam;   // original owner
+    if (a.assetType === "PLAYER" && a.playerId) {
+      const pl = await prisma.player.findUnique({ where: { id: a.playerId }, select: { rosterType: true } });
+      if (!pl) continue;
+      const destId = pl.rosterType === "AHL" ? affOf(home) : home.id;
+      ops.push(prisma.player.update({ where: { id: a.playerId }, data: { teamId: destId, captaincy: null } }));
+      moved++;
+    } else if (a.assetType === "PICK" && a.draftPickId) {
+      ops.push(prisma.draftPick.update({ where: { id: a.draftPickId }, data: { teamId: home.id } })); moved++;
+    } else if (a.assetType === "PROSPECT" && a.prospectId) {
+      ops.push(prisma.prospect.update({ where: { id: a.prospectId }, data: { teamId: home.id } })); moved++;
+    }
+  }
+  // reverse the cash (from paid net to `to`)
+  const net = (assets.filter((a) => a.side === "FROM").reduce((s, a) => s + (a.cashAmount ?? 0), 0))
+            - (assets.filter((a) => a.side === "TO").reduce((s, a) => s + (a.cashAmount ?? 0), 0));
+  if (net !== 0) {
+    ops.push(prisma.team.update({ where: { id: trade.fromTeamId }, data: { bankAccount: { increment: net }, ledgerAdj: { increment: net } } }));
+    ops.push(prisma.team.update({ where: { id: trade.toTeamId }, data: { bankAccount: { decrement: net }, ledgerAdj: { decrement: net } } }));
+  }
+  return { ops, fromTeam, toTeam, moved };
 }
 
 /** Execute every leg of a 3-team TradeGroup together, in one transaction — either
