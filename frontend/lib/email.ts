@@ -71,9 +71,9 @@ function welcomeHtml(opts: { gmName: string; teamName: string; leagueName: strin
     <tr><td align="center">
       <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#0f172a;border:1px solid #1e293b;border-radius:16px;overflow:hidden;">
 
-        <tr><td style="background:linear-gradient(135deg,${accent}22,#0f172a);padding:36px 32px 28px;text-align:center;">
-          ${logoUrl ? `<img src="${logoUrl}" alt="${leagueName}" height="60" style="height:60px;width:auto;margin-bottom:14px;" />` : ""}
-          <div style="color:#f1f5f9;font-size:24px;font-weight:800;letter-spacing:-0.3px;">Vitaj v ${leagueName}! 🏒</div>
+        <tr><td style="background-color:#0a1628;border-bottom:3px solid ${accent};padding:36px 32px 28px;text-align:center;">
+          ${logoUrl ? `<img src="${logoUrl}" alt="${leagueName}" height="60" style="height:60px;width:auto;margin-bottom:16px;" />` : ""}
+          <div style="color:#ffffff;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:700;letter-spacing:0.2px;">Vitaj v ${leagueName}! 🏒</div>
         </td></tr>
 
         <tr><td style="padding:32px;">
