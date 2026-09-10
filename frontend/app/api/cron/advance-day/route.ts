@@ -4,7 +4,7 @@
 // after midnight). Protected by a shared secret since it mutates league state
 // (plays games, moves money, resolves waivers) with no user session behind it.
 import { NextRequest, NextResponse } from "next/server";
-import { simulateDayIfDue, rolloverLeagueDateIfDue, autoOpenFrenzyIfDue } from "@/lib/season-cron";
+import { simulateDayIfDue, rolloverLeagueDateIfDue, autoOpenFrenzyIfDue, cleanupDeclinedTrades } from "@/lib/season-cron";
 
 export async function POST(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -21,5 +21,6 @@ export async function POST(req: NextRequest) {
   const result = await simulateDayIfDue(now);
   const rollover = await rolloverLeagueDateIfDue(now);
   const frenzy = await autoOpenFrenzyIfDue(now);
-  return NextResponse.json({ ...result, rollover, frenzy });
+  const declinedCleanup = await cleanupDeclinedTrades();
+  return NextResponse.json({ ...result, rollover, frenzy, declinedCleanup });
 }

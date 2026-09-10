@@ -135,3 +135,39 @@ export async function autoOpenFrenzyIfDue(now: Date = new Date()): Promise<Frenz
   const expiredToUfa = await sweepExpiredContractsToUfa();
   return { opened: true, expiredToUfa };
 }
+
+export type DeclinedTradeCleanupResult = { deleted: number; groupsDeleted: number };
+
+/** Called by /api/cron/advance-day on every tick. A DECLINED trade never executed
+ *  and has no history a GM needs to keep seeing on their Trades page, so rather
+ *  than teach every place that can set a trade to DECLINED (human decline, commish
+ *  decline, a 3-team TradeGroup decline, AI auto-decline) to also clean up after
+ *  itself, this single sweep just deletes any DECLINED trade — and its assets /
+ *  conditions — it finds, plus any 3-team TradeGroup whose legs are all gone. */
+export async function cleanupDeclinedTrades(): Promise<DeclinedTradeCleanupResult> {
+  const declined = await prisma.trade.findMany({ where: { status: "DECLINED" }, select: { id: true, groupId: true } });
+  if (declined.length === 0) return { deleted: 0, groupsDeleted: 0 };
+  const ids = declined.map((t) => t.id);
+  const groupIds = [...new Set(declined.map((t) => t.groupId).filter((x): x is number => x != null))];
+  await prisma.$transaction([
+    prisma.tradeAsset.deleteMany({ where: { tradeId: { in: ids } } }),
+    prisma.tradeCondition.deleteMany({ where: { tradeId: { in: ids } } }),
+    prisma.trade.deleteMany({ where: { id: { in: ids } } }),
+  ]);
+  let groupsDeleted = 0;
+  if (groupIds.length) {
+    // only remove a TradeGroup once every one of its legs is gone — a 3-team
+    // group declines all its legs together, but a defensive re-check costs nothing
+    const remaining = await prisma.trade.findMany({ where: { groupId: { in: groupIds } }, select: { groupId: true } });
+    const stillHasLegs = new Set(remaining.map((t) => t.groupId));
+    const emptyGroupIds = groupIds.filter((id) => !stillHasLegs.has(id));
+    if (emptyGroupIds.length) {
+      const res = await prisma.$transaction([
+        prisma.tradeGroupResponse.deleteMany({ where: { groupId: { in: emptyGroupIds } } }),
+        prisma.tradeGroup.deleteMany({ where: { id: { in: emptyGroupIds }, status: "DECLINED" } }),
+      ]);
+      groupsDeleted = res[1].count;
+    }
+  }
+  return { deleted: ids.length, groupsDeleted };
+}

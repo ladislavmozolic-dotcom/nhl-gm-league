@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card } from "@/components/ui";
+import { tradeSummaries } from "@/lib/trade-summary";
 
 export const dynamic = "force-dynamic";
 const SEASON = "2026-27";
@@ -36,6 +37,7 @@ export default async function TeamTradesPage({ params }: { params: Promise<{ slu
     select: { id: true, name: true, code: true, logoUrl: true },
   });
   const tById = new Map(teams.map((t) => [t.id, t]));
+  const summaries = await tradeSummaries(trades.map((t) => t.id));
 
   if (trades.length === 0) {
     return (
@@ -72,19 +74,35 @@ export default async function TeamTradesPage({ params }: { params: Promise<{ slu
               </tr>
             </thead>
             <tbody>
-              {trades.map((t) => (
-                <tr key={t.id} className="border-b border-slate-800/40 hover:bg-slate-800/30 transition-colors last:border-0">
-                  <td className="px-4 py-3">
-                    <Link href={`/trades/${t.id}`} className="flex items-center gap-2 hover:text-blue-400 transition-colors">
-                      <TeamChip id={t.fromTeamId} />
-                      <span className="text-slate-600">→</span>
-                      <TeamChip id={t.toTeamId} />
-                    </Link>
-                  </td>
-                  <td className="px-3 py-3 text-center"><StatusBadge status={t.status} /></td>
-                  <td className="px-4 py-3 text-right text-slate-400 whitespace-nowrap">{fmtDate((t.status === "ACCEPTED" || t.status === "COMPLETED") ? (t.respondedAt ?? t.createdAt) : t.createdAt)}</td>
-                </tr>
-              ))}
+              {trades.map((t) => {
+                // fromTeam sent the "from" side assets, toTeam sent the "to" side —
+                // reframe as this club's own gives/gets regardless of which side of
+                // the Trade row it happens to be.
+                const isFrom = t.fromTeamId === team.id;
+                const s = summaries.get(t.id);
+                const gives = isFrom ? s?.from : s?.to;
+                const gets = isFrom ? s?.to : s?.from;
+                return (
+                  <tr key={t.id} className="border-b border-slate-800/40 hover:bg-slate-800/30 transition-colors last:border-0">
+                    <td className="px-4 py-3">
+                      <Link href={`/trades/${t.id}`} className="block hover:text-blue-400 transition-colors">
+                        <div className="flex items-center gap-2">
+                          <TeamChip id={t.fromTeamId} />
+                          <span className="text-slate-600">→</span>
+                          <TeamChip id={t.toTeamId} />
+                        </div>
+                        {s && (
+                          <p className="text-xs text-slate-500 mt-1">
+                            <span className="text-slate-400">Gives:</span> {gives} <span className="text-slate-600">·</span> <span className="text-slate-400">Gets:</span> {gets}
+                          </p>
+                        )}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-3 text-center"><StatusBadge status={t.status} /></td>
+                    <td className="px-4 py-3 text-right text-slate-400 whitespace-nowrap">{fmtDate((t.status === "ACCEPTED" || t.status === "COMPLETED") ? (t.respondedAt ?? t.createdAt) : t.createdAt)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
