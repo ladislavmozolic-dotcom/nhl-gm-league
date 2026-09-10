@@ -187,6 +187,32 @@ export function autoFill(data: TeamLinesData, skaters: Skater[], goalies: Goalie
   const all = [...skaters].sort((a, b) => b.overall - a.overall);
   const gk = [...goalies].sort((a, b) => b.overall - a.overall);
 
+  // Drop any slot referencing a player no longer on this roster (traded,
+  // retired, or otherwise excluded from `skaters`/`goalies`) so a stale id
+  // reads as an empty slot to fill, not as "already filled" — otherwise a
+  // traded-away player's id sits in a slot forever, immune to Auto Lines.
+  const validSkater = new Set(skaters.map((s) => s.id));
+  const validGoalie = new Set(goalies.map((g) => g.id));
+  const scrub = (id: number | null) => (id != null && validSkater.has(id) ? id : null);
+  for (const l of d.forwardLines) { l.lw = scrub(l.lw); l.c = scrub(l.c); l.rw = scrub(l.rw); }
+  for (const p of d.defensePairs) { p.ld = scrub(p.ld); p.rd = scrub(p.rd); }
+  for (const group of [d.situations.pp, d.situations.fourVFour, d.situations.pk4, d.situations.pk3, d.situations.overtime]) {
+    for (const u of group) u.players = u.players.map(scrub);
+  }
+  {
+    const o = d.situations.others;
+    o.starter = o.starter != null && validGoalie.has(o.starter) ? o.starter : null;
+    o.backup = o.backup != null && validGoalie.has(o.backup) ? o.backup : null;
+    o.extraForwards = o.extraForwards.map(scrub);
+    o.extraDefense = o.extraDefense.map(scrub);
+    o.subPP = scrub(o.subPP);
+    o.subPK1 = scrub(o.subPK1);
+    o.subPK2 = scrub(o.subPK2);
+    o.shootout = o.shootout.map(scrub);
+  }
+  d.situations.lastMin.off = d.situations.lastMin.off.map(scrub);
+  d.situations.lastMin.def = d.situations.lastMin.def.map(scrub);
+
   // forwards: each forward appears at most once across all four lines, and only
   // in a slot his listed position allows (a centre is never dropped onto a wing).
   const fUsed = new Set<number>();
@@ -246,7 +272,12 @@ export function autoFill(data: TeamLinesData, skaters: Skater[], goalies: Goalie
       for (let i = 0; i < u.players.length; i++) {
         if (u.players[i] != null) continue;
         const pool = i < nF ? fPool : dPool, used = i < nF ? usedF : usedD;
-        const p = pool.find((x) => !used.has(x.id)) ?? all.find((x) => !used.has(x.id));
+        // A candidate must be free in BOTH sets, not just the current seat's
+        // set — dPool legitimately contains a D who was already forced into
+        // an F seat by the fallback below (when forwards ran short), and
+        // picking him again for the D seat would double-book that one player.
+        const free = (x: Skater) => !usedF.has(x.id) && !usedD.has(x.id);
+        const p = pool.find(free) ?? all.find(free);
         if (p) { u.players[i] = p.id; used.add(p.id); }
       }
     }
