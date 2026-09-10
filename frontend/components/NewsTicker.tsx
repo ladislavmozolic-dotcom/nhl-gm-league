@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { tradeBlockBoard } from "@/lib/trade-block-server";
 
 // Fallback for the top-of-page ScoreTracker row on days with nothing to score
 // (pre-season, the off-season) — a scrolling feed of recent league moves
@@ -13,8 +14,10 @@ const TYPE_PILL: Record<string, { label: string; cls: string }> = {
 };
 
 type TeamLite = { id: number; name: string; code: string | null; logoUrl: string | null };
+type NewsItem = { key: string; type: string; message: string; teamId: number | null; createdAt: Date | null };
 
-function timeAgo(d: Date): string {
+function timeAgo(d: Date | null): string | null {
+  if (!d) return null;
   const s = Math.max(0, (Date.now() - d.getTime()) / 1000);
   if (s < 3600) return `${Math.max(1, Math.round(s / 60))}m`;
   if (s < 86400) return `${Math.round(s / 3600)}h`;
@@ -22,20 +25,41 @@ function timeAgo(d: Date): string {
 }
 
 export default async function NewsTicker() {
-  const items = await prisma.transaction.findMany({
-    where: {
-      type: { in: ["WAIVER", "TRADE_BLOCK", "SIGNING", "TRADE"] },
-      NOT: { OR: [
-        { message: { contains: "proposed a trade" } },
-        { message: { contains: "Awaiting response" } },
-        { message: { contains: "was declined" } },
-        { message: { contains: "was cancelled" } },
-      ] },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 20,
-    select: { id: true, type: true, message: true, teamId: true, createdAt: true },
-  });
+  const [txRows, tbBoard] = await Promise.all([
+    prisma.transaction.findMany({
+      where: {
+        type: { in: ["WAIVER", "TRADE_BLOCK", "SIGNING", "TRADE"] },
+        NOT: { OR: [
+          { message: { contains: "proposed a trade" } },
+          { message: { contains: "Awaiting response" } },
+          { message: { contains: "was declined" } },
+          { message: { contains: "was cancelled" } },
+        ] },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+      select: { id: true, type: true, message: true, teamId: true, createdAt: true },
+    }),
+    tradeBlockBoard(),
+  ]);
+
+  // Trade-block ADD/REMOVE events are rare and can age out of the log fast, so a
+  // handful of currently-listed players (top by overall) ride along as their own
+  // items — the block always has something to show, not just its latest churn.
+  const blockItems: NewsItem[] = tbBoard
+    .flatMap((t) => t.players)
+    .sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0))
+    .slice(0, 8)
+    .map((p) => ({
+      key: `tb-${p.id}`,
+      type: "TRADE_BLOCK",
+      message: `${p.name} (${p.teamCode ?? p.teamName}, ${p.position}) is on the trade block${p.note ? ` — "${p.note}"` : ""}`,
+      teamId: p.teamId,
+      createdAt: null,
+    }));
+
+  const txItems: NewsItem[] = txRows.map((tx) => ({ key: `tx-${tx.id}`, type: tx.type, message: tx.message, teamId: tx.teamId, createdAt: tx.createdAt }));
+  const items = [...txItems, ...blockItems];
   if (items.length === 0) return null;
 
   // Resolve up to two club logos per item: the linked team (when the write
@@ -92,13 +116,14 @@ export default async function NewsTicker() {
           <div className="nt-track absolute inset-y-0 left-0 flex items-center w-max whitespace-nowrap">
             {[0, 1].map((seg) => (
               <div key={seg} className="flex items-center">
-                {items.map((tx, i) => {
-                  const logos = logosFor(tx.message, tx.teamId);
-                  const pill = TYPE_PILL[tx.type] ?? { label: tx.type, cls: "bg-slate-700/40 text-slate-300 ring-1 ring-slate-600" };
+                {items.map((it, i) => {
+                  const logos = logosFor(it.message, it.teamId);
+                  const pill = TYPE_PILL[it.type] ?? { label: it.type, cls: "bg-slate-700/40 text-slate-300 ring-1 ring-slate-600" };
+                  const ago = timeAgo(it.createdAt);
                   return (
                     <Link
-                      key={`${seg}-${tx.id}-${i}`}
-                      href={TYPE_HREF[tx.type] ?? "/transactions"}
+                      key={`${seg}-${it.key}-${i}`}
+                      href={TYPE_HREF[it.type] ?? "/transactions"}
                       className="group/item inline-flex items-center gap-2.5 mx-1.5 pl-2 pr-3.5 py-1.5 rounded-xl bg-slate-800/40 border border-slate-800 hover:border-slate-600 hover:bg-slate-800/80 transition-colors"
                     >
                       <span className={`shrink-0 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${pill.cls}`}>{pill.label}</span>
@@ -112,8 +137,8 @@ export default async function NewsTicker() {
                           ))}
                         </span>
                       )}
-                      <span className="text-sm text-slate-200 group-hover/item:text-white transition-colors">{tx.message}</span>
-                      <span className="shrink-0 text-[10px] text-slate-500 tabular-nums">{timeAgo(tx.createdAt)}</span>
+                      <span className="text-sm text-slate-200 group-hover/item:text-white transition-colors">{it.message}</span>
+                      {ago && <span className="shrink-0 text-[10px] text-slate-500 tabular-nums">{ago}</span>}
                     </Link>
                   );
                 })}
