@@ -293,6 +293,10 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   const status = p.injuryDaysLeft > 0 ? "Injured" : (p.rosterType ?? "—");
   const contractType = p.contractType === "TWO_WAY" ? "Two-Way" : p.contractType === "ONE_WAY" ? "One-Way" : "—";
   const capHit = p.capHit != null ? money(p.capHit) : "—";
+  // Player.capHit deliberately freezes at its last value once contractYears
+  // hits 0 rather than clearing to 0 — useful history here on the profile, but
+  // only here: it must read as a PAST number, not his current cap charge.
+  const hasContract = (p.contractYears ?? 0) > 0;
 
   const leftInfo: [string, React.ReactNode][] = [
     ["Position", p.position ?? "—"],
@@ -320,12 +324,14 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     ["Until", untilYear ?? "—"],
     ["Expiry Status", expiryStatus ? <span className={expiryStatus === "UFA" ? "text-red-400" : "text-blue-400"}>{expiryStatus}</span> : "—"],
     ["Type", contractType],
-    ["Cap Hit", capHit],
+    [hasContract ? "Cap Hit" : "Previous Cap Hit", capHit],
     ...(retained > 0 ? ([
       ["Salary Retention", <span className="text-amber-300">{retainedPct}% retained</span>],
       ["Actual Salary after Retention", <b className="text-emerald-300">{money(Math.max(0, (p.capHit ?? 0) - retained))}</b>],
     ] as [string, React.ReactNode][]) : []),
-    ["Last Year Salary", p.capHit != null ? capHit : "—"],
+    // Only worth its own row when there IS a current deal — otherwise it's
+    // just "Previous Cap Hit" repeated under a second label.
+    ...(hasContract ? ([["Last Year Salary", capHit]] as [string, React.ReactNode][]) : []),
   ];
 
   const InfoRow = ({ label, value, valueClass }: { label: string; value: React.ReactNode; valueClass?: string }) => (

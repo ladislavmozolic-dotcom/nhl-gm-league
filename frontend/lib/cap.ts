@@ -5,7 +5,7 @@
 import { prisma } from "./prisma";
 import { getLeagueClock } from "./calendar-server";
 import { loadLeagueCap } from "./free-agency-server";
-import { capCeilingForPhase, ltirRelief, deadMoneyForYear, CURRENT_SEASON_START } from "./finance";
+import { capCeilingForPhase, ltirRelief, deadMoneyForYear, liveCapHit, CURRENT_SEASON_START } from "./finance";
 
 export type CapStatus = {
   committed: number; ltir: number; ceiling: number; space: number;
@@ -31,10 +31,13 @@ export type CapStatus = {
  *  retention (Buyout rows, summed live — nothing caches this). */
 export async function teamCapCommitted(teamId: number): Promise<{ totalSalaries: number; retainsBuyouts: number; committed: number }> {
   const [roster, buyouts] = await Promise.all([
-    prisma.player.findMany({ where: { teamId, rosterType: "NHL" }, select: { capHit: true, retainedSalary: true } }),
+    prisma.player.findMany({ where: { teamId, rosterType: "NHL" }, select: { capHit: true, retainedSalary: true, contractYears: true } }),
     prisma.buyout.findMany({ where: { teamId }, select: { perYear: true, years: true, startYear: true } }),
   ]);
-  const totalSalaries = roster.reduce((s, p) => s + (p.capHit ?? 0), 0);
+  // a player whose contract has fully expired (contractYears 0) carries no
+  // salary until he re-signs or is swept to UFA — his frozen last capHit must
+  // not still count against the cap (see liveCapHit).
+  const totalSalaries = roster.reduce((s, p) => s + liveCapHit(p), 0);
   const retentionRelief = roster.reduce((s, p) => s + (p.retainedSalary ?? 0), 0);
   const deadMoney = deadMoneyForYear(buyouts, CURRENT_SEASON_START);
   const retainsBuyouts = deadMoney - retentionRelief;
@@ -45,7 +48,7 @@ export async function teamCapCommitted(teamId: number): Promise<{ totalSalaries:
  *  compliance against a different phase — used for the opening-day check. */
 export async function teamCapStatus(teamId: number, phaseOverride?: string): Promise<CapStatus> {
   const [roster, capInfo, cap, clock] = await Promise.all([
-    prisma.player.findMany({ where: { teamId, rosterType: "NHL" }, select: { capHit: true, retainedSalary: true, injuryDaysLeft: true, condition: true, isGoalie: true } }),
+    prisma.player.findMany({ where: { teamId, rosterType: "NHL" }, select: { capHit: true, retainedSalary: true, injuryDaysLeft: true, condition: true, isGoalie: true, contractYears: true } }),
     teamCapCommitted(teamId),
     loadLeagueCap(),
     getLeagueClock(),
@@ -53,8 +56,9 @@ export async function teamCapStatus(teamId: number, phaseOverride?: string): Pro
   const phase = phaseOverride ?? clock.phase;
   const committed = capInfo.committed;
   // LTIR relief is based on what this club actually carries for the injured
-  // player (net of any retention it benefits from), matching `committed` above.
-  const ltirRoster = roster.map((p) => ({ ...p, capHit: Math.max(0, (p.capHit ?? 0) - (p.retainedSalary ?? 0)) }));
+  // player (net of any retention it benefits from), matching `committed` above —
+  // and, same as there, a contract-less player's frozen capHit is 0, not stale.
+  const ltirRoster = roster.map((p) => ({ ...p, capHit: Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0)) }));
   const ltir = ltirRelief(ltirRoster);
   const ceiling = capCeilingForPhase(cap.upper, phase) + ltir;
   const floor = cap.lower;

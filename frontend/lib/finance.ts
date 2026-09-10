@@ -54,6 +54,17 @@ export const computeContractExpiry = (years: number, from = CURRENT_SEASON_START
 
 export type CapPlayer = { capHit: number | null; contractYears: number | null; age: number | null; birthDate?: string | Date | null };
 
+/** A player's Cap Hit once his contract has fully run out (contractYears <= 0)
+ *  is a frozen historical number, not a live salary — Player.capHit deliberately
+ *  keeps its last value after a deal expires (so his roster row/profile can
+ *  still show what he was making until he re-signs or is swept to UFA), but
+ *  that stale figure must stop counting toward anything live: the cap, the
+ *  bank, a roster total. Use this instead of reading `p.capHit` directly
+ *  anywhere a contract-less player might still be sitting on a roster. */
+export function liveCapHit(p: { capHit: number | null; contractYears?: number | null }): number {
+  return (p.contractYears ?? 0) > 0 ? (p.capHit ?? 0) : 0;
+}
+
 /** The NHL's own UFA/RFA cutoff: age as of June 30 of `year`, not a plain
  *  year-count added to the player's current age — a summer/fall birthday
  *  shouldn't get credited a year early just because "age + years" rounds up. */
@@ -236,8 +247,8 @@ export function buyoutTerms(
 // rounding error. This never touches the NHL salary cap; it only drains
 // the bank, same as NHL salaries do.
 export const FARM_SALARY_THRESHOLD = 100_000;
-export function farmSalaryExpense(players: Array<{ capHit: number | null }>): number {
-  return players.reduce((s, p) => s + ((p.capHit ?? 0) > FARM_SALARY_THRESHOLD ? (p.capHit ?? 0) : 0), 0);
+export function farmSalaryExpense(players: Array<{ capHit: number | null; contractYears?: number | null }>): number {
+  return players.reduce((s, p) => { const hit = liveCapHit(p); return s + (hit > FARM_SALARY_THRESHOLD ? hit : 0); }, 0);
 }
 
 export type TeamFinance = {

@@ -7,7 +7,7 @@ import { computeStandings } from "@/lib/sim/standings";
 import {
   getArenaSections, selloutRevenue, computeTeamFinance, teamCapSummary, projectedPointsPct,
   playerCapYears, deadMoneyForYear, money, CURRENT_SEASON_START, seasonLabel,
-  accruedCapSpace, SEASON_GAMES, ltirRelief, capCeilingForPhase, farmSalaryExpense,
+  accruedCapSpace, SEASON_GAMES, ltirRelief, capCeilingForPhase, farmSalaryExpense, liveCapHit,
 } from "@/lib/finance";
 import { getLeagueClock } from "@/lib/calendar-server";
 import { getTeamSession } from "@/lib/auth";
@@ -62,7 +62,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
     selloutRevenue: selloutRevenue(getArenaSections(team)),
     // real dollars this club owes — a retained acquisition only costs it the
     // post-retention share; the retaining club carries the rest.
-    salary: team.players.reduce((s, p) => s + Math.max(0, (p.capHit ?? 0) - (p.retainedSalary ?? 0)), 0) + farmExpense,
+    salary: team.players.reduce((s, p) => s + Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0)), 0) + farmExpense,
     homeGamesPlayed: homeGames, totalGamesPlayed: totalGames,
     startingBank: settings.startingCapital,
   });
@@ -73,7 +73,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   // tables below: real buyouts, and Dead Cap (salary it retains on players it
   // traded away) — kept apart since a retention isn't a buyout, but both still
   // count toward the Actual Cap Hit.
-  const netPlayersForCap = team.players.map((p) => ({ capHit: Math.max(0, (p.capHit ?? 0) - (p.retainedSalary ?? 0)) }));
+  const netPlayersForCap = team.players.map((p) => ({ capHit: Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0)) }));
   const realBuyoutsDeadMoney = deadMoneyForYear(realBuyouts, CURRENT_SEASON_START);
   const deadCapAmount = deadMoneyForYear(retentions, CURRENT_SEASON_START);
   const cap = teamCapSummary(netPlayersForCap, settings, realBuyoutsDeadMoney + deadCapAmount);
@@ -83,7 +83,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   const maxCapHit = cap.capHit + accrued.actual; // Projected Cap Hit — max the club may carry for the rest
   // LTIR relief is based on what this club actually carries for the injured player
   // (net of any retention it benefits from), matching `cap.capHit` above.
-  const ltirRoster = team.players.map((p) => ({ ...p, capHit: Math.max(0, (p.capHit ?? 0) - (p.retainedSalary ?? 0)) }));
+  const ltirRoster = team.players.map((p) => ({ ...p, capHit: Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0)) }));
   const ltir = ltirRelief(ltirRoster); // cap relief from skaters on LTIR (injured, CON < 90)
   const { phase } = await getLeagueClock();
   const effectiveCeiling = capCeilingForPhase(cap.upper, phase) + ltir;
@@ -101,7 +101,10 @@ export default async function TeamCapView({ slug }: { slug: string }) {
       // A player this club acquired with retention only counts against it for
       // the post-retention share — the retaining club carries the rest (shown
       // on ITS page as Dead Cap, not repeated here).
-      const netCapHit = Math.max(0, (p.capHit ?? 0) - (p.retainedSalary ?? 0));
+      // 0 once his contract has fully run out — his last capHit stays frozen on
+      // the row for the year-by-year columns' benefit, but isn't a live salary
+      // any more, so the standalone Cap Hit column shouldn't read as one either.
+      const netCapHit = Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0));
       const cells = playerCapYears({ ...p, capHit: netCapHit }, CURRENT_SEASON_START, SPAN);
       return (
         <tr key={p.id} className="border-b border-slate-800/60 hover:bg-slate-800/30">
@@ -124,7 +127,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
       </tr>
     </thead>
   );
-  const groupCapHit = (list: CP[]) => list.reduce((s, p) => s + Math.max(0, (p.capHit ?? 0) - (p.retainedSalary ?? 0)), 0);
+  const groupCapHit = (list: CP[]) => list.reduce((s, p) => s + Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0)), 0);
   // capwages-style position group: its own header (name, count, subtotal) + table.
   const PosGroup = ({ title, list, gm }: { title: string; list: CP[]; gm: boolean }) => (
     <div className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 overflow-x-auto">
