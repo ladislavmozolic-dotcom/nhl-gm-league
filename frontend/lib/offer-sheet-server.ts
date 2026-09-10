@@ -13,7 +13,7 @@ import { twoWayObjection } from "./free-agency";
 import { evaluateTeamOffer, weakestTeams, loadLeagueCap } from "./free-agency-server";
 import { canManageTeam } from "./auth";
 import { getLeagueClock } from "./calendar-server";
-import { CURRENT_SEASON_START, capCeilingForPhase, ltirRelief } from "./finance";
+import { CURRENT_SEASON_START, capCeilingForPhase, ltirRelief, liveCapHit } from "./finance";
 import { teamCapCommitted } from "./cap";
 
 type Ok = { ok: true };
@@ -72,11 +72,11 @@ async function planPicks(teamId: number, requiredRounds: number[], reserved: Set
 async function teamCapInfo(teamId: number): Promise<{ committed: number; ltir: number }> {
   const [roster, capInfo] = await Promise.all([
     prisma.player.findMany({
-      where: { teamId, rosterType: "NHL" }, select: { capHit: true, retainedSalary: true, injuryDaysLeft: true, condition: true, isGoalie: true },
+      where: { teamId, rosterType: "NHL" }, select: { capHit: true, retainedSalary: true, contractYears: true, injuryDaysLeft: true, condition: true, isGoalie: true },
     }),
     teamCapCommitted(teamId),
   ]);
-  const ltirRoster = roster.map((p) => ({ ...p, capHit: Math.max(0, (p.capHit ?? 0) - (p.retainedSalary ?? 0)) }));
+  const ltirRoster = roster.map((p) => ({ ...p, capHit: Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0)) }));
   return { committed: capInfo.committed, ltir: ltirRelief(ltirRoster) };
 }
 

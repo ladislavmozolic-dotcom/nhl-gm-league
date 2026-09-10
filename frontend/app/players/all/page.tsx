@@ -5,6 +5,7 @@ import SortableTable, { type SortCol, type SortRow } from "@/components/Sortable
 import { posGroup, ratingColor, ovColor } from "@/lib/ratingBands";
 import { epProfileUrl } from "@/lib/playerName";
 import { isLoggedIn } from "@/lib/auth";
+import { liveCapHit } from "@/lib/finance";
 
 export const dynamic = "force-dynamic";
 
@@ -80,7 +81,7 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
         pos: p.position, age: p.age,
         ...Object.fromEntries(attrs.map((a) => [a, rr[a]])),
         ...Object.fromEntries(attrs.map((a) => [`_c_${a}`, ratingColor(grp, a, rr[a])])),
-        ovr, _c_ovr: ovColor(grp, ovr), cap: p.capHit ?? 0, yrs: p.contractYears ?? (p.contractExpiry ? p.contractExpiry - 2026 : null),
+        ovr, _c_ovr: ovColor(grp, ovr), cap: liveCapHit(p), yrs: p.contractYears ?? (p.contractExpiry ? p.contractExpiry - 2026 : null),
       };
     });
   }

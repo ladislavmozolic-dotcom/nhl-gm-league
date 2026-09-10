@@ -7,6 +7,7 @@ import { teamRosterForBlock, matchesForTeam, type BlockPlayer } from "@/lib/trad
 import { cleanName } from "@/lib/playerName";
 import TradeBlockManager from "@/components/TradeBlockManager";
 import WaiverPlacer from "@/components/WaiverPlacer";
+import { liveCapHit } from "@/lib/finance";
 
 export const dynamic = "force-dynamic";
 
@@ -29,10 +30,10 @@ export default async function TeamTradeBlockPage({ params }: { params: Promise<{
   const [mine, matches, waiverRoster] = await Promise.all([
     teamRosterForBlock(team.id),
     matchesForTeam(team.id),
-    prisma.player.findMany({ where: { teamId: team.id, rosterType: "NHL" }, select: { id: true, name: true, position: true, capHit: true, tradeClause: true, waiverStatus: true } }),
+    prisma.player.findMany({ where: { teamId: team.id, rosterType: "NHL" }, select: { id: true, name: true, position: true, capHit: true, contractYears: true, tradeClause: true, waiverStatus: true } }),
   ]);
   const waiverPlayers = waiverRoster
-    .map((p) => ({ id: p.id, name: cleanName(p.name), position: p.position ?? "", capHit: p.capHit ?? 0, clause: p.tradeClause, onWaivers: p.waiverStatus === "ON_WAIVERS" }))
+    .map((p) => ({ id: p.id, name: cleanName(p.name), position: p.position ?? "", capHit: liveCapHit(p), clause: p.tradeClause, onWaivers: p.waiverStatus === "ON_WAIVERS" }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const MatchRow = ({ p }: { p: BlockPlayer }) => (

@@ -5,7 +5,7 @@ import { canManageTeam } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { ROSTER_LIMITS, isNhlSide, isScratchSide, type MoveRow } from "@/lib/roster-rules";
 import { canAddCapHit } from "@/lib/cap";
-import { money } from "@/lib/finance";
+import { money, liveCapHit } from "@/lib/finance";
 import { loadSettings } from "@/lib/sim/settings";
 import { placeOnWaivers } from "@/lib/waivers-server";
 
@@ -23,7 +23,7 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
   const ids = moves.map((m) => m.id);
   const players = await prisma.player.findMany({
     where: { id: { in: ids }, teamId: { in: [team.id, affiliate.id] } },
-    select: { id: true, name: true, isGoalie: true, rosterType: true, capHit: true, contractType: true, contractText: true },
+    select: { id: true, name: true, isGoalie: true, rosterType: true, capHit: true, contractYears: true, contractType: true, contractText: true },
   });
   const byId = new Map(players.map((p) => [p.id, p]));
   const valid = moves.filter((m) => byId.has(m.id));
@@ -78,8 +78,8 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
     const p = byId.get(m.id)!;
     const toNhl = isNhlSide(m.side); // dressed or NHL-scratched both sit on the cap
     const wasNhl = p.rosterType === "NHL";
-    if (toNhl && !wasNhl) netAdd += p.capHit ?? 0;       // call-up adds cap
-    else if (!toNhl && wasNhl) netAdd -= p.capHit ?? 0;  // send-down frees cap
+    if (toNhl && !wasNhl) netAdd += liveCapHit(p);       // call-up adds cap
+    else if (!toNhl && wasNhl) netAdd -= liveCapHit(p);  // send-down frees cap
   }
   if (netAdd > 0) {
     const cap = await canAddCapHit(team.id, netAdd);

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { cleanName } from "@/lib/playerName";
+import { liveCapHit } from "@/lib/finance";
 
 /** Everything one club could put into a trade — its NHL roster + AHL affiliate
  *  roster, draft picks, and prospects. Shared by the 2-team and 3-team builders. */
@@ -32,7 +33,7 @@ export async function teamAssets(teamId: number, prospectSource: "real" | "profi
     // Retention". A fresh retention slider in the trade builder multiplies
     // against this, so retaining MORE on an already-retained player is a % of
     // what's left, not the player's full original salary (see trade-exec.ts).
-    players: players.slice().sort(byName).map((p) => ({ id: p.id, name: p.name, position: p.position, capHit: Math.max(0, (p.capHit ?? 0) - (p.retainedSalary ?? 0)), farm: p.rosterType === "AHL", clause: p.tradeClause, noTradeTeams: p.noTradeTeams })),
+    players: players.slice().sort(byName).map((p) => ({ id: p.id, name: p.name, position: p.position, capHit: Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0)), farm: p.rosterType === "AHL", clause: p.tradeClause, noTradeTeams: p.noTradeTeams })),
     picks: picks.map((p) => {
       const orig = teamByLogoId.get(p.ownerLogoId);
       return { id: p.id, label: `${p.year} R${p.round}${orig ? ` (${orig.code ?? orig.name})` : ""}`, logoUrl: orig?.logoUrl ?? null };

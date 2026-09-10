@@ -10,7 +10,7 @@ import { getLeagueDate, computePhase } from "./calendar-server";
 import { roundForDate, daysBetween } from "./calendar";
 import { computeStandings } from "./sim/standings";
 import { cleanName } from "./playerName";
-import { CURRENT_SEASON_START } from "./finance";
+import { CURRENT_SEASON_START, liveCapHit } from "./finance";
 import { WAIVER_CAP_HIT_LIMIT } from "./roster-rules";
 import type { Phase } from "./calendar";
 
@@ -24,7 +24,7 @@ export type WaiverRow = {
 export async function activeWaivers(): Promise<WaiverRow[]> {
   const waivers = await prisma.waiver.findMany({ where: { status: "ACTIVE" }, orderBy: { createdAt: "desc" }, include: { claims: true } });
   if (waivers.length === 0) return [];
-  const players = await prisma.player.findMany({ where: { id: { in: waivers.map((w) => w.playerId) } }, select: { id: true, name: true, slug: true, position: true, capHit: true, tradeClause: true } });
+  const players = await prisma.player.findMany({ where: { id: { in: waivers.map((w) => w.playerId) } }, select: { id: true, name: true, slug: true, position: true, capHit: true, contractYears: true, tradeClause: true } });
   const pById = new Map(players.map((p) => [p.id, p]));
   const teamIds = new Set<number>();
   for (const w of waivers) { teamIds.add(w.fromTeamId); w.claims.forEach((c) => teamIds.add(c.teamId)); }
@@ -33,7 +33,7 @@ export async function activeWaivers(): Promise<WaiverRow[]> {
   return waivers.map((w) => {
     const p = pById.get(w.playerId);
     return {
-      id: w.id, playerId: w.playerId, playerName: cleanName(p?.name ?? ""), playerSlug: p?.slug ?? null, position: p?.position ?? "", capHit: p?.capHit ?? 0,
+      id: w.id, playerId: w.playerId, playerName: cleanName(p?.name ?? ""), playerSlug: p?.slug ?? null, position: p?.position ?? "", capHit: p ? liveCapHit(p) : 0,
       fromTeamId: w.fromTeamId, fromCode: code.get(w.fromTeamId) ?? "?", placedDay: w.placedDay, clause: p?.tradeClause ?? null,
       claims: w.claims.map((c) => ({ teamId: c.teamId, code: code.get(c.teamId) ?? "?" })),
     };
@@ -42,14 +42,14 @@ export async function activeWaivers(): Promise<WaiverRow[]> {
 
 /** Place a player on waivers. NMC blocks it; NTC is allowed. */
 export async function placeOnWaivers(playerId: number, actorTeamId: number): Promise<{ ok: boolean; error?: string }> {
-  const p = await prisma.player.findUnique({ where: { id: playerId }, select: { teamId: true, rosterType: true, tradeClause: true, name: true, capHit: true } });
+  const p = await prisma.player.findUnique({ where: { id: playerId }, select: { teamId: true, rosterType: true, tradeClause: true, name: true, capHit: true, contractYears: true } });
   if (!p) return { ok: false, error: "Player not found." };
   if (p.teamId !== actorTeamId) return { ok: false, error: "That player isn't on your team." };
   if (p.rosterType !== "NHL") return { ok: false, error: "Only an NHL player goes through waivers." };
   const settings = await loadSettings();
   if (!settings.waiversEnabled) return { ok: false, error: "Waivers are turned off in this league — send players down freely from the roster mover." };
   if (settings.clausesEnabled && p.tradeClause === "NMC") return { ok: false, error: `${cleanName(p.name)} has a no-movement clause — he can't be waived.` };
-  if ((p.capHit ?? 0) > WAIVER_CAP_HIT_LIMIT) return { ok: false, error: `${cleanName(p.name)} carries a $${(WAIVER_CAP_HIT_LIMIT / 1e6).toFixed(1)}M+ cap hit — too valuable to waive to the farm.` };
+  if (liveCapHit(p) > WAIVER_CAP_HIT_LIMIT) return { ok: false, error: `${cleanName(p.name)} carries a $${(WAIVER_CAP_HIT_LIMIT / 1e6).toFixed(1)}M+ cap hit — too valuable to waive to the farm.` };
   const existing = await prisma.waiver.findUnique({ where: { playerId } });
   if (existing && existing.status === "ACTIVE") return { ok: false, error: "He's already on waivers." };
   const day = roundForDate(await getLeagueDate());

@@ -7,7 +7,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { loadSettings } from "@/lib/sim/settings";
-import { CURRENT_SEASON_START } from "@/lib/finance";
+import { CURRENT_SEASON_START, liveCapHit } from "@/lib/finance";
 import { getLeagueDate } from "@/lib/calendar-server";
 import { roundForDate, daysBetween } from "@/lib/calendar";
 import { displayName } from "@/lib/playerName";
@@ -126,7 +126,7 @@ export async function collectMoveOps(pkg: TradePackage) {
       // slice a former club keeps carrying) so his profile/contract always reads
       // right, and the acquiring club's cap total nets it out at the team level
       // (see lib/cap.ts teamCapCommitted).
-      const capHit = pl.capHit ?? 0;
+      const capHit = liveCapHit(pl);
       let retainedSalary = pl.retainedSalary ?? 0;
       if (tp.retentionPct > 0 && capHit) {
         if (history.length >= settings.retentionMaxPerContract) throw new Error(`${displayName(pl.name)}'s contract has already been retained ${history.length} time(s) — no further retention is allowed.`);

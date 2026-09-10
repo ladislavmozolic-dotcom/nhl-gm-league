@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { canAddCapHit } from "@/lib/cap";
-import { money } from "@/lib/finance";
+import { money, liveCapHit } from "@/lib/finance";
 import { loadSettings } from "@/lib/sim/settings";
 
 export async function movePlayer(
@@ -64,9 +64,9 @@ export async function movePlayer(
 
     // in-season: a manual call-up must fit under the cap (ceiling incl. LTIR relief).
     // The off-season +10% cushion is applied automatically inside canAddCapHit.
-    const cap = await canAddCapHit(parentTeam.id, player.capHit ?? 0);
+    const cap = await canAddCapHit(parentTeam.id, liveCapHit(player));
     if (!cap.ok) {
-      return { ok: false, error: `Call-up blocked — ${parentTeam.name} has ${money(cap.status.space)} of cap space, ${player.name}'s hit is ${money(player.capHit ?? 0)}. Send a player down or use LTIR relief.` };
+      return { ok: false, error: `Call-up blocked — ${parentTeam.name} has ${money(cap.status.space)} of cap space, ${player.name}'s hit is ${money(liveCapHit(player))}. Send a player down or use LTIR relief.` };
     }
 
     await prisma.player.update({

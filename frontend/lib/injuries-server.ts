@@ -4,7 +4,7 @@
 
 import { prisma } from "./prisma";
 import { cleanName } from "./playerName";
-import { onLtir } from "./finance";
+import { onLtir, liveCapHit } from "./finance";
 
 export type CurrentInjury = {
   playerId: number; name: string; slug: string | null; position: string;
@@ -43,8 +43,8 @@ export async function currentInjuries(opts?: { teamId?: number; league?: string 
     playerId: p.id, name: cleanName(p.name), slug: p.slug, position: p.position ?? "—",
     teamId: p.team?.id ?? null, teamCode: p.team?.code ?? null, teamName: p.team?.name ?? null, teamSlug: p.team?.slug ?? null, teamLogo: p.team?.logoUrl ?? null, league: p.team?.league ?? null,
     desc: p.injuryDesc ?? "Injury", daysLeft: p.injuryDaysLeft, severity: p.injurySeverity ?? severityFromDays(p.injuryDaysLeft),
-    isGoalie: p.isGoalie, capHit: p.capHit ?? 0,
-    onLtir: onLtir({ capHit: p.capHit, injuryDaysLeft: p.injuryDaysLeft, condition: p.condition, isGoalie: p.isGoalie }),
+    isGoalie: p.isGoalie, capHit: liveCapHit(p),
+    onLtir: onLtir({ capHit: liveCapHit(p), injuryDaysLeft: p.injuryDaysLeft, condition: p.condition, isGoalie: p.isGoalie }),
   }));
 }
 

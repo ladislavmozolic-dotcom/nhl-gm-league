@@ -8,7 +8,9 @@ import { posGroup, ratingColor, ovColor } from "@/lib/ratingBands";
 import { isWorthyGoalie } from "@/lib/goalie-rule";
 
 const parseCap = (t: string | null) => { if (!t) return 0; const m = t.match(/[\d,]+/); return m ? parseInt(m[0].replace(/,/g, ""), 10) : 0; };
-const salaryOf = (p: any) => p.capHit || parseCap(p.contractText);
+// A player's capHit freezes at its last value once his contract runs out
+// (contractYears <= 0) rather than clearing — must stop reading as live salary.
+const salaryOf = (p: any) => ((p.contractYears ?? 0) > 0 ? (p.capHit || parseCap(p.contractText)) : 0);
 const fmtM = (v: number) => (v > 0 ? `$${Math.round(v).toLocaleString("en-US")}` : "—");
 
 type Col = { key: string; label: string; num: boolean };

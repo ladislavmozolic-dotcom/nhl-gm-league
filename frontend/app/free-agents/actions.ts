@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { canManageTeam, getTeamSession, isAdmin, isComishTier } from "@/lib/auth";
 import { getLeagueClock, getLeagueDate } from "@/lib/calendar-server";
 import { addDays } from "@/lib/calendar";
-import { CURRENT_SEASON_START, capCeilingForPhase, ltirRelief, accruedCapSpace } from "@/lib/finance";
+import { CURRENT_SEASON_START, capCeilingForPhase, ltirRelief, accruedCapSpace, liveCapHit } from "@/lib/finance";
 import { teamCapCommitted } from "@/lib/cap";
 import {
   loadMarketPool, teamContentionMap, teamAsk, evaluateTeamOffer, loadLeagueCap, weakestTeams,
@@ -79,11 +79,11 @@ function competitiveAsk(baseAsk: number, myBid: number, list: { salary: number }
 async function teamCapInfo(teamId: number): Promise<{ committed: number; ltir: number }> {
   const [roster, capInfo] = await Promise.all([
     prisma.player.findMany({
-      where: { teamId, rosterType: "NHL" }, select: { capHit: true, retainedSalary: true, injuryDaysLeft: true, condition: true, isGoalie: true },
+      where: { teamId, rosterType: "NHL" }, select: { capHit: true, retainedSalary: true, contractYears: true, injuryDaysLeft: true, condition: true, isGoalie: true },
     }),
     teamCapCommitted(teamId),
   ]);
-  const ltirRoster = roster.map((p) => ({ ...p, capHit: Math.max(0, (p.capHit ?? 0) - (p.retainedSalary ?? 0)) }));
+  const ltirRoster = roster.map((p) => ({ ...p, capHit: Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0)) }));
   return { committed: capInfo.committed, ltir: ltirRelief(ltirRoster) };
 }
 
@@ -1246,7 +1246,7 @@ export async function extendContractAction(
   if (!onFarm) {
     const cap = await loadLeagueCap();
     const info = await teamCapInfo(teamId);
-    const committed = info.committed - (player.capHit ?? 0);
+    const committed = info.committed - liveCapHit(player);
     const ceiling = capCeilingForPhase(cap.upper, (await getLeagueClock()).phase) + info.ltir;
     if (committed + salary > ceiling) {
       return { ok: false as const, error: `Over the ceiling — you'd have ${fmtM(ceiling - committed)} of room, this deal is ${fmtM(salary)}.` };

@@ -12,6 +12,7 @@ import { loadSimTeam } from "./sim/index";
 import { PRESETS, systemFit } from "./sim/tactics";
 import { autoFillRosters, fillAhlFromScratched } from "./roster-fill";
 import { teamCapStatus } from "./cap";
+import { liveCapHit } from "./finance";
 
 /** Teams with no human GM login → AI-controlled. Returns NHL clubs + AHL affiliates. */
 export async function aiTeamIds(): Promise<number[]> {
@@ -69,13 +70,13 @@ async function enforceCap(teamId: number): Promise<string | null> {
       OR: [{ contractType: "TWO_WAY" }, { contractText: { contains: "ELC" } }],
     },
     orderBy: { capHit: "desc" },
-    select: { id: true, capHit: true },
+    select: { id: true, capHit: true, contractYears: true },
   });
   let sent = 0;
   for (const p of movable) {
     if (over <= 0) break;
     await prisma.player.update({ where: { id: p.id }, data: { teamId: affId, rosterType: "AHL" } });
-    over -= p.capHit ?? 0;
+    over -= liveCapHit(p);
     sent++;
   }
   return sent ? `${team.code ?? team.name}: sent ${sent} down for cap` : null;

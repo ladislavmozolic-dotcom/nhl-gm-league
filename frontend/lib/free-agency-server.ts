@@ -98,7 +98,7 @@ export function playerMarket(p: PoolPlayer): { grp: FaPos; market: number } {
 /** Every signed contract becomes one comparable row. */
 export async function loadMarketPool(): Promise<MarketRow[]> {
   const signed = await prisma.player.findMany({
-    where: { rosterType: { in: ["NHL", "AHL"] }, capHit: { gt: 0 } },
+    where: { rosterType: { in: ["NHL", "AHL"] }, capHit: { gt: 0 }, contractYears: { gt: 0 } },
     select: SEL,
   });
   return signed.map((p) => {

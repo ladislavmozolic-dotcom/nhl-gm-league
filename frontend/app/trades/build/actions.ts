@@ -4,7 +4,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getTeamSession, isAdmin, isCommission } from "@/lib/auth";
 import { loadSettings } from "@/lib/sim/settings";
-import { CURRENT_SEASON_START, money } from "@/lib/finance";
+import { CURRENT_SEASON_START, money, liveCapHit } from "@/lib/finance";
 import { revalidatePath } from "next/cache";
 import { clauseBlock, assertOwnership, packageFromTrade, executeAcceptedTrade, createTradeRecord, collectMoveOps, reverseTradeOps, type TradePlayer, type TradePackage } from "@/lib/trade-exec";
 import { playerValue, pickValueBySlot } from "@/lib/trade-value";
@@ -32,7 +32,7 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
   const norm = (s: string) => clean(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
   const pidAll = [...pkg.fromPlayers, ...pkg.toPlayers].map((p) => p.playerId);
-  const players = await prisma.player.findMany({ where: { id: { in: pidAll } }, select: { id: true, name: true, overall: true, age: true, capHit: true, position: true, isGoalie: true, lastSeasonGP: true, lastSeasonSvPct: true } });
+  const players = await prisma.player.findMany({ where: { id: { in: pidAll } }, select: { id: true, name: true, overall: true, age: true, capHit: true, contractYears: true, position: true, isGoalie: true, lastSeasonGP: true, lastSeasonSvPct: true } });
   const pById = new Map(players.map((p) => [p.id, p]));
 
   // --- draft-order-aware picks: value follows the estimated slot the pick lands at,
@@ -97,7 +97,7 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
 
   // fit reasoning
   const reasoning: string[] = [];
-  const capOf = (pls: TradePlayer[]) => pls.reduce((s, x) => s + (pById.get(x.playerId)?.capHit ?? 0), 0);
+  const capOf = (pls: TradePlayer[]) => pls.reduce((s, x) => { const p = pById.get(x.playerId); return s + (p ? liveCapHit(p) : 0); }, 0);
   const capIn = capOf(pkg.toPlayers), capOut = capOf(pkg.fromPlayers);
   const capDelta = capIn - capOut;
   const fmt = (n: number) => `$${Math.abs(Math.round(n)).toLocaleString("en-US")}`;

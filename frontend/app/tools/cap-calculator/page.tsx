@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { loadSettings } from "@/lib/sim/settings";
+import { liveCapHit } from "@/lib/finance";
 import { computeStandings } from "@/lib/sim/standings";
 import { PageHeader } from "@/components/ui";
 import CapCalculator from "@/components/CapCalculator";
@@ -12,7 +13,7 @@ export default async function CapCalculatorPage() {
     loadSettings(),
     prisma.team.findMany({
       where: { league: "NHL", isAffiliate: false },
-      select: { id: true, name: true, code: true, players: { where: { rosterType: "NHL" }, select: { capHit: true } } },
+      select: { id: true, name: true, code: true, players: { where: { rosterType: "NHL" }, select: { capHit: true, contractYears: true } } },
       orderBy: { name: "asc" },
     }),
     computeStandings(SEASON, "NHL"),
@@ -24,7 +25,7 @@ export default async function CapCalculatorPage() {
   const gamesTotal = Math.max(82, ...[...totById.values()]); // season length from the schedule (82/84…)
   const teamData = teams.map((t) => ({
     name: t.name, code: t.code,
-    capHit: t.players.reduce((s, p) => s + (p.capHit ?? 0), 0),
+    capHit: t.players.reduce((s, p) => s + liveCapHit(p), 0),
     gp: gpById.get(t.id) ?? 0,
   }));
 

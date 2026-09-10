@@ -12,7 +12,7 @@ function contractTypeLabel(t: string | null): string {
 
 export default async function ContractsPage() {
   const players = await prisma.player.findMany({
-    where: { rosterType: { in: ["NHL", "AHL"] }, capHit: { gt: 0 } },
+    where: { rosterType: { in: ["NHL", "AHL"] }, capHit: { gt: 0 }, contractYears: { gt: 0 } },
     include: { team: { select: { code: true, slug: true, logoUrl: true } } },
     orderBy: { capHit: "desc" },
   });

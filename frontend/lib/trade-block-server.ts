@@ -4,6 +4,7 @@
 
 import { prisma } from "./prisma";
 import { cleanName } from "./playerName";
+import { liveCapHit } from "./finance";
 
 export const NEED_POSITIONS = ["C", "LW", "RW", "D", "G"] as const;
 export type NeedPos = (typeof NEED_POSITIONS)[number];
@@ -35,7 +36,7 @@ export async function tradeBlockBoard(): Promise<BlockTeam[]> {
     if (!t) { t = { teamId: p.teamId, code: p.team.code, name: p.team.name, slug: p.team.slug, needs: p.team.needs ?? [], players: [] }; byTeam.set(p.teamId, t); }
     t.players.push({
       id: p.id, name: cleanName(p.name), slug: p.slug, position: p.position, overall: p.overall, age: p.age,
-      capHit: p.capHit, contractYears: p.contractYears, note: p.blockNote,
+      capHit: liveCapHit(p), contractYears: p.contractYears, note: p.blockNote,
       teamId: p.teamId, teamCode: p.team.code, teamName: p.team.name, teamSlug: p.team.slug,
     });
   }
@@ -68,7 +69,7 @@ export async function teamRosterForBlock(teamId: number): Promise<{ needs: strin
     needs: team?.needs ?? [],
     players: rows.map((p) => ({
       id: p.id, name: cleanName(p.name), slug: p.slug, position: p.position, overall: p.overall, age: p.age,
-      capHit: p.capHit, contractYears: p.contractYears, note: p.blockNote, onBlock: p.onBlock,
+      capHit: liveCapHit(p), contractYears: p.contractYears, note: p.blockNote, onBlock: p.onBlock,
       teamId, teamCode: p.team?.code ?? null, teamName: p.team?.name ?? "", teamSlug: p.team?.slug ?? null,
     })).sort((a, b) => a.name.localeCompare(b.name)),
   };

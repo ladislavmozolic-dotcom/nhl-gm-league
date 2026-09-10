@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { loadSettings } from "@/lib/sim/settings";
 import { computeStandings } from "@/lib/sim/standings";
-import { getArenaSections, selloutRevenue, computeTeamFinance, projectedPointsPct, farmSalaryExpense, money } from "@/lib/finance";
+import { getArenaSections, selloutRevenue, computeTeamFinance, projectedPointsPct, farmSalaryExpense, liveCapHit, money } from "@/lib/finance";
 import FinanceTable, { type FinanceRow } from "@/components/FinanceTable";
 import { PageHeader } from "@/components/ui";
 
@@ -15,8 +15,8 @@ export default async function FinancePage() {
       select: {
         id: true, name: true, slug: true, logoUrl: true, popularity: true,
         capacity: true, arenaSections: true, ledgerAdj: true,
-        players: { where: { rosterType: "NHL" }, select: { capHit: true, retainedSalary: true } },
-        affiliateTeams: { select: { players: { where: { rosterType: "AHL" }, select: { capHit: true } } } },
+        players: { where: { rosterType: "NHL" }, select: { capHit: true, retainedSalary: true, contractYears: true } },
+        affiliateTeams: { select: { players: { where: { rosterType: "AHL" }, select: { capHit: true, contractYears: true } } } },
       },
     }),
     loadSettings(),
@@ -41,7 +41,7 @@ export default async function FinancePage() {
       popularity: t.popularity,
       pointsPct: projectedPointsPct(st),
       selloutRevenue: selloutRevenue(getArenaSections(t)),
-      salary: t.players.reduce((s, p) => s + Math.max(0, (p.capHit ?? 0) - (p.retainedSalary ?? 0)), 0)
+      salary: t.players.reduce((s, p) => s + Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0)), 0)
         + farmSalaryExpense(t.affiliateTeams.flatMap((a) => a.players)),
       homeGamesPlayed: homeById.get(t.id) ?? 0,
       totalGamesPlayed: st?.gp ?? 0,

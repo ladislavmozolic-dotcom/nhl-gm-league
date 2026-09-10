@@ -8,6 +8,10 @@ export function parseCapFromContract(contractText: string | null): number {
   return nums ? parseInt(nums[0].replace(/,/g, ""), 10) : 0;
 }
 export function salaryOf(p: any): number {
+  // A player's capHit freezes at its last value once his contract runs out
+  // (contractYears <= 0) rather than clearing — must stop counting as live
+  // salary once that's happened, same rule as lib/finance.ts's liveCapHit.
+  if ((p.contractYears ?? 0) <= 0) return 0;
   return p.capHit || parseCapFromContract(p.contractText);
 }
 export function fmtM(v: number): string {

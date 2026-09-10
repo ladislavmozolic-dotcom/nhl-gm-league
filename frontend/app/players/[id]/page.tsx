@@ -19,7 +19,7 @@ import RinkDefenseMap from "@/components/RinkDefenseMap";
 import { goalieAnalytics } from "@/lib/goalie-analytics-server";
 import GoalieAnalyticsCard from "@/components/GoalieAnalyticsCard";
 import { starPowerForPlayer } from "@/lib/star-power-server";
-import { onLtir, money, CURRENT_SEASON_START, seasonLabel, ageAsOfJune30 } from "@/lib/finance";
+import { onLtir, money, CURRENT_SEASON_START, seasonLabel, ageAsOfJune30, liveCapHit } from "@/lib/finance";
 import { tierAccent } from "@/lib/star-power";
 import InfoTip from "@/components/InfoTip";
 import { playerTradeHistory, playerTransactionHistory } from "@/lib/trade-history-server";
@@ -531,7 +531,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
             <div className="flex items-center justify-between text-xs text-slate-500">
               <span>Est. return: <span className="text-amber-400 font-semibold">{eta}</span> <span className="text-slate-600">({p.injuryDaysLeft} days)</span></span>
               {ltir
-                ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300" title={`On LTIR — the club may exceed the cap by his ${money(p.capHit ?? 0)} hit to call up a replacement.`}>LTIR · +{money(p.capHit ?? 0)}</span>
+                ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300" title={`On LTIR — the club may exceed the cap by his ${money(liveCapHit(p))} hit to call up a replacement.`}>LTIR · +{money(liveCapHit(p))}</span>
                 : (sev === "Multi-week" ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-300">IR</span> : null)}
             </div>
           </div>

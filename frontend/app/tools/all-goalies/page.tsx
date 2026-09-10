@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import RosterTable, { type RosterPlayer } from "@/components/RosterTable";
 import { PageHeader, SectionTitle } from "@/components/ui";
-import { money } from "@/lib/finance";
+import { money, liveCapHit } from "@/lib/finance";
 import { captaincyFromName } from "@/lib/playerName";
 import { isLoggedIn } from "@/lib/auth";
 import { redactAttrs } from "@/lib/player-attrs";
@@ -43,7 +43,7 @@ export default async function AllGoaliesPage({ searchParams }: { searchParams: P
   const farmHasField = farm.some((p) => p.captaincy === "C" || p.captaincy === "A");
   const toRP = (p: (typeof full.players)[number], hasField: boolean): RosterPlayer => {
     const row = { ...(p as unknown as RosterPlayer), ...((p.goalieRating ?? {}) as unknown as Record<string, number | null>), capRole: hasField ? (p.captaincy ?? null) : captaincyFromName(p.name) };
-    const out = realMode ? { ...row, contractText: p.capHit ? money(p.capHit) : (row.contractText ?? null) } : row;
+    const out = realMode ? { ...row, contractText: liveCapHit(p) ? money(liveCapHit(p)) : (row.contractText ?? null) } : row;
     return redactAttrs(out, !loggedIn);
   };
 

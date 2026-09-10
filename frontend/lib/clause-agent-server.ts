@@ -6,6 +6,7 @@ import { prisma } from "./prisma";
 import { computeStandings } from "./sim/standings";
 import { loadTeamContext, projectSlot, playerMarket, teamContentionMap } from "./free-agency-server";
 import { clauseVerdict, type ClauseType, type ClauseVerdict } from "./clause-agent";
+import { liveCapHit } from "./finance";
 
 const SEL = {
   id: true, isGoalie: true, position: true, capHit: true, contractYears: true,
@@ -36,7 +37,7 @@ export async function clauseTerms(playerId: number, toTeamId: number): Promise<C
 
   const v = clauseVerdict({
     clause: p.tradeClause as ClauseType,
-    capHit: p.capHit ?? 0, contractYears: p.contractYears ?? 1,
+    capHit: liveCapHit(p), contractYears: p.contractYears ?? 1,
     fromLine, toLine,
     fromPointsPct: ptsPct.get(fromTeamId) ?? 0.5,
     toPointsPct: ptsPct.get(toTeamId) ?? 0.5,

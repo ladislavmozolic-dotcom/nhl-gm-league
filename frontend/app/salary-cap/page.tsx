@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { loadSettings } from "@/lib/sim/settings";
-import { teamCapCentral, deadMoneyForYear, CURRENT_SEASON_START, money } from "@/lib/finance";
+import { teamCapCentral, deadMoneyForYear, CURRENT_SEASON_START, money, liveCapHit } from "@/lib/finance";
 import { computeStandings } from "@/lib/sim/standings";
 import CapCentralTable, { type CapRow } from "@/components/CapCentralTable";
 import { PageHeader } from "@/components/ui";
@@ -14,7 +14,7 @@ export default async function SalaryCapPage() {
       where: { league: "NHL", isAffiliate: false },
       select: {
         id: true, name: true, slug: true, logoUrl: true,
-        players: { where: { rosterType: "NHL" }, select: { capHit: true, retainedSalary: true } },
+        players: { where: { rosterType: "NHL" }, select: { capHit: true, retainedSalary: true, contractYears: true } },
       },
     }),
     loadSettings(),
@@ -36,7 +36,7 @@ export default async function SalaryCapPage() {
     const buyoutRows = await prisma.buyout.findMany({ where: { teamId: t.id }, select: { perYear: true, years: true, startYear: true, totalCost: true } });
     const buyouts = deadMoneyForYear(buyoutRows.filter((b) => b.totalCost > 0), CURRENT_SEASON_START);
     const deadCap = deadMoneyForYear(buyoutRows.filter((b) => b.totalCost === 0), CURRENT_SEASON_START);
-    const netPlayers = t.players.map((p) => ({ capHit: Math.max(0, (p.capHit ?? 0) - (p.retainedSalary ?? 0)) }));
+    const netPlayers = t.players.map((p) => ({ capHit: Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0)) }));
     const { totalSalaries, capHit, capSpace, underFloorBy, projCapHit, projCapSpace, count } =
       teamCapCentral(netPlayers, buyouts + deadCap, { salaryCapUpper: settings.salaryCapUpper, salaryCapLower: settings.salaryCapLower }, { gamesPlayed: gp, gamesTotal });
     return { id: t.id, name: t.name, slug: t.slug, logoUrl: t.logoUrl, gp, gamesTotal, count, totalSalaries, buyouts, deadCap, capHit, capSpace, underFloorBy, projCapHit, projCapSpace };
