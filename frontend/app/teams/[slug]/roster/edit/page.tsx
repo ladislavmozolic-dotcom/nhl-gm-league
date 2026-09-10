@@ -12,8 +12,9 @@ export default async function RosterPage({ params }: { params: Promise<{ slug: s
   if (!team) notFound();
   if (!(await canManageTeam(team.id))) redirect(`/teams/${slug}/login`);
 
+  const rosterType = team.league === "AHL" ? "AHL" : "NHL";
   const players = await prisma.player.findMany({
-    where: { teamId: team.id, rosterType: "NHL" },
+    where: { teamId: team.id, rosterType },
     select: { id: true, name: true, position: true, number: true, overall: true, captaincy: true, isGoalie: true },
     orderBy: [{ isGoalie: "asc" }, { overall: "desc" }],
   });

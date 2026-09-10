@@ -17,6 +17,7 @@ type Col = { key: string; label: string; num: boolean };
 export default function RosterRows({ players, attrs, isGoalie, farm, hideAttrs = false }: { players: any[]; attrs: string[]; isGoalie: boolean; farm?: boolean; hideAttrs?: boolean }) {
   const cols: Col[] = [
     { key: "name", label: "Player", num: false },
+    { key: "number", label: "#", num: true },
     { key: "position", label: "Pos", num: false },
     { key: "age", label: "Age", num: true },
     { key: "condition", label: "CON", num: true },
@@ -78,6 +79,7 @@ export default function RosterRows({ players, attrs, isGoalie, farm, hideAttrs =
                     </div>
                   </div>
                 </td>
+                <td className="px-2 py-2.5 text-center text-slate-500 tabular-nums">{player.number ?? "—"}</td>
                 <td className="px-3 py-2.5 text-center text-slate-400 whitespace-nowrap">{player.position}</td>
                 <td className="px-3 py-2.5 text-center text-slate-400">{player.age || "—"}</td>
                 <td className="px-3 py-2.5 text-center tabular-nums">

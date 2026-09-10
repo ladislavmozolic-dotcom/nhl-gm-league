@@ -12,12 +12,13 @@ export const dynamic = "force-dynamic";
 // his lineup.
 export default async function LinesCaptainsPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const team = await prisma.team.findUnique({ where: { slug }, select: { id: true, name: true } });
+  const team = await prisma.team.findUnique({ where: { slug }, select: { id: true, name: true, league: true } });
   if (!team) notFound();
   if (!(await canManageTeam(team.id))) redirect(`/teams/${slug}/login`);
 
+  const rosterType = team.league === "AHL" ? "AHL" : "NHL";
   const players = await prisma.player.findMany({
-    where: { teamId: team.id, rosterType: "NHL" },
+    where: { teamId: team.id, rosterType },
     select: { id: true, name: true, position: true, number: true, overall: true, captaincy: true, isGoalie: true },
     orderBy: [{ isGoalie: "asc" }, { overall: "desc" }],
   });

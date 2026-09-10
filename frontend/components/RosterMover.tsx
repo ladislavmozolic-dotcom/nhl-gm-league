@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import PlayerLink from "@/components/PlayerLink";
 import Link from "next/link";
+import BackLink from "@/components/BackLink";
 import { ROSTER_LIMITS, WAIVER_CAP_HIT_LIMIT, isNhlSide, type MoveRow, type RosterSide } from "@/lib/roster-rules";
 
 type Player = {
@@ -234,8 +235,11 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
             <button onClick={() => setSortMode("ov")} className={`px-2.5 py-1 rounded-md font-semibold transition-colors ${sortMode === "ov" ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-400 hover:text-slate-200"}`}>OV</button>
           </div>
         </div>
-        <div className="flex gap-3 text-sm mt-1">
-          <Link href={`/teams/${teamSlug}`} className="text-slate-400 hover:text-blue-400">← team</Link>
+        <div className="flex gap-3 text-sm mt-1 items-center">
+          {/* History-aware: a GM who reached this page from the AHL affiliate's own
+              "Roster Moves" link (which deep-links here using the NHL parent's slug)
+              should land back on the AHL page, not on the NHL team this URL is scoped to. */}
+          <BackLink fallback={`/teams/${teamSlug}`} label="team" />
           <Link href={`/teams/${teamSlug}/lines`} className="text-slate-400 hover:text-blue-400">Lines →</Link>
           <Link href={`/teams/${teamSlug}/roster/edit`} className="text-slate-400 hover:text-blue-400">Numbers &amp; captains →</Link>
         </div>
