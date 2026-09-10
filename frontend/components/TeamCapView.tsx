@@ -16,7 +16,7 @@ import { buyoutPlayer } from "@/app/finance/[slug]/actions";
 
 const SEASON = "2026-27";
 const SPAN = 5;
-type CP = { id: number; name: string; position: string; age: number | null; isGoalie: boolean; capHit: number | null; contractYears: number | null; retainedSalary?: number | null };
+type CP = { id: number; name: string; position: string; age: number | null; birthDate?: string | Date | null; isGoalie: boolean; capHit: number | null; contractYears: number | null; retainedSalary?: number | null };
 const isD = (pos: string) => /(^|\/)D(\/|$)/.test(pos) || pos === "D";
 /** capwages-style split: Forwards / Defense / Goalies as their own groups
  *  instead of one flat cap-hit-sorted list. */
@@ -32,8 +32,8 @@ export default async function TeamCapView({ slug }: { slug: string }) {
     where: { slug },
     select: {
       id: true, name: true, logoUrl: true, arena: true, popularity: true, arenaSections: true, capacity: true, bankAccount: true,
-      players: { where: { rosterType: "NHL" }, select: { id: true, name: true, position: true, age: true, isGoalie: true, capHit: true, retainedSalary: true, contractYears: true, injuryDaysLeft: true, condition: true }, orderBy: [{ isGoalie: "asc" }, { capHit: "desc" }] },
-      affiliateTeams: { select: { players: { where: { rosterType: "AHL" }, select: { id: true, name: true, position: true, age: true, isGoalie: true, capHit: true, contractYears: true }, orderBy: [{ isGoalie: "asc" }, { capHit: "desc" }] } } },
+      players: { where: { rosterType: "NHL" }, select: { id: true, name: true, position: true, age: true, birthDate: true, isGoalie: true, capHit: true, retainedSalary: true, contractYears: true, injuryDaysLeft: true, condition: true }, orderBy: [{ isGoalie: "asc" }, { capHit: "desc" }] },
+      affiliateTeams: { select: { players: { where: { rosterType: "AHL" }, select: { id: true, name: true, position: true, age: true, birthDate: true, isGoalie: true, capHit: true, contractYears: true }, orderBy: [{ isGoalie: "asc" }, { capHit: "desc" }] } } },
     },
   });
   if (!team) notFound();

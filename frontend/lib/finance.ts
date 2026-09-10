@@ -52,10 +52,19 @@ export const seasonLabel = (startYear: number) =>
  *  a separately-typed Player.contractExpiry to stay in sync by hand. */
 export const computeContractExpiry = (years: number, from = CURRENT_SEASON_START) => from + years;
 
-export type CapPlayer = { capHit: number | null; contractYears: number | null; age: number | null };
+export type CapPlayer = { capHit: number | null; contractYears: number | null; age: number | null; birthDate?: string | Date | null };
+
+/** The NHL's own UFA/RFA cutoff: age as of June 30 of `year`, not a plain
+ *  year-count added to the player's current age — a summer/fall birthday
+ *  shouldn't get credited a year early just because "age + years" rounds up. */
+export function ageAsOfJune30(birthDate: string | Date, year: number): number {
+  const d = typeof birthDate === "string" ? new Date(birthDate) : birthDate;
+  const hadBirthdayByJune30 = d.getUTCMonth() < 5 || (d.getUTCMonth() === 5 && d.getUTCDate() <= 30);
+  return year - d.getUTCFullYear() - (hadBirthdayByJune30 ? 0 : 1);
+}
 
 /** Per-year cap for a player over `span` seasons: salary while under contract,
- *  then a UFA/RFA marker the season it expires (UFA if 27+ at expiry). */
+ *  then a UFA/RFA marker the season it expires (UFA if 27+ on June 30 of that year). */
 export function playerCapYears(p: CapPlayer, startYear = CURRENT_SEASON_START, span = 8) {
   const years = p.contractYears ?? 0;
   const out: Array<{ year: string; salary: number | null; status: "UFA" | "RFA" | null }> = [];
@@ -63,7 +72,7 @@ export function playerCapYears(p: CapPlayer, startYear = CURRENT_SEASON_START, s
     const label = seasonLabel(startYear + i);
     if (i < years) out.push({ year: label, salary: p.capHit ?? 0, status: null });
     else if (i === years) {
-      const ageAtExpiry = (p.age ?? 0) + i;
+      const ageAtExpiry = p.birthDate != null ? ageAsOfJune30(p.birthDate, startYear + i) : (p.age ?? 0) + i;
       out.push({ year: label, salary: null, status: ageAtExpiry >= 27 ? "UFA" : "RFA" });
     } else out.push({ year: label, salary: null, status: null });
   }
