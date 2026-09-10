@@ -37,8 +37,19 @@ export default async function GmAssistantPage() {
           <div className="flex flex-col gap-3">
             <p className="text-sm text-slate-400">
               {analysis.teamName} — priemerný <span className="text-slate-300 font-semibold">overall</span> hráčov na danom slote formácie/páru,
-              porovnaný voči rovnakému slotu vo všetkých {analysis.findings[0]?.leagueSize ?? 32} NHL kluboch.
+              porovnaný voči rovnakému slotu v ostatných NHL kluboch, ktoré majú formácie/páry nastavené.
             </p>
+            {analysis.missingLinesTeams.length > 0 && (() => {
+              const n = analysis.missingLinesTeams.length;
+              const klubWord = n === 1 ? "klub" : n <= 4 ? "kluby" : "klubov";
+              const verb = n === 1 ? "nemá" : "nemajú";
+              return (
+                <p className="text-xs text-amber-400/90 bg-amber-950/20 border border-amber-900/40 rounded-lg px-3 py-2">
+                  ⚠️ {n} {klubWord} ešte {verb} nastavené formácie/páry, preto sa do porovnania nezapočítava{n === 1 ? "" : "jú"}
+                  {" "}(chýba: {analysis.missingLinesTeams.join(", ")}). Poradia nižšie sú preto {`„z ${32 - n} klubov“`}, nie z 32.
+                </p>
+              );
+            })()}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {analysis.findings.map((f) => {
                 const s = severityStyle[f.severity];

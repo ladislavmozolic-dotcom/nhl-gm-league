@@ -55,6 +55,10 @@ export interface RosterAnalysis {
   teamId: number;
   teamName: string;
   findings: RosterFinding[]; // worst (highest rank number) first
+  // NHL clubs with no Team Lines set at all — excluded from every ranking below
+  // rather than silently assumed average, so "X. miesto z Y klubov" always means
+  // exactly Y clubs had a player to compare.
+  missingLinesTeams: string[];
 }
 
 function slotPlayers(
@@ -127,5 +131,13 @@ export async function analyzeRoster(teamId: number): Promise<RosterAnalysis | nu
 
   findings.sort((a, b) => b.leagueRank - a.leagueRank);
 
-  return { teamId, teamName: myTeam.name, findings };
+  const missingLinesTeams = teams
+    .filter((t) => {
+      const fl = Array.isArray(t.lines?.forwardLines) ? (t.lines!.forwardLines as unknown[]) : [];
+      const dp = Array.isArray(t.lines?.defensePairs) ? (t.lines!.defensePairs as unknown[]) : [];
+      return fl.length === 0 && dp.length === 0;
+    })
+    .map((t) => t.name);
+
+  return { teamId, teamName: myTeam.name, findings, missingLinesTeams };
 }
