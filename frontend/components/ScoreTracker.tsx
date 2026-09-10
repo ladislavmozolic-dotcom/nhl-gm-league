@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import NewsTicker from "@/components/NewsTicker";
 
 // Global score tracker shown at the top of every page — results only.
 // (Goal scorers / assists live on the game-detail scoreboard.)
@@ -11,7 +12,9 @@ export default async function ScoreTracker() {
     orderBy: { gameDate: "desc" },
     select: { gameDate: true },
   });
-  if (!lastDay?.gameDate) return null;
+  // No games simmed yet this era (pre-season, or before the season opens) — show
+  // the latest league moves instead of leaving the row blank.
+  if (!lastDay?.gameDate) return <NewsTicker />;
 
   const start = new Date(lastDay.gameDate); start.setHours(0, 0, 0, 0);
   const end = new Date(lastDay.gameDate); end.setHours(23, 59, 59, 999);
@@ -24,7 +27,7 @@ export default async function ScoreTracker() {
     },
     orderBy: { id: "asc" },
   });
-  if (games.length === 0) return null;
+  if (games.length === 0) return <NewsTicker />;
 
   const TeamRow = ({ t, score, win }: { t: { code: string | null; logoUrl: string | null }; score: number | null; win: boolean }) => (
     <div className="flex items-center justify-between gap-3">
