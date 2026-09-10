@@ -210,8 +210,13 @@ export default function MegaMenu({ gm, items, lang = "en", light = false, hideFo
                 onMouseLeave={scheduleCloseMenu}
               >
                 {item.mega ? (
+                  // A <button> defaults to display:inline-block (a real box whose
+                  // height includes its padding), while the <a> below is plain
+                  // display:inline (padding doesn't add to line-box height) — same
+                  // padding/line-height then renders a few px taller/shifted on the
+                  // button. inline-flex + items-center puts both on equal footing.
                   <button
-                    className={`px-2.5 py-1.5 text-[13px] font-semibold rounded-md transition-all ${
+                    className={`inline-flex items-center px-2.5 py-1.5 text-[13px] font-semibold rounded-md transition-all whitespace-nowrap ${
                       activeMenu === item.key ? linkActive : linkIdle
                     }`}
                   >
@@ -220,7 +225,7 @@ export default function MegaMenu({ gm, items, lang = "en", light = false, hideFo
                 ) : (
                   <Link
                     href={item.href}
-                    className={`px-2.5 py-1.5 text-[13px] font-semibold rounded-md transition-all whitespace-nowrap ${
+                    className={`inline-flex items-center px-2.5 py-1.5 text-[13px] font-semibold rounded-md transition-all whitespace-nowrap ${
                       activeMenu === item.key ? linkActive : linkIdle
                     }`}
                   >
