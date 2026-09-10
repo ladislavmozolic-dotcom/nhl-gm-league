@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { isLoggedIn } from "@/lib/auth";
 import { cleanName, epProfileUrl } from "@/lib/playerName";
 import { Card } from "@/components/ui";
-import { posGroup, ratingColor } from "@/lib/ratingBands";
+import { posGroup, ratingColor, ovColor } from "@/lib/ratingBands";
 import { playerType } from "@/lib/player-type";
 import { playerCareer } from "@/lib/career-server";
 import PlayerCareerCard from "@/components/PlayerCareerCard";
@@ -201,6 +201,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   const isGoalie: boolean = p.isGoalie || p.position === "G";
   const ratings = isGoalie ? { ...(p.goalieRating ?? {}) } : p;
   const attrs = isGoalie ? GOALIE_ATTRS : SKATER_ATTRS;
+  const overall: number | null = isGoalie ? (p.goalieRating?.overall ?? p.overall) : p.overall;
   const grp = posGroup(p.position, isGoalie);
   const ptype = playerType(isGoalie
     ? { isGoalie: true, position: p.position, ag: p.goalieRating?.ag, rb: p.goalieRating?.rb, sz: p.goalieRating?.sz }
@@ -462,6 +463,10 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                   🔒 <Link href="/login" className="text-blue-400 hover:underline">Sign in as a GM</Link> to see full player attributes.
                 </div>
               )}
+              <div className="min-w-[64px] text-center px-2 py-2.5 bg-slate-800/60 border-l border-slate-700">
+                <div className="text-[10px] font-bold text-slate-400 tracking-wide">OV</div>
+                <div className={`text-lg font-black tabular-nums leading-tight ${ovColor(grp, overall)}`}>{overall ?? "—"}</div>
+              </div>
             </div>
           </div>
         </div>
