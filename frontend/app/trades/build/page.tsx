@@ -7,6 +7,7 @@ import { proposeTrade, resubmitModifiedTrade } from "./actions";
 import { packageFromTrade, type TradePackage } from "@/lib/trade-exec";
 import { PageHeader, Card } from "@/components/ui";
 import { teamAssets } from "@/lib/trade-assets";
+import { teamCapStatus } from "@/lib/cap";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,7 @@ export default async function TradeBuildPage({ searchParams }: { searchParams: P
       prisma.team.findUnique({ where: { id: trade!.fromTeamId }, select: { id: true, name: true, logoUrl: true } }),
       prisma.team.findUnique({ where: { id: trade!.toTeamId }, select: { id: true, name: true, logoUrl: true } }),
     ]);
-    const [mine, theirs] = await Promise.all([teamAssets(fromT!.id, src), teamAssets(toT!.id, src)]);
+    const [mine, theirs, mineCap, theirsCap] = await Promise.all([teamAssets(fromT!.id, src), teamAssets(toT!.id, src), teamCapStatus(fromT!.id), teamCapStatus(toT!.id)]);
     const pkg = await packageFromTrade(editId);
     const initial = {
       mineP: Object.fromEntries(pkg.fromPlayers.map((p) => [p.playerId, p.retentionPct || 0])),
@@ -42,7 +43,7 @@ export default async function TradeBuildPage({ searchParams }: { searchParams: P
       <div className="space-y-4 py-2">
         <PageHeader title={`Modify trade #${editId}`} subtitle={`${fromT!.name} ↔ ${toT!.name} — the commission asked you to rebalance this deal. Adjust the assets and resubmit for review.`} />
         {trade!.commishNote && <Card><p className="text-sm text-amber-300">✏️ Commission note: {trade!.commishNote}</p></Card>}
-        <TradeBuilder me={{ id: fromT!.id, name: fromT!.name, logoUrl: fromT!.logoUrl }} opp={{ id: toT!.id, name: toT!.name, logoUrl: toT!.logoUrl }} mine={mine} theirs={theirs} initial={initial} submitLabel="Resubmit to commission" onPropose={submitEdit} />
+        <TradeBuilder me={{ id: fromT!.id, name: fromT!.name, logoUrl: fromT!.logoUrl }} opp={{ id: toT!.id, name: toT!.name, logoUrl: toT!.logoUrl }} mine={mine} theirs={theirs} meCap={mineCap} oppCap={theirsCap} initial={initial} submitLabel="Resubmit to commission" onPropose={submitEdit} />
       </div>
     );
   }
@@ -78,7 +79,10 @@ export default async function TradeBuildPage({ searchParams }: { searchParams: P
 
   const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true } });
   const prospectSource = cfg?.rosterMode === "real" ? "real" : "profinhl";
-  const [mine, theirs] = await Promise.all([teamAssets(myTeam.id, prospectSource), teamAssets(oppTeam.id, prospectSource)]);
+  const [mine, theirs, mineCap, theirsCap] = await Promise.all([
+    teamAssets(myTeam.id, prospectSource), teamAssets(oppTeam.id, prospectSource),
+    teamCapStatus(myTeam.id), teamCapStatus(oppTeam.id),
+  ]);
 
   return (
     <TradeBuilder
@@ -86,6 +90,8 @@ export default async function TradeBuildPage({ searchParams }: { searchParams: P
       opp={{ id: oppTeam.id, name: oppTeam.name, logoUrl: oppTeam.logoUrl }}
       mine={mine}
       theirs={theirs}
+      meCap={mineCap}
+      oppCap={theirsCap}
       onPropose={proposeTrade}
     />
   );

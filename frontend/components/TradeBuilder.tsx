@@ -12,6 +12,47 @@ type Pick = { id: number; label: string; logoUrl?: string | null };
 type Assets = { players: Player[]; picks: Pick[]; prospects: Pick[] };
 type Team = { id: number; name: string; logoUrl?: string | null };
 type Terms = { feeAmount: number; feePct: number; fullPayout: boolean; reason: string; payTeamId: number };
+// Only the fields the cap-impact widget needs, from lib/cap.ts's CapStatus.
+type CapSnapshot = { committed: number; ceiling: number; strictSpace: number; floor: number };
+
+// A moved player's own Cap Hit never changes — what changes hands is his cap
+// hit net of whatever retention the SENDING side sets in this trade (the
+// slider), since the sender keeps that retained slice as dead cap on their own
+// books forever rather than the acquiring side ever carrying it. Mirrors the
+// server-side math in lib/trade-exec.ts's movePlayers (netBefore/newSlice/netCap).
+function netTransferred(map: Record<number, number>, assets: Assets): number {
+  return Object.entries(map).reduce((sum, [id, pct]) => {
+    const p = assets.players.find((pl) => pl.id === Number(id));
+    if (!p || p.farm) return sum; // AHL players don't count against the NHL cap
+    return sum + p.capHit * (1 - pct / 100);
+  }, 0);
+}
+
+function CapImpact({ status, delta }: { status: CapSnapshot; delta: number }) {
+  const spaceNow = status.strictSpace;
+  const spaceAfter = spaceNow - delta;
+  const color = (v: number) => (v < 0 ? "text-red-400" : "text-emerald-400");
+  return (
+    <div className="bg-slate-900/40 border border-slate-800 rounded-lg px-3 py-2 text-xs space-y-1" title="Cap space against the actual league ceiling (uncushioned) — same figure Cap Central calls Actual Cap Space">
+      <div className="flex items-center justify-between">
+        <span className="text-slate-500">Cap space now</span>
+        <span className={`tabular-nums font-medium ${color(spaceNow)}`}>{money(spaceNow)}</span>
+      </div>
+      {delta !== 0 && (
+        <>
+          <div className="flex items-center justify-between">
+            <span className="text-slate-500">After this trade</span>
+            <span className={`tabular-nums font-bold ${color(spaceAfter)}`}>{money(spaceAfter)}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-slate-500">Δ</span>
+            <span className={`tabular-nums ${delta > 0 ? "text-red-400" : "text-emerald-400"}`}>{delta > 0 ? "−" : "+"}{money(Math.abs(delta))}</span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 const setRet = (map: Record<number, number>, set: (v: Record<number, number>) => void, id: number, pct: number) =>
   set({ ...map, [id]: Math.max(0, Math.min(50, pct)) });
@@ -113,7 +154,7 @@ function CheckTable({ title, icon, list, sel, setSel, onToggle }: {
   );
 }
 
-function Side({ team, assets, pmap, setPmap, pk, setPk, pro, setPro, cash, setCash, destTeamId, terms, fees, onToggleClause, onAgreeFee, onTogglePick }: {
+function Side({ team, assets, pmap, setPmap, pk, setPk, pro, setPro, cash, setCash, destTeamId, terms, fees, onToggleClause, onAgreeFee, onTogglePick, capStatus, capDelta }: {
   team: Team; assets: Assets; pmap: Record<number, number>; setPmap: (v: Record<number, number>) => void;
   pk: Set<number>; setPk: (s: Set<number>) => void; pro: Set<number>; setPro: (s: Set<number>) => void;
   cash: number; setCash: (n: number) => void; destTeamId: number;
@@ -121,6 +162,7 @@ function Side({ team, assets, pmap, setPmap, pk, setPk, pro, setPro, cash, setCa
   onToggleClause: (map: Record<number, number>, set: (v: Record<number, number>) => void, p: Player, destTeamId: number, ownerTeamId: number) => void;
   onAgreeFee: (id: number, t: Terms) => void;
   onTogglePick: (sel: Set<number>, setSel: (s: Set<number>) => void, id: number) => void;
+  capStatus: CapSnapshot; capDelta: number;
 }) {
   return (
     <div className="space-y-3">
@@ -128,6 +170,7 @@ function Side({ team, assets, pmap, setPmap, pk, setPk, pro, setPro, cash, setCa
         {team.logoUrl && <img src={team.logoUrl} alt="" className="w-6 h-6 object-contain shrink-0" />}
         {team.name} sends
       </div>
+      <CapImpact status={capStatus} delta={capDelta} />
       <PlayerTable title="NHL players" list={assets.players.filter((p) => !p.farm)} pmap={pmap} setPmap={setPmap} destTeamId={destTeamId} ownerTeamId={team.id} terms={terms} fees={fees} onToggleClause={onToggleClause} onAgreeFee={onAgreeFee} />
       <PlayerTable title="AHL players" list={assets.players.filter((p) => p.farm)} pmap={pmap} setPmap={setPmap} destTeamId={destTeamId} ownerTeamId={team.id} terms={terms} fees={fees} onToggleClause={onToggleClause} onAgreeFee={onAgreeFee} />
       <CheckTable title="Prospects" icon="⭐" list={assets.prospects} sel={pro} setSel={setPro} onToggle={onTogglePick} />
@@ -164,8 +207,8 @@ export type TradeBuilderInitial = {
   mineCash?: number; theirsCash?: number; condition?: string;
 };
 
-export default function TradeBuilder({ me, opp, mine, theirs, onPropose, initial, submitLabel }: {
-  me: Team; opp: Team; mine: Assets; theirs: Assets;
+export default function TradeBuilder({ me, opp, mine, theirs, meCap, oppCap, onPropose, initial, submitLabel }: {
+  me: Team; opp: Team; mine: Assets; theirs: Assets; meCap: CapSnapshot; oppCap: CapSnapshot;
   onPropose: (pkg: TradePackage) => Promise<{ tradeId: number }>;
   initial?: TradeBuilderInitial; submitLabel?: string;
 }) {
@@ -243,6 +286,14 @@ export default function TradeBuilder({ me, opp, mine, theirs, onPropose, initial
     }));
   });
 
+  // Cap impact — the net cap hit moving each way (see netTransferred). What I
+  // send away leaves my books and lands on theirs, and vice versa; picks,
+  // prospects and cash never carry a cap hit.
+  const mineSent = netTransferred(mineP, mine);
+  const theirsSent = netTransferred(theirsP, theirs);
+  const meCapDelta = theirsSent - mineSent;
+  const oppCapDelta = mineSent - theirsSent;
+
   // live "who gives what" summary for the middle column
   const nameP = (a: Assets, id: number) => a.players.find((p) => p.id === id)?.name ?? `#${id}`;
   const labelPk = (a: Assets, id: number) => a.picks.find((p) => p.id === id)?.label ?? `Pick #${id}`;
@@ -266,7 +317,7 @@ export default function TradeBuilder({ me, opp, mine, theirs, onPropose, initial
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px_1fr] gap-4 items-start">
-        <Side team={me} assets={mine} pmap={mineP} setPmap={setMineP} pk={minePk} setPk={setMinePk} pro={minePro} setPro={setMinePro} cash={mineCash} setCash={setMineCash} destTeamId={opp.id} terms={terms} fees={fees} onToggleClause={toggleClausePlayer} onAgreeFee={agreeFee} onTogglePick={togglePick} />
+        <Side team={me} assets={mine} pmap={mineP} setPmap={setMineP} pk={minePk} setPk={setMinePk} pro={minePro} setPro={setMinePro} cash={mineCash} setCash={setMineCash} destTeamId={opp.id} terms={terms} fees={fees} onToggleClause={toggleClausePlayer} onAgreeFee={agreeFee} onTogglePick={togglePick} capStatus={meCap} capDelta={meCapDelta} />
 
         {/* MIDDLE — live summary, conditions, Propose + GM Assist */}
         <div className="lg:sticky lg:top-4 space-y-3">
@@ -325,7 +376,7 @@ export default function TradeBuilder({ me, opp, mine, theirs, onPropose, initial
           </div>
         </div>
 
-        <Side team={opp} assets={theirs} pmap={theirsP} setPmap={setTheirsP} pk={theirsPk} setPk={setTheirsPk} pro={theirsPro} setPro={setTheirsPro} cash={theirsCash} setCash={setTheirsCash} destTeamId={me.id} terms={terms} fees={fees} onToggleClause={toggleClausePlayer} onAgreeFee={agreeFee} onTogglePick={togglePick} />
+        <Side team={opp} assets={theirs} pmap={theirsP} setPmap={setTheirsP} pk={theirsPk} setPk={setTheirsPk} pro={theirsPro} setPro={setTheirsPro} cash={theirsCash} setCash={setTheirsCash} destTeamId={me.id} terms={terms} fees={fees} onToggleClause={toggleClausePlayer} onAgreeFee={agreeFee} onTogglePick={togglePick} capStatus={oppCap} capDelta={oppCapDelta} />
       </div>
     </div>
   );
