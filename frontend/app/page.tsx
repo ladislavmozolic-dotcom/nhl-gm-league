@@ -4,7 +4,7 @@ import PlayerAvatar from "@/components/playerAvatar";
 import { prisma } from "@/lib/prisma";
 import { computeStandings } from "@/lib/sim/standings";
 import { skaterTotals } from "@/lib/stats-server";
-import { cleanName } from "@/lib/playerName";
+import { cleanName, displayName } from "@/lib/playerName";
 import { money } from "@/lib/finance";
 import NextSimCountdown from "@/components/home/NextSimCountdown";
 import { getLeagueClock, defaultStatsPhase } from "@/lib/calendar-server";
@@ -113,8 +113,11 @@ export default async function HomePage() {
     // a quieter detail line underneath instead of one long run-on sentence.
     let fromAssets: string | null = null, toAssets: string | null = null;
     if (fromTeam && toTeam && toIdx >= 0) {
-      fromAssets = tr.message.slice(fromTeam.name.length, toIdx).replace(/^\s*traded\s*/, "").trim();
-      toAssets = afterTo.slice(toTeam.name.length).replace(/^\s*for\s*/, "").replace(/\.\s*$/, "").trim();
+      // displayName() also scrubs captaincy/clause/rookie markers ("(NTC)", "''A''",
+      // "(R)") that leaked into the raw Transaction.message text at logging time —
+      // applying it here at render time cleans historical rows too, not just new ones.
+      fromAssets = displayName(tr.message.slice(fromTeam.name.length, toIdx).replace(/^\s*traded\s*/, "").trim());
+      toAssets = displayName(afterTo.slice(toTeam.name.length).replace(/^\s*for\s*/, "").replace(/\.\s*$/, "").trim());
     }
     return {
       ...tr,
