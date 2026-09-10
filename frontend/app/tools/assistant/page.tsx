@@ -67,9 +67,8 @@ export default async function GmAssistantPage() {
       </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card title="Find Player" accent="text-slate-500">
-          <SectionTitle accent="text-slate-600">Čoskoro</SectionTitle>
-          <p className="text-sm text-slate-500">Vyhľadávanie hráčov podľa pozície, ratingu, cap hitu a kontraktu — nasleduje po Analyze My Roster.</p>
+        <Card title="Find Player" accent="text-blue-400" href="/tools/assistant/find-player">
+          <p className="text-sm text-slate-400">Filtruj hráčov podľa pozície, ratingu, cap hitu, veku a statusu — presné, zoraditeľné výsledky, žiadny model.</p>
         </Card>
         <Card title="Find Trade Partner" accent="text-slate-500">
           <SectionTitle accent="text-slate-600">Čoskoro</SectionTitle>
