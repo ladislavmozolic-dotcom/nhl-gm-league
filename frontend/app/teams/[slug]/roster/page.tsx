@@ -26,7 +26,11 @@ export default async function TeamRosterPage({ params }: { params: Promise<{ slu
   // OWNED roster; if it's short the farm auto-fills the missing spots at game
   // time, so the shortfall never stops a game — it's just a heads-up to the GM.
   const rt = team.league === "AHL" ? "AHL" : "NHL";
-  const roster = team.players.filter((p) => p.rosterType === rt);
+  // A goalie's live overall lives on goalieRating (kept in sync with his rating
+  // edits/recalcs) — Player.overall can lag behind it. Use the live value
+  // everywhere a goalie's OV matters here, same as the player bio page does.
+  const roster = team.players.filter((p) => p.rosterType === rt)
+    .map((p) => (p.isGoalie ? { ...p, overall: p.goalieRating?.overall ?? p.overall } : p));
   const nF = roster.filter((p) => !p.isGoalie && !isDefPos(p.position ?? "")).length;
   const nD = roster.filter((p) => !p.isGoalie && isDefPos(p.position ?? "")).length;
   const nG = roster.filter((p) => p.isGoalie).length;

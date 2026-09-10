@@ -32,7 +32,7 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
   const norm = (s: string) => clean(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
   const pidAll = [...pkg.fromPlayers, ...pkg.toPlayers].map((p) => p.playerId);
-  const players = await prisma.player.findMany({ where: { id: { in: pidAll } }, select: { id: true, name: true, overall: true, age: true, capHit: true, contractYears: true, position: true, isGoalie: true, lastSeasonGP: true, lastSeasonSvPct: true } });
+  const players = await prisma.player.findMany({ where: { id: { in: pidAll } }, select: { id: true, name: true, overall: true, age: true, capHit: true, contractYears: true, position: true, isGoalie: true, lastSeasonGP: true, lastSeasonSvPct: true, goalieRating: { select: { overall: true } } } });
   const pById = new Map(players.map((p) => [p.id, p]));
 
   // --- draft-order-aware picks: value follows the estimated slot the pick lands at,
@@ -118,8 +118,8 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
   // fill a need there? (fromPlayers go TO toTeam; toPlayers go TO fromTeam)
   const grp = (pos: string | null) => { const P = (pos ?? "").toUpperCase(); if (/G/.test(P)) return "G"; if (/(^|\/)D(\/|$)|^D$/.test(P)) return "D"; if (/C/.test(P)) return "C"; return "W"; };
   const [fromRoster, toRoster] = await Promise.all([
-    prisma.player.findMany({ where: { teamId: pkg.fromTeamId, rosterType: "NHL" }, select: { id: true, overall: true, position: true, isGoalie: true, lastSeasonGP: true, lastSeasonSvPct: true } }),
-    prisma.player.findMany({ where: { teamId: pkg.toTeamId, rosterType: "NHL" }, select: { id: true, overall: true, position: true, isGoalie: true, lastSeasonGP: true, lastSeasonSvPct: true } }),
+    prisma.player.findMany({ where: { teamId: pkg.fromTeamId, rosterType: "NHL" }, select: { id: true, overall: true, position: true, isGoalie: true, lastSeasonGP: true, lastSeasonSvPct: true, goalieRating: { select: { overall: true } } } }),
+    prisma.player.findMany({ where: { teamId: pkg.toTeamId, rosterType: "NHL" }, select: { id: true, overall: true, position: true, isGoalie: true, lastSeasonGP: true, lastSeasonSvPct: true, goalieRating: { select: { overall: true } } } }),
   ]);
   const grpLabel: Record<string, string> = { C: "centra", W: "krídla", D: "obrancu", G: "brankára" };
   const slotFor = (g: string, slot: number) => {
@@ -165,8 +165,11 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
   const outToIds = new Set(pkg.toPlayers.map((p) => p.playerId));
   const incomingToFrom = pkg.toPlayers.map((p) => pById.get(p.playerId)).filter((p): p is NonNullable<typeof p> => !!p?.isGoalie);
   const incomingToTo = pkg.fromPlayers.map((p) => pById.get(p.playerId)).filter((p): p is NonNullable<typeof p> => !!p?.isGoalie);
-  const postFromGoalies = [...fromRoster.filter((r) => r.isGoalie && !outFromIds.has(r.id)), ...incomingToFrom];
-  const postToGoalies = [...toRoster.filter((r) => r.isGoalie && !outToIds.has(r.id)), ...incomingToTo];
+  // a goalie's live OV lives on goalieRating (Player.overall can lag behind it) —
+  // use the live value here, same as the player bio page and roster page do.
+  const liveOv = (p: { overall: number | null; goalieRating?: { overall: number | null } | null }) => p.goalieRating?.overall ?? p.overall;
+  const postFromGoalies = [...fromRoster.filter((r) => r.isGoalie && !outFromIds.has(r.id)), ...incomingToFrom].map((p) => ({ ...p, overall: liveOv(p) }));
+  const postToGoalies = [...toRoster.filter((r) => r.isGoalie && !outToIds.has(r.id)), ...incomingToTo].map((p) => ({ ...p, overall: liveOv(p) }));
   if (!hasWorthyGoalie(postFromGoalies)) fit.push(`⚠️ <b>${fromTeam.name}</b> by po tomto trejde nemal žiadneho dostojného brankára — podľa pravidiel ligy jeho súpiska nie je pripravená na zápas.`);
   if (!hasWorthyGoalie(postToGoalies)) fit.push(`⚠️ <b>${toTeam.name}</b> by po tomto trejde nemal žiadneho dostojného brankára — podľa pravidiel ligy jeho súpiska nie je pripravená na zápas.`);
 

@@ -41,7 +41,7 @@ export async function commishToday(): Promise<CommishToday> {
     prisma.teamLines.findMany({ select: { teamId: true, forwardLines: true } }),
     leagueCapCompliance(phase === "regular" ? "regular" : undefined).catch(() => []),
     prisma.trade.count({ where: { status: "PENDING" } }),
-    prisma.player.findMany({ where: { rosterType: "NHL", team: { league: "NHL" } }, select: { teamId: true, position: true, injuryDaysLeft: true, overall: true, isGoalie: true, lastSeasonGP: true, lastSeasonSvPct: true } }),
+    prisma.player.findMany({ where: { rosterType: "NHL", team: { league: "NHL" } }, select: { teamId: true, position: true, injuryDaysLeft: true, overall: true, isGoalie: true, lastSeasonGP: true, lastSeasonSvPct: true, goalieRating: { select: { overall: true } } } }),
   ]);
 
   const linesByTeam = new Map(lines.map((l) => [l.teamId, Array.isArray(l.forwardLines) ? (l.forwardLines as unknown[]).length : 0]));
@@ -52,7 +52,7 @@ export async function commishToday(): Promise<CommishToday> {
   let injuredActive = 0;
   for (const p of nhlPlayers) {
     const r = roster.get(p.teamId); if (!r) continue;
-    if (p.isGoalie && isWorthyGoalie(p)) worthyGoalie.set(p.teamId, true);
+    if (p.isGoalie && isWorthyGoalie({ ...p, overall: p.goalieRating?.overall ?? p.overall })) worthyGoalie.set(p.teamId, true);
     if (p.injuryDaysLeft > 0) { r.injured++; injuredActive++; continue; } // injured don't dress
     if (isG(p.position)) r.g++; else if (isDef(p.position)) r.d++; else if (isFwd(p.position)) r.f++;
   }
