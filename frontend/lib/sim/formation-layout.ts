@@ -52,30 +52,30 @@ export const PP_LAYOUTS: Record<string, FormationRole[]> = {
 
 export const PK_LAYOUTS: Record<string, FormationRole[]> = {
   balanced: [
-    { key: "r1", label: "C", x: 32, y: 52 },
-    { key: "r2", label: "W", x: 68, y: 52 },
-    { key: "r3", label: "LD", x: 32, y: 80 },
-    { key: "r4", label: "RD", x: 68, y: 80 },
+    { key: "r1", label: "C", x: 32, y: 72 },
+    { key: "r2", label: "W", x: 68, y: 72 },
+    { key: "r3", label: "LD", x: 32, y: 28 },
+    { key: "r4", label: "RD", x: 68, y: 28 },
   ],
   box: [
-    { key: "r1", label: "Left Top", x: 34, y: 40 },
-    { key: "r2", label: "Right Top", x: 66, y: 40 },
-    { key: "r3", label: "Left D", x: 34, y: 78 },
-    { key: "r4", label: "Right D", x: 66, y: 78 },
+    { key: "r1", label: "Left Top", x: 34, y: 70 },
+    { key: "r2", label: "Right Top", x: 66, y: 70 },
+    { key: "r3", label: "Left D", x: 34, y: 26 },
+    { key: "r4", label: "Right D", x: 66, y: 26 },
   ],
   // Real 1-2-1: one forward pressures the point up top, two D guard the
   // half-wall seams on the flanks, one forward covers the net/slot down low.
   diamond: [
-    { key: "r1", label: "Top (pressure)", x: 50, y: 32 },
-    { key: "r2", label: "Net Coverage", x: 50, y: 82 },
-    { key: "r3", label: "Left D", x: 24, y: 60 },
-    { key: "r4", label: "Right D", x: 76, y: 60 },
+    { key: "r1", label: "Top (pressure)", x: 50, y: 78 },
+    { key: "r2", label: "Net Coverage", x: 50, y: 22 },
+    { key: "r3", label: "Left D", x: 24, y: 48 },
+    { key: "r4", label: "Right D", x: 76, y: 48 },
   ],
   aggressive: [
-    { key: "r1", label: "Pressure F", x: 40, y: 26 },
-    { key: "r2", label: "Pressure F", x: 60, y: 26 },
-    { key: "r3", label: "Left D", x: 32, y: 70 },
-    { key: "r4", label: "Right D", x: 68, y: 70 },
+    { key: "r1", label: "Pressure F", x: 40, y: 80 },
+    { key: "r2", label: "Pressure F", x: 60, y: 80 },
+    { key: "r3", label: "Left D", x: 32, y: 24 },
+    { key: "r4", label: "Right D", x: 68, y: 24 },
   ],
 };
 
@@ -85,23 +85,23 @@ export const PK_LAYOUTS: Record<string, FormationRole[]> = {
 // the lone forward plays, which is the one real tactical knob left at 3 men.
 export const PK3_LAYOUTS: Record<string, FormationRole[]> = {
   balanced: [
-    { key: "r1", label: "C", x: 50, y: 46 },
-    { key: "r2", label: "LD", x: 32, y: 82 },
-    { key: "r3", label: "RD", x: 68, y: 82 },
+    { key: "r1", label: "C", x: 50, y: 56 },
+    { key: "r2", label: "LD", x: 32, y: 30 },
+    { key: "r3", label: "RD", x: 68, y: 30 },
   ],
   box: [
-    { key: "r1", label: "Top (protect middle)", x: 50, y: 42 },
-    { key: "r2", label: "Left D", x: 32, y: 80 },
-    { key: "r3", label: "Right D", x: 68, y: 80 },
+    { key: "r1", label: "Top (protect middle)", x: 50, y: 62 },
+    { key: "r2", label: "Left D", x: 32, y: 26 },
+    { key: "r3", label: "Right D", x: 68, y: 26 },
   ],
   diamond: [
-    { key: "r1", label: "Top (read passes)", x: 50, y: 36 },
-    { key: "r2", label: "Left D", x: 30, y: 82 },
-    { key: "r3", label: "Right D", x: 70, y: 82 },
+    { key: "r1", label: "Top (read passes)", x: 50, y: 68 },
+    { key: "r2", label: "Left D", x: 30, y: 24 },
+    { key: "r3", label: "Right D", x: 70, y: 24 },
   ],
   aggressive: [
-    { key: "r1", label: "Pressure F", x: 50, y: 24 },
-    { key: "r2", label: "Left D", x: 32, y: 76 },
-    { key: "r3", label: "Right D", x: 68, y: 76 },
+    { key: "r1", label: "Pressure F", x: 50, y: 80 },
+    { key: "r2", label: "Left D", x: 32, y: 20 },
+    { key: "r3", label: "Right D", x: 68, y: 20 },
   ],
 };

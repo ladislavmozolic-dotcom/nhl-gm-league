@@ -621,8 +621,26 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
 
       {tab === "Last Min" && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <ListBlock title="Offensive — chase the tie (goalie pulled)" values={data.situations.lastMin.off} pool={players} numbered onSet={(i, v) => setLastMin("off", i, v)} Select={Select} />
-          <ListBlock title="Defensive — protect the lead" values={data.situations.lastMin.def} pool={players} numbered onSet={(i, v) => setLastMin("def", i, v)} Select={Select} />
+          {/* Fixed seats by position, same as Forward Lines/Defense Pairs — the F
+              slots pool forwards, the D slots pool defensemen, so a center can't
+              land in a blue-line seat and vice versa. off = pulled goalie (an
+              extra attacker up front, still 2 D back); def = goalie in net (a
+              normal 3F+2D shift). */}
+          <UnitBlock title="Offensive — chase the tie (goalie pulled)" head={["Pos", "Player"]}>
+            <ORow label="C"><Select value={data.situations.lastMin.off[0]} onChange={(v) => setLastMin("off", 0, v)} pool={forwards} /></ORow>
+            <ORow label="LW"><Select value={data.situations.lastMin.off[1]} onChange={(v) => setLastMin("off", 1, v)} pool={forwards} /></ORow>
+            <ORow label="RW"><Select value={data.situations.lastMin.off[2]} onChange={(v) => setLastMin("off", 2, v)} pool={forwards} /></ORow>
+            <ORow label="F (extra attacker)"><Select value={data.situations.lastMin.off[3]} onChange={(v) => setLastMin("off", 3, v)} pool={forwards} /></ORow>
+            <ORow label="LD"><Select value={data.situations.lastMin.off[4]} onChange={(v) => setLastMin("off", 4, v)} pool={defense} /></ORow>
+            <ORow label="RD"><Select value={data.situations.lastMin.off[5]} onChange={(v) => setLastMin("off", 5, v)} pool={defense} /></ORow>
+          </UnitBlock>
+          <UnitBlock title="Defensive — protect the lead" head={["Pos", "Player"]}>
+            <ORow label="C"><Select value={data.situations.lastMin.def[0]} onChange={(v) => setLastMin("def", 0, v)} pool={forwards} /></ORow>
+            <ORow label="LW"><Select value={data.situations.lastMin.def[1]} onChange={(v) => setLastMin("def", 1, v)} pool={forwards} /></ORow>
+            <ORow label="RW"><Select value={data.situations.lastMin.def[2]} onChange={(v) => setLastMin("def", 2, v)} pool={forwards} /></ORow>
+            <ORow label="LD"><Select value={data.situations.lastMin.def[3]} onChange={(v) => setLastMin("def", 3, v)} pool={defense} /></ORow>
+            <ORow label="RD"><Select value={data.situations.lastMin.def[4]} onChange={(v) => setLastMin("def", 4, v)} pool={defense} /></ORow>
+          </UnitBlock>
         </div>
       )}
 

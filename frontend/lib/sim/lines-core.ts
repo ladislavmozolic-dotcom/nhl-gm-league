@@ -279,9 +279,20 @@ export function autoFill(data: TeamLinesData, skaters: Skater[], goalies: Goalie
   if (o.subPK2 == null) o.subPK2 = def[1]?.id ?? null;
   fillList(o.shootout, all);
 
-  // last minute: OFF pushes for the tie, DF protects — fill from best skaters
-  fillList(d.situations.lastMin.off, all);
-  fillList(d.situations.lastMin.def, all);
+  // last minute: fixed seats by position (C/LW/RW[/extra F] then D), same
+  // split as the forward lines/D pairs — a forward never backfills a D seat
+  // or vice versa. off = pulled goalie (4F+2D); def = goalie in net (3F+2D).
+  const fillSplit = (list: (number | null)[], dStartIndex: number, fPool: Skater[], dPool: Skater[]) => {
+    const used = new Set(list.filter((x): x is number => x != null));
+    for (let i = 0; i < list.length; i++) {
+      if (list[i] != null) continue;
+      const pool = i < dStartIndex ? fPool : dPool;
+      const p = pool.find((x) => !used.has(x.id)) ?? all.find((x) => !used.has(x.id));
+      if (p) { list[i] = p.id; used.add(p.id); }
+    }
+  };
+  fillSplit(d.situations.lastMin.off, 4, fwd, def);
+  fillSplit(d.situations.lastMin.def, 3, fwd, def);
   return d;
 }
 
