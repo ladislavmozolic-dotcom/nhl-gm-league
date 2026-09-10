@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { DEFAULT_MENU, type MenuItem } from "@/lib/menu-config";
 import { t, type Lang } from "@/lib/i18n";
@@ -69,6 +69,23 @@ export default function MegaMenu({ gm, items, lang = "en", light = false, hideFo
   const mobileGmSwitch = light ? "text-blue-700" : "text-blue-300";
   const badgeRing = light ? "border-white" : "border-[#0a1628]";
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  // Closing is debounced: the mega-panel sits flush against its trigger (no
+  // margin gap — a gap there is dead space with no element under the cursor,
+  // so a mouseleave fires before the pointer reaches the panel below it) and
+  // this timeout also absorbs the brief mouseout/mouseover flicker a fast
+  // diagonal mouse move causes when crossing between rows inside the panel.
+  const closeMenuTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openMenu = (key: string) => {
+    if (closeMenuTimeout.current) clearTimeout(closeMenuTimeout.current);
+    setActiveMenu(key);
+  };
+  const scheduleCloseMenu = () => {
+    if (closeMenuTimeout.current) clearTimeout(closeMenuTimeout.current);
+    closeMenuTimeout.current = setTimeout(() => setActiveMenu(null), 150);
+  };
+  useEffect(() => () => {
+    if (closeMenuTimeout.current) clearTimeout(closeMenuTimeout.current);
+  }, []);
   const [teams, setTeams] = useState<Team[]>([]);
   const [scrolled, setScrolled] = useState(false);
   // Mobile drawer — hover doesn't exist on touch, so nested items (e.g. League
@@ -189,8 +206,8 @@ export default function MegaMenu({ gm, items, lang = "en", light = false, hideFo
               <div
                 key={item.key}
                 className="relative"
-                onMouseEnter={() => setActiveMenu(item.key)}
-                onMouseLeave={() => setActiveMenu(null)}
+                onMouseEnter={() => openMenu(item.key)}
+                onMouseLeave={scheduleCloseMenu}
               >
                 {item.mega ? (
                   <button
@@ -212,7 +229,8 @@ export default function MegaMenu({ gm, items, lang = "en", light = false, hideFo
                 )}
 
                 {item.children && activeMenu === item.key && (
-                  <div className={`absolute top-full left-0 mt-0.5 w-52 border rounded-lg py-1.5 z-50 ${panelBg} ${panelShadow}`}>
+                  <div className={`absolute top-full left-0 pt-0.5 w-52 z-50`}>
+                  <div className={`border rounded-lg py-1.5 ${panelBg} ${panelShadow}`}>
                     {item.children.map((child) =>
                       child.children && child.children.length ? (
                         <div key={child.label} className="relative group/sub">
@@ -248,10 +266,12 @@ export default function MegaMenu({ gm, items, lang = "en", light = false, hideFo
                       )
                     )}
                   </div>
+                  </div>
                 )}
 
                 {item.mega && activeMenu === item.key && (
-                  <div className={`absolute top-full left-0 mt-0.5 w-[720px] max-w-[calc(100vw-2rem)] border rounded-xl overflow-hidden z-50 ${panelBg} ${panelShadow}`}>
+                  <div className={`absolute top-full left-0 pt-0.5 w-[720px] max-w-[calc(100vw-2rem)] z-50`}>
+                  <div className={`border rounded-xl overflow-hidden ${panelBg} ${panelShadow}`}>
                   <div className="p-5">
                     <div className="grid grid-cols-2 gap-8">
                       {/* Eastern */}
@@ -314,6 +334,7 @@ export default function MegaMenu({ gm, items, lang = "en", light = false, hideFo
                         </div>
                       </div>
                     </div>
+                  </div>
                   </div>
                 </div>
                 )}
