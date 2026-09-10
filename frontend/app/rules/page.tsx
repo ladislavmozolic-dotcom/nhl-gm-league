@@ -78,6 +78,11 @@ const SECTIONS: Sec[] = [
         "In the off-season the ceiling carries a +10% cushion; on opening day the strict ceiling applies and non-compliant clubs are publicly warned and must shed salary.",
         "LTIR: a player parked on long-term injury relief comes off the cap. Buyouts and retained salary are tracked against the club's books.",
       ] },
+      { h: "Buyouts", points: [
+        "Any NHL-roster player with an active contract can be bought out. The cost is a percentage of his current cap hit — 50% if done during the regular season or playoffs, 35% in the off-season (both commissioner-tunable) — rounded to the nearest $500.",
+        "That per-year charge counts against the cap as dead money for twice his remaining contract years (e.g. 4 years left on his deal → 8 years of dead cap). The full total cost is deducted from the team's bank account immediately, in one lump sum.",
+        "The bought-out player instantly becomes a UFA and loses the captaincy. There's no age-based discount (unlike the real NHL's under/over-26 split), no protection from no-trade or no-movement clauses, and no seasonal blackout window — only the in-season vs off-season timing changes the price.",
+      ] },
     ],
   },
   {
@@ -314,6 +319,11 @@ const SECTIONS_CS: Sec[] = [
         "Každý klub musí zůstat pod platovým stropem. Strop a jeho spodní hranici nastavuje komisař (hodnoty profinhl nebo reálné NHL).",
         "V mezisezoně má strop +10% rezervu; v den startu platí přísný strop a nevyhovující kluby dostanou veřejné varování a musí snížit platy.",
         "LTIR: hráč odložený na dlouhodobou marodku jde ze stropu ven. Odkupy (buyouts) a zadržený plat se evidují v účetnictví klubu.",
+      ] },
+      { h: "Odkupy smluv (buyouts)", points: [
+        "Odkoupit lze libovolného hráče na NHL soupisce s aktivní smlouvou. Cena je procento z jeho aktuálního cap hitu — 50 % v průběhu základní části nebo play-off, 35 % v mimosezóně (obojí nastavuje komisař) — zaokrouhlené na nejbližších 500 $.",
+        "Tato roční částka se počítá do stropu jako mrtvé peníze po dobu dvojnásobku zbývajících let smlouvy (např. 4 zbývající roky → 8 let mrtvého capu). Celá částka odkupu se strhne z bankovního účtu klubu okamžitě, najednou.",
+        "Odkoupený hráč se ihned stává UFA a přichází o kapitánskou pásku. Neexistuje věková sleva (na rozdíl od reálné NHL, kde se rozlišuje věk pod/nad 26 let), žádná ochrana klauzulemi NTC/NMC ani sezónní uzávěrka — mění se pouze cena podle toho, zda probíhá sezóna, nebo ne.",
       ] },
     ],
   },

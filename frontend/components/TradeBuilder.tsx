@@ -45,7 +45,7 @@ function CapImpact({ status, delta }: { status: CapSnapshot; delta: number }) {
             <span className={`tabular-nums font-bold ${color(spaceAfter)}`}>{money(spaceAfter)}</span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-slate-500">Δ</span>
+            <span className="text-slate-500">Difference</span>
             <span className={`tabular-nums ${delta > 0 ? "text-red-400" : "text-emerald-400"}`}>{delta > 0 ? "−" : "+"}{money(Math.abs(delta))}</span>
           </div>
         </>
