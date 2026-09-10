@@ -32,21 +32,24 @@ export default async function GmAssistantPage() {
         {!analysis ? (
           <p className="text-sm text-slate-400">Tvoj tím sa nenašiel medzi NHL klubmi.</p>
         ) : analysis.findings.length === 0 ? (
-          <p className="text-sm text-slate-400">Zatiaľ nemáš nastavené formácie/páry (Team Lines), takže nie je z čoho počítať.</p>
+          <p className="text-sm text-slate-400">Tvoj roster nemá hráčov na žiadnom sledovanom slote, takže nie je z čoho počítať.</p>
         ) : (
           <div className="flex flex-col gap-3">
             <p className="text-sm text-slate-400">
               {analysis.teamName} — priemerný <span className="text-slate-300 font-semibold">overall</span> hráčov na danom slote formácie/páru,
-              porovnaný voči rovnakému slotu v ostatných NHL kluboch, ktoré majú formácie/páry nastavené.
+              porovnaný voči rovnakému slotu vo všetkých 32 NHL kluboch.
             </p>
-            {analysis.missingLinesTeams.length > 0 && (() => {
-              const n = analysis.missingLinesTeams.length;
-              const klubWord = n === 1 ? "klub" : n <= 4 ? "kluby" : "klubov";
-              const verb = n === 1 ? "nemá" : "nemajú";
+            {analysis.myTeamIsAuto && (
+              <p className="text-xs text-amber-400/90 bg-amber-950/20 border border-amber-900/40 rounded-lg px-3 py-2">
+                ⚠️ Nemáš uložené vlastné formácie/páry — čísla nižšie sú z automaticky poskladanej zostavy (najlepší dostupný hráč na danú pozíciu podľa overall), nie z tvojho skutočného plánu.
+              </p>
+            )}
+            {analysis.autoTeams.length > 0 && (() => {
+              const others = analysis.autoTeams.filter((n) => n !== analysis.teamName);
+              if (!others.length) return null;
               return (
-                <p className="text-xs text-amber-400/90 bg-amber-950/20 border border-amber-900/40 rounded-lg px-3 py-2">
-                  ⚠️ {n} {klubWord} ešte {verb} nastavené formácie/páry, preto sa do porovnania nezapočítava{n === 1 ? "" : "jú"}
-                  {" "}(chýba: {analysis.missingLinesTeams.join(", ")}). Poradia nižšie sú preto {`„z ${32 - n} klubov“`}, nie z 32.
+                <p className="text-xs text-slate-500 bg-slate-900/40 border border-slate-800 rounded-lg px-3 py-2">
+                  ℹ️ {others.length} {others.length === 1 ? "klub" : others.length <= 4 ? "kluby" : "klubov"} nemá uložené vlastné formácie/páry — pre porovnanie použili automaticky poskladanú zostavu, nie svoj skutočný plán: {others.join(", ")}.
                 </p>
               );
             })()}

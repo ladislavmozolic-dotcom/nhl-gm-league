@@ -1,11 +1,16 @@
 import { prisma } from "@/lib/prisma";
+import { autoLines } from "@/lib/sim/lines-core";
 
 // "Analyze my roster" — the first GM Assistant function. No LLM, no black-box
 // judgment: every finding below is a plain average of Player.overall (the same
 // number every roster page already shows) for the players occupying a given
-// line/pair slot in TeamLines, ranked against the same slot across all 32 NHL
-// clubs. The UI renders the exact players + numbers behind each finding, so a
-// GM can always see precisely why a slot was flagged.
+// line/pair slot, ranked against the same slot across all 32 NHL clubs. A club
+// that hasn't set its own Team Lines gets a position-aware best-lineup computed
+// on the fly with the same autoLines() the sim itself falls back to (see
+// lib/sim/lines-core.ts) — purely in memory for this comparison, never written
+// back, never shown on that club's own Lines page. Every finding still lists
+// its exact players + numbers, and autoTeams flags which clubs' numbers are
+// algorithmic guesses rather than a GM's real deployment.
 
 type ForwardSide = "lw" | "c" | "rw";
 type DefenseSide = "ld" | "rd";
@@ -55,22 +60,24 @@ export interface RosterAnalysis {
   teamId: number;
   teamName: string;
   findings: RosterFinding[]; // worst (highest rank number) first
-  // NHL clubs with no Team Lines set at all — excluded from every ranking below
-  // rather than silently assumed average, so "X. miesto z Y klubov" always means
-  // exactly Y clubs had a player to compare.
-  missingLinesTeams: string[];
+  // Clubs with no Team Lines of their own — their numbers above come from an
+  // auto-generated best-available lineup (best player per eligible slot by
+  // overall), not a GM's real deployment. Always non-empty-checked before
+  // trusting a finding as "this club's real plan".
+  autoTeams: string[];
+  myTeamIsAuto: boolean;
 }
 
-function slotPlayers(
-  lines: { forwardLines: unknown; defensePairs: unknown } | null,
-  slot: SlotDef,
-  playerMap: Map<number, SlotPlayer>
-): SlotPlayer[] {
-  const source = slot.kind === "forward" ? lines?.forwardLines : lines?.defensePairs;
-  const rows = Array.isArray(source) ? (source as Record<string, unknown>[]) : [];
+interface ResolvedLines {
+  forwardLines: { lw: number | null; c: number | null; rw: number | null }[];
+  defensePairs: { ld: number | null; rd: number | null }[];
+}
+
+function slotPlayers(lines: ResolvedLines, slot: SlotDef, playerMap: Map<number, SlotPlayer>): SlotPlayer[] {
+  const rows = slot.kind === "forward" ? lines.forwardLines : lines.defensePairs;
   const picked: SlotPlayer[] = [];
   for (const idx of slot.lineIdxs) {
-    const row = rows[idx];
+    const row = rows[idx] as Record<string, number | null> | undefined;
     const pid = row?.[slot.side];
     if (typeof pid !== "number") continue;
     const player = playerMap.get(pid);
@@ -80,27 +87,54 @@ function slotPlayers(
 }
 
 export async function analyzeRoster(teamId: number): Promise<RosterAnalysis | null> {
-  const [teams, players] = await Promise.all([
-    prisma.team.findMany({
-      where: { league: "NHL", isAffiliate: false },
-      select: { id: true, name: true, lines: { select: { forwardLines: true, defensePairs: true } } },
-    }),
-    prisma.player.findMany({
+  const [teams, linesRows, roster] = await Promise.all([
+    prisma.team.findMany({ where: { league: "NHL", isAffiliate: false }, select: { id: true, name: true } }),
+    prisma.teamLines.findMany({
       where: { team: { league: "NHL", isAffiliate: false } },
-      select: { id: true, name: true, slug: true, overall: true },
+      select: { teamId: true, forwardLines: true, defensePairs: true },
+    }),
+    // same roster filter teamLineBuilder/the sim use for its own auto-lines fallback
+    prisma.player.findMany({
+      where: { team: { league: "NHL", isAffiliate: false }, rosterType: "NHL", isGoalie: false, scratched: false },
+      select: { id: true, name: true, slug: true, overall: true, position: true, shoots: true, teamId: true },
     }),
   ]);
 
   const myTeam = teams.find((t) => t.id === teamId);
   if (!myTeam) return null;
 
-  const playerMap = new Map<number, SlotPlayer>(players.map((p) => [p.id, p]));
+  const playerMap = new Map<number, SlotPlayer>(roster.map((p) => [p.id, { id: p.id, name: p.name, slug: p.slug, overall: p.overall }]));
+  const linesByTeam = new Map(linesRows.map((l) => [l.teamId, l]));
+  const rosterByTeam = new Map<number, typeof roster>();
+  for (const p of roster) {
+    const arr = rosterByTeam.get(p.teamId) ?? [];
+    arr.push(p);
+    rosterByTeam.set(p.teamId, arr);
+  }
+
+  const autoTeamIds = new Set<number>();
+  const resolvedLines = new Map<number, ResolvedLines>();
+  for (const team of teams) {
+    const saved = linesByTeam.get(team.id);
+    const fl = Array.isArray(saved?.forwardLines) ? (saved!.forwardLines as ResolvedLines["forwardLines"]) : [];
+    const dp = Array.isArray(saved?.defensePairs) ? (saved!.defensePairs as ResolvedLines["defensePairs"]) : [];
+    if (fl.length > 0 && dp.length > 0) {
+      resolvedLines.set(team.id, { forwardLines: fl, defensePairs: dp });
+    } else {
+      const skaters = (rosterByTeam.get(team.id) ?? []).map((p) => ({
+        id: p.id, position: p.position, overall: p.overall ?? 0, shoots: p.shoots,
+      }));
+      const built = autoLines(skaters, []);
+      resolvedLines.set(team.id, { forwardLines: built.forwardLines, defensePairs: built.defensePairs });
+      autoTeamIds.add(team.id);
+    }
+  }
 
   const findings: RosterFinding[] = [];
   for (const slot of SLOTS) {
     const rows = teams
       .map((team) => {
-        const slotedPlayers = slotPlayers(team.lines, slot, playerMap);
+        const slotedPlayers = slotPlayers(resolvedLines.get(team.id)!, slot, playerMap);
         const rated = slotedPlayers.filter((p) => p.overall != null);
         if (!rated.length) return null;
         const avg = rated.reduce((sum, p) => sum + (p.overall as number), 0) / rated.length;
@@ -110,7 +144,7 @@ export async function analyzeRoster(teamId: number): Promise<RosterAnalysis | nu
       .sort((a, b) => b.avg - a.avg);
 
     const myIdx = rows.findIndex((r) => r.teamId === teamId);
-    if (myIdx === -1) continue; // this team has no lines set for the slot yet
+    if (myIdx === -1) continue; // no eligible player anywhere on the roster for this slot
 
     const rank = myIdx + 1;
     const leagueSize = rows.length;
@@ -131,13 +165,7 @@ export async function analyzeRoster(teamId: number): Promise<RosterAnalysis | nu
 
   findings.sort((a, b) => b.leagueRank - a.leagueRank);
 
-  const missingLinesTeams = teams
-    .filter((t) => {
-      const fl = Array.isArray(t.lines?.forwardLines) ? (t.lines!.forwardLines as unknown[]) : [];
-      const dp = Array.isArray(t.lines?.defensePairs) ? (t.lines!.defensePairs as unknown[]) : [];
-      return fl.length === 0 && dp.length === 0;
-    })
-    .map((t) => t.name);
+  const autoTeams = teams.filter((t) => autoTeamIds.has(t.id)).map((t) => t.name);
 
-  return { teamId, teamName: myTeam.name, findings, missingLinesTeams };
+  return { teamId, teamName: myTeam.name, findings, autoTeams, myTeamIsAuto: autoTeamIds.has(teamId) };
 }
