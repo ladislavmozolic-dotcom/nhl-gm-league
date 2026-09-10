@@ -8,6 +8,7 @@ import { unitChemistry } from "@/lib/sim/chemistry";
 import { roleFitOf } from "@/lib/sim/role-fit";
 import { DIAL_LABELS, mergeTactics, type PuckStyle, type DZone, type PpStyle, type PkStyle } from "@/lib/sim/tactics";
 import { PP_LAYOUTS, PK_LAYOUTS, PK3_LAYOUTS, type FormationRole } from "@/lib/sim/formation-layout";
+import { displayName } from "@/lib/playerName";
 import RinkFormationMap from "@/components/RinkFormationMap";
 import { useLang } from "@/components/LangProvider";
 import { dialLabel, dialDesc } from "@/lib/tactics-i18n";
@@ -70,7 +71,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
   const slotPlayersFixed = (ids: (number | null)[], dStartIndex: number) => ids.map((id, i) => {
     if (id == null) return null;
     const p = byId.get(id);
-    return p ? { id: p.id, name: p.name, isD: i >= dStartIndex } : null;
+    return p ? { id: p.id, name: displayName(p.name), isD: i >= dStartIndex } : null;
   });
   const byName = (a: Player, b: Player) => a.name.localeCompare(b.name);
   const forwards = useMemo(() => players.filter((p) => !isD(p.position)).sort(byName), [players]);
