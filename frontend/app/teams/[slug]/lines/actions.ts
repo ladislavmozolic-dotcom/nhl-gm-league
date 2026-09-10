@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { canManageTeam } from "@/lib/auth";
 import { saveTeamLines, autoLines, type TeamLinesData } from "@/lib/sim/lines";
 import { PRESETS, systemFit, type RosterProfile } from "@/lib/sim/tactics";
-import { cleanName } from "@/lib/playerName";
+import { displayName } from "@/lib/playerName";
 import { revalidatePath } from "next/cache";
 
 export async function saveLines(slug: string, data: TeamLinesData) {
@@ -27,7 +27,7 @@ export async function suggestLinesAction(slug: string): Promise<{ ok: false; err
   if (!(await canManageTeam(team.id))) return { ok: false, error: "Not authorized for this team." };
   const rosterType = team.league === "AHL" ? "AHL" : "NHL";
   const rows = await prisma.player.findMany({
-    where: { teamId: team.id, rosterType, injuryDaysLeft: { lte: 0 } },
+    where: { teamId: team.id, rosterType, injuryDaysLeft: { lte: 0 }, scratched: false },
     select: { id: true, name: true, position: true, overall: true, isGoalie: true, shoots: true, sc: true, pa: true, ck: true, df: true, st: true, fg: true, sk: true, en: true, weight: true },
   });
   const skaters: Atk[] = rows.filter((p) => !p.isGoalie).map((p) => ({ id: p.id, name: p.name, position: p.position ?? "C", overall: p.overall ?? 50, shoots: p.shoots, sc: A(p.sc), pa: A(p.pa), ck: A(p.ck), df: A(p.df), st: A(p.st), fg: A(p.fg), sk: A(p.sk), en: A(p.en), weight: p.weight ?? 90 }));
@@ -53,7 +53,7 @@ export async function suggestLinesAction(slug: string): Promise<{ ok: false; err
     else if (i <= 1) { t = { phy: 1, df: 1, of: 3 }; why = "vyvážená útočná lajna"; }
     else { t = { phy: 1, df: 2, of: 2 }; why = "vyvážená stredná lajna"; }
     l.tactic = { phy: clamp(t.phy), df: clamp(t.df), of: clamp(t.of) };
-    const names = trio.map((p) => cleanName(p.name).split(" ").pop()).join("-");
+    const names = trio.map((p) => displayName(p.name).split(" ").pop()).join("-");
     rationale.push(`${i + 1}. útok (${names}): ${why} → PHY ${l.tactic.phy} / DF ${l.tactic.df} / OF ${l.tactic.of}`);
   });
 
@@ -69,7 +69,7 @@ export async function suggestLinesAction(slug: string): Promise<{ ok: false; err
     else if (def >= 66) { t = { phy: 1, df: 4, of: 0 }; why = "shut-down pár (vysoké DF)"; }
     else { t = { phy: 1, df: 3, of: 1 }; why = "obranný pár"; }
     p.tactic = { phy: clamp(t.phy), df: clamp(t.df), of: clamp(t.of) };
-    const dnames = pair.map((x) => cleanName(x.name).split(" ").pop()).join("-");
+    const dnames = pair.map((x) => displayName(x.name).split(" ").pop()).join("-");
     rationale.push(`${i + 1}. obranný pár (${dnames}): ${why} → PHY ${p.tactic.phy} / DF ${p.tactic.df} / OF ${p.tactic.of}`);
   });
 
