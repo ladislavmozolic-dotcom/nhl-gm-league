@@ -124,10 +124,10 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
         ))}
       </div>
 
-      <div className="flex items-center gap-3">
+      <Link href={`/teams/${team.slug}`} className="flex items-center gap-3 w-fit group">
         {team.logoUrl && <img src={team.logoUrl} alt="" className="w-9 h-9 object-contain" />}
-        <h2 className="text-xl font-bold">{team.name}</h2>
-      </div>
+        <h2 className="text-xl font-bold group-hover:text-blue-400 transition-colors">{team.name}</h2>
+      </Link>
 
       <div>
         <SectionTitle accent="text-blue-400">NHL Roster</SectionTitle>
