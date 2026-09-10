@@ -14,6 +14,17 @@ export type RosterPlayer = Record<string, number | string | null> & {
 const SKATER_ATTRS = ["ck", "fg", "di", "sk", "st", "en", "du", "ph", "fo", "pa", "sc", "df", "ps", "ex", "ld", "mo"];
 const GOALIE_ATTRS = ["sk", "du", "en", "sz", "ag", "rb", "sc", "hs", "rt", "ph", "ps", "ex", "ld", "mo"];
 
+// contractText is a formatted string ("$7,000,000 x 1yr...") — sorting it as
+// text compares digit-by-digit ("$8..." vs "$4...") instead of by amount, so
+// the Contract column needs the number pulled back out of it to sort right.
+function capOf(p: RosterPlayer): number | null {
+  if (typeof p.capHit === "number") return p.capHit;
+  const text = p.contractText;
+  if (!text) return null;
+  const nums = text.match(/[\d,]+/);
+  return nums ? parseInt(nums[0].replace(/,/g, ""), 10) : null;
+}
+
 type Col = { key: string; label: string; num: boolean };
 
 export default function RosterTable({ title, players, goalie = false, hideAttrs = false }: { title: string; players: RosterPlayer[]; goalie?: boolean; hideAttrs?: boolean }) {
@@ -26,14 +37,14 @@ export default function RosterTable({ title, players, goalie = false, hideAttrs 
     { key: "overall", label: "OV", num: true },
     { key: "age", label: "Age", num: true },
     { key: "contractYears", label: "Yrs", num: true },
-    { key: "contractText", label: "Contract", num: false },
+    { key: "contractText", label: "Contract", num: true },
   ];
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 } | null>(null);
   const click = (c: Col) => setSort((s) => (s && s.key === c.key ? { key: c.key, dir: (s.dir * -1) as 1 | -1 } : { key: c.key, dir: c.num ? -1 : 1 }));
 
   const rows = useMemo(() => {
     if (!sort) return players;
-    const v = (p: RosterPlayer) => sort.key === "name" ? cleanName(p.name).toLowerCase() : p[sort.key];
+    const v = (p: RosterPlayer) => sort.key === "name" ? cleanName(p.name).toLowerCase() : sort.key === "contractText" ? capOf(p) : p[sort.key];
     return [...players].sort((a, b) => {
       const va = v(a), vb = v(b);
       if (va == null && vb == null) return 0;
