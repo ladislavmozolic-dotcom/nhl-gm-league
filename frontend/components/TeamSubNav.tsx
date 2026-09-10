@@ -50,6 +50,10 @@ export default function TeamSubNav({ slug, isGm, isAffiliate, farmSlug, parentSl
           { label: "Roster", href: `${base}/roster` },
           { label: "Depth Chart", href: `${base}/depth-chart` },
           { label: "Injuries", href: `${base}/injuries` },
+          // Roster moves for an AHL club actually live on its NHL parent's /rosters
+          // page (RosterMover shows both org sides at once) — deep-link there rather
+          // than duplicating that page/data-fetch for the affiliate's own slug.
+          ...(parentSlug ? [{ label: "Roster Moves", href: `/teams/${parentSlug}/rosters`, gm: true }] : []),
           { label: "Lines", href: `${base}/lines`, gm: true },
           { label: "System", href: `${base}/tactics`, gm: true },
         ] },

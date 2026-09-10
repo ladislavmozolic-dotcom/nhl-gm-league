@@ -5,6 +5,7 @@ import { getTeamSession, isAdmin, isCommission } from "@/lib/auth";
 import { loadSettings } from "@/lib/sim/settings";
 import { revalidatePath } from "next/cache";
 import { clauseBlock, assertOwnership, createTradeRecord, executeTradeGroup, collectMoveOps, type TradePackage } from "@/lib/trade-exec";
+import { displayName } from "@/lib/playerName";
 
 /** One one-directional asset move: `fromTeamId`'s listed assets go to `toTeamId`.
  *  A 3-team trade is exactly 3 of these forming a closed cycle (A→C, B→A, C→B) —
@@ -93,7 +94,7 @@ export async function proposeTradeGroupAction(legs: GroupLeg[]) {
         if (required <= 0) continue;
         const paid = feeBy.get(p.playerId);
         if (!paid || paid.feeAmount < required || paid.payTeamId !== pkg.fromTeamId)
-          throw new Error(`${pl.name} won't waive his clause for free — the agent fee is $${(required / 1e6).toFixed(2)}M, paid by the club dealing him.`);
+          throw new Error(`${displayName(pl.name)} won't waive his clause for free — the agent fee is $${(required / 1e6).toFixed(2)}M, paid by the club dealing him.`);
       }
     }
   }

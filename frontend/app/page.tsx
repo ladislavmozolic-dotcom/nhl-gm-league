@@ -231,7 +231,7 @@ export default async function HomePage() {
         {/* Trade Tracker — the latest completed deals around the league */}
         <Link href="/trades" className="block bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg shadow-black/20 hover:border-blue-500/40 transition-colors">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-xs uppercase tracking-wide text-blue-400">🔁 Trade Tracker</p>
+            <p className="text-xs uppercase tracking-wide text-blue-400">🔁 Recent Trades</p>
             <span className="text-xs text-slate-400">{T("ui.viewAll")}</span>
           </div>
           {recentTrades.length ? (

@@ -4,11 +4,12 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getTeamSession, isAdmin, isCommission } from "@/lib/auth";
 import { loadSettings } from "@/lib/sim/settings";
-import { CURRENT_SEASON_START } from "@/lib/finance";
+import { CURRENT_SEASON_START, money } from "@/lib/finance";
 import { revalidatePath } from "next/cache";
 import { clauseBlock, assertOwnership, packageFromTrade, executeAcceptedTrade, createTradeRecord, collectMoveOps, reverseTradeOps, type TradePlayer, type TradePackage } from "@/lib/trade-exec";
 import { playerValue, pickValueBySlot } from "@/lib/trade-value";
 import { hasWorthyGoalie } from "@/lib/goalie-rule";
+import { displayName } from "@/lib/playerName";
 
 export type { TradePlayer, TradePackage } from "@/lib/trade-exec";
 
@@ -231,7 +232,7 @@ export async function proposeTrade(pkg: TradePackage) {
       if (required <= 0) return; // he waives for free
       const paid = feeBy.get(playerId);
       if (!paid || paid.feeAmount < required || paid.payTeamId !== giverTeamId)
-        throw new Error(`${pl.name} won't waive his clause for free — the agent fee is $${(required / 1e6).toFixed(2)}M, paid by the club dealing him.`);
+        throw new Error(`${displayName(pl.name)} won't waive his clause for free — the agent fee is $${(required / 1e6).toFixed(2)}M, paid by the club dealing him.`);
     };
     for (const p of pkg.fromPlayers) await requireConsent(p.playerId, pkg.toTeamId, pkg.fromTeamId);
     for (const p of pkg.toPlayers) await requireConsent(p.playerId, pkg.fromTeamId, pkg.toTeamId);
@@ -466,14 +467,13 @@ export async function latestTradeCelebrationAction() {
   const pIds = assets.filter((a) => a.playerId).map((a) => a.playerId!);
   const players = await prisma.player.findMany({ where: { id: { in: pIds } }, select: { id: true, name: true } });
   const nameOf = new Map(players.map((p) => [p.id, p.name]));
-  const clean = (s: string) => s.replace(/\s*\([^)]*\)/g, "").trim();
   // my side = FROM if I'm the proposer, else TO
   const mySide = iAmFrom ? "FROM" : "TO";
   const describe = (side: string) => {
     const rows = assets.filter((a) => a.side === side);
     const parts: string[] = [];
     for (const a of rows) {
-      if (a.assetType === "PLAYER" && a.playerId) parts.push(clean(nameOf.get(a.playerId) ?? "a player"));
+      if (a.assetType === "PLAYER" && a.playerId) parts.push(displayName(nameOf.get(a.playerId) ?? "a player"));
       else if (a.assetType === "PICK") parts.push("a draft pick");
       else if (a.assetType === "PROSPECT") parts.push("a prospect");
       else if (a.assetType === "CASH" && a.cashAmount) parts.push(`$${(a.cashAmount / 1e6).toFixed(1)}M`);
@@ -503,4 +503,63 @@ export async function cancelTrade(tradeId: number) {
   await prisma.trade.update({ where: { id: tradeId }, data: { status: "CANCELLED", respondedAt: new Date() } });
   revalidatePath("/trades");
   return { status: "CANCELLED" as const };
+}
+
+export type TradeAnnouncement = {
+  id: number;
+  respondedAt: Date;
+  fromTeam: { name: string; code: string | null; logoUrl: string | null } | null;
+  toTeam: { name: string; code: string | null; logoUrl: string | null } | null;
+  fromLabels: string[];
+  toLabels: string[];
+};
+
+/** Every 2-team trade completed league-wide in the last 3 days, EXCLUDING the logged-in
+ *  club's own deals (those already get the personal latestTradeCelebrationAction popup) —
+ *  powers the site-wide "new trades around the league" announcement. The client remembers
+ *  which ids it has dismissed (localStorage), so this just reports what's recent. */
+export async function recentTradeAnnouncementsAction(): Promise<TradeAnnouncement[]> {
+  const session = await getTeamSession();
+  if (session == null) return [];
+  const since = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+  const trades = await prisma.trade.findMany({
+    where: {
+      status: "ACCEPTED", respondedAt: { gte: since }, groupId: null,
+      NOT: [{ fromTeamId: session }, { toTeamId: session }],
+    },
+    orderBy: { respondedAt: "desc" },
+    take: 15,
+  });
+  if (!trades.length) return [];
+  const teamIds = [...new Set(trades.flatMap((t) => [t.fromTeamId, t.toTeamId]))];
+  const assets = await prisma.tradeAsset.findMany({ where: { tradeId: { in: trades.map((t) => t.id) } } });
+  const playerIds = assets.filter((a) => a.playerId).map((a) => a.playerId!);
+  const prospectIds = assets.filter((a) => a.prospectId).map((a) => a.prospectId!);
+  const pickIds = assets.filter((a) => a.draftPickId).map((a) => a.draftPickId!);
+  const [teams, players, prospects, picks] = await Promise.all([
+    prisma.team.findMany({ where: { id: { in: teamIds } }, select: { id: true, name: true, code: true, logoUrl: true } }),
+    prisma.player.findMany({ where: { id: { in: playerIds } }, select: { id: true, name: true } }),
+    prisma.prospect.findMany({ where: { id: { in: prospectIds } }, select: { id: true, name: true } }),
+    prisma.draftPick.findMany({ where: { id: { in: pickIds } }, select: { id: true, year: true, round: true } }),
+  ]);
+  const teamById = new Map(teams.map((t) => [t.id, t]));
+  const pName = new Map(players.map((p) => [p.id, p.name]));
+  const proName = new Map(prospects.map((p) => [p.id, p.name]));
+  const pickLabel = new Map(picks.map((p) => [p.id, `${p.year} R${p.round}`]));
+  const labelsFor = (tradeId: number, side: "FROM" | "TO") =>
+    assets.filter((a) => a.tradeId === tradeId && a.side === side).map((a) => {
+      if (a.assetType === "PLAYER") return displayName(pName.get(a.playerId ?? -1) ?? "Player");
+      if (a.assetType === "PROSPECT") return `⭐ ${displayName(proName.get(a.prospectId ?? -1) ?? "Prospect")}`;
+      if (a.assetType === "PICK") return `🎫 ${pickLabel.get(a.draftPickId ?? -1) ?? "Pick"}`;
+      if (a.assetType === "CASH") return `💵 ${money(a.cashAmount ?? 0)}`;
+      return a.assetType;
+    });
+  return trades.map((t) => ({
+    id: t.id,
+    respondedAt: t.respondedAt!,
+    fromTeam: teamById.get(t.fromTeamId) ?? null,
+    toTeam: teamById.get(t.toTeamId) ?? null,
+    fromLabels: labelsFor(t.id, "FROM"),
+    toLabels: labelsFor(t.id, "TO"),
+  }));
 }

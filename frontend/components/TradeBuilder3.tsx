@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import PlayerLink from "@/components/PlayerLink";
 import { money } from "@/lib/finance";
+import { displayName } from "@/lib/playerName";
 import { clauseTermsAction } from "@/app/trades/build/actions";
 import { proposeTradeGroupAction, type GroupLeg } from "@/app/trades/build3/actions";
 
@@ -12,8 +13,6 @@ type Pick = { id: number; label: string; logoUrl?: string | null };
 type Assets = { players: Player[]; picks: Pick[]; prospects: Pick[] };
 type Team = { id: number; name: string; logoUrl?: string | null };
 type Terms = { feeAmount: number; feePct: number; fullPayout: boolean; reason: string };
-
-const clauseTag = (c?: string | null) => c === "NMC" ? "NMC" : c === "M_NTC" ? "M-NTC" : c === "NTC" ? "NTC" : null;
 
 /** One team's picker column: what it sends, and to which of the other two clubs. */
 function TeamColumn({ team, others, assets, dest, setDest, playerIds, setPlayerIds, retentions, setRetentions, fees, setFees, terms, setTerms, pickIds, setPickIds, prospectIds, setProspectIds, cash, setCash }: {
@@ -72,13 +71,12 @@ function TeamColumn({ team, others, assets, dest, setDest, playerIds, setPlayerI
           {assets.players.length === 0 && <div className="px-3 py-3 text-slate-600 text-sm">none</div>}
           {assets.players.map((p) => {
             const on = playerIds.has(p.id);
-            const tag = clauseTag(p.clause);
             const needsWaiver = dest != null && !!p.clause && (p.clause !== "M_NTC" || (p.noTradeTeams ?? []).includes(dest));
             return (
               <div key={p.id} className={`px-3 py-2 ${on ? "bg-blue-950/30" : ""}`}>
                 <label className="flex items-center gap-2.5 cursor-pointer">
                   <input type="checkbox" disabled={!dest} checked={on} onChange={() => togglePlayer(p)} className="accent-blue-500 w-4 h-4" />
-                  <span className="flex-1 truncate"><PlayerLink id={p.id} name={p.name} /> <span className="text-slate-500 text-xs">{p.position}{p.farm ? " · AHL" : ""}</span>{tag && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30">{tag}</span>}</span>
+                  <span className="flex-1 truncate"><PlayerLink id={p.id} name={displayName(p.name)} /> <span className="text-slate-500 text-xs">{p.position}{p.farm ? " · AHL" : ""}</span></span>
                   <span className="text-slate-400 tabular-nums text-sm">{money(p.capHit)}</span>
                 </label>
                 {!dest && <p className="mt-1 ml-6.5 text-[11px] text-slate-600">pick a destination first</p>}

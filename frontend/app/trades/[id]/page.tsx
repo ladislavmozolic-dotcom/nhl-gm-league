@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getTeamSession, isAdmin, isCommission } from "@/lib/auth";
 import { money } from "@/lib/finance";
-import { cleanName } from "@/lib/playerName";
+import { displayName } from "@/lib/playerName";
 import { PageHeader } from "@/components/ui";
 import TradeActions from "@/components/TradeActions";
 
@@ -88,8 +88,8 @@ export default async function TradePage({ params }: { params: Promise<{ id: stri
   type Item = { text: string; logoUrl?: string | null };
   const labelsFor = (side: "FROM" | "TO"): Item[] =>
     assets.filter((a) => a.side === side).map((a): Item => {
-      if (a.assetType === "PLAYER") return { text: `${cleanName(pName.get(a.playerId ?? -1) ?? "Player")}${a.retentionPct ? ` (${a.retentionPct}% ret.)` : ""}` };
-      if (a.assetType === "PROSPECT") return { text: `⭐ ${cleanName(proName.get(a.prospectId ?? -1) ?? "Prospect")}` };
+      if (a.assetType === "PLAYER") return { text: `${displayName(pName.get(a.playerId ?? -1) ?? "Player")}${a.retentionPct ? ` (${a.retentionPct}% ret.)` : ""}` };
+      if (a.assetType === "PROSPECT") return { text: `⭐ ${displayName(proName.get(a.prospectId ?? -1) ?? "Prospect")}` };
       if (a.assetType === "PICK") {
         const info = pickInfo.get(a.draftPickId ?? -1);
         const orig = info?.origTeam;

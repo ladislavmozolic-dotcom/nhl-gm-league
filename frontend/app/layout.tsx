@@ -14,6 +14,7 @@ import MessageNotifier from "@/components/MessageNotifier";
 import SessionResume from "@/components/SessionResume";
 import PullToRefresh from "@/components/PullToRefresh";
 import TradeSuccessOverlay from "@/components/TradeSuccessOverlay";
+import TradeAnnouncementOverlay from "@/components/TradeAnnouncementOverlay";
 import VisitBeacon from "@/components/VisitBeacon";
 import SiteBanner from "@/components/SiteBanner";
 import MegaMenu from "@/components/MegaMenu";
@@ -132,6 +133,7 @@ export default async function RootLayout({
           <PullToRefresh />
           {gm && <MessageNotifier initialUnread={gm.unreadDm} />}
           {gm && <TradeSuccessOverlay />}
+          {gm && <TradeAnnouncementOverlay />}
           {!gm && <SessionResume />}
           <SiteBanner branding={branding} />
           <MegaMenu gm={gm} items={menu} lang={lang} light={branding.navLight} hideForum={hideForum} />

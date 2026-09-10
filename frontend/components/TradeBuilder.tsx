@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import PlayerLink from "@/components/PlayerLink";
 import Link from "next/link";
 import { money } from "@/lib/finance";
+import { displayName } from "@/lib/playerName";
 import { clauseTermsAction, analyzeTradeAction, type TradePackage } from "@/app/trades/build/actions";
 
 type Player = { id: number; name: string; position: string; capHit: number; farm: boolean; clause?: string | null; noTradeTeams?: number[] };
@@ -12,7 +13,6 @@ type Assets = { players: Player[]; picks: Pick[]; prospects: Pick[] };
 type Team = { id: number; name: string; logoUrl?: string | null };
 type Terms = { feeAmount: number; feePct: number; fullPayout: boolean; reason: string; payTeamId: number };
 
-const clauseTag = (c?: string | null) => c === "NMC" ? "NMC" : c === "M_NTC" ? "M-NTC" : c === "NTC" ? "NTC" : null;
 const setRet = (map: Record<number, number>, set: (v: Record<number, number>) => void, id: number, pct: number) =>
   set({ ...map, [id]: Math.max(0, Math.min(50, pct)) });
 
@@ -40,13 +40,12 @@ function PlayerTable({ title, list, pmap, setPmap, destTeamId, ownerTeamId, term
         {list.length === 0 && <div className="px-3 py-3 text-slate-600 text-sm">none</div>}
         {list.map((p) => {
           const on = p.id in pmap;
-          const tag = clauseTag(p.clause);
           const needsWaiver = !!p.clause && (p.clause !== "M_NTC" || (p.noTradeTeams ?? []).includes(destTeamId));
           return (
             <div key={p.id} className={`px-3 py-2 ${on ? "bg-blue-950/30" : ""}`}>
               <label className="flex items-center gap-2.5 cursor-pointer">
                 <input type="checkbox" checked={on} onChange={() => onToggleClause(pmap, setPmap, p, destTeamId, ownerTeamId)} className="accent-blue-500 w-4 h-4" />
-                <span className="flex-1 truncate"><PlayerLink id={p.id} name={p.name} /> <span className="text-slate-500 text-xs">{p.position}</span>{tag && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30">{tag}</span>}</span>
+                <span className="flex-1 truncate"><PlayerLink id={p.id} name={displayName(p.name)} /> <span className="text-slate-500 text-xs">{p.position}</span></span>
                 <span className="text-slate-400 tabular-nums text-sm">{money(p.capHit)}</span>
               </label>
               {on && needsWaiver && (() => {

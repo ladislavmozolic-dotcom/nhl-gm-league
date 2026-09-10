@@ -5,6 +5,7 @@ import { money } from "@/lib/finance";
 import TradeActions from "@/components/TradeActions";
 import TradeGroupActions from "@/components/TradeGroupActions";
 import { PageHeader } from "@/components/ui";
+import { displayName } from "@/lib/playerName";
 
 export const dynamic = "force-dynamic";
 
@@ -46,8 +47,8 @@ export default async function TradesPage() {
 
   const labelsFor = (tradeId: number, side: "FROM" | "TO"): AssetLabel[] =>
     assets.filter((a) => a.tradeId === tradeId && a.side === side).map((a) => {
-      if (a.assetType === "PLAYER") return { text: `${pName.get(a.playerId ?? -1) ?? "Player"}${a.retentionPct ? ` (${a.retentionPct}% ret.)` : ""}` };
-      if (a.assetType === "PROSPECT") return { text: `⭐ ${proName.get(a.prospectId ?? -1) ?? "Prospect"}` };
+      if (a.assetType === "PLAYER") return { text: `${displayName(pName.get(a.playerId ?? -1) ?? "Player")}${a.retentionPct ? ` (${a.retentionPct}% ret.)` : ""}` };
+      if (a.assetType === "PROSPECT") return { text: `⭐ ${displayName(proName.get(a.prospectId ?? -1) ?? "Prospect")}` };
       if (a.assetType === "PICK") {
         const info = pickInfo.get(a.draftPickId ?? -1);
         const orig = info?.origTeam;
@@ -71,7 +72,12 @@ export default async function TradesPage() {
   const pending = enriched.filter((t) => t.status === "PENDING" && involvedOrAdmin(t));
   const IN_REVIEW = ["AWAITING_COMMISH", "MODIFY", "MODIFIED"];
   const inReview = enriched.filter((t) => IN_REVIEW.includes(t.status) && involvedOrAdmin(t));
-  const history = enriched.filter((t) => t.status === "ACCEPTED" || t.status === "COMPLETED" || ((t.status === "DECLINED" || t.status === "CANCELLED") && involvedOrAdmin(t)));
+  // Sort by respondedAt (when the deal actually closed), not createdAt (when it
+  // was proposed) — a trade that sat in the commish queue a while before being
+  // accepted should still surface as the newest completed deal.
+  const history = enriched
+    .filter((t) => t.status === "ACCEPTED" || t.status === "COMPLETED" || ((t.status === "DECLINED" || t.status === "CANCELLED") && involvedOrAdmin(t)))
+    .sort((a, b) => (b.respondedAt ?? b.createdAt).getTime() - (a.respondedAt ?? a.createdAt).getTime());
 
   // ---- 3-team trade groups (separate from the 2-team Trade rows above) ----
   const groups = await prisma.tradeGroup.findMany({ where: { status: { in: ["PENDING", "AWAITING_COMMISH"] } }, orderBy: { createdAt: "desc" } });
@@ -95,8 +101,8 @@ export default async function TradesPage() {
   const glProName = new Map(glProspects.map((p) => [p.id, p.name]));
   const glPickLabel = new Map(glPicks.map((p) => [p.id, `${p.year} R${p.round}`]));
   const legAssetLabels = (legId: number): string[] => groupLegAssets.filter((a) => a.tradeId === legId).map((a) => {
-    if (a.assetType === "PLAYER") return glPName.get(a.playerId ?? -1) ?? "Player";
-    if (a.assetType === "PROSPECT") return `⭐ ${glProName.get(a.prospectId ?? -1) ?? "Prospect"}`;
+    if (a.assetType === "PLAYER") return displayName(glPName.get(a.playerId ?? -1) ?? "Player");
+    if (a.assetType === "PROSPECT") return `⭐ ${displayName(glProName.get(a.prospectId ?? -1) ?? "Prospect")}`;
     if (a.assetType === "PICK") return `🎫 ${glPickLabel.get(a.draftPickId ?? -1) ?? "Pick"}`;
     if (a.assetType === "CASH") return `💵 ${money(a.cashAmount ?? 0)}`;
     return a.assetType;
@@ -228,7 +234,7 @@ function AssetList({ team, labels, verb }: { team?: { name: string }; labels: As
 
 function TradeCard({ trade, action, admin }: {
   trade: {
-    id: number; status: string; condition: string | null; createdAt: Date;
+    id: number; status: string; condition: string | null; createdAt: Date; respondedAt: Date | null;
     fromTeam?: { name: string; code: string | null; logoUrl: string | null; rookieGm?: boolean };
     toTeam?: { name: string; code: string | null; logoUrl: string | null; rookieGm?: boolean };
     fromLabels: { text: string }[]; toLabels: { text: string }[];
@@ -236,6 +242,8 @@ function TradeCard({ trade, action, admin }: {
   action: "receiver" | "proposer" | null;
   admin?: boolean;
 }) {
+  const fmtDate = (d: Date) => d.toLocaleDateString("sk-SK", { day: "numeric", month: "long", year: "numeric" });
+  const done = trade.status === "ACCEPTED" || trade.status === "COMPLETED";
   return (
     <div className="bg-slate-900/70 rounded-2xl border border-slate-800 shadow-lg shadow-black/20 p-5">
       <div className="flex items-center justify-between mb-1">
@@ -253,15 +261,10 @@ function TradeCard({ trade, action, admin }: {
       {/* "Receives" (and the swapped-side layout) only makes sense once a trade is
           actually done — a still-pending proposal hasn't given either club anything
           yet, so it keeps reading as "X sends" under its own name. */}
-      {(() => {
-        const done = trade.status === "ACCEPTED" || trade.status === "COMPLETED";
-        return (
-          <div className="bg-slate-950/50 rounded-lg p-3 mb-3 flex gap-4">
-            <AssetList team={trade.fromTeam} labels={done ? trade.toLabels : trade.fromLabels} verb={done ? "received" : "sends"} />
-            <AssetList team={trade.toTeam} labels={done ? trade.fromLabels : trade.toLabels} verb={done ? "received" : "sends"} />
-          </div>
-        );
-      })()}
+      <div className="bg-slate-950/50 rounded-lg p-3 mb-3 flex gap-4">
+        <AssetList team={trade.fromTeam} labels={done ? trade.toLabels : trade.fromLabels} verb={done ? "received" : "sends"} />
+        <AssetList team={trade.toTeam} labels={done ? trade.fromLabels : trade.toLabels} verb={done ? "received" : "sends"} />
+      </div>
 
       {trade.condition && <p className="text-xs text-amber-300/80 mb-3">📎 {trade.condition}</p>}
       {trade.status === "AWAITING_COMMISH" && <p className="text-xs text-amber-300/80 mb-3">🕵️ Agreed by both GMs — awaiting commission approval (rookie-GM oversight).</p>}
@@ -269,7 +272,7 @@ function TradeCard({ trade, action, admin }: {
       {trade.status === "MODIFIED" && <p className="text-xs text-fuchsia-300/90 mb-3">✏️ Modified by the GM — back with the commission for a final Accept/Decline.</p>}
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <p className="text-xs text-slate-600">{trade.createdAt.toLocaleDateString("sk-SK", { day: "numeric", month: "long", year: "numeric" })}</p>
+        <p className="text-xs text-slate-600">{done ? `Completed ${fmtDate(trade.respondedAt ?? trade.createdAt)}` : `Proposed ${fmtDate(trade.createdAt)}`}</p>
         {(action || admin) && <TradeActions tradeId={trade.id} role={action} admin={admin} pending={trade.status === "PENDING"} />}
       </div>
     </div>

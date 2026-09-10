@@ -15,6 +15,11 @@ import { money } from "./finance";
 export type FaPos = "F" | "D" | "G";
 export const LEAGUE_MIN = 775_000;
 export const MAX_TERM = 4; // our league caps contracts at 4 years (shorter than real NHL)
+// Our economy doesn't have to match real NHL dollars, but a player's demand
+// shouldn't drift too far below what he's actually worth in reality — e.g. a real
+// $15M earner shouldn't be signable here for pennies just because our internal
+// comps pool is thin. Floors his demand at this fraction of his real cap hit.
+export const REAL_FLOOR_RATIO = 0.80;
 
 const n = (x: number | null | undefined, dflt = 50) => (typeof x === "number" ? x : dflt);
 
@@ -253,6 +258,7 @@ export function buildDemand(input: {
   round?: number;
   priorBidders?: number; // distinct clubs that bid on him in the round before this one
   currentSalary?: number | null; // his existing cap hit — the opening ask won't come in under it
+  realCapHit?: number | null; // his actual real-NHL cap hit, if known — see REAL_FLOOR_RATIO
 }): Demand {
   const { market, grp, age, anchor, comps } = input;
   const premium = roundPremium(input.round ?? 1, input.priorBidders); // default = opening ask (high)
@@ -272,6 +278,11 @@ export function buildDemand(input: {
   if (!overridden && (input.round ?? 1) <= 1 && input.currentSalary && input.currentSalary > 0) {
     const raise = 1.03 + Math.max(0, (input.perf ?? 1) - 1) * 0.6;
     salary = Math.max(salary, input.currentSalary * raise);
+  }
+  // Real-world tether — never let his demand fall too far below what he actually
+  // earns in reality, regardless of what our internal comps pool computes.
+  if (!overridden && input.realCapHit && input.realCapHit > 0) {
+    salary = Math.max(salary, input.realCapHit * REAL_FLOOR_RATIO);
   }
   salary = Math.max(LEAGUE_MIN, Math.min(salary, 16_000_000));
   salary = Math.round(salary / 50_000) * 50_000;

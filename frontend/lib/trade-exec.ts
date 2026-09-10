@@ -10,6 +10,7 @@ import { loadSettings } from "@/lib/sim/settings";
 import { CURRENT_SEASON_START } from "@/lib/finance";
 import { getLeagueDate } from "@/lib/calendar-server";
 import { roundForDate, daysBetween } from "@/lib/calendar";
+import { displayName } from "@/lib/playerName";
 
 /** In-season days between two league dates (off-season time doesn't count) —
  *  the NHL's real "75-day rule" for a 2nd retention on the same contract.
@@ -35,9 +36,10 @@ type ClausePlayer = { id: number; name: string; tradeClause: string | null; noTr
 /** A blocking reason if this player's clause forbids a move to `destTeamId`, else null. */
 export function clauseBlock(pl: ClausePlayer, destTeamId: number, waived: Set<number>, enabled: boolean): string | null {
   if (!enabled || !pl.tradeClause || waived.has(pl.id)) return null;
+  const nm = displayName(pl.name);
   if (pl.tradeClause === "M_NTC")
-    return (pl.noTradeTeams ?? []).includes(destTeamId) ? `${pl.name} has a modified no-trade clause that blocks a deal to that team — he must waive it.` : null;
-  return `${pl.name} has a ${pl.tradeClause === "NMC" ? "no-movement" : "no-trade"} clause — he must waive it to be dealt.`;
+    return (pl.noTradeTeams ?? []).includes(destTeamId) ? `${nm} has a modified no-trade clause that blocks a deal to that team — he must waive it.` : null;
+  return `${nm} has a ${pl.tradeClause === "NMC" ? "no-movement" : "no-trade"} clause — he must waive it to be dealt.`;
 }
 
 type OrgTeam = { id: number; name: string; bankAccount: number; affiliateTeams: { id: number }[] };
@@ -113,7 +115,7 @@ export async function collectMoveOps(pkg: TradePackage) {
       });
       if (stillBlocked) {
         const daysLeft = settings.retentionReacquireBanDays - daysBetween(stillBlocked.leagueDate ?? stillBlocked.createdAt, nowLeagueDate);
-        throw new Error(`${pl.name} can't rejoin a club that retained his salary yet — ${daysLeft} day(s) left on that ban.`);
+        throw new Error(`${displayName(pl.name)} can't rejoin a club that retained his salary yet — ${daysLeft} day(s) left on that ban.`);
       }
 
       const toFarm = pl.rosterType === "AHL";
@@ -127,12 +129,12 @@ export async function collectMoveOps(pkg: TradePackage) {
       const capHit = pl.capHit ?? 0;
       let retainedSalary = pl.retainedSalary ?? 0;
       if (tp.retentionPct > 0 && capHit) {
-        if (history.length >= settings.retentionMaxPerContract) throw new Error(`${pl.name}'s contract has already been retained ${history.length} time(s) — no further retention is allowed.`);
+        if (history.length >= settings.retentionMaxPerContract) throw new Error(`${displayName(pl.name)}'s contract has already been retained ${history.length} time(s) — no further retention is allowed.`);
         if (history.length > 0) {
           const last = history[history.length - 1];
           const elapsed = regularSeasonDaysBetween(last.leagueDate ?? last.createdAt, nowLeagueDate);
           if (elapsed < settings.retentionCooldownDays) {
-            throw new Error(`A 2nd retention on ${pl.name}'s contract needs ${settings.retentionCooldownDays - elapsed} more in-season day(s) since the first.`);
+            throw new Error(`A 2nd retention on ${displayName(pl.name)}'s contract needs ${settings.retentionCooldownDays - elapsed} more in-season day(s) since the first.`);
           }
         }
         // A 2nd (or 3rd) retention is a % of what the SENDING club has actually
@@ -146,9 +148,9 @@ export async function collectMoveOps(pkg: TradePackage) {
         const pct = Math.min(maxPct, tp.retentionPct);
         const newSlice = Math.round((netBefore * pct / 100) / 500) * 500;
         const netCap = netBefore - newSlice;
-        if (netCap < settings.retentionMinSalary) throw new Error(`Retention would drop ${pl.name} below the ${settings.retentionMinSalary.toLocaleString()} floor.`);
+        if (netCap < settings.retentionMinSalary) throw new Error(`Retention would drop ${displayName(pl.name)} below the ${settings.retentionMinSalary.toLocaleString()} floor.`);
         retainedSalary += newSlice;
-        retentionRecords.push({ teamId: fromOrg.id, playerId: pl.id, playerName: `${pl.name} (retained)`, perYear: newSlice, years: Math.max(1, pl.contractYears ?? 1) });
+        retentionRecords.push({ teamId: fromOrg.id, playerId: pl.id, playerName: `${displayName(pl.name)} (retained)`, perYear: newSlice, years: Math.max(1, pl.contractYears ?? 1) });
       }
       // being shopped was the OLD club's decision — it doesn't carry over to whoever
       // just acquired him, so clear the trade-block flag on every trade.
@@ -196,7 +198,7 @@ export async function collectMoveOps(pkg: TradePackage) {
     if (!f.feeAmount) continue;
     const pl = pById.get(f.playerId);
     ops.push(prisma.team.update({ where: { id: f.payTeamId }, data: { bankAccount: { decrement: f.feeAmount }, ledgerAdj: { decrement: f.feeAmount } } }));
-    ops.push(prisma.transaction.create({ data: { type: "CLAUSE_WAIVER", message: `Paid ${pl?.name ?? "a player"} ${(f.feeAmount / 1_000_000).toFixed(2)}M to waive his no-trade clause.` } }));
+    ops.push(prisma.transaction.create({ data: { type: "CLAUSE_WAIVER", message: `Paid ${pl?.name ? displayName(pl.name) : "a player"} ${(f.feeAmount / 1_000_000).toFixed(2)}M to waive his no-trade clause.` } }));
   }
 
   // Full asset labels (not just players) so the trade log never falls back to
@@ -204,9 +206,9 @@ export async function collectMoveOps(pkg: TradePackage) {
   const ordinal = (n: number) => `${n}${n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th"}`;
   const assetLabels = (pls: TradePlayer[], pickIds: number[], prospectIds: number[], cash: number): string[] => {
     const out: string[] = [];
-    for (const p of pls) { const nm = pById.get(p.playerId)?.name; if (nm) out.push(nm); }
+    for (const p of pls) { const nm = pById.get(p.playerId)?.name; if (nm) out.push(displayName(nm)); }
     for (const id of pickIds) { const pk = pkById.get(id); if (pk) out.push(`${pk.year} ${ordinal(pk.round)}-round pick`); }
-    for (const id of prospectIds) { const pr = prById.get(id); if (pr) out.push(pr.name); }
+    for (const id of prospectIds) { const pr = prById.get(id); if (pr) out.push(displayName(pr.name)); }
     if (cash) out.push(`$${cash.toLocaleString("en-US")} cash`);
     return out;
   };

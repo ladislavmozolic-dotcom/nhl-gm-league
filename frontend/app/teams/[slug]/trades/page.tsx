@@ -82,7 +82,7 @@ export default async function TeamTradesPage({ params }: { params: Promise<{ slu
                     </Link>
                   </td>
                   <td className="px-3 py-3 text-center"><StatusBadge status={t.status} /></td>
-                  <td className="px-4 py-3 text-right text-slate-400 whitespace-nowrap">{fmtDate(t.createdAt)}</td>
+                  <td className="px-4 py-3 text-right text-slate-400 whitespace-nowrap">{fmtDate((t.status === "ACCEPTED" || t.status === "COMPLETED") ? (t.respondedAt ?? t.createdAt) : t.createdAt)}</td>
                 </tr>
               ))}
             </tbody>

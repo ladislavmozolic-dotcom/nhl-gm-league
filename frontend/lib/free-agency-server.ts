@@ -31,6 +31,7 @@ export async function loadLeagueCap(): Promise<LeagueCap> {
 const SEL = {
   id: true, isGoalie: true, position: true, age: true, capHit: true, rosterType: true,
   sc: true, pa: true, df: true, sk: true, lastSeasonGP: true, lastSeasonPts: true, morale: true,
+  realCapHit: true,
   goalieRating: { select: { ag: true, rb: true, sc: true, hs: true } },
 } as const;
 
@@ -83,6 +84,7 @@ type PoolPlayer = {
   isGoalie: boolean; position: string | null; capHit: number | null;
   sc: number | null; pa: number | null; df: number | null; sk: number | null;
   lastSeasonGP?: number | null; lastSeasonPts?: number | null; morale?: number | null;
+  realCapHit?: number | null;
   goalieRating: { ag: number | null; rb: number | null; sc: number | null; hs: number | null } | null;
 };
 
@@ -132,6 +134,7 @@ function demandFromRow(
     market, grp, age: p.age, anchor, comps: count,
     override: p.faDemandOverride, capGrowth: 1, round, priorBidders,
     downSeason: isDownSeason(p.lastSeasonGP, fullGP), morale: p.morale, currentSalary: p.capHit,
+    realCapHit: p.realCapHit,
   });
   // a manual override is the commissioner's word — never soften it
   if (p.faDemandOverride != null) return { demand, grp };
@@ -217,7 +220,7 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
   const priorBidders = (await priorRoundBidderCounts([playerId], rnd)).get(playerId);
   const { grp, market } = playerMarket(p as PoolPlayer);
   const { anchor, count } = anchorFromPool(marketPool, grp, market);
-  const rawBase = buildDemand({ market, grp, age: p.age, anchor, comps: count, override: p.faDemandOverride, capGrowth: 1, round: rnd, priorBidders, downSeason: isDownSeason(p.lastSeasonGP, fullGP), morale: p.morale, currentSalary: p.capHit });
+  const rawBase = buildDemand({ market, grp, age: p.age, anchor, comps: count, override: p.faDemandOverride, capGrowth: 1, round: rnd, priorBidders, downSeason: isDownSeason(p.lastSeasonGP, fullGP), morale: p.morale, currentSalary: p.capHit, realCapHit: p.realCapHit });
   // A player re-signing with his OWN club is NOT stale on the open market — no season
   // decay. The "nobody's biting" softening only applies to unsigned market UFAs.
   const isOwn = p.teamId === teamId;

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { isCommission, getTeamSession } from "@/lib/auth";
-import { cleanName } from "@/lib/playerName";
+import { displayName } from "@/lib/playerName";
 import { PageHeader, Card } from "@/components/ui";
 import CommishTradeActions from "@/components/CommishTradeActions";
 
@@ -25,8 +25,8 @@ async function summarize(tradeId: number) {
     prids.length ? prisma.prospect.findMany({ where: { id: { in: prids } }, select: { id: true, name: true } }) : [],
     pkids.length ? prisma.draftPick.findMany({ where: { id: { in: pkids } }, select: { id: true, year: true, round: true, ownerLogoId: true } }) : [],
   ]);
-  const pN = new Map(players.map((p) => [p.id, cleanName(p.name)]));
-  const prN = new Map(prospects.map((p) => [p.id, cleanName(p.name)]));
+  const pN = new Map(players.map((p) => [p.id, displayName(p.name)]));
+  const prN = new Map(prospects.map((p) => [p.id, displayName(p.name)]));
   // ownerLogoId = the pick's ORIGINAL team — a compact text list, so just append the
   // code rather than a logo (matching /trades and /trades/[id], which show the logo).
   const origTeams = picks.length
