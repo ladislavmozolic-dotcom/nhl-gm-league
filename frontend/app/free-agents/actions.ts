@@ -17,13 +17,14 @@ import { computeELC } from "@/lib/elc";
 /** Commissioner-tuned two-way thresholds, shaped for twoWayObjection's opts. */
 async function twoWayOpts(): Promise<{
   olderAge: number; gpLimit: number; maxYears: number; relaxRound: number;
-  weakOverall: number; weakRound: number; ahlMaxYears: number; fewGpMaxYears: number;
+  weakOverall: number; weakRound: number; ahlMaxYears: number; fewGpMaxYears: number; maxSalary: number;
   faMode: "full" | "simple";
 }> {
   const s = await loadSettings();
   return {
     olderAge: s.faTwoWayOlderAge, gpLimit: s.faTwoWayNhlGpLimit, maxYears: s.faTwoWayMaxYears, relaxRound: s.faTwoWayRelaxRound,
     weakOverall: s.faTwoWayWeakOverall, weakRound: s.faTwoWayWeakRound, ahlMaxYears: s.faTwoWayAhlMaxYears, fewGpMaxYears: s.faTwoWayFewGpMaxYears,
+    maxSalary: s.faTwoWayMaxSalary,
     faMode: s.faMode,
   };
 }
@@ -565,9 +566,9 @@ export async function submitOfferAction(
     relaxOlder = cold;
     relaxWeak = cold && clock.frenzyRound >= tw.weakRound;
   }
-  const twoWayErr = twoWayObjection(twoWay, player, years, {
+  const twoWayErr = twoWayObjection(twoWay, player, years, salary, {
     relaxOlder, relaxWeak, olderAge: tw.olderAge, gpLimit: tw.gpLimit, weakOverall: tw.weakOverall,
-    maxYears: tw.maxYears, ahlMaxYears: tw.ahlMaxYears, fewGpMaxYears: tw.fewGpMaxYears,
+    maxYears: tw.maxYears, ahlMaxYears: tw.ahlMaxYears, fewGpMaxYears: tw.fewGpMaxYears, maxSalary: tw.maxSalary,
   });
   if (twoWayErr) return { ok: false as const, error: twoWayErr };
 
@@ -1229,9 +1230,9 @@ export async function extendContractAction(
   // no round-based relaxation here — re-signing your own player isn't a market-round
   // negotiation, so an established player (older or weak) still just refuses outright;
   // the AHL-only/few-games tiers still apply for a not-yet-established player.
-  const twoWayErr = twoWayObjection(twoWay, player, years, {
+  const twoWayErr = twoWayObjection(twoWay, player, years, salary, {
     olderAge: tw.olderAge, gpLimit: tw.gpLimit, weakOverall: tw.weakOverall,
-    maxYears: tw.maxYears, ahlMaxYears: tw.ahlMaxYears, fewGpMaxYears: tw.fewGpMaxYears,
+    maxYears: tw.maxYears, ahlMaxYears: tw.ahlMaxYears, fewGpMaxYears: tw.fewGpMaxYears, maxSalary: tw.maxSalary,
   });
   if (twoWayErr) return { ok: false as const, error: twoWayErr };
 

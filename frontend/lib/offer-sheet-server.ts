@@ -124,9 +124,10 @@ export async function submitOfferSheetAction(
   // two-way rules mirror the FA/extension flow (real NHL games, older players only —
   // an RFA target is by definition already an active NHL/AHL player, so the AHL-only/
   // few-games tiers still cover a young call-up type here too)
-  const twoWayErr = twoWayObjection(twoWay, player, yrs, {
+  const twoWayErr = twoWayObjection(twoWay, player, yrs, salary, {
     olderAge: settings.faTwoWayOlderAge, gpLimit: settings.faTwoWayNhlGpLimit, weakOverall: settings.faTwoWayWeakOverall,
     maxYears: settings.faTwoWayMaxYears, ahlMaxYears: settings.faTwoWayAhlMaxYears, fewGpMaxYears: settings.faTwoWayFewGpMaxYears,
+    maxSalary: settings.faTwoWayMaxSalary,
   });
   if (twoWayErr) return { ok: false, error: twoWayErr };
 

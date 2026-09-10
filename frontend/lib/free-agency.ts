@@ -184,6 +184,11 @@ export function clauseDiscount(clause?: string | null, breadth?: number | null):
 
 /** Why a player would turn down a two-way offer (null = he'll take it).
  *
+ *  A hard money ceiling comes FIRST and overrides every other rule below: at or
+ *  above `maxSalary` (default $1.3M) he insists on a one-way deal no matter his
+ *  age, games played, or how many relaxation rounds have passed — nobody takes
+ *  real two-way money and risks the AHL half of it.
+ *
  *  The established-NHLer barrier is real NHL games played, NOT rating: anyone who
  *  logged more than `gpLimit` (30) games last season is proven and refuses a
  *  two-way outright — UNLESS the market's gone cold for him and one of two
@@ -208,13 +213,19 @@ export function twoWayObjection(
   twoWay: boolean,
   p: { overall?: number | null; lastSeasonGP?: number | null; age?: number | null },
   years: number,
+  salary?: number | null,
   opts?: {
     relaxOlder?: boolean; relaxWeak?: boolean;
     olderAge?: number; gpLimit?: number; ovrFallback?: number; weakOverall?: number;
     maxYears?: number; ahlMaxYears?: number; fewGpMaxYears?: number;
+    maxSalary?: number;
   },
 ): string | null {
   if (!twoWay) return null;
+  const maxSalary = opts?.maxSalary;
+  if (maxSalary != null && (salary ?? 0) >= maxSalary) {
+    return `At $${(maxSalary / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 1 })}M+ he won't take a two-way at any age or experience level — offer a one-way deal.`;
+  }
   const olderAge = opts?.olderAge ?? 25;
   const gpLimit = opts?.gpLimit ?? 30;
   const ovrFallback = opts?.ovrFallback ?? 72;
