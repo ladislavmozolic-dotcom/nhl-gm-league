@@ -7,7 +7,7 @@ import NewsTicker from "@/components/NewsTicker";
 export default async function ScoreTracker() {
   // Ak liga ešte nezačala (pre-season fáza), nezobrazuj výsledky, len NewsTicker
   const league = await prisma.leagueConfig.findUnique({ where: { id: 1 } });
-  const isPreOrBefore = !league || league.leagueDate < new Date("2026-09-14T00:00:00Z");
+  const isPreOrBefore = !league || !league.leagueDate || league.leagueDate < new Date("2026-09-14T00:00:00Z");
 
   if (isPreOrBefore) return <NewsTicker />;
 
