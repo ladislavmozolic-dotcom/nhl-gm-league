@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getTeamSession, isAdmin } from "@/lib/auth";
 import { analyzeRoster, type RosterFinding } from "@/lib/gm-assistant/analyzeRoster";
 import { cleanName } from "@/lib/playerName";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -65,13 +65,16 @@ export default async function GmAssistantPage() {
                     <p className="text-xs text-slate-400 mb-2">
                       Priemer <span className="text-slate-200 font-semibold">{f.teamValue}</span> overall — {f.leagueRank}. miesto z {f.leagueSize} klubov
                     </p>
-                    <div className="flex flex-wrap gap-x-3 gap-y-1">
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 mb-2">
                       {f.players.map((p) => (
                         <Link key={p.id} href={`/players/${p.slug}`} className="text-xs text-slate-300 hover:text-blue-400">
                           {cleanName(p.name)} <span className="text-slate-500">({p.overall ?? "?"})</span>
                         </Link>
                       ))}
                     </div>
+                    <Link href={`/tools/assistant/find-trade-partner?slot=${f.id}`} className="text-xs text-blue-400 hover:text-blue-300 font-semibold">
+                      Nájsť trade partnera →
+                    </Link>
                   </div>
                 );
               })}
@@ -84,9 +87,8 @@ export default async function GmAssistantPage() {
         <Card title="Find Player" accent="text-blue-400" href="/tools/assistant/find-player">
           <p className="text-sm text-slate-400">Filtruj hráčov podľa pozície, ratingu, cap hitu, veku a statusu — presné, zoraditeľné výsledky, žiadny model.</p>
         </Card>
-        <Card title="Find Trade Partner" accent="text-slate-500">
-          <SectionTitle accent="text-slate-600">Čoskoro</SectionTitle>
-          <p className="text-sm text-slate-500">Kluby s prebytkom presne tam, kde tebe chýba — na základe zistení vyššie.</p>
+        <Card title="Find Trade Partner" accent="text-blue-400" href="/tools/assistant/find-trade-partner">
+          <p className="text-sm text-slate-400">Zvoľ slot v zostave a uvidíš, ktoré kluby sú tam silnejšie než ty — presne z tých istých čísel ako vyššie.</p>
         </Card>
       </div>
     </div>
