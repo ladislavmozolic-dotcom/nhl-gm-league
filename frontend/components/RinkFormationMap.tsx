@@ -11,8 +11,12 @@ type SlotPlayer = { id: number; name: string; isD: boolean } | null;
  *  seat), not a compacted list of just the filled ones. Purely illustrative:
  *  it mirrors what the picker table shows, it doesn't feed the sim engine —
  *  that reads the team/unit's chosen STYLE directly, not this per-seat map.
- *  `accent` tints the pucks/ring so PP1/PP2/PK1/PK2 read apart at a glance. */
-export default function RinkFormationMap({ roles, players, accent = "#2563eb" }: { roles: FormationRole[]; players: SlotPlayer[]; accent?: string }) {
+ *  `accent` tints the pucks/ring so PP1/PP2/PK1/PK2 read apart at a glance.
+ *  `goalAtTop` flips which edge is the goal line: PP is drawn attacking
+ *  (goal at the top, blue line at the bottom) while PK defends its own net
+ *  (goal at the bottom, blue line at the top) — see the role.y comment
+ *  below for how this swaps the y-mapping. */
+export default function RinkFormationMap({ roles, players, accent = "#2563eb", goalAtTop = false }: { roles: FormationRole[]; players: SlotPlayer[]; accent?: string; goalAtTop?: boolean }) {
   const assigned = roles.map((role, i) => ({ role, player: players[i] ?? null }));
   const gid = `puckGrad-${accent.replace("#", "")}`;
   const iid = `iceGrad-${accent.replace("#", "")}`;
@@ -36,20 +40,35 @@ export default function RinkFormationMap({ roles, players, accent = "#2563eb" }:
         <circle cx="76" cy="54" r="11" fill="none" stroke="#26374f" strokeWidth="0.8" />
         <circle cx="24" cy="54" r="1" fill="#26374f" />
         <circle cx="76" cy="54" r="1" fill="#26374f" />
-        {/* goal crease */}
-        <path d="M 42 92 L 42 98 L 58 98 L 58 92 Q 50 78 42 92 Z" fill="#1a2c47" stroke="#3b5578" strokeWidth="0.6" />
-        {/* blue line */}
-        <line x1="4" y1="8" x2="96" y2="8" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" />
-        <line x1="4" y1="7.1" x2="96" y2="7.1" stroke="#3b82f6" strokeWidth="0.6" strokeOpacity="0.4" />
-        {/* goal line */}
-        <line x1="4" y1="92" x2="96" y2="92" stroke="#dc2626" strokeWidth="1" strokeOpacity="0.85" />
-        {/* role.y: 0 = goal line, 100 = blue line — the goal sits at the BOTTOM
-            of this drawing (svg y=92), so role.y maps to svg y INVERTED
-            (svgY = 100 - role.y): a low role.y (net-front) lands near the
-            bottom by the crease, a high role.y (point) stays near the top
-            by the blue line. */}
+        {goalAtTop ? (
+          <>
+            {/* goal crease */}
+            <path d="M 42 8 L 42 2 L 58 2 L 58 8 Q 50 22 42 8 Z" fill="#1a2c47" stroke="#3b5578" strokeWidth="0.6" />
+            {/* blue line */}
+            <line x1="4" y1="92" x2="96" y2="92" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" />
+            <line x1="4" y1="92.9" x2="96" y2="92.9" stroke="#3b82f6" strokeWidth="0.6" strokeOpacity="0.4" />
+            {/* goal line */}
+            <line x1="4" y1="8" x2="96" y2="8" stroke="#dc2626" strokeWidth="1" strokeOpacity="0.85" />
+          </>
+        ) : (
+          <>
+            {/* goal crease */}
+            <path d="M 42 92 L 42 98 L 58 98 L 58 92 Q 50 78 42 92 Z" fill="#1a2c47" stroke="#3b5578" strokeWidth="0.6" />
+            {/* blue line */}
+            <line x1="4" y1="8" x2="96" y2="8" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" />
+            <line x1="4" y1="7.1" x2="96" y2="7.1" stroke="#3b82f6" strokeWidth="0.6" strokeOpacity="0.4" />
+            {/* goal line */}
+            <line x1="4" y1="92" x2="96" y2="92" stroke="#dc2626" strokeWidth="1" strokeOpacity="0.85" />
+          </>
+        )}
+        {/* role.y: 0 = goal line, 100 = blue line. PP attacks (goalAtTop),
+            so the goal sits at svg y=8 and role.y maps DIRECTLY to svg y — a
+            low role.y (net-front) stays near the top. PK defends its own
+            net (goal at svg y=92), so role.y maps INVERTED (svgY = 100 -
+            role.y) — a low role.y (net-front) lands near the bottom by the
+            crease, a high role.y (point) stays up near the blue line. */}
         {assigned.map(({ role, player }) => {
-          const svgY = 100 - role.y;
+          const svgY = goalAtTop ? role.y : 100 - role.y;
           return (
             <g key={role.key}>
               <text x={role.x} y={svgY - 9.5} textAnchor="middle" fontSize="3.4" fill="#7c8ba3" fontWeight="600" letterSpacing="0.2">

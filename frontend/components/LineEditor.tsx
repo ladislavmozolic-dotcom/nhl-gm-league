@@ -282,7 +282,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
           <SysSelect value={unit?.style} dial={dial} opts={DIAL_LABELS[dial]} onChange={(v) => setUnitStyle(unitKey, ui, v)} />
         </div>
         <div className="p-3">
-          <RinkFormationMap roles={layouts[effective] ?? layouts.balanced} players={slotPlayersFixed(unit?.players ?? [], dStartIndex)} accent={accent} />
+          <RinkFormationMap roles={layouts[effective] ?? layouts.balanced} players={slotPlayersFixed(unit?.players ?? [], dStartIndex)} accent={accent} goalAtTop={unitKey === "pp"} />
         </div>
       </div>
     );
