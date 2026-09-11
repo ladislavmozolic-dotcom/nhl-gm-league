@@ -36,6 +36,7 @@ export const DICT: Dict = {
   "ui.installApp": { en: "Install app", cs: "Nainstalovat appku", de: "App installieren", ru: "Установить приложение" },
   "ui.installHintIOS": {
   "admin.retention.d": { en: "Configure salary retention limits and trade rules.", cs: "Nastavení limitů retence platu a pravidel výměn." },
+  "admin.grpFinance": { en: "Finance & Trade Rules", cs: "Finance a pravidla výměn", de: "Finanzen & Transferregeln", ru: "Финансы и правила обменов" },
     en: 'Tap the Share button (square with an arrow) at the bottom of Safari, then "Add to Home Screen".',
     cs: 'Klepněte na tlačítko Sdílet (čtverec se šipkou) dole v Safari a pak na "Přidat na plochu".',
     de: 'Tippen Sie unten in Safari auf „Teilen" (Quadrat mit Pfeil) und dann auf „Zum Home-Bildschirm".',
