@@ -5,8 +5,12 @@ import NewsTicker from "@/components/NewsTicker";
 // Global score tracker shown at the top of every page — results only.
 // (Goal scorers / assists live on the game-detail scoreboard.)
 export default async function ScoreTracker() {
-  // NHL results only — the AHL has its own scores pages; this league-wide ticker
-  // shows the top league (and AHL clubs share NHL logos, so they don't belong here).
+  // Ak liga ešte nezačala (pre-season fáza), nezobrazuj výsledky, len NewsTicker
+  const league = await prisma.leagueConfig.findUnique({ where: { id: 1 } });
+  const isPreOrBefore = !league || league.leagueDate < new Date("2026-09-14T00:00:00Z");
+
+  if (isPreOrBefore) return <NewsTicker />;
+
   const lastDay = await prisma.game.findFirst({
     where: { status: "FINAL", seriesId: null, league: "NHL", gameDate: { not: null } },
     orderBy: { gameDate: "desc" },
