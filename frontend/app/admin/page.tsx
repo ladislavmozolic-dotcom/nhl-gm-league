@@ -41,6 +41,7 @@ const GROUPS: Group[] = [
       { href: "/admin/finance", title: "Team Popularity", descKey: "admin.finance.d" },
       { href: "/draft/lottery", title: "Draft Lottery", descKey: "admin.lottery.d" },
       { href: "/admin/real-drafts", title: "Real Draft Import", descKey: "admin.realDrafts.d" },
+      { href: "/admin/salary-retention", title: "Salary Retention Rules", descKey: "admin.retention.d" },
     ],
   },
   {
@@ -53,7 +54,6 @@ const GROUPS: Group[] = [
     ],
   },
 ];
-      { href: "/admin/salary-retention", title: "Salary Retention Rules", descKey: "admin.retention.d" },
 
 export default async function AdminPage() {
   const lang = await getLang();
