@@ -39,20 +39,6 @@ export default async function GmAssistantPage() {
               {analysis.teamName} — priemerný <span className="text-slate-300 font-semibold">overall</span> hráčov na danom slote formácie/páru,
               porovnaný voči rovnakému slotu vo všetkých 32 NHL kluboch.
             </p>
-            {analysis.myTeamIsAuto && (
-              <p className="text-xs text-amber-400/90 bg-amber-950/20 border border-amber-900/40 rounded-lg px-3 py-2">
-                ⚠️ Nemáš uložené vlastné formácie/páry — čísla nižšie sú z automaticky poskladanej zostavy (najlepší dostupný hráč na danú pozíciu podľa overall), nie z tvojho skutočného plánu.
-              </p>
-            )}
-            {analysis.autoTeams.length > 0 && (() => {
-              const others = analysis.autoTeams.filter((n) => n !== analysis.teamName);
-              if (!others.length) return null;
-              return (
-                <p className="text-xs text-slate-500 bg-slate-900/40 border border-slate-800 rounded-lg px-3 py-2">
-                  ℹ️ {others.length} {others.length === 1 ? "klub" : others.length <= 4 ? "kluby" : "klubov"} nemá uložené vlastné formácie/páry — pre porovnanie použili automaticky poskladanú zostavu, nie svoj skutočný plán: {others.join(", ")}.
-                </p>
-              );
-            })()}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {analysis.findings.map((f) => {
                 const s = severityStyle[f.severity];
@@ -64,6 +50,7 @@ export default async function GmAssistantPage() {
                     </div>
                     <p className="text-xs text-slate-400 mb-2">
                       Priemer <span className="text-slate-200 font-semibold">{f.teamValue}</span> overall — {f.leagueRank}. miesto z {f.leagueSize} klubov
+                      {f.auto && <span className="text-amber-400/90"> · auto-zostava (nemáš to uložené)</span>}
                     </p>
                     <div className="flex flex-wrap gap-x-3 gap-y-1 mb-2">
                       {f.players.map((p) => (

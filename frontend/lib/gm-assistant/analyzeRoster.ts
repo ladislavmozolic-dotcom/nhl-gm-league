@@ -1,10 +1,11 @@
 import { loadLeagueSlots, rankSlot, SLOTS, type SlotPlayer } from "./leagueSlots";
 
 // "Analyze my roster" — the first GM Assistant function. No LLM, no black-box
-// judgment: every finding below is a plain average of Player.overall (the same
-// number every roster page already shows) for the players occupying a given
-// line/pair slot, ranked against the same slot across all 32 NHL clubs. See
-// leagueSlots.ts for how a club with no Team Lines of its own is filled in.
+// judgment: every finding below is a plain average of overall (Player.overall
+// for skaters, GoalieRating.overall for goalies — the same numbers every
+// roster page already shows) for the players occupying a given slot, ranked
+// against the same slot across all 32 NHL clubs. See leagueSlots.ts for how a
+// slot a club hasn't set itself gets filled in.
 
 export interface RosterFinding {
   id: string;
@@ -14,18 +15,16 @@ export interface RosterFinding {
   leagueSize: number;
   severity: "ok" | "warning" | "critical";
   players: SlotPlayer[];
+  // true when THIS slot's numbers came from the autoLines() fallback because
+  // the club hasn't set it — a real forward-lines club can still be auto on,
+  // say, PP1 if that tab was never touched.
+  auto: boolean;
 }
 
 export interface RosterAnalysis {
   teamId: number;
   teamName: string;
   findings: RosterFinding[]; // worst (highest rank number) first
-  // Clubs with no Team Lines of their own — their numbers above come from an
-  // auto-generated best-available lineup (best player per eligible slot by
-  // overall), not a GM's real deployment. Always non-empty-checked before
-  // trusting a finding as "this club's real plan".
-  autoTeams: string[];
-  myTeamIsAuto: boolean;
 }
 
 export async function analyzeRoster(teamId: number): Promise<RosterAnalysis | null> {
@@ -53,12 +52,11 @@ export async function analyzeRoster(teamId: number): Promise<RosterAnalysis | nu
       leagueSize,
       severity,
       players: rows[myIdx].players,
+      auto: rows[myIdx].isAuto,
     });
   }
 
   findings.sort((a, b) => b.leagueRank - a.leagueRank);
 
-  const autoTeams = data.teams.filter((t) => data.autoTeamIds.has(t.id)).map((t) => t.name);
-
-  return { teamId, teamName: myTeam.name, findings, autoTeams, myTeamIsAuto: data.autoTeamIds.has(teamId) };
+  return { teamId, teamName: myTeam.name, findings };
 }
