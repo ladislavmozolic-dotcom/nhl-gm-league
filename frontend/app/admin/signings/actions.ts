@@ -28,6 +28,15 @@ export async function revertSigningAction(logId: number) {
     await prisma.faOffer.deleteMany({ where: { playerId: log.playerId, status: "ACCEPTED" } }).catch(() => {});
   }
   await prisma.signingLog.update({ where: { id: logId }, data: { reverted: true } });
+  await prisma.transaction.create({
+    data: {
+      type: "SIGNING",
+      message: log.kind === "EXTEND"
+        ? `Commissioner reverted ${log.teamCode ?? "a club"}'s extension of ${log.playerName}.`
+        : `Commissioner reverted ${log.teamCode ?? "a club"}'s signing of ${log.playerName} — returned to the ${log.prevRosterType === "RFA" ? "RFA" : "UFA"} market.`,
+      playerId: log.playerId,
+    },
+  }).catch(() => {});
   for (const p of ["/admin/signings", "/salary-cap", "/finance", "/free-agents", "/signings"]) revalidatePath(p);
   return { ok: true as const };
 }

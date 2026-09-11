@@ -694,7 +694,20 @@ export async function submitOfferAction(
 
 export async function withdrawOfferAction(playerId: number, teamId: number) {
   if (!(await canManageTeam(teamId))) return { ok: false as const, error: "You don't manage this team." };
-  await prisma.faOffer.deleteMany({ where: { playerId, teamId } });
+  const removed = await prisma.faOffer.deleteMany({ where: { playerId, teamId } });
+  if (removed.count > 0) {
+    // logged (not deleted-without-trace) so the commissioner can later see a bid
+    // vanished because the club pulled it, not from a bug — FA_NEGOTIATION is
+    // filtered out of the public Transactions feed (TX_NOISE) but is queryable
+    // by playerId, e.g. on the admin bidding-trail page.
+    const [player, team] = await Promise.all([
+      prisma.player.findUnique({ where: { id: playerId }, select: { name: true } }),
+      prisma.team.findUnique({ where: { id: teamId }, select: { code: true } }),
+    ]);
+    await prisma.transaction.create({
+      data: { type: "FA_NEGOTIATION", message: `${team?.code ?? "A club"} withdrew their offer on ${player?.name ?? "a free agent"}.`, playerId, teamId },
+    }).catch(() => {});
+  }
   revalidatePath("/free-agents");
   return { ok: true as const };
 }

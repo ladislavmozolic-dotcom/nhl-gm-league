@@ -19,9 +19,12 @@ export default async function AdminBidsPage({ params }: { params: Promise<{ play
   const player = Number.isFinite(pid) ? await prisma.player.findUnique({ where: { id: pid }, select: { id: true, name: true, slug: true, rosterType: true, capHit: true, contractYears: true, team: { select: { code: true, name: true } } } }) : null;
   if (!player) notFound();
 
-  const [bids, offers] = await Promise.all([
+  const [bids, offers, events] = await Promise.all([
     prisma.faBid.findMany({ where: { playerId: pid }, orderBy: { id: "asc" } }),
     prisma.faOffer.findMany({ where: { playerId: pid } }),
+    // withdrawals, negotiation updates, revert notices — the stuff a bid/offer
+    // row alone can't explain (e.g. "why did this club's offer just vanish?").
+    prisma.transaction.findMany({ where: { playerId: pid }, orderBy: { id: "asc" } }),
   ]);
   const teamIds = [...new Set([...bids.map((b) => b.teamId), ...offers.map((o) => o.teamId)])];
   const teams = await prisma.team.findMany({ where: { id: { in: teamIds } }, select: { id: true, code: true } });
@@ -78,6 +81,20 @@ export default async function AdminBidsPage({ params }: { params: Promise<{ play
           </div>
         )}
       </Card>
+
+      {events.length > 0 && (
+        <Card bodyClassName="p-0">
+          <div className="px-4 py-2.5 border-b border-slate-800 text-xs uppercase tracking-wider text-slate-500 font-medium">Events</div>
+          <div className="divide-y divide-slate-800/40">
+            {events.map((e) => (
+              <div key={e.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                <span className="text-slate-300">{e.message}</span>
+                <span className="text-xs text-slate-500 tabular-nums whitespace-nowrap">{fmtDate(e.createdAt)}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
     </div>
   );
 }
