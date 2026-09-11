@@ -63,13 +63,15 @@ export default async function AdminPage() {
       <PageHeader title="Admin Panel" subtitle={T("admin.subtitle")} />
       {GROUPS.map((g) => (
         <section key={g.titleKey} className="space-y-3">
-          <h2 className="text-[11px] font-bold uppercase tracking-widest text-slate-500">{T(g.titleKey)}</h2>
+          <h2 className="text-[11px] font-bold uppercase tracking-widest text-slate-500">
+            {T(g.titleKey) || g.titleKey.replace("admin.", "")}
+          </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {g.items.map((c) => (
               <Link key={c.href} href={c.href}
                 className="group block bg-slate-900/70 border border-slate-800 rounded-xl p-4 hover:border-blue-500/60 hover:bg-slate-900 transition-colors">
                 <div className="font-semibold text-sm mb-1 group-hover:text-white">{c.title}</div>
-                <div className="text-[12px] text-slate-400 leading-snug">{T(c.descKey)}</div>
+                <div className="text-[12px] text-slate-400 leading-snug">{T(c.descKey) || c.descKey}</div>
               </Link>
             ))}
           </div>
