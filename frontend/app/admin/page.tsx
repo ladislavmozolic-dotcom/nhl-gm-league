@@ -53,6 +53,7 @@ const GROUPS: Group[] = [
     ],
   },
 ];
+      { href: "/admin/salary-retention", title: "Salary Retention Rules", descKey: "admin.retention.d" },
 
 export default async function AdminPage() {
   const lang = await getLang();
