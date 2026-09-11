@@ -51,6 +51,15 @@ export function slotById(id: string): SlotDef | undefined {
   return SLOTS.find((s) => s.id === id);
 }
 
+/** Maps a slot to the Find Player position filter that fills it — "ALL" for
+ *  PP1/PK1, which draw from multiple positions and have no single fit. */
+export function slotPositionFilter(slot: SlotDef): "C" | "LW" | "RW" | "D" | "G" | "ALL" {
+  if (slot.kind === "goalie") return "G";
+  if (slot.kind === "forward") return slot.side!.toUpperCase() as "LW" | "C" | "RW";
+  if (slot.kind === "defense") return "D";
+  return "ALL";
+}
+
 export interface SlotPlayer {
   id: number;
   name: string;

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTeamSession, isAdmin } from "@/lib/auth";
 import { analyzeRoster, type RosterFinding } from "@/lib/gm-assistant/analyzeRoster";
+import { slotById, slotPositionFilter } from "@/lib/gm-assistant/leagueSlots";
 import { cleanName } from "@/lib/playerName";
 import { PageHeader, Card } from "@/components/ui";
 
@@ -42,6 +43,8 @@ export default async function GmAssistantPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {analysis.findings.map((f) => {
                 const s = severityStyle[f.severity];
+                const slot = slotById(f.id);
+                const posFilter = slot ? slotPositionFilter(slot) : "ALL";
                 return (
                   <div key={f.id} className={`border rounded-xl p-3.5 ${s.bg}`}>
                     <div className="flex items-center justify-between mb-1.5">
@@ -59,9 +62,16 @@ export default async function GmAssistantPage() {
                         </Link>
                       ))}
                     </div>
-                    <Link href={`/tools/assistant/find-trade-partner?slot=${f.id}`} className="text-xs text-blue-400 hover:text-blue-300 font-semibold">
-                      Nájsť trade partnera →
-                    </Link>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                      <Link href={`/tools/assistant/find-trade-partner?slot=${f.id}`} className="text-xs text-blue-400 hover:text-blue-300 font-semibold">
+                        Nájsť trade partnera →
+                      </Link>
+                      {posFilter !== "ALL" && (
+                        <Link href={`/tools/assistant/find-player?pos=${posFilter}&rosterType=UFA`} className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold">
+                          Nájsť voľného agenta →
+                        </Link>
+                      )}
+                    </div>
                   </div>
                 );
               })}
