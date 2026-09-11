@@ -14,15 +14,15 @@ export default function JerseyChip({ teamSlug, number, lastName, size = 84 }: {
 }) {
   const blank = BLANK_TEAMS.has(teamSlug);
   return (
-    <div style={{ position: "relative", width: size, flex: "none" }}>
-      <img src={`/jerseys/${teamSlug}.png`} alt="" style={{ display: "block", width: "100%", height: "auto", borderRadius: 4 }} />
+    <div style={{ position: "relative", width: size, height: size, flex: "none" }}>
+      <img src={`/jerseys/${teamSlug}.png`} alt="" style={{ display: "block", width: "100%", height: "100%", objectFit: "contain", borderRadius: 4 }} />
       {blank && number != null && (
-        <span style={{ position: "absolute", left: "49.8%", top: "48.1%", transform: "translate(-50%, -50%)", fontSize: 19, fontWeight: 800, color: "#fff", letterSpacing: -0.5, textShadow: "0 1px 2px rgba(0,0,0,0.5)", pointerEvents: "none" }}>
+        <span style={{ position: "absolute", left: "49.8%", top: "48.1%", transform: "translate(-50%, -50%)", fontSize: Math.round(19 * (size / 84)), fontWeight: 800, color: "#fff", letterSpacing: -0.5, textShadow: "0 1px 2px rgba(0,0,0,0.5)", pointerEvents: "none" }}>
           {number}
         </span>
       )}
       {blank && lastName && (
-        <span style={{ position: "absolute", left: "49.8%", top: "19.3%", transform: "translate(-50%, -50%)", fontSize: nameSize(lastName), fontWeight: 800, color: "#fff", letterSpacing: 0.3, textShadow: "0 1px 1px rgba(0,0,0,0.5)", pointerEvents: "none", whiteSpace: "nowrap" }}>
+        <span style={{ position: "absolute", left: "49.8%", top: "19.3%", transform: "translate(-50%, -50%)", fontSize: Math.round(nameSize(lastName) * (size / 84)), fontWeight: 800, color: "#fff", letterSpacing: 0.3, textShadow: "0 1px 1px rgba(0,0,0,0.5)", pointerEvents: "none", whiteSpace: "nowrap" }}>
           {lastName.toUpperCase()}
         </span>
       )}
