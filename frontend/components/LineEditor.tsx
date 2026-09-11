@@ -10,12 +10,14 @@ import { DIAL_LABELS, mergeTactics, type PuckStyle, type DZone, type PpStyle, ty
 import { PP_LAYOUTS, PK_LAYOUTS, PK3_LAYOUTS, type FormationRole } from "@/lib/sim/formation-layout";
 import { displayName } from "@/lib/playerName";
 import RinkFormationMap from "@/components/RinkFormationMap";
+import JerseyChip from "@/components/JerseyChip";
 import { useLang } from "@/components/LangProvider";
 import { dialLabel, dialDesc } from "@/lib/tactics-i18n";
 import type { GameStrategy, StratWeights } from "@/lib/sim/types";
 
 type Player = {
   id: number; name: string; position: string; overall: number; injured?: boolean; df?: number | null; con?: number; cap?: "C" | "A" | null;
+  number?: number | null;
   pa?: number | null; sk?: number | null; sc?: number | null; ck?: number | null; fo?: number | null; st?: number | null;
 };
 type SuggestResult = { ok: false; error: string } | { ok: true; lines: TeamLinesData; system: string; rationale: string[] };
@@ -318,12 +320,20 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
     </div>
   );
   // a player slot: small label above a full-width select
-  const Slot = ({ label, value, onChange, pool }: { label: string; value: number | null; onChange: (v: number | null) => void; pool: Player[] }) => (
-    <div>
-      <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">{label}</div>
-      <Select value={value} onChange={onChange} pool={pool} />
-    </div>
-  );
+  const Slot = ({ label, value, onChange, pool }: { label: string; value: number | null; onChange: (v: number | null) => void; pool: Player[] }) => {
+    const p = value != null ? byId.get(value) : null;
+    return (
+      <div>
+        <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">{label}</div>
+        {p && (
+          <div className="mb-1.5 flex justify-center">
+            <JerseyChip teamSlug={teamSlug} number={p.number} lastName={p.name.trim().split(/\s+/).pop()} size={72} />
+          </div>
+        )}
+        <Select value={value} onChange={onChange} pool={pool} />
+      </div>
+    );
+  };
 
   const LineTotalBar = (rows: { timePct: number }[]) => {
     const tot = timeSum(rows);
