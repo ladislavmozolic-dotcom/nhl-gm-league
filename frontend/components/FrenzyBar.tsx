@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { resolveFrenzyAction, processRoundEndAction } from "@/app/free-agents/actions";
 import { frenzyRoundCloseUtcMs } from "@/lib/sim-clock";
@@ -64,6 +65,12 @@ export default function FrenzyBar({ frenzyOpen, frenzyDay, frenzyRound, phaseLab
                 : "Open market: an offer opens a 7-day window — the UFA weighs every club's bid, then counters, and signs a few days later.")
               : "Signings open July 1 (advance the League Calendar)."}
         </span>
+        {isAdmin && (
+          <Link href="/signings" className={`text-sm font-semibold text-slate-400 hover:text-blue-400 ${frenzyOpen ? "" : "ml-auto"}`}
+            title="Who signed each round, every competing bid, and why the winner beat the rest (admin-only)">
+            Signed →
+          </Link>
+        )}
         {isAdmin && frenzyOpen && (
           <div className="ml-auto flex items-center gap-2">
             {frenzyRound < 3 && (
