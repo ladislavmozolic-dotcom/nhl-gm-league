@@ -10,7 +10,7 @@ export type TypeInput = {
   position?: string | null;
   isGoalie?: boolean;
   sc?: number | null; pa?: number | null; df?: number | null;
-  ck?: number | null; st?: number | null; sk?: number | null;
+  ck?: number | null; st?: number | null; sk?: number | null; ph?: number | null;
   ag?: number | null; rb?: number | null; sz?: number | null; // goalie
 };
 
@@ -58,42 +58,63 @@ export function playerType(p: TypeInput): string | null {
   // NB: DF is high across all decent players in this rating set, so type is driven
   // by OFFENSE level (SC/PA) and PHYSICALITY (CK/ST), not offense-vs-defense.
   const S = n(sc), P = n(pa), D = n(df), C = n(ck), T = n(st);
+  const SK = n(p.sk), PH = n(p.ph);
+  const paSc = P + S;
   const off = Math.max(S, P);
   // physicality is a CHECKING trait (CK), not raw strength — a strong but skilled
   // winger (high ST) shouldn't read as a grinder, so ST only lightly contributes.
   const phys = C * 0.75 + T * 0.25;
 
   if (isDefPos(p.position ?? "")) {
-    // "decent at both ends": offense meaningfully above the D-position average
-    // (D_OFF_TWO_WAY) AND defense clearly above the DF average — not just "not
-    // weak enough to be Offensive", so a genuine two-way blueliner (e.g. Ekholm:
-    // PA 60, DF 79) reads as Two-Way instead of falling into Stay-at-Home purely
-    // because his offense sits below the 68 Offensive-D cutoff. A pure shutdown
-    // D (e.g. PA low-50s, still DF-strong) stays below D_OFF_TWO_WAY and keeps
-    // reading as Stay-at-Home/Defensive, same as before.
+    // RAW THRESHOLD RULES first (unhl-player-types-roles-formulas-v6.xlsx's "Role
+    // Rules" sheet, "Raw thresholds" tier — exact fixed cutoffs on PA+SC/DF/SK).
+    if (paSc >= 105 && D < 78) return "Offensive D";
+    if (paSc >= 105 && D >= 78) return "Two-Way D";
+    if (SK >= 40 && P >= 53 && paSc < 105 && D >= 78) return "Defensive D";
+    if (P < 53 && paSc < 105 && D >= 78) return "Stay-at-Home D";
+
+    // Percentile-fallback tier (approximated via league-average-relative
+    // comparison, since true percentile ranks need a league-wide DB query this
+    // per-player function doesn't have access to): "decent at both ends" means
+    // offense meaningfully above the D-position average (D_OFF_TWO_WAY) AND
+    // defense clearly above the DF average — not just "not weak enough to be
+    // Offensive", so a genuine two-way blueliner (e.g. Ekholm: PA 60, DF 79)
+    // reads as Two-Way instead of falling into Stay-at-Home purely because his
+    // offense sits below the 68 Offensive-D cutoff. A pure shutdown D (e.g. PA
+    // low-50s, still DF-strong) stays below D_OFF_TWO_WAY and keeps reading as
+    // Stay-at-Home/Defensive, same as before.
     const defGood = D >= OVERRIDE.D.df.y;
-    if (off >= 68) return "Offensive Defenseman";
-    if (off >= D_OFF_TWO_WAY && defGood) return "Two-Way Defenseman";
-    if (off <= 60) return phys >= 74 ? "Stay-at-Home D" : "Defensive Defenseman";
-    return "Two-Way Defenseman";
+    if (off >= 68) return "Offensive D";
+    if (off >= D_OFF_TWO_WAY && defGood) return "Two-Way D";
+    if (off <= 60) return phys >= 74 ? "Stay-at-Home D" : "Defensive D";
+    return "Two-Way D";
   }
 
-  // forward — compare each attribute against ITS OWN league-average for forwards
-  // (AVG.F) before combining/comparing, not the raw values: CK averages ~66 and
-  // DF ~63 here while SC/PA average only ~49, so comparing raw values (as this
-  // used to) let CK/DF dominate regardless of whether a player was actually
-  // above his OWN attribute's average — a pure scorer with merely AVERAGE
-  // defense (DF == avg) used to still read as "defense keeps pace with
-  // offense" just because DF's raw average already sits above SC/PA's.
-  const avgF = AVG.F;
-  const offRel = Math.max(S - avgF.sc, P - avgF.pa);
-  const physRel = (C - avgF.ck) * 0.75 + (T - avgF.st) * 0.25;
-  const dRel = D - avgF.df;
+  // forward — RAW THRESHOLD RULES first, exactly as the Role Rules sheet specifies
+  // (checked in the sheet's own row order; each combination of PA/SC/PA+SC/DF
+  // below matches at most one rule, so order only matters where a player fails
+  // Dual-Threat's SK/PH bar despite clearing its PA/SC bar).
+  if (SK >= 62 && PH >= 65 && P >= 60 && S >= 60 && paSc >= 125) return "Dual-Threat";
+  if (P < 60 && S >= 66) return "Sniper";
+  if (P >= 66 && S < 60) return "Playmaker";
+  if (P < 66 && S < 66 && paSc >= 110 && paSc < 125) return D >= 69 ? "Two-Way Forward" : "Offensive Forward";
+  if (P < 66 && S < 66 && paSc < 110 && D >= 69) return "Defensive Forward";
+  if (C >= 75 && paSc < 110 && D < 69) return "Forechecker / Grinder";
 
-  if (offRel >= 13 && physRel >= 4) return "Power Forward";  // real offense + big body
-  if (physRel >= -1 && offRel < 13) return "Grinder";        // physical, limited offense
-  if (S - P >= 4) return "Sniper";
-  if (P - S >= 4) return "Playmaker";
-  if (dRel >= offRel - 2) return "Two-Way Forward";          // defense keeps pace with offense
-  return "Dual-Threat";
+  // Percentile-fallback tier (approximated via league-average-relative deltas,
+  // since true percentile ranks need a league-wide DB query this per-player
+  // function doesn't have access to — see the sheet's own note: "Two-Way
+  // special condition first; then specialist defensive/grinder rule; then
+  // offense-vs-defense comparison"). Compare each attribute against ITS OWN
+  // league-average for forwards (AVG.F), not the raw values: CK averages ~66
+  // and DF ~63 here while SC/PA average only ~49, so comparing raw values let
+  // CK/DF dominate regardless of whether a player was actually above his OWN
+  // attribute's average.
+  const avgF = AVG.F;
+  const sRel = S - avgF.sc, pRel = P - avgF.pa, cRel = C - avgF.ck, dRel = D - avgF.df;
+  const offSumRel = sRel + pRel; // proxy for (PA+SC) percentile
+
+  if (offSumRel > 2 * cRel && Math.abs(2 * dRel - offSumRel) <= 8) return "Two-Way Forward";
+  if (2 * cRel > offSumRel && cRel > dRel) return "Forechecker / Grinder";
+  return offSumRel > cRel + dRel ? "Offensive Forward" : "Defensive Forward";
 }
