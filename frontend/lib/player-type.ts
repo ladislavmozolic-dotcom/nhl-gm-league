@@ -95,5 +95,5 @@ export function playerType(p: TypeInput): string | null {
   if (S - P >= 4) return "Sniper";
   if (P - S >= 4) return "Playmaker";
   if (dRel >= offRel - 2) return "Two-Way Forward";          // defense keeps pace with offense
-  return "Scorer";
+  return "Dual-Threat";
 }
