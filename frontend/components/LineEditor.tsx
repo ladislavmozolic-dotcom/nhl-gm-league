@@ -186,12 +186,18 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
   };
 
   // ---------- reusable inputs ----------
+  // colorScheme:"dark" + explicit option colors keep the native dropdown list
+  // readable regardless of the OS/browser theme — without them, an `overlay`
+  // select (opacity-0, so it has no visible bg/text of its own) lets the
+  // browser fall back to its native popup styling, which on a dark-mode OS
+  // can render white-on-white until an option is hovered/highlighted.
   const Select = ({ value, onChange, pool, overlay = false }: { value: number | null; onChange: (v: number | null) => void; pool: Player[]; overlay?: boolean }) => (
     <select value={value ?? ""} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
+      style={{ colorScheme: "dark" }}
       className={overlay ? "absolute inset-0 w-full h-full opacity-0 cursor-pointer" : "w-full min-w-[132px] bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-sm"}>
-      <option value="">— empty —</option>
-      {value != null && !pool.some((p) => p.id === value) && <option value={value}>{nameOf(value)}</option>}
-      {pool.map((p) => <option key={p.id} value={p.id} disabled={p.injured}>{p.name}{p.cap ? ` (${p.cap})` : ""} · {p.position} ({p.overall}){p.con != null ? ` · CON ${p.con}%${p.con < 90 ? " ⚠️" : ""}` : ""}{p.injured ? " 🤕 INJ" : ""}</option>)}
+      <option value="" style={{ backgroundColor: "#0f172a", color: "#e2e8f0" }}>— empty —</option>
+      {value != null && !pool.some((p) => p.id === value) && <option value={value} style={{ backgroundColor: "#0f172a", color: "#e2e8f0" }}>{nameOf(value)}</option>}
+      {pool.map((p) => <option key={p.id} value={p.id} disabled={p.injured} style={{ backgroundColor: "#0f172a", color: "#e2e8f0" }}>{p.name}{p.cap ? ` (${p.cap})` : ""} · {p.position} ({p.overall}){p.con != null ? ` · CON ${p.con}%${p.con < 90 ? " ⚠️" : ""}` : ""}{p.injured ? " 🤕 INJ" : ""}</option>)}
     </select>
   );
 
@@ -234,9 +240,10 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
   const SysSelect = ({ value, dial, opts, onChange }: { value: string | undefined; dial: "puckStyle" | "dZone" | "ppStyle" | "pkStyle"; opts: Record<string, string>; onChange: (v: string) => void }) => (
     <select value={value ?? ""} onChange={(e) => onChange(e.target.value)}
       title={value ? dialDesc(lang, dial, value) : inheritTxt}
+      style={{ colorScheme: "dark" }}
       className={`bg-slate-800 border rounded px-1.5 py-1 text-xs cursor-help ${value ? "border-sky-600 text-sky-300" : "border-slate-700 text-slate-400"}`}>
-      <option value="" title={inheritTxt}>{lang === "cs" ? "Tím" : "Team"}</option>
-      {Object.keys(opts).filter((k) => k !== "balanced").map((k) => <option key={k} value={k} title={dialDesc(lang, dial, k)}>{dialLabel(lang, dial, k)}</option>)}
+      <option value="" title={inheritTxt} style={{ backgroundColor: "#1e293b", color: "#e2e8f0" }}>{lang === "cs" ? "Tím" : "Team"}</option>
+      {Object.keys(opts).filter((k) => k !== "balanced").map((k) => <option key={k} value={k} title={dialDesc(lang, dial, k)} style={{ backgroundColor: "#1e293b", color: "#e2e8f0" }}>{dialLabel(lang, dial, k)}</option>)}
     </select>
   );
   // team-level special-teams formation (stored on data.system, persisted with lines)
