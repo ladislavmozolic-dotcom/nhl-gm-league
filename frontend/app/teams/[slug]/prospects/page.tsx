@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { cleanName, epSearchName, epProfileUrl } from "@/lib/playerName";
 import { Card, SectionTitle } from "@/components/ui";
+import SortableTable, { type SortCol, type SortRow } from "@/components/SortableTable";
 
 export const dynamic = "force-dynamic";
 
@@ -90,39 +91,32 @@ export default async function TeamProspectsPage({ params }: { params: Promise<{ 
         </>
       )}
 
-      {prospects.length > 0 && (<>
-      <SectionTitle count={prospects.length}>Draft Prospects</SectionTitle>
-      <Card bodyClassName="p-0">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-800 text-slate-500 text-xs uppercase tracking-wider bg-slate-800/30">
-                <th className="px-4 py-3 text-left font-medium">Prospect</th>
-                <th className="px-4 py-3 text-center font-medium">Pos</th>
-                <th className="px-4 py-3 text-center font-medium">Draft Year</th>
-                <th className="px-4 py-3 text-center font-medium">Round</th>
-                <th className="px-4 py-3 text-center font-medium">Overall Pick</th>
-              </tr>
-            </thead>
-            <tbody>
-              {prospects.map((p) => (
-                <tr key={p.id} className="border-b border-slate-800/40 hover:bg-slate-800/30 transition-colors last:border-0">
-                  <td className="px-4 py-3 font-medium"><a href={(p as any).epUrl ?? epUrl(p.name)} target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 inline-flex items-center gap-1">{cleanName(p.name)}<span className="text-[9px] text-slate-500" aria-hidden>↗</span></a></td>
-                  <td className="px-4 py-3 text-center text-slate-400">{(p as any).position || "—"}</td>
-                  {(p as any).undrafted && !p.draftYear ? (
-                    <td colSpan={3} className="px-4 py-3 text-center text-slate-500 italic">Undrafted</td>
-                  ) : (<>
-                    <td className="px-4 py-3 text-center text-slate-400">{p.draftYear || "—"}</td>
-                    <td className="px-4 py-3 text-center text-slate-400">{p.overallPick ? `R${Math.ceil(p.overallPick / 32)}` : "—"}</td>
-                    <td className="px-4 py-3 text-center text-slate-400">{p.overallPick ? `#${p.overallPick}` : "—"}</td>
-                  </>)}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-      </>)}
+      {prospects.length > 0 && (() => {
+        const cols: SortCol[] = [
+          { key: "name", label: "Prospect", kind: "ext", sticky: true, title: "Opens EliteProspects in a new tab" },
+          { key: "position", label: "Pos", kind: "text" },
+          { key: "draftYear", label: "Draft Year", kind: "num" },
+          { key: "round", label: "Round", kind: "num" },
+          { key: "overallPick", label: "Overall Pick", kind: "num" },
+        ];
+        const drafted = (p: (typeof prospects)[number]) => !((p as any).undrafted && !p.draftYear);
+        const rows: SortRow[] = prospects.map((p) => ({
+          _id: p.id, name: p.name, epUrl: (p as any).epUrl ?? epUrl(p.name),
+          position: (p as any).position || "—",
+          draftYear: drafted(p) ? p.draftYear ?? undefined : undefined,
+          round: drafted(p) && p.overallPick ? Math.ceil(p.overallPick / 32) : undefined,
+          overallPick: drafted(p) ? p.overallPick ?? undefined : undefined,
+        }));
+        return (
+          <>
+            <SectionTitle count={prospects.length}>Prospects</SectionTitle>
+            <Card bodyClassName="p-2">
+              <SortableTable cols={cols} rows={rows} initialSort="name" minWidth={640} />
+              <p className="text-[11px] text-slate-600 px-2 pt-1">Click any column header to sort.</p>
+            </Card>
+          </>
+        );
+      })()}
     </div>
   );
 }

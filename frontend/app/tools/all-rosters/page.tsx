@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import RosterTable, { type RosterPlayer } from "@/components/RosterTable";
+import SortableTable, { type SortCol, type SortRow } from "@/components/SortableTable";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { money, liveCapHit } from "@/lib/finance";
-import { cleanName, epSearchName, captaincyFromName } from "@/lib/playerName";
+import { cleanName, epSearchName, epProfileUrl, captaincyFromName } from "@/lib/playerName";
 import { isLoggedIn } from "@/lib/auth";
 import { redactAttrs } from "@/lib/player-attrs";
 import { pickIdsWithTradeHistory } from "@/lib/trade-history-server";
@@ -184,29 +185,29 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
 
       <div>
         <SectionTitle accent="text-blue-400">Prospects</SectionTitle>
-        <Card bodyClassName="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[520px]">
-              <thead><tr className="text-xs text-slate-500 uppercase tracking-wider border-b border-slate-800 bg-slate-800/30">
-                <th className="px-4 py-3 text-left font-medium">Prospect</th><th className="px-4 py-3 text-center font-medium">Draft Year</th><th className="px-4 py-3 text-center font-medium">Overall Pick</th>
-              </tr></thead>
-              <tbody>
-                {prospects.length === 0 && <tr><td colSpan={3} className="px-4 py-3 text-slate-600">no prospects</td></tr>}
-                {prospects.map((p) => (
-                  <tr key={p.id} className="border-b border-slate-800/40 hover:bg-slate-800/30 transition-colors last:border-0">
-                    <td className="px-4 py-3 font-medium">{cleanName(p.name)}</td>
-                    {(p as any).undrafted && !p.draftYear ? (
-                      <td colSpan={2} className="px-4 py-3 text-center text-slate-500 italic">Undrafted</td>
-                    ) : (<>
-                      <td className="px-4 py-3 text-center text-slate-400 tabular-nums">{p.draftYear ?? "—"}</td>
-                      <td className="px-4 py-3 text-center text-slate-400 tabular-nums">{p.overallPick ? `#${p.overallPick}` : "—"}</td>
-                    </>)}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+        {prospects.length === 0 ? (
+          <Card><p className="text-slate-600 text-sm">no prospects</p></Card>
+        ) : (() => {
+          const cols: SortCol[] = [
+            { key: "name", label: "Prospect", kind: "ext", sticky: true, title: "Opens EliteProspects in a new tab" },
+            { key: "position", label: "Pos", kind: "text" },
+            { key: "draftYear", label: "Draft Year", kind: "num" },
+            { key: "overallPick", label: "Overall Pick", kind: "num" },
+          ];
+          const drafted = (p: (typeof prospects)[number]) => !((p as any).undrafted && !p.draftYear);
+          const rows: SortRow[] = prospects.map((p) => ({
+            _id: p.id, name: p.name, epUrl: (p as any).epUrl ?? epProfileUrl(p.name),
+            position: (p as any).position || "—",
+            draftYear: drafted(p) ? p.draftYear ?? undefined : undefined,
+            overallPick: drafted(p) ? p.overallPick ?? undefined : undefined,
+          }));
+          return (
+            <Card bodyClassName="p-2">
+              <SortableTable cols={cols} rows={rows} initialSort="name" minWidth={560} />
+              <p className="text-[11px] text-slate-600 px-2 pt-1">Click any column header to sort.</p>
+            </Card>
+          );
+        })()}
       </div>
 
       <div>
