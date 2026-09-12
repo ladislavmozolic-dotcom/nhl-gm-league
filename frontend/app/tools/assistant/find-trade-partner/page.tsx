@@ -58,7 +58,7 @@ export default async function FindTradePartnerPage({ searchParams }: { searchPar
             ) : (
               <div className="flex flex-col gap-2">
                 <p className="text-sm text-slate-400">
-                  {result.slot.label} — priemer <span className="text-slate-200 font-semibold">{result.myAvg}</span> overall,{" "}
+                  {result.slot.label} — priemer <span className="text-slate-200 font-semibold">{result.myAvg}</span> rating,{" "}
                   {result.myRank}. miesto z {result.leagueSize} klubov{result.myAuto ? " (z automaticky poskladanej zostavy — nemáš uložené vlastné formácie)" : ""}.
                 </p>
               </div>
@@ -74,13 +74,13 @@ export default async function FindTradePartnerPage({ searchParams }: { searchPar
                   <div key={c.teamId} className="border border-slate-800 bg-slate-900/40 rounded-xl p-3.5 flex flex-col gap-2">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-bold text-slate-200">{c.teamName}</span>
-                      <span className="text-xs font-bold text-emerald-400">{c.rank}. miesto — {c.avg} overall</span>
+                      <span className="text-xs font-bold text-emerald-400">{c.rank}. miesto — {c.avg} rating</span>
                     </div>
                     {c.isAuto && <p className="text-[11px] text-amber-400/80">z automaticky poskladanej zostavy — klub nemá uložené vlastné formácie</p>}
                     <div className="flex flex-wrap gap-x-3 gap-y-1">
                       {c.players.map((p) => (
                         <Link key={p.id} href={`/players/${p.slug}`} className="text-xs text-slate-300 hover:text-blue-400">
-                          {cleanName(p.name)} <span className="text-slate-500">({p.overall ?? "?"})</span>
+                          {cleanName(p.name)} <span className="text-slate-500">({p.rating ?? "?"})</span>
                         </Link>
                       ))}
                     </div>

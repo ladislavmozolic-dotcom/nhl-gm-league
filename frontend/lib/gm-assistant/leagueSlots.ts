@@ -64,7 +64,20 @@ export interface SlotPlayer {
   id: number;
   name: string;
   slug: string;
-  overall: number | null;
+  overall: number | null; // OV — orientational only, shown as secondary reference
+  // The rating this player is actually ranked/averaged by: for skaters, the
+  // plain average of CK/PA/SC/DF (the parameters that matter for real roster
+  // decisions — OV is not one of them); for goalies, GoalieRating.overall,
+  // since they have no CK/PA/SC/DF split. See memory: ov-vs-specific-params.
+  rating: number | null;
+}
+
+/** Average of whichever of CK/PA/SC/DF a skater has (null if none). No single
+ *  param dominates — a plain mean, same "no magic weighting" rule the rest of
+ *  the sim follows. */
+function compositeRating(p: { ck: number | null; pa: number | null; sc: number | null; df: number | null }): number | null {
+  const vals = [p.ck, p.pa, p.sc, p.df].filter((v): v is number => v != null);
+  return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : null;
 }
 
 interface ResolvedLines {
@@ -82,8 +95,8 @@ export interface LeagueSlotsData {
   // teamId -> set of slot ids whose value for that team came from the
   // autoLines() fallback rather than the club's own saved Team Lines.
   autoBySlot: Map<number, Set<string>>;
-  playerMap: Map<number, SlotPlayer>; // skaters, rated by Player.overall
-  goalieMap: Map<number, SlotPlayer>; // goalies, rated by GoalieRating.overall (the live goalie number, not Player.overall)
+  playerMap: Map<number, SlotPlayer>; // skaters, rated by the CK/PA/SC/DF composite (SlotPlayer.rating)
+  goalieMap: Map<number, SlotPlayer>; // goalies, rated by GoalieRating.overall (they have no CK/PA/SC/DF split)
 }
 
 function hasAnyId(arr: unknown): arr is (number | null)[] {
@@ -104,7 +117,7 @@ export async function loadLeagueSlots(): Promise<LeagueSlotsData> {
     // same roster filter teamLineBuilder/the sim use for its own auto-lines fallback
     prisma.player.findMany({
       where: { team: { league: "NHL", isAffiliate: false }, rosterType: "NHL", isGoalie: false, scratched: false },
-      select: { id: true, name: true, slug: true, overall: true, position: true, shoots: true, teamId: true },
+      select: { id: true, name: true, slug: true, overall: true, ck: true, pa: true, sc: true, df: true, position: true, shoots: true, teamId: true },
     }),
     prisma.player.findMany({
       where: { team: { league: "NHL", isAffiliate: false }, rosterType: "NHL", isGoalie: true, scratched: false },
@@ -112,8 +125,15 @@ export async function loadLeagueSlots(): Promise<LeagueSlotsData> {
     }),
   ]);
 
-  const playerMap = new Map<number, SlotPlayer>(skaterRows.map((p) => [p.id, { id: p.id, name: p.name, slug: p.slug, overall: p.overall }]));
-  const goalieMap = new Map<number, SlotPlayer>(goalieRows.map((g) => [g.id, { id: g.id, name: g.name, slug: g.slug, overall: g.goalieRating?.overall ?? null }]));
+  const playerMap = new Map<number, SlotPlayer>(
+    skaterRows.map((p) => [p.id, { id: p.id, name: p.name, slug: p.slug, overall: p.overall, rating: compositeRating(p) }])
+  );
+  const goalieMap = new Map<number, SlotPlayer>(
+    goalieRows.map((g) => {
+      const overall = g.goalieRating?.overall ?? null;
+      return [g.id, { id: g.id, name: g.name, slug: g.slug, overall, rating: overall }];
+    })
+  );
 
   const linesByTeam = new Map(linesRows.map((l) => [l.teamId, l]));
   const skatersByTeam = new Map<number, typeof skaterRows>();
@@ -207,15 +227,16 @@ export interface SlotTeamRow {
   isAuto: boolean;
 }
 
-/** Every club's average overall for one slot, best first. Clubs with nobody
- *  eligible for the slot are left out entirely (nothing to rank). */
+/** Every club's average rating for one slot, best first — CK/PA/SC/DF composite
+ *  for skater slots, GoalieRating.overall for goalie slots (see SlotPlayer.rating).
+ *  Clubs with nobody eligible for the slot are left out entirely (nothing to rank). */
 export function rankSlot(data: LeagueSlotsData, slot: SlotDef): SlotTeamRow[] {
   return data.teams
     .map((team) => {
       const players = slotPlayers(data.resolved.get(team.id)!, slot, data.playerMap, data.goalieMap);
-      const rated = players.filter((p) => p.overall != null);
+      const rated = players.filter((p) => p.rating != null);
       if (!rated.length) return null;
-      const avg = rated.reduce((sum, p) => sum + (p.overall as number), 0) / rated.length;
+      const avg = rated.reduce((sum, p) => sum + (p.rating as number), 0) / rated.length;
       return { teamId: team.id, teamName: team.name, avg: Math.round(avg * 10) / 10, players, isAuto: data.autoBySlot.get(team.id)?.has(slot.id) ?? false };
     })
     .filter((r): r is SlotTeamRow => r != null)

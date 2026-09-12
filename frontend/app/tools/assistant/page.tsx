@@ -37,7 +37,8 @@ export default async function GmAssistantPage() {
         ) : (
           <div className="flex flex-col gap-3">
             <p className="text-sm text-slate-400">
-              {analysis.teamName} — priemerný <span className="text-slate-300 font-semibold">overall</span> hráčov na danom slote formácie/páru,
+              {analysis.teamName} — priemerný <span className="text-slate-300 font-semibold">rating</span> hráčov na danom slote formácie/páru
+              (CK/PA/SC/DF pre korčuliarov, overall pre brankárov — OV je len orientačné, nepoužíva sa na porovnanie),
               porovnaný voči rovnakému slotu vo všetkých 32 NHL kluboch.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -52,13 +53,13 @@ export default async function GmAssistantPage() {
                       <span className={`text-xs font-bold uppercase tracking-wide ${s.text}`}>{s.label}</span>
                     </div>
                     <p className="text-xs text-slate-400 mb-2">
-                      Priemer <span className="text-slate-200 font-semibold">{f.teamValue}</span> overall — {f.leagueRank}. miesto z {f.leagueSize} klubov
+                      Priemer <span className="text-slate-200 font-semibold">{f.teamValue}</span> rating — {f.leagueRank}. miesto z {f.leagueSize} klubov
                       {f.auto && <span className="text-amber-400/90"> · auto-zostava (nemáš to uložené)</span>}
                     </p>
                     <div className="flex flex-wrap gap-x-3 gap-y-1 mb-2">
                       {f.players.map((p) => (
                         <Link key={p.id} href={`/players/${p.slug}`} className="text-xs text-slate-300 hover:text-blue-400">
-                          {cleanName(p.name)} <span className="text-slate-500">({p.overall ?? "?"})</span>
+                          {cleanName(p.name)} <span className="text-slate-500">({p.rating ?? "?"})</span>
                         </Link>
                       ))}
                     </div>
