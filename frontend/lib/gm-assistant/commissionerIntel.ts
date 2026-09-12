@@ -113,7 +113,7 @@ function percentileRanks<T>(items: T[], valueOf: (t: T) => number): number[] {
 
 async function contractOutlierFinding(): Promise<CommissionerFinding> {
   const [skaters, goalies] = await Promise.all([
-    prisma.player.findMany({ where: { rosterType: "NHL", isGoalie: false }, select: { id: true, name: true, teamId: true, team: { select: { name: true } }, capHit: true, contractYears: true, ck: true, pa: true, sc: true, df: true } }),
+    prisma.player.findMany({ where: { rosterType: "NHL", isGoalie: false }, select: { id: true, name: true, teamId: true, team: { select: { name: true } }, capHit: true, contractYears: true, ck: true, pa: true, sc: true, df: true, sk: true, ph: true } }),
     prisma.player.findMany({ where: { rosterType: "NHL", isGoalie: true }, select: { id: true, name: true, teamId: true, team: { select: { name: true } }, capHit: true, contractYears: true, goalieRating: { select: { overall: true } } } }),
   ]);
 

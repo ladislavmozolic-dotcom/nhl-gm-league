@@ -120,7 +120,7 @@ export async function searchUfaPlayers(query: string) {
 
 const PLAYER_SELECT = {
   id: true, name: true, slug: true, teamId: true, isGoalie: true,
-  position: true, shoots: true, overall: true, ck: true, pa: true, sc: true, df: true,
+  position: true, shoots: true, overall: true, ck: true, pa: true, sc: true, df: true, sk: true, ph: true,
   capHit: true, contractYears: true, age: true, birthDate: true, scratched: true,
   goalieRating: { select: { overall: true } },
 } as const;

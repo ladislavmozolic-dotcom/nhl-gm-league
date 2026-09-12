@@ -37,7 +37,7 @@ function median(nums: number[]): number {
 export async function idealRole(playerId: number): Promise<IdealRoleResult | null> {
   const player = await prisma.player.findUnique({
     where: { id: playerId },
-    select: { id: true, isGoalie: true, position: true, ck: true, pa: true, sc: true, df: true, goalieRating: { select: { overall: true } } },
+    select: { id: true, isGoalie: true, position: true, ck: true, pa: true, sc: true, df: true, sk: true, ph: true, goalieRating: { select: { overall: true } } },
   });
   if (!player) return null;
 

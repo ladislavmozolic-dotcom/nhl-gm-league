@@ -67,7 +67,7 @@ async function positionNeeds(teamId: number): Promise<PositionNeed[]> {
   const [skaters, goalies] = await Promise.all([
     prisma.player.findMany({
       where: { team: { league: "NHL", isAffiliate: false }, rosterType: "NHL", isGoalie: false, scratched: false },
-      select: { teamId: true, position: true, ck: true, pa: true, sc: true, df: true },
+      select: { teamId: true, position: true, ck: true, pa: true, sc: true, df: true, sk: true, ph: true },
     }),
     prisma.player.findMany({
       where: { team: { league: "NHL", isAffiliate: false }, rosterType: "NHL", isGoalie: true, scratched: false },
@@ -123,7 +123,7 @@ async function comparablePastPicks(target: BpaEntry, draftYear: number, sourceWh
 
   const players = await prisma.player.findMany({
     where: { id: { in: past.map((p) => p.playerId as number) } },
-    select: { id: true, isGoalie: true, ck: true, pa: true, sc: true, df: true, goalieRating: { select: { overall: true } } },
+    select: { id: true, isGoalie: true, ck: true, pa: true, sc: true, df: true, sk: true, ph: true, goalieRating: { select: { overall: true } } },
   });
   const playerById = new Map(players.map((p) => [p.id, p]));
 

@@ -72,38 +72,52 @@ export interface SlotPlayer {
   rating: number | null;
 }
 
-// CK/PA/SC/DF don't share a scale: across the current NHL skater pool, CK and
+// These six don't share a scale: across the current NHL skater pool, CK and
 // DF sit centered around ~69 (players reach the high 90s), while PA and SC
-// sit centered around ~54-55 and rarely clear ~78. A plain average of the raw
-// numbers would give "high CK" more weight than "high SC" for no reason other
-// than CK's ceiling being higher — a checking/defense-heavy grinder would
-// always out-rate an elite pure scorer on that measure alone, regardless of
-// which one actually helps a given slot more. Fixed calibration snapshot
-// (mean, sd) per param, taken from the live NHL skater pool — not refit
-// automatically, so recompute these four pairs if the edge-engine ratings
-// ever get rebalanced league-wide (see memory: local-db-stale-vs-production —
-// always recompute from production, never local dev).
-const PARAM_STATS: Record<"ck" | "pa" | "sc" | "df", { mean: number; sd: number }> = {
+// sit centered around ~54-55 and rarely clear ~78, and SK/PH sit lower still
+// (~51-52) with a wide spread. A plain average of the raw numbers would give
+// "high CK" more weight than "high SC" for no reason other than CK's ceiling
+// being higher — a checking/defense-heavy grinder would out-rate an elite
+// scorer/skater on that measure alone, regardless of which one actually
+// helps a given slot more. Fixed calibration snapshot (mean, sd) per param,
+// taken from the live NHL skater pool — not refit automatically, so
+// recompute these pairs if the edge-engine ratings ever get rebalanced
+// league-wide (see memory: local-db-stale-vs-production — always recompute
+// from production, never local dev).
+//
+// CK/PA/SC/DF plus SK (skating) and PH (puckhandling) — the parameters that
+// feed a skater's actual on-ice production and puck skill. PS (penalty
+// shot/shootout conversion) was considered and left out: it only matters in
+// a handful of shootouts a season and barely differentiates most players, so
+// it would mostly add scale-unrelated noise rather than a real quality
+// signal. FG/DI/ST/EN/DU/FO/EX/LD/MO are also left out — they're
+// fitness/intangible/situational ratings (fighting, discipline, faceoffs,
+// endurance, durability, clutch, morale), not "how good is this player at
+// hockey" skill parameters, which is what this composite is for.
+const PARAM_STATS: Record<"ck" | "pa" | "sc" | "df" | "sk" | "ph", { mean: number; sd: number }> = {
   ck: { mean: 69.1, sd: 7.6 },
   pa: { mean: 55.4, sd: 5.7 },
   sc: { mean: 53.4, sd: 6.4 },
   df: { mean: 69.5, sd: 6.5 },
+  sk: { mean: 51.4, sd: 9.3 },
+  ph: { mean: 51.5, sd: 9.7 },
 };
+const PARAM_KEYS = Object.keys(PARAM_STATS) as (keyof typeof PARAM_STATS)[];
 // Re-centers the composite back onto a familiar ~0-100 scale (the average of
-// the 4 raw means/sds above) so it still reads like "a rating", not a bare
+// the raw means/sds above) so it still reads like "a rating", not a bare
 // z-score, while the z-scoring itself is what actually makes the average fair.
-const COMPOSITE_CENTER = (PARAM_STATS.ck.mean + PARAM_STATS.pa.mean + PARAM_STATS.sc.mean + PARAM_STATS.df.mean) / 4;
-const COMPOSITE_SPREAD = (PARAM_STATS.ck.sd + PARAM_STATS.pa.sd + PARAM_STATS.sc.sd + PARAM_STATS.df.sd) / 4;
+const COMPOSITE_CENTER = PARAM_KEYS.reduce((s, k) => s + PARAM_STATS[k].mean, 0) / PARAM_KEYS.length;
+const COMPOSITE_SPREAD = PARAM_KEYS.reduce((s, k) => s + PARAM_STATS[k].sd, 0) / PARAM_KEYS.length;
 
-/** Composite of whichever of CK/PA/SC/DF a skater has (null if none): each
- *  param is first standardized against its own league-wide mean/sd (see
+/** Composite of whichever of CK/PA/SC/DF/SK/PH a skater has (null if none):
+ *  each param is first standardized against its own league-wide mean/sd (see
  *  PARAM_STATS) so "2 sd above average in SC" and "2 sd above average in CK"
  *  count the same, then the standardized scores are averaged and rescaled
  *  back onto a ~0-100 rating. No single param dominates by design — same "no
  *  magic weighting" rule the rest of the sim follows, just fair across scales. */
-export function compositeRating(p: { ck: number | null; pa: number | null; sc: number | null; df: number | null }): number | null {
+export function compositeRating(p: { ck: number | null; pa: number | null; sc: number | null; df: number | null; sk?: number | null; ph?: number | null }): number | null {
   const zs: number[] = [];
-  for (const key of ["ck", "pa", "sc", "df"] as const) {
+  for (const key of PARAM_KEYS) {
     const v = p[key];
     if (v == null) continue;
     const { mean, sd } = PARAM_STATS[key];
@@ -151,7 +165,7 @@ export async function loadLeagueSlots(): Promise<LeagueSlotsData> {
     // same roster filter teamLineBuilder/the sim use for its own auto-lines fallback
     prisma.player.findMany({
       where: { team: { league: "NHL", isAffiliate: false }, rosterType: "NHL", isGoalie: false, scratched: false },
-      select: { id: true, name: true, slug: true, overall: true, ck: true, pa: true, sc: true, df: true, position: true, shoots: true, teamId: true },
+      select: { id: true, name: true, slug: true, overall: true, ck: true, pa: true, sc: true, df: true, sk: true, ph: true, position: true, shoots: true, teamId: true },
     }),
     prisma.player.findMany({
       where: { team: { league: "NHL", isAffiliate: false }, rosterType: "NHL", isGoalie: true, scratched: false },

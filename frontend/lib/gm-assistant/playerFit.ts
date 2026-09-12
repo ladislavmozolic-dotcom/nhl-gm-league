@@ -29,7 +29,7 @@ async function loadPlayerForFit(playerId: number) {
   return prisma.player.findUnique({
     where: { id: playerId },
     select: {
-      id: true, teamId: true, isGoalie: true, position: true, ck: true, pa: true, sc: true, df: true,
+      id: true, teamId: true, isGoalie: true, position: true, ck: true, pa: true, sc: true, df: true, sk: true, ph: true,
       capHit: true, contractYears: true, goalieRating: { select: { overall: true } },
     },
   });
