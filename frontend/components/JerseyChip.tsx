@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 // Real cropped/background-removed team jersey art (see /public/jerseys). Every
 // team's baked-in "PLAYER"/"00" placeholder has been erased and calibrated
 // (position + font size, both as % of the image's own width so they scale
@@ -49,21 +51,60 @@ const CALIBRATION: Record<string, Calib> = {
 // ratios relative to nameFontBasePct (a <=4-char name gets the full base size).
 const nameSizeRatio = (n: string) => (n.length <= 4 ? 1 : n.length <= 6 ? 0.922 : n.length <= 8 ? 0.8 : 0.7);
 
+// The per-team calibration above only accounts for name length in coarse buckets,
+// which isn't enough for wide letters (M/W) or teams with a large nameFontBasePct —
+// text can still run past the jersey art's edges. As a hard safety net, measure the
+// actual rendered width (canvas, since layout isn't known until after paint) and
+// shrink further so it never exceeds a safe fraction of the jersey's own width.
+let measureCtx: CanvasRenderingContext2D | null | undefined;
+function getMeasureCtx() {
+  if (measureCtx === undefined) {
+    measureCtx = typeof document !== "undefined" ? document.createElement("canvas").getContext("2d") : null;
+  }
+  return measureCtx;
+}
+function fitFontSize(text: string, fontSizePx: number, letterSpacingPx: number, maxWidthPx: number): number {
+  const ctx = getMeasureCtx();
+  if (!ctx || !text || fontSizePx <= 0) return fontSizePx;
+  ctx.font = `800 ${fontSizePx}px system-ui, -apple-system, sans-serif`;
+  const width = ctx.measureText(text).width + letterSpacingPx * Math.max(0, text.length - 1);
+  if (width <= maxWidthPx) return fontSizePx;
+  return Math.max(8, Math.floor(fontSizePx * (maxWidthPx / width)));
+}
+
 export default function JerseyChip({ teamSlug, number, lastName, size = 84 }: {
   teamSlug: string; number?: number | null; lastName?: string | null; size?: number;
 }) {
   const c = CALIBRATION[teamSlug];
+  const numberText = number != null ? String(number) : "";
+  const nameText = lastName ? lastName.toUpperCase() : "";
+  const numberBaseFontPx = c ? Math.round((c.numberFontPct / 100) * size) : 0;
+  const nameBaseFontPx = c ? Math.round((c.nameFontBasePct / 100) * size * nameSizeRatio(nameText)) : 0;
+
+  // start at the calibrated size (matches server render) and correct down to fit
+  // once we can measure text in the browser, avoiding a hydration mismatch.
+  const [numberFontPx, setNumberFontPx] = useState(numberBaseFontPx);
+  const [nameFontPx, setNameFontPx] = useState(nameBaseFontPx);
+
+  useEffect(() => {
+    setNumberFontPx(fitFontSize(numberText, numberBaseFontPx, -0.5, size * 0.86));
+  }, [numberText, numberBaseFontPx, size]);
+
+  useEffect(() => {
+    setNameFontPx(fitFontSize(nameText, nameBaseFontPx, 0.3, size * 0.9));
+  }, [nameText, nameBaseFontPx, size]);
+
   return (
     <div style={{ position: "relative", width: size, flex: "none" }}>
       <img src={`/jerseys/${teamSlug}.png`} alt="" style={{ display: "block", width: "100%", height: "auto", borderRadius: 4 }} />
       {c && number != null && (
-        <span style={{ position: "absolute", left: `${c.numberLeftPct}%`, top: `${c.numberTopPct}%`, transform: "translate(-50%, -50%)", fontSize: Math.round((c.numberFontPct / 100) * size), fontWeight: 800, color: c.textColor, letterSpacing: -0.5, textShadow: "0 1px 2px rgba(0,0,0,0.5)", pointerEvents: "none" }}>
-          {number}
+        <span style={{ position: "absolute", left: `${c.numberLeftPct}%`, top: `${c.numberTopPct}%`, transform: "translate(-50%, -50%)", fontSize: numberFontPx, fontWeight: 800, color: c.textColor, letterSpacing: -0.5, textShadow: "0 1px 2px rgba(0,0,0,0.5)", pointerEvents: "none" }}>
+          {numberText}
         </span>
       )}
       {c && lastName && (
-        <span style={{ position: "absolute", left: `${c.nameLeftPct}%`, top: `${c.nameTopPct}%`, transform: "translate(-50%, -50%)", fontSize: Math.round((c.nameFontBasePct / 100) * size * nameSizeRatio(lastName)), fontWeight: 800, color: c.textColor, letterSpacing: 0.3, textShadow: "0 1px 1px rgba(0,0,0,0.5)", pointerEvents: "none", whiteSpace: "nowrap" }}>
-          {lastName.toUpperCase()}
+        <span style={{ position: "absolute", left: `${c.nameLeftPct}%`, top: `${c.nameTopPct}%`, transform: "translate(-50%, -50%)", fontSize: nameFontPx, fontWeight: 800, color: c.textColor, letterSpacing: 0.3, textShadow: "0 1px 1px rgba(0,0,0,0.5)", pointerEvents: "none", whiteSpace: "nowrap" }}>
+          {nameText}
         </span>
       )}
     </div>
