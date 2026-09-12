@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getTeamSession, isAdmin } from "@/lib/auth";
+import { getTeamSession } from "@/lib/auth";
 import { analyzeRoster, type RosterFinding } from "@/lib/gm-assistant/analyzeRoster";
 import { slotById, slotPositionFilter } from "@/lib/gm-assistant/leagueSlots";
 import { cleanName } from "@/lib/playerName";
@@ -8,12 +8,11 @@ import { PageHeader, Card } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
-// UNHL Intelligence — not linked anywhere and 404s for anyone but the
-// commissioner login. Every function here computes a plain, inspectable
-// number from data already live in the DB (Player.overall via TeamLines
-// slots) — no LLM, no black-box verdicts. See memory: gm-assistant-intelligence.
+// UNHL Intelligence — open to any logged-in GM (team session), not admin-only.
+// Every function here computes a plain, inspectable number from data already
+// live in the DB (Player.overall via TeamLines slots) — no LLM, no black-box
+// verdicts. See memory: gm-assistant-intelligence.
 export default async function GmAssistantPage() {
-  if (!(await isAdmin())) notFound();
   const teamId = await getTeamSession();
   if (teamId == null) notFound();
 

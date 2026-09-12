@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getTeamSession, isAdmin } from "@/lib/auth";
+import { getTeamSession } from "@/lib/auth";
 import { findTradePartners } from "@/lib/gm-assistant/findTradePartners";
 import { SLOTS } from "@/lib/gm-assistant/leagueSlots";
 import { cleanName } from "@/lib/playerName";
@@ -12,14 +12,13 @@ export const dynamic = "force-dynamic";
 // no trade-value model, no willingness-to-deal guess. A slot you're weak at
 // (from Analyze My Roster) is ranked league-wide, and every club that
 // currently ranks above you there is shown as a candidate — nothing more
-// than "this club has more there than you do right now". Commissioner-only
-// for now (see memory: gm-assistant-intelligence) — 404s for anyone else.
+// than "this club has more there than you do right now". Open to any
+// logged-in GM (see memory: gm-assistant-intelligence) — 404s otherwise.
 
 const inputCls = "w-full bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500";
 const labelCls = "block text-xs uppercase tracking-wide text-slate-400 mb-1";
 
 export default async function FindTradePartnerPage({ searchParams }: { searchParams: Promise<{ slot?: string }> }) {
-  if (!(await isAdmin())) notFound();
   const teamId = await getTeamSession();
   if (teamId == null) notFound();
 

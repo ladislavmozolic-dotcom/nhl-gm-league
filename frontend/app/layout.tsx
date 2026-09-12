@@ -96,9 +96,9 @@ export default async function RootLayout({
     const item = m.key.startsWith("page:") ? m : { ...m, label: translate(lang, `menu.${m.key}`) };
     if (item.key === "tools" && item.children) {
       const children = item.children.filter((c) => c.href !== hiddenCalc);
-      // UNHL Intelligence — commissioner-only for now (see memory: gm-assistant-intelligence);
-      // the route itself also 404s for anyone else, this just keeps it off the menu.
-      if (t?.isAdmin) children.push({ label: "🧠 UNHL Intelligence", href: "/tools/assistant" });
+      // UNHL Intelligence — open to any logged-in GM (see memory: gm-assistant-intelligence);
+      // the route itself 404s for anyone not logged in, this just keeps it off the menu for guests.
+      if (t) children.push({ label: "🧠 UNHL Intelligence", href: "/tools/assistant" });
       return { ...item, children };
     }
     if (item.key === "league" && item.children) {

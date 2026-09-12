@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { isAdmin } from "@/lib/auth";
+import { getTeamSession } from "@/lib/auth";
 import { liveCapHit } from "@/lib/finance";
 import { PageHeader, Card } from "@/components/ui";
 import SortableTable, { type SortCol, type SortRow } from "@/components/SortableTable";
@@ -11,8 +11,8 @@ export const dynamic = "force-dynamic";
 // UNHL Intelligence — "Find Player". Same rule as Analyze My Roster: a plain,
 // inspectable filter over data already in the DB — every filter you set is
 // visible in the URL/form, and every result row is the exact player + numbers
-// that matched it. No ranking model, no LLM. Commissioner-only for now (see
-// memory: gm-assistant-intelligence) — 404s for anyone else.
+// that matched it. No ranking model, no LLM. Open to any logged-in GM (see
+// memory: gm-assistant-intelligence) — 404s for anyone not logged in.
 
 const POSITIONS = ["ALL", "C", "LW", "RW", "D", "G"] as const;
 const ROSTER_TYPES = ["ANY", "NHL", "AHL", "UFA"] as const;
@@ -51,7 +51,7 @@ function parseFilters(sp: Record<string, string | undefined>): Filters {
 }
 
 export default async function FindPlayerPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  if (!(await isAdmin())) notFound();
+  if ((await getTeamSession()) == null) notFound();
 
   const sp = await searchParams;
   const f = parseFilters(sp);
