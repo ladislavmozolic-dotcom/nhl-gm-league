@@ -42,7 +42,7 @@ export default async function PlayerIntelligenceCard({ playerId }: { playerId: n
   const bestRole = hasRole && role ? [...role.slots].sort((a, b) => a.rank - b.rank)[0] : null;
 
   const cheaperRows: SortRow[] | null = hasCheaper && cheaper ? cheaper.players.map((p) => ({
-    _id: p.id, name: p.name, slug: p.slug, teamCode: p.teamCode, teamSlug: p.teamSlug, teamLogo: p.teamLogo,
+    _id: p.id, name: p.name, slug: p.slug, photo: p.photoUrl, teamCode: p.teamCode, teamSlug: p.teamSlug, teamLogo: p.teamLogo,
     pos: p.position, age: p.age,
     ck: p.ck, pa: p.pa, sc: p.sc, df: p.df,
     ovr: p.overall, cap: p.capHit, savings: p.savings, yrs: p.contractYears,
@@ -84,7 +84,7 @@ export default async function PlayerIntelligenceCard({ playerId }: { playerId: n
             Zmluvy v tabuľke slúžia aj ako contract comparables.
           </p>
           <SortableTable cols={similarCols(similar.isGoalie)} rows={similar.players.map((p) => ({
-            _id: p.id, name: p.name, slug: p.slug, teamCode: p.teamCode, teamSlug: p.teamSlug, teamLogo: p.teamLogo,
+            _id: p.id, name: p.name, slug: p.slug, photo: p.photoUrl, teamCode: p.teamCode, teamSlug: p.teamSlug, teamLogo: p.teamLogo,
             pos: p.position, age: p.age,
             ck: p.ck, pa: p.pa, sc: p.sc, df: p.df,
             ovr: p.overall, cap: p.capHit, yrs: p.contractYears,

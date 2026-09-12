@@ -32,7 +32,18 @@ export default async function PlayerIntelligencePage({ params }: { params: Promi
   return (
     <div className="py-2 flex flex-col gap-6">
       <PageHeader
-        title={`🧠 UNHL Intelligence — ${cleanName(player.name)}`}
+        title={
+          <span className="inline-flex items-center gap-3">
+            <span className="w-11 h-11 shrink-0 rounded-full overflow-hidden bg-slate-800/80 ring-1 ring-white/10">
+              {player.photoUrl ? (
+                <img src={player.photoUrl} alt={cleanName(player.name)} className="w-full h-full object-cover" />
+              ) : (
+                <span className="w-full h-full flex items-center justify-center text-lg font-black text-slate-600">{player.name?.[0] ?? "?"}</span>
+              )}
+            </span>
+            🧠 UNHL Intelligence — {cleanName(player.name)}
+          </span>
+        }
         subtitle={player.team ? player.team.name : "Free Agent"}
         right={<Link href={`/players/${player.id}`} className="text-sm text-slate-400 hover:text-blue-400">← Späť na profil</Link>}
       />

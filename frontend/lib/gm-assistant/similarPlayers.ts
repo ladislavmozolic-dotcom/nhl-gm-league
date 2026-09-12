@@ -19,6 +19,7 @@ export interface SimilarPlayer {
   teamCode: string | null;
   teamSlug: string | null;
   teamLogo: string | null;
+  photoUrl: string | null;
   ck: number | null; pa: number | null; sc: number | null; df: number | null; // null for goalies
   overall: number | null;
   capHit: number;
@@ -62,7 +63,7 @@ async function scoreGoalieCandidates(playerId: number, target: NonNullable<Await
   const candidates = await prisma.player.findMany({
     where: { id: { not: playerId }, isGoalie: true, rosterType: "NHL" },
     select: {
-      id: true, name: true, slug: true, position: true, age: true, capHit: true, contractYears: true, rosterType: true,
+      id: true, name: true, slug: true, position: true, age: true, capHit: true, contractYears: true, rosterType: true, photoUrl: true,
       goalieRating: { select: { overall: true } }, team: { select: { code: true, slug: true, logoUrl: true } },
     },
   });
@@ -74,7 +75,7 @@ async function scoreGoalieCandidates(playerId: number, target: NonNullable<Await
       const distance = Math.sqrt(ovDiff * ovDiff + ageDiff * ageDiff);
       return {
         id: c.id, name: c.name, slug: c.slug, position: c.position, age: c.age,
-        teamCode: c.team?.code ?? null, teamSlug: c.team?.slug ?? null, teamLogo: c.team?.logoUrl ?? null,
+        teamCode: c.team?.code ?? null, teamSlug: c.team?.slug ?? null, teamLogo: c.team?.logoUrl ?? null, photoUrl: c.photoUrl ?? null,
         ck: null, pa: null, sc: null, df: null, overall: c.goalieRating!.overall,
         capHit: liveCapHit(c), contractYears: c.contractYears, rosterType: c.rosterType, distance,
       } satisfies SimilarPlayer;
@@ -85,7 +86,7 @@ async function scoreSkaterCandidates(playerId: number, target: NonNullable<Await
   const grp = posGroup(target.position, false);
   const candidates = await prisma.player.findMany({
     where: { id: { not: playerId }, isGoalie: false, rosterType: "NHL" },
-    select: { id: true, name: true, slug: true, position: true, age: true, ck: true, pa: true, sc: true, df: true, overall: true, capHit: true, contractYears: true, rosterType: true, team: { select: { code: true, slug: true, logoUrl: true } } },
+    select: { id: true, name: true, slug: true, position: true, age: true, ck: true, pa: true, sc: true, df: true, overall: true, capHit: true, contractYears: true, rosterType: true, photoUrl: true, team: { select: { code: true, slug: true, logoUrl: true } } },
   });
   return candidates
     .filter((c) => posGroup(c.position, false) === grp && c.age != null && c.ck != null && c.pa != null && c.sc != null && c.df != null)
@@ -98,7 +99,7 @@ async function scoreSkaterCandidates(playerId: number, target: NonNullable<Await
       const distance = Math.sqrt(dCk * dCk + dPa * dPa + dSc * dSc + dDf * dDf + dAge * dAge);
       return {
         id: c.id, name: c.name, slug: c.slug, position: c.position, age: c.age,
-        teamCode: c.team?.code ?? null, teamSlug: c.team?.slug ?? null, teamLogo: c.team?.logoUrl ?? null,
+        teamCode: c.team?.code ?? null, teamSlug: c.team?.slug ?? null, teamLogo: c.team?.logoUrl ?? null, photoUrl: c.photoUrl ?? null,
         ck: c.ck, pa: c.pa, sc: c.sc, df: c.df, overall: c.overall,
         capHit: liveCapHit(c), contractYears: c.contractYears, rosterType: c.rosterType, distance,
       } satisfies SimilarPlayer;
