@@ -352,15 +352,18 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
           <Toggle k="chemistryEnabled" label="Chemistry enabled" />
         </div>
         <p className="text-[11px] text-slate-500 mb-3">
-          Units (manager lines, else depth-chart trios/pairs) gel while intact and drop when broken by
-          injury/call-up. Penalty-only: a fully gelled unit (≥ neutral) sims at full strength; a fresh or
-          disrupted one scores slightly less — so it never inflates league-wide offense.
+          5v5 chemistry is tracked PER PAIRWISE BOND within a unit, not per whole line: an intact bond
+          grows every game, a split bond fades slowly (never a hard drop) down to the starting floor, and
+          a reunited bond resumes from where it left off. Special-teams units (PP1/PK1 etc.) work
+          differently — graded as one unit, taking the full &quot;Drop when broken&quot; hit instantly the
+          game they&apos;re split. Penalty-only either way: a fully gelled unit (≥ neutral) sims at full
+          strength; a fresh or disrupted one scores slightly less — so it never inflates league-wide offense.
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
           <div>
-            <NumField k="chemistryBase" label="Starting chemistry (new line)" />
-            <NumField k="chemistryGrowth" label="Growth / game intact" />
-            <NumField k="chemistryDrop" label="Drop when broken" />
+            <NumField k="chemistryBase" label="Starting chemistry (new line) / fade floor" />
+            <NumField k="chemistryGrowth" label="Growth / game intact (5v5 fade = half this)" />
+            <NumField k="chemistryDrop" label="Drop when broken (special teams only)" />
           </div>
           <div>
             <NumField k="chemistryNeutral" label="Fully-gelled threshold" />
