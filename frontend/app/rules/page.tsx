@@ -249,6 +249,25 @@ const SECTIONS: Sec[] = [
       ] },
     ],
   },
+  {
+    id: "tactics", title: "16 · Team Tactics & Line Fit",
+    intro: "Beyond raw ratings, HOW you deploy your roster moves every simulated game — team-wide system tactics, per-line overrides, and how well the players on a line/pair actually complement each other.",
+    groups: [
+      { h: "Team system tactics", points: [
+        "Six dials, each with a neutral \"Balanced\" default: Tempo (pace of play), Forecheck (pressure on the puck), Puck Style (how you attack), D-Zone Coverage (how you defend your own end), and two special-teams dials — PP Style and PK Style. Presets bundle them (Run-and-Gun, Trap, Heavy Forecheck, Shot Volume, Shutdown) or set each dial individually from the Tactics page, which spells out exactly what each option does and which attributes it wants.",
+        "Every non-balanced choice has a real upside (more shots, more takeaways, fewer/less dangerous chances against, a stronger power play or kill) AND a real cost (more shots against, more fatigue, more penalties) — the cost always applies in full; the upside is scaled by System Fit below.",
+        "System Fit (shown live as a %, roughly 60–118%) measures how well your roster's ice-weighted attributes suit the dials you've picked — e.g. a Fast tempo wants skating + endurance, an Aggressive forecheck wants checking + speed, a Cycle attack wants passing + strength, a 1-3-1 power play wants a one-timer shooter + a playmaker. Pick a system your roster fits and its benefits are amplified; force one it doesn't fit and you still pay the full cost without the full reward.",
+        "Your head coach nudges Fit two ways: his Experience (EX) helps him execute a demanding system (a veteran bench boss lifts a shaky fit; a rookie can't get as much out of one), and his personal coaching Style (Offensive / Defensive / Physical / Balanced) adds a small bonus when the system you install matches his own identity, and a little friction when it clashes.",
+        "Per-line overrides: each forward line can run its own Puck Style, and each D pair its own D-Zone coverage, layered on top of the team-wide Tempo and Forecheck (which always stay team-level) — e.g. a shutdown pairing can play Collapse while your top pairing plays Aggressive.",
+      ] },
+      { h: "Line & pair role fit (chemistry)", points: [
+        "Beyond raw talent, a unit's role MIX matters: a forward line wants a playmaker + a sniper + a grinder, not three of the same type; a D pair wants one offense-leaning defenseman paired with one defense-leaning one, not two who play an identical style.",
+        "A player's role is judged relative to the LEAGUE AVERAGE for his position, not by comparing his own offense to his own defense in isolation — a defenseman only counts as offense-leaning if he's genuinely more offensive than a typical NHL defenseman, since defensive attributes run high across the board for every D-man. (Judging a player purely against himself used to misclassify plenty of real offensive defensemen as defensive, since even an offensive D's defensive numbers usually still beat his own offensive ones.)",
+        "Role Fit is a graduated score, not a pass/fail flag: a strongly complementary pairing (a true shutdown D next to a true offensive-QB D) scores meaningfully higher than a barely-complementary one, rather than every \"mixed\" combo landing on the same number. It feeds real games directly through a structural penalty that suppresses a role-redundant unit's offensive output — one that does NOT fade with time on ice together, unlike the separate chemistry penalty below.",
+        "Separately, a line/pair also builds ordinary chemistry from repeated shared ice time — a freshly formed or just-shuffled combo sims below full strength until it gels, and that penalty DOES fade as the unit plays together. The Line Editor shows live badges for both Chemistry and Role Fit while you drag players around, and the Line Builder view shows the same numbers (plus an offensive profile and a plain-language summary) for your saved lines.",
+      ] },
+    ],
+  },
 ];
 
 // ---- Czech rulebook (shown when the site language is Czech) ------------------
@@ -487,6 +506,25 @@ const SECTIONS_CS: Sec[] = [
       { h: "Dobré vědět", points: [
         "OV (Overall/celkové hodnocení) je jedno souhrnné číslo. Rozhoduje o automatickém rozdělení ledového času/sestavy, kdykoli si linky nenastavíte ručně, a (uměle roztažené pro reálný rozdíl mezi týmy) zhruba vyjadřuje celkovou kvalitu týmu.",
         "CON (kondice) je popsaná v §3 — není to pevný atribut, ale živá hodnota únavy/zdraví, která klesá hraním a obnovuje se ve dnech volna.",
+      ] },
+    ],
+  },
+  {
+    id: "tactics", title: "16 · Taktika týmu a shoda formací",
+    intro: "Kromě čistých hodnocení hraje roli i to, JAK sestavu nasadíte — celotýmová systémová taktika, úpravy na úrovni jednotlivých formací a to, jak dobře se hráči na lajně/páru vzájemně doplňují, to vše ovlivňuje každý odsimulovaný zápas.",
+    groups: [
+      { h: "Systémová taktika týmu", points: [
+        "Šest voličů, každý s neutrální výchozí hodnotou „Vyvážené”: Tempo (rychlost hry), Forček (tlak na puk), Styl s pukem (jak útočíte), Krytí obranného pásma (jak bráníte vlastní pásmo) a dva voliče speciálních formací — styl přesilovky a styl oslabení. Přednastavené styly je sdruží (Run-and-Gun, Past, Těžký forček, Objem střel, Uzamčení) nebo si každý volič nastavíte zvlášť na stránce Taktika, kde je přesně popsané, co která volba dělá a jaké atributy chce.",
+        "Každá volba mimo vyvážené má reálný přínos (víc střel, víc zisků puku, méně/méně nebezpečných šancí soupeře, silnější přesilovka nebo oslabení) A reálnou cenu (víc střel proti, víc únavy, víc trestů) — cena platí vždy naplno, přínos škáluje Shoda systému níže.",
+        "Shoda systému (živě zobrazená jako %, zhruba 60–118 %) měří, jak dobře se na ledě zprůměrované atributy vaší soupisky hodí k voličům, které jste nastavili — např. rychlé tempo chce bruslení (SK) a výdrž (EN), agresivní forček chce důraz (CK) a rychlost (SK), cyklovací útok chce přihrávku (PA) a sílu (ST), přesilovka 1-3-1 chce střelce na blafák (SC) a rozehrávače (PA). Zvolíte-li systém, na který máte v soupisce hráče, jeho přínosy se zesílí; vnutíte-li systém, na který nemáte, platíte plnou cenu bez plné odměny.",
+        "Hlavní trenér posouvá Shodu dvěma způsoby: jeho zkušenost (EX) pomáhá zvládnout náročný systém (ostřílený kouč pozvedne slabší shodu; nezkušený z náročného systému tolik nevytěží), a jeho osobní koučovací styl (Ofenzivní / Defenzivní / Fyzický / Vyvážený) přidává malý bonus, když systém, který nastavíte, odpovídá jeho vlastní identitě, a trochu tření, když si odporují.",
+        "Úpravy na úrovni formace: každá útočná lajna může mít vlastní Styl s pukem a každý obranný pár vlastní Krytí obranného pásma, navrstvené na celotýmové Tempo a Forček (ty zůstávají vždy na úrovni týmu) — např. defenzivní pár může hrát Zhustenie, zatímco vaše první dvojice hraje Agresivně.",
+      ] },
+      { h: "Shoda rolí na lajně/páru (chemie)", points: [
+        "Kromě čistého talentu záleží i na MIXU rolí: útočná lajna chce rozehrávače + střelce + dříče, ne tři stejné typy; obranný pár chce jednoho ofenzivně laděného beka spárovaného s jedním defenzivně laděným, ne dva se stejným stylem hry.",
+        "Role hráče se posuzuje vůči PRŮMĚRU LIGY pro jeho post, ne porovnáním jeho vlastní ofenzivy s vlastní obranou izolovaně — bek se počítá jako ofenzivně laděný, jen pokud je opravdu ofenzivnější než typický bek v NHL, protože obranné atributy jsou u všech beků napříč ligou vysoké. (Posuzování hráče čistě proti sobě samému dřív chybně řadilo řadu reálně ofenzivních beků mezi defenzivní, protože i ofenzivnímu bekovi obvykle vyjdou jeho obranná čísla vyšší než ta ofenzivní.)",
+        "Shoda rolí je odstupňované skóre, ne příznak ano/ne: silně se doplňující pár (skutečný defenzivní bek vedle skutečného ofenzivního) má výrazně vyšší skóre než pár, který se doplňuje jen málo — místo aby každá „smíšená” kombinace vyšla na stejné číslo. Přímo se promítá do reálných zápasů přes strukturální postih, který snižuje ofenzivní výkon jednotky s duplicitními rolemi — ten se ČASEM NEVYTRÁCÍ, na rozdíl od samostatného postihu za chemii níže.",
+        "Samostatně si lajna/pár buduje i běžnou chemii ze společně odehraného času na ledě — čerstvě sestavená nebo právě přeskládaná kombinace simuluje pod plnou silou, dokud se nesehraje, a tento postih se ČASEM VYTRÁCÍ. Editor sestav ukazuje živé odznaky pro Chemii i Shodu rolí, zatímco přesouváte hráče mezi lajnami, a pohled Line Builder ukazuje stejná čísla (plus ofenzivní profil a shrnutí v prostém jazyce) pro vaše uložené sestavy.",
       ] },
     ],
   },
