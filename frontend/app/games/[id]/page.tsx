@@ -5,7 +5,9 @@ import type { PbpEvent, ShootoutAttempt } from "@/lib/sim/types";
 import { loadTeamLines, autoLines, autoFill, deployDistinct } from "@/lib/sim/lines";
 import { cleanName } from "@/lib/playerName";
 import GameIntegrity from "@/components/GameIntegrity";
+import PostGameIntelCard from "@/components/PostGameIntelCard";
 import { gameStory } from "@/lib/game-report-server";
+import { getTeamSession } from "@/lib/auth";
 
 // Build every line unit for the Lines tab — the manager's lines if set, else the
 // same position-aware auto lines the sim uses — resolved to player names.
@@ -236,6 +238,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
   return (
     <>
       <GameView data={data} />
+      {game.status === "FINAL" && (await getTeamSession()) != null && <PostGameIntelCard gameId={game.id} />}
       {game.status === "FINAL" && (
         <GameIntegrity
           engineVersion={game.engineVersion}
