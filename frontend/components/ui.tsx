@@ -59,6 +59,23 @@ export function SectionTitle({ children, count, accent, action }: { children: Re
   );
 }
 
+/** A "back to X" link, styled as a small pill (chevron + label) instead of the
+ *  plain "← text" links scattered around the app — use this everywhere a page
+ *  links back to a parent/list page (PageHeader's `right` slot, a page's own
+ *  top-left corner, etc.) so every return link looks the same. For a link that
+ *  should pop real browser history when available (falling back to a fixed
+ *  parent otherwise), use BackLink instead — this one always goes straight to
+ *  `href`. */
+export function BackPill({ href, children, className = "" }: { href: string; children: React.ReactNode; className?: string }) {
+  return (
+    <Link href={href}
+      className={`inline-flex items-center gap-1.5 text-sm font-medium text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 hover:border-slate-600 rounded-lg pl-2 pr-3 py-1.5 transition-colors whitespace-nowrap ${className}`}>
+      <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+      {children}
+    </Link>
+  );
+}
+
 export function PageHeader({ title, subtitle, right }: { title: React.ReactNode; subtitle?: React.ReactNode; right?: React.ReactNode }) {
   return (
     <div className="flex items-end justify-between gap-4">

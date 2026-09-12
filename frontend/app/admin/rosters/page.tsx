@@ -1,9 +1,9 @@
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getRosterConfig } from "./actions";
 import RosterModeControl from "@/components/RosterModeControl";
 import NormalizeRostersButton from "@/components/NormalizeRostersButton";
 import { money } from "@/lib/finance";
+import { BackPill } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +20,7 @@ export default async function AdminRostersPage() {
     <div className="max-w-3xl mx-auto px-4">
       <div className="flex items-center justify-between mb-1">
         <h1 className="text-2xl font-bold">Roster Source</h1>
-        <Link href="/admin" className="text-sm text-slate-400 hover:text-blue-400">← Admin</Link>
+        <BackPill href="/admin">Admin</BackPill>
       </div>
       <p className="text-slate-400 text-sm mb-6">Choose which roster the league plays with. Currently: <b className="text-white">{cfg.rosterMode === "real" ? "Real NHL Rosters" : "ProfiNHL Rosters"}</b>. Switching also swaps the <b>salary-cap ceiling</b> and each player&apos;s cap hit.</p>
 

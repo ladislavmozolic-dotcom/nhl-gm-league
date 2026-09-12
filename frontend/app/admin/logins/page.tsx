@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { isAdmin } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, BackPill } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +32,7 @@ export default async function LoginsPage() {
 
   return (
     <div className="space-y-4 py-2">
-      <PageHeader title="Access Audit" subtitle="GM sign-ins and site visits — time, IP and rough location." right={<Link href="/admin" className="text-sm text-slate-400 hover:text-blue-400">← Admin</Link>} />
+      <PageHeader title="Access Audit" subtitle="GM sign-ins and site visits — time, IP and rough location." right={<BackPill href="/admin">Admin</BackPill>} />
       <Card bodyClassName="p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[900px]">

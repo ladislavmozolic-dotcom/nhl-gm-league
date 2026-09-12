@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getTeamSession } from "@/lib/auth";
 import { ReactionBar, CommentBox } from "@/components/NewsReactions";
+import { BackPill } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +25,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
 
   return (
     <div className="py-2">
-      <Link href="/" className="text-sm text-slate-400 hover:text-blue-400">← Home</Link>
+      <BackPill href="/">Home</BackPill>
       <article className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 p-6 mt-3">
         <div className="flex items-center gap-3 mb-4">
           {author?.logoUrl ? <img src={author.logoUrl} alt="" className="w-10 h-10 object-contain" />

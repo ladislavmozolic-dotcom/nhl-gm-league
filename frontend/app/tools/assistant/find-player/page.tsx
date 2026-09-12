@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getTeamSession } from "@/lib/auth";
 import { liveCapHit } from "@/lib/finance";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, BackPill } from "@/components/ui";
 import SortableTable, { type SortCol, type SortRow } from "@/components/SortableTable";
 
 export const dynamic = "force-dynamic";
@@ -125,7 +125,7 @@ export default async function FindPlayerPage({ searchParams }: { searchParams: P
       <PageHeader
         title="🔎 Find Player"
         subtitle="UNHL Intelligence"
-        right={<Link href="/tools/assistant" className="text-sm text-slate-400 hover:text-blue-400">← UNHL Intelligence</Link>}
+        right={<BackPill href="/tools/assistant">UNHL Intelligence</BackPill>}
       />
 
       <Card bodyClassName="p-4">

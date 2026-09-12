@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import RosterTable, { type RosterPlayer } from "@/components/RosterTable";
-import { PageHeader, SectionTitle } from "@/components/ui";
+import { PageHeader, SectionTitle, BackPill } from "@/components/ui";
 import { money, liveCapHit } from "@/lib/finance";
 import { captaincyFromName } from "@/lib/playerName";
 import { isLoggedIn } from "@/lib/auth";
@@ -50,7 +50,7 @@ export default async function AllGoaliesPage({ searchParams }: { searchParams: P
   return (
     <div className="space-y-6 py-2">
       <PageHeader title="All Goalies" subtitle="Every club's NHL and AHL goaltenders, one team at a time."
-        right={<Link href="/tools/all-rosters" className="text-sm text-slate-400 hover:text-blue-400 whitespace-nowrap">← All Rosters</Link>}
+        right={<BackPill href="/tools/all-rosters">All Rosters</BackPill>}
       />
 
       {/* team logo switcher — same mechanism as All Rosters */}

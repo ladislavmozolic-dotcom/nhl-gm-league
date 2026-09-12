@@ -4,7 +4,7 @@ import { getTeamSession } from "@/lib/auth";
 import { findTradePartners } from "@/lib/gm-assistant/findTradePartners";
 import { SLOTS } from "@/lib/gm-assistant/leagueSlots";
 import { cleanName } from "@/lib/playerName";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, BackPill } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +32,7 @@ export default async function FindTradePartnerPage({ searchParams }: { searchPar
       <PageHeader
         title="🤝 Find Trade Partner"
         subtitle="UNHL Intelligence"
-        right={<Link href="/tools/assistant" className="text-sm text-slate-400 hover:text-blue-400">← UNHL Intelligence</Link>}
+        right={<BackPill href="/tools/assistant">UNHL Intelligence</BackPill>}
       />
 
       <Card bodyClassName="p-4">

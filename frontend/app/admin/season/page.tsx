@@ -1,10 +1,9 @@
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import SeasonControls from "@/components/SeasonControls";
 import { generateScheduleAction, playSeasonAction, runPlayoffsAction, resetSeasonAction, importNhlApiAction, importCsvAction, archiveSeasonAction, runRetirementsAction, developProspectsAction } from "./actions";
 import RunAiGmButton from "@/components/RunAiGmButton";
 import RestartSeasonButton from "@/components/RestartSeasonButton";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, BackPill } from "@/components/ui";
 import PrepareNextDraftButton from "@/components/PrepareNextDraftButton";
 import DraftPickControls from "@/components/DraftPickControls";
 import PhaseControl from "@/components/PhaseControl";
@@ -72,7 +71,7 @@ export default async function SeasonAdminPage() {
       <PageHeader
         title="Season Control"
         subtitle={`${SEASON} — run the regular season and playoffs without scripts.`}
-        right={<Link href="/admin" className="text-sm text-slate-400 hover:text-blue-400">← Admin</Link>}
+        right={<BackPill href="/admin">Admin</BackPill>}
       />
 
       <Card title="League phase" accent="text-blue-400">

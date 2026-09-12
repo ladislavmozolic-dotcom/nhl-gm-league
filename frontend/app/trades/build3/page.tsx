@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { getTeamSession } from "@/lib/auth";
@@ -6,7 +5,7 @@ import { teamAssets } from "@/lib/trade-assets";
 import { teamCapStatus } from "@/lib/cap";
 import TradeBuilder3 from "@/components/TradeBuilder3";
 import TeamSelect from "@/components/TeamSelect";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, BackPill } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +32,7 @@ export default async function TradeBuild3Page({ searchParams }: { searchParams: 
         <PageHeader
           title="3-Team Trade Room"
           subtitle={`You are ${myTeam.name}. Pick the other two clubs.`}
-          right={<Link href="/trades/build" className="text-sm text-slate-400 hover:text-blue-400">← 2-team Trade Room</Link>}
+          right={<BackPill href="/trades/build">2-team Trade Room</BackPill>}
         />
         <Card>
           <form className="flex flex-col sm:flex-row gap-3">

@@ -1,7 +1,6 @@
-import Link from "next/link";
 import PlayerLink from "@/components/PlayerLink";
 import { isAdmin } from "@/lib/auth";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, BackPill } from "@/components/ui";
 import { previewLeagueElc } from "@/app/free-agents/actions";
 import { cleanName } from "@/lib/playerName";
 import ElcApplyButton from "@/components/ElcApplyButton";
@@ -25,7 +24,7 @@ export default async function ElcAdminPage() {
   return (
     <div className="space-y-6 py-2">
       <PageHeader title="Entry-Level Contracts" subtitle="Auto-computed rookie deals — review, then assign (July 1)"
-        right={<Link href="/admin" className="text-sm text-slate-400 hover:text-blue-400">← Admin</Link>} />
+        right={<BackPill href="/admin">Admin</BackPill>} />
 
       <Card title="How the ELC is computed" accent="text-slate-200">
         <ul className="text-sm text-slate-300 space-y-1 list-disc pl-5">

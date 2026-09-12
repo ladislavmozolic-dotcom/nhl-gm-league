@@ -1,9 +1,8 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTeamSession } from "@/lib/auth";
 import { cleanName } from "@/lib/playerName";
 import { money } from "@/lib/finance";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, BackPill } from "@/components/ui";
 import { parseMoves, runScenario, searchUfaPlayers, listTeamRoster, listNhlTeams } from "@/lib/gm-assistant/scenarioEngine";
 import { addSignMoveAction, addWalkMoveAction, addTradeMoveAction, removeMoveAction } from "./actions";
 
@@ -54,7 +53,7 @@ export default async function ScenarioPage({ searchParams }: { searchParams: Pro
       <PageHeader
         title="🧪 Scenario Engine"
         subtitle="UNHL Intelligence — „Čo ak?“ simulácia bez zápisu do ligy, kým reálne krok nevykonáš."
-        right={<Link href="/tools/assistant" className="text-sm text-slate-400 hover:text-blue-400">← UNHL Intelligence</Link>}
+        right={<BackPill href="/tools/assistant">UNHL Intelligence</BackPill>}
       />
 
       <Card title={`Kroky scenára (${result.moves.length})`} accent="text-blue-400">

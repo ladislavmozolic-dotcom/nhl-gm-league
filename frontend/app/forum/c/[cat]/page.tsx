@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, BackPill } from "@/components/ui";
 import { getTeamSession, isAdmin } from "@/lib/auth";
 import { createThread, markForumSeen } from "../../actions";
 import { CATEGORIES, CAT_META, type Category } from "../../categories";
@@ -39,7 +39,7 @@ export default async function CategoryPage({ params, searchParams }: { params: P
       <PageHeader
         title={<span className="flex items-center gap-2.5"><span className="text-3xl">{m.icon}</span>{m.label}</span>}
         subtitle={m.desc}
-        right={<Link href="/forum" className="text-sm text-slate-400 hover:text-blue-400 whitespace-nowrap">← Board index</Link>}
+        right={<BackPill href="/forum">Board index</BackPill>}
       />
 
       {error === "admin" && <Card><p className="text-center text-amber-400 text-sm py-2">Do tohto podfóra môže vlákna zakladať len komisár.</p></Card>}

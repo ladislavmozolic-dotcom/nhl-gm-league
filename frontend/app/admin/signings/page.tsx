@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, BackPill } from "@/components/ui";
 import { cleanName } from "@/lib/playerName";
 import RevertSigningButton from "@/components/RevertSigningButton";
 
@@ -14,7 +14,7 @@ export default async function AdminSigningsPage() {
 
   return (
     <div className="space-y-6 py-2">
-      <PageHeader title="Latest Signings" subtitle="Every UFA signing & extension — revert one to restore the player's prior contract." right={<Link href="/admin" className="text-sm text-slate-400 hover:text-blue-400">← Admin</Link>} />
+      <PageHeader title="Latest Signings" subtitle="Every UFA signing & extension — revert one to restore the player's prior contract." right={<BackPill href="/admin">Admin</BackPill>} />
 
       <Card bodyClassName="p-0">
         {logs.length === 0 ? (

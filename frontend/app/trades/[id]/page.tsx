@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getTeamSession, isAdmin, isCommission } from "@/lib/auth";
 import { money } from "@/lib/finance";
 import { displayName, epProfileUrl } from "@/lib/playerName";
-import { PageHeader } from "@/components/ui";
+import { PageHeader, BackPill } from "@/components/ui";
 import TradeActions from "@/components/TradeActions";
 
 export const dynamic = "force-dynamic";
@@ -45,7 +45,7 @@ export default async function TradePage({ params }: { params: Promise<{ id: stri
     return (
       <div className="py-10 text-center">
         <p className="text-slate-400">Trade not found.</p>
-        <Link href="/trades" className="text-blue-400 hover:text-blue-300 text-sm">← all trades</Link>
+        <BackPill href="/trades">all trades</BackPill>
       </div>
     );
   }
@@ -59,7 +59,7 @@ export default async function TradePage({ params }: { params: Promise<{ id: stri
     return (
       <div className="py-10 text-center space-y-2">
         <p className="text-slate-400">This trade proposal is private — only the clubs involved can see it until it&apos;s completed.</p>
-        <Link href="/trades" className="text-blue-400 hover:text-blue-300 text-sm">← all trades</Link>
+        <BackPill href="/trades">all trades</BackPill>
       </div>
     );
   }
@@ -122,7 +122,7 @@ export default async function TradePage({ params }: { params: Promise<{ id: stri
 
   return (
     <div className="space-y-5 py-2 max-w-3xl mx-auto">
-      <PageHeader title={`Trade #${trade.id}`} subtitle="Trade proposal" right={<Link href="/trades" className="text-sm text-slate-400 hover:text-blue-400">← all trades</Link>} />
+      <PageHeader title={`Trade #${trade.id}`} subtitle="Trade proposal" right={<BackPill href="/trades">all trades</BackPill>} />
 
       <div className="bg-slate-900/70 rounded-2xl border border-slate-800 shadow-lg shadow-black/20 p-5">
         <div className="flex items-center justify-between mb-1 flex-wrap gap-2">

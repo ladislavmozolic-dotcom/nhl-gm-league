@@ -1,9 +1,8 @@
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import PopularityEditor from "@/components/PopularityEditor";
 import CoachImportButton from "@/components/CoachImportButton";
 import { savePopularity } from "./actions";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, BackPill } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +17,7 @@ export default async function AdminFinancePage() {
       <PageHeader
         title="Team Popularity"
         subtitle="Popularity (0–200) drives attendance and ticket revenue. A winning record raises the effective draw, a losing one lowers it. Saving recomputes bank accounts."
-        right={<Link href="/admin" className="text-sm text-slate-400 hover:text-blue-400">← Admin</Link>}
+        right={<BackPill href="/admin">Admin</BackPill>}
       />
       <Card>
         <div className="text-sm font-semibold mb-1">Profinhl imports</div>

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, BackPill } from "@/components/ui";
 import { getTeamSession, isAdmin } from "@/lib/auth";
 import ForumReply from "@/components/ForumReply";
 import ForumPostCard, { type ForumPostView } from "@/components/ForumPostCard";
@@ -54,7 +54,7 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
       <PageHeader
         title={thread.title}
         subtitle={`${CAT_META[cat].label} · ${posts.length} príspevk${posts.length === 1 ? "" : "ov"}`}
-        right={<Link href={`/forum/c/${cat}`} className="text-sm text-slate-400 hover:text-blue-400">← {CAT_META[cat].label}</Link>}
+        right={<BackPill href={`/forum/c/${cat}`}>{CAT_META[cat].label}</BackPill>}
       />
 
       <div className="space-y-3">

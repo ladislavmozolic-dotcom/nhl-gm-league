@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { createPlayer } from "../actions";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, BackPill } from "@/components/ui";
 import { isComishOrCoComish } from "@/lib/auth";
 import { SKATER_FIELDS } from "@/lib/skater-fields";
 
@@ -26,7 +25,7 @@ export default async function NewPlayerPage() {
       <PageHeader
         title="Add Player"
         subtitle="Create a player from scratch — bio, contract and ratings entered by hand."
-        right={<Link href="/admin/contracts" className="text-sm text-slate-400 hover:text-blue-400">← Contracts</Link>}
+        right={<BackPill href="/admin/contracts">Contracts</BackPill>}
       />
 
       {!canOverride ? (

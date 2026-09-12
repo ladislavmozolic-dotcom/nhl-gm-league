@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { updateContract, markLtir, sendToProspects, activateFromReserve } from "../actions";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, BackPill } from "@/components/ui";
 import { money } from "@/lib/finance";
 import { isComishOrCoComish } from "@/lib/auth";
 import DeletePlayerButton from "@/components/DeletePlayerButton";
@@ -27,7 +26,7 @@ export default async function ContractEditPage({
   if (!player) {
     return (
       <div className="space-y-6 py-2">
-        <PageHeader title="Player not found" right={<Link href="/admin/contracts" className="text-sm text-slate-400 hover:text-blue-400">← Contracts</Link>} />
+        <PageHeader title="Player not found" right={<BackPill href="/admin/contracts">Contracts</BackPill>} />
       </div>
     );
   }
@@ -39,7 +38,7 @@ export default async function ContractEditPage({
       <PageHeader
         title={player.name}
         subtitle={`${player.position ?? ""} · ${player.team.name}`}
-        right={<Link href="/admin/contracts" className="text-sm text-slate-400 hover:text-blue-400">← Contracts</Link>}
+        right={<BackPill href="/admin/contracts">Contracts</BackPill>}
       />
       {saved && <div className="text-sm text-green-300 bg-green-950/30 border border-green-800/40 rounded-lg px-4 py-2.5">Contract saved.</div>}
 

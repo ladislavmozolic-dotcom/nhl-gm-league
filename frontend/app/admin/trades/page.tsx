@@ -1,10 +1,9 @@
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { isAdmin } from "@/lib/auth";
 import { money } from "@/lib/finance";
 import { cleanName } from "@/lib/playerName";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, BackPill } from "@/components/ui";
 import RevokeTradeButton from "@/components/RevokeTradeButton";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +33,7 @@ export default async function AdminTradesPage() {
 
   return (
     <div className="space-y-5 py-2">
-      <PageHeader title="Completed Trades" subtitle="Every accepted trade — revoke one to return all assets to their original clubs." right={<Link href="/admin" className="text-sm text-slate-400 hover:text-blue-400">← Admin</Link>} />
+      <PageHeader title="Completed Trades" subtitle="Every accepted trade — revoke one to return all assets to their original clubs." right={<BackPill href="/admin">Admin</BackPill>} />
       {trades.length === 0 ? (
         <Card><p className="text-slate-500 text-center py-8">No completed trades yet.</p></Card>
       ) : (

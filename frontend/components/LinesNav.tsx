@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { BackPill } from "@/components/ui";
 
 // Header shared by the Line Editor and the Line Builder: team name + a toggle
 // between the two views.
@@ -22,7 +23,7 @@ export default function LinesNav({ teamName, teamSlug }: { teamName: string; tea
           <Tab href={`/teams/${teamSlug}/lines/captains`} label="Captains & Numbers" active={onCaptains} />
         </div>
       </div>
-      <Link href={`/teams/${teamSlug}`} className="text-sm text-slate-400 hover:text-blue-400">← back to team</Link>
+      <BackPill href={`/teams/${teamSlug}`}>back to team</BackPill>
     </div>
   );
 }

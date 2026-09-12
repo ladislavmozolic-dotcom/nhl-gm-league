@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import { BackPill } from "@/components/ui";
 import type { ArenaSection } from "@/lib/finance";
 
 export type HomeGame = {
@@ -60,7 +61,7 @@ export default function FinanceEditor({ teamName, teamSlug, arena, sections, cap
       <div className="mb-5">
         <h1 className="text-2xl font-bold">{teamName} — Arena &amp; Tickets</h1>
         <div className="flex gap-3 text-sm mt-1">
-          <Link href={`/teams/${teamSlug}`} className="text-slate-400 hover:text-blue-400">← team</Link>
+          <BackPill href={`/teams/${teamSlug}`}>team</BackPill>
           <Link href={`/teams/${teamSlug}/salary`} className="text-slate-400 hover:text-blue-400">Salary Cap →</Link>
           <Link href={`/teams/${teamSlug}/lines`} className="text-slate-400 hover:text-blue-400">Lines →</Link>
         </div>

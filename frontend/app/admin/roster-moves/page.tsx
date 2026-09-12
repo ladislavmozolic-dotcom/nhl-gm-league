@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { isAdmin } from "@/lib/auth";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, BackPill } from "@/components/ui";
 import PlayerLink from "@/components/PlayerLink";
 import AdminTransferButton from "@/components/AdminTransferButton";
 import TeamPicker from "@/components/TeamPicker";
@@ -164,7 +163,7 @@ export default async function AdminRosterMovesPage({ searchParams }: { searchPar
   return (
     <div className="space-y-6 py-2">
       <PageHeader title="Roster Moves — Move Players Between Clubs" subtitle="Commissioner override: transfer any player, draft pick, or prospect between two organizations directly — no trade proposal, no consent, no cap check."
-        right={<Link href="/admin" className="text-sm text-slate-400 hover:text-blue-400 whitespace-nowrap">← Admin</Link>}
+        right={<BackPill href="/admin">Admin</BackPill>}
       />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

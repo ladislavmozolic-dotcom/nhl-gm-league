@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { notFound, redirect } from "next/navigation";
 import { isAdmin } from "@/lib/auth";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, BackPill } from "@/components/ui";
 import { cleanName } from "@/lib/playerName";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +36,7 @@ export default async function AdminBidsPage({ params }: { params: Promise<{ play
       <PageHeader
         title={`${cleanName(player.name)} — Bidding Trail`}
         subtitle="Every offer & raise on this free agent, oldest first (admin view)."
-        right={<Link href="/admin/signings" className="text-sm text-slate-400 hover:text-blue-400">← Latest Signings</Link>}
+        right={<BackPill href="/admin/signings">Latest Signings</BackPill>}
       />
 
       <Card>

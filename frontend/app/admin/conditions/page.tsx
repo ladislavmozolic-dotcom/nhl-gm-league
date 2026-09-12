@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import ConditionActions from "@/components/ConditionActions";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, BackPill } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +18,7 @@ export default async function AdminConditionsPage() {
       <PageHeader
         title="Trade Conditions"
         subtitle={`Conditional future compensation from trades. Mark a condition fulfilled once its terms are met — the settlement is logged to the transaction feed. ${pending.length} pending.`}
-        right={<Link href="/admin" className="text-sm text-slate-400 hover:text-blue-400">← Admin</Link>}
+        right={<BackPill href="/admin">Admin</BackPill>}
       />
 
       {conditions.length === 0 ? (

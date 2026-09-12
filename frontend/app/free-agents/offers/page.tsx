@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, BackPill } from "@/components/ui";
 import PlayerLink from "@/components/PlayerLink";
 import PlayerAvatar from "@/components/playerAvatar";
 import { money } from "@/lib/finance";
@@ -41,7 +41,7 @@ export default async function AllOffersPage({ searchParams }: { searchParams: Pr
       <PageHeader
         title="All Active Offers"
         subtitle="Every free agent currently carrying at least one standing offer — commissioner / co-commissioner view."
-        right={<Link href="/free-agents" className="text-sm text-slate-400 hover:text-blue-400">← Free Agent Frenzy</Link>}
+        right={<BackPill href="/free-agents">Free Agent Frenzy</BackPill>}
       />
 
       {r.ok && (

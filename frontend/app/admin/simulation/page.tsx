@@ -1,10 +1,9 @@
-import Link from "next/link";
 import { loadSettings } from "@/lib/sim/settings";
 import SimSettingsForm from "@/components/SimSettingsForm";
 import SimEngineToggle from "@/components/SimEngineToggle";
 import ParamModeToggle from "@/components/ParamModeToggle";
 import { saveSimSettings } from "./actions";
-import { PageHeader } from "@/components/ui";
+import { PageHeader, BackPill } from "@/components/ui";
 import { activeSimEngine } from "@/lib/sim/version";
 import { prisma } from "@/lib/prisma";
 
@@ -22,7 +21,7 @@ export default async function SimulationAdminPage() {
       <PageHeader
         title="NHL Sim Engine"
         subtitle="Tune how games play out. Multipliers are % of the calibrated baseline (100 = default). Changes apply to the next simulation."
-        right={<Link href="/admin" className="text-sm text-slate-400 hover:text-blue-400">← Admin</Link>}
+        right={<BackPill href="/admin">Admin</BackPill>}
       />
       <SimEngineToggle engine={engine} />
       <ParamModeToggle mode={paramMode} />

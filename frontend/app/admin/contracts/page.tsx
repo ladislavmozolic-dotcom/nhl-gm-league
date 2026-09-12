@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, BackPill } from "@/components/ui";
 import { money, seasonLabel, CURRENT_SEASON_START } from "@/lib/finance";
 import { isAdmin } from "@/lib/auth";
 import type { Prisma } from "@prisma/client";
@@ -77,7 +77,7 @@ export default async function AdminContractsPage({ searchParams }: { searchParam
         subtitle="Set a player's salary (cap hit) and contract length. Manual override until Agent signing writes it automatically."
         right={<div className="flex items-center gap-4">
           <Link href="/admin/contracts/new" className="text-sm text-emerald-400 hover:text-emerald-300 font-semibold">+ Add Player</Link>
-          <Link href="/admin" className="text-sm text-slate-400 hover:text-blue-400">← Admin</Link>
+          <BackPill href="/admin">Admin</BackPill>
         </div>}
       />
 

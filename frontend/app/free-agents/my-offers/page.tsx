@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, BackPill } from "@/components/ui";
 import PlayerLink from "@/components/PlayerLink";
 import PlayerAvatar from "@/components/playerAvatar";
 import { money } from "@/lib/finance";
@@ -24,7 +23,7 @@ export default async function MyOffersPage() {
       <PageHeader
         title="My Active Offers"
         subtitle="Every standing offer your own club currently has out on a free agent."
-        right={<Link href="/free-agents" className="text-sm text-slate-400 hover:text-blue-400">← Free Agent Frenzy</Link>}
+        right={<BackPill href="/free-agents">Free Agent Frenzy</BackPill>}
       />
 
       {!r.ok ? (

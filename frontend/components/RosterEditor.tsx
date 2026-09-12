@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import PlayerLink from "@/components/PlayerLink";
 import Link from "next/link";
+import { BackPill } from "@/components/ui";
 import type { RosterRow } from "@/app/teams/[slug]/roster/actions";
 
 type Player = { id: number; name: string; position: string; number: number | null; overall: number; captaincy: "C" | "A" | null; isGoalie: boolean };
@@ -105,7 +106,7 @@ export default function RosterEditor({ teamName, teamSlug, players, onSave, embe
           <div>
             <h1 className="text-2xl font-bold">{teamName} — Roster Management</h1>
             <div className="flex gap-3 text-sm mt-1">
-              <Link href={`/teams/${teamSlug}`} className="text-slate-400 hover:text-blue-400">← team</Link>
+              <BackPill href={`/teams/${teamSlug}`}>team</BackPill>
               <Link href={`/teams/${teamSlug}/lines`} className="text-slate-400 hover:text-blue-400">Line editor →</Link>
             </div>
           </div>

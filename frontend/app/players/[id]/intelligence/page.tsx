@@ -1,9 +1,8 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getTeamSession } from "@/lib/auth";
 import { cleanName } from "@/lib/playerName";
-import { PageHeader } from "@/components/ui";
+import { PageHeader, BackPill } from "@/components/ui";
 import PlayerIntelligenceCard from "@/components/PlayerIntelligenceCard";
 import PlayerFitCard from "@/components/PlayerFitCard";
 import ContractIntelCard from "@/components/ContractIntelCard";
@@ -45,7 +44,7 @@ export default async function PlayerIntelligencePage({ params }: { params: Promi
           </span>
         }
         subtitle={player.team ? player.team.name : "Free Agent"}
-        right={<Link href={`/players/${player.id}`} className="text-sm text-slate-400 hover:text-blue-400">← Späť na profil</Link>}
+        right={<BackPill href={`/players/${player.id}`}>Späť na profil</BackPill>}
       />
       <PlayerIntelligenceCard playerId={player.id} />
       <PlayerFitCard playerId={player.id} playerTeamId={player.teamId ?? null} viewerTeamId={gmTeamId} />

@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getAutoSim } from "@/lib/sim/auto";
 import AutoSimControl from "@/components/AutoSimControl";
+import { BackPill } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +23,7 @@ export default async function AdminLinesPage() {
     <div className="max-w-3xl mx-auto px-4">
       <div className="flex items-center justify-between mb-1">
         <h1 className="text-2xl font-bold">Line Submissions</h1>
-        <Link href="/admin" className="text-sm text-slate-400 hover:text-blue-400">← Admin</Link>
+        <BackPill href="/admin">Admin</BackPill>
       </div>
       <p className="text-slate-400 text-sm mb-4">The simulation runs daily at <b>{SIM_HOUR}</b>. If a GM hasn&apos;t re-saved their lines, their last-saved lineup is used. Below is when each club last submitted lines.</p>
 

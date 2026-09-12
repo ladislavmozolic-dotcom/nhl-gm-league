@@ -28,9 +28,9 @@ export default function BackLink({ fallback, label }: { fallback: string; label:
     <Link
       href={fallback}
       onClick={(e) => { if (canBack) { e.preventDefault(); router.back(); } }}
-      className="inline-flex items-center text-sm text-slate-400 hover:text-white transition-colors"
+      className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 hover:border-slate-600 rounded-lg pl-2 pr-3 py-1.5 transition-colors whitespace-nowrap"
     >
-      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+      <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
       {canBack ? "Back" : label}
     </Link>
   );

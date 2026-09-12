@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, BackPill } from "@/components/ui";
 import { cleanName } from "@/lib/playerName";
 import DeleteFaOfferButton from "@/components/DeleteFaOfferButton";
 import ResetResignButton from "@/components/ResetResignButton";
@@ -41,7 +41,7 @@ export default async function AdminAgentPage() {
       <PageHeader
         title="🤖 AI Agent"
         subtitle="Standing offers the free-agent negotiation engine is currently working through — clear a stuck or unwanted one."
-        right={<Link href="/admin" className="text-sm text-slate-400 hover:text-blue-400">← Admin</Link>}
+        right={<BackPill href="/admin">Admin</BackPill>}
       />
 
       <Card title="Free Agent Frenzy" accent="text-blue-400">

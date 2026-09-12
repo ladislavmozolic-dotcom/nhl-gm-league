@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { isAdmin } from "@/lib/auth";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, BackPill } from "@/components/ui";
 import { previewReconciliation } from "@/lib/roster-reconcile";
 import RosterReconcile from "@/components/RosterReconcile";
 
@@ -21,7 +20,7 @@ export default async function RosterUpdatePage() {
   return (
     <div className="space-y-6 py-2">
       <PageHeader title="Post-Season Roster Update" subtitle="Reconcile A-team & farm rosters from last season's games (run before the June draft)"
-        right={<Link href="/admin" className="text-sm text-slate-400 hover:text-blue-400">← Admin</Link>} />
+        right={<BackPill href="/admin">Admin</BackPill>} />
 
       <Card title="Rules" accent="text-slate-200">
         <ul className="text-sm text-slate-300 space-y-1 list-disc pl-5">
