@@ -10,7 +10,7 @@ import { liveCapHit } from "@/lib/finance";
 // Partner already rank on — a player's "fit" is just his own rating held up
 // against the same numbers, nothing invented.
 
-const isPos = (pos: string, code: string) => new RegExp(`(^|/)${code}(/|$)`).test(pos.toUpperCase());
+export const isPos = (pos: string, code: string) => new RegExp(`(^|/)${code}(/|$)`).test(pos.toUpperCase());
 
 /** Forward-line / D-pair / goalie slots this player's position is eligible
  *  for (PP1/PK1 excluded — those draw from multiple positions and are a

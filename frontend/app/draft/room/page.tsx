@@ -6,6 +6,7 @@ import { effectiveOrder, reverseStandingsOrder, PICKS_PER_ROUND } from "@/lib/dr
 import { countryFlag } from "@/lib/flags";
 import DraftAvailableBoard, { type BoardProspect } from "@/components/DraftAvailableBoard";
 import DraftQueuePanel, { type QueueItem } from "@/components/DraftQueuePanel";
+import DraftIntelCard from "@/components/DraftIntelCard";
 import DraftRoundStarter from "@/components/DraftRoundStarter";
 import DraftTestControls from "@/components/DraftTestControls";
 import DraftChat from "@/components/DraftChat";
@@ -132,6 +133,8 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
         </div>
       )}
       {admin && <BonusPickManager teams={bonusTeams} bonus={bonusRows} />}
+
+      {me != null && <DraftIntelCard teamId={me} draftYear={DRAFT_YEAR} available={availableRaw} sourceWhere={src} />}
 
       {fullView ? (
         <div>
