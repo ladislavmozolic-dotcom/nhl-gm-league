@@ -20,6 +20,38 @@ export type WaiverRow = {
   claims: { teamId: number; code: string }[];
 };
 
+export type WaiverPriorityRow = { teamId: number; code: string; name: string; logoUrl: string | null; rank: number };
+
+/** Full-league waiver-claim priority order, first-in-line first — the SAME
+ *  ordering processWaivers uses to resolve a contested claim (reverse
+ *  standings in-season, a claim-order queue otherwise), just computed for
+ *  every club instead of one contested waiver so a GM can see where their
+ *  club stands in line before claiming. */
+export async function waiverPriorityOrder(phase: Phase): Promise<WaiverPriorityRow[]> {
+  const teams = await prisma.team.findMany({
+    where: { league: "NHL", isAffiliate: false },
+    select: { id: true, code: true, name: true, logoUrl: true, lastWaiverClaimAt: true },
+  });
+  const useStandings = phase === "regular" || phase === "playoffs";
+  let ordered: typeof teams;
+  if (useStandings) {
+    const standings = await computeStandings();
+    const priority = new Map(standings.map((s, i) => [s.teamId, i])); // 0 = best
+    // worst standings (highest priority index) first, unranked teams last
+    ordered = [...teams].sort((a, b) => (priority.get(b.id) ?? -1) - (priority.get(a.id) ?? -1) || a.id - b.id);
+  } else {
+    // never-claimed/longest-idle first, same tie rule as processWaivers' queue branch
+    ordered = [...teams].sort((a, b) => {
+      const la = a.lastWaiverClaimAt, lb = b.lastWaiverClaimAt;
+      if (la === null && lb === null) return a.id - b.id;
+      if (la === null) return -1;
+      if (lb === null) return 1;
+      return la.getTime() - lb.getTime() || a.id - b.id;
+    });
+  }
+  return ordered.map((t, i) => ({ teamId: t.id, code: t.code ?? String(t.id), name: t.name, logoUrl: t.logoUrl, rank: i + 1 }));
+}
+
 /** Active waivers for the wire, newest first. */
 export async function activeWaivers(): Promise<WaiverRow[]> {
   const waivers = await prisma.waiver.findMany({ where: { status: "ACTIVE" }, orderBy: { createdAt: "desc" }, include: { claims: true } });

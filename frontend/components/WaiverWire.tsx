@@ -5,11 +5,11 @@ import Link from "next/link";
 import { Card } from "@/components/ui";
 import { money } from "@/lib/finance";
 import { claimWaiverAction } from "@/app/waivers/actions";
-import type { WaiverRow } from "@/lib/waivers-server";
+import type { WaiverRow, WaiverPriorityRow } from "@/lib/waivers-server";
 
 const clauseTag = (c?: string | null) => c === "NMC" ? "NMC" : c === "M_NTC" ? "M-NTC" : c === "NTC" ? "NTC" : null;
 
-export default function WaiverWire({ waivers, myTeamId, inSeason }: { waivers: WaiverRow[]; myTeamId: number | null; inSeason: boolean }) {
+export default function WaiverWire({ waivers, myTeamId, inSeason, order }: { waivers: WaiverRow[]; myTeamId: number | null; inSeason: boolean; order: WaiverPriorityRow[] }) {
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<{ t: "ok" | "err"; s: string } | null>(null);
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>, okMsg: string) => start(async () => {
@@ -20,6 +20,26 @@ export default function WaiverWire({ waivers, myTeamId, inSeason }: { waivers: W
 
   return (
     <div className="space-y-5">
+      {order.length > 0 && (
+        <Card title="Claim Priority Order" accent="text-sky-400">
+          <p className="text-xs text-slate-500 mb-3">
+            Who wins a contested claim, first in line first — {inSeason
+              ? <>currently the <b>worst team in the standings</b></>
+              : <>currently a <b>claim-order queue</b> (whoever&apos;s gone longest without winning a claim)</>
+            }. A club drops to the back of this line the moment it wins a claim.
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {order.map((t) => (
+              <div key={t.teamId} title={t.name}
+                className={`flex items-center gap-1.5 pl-1.5 pr-2.5 py-1 rounded-lg border text-xs ${t.teamId === myTeamId ? "bg-sky-600/20 border-sky-500/50 text-sky-200" : "bg-slate-900/60 border-slate-800 text-slate-400"}`}>
+                <span className="text-[10px] font-bold tabular-nums text-slate-500">{t.rank}</span>
+                {t.logoUrl && <img src={t.logoUrl} alt="" className="w-4 h-4 object-contain" />}
+                <span className="font-semibold">{t.code}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
       <Card title="Waiver Wire" accent="text-sky-400">
         <p className="text-xs text-slate-500 mb-3">
           A player must clear waivers before he can be sent to the AHL. Any club can claim him within a one-day window; if more than one does, {inSeason
