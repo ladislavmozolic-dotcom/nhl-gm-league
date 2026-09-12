@@ -2,7 +2,8 @@ import Link from "next/link";
 import BackLink from "@/components/BackLink";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { isLoggedIn } from "@/lib/auth";
+import { isLoggedIn, getTeamSession } from "@/lib/auth";
+import PlayerIntelligenceCard from "@/components/PlayerIntelligenceCard";
 import { cleanName, epProfileUrl } from "@/lib/playerName";
 import { Card } from "@/components/ui";
 import { posGroup, ratingColor, ovColor } from "@/lib/ratingBands";
@@ -197,7 +198,7 @@ function StatBlock({ league, cols, reg, po, cellsOf, team }: {
 
 export default async function PlayerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [p, loggedIn] = await Promise.all([getPlayer(id) as Promise<any>, isLoggedIn()]);
+  const [p, loggedIn, gmTeamId] = await Promise.all([getPlayer(id) as Promise<any>, isLoggedIn(), getTeamSession()]);
   const isGoalie: boolean = p.isGoalie || p.position === "G";
   const ratings = isGoalie ? { ...(p.goalieRating ?? {}) } : p;
   const attrs = isGoalie ? GOALIE_ATTRS : SKATER_ATTRS;
@@ -490,6 +491,9 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
           {defenseMap && <RinkDefenseMap map={defenseMap} />}
         </div>
       )}
+
+      {/* ── UNHL INTELLIGENCE — Similar Players / Contract Comparables ── */}
+      {gmTeamId != null && <PlayerIntelligenceCard playerId={p.id} />}
 
       {/* ── PLAYER STATS (Season / Game Log tabs) ─────────────────── */}
       <Card bodyClassName="p-0">
