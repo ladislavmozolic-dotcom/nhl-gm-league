@@ -59,11 +59,22 @@ export function playerType(p: TypeInput): string | null {
     return "Two-Way Defenseman";
   }
 
-  // forward
-  if (off >= 62 && phys >= 73) return "Power Forward";     // real offense + big body
-  if (phys >= 68 && off < 62) return "Grinder";            // physical, limited offense
+  // forward — compare each attribute against ITS OWN league-average for forwards
+  // (AVG.F) before combining/comparing, not the raw values: CK averages ~66 and
+  // DF ~63 here while SC/PA average only ~49, so comparing raw values (as this
+  // used to) let CK/DF dominate regardless of whether a player was actually
+  // above his OWN attribute's average — a pure scorer with merely AVERAGE
+  // defense (DF == avg) used to still read as "defense keeps pace with
+  // offense" just because DF's raw average already sits above SC/PA's.
+  const avgF = AVG.F;
+  const offRel = Math.max(S - avgF.sc, P - avgF.pa);
+  const physRel = (C - avgF.ck) * 0.75 + (T - avgF.st) * 0.25;
+  const dRel = D - avgF.df;
+
+  if (offRel >= 13 && physRel >= 4) return "Power Forward";  // real offense + big body
+  if (physRel >= -1 && offRel < 13) return "Grinder";        // physical, limited offense
   if (S - P >= 4) return "Sniper";
   if (P - S >= 4) return "Playmaker";
-  if (D >= off - 2) return "Two-Way Forward";              // defense keeps pace with offense
+  if (dRel >= offRel - 2) return "Two-Way Forward";          // defense keeps pace with offense
   return "Scorer";
 }
