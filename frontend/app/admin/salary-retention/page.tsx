@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { CURRENT_SEASON_START, money } from "@/lib/finance";
 import { cleanName } from "@/lib/playerName";
 import RemoveRetentionButton from "@/components/RemoveRetentionButton";
+import RetentionPctEditor from "@/components/RetentionPctEditor";
 
 export const dynamic = "force-dynamic";
 
@@ -20,21 +21,42 @@ async function loadActiveRetentions() {
     prisma.team.findMany({ select: { id: true, name: true, code: true } }),
     prisma.player.findMany({
       where: { id: { in: records.map((r) => r.playerId).filter((id): id is number => id != null) } },
-      select: { id: true, name: true, teamId: true },
+      select: { id: true, name: true, teamId: true, capHit: true },
     }),
   ]);
   const teamById = new Map(teams.map((t) => [t.id, t]));
   const playerById = new Map(players.map((p) => [p.id, p]));
 
-  return records.map((r) => ({
-    id: r.id,
-    playerName: r.playerId ? cleanName(playerById.get(r.playerId)?.name ?? r.playerName) : r.playerName,
-    retainingTeam: teamById.get(r.teamId)?.name ?? "Unknown",
-    currentTeam: r.playerId ? teamById.get(playerById.get(r.playerId)?.teamId ?? -1)?.name ?? "—" : "—",
-    perYear: r.perYear,
-    startYear: r.startYear,
-    expiryYear: r.startYear + r.years,
-  }));
+  // A player can (rarely) carry 2 stacked retentions — each one's % is against
+  // the cap hit net of every OTHER active retention on him (matching how
+  // lib/trade-exec.ts computes `netBefore` when a retention is first applied),
+  // so we need every record grouped by player to work that out per row.
+  const byPlayer = new Map<number, typeof records>();
+  for (const r of records) {
+    if (r.playerId == null) continue;
+    const arr = byPlayer.get(r.playerId) ?? [];
+    arr.push(r);
+    byPlayer.set(r.playerId, arr);
+  }
+
+  return records.map((r) => {
+    const player = r.playerId ? playerById.get(r.playerId) : null;
+    const siblings = r.playerId ? (byPlayer.get(r.playerId) ?? []) : [];
+    const otherTotal = siblings.filter((s) => s.id !== r.id).reduce((sum, s) => sum + s.perYear, 0);
+    const netBefore = player ? Math.max(0, (player.capHit ?? 0) - otherTotal) : 0;
+    const pct = netBefore > 0 ? Math.round((r.perYear / netBefore) * 1000) / 10 : 0;
+    return {
+      id: r.id,
+      playerId: r.playerId,
+      playerName: r.playerId ? cleanName(player?.name ?? r.playerName) : r.playerName,
+      retainingTeam: teamById.get(r.teamId)?.name ?? "Unknown",
+      currentTeam: r.playerId ? teamById.get(player?.teamId ?? -1)?.name ?? "—" : "—",
+      perYear: r.perYear,
+      pct,
+      startYear: r.startYear,
+      expiryYear: r.startYear + r.years,
+    };
+  });
 }
 
 export default async function SalaryRetentionAdminPage() {
@@ -152,6 +174,7 @@ export default async function SalaryRetentionAdminPage() {
                   <th className="py-2 pr-3">Player</th>
                   <th className="py-2 pr-3">Retained By</th>
                   <th className="py-2 pr-3">Now On</th>
+                  <th className="py-2 pr-3">%</th>
                   <th className="py-2 pr-3">Per Year</th>
                   <th className="py-2 pr-3">Expires</th>
                   <th className="py-2"></th>
@@ -163,9 +186,15 @@ export default async function SalaryRetentionAdminPage() {
                     <td className="py-2 pr-3 text-white font-semibold">{r.playerName}</td>
                     <td className="py-2 pr-3 text-slate-300">{r.retainingTeam}</td>
                     <td className="py-2 pr-3 text-slate-300">{r.currentTeam}</td>
+                    <td className="py-2 pr-3 text-slate-300 tabular-nums">{r.pct}%</td>
                     <td className="py-2 pr-3 text-slate-300 tabular-nums">{money(r.perYear)}</td>
                     <td className="py-2 pr-3 text-slate-500">{r.expiryYear}</td>
-                    <td className="py-2"><RemoveRetentionButton buyoutId={r.id} /></td>
+                    <td className="py-2">
+                      <div className="flex items-center gap-1.5">
+                        {r.playerId != null && <RetentionPctEditor buyoutId={r.id} currentPct={r.pct} maxPct={settings.retentionMaxPct} />}
+                        <RemoveRetentionButton buyoutId={r.id} />
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
