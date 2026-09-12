@@ -186,9 +186,9 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
   };
 
   // ---------- reusable inputs ----------
-  const Select = ({ value, onChange, pool }: { value: number | null; onChange: (v: number | null) => void; pool: Player[] }) => (
+  const Select = ({ value, onChange, pool, overlay = false }: { value: number | null; onChange: (v: number | null) => void; pool: Player[]; overlay?: boolean }) => (
     <select value={value ?? ""} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
-      className="w-full min-w-[132px] bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-sm">
+      className={overlay ? "absolute inset-0 w-full h-full opacity-0 cursor-pointer" : "w-full min-w-[132px] bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-sm"}>
       <option value="">— empty —</option>
       {value != null && !pool.some((p) => p.id === value) && <option value={value}>{nameOf(value)}</option>}
       {pool.map((p) => <option key={p.id} value={p.id} disabled={p.injured}>{p.name}{p.cap ? ` (${p.cap})` : ""} · {p.position} ({p.overall}){p.con != null ? ` · CON ${p.con}%${p.con < 90 ? " ⚠️" : ""}` : ""}{p.injured ? " 🤕 INJ" : ""}</option>)}
@@ -319,18 +319,30 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
       <Stepper value={value} step={1} compact onChange={(v) => onSet(Math.max(0, Math.min(5, v as unknown as number)))} />
     </div>
   );
-  // a player slot: small label above a full-width select
+  // a player slot: jersey card with the pick baked in — the visible chip is
+  // purely decorative, a transparent native <select> (`overlay`) covers the
+  // whole card so clicking anywhere (or the swap badge) opens the real
+  // picker, same swap logic as the old plain dropdown.
+  const SHORT_SLOT: Record<string, string> = { "Left Wing": "LW", "Center": "C", "Right Wing": "RW", "Left Defense": "LD", "Right Defense": "RD" };
   const Slot = ({ label, value, onChange, pool }: { label: string; value: number | null; onChange: (v: number | null) => void; pool: Player[] }) => {
     const p = value != null ? byId.get(value) : null;
     return (
-      <div>
-        <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">{label}</div>
-        {p && (
-          <div className="mb-1.5 flex justify-center">
-            <JerseyChip teamSlug={teamSlug} number={p.number} lastName={p.name.trim().split(/\s+/).pop()} size={72} />
+      <div className="relative flex items-center gap-2.5 bg-slate-900/60 border border-slate-700 rounded-lg p-2 cursor-pointer hover:border-slate-600">
+        <div className="relative flex-none">
+          <JerseyChip teamSlug={teamSlug} number={p?.number} lastName={p?.name.trim().split(/\s+/).pop()} size={64} />
+          <div className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-blue-600 border-2 border-slate-950 flex items-center justify-center pointer-events-none">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" />
+              <polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" />
+            </svg>
           </div>
-        )}
-        <Select value={value} onChange={onChange} pool={pool} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-[10px] font-extrabold tracking-wide text-blue-400 uppercase">{SHORT_SLOT[label] ?? label}</div>
+          <div className={`text-[13px] font-bold truncate ${p ? "text-white" : "text-slate-500 italic font-normal"}`}>{p ? p.name : "— empty —"}</div>
+          {p && <div className="text-slate-500 text-[11px]">OV {p.overall}{p.con != null && <> · CON {p.con}%{p.con < 90 && " ⚠️"}</>}{p.injured && " · 🤕 INJ"}</div>}
+        </div>
+        <Select value={value} onChange={onChange} pool={pool} overlay />
       </div>
     );
   };
@@ -356,10 +368,10 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
               <div className="flex items-center gap-2"><span className="text-sm font-bold text-slate-300">Line {i + 1}</span><ChemBadge ids={[l.lw, l.c, l.rw]} /><RoleFitBadge ids={[l.lw, l.c, l.rw]} isDef={false} /></div>
               <div className="flex items-center gap-2"><span className="text-[11px] uppercase tracking-wide text-slate-500">Time</span><Stepper value={l.timePct} step={1} onChange={(v) => setFwd(i, "timePct", v as unknown as number)} /><span className="text-slate-500 text-sm">%</span></div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <Slot label="Left Wing" value={l.lw} onChange={(v) => setFwd(i, "lw", v)} pool={forwards} />
-              <Slot label="Center" value={l.c} onChange={(v) => setFwd(i, "c", v)} pool={forwards} />
-              <Slot label="Right Wing" value={l.rw} onChange={(v) => setFwd(i, "rw", v)} pool={forwards} />
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex-1 min-w-0"><Slot label="Left Wing" value={l.lw} onChange={(v) => setFwd(i, "lw", v)} pool={forwards} /></div>
+              <div className="flex-1 min-w-0"><Slot label="Center" value={l.c} onChange={(v) => setFwd(i, "c", v)} pool={forwards} /></div>
+              <div className="flex-1 min-w-0"><Slot label="Right Wing" value={l.rw} onChange={(v) => setFwd(i, "rw", v)} pool={forwards} /></div>
             </div>
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-1 border-t border-slate-800/60">
               <TacStep label="PHY" value={t.phy} onSet={(v) => setFwdTac(i, "phy", v)} />
@@ -389,9 +401,9 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
               <div className="flex items-center gap-2"><span className="text-sm font-bold text-slate-300">Pair {i + 1}</span><ChemBadge ids={[p.ld, p.rd]} /><RoleFitBadge ids={[p.ld, p.rd]} isDef={true} /></div>
               <div className="flex items-center gap-2"><span className="text-[11px] uppercase tracking-wide text-slate-500">Time</span><Stepper value={p.timePct} step={1} onChange={(v) => setDef(i, "timePct", v as unknown as number)} /><span className="text-slate-500 text-sm">%</span></div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <Slot label="Left Defense" value={p.ld} onChange={(v) => setDef(i, "ld", v)} pool={defense} />
-              <Slot label="Right Defense" value={p.rd} onChange={(v) => setDef(i, "rd", v)} pool={defense} />
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex-1 min-w-0"><Slot label="Left Defense" value={p.ld} onChange={(v) => setDef(i, "ld", v)} pool={defense} /></div>
+              <div className="flex-1 min-w-0"><Slot label="Right Defense" value={p.rd} onChange={(v) => setDef(i, "rd", v)} pool={defense} /></div>
             </div>
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-1 border-t border-slate-800/60">
               <TacStep label="PHY" value={t.phy} onSet={(v) => setDefTac(i, "phy", v)} />
