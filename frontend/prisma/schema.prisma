@@ -1029,6 +1029,20 @@ model GameAudit {
   @@index([createdAt])
 }
 
+// UNHL Intelligence — Commissioner Intelligence (Phase 7, admin-only). One row
+// per admin view of the leaguewide integrity/consistency scan — the feature's
+// design doc requires every commissioner query to be audit-logged, same
+// principle as GameAudit above but for a read-only advisory view rather than
+// a state-changing action.
+model CommishIntelAudit {
+  id        Int      @id @default(autoincrement())
+  byName    String
+  summary   String   // short plain-text roll-up of what was flagged at view time
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 model PlayerSeasonStat {
   id        Int     @id @default(autoincrement())
   playerId  Int

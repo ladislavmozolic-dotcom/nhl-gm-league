@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getTeamSession } from "@/lib/auth";
+import { getTeamSession, isAdmin } from "@/lib/auth";
 import { analyzeRoster, type RosterFinding } from "@/lib/gm-assistant/analyzeRoster";
 import { slotById, slotPositionFilter } from "@/lib/gm-assistant/leagueSlots";
 import { cleanName } from "@/lib/playerName";
@@ -16,7 +16,7 @@ export default async function GmAssistantPage() {
   const teamId = await getTeamSession();
   if (teamId == null) notFound();
 
-  const analysis = await analyzeRoster(teamId);
+  const [analysis, admin] = await Promise.all([analyzeRoster(teamId), isAdmin()]);
 
   const severityStyle: Record<RosterFinding["severity"], { text: string; bg: string; label: string }> = {
     critical: { text: "text-red-400", bg: "bg-red-950/40 border-red-900/60", label: "Slabé miesto" },
@@ -111,6 +111,12 @@ export default async function GmAssistantPage() {
           <p className="text-sm text-slate-400">„Čo ak?“ — podpíš, obchoduj alebo pusti hráča nanečisto a uvidíš dopad na cap, rebríček aj vek kádra, bez zápisu do ligy.</p>
         </Card>
       </div>
+
+      {admin && (
+        <Card title="🛡️ Commissioner Intelligence" accent="text-red-400" href="/tools/assistant/commissioner">
+          <p className="text-sm text-slate-400">Admin-only: leaguewide cap violations, legálnosť rosterov, kontraktné výkyvy a data-consistency kontroly naprieč všetkými klubmi. Read-only, každé zobrazenie sa audit-loguje.</p>
+        </Card>
+      )}
     </div>
   );
 }

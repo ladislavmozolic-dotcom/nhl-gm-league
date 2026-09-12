@@ -57,3 +57,18 @@ export async function gameAudits(gameId: number): Promise<AuditRow[]> {
     createdAt: r.createdAt.toISOString(), league: r.league, homeCode: null, awayCode: null, homeGoals: r.homeGoals, awayGoals: r.awayGoals, simCount: 0,
   }));
 }
+
+// UNHL Intelligence — Commissioner Intelligence (Phase 7) is read-only/advisory,
+// but the design doc still requires every commissioner query to be logged —
+// same transparency principle as the simulation audit above, for a view
+// instead of a state-changing action.
+export async function recordCommishIntelView(byName: string, summary: string): Promise<void> {
+  await prisma.commishIntelAudit.create({ data: { byName, summary } });
+}
+
+export type CommishIntelAuditRow = { id: number; byName: string; summary: string; createdAt: string };
+
+export async function recentCommishIntelAudits(limit = 20): Promise<CommishIntelAuditRow[]> {
+  const rows = await prisma.commishIntelAudit.findMany({ orderBy: { createdAt: "desc" }, take: limit });
+  return rows.map((r) => ({ id: r.id, byName: r.byName, summary: r.summary, createdAt: r.createdAt.toISOString() }));
+}
