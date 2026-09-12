@@ -11,7 +11,7 @@ import { roundForDate, daysBetween } from "./calendar";
 import { computeStandings } from "./sim/standings";
 import { cleanName } from "./playerName";
 import { CURRENT_SEASON_START, liveCapHit } from "./finance";
-import { WAIVER_CAP_HIT_LIMIT } from "./roster-rules";
+import { WAIVER_CAP_HIT_LIMIT, RECALL_EXEMPT_DAYS, RECALL_EXEMPT_GAMES } from "./roster-rules";
 import type { Phase } from "./calendar";
 
 export type WaiverRow = {
@@ -50,6 +50,48 @@ export async function waiverPriorityOrder(phase: Phase): Promise<WaiverPriorityR
     });
   }
   return ordered.map((t, i) => ({ teamId: t.id, code: t.code ?? String(t.id), name: t.name, logoUrl: t.logoUrl, rank: i + 1 }));
+}
+
+export type RecallExemption = { exempt: boolean; daysUsed: number; gamesUsed: number; daysLeft: number; gamesLeft: number };
+
+/** Rule 30/10 recall pass — is this player still riding a free (no-waivers)
+ *  trip back to the farm? Only meaningful for a player with a lastRecalledAt
+ *  stamp (set by saveRosterMoves whenever a move calls him up from the AHL).
+ *  Days are league-calendar days since that call-up; games are NHL games
+ *  actually played since then, counted lazily off PlayerGameStat rather than
+ *  a live incrementing counter — same "compute on demand" pattern the rest of
+ *  the calendar/waiver code uses (roundForDate, daysBetween). Batched so a
+ *  whole roster page needs one query, not one per player. */
+export async function recallExemptions(players: { id: number; lastRecalledAt: Date | null }[]): Promise<Map<number, RecallExemption>> {
+  const map = new Map<number, RecallExemption>();
+  const NONE: RecallExemption = { exempt: false, daysUsed: 0, gamesUsed: 0, daysLeft: 0, gamesLeft: 0 };
+  const withRecall = players.filter((p): p is { id: number; lastRecalledAt: Date } => p.lastRecalledAt != null);
+  for (const p of players) if (p.lastRecalledAt == null) map.set(p.id, NONE);
+  if (withRecall.length === 0) return map;
+
+  const today = await getLeagueDate();
+  const earliest = withRecall.reduce((min, p) => (p.lastRecalledAt < min ? p.lastRecalledAt : min), withRecall[0].lastRecalledAt);
+  const stats = await prisma.playerGameStat.findMany({
+    where: { playerId: { in: withRecall.map((p) => p.id) }, game: { league: "NHL", gameDate: { gte: earliest } } },
+    select: { playerId: true, game: { select: { gameDate: true } } },
+  });
+  const gamesByPlayer = new Map<number, Date[]>();
+  for (const s of stats) {
+    if (!s.game?.gameDate) continue;
+    const arr = gamesByPlayer.get(s.playerId) ?? [];
+    arr.push(s.game.gameDate);
+    gamesByPlayer.set(s.playerId, arr);
+  }
+  for (const p of withRecall) {
+    const daysUsed = daysBetween(p.lastRecalledAt, today);
+    const gamesUsed = (gamesByPlayer.get(p.id) ?? []).filter((d) => d >= p.lastRecalledAt).length;
+    const exempt = daysUsed <= RECALL_EXEMPT_DAYS && gamesUsed <= RECALL_EXEMPT_GAMES;
+    map.set(p.id, {
+      exempt, daysUsed, gamesUsed,
+      daysLeft: Math.max(0, RECALL_EXEMPT_DAYS - daysUsed), gamesLeft: Math.max(0, RECALL_EXEMPT_GAMES - gamesUsed),
+    });
+  }
+  return map;
 }
 
 /** Active waivers for the wire, newest first. */

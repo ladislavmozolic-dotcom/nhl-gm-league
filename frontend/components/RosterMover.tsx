@@ -10,6 +10,9 @@ type Player = {
   id: number; name: string; position: string; overall: number;
   isGoalie: boolean; side: RosterSide; contractType: "ONE_WAY" | "TWO_WAY" | null;
   capHit: number; onWaivers?: boolean;
+  // Rule 30/10 recall pass — riding a free (no-waivers) trip back to the farm since
+  // his last AHL→NHL call-up (≤30 days AND ≤10 NHL games played since then).
+  recallExempt?: boolean; recallDaysLeft?: number; recallGamesLeft?: number;
 };
 
 // Exactly the $100k farm deal → a minor-league (AHL-only) contract. Such a player
@@ -168,25 +171,30 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
             {oneWay ? "1-way" : "2-way"}
           </span>
         )}
+        {oneWay && !ahlOnly && p.recallExempt && (p.side === "pro" || p.side === "pro-scratched") && (
+          <span title={`Recall pass — sent down from the AHL within the last 30 days/10 games gets him back down freely: ${p.recallDaysLeft}d / ${p.recallGamesLeft}g left before he needs waivers again`}
+            className="text-[10px] font-bold px-1.5 py-0.5 rounded border border-emerald-600/50 text-emerald-400 whitespace-nowrap">🔓 Recall pass</span>
+        )}
         <div className="flex items-center gap-1 shrink-0">
           {/* a one-way player already on the wire: nothing left to do here but wait */}
           {oneWay && p.onWaivers && (p.side === "pro" || p.side === "pro-scratched") && (
             <span title="Waiting for the one-day waiver window to close — check the Waivers page"
               className="text-[10px] font-bold px-1.5 py-0.5 rounded border border-amber-600/50 text-amber-400 whitespace-nowrap">⏳ On Waivers</span>
           )}
-          {/* dressed NHL: scratch, and send down (a one-way deal goes through waivers instead) */}
+          {/* dressed NHL: scratch, and send down (a one-way deal goes through waivers,
+              unless he's still riding his Rule 30/10 recall pass from his last call-up) */}
           {p.side === "pro" && <>
             <MoveBtn p={p} to="pro-scratched" label="Scratch" />
-            {oneWay && !ahlOnly
+            {oneWay && !ahlOnly && !p.recallExempt
               ? (!p.onWaivers && <button onClick={() => waiver(p)} disabled={pending || tooExpensive}
                   title={tooExpensive ? `Too valuable to clear waivers (over $${(WAIVER_CAP_HIT_LIMIT / 1e6).toFixed(1)}M cap hit) — he can't be sent to the farm` : "One-way contracts must clear waivers before they can be sent to the farm"}
                   className="text-[11px] px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-30 whitespace-nowrap">Farm/Waivers</button>)
               : <MoveBtn p={p} to="farm" label="↓ Farm" />}
           </>}
-          {/* NHL scratch: dress, and send down (same one-way → waivers rule) */}
+          {/* NHL scratch: dress, and send down (same one-way → waivers rule, same recall-pass exception) */}
           {p.side === "pro-scratched" && <>
             <MoveBtn p={p} to="pro" label="Dress" />
-            {oneWay && !ahlOnly
+            {oneWay && !ahlOnly && !p.recallExempt
               ? (!p.onWaivers && <button onClick={() => waiver(p)} disabled={pending || tooExpensive}
                   title={tooExpensive ? `Too valuable to clear waivers (over $${(WAIVER_CAP_HIT_LIMIT / 1e6).toFixed(1)}M cap hit) — he can't be sent to the farm` : "One-way contracts must clear waivers before they can be sent to the farm"}
                   className="text-[11px] px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-30 whitespace-nowrap">Farm/Waivers</button>)
@@ -243,7 +251,7 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
           <Link href={`/teams/${teamSlug}/lines`} className="text-slate-400 hover:text-blue-400">Lines →</Link>
           <Link href={`/teams/${teamSlug}/roster/edit`} className="text-slate-400 hover:text-blue-400">Numbers &amp; captains →</Link>
         </div>
-        <p className="text-xs text-slate-500 mt-1">Choose which <b>20 dress</b> (NHL) vs the healthy scratches, and manage the farm. One-way contracts can&apos;t be sent down directly — put them on <b>Farm/Waivers</b> instead (a player over <b>${(WAIVER_CAP_HIT_LIMIT / 1e6).toFixed(1)}M</b> cap hit is too valuable to clear waivers, so that button is disabled for him); AHL-only / $100k minor-league deals can&apos;t be called up. <b>NHL Scratched</b> still count against the cap; <b>Farm Scratched</b> dress nowhere. A <b>$100k</b> minor-league player can be <b>Released</b> from Farm Scratched straight to the UFA market.</p>
+        <p className="text-xs text-slate-500 mt-1">Choose which <b>20 dress</b> (NHL) vs the healthy scratches, and manage the farm. One-way contracts can&apos;t be sent down directly — put them on <b>Farm/Waivers</b> instead (a player over <b>${(WAIVER_CAP_HIT_LIMIT / 1e6).toFixed(1)}M</b> cap hit is too valuable to clear waivers, so that button is disabled for him), unless he still has a <b>🔓 Recall pass</b> from his last call-up — sent up from the AHL within the last 30 days/10 games, he goes back down freely; AHL-only / $100k minor-league deals can&apos;t be called up. <b>NHL Scratched</b> still count against the cap; <b>Farm Scratched</b> dress nowhere. A <b>$100k</b> minor-league player can be <b>Released</b> from Farm Scratched straight to the UFA market.</p>
       </div>
 
       {blockers.length > 0 && (

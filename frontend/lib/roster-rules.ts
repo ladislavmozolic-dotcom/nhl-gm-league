@@ -22,3 +22,13 @@ export const ROSTER_LIMITS = {
 // disable the Farm/Waivers button for him instead of offering an action
 // that's always going to fail.
 export const WAIVER_CAP_HIT_LIMIT = 1_500_000;
+
+// "Rule 30/10" — a recall pass. A player called up from the AHL can be sent back
+// down without clearing waivers again as long as, since that call-up, he hasn't
+// spent more than RECALL_EXEMPT_DAYS cumulative days on the NHL roster AND hasn't
+// played more than RECALL_EXEMPT_GAMES NHL games. Cross either limit and the pass
+// expires — his next trip to the farm needs to clear waivers like normal. Only
+// matters for a non-exempt (one-way, non-AHL-only) player; ELC/two-way players
+// never needed this in the first place. See lib/waivers-server.ts recallExemptions.
+export const RECALL_EXEMPT_DAYS = 30;
+export const RECALL_EXEMPT_GAMES = 10;

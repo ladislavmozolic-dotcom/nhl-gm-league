@@ -46,6 +46,7 @@ export default function WaiverWire({ waivers, myTeamId, inSeason, order }: { wai
             ? <>the <b>worst team in the standings gets priority</b></>
             : <>outside the regular season/playoffs, priority follows a <b>claim-order queue</b> — whichever claiming club has gone longest without winning a claim gets him, and it then drops to the back of the line</>
           }. Unclaimed players clear and drop to the affiliate. An <b>NMC blocks waivers</b>; an NTC does not. Waiving a player is final — there's no pull-back, claim or no claim.
+          {" "}A one-way player gets a <b>recall pass</b> after a call-up, too — he can be sent back to the farm without waivers as long as it&apos;s been <b>30 days or 10 NHL games or fewer</b> since that recall; cross either and his next trip down needs to clear the wire like normal (see Roster Moves for the pass status).
         </p>
         {waivers.length === 0 ? (
           <p className="text-sm text-slate-500">No players are on waivers right now.</p>

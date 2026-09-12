@@ -177,6 +177,11 @@ const SECTIONS: Sec[] = [
         "A cap hit above $1.5M currently can't be placed on waivers at all — too valuable to realistically waive to the farm this way (a commissioner-tunable limit).",
         "An NMC blocks waivers outright; an NTC does not.",
       ] },
+      { h: "Recall pass (Rule 30/10)", points: [
+        "Calling a player up from the AHL starts a temporary exemption: he can be sent back down without clearing waivers again as long as it's been 30 days or fewer, and 10 NHL games or fewer, since that call-up.",
+        "Cross either limit — his 11th NHL game since the recall, or his 31st day up — and the pass expires. His next trip to the farm has to clear the Waiver Wire like any other one-way player.",
+        "A fresh call-up always starts a brand-new pass, even for a player who already burned one earlier in the season.",
+      ] },
       { h: "The one-day window", points: [
         "Any club can claim an exposed player within a one-day window.",
         "Waiving a player is final — there's no pull-back. Once he's placed on the wire, the placing club can't reverse it, claim or no claim.",
@@ -438,6 +443,11 @@ const SECTIONS_CS: Sec[] = [
         "Jednocestný / veteránský hráč musí nejdřív projít wire — roster mover přímé zakopání na farmu zablokuje a odkáže tě na Waiver Wire.",
         "Strop nad 1,5M $ momentálně nejde na waivery poslat vůbec — příliš cenný hráč na to, aby takhle reálně propadl na farmu (limit, který může komisař upravit).",
         "NMC blokuje waivery úplně; NTC ne.",
+      ] },
+      { h: "Návratová výjimka (pravidlo 30/10)", points: [
+        "Povolání hráče z AHL mu na čas otevře výjimku: může jít zpátky na farmu bez nového vystavení na waivery, pokud od toho povolání uplynulo 30 dní nebo méně a odehrál 10 zápasů v NHL nebo méně.",
+        "Jakmile překročí jeden z limitů — svůj 11. zápas v NHL od povolání, nebo 31. den nahoře — výjimka propadne. Další cesta na farmu už musí projít Waiver Wire jako u každého jiného jednocestného hráče.",
+        "Nové povolání vždy nastartuje úplně novou výjimku, i pro hráče, co už jednu dřív v sezoně vyčerpal.",
       ] },
       { h: "Jednodenní okno", points: [
         "Vystaveného hráče může kterýkoliv klub nárokovat během jednodenního okna.",

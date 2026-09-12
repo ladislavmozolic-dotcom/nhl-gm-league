@@ -177,6 +177,8 @@ model Player {
   sourceType           String?
   onTradeBlock         Boolean       @default(false)
   waiverStatus         String?       @default("NONE")
+  lastRecalledAt       DateTime?     // league-calendar date of the most recent AHL→NHL call-up — starts the
+                                      // Rule 30/10 recall-exemption clock (see lib/waivers-server.ts recallExemptions)
   injuryDaysLeft       Int           @default(0)
   injuryDesc           String?
   injurySeverity       String?       // "Day-to-Day" | "Week-to-Week" | "Multi-week" | "Long-term" | "Season-ending" (persisted from the sim for current-injury depth)

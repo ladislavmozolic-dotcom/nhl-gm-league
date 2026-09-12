@@ -7,7 +7,8 @@ import { ROSTER_LIMITS, isNhlSide, isScratchSide, type MoveRow } from "@/lib/ros
 import { canAddCapHit } from "@/lib/cap";
 import { money, liveCapHit } from "@/lib/finance";
 import { loadSettings } from "@/lib/sim/settings";
-import { placeOnWaivers } from "@/lib/waivers-server";
+import { placeOnWaivers, recallExemptions } from "@/lib/waivers-server";
+import { getLeagueDate } from "@/lib/calendar-server";
 
 export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
   const team = await prisma.team.findUnique({
@@ -23,7 +24,7 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
   const ids = moves.map((m) => m.id);
   const players = await prisma.player.findMany({
     where: { id: { in: ids }, teamId: { in: [team.id, affiliate.id] } },
-    select: { id: true, name: true, isGoalie: true, rosterType: true, capHit: true, contractYears: true, contractType: true, contractText: true },
+    select: { id: true, name: true, isGoalie: true, rosterType: true, capHit: true, contractYears: true, contractType: true, contractText: true, lastRecalledAt: true },
   });
   const byId = new Map(players.map((p) => [p.id, p]));
   const valid = moves.filter((m) => byId.has(m.id));
@@ -53,15 +54,19 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
   if (illegalFarm) return { ok: false as const, error: `${byId.get(illegalFarm.id)!.name} has a one-way contract — he can't be sent down. Keep him on the NHL roster.` };
 
   // waivers ON → a non-exempt NHL player must clear the waiver wire before he drops.
-  // ELC and two-way contracts are waiver-exempt (sent down freely).
+  // ELC and two-way contracts are waiver-exempt (sent down freely); so is a one-way
+  // player still riding his Rule 30/10 recall pass (≤30 days / ≤10 NHL games since
+  // his last call-up from the AHL — see lib/waivers-server.ts recallExemptions).
   const settings = await loadSettings();
   if (settings.waiversEnabled) {
-    const buried = goingDown.find((m) => {
+    const nhlGoingDown = goingDown.filter((m) => byId.get(m.id)!.rosterType === "NHL");
+    const recall = await recallExemptions(nhlGoingDown.map((m) => ({ id: m.id, lastRecalledAt: byId.get(m.id)!.lastRecalledAt })));
+    const buried = nhlGoingDown.find((m) => {
       const p = byId.get(m.id)!;
-      const exempt = p.contractType === "TWO_WAY" || isAhlOnly(m.id) || /ELC/i.test(p.contractText ?? "");
-      return p.rosterType === "NHL" && !exempt;
+      const exempt = p.contractType === "TWO_WAY" || isAhlOnly(m.id) || /ELC/i.test(p.contractText ?? "") || (recall.get(m.id)?.exempt ?? false);
+      return !exempt;
     });
-    if (buried) return { ok: false as const, error: `Waivers are on — ${byId.get(buried.id)!.name} must clear the Waiver Wire before going down (ELC & two-way players are exempt).` };
+    if (buried) return { ok: false as const, error: `Waivers are on — ${byId.get(buried.id)!.name} must clear the Waiver Wire before going down (ELC, two-way & recall-exempt players are exempt).` };
   }
 
   // Only HARD maxima block a save. Being under a minimum (short-handed pro roster)
@@ -86,8 +91,14 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
     if (!cap.ok) return { ok: false as const, error: `Call-ups blocked — ${team.name} has ${money(cap.status.space)} of cap space, this batch adds ${money(netAdd)}. Send a player down first.` };
   }
 
-  await prisma.$transaction(valid.map((m) =>
-    prisma.player.update({
+  // a call-up (AHL → NHL) starts a fresh Rule 30/10 recall-exemption clock — stamped
+  // even for an already-exempt player (two-way/ELC/AHL-only) so the clock is always
+  // current for whoever it ends up mattering to later (e.g. after a re-sign).
+  const today = await getLeagueDate();
+  await prisma.$transaction(valid.map((m) => {
+    const p = byId.get(m.id)!;
+    const calledUp = isNhlSide(m.side) && p.rosterType === "AHL";
+    return prisma.player.update({
       where: { id: m.id },
       data: {
         teamId: isNhlSide(m.side) ? team.id : affiliate.id,
@@ -95,8 +106,10 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
         scratched: isScratchSide(m.side), // NHL-scratched + farm-scratched
         // contractType is a contract term — the roster mover does NOT change it (no
         // flipping 1-way → 2-way to bury a player).
+        ...(calledUp ? { lastRecalledAt: today } : {}),
       },
-    })));
+    });
+  }));
 
   revalidatePath(`/teams/${slug}/rosters`);
   revalidatePath(`/teams/${slug}`);

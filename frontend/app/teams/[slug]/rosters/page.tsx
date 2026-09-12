@@ -4,6 +4,7 @@ import { canManageTeam } from "@/lib/auth";
 import RosterMover from "@/components/RosterMover";
 import { saveRosterMoves, releasePlayer, placeOnWaiversFromRoster } from "./actions";
 import { liveCapHit } from "@/lib/finance";
+import { recallExemptions } from "@/lib/waivers-server";
 
 export const dynamic = "force-dynamic";
 
@@ -23,9 +24,14 @@ export default async function RostersPage({ params }: { params: Promise<{ slug: 
     // only real roster players (NHL/AHL) — released UFAs, prospects and retirees keep a
     // team id (schema requires one) but must never surface in the roster manager.
     where: { teamId: { in: orgTeamIds }, rosterType: { in: ["NHL", "AHL"] } },
-    select: { id: true, name: true, position: true, overall: true, isGoalie: true, rosterType: true, contractType: true, capHit: true, contractYears: true, scratched: true, teamId: true, waiverStatus: true },
+    select: { id: true, name: true, position: true, overall: true, isGoalie: true, rosterType: true, contractType: true, capHit: true, contractYears: true, scratched: true, teamId: true, waiverStatus: true, lastRecalledAt: true },
     orderBy: [{ isGoalie: "asc" }, { overall: "desc" }],
   });
+
+  // Rule 30/10 recall pass — only worth computing for NHL-side players (only they
+  // can ever be "sent down"); a farm player's lastRecalledAt is stale history.
+  const nhlPlayers = players.filter((p) => p.rosterType === "NHL");
+  const recall = await recallExemptions(nhlPlayers.map((p) => ({ id: p.id, lastRecalledAt: p.lastRecalledAt })));
 
   return (
     <RosterMover
@@ -33,14 +39,20 @@ export default async function RostersPage({ params }: { params: Promise<{ slug: 
       teamSlug={slug}
       affiliateName={affiliate?.name ?? "(no affiliate)"}
       hasAffiliate={!!affiliate}
-      players={players.map((p) => ({
-        id: p.id, name: p.name, position: p.position, overall: p.overall ?? 0,
-        isGoalie: p.isGoalie,
-        side: (p.rosterType === "AHL" ? (p.scratched ? "farm-scratched" : "farm") : (p.scratched ? "pro-scratched" : "pro")) as "pro" | "pro-scratched" | "farm" | "farm-scratched",
-        contractType: (p.contractType as "ONE_WAY" | "TWO_WAY" | null) ?? null,
-        capHit: liveCapHit(p),
-        onWaivers: p.waiverStatus === "ON_WAIVERS",
-      }))}
+      players={players.map((p) => {
+        const r = recall.get(p.id);
+        return {
+          id: p.id, name: p.name, position: p.position, overall: p.overall ?? 0,
+          isGoalie: p.isGoalie,
+          side: (p.rosterType === "AHL" ? (p.scratched ? "farm-scratched" : "farm") : (p.scratched ? "pro-scratched" : "pro")) as "pro" | "pro-scratched" | "farm" | "farm-scratched",
+          contractType: (p.contractType as "ONE_WAY" | "TWO_WAY" | null) ?? null,
+          capHit: liveCapHit(p),
+          onWaivers: p.waiverStatus === "ON_WAIVERS",
+          recallExempt: r?.exempt ?? false,
+          recallDaysLeft: r?.daysLeft ?? 0,
+          recallGamesLeft: r?.gamesLeft ?? 0,
+        };
+      })}
       onSave={saveRosterMoves}
       onRelease={releasePlayer}
       onWaiver={placeOnWaiversFromRoster}
