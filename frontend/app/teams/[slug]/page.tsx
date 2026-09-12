@@ -8,6 +8,8 @@ import { Card } from "@/components/ui";
 import { salaryOf, fmtM } from "@/components/TeamRosterTable";
 import { teamRetentionStatus } from "@/lib/cap";
 
+export const dynamic = "force-dynamic";
+
 const SEASON = "2026-27";
 
 const isDefPos = (pos = "") => pos.includes("D") && !(pos.includes("C") || pos.includes("W") || pos.includes("F"));
