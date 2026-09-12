@@ -31,14 +31,14 @@ const D_OFF_TWO_WAY = Math.max(AVG.D.pa, AVG.D.sc) + 10;
 // as the league's true top tier — keyed by DB id (not name) since several of
 // these players' name field carries a captaincy suffix, e.g. "''C'' (NTC)".
 const ELITE_OVERRIDE: Record<number, string> = {
-  584: "Dual-Threat (Elite)",  // Connor McDavid
-  585: "Dual-Threat (Elite)",  // Leon Draisaitl
-  1041: "Dual-Threat (Elite)", // Nathan MacKinnon
-  673: "Dual-Threat (Elite)",  // Macklin Celebrini
-  512: "Dual-Threat (Elite)",  // Nikita Kucherov
-  489: "Two-Way D (Elite)",    // Cale Makar
-  1121: "Two-Way D (Elite)",   // Evan Bouchard
-  878: "Two-Way D (Elite)",    // Zach Werenski
+  584: "Elite Forward",    // Connor McDavid
+  585: "Elite Forward",    // Leon Draisaitl
+  1041: "Elite Forward",   // Nathan MacKinnon
+  673: "Elite Forward",    // Macklin Celebrini
+  512: "Elite Forward",    // Nikita Kucherov
+  489: "Elite Defenseman", // Cale Makar
+  1121: "Elite Defenseman",// Evan Bouchard
+  878: "Elite Defenseman", // Zach Werenski
 };
 
 /** A short player-type label, or null if there aren't enough ratings. */
