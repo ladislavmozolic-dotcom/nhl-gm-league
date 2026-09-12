@@ -75,7 +75,7 @@ export interface SlotPlayer {
 /** Average of whichever of CK/PA/SC/DF a skater has (null if none). No single
  *  param dominates — a plain mean, same "no magic weighting" rule the rest of
  *  the sim follows. */
-function compositeRating(p: { ck: number | null; pa: number | null; sc: number | null; df: number | null }): number | null {
+export function compositeRating(p: { ck: number | null; pa: number | null; sc: number | null; df: number | null }): number | null {
   const vals = [p.ck, p.pa, p.sc, p.df].filter((v): v is number => v != null);
   return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : null;
 }

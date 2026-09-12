@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { isLoggedIn, getTeamSession } from "@/lib/auth";
 import PlayerIntelligenceCard from "@/components/PlayerIntelligenceCard";
+import PlayerFitCard from "@/components/PlayerFitCard";
 import { cleanName, epProfileUrl } from "@/lib/playerName";
 import { Card } from "@/components/ui";
 import { posGroup, ratingColor, ovColor } from "@/lib/ratingBands";
@@ -494,6 +495,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
 
       {/* ── UNHL INTELLIGENCE — Similar Players / Contract Comparables ── */}
       {gmTeamId != null && <PlayerIntelligenceCard playerId={p.id} />}
+      {gmTeamId != null && <PlayerFitCard playerId={p.id} playerTeamId={p.teamId ?? null} viewerTeamId={gmTeamId} />}
 
       {/* ── PLAYER STATS (Season / Game Log tabs) ─────────────────── */}
       <Card bodyClassName="p-0">
