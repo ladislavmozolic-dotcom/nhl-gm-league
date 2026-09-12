@@ -13,11 +13,10 @@ export const dynamic = "force-dynamic";
 // UNHL Intelligence — Player/Contract Intelligence (phase 4), moved out of the
 // main player profile into its own page at the user's request: it used to
 // render inline on every player's profile, always taking up space there —
-// now it's a separate window/tab reached via the "🧠 UNHL Intelligence"
-// button on the profile (opened with target="_blank", same pattern as the
-// existing EliteProspects link). Same gate the 3 cards below already
-// required individually (a signed-in GM session) — 404 otherwise, since
-// there's nothing to show a logged-out visitor here.
+// now it's a dedicated subpage reached via the "🧠 UNHL Intelligence" button
+// on the profile, with a back link here to return. Same gate the 3 cards
+// below already required individually (a signed-in GM session) — 404
+// otherwise, since there's nothing to show a logged-out visitor here.
 export default async function PlayerIntelligencePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const gmTeamId = await getTeamSession();

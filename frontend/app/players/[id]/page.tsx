@@ -412,10 +412,10 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                     </span>
                   )}
                   {gmTeamId != null && (
-                    <a href={`/players/${p.id}/intelligence`} target="_blank" rel="noopener noreferrer"
+                    <Link href={`/players/${p.id}/intelligence`}
                       className="ml-auto inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-blue-950/50 hover:bg-blue-900/60 text-blue-300 border border-blue-800/60 transition-colors">
                       🧠 UNHL Intelligence
-                    </a>
+                    </Link>
                   )}
                   <Link href={`/tools/compare?p=${p.id}`}
                     className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-600/40 transition-colors ${gmTeamId != null ? "" : "ml-auto"}`}>
