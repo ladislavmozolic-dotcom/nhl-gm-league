@@ -81,6 +81,26 @@ export default async function GmAssistantPage() {
         )}
       </Card>
 
+      {analysis && analysis.teamFindings.length > 0 && (
+        <Card title="Ďalšie zistenia" accent="text-blue-400">
+          <p className="text-sm text-slate-400 mb-3">Cap výhľad, vekový profil, prospect pipeline a rovnováha zostavy — rovnaký princíp: presné číslo, žiadny odhad.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {analysis.teamFindings.map((f) => {
+              const s = severityStyle[f.severity];
+              return (
+                <div key={f.id} className={`border rounded-xl p-3.5 ${s.bg}`}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-sm font-bold text-slate-200">{f.label}</span>
+                    <span className={`text-xs font-bold uppercase tracking-wide ${s.text}`}>{s.label}</span>
+                  </div>
+                  <p className="text-xs text-slate-400">{f.summary}</p>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card title="Find Player" accent="text-blue-400" href="/tools/assistant/find-player">
           <p className="text-sm text-slate-400">Filtruj hráčov podľa pozície, ratingu, cap hitu, veku a statusu — presné, zoraditeľné výsledky, žiadny model.</p>

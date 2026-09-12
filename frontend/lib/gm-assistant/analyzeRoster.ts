@@ -1,4 +1,5 @@
 import { loadLeagueSlots, rankSlot, SLOTS, type SlotPlayer } from "./leagueSlots";
+import { teamWideFindings, type TeamFinding } from "./teamFindings";
 
 // "Analyze my roster" — the first UNHL Intelligence function. No LLM, no black-box
 // judgment: every finding below is a plain average rating — the CK/PA/SC/DF
@@ -26,10 +27,11 @@ export interface RosterAnalysis {
   teamId: number;
   teamName: string;
   findings: RosterFinding[]; // worst (highest rank number) first
+  teamFindings: TeamFinding[]; // cap outlook, age curve, prospect pipeline, roster balance
 }
 
 export async function analyzeRoster(teamId: number): Promise<RosterAnalysis | null> {
-  const data = await loadLeagueSlots();
+  const [data, teamFindings] = await Promise.all([loadLeagueSlots(), teamWideFindings(teamId)]);
   const myTeam = data.teams.find((t) => t.id === teamId);
   if (!myTeam) return null;
 
@@ -59,5 +61,5 @@ export async function analyzeRoster(teamId: number): Promise<RosterAnalysis | nu
 
   findings.sort((a, b) => b.leagueRank - a.leagueRank);
 
-  return { teamId, teamName: myTeam.name, findings };
+  return { teamId, teamName: myTeam.name, findings, teamFindings };
 }
