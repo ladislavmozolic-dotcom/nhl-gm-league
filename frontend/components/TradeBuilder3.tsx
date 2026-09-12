@@ -8,13 +8,16 @@ import { displayName } from "@/lib/playerName";
 import { clauseTermsAction } from "@/app/trades/build/actions";
 import { proposeTradeGroupAction, type GroupLeg } from "@/app/trades/build3/actions";
 
-type Player = { id: number; name: string; position: string; capHit: number; farm: boolean; clause?: string | null; noTradeTeams?: number[] };
+type Player = { id: number; name: string; position: string; capHit: number; farm: boolean; clause?: string | null; noTradeTeams?: number[]; alreadyRetained?: boolean };
 type Pick = { id: number; label: string; logoUrl?: string | null };
 type Assets = { players: Player[]; picks: Pick[]; prospects: Pick[] };
 type Team = { id: number; name: string; logoUrl?: string | null };
 type Terms = { feeAmount: number; feePct: number; fullPayout: boolean; reason: string };
 // Only what the retention-capacity note needs, from lib/cap.ts's CapStatus.
-type CapSnapshot = { retentionSlotsUsed: number; retentionSlotsMax: number; retentionPctUsed: number; retentionPctMax: number; retentionMaxPct: number; capUpper: number };
+type CapSnapshot = {
+  retentionSlotsUsed: number; retentionSlotsMax: number; retentionPctUsed: number; retentionPctMax: number; retentionMaxPct: number; capUpper: number;
+  retentionPlayersInUsed: number; retentionPlayersInMax: number;
+};
 
 /** New retention this trade would add on this club's own outgoing players
  *  (it keeps paying the retained slice) — same convention as lib/trade-exec.ts. */
@@ -30,27 +33,54 @@ function retentionAdded(map: Record<number, number>, assets: Assets, capUpper: n
   return { slots, pct: capUpper > 0 ? (dollars / capUpper) * 100 : 0 };
 }
 
-function RetentionCapacity({ status, newSlots, newPct }: { status: CapSnapshot; newSlots: number; newPct: number }) {
+/** How many NEW retained-salary players would land on `teamId`'s roster from
+ *  whichever of the other two columns targets it as their destination — a
+ *  player counts whether he already carried retention (alreadyRetained) or is
+ *  gaining fresh retention right here. Mirrors TradeBuilder.tsx's retainedInAdded,
+ *  adapted for the 3-column cycle where "incoming" isn't a single fixed side. */
+function retainedInForTeam(
+  sources: Array<{ dest: number | null; assets: Assets; playerIds: Set<number>; retentions: Record<number, number> }>,
+  teamId: number,
+): number {
+  let count = 0;
+  for (const s of sources) {
+    if (s.dest !== teamId) continue;
+    for (const id of s.playerIds) {
+      const p = s.assets.players.find((pl) => pl.id === id);
+      if (!p || p.farm) continue;
+      if ((s.retentions[id] ?? 0) > 0 || p.alreadyRetained) count++;
+    }
+  }
+  return count;
+}
+
+function RetentionCapacity({ status, newSlots, newPct, newIn }: { status: CapSnapshot; newSlots: number; newPct: number; newIn: number }) {
   const slotsAfter = status.retentionSlotsUsed + newSlots;
   const pctAfter = status.retentionPctUsed + newPct;
-  const over = slotsAfter > status.retentionSlotsMax || pctAfter > status.retentionPctMax;
+  const inAfter = status.retentionPlayersInUsed + newIn;
+  const overOut = slotsAfter > status.retentionSlotsMax || pctAfter > status.retentionPctMax;
+  const overIn = inAfter > status.retentionPlayersInMax;
   return (
-    <div className={`bg-slate-900/40 border rounded-lg px-3 py-2 text-xs space-y-1 ${over ? "border-amber-700/60" : "border-slate-800"}`} title="Active retention slots and % of the cap tied up in dead money — vs. the league's configured limits">
+    <div className={`bg-slate-900/40 border rounded-lg px-3 py-2 text-xs space-y-1 ${overOut || overIn ? "border-amber-700/60" : "border-slate-800"}`} title="Retention capacity vs. the league's configured limits — contracts retained on (out), % of cap tied up, and retained-salary players rostered (in)">
       <div className="flex items-center justify-between">
-        <span className="text-slate-500">Retention slots</span>
+        <span className="text-slate-500">Retention slots (out)</span>
         <span className={`tabular-nums font-medium ${slotsAfter > status.retentionSlotsMax ? "text-amber-400" : "text-slate-200"}`}>{slotsAfter}/{status.retentionSlotsMax}</span>
       </div>
       <div className="flex items-center justify-between">
         <span className="text-slate-500">Retention % of cap</span>
         <span className={`tabular-nums font-medium ${pctAfter > status.retentionPctMax ? "text-amber-400" : "text-slate-200"}`}>{pctAfter.toFixed(1)}% / {status.retentionPctMax}%</span>
       </div>
-      {over && <p className="text-amber-400">⚠ This would exceed the league&apos;s configured retention limit.</p>}
+      <div className="flex items-center justify-between">
+        <span className="text-slate-500">Retained players (in)</span>
+        <span className={`tabular-nums font-medium ${overIn ? "text-amber-400" : "text-slate-200"}`}>{inAfter}/{status.retentionPlayersInMax}</span>
+      </div>
+      {(overOut || overIn) && <p className="text-amber-400">⚠ This would exceed the league&apos;s configured retention limit.</p>}
     </div>
   );
 }
 
 /** One team's picker column: what it sends, and to which of the other two clubs. */
-function TeamColumn({ team, others, assets, dest, setDest, playerIds, setPlayerIds, retentions, setRetentions, fees, setFees, terms, setTerms, pickIds, setPickIds, prospectIds, setProspectIds, cash, setCash, capStatus }: {
+function TeamColumn({ team, others, assets, dest, setDest, playerIds, setPlayerIds, retentions, setRetentions, fees, setFees, terms, setTerms, pickIds, setPickIds, prospectIds, setProspectIds, cash, setCash, capStatus, newIn }: {
   team: Team; others: Team[]; assets: Assets;
   dest: number | null; setDest: (id: number | null) => void;
   playerIds: Set<number>; setPlayerIds: (s: Set<number>) => void;
@@ -60,7 +90,7 @@ function TeamColumn({ team, others, assets, dest, setDest, playerIds, setPlayerI
   pickIds: Set<number>; setPickIds: (s: Set<number>) => void;
   prospectIds: Set<number>; setProspectIds: (s: Set<number>) => void;
   cash: number; setCash: (n: number) => void;
-  capStatus: CapSnapshot;
+  capStatus: CapSnapshot; newIn: number;
 }) {
   const toggle = (set: Set<number>, setter: (s: Set<number>) => void, id: number) => {
     const n = new Set(set); if (n.has(id)) n.delete(id); else n.add(id); setter(n);
@@ -102,7 +132,7 @@ function TeamColumn({ team, others, assets, dest, setDest, playerIds, setPlayerI
         </select>
       </div>
 
-      <RetentionCapacity status={capStatus} newSlots={added.slots} newPct={added.pct} />
+      <RetentionCapacity status={capStatus} newSlots={added.slots} newPct={added.pct} newIn={newIn} />
 
       <div className="bg-slate-900/40 border border-slate-800 rounded-lg overflow-hidden">
         <div className="px-3 py-2 bg-slate-800/40 text-xs font-bold uppercase tracking-wide text-slate-400">Players ({assets.players.length})</div>
@@ -243,6 +273,17 @@ export default function TradeBuilder3({ me, teamB, teamC, assetsA, assetsB, asse
   const distinctDests = destsChosen && new Set([destA, destB, destC]).size === 3;
   const formsCycle = noSelfSend && distinctDests;
 
+  // Each column's "retained IN" count depends on which OTHER column targets it
+  // as a destination — computed once here from all 3 columns' current state.
+  const retentionSources = [
+    { dest: destA, assets: assetsA, playerIds: playersA, retentions: retA },
+    { dest: destB, assets: assetsB, playerIds: playersB, retentions: retB },
+    { dest: destC, assets: assetsC, playerIds: playersC, retentions: retC },
+  ];
+  const newInA = retainedInForTeam(retentionSources, me.id);
+  const newInB = retainedInForTeam(retentionSources, teamB.id);
+  const newInC = retainedInForTeam(retentionSources, teamC.id);
+
   const submit = () => start(async () => {
     setErr(null); setMsg(null);
     try {
@@ -278,13 +319,13 @@ export default function TradeBuilder3({ me, teamB, teamC, assetsA, assetsB, asse
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
         <TeamColumn team={me} others={[teamB, teamC]} assets={assetsA} dest={destA} setDest={setDestA}
           playerIds={playersA} setPlayerIds={setPlayersA} retentions={retA} setRetentions={setRetA} fees={feesA} setFees={setFeesA} terms={termsA} setTerms={setTermsA}
-          pickIds={picksA} setPickIds={setPicksA} prospectIds={prospectsA} setProspectIds={setProspectsA} cash={cashA} setCash={setCashA} capStatus={capA} />
+          pickIds={picksA} setPickIds={setPicksA} prospectIds={prospectsA} setProspectIds={setProspectsA} cash={cashA} setCash={setCashA} capStatus={capA} newIn={newInA} />
         <TeamColumn team={teamB} others={[me, teamC]} assets={assetsB} dest={destB} setDest={setDestB}
           playerIds={playersB} setPlayerIds={setPlayersB} retentions={retB} setRetentions={setRetB} fees={feesB} setFees={setFeesB} terms={termsB} setTerms={setTermsB}
-          pickIds={picksB} setPickIds={setPicksB} prospectIds={prospectsB} setProspectIds={setProspectsB} cash={cashB} setCash={setCashB} capStatus={capB} />
+          pickIds={picksB} setPickIds={setPicksB} prospectIds={prospectsB} setProspectIds={setProspectsB} cash={cashB} setCash={setCashB} capStatus={capB} newIn={newInB} />
         <TeamColumn team={teamC} others={[me, teamB]} assets={assetsC} dest={destC} setDest={setDestC}
           playerIds={playersC} setPlayerIds={setPlayersC} retentions={retC} setRetentions={setRetC} fees={feesC} setFees={setFeesC} terms={termsC} setTerms={setTermsC}
-          pickIds={picksC} setPickIds={setPicksC} prospectIds={prospectsC} setProspectIds={setProspectsC} cash={cashC} setCash={setCashC} capStatus={capC} />
+          pickIds={picksC} setPickIds={setPicksC} prospectIds={prospectsC} setProspectIds={setProspectsC} cash={cashC} setCash={setCashC} capStatus={capC} newIn={newInC} />
       </div>
 
       <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-4 space-y-2">

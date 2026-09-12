@@ -160,6 +160,12 @@ const SECTIONS: Sec[] = [
         "Re-traded again WITH more retention (double retention): one contract can carry retention at most twice, ever. A 2nd retention on the same contract can't be applied until 75 in-season days have passed since the first (off-season days don't count) — this closes off the old same-day 'retention broker' trick at the trade deadline.",
         "Returning to a club that retained on him: a club that retained salary on a player can't reacquire him — by trade or off waivers — for a full year (365 days) from that trade, unless the specific contract it retained on has since fully expired or been bought out.",
       ] },
+      { h: "Retention capacity limits", points: [
+        "A club may be retaining on at most a league-set number of contracts at once (default 3) — the Trade Builder shows this as \"Retention slots (out)\" for each side, and a trade that would push a club over the limit is rejected.",
+        "The combined dead money a club is retaining can't exceed a league-set % of the cap ceiling (default 10%) — shown as \"Retention % of cap\"; a trade that would push either club over it is rejected.",
+        "A club may also only ROSTER a league-set number of retained-salary players at once (default 3, shown as \"Retained players (in)\") — acquiring a player who already carries retention from an earlier trade counts too, even if this trade adds no new retention of its own. Exceeding it on either side blocks the trade.",
+        "All three limits are checked against what a club already carries PLUS what the proposed trade would add — not the trade in isolation — and the Trade Builder previews the same numbers live before you propose.",
+      ] },
     ],
   },
   {
@@ -395,6 +401,12 @@ const SECTIONS_CS: Sec[] = [
         "Výměny stavíte v Trade Builderu (hráči, prospekti a volby v draftu). Můžete ji spustit rovnou z chatu s GM přes „Propose trade“.",
         "Zadržení platu je podporováno. Klauzule o nevyměnitelnosti / nehnutelnosti se musí respektovat — chráněný hráč musí souhlasit.",
         "Podle nastavení ligy mohou výměny vyžadovat schválení komisařem. Každá výměna se loguje.",
+      ] },
+      { h: "Limity zadržování platu", points: [
+        "Klub může mít najednou zadržený plat u nejvýše ligou nastaveného počtu smluv (výchozí 3) — Trade Builder to ukazuje jako „Retention slots (out)“ za každou stranu; výměnu, která by klub přes tento limit posunula, systém odmítne.",
+        "Součet zadrženého platu nesmí přesáhnout ligou nastavené % stropu (výchozí 10 %) — ukázáno jako „Retention % of cap“; výměna, která by kterýkoliv klub přes tuto hranici posunula, je odmítnuta.",
+        "Klub může mít na soupisce zároveň jen ligou nastavený počet hráčů se zadrženým platem (výchozí 3, „Retained players (in)“) — počítá se i hráč, který zadržený plat nese už z dřívější výměny, i když tato výměna žádné nové zadržení nepřidává. Překročení na kterékoli straně výměnu zablokuje.",
+        "Všechny tři limity se počítají proti tomu, co klub už nese, PLUS co by výměna přidala — ne proti samotné výměně izolovaně — a Trade Builder stejná čísla ukazuje živě ještě před odesláním nabídky.",
       ] },
     ],
   },

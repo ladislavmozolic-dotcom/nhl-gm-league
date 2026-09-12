@@ -28,12 +28,18 @@ export type CapStatus = {
   retentionPctUsed: number; retentionPctMax: number;
   retentionMaxPct: number; // max % a single contract may have retained (the slider's own cap)
   capUpper: number; // the real, uncushioned league cap ceiling — the base retentionPctUsed/Max are computed against
+  // How many retained-salary players this club currently ROSTERS (someone else
+  // is paying part of their cap hit) vs. the league's configured max — the
+  // "IN" side of retention capacity, separate from retentionSlotsUsed/Max
+  // above (the "OUT" side: contracts THIS club is retaining on).
+  retentionPlayersInUsed: number; retentionPlayersInMax: number;
 };
 
 export type RetentionStatus = {
   slotsUsed: number; slotsMax: number;
   pctOfCap: number; pctMax: number;
   deadCapAmount: number;
+  playersInUsed: number; playersInMax: number;
 };
 
 /** Active trade-retention (Buyout rows with totalCost=0) for one club: how many
@@ -44,20 +50,30 @@ async function activeRetentionRecords(teamId: number): Promise<{ slotsUsed: numb
   return { slotsUsed: active.length, deadCapAmount: deadMoneyForYear(active, CURRENT_SEASON_START) };
 }
 
-/** How much of a club's configured retention capacity — max retained contracts
- *  (retentionMaxPlayersOut) and max % of the cap tied up in retention
- *  (retentionMaxTotalPct) — is already spoken for by active retentions from
- *  past trades. Note: per the Admin > Salary Retention page's own TODO, these
- *  two limits aren't enforced by the trade engine (lib/trade-exec.ts) yet —
- *  this is purely informational, so a GM can see their real room before
- *  proposing a deal. */
+/** How many players on this club's NHL roster are currently retained-salary
+ *  acquisitions (someone else is paying part of their cap hit) — the "IN" side
+ *  of retention capacity, checked against retentionMaxPlayersIn. */
+async function retainedInCount(teamId: number): Promise<number> {
+  return prisma.player.count({ where: { teamId, rosterType: "NHL", retainedSalary: { gt: 0 } } });
+}
+
+/** How much of a club's configured retention capacity is already spoken for:
+ *  max retained contracts (retentionMaxPlayersOut) and max % of the cap tied
+ *  up in retention (retentionMaxTotalPct) it's already carrying from past
+ *  trades, plus how many retained-salary players it already rosters
+ *  (retentionMaxPlayersIn). All three are enforced server-side in
+ *  lib/trade-exec.ts's collectMoveOps — this is the same read used to show a
+ *  GM their real room before proposing a deal. */
 export async function teamRetentionStatus(teamId: number): Promise<RetentionStatus> {
-  const [settings, cap, { slotsUsed, deadCapAmount }] = await Promise.all([loadSettings(), loadLeagueCap(), activeRetentionRecords(teamId)]);
+  const [settings, cap, { slotsUsed, deadCapAmount }, playersInUsed] = await Promise.all([
+    loadSettings(), loadLeagueCap(), activeRetentionRecords(teamId), retainedInCount(teamId),
+  ]);
   return {
     slotsUsed, slotsMax: settings.retentionMaxPlayersOut,
     pctOfCap: cap.upper > 0 ? (deadCapAmount / cap.upper) * 100 : 0,
     pctMax: settings.retentionMaxTotalPct,
     deadCapAmount,
+    playersInUsed, playersInMax: settings.retentionMaxPlayersIn,
   };
 }
 
@@ -87,13 +103,14 @@ export async function teamCapCommitted(teamId: number): Promise<{ totalSalaries:
 /** Cap status for one club. Pass `phaseOverride` (e.g. "regular") to test
  *  compliance against a different phase — used for the opening-day check. */
 export async function teamCapStatus(teamId: number, phaseOverride?: string): Promise<CapStatus> {
-  const [roster, capInfo, cap, clock, settings, retention] = await Promise.all([
+  const [roster, capInfo, cap, clock, settings, retention, retentionPlayersIn] = await Promise.all([
     prisma.player.findMany({ where: { teamId, rosterType: "NHL" }, select: { capHit: true, retainedSalary: true, injuryDaysLeft: true, condition: true, isGoalie: true, contractYears: true } }),
     teamCapCommitted(teamId),
     loadLeagueCap(),
     getLeagueClock(),
     loadSettings(),
     activeRetentionRecords(teamId),
+    retainedInCount(teamId),
   ]);
   const phase = phaseOverride ?? clock.phase;
   const committed = capInfo.committed;
@@ -116,6 +133,7 @@ export async function teamCapStatus(teamId: number, phaseOverride?: string): Pro
     retentionPctMax: settings.retentionMaxTotalPct,
     retentionMaxPct: settings.retentionMaxPct,
     capUpper: cap.upper,
+    retentionPlayersInUsed: retentionPlayersIn, retentionPlayersInMax: settings.retentionMaxPlayersIn,
   };
 }
 

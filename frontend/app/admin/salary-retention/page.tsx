@@ -73,12 +73,14 @@ export default async function SalaryRetentionAdminPage() {
         </p>
       </div>
 
-      <div className="bg-amber-950/40 border border-amber-800/50 rounded-xl p-4 text-sm text-amber-200">
-        <b>⚠ Not wired up yet:</b> the value saves fine (e.g. setting Max Total Retention % to 20% works — nothing here
-        caps it below 100%), but <code className="text-amber-100">retentionMaxPlayersIn</code>, <code className="text-amber-100">retentionMaxPlayersOut</code> and
-        <code className="text-amber-100"> retentionMaxTotalPct</code> aren&apos;t read by the trade engine yet (checked in <code className="text-amber-100">lib/trade-exec.ts</code>) — only{" "}
-        <b>Max % Retained on Single Contract</b> and the older single &quot;max retained players&quot; setting (Simulation Engine page) are actually enforced during a trade.
-        Saving a number here won&apos;t change trade behavior until that enforcement is added.
+      <div className="bg-emerald-950/40 border border-emerald-800/50 rounded-xl p-4 text-sm text-emerald-200">
+        <b>✓ Enforced:</b> all three capacity limits are checked in <code className="text-emerald-100">lib/trade-exec.ts</code> and
+        will reject a proposed trade that pushes either club over them —{" "}
+        <code className="text-emerald-100">retentionMaxPlayersOut</code> (max contracts a club may be retaining on at once),{" "}
+        <code className="text-emerald-100">retentionMaxTotalPct</code> (max % of the cap tied up in that dead money), and{" "}
+        <code className="text-emerald-100">retentionMaxPlayersIn</code> (max retained-salary players a club may roster —
+        acquiring a player who already carries retention from an earlier trade counts too, even without new retention in this
+        deal). All three are checked against what a club already carries PLUS whatever the proposed trade would add.
       </div>
 
       <form action={updateSalaryRetentionSettings} className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-6">

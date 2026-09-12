@@ -7,7 +7,7 @@ import { money } from "@/lib/finance";
 import { displayName } from "@/lib/playerName";
 import { clauseTermsAction, analyzeTradeAction, type TradePackage } from "@/app/trades/build/actions";
 
-type Player = { id: number; name: string; position: string; capHit: number; farm: boolean; clause?: string | null; noTradeTeams?: number[] };
+type Player = { id: number; name: string; position: string; capHit: number; farm: boolean; clause?: string | null; noTradeTeams?: number[]; alreadyRetained?: boolean };
 type Pick = { id: number; label: string; logoUrl?: string | null };
 type Assets = { players: Player[]; picks: Pick[]; prospects: Pick[] };
 type Team = { id: number; name: string; logoUrl?: string | null };
@@ -17,6 +17,7 @@ type CapSnapshot = {
   committed: number; ceiling: number; strictSpace: number; floor: number;
   retentionSlotsUsed: number; retentionSlotsMax: number;
   retentionPctUsed: number; retentionPctMax: number; retentionMaxPct: number; capUpper: number;
+  retentionPlayersInUsed: number; retentionPlayersInMax: number;
 };
 
 // A moved player's own Cap Hit never changes — what changes hands is his cap
@@ -47,6 +48,21 @@ function retentionAdded(map: Record<number, number>, assets: Assets, capUpper: n
   return { slots, pct: capUpper > 0 ? (dollars / capUpper) * 100 : 0 };
 }
 
+/** New retained-salary players this trade would land on the RECEIVING side
+ *  (this Side's own team) — a player counts whether he already carried
+ *  retention from an earlier trade (alreadyRetained) or is gaining fresh
+ *  retention right here from the OTHER side's map. AHL destinations don't
+ *  touch the NHL retention count. */
+function retainedInAdded(incomingMap: Record<number, number>, incomingAssets: Assets): number {
+  let count = 0;
+  for (const [id, pct] of Object.entries(incomingMap)) {
+    const p = incomingAssets.players.find((pl) => pl.id === Number(id));
+    if (!p || p.farm) continue;
+    if (pct > 0 || p.alreadyRetained) count++;
+  }
+  return count;
+}
+
 function CapImpact({ status, delta }: { status: CapSnapshot; delta: number }) {
   const spaceNow = status.strictSpace;
   const spaceAfter = spaceNow - delta;
@@ -73,26 +89,32 @@ function CapImpact({ status, delta }: { status: CapSnapshot; delta: number }) {
   );
 }
 
-// How much of this club's retention capacity (slots + % of cap tied up in
-// dead money) is already used by past trades, plus what THIS trade would add
-// on top — so a GM sees their real room before proposing a deal. The league
-// limits behind slotsMax/pctMax aren't enforced server-side yet (see
-// app/admin/salary-retention's own note), so this is advisory, not a hard cap.
-function RetentionCapacity({ status, newSlots, newPct }: { status: CapSnapshot; newSlots: number; newPct: number }) {
+// How much of this club's retention capacity — contracts it's retaining on
+// (OUT), % of the cap tied up in that dead money, and retained-salary players
+// it rosters (IN) — is already used, plus what THIS trade would add on top of
+// each. All three are enforced server-side in lib/trade-exec.ts, so this is a
+// live preview of the same check, not just advisory.
+function RetentionCapacity({ status, newSlots, newPct, newIn }: { status: CapSnapshot; newSlots: number; newPct: number; newIn: number }) {
   const slotsAfter = status.retentionSlotsUsed + newSlots;
   const pctAfter = status.retentionPctUsed + newPct;
-  const over = slotsAfter > status.retentionSlotsMax || pctAfter > status.retentionPctMax;
+  const inAfter = status.retentionPlayersInUsed + newIn;
+  const overOut = slotsAfter > status.retentionSlotsMax || pctAfter > status.retentionPctMax;
+  const overIn = inAfter > status.retentionPlayersInMax;
   return (
-    <div className={`bg-slate-900/40 border rounded-lg px-3 py-2 text-xs space-y-1 ${over ? "border-amber-700/60" : "border-slate-800"}`} title="Active retention slots and % of the cap tied up in dead money — vs. the league's configured limits">
+    <div className={`bg-slate-900/40 border rounded-lg px-3 py-2 text-xs space-y-1 ${overOut || overIn ? "border-amber-700/60" : "border-slate-800"}`} title="Retention capacity vs. the league's configured limits — contracts retained on (out), % of cap tied up, and retained-salary players rostered (in)">
       <div className="flex items-center justify-between">
-        <span className="text-slate-500">Retention slots</span>
+        <span className="text-slate-500">Retention slots (out)</span>
         <span className={`tabular-nums font-medium ${slotsAfter > status.retentionSlotsMax ? "text-amber-400" : "text-slate-200"}`}>{slotsAfter}/{status.retentionSlotsMax}</span>
       </div>
       <div className="flex items-center justify-between">
         <span className="text-slate-500">Retention % of cap</span>
         <span className={`tabular-nums font-medium ${pctAfter > status.retentionPctMax ? "text-amber-400" : "text-slate-200"}`}>{pctAfter.toFixed(1)}% / {status.retentionPctMax}%</span>
       </div>
-      {over && <p className="text-amber-400">⚠ This would exceed the league&apos;s configured retention limit.</p>}
+      <div className="flex items-center justify-between">
+        <span className="text-slate-500">Retained players (in)</span>
+        <span className={`tabular-nums font-medium ${overIn ? "text-amber-400" : "text-slate-200"}`}>{inAfter}/{status.retentionPlayersInMax}</span>
+      </div>
+      {(overOut || overIn) && <p className="text-amber-400">⚠ This would exceed the league&apos;s configured retention limit.</p>}
     </div>
   );
 }
@@ -198,7 +220,7 @@ function CheckTable({ title, icon, list, sel, setSel, onToggle }: {
   );
 }
 
-function Side({ team, assets, pmap, setPmap, pk, setPk, pro, setPro, cash, setCash, destTeamId, terms, fees, onToggleClause, onAgreeFee, onTogglePick, capStatus, capDelta }: {
+function Side({ team, assets, pmap, setPmap, pk, setPk, pro, setPro, cash, setCash, destTeamId, terms, fees, onToggleClause, onAgreeFee, onTogglePick, capStatus, capDelta, incomingAssets, incomingPmap }: {
   team: Team; assets: Assets; pmap: Record<number, number>; setPmap: (v: Record<number, number>) => void;
   pk: Set<number>; setPk: (s: Set<number>) => void; pro: Set<number>; setPro: (s: Set<number>) => void;
   cash: number; setCash: (n: number) => void; destTeamId: number;
@@ -207,8 +229,12 @@ function Side({ team, assets, pmap, setPmap, pk, setPk, pro, setPro, cash, setCa
   onAgreeFee: (id: number, t: Terms) => void;
   onTogglePick: (sel: Set<number>, setSel: (s: Set<number>) => void, id: number) => void;
   capStatus: CapSnapshot; capDelta: number;
+  // The OTHER side's assets/retention map — what THIS team would be acquiring,
+  // needed to know how many newly-retained players would land on its roster.
+  incomingAssets: Assets; incomingPmap: Record<number, number>;
 }) {
   const added = retentionAdded(pmap, assets, capStatus.capUpper);
+  const addedIn = retainedInAdded(incomingPmap, incomingAssets);
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-center gap-2 font-bold">
@@ -216,7 +242,7 @@ function Side({ team, assets, pmap, setPmap, pk, setPk, pro, setPro, cash, setCa
         {team.name} sends
       </div>
       <CapImpact status={capStatus} delta={capDelta} />
-      <RetentionCapacity status={capStatus} newSlots={added.slots} newPct={added.pct} />
+      <RetentionCapacity status={capStatus} newSlots={added.slots} newPct={added.pct} newIn={addedIn} />
       <PlayerTable title="NHL players" list={assets.players.filter((p) => !p.farm)} pmap={pmap} setPmap={setPmap} destTeamId={destTeamId} ownerTeamId={team.id} terms={terms} fees={fees} onToggleClause={onToggleClause} onAgreeFee={onAgreeFee} maxRetentionPct={capStatus.retentionMaxPct} />
       <PlayerTable title="AHL players" list={assets.players.filter((p) => p.farm)} pmap={pmap} setPmap={setPmap} destTeamId={destTeamId} ownerTeamId={team.id} terms={terms} fees={fees} onToggleClause={onToggleClause} onAgreeFee={onAgreeFee} maxRetentionPct={capStatus.retentionMaxPct} />
       <CheckTable title="Prospects" icon="⭐" list={assets.prospects} sel={pro} setSel={setPro} onToggle={onTogglePick} />
@@ -363,7 +389,7 @@ export default function TradeBuilder({ me, opp, mine, theirs, meCap, oppCap, onP
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px_1fr] gap-4 items-start">
-        <Side team={me} assets={mine} pmap={mineP} setPmap={setMineP} pk={minePk} setPk={setMinePk} pro={minePro} setPro={setMinePro} cash={mineCash} setCash={setMineCash} destTeamId={opp.id} terms={terms} fees={fees} onToggleClause={toggleClausePlayer} onAgreeFee={agreeFee} onTogglePick={togglePick} capStatus={meCap} capDelta={meCapDelta} />
+        <Side team={me} assets={mine} pmap={mineP} setPmap={setMineP} pk={minePk} setPk={setMinePk} pro={minePro} setPro={setMinePro} cash={mineCash} setCash={setMineCash} destTeamId={opp.id} terms={terms} fees={fees} onToggleClause={toggleClausePlayer} onAgreeFee={agreeFee} onTogglePick={togglePick} capStatus={meCap} capDelta={meCapDelta} incomingAssets={theirs} incomingPmap={theirsP} />
 
         {/* MIDDLE — live summary, conditions, Propose + GM Assist */}
         <div className="lg:sticky lg:top-4 space-y-3">
@@ -422,7 +448,7 @@ export default function TradeBuilder({ me, opp, mine, theirs, meCap, oppCap, onP
           </div>
         </div>
 
-        <Side team={opp} assets={theirs} pmap={theirsP} setPmap={setTheirsP} pk={theirsPk} setPk={setTheirsPk} pro={theirsPro} setPro={setTheirsPro} cash={theirsCash} setCash={setTheirsCash} destTeamId={me.id} terms={terms} fees={fees} onToggleClause={toggleClausePlayer} onAgreeFee={agreeFee} onTogglePick={togglePick} capStatus={oppCap} capDelta={oppCapDelta} />
+        <Side team={opp} assets={theirs} pmap={theirsP} setPmap={setTheirsP} pk={theirsPk} setPk={setTheirsPk} pro={theirsPro} setPro={setTheirsPro} cash={theirsCash} setCash={setTheirsCash} destTeamId={me.id} terms={terms} fees={fees} onToggleClause={toggleClausePlayer} onAgreeFee={agreeFee} onTogglePick={togglePick} capStatus={oppCap} capDelta={oppCapDelta} incomingAssets={mine} incomingPmap={mineP} />
       </div>
     </div>
   );
