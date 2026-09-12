@@ -3,6 +3,8 @@
 // already thinks in these terms (ratings.ts roleFitOf) — this is the per-player
 // version for display on profiles. Ratings in this DB are compressed (~50-70).
 
+import { AVG, OVERRIDE } from "./ratingBands";
+
 export type TypeInput = {
   position?: string | null;
   isGoalie?: boolean;
@@ -13,6 +15,13 @@ export type TypeInput = {
 
 const n = (v: number | null | undefined, d = 55) => (v == null ? d : v);
 const isDefPos = (pos = "") => /(^|\/)D(\/|$)/.test(pos) || (pos.toUpperCase().includes("D") && !/[CW]/.test(pos.toUpperCase()));
+
+// A D's offense needs to be MEANINGFULLY above his position's league-average
+// PA/SC (lib/ratingBands.ts's AVG.D, ~44-48 here) to count as "decent" for the
+// Two-Way check below — a couple points over average (ratingBands.ts's own
+// green colouring bar) isn't enough to separate a real two-way blueliner from
+// a shutdown defenseman who just happens to clear the green threshold too.
+const D_OFF_TWO_WAY = Math.max(AVG.D.pa, AVG.D.sc) + 10;
 
 /** A short player-type label, or null if there aren't enough ratings. */
 export function playerType(p: TypeInput): string | null {
@@ -36,7 +45,16 @@ export function playerType(p: TypeInput): string | null {
   const phys = C * 0.75 + T * 0.25;
 
   if (isDefPos(p.position ?? "")) {
+    // "decent at both ends": offense meaningfully above the D-position average
+    // (D_OFF_TWO_WAY) AND defense clearly above the DF average — not just "not
+    // weak enough to be Offensive", so a genuine two-way blueliner (e.g. Ekholm:
+    // PA 60, DF 79) reads as Two-Way instead of falling into Stay-at-Home purely
+    // because his offense sits below the 68 Offensive-D cutoff. A pure shutdown
+    // D (e.g. PA low-50s, still DF-strong) stays below D_OFF_TWO_WAY and keeps
+    // reading as Stay-at-Home/Defensive, same as before.
+    const defGood = D >= OVERRIDE.D.df.y;
     if (off >= 68) return "Offensive Defenseman";
+    if (off >= D_OFF_TWO_WAY && defGood) return "Two-Way Defenseman";
     if (off <= 60) return phys >= 74 ? "Stay-at-Home D" : "Defensive Defenseman";
     return "Two-Way Defenseman";
   }

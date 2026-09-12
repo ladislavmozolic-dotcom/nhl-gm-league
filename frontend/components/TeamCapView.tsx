@@ -12,6 +12,7 @@ import {
 import { getLeagueClock } from "@/lib/calendar-server";
 import { getTeamSession } from "@/lib/auth";
 import { teamRetentionStatus } from "@/lib/cap";
+import { ROSTER_LIMITS } from "@/lib/roster-rules";
 import BuyoutButton from "@/components/BuyoutButton";
 import { buyoutPlayer } from "@/app/finance/[slug]/actions";
 
@@ -92,6 +93,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   const overBy = Math.max(0, cap.capHit - effectiveCeiling);
   const cushioned = phase !== "regular" && phase !== "playoffs";
   const posCounts = splitByPos(team.players);
+  const orgTotal = team.players.length + farm.length; // NHL + AHL, vs. ROSTER_LIMITS.orgMax
 
   const Badge = ({ s }: { s: "UFA" | "RFA" }) => (
     <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${s === "UFA" ? "bg-red-600 text-white" : "bg-blue-600 text-white"}`}>{s}</span>
@@ -158,8 +160,10 @@ export default async function TeamCapView({ slug }: { slug: string }) {
           {isGm && <Link href={`/teams/${slug}/finance`} className="text-xs text-blue-400 hover:underline">Ticket prices →</Link>}
         </div>
         <div className="text-sm grid grid-cols-2 gap-x-6 gap-y-1 tabular-nums">
-          <span className="text-slate-400" title="Skaters + goalies on the NHL roster">Roster Size</span>
-          <span className="text-right">{team.players.length} <span className="text-slate-500 text-xs">({posCounts.forwards.length}F · {posCounts.defense.length}D · {posCounts.goalies.length}G)</span></span>
+          <span className="text-slate-400" title="NHL + AHL players in the organization, vs. the league's max org roster size">Roster Size</span>
+          <span className={`text-right ${orgTotal > ROSTER_LIMITS.orgMax ? "text-red-400 font-semibold" : ""}`}>
+            {orgTotal}/{ROSTER_LIMITS.orgMax} <span className="text-slate-500 text-xs">({team.players.length} NHL: {posCounts.forwards.length}F·{posCounts.defense.length}D·{posCounts.goalies.length}G · {farm.length} AHL)</span>
+          </span>
           <span className="text-slate-400" title="Sum of each player's Cap Hit — already net of any retention someone else pays">Total Salaries</span><span className="text-right">{money(cap.totalSalaries)}</span>
           <span className="text-slate-400" title="Dead money from this club's own player buyouts">Buyouts</span><span className="text-right">{realBuyoutsDeadMoney ? money(realBuyoutsDeadMoney) : "—"}</span>
           <span className="text-slate-400" title="Salary this club retains on players it traded away (see Dead Cap below) — not a buyout, but still counts against its cap">Dead Cap</span><span className="text-right">{deadCapAmount ? money(deadCapAmount) : "—"}</span>

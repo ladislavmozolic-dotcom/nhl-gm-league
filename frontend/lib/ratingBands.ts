@@ -23,7 +23,10 @@ export const AVG: Record<PosGroup, Record<string, number>> = {
 };
 
 // explicit {greenMin, yellowMin}: green ≥ g, yellow ≥ y (and < g), red < y
-const OVERRIDE: Record<PosGroup, Record<string, { g: number; y: number }>> = {
+// Exported so other logic that needs "is this attribute actually good" (e.g.
+// lib/player-type.ts's Two-Way Defenseman check) can reuse the SAME calibrated
+// bar the UI already colours green/yellow with, instead of inventing its own.
+export const OVERRIDE: Record<PosGroup, Record<string, { g: number; y: number }>> = {
   F: { df: { g: 70, y: 65 }, pa: { g: 56, y: 50 }, sc: { g: 56, y: 50 }, OV: { g: 60, y: 55 } },
   D: { df: { g: 80, y: 76 }, pa: { g: 51, y: 45 }, sc: { g: 51, y: 45 }, OV: { g: 60, y: 55 } },
   G: { OV: { g: 68, y: 64 } },
