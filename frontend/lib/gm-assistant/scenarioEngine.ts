@@ -258,8 +258,8 @@ export async function runScenario(teamId: number, moves: ScenarioMove[]): Promis
     afterResolved.set(tid, {
       forwardLines: built.forwardLines,
       defensePairs: built.defensePairs,
-      ppUnit: built.situations.pp[0].players,
-      pkUnit: built.situations.pk4[0].players,
+      ppUnits: [built.situations.pp[0].players, built.situations.pp[1].players],
+      pkUnits: [built.situations.pk4[0].players, built.situations.pk4[1].players],
       starter: built.situations.others.starter,
       backup: built.situations.others.backup,
     });

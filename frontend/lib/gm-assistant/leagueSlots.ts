@@ -23,13 +23,14 @@ export interface SlotDef {
   lineIdxs?: number[]; // forward/defense: 0-based indexes into forwardLines / defensePairs
   side?: ForwardSide | DefenseSide; // forward/defense
   situationsKey?: "pp" | "pk4"; // special
+  unitIdx?: 0 | 1; // special: which of the club's 2 saved PP/PK units (0 = first, 1 = second)
   goalieRole?: "starter" | "backup"; // goalie
 }
 
 // Top slot vs. depth slot, per side — mirrors how GMs actually talk about a
 // lineup ("top-line C", "bottom-pair RD") and is exactly granular enough to
 // reproduce findings like "2nd/3rd-pair RD". Plus the starting goalie tandem
-// and each club's first PP/PK unit.
+// and each club's two PP/PK units.
 export const SLOTS: SlotDef[] = [
   { id: "lw-top", label: "Top-line LW", kind: "forward", lineIdxs: [0], side: "lw" },
   { id: "lw-depth", label: "Depth LW (2.–4. formácia)", kind: "forward", lineIdxs: [1, 2, 3], side: "lw" },
@@ -43,8 +44,10 @@ export const SLOTS: SlotDef[] = [
   { id: "rd-bottom", label: "2.–3. pár RD", kind: "defense", lineIdxs: [1, 2], side: "rd" },
   { id: "goalie-starter", label: "Štartujúci brankár", kind: "goalie", goalieRole: "starter" },
   { id: "goalie-backup", label: "Náhradný brankár", kind: "goalie", goalieRole: "backup" },
-  { id: "pp1", label: "PP1 (presilovka č.1)", kind: "special", situationsKey: "pp" },
-  { id: "pk1", label: "PK1 (oslabenie č.1)", kind: "special", situationsKey: "pk4" },
+  { id: "pp1", label: "PP1 (presilovka č.1)", kind: "special", situationsKey: "pp", unitIdx: 0 },
+  { id: "pp2", label: "PP2 (presilovka č.2)", kind: "special", situationsKey: "pp", unitIdx: 1 },
+  { id: "pk1", label: "PK1 (oslabenie č.1)", kind: "special", situationsKey: "pk4", unitIdx: 0 },
+  { id: "pk2", label: "PK2 (oslabenie č.2)", kind: "special", situationsKey: "pk4", unitIdx: 1 },
 ];
 
 export function slotById(id: string): SlotDef | undefined {
@@ -168,8 +171,8 @@ export function ppRating(p: RawSkaterParams): number | null {
 interface ResolvedLines {
   forwardLines: { lw: number | null; c: number | null; rw: number | null }[];
   defensePairs: { ld: number | null; rd: number | null }[];
-  ppUnit: (number | null)[]; // PP1 only
-  pkUnit: (number | null)[]; // PK1 only
+  ppUnits: (number | null)[][]; // [PP1, PP2]
+  pkUnits: (number | null)[][]; // [PK1, PK2]
   starter: number | null;
   backup: number | null;
 }
@@ -257,15 +260,19 @@ export async function loadLeagueSlots(): Promise<LeagueSlotsData> {
 
     const sit = saved?.situations as { pp?: { players?: unknown }[]; pk4?: { players?: unknown }[]; others?: { starter?: unknown; backup?: unknown } } | null | undefined;
 
-    const savedPp1 = sit?.pp?.[0]?.players;
-    const hasRealPp1 = hasAnyId(savedPp1);
-    if (!hasRealPp1) auto.add("pp1");
-    const ppUnit = hasRealPp1 ? (savedPp1 as (number | null)[]) : built.situations.pp[0].players;
+    const ppUnits = ([0, 1] as const).map((i) => {
+      const savedUnit = sit?.pp?.[i]?.players;
+      const hasReal = hasAnyId(savedUnit);
+      if (!hasReal) auto.add(i === 0 ? "pp1" : "pp2");
+      return hasReal ? (savedUnit as (number | null)[]) : built.situations.pp[i].players;
+    });
 
-    const savedPk1 = sit?.pk4?.[0]?.players;
-    const hasRealPk1 = hasAnyId(savedPk1);
-    if (!hasRealPk1) auto.add("pk1");
-    const pkUnit = hasRealPk1 ? (savedPk1 as (number | null)[]) : built.situations.pk4[0].players;
+    const pkUnits = ([0, 1] as const).map((i) => {
+      const savedUnit = sit?.pk4?.[i]?.players;
+      const hasReal = hasAnyId(savedUnit);
+      if (!hasReal) auto.add(i === 0 ? "pk1" : "pk2");
+      return hasReal ? (savedUnit as (number | null)[]) : built.situations.pk4[i].players;
+    });
 
     const validGoalie = new Set(teamGoalies.map((g) => g.id));
     const savedStarter = sit?.others?.starter;
@@ -278,7 +285,7 @@ export async function loadLeagueSlots(): Promise<LeagueSlotsData> {
     if (!hasRealBackup) auto.add("goalie-backup");
     const backup = hasRealBackup ? (savedBackup as number) : built.situations.others.backup;
 
-    resolved.set(team.id, { forwardLines, defensePairs, ppUnit, pkUnit, starter, backup });
+    resolved.set(team.id, { forwardLines, defensePairs, ppUnits, pkUnits, starter, backup });
   }
 
   return { teams, resolved, autoBySlot, playerMap, goalieMap };
@@ -292,9 +299,10 @@ export function slotPlayers(lines: ResolvedLines, slot: SlotDef, playerMap: Map<
     return g ? [g] : [];
   }
   if (slot.kind === "special") {
-    const ids = slot.situationsKey === "pp" ? lines.ppUnit : lines.pkUnit;
-    // PP1/PK1 don't use the general rating — each is re-rated on just the
-    // params that matter for that situation (see pkRating/ppRating).
+    const units = slot.situationsKey === "pp" ? lines.ppUnits : lines.pkUnits;
+    const ids = units[slot.unitIdx ?? 0] ?? [];
+    // PP1/PP2/PK1/PK2 don't use the general rating — each is re-rated on just
+    // the params that matter for that situation (see pkRating/ppRating).
     const situationalRating = slot.situationsKey === "pp" ? ppRating : pkRating;
     return ids
       .filter((id): id is number => typeof id === "number")
