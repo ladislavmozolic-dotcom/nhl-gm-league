@@ -96,9 +96,9 @@ export default async function RootLayout({
     const item = m.key.startsWith("page:") ? m : { ...m, label: translate(lang, `menu.${m.key}`) };
     if (item.key === "tools" && item.children) {
       const children = item.children.filter((c) => c.href !== hiddenCalc);
-      // GM Assistant — commissioner-only for now (see memory: gm-assistant-intelligence);
+      // UNHL Intelligence — commissioner-only for now (see memory: gm-assistant-intelligence);
       // the route itself also 404s for anyone else, this just keeps it off the menu.
-      if (t?.isAdmin) children.push({ label: "🧠 GM Assistant", href: "/tools/assistant" });
+      if (t?.isAdmin) children.push({ label: "🧠 UNHL Intelligence", href: "/tools/assistant" });
       return { ...item, children };
     }
     if (item.key === "league" && item.children) {

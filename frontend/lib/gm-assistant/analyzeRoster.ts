@@ -1,6 +1,6 @@
 import { loadLeagueSlots, rankSlot, SLOTS, type SlotPlayer } from "./leagueSlots";
 
-// "Analyze my roster" — the first GM Assistant function. No LLM, no black-box
+// "Analyze my roster" — the first UNHL Intelligence function. No LLM, no black-box
 // judgment: every finding below is a plain average rating — the CK/PA/SC/DF
 // composite for skaters, GoalieRating.overall for goalies (OV is orientational
 // only in this league, see memory: ov-vs-specific-params) — for the players

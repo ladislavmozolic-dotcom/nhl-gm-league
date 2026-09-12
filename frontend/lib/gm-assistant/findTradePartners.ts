@@ -1,6 +1,6 @@
 import { loadLeagueSlots, rankSlot, slotById, type SlotDef, type SlotTeamRow } from "./leagueSlots";
 
-// "Find Trade Partner" — the third GM Assistant function. Given a slot (e.g.
+// "Find Trade Partner" — the third UNHL Intelligence function. Given a slot (e.g.
 // the "2.–3. pár RD" a GM's own Analyze My Roster flagged as weak), it ranks
 // every other NHL club at that exact same slot — the same computation
 // Analyze My Roster already ranks your own club against — so a "candidate"

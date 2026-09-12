@@ -8,10 +8,10 @@ import { PageHeader, Card } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
-// GM Assistant — not linked anywhere and 404s for anyone but the commissioner
-// login. Every function here computes a plain, inspectable number from data
-// already live in the DB (Player.overall via TeamLines slots) — no LLM, no
-// black-box verdicts. See memory: gm-assistant-intelligence.
+// UNHL Intelligence — not linked anywhere and 404s for anyone but the
+// commissioner login. Every function here computes a plain, inspectable
+// number from data already live in the DB (Player.overall via TeamLines
+// slots) — no LLM, no black-box verdicts. See memory: gm-assistant-intelligence.
 export default async function GmAssistantPage() {
   if (!(await isAdmin())) notFound();
   const teamId = await getTeamSession();
@@ -27,7 +27,7 @@ export default async function GmAssistantPage() {
 
   return (
     <div className="py-2 flex flex-col gap-6">
-      <PageHeader title="🧠 GM Assistant" subtitle="Explainable roster intelligence — každé zistenie s presnými číslami a hráčmi za ním." />
+      <PageHeader title="🧠 UNHL Intelligence" subtitle="Explainable roster intelligence — každé zistenie s presnými číslami a hráčmi za ním." />
 
       <Card title="Analyze My Roster" accent="text-blue-400">
         {!analysis ? (

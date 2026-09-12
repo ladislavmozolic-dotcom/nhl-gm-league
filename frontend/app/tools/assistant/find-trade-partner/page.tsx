@@ -8,8 +8,8 @@ import { PageHeader, Card } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
-// GM Assistant — "Find Trade Partner". Same rule as the other two tools: no
-// trade-value model, no willingness-to-deal guess. A slot you're weak at
+// UNHL Intelligence — "Find Trade Partner". Same rule as the other two tools:
+// no trade-value model, no willingness-to-deal guess. A slot you're weak at
 // (from Analyze My Roster) is ranked league-wide, and every club that
 // currently ranks above you there is shown as a candidate — nothing more
 // than "this club has more there than you do right now". Commissioner-only
@@ -32,8 +32,8 @@ export default async function FindTradePartnerPage({ searchParams }: { searchPar
     <div className="py-2 flex flex-col gap-6">
       <PageHeader
         title="🤝 Find Trade Partner"
-        subtitle="GM Assistant"
-        right={<Link href="/tools/assistant" className="text-sm text-slate-400 hover:text-blue-400">← GM Assistant</Link>}
+        subtitle="UNHL Intelligence"
+        right={<Link href="/tools/assistant" className="text-sm text-slate-400 hover:text-blue-400">← UNHL Intelligence</Link>}
       />
 
       <Card bodyClassName="p-4">

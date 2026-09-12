@@ -8,7 +8,7 @@ import SortableTable, { type SortCol, type SortRow } from "@/components/Sortable
 
 export const dynamic = "force-dynamic";
 
-// GM Assistant — "Find Player". Same rule as Analyze My Roster: a plain,
+// UNHL Intelligence — "Find Player". Same rule as Analyze My Roster: a plain,
 // inspectable filter over data already in the DB — every filter you set is
 // visible in the URL/form, and every result row is the exact player + numbers
 // that matched it. No ranking model, no LLM. Commissioner-only for now (see
@@ -124,8 +124,8 @@ export default async function FindPlayerPage({ searchParams }: { searchParams: P
     <div className="py-2 flex flex-col gap-6">
       <PageHeader
         title="🔎 Find Player"
-        subtitle="GM Assistant"
-        right={<Link href="/tools/assistant" className="text-sm text-slate-400 hover:text-blue-400">← GM Assistant</Link>}
+        subtitle="UNHL Intelligence"
+        right={<Link href="/tools/assistant" className="text-sm text-slate-400 hover:text-blue-400">← UNHL Intelligence</Link>}
       />
 
       <Card bodyClassName="p-4">

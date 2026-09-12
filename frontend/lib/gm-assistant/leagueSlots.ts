@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { autoLines } from "@/lib/sim/lines-core";
 
-// Shared slot model for GM Assistant's roster-shape tools (Analyze My Roster,
+// Shared slot model for UNHL Intelligence's roster-shape tools (Analyze My Roster,
 // Find Trade Partner). Every slot below — forward lines, D pairs, the starting
 // goalie tandem, and the top PP/PK units — is read from a club's own saved
 // Team Lines wherever it has one set. Whatever a club HASN'T set (missing
