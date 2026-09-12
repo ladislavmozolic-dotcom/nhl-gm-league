@@ -16,13 +16,13 @@ function AssetList({ items, highlight }: { items: TradeHistoryAssetItem[]; highl
   return (
     <div className="flex flex-wrap gap-1.5">
       {items.map((it, i) => {
+        // this player's own entry — already the page we're on, so no self-link
         const isMe = it.text === highlight || it.text.startsWith(`${highlight} (`);
-        return (
-          <span key={i} className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1.5 ${isMe ? "bg-blue-500/20 text-blue-200 ring-1 ring-blue-500/40 font-semibold" : "bg-slate-800 text-slate-100"}`}>
-            {it.logoUrl && <img src={it.logoUrl} alt="" className="w-3.5 h-3.5 object-contain shrink-0" />}
-            {it.text}
-          </span>
-        );
+        const cls = `text-xs px-2 py-1 rounded inline-flex items-center gap-1.5 ${isMe ? "bg-blue-500/20 text-blue-200 ring-1 ring-blue-500/40 font-semibold" : "bg-slate-800 text-slate-100"}`;
+        const content = <>{it.logoUrl && <img src={it.logoUrl} alt="" className="w-3.5 h-3.5 object-contain shrink-0" />}{it.text}</>;
+        if (!isMe && it.href && it.external) return <a key={i} href={it.href} target="_blank" rel="noopener noreferrer" className={`${cls} hover:bg-slate-700 transition-colors`}>{content}</a>;
+        if (!isMe && it.href) return <Link key={i} href={it.href} className={`${cls} hover:bg-slate-700 transition-colors`}>{content}</Link>;
+        return <span key={i} className={cls}>{content}</span>;
       })}
     </div>
   );

@@ -4,15 +4,17 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import type { TradeHistoryEntry } from "@/lib/trade-history-server";
 
-const AssetChips = ({ items }: { items: { text: string; logoUrl?: string | null }[] }) => (
+type ChipItem = { text: string; logoUrl?: string | null; href?: string | null; external?: boolean };
+const AssetChips = ({ items }: { items: ChipItem[] }) => (
   <div className="flex flex-wrap gap-1.5">
     {items.length === 0 && <span className="text-slate-600 text-xs">nothing</span>}
-    {items.map((it, i) => (
-      <span key={i} className="text-xs px-2 py-1 rounded bg-slate-800 text-slate-100 inline-flex items-center gap-1.5">
-        {it.logoUrl && <img src={it.logoUrl} alt="" className="w-3.5 h-3.5 object-contain shrink-0" />}
-        {it.text}
-      </span>
-    ))}
+    {items.map((it, i) => {
+      const cls = "text-xs px-2 py-1 rounded bg-slate-800 text-slate-100 inline-flex items-center gap-1.5";
+      const content = <>{it.logoUrl && <img src={it.logoUrl} alt="" className="w-3.5 h-3.5 object-contain shrink-0" />}{it.text}</>;
+      if (it.href && it.external) return <a key={i} href={it.href} target="_blank" rel="noopener noreferrer" className={`${cls} hover:bg-slate-700 hover:text-blue-300 transition-colors`}>{content}</a>;
+      if (it.href) return <Link key={i} href={it.href} className={`${cls} hover:bg-slate-700 hover:text-blue-300 transition-colors`}>{content}</Link>;
+      return <span key={i} className={cls}>{content}</span>;
+    })}
   </div>
 );
 

@@ -5,11 +5,14 @@ import { money } from "@/lib/finance";
 import TradeActions from "@/components/TradeActions";
 import TradeGroupActions from "@/components/TradeGroupActions";
 import { PageHeader } from "@/components/ui";
-import { displayName } from "@/lib/playerName";
+import { displayName, epProfileUrl } from "@/lib/playerName";
 
 export const dynamic = "force-dynamic";
 
-type AssetLabel = { text: string; logoUrl?: string | null };
+// href set → the chip is clickable: an internal /players/{id} link for a player,
+// or an external EliteProspects link (external: true) for a prospect — prospects
+// have no profile route of their own, same convention the Prospects tables use.
+type AssetLabel = { text: string; logoUrl?: string | null; href?: string | null; external?: boolean };
 
 export default async function TradesPage() {
   const [session, admin, commission, trades, teams] = await Promise.all([
@@ -32,11 +35,12 @@ export default async function TradesPage() {
   const pickIds = assets.filter((a) => a.draftPickId).map((a) => a.draftPickId!) as number[];
   const [players, prospects, picks] = await Promise.all([
     prisma.player.findMany({ where: { id: { in: playerIds } }, select: { id: true, name: true } }),
-    prisma.prospect.findMany({ where: { id: { in: prospectIds } }, select: { id: true, name: true } }),
+    prisma.prospect.findMany({ where: { id: { in: prospectIds } }, select: { id: true, name: true, epUrl: true } }),
     prisma.draftPick.findMany({ where: { id: { in: pickIds } }, select: { id: true, year: true, round: true, ownerLogoId: true } }),
   ]);
   const pName = new Map(players.map((p) => [p.id, p.name]));
   const proName = new Map(prospects.map((p) => [p.id, p.name]));
+  const proHref = new Map(prospects.map((p) => [p.id, p.epUrl ?? epProfileUrl(p.name)]));
   // ownerLogoId = the pick's ORIGINAL team (not necessarily current holder) — show
   // that team's logo/code so "2027 R3" doesn't leave the reader guessing whose pick it is.
   const origTeams = picks.length
@@ -47,8 +51,8 @@ export default async function TradesPage() {
 
   const labelsFor = (tradeId: number, side: "FROM" | "TO"): AssetLabel[] =>
     assets.filter((a) => a.tradeId === tradeId && a.side === side).map((a) => {
-      if (a.assetType === "PLAYER") return { text: `${displayName(pName.get(a.playerId ?? -1) ?? "Player")}${a.retentionPct ? ` (${a.retentionPct}% ret.)` : ""}` };
-      if (a.assetType === "PROSPECT") return { text: `⭐ ${displayName(proName.get(a.prospectId ?? -1) ?? "Prospect")}` };
+      if (a.assetType === "PLAYER") return { text: `${displayName(pName.get(a.playerId ?? -1) ?? "Player")}${a.retentionPct ? ` (${a.retentionPct}% ret.)` : ""}`, href: a.playerId ? `/players/${a.playerId}` : null };
+      if (a.assetType === "PROSPECT") return { text: `⭐ ${displayName(proName.get(a.prospectId ?? -1) ?? "Prospect")}`, href: proHref.get(a.prospectId ?? -1) ?? null, external: true };
       if (a.assetType === "PICK") {
         const info = pickInfo.get(a.draftPickId ?? -1);
         const orig = info?.origTeam;
@@ -94,18 +98,19 @@ export default async function TradesPage() {
   const glPickIds = groupLegAssets.filter((a) => a.draftPickId).map((a) => a.draftPickId!) as number[];
   const [glPlayers, glProspects, glPicks] = await Promise.all([
     prisma.player.findMany({ where: { id: { in: glPlayerIds } }, select: { id: true, name: true } }),
-    prisma.prospect.findMany({ where: { id: { in: glProspectIds } }, select: { id: true, name: true } }),
+    prisma.prospect.findMany({ where: { id: { in: glProspectIds } }, select: { id: true, name: true, epUrl: true } }),
     prisma.draftPick.findMany({ where: { id: { in: glPickIds } }, select: { id: true, year: true, round: true } }),
   ]);
   const glPName = new Map(glPlayers.map((p) => [p.id, p.name]));
   const glProName = new Map(glProspects.map((p) => [p.id, p.name]));
+  const glProHref = new Map(glProspects.map((p) => [p.id, p.epUrl ?? epProfileUrl(p.name)]));
   const glPickLabel = new Map(glPicks.map((p) => [p.id, `${p.year} R${p.round}`]));
-  const legAssetLabels = (legId: number): string[] => groupLegAssets.filter((a) => a.tradeId === legId).map((a) => {
-    if (a.assetType === "PLAYER") return displayName(glPName.get(a.playerId ?? -1) ?? "Player");
-    if (a.assetType === "PROSPECT") return `⭐ ${displayName(glProName.get(a.prospectId ?? -1) ?? "Prospect")}`;
-    if (a.assetType === "PICK") return `🎫 ${glPickLabel.get(a.draftPickId ?? -1) ?? "Pick"}`;
-    if (a.assetType === "CASH") return `💵 ${money(a.cashAmount ?? 0)}`;
-    return a.assetType;
+  const legAssetLabels = (legId: number): AssetLabel[] => groupLegAssets.filter((a) => a.tradeId === legId).map((a) => {
+    if (a.assetType === "PLAYER") return { text: displayName(glPName.get(a.playerId ?? -1) ?? "Player"), href: a.playerId ? `/players/${a.playerId}` : null };
+    if (a.assetType === "PROSPECT") return { text: `⭐ ${displayName(glProName.get(a.prospectId ?? -1) ?? "Prospect")}`, href: glProHref.get(a.prospectId ?? -1) ?? null, external: true };
+    if (a.assetType === "PICK") return { text: `🎫 ${glPickLabel.get(a.draftPickId ?? -1) ?? "Pick"}` };
+    if (a.assetType === "CASH") return { text: `💵 ${money(a.cashAmount ?? 0)}` };
+    return { text: a.assetType };
   });
   const myGroupIds = session ? groupResponses.filter((r) => r.teamId === session).map((r) => r.groupId) : [];
   const enrichedGroups = groups
@@ -214,18 +219,21 @@ function TeamHead({ team }: { team?: { name: string; code: string | null; logoUr
   );
 }
 
+function AssetChip({ l }: { l: AssetLabel }) {
+  const cls = "text-xs bg-slate-800 px-2 py-1 rounded text-slate-200 inline-flex items-center gap-1";
+  const content = <>{l.logoUrl && <img src={l.logoUrl} alt="" className="w-3.5 h-3.5 object-contain shrink-0" />}{l.text}</>;
+  if (l.href && l.external) return <a href={l.href} target="_blank" rel="noopener noreferrer" className={`${cls} hover:bg-slate-700 hover:text-blue-300 transition-colors`}>{content}</a>;
+  if (l.href) return <Link href={l.href} className={`${cls} hover:bg-slate-700 hover:text-blue-300 transition-colors`}>{content}</Link>;
+  return <span className={cls}>{content}</span>;
+}
+
 function AssetList({ team, labels, verb }: { team?: { name: string }; labels: AssetLabel[]; verb: "sends" | "received" }) {
   return (
     <div className="flex-1 min-w-0">
       <p className="text-xs text-slate-500 mb-1">{team?.name || "Team"} {verb}</p>
       {labels.length === 0 ? <p className="text-slate-600 text-sm">nothing</p> : (
         <div className="flex flex-wrap gap-1.5">
-          {labels.map((l, i) => (
-            <span key={i} className="text-xs bg-slate-800 px-2 py-1 rounded text-slate-200 inline-flex items-center gap-1">
-              {l.logoUrl && <img src={l.logoUrl} alt="" className="w-3.5 h-3.5 object-contain shrink-0" />}
-              {l.text}
-            </span>
-          ))}
+          {labels.map((l, i) => <AssetChip key={i} l={l} />)}
         </div>
       )}
     </div>
@@ -237,7 +245,7 @@ function TradeCard({ trade, action, admin }: {
     id: number; status: string; condition: string | null; createdAt: Date; respondedAt: Date | null;
     fromTeam?: { name: string; code: string | null; logoUrl: string | null; rookieGm?: boolean };
     toTeam?: { name: string; code: string | null; logoUrl: string | null; rookieGm?: boolean };
-    fromLabels: { text: string }[]; toLabels: { text: string }[];
+    fromLabels: AssetLabel[]; toLabels: AssetLabel[];
   };
   action: "receiver" | "proposer" | null;
   admin?: boolean;
@@ -281,7 +289,7 @@ function TradeCard({ trade, action, admin }: {
 
 type EnrichedLeg = {
   id: number; fromTeam?: { name: string; code: string | null; logoUrl: string | null };
-  toTeam?: { name: string; code: string | null; logoUrl: string | null }; assetLabels: string[];
+  toTeam?: { name: string; code: string | null; logoUrl: string | null }; assetLabels: AssetLabel[];
 };
 type EnrichedResponse = { teamId: number; status: string; team?: { name: string; code: string | null } };
 
@@ -312,7 +320,7 @@ function TradeGroupCard({ group, canRespond, isCommishReview }: {
           <div key={l.id} className="flex items-center gap-2 text-sm flex-wrap">
             <span className="text-slate-400 shrink-0">{l.fromTeam?.name ?? "?"} sends</span>
             {l.assetLabels.length === 0 ? <span className="text-slate-600">nothing</span> : l.assetLabels.map((t, i) => (
-              <span key={i} className="text-xs bg-slate-800 px-2 py-1 rounded text-slate-200">{t}</span>
+              <AssetChip key={i} l={t} />
             ))}
             <span className="text-slate-500 shrink-0">→ {l.toTeam?.name ?? "?"}</span>
           </div>

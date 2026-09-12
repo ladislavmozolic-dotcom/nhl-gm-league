@@ -1,8 +1,12 @@
 import { prisma } from "@/lib/prisma";
-import { displayName } from "@/lib/playerName";
+import { displayName, epProfileUrl } from "@/lib/playerName";
 import { money } from "@/lib/finance";
 
-export type TradeSummary = { from: string[]; to: string[] };
+// href set → the chip is clickable: an internal /players/{id} link for a player, or
+// an external EliteProspects link (external: true) for a prospect (no profile route
+// of its own — same convention the Prospects tables use).
+export type AssetLabel = { text: string; href?: string | null; external?: boolean };
+export type TradeSummary = { from: AssetLabel[]; to: AssetLabel[] };
 
 /** Short "who sent what" for a batch of trades, keyed by trade id — the same
  *  asset formatting /trades/[id] uses (player/prospect/pick/cash), one label
@@ -16,20 +20,21 @@ export async function tradeSummaries(tradeIds: number[]): Promise<Map<number, Tr
   const assets = await prisma.tradeAsset.findMany({ where: { tradeId: { in: tradeIds } } });
   const [players, prospects, picks] = await Promise.all([
     prisma.player.findMany({ where: { id: { in: assets.filter((a) => a.playerId).map((a) => a.playerId!) } }, select: { id: true, name: true } }),
-    prisma.prospect.findMany({ where: { id: { in: assets.filter((a) => a.prospectId).map((a) => a.prospectId!) } }, select: { id: true, name: true } }),
+    prisma.prospect.findMany({ where: { id: { in: assets.filter((a) => a.prospectId).map((a) => a.prospectId!) } }, select: { id: true, name: true, epUrl: true } }),
     prisma.draftPick.findMany({ where: { id: { in: assets.filter((a) => a.draftPickId).map((a) => a.draftPickId!) } }, select: { id: true, year: true, round: true } }),
   ]);
   const pName = new Map(players.map((p) => [p.id, p.name]));
   const proName = new Map(prospects.map((p) => [p.id, p.name]));
+  const proHref = new Map(prospects.map((p) => [p.id, p.epUrl ?? epProfileUrl(p.name)]));
   const pickLabel = new Map(picks.map((p) => [p.id, `${p.year} R${p.round}`]));
-  const label = (a: (typeof assets)[number]): string => {
-    if (a.assetType === "PLAYER") return `${displayName(pName.get(a.playerId ?? -1) ?? "Player")}${a.retentionPct ? ` (${a.retentionPct}% ret.)` : ""}`;
-    if (a.assetType === "PROSPECT") return `⭐ ${displayName(proName.get(a.prospectId ?? -1) ?? "Prospect")}`;
-    if (a.assetType === "PICK") return `🎫 ${pickLabel.get(a.draftPickId ?? -1) ?? "Pick"}`;
-    if (a.assetType === "CASH") return `💵 ${money(a.cashAmount ?? 0)}`;
-    return a.assetType;
+  const label = (a: (typeof assets)[number]): AssetLabel => {
+    if (a.assetType === "PLAYER") return { text: `${displayName(pName.get(a.playerId ?? -1) ?? "Player")}${a.retentionPct ? ` (${a.retentionPct}% ret.)` : ""}`, href: a.playerId ? `/players/${a.playerId}` : null };
+    if (a.assetType === "PROSPECT") return { text: `⭐ ${displayName(proName.get(a.prospectId ?? -1) ?? "Prospect")}`, href: proHref.get(a.prospectId ?? -1) ?? null, external: true };
+    if (a.assetType === "PICK") return { text: `🎫 ${pickLabel.get(a.draftPickId ?? -1) ?? "Pick"}` };
+    if (a.assetType === "CASH") return { text: `💵 ${money(a.cashAmount ?? 0)}` };
+    return { text: a.assetType };
   };
-  const grouped = new Map<number, { from: string[]; to: string[] }>();
+  const grouped = new Map<number, { from: AssetLabel[]; to: AssetLabel[] }>();
   for (const id of tradeIds) grouped.set(id, { from: [], to: [] });
   for (const a of assets) {
     const g = grouped.get(a.tradeId);

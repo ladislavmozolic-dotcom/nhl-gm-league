@@ -1,9 +1,15 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { isCommission, getTeamSession } from "@/lib/auth";
-import { displayName } from "@/lib/playerName";
+import { displayName, epProfileUrl } from "@/lib/playerName";
 import { PageHeader, Card } from "@/components/ui";
 import CommishTradeActions from "@/components/CommishTradeActions";
+
+// href set → the item is clickable: an internal /players/{id} link for a player, or
+// an external EliteProspects link (external: true) for a prospect (no profile route
+// of its own — same convention the Prospects tables use).
+type AssetItem = { text: string; href?: string | null; external?: boolean };
 
 export const dynamic = "force-dynamic";
 
@@ -22,11 +28,12 @@ async function summarize(tradeId: number) {
   const pkids = assets.filter((a) => a.assetType === "PICK" && a.draftPickId).map((a) => a.draftPickId!) as number[];
   const [players, prospects, picks] = await Promise.all([
     pids.length ? prisma.player.findMany({ where: { id: { in: pids } }, select: { id: true, name: true } }) : [],
-    prids.length ? prisma.prospect.findMany({ where: { id: { in: prids } }, select: { id: true, name: true } }) : [],
+    prids.length ? prisma.prospect.findMany({ where: { id: { in: prids } }, select: { id: true, name: true, epUrl: true } }) : [],
     pkids.length ? prisma.draftPick.findMany({ where: { id: { in: pkids } }, select: { id: true, year: true, round: true, ownerLogoId: true } }) : [],
   ]);
   const pN = new Map(players.map((p) => [p.id, displayName(p.name)]));
   const prN = new Map(prospects.map((p) => [p.id, displayName(p.name)]));
+  const prHref = new Map(prospects.map((p) => [p.id, p.epUrl ?? epProfileUrl(p.name)]));
   // ownerLogoId = the pick's ORIGINAL team — a compact text list, so just append the
   // code rather than a logo (matching /trades and /trades/[id], which show the logo).
   const origTeams = picks.length
@@ -34,16 +41,24 @@ async function summarize(tradeId: number) {
     : [];
   const codeByLogoId = new Map(origTeams.map((t) => [t.profinhlLogoId, t.code]));
   const pkN = new Map(picks.map((p) => [p.id, `${p.year} R${p.round}${codeByLogoId.get(p.ownerLogoId) ? ` (${codeByLogoId.get(p.ownerLogoId)})` : ""}`]));
-  const side = (s: "FROM" | "TO") => assets.filter((a) => a.side === s).map((a) =>
-    a.assetType === "PLAYER" ? pN.get(a.playerId!) ?? "player"
-    : a.assetType === "PROSPECT" ? prN.get(a.prospectId!) ?? "prospect"
-    : a.assetType === "PICK" ? pkN.get(a.draftPickId!) ?? "pick"
-    : a.assetType === "CASH" ? `$${((a.cashAmount ?? 0) / 1e6).toFixed(2)}M` : "asset");
+  const side = (s: "FROM" | "TO"): AssetItem[] => assets.filter((a) => a.side === s).map((a): AssetItem => {
+    if (a.assetType === "PLAYER") return { text: pN.get(a.playerId!) ?? "player", href: a.playerId ? `/players/${a.playerId}` : null };
+    if (a.assetType === "PROSPECT") return { text: prN.get(a.prospectId!) ?? "prospect", href: prHref.get(a.prospectId!) ?? null, external: true };
+    if (a.assetType === "PICK") return { text: pkN.get(a.draftPickId!) ?? "pick" };
+    if (a.assetType === "CASH") return { text: `$${((a.cashAmount ?? 0) / 1e6).toFixed(2)}M` };
+    return { text: "asset" };
+  });
   return { from: side("FROM"), to: side("TO") };
 }
 
 type TeamMini = { id: number; name: string; code: string | null; rookieGm: boolean };
-type Row = { t: { id: number; status: string; fromTeamId: number; toTeamId: number; condition: string | null; commishNote: string | null }; sum: { from: string[]; to: string[] } };
+type Row = { t: { id: number; status: string; fromTeamId: number; toTeamId: number; condition: string | null; commishNote: string | null }; sum: { from: AssetItem[]; to: AssetItem[] } };
+
+function AssetLine({ item }: { item: AssetItem }) {
+  if (item.href && item.external) return <li>• <a href={item.href} target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 underline-offset-2 hover:underline">{item.text}</a></li>;
+  if (item.href) return <li>• <Link href={item.href} className="hover:text-blue-400 underline-offset-2 hover:underline">{item.text}</Link></li>;
+  return <li>• {item.text}</li>;
+}
 
 function TradeCard({ t, sum, teams, myTeamId, actionable }: { t: Row["t"]; sum: Row["sum"]; teams: Map<number, TeamMini>; myTeamId: number | null; actionable: boolean }) {
   const from = teams.get(t.fromTeamId), to = teams.get(t.toTeamId);
@@ -59,11 +74,11 @@ function TradeCard({ t, sum, teams, myTeamId, actionable }: { t: Row["t"]; sum: 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-3">
           <div className="font-bold text-sm mb-1">{from?.name}{badge(from)} <span className="text-slate-500 font-normal">gives →</span></div>
-          <ul className="text-sm text-slate-300 space-y-0.5">{sum.from.length ? sum.from.map((x, i) => <li key={i}>• {x}</li>) : <li className="text-slate-600">nothing</li>}</ul>
+          <ul className="text-sm text-slate-300 space-y-0.5">{sum.from.length ? sum.from.map((x, i) => <AssetLine key={i} item={x} />) : <li className="text-slate-600">nothing</li>}</ul>
         </div>
         <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-3">
           <div className="font-bold text-sm mb-1">{to?.name}{badge(to)} <span className="text-slate-500 font-normal">gives →</span></div>
-          <ul className="text-sm text-slate-300 space-y-0.5">{sum.to.length ? sum.to.map((x, i) => <li key={i}>• {x}</li>) : <li className="text-slate-600">nothing</li>}</ul>
+          <ul className="text-sm text-slate-300 space-y-0.5">{sum.to.length ? sum.to.map((x, i) => <AssetLine key={i} item={x} />) : <li className="text-slate-600">nothing</li>}</ul>
         </div>
       </div>
       {t.condition && <p className="text-xs text-slate-400 mt-2">Condition: {t.condition}</p>}

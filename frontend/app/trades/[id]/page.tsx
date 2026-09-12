@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getTeamSession, isAdmin, isCommission } from "@/lib/auth";
 import { money } from "@/lib/finance";
-import { displayName } from "@/lib/playerName";
+import { displayName, epProfileUrl } from "@/lib/playerName";
 import { PageHeader } from "@/components/ui";
 import TradeActions from "@/components/TradeActions";
 
@@ -72,11 +72,12 @@ export default async function TradePage({ params }: { params: Promise<{ id: stri
 
   const [players, prospects, picks] = await Promise.all([
     prisma.player.findMany({ where: { id: { in: assets.filter((a) => a.playerId).map((a) => a.playerId!) } }, select: { id: true, name: true } }),
-    prisma.prospect.findMany({ where: { id: { in: assets.filter((a) => a.prospectId).map((a) => a.prospectId!) } }, select: { id: true, name: true } }),
+    prisma.prospect.findMany({ where: { id: { in: assets.filter((a) => a.prospectId).map((a) => a.prospectId!) } }, select: { id: true, name: true, epUrl: true } }),
     prisma.draftPick.findMany({ where: { id: { in: assets.filter((a) => a.draftPickId).map((a) => a.draftPickId!) } }, select: { id: true, year: true, round: true, ownerLogoId: true } }),
   ]);
   const pName = new Map(players.map((p) => [p.id, p.name]));
   const proName = new Map(prospects.map((p) => [p.id, p.name]));
+  const proHref = new Map(prospects.map((p) => [p.id, p.epUrl ?? epProfileUrl(p.name)]));
   // A pick's ownerLogoId is the ORIGINAL team it belongs to — not necessarily who
   // currently holds it (it may already have changed hands once via an earlier trade).
   // "2027 R3" alone doesn't say whose pick it is, so show that team's logo alongside.
@@ -85,11 +86,11 @@ export default async function TradePage({ params }: { params: Promise<{ id: stri
     : [];
   const teamByLogoId = new Map(origTeams.map((t) => [t.profinhlLogoId, t]));
   const pickInfo = new Map(picks.map((p) => [p.id, { label: `${p.year} R${p.round}`, origTeam: teamByLogoId.get(p.ownerLogoId) ?? null }]));
-  type Item = { text: string; logoUrl?: string | null };
+  type Item = { text: string; logoUrl?: string | null; href?: string | null; external?: boolean };
   const labelsFor = (side: "FROM" | "TO"): Item[] =>
     assets.filter((a) => a.side === side).map((a): Item => {
-      if (a.assetType === "PLAYER") return { text: `${displayName(pName.get(a.playerId ?? -1) ?? "Player")}${a.retentionPct ? ` (${a.retentionPct}% ret.)` : ""}` };
-      if (a.assetType === "PROSPECT") return { text: `⭐ ${displayName(proName.get(a.prospectId ?? -1) ?? "Prospect")}` };
+      if (a.assetType === "PLAYER") return { text: `${displayName(pName.get(a.playerId ?? -1) ?? "Player")}${a.retentionPct ? ` (${a.retentionPct}% ret.)` : ""}`, href: a.playerId ? `/players/${a.playerId}` : null };
+      if (a.assetType === "PROSPECT") return { text: `⭐ ${displayName(proName.get(a.prospectId ?? -1) ?? "Prospect")}`, href: proHref.get(a.prospectId ?? -1) ?? null, external: true };
       if (a.assetType === "PICK") {
         const info = pickInfo.get(a.draftPickId ?? -1);
         const orig = info?.origTeam;
@@ -107,12 +108,13 @@ export default async function TradePage({ params }: { params: Promise<{ id: stri
       <p className="text-xs text-slate-500 mb-1.5">{team?.name || "Team"} {verb}</p>
       {labels.length === 0 ? <p className="text-slate-600 text-sm">nothing</p> : (
         <div className="flex flex-wrap gap-1.5">
-          {labels.map((l, i) => (
-            <span key={i} className="text-sm bg-slate-800 px-2.5 py-1 rounded text-slate-100 inline-flex items-center gap-1.5">
-              {l.logoUrl && <img src={l.logoUrl} alt="" className="w-4 h-4 object-contain shrink-0" />}
-              {l.text}
-            </span>
-          ))}
+          {labels.map((l, i) => {
+            const cls = "text-sm bg-slate-800 px-2.5 py-1 rounded text-slate-100 inline-flex items-center gap-1.5";
+            const content = <>{l.logoUrl && <img src={l.logoUrl} alt="" className="w-4 h-4 object-contain shrink-0" />}{l.text}</>;
+            if (l.href && l.external) return <a key={i} href={l.href} target="_blank" rel="noopener noreferrer" className={`${cls} hover:bg-slate-700 hover:text-blue-300 transition-colors`}>{content}</a>;
+            if (l.href) return <Link key={i} href={l.href} className={`${cls} hover:bg-slate-700 hover:text-blue-300 transition-colors`}>{content}</Link>;
+            return <span key={i} className={cls}>{content}</span>;
+          })}
         </div>
       )}
     </div>

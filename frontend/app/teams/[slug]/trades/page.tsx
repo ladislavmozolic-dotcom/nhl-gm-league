@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/prisma";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card } from "@/components/ui";
 import { tradeSummaries } from "@/lib/trade-summary";
+import ClickableCard from "@/components/ClickableCard";
+import TradeAssetChips from "@/components/TradeAssetChips";
 
 export const dynamic = "force-dynamic";
 
@@ -60,23 +61,6 @@ export default async function TeamTradesPage({ params }: { params: Promise<{ slu
     );
   };
 
-  const AssetChips = ({ items, kind }: { items: string[]; kind: "get" | "give" }) => (
-    <div className="flex flex-wrap gap-1.5">
-      {(items.length ? items : ["Nothing"]).map((x, i) => (
-        <span
-          key={i}
-          className={
-            kind === "get"
-              ? "px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-sm font-semibold text-emerald-50"
-              : "px-2.5 py-1 rounded-lg bg-slate-700/30 border border-slate-600/50 text-sm font-semibold text-slate-100"
-          }
-        >
-          {x}
-        </span>
-      ))}
-    </div>
-  );
-
   const fmtDate = (d: Date) => d.toLocaleDateString("sk-SK", { day: "numeric", month: "short", year: "numeric" });
 
   return (
@@ -93,8 +77,8 @@ export default async function TeamTradesPage({ params }: { params: Promise<{ slu
           const gets = (isFrom ? s?.to : s?.from) ?? [];
           const otherTeamId = isFrom ? t.toTeamId : t.fromTeamId;
           return (
-            <Link key={t.id} href={`/trades/${t.id}`}
-              className="block rounded-2xl border border-slate-800 bg-slate-900/70 shadow-lg shadow-black/20 overflow-hidden hover:border-blue-500/40 hover:shadow-blue-500/5 transition-colors">
+            <ClickableCard key={t.id} href={`/trades/${t.id}`}
+              className="block rounded-2xl border border-slate-800 bg-slate-900/70 shadow-lg shadow-black/20 overflow-hidden hover:border-blue-500/40 hover:shadow-blue-500/5 transition-colors cursor-pointer">
               <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 bg-slate-800/40 border-b border-slate-800">
                 <div className="flex items-center gap-3">
                   <TeamMark id={team.id} big />
@@ -111,14 +95,14 @@ export default async function TeamTradesPage({ params }: { params: Promise<{ slu
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-5">
                 <div>
                   <div className="text-[11px] uppercase tracking-wider font-bold text-emerald-400 mb-2">You Get</div>
-                  <AssetChips items={gets} kind="get" />
+                  <TradeAssetChips items={gets} kind="get" />
                 </div>
                 <div>
                   <div className="text-[11px] uppercase tracking-wider font-bold text-slate-400 mb-2">You Give</div>
-                  <AssetChips items={gives} kind="give" />
+                  <TradeAssetChips items={gives} kind="give" />
                 </div>
               </div>
-            </Link>
+            </ClickableCard>
           );
         })}
       </div>

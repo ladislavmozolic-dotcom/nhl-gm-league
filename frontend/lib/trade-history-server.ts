@@ -3,10 +3,13 @@
 // both sides. Mirrors the asset-label resolution in app/trades/[id]/page.tsx.
 
 import { prisma } from "@/lib/prisma";
-import { cleanName } from "@/lib/playerName";
+import { cleanName, epProfileUrl } from "@/lib/playerName";
 import { money } from "@/lib/finance";
 
-export type TradeHistoryAssetItem = { text: string; logoUrl?: string | null };
+// href set → the chip is clickable: an internal /players/{id} link for a player, or
+// an external EliteProspects link (external: true) for a prospect (no profile route
+// of its own — same convention the Prospects tables use).
+export type TradeHistoryAssetItem = { text: string; logoUrl?: string | null; href?: string | null; external?: boolean };
 export type TradeHistoryTeam = { name: string | null; code: string | null; logoUrl: string | null };
 export type TradeHistoryEntry = {
   tradeId: number;
@@ -39,11 +42,12 @@ export async function playerTradeHistory(playerId: number): Promise<TradeHistory
   const pickIds = [...new Set(allAssets.filter((a) => a.draftPickId).map((a) => a.draftPickId!))];
   const [players, prospects, picks] = await Promise.all([
     prisma.player.findMany({ where: { id: { in: playerIds } }, select: { id: true, name: true } }),
-    prisma.prospect.findMany({ where: { id: { in: prospectIds } }, select: { id: true, name: true } }),
+    prisma.prospect.findMany({ where: { id: { in: prospectIds } }, select: { id: true, name: true, epUrl: true } }),
     prisma.draftPick.findMany({ where: { id: { in: pickIds } }, select: { id: true, year: true, round: true, ownerLogoId: true } }),
   ]);
   const pName = new Map(players.map((p) => [p.id, p.name]));
   const proName = new Map(prospects.map((p) => [p.id, p.name]));
+  const proHref = new Map(prospects.map((p) => [p.id, p.epUrl ?? epProfileUrl(p.name)]));
   const origTeams = picks.length
     ? await prisma.team.findMany({ where: { profinhlLogoId: { in: picks.map((p) => p.ownerLogoId).filter((x): x is number => x != null) } }, select: { profinhlLogoId: true, code: true, name: true, logoUrl: true } })
     : [];
@@ -58,8 +62,8 @@ export async function playerTradeHistory(playerId: number): Promise<TradeHistory
 
   const labelsFor = (assets: typeof allAssets, side: "FROM" | "TO"): TradeHistoryAssetItem[] =>
     assets.filter((a) => a.side === side).map((a): TradeHistoryAssetItem => {
-      if (a.assetType === "PLAYER") return { text: `${cleanName(pName.get(a.playerId ?? -1) ?? "Player")}${a.retentionPct ? ` (${a.retentionPct}% ret.)` : ""}` };
-      if (a.assetType === "PROSPECT") return { text: `⭐ ${cleanName(proName.get(a.prospectId ?? -1) ?? "Prospect")}` };
+      if (a.assetType === "PLAYER") return { text: `${cleanName(pName.get(a.playerId ?? -1) ?? "Player")}${a.retentionPct ? ` (${a.retentionPct}% ret.)` : ""}`, href: a.playerId ? `/players/${a.playerId}` : null };
+      if (a.assetType === "PROSPECT") return { text: `⭐ ${cleanName(proName.get(a.prospectId ?? -1) ?? "Prospect")}`, href: proHref.get(a.prospectId ?? -1) ?? null, external: true };
       if (a.assetType === "PICK") {
         const info = pickInfo.get(a.draftPickId ?? -1);
         const orig = info?.origTeam;
@@ -108,11 +112,12 @@ export async function pickTradeHistory(pickId: number): Promise<TradeHistoryEntr
   const pickIds = [...new Set(allAssets.filter((a) => a.draftPickId).map((a) => a.draftPickId!))];
   const [players, prospects, picks] = await Promise.all([
     prisma.player.findMany({ where: { id: { in: playerIds } }, select: { id: true, name: true } }),
-    prisma.prospect.findMany({ where: { id: { in: prospectIds } }, select: { id: true, name: true } }),
+    prisma.prospect.findMany({ where: { id: { in: prospectIds } }, select: { id: true, name: true, epUrl: true } }),
     prisma.draftPick.findMany({ where: { id: { in: pickIds } }, select: { id: true, year: true, round: true, ownerLogoId: true } }),
   ]);
   const pName = new Map(players.map((p) => [p.id, p.name]));
   const proName = new Map(prospects.map((p) => [p.id, p.name]));
+  const proHref = new Map(prospects.map((p) => [p.id, p.epUrl ?? epProfileUrl(p.name)]));
   const origTeams = picks.length
     ? await prisma.team.findMany({ where: { profinhlLogoId: { in: picks.map((p) => p.ownerLogoId).filter((x): x is number => x != null) } }, select: { profinhlLogoId: true, code: true, name: true, logoUrl: true } })
     : [];
@@ -127,8 +132,8 @@ export async function pickTradeHistory(pickId: number): Promise<TradeHistoryEntr
 
   const labelsFor = (assets: typeof allAssets, side: "FROM" | "TO"): TradeHistoryAssetItem[] =>
     assets.filter((a) => a.side === side).map((a): TradeHistoryAssetItem => {
-      if (a.assetType === "PLAYER") return { text: `${cleanName(pName.get(a.playerId ?? -1) ?? "Player")}${a.retentionPct ? ` (${a.retentionPct}% ret.)` : ""}` };
-      if (a.assetType === "PROSPECT") return { text: `⭐ ${cleanName(proName.get(a.prospectId ?? -1) ?? "Prospect")}` };
+      if (a.assetType === "PLAYER") return { text: `${cleanName(pName.get(a.playerId ?? -1) ?? "Player")}${a.retentionPct ? ` (${a.retentionPct}% ret.)` : ""}`, href: a.playerId ? `/players/${a.playerId}` : null };
+      if (a.assetType === "PROSPECT") return { text: `⭐ ${cleanName(proName.get(a.prospectId ?? -1) ?? "Prospect")}`, href: proHref.get(a.prospectId ?? -1) ?? null, external: true };
       if (a.assetType === "PICK") {
         const info = pickInfo.get(a.draftPickId ?? -1);
         const orig = info?.origTeam;
