@@ -13,8 +13,10 @@ export function posGroup(position: string | null | undefined, isGoalie: boolean)
   return p.includes("D") && !fwd ? "D" : "F";
 }
 
-// baked league averages (per group, per attr) — used as the yellow centre for un-overridden attrs
-const AVG: Record<PosGroup, Record<string, number>> = {
+// baked league averages (per group, per attr) — used as the yellow centre for un-overridden attrs.
+// Exported so other league-average-relative logic (e.g. lib/sim/role-fit.ts's role
+// classification) can share this SAME baseline instead of each guessing its own.
+export const AVG: Record<PosGroup, Record<string, number>> = {
   F: { ck: 66, fg: 44, di: 84, sk: 48, st: 79, en: 82, du: 83, ph: 48, fo: 70, pa: 49, sc: 49, df: 63, ps: 62, ex: 71, ld: 70, mo: 50, OV: 53 },
   D: { ck: 72, fg: 45, di: 82, sk: 37, st: 81, en: 83, du: 83, ph: 37, fo: 30, pa: 48, sc: 44, df: 71, ps: 49, ex: 71, ld: 70, mo: 50, OV: 54 },
   G: { sk: 77, du: 79, en: 79, sz: 91, ag: 75, rb: 76, sc: 75, hs: 75, rt: 75, ph: 75, ps: 74, ex: 75, ld: 75, mo: 50, OV: 66 },

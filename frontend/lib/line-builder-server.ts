@@ -6,6 +6,7 @@
 import { prisma } from "./prisma";
 import { loadTeamLines, autoLines } from "./sim/lines";
 import { pairSig, unitChemistry } from "./sim/chemistry";
+import { roleFitOf } from "./sim/role-fit";
 import { cleanName } from "./playerName";
 
 type Attrs = { pa: number; sc: number; sk: number; ck: number; df: number; st: number; fo: number; weight: number };
@@ -21,13 +22,6 @@ export type TeamLineBuild = { forwards: BuiltLine[]; defense: BuiltLine[] } | nu
 
 const avg = (ns: number[]) => (ns.length ? ns.reduce((a, b) => a + b, 0) / ns.length : 0);
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
-
-// forward role from attrs (mirrors ratings.roleFitOf)
-const fRole = (a: Attrs) => {
-  const play = 0.6 * a.pa + 0.4 * a.fo, snipe = 0.6 * a.sc + 0.4 * a.sk, grind = 0.5 * a.ck + 0.3 * a.df + 0.2 * a.st;
-  return play >= snipe && play >= grind ? "PLAY" : snipe >= grind ? "SNIPE" : "GRIND";
-};
-const dRole = (a: Attrs) => (0.5 * a.pa + 0.3 * a.sk + 0.2 * a.sc >= 0.5 * a.df + 0.3 * a.st + 0.2 * a.ck ? "OFD" : "DFD");
 
 function profileOf(ps: P[]): LineProfile {
   return {
@@ -52,12 +46,12 @@ function summaryOf(prof: LineProfile, kind: "F" | "D"): string {
   return s;
 }
 
-// tactical fit = role diversity (a balanced line) × position/handedness correctness
+// tactical fit = role diversity (a balanced line, graduated — see lib/sim/role-fit.ts,
+// the SAME function the real sim rewards via chemFactor) × position/handedness correctness
 function tacticalFitF(ps: (P | null)[]): number {
   const present = ps.filter((p): p is P => !!p);
   if (present.length < 2) return 0;
-  const roles = new Set(present.map((p) => fRole(p.a))).size;
-  const roleScore = roles >= 3 ? 100 : roles === 2 ? 72 : 48;
+  const roleScore = roleFitOf(present.map((p) => p.a), false) * 100;
   // position: c is a centre, wingers on a natural/either side
   const slots = ["LW", "C", "RW"]; let good = 0, n = 0;
   ps.forEach((p, i) => { if (!p) return; n++; const pos = (p.position || "").toUpperCase(); const want = slots[i];
@@ -69,8 +63,7 @@ function tacticalFitF(ps: (P | null)[]): number {
 function tacticalFitD(pair: (P | null)[]): number {
   const present = pair.filter((p): p is P => !!p);
   if (present.length < 2) return 0;
-  const mixed = new Set(present.map((p) => dRole(p.a))).size >= 2; // offensive + shutdown
-  const roleScore = mixed ? 100 : 60;
+  const roleScore = roleFitOf(present.map((p) => p.a), true) * 100;
   // handedness: LD shoots L, RD shoots R
   let good = 0; if (pair[0]?.shoots === "L") good++; if (pair[1]?.shoots === "R") good++;
   const posFactor = 0.78 + 0.22 * (good / 2);
