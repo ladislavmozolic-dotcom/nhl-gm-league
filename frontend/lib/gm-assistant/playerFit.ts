@@ -15,7 +15,7 @@ const isPos = (pos: string, code: string) => new RegExp(`(^|/)${code}(/|$)`).tes
 /** Forward-line / D-pair / goalie slots this player's position is eligible
  *  for (PP1/PK1 excluded — those draw from multiple positions and are a
  *  strategy choice, not a home-position fit). */
-function slotsForPosition(position: string | null, isGoalie: boolean): SlotDef[] {
+export function slotsForPosition(position: string | null, isGoalie: boolean): SlotDef[] {
   if (isGoalie) return SLOTS.filter((s) => s.kind === "goalie");
   const pos = position ?? "";
   return SLOTS.filter((s) => {
