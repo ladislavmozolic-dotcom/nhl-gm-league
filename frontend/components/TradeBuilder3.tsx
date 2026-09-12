@@ -63,15 +63,19 @@ function retainedInForTeam(
 // against a single % of the cap. Both are enforced server-side in
 // lib/trade-exec.ts, so this is a live preview of the same check.
 function RetentionCapacity({ status, newOutSlots, newOutPct, newIn }: { status: CapSnapshot; newOutSlots: number; newOutPct: number; newIn: { count: number; dollars: number } }) {
-  const slotsAfter = status.retentionSlotsOutUsed + status.retentionSlotsInUsed + newOutSlots + newIn.count;
+  const outAfter = status.retentionSlotsOutUsed + newOutSlots;
+  const inAfter = status.retentionSlotsInUsed + newIn.count;
+  const slotsAfter = outAfter + inAfter;
   const newInPct = status.capUpper > 0 ? (newIn.dollars / status.capUpper) * 100 : 0;
   const pctAfter = status.retentionPctUsed + newOutPct + newInPct;
   const over = slotsAfter > status.retentionSlotsMax || pctAfter > status.retentionPctMax;
   return (
-    <div className={`bg-slate-900/40 border rounded-lg px-3 py-2 text-xs space-y-1 ${over ? "border-amber-700/60" : "border-slate-800"}`} title="Retention capacity vs. the league's configured limits — one combined pool of slots (retained-on + rostered-retained) and one combined % of the cap">
+    <div className={`bg-slate-900/40 border rounded-lg px-3 py-2 text-xs space-y-1 ${over ? "border-amber-700/60" : "border-slate-800"}`} title="Retention capacity vs. the league's configured limits — one combined pool of slots (retained-on + rostered-retained) and one combined % of the cap. Existing (out/in) reflects retentions this club already carries from PAST trades, unrelated to what's selected here.">
       <div className="flex items-center justify-between">
         <span className="text-slate-500">Retention slots</span>
-        <span className={`tabular-nums font-medium ${slotsAfter > status.retentionSlotsMax ? "text-amber-400" : "text-slate-200"}`}>{slotsAfter}/{status.retentionSlotsMax}</span>
+        <span className={`tabular-nums font-medium ${slotsAfter > status.retentionSlotsMax ? "text-amber-400" : "text-slate-200"}`}>
+          {slotsAfter}/{status.retentionSlotsMax} <span className="text-slate-500 font-normal">({outAfter} out, {inAfter} in)</span>
+        </span>
       </div>
       <div className="flex items-center justify-between">
         <span className="text-slate-500">Retention % of cap</span>
