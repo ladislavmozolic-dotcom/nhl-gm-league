@@ -59,7 +59,7 @@ export default function TradeBlockManager({ teamId, teamName, initialNeeds, play
               </button>
               <div className="w-40 shrink-0 min-w-0">
                 <div className="truncate text-sm font-medium"><PlayerLink id={r.id} name={r.name} /></div>
-                <div className="text-[11px] text-slate-500">{r.position} · {r.overall ?? "—"} OV{r.age ? ` · ${r.age}y` : ""}</div>
+                <div className="text-[11px] text-slate-500">{r.position} · {r.overall ?? "—"} OV{r.age ? ` · ${r.age}y` : ""}{r.farm ? " · AHL" : ""}</div>
               </div>
               <input
                 defaultValue={r.note ?? ""} placeholder={r.onBlock ? "asking price / note…" : "list to add a note"}

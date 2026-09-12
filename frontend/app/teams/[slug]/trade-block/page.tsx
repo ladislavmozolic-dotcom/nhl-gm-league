@@ -41,7 +41,7 @@ export default async function TeamTradeBlockPage({ params }: { params: Promise<{
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           {p.slug ? <Link href={`/players/${p.slug}`} className="text-sm font-semibold hover:text-blue-400 truncate">{p.name}</Link> : <span className="text-sm font-semibold truncate">{p.name}</span>}
-          <span className="text-[11px] text-slate-500">{p.position}</span>
+          <span className="text-[11px] text-slate-500">{p.position}{p.farm ? " · AHL" : ""}</span>
           <Link href={`/teams/${p.teamSlug}`} className="text-[11px] text-slate-500 hover:text-blue-400">{p.teamCode}</Link>
         </div>
         {p.note && <div className="text-[11px] text-amber-400/80 truncate">“{p.note}”</div>}
