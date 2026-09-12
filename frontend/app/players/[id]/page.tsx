@@ -189,8 +189,8 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   const overall: number | null = isGoalie ? (p.goalieRating?.overall ?? p.overall) : p.overall;
   const grp = posGroup(p.position, isGoalie);
   const ptype = playerType(isGoalie
-    ? { isGoalie: true, position: p.position, ag: p.goalieRating?.ag, rb: p.goalieRating?.rb, sz: p.goalieRating?.sz }
-    : { position: p.position, sc: p.sc, pa: p.pa, df: p.df, ck: p.ck, st: p.st });
+    ? { id: p.id, isGoalie: true, position: p.position, ag: p.goalieRating?.ag, rb: p.goalieRating?.rb, sz: p.goalieRating?.sz }
+    : { id: p.id, position: p.position, sc: p.sc, pa: p.pa, df: p.df, ck: p.ck, st: p.st });
 
   // Aggregate the simulated 2026-27 season, split by league (NHL / AHL) and regular / playoffs.
   // If a player suited up in both leagues, both blocks show; NHL-only players hide the AHL block.

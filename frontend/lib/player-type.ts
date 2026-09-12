@@ -6,6 +6,7 @@
 import { AVG, OVERRIDE } from "./ratingBands";
 
 export type TypeInput = {
+  id?: number | null;
   position?: string | null;
   isGoalie?: boolean;
   sc?: number | null; pa?: number | null; df?: number | null;
@@ -23,8 +24,26 @@ const isDefPos = (pos = "") => /(^|\/)D(\/|$)/.test(pos) || (pos.toUpperCase().i
 // a shutdown defenseman who just happens to clear the green threshold too.
 const D_OFF_TWO_WAY = Math.max(AVG.D.pa, AVG.D.sc) + 10;
 
+// Hand-picked "Elite" tier overrides, from the commissioner's own external
+// rating-scale review (unhl-player-types-roles-formulas-v6.xlsx, "Role
+// Classification" sheet). These 8 players' compressed attributes in this DB
+// still clear the algorithmic thresholds above, but are explicitly called out
+// as the league's true top tier — keyed by DB id (not name) since several of
+// these players' name field carries a captaincy suffix, e.g. "''C'' (NTC)".
+const ELITE_OVERRIDE: Record<number, string> = {
+  584: "Dual-Threat (Elite)",  // Connor McDavid
+  585: "Dual-Threat (Elite)",  // Leon Draisaitl
+  1041: "Dual-Threat (Elite)", // Nathan MacKinnon
+  673: "Dual-Threat (Elite)",  // Macklin Celebrini
+  512: "Dual-Threat (Elite)",  // Nikita Kucherov
+  489: "Two-Way D (Elite)",    // Cale Makar
+  1121: "Two-Way D (Elite)",   // Evan Bouchard
+  878: "Two-Way D (Elite)",    // Zach Werenski
+};
+
 /** A short player-type label, or null if there aren't enough ratings. */
 export function playerType(p: TypeInput): string | null {
+  if (p.id != null && ELITE_OVERRIDE[p.id]) return ELITE_OVERRIDE[p.id];
   if (p.isGoalie || p.position === "G") {
     const ag = p.ag, rb = p.rb, sz = p.sz;
     if (ag == null && rb == null && sz == null) return "Goaltender";
