@@ -326,12 +326,13 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
   const SHORT_SLOT: Record<string, string> = { "Left Wing": "LW", "Center": "C", "Right Wing": "RW", "Left Defense": "LD", "Right Defense": "RD" };
   const Slot = ({ label, value, onChange, pool }: { label: string; value: number | null; onChange: (v: number | null) => void; pool: Player[] }) => {
     const p = value != null ? byId.get(value) : null;
+    const cleanLastName = p ? displayName(p.name).trim().split(/\s+/).pop() : null;
     return (
-      <div className="relative flex items-center gap-2.5 bg-slate-900/60 border border-slate-700 rounded-lg p-2 cursor-pointer hover:border-slate-600">
+      <div className="relative flex items-center gap-3 bg-slate-900/60 border border-slate-700 rounded-lg p-2.5 cursor-pointer hover:border-slate-600">
         <div className="relative flex-none">
-          <JerseyChip teamSlug={teamSlug} number={p?.number} lastName={p?.name.trim().split(/\s+/).pop()} size={64} />
-          <div className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-blue-600 border-2 border-slate-950 flex items-center justify-center pointer-events-none">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+          <JerseyChip teamSlug={teamSlug} number={p?.number} lastName={cleanLastName} size={128} />
+          <div className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-blue-600 border-2 border-slate-950 flex items-center justify-center pointer-events-none">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" />
               <polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" />
             </svg>
