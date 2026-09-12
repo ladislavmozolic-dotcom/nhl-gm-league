@@ -100,12 +100,15 @@ export default async function GmAssistantPage() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card title="Find Player" accent="text-blue-400" href="/tools/assistant/find-player">
           <p className="text-sm text-slate-400">Filtruj hráčov podľa pozície, ratingu, cap hitu, veku a statusu — presné, zoraditeľné výsledky, žiadny model.</p>
         </Card>
         <Card title="Find Trade Partner" accent="text-blue-400" href="/tools/assistant/find-trade-partner">
           <p className="text-sm text-slate-400">Zvoľ slot v zostave a uvidíš, ktoré kluby sú tam silnejšie než ty — presne z tých istých čísel ako vyššie.</p>
+        </Card>
+        <Card title="🧪 Scenario Engine" accent="text-blue-400" href="/tools/assistant/scenario">
+          <p className="text-sm text-slate-400">„Čo ak?“ — podpíš, obchoduj alebo pusti hráča nanečisto a uvidíš dopad na cap, rebríček aj vek kádra, bez zápisu do ligy.</p>
         </Card>
       </div>
     </div>
