@@ -138,9 +138,12 @@ function toLineGoalie(p: RawPlayer) {
   return { id: p.id, overall: p.goalieRating?.overall ?? p.overall ?? 0 };
 }
 function toSlotPlayer(p: RawPlayer): SlotPlayer {
-  return p.isGoalie
-    ? { id: p.id, name: p.name, slug: p.slug, overall: p.goalieRating?.overall ?? null, rating: p.goalieRating?.overall ?? null }
-    : { id: p.id, name: p.name, slug: p.slug, overall: p.overall, rating: compositeRating(p) };
+  if (p.isGoalie) {
+    const overall = p.goalieRating?.overall ?? null;
+    return { id: p.id, name: p.name, slug: p.slug, overall, rating: overall, raw: null };
+  }
+  const raw = { ck: p.ck, pa: p.pa, sc: p.sc, df: p.df, sk: p.sk, ph: p.ph };
+  return { id: p.id, name: p.name, slug: p.slug, overall: p.overall, rating: compositeRating(raw), raw };
 }
 
 const avgAgeOf = (players: RawPlayer[]) => {

@@ -66,10 +66,15 @@ export interface SlotPlayer {
   slug: string;
   overall: number | null; // OV — orientational only, shown as secondary reference
   // The rating this player is actually ranked/averaged by: for skaters, the
-  // plain average of CK/PA/SC/DF (the parameters that matter for real roster
-  // decisions — OV is not one of them); for goalies, GoalieRating.overall,
-  // since they have no CK/PA/SC/DF split. See memory: ov-vs-specific-params.
+  // composite of whichever of CK/PA/SC/DF/SK/PH matters for the slot they're
+  // shown in (see compositeRating/pkRating/ppRating below — OV is not one of
+  // the inputs); for goalies, GoalieRating.overall, since they have no
+  // CK/PA/SC/DF split. See memory: ov-vs-specific-params.
   rating: number | null;
+  // Raw params behind `rating`, kept around so slotPlayers() can recompute a
+  // situational rating (PK1/PP1) instead of always using the general one.
+  // null for goalies.
+  raw: RawSkaterParams | null;
 }
 
 // These six don't share a scale: across the current NHL skater pool, CK and
@@ -109,15 +114,17 @@ const PARAM_KEYS = Object.keys(PARAM_STATS) as (keyof typeof PARAM_STATS)[];
 const COMPOSITE_CENTER = PARAM_KEYS.reduce((s, k) => s + PARAM_STATS[k].mean, 0) / PARAM_KEYS.length;
 const COMPOSITE_SPREAD = PARAM_KEYS.reduce((s, k) => s + PARAM_STATS[k].sd, 0) / PARAM_KEYS.length;
 
-/** Composite of whichever of CK/PA/SC/DF/SK/PH a skater has (null if none):
- *  each param is first standardized against its own league-wide mean/sd (see
- *  PARAM_STATS) so "2 sd above average in SC" and "2 sd above average in CK"
- *  count the same, then the standardized scores are averaged and rescaled
- *  back onto a ~0-100 rating. No single param dominates by design — same "no
- *  magic weighting" rule the rest of the sim follows, just fair across scales. */
-export function compositeRating(p: { ck: number | null; pa: number | null; sc: number | null; df: number | null; sk?: number | null; ph?: number | null }): number | null {
+type ParamKey = keyof typeof PARAM_STATS;
+type RawSkaterParams = { ck: number | null; pa: number | null; sc: number | null; df: number | null; sk?: number | null; ph?: number | null };
+
+/** Shared z-score-and-rescale step behind every composite below: standardizes
+ *  each given param against its own league-wide mean/sd (PARAM_STATS) so a
+ *  player 2 sd above average in one param counts the same as 2 sd above
+ *  average in another, then averages and rescales back onto a ~0-100 rating
+ *  centered on the mean of just the params actually used. */
+function zComposite(p: RawSkaterParams, keys: ParamKey[]): number | null {
   const zs: number[] = [];
-  for (const key of PARAM_KEYS) {
+  for (const key of keys) {
     const v = p[key];
     if (v == null) continue;
     const { mean, sd } = PARAM_STATS[key];
@@ -125,7 +132,37 @@ export function compositeRating(p: { ck: number | null; pa: number | null; sc: n
   }
   if (!zs.length) return null;
   const avgZ = zs.reduce((s, v) => s + v, 0) / zs.length;
-  return Math.round((COMPOSITE_CENTER + avgZ * COMPOSITE_SPREAD) * 100) / 100;
+  const center = keys.reduce((s, k) => s + PARAM_STATS[k].mean, 0) / keys.length;
+  const spread = keys.reduce((s, k) => s + PARAM_STATS[k].sd, 0) / keys.length;
+  return Math.round((center + avgZ * spread) * 100) / 100;
+}
+
+/** Composite of whichever of CK/PA/SC/DF/SK/PH a skater has (null if none) —
+ *  the general-purpose "how good is this player at hockey" rating used for
+ *  line/pair slots. No single param dominates by design — same "no magic
+ *  weighting" rule the rest of the sim follows, just fair across scales. */
+export function compositeRating(p: RawSkaterParams): number | null {
+  return zComposite(p, PARAM_KEYS);
+}
+
+// Special-teams units draw on a narrower slice of a skater's game than a full
+// line shift, so they get their own composites instead of reusing the
+// general one — a player who's elite at PA/SC but a checking/positioning
+// liability isn't automatically a good penalty-killer just because their
+// overall rating is high, and vice versa for the power play. Calibration
+// (mean/sd) is shared with PARAM_STATS above since it's the same league-wide
+// player pool, just a different subset of params per situation.
+const PK_KEYS: ParamKey[] = ["ck", "df", "sk"]; // killing a penalty is about checking, positioning/defense and mobility — PA/SC (offensive skill) don't apply
+const PP_KEYS: ParamKey[] = ["pa", "sc", "sk", "ph"]; // a power play unit is run on passing, shooting, skating and puckhandling — CK/DF (defensive/physical play) barely matter here
+
+/** PK1-specific rating: CK/DF/SK only — see PK_KEYS above for why PA/SC are excluded. */
+export function pkRating(p: RawSkaterParams): number | null {
+  return zComposite(p, PK_KEYS);
+}
+
+/** PP1-specific rating: PA/SC/SK/PH only — see PP_KEYS above for why CK/DF are excluded. */
+export function ppRating(p: RawSkaterParams): number | null {
+  return zComposite(p, PP_KEYS);
 }
 
 interface ResolvedLines {
@@ -174,12 +211,15 @@ export async function loadLeagueSlots(): Promise<LeagueSlotsData> {
   ]);
 
   const playerMap = new Map<number, SlotPlayer>(
-    skaterRows.map((p) => [p.id, { id: p.id, name: p.name, slug: p.slug, overall: p.overall, rating: compositeRating(p) }])
+    skaterRows.map((p) => {
+      const raw: RawSkaterParams = { ck: p.ck, pa: p.pa, sc: p.sc, df: p.df, sk: p.sk, ph: p.ph };
+      return [p.id, { id: p.id, name: p.name, slug: p.slug, overall: p.overall, rating: compositeRating(raw), raw }];
+    })
   );
   const goalieMap = new Map<number, SlotPlayer>(
     goalieRows.map((g) => {
       const overall = g.goalieRating?.overall ?? null;
-      return [g.id, { id: g.id, name: g.name, slug: g.slug, overall, rating: overall }];
+      return [g.id, { id: g.id, name: g.name, slug: g.slug, overall, rating: overall, raw: null }];
     })
   );
 
@@ -253,7 +293,14 @@ export function slotPlayers(lines: ResolvedLines, slot: SlotDef, playerMap: Map<
   }
   if (slot.kind === "special") {
     const ids = slot.situationsKey === "pp" ? lines.ppUnit : lines.pkUnit;
-    return ids.filter((id): id is number => typeof id === "number").map((id) => playerMap.get(id)).filter((p): p is SlotPlayer => !!p);
+    // PP1/PK1 don't use the general rating — each is re-rated on just the
+    // params that matter for that situation (see pkRating/ppRating).
+    const situationalRating = slot.situationsKey === "pp" ? ppRating : pkRating;
+    return ids
+      .filter((id): id is number => typeof id === "number")
+      .map((id) => playerMap.get(id))
+      .filter((p): p is SlotPlayer => !!p)
+      .map((p) => (p.raw ? { ...p, rating: situationalRating(p.raw) } : p));
   }
   const rows = slot.kind === "forward" ? lines.forwardLines : lines.defensePairs;
   const picked: SlotPlayer[] = [];
