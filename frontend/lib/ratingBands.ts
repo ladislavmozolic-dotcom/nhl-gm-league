@@ -13,6 +13,25 @@ export function posGroup(position: string | null | undefined, isGoalie: boolean)
   return p.includes("D") && !fwd ? "D" : "F";
 }
 
+// Canonical display order for the full rating card — shared by the player
+// profile page and any tool that lists every attribute (e.g. Find Player),
+// so both always show the same columns in the same order.
+export const SKATER_ATTRS: { key: string; label: string }[] = [
+  { key: "ck", label: "CK" }, { key: "fg", label: "FG" }, { key: "di", label: "DI" },
+  { key: "sk", label: "SK" }, { key: "st", label: "ST" }, { key: "en", label: "EN" },
+  { key: "du", label: "DU" }, { key: "ph", label: "PH" }, { key: "fo", label: "FO" },
+  { key: "pa", label: "PA" }, { key: "sc", label: "SC" }, { key: "df", label: "DF" },
+  { key: "ps", label: "PS" }, { key: "ex", label: "EX" }, { key: "ld", label: "LD" },
+  { key: "mo", label: "MO" },
+];
+export const GOALIE_ATTRS: { key: string; label: string }[] = [
+  { key: "sk", label: "SK" }, { key: "du", label: "DU" }, { key: "en", label: "EN" },
+  { key: "sz", label: "SZ" }, { key: "ag", label: "AG" }, { key: "rb", label: "RB" },
+  { key: "sc", label: "SC" }, { key: "hs", label: "HS" }, { key: "rt", label: "RT" },
+  { key: "ph", label: "PH" }, { key: "ps", label: "PS" }, { key: "ex", label: "EX" },
+  { key: "ld", label: "LD" }, { key: "mo", label: "MO" },
+];
+
 // baked league averages (per group, per attr) — used as the yellow centre for un-overridden attrs.
 // Exported so other league-average-relative logic (e.g. lib/sim/role-fit.ts's role
 // classification) can share this SAME baseline instead of each guessing its own.

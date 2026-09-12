@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { isLoggedIn, getTeamSession } from "@/lib/auth";
 import { cleanName, epProfileUrl } from "@/lib/playerName";
 import { Card } from "@/components/ui";
-import { posGroup, ratingColor, ovColor } from "@/lib/ratingBands";
+import { posGroup, ratingColor, ovColor, SKATER_ATTRS, GOALIE_ATTRS } from "@/lib/ratingBands";
 import { playerType } from "@/lib/player-type";
 import { playerCareer } from "@/lib/career-server";
 import PlayerCareerCard from "@/components/PlayerCareerCard";
@@ -42,21 +42,6 @@ async function getPlayer(idOrSlug: string) {
   return player;
 }
 
-const SKATER_ATTRS: { key: string; label: string }[] = [
-  { key: "ck", label: "CK" }, { key: "fg", label: "FG" }, { key: "di", label: "DI" },
-  { key: "sk", label: "SK" }, { key: "st", label: "ST" }, { key: "en", label: "EN" },
-  { key: "du", label: "DU" }, { key: "ph", label: "PH" }, { key: "fo", label: "FO" },
-  { key: "pa", label: "PA" }, { key: "sc", label: "SC" }, { key: "df", label: "DF" },
-  { key: "ps", label: "PS" }, { key: "ex", label: "EX" }, { key: "ld", label: "LD" },
-  { key: "mo", label: "MO" },
-];
-const GOALIE_ATTRS: { key: string; label: string }[] = [
-  { key: "sk", label: "SK" }, { key: "du", label: "DU" }, { key: "en", label: "EN" },
-  { key: "sz", label: "SZ" }, { key: "ag", label: "AG" }, { key: "rb", label: "RB" },
-  { key: "sc", label: "SC" }, { key: "hs", label: "HS" }, { key: "rt", label: "RT" },
-  { key: "ph", label: "PH" }, { key: "ps", label: "PS" }, { key: "ex", label: "EX" },
-  { key: "ld", label: "LD" }, { key: "mo", label: "MO" },
-];
 
 function attrColor(val: number | null | undefined): string {
   if (val == null) return "text-slate-600";

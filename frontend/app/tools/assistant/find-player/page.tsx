@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getTeamSession } from "@/lib/auth";
 import { liveCapHit } from "@/lib/finance";
+import { SKATER_ATTRS, GOALIE_ATTRS } from "@/lib/ratingBands";
 import { PageHeader, Card, BackPill } from "@/components/ui";
 import SortableTable, { type SortCol, type SortRow } from "@/components/SortableTable";
 
@@ -14,11 +15,19 @@ export const dynamic = "force-dynamic";
 // that matched it. No ranking model, no LLM. Open to any logged-in GM (see
 // memory: gm-assistant-intelligence) — 404s for anyone not logged in.
 
-const POSITIONS = ["ALL", "C", "LW", "RW", "D", "G"] as const;
+const SKATER_POS = ["C", "LW", "RW", "D"] as const;
+type SkaterPos = (typeof SKATER_POS)[number];
 const ROSTER_TYPES = ["ANY", "NHL", "AHL", "UFA"] as const;
+const SHOOTS = ["ANY", "L", "R"] as const;
 
 interface Filters {
-  pos: (typeof POSITIONS)[number];
+  // Which skater positions to include — empty means all of them. "G" is its
+  // own checkbox outside this list: checking it switches the whole search to
+  // goalies (their rating card doesn't share a single field with skaters, so
+  // the two searches don't mix in one query/table).
+  positions: SkaterPos[];
+  searchGoalies: boolean;
+  shoots: (typeof SHOOTS)[number];
   rosterType: (typeof ROSTER_TYPES)[number];
   // OV is a rough headline number in this league — real scouting goes through the
   // rated parameters, so filtering/sorting leans on CK/PA/SC/DF, not OV.
@@ -37,32 +46,42 @@ function num(v: string | undefined): number | null {
   return Number.isNaN(n) ? null : n;
 }
 
-function parseFilters(sp: Record<string, string | undefined>): Filters {
-  const pos = POSITIONS.includes(sp.pos as any) ? (sp.pos as Filters["pos"]) : "ALL";
+function toArray(v: string | string[] | undefined): string[] {
+  if (v == null) return [];
+  return Array.isArray(v) ? v : [v];
+}
+
+function parseFilters(sp: Record<string, string | string[] | undefined>): Filters {
+  const rawPos = toArray(sp.pos);
+  const positions = SKATER_POS.filter((p) => rawPos.includes(p));
+  const searchGoalies = rawPos.includes("G");
+  const shoots = SHOOTS.includes(sp.shoots as any) ? (sp.shoots as Filters["shoots"]) : "ANY";
   const rosterType = ROSTER_TYPES.includes(sp.rosterType as any) ? (sp.rosterType as Filters["rosterType"]) : "ANY";
-  const maxCapM = num(sp.maxCap);
+  const maxCapM = num(sp.maxCap as string | undefined);
   return {
-    pos, rosterType,
-    minCk: num(sp.minCk), minPa: num(sp.minPa), minSc: num(sp.minSc), minDf: num(sp.minDf),
+    positions, searchGoalies, shoots, rosterType,
+    minCk: num(sp.minCk as string | undefined), minPa: num(sp.minPa as string | undefined),
+    minSc: num(sp.minSc as string | undefined), minDf: num(sp.minDf as string | undefined),
     maxCap: maxCapM != null ? maxCapM * 1_000_000 : null,
-    maxAge: num(sp.maxAge),
+    maxAge: num(sp.maxAge as string | undefined),
     tradeBlockOnly: sp.tradeBlockOnly === "1",
   };
 }
 
-export default async function FindPlayerPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+export default async function FindPlayerPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   if ((await getTeamSession()) == null) notFound();
 
   const sp = await searchParams;
   const f = parseFilters(sp);
-  const isGoalieSearch = f.pos === "G";
+  const isGoalieSearch = f.searchGoalies;
 
   const baseWhere: Record<string, unknown> = {
     isGoalie: isGoalieSearch,
     ...(f.rosterType !== "ANY" ? { rosterType: f.rosterType } : { rosterType: { in: ["NHL", "AHL", "UFA"] } }),
     ...(f.tradeBlockOnly ? { onTradeBlock: true } : {}),
     ...(f.maxAge != null ? { age: { lte: f.maxAge } } : {}),
-    ...(!isGoalieSearch && f.pos !== "ALL" ? { position: { contains: f.pos } } : {}),
+    ...(f.shoots !== "ANY" ? { shoots: f.shoots } : {}),
+    ...(!isGoalieSearch && f.positions.length > 0 ? { OR: f.positions.map((p) => ({ position: { contains: p } })) } : {}),
     // CK/PA/SC/DF are the parameters that actually matter here — OV is only a rough
     // headline number in this league, so it's shown but never filtered on.
     ...(!isGoalieSearch && f.minCk != null ? { ck: { gte: f.minCk } } : {}),
@@ -74,7 +93,7 @@ export default async function FindPlayerPage({ searchParams }: { searchParams: P
   const players = isGoalieSearch
     ? await prisma.player.findMany({
         where: baseWhere,
-        include: { team: { select: { code: true, slug: true, logoUrl: true } }, goalieRating: { select: { overall: true } } },
+        include: { team: { select: { code: true, slug: true, logoUrl: true } }, goalieRating: true },
         orderBy: { overall: "desc" },
       })
     : await prisma.player.findMany({
@@ -83,16 +102,20 @@ export default async function FindPlayerPage({ searchParams }: { searchParams: P
         orderBy: { overall: "desc" },
       });
 
+  const attrs = isGoalieSearch ? GOALIE_ATTRS : SKATER_ATTRS;
+
   const rows: SortRow[] = players
     .map((p) => {
-      const ovr = isGoalieSearch ? (p as any).goalieRating?.overall ?? p.overall : p.overall;
+      const gr = isGoalieSearch ? (p as any).goalieRating : null;
+      const ovr = isGoalieSearch ? gr?.overall ?? p.overall : p.overall;
       const cap = liveCapHit(p);
+      const attrVals: Record<string, number | null> = {};
+      for (const a of attrs) attrVals[a.key] = isGoalieSearch ? gr?.[a.key] ?? null : (p as any)[a.key] ?? null;
       return {
         _id: p.id, name: p.name, slug: p.slug, photo: p.photoUrl,
         teamCode: p.team?.code, teamSlug: p.team?.slug, teamLogo: p.team?.logoUrl,
-        pos: p.position, age: p.age,
-        ck: isGoalieSearch ? null : (p as any).ck, pa: isGoalieSearch ? null : (p as any).pa,
-        sc: isGoalieSearch ? null : (p as any).sc, df: isGoalieSearch ? null : (p as any).df,
+        pos: p.position, age: p.age, shoots: p.shoots ?? "—",
+        ...attrVals,
         ovr, cap,
         yrs: p.contractYears ?? null,
         status: [p.rosterType, p.onTradeBlock ? "Trade Block" : null].filter(Boolean).join(" · "),
@@ -104,14 +127,10 @@ export default async function FindPlayerPage({ searchParams }: { searchParams: P
     { key: "name", label: "Player", kind: "player", sticky: true },
     { key: "team", label: "Team", kind: "team" },
     { key: "pos", label: "Pos", kind: "text" },
+    { key: "shoots", label: "Shoots", kind: "text" },
     { key: "age", label: "Age", kind: "num" },
-    ...(isGoalieSearch ? [] : ([
-      { key: "ck", label: "CK", kind: "num" },
-      { key: "pa", label: "PA", kind: "num" },
-      { key: "sc", label: "SC", kind: "num" },
-      { key: "df", label: "DF", kind: "num" },
-    ] as SortCol[])),
-    { key: "ovr", label: "OVR", kind: "ovr", title: "Orientačné celkové číslo — na hľadanie použi radšej CK/PA/SC/DF" },
+    ...attrs.map((a): SortCol => ({ key: a.key, label: a.label, kind: "num" })),
+    { key: "ovr", label: "OVR", kind: "ovr", title: "Orientačné celkové číslo — na hľadanie použi radšej konkrétne parametre" },
     { key: "cap", label: "Cap Hit", kind: "money" },
     { key: "yrs", label: "Yrs", kind: "years" },
     { key: "status", label: "Status", kind: "text" },
@@ -130,17 +149,34 @@ export default async function FindPlayerPage({ searchParams }: { searchParams: P
 
       <Card bodyClassName="p-4">
         <form method="get" className="flex flex-col gap-3">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
-            <div>
-              <label className={labelCls}>Pozícia</label>
-              <select name="pos" defaultValue={f.pos} className={inputCls}>
-                {POSITIONS.map((p) => <option key={p} value={p}>{p === "ALL" ? "Všetky" : p}</option>)}
-              </select>
+          <div>
+            <label className={labelCls}>Pozícia (viac možností)</label>
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+              {SKATER_POS.map((p) => (
+                <label key={p} className="flex items-center gap-1.5 text-sm text-slate-200">
+                  <input type="checkbox" name="pos" value={p} defaultChecked={f.positions.includes(p)} className="w-4 h-4" />
+                  {p}
+                </label>
+              ))}
+              <label className="flex items-center gap-1.5 text-sm text-slate-200">
+                <input type="checkbox" name="pos" value="G" defaultChecked={f.searchGoalies} className="w-4 h-4" />
+                G
+              </label>
+              <span className="text-[11px] text-slate-500 self-center">nič nezaškrtnuté = všetky korčuliari; G prepne hľadanie na brankárov</span>
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-3 items-end">
             <div>
               <label className={labelCls}>Status</label>
               <select name="rosterType" defaultValue={f.rosterType} className={inputCls}>
                 {ROSTER_TYPES.map((r) => <option key={r} value={r}>{r === "ANY" ? "Akýkoľvek" : r}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Shoots</label>
+              <select name="shoots" defaultValue={f.shoots} className={inputCls}>
+                {SHOOTS.map((s) => <option key={s} value={s}>{s === "ANY" ? "Akákoľvek" : s}</option>)}
               </select>
             </div>
             <div>
@@ -157,7 +193,7 @@ export default async function FindPlayerPage({ searchParams }: { searchParams: P
             </div>
           </div>
 
-          {f.pos !== "G" && (
+          {!f.searchGoalies && (
             <div>
               <label className={`${labelCls} mb-1.5`}>Min. parametre (OVR je len orientačné — hľadaj radšej podľa týchto)</label>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -192,7 +228,7 @@ export default async function FindPlayerPage({ searchParams }: { searchParams: P
         {rows.length === 0 ? (
           <p className="text-slate-500 text-center py-8">Žiadny hráč nezodpovedá filtrom.</p>
         ) : (
-          <SortableTable cols={cols} rows={rows} initialSort={isGoalieSearch ? "ovr" : "sc"} minWidth={880} />
+          <SortableTable cols={cols} rows={rows} initialSort={isGoalieSearch ? "ovr" : "sc"} minWidth={1400} />
         )}
       </Card>
     </div>
