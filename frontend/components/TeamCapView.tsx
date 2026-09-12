@@ -11,6 +11,7 @@ import {
 } from "@/lib/finance";
 import { getLeagueClock } from "@/lib/calendar-server";
 import { getTeamSession } from "@/lib/auth";
+import { teamRetentionStatus } from "@/lib/cap";
 import BuyoutButton from "@/components/BuyoutButton";
 import { buyoutPlayer } from "@/app/finance/[slug]/actions";
 
@@ -39,13 +40,14 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   if (!team) notFound();
   const farm = team.affiliateTeams[0]?.players ?? [];
 
-  const [settings, session, buyouts, standings, homeGames, totalGames, gamesScheduled] = await Promise.all([
+  const [settings, session, buyouts, standings, homeGames, totalGames, gamesScheduled, retention] = await Promise.all([
     loadSettings(), getTeamSession(),
     prisma.buyout.findMany({ where: { teamId: team.id }, select: { id: true, playerId: true, playerName: true, perYear: true, startYear: true, years: true, totalCost: true } }),
     computeStandings(SEASON, "NHL"),
     prisma.game.count({ where: { season: SEASON, league: "NHL", status: "FINAL", seriesId: null, homeTeamId: team.id } }),
     prisma.game.count({ where: { season: SEASON, league: "NHL", status: "FINAL", seriesId: null, OR: [{ homeTeamId: team.id }, { awayTeamId: team.id }] } }),
     prisma.game.count({ where: { season: SEASON, league: "NHL", seriesId: null, OR: [{ homeTeamId: team.id }, { awayTeamId: team.id }] } }),
+    teamRetentionStatus(team.id),
   ]);
   const isGm = session === team.id;
   // The Buyout table doubles up: a real buyout debits the bank (totalCost > 0);
@@ -158,6 +160,10 @@ export default async function TeamCapView({ slug }: { slug: string }) {
           <span className="text-slate-400" title="Sum of each player's Cap Hit — already net of any retention someone else pays">Total Salaries</span><span className="text-right">{money(cap.totalSalaries)}</span>
           <span className="text-slate-400" title="Dead money from this club's own player buyouts">Buyouts</span><span className="text-right">{realBuyoutsDeadMoney ? money(realBuyoutsDeadMoney) : "—"}</span>
           <span className="text-slate-400" title="Salary this club retains on players it traded away (see Dead Cap below) — not a buyout, but still counts against its cap">Dead Cap</span><span className="text-right">{deadCapAmount ? money(deadCapAmount) : "—"}</span>
+          <span className="text-slate-400" title="Active trade-retention contracts vs. the league's configured max per team">Retention slots</span>
+          <span className={`text-right ${retention.slotsUsed >= retention.slotsMax ? "text-red-400 font-semibold" : ""}`}>{retention.slotsUsed}/{retention.slotsMax}</span>
+          <span className="text-slate-400" title="Dead Cap as a % of the cap ceiling vs. the league's configured max">Retention % of cap</span>
+          <span className={`text-right ${retention.pctOfCap >= retention.pctMax ? "text-red-400 font-semibold" : ""}`}>{retention.pctOfCap.toFixed(1)}% <span className="text-slate-500">/ {retention.pctMax}%</span></span>
           <span className="text-slate-400" title="Total Salaries + Buyouts + Dead Cap">Actual Cap Hit</span><span className="text-right font-semibold">{money(cap.capHit)}</span>
           <span className="text-slate-400" title={`Ceiling ${money(cap.upper)} − Actual Cap Hit`}>Actual Cap Space</span><span className={`text-right font-semibold ${cap.capSpace < 0 ? "text-red-400" : "text-green-400"}`}>{money(cap.capSpace)}</span>
           <span className="text-slate-400" title="Max total cap hit you may carry for the rest of the season">Projected Cap Hit</span><span className="text-right tabular-nums text-slate-200">{money(maxCapHit)}</span>
@@ -238,7 +244,12 @@ export default async function TeamCapView({ slug }: { slug: string }) {
       {/* Dead cap — retained salary on players this club no longer rosters */}
       {retentions.length > 0 && (
         <div className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 overflow-x-auto -mt-2">
-          <div className="px-4 py-2.5 bg-slate-800/30 border-b border-slate-800 text-xs font-bold uppercase tracking-wide text-slate-400">Dead Cap — salary retained on traded players</div>
+          <div className="px-4 py-2.5 bg-slate-800/30 border-b border-slate-800 text-xs font-bold uppercase tracking-wide text-slate-400 flex items-center justify-between">
+            <span>Dead Cap — salary retained on traded players</span>
+            <span className={`normal-case font-normal ${retention.slotsUsed >= retention.slotsMax || retention.pctOfCap >= retention.pctMax ? "text-red-400" : "text-slate-500"}`}>
+              {retention.slotsUsed}/{retention.slotsMax} slots · {retention.pctOfCap.toFixed(1)}/{retention.pctMax}% of cap
+            </span>
+          </div>
           <table className="w-full text-sm min-w-[720px]">
             <thead>
               <tr className="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-800 bg-slate-800/30">

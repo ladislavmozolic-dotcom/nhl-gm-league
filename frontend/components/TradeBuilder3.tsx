@@ -13,9 +13,44 @@ type Pick = { id: number; label: string; logoUrl?: string | null };
 type Assets = { players: Player[]; picks: Pick[]; prospects: Pick[] };
 type Team = { id: number; name: string; logoUrl?: string | null };
 type Terms = { feeAmount: number; feePct: number; fullPayout: boolean; reason: string };
+// Only what the retention-capacity note needs, from lib/cap.ts's CapStatus.
+type CapSnapshot = { retentionSlotsUsed: number; retentionSlotsMax: number; retentionPctUsed: number; retentionPctMax: number; retentionMaxPct: number; capUpper: number };
+
+/** New retention this trade would add on this club's own outgoing players
+ *  (it keeps paying the retained slice) — same convention as lib/trade-exec.ts. */
+function retentionAdded(map: Record<number, number>, assets: Assets, capUpper: number): { slots: number; pct: number } {
+  let slots = 0, dollars = 0;
+  for (const [id, pct] of Object.entries(map)) {
+    if (pct <= 0) continue;
+    const p = assets.players.find((pl) => pl.id === Number(id));
+    if (!p || p.farm) continue;
+    slots++;
+    dollars += p.capHit * pct / 100;
+  }
+  return { slots, pct: capUpper > 0 ? (dollars / capUpper) * 100 : 0 };
+}
+
+function RetentionCapacity({ status, newSlots, newPct }: { status: CapSnapshot; newSlots: number; newPct: number }) {
+  const slotsAfter = status.retentionSlotsUsed + newSlots;
+  const pctAfter = status.retentionPctUsed + newPct;
+  const over = slotsAfter > status.retentionSlotsMax || pctAfter > status.retentionPctMax;
+  return (
+    <div className={`bg-slate-900/40 border rounded-lg px-3 py-2 text-xs space-y-1 ${over ? "border-amber-700/60" : "border-slate-800"}`} title="Active retention slots and % of the cap tied up in dead money — vs. the league's configured limits">
+      <div className="flex items-center justify-between">
+        <span className="text-slate-500">Retention slots</span>
+        <span className={`tabular-nums font-medium ${slotsAfter > status.retentionSlotsMax ? "text-amber-400" : "text-slate-200"}`}>{slotsAfter}/{status.retentionSlotsMax}</span>
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-slate-500">Retention % of cap</span>
+        <span className={`tabular-nums font-medium ${pctAfter > status.retentionPctMax ? "text-amber-400" : "text-slate-200"}`}>{pctAfter.toFixed(1)}% / {status.retentionPctMax}%</span>
+      </div>
+      {over && <p className="text-amber-400">⚠ This would exceed the league&apos;s configured retention limit.</p>}
+    </div>
+  );
+}
 
 /** One team's picker column: what it sends, and to which of the other two clubs. */
-function TeamColumn({ team, others, assets, dest, setDest, playerIds, setPlayerIds, retentions, setRetentions, fees, setFees, terms, setTerms, pickIds, setPickIds, prospectIds, setProspectIds, cash, setCash }: {
+function TeamColumn({ team, others, assets, dest, setDest, playerIds, setPlayerIds, retentions, setRetentions, fees, setFees, terms, setTerms, pickIds, setPickIds, prospectIds, setProspectIds, cash, setCash, capStatus }: {
   team: Team; others: Team[]; assets: Assets;
   dest: number | null; setDest: (id: number | null) => void;
   playerIds: Set<number>; setPlayerIds: (s: Set<number>) => void;
@@ -25,11 +60,13 @@ function TeamColumn({ team, others, assets, dest, setDest, playerIds, setPlayerI
   pickIds: Set<number>; setPickIds: (s: Set<number>) => void;
   prospectIds: Set<number>; setProspectIds: (s: Set<number>) => void;
   cash: number; setCash: (n: number) => void;
+  capStatus: CapSnapshot;
 }) {
   const toggle = (set: Set<number>, setter: (s: Set<number>) => void, id: number) => {
     const n = new Set(set); if (n.has(id)) n.delete(id); else n.add(id); setter(n);
   };
-  const setRet = (id: number, pct: number) => setRetentions({ ...retentions, [id]: Math.max(0, Math.min(50, pct)) });
+  const setRet = (id: number, pct: number) => setRetentions({ ...retentions, [id]: Math.max(0, Math.min(capStatus.retentionMaxPct, pct)) });
+  const added = retentionAdded(retentions, assets, capStatus.capUpper);
 
   const togglePlayer = (p: Player) => {
     const wasOn = playerIds.has(p.id);
@@ -64,6 +101,8 @@ function TeamColumn({ team, others, assets, dest, setDest, playerIds, setPlayerI
           {others.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
         </select>
       </div>
+
+      <RetentionCapacity status={capStatus} newSlots={added.slots} newPct={added.pct} />
 
       <div className="bg-slate-900/40 border border-slate-800 rounded-lg overflow-hidden">
         <div className="px-3 py-2 bg-slate-800/40 text-xs font-bold uppercase tracking-wide text-slate-400">Players ({assets.players.length})</div>
@@ -105,7 +144,7 @@ function TeamColumn({ team, others, assets, dest, setDest, playerIds, setPlayerI
                       <button type="button" onClick={() => setRet(p.id, (retentions[p.id] || 0) - 5)}
                         className="w-7 h-8 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-base leading-none">−</button>
                       <div className="flex items-center bg-slate-900 border border-slate-700 rounded">
-                        <input type="number" min={0} max={50} step={5} value={retentions[p.id] ?? 0}
+                        <input type="number" min={0} max={capStatus.retentionMaxPct} step={5} value={retentions[p.id] ?? 0}
                           onChange={(e) => setRet(p.id, Number(e.target.value))}
                           className="w-16 bg-transparent px-2.5 py-1.5 text-right text-sm tabular-nums outline-none" />
                         <span className="pr-2.5 text-slate-500">%</span>
@@ -161,8 +200,9 @@ function TeamColumn({ team, others, assets, dest, setDest, playerIds, setPlayerI
   );
 }
 
-export default function TradeBuilder3({ me, teamB, teamC, assetsA, assetsB, assetsC }: {
+export default function TradeBuilder3({ me, teamB, teamC, assetsA, assetsB, assetsC, capA, capB, capC }: {
   me: Team; teamB: Team; teamC: Team; assetsA: Assets; assetsB: Assets; assetsC: Assets;
+  capA: CapSnapshot; capB: CapSnapshot; capC: CapSnapshot;
 }) {
   const [destA, setDestA] = useState<number | null>(null);
   const [destB, setDestB] = useState<number | null>(null);
@@ -238,13 +278,13 @@ export default function TradeBuilder3({ me, teamB, teamC, assetsA, assetsB, asse
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
         <TeamColumn team={me} others={[teamB, teamC]} assets={assetsA} dest={destA} setDest={setDestA}
           playerIds={playersA} setPlayerIds={setPlayersA} retentions={retA} setRetentions={setRetA} fees={feesA} setFees={setFeesA} terms={termsA} setTerms={setTermsA}
-          pickIds={picksA} setPickIds={setPicksA} prospectIds={prospectsA} setProspectIds={setProspectsA} cash={cashA} setCash={setCashA} />
+          pickIds={picksA} setPickIds={setPicksA} prospectIds={prospectsA} setProspectIds={setProspectsA} cash={cashA} setCash={setCashA} capStatus={capA} />
         <TeamColumn team={teamB} others={[me, teamC]} assets={assetsB} dest={destB} setDest={setDestB}
           playerIds={playersB} setPlayerIds={setPlayersB} retentions={retB} setRetentions={setRetB} fees={feesB} setFees={setFeesB} terms={termsB} setTerms={setTermsB}
-          pickIds={picksB} setPickIds={setPicksB} prospectIds={prospectsB} setProspectIds={setProspectsB} cash={cashB} setCash={setCashB} />
+          pickIds={picksB} setPickIds={setPicksB} prospectIds={prospectsB} setProspectIds={setProspectsB} cash={cashB} setCash={setCashB} capStatus={capB} />
         <TeamColumn team={teamC} others={[me, teamB]} assets={assetsC} dest={destC} setDest={setDestC}
           playerIds={playersC} setPlayerIds={setPlayersC} retentions={retC} setRetentions={setRetC} fees={feesC} setFees={setFeesC} terms={termsC} setTerms={setTermsC}
-          pickIds={picksC} setPickIds={setPicksC} prospectIds={prospectsC} setProspectIds={setProspectsC} cash={cashC} setCash={setCashC} />
+          pickIds={picksC} setPickIds={setPicksC} prospectIds={prospectsC} setProspectIds={setProspectsC} cash={cashC} setCash={setCashC} capStatus={capC} />
       </div>
 
       <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-4 space-y-2">

@@ -6,6 +6,7 @@ import PlayerAvatar from "@/components/playerAvatar";
 import { cleanName } from "@/lib/playerName";
 import { Card } from "@/components/ui";
 import { salaryOf, fmtM } from "@/components/TeamRosterTable";
+import { teamRetentionStatus } from "@/lib/cap";
 
 const SEASON = "2026-27";
 
@@ -40,6 +41,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
   if (!team) return notFound();
 
   const isNhl = team.league === "NHL" && !team.isAffiliate;
+  const retention = isNhl ? await teamRetentionStatus(team.id) : null;
   const proCount = team.players.length;
   const farmCount = team.affiliateTeams.reduce((s, a) => s + a.players.length, 0);
   const totalCap = team.players.reduce((s, p) => s + Math.max(0, salaryOf(p) - (p.retainedSalary ?? 0)), 0);
@@ -188,6 +190,16 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
             <div className="mt-3 space-y-2">
               <InfoRow label="Cap space" value={<span className={capSpace < 0 ? "text-red-400" : "text-green-400"}>{fmtM(Math.abs(capSpace))}</span>} />
               <InfoRow label="Ceiling" value={fmtM(capCeiling)} />
+              {retention && (
+                <>
+                  <InfoRow label="Retention slots" value={
+                    <span className={retention.slotsUsed >= retention.slotsMax ? "text-red-400" : "text-slate-200"}>{retention.slotsUsed}/{retention.slotsMax}</span>
+                  } />
+                  <InfoRow label="Retention % of cap" value={
+                    <span className={retention.pctOfCap >= retention.pctMax ? "text-red-400" : "text-slate-200"}>{retention.pctOfCap.toFixed(1)}% <span className="text-slate-500">/ {retention.pctMax}%</span></span>
+                  } />
+                </>
+              )}
             </div>
           </Card>
 

@@ -5,6 +5,7 @@
 import { prisma } from "./prisma";
 import { getLeagueClock } from "./calendar-server";
 import { loadLeagueCap } from "./free-agency-server";
+import { loadSettings } from "./sim/settings";
 import { capCeilingForPhase, ltirRelief, deadMoneyForYear, liveCapHit, CURRENT_SEASON_START } from "./finance";
 
 export type CapStatus = {
@@ -19,7 +20,46 @@ export type CapStatus = {
   // Anywhere this gets shown to a GM as "how much can I spend" should read
   // strictSpace, not space, or it silently overstates room by the cushion.
   strictSpace: number;
+  // How much of this club's trade-retention capacity is already used by
+  // ACTIVE retentions from past trades (see RetentionStatus below) — surfaced
+  // here too so the Trade Builder can show it alongside cap space without a
+  // second round-trip.
+  retentionSlotsUsed: number; retentionSlotsMax: number;
+  retentionPctUsed: number; retentionPctMax: number;
+  retentionMaxPct: number; // max % a single contract may have retained (the slider's own cap)
+  capUpper: number; // the real, uncushioned league cap ceiling — the base retentionPctUsed/Max are computed against
 };
+
+export type RetentionStatus = {
+  slotsUsed: number; slotsMax: number;
+  pctOfCap: number; pctMax: number;
+  deadCapAmount: number;
+};
+
+/** Active trade-retention (Buyout rows with totalCost=0) for one club: how many
+ *  "slots" it's using and the combined dead-money cap hit they carry this season. */
+async function activeRetentionRecords(teamId: number): Promise<{ slotsUsed: number; deadCapAmount: number }> {
+  const records = await prisma.buyout.findMany({ where: { teamId, totalCost: 0 }, select: { perYear: true, years: true, startYear: true } });
+  const active = records.filter((r) => CURRENT_SEASON_START >= r.startYear && CURRENT_SEASON_START < r.startYear + r.years);
+  return { slotsUsed: active.length, deadCapAmount: deadMoneyForYear(active, CURRENT_SEASON_START) };
+}
+
+/** How much of a club's configured retention capacity — max retained contracts
+ *  (retentionMaxPlayersOut) and max % of the cap tied up in retention
+ *  (retentionMaxTotalPct) — is already spoken for by active retentions from
+ *  past trades. Note: per the Admin > Salary Retention page's own TODO, these
+ *  two limits aren't enforced by the trade engine (lib/trade-exec.ts) yet —
+ *  this is purely informational, so a GM can see their real room before
+ *  proposing a deal. */
+export async function teamRetentionStatus(teamId: number): Promise<RetentionStatus> {
+  const [settings, cap, { slotsUsed, deadCapAmount }] = await Promise.all([loadSettings(), loadLeagueCap(), activeRetentionRecords(teamId)]);
+  return {
+    slotsUsed, slotsMax: settings.retentionMaxPlayersOut,
+    pctOfCap: cap.upper > 0 ? (deadCapAmount / cap.upper) * 100 : 0,
+    pctMax: settings.retentionMaxTotalPct,
+    deadCapAmount,
+  };
+}
 
 /** A team's live cap-relevant totals, split the way Cap Central shows them:
  *  totalSalaries = Σ full (gross) cap hits of the NHL roster — a player's own
@@ -47,11 +87,13 @@ export async function teamCapCommitted(teamId: number): Promise<{ totalSalaries:
 /** Cap status for one club. Pass `phaseOverride` (e.g. "regular") to test
  *  compliance against a different phase — used for the opening-day check. */
 export async function teamCapStatus(teamId: number, phaseOverride?: string): Promise<CapStatus> {
-  const [roster, capInfo, cap, clock] = await Promise.all([
+  const [roster, capInfo, cap, clock, settings, retention] = await Promise.all([
     prisma.player.findMany({ where: { teamId, rosterType: "NHL" }, select: { capHit: true, retainedSalary: true, injuryDaysLeft: true, condition: true, isGoalie: true, contractYears: true } }),
     teamCapCommitted(teamId),
     loadLeagueCap(),
     getLeagueClock(),
+    loadSettings(),
+    activeRetentionRecords(teamId),
   ]);
   const phase = phaseOverride ?? clock.phase;
   const committed = capInfo.committed;
@@ -69,6 +111,11 @@ export async function teamCapStatus(teamId: number, phaseOverride?: string): Pro
     phase, cushioned: phase !== "regular" && phase !== "playoffs",
     compliant: committed <= ceiling && committed >= floor,
     strictSpace: cap.upper + ltir - committed,
+    retentionSlotsUsed: retention.slotsUsed, retentionSlotsMax: settings.retentionMaxPlayersOut,
+    retentionPctUsed: cap.upper > 0 ? (retention.deadCapAmount / cap.upper) * 100 : 0,
+    retentionPctMax: settings.retentionMaxTotalPct,
+    retentionMaxPct: settings.retentionMaxPct,
+    capUpper: cap.upper,
   };
 }
 

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { getTeamSession } from "@/lib/auth";
 import { teamAssets } from "@/lib/trade-assets";
+import { teamCapStatus } from "@/lib/cap";
 import TradeBuilder3 from "@/components/TradeBuilder3";
 import TeamSelect from "@/components/TeamSelect";
 import { PageHeader, Card } from "@/components/ui";
@@ -48,9 +49,10 @@ export default async function TradeBuild3Page({ searchParams }: { searchParams: 
 
   const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true } });
   const prospectSource = cfg?.rosterMode === "real" ? "real" : "profinhl";
-  const [assetsA, assetsB, assetsC] = await Promise.all([
+  const [assetsA, assetsB, assetsC, capA, capB, capC] = await Promise.all([
     teamAssets(myTeam.id, prospectSource), teamAssets(teamB.id, prospectSource), teamAssets(teamC.id, prospectSource),
+    teamCapStatus(myTeam.id), teamCapStatus(teamB.id), teamCapStatus(teamC.id),
   ]);
 
-  return <TradeBuilder3 me={myTeam} teamB={teamB} teamC={teamC} assetsA={assetsA} assetsB={assetsB} assetsC={assetsC} />;
+  return <TradeBuilder3 me={myTeam} teamB={teamB} teamC={teamC} assetsA={assetsA} assetsB={assetsB} assetsC={assetsC} capA={capA} capB={capB} capC={capC} />;
 }

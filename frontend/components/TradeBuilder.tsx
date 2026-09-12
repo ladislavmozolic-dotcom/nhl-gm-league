@@ -13,7 +13,11 @@ type Assets = { players: Player[]; picks: Pick[]; prospects: Pick[] };
 type Team = { id: number; name: string; logoUrl?: string | null };
 type Terms = { feeAmount: number; feePct: number; fullPayout: boolean; reason: string; payTeamId: number };
 // Only the fields the cap-impact widget needs, from lib/cap.ts's CapStatus.
-type CapSnapshot = { committed: number; ceiling: number; strictSpace: number; floor: number };
+type CapSnapshot = {
+  committed: number; ceiling: number; strictSpace: number; floor: number;
+  retentionSlotsUsed: number; retentionSlotsMax: number;
+  retentionPctUsed: number; retentionPctMax: number; retentionMaxPct: number; capUpper: number;
+};
 
 // A moved player's own Cap Hit never changes — what changes hands is his cap
 // hit net of whatever retention the SENDING side sets in this trade (the
@@ -26,6 +30,21 @@ function netTransferred(map: Record<number, number>, assets: Assets): number {
     if (!p || p.farm) return sum; // AHL players don't count against the NHL cap
     return sum + p.capHit * (1 - pct / 100);
   }, 0);
+}
+
+/** New retention this trade would add on the SENDING side (the side whose own
+ *  `map` this is — they keep paying the retained slice, same convention as
+ *  lib/trade-exec.ts's retentionRecords: teamId = the sending club). */
+function retentionAdded(map: Record<number, number>, assets: Assets, capUpper: number): { slots: number; pct: number } {
+  let slots = 0, dollars = 0;
+  for (const [id, pct] of Object.entries(map)) {
+    if (pct <= 0) continue;
+    const p = assets.players.find((pl) => pl.id === Number(id));
+    if (!p || p.farm) continue;
+    slots++;
+    dollars += p.capHit * pct / 100;
+  }
+  return { slots, pct: capUpper > 0 ? (dollars / capUpper) * 100 : 0 };
 }
 
 function CapImpact({ status, delta }: { status: CapSnapshot; delta: number }) {
@@ -54,8 +73,32 @@ function CapImpact({ status, delta }: { status: CapSnapshot; delta: number }) {
   );
 }
 
-const setRet = (map: Record<number, number>, set: (v: Record<number, number>) => void, id: number, pct: number) =>
-  set({ ...map, [id]: Math.max(0, Math.min(50, pct)) });
+// How much of this club's retention capacity (slots + % of cap tied up in
+// dead money) is already used by past trades, plus what THIS trade would add
+// on top — so a GM sees their real room before proposing a deal. The league
+// limits behind slotsMax/pctMax aren't enforced server-side yet (see
+// app/admin/salary-retention's own note), so this is advisory, not a hard cap.
+function RetentionCapacity({ status, newSlots, newPct }: { status: CapSnapshot; newSlots: number; newPct: number }) {
+  const slotsAfter = status.retentionSlotsUsed + newSlots;
+  const pctAfter = status.retentionPctUsed + newPct;
+  const over = slotsAfter > status.retentionSlotsMax || pctAfter > status.retentionPctMax;
+  return (
+    <div className={`bg-slate-900/40 border rounded-lg px-3 py-2 text-xs space-y-1 ${over ? "border-amber-700/60" : "border-slate-800"}`} title="Active retention slots and % of the cap tied up in dead money — vs. the league's configured limits">
+      <div className="flex items-center justify-between">
+        <span className="text-slate-500">Retention slots</span>
+        <span className={`tabular-nums font-medium ${slotsAfter > status.retentionSlotsMax ? "text-amber-400" : "text-slate-200"}`}>{slotsAfter}/{status.retentionSlotsMax}</span>
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-slate-500">Retention % of cap</span>
+        <span className={`tabular-nums font-medium ${pctAfter > status.retentionPctMax ? "text-amber-400" : "text-slate-200"}`}>{pctAfter.toFixed(1)}% / {status.retentionPctMax}%</span>
+      </div>
+      {over && <p className="text-amber-400">⚠ This would exceed the league&apos;s configured retention limit.</p>}
+    </div>
+  );
+}
+
+const setRet = (map: Record<number, number>, set: (v: Record<number, number>) => void, id: number, pct: number, maxPct: number) =>
+  set({ ...map, [id]: Math.max(0, Math.min(maxPct, pct)) });
 
 // Every sub-component below is defined at MODULE scope, not inside TradeBuilder's
 // body — a component whose own function identity is recreated on every parent
@@ -68,11 +111,12 @@ const setRet = (map: Record<number, number>, set: (v: Record<number, number>) =>
 // scratch. Callback props changing identity each render is completely normal
 // and doesn't cause this; only the component reference itself needs to be stable.
 
-function PlayerTable({ title, list, pmap, setPmap, destTeamId, ownerTeamId, terms, fees, onToggleClause, onAgreeFee }: {
+function PlayerTable({ title, list, pmap, setPmap, destTeamId, ownerTeamId, terms, fees, onToggleClause, onAgreeFee, maxRetentionPct }: {
   title: string; list: Player[]; pmap: Record<number, number>; setPmap: (v: Record<number, number>) => void; destTeamId: number; ownerTeamId: number;
   terms: Record<number, Terms | "loading">; fees: Record<number, { feeAmount: number; payTeamId: number }>;
   onToggleClause: (map: Record<number, number>, set: (v: Record<number, number>) => void, p: Player, destTeamId: number, ownerTeamId: number) => void;
   onAgreeFee: (id: number, t: Terms) => void;
+  maxRetentionPct: number;
 }) {
   return (
     <div className="bg-slate-900/40 border border-slate-800 rounded-lg overflow-hidden">
@@ -111,15 +155,15 @@ function PlayerTable({ title, list, pmap, setPmap, destTeamId, ownerTeamId, term
                 <div className="flex items-center gap-3 mt-2.5 ml-6.5 text-xs text-slate-400 flex-wrap">
                   <span className="font-medium">Salary Retention</span>
                   <div className="flex items-center gap-2">
-                    <button type="button" onClick={() => setRet(pmap, setPmap, p.id, (pmap[p.id] || 0) - 5)}
+                    <button type="button" onClick={() => setRet(pmap, setPmap, p.id, (pmap[p.id] || 0) - 5, maxRetentionPct)}
                       className="w-7 h-8 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-base leading-none">−</button>
                     <div className="flex items-center bg-slate-900 border border-slate-700 rounded">
-                      <input type="number" min={0} max={50} step={5} value={pmap[p.id]}
-                        onChange={(e) => setRet(pmap, setPmap, p.id, Number(e.target.value))}
+                      <input type="number" min={0} max={maxRetentionPct} step={5} value={pmap[p.id]}
+                        onChange={(e) => setRet(pmap, setPmap, p.id, Number(e.target.value), maxRetentionPct)}
                         className="w-16 bg-transparent px-2.5 py-1.5 text-right text-sm tabular-nums outline-none" />
                       <span className="pr-2.5 text-slate-500">%</span>
                     </div>
-                    <button type="button" onClick={() => setRet(pmap, setPmap, p.id, (pmap[p.id] || 0) + 5)}
+                    <button type="button" onClick={() => setRet(pmap, setPmap, p.id, (pmap[p.id] || 0) + 5, maxRetentionPct)}
                       className="w-7 h-8 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-base leading-none">+</button>
                   </div>
                   {pmap[p.id] > 0 && <span className="text-amber-400">retains {money(p.capHit * pmap[p.id] / 100)}</span>}
@@ -164,6 +208,7 @@ function Side({ team, assets, pmap, setPmap, pk, setPk, pro, setPro, cash, setCa
   onTogglePick: (sel: Set<number>, setSel: (s: Set<number>) => void, id: number) => void;
   capStatus: CapSnapshot; capDelta: number;
 }) {
+  const added = retentionAdded(pmap, assets, capStatus.capUpper);
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-center gap-2 font-bold">
@@ -171,8 +216,9 @@ function Side({ team, assets, pmap, setPmap, pk, setPk, pro, setPro, cash, setCa
         {team.name} sends
       </div>
       <CapImpact status={capStatus} delta={capDelta} />
-      <PlayerTable title="NHL players" list={assets.players.filter((p) => !p.farm)} pmap={pmap} setPmap={setPmap} destTeamId={destTeamId} ownerTeamId={team.id} terms={terms} fees={fees} onToggleClause={onToggleClause} onAgreeFee={onAgreeFee} />
-      <PlayerTable title="AHL players" list={assets.players.filter((p) => p.farm)} pmap={pmap} setPmap={setPmap} destTeamId={destTeamId} ownerTeamId={team.id} terms={terms} fees={fees} onToggleClause={onToggleClause} onAgreeFee={onAgreeFee} />
+      <RetentionCapacity status={capStatus} newSlots={added.slots} newPct={added.pct} />
+      <PlayerTable title="NHL players" list={assets.players.filter((p) => !p.farm)} pmap={pmap} setPmap={setPmap} destTeamId={destTeamId} ownerTeamId={team.id} terms={terms} fees={fees} onToggleClause={onToggleClause} onAgreeFee={onAgreeFee} maxRetentionPct={capStatus.retentionMaxPct} />
+      <PlayerTable title="AHL players" list={assets.players.filter((p) => p.farm)} pmap={pmap} setPmap={setPmap} destTeamId={destTeamId} ownerTeamId={team.id} terms={terms} fees={fees} onToggleClause={onToggleClause} onAgreeFee={onAgreeFee} maxRetentionPct={capStatus.retentionMaxPct} />
       <CheckTable title="Prospects" icon="⭐" list={assets.prospects} sel={pro} setSel={setPro} onToggle={onTogglePick} />
       <CheckTable title="Draft picks" icon="🎫" list={assets.picks} sel={pk} setSel={setPk} onToggle={onTogglePick} />
       <div className="bg-slate-900/40 border border-slate-800 rounded-lg px-3 py-2.5 flex items-center gap-2 text-sm">
