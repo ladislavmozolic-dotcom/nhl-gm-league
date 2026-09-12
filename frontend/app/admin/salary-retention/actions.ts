@@ -1,3 +1,5 @@
+"use server";
+
 import { loadSettings, saveSettings } from "@/lib/sim/settings";
 import { isAdmin } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
