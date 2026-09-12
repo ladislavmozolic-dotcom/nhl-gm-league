@@ -8,15 +8,15 @@ import { displayName } from "@/lib/playerName";
 import { clauseTermsAction } from "@/app/trades/build/actions";
 import { proposeTradeGroupAction, type GroupLeg } from "@/app/trades/build3/actions";
 
-type Player = { id: number; name: string; position: string; capHit: number; farm: boolean; clause?: string | null; noTradeTeams?: number[]; alreadyRetained?: boolean };
+type Player = { id: number; name: string; position: string; capHit: number; farm: boolean; clause?: string | null; noTradeTeams?: number[]; retainedAmount?: number };
 type Pick = { id: number; label: string; logoUrl?: string | null };
 type Assets = { players: Player[]; picks: Pick[]; prospects: Pick[] };
 type Team = { id: number; name: string; logoUrl?: string | null };
 type Terms = { feeAmount: number; feePct: number; fullPayout: boolean; reason: string };
 // Only what the retention-capacity note needs, from lib/cap.ts's CapStatus.
 type CapSnapshot = {
-  retentionSlotsUsed: number; retentionSlotsMax: number; retentionPctUsed: number; retentionPctMax: number; retentionMaxPct: number; capUpper: number;
-  retentionPlayersInUsed: number; retentionPlayersInMax: number;
+  retentionSlotsOutUsed: number; retentionSlotsInUsed: number; retentionSlotsMax: number;
+  retentionPctUsed: number; retentionPctMax: number; retentionMaxPct: number; capUpper: number;
 };
 
 /** New retention this trade would add on this club's own outgoing players
@@ -33,48 +33,51 @@ function retentionAdded(map: Record<number, number>, assets: Assets, capUpper: n
   return { slots, pct: capUpper > 0 ? (dollars / capUpper) * 100 : 0 };
 }
 
-/** How many NEW retained-salary players would land on `teamId`'s roster from
- *  whichever of the other two columns targets it as their destination — a
- *  player counts whether he already carried retention (alreadyRetained) or is
- *  gaining fresh retention right here. Mirrors TradeBuilder.tsx's retainedInAdded,
- *  adapted for the 3-column cycle where "incoming" isn't a single fixed side. */
+/** New retained-salary players (with their combined dollar amount) that would
+ *  land on `teamId`'s roster from whichever of the other two columns targets
+ *  it as their destination — a player counts whether he already carried
+ *  retention (retainedAmount) or is gaining fresh retention right here.
+ *  Mirrors TradeBuilder.tsx's retainedInAdded, adapted for the 3-column cycle
+ *  where "incoming" isn't a single fixed side. */
 function retainedInForTeam(
   sources: Array<{ dest: number | null; assets: Assets; playerIds: Set<number>; retentions: Record<number, number> }>,
   teamId: number,
-): number {
-  let count = 0;
+): { count: number; dollars: number } {
+  let count = 0, dollars = 0;
   for (const s of sources) {
     if (s.dest !== teamId) continue;
     for (const id of s.playerIds) {
       const p = s.assets.players.find((pl) => pl.id === id);
       if (!p || p.farm) continue;
-      if ((s.retentions[id] ?? 0) > 0 || p.alreadyRetained) count++;
+      const pct = s.retentions[id] ?? 0;
+      const total = (p.retainedAmount ?? 0) + (pct > 0 ? p.capHit * pct / 100 : 0);
+      if (total > 0) { count++; dollars += total; }
     }
   }
-  return count;
+  return { count, dollars };
 }
 
-function RetentionCapacity({ status, newSlots, newPct, newIn }: { status: CapSnapshot; newSlots: number; newPct: number; newIn: number }) {
-  const slotsAfter = status.retentionSlotsUsed + newSlots;
-  const pctAfter = status.retentionPctUsed + newPct;
-  const inAfter = status.retentionPlayersInUsed + newIn;
-  const overOut = slotsAfter > status.retentionSlotsMax || pctAfter > status.retentionPctMax;
-  const overIn = inAfter > status.retentionPlayersInMax;
+// This club's retention CAPACITY: "slots" is ONE combined pool — contracts
+// it's retaining on (OUT) plus retained-salary players it rosters (IN) —
+// against a single max, and the dollar amount of both together is checked
+// against a single % of the cap. Both are enforced server-side in
+// lib/trade-exec.ts, so this is a live preview of the same check.
+function RetentionCapacity({ status, newOutSlots, newOutPct, newIn }: { status: CapSnapshot; newOutSlots: number; newOutPct: number; newIn: { count: number; dollars: number } }) {
+  const slotsAfter = status.retentionSlotsOutUsed + status.retentionSlotsInUsed + newOutSlots + newIn.count;
+  const newInPct = status.capUpper > 0 ? (newIn.dollars / status.capUpper) * 100 : 0;
+  const pctAfter = status.retentionPctUsed + newOutPct + newInPct;
+  const over = slotsAfter > status.retentionSlotsMax || pctAfter > status.retentionPctMax;
   return (
-    <div className={`bg-slate-900/40 border rounded-lg px-3 py-2 text-xs space-y-1 ${overOut || overIn ? "border-amber-700/60" : "border-slate-800"}`} title="Retention capacity vs. the league's configured limits — contracts retained on (out), % of cap tied up, and retained-salary players rostered (in)">
+    <div className={`bg-slate-900/40 border rounded-lg px-3 py-2 text-xs space-y-1 ${over ? "border-amber-700/60" : "border-slate-800"}`} title="Retention capacity vs. the league's configured limits — one combined pool of slots (retained-on + rostered-retained) and one combined % of the cap">
       <div className="flex items-center justify-between">
-        <span className="text-slate-500">Retention slots (out)</span>
+        <span className="text-slate-500">Retention slots</span>
         <span className={`tabular-nums font-medium ${slotsAfter > status.retentionSlotsMax ? "text-amber-400" : "text-slate-200"}`}>{slotsAfter}/{status.retentionSlotsMax}</span>
       </div>
       <div className="flex items-center justify-between">
         <span className="text-slate-500">Retention % of cap</span>
         <span className={`tabular-nums font-medium ${pctAfter > status.retentionPctMax ? "text-amber-400" : "text-slate-200"}`}>{pctAfter.toFixed(1)}% / {status.retentionPctMax}%</span>
       </div>
-      <div className="flex items-center justify-between">
-        <span className="text-slate-500">Retained players (in)</span>
-        <span className={`tabular-nums font-medium ${overIn ? "text-amber-400" : "text-slate-200"}`}>{inAfter}/{status.retentionPlayersInMax}</span>
-      </div>
-      {(overOut || overIn) && <p className="text-amber-400">⚠ This would exceed the league&apos;s configured retention limit.</p>}
+      {over && <p className="text-amber-400">⚠ This would exceed the league&apos;s configured retention limit.</p>}
     </div>
   );
 }
@@ -90,7 +93,7 @@ function TeamColumn({ team, others, assets, dest, setDest, playerIds, setPlayerI
   pickIds: Set<number>; setPickIds: (s: Set<number>) => void;
   prospectIds: Set<number>; setProspectIds: (s: Set<number>) => void;
   cash: number; setCash: (n: number) => void;
-  capStatus: CapSnapshot; newIn: number;
+  capStatus: CapSnapshot; newIn: { count: number; dollars: number };
 }) {
   const toggle = (set: Set<number>, setter: (s: Set<number>) => void, id: number) => {
     const n = new Set(set); if (n.has(id)) n.delete(id); else n.add(id); setter(n);
@@ -132,7 +135,7 @@ function TeamColumn({ team, others, assets, dest, setDest, playerIds, setPlayerI
         </select>
       </div>
 
-      <RetentionCapacity status={capStatus} newSlots={added.slots} newPct={added.pct} newIn={newIn} />
+      <RetentionCapacity status={capStatus} newOutSlots={added.slots} newOutPct={added.pct} newIn={newIn} />
 
       <div className="bg-slate-900/40 border border-slate-800 rounded-lg overflow-hidden">
         <div className="px-3 py-2 bg-slate-800/40 text-xs font-bold uppercase tracking-wide text-slate-400">Players ({assets.players.length})</div>

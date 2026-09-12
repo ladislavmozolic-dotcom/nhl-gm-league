@@ -74,45 +74,30 @@ export default async function SalaryRetentionAdminPage() {
       </div>
 
       <div className="bg-emerald-950/40 border border-emerald-800/50 rounded-xl p-4 text-sm text-emerald-200">
-        <b>✓ Enforced:</b> all three capacity limits are checked in <code className="text-emerald-100">lib/trade-exec.ts</code> and
-        will reject a proposed trade that pushes either club over them —{" "}
-        <code className="text-emerald-100">retentionMaxPlayersOut</code> (max contracts a club may be retaining on at once),{" "}
-        <code className="text-emerald-100">retentionMaxTotalPct</code> (max % of the cap tied up in that dead money), and{" "}
-        <code className="text-emerald-100">retentionMaxPlayersIn</code> (max retained-salary players a club may roster —
-        acquiring a player who already carries retention from an earlier trade counts too, even without new retention in this
-        deal). All three are checked against what a club already carries PLUS whatever the proposed trade would add.
+        <b>✓ Enforced:</b> checked in <code className="text-emerald-100">lib/trade-exec.ts</code> and will reject a proposed
+        trade that pushes either club over them. A club&apos;s retention <b>slots</b> are ONE combined pool — contracts it&apos;s
+        retaining on (dead money it pays) PLUS retained-salary players it rosters (acquisitions someone else subsidizes,
+        including one already carrying retention from an earlier trade even without new retention in this deal) — capped by{" "}
+        <b>Total Retention Slots</b>, below. The dollar amount of both combined is capped separately by{" "}
+        <b>Max Total Retention % of Cap Hit</b>. Both are checked against what a club already carries PLUS whatever the
+        proposed trade would add.
       </div>
 
       <form action={updateSalaryRetentionSettings} className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
-              Max Players IN with Retention
+              Total Retention Slots
             </label>
             <input
               type="number"
-              name="retentionMaxPlayersIn"
-              defaultValue={settings.retentionMaxPlayersIn}
+              name="retentionMaxSlots"
+              defaultValue={settings.retentionMaxSlots}
               className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
               min={0}
               max={10}
             />
-            <p className="text-xs text-slate-500 mt-1">Maximum number of retained players a team can acquire.</p>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
-              Max Players OUT with Retention
-            </label>
-            <input
-              type="number"
-              name="retentionMaxPlayersOut"
-              defaultValue={settings.retentionMaxPlayersOut}
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
-              min={0}
-              max={10}
-            />
-            <p className="text-xs text-slate-500 mt-1">Maximum number of players a team can retain salary for.</p>
+            <p className="text-xs text-slate-500 mt-1">Max contracts a club can be retaining on PLUS retained-salary players it rosters — combined, one pool.</p>
           </div>
 
           <div>
@@ -129,7 +114,7 @@ export default async function SalaryRetentionAdminPage() {
               step={0.5}
             />
             <p className="text-xs text-slate-500 mt-1">
-              Maximum total active retained salary as a percentage of the team&apos;s Salary Cap (Default: 10%).
+              Combined retained-salary dollars (in + out) as a percentage of the team&apos;s Salary Cap (Default: 10%).
             </p>
           </div>
 

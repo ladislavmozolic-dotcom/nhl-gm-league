@@ -7,7 +7,7 @@ import { money } from "@/lib/finance";
 import { displayName } from "@/lib/playerName";
 import { clauseTermsAction, analyzeTradeAction, type TradePackage } from "@/app/trades/build/actions";
 
-type Player = { id: number; name: string; position: string; capHit: number; farm: boolean; clause?: string | null; noTradeTeams?: number[]; alreadyRetained?: boolean };
+type Player = { id: number; name: string; position: string; capHit: number; farm: boolean; clause?: string | null; noTradeTeams?: number[]; retainedAmount?: number };
 type Pick = { id: number; label: string; logoUrl?: string | null };
 type Assets = { players: Player[]; picks: Pick[]; prospects: Pick[] };
 type Team = { id: number; name: string; logoUrl?: string | null };
@@ -15,9 +15,8 @@ type Terms = { feeAmount: number; feePct: number; fullPayout: boolean; reason: s
 // Only the fields the cap-impact widget needs, from lib/cap.ts's CapStatus.
 type CapSnapshot = {
   committed: number; ceiling: number; strictSpace: number; floor: number;
-  retentionSlotsUsed: number; retentionSlotsMax: number;
+  retentionSlotsOutUsed: number; retentionSlotsInUsed: number; retentionSlotsMax: number;
   retentionPctUsed: number; retentionPctMax: number; retentionMaxPct: number; capUpper: number;
-  retentionPlayersInUsed: number; retentionPlayersInMax: number;
 };
 
 // A moved player's own Cap Hit never changes — what changes hands is his cap
@@ -49,18 +48,20 @@ function retentionAdded(map: Record<number, number>, assets: Assets, capUpper: n
 }
 
 /** New retained-salary players this trade would land on the RECEIVING side
- *  (this Side's own team) — a player counts whether he already carried
- *  retention from an earlier trade (alreadyRetained) or is gaining fresh
- *  retention right here from the OTHER side's map. AHL destinations don't
- *  touch the NHL retention count. */
-function retainedInAdded(incomingMap: Record<number, number>, incomingAssets: Assets): number {
-  let count = 0;
+ *  (this Side's own team), with their combined dollar amount — a player
+ *  counts whether he already carried retention from an earlier trade
+ *  (retainedAmount) or is gaining fresh retention right here from the OTHER
+ *  side's map (added on top of whatever he already carried, same additive
+ *  rule as lib/trade-exec.ts). AHL destinations don't touch the NHL count. */
+function retainedInAdded(incomingMap: Record<number, number>, incomingAssets: Assets): { count: number; dollars: number } {
+  let count = 0, dollars = 0;
   for (const [id, pct] of Object.entries(incomingMap)) {
     const p = incomingAssets.players.find((pl) => pl.id === Number(id));
     if (!p || p.farm) continue;
-    if (pct > 0 || p.alreadyRetained) count++;
+    const total = (p.retainedAmount ?? 0) + (pct > 0 ? p.capHit * pct / 100 : 0);
+    if (total > 0) { count++; dollars += total; }
   }
-  return count;
+  return { count, dollars };
 }
 
 function CapImpact({ status, delta }: { status: CapSnapshot; delta: number }) {
@@ -89,32 +90,27 @@ function CapImpact({ status, delta }: { status: CapSnapshot; delta: number }) {
   );
 }
 
-// How much of this club's retention capacity — contracts it's retaining on
-// (OUT), % of the cap tied up in that dead money, and retained-salary players
-// it rosters (IN) — is already used, plus what THIS trade would add on top of
-// each. All three are enforced server-side in lib/trade-exec.ts, so this is a
-// live preview of the same check, not just advisory.
-function RetentionCapacity({ status, newSlots, newPct, newIn }: { status: CapSnapshot; newSlots: number; newPct: number; newIn: number }) {
-  const slotsAfter = status.retentionSlotsUsed + newSlots;
-  const pctAfter = status.retentionPctUsed + newPct;
-  const inAfter = status.retentionPlayersInUsed + newIn;
-  const overOut = slotsAfter > status.retentionSlotsMax || pctAfter > status.retentionPctMax;
-  const overIn = inAfter > status.retentionPlayersInMax;
+// This club's retention CAPACITY: "slots" is ONE combined pool — contracts
+// it's retaining on (OUT) plus retained-salary players it rosters (IN) —
+// against a single max, and the dollar amount of both together is checked
+// against a single % of the cap. Both are enforced server-side in
+// lib/trade-exec.ts, so this is a live preview of the same check.
+function RetentionCapacity({ status, newOutSlots, newOutPct, newIn }: { status: CapSnapshot; newOutSlots: number; newOutPct: number; newIn: { count: number; dollars: number } }) {
+  const slotsAfter = status.retentionSlotsOutUsed + status.retentionSlotsInUsed + newOutSlots + newIn.count;
+  const newInPct = status.capUpper > 0 ? (newIn.dollars / status.capUpper) * 100 : 0;
+  const pctAfter = status.retentionPctUsed + newOutPct + newInPct;
+  const over = slotsAfter > status.retentionSlotsMax || pctAfter > status.retentionPctMax;
   return (
-    <div className={`bg-slate-900/40 border rounded-lg px-3 py-2 text-xs space-y-1 ${overOut || overIn ? "border-amber-700/60" : "border-slate-800"}`} title="Retention capacity vs. the league's configured limits — contracts retained on (out), % of cap tied up, and retained-salary players rostered (in)">
+    <div className={`bg-slate-900/40 border rounded-lg px-3 py-2 text-xs space-y-1 ${over ? "border-amber-700/60" : "border-slate-800"}`} title="Retention capacity vs. the league's configured limits — one combined pool of slots (retained-on + rostered-retained) and one combined % of the cap">
       <div className="flex items-center justify-between">
-        <span className="text-slate-500">Retention slots (out)</span>
+        <span className="text-slate-500">Retention slots</span>
         <span className={`tabular-nums font-medium ${slotsAfter > status.retentionSlotsMax ? "text-amber-400" : "text-slate-200"}`}>{slotsAfter}/{status.retentionSlotsMax}</span>
       </div>
       <div className="flex items-center justify-between">
         <span className="text-slate-500">Retention % of cap</span>
         <span className={`tabular-nums font-medium ${pctAfter > status.retentionPctMax ? "text-amber-400" : "text-slate-200"}`}>{pctAfter.toFixed(1)}% / {status.retentionPctMax}%</span>
       </div>
-      <div className="flex items-center justify-between">
-        <span className="text-slate-500">Retained players (in)</span>
-        <span className={`tabular-nums font-medium ${overIn ? "text-amber-400" : "text-slate-200"}`}>{inAfter}/{status.retentionPlayersInMax}</span>
-      </div>
-      {(overOut || overIn) && <p className="text-amber-400">⚠ This would exceed the league&apos;s configured retention limit.</p>}
+      {over && <p className="text-amber-400">⚠ This would exceed the league&apos;s configured retention limit.</p>}
     </div>
   );
 }
@@ -242,7 +238,7 @@ function Side({ team, assets, pmap, setPmap, pk, setPk, pro, setPro, cash, setCa
         {team.name} sends
       </div>
       <CapImpact status={capStatus} delta={capDelta} />
-      <RetentionCapacity status={capStatus} newSlots={added.slots} newPct={added.pct} newIn={addedIn} />
+      <RetentionCapacity status={capStatus} newOutSlots={added.slots} newOutPct={added.pct} newIn={addedIn} />
       <PlayerTable title="NHL players" list={assets.players.filter((p) => !p.farm)} pmap={pmap} setPmap={setPmap} destTeamId={destTeamId} ownerTeamId={team.id} terms={terms} fees={fees} onToggleClause={onToggleClause} onAgreeFee={onAgreeFee} maxRetentionPct={capStatus.retentionMaxPct} />
       <PlayerTable title="AHL players" list={assets.players.filter((p) => p.farm)} pmap={pmap} setPmap={setPmap} destTeamId={destTeamId} ownerTeamId={team.id} terms={terms} fees={fees} onToggleClause={onToggleClause} onAgreeFee={onAgreeFee} maxRetentionPct={capStatus.retentionMaxPct} />
       <CheckTable title="Prospects" icon="⭐" list={assets.prospects} sel={pro} setSel={setPro} onToggle={onTogglePick} />

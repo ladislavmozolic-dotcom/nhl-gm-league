@@ -94,10 +94,12 @@ export async function collectMoveOps(pkg: TradePackage) {
 
   const ops: Prisma.PrismaPromise<unknown>[] = [];
   const retentionRecords: Array<{ teamId: number; playerId: number; playerName: string; perYear: number; years: number }> = [];
-  // Acquiring-team id -> how many NHL players landing there in this trade will
-  // carry retainedSalary > 0 (whether newly retained here or already carried
-  // over from an earlier trade) — feeds the retentionMaxPlayersIn check below.
+  // Acquiring-team id -> count/dollars of NHL players landing there in this
+  // trade who will carry retainedSalary > 0 (whether newly retained here or
+  // already carried over from an earlier trade) — feeds the combined
+  // retention-capacity check below (the "IN" side of the pool).
   const acquiredRetainedCount = new Map<number, number>();
+  const acquiredRetainedDollars = new Map<number, number>();
 
   const movePlayers = (list: TradePlayer[], fromOrg: OrgTeam, toNhlId: number, toAffId: number | null) => {
     const fromOrgIds = orgIds(fromOrg);
@@ -160,59 +162,74 @@ export async function collectMoveOps(pkg: TradePackage) {
       // being shopped was the OLD club's decision — it doesn't carry over to whoever
       // just acquired him, so clear the trade-block flag on every trade.
       ops.push(prisma.player.update({ where: { id: pl.id }, data: { teamId: destId, rosterType: destRoster, capHit, retainedSalary, captaincy: null, onBlock: false, blockNote: null } }));
-      if (destRoster === "NHL" && retainedSalary > 0) acquiredRetainedCount.set(toNhlId, (acquiredRetainedCount.get(toNhlId) ?? 0) + 1);
+      if (destRoster === "NHL" && retainedSalary > 0) {
+        acquiredRetainedCount.set(toNhlId, (acquiredRetainedCount.get(toNhlId) ?? 0) + 1);
+        acquiredRetainedDollars.set(toNhlId, (acquiredRetainedDollars.get(toNhlId) ?? 0) + retainedSalary);
+      }
     }
   };
   movePlayers(pkg.fromPlayers, fromTeam, pkg.toTeamId, toAff);
   movePlayers(pkg.toPlayers, toTeam, pkg.fromTeamId, fromAff);
 
-  // League-configured retention CAPACITY limits — how many contracts a club may
-  // carry under retention at once (retentionMaxPlayersOut) and how much of the
-  // cap ceiling that dead money may tie up (retentionMaxTotalPct) — checked
-  // against every ACTIVE retention the club already carries from past trades
-  // plus whatever this trade would add on top, not just this trade in isolation.
-  if (retentionRecords.length) {
-    const teamIds = [pkg.fromTeamId, pkg.toTeamId];
-    const [existingRetentions, leagueCap] = await Promise.all([
-      prisma.buyout.findMany({ where: { teamId: { in: teamIds }, totalCost: 0 }, select: { teamId: true, perYear: true, years: true, startYear: true } }),
-      loadLeagueCap(),
-    ]);
-    const byTeam = new Map<number, { slots: number; dollars: number }>();
-    const add = (teamId: number, perYear: number) => {
-      const cur = byTeam.get(teamId) ?? { slots: 0, dollars: 0 };
-      cur.slots++; cur.dollars += perYear;
-      byTeam.set(teamId, cur);
-    };
-    for (const r of existingRetentions) {
-      if (CURRENT_SEASON_START >= r.startYear && CURRENT_SEASON_START < r.startYear + r.years) add(r.teamId, r.perYear);
-    }
-    for (const r of retentionRecords) add(r.teamId, r.perYear);
-    for (const teamId of teamIds) {
-      const totals = byTeam.get(teamId);
-      if (!totals) continue;
-      const teamName = teamId === fromTeam.id ? fromTeam.name : toTeam.name;
-      if (totals.slots > settings.retentionMaxPlayersOut) throw new Error(`${teamName} would have ${totals.slots} contracts under retention at once — the league max is ${settings.retentionMaxPlayersOut}.`);
-      const pctUsed = leagueCap.upper > 0 ? (totals.dollars / leagueCap.upper) * 100 : 0;
-      if (pctUsed > settings.retentionMaxTotalPct) throw new Error(`${teamName} would have ${pctUsed.toFixed(1)}% of the cap tied up in retention — the league max is ${settings.retentionMaxTotalPct}%.`);
-    }
-  }
-
-  // retentionMaxPlayersIn — how many retained-salary players a club may ROSTER
-  // at once (someone else paying part of the cap hit), regardless of whether
-  // this trade itself applies new retention: acquiring a player who already
-  // carries retention from an earlier trade counts too. Existing roster counts
-  // exclude players THIS trade sends away (they won't be on the roster after).
+  // League-configured retention CAPACITY: a club's "slots" — contracts it's
+  // retaining on (OUT, dead money it pays) PLUS retained-salary players it
+  // ROSTERS (IN, acquisitions someone else subsidizes) — share ONE combined
+  // pool capped at retentionMaxSlots, and the dollar amount of both
+  // together shares ONE combined % of the cap capped at retentionMaxTotalPct.
+  // Both are checked against what a club already carries from past trades
+  // PLUS whatever this trade would add, not the trade in isolation — and a
+  // player already carrying retention from an earlier trade counts on the
+  // acquiring side even if this trade itself applies no new retention.
   if (pkg.fromPlayers.length || pkg.toPlayers.length) {
+    const teamIds = [pkg.fromTeamId, pkg.toTeamId];
     const fromLeavingIds = new Set(pkg.fromPlayers.map((p) => p.playerId));
     const toLeavingIds = new Set(pkg.toPlayers.map((p) => p.playerId));
-    const [fromRoster, toRoster] = await Promise.all([
-      prisma.player.findMany({ where: { teamId: pkg.fromTeamId, rosterType: "NHL", retainedSalary: { gt: 0 } }, select: { id: true } }),
-      prisma.player.findMany({ where: { teamId: pkg.toTeamId, rosterType: "NHL", retainedSalary: { gt: 0 } }, select: { id: true } }),
+    const [existingRetentions, fromRosterIn, toRosterIn, leagueCap] = await Promise.all([
+      prisma.buyout.findMany({ where: { teamId: { in: teamIds }, totalCost: 0 }, select: { teamId: true, perYear: true, years: true, startYear: true } }),
+      prisma.player.findMany({ where: { teamId: pkg.fromTeamId, rosterType: "NHL", retainedSalary: { gt: 0 } }, select: { id: true, retainedSalary: true } }),
+      prisma.player.findMany({ where: { teamId: pkg.toTeamId, rosterType: "NHL", retainedSalary: { gt: 0 } }, select: { id: true, retainedSalary: true } }),
+      loadLeagueCap(),
     ]);
-    const fromFinalIn = fromRoster.filter((p) => !fromLeavingIds.has(p.id)).length + (acquiredRetainedCount.get(pkg.fromTeamId) ?? 0);
-    const toFinalIn = toRoster.filter((p) => !toLeavingIds.has(p.id)).length + (acquiredRetainedCount.get(pkg.toTeamId) ?? 0);
-    if (fromFinalIn > settings.retentionMaxPlayersIn) throw new Error(`${fromTeam.name} would roster ${fromFinalIn} retained-salary players — the league max is ${settings.retentionMaxPlayersIn}.`);
-    if (toFinalIn > settings.retentionMaxPlayersIn) throw new Error(`${toTeam.name} would roster ${toFinalIn} retained-salary players — the league max is ${settings.retentionMaxPlayersIn}.`);
+    const outByTeam = new Map<number, { slots: number; dollars: number }>();
+    const addOut = (teamId: number, perYear: number) => {
+      const cur = outByTeam.get(teamId) ?? { slots: 0, dollars: 0 };
+      cur.slots++; cur.dollars += perYear;
+      outByTeam.set(teamId, cur);
+    };
+    for (const r of existingRetentions) {
+      if (CURRENT_SEASON_START >= r.startYear && CURRENT_SEASON_START < r.startYear + r.years) addOut(r.teamId, r.perYear);
+    }
+    for (const r of retentionRecords) addOut(r.teamId, r.perYear);
+
+    // Existing IN counts/dollars exclude players THIS trade sends away (they
+    // won't be on the roster after) — the acquired side is added separately.
+    const fromExistingIn = fromRosterIn.filter((p) => !fromLeavingIds.has(p.id));
+    const toExistingIn = toRosterIn.filter((p) => !toLeavingIds.has(p.id));
+    const inByTeam = new Map<number, { count: number; dollars: number }>([
+      [pkg.fromTeamId, {
+        count: fromExistingIn.length + (acquiredRetainedCount.get(pkg.fromTeamId) ?? 0),
+        dollars: fromExistingIn.reduce((s, p) => s + (p.retainedSalary ?? 0), 0) + (acquiredRetainedDollars.get(pkg.fromTeamId) ?? 0),
+      }],
+      [pkg.toTeamId, {
+        count: toExistingIn.length + (acquiredRetainedCount.get(pkg.toTeamId) ?? 0),
+        dollars: toExistingIn.reduce((s, p) => s + (p.retainedSalary ?? 0), 0) + (acquiredRetainedDollars.get(pkg.toTeamId) ?? 0),
+      }],
+    ]);
+
+    for (const teamId of teamIds) {
+      const out = outByTeam.get(teamId) ?? { slots: 0, dollars: 0 };
+      const inTotals = inByTeam.get(teamId) ?? { count: 0, dollars: 0 };
+      const combinedSlots = out.slots + inTotals.count;
+      const combinedDollars = out.dollars + inTotals.dollars;
+      const teamName = teamId === fromTeam.id ? fromTeam.name : toTeam.name;
+      if (combinedSlots > settings.retentionMaxSlots) {
+        throw new Error(`${teamName} would have ${combinedSlots} retention slots (${out.slots} retaining on, ${inTotals.count} rostered retained) — the league max is ${settings.retentionMaxSlots} combined.`);
+      }
+      const pctUsed = leagueCap.upper > 0 ? (combinedDollars / leagueCap.upper) * 100 : 0;
+      if (pctUsed > settings.retentionMaxTotalPct) {
+        throw new Error(`${teamName} would have ${pctUsed.toFixed(1)}% of the cap tied up in retention (in + out combined) — the league max is ${settings.retentionMaxTotalPct}%.`);
+      }
+    }
   }
 
   const fromOrgIds = orgIds(fromTeam), toOrgIds = orgIds(toTeam);

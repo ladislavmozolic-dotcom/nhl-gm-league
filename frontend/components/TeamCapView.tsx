@@ -160,8 +160,10 @@ export default async function TeamCapView({ slug }: { slug: string }) {
           <span className="text-slate-400" title="Sum of each player's Cap Hit — already net of any retention someone else pays">Total Salaries</span><span className="text-right">{money(cap.totalSalaries)}</span>
           <span className="text-slate-400" title="Dead money from this club's own player buyouts">Buyouts</span><span className="text-right">{realBuyoutsDeadMoney ? money(realBuyoutsDeadMoney) : "—"}</span>
           <span className="text-slate-400" title="Salary this club retains on players it traded away (see Dead Cap below) — not a buyout, but still counts against its cap">Dead Cap</span><span className="text-right">{deadCapAmount ? money(deadCapAmount) : "—"}</span>
-          <span className="text-slate-400" title="Active trade-retention contracts vs. the league's configured max per team">Retention slots</span>
-          <span className={`text-right ${retention.slotsUsed >= retention.slotsMax ? "text-red-400 font-semibold" : ""}`}>{retention.slotsUsed}/{retention.slotsMax}</span>
+          <span className="text-slate-400" title="Contracts retained on (out) + retained-salary players rostered (in) — one combined pool vs. the league's configured max per team">Retention slots</span>
+          <span className={`text-right ${retention.slotsOutUsed + retention.slotsInUsed >= retention.slotsMax ? "text-red-400 font-semibold" : ""}`}>
+            {retention.slotsOutUsed + retention.slotsInUsed}/{retention.slotsMax} <span className="text-slate-500 font-normal text-xs">({retention.slotsOutUsed} out, {retention.slotsInUsed} in)</span>
+          </span>
           <span className="text-slate-400" title="Dead Cap as a % of the cap ceiling vs. the league's configured max">Retention % of cap</span>
           <span className={`text-right ${retention.pctOfCap >= retention.pctMax ? "text-red-400 font-semibold" : ""}`}>{retention.pctOfCap.toFixed(1)}% <span className="text-slate-500">/ {retention.pctMax}%</span></span>
           <span className="text-slate-400" title="Total Salaries + Buyouts + Dead Cap">Actual Cap Hit</span><span className="text-right font-semibold">{money(cap.capHit)}</span>
@@ -246,8 +248,8 @@ export default async function TeamCapView({ slug }: { slug: string }) {
         <div className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 overflow-x-auto -mt-2">
           <div className="px-4 py-2.5 bg-slate-800/30 border-b border-slate-800 text-xs font-bold uppercase tracking-wide text-slate-400 flex items-center justify-between">
             <span>Dead Cap — salary retained on traded players</span>
-            <span className={`normal-case font-normal ${retention.slotsUsed >= retention.slotsMax || retention.pctOfCap >= retention.pctMax ? "text-red-400" : "text-slate-500"}`}>
-              {retention.slotsUsed}/{retention.slotsMax} slots · {retention.pctOfCap.toFixed(1)}/{retention.pctMax}% of cap
+            <span className={`normal-case font-normal ${retention.slotsOutUsed + retention.slotsInUsed >= retention.slotsMax || retention.pctOfCap >= retention.pctMax ? "text-red-400" : "text-slate-500"}`}>
+              {retention.slotsOutUsed + retention.slotsInUsed}/{retention.slotsMax} slots · {retention.pctOfCap.toFixed(1)}/{retention.pctMax}% of cap
             </span>
           </div>
           <table className="w-full text-sm min-w-[720px]">

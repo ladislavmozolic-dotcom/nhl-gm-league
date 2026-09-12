@@ -193,7 +193,9 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
               {retention && (
                 <>
                   <InfoRow label="Retention slots" value={
-                    <span className={retention.slotsUsed >= retention.slotsMax ? "text-red-400" : "text-slate-200"}>{retention.slotsUsed}/{retention.slotsMax}</span>
+                    <span className={retention.slotsOutUsed + retention.slotsInUsed >= retention.slotsMax ? "text-red-400" : "text-slate-200"}>
+                      {retention.slotsOutUsed + retention.slotsInUsed}/{retention.slotsMax} <span className="text-slate-500 text-xs">({retention.slotsOutUsed} out, {retention.slotsInUsed} in)</span>
+                    </span>
                   } />
                   <InfoRow label="Retention % of cap" value={
                     <span className={retention.pctOfCap >= retention.pctMax ? "text-red-400" : "text-slate-200"}>{retention.pctOfCap.toFixed(1)}% <span className="text-slate-500">/ {retention.pctMax}%</span></span>

@@ -76,9 +76,12 @@ export type EngineSettings = {
   retentionCooldownDays: number;   // in-season days that must pass before a 2nd retention on the same contract (NHL's 75-day rule)
   retentionReacquireBanDays: number; // days a club that retained on a player must wait before reacquiring him (trade or waivers) — NHL: 365
   clausesEnabled: boolean;    // enforce NTC / NMC / M-NTC contract clauses in trades (off = no-CBA league)
-  retentionMaxPlayersIn: number;
-  retentionMaxPlayersOut: number;
-  retentionMaxTotalPct: number; // e.g. 10 for 10% of salaryCapUpper
+  // Total retention SLOTS a club may hold at once — ONE combined pool of
+  // contracts it's retaining on (dead money it pays) PLUS retained-salary
+  // players it rosters (acquisitions someone else subsidizes), not two
+  // independent in/out limits.
+  retentionMaxSlots: number;
+  retentionMaxTotalPct: number; // combined % of salaryCapUpper tied up in retention (in + out together)
 
   aiTradesEnabled: boolean;   // master switch: let Advanced-AI clubs negotiate trades with human GMs (accept/decline/counter + initiate)
   aiInitiateTrades: boolean;  // let Advanced-AI clubs PROACTIVELY offer trades to human GMs (scouts needs; rate-limited)
@@ -200,7 +203,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   salaryCapUpper: 85900000, salaryCapLower: 51500000, startingCapital: 40000000,
   buyoutPctSeason: 50, buyoutPctOffseason: 35,
   retentionMaxPct: 50, retentionMinSalary: 600000, retentionMaxPlayers: 3,
-  retentionMaxPlayersIn: 3, retentionMaxPlayersOut: 3, retentionMaxTotalPct: 10,
+  retentionMaxSlots: 3, retentionMaxTotalPct: 10,
   retentionMaxPerContract: 2, retentionCooldownDays: 75, retentionReacquireBanDays: 365,
   clausesEnabled: true, aiTradesEnabled: true, aiInitiateTrades: false,
   osCompEnabled: true,

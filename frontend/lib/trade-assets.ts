@@ -33,7 +33,7 @@ export async function teamAssets(teamId: number, prospectSource: "real" | "profi
     // Retention". A fresh retention slider in the trade builder multiplies
     // against this, so retaining MORE on an already-retained player is a % of
     // what's left, not the player's full original salary (see trade-exec.ts).
-    players: players.slice().sort(byName).map((p) => ({ id: p.id, name: p.name, position: p.position, capHit: Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0)), farm: p.rosterType === "AHL", clause: p.tradeClause, noTradeTeams: p.noTradeTeams, alreadyRetained: (p.retainedSalary ?? 0) > 0 })),
+    players: players.slice().sort(byName).map((p) => ({ id: p.id, name: p.name, position: p.position, capHit: Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0)), farm: p.rosterType === "AHL", clause: p.tradeClause, noTradeTeams: p.noTradeTeams, retainedAmount: p.retainedSalary ?? 0 })),
     picks: picks.map((p) => {
       const orig = teamByLogoId.get(p.ownerLogoId);
       return { id: p.id, label: `${p.year} R${p.round}${orig ? ` (${orig.code ?? orig.name})` : ""}`, logoUrl: orig?.logoUrl ?? null };
