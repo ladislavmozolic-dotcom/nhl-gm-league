@@ -91,6 +91,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   const effectiveCeiling = capCeilingForPhase(cap.upper, phase) + ltir;
   const overBy = Math.max(0, cap.capHit - effectiveCeiling);
   const cushioned = phase !== "regular" && phase !== "playoffs";
+  const posCounts = splitByPos(team.players);
 
   const Badge = ({ s }: { s: "UFA" | "RFA" }) => (
     <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${s === "UFA" ? "bg-red-600 text-white" : "bg-blue-600 text-white"}`}>{s}</span>
@@ -157,6 +158,8 @@ export default async function TeamCapView({ slug }: { slug: string }) {
           {isGm && <Link href={`/teams/${slug}/finance`} className="text-xs text-blue-400 hover:underline">Ticket prices →</Link>}
         </div>
         <div className="text-sm grid grid-cols-2 gap-x-6 gap-y-1 tabular-nums">
+          <span className="text-slate-400" title="Skaters + goalies on the NHL roster">Roster Size</span>
+          <span className="text-right">{team.players.length} <span className="text-slate-500 text-xs">({posCounts.forwards.length}F · {posCounts.defense.length}D · {posCounts.goalies.length}G)</span></span>
           <span className="text-slate-400" title="Sum of each player's Cap Hit — already net of any retention someone else pays">Total Salaries</span><span className="text-right">{money(cap.totalSalaries)}</span>
           <span className="text-slate-400" title="Dead money from this club's own player buyouts">Buyouts</span><span className="text-right">{realBuyoutsDeadMoney ? money(realBuyoutsDeadMoney) : "—"}</span>
           <span className="text-slate-400" title="Salary this club retains on players it traded away (see Dead Cap below) — not a buyout, but still counts against its cap">Dead Cap</span><span className="text-right">{deadCapAmount ? money(deadCapAmount) : "—"}</span>
@@ -207,16 +210,11 @@ export default async function TeamCapView({ slug }: { slug: string }) {
 
       {/* NHL cap table — split by position, capwages-style */}
       <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400">NHL Roster ({team.players.length})</h2>
-      {(() => {
-        const g = splitByPos(team.players);
-        return (
-          <div className="space-y-4 -mt-2">
-            <PosGroup title="Forwards" list={g.forwards} gm={isGm} />
-            <PosGroup title="Defense" list={g.defense} gm={isGm} />
-            <PosGroup title="Goalies" list={g.goalies} gm={isGm} />
-          </div>
-        );
-      })()}
+      <div className="space-y-4 -mt-2">
+        <PosGroup title="Forwards" list={posCounts.forwards} gm={isGm} />
+        <PosGroup title="Defense" list={posCounts.defense} gm={isGm} />
+        <PosGroup title="Goalies" list={posCounts.goalies} gm={isGm} />
+      </div>
 
       {/* Buyouts — dead money from this club's own bought-out contracts */}
       {realBuyouts.length > 0 && (
