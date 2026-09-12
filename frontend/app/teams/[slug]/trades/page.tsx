@@ -5,7 +5,6 @@ import { Card } from "@/components/ui";
 import { tradeSummaries } from "@/lib/trade-summary";
 
 export const dynamic = "force-dynamic";
-const SEASON = "2026-27";
 
 function StatusBadge({ status }: { status: string }) {
   const cls =
@@ -49,64 +48,80 @@ export default async function TeamTradesPage({ params }: { params: Promise<{ slu
     );
   }
 
-  const TeamChip = ({ id }: { id: number }) => {
+  const TeamMark = ({ id, big = false }: { id: number; big?: boolean }) => {
     const t = tById.get(id);
     return (
-      <div className="flex items-center gap-1.5">
-        {t?.logoUrl && <img src={t.logoUrl} alt="" className="w-5 h-5 object-contain" />}
-        <span className="font-medium">{t?.code ?? t?.name ?? "?"}</span>
+      <div className="flex items-center gap-2">
+        {t?.logoUrl && (
+          <img src={t.logoUrl} alt="" className={big ? "w-10 h-10 object-contain drop-shadow" : "w-6 h-6 object-contain"} />
+        )}
+        <span className={big ? "font-black text-lg tracking-tight" : "font-semibold text-sm"}>{t?.code ?? t?.name ?? "?"}</span>
       </div>
     );
   };
+
+  const AssetChips = ({ items, kind }: { items: string[]; kind: "get" | "give" }) => (
+    <div className="flex flex-wrap gap-1.5">
+      {(items.length ? items : ["Nothing"]).map((x, i) => (
+        <span
+          key={i}
+          className={
+            kind === "get"
+              ? "px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-sm font-semibold text-emerald-50"
+              : "px-2.5 py-1 rounded-lg bg-slate-700/30 border border-slate-600/50 text-sm font-semibold text-slate-100"
+          }
+        >
+          {x}
+        </span>
+      ))}
+    </div>
+  );
 
   const fmtDate = (d: Date) => d.toLocaleDateString("sk-SK", { day: "numeric", month: "short", year: "numeric" });
 
   return (
     <div className="space-y-6">
-      <Card title="Trades" accent="text-blue-400" bodyClassName="p-0">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-slate-800/30 border-b border-slate-800 text-slate-500 text-xs uppercase tracking-wider">
-                <th className="px-4 py-3 text-left font-medium">Trade</th>
-                <th className="px-3 py-3 text-center font-medium w-28">Status</th>
-                <th className="px-4 py-3 text-right font-medium w-32">Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {trades.map((t) => {
-                // fromTeam sent the "from" side assets, toTeam sent the "to" side —
-                // reframe as this club's own gives/gets regardless of which side of
-                // the Trade row it happens to be.
-                const isFrom = t.fromTeamId === team.id;
-                const s = summaries.get(t.id);
-                const gives = isFrom ? s?.from : s?.to;
-                const gets = isFrom ? s?.to : s?.from;
-                return (
-                  <tr key={t.id} className="border-b border-slate-800/40 hover:bg-slate-800/30 transition-colors last:border-0">
-                    <td className="px-4 py-3">
-                      <Link href={`/trades/${t.id}`} className="block hover:text-blue-400 transition-colors">
-                        <div className="flex items-center gap-2">
-                          <TeamChip id={t.fromTeamId} />
-                          <span className="text-slate-600">→</span>
-                          <TeamChip id={t.toTeamId} />
-                        </div>
-                        {s && (
-                          <p className="text-xs text-slate-500 mt-1">
-                            <span className="text-slate-400">Gives:</span> {gives} <span className="text-slate-600">·</span> <span className="text-slate-400">Gets:</span> {gets}
-                          </p>
-                        )}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-3 text-center"><StatusBadge status={t.status} /></td>
-                    <td className="px-4 py-3 text-right text-slate-400 whitespace-nowrap">{fmtDate((t.status === "ACCEPTED" || t.status === "COMPLETED") ? (t.respondedAt ?? t.createdAt) : t.createdAt)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+      <h1 className="text-lg font-bold text-slate-200">Trade Tracker</h1>
+      <div className="space-y-4">
+        {trades.map((t) => {
+          // fromTeam sent the "from" side assets, toTeam sent the "to" side —
+          // reframe as this club's own gives/gets regardless of which side of
+          // the Trade row it happens to be.
+          const isFrom = t.fromTeamId === team.id;
+          const s = summaries.get(t.id);
+          const gives = (isFrom ? s?.from : s?.to) ?? [];
+          const gets = (isFrom ? s?.to : s?.from) ?? [];
+          const otherTeamId = isFrom ? t.toTeamId : t.fromTeamId;
+          return (
+            <Link key={t.id} href={`/trades/${t.id}`}
+              className="block rounded-2xl border border-slate-800 bg-slate-900/70 shadow-lg shadow-black/20 overflow-hidden hover:border-blue-500/40 hover:shadow-blue-500/5 transition-colors">
+              <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 bg-slate-800/40 border-b border-slate-800">
+                <div className="flex items-center gap-3">
+                  <TeamMark id={team.id} big />
+                  <span className="text-slate-500 text-xl">⇄</span>
+                  <TeamMark id={otherTeamId} big />
+                </div>
+                <div className="flex items-center gap-3">
+                  <StatusBadge status={t.status} />
+                  <span className="text-xs text-slate-500 whitespace-nowrap">
+                    {fmtDate((t.status === "ACCEPTED" || t.status === "COMPLETED") ? (t.respondedAt ?? t.createdAt) : t.createdAt)}
+                  </span>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-5">
+                <div>
+                  <div className="text-[11px] uppercase tracking-wider font-bold text-emerald-400 mb-2">You Get</div>
+                  <AssetChips items={gets} kind="get" />
+                </div>
+                <div>
+                  <div className="text-[11px] uppercase tracking-wider font-bold text-slate-400 mb-2">You Give</div>
+                  <AssetChips items={gives} kind="give" />
+                </div>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
     </div>
   );
 }

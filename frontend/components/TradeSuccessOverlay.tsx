@@ -47,7 +47,8 @@ export default function TradeSuccessOverlay() {
           </div>
         </div>
         <div className="mt-6 flex items-center justify-center gap-3">
-          <a href={`/trades/${show.id}`} className="px-4 py-2 rounded-lg border border-slate-600 text-slate-200 hover:bg-slate-800 text-sm font-semibold">View trade</a>
+          <a href={`/trades/${show.id}`} onClick={() => remember(show.id)}
+            className="px-4 py-2 rounded-lg border border-slate-600 text-slate-200 hover:bg-slate-800 text-sm font-semibold">View trade</a>
           <button onClick={close} className="px-6 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold">Great!</button>
         </div>
       </div>
