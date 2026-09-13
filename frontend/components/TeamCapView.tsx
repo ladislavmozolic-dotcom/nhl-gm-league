@@ -33,7 +33,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   const team = await prisma.team.findUnique({
     where: { slug },
     select: {
-      id: true, name: true, logoUrl: true, arena: true, popularity: true, arenaSections: true, capacity: true, bankAccount: true,
+      id: true, name: true, code: true, logoUrl: true, arena: true, popularity: true, arenaSections: true, capacity: true, bankAccount: true,
       players: { where: { rosterType: "NHL" }, select: { id: true, name: true, position: true, age: true, birthDate: true, isGoalie: true, capHit: true, retainedSalary: true, contractYears: true, injuryDaysLeft: true, condition: true }, orderBy: [{ isGoalie: "asc" }, { capHit: "desc" }] },
       affiliateTeams: { select: { players: { where: { rosterType: "AHL" }, select: { id: true, name: true, position: true, age: true, birthDate: true, isGoalie: true, capHit: true, contractYears: true }, orderBy: [{ isGoalie: "asc" }, { capHit: "desc" }] } } },
     },
@@ -153,7 +153,11 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   return (
     <div className="space-y-5">
       {/* header + cap summary */}
-      <div className="flex flex-wrap items-center gap-6 bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 p-5">
+      <div className="relative flex flex-wrap items-center gap-6 bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 p-5">
+        <Link href={`/tools/cap-calculator${team.code ? `?team=${team.code}` : ""}`}
+          className="absolute top-4 right-4 px-3 py-1.5 rounded-lg text-xs font-semibold bg-sky-600/20 hover:bg-sky-600/30 border border-sky-700/50 text-sky-300 transition-colors">
+          Cap Calculator →
+        </Link>
         {team.logoUrl && <img src={team.logoUrl} alt="" className="w-16 h-16 object-contain" />}
         <div className="flex-1 min-w-[180px]">
           <h1 className="text-2xl font-bold">{team.name}</h1>

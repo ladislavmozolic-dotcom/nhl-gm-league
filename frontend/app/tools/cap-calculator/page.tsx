@@ -11,7 +11,8 @@ export const dynamic = "force-dynamic";
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
-export default async function CapCalculatorPage() {
+export default async function CapCalculatorPage({ searchParams }: { searchParams: Promise<{ team?: string }> }) {
+  const { team: initialTeam } = await searchParams;
   const [settings, teams, dayProgress, { regularAt, playoffsAt }, games] = await Promise.all([
     loadSettings(),
     prisma.team.findMany({
@@ -54,6 +55,7 @@ export default async function CapCalculatorPage() {
         daysTotal={dayProgress.daysTotal}
         defaultDate={iso(addDays(regularAt, dayProgress.daysPlayed))}
         schedule={schedule}
+        initialTeam={initialTeam}
       />
     </div>
   );

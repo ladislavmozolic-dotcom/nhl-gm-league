@@ -29,15 +29,17 @@ const PresetBtn = ({ label, onClick }: { label: string; onClick: () => void }) =
 );
 
 export default function CapCalculator({
-  ceiling, teams, seasonStart, seasonEnd, daysTotal, defaultDate, schedule,
+  ceiling, teams, seasonStart, seasonEnd, daysTotal, defaultDate, schedule, initialTeam,
 }: {
   ceiling: number; teams: Team[];
   seasonStart: string; seasonEnd: string; daysTotal: number; defaultDate: string;
   schedule: Record<string, Record<string, GameEntry>>; // team code -> date (yyyy-mm-dd) -> that day's game
+  initialTeam?: string;
 }) {
-  const [capM, setCapM] = useState("81.60"); // projected cap hit, in $M
+  const preselected = initialTeam ? teams.find((t) => t.code === initialTeam) : undefined;
+  const [capM, setCapM] = useState(preselected ? (preselected.capHit / 1_000_000).toFixed(2) : "81.60"); // projected cap hit, in $M
   const [date, setDate] = useState(defaultDate);
-  const [teamCode, setTeamCode] = useState("");
+  const [teamCode, setTeamCode] = useState(preselected?.code ?? "");
   const [viewMonth, setViewMonth] = useState(() => monthOf(new Date(defaultDate)));
 
   const start = useMemo(() => new Date(seasonStart), [seasonStart]);
