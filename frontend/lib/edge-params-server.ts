@@ -220,7 +220,11 @@ function calibrateSkaters(rows: EdgeRow[], ref: Ref, map = CAL_MAP): EdgeRow[] {
 /** Compute Edge ratings for every skater in a league (default NHL). `calibrate`
  *  (default on) maps the absolute ability ratings onto the STHS value scale. */
 export async function edgeRatings(league = "NHL", calibrate = true): Promise<EdgeRow[]> {
-  const players = await prisma.player.findMany({ where: { rosterType: league, isGoalie: false }, select: SEL });
+  // Free agents (UFA) keep whatever rosterType their last team roster had, but a
+  // released/expired player's real NHL performance data still lives on their
+  // Player row — fold them into the same league population rather than losing
+  // them from the list entirely.
+  const players = await prisma.player.findMany({ where: { rosterType: { in: [league, "UFA"] }, isGoalie: false }, select: SEL });
   const teams = await prisma.team.findMany({ select: { id: true, code: true } });
   const codeById = new Map(teams.map((t) => [t.id, t.code]));
 
@@ -442,7 +446,7 @@ const GOALIE_REG_K = 700; // shots faced at which reliability = 0.5
 /** Edge ratings for every goalie in a league (MoneyPuck-driven; NHL only for now). */
 export async function edgeGoalieRatings(league = "NHL", calibrate = true): Promise<EdgeRow[]> {
   const goalies = await prisma.player.findMany({
-    where: { rosterType: league, isGoalie: true },
+    where: { rosterType: { in: [league, "UFA"] }, isGoalie: true },
     select: { id: true, name: true, position: true, teamId: true, height: true, age: true, captaincy: true, goalieAdvanced: true, lastSeasonGP: true, curSeasonGP: true, careerGP: true },
   });
   const teams = await prisma.team.findMany({ select: { id: true, code: true } });

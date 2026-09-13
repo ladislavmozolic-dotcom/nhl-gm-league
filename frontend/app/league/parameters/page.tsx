@@ -40,6 +40,7 @@ export default async function LeagueParametersPage({ searchParams }: { searchPar
       { key: "name", label: isGoalie ? "Goalie" : "Player", kind: "player", sticky: true },
       { key: "team", label: "Team", kind: "team" },
       { key: "pos", label: "Pos", kind: "text" },
+      { key: "nhlId", label: "NHL ID", kind: "num" },
       ...order.map((k): SortCol => ({ key: k.toLowerCase(), label: k, kind: k === "OV" ? "ovr" : "num", info: labels[k] })),
     ];
 
@@ -62,7 +63,7 @@ export default async function LeagueParametersPage({ searchParams }: { searchPar
       const ids = edge.map((r) => r.playerId);
       const meta = await prisma.player.findMany({
         where: { id: { in: ids } },
-        select: { id: true, slug: true, photoUrl: true, position: true, team: { select: { code: true, slug: true, logoUrl: true } } },
+        select: { id: true, slug: true, photoUrl: true, position: true, nhlId: true, team: { select: { code: true, slug: true, logoUrl: true } } },
       });
       const metaById = new Map(meta.map((m) => [m.id, m]));
       rows = edge.map((r) => {
@@ -71,7 +72,7 @@ export default async function LeagueParametersPage({ searchParams }: { searchPar
         const row: SortRow = {
           _id: r.playerId, name: r.name, slug: m?.slug ?? null, photo: m?.photoUrl ?? null,
           teamCode: m?.team?.code ?? r.teamCode, teamSlug: m?.team?.slug ?? null, teamLogo: m?.team?.logoUrl ?? null,
-          pos: m?.position ?? r.position,
+          pos: m?.position ?? r.position, nhlId: m?.nhlId ?? null,
         };
         for (const k of order) {
           const v = r.ratings[k] ?? null;
@@ -87,9 +88,9 @@ export default async function LeagueParametersPage({ searchParams }: { searchPar
       const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
       if (!isGoalie) {
         const players = await prisma.player.findMany({
-          where: { rosterType: { in: ["NHL", "AHL"] }, isGoalie: false },
+          where: { rosterType: { in: ["NHL", "AHL", "UFA"] }, isGoalie: false },
           select: {
-            id: true, name: true, slug: true, photoUrl: true, position: true,
+            id: true, name: true, slug: true, photoUrl: true, position: true, nhlId: true,
             team: { select: { code: true, slug: true, logoUrl: true } },
             ck: true, fg: true, di: true, sk: true, st: true, en: true, du: true, ph: true, fo: true, pa: true,
             sc: true, df: true, ps: true, ex: true, ld: true, mo: true, overall: true,
@@ -100,7 +101,7 @@ export default async function LeagueParametersPage({ searchParams }: { searchPar
         count = players.length;
         rows = players.map((p) => {
           const grp = posGroup(p.position, false);
-          const row: SortRow = { _id: p.id, name: p.name, slug: p.slug, photo: p.photoUrl, teamCode: p.team?.code ?? null, teamSlug: p.team?.slug ?? null, teamLogo: p.team?.logoUrl ?? null, pos: p.position };
+          const row: SortRow = { _id: p.id, name: p.name, slug: p.slug, photo: p.photoUrl, teamCode: p.team?.code ?? null, teamSlug: p.team?.slug ?? null, teamLogo: p.team?.logoUrl ?? null, pos: p.position, nhlId: p.nhlId };
           for (const k of order) {
             const dbKey = (field ? `${field}${cap(k.toLowerCase())}` : k.toLowerCase()) as keyof typeof p;
             const v = (p as any)[k === "OV" ? (field ? "unhlOverall" : "overall") : dbKey] ?? null;
@@ -111,9 +112,9 @@ export default async function LeagueParametersPage({ searchParams }: { searchPar
         });
       } else {
         const goalies = await prisma.player.findMany({
-          where: { rosterType: { in: ["NHL", "AHL"] }, isGoalie: true },
+          where: { rosterType: { in: ["NHL", "AHL", "UFA"] }, isGoalie: true },
           select: {
-            id: true, name: true, slug: true, photoUrl: true, position: true,
+            id: true, name: true, slug: true, photoUrl: true, position: true, nhlId: true,
             team: { select: { code: true, slug: true, logoUrl: true } },
             goalieRating: {
               select: {
@@ -126,7 +127,7 @@ export default async function LeagueParametersPage({ searchParams }: { searchPar
         count = goalies.length;
         rows = goalies.map((g) => {
           const gr: any = g.goalieRating ?? {};
-          const row: SortRow = { _id: g.id, name: g.name, slug: g.slug, photo: g.photoUrl, teamCode: g.team?.code ?? null, teamSlug: g.team?.slug ?? null, teamLogo: g.team?.logoUrl ?? null, pos: g.position };
+          const row: SortRow = { _id: g.id, name: g.name, slug: g.slug, photo: g.photoUrl, teamCode: g.team?.code ?? null, teamSlug: g.team?.slug ?? null, teamLogo: g.team?.logoUrl ?? null, pos: g.position, nhlId: g.nhlId };
           for (const k of order) {
             const dbKey = k === "OV" ? (field ? "unhlOverall" : "overall") : (field ? `${field}${cap(k.toLowerCase())}` : k.toLowerCase());
             const v = gr[dbKey] ?? null;
