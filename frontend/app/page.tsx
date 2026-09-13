@@ -369,7 +369,7 @@ export default async function HomePage() {
           )}
           {articlesRaw.map((a) => {
             const author = teamById.get(a.authorTeamId);
-            const preview = a.bodyHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 200);
+            const preview = a.bodyHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 500);
             return (
               <article key={a.id} className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 hover:border-slate-600 transition-colors">
                 <div className="flex items-center gap-3 mb-3">
@@ -381,7 +381,7 @@ export default async function HomePage() {
                   </div>
                 </div>
                 <Link href={`/news/${a.id}`}><h3 className="text-lg font-bold mb-2 hover:text-blue-400">{a.title}</h3></Link>
-                <p className="text-sm text-slate-300 leading-relaxed">{preview}{preview.length >= 200 ? "…" : ""}</p>
+                <p className="text-sm text-slate-300 leading-relaxed">{preview}{preview.length >= 500 ? "…" : ""}</p>
                 <div className="mt-3 flex items-center gap-4 text-xs text-slate-500">
                   <Link href={`/news/${a.id}`} className="text-blue-400 hover:text-blue-300">Read more →</Link>
                   <span>👍 {a._count.reactions}</span>
