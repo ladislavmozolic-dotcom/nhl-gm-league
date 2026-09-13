@@ -204,7 +204,7 @@ export default async function ScenarioPage({ searchParams }: { searchParams: Pro
       </Card>
 
       <Card title="Posuny v rebríčku formácií/párov" accent="text-blue-400">
-        <p className="text-xs text-slate-500 mb-3">Rovnaké sloty a rating (CK/PA/SC/DF, resp. overall pre brankárov) ako Analyze My Roster — po zmene sa zostava aj u dotknutých tímov prepočíta cez auto-lineup.</p>
+        <p className="text-xs text-slate-500 mb-3">Rovnaké sloty a Role Score (resp. Goalie Quality Score pre brankárov) ako Analyze My Roster — po zmene sa zostava aj u dotknutých tímov prepočíta cez auto-lineup.</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {result.slots.map((s) => (
             <div key={s.id} className="border border-slate-800 bg-slate-900/40 rounded-xl p-3">

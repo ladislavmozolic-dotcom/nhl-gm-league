@@ -140,10 +140,10 @@ function toLineGoalie(p: RawPlayer) {
 function toSlotPlayer(p: RawPlayer): SlotPlayer {
   if (p.isGoalie) {
     const overall = p.goalieRating?.overall ?? null;
-    return { id: p.id, name: p.name, slug: p.slug, overall, rating: overall, raw: null };
+    return { id: p.id, name: p.name, slug: p.slug, overall, rating: overall, raw: null, position: null };
   }
   const raw = { ck: p.ck, pa: p.pa, sc: p.sc, df: p.df, sk: p.sk, ph: p.ph };
-  return { id: p.id, name: p.name, slug: p.slug, overall: p.overall, rating: compositeRating(raw), raw };
+  return { id: p.id, name: p.name, slug: p.slug, overall: p.overall, rating: compositeRating(raw), raw, position: p.position };
 }
 
 const avgAgeOf = (players: RawPlayer[]) => {
@@ -267,7 +267,10 @@ export async function runScenario(teamId: number, moves: ScenarioMove[]): Promis
     for (const p of skaters) afterPlayerMap.set(p.id, toSlotPlayer(p));
     for (const p of goalies) afterGoalieMap.set(p.id, toSlotPlayer(p));
   }
-  const afterData: LeagueSlotsData = { teams: data.teams, resolved: afterResolved, autoBySlot: afterAutoBySlot, playerMap: afterPlayerMap, goalieMap: afterGoalieMap };
+  // rolePercentiles/goaliePercentiles carry over unchanged from the base
+  // league-wide load — a hypothetical trade moves a player between teams but
+  // never changes their own raw ratings, so the percentile pools stay valid.
+  const afterData: LeagueSlotsData = { ...data, resolved: afterResolved, autoBySlot: afterAutoBySlot, playerMap: afterPlayerMap, goalieMap: afterGoalieMap };
 
   const slots: ScenarioSlotRow[] = SLOTS.map((slot) => {
     const beforeRows = rankSlot(data, slot);

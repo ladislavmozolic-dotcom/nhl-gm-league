@@ -2,12 +2,14 @@ import { loadLeagueSlots, rankSlot, SLOTS, type SlotPlayer } from "./leagueSlots
 import { teamWideFindings, type TeamFinding } from "./teamFindings";
 
 // "Analyze my roster" — the first UNHL Intelligence function. No LLM, no black-box
-// judgment: every finding below is a plain average rating — the CK/PA/SC/DF
-// composite for skaters, GoalieRating.overall for goalies (OV is orientational
-// only in this league, see memory: ov-vs-specific-params) — for the players
-// occupying a given slot, ranked against the same slot across all 32 NHL
-// clubs. See leagueSlots.ts for how a slot a club hasn't set itself gets
-// filled in, and for the rating composite itself.
+// judgment: every finding below is a role-specific Role Score (a weighted mix
+// of STHS params, each converted to a C/W/D/G percentile — see leagueSlots.ts's
+// ROLE_WEIGHTS for the exact per-role weight tables, per the "Analyze My
+// Roster" spec doc) or a Goalie Quality Score for goalies (OV is orientational
+// only in this league and never an input, see memory: ov-vs-specific-params)
+// — for the players occupying a given slot, ranked against the same slot
+// across all 32 NHL clubs. See leagueSlots.ts for how a slot a club hasn't
+// set itself gets filled in, and for the scoring itself.
 
 export interface RosterFinding {
   id: string;

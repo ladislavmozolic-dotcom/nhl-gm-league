@@ -16,6 +16,15 @@ import { autoLines } from "@/lib/sim/lines-core";
 type ForwardSide = "lw" | "c" | "rw";
 type DefenseSide = "ld" | "rd";
 
+// A player's peer pool for percentile normalization (see ROLE_WEIGHTS below) —
+// Centers, Wingers, Defensemen. Goalies have their own separate pool (G),
+// tracked outside this type since they never share a role/weight table with skaters.
+type RoleGroup = "C" | "W" | "D";
+type RoleKey =
+  | "top6C" | "top6W" | "bottom6C" | "bottom6W"
+  | "ppForward" | "pkCenter" | "pkWinger"
+  | "offensiveD" | "twoWayD" | "shutdownD" | "bottomPairD" | "ppDefenseman" | "pkDefenseman";
+
 export interface SlotDef {
   id: string;
   label: string;
@@ -25,23 +34,30 @@ export interface SlotDef {
   situationsKey?: "pp" | "pk4"; // special
   unitIdx?: 0 | 1; // special: which of the club's 2 saved PP/PK units (0 = first, 1 = second)
   goalieRole?: "starter" | "backup"; // goalie
+  // forward/defense only: which role-score formula and percentile peer group
+  // (see ROLE_WEIGHTS) rates a player in this slot. Special-teams slots don't
+  // set this — PP1/PP2/PK1/PK2 pick a forward-vs-D (and C-vs-W) formula per
+  // player at score time instead, since one unit mixes positions.
+  role?: { group: RoleGroup; key: RoleKey };
 }
 
 // Top slot vs. depth slot, per side — mirrors how GMs actually talk about a
 // lineup ("top-line C", "bottom-pair RD") and is exactly granular enough to
 // reproduce findings like "2nd/3rd-pair RD". Plus the starting goalie tandem
-// and each club's two PP/PK units.
+// and each club's two PP/PK units. Role/group per slot follows the "UNHL
+// Intelligence / Analyze My Roster" spec doc (2026-09, supplied by the user) —
+// see ROLE_WEIGHTS for the exact weight tables.
 export const SLOTS: SlotDef[] = [
-  { id: "lw-top", label: "Top-line LW", kind: "forward", lineIdxs: [0], side: "lw" },
-  { id: "lw-depth", label: "Depth LW (2.–4. formácia)", kind: "forward", lineIdxs: [1, 2, 3], side: "lw" },
-  { id: "c-top", label: "Top-line C", kind: "forward", lineIdxs: [0], side: "c" },
-  { id: "c-depth", label: "Depth C (2.–4. formácia)", kind: "forward", lineIdxs: [1, 2, 3], side: "c" },
-  { id: "rw-top", label: "Top-line RW", kind: "forward", lineIdxs: [0], side: "rw" },
-  { id: "rw-depth", label: "Depth RW (2.–4. formácia)", kind: "forward", lineIdxs: [1, 2, 3], side: "rw" },
-  { id: "ld-top", label: "Top-pár LD", kind: "defense", lineIdxs: [0], side: "ld" },
-  { id: "ld-bottom", label: "2.–3. pár LD", kind: "defense", lineIdxs: [1, 2], side: "ld" },
-  { id: "rd-top", label: "Top-pár RD", kind: "defense", lineIdxs: [0], side: "rd" },
-  { id: "rd-bottom", label: "2.–3. pár RD", kind: "defense", lineIdxs: [1, 2], side: "rd" },
+  { id: "lw-top", label: "Top-line LW", kind: "forward", lineIdxs: [0], side: "lw", role: { group: "W", key: "top6W" } },
+  { id: "lw-depth", label: "Depth LW (2.–4. formácia)", kind: "forward", lineIdxs: [1, 2, 3], side: "lw", role: { group: "W", key: "bottom6W" } },
+  { id: "c-top", label: "Top-line C", kind: "forward", lineIdxs: [0], side: "c", role: { group: "C", key: "top6C" } },
+  { id: "c-depth", label: "Depth C (2.–4. formácia)", kind: "forward", lineIdxs: [1, 2, 3], side: "c", role: { group: "C", key: "bottom6C" } },
+  { id: "rw-top", label: "Top-line RW", kind: "forward", lineIdxs: [0], side: "rw", role: { group: "W", key: "top6W" } },
+  { id: "rw-depth", label: "Depth RW (2.–4. formácia)", kind: "forward", lineIdxs: [1, 2, 3], side: "rw", role: { group: "W", key: "bottom6W" } },
+  { id: "ld-top", label: "Top-pár LD", kind: "defense", lineIdxs: [0], side: "ld", role: { group: "D", key: "twoWayD" } },
+  { id: "ld-bottom", label: "2.–3. pár LD", kind: "defense", lineIdxs: [1, 2], side: "ld", role: { group: "D", key: "bottomPairD" } },
+  { id: "rd-top", label: "Top-pár RD", kind: "defense", lineIdxs: [0], side: "rd", role: { group: "D", key: "twoWayD" } },
+  { id: "rd-bottom", label: "2.–3. pár RD", kind: "defense", lineIdxs: [1, 2], side: "rd", role: { group: "D", key: "bottomPairD" } },
   { id: "goalie-starter", label: "Štartujúci brankár", kind: "goalie", goalieRole: "starter" },
   { id: "goalie-backup", label: "Náhradný brankár", kind: "goalie", goalieRole: "backup" },
   { id: "pp1", label: "PP1 (presilovka č.1)", kind: "special", situationsKey: "pp", unitIdx: 0 },
@@ -69,15 +85,17 @@ export interface SlotPlayer {
   slug: string;
   overall: number | null; // OV — orientational only, shown as secondary reference
   // The rating this player is actually ranked/averaged by: for skaters, the
-  // composite of whichever of CK/PA/SC/DF/SK/PH matters for the slot they're
-  // shown in (see compositeRating/pkRating/ppRating below — OV is not one of
-  // the inputs); for goalies, GoalieRating.overall, since they have no
-  // CK/PA/SC/DF split. See memory: ov-vs-specific-params.
+  // role-and-percentile score for whatever slot they're shown in (see
+  // ROLE_WEIGHTS/weightedPercentile below — OV is never an input, per the
+  // spec doc's core rule); for goalies, the Goalie Quality Score (also
+  // percentile-based — see GOALIE_QUALITY_WEIGHTS). See memory: ov-vs-specific-params.
   rating: number | null;
-  // Raw params behind `rating`, kept around so slotPlayers() can recompute a
-  // situational rating (PK1/PP1) instead of always using the general one.
-  // null for goalies.
+  // Raw params behind the general-purpose compositeRating() fallback (used
+  // only if a slot has no role mapping) — null for goalies.
   raw: RawSkaterParams | null;
+  // Needed to pick a role formula for special-teams slots (PP1/PP2/PK1/PK2),
+  // which mix forwards and D in one unit — null for goalies.
+  position: string | null;
 }
 
 // These six don't share a scale: across the current NHL skater pool, CK and
@@ -141,31 +159,157 @@ function zComposite(p: RawSkaterParams, keys: ParamKey[]): number | null {
 }
 
 /** Composite of whichever of CK/PA/SC/DF/SK/PH a skater has (null if none) —
- *  the general-purpose "how good is this player at hockey" rating used for
- *  line/pair slots. No single param dominates by design — same "no magic
- *  weighting" rule the rest of the sim follows, just fair across scales. */
+ *  the general-purpose "how good is this player at hockey" rating used by
+ *  Draft Intelligence, Player Fit, Ideal Role, Commissioner Intelligence and
+ *  Similar Players (none of which have a specific line/pair/PP/PK role to
+ *  score against). The SLOTS in this file use the role-specific percentile
+ *  scores further down instead (see ROLE_WEIGHTS) — this stays only as their
+ *  fallback if a slot is ever missing a role mapping. No single param
+ *  dominates by design — same "no magic weighting" rule the rest of the sim follows. */
 export function compositeRating(p: RawSkaterParams): number | null {
   return zComposite(p, PARAM_KEYS);
 }
 
-// Special-teams units draw on a narrower slice of a skater's game than a full
-// line shift, so they get their own composites instead of reusing the
-// general one — a player who's elite at PA/SC but a checking/positioning
-// liability isn't automatically a good penalty-killer just because their
-// overall rating is high, and vice versa for the power play. Calibration
-// (mean/sd) is shared with PARAM_STATS above since it's the same league-wide
-// player pool, just a different subset of params per situation.
-const PK_KEYS: ParamKey[] = ["ck", "df", "sk"]; // killing a penalty is about checking, positioning/defense and mobility — PA/SC (offensive skill) don't apply
-const PP_KEYS: ParamKey[] = ["pa", "sc", "sk", "ph"]; // a power play unit is run on passing, shooting, skating and puckhandling — CK/DF (defensive/physical play) barely matter here
+// ============================================================================
+// Role-based percentile scoring — "UNHL Intelligence / Analyze My Roster"
+// spec doc (2026-09, PDF supplied by the user). Every line/pair/special-teams
+// slot below is scored with its OWN weighted mix of STHS parameters, and each
+// parameter is first converted to a PERCENTILE within its own C/W/D (skater)
+// or G (goalie) peer pool — not a raw number, and not standardized against
+// the whole league at once like compositeRating() above. This is a stronger
+// version of the same "don't let one param's scale dominate" idea: percentile
+// is scale-free by construction (always 0-100, always relative to the actual
+// peer pool a player is being judged against), so a shutdown center's DF/FO
+// strength and a top-line winger's SC/PA strength are judged on a level
+// field, and a bottom-pair D is judged against OTHER bottom-pair-caliber D,
+// not against the league's elite. OV is never an input, per the doc's rule.
+//
+// compositeRating() above is kept as-is (and still used by Draft Intelligence,
+// Player Fit, Ideal Role, Commissioner Intelligence, Similar Players) since
+// those need one generic "how good is this player at hockey" number, not a
+// role-specific one. It also remains the fallback here if a slot is ever
+// missing a role mapping.
 
-/** PK1-specific rating: CK/DF/SK only — see PK_KEYS above for why PA/SC are excluded. */
-export function pkRating(p: RawSkaterParams): number | null {
-  return zComposite(p, PK_KEYS);
+type RoleParam = "ck" | "di" | "df" | "en" | "fo" | "pa" | "ph" | "sc" | "sk" | "st";
+const ROLE_PARAM_KEYS: RoleParam[] = ["ck", "di", "df", "en", "fo", "pa", "ph", "sc", "sk", "st"];
+
+// Weight tables straight from the spec doc's tables 2 ("Forward role scores")
+// and 3 ("Defense role scores") — percentages there become fractional weights
+// here (weightedPercentile() re-normalizes by weight actually used, so a
+// missing param just drops out rather than skewing the score).
+const ROLE_WEIGHTS: Record<RoleKey, Partial<Record<RoleParam, number>>> = {
+  top6C: { sc: 25, pa: 25, fo: 15, ph: 10, sk: 10, df: 8, en: 5, st: 2 },
+  top6W: { sc: 30, pa: 25, ph: 15, sk: 10, df: 8, st: 5, en: 5, ck: 2 },
+  bottom6C: { df: 25, fo: 20, ck: 12, st: 10, en: 10, di: 8, pa: 7, sk: 5, sc: 3 },
+  bottom6W: { df: 25, ck: 20, st: 15, en: 10, di: 10, sk: 8, pa: 5, sc: 5, ph: 2 },
+  ppForward: { sc: 35, pa: 30, ph: 20, sk: 10, en: 5 },
+  pkCenter: { df: 35, fo: 20, di: 15, en: 15, sk: 10, ck: 5 },
+  pkWinger: { df: 45, di: 15, en: 15, ck: 10, sk: 10, st: 5 },
+  // offensiveD/shutdownD: defined per the doc but not wired to a SLOT yet — our
+  // D-pair slots only distinguish top-pair vs. depth (twoWayD/bottomPairD), not
+  // a puck-mover/shutdown split within the top pair. Kept here so that finer
+  // D-role slots can use them later without re-deriving the weights.
+  offensiveD: { pa: 30, sk: 20, ph: 15, sc: 15, df: 10, en: 5, st: 5 },
+  twoWayD: { df: 35, pa: 20, sk: 15, ck: 10, st: 8, ph: 7, en: 5 },
+  shutdownD: { df: 45, ck: 20, st: 15, sk: 7, en: 7, di: 6 },
+  bottomPairD: { df: 40, ck: 15, st: 15, di: 10, en: 10, sk: 5, pa: 5 },
+  ppDefenseman: { pa: 35, sc: 25, ph: 20, sk: 10, en: 10 },
+  pkDefenseman: { df: 50, ck: 15, st: 10, di: 10, en: 10, sk: 5 },
+};
+
+type GoalieParam = "sc" | "hs" | "rt" | "rb" | "ag" | "sk" | "sz";
+const GOALIE_PARAM_KEYS: GoalieParam[] = ["sc", "hs", "rt", "rb", "ag", "sk", "sz"];
+// Doc section 5.1 "Goalie Quality Score" — deliberately excludes EN/DU (doc
+// treats those as a separate workload/reliability signal, not skill) and PH/PS/EX/LD/MO.
+const GOALIE_QUALITY_WEIGHTS: Record<GoalieParam, number> = { sc: 22, hs: 22, rt: 22, rb: 18, ag: 8, sk: 4, sz: 4 };
+
+/** Percentile rank (0-100) of every id's value within the given population —
+ *  ties share the average rank of their tie group, the standard "percentile
+ *  rank" definition. A population of 1 (or all-null) maps everyone to 50. */
+function percentileMap(entries: { id: number; v: number | null }[]): Map<number, number> {
+  const valid = entries
+    .filter((e): e is { id: number; v: number } => e.v != null)
+    .sort((a, b) => a.v - b.v);
+  const n = valid.length;
+  const map = new Map<number, number>();
+  let i = 0;
+  while (i < n) {
+    let j = i;
+    while (j < n && valid[j].v === valid[i].v) j++;
+    const pct = n > 1 ? (((i + j - 1) / 2) / (n - 1)) * 100 : 50;
+    for (let k = i; k < j; k++) map.set(valid[k].id, pct);
+    i = j;
+  }
+  return map;
 }
 
-/** PP1-specific rating: PA/SC/SK/PH only — see PP_KEYS above for why CK/DF are excluded. */
-export function ppRating(p: RawSkaterParams): number | null {
-  return zComposite(p, PP_KEYS);
+/** Weighted average of a player's percentiles for whichever weighted params
+ *  they have a percentile for (missing ones drop out and the rest re-normalize,
+ *  same tolerance-for-missing-data rule as zComposite above). null if none. */
+function weightedPercentile<K extends string>(playerId: number, table: Record<K, Map<number, number>>, weights: Partial<Record<K, number>>): number | null {
+  let sum = 0;
+  let wUsed = 0;
+  for (const key of Object.keys(weights) as K[]) {
+    const w = weights[key];
+    if (w == null) continue;
+    const pct = table[key]?.get(playerId);
+    if (pct == null) continue;
+    sum += pct * w;
+    wUsed += w;
+  }
+  return wUsed > 0 ? Math.round((sum / wUsed) * 100) / 100 : null;
+}
+
+function isCenter(position: string): boolean { return position.includes("C"); }
+function isWinger(position: string): boolean { return position.includes("LW") || position.includes("RW"); }
+function isDefenseman(position: string): boolean { return position.includes("D"); }
+
+interface RolePercentiles {
+  C: Record<RoleParam, Map<number, number>>;
+  W: Record<RoleParam, Map<number, number>>;
+  D: Record<RoleParam, Map<number, number>>;
+}
+
+interface RoleParamRow {
+  id: number;
+  position: string;
+  ck: number | null; di: number | null; df: number | null; en: number | null; fo: number | null;
+  pa: number | null; ph: number | null; sc: number | null; sk: number | null; st: number | null;
+}
+
+function buildRolePercentileGroup(rows: RoleParamRow[]): Record<RoleParam, Map<number, number>> {
+  const out = {} as Record<RoleParam, Map<number, number>>;
+  for (const key of ROLE_PARAM_KEYS) out[key] = percentileMap(rows.map((p) => ({ id: p.id, v: p[key] })));
+  return out;
+}
+
+/** Builds the C/W/D percentile pools from the full NHL-rostered skater
+ *  population — a player with a dual-eligible position (e.g. "C/LW") appears
+ *  in BOTH pools, since which one applies depends on which slot they're being
+ *  judged for (a C/LW playing top-line C is judged against centers; the same
+ *  player on a wing is judged against wingers), same as real scouting. */
+function buildRolePercentiles(rows: RoleParamRow[]): RolePercentiles {
+  return {
+    C: buildRolePercentileGroup(rows.filter((p) => isCenter(p.position))),
+    W: buildRolePercentileGroup(rows.filter((p) => isWinger(p.position))),
+    D: buildRolePercentileGroup(rows.filter((p) => isDefenseman(p.position))),
+  };
+}
+
+function buildGoaliePercentiles(rows: { id: number; goalieRating: Record<GoalieParam, number | null> | null }[]): Record<GoalieParam, Map<number, number>> {
+  const out = {} as Record<GoalieParam, Map<number, number>>;
+  for (const key of GOALIE_PARAM_KEYS) out[key] = percentileMap(rows.map((g) => ({ id: g.id, v: g.goalieRating?.[key] ?? null })));
+  return out;
+}
+
+/** Which role formula + peer group rates a player in a PP/PK unit — these mix
+ *  forwards and D in one unit, so (unlike a fixed line/pair slot) the role is
+ *  picked per player from their own position, not from the SlotDef. */
+function specialRoleFor(situationsKey: "pp" | "pk4", position: string): { group: RoleGroup; key: RoleKey } {
+  if (isDefenseman(position)) return { group: "D", key: situationsKey === "pp" ? "ppDefenseman" : "pkDefenseman" };
+  const group: RoleGroup = isCenter(position) ? "C" : "W";
+  if (situationsKey === "pp") return { group, key: "ppForward" };
+  return { group, key: group === "C" ? "pkCenter" : "pkWinger" };
 }
 
 interface ResolvedLines {
@@ -183,8 +327,15 @@ export interface LeagueSlotsData {
   // teamId -> set of slot ids whose value for that team came from the
   // autoLines() fallback rather than the club's own saved Team Lines.
   autoBySlot: Map<number, Set<string>>;
-  playerMap: Map<number, SlotPlayer>; // skaters, rated by the CK/PA/SC/DF composite (SlotPlayer.rating)
-  goalieMap: Map<number, SlotPlayer>; // goalies, rated by GoalieRating.overall (they have no CK/PA/SC/DF split)
+  playerMap: Map<number, SlotPlayer>; // skaters — SlotPlayer.rating is set per-slot by slotPlayers()
+  goalieMap: Map<number, SlotPlayer>; // goalies — ditto (Goalie Quality Score, not GoalieRating.overall)
+  // C/W/D and goalie percentile pools behind the role scores above — built
+  // once from the full NHL-rostered population and reused for every slot/team
+  // (and, in Scenario Engine, for hypothetical rosters too: a trade moves a
+  // player between teams but never changes their own raw ratings, so the
+  // league-wide percentile pool doesn't need to be rebuilt for it).
+  rolePercentiles: RolePercentiles;
+  goaliePercentiles: Record<GoalieParam, Map<number, number>>;
 }
 
 function hasAnyId(arr: unknown): arr is (number | null)[] {
@@ -202,27 +353,37 @@ export async function loadLeagueSlots(): Promise<LeagueSlotsData> {
       where: { team: { league: "NHL", isAffiliate: false } },
       select: { teamId: true, forwardLines: true, defensePairs: true, situations: true },
     }),
-    // same roster filter teamLineBuilder/the sim use for its own auto-lines fallback
+    // same roster filter teamLineBuilder/the sim use for its own auto-lines fallback —
+    // also the population the C/W/D role percentiles below are built from.
     prisma.player.findMany({
       where: { team: { league: "NHL", isAffiliate: false }, rosterType: "NHL", isGoalie: false, scratched: false },
-      select: { id: true, name: true, slug: true, overall: true, ck: true, pa: true, sc: true, df: true, sk: true, ph: true, position: true, shoots: true, teamId: true },
+      select: {
+        id: true, name: true, slug: true, overall: true, position: true, shoots: true, teamId: true,
+        ck: true, pa: true, sc: true, df: true, sk: true, ph: true, di: true, en: true, fo: true, st: true,
+      },
     }),
     prisma.player.findMany({
       where: { team: { league: "NHL", isAffiliate: false }, rosterType: "NHL", isGoalie: true, scratched: false },
-      select: { id: true, name: true, slug: true, teamId: true, goalieRating: { select: { overall: true } } },
+      select: {
+        id: true, name: true, slug: true, teamId: true,
+        goalieRating: { select: { overall: true, sc: true, hs: true, rt: true, rb: true, ag: true, sk: true, sz: true } },
+      },
     }),
   ]);
+
+  const rolePercentiles = buildRolePercentiles(skaterRows);
+  const goaliePercentiles = buildGoaliePercentiles(goalieRows);
 
   const playerMap = new Map<number, SlotPlayer>(
     skaterRows.map((p) => {
       const raw: RawSkaterParams = { ck: p.ck, pa: p.pa, sc: p.sc, df: p.df, sk: p.sk, ph: p.ph };
-      return [p.id, { id: p.id, name: p.name, slug: p.slug, overall: p.overall, rating: compositeRating(raw), raw }];
+      return [p.id, { id: p.id, name: p.name, slug: p.slug, overall: p.overall, rating: compositeRating(raw), raw, position: p.position }];
     })
   );
   const goalieMap = new Map<number, SlotPlayer>(
     goalieRows.map((g) => {
       const overall = g.goalieRating?.overall ?? null;
-      return [g.id, { id: g.id, name: g.name, slug: g.slug, overall, rating: overall, raw: null }];
+      return [g.id, { id: g.id, name: g.name, slug: g.slug, overall, rating: overall, raw: null, position: null }];
     })
   );
 
@@ -288,27 +449,33 @@ export async function loadLeagueSlots(): Promise<LeagueSlotsData> {
     resolved.set(team.id, { forwardLines, defensePairs, ppUnits, pkUnits, starter, backup });
   }
 
-  return { teams, resolved, autoBySlot, playerMap, goalieMap };
+  return { teams, resolved, autoBySlot, playerMap, goalieMap, rolePercentiles, goaliePercentiles };
 }
 
-export function slotPlayers(lines: ResolvedLines, slot: SlotDef, playerMap: Map<number, SlotPlayer>, goalieMap: Map<number, SlotPlayer>): SlotPlayer[] {
+export function slotPlayers(lines: ResolvedLines, slot: SlotDef, data: Pick<LeagueSlotsData, "playerMap" | "goalieMap" | "rolePercentiles" | "goaliePercentiles">): SlotPlayer[] {
+  const { playerMap, goalieMap, rolePercentiles, goaliePercentiles } = data;
   if (slot.kind === "goalie") {
     const id = slot.goalieRole === "starter" ? lines.starter : lines.backup;
     if (id == null) return [];
     const g = goalieMap.get(id);
-    return g ? [g] : [];
+    if (!g) return [];
+    // Goalie Quality Score (SC/HS/RT/RB/AG/SK/SZ percentile), not GoalieRating.overall.
+    return [{ ...g, rating: weightedPercentile(g.id, goaliePercentiles, GOALIE_QUALITY_WEIGHTS) }];
   }
   if (slot.kind === "special") {
     const units = slot.situationsKey === "pp" ? lines.ppUnits : lines.pkUnits;
     const ids = units[slot.unitIdx ?? 0] ?? [];
-    // PP1/PP2/PK1/PK2 don't use the general rating — each is re-rated on just
-    // the params that matter for that situation (see pkRating/ppRating).
-    const situationalRating = slot.situationsKey === "pp" ? ppRating : pkRating;
+    // PP1/PP2/PK1/PK2 mix forwards and D in one unit, so the role formula is
+    // picked per player from their own position (see specialRoleFor).
     return ids
       .filter((id): id is number => typeof id === "number")
       .map((id) => playerMap.get(id))
       .filter((p): p is SlotPlayer => !!p)
-      .map((p) => (p.raw ? { ...p, rating: situationalRating(p.raw) } : p));
+      .map((p) => {
+        if (!p.position) return { ...p, rating: p.rating };
+        const { group, key } = specialRoleFor(slot.situationsKey!, p.position);
+        return { ...p, rating: weightedPercentile(p.id, rolePercentiles[group], ROLE_WEIGHTS[key]) };
+      });
   }
   const rows = slot.kind === "forward" ? lines.forwardLines : lines.defensePairs;
   const picked: SlotPlayer[] = [];
@@ -317,7 +484,11 @@ export function slotPlayers(lines: ResolvedLines, slot: SlotDef, playerMap: Map<
     const pid = row?.[slot.side!];
     if (typeof pid !== "number") continue;
     const player = playerMap.get(pid);
-    if (player) picked.push(player);
+    if (!player) continue;
+    // compositeRating() fallback only kicks in if a slot is ever missing a
+    // role mapping — every current forward/defense SlotDef has one.
+    const score = slot.role ? weightedPercentile(player.id, rolePercentiles[slot.role.group], ROLE_WEIGHTS[slot.role.key]) : player.rating;
+    picked.push({ ...player, rating: score });
   }
   return picked;
 }
@@ -330,13 +501,14 @@ export interface SlotTeamRow {
   isAuto: boolean;
 }
 
-/** Every club's average rating for one slot, best first — CK/PA/SC/DF composite
- *  for skater slots, GoalieRating.overall for goalie slots (see SlotPlayer.rating).
+/** Every club's average rating for one slot, best first — a role-and-percentile
+ *  Role Score for skater slots (see ROLE_WEIGHTS), a Goalie Quality Score for
+ *  goalie slots (see GOALIE_QUALITY_WEIGHTS) — never OV (see SlotPlayer.rating).
  *  Clubs with nobody eligible for the slot are left out entirely (nothing to rank). */
 export function rankSlot(data: LeagueSlotsData, slot: SlotDef): SlotTeamRow[] {
   return data.teams
     .map((team) => {
-      const players = slotPlayers(data.resolved.get(team.id)!, slot, data.playerMap, data.goalieMap);
+      const players = slotPlayers(data.resolved.get(team.id)!, slot, data);
       const rated = players.filter((p) => p.rating != null);
       if (!rated.length) return null;
       const avg = rated.reduce((sum, p) => sum + (p.rating as number), 0) / rated.length;

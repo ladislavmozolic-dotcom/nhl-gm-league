@@ -36,8 +36,8 @@ export default async function GmAssistantPage() {
         ) : (
           <div className="flex flex-col gap-3">
             <p className="text-sm text-slate-400">
-              {analysis.teamName} — priemerný <span className="text-slate-300 font-semibold">rating</span> hráčov na danom slote formácie/páru
-              (CK/PA/SC/DF pre korčuliarov, overall pre brankárov — OV je len orientačné, nepoužíva sa na porovnanie),
+              {analysis.teamName} — priemerný <span className="text-slate-300 font-semibold">Role Score</span> hráčov na danom slote formácie/páru
+              (vlastná váhová kombinácia STHS parametrov podľa roly — top-6 vs. bottom-6, PP vs. PK, ... — každý prepočítaný na percentil v rámci C/W/D/G; OV je len orientačné, nepoužíva sa na porovnanie),
               porovnaný voči rovnakému slotu vo všetkých 32 NHL kluboch.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
