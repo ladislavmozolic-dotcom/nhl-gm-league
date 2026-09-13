@@ -15,16 +15,24 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
   if (!article) notFound();
 
   const teamIds = [article.authorTeamId, ...article.comments.map((c) => c.teamId), ...article.reactions.map((r) => r.teamId)];
-  const teams = await prisma.team.findMany({ where: { id: { in: teamIds } }, select: { id: true, name: true, logoUrl: true, gm: true } });
+  const teams = await prisma.team.findMany({
+    where: { id: { in: teamIds } },
+    select: { id: true, name: true, logoUrl: true, gm: true, gmNickname: true, gmFirstName: true, gmLastName: true },
+  });
   const teamById = new Map(teams.map((t) => [t.id, t]));
   const author = teamById.get(article.authorTeamId);
+  // the CURRENT GM's name, not the stale placeholder `gm` field imported at team
+  // creation (which can read like "Vacancy" or a GM who's since left the league) —
+  // gmNickname/gmFirstName/gmLastName track the actually-registered human, same
+  // precedence TeamCapView uses.
+  const gmName = (t?: { name: string; gm: string; gmNickname: string | null; gmFirstName: string | null; gmLastName: string | null }) =>
+    t?.gmNickname || [t?.gmFirstName, t?.gmLastName].filter(Boolean).join(" ").trim() || t?.gm || t?.name || "GM";
 
   const counts: Record<string, number> = {};
   const reactorNames: Record<string, string[]> = {};
   for (const r of article.reactions) {
     counts[r.kind] = (counts[r.kind] ?? 0) + 1;
-    const label = teamById.get(r.teamId)?.gm || teamById.get(r.teamId)?.name || "GM";
-    (reactorNames[r.kind] ??= []).push(label);
+    (reactorNames[r.kind] ??= []).push(gmName(teamById.get(r.teamId)));
   }
   const mine = session ? article.reactions.find((r) => r.teamId === session)?.kind ?? null : null;
 
@@ -36,7 +44,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
           {author?.logoUrl ? <img src={author.logoUrl} alt="" className="w-10 h-10 object-contain" />
             : <div className="w-10 h-10 rounded-full bg-slate-700 grid place-items-center font-bold">{author?.name?.[0] ?? "?"}</div>}
           <div>
-            <p className="text-sm font-bold">{author?.gm || author?.name || "GM"}</p>
+            <p className="text-sm font-bold">{gmName(author)}</p>
             <p className="text-xs text-slate-500">{author?.name} · {article.createdAt.toLocaleString("sk-SK")}</p>
           </div>
         </div>
@@ -57,7 +65,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
               <div key={c.id} className="bg-slate-900/70 border border-slate-800 rounded-xl shadow-lg shadow-black/20 px-4 py-3">
                 <div className="flex items-center gap-2 mb-1">
                   {t?.logoUrl && <img src={t.logoUrl} alt="" className="w-5 h-5 object-contain" />}
-                  <span className="text-xs font-semibold">{t?.gm || t?.name || "GM"}</span>
+                  <span className="text-xs font-semibold">{gmName(t)}</span>
                   <span className="text-[10px] text-slate-500">{c.createdAt.toLocaleDateString("sk-SK")}</span>
                 </div>
                 <p className="text-sm text-slate-300">{c.body}</p>

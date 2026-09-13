@@ -67,7 +67,7 @@ export default async function HomePage() {
     prisma.player.count({ where: faWhere }),
     prisma.player.findMany({ where: faWhere, select: { id: true, name: true, position: true, overall: true, slug: true }, orderBy: { overall: "desc" }, take: 6 }),
     prisma.newsArticle.findMany({ orderBy: { createdAt: "desc" }, take: 6, include: { _count: { select: { comments: true, reactions: true } } } }),
-    prisma.team.findMany({ select: { id: true, name: true, code: true, logoUrl: true, gm: true, slug: true } }),
+    prisma.team.findMany({ select: { id: true, name: true, code: true, logoUrl: true, gm: true, gmNickname: true, gmFirstName: true, gmLastName: true, slug: true } }),
   ]);
   const teamById = new Map(teams.map((t) => [t.id, t]));
   const leader = standings[0];
@@ -376,7 +376,7 @@ export default async function HomePage() {
                   {author?.logoUrl ? <img src={author.logoUrl} alt="" className="w-9 h-9 object-contain" />
                     : <div className="w-9 h-9 rounded-full bg-slate-700 grid place-items-center font-bold text-sm">{author?.name?.[0] ?? "?"}</div>}
                   <div>
-                    <p className="text-sm font-bold">{author?.gm || author?.name || "GM"}</p>
+                    <p className="text-sm font-bold">{author?.gmNickname || [author?.gmFirstName, author?.gmLastName].filter(Boolean).join(" ").trim() || author?.gm || author?.name || "GM"}</p>
                     <p className="text-xs text-slate-500">{author?.name} · {a.createdAt.toLocaleDateString("sk-SK")}</p>
                   </div>
                 </div>
