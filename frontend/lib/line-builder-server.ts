@@ -4,12 +4,13 @@
 // language summary — so a GM can judge and experiment with combinations before a sim.
 
 import { prisma } from "./prisma";
-import { loadTeamLines, autoLines } from "./sim/lines";
+import { loadTeamLines, loadTeamSystem, autoLines } from "./sim/lines";
 import { pairSig, unitChemistry } from "./sim/chemistry";
 import { roleFitOf } from "./sim/role-fit";
+import { systemFit, DEFAULT_TACTICS, type TeamTactics } from "./sim/tactics";
 import { cleanName } from "./playerName";
 
-type Attrs = { pa: number; sc: number; sk: number; ck: number; df: number; st: number; fo: number; weight: number };
+type Attrs = { pa: number; sc: number; sk: number; ck: number; df: number; st: number; fo: number; en: number; weight: number };
 type P = { id: number; name: string; slug: string | null; position: string; shoots: string | null; overall: number; a: Attrs };
 export type LineSlot = { role: string; id: number | null; name: string | null; slug: string | null; overall: number | null; offSlot: boolean };
 export type LineProfile = { playmaking: number; shooting: number; transition: number; physical: number; defense: number };
@@ -46,9 +47,22 @@ function summaryOf(prof: LineProfile, kind: "F" | "D"): string {
   return s;
 }
 
+// Average this unit's roster attributes into the shape lib/sim/tactics.ts's
+// systemFit expects, so a line can be scored against the team's chosen system.
+function unitProfile(present: P[]) {
+  const avgOf = (f: (a: Attrs) => number) => present.reduce((s, p) => s + f(p.a), 0) / present.length;
+  return { sk: avgOf((a) => a.sk), en: avgOf((a) => a.en), ck: avgOf((a) => a.ck), sc: avgOf((a) => a.sc),
+    pa: avgOf((a) => a.pa), df: avgOf((a) => a.df), st: avgOf((a) => a.st), weight: avgOf((a) => a.weight) };
+}
+
 // tactical fit = role diversity (a balanced line, graduated — see lib/sim/role-fit.ts,
-// the SAME function the real sim rewards via chemFactor) × position/handedness correctness
-function tacticalFitF(ps: (P | null)[]): number {
+// the SAME function the real sim rewards via chemFactor) × position/handedness
+// correctness × how well this unit's personnel suits the team's CHOSEN SYSTEM
+// (lib/sim/tactics.ts's systemFit — the same fit multiplier the real sim applies
+// per game, e.g. a rush team wants finishing/passing/speed, a cycle team wants
+// passing/strength). A club running the default Balanced system scores exactly
+// as before (systemFit returns a neutral 1.0 when every dial is "balanced").
+function tacticalFitF(ps: (P | null)[], tactics: TeamTactics): number {
   const present = ps.filter((p): p is P => !!p);
   if (present.length < 2) return 0;
   const roleScore = roleFitOf(present.map((p) => p.a), false) * 100;
@@ -58,33 +72,36 @@ function tacticalFitF(ps: (P | null)[]): number {
     const ok = want === "C" ? /C|F/.test(pos) : (pos.includes(want) || /\bW\b|F/.test(pos) || pos === "LW/RW" || (want === "LW" && /L/.test(pos)) || (want === "RW" && /R/.test(pos)));
     if (ok) good++; });
   const posFactor = n ? 0.75 + 0.25 * (good / n) : 0.85;
-  return clamp(roleScore * posFactor);
+  const sysFactor = systemFit(unitProfile(present), tactics);
+  return clamp(roleScore * posFactor * sysFactor);
 }
-function tacticalFitD(pair: (P | null)[]): number {
+function tacticalFitD(pair: (P | null)[], tactics: TeamTactics): number {
   const present = pair.filter((p): p is P => !!p);
   if (present.length < 2) return 0;
   const roleScore = roleFitOf(present.map((p) => p.a), true) * 100;
   // handedness: LD shoots L, RD shoots R
   let good = 0; if (pair[0]?.shoots === "L") good++; if (pair[1]?.shoots === "R") good++;
   const posFactor = 0.78 + 0.22 * (good / 2);
-  return clamp(roleScore * posFactor);
+  const sysFactor = systemFit(unitProfile(present), tactics);
+  return clamp(roleScore * posFactor * sysFactor);
 }
 
 export async function teamLineBuilder(teamId: number, league = "NHL"): Promise<TeamLineBuild> {
   const rosterType = league === "AHL" ? "AHL" : "NHL";
   const rows = await prisma.player.findMany({
     where: { teamId, rosterType, isGoalie: false, scratched: false },
-    select: { id: true, name: true, slug: true, position: true, shoots: true, overall: true, pa: true, sc: true, sk: true, ck: true, df: true, st: true, fo: true, weight: true },
+    select: { id: true, name: true, slug: true, position: true, shoots: true, overall: true, pa: true, sc: true, sk: true, ck: true, df: true, st: true, fo: true, en: true, weight: true },
   });
   if (!rows.length) return null;
   // the GM's saved lines, else the same position-aware auto lines the sim uses
   const saved = await loadTeamLines(teamId);
   const lines = saved ?? autoLines(rows.map((r) => ({ id: r.id, name: r.name, position: r.position, overall: r.overall ?? 0 })), []);
+  const tactics = (await loadTeamSystem(teamId)) ?? DEFAULT_TACTICS;
   const chemRow = await prisma.teamLines.findUnique({ where: { teamId }, select: { chemistry: true } });
   const chem = ((chemRow?.chemistry ?? {}) as Record<string, number>) || {};
   const byId = new Map<number, P>(rows.map((r) => [r.id, {
     id: r.id, name: cleanName(r.name), slug: r.slug, position: r.position, shoots: r.shoots, overall: r.overall ?? 0,
-    a: { pa: r.pa ?? 50, sc: r.sc ?? 50, sk: r.sk ?? 50, ck: r.ck ?? 50, df: r.df ?? 50, st: r.st ?? 50, fo: r.fo ?? 50, weight: r.weight ?? 90 },
+    a: { pa: r.pa ?? 50, sc: r.sc ?? 50, sk: r.sk ?? 50, ck: r.ck ?? 50, df: r.df ?? 50, st: r.st ?? 50, fo: r.fo ?? 50, en: r.en ?? 50, weight: r.weight ?? 90 },
   }]));
 
   const base = 46;
@@ -112,7 +129,7 @@ export async function teamLineBuilder(teamId: number, league = "NHL"): Promise<T
     const slots: LineSlot[] = ps.map((p, idx) => ({ role: roles[idx], id: p?.id ?? null, name: p?.name ?? null, slug: p?.slug ?? null, overall: p?.overall ?? null,
       offSlot: !!p && !(roles[idx] === "C" ? /C|F/.test((p.position || "").toUpperCase()) : ((p.position || "").toUpperCase().includes(roles[idx]) || /\bW\b|F/.test((p.position || "").toUpperCase()))) }));
     const profile = profileOf(present);
-    const tacticalFit = tacticalFitF(ps);
+    const tacticalFit = tacticalFitF(ps, tactics);
     const { chemistry, gelled, pairs } = chemFor(slots.map((s) => ({ role: s.role, id: s.id })), tacticalFit);
     return { kind: "F", index: i, slots, chemistry, gelled, pairs, tacticalFit, profile, summary: summaryOf(profile, "F") };
   });
@@ -124,7 +141,7 @@ export async function teamLineBuilder(teamId: number, league = "NHL"): Promise<T
     const slots: LineSlot[] = ps.map((p, idx) => ({ role: roles[idx], id: p?.id ?? null, name: p?.name ?? null, slug: p?.slug ?? null, overall: p?.overall ?? null,
       offSlot: !!p && ((idx === 0 && p.shoots === "R") || (idx === 1 && p.shoots === "L")) }));
     const profile = profileOf(present);
-    const tacticalFit = tacticalFitD(ps);
+    const tacticalFit = tacticalFitD(ps, tactics);
     const { chemistry, gelled, pairs } = chemFor(slots.map((s) => ({ role: s.role, id: s.id })), tacticalFit);
     return { kind: "D", index: i, slots, chemistry, gelled, pairs, tacticalFit, profile, summary: summaryOf(profile, "D") };
   });
