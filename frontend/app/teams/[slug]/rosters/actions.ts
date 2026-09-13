@@ -49,18 +49,25 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
   // not let a one-way player be buried on the farm.
   // an AHL-only ($100k) contract is farm-bound no matter what — it overrides any
   // stale one-way flag, so it never triggers the send-down blocks below.
+  // EXCEPT a one-way player still riding his Rule 30/10 recall pass (≤30 days / ≤10
+  // NHL games since his last call-up from the AHL — see lib/waivers-server.ts
+  // recallExemptions) — same exemption the roster-mover UI's "🔓 Recall pass" badge
+  // and direct "↓ Farm" button already promise, computed once and reused below for
+  // the general waivers check too.
   const goingDown = valid.filter((m) => !isNhlSide(m.side)); // ending on the AHL (farm or farm-scratched)
-  const illegalFarm = goingDown.find((m) => byId.get(m.id)!.contractType === "ONE_WAY" && byId.get(m.id)!.rosterType === "NHL" && !isAhlOnly(m.id));
-  if (illegalFarm) return { ok: false as const, error: `${byId.get(illegalFarm.id)!.name} has a one-way contract — he can't be sent down. Keep him on the NHL roster.` };
+  const nhlGoingDown = goingDown.filter((m) => byId.get(m.id)!.rosterType === "NHL");
+  const recall = await recallExemptions(nhlGoingDown.map((m) => ({ id: m.id, lastRecalledAt: byId.get(m.id)!.lastRecalledAt })));
+  const illegalFarm = goingDown.find((m) => {
+    const p = byId.get(m.id)!;
+    return p.contractType === "ONE_WAY" && p.rosterType === "NHL" && !isAhlOnly(m.id) && !(recall.get(m.id)?.exempt ?? false);
+  });
+  if (illegalFarm) return { ok: false as const, error: `${byId.get(illegalFarm.id)!.name} has a one-way contract — he can't be sent down without clearing waivers first (or a live Recall Pass). Use Farm/Waivers instead.` };
 
   // waivers ON → a non-exempt NHL player must clear the waiver wire before he drops.
   // ELC and two-way contracts are waiver-exempt (sent down freely); so is a one-way
-  // player still riding his Rule 30/10 recall pass (≤30 days / ≤10 NHL games since
-  // his last call-up from the AHL — see lib/waivers-server.ts recallExemptions).
+  // player still riding his recall pass (checked above already, reused here).
   const settings = await loadSettings();
   if (settings.waiversEnabled) {
-    const nhlGoingDown = goingDown.filter((m) => byId.get(m.id)!.rosterType === "NHL");
-    const recall = await recallExemptions(nhlGoingDown.map((m) => ({ id: m.id, lastRecalledAt: byId.get(m.id)!.lastRecalledAt })));
     const buried = nhlGoingDown.find((m) => {
       const p = byId.get(m.id)!;
       const exempt = p.contractType === "TWO_WAY" || isAhlOnly(m.id) || /ELC/i.test(p.contractText ?? "") || (recall.get(m.id)?.exempt ?? false);
