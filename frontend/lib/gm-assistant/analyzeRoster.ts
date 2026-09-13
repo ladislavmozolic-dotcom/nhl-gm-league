@@ -28,7 +28,12 @@ export interface RosterFinding {
 export interface RosterAnalysis {
   teamId: number;
   teamName: string;
-  findings: RosterFinding[]; // worst (highest rank number) first
+  // In SLOTS order, not by severity: grouped by position (LW, C, RW, D, then
+  // goalies), with each position's top-line/pair and depth slot back to back
+  // so strong and weak sides of the same position sit next to each other, and
+  // PP1/PP2/PK1/PK2 grouped together at the end. The UI's 2-column grid turns
+  // each adjacent pair into a visual side-by-side comparison.
+  findings: RosterFinding[];
   teamFindings: TeamFinding[]; // cap outlook, age curve, prospect pipeline, roster balance
 }
 
@@ -60,8 +65,6 @@ export async function analyzeRoster(teamId: number): Promise<RosterAnalysis | nu
       auto: rows[myIdx].isAuto,
     });
   }
-
-  findings.sort((a, b) => b.leagueRank - a.leagueRank);
 
   return { teamId, teamName: myTeam.name, findings, teamFindings };
 }
