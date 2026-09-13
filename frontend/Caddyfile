@@ -27,3 +27,15 @@
 		}
 	}
 }
+
+# ProfiNHL-branded second league (profi.unhl.eu) — its own app + DB container,
+# fully isolated, joins this same Docker network so this (already-running) Caddy
+# can front it too instead of standing up a second Caddy. See
+# /opt/nhl-gm-league-profi/frontend/docker-compose.yml for the container.
+profi.unhl.eu {
+	encode gzip
+	reverse_proxy nhl-gm-league-profi-app:3000
+	request_body {
+		max_size 10MB
+	}
+}
