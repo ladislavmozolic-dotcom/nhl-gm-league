@@ -187,6 +187,8 @@ export default function SortableTable({ cols, rows, initialSort, minWidth = 720,
                           {row.teamLogo && <img src={row.teamLogo} alt="" className="w-5 h-5 object-contain" />}
                           <span className="font-medium">{row.teamCode ?? "—"}</span>
                         </Link>
+                      ) : row.teamCode ? (
+                        <span className="font-medium text-slate-500">{row.teamCode}</span>
                       ) : <span className="text-slate-600">—</span>}
                     </td>
                   );
