@@ -7,9 +7,9 @@ import { computeStandings } from "@/lib/sim/standings";
 import {
   getArenaSections, selloutRevenue, computeTeamFinance, teamCapSummary, projectedPointsPct,
   playerCapYears, deadMoneyForYear, money, CURRENT_SEASON_START, seasonLabel,
-  accruedCapSpace, SEASON_GAMES, ltirRelief, capCeilingForPhase, farmSalaryExpense, liveCapHit,
+  accruedCapSpace, ltirRelief, capCeilingForPhase, farmSalaryExpense, liveCapHit,
 } from "@/lib/finance";
-import { getLeagueClock } from "@/lib/calendar-server";
+import { getLeagueClock, regularSeasonDayProgress } from "@/lib/calendar-server";
 import { getTeamSession } from "@/lib/auth";
 import { teamRetentionStatus } from "@/lib/cap";
 import { ROSTER_LIMITS } from "@/lib/roster-rules";
@@ -41,14 +41,14 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   if (!team) notFound();
   const farm = team.affiliateTeams[0]?.players ?? [];
 
-  const [settings, session, buyouts, standings, homeGames, totalGames, gamesScheduled, retention] = await Promise.all([
+  const [settings, session, buyouts, standings, homeGames, totalGames, retention, dayProgress] = await Promise.all([
     loadSettings(), getTeamSession(),
     prisma.buyout.findMany({ where: { teamId: team.id }, select: { id: true, playerId: true, playerName: true, perYear: true, startYear: true, years: true, totalCost: true } }),
     computeStandings(SEASON, "NHL"),
     prisma.game.count({ where: { season: SEASON, league: "NHL", status: "FINAL", seriesId: null, homeTeamId: team.id } }),
     prisma.game.count({ where: { season: SEASON, league: "NHL", status: "FINAL", seriesId: null, OR: [{ homeTeamId: team.id }, { awayTeamId: team.id }] } }),
-    prisma.game.count({ where: { season: SEASON, league: "NHL", seriesId: null, OR: [{ homeTeamId: team.id }, { awayTeamId: team.id }] } }),
     teamRetentionStatus(team.id),
+    regularSeasonDayProgress(),
   ]);
   const isGm = session === team.id;
   // The Buyout table doubles up: a real buyout debits the bank (totalCost > 0);
@@ -81,8 +81,9 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   const deadCapAmount = deadMoneyForYear(retentions, CURRENT_SEASON_START);
   const cap = teamCapSummary(netPlayersForCap, settings, realBuyoutsDeadMoney + deadCapAmount);
   // Projected Cap Space = biggest full-season cap hit a club can still add and
-  // stay legal — unused cap banks each game, so it grows toward the deadline.
-  const accrued = accruedCapSpace(cap.capSpace, totalGames, gamesScheduled || 82);
+  // stay legal — unused cap banks each CALENDAR DAY (the real NHL mechanic,
+  // same denominator for every club), so it grows toward the trade deadline.
+  const accrued = accruedCapSpace(cap.capSpace, dayProgress.daysPlayed, dayProgress.daysTotal);
   const maxCapHit = cap.capHit + accrued.actual; // Projected Cap Hit — max the club may carry for the rest
   // LTIR relief is based on what this club actually carries for the injured player
   // (net of any retention it benefits from), matching `cap.capHit` above.
@@ -176,8 +177,8 @@ export default async function TeamCapView({ slug }: { slug: string }) {
           <span className="text-slate-400" title="Total Salaries + Buyouts + Dead Cap">Actual Cap Hit</span><span className="text-right font-semibold">{money(cap.capHit)}</span>
           <span className="text-slate-400" title={`Ceiling ${money(cap.upper)} − Actual Cap Hit`}>Actual Cap Space</span><span className={`text-right font-semibold ${cap.capSpace < 0 ? "text-red-400" : "text-green-400"}`}>{money(cap.capSpace)}</span>
           <span className="text-slate-400" title="Max total cap hit you may carry for the rest of the season">Projected Cap Hit</span><span className="text-right tabular-nums text-slate-200">{money(maxCapHit)}</span>
-          <span className="text-slate-400" title={`Biggest full-season cap hit you can still add and stay legal — unused cap banks each game (grows toward the deadline). ${accrued.played}/${gamesScheduled || 82} GP.`}>
-            Projected Cap Space <span className="text-slate-600">({accrued.played}/{gamesScheduled || 82} GP)</span>
+          <span className="text-slate-400" title={`Biggest full-season cap hit you can still add and stay legal — unused cap banks each calendar day of the regular season (grows toward the deadline). Day ${accrued.played}/${dayProgress.daysTotal}.`}>
+            Projected Cap Space <span className="text-slate-600">(day {accrued.played}/{dayProgress.daysTotal})</span>
           </span>
           <span className={`text-right font-bold ${accrued.actual < 0 ? "text-red-400" : "text-emerald-400"}`}>{money(accrued.actual)}</span>
           {ltir > 0 && (<>

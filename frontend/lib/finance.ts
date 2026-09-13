@@ -111,6 +111,13 @@ export function teamCapSummary(
 export const money = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
 
 export const SEASON_GAMES = 82;
+// Real NHL calendar length the cap accrues over (~186 days from opening night
+// to the regular season's last day) — used only as a fallback default when a
+// caller doesn't have this league's actual schedule handy. Real callers should
+// pass the schedule-derived total from lib/calendar-server.ts's
+// regularSeasonDayProgress() instead, since a league's own regular season can
+// span a different number of days.
+export const SEASON_DAYS = 186;
 
 // NHL-style off-season cushion: a club may sit up to 10% over the upper limit
 // through the summer, but must be cap-compliant by regular-season opening day.
@@ -133,22 +140,25 @@ export function ltirRelief(players: LtirPlayer[]): number {
 }
 
 /**
- * In-season ACCRUED ("Actual") cap space, per the league's cap calculator:
- * unused cap banks every game, so a club that sits under the ceiling early can
- * carry more than the ceiling later (a pricier deadline addition is fine because
- * of the saved space). Derivation from the sheet:
- *   maxCapHit = (games×ceiling − capHit×played) / (games − played)   [DY3]
- *   actual space = maxCapHit − capHit  =  games × (ceiling − capHit) / (games − played)
- * So a team $1M under after 10 of 82 games has 82×1M/72 ≈ $1.14M; by the
- * deadline the same $1M is worth far more (fewer games to prorate it over).
+ * In-season ACCRUED ("Actual") cap space — the real NHL mechanic: a club's cap
+ * hit is charged 1/(regular-season days) per DAY a player sits on the active
+ * roster, not per game, so unused cap banks every calendar day (including
+ * off-days) that a club sits under the ceiling. A club that saves space early
+ * can carry more than the ceiling later — a pricier deadline addition is fine
+ * because only the days left in the season get charged against it. Derivation:
+ *   maxCapHit = (days×ceiling − capHit×played) / (days − played)   [DY3]
+ *   actual space = maxCapHit − capHit  =  days × (ceiling − capHit) / (days − played)
+ * So a team $1M under after 40 of 186 days has 186×1M/146 ≈ $1.27M; by the
+ * trade deadline (say 40 days left) the same $1M is worth far more (fewer days
+ * to prorate it over — the puckpedia-documented ~4.5× effect at that point).
  * `annualSpace` is (ceiling − capHit). Returns the accrued space and the max
  * cap hit the club may carry for the rest of the season.
  */
-export function accruedCapSpace(annualSpace: number, gamesPlayed: number, gamesTotal = SEASON_GAMES) {
-  const played = Math.max(0, Math.round(gamesPlayed));
-  const remaining = gamesTotal - played;
-  if (remaining <= 0) return { actual: annualSpace, remaining: 0, played }; // season over — no games left to accrue over
-  const actual = (annualSpace * gamesTotal) / remaining;
+export function accruedCapSpace(annualSpace: number, daysPlayed: number, daysTotal = SEASON_DAYS) {
+  const played = Math.max(0, Math.round(daysPlayed));
+  const remaining = daysTotal - played;
+  if (remaining <= 0) return { actual: annualSpace, remaining: 0, played }; // season over — no days left to accrue over
+  const actual = (annualSpace * daysTotal) / remaining;
   return { actual, remaining, played };
 }
 
@@ -171,25 +181,29 @@ export type CapCentralRow = {
  *   Actual Cap Hit      = Total Salaries + Retains & Buyouts
  *   Actual Cap Space    = ceiling − Actual Cap Hit  (current, can be negative)
  *   Projected Cap Space = the biggest FULL-SEASON cap hit a club can still add and
- *                         stay legal — unused cap banks each game, so it grows
- *                         toward the deadline. = gamesTotal × (ceiling − capHit) ÷
- *                         gamesRemaining. (e.g. $1M under at game 60 → $3.7M.)
+ *                         stay legal — unused cap banks each DAY (not game), so
+ *                         it grows toward the trade deadline. = daysTotal ×
+ *                         (ceiling − capHit) ÷ daysRemaining. (e.g. $1M under
+ *                         with 40 of 186 days gone → ≈$1.27M; the closer to the
+ *                         deadline, the bigger the multiplier.)
  *   Projected Cap Hit    = the max total cap hit a club may carry for the rest of
  *                         the season = Actual Cap Hit + Projected Cap Space.
- * gamesTotal comes from the actual schedule (82/84…); gamesPlayed from standings.
+ * daysTotal/daysPlayed come from the actual regular-season schedule and the
+ * league clock (lib/calendar-server.ts's regularSeasonDayProgress) — the SAME
+ * denominator for every club, unlike games played which varies team to team.
  */
 export function teamCapCentral(
   players: Array<{ capHit: number | null }>,
   retainsBuyouts: number, // net retention / buyout adjustment (± dollars) from the team record
   cap: { salaryCapUpper: number; salaryCapLower?: number },
-  opts: { gamesPlayed?: number; gamesTotal?: number } = {},
+  opts: { daysPlayed?: number; daysTotal?: number } = {},
 ): CapCentralRow {
-  const gamesTotal = opts.gamesTotal ?? SEASON_GAMES;
+  const daysTotal = opts.daysTotal ?? SEASON_DAYS;
   const totalSalaries = players.reduce((t, p) => t + (p.capHit ?? 0), 0);
   const capHit = totalSalaries + retainsBuyouts;
   const capSpace = cap.salaryCapUpper - capHit;
   const underFloorBy = Math.max(0, (cap.salaryCapLower ?? 0) - capHit);
-  const projCapSpace = accruedCapSpace(capSpace, opts.gamesPlayed ?? 0, gamesTotal).actual;
+  const projCapSpace = accruedCapSpace(capSpace, opts.daysPlayed ?? 0, daysTotal).actual;
   return {
     count: players.length, totalSalaries, retainsBuyouts, capHit,
     capSpace, underFloorBy,

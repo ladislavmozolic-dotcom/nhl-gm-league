@@ -1,6 +1,6 @@
 import { prisma } from "./prisma";
 import {
-  defaultLeagueDate, frenzyDay, frenzyRound, isFrenzyOpen, addDays, utcDay,
+  defaultLeagueDate, frenzyDay, frenzyRound, isFrenzyOpen, addDays, utcDay, daysBetween,
   seasonOpen, FRENZY_WINDOW_DAYS, SEASON_START_YEAR, PHASES, PHASE_LABEL, type Phase,
 } from "./calendar";
 import { PRE_SEASON, REGULAR_SEASON } from "./phase";
@@ -29,6 +29,19 @@ export async function resolvePhaseThresholds(year = SEASON_START_YEAR): Promise<
   const regularAt = cfg?.regularPhaseAt ?? firstReg?.gameDate ?? new Date(Date.UTC(year, 9, 1));       // Oct 1 fallback
   const playoffsAt = lastReg?.gameDate ? addDays(lastReg.gameDate, 1) : new Date(Date.UTC(year + 1, 3, 15)); // Apr 15 fallback
   return { preseasonAt, regularAt, playoffsAt };
+}
+
+/** Days elapsed / total in the REGULAR SEASON, for day-based cap-space accrual
+ *  (the real NHL banks 1/season-length of a player's cap hit per calendar day
+ *  he's on the active roster, not per game — lib/finance.ts's accruedCapSpace).
+ *  Before the season opens, played is 0 (nothing accrued yet); once it's over,
+ *  played reaches total on its own (accrual is done, same as the real cap
+ *  freezing at season's end) — no separate phase check needed. */
+export async function regularSeasonDayProgress(): Promise<{ daysPlayed: number; daysTotal: number }> {
+  const [{ regularAt, playoffsAt }, leagueDate] = await Promise.all([resolvePhaseThresholds(), getLeagueDate()]);
+  const daysTotal = Math.max(1, daysBetween(regularAt, playoffsAt));
+  const daysPlayed = Math.max(0, Math.min(daysTotal, daysBetween(regularAt, leagueDate)));
+  return { daysPlayed, daysTotal };
 }
 
 /** DB-aware phase computation — the one to use for "what phase is it right now" /

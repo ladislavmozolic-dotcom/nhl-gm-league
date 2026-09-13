@@ -1,25 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { accruedCapSpace, SEASON_GAMES, money } from "@/lib/finance";
+import { accruedCapSpace, SEASON_DAYS, money } from "@/lib/finance";
 
-type Team = { name: string; code: string | null; capHit: number; gp: number };
+type Team = { name: string; code: string | null; capHit: number; day: number };
 
-export default function CapCalculator({ ceiling, teams, gamesTotal = SEASON_GAMES }: { ceiling: number; teams: Team[]; gamesTotal?: number }) {
+export default function CapCalculator({ ceiling, teams, daysTotal = SEASON_DAYS }: { ceiling: number; teams: Team[]; daysTotal?: number }) {
   const [capM, setCapM] = useState("81.60");   // projected cap hit, in $M
-  const [gp, setGp] = useState("10");           // games played
+  const [day, setDay] = useState("22");         // days into the regular season
 
   const capHit = Math.max(0, (parseFloat(capM) || 0) * 1_000_000);
-  const played = Math.max(0, Math.min(gamesTotal, Math.round(parseFloat(gp) || 0)));
+  const played = Math.max(0, Math.min(daysTotal, Math.round(parseFloat(day) || 0)));
   const annualSpace = ceiling - capHit;
-  const { actual, remaining } = accruedCapSpace(annualSpace, played, gamesTotal);
+  const { actual, remaining } = accruedCapSpace(annualSpace, played, daysTotal);
   const maxCapHit = capHit + actual;
 
   const prefill = (code: string) => {
     const t = teams.find((x) => x.code === code);
     if (!t) return;
     setCapM((t.capHit / 1_000_000).toFixed(2));
-    setGp(String(t.gp));
+    setDay(String(t.day));
   };
 
   const Field = ({ label, value, onChange, suffix }: { label: string; value: string; onChange: (v: string) => void; suffix: string }) => (
@@ -51,12 +51,12 @@ export default function CapCalculator({ ceiling, teams, gamesTotal = SEASON_GAME
             <select onChange={(e) => e.target.value && prefill(e.target.value)} defaultValue=""
               className="mt-1 w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm">
               <option value="">— enter manually —</option>
-              {teams.map((t) => <option key={t.code} value={t.code ?? ""}>{t.name} — {money(t.capHit)} · {t.gp} GP</option>)}
+              {teams.map((t) => <option key={t.code} value={t.code ?? ""}>{t.name} — {money(t.capHit)} · day {t.day}</option>)}
             </select>
           </label>
         )}
         <Field label="Projected Cap Hit" value={capM} onChange={setCapM} suffix="$M" />
-        <Field label="Games Played" value={gp} onChange={setGp} suffix={`/ ${gamesTotal}`} />
+        <Field label="Days Into Regular Season" value={day} onChange={setDay} suffix={`/ ${daysTotal}`} />
         <div className="text-xs text-slate-500 pt-1">
           League cap ceiling: <b className="text-slate-300">{money(ceiling)}</b> — set in Admin → Simulation Engine.
         </div>
@@ -64,7 +64,7 @@ export default function CapCalculator({ ceiling, teams, gamesTotal = SEASON_GAME
 
       {/* results */}
       <div className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden">
-        <div className="px-4 py-2.5 bg-slate-800/30 border-b border-slate-800 text-xs font-bold uppercase tracking-wide text-slate-400">Result — {remaining} games left</div>
+        <div className="px-4 py-2.5 bg-slate-800/30 border-b border-slate-800 text-xs font-bold uppercase tracking-wide text-slate-400">Result — {remaining} days left</div>
         <Out label="Actual Cap Space (vs ceiling)" value={money(annualSpace)} tone={annualSpace < 0 ? "bad" : "neutral"} />
         <Out label="Projected Cap Space" value={money(actual)} big tone={actual < 0 ? "bad" : "good"} />
         <Out label="Projected Cap Hit (max for the rest)" value={money(maxCapHit)} />

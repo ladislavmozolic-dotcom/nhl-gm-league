@@ -1,38 +1,34 @@
 import { prisma } from "@/lib/prisma";
 import { loadSettings } from "@/lib/sim/settings";
 import { liveCapHit } from "@/lib/finance";
-import { computeStandings } from "@/lib/sim/standings";
+import { regularSeasonDayProgress } from "@/lib/calendar-server";
 import { PageHeader } from "@/components/ui";
 import CapCalculator from "@/components/CapCalculator";
 
 export const dynamic = "force-dynamic";
-const SEASON = "2026-27";
 
 export default async function CapCalculatorPage() {
-  const [settings, teams, standings, schedule] = await Promise.all([
+  const [settings, teams, dayProgress] = await Promise.all([
     loadSettings(),
     prisma.team.findMany({
       where: { league: "NHL", isAffiliate: false },
       select: { id: true, name: true, code: true, players: { where: { rosterType: "NHL" }, select: { capHit: true, contractYears: true } } },
       orderBy: { name: "asc" },
     }),
-    computeStandings(SEASON, "NHL"),
-    prisma.game.findMany({ where: { season: SEASON, league: "NHL", seriesId: null }, select: { homeTeamId: true, awayTeamId: true } }),
+    regularSeasonDayProgress(),
   ]);
-  const gpById = new Map(standings.map((s) => [s.teamId, s.gp]));
-  const totById = new Map<number, number>();
-  for (const g of schedule) for (const id of [g.homeTeamId, g.awayTeamId]) totById.set(id, (totById.get(id) ?? 0) + 1);
-  const gamesTotal = Math.max(82, ...[...totById.values()]); // season length from the schedule (82/84…)
+  // "day" is the league's own calendar clock — the same for every club, unlike
+  // games played, which varies team to team.
   const teamData = teams.map((t) => ({
     name: t.name, code: t.code,
     capHit: t.players.reduce((s, p) => s + liveCapHit(p), 0),
-    gp: gpById.get(t.id) ?? 0,
+    day: dayProgress.daysPlayed,
   }));
 
   return (
     <div className="space-y-6 py-2">
-      <PageHeader title="Cap Space Calculator" subtitle="How pricey an addition can you afford? Unused cap banks each game, so your spending room grows toward the deadline." />
-      <CapCalculator ceiling={settings.salaryCapUpper} teams={teamData} gamesTotal={gamesTotal} />
+      <PageHeader title="Cap Space Calculator" subtitle="How pricey an addition can you afford? Unused cap banks each day of the regular season, so your spending room grows toward the deadline." />
+      <CapCalculator ceiling={settings.salaryCapUpper} teams={teamData} daysTotal={dayProgress.daysTotal} />
     </div>
   );
 }
