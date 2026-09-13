@@ -7,20 +7,27 @@ const REACTIONS: Array<{ kind: string; emoji: string }> = [
   { kind: "like", emoji: "👍" }, { kind: "dislike", emoji: "👎" }, { kind: "laugh", emoji: "😄" }, { kind: "heart", emoji: "❤️" },
 ];
 
-export function ReactionBar({ articleId, counts, mine, canReact }: {
+export function ReactionBar({ articleId, counts, mine, canReact, reactorNames }: {
   articleId: number; counts: Record<string, number>; mine: string | null; canReact: boolean;
+  // GM display names for each reaction kind — shown as a hover tooltip on that
+  // button so a GM can see who reacted, not just how many.
+  reactorNames?: Record<string, string[]>;
 }) {
   const [pending, start] = useTransition();
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      {REACTIONS.map((r) => (
-        <button key={r.kind} disabled={!canReact || pending}
-          onClick={() => start(() => reactToArticle(articleId, r.kind))}
-          className={`px-3 py-1.5 rounded-full border text-sm flex items-center gap-1.5 transition-colors ${mine === r.kind ? "bg-blue-600/30 border-blue-500 text-white" : "border-slate-700 hover:bg-slate-800 text-slate-300"} disabled:opacity-50`}
-          title={canReact ? "" : "Sign in as a GM to react"}>
-          <span>{r.emoji}</span><span className="tabular-nums">{counts[r.kind] ?? 0}</span>
-        </button>
-      ))}
+      {REACTIONS.map((r) => {
+        const names = reactorNames?.[r.kind] ?? [];
+        const title = names.length ? names.join(", ") : canReact ? "" : "Sign in as a GM to react";
+        return (
+          <button key={r.kind} disabled={!canReact || pending}
+            onClick={() => start(() => reactToArticle(articleId, r.kind))}
+            className={`px-3 py-1.5 rounded-full border text-sm flex items-center gap-1.5 transition-colors ${mine === r.kind ? "bg-blue-600/30 border-blue-500 text-white" : "border-slate-700 hover:bg-slate-800 text-slate-300"} disabled:opacity-50`}
+            title={title}>
+            <span>{r.emoji}</span><span className="tabular-nums">{counts[r.kind] ?? 0}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }

@@ -14,13 +14,18 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
   ]);
   if (!article) notFound();
 
-  const teamIds = [article.authorTeamId, ...article.comments.map((c) => c.teamId)];
+  const teamIds = [article.authorTeamId, ...article.comments.map((c) => c.teamId), ...article.reactions.map((r) => r.teamId)];
   const teams = await prisma.team.findMany({ where: { id: { in: teamIds } }, select: { id: true, name: true, logoUrl: true, gm: true } });
   const teamById = new Map(teams.map((t) => [t.id, t]));
   const author = teamById.get(article.authorTeamId);
 
   const counts: Record<string, number> = {};
-  for (const r of article.reactions) counts[r.kind] = (counts[r.kind] ?? 0) + 1;
+  const reactorNames: Record<string, string[]> = {};
+  for (const r of article.reactions) {
+    counts[r.kind] = (counts[r.kind] ?? 0) + 1;
+    const label = teamById.get(r.teamId)?.gm || teamById.get(r.teamId)?.name || "GM";
+    (reactorNames[r.kind] ??= []).push(label);
+  }
   const mine = session ? article.reactions.find((r) => r.teamId === session)?.kind ?? null : null;
 
   return (
@@ -38,7 +43,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
         <h1 className="text-2xl font-bold mb-4">{article.title}</h1>
         <div className="news-body text-slate-200 leading-relaxed" dangerouslySetInnerHTML={{ __html: article.bodyHtml }} />
         <div className="mt-6 pt-4 border-t border-slate-800">
-          <ReactionBar articleId={article.id} counts={counts} mine={mine} canReact={!!session} />
+          <ReactionBar articleId={article.id} counts={counts} mine={mine} canReact={!!session} reactorNames={reactorNames} />
         </div>
       </article>
 
