@@ -19,9 +19,9 @@ export interface TradePartnerResult {
   myRank: number | null; // null = my club has nobody eligible for this slot at all
   myAvg: number | null;
   myAuto: boolean;
-  // clubs ranked ABOVE my club at this slot, best first — potential sellers of
-  // a surplus there. Clubs at/below my own rank are omitted: they have no
-  // depth advantage at this exact slot to trade from.
+  // every other club at this slot, best first — a club ranked above me is a
+  // potential seller of a surplus there; one ranked below is still shown for
+  // full league context even though it has no depth advantage to trade from.
   candidates: TradePartnerCandidate[];
 }
 
@@ -35,7 +35,7 @@ export async function findTradePartners(myTeamId: number, slotId: string): Promi
 
   const candidates: TradePartnerCandidate[] = rows
     .map((r, i) => ({ ...r, rank: i + 1 }))
-    .filter((r) => r.teamId !== myTeamId && (myIdx === -1 || r.rank < myIdx + 1));
+    .filter((r) => r.teamId !== myTeamId);
 
   return {
     slot,

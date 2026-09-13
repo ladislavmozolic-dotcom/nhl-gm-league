@@ -10,10 +10,12 @@ export const dynamic = "force-dynamic";
 
 // UNHL Intelligence — "Find Trade Partner". Same rule as the other two tools:
 // no trade-value model, no willingness-to-deal guess. A slot you're weak at
-// (from Analyze My Roster) is ranked league-wide, and every club that
-// currently ranks above you there is shown as a candidate — nothing more
-// than "this club has more there than you do right now". Open to any
-// logged-in GM (see memory: gm-assistant-intelligence) — 404s otherwise.
+// (from Analyze My Roster) is ranked league-wide, and every other club is
+// listed in that order — nothing more than "here's where everyone else
+// stands at this slot right now". Clubs ranked above you are the real
+// surplus-seller candidates (highlighted); clubs at/below your own rank are
+// still shown for full league context, just dimmed. Open to any logged-in
+// GM (see memory: gm-assistant-intelligence) — 404s otherwise.
 
 const inputCls = "w-full bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500";
 const labelCls = "block text-xs uppercase tracking-wide text-slate-400 mb-1";
@@ -66,14 +68,16 @@ export default async function FindTradePartnerPage({ searchParams }: { searchPar
 
           <Card title={`Kandidáti (${result.candidates.length})`} accent="text-emerald-400" bodyClassName="p-3">
             {result.candidates.length === 0 ? (
-              <p className="text-slate-500 text-center py-8">Na tomto slote nie je žiadny klub silnejší než ty — nemáš tu koho žiadať.</p>
+              <p className="text-slate-500 text-center py-8">Na tomto slote nemá nikoho žiadny iný klub v lige.</p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {result.candidates.map((c) => (
+                {result.candidates.map((c) => {
+                  const isBetter = result.myRank == null || c.rank < result.myRank;
+                  return (
                   <div key={c.teamId} className="border border-slate-800 bg-slate-900/40 rounded-xl p-3.5 flex flex-col gap-2">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-bold text-slate-200">{c.teamName}</span>
-                      <span className="text-xs font-bold text-emerald-400">{c.rank}. miesto — {c.avg} rating</span>
+                      <span className={`text-xs font-bold ${isBetter ? "text-emerald-400" : "text-slate-500"}`}>{c.rank}. miesto — {c.avg} rating</span>
                     </div>
                     {c.isAuto && <p className="text-[11px] text-amber-400/80">z automaticky poskladanej zostavy — klub nemá uložené vlastné formácie</p>}
                     <div className="flex flex-wrap gap-x-3 gap-y-1">
@@ -87,7 +91,8 @@ export default async function FindTradePartnerPage({ searchParams }: { searchPar
                       Navrhnúť trade →
                     </Link>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </Card>
