@@ -7,6 +7,7 @@ import { cleanName } from "@/lib/playerName";
 import { Card } from "@/components/ui";
 import { salaryOf, fmtM } from "@/components/TeamRosterTable";
 import { teamRetentionStatus } from "@/lib/cap";
+import { deadMoneyForYear, CURRENT_SEASON_START } from "@/lib/finance";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
       // rosterType-filtered — a player parked as PROSPECT/UFA/RETIRED/RELEASED keeps
       // this teamId (schema requires one) but must never count toward roster size,
       // cap total, captains or injured list once he's off the active roster.
-      players: { where: { rosterType: { in: ["NHL", "AHL"] } }, orderBy: { overall: "desc" }, select: { id: true, isGoalie: true, position: true, age: true, capHit: true, contractYears: true, retainedSalary: true, contractText: true, name: true, slug: true, photoUrl: true, captaincy: true, nationality: true, injuryDaysLeft: true, injuryDesc: true } },
+      players: { where: { rosterType: { in: ["NHL", "AHL"] } }, orderBy: { overall: "desc" }, select: { id: true, rosterType: true, isGoalie: true, position: true, age: true, capHit: true, contractYears: true, retainedSalary: true, contractText: true, name: true, slug: true, photoUrl: true, captaincy: true, nationality: true, injuryDaysLeft: true, injuryDesc: true } },
       // NOT counted in players above (deliberately excluded from roster size/cap) — an
       // RFA-age player benched at regular-season opening day for staying unsigned
       // (sweepUnsignedRfasToNonRoster). Fetched separately just for a visibility count.
@@ -43,10 +44,18 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
   if (!team) return notFound();
 
   const isNhl = team.league === "NHL" && !team.isAffiliate;
-  const retention = isNhl ? await teamRetentionStatus(team.id) : null;
+  const [retention, buyouts] = await Promise.all([
+    isNhl ? teamRetentionStatus(team.id) : Promise.resolve(null),
+    isNhl ? prisma.buyout.findMany({ where: { teamId: team.id }, select: { perYear: true, startYear: true, years: true } }) : Promise.resolve([]),
+  ]);
   const proCount = team.players.length;
   const farmCount = team.affiliateTeams.reduce((s, a) => s + a.players.length, 0);
-  const totalCap = team.players.reduce((s, p) => s + Math.max(0, salaryOf(p) - (p.retainedSalary ?? 0)), 0);
+  // Cap purposes: NHL roster only (farm salaries never count against the NHL
+  // cap) plus dead money from buyouts and retained-salary trades — same figure
+  // as the team's own Salary Cap page, so the two never disagree.
+  const nhlSalaries = team.players.filter((p) => p.rosterType === "NHL").reduce((s, p) => s + Math.max(0, salaryOf(p) - (p.retainedSalary ?? 0)), 0);
+  const deadMoney = deadMoneyForYear(buyouts, CURRENT_SEASON_START);
+  const totalCap = nhlSalaries + deadMoney;
   const capSpace = capCeiling - totalCap;
   const capPct = Math.min(100, capCeiling ? (totalCap / capCeiling) * 100 : 0);
   const avgAge = proCount ? (team.players.reduce((s, p) => s + (p.age || 0), 0) / proCount).toFixed(1) : "0";

@@ -153,7 +153,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   return (
     <div className="space-y-5">
       <div className="flex justify-end">
-        <Link href={`/tools/cap-calculator${team.code ? `?team=${team.code}` : ""}`}
+        <Link href={`/tools/cap-calculator?${new URLSearchParams({ ...(team.code ? { team: team.code } : {}), from: slug }).toString()}`}
           className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-sky-600/20 hover:bg-sky-600/30 border border-sky-700/50 text-sky-300 transition-colors">
           Cap Calculator →
         </Link>

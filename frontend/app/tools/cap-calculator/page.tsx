@@ -4,15 +4,15 @@ import { liveCapHit } from "@/lib/finance";
 import { regularSeasonDayProgress, resolvePhaseThresholds } from "@/lib/calendar-server";
 import { addDays } from "@/lib/calendar";
 import { REGULAR_SEASON } from "@/lib/phase";
-import { PageHeader } from "@/components/ui";
+import { PageHeader, BackPill } from "@/components/ui";
 import CapCalculator from "@/components/CapCalculator";
 
 export const dynamic = "force-dynamic";
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
-export default async function CapCalculatorPage({ searchParams }: { searchParams: Promise<{ team?: string }> }) {
-  const { team: initialTeam } = await searchParams;
+export default async function CapCalculatorPage({ searchParams }: { searchParams: Promise<{ team?: string; from?: string }> }) {
+  const { team: initialTeam, from } = await searchParams;
   const [settings, teams, dayProgress, { regularAt, playoffsAt }, games] = await Promise.all([
     loadSettings(),
     prisma.team.findMany({
@@ -48,7 +48,8 @@ export default async function CapCalculatorPage({ searchParams }: { searchParams
 
   return (
     <div className="space-y-6 py-2">
-      <PageHeader title="Cap Space Calculator" subtitle="How pricey an addition can you afford? Unused cap banks each day of the regular season, so your spending room grows toward the deadline." />
+      <PageHeader title="Cap Space Calculator" subtitle="How pricey an addition can you afford? Unused cap banks each day of the regular season, so your spending room grows toward the deadline."
+        right={from ? <BackPill href={`/teams/${from}/salary`}>Team Salary Cap</BackPill> : undefined} />
       <CapCalculator
         ceiling={settings.salaryCapUpper} teams={teamData}
         seasonStart={iso(regularAt)} seasonEnd={iso(seasonEnd)}
