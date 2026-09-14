@@ -7,16 +7,19 @@ import type { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
-const SORT_KEYS = ["name", "team", "age", "capHit", "years"] as const;
+const SORT_KEYS = ["name", "team", "age", "capHit", "years", "clause"] as const;
 type SortKey = (typeof SORT_KEYS)[number];
 const isSortKey = (v: string | undefined): v is SortKey => !!v && (SORT_KEYS as readonly string[]).includes(v);
 
 // Each column's natural first-click direction — cap hit/years lead with the
 // biggest/longest first (matches the page's old fixed default), everything
 // else starts alphabetical/youngest-first.
-const DEFAULT_DIR: Record<SortKey, "asc" | "desc"> = { name: "asc", team: "asc", age: "asc", capHit: "desc", years: "desc" };
-const LABEL: Record<SortKey, string> = { name: "Player", team: "Team", age: "Age", capHit: "Cap Hit", years: "Years" };
+const DEFAULT_DIR: Record<SortKey, "asc" | "desc"> = { name: "asc", team: "asc", age: "asc", capHit: "desc", years: "desc", clause: "asc" };
+const LABEL: Record<SortKey, string> = { name: "Player", team: "Team", age: "Age", capHit: "Cap Hit", years: "Years", clause: "Clause" };
 
+// "M_NTC" < "NMC" < "NTC" alphabetically, and nulls (no clause) sort last —
+// clicking the column groups same-clause contracts together either way, so a
+// GM can count how many of each type the league has.
 function orderByFor(sort: SortKey, dir: "asc" | "desc"): Prisma.PlayerOrderByWithRelationInput[] {
   const tiebreak: Prisma.PlayerOrderByWithRelationInput = { name: "asc" };
   switch (sort) {
@@ -25,8 +28,11 @@ function orderByFor(sort: SortKey, dir: "asc" | "desc"): Prisma.PlayerOrderByWit
     case "age": return [{ age: dir }, tiebreak];
     case "capHit": return [{ capHit: dir }, tiebreak];
     case "years": return [{ contractYears: dir }, tiebreak];
+    case "clause": return [{ tradeClause: { sort: dir, nulls: "last" } }, tiebreak];
   }
 }
+
+const CLAUSE_LABEL: Record<string, string> = { NTC: "NTC", NMC: "NMC", M_NTC: "M-NTC" };
 
 export default async function AdminContractsPage({ searchParams }: { searchParams: Promise<{ q?: string; sort?: string; dir?: string }> }) {
   const sp = await searchParams;
@@ -43,7 +49,7 @@ export default async function AdminContractsPage({ searchParams }: { searchParam
         team: { league: { in: ["NHL", "AHL"] } },
         ...(q ? { name: { contains: q, mode: "insensitive" } } : {}),
       },
-      select: { id: true, name: true, slug: true, position: true, age: true, capHit: true, contractYears: true, contractExpiry: true, team: { select: { name: true, code: true } } },
+      select: { id: true, name: true, slug: true, position: true, age: true, capHit: true, contractYears: true, contractExpiry: true, tradeClause: true, team: { select: { name: true, code: true } } },
       orderBy: orderByFor(sort, dir),
       take: q ? 200 : 60,
     }),
@@ -103,6 +109,7 @@ export default async function AdminContractsPage({ searchParams }: { searchParam
                 <SortHeader col="age" align="center" />
                 <SortHeader col="capHit" align="right" />
                 <SortHeader col="years" align="center" />
+                <SortHeader col="clause" align="center" />
                 <th className="px-4 py-3 text-center font-medium">Expiry</th>
                 <th className="px-4 py-3 text-right font-medium"></th>
               </tr>
@@ -115,6 +122,13 @@ export default async function AdminContractsPage({ searchParams }: { searchParam
                   <td className="px-4 py-3 text-center text-slate-400">{player.age ?? "—"}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{player.capHit ? money(player.capHit) : "—"}</td>
                   <td className="px-4 py-3 text-center text-slate-400">{player.contractYears ?? "—"}</td>
+                  <td className="px-4 py-3 text-center">
+                    {player.tradeClause && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                        {CLAUSE_LABEL[player.tradeClause] ?? player.tradeClause}
+                      </span>
+                    )}
+                  </td>
                   {/* Expiry = last season under contract, derived from years remaining (the
                       stored contractExpiry is stale for imported deals). */}
                   <td className="px-4 py-3 text-center text-slate-400">{player.contractYears && player.contractYears > 0 ? seasonLabel(CURRENT_SEASON_START + player.contractYears - 1) : "—"}</td>
@@ -123,7 +137,7 @@ export default async function AdminContractsPage({ searchParams }: { searchParam
                   </td>
                 </tr>
               ))}
-              {players.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">No players match “{q}”.</td></tr>}
+              {players.length === 0 && <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">No players match “{q}”.</td></tr>}
             </tbody>
           </table>
         </div>
