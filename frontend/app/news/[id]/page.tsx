@@ -1,6 +1,7 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { getTeamSession } from "@/lib/auth";
+import { getTeamSession, canManageTeam } from "@/lib/auth";
 import { ReactionBar, CommentBox } from "@/components/NewsReactions";
 import { BackPill } from "@/components/ui";
 
@@ -13,6 +14,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
     getTeamSession(),
   ]);
   if (!article) notFound();
+  const canEdit = await canManageTeam(article.authorTeamId);
 
   const teamIds = [article.authorTeamId, ...article.comments.map((c) => c.teamId), ...article.reactions.map((r) => r.teamId)];
   const teams = await prisma.team.findMany({
@@ -37,19 +39,24 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
   const mine = session ? article.reactions.find((r) => r.teamId === session)?.kind ?? null : null;
 
   return (
-    <div className="py-2">
+    <div className="py-2 max-w-3xl mx-auto">
       <BackPill href="/">Home</BackPill>
       <article className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 p-6 mt-3">
-        <div className="flex items-center gap-3 mb-4">
-          {author?.logoUrl ? <img src={author.logoUrl} alt="" className="w-10 h-10 object-contain" />
-            : <div className="w-10 h-10 rounded-full bg-slate-700 grid place-items-center font-bold">{author?.name?.[0] ?? "?"}</div>}
-          <div>
-            <p className="text-sm font-bold">{gmName(author)}</p>
-            <p className="text-xs text-slate-500">{author?.name} · {article.createdAt.toLocaleString("sk-SK")}</p>
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-3">
+            {author?.logoUrl ? <img src={author.logoUrl} alt="" className="w-10 h-10 object-contain" />
+              : <div className="w-10 h-10 rounded-full bg-slate-700 grid place-items-center font-bold">{author?.name?.[0] ?? "?"}</div>}
+            <div>
+              <p className="text-sm font-bold">{gmName(author)}</p>
+              <p className="text-xs text-slate-500">{author?.name} · {article.createdAt.toLocaleString("sk-SK")}</p>
+            </div>
           </div>
+          {canEdit && <Link href={`/news/${article.id}/edit`} className="text-xs text-blue-400 hover:text-blue-300 shrink-0">Edit →</Link>}
         </div>
         <h1 className="text-2xl font-bold mb-4">{article.title}</h1>
-        <div className="news-body text-slate-200 leading-relaxed" dangerouslySetInnerHTML={{ __html: article.bodyHtml }} />
+        {/* the perex cut line is a homepage-preview marker, not something a reader
+            should see once they're already on the full article */}
+        <div className="news-body text-slate-200 leading-relaxed [&_.article-cut]:hidden" dangerouslySetInnerHTML={{ __html: article.bodyHtml }} />
         <div className="mt-6 pt-4 border-t border-slate-800">
           <ReactionBar articleId={article.id} counts={counts} mine={mine} canReact={!!session} reactorNames={reactorNames} />
         </div>

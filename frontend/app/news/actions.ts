@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { getTeamSession } from "@/lib/auth";
+import { getTeamSession, canManageTeam } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -12,6 +12,16 @@ export async function createArticle(title: string, bodyHtml: string) {
   const article = await prisma.newsArticle.create({ data: { authorTeamId: session, title: title.trim(), bodyHtml } });
   revalidatePath("/"); revalidatePath("/news");
   redirect(`/news/${article.id}`);
+}
+
+export async function updateArticle(id: number, title: string, bodyHtml: string) {
+  const article = await prisma.newsArticle.findUnique({ where: { id }, select: { authorTeamId: true } });
+  if (!article) throw new Error("Article not found.");
+  if (!(await canManageTeam(article.authorTeamId))) throw new Error("You can only edit your own club's articles.");
+  if (!title.trim()) throw new Error("Add a title.");
+  await prisma.newsArticle.update({ where: { id }, data: { title: title.trim(), bodyHtml } });
+  revalidatePath("/"); revalidatePath("/news"); revalidatePath(`/news/${id}`);
+  redirect(`/news/${id}`);
 }
 
 const KINDS = ["like", "dislike", "laugh", "heart"] as const;
