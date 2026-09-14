@@ -173,8 +173,11 @@ export type EngineSettings = {
   chemistryBase: number;       // starting chemistry of a brand-new line (0..100)
   chemistryGrowth: number;     // chemistry gained per game a unit stays intact
   chemistryDrop: number;       // chemistry lost the game a unit is broken (injury/call-up)
-  chemistryNeutral: number;    // chemistry at/above which a unit is fully gelled (no penalty)
-  chemistryPenaltyPct: number; // max scoring penalty for a zero-chemistry unit (fades to 0 at neutral)
+  // Hand-tuned curve mapping a unit's chemistry (0..100) to a sim bonus/penalty (%).
+  // Piecewise-linear between points, sorted by chem ascending; below the first point
+  // or above the last, the end value holds flat. Lets admin dial in e.g. "100 chem =
+  // +10%, 80 = +2%, 35 = -10%" directly instead of a single fixed-shape formula.
+  chemistryCurve: { chem: number; bonusPct: number }[];
   chemistryRolePenaltyPct: number; // structural penalty for a role-redundant unit (3 snipers / 2 offensive D)
   // Graduated off-position penalties (STHS): wrong wing or off-hand D side (mild),
   // wing↔center (medium, + faceoff cap), forward↔defense (extreme). Not applied on PP/PK.
@@ -235,7 +238,14 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   moraleGoalieSlope: 0.0008, moraleFrustrationPct: 0.006,
   moraleDroughtGames: 10, moraleDroughtDrop: 1.5, moraleRoleDrop: 4,
   chemistryEnabled: true, chemistryBase: 35, chemistryGrowth: 2, chemistryDrop: 25,
-  chemistryNeutral: 70, chemistryPenaltyPct: 0.06, chemistryRolePenaltyPct: 0.05,
+  chemistryCurve: [
+    { chem: 0, bonusPct: -15 },
+    { chem: 35, bonusPct: -10 },
+    { chem: 70, bonusPct: 0 },
+    { chem: 80, bonusPct: 2 },
+    { chem: 100, bonusPct: 10 },
+  ],
+  chemistryRolePenaltyPct: 0.05,
   offPosWingPct: 0.07, offPosCenterPct: 0.17, offPosDefPct: 0.35, offPosChemCap: 55,
   physicalityEnabled: true, physicalityMeanLbs: 92, physicalityPct: 0.001,
 };
@@ -243,6 +253,46 @@ export const DEFAULT_SETTINGS: EngineSettings = {
 /** Merge stored partial settings over the defaults (forward-compatible). */
 export function mergeSettings(partial: Partial<EngineSettings> | null | undefined): EngineSettings {
   return { ...DEFAULT_SETTINGS, ...(partial ?? {}) };
+}
+
+type ChemPoint = { chem: number; bonusPct: number };
+
+/** Interpolate the chemistry→bonus curve at a given chemistry value (0..100).
+ *  Piecewise-linear between the configured points; outside the configured range
+ *  the nearest end point's value holds flat. Returns a bonus/penalty in % (e.g.
+ *  10 for +10%), NOT a fraction. Shared by the sim engine and any UI display. */
+export function chemCurveBonusPct(curve: ChemPoint[], chem: number): number {
+  if (!curve.length) return 0;
+  const pts = [...curve].sort((a, b) => a.chem - b.chem);
+  if (chem <= pts[0].chem) return pts[0].bonusPct;
+  const last = pts[pts.length - 1];
+  if (chem >= last.chem) return last.bonusPct;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1];
+    if (chem >= a.chem && chem <= b.chem) {
+      const t = (chem - a.chem) / Math.max(1e-9, b.chem - a.chem);
+      return a.bonusPct + (b.bonusPct - a.bonusPct) * t;
+    }
+  }
+  return 0;
+}
+
+/** The chemistry value at which the curve crosses from penalty to bonus (bonus %
+ *  = 0) — used purely for UI labeling ("fully gelled at X"), not by the sim
+ *  itself. Falls back to the lowest/highest point if the curve never crosses 0. */
+export function chemistryNeutralPoint(curve: ChemPoint[]): number {
+  if (!curve.length) return 70;
+  const pts = [...curve].sort((a, b) => a.chem - b.chem);
+  if (pts[0].bonusPct >= 0) return pts[0].chem;
+  if (pts[pts.length - 1].bonusPct < 0) return pts[pts.length - 1].chem;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1];
+    if (a.bonusPct < 0 && b.bonusPct >= 0) {
+      const t = -a.bonusPct / Math.max(1e-9, b.bonusPct - a.bonusPct);
+      return a.chem + (b.chem - a.chem) * t;
+    }
+  }
+  return 70;
 }
 
 export async function loadSettings(): Promise<EngineSettings> {

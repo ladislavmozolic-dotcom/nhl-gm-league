@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { notFound, redirect } from "next/navigation";
 import { loadTeamLines, autoLines } from "@/lib/sim/lines";
-import { loadSettings } from "@/lib/sim/settings";
+import { loadSettings, chemistryNeutralPoint } from "@/lib/sim/settings";
 import { canManageTeam } from "@/lib/auth";
 import { cleanName, captaincyFromName } from "@/lib/playerName";
 import LineEditor from "@/components/LineEditor";
@@ -60,7 +60,7 @@ export default async function LinesPage({ params }: { params: Promise<{ slug: st
       initial={lines}
       chemistry={chemistry}
       chemBase={settings.chemistryBase}
-      chemNeutral={settings.chemistryNeutral}
+      chemNeutral={chemistryNeutralPoint(settings.chemistryCurve)}
       chemEnabled={settings.chemistryEnabled}
       onSave={saveLines}
       onSuggest={suggestLinesAction}

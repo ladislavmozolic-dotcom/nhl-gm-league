@@ -6,7 +6,7 @@
 import { RNG, fixtureSeed } from "./rng";
 import { cleanName } from "../playerName";
 import { generatePlayByPlay } from "./playbyplay";
-import { DEFAULT_SETTINGS, type EngineSettings } from "./settings";
+import { DEFAULT_SETTINGS, chemCurveBonusPct, type EngineSettings } from "./settings";
 import { EventSink, type SimEvent } from "./events";
 import { shotProfile, ppShotProfile, expectedGoal, isHighDanger, shotSpeed, sectorIndex, type ShotStrength } from "./shot-quality";
 import { ENGINE_V2 } from "./version";
@@ -279,18 +279,17 @@ function conversion(
 // make chronic overuse bite. e.g. slope 0.006 @ CON 95 => ~3% weaker.
 const conFactor = (con: number) => Math.max(0.5, 1 - (100 - (con ?? 100)) * CFG.skaterConSlope);
 
-// Line chemistry: penalty-only. A fully gelled unit (>= neutral) sims at full
-// strength (factor 1); a fresh or disrupted unit is scaled down toward
-// (1 - chemistryPenaltyPct). This suppresses new lines without inflating anyone,
-// so league-wide scoring stays calibrated.
-// Two penalties, both fading to 1 for an ideal unit: a STABILITY penalty that
-// shrinks as the line gels (chem -> neutral), and a structural ROLE penalty for
-// a role-redundant unit (three snipers / two offensive D) that never goes away.
+// Line chemistry: a hand-tuned curve (admin-editable, /admin/simulation) maps a
+// unit's chemistry (0..100) to a sim bonus/penalty in %, e.g. "100 chem = +10%,
+// 80 = +2%, 35 = -10%". Piecewise-linear between the configured points; outside
+// the configured range the nearest end value holds flat. On top of that, a
+// separate structural ROLE penalty (never a bonus) punishes a role-redundant
+// unit (three snipers / two offensive D) regardless of its chemistry.
 const chemFactor = (chem: number, roleFit = 1) => {
   if (!CFG.chemistryEnabled) return 1;
-  const stability = (Math.max(0, CFG.chemistryNeutral - (chem ?? 100)) / Math.max(1, CFG.chemistryNeutral)) * CFG.chemistryPenaltyPct;
+  const curveBonus = chemCurveBonusPct(CFG.chemistryCurve, chem ?? 100) / 100;
   const role = (1 - (roleFit ?? 1)) * CFG.chemistryRolePenaltyPct;
-  return 1 - stability - role;
+  return 1 + curveBonus - role;
 };
 
 // ---- momentum ---------------------------------------------------------------

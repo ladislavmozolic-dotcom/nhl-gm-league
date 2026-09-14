@@ -51,6 +51,14 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
       return { ...t, picks: [...others, ...add].sort((a, b) => a - b) };
     }));
 
+  // chemistry curve editor (chem 0..100 -> sim bonus/penalty %)
+  const setCurvePoint = (i: number, patch: Partial<{ chem: number; bonusPct: number }>) =>
+    set("chemistryCurve", s.chemistryCurve.map((p, j) => (j === i ? { ...p, ...patch } : p)));
+  const addCurvePoint = () =>
+    set("chemistryCurve", [...s.chemistryCurve, { chem: 50, bonusPct: 0 }].sort((a, b) => a.chem - b.chem));
+  const removeCurvePoint = (i: number) =>
+    set("chemistryCurve", s.chemistryCurve.filter((_, j) => j !== i));
+
   const Slider = ({ k, label, hint }: { k: keyof EngineSettings; label: string; hint: string }) => (
     <div className="grid grid-cols-[150px_1fr_60px] items-center gap-3 py-1.5">
       <div>
@@ -356,8 +364,8 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
           grows every game, a split bond fades slowly (never a hard drop) down to the starting floor, and
           a reunited bond resumes from where it left off. Special-teams units (PP1/PK1 etc.) work
           differently — graded as one unit, taking the full &quot;Drop when broken&quot; hit instantly the
-          game they&apos;re split. Penalty-only either way: a fully gelled unit (≥ neutral) sims at full
-          strength; a fresh or disrupted one scores slightly less — so it never inflates league-wide offense.
+          game they&apos;re split. The curve below then converts that chemistry number into an actual sim
+          bonus or penalty (a high-chem unit can score more than the base rate, a low-chem one less).
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
           <div>
@@ -366,8 +374,6 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
             <NumField k="chemistryDrop" label="Drop when broken (special teams only)" />
           </div>
           <div>
-            <NumField k="chemistryNeutral" label="Fully-gelled threshold" />
-            <NumField k="chemistryPenaltyPct" label="Max penalty (0 chem)" step={0.01} w="w-28" />
             <NumField k="chemistryRolePenaltyPct" label="Role-redundancy penalty" step={0.01} w="w-28" />
           </div>
         </div>
@@ -375,6 +381,39 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
           Role-redundancy penalises a line of three similar players (or two offensive D) — the sim rewards a
           playmaker + sniper + grinder up front and an offensive + stay-at-home pairing on the blue line.
         </p>
+
+        <div className="mt-4">
+          <div className="text-xs text-slate-500 mb-1">
+            Chemistry → sim bonus curve — pick points (chem 0-100 → bonus/penalty %); the engine interpolates
+            between them, e.g. 100 chem = +10%, 80 = +2%, 35 = −10%. Below the lowest or above the highest
+            point, that point&apos;s value holds flat.
+          </div>
+          <div className="space-y-1.5">
+            {s.chemistryCurve.map((p, i) => (
+              <div key={i} className="grid grid-cols-[100px_120px_1fr_auto] items-center gap-2">
+                <label className="flex items-center gap-2 text-xs text-slate-400">Chem
+                  <input type="number" min={0} max={100} value={p.chem}
+                    onChange={(e) => setCurvePoint(i, { chem: Math.max(0, Math.min(100, Number(e.target.value))) })}
+                    className="w-16 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-right tabular-nums" />
+                </label>
+                <label className="flex items-center gap-2 text-xs text-slate-400">Bonus %
+                  <input type="number" step={0.5} value={p.bonusPct}
+                    onChange={(e) => setCurvePoint(i, { bonusPct: Number(e.target.value) })}
+                    className="w-20 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-right tabular-nums" />
+                </label>
+                <span className={`text-xs tabular-nums ${p.bonusPct > 0 ? "text-emerald-400" : p.bonusPct < 0 ? "text-red-400" : "text-slate-500"}`}>
+                  {p.bonusPct > 0 ? "+" : ""}{p.bonusPct}% at {p.chem} chem
+                </span>
+                <button type="button" onClick={() => removeCurvePoint(i)} disabled={s.chemistryCurve.length <= 2}
+                  className="text-xs text-red-400 hover:text-red-300 disabled:opacity-30 disabled:cursor-not-allowed px-2">✕</button>
+              </div>
+            ))}
+          </div>
+          <button type="button" onClick={addCurvePoint}
+            className="mt-2 text-xs px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800/60">
+            + Add point
+          </button>
+        </div>
       </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
