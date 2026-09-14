@@ -16,7 +16,7 @@ import type { Phase } from "./calendar";
 
 export type WaiverRow = {
   id: number; playerId: number; playerName: string; playerSlug: string | null; position: string; capHit: number;
-  fromTeamId: number; fromCode: string; placedDay: number; clause: string | null;
+  fromTeamId: number; fromCode: string; placedDay: number; placedAt: Date; clause: string | null;
   claims: { teamId: number; code: string }[];
 };
 
@@ -108,7 +108,7 @@ export async function activeWaivers(): Promise<WaiverRow[]> {
     const p = pById.get(w.playerId);
     return {
       id: w.id, playerId: w.playerId, playerName: cleanName(p?.name ?? ""), playerSlug: p?.slug ?? null, position: p?.position ?? "", capHit: p ? liveCapHit(p) : 0,
-      fromTeamId: w.fromTeamId, fromCode: code.get(w.fromTeamId) ?? "?", placedDay: w.placedDay, clause: p?.tradeClause ?? null,
+      fromTeamId: w.fromTeamId, fromCode: code.get(w.fromTeamId) ?? "?", placedDay: w.placedDay, placedAt: w.placedAt, clause: p?.tradeClause ?? null,
       claims: w.claims.map((c) => ({ teamId: c.teamId, code: code.get(c.teamId) ?? "?" })),
     };
   });

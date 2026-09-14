@@ -448,6 +448,28 @@ export async function deleteTradeAction(tradeId: number) {
   return { ok: true, wasStatus: trade.status, moved };
 }
 
+/** Commissioner restores a DECLINED trade back to PENDING — for a decline that was a
+ *  mistake (wrong button, a commission decline meant for a different deal, ...).
+ *  No assets ever moved on a DECLINED trade, so this is a pure status flip; the
+ *  receiving club still needs to actually Accept it. Only reachable within
+ *  cleanupDeclinedTrades' grace window — past that the trade (and its TradeAsset
+ *  rows) is already gone for good. */
+export async function restoreDeclinedTradeAction(tradeId: number) {
+  if (!(await isAdmin())) return { ok: false as const, error: "Only the commissioner can restore trades." };
+  const trade = await prisma.trade.findUnique({ where: { id: tradeId } });
+  if (!trade) return { ok: false as const, error: "Trade not found — it may already have been swept for good." };
+  if (trade.status !== "DECLINED") return { ok: false as const, error: "Only a declined trade can be restored." };
+  await prisma.trade.update({ where: { id: tradeId }, data: { status: "PENDING", respondedAt: null, commishNote: null } });
+  const [fromTeam, toTeam] = await Promise.all([
+    prisma.team.findUnique({ where: { id: trade.fromTeamId }, select: { name: true } }),
+    prisma.team.findUnique({ where: { id: trade.toTeamId }, select: { name: true } }),
+  ]);
+  for (const tid of [trade.fromTeamId, trade.toTeamId])
+    await prisma.dmMessage.create({ data: { fromTeamId: tid, toTeamId: tid, body: `↩️ The commissioner restored trade #${tradeId} (${fromTeam?.name ?? "?"} ↔ ${toTeam?.name ?? "?"}) — it's pending again.`, tradeUrl: `/trades/${tradeId}` } }).catch(() => {});
+  revalidatePath("/trades"); revalidatePath("/admin/trades"); revalidatePath("/messages");
+  return { ok: true as const };
+}
+
 /** The most recent completed (ACCEPTED) trade involving the logged-in club, within
  *  the last 2 days — powers the full-screen "trade complete" celebration. The client
  *  remembers which ids it has dismissed (localStorage), so this just reports the latest. */

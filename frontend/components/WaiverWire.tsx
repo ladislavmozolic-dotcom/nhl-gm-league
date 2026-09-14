@@ -66,6 +66,9 @@ export default function WaiverWire({ waivers, myTeamId, inSeason, order }: { wai
                     )} <span className="text-slate-500 text-xs">{w.position}</span>
                     {tag && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30">{tag}</span>}
                     <span className="ml-2 text-xs text-slate-500">from <b className="text-slate-400">{w.fromCode}</b> · {money(w.capHit)}</span>
+                    <span className="ml-2 text-xs text-slate-600">
+                      placed {new Date(w.placedAt).toLocaleString("sk-SK", { day: "numeric", month: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    </span>
                   </div>
                   <div className="text-xs text-slate-500">
                     {w.claims.length > 0 ? <>claims: {w.claims.map((c) => c.code).join(", ")}</> : "no claims yet"}
