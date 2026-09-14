@@ -1,23 +1,28 @@
-// Structured trade conditions — the stat-threshold layer on top of
-// TradeCondition's plain free-text description (see prisma/schema.prisma).
-// A commissioner attaches this AFTER a trade with a text condition already
-// exists (createTradeRecord auto-creates the row), picking a player, a
-// threshold (or two, AND/OR), and the two candidate DraftPicks — the one
-// already conveyed (pickA, the "if NOT met" resting state) and the alternate
-// that swaps in for the receiving club instead if the stats clear the bar
-// (pickB). Both picks get locked out of any other trade for as long as the
-// condition is PENDING (see lib/trade-exec.ts's assertOwnership).
+// Structured trade conditions — the layer on top of TradeCondition's plain
+// free-text description (see prisma/schema.prisma). A commissioner attaches
+// this AFTER a trade with a text condition already exists (createTradeRecord
+// auto-creates the row), or a GM builds it directly in the Trade Builder,
+// picking a player (or, for a protected pick, no player at all), 1-3 clauses,
+// and the two candidate DraftPicks — pickA (the UPGRADE, conveys INSTEAD if
+// the clauses evaluate true) and pickB (the DEFAULT, conveys as-is if they
+// evaluate false). Both picks get locked out of any other trade for as long
+// as the condition is PENDING (see lib/trade-exec.ts's assertOwnership).
 //
-// IMPORTANT: a real conditional-pick clause in this league is judged on the
-// player's REAL-LIFE NHL production, not this league's own simulated games —
-// same real NHL API (api-web.nhle.com) lib/nhl-career-gp-import.ts already
-// pulls career games from. Requires the player to carry a real Player.nhlId;
-// a fictional/generated player has no real season to check against.
+// A clause can be judged on the player's REAL-LIFE NHL production (same real
+// NHL API — api-web.nhle.com — lib/nhl-career-gp-import.ts already pulls
+// career games from) or on this league's OWN (UNHL) simulated games —
+// whichever the GM picks per clause. A clause can also be a UNHL playoff run,
+// a UNHL contract extension, or (no player at all) a classic top-N protected
+// 1st rounder resolved against the Draft Lottery.
 
 import { prisma } from "./prisma";
 
 export * from "./trade-conditions-shared";
-import { METRIC_LABELS, type Metric } from "./trade-conditions-shared";
+import {
+  METRIC_LABELS, OP_LABELS, PLAYOFF_ROUND_LABELS,
+  type Metric, type Op, type PlayoffRound, type ConditionClause,
+  type StatClause, type PlayoffClause, type ContractClause, type LotteryClause,
+} from "./trade-conditions-shared";
 
 const compare = (op: string, value: number, threshold: number): boolean => {
   switch (op) {
@@ -28,6 +33,8 @@ const compare = (op: string, value: number, threshold: number): boolean => {
     default: return false;
   }
 };
+
+const seasonStr = (startYear: number) => `${startYear}-${String(startYear + 1).slice(-2)}`;
 
 export type PlayerSeasonStats = { goals: number; assists: number; points: number; gamesPlayed: number; ppg: number };
 
@@ -66,50 +73,114 @@ export async function playerSeasonStats(playerId: number, seasonYear: number): P
   }
 }
 
+/** This league's (UNHL) own regular-season stats for `seasonYear`, summed
+ *  across every FINAL NHL game he actually appears in that season regardless
+ *  of which club he suited up for (mirrors the real-NHL trade-split summing
+ *  above). Returns null only if the player doesn't exist at all — 0 games so
+ *  far is a normal, valid (not-yet-met) result, not an error. */
+export async function unhlSeasonStats(playerId: number, seasonYear: number): Promise<PlayerSeasonStats | null> {
+  const p = await prisma.player.findUnique({ where: { id: playerId }, select: { id: true } });
+  if (!p) return null;
+  const rows = await prisma.playerGameStat.findMany({
+    where: { playerId, game: { season: seasonStr(seasonYear), league: "NHL", status: "FINAL" } },
+    select: { goals: true, assists: true, points: true },
+  });
+  const gamesPlayed = rows.length;
+  const goals = rows.reduce((t, r) => t + r.goals, 0);
+  const assists = rows.reduce((t, r) => t + r.assists, 0);
+  const points = rows.reduce((t, r) => t + r.points, 0);
+  return { goals, assists, points, gamesPlayed, ppg: gamesPlayed ? points / gamesPlayed : 0 };
+}
+
 const valueOf = (stats: PlayerSeasonStats, metric: string): number =>
   metric === "POINTS" ? stats.points : metric === "GOALS" ? stats.goals : metric === "ASSISTS" ? stats.assists
     : metric === "GAMES_PLAYED" ? stats.gamesPlayed : metric === "PPG" ? stats.ppg : 0;
 
-export type ClauseProgress = { metric: string; label: string; value: number; op: string; threshold: number; pass: boolean };
-export type ConditionEval = { met: boolean; clauses: ClauseProgress[]; stats: PlayerSeasonStats };
-export type ConditionEvalResult = { eval: ConditionEval | null; error: string | null };
+const ROUND_LEVEL: Record<PlayoffRound, number> = { MADE_PLAYOFFS: 1, WON_R1: 2, WON_R2: 3, WON_CONF: 4, WON_CUP: 5 };
 
-export function evaluateAgainstStats(c: {
-  metric: string | null; op: string | null; threshold: number | null;
-  metric2: string | null; op2: string | null; threshold2: number | null; logic2: string | null;
-  metric3?: string | null; op3?: string | null; threshold3?: number | null; logic3?: string | null;
-}, stats: PlayerSeasonStats): ConditionEval | null {
-  if (!c.metric || !c.op || c.threshold == null) return null;
-  const v1 = valueOf(stats, c.metric);
-  const pass1 = compare(c.op, v1, c.threshold);
-  const clauses: ClauseProgress[] = [{ metric: c.metric, label: METRIC_LABELS[c.metric as Metric] ?? c.metric, value: Math.round(v1 * 100) / 100, op: c.op, threshold: c.threshold, pass: pass1 }];
-  let met = pass1;
-  if (c.metric2 && c.op2 && c.threshold2 != null) {
-    const v2 = valueOf(stats, c.metric2);
-    const pass2 = compare(c.op2, v2, c.threshold2);
-    clauses.push({ metric: c.metric2, label: METRIC_LABELS[c.metric2 as Metric] ?? c.metric2, value: Math.round(v2 * 100) / 100, op: c.op2, threshold: c.threshold2, pass: pass2 });
-    met = c.logic2 === "OR" ? (pass1 || pass2) : (pass1 && pass2);
-  }
-  if (c.metric3 && c.op3 && c.threshold3 != null) {
-    const v3 = valueOf(stats, c.metric3);
-    const pass3 = compare(c.op3, v3, c.threshold3);
-    clauses.push({ metric: c.metric3, label: METRIC_LABELS[c.metric3 as Metric] ?? c.metric3, value: Math.round(v3 * 100) / 100, op: c.op3, threshold: c.threshold3, pass: pass3 });
-    met = c.logic3 === "OR" ? (met || pass3) : (met && pass3);
-  }
-  return { met, clauses, stats };
-}
+export type ClauseProgress = { kind: ConditionClause["kind"]; label: string; pass: boolean; detail: string; logic?: "AND" | "OR" };
+export type ConditionEval = { met: boolean; clauses: ClauseProgress[] };
+export type ConditionEvalResult = { eval: ConditionEval | null; error: string | null };
 
 export type StructuredCondition = Awaited<ReturnType<typeof prisma.tradeCondition.findUniqueOrThrow>>;
 
-/** Live progress for a condition that already has structured fields set —
- *  against the player's REAL NHL stats (see playerSeasonStats above), not this
- *  league's own simulated games. `eval` is null (with `error` set) when it's
- *  still a plain free-text condition, the player has no real Player.nhlId on
- *  file, or the real NHL API call failed. */
-export async function evaluateCondition(condition: StructuredCondition): Promise<ConditionEvalResult> {
-  if (!condition.playerId || !condition.seasonYear) return { eval: null, error: "No player/season attached." };
-  const stats = await playerSeasonStats(condition.playerId, condition.seasonYear);
-  if (!stats) return { eval: null, error: "Couldn't read real NHL stats for this player (no real NHL ID on file, or the NHL API is unreachable right now)." };
-  return { eval: evaluateAgainstStats(condition, stats), error: null };
+async function evalStat(c: StatClause, condition: StructuredCondition): Promise<ClauseProgress | { error: string }> {
+  if (!condition.playerId) return { error: "No player attached for this stat clause." };
+  const stats = c.source === "UNHL" ? await unhlSeasonStats(condition.playerId, c.seasonYear) : await playerSeasonStats(condition.playerId, c.seasonYear);
+  if (!stats) return { error: c.source === "UNHL" ? "Couldn't find this player for UNHL stats." : "Couldn't read real NHL stats for this player (no real NHL ID on file, or the NHL API is unreachable right now)." };
+  const value = valueOf(stats, c.metric);
+  const pass = compare(c.op, value, c.threshold);
+  const label = `${METRIC_LABELS[c.metric as Metric] ?? c.metric} ${OP_LABELS[c.op as Op] ?? c.op} ${c.threshold} (${c.source === "UNHL" ? "UNHL" : "Real NHL"} ${seasonStr(c.seasonYear)})`;
+  return { kind: "STAT", label, pass, detail: `currently ${Math.round(value * 100) / 100} (${stats.gamesPlayed} GP)`, logic: c.logic };
 }
 
+async function evalPlayoff(c: PlayoffClause, condition: StructuredCondition): Promise<ClauseProgress | { error: string }> {
+  const teamId = condition.fromTeamId; // the condition's ownerTeamId
+  const season = seasonStr(c.seasonYear);
+  const rows = await prisma.playoffSeries.findMany({
+    where: { season, league: "NHL", OR: [{ highSeedTeamId: teamId }, { lowSeedTeamId: teamId }] },
+    select: { round: true, winnerTeamId: true },
+  });
+  let level = 0;
+  if (rows.length) {
+    level = Math.max(...rows.map((r) => r.round));
+    if (rows.some((r) => r.round === 4 && r.winnerTeamId === teamId)) level = 5;
+  }
+  const need = ROUND_LEVEL[c.round];
+  const pass = level >= need;
+  const label = `${PLAYOFF_ROUND_LABELS[c.round] ?? c.round} (${season}, UNHL)`;
+  return { kind: "PLAYOFF_ROUND", label, pass, detail: level === 0 ? "didn't make the playoffs (yet)" : `reached level ${level}/5`, logic: c.logic };
+}
+
+async function evalContract(c: ContractClause, condition: StructuredCondition): Promise<ClauseProgress | { error: string }> {
+  if (!condition.playerId) return { error: "No player attached for this contract clause." };
+  const [team, logs] = await Promise.all([
+    prisma.team.findUnique({ where: { id: condition.fromTeamId }, select: { code: true } }),
+    prisma.signingLog.findMany({ where: { playerId: condition.playerId, reverted: false, createdAt: { gte: condition.createdAt } }, select: { teamCode: true } }),
+  ]);
+  const signed = !!team?.code && logs.some((l) => l.teamCode === team.code);
+  const pass = c.extended ? signed : !signed;
+  const label = c.extended ? "Signs a new deal with them" : "Does NOT sign with them";
+  return { kind: "CONTRACT_EXT", label, pass, detail: signed ? "signed a new deal" : "no new deal signed yet", logic: c.logic };
+}
+
+async function evalLottery(c: LotteryClause, condition: StructuredCondition): Promise<ClauseProgress | { error: string }> {
+  if (!condition.pickBId) return { error: "No protected pick attached." };
+  const pick = await prisma.draftPick.findUnique({ where: { id: condition.pickBId } });
+  if (!pick) return { error: "Protected pick not found." };
+  if (pick.round !== 1) return { error: "Only a 1st round pick can be lottery-protected." };
+  const origTeam = pick.ownerLogoId != null ? await prisma.team.findFirst({ where: { profinhlLogoId: pick.ownerLogoId } }) : null;
+  if (!origTeam) return { error: "Couldn't resolve the pick's original team." };
+  const lotteryRow = await prisma.draftLottery.findFirst({ where: { year: pick.year, teamId: origTeam.id } });
+  if (!lotteryRow) return { error: `The ${pick.year} Draft Lottery hasn't been drawn yet.` };
+  const pass = lotteryRow.pick <= c.threshold;
+  const label = `Lands in the top ${c.threshold} (${pick.year} lottery)`;
+  return { kind: "LOTTERY_PROTECTION", label, pass, detail: `${origTeam.code ?? origTeam.name} landed at #${lotteryRow.pick}`, logic: c.logic };
+}
+
+async function evalClause(c: ConditionClause, condition: StructuredCondition): Promise<ClauseProgress | { error: string }> {
+  switch (c.kind) {
+    case "STAT": return evalStat(c, condition);
+    case "PLAYOFF_ROUND": return evalPlayoff(c, condition);
+    case "CONTRACT_EXT": return evalContract(c, condition);
+    case "LOTTERY_PROTECTION": return evalLottery(c, condition);
+  }
+}
+
+/** Live progress for a condition that already has structured `clauses`
+ *  attached. `eval` is null (with `error` set) when it's still a plain
+ *  free-text condition, or any one clause couldn't be evaluated (no real NHL
+ *  ID on file, the lottery for a protected pick's year hasn't run yet, etc). */
+export async function evaluateCondition(condition: StructuredCondition): Promise<ConditionEvalResult> {
+  const clauses = (condition.clauses as unknown as ConditionClause[] | null) ?? [];
+  if (clauses.length === 0) return { eval: null, error: "No structured clauses attached." };
+  const progress: ClauseProgress[] = [];
+  let met: boolean | null = null;
+  for (const c of clauses) {
+    const r = await evalClause(c, condition);
+    if ("error" in r) return { eval: null, error: r.error };
+    progress.push(r);
+    met = met === null ? r.pass : (c.logic === "OR" ? (met || r.pass) : (met && r.pass));
+  }
+  return { eval: { met: met ?? false, clauses: progress }, error: null };
+}

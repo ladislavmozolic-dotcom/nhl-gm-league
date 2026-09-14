@@ -623,29 +623,25 @@ model TradeCondition {
   createdAt   DateTime  @default(now())
   resolvedAt  DateTime?
 
-  // Optional structured stat-based tracking, attached by the commissioner after
-  // the fact (see /admin/conditions) — a plain free-text condition just leaves
-  // all of these null. When set, pickA and pickB are LOCKED (DraftPick.
-  // lockedByConditionId) from being moved in any other trade until resolved:
-  // pickA is where the pick currently sits (the "if NOT met" outcome, a no-op
-  // on resolution); pickB is the alternate that swaps in for toTeamId instead
-  // if the condition evaluates true. Mirrors a real conditional-pick clause
-  // ("conveys as a 2nd unless X, in which case a 3rd").
-  playerId    Int?
-  seasonYear  Int?    // season the stats are measured over (e.g. 2027 = 2026-27)
-  metric      String? // POINTS | GOALS | ASSISTS | GAMES_PLAYED | PPG
-  op          String? // GTE | GT | LTE | LT
-  threshold   Float?
-  metric2     String?
-  op2         String?
-  threshold2  Float?
-  logic2      String? // AND | OR — how metric2's clause combines with metric's
-  metric3     String?
-  op3         String?
-  threshold3  Float?
-  logic3      String? // AND | OR — how metric3's clause combines with the metric+metric2 result so far
-  pickAId     Int?    // stays put if the condition is NOT met
-  pickBId     Int?    // swaps to toTeamId INSTEAD of pickA if the condition IS met
+  // Optional structured tracking, attached by the commissioner after the fact
+  // (see /admin/conditions) or built directly in the Trade Builder — a plain
+  // free-text condition just leaves these null. When set, pickA and pickB are
+  // LOCKED (DraftPick.lockedByConditionId) from being moved in any other
+  // trade until resolved. Pick A is the UPGRADE — it conveys INSTEAD of pick
+  // B if `clauses` evaluates true; pick B is the DEFAULT — it conveys as
+  // part of the deal right away and just stays put if the clauses evaluate
+  // false. Mirrors a real conditional-pick clause ("conveys as a 2nd unless
+  // X, in which case a 3rd") as well as a classic protected first-rounder
+  // ("conveys unless it lands in the top 10, in which case a future 1st").
+  playerId    Int?    // the tracked player — absent for a LOTTERY_PROTECTION-only condition
+  // ConditionClause[] (see lib/trade-conditions-shared.ts) — 1-3 clauses,
+  // each carrying its own `kind` (STAT / PLAYOFF_ROUND / CONTRACT_EXT /
+  // LOTTERY_PROTECTION) and `logic` (how it combines with the clauses before
+  // it; ignored on the first clause). Replaces the old flat metric/op/
+  // threshold(×3) columns now that a clause can be several different shapes.
+  clauses     Json?
+  pickAId     Int?    // the upgrade — conveys INSTEAD of pickB if `clauses` evaluates true
+  pickBId     Int?    // the default — conveys as-is if `clauses` evaluates false
 }
 
 model TradeAsset {

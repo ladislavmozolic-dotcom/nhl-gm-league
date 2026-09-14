@@ -333,22 +333,32 @@ export async function assertOwnership(pkg: TradePackage) {
 export async function assertConditionSpec(pkg: TradePackage): Promise<void> {
   const spec = pkg.conditionSpec;
   if (!spec) return;
+  if (!spec.clauses || spec.clauses.length === 0) throw new Error("Conditional pick: at least one clause is required.");
   if (spec.ownerTeamId !== pkg.fromTeamId && spec.ownerTeamId !== pkg.toTeamId) throw new Error("Conditional pick: owning team isn't part of this trade.");
   const ownSide = spec.ownerTeamId === pkg.fromTeamId ? pkg.fromPicks : pkg.toPicks;
-  const tradedPlayerIds = new Set([...pkg.fromPlayers, ...pkg.toPlayers].map((p) => p.playerId));
-  if (!tradedPlayerIds.has(spec.playerId)) throw new Error("Conditional pick: the tracked player isn't actually part of this trade.");
+  if (spec.playerId != null) {
+    const tradedPlayerIds = new Set([...pkg.fromPlayers, ...pkg.toPlayers].map((p) => p.playerId));
+    if (!tradedPlayerIds.has(spec.playerId)) throw new Error("Conditional pick: the tracked player isn't actually part of this trade.");
+  }
   if (spec.pickAId === spec.pickBId) throw new Error("Conditional pick: pick A and pick B must be different picks.");
   if (!ownSide.includes(spec.pickBId)) throw new Error("Conditional pick: pick B must be one of the picks this side is already sending.");
   if (ownSide.includes(spec.pickAId) || pkg.fromPicks.includes(spec.pickAId) || pkg.toPicks.includes(spec.pickAId))
     throw new Error("Conditional pick: pick A must NOT already be part of this trade — it only moves if the condition is met.");
 
-  const [player, pickA] = await Promise.all([
-    prisma.player.findUnique({ where: { id: spec.playerId }, select: { nhlId: true } }),
+  const needsPlayer = spec.clauses.some((c) => c.kind === "STAT" || c.kind === "PLAYOFF_ROUND" || c.kind === "CONTRACT_EXT");
+  const needsRealNhl = spec.clauses.some((c) => c.kind === "STAT" && c.source === "REAL_NHL");
+  const needsLottery = spec.clauses.some((c) => c.kind === "LOTTERY_PROTECTION");
+  if (needsPlayer && spec.playerId == null) throw new Error("Conditional pick: this clause type needs a tracked player.");
+
+  const [player, pickA, pickB] = await Promise.all([
+    spec.playerId != null ? prisma.player.findUnique({ where: { id: spec.playerId }, select: { nhlId: true } }) : Promise.resolve(null),
     prisma.draftPick.findUnique({ where: { id: spec.pickAId }, select: { teamId: true, lockedByConditionId: true } }),
+    needsLottery ? prisma.draftPick.findUnique({ where: { id: spec.pickBId }, select: { round: true } }) : Promise.resolve(null),
   ]);
-  if (!player?.nhlId) throw new Error("Conditional pick: this player has no real NHL ID on file — his real-life production can't be tracked.");
+  if (needsRealNhl && !player?.nhlId) throw new Error("Conditional pick: this player has no real NHL ID on file — his real-life production can't be tracked.");
   if (!pickA || pickA.teamId !== spec.ownerTeamId) throw new Error("Conditional pick: pick A isn't owned by the team offering it.");
   if (pickA.lockedByConditionId != null) throw new Error("Conditional pick: pick A is already locked by another pending condition.");
+  if (needsLottery && (!pickB || pickB.round !== 1)) throw new Error("Conditional pick: only a 1st round pick can be lottery-protected.");
 }
 
 /** Rebuild the TradePackage from stored TradeAssets. */
@@ -426,10 +436,7 @@ export async function createTradeRecord(pkg: TradePackage, opts: { fromName: str
     const desc = pkg.condition?.trim() ? `${pkg.condition.trim()}\n\n${describeConditionSpec(spec)}` : describeConditionSpec(spec);
     await prisma.tradeCondition.create({ data: {
       tradeId: trade.id, fromTeamId: condFromTeamId, toTeamId: condToTeamId, description: desc, status: "PENDING",
-      playerId: spec.playerId, seasonYear: spec.seasonYear,
-      metric: spec.metric, op: spec.op, threshold: spec.threshold,
-      metric2: spec.metric2 ?? null, op2: spec.op2 ?? null, threshold2: spec.threshold2 ?? null, logic2: spec.logic2 ?? null,
-      metric3: spec.metric3 ?? null, op3: spec.op3 ?? null, threshold3: spec.threshold3 ?? null, logic3: spec.logic3 ?? null,
+      playerId: spec.playerId ?? null, clauses: spec.clauses as unknown as Prisma.InputJsonValue,
       pickAId: spec.pickAId, pickBId: spec.pickBId,
     } });
   } else if (pkg.condition?.trim()) {

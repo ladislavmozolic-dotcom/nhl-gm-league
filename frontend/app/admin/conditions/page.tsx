@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { isAdmin } from "@/lib/auth";
 import { cleanName } from "@/lib/playerName";
 import { CURRENT_SEASON_START } from "@/lib/finance";
-import { evaluateCondition, OP_LABELS, METRIC_LABELS, type Op, type Metric } from "@/lib/trade-conditions-server";
+import { evaluateCondition } from "@/lib/trade-conditions-server";
 import ConditionActions from "@/components/ConditionActions";
 import AttachConditionTracking from "@/components/AttachConditionTracking";
 import ResolveConditionButton from "@/components/ResolveConditionButton";
@@ -47,7 +47,7 @@ export default async function AdminConditionsPage() {
       ) : (
         <div className="space-y-3">
           {await Promise.all(conditions.map(async (c) => {
-            const structured = c.playerId != null && c.seasonYear != null;
+            const structured = Array.isArray(c.clauses) && c.clauses.length > 0;
             const { eval: evalResult, error: evalError } = structured ? await evaluateCondition(c) : { eval: null, error: null };
             const player = c.playerId != null ? playersById.get(c.playerId) : null;
             const teamPicks = [...(picksByTeam.get(c.fromTeamId) ?? []), ...(picksByTeam.get(c.toTeamId) ?? [])];
@@ -64,22 +64,22 @@ export default async function AdminConditionsPage() {
                   </div>
                 </div>
 
-                {structured && player && (
+                {structured && (
                   <div className="mt-3 bg-slate-950/50 rounded-lg p-3 space-y-2">
-                    <p className="text-xs text-slate-500">Tracking <b className="text-slate-300">{cleanName(player.name)}</b>&apos;s real NHL production — {c.seasonYear}-{String((c.seasonYear ?? 0) + 1).slice(-2)} regular season</p>
+                    {player && <p className="text-xs text-slate-500">Tracking <b className="text-slate-300">{cleanName(player.name)}</b></p>}
                     {evalError && <p className="text-xs text-amber-400">⚠ {evalError}</p>}
                     {evalResult && (
                       <div className="space-y-1.5">
                         {evalResult.clauses.map((cl, i) => (
                           <div key={i} className="flex items-center gap-2 text-xs">
                             <span className={`font-bold ${cl.pass ? "text-emerald-400" : "text-slate-500"}`}>{cl.pass ? "✓" : "○"}</span>
-                            <span className="text-slate-400">{METRIC_LABELS[cl.metric as Metric] ?? cl.metric} {OP_LABELS[cl.op as Op] ?? cl.op} {cl.threshold}</span>
-                            <span className="text-slate-600">— currently {cl.value}</span>
-                            {i === 0 && evalResult.clauses.length > 1 && <span className="text-slate-600 italic">{c.logic2 === "OR" ? "OR" : "AND"}</span>}
+                            <span className="text-slate-400">{cl.label}</span>
+                            <span className="text-slate-600">— {cl.detail}</span>
+                            {i > 0 && <span className="text-slate-600 italic">{cl.logic === "OR" ? "OR" : "AND"}</span>}
                           </div>
                         ))}
                         <p className={`text-xs font-bold ${evalResult.met ? "text-emerald-400" : "text-slate-500"}`}>
-                          {evalResult.met ? "Condition currently MET" : "Condition currently NOT met"} ({evalResult.stats.gamesPlayed} GP so far)
+                          {evalResult.met ? "Condition currently MET" : "Condition currently NOT met"}
                         </p>
                       </div>
                     )}

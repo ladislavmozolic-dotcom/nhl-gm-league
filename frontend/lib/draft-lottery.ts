@@ -6,6 +6,8 @@
 import { prisma } from "./prisma";
 import { computeStandings } from "./sim/standings";
 import { assignBlocks, ownerOfRank, drawFourBalls, type ComboBlock } from "./lottery-combos";
+import { evaluateCondition, type ConditionClause } from "./trade-conditions-server";
+import { settleCondition } from "@/app/admin/conditions/actions";
 
 // Odds (%) for the #1 pick, worst record first — the real NHL table (16 clubs).
 export const LOTTERY_ODDS_PCT = [18.5, 13.5, 11.5, 9.5, 8.5, 7.5, 6.5, 6.0, 5.0, 3.5, 3.0, 2.5, 2.0, 1.5, 0.5, 0.5];
@@ -123,7 +125,28 @@ export async function runLottery(year: number) {
     prisma.draftLottery.deleteMany({ where: { year } }),
     prisma.draftLottery.createMany({ data: outcome.round1.map((r) => ({ year, pick: r.pick, teamId: r.teamId, viaLottery: r.viaLottery, combo: r.combo ? r.combo.join("-") : null })) }),
   ]);
+  // A protected 1st-rounder (TradeCondition with a LOTTERY_PROTECTION clause)
+  // is only ever resolvable once ITS year's lottery has actually been drawn —
+  // check right now for any pending protections riding on this exact year.
+  await resolveLotteryProtectionsForYear(year).catch((e) => console.error(`resolveLotteryProtectionsForYear(${year}) failed:`, e));
   return { winners: outcome.winners };
+}
+
+/** Auto-settle every PENDING conditional pick that's a classic top-N
+ *  protected 1st-rounder (see lib/trade-conditions-shared.ts's
+ *  LotteryClause) whose protected pick (pickB) belongs to draft year `year`
+ *  — called right after that year's Draft Lottery commits, since that's the
+ *  only moment this kind of condition can actually be evaluated. */
+export async function resolveLotteryProtectionsForYear(year: number) {
+  const pending = await prisma.tradeCondition.findMany({ where: { status: "PENDING", pickBId: { not: null } } });
+  for (const condition of pending) {
+    const clauses = (condition.clauses as unknown as ConditionClause[] | null) ?? [];
+    if (!clauses.some((c) => c.kind === "LOTTERY_PROTECTION")) continue;
+    const pickB = await prisma.draftPick.findUnique({ where: { id: condition.pickBId! }, select: { year: true } });
+    if (!pickB || pickB.year !== year) continue;
+    const { eval: evalResult } = await evaluateCondition(condition);
+    if (evalResult) await settleCondition(condition, evalResult);
+  }
 }
 
 export async function getLottery(year: number) {
