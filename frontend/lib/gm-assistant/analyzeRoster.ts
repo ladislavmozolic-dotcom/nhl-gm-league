@@ -29,10 +29,11 @@ export interface RosterAnalysis {
   teamId: number;
   teamName: string;
   // In SLOTS order, not by severity: grouped by position (LW, C, RW, D, then
-  // goalies), with each position's top-line/pair and depth slot back to back
-  // so strong and weak sides of the same position sit next to each other, and
-  // PP1/PP2/PK1/PK2 grouped together at the end. The UI's 2-column grid turns
-  // each adjacent pair into a visual side-by-side comparison.
+  // goalies), with each position's top-line, 2nd-line and depth slot back to
+  // back so its strong and weak sides sit near each other, and PP1/PP2/PK1/PK2
+  // grouped together at the end. The UI's grid just flows these in order —
+  // not literally 2 cards per row per position any more now that forwards
+  // have 3 slots each, but still reads as one coherent group per position.
   findings: RosterFinding[];
   teamFindings: TeamFinding[]; // cap outlook, age curve, prospect pipeline, roster balance
 }

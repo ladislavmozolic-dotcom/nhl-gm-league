@@ -41,19 +41,29 @@ export interface SlotDef {
   role?: { group: RoleGroup; key: RoleKey };
 }
 
-// Top slot vs. depth slot, per side — mirrors how GMs actually talk about a
-// lineup ("top-line C", "bottom-pair RD") and is exactly granular enough to
-// reproduce findings like "2nd/3rd-pair RD". Plus the starting goalie tandem
-// and each club's two PP/PK units. Role/group per slot follows the "UNHL
-// Intelligence / Analyze My Roster" spec doc (2026-09, supplied by the user) —
-// see ROLE_WEIGHTS for the exact weight tables.
+// Top-line, 2nd-line and depth (3rd/4th-line), per side — mirrors how GMs
+// actually talk about a lineup ("top-6 forward", "bottom-6 forward") and how
+// real rosters are built: a 2nd line is still expected to produce offense
+// (same top6 weights as the top line), it's the 3rd/4th line that's judged on
+// checking/energy instead (bottom6 weights). An earlier version folded the
+// 2nd line in with the 3rd/4th under bottom6 weights, which meant a
+// genuinely elite scorer on his club's 2nd line (e.g. a 2nd 1A center paired
+// with his own team's superstar) was graded like a checking-line grinder
+// instead of a top-6 forward — DF/CK-heavy weights he was never meant to be
+// judged on. Plus the starting goalie tandem and each club's two PP/PK
+// units. Role/group per slot follows the "UNHL Intelligence / Analyze My
+// Roster" spec doc (2026-09, supplied by the user) — see ROLE_WEIGHTS for the
+// exact weight tables.
 export const SLOTS: SlotDef[] = [
   { id: "lw-top", label: "Top-line LW", kind: "forward", lineIdxs: [0], side: "lw", role: { group: "W", key: "top6W" } },
-  { id: "lw-depth", label: "Depth LW (2.–4. formácia)", kind: "forward", lineIdxs: [1, 2, 3], side: "lw", role: { group: "W", key: "bottom6W" } },
+  { id: "lw-line2", label: "2. formácia LW", kind: "forward", lineIdxs: [1], side: "lw", role: { group: "W", key: "top6W" } },
+  { id: "lw-depth", label: "Depth LW (3.–4. formácia)", kind: "forward", lineIdxs: [2, 3], side: "lw", role: { group: "W", key: "bottom6W" } },
   { id: "c-top", label: "Top-line C", kind: "forward", lineIdxs: [0], side: "c", role: { group: "C", key: "top6C" } },
-  { id: "c-depth", label: "Depth C (2.–4. formácia)", kind: "forward", lineIdxs: [1, 2, 3], side: "c", role: { group: "C", key: "bottom6C" } },
+  { id: "c-line2", label: "2. formácia C", kind: "forward", lineIdxs: [1], side: "c", role: { group: "C", key: "top6C" } },
+  { id: "c-depth", label: "Depth C (3.–4. formácia)", kind: "forward", lineIdxs: [2, 3], side: "c", role: { group: "C", key: "bottom6C" } },
   { id: "rw-top", label: "Top-line RW", kind: "forward", lineIdxs: [0], side: "rw", role: { group: "W", key: "top6W" } },
-  { id: "rw-depth", label: "Depth RW (2.–4. formácia)", kind: "forward", lineIdxs: [1, 2, 3], side: "rw", role: { group: "W", key: "bottom6W" } },
+  { id: "rw-line2", label: "2. formácia RW", kind: "forward", lineIdxs: [1], side: "rw", role: { group: "W", key: "top6W" } },
+  { id: "rw-depth", label: "Depth RW (3.–4. formácia)", kind: "forward", lineIdxs: [2, 3], side: "rw", role: { group: "W", key: "bottom6W" } },
   { id: "ld-top", label: "Top-pár LD", kind: "defense", lineIdxs: [0], side: "ld", role: { group: "D", key: "twoWayD" } },
   { id: "ld-bottom", label: "2.–3. pár LD", kind: "defense", lineIdxs: [1, 2], side: "ld", role: { group: "D", key: "bottomPairD" } },
   { id: "rd-top", label: "Top-pár RD", kind: "defense", lineIdxs: [0], side: "rd", role: { group: "D", key: "twoWayD" } },
