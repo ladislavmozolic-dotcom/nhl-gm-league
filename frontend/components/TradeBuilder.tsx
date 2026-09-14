@@ -11,7 +11,7 @@ import { describeConditionSpec, type ConditionSpec } from "@/lib/trade-condition
 import { t, type Lang } from "@/lib/i18n";
 
 type Player = { id: number; name: string; position: string; capHit: number; farm: boolean; clause?: string | null; noTradeTeams?: number[]; retainedAmount?: number };
-type Pick = { id: number; round?: number; label: string; logoUrl?: string | null; locked?: boolean };
+type Pick = { id: number; label: string; logoUrl?: string | null; locked?: boolean };
 type Assets = { players: Player[]; picks: Pick[]; prospects: Pick[] };
 type Team = { id: number; name: string; logoUrl?: string | null };
 type Terms = { feeAmount: number; feePct: number; fullPayout: boolean; reason: string; payTeamId: number };
@@ -221,47 +221,24 @@ function PlayerTable({ title, list, pmap, setPmap, destTeamId, ownerTeamId, term
   );
 }
 
-function CheckTable({ title, icon, list, sel, setSel, onToggle, protect }: {
+function CheckTable({ title, icon, list, sel, setSel, onToggle }: {
   title: string; icon: string; list: Pick[]; sel: Set<number>; setSel: (s: Set<number>) => void;
   onToggle: (sel: Set<number>, setSel: (s: Set<number>) => void, id: number) => void;
-  // Draft-pick-level "protect this against the lottery" toggle (round-1 picks
-  // only) — the pick-level analog of the player-level CON checkbox.
-  protect?: { conditionSpec: ConditionSpec | null; onOpen: (pick: Pick) => void; onRemove: () => void; lang: Lang };
 }) {
   return (
     <div className="bg-slate-900/40 border border-slate-800 rounded-lg overflow-hidden">
       <div className="px-3 py-2 bg-slate-800/40 text-xs font-bold uppercase tracking-wide text-slate-400">{title} ({list.length})</div>
       <div className="max-h-[28vh] overflow-y-auto divide-y divide-slate-800/60">
         {list.length === 0 && <div className="px-3 py-3 text-slate-600 text-sm">none</div>}
-        {list.map((it) => {
-          const protectedNow = protect?.conditionSpec?.pickBId === it.id;
-          return (
-            <div key={it.id} className={`px-3 py-2 text-sm ${sel.has(it.id) ? "bg-blue-950/30" : ""}`}>
-              <label className={`flex items-center gap-2.5 ${it.locked ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
-                title={it.locked ? "Locked by a pending conditional trade — can't be moved until it resolves" : undefined}>
-                <input type="checkbox" checked={sel.has(it.id)} disabled={it.locked} onChange={() => !it.locked && onToggle(sel, setSel, it.id)} className="accent-blue-500 w-4 h-4" />
-                {it.logoUrl && <img src={it.logoUrl} alt="" className="w-4 h-4 object-contain shrink-0" />}
-                <span className="text-slate-300 flex-1">{icon} {it.label}</span>
-                {it.locked && <span className="text-amber-400 text-xs">🔒</span>}
-              </label>
-              {protect && it.round === 1 && !it.locked && (
-                <div className="mt-1.5 ml-6.5 text-xs">
-                  <label className="flex items-center gap-2 cursor-pointer text-slate-400">
-                    <input type="checkbox" checked={protectedNow} onChange={() => (protectedNow ? protect.onRemove() : protect.onOpen(it))} className="accent-amber-500 w-3.5 h-3.5" />
-                    <span className="font-medium">{t(protect.lang, "cond.conLabel")}</span>
-                    <span className="text-slate-600">— {t(protect.lang, "cond.conHintPick")}</span>
-                  </label>
-                  {protectedNow && protect.conditionSpec && (
-                    <p className="mt-1.5 ml-5.5 text-amber-300/90 bg-amber-950/20 border border-amber-800/30 rounded px-2 py-1.5">
-                      📋 {describeConditionSpec(protect.conditionSpec, protect.lang)}{" "}
-                      <button type="button" onClick={() => protect.onOpen(it)} className="underline hover:text-amber-200">{t(protect.lang, "cond.edit")}</button>
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {list.map((it) => (
+          <label key={it.id} className={`flex items-center gap-2.5 px-3 py-2 text-sm ${it.locked ? "cursor-not-allowed opacity-50" : "cursor-pointer"} ${sel.has(it.id) ? "bg-blue-950/30" : ""}`}
+            title={it.locked ? "Locked by a pending conditional trade — can't be moved until it resolves" : undefined}>
+            <input type="checkbox" checked={sel.has(it.id)} disabled={it.locked} onChange={() => !it.locked && onToggle(sel, setSel, it.id)} className="accent-blue-500 w-4 h-4" />
+            {it.logoUrl && <img src={it.logoUrl} alt="" className="w-4 h-4 object-contain shrink-0" />}
+            <span className="text-slate-300">{icon} {it.label}</span>
+            {it.locked && <span className="text-amber-400 text-xs">🔒</span>}
+          </label>
+        ))}
       </div>
     </div>
   );
@@ -281,7 +258,7 @@ function Side({ team, assets, pmap, setPmap, pk, setPk, pro, setPro, cash, setCa
   // needed to know how many newly-retained players would land on its roster.
   incomingAssets: Assets; incomingPmap: Record<number, number>;
   conditionSpec: ConditionSpec | null;
-  onOpenCondition: (p: Player | null, ownerTeamId: number, picks: Pick[], presetPickBId?: number) => void;
+  onOpenCondition: (p: Player, ownerTeamId: number, picks: Pick[]) => void;
   onRemoveCondition: () => void;
   lang: Lang;
 }) {
@@ -301,13 +278,7 @@ function Side({ team, assets, pmap, setPmap, pk, setPk, pro, setPro, cash, setCa
         onRemoveCondition={onRemoveCondition}
         lang={lang} />
       <CheckTable title="Prospects" icon="⭐" list={assets.prospects} sel={pro} setSel={setPro} onToggle={onTogglePick} />
-      <CheckTable title="Draft picks" icon="🎫" list={assets.picks} sel={pk} setSel={setPk} onToggle={onTogglePickAsset}
-        protect={{
-          conditionSpec: conditionSpec && conditionSpec.playerId == null && assets.picks.some((p) => p.id === conditionSpec.pickBId) ? conditionSpec : null,
-          onOpen: (pick) => onOpenCondition(null, team.id, assets.picks, pick.id),
-          onRemove: onRemoveCondition,
-          lang,
-        }} />
+      <CheckTable title="Draft picks" icon="🎫" list={assets.picks} sel={pk} setSel={setPk} onToggle={onTogglePickAsset} />
       <div className="bg-slate-900/40 border border-slate-800 rounded-lg px-3 py-2.5 flex items-center gap-2 text-sm">
         <span className="text-slate-400">Cash</span>
         <div className="flex items-center bg-slate-900 border border-slate-700 rounded">
@@ -360,7 +331,7 @@ export default function TradeBuilder({ me, opp, mine, theirs, meCap, oppCap, onP
   // one structured conditional-pick clause per trade — the player it's under,
   // and the modal state while it's open (null = closed)
   const [conditionSpec, setConditionSpec] = useState<ConditionSpec | null>(null);
-  const [conditionModal, setConditionModal] = useState<{ player: Player | null; ownerTeamId: number; picks: Pick[]; presetPickBId?: number } | null>(null);
+  const [conditionModal, setConditionModal] = useState<{ player: Player; ownerTeamId: number; picks: Pick[] } | null>(null);
   // clause agent: fetched terms per protected player + the fees the GM agrees to pay
   const [terms, setTerms] = useState<Record<number, Terms | "loading">>({});
   const [fees, setFees] = useState<Record<number, { feeAmount: number; payTeamId: number }>>({});
@@ -471,7 +442,7 @@ export default function TradeBuilder({ me, opp, mine, theirs, meCap, oppCap, onP
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px_1fr] gap-4 items-start">
         <Side team={me} assets={mine} pmap={mineP} setPmap={setMineP} pk={minePk} setPk={setMinePk} pro={minePro} setPro={setMinePro} cash={mineCash} setCash={setMineCash} destTeamId={opp.id} terms={terms} fees={fees} onToggleClause={toggleClausePlayer} onAgreeFee={agreeFee} onTogglePick={togglePick} onTogglePickAsset={toggleDraftPick} capStatus={meCap} capDelta={meCapDelta} incomingAssets={theirs} incomingPmap={theirsP}
-          conditionSpec={conditionSpec} onOpenCondition={(p, ownerTeamId, picks, presetPickBId) => setConditionModal({ player: p, ownerTeamId, picks, presetPickBId })} onRemoveCondition={() => setConditionSpec(null)} lang={lang} />
+          conditionSpec={conditionSpec} onOpenCondition={(p, ownerTeamId, picks) => setConditionModal({ player: p, ownerTeamId, picks })} onRemoveCondition={() => setConditionSpec(null)} lang={lang} />
 
         {/* MIDDLE — live summary, conditions, Propose + GM Assist */}
         <div className="lg:sticky lg:top-4 space-y-3">
@@ -525,23 +496,16 @@ export default function TradeBuilder({ me, opp, mine, theirs, meCap, oppCap, onP
         </div>
 
         <Side team={opp} assets={theirs} pmap={theirsP} setPmap={setTheirsP} pk={theirsPk} setPk={setTheirsPk} pro={theirsPro} setPro={setTheirsPro} cash={theirsCash} setCash={setTheirsCash} destTeamId={me.id} terms={terms} fees={fees} onToggleClause={toggleClausePlayer} onAgreeFee={agreeFee} onTogglePick={togglePick} onTogglePickAsset={toggleDraftPick} capStatus={oppCap} capDelta={oppCapDelta} incomingAssets={mine} incomingPmap={mineP}
-          conditionSpec={conditionSpec} onOpenCondition={(p, ownerTeamId, picks, presetPickBId) => setConditionModal({ player: p, ownerTeamId, picks, presetPickBId })} onRemoveCondition={() => setConditionSpec(null)} lang={lang} />
+          conditionSpec={conditionSpec} onOpenCondition={(p, ownerTeamId, picks) => setConditionModal({ player: p, ownerTeamId, picks })} onRemoveCondition={() => setConditionSpec(null)} lang={lang} />
       </div>
 
-      {conditionModal && (() => {
-        // A player-row CON matches an existing spec by playerId; a pick-row
-        // PROTECT (no player) matches by which pick it was opened for instead.
-        const editingExisting = conditionModal.player
-          ? conditionSpec?.playerId === conditionModal.player.id
-          : conditionSpec != null && conditionSpec.playerId == null && conditionSpec.pickBId === conditionModal.presetPickBId;
-        return (
+      {conditionModal && (
           <ConditionModal
             player={conditionModal.player}
             ownerTeamId={conditionModal.ownerTeamId}
             picks={conditionModal.picks}
-            presetPickBId={conditionModal.presetPickBId}
             lang={lang}
-            initial={editingExisting ? conditionSpec : null}
+            initial={conditionSpec?.playerId === conditionModal.player.id ? conditionSpec : null}
             onSave={(spec) => {
               // Pick B is the default — it conveys as part of this deal right
               // away unless the condition is met — so it must actually be part
@@ -554,11 +518,10 @@ export default function TradeBuilder({ me, opp, mine, theirs, meCap, oppCap, onP
               if (!pk.has(spec.pickBId)) { const n = new Set(pk); n.add(spec.pickBId); setPk(n); }
               setConditionSpec(spec); setConditionModal(null);
             }}
-            onRemove={editingExisting ? () => { setConditionSpec(null); setConditionModal(null); } : undefined}
+            onRemove={conditionSpec?.playerId === conditionModal.player.id ? () => { setConditionSpec(null); setConditionModal(null); } : undefined}
             onClose={() => setConditionModal(null)}
           />
-        );
-      })()}
+      )}
     </div>
   );
 }

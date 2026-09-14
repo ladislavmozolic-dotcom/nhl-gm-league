@@ -100,7 +100,7 @@ function describeClause(lang: Lang, c: ConditionClause): string {
     case "CONTRACT_EXT":
       return t(lang, c.extended ? "cond.contractExtYes" : "cond.contractExtNo");
     case "LOTTERY_PROTECTION":
-      return `${t(lang, "cond.lotteryProtects")} TOP ${c.threshold}`;
+      return `${t(lang, "cond.lotteryProtects")} ${c.threshold}`;
   }
 }
 
