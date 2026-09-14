@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { loadSettings } from "@/lib/sim/settings";
-import { liveCapHit } from "@/lib/finance";
+import { liveCapHit, deadMoneyForYear, CURRENT_SEASON_START } from "@/lib/finance";
 import { regularSeasonDayProgress, resolvePhaseThresholds } from "@/lib/calendar-server";
 import { addDays } from "@/lib/calendar";
 import { REGULAR_SEASON } from "@/lib/phase";
@@ -13,11 +13,11 @@ const iso = (d: Date) => d.toISOString().slice(0, 10);
 
 export default async function CapCalculatorPage({ searchParams }: { searchParams: Promise<{ team?: string; from?: string }> }) {
   const { team: initialTeam, from } = await searchParams;
-  const [settings, teams, dayProgress, { regularAt, playoffsAt }, games] = await Promise.all([
+  const [settings, teams, dayProgress, { regularAt, playoffsAt }, games, buyouts] = await Promise.all([
     loadSettings(),
     prisma.team.findMany({
       where: { league: "NHL", isAffiliate: false },
-      select: { id: true, name: true, code: true, logoUrl: true, players: { where: { rosterType: "NHL" }, select: { capHit: true, contractYears: true } } },
+      select: { id: true, name: true, code: true, logoUrl: true, players: { where: { rosterType: "NHL" }, select: { capHit: true, contractYears: true, retainedSalary: true } } },
       orderBy: { name: "asc" },
     }),
     regularSeasonDayProgress(),
@@ -26,10 +26,19 @@ export default async function CapCalculatorPage({ searchParams }: { searchParams
       where: { season: REGULAR_SEASON, league: "NHL", seriesId: null },
       select: { gameDate: true, homeTeamId: true, awayTeamId: true },
     }),
+    // Real buyouts AND trade-retention dead cap (totalCost=0) both count
+    // against the cap the same way — no need to split them here.
+    prisma.buyout.findMany({ select: { teamId: true, perYear: true, startYear: true, years: true } }),
   ]);
+  const buyoutsByTeam = new Map<number, typeof buyouts>();
+  for (const b of buyouts) (buyoutsByTeam.get(b.teamId) ?? buyoutsByTeam.set(b.teamId, []).get(b.teamId)!).push(b);
   const teamData = teams.map((t) => ({
     name: t.name, code: t.code, logoUrl: t.logoUrl,
-    capHit: t.players.reduce((s, p) => s + liveCapHit(p), 0),
+    // Net each player's cap hit of any retention someone ELSE pays (see
+    // components/TeamCapView.tsx's identical "Actual Cap Hit" formula), then
+    // add this club's own dead money from buyouts/retentions it carries.
+    capHit: t.players.reduce((s, p) => s + Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0)), 0)
+      + deadMoneyForYear(buyoutsByTeam.get(t.id) ?? [], CURRENT_SEASON_START),
   }));
   // The last real day of the regular season is one before playoffsAt (which marks
   // the day AFTER the last scheduled game).
