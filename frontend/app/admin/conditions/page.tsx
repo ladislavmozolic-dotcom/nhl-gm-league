@@ -19,7 +19,10 @@ export default async function AdminConditionsPage() {
   const teamIds = [...new Set(conditions.flatMap((c) => [c.fromTeamId, c.toTeamId]))];
   const [teams, skaters, picks] = await Promise.all([
     prisma.team.findMany({ select: { id: true, name: true, code: true } }),
-    prisma.player.findMany({ where: { rosterType: "NHL", isGoalie: false }, select: { id: true, name: true, teamId: true }, orderBy: { name: "asc" } }),
+    // structured tracking runs on real NHL production, so only offer players
+    // with a real Player.nhlId — a fictional/generated player has no real
+    // season to check against
+    prisma.player.findMany({ where: { rosterType: "NHL", isGoalie: false, nhlId: { not: null } }, select: { id: true, name: true, teamId: true }, orderBy: { name: "asc" } }),
     prisma.draftPick.findMany({ where: { teamId: { in: teamIds } }, orderBy: [{ year: "asc" }, { round: "asc" }] }),
   ]);
   const nameOf = (id: number) => teams.find((t) => t.id === id)?.name ?? `#${id}`;
@@ -45,7 +48,7 @@ export default async function AdminConditionsPage() {
         <div className="space-y-3">
           {await Promise.all(conditions.map(async (c) => {
             const structured = c.playerId != null && c.seasonYear != null;
-            const evalResult = structured ? await evaluateCondition(c) : null;
+            const { eval: evalResult, error: evalError } = structured ? await evaluateCondition(c) : { eval: null, error: null };
             const player = c.playerId != null ? playersById.get(c.playerId) : null;
             const teamPicks = [...(picksByTeam.get(c.fromTeamId) ?? []), ...(picksByTeam.get(c.toTeamId) ?? [])];
             return (
@@ -63,7 +66,8 @@ export default async function AdminConditionsPage() {
 
                 {structured && player && (
                   <div className="mt-3 bg-slate-950/50 rounded-lg p-3 space-y-2">
-                    <p className="text-xs text-slate-500">Tracking <b className="text-slate-300">{cleanName(player.name)}</b> — {c.seasonYear}-{String((c.seasonYear ?? 0) + 1).slice(-2)} regular season</p>
+                    <p className="text-xs text-slate-500">Tracking <b className="text-slate-300">{cleanName(player.name)}</b>&apos;s real NHL production — {c.seasonYear}-{String((c.seasonYear ?? 0) + 1).slice(-2)} regular season</p>
+                    {evalError && <p className="text-xs text-amber-400">⚠ {evalError}</p>}
                     {evalResult && (
                       <div className="space-y-1.5">
                         {evalResult.clauses.map((cl, i) => (

@@ -42,6 +42,10 @@ export async function attachStructuredCondition(input: {
   if (!condition) return { ok: false as const, error: "Condition not found." };
   if (condition.status !== "PENDING") return { ok: false as const, error: "This condition is already resolved." };
   if (input.pickAId === input.pickBId) return { ok: false as const, error: "Pick A and Pick B must be different picks." };
+  // structured tracking is judged against the player's REAL NHL production, so
+  // a fictional/generated player with no real nhlId on file can't be tracked
+  const trackedPlayer = await prisma.player.findUnique({ where: { id: input.playerId }, select: { nhlId: true } });
+  if (!trackedPlayer?.nhlId) return { ok: false as const, error: "This player has no real NHL ID on file — his real-life production can't be tracked." };
 
   const picks = await prisma.draftPick.findMany({ where: { id: { in: [input.pickAId, input.pickBId] } } });
   if (picks.length !== 2) return { ok: false as const, error: "One of the picks wasn't found." };
@@ -75,8 +79,8 @@ export async function resolveStructuredCondition(conditionId: number) {
   if (condition.status !== "PENDING") return { ok: false as const, error: "Already resolved." };
   if (!condition.pickAId || !condition.pickBId) return { ok: false as const, error: "No structured tracking attached yet." };
 
-  const evalResult = await evaluateCondition(condition);
-  if (!evalResult) return { ok: false as const, error: "Missing player/season — can't evaluate." };
+  const { eval: evalResult, error: evalError } = await evaluateCondition(condition);
+  if (!evalResult) return { ok: false as const, error: evalError ?? "Couldn't evaluate this condition." };
 
   const [player, fromTeam, toTeam, pickA, pickB] = await Promise.all([
     prisma.player.findUnique({ where: { id: condition.playerId! }, select: { name: true } }),
