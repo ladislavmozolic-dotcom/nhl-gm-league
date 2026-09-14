@@ -18,7 +18,8 @@ import { buyoutPlayer } from "@/app/finance/[slug]/actions";
 
 const SEASON = "2026-27";
 const SPAN = 5;
-type CP = { id: number; name: string; position: string; age: number | null; birthDate?: string | Date | null; isGoalie: boolean; capHit: number | null; contractYears: number | null; retainedSalary?: number | null };
+type CP = { id: number; name: string; position: string; age: number | null; birthDate?: string | Date | null; isGoalie: boolean; capHit: number | null; contractYears: number | null; retainedSalary?: number | null; tradeClause?: string | null; noTradeTeams?: number[] };
+const CLAUSE_LABEL: Record<string, string> = { NTC: "NTC", NMC: "NMC", M_NTC: "M-NTC" };
 const isD = (pos: string) => /(^|\/)D(\/|$)/.test(pos) || pos === "D";
 /** capwages-style split: Forwards / Defense / Goalies as their own groups
  *  instead of one flat cap-hit-sorted list. */
@@ -34,14 +35,14 @@ export default async function TeamCapView({ slug }: { slug: string }) {
     where: { slug },
     select: {
       id: true, name: true, code: true, logoUrl: true, arena: true, popularity: true, arenaSections: true, capacity: true, bankAccount: true,
-      players: { where: { rosterType: "NHL" }, select: { id: true, name: true, position: true, age: true, birthDate: true, isGoalie: true, capHit: true, retainedSalary: true, contractYears: true, injuryDaysLeft: true, condition: true }, orderBy: [{ isGoalie: "asc" }, { capHit: "desc" }] },
+      players: { where: { rosterType: "NHL" }, select: { id: true, name: true, position: true, age: true, birthDate: true, isGoalie: true, capHit: true, retainedSalary: true, contractYears: true, injuryDaysLeft: true, condition: true, tradeClause: true, noTradeTeams: true }, orderBy: [{ isGoalie: "asc" }, { capHit: "desc" }] },
       affiliateTeams: { select: { players: { where: { rosterType: "AHL" }, select: { id: true, name: true, position: true, age: true, birthDate: true, isGoalie: true, capHit: true, contractYears: true }, orderBy: [{ isGoalie: "asc" }, { capHit: "desc" }] } } },
     },
   });
   if (!team) notFound();
   const farm = team.affiliateTeams[0]?.players ?? [];
 
-  const [settings, session, buyouts, standings, homeGames, totalGames, retention, dayProgress] = await Promise.all([
+  const [settings, session, buyouts, standings, homeGames, totalGames, retention, dayProgress, allTeams] = await Promise.all([
     loadSettings(), getTeamSession(),
     prisma.buyout.findMany({ where: { teamId: team.id }, select: { id: true, playerId: true, playerName: true, perYear: true, startYear: true, years: true, totalCost: true } }),
     computeStandings(SEASON, "NHL"),
@@ -49,7 +50,10 @@ export default async function TeamCapView({ slug }: { slug: string }) {
     prisma.game.count({ where: { season: SEASON, league: "NHL", status: "FINAL", seriesId: null, OR: [{ homeTeamId: team.id }, { awayTeamId: team.id }] } }),
     teamRetentionStatus(team.id),
     regularSeasonDayProgress(),
+    prisma.team.findMany({ select: { id: true, code: true } }),
   ]);
+  // For an M-NTC player's protected-teams tooltip.
+  const teamCodeById = new Map(allTeams.map((t) => [t.id, t.code]));
   const isGm = session === team.id;
   // The Buyout table doubles up: a real buyout debits the bank (totalCost > 0);
   // a trade-retention record (totalCost = 0) is dead cap only — the player is
@@ -112,9 +116,22 @@ export default async function TeamCapView({ slug }: { slug: string }) {
       // any more, so the standalone Cap Hit column shouldn't read as one either.
       const netCapHit = Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0));
       const cells = playerCapYears({ ...p, capHit: netCapHit }, CURRENT_SEASON_START, SPAN);
+      const protectedTeams = p.tradeClause === "M_NTC" ? (p.noTradeTeams ?? []).map((id) => teamCodeById.get(id)).filter(Boolean).join(", ") : "";
       return (
         <tr key={p.id} className="border-b border-slate-800/60 hover:bg-slate-800/30">
-          <td className="px-3 py-1.5"><PlayerLink id={p.id} name={p.name} /></td>
+          <td className="px-3 py-1.5">
+            <span className="inline-flex items-center gap-1.5">
+              <PlayerLink id={p.id} name={p.name} />
+              {p.tradeClause && (
+                <span
+                  className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                  title={protectedTeams ? `Protected against: ${protectedTeams}` : undefined}
+                >
+                  {CLAUSE_LABEL[p.tradeClause] ?? p.tradeClause}
+                </span>
+              )}
+            </span>
+          </td>
           <td className="px-2 py-1.5 text-center text-slate-500 text-xs">{p.position}</td>
           <td className="px-2 py-1.5 text-center text-slate-400 tabular-nums">{p.age ?? "—"}</td>
           <td className="px-3 py-1.5 text-right tabular-nums font-medium">{netCapHit ? money(netCapHit) : "—"}</td>
