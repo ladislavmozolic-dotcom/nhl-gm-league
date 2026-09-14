@@ -19,7 +19,7 @@ export type BuiltLine = {
   kind: "F" | "D"; index: number; slots: LineSlot[];
   chemistry: number; gelled: boolean; pairs: PairBond[]; tacticalFit: number; profile: LineProfile; summary: string;
 };
-export type TeamLineBuild = { forwards: BuiltLine[]; defense: BuiltLine[] } | null;
+export type TeamLineBuild = { forwards: BuiltLine[]; defense: BuiltLine[]; scale: LineProfile } | null;
 
 const avg = (ns: number[]) => (ns.length ? ns.reduce((a, b) => a + b, 0) / ns.length : 0);
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
@@ -93,12 +93,33 @@ function tacticalFitD(pair: (P | null)[], tactics: TeamTactics, dZoneOverride?: 
   return clamp(roleScore * posFactor * sysFactor);
 }
 
+// The bars in the UI read as "how close to the league's best" rather than "how
+// close to a theoretical 100" — no skater actually runs a rating near 100 on
+// any of these, so a flat 0-100 scale made every line look weak on every bar.
+// Ceiling = the single highest NHL rating anyone in the league carries in that
+// attribute right now (e.g. McDavid's Playmaking), so a bar can actually reach
+// full width for a truly elite unit. Always benchmarked against the NHL pool,
+// even when viewing AHL lines, so "how far from the NHL's best" stays honest.
+async function leagueMaxProfile(): Promise<LineProfile> {
+  const agg = await prisma.player.aggregate({
+    where: { rosterType: "NHL", isGoalie: false },
+    _max: { pa: true, sc: true, sk: true, ck: true, df: true },
+  });
+  return {
+    playmaking: agg._max.pa ?? 100, shooting: agg._max.sc ?? 100, transition: agg._max.sk ?? 100,
+    physical: agg._max.ck ?? 100, defense: agg._max.df ?? 100,
+  };
+}
+
 export async function teamLineBuilder(teamId: number, league = "NHL"): Promise<TeamLineBuild> {
   const rosterType = league === "AHL" ? "AHL" : "NHL";
-  const rows = await prisma.player.findMany({
-    where: { teamId, rosterType, isGoalie: false, scratched: false },
-    select: { id: true, name: true, slug: true, position: true, shoots: true, overall: true, pa: true, sc: true, sk: true, ck: true, df: true, st: true, fo: true, en: true, weight: true },
-  });
+  const [rows, scale] = await Promise.all([
+    prisma.player.findMany({
+      where: { teamId, rosterType, isGoalie: false, scratched: false },
+      select: { id: true, name: true, slug: true, position: true, shoots: true, overall: true, pa: true, sc: true, sk: true, ck: true, df: true, st: true, fo: true, en: true, weight: true },
+    }),
+    leagueMaxProfile(),
+  ]);
   if (!rows.length) return null;
   // the GM's saved lines, else the same position-aware auto lines the sim uses
   const saved = await loadTeamLines(teamId);
@@ -153,5 +174,5 @@ export async function teamLineBuilder(teamId: number, league = "NHL"): Promise<T
     return { kind: "D", index: i, slots, chemistry, gelled, pairs, tacticalFit, profile, summary: summaryOf(profile, "D") };
   });
 
-  return { forwards, defense };
+  return { forwards, defense, scale };
 }
