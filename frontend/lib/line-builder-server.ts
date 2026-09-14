@@ -7,7 +7,7 @@ import { prisma } from "./prisma";
 import { loadTeamLines, loadTeamSystem, autoLines } from "./sim/lines";
 import { pairSig, unitChemistry } from "./sim/chemistry";
 import { roleFitOf } from "./sim/role-fit";
-import { systemFit, DEFAULT_TACTICS, type TeamTactics } from "./sim/tactics";
+import { systemFit, DEFAULT_TACTICS, type TeamTactics, type PuckStyle, type DZone } from "./sim/tactics";
 import { cleanName } from "./playerName";
 
 type Attrs = { pa: number; sc: number; sk: number; ck: number; df: number; st: number; fo: number; en: number; weight: number };
@@ -62,7 +62,12 @@ function unitProfile(present: P[]) {
 // per game, e.g. a rush team wants finishing/passing/speed, a cycle team wants
 // passing/strength). A club running the default Balanced system scores exactly
 // as before (systemFit returns a neutral 1.0 when every dial is "balanced").
-function tacticalFitF(ps: (P | null)[], tactics: TeamTactics): number {
+// `puckOverride` is this specific line's own Puck Style from the Line Editor
+// (ForwardLine.puck), which overrides the team dial for just this unit — the
+// SAME override lib/sim/tactics.ts's resolveLineTactics applies for the real
+// sim. Without it, editing a line's own system in the Line Editor (as opposed
+// to the team-wide Team System page) never moved this line's Tactical Fit.
+function tacticalFitF(ps: (P | null)[], tactics: TeamTactics, puckOverride?: PuckStyle): number {
   const present = ps.filter((p): p is P => !!p);
   if (present.length < 2) return 0;
   const roleScore = roleFitOf(present.map((p) => p.a), false) * 100;
@@ -72,17 +77,19 @@ function tacticalFitF(ps: (P | null)[], tactics: TeamTactics): number {
     const ok = want === "C" ? /C|F/.test(pos) : (pos.includes(want) || /\bW\b|F/.test(pos) || pos === "LW/RW" || (want === "LW" && /L/.test(pos)) || (want === "RW" && /R/.test(pos)));
     if (ok) good++; });
   const posFactor = n ? 0.75 + 0.25 * (good / n) : 0.85;
-  const sysFactor = systemFit(unitProfile(present), tactics);
+  const effTactics = puckOverride ? { ...tactics, puckStyle: puckOverride } : tactics;
+  const sysFactor = systemFit(unitProfile(present), effTactics);
   return clamp(roleScore * posFactor * sysFactor);
 }
-function tacticalFitD(pair: (P | null)[], tactics: TeamTactics): number {
+function tacticalFitD(pair: (P | null)[], tactics: TeamTactics, dZoneOverride?: DZone): number {
   const present = pair.filter((p): p is P => !!p);
   if (present.length < 2) return 0;
   const roleScore = roleFitOf(present.map((p) => p.a), true) * 100;
   // handedness: LD shoots L, RD shoots R
   let good = 0; if (pair[0]?.shoots === "L") good++; if (pair[1]?.shoots === "R") good++;
   const posFactor = 0.78 + 0.22 * (good / 2);
-  const sysFactor = systemFit(unitProfile(present), tactics);
+  const effTactics = dZoneOverride ? { ...tactics, dZone: dZoneOverride } : tactics;
+  const sysFactor = systemFit(unitProfile(present), effTactics);
   return clamp(roleScore * posFactor * sysFactor);
 }
 
@@ -129,7 +136,7 @@ export async function teamLineBuilder(teamId: number, league = "NHL"): Promise<T
     const slots: LineSlot[] = ps.map((p, idx) => ({ role: roles[idx], id: p?.id ?? null, name: p?.name ?? null, slug: p?.slug ?? null, overall: p?.overall ?? null,
       offSlot: !!p && !(roles[idx] === "C" ? /C|F/.test((p.position || "").toUpperCase()) : ((p.position || "").toUpperCase().includes(roles[idx]) || /\bW\b|F/.test((p.position || "").toUpperCase()))) }));
     const profile = profileOf(present);
-    const tacticalFit = tacticalFitF(ps, tactics);
+    const tacticalFit = tacticalFitF(ps, tactics, l.puck);
     const { chemistry, gelled, pairs } = chemFor(slots.map((s) => ({ role: s.role, id: s.id })), tacticalFit);
     return { kind: "F", index: i, slots, chemistry, gelled, pairs, tacticalFit, profile, summary: summaryOf(profile, "F") };
   });
@@ -141,7 +148,7 @@ export async function teamLineBuilder(teamId: number, league = "NHL"): Promise<T
     const slots: LineSlot[] = ps.map((p, idx) => ({ role: roles[idx], id: p?.id ?? null, name: p?.name ?? null, slug: p?.slug ?? null, overall: p?.overall ?? null,
       offSlot: !!p && ((idx === 0 && p.shoots === "R") || (idx === 1 && p.shoots === "L")) }));
     const profile = profileOf(present);
-    const tacticalFit = tacticalFitD(ps, tactics);
+    const tacticalFit = tacticalFitD(ps, tactics, l.dzone);
     const { chemistry, gelled, pairs } = chemFor(slots.map((s) => ({ role: s.role, id: s.id })), tacticalFit);
     return { kind: "D", index: i, slots, chemistry, gelled, pairs, tacticalFit, profile, summary: summaryOf(profile, "D") };
   });
