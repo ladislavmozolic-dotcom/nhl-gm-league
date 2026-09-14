@@ -10,6 +10,8 @@ function contractTypeLabel(t: string | null): string {
   return "—";
 }
 
+const CLAUSE_LABEL: Record<string, string> = { NTC: "NTC", NMC: "NMC", M_NTC: "M-NTC" };
+
 export default async function ContractsPage() {
   const players = await prisma.player.findMany({
     where: { rosterType: { in: ["NHL", "AHL"] }, capHit: { gt: 0 }, contractYears: { gt: 0 } },
@@ -24,11 +26,13 @@ export default async function ContractsPage() {
     { key: "cap", label: "Cap Hit", kind: "money" },
     { key: "yrs", label: "Years", kind: "years" },
     { key: "type", label: "Type", kind: "text" },
+    { key: "clause", label: "Clause", kind: "text" },
   ];
   const rows = players.map((p) => ({
     _id: p.id, name: p.name, slug: p.slug, photo: p.photoUrl,
     teamCode: p.team?.code, teamSlug: p.team?.slug, teamLogo: p.team?.logoUrl,
     pos: p.position, cap: p.capHit ?? 0, yrs: p.contractYears ?? null, type: contractTypeLabel(p.contractType),
+    clause: p.tradeClause ? (CLAUSE_LABEL[p.tradeClause] ?? p.tradeClause) : "",
   }));
 
   return (

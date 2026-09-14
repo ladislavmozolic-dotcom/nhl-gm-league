@@ -119,18 +119,16 @@ export default async function TeamCapView({ slug }: { slug: string }) {
       const protectedTeams = p.tradeClause === "M_NTC" ? (p.noTradeTeams ?? []).map((id) => teamCodeById.get(id)).filter(Boolean).join(", ") : "";
       return (
         <tr key={p.id} className="border-b border-slate-800/60 hover:bg-slate-800/30">
-          <td className="px-3 py-1.5">
-            <span className="inline-flex items-center gap-1.5">
-              <PlayerLink id={p.id} name={p.name} />
-              {p.tradeClause && (
-                <span
-                  className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30"
-                  title={protectedTeams ? `Protected against: ${protectedTeams}` : undefined}
-                >
-                  {CLAUSE_LABEL[p.tradeClause] ?? p.tradeClause}
-                </span>
-              )}
-            </span>
+          <td className="px-3 py-1.5"><PlayerLink id={p.id} name={p.name} /></td>
+          <td className="px-2 py-1.5 text-center">
+            {p.tradeClause && (
+              <span
+                className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                title={protectedTeams ? `Protected against: ${protectedTeams}` : undefined}
+              >
+                {CLAUSE_LABEL[p.tradeClause] ?? p.tradeClause}
+              </span>
+            )}
           </td>
           <td className="px-2 py-1.5 text-center text-slate-500 text-xs">{p.position}</td>
           <td className="px-2 py-1.5 text-center text-slate-400 tabular-nums">{p.age ?? "—"}</td>
@@ -144,7 +142,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   const Thead = ({ gm }: { gm: boolean }) => (
     <thead>
       <tr className="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-800 bg-slate-800/30">
-        <th className="text-left px-3 py-2 font-medium">Player</th><th className="px-2 py-2 font-medium">Pos</th><th className="px-2 py-2 font-medium">Age</th><th className="text-right px-3 py-2 font-medium">Cap Hit</th>
+        <th className="text-left px-3 py-2 font-medium">Player</th><th className="px-2 py-2 font-medium">Clause</th><th className="px-2 py-2 font-medium">Pos</th><th className="px-2 py-2 font-medium">Age</th><th className="text-right px-3 py-2 font-medium">Cap Hit</th>
         {years.map((y) => <th key={y} className="text-right px-3 py-2 whitespace-nowrap">{seasonLabel(y)}</th>)}
         {gm && <th />}
       </tr>
@@ -161,7 +159,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
       <table className="w-full text-sm min-w-[960px]">
         <Thead gm={gm} />
         <tbody>
-          {list.length > 0 ? <CapRows list={list} gm={gm} /> : <tr><td colSpan={4 + SPAN + (gm ? 1 : 0)} className="px-3 py-3 text-slate-600 text-sm">None on this roster.</td></tr>}
+          {list.length > 0 ? <CapRows list={list} gm={gm} /> : <tr><td colSpan={5 + SPAN + (gm ? 1 : 0)} className="px-3 py-3 text-slate-600 text-sm">None on this roster.</td></tr>}
         </tbody>
       </table>
     </div>
