@@ -132,18 +132,18 @@ export async function runLottery(year: number) {
   return { winners: outcome.winners };
 }
 
-/** Auto-settle every PENDING conditional pick that's a classic top-N
- *  protected 1st-rounder (see lib/trade-conditions-shared.ts's
- *  LotteryClause) whose protected pick (pickB) belongs to draft year `year`
+/** Auto-settle every PENDING conditional pick that carries a top-N
+ *  protected-pick clause (see lib/trade-conditions-shared.ts's
+ *  LotteryClause) whose protected pick (pickA) belongs to draft year `year`
  *  — called right after that year's Draft Lottery commits, since that's the
  *  only moment this kind of condition can actually be evaluated. */
 export async function resolveLotteryProtectionsForYear(year: number) {
-  const pending = await prisma.tradeCondition.findMany({ where: { status: "PENDING", pickBId: { not: null } } });
+  const pending = await prisma.tradeCondition.findMany({ where: { status: "PENDING", pickAId: { not: null } } });
   for (const condition of pending) {
     const clauses = (condition.clauses as unknown as ConditionClause[] | null) ?? [];
     if (!clauses.some((c) => c.kind === "LOTTERY_PROTECTION")) continue;
-    const pickB = await prisma.draftPick.findUnique({ where: { id: condition.pickBId! }, select: { year: true } });
-    if (!pickB || pickB.year !== year) continue;
+    const pickA = await prisma.draftPick.findUnique({ where: { id: condition.pickAId! }, select: { year: true } });
+    if (!pickA || pickA.year !== year) continue;
     const { eval: evalResult } = await evaluateCondition(condition);
     if (evalResult) await settleCondition(condition, evalResult);
   }

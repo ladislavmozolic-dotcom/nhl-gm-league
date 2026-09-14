@@ -145,16 +145,18 @@ async function evalContract(c: ContractClause, condition: StructuredCondition): 
 }
 
 async function evalLottery(c: LotteryClause, condition: StructuredCondition): Promise<ClauseProgress | { error: string }> {
-  if (!condition.pickBId) return { error: "No protected pick attached." };
-  const pick = await prisma.draftPick.findUnique({ where: { id: condition.pickBId } });
-  if (!pick) return { error: "Protected pick not found." };
-  if (pick.round !== 1) return { error: "Only a 1st round pick can be lottery-protected." };
-  const origTeam = pick.ownerLogoId != null ? await prisma.team.findFirst({ where: { profinhlLogoId: pick.ownerLogoId } }) : null;
+  if (!condition.pickAId) return { error: "No protected pick attached." };
+  const pickA = await prisma.draftPick.findUnique({ where: { id: condition.pickAId } });
+  if (!pickA) return { error: "Protected pick not found." };
+  if (pickA.round !== 1) return { error: "Only a 1st round pick can be lottery-protected." };
+  const origTeam = pickA.ownerLogoId != null ? await prisma.team.findFirst({ where: { profinhlLogoId: pickA.ownerLogoId } }) : null;
   if (!origTeam) return { error: "Couldn't resolve the pick's original team." };
-  const lotteryRow = await prisma.draftLottery.findFirst({ where: { year: pick.year, teamId: origTeam.id } });
-  if (!lotteryRow) return { error: `The ${pick.year} Draft Lottery hasn't been drawn yet.` };
-  const pass = lotteryRow.pick <= c.threshold;
-  const label = `Lands in the top ${c.threshold} (${pick.year} lottery)`;
+  const lotteryRow = await prisma.draftLottery.findFirst({ where: { year: pickA.year, teamId: origTeam.id } });
+  if (!lotteryRow) return { error: `The ${pickA.year} Draft Lottery hasn't been drawn yet.` };
+  // pass = SAFE to convey (the original team did NOT land in the protected
+  // range) — if they did, Pick A is protected and Pick B goes out instead.
+  const pass = lotteryRow.pick > c.threshold;
+  const label = `Not lottery-protected (top ${c.threshold}, ${pickA.year})`;
   return { kind: "LOTTERY_PROTECTION", label, pass, detail: `${origTeam.code ?? origTeam.name} landed at #${lotteryRow.pick}`, logic: c.logic };
 }
 

@@ -350,15 +350,14 @@ export async function assertConditionSpec(pkg: TradePackage): Promise<void> {
   const needsLottery = spec.clauses.some((c) => c.kind === "LOTTERY_PROTECTION");
   if (needsPlayer && spec.playerId == null) throw new Error("Conditional pick: this clause type needs a tracked player.");
 
-  const [player, pickA, pickB] = await Promise.all([
+  const [player, pickA] = await Promise.all([
     spec.playerId != null ? prisma.player.findUnique({ where: { id: spec.playerId }, select: { nhlId: true } }) : Promise.resolve(null),
-    prisma.draftPick.findUnique({ where: { id: spec.pickAId }, select: { teamId: true, lockedByConditionId: true } }),
-    needsLottery ? prisma.draftPick.findUnique({ where: { id: spec.pickBId }, select: { round: true } }) : Promise.resolve(null),
+    prisma.draftPick.findUnique({ where: { id: spec.pickAId }, select: { teamId: true, lockedByConditionId: true, round: true } }),
   ]);
   if (needsRealNhl && !player?.nhlId) throw new Error("Conditional pick: this player has no real NHL ID on file — his real-life production can't be tracked.");
   if (!pickA || pickA.teamId !== spec.ownerTeamId) throw new Error("Conditional pick: pick A isn't owned by the team offering it.");
   if (pickA.lockedByConditionId != null) throw new Error("Conditional pick: pick A is already locked by another pending condition.");
-  if (needsLottery && (!pickB || pickB.round !== 1)) throw new Error("Conditional pick: only a 1st round pick can be lottery-protected.");
+  if (needsLottery && pickA.round !== 1) throw new Error("Conditional pick: only a 1st round pick can be lottery-protected.");
 }
 
 /** Rebuild the TradePackage from stored TradeAssets. */

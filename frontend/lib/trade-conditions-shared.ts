@@ -56,11 +56,15 @@ export type PlayoffClause = { kind: "PLAYOFF_ROUND"; seasonYear: number; round: 
 /** UNHL-only: whether the tracked player signs a new contract (extension or
  *  fresh deal) with the acquiring club before the condition is resolved. */
 export type ContractClause = { kind: "CONTRACT_EXT"; extended: boolean; logic?: "AND" | "OR" };
-/** No tracked player at all — a classic "protected 1st round pick": Pick B
- *  (the default) IS the pick being protected, and this clause is met when
- *  that pick's ORIGINAL team lands within the top `threshold` slots of the
- *  Draft Lottery for its year, in which case Pick A (the fallback, e.g. a
- *  future 1st) conveys instead and Pick B stays home. */
+/** A classic "protected 1st round pick": Pick A (the upgrade the other
+ *  clauses would otherwise send) IS the pick being protected. This clause
+ *  passes when Pick A's ORIGINAL team does NOT land within the top
+ *  `threshold` slots of Pick A's own Draft Lottery year — i.e. it's safe to
+ *  convey. If that team DOES land that high, Pick A is protected (doesn't
+ *  convey) and Pick B (the default, e.g. a future 1st) stays out as usual.
+ *  Combines with any other clauses via the normal AND/OR chain — on its own
+ *  (no other clauses) it makes Pick A a plain protected pick with no player
+ *  performance attached. */
 export type LotteryClause = { kind: "LOTTERY_PROTECTION"; threshold: LotteryThreshold; logic?: "AND" | "OR" };
 export type ConditionClause = StatClause | PlayoffClause | ContractClause | LotteryClause;
 
@@ -100,7 +104,7 @@ function describeClause(lang: Lang, c: ConditionClause): string {
     case "CONTRACT_EXT":
       return t(lang, c.extended ? "cond.contractExtYes" : "cond.contractExtNo");
     case "LOTTERY_PROTECTION":
-      return `${t(lang, "cond.lotteryProtects")} ${c.threshold}`;
+      return t(lang, "cond.lotteryClauseDesc").replace("{threshold}", String(c.threshold));
   }
 }
 
