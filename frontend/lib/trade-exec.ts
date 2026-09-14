@@ -324,11 +324,12 @@ export async function assertOwnership(pkg: TradePackage) {
 }
 
 /** Validate a Trade Builder-authored ConditionSpec before the trade is even
- *  proposed. pickA must be one of the picks THIS deal is already sending on
- *  the condition's own side (spec.ownerTeamId); pickB is the alternate that
- *  stays home unless the condition is met, so it must be a DIFFERENT pick the
- *  same side still owns, not already part of this trade, and not already
- *  locked by some other pending condition. */
+ *  proposed. Pick A is the UPGRADE — it only conveys if the condition is MET
+ *  — so it must be a pick the condition's own side (spec.ownerTeamId) still
+ *  owns, not already part of this trade, and not already locked by some other
+ *  pending condition. Pick B is the DEFAULT — it conveys as part of this deal
+ *  right away, staying put unless the condition is met — so it must already
+ *  be one of the picks this side is sending. */
 export async function assertConditionSpec(pkg: TradePackage): Promise<void> {
   const spec = pkg.conditionSpec;
   if (!spec) return;
@@ -337,17 +338,17 @@ export async function assertConditionSpec(pkg: TradePackage): Promise<void> {
   const tradedPlayerIds = new Set([...pkg.fromPlayers, ...pkg.toPlayers].map((p) => p.playerId));
   if (!tradedPlayerIds.has(spec.playerId)) throw new Error("Conditional pick: the tracked player isn't actually part of this trade.");
   if (spec.pickAId === spec.pickBId) throw new Error("Conditional pick: pick A and pick B must be different picks.");
-  if (!ownSide.includes(spec.pickAId)) throw new Error("Conditional pick: pick A must be one of the picks this side is already sending.");
-  if (ownSide.includes(spec.pickBId) || pkg.fromPicks.includes(spec.pickBId) || pkg.toPicks.includes(spec.pickBId))
-    throw new Error("Conditional pick: pick B must NOT already be part of this trade — it only moves if the condition is met.");
+  if (!ownSide.includes(spec.pickBId)) throw new Error("Conditional pick: pick B must be one of the picks this side is already sending.");
+  if (ownSide.includes(spec.pickAId) || pkg.fromPicks.includes(spec.pickAId) || pkg.toPicks.includes(spec.pickAId))
+    throw new Error("Conditional pick: pick A must NOT already be part of this trade — it only moves if the condition is met.");
 
-  const [player, pickB] = await Promise.all([
+  const [player, pickA] = await Promise.all([
     prisma.player.findUnique({ where: { id: spec.playerId }, select: { nhlId: true } }),
-    prisma.draftPick.findUnique({ where: { id: spec.pickBId }, select: { teamId: true, lockedByConditionId: true } }),
+    prisma.draftPick.findUnique({ where: { id: spec.pickAId }, select: { teamId: true, lockedByConditionId: true } }),
   ]);
   if (!player?.nhlId) throw new Error("Conditional pick: this player has no real NHL ID on file — his real-life production can't be tracked.");
-  if (!pickB || pickB.teamId !== spec.ownerTeamId) throw new Error("Conditional pick: pick B isn't owned by the team offering it.");
-  if (pickB.lockedByConditionId != null) throw new Error("Conditional pick: pick B is already locked by another pending condition.");
+  if (!pickA || pickA.teamId !== spec.ownerTeamId) throw new Error("Conditional pick: pick A isn't owned by the team offering it.");
+  if (pickA.lockedByConditionId != null) throw new Error("Conditional pick: pick A is already locked by another pending condition.");
 }
 
 /** Rebuild the TradePackage from stored TradeAssets. */

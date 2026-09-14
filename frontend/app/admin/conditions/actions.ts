@@ -69,9 +69,10 @@ export async function attachStructuredCondition(input: {
   return { ok: true as const };
 }
 
-/** Evaluate now and settle for good: on MET, swap pickB to toTeamId and pickA
- *  back to fromTeamId; on NOT MET, no asset moves (pickA was already the
- *  resting state). Either way both picks unlock and the condition closes. */
+/** Evaluate now and settle for good: on MET, swap pickA (the upgrade) to
+ *  toTeamId and pickB (the default, already resting with toTeamId) back to
+ *  fromTeamId; on NOT MET, no asset moves (pickB was already the resting
+ *  state). Either way both picks unlock and the condition closes. */
 export async function resolveStructuredCondition(conditionId: number) {
   if (!(await isAdmin())) return { ok: false as const, error: "Only the commissioner can resolve conditions." };
   const condition = await prisma.tradeCondition.findUnique({ where: { id: conditionId } });
@@ -96,15 +97,15 @@ export async function resolveStructuredCondition(conditionId: number) {
   const ops = [];
   let note: string;
   if (evalResult.met && pickA && pickB) {
-    ops.push(prisma.draftPick.update({ where: { id: pickA.id }, data: { teamId: condition.fromTeamId, lockedByConditionId: null } }));
-    ops.push(prisma.draftPick.update({ where: { id: pickB.id }, data: { teamId: condition.toTeamId, lockedByConditionId: null } }));
-    note = `RESOLVED — condition MET (${summary}). ${toTeam?.name} gets the ${pickB.year} R${pickB.round} instead of the ${pickA.year} R${pickA.round} (returned to ${fromTeam?.name}).`;
-    ops.push(prisma.transaction.create({ data: { type: "TRADE", message: `Conditional pick settled: ${player ? cleanName(player.name) : "player"} hit his target — ${fromTeam?.name} sends ${toTeam?.name} the ${pickB.year} R${pickB.round} instead of the ${pickA.year} R${pickA.round}.` } }));
+    ops.push(prisma.draftPick.update({ where: { id: pickB.id }, data: { teamId: condition.fromTeamId, lockedByConditionId: null } }));
+    ops.push(prisma.draftPick.update({ where: { id: pickA.id }, data: { teamId: condition.toTeamId, lockedByConditionId: null } }));
+    note = `RESOLVED — condition MET (${summary}). ${toTeam?.name} gets the ${pickA.year} R${pickA.round} instead of the ${pickB.year} R${pickB.round} (returned to ${fromTeam?.name}).`;
+    ops.push(prisma.transaction.create({ data: { type: "TRADE", message: `Conditional pick settled: ${player ? cleanName(player.name) : "player"} hit his target — ${fromTeam?.name} sends ${toTeam?.name} the ${pickA.year} R${pickA.round} instead of the ${pickB.year} R${pickB.round}.` } }));
   } else {
     if (pickA) ops.push(prisma.draftPick.update({ where: { id: pickA.id }, data: { lockedByConditionId: null } }));
     if (pickB) ops.push(prisma.draftPick.update({ where: { id: pickB.id }, data: { lockedByConditionId: null } }));
-    note = `RESOLVED — condition NOT met (${summary}). Pick stays as-is (${pickA ? `${pickA.year} R${pickA.round}` : "?"}).`;
-    ops.push(prisma.transaction.create({ data: { type: "TRADE", message: `Conditional pick settled: ${player ? cleanName(player.name) : "player"} didn't hit his target — the ${pickA ? `${pickA.year} R${pickA.round}` : ""} pick stays with ${toTeam?.name}.` } }));
+    note = `RESOLVED — condition NOT met (${summary}). Pick stays as-is (${pickB ? `${pickB.year} R${pickB.round}` : "?"}).`;
+    ops.push(prisma.transaction.create({ data: { type: "TRADE", message: `Conditional pick settled: ${player ? cleanName(player.name) : "player"} didn't hit his target — the ${pickB ? `${pickB.year} R${pickB.round}` : ""} pick stays with ${toTeam?.name}.` } }));
   }
   ops.push(prisma.tradeCondition.update({ where: { id: conditionId }, data: { status: "FULFILLED", resolvedAt: new Date(), description: `${condition.description}\n\n${note}` } }));
   await prisma.$transaction(ops);

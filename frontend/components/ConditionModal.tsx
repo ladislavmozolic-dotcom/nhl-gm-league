@@ -86,7 +86,7 @@ export default function ConditionModal({ player, ownerTeamId, picks, initial, la
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-slate-900 border border-slate-700 rounded-xl p-5 max-w-lg w-full space-y-3 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-2xl w-full space-y-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <h3 className="font-bold text-slate-100">{tt("cond.modalTitle")} — {player.name}</h3>
         <p className="text-xs text-slate-500">{tt("cond.desc")}</p>
 

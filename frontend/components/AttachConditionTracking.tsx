@@ -113,14 +113,14 @@ export default function AttachConditionTracking({ conditionId, skaterOptions, pi
 
       <div className="grid sm:grid-cols-2 gap-2">
         <label className="space-y-1">
-          <span className="text-xs text-slate-500">Pick A — stays as-is if NOT met</span>
+          <span className="text-xs text-slate-500">Pick A — the upgrade, swaps in INSTEAD if MET</span>
           <select className={`${sel} w-full`} value={pickAId} onChange={(e) => setPickAId(e.target.value ? Number(e.target.value) : "")}>
             <option value="">— select —</option>
             {availablePicks.map((p) => <option key={p.id} value={p.id} disabled={p.id === pickBId}>{p.label}</option>)}
           </select>
         </label>
         <label className="space-y-1">
-          <span className="text-xs text-slate-500">Pick B — swaps in INSTEAD if MET</span>
+          <span className="text-xs text-slate-500">Pick B — the default, stays as-is if NOT met</span>
           <select className={`${sel} w-full`} value={pickBId} onChange={(e) => setPickBId(e.target.value ? Number(e.target.value) : "")}>
             <option value="">— select —</option>
             {availablePicks.map((p) => <option key={p.id} value={p.id} disabled={p.id === pickAId}>{p.label}</option>)}

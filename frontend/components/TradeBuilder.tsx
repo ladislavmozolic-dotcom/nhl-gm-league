@@ -324,7 +324,10 @@ export default function TradeBuilder({ me, opp, mine, theirs, meCap, oppCap, onP
   const [theirsPro, setTheirsPro] = useState<Set<number>>(new Set(initial?.theirsPro ?? []));
   const [mineCash, setMineCash] = useState(initial?.mineCash ?? 0);
   const [theirsCash, setTheirsCash] = useState(initial?.theirsCash ?? 0);
-  const [condition, setCondition] = useState(initial?.condition ?? "");
+  // Free-text condition is legacy — no longer editable from the builder (the
+  // structured CON flow replaces it), but a MODIFY resubmit still carries
+  // whatever a trade already had so it isn't silently dropped.
+  const [condition] = useState(initial?.condition ?? "");
   // one structured conditional-pick clause per trade — the player it's under,
   // and the modal state while it's open (null = closed)
   const [conditionSpec, setConditionSpec] = useState<ConditionSpec | null>(null);
@@ -449,12 +452,6 @@ export default function TradeBuilder({ me, opp, mine, theirs, meCap, oppCap, onP
             <div className="flex items-center justify-center text-slate-500">⇅</div>
             <SummaryBox name={opp.name} logoUrl={opp.logoUrl} items={theirsSummary} accent="text-red-400" />
 
-            <div>
-              <label className="text-xs text-slate-400">Condition (optional)</label>
-              <textarea value={condition} onChange={(e) => setCondition(e.target.value)} rows={2}
-                className="mt-1 w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-sm" placeholder="e.g. 2027 4th becomes a 3rd if he scores 20 goals" />
-            </div>
-
             <div className="flex flex-col gap-2">
               <button onClick={submit} disabled={pending || count === 0}
                 className="w-full px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 font-semibold text-sm disabled:opacity-40">
@@ -510,13 +507,15 @@ export default function TradeBuilder({ me, opp, mine, theirs, meCap, oppCap, onP
           lang={lang}
           initial={conditionSpec?.playerId === conditionModal.player.id ? conditionSpec : null}
           onSave={(spec) => {
-            // Pick A is now chosen freely from the picks-owner's own pool (not
-            // necessarily already checked in the trade's Draft Picks list) —
-            // make sure it's actually part of the package being sent.
+            // Pick B is the default — it conveys as part of this deal right
+            // away unless the condition is met — so it must actually be part
+            // of the package being sent; make sure it's checked even though
+            // it was chosen freely from the picks-owner's own pool rather than
+            // pre-checked in the trade's Draft Picks list.
             const isMe = conditionModal.ownerTeamId === me.id;
             const pk = isMe ? minePk : theirsPk;
             const setPk = isMe ? setMinePk : setTheirsPk;
-            if (!pk.has(spec.pickAId)) { const n = new Set(pk); n.add(spec.pickAId); setPk(n); }
+            if (!pk.has(spec.pickBId)) { const n = new Set(pk); n.add(spec.pickBId); setPk(n); }
             setConditionSpec(spec); setConditionModal(null);
           }}
           onRemove={conditionSpec?.playerId === conditionModal.player.id ? () => { setConditionSpec(null); setConditionModal(null); } : undefined}
