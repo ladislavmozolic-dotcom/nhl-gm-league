@@ -1,14 +1,15 @@
 import { prisma } from "@/lib/prisma";
-import { loadLeagueSlots, rankSlot, SLOTS, compositeRating, type SlotDef } from "./leagueSlots";
+import { loadLeagueSlots, rankSlot, SLOTS, compositeRating, roleRatingFor, type SlotDef } from "./leagueSlots";
 import { teamCapStatus } from "@/lib/cap";
 import { liveCapHit } from "@/lib/finance";
 
 // UNHL Intelligence — "Fit for my team" and "Who could want him" (Player
-// Intelligence, phase 4 — see memory: gm-assistant-intelligence). Both reuse
-// the exact same per-slot rating (leagueSlots.ts: CK/PA/SC/DF composite for
-// skaters, GoalieRating.overall for goalies) Analyze My Roster and Find Trade
-// Partner already rank on — a player's "fit" is just his own rating held up
-// against the same numbers, nothing invented.
+// Intelligence, phase 4 — see memory: gm-assistant-intelligence). Both hold
+// this player's own rating up against the exact same per-slot team averages
+// Analyze My Roster and Find Trade Partner already rank on (leagueSlots.ts's
+// rankSlot()) — role-weighted percentile scores for skaters, Goalie Quality
+// Score for goalies, via roleRatingFor() — so "fit" is a real apples-to-apples
+// comparison, not a generic rating held up against a role-specific one.
 
 export const isPos = (pos: string, code: string) => new RegExp(`(^|/)${code}(/|$)`).test(pos.toUpperCase());
 
@@ -57,7 +58,11 @@ export interface FitForMyTeamResult {
 export async function fitForMyTeam(playerId: number, teamId: number): Promise<FitForMyTeamResult | null> {
   const player = await loadPlayerForFit(playerId);
   if (!player) return null;
-  const playerRating = player.isGoalie ? (player.goalieRating?.overall ?? null) : compositeRating(player);
+  // Generic fallback only — see roleRatingFor()'s doc comment in
+  // leagueSlots.ts for why the per-slot rating below can't just be this
+  // composite (it's on a different scale than the role-weighted team
+  // averages it gets compared against).
+  const fallbackRating = player.isGoalie ? (player.goalieRating?.overall ?? null) : compositeRating(player);
   const relevantSlots = slotsForPosition(player.position, player.isGoalie);
   if (!relevantSlots.length) return null;
 
@@ -72,6 +77,7 @@ export async function fitForMyTeam(playerId: number, teamId: number): Promise<Fi
     const rows = rankSlot(data, slot);
     const mine = rows.find((r) => r.teamId === teamId);
     const teamRating = mine?.avg ?? null;
+    const playerRating = roleRatingFor(playerId, slot, !!player.isGoalie, data) ?? fallbackRating;
     return {
       slotId: slot.id, slotLabel: slot.label,
       teamRating, teamAuto: mine?.isAuto ?? false, playerRating,
@@ -108,14 +114,19 @@ export interface WhoCouldWantHimResult {
 export async function whoCouldWantHim(playerId: number, limit = 8): Promise<WhoCouldWantHimResult | null> {
   const player = await loadPlayerForFit(playerId);
   if (!player) return null;
-  const playerRating = player.isGoalie ? (player.goalieRating?.overall ?? null) : compositeRating(player);
-  if (playerRating == null) return { playerId, playerRating, teams: [] };
+  // Generic fallback only — see roleRatingFor()'s doc comment in
+  // leagueSlots.ts for why the per-slot rating below can't just be this
+  // composite (it's on a different scale than the role-weighted team
+  // averages it gets compared against).
+  const fallbackRating = player.isGoalie ? (player.goalieRating?.overall ?? null) : compositeRating(player);
+  if (fallbackRating == null) return { playerId, playerRating: fallbackRating, teams: [] };
   const relevantSlots = slotsForPosition(player.position, player.isGoalie);
-  if (!relevantSlots.length) return { playerId, playerRating, teams: [] };
+  if (!relevantSlots.length) return { playerId, playerRating: fallbackRating, teams: [] };
 
   const data = await loadLeagueSlots();
   const bestNeedByTeam = new Map<number, InterestedTeam>();
   for (const slot of relevantSlots) {
+    const playerRating = roleRatingFor(playerId, slot, !!player.isGoalie, data) ?? fallbackRating;
     const rows = rankSlot(data, slot);
     for (const row of rows) {
       if (row.teamId === player.teamId) continue; // already his own club
@@ -128,5 +139,5 @@ export async function whoCouldWantHim(playerId: number, limit = 8): Promise<WhoC
     }
   }
   const teams = [...bestNeedByTeam.values()].sort((a, b) => b.delta - a.delta).slice(0, limit);
-  return { playerId, playerRating, teams };
+  return { playerId, playerRating: fallbackRating, teams };
 }

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { loadLeagueSlots, rankSlot, compositeRating } from "./leagueSlots";
+import { loadLeagueSlots, rankSlot, compositeRating, roleRatingFor } from "./leagueSlots";
 import { slotsForPosition } from "./playerFit";
 
 // UNHL Intelligence — "Ideal role" (Player Intelligence, phase 4 — see
@@ -41,8 +41,11 @@ export async function idealRole(playerId: number): Promise<IdealRoleResult | nul
   });
   if (!player) return null;
 
-  const playerRating = player.isGoalie ? (player.goalieRating?.overall ?? null) : compositeRating(player);
-  if (playerRating == null) return null;
+  // Generic fallback only — see roleRatingFor()'s own doc comment for why the
+  // per-slot number below can't just be this composite (it's on a different
+  // scale than the role-weighted team averages it gets compared against).
+  const fallbackRating = player.isGoalie ? (player.goalieRating?.overall ?? null) : compositeRating(player);
+  if (fallbackRating == null) return null;
 
   const relevantSlots = slotsForPosition(player.position, player.isGoalie);
   if (!relevantSlots.length) return null;
@@ -51,6 +54,7 @@ export async function idealRole(playerId: number): Promise<IdealRoleResult | nul
   const slots: RoleBenchmark[] = relevantSlots.map((slot) => {
     const rows = rankSlot(data, slot); // best-first, one avg per team with anyone eligible
     const leagueMedian = Math.round(median(rows.map((r) => r.avg)) * 10) / 10;
+    const playerRating = roleRatingFor(playerId, slot, !!player.isGoalie, data) ?? fallbackRating;
     const rank = rows.filter((r) => r.avg > playerRating).length + 1;
     return {
       slotId: slot.id, slotLabel: slot.label, leagueMedian, playerRating,
@@ -59,5 +63,8 @@ export async function idealRole(playerId: number): Promise<IdealRoleResult | nul
     };
   });
 
-  return { playerId, playerRating, slots };
+  // The headline "closest to his profile" number should match whichever slot
+  // he actually ranks best in below, not a separate generic figure.
+  const best = [...slots].sort((a, b) => a.rank - b.rank)[0];
+  return { playerId, playerRating: best.playerRating, slots };
 }

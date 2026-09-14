@@ -184,11 +184,14 @@ export function compositeRating(p: RawSkaterParams): number | null {
 // field, and a bottom-pair D is judged against OTHER bottom-pair-caliber D,
 // not against the league's elite. OV is never an input, per the doc's rule.
 //
-// compositeRating() above is kept as-is (and still used by Draft Intelligence,
-// Player Fit, Ideal Role, Commissioner Intelligence, Similar Players) since
-// those need one generic "how good is this player at hockey" number, not a
-// role-specific one. It also remains the fallback here if a slot is ever
-// missing a role mapping.
+// compositeRating() above is kept as-is and still used by Draft Intelligence,
+// Commissioner Intelligence and Similar Players, which need one generic "how
+// good is this player at hockey" number, not a role-specific one. It also
+// remains the fallback inside slotPlayers() below if a slot is ever missing a
+// role mapping. Ideal Role and Player Fit hold ONE player up against these
+// SLOTS' own team averages (rankSlot() below), so they need the matching
+// role-weighted number for that comparison to mean anything — see
+// roleRatingFor() further down, and don't reach for compositeRating() there.
 
 type RoleParam = "ck" | "di" | "df" | "en" | "fo" | "pa" | "ph" | "sc" | "sk" | "st";
 const ROLE_PARAM_KEYS: RoleParam[] = ["ck", "di", "df", "en", "fo", "pa", "ph", "sc", "sk", "st"];
@@ -491,6 +494,23 @@ export function slotPlayers(lines: ResolvedLines, slot: SlotDef, data: Pick<Leag
     picked.push({ ...player, rating: score });
   }
   return picked;
+}
+
+/** A single player's own rating for one slot, on the SAME role-weighted
+ *  percentile scale rankSlot()'s team averages use below (the slot's role
+ *  score for skaters, the Goalie Quality Score for goalies) — for holding one
+ *  player up against those team averages apples-to-apples (Ideal Role, Player
+ *  Fit). Using compositeRating()/GoalieRating.overall for that instead would
+ *  compare a raw-stat-scale number against a 0-100 percentile-scale one — two
+ *  different scales that only coincidentally overlap, producing a rank/delta
+ *  that doesn't mean what it looks like it means. null if this player isn't
+ *  in the slot's percentile pool (not an NHL-rostered, non-scratched player,
+ *  per loadLeagueSlots()'s population) — callers should fall back to
+ *  compositeRating()/GoalieRating.overall in that case. */
+export function roleRatingFor(playerId: number, slot: SlotDef, isGoalie: boolean, data: Pick<LeagueSlotsData, "rolePercentiles" | "goaliePercentiles">): number | null {
+  if (isGoalie) return weightedPercentile(playerId, data.goaliePercentiles, GOALIE_QUALITY_WEIGHTS);
+  if (!slot.role) return null;
+  return weightedPercentile(playerId, data.rolePercentiles[slot.role.group], ROLE_WEIGHTS[slot.role.key]);
 }
 
 export interface SlotTeamRow {
