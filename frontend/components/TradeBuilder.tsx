@@ -419,7 +419,7 @@ export default function TradeBuilder({ me, opp, mine, theirs, meCap, oppCap, onP
   const oppCapDelta = mineSent - theirsSent;
 
   // live "who gives what" summary for the middle column
-  const nameP = (a: Assets, id: number) => a.players.find((p) => p.id === id)?.name ?? `#${id}`;
+  const nameP = (a: Assets, id: number) => { const p = a.players.find((p) => p.id === id); return p ? displayName(p.name) : `#${id}`; };
   const labelPk = (a: Assets, id: number) => a.picks.find((p) => p.id === id)?.label ?? `Pick #${id}`;
   const labelPro = (a: Assets, id: number) => a.prospects.find((p) => p.id === id)?.label ?? `Prospect #${id}`;
   const sideSummary = (a: Assets, pmap: Record<number, number>, pk: Set<number>, pro: Set<number>, cash: number): string[] => {
