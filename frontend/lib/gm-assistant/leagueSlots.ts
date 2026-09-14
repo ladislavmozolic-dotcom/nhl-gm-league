@@ -223,7 +223,16 @@ const ROLE_WEIGHTS: Record<RoleKey, Partial<Record<RoleParam, number>>> = {
   // a puck-mover/shutdown split within the top pair. Kept here so that finer
   // D-role slots can use them later without re-deriving the weights.
   offensiveD: { pa: 30, sk: 20, ph: 15, sc: 15, df: 10, en: 5, st: 5 },
-  twoWayD: { df: 35, pa: 20, sk: 15, ck: 10, st: 8, ph: 7, en: 5 },
+  // A real #1 pairing still needs genuine defensive minutes (df stays the single
+  // biggest weight), but it's also expected to drive the offense — same
+  // reasoning the forward top6* tables use to all but zero out ck (checking is
+  // a bottom-pair/depth trait, not what makes a top pair valuable). Previously
+  // this table had NO sc weight at all and gave ck/st a combined 18%, which
+  // could rank a pure shutdown df/ck/st profile above a true elite two-way #1
+  // (verified against production: Cale Makar scored below Charlie McAvoy here
+  // despite clearly superior sc/pa/sk, purely because Makar's ck/st percentiles
+  // are low — a checking/stamina bias that has no place grading a top pairing).
+  twoWayD: { df: 30, pa: 25, sc: 20, sk: 15, ph: 6, en: 4 },
   shutdownD: { df: 45, ck: 20, st: 15, sk: 7, en: 7, di: 6 },
   bottomPairD: { df: 40, ck: 15, st: 15, di: 10, en: 10, sk: 5, pa: 5 },
   ppDefenseman: { pa: 35, sc: 25, ph: 20, sk: 10, en: 10 },
