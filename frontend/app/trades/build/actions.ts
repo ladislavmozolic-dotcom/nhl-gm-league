@@ -6,7 +6,7 @@ import { getTeamSession, isAdmin, isCommission } from "@/lib/auth";
 import { loadSettings } from "@/lib/sim/settings";
 import { CURRENT_SEASON_START, money, liveCapHit } from "@/lib/finance";
 import { revalidatePath } from "next/cache";
-import { clauseBlock, assertOwnership, packageFromTrade, executeAcceptedTrade, createTradeRecord, collectMoveOps, reverseTradeOps, type TradePlayer, type TradePackage } from "@/lib/trade-exec";
+import { clauseBlock, assertOwnership, assertConditionSpec, packageFromTrade, executeAcceptedTrade, createTradeRecord, collectMoveOps, reverseTradeOps, type TradePlayer, type TradePackage } from "@/lib/trade-exec";
 import { playerValue, pickValueBySlot } from "@/lib/trade-value";
 import { hasWorthyGoalie } from "@/lib/goalie-rule";
 import { displayName } from "@/lib/playerName";
@@ -210,6 +210,7 @@ export async function proposeTrade(pkg: TradePackage) {
   if (!hasAssets) throw new Error("Add at least one asset.");
 
   const { fromTeam, toTeam } = await assertOwnership(pkg);
+  await assertConditionSpec(pkg);
 
   // NTC / NMC / M-NTC: a protected player can't be moved unless his clause is waived.
   const settings = await loadSettings();

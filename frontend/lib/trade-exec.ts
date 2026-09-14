@@ -12,6 +12,7 @@ import { getLeagueDate } from "@/lib/calendar-server";
 import { roundForDate, daysBetween } from "@/lib/calendar";
 import { displayName } from "@/lib/playerName";
 import { loadLeagueCap } from "@/lib/free-agency-server";
+import { describeConditionSpec, type ConditionSpec } from "@/lib/trade-conditions-shared";
 
 /** In-season days between two league dates (off-season time doesn't count) —
  *  the NHL's real "75-day rule" for a 2nd retention on the same contract.
@@ -29,6 +30,7 @@ export type TradePackage = {
   fromProspects: number[]; toProspects: number[];
   fromCash: number; toCash: number;
   condition: string;
+  conditionSpec?: ConditionSpec | null;
   waived?: number[];
   clauseFees?: { playerId: number; feeAmount: number; payTeamId: number }[];
 };
@@ -321,6 +323,33 @@ export async function assertOwnership(pkg: TradePackage) {
   return { fromTeam, toTeam };
 }
 
+/** Validate a Trade Builder-authored ConditionSpec before the trade is even
+ *  proposed. pickA must be one of the picks THIS deal is already sending on
+ *  the condition's own side (spec.ownerTeamId); pickB is the alternate that
+ *  stays home unless the condition is met, so it must be a DIFFERENT pick the
+ *  same side still owns, not already part of this trade, and not already
+ *  locked by some other pending condition. */
+export async function assertConditionSpec(pkg: TradePackage): Promise<void> {
+  const spec = pkg.conditionSpec;
+  if (!spec) return;
+  if (spec.ownerTeamId !== pkg.fromTeamId && spec.ownerTeamId !== pkg.toTeamId) throw new Error("Conditional pick: owning team isn't part of this trade.");
+  const ownSide = spec.ownerTeamId === pkg.fromTeamId ? pkg.fromPicks : pkg.toPicks;
+  const tradedPlayerIds = new Set([...pkg.fromPlayers, ...pkg.toPlayers].map((p) => p.playerId));
+  if (!tradedPlayerIds.has(spec.playerId)) throw new Error("Conditional pick: the tracked player isn't actually part of this trade.");
+  if (spec.pickAId === spec.pickBId) throw new Error("Conditional pick: pick A and pick B must be different picks.");
+  if (!ownSide.includes(spec.pickAId)) throw new Error("Conditional pick: pick A must be one of the picks this side is already sending.");
+  if (ownSide.includes(spec.pickBId) || pkg.fromPicks.includes(spec.pickBId) || pkg.toPicks.includes(spec.pickBId))
+    throw new Error("Conditional pick: pick B must NOT already be part of this trade — it only moves if the condition is met.");
+
+  const [player, pickB] = await Promise.all([
+    prisma.player.findUnique({ where: { id: spec.playerId }, select: { nhlId: true } }),
+    prisma.draftPick.findUnique({ where: { id: spec.pickBId }, select: { teamId: true, lockedByConditionId: true } }),
+  ]);
+  if (!player?.nhlId) throw new Error("Conditional pick: this player has no real NHL ID on file — his real-life production can't be tracked.");
+  if (!pickB || pickB.teamId !== spec.ownerTeamId) throw new Error("Conditional pick: pick B isn't owned by the team offering it.");
+  if (pickB.lockedByConditionId != null) throw new Error("Conditional pick: pick B is already locked by another pending condition.");
+}
+
 /** Rebuild the TradePackage from stored TradeAssets. */
 export async function packageFromTrade(tradeId: number): Promise<TradePackage> {
   const trade = await prisma.trade.findUnique({ where: { id: tradeId } });
@@ -358,6 +387,14 @@ export async function executeAcceptedTrade(tradeId: number) {
     data: { type: "TRADE", tradeId, message: `${fromTeam.name} traded ${fromNames.join(", ") || "assets"} to ${toTeam.name} for ${toNames.join(", ") || "assets"}.` },
   }));
   await prisma.$transaction(ops);
+  // a structured conditional-pick clause was captured at proposal time
+  // (createTradeRecord) but its two candidate picks only lock now, once the
+  // deal has actually gone through and pickA has really moved to the
+  // receiving club — see lib/trade-conditions-shared.ts's ConditionSpec.
+  const conditions = await prisma.tradeCondition.findMany({ where: { tradeId, pickAId: { not: null }, pickBId: { not: null } } });
+  for (const c of conditions) {
+    await prisma.draftPick.updateMany({ where: { id: { in: [c.pickAId!, c.pickBId!] } }, data: { lockedByConditionId: c.id } });
+  }
   return { fromTeam, toTeam, fromNames, toNames };
 }
 
@@ -376,8 +413,25 @@ export async function createTradeRecord(pkg: TradePackage, opts: { fromName: str
   if (pkg.fromCash) rows.push({ tradeId: trade.id, assetType: "CASH", side: "FROM", cashAmount: pkg.fromCash });
   if (pkg.toCash) rows.push({ tradeId: trade.id, assetType: "CASH", side: "TO", cashAmount: pkg.toCash });
   await prisma.tradeAsset.createMany({ data: rows });
-  if (pkg.condition?.trim())
+  if (pkg.conditionSpec) {
+    const spec = pkg.conditionSpec;
+    // ConditionSpec.ownerTeamId is whichever side actually owns pickA/pickB (the
+    // side sending the player) — NOT necessarily pkg.fromTeamId, since a Trade
+    // record's own fromTeamId/toTeamId is fixed to "me → opp" regardless of
+    // which side's player/picks the condition is actually about.
+    const condFromTeamId = spec.ownerTeamId;
+    const condToTeamId = spec.ownerTeamId === pkg.fromTeamId ? pkg.toTeamId : pkg.fromTeamId;
+    const desc = pkg.condition?.trim() ? `${pkg.condition.trim()}\n\n${describeConditionSpec(spec)}` : describeConditionSpec(spec);
+    await prisma.tradeCondition.create({ data: {
+      tradeId: trade.id, fromTeamId: condFromTeamId, toTeamId: condToTeamId, description: desc, status: "PENDING",
+      playerId: spec.playerId, seasonYear: spec.seasonYear,
+      metric: spec.metric, op: spec.op, threshold: spec.threshold,
+      metric2: spec.metric2 ?? null, op2: spec.op2 ?? null, threshold2: spec.threshold2 ?? null, logic2: spec.logic2 ?? null,
+      pickAId: spec.pickAId, pickBId: spec.pickBId,
+    } });
+  } else if (pkg.condition?.trim()) {
     await prisma.tradeCondition.create({ data: { tradeId: trade.id, fromTeamId: pkg.fromTeamId, toTeamId: pkg.toTeamId, description: pkg.condition.trim(), status: "PENDING" } });
+  }
   if (!opts.skipDm) {
     await prisma.dmMessage.create({
       data: { fromTeamId: pkg.fromTeamId, toTeamId: pkg.toTeamId, body: opts.dmBody ?? `📩 ${opts.fromName} sent you a trade proposal — open it to review, then Accept or Decline.`, tradeUrl: `/trades/${trade.id}` },

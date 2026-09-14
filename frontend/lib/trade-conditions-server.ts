@@ -16,15 +16,8 @@
 
 import { prisma } from "./prisma";
 
-export const METRICS = ["POINTS", "GOALS", "ASSISTS", "GAMES_PLAYED", "PPG"] as const;
-export type Metric = (typeof METRICS)[number];
-export const METRIC_LABELS: Record<Metric, string> = {
-  POINTS: "Points", GOALS: "Goals", ASSISTS: "Assists", GAMES_PLAYED: "Games Played", PPG: "Points per Game",
-};
-
-export const OPS = ["GTE", "GT", "LTE", "LT"] as const;
-export type Op = (typeof OPS)[number];
-export const OP_LABELS: Record<Op, string> = { GTE: "≥", GT: ">", LTE: "≤", LT: "<" };
+export * from "./trade-conditions-shared";
+import { METRIC_LABELS, type Metric } from "./trade-conditions-shared";
 
 const compare = (op: string, value: number, threshold: number): boolean => {
   switch (op) {

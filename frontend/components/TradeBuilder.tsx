@@ -6,6 +6,8 @@ import Link from "next/link";
 import { money } from "@/lib/finance";
 import { displayName } from "@/lib/playerName";
 import { clauseTermsAction, analyzeTradeAction, type TradePackage } from "@/app/trades/build/actions";
+import ConditionModal from "@/components/ConditionModal";
+import { describeConditionSpec, type ConditionSpec } from "@/lib/trade-conditions-shared";
 
 type Player = { id: number; name: string; position: string; capHit: number; farm: boolean; clause?: string | null; noTradeTeams?: number[]; retainedAmount?: number };
 type Pick = { id: number; label: string; logoUrl?: string | null; locked?: boolean };
@@ -133,12 +135,15 @@ const setRet = (map: Record<number, number>, set: (v: Record<number, number>) =>
 // scratch. Callback props changing identity each render is completely normal
 // and doesn't cause this; only the component reference itself needs to be stable.
 
-function PlayerTable({ title, list, pmap, setPmap, destTeamId, ownerTeamId, terms, fees, onToggleClause, onAgreeFee, maxRetentionPct }: {
+function PlayerTable({ title, list, pmap, setPmap, destTeamId, ownerTeamId, terms, fees, onToggleClause, onAgreeFee, maxRetentionPct, conditionSpec, onOpenCondition, onRemoveCondition }: {
   title: string; list: Player[]; pmap: Record<number, number>; setPmap: (v: Record<number, number>) => void; destTeamId: number; ownerTeamId: number;
   terms: Record<number, Terms | "loading">; fees: Record<number, { feeAmount: number; payTeamId: number }>;
   onToggleClause: (map: Record<number, number>, set: (v: Record<number, number>) => void, p: Player, destTeamId: number, ownerTeamId: number) => void;
   onAgreeFee: (id: number, t: Terms) => void;
   maxRetentionPct: number;
+  conditionSpec: ConditionSpec | null;
+  onOpenCondition: (p: Player) => void;
+  onRemoveCondition: () => void;
 }) {
   return (
     <div className="bg-slate-900/40 border border-slate-800 rounded-lg overflow-hidden">
@@ -191,6 +196,21 @@ function PlayerTable({ title, list, pmap, setPmap, destTeamId, ownerTeamId, term
                   {pmap[p.id] > 0 && <span className="text-amber-400">retains {money(p.capHit * pmap[p.id] / 100)}</span>}
                 </div>
               )}
+              {on && (
+                <div className="mt-2 ml-6.5 text-xs">
+                  <label className="flex items-center gap-2 cursor-pointer text-slate-400">
+                    <input type="checkbox" checked={conditionSpec?.playerId === p.id} onChange={() => conditionSpec?.playerId === p.id ? onRemoveCondition() : onOpenCondition(p)} className="accent-amber-500 w-3.5 h-3.5" />
+                    <span className="font-medium">CON</span>
+                    <span className="text-slate-600">— make a draft pick conditional on his real NHL production</span>
+                  </label>
+                  {conditionSpec?.playerId === p.id && (
+                    <p className="mt-1.5 ml-5.5 text-amber-300/90 bg-amber-950/20 border border-amber-800/30 rounded px-2 py-1.5">
+                      📋 {describeConditionSpec(conditionSpec)}{" "}
+                      <button type="button" onClick={() => onOpenCondition(p)} className="underline hover:text-amber-200">edit</button>
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
@@ -222,7 +242,7 @@ function CheckTable({ title, icon, list, sel, setSel, onToggle }: {
   );
 }
 
-function Side({ team, assets, pmap, setPmap, pk, setPk, pro, setPro, cash, setCash, destTeamId, terms, fees, onToggleClause, onAgreeFee, onTogglePick, capStatus, capDelta, incomingAssets, incomingPmap }: {
+function Side({ team, assets, pmap, setPmap, pk, setPk, pro, setPro, cash, setCash, destTeamId, terms, fees, onToggleClause, onAgreeFee, onTogglePick, onTogglePickAsset, capStatus, capDelta, incomingAssets, incomingPmap, conditionSpec, onOpenCondition, onRemoveCondition }: {
   team: Team; assets: Assets; pmap: Record<number, number>; setPmap: (v: Record<number, number>) => void;
   pk: Set<number>; setPk: (s: Set<number>) => void; pro: Set<number>; setPro: (s: Set<number>) => void;
   cash: number; setCash: (n: number) => void; destTeamId: number;
@@ -230,10 +250,14 @@ function Side({ team, assets, pmap, setPmap, pk, setPk, pro, setPro, cash, setCa
   onToggleClause: (map: Record<number, number>, set: (v: Record<number, number>) => void, p: Player, destTeamId: number, ownerTeamId: number) => void;
   onAgreeFee: (id: number, t: Terms) => void;
   onTogglePick: (sel: Set<number>, setSel: (s: Set<number>) => void, id: number) => void;
+  onTogglePickAsset: (sel: Set<number>, setSel: (s: Set<number>) => void, id: number) => void;
   capStatus: CapSnapshot; capDelta: number;
   // The OTHER side's assets/retention map — what THIS team would be acquiring,
   // needed to know how many newly-retained players would land on its roster.
   incomingAssets: Assets; incomingPmap: Record<number, number>;
+  conditionSpec: ConditionSpec | null;
+  onOpenCondition: (p: Player, ownerTeamId: number, picks: Pick[], pickSel: Set<number>) => void;
+  onRemoveCondition: () => void;
 }) {
   const added = retentionAdded(pmap, assets, capStatus.capUpper);
   const addedIn = retainedInAdded(incomingPmap, incomingAssets);
@@ -245,9 +269,12 @@ function Side({ team, assets, pmap, setPmap, pk, setPk, pro, setPro, cash, setCa
       </div>
       <CapImpact status={capStatus} delta={capDelta} />
       <RetentionCapacity status={capStatus} newOutSlots={added.slots} newOutPct={added.pct} newIn={addedIn} />
-      <PlayerTable title="Players" list={assets.players} pmap={pmap} setPmap={setPmap} destTeamId={destTeamId} ownerTeamId={team.id} terms={terms} fees={fees} onToggleClause={onToggleClause} onAgreeFee={onAgreeFee} maxRetentionPct={capStatus.retentionMaxPct} />
+      <PlayerTable title="Players" list={assets.players} pmap={pmap} setPmap={setPmap} destTeamId={destTeamId} ownerTeamId={team.id} terms={terms} fees={fees} onToggleClause={onToggleClause} onAgreeFee={onAgreeFee} maxRetentionPct={capStatus.retentionMaxPct}
+        conditionSpec={conditionSpec?.ownerTeamId === team.id ? conditionSpec : null}
+        onOpenCondition={(p) => onOpenCondition(p, team.id, assets.picks, pk)}
+        onRemoveCondition={onRemoveCondition} />
       <CheckTable title="Prospects" icon="⭐" list={assets.prospects} sel={pro} setSel={setPro} onToggle={onTogglePick} />
-      <CheckTable title="Draft picks" icon="🎫" list={assets.picks} sel={pk} setSel={setPk} onToggle={onTogglePick} />
+      <CheckTable title="Draft picks" icon="🎫" list={assets.picks} sel={pk} setSel={setPk} onToggle={onTogglePickAsset} />
       <div className="bg-slate-900/40 border border-slate-800 rounded-lg px-3 py-2.5 flex items-center gap-2 text-sm">
         <span className="text-slate-400">Cash</span>
         <div className="flex items-center bg-slate-900 border border-slate-700 rounded">
@@ -294,6 +321,10 @@ export default function TradeBuilder({ me, opp, mine, theirs, meCap, oppCap, onP
   const [mineCash, setMineCash] = useState(initial?.mineCash ?? 0);
   const [theirsCash, setTheirsCash] = useState(initial?.theirsCash ?? 0);
   const [condition, setCondition] = useState(initial?.condition ?? "");
+  // one structured conditional-pick clause per trade — the player it's under,
+  // and the modal state while it's open (null = closed)
+  const [conditionSpec, setConditionSpec] = useState<ConditionSpec | null>(null);
+  const [conditionModal, setConditionModal] = useState<{ player: Player; ownerTeamId: number; picks: Pick[]; pickSel: Set<number> } | null>(null);
   // clause agent: fetched terms per protected player + the fees the GM agrees to pay
   const [terms, setTerms] = useState<Record<number, Terms | "loading">>({});
   const [fees, setFees] = useState<Record<number, { feeAmount: number; payTeamId: number }>>({});
@@ -312,7 +343,12 @@ export default function TradeBuilder({ me, opp, mine, theirs, meCap, oppCap, onP
   const toggleClausePlayer = (map: Record<number, number>, set: (v: Record<number, number>) => void, p: Player, destTeamId: number, ownerTeamId: number) => {
     const wasOn = p.id in map;
     togglePlayer(map, set, p.id);
-    if (wasOn) { setFees((f) => { const n = { ...f }; delete n[p.id]; return n; }); setTerms((t) => { const n = { ...t }; delete n[p.id]; return n; }); return; }
+    if (wasOn) {
+      setFees((f) => { const n = { ...f }; delete n[p.id]; return n; }); setTerms((t) => { const n = { ...t }; delete n[p.id]; return n; });
+      // a conditional pick attached to this player no longer makes sense once he's out of the trade
+      setConditionSpec((c) => (c?.playerId === p.id ? null : c));
+      return;
+    }
     const needs = !!p.clause && (p.clause !== "M_NTC" || (p.noTradeTeams ?? []).includes(destTeamId));
     if (!needs) return;
     setTerms((t) => ({ ...t, [p.id]: "loading" }));
@@ -325,6 +361,14 @@ export default function TradeBuilder({ me, opp, mine, theirs, meCap, oppCap, onP
   const togglePick = (set: Set<number>, setter: (s: Set<number>) => void, id: number) => {
     const n = new Set(set); if (n.has(id)) n.delete(id); else n.add(id); setter(n); setMsg(null);
   };
+  // same as togglePick, but for the Draft Picks table specifically — unchecking a
+  // pick that's part of the active conditional clause invalidates it (prospects
+  // share togglePick too, and a prospect id can collide with a pick id from a
+  // different table, so this check only applies where it's actually a pick).
+  const toggleDraftPick = (set: Set<number>, setter: (s: Set<number>) => void, id: number) => {
+    const n = new Set(set); if (n.has(id)) n.delete(id); else n.add(id); setter(n); setMsg(null);
+    setConditionSpec((c) => (c && !n.has(id) && (c.pickAId === id || c.pickBId === id) ? null : c));
+  };
 
   const submit = () => start(async () => {
     setErr(null); setMsg(null);
@@ -335,12 +379,12 @@ export default function TradeBuilder({ me, opp, mine, theirs, meCap, oppCap, onP
         toPlayers: Object.entries(theirsP).map(([id, pct]) => ({ playerId: Number(id), retentionPct: pct })),
         fromPicks: [...minePk], toPicks: [...theirsPk],
         fromProspects: [...minePro], toProspects: [...theirsPro],
-        fromCash: mineCash, toCash: theirsCash, condition,
+        fromCash: mineCash, toCash: theirsCash, condition, conditionSpec,
         waived: Object.keys(fees).map(Number),
         clauseFees: Object.entries(fees).map(([id, v]) => ({ playerId: Number(id), feeAmount: v.feeAmount, payTeamId: v.payTeamId })),
       });
       setMsg(`Trade proposed to ${opp.name} (#${r.tradeId}). Awaiting their GM's response.`);
-      setMineP({}); setTheirsP({}); setMinePk(new Set()); setTheirsPk(new Set()); setMinePro(new Set()); setTheirsPro(new Set()); setMineCash(0); setTheirsCash(0); setFees({}); setTerms({});
+      setMineP({}); setTheirsP({}); setMinePk(new Set()); setTheirsPk(new Set()); setMinePro(new Set()); setTheirsPro(new Set()); setMineCash(0); setTheirsCash(0); setFees({}); setTerms({}); setConditionSpec(null);
     } catch (e) { setErr((e as Error).message); }
   });
 
@@ -390,7 +434,8 @@ export default function TradeBuilder({ me, opp, mine, theirs, meCap, oppCap, onP
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px_1fr] gap-4 items-start">
-        <Side team={me} assets={mine} pmap={mineP} setPmap={setMineP} pk={minePk} setPk={setMinePk} pro={minePro} setPro={setMinePro} cash={mineCash} setCash={setMineCash} destTeamId={opp.id} terms={terms} fees={fees} onToggleClause={toggleClausePlayer} onAgreeFee={agreeFee} onTogglePick={togglePick} capStatus={meCap} capDelta={meCapDelta} incomingAssets={theirs} incomingPmap={theirsP} />
+        <Side team={me} assets={mine} pmap={mineP} setPmap={setMineP} pk={minePk} setPk={setMinePk} pro={minePro} setPro={setMinePro} cash={mineCash} setCash={setMineCash} destTeamId={opp.id} terms={terms} fees={fees} onToggleClause={toggleClausePlayer} onAgreeFee={agreeFee} onTogglePick={togglePick} onTogglePickAsset={toggleDraftPick} capStatus={meCap} capDelta={meCapDelta} incomingAssets={theirs} incomingPmap={theirsP}
+          conditionSpec={conditionSpec} onOpenCondition={(p, ownerTeamId, picks, pickSel) => setConditionModal({ player: p, ownerTeamId, picks, pickSel })} onRemoveCondition={() => setConditionSpec(null)} />
 
         {/* MIDDLE — live summary, conditions, Propose + GM Assist */}
         <div className="lg:sticky lg:top-4 space-y-3">
@@ -449,8 +494,22 @@ export default function TradeBuilder({ me, opp, mine, theirs, meCap, oppCap, onP
           </div>
         </div>
 
-        <Side team={opp} assets={theirs} pmap={theirsP} setPmap={setTheirsP} pk={theirsPk} setPk={setTheirsPk} pro={theirsPro} setPro={setTheirsPro} cash={theirsCash} setCash={setTheirsCash} destTeamId={me.id} terms={terms} fees={fees} onToggleClause={toggleClausePlayer} onAgreeFee={agreeFee} onTogglePick={togglePick} capStatus={oppCap} capDelta={oppCapDelta} incomingAssets={mine} incomingPmap={mineP} />
+        <Side team={opp} assets={theirs} pmap={theirsP} setPmap={setTheirsP} pk={theirsPk} setPk={setTheirsPk} pro={theirsPro} setPro={setTheirsPro} cash={theirsCash} setCash={setTheirsCash} destTeamId={me.id} terms={terms} fees={fees} onToggleClause={toggleClausePlayer} onAgreeFee={agreeFee} onTogglePick={togglePick} onTogglePickAsset={toggleDraftPick} capStatus={oppCap} capDelta={oppCapDelta} incomingAssets={mine} incomingPmap={mineP}
+          conditionSpec={conditionSpec} onOpenCondition={(p, ownerTeamId, picks, pickSel) => setConditionModal({ player: p, ownerTeamId, picks, pickSel })} onRemoveCondition={() => setConditionSpec(null)} />
       </div>
+
+      {conditionModal && (
+        <ConditionModal
+          player={conditionModal.player}
+          ownerTeamId={conditionModal.ownerTeamId}
+          picks={conditionModal.picks}
+          selectedPickIds={conditionModal.pickSel}
+          initial={conditionSpec?.playerId === conditionModal.player.id ? conditionSpec : null}
+          onSave={(spec) => { setConditionSpec(spec); setConditionModal(null); }}
+          onRemove={conditionSpec?.playerId === conditionModal.player.id ? () => { setConditionSpec(null); setConditionModal(null); } : undefined}
+          onClose={() => setConditionModal(null)}
+        />
+      )}
     </div>
   );
 }
