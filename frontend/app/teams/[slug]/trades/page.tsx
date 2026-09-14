@@ -4,18 +4,31 @@ import { Card } from "@/components/ui";
 import { tradeSummaries } from "@/lib/trade-summary";
 import ClickableCard from "@/components/ClickableCard";
 import TradeAssetChips from "@/components/TradeAssetChips";
+import TeamTradeTabs from "@/components/TeamTradeTabs";
 
 export const dynamic = "force-dynamic";
 
+// Same status→color convention as the league-wide /trades page's STATUS_STYLE.
+const STATUS_STYLE: Record<string, string> = {
+  PENDING: "bg-amber-500/15 text-amber-400 border-amber-500/20",
+  ACCEPTED: "bg-green-500/15 text-green-400 border-green-500/20",
+  COMPLETED: "bg-green-500/15 text-green-400 border-green-500/20",
+  DECLINED: "bg-red-500/15 text-red-400 border-red-500/20",
+  CANCELLED: "bg-slate-700/40 text-slate-400 border-slate-600/30",
+  REVERTED: "bg-slate-700/40 text-slate-400 border-slate-600/30",
+  AWAITING_COMMISH: "bg-amber-500/15 text-amber-300 border-amber-500/20",
+  MODIFY: "bg-sky-500/15 text-sky-300 border-sky-500/20",
+  MODIFIED: "bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/20",
+};
+// Which tab each trade status lands in — Approved is the default/main tab
+// (real completed deals), Pending covers anything still awaiting action,
+// and Declined groups every way a proposal died without going through.
+const APPROVED_STATUSES = new Set(["ACCEPTED", "COMPLETED"]);
+const PENDING_STATUSES = new Set(["PENDING", "AWAITING_COMMISH", "MODIFY", "MODIFIED"]);
+
 function StatusBadge({ status }: { status: string }) {
-  const cls =
-    status === "ACCEPTED"
-      ? "bg-green-500/15 text-green-400 border-green-500/20"
-      : status === "PENDING"
-      ? "bg-amber-500/15 text-amber-400 border-amber-500/20"
-      : "bg-slate-700/40 text-slate-400 border-slate-600/30";
   return (
-    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${cls}`}>
+    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${STATUS_STYLE[status] ?? "bg-slate-700/40 text-slate-400 border-slate-600/30"}`}>
       {status}
     </span>
   );
@@ -63,49 +76,58 @@ export default async function TeamTradesPage({ params }: { params: Promise<{ slu
 
   const fmtDate = (d: Date) => d.toLocaleDateString("sk-SK", { day: "numeric", month: "short", year: "numeric" });
 
+  const cards = trades.map((t) => {
+    // fromTeam sent the "from" side assets, toTeam sent the "to" side —
+    // reframe as this club's own gives/gets regardless of which side of
+    // the Trade row it happens to be.
+    const isFrom = t.fromTeamId === team.id;
+    const s = summaries.get(t.id);
+    const gives = (isFrom ? s?.from : s?.to) ?? [];
+    const gets = (isFrom ? s?.to : s?.from) ?? [];
+    const otherTeamId = isFrom ? t.toTeamId : t.fromTeamId;
+    return {
+      status: t.status,
+      node: (
+        <ClickableCard key={t.id} href={`/trades/${t.id}`}
+          className="block rounded-2xl border border-slate-800 bg-slate-900/70 shadow-lg shadow-black/20 overflow-hidden hover:border-blue-500/40 hover:shadow-blue-500/5 transition-colors cursor-pointer">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 bg-slate-800/40 border-b border-slate-800">
+            <div className="flex items-center gap-3">
+              <TeamMark id={team.id} big />
+              <span className="text-slate-500 text-xl">⇄</span>
+              <TeamMark id={otherTeamId} big />
+            </div>
+            <div className="flex items-center gap-3">
+              <StatusBadge status={t.status} />
+              <span className="text-xs text-slate-500 whitespace-nowrap">
+                {fmtDate((t.status === "ACCEPTED" || t.status === "COMPLETED") ? (t.respondedAt ?? t.createdAt) : t.createdAt)}
+              </span>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-5">
+            <div>
+              <div className="text-[11px] uppercase tracking-wider font-bold text-emerald-400 mb-2">You Get</div>
+              <TradeAssetChips items={gets} kind="get" />
+            </div>
+            <div>
+              <div className="text-[11px] uppercase tracking-wider font-bold text-slate-400 mb-2">You Give</div>
+              <TradeAssetChips items={gives} kind="give" />
+            </div>
+          </div>
+        </ClickableCard>
+      ),
+    };
+  });
+
+  const groups = [
+    { key: "approved", label: "Approved", items: cards.filter((c) => APPROVED_STATUSES.has(c.status)) },
+    { key: "pending", label: "Pending", items: cards.filter((c) => PENDING_STATUSES.has(c.status)) },
+    { key: "declined", label: "Declined", items: cards.filter((c) => !APPROVED_STATUSES.has(c.status) && !PENDING_STATUSES.has(c.status)) },
+  ].map((g) => ({ key: g.key, label: g.label, count: g.items.length, items: g.items.map((c) => c.node) }));
+
   return (
     <div className="space-y-6">
       <h1 className="text-lg font-bold text-slate-200">Trade Tracker</h1>
-      <div className="space-y-4">
-        {trades.map((t) => {
-          // fromTeam sent the "from" side assets, toTeam sent the "to" side —
-          // reframe as this club's own gives/gets regardless of which side of
-          // the Trade row it happens to be.
-          const isFrom = t.fromTeamId === team.id;
-          const s = summaries.get(t.id);
-          const gives = (isFrom ? s?.from : s?.to) ?? [];
-          const gets = (isFrom ? s?.to : s?.from) ?? [];
-          const otherTeamId = isFrom ? t.toTeamId : t.fromTeamId;
-          return (
-            <ClickableCard key={t.id} href={`/trades/${t.id}`}
-              className="block rounded-2xl border border-slate-800 bg-slate-900/70 shadow-lg shadow-black/20 overflow-hidden hover:border-blue-500/40 hover:shadow-blue-500/5 transition-colors cursor-pointer">
-              <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 bg-slate-800/40 border-b border-slate-800">
-                <div className="flex items-center gap-3">
-                  <TeamMark id={team.id} big />
-                  <span className="text-slate-500 text-xl">⇄</span>
-                  <TeamMark id={otherTeamId} big />
-                </div>
-                <div className="flex items-center gap-3">
-                  <StatusBadge status={t.status} />
-                  <span className="text-xs text-slate-500 whitespace-nowrap">
-                    {fmtDate((t.status === "ACCEPTED" || t.status === "COMPLETED") ? (t.respondedAt ?? t.createdAt) : t.createdAt)}
-                  </span>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-5">
-                <div>
-                  <div className="text-[11px] uppercase tracking-wider font-bold text-emerald-400 mb-2">You Get</div>
-                  <TradeAssetChips items={gets} kind="get" />
-                </div>
-                <div>
-                  <div className="text-[11px] uppercase tracking-wider font-bold text-slate-400 mb-2">You Give</div>
-                  <TradeAssetChips items={gives} kind="give" />
-                </div>
-              </div>
-            </ClickableCard>
-          );
-        })}
-      </div>
+      <TeamTradeTabs groups={groups} />
     </div>
   );
 }
