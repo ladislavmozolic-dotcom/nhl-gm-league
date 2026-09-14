@@ -19,7 +19,7 @@ export async function saveSystem(teamId: number, tactics: TeamTactics) {
     await prisma.teamLines.create({ data: { teamId, system: clean as object } });
   }
 
-  revalidatePath(`/teams`);
+  revalidatePath(`/teams`, "layout");
   return { ok: true };
 }
 
@@ -32,6 +32,6 @@ export async function applyCoachSuggestionAction(teamId: number, dial: string, v
   const clean = mergeTactics({ ...current, [dial]: value } as TeamTactics);
   if (row) await prisma.teamLines.update({ where: { teamId }, data: { system: clean as object } });
   else await prisma.teamLines.create({ data: { teamId, system: clean as object } });
-  revalidatePath(`/teams`);
+  revalidatePath(`/teams`, "layout");
   return { ok: true as const };
 }

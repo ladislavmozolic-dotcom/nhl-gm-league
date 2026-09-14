@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/ui";
 import SystemEditor from "@/components/SystemEditor";
 import CoachAdvice from "@/components/CoachAdvice";
 import { loadSimTeam } from "@/lib/sim";
-import { loadTeamLines } from "@/lib/sim/lines";
+import { loadTeamSystem } from "@/lib/sim/lines";
 import { mergeTactics } from "@/lib/sim/tactics";
 import { coachAdvice } from "@/lib/coach-advice";
 
@@ -17,9 +17,12 @@ export default async function TeamTacticsPage({ params }: { params: Promise<{ sl
   if (!team) notFound();
   if (!(await canManageTeam(team.id))) redirect(`/teams/${slug}/login`);
 
-  // roster profile drives system fit; current stored system (if any)
-  const [sim, lines] = await Promise.all([loadSimTeam(team.id), loadTeamLines(team.id)]);
-  const current = mergeTactics(lines?.system ?? null);
+  // roster profile drives system fit; current stored system (if any) — read via
+  // loadTeamSystem, NOT loadTeamLines, since loadTeamLines returns null whenever
+  // the club hasn't set custom forward lines/D pairs yet, which would otherwise
+  // make a previously-saved system silently reset to "Balanced" on every reload.
+  const [sim, system] = await Promise.all([loadSimTeam(team.id), loadTeamSystem(team.id)]);
+  const current = mergeTactics(system);
   const advice = coachAdvice(sim.profile, current, sim.coachEx);
 
   return (
