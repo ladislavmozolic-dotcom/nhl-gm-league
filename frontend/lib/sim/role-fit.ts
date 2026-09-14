@@ -97,5 +97,5 @@ export function roleFitOf(members: RoleFitAttrs[], isDef: boolean): number {
 }
 
 export const ROLE_LABEL: Record<Role, string> = {
-  OFD: "Offensive D", DFD: "Defensive D", PLAY: "Playmaker", SNIPE: "Sniper", GRIND: "Grinder",
+  OFD: "Offensive Defenceman", DFD: "Defensive D", PLAY: "Playmaker", SNIPE: "Sniper", GRIND: "Grinder",
 };

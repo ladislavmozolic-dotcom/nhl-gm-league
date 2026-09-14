@@ -107,6 +107,7 @@ export const DICT: Dict = {
   "admin.agent.d": { en: "Standing offers the negotiation engine is working through — Free Agent Frenzy market bids and clubs' own re-signings — delete a stuck or unwanted one.", cs: "Aktívne ponuky, ktoré rieši vyjednávací systém — trhové ponuky Free Agent Frenzy a vlastné re-signingy klubov — zmaž zaseknutú alebo nechcenú." },
   "admin.positions.d": { en: "Find a player and add/remove positions and shooting side.", cs: "Nájdi hráča a pridaj/odober pozície a stranu strely." },
   "admin.ratings.d": { en: "Find a player and tune his ratings (OV, SC, PA…) — the sim reflects them.", cs: "Nájdi hráča a nalaď jeho ratingy (OV, SC, PA…) — sim ich odzrkadlí." },
+  "admin.profile.d": { en: "Find a player and edit his bio — birth date, birthplace, nationality, height, weight, jersey number, shoots.", cs: "Nájdi hráča a uprav jeho profil — dátum narodenia, miesto narodenia, národnosť, výšku, váhu, číslo dresu, streľbu." },
   "admin.conditions.d": { en: "Track conditional trades; trigger settlement once conditions are met.", cs: "Sleduj podmienené trejdy; spusti vyrovnanie po splnení podmienok." },
   "admin.finance.d": { en: "Set popularity — drives attendance and ticket revenue.", cs: "Nastav popularitu — poháňa návštevnosť a príjmy zo vstupného." },
   "admin.lottery.d": { en: "Draw the NHL-style lottery (16 non-playoff clubs, 2 weighted picks).", cs: "Vyžrebuj NHL-štýl lotériu (16 nepostupujúcich, 2 vážené picky)." },

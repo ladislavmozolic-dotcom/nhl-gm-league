@@ -68,7 +68,7 @@ export function playerType(p: TypeInput): string | null {
   if (isDefPos(p.position ?? "")) {
     // RAW THRESHOLD RULES first (unhl-player-types-roles-formulas-v6.xlsx's "Role
     // Rules" sheet, "Raw thresholds" tier — exact fixed cutoffs on PA+SC/DF/SK).
-    if (paSc >= 105 && D < 78) return "Offensive D";
+    if (paSc >= 105 && D < 78) return "Offensive Defenceman";
     if (paSc >= 105 && D >= 78) return "Two-Way D";
     if (SK >= 40 && P >= 53 && paSc < 105 && D >= 78) return "Defensive D";
     if (P < 53 && paSc < 105 && D >= 78) return "Stay-at-Home D";
@@ -84,7 +84,7 @@ export function playerType(p: TypeInput): string | null {
     // low-50s, still DF-strong) stays below D_OFF_TWO_WAY and keeps reading as
     // Stay-at-Home/Defensive, same as before.
     const defGood = D >= OVERRIDE.D.df.y;
-    if (off >= 68) return "Offensive D";
+    if (off >= 68) return "Offensive Defenceman";
     if (off >= D_OFF_TWO_WAY && defGood) return "Two-Way D";
     if (off <= 60) return phys >= 74 ? "Stay-at-Home D" : "Defensive D";
     return "Two-Way D";

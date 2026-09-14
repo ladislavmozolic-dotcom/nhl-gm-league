@@ -33,6 +33,7 @@ const GROUPS: Group[] = [
       { href: "/admin/agent", title: "🤖 AI Agent", descKey: "admin.agent.d" },
       { href: "/admin/positions", title: "Player Positions", descKey: "admin.positions.d" },
       { href: "/admin/ratings", title: "Player Ratings", descKey: "admin.ratings.d" },
+      { href: "/admin/profile", title: "Player Profile", descKey: "admin.profile.d" },
       { href: "/admin/conditions", title: "Trade Conditions", descKey: "admin.conditions.d" },
     ],
   },
