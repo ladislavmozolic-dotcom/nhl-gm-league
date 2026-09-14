@@ -65,11 +65,16 @@ export async function fillRealProspectsAction() {
  */
 export async function applyRosterMode(mode: "profinhl" | "real") {
   const cfg = await getRosterConfig();
+  // Read once up front — both branches' bank reset below uses the commissioner's
+  // configured starting capital, not a hardcoded guess (see lib/sim/settings.ts
+  // startingCapital, the same uniform season-opening bank processFinances() uses).
+  const settings = await loadSettings();
+  const startingCapital = settings.startingCapital;
 
   if (mode === "profinhl") {
     await prisma.$executeRawUnsafe(`UPDATE "Player" SET "teamId"="profinhlTeamId", "rosterType"=COALESCE("profinhlRosterType",'NHL'), "capHit"="profinhlCapHit", "tradeClause"="profinhlTradeClause" WHERE "profinhlTeamId" IS NOT NULL`);
-    // ProfiNHL mode: real scraped bank balances (fallback 50M); reset the transaction ledger
-    await prisma.$executeRawUnsafe(`UPDATE "Team" SET "bankAccount"=COALESCE("profinhlBank", 50000000), "ledgerAdj"=0`);
+    // ProfiNHL mode: real scraped bank balances (fallback the configured starting capital); reset the transaction ledger
+    await prisma.$executeRawUnsafe(`UPDATE "Team" SET "bankAccount"=COALESCE("profinhlBank", ${startingCapital}), "ledgerAdj"=0`);
   } else {
     // NHL 23-man roster — real cap hit AND real clause (kept separate from ProfiNHL)
     await prisma.$executeRawUnsafe(`UPDATE "Player" SET "teamId"="realTeamId", "rosterType"='NHL', "capHit"=COALESCE("realCapHit","profinhlCapHit"), "tradeClause"="realTradeClause", "contractYears"=LEAST(COALESCE("realContractYears","contractYears"), 4), "contractExpiry"=${CURRENT_SEASON_START}+LEAST(COALESCE("realContractYears","contractYears"), 4) WHERE "realTeamId" IS NOT NULL`);
@@ -79,12 +84,11 @@ export async function applyRosterMode(mode: "profinhl" | "real") {
       await prisma.$executeRawUnsafe(`UPDATE "Player" SET "teamId"=${aff.id}, "rosterType"='AHL', "capHit"=COALESCE("realCapHit","profinhlCapHit") WHERE "realFarmTeamId"=${aff.parentTeamId} AND "realTeamId" IS NULL`);
     // everyone else → free agents
     await prisma.$executeRawUnsafe(`UPDATE "Player" SET "rosterType"='UFA' WHERE "realTeamId" IS NULL AND "realFarmTeamId" IS NULL AND "rosterType" IN ('NHL','AHL')`);
-    // NHL mode: every team starts with a 50M bank; reset the transaction ledger
-    await prisma.$executeRawUnsafe(`UPDATE "Team" SET "bankAccount"=50000000, "ledgerAdj"=0`);
+    // NHL mode: every team starts with the commissioner's configured starting capital; reset the transaction ledger
+    await prisma.$executeRawUnsafe(`UPDATE "Team" SET "bankAccount"=${startingCapital}, "ledgerAdj"=0`);
   }
 
   // swap the league salary-cap ceiling to match the mode
-  const settings = await loadSettings();
   settings.salaryCapUpper = mode === "real" ? cfg.realCapUpper : cfg.profinhlCapUpper;
   settings.salaryCapLower = mode === "real" ? cfg.realCapLower : cfg.profinhlCapLower;
   await saveSettings(settings);
