@@ -232,7 +232,9 @@ const ROLE_WEIGHTS: Record<RoleKey, Partial<Record<RoleParam, number>>> = {
   // (verified against production: Cale Makar scored below Charlie McAvoy here
   // despite clearly superior sc/pa/sk, purely because Makar's ck/st percentiles
   // are low — a checking/stamina bias that has no place grading a top pairing).
-  twoWayD: { df: 30, pa: 25, sc: 20, sk: 15, ph: 6, en: 4 },
+  // df/sc/pa kept at an even 25% each — a top pairing is judged equally on
+  // defense, scoring and playmaking, not defense-first with offense as a bonus.
+  twoWayD: { df: 25, pa: 25, sc: 25, sk: 15, ph: 6, en: 4 },
   shutdownD: { df: 45, ck: 20, st: 15, sk: 7, en: 7, di: 6 },
   bottomPairD: { df: 40, ck: 15, st: 15, di: 10, en: 10, sk: 5, pa: 5 },
   ppDefenseman: { pa: 35, sc: 25, ph: 20, sk: 10, en: 10 },
