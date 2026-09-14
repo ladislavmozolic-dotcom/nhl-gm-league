@@ -640,6 +640,10 @@ model TradeCondition {
   op2         String?
   threshold2  Float?
   logic2      String? // AND | OR — how metric2's clause combines with metric's
+  metric3     String?
+  op3         String?
+  threshold3  Float?
+  logic3      String? // AND | OR — how metric3's clause combines with the metric+metric2 result so far
   pickAId     Int?    // stays put if the condition is NOT met
   pickBId     Int?    // swaps to toTeamId INSTEAD of pickA if the condition IS met
 }

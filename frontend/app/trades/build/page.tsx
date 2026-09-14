@@ -8,12 +8,14 @@ import { packageFromTrade, type TradePackage } from "@/lib/trade-exec";
 import { PageHeader, Card } from "@/components/ui";
 import { teamAssets } from "@/lib/trade-assets";
 import { teamCapStatus } from "@/lib/cap";
+import { getLang } from "@/lib/lang-server";
 
 export const dynamic = "force-dynamic";
 
 export default async function TradeBuildPage({ searchParams }: { searchParams: Promise<{ opp?: string; edit?: string }> }) {
   const session = await getTeamSession();
   if (!session) redirect("/login");
+  const lang = await getLang();
   const myTeam = await prisma.team.findUnique({ where: { id: session }, select: { id: true, name: true, logoUrl: true, slug: true } });
   if (!myTeam) redirect("/login");
 
@@ -43,7 +45,7 @@ export default async function TradeBuildPage({ searchParams }: { searchParams: P
       <div className="space-y-4 py-2">
         <PageHeader title={`Modify trade #${editId}`} subtitle={`${fromT!.name} ↔ ${toT!.name} — the commission asked you to rebalance this deal. Adjust the assets and resubmit for review.`} />
         {trade!.commishNote && <Card><p className="text-sm text-amber-300">✏️ Commission note: {trade!.commishNote}</p></Card>}
-        <TradeBuilder me={{ id: fromT!.id, name: fromT!.name, logoUrl: fromT!.logoUrl }} opp={{ id: toT!.id, name: toT!.name, logoUrl: toT!.logoUrl }} mine={mine} theirs={theirs} meCap={mineCap} oppCap={theirsCap} initial={initial} submitLabel="Resubmit to commission" onPropose={submitEdit} />
+        <TradeBuilder me={{ id: fromT!.id, name: fromT!.name, logoUrl: fromT!.logoUrl }} opp={{ id: toT!.id, name: toT!.name, logoUrl: toT!.logoUrl }} mine={mine} theirs={theirs} meCap={mineCap} oppCap={theirsCap} initial={initial} submitLabel="Resubmit to commission" onPropose={submitEdit} lang={lang} />
       </div>
     );
   }
@@ -93,6 +95,7 @@ export default async function TradeBuildPage({ searchParams }: { searchParams: P
       meCap={mineCap}
       oppCap={theirsCap}
       onPropose={proposeTrade}
+      lang={lang}
     />
   );
 }

@@ -77,6 +77,7 @@ export type ConditionEvalResult = { eval: ConditionEval | null; error: string | 
 export function evaluateAgainstStats(c: {
   metric: string | null; op: string | null; threshold: number | null;
   metric2: string | null; op2: string | null; threshold2: number | null; logic2: string | null;
+  metric3?: string | null; op3?: string | null; threshold3?: number | null; logic3?: string | null;
 }, stats: PlayerSeasonStats): ConditionEval | null {
   if (!c.metric || !c.op || c.threshold == null) return null;
   const v1 = valueOf(stats, c.metric);
@@ -88,6 +89,12 @@ export function evaluateAgainstStats(c: {
     const pass2 = compare(c.op2, v2, c.threshold2);
     clauses.push({ metric: c.metric2, label: METRIC_LABELS[c.metric2 as Metric] ?? c.metric2, value: Math.round(v2 * 100) / 100, op: c.op2, threshold: c.threshold2, pass: pass2 });
     met = c.logic2 === "OR" ? (pass1 || pass2) : (pass1 && pass2);
+  }
+  if (c.metric3 && c.op3 && c.threshold3 != null) {
+    const v3 = valueOf(stats, c.metric3);
+    const pass3 = compare(c.op3, v3, c.threshold3);
+    clauses.push({ metric: c.metric3, label: METRIC_LABELS[c.metric3 as Metric] ?? c.metric3, value: Math.round(v3 * 100) / 100, op: c.op3, threshold: c.threshold3, pass: pass3 });
+    met = c.logic3 === "OR" ? (met || pass3) : (met && pass3);
   }
   return { met, clauses, stats };
 }

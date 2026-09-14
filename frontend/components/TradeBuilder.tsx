@@ -8,6 +8,7 @@ import { displayName } from "@/lib/playerName";
 import { clauseTermsAction, analyzeTradeAction, type TradePackage } from "@/app/trades/build/actions";
 import ConditionModal from "@/components/ConditionModal";
 import { describeConditionSpec, type ConditionSpec } from "@/lib/trade-conditions-shared";
+import { t, type Lang } from "@/lib/i18n";
 
 type Player = { id: number; name: string; position: string; capHit: number; farm: boolean; clause?: string | null; noTradeTeams?: number[]; retainedAmount?: number };
 type Pick = { id: number; label: string; logoUrl?: string | null; locked?: boolean };
@@ -135,7 +136,7 @@ const setRet = (map: Record<number, number>, set: (v: Record<number, number>) =>
 // scratch. Callback props changing identity each render is completely normal
 // and doesn't cause this; only the component reference itself needs to be stable.
 
-function PlayerTable({ title, list, pmap, setPmap, destTeamId, ownerTeamId, terms, fees, onToggleClause, onAgreeFee, maxRetentionPct, conditionSpec, onOpenCondition, onRemoveCondition }: {
+function PlayerTable({ title, list, pmap, setPmap, destTeamId, ownerTeamId, terms, fees, onToggleClause, onAgreeFee, maxRetentionPct, conditionSpec, onOpenCondition, onRemoveCondition, lang }: {
   title: string; list: Player[]; pmap: Record<number, number>; setPmap: (v: Record<number, number>) => void; destTeamId: number; ownerTeamId: number;
   terms: Record<number, Terms | "loading">; fees: Record<number, { feeAmount: number; payTeamId: number }>;
   onToggleClause: (map: Record<number, number>, set: (v: Record<number, number>) => void, p: Player, destTeamId: number, ownerTeamId: number) => void;
@@ -144,6 +145,7 @@ function PlayerTable({ title, list, pmap, setPmap, destTeamId, ownerTeamId, term
   conditionSpec: ConditionSpec | null;
   onOpenCondition: (p: Player) => void;
   onRemoveCondition: () => void;
+  lang: Lang;
 }) {
   return (
     <div className="bg-slate-900/40 border border-slate-800 rounded-lg overflow-hidden">
@@ -200,13 +202,13 @@ function PlayerTable({ title, list, pmap, setPmap, destTeamId, ownerTeamId, term
                 <div className="mt-2 ml-6.5 text-xs">
                   <label className="flex items-center gap-2 cursor-pointer text-slate-400">
                     <input type="checkbox" checked={conditionSpec?.playerId === p.id} onChange={() => conditionSpec?.playerId === p.id ? onRemoveCondition() : onOpenCondition(p)} className="accent-amber-500 w-3.5 h-3.5" />
-                    <span className="font-medium">CON</span>
-                    <span className="text-slate-600">— make a draft pick conditional on his real NHL production</span>
+                    <span className="font-medium">{t(lang, "cond.conLabel")}</span>
+                    <span className="text-slate-600">— {t(lang, "cond.conHint")}</span>
                   </label>
                   {conditionSpec?.playerId === p.id && (
                     <p className="mt-1.5 ml-5.5 text-amber-300/90 bg-amber-950/20 border border-amber-800/30 rounded px-2 py-1.5">
-                      📋 {describeConditionSpec(conditionSpec)}{" "}
-                      <button type="button" onClick={() => onOpenCondition(p)} className="underline hover:text-amber-200">edit</button>
+                      📋 {describeConditionSpec(conditionSpec, lang)}{" "}
+                      <button type="button" onClick={() => onOpenCondition(p)} className="underline hover:text-amber-200">{t(lang, "cond.edit")}</button>
                     </p>
                   )}
                 </div>
@@ -242,7 +244,7 @@ function CheckTable({ title, icon, list, sel, setSel, onToggle }: {
   );
 }
 
-function Side({ team, assets, pmap, setPmap, pk, setPk, pro, setPro, cash, setCash, destTeamId, terms, fees, onToggleClause, onAgreeFee, onTogglePick, onTogglePickAsset, capStatus, capDelta, incomingAssets, incomingPmap, conditionSpec, onOpenCondition, onRemoveCondition }: {
+function Side({ team, assets, pmap, setPmap, pk, setPk, pro, setPro, cash, setCash, destTeamId, terms, fees, onToggleClause, onAgreeFee, onTogglePick, onTogglePickAsset, capStatus, capDelta, incomingAssets, incomingPmap, conditionSpec, onOpenCondition, onRemoveCondition, lang }: {
   team: Team; assets: Assets; pmap: Record<number, number>; setPmap: (v: Record<number, number>) => void;
   pk: Set<number>; setPk: (s: Set<number>) => void; pro: Set<number>; setPro: (s: Set<number>) => void;
   cash: number; setCash: (n: number) => void; destTeamId: number;
@@ -256,8 +258,9 @@ function Side({ team, assets, pmap, setPmap, pk, setPk, pro, setPro, cash, setCa
   // needed to know how many newly-retained players would land on its roster.
   incomingAssets: Assets; incomingPmap: Record<number, number>;
   conditionSpec: ConditionSpec | null;
-  onOpenCondition: (p: Player, ownerTeamId: number, picks: Pick[], pickSel: Set<number>) => void;
+  onOpenCondition: (p: Player, ownerTeamId: number, picks: Pick[]) => void;
   onRemoveCondition: () => void;
+  lang: Lang;
 }) {
   const added = retentionAdded(pmap, assets, capStatus.capUpper);
   const addedIn = retainedInAdded(incomingPmap, incomingAssets);
@@ -270,9 +273,10 @@ function Side({ team, assets, pmap, setPmap, pk, setPk, pro, setPro, cash, setCa
       <CapImpact status={capStatus} delta={capDelta} />
       <RetentionCapacity status={capStatus} newOutSlots={added.slots} newOutPct={added.pct} newIn={addedIn} />
       <PlayerTable title="Players" list={assets.players} pmap={pmap} setPmap={setPmap} destTeamId={destTeamId} ownerTeamId={team.id} terms={terms} fees={fees} onToggleClause={onToggleClause} onAgreeFee={onAgreeFee} maxRetentionPct={capStatus.retentionMaxPct}
-        conditionSpec={conditionSpec?.ownerTeamId === team.id ? conditionSpec : null}
-        onOpenCondition={(p) => onOpenCondition(p, team.id, assets.picks, pk)}
-        onRemoveCondition={onRemoveCondition} />
+        conditionSpec={conditionSpec && assets.players.some((pl) => pl.id === conditionSpec.playerId) ? conditionSpec : null}
+        onOpenCondition={(p) => onOpenCondition(p, destTeamId, incomingAssets.picks)}
+        onRemoveCondition={onRemoveCondition}
+        lang={lang} />
       <CheckTable title="Prospects" icon="⭐" list={assets.prospects} sel={pro} setSel={setPro} onToggle={onTogglePick} />
       <CheckTable title="Draft picks" icon="🎫" list={assets.picks} sel={pk} setSel={setPk} onToggle={onTogglePickAsset} />
       <div className="bg-slate-900/40 border border-slate-800 rounded-lg px-3 py-2.5 flex items-center gap-2 text-sm">
@@ -307,10 +311,10 @@ export type TradeBuilderInitial = {
   mineCash?: number; theirsCash?: number; condition?: string;
 };
 
-export default function TradeBuilder({ me, opp, mine, theirs, meCap, oppCap, onPropose, initial, submitLabel }: {
+export default function TradeBuilder({ me, opp, mine, theirs, meCap, oppCap, onPropose, initial, submitLabel, lang = "en" }: {
   me: Team; opp: Team; mine: Assets; theirs: Assets; meCap: CapSnapshot; oppCap: CapSnapshot;
   onPropose: (pkg: TradePackage) => Promise<{ tradeId: number }>;
-  initial?: TradeBuilderInitial; submitLabel?: string;
+  initial?: TradeBuilderInitial; submitLabel?: string; lang?: Lang;
 }) {
   const [mineP, setMineP] = useState<Record<number, number>>(initial?.mineP ?? {});   // playerId -> retention%
   const [theirsP, setTheirsP] = useState<Record<number, number>>(initial?.theirsP ?? {});
@@ -324,7 +328,7 @@ export default function TradeBuilder({ me, opp, mine, theirs, meCap, oppCap, onP
   // one structured conditional-pick clause per trade — the player it's under,
   // and the modal state while it's open (null = closed)
   const [conditionSpec, setConditionSpec] = useState<ConditionSpec | null>(null);
-  const [conditionModal, setConditionModal] = useState<{ player: Player; ownerTeamId: number; picks: Pick[]; pickSel: Set<number> } | null>(null);
+  const [conditionModal, setConditionModal] = useState<{ player: Player; ownerTeamId: number; picks: Pick[] } | null>(null);
   // clause agent: fetched terms per protected player + the fees the GM agrees to pay
   const [terms, setTerms] = useState<Record<number, Terms | "loading">>({});
   const [fees, setFees] = useState<Record<number, { feeAmount: number; payTeamId: number }>>({});
@@ -435,7 +439,7 @@ export default function TradeBuilder({ me, opp, mine, theirs, meCap, oppCap, onP
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px_1fr] gap-4 items-start">
         <Side team={me} assets={mine} pmap={mineP} setPmap={setMineP} pk={minePk} setPk={setMinePk} pro={minePro} setPro={setMinePro} cash={mineCash} setCash={setMineCash} destTeamId={opp.id} terms={terms} fees={fees} onToggleClause={toggleClausePlayer} onAgreeFee={agreeFee} onTogglePick={togglePick} onTogglePickAsset={toggleDraftPick} capStatus={meCap} capDelta={meCapDelta} incomingAssets={theirs} incomingPmap={theirsP}
-          conditionSpec={conditionSpec} onOpenCondition={(p, ownerTeamId, picks, pickSel) => setConditionModal({ player: p, ownerTeamId, picks, pickSel })} onRemoveCondition={() => setConditionSpec(null)} />
+          conditionSpec={conditionSpec} onOpenCondition={(p, ownerTeamId, picks) => setConditionModal({ player: p, ownerTeamId, picks })} onRemoveCondition={() => setConditionSpec(null)} lang={lang} />
 
         {/* MIDDLE — live summary, conditions, Propose + GM Assist */}
         <div className="lg:sticky lg:top-4 space-y-3">
@@ -495,7 +499,7 @@ export default function TradeBuilder({ me, opp, mine, theirs, meCap, oppCap, onP
         </div>
 
         <Side team={opp} assets={theirs} pmap={theirsP} setPmap={setTheirsP} pk={theirsPk} setPk={setTheirsPk} pro={theirsPro} setPro={setTheirsPro} cash={theirsCash} setCash={setTheirsCash} destTeamId={me.id} terms={terms} fees={fees} onToggleClause={toggleClausePlayer} onAgreeFee={agreeFee} onTogglePick={togglePick} onTogglePickAsset={toggleDraftPick} capStatus={oppCap} capDelta={oppCapDelta} incomingAssets={mine} incomingPmap={mineP}
-          conditionSpec={conditionSpec} onOpenCondition={(p, ownerTeamId, picks, pickSel) => setConditionModal({ player: p, ownerTeamId, picks, pickSel })} onRemoveCondition={() => setConditionSpec(null)} />
+          conditionSpec={conditionSpec} onOpenCondition={(p, ownerTeamId, picks) => setConditionModal({ player: p, ownerTeamId, picks })} onRemoveCondition={() => setConditionSpec(null)} lang={lang} />
       </div>
 
       {conditionModal && (
@@ -503,9 +507,18 @@ export default function TradeBuilder({ me, opp, mine, theirs, meCap, oppCap, onP
           player={conditionModal.player}
           ownerTeamId={conditionModal.ownerTeamId}
           picks={conditionModal.picks}
-          selectedPickIds={conditionModal.pickSel}
+          lang={lang}
           initial={conditionSpec?.playerId === conditionModal.player.id ? conditionSpec : null}
-          onSave={(spec) => { setConditionSpec(spec); setConditionModal(null); }}
+          onSave={(spec) => {
+            // Pick A is now chosen freely from the picks-owner's own pool (not
+            // necessarily already checked in the trade's Draft Picks list) —
+            // make sure it's actually part of the package being sent.
+            const isMe = conditionModal.ownerTeamId === me.id;
+            const pk = isMe ? minePk : theirsPk;
+            const setPk = isMe ? setMinePk : setTheirsPk;
+            if (!pk.has(spec.pickAId)) { const n = new Set(pk); n.add(spec.pickAId); setPk(n); }
+            setConditionSpec(spec); setConditionModal(null);
+          }}
           onRemove={conditionSpec?.playerId === conditionModal.player.id ? () => { setConditionSpec(null); setConditionModal(null); } : undefined}
           onClose={() => setConditionModal(null)}
         />

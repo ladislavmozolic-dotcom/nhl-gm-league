@@ -415,10 +415,11 @@ export async function createTradeRecord(pkg: TradePackage, opts: { fromName: str
   await prisma.tradeAsset.createMany({ data: rows });
   if (pkg.conditionSpec) {
     const spec = pkg.conditionSpec;
-    // ConditionSpec.ownerTeamId is whichever side actually owns pickA/pickB (the
-    // side sending the player) — NOT necessarily pkg.fromTeamId, since a Trade
-    // record's own fromTeamId/toTeamId is fixed to "me → opp" regardless of
-    // which side's player/picks the condition is actually about.
+    // ConditionSpec.ownerTeamId is whichever side actually owns pickA/pickB —
+    // the side ACQUIRING the tracked player, never the one giving him up —
+    // which is NOT necessarily pkg.fromTeamId, since a Trade record's own
+    // fromTeamId/toTeamId is fixed to "me → opp" regardless of which side's
+    // player/picks the condition is actually about.
     const condFromTeamId = spec.ownerTeamId;
     const condToTeamId = spec.ownerTeamId === pkg.fromTeamId ? pkg.toTeamId : pkg.fromTeamId;
     const desc = pkg.condition?.trim() ? `${pkg.condition.trim()}\n\n${describeConditionSpec(spec)}` : describeConditionSpec(spec);
@@ -427,6 +428,7 @@ export async function createTradeRecord(pkg: TradePackage, opts: { fromName: str
       playerId: spec.playerId, seasonYear: spec.seasonYear,
       metric: spec.metric, op: spec.op, threshold: spec.threshold,
       metric2: spec.metric2 ?? null, op2: spec.op2 ?? null, threshold2: spec.threshold2 ?? null, logic2: spec.logic2 ?? null,
+      metric3: spec.metric3 ?? null, op3: spec.op3 ?? null, threshold3: spec.threshold3 ?? null, logic3: spec.logic3 ?? null,
       pickAId: spec.pickAId, pickBId: spec.pickBId,
     } });
   } else if (pkg.condition?.trim()) {
