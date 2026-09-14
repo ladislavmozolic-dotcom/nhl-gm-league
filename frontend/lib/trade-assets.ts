@@ -36,7 +36,7 @@ export async function teamAssets(teamId: number, prospectSource: "real" | "profi
     players: players.slice().sort(byName).map((p) => ({ id: p.id, name: p.name, position: p.position, capHit: Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0)), farm: p.rosterType === "AHL", clause: p.tradeClause, noTradeTeams: p.noTradeTeams, retainedAmount: p.retainedSalary ?? 0 })),
     picks: picks.map((p) => {
       const orig = teamByLogoId.get(p.ownerLogoId);
-      return { id: p.id, label: `${p.year} R${p.round}${orig ? ` (${orig.code ?? orig.name})` : ""}`, logoUrl: orig?.logoUrl ?? null };
+      return { id: p.id, label: `${p.year} R${p.round}${orig ? ` (${orig.code ?? orig.name})` : ""}`, logoUrl: orig?.logoUrl ?? null, locked: p.lockedByConditionId != null };
     }),
     prospects: prospects.slice().sort(byName).map((p) => ({ id: p.id, label: p.draftYear || p.overallPick ? `${p.name} (${p.draftYear ?? "?"}${p.overallPick ? ` #${p.overallPick}` : ""})` : p.name })),
   };

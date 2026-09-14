@@ -622,6 +622,26 @@ model TradeCondition {
   status      String    @default("PENDING") // PENDING | FULFILLED | EXPIRED
   createdAt   DateTime  @default(now())
   resolvedAt  DateTime?
+
+  // Optional structured stat-based tracking, attached by the commissioner after
+  // the fact (see /admin/conditions) — a plain free-text condition just leaves
+  // all of these null. When set, pickA and pickB are LOCKED (DraftPick.
+  // lockedByConditionId) from being moved in any other trade until resolved:
+  // pickA is where the pick currently sits (the "if NOT met" outcome, a no-op
+  // on resolution); pickB is the alternate that swaps in for toTeamId instead
+  // if the condition evaluates true. Mirrors a real conditional-pick clause
+  // ("conveys as a 2nd unless X, in which case a 3rd").
+  playerId    Int?
+  seasonYear  Int?    // season the stats are measured over (e.g. 2027 = 2026-27)
+  metric      String? // POINTS | GOALS | ASSISTS | GAMES_PLAYED | PPG
+  op          String? // GTE | GT | LTE | LT
+  threshold   Float?
+  metric2     String?
+  op2         String?
+  threshold2  Float?
+  logic2      String? // AND | OR — how metric2's clause combines with metric's
+  pickAId     Int?    // stays put if the condition is NOT met
+  pickBId     Int?    // swaps to toTeamId INSTEAD of pickA if the condition IS met
 }
 
 model TradeAsset {
@@ -725,6 +745,10 @@ model DraftPick {
   ownerLogoId Int
   source      String @default("profinhl") // profinhl | real
   team        Team   @relation(fields: [teamId], references: [id])
+  // Set while this pick is one of the two candidates on a PENDING structured
+  // TradeCondition (see that model) — assertOwnership refuses to let a locked
+  // pick into any OTHER trade until the condition resolves and clears this.
+  lockedByConditionId Int?
 }
 
 model Game {

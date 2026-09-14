@@ -8,7 +8,7 @@ import { displayName } from "@/lib/playerName";
 import { clauseTermsAction, analyzeTradeAction, type TradePackage } from "@/app/trades/build/actions";
 
 type Player = { id: number; name: string; position: string; capHit: number; farm: boolean; clause?: string | null; noTradeTeams?: number[]; retainedAmount?: number };
-type Pick = { id: number; label: string; logoUrl?: string | null };
+type Pick = { id: number; label: string; logoUrl?: string | null; locked?: boolean };
 type Assets = { players: Player[]; picks: Pick[]; prospects: Pick[] };
 type Team = { id: number; name: string; logoUrl?: string | null };
 type Terms = { feeAmount: number; feePct: number; fullPayout: boolean; reason: string; payTeamId: number };
@@ -209,10 +209,12 @@ function CheckTable({ title, icon, list, sel, setSel, onToggle }: {
       <div className="max-h-[28vh] overflow-y-auto divide-y divide-slate-800/60">
         {list.length === 0 && <div className="px-3 py-3 text-slate-600 text-sm">none</div>}
         {list.map((it) => (
-          <label key={it.id} className={`flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer ${sel.has(it.id) ? "bg-blue-950/30" : ""}`}>
-            <input type="checkbox" checked={sel.has(it.id)} onChange={() => onToggle(sel, setSel, it.id)} className="accent-blue-500 w-4 h-4" />
+          <label key={it.id} className={`flex items-center gap-2.5 px-3 py-2 text-sm ${it.locked ? "cursor-not-allowed opacity-50" : "cursor-pointer"} ${sel.has(it.id) ? "bg-blue-950/30" : ""}`}
+            title={it.locked ? "Locked by a pending conditional trade — can't be moved until it resolves" : undefined}>
+            <input type="checkbox" checked={sel.has(it.id)} disabled={it.locked} onChange={() => !it.locked && onToggle(sel, setSel, it.id)} className="accent-blue-500 w-4 h-4" />
             {it.logoUrl && <img src={it.logoUrl} alt="" className="w-4 h-4 object-contain shrink-0" />}
             <span className="text-slate-300">{icon} {it.label}</span>
+            {it.locked && <span className="text-amber-400 text-xs">🔒</span>}
           </label>
         ))}
       </div>

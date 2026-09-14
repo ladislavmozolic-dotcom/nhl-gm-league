@@ -9,7 +9,7 @@ import { clauseTermsAction } from "@/app/trades/build/actions";
 import { proposeTradeGroupAction, type GroupLeg } from "@/app/trades/build3/actions";
 
 type Player = { id: number; name: string; position: string; capHit: number; farm: boolean; clause?: string | null; noTradeTeams?: number[]; retainedAmount?: number };
-type Pick = { id: number; label: string; logoUrl?: string | null };
+type Pick = { id: number; label: string; logoUrl?: string | null; locked?: boolean };
 type Assets = { players: Player[]; picks: Pick[]; prospects: Pick[] };
 type Team = { id: number; name: string; logoUrl?: string | null };
 type Terms = { feeAmount: number; feePct: number; fullPayout: boolean; reason: string };
@@ -216,10 +216,12 @@ function TeamColumn({ team, others, assets, dest, setDest, playerIds, setPlayerI
         <div className="max-h-[18vh] overflow-y-auto divide-y divide-slate-800/60">
           {assets.picks.length === 0 && <div className="px-3 py-3 text-slate-600 text-sm">none</div>}
           {assets.picks.map((it) => (
-            <label key={it.id} className={`flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer ${pickIds.has(it.id) ? "bg-blue-950/30" : ""}`}>
-              <input type="checkbox" checked={pickIds.has(it.id)} onChange={() => toggle(pickIds, setPickIds, it.id)} className="accent-blue-500 w-4 h-4" />
+            <label key={it.id} className={`flex items-center gap-2.5 px-3 py-2 text-sm ${it.locked ? "cursor-not-allowed opacity-50" : "cursor-pointer"} ${pickIds.has(it.id) ? "bg-blue-950/30" : ""}`}
+              title={it.locked ? "Locked by a pending conditional trade — can't be moved until it resolves" : undefined}>
+              <input type="checkbox" checked={pickIds.has(it.id)} disabled={it.locked} onChange={() => !it.locked && toggle(pickIds, setPickIds, it.id)} className="accent-blue-500 w-4 h-4" />
               {it.logoUrl && <img src={it.logoUrl} alt="" className="w-4 h-4 object-contain shrink-0" />}
               <span className="text-slate-300">🎫 {it.label}</span>
+              {it.locked && <span className="text-amber-400 text-xs">🔒</span>}
             </label>
           ))}
         </div>

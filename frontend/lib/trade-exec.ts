@@ -304,9 +304,13 @@ export async function assertOwnership(pkg: TradePackage) {
 
   const pickIds = [...pkg.fromPicks, ...pkg.toPicks];
   if (pickIds.length) {
-    const picks = await prisma.draftPick.findMany({ where: { id: { in: pickIds } }, select: { id: true, teamId: true } });
+    const picks = await prisma.draftPick.findMany({ where: { id: { in: pickIds } }, select: { id: true, teamId: true, year: true, round: true, lockedByConditionId: true } });
     for (const id of pkg.fromPicks) { const pk = picks.find((x) => x.id === id); if (!pk || !fromOrg.includes(pk.teamId)) throw new Error("A draft pick you offered is not owned by your team."); }
     for (const id of pkg.toPicks) { const pk = picks.find((x) => x.id === id); if (!pk || !toOrg.includes(pk.teamId)) throw new Error("A requested draft pick is not owned by the other team."); }
+    // a pick that's one of two candidates on a pending conditional trade can't
+    // be moved elsewhere until that condition resolves (see trade-conditions-server.ts)
+    const locked = picks.find((p) => p.lockedByConditionId != null);
+    if (locked) throw new Error(`The ${locked.year} R${locked.round} pick is locked by a pending conditional trade (#${locked.lockedByConditionId}) and can't be moved until it resolves.`);
   }
   const prospectIds = [...(pkg.fromProspects ?? []), ...(pkg.toProspects ?? [])];
   if (prospectIds.length) {
