@@ -120,20 +120,13 @@ export default async function TeamCapView({ slug }: { slug: string }) {
       return (
         <tr key={p.id} className="border-b border-slate-800/60 hover:bg-slate-800/30">
           <td className="px-3 py-1.5"><PlayerLink id={p.id} name={p.name} /></td>
-          <td className="px-2 py-1.5 text-center">
-            {p.tradeClause && (
-              <span
-                className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30"
-                title={protectedTeams ? `Protected against: ${protectedTeams}` : undefined}
-              >
-                {CLAUSE_LABEL[p.tradeClause] ?? p.tradeClause}
-              </span>
-            )}
-          </td>
           <td className="px-2 py-1.5 text-center text-slate-500 text-xs">{p.position}</td>
           <td className="px-2 py-1.5 text-center text-slate-400 tabular-nums">{p.age ?? "—"}</td>
-          <td className="px-3 py-1.5 text-right tabular-nums font-medium">{netCapHit ? money(netCapHit) : "—"}</td>
-          {cells.map((c, i) => <td key={i} className="px-3 py-1.5 text-right tabular-nums">{c.salary != null ? <span className="text-green-400">{money(c.salary)}</span> : c.status ? <Badge s={c.status} /> : ""}</td>)}
+          <td className="px-2 py-1.5 text-center text-slate-400 tabular-nums" title={protectedTeams ? `Protected against: ${protectedTeams}` : undefined}>
+            {p.tradeClause ? (CLAUSE_LABEL[p.tradeClause] ?? p.tradeClause) : ""}
+          </td>
+          <td className="px-3 py-1.5 text-right tabular-nums font-medium text-xs">{netCapHit ? money(netCapHit) : "—"}</td>
+          {cells.map((c, i) => <td key={i} className="px-3 py-1.5 text-right tabular-nums text-xs">{c.salary != null ? <span className="text-green-400">{money(c.salary)}</span> : c.status ? <Badge s={c.status} /> : ""}</td>)}
           {gm && <td className="px-2 py-1.5 text-right">{p.capHit && p.contractYears ? <BuyoutButton slug={slug} playerId={p.id} playerName={p.name} onBuyout={buyoutPlayer} /> : null}</td>}
         </tr>
       );
@@ -142,7 +135,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   const Thead = ({ gm }: { gm: boolean }) => (
     <thead>
       <tr className="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-800 bg-slate-800/30">
-        <th className="text-left px-3 py-2 font-medium">Player</th><th className="px-2 py-2 font-medium">Clause</th><th className="px-2 py-2 font-medium">Pos</th><th className="px-2 py-2 font-medium">Age</th><th className="text-right px-3 py-2 font-medium">Cap Hit</th>
+        <th className="text-left px-3 py-2 font-medium">Player</th><th className="px-2 py-2 font-medium">Pos</th><th className="px-2 py-2 font-medium">Age</th><th className="px-2 py-2 font-medium">Terms</th><th className="text-right px-3 py-2 font-medium">Cap Hit</th>
         {years.map((y) => <th key={y} className="text-right px-3 py-2 whitespace-nowrap">{seasonLabel(y)}</th>)}
         {gm && <th />}
       </tr>

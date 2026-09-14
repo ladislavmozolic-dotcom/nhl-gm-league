@@ -108,7 +108,9 @@ export function teamCapSummary(
   };
 }
 
-export const money = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+// Space-separated thousands (cs-CZ locale, e.g. "$14 000 000") — this is a
+// CZ/SK-run league, commas read as decimal points to our users.
+export const money = (n: number) => `$${Math.round(n).toLocaleString("cs-CZ")}`;
 
 export const SEASON_GAMES = 82;
 // Real NHL calendar length the cap accrues over (~186 days from opening night
