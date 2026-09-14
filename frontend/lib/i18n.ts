@@ -100,6 +100,7 @@ export const DICT: Dict = {
   "admin.rosters.d": { en: "Start the season with ProfiNHL rosters or the real NHL rosters.", cs: "Začni sezónu s ProfiNHL súpiskami alebo reálnymi NHL súpiskami." },
   "admin.rosterMoves.d": { en: "Pick two clubs and move any player directly between them — no trade proposal needed.", cs: "Vyber dva kluby a presuň medzi nimi hráča priamo — bez ponuky výmeny." },
   "admin.teamLines.d": { en: "Open any club's line editor — players, tactics, ice-time.", cs: "Otvor editor zostáv ľubovoľného klubu — hráči, taktiky, ice-time." },
+  "admin.chemistry.d": { en: "Directly set a line's chemistry — takes effect in the next sim.", cs: "Priamo nastav chémiu formácie — prejaví sa hneď v ďalšej simulácii." },
   "admin.contracts.d": { en: "Edit player cap hits and contract terms.", cs: "Uprav cap hity a podmienky kontraktov hráčov." },
   "admin.trades.d": { en: "Every completed trade — revoke one to return all assets.", cs: "Všetky dokončené výmeny — revoke vráti všetky aktíva." },
   "admin.signings.d": { en: "Every UFA signing & extension — click a player for his bid trail; revert a deal.", cs: "Všetky podpisy a predĺženia — klik na hráča ukáže priebeh ponúk; revert vráti zmluvu." },
