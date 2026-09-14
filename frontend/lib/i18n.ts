@@ -206,9 +206,9 @@ export const DICT: Dict = {
   "cond.contractExtYes": { en: "Signs a new deal with them", cs: "Podpíše novú zmluvu s nimi" },
   "cond.contractExtNo": { en: "Does NOT sign with them", cs: "NEpodpíše s nimi" },
   "cond.lotteryThresholdLabel": { en: "Protect against finishing in the top", cs: "Chráň pri umiestnení v žrebe do" },
-  "cond.lotteryClauseDesc": {
-    en: "the pick isn't lottery-protected (its original team avoids a top {threshold} finish)",
-    cs: "pick nie je chránený lotériou (pôvodný tím neskončí v žrebe do {threshold})",
+  "cond.describeProtection": {
+    en: "{pickA} is TOP {threshold} protected — if it lands in the lottery's top {threshold}, {pickB} conveys instead.",
+    cs: "{pickA} je chránený do TOP {threshold} — ak skončí v žrebe do {threshold}, namiesto neho pôjde {pickB}.",
   },
   "cond.noConditions": { en: "No conditions yet — add at least one below.", cs: "Zatiaľ žiadna podmienka — pridaj aspoň jednu nižšie." },
   "cond.errNoClauses": { en: "Add at least one condition.", cs: "Pridaj aspoň jednu podmienku." },

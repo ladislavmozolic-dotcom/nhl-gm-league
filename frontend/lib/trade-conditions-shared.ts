@@ -104,21 +104,41 @@ function describeClause(lang: Lang, c: ConditionClause): string {
     case "CONTRACT_EXT":
       return t(lang, c.extended ? "cond.contractExtYes" : "cond.contractExtNo");
     case "LOTTERY_PROTECTION":
-      return t(lang, "cond.lotteryClauseDesc").replace("{threshold}", String(c.threshold));
+      // Never actually reached — describeConditionSpec pulls LOTTERY_PROTECTION
+      // clauses out and describes them in its own dedicated sentence instead,
+      // since it needs the pick labels (not just the clause) to read clearly.
+      return "";
   }
 }
 
 /** One-line human summary of a spec — used both for the Trade Builder's own
  *  chip/preview (localized to `lang`) and as the auto-generated
  *  TradeCondition.description when the GM doesn't type free text of their own
- *  (always English there, since that's a permanent admin-facing record). */
+ *  (always English there, since that's a permanent admin-facing record).
+ *  A LOTTERY_PROTECTION clause gets its own trailing sentence naming the
+ *  actual picks (e.g. "2027 R1 (BUF) is TOP 10 protected...") rather than
+ *  being folded into the generic "if {clauses}" chain — that read as a
+ *  confusing double negative ("if the pick ISN'T protected..."). */
 export function describeConditionSpec(spec: ConditionSpec, lang: Lang = "en"): string {
-  const clausesText = spec.clauses
-    .map((c, i) => (i === 0 ? describeClause(lang, c) : ` ${t(lang, c.logic === "OR" ? "cond.or" : "cond.and")} ${describeClause(lang, c)}`))
-    .join("");
+  const lottery = spec.clauses.find((c): c is LotteryClause => c.kind === "LOTTERY_PROTECTION");
+  const otherClauses = spec.clauses.filter((c) => c.kind !== "LOTTERY_PROTECTION");
   const subject = spec.playerName ? `${spec.playerName}: ` : "";
-  return subject + t(lang, "cond.describe")
-    .replaceAll("{clauses}", clausesText)
-    .replaceAll("{pickA}", spec.pickALabel)
-    .replaceAll("{pickB}", spec.pickBLabel);
+  const parts: string[] = [];
+
+  if (otherClauses.length > 0) {
+    const clausesText = otherClauses
+      .map((c, i) => (i === 0 ? describeClause(lang, c) : ` ${t(lang, c.logic === "OR" ? "cond.or" : "cond.and")} ${describeClause(lang, c)}`))
+      .join("");
+    parts.push(t(lang, "cond.describe")
+      .replaceAll("{clauses}", clausesText)
+      .replaceAll("{pickA}", spec.pickALabel)
+      .replaceAll("{pickB}", spec.pickBLabel));
+  }
+  if (lottery) {
+    parts.push(t(lang, "cond.describeProtection")
+      .replaceAll("{pickA}", spec.pickALabel)
+      .replaceAll("{pickB}", spec.pickBLabel)
+      .replaceAll("{threshold}", String(lottery.threshold)));
+  }
+  return subject + parts.join(" ");
 }
