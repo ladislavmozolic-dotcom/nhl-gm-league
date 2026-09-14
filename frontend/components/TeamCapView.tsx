@@ -276,8 +276,16 @@ export default async function TeamCapView({ slug }: { slug: string }) {
                   <td className="px-3 py-1.5">
                     {r.playerId ? <PlayerLink id={r.playerId} name={r.playerName} /> : <span className="italic text-slate-400">{r.playerName}</span>}
                   </td>
-                  <td className="px-3 py-1.5 text-right text-amber-300 tabular-nums font-medium">{money(r.perYear)}</td>
-                  {years.map((y, i) => <td key={i} className="px-3 py-1.5 text-right tabular-nums">{y >= r.startYear && y < r.startYear + r.years ? <span className="text-amber-300">{money(r.perYear)}</span> : ""}</td>)}
+                  <td
+                    className="px-3 py-1.5 text-right tabular-nums font-medium"
+                    // A little running gag for the Edmonton GM — everything else in
+                    // this column is plain white, his "Retained" figure gets a
+                    // temporary pride-flag gradient instead.
+                    style={team.code === "EDM" ? { background: "linear-gradient(90deg,#e40303,#ff8c00,#ffed00,#008026,#004dff,#750787)", WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" } : undefined}
+                  >
+                    {money(r.perYear)}
+                  </td>
+                  {years.map((y, i) => <td key={i} className="px-3 py-1.5 text-right tabular-nums">{y >= r.startYear && y < r.startYear + r.years ? <span className="text-red-400">{money(r.perYear)}</span> : ""}</td>)}
                 </tr>
               ))}
             </tbody>
