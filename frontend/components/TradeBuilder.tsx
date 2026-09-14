@@ -11,7 +11,7 @@ import { describeConditionSpec, type ConditionSpec } from "@/lib/trade-condition
 import { t, type Lang } from "@/lib/i18n";
 
 type Player = { id: number; name: string; position: string; capHit: number; farm: boolean; clause?: string | null; noTradeTeams?: number[]; retainedAmount?: number };
-type Pick = { id: number; label: string; logoUrl?: string | null; locked?: boolean };
+type Pick = { id: number; round?: number; label: string; logoUrl?: string | null; locked?: boolean };
 type Assets = { players: Player[]; picks: Pick[]; prospects: Pick[] };
 type Team = { id: number; name: string; logoUrl?: string | null };
 type Terms = { feeAmount: number; feePct: number; fullPayout: boolean; reason: string; payTeamId: number };

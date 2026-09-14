@@ -5,11 +5,10 @@ import { CURRENT_SEASON_START } from "@/lib/finance";
 import { t, type Lang } from "@/lib/i18n";
 import {
   METRICS, OPS, PLAYOFF_ROUNDS, LOTTERY_THRESHOLDS, metricLabel, opLabelFor, roundLabel, describeConditionSpec,
-  type Metric, type Op, type PlayoffRound, type ConditionSpec, type ConditionClause, type StatClause,
+  type Metric, type Op, type PlayoffRound, type ConditionSpec, type ConditionClause, type StatClause, type LotteryClause,
 } from "@/lib/trade-conditions-shared";
 
-type PickOption = { id: number; label: string; locked?: boolean };
-type Source = "REAL_NHL" | "UNHL" | "LOTTERY";
+type PickOption = { id: number; round?: number; label: string; locked?: boolean };
 
 const sel = "bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-sm text-slate-200";
 
@@ -26,24 +25,22 @@ function defaultStatClause(logic?: "AND" | "OR"): StatClause {
   return { kind: "STAT", source: "REAL_NHL", seasonYear: CURRENT_SEASON_START, metric: "PPG", op: "GTE", threshold: 0.6, logic };
 }
 
-/** One clause's editor. `source` is a UI-only concept layered over the real
- *  clause shape: Real NHL always means kind STAT/source REAL_NHL; UNHL
- *  additionally offers Playoff Round and Contract Extension (neither has a
- *  real-NHL equivalent); Draft Lottery protection needs no tracked player at
- *  all — it's judged purely on Pick B's own original team and year. */
+/** One player-performance clause's editor — Real NHL stats, or (UNHL) a stat
+ *  threshold, playoff round, or contract extension. Draft Lottery protection
+ *  isn't a clause kind picked here; it lives with Pick A/Pick B below, since
+ *  it's tied to which pick is actually selected there, not to the player. */
 function ClauseEditor({ lang, clause, onChange, onRemove }: {
   lang: Lang; clause: ConditionClause; onChange: (c: ConditionClause) => void; onRemove?: () => void;
 }) {
   const tt = (key: string) => t(lang, key);
-  const source: Source = clause.kind === "LOTTERY_PROTECTION" ? "LOTTERY" : clause.kind === "STAT" ? clause.source : "UNHL";
+  const source: "REAL_NHL" | "UNHL" = clause.kind === "STAT" ? clause.source : "UNHL";
 
-  const setSource = (s: Source) => {
+  const setSource = (s: "REAL_NHL" | "UNHL") => {
     if (s === "REAL_NHL") { onChange({ ...defaultStatClause(clause.logic), source: "REAL_NHL" }); return; }
-    if (s === "LOTTERY") { onChange({ kind: "LOTTERY_PROTECTION", threshold: 10, logic: clause.logic }); return; }
     if (clause.kind === "STAT") onChange({ ...clause, source: "UNHL" });
     else onChange({ ...defaultStatClause(clause.logic), source: "UNHL" });
   };
-  const setKind = (kind: ConditionClause["kind"]) => {
+  const setKind = (kind: "STAT" | "PLAYOFF_ROUND" | "CONTRACT_EXT") => {
     if (kind === "STAT") { onChange({ ...defaultStatClause(clause.logic), source: "UNHL" }); return; }
     if (kind === "PLAYOFF_ROUND") { onChange({ kind: "PLAYOFF_ROUND", seasonYear: CURRENT_SEASON_START, round: "MADE_PLAYOFFS", logic: clause.logic }); return; }
     onChange({ kind: "CONTRACT_EXT", extended: true, logic: clause.logic });
@@ -55,16 +52,15 @@ function ClauseEditor({ lang, clause, onChange, onRemove }: {
         {clause.logic && <LogicSelect lang={lang} value={clause.logic} onChange={(l) => onChange({ ...clause, logic: l })} />}
         <label className="flex items-center gap-1.5">
           <span className="text-xs text-slate-500">{tt("cond.sourceLabel")}</span>
-          <select className={sel} value={source} onChange={(e) => setSource(e.target.value as Source)}>
+          <select className={sel} value={source} onChange={(e) => setSource(e.target.value as "REAL_NHL" | "UNHL")}>
             <option value="REAL_NHL">{tt("cond.source.REAL_NHL")}</option>
             <option value="UNHL">{tt("cond.source.UNHL")}</option>
-            <option value="LOTTERY">{tt("cond.source.LOTTERY")}</option>
           </select>
         </label>
         {source === "UNHL" && (
           <label className="flex items-center gap-1.5">
             <span className="text-xs text-slate-500">{tt("cond.kindLabel")}</span>
-            <select className={sel} value={clause.kind} onChange={(e) => setKind(e.target.value as ConditionClause["kind"])}>
+            <select className={sel} value={clause.kind} onChange={(e) => setKind(e.target.value as "STAT" | "PLAYOFF_ROUND" | "CONTRACT_EXT")}>
               <option value="STAT">{tt("cond.kind.STAT")}</option>
               <option value="PLAYOFF_ROUND">{tt("cond.kind.PLAYOFF_ROUND")}</option>
               <option value="CONTRACT_EXT">{tt("cond.kind.CONTRACT_EXT")}</option>
@@ -123,16 +119,6 @@ function ClauseEditor({ lang, clause, onChange, onRemove }: {
           </select>
         </label>
       )}
-
-      {clause.kind === "LOTTERY_PROTECTION" && (
-        <label className="space-y-1 block max-w-xs">
-          <span className="text-xs text-slate-500">{tt("cond.lotteryThresholdLabel")}</span>
-          <select className={`${sel} w-full`} value={clause.threshold} onChange={(e) => onChange({ ...clause, threshold: Number(e.target.value) as 10 | 15 })}>
-            {LOTTERY_THRESHOLDS.map((n) => <option key={n} value={n}>TOP {n}</option>)}
-          </select>
-          <span className="text-[11px] text-slate-600 block">{tt("cond.lotteryPickBHint")}</span>
-        </label>
-      )}
     </div>
   );
 }
@@ -148,19 +134,33 @@ export default function ConditionModal({ player, ownerTeamId, picks, initial, la
   onClose: () => void;
 }) {
   const tt = (key: string) => t(lang, key);
-  const [clauses, setClauses] = useState<ConditionClause[]>(initial?.clauses ?? [defaultStatClause()]);
+  const initialClauses = initial?.clauses ?? [defaultStatClause()];
+  const [clauses, setClauses] = useState<ConditionClause[]>(initialClauses.filter((c) => c.kind !== "LOTTERY_PROTECTION"));
+  const [lottery, setLottery] = useState<LotteryClause | null>((initialClauses.find((c) => c.kind === "LOTTERY_PROTECTION") as LotteryClause | undefined) ?? null);
   const available = picks.filter((p) => !p.locked);
   const [pickAId, setPickAId] = useState<number | "">(initial?.pickAId ?? "");
   const [pickBId, setPickBId] = useState<number | "">(initial?.pickBId ?? "");
   const [error, setError] = useState<string | null>(null);
 
+  const pickB = picks.find((p) => p.id === pickBId);
+  // Protection only makes sense on a 1st-round pick — if Pick B is changed
+  // away from one, drop any protection already configured.
+  const setPickBIdChecked = (id: number | "") => {
+    setPickBId(id);
+    const newPick = id === "" ? undefined : picks.find((p) => p.id === id);
+    if (newPick?.round !== 1) setLottery(null);
+  };
+
   const updateClause = (i: number, c: ConditionClause) => setClauses((cs) => cs.map((x, idx) => (idx === i ? c : x)));
   const addClause = () => setClauses((cs) => [...cs, defaultStatClause("AND")]);
   const removeLastClause = () => setClauses((cs) => cs.slice(0, -1));
+  const totalClauseCount = clauses.length + (lottery ? 1 : 0);
+
+  const toggleLottery = () => setLottery((l) => (l ? null : { kind: "LOTTERY_PROTECTION", threshold: 10, logic: clauses.length > 0 ? "OR" : undefined }));
 
   const buildSpec = (): ConditionSpec => ({
     ownerTeamId, playerId: player.id, playerName: player.name,
-    clauses,
+    clauses: lottery ? [...clauses, lottery] : clauses,
     pickAId: Number(pickAId), pickALabel: picks.find((p) => p.id === pickAId)?.label ?? "?",
     pickBId: Number(pickBId), pickBLabel: picks.find((p) => p.id === pickBId)?.label ?? "?",
   });
@@ -168,12 +168,12 @@ export default function ConditionModal({ player, ownerTeamId, picks, initial, la
   const save = () => {
     if (!pickAId || !pickBId) { setError(tt("cond.errBothPicks")); return; }
     if (pickAId === pickBId) { setError(tt("cond.errSamePick")); return; }
-    const pickA = picks.find((p) => p.id === pickAId), pickB = picks.find((p) => p.id === pickBId);
+    const pickA = picks.find((p) => p.id === pickAId);
     if (!pickA || !pickB) { setError(tt("cond.errPickNotFound")); return; }
     onSave(buildSpec());
   };
 
-  const preview = pickAId && pickBId ? describeConditionSpec(buildSpec(), lang) : null;
+  const preview = pickAId && pickBId && (clauses.length > 0 || lottery) ? describeConditionSpec(buildSpec(), lang) : null;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
@@ -185,7 +185,7 @@ export default function ConditionModal({ player, ownerTeamId, picks, initial, la
           <ClauseEditor key={i} lang={lang} clause={c} onChange={(nc) => updateClause(i, nc)}
             onRemove={i > 0 && i === clauses.length - 1 ? removeLastClause : undefined} />
         ))}
-        {clauses.length < 3 && (
+        {totalClauseCount < 3 && (
           <button type="button" onClick={addClause}
             className="text-xs px-2.5 py-1 rounded-lg border border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-600">
             {tt("cond.addCondition")}
@@ -202,12 +202,30 @@ export default function ConditionModal({ player, ownerTeamId, picks, initial, la
           </label>
           <label className="space-y-1">
             <span className="text-xs text-slate-500">{tt("cond.pickB")}</span>
-            <select className={`${sel} w-full`} value={pickBId} onChange={(e) => setPickBId(e.target.value ? Number(e.target.value) : "")}>
+            <select className={`${sel} w-full`} value={pickBId} onChange={(e) => setPickBIdChecked(e.target.value ? Number(e.target.value) : "")}>
               <option value="">{tt("cond.selectPlaceholder")}</option>
               {available.map((p) => <option key={p.id} value={p.id} disabled={p.id === pickAId}>{p.label}</option>)}
             </select>
           </label>
         </div>
+
+        {pickB?.round === 1 && (
+          <div className="space-y-2">
+            <label className={`flex items-center gap-2 ${!lottery && totalClauseCount >= 3 ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
+              <input type="checkbox" checked={!!lottery} disabled={!lottery && totalClauseCount >= 3} onChange={toggleLottery} className="accent-amber-500 w-4 h-4" />
+              <span className="text-sm text-slate-300 font-medium">{tt("cond.lotteryToggle")}</span>
+            </label>
+            {lottery && (
+              <div className="flex items-center gap-2 flex-wrap pl-6">
+                {clauses.length > 0 && <LogicSelect lang={lang} value={lottery.logic ?? "OR"} onChange={(l) => setLottery({ ...lottery, logic: l })} />}
+                <span className="text-xs text-slate-500">{tt("cond.lotteryThresholdLabel")}</span>
+                <select className={sel} value={lottery.threshold} onChange={(e) => setLottery({ ...lottery, threshold: Number(e.target.value) as 10 | 15 })}>
+                  {LOTTERY_THRESHOLDS.map((n) => <option key={n} value={n}>TOP {n}</option>)}
+                </select>
+              </div>
+            )}
+          </div>
+        )}
 
         {preview && <p className="text-xs text-slate-400 bg-slate-950/50 rounded-lg p-2.5">{preview}</p>}
         {error && <p className="text-xs text-rose-400">{error}</p>}
