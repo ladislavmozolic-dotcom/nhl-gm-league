@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/ui";
+import { isAdmin } from "@/lib/auth";
 
 const tools = [
   {
@@ -16,13 +17,24 @@ const tools = [
   },
 ];
 
-export default function ToolsPage() {
+const adminTools = [
+  {
+    title: "Buyout Calculator",
+    description: "Preview a player's dead-money cap hit and bank cost before buying out his contract",
+    href: "/tools/buyout-calculator",
+    icon: "🧮",
+  },
+];
+
+export default async function ToolsPage() {
+  const admin = await isAdmin();
+  const list = admin ? [...tools, ...adminTools] : tools;
   return (
     <div className="space-y-6 py-2">
       <PageHeader title="Tools" subtitle="League management utilities" />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {tools.map((tool) => (
+        {list.map((tool) => (
           <Link
             key={tool.href}
             href={tool.href}
