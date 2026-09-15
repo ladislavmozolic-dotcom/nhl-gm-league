@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { buyoutTerms, seasonLabel, CURRENT_SEASON_START, money } from "@/lib/finance";
 
 export type BuyoutPickerPlayer = {
-  id: number; name: string; teamCode: string | null; capHit: number; contractYears: number;
+  id: number; name: string; teamCode: string | null; rosterType: string | null; capHit: number; contractYears: number;
 };
 
 type BuyoutPhase = "offseason" | "preseason" | "regular" | "playoffs";
@@ -29,7 +29,7 @@ function PlayerPicker({ pool, value, onPick, onClear }: {
   if (value) {
     return (
       <div className="flex items-center justify-between gap-2 bg-slate-800/60 rounded-lg px-3 py-2">
-        <span className="font-semibold text-sm truncate">{value.name} <span className="text-slate-500 text-xs">{value.teamCode ?? ""}</span></span>
+        <span className="font-semibold text-sm truncate">{value.name} <span className="text-slate-500 text-xs">{value.teamCode ?? ""} · {value.rosterType}</span></span>
         <button onClick={onClear} className="text-slate-400 hover:text-red-400 text-sm shrink-0">✕</button>
       </div>
     );
@@ -45,7 +45,7 @@ function PlayerPicker({ pool, value, onPick, onClear }: {
             <button key={p.id} onMouseDown={() => { onPick(p); setQ(""); setOpen(false); }}
               className="w-full text-left px-3 py-2 text-sm hover:bg-slate-700/50 flex items-center justify-between gap-2">
               <span className="truncate">{p.name}</span>
-              <span className="text-slate-500 text-xs shrink-0">{p.teamCode} · {money(p.capHit)} · {p.contractYears}yr</span>
+              <span className="text-slate-500 text-xs shrink-0">{p.teamCode} · {p.rosterType} · {money(p.capHit)} · {p.contractYears}yr</span>
             </button>
           ))}
         </div>

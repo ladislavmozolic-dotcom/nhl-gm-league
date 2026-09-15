@@ -12,16 +12,16 @@ export default async function BuyoutCalculatorPage() {
     loadSettings(),
     getLeagueClock(),
     prisma.player.findMany({
-      where: { rosterType: "NHL", capHit: { gt: 0 }, contractYears: { gt: 0 } },
-      select: { id: true, name: true, teamId: true, capHit: true, contractYears: true },
+      where: { rosterType: { in: ["NHL", "AHL"] }, capHit: { gt: 100_000 }, contractYears: { gt: 0 } },
+      select: { id: true, name: true, teamId: true, rosterType: true, capHit: true, contractYears: true },
       orderBy: { capHit: "desc" },
     }),
-    prisma.team.findMany({ where: { league: "NHL", isAffiliate: false }, select: { id: true, code: true } }),
+    prisma.team.findMany({ select: { id: true, code: true, name: true } }),
   ]);
-  const codeById = new Map(teams.map((t) => [t.id, t.code]));
+  const codeById = new Map(teams.map((t) => [t.id, t.code || t.name]));
   const pickerPlayers = players.map((p) => ({
     id: p.id, name: cleanName(p.name), teamCode: p.teamId ? codeById.get(p.teamId) ?? null : null,
-    capHit: p.capHit ?? 0, contractYears: p.contractYears ?? 0,
+    rosterType: p.rosterType, capHit: p.capHit ?? 0, contractYears: p.contractYears ?? 0,
   }));
 
   return (
