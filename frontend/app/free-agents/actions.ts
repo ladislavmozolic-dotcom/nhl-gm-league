@@ -13,6 +13,7 @@ import {
 import { MAX_TERM, faPosGroup, willingnessNote, twoWayObjection, type Deployment } from "@/lib/free-agency";
 import { loadSettings, saveSettings } from "@/lib/sim/settings";
 import { computeELC } from "@/lib/elc";
+import { isCommissionOfferEmbargo } from "@/lib/sim-clock";
 
 /** Commissioner-tuned two-way thresholds, shaped for twoWayObjection's opts. */
 async function twoWayOpts(): Promise<{
@@ -129,74 +130,36 @@ export async function getAskAtAction(playerId: number, teamId: number, line: num
   return { askSalary: ev.ask.salary, askYears: ev.ask.years, floor: ev.ask.floorSalary, minYears: ev.ask.minYears, maxYears: ev.ask.maxYears };
 }
 
-/** Who (if anyone) may see the competing offers, and whose offers stay hidden from them.
- *  Only admin-tier (commissioner / co-commissioner) see the blind market. The TOP
- *  commissioner sees everything; a co-commissioner sees every offer EXCEPT the
- *  commissioner's own bid (his own club's offers are always visible to himself). */
-async function offerViewMask(playerId?: number): Promise<{ hide: Set<number> } | null> {
+/** Only the commissioner tier can inspect league-wide bids. During the first
+ *  24 real hours of a round, they see only their own club's offers. Once that
+ *  embargo ends, commissioner and co-commissioner both see the full field. */
+async function offerViewMask(): Promise<{ hide: Set<number> } | null> {
   const id = await getTeamSession();
   if (id == null) return null;
   const me = await prisma.team.findUnique({ where: { id }, select: { isAdmin: true, gmRole: true } });
   if (!me || !(me.isAdmin || me.gmRole === "comish" || me.gmRole === "co_comish")) return null;
-  // Fresh-round blackout: for the first 24 REAL hours after a force-opened
-  // round starts, the commissioner's office sees NOTHING at all through this
-  // per-player admin view — not even on a player they have no stake in.
-  // Without this, a comish/co-comish could open a player's Interest widget
-  // before placing their own bid and simply read off what everyone else is
-  // offering, using their day-1 head start (submitOfferAction's
-  // dayInRound===1 gate) to scout the field risk-free. Only meaningful for a
-  // force-opened market (faOpen) — a calendar-driven round has no real-time
-  // start to measure. (The market-wide "All Active Offers" list has its own,
-  // milder blackout — see offerViewMaskForMarketList below — since showing
-  // WHICH players/teams are in play there, without dollar figures, isn't the
-  // same information leak as a per-player breakdown.)
   const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { faOpen: true, frenzyRoundStartedAt: true, frenzyStage: true } });
-  if (cfg?.faOpen && cfg.frenzyStage === "BIDDING" && cfg.frenzyRoundStartedAt && Date.now() - cfg.frenzyRoundStartedAt.getTime() < 24 * 60 * 60 * 1000) {
-    return null;
-  }
-  // Conflict of interest: a commish/co-commish who is ALSO bidding on this exact
-  // player (as a club) loses the admin view of it entirely — bidding stays blind
-  // for them here too, same as an ordinary GM, so their office can't use the
-  // full-market view to see what they're up against on a player they themselves
-  // want. This check is per-player and only kicks in when one is given.
-  if (playerId != null) {
-    const ownBid = await prisma.faOffer.findFirst({ where: { playerId, teamId: id, status: { in: ACTIVE } }, select: { id: true } });
-    if (ownBid) return null;
-  }
   const hide = new Set<number>();
-  if (me.gmRole !== "comish") { // co-commissioner: the commissioner's own bid is hidden
-    const comish = await prisma.team.findMany({ where: { gmRole: "comish" }, select: { id: true } });
-    for (const t of comish) if (t.id !== id) hide.add(t.id);
+  if (isCommissionOfferEmbargo(cfg, new Date())) {
+    const otherTeams = await prisma.team.findMany({ where: { league: "NHL", id: { not: id } }, select: { id: true } });
+    for (const t of otherTeams) hide.add(t.id);
   }
   return { hide };
 }
 
-/** Same admin/comish-tier gate and comish-vs-co-comish hide-set as offerViewMask,
- *  but for the market-wide "All Active Offers" list only — during the first 24h
- *  fresh-round blackout, instead of hiding everything, it flags `namesOnly` so
- *  getAllActiveOffersAction still returns which players/teams have an offer in
- *  (real market activity, not exploitable on its own) while stripping every
- *  dollar figure. Regular blind-bidding conflict-of-interest still applies —
- *  the caller's own actively-bid-on players are filtered out by the caller. */
-async function offerViewMaskForMarketList(): Promise<{ hide: Set<number>; namesOnly: boolean; blackoutRound: number | null } | null> {
+/** The market-wide view uses the same complete 24-hour embargo. */
+async function offerViewMaskForMarketList(): Promise<{ hide: Set<number>; namesOnly: boolean } | null> {
   const id = await getTeamSession();
   if (id == null) return null;
   const me = await prisma.team.findUnique({ where: { id }, select: { isAdmin: true, gmRole: true } });
   if (!me || !(me.isAdmin || me.gmRole === "comish" || me.gmRole === "co_comish")) return null;
-  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { faOpen: true, frenzyRoundStartedAt: true, frenzyForcedRound: true, frenzyStage: true } });
-  const namesOnly = !!(cfg?.faOpen && cfg.frenzyStage === "BIDDING" && cfg.frenzyRoundStartedAt && Date.now() - cfg.frenzyRoundStartedAt.getTime() < 24 * 60 * 60 * 1000);
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { faOpen: true, frenzyRoundStartedAt: true, frenzyStage: true } });
   const hide = new Set<number>();
-  if (me.gmRole !== "comish") {
-    const comish = await prisma.team.findMany({ where: { gmRole: "comish" }, select: { id: true } });
-    for (const t of comish) if (t.id !== id) hide.add(t.id);
+  if (isCommissionOfferEmbargo(cfg, new Date())) {
+    const otherTeams = await prisma.team.findMany({ where: { league: "NHL", id: { not: id } }, select: { id: true } });
+    for (const t of otherTeams) hide.add(t.id);
   }
-  // the blackout only ever meant "the round that just opened, before the comish's
-  // day-1 head start turns into everyone else's fair market info" — it must NOT
-  // blanket-hide an EARLIER, already-CLOSED round's numbers just because a new
-  // round happens to be inside its own first 24h. Only offers actually placed
-  // in that current round get their $ withheld; a resolved prior round's offers
-  // (COUNTERED, still inside their own decision window or not) show normally.
-  return { hide, namesOnly, blackoutRound: namesOnly ? (cfg?.frenzyForcedRound ?? null) : null };
+  return { hide, namesOnly: false };
 }
 
 /** Commissioner toggle: lock / unlock UFA signings for ordinary GMs. */
@@ -208,22 +171,10 @@ export async function setFaSignLockAction(lock: boolean) {
   return { ok: true as const, locked: lock };
 }
 
-/** Commissioner toggle: let comish-tier submit UFA-market offers even while the
- *  market is closed to everyone else — a manual head start for leagues that pin
- *  the phase by hand rather than following the real calendar (where the
- *  date-driven preview in getLeagueClock never has a "tomorrow" to look ahead to). */
-export async function setFaEarlyAccessAction(on: boolean) {
-  if (!(await isAdmin()) && !(await isComishTier())) return { ok: false as const, error: "Commissioner only." };
-  const s = await loadSettings();
-  await saveSettings({ ...s, faEarlyAccess: on });
-  for (const p of ["/free-agents", "/teams"]) revalidatePath(p);
-  return { ok: true as const, on };
-}
-
 /** Commissioner: schedule (or clear, passing null) a one-shot real moment for the
- *  Free Agent Frenzy window to auto-open for every GM — checked every ~5 minutes by
- *  the same cron that drives the daily league-day advance (lib/season-cron.ts
- *  autoOpenFrenzyIfDue). Pass a full ISO datetime (with timezone offset), not just a
+ *  Free Agent Frenzy window to auto-open for every GM — checked every minute by
+ *  instrumentation.ts via lib/season-cron.ts autoOpenFrenzyIfDue. Pass a full
+ *  ISO datetime (with timezone offset), not just a
  *  date, since this fires at a specific time of day, not once-per-day like the
  *  20:30 sim trigger. */
 export async function setFrenzyAutoOpenAction(iso: string | null) {
@@ -237,9 +188,9 @@ export async function setFrenzyAutoOpenAction(iso: string | null) {
 
 /** All standing offers on a player (open frenzy — GMs can see the competition). */
 export async function getPlayerOffersAction(playerId: number) {
-  // blind bidding: only the commissioner tier sees the competing offers; a plain GM never
-  // sees what other clubs have bid, and a co-commissioner can't see the commissioner's bid.
-  const mask = await offerViewMask(playerId);
+  // A plain GM never sees competing bids. The commissioner tier follows the
+  // shared 24-hour embargo enforced by offerViewMask.
+  const mask = await offerViewMask();
   if (!mask) return [];
   const offers = (await prisma.faOffer.findMany({
     where: { playerId, status: { in: ACTIVE } }, orderBy: { salary: "desc" },
@@ -281,7 +232,7 @@ async function lastRaisedAtByTeam(playerId: number, teamIds: number[]): Promise<
 /** Full bid history on a player — every offer/raise, oldest first. Commissioner only
  *  (blind bidding: a GM never sees rivals' bids). */
 export async function getBidHistoryAction(playerId: number) {
-  const mask = await offerViewMask(playerId);
+  const mask = await offerViewMask();
   if (!mask) return [];
   const bids = (await prisma.faBid.findMany({ where: { playerId }, orderBy: { id: "asc" } })).filter((b) => !mask.hide.has(b.teamId));
   if (bids.length === 0) return [];
@@ -307,21 +258,13 @@ export async function getBidHistoryAction(playerId: number) {
  *  "Weighing offers" list only ever showed in-season deliberators, a narrow
  *  slice; this covers Frenzy round bids and in-season offers alike, since both
  *  write to the same FaOffer table). Comish-tier only, same blind-bidding mask
- *  as every other offer-visibility action (a co-commissioner never sees the
- *  commissioner's own bid). */
+ *  as every other offer-visibility action. */
 export async function getAllActiveOffersAction() {
   const mask = await offerViewMaskForMarketList();
   if (!mask) return { ok: false as const, error: "Commissioner or co-commissioner only." };
-  // conflict of interest, market-wide: drop every player the viewer's own club is
-  // ALSO bidding on — same rule getPlayerOffersAction applies per-player, so the
-  // full-market view can't be used to peek at competition on a player they want.
-  const myTeamId = await getTeamSession();
-  const myBidPlayerIds = myTeamId != null
-    ? new Set((await prisma.faOffer.findMany({ where: { teamId: myTeamId, status: { in: ACTIVE } }, select: { playerId: true } })).map((o) => o.playerId))
-    : new Set<number>();
   const offers = (await prisma.faOffer.findMany({
     where: { status: { in: ACTIVE } }, orderBy: [{ playerId: "asc" }, { salary: "desc" }],
-  })).filter((o) => !mask.hide.has(o.teamId) && !myBidPlayerIds.has(o.playerId));
+  })).filter((o) => !mask.hide.has(o.teamId));
   if (offers.length === 0) return { ok: true as const, players: [] };
   const playerIds = [...new Set(offers.map((o) => o.playerId))];
   const teamIds = [...new Set(offers.map((o) => o.teamId))];
@@ -349,24 +292,17 @@ export async function getAllActiveOffersAction() {
     return {
       playerId, name: p?.name ?? "?", slug: p?.slug ?? null, position: p?.position ?? "", isGoalie: p?.isGoalie ?? false,
       photoUrl: p?.photoUrl ?? null, overall: p?.overall ?? null,
-      offers: os.map((o) => {
-        // fresh-round blackout: dollar figures are withheld for the first 24h,
-        // but only for offers actually placed IN that fresh round — an already-
-        // closed prior round's numbers aren't live information the comish's
-        // day-1 head start could exploit, so they show normally regardless.
-        const hideValue = mask.blackoutRound != null && o.round === mask.blackoutRound;
-        return {
+      offers: os.map((o) => ({
         teamId: o.teamId, teamCode: teamById.get(o.teamId)?.code ?? "?", teamLogo: teamById.get(o.teamId)?.logoUrl ?? null,
-        salary: hideValue ? null : o.salary, years: hideValue ? null : o.years,
+        salary: o.salary, years: o.years,
         line: o.line, pp: o.pp, pk: o.pk, round: o.round, status: o.status, twoWay: !!o.twoWay,
         // last ACTUAL raise (FaBid log), not o.updatedAt — that also bumps on
         // round-processing status flips (COUNTERED/SHORTLISTED/REJECTED) that
         // never touched the GM's terms, which would falsely read as "raised"
         placedAt: o.createdAt.toISOString(), updatedAt: lastRaisedAt.get(`${playerId}:${o.teamId}`) ?? o.createdAt.toISOString(),
-        };
-      }),
+      })),
     };
-  }).filter((p) => p.offers.length > 0); // a hidden comish-only offer can leave a co-comish's view empty for that player
+  }).filter((p) => p.offers.length > 0);
   result.sort((a, b) => Math.max(...b.offers.map((o) => o.salary ?? 0)) - Math.max(...a.offers.map((o) => o.salary ?? 0)));
   return { ok: true as const, players: result, namesOnly: mask.namesOnly };
 }
@@ -409,151 +345,22 @@ export async function getMyActiveOffersAction() {
   return { ok: true as const, offers: result };
 }
 
-/** Comish-tier only, READ-ONLY: DMs the caller's own team what round 1 WOULD do
- *  to each of its standing offers if it closed right now — sign / counter (with
- *  the amount) / pass. Nothing is written: no FaOffer status changes, no
- *  signings, no eliminations, for the caller OR anyone else, and no other
- *  bidder is notified. This exists because a comish/co-comish gets a one-day
- *  head start PLACING offers ahead of ordinary GMs (see the round-lock in
- *  submitOfferAction) — without this they'd have no way to know where they
- *  stand until the real close, a day after everyone else finds out. The actual
- *  binding round close (processRoundEnd) still runs for the whole league
- *  together at its normal time; this only lets the two commissioner offices
- *  see the outcome early so they can raise before then — it changes nothing
- *  about what the real close decides, or when anyone else's offers resolve. */
-export async function previewMyRoundOutcomeAction() {
-  const id = await getTeamSession();
-  if (id == null) return { ok: false as const, error: "Sign in first." };
-  const me = await prisma.team.findUnique({ where: { id }, select: { isAdmin: true, gmRole: true } });
-  if (!me || !(me.isAdmin || me.gmRole === "comish" || me.gmRole === "co_comish")) {
-    return { ok: false as const, error: "Commissioner or co-commissioner only." };
-  }
-  const clock = await getLeagueClock();
-  if (!clock.frenzyOpen || clock.frenzyRound !== 1) return { ok: false as const, error: "Only meaningful during round 1." };
-  const previewed = await previewRoundOutcomeForTeam(id);
-  return { ok: true as const, previewed };
-}
-
-/** The actual read-only preview logic behind previewMyRoundOutcomeAction, split
- *  out so it can run for a specific team id (e.g. both commissioner offices at
- *  once) without a live session. */
-export async function previewRoundOutcomeForTeam(id: number): Promise<number> {
-  const myOffers = await prisma.faOffer.findMany({ where: { teamId: id, status: { in: ACTIVE } } });
-  if (myOffers.length === 0) return 0;
-
-  const pool = await loadMarketPool();
-  const cmap = await teamContentionMap();
-  const faId = await faPoolTeamId();
-  const clock = await getLeagueClock();
-  const cap = await loadLeagueCap();
-  const nice = (s: string) => s.replace(/''[A-Za-z]''|\s*\([^)]*\)/g, "").trim();
-  let previewed = 0;
-  for (const my of myOffers) {
-    const player = await prisma.player.findUnique({ where: { id: my.playerId }, select: { name: true, isGoalie: true, rosterType: true } });
-    if (!player || (player.rosterType && FREE.includes(player.rosterType))) continue;
-    const list = await prisma.faOffer.findMany({ where: { playerId: my.playerId, status: { in: ACTIVE } } });
-    const nm = nice(player.name);
-    const url = faFocusUrl(my.playerId, player.isGoalie);
-
-    // would he sign right now? Same test pickAndSign uses at round close: best
-    // acceptable offer wins; failing that, a genuinely UNCONTESTED player (one
-    // standing offer, period) still signs at his floor — round-lock means no
-    // new club can join once this round closes, so there's nobody left to wait
-    // for (matches processRoundEnd's allowSoleFloor=true). But if 2+ offers are
-    // genuinely close (same 0.75x band as the outclassed check below), that's
-    // real competition, not a snap decision — predict a counter instead of a
-    // sign, matching processRoundEnd's own liveCount gate.
-    const liveSalary = Math.max(...list.map((o) => o.salary));
-    const liveCount = list.filter((o) => o.salary >= liveSalary * 0.75).length;
-    let bestAcceptable: { teamId: number; utility: number } | null = null;
-    if (liveCount < 2) for (const o of list) {
-      const ev = await evaluateTeamOffer(my.playerId, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, 1, { clause: o.grantClause, breadth: o.mNtcBreadth });
-      if (ev?.acceptable && (!bestAcceptable || ev.utility > bestAcceptable.utility)) bestAcceptable = { teamId: o.teamId, utility: ev.utility };
-    }
-    if (!bestAcceptable && list.length === 1) {
-      const soleEv = await evaluateTeamOffer(my.playerId, id, my.salary, my.years, { line: my.line, pp: my.pp, pk: my.pk }, pool, cmap, 1, { clause: my.grantClause, breadth: my.mNtcBreadth });
-      if (soleEv) {
-        const info = await teamCapInfo(id);
-        const ceiling = capCeilingForPhase(cap.upper, clock.phase) + info.ltir;
-        if (info.committed + soleEv.ask.floorSalary <= ceiling) bestAcceptable = { teamId: id, utility: 0 };
-      }
-    }
-    if (bestAcceptable) {
-      const body = bestAcceptable.teamId === id
-        ? `👀 Preview (round 1 hasn't closed yet): ${nm} would SIGN with you right now${list.length === 1 ? " — you're his only offer" : ""}.`
-        : `👀 Preview (round 1 hasn't closed yet): ${nm} would sign elsewhere right now — your offer would be rejected.`;
-      await prisma.dmMessage.create({ data: { fromTeamId: faId, toTeamId: id, body, tradeUrl: url } }).catch(() => {});
-      previewed++;
-      continue;
-    }
-
-    // not an outright sign — would he counter, or cut this offer as outclassed?
-    const ev = await evaluateTeamOffer(my.playerId, id, my.salary, my.years, { line: my.line, pp: my.pp, pk: my.pk }, pool, cmap, 2, { clause: my.grantClause, breadth: my.mNtcBreadth });
-    if (!ev) continue;
-    const bestSalary = Math.max(...list.map((o) => o.salary));
-    const soleOffer = list.length === 1;
-    const outclassed = !soleOffer && my.salary < bestSalary * 0.75;
-    const closeRace = !soleOffer && list.filter((x) => x.salary >= bestSalary * 0.90).length >= 2;
-    let body: string;
-    if (my.salary < ev.ask.floorSalary * 0.6 || outclassed) {
-      body = `👀 Preview (round 1 hasn't closed yet): ${nm} would pass on your offer right now — ${outclassed ? "another club's offer is well ahead of yours" : "it isn't close to his value"}.`;
-    } else if (!soleOffer && !closeRace) {
-      const isLeader = my.salary === bestSalary;
-      body = isLeader
-        ? `👀 Preview (round 1 hasn't closed yet): your offer on ${nm} is currently the best on the table. You can wait for his decision, or raise it if you're worried another club might try to top you.`
-        : `👀 Preview (round 1 hasn't closed yet): another club has a better offer on ${nm} right now. You have room to improve yours if you want to stay in it.`;
-    } else {
-      const want = competitiveAsk(ev.ask.salary, my.salary, list);
-      body = `👀 Preview (round 1 hasn't closed yet): ${nm} would counter — he wants about $${(want / 1e6).toFixed(2)}M × ${ev.ask.years}yr${soleOffer ? "" : " (other clubs are also in)"}. You have time to raise before the real close.`;
-    }
-    await prisma.dmMessage.create({ data: { fromTeamId: faId, toTeamId: id, body, tradeUrl: url } }).catch(() => {});
-    previewed++;
-  }
-  revalidatePath("/free-agents");
-  return previewed;
-}
-
 /** Place or raise a team's standing offer to a free agent (money + term + promised usage). */
 export async function submitOfferAction(
   playerId: number, teamId: number, salary: number, years: number, line: number, pp: boolean, pk: boolean,
   grantClause?: string | null, mNtcBreadth?: number | null, offerTwoWay?: boolean,
 ) {
   if (!(await canManageTeam(teamId))) return { ok: false as const, error: "You don't manage this team." };
-  // commissioner lock: UFA signings can be temporarily closed to ordinary GMs
+  // A commissioner lock closes bidding for every club, including the
+  // commissioner offices, so it can never become an unofficial head start.
   const lockSettings = await loadSettings();
-  if (lockSettings.faSignLock && !(await isAdmin()) && !(await isComishTier())) {
+  if (lockSettings.faSignLock) {
     return { ok: false as const, error: "🔒 UFA podpisy sú momentálne zamknuté komisárom." };
   }
   const clock = await getLeagueClock();
   let win = clock.faWindow;
   if (!win.open) {
-    // Manual comish head start (faEarlyAccess) — for leagues that pin the phase by
-    // hand rather than following the real calendar, where getLeagueClock's date-driven
-    // "tomorrow" preview has nothing to look ahead to. Comish-tier acts as if the
-    // standard in-season market were already open; everyone else stays locked out.
-    if (lockSettings.faEarlyAccess && (await isComishTier())) {
-      win = { open: true, immediate: true, ownOnly: false, previewOnly: true, postFrenzy: false };
-    } else {
-      return { ok: false as const, error: "The free-agent market is closed." };
-    }
-  }
-  // comish-tier head-start: the market opens for everyone tomorrow — the commissioner's
-  // office may already act on it today, since they already see the whole field of offers.
-  if (win.previewOnly && !(await isComishTier())) {
-    return { ok: false as const, error: "The market opens tomorrow — the commissioner's office gets today." };
-  }
-  // comish-tier head-start (July Frenzy only): the first day of each round is the
-  // commissioner's office only (they bid before they can see anything), GMs join day 2.
-  // This is purely a real-calendar-day head start, so it's skipped entirely when the
-  // market was FORCE-opened (clock.faForced, e.g. frenzyAutoOpenAt on a league that
-  // doesn't run on the real July dates) — the real calendar day never advances in
-  // that case, so `dayInRound` would read as "day 1" forever, permanently locking
-  // every ordinary GM out of a market the commissioner deliberately opened for them.
-  if (!win.immediate && !clock.faForced) {
-    const dayInRound = clock.frenzyDay >= 1 ? ((clock.frenzyDay - 1) % 7) + 1 : 1;
-    if (dayInRound === 1 && !(await isComishTier())) {
-      return { ok: false as const, error: "This round opens for GMs tomorrow — the commissioner's office gets the first day." };
-    }
+    return { ok: false as const, error: "The free-agent market is closed." };
   }
 
   const player = await prisma.player.findUnique({ where: { id: playerId }, select: { name: true, rosterType: true, overall: true, realFarmTeamId: true, age: true, lastSeasonGP: true, teamId: true, faDecisionAt: true, faCountered: true } });
@@ -603,12 +410,8 @@ export async function submitOfferAction(
   }
   // Round lock: once the four-day bidding stage ends, the field is closed to
   // new entrants, while an existing bidder can still raise. A player who got
-  // no offer remains open in the next round. Keyed off the game PHASE, not
-  // win.immediate — the commissioner's faEarlyAccess head start (see above)
-  // also sets win.immediate=true to get past the "market closed" wall, but
-  // it's still round-based Frenzy negotiation underneath. Only the regular-
-  // season / playoffs immediate market is genuinely round-less (continuous
-  // re-negotiation is the intended behavior there).
+  // no offer remains open in the next round. The regular-season and playoff
+  // paths use their separate market rules.
   if (!win.postFrenzy && clock.phase !== "regular" && clock.phase !== "playoffs") {
     if (!existing && player.faDecisionAt != null) {
       return { ok: false as const, error: "He's already deciding among his current suitors — bidding is closed to new clubs." };

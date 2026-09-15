@@ -29,6 +29,15 @@ export function nextSimUtcMs(now: Date): number {
  *  about a manual re-sim. */
 const FORCE_BIDDING_DAYS = 4;
 const FORCE_IMPROVEMENT_DAYS = 2;
+export const COMMISSION_OFFER_EMBARGO_MS = 24 * 60 * 60 * 1000;
+
+export function isCommissionOfferEmbargo(
+  cfg: { faOpen?: boolean | null; frenzyStage?: string | null; frenzyRoundStartedAt?: Date | null } | null | undefined,
+  now = new Date(),
+): boolean {
+  return !!(cfg?.faOpen && cfg.frenzyStage === "BIDDING" && cfg.frenzyRoundStartedAt
+    && now.getTime() - cfg.frenzyRoundStartedAt.getTime() < COMMISSION_OFFER_EMBARGO_MS);
+}
 export function frenzyRoundCloseUtcMs(
   now: Date, frenzyRound: number, frenzyDay: number, roundStartedAt?: string | null,
   stage: "BIDDING" | "IMPROVEMENT" = "BIDDING",

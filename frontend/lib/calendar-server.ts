@@ -77,10 +77,7 @@ export type LeagueClock = {
   // Broader FA-signing window: Frenzy is offer-based; the regular-season market
   // uses per-player collection/match windows; playoffs allow immediate re-signing
   // only of a club's own UFAs; off-season outside these markets is closed.
-  // `previewOnly` = this shape is actually TOMORROW's window — the market is still
-  // closed to ordinary GMs today, but the commissioner's office may act on it a day
-  // early (see faWindowFor below).
-  faWindow: { open: boolean; immediate: boolean; ownOnly: boolean; previewOnly: boolean; postFrenzy: boolean };
+  faWindow: { open: boolean; immediate: boolean; ownOnly: boolean; postFrenzy: boolean };
 };
 
 function faWindowFor(phase: Phase, frenzyOpen: boolean, postFrenzyOpen = false): { open: boolean; immediate: boolean; ownOnly: boolean; postFrenzy: boolean } {
@@ -109,18 +106,7 @@ export async function getLeagueClock(): Promise<LeagueClock> {
   const frenzyOpen = (faForced && stage !== "CONTINUOUS") || calendarFrenzyOpen;
   const today = faWindowFor(phase, frenzyOpen, postFrenzyOpen);
 
-  // Comish/Co-Comish head start: whenever the market is closed to everyone today but
-  // opens tomorrow (the Frenzy's July 1 open, or the regular-season opener), the
-  // commissioner's office may already act on tomorrow's window — they already see the
-  // whole field of competing offers, so a day's head start isn't hidden information.
-  let faWindow: LeagueClock["faWindow"] = { ...today, previewOnly: false };
-  if (!today.open) {
-    const tomorrow = addDays(date, 1);
-    const tomorrowPhase = await computePhase(tomorrow, cfg?.phaseOverride);
-    const tomorrowFrenzyOpen = (faForced && stage !== "CONTINUOUS") || isFrenzyOpen(tomorrow);
-    const preview = faWindowFor(tomorrowPhase, tomorrowFrenzyOpen, postFrenzyOpen && tomorrowPhase !== "playoffs");
-    if (preview.open) faWindow = { ...preview, previewOnly: true };
-  }
+  const faWindow: LeagueClock["faWindow"] = today;
 
   return {
     date, phase, phaseLabel: PHASE_LABEL[phase],

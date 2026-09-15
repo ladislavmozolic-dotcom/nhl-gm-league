@@ -10,7 +10,6 @@ import { cleanName } from "@/lib/playerName";
 import { getTeamSession, isAdmin, isComishTier } from "@/lib/auth";
 import { loadSettings } from "@/lib/sim/settings";
 import FaSignLockToggle from "@/components/FaSignLockToggle";
-import FaEarlyAccessToggle from "@/components/FaEarlyAccessToggle";
 import FrenzyAutoOpenControl from "@/components/FrenzyAutoOpenControl";
 import type { InterestCtx } from "@/components/InterestButton";
 import FrenzyBar from "@/components/FrenzyBar";
@@ -65,13 +64,7 @@ export default async function FreeAgentsPage({
   const [clock, sessionTeamId, admin, comishTier, faSettings] = await Promise.all([getLeagueClock(), getTeamSession(), isAdmin(), isComishTier(), loadSettings()]);
   const isComish = admin || comishTier;
   const faSignLock = faSettings.faSignLock;
-  // The comish-tier early-access toggle only ever reached submitOfferAction — the
-  // UI's own idea of "is the market open" (interestCtx, the FrenzyBar status line)
-  // still came straight from clock.faWindow, so a comish with early access on saw
-  // the Interest button behave as if the market were still closed to them too.
-  // Mirror the exact same override shape the server action uses.
-  const faOverrideForMe = isComish && faSettings.faEarlyAccess && !clock.faWindow.open;
-  const effWindow = faOverrideForMe ? { open: true, immediate: true, ownOnly: false, postFrenzy: false } : clock.faWindow;
+  const effWindow = clock.faWindow;
   let interestCtx: InterestCtx | null = null;
   if (sessionTeamId != null) {
     const teams = admin
@@ -199,7 +192,6 @@ export default async function FreeAgentsPage({
       />
 
       <FaSignLockToggle locked={faSignLock} comish={isComish} />
-      <FaEarlyAccessToggle on={faSettings.faEarlyAccess} comish={isComish} marketOpen={clock.faWindow.open && !clock.faWindow.previewOnly} />
       <FrenzyAutoOpenControl at={cfg?.frenzyAutoOpenAt?.toISOString() ?? null} comish={isComish} faOpen={!!cfg?.faOpen} />
 
       <FrenzyBar

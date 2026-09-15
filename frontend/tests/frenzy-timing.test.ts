@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { frenzyRoundCloseUtcMs } from "../lib/sim-clock";
+import { frenzyRoundCloseUtcMs, isCommissionOfferEmbargo } from "../lib/sim-clock";
 
 test("a scheduled round runs four days of bidding followed by two days of improvement", () => {
   // 1 September 14:00 in Bratislava (CEST) is 12:00 UTC.
@@ -22,4 +22,12 @@ test("all three rounds occupy eighteen real days", () => {
     stageStart = new Date(decision);
   }
   assert.equal(stageStart.toISOString(), "2027-09-19T12:00:00.000Z");
+});
+
+test("commissioner offer visibility opens exactly 24 hours after bidding starts", () => {
+  const startedAt = new Date("2026-09-01T12:00:00.000Z");
+  const cfg = { faOpen: true, frenzyStage: "BIDDING", frenzyRoundStartedAt: startedAt };
+  assert.equal(isCommissionOfferEmbargo(cfg, new Date("2026-09-02T11:59:59.999Z")), true);
+  assert.equal(isCommissionOfferEmbargo(cfg, new Date("2026-09-02T12:00:00.000Z")), false);
+  assert.equal(isCommissionOfferEmbargo({ ...cfg, frenzyStage: "IMPROVEMENT" }, new Date("2026-09-01T12:05:00.000Z")), false);
 });

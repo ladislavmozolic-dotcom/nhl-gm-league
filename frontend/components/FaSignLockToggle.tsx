@@ -23,7 +23,7 @@ export default function FaSignLockToggle({ locked, comish }: { locked: boolean; 
   return (
     <div className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-2.5 text-sm ${locked ? "border-amber-500/40 bg-amber-500/10" : "border-emerald-500/40 bg-emerald-500/10"}`}>
       <span className={locked ? "text-amber-200" : "text-emerald-200"}>
-        {locked ? "🔒 UFA podpisy sú ZAMKNUTÉ pre GM-ov." : "🔓 UFA podpisy sú ODOMKNUTÉ — GM-ovia môžu podpisovať."}
+        {locked ? "🔒 UFA ponuky sú ZAMKNUTÉ pre všetky tímy vrátane komisárov." : "🔓 UFA ponuky sú ODOMKNUTÉ — všetky tímy môžu podávať ponuky."}
         <span className="text-slate-500 ml-1.5 text-xs">(túto lištu vidí len komisár)</span>
       </span>
       <button onClick={toggle} disabled={pending}
