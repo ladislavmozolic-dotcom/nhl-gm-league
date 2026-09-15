@@ -31,6 +31,20 @@ const slotLabels: Record<string, string> = {
   P1: "top pair", P2: "2nd pair", P3: "3rd pair", XD: "7th D", G1: "starter", G2: "backup", G3: "3rd goalie",
 };
 
+const bidStatusStyle: Record<string, string> = {
+  PENDING: "bg-blue-600/20 text-blue-300",
+  COUNTERED: "bg-amber-600/20 text-amber-300",
+  SHORTLISTED: "bg-amber-600/20 text-amber-300",
+  ACCEPTED: "bg-green-600/20 text-green-300",
+  REJECTED: "bg-red-600/20 text-red-300",
+  WITHDRAWN: "bg-slate-700/40 text-slate-400",
+  SUPERSEDED: "bg-slate-700/40 text-slate-400",
+};
+const bidStatusLabel: Record<string, string> = {
+  PENDING: "pending", COUNTERED: "countered", SHORTLISTED: "shortlisted",
+  ACCEPTED: "accepted", REJECTED: "rejected", WITHDRAWN: "withdrawn", SUPERSEDED: "raised over",
+};
+
 export default function InterestButton({ playerId, name, ctx }: { playerId: number; name: string; ctx: InterestCtx }) {
   const [open, setOpen] = useState(false);
   const [teamId, setTeamId] = useState<number | null>(ctx.actingTeamId);
@@ -325,6 +339,9 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
                         <div key={i} className="flex items-center justify-between gap-3 text-xs bg-slate-800/30 rounded px-2 py-1">
                           <span className="font-semibold shrink-0">{b.teamCode}</span>
                           <span className="tabular-nums text-slate-300 flex-1 text-right">{M(b.salary)} × {b.years}yr</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 whitespace-nowrap ${bidStatusStyle[b.status] ?? "bg-slate-700/40 text-slate-400"}`}>
+                            {bidStatusLabel[b.status] ?? b.status.toLowerCase()}
+                          </span>
                           <span className="text-[11px] text-slate-500 shrink-0 whitespace-nowrap">{new Date(b.at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
                         </div>
                       ))}

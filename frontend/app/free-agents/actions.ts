@@ -282,9 +282,21 @@ export async function getBidHistoryAction(playerId: number) {
   if (!mask) return [];
   const bids = (await prisma.faBid.findMany({ where: { playerId }, orderBy: { id: "asc" } })).filter((b) => !mask.hide.has(b.teamId));
   if (bids.length === 0) return [];
-  const teams = await prisma.team.findMany({ where: { id: { in: [...new Set(bids.map((b) => b.teamId))] } }, select: { id: true, code: true } });
+  const teamIds = [...new Set(bids.map((b) => b.teamId))];
+  const [teams, offers] = await Promise.all([
+    prisma.team.findMany({ where: { id: { in: teamIds } }, select: { id: true, code: true } }),
+    prisma.faOffer.findMany({ where: { playerId, teamId: { in: teamIds } }, select: { teamId: true, salary: true, years: true, status: true } }),
+  ]);
   const codeOf = new Map(teams.map((t) => [t.id, t.code]));
-  return bids.map((b) => ({ teamCode: codeOf.get(b.teamId) ?? "?", salary: b.salary, years: b.years, at: b.createdAt.toISOString() }));
+  const offerByTeam = new Map(offers.map((o) => [o.teamId, o]));
+  return bids.map((b) => {
+    const offer = offerByTeam.get(b.teamId);
+    // The FaOffer row only ever holds a team's LATEST terms. A bid whose
+    // (salary, years) no longer matches it was raised over by a later bid
+    // from the same team and never itself got a final status.
+    const status = offer && offer.salary === b.salary && offer.years === b.years ? offer.status : "SUPERSEDED";
+    return { teamCode: codeOf.get(b.teamId) ?? "?", salary: b.salary, years: b.years, at: b.createdAt.toISOString(), status };
+  });
 }
 
 /** Every free agent currently carrying at least one active offer, with who's
