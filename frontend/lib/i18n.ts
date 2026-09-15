@@ -85,10 +85,6 @@ export const DICT: Dict = {
   "home.quickLinks": { en: "Quick Links", cs: "Rychlé odkazy", de: "Schnellzugriff", ru: "Быстрые ссылки" },
   "home.eastern": { en: "Eastern Conference", cs: "Východní konference", de: "Eastern Conference", ru: "Восточная конференция" },
   "home.western": { en: "Western Conference", cs: "Západní konference", de: "Western Conference", ru: "Западная конференция" },
-  "home.tracker": { en: "Game Tracker", cs: "Přehled zápasů", de: "Spiel-Tracker", ru: "Трекер матчей" },
-  "home.trackerResults": { en: "Results", cs: "Výsledky", de: "Ergebnisse", ru: "Результаты" },
-  "home.trackerUpcoming": { en: "Upcoming", cs: "Nadcházející zápasy", de: "Bevorstehende Spiele", ru: "Ближайшие матчи" },
-  "home.trackerEmpty": { en: "No games scheduled yet.", cs: "Zatím nejsou naplánované žádné zápasy.", de: "Noch keine Spiele angesetzt.", ru: "Пока нет запланированных матчей." },
   // Admin panel (en base; de/ru fall back to en)
   "admin.subtitle": { en: "League operations — schedule, simulation, finance, rosters and tools.", cs: "Prevádzka ligy — rozpis, simulácia, financie, súpisky a nástroje." },
   "admin.grpSeason": { en: "Season & Simulation", cs: "Sezóna & Simulácia" },

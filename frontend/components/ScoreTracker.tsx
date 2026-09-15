@@ -2,64 +2,86 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import NewsTicker from "@/components/NewsTicker";
 
-// Global score tracker shown at the top of every page — results only.
-// (Goal scorers / assists live on the game-detail scoreboard.)
-export default async function ScoreTracker() {
-  // Ak liga ešte nezačala (pre-season fáza), nezobrazuj výsledky, len NewsTicker
-  const league = await prisma.leagueConfig.findUnique({ where: { id: 1 } });
-  const isPreOrBefore = !league || !league.leagueDate || league.leagueDate < new Date("2026-09-14T00:00:00Z");
+type TeamLite = { code: string | null; logoUrl: string | null };
 
-  if (isPreOrBefore) return <NewsTicker />;
-
-  const lastDay = await prisma.game.findFirst({
-    where: { status: "FINAL", seriesId: null, league: "NHL", gameDate: { not: null } },
-    orderBy: { gameDate: "desc" },
-    select: { gameDate: true },
-  });
-  // No games simmed yet this era (pre-season, or before the season opens) — show
-  // the latest league moves instead of leaving the row blank.
-  if (!lastDay?.gameDate) return <NewsTicker />;
-
-  const start = new Date(lastDay.gameDate); start.setHours(0, 0, 0, 0);
-  const end = new Date(lastDay.gameDate); end.setHours(23, 59, 59, 999);
-
-  const games = await prisma.game.findMany({
-    where: { status: "FINAL", seriesId: null, league: "NHL", gameDate: { gte: start, lte: end } },
-    select: {
-      id: true, league: true, homeGoals: true, awayGoals: true,
-      homeTeam: { select: { code: true, logoUrl: true } }, awayTeam: { select: { code: true, logoUrl: true } },
-    },
-    orderBy: { id: "asc" },
-  });
-  if (games.length === 0) return <NewsTicker />;
-
-  const TeamRow = ({ t, score, win }: { t: { code: string | null; logoUrl: string | null }; score: number | null; win: boolean }) => (
-    <div className="flex items-center justify-between gap-3">
-      <div className="flex items-center gap-1.5 min-w-0">
-        {t.logoUrl && <img src={t.logoUrl} alt="" className="w-5 h-5 object-contain" />}
-        <span className={`text-sm ${win ? "font-bold text-white" : "text-slate-400"}`}>{t.code}</span>
-      </div>
-      <span className={`text-base tabular-nums ${win ? "font-bold text-white" : "text-slate-400"}`}>{score ?? "–"}</span>
+const TeamRow = ({ t, score, win }: { t: TeamLite; score: number | null; win: boolean }) => (
+  <div className="flex items-center justify-between gap-3">
+    <div className="flex items-center gap-1.5 min-w-0">
+      {t.logoUrl && <img src={t.logoUrl} alt="" className="w-5 h-5 object-contain" />}
+      <span className={`text-sm ${win ? "font-bold text-white" : "text-slate-400"}`}>{t.code}</span>
     </div>
-  );
+    {score != null && <span className={`text-base tabular-nums ${win ? "font-bold text-white" : "text-slate-400"}`}>{score}</span>}
+  </div>
+);
+
+// Global scoreboard shown at the top of every page, right under the League
+// News ticker — the latest simmed day's results (clickable through to the
+// box score), and, once known, the next day's matchups. Goal scorers /
+// assists live on the game-detail scoreboard, not here.
+export default async function ScoreTracker() {
+  const [lastDay, nextDay] = await Promise.all([
+    prisma.game.findFirst({ where: { status: "FINAL", seriesId: null, league: "NHL", gameDate: { not: null } }, orderBy: { gameDate: "desc" }, select: { gameDate: true } }),
+    prisma.game.findFirst({ where: { status: "SCHEDULED", seriesId: null, league: "NHL", gameDate: { not: null } }, orderBy: { gameDate: "asc" }, select: { gameDate: true } }),
+  ]);
+
+  let results: { id: number; homeGoals: number | null; awayGoals: number | null; homeTeam: TeamLite; awayTeam: TeamLite }[] = [];
+  if (lastDay?.gameDate) {
+    const start = new Date(lastDay.gameDate); start.setHours(0, 0, 0, 0);
+    const end = new Date(lastDay.gameDate); end.setHours(23, 59, 59, 999);
+    results = await prisma.game.findMany({
+      where: { status: "FINAL", seriesId: null, league: "NHL", gameDate: { gte: start, lte: end } },
+      select: { id: true, homeGoals: true, awayGoals: true, homeTeam: { select: { code: true, logoUrl: true } }, awayTeam: { select: { code: true, logoUrl: true } } },
+      orderBy: { id: "asc" },
+    });
+  }
+
+  let upcoming: { id: number; homeTeam: TeamLite; awayTeam: TeamLite }[] = [];
+  if (nextDay?.gameDate) {
+    const start = new Date(nextDay.gameDate); start.setHours(0, 0, 0, 0);
+    const end = new Date(nextDay.gameDate); end.setHours(23, 59, 59, 999);
+    upcoming = await prisma.game.findMany({
+      where: { status: "SCHEDULED", seriesId: null, league: "NHL", gameDate: { gte: start, lte: end } },
+      select: { id: true, homeTeam: { select: { code: true, logoUrl: true } }, awayTeam: { select: { code: true, logoUrl: true } } },
+      orderBy: { id: "asc" },
+    });
+  }
 
   return (
-    <div className="bg-[#0a1628] border-b border-slate-800">
-      <div className="max-w-[1400px] mx-auto flex items-stretch">
-        <div className="shrink-0 bg-blue-600 text-white text-[11px] font-bold px-3 flex items-center uppercase tracking-wide">Scores</div>
-        <div className="flex gap-2 overflow-x-auto p-2 no-scrollbar">
-          {games.map((g) => {
-            const aw = (g.awayGoals ?? 0) > (g.homeGoals ?? 0), hw = (g.homeGoals ?? 0) > (g.awayGoals ?? 0);
-            return (
-              <Link key={g.id} href={`/games/${g.id}`} className="shrink-0 min-w-[128px] bg-slate-800/40 hover:bg-slate-800 rounded-lg px-3 py-1.5 border border-slate-800 transition-colors">
-                <div className={`text-[9px] font-bold mb-0.5 ${g.league === "AHL" ? "text-emerald-400" : "text-slate-500"}`}>{g.league}</div>
-                <TeamRow t={g.awayTeam} score={g.awayGoals} win={aw} />
-                <TeamRow t={g.homeTeam} score={g.homeGoals} win={hw} />
-              </Link>
-            );
-          })}
+    <>
+      <NewsTicker />
+      {results.length > 0 && (
+        <div className="bg-[#0a1628] border-b border-slate-800">
+          <div className="max-w-[1400px] mx-auto flex items-stretch">
+            <div className="shrink-0 bg-blue-600 text-white text-[11px] font-bold px-3 flex items-center uppercase tracking-wide">Scores</div>
+            <div className="flex gap-2 overflow-x-auto p-2 no-scrollbar">
+              {results.map((g) => {
+                const aw = (g.awayGoals ?? 0) > (g.homeGoals ?? 0), hw = (g.homeGoals ?? 0) > (g.awayGoals ?? 0);
+                return (
+                  <Link key={g.id} href={`/games/${g.id}`} className="shrink-0 min-w-[128px] bg-slate-800/40 hover:bg-slate-800 rounded-lg px-3 py-1.5 border border-slate-800 transition-colors">
+                    <TeamRow t={g.awayTeam} score={g.awayGoals} win={aw} />
+                    <TeamRow t={g.homeTeam} score={g.homeGoals} win={hw} />
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
+      )}
+      {upcoming.length > 0 && (
+        <div className="bg-[#0a1628] border-b border-slate-800">
+          <div className="max-w-[1400px] mx-auto flex items-stretch">
+            <div className="shrink-0 bg-emerald-700 text-white text-[11px] font-bold px-3 flex items-center uppercase tracking-wide">Next</div>
+            <div className="flex gap-2 overflow-x-auto p-2 no-scrollbar">
+              {upcoming.map((g) => (
+                <div key={g.id} className="shrink-0 min-w-[128px] bg-slate-800/40 rounded-lg px-3 py-1.5 border border-slate-800">
+                  <TeamRow t={g.awayTeam} score={null} win={false} />
+                  <TeamRow t={g.homeTeam} score={null} win={false} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

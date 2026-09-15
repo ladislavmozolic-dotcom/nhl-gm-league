@@ -183,35 +183,6 @@ export default async function HomePage() {
 
   const dateStr = (d: Date) => d.toLocaleDateString("sk-SK", { day: "numeric", month: "short" });
 
-  // Game Tracker — latest results + next day's schedule. Deliberately NOT scoped to
-  // activeSeason (unlike the ticker/leaders above): it just wants the closest FINAL
-  // day and the closest SCHEDULED day by real gameDate, so it reads correctly across
-  // the pre-season → regular-season phase flip without depending on its exact timing.
-  const [trackerLastDay, trackerNextDay] = await Promise.all([
-    prisma.game.findFirst({ where: { status: "FINAL", seriesId: null, league: "NHL", gameDate: { not: null } }, orderBy: { gameDate: "desc" }, select: { gameDate: true } }),
-    prisma.game.findFirst({ where: { status: "SCHEDULED", seriesId: null, league: "NHL", gameDate: { not: null } }, orderBy: { gameDate: "asc" }, select: { gameDate: true } }),
-  ]);
-  let trackerResults: { id: number; homeGoals: number | null; awayGoals: number | null; homeTeam: { code: string | null; logoUrl: string | null }; awayTeam: { code: string | null; logoUrl: string | null } }[] = [];
-  if (trackerLastDay?.gameDate) {
-    const start = new Date(trackerLastDay.gameDate); start.setHours(0, 0, 0, 0);
-    const end = new Date(trackerLastDay.gameDate); end.setHours(23, 59, 59, 999);
-    trackerResults = await prisma.game.findMany({
-      where: { status: "FINAL", seriesId: null, league: "NHL", gameDate: { gte: start, lte: end } },
-      select: { id: true, homeGoals: true, awayGoals: true, homeTeam: { select: { code: true, logoUrl: true } }, awayTeam: { select: { code: true, logoUrl: true } } },
-      orderBy: { id: "asc" },
-    });
-  }
-  let trackerUpcoming: { id: number; homeTeam: { code: string | null; logoUrl: string | null }; awayTeam: { code: string | null; logoUrl: string | null } }[] = [];
-  if (trackerNextDay?.gameDate) {
-    const start = new Date(trackerNextDay.gameDate); start.setHours(0, 0, 0, 0);
-    const end = new Date(trackerNextDay.gameDate); end.setHours(23, 59, 59, 999);
-    trackerUpcoming = await prisma.game.findMany({
-      where: { status: "SCHEDULED", seriesId: null, league: "NHL", gameDate: { gte: start, lte: end } },
-      select: { id: true, homeTeam: { select: { code: true, logoUrl: true } }, awayTeam: { select: { code: true, logoUrl: true } } },
-      orderBy: { id: "asc" },
-    });
-  }
-
   const clock = await getLeagueClock();
   const lang = await getLang();
   const T = (k: string) => tt(lang, k);
@@ -391,64 +362,6 @@ export default async function HomePage() {
         {/* CENTER — News */}
         <div className="lg:col-span-6 space-y-4">
           <CommissionerBanner items={bannerItems} signedIn={me != null} />
-
-          {/* Game Tracker — latest results, then what's next on the schedule */}
-          <Card title={`🏒 ${T("home.tracker")}`} href="/schedule" accent="text-emerald-400" viewLabel={T("ui.viewAll")}>
-            {trackerResults.length === 0 && trackerUpcoming.length === 0 ? (
-              <p className="text-sm text-slate-500">{T("home.trackerEmpty")}</p>
-            ) : (
-              <div className="space-y-4">
-                {trackerResults.length > 0 && trackerLastDay?.gameDate && (
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-                      {T("home.trackerResults")} · {dateStr(trackerLastDay.gameDate)}
-                    </p>
-                    <div className="space-y-1">
-                      {trackerResults.map((g) => {
-                        const aw = (g.awayGoals ?? 0) > (g.homeGoals ?? 0);
-                        return (
-                          <Link key={g.id} href={`/games/${g.id}`} className="flex items-center justify-between gap-2 text-sm bg-slate-800/30 hover:bg-slate-800 rounded-lg px-2.5 py-1.5 transition-colors">
-                            <span className="flex items-center gap-1.5 min-w-0 flex-1">
-                              {g.awayTeam.logoUrl && <img src={g.awayTeam.logoUrl} alt="" className="w-4 h-4 object-contain shrink-0" />}
-                              <span className={`truncate ${aw ? "font-bold text-slate-100" : "text-slate-400"}`}>{g.awayTeam.code}</span>
-                            </span>
-                            <span className="tabular-nums font-bold text-slate-200 shrink-0">{g.awayGoals} – {g.homeGoals}</span>
-                            <span className="flex items-center gap-1.5 min-w-0 flex-1 justify-end">
-                              <span className={`truncate ${!aw ? "font-bold text-slate-100" : "text-slate-400"}`}>{g.homeTeam.code}</span>
-                              {g.homeTeam.logoUrl && <img src={g.homeTeam.logoUrl} alt="" className="w-4 h-4 object-contain shrink-0" />}
-                            </span>
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-                {trackerUpcoming.length > 0 && trackerNextDay?.gameDate && (
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-                      {T("home.trackerUpcoming")} · {dateStr(trackerNextDay.gameDate)}
-                    </p>
-                    <div className="space-y-1">
-                      {trackerUpcoming.map((g) => (
-                        <div key={g.id} className="flex items-center justify-between gap-2 text-sm bg-slate-800/30 rounded-lg px-2.5 py-1.5">
-                          <span className="flex items-center gap-1.5 min-w-0 flex-1">
-                            {g.awayTeam.logoUrl && <img src={g.awayTeam.logoUrl} alt="" className="w-4 h-4 object-contain shrink-0" />}
-                            <span className="truncate text-slate-300">{g.awayTeam.code}</span>
-                          </span>
-                          <span className="text-slate-500 text-xs shrink-0">@</span>
-                          <span className="flex items-center gap-1.5 min-w-0 flex-1 justify-end">
-                            <span className="truncate text-slate-300">{g.homeTeam.code}</span>
-                            {g.homeTeam.logoUrl && <img src={g.homeTeam.logoUrl} alt="" className="w-4 h-4 object-contain shrink-0" />}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </Card>
-
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold">{T("home.latestArticle")}</h2>
             <Link href="/news/create" className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg font-medium">{T("home.addArticle")}</Link>
