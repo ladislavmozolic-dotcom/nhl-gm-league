@@ -1,42 +1,19 @@
-// Lightweight team-based auth (STHS-style per-team password). Low-stakes for a
-// hockey sim: a signed cookie holds the logged-in teamId. Passwords are salted
-// SHA-256 hashes. Not production-grade security — good enough to gate line edits.
-
+// Team-based authentication. Sessions are expiring, versioned, and checked
+// against the current credentials on every request. Legacy passwords remain
+// compatible until the separate password-hashing migration.
 import { cache } from "react";
-import { cookies, headers } from "next/headers";
-import { createHmac, createHash, timingSafeEqual } from "crypto";
+import { cookies } from "next/headers";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { prisma } from "./prisma";
+import { authConfig } from "./auth-config";
+import { encodeSession, decodeSession, credentialTag } from "./session-token";
 
 const COOKIE = "team_session";
-const SECRET = process.env.AUTH_SECRET ?? "profinhl-dev-secret-change-me";
-const SALT = process.env.AUTH_SALT ?? "profinhl-salt";
-
-// www.unhl.eu now 301-redirects to the bare apex at the Caddy level (see the
-// server's Caddyfile), so real traffic only ever lands on unhl.eu itself —
-// the cookie no longer needs to span two hosts. A plain host-only cookie (no
-// `domain` attribute) is the most standard, widely-compatible shape; a
-// leading-dot domain-scoped cookie was tried first (when both hosts were
-// served identically) but iOS Safari kept losing the session regardless, so
-// removing this extra variable is worth doing even without a confirmed
-// mechanism — it can only make the cookie's handling more conventional.
+// Keep host-only cookies; do not reintroduce a second domain-scoped cookie.
 const COOKIE_DOMAIN = undefined;
 
-// From 2026-09-06 19:44 to 2026-09-08 09:05 the cookie above was set with
-// `domain: ".unhl.eu"` (commit 515fc10) before being reverted to host-only
-// (commit 2a32598). Anyone who logged in during that ~37h window is still
-// carrying that old `.unhl.eu`-scoped cookie in their browser alongside the
-// new host-only one — a real lead worth investigating further, but a same-name
-// cleanup delete turned out to be unsafe to fire from getTeamSession()/
-// setTeamSession(): Next's cookies() response jar keys its internal map by
-// cookie NAME ONLY (not name+domain), so a delete() for "team_session" can
-// clobber an in-flight real login cookie write for "team_session" elsewhere in
-// the same response/action, regardless of call order — this shipped for a few
-// minutes and broke login outright. Don't reintroduce a same-name delete on
-// this hot path without a way to isolate it from the real cookie write (e.g.
-// a dedicated one-off Route Handler hit outside the login flow).
-
 export function hashPassword(password: string): string {
-  return createHash("sha256").update(SALT + password).digest("hex");
+  return createHash("sha256").update(authConfig().salt + password).digest("hex");
 }
 
 export function verifyPassword(password: string, hash: string | null | undefined): boolean {
@@ -46,66 +23,50 @@ export function verifyPassword(password: string, hash: string | null | undefined
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-function sign(value: string): string {
-  return createHmac("sha256", SECRET).update(value).digest("hex");
+async function validatedSession(token: string | undefined | null) {
+  const { secret } = authConfig();
+  const claims = decodeSession(token, secret);
+  if (!claims) return null;
+  const team = await prisma.team.findUnique({
+    where: { id: claims.teamId }, select: { passwordHash: true, sessionVersion: true },
+  });
+  if (!team?.passwordHash || team.sessionVersion !== claims.version) return null;
+  const expected = Buffer.from(credentialTag(team.passwordHash, secret), "hex");
+  if (!timingSafeEqual(expected, Buffer.from(claims.credential, "hex"))) return null;
+  return claims;
 }
 
-/** Builds the same signed "teamId.signature" value the session cookie carries.
- *  Exported so the login action can also hand it to the client for the
- *  localStorage remember-token fallback (see SessionResume.tsx) — it's the
- *  exact same credential, just given a second delivery channel that isn't
- *  subject to whatever iOS Safari does to drop the httpOnly cookie mid-session. */
-export function buildSessionToken(teamId: number): string {
-  const value = String(teamId);
-  return `${value}.${sign(value)}`;
-}
-
-/** The inverse of buildSessionToken — verifies a token's signature and returns
- *  the teamId it encodes, or null if malformed/tampered. Used both by
- *  getTeamSession() (reading the cookie) and the /api/auth/resume route
- *  (reading the localStorage remember-token). */
-export function verifySessionToken(token: string | undefined | null): number | null {
-  if (!token) return null;
-  const [value, sig] = token.split(".");
-  if (!value || !sig || sign(value) !== sig) return null;
-  const id = Number(value);
-  return Number.isFinite(id) ? id : null;
-}
-
-export async function setTeamSession(teamId: number): Promise<string> {
-  const token = buildSessionToken(teamId);
+async function writeSessionCookie(token: string, expiresAt: number) {
   (await cookies()).set(COOKIE, token, {
-    httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 30,
+    httpOnly: true, sameSite: "lax", path: "/",
+    expires: new Date(expiresAt * 1000),
     secure: process.env.NODE_ENV === "production", domain: COOKIE_DOMAIN,
   });
-  // TEMP DEBUG — remove once the mobile logout-loop report is confirmed fixed.
-  try {
-    const h = await headers();
-    console.log(`[auth-debug] setTeamSession team=${teamId} host=${h.get("host")} ua=${(h.get("user-agent") ?? "").slice(0, 80)}`);
-  } catch { /* ignore */ }
+}
+
+/** Issue only after verifying a password; reject credentials changed mid-login. */
+export async function setTeamSession(teamId: number, verifiedPasswordHash: string): Promise<string> {
+  const { secret } = authConfig();
+  const team = await prisma.team.findUnique({ where: { id: teamId }, select: { passwordHash: true, sessionVersion: true } });
+  if (!team?.passwordHash || team.passwordHash !== verifiedPasswordHash) throw new Error("Credentials changed. Sign in again.");
+  const token = encodeSession(teamId, team.sessionVersion, team.passwordHash, secret);
+  const claims = decodeSession(token, secret)!;
+  await writeSessionCookie(token, claims.expiresAt);
   return token;
 }
 
-// Memoized per request (React's cache()) — isAdmin()/isComishTier()/canManageTeam()/etc.
-// all call this, so a page that uses a few of them would otherwise re-read + re-verify the
-// same cookie several times over.
+/** Restore the SAME token and expiry, never extend a remember-token's lifetime. */
+export async function resumeTeamSession(token: string | null): Promise<boolean> {
+  const claims = await validatedSession(token);
+  if (!claims || !token) return false;
+  await writeSessionCookie(token, claims.expiresAt);
+  return true;
+}
+
+// React cache is scoped to a request; revocations take effect on the next request.
 export const getTeamSession = cache(async (): Promise<number | null> => {
   const token = (await cookies()).get(COOKIE)?.value;
-  // TEMP DEBUG — remove once the mobile logout-loop report is confirmed fixed.
-  try {
-    const h = await headers();
-    const rawCookieHeader = h.get("cookie") ?? "";
-    const dupeCount = rawCookieHeader.split(";").filter((c) => c.trim().startsWith(`${COOKIE}=`)).length;
-    console.log(`[auth-debug] getTeamSession host=${h.get("host")} referer=${h.get("referer") ?? "?"} hasCookie=${!!token} cookieLen=${token?.length ?? 0} rawCookieMatches=${dupeCount} ua=${(h.get("user-agent") ?? "").slice(0, 80)}`);
-  } catch { /* ignore */ }
-  if (!token) return null;
-  const [value, sig] = token.split(".");
-  if (!value || !sig || sign(value) !== sig) {
-    console.log(`[auth-debug] getTeamSession INVALID token (bad format or signature mismatch)`);
-    return null;
-  }
-  const id = Number(value);
-  return Number.isFinite(id) ? id : null;
+  return (await validatedSession(token))?.teamId ?? null;
 });
 
 export async function clearTeamSession(): Promise<void> {

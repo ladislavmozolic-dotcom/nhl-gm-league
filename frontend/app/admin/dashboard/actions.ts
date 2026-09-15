@@ -64,8 +64,8 @@ export async function reassignGmTeamAction(fromTeamId: number, toTeamId: number)
 
   const swapped = !!to.passwordHash;
   await prisma.$transaction([
-    prisma.team.update({ where: { id: toTeamId }, data: pickGm(from) as never }),
-    prisma.team.update({ where: { id: fromTeamId }, data: (swapped ? pickGm(to) : blankGm) as never }),
+    prisma.team.update({ where: { id: toTeamId }, data: { ...pickGm(from), sessionVersion: { increment: 1 } } as never }),
+    prisma.team.update({ where: { id: fromTeamId }, data: { ...(swapped ? pickGm(to) : blankGm), sessionVersion: { increment: 1 } } as never }),
   ]);
   revalidatePath("/admin/dashboard");
   return { ok: true as const, swapped, from: from.name, to: to.name };

@@ -19,7 +19,7 @@
 //      displayed date tracks real time immediately, without waiting for
 //      tonight's game-sim window.
 import { prisma } from "./prisma";
-import { simulateLeagueDay } from "@/app/admin/season/actions";
+import { simulateLeagueDay } from "@/lib/season-day";
 import { addDays } from "./calendar";
 import { sweepExpiredContractsToUfa } from "./free-agency-server";
 

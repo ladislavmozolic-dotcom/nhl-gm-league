@@ -198,3 +198,32 @@ Každá liga = vlastná izolovaná DB + uploady + doména. Žiadne zmeny kódu.
 - **HTTPS nefunguje** → over `dig +short DOMENA` = IP servera, a že porty 80/443 sú otvorené (ufw). Caddy potrebuje port 80 na overenie certifikátu.
 - **App padá pri štarte** → `docker compose logs app`; často chýbajúci/zlý `DATABASE_URL` v `.env`.
 - **Uploady zmizli po redeployi** → over že volume `uploads` je namapovaný (`docker compose config`), nesmieš robiť `down -v`.
+
+## Bezpečnostná aktualizácia relácií (sessionVersion)
+
+Pred nasadením tejto verzie:
+
+1. V serverovom `.env` nastav `AUTH_SECRET` na novú náhodnú hodnotu
+   vytvorenú cez `openssl rand -hex 32`. Tajomstvo neposielaj do Gitu ani chatu.
+2. Explicitne nastav `AUTH_SALT` na **doterajšiu hodnotu**. Ak premenná predtým
+   nebola nastavená, pôvodný kód používal `profinhl-salt`; zachovaj ju.
+   Náhodná nová soľ patrí iba k novej databáze. Zmena soli existujúcej ligy by
+   znemožnila overenie uložených hesiel. Táto aktualizácia ich neprepočítava.
+3. Zálohuj databázu. Schéma pridáva `Team.sessionVersion Int @default(0)`.
+   Existujúci `deploy.sh` aplikuje pole cez `prisma db push` pred reštartom.
+   Pri ručnom nasadení aplikuj schému pred spustením novej aplikácie.
+4. Nová aplikácia odmietne staré tokeny; všetci GM sa prihlásia znova svojím
+   existujúcim heslom. Vyskúšaj bežné prihlásenie a prihlásenie administrátora.
+
+Produkčný proces bez platného `AUTH_SECRET` a explicitného `AUTH_SALT` odmietne
+štart. Pri lokálnom vývoji bez `AUTH_SECRET` sa používa náhodné tajomstvo procesu,
+takže reštart môže vyžadovať nové prihlásenie.
+
+Nová cookie aj mobilný remember-token majú rovnakú pevnú platnosť 30 dní.
+Obnovenie cookie neposúva dátum expirácie. Zmena hesla, odobratie GM, schválenie
+nového GM a presun/výmena GM inkrementujú verziu príslušného tímu; staré relácie
+sa odmietnu od nasledujúcej požiadavky. Zmena hesla odhlási aj aktuálne zariadenie.
+
+Táto zmena ešte nemigruje SHA-256 heslá na Argon2/scrypt, nepridáva obmedzenie
+pokusov o prihlásenie a neodstraňuje localStorage fallback. Tieto opravy nasledujú
+samostatne. HTML článkov sa už sanitizuje pri zápise aj čítaní.

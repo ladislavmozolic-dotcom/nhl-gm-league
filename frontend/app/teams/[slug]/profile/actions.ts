@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { getTeamSession, verifyPassword, hashPassword } from "@/lib/auth";
+import { getTeamSession, verifyPassword, hashPassword, clearTeamSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
@@ -30,9 +30,14 @@ export async function updateProfile(formData: FormData) {
     if (!verifyPassword(currentPw, team.passwordHash)) redirect(`/teams/${slug}/profile?error=pw`);
     if (newPw.length < 3) redirect(`/teams/${slug}/profile?error=short`);
     data.passwordHash = hashPassword(newPw);
+    data.sessionVersion = { increment: 1 };
   }
 
   await prisma.team.update({ where: { id: team.id }, data });
   revalidatePath("/", "layout");
+  if (newPw) {
+    await clearTeamSession();
+    redirect(`/teams/${slug}/login`);
+  }
   redirect(`/teams/${slug}/profile?ok=1`);
 }

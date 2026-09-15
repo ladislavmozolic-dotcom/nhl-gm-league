@@ -64,6 +64,7 @@ export async function fillRealProspectsAction() {
  * The league salary-cap ceiling (a key league value) changes automatically with the mode.
  */
 export async function applyRosterMode(mode: "profinhl" | "real") {
+  if (!(await isAdmin())) throw new Error("Only a league admin can manage rosters.");
   const cfg = await getRosterConfig();
   // Read once up front — both branches' bank reset below uses the commissioner's
   // configured starting capital, not a hardcoded guess (see lib/sim/settings.ts
@@ -162,5 +163,6 @@ export async function normalizeAllRostersAction() {
 }
 
 export async function getRosterConfig() {
+  if (!(await isAdmin())) throw new Error("Only a league admin can manage rosters.");
   return (await prisma.leagueConfig.findUnique({ where: { id: 1 } })) ?? (await prisma.leagueConfig.create({ data: { id: 1 } }));
 }

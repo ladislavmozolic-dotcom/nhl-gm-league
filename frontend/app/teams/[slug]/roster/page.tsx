@@ -7,6 +7,7 @@ import RosterTabs from "@/components/RosterTabs";
 import { captaincyFromName } from "@/lib/playerName";
 import { hasWorthyGoalie, MIN_GOALIE_OV, MIN_GOALIE_GP, MIN_GOALIE_GP_SVPCT } from "@/lib/goalie-rule";
 import { redactAttrs } from "@/lib/player-attrs";
+import { livePlayerOverall } from "@/lib/player-overall";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,7 @@ export default async function TeamRosterPage({ params }: { params: Promise<{ slu
   // edits/recalcs) — Player.overall can lag behind it. Use the live value
   // everywhere a goalie's OV matters here, same as the player bio page does.
   const roster = team.players.filter((p) => p.rosterType === rt)
-    .map((p) => (p.isGoalie ? { ...p, overall: p.goalieRating?.overall ?? p.overall } : p));
+    .map((p) => ({ ...p, overall: livePlayerOverall(p) }));
   const nF = roster.filter((p) => !p.isGoalie && !isDefPos(p.position ?? "")).length;
   const nD = roster.filter((p) => !p.isGoalie && isDefPos(p.position ?? "")).length;
   const nG = roster.filter((p) => p.isGoalie).length;

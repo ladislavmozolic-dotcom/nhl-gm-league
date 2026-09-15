@@ -10,6 +10,7 @@ import { redactAttrs } from "@/lib/player-attrs";
 import { pickIdsWithTradeHistory } from "@/lib/trade-history-server";
 import { getPickTradeHistoryAction } from "@/app/actions/pick-trade-history";
 import PickTradeBadge from "@/components/PickTradeBadge";
+import { livePlayerOverall } from "@/lib/player-overall";
 
 export const dynamic = "force-dynamic";
 
@@ -55,7 +56,7 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
   const nhlHasField = full.players.some((p) => p.captaincy === "C" || p.captaincy === "A");
   const farmHasField = (full.affiliateTeams[0]?.players ?? []).some((p) => p.captaincy === "C" || p.captaincy === "A");
   const toRP = (p: (typeof full.players)[number], hasField: boolean): RosterPlayer => {
-    const row = { ...(p as unknown as RosterPlayer), ...((p.goalieRating ?? {}) as unknown as Record<string, number | null>), capRole: hasField ? (p.captaincy ?? null) : captaincyFromName(p.name) };
+    const row = { ...(p as unknown as RosterPlayer), ...((p.goalieRating ?? {}) as unknown as Record<string, number | null>), overall: livePlayerOverall(p), capRole: hasField ? (p.captaincy ?? null) : captaincyFromName(p.name) };
     const out = realMode ? { ...row, contractText: liveCapHit(p) ? money(liveCapHit(p)) : (row.contractText ?? null) } : row;
     return redactAttrs(out, !loggedIn);
   };

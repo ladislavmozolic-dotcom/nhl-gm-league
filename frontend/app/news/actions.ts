@@ -4,12 +4,26 @@ import { prisma } from "@/lib/prisma";
 import { getTeamSession, canManageTeam } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { articlePlainText, sanitizeArticleHtml } from "@/lib/news-html";
+
+const MAX_TITLE = 160;
+// A 4 MB image grows by roughly one third when encoded as a data URL.
+const MAX_HTML = 6_000_000;
+
+function cleanArticle(title: string, bodyHtml: string) {
+  const cleanTitle = title.trim().slice(0, MAX_TITLE);
+  if (!cleanTitle) throw new Error("Add a title.");
+  if (bodyHtml.length > MAX_HTML) throw new Error("Article is too large.");
+  const cleanBody = sanitizeArticleHtml(bodyHtml);
+  if (!articlePlainText(cleanBody) && !/<img\b/i.test(cleanBody)) throw new Error("Write something.");
+  return { title: cleanTitle, bodyHtml: cleanBody };
+}
 
 export async function createArticle(title: string, bodyHtml: string) {
   const session = await getTeamSession();
   if (!session) throw new Error("Sign in as a GM to post news.");
-  if (!title.trim()) throw new Error("Add a title.");
-  const article = await prisma.newsArticle.create({ data: { authorTeamId: session, title: title.trim(), bodyHtml } });
+  const clean = cleanArticle(title, bodyHtml);
+  const article = await prisma.newsArticle.create({ data: { authorTeamId: session, ...clean } });
   revalidatePath("/"); revalidatePath("/news");
   redirect(`/news/${article.id}`);
 }
@@ -18,8 +32,8 @@ export async function updateArticle(id: number, title: string, bodyHtml: string)
   const article = await prisma.newsArticle.findUnique({ where: { id }, select: { authorTeamId: true } });
   if (!article) throw new Error("Article not found.");
   if (!(await canManageTeam(article.authorTeamId))) throw new Error("You can only edit your own club's articles.");
-  if (!title.trim()) throw new Error("Add a title.");
-  await prisma.newsArticle.update({ where: { id }, data: { title: title.trim(), bodyHtml } });
+  const clean = cleanArticle(title, bodyHtml);
+  await prisma.newsArticle.update({ where: { id }, data: clean });
   revalidatePath("/"); revalidatePath("/news"); revalidatePath(`/news/${id}`);
   redirect(`/news/${id}`);
 }

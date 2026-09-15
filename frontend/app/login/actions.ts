@@ -32,10 +32,10 @@ export async function directLogin(formData: FormData): Promise<DirectLoginResult
   });
 
   const match = candidates.find((t) => t.passwordHash && verifyPassword(password, t.passwordHash));
-  if (!match) return { ok: false, error: "bad" };
+  if (!match?.passwordHash) return { ok: false, error: "bad" };
 
   await prisma.team.update({ where: { id: match.id }, data: { lastLoginAt: new Date() } });
   await recordLogin(match.id); // audit: IP + geolocation
-  const rememberToken = await setTeamSession(match.id);
+  const rememberToken = await setTeamSession(match.id, match.passwordHash);
   return { ok: true, redirectTo: `/teams/${match.slug}/roster`, rememberToken };
 }

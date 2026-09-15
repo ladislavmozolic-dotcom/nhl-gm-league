@@ -23,6 +23,7 @@ import { renderMarkdown } from "@/lib/markdown";
 import type { HomeBlock } from "@/app/admin/site-editor/actions";
 import { getLang } from "@/lib/lang-server";
 import { t as tt } from "@/lib/i18n";
+import { articlePlainText, sanitizeArticleHtml } from "@/lib/news-html";
 
 export const dynamic = "force-dynamic";
 const SEASON = "2026-27";
@@ -373,9 +374,10 @@ export default async function HomePage() {
             // homepage preview should end — everything before it is the perex,
             // everything after only shows once a reader clicks through. No cut
             // line falls back to the old behavior: just truncate at 500 chars.
-            const cutAt = a.bodyHtml.search(/<hr[^>]*\bclass="[^"]*\barticle-cut\b/i);
-            const rawPreview = cutAt >= 0 ? a.bodyHtml.slice(0, cutAt) : a.bodyHtml;
-            const text = rawPreview.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+            const safeBodyHtml = sanitizeArticleHtml(a.bodyHtml);
+            const cutAt = safeBodyHtml.search(/<hr[^>]*\bclass="[^"]*\barticle-cut\b/i);
+            const rawPreview = cutAt >= 0 ? safeBodyHtml.slice(0, cutAt) : safeBodyHtml;
+            const text = articlePlainText(rawPreview);
             const hasMore = cutAt >= 0 || text.length > 500;
             const preview = cutAt >= 0 ? text : text.slice(0, 500);
             return (

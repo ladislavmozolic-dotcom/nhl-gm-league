@@ -5,6 +5,7 @@ import RosterMover from "@/components/RosterMover";
 import { saveRosterMoves, releasePlayer, placeOnWaiversFromRoster } from "./actions";
 import { liveCapHit } from "@/lib/finance";
 import { recallExemptions } from "@/lib/waivers-server";
+import { livePlayerOverall } from "@/lib/player-overall";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +25,7 @@ export default async function RostersPage({ params }: { params: Promise<{ slug: 
     // only real roster players (NHL/AHL) — released UFAs, prospects and retirees keep a
     // team id (schema requires one) but must never surface in the roster manager.
     where: { teamId: { in: orgTeamIds }, rosterType: { in: ["NHL", "AHL"] } },
-    select: { id: true, name: true, position: true, overall: true, isGoalie: true, rosterType: true, contractType: true, capHit: true, contractYears: true, scratched: true, teamId: true, waiverStatus: true, lastRecalledAt: true },
+    select: { id: true, name: true, position: true, overall: true, isGoalie: true, rosterType: true, contractType: true, capHit: true, contractYears: true, scratched: true, teamId: true, waiverStatus: true, lastRecalledAt: true, goalieRating: { select: { overall: true } } },
     orderBy: [{ isGoalie: "asc" }, { overall: "desc" }],
   });
 
@@ -42,7 +43,7 @@ export default async function RostersPage({ params }: { params: Promise<{ slug: 
       players={players.map((p) => {
         const r = recall.get(p.id);
         return {
-          id: p.id, name: p.name, position: p.position, overall: p.overall ?? 0,
+          id: p.id, name: p.name, position: p.position, overall: livePlayerOverall(p) ?? 0,
           isGoalie: p.isGoalie,
           side: (p.rosterType === "AHL" ? (p.scratched ? "farm-scratched" : "farm") : (p.scratched ? "pro-scratched" : "pro")) as "pro" | "pro-scratched" | "farm" | "farm-scratched",
           contractType: (p.contractType as "ONE_WAY" | "TWO_WAY" | null) ?? null,

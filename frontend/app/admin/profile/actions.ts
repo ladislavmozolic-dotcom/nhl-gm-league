@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { isAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { cleanName } from "@/lib/playerName";
 
@@ -12,6 +13,7 @@ export type FoundProfilePlayer = {
 
 /** Search players by (clean) name for the profile editor. */
 export async function searchProfilePlayers(query: string): Promise<FoundProfilePlayer[]> {
+  if (!(await isAdmin())) throw new Error("Only a league admin can manage profile.");
   const q = query.trim();
   if (q.length < 2) return [];
   const rows = await prisma.player.findMany({
@@ -37,6 +39,7 @@ export type ProfileValues = {
 
 /** Save a player's bio/profile fields. */
 export async function savePlayerProfile(id: number, v: ProfileValues) {
+  if (!(await isAdmin())) throw new Error("Only a league admin can manage profile.");
   await prisma.player.update({
     where: { id },
     data: {

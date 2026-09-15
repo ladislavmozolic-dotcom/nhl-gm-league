@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { PageHeader, Card } from "@/components/ui";
+import { teamManagerLabel } from "@/lib/team-gm";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +44,7 @@ export default async function LeagueDirectoryPage() {
                   <td className="px-3 py-3">
                     {t.passwordHash
                       ? <Link href={`/gm/${t.slug}`} className="hover:text-blue-400 transition-colors">
-                          {t.gmNickname || [t.gmFirstName, t.gmLastName].filter(Boolean).join(" ").trim() || t.gm}
+                          {teamManagerLabel(t)}
                           {t.rookieGm && <span className="text-[10px] font-bold text-rose-400 ml-1" title="Rookie GM — new to the league">(R)</span>}
                         </Link>
                       : <span className="inline-flex items-center gap-1.5 text-cyan-400" title="No registered GM — run by the AI GM">🤖 AI GM</span>}

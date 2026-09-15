@@ -32,7 +32,7 @@ export async function approveJoinRequest(formData: FormData) {
   await prisma.$transaction([
     prisma.team.update({
       where: { id: req.teamId },
-      data: { passwordHash: req.passwordHash, gmFirstName: req.firstName, gmLastName: req.lastName, gmNickname: req.nickname, gmEmail: req.email },
+      data: { sessionVersion: { increment: 1 }, passwordHash: req.passwordHash, gmFirstName: req.firstName, gmLastName: req.lastName, gmNickname: req.nickname, gmEmail: req.email },
     }),
     prisma.joinRequest.update({ where: { id }, data: { status: "approved", decidedBy: who, decidedAt: new Date() } }),
     // any other pending request for the same team is now moot
@@ -63,17 +63,15 @@ export async function rejectJoinRequest(formData: FormData) {
  *  Deliberately leaves isAdmin/gmRole untouched, matching approveJoinRequest's own
  *  behavior — those are a property of the SEAT (a team's standing league role),
  *  not the specific person, so whoever claims the team next keeps continuity with
- *  it exactly as re-approving an existing team already does. Does NOT invalidate an
- *  already-active login cookie for that team (this app's session is a signed teamId
- *  cookie, not tied to the password) — if the removed GM is still signed in on their
- *  own device, they keep working until they log out or the cookie expires (30 days).
+ *  it exactly as re-approving an existing team already does. The session version
+ *  is incremented atomically so old cookies and remember-tokens stop working.
  */
 export async function removeGmAction(formData: FormData) {
   if (!(await isAdmin())) throw new Error("Admin only.");
   const teamId = Number(formData.get("teamId"));
   await prisma.team.update({
     where: { id: teamId },
-    data: { passwordHash: null, gmFirstName: null, gmLastName: null, gmNickname: null, gmEmail: null, lastLoginAt: null },
+    data: { sessionVersion: { increment: 1 }, passwordHash: null, gmFirstName: null, gmLastName: null, gmNickname: null, gmEmail: null, lastLoginAt: null },
   });
   revalidatePath("/admin/join-requests");
   revalidatePath("/league");

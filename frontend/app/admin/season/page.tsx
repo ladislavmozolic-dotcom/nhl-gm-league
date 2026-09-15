@@ -1,3 +1,5 @@
+import { isAdmin } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import SeasonControls from "@/components/SeasonControls";
 import { generateScheduleAction, playSeasonAction, runPlayoffsAction, resetSeasonAction, importNhlApiAction, importCsvAction, archiveSeasonAction, runRetirementsAction, developProspectsAction } from "./actions";
@@ -50,6 +52,7 @@ function AutoAdvanceHealth({ pinned, lastSimDay }: { pinned: boolean; lastSimDay
 }
 
 export default async function SeasonAdminPage() {
+  if (!(await isAdmin())) redirect("/login");
   const [played, scheduled, playoffSeries, finalDone, clock, cfg, preScheduled, prePlayed] = await Promise.all([
     prisma.game.count({ where: { season: SEASON, status: "FINAL", seriesId: null } }),
     prisma.game.count({ where: { season: SEASON, status: "SCHEDULED" } }),

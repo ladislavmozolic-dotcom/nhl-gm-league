@@ -30,6 +30,8 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       NODE_ENV: production
+      AUTH_SECRET: ${AUTH_SECRET:?Set a random AUTH_SECRET before deployment}
+      AUTH_SALT: ${AUTH_SALT:?Set the existing password salt before deployment}
       CRON_SECRET: ${CRON_SECRET}   # protects /api/cron/advance-day (the 20:30 auto-sim trigger)
       RESEND_API_KEY: ${RESEND_API_KEY}   # transactional email (welcome mail on GM approval)
     volumes:

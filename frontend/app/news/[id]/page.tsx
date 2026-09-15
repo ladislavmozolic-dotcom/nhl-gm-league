@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getTeamSession, canManageTeam } from "@/lib/auth";
 import { ReactionBar, CommentBox } from "@/components/NewsReactions";
 import { BackPill } from "@/components/ui";
+import { sanitizeArticleHtml } from "@/lib/news-html";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
     getTeamSession(),
   ]);
   if (!article) notFound();
+  const safeBodyHtml = sanitizeArticleHtml(article.bodyHtml);
   const canEdit = await canManageTeam(article.authorTeamId);
 
   const teamIds = [article.authorTeamId, ...article.comments.map((c) => c.teamId), ...article.reactions.map((r) => r.teamId)];
@@ -56,7 +58,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
         <h1 className="text-2xl font-bold mb-4">{article.title}</h1>
         {/* the perex cut line is a homepage-preview marker, not something a reader
             should see once they're already on the full article */}
-        <div className="news-body text-slate-200 leading-relaxed [&_.article-cut]:hidden" dangerouslySetInnerHTML={{ __html: article.bodyHtml }} />
+        <div className="news-body text-slate-200 leading-relaxed [&_.article-cut]:hidden" dangerouslySetInnerHTML={{ __html: safeBodyHtml }} />
         <div className="mt-6 pt-4 border-t border-slate-800">
           <ReactionBar articleId={article.id} counts={counts} mine={mine} canReact={!!session} reactorNames={reactorNames} />
         </div>

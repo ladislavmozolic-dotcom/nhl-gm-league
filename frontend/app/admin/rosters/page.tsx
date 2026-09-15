@@ -1,3 +1,5 @@
+import { isAdmin } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getRosterConfig } from "./actions";
 import RosterModeControl from "@/components/RosterModeControl";
@@ -8,6 +10,7 @@ import { BackPill } from "@/components/ui";
 export const dynamic = "force-dynamic";
 
 export default async function AdminRostersPage() {
+  if (!(await isAdmin())) redirect("/login");
   const [cfg, realCount, profinhlCount, realCapCount, farmCount] = await Promise.all([
     getRosterConfig(),
     prisma.player.count({ where: { realTeamId: { not: null } } }),

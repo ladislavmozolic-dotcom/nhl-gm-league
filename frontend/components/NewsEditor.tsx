@@ -3,6 +3,13 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createArticle, updateArticle } from "@/app/news/actions";
 
+function EditorButton({ onClick, children, title }: { onClick: () => void; children: React.ReactNode; title: string }) {
+  return (
+    <button type="button" title={title} onMouseDown={(e) => { e.preventDefault(); onClick(); }}
+      className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm text-slate-200">{children}</button>
+  );
+}
+
 export default function NewsEditor({ initial }: { initial?: { id: number; title: string; bodyHtml: string } }) {
   const [title, setTitle] = useState(initial?.title ?? "");
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -20,6 +27,8 @@ export default function NewsEditor({ initial }: { initial?: { id: number; title:
   };
 
   const insertImage = (file: File) => {
+    if (!/^image\/(png|jpeg|gif|webp)$/.test(file.type)) { setErr("Use a PNG, JPG, GIF or WEBP image."); return; }
+    if (file.size > 4_000_000) { setErr("Image is too large (max 4 MB)."); return; }
     const reader = new FileReader();
     reader.onload = () => { bodyRef.current?.focus(); document.execCommand("insertImage", false, String(reader.result)); };
     reader.readAsDataURL(file);
@@ -41,11 +50,6 @@ export default function NewsEditor({ initial }: { initial?: { id: number; title:
     } catch (e) { setErr((e as Error).message); }
   });
 
-  const Btn = ({ onClick, children, title }: { onClick: () => void; children: React.ReactNode; title: string }) => (
-    <button type="button" title={title} onMouseDown={(e) => { e.preventDefault(); onClick(); }}
-      className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm text-slate-200">{children}</button>
-  );
-
   return (
     <div className="max-w-3xl mx-auto px-4">
       <h1 className="text-2xl font-bold mb-4">{initial ? "Edit Article" : "Write an Article"}</h1>
@@ -56,23 +60,23 @@ export default function NewsEditor({ initial }: { initial?: { id: number; title:
 
       <label className="block text-xs uppercase tracking-wide text-slate-500 mb-1">Body</label>
       <div className="flex flex-wrap items-center gap-1.5 bg-slate-900/60 border border-slate-700 rounded-t-lg px-2 py-2">
-        <Btn onClick={() => cmd("bold")} title="Bold"><b>B</b></Btn>
-        <Btn onClick={() => cmd("italic")} title="Italic"><i>I</i></Btn>
-        <Btn onClick={() => cmd("underline")} title="Underline"><u>U</u></Btn>
+        <EditorButton onClick={() => cmd("bold")} title="Bold"><b>B</b></EditorButton>
+        <EditorButton onClick={() => cmd("italic")} title="Italic"><i>I</i></EditorButton>
+        <EditorButton onClick={() => cmd("underline")} title="Underline"><u>U</u></EditorButton>
         <span className="w-px h-5 bg-slate-700 mx-1" />
-        <Btn onClick={() => cmd("formatBlock", "H2")} title="Large heading">H1</Btn>
-        <Btn onClick={() => cmd("formatBlock", "H3")} title="Small heading">H2</Btn>
-        <Btn onClick={() => cmd("formatBlock", "P")} title="Normal text">P</Btn>
+        <EditorButton onClick={() => cmd("formatBlock", "H2")} title="Large heading">H1</EditorButton>
+        <EditorButton onClick={() => cmd("formatBlock", "H3")} title="Small heading">H2</EditorButton>
+        <EditorButton onClick={() => cmd("formatBlock", "P")} title="Normal text">P</EditorButton>
         <span className="w-px h-5 bg-slate-700 mx-1" />
-        <Btn onClick={() => cmd("fontSize", "5")} title="Bigger text">A+</Btn>
-        <Btn onClick={() => cmd("fontSize", "2")} title="Smaller text">A−</Btn>
-        <Btn onClick={() => cmd("insertUnorderedList")} title="Bullet list">• List</Btn>
+        <EditorButton onClick={() => cmd("fontSize", "5")} title="Bigger text">A+</EditorButton>
+        <EditorButton onClick={() => cmd("fontSize", "2")} title="Smaller text">A−</EditorButton>
+        <EditorButton onClick={() => cmd("insertUnorderedList")} title="Bullet list">• List</EditorButton>
         <span className="w-px h-5 bg-slate-700 mx-1" />
-        <Btn onClick={insertCut} title="Insert a cut line — text above becomes the homepage preview, text below only shows after Read more">✂️ Perex cut</Btn>
+        <EditorButton onClick={insertCut} title="Insert a cut line — text above becomes the homepage preview, text below only shows after Read more">✂️ Perex cut</EditorButton>
         <span className="w-px h-5 bg-slate-700 mx-1" />
         <label className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm text-slate-200 cursor-pointer">
           🖼 Image
-          <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) insertImage(f); e.target.value = ""; }} />
+          <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) insertImage(f); e.target.value = ""; }} />
         </label>
       </div>
       <div ref={bodyRef} contentEditable suppressContentEditableWarning
