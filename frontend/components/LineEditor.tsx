@@ -619,7 +619,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
           <UnitFormationBlock unitKey="pk4" ui={0} dial="pkStyle" label="PK1" layouts={PK_LAYOUTS} dStartIndex={2} accent="#ef4444" />
           <UnitFormationBlock unitKey="pk4" ui={1} dial="pkStyle" label="PK2" layouts={PK_LAYOUTS} dStartIndex={2} accent="#f97316" />
         </div>
-        {SplitUnitSection("pk4", "Penalty Kill (4 on 5)", ["F1", "F2"], ["D1", "D2"], stPointPool, "💡 Ktorýkoľvek slot môže mať útočníka aj obrancu — napr. ak chceš mať na role Net Coverage/Net-Front obrancu namiesto útočníka, jednoducho ho daj do toho F slotu.", { dial: "pkStyle", layouts: PK_LAYOUTS }, allSkatersPool)}
+        {SplitUnitSection("pk4", "Penalty Kill (4 on 5)", ["F1", "F2"], ["D1", "D2"], stPointPool, "💡 Ktorýkoľvek slot môže mať útočníka aj obrancu — dropdown ponúka oboje na oboch pozíciách.", { dial: "pkStyle", layouts: PK_LAYOUTS }, allSkatersPool)}
       </>}
       {tab === "PK3" && <>
         <p className="text-xs text-slate-500 px-1 mb-3">Zdieľa systém (Box/Diamond/Aggressive) s PK4 — pri 3 hráčoch niet 4. rohu, takže sa mení hlavne to, ako vysoko/agresívne hrá útočník. Zmeň to na karte <strong className="text-slate-300">PK4</strong> vyššie.</p>

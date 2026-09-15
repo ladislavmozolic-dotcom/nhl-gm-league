@@ -63,13 +63,14 @@ export const PK_LAYOUTS: Record<string, FormationRole[]> = {
     { key: "r3", label: "Left D", x: 34, y: 26 },
     { key: "r4", label: "Right D", x: 66, y: 26 },
   ],
-  // Real 1-2-1: one forward pressures the point up top, two D guard the
-  // half-wall seams on the flanks, one forward covers the net/slot down low.
+  // Real 1-2-1: one forward pressures the point up top, one flank seam is
+  // covered from the F slots, the other flank + net coverage sit in the D
+  // slots — net-front coverage reads as a D-column job, not a forward one.
   diamond: [
     { key: "r1", label: "Top (pressure)", x: 50, y: 78 },
-    { key: "r2", label: "Net Coverage", x: 50, y: 22 },
-    { key: "r3", label: "Left D", x: 24, y: 48 },
-    { key: "r4", label: "Right D", x: 76, y: 48 },
+    { key: "r2", label: "Left Flank", x: 24, y: 48 },
+    { key: "r3", label: "Net Coverage", x: 50, y: 22 },
+    { key: "r4", label: "Right Flank", x: 76, y: 48 },
   ],
   aggressive: [
     { key: "r1", label: "Pressure F", x: 40, y: 80 },
