@@ -9,7 +9,7 @@ import { coachDemand, coachBuyout } from "@/lib/coach-contract";
  *  contract (salary × years) from the bank, and he returns to the free-agent pool. */
 export async function fireCoachAction(teamId: number, slug: string) {
   if (!(await canManageTeam(teamId))) return { ok: false as const, error: "Not authorized." };
-  const coach = await prisma.coach.findUnique({ where: { teamId } });
+  const coach = await prisma.coach.findUnique({ where: { teamId }, include: { team: { select: { code: true } } } });
   if (!coach) return { ok: false as const, error: "This club has no head coach to fire." };
 
   const payout = coachBuyout(coach.salary, coach.contract);
@@ -18,6 +18,13 @@ export async function fireCoachAction(teamId: number, slug: string) {
     prisma.team.update({ where: { id: teamId }, data: { bankAccount: { decrement: payout }, ledgerAdj: { decrement: payout } } }),
     // release to the FA pool; his old deal is void (renegotiated on the next signing)
     prisma.coach.update({ where: { id: coach.id }, data: { teamId: null, salary: 0, contract: 0 } }),
+    prisma.coachSigningLog.create({
+      data: {
+        coachId: coach.id, coachName: coach.name, teamId, teamCode: coach.team?.code ?? null,
+        kind: "FIRE", salary: coach.salary, years: coach.contract, payout,
+        prevTeamId: teamId, prevSalary: coach.salary, prevContract: coach.contract,
+      },
+    }),
   ]);
   revalidatePath(`/teams/${slug}/coach`);
   revalidatePath(`/teams/${slug}`);
@@ -29,16 +36,26 @@ export async function fireCoachAction(teamId: number, slug: string) {
  *  command (salary + term, max 4 yrs). The seat must be vacant — fire first. */
 export async function hireCoachAction(teamId: number, coachId: number, slug: string) {
   if (!(await canManageTeam(teamId))) return { ok: false as const, error: "Not authorized." };
-  const [seat, coach] = await Promise.all([
+  const [seat, coach, team] = await Promise.all([
     prisma.coach.findUnique({ where: { teamId }, select: { id: true, name: true } }),
     prisma.coach.findUnique({ where: { id: coachId }, select: { id: true, name: true, overall: true, teamId: true } }),
+    prisma.team.findUnique({ where: { id: teamId }, select: { code: true } }),
   ]);
   if (!coach) return { ok: false as const, error: "Coach not found." };
   if (coach.teamId != null) return { ok: false as const, error: `${coach.name} is already under contract elsewhere.` };
   if (seat) return { ok: false as const, error: `Fire ${seat.name} first — a club can carry only one head coach.` };
 
   const { salary, years } = coachDemand(coach.overall);
-  await prisma.coach.update({ where: { id: coach.id }, data: { teamId, salary, contract: years } });
+  await prisma.$transaction([
+    prisma.coach.update({ where: { id: coach.id }, data: { teamId, salary, contract: years } }),
+    prisma.coachSigningLog.create({
+      data: {
+        coachId: coach.id, coachName: coach.name, teamId, teamCode: team?.code ?? null,
+        kind: "HIRE", salary, years,
+        prevTeamId: null, prevSalary: 0, prevContract: 0,
+      },
+    }),
+  ]);
   revalidatePath(`/teams/${slug}/coach`);
   revalidatePath(`/teams/${slug}`);
   revalidatePath("/coaches");
