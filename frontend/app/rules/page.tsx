@@ -83,6 +83,10 @@ const SECTIONS: Sec[] = [
         "That per-year charge counts against the cap as dead money for twice his remaining contract years (e.g. 4 years left on his deal → 8 years of dead cap). The full total cost is deducted from the team's bank account immediately, in one lump sum.",
         "The bought-out player instantly becomes a UFA and loses the captaincy. There's no age-based discount (unlike the real NHL's under/over-26 split), no protection from no-trade or no-movement clauses, and no seasonal blackout window — only the in-season vs off-season timing changes the price.",
       ] },
+      { h: "Coach contracts & buyouts", points: [
+        "Each club carries one head coach. His salary and contract length (up to 4 years) are set automatically by his overall rating — a GM doesn't negotiate a coach's terms, only whether to sign him. Coach salary doesn't count against the salary cap, but it does draw down the bank like any other club expense.",
+        "Firing a coach pays out his ENTIRE remaining contract (salary × years left) from the team bank in one lump sum, immediately — no age or timing discount, no proration for years already served. He returns to the free-agent coaching pool the moment he's fired, and can be re-signed by any club, including yours, on a fresh contract reflecting his rating.",
+      ] },
     ],
   },
   {
@@ -360,6 +364,10 @@ const SECTIONS_CS: Sec[] = [
         "Odkoupit lze libovolného hráče na NHL soupisce s aktivní smlouvou. Cena je procento z jeho aktuálního cap hitu — 50 % v průběhu základní části nebo play-off, 35 % v mimosezóně (obojí nastavuje komisař) — zaokrouhlené na nejbližších 500 $.",
         "Tato roční částka se počítá do stropu jako mrtvé peníze po dobu dvojnásobku zbývajících let smlouvy (např. 4 zbývající roky → 8 let mrtvého capu). Celá částka odkupu se strhne z bankovního účtu klubu okamžitě, najednou.",
         "Odkoupený hráč se ihned stává UFA a přichází o kapitánskou pásku. Neexistuje věková sleva (na rozdíl od reálné NHL, kde se rozlišuje věk pod/nad 26 let), žádná ochrana klauzulemi NTC/NMC ani sezónní uzávěrka — mění se pouze cena podle toho, zda probíhá sezóna, nebo ne.",
+      ] },
+      { h: "Trenérské smlouvy a odkupy", points: [
+        "Každý klub má jednoho hlavního trenéra. Jeho plat a délka smlouvy (max. 4 roky) se určují automaticky podle jeho celkového hodnocení — GM podmínky trenéra nevyjednává, jen rozhoduje, zda ho podepíše. Trenérský plat se nepočítá do platového stropu, ale stejně jako každý jiný klubový výdaj ubírá z bankovního účtu.",
+        "Propuštění trenéra znamená okamžité vyplacení CELÉ zbývající smlouvy (plat × zbývající roky) z bankovního účtu klubu, najednou — bez věkové ani sezónní slevy, bez poměrného krácení za odsloužené roky. Trenér se ihned vrací do volného trenérského poolu a může ho znovu podepsat kterýkoli klub, včetně toho, co ho propustil, za novou smlouvu odpovídající jeho hodnocení.",
       ] },
     ],
   },
