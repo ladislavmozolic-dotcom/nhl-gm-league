@@ -391,45 +391,6 @@ export default async function HomePage() {
         {/* CENTER — News */}
         <div className="lg:col-span-6 space-y-4">
           <CommissionerBanner items={bannerItems} signedIn={me != null} />
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold">{T("home.latestArticle")}</h2>
-            <Link href="/news/create" className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg font-medium">{T("home.addArticle")}</Link>
-          </div>
-          {articlesRaw.length === 0 && (
-            <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-8 text-center text-slate-500">{T("home.noNews")}</div>
-          )}
-          {articlesRaw.map((a) => {
-            const author = teamById.get(a.authorTeamId);
-            // A "Perex cut" line the author drops into the editor marks where the
-            // homepage preview should end — everything before it is the perex,
-            // everything after only shows once a reader clicks through. No cut
-            // line falls back to the old behavior: just truncate at 500 chars.
-            const safeBodyHtml = sanitizeArticleHtml(a.bodyHtml);
-            const cutAt = safeBodyHtml.search(/<hr[^>]*\bclass="[^"]*\barticle-cut\b/i);
-            const rawPreview = cutAt >= 0 ? safeBodyHtml.slice(0, cutAt) : safeBodyHtml;
-            const text = articlePlainText(rawPreview);
-            const hasMore = cutAt >= 0 || text.length > 500;
-            const preview = cutAt >= 0 ? text : text.slice(0, 500);
-            return (
-              <article key={a.id} className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 hover:border-slate-600 transition-colors">
-                <div className="flex items-center gap-3 mb-3">
-                  {author?.logoUrl ? <img src={author.logoUrl} alt="" className="w-9 h-9 object-contain" />
-                    : <div className="w-9 h-9 rounded-full bg-slate-700 grid place-items-center font-bold text-sm">{author?.name?.[0] ?? "?"}</div>}
-                  <div>
-                    <p className="text-sm font-bold">{author?.gmNickname || [author?.gmFirstName, author?.gmLastName].filter(Boolean).join(" ").trim() || author?.gm || author?.name || "GM"}</p>
-                    <p className="text-xs text-slate-500">{author?.name} · {a.createdAt.toLocaleDateString("sk-SK")}</p>
-                  </div>
-                </div>
-                <Link href={`/news/${a.id}`}><h3 className="text-lg font-bold mb-2 hover:text-blue-400">{a.title}</h3></Link>
-                <p className="text-sm text-slate-300 leading-relaxed">{preview}{hasMore ? "…" : ""}</p>
-                <div className="mt-3 flex items-center gap-4 text-xs text-slate-500">
-                  <Link href={`/news/${a.id}`} className="text-blue-400 hover:text-blue-300">Read more →</Link>
-                  <span>👍 {a._count.reactions}</span>
-                  <span>💬 {a._count.comments}</span>
-                </div>
-              </article>
-            );
-          })}
 
           {/* Game Tracker — latest results, then what's next on the schedule */}
           <Card title={`🏒 ${T("home.tracker")}`} href="/schedule" accent="text-emerald-400" viewLabel={T("ui.viewAll")}>
@@ -487,6 +448,46 @@ export default async function HomePage() {
               </div>
             )}
           </Card>
+
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold">{T("home.latestArticle")}</h2>
+            <Link href="/news/create" className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg font-medium">{T("home.addArticle")}</Link>
+          </div>
+          {articlesRaw.length === 0 && (
+            <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-8 text-center text-slate-500">{T("home.noNews")}</div>
+          )}
+          {articlesRaw.map((a) => {
+            const author = teamById.get(a.authorTeamId);
+            // A "Perex cut" line the author drops into the editor marks where the
+            // homepage preview should end — everything before it is the perex,
+            // everything after only shows once a reader clicks through. No cut
+            // line falls back to the old behavior: just truncate at 500 chars.
+            const safeBodyHtml = sanitizeArticleHtml(a.bodyHtml);
+            const cutAt = safeBodyHtml.search(/<hr[^>]*\bclass="[^"]*\barticle-cut\b/i);
+            const rawPreview = cutAt >= 0 ? safeBodyHtml.slice(0, cutAt) : safeBodyHtml;
+            const text = articlePlainText(rawPreview);
+            const hasMore = cutAt >= 0 || text.length > 500;
+            const preview = cutAt >= 0 ? text : text.slice(0, 500);
+            return (
+              <article key={a.id} className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 hover:border-slate-600 transition-colors">
+                <div className="flex items-center gap-3 mb-3">
+                  {author?.logoUrl ? <img src={author.logoUrl} alt="" className="w-9 h-9 object-contain" />
+                    : <div className="w-9 h-9 rounded-full bg-slate-700 grid place-items-center font-bold text-sm">{author?.name?.[0] ?? "?"}</div>}
+                  <div>
+                    <p className="text-sm font-bold">{author?.gmNickname || [author?.gmFirstName, author?.gmLastName].filter(Boolean).join(" ").trim() || author?.gm || author?.name || "GM"}</p>
+                    <p className="text-xs text-slate-500">{author?.name} · {a.createdAt.toLocaleDateString("sk-SK")}</p>
+                  </div>
+                </div>
+                <Link href={`/news/${a.id}`}><h3 className="text-lg font-bold mb-2 hover:text-blue-400">{a.title}</h3></Link>
+                <p className="text-sm text-slate-300 leading-relaxed">{preview}{hasMore ? "…" : ""}</p>
+                <div className="mt-3 flex items-center gap-4 text-xs text-slate-500">
+                  <Link href={`/news/${a.id}`} className="text-blue-400 hover:text-blue-300">Read more →</Link>
+                  <span>👍 {a._count.reactions}</span>
+                  <span>💬 {a._count.comments}</span>
+                </div>
+              </article>
+            );
+          })}
         </div>
 
         {/* RIGHT */}
