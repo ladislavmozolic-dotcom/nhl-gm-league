@@ -35,8 +35,7 @@ export function isCommissionOfferEmbargo(
   cfg: { faOpen?: boolean | null; frenzyStage?: string | null; frenzyRoundStartedAt?: Date | null } | null | undefined,
   now = new Date(),
 ): boolean {
-  const embargoedStage = cfg?.frenzyStage === "BIDDING" || cfg?.frenzyStage === "IMPROVEMENT";
-  return !!(cfg?.faOpen && embargoedStage && cfg.frenzyRoundStartedAt
+  return !!(cfg?.faOpen && cfg?.frenzyStage === "BIDDING" && cfg.frenzyRoundStartedAt
     && now.getTime() - cfg.frenzyRoundStartedAt.getTime() < COMMISSION_OFFER_EMBARGO_MS);
 }
 export function frenzyRoundCloseUtcMs(

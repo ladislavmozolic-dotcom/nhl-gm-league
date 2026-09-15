@@ -29,6 +29,6 @@ test("commissioner offer visibility opens exactly 24 hours after bidding starts"
   const cfg = { faOpen: true, frenzyStage: "BIDDING", frenzyRoundStartedAt: startedAt };
   assert.equal(isCommissionOfferEmbargo(cfg, new Date("2026-09-02T11:59:59.999Z")), true);
   assert.equal(isCommissionOfferEmbargo(cfg, new Date("2026-09-02T12:00:00.000Z")), false);
-  assert.equal(isCommissionOfferEmbargo({ ...cfg, frenzyStage: "IMPROVEMENT" }, new Date("2026-09-01T12:05:00.000Z")), true);
+  assert.equal(isCommissionOfferEmbargo({ ...cfg, frenzyStage: "IMPROVEMENT" }, new Date("2026-09-01T12:05:00.000Z")), false);
   assert.equal(isCommissionOfferEmbargo({ ...cfg, frenzyStage: "IMPROVEMENT" }, new Date("2026-09-02T12:00:00.000Z")), false);
 });
