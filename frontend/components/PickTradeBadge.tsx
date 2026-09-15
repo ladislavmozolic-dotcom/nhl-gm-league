@@ -61,8 +61,16 @@ export default function PickTradeBadge({
               <p className="text-sm text-slate-500">No trade found for this pick.</p>
             ) : (
               <div className="space-y-3">
-                {history.map((h) => (
-                  <div key={h.tradeId} className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
+                {history.map((h) => h.hidden ? (
+                  <div key={h.tradeId} className="rounded-lg border border-yellow-800/40 bg-yellow-950/20 p-3">
+                    <p className="text-sm text-yellow-400 font-semibold">🔄 In active trade talks</p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      This pick is part of a trade proposal that hasn&apos;t been accepted yet. Details are private
+                      to the two clubs involved — check back once it&apos;s finalized.
+                    </p>
+                  </div>
+                ) : (
+                  <div key={h.tradeId} className={`rounded-lg border p-3 ${h.status === "PENDING" ? "border-yellow-800/40 bg-yellow-950/20" : "border-slate-800 bg-slate-950/40"}`}>
                     <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
                       <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-200">
                         {h.fromTeam?.logoUrl && <img src={h.fromTeam.logoUrl} alt="" className="w-5 h-5 object-contain" />}
@@ -71,15 +79,19 @@ export default function PickTradeBadge({
                         {h.toTeam?.logoUrl && <img src={h.toTeam.logoUrl} alt="" className="w-5 h-5 object-contain" />}
                         {h.toTeam?.name ?? "Team"}
                       </div>
-                      <span className="text-xs text-slate-500 whitespace-nowrap">{h.date.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}</span>
+                      {h.status === "PENDING" ? (
+                        <span className="text-xs text-yellow-400 font-semibold whitespace-nowrap">⏳ Pending — not yet accepted</span>
+                      ) : (
+                        <span className="text-xs text-slate-500 whitespace-nowrap">{h.date.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}</span>
+                      )}
                     </div>
                     <div className="grid sm:grid-cols-2 gap-3">
                       <div>
-                        <p className="text-[10px] uppercase tracking-wide text-slate-600 mb-1">{h.toTeam?.name ?? "Team"} received</p>
+                        <p className="text-[10px] uppercase tracking-wide text-slate-600 mb-1">{h.toTeam?.name ?? "Team"} {h.status === "PENDING" ? "would receive" : "received"}</p>
                         <AssetChips items={h.fromLabels} />
                       </div>
                       <div>
-                        <p className="text-[10px] uppercase tracking-wide text-slate-600 mb-1">{h.fromTeam?.name ?? "Team"} received</p>
+                        <p className="text-[10px] uppercase tracking-wide text-slate-600 mb-1">{h.fromTeam?.name ?? "Team"} {h.status === "PENDING" ? "would receive" : "received"}</p>
                         <AssetChips items={h.toLabels} />
                       </div>
                     </div>

@@ -14,11 +14,17 @@ export type TradeHistoryTeam = { name: string | null; code: string | null; logoU
 export type TradeHistoryEntry = {
   tradeId: number;
   date: Date;
-  status: string; // ACCEPTED | REVERTED
+  status: string; // ACCEPTED | REVERTED | PENDING
   fromTeam: TradeHistoryTeam | null;
   toTeam: TradeHistoryTeam | null;
   fromLabels: TradeHistoryAssetItem[];
   toLabels: TradeHistoryAssetItem[];
+  // true for a PENDING trade the caller isn't privy to (not one of the two
+  // clubs, not admin/commission) — team identities and the asset packages are
+  // withheld (fromTeam/toTeam null, labels empty) so an unrelated GM browsing
+  // another club's picks can't peek at an in-progress, unaccepted negotiation.
+  // Matches the same privacy rule app/trades/[id]/page.tsx enforces.
+  hidden?: boolean;
 };
 
 export async function playerTradeHistory(playerId: number): Promise<TradeHistoryEntry[]> {
@@ -88,16 +94,22 @@ export async function playerTradeHistory(playerId: number): Promise<TradeHistory
 }
 
 /** Every completed (or later-reverted) trade a specific draft pick changed
- *  hands in — same shape/resolution as playerTradeHistory, just keyed off
+ *  hands in, PLUS any currently-open PENDING proposal it's part of — same
+ *  shape/resolution as playerTradeHistory, just keyed off
  *  TradeAsset.draftPickId instead of .playerId. Powers the "which trade got
- *  us this pick?" popup on All Rosters / a team's draft-picks page. */
-export async function pickTradeHistory(pickId: number): Promise<TradeHistoryEntry[]> {
+ *  us this pick?" popup on All Rosters / a team's draft-picks page.
+ *  `viewer` gates what a PENDING entry reveals: only the two clubs in that
+ *  trade (or admin/commission) see who's involved and what's being offered —
+ *  everyone else gets a `hidden: true` entry (see TradeHistoryEntry) so the
+ *  popup can still say "trade talks in progress" without leaking a private,
+ *  unaccepted negotiation to an unrelated GM. */
+export async function pickTradeHistory(pickId: number, viewer?: { teamId: number | null; privileged: boolean }): Promise<TradeHistoryEntry[]> {
   const pickAssets = await prisma.tradeAsset.findMany({ where: { draftPickId: pickId, assetType: "PICK" }, select: { tradeId: true } });
   const tradeIds = [...new Set(pickAssets.map((a) => a.tradeId))];
   if (!tradeIds.length) return [];
 
   const trades = await prisma.trade.findMany({
-    where: { id: { in: tradeIds }, status: { in: ["ACCEPTED", "REVERTED"] } },
+    where: { id: { in: tradeIds }, status: { in: ["ACCEPTED", "REVERTED", "PENDING"] } },
     orderBy: [{ respondedAt: "asc" }, { createdAt: "asc" }],
   });
   if (!trades.length) return [];
@@ -145,6 +157,10 @@ export async function pickTradeHistory(pickId: number): Promise<TradeHistoryEntr
 
   return trades.map((t) => {
     const assets = assetsByTrade.get(t.id) ?? [];
+    const authorized = t.status !== "PENDING" || !!viewer?.privileged || (viewer?.teamId != null && (viewer.teamId === t.fromTeamId || viewer.teamId === t.toTeamId));
+    if (!authorized) {
+      return { tradeId: t.id, date: t.respondedAt ?? t.createdAt, status: t.status, fromTeam: null, toTeam: null, fromLabels: [], toLabels: [], hidden: true };
+    }
     return {
       tradeId: t.id,
       date: t.respondedAt ?? t.createdAt,
