@@ -67,7 +67,6 @@ export const DICT: Dict = {
   "ui.playoffs": { en: "Playoffs", cs: "Playoff", de: "Playoffs", ru: "Плей-офф" },
   "ui.allRosters": { en: "All Rosters", cs: "Všechny soupisky", de: "Alle Kader", ru: "Все составы" },
   // Homepage
-  "home.nextSim": { en: "Next Simulation", cs: "Nejbližší simulace", de: "Nächste Simulation", ru: "Следующая симуляция" },
   "home.threeStars": { en: "3 Stars of the Day", cs: "3 hvězdy dne", de: "3 Sterne des Tages", ru: "3 звезды дня" },
   "home.leagueLeader": { en: "League Leader", cs: "Lídr ligy", de: "Liga-Führender", ru: "Лидер лиги" },
   "home.tonightsBest": { en: "Tonight's Best", cs: "Nejlepší dnes", de: "Das Beste heute", ru: "Лучшее за вечер" },

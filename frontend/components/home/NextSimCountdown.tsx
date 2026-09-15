@@ -32,8 +32,13 @@ export default function NextSimCountdown({ frenzyAt, frenzyOpen, frenzyRound, fr
   if (!now) return <div className="text-3xl font-black text-slate-100 tabular-nums">--:--:--</div>;
   const frenzyMs = frenzyAt ? new Date(frenzyAt).getTime() : null;
   const frenzyPending = frenzyMs != null && frenzyMs > now.getTime();
-  const roundActive = !frenzyPending && frenzyOpen && frenzyRound != null && frenzyDay != null;
-  const targetMs = frenzyPending ? frenzyMs! : roundActive ? frenzyRoundCloseUtcMs(now, frenzyRound!, frenzyDay!, frenzyRoundStartedAt, frenzyStage === "IMPROVEMENT" ? "IMPROVEMENT" : "BIDDING") : nextSimUtcMs(now);
+  const roundOpen = !frenzyPending && frenzyOpen && frenzyRound != null && frenzyDay != null;
+  const roundCloseMs = roundOpen ? frenzyRoundCloseUtcMs(now, frenzyRound!, frenzyDay!, frenzyRoundStartedAt, frenzyStage === "IMPROVEMENT" ? "IMPROVEMENT" : "BIDDING") : null;
+  const simMs = nextSimUtcMs(now);
+  // A round's own deadline can be days out while the next game sim (tomorrow
+  // night, say) is much sooner — show whichever is actually coming up next.
+  const roundActive = roundOpen && roundCloseMs! <= simMs;
+  const targetMs = frenzyPending ? frenzyMs! : roundActive ? roundCloseMs! : simMs;
   const rem = Math.max(0, targetMs - now.getTime());
   const d = Math.floor(rem / 86_400_000);
   const h = Math.floor((rem % 86_400_000) / 3.6e6), m = Math.floor((rem % 3.6e6) / 6e4), s = Math.floor((rem % 6e4) / 1000);
@@ -44,6 +49,7 @@ export default function NextSimCountdown({ frenzyAt, frenzyOpen, frenzyRound, fr
     <div>
       {frenzyPending && <p className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wide mb-1">Free Agent Frenzy open in</p>}
       {roundActive && <p className="text-[11px] font-semibold text-amber-400 uppercase tracking-wide mb-1">Frenzy Round {frenzyRound} · {frenzyStage === "IMPROVEMENT" ? "decision in" : "offers close in"}</p>}
+      {!frenzyPending && !roundActive && <p className="text-[11px] font-semibold text-blue-400 uppercase tracking-wide mb-1">Next Game Sim</p>}
       <p className="text-3xl font-black text-slate-100 tabular-nums leading-none">{d > 0 && `${d}d `}{pad(h)}:{pad(m)}:{pad(s)}</p>
       <div className="flex items-center justify-between gap-2 mt-2">
         <p className="text-xs text-slate-400">{frenzyPending ? "Opens" : roundActive ? "Closes" : "Sim"} at {targetLabel}</p>
