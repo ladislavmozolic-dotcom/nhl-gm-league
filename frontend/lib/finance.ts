@@ -245,8 +245,9 @@ export function projectedPointsPct(st: { pointsPct: number; gp: number } | null 
 // ---- buyouts ("vyplatený zo zmluvy") ---------------------------------------
 
 /**
- * Buyout terms: dead-money cap hit = buyout% of salary, spread over 2× the
- * remaining contract years; the same total is debited from the team bank.
+ * League buyout terms: the configured percentage of the player's annual cap
+ * hit becomes dead cap for 2× the remaining contract years. `totalCost` is the
+ * total dead-cap obligation across that span; buyouts do not debit team cash.
  */
 export function buyoutTerms(
   salary: number, remainingYears: number, inSeason: boolean,
@@ -256,45 +257,6 @@ export function buyoutTerms(
   const perYear = Math.round((salary * pct / 100) / 500) * 500;
   const years = Math.max(1, remainingYears * 2);
   return { perYear, years, totalCost: perYear * years, pct };
-}
-
-/**
- * Real-NHL-style buyout terms (CBA Art. 50.5(b)): the club owes the player a
- * fraction of his remaining SALARY (not signing bonus — bonus money is
- * guaranteed and survives a buyout untouched, in full) — 1/3 if he's under
- * the age threshold at the time of the buyout, 2/3 if he's at/over it — for
- * EACH of the `n` remaining contract years. That salary-only compensation is
- * paid out evenly over TWICE the remaining term (2n years), which is also
- * how long it counts against the cap; the flat/constant salary and fraction
- * each year makes the total collapse to `salaryOnly × n × pct`, and dividing
- * by `2n` years cancels `n` out, so the salary-only dead-cap charge is just
- * `salaryOnly × pct ÷ 2` every one of the 2n years. The full, unreduced
- * signing bonus is added on top, but ONLY for the `n` years it was actually
- * owed (it isn't extended into the back half like the salary charge is).
- * `signingBonus` is a flat annual figure (admin-entered — we don't store a
- * real per-year salary/bonus schedule for any player) and defaults to 0,
- * which is exactly right for every one of our own league's own contracts
- * (they never model a signing bonus at all). Matches CapFriendly/CapWages/
- * PuckPedia buyout calculators when a real player's remaining salary and
- * bonus truly are flat year to year; a front- or back-loaded real deal needs
- * its own year-by-year schedule to match exactly, which this doesn't have.
- * Used by the admin Buyout Calculator tool only — the LIVE in-game buyout
- * (buyoutTerms above) still runs on the simpler season/off-season % pair.
- */
-export function realBuyoutTerms(
-  salary: number, remainingYears: number, age: number,
-  cfg: { buyoutRealAgeThreshold: number; buyoutRealYoungPct: number; buyoutRealOldPct: number },
-  signingBonus = 0,
-) {
-  const pct = age < cfg.buyoutRealAgeThreshold ? cfg.buyoutRealYoungPct : cfg.buyoutRealOldPct;
-  const n = Math.max(1, Math.round(remainingYears));
-  const years = n * 2;
-  const salaryOnly = Math.max(0, salary - signingBonus);
-  const baseline = Math.round((salaryOnly * pct / 100 / 2) / 500) * 500; // charged every one of the 2n years
-  const perYearOriginal = baseline + signingBonus; // years 1..n: salary charge + full bonus
-  const perYearExtended = baseline;                // years n+1..2n: salary charge only
-  const totalCost = perYearOriginal * n + perYearExtended * n;
-  return { perYearOriginal, perYearExtended, years, originalYears: n, totalCost, pct, ageUsed: age, signingBonus };
 }
 
 // A parent club still pays real money for its farm team's roster, but only

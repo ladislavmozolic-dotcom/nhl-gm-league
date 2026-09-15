@@ -15,9 +15,9 @@ type Col = { key: keyof CapRow; label: string; money?: boolean; space?: boolean;
 const COLS: Col[] = [
   { key: "count", label: "Players in Salary Cap" },
   { key: "totalSalaries", label: "Total Salaries", money: true, title: "Sum of each player's Cap Hit — already net of any retention someone else pays" },
-  { key: "buyouts", label: "Buyouts", money: true, title: "Dead money from this club's own player buyouts" },
-  { key: "deadCap", label: "Dead Cap", money: true, title: "Salary this club retains on players it traded away — not a buyout, but still counts against its cap" },
-  { key: "capHit", label: "Actual Cap Hit", money: true, title: "Total Salaries + Buyouts + Dead Cap" },
+  { key: "buyouts", label: "Buyout Dead Cap", money: true, title: "Dead cap from this club's bought-out contracts" },
+  { key: "deadCap", label: "Retained Salary", money: true, title: "Salary this club retains on players it traded away" },
+  { key: "capHit", label: "Actual Cap Hit", money: true, title: "Total Salaries + Buyout Dead Cap + Retained Salary" },
   { key: "capSpace", label: "Actual Cap Space", money: true, space: true, title: "Upper ceiling − Actual Cap Hit (can be negative)" },
   { key: "projCapHit", label: "Projected Cap Hit", money: true, title: "Max total cap hit you may carry for the rest of the season" },
   { key: "projCapSpace", label: "Projected Cap Space", money: true, space: true, title: "The biggest full-season cap hit you can still add and stay legal — unused cap banks each game, so it grows toward the deadline." },

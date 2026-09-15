@@ -9,10 +9,9 @@ import { revalidatePath } from "next/cache";
 
 /** Buy a player out of his contract ("vyplatený zo zmluvy"). GM-only.
  *  inSeason (which buyout % applies) is derived from the league's actual
- *  current phase, not a client-supplied flag — it used to be hardcoded true
- *  by the only caller (BuyoutButton), so an off-season buyout was silently
- *  charged the in-season rate. Regular season/playoffs = in-season; frenzy/
- *  preseason/off-season = the cheaper off-season rate. */
+ *  current phase, not a client-supplied flag. Regular season/playoffs use the
+ *  66% rate; frenzy/preseason/off-season use 33%. The resulting obligation is
+ *  dead cap only and never changes the team bank. */
 export async function buyoutPlayer(slug: string, playerId: number) {
   const team = await prisma.team.findUnique({ where: { slug }, select: { id: true } });
   if (!team) throw new Error("Team not found");
@@ -39,11 +38,11 @@ export async function buyoutPlayer(slug: string, playerId: number) {
         totalCost: terms.totalCost, inSeason,
       },
     }),
-    prisma.team.update({ where: { id: team.id }, data: { bankAccount: { decrement: terms.totalCost }, ledgerAdj: { decrement: terms.totalCost } } }),
     prisma.player.update({ where: { id: player.id }, data: { rosterType: "UFA", captaincy: null } }),
   ]);
 
   revalidatePath(`/finance/${slug}`);
+  revalidatePath(`/teams/${slug}/salary`);
   revalidatePath("/salary-cap");
   revalidatePath("/finance");
 }

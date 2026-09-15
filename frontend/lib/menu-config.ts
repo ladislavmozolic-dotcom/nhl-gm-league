@@ -80,6 +80,7 @@ export const DEFAULT_MENU: MenuItem[] = [
     { label: "🗂️ All Rosters", href: "/tools/all-rosters" },
     { label: "⚖️ Player Compare", href: "/tools/compare" },
     { label: "🧮 Cap Calculator", href: "/tools/cap-calculator" },
+    { label: "💸 Buyout Calculator", href: "/tools/buyout-calculator" },
     { label: "🚫 Clauses", href: "/tools/clauses" },
     { label: "🎚️ Parameters (calculator)", href: "/tools/player-calculator" },
     { label: "🎛️ Next Gen Parameters (calculator)", href: "/tools/edge-calculator" },

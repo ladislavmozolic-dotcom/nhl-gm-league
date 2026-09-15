@@ -10,7 +10,7 @@ export default function BuyoutButton({ slug, playerId, playerName, onBuyout }: {
   const [err, setErr] = useState<string | null>(null);
 
   const buy = () => {
-    if (!confirm(`Buy out ${playerName}? Dead-money cap over 2× the remaining years and the cost is debited from your bank.`)) return;
+    if (!confirm(`Buy out ${playerName}? The buyout becomes dead cap for 2× the remaining contract years. No cash is deducted from the team bank.`)) return;
     start(async () => {
       setErr(null);
       try { await onBuyout(slug, playerId); }

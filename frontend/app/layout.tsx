@@ -99,9 +99,6 @@ export default async function RootLayout({
       // UNHL Intelligence — open to any logged-in GM (see memory: gm-assistant-intelligence);
       // the route itself 404s for anyone not logged in, this just keeps it off the menu for guests.
       if (t) children.push({ label: "🧠 UNHL Intelligence", href: "/tools/assistant" });
-      // Buyout Calculator — admin-only preview tool, the route itself redirects
-      // non-admins away; this just keeps it off the menu for everyone else.
-      if (t?.isAdmin) children.push({ label: "💸 Buyout Calculator", href: "/tools/buyout-calculator" });
       return { ...item, children };
     }
     if (item.key === "league" && item.children) {

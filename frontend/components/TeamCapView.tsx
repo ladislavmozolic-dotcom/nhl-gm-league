@@ -55,9 +55,8 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   // For an M-NTC player's protected-teams tooltip.
   const teamCodeById = new Map(allTeams.map((t) => [t.id, t.code]));
   const isGm = session === team.id;
-  // The Buyout table doubles up: a real buyout debits the bank (totalCost > 0);
-  // a trade-retention record (totalCost = 0) is dead cap only — the player is
-  // gone from this roster, but this club still carries part of his cap hit.
+  // The Buyout table doubles up: a positive totalCost identifies a bought-out
+  // contract; 0 identifies trade retention. Both are dead cap, never a cash fee.
   const realBuyouts = buyouts.filter((b) => b.totalCost > 0);
   const retentions = buyouts.filter((b) => b.totalCost === 0);
   const st = standings.find((s) => s.teamId === team.id);
@@ -181,15 +180,15 @@ export default async function TeamCapView({ slug }: { slug: string }) {
             {orgTotal}/{ROSTER_LIMITS.orgMax} <span className="text-slate-500 text-xs">({team.players.length} NHL: {posCounts.forwards.length}F·{posCounts.defense.length}D·{posCounts.goalies.length}G · {farm.length} AHL)</span>
           </span>
           <span className="text-slate-400" title="Sum of each player's Cap Hit — already net of any retention someone else pays">Total Salaries</span><span className="text-right">{money(cap.totalSalaries)}</span>
-          <span className="text-slate-400" title="Dead money from this club's own player buyouts">Buyouts</span><span className="text-right">{realBuyoutsDeadMoney ? money(realBuyoutsDeadMoney) : "—"}</span>
-          <span className="text-slate-400" title="Salary this club retains on players it traded away (see Dead Cap below) — not a buyout, but still counts against its cap">Dead Cap</span><span className="text-right">{deadCapAmount ? money(deadCapAmount) : "—"}</span>
+          <span className="text-slate-400" title="Dead cap from this club's bought-out contracts">Dead Cap — Buyouts</span><span className="text-right">{realBuyoutsDeadMoney ? money(realBuyoutsDeadMoney) : "—"}</span>
+          <span className="text-slate-400" title="Salary this club retains on players it traded away">Retained Salary</span><span className="text-right">{deadCapAmount ? money(deadCapAmount) : "—"}</span>
           <span className="text-slate-400" title="Contracts retained on (out) + retained-salary players rostered (in) — one combined pool vs. the league's configured max per team">Retention slots</span>
           <span className={`text-right ${retention.slotsOutUsed + retention.slotsInUsed >= retention.slotsMax ? "text-red-400 font-semibold" : ""}`}>
             {retention.slotsOutUsed + retention.slotsInUsed}/{retention.slotsMax} <span className="text-slate-500 font-normal text-xs">({retention.slotsOutUsed} out, {retention.slotsInUsed} in)</span>
           </span>
           <span className="text-slate-400" title="Dead Cap as a % of the cap ceiling vs. the league's configured max">Retention % of cap</span>
           <span className={`text-right ${retention.pctOfCap >= retention.pctMax ? "text-red-400 font-semibold" : ""}`}>{retention.pctOfCap.toFixed(1)}% <span className="text-slate-500">/ {retention.pctMax}%</span></span>
-          <span className="text-slate-400" title="Total Salaries + Buyouts + Dead Cap">Actual Cap Hit</span><span className="text-right font-semibold">{money(cap.capHit)}</span>
+          <span className="text-slate-400" title="Total Salaries + Buyout Dead Cap + Retained Salary">Actual Cap Hit</span><span className="text-right font-semibold">{money(cap.capHit)}</span>
           <span className="text-slate-400" title={`Ceiling ${money(cap.upper)} − Actual Cap Hit`}>Actual Cap Space</span><span className={`text-right font-semibold ${cap.capSpace < 0 ? "text-red-400" : "text-green-400"}`}>{money(cap.capSpace)}</span>
           <span className="text-slate-400" title="Max total cap hit you may carry for the rest of the season">Projected Cap Hit</span><span className="text-right tabular-nums text-slate-200">{money(maxCapHit)}</span>
           <span className="text-slate-400" title={`Biggest full-season cap hit you can still add and stay legal — unused cap banks each calendar day of the regular season (grows toward the deadline). Day ${accrued.played}/${dayProgress.daysTotal}.`}>
@@ -236,10 +235,10 @@ export default async function TeamCapView({ slug }: { slug: string }) {
         <PosGroup title="Goalies" list={posCounts.goalies} gm={isGm} />
       </div>
 
-      {/* Buyouts — dead money from this club's own bought-out contracts */}
+      {/* Dead cap from this club's own bought-out contracts */}
       {realBuyouts.length > 0 && (
         <div className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 overflow-x-auto">
-          <div className="px-4 py-2.5 bg-slate-800/30 border-b border-slate-800 text-xs font-bold uppercase tracking-wide text-slate-400">Buyouts</div>
+          <div className="px-4 py-2.5 bg-slate-800/30 border-b border-slate-800 text-xs font-bold uppercase tracking-wide text-slate-400">Dead Cap — bought-out contracts</div>
           <table className="w-full text-sm min-w-[720px]">
             <thead>
               <tr className="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-800 bg-slate-800/30">
@@ -251,7 +250,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
             <tbody>
               {realBuyouts.map((b) => (
                 <tr key={`b${b.id}`} className="border-b border-slate-800/60 bg-red-950/10">
-                  <td className="px-3 py-1.5 text-slate-400 italic">{b.playerName} <span className="text-[10px] text-red-400">(bought out)</span></td>
+                  <td className="px-3 py-1.5 text-slate-400 italic">{b.playerId ? <PlayerLink id={b.playerId} name={b.playerName} /> : b.playerName} <span className="text-[10px] text-red-400">(bought out)</span></td>
                   <td className="px-3 py-1.5 text-right text-red-300 tabular-nums">{money(b.perYear)}</td>
                   {years.map((y, i) => <td key={i} className="px-3 py-1.5 text-right tabular-nums">{y >= b.startYear && y < b.startYear + b.years ? <span className="text-red-300">{money(b.perYear)}</span> : ""}</td>)}
                 </tr>
@@ -261,11 +260,11 @@ export default async function TeamCapView({ slug }: { slug: string }) {
         </div>
       )}
 
-      {/* Dead cap — retained salary on players this club no longer rosters */}
+      {/* Retained salary on players this club no longer rosters */}
       {retentions.length > 0 && (
         <div className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 overflow-x-auto -mt-2">
           <div className="px-4 py-2.5 bg-slate-800/30 border-b border-slate-800 text-xs font-bold uppercase tracking-wide text-slate-400 flex items-center justify-between">
-            <span>Dead Cap — salary retained on traded players</span>
+            <span>Retained Salary — traded players</span>
             <span className={`normal-case font-normal ${retention.slotsOutUsed + retention.slotsInUsed >= retention.slotsMax || retention.pctOfCap >= retention.pctMax ? "text-red-400" : "text-slate-500"}`}>
               {retention.slotsOutUsed + retention.slotsInUsed}/{retention.slotsMax} slots · {retention.pctOfCap.toFixed(1)}/{retention.pctMax}% of cap
             </span>
