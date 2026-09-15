@@ -13,23 +13,27 @@ export function nextSimUtcMs(now: Date): number {
   return now.getTime() + (target.getTime() - brat.getTime());
 }
 
-/** A calendar-driven Frenzy round (the real July 1-21 window) is 7 days. When
+/** A calendar-driven Frenzy round (the legacy July 1-21 window) is 7 days. When
  *  the market is running off that real calendar, the league clock advances
  *  one in-game day per daily trigger, so "round N closes" is the trigger
  *  `7*round - day` ticks from now (0 = the very next trigger closes it
  *  today). But a FORCE-opened market (faOpen, any time of year) has no
  *  calendar day to derive that from — `roundStartedAt` (real wall-clock ISO
  *  instant the round began, from LeagueConfig.frenzyRoundStartedAt) is the
- *  actual source of truth there: round closes FORCE_ROUND_DAYS real days
- *  after it started, independent of the daily tick (must match
- *  FRENZY_ROUND_MS in lib/sim/auto.ts — the actual scheduler that closes it —
+ *  actual source of truth there: new bidding closes after four real days and
+ *  its improvement stage resolves after two more. These values must match
+ *  lib/sim/auto.ts — the actual scheduler that advances the market —
  *  or this countdown just displays the wrong number). An admin can still
  *  close a round early via the manual button — this doesn't know about that
  *  until the page reloads, same caveat as the sim countdown not knowing
  *  about a manual re-sim. */
-const FORCE_ROUND_DAYS = 4;
-export function frenzyRoundCloseUtcMs(now: Date, frenzyRound: number, frenzyDay: number, roundStartedAt?: string | null): number {
-  if (roundStartedAt) return new Date(roundStartedAt).getTime() + FORCE_ROUND_DAYS * 86_400_000;
+const FORCE_BIDDING_DAYS = 4;
+const FORCE_IMPROVEMENT_DAYS = 2;
+export function frenzyRoundCloseUtcMs(
+  now: Date, frenzyRound: number, frenzyDay: number, roundStartedAt?: string | null,
+  stage: "BIDDING" | "IMPROVEMENT" = "BIDDING",
+): number {
+  if (roundStartedAt) return new Date(roundStartedAt).getTime() + (stage === "IMPROVEMENT" ? FORCE_IMPROVEMENT_DAYS : FORCE_BIDDING_DAYS) * 86_400_000;
   const ticksLeft = Math.max(0, 7 * frenzyRound - frenzyDay);
   return nextSimUtcMs(now) + ticksLeft * 86_400_000;
 }

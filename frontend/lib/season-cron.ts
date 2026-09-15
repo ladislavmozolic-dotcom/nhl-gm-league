@@ -118,11 +118,14 @@ export type FrenzyAutoOpenResult = { opened: false; reason: string } | { opened:
  *  unresigned expired player available too, not just one whose old contract
  *  happens to fall inside the real July window. */
 export async function autoOpenFrenzyIfDue(now: Date = new Date()): Promise<FrenzyAutoOpenResult> {
-  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { frenzyAutoOpenAt: true, faOpen: true } });
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { frenzyAutoOpenAt: true, faOpen: true, frenzyStage: true } });
   if (!cfg?.frenzyAutoOpenAt) return { opened: false, reason: "no auto-open time set" };
-  if (cfg.faOpen) { await prisma.leagueConfig.update({ where: { id: 1 }, data: { frenzyAutoOpenAt: null } }); return { opened: false, reason: "already open — cleared the stale trigger" }; }
+  if (cfg.faOpen && cfg.frenzyStage !== "CONTINUOUS") { await prisma.leagueConfig.update({ where: { id: 1 }, data: { frenzyAutoOpenAt: null } }); return { opened: false, reason: "already open — cleared the stale trigger" }; }
   if (now.getTime() < cfg.frenzyAutoOpenAt.getTime()) return { opened: false, reason: `not due until ${cfg.frenzyAutoOpenAt.toISOString()}` };
-  await prisma.leagueConfig.update({ where: { id: 1 }, data: { faOpen: true, frenzyAutoOpenAt: null, frenzyRoundStartedAt: now } });
+  await prisma.leagueConfig.update({
+    where: { id: 1 },
+    data: { faOpen: true, frenzyAutoOpenAt: null, frenzyRoundStartedAt: now, frenzyForcedRound: 1, frenzyStage: "BIDDING" },
+  });
   // A comish-tier "early access" bid placed BEFORE this open (market fully closed,
   // no Frenzy yet) routes through the continuous in-season negotiation model
   // (Player.faDecisionAt — collect a week, then counter) since that's the only
@@ -132,6 +135,8 @@ export async function autoOpenFrenzyIfDue(now: Date = new Date()): Promise<Frenz
   // processRoundEnd/resolveFrenzy pick them up like every other Frenzy offer,
   // instead of resolving early on their own day-count clock.
   await prisma.player.updateMany({ where: { faDecisionAt: { not: null } }, data: { faDecisionAt: null, faCountered: false } });
+  await prisma.faOffer.updateMany({ where: { status: { in: ["PENDING", "COUNTERED", "SHORTLISTED"] }, round: { gte: 1 } }, data: { status: "REJECTED" } });
+  await prisma.faOffer.updateMany({ where: { status: { in: ["PENDING", "COUNTERED", "SHORTLISTED"] }, round: 0 }, data: { round: 1, status: "PENDING", counterSalary: null, counterYears: null } });
   const expiredToUfa = await sweepExpiredContractsToUfa();
   return { opened: true, expiredToUfa };
 }

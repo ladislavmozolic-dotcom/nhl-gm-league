@@ -71,29 +71,42 @@ export default async function FreeAgentsPage({
   // the Interest button behave as if the market were still closed to them too.
   // Mirror the exact same override shape the server action uses.
   const faOverrideForMe = isComish && faSettings.faEarlyAccess && !clock.faWindow.open;
-  const effWindow = faOverrideForMe ? { open: true, immediate: true, ownOnly: false } : clock.faWindow;
+  const effWindow = faOverrideForMe ? { open: true, immediate: true, ownOnly: false, postFrenzy: false } : clock.faWindow;
   let interestCtx: InterestCtx | null = null;
   if (sessionTeamId != null) {
     const teams = admin
       ? await prisma.team.findMany({ where: { league: "NHL" }, select: { id: true, code: true, name: true }, orderBy: { name: "asc" } })
       : await prisma.team.findMany({ where: { id: sessionTeamId }, select: { id: true, code: true, name: true } });
     const actingTeamId = teams.some((t) => t.id === sessionTeamId) ? sessionTeamId : (teams[0]?.id ?? null);
-    interestCtx = { frenzyOpen: effWindow.open, immediate: effWindow.immediate, ownOnly: effWindow.ownOnly, actingTeamId, teams: teams.map((t) => ({ ...t, code: t.code ?? "" })) };
+    interestCtx = {
+      frenzyOpen: effWindow.open,
+      immediate: effWindow.immediate,
+      ownOnly: effWindow.ownOnly,
+      improvementOnly: clock.frenzyOpen && clock.frenzyStage === "IMPROVEMENT",
+      actingTeamId,
+      teams: teams.map((t) => ({ ...t, code: t.code ?? "" })),
+    };
   }
 
-  // in-season deliberation: free agents currently weighing offers (7-day window, then
-  // a counter round). Show who's deciding + how many clubs are in + days left.
+  // Players currently weighing offers. Show who's deciding, how many clubs are
+  // involved, and the time remaining in the applicable market window.
   const deliberators = freeAgents.filter((p: any) => p.faDecisionAt);
   const leagueDate = await getLeagueDate();
+  const deadlineBase = (clock.frenzyOpen || clock.postFrenzyOpen) ? Date.now() : leagueDate.getTime();
   const offerCounts = deliberators.length
     ? await prisma.faOffer.groupBy({ by: ["playerId"], where: { playerId: { in: deliberators.map((p) => p.id) }, status: { in: ["PENDING", "COUNTERED", "SHORTLISTED"] } }, _count: true })
     : [];
   const offerCountBy = new Map(offerCounts.map((o) => [o.playerId, o._count]));
-  const deliberating = deliberators.map((p: any) => ({
-    id: p.id, name: cleanName(p.name),
-    days: Math.max(0, Math.ceil((new Date(p.faDecisionAt).getTime() - leagueDate.getTime()) / 86400000)),
-    offers: offerCountBy.get(p.id) ?? 0, countered: p.faCountered,
-  })).sort((a, b) => a.days - b.days);
+  const deliberating = deliberators.map((p: any) => {
+    const remainingMs = Math.max(0, new Date(p.faDecisionAt).getTime() - deadlineBase);
+    return {
+      id: p.id, name: cleanName(p.name), remainingMs,
+      remaining: clock.postFrenzyOpen
+        ? `${Math.ceil(remainingMs / 3_600_000)}h`
+        : `${Math.ceil(remainingMs / 86_400_000)}d`,
+      offers: offerCountBy.get(p.id) ?? 0, countered: p.faCountered,
+    };
+  }).sort((a, b) => a.remainingMs - b.remainingMs);
 
   // A club that got shut out of a decided player's round (no offer of its own
   // on him) shouldn't see him on the open market at all — he isn't actually
@@ -108,7 +121,10 @@ export default async function FreeAgentsPage({
         select: { playerId: true },
       })).map((o) => o.playerId))
     : new Set<number>();
-  const listedFreeAgents = freeAgents.filter((p: any) => !p.faDecisionAt || myDeciderIds.has(p.id));
+  // During the first collection window new clubs may still join. Hide the
+  // player only after his Agent has countered and the field is locked to the
+  // bidders who already made the cut.
+  const listedFreeAgents = freeAgents.filter((p: any) => !p.faDecisionAt || !p.faCountered || myDeciderIds.has(p.id));
 
   const attrs = sessionTeamId != null ? (isGoalie ? GOALIE_ATTRS : SKATER_ATTRS) : [];
   const cols: SortCol[] = [
@@ -190,6 +206,8 @@ export default async function FreeAgentsPage({
         frenzyOpen={clock.frenzyOpen}
         frenzyDay={clock.frenzyDay}
         frenzyRound={clock.frenzyRound}
+        frenzyStage={clock.frenzyStage}
+        postFrenzyOpen={clock.postFrenzyOpen}
         phaseLabel={clock.phaseLabel}
         isAdmin={admin}
         inSeasonOpen={!clock.frenzyOpen && effWindow.open}
@@ -204,11 +222,11 @@ export default async function FreeAgentsPage({
             {deliberating.map((d) => (
               <span key={d.id} className="text-xs rounded-lg border border-slate-700 bg-slate-900/60 px-2.5 py-1">
                 <b className="text-slate-200"><PlayerLink id={d.id} name={d.name} clean={false} /></b>
-                <span className="text-slate-500"> · {d.offers} offer{d.offers === 1 ? "" : "s"} · {d.countered ? "countered, " : ""}decides in {d.days}d</span>
+                <span className="text-slate-500"> · {d.offers} offer{d.offers === 1 ? "" : "s"} · {d.countered ? "improvement stage, " : ""}decides in {d.remaining}</span>
               </span>
             ))}
           </div>
-          <p className="text-[11px] text-slate-500 mt-2">In-season UFAs take a week to weigh their offers (more clubs can bid), then counter the bidders — they sign a few days later. Get your offer in before the clock runs out.</p>
+          <p className="text-[11px] text-slate-500 mt-2">{clock.postFrenzyOpen ? "Post-Frenzy: the first offer opens 24 hours; a contested player then gives existing bidders another 24 hours to improve." : clock.frenzyOpen ? "Frenzy improvement stage: only clubs already negotiating with the player may raise before the Agent decides." : "In-season UFAs take a week to weigh offers, then give their bidders a 3-day improvement stage."}</p>
         </div>
       )}
 

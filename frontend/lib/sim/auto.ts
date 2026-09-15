@@ -9,11 +9,13 @@ import { getLeagueDate, computePhase } from "../calendar-server";
 import { addDays, frenzyRound, frenzyDay } from "../calendar";
 
 const SEASON = "2026-27";
-const FRENZY_ROUND_MS = 4 * 86_400_000;
+const FRENZY_BIDDING_MS = 4 * 86_400_000;
+const FRENZY_IMPROVEMENT_MS = 2 * 86_400_000;
+let frenzyTransitionRunning = false;
 
 /** Checked on every scheduler tick (unlike runAutoSimIfDue, which only fires
  *  once a day at the configured sim time) — a FORCE-opened Frenzy round (faOpen,
- *  outside the real July calendar window) runs on its own real 7-day clock
+ *  outside the legacy calendar window) runs on its own real-time 4+2-day clock
  *  (LeagueConfig.frenzyRoundStartedAt), independent of the daily calendar tick
  *  that advances a calendar-driven Frenzy. It needs checking this often so it
  *  actually closes close to the instant the round-close countdown promises,
@@ -21,53 +23,76 @@ const FRENZY_ROUND_MS = 4 * 86_400_000;
  *  driven Frenzy (frenzyRoundStartedAt stays null there — see its schema
  *  comment) or when the market isn't force-opened at all. */
 export async function checkFrenzyRoundCloseIfDue() {
+  if (frenzyTransitionRunning) return { closed: false as const };
   const cfg = await prisma.leagueConfig.findUnique({
-    where: { id: 1 }, select: { faOpen: true, frenzyRoundStartedAt: true, frenzyForcedRound: true },
+    where: { id: 1 }, select: { faOpen: true, frenzyRoundStartedAt: true, frenzyForcedRound: true, frenzyStage: true },
   });
-  if (!cfg?.faOpen || !cfg.frenzyRoundStartedAt) return { closed: false as const };
-  if (Date.now() - cfg.frenzyRoundStartedAt.getTime() < FRENZY_ROUND_MS) return { closed: false as const };
+  const stage = cfg?.frenzyStage === "IMPROVEMENT" ? "IMPROVEMENT" : cfg?.frenzyStage === "CONTINUOUS" ? "CONTINUOUS" : "BIDDING";
+  if (!cfg?.faOpen || !cfg.frenzyRoundStartedAt || stage === "CONTINUOUS") return { closed: false as const };
+  const elapsed = Date.now() - cfg.frenzyRoundStartedAt.getTime();
+  const dueMs = stage === "BIDDING" ? FRENZY_BIDDING_MS : FRENZY_IMPROVEMENT_MS;
+  if (elapsed < dueMs) return { closed: false as const };
 
-  const round = cfg.frenzyForcedRound;
-  const { resolveFrenzy, processRoundEnd } = await import("../../app/free-agents/actions");
-  if (round >= 3) {
-    // final week's 7 days are up — resolve standing offers and close the market,
-    // same as leaving the real July window would.
-    const r = await resolveFrenzy();
-    await prisma.leagueConfig.update({ where: { id: 1 }, data: { faOpen: false, frenzyRoundStartedAt: null, frenzyForcedRound: 1 } });
-    console.log(`[auto-frenzy] force-opened market resolved after round 3 — ${r.signed} signed`);
-    return { closed: true as const, finalClose: true as const, signed: r.signed };
+  frenzyTransitionRunning = true;
+  try {
+    const round = cfg.frenzyForcedRound;
+    const { processRoundEnd, resolveFrenzyDecisions, rejectActiveFrenzyOffersThroughRound } = await import("../../app/free-agents/actions");
+    if (stage === "BIDDING") {
+      const improvementStartedAt = new Date();
+      const decisionAt = new Date(improvementStartedAt.getTime() + FRENZY_IMPROVEMENT_MS);
+      const claimed = await prisma.leagueConfig.updateMany({
+        where: { id: 1, faOpen: true, frenzyStage: "BIDDING", frenzyForcedRound: round, frenzyRoundStartedAt: cfg.frenzyRoundStartedAt },
+        data: { frenzyStage: "IMPROVEMENT", frenzyRoundStartedAt: improvementStartedAt },
+      });
+      if (claimed.count === 0) return { closed: false as const };
+      let r;
+      try {
+        r = await processRoundEnd(round, decisionAt);
+      } catch (e) {
+        await prisma.leagueConfig.update({ where: { id: 1 }, data: { frenzyStage: "BIDDING", frenzyRoundStartedAt: cfg.frenzyRoundStartedAt } });
+        throw e;
+      }
+      console.log(`[auto-frenzy] round ${round} bidding closed — ${r.decided} players entered the 2-day improvement stage`);
+      return { closed: true as const, stage: "IMPROVEMENT" as const, round };
+    }
+
+    const r = await resolveFrenzyDecisions(new Date());
+    await rejectActiveFrenzyOffersThroughRound(round);
+    if (round >= 3) {
+      await prisma.leagueConfig.update({
+        where: { id: 1 },
+        data: { frenzyStage: "CONTINUOUS", frenzyRoundStartedAt: null, frenzyForcedRound: 3 },
+      });
+      console.log(`[auto-frenzy] round 3 improvement resolved — ${r.signed} signed; continuous 24-hour market opened`);
+      return { closed: true as const, finalClose: true as const, signed: r.signed };
+    }
+    await prisma.leagueConfig.update({
+      where: { id: 1 },
+      data: { frenzyStage: "BIDDING", frenzyRoundStartedAt: new Date(), frenzyForcedRound: round + 1 },
+    });
+    console.log(`[auto-frenzy] round ${round} improvement resolved — round ${round + 1} opened`);
+    return { closed: true as const, stage: "BIDDING" as const, round: round + 1, signed: r.signed };
+  } finally {
+    frenzyTransitionRunning = false;
   }
-  await processRoundEnd(round);
-  await prisma.leagueConfig.update({ where: { id: 1 }, data: { frenzyRoundStartedAt: new Date(), frenzyForcedRound: round + 1 } });
-  console.log(`[auto-frenzy] force-opened round ${round} closed automatically`);
-  return { closed: true as const, finalClose: false as const, round };
 }
 
-/** Checked on every scheduler tick, same as checkFrenzyRoundCloseIfDue above —
- *  a player who got at least one offer when a round closed is on his OWN
- *  real-time FRENZY_DECISION_DAYS-day clock (Player.faDecisionAt, set by
- *  processRoundEnd), independent of the weekly round timer entirely. This
- *  needs the same frequent, real-timestamp check so the Agent settles him
- *  close to the actual deadline instead of drifting to the next daily tick.
- *  Gated on faOpen: resolveInSeasonWindows (the separate regular-season/
- *  playoffs UFA market) reuses these exact same Player fields for its own
- *  7-day-collect/3-day-match cycle — without this gate, a player mid-way
- *  through THAT window would also get swept up here on the very next tick
- *  and double-resolved. Frenzy force-open and the in-season market are
- *  mutually exclusive in normal operation (faOpen is cleared before regular
- *  season begins), so this keeps the two mechanisms from ever colliding. */
+/** Resolve elapsed per-player windows after round 3. The three scheduled
+ * rounds are resolved together by checkFrenzyRoundCloseIfDue; CONTINUOUS uses
+ * each player's own 24-hour timestamps. */
 export async function checkFrenzyDecisionsIfDue() {
-  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { faOpen: true } });
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { faOpen: true, frenzyStage: true } });
   if (!cfg?.faOpen) return { signed: 0, unsigned: 0 };
-  const { resolveFrenzyDecisions } = await import("../../app/free-agents/actions");
-  const r = await resolveFrenzyDecisions(new Date());
-  if (r.signed || r.unsigned) console.log(`[auto-frenzy] decision windows resolved — ${r.signed} signed, ${r.unsigned} stayed unsigned`);
+  // Round improvement is resolved as one global stage by the function above.
+  if (cfg.frenzyStage !== "CONTINUOUS") return { signed: 0, unsigned: 0 };
+  const { resolvePostFrenzyWindows } = await import("../../app/free-agents/actions");
+  const r = await resolvePostFrenzyWindows(new Date());
+  if (r.signed || r.unsigned) console.log(`[auto-frenzy] continuous-market windows resolved — ${r.signed} signed, ${r.unsigned} stayed unsigned`);
   return r;
 }
 
-/** Off-season only: advance the league clock one day and run any frenzy-round
- *  transition it crosses (starts each bid player's individual decision window
- *  at a weekly boundary) and resolve any decision window that's since
+/** Off-season only: advance the legacy league clock one day and run any
+ *  calendar-driven Frenzy transition it crosses, then resolve any window since
  *  elapsed. Calendar-driven, once-daily — coarser than the force-opened
  *  path's 60-second real-time check (checkFrenzy*IfDue, above), which is the
  *  active path today, but still correct on its own once-a-day cadence. The

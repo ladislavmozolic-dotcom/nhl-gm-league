@@ -54,7 +54,7 @@ export default function FrenzyAutoOpenControl({ at, comish, faOpen }: { at: stri
         )}
       </div>
       <p className="text-xs text-slate-500">
-        {faOpen ? "The market is already open — this has no effect until you close it." : "Checked every ~5 minutes; fires once, then clears itself. Comish/Co-Comish already have access via the toggle above."}
+        {faOpen ? "The market is already open — scheduling a future start will begin a fresh three-round Frenzy at that time." : "Checked every minute; fires once, then clears itself. Comish/Co-Comish already have access via the toggle above."}
       </p>
       {err && <div className="text-xs text-red-400">{err}</div>}
       {saved && <div className="text-xs text-emerald-400">Saved.</div>}

@@ -10,8 +10,9 @@ import { friendlyActionError } from "@/lib/client/action-error";
 
 export type InterestCtx = {
   frenzyOpen: boolean;          // FA market open (Frenzy, regular season, or playoffs)
-  immediate?: boolean;          // in-season: an acceptable offer signs on the spot
+  immediate?: boolean;          // market mode outside the three scheduled rounds
   ownOnly?: boolean;            // playoffs: only a club's own UFAs
+  improvementOnly?: boolean;    // global two-day stage: only existing bidders may act
   actingTeamId: number | null;
   teams: { id: number; code: string; name: string }[];
 };
@@ -117,9 +118,10 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
       }
       if (!r.ok) { setResult({ t: "err", s: r.error }); return; }
       if ("deliberating" in r && r.deliberating) {
-        const when = new Date(r.decisionAt).toLocaleDateString();
+        const when = new Date(r.decisionAt).toLocaleString([], { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
         const raised = "raised" in r && r.raised;
-        setResult({ t: "ok", s: `${raised ? "Offer raised" : "Offer placed"} — ${name} is taking time to weigh his offers${r.countered ? " and has already countered his suitors (match to stay in it)" : ""}. He'll decide around ${when}; other clubs can keep bidding until then.${r.clears ? " Your terms clear his ask. ✓" : ""}` });
+        const post = "postFrenzy" in r && r.postFrenzy;
+        setResult({ t: "ok", s: `${raised ? "Offer raised" : "Offer placed"} — ${name} is weighing his offers${r.countered ? " and only existing bidders may now improve" : ""}. ${post ? "This 24-hour stage ends" : "He'll decide around"} ${when}.${!r.countered ? " Other clubs may bid until then." : ""}${r.clears ? " Your terms clear his ask. ✓" : ""}` });
       } else if ("signed" in r && r.signed) {
         setResult({ t: "ok", s: `✅ ${name} signed!` });
       } else if ("signed" in r && r.signed === false) {
@@ -145,8 +147,9 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
     });
   };
 
-  const canOffer = ctx.frenzyOpen && teamId != null;
   const i = info && info.ok ? info : null;
+  const hasActiveOffer = !!i?.existing && ["PENDING", "COUNTERED", "SHORTLISTED"].includes(i.existing.status);
+  const canOffer = ctx.frenzyOpen && teamId != null && (!ctx.improvementOnly || hasActiveOffer);
   const grp = i?.grp ?? "F";
 
   return (
@@ -198,7 +201,7 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
                 )}
                 {i.existing?.status === "SHORTLISTED" && (
                   <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 mb-3 text-sm">
-                    <b className="text-green-300">You made his shortlist.</b> Final week — sharpen your best offer.
+                    <b className="text-green-300">You remain in the negotiation.</b> Improve your offer before the decision window closes.
                   </div>
                 )}
                 {i.existing?.status === "REJECTED" && (
@@ -306,7 +309,13 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
                     </div>
                   </div>
                 ) : (
-                  <p className="text-slate-500 text-sm">{ctx.frenzyOpen ? "No team selected." : "The free-agent market is closed."}</p>
+                  <p className="text-slate-500 text-sm">
+                    {!ctx.frenzyOpen
+                      ? "The free-agent market is closed."
+                      : ctx.improvementOnly && !hasActiveOffer
+                        ? "The market is in its two-day improvement stage. Only clubs with an existing offer on this player may act."
+                        : "No team selected."}
+                  </p>
                 )}
 
                 {msg && <div className={`mt-3 text-sm ${msg.t === "ok" ? "text-green-300" : "text-red-300"}`}>{msg.s}</div>}

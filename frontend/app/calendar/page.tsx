@@ -9,7 +9,7 @@ import CalendarControls from "@/components/CalendarControls";
 export const dynamic = "force-dynamic";
 
 const PHASE_BLURB: Record<string, string> = {
-  frenzy: "Free Agent Frenzy is open — three weekly rounds. Players open high (week 1) and their asks come down toward fair value by week 3, when each signs the best standing offer (money + role + contention).",
+  frenzy: "Free Agent Frenzy is open — three rounds with 4 days for first offers and 2 days for finalists to improve. Unsigned players return in the next round with softer demands.",
   offseason: "The quiet off-season — re-signings, trades and roster housekeeping. The next milestone is preseason in late September.",
   preseason: "Preseason. Rosters get finalized and conditioning ramps up before opening night on October 1.",
   regular: "Regular season. Advancing a day plays that night's games (or recovers conditioning on an off-day).",

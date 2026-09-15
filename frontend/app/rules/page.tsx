@@ -93,13 +93,14 @@ const SECTIONS: Sec[] = [
     id: "fa", title: "7 · Free Agency",
     intro: "How and when you can sign free agents depends on the phase of the year.",
     groups: [
-      { h: "Off-season — the Free Agent Frenzy (July)", points: [
-        "The Frenzy is offer-based over three weekly rounds. GMs table offers (money + term + role + special-teams); the player weighs every suitor and signs the best fit when the round resolves.",
-        "The first day of each round is a commissioner-office head-start; GMs join from day two. From round 2 on, only clubs already negotiating a player may keep bidding on him.",
+      { h: "Off-season — the Free Agent Frenzy", points: [
+        "The Frenzy has three rounds. Each round gives every GM 4 days for first offers (money + term + role + special teams), followed by a 2-day improvement stage for the clubs that made the cut.",
+        "At the end of the 2-day stage the Agent evaluates the live offers. Unsigned players return immediately for the next round with softer demands.",
+        "After round 3, remaining UFAs enter a continuous market: a first offer opens 24 hours; if another club joins, the current bidders receive a final 24 hours to improve before the player decides.",
         "Two-way vs one-way, granted no-trade clauses (a discount) and term all shape his ask.",
       ] },
       { h: "Regular season — open market", points: [
-        "Both your own UFAs and the open market are open. An acceptable offer signs the player immediately — no waiting for a resolution day. Fall short and he tells you what it'll take.",
+        "Both your own UFAs and the open market are open. Players remaining from the Frenzy continue under the 24-hour window system.",
         "An unsigned free agent softens his demands the deeper the season gets (nobody's biting) — down to roughly −45% late in the year.",
       ] },
       { h: "Playoffs", points: [
@@ -375,13 +376,14 @@ const SECTIONS_CS: Sec[] = [
     id: "fa", title: "7 · Volní hráči (Free Agency)",
     intro: "Jak a kdy můžete podepsat volné hráče, závisí na fázi roku.",
     groups: [
-      { h: "Mezisezona — Free Agent Frenzy (červenec)", points: [
-        "Frenzy je založené na nabídkách ve třech týdenních kolech. GM předkládají nabídky (peníze + délka + role + speciální formace); hráč zváží všechny zájemce a při uzavření kola podepíše nejlepší volbu.",
-        "První den každého kola je náskok komisařské kanceláře; GM se přidají od druhého dne. Od 2. kola mohou na hráče dál přihazovat jen kluby, které s ním už jednají.",
+      { h: "Mezisezona — Free Agent Frenzy", points: [
+        "Frenzy má tři kola. V každém mají všichni GM 4 dny na první nabídky (peníze + délka + role + speciální formace), potom následují 2 dny na zlepšení pro kluby, které postoupily.",
+        "Po dvoudenní fázi Agent vyhodnotí aktuální nabídky. Nepodepsaní hráči se ihned vrátí do dalšího kola s nižšími požadavky.",
+        "Po 3. kole přejdou zbývající UFA na průběžný trh: první nabídka otevře 24 hodin; pokud se přidá další klub, stávající zájemci dostanou posledních 24 hodin na zlepšení.",
         "Obousměrná vs jednosměrná smlouva, udělené klauzule o nevyměnitelnosti (sleva) i délka smlouvy formují jeho požadavek.",
       ] },
       { h: "Základní část — otevřený trh", points: [
-        "Otevření jsou jak vaši vlastní UFA, tak volný trh. Přijatelná nabídka podepíše hráče okamžitě — bez čekání na den uzávěrky. Když nedosáhnete, řekne vám, co to bude stát.",
+        "Otevření jsou jak vaši vlastní UFA, tak volný trh. Hráči, kteří zůstali po Frenzy, pokračují v systému 24hodinových oken.",
         "Nepodepsaný volný hráč zmírňuje své požadavky, čím dál je sezona (nikdo nebere) — až zhruba o −45 % v pozdní části roku.",
       ] },
       { h: "Play-off", points: [

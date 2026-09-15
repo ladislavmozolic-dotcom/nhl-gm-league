@@ -35,11 +35,11 @@ const FREE = ["NHL", "AHL", "RETIRED", "PROSPECT", "RELEASED", "NONROSTER"]; // 
 const IN_SEASON_COLLECT_DAYS = 7;
 const IN_SEASON_MATCH_DAYS = 3;
 const ACTIVE = ["PENDING", "COUNTERED", "SHORTLISTED"]; // an offer still in contention
-// A Frenzy round no longer cascades a bid player into the NEXT weekly round —
-// the moment he gets his first offer, his suitors get this many real days to
-// submit their best before the Agent judges the field and signs him. Only a
-// player who got NO offer at all this round remains open for a future round.
-const FRENZY_DECISION_DAYS = 3;
+// After a four-day bidding stage, qualified bidders get this many real days to
+// submit their best before the Agent judges the field. A player who got no
+// offer stays available in the next round.
+const FRENZY_IMPROVEMENT_DAYS = 2;
+const POST_FRENZY_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 let faPoolTeamIdCache: number | null | undefined;
 /** The "Free Agents" holding club — the fixed identity every player's "agent" DM
@@ -91,8 +91,11 @@ async function teamCapInfo(teamId: number): Promise<{ committed: number; ltir: n
 export async function getInterestAction(playerId: number, teamId: number) {
   const info = await teamAsk(playerId, teamId);
   if (!info) return { ok: false as const, error: "Player not found." };
-  const player = await prisma.player.findUnique({ where: { id: playerId }, select: { name: true } });
+  const player = await prisma.player.findUnique({ where: { id: playerId }, select: { name: true, faDecisionAt: true } });
   const existing = await prisma.faOffer.findUnique({ where: { playerId_teamId: { playerId, teamId } } });
+  const clock = await getLeagueClock();
+  const mayStartFresh = existing?.status === "REJECTED" && player?.faDecisionAt == null
+    && (clock.postFrenzyOpen || (clock.frenzyStage === "BIDDING" && existing.round < clock.frenzyRound));
   return {
     ok: true as const,
     name: player?.name ?? "",
@@ -108,8 +111,8 @@ export async function getInterestAction(playerId: number, teamId: number) {
     minYears: info.ask.minYears,
     maxYears: info.ask.maxYears,
     moraleNote: willingnessNote(info.ask.willingness),
-    round: (await getLeagueClock()).frenzyRound,
-    existing: existing ? {
+    round: clock.frenzyRound,
+    existing: existing && !mayStartFresh ? {
       salary: existing.salary, years: existing.years, line: existing.line, pp: existing.pp, pk: existing.pk,
       status: existing.status, counterSalary: existing.counterSalary, counterYears: existing.counterYears,
     } : null,
@@ -147,8 +150,8 @@ async function offerViewMask(playerId?: number): Promise<{ hide: Set<number> } |
   // milder blackout — see offerViewMaskForMarketList below — since showing
   // WHICH players/teams are in play there, without dollar figures, isn't the
   // same information leak as a per-player breakdown.)
-  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { faOpen: true, frenzyRoundStartedAt: true } });
-  if (cfg?.faOpen && cfg.frenzyRoundStartedAt && Date.now() - cfg.frenzyRoundStartedAt.getTime() < 24 * 60 * 60 * 1000) {
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { faOpen: true, frenzyRoundStartedAt: true, frenzyStage: true } });
+  if (cfg?.faOpen && cfg.frenzyStage === "BIDDING" && cfg.frenzyRoundStartedAt && Date.now() - cfg.frenzyRoundStartedAt.getTime() < 24 * 60 * 60 * 1000) {
     return null;
   }
   // Conflict of interest: a commish/co-commish who is ALSO bidding on this exact
@@ -180,8 +183,8 @@ async function offerViewMaskForMarketList(): Promise<{ hide: Set<number>; namesO
   if (id == null) return null;
   const me = await prisma.team.findUnique({ where: { id }, select: { isAdmin: true, gmRole: true } });
   if (!me || !(me.isAdmin || me.gmRole === "comish" || me.gmRole === "co_comish")) return null;
-  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { faOpen: true, frenzyRoundStartedAt: true, frenzyForcedRound: true } });
-  const namesOnly = !!(cfg?.faOpen && cfg.frenzyRoundStartedAt && Date.now() - cfg.frenzyRoundStartedAt.getTime() < 24 * 60 * 60 * 1000);
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { faOpen: true, frenzyRoundStartedAt: true, frenzyForcedRound: true, frenzyStage: true } });
+  const namesOnly = !!(cfg?.faOpen && cfg.frenzyStage === "BIDDING" && cfg.frenzyRoundStartedAt && Date.now() - cfg.frenzyRoundStartedAt.getTime() < 24 * 60 * 60 * 1000);
   const hide = new Set<number>();
   if (me.gmRole !== "comish") {
     const comish = await prisma.team.findMany({ where: { gmRole: "comish" }, select: { id: true } });
@@ -529,7 +532,7 @@ export async function submitOfferAction(
     // "tomorrow" preview has nothing to look ahead to. Comish-tier acts as if the
     // standard in-season market were already open; everyone else stays locked out.
     if (lockSettings.faEarlyAccess && (await isComishTier())) {
-      win = { open: true, immediate: true, ownOnly: false, previewOnly: true };
+      win = { open: true, immediate: true, ownOnly: false, previewOnly: true, postFrenzy: false };
     } else {
       return { ok: false as const, error: "The free-agent market is closed." };
     }
@@ -562,7 +565,10 @@ export async function submitOfferAction(
   if (win.ownOnly && player.teamId !== teamId) {
     return { ok: false as const, error: "During the playoffs you can only re-sign your own UFAs — the open market is closed." };
   }
+  if (!Number.isFinite(salary) || !Number.isInteger(salary)) return { ok: false as const, error: "Invalid salary." };
   if (salary < 775_000) return { ok: false as const, error: "Below the league minimum salary." };
+  if (salary > 16_000_000) return { ok: false as const, error: "The maximum offer is $16.00M per year." };
+  if (!Number.isFinite(years)) return { ok: false as const, error: "Invalid contract term." };
   years = Math.max(1, Math.min(MAX_TERM, Math.round(years)));
   // one-way vs two-way: an established player refuses — UNLESS the market has gone
   // cold for him (no round-1 offer at all) and either relaxation round has arrived:
@@ -588,32 +594,32 @@ export async function submitOfferAction(
   const cap = await loadLeagueCap();
   const { committed, ltir } = await teamCapInfo(teamId);
   const existing = await prisma.faOffer.findUnique({ where: { playerId_teamId: { playerId, teamId } } });
-  if (existing && existing.status === "REJECTED") {
+  const wasActiveOffer = !!existing && ACTIVE.includes(existing.status);
+  if (existing?.status === "REJECTED" && (player.faDecisionAt != null || clock.frenzyStage === "IMPROVEMENT" || (clock.frenzyOpen && existing.round === clock.frenzyRound))) {
     return { ok: false as const, error: "The player has moved on — he's no longer negotiating with your club." };
   }
-  // round-lock (July Frenzy only): once a player has AT LEAST ONE standing
-  // offer, he's in his own individual FRENZY_DECISION_DAYS-day window
-  // (Player.faDecisionAt — see processRoundEnd) and the field is closed to
-  // new entrants, though an existing bidder can still raise. A player who's
-  // never had any offer stays open to a fresh bid in ANY round — he only
-  // ever carries forward because nobody's bid on him yet, so there's no
-  // negotiation in progress to protect. Keyed off the game PHASE, not
+  if (clock.frenzyStage === "IMPROVEMENT" && !win.postFrenzy && !wasActiveOffer) {
+    return { ok: false as const, error: "New offers are closed for this round — only existing bidders may improve their terms." };
+  }
+  // Round lock: once the four-day bidding stage ends, the field is closed to
+  // new entrants, while an existing bidder can still raise. A player who got
+  // no offer remains open in the next round. Keyed off the game PHASE, not
   // win.immediate — the commissioner's faEarlyAccess head start (see above)
   // also sets win.immediate=true to get past the "market closed" wall, but
   // it's still round-based Frenzy negotiation underneath. Only the regular-
   // season / playoffs immediate market is genuinely round-less (continuous
   // re-negotiation is the intended behavior there).
-  if (clock.phase !== "regular" && clock.phase !== "playoffs") {
+  if (!win.postFrenzy && clock.phase !== "regular" && clock.phase !== "playoffs") {
     if (!existing && player.faDecisionAt != null) {
       return { ok: false as const, error: "He's already deciding among his current suitors — bidding is closed to new clubs." };
     }
-    if (existing && existing.round === clock.frenzyRound && existing.status !== "REJECTED") {
+    if (clock.frenzyStage === "BIDDING" && existing && existing.round === clock.frenzyRound && existing.status !== "REJECTED") {
       return { ok: false as const, error: "You've already made your offer this round — wait for the next round to change it." };
     }
   }
   // In-season counter phase: once he's countered his suitors, no NEW club may jump in —
   // only clubs already negotiating can raise to match (mirrors the July round-lock).
-  if (win.immediate && !win.ownOnly && player.faCountered && !existing) {
+  if (win.immediate && !win.ownOnly && player.faCountered && !wasActiveOffer) {
     return { ok: false as const, error: "He's already deciding among his current suitors — bidding is closed to new clubs." };
   }
   // Cap is a SOFT gate for offers: we DON'T block a bid that would exceed it — the GM can
@@ -636,19 +642,14 @@ export async function submitOfferAction(
   const evalr = await evaluateTeamOffer(playerId, teamId, salary, years, dep, undefined, undefined, undefined, { clause, breadth });
   // a raise re-enters contention; a shortlisted offer stays shortlisted
   const newStatus = existing?.status === "SHORTLISTED" ? "SHORTLISTED" : "PENDING";
-  // A raise on a player ALREADY in his individual decision window keeps the
-  // round that actually opened that window (existing.round) instead of
-  // whatever weekly round happens to be current — the 3-day window is
-  // deliberately decoupled from the round clock (submitOfferAction's own
-  // round-lock comment above), so a raise made an hour after the NEXT round
-  // opened is still part of the round-1 process, not a fresh round-2 entry.
+  // A raise during an active decision window keeps the round that opened it.
   // A brand-new offer (no existing row, or the player isn't deciding) always
   // takes the current round — that's genuinely when it was first placed.
-  const roundToStamp = (existing && player.faDecisionAt != null) ? existing.round : clock.frenzyRound;
+  const roundToStamp = win.postFrenzy ? 4 : (existing && player.faDecisionAt != null) ? existing.round : clock.frenzyRound;
 
   const offer = await prisma.faOffer.upsert({
     where: { playerId_teamId: { playerId, teamId } },
-    update: { salary, years, line: dep.line, pp, pk, status: newStatus, round: roundToStamp, grantClause: clause, mNtcBreadth: breadth, twoWay },
+    update: { salary, years, line: dep.line, pp, pk, status: newStatus, round: roundToStamp, counterSalary: null, counterYears: null, grantClause: clause, mNtcBreadth: breadth, twoWay },
     create: { playerId, teamId, salary, years, line: dep.line, pp, pk, round: roundToStamp, grantClause: clause, mNtcBreadth: breadth, twoWay },
   });
   // append every bid/raise to the running log (FaOffer keeps only the latest standing offer)
@@ -660,13 +661,14 @@ export async function submitOfferAction(
   // market in miniature, per player. The standing offer is kept for the resolver.
   if (win.immediate && !win.ownOnly) {
     if (!player.faDecisionAt) {
-      await prisma.player.update({ where: { id: playerId }, data: { faDecisionAt: addDays(await getLeagueDate(), IN_SEASON_COLLECT_DAYS), faCountered: false } });
+      const firstDeadline = win.postFrenzy ? new Date(Date.now() + POST_FRENZY_WINDOW_MS) : addDays(await getLeagueDate(), IN_SEASON_COLLECT_DAYS);
+      await prisma.player.update({ where: { id: playerId }, data: { faDecisionAt: firstDeadline, faCountered: false } });
     }
-    const decideAt = player.faDecisionAt ?? addDays(await getLeagueDate(), IN_SEASON_COLLECT_DAYS);
+    const decideAt = player.faDecisionAt ?? (win.postFrenzy ? new Date(Date.now() + POST_FRENZY_WINDOW_MS) : addDays(await getLeagueDate(), IN_SEASON_COLLECT_DAYS));
     revalidatePath("/free-agents");
     return {
-      ok: true as const, deliberating: true as const, raised: !!existing,
-      decisionAt: decideAt.toISOString(), countered: player.faCountered, capWarning,
+      ok: true as const, deliberating: true as const, raised: wasActiveOffer,
+      decisionAt: decideAt.toISOString(), countered: player.faCountered, postFrenzy: win.postFrenzy, capWarning,
       clears: evalr?.acceptable ?? false,
       floor: evalr?.ask.floorSalary ?? 0,
       askYears: evalr ? { min: evalr.ask.minYears, max: evalr.ask.maxYears } : null,
@@ -697,7 +699,7 @@ export async function submitOfferAction(
   revalidatePath("/free-agents");
   return {
     ok: true as const, capWarning,
-    raised: !!existing,
+    raised: wasActiveOffer,
     clears: evalr?.acceptable ?? false,
     floor: evalr?.ask.floorSalary ?? 0,
     askYears: evalr ? { min: evalr.ask.minYears, max: evalr.ask.maxYears } : null,
@@ -724,9 +726,9 @@ export async function withdrawOfferAction(playerId: number, teamId: number) {
   return { ok: true as const };
 }
 
-/** Resolve the frenzy: every unsigned FA with pending offers signs the best one
- *  (highest utility that clears his team-specific floor + term). Called when the
- *  7-day window closes, or manually by an admin. */
+/** Legacy emergency resolver retained for admin recovery. Normal operation uses
+ * processRoundEndAction so the required bidding and improvement stages cannot
+ * be skipped from the UI. */
 export async function resolveFrenzyAction() {
   if (!(await isAdmin())) return { ok: false as const, error: "Only a league admin can resolve the frenzy." };
   // a manual resolve judges at the CURRENT round (a round-1 resolve keeps the high
@@ -737,29 +739,35 @@ export async function resolveFrenzyAction() {
   return { ok: true as const, ...result };
 }
 
-/** Admin: manually run the current negotiation round's end (counters after R1,
- *  shortlisting after R2) without waiting for the calendar to cross the week. */
+/** Admin: manually advance the current forced Frenzy stage. This uses the same
+ * state transitions as the automatic timer and never changes the league date. */
 export async function processRoundEndAction() {
   if (!(await isAdmin())) return { ok: false as const, error: "Only a league admin can advance the frenzy." };
   const clock = await getLeagueClock();
-  if (!clock.frenzyOpen || clock.frenzyRound >= 3) return { ok: false as const, error: "Rounds run in weeks 1 and 2 — the final week resolves by signing." };
-  const r = await processRoundEnd(clock.frenzyRound);
-  // the round is calendar-driven (a week each) — advance the clock a week so the
-  // frenzy visibly moves to the next round (off-season: no games to sim).
-  const { addDays } = await import("@/lib/calendar");
-  const { getLeagueDate } = await import("@/lib/calendar-server");
-  const next = addDays(await getLeagueDate(), 7);
-  // reset the real-time round-close countdown, and advance the tracked round
-  // number too — both matter when the market is force-opened (clock.frenzyOpen
-  // via faOpen, not the real July calendar), where getLeagueClock has no
-  // calendar day to derive either from.
-  await prisma.leagueConfig.upsert({
-    where: { id: 1 },
-    update: { leagueDate: next, frenzyRoundStartedAt: new Date(), frenzyForcedRound: { increment: 1 } },
-    create: { id: 1, leagueDate: next, frenzyRoundStartedAt: new Date(), frenzyForcedRound: 2 },
-  });
+  if (!clock.frenzyOpen) return { ok: false as const, error: "The round-based Frenzy is not open." };
+  if (clock.frenzyStage === "BIDDING") {
+    const now = new Date();
+    const decisionAt = new Date(now.getTime() + FRENZY_IMPROVEMENT_DAYS * 86_400_000);
+    await prisma.leagueConfig.update({ where: { id: 1 }, data: { frenzyStage: "IMPROVEMENT", frenzyRoundStartedAt: now } });
+    let r;
+    try {
+      r = await processRoundEnd(clock.frenzyRound, decisionAt);
+    } catch (e) {
+      await prisma.leagueConfig.update({ where: { id: 1 }, data: { frenzyStage: "BIDDING", frenzyRoundStartedAt: clock.frenzyRoundStartedAt ? new Date(clock.frenzyRoundStartedAt) : new Date() } });
+      throw e;
+    }
+    for (const p of ["/free-agents", "/signings", "/calendar", "/"]) revalidatePath(p);
+    return { ok: true as const, ...r, round: clock.frenzyRound, stage: "IMPROVEMENT" as const };
+  }
+  const r = await resolveFrenzyDecisions(new Date(Date.now() + 10 * 86_400_000));
+  await rejectActiveFrenzyOffersThroughRound(clock.frenzyRound);
+  if (clock.frenzyRound >= 3) {
+    await prisma.leagueConfig.update({ where: { id: 1 }, data: { frenzyStage: "CONTINUOUS", frenzyRoundStartedAt: null, frenzyForcedRound: 3 } });
+  } else {
+    await prisma.leagueConfig.update({ where: { id: 1 }, data: { frenzyStage: "BIDDING", frenzyRoundStartedAt: new Date(), frenzyForcedRound: clock.frenzyRound + 1 } });
+  }
   for (const p of ["/free-agents", "/signings", "/calendar", "/"]) revalidatePath(p);
-  return { ok: true as const, ...r, round: clock.frenzyRound };
+  return { ok: true as const, ...r, decided: 0, eliminated: 0, round: clock.frenzyRound, stage: clock.frenzyRound >= 3 ? "CONTINUOUS" as const : "BIDDING" as const };
 }
 
 type FaOfferRow = Awaited<ReturnType<typeof prisma.faOffer.findMany>>[number];
@@ -771,8 +779,6 @@ async function signFaOffer(playerId: number, player: { name: string; age: number
   const expiry = CURRENT_SEASON_START + years;
   const clause = o.grantClause && ["NTC", "NMC", "M_NTC"].includes(o.grantClause) ? o.grantClause : null;
   const noTradeTeams = clause === "M_NTC" ? await weakestTeams(o.mNtcBreadth ?? 12, o.teamId) : [];
-  // snapshot the pre-signing contract so an admin can revert this signing later
-  const prev = await prisma.player.findUnique({ where: { id: playerId }, select: { capHit: true, contractYears: true, contractExpiry: true, contractType: true, tradeClause: true, noTradeTeams: true, rosterType: true, teamId: true, contractText: true } });
   const data = {
     teamId: o.teamId, rosterType: "NHL",
     capHit: salary, contractYears: years, contractExpiry: expiry,
@@ -782,28 +788,30 @@ async function signFaOffer(playerId: number, player: { name: string; age: number
     tradeClause: clause, noTradeTeams,
     disgruntled: false, tradeRequested: false, promiseWarnGame: null,
   };
-  // race guard (in-season immediate path): only sign if the player is still where he
-  // was when we evaluated — a simultaneous signing by another club would have moved him.
-  if (expectedTeamId !== undefined) {
-    const res = await prisma.player.updateMany({ where: { id: playerId, teamId: expectedTeamId }, data });
-    if (res.count === 0) return null; // lost the race — already signed elsewhere
-  } else {
-    await prisma.player.update({ where: { id: playerId }, data });
-  }
-  // keep the signed round on the accepted offer (its `round`) for the signings report
-  await prisma.faOffer.update({ where: { id: o.id }, data: { status: "ACCEPTED", salary, years } });
-  await prisma.faOffer.updateMany({ where: { playerId, id: { not: o.id }, status: { in: ACTIVE } }, data: { status: "REJECTED" } });
-  const team = await prisma.team.findUnique({ where: { id: o.teamId }, select: { code: true } });
-  await prisma.signingLog.create({ data: {
-    playerId, playerName: player.name, teamCode: team?.code ?? null, kind: "SIGN", salary, years,
-    prevCapHit: prev?.capHit != null ? Math.round(prev.capHit) : null, prevYears: prev?.contractYears ?? null, prevExpiry: prev?.contractExpiry ?? null,
-    prevType: prev?.contractType ?? null, prevClause: prev?.tradeClause ?? null, prevNoTrade: prev?.noTradeTeams ?? [],
-    prevRosterType: prev?.rosterType ?? null, prevTeamId: prev?.teamId ?? null, prevContractText: prev?.contractText ?? null,
-  } });
-  await prisma.transaction.create({
-    data: { type: "SIGNING", message: `${team?.code ?? "?"} signed ${player.name} — $${(salary / 1e6).toFixed(2)}M × ${years}yr` },
+  return prisma.$transaction(async (tx) => {
+    // Snapshot and every resulting write belong to one transaction. The guarded
+    // update also makes concurrent automatic/manual resolvers idempotent: only
+    // the first one can move a player who is still a signable free agent.
+    const [prev, team] = await Promise.all([
+      tx.player.findUnique({ where: { id: playerId }, select: { capHit: true, contractYears: true, contractExpiry: true, contractType: true, tradeClause: true, noTradeTeams: true, rosterType: true, teamId: true, contractText: true } }),
+      tx.team.findUnique({ where: { id: o.teamId }, select: { code: true } }),
+    ]);
+    const moved = await tx.player.updateMany({
+      where: { id: playerId, rosterType: { notIn: FREE }, ...(expectedTeamId !== undefined ? { teamId: expectedTeamId } : {}) },
+      data,
+    });
+    if (moved.count === 0) return null;
+    await tx.faOffer.update({ where: { id: o.id }, data: { status: "ACCEPTED", salary, years } });
+    await tx.faOffer.updateMany({ where: { playerId, id: { not: o.id }, status: { in: ACTIVE } }, data: { status: "REJECTED" } });
+    await tx.signingLog.create({ data: {
+      playerId, playerName: player.name, teamCode: team?.code ?? null, kind: "SIGN", salary, years,
+      prevCapHit: prev?.capHit != null ? Math.round(prev.capHit) : null, prevYears: prev?.contractYears ?? null, prevExpiry: prev?.contractExpiry ?? null,
+      prevType: prev?.contractType ?? null, prevClause: prev?.tradeClause ?? null, prevNoTrade: prev?.noTradeTeams ?? [],
+      prevRosterType: prev?.rosterType ?? null, prevTeamId: prev?.teamId ?? null, prevContractText: prev?.contractText ?? null,
+    } });
+    await tx.transaction.create({ data: { type: "SIGNING", message: `${team?.code ?? "?"} signed ${player.name} — $${(salary / 1e6).toFixed(2)}M × ${years}yr` } });
+    return team?.code ?? "?";
   });
-  return team?.code ?? "?";
 }
 
 /** Best acceptable offer for a player at `judgeRound`; with `allowSoleFloor`, a lone
@@ -966,24 +974,16 @@ export async function resolveInSeasonWindows(asOf: Date): Promise<{ signed: numb
   return { signed, countered, details };
 }
 
-/** End-of-round processing for the force-opened frenzy. Called when a round's
- *  real-time clock elapses (or by the admin button). A player who gets AT
- *  LEAST ONE offer this round does NOT cascade into the next weekly round —
- *  hopeless/outclassed offers are cut immediately, and every surviving offer
- *  starts a shared FRENZY_DECISION_DAYS-day window (Player.faDecisionAt),
- *  judged individually by resolveFrenzyDecisions once it elapses. Only a
- *  player who got NO offer at all this round stays open and carries into the
- *  next round (see submitOfferAction's round-lock: a fresh club may bid on an
- *  untouched player any round; once he has a faDecisionAt, new entrants are
- *  shut out — existing bidders can still raise). */
-export async function processRoundEnd(endedRound: number): Promise<{ decided: number; eliminated: number; signed: number }> {
+/** End-of-bidding processing for the force-opened Frenzy. Hopeless or clearly
+ * outclassed bids are removed; every surviving bidder enters the same two-day
+ * improvement stage. Players with no offer remain open in the next round. */
+export async function processRoundEnd(endedRound: number, sharedDecisionAt = new Date(Date.now() + FRENZY_IMPROVEMENT_DAYS * 86_400_000)): Promise<{ decided: number; eliminated: number; signed: number }> {
   const pool = await loadMarketPool();
   const cmap = await teamContentionMap();
   const faId = await faPoolTeamId();
   const agentDm = async (toTeamId: number, body: string, playerId: number, isGoalie: boolean) => {
     await prisma.dmMessage.create({ data: { fromTeamId: faId, toTeamId, body, tradeUrl: faFocusUrl(playerId, isGoalie) } }).catch(() => {});
   };
-  const nextRound = endedRound + 1;
   // players already mid-way through a PREVIOUS round's individual decision
   // window are on their own clock — a later round's close must never re-touch
   // their still-active offers.
@@ -995,44 +995,20 @@ export async function processRoundEnd(endedRound: number): Promise<{ decided: nu
   // round and must not get swept into one just because it's still PENDING —
   // that's exactly what mixed an old pre-Frenzy offer into today's round
   // close and confused the field for a completely unrelated new bidder.
-  const offers = await prisma.faOffer.findMany({ where: { status: { in: ACTIVE }, round: { gte: 1 }, playerId: { notIn: inDecision.map((p) => p.id) } } });
+  const offers = await prisma.faOffer.findMany({ where: { status: { in: ACTIVE }, round: endedRound, playerId: { notIn: inDecision.map((p) => p.id) } } });
   const byPlayer = new Map<number, typeof offers>();
   for (const o of offers) { const a = byPlayer.get(o.playerId) ?? []; a.push(o); byPlayer.set(o.playerId, a); }
 
-  let decided = 0, eliminated = 0, signedNow = 0;
+  let decided = 0, eliminated = 0;
   for (const [playerId, list] of byPlayer) {
     const player = await prisma.player.findUnique({ where: { id: playerId }, select: { name: true, rosterType: true, age: true, isGoalie: true } });
     if (!player || (player.rosterType && FREE.includes(player.rosterType))) continue;
     const name = player.name;
 
-    // if a standing offer already meets his ask at THIS round, he signs now —
-    // no waiting on a decision window for something that's already a clear
-    // yes. A sole/dominant bidder (liveCount<2) gets allowSoleFloor=true (at
-    // his floor if the bid undercuts it); 2+ genuinely live offers skip
-    // straight to the shared decision window below instead of an instant
-    // utility tiebreak deciding real competition on the spot.
-    const liveSalary = Math.max(...list.map((o) => o.salary));
-    const liveCount = list.filter((o) => o.salary >= liveSalary * 0.75).length;
-    const signDetail = liveCount >= 2 ? null : await pickAndSign(playerId, player, list, endedRound, pool, cmap, true);
-    if (signDetail) {
-      signedNow++;
-      const after = await prisma.player.findUnique({ where: { id: playerId }, select: { teamId: true } });
-      const winner = after?.teamId ?? null;
-      const bidders = [...new Set(list.map((o) => o.teamId))];
-      const winnerTeam = winner != null ? await prisma.team.findUnique({ where: { id: winner }, select: { code: true } }) : null;
-      for (const tid of bidders) {
-        if (tid === winner) await agentDm(tid, `✅ ${name} has SIGNED with you!`, playerId, player.isGoalie);
-        else await agentDm(tid, `🚫 ${name} signed with ${winnerTeam?.code ?? "another club"} — your offer is rejected.`, playerId, player.isGoalie);
-      }
-      continue;
-    }
-
-    // value every offer, drop the hopeless lowballs, and start a shared
-    // FRENZY_DECISION_DAYS-day window for everyone who survives instead of
-    // waiting for a future round — resolveFrenzyDecisions judges the field
-    // the moment it elapses.
+    // Value every offer, drop hopeless lowballs, and start one shared
+    // two-day window for every surviving bidder.
     const scored = [] as { o: (typeof list)[number]; ev: Awaited<ReturnType<typeof evaluateTeamOffer>> }[];
-    for (const o of list) scored.push({ o, ev: await evaluateTeamOffer(playerId, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, nextRound, { clause: o.grantClause, breadth: o.mNtcBreadth }) });
+    for (const o of list) scored.push({ o, ev: await evaluateTeamOffer(playerId, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, endedRound, { clause: o.grantClause, breadth: o.mNtcBreadth }) });
 
     const soleOffer = list.length === 1;
     const bestSalary = Math.max(...list.map((o) => o.salary));
@@ -1053,29 +1029,29 @@ export async function processRoundEnd(endedRound: number): Promise<{ decided: nu
         await prisma.faOffer.update({ where: { id: o.id }, data: { status: "COUNTERED", counterSalary: null, counterYears: null } });
         survivors++;
         const msg = isLeader
-          ? `🥇 Your offer on ${name} is currently the best on the table. You have ${FRENZY_DECISION_DAYS} days — raise it if you're worried another club might try to top you.`
-          : `📩 Another club has a better offer on ${name} right now. You have ${FRENZY_DECISION_DAYS} days to improve yours if you want to stay in it.`;
+          ? `🥇 Your offer on ${name} is currently the best on the table. You have ${FRENZY_IMPROVEMENT_DAYS} days — raise it if you're worried another club might try to top you.`
+          : `📩 Another club has a better offer on ${name} right now. You have ${FRENZY_IMPROVEMENT_DAYS} days to improve yours if you want to stay in it.`;
         await agentDm(o.teamId, msg, playerId, player.isGoalie);
       } else {
         const want = competitiveAsk(ev.ask.salary, o.salary, list);
         await prisma.faOffer.update({ where: { id: o.id }, data: { status: "COUNTERED", counterSalary: want, counterYears: ev.ask.years } });
         survivors++;
         const msg = soleOffer
-          ? `📩 ${name} isn't ready to sign at that price yet — he wants about $${(want / 1e6).toFixed(2)}M × ${ev.ask.years}yr. You have ${FRENZY_DECISION_DAYS} days to raise your offer.`
-          : `📩 ${name} is weighing multiple offers. Put in your BEST offer within ${FRENZY_DECISION_DAYS} days: he wants about $${(want / 1e6).toFixed(2)}M × ${ev.ask.years}yr (other clubs are also in — bidding is blind).`;
+          ? `📩 ${name} isn't ready to sign at that price yet — he wants about $${(want / 1e6).toFixed(2)}M × ${ev.ask.years}yr. You have ${FRENZY_IMPROVEMENT_DAYS} days to raise your offer.`
+          : `📩 ${name} is weighing multiple offers. Put in your BEST offer within ${FRENZY_IMPROVEMENT_DAYS} days: he wants about $${(want / 1e6).toFixed(2)}M × ${ev.ask.years}yr (other clubs are also in — bidding is blind).`;
         await agentDm(o.teamId, msg, playerId, player.isGoalie);
       }
     }
     if (survivors > 0) {
-      await prisma.player.update({ where: { id: playerId }, data: { faDecisionAt: new Date(Date.now() + FRENZY_DECISION_DAYS * 86_400_000), faCountered: true } });
-      await prisma.transaction.create({ data: { type: "FA_NEGOTIATION", message: `${name} is deciding between his suitors — the Agent settles it in ${FRENZY_DECISION_DAYS} days.` } });
+      await prisma.player.update({ where: { id: playerId }, data: { faDecisionAt: sharedDecisionAt, faCountered: true } });
+      await prisma.transaction.create({ data: { type: "FA_NEGOTIATION", message: `${name} is deciding between his suitors — the Agent settles it in ${FRENZY_IMPROVEMENT_DAYS} days.` } });
       decided++;
     }
   }
-  return { decided, eliminated, signed: signedNow };
+  return { decided, eliminated, signed: 0 };
 }
 
-/** Resolves every player whose individual FRENZY_DECISION_DAYS-day window
+/** Resolves every player when the shared two-day improvement window
  *  (started by processRoundEnd, above) has elapsed. Checked on the same
  *  real-time tick as checkFrenzyRoundCloseIfDue (lib/sim/auto.ts) — NOT the
  *  once-daily calendar cron — so it fires close to the actual deadline
@@ -1112,6 +1088,11 @@ export async function resolveFrenzyDecisions(asOf: Date = new Date()): Promise<{
         else await agentDm(tid, `🚫 ${nm} signed with ${winnerTeam?.code ?? "another club"} — your offer is rejected.`, p.id, p.isGoalie);
       }
     } else {
+      // Another server process may have signed this player after our initial
+      // due-player query. The guarded signing transaction correctly returned
+      // null; do not follow it with contradictory rejection messages.
+      const current = await prisma.player.findUnique({ where: { id: p.id }, select: { rosterType: true } });
+      if (current?.rosterType && FREE.includes(current.rosterType)) continue;
       unsigned++;
       await prisma.faOffer.updateMany({ where: { playerId: p.id, status: { in: ACTIVE } }, data: { status: "REJECTED" } });
       for (const tid of bidders) await agentDm(tid, `${nm} didn't sign anyone — no offer met his ask. He stays on the market.`, p.id, p.isGoalie);
@@ -1119,6 +1100,100 @@ export async function resolveFrenzyDecisions(asOf: Date = new Date()): Promise<{
     await prisma.player.update({ where: { id: p.id }, data: { faDecisionAt: null, faCountered: false } });
   }
   return { signed, unsigned };
+}
+
+/** Close every still-standing offer from completed Frenzy rounds. A declined
+ * offer must not silently carry into the later 24-hour market and win weeks
+ * after the GM expected that round to be over. */
+export async function rejectActiveFrenzyOffersThroughRound(round: number): Promise<number> {
+  const r = await prisma.faOffer.updateMany({
+    where: { status: { in: ACTIVE }, round: { gte: 1, lte: round } },
+    data: { status: "REJECTED" },
+  });
+  return r.count;
+}
+
+/** Post-round-3 continuous UFA market.
+ *  First offer opens a 24-hour window in which any club may join. One bidder is
+ *  judged at that deadline. With competition, weak bids are cut and surviving
+ *  clubs receive one further 24-hour improvement window before the final choice. */
+export async function resolvePostFrenzyWindows(asOf: Date = new Date()): Promise<{ signed: number; unsigned: number; countered: number }> {
+  const due = await prisma.player.findMany({
+    where: { faDecisionAt: { not: null, lte: asOf }, rosterType: { notIn: FREE } },
+    select: { id: true, name: true, age: true, faCountered: true, isGoalie: true },
+  });
+  if (due.length === 0) return { signed: 0, unsigned: 0, countered: 0 };
+  const pool = await loadMarketPool();
+  const cmap = await teamContentionMap();
+  const faId = await faPoolTeamId();
+  const nice = (s: string) => s.replace(/''[A-Za-z]''|\s*\([^)]*\)/g, "").trim();
+  const agentDm = async (toTeamId: number, body: string, playerId: number, isGoalie: boolean) => {
+    await prisma.dmMessage.create({ data: { fromTeamId: faId, toTeamId, body, tradeUrl: faFocusUrl(playerId, isGoalie) } }).catch(() => {});
+  };
+  let signed = 0, unsigned = 0, countered = 0;
+
+  for (const p of due) {
+    const offers = await prisma.faOffer.findMany({ where: { playerId: p.id, status: { in: ACTIVE }, round: 4 } });
+    const nm = nice(p.name);
+    if (offers.length === 0) { await clearFaWindow(p.id); continue; }
+    const bidders = [...new Set(offers.map((o) => o.teamId))];
+
+    if (!p.faCountered && offers.length > 1) {
+      const scored = [] as { o: (typeof offers)[number]; ev: Awaited<ReturnType<typeof evaluateTeamOffer>> }[];
+      for (const o of offers) scored.push({ o, ev: await evaluateTeamOffer(p.id, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, 3, { clause: o.grantClause, breadth: o.mNtcBreadth }) });
+      const bestSalary = Math.max(...offers.map((o) => o.salary));
+      const closeRace = offers.filter((o) => o.salary >= bestSalary * 0.90).length >= 2;
+      let survivors = 0;
+      for (const { o, ev } of scored) {
+        if (!ev) continue;
+        const outclassed = o.salary < bestSalary * 0.75;
+        if (o.salary < ev.ask.floorSalary * 0.6 || outclassed) {
+          await prisma.faOffer.update({ where: { id: o.id }, data: { status: "REJECTED" } });
+          await agentDm(o.teamId, `❌ ${nm}'s camp passed on your offer — ${outclassed ? "another club was well ahead" : "it wasn't close to his value"}.`, p.id, p.isGoalie);
+          continue;
+        }
+        const want = closeRace ? competitiveAsk(ev.ask.salary, o.salary, offers) : null;
+        await prisma.faOffer.update({ where: { id: o.id }, data: { status: "COUNTERED", counterSalary: want, counterYears: want == null ? null : ev.ask.years } });
+        const isLeader = o.salary === bestSalary;
+        const msg = want != null
+          ? `📩 ${nm} is weighing multiple offers. Put in your BEST offer within 24 hours: he wants about $${(want / 1e6).toFixed(2)}M × ${ev.ask.years}yr (bidding remains blind).`
+          : isLeader
+            ? `🥇 Your offer on ${nm} is currently the best. You have 24 hours to improve it before he decides.`
+            : `📩 Another club has a better offer on ${nm}. You have 24 hours to improve yours.`;
+        await agentDm(o.teamId, msg, p.id, p.isGoalie);
+        survivors++;
+      }
+      if (survivors > 0) {
+        await prisma.player.update({ where: { id: p.id }, data: { faCountered: true, faDecisionAt: new Date(asOf.getTime() + POST_FRENZY_WINDOW_MS) } });
+        await prisma.transaction.create({ data: { type: "FA_NEGOTIATION", message: `${nm} has multiple offers — his remaining suitors have 24 hours to improve them.` } });
+        countered++;
+      } else {
+        await clearFaWindow(p.id);
+        unsigned++;
+      }
+      continue;
+    }
+
+    const detail = await pickAndSign(p.id, { name: p.name, age: p.age }, offers, 3, pool, cmap, true);
+    if (detail) {
+      signed++;
+      const after = await prisma.player.findUnique({ where: { id: p.id }, select: { teamId: true } });
+      const winner = after?.teamId ?? null;
+      const winnerTeam = winner != null ? await prisma.team.findUnique({ where: { id: winner }, select: { code: true } }) : null;
+      for (const tid of bidders) {
+        await agentDm(tid, tid === winner ? `✅ ${nm} has SIGNED with you!` : `🚫 ${nm} signed with ${winnerTeam?.code ?? "another club"} — your offer is rejected.`, p.id, p.isGoalie);
+      }
+    } else {
+      // A concurrent resolver may already have completed the signing.
+      const current = await prisma.player.findUnique({ where: { id: p.id }, select: { rosterType: true } });
+      if (current?.rosterType && FREE.includes(current.rosterType)) continue;
+      unsigned++;
+      await prisma.faOffer.updateMany({ where: { playerId: p.id, status: { in: ACTIVE }, round: 4 }, data: { status: "REJECTED" } });
+      for (const tid of bidders) await agentDm(tid, `${nm} didn't sign anyone — no offer met his ask. He stays available on the market.`, p.id, p.isGoalie);
+    }
+    await clearFaWindow(p.id);
+  }
+  return { signed, unsigned, countered };
 }
 
 /** Compute + apply a player's Entry-Level Contract from the auto-formula

@@ -69,38 +69,45 @@ export async function computePhase(date: Date, override?: string | null): Promis
 export type LeagueClock = {
   date: Date; phase: Phase; phaseLabel: string;
   frenzyOpen: boolean; frenzyDay: number; frenzyRound: number; faForced: boolean;
-  // Real wall-clock moment the current round began — set only when the round's
-  // start/advance isn't driven by the real July calendar (see the field's own
-  // schema comment). Countdown UIs prefer this + 7 days over the day/round
-  // index math above whenever it's present.
+  frenzyStage: "BIDDING" | "IMPROVEMENT" | "CONTINUOUS";
+  postFrenzyOpen: boolean;
+  // Real wall-clock moment the current global stage began. Countdown UIs use
+  // it for the four-day bidding and two-day improvement deadlines.
   frenzyRoundStartedAt: string | null;
-  // Broader FA-signing window: the July Frenzy is offer-based; the regular season
-  // signs UFAs immediately (own + market); playoffs allow immediate signings but
-  // only of a club's OWN UFAs; off-season outside the Frenzy is closed.
+  // Broader FA-signing window: Frenzy is offer-based; the regular-season market
+  // uses per-player collection/match windows; playoffs allow immediate re-signing
+  // only of a club's own UFAs; off-season outside these markets is closed.
   // `previewOnly` = this shape is actually TOMORROW's window — the market is still
   // closed to ordinary GMs today, but the commissioner's office may act on it a day
   // early (see faWindowFor below).
-  faWindow: { open: boolean; immediate: boolean; ownOnly: boolean; previewOnly: boolean };
+  faWindow: { open: boolean; immediate: boolean; ownOnly: boolean; previewOnly: boolean; postFrenzy: boolean };
 };
 
-function faWindowFor(phase: Phase, frenzyOpen: boolean): { open: boolean; immediate: boolean; ownOnly: boolean } {
+function faWindowFor(phase: Phase, frenzyOpen: boolean, postFrenzyOpen = false): { open: boolean; immediate: boolean; ownOnly: boolean; postFrenzy: boolean } {
   return frenzyOpen
-    ? { open: true, immediate: false, ownOnly: false }          // July Frenzy — offer-based
+    ? { open: true, immediate: false, ownOnly: false, postFrenzy: false } // round-based Frenzy
+    : postFrenzyOpen
+      ? { open: true, immediate: true, ownOnly: false, postFrenzy: true } // post-round-3 24h market
     : phase === "regular"
-      ? { open: true, immediate: true, ownOnly: false }         // regular season — sign own + market UFAs now
+      ? { open: true, immediate: true, ownOnly: false, postFrenzy: false } // regular-season 7d + 3d market
       : phase === "playoffs"
-        ? { open: true, immediate: true, ownOnly: true }        // playoffs — own UFAs only
-        : { open: false, immediate: false, ownOnly: false };    // off-season outside the Frenzy — closed
+        ? { open: true, immediate: true, ownOnly: true, postFrenzy: false } // playoffs — own UFAs only
+        : { open: false, immediate: false, ownOnly: false, postFrenzy: false };
 }
 
 /** Everything the UI needs about "what day is it in the league". */
 export async function getLeagueClock(): Promise<LeagueClock> {
-  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { leagueDate: true, faOpen: true, phaseOverride: true, frenzyRoundStartedAt: true, frenzyForcedRound: true } });
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { leagueDate: true, faOpen: true, phaseOverride: true, frenzyRoundStartedAt: true, frenzyForcedRound: true, frenzyStage: true } });
   const date = cfg?.leagueDate ?? defaultLeagueDate();
   const phase = await computePhase(date, cfg?.phaseOverride);
   const faForced = !!cfg?.faOpen;
-  const frenzyOpen = faForced || isFrenzyOpen(date);
-  const today = faWindowFor(phase, frenzyOpen);
+  const stage = (cfg?.frenzyStage === "IMPROVEMENT" || cfg?.frenzyStage === "CONTINUOUS") ? cfg.frenzyStage : "BIDDING";
+  const postFrenzyOpen = faForced && stage === "CONTINUOUS" && phase !== "playoffs";
+  // An explicitly scheduled/opened market is authoritative. This also prevents
+  // the legacy July date window from masking CONTINUOUS or its tracked round.
+  const calendarFrenzyOpen = !faForced && isFrenzyOpen(date);
+  const frenzyOpen = (faForced && stage !== "CONTINUOUS") || calendarFrenzyOpen;
+  const today = faWindowFor(phase, frenzyOpen, postFrenzyOpen);
 
   // Comish/Co-Comish head start: whenever the market is closed to everyone today but
   // opens tomorrow (the Frenzy's July 1 open, or the regular-season opener), the
@@ -110,24 +117,26 @@ export async function getLeagueClock(): Promise<LeagueClock> {
   if (!today.open) {
     const tomorrow = addDays(date, 1);
     const tomorrowPhase = await computePhase(tomorrow, cfg?.phaseOverride);
-    const tomorrowFrenzyOpen = faForced || isFrenzyOpen(tomorrow);
-    const preview = faWindowFor(tomorrowPhase, tomorrowFrenzyOpen);
+    const tomorrowFrenzyOpen = (faForced && stage !== "CONTINUOUS") || isFrenzyOpen(tomorrow);
+    const preview = faWindowFor(tomorrowPhase, tomorrowFrenzyOpen, postFrenzyOpen && tomorrowPhase !== "playoffs");
     if (preview.open) faWindow = { ...preview, previewOnly: true };
   }
 
   return {
     date, phase, phaseLabel: PHASE_LABEL[phase],
     frenzyOpen,
+    frenzyStage: stage,
+    postFrenzyOpen,
     // faForced fallback matches frenzyRound below — a force-opened market
     // (frenzyAutoOpenAt, outside the real July window) has no real calendar day to
     // read, so it reads as day 1 rather than "closed" (0), same as frenzyRound does.
-    frenzyDay: isFrenzyOpen(date) ? frenzyDay(date) : (faForced ? 1 : 0),
-    // frenzyForcedRound tracks which week a force-opened market is actually in
-    // (bumped by the "Close round" button and the automatic 7-day check) — the
+    frenzyDay: calendarFrenzyOpen ? frenzyDay(date) : (frenzyOpen ? ((cfg?.frenzyForcedRound ?? 1) - 1) * 6 + (stage === "IMPROVEMENT" ? 5 : 1) : 0),
+    // frenzyForcedRound tracks which round a force-opened market is actually in
+    // (bumped after the improvement stage by the admin or automatic check) — the
     // real calendar has nothing to derive this from while forced.
-    frenzyRound: isFrenzyOpen(date) ? frenzyRound(date) : (faForced ? (cfg?.frenzyForcedRound ?? 1) : 0),
+    frenzyRound: calendarFrenzyOpen ? frenzyRound(date) : (frenzyOpen ? (cfg?.frenzyForcedRound ?? 1) : 0),
     faForced,
-    frenzyRoundStartedAt: faForced ? (cfg?.frenzyRoundStartedAt?.toISOString() ?? null) : null,
+    frenzyRoundStartedAt: frenzyOpen ? (cfg?.frenzyRoundStartedAt?.toISOString() ?? null) : null,
     faWindow,
   };
 }

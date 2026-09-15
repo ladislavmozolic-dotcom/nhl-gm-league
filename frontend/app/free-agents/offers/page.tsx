@@ -19,10 +19,10 @@ const ovColor = (v: number | null) => v == null ? "text-slate-500" : v >= 80 ? "
 export default async function AllOffersPage({ searchParams }: { searchParams: Promise<{ round?: string }> }) {
   const r = await getAllActiveOffersAction();
   const roundParam = (await searchParams).round;
-  const round = [1, 2, 3].includes(Number(roundParam)) ? Number(roundParam) : 0; // 0 = All
+  const round = [1, 2, 3, 4].includes(Number(roundParam)) ? Number(roundParam) : 0; // 4 = post-Frenzy continuous market
 
   const allPlayers = r.ok ? r.players : [];
-  const counts = [1, 2, 3].map((rd) => allPlayers.filter((p) => p.offers.some((o) => (o.round || 1) === rd)).length);
+  const counts = [1, 2, 3, 4].map((rd) => allPlayers.filter((p) => p.offers.some((o) => (o.round || 1) === rd)).length);
   const players = round === 0
     ? allPlayers
     : allPlayers
@@ -47,7 +47,7 @@ export default async function AllOffersPage({ searchParams }: { searchParams: Pr
       {r.ok && (
         <div className="flex gap-2 flex-wrap">
           <Tab label="All" rd={0} />
-          {[1, 2, 3].map((rd) => <Tab key={rd} label={`Round ${rd}`} rd={rd} />)}
+          {[1, 2, 3, 4].map((rd) => <Tab key={rd} label={rd === 4 ? "24h market" : `Round ${rd}`} rd={rd} />)}
         </div>
       )}
 
