@@ -82,6 +82,7 @@ const SECTIONS: Sec[] = [
         "Any NHL-roster player with an active contract can be bought out. The annual dead-cap charge is 66% of his current cap hit during the regular season or playoffs, and 33% during the off-season, Free Agent Frenzy or preseason, rounded to the nearest $500.",
         "That annual charge counts against the cap for twice his remaining contract years (e.g. 4 years left on his deal → 8 years of dead cap). A buyout never deducts cash from the team's bank account.",
         "The bought-out player instantly becomes a UFA and loses the captaincy. There's no age-based discount (unlike the real NHL's under/over-26 split), no protection from no-trade or no-movement clauses, and no seasonal blackout window — only the in-season vs off-season timing changes the price.",
+        "The public Buyout Calculator uses exactly the same calculation as the live Buy out button. Its player picker includes every NHL and AHL/farm player with an active contract and a salary above $100,000, so farm contracts can also be tested.",
       ] },
       { h: "Coach contracts & buyouts", points: [
         "Each club carries one head coach. His salary and contract length (up to 4 years) are set automatically by his overall rating — a GM doesn't negotiate a coach's terms, only whether to sign him. Coach salary doesn't count against the salary cap, but it does draw down the bank like any other club expense.",
@@ -365,6 +366,7 @@ const SECTIONS_CS: Sec[] = [
         "Odkoupit lze libovolného hráče na NHL soupisce s aktivní smlouvou. Roční dead cap je 66 % jeho aktuálního cap hitu během základní části nebo play-off a 33 % během mimosezóny, Free Agent Frenzy nebo přípravy, zaokrouhlených na nejbližších 500 $.",
         "Tato roční částka se počítá do stropu po dobu dvojnásobku zbývajících let smlouvy (např. 4 zbývající roky → 8 let dead capu). Buyout nikdy nestrhává hotovost z bankovního účtu klubu.",
         "Odkoupený hráč se ihned stává UFA a přichází o kapitánskou pásku. Neexistuje věková sleva (na rozdíl od reálné NHL, kde se rozlišuje věk pod/nad 26 let), žádná ochrana klauzulemi NTC/NMC ani sezónní uzávěrka — mění se pouze cena podle toho, zda probíhá sezóna, nebo ne.",
+        "Veřejný Buyout Calculator používá úplně stejný výpočet jako skutečné tlačítko Buy out. Ve výběru jsou všichni hráči NHL i AHL/farmy s aktivní smlouvou a platem nad 100 000 $, takže lze otestovat také farmářské smlouvy.",
       ] },
       { h: "Trenérské smlouvy a odkupy", points: [
         "Každý klub má jednoho hlavního trenéra. Jeho plat a délka smlouvy (max. 4 roky) se určují automaticky podle jeho celkového hodnocení — GM podmínky trenéra nevyjednává, jen rozhoduje, zda ho podepíše. Trenérský plat se nepočítá do platového stropu, ale stejně jako každý jiný klubový výdaj ubírá z bankovního účtu.",
