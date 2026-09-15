@@ -30,7 +30,11 @@ test("an affiliate follows the League directory when its parent has no registere
 });
 
 test("an NHL team displays its own GM", () => {
-  assert.equal(teamManagerLabel(gm), "Laco");
+  assert.equal(teamManagerLabel(gm), "Ladislav Mozolic");
+});
+
+test("nickname is used when the registered GM has no full name", () => {
+  assert.equal(teamManagerLabel({ ...gm, gmFirstName: null, gmLastName: null }), "Laco");
 });
 
 test("a team without a registered manager displays AI GM", () => {

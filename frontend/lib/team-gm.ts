@@ -17,8 +17,8 @@ export function teamManagerLabel(team: TeamWithParentGm): string {
   const manager = team.parentTeam ?? team;
   if (!manager.passwordHash) return "🤖 AI GM";
 
-  return manager.gmNickname
-    || [manager.gmFirstName, manager.gmLastName].filter(Boolean).join(" ").trim()
+  return [manager.gmFirstName, manager.gmLastName].filter(Boolean).join(" ").trim()
+    || manager.gmNickname
     || manager.gm
     || "GM";
 }
