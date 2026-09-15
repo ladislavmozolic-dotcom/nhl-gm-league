@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { buyoutTerms, seasonLabel, CURRENT_SEASON_START, money } from "@/lib/finance";
+import { realBuyoutTerms, seasonLabel, CURRENT_SEASON_START, money } from "@/lib/finance";
 
 export type BuyoutPickerPlayer = {
   id: number; name: string; teamCode: string | null; capHit: number; contractYears: number; age: number | null;
@@ -47,20 +47,22 @@ function PlayerPicker({ pool, value, onPick, onClear }: {
   );
 }
 
-export default function BuyoutCalculator({ players, pctSeason, pctOffseason, defaultInSeason, currentPhase }: {
-  players: BuyoutPickerPlayer[]; pctSeason: number; pctOffseason: number; defaultInSeason: boolean; currentPhase: string;
+export default function BuyoutCalculator({ players, ageThreshold, youngPct, oldPct }: {
+  players: BuyoutPickerPlayer[]; ageThreshold: number; youngPct: number; oldPct: number;
 }) {
   const [picked, setPicked] = useState<BuyoutPickerPlayer | null>(null);
   const [salary, setSalary] = useState(0);
   const [years, setYears] = useState(1);
-  const [inSeason, setInSeason] = useState(defaultInSeason);
+  const [age, setAge] = useState(27);
 
-  const pick = (p: BuyoutPickerPlayer) => { setPicked(p); setSalary(p.capHit); setYears(p.contractYears); };
+  const pick = (p: BuyoutPickerPlayer) => { setPicked(p); setSalary(p.capHit); setYears(p.contractYears); setAge(p.age ?? 27); };
   const clear = () => setPicked(null);
 
   const terms = useMemo(
-    () => buyoutTerms(Math.max(0, salary), Math.max(1, Math.round(years)), inSeason, { buyoutPctSeason: pctSeason, buyoutPctOffseason: pctOffseason }),
-    [salary, years, inSeason, pctSeason, pctOffseason],
+    () => realBuyoutTerms(Math.max(0, salary), Math.max(1, Math.round(years)), age, {
+      buyoutRealAgeThreshold: ageThreshold, buyoutRealYoungPct: youngPct, buyoutRealOldPct: oldPct,
+    }),
+    [salary, years, age, ageThreshold, youngPct, oldPct],
   );
   const remainingYears = Math.max(1, Math.round(years));
   const rows = Array.from({ length: terms.years }, (_, i) => {
@@ -89,17 +91,17 @@ export default function BuyoutCalculator({ players, pctSeason, pctOffseason, def
               onChange={(e) => { setYears(Number(e.target.value)); setPicked(null); }}
               className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm tabular-nums" />
           </div>
+          <div className="w-24">
+            <label className="block text-xs text-slate-500 mb-1">Age at buyout</label>
+            <input type="number" min={17} max={45} step={1} value={age}
+              onChange={(e) => setAge(Number(e.target.value))}
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm tabular-nums" />
+          </div>
         </div>
-        <div className="sm:col-span-2 flex items-center gap-2">
-          <span className="text-xs text-slate-500">Buyout timing:</span>
-          {([true, false] as const).map((v) => (
-            <button key={String(v)} onClick={() => setInSeason(v)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${inSeason === v ? "bg-blue-600 text-white" : "border border-slate-700 text-slate-400 hover:bg-slate-800"}`}>
-              {v ? `In-season (${pctSeason}%)` : `Off-season (${pctOffseason}%)`}
-            </button>
-          ))}
-          <span className="text-xs text-slate-600 ml-1">League is currently in: {currentPhase}</span>
-        </div>
+        <p className="sm:col-span-2 text-xs text-slate-600">
+          Under {ageThreshold} at buyout → {youngPct}% of salary owed. {ageThreshold}+ → {oldPct}%. Change these
+          conditions in Sim Settings to test different rules.
+        </p>
       </div>
 
       <div className="grid grid-cols-3 gap-3">
@@ -134,9 +136,11 @@ export default function BuyoutCalculator({ players, pctSeason, pctOffseason, def
         </table>
       </div>
       <p className="text-xs text-slate-500">
-        Same math the real Buy Out button uses (see <code>buyoutTerms</code> in <code>lib/finance.ts</code>): dead-money
-        cap hit per year = round(salary × buyout% ÷ 500) × 500, spread over 2× the remaining contract years. The full
-        total cost is debited from the club&apos;s bank the moment the buyout happens, not spread out.
+        Real NHL buyout math (CBA Art. 50.5(b)), via <code>realBuyoutTerms</code> in <code>lib/finance.ts</code>: the
+        club owes buyout% of the player&apos;s salary for each remaining year, and that total is paid out — and
+        counted against the cap — evenly over 2× the remaining contract years. This is a preview only: the live
+        in-game &quot;Buy out&quot; button still uses the league&apos;s own simpler season/off-season rule unless
+        you ask to switch it over.
       </p>
     </div>
   );

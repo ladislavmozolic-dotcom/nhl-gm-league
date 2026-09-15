@@ -258,6 +258,30 @@ export function buyoutTerms(
   return { perYear, years, totalCost: perYear * years, pct };
 }
 
+/**
+ * Real-NHL-style buyout terms (CBA Art. 50.5(b)): the club owes the player a
+ * fraction of his remaining salary — 1/3 if he's under the age threshold at
+ * the time of the buyout, 2/3 if he's at/over it — for EACH of the `n`
+ * remaining contract years. That total compensation is then paid out evenly
+ * over TWICE the remaining term (2n years), which is also how long it counts
+ * against the cap. Because the fraction and salary are flat across all n
+ * years here (we don't model year-by-year salary), the total collapses to
+ * `salary × n × pct`, and dividing by `2n` years cancels `n` out — so the
+ * per-year dead-cap charge is just `salary × pct ÷ 2`, independent of term
+ * length (matches CapFriendly/CapWages/PuckPedia buyout calculators).
+ * Used by the admin Buyout Calculator tool only — the LIVE in-game buyout
+ * (buyoutTerms above) still runs on the simpler season/off-season % pair.
+ */
+export function realBuyoutTerms(
+  salary: number, remainingYears: number, age: number,
+  cfg: { buyoutRealAgeThreshold: number; buyoutRealYoungPct: number; buyoutRealOldPct: number },
+) {
+  const pct = age < cfg.buyoutRealAgeThreshold ? cfg.buyoutRealYoungPct : cfg.buyoutRealOldPct;
+  const years = Math.max(1, Math.round(remainingYears) * 2);
+  const perYear = Math.round((salary * pct / 100 / 2) / 500) * 500;
+  return { perYear, years, totalCost: perYear * years, pct, ageUsed: age };
+}
+
 // A parent club still pays real money for its farm team's roster, but only
 // contracts worth actually budgeting for — cheap two-way/entry deals are
 // rounding error. This never touches the NHL salary cap; it only drains

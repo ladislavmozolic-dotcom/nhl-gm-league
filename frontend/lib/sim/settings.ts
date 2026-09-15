@@ -69,6 +69,13 @@ export type EngineSettings = {
   startingCapital: number;    // uniform season-opening bank for every club
   buyoutPctSeason: number;    // % of salary as buyout dead-money (in-season)
   buyoutPctOffseason: number; // ... in the off-season
+  // Real-NHL-style buyout conditions (age-based, used by the admin Buyout
+  // Calculator tool only — the live in-game buyout above still runs on the
+  // season/off-season % pair, not these). Tunable so the commissioner can
+  // test different conditions before deciding whether to adopt them live.
+  buyoutRealAgeThreshold: number; // age cutoff for young vs old % (NHL: 26)
+  buyoutRealYoungPct: number;     // % of salary owed if under the threshold (NHL: 1/3 ≈ 33.33)
+  buyoutRealOldPct: number;       // % of salary owed at/over the threshold (NHL: 2/3 ≈ 66.67)
   retentionMaxPct: number;    // max salary a team can retain in a trade
   retentionMinSalary: number; // new team must carry at least this
   retentionMaxPlayers: number;// max retained players per team
@@ -205,6 +212,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   playoffFormat: "division", playoffTeamsPerConf: 8, playoffBestOf: 7,
   salaryCapUpper: 85900000, salaryCapLower: 51500000, startingCapital: 40000000,
   buyoutPctSeason: 50, buyoutPctOffseason: 35,
+  buyoutRealAgeThreshold: 26, buyoutRealYoungPct: 33.33, buyoutRealOldPct: 66.67,
   retentionMaxPct: 50, retentionMinSalary: 600000, retentionMaxPlayers: 3,
   retentionMaxSlots: 3, retentionMaxTotalPct: 10,
   retentionMaxPerContract: 2, retentionCooldownDays: 75, retentionReacquireBanDays: 365,

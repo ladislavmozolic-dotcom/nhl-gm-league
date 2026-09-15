@@ -207,6 +207,9 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
             <NumField k="rosterOverFinePerDay" label="Over-roster fine / day" step={50000} w="w-32" />
             <NumField k="buyoutPctSeason" label="Buyout % (in-season)" />
             <NumField k="buyoutPctOffseason" label="Buyout % (off-season)" />
+            <NumField k="buyoutRealAgeThreshold" label="Real buyout: age threshold" />
+            <NumField k="buyoutRealYoungPct" label="Real buyout: % under threshold" step={0.01} />
+            <NumField k="buyoutRealOldPct" label="Real buyout: % at/over threshold" step={0.01} />
           </div>
           <div>
             <NumField k="retentionMaxPct" label="Retention max %" />
