@@ -220,7 +220,15 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
             <div className="space-y-2.5">
               <InfoRow label="Total players" value={`${proCount + farmCount} players`} />
               <InfoRow label="Pro roster" value={`${proCount} players`} />
-              {farmCount > 0 && <InfoRow label="Farm" value={`${farmCount} players`} />}
+              {farmCount > 0 && (
+                <InfoRow label="Farm" value={
+                  team.affiliateTeams[0] ? (
+                    <Link href={`/teams/${team.affiliateTeams[0].slug}`} className="hover:text-blue-400">
+                      {farmCount} players <span className="text-slate-500 text-xs">· {team.affiliateTeams[0].name}</span>
+                    </Link>
+                  ) : `${farmCount} players`
+                } />
+              )}
               {team._count.players > 0 && (
                 <InfoRow label="Non-roster" value={
                   <Link href={`/teams/${team.slug}/contracts`} className="text-amber-400 hover:text-amber-300">
