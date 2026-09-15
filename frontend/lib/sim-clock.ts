@@ -2,7 +2,11 @@
 // and the Free Agent Frenzy round-close countdown — both tick toward the same
 // daily 20:30:01 Europe/Bratislava trigger, just a different number of ticks out.
 
-/** The next daily sim/day-advance trigger (20:30:01 Bratislava), as a UTC ms instant. */
+/** The next daily sim/day-advance trigger (20:30:01 Bratislava), as a UTC ms instant.
+ *  Note: the daily trigger fires every real day regardless of whether anything is
+ *  actually scheduled that day (it's a no-op on an off day) — for "when does the
+ *  next sim that actually plays a game happen", use simUtcMsForDate with the next
+ *  SCHEDULED game's date instead. */
 export function nextSimUtcMs(now: Date): number {
   // wall-clock in Bratislava
   const brat = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Bratislava" }));
@@ -11,6 +15,19 @@ export function nextSimUtcMs(now: Date): number {
   if (target.getTime() <= brat.getTime()) target.setDate(target.getDate() + 1);
   // difference is frame-independent
   return now.getTime() + (target.getTime() - brat.getTime());
+}
+
+/** The 20:30:01 Bratislava trigger for a SPECIFIC calendar day (e.g. the next
+ *  SCHEDULED game's date), rather than whichever trigger comes up next from `now`.
+ *  `dateIso` only needs to carry the right Y-M-D — anchoring at UTC noon on that
+ *  day keeps Bratislava's own wall-clock date from rolling onto a neighbor. */
+export function simUtcMsForDate(dateIso: string): number {
+  const src = new Date(dateIso);
+  const anchor = new Date(Date.UTC(src.getUTCFullYear(), src.getUTCMonth(), src.getUTCDate(), 12, 0, 0));
+  const brat = new Date(anchor.toLocaleString("en-US", { timeZone: "Europe/Bratislava" }));
+  const target = new Date(brat);
+  target.setHours(20, 30, 1, 0);
+  return anchor.getTime() + (target.getTime() - brat.getTime());
 }
 
 /** A calendar-driven Frenzy round (the legacy July 1-21 window) is 7 days. When

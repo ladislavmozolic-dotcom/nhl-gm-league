@@ -183,6 +183,15 @@ export default async function HomePage() {
 
   const dateStr = (d: Date) => d.toLocaleDateString("sk-SK", { day: "numeric", month: "short" });
 
+  // Next SCHEDULED game's date — the daily 20:30 trigger fires every real day even
+  // on an off day (a no-op), so the "Next Game Sim" card needs the actual next date
+  // with something to play, not just "the next trigger from now".
+  const nextGame = await prisma.game.findFirst({
+    where: { status: "SCHEDULED", seriesId: null, league: "NHL", gameDate: { not: null } },
+    orderBy: { gameDate: "asc" },
+    select: { gameDate: true },
+  });
+
   const clock = await getLeagueClock();
   const lang = await getLang();
   const T = (k: string) => tt(lang, k);
@@ -209,6 +218,7 @@ export default async function HomePage() {
             frenzyOpen={clock.frenzyOpen} frenzyRound={clock.frenzyRound} frenzyDay={clock.frenzyDay}
             frenzyRoundStartedAt={clock.frenzyRoundStartedAt}
             frenzyStage={clock.frenzyStage}
+            nextGameDate={nextGame?.gameDate?.toISOString() ?? null}
           />
           <p className="text-xs text-slate-500 mt-2">{fmtLeagueDate(clock.date)} · <span className="text-slate-400">{clock.phaseLabel}</span></p>
         </div>

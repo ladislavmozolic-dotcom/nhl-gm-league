@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { nextSimUtcMs, frenzyRoundCloseUtcMs } from "@/lib/sim-clock";
+import { nextSimUtcMs, simUtcMsForDate, frenzyRoundCloseUtcMs } from "@/lib/sim-clock";
 
 const ZONES = [
   { id: "Europe/Bratislava", label: "Bratislava" },
@@ -21,9 +21,9 @@ const ZONES = [
  *  `frenzyOpen`/`frenzyRound`/`frenzyDay` = the market is currently open — takes
  *  priority over the plain daily-sim countdown (but not over a still-pending
  *  `frenzyAt`) and counts down to when the CURRENT round closes instead. */
-export default function NextSimCountdown({ frenzyAt, frenzyOpen, frenzyRound, frenzyDay, frenzyRoundStartedAt, frenzyStage = "BIDDING" }: {
+export default function NextSimCountdown({ frenzyAt, frenzyOpen, frenzyRound, frenzyDay, frenzyRoundStartedAt, frenzyStage = "BIDDING", nextGameDate }: {
   frenzyAt?: string | null; frenzyOpen?: boolean; frenzyRound?: number; frenzyDay?: number; frenzyRoundStartedAt?: string | null;
-  frenzyStage?: "BIDDING" | "IMPROVEMENT" | "CONTINUOUS";
+  frenzyStage?: "BIDDING" | "IMPROVEMENT" | "CONTINUOUS"; nextGameDate?: string | null;
 }) {
   const [now, setNow] = useState<Date | null>(null);
   const [zone, setZone] = useState("Europe/Bratislava");
@@ -34,7 +34,10 @@ export default function NextSimCountdown({ frenzyAt, frenzyOpen, frenzyRound, fr
   const frenzyPending = frenzyMs != null && frenzyMs > now.getTime();
   const roundOpen = !frenzyPending && frenzyOpen && frenzyRound != null && frenzyDay != null;
   const roundCloseMs = roundOpen ? frenzyRoundCloseUtcMs(now, frenzyRound!, frenzyDay!, frenzyRoundStartedAt, frenzyStage === "IMPROVEMENT" ? "IMPROVEMENT" : "BIDDING") : null;
-  const simMs = nextSimUtcMs(now);
+  // The daily trigger fires every real day even when nothing's scheduled (a no-op
+  // that night) — anchor "next game sim" to the next SCHEDULED game's own date
+  // when we know it, so an off day doesn't get mislabeled as tonight's sim.
+  const simMs = nextGameDate ? simUtcMsForDate(nextGameDate) : nextSimUtcMs(now);
   // A round's own deadline can be days out while the next game sim (tomorrow
   // night, say) is much sooner — show whichever is actually coming up next.
   const roundActive = roundOpen && roundCloseMs! <= simMs;
