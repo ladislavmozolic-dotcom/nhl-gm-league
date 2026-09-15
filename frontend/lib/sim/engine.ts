@@ -8,7 +8,7 @@ import { cleanName } from "../playerName";
 import { generatePlayByPlay } from "./playbyplay";
 import { DEFAULT_SETTINGS, chemCurveBonusPct, type EngineSettings } from "./settings";
 import { EventSink, type SimEvent } from "./events";
-import { shotProfile, ppShotProfile, expectedGoal, isHighDanger, shotSpeed, sectorIndex, type ShotStrength } from "./shot-quality";
+import { shotProfile, ppShotProfile, expectedGoal, isHighDanger, shotSpeed, sectorIndex, oneTimerHandednessMult, type ShotStrength } from "./shot-quality";
 import { ENGINE_V2 } from "./version";
 import type {
   SimTeam, SimSkater, SimGoalie, GameResult, TeamBox, PlayerLine, GoalieLine,
@@ -1543,7 +1543,16 @@ function simulatePeriodPossession(st: SimState, period: number) {
             pkStyle: (manAdv3 ? def.pk3UnitStyleByPlayer.get(dman.id) : def.pkUnitStyleByPlayer.get(dman.id)) ?? def.teamTactics.pkStyle ?? "balanced",
           })
         : shotProfile(rng, { isDefense: carrier.isDefense, setup, danger, dangerBias });
-      const xg = expectedGoal(rng, sector, shotType, strengthKey);
+      // Off-wing one-timer bonus (PP only — the seat side comes from that unit's
+      // own formation, see ppUnitSideByPlayer): a shooter whose hand disagrees
+      // with his seat's flank already has his blade facing the middle for a
+      // cross-seam feed, so it converts better; same-side is a worse look. Feeds
+      // both the tracked xG stat and the real conversion odds below (`p`), not
+      // just the display number.
+      const handMult = strength === "PP"
+        ? oneTimerHandednessMult(shotType, carrierTeam.ppUnitSideByPlayer.get(carrier.id), carrier.shoots)
+        : 1;
+      const xg = expectedGoal(rng, sector, shotType, strengthKey) * handMult;
       const hd = isHighDanger(sector);
       // Shift Quality: this chance's xG lifts the shooters' on-ice shift, dents the defenders'
       creditShiftXg(st, [...onIceF(carrierTeam), ...onIceD(carrierTeam)], [...onIceF(def), ...onIceD(def)], xg);
@@ -1605,7 +1614,7 @@ function simulatePeriodPossession(st: SimState, period: number) {
       // beats the keeper cleanly, a stay-at-home D rarely does. Centred so the mean
       // D keeps the same total (only the SPREAD widens → a few elite D reach 20-25).
       const pointFinish = pointShot ? Math.max(0.75, Math.min(1.5, 1 + 0.016 * ((carrier.attrs.sc ?? 50) - 58))) : 1;
-      let p = pConv * danger * pressBonus * pointFinish
+      let p = pConv * danger * pressBonus * pointFinish * handMult
         * momoBoost(st, carrierTeam.id, absT) * clutchFactor(st, carrier, period, tick, margin)
         * teamEdge * catchUp * ppMod
         * (st.nightOff[carrierTeam.id] ?? 1) * (st.nightDef[def.id] ?? 1); // any-given-night form

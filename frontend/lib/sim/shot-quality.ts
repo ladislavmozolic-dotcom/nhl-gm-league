@@ -130,6 +130,24 @@ export function ppShotProfile(
   return { sector: "CIRCLE", shotType: rng.chance(0.5) ? "SNAP" : "WRIST" };
 }
 
+// Off-wing one-timer bonus (real hockey: a shooter stationed on the side
+// OPPOSITE his shooting hand — an R-shot on the left flank, an L-shot on the
+// right — already has his blade facing the middle of the ice, so a cross-seam
+// feed becomes a clean one-timer release. Same-side ("strong side") means
+// bringing the puck across his body first, a worse look. Only a ONE_TIMER
+// from a seat that actually HAS a side (the formation's Point/Bumper/Net-Front/
+// centre seats don't) is affected — a plain snap/wrist shot isn't a one-timer
+// in the first place, so handedness doesn't move it.
+const OFF_WING_ONE_TIMER_BONUS = 1.15;
+const SAME_WING_ONE_TIMER_PENALTY = 0.92;
+
+export function oneTimerHandednessMult(
+  shotType: ShotType, side: "L" | "R" | null | undefined, shoots: string | null | undefined,
+): number {
+  if (shotType !== "ONE_TIMER" || !side || (shoots !== "L" && shoots !== "R")) return 1;
+  return shoots !== side ? OFF_WING_ONE_TIMER_BONUS : SAME_WING_ONE_TIMER_PENALTY;
+}
+
 /** Expected goals for a shot from `sector` of `shotType` at `strength`, with mild jitter. */
 export function expectedGoal(
   rng: RNG,

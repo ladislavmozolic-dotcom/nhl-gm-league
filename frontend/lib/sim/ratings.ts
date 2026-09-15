@@ -13,6 +13,7 @@ import type { TeamLinesData } from "./lines";
 import { buildUnits, buildStUnits, depthChartUnits, playerChemistry, unitSignature } from "./chemistry";
 import { roleFitOf as roleFitPure } from "./role-fit";
 import { resolveTactics, resolveLineTactics, mergeTactics, type RosterProfile, type TeamTactics, type PpStyle, type PkStyle } from "./tactics";
+import { PP_LAYOUTS } from "./formation-layout";
 
 const clamp = (v: number, lo = 20, hi = 99) => Math.max(lo, Math.min(hi, v));
 const w = (parts: Array<[number, number]>) => {
@@ -335,9 +336,23 @@ export function buildTeam(input: {
   // above. Keyed by playerId so the shot-generation site can look up whoever
   // actually has the puck without needing to know which unit is on the ice.
   const ppUnitStyleByPlayer = new Map<number, PpStyle>();
+  // Off-wing one-timer bonus: which flank (if any) each PP seat sits on, derived
+  // straight from that formation's own layout diagram (x<50 = left side, x>50 =
+  // right, x===50 a centered seat like Point/Bumper/Net-Front/C — no side at all).
+  // Whoever's shot hand DISAGREES with his seat's side (an off-wing player, blade
+  // already facing the middle for a cross-ice feed) gets the one-timer bonus at
+  // the shot-generation site — same mechanism for every PP style automatically,
+  // no per-formation hand-curation needed.
+  const ppUnitSideByPlayer = new Map<number, "L" | "R" | null>();
   for (const u of input.lines?.situations?.pp ?? []) {
     const style = u.style ?? teamTac.ppStyle ?? "balanced";
     for (const id of u.players) if (id != null) ppUnitStyleByPlayer.set(id, style as PpStyle);
+    const layout = PP_LAYOUTS[style] ?? PP_LAYOUTS.balanced;
+    u.players.forEach((id, i) => {
+      if (id == null) return;
+      const role = layout[i];
+      ppUnitSideByPlayer.set(id, !role || role.x === 50 ? null : role.x < 50 ? "L" : "R");
+    });
   }
   // Same idea for the PK: which structure THIS unit's own defenders run, so
   // the shot-generation site can pick the actual on-ice kill's formation
@@ -385,6 +400,7 @@ export function buildTeam(input: {
     tactics,
     teamTactics: teamTac,
     ppUnitStyleByPlayer,
+    ppUnitSideByPlayer,
     pkUnitStyleByPlayer,
     pk3UnitStyleByPlayer,
     profile,
