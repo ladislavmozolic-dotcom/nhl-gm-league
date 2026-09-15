@@ -54,21 +54,23 @@ export default function BuyoutCalculator({ players, ageThreshold, youngPct, oldP
   const [salary, setSalary] = useState(0);
   const [years, setYears] = useState(1);
   const [age, setAge] = useState(27);
+  const [bonus, setBonus] = useState(0);
 
-  const pick = (p: BuyoutPickerPlayer) => { setPicked(p); setSalary(p.capHit); setYears(p.contractYears); setAge(p.age ?? 27); };
+  const pick = (p: BuyoutPickerPlayer) => { setPicked(p); setSalary(p.capHit); setYears(p.contractYears); setAge(p.age ?? 27); setBonus(0); };
   const clear = () => setPicked(null);
 
   const terms = useMemo(
     () => realBuyoutTerms(Math.max(0, salary), Math.max(1, Math.round(years)), age, {
       buyoutRealAgeThreshold: ageThreshold, buyoutRealYoungPct: youngPct, buyoutRealOldPct: oldPct,
-    }),
-    [salary, years, age, ageThreshold, youngPct, oldPct],
+    }, Math.max(0, Math.min(salary, bonus))),
+    [salary, years, age, ageThreshold, youngPct, oldPct, bonus],
   );
-  const remainingYears = Math.max(1, Math.round(years));
   const rows = Array.from({ length: terms.years }, (_, i) => {
-    const originalCapHit = i < remainingYears ? salary : null;
-    const savings = originalCapHit != null ? originalCapHit - terms.perYear : -terms.perYear;
-    return { season: seasonLabel(CURRENT_SEASON_START + i), originalCapHit, buyoutCapHit: terms.perYear, savings };
+    const isOriginal = i < terms.originalYears;
+    const originalCapHit = isOriginal ? salary : null;
+    const buyoutCapHit = isOriginal ? terms.perYearOriginal : terms.perYearExtended;
+    const savings = (originalCapHit ?? 0) - buyoutCapHit;
+    return { season: seasonLabel(CURRENT_SEASON_START + i), originalCapHit, buyoutCapHit, savings };
   });
 
   return (
@@ -97,19 +99,31 @@ export default function BuyoutCalculator({ players, ageThreshold, youngPct, oldP
               onChange={(e) => setAge(Number(e.target.value))}
               className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm tabular-nums" />
           </div>
+          <div className="w-36">
+            <label className="block text-xs text-slate-500 mb-1">Signing bonus / yr</label>
+            <input type="number" min={0} step={50000} value={bonus}
+              onChange={(e) => setBonus(Number(e.target.value))}
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm tabular-nums" />
+          </div>
         </div>
         <p className="sm:col-span-2 text-xs text-slate-600">
           Under {ageThreshold} at buyout → {youngPct}% of salary owed. {ageThreshold}+ → {oldPct}%. Change these
-          conditions in Sim Settings to test different rules.
+          conditions in Sim Settings to test different rules. Signing bonus is guaranteed money — a buyout never
+          reduces it, only the salary portion (Cap Hit − bonus) gets the %. We don&apos;t store real signing-bonus
+          data, so enter it manually (e.g. from CapWages) to match a real player&apos;s numbers — leave at 0 for
+          our own league&apos;s contracts, which never carry one.
         </p>
       </div>
 
       <div className="grid grid-cols-3 gap-3">
         <Stat label="Buyout %" value={`${terms.pct}%`} />
-        <Stat label="Dead cap / year" value={money(terms.perYear)} />
-        <Stat label="Spread over" value={`${terms.years} seasons`} />
+        <Stat label={`Cap hit / yr (yrs 1–${terms.originalYears})`} value={money(terms.perYearOriginal)} />
+        <Stat label={`Cap hit / yr (yrs ${terms.originalYears + 1}–${terms.years})`} value={money(terms.perYearExtended)} />
       </div>
-      <Stat label="Total cost (debited from bank at signing)" value={money(terms.totalCost)} wide />
+      <div className="grid grid-cols-2 gap-3">
+        <Stat label="Spread over" value={`${terms.years} seasons`} />
+        <Stat label="Total cost (bonus + salary charge, debited at signing)" value={money(terms.totalCost)} />
+      </div>
 
       <div className="bg-slate-900/40 border border-slate-800 rounded-xl overflow-x-auto">
         <table className="w-full text-sm">
@@ -137,10 +151,15 @@ export default function BuyoutCalculator({ players, ageThreshold, youngPct, oldP
       </div>
       <p className="text-xs text-slate-500">
         Real NHL buyout math (CBA Art. 50.5(b)), via <code>realBuyoutTerms</code> in <code>lib/finance.ts</code>: the
-        club owes buyout% of the player&apos;s salary for each remaining year, and that total is paid out — and
-        counted against the cap — evenly over 2× the remaining contract years. This is a preview only: the live
-        in-game &quot;Buy out&quot; button still uses the league&apos;s own simpler season/off-season rule unless
-        you ask to switch it over.
+        club owes buyout% of the player&apos;s SALARY only (Cap Hit minus signing bonus) for each remaining year,
+        paid out — and counted against the cap — evenly over 2× the remaining contract years. The full signing
+        bonus is added on top for the original {terms.originalYears} year{terms.originalYears === 1 ? "" : "s"} only
+        (it&apos;s guaranteed, not reduced, and isn&apos;t owed past the deal&apos;s real term). Since we only
+        store a flat annual figure (no real per-year salary/bonus schedule), a real player with a front- or
+        back-loaded contract may still differ slightly from CapWages/CapFriendly — this is exact for any contract
+        with a genuinely flat salary and bonus year to year, which covers every contract our own league generates.
+        This is a preview only: the live in-game &quot;Buy out&quot; button still uses the league&apos;s own
+        simpler season/off-season rule unless you ask to switch it over.
       </p>
     </div>
   );
