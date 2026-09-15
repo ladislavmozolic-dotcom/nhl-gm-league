@@ -525,56 +525,6 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
     );
   };
 
-  // PK-specific: unlike PP, a penalty-kill unit isn't shown as separate
-  // Forwards/Defense tables — real PK reads as one group of 4 (or 3) skaters
-  // on the ice together, so stack every slot (F then D) as rows in ONE table,
-  // no color-coded role labels.
-  const PkUnitSection = (
-    key: "pk4" | "pk3", title: string, fLabels: string[], dLabels: string[],
-    dPool: Player[] = defense, dHint?: string,
-    roleInfo?: { dial: "pkStyle"; layouts: Record<string, FormationRole[]> },
-    fPool: Player[] = forwards,
-  ) => {
-    const units = data.situations[key];
-    const nF = fLabels.length, nD = dLabels.length;
-    const total = nF + nD;
-    const rolesFor = (ui: number): FormationRole[] | null => {
-      if (!roleInfo) return null;
-      const unit = units[ui] as SpecialUnit;
-      const teamDefault = ((mergeTactics(data.system) as Record<string, string>)[roleInfo.dial]) ?? "balanced";
-      const effective = unit.style ?? teamDefault;
-      return roleInfo.layouts[effective] ?? roleInfo.layouts.balanced;
-    };
-    return (
-      <div className="space-y-4">
-        <p className="text-xs text-slate-500 px-1">💡 {roleInfo
-          ? "Rola pod menom hráča ukazuje, koho miesto na ľade v aktuálne zvolenej taktike zaberá (mení sa podľa PK formation vyššie). O buly sa vždy automaticky pokúša hráč s najvyšším FO na ľade — bez ohľadu na to, kde je zaradený."
-          : "Buly berie automaticky hráč s najvyšším FO na ľade, bez ohľadu na pozíciu/slot."}</p>
-        {dHint && <p className="text-xs text-slate-500 px-1">{dHint}</p>}
-        <UnitBlock title={title} head={["Unit", "Slot", "Player", "PHY", "DF", "OF", "Time %"]} timeTotal={timeSum(units)}>
-          {units.map((u, ui) => {
-            const roles = rolesFor(ui);
-            return Array.from({ length: total }).map((_, si) => {
-              const isF = si < nF;
-              const label = roles ? (roles[si]?.label ?? "—") : (isF ? fLabels[si] : dLabels[si - nF]);
-              return (
-                <tr key={`${ui}-${si}`} className="border-b border-slate-800/60">
-                  {si === 0 && <td rowSpan={total} className="px-2 py-1.5 text-slate-500 align-top">{ui + 1}</td>}
-                  <td className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400 whitespace-nowrap">{label}</td>
-                  <td className="px-2 align-top"><Select value={u.players[si]} onChange={(v) => setUnit(key, ui, si, v)} pool={isF ? fPool : dPool} /></td>
-                  {si === 0 && <TacCells t={u.tactic} onSet={(k, v) => setUnitTac(key, ui, k, v)} />}
-                  {si === nF && <TacCells t={u.dTactic} onSet={(k, v) => setUnitDTac(key, ui, k, v)} />}
-                  {si !== 0 && si !== nF && <td colSpan={3} />}
-                  {si === 0 && <td rowSpan={total} className="px-2 py-1.5 text-right align-top"><Stepper value={u.timePct} step={5} onChange={(v) => setUnitTime(key, ui, v)} /></td>}
-                </tr>
-              );
-            });
-          })}
-        </UnitBlock>
-      </div>
-    );
-  };
-
   const others = data.situations.others;
   const setOther = <K extends keyof typeof others>(k: K, v: (typeof others)[K]) => change((d) => { (d.situations.others[k] as typeof v) = v; });
   const setOtherList = (k: "extraForwards" | "extraDefense" | "shootout", i: number, v: number | null) =>
@@ -669,7 +619,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
           <UnitFormationBlock unitKey="pk4" ui={0} dial="pkStyle" label="PK1" layouts={PK_LAYOUTS} dStartIndex={2} accent="#ef4444" />
           <UnitFormationBlock unitKey="pk4" ui={1} dial="pkStyle" label="PK2" layouts={PK_LAYOUTS} dStartIndex={2} accent="#f97316" />
         </div>
-        {PkUnitSection("pk4", "Penalty Kill (4 on 5)", ["F1", "F2"], ["D1", "D2"], stPointPool, "💡 Ktorýkoľvek slot môže mať útočníka aj obrancu — napr. ak chceš mať na role Net Coverage/Net-Front obrancu namiesto útočníka, jednoducho ho daj do toho F slotu.", { dial: "pkStyle", layouts: PK_LAYOUTS }, allSkatersPool)}
+        {SplitUnitSection("pk4", "Penalty Kill (4 on 5)", ["F1", "F2"], ["D1", "D2"], stPointPool, "💡 Ktorýkoľvek slot môže mať útočníka aj obrancu — napr. ak chceš mať na role Net Coverage/Net-Front obrancu namiesto útočníka, jednoducho ho daj do toho F slotu.", { dial: "pkStyle", layouts: PK_LAYOUTS }, allSkatersPool)}
       </>}
       {tab === "PK3" && <>
         <p className="text-xs text-slate-500 px-1 mb-3">Zdieľa systém (Box/Diamond/Aggressive) s PK4 — pri 3 hráčoch niet 4. rohu, takže sa mení hlavne to, ako vysoko/agresívne hrá útočník. Zmeň to na karte <strong className="text-slate-300">PK4</strong> vyššie.</p>
@@ -677,7 +627,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
           <UnitFormationBlock unitKey="pk3" ui={0} dial="pkStyle" label="PK3-1" layouts={PK3_LAYOUTS} dStartIndex={1} accent="#facc15" />
           <UnitFormationBlock unitKey="pk3" ui={1} dial="pkStyle" label="PK3-2" layouts={PK3_LAYOUTS} dStartIndex={1} accent="#eab308" />
         </div>
-        {PkUnitSection("pk3", "Penalty Kill (3 on 5)", ["F1"], ["D1", "D2"], stPointPool, "💡 Ktorýkoľvek slot môže mať útočníka aj obrancu — dropdown ponúka oboje na oboch pozíciách.", { dial: "pkStyle", layouts: PK3_LAYOUTS }, allSkatersPool)}
+        {SplitUnitSection("pk3", "Penalty Kill (3 on 5)", ["F1"], ["D1", "D2"], stPointPool, "💡 Ktorýkoľvek slot môže mať útočníka aj obrancu — dropdown ponúka oboje na oboch pozíciách.", { dial: "pkStyle", layouts: PK3_LAYOUTS }, allSkatersPool)}
       </>}
       {tab === "Overtime" && UnitSection("overtime", "Overtime (3 vs 3)", ["OT1", "OT2", "OT3"], () => players)}
 
