@@ -167,7 +167,7 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
           <span title="Minor-league (AHL-only) contract — below the NHL minimum salary, can't be called up"
             className="text-[10px] font-bold px-1.5 py-0.5 rounded border border-emerald-600/50 text-emerald-400">AHL only</span>
         ) : (
-          <span title={oneWay ? "One-way contract — can't be sent to the farm" : `Two-way contract — $${p.capHit.toLocaleString("en-US")} NHL / $${(p.ahlSalary ?? 100_000).toLocaleString("en-US")} AHL`}
+          <span title={oneWay ? "One-way contract — can't be sent to the farm" : p.ahlSalary != null ? `Two-way contract — $${p.capHit.toLocaleString("en-US")} NHL / $${p.ahlSalary.toLocaleString("en-US")} AHL` : `Legacy contract — $${p.capHit.toLocaleString("en-US")} on NHL and AHL roster`}
             className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${oneWay ? "border-amber-600/60 text-amber-400" : "border-slate-700 text-slate-400"}`}>
             {oneWay ? "1-way" : "2-way"}
           </span>

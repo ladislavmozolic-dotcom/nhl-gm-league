@@ -130,6 +130,7 @@ const SECTIONS: Sec[] = [
     groups: [
       { points: [
         "Every contract has a cap hit and a term (years). A two-way deal has two salaries: its offered NHL salary and a fixed $100,000 AHL salary. The NHL salary counts against the cap only while the player is on the NHL roster; on the farm the club pays the AHL salary and no NHL cap hit is charged.",
+        "Existing farm contracts signed before the separate AHL-salary system keep their original listed salary on the farm. The fixed $100,000 AHL salary applies only to new two-way contracts that explicitly include it.",
         "A legacy $100,000 farm-only player cannot be called up. His GM may use Offer 2-way beside the player in the AHL section of Team Roster to propose an NHL salary and term; the Agent applies the same age, NHL-experience, term and salary rules as for every other two-way offer. If accepted, the player becomes call-up eligible.",
       ] },
       { h: "NTC vs NMC vs Modified-NTC — what each actually protects", points: [
@@ -415,6 +416,7 @@ const SECTIONS_CS: Sec[] = [
     groups: [
       { points: [
         "Každá smlouva má cap hit a délku (roky). Obousměrná smlouva má dva platy: nabídnutý plat pro NHL a pevný plat 100 000 $ pro AHL. NHL plat se počítá do stropu jen tehdy, když je hráč na soupisce NHL; na farmě klub platí AHL plat a hráč nemá NHL cap hit.",
+        "Stávající farmářské smlouvy podepsané před zavedením samostatného AHL platu si na farmě ponechávají původní uvedený plat. Pevných 100 000 $ pro AHL platí jen pro nové obousměrné smlouvy, které tento plat výslovně obsahují.",
         "Hráče se starou farmářskou smlouvou 100 000 $ nelze povolat do NHL. Jeho GM mu může přes Offer 2-way u hráče v AHL části Team Roster nabídnout NHL plat a délku; Agent použije stejná pravidla věku, zkušeností z NHL, délky a platu jako u ostatních obousměrných nabídek. Po přijetí lze hráče povolat.",
       ] },
       { h: "NTC vs. NMC vs. modifikovaná NTC — co která opravdu chrání", points: [

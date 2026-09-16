@@ -19,7 +19,7 @@ type Col = { key: string; label: string; num: boolean };
 export default function RosterRows({ players, attrs, isGoalie, farm, hideAttrs = false, onOfferTwoWay }: { players: any[]; attrs: string[]; isGoalie: boolean; farm?: boolean; hideAttrs?: boolean; onOfferTwoWay?: (player: any) => void }) {
   const displayedSalary = (p: any) => {
     const nhlSalary = salaryOf(p);
-    return farm && p.contractType === "TWO_WAY" && nhlSalary > 100_000 ? (p.ahlSalary ?? 100_000) : nhlSalary;
+    return farm && p.contractType === "TWO_WAY" && p.ahlSalary != null ? p.ahlSalary : nhlSalary;
   };
   const cols: Col[] = [
     { key: "name", label: "Player", num: false },
@@ -110,7 +110,7 @@ export default function RosterRows({ players, attrs, isGoalie, farm, hideAttrs =
                       title="Offer a real two-way deal: NHL salary on call-up, $100k salary on the farm"
                       className="text-[11px] px-2.5 py-1 rounded bg-blue-900/70 hover:bg-blue-800 text-blue-200">Offer 2-way</button>
                   ) : player.contractType === "TWO_WAY" ? (
-                    <span className="text-[10px] font-bold text-amber-400" title={`$${nhlSalary.toLocaleString("en-US")} NHL / $${(player.ahlSalary ?? 100_000).toLocaleString("en-US")} AHL`}>2-way</span>
+                    <span className="text-[10px] font-bold text-amber-400" title={player.ahlSalary != null ? `$${nhlSalary.toLocaleString("en-US")} NHL / $${player.ahlSalary.toLocaleString("en-US")} AHL` : `Legacy contract — $${nhlSalary.toLocaleString("en-US")} on NHL and AHL roster`}>2-way</span>
                   ) : <span className="text-slate-700">—</span>}
                 </td>}
               </tr>

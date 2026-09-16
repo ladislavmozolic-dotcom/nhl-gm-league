@@ -74,9 +74,7 @@ export function liveAhlSalary(p: {
   contractType?: string | null; ahlSalary?: number | null;
 }): number {
   if ((p.contractYears ?? 0) <= 0) return 0;
-  if (p.contractType === "TWO_WAY" && (p.capHit ?? 0) > TWO_WAY_AHL_SALARY) {
-    return p.ahlSalary ?? TWO_WAY_AHL_SALARY;
-  }
+  if (p.contractType === "TWO_WAY" && p.ahlSalary != null) return p.ahlSalary;
   return p.capHit ?? 0;
 }
 

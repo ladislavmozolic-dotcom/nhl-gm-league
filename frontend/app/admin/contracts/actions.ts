@@ -70,12 +70,18 @@ export async function updateContract(formData: FormData) {
   const contractExpiry = contractYears > 0 ? computeContractExpiry(contractYears) : null;
   const contractTypeRaw = String(formData.get("contractType") ?? "");
   const contractType = contractTypeRaw === "ONE_WAY" || contractTypeRaw === "TWO_WAY" ? contractTypeRaw : null;
+  const previous = await prisma.player.findUnique({ where: { slug }, select: { contractType: true, ahlSalary: true } });
+  const ahlSalary = contractType !== "TWO_WAY"
+    ? null
+    : previous?.contractType === "TWO_WAY"
+      ? previous.ahlSalary
+      : capHit > TWO_WAY_AHL_SALARY ? TWO_WAY_AHL_SALARY : null;
   // keep the shown contract string in sync (e.g. "9,000,000$ / 2yrs")
   const contractText = capHit ? `${capHit.toLocaleString("en-US")}$ / ${contractYears}yr${contractYears === 1 ? "" : "s"}` : null;
 
   await prisma.player.update({
     where: { slug },
-    data: { capHit, contractYears, contractExpiry, contractText, contractType, ahlSalary: contractType === "TWO_WAY" && capHit > TWO_WAY_AHL_SALARY ? TWO_WAY_AHL_SALARY : null },
+    data: { capHit, contractYears, contractExpiry, contractText, contractType, ahlSalary },
   });
 
   for (const p of ["/admin/contracts", `/admin/contracts/${slug}`, "/salary-cap", `/players/${slug}`]) revalidatePath(p);
