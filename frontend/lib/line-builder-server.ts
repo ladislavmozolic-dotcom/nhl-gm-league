@@ -6,8 +6,8 @@
 import { prisma } from "./prisma";
 import { loadTeamLines, loadTeamSystem, autoLines } from "./sim/lines";
 import { pairSig, unitChemistry } from "./sim/chemistry";
-import { roleFitOf } from "./sim/role-fit";
-import { systemFit, DEFAULT_TACTICS, type TeamTactics, type PuckStyle, type DZone } from "./sim/tactics";
+import { tacticalFitDefense, tacticalFitForwards, type TacticalFitPlayer } from "./sim/tactical-fit";
+import { DEFAULT_TACTICS } from "./sim/tactics";
 import { cleanName } from "./playerName";
 
 type Attrs = { pa: number; sc: number; sk: number; ck: number; df: number; st: number; fo: number; en: number; weight: number };
@@ -47,51 +47,9 @@ function summaryOf(prof: LineProfile, kind: "F" | "D"): string {
   return s;
 }
 
-// Average this unit's roster attributes into the shape lib/sim/tactics.ts's
-// systemFit expects, so a line can be scored against the team's chosen system.
-function unitProfile(present: P[]) {
-  const avgOf = (f: (a: Attrs) => number) => present.reduce((s, p) => s + f(p.a), 0) / present.length;
-  return { sk: avgOf((a) => a.sk), en: avgOf((a) => a.en), ck: avgOf((a) => a.ck), sc: avgOf((a) => a.sc),
-    pa: avgOf((a) => a.pa), df: avgOf((a) => a.df), st: avgOf((a) => a.st), weight: avgOf((a) => a.weight) };
-}
-
-// tactical fit = role diversity (a balanced line, graduated — see lib/sim/role-fit.ts,
-// the SAME function the real sim rewards via chemFactor) × position/handedness
-// correctness × how well this unit's personnel suits the team's CHOSEN SYSTEM
-// (lib/sim/tactics.ts's systemFit — the same fit multiplier the real sim applies
-// per game, e.g. a rush team wants finishing/passing/speed, a cycle team wants
-// passing/strength). A club running the default Balanced system scores exactly
-// as before (systemFit returns a neutral 1.0 when every dial is "balanced").
-// `puckOverride` is this specific line's own Puck Style from the Line Editor
-// (ForwardLine.puck), which overrides the team dial for just this unit — the
-// SAME override lib/sim/tactics.ts's resolveLineTactics applies for the real
-// sim. Without it, editing a line's own system in the Line Editor (as opposed
-// to the team-wide Team System page) never moved this line's Tactical Fit.
-function tacticalFitF(ps: (P | null)[], tactics: TeamTactics, puckOverride?: PuckStyle): number {
-  const present = ps.filter((p): p is P => !!p);
-  if (present.length < 2) return 0;
-  const roleScore = roleFitOf(present.map((p) => p.a), false) * 100;
-  // position: c is a centre, wingers on a natural/either side
-  const slots = ["LW", "C", "RW"]; let good = 0, n = 0;
-  ps.forEach((p, i) => { if (!p) return; n++; const pos = (p.position || "").toUpperCase(); const want = slots[i];
-    const ok = want === "C" ? /C|F/.test(pos) : (pos.includes(want) || /\bW\b|F/.test(pos) || pos === "LW/RW" || (want === "LW" && /L/.test(pos)) || (want === "RW" && /R/.test(pos)));
-    if (ok) good++; });
-  const posFactor = n ? 0.75 + 0.25 * (good / n) : 0.85;
-  const effTactics = puckOverride ? { ...tactics, puckStyle: puckOverride } : tactics;
-  const sysFactor = systemFit(unitProfile(present), effTactics);
-  return clamp(roleScore * posFactor * sysFactor);
-}
-function tacticalFitD(pair: (P | null)[], tactics: TeamTactics, dZoneOverride?: DZone): number {
-  const present = pair.filter((p): p is P => !!p);
-  if (present.length < 2) return 0;
-  const roleScore = roleFitOf(present.map((p) => p.a), true) * 100;
-  // handedness: LD shoots L, RD shoots R
-  let good = 0; if (pair[0]?.shoots === "L") good++; if (pair[1]?.shoots === "R") good++;
-  const posFactor = 0.78 + 0.22 * (good / 2);
-  const effTactics = dZoneOverride ? { ...tactics, dZone: dZoneOverride } : tactics;
-  const sysFactor = systemFit(unitProfile(present), effTactics);
-  return clamp(roleScore * posFactor * sysFactor);
-}
+const fitPlayer = (player: P | null): TacticalFitPlayer | null => player == null
+  ? null
+  : { ...player.a, position: player.position, shoots: player.shoots };
 
 // The bars in the UI read as "how close to the league's best" rather than "how
 // close to a theoretical 100" — no skater actually runs a rating near 100 on
@@ -157,7 +115,7 @@ export async function teamLineBuilder(teamId: number, league = "NHL"): Promise<T
     const slots: LineSlot[] = ps.map((p, idx) => ({ role: roles[idx], id: p?.id ?? null, name: p?.name ?? null, slug: p?.slug ?? null, overall: p?.overall ?? null,
       offSlot: !!p && !(roles[idx] === "C" ? /C|F/.test((p.position || "").toUpperCase()) : ((p.position || "").toUpperCase().includes(roles[idx]) || /\bW\b|F/.test((p.position || "").toUpperCase()))) }));
     const profile = profileOf(present);
-    const tacticalFit = tacticalFitF(ps, tactics, l.puck);
+    const tacticalFit = tacticalFitForwards(ps.map(fitPlayer), tactics, l.puck);
     const { chemistry, gelled, pairs } = chemFor(slots.map((s) => ({ role: s.role, id: s.id })), tacticalFit);
     return { kind: "F", index: i, slots, chemistry, gelled, pairs, tacticalFit, profile, summary: summaryOf(profile, "F") };
   });
@@ -169,7 +127,7 @@ export async function teamLineBuilder(teamId: number, league = "NHL"): Promise<T
     const slots: LineSlot[] = ps.map((p, idx) => ({ role: roles[idx], id: p?.id ?? null, name: p?.name ?? null, slug: p?.slug ?? null, overall: p?.overall ?? null,
       offSlot: !!p && ((idx === 0 && p.shoots === "R") || (idx === 1 && p.shoots === "L")) }));
     const profile = profileOf(present);
-    const tacticalFit = tacticalFitD(ps, tactics, l.dzone);
+    const tacticalFit = tacticalFitDefense(ps.map(fitPlayer), tactics, l.dzone);
     const { chemistry, gelled, pairs } = chemFor(slots.map((s) => ({ role: s.role, id: s.id })), tacticalFit);
     return { kind: "D", index: i, slots, chemistry, gelled, pairs, tacticalFit, profile, summary: summaryOf(profile, "D") };
   });

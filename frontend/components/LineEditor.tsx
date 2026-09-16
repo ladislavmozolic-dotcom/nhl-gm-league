@@ -6,6 +6,7 @@ import LinesNav from "@/components/LinesNav";
 import { autoFill, type TeamLinesData, type ForwardLine, type DefensePair, type SpecialUnit } from "@/lib/sim/lines-core";
 import { unitChemistry } from "@/lib/sim/chemistry";
 import { roleFitOf } from "@/lib/sim/role-fit";
+import { tacticalFitDefense, tacticalFitForwards } from "@/lib/sim/tactical-fit";
 import { DIAL_LABELS, mergeTactics, type PuckStyle, type DZone, type PpStyle, type PkStyle } from "@/lib/sim/tactics";
 import { PP_LAYOUTS, PP4_LAYOUTS, PK_LAYOUTS, PK3_LAYOUTS, type FormationRole } from "@/lib/sim/formation-layout";
 import { displayName } from "@/lib/playerName";
@@ -19,6 +20,7 @@ type Player = {
   id: number; name: string; position: string; overall: number; injured?: boolean; df?: number | null; con?: number; cap?: "C" | "A" | null;
   number?: number | null;
   pa?: number | null; sk?: number | null; sc?: number | null; ck?: number | null; fo?: number | null; st?: number | null;
+  en?: number | null; weight?: number | null; shoots?: string | null;
 };
 type SuggestResult = { ok: false; error: string } | { ok: true; lines: TeamLinesData; system: string; rationale: string[] };
 type Props = {
@@ -150,6 +152,22 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${cls} cursor-help`}
         title={`Role fit — ${isDef ? "a pair wants one offensive + one stay-at-home D" : "a line wants a playmaker + a sniper + a grinder"}. Same-role players clash and sim at reduced offense.`}>
         ⚙ {label}
+      </span>
+    );
+  };
+
+  const TacticalFitBadge = ({ ids, isDef, puck, dZone }: { ids: (number | null)[]; isDef: boolean; puck?: PuckStyle; dZone?: DZone }) => {
+    const members = ids.map((id) => id == null ? null : byId.get(id) ?? null);
+    if (members.filter(Boolean).length < 2) return null;
+    const tactics = mergeTactics(data.system);
+    const fit = isDef
+      ? tacticalFitDefense(members, tactics, dZone)
+      : tacticalFitForwards(members, tactics, puck);
+    const cls = fit >= 80 ? "bg-emerald-500/20 text-emerald-300" : fit >= 60 ? "bg-sky-500/20 text-sky-300" : fit >= 45 ? "bg-amber-500/20 text-amber-300" : "bg-rose-500/20 text-rose-300";
+    return (
+      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${cls} cursor-help`}
+        title="Tactical Fit — rovnaký výpočet ako v Lines Builderi: skladba rolí, správne pozície alebo držanie hokejky a vhodnosť hráčov pre zvolený systém.">
+        ♟ Fit {fit}
       </span>
     );
   };
@@ -395,7 +413,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
         return (
           <div key={i} className="lines-card bg-slate-900/40 border border-slate-800 rounded-lg p-3 space-y-3">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2"><span className="text-sm font-bold text-slate-300">Line {i + 1}</span><ChemBadge ids={[l.lw, l.c, l.rw]} /><RoleFitBadge ids={[l.lw, l.c, l.rw]} isDef={false} /></div>
+              <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-bold text-slate-300">Line {i + 1}</span><ChemBadge ids={[l.lw, l.c, l.rw]} /><RoleFitBadge ids={[l.lw, l.c, l.rw]} isDef={false} /><TacticalFitBadge ids={[l.lw, l.c, l.rw]} isDef={false} puck={l.puck} /></div>
               <div className="flex items-center gap-2"><span className="text-[11px] uppercase tracking-wide text-slate-500">Time</span><Stepper value={l.timePct} step={1} onChange={(v) => setFwd(i, "timePct", v as unknown as number)} /><span className="text-slate-500 text-sm">%</span></div>
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
@@ -428,7 +446,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
         return (
           <div key={i} className="lines-card bg-slate-900/40 border border-slate-800 rounded-lg p-3 space-y-3">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2"><span className="text-sm font-bold text-slate-300">Pair {i + 1}</span><ChemBadge ids={[p.ld, p.rd]} /><RoleFitBadge ids={[p.ld, p.rd]} isDef={true} /></div>
+              <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-bold text-slate-300">Pair {i + 1}</span><ChemBadge ids={[p.ld, p.rd]} /><RoleFitBadge ids={[p.ld, p.rd]} isDef={true} /><TacticalFitBadge ids={[p.ld, p.rd]} isDef={true} dZone={p.dzone} /></div>
               <div className="flex items-center gap-2"><span className="text-[11px] uppercase tracking-wide text-slate-500">Time</span><Stepper value={p.timePct} step={1} onChange={(v) => setDef(i, "timePct", v as unknown as number)} /><span className="text-slate-500 text-sm">%</span></div>
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
