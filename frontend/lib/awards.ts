@@ -109,13 +109,12 @@ export async function computeSeasonAwards(season: string, league = "NHL"): Promi
   return { championTeamId: f.championTeamId, runnerUpTeamId: f.runnerUpTeamId, presidentsTeamId: f.presidentsTeamId, awards };
 }
 
-/** Snapshot whatever pre-season data currently exists (NHL only — pre-season has no
- *  AHL slate) into a durable per-year record, since the pre-season Game rows
+/** Snapshot whatever pre-season data currently exists into a durable per-year record,
+ *  since the pre-season Game rows
  *  themselves live under one fixed season string and get wiped by next year's
  *  Off-season cascade. Best-effort: silently no-ops if nothing was ever generated. */
 async function archivePreseasonSnapshot(season: string, league: string) {
-  if (league !== "NHL") return;
-  const games = await prisma.game.count({ where: { season: PRE_SEASON, status: "FINAL" } });
+  const games = await prisma.game.count({ where: { season: PRE_SEASON, league, status: "FINAL" } });
   if (!games) return;
   const [standings, scorers] = await Promise.all([
     computeStandings(PRE_SEASON, league).catch(() => []),

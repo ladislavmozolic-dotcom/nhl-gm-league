@@ -100,9 +100,9 @@ export default async function TeamSchedulePage({ params }: { params: Promise<{ s
     prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { preseasonPublic: true } }),
   ]);
 
-  // Pre-season is NHL-only, same admin-or-public visibility rule as /preseason
-  // and the main /schedule merge.
-  const showPre = team.league === "NHL" && (admin || leagueCfg?.preseasonPublic);
+  // NHL and AHL pre-season use the same admin-or-public visibility rule as
+  // /preseason and the main /schedule merge.
+  const showPre = admin || !!leagueCfg?.preseasonPublic;
   const preGames = showPre ? await loadTeamGames(PRE_SEASON, team.league, team.id) : [];
 
   return (

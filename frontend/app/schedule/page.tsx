@@ -36,12 +36,12 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
   // official numbering is unaffected by whether pre-season happens to be showing.
   const numById = new Map(games.map((g, i) => [g.id, i + 1]));
 
-  // Pre-season (NHL only) merges into the same timeline, right before the regular
+  // Pre-season merges into the same league timeline, right before the regular
   // season it leads into — same visibility rule as the dedicated /preseason page:
   // admin-only until LeagueConfig.preseasonPublic is on.
-  const preGames = league === "NHL" && (admin || leagueCfg?.preseasonPublic)
+  const preGames = admin || leagueCfg?.preseasonPublic
     ? await prisma.game.findMany({
-        where: { season: PRE_SEASON },
+        where: { season: PRE_SEASON, league },
         orderBy: [{ round: "asc" }, { id: "asc" }],
         include: { homeTeam: { select: { code: true, name: true, logoUrl: true } }, awayTeam: { select: { code: true, name: true, logoUrl: true } } },
       })

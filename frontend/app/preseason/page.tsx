@@ -36,9 +36,12 @@ function GameCard({ g }: { g: PreGameRow }) {
   );
 }
 
-export default async function PreseasonPage() {
+export default async function PreseasonPage({ searchParams }: { searchParams: Promise<{ league?: string }> }) {
+  const { league: leagueParam } = await searchParams;
+  const league = leagueParam === "AHL" ? "AHL" : "NHL";
+  const otherLeague = league === "NHL" ? "AHL" : "NHL";
   const [{ rounds, hasSchedule }, cfg, admin] = await Promise.all([
-    preseasonSchedule(),
+    preseasonSchedule(league),
     prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { preseasonPublic: true } }),
     isAdmin(),
   ]);
@@ -46,7 +49,7 @@ export default async function PreseasonPage() {
   if (hasSchedule && !cfg?.preseasonPublic && !admin) {
     return (
       <div className="space-y-6 py-2">
-        <PageHeader title="Pre-season" subtitle="Exhibition games before the regular season — results don't count in the standings or stats." />
+        <PageHeader title={`${league} Pre-season`} subtitle="Exhibition games before the regular season — results don't count in the regular-season standings or stats." />
         <Card><p className="text-sm text-slate-400">Pre-season schedule isn&apos;t public yet — check back soon.</p></Card>
       </div>
     );
@@ -54,7 +57,11 @@ export default async function PreseasonPage() {
 
   return (
     <div className="space-y-6 py-2">
-      <PageHeader title="Pre-season" subtitle="Exhibition games before the regular season — results don't count in the standings or stats." />
+      <PageHeader
+        title={`${league} Pre-season`}
+        subtitle="Exhibition games before the regular season — results don't count in the regular-season standings or stats."
+        right={<Link href={`/preseason${otherLeague === "AHL" ? "?league=AHL" : ""}`} className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 text-sm">{otherLeague}</Link>}
+      />
       {!hasSchedule ? (
         <Card><p className="text-sm text-slate-400">No pre-season schedule yet. The commissioner generates it from <span className="text-slate-200">Admin → Season Control → Pre-season</span>.</p></Card>
       ) : (

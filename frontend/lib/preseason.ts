@@ -1,4 +1,5 @@
 // PRE-SEASON — 6 exhibition games per NHL club, a rest day between each round.
+// Every NHL fixture is mirrored by its two AHL affiliates on the same date.
 // Fully isolated from the real season by a distinct Game.season string, so it
 // never touches standings, stats, careers or records. The sim persists ONLY the
 // Game score + play-by-play — no PlayerGameStat/GoalieGameStat rows, no injuries,
@@ -74,17 +75,31 @@ export async function computeAutoPreseasonStart(): Promise<Date | null> {
 /** (Re)build the pre-season schedule (6 rounds, a rest day between each). Wipes any
  *  existing pre-season games. `startDate` sets the exact face-off day of round 1. */
 export async function generatePreseason(startDate?: Date): Promise<{ games: number; teams: number; rounds: number; firstDate: Date; lastDate: Date }> {
-  const teams = await prisma.team.findMany({ where: { league: "NHL", isAffiliate: false }, select: { id: true }, orderBy: { id: "asc" } });
+  const teams = await prisma.team.findMany({
+    where: { league: "NHL", isAffiliate: false },
+    select: { id: true, affiliateTeams: { where: { league: "AHL" }, select: { id: true }, take: 1 } },
+    orderBy: { id: "asc" },
+  });
   const ids = teams.map((t) => t.id);
   if (ids.length < 2) return { games: 0, teams: ids.length, rounds: 0, firstDate: preseasonDate(0, startDate), lastDate: preseasonDate(PRE_ROUNDS - 1, startDate) };
 
   await prisma.game.deleteMany({ where: { season: PRE_SEASON } });
   const rounds = buildRounds(ids, PRE_ROUNDS);
-  const rows = rounds.flatMap((pairs, r) =>
-    pairs.map(([home, away]) => ({
-      season: PRE_SEASON, league: "NHL", round: r, gameDate: preseasonDate(r, startDate),
+  const affiliateByParent = new Map(teams.flatMap((t) => t.affiliateTeams[0] ? [[t.id, t.affiliateTeams[0].id] as const] : []));
+  const rows = rounds.flatMap((pairs, r) => pairs.flatMap(([home, away]) => {
+    const gameDate = preseasonDate(r, startDate);
+    const fixtures = [{
+      season: PRE_SEASON, league: "NHL", round: r, gameDate,
       homeTeamId: home, awayTeamId: away, status: "SCHEDULED",
-    })));
+    }];
+    const ahlHome = affiliateByParent.get(home);
+    const ahlAway = affiliateByParent.get(away);
+    if (ahlHome != null && ahlAway != null) fixtures.push({
+      season: PRE_SEASON, league: "AHL", round: r, gameDate,
+      homeTeamId: ahlHome, awayTeamId: ahlAway, status: "SCHEDULED",
+    });
+    return fixtures;
+  }));
   await prisma.game.createMany({ data: rows });
   return { games: rows.length, teams: ids.length, rounds: rounds.length, firstDate: preseasonDate(0, startDate), lastDate: preseasonDate(PRE_ROUNDS - 1, startDate) };
 }
@@ -106,7 +121,7 @@ async function simPreseason(where: object): Promise<{ played: number }> {
   const scheduled = await prisma.game.findMany({
     where,
     orderBy: [{ round: "asc" }, { id: "asc" }],
-    select: { id: true, round: true, gameDate: true, homeTeamId: true, awayTeamId: true },
+    select: { id: true, league: true, round: true, gameDate: true, homeTeamId: true, awayTeamId: true },
   });
   if (scheduled.length === 0) return { played: 0 };
 
@@ -137,7 +152,8 @@ async function simPreseason(where: object): Promise<{ played: number }> {
     }
     const seed = fixtureSeed(gm.homeTeamId, gm.awayTeamId, (gm.round ?? 0) + gm.id * 7);
     const rivalry = home.rivalTeamIds.includes(away.id) || away.rivalTeamIds.includes(home.id);
-    const result = simulateGame(home, away, { seed, settings, rivalry, league: "NHL", engineVersion });
+    const league = gm.league === "AHL" ? "AHL" : "NHL";
+    const result = simulateGame(home, away, { seed, settings, rivalry, league, engineVersion });
     // Full box score (players, goalies, goals, penalties, events) is persisted under the
     // PRE season string → complete pre-season stats/standings/scoreboard, while every
     // player-profile / career / regular-season aggregation (keyed on the regular season
@@ -157,9 +173,9 @@ export type PreGameRow = {
 type TeamMini = { id: number; name: string; code: string | null; logoUrl: string | null; slug: string | null };
 
 /** All pre-season games grouped by round, for the public page. */
-export async function preseasonSchedule(): Promise<{ rounds: { round: number; date: Date | null; games: PreGameRow[] }[]; hasSchedule: boolean }> {
+export async function preseasonSchedule(league: "NHL" | "AHL" = "NHL"): Promise<{ rounds: { round: number; date: Date | null; games: PreGameRow[] }[]; hasSchedule: boolean }> {
   const games = await prisma.game.findMany({
-    where: { season: PRE_SEASON },
+    where: { season: PRE_SEASON, league },
     orderBy: [{ round: "asc" }, { id: "asc" }],
     select: { id: true, round: true, gameDate: true, status: true, homeTeamId: true, awayTeamId: true, homeGoals: true, awayGoals: true, endedIn: true, winnerTeamId: true },
   });

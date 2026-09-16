@@ -80,6 +80,7 @@ export async function simulateLeagueDay(day: Date) {
   const preDue = await prisma.game.count({ where: { season: PRE_SEASON, status: "SCHEDULED", gameDate: { gte: start, lt: end } } });
   if (preDue > 0) {
     await autoFillRosters("NHL").catch(() => {});
+    await autoFillRosters("AHL").catch(() => {});
     const pr = await playPreseasonDay(start, end);
     played += pr.played;
   }
