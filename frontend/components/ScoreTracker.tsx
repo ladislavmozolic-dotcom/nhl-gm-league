@@ -5,6 +5,7 @@ import NewsTicker from "@/components/NewsTicker";
 type TeamLite = { code: string | null; logoUrl: string | null };
 
 const dateStr = (d: Date) => d.toLocaleDateString("sk-SK", { day: "numeric", month: "short" });
+const dayKey = (d: Date) => d.toISOString().slice(0, 10);
 
 const TeamRow = ({ t, score, win }: { t: TeamLite; score: number | null; win: boolean }) => (
   <div className="flex items-center justify-between gap-3">
@@ -75,9 +76,13 @@ export default async function ScoreTracker() {
       {upcoming.length > 0 && (
         <div className="bg-[#0a1628] border-b border-slate-800">
           <div className="max-w-[1400px] mx-auto flex items-stretch">
+            {/* When the day's sim is still in progress, the remaining games'
+                date equals today's already-final results' date — labelling
+                both "16.9." reads as a glitch, so call this one out as
+                "Later Today" instead of repeating the same date. */}
             <div className="shrink-0 bg-emerald-700 text-white text-[11px] font-bold px-3 flex flex-col items-start justify-center leading-tight uppercase tracking-wide">
-              <span>Next</span>
-              {nextDay?.gameDate && <span className="text-[10px] font-normal normal-case text-emerald-100">{dateStr(nextDay.gameDate)}</span>}
+              <span>{nextDay?.gameDate && lastDay?.gameDate && dayKey(nextDay.gameDate) === dayKey(lastDay.gameDate) ? "Later Today" : "Next"}</span>
+              {nextDay?.gameDate && (!lastDay?.gameDate || dayKey(nextDay.gameDate) !== dayKey(lastDay.gameDate)) && <span className="text-[10px] font-normal normal-case text-emerald-100">{dateStr(nextDay.gameDate)}</span>}
             </div>
             <div className="flex gap-2 overflow-x-auto p-2 no-scrollbar">
               {upcoming.map((g) => (
