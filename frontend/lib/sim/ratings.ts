@@ -233,7 +233,14 @@ export function buildTeam(input: {
   const roster = input.lines
     ? assignIceTimeFromLines(input.skaters, input.lines)
     : assignIceTime(input.skaters);
-  const goalies = [...input.goalies].sort((a, b) => b.overall - a.overall);
+  // Start whoever the GM actually picked in Lines (situations.others.starter),
+  // not just the higher-overall goalie — a GM resting a tired starter or riding
+  // a hot backup must be honored. Fall back to overall-sort only when no valid
+  // starter is set (auto lines, or a stale id no longer on the roster).
+  const goalieById = new Map(input.goalies.map((g) => [g.id, g]));
+  const pickedStarter = goalieById.get(input.lines?.situations?.others?.starter ?? -1);
+  const rest = [...input.goalies].filter((g) => g.id !== pickedStarter?.id).sort((a, b) => b.overall - a.overall);
+  const goalies = pickedStarter ? [pickedStarter, ...rest] : rest;
 
   // line chemistry: tag each skater with their unit's current chemistry.
   // Prefer manager-set line units; otherwise fall back to depth-chart groupings
