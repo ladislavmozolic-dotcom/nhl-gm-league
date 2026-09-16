@@ -8,11 +8,12 @@ import { captaincyFromName } from "@/lib/playerName";
 import { hasWorthyGoalie, MIN_GOALIE_OV, MIN_GOALIE_GP, MIN_GOALIE_GP_SVPCT } from "@/lib/goalie-rule";
 import { redactAttrs } from "@/lib/player-attrs";
 import { livePlayerOverall } from "@/lib/player-overall";
+import { offerTwoWayFromRoster } from "../rosters/actions";
 
 export const dynamic = "force-dynamic";
 
-// Read-only roster — main (NHL/pro) roster only. Farm / prospects / draft picks
-// live on their own sub-nav pages. GM editing is at /teams/[slug]/roster/edit.
+// Read-only organization roster: NHL first, then its AHL affiliate. GM editing
+// remains at /teams/[slug]/roster/edit and roster moves at /teams/[slug]/rosters.
 const isDefPos = (p: string) => /(^|\/)D(\/|$)/.test(p) || p === "D";
 
 export default async function TeamRosterPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -45,7 +46,10 @@ export default async function TeamRosterPage({ params }: { params: Promise<{ slu
   // lib/goalie-rule.ts.
   const noWorthyGoalie = rt === "NHL" && !hasWorthyGoalie(roster.filter((p) => p.isGoalie));
   const affiliate = team.league === "NHL"
-    ? await prisma.team.findFirst({ where: { parentTeamId: team.id }, select: { name: true } })
+    ? await prisma.team.findFirst({
+        where: { parentTeamId: team.id },
+        select: { id: true, name: true, code: true, players: { where: { rosterType: "AHL" }, orderBy: { overall: "desc" }, include: { goalieRating: true } } },
+      })
     : null;
   const admin = await isAdmin();
   const isGm = await canManageTeam(team.id);
@@ -95,6 +99,12 @@ export default async function TeamRosterPage({ params }: { params: Promise<{ slu
   // or in the Non-Roster section, once he's off the active NHL/AHL roster.
   const loggedIn = await isLoggedIn();
   const rosterWithCap = roster.map((p) => redactAttrs({ ...p, capRole: capHasField ? p.captaincy : captaincyFromName(p.name) }, !loggedIn));
+  const farmHasCapField = affiliate?.players.some((p) => p.captaincy === "C" || p.captaincy === "A") ?? false;
+  const farmRoster = (affiliate?.players ?? []).map((p) => redactAttrs({
+    ...p,
+    overall: livePlayerOverall(p),
+    capRole: farmHasCapField ? p.captaincy : captaincyFromName(p.name),
+  }, !loggedIn));
 
   return (
     <div className="space-y-6">
@@ -115,7 +125,28 @@ export default async function TeamRosterPage({ params }: { params: Promise<{ slu
           <b>🥅 No worthy goalie.</b> League rule: every club must carry at least one goalie who is either {MIN_GOALIE_OV}+ overall, started {MIN_GOALIE_GP}+ real games last season, or started more than {MIN_GOALIE_GP_SVPCT} real games at a save % above 90 — until you do, this roster isn't game-ready. Sign, trade for, or call up a qualifying goalie.
         </div>
       )}
-      <RosterView players={rosterWithCap} dressedIds={[...dressed]} hideAttrs={!loggedIn} />
+      <section className="space-y-4">
+        <div className="border-b border-slate-800 pb-2">
+          <h2 className="text-xl font-bold text-white">{rt} Roster</h2>
+          <p className="text-xs text-slate-500">{team.name}</p>
+        </div>
+        <RosterView players={rosterWithCap} dressedIds={[...dressed]} hideAttrs={!loggedIn} />
+      </section>
+      {affiliate && (
+        <section className="space-y-4 pt-4 border-t border-slate-800">
+          <div>
+            <h2 className="text-xl font-bold text-white">AHL Roster</h2>
+            <p className="text-xs text-slate-500">{affiliate.name} · {farmRoster.length} players</p>
+          </div>
+          <RosterView
+            players={farmRoster}
+            farm
+            hideAttrs={!loggedIn}
+            teamSlug={isGm ? slug : undefined}
+            offerTwoWayAction={isGm ? offerTwoWayFromRoster : undefined}
+          />
+        </section>
+      )}
     </div>
   );
 }

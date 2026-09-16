@@ -34,7 +34,7 @@ export function groupRoster(players: any[]): Grouped {
 const SKATER_ATTRS = ["ck", "fg", "di", "sk", "st", "en", "du", "ph", "fo", "pa", "sc", "df", "ps", "ex", "ld", "mo"];
 const GOALIE_ATTRS = ["sk", "du", "en", "sz", "ag", "rb", "sc", "hs", "rt", "ph", "ps", "ex", "ld", "mo"];
 
-export function RosterSection({ title, players, accent, farm, hideAttrs }: { title: string; players: any[]; accent?: string; farm?: boolean; hideAttrs?: boolean }) {
+export function RosterSection({ title, players, accent, farm, hideAttrs, onOfferTwoWay }: { title: string; players: any[]; accent?: string; farm?: boolean; hideAttrs?: boolean; onOfferTwoWay?: (player: any) => void }) {
   const isGoalie = title === "Goalies";
   const attrs = isGoalie ? GOALIE_ATTRS : SKATER_ATTRS;
 
@@ -42,7 +42,7 @@ export function RosterSection({ title, players, accent, farm, hideAttrs }: { tit
     <div>
       <SectionTitle count={players.length} accent={accent}>{title}</SectionTitle>
       <Card bodyClassName="p-0">
-        <RosterRows players={players} attrs={attrs} isGoalie={isGoalie} farm={farm} hideAttrs={hideAttrs} />
+        <RosterRows players={players} attrs={attrs} isGoalie={isGoalie} farm={farm} hideAttrs={hideAttrs} onOfferTwoWay={onOfferTwoWay} />
       </Card>
     </div>
   );

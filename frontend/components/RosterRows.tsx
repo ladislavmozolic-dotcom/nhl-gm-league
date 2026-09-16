@@ -16,7 +16,11 @@ const fmtM = (v: number) => (v > 0 ? `$${Math.round(v).toLocaleString("en-US")}`
 type Col = { key: string; label: string; num: boolean };
 
 /** The interactive (click-to-sort) roster table body for one section. */
-export default function RosterRows({ players, attrs, isGoalie, farm, hideAttrs = false }: { players: any[]; attrs: string[]; isGoalie: boolean; farm?: boolean; hideAttrs?: boolean }) {
+export default function RosterRows({ players, attrs, isGoalie, farm, hideAttrs = false, onOfferTwoWay }: { players: any[]; attrs: string[]; isGoalie: boolean; farm?: boolean; hideAttrs?: boolean; onOfferTwoWay?: (player: any) => void }) {
+  const displayedSalary = (p: any) => {
+    const nhlSalary = salaryOf(p);
+    return farm && p.contractType === "TWO_WAY" && nhlSalary > 100_000 ? (p.ahlSalary ?? 100_000) : nhlSalary;
+  };
   const cols: Col[] = [
     { key: "name", label: "Player", num: false },
     { key: "number", label: "#", num: true },
@@ -25,11 +29,11 @@ export default function RosterRows({ players, attrs, isGoalie, farm, hideAttrs =
     { key: "condition", label: "CON", num: true },
     ...(hideAttrs ? [] : attrs.map((a) => ({ key: a, label: a.toUpperCase(), num: true }))),
     { key: "overall", label: "OVR", num: true },
-    { key: "salary", label: "Salary", num: true },
+    { key: "salary", label: farm ? "AHL Salary" : "Salary", num: true },
   ];
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 } | null>(null);
   const click = (c: Col) => setSort((s) => (s && s.key === c.key ? { key: c.key, dir: (s.dir * -1) as 1 | -1 } : { key: c.key, dir: c.num ? -1 : 1 }));
-  const val = (p: any, k: string) => k === "name" ? cleanName(p.name).toLowerCase() : k === "salary" ? salaryOf(p) : p[k];
+  const val = (p: any, k: string) => k === "name" ? cleanName(p.name).toLowerCase() : k === "salary" ? displayedSalary(p) : p[k];
 
   const rows = useMemo(() => {
     if (!sort) return players;
@@ -55,11 +59,13 @@ export default function RosterRows({ players, attrs, isGoalie, farm, hideAttrs =
                 {c.label}{arrow(c.key)}
               </th>
             ))}
+            {onOfferTwoWay && <th className="px-3 py-3 font-medium text-right whitespace-nowrap">Contract</th>}
           </tr>
         </thead>
         <tbody>
           {rows.map((player) => {
-            const salary = salaryOf(player);
+            const nhlSalary = salaryOf(player);
+            const salary = displayedSalary(player);
             const grp = isGoalie ? ("G" as const) : posGroup(player.position, false);
             return (
               <tr key={player.id} className="border-b border-slate-800/40 hover:bg-slate-800/30 transition-colors last:border-0">
@@ -98,6 +104,15 @@ export default function RosterRows({ players, attrs, isGoalie, farm, hideAttrs =
                   <span className={`font-semibold tabular-nums ${salary > 0 ? "text-white" : "text-slate-600"}`}>{fmtM(salary)}</span>
                   {(() => { const yr = player.contractText?.match(/(\d+)\s*yr/i)?.[1]; return yr ? <p className="text-[10px] text-slate-500 tabular-nums">{yr} {yr === "1" ? "year" : "years"}</p> : null; })()}
                 </td>
+                {onOfferTwoWay && <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                  {nhlSalary === 100_000 ? (
+                    <button onClick={() => onOfferTwoWay(player)}
+                      title="Offer a real two-way deal: NHL salary on call-up, $100k salary on the farm"
+                      className="text-[11px] px-2.5 py-1 rounded bg-blue-900/70 hover:bg-blue-800 text-blue-200">Offer 2-way</button>
+                  ) : player.contractType === "TWO_WAY" ? (
+                    <span className="text-[10px] font-bold text-amber-400" title={`$${nhlSalary.toLocaleString("en-US")} NHL / $${(player.ahlSalary ?? 100_000).toLocaleString("en-US")} AHL`}>2-way</span>
+                  ) : <span className="text-slate-700">—</span>}
+                </td>}
               </tr>
             );
           })}

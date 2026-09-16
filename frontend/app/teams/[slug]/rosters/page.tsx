@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { notFound, redirect } from "next/navigation";
 import { canManageTeam } from "@/lib/auth";
 import RosterMover from "@/components/RosterMover";
-import { saveRosterMoves, releasePlayer, placeOnWaiversFromRoster, offerTwoWayFromRoster } from "./actions";
+import { saveRosterMoves, releasePlayer, placeOnWaiversFromRoster } from "./actions";
 import { liveCapHit } from "@/lib/finance";
 import { recallExemptions } from "@/lib/waivers-server";
 import { livePlayerOverall } from "@/lib/player-overall";
@@ -49,7 +49,6 @@ export default async function RostersPage({ params }: { params: Promise<{ slug: 
           contractType: (p.contractType as "ONE_WAY" | "TWO_WAY" | null) ?? null,
           capHit: liveCapHit(p),
           ahlSalary: p.ahlSalary,
-          contractYears: p.contractYears ?? 0,
           onWaivers: p.waiverStatus === "ON_WAIVERS",
           recallExempt: r?.exempt ?? false,
           recallDaysLeft: r?.daysLeft ?? 0,
@@ -59,7 +58,6 @@ export default async function RostersPage({ params }: { params: Promise<{ slug: 
       onSave={saveRosterMoves}
       onRelease={releasePlayer}
       onWaiver={placeOnWaiversFromRoster}
-      onOfferTwoWay={offerTwoWayFromRoster}
     />
   );
 }

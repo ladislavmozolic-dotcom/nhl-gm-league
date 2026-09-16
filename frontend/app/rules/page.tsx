@@ -130,7 +130,7 @@ const SECTIONS: Sec[] = [
     groups: [
       { points: [
         "Every contract has a cap hit and a term (years). A two-way deal has two salaries: its offered NHL salary and a fixed $100,000 AHL salary. The NHL salary counts against the cap only while the player is on the NHL roster; on the farm the club pays the AHL salary and no NHL cap hit is charged.",
-        "A legacy $100,000 farm-only player cannot be called up. His GM may use Offer 2-way in Team Rosters to propose an NHL salary and term; the Agent applies the same age, NHL-experience, term and salary rules as for every other two-way offer. If accepted, the player becomes call-up eligible.",
+        "A legacy $100,000 farm-only player cannot be called up. His GM may use Offer 2-way beside the player in the AHL section of Team Roster to propose an NHL salary and term; the Agent applies the same age, NHL-experience, term and salary rules as for every other two-way offer. If accepted, the player becomes call-up eligible.",
       ] },
       { h: "NTC vs NMC vs Modified-NTC — what each actually protects", points: [
         "NTC (No-Trade Clause) — blocks ANY trade without the player's consent. He can still be exposed to waivers.",
@@ -415,7 +415,7 @@ const SECTIONS_CS: Sec[] = [
     groups: [
       { points: [
         "Každá smlouva má cap hit a délku (roky). Obousměrná smlouva má dva platy: nabídnutý plat pro NHL a pevný plat 100 000 $ pro AHL. NHL plat se počítá do stropu jen tehdy, když je hráč na soupisce NHL; na farmě klub platí AHL plat a hráč nemá NHL cap hit.",
-        "Hráče se starou farmářskou smlouvou 100 000 $ nelze povolat do NHL. Jeho GM mu může v Team Rosters přes Offer 2-way nabídnout NHL plat a délku; Agent použije stejná pravidla věku, zkušeností z NHL, délky a platu jako u ostatních obousměrných nabídek. Po přijetí lze hráče povolat.",
+        "Hráče se starou farmářskou smlouvou 100 000 $ nelze povolat do NHL. Jeho GM mu může přes Offer 2-way u hráče v AHL části Team Roster nabídnout NHL plat a délku; Agent použije stejná pravidla věku, zkušeností z NHL, délky a platu jako u ostatních obousměrných nabídek. Po přijetí lze hráče povolat.",
       ] },
       { h: "NTC vs. NMC vs. modifikovaná NTC — co která opravdu chrání", points: [
         "NTC (no-trade clause) — blokuje JAKOUKOLIV výměnu bez hráčova souhlasu. Na waivery ho ale poslat můžete.",

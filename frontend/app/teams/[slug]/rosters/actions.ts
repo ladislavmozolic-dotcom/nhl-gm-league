@@ -215,6 +215,6 @@ export async function offerTwoWayFromRoster(slug: string, playerId: number, requ
       data: { type: "SIGNING", playerId: player.id, message: `${team.code ?? "?"} converted ${player.name} to a two-way contract — $${(salary / 1_000_000).toFixed(2)}M NHL / $0.10M AHL × ${years}yr` },
     }),
   ]);
-  for (const path of [`/teams/${slug}/rosters`, `/teams/${slug}`, `/teams/${slug}/salary`, "/salary-cap", "/finance", "/signings"]) revalidatePath(path);
+  for (const path of [`/teams/${slug}/roster`, `/teams/${slug}/rosters`, `/teams/${slug}`, `/teams/${slug}/salary`, "/salary-cap", "/finance", "/signings"]) revalidatePath(path);
   return { ok: true as const, name: player.name, capHit: salary, ahlSalary: TWO_WAY_AHL_SALARY, years };
 }
