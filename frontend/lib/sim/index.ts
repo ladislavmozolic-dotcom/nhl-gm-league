@@ -5,6 +5,7 @@ import { buildSkater, buildGoalie, buildTeam } from "./ratings";
 import { simulateGame } from "./engine";
 import { loadTeamLines, loadTeamSystem, autoLines, deployDistinct } from "./lines";
 import type { SimTeam, SkaterAttrs, GoalieAttrs } from "./types";
+import type { TeamLinesData } from "./lines-core";
 
 export * from "./types";
 export { simulateGame } from "./engine";
@@ -28,7 +29,7 @@ const goalieAttrs = (g: any): GoalieAttrs => ({
  * Load a team's active NHL roster and assemble a SimTeam.
  * Uses rosterType='NHL' players; picks the best-overall goalie as starter.
  */
-export async function loadSimTeam(teamId: number, rosterType?: string, opts?: { chemBase?: number; offPos?: { wing: number; center: number; def: number; chemCap: number } }): Promise<SimTeam> {
+export async function loadSimTeam(teamId: number, rosterType?: string, opts?: { chemBase?: number; offPos?: { wing: number; center: number; def: number; chemCap: number } }): Promise<SimTeam & { linesUsed: TeamLinesData }> {
   const team = await prisma.team.findUnique({ where: { id: teamId }, include: { headCoach: true } });
   if (!team) throw new Error(`Team ${teamId} not found`);
   // AHL affiliates dress their AHL roster; NHL clubs their NHL roster
@@ -201,13 +202,17 @@ export async function loadSimTeam(teamId: number, rosterType?: string, opts?: { 
     chemistry = (row?.chemistry as Record<string, number> | null) ?? {};
   }
   const hc = team.headCoach;
-  return buildTeam({
+  const simTeam = buildTeam({
     id: team.id, name: team.name, code: team.code, skaters, goalies, lines,
     chemistry, chemBase: opts?.chemBase ?? 100, offPos: opts?.offPos,
     rivalTeamIds: (team as { rivalTeamIds?: number[] }).rivalTeamIds ?? [],
     coach: hc ? { style: hc.style, ph: hc.ph, df: hc.df, of: hc.of, pd: hc.pd, ex: hc.ex, ld: hc.ld } : null,
     system: dbSystem,
   });
+  // The exact deployed lines (post-distinct-dressing) so a saved game can freeze
+  // a snapshot of what was actually iced — the Lines editor is live and can be
+  // changed by the GM anytime after, which must not rewrite a past game's report.
+  return { ...simTeam, linesUsed: lines };
 }
 
 /** Load both rosters and simulate a single game. */

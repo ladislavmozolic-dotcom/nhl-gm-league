@@ -18,6 +18,9 @@ import { pairSig, unitPairs } from "./chemistry";
 import { computeStandings } from "./standings";
 import { getArenaSections, selloutRevenue, attendanceRate, priceAttendanceFactor } from "../finance";
 import type { SimTeam, SimGoalie, TeamBox } from "./types";
+import type { TeamLinesData } from "./lines-core";
+
+type SeasonTeam = SimTeam & { linesUsed: TeamLinesData };
 
 const DU_HIGH = 85; // durability at/above which CON recovers +2/day instead of +1
 export const PLAY_CON = 95; // a skater must be at CON >= 95 to dress (below = still hurt / rusty)
@@ -133,7 +136,14 @@ type GoalieState = { lastStartRound: number; starts: number };
  * second half of a back-to-back and a tired starter (low CON) is rested — so no
  * goalie plays all 82 and CON stays healthy.
  */
-function chooseStarter(team: SimTeam, prevRound: number, state: Map<number, GoalieState>): SimGoalie {
+function chooseStarter(team: SeasonTeam, prevRound: number, state: Map<number, GoalieState>): SimGoalie {
+  // Honor the GM's explicit starter pick from Lines whenever he's actually fit
+  // to go — the auto-rotation below exists to manage goalies the GM never set
+  // an opinion on, not to overrule a deliberate choice (rest a hot backup, etc).
+  // Same fitness bar as a skater dressing (PLAY_CON) rather than the AI's own
+  // stricter GOALIE_REST_CON, which is tuned for its own rotation heuristic.
+  const picked = team.goalies.find((g) => g.id === team.linesUsed?.situations?.others?.starter);
+  if (picked && picked.con >= PLAY_CON) return picked;
   const scored = [...team.goalies]
     .map((g) => {
       const startedYesterday = (state.get(g.id)?.lastStartRound ?? -99) === prevRound;
@@ -221,7 +231,7 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
       );
     }
   }
-  const cache = new Map<number, SimTeam | null>();
+  const cache = new Map<number, SeasonTeam | null>();
   // Season-long MORALE state that must SURVIVE a mid-season roster reload
   // (injuries force a reload, which otherwise re-reads stale morale from the DB
   // and wipes the in-memory evolution — flattening morale to the base). NB: CON is
@@ -238,7 +248,7 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
       if (moraleState.has(g.id)) g.morale = moraleState.get(g.id)!;
     }
   };
-  const getTeam = async (id: number): Promise<SimTeam | null> => {
+  const getTeam = async (id: number): Promise<SeasonTeam | null> => {
     if (cache.has(id)) return cache.get(id) ?? null;
     try {
       const t = await loadSimTeam(id, undefined, { chemBase: settings.chemistryBase, offPos: { wing: settings.offPosWingPct, center: settings.offPosCenterPct, def: settings.offPosDefPct, chemCap: settings.offPosChemCap } });
@@ -326,7 +336,10 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
     const seed = fixtureSeed(gm.homeTeamId, gm.awayTeamId, round + (gm.simCount ?? 0) * 1_000_003 + gm.id * 7);
     const rivalry = home.rivalTeamIds.includes(away.id) || away.rivalTeamIds.includes(home.id);
     const result = simulateGame(home, away, { seed, settings, rivalry, league: gm.league === "AHL" ? "AHL" : "NHL", engineVersion });
-    await saveGameResult(result, { gameId: gm.id, season, gameDate: gm.gameDate ?? seasonDateFor(season, round) });
+    await saveGameResult(result, {
+      gameId: gm.id, season, gameDate: gm.gameDate ?? seasonDateFor(season, round),
+      homeLines: home.linesUsed, awayLines: away.linesUsed,
+    });
     await storeAttendance(gm); // lock in the real crowd + gate for this home game
 
     // coach fine: a team that racks up too many penalty minutes is fined by the league

@@ -815,6 +815,8 @@ model Game {
   awayAvgShot       Float?
   homeSystem        Json?            // team-system dials the home side played (scouting)
   awaySystem        Json?
+  homeLines         Json?            // exact TeamLinesData actually iced by the home side (Lines tab snapshot — lines can change after the game)
+  awayLines         Json?
   endedIn           String?          // REG | OT | SO
   otPeriods         Int?             @default(0) // sudden-death OT periods played (playoff marathons: 1=OT, 2=2OT…)
   winnerTeamId      Int?

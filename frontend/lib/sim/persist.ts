@@ -3,6 +3,7 @@
 
 import { prisma } from "../prisma";
 import type { GameResult, TeamBox } from "./types";
+import type { TeamLinesData } from "./lines-core";
 
 export type GameMeta = {
   season?: string;
@@ -12,6 +13,8 @@ export type GameMeta = {
   gameId?: number;   // if set, updates a pre-scheduled Game row instead of creating
   seriesId?: number; // playoff series link
   gameNum?: number;  // game number within a playoff series
+  homeLines?: TeamLinesData | null; // exact lines the home side iced — frozen for the game report
+  awayLines?: TeamLinesData | null;
 };
 
 // EDGE zone occupancy → OZ/NZ/DZ percentages (sum ~100) for one side.
@@ -86,6 +89,8 @@ export async function saveGameResult(result: GameResult, meta: GameMeta = {}) {
     awayAvgShot: result.away.shots ? result.away.shotSpeedSum / result.away.shots : null,
     homeSystem: (result.homeSystem ?? undefined) as object | undefined,
     awaySystem: (result.awaySystem ?? undefined) as object | undefined,
+    homeLines: (meta.homeLines ?? undefined) as object | undefined,
+    awayLines: (meta.awayLines ?? undefined) as object | undefined,
     endedIn: result.endedIn,
     otPeriods: result.otPeriods,
     winnerTeamId: result.winner,

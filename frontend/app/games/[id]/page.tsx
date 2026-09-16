@@ -2,20 +2,45 @@ import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import GameView from "@/components/GameView";
 import type { PbpEvent, ShootoutAttempt } from "@/lib/sim/types";
-import { loadTeamLines, autoLines, autoFill, deployDistinct } from "@/lib/sim/lines";
+import { loadTeamLines, autoLines, autoFill, deployDistinct, type TeamLinesData } from "@/lib/sim/lines";
 import { cleanName } from "@/lib/playerName";
 import GameIntegrity from "@/components/GameIntegrity";
 import PostGameIntelCard from "@/components/PostGameIntelCard";
 import { gameStory } from "@/lib/game-report-server";
 import { getTeamSession } from "@/lib/auth";
 
-// Build every line unit for the Lines tab — the manager's lines if set, else the
-// same position-aware auto lines the sim uses — resolved to player names.
-async function buildLineGroups(teamId: number) {
+// Resolve an already-fully-deployed TeamLinesData into the Lines tab's display
+// groups (player ids -> names). Shared by the frozen game-time snapshot and the
+// live-lines fallback below.
+function lineGroupsFromData(ld: TeamLinesData, nameOf: Map<number, string>) {
+  const nm = (id: number | null | undefined) => (id == null ? null : nameOf.get(id) ?? null);
+  const s = ld.situations;
+  const NT = { phy: 1, df: 2, of: 2 };
+  return [
+    { title: "5 vs 5 Forward", cols: ["Left Wing", "Center", "Right Wing"], units: ld.forwardLines.map((l, i) => ({ n: i + 1, players: [nm(l.lw), nm(l.c), nm(l.rw)], tactic: l.tactic ?? NT, wanted: l.timePct })) },
+    { title: "5 vs 5 Defense", cols: ["Left D", "Right D"], units: ld.defensePairs.map((p, i) => ({ n: i + 1, players: [nm(p.ld), nm(p.rd)], tactic: p.tactic ?? NT, wanted: p.timePct })) },
+    { title: "Power Play", cols: ["LW", "C", "RW", "LD", "RD"], units: s.pp.map((u, i) => ({ n: i + 1, players: u.players.map(nm), tactic: u.tactic ?? { phy: 0, df: 1, of: 4 }, wanted: u.timePct })) },
+    { title: "Power Play 4 on 3", cols: ["F1", "F2", "F3", "D1"], units: s.pp4.map((u, i) => ({ n: i + 1, players: u.players.map(nm), tactic: u.tactic ?? { phy: 0, df: 1, of: 4 }, wanted: u.timePct })) },
+    { title: "Penalty Kill (4)", cols: ["C", "W", "LD", "RD"], units: s.pk4.map((u, i) => ({ n: i + 1, players: u.players.map(nm), tactic: u.tactic ?? { phy: 1, df: 4, of: 0 }, wanted: u.timePct })) },
+    { title: "Penalty Kill (3)", cols: ["C", "LD", "RD"], units: s.pk3.map((u, i) => ({ n: i + 1, players: u.players.map(nm), tactic: u.tactic ?? { phy: 1, df: 4, of: 0 }, wanted: u.timePct })) },
+    { title: "4 vs 4", cols: ["C", "W", "LD", "RD"], units: s.fourVFour.map((u, i) => ({ n: i + 1, players: u.players.map(nm), tactic: u.tactic ?? NT, wanted: u.timePct })) },
+    { title: "Overtime (3 vs 3)", cols: ["OT1", "OT2", "OT3"], units: s.overtime.map((u, i) => ({ n: i + 1, players: u.players.map(nm), tactic: u.tactic ?? { phy: 0, df: 1, of: 4 }, wanted: u.timePct })) },
+  ];
+}
+
+// Build every line unit for the Lines tab. `snapshot` is the exact TeamLinesData
+// frozen at simulation time (Game.homeLines/awayLines) — always prefer it, since
+// the GM's live Lines can (and often does) change after the game is played, which
+// must never rewrite a past game's report. Only a game simulated before this
+// snapshot existed (no `snapshot`) falls back to reconstructing from CURRENT
+// lines, which is a best-effort approximation for that older data.
+async function buildLineGroups(teamId: number, snapshot: TeamLinesData | null | undefined) {
   const roster = await prisma.player.findMany({
     where: { teamId }, select: { id: true, name: true, position: true, overall: true, shoots: true, isGoalie: true },
   });
   const nameOf = new Map(roster.map((p) => [p.id, cleanName(p.name)]));
+  if (snapshot) return lineGroupsFromData(snapshot, nameOf);
+
   const skaters = roster.filter((p) => !p.isGoalie);
   const skIn = skaters.map((p) => ({ id: p.id, position: p.position ?? "C", overall: p.overall ?? 50, shoots: p.shoots }));
   const gkIn = roster.filter((p) => p.isGoalie).map((p) => ({ id: p.id, overall: p.overall ?? 50 }));
@@ -32,19 +57,7 @@ async function buildLineGroups(teamId: number) {
   const dressedF = skaters.filter((p) => !isDefPos(p.position ?? "")).sort(byOv).map((p) => p.id).slice(0, 12);
   const dressedD = skaters.filter((p) => isDefPos(p.position ?? "")).sort(byOv).map((p) => p.id).slice(0, 6);
   deployDistinct(ld, dressedF, dressedD);
-  const nm = (id: number | null | undefined) => (id == null ? null : nameOf.get(id) ?? null);
-  const s = ld.situations;
-  const NT = { phy: 1, df: 2, of: 2 };
-  return [
-    { title: "5 vs 5 Forward", cols: ["Left Wing", "Center", "Right Wing"], units: ld.forwardLines.map((l, i) => ({ n: i + 1, players: [nm(l.lw), nm(l.c), nm(l.rw)], tactic: l.tactic ?? NT, wanted: l.timePct })) },
-    { title: "5 vs 5 Defense", cols: ["Left D", "Right D"], units: ld.defensePairs.map((p, i) => ({ n: i + 1, players: [nm(p.ld), nm(p.rd)], tactic: p.tactic ?? NT, wanted: p.timePct })) },
-    { title: "Power Play", cols: ["LW", "C", "RW", "LD", "RD"], units: s.pp.map((u, i) => ({ n: i + 1, players: u.players.map(nm), tactic: u.tactic ?? { phy: 0, df: 1, of: 4 }, wanted: u.timePct })) },
-    { title: "Power Play 4 on 3", cols: ["F1", "F2", "F3", "D1"], units: s.pp4.map((u, i) => ({ n: i + 1, players: u.players.map(nm), tactic: u.tactic ?? { phy: 0, df: 1, of: 4 }, wanted: u.timePct })) },
-    { title: "Penalty Kill (4)", cols: ["C", "W", "LD", "RD"], units: s.pk4.map((u, i) => ({ n: i + 1, players: u.players.map(nm), tactic: u.tactic ?? { phy: 1, df: 4, of: 0 }, wanted: u.timePct })) },
-    { title: "Penalty Kill (3)", cols: ["C", "LD", "RD"], units: s.pk3.map((u, i) => ({ n: i + 1, players: u.players.map(nm), tactic: u.tactic ?? { phy: 1, df: 4, of: 0 }, wanted: u.timePct })) },
-    { title: "4 vs 4", cols: ["C", "W", "LD", "RD"], units: s.fourVFour.map((u, i) => ({ n: i + 1, players: u.players.map(nm), tactic: u.tactic ?? NT, wanted: u.timePct })) },
-    { title: "Overtime (3 vs 3)", cols: ["OT1", "OT2", "OT3"], units: s.overtime.map((u, i) => ({ n: i + 1, players: u.players.map(nm), tactic: u.tactic ?? { phy: 0, df: 1, of: 4 }, wanted: u.timePct })) },
-  ];
+  return lineGroupsFromData(ld, nameOf);
 }
 
 export default async function GamePage({ params }: { params: Promise<{ id: string }> }) {
@@ -131,7 +144,8 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
     .sort((a, b) => Number(b.started) - Number(a.started));
 
   const [homeLines, awayLines] = await Promise.all([
-    buildLineGroups(game.homeTeamId), buildLineGroups(game.awayTeamId),
+    buildLineGroups(game.homeTeamId, game.homeLines as TeamLinesData | null),
+    buildLineGroups(game.awayTeamId, game.awayLines as TeamLinesData | null),
   ]);
 
   // injuries that happened in THIS game (from the event stream) — timed, with cause

@@ -123,7 +123,10 @@ export async function playSeries(seriesId: number, season: string) {
     const year = parseInt(season.slice(0, 4), 10) || 2026;
     const dayIdx = 200 + (s.round - 1) * 16 + gameNum * 2;
     const gameDate = new Date(Date.UTC(year, 9, 1) + dayIdx * 86_400_000);
-    await saveGameResult(result, { season, league: s.league, round: s.round, seriesId, gameNum: gameNum + 1, gameDate });
+    await saveGameResult(result, {
+      season, league: s.league, round: s.round, seriesId, gameNum: gameNum + 1, gameDate,
+      homeLines: home.linesUsed, awayLines: away.linesUsed,
+    });
     if (result.winner === s.highSeedTeamId) hiW++; else loW++;
     gameNum++;
   }
@@ -257,7 +260,10 @@ export async function advancePlayoffDay(season: string, league: string, dayStart
     const home = highHome ? high : low, away = highHome ? low : high;
     const seed = fixtureSeed(s.id * 101 + (g.gameNum ?? 1), s.highSeedTeamId, s.round);
     const result = simulateGame(home, away, { seed, settings, noShootout: true, engineVersion });
-    await saveGameResult(result, { gameId: g.id, season, league, round: s.round, seriesId: s.id, gameNum: g.gameNum ?? 1, gameDate: g.gameDate ?? dayStart });
+    await saveGameResult(result, {
+      gameId: g.id, season, league, round: s.round, seriesId: s.id, gameNum: g.gameNum ?? 1, gameDate: g.gameDate ?? dayStart,
+      homeLines: home.linesUsed, awayLines: away.linesUsed,
+    });
     const hiW = s.highWins + (result.winner === s.highSeedTeamId ? 1 : 0);
     const loW = s.lowWins + (result.winner === s.lowSeedTeamId ? 1 : 0);
     const done = hiW >= need || loW >= need;

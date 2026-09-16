@@ -13,6 +13,7 @@ import { injuryConTarget, syncChem, updateInjuryCon } from "./sim/season";
 import { loadSettings } from "./sim/settings";
 import { activeSimEngine, engineVersionFor } from "./sim/version";
 import type { SimTeam } from "./sim/types";
+import type { TeamLinesData } from "./sim/lines-core";
 import { PRE_SEASON, REGULAR_SEASON } from "./phase";
 
 export { PRE_SEASON };
@@ -169,7 +170,7 @@ async function simPreseason(where: object): Promise<{ played: number }> {
   });
   if (scheduled.length === 0) return { played: 0 };
 
-  const cache = new Map<number, SimTeam | null>();
+  const cache = new Map<number, (SimTeam & { linesUsed: TeamLinesData }) | null>();
   const starts = new Map<number, number>(); // per-team games played → rotate the starter
   const getTeam = async (id: number) => {
     if (cache.has(id)) return cache.get(id) ?? null;
@@ -209,7 +210,10 @@ async function simPreseason(where: object): Promise<{ played: number }> {
     const result = simulateGame(home, away, { seed, settings, rivalry, league, engineVersion });
     // Full box score stays isolated under the PRE season string; CON and injuries
     // carry over because they affect who can dress for the next exhibition game.
-    await saveGameResult(result, { gameId: gm.id, season: PRE_SEASON, gameDate: gm.gameDate ?? preseasonDate(gm.round ?? 0), round: gm.round ?? 0 });
+    await saveGameResult(result, {
+      gameId: gm.id, season: PRE_SEASON, gameDate: gm.gameDate ?? preseasonDate(gm.round ?? 0), round: gm.round ?? 0,
+      homeLines: home.linesUsed, awayLines: away.linesUsed,
+    });
     await persistPreseasonPlayerState(result, home, away);
     for (const injury of result.injuries) cache.delete(injury.teamId);
     played++;
