@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import GameView from "@/components/GameView";
 import type { PbpEvent, ShootoutAttempt } from "@/lib/sim/types";
-import { loadTeamLines, autoLines, autoFill, deployDistinct, type TeamLinesData } from "@/lib/sim/lines";
+import type { TeamLinesData } from "@/lib/sim/lines";
 import { cleanName } from "@/lib/playerName";
 import GameIntegrity from "@/components/GameIntegrity";
 import PostGameIntelCard from "@/components/PostGameIntelCard";
@@ -28,36 +28,97 @@ function lineGroupsFromData(ld: TeamLinesData, nameOf: Map<number, string>) {
   ];
 }
 
+type BoxSkater = { playerId: number; toi: number; ppToi: number; pkToi: number; name: string; position: string | null };
+
+const isDefPos = (pos: string | null) => /(^|\/)D(\/|$)/.test(pos ?? "") || pos === "D";
+const chunk = <T,>(arr: T[], n: number) => {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
+  return out;
+};
+const shareOf = (group: BoxSkater[], total: number, key: "toi" | "ppToi" | "pkToi" = "toi") =>
+  total > 0 ? Math.round((group.reduce((a, s) => a + s[key], 0) / total) * 1000) / 10 : 0;
+
+// A pre-fix game has no frozen snapshot (see below), so reconstruct the Lines tab
+// straight from what was actually PLAYED — the persisted box score — instead of
+// today's live (and by now likely different) Lines. Every name shown here is
+// guaranteed to have an actual stat row for this exact game; grouping into
+// lines/pairs/PP/PK units is inferred from ice-time rank (best-effort — the real
+// linemate pairings from that night were never recorded before this fix shipped).
+async function reconstructFromBoxScore(gameId: number, teamId: number) {
+  const skaterRows = await prisma.playerGameStat.findMany({
+    where: { gameId, teamId },
+    select: { playerId: true, toi: true, ppToi: true, pkToi: true, player: { select: { name: true, position: true } } },
+  });
+  const skaters: BoxSkater[] = skaterRows.map((s) => ({
+    playerId: s.playerId, toi: s.toi, ppToi: s.ppToi ?? 0, pkToi: s.pkToi ?? 0,
+    name: cleanName(s.player.name), position: s.player.position,
+  }));
+  const nm = (s: BoxSkater | undefined) => s?.name ?? null;
+  const NT = { phy: 1, df: 2, of: 2 };
+
+  // 5v5 forward lines / D pairs, ranked by even-strength TOI (total minus special
+  // teams) so a PP/PK workhorse doesn't out-rank his actual 5v5 linemates.
+  const evToi = (s: BoxSkater) => Math.max(0, s.toi - s.ppToi - s.pkToi);
+  const fwds = skaters.filter((s) => !isDefPos(s.position)).sort((a, b) => evToi(b) - evToi(a));
+  const defs = skaters.filter((s) => isDefPos(s.position)).sort((a, b) => evToi(b) - evToi(a));
+  const totalFEv = fwds.reduce((a, s) => a + evToi(s), 0);
+  const totalDEv = defs.reduce((a, s) => a + evToi(s), 0);
+  const slotForward = (three: BoxSkater[]) => {
+    const c = three.find((p) => (p.position ?? "").includes("C")) ?? three[0];
+    const rest = three.filter((p) => p !== c);
+    const rw = rest.find((p) => (p.position ?? "").includes("RW")) ?? rest[0];
+    const lw = rest.find((p) => p !== rw) ?? rest[1];
+    return [nm(lw), nm(c), nm(rw)];
+  };
+  const forwardLines = chunk(fwds, 3).slice(0, 4).map((line, i) => ({
+    n: i + 1, players: slotForward(line), tactic: NT,
+    wanted: totalFEv > 0 ? Math.round((line.reduce((a, s) => a + evToi(s), 0) / totalFEv) * 1000) / 10 : 0,
+  }));
+  const defensePairs = chunk(defs, 2).slice(0, 3).map((pair, i) => ({
+    n: i + 1, players: [nm(pair[0]), nm(pair[1])], tactic: NT,
+    wanted: totalDEv > 0 ? Math.round((pair.reduce((a, s) => a + evToi(s), 0) / totalDEv) * 1000) / 10 : 0,
+  }));
+
+  // Power play / penalty kill: same idea, ranked by that special-teams TOI itself.
+  const ppF = [...skaters].filter((s) => !isDefPos(s.position) && s.ppToi > 0).sort((a, b) => b.ppToi - a.ppToi);
+  const ppD = [...skaters].filter((s) => isDefPos(s.position) && s.ppToi > 0).sort((a, b) => b.ppToi - a.ppToi);
+  const ppUnits = chunk(ppF, 3).slice(0, 2).map((f, i) => {
+    const d = chunk(ppD, 2)[i] ?? [];
+    return { n: i + 1, players: [nm(f[0]), nm(f[1]), nm(f[2]), nm(d[0]), nm(d[1])], tactic: { phy: 0, df: 1, of: 4 }, wanted: shareOf(f, ppF.reduce((a, s) => a + s.ppToi, 0), "ppToi") };
+  });
+  const pkF = [...skaters].filter((s) => !isDefPos(s.position) && s.pkToi > 0).sort((a, b) => b.pkToi - a.pkToi);
+  const pkD = [...skaters].filter((s) => isDefPos(s.position) && s.pkToi > 0).sort((a, b) => b.pkToi - a.pkToi);
+  const pk4Units = chunk(pkF, 2).slice(0, 2).map((f, i) => {
+    const d = chunk(pkD, 2)[i] ?? [];
+    return { n: i + 1, players: [nm(f[0]), nm(f[1]), nm(d[0]), nm(d[1])], tactic: { phy: 1, df: 4, of: 0 }, wanted: shareOf(f, pkF.reduce((a, s) => a + s.pkToi, 0), "pkToi") };
+  });
+
+  return [
+    { title: "5 vs 5 Forward", cols: ["Left Wing", "Center", "Right Wing"], units: forwardLines },
+    { title: "5 vs 5 Defense", cols: ["Left D", "Right D"], units: defensePairs },
+    { title: "Power Play", cols: ["LW", "C", "RW", "LD", "RD"], units: ppUnits },
+    { title: "Power Play 4 on 3", cols: ["F1", "F2", "F3", "D1"], units: [] as typeof ppUnits },
+    { title: "Penalty Kill (4)", cols: ["C", "W", "LD", "RD"], units: pk4Units },
+    { title: "Penalty Kill (3)", cols: ["C", "LD", "RD"], units: [] as typeof pk4Units },
+    { title: "4 vs 4", cols: ["C", "W", "LD", "RD"], units: [] as typeof pk4Units },
+    { title: "Overtime (3 vs 3)", cols: ["OT1", "OT2", "OT3"], units: [] as typeof pk4Units },
+  ];
+}
+
 // Build every line unit for the Lines tab. `snapshot` is the exact TeamLinesData
 // frozen at simulation time (Game.homeLines/awayLines) — always prefer it, since
 // the GM's live Lines can (and often does) change after the game is played, which
-// must never rewrite a past game's report. Only a game simulated before this
-// snapshot existed (no `snapshot`) falls back to reconstructing from CURRENT
-// lines, which is a best-effort approximation for that older data.
-async function buildLineGroups(teamId: number, snapshot: TeamLinesData | null | undefined) {
-  const roster = await prisma.player.findMany({
-    where: { teamId }, select: { id: true, name: true, position: true, overall: true, shoots: true, isGoalie: true },
-  });
-  const nameOf = new Map(roster.map((p) => [p.id, cleanName(p.name)]));
-  if (snapshot) return lineGroupsFromData(snapshot, nameOf);
-
-  const skaters = roster.filter((p) => !p.isGoalie);
-  const skIn = skaters.map((p) => ({ id: p.id, position: p.position ?? "C", overall: p.overall ?? 50, shoots: p.shoots }));
-  const gkIn = roster.filter((p) => p.isGoalie).map((p) => ({ id: p.id, overall: p.overall ?? 50 }));
-  // Manager lines if set, else position-aware auto lines. Either way run autoFill
-  // so empty special-teams slots (PP/PK/4v4/OT) get a proper, deduped lineup — the
-  // stored situations can be empty, and each unit must be distinct (no OT1 = OT2,
-  // no 3 defencemen on PK3). Manager-set slots are preserved (autoFill fills only nulls).
-  const ld = autoFill((await loadTeamLines(teamId)) ?? autoLines(skIn, gkIn), skIn, gkIn);
-  // Show exactly what the sim iced: 12 different forwards + 6 different D. A
-  // manager double-shift (a star in two lines) is resolved to the real depth
-  // players so line 4 never mirrors line 1.
-  const isDefPos = (pos: string) => /(^|\/)D(\/|$)/.test(pos) || pos === "D";
-  const byOv = (a: { overall: number | null }, b: { overall: number | null }) => (b.overall ?? 0) - (a.overall ?? 0);
-  const dressedF = skaters.filter((p) => !isDefPos(p.position ?? "")).sort(byOv).map((p) => p.id).slice(0, 12);
-  const dressedD = skaters.filter((p) => isDefPos(p.position ?? "")).sort(byOv).map((p) => p.id).slice(0, 6);
-  deployDistinct(ld, dressedF, dressedD);
-  return lineGroupsFromData(ld, nameOf);
+// must never rewrite a past game's report. A game simulated before this snapshot
+// existed (no `snapshot`) instead reconstructs from that game's own box score —
+// never from today's live Lines, which by now may bear no relation to it.
+async function buildLineGroups(teamId: number, snapshot: TeamLinesData | null | undefined, gameId: number) {
+  if (snapshot) {
+    const roster = await prisma.player.findMany({ where: { teamId }, select: { id: true, name: true } });
+    const nameOf = new Map(roster.map((p) => [p.id, cleanName(p.name)]));
+    return lineGroupsFromData(snapshot, nameOf);
+  }
+  return reconstructFromBoxScore(gameId, teamId);
 }
 
 export default async function GamePage({ params }: { params: Promise<{ id: string }> }) {
@@ -144,8 +205,8 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
     .sort((a, b) => Number(b.started) - Number(a.started));
 
   const [homeLines, awayLines] = await Promise.all([
-    buildLineGroups(game.homeTeamId, game.homeLines as TeamLinesData | null),
-    buildLineGroups(game.awayTeamId, game.awayLines as TeamLinesData | null),
+    buildLineGroups(game.homeTeamId, game.homeLines as TeamLinesData | null, game.id),
+    buildLineGroups(game.awayTeamId, game.awayLines as TeamLinesData | null, game.id),
   ]);
 
   // injuries that happened in THIS game (from the event stream) — timed, with cause
