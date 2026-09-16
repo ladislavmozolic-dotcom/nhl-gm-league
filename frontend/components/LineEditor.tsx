@@ -574,6 +574,14 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
 
   const others = data.situations.others;
   const setOther = <K extends keyof typeof others>(k: K, v: (typeof others)[K]) => change((d) => { (d.situations.others[k] as typeof v) = v; });
+  // Picking a goalie already on the OTHER depth slot swaps them (the natural
+  // "make him the starter instead" gesture) rather than being blocked or
+  // silently creating a duplicate in both slots.
+  const setGoalieSlot = (slot: "starter" | "backup", v: number | null) => change((d) => {
+    const other: "starter" | "backup" = slot === "starter" ? "backup" : "starter";
+    if (v != null && v === d.situations.others[other]) d.situations.others[other] = d.situations.others[slot];
+    d.situations.others[slot] = v;
+  });
   const setOtherList = (k: "extraForwards" | "extraDefense" | "shootout", i: number, v: number | null) =>
     change((d) => { d.situations.others[k][i] = v; });
   const setLastMin = (k: "off" | "def", i: number, v: number | null) => change((d) => { d.situations.lastMin[k][i] = v; });
@@ -706,10 +714,8 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
             <p className="text-xs text-slate-400 mt-1">Set the starter and backup used by the next simulation.</p>
           </div>
           <div className="lines-goalie-depth-grid">
-            <GoalieDepthCard role="G1" value={others.starter} onChange={(v) => setOther("starter", v)} starter
-              pool={goaliesByName.filter((g) => g.id !== others.backup || g.id === others.starter)} />
-            <GoalieDepthCard role="G2" value={others.backup} onChange={(v) => setOther("backup", v)}
-              pool={goaliesByName.filter((g) => g.id !== others.starter || g.id === others.backup)} />
+            <GoalieDepthCard role="G1" value={others.starter} onChange={(v) => setGoalieSlot("starter", v)} starter />
+            <GoalieDepthCard role="G2" value={others.backup} onChange={(v) => setGoalieSlot("backup", v)} />
           </div>
         </section>
       )}
