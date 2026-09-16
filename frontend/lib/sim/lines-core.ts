@@ -246,6 +246,27 @@ export function autoFill(data: TeamLinesData, skaters: Skater[], goalies: Goalie
     if (pair.rd == null) pair.rd = pickD();
   }
 
+  // Only the 12F + 6D placed in the even-strength lineup are dressed for this
+  // game. A 13th forward / 7th defenseman may still belong to the active club
+  // roster, but cannot appear only on PP/PK/OT while being absent from all four
+  // forward lines / three defense pairs. Scrub those stale ids before filling
+  // the situational units from the dressed pool.
+  const dressedIds = new Set<number>();
+  for (const l of d.forwardLines) for (const id of [l.lw, l.c, l.rw]) if (id != null) dressedIds.add(id);
+  for (const p of d.defensePairs) for (const id of [p.ld, p.rd]) if (id != null) dressedIds.add(id);
+  const dressedFwd = fwd.filter((p) => dressedIds.has(p.id));
+  const dressedDef = def.filter((p) => dressedIds.has(p.id));
+  const dressedAll = all.filter((p) => dressedIds.has(p.id));
+  const scrubDressed = (id: number | null) => (id != null && dressedIds.has(id) ? id : null);
+  for (const group of [d.situations.pp, d.situations.fourVFour, d.situations.pk4, d.situations.pk3, d.situations.overtime])
+    for (const u of group) u.players = u.players.map(scrubDressed);
+  d.situations.others.subPP = scrubDressed(d.situations.others.subPP);
+  d.situations.others.subPK1 = scrubDressed(d.situations.others.subPK1);
+  d.situations.others.subPK2 = scrubDressed(d.situations.others.subPK2);
+  d.situations.others.shootout = d.situations.others.shootout.map(scrubDressed);
+  d.situations.lastMin.off = d.situations.lastMin.off.map(scrubDressed);
+  d.situations.lastMin.def = d.situations.lastMin.def.map(scrubDressed);
+
   // generic unit filler: dedups ACROSS every unit of the group (so unit 1 and
   // unit 2 never share a player — e.g. OT1 vs OT2), preferring `pool` then all
   // skaters. Hand-set players are kept and seed the used set.
@@ -255,7 +276,7 @@ export function autoFill(data: TeamLinesData, skaters: Skater[], goalies: Goalie
     for (const u of units) {
       for (let i = 0; i < u.players.length; i++) {
         if (u.players[i] != null) continue;
-        const p = pool.find((x) => !used.has(x.id)) ?? all.find((x) => !used.has(x.id));
+        const p = pool.find((x) => !used.has(x.id)) ?? dressedAll.find((x) => !used.has(x.id));
         if (p) { u.players[i] = p.id; used.add(p.id); }
       }
     }
@@ -277,23 +298,23 @@ export function autoFill(data: TeamLinesData, skaters: Skater[], goalies: Goalie
         // an F seat by the fallback below (when forwards ran short), and
         // picking him again for the D seat would double-book that one player.
         const free = (x: Skater) => !usedF.has(x.id) && !usedD.has(x.id);
-        const p = pool.find(free) ?? all.find(free);
+        const p = pool.find(free) ?? dressedAll.find(free);
         if (p) { u.players[i] = p.id; used.add(p.id); }
       }
     }
   };
   const dfKey = (s: Skater) => s.df ?? 0;
-  const fwdByDf = [...fwd].sort((a, b) => dfKey(b) - dfKey(a)); // defensive forwards first (for the PK)
-  const defByDf = [...def].sort((a, b) => dfKey(b) - dfKey(a));
-  splitFill(d.situations.pp, 3, fwd, def);           // PP: best forwards (overall) + best D
-  splitFill(d.situations.fourVFour, 2, fwd, def);
+  const fwdByDf = [...dressedFwd].sort((a, b) => dfKey(b) - dfKey(a)); // defensive forwards first (for the PK)
+  const defByDf = [...dressedDef].sort((a, b) => dfKey(b) - dfKey(a));
+  splitFill(d.situations.pp, 3, dressedFwd, dressedDef);           // PP: best forwards (overall) + best D
+  splitFill(d.situations.fourVFour, 2, dressedFwd, dressedDef);
   // PK: prefer the most defensive forwards, and NOT the PP forwards (both PP units)
   const ppFwds = new Set(d.situations.pp.flatMap((u) => u.players.slice(0, 3)).filter((x): x is number => x != null));
   splitFill(d.situations.pk4, 2, fwdByDf, defByDf, new Set(ppFwds));
   // PK3 (3-on-5) = 1 defensive forward + 2 defencemen, deduped across both units.
   splitFill(d.situations.pk3, 1, fwdByDf, defByDf, new Set(ppFwds));
   // Overtime (3-on-3): 3 skaters per unit, unit 1 ≠ unit 2.
-  fillUnits(d.situations.overtime, all);
+  fillUnits(d.situations.overtime, dressedAll);
 
   // others
   const o = d.situations.others;
@@ -305,10 +326,10 @@ export function autoFill(data: TeamLinesData, skaters: Skater[], goalies: Goalie
   };
   fillList(o.extraForwards, fwd);
   fillList(o.extraDefense, def);
-  if (o.subPP == null) o.subPP = fwd[0]?.id ?? null;
-  if (o.subPK1 == null) o.subPK1 = def[0]?.id ?? null;
-  if (o.subPK2 == null) o.subPK2 = def[1]?.id ?? null;
-  fillList(o.shootout, all);
+  if (o.subPP == null) o.subPP = dressedFwd[0]?.id ?? null;
+  if (o.subPK1 == null) o.subPK1 = dressedDef[0]?.id ?? null;
+  if (o.subPK2 == null) o.subPK2 = dressedDef[1]?.id ?? null;
+  fillList(o.shootout, dressedAll);
 
   // last minute: fixed seats by position (C/LW/RW[/extra F] then D), same
   // split as the forward lines/D pairs — a forward never backfills a D seat
@@ -318,12 +339,12 @@ export function autoFill(data: TeamLinesData, skaters: Skater[], goalies: Goalie
     for (let i = 0; i < list.length; i++) {
       if (list[i] != null) continue;
       const pool = i < dStartIndex ? fPool : dPool;
-      const p = pool.find((x) => !used.has(x.id)) ?? all.find((x) => !used.has(x.id));
+      const p = pool.find((x) => !used.has(x.id)) ?? dressedAll.find((x) => !used.has(x.id));
       if (p) { list[i] = p.id; used.add(p.id); }
     }
   };
-  fillSplit(d.situations.lastMin.off, 4, fwd, def);
-  fillSplit(d.situations.lastMin.def, 3, fwd, def);
+  fillSplit(d.situations.lastMin.off, 4, dressedFwd, dressedDef);
+  fillSplit(d.situations.lastMin.def, 3, dressedFwd, dressedDef);
   return d;
 }
 
@@ -406,4 +427,3 @@ export function normalize(data: Partial<TeamLinesData>): TeamLinesData {
     system: data.system ? mergeTactics(data.system) : undefined,
   };
 }
-

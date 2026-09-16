@@ -78,16 +78,25 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
   const byName = (a: Player, b: Player) => a.name.localeCompare(b.name);
   const forwards = useMemo(() => players.filter((p) => !isD(p.position)).sort(byName), [players]);
   const defense = useMemo(() => players.filter((p) => isD(p.position)).sort(byName), [players]);
+  const dressedIds = useMemo(() => {
+    const ids = new Set<number>();
+    for (const l of data.forwardLines) for (const id of [l.lw, l.c, l.rw]) if (id != null) ids.add(id);
+    for (const p of data.defensePairs) for (const id of [p.ld, p.rd]) if (id != null) ids.add(id);
+    return ids;
+  }, [data.forwardLines, data.defensePairs]);
+  const dressedForwards = useMemo(() => forwards.filter((p) => dressedIds.has(p.id)), [forwards, dressedIds]);
+  const dressedDefense = useMemo(() => defense.filter((p) => dressedIds.has(p.id)), [defense, dressedIds]);
+  const dressedPlayers = useMemo(() => players.filter((p) => dressedIds.has(p.id)), [players, dressedIds]);
   // PP/PK blue-line slots accept a forward too (a 4F-1D power play, or a
   // bigger/more physical forward manning the point on the kill) — defencemen
   // listed first.
-  const stPointPool = useMemo(() => [...defense, ...forwards], [defense, forwards]);
+  const stPointPool = useMemo(() => [...dressedDefense, ...dressedForwards], [dressedDefense, dressedForwards]);
   // And the reverse: a PP/PK forward slot accepts a defenseman too — a role
   // like Net Coverage/Net-Front is a fixed SEAT (see formation-layout.ts),
   // not a real-position restriction, so a GM who wants a rangy D down low
   // instead of a forward can just put him in that seat directly. Forwards
   // listed first, matching the F-table's usual order.
-  const allSkatersPool = useMemo(() => [...forwards, ...defense], [forwards, defense]);
+  const allSkatersPool = useMemo(() => [...dressedForwards, ...dressedDefense], [dressedForwards, dressedDefense]);
   const goaliesByName = useMemo(() => [...goalies].sort(byName), [goalies]);
 
   // Line chemistry — a 0..100 bond that grows while a unit stays intact and drops
@@ -192,11 +201,10 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
   // browser fall back to its native popup styling, which on a dark-mode OS
   // can render white-on-white until an option is hovered/highlighted.
   const Select = ({ value, onChange, pool, overlay = false }: { value: number | null; onChange: (v: number | null) => void; pool: Player[]; overlay?: boolean }) => (
-    <select value={value ?? ""} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
+    <select value={value != null && pool.some((p) => p.id === value) ? value : ""} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
       style={{ colorScheme: "dark" }}
       className={overlay ? "absolute inset-0 w-full h-full opacity-0 cursor-pointer" : "w-full min-w-[132px] bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-sm"}>
       <option value="" style={{ backgroundColor: "#0f172a", color: "#e2e8f0" }}>— empty —</option>
-      {value != null && !pool.some((p) => p.id === value) && <option value={value} style={{ backgroundColor: "#0f172a", color: "#e2e8f0" }}>{nameOf(value)}</option>}
       {pool.map((p) => <option key={p.id} value={p.id} disabled={p.injured} style={{ backgroundColor: "#0f172a", color: "#e2e8f0" }}>{p.name}{p.cap ? ` (${p.cap})` : ""} · {p.position} ({p.overall}){p.con != null ? ` · CON ${p.con}%${p.con < 90 ? " ⚠️" : ""}` : ""}{p.injured ? " 🤕 INJ" : ""}</option>)}
     </select>
   );
@@ -467,9 +475,9 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
   // reassignment).
   const SplitUnitSection = (
     key: "pp" | "fourVFour" | "pk4" | "pk3", title: string, fLabels: string[], dLabels: string[],
-    dPool: Player[] = defense, dHint?: string,
+    dPool: Player[] = dressedDefense, dHint?: string,
     roleInfo?: { dial: "ppStyle" | "pkStyle"; layouts: Record<string, FormationRole[]> },
-    fPool: Player[] = forwards,
+    fPool: Player[] = dressedForwards,
   ) => {
     const units = data.situations[key];
     const nF = fLabels.length, nD = dLabels.length;
@@ -629,7 +637,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
         </div>
         {SplitUnitSection("pk3", "Penalty Kill (3 on 5)", ["F1"], ["D1", "D2"], stPointPool, "💡 Ktorýkoľvek slot môže mať útočníka aj obrancu — dropdown ponúka oboje na oboch pozíciách.", { dial: "pkStyle", layouts: PK3_LAYOUTS }, allSkatersPool)}
       </>}
-      {tab === "Overtime" && UnitSection("overtime", "Overtime (3 vs 3)", ["OT1", "OT2", "OT3"], () => players)}
+      {tab === "Overtime" && UnitSection("overtime", "Overtime (3 vs 3)", ["OT1", "OT2", "OT3"], () => dressedPlayers)}
 
       {tab === "Others" && (
         <div className="space-y-6">
@@ -642,11 +650,11 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
             <ListBlock title="Extra Defense" values={others.extraDefense} pool={defense} onSet={(i, v) => setOtherList("extraDefense", i, v)} Select={Select} />
           </div>
           <UnitBlock title="Substitutes" head={["Situation", "Player"]}>
-            <ORow label="Power-play sub"><Select value={others.subPP} onChange={(v) => setOther("subPP", v)} pool={players} /></ORow>
-            <ORow label="Penalty-kill 1 sub"><Select value={others.subPK1} onChange={(v) => setOther("subPK1", v)} pool={players} /></ORow>
-            <ORow label="Penalty-kill 2 sub"><Select value={others.subPK2} onChange={(v) => setOther("subPK2", v)} pool={players} /></ORow>
+            <ORow label="Power-play sub"><Select value={others.subPP} onChange={(v) => setOther("subPP", v)} pool={dressedPlayers} /></ORow>
+            <ORow label="Penalty-kill 1 sub"><Select value={others.subPK1} onChange={(v) => setOther("subPK1", v)} pool={dressedPlayers} /></ORow>
+            <ORow label="Penalty-kill 2 sub"><Select value={others.subPK2} onChange={(v) => setOther("subPK2", v)} pool={dressedPlayers} /></ORow>
           </UnitBlock>
-          <ListBlock title="Shootout order (1 → 5)" values={others.shootout} pool={players} numbered onSet={(i, v) => setOtherList("shootout", i, v)} Select={Select} />
+          <ListBlock title="Shootout order (1 → 5)" values={others.shootout} pool={dressedPlayers} numbered onSet={(i, v) => setOtherList("shootout", i, v)} Select={Select} />
         </div>
       )}
 
@@ -658,19 +666,19 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
               extra attacker up front, still 2 D back); def = goalie in net (a
               normal 3F+2D shift). */}
           <UnitBlock title="Offensive — chase the tie (goalie pulled)" head={["Pos", "Player"]}>
-            <ORow label="C"><Select value={data.situations.lastMin.off[0]} onChange={(v) => setLastMin("off", 0, v)} pool={forwards} /></ORow>
-            <ORow label="LW"><Select value={data.situations.lastMin.off[1]} onChange={(v) => setLastMin("off", 1, v)} pool={forwards} /></ORow>
-            <ORow label="RW"><Select value={data.situations.lastMin.off[2]} onChange={(v) => setLastMin("off", 2, v)} pool={forwards} /></ORow>
-            <ORow label="F (extra attacker)"><Select value={data.situations.lastMin.off[3]} onChange={(v) => setLastMin("off", 3, v)} pool={forwards} /></ORow>
-            <ORow label="LD"><Select value={data.situations.lastMin.off[4]} onChange={(v) => setLastMin("off", 4, v)} pool={defense} /></ORow>
-            <ORow label="RD"><Select value={data.situations.lastMin.off[5]} onChange={(v) => setLastMin("off", 5, v)} pool={defense} /></ORow>
+            <ORow label="C"><Select value={data.situations.lastMin.off[0]} onChange={(v) => setLastMin("off", 0, v)} pool={dressedForwards} /></ORow>
+            <ORow label="LW"><Select value={data.situations.lastMin.off[1]} onChange={(v) => setLastMin("off", 1, v)} pool={dressedForwards} /></ORow>
+            <ORow label="RW"><Select value={data.situations.lastMin.off[2]} onChange={(v) => setLastMin("off", 2, v)} pool={dressedForwards} /></ORow>
+            <ORow label="F (extra attacker)"><Select value={data.situations.lastMin.off[3]} onChange={(v) => setLastMin("off", 3, v)} pool={dressedForwards} /></ORow>
+            <ORow label="LD"><Select value={data.situations.lastMin.off[4]} onChange={(v) => setLastMin("off", 4, v)} pool={dressedDefense} /></ORow>
+            <ORow label="RD"><Select value={data.situations.lastMin.off[5]} onChange={(v) => setLastMin("off", 5, v)} pool={dressedDefense} /></ORow>
           </UnitBlock>
           <UnitBlock title="Defensive — protect the lead" head={["Pos", "Player"]}>
-            <ORow label="C"><Select value={data.situations.lastMin.def[0]} onChange={(v) => setLastMin("def", 0, v)} pool={forwards} /></ORow>
-            <ORow label="LW"><Select value={data.situations.lastMin.def[1]} onChange={(v) => setLastMin("def", 1, v)} pool={forwards} /></ORow>
-            <ORow label="RW"><Select value={data.situations.lastMin.def[2]} onChange={(v) => setLastMin("def", 2, v)} pool={forwards} /></ORow>
-            <ORow label="LD"><Select value={data.situations.lastMin.def[3]} onChange={(v) => setLastMin("def", 3, v)} pool={defense} /></ORow>
-            <ORow label="RD"><Select value={data.situations.lastMin.def[4]} onChange={(v) => setLastMin("def", 4, v)} pool={defense} /></ORow>
+            <ORow label="C"><Select value={data.situations.lastMin.def[0]} onChange={(v) => setLastMin("def", 0, v)} pool={dressedForwards} /></ORow>
+            <ORow label="LW"><Select value={data.situations.lastMin.def[1]} onChange={(v) => setLastMin("def", 1, v)} pool={dressedForwards} /></ORow>
+            <ORow label="RW"><Select value={data.situations.lastMin.def[2]} onChange={(v) => setLastMin("def", 2, v)} pool={dressedForwards} /></ORow>
+            <ORow label="LD"><Select value={data.situations.lastMin.def[3]} onChange={(v) => setLastMin("def", 3, v)} pool={dressedDefense} /></ORow>
+            <ORow label="RD"><Select value={data.situations.lastMin.def[4]} onChange={(v) => setLastMin("def", 4, v)} pool={dressedDefense} /></ORow>
           </UnitBlock>
         </div>
       )}
