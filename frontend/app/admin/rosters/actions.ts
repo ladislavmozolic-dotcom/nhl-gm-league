@@ -83,6 +83,11 @@ export async function applyRosterMode(mode: "profinhl" | "real") {
     const affiliates = await prisma.team.findMany({ where: { isAffiliate: true, parentTeamId: { not: null } }, select: { id: true, parentTeamId: true } });
     for (const aff of affiliates)
       await prisma.$executeRawUnsafe(`UPDATE "Player" SET "teamId"=${aff.id}, "rosterType"='AHL', "capHit"=COALESCE("realCapHit","profinhlCapHit") WHERE "realFarmTeamId"=${aff.parentTeamId} AND "realTeamId" IS NULL`);
+    // A legacy $100k deal is farm-only even if the real-roster feed also matched
+    // that player to an NHL club. The feed supplies no real cap hit in this case,
+    // so COALESCE above otherwise leaves the old $100k deal on the NHL roster.
+    for (const aff of affiliates)
+      await prisma.$executeRawUnsafe(`UPDATE "Player" SET "teamId"=${aff.id}, "rosterType"='AHL', "scratched"=true WHERE "teamId"=${aff.parentTeamId} AND "rosterType"='NHL' AND "capHit"=100000`);
     // everyone else → free agents
     await prisma.$executeRawUnsafe(`UPDATE "Player" SET "rosterType"='UFA' WHERE "realTeamId" IS NULL AND "realFarmTeamId" IS NULL AND "rosterType" IN ('NHL','AHL')`);
     // NHL mode: every team starts with the commissioner's configured starting capital; reset the transaction ledger
@@ -130,14 +135,15 @@ export async function normalizeAllRostersAction() {
     const orgIds = [team.id, aff.id];
     const org = await prisma.player.findMany({
       where: { teamId: { in: orgIds } },
-      select: { id: true, position: true, overall: true, isGoalie: true, shoots: true, injuryDaysLeft: true, contractType: true },
+      select: { id: true, position: true, overall: true, isGoalie: true, shoots: true, injuryDaysLeft: true, contractType: true, capHit: true },
     });
     const healthy = org.filter((p) => (p.injuryDaysLeft ?? 0) <= 0);
+    const nhlEligible = healthy.filter((p) => p.capHit !== 100_000);
 
     // NHL = the best auto-lined 20 PLUS every one-way player (one-way can't be sent down).
-    const nhlLines = autoLines(healthy.filter((p) => !p.isGoalie).map(toSk), healthy.filter((p) => p.isGoalie).map(toSk));
+    const nhlLines = autoLines(nhlEligible.filter((p) => !p.isGoalie).map(toSk), nhlEligible.filter((p) => p.isGoalie).map(toSk));
     const nhl = dressedOf(nhlLines);
-    for (const p of healthy) if (p.contractType === "ONE_WAY") nhl.add(p.id);
+    for (const p of nhlEligible) if (p.contractType === "ONE_WAY") nhl.add(p.id);
 
     // farm = the rest; dress the best 20 there, the remainder are healthy scratches.
     const farmPool = healthy.filter((p) => !nhl.has(p.id));

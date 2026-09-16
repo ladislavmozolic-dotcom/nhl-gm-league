@@ -283,14 +283,15 @@ export async function importRealRosters(opts: Options = {}) {
   if (rostersFetched === 0) return { ok: false as const, error: "Could not reach the NHL roster API (0 clubs fetched)." };
 
   // 2) our team code -> id
-  const teams = await prisma.team.findMany({ where: { league: "NHL", isAffiliate: false }, select: { id: true, code: true } });
+  const teams = await prisma.team.findMany({ where: { league: "NHL", isAffiliate: false }, select: { id: true, code: true, affiliateTeams: { select: { id: true }, take: 1 } } });
   const codeToId = new Map(teams.map((t) => [t.code, t.id]));
+  const affiliateByParent = new Map(teams.flatMap((t) => t.affiliateTeams[0] ? [[t.id, t.affiliateTeams[0].id] as const] : []));
 
   // 3) match players
   const realMode = placeIfRealMode && (await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true } }))?.rosterMode === "real";
   const players = await prisma.player.findMany({
     where: onlyMissing ? { realTeamId: null } : {},
-    select: { id: true, name: true, rosterType: true, faDecisionAt: true },
+    select: { id: true, name: true, rosterType: true, faDecisionAt: true, capHit: true, teamId: true },
   });
   // A UFA currently under real in-game negotiation (a standing offer, or mid
   // deliberation) must NOT be silently overwritten by this real-world snapshot —
@@ -316,11 +317,17 @@ export async function importRealRosters(opts: Options = {}) {
     const tid = ab ? codeToId.get(ab) : undefined;
     if (!tid) { unmatched.push(pl.name); continue; }
     const underNegotiation = pl.rosterType === "UFA" && (activeOfferIds.has(pl.id) || pl.faDecisionAt != null);
+    const farmOnly = pl.capHit === 100_000;
+    const placement = realMode && !underNegotiation
+      ? farmOnly
+        ? { teamId: affiliateByParent.get(tid) ?? pl.teamId, rosterType: "AHL" as const }
+        : { teamId: tid, rosterType: "NHL" as const }
+      : {};
     await prisma.player.update({
       where: { id: pl.id },
       // set the real team; if we're live in real mode AND he's not mid-negotiation,
-      // also ice him now (no finance reset)
-      data: { realTeamId: tid, ...(realMode && !underNegotiation ? { teamId: tid, rosterType: "NHL" } : {}) },
+      // also place him now (no finance reset). A legacy $100k deal remains farm-only.
+      data: { realTeamId: tid, ...placement },
     });
     if (underNegotiation) skippedActive++;
     matched++;

@@ -31,7 +31,10 @@ export async function autoFillRosters(league = "NHL"): Promise<RosterFill[]> {
     if (!needF && !needD && !needG) continue;
 
     const pool = await prisma.player.findMany({
-      where: { teamId: { in: affIds }, injuryDaysLeft: { lte: 0 } }, // only promote healthy bodies
+      where: {
+        teamId: { in: affIds }, rosterType: "AHL", injuryDaysLeft: { lte: 0 },
+        contractYears: { gt: 0 }, NOT: { capHit: 100_000 },
+      }, // only healthy, call-up-eligible AHL contracts; $100k farm-only deals stay down
       orderBy: { overall: "desc" },
       select: { id: true, isGoalie: true, position: true },
     });
