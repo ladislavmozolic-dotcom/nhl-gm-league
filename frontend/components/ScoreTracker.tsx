@@ -5,7 +5,6 @@ import NewsTicker from "@/components/NewsTicker";
 type TeamLite = { code: string | null; logoUrl: string | null };
 
 const dateStr = (d: Date) => d.toLocaleDateString("sk-SK", { day: "numeric", month: "short" });
-const dayKey = (d: Date) => d.toISOString().slice(0, 10);
 
 const TeamRow = ({ t, score, win }: { t: TeamLite; score: number | null; win: boolean }) => (
   <div className="flex items-center justify-between gap-3">
@@ -52,13 +51,16 @@ export default async function ScoreTracker() {
   return (
     <>
       <NewsTicker />
-      {results.length > 0 && (
+      {(results.length > 0 || upcoming.length > 0) && (
         <div className="bg-[#0a1628] border-b border-slate-800">
           <div className="max-w-[1400px] mx-auto flex items-stretch">
             <div className="shrink-0 bg-blue-600 text-white text-[11px] font-bold px-3 flex flex-col items-start justify-center leading-tight uppercase tracking-wide">
               <span>Scores</span>
               {lastDay?.gameDate && <span className="text-[10px] font-normal normal-case text-blue-100">{dateStr(lastDay.gameDate)}</span>}
             </div>
+            {/* One scrollable row: today's finished results first, then — same
+                row, no separate section — whatever's still to be simmed (today's
+                remainder, or the next scheduled day once today is complete). */}
             <div className="flex gap-2 overflow-x-auto p-2 no-scrollbar">
               {results.map((g) => {
                 const aw = (g.awayGoals ?? 0) > (g.homeGoals ?? 0), hw = (g.homeGoals ?? 0) > (g.awayGoals ?? 0);
@@ -69,24 +71,8 @@ export default async function ScoreTracker() {
                   </Link>
                 );
               })}
-            </div>
-          </div>
-        </div>
-      )}
-      {upcoming.length > 0 && (
-        <div className="bg-[#0a1628] border-b border-slate-800">
-          <div className="max-w-[1400px] mx-auto flex items-stretch">
-            {/* When the day's sim is still in progress, the remaining games'
-                date equals today's already-final results' date — labelling
-                both "16.9." reads as a glitch, so call this one out as
-                "Later Today" instead of repeating the same date. */}
-            <div className="shrink-0 bg-emerald-700 text-white text-[11px] font-bold px-3 flex flex-col items-start justify-center leading-tight uppercase tracking-wide">
-              <span>{nextDay?.gameDate && lastDay?.gameDate && dayKey(nextDay.gameDate) === dayKey(lastDay.gameDate) ? "Later Today" : "Next"}</span>
-              {nextDay?.gameDate && (!lastDay?.gameDate || dayKey(nextDay.gameDate) !== dayKey(lastDay.gameDate)) && <span className="text-[10px] font-normal normal-case text-emerald-100">{dateStr(nextDay.gameDate)}</span>}
-            </div>
-            <div className="flex gap-2 overflow-x-auto p-2 no-scrollbar">
               {upcoming.map((g) => (
-                <div key={g.id} className="shrink-0 min-w-[128px] bg-slate-800/40 rounded-lg px-3 py-1.5 border border-slate-800">
+                <div key={g.id} className="shrink-0 min-w-[128px] bg-slate-800/40 rounded-lg px-3 py-1.5 border border-slate-800 border-dashed opacity-70">
                   <TeamRow t={g.awayTeam} score={null} win={false} />
                   <TeamRow t={g.homeTeam} score={null} win={false} />
                 </div>
