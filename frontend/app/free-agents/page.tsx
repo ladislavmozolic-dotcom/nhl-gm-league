@@ -132,7 +132,9 @@ export default async function FreeAgentsPage({
     ...attrs.map((a) => ({ key: a, label: a.toUpperCase(), kind: "num" as const })),
   ];
   const rows = listedFreeAgents.map((p) => {
-    const rr: any = isGoalie ? { ...p, ...(p.goalieRating ?? {}) } : p;
+    // goalieRating.mo is never touched by the sim (it only writes the live
+    // value to Player.mo/morale) — keep the live one, not the stale copy.
+    const rr: any = isGoalie ? { ...p, ...(p.goalieRating ?? {}), mo: p.mo } : p;
     const ovr = isGoalie ? p.goalieRating?.overall ?? p.overall : p.overall;
     const grp = isGoalie ? ("G" as const) : posGroup(p.position, false);
     const d = demands.get(p.id)?.demand;

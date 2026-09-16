@@ -26,8 +26,9 @@ export function groupRoster(players: any[]): Grouped {
     forwards: players.filter(isFwd),
     defense: players.filter(isDef),
     // spread goalieRating for the goalie attrs, but keep the live Player.condition
-    // (the sim writes CON to the Player row; goalieRating.condition is stale)
-    goalies: players.filter((p) => p.isGoalie).map((p) => ({ ...p, ...(p.goalieRating ?? {}), condition: p.condition })),
+    // and Player.mo (the sim writes CON/morale to the Player row every game;
+    // goalieRating's own condition/mo columns are never touched, so they go stale)
+    goalies: players.filter((p) => p.isGoalie).map((p) => ({ ...p, ...(p.goalieRating ?? {}), condition: p.condition, mo: p.mo })),
   };
 }
 

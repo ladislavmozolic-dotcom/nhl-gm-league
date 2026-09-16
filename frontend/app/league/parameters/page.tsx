@@ -119,6 +119,7 @@ export default async function LeagueParametersPage({ searchParams }: { searchPar
           where: { rosterType: { in: ["NHL", "AHL", "UFA"] }, isGoalie: true },
           select: {
             id: true, name: true, slug: true, photoUrl: true, position: true, nhlId: true, rosterType: true,
+            mo: true, // live morale — goalieRating.mo is never touched by the sim, so it goes stale
             team: { select: { code: true, slug: true, logoUrl: true } },
             goalieRating: {
               select: {
@@ -130,7 +131,7 @@ export default async function LeagueParametersPage({ searchParams }: { searchPar
         });
         count = goalies.length;
         rows = goalies.map((g) => {
-          const gr: any = g.goalieRating ?? {};
+          const gr: any = { ...(g.goalieRating ?? {}), mo: g.mo };
           const isUfa = g.rosterType === "UFA";
           const row: SortRow = { _id: g.id, name: g.name, slug: g.slug, photo: g.photoUrl, teamCode: isUfa ? "FA" : g.team?.code ?? null, teamSlug: isUfa ? null : g.team?.slug ?? null, teamLogo: isUfa ? null : g.team?.logoUrl ?? null, pos: g.position, nhlId: g.nhlId };
           for (const k of order) {

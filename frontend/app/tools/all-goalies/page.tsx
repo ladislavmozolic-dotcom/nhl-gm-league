@@ -42,7 +42,9 @@ export default async function AllGoaliesPage({ searchParams }: { searchParams: P
   const farm = full.affiliateTeams[0]?.players ?? [];
   const farmHasField = farm.some((p) => p.captaincy === "C" || p.captaincy === "A");
   const toRP = (p: (typeof full.players)[number], hasField: boolean): RosterPlayer => {
-    const row = { ...(p as unknown as RosterPlayer), ...((p.goalieRating ?? {}) as unknown as Record<string, number | null>), capRole: hasField ? (p.captaincy ?? null) : captaincyFromName(p.name) };
+    // goalieRating.mo is never touched by the sim (it only writes the live
+    // value to Player.mo/morale) — keep the live one, not the stale copy.
+    const row = { ...(p as unknown as RosterPlayer), ...((p.goalieRating ?? {}) as unknown as Record<string, number | null>), mo: p.mo, capRole: hasField ? (p.captaincy ?? null) : captaincyFromName(p.name) };
     const out = realMode ? { ...row, contractText: liveCapHit(p) ? money(liveCapHit(p)) : (row.contractText ?? null) } : row;
     return redactAttrs(out, !loggedIn);
   };

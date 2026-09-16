@@ -72,7 +72,9 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
       { key: "yrs", label: "Yrs", kind: "years" as const },
     ];
     rows = players.map((p) => {
-      const rr: any = isGoalie ? { ...p, ...(p.goalieRating ?? {}) } : p;
+      // goalieRating.mo is never touched by the sim (it only writes the live
+      // value to Player.mo/morale) — keep the live one, not the stale copy.
+      const rr: any = isGoalie ? { ...p, ...(p.goalieRating ?? {}), mo: p.mo } : p;
       const ovr = isGoalie ? p.goalieRating?.overall ?? p.overall : p.overall;
       const grp = isGoalie ? ("G" as const) : posGroup(p.position, false);
       return {
