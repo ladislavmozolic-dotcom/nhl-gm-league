@@ -50,6 +50,36 @@ export const PP_LAYOUTS: Record<string, FormationRole[]> = {
   ],
 };
 
+// Four skaters on a 4-on-3 power play. These keep the same named PP systems as
+// 5-on-4, but remove the least essential second point/low option and use the
+// extra open ice: three attacking seats plus one quarterback at the point.
+export const PP4_LAYOUTS: Record<string, FormationRole[]> = {
+  balanced: [
+    { key: "r1", label: "Left Circle", x: 26, y: 54 },
+    { key: "r2", label: "Net-Front", x: 50, y: 18 },
+    { key: "r3", label: "Right Circle", x: 74, y: 54 },
+    { key: "r4", label: "Point", x: 50, y: 84 },
+  ],
+  umbrella: [
+    { key: "r1", label: "Left Half-Wall", x: 24, y: 56 },
+    { key: "r2", label: "Net-Front", x: 50, y: 17 },
+    { key: "r3", label: "Right Half-Wall", x: 76, y: 56 },
+    { key: "r4", label: "High Point", x: 50, y: 84 },
+  ],
+  "131": [
+    { key: "r1", label: "Left One-Timer", x: 22, y: 55 },
+    { key: "r2", label: "Bumper", x: 50, y: 38 },
+    { key: "r3", label: "Right One-Timer", x: 78, y: 55 },
+    { key: "r4", label: "Point", x: 50, y: 84 },
+  ],
+  overload: [
+    { key: "r1", label: "Corner", x: 18, y: 32 },
+    { key: "r2", label: "Net-Front", x: 50, y: 17 },
+    { key: "r3", label: "Backdoor", x: 78, y: 30 },
+    { key: "r4", label: "Strong-Side Point", x: 38, y: 80 },
+  ],
+};
+
 export const PK_LAYOUTS: Record<string, FormationRole[]> = {
   balanced: [
     { key: "r1", label: "C", x: 32, y: 72 },

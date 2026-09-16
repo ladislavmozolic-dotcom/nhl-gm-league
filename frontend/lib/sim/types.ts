@@ -85,7 +85,7 @@ export type SimTeam = {
   avgOV: number;          // ice-time-weighted roster overall (+ starter) — team quality
   // line chemistry
   units: LineUnit[];               // forward trios + defense pairs from the set lines
-  stUnits: LineUnit[];             // PP1 + PK1 as their own chemistry units (grown separately)
+  stUnits: LineUnit[];             // PP/PP4/PK/OT units with separate chemistry
   chemistry: Record<string, number>; // unit signature -> chemistry value (mutable across a season)
   slowChem: string[];              // unit signatures that gel 20% slower (an off-side player)
   ppChem: number;                  // power-play unit chemistry factor (~1; >1 = gelled PP1 → deadly)
@@ -105,6 +105,8 @@ export type SimTeam = {
   teamTactics: TeamTactics;        // the raw dials the GM set (for display / scouting)
   ppUnitStyleByPlayer: Map<number, PpStyle>; // playerId -> that PP unit's own formation (falls back to teamTactics.ppStyle)
   ppUnitSideByPlayer: Map<number, "L" | "R" | null>; // playerId -> the flank side (by x-coord) of his PP seat in that unit's formation — null for a centered seat (Point, Bumper, Net-Front, C)
+  pp4UnitStyleByPlayer: Map<number, PpStyle>; // same lookups for a true 4-on-3 PP unit
+  pp4UnitSideByPlayer: Map<number, "L" | "R" | null>;
   pkUnitStyleByPlayer: Map<number, PkStyle>; // playerId -> that PK unit's own structure (falls back to teamTactics.pkStyle)
   pk3UnitStyleByPlayer: Map<number, PkStyle>; // playerId -> that PK3 (5-on-3) unit's own structure — separate map, since a true 5-on-3 uses its own personnel/formation, not a trimmed PK4 unit
   profile: RosterProfile;          // ice-weighted roster attribute averages (drives system fit)

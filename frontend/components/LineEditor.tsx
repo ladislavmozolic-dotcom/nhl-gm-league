@@ -7,7 +7,7 @@ import { autoFill, type TeamLinesData, type ForwardLine, type DefensePair, type 
 import { unitChemistry } from "@/lib/sim/chemistry";
 import { roleFitOf } from "@/lib/sim/role-fit";
 import { DIAL_LABELS, mergeTactics, type PuckStyle, type DZone, type PpStyle, type PkStyle } from "@/lib/sim/tactics";
-import { PP_LAYOUTS, PK_LAYOUTS, PK3_LAYOUTS, type FormationRole } from "@/lib/sim/formation-layout";
+import { PP_LAYOUTS, PP4_LAYOUTS, PK_LAYOUTS, PK3_LAYOUTS, type FormationRole } from "@/lib/sim/formation-layout";
 import { displayName } from "@/lib/playerName";
 import RinkFormationMap from "@/components/RinkFormationMap";
 import JerseyChip from "@/components/JerseyChip";
@@ -41,7 +41,20 @@ const STATES: Array<{ key: keyof Omit<GameStrategy, "goaliePull">; label: string
   { key: "losing1", label: "Losing by 1" },
   { key: "losing2", label: "Losing by 2+" },
 ];
-const TABS = ["Forward", "Defense", "PP", "4 vs 4", "PK4", "PK3", "Others", "Last Min", "Overtime", "Strategy"] as const;
+const STRATEGY_META: Record<keyof Omit<GameStrategy, "goaliePull">, { tone: string; cue: string }> = {
+  winning2: { tone: "protect", cue: "Protect the lead" },
+  winning1: { tone: "steady", cue: "Stay structured" },
+  tied: { tone: "balanced", cue: "Control the play" },
+  losing1: { tone: "pressure", cue: "Generate offense" },
+  losing2: { tone: "attack", cue: "All-out attack" },
+};
+const TAB_GROUPS = [
+  { label: "5v5", tabs: ["Forward", "Defense"] },
+  { label: "Special Teams", tabs: ["PP 5v4", "PP 4v3", "4 vs 4", "PK4", "PK3"] },
+  { label: "Situations", tabs: ["Others", "Last Min", "Overtime"] },
+  { label: "Tactics", tabs: ["Strategy"] },
+] as const;
+const TABS = TAB_GROUPS.flatMap((g) => g.tabs);
 
 export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSlug, players, goalies, initial, chemistry, chemBase = 35, chemNeutral = 70, chemEnabled = true, onSave, onSuggest }: Props) {
   const lang = useLang();
@@ -150,7 +163,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
     };
     for (const l of data.forwardLines) scan([l.lw, l.c, l.rw]);
     for (const p of data.defensePairs) scan([p.ld, p.rd]);
-    for (const key of ["pp", "fourVFour", "pk4", "pk3", "overtime"] as const)
+    for (const key of ["pp", "pp4", "fourVFour", "pk4", "pk3", "overtime"] as const)
       for (const u of data.situations[key]) scan(u.players);
     return [...bad];
   }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -160,7 +173,8 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
   const timeGroups: Array<[string, number]> = [
     ["Forward", timeSum(data.forwardLines)],
     ["Defense", timeSum(data.defensePairs)],
-    ["PP", timeSum(data.situations.pp)],
+    ["PP 5v4", timeSum(data.situations.pp)],
+    ["PP 4v3", timeSum(data.situations.pp4)],
     ["4 vs 4", timeSum(data.situations.fourVFour)],
     ["PK4", timeSum(data.situations.pk4)],
     ["PK3", timeSum(data.situations.pk3)],
@@ -173,9 +187,9 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
   const badLineTactics = [
     ...data.forwardLines.map((l) => tSum(l.tactic)),
     ...data.defensePairs.map((p) => tSum(p.tactic)),
-    ...([data.situations.pp, data.situations.pk4, data.situations.pk3, data.situations.fourVFour, data.situations.overtime].flatMap((us) => us.map((u) => tSum(u.tactic)))),
+    ...([data.situations.pp, data.situations.pp4, data.situations.pk4, data.situations.pk3, data.situations.fourVFour, data.situations.overtime].flatMap((us) => us.map((u) => tSum(u.tactic)))),
     // the split-unit DEFENSE game plans (PP/PK4/PK3/4v4) must also total 5
-    ...([data.situations.pp, data.situations.pk4, data.situations.pk3, data.situations.fourVFour].flatMap((us) => us.map((u) => tSum(u.dTactic)))),
+    ...([data.situations.pp, data.situations.pp4, data.situations.pk4, data.situations.pk3, data.situations.fourVFour].flatMap((us) => us.map((u) => tSum(u.dTactic)))),
   ].some((s) => s !== 5);
   const invalid = dupes.length > 0 || badTime.length > 0 || badTactics.length > 0 || badLineTactics;
 
@@ -203,7 +217,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
   const Select = ({ value, onChange, pool, overlay = false }: { value: number | null; onChange: (v: number | null) => void; pool: Player[]; overlay?: boolean }) => (
     <select value={value != null && pool.some((p) => p.id === value) ? value : ""} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
       style={{ colorScheme: "dark" }}
-      className={overlay ? "absolute inset-0 w-full h-full opacity-0 cursor-pointer" : "w-full min-w-[132px] bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-sm"}>
+      className={overlay ? "absolute inset-0 w-full h-full opacity-0 cursor-pointer" : "lines-select w-full min-w-[132px] bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-sm"}>
       <option value="" style={{ backgroundColor: "#0f172a", color: "#e2e8f0" }}>— empty —</option>
       {pool.map((p) => <option key={p.id} value={p.id} disabled={p.injured} style={{ backgroundColor: "#0f172a", color: "#e2e8f0" }}>{p.name}{p.cap ? ` (${p.cap})` : ""} · {p.position} ({p.overall}){p.con != null ? ` · CON ${p.con}%${p.con < 90 ? " ⚠️" : ""}` : ""}{p.injured ? " 🤕 INJ" : ""}</option>)}
     </select>
@@ -218,13 +232,13 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
     const btn = compact ? "w-6 h-7 text-sm" : "w-7 h-8 text-base";
     const inp = compact ? "w-8 px-1 py-1" : `${w} px-2 py-1.5`;
     return (
-      <div className={`inline-flex items-center ${compact ? "gap-1" : "gap-2"}`}>
+      <div className={`lines-stepper inline-flex items-center ${compact ? "gap-1" : "gap-2"}`}>
         <button type="button" onClick={() => onChange(clamp(value - step))}
-          className={`${btn} rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 leading-none`}>−</button>
+          className={`${btn} lines-stepper-btn rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 leading-none`}>−</button>
         <input type="number" min={min} max={max} value={value} onChange={(e) => onChange(clamp(Number(e.target.value)))}
-          className={`${inp} bg-slate-900 border border-slate-700 rounded text-sm text-center tabular-nums`} />
+          className={`${inp} lines-stepper-value bg-slate-900 border border-slate-700 rounded text-sm text-center tabular-nums`} />
         <button type="button" onClick={() => onChange(clamp(value + step))}
-          className={`${btn} rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 leading-none`}>+</button>
+          className={`${btn} lines-stepper-btn rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 leading-none`}>+</button>
       </div>
     );
   };
@@ -249,7 +263,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
     <select value={value ?? ""} onChange={(e) => onChange(e.target.value)}
       title={value ? dialDesc(lang, dial, value) : inheritTxt}
       style={{ colorScheme: "dark" }}
-      className={`bg-slate-800 border rounded px-1.5 py-1 text-xs cursor-help ${value ? "border-sky-600 text-sky-300" : "border-slate-700 text-slate-400"}`}>
+      className={`lines-select bg-slate-800 border rounded px-1.5 py-1 text-xs cursor-help ${value ? "border-sky-600 text-sky-300" : "border-slate-700 text-slate-400"}`}>
       <option value="" title={inheritTxt} style={{ backgroundColor: "#1e293b", color: "#e2e8f0" }}>{lang === "cs" ? "Tím" : "Team"}</option>
       {Object.keys(opts).filter((k) => k !== "balanced").map((k) => <option key={k} value={k} title={dialDesc(lang, dial, k)} style={{ backgroundColor: "#1e293b", color: "#e2e8f0" }}>{dialLabel(lang, dial, k)}</option>)}
     </select>
@@ -260,7 +274,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
     const opts = DIAL_LABELS[k];
     const val = (mergeTactics(data.system) as Record<string, string>)[k] ?? "balanced";
     return (
-      <div className="mb-3 bg-slate-900/40 border border-slate-800 rounded-lg p-3">
+      <div className="lines-card mb-3 bg-slate-900/40 border border-slate-800 rounded-lg p-3">
         <div className="flex items-baseline gap-2 mb-1.5"><span className="text-sm font-semibold">{label}</span><span className="text-xs text-slate-500">{lang === "cs" ? "klasické NHL systémy — nájdi kurzorom na voľbu" : "classic NHL systems — hover an option for what it does"}</span></div>
         <div className="flex flex-wrap gap-1.5">
           {Object.keys(opts).map((kk) => (
@@ -277,10 +291,10 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
   // per-unit formation override (empty = inherit the team's ppStyle/pkStyle) —
   // same "Team" pattern as SysSelect above, so PP1 can run 1-3-1 while PP2
   // runs Umbrella, or PK1 a Box while PK2 presses in a Diamond.
-  const setUnitStyle = (key: "pp" | "pk4" | "pk3", ui: number, v: string) =>
+  const setUnitStyle = (key: "pp" | "pp4" | "pk4" | "pk3", ui: number, v: string) =>
     change((d) => { const u = (d.situations[key] as SpecialUnit[])[ui]; if (v) u.style = v as PpStyle & PkStyle; else delete u.style; });
   const UnitFormationBlock = ({ unitKey, ui, dial, label, layouts, dStartIndex, accent }: {
-    unitKey: "pp" | "pk4" | "pk3"; ui: number; dial: "ppStyle" | "pkStyle"; label: string;
+    unitKey: "pp" | "pp4" | "pk4" | "pk3"; ui: number; dial: "ppStyle" | "pkStyle"; label: string;
     layouts: Record<string, FormationRole[]>; dStartIndex: number; accent: string;
   }) => {
     const unit = (data.situations[unitKey] as SpecialUnit[])[ui];
@@ -343,7 +357,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
     const p = value != null ? byId.get(value) : null;
     const cleanLastName = p ? displayName(p.name).trim().split(/\s+/).pop() : null;
     return (
-      <div className="relative flex items-center gap-3 bg-slate-900/60 border border-slate-700 rounded-lg p-2.5 cursor-pointer hover:border-slate-600">
+      <div className="lines-player-slot relative flex items-center gap-3 bg-slate-900/60 border border-slate-700 rounded-lg p-2.5 cursor-pointer hover:border-slate-600">
         <div className="relative flex-none">
           <JerseyChip teamSlug={jerseyTeamSlug} number={p?.number} lastName={cleanLastName} size={128} />
           <div className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-blue-600 border-2 border-slate-950 flex items-center justify-center pointer-events-none">
@@ -375,11 +389,11 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
 
   const ForwardSection = (
     <section className="space-y-3">
-      <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400">5 vs 5 Forward</h2>
+      <h2 className="lines-section-title text-sm font-bold uppercase tracking-wide text-slate-300"><span />5 vs 5 Forward</h2>
       {data.forwardLines.map((l, i) => {
         const t = tac(l.tactic); const bad = t.phy + t.df + t.of !== 5;
         return (
-          <div key={i} className="bg-slate-900/40 border border-slate-800 rounded-lg p-3 space-y-3">
+          <div key={i} className="lines-card bg-slate-900/40 border border-slate-800 rounded-lg p-3 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2"><span className="text-sm font-bold text-slate-300">Line {i + 1}</span><ChemBadge ids={[l.lw, l.c, l.rw]} /><RoleFitBadge ids={[l.lw, l.c, l.rw]} isDef={false} /></div>
               <div className="flex items-center gap-2"><span className="text-[11px] uppercase tracking-wide text-slate-500">Time</span><Stepper value={l.timePct} step={1} onChange={(v) => setFwd(i, "timePct", v as unknown as number)} /><span className="text-slate-500 text-sm">%</span></div>
@@ -408,11 +422,11 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
 
   const DefenseSection = (
     <section className="space-y-3">
-      <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400">5 vs 5 Defense</h2>
+      <h2 className="lines-section-title text-sm font-bold uppercase tracking-wide text-slate-300"><span />5 vs 5 Defense</h2>
       {data.defensePairs.map((p, i) => {
         const t = tac(p.tactic); const bad = t.phy + t.df + t.of !== 5;
         return (
-          <div key={i} className="bg-slate-900/40 border border-slate-800 rounded-lg p-3 space-y-3">
+          <div key={i} className="lines-card bg-slate-900/40 border border-slate-800 rounded-lg p-3 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2"><span className="text-sm font-bold text-slate-300">Pair {i + 1}</span><ChemBadge ids={[p.ld, p.rd]} /><RoleFitBadge ids={[p.ld, p.rd]} isDef={true} /></div>
               <div className="flex items-center gap-2"><span className="text-[11px] uppercase tracking-wide text-slate-500">Time</span><Stepper value={p.timePct} step={1} onChange={(v) => setDef(i, "timePct", v as unknown as number)} /><span className="text-slate-500 text-sm">%</span></div>
@@ -444,7 +458,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
   const setUnitTime = (key: keyof TeamLinesData["situations"] & string, ui: number, v: number) =>
     change((d) => { (d.situations[key] as SpecialUnit[])[ui].timePct = v; });
 
-  const UnitSection = (key: "pp" | "fourVFour" | "pk4" | "pk3" | "overtime", title: string, labels: string[], poolFor: (i: number) => Player[]) => {
+  const UnitSection = (key: "pp" | "pp4" | "fourVFour" | "pk4" | "pk3" | "overtime", title: string, labels: string[], poolFor: (i: number) => Player[]) => {
     const units = data.situations[key];
     return (
       <UnitBlock title={title} head={["Unit", ...labels, "PHY", "DF", "OF", "Time %"]} timeTotal={timeSum(units)}>
@@ -474,7 +488,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
   // comment for why this is a fixed slot→role mapping, not an attribute-fit
   // reassignment).
   const SplitUnitSection = (
-    key: "pp" | "fourVFour" | "pk4" | "pk3", title: string, fLabels: string[], dLabels: string[],
+    key: "pp" | "pp4" | "fourVFour" | "pk4" | "pk3", title: string, fLabels: string[], dLabels: string[],
     dPool: Player[] = dressedDefense, dHint?: string,
     roleInfo?: { dial: "ppStyle" | "pkStyle"; layouts: Record<string, FormationRole[]> },
     fPool: Player[] = dressedForwards,
@@ -540,7 +554,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
   const setLastMin = (k: "off" | "def", i: number, v: number | null) => change((d) => { d.situations.lastMin[k][i] = v; });
 
   return (
-    <div className="max-w-5xl mx-auto px-4 pb-28">
+    <div className="max-w-7xl mx-auto px-4 pb-28">
       <div className="flex items-start justify-between mb-4 flex-wrap gap-2">
         <LinesNav teamName={teamName} teamSlug={teamSlug} />
         <div className="flex items-center gap-2">
@@ -603,22 +617,41 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
         </div>
       )}
 
-      <div className="flex flex-wrap gap-1.5 border-b border-slate-800 pb-3 mb-5">
-        {TABS.map((t) => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`px-3 py-1.5 rounded-md text-[13px] font-semibold transition-colors ${tab === t ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white hover:bg-slate-800/60"}`}>{t}</button>
+      <div className="lines-tab-shell mb-5">
+        {TAB_GROUPS.map((group) => (
+          <div key={group.label} className="lines-tab-group">
+            <div className="lines-tab-label">{group.label}</div>
+            <div className="flex gap-1.5">
+              {group.tabs.map((t) => (
+                <button key={t} onClick={() => setTab(t)}
+                  className={`lines-tab ${tab === t ? "lines-tab-active" : ""}`}>{t}</button>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
 
+      <div className="lines-rink-board">
       {tab === "Forward" && <>{ForwardSection}<p className="text-xs text-slate-500 mt-2 px-1">💡 <strong>System</strong>: give a line its own Puck Style (else it inherits the team system from <em>Team → System</em>). E.g. set your 4th line to <em>Cycle</em> while the team runs <em>Rush</em>. Tempo &amp; Forecheck stay team-wide.</p></>}
       {tab === "Defense" && <>{DefenseSection}<p className="text-xs text-slate-500 mt-2 px-1">💡 <strong>System</strong>: give a pair its own D-Zone (else it inherits the team system). E.g. a <em>Collapse</em> shut-down pair for defending a lead.</p></>}
-      {tab === "PP" && <>
+      {tab === "PP 5v4" && <>
         {FormationPicker("ppStyle", "Power-play formation (team default)")}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <UnitFormationBlock unitKey="pp" ui={0} dial="ppStyle" label="PP1" layouts={PP_LAYOUTS} dStartIndex={3} accent="#3b82f6" />
           <UnitFormationBlock unitKey="pp" ui={1} dial="ppStyle" label="PP2" layouts={PP_LAYOUTS} dStartIndex={3} accent="#a855f7" />
         </div>
         {SplitUnitSection("pp", "Power Play (5 on 4)", ["F1", "F2", "F3"], ["D1", "D2"], stPointPool, "💡 Ktorýkoľvek slot môže mať útočníka aj obrancu — dropdown ponúka oboje, takže sa dá hrať aj 4 útočníci + 1 obranca alebo naopak.", { dial: "ppStyle", layouts: PP_LAYOUTS }, allSkatersPool)}
+      </>}
+      {tab === "PP 4v3" && <>
+        <div className="lines-info-card mb-4">
+          <span className="lines-info-icon">4v3</span>
+          <div><strong>Power play 4 na 3</strong><p>Viac priestoru, jeden hráč na pointe a tri útočné pozície. Jednotka používa tímový PP systém, ale rozostavenie je prispôsobené štyrom korčuliarom.</p></div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <UnitFormationBlock unitKey="pp4" ui={0} dial="ppStyle" label="PP 4v3 — Unit 1" layouts={PP4_LAYOUTS} dStartIndex={3} accent="#22d3ee" />
+          <UnitFormationBlock unitKey="pp4" ui={1} dial="ppStyle" label="PP 4v3 — Unit 2" layouts={PP4_LAYOUTS} dStartIndex={3} accent="#8b5cf6" />
+        </div>
+        {SplitUnitSection("pp4", "Power Play (4 on 3)", ["F1", "F2", "F3"], ["D1"], stPointPool, "💡 Všetky štyri sloty ponúkajú oblečených korčuliarov. Rozostavenie počíta s tromi útočnými pozíciami a jedným quarterbackom na pointe.", { dial: "ppStyle", layouts: PP4_LAYOUTS }, allSkatersPool)}
       </>}
       {tab === "4 vs 4" && SplitUnitSection("fourVFour", "4 vs 4", ["C", "W"], ["LD", "RD"])}
       {tab === "PK4" && <>
@@ -684,35 +717,55 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
       )}
 
       {tab === "Strategy" && (
-        <div className="space-y-4">
-          <UnitBlock title="Team Strategy (each row must total 5)" head={["Game state", "PHY", "DF", "OF", "Σ"]}>
+        <div className="space-y-5">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="lines-kicker">Tactical game plan</p>
+              <h2 className="text-xl font-extrabold tracking-tight text-white">Team Strategy</h2>
+              <p className="text-xs text-slate-400 mt-1">Each game state has a five-point tactical budget.</p>
+            </div>
+            <div className="lines-legend">
+              <span className="phy">PHY</span><span className="df">DF</span><span className="of">OF</span>
+            </div>
+          </div>
+          <div className="space-y-2.5">
             {STATES.map((st) => {
               const w = data.strategy[st.key];
               const sum = w.phy + w.df + w.of;
+              const meta = STRATEGY_META[st.key];
               return (
-                <tr key={st.key} className="border-b border-slate-800/60">
-                  <td className="px-3 py-2">{st.label}</td>
+                <div key={st.key} className={`strategy-lane strategy-${meta.tone}`}>
+                  <div className="strategy-state">
+                    <span className="strategy-state-mark" />
+                    <div><strong>{st.label}</strong><span>{meta.cue}</span></div>
+                  </div>
+                  <div className="strategy-controls">
                   {(["phy", "df", "of"] as const).map((k) => (
-                    <td key={k} className="px-2 py-2 text-center">
+                    <div key={k} className={`strategy-control strategy-${k}`}>
+                      <span>{k.toUpperCase()}</span>
                       <Stepper value={w[k]} min={0} max={5} w="w-12"
                         onChange={(v) => change((d) => { d.strategy[st.key][k as keyof StratWeights] = v; })} />
-                    </td>
+                    </div>
                   ))}
-                  <td className={`px-2 py-2 text-right font-bold tabular-nums ${sum === 5 ? "text-green-400" : "text-red-400"}`}>{sum}{sum !== 5 && " ✗"}</td>
-                </tr>
+                  </div>
+                  <StrategyMiniRink weights={w} />
+                  <div className={`strategy-total ${sum === 5 ? "valid" : "invalid"}`}>{sum}/5</div>
+                </div>
               );
             })}
-          </UnitBlock>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-900/40 border border-slate-800 rounded-lg p-4">
-            <label className="text-sm flex items-center justify-between gap-3">Pull goalie down by ≥
-              <Stepper value={data.strategy.goaliePull.minGoals} min={1} max={6} w="w-12" onChange={(v) => change((d) => { d.strategy.goaliePull.minGoals = v; })} /></label>
-            <label className="text-sm flex items-center justify-between gap-3">Pull at (sec left)
-              <Stepper value={data.strategy.goaliePull.pullSec} min={0} max={300} step={10} w="w-16" onChange={(v) => change((d) => { d.strategy.goaliePull.pullSec = v; })} /></label>
-            <label className="text-sm flex items-center justify-between gap-3">Swap goalie under SV%
-              <Stepper value={data.strategy.goaliePull.savePctUnder} min={0} max={100} step={5} w="w-14" onChange={(v) => change((d) => { d.strategy.goaliePull.savePctUnder = v; })} /></label>
           </div>
+          <section className="lines-goalie-panel">
+            <div className="sm:col-span-3"><p className="lines-kicker">Goalie decisions</p></div>
+            <label className="lines-goalie-card"><span className="lines-setting-icon">⇊</span><span>Pull goalie down by ≥</span>
+              <Stepper value={data.strategy.goaliePull.minGoals} min={1} max={6} w="w-12" onChange={(v) => change((d) => { d.strategy.goaliePull.minGoals = v; })} /></label>
+            <label className="lines-goalie-card"><span className="lines-setting-icon">◷</span><span>Pull at (sec left)</span>
+              <Stepper value={data.strategy.goaliePull.pullSec} min={0} max={300} step={10} w="w-16" onChange={(v) => change((d) => { d.strategy.goaliePull.pullSec = v; })} /></label>
+            <label className="lines-goalie-card"><span className="lines-setting-icon">⇄</span><span>Swap goalie under SV%</span>
+              <Stepper value={data.strategy.goaliePull.savePctUnder} min={0} max={100} step={5} w="w-14" onChange={(v) => change((d) => { d.strategy.goaliePull.savePctUnder = v; })} /></label>
+          </section>
         </div>
       )}
+      </div>
 
       <div className="fixed bottom-0 left-0 right-0 bg-slate-950/90 border-t border-slate-800 backdrop-blur px-4 py-3">
         <div className="max-w-5xl mx-auto flex items-center gap-3">
@@ -733,9 +786,9 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
 // ---- small layout helpers ----
 function UnitBlock({ title, head, children, timeTotal }: { title: string; head: string[]; children: React.ReactNode; timeTotal?: number }) {
   return (
-    <section className="mb-2">
-      <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400 mb-2">{title}</h2>
-      <div className="bg-slate-900/40 border border-slate-800 rounded-lg overflow-x-auto">
+    <section className="mb-2 lines-unit-section">
+      <h2 className="lines-section-title text-sm font-bold uppercase tracking-wide text-slate-300 mb-2"><span />{title}</h2>
+      <div className="lines-table-card bg-slate-900/40 border border-slate-800 rounded-lg overflow-x-auto">
         <table className="w-full text-sm min-w-[560px]">
           <thead><tr className="text-xs text-slate-500 border-b border-slate-800">
             {head.map((h, i) => <th key={i} className={`px-2 py-2 ${i === 0 ? "text-left w-14" : i === head.length - 1 ? "text-right" : "text-left"}`}>{h}</th>)}
@@ -755,7 +808,7 @@ function UnitBlock({ title, head, children, timeTotal }: { title: string; head: 
 
 function ORow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <tr className="border-b border-slate-800/60">
+    <tr className="lines-table-row border-b border-slate-800/60">
       <td className="px-3 py-1.5 text-slate-300 w-40">{label}</td>
       <td className="px-2 py-1.5">{children}</td>
     </tr>
@@ -769,8 +822,8 @@ function ListBlock({ title, values, pool, onSet, Select, numbered }: {
 }) {
   return (
     <div>
-      <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400 mb-2">{title}</h2>
-      <div className="bg-slate-900/40 border border-slate-800 rounded-lg p-3 space-y-2">
+      <h2 className="lines-section-title text-sm font-bold uppercase tracking-wide text-slate-300 mb-2"><span />{title}</h2>
+      <div className="lines-card bg-slate-900/40 border border-slate-800 rounded-lg p-3 space-y-2">
         {values.map((v, i) => (
           <div key={i} className="flex items-center gap-2">
             {numbered && <span className="w-5 text-slate-500 text-sm tabular-nums">{i + 1}</span>}
@@ -778,6 +831,18 @@ function ListBlock({ title, values, pool, onSet, Select, numbered }: {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function StrategyMiniRink({ weights }: { weights: StratWeights }) {
+  const total = Math.max(1, weights.phy + weights.df + weights.of);
+  return (
+    <div className="strategy-mini-rink" aria-label={`Physical ${weights.phy}, defense ${weights.df}, offense ${weights.of}`}>
+      <span className="strategy-rink-line" />
+      <span className="strategy-rink-dot dot-phy" style={{ opacity: 0.3 + 0.7 * weights.phy / total }} />
+      <span className="strategy-rink-dot dot-df" style={{ opacity: 0.3 + 0.7 * weights.df / total }} />
+      <span className="strategy-rink-dot dot-of" style={{ opacity: 0.3 + 0.7 * weights.of / total }} />
     </div>
   );
 }

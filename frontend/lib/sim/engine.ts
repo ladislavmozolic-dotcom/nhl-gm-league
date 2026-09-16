@@ -422,7 +422,7 @@ type StUnit = { f: SimSkater[]; d: SimSkater[] };
  *  (nobody kills a 2-minute penalty for the full two minutes). Uses the manager-set /
  *  auto-filled units (team.stUnits: pp/pp2/pk/pk2) when present, else builds sensible
  *  tiers from the roster: PP by playmaking, PK by defensive rating. */
-function resolveStUnits(team: SimTeam): { pp: StUnit[]; pk: StUnit[]; pk3: StUnit[] } {
+function resolveStUnits(team: SimTeam): { pp: StUnit[]; pp4: StUnit[]; pk: StUnit[]; pk3: StUnit[] } {
   const byId = new Map([...team.forwards, ...team.defense].map((s) => [s.id, s]));
   const isD = (s: SimSkater) => team.defense.some((d) => d.id === s.id);
   const split = (ids: number[]): StUnit => {
@@ -444,6 +444,7 @@ function resolveStUnits(team: SimTeam): { pp: StUnit[]; pk: StUnit[]; pk3: StUni
   ];
   const pkD = [...team.defense].sort(byDf);
   const ppTier = (t: number): StUnit => ({ f: ppF.slice(t * 3, t * 3 + 3), d: ppD.slice(t * 2, t * 2 + 2) });
+  const pp4Tier = (t: number): StUnit => ({ f: ppF.slice(t * 3, t * 3 + 3), d: ppD.slice(t, t + 1) });
   const pkTier = (t: number): StUnit => ({ f: pkF.slice(t * 2, t * 2 + 2), d: pkD.slice(t * 2, t * 2 + 2) });
   // 5-on-3: same PK personnel pool, just one forward instead of two — the top
   // PK trio, not a separate roster tier.
@@ -456,17 +457,21 @@ function resolveStUnits(team: SimTeam): { pp: StUnit[]; pk: StUnit[]; pk3: StUni
   // PP1===PP2 and PK===PP for every non-hand-set club, so those fall back to sensible,
   // distinct roster tiers (PP by playmaking, PK by defence).
   const pp1s = findU("pp:"), pp2s = findU("pp2:"), pk1s = findU("pk:"), pk2s = findU("pk2:");
+  const pp4as = findU("pp4:"), pp4bs = findU("pp4-2:");
   const pk3as = findU("pk3:"), pk3bs = findU("pk3-2:");
   const ppOk = !!pp1s && !!pp2s && nonEmpty(pp1s) && nonEmpty(pp2s) && !sameIds(pp1s, pp2s);
   const pp1 = ppOk ? pp1s! : ppTier(0);
   const pp2 = ppOk ? pp2s! : (nonEmpty(ppTier(1)) ? ppTier(1) : ppTier(0));
+  const pp4Ok = !!pp4as && !!pp4bs && nonEmpty(pp4as) && nonEmpty(pp4bs) && !sameIds(pp4as, pp4bs);
+  const pp4a = pp4Ok ? pp4as! : pp4Tier(0);
+  const pp4b = pp4Ok ? pp4bs! : (nonEmpty(pp4Tier(1)) ? pp4Tier(1) : pp4Tier(0));
   const pkOk = !!pk1s && !!pk2s && nonEmpty(pk1s) && nonEmpty(pk2s) && !sameIds(pk1s, pk2s) && !sameIds(pk1s, pp1s);
   const pk1 = pkOk ? pk1s! : pkTier(0);
   const pk2 = pkOk ? pk2s! : (nonEmpty(pkTier(1)) ? pkTier(1) : pkTier(0));
   const pk3Ok = !!pk3as && !!pk3bs && nonEmpty(pk3as) && nonEmpty(pk3bs) && !sameIds(pk3as, pk3bs);
   const pk3a = pk3Ok ? pk3as! : pk3Tier(0);
   const pk3b = pk3Ok ? pk3bs! : (nonEmpty(pk3Tier(1)) ? pk3Tier(1) : pk3Tier(0));
-  return { pp: [pp1, pp2], pk: [pk1, pk2], pk3: [pk3a, pk3b] };
+  return { pp: [pp1, pp2], pp4: [pp4a, pp4b], pk: [pk1, pk2], pk3: [pk3a, pk3b] };
 }
 
 /** Resolve a club's 3-on-3 overtime personnel — THREE trios so a team actually rotates
@@ -861,14 +866,19 @@ function generateHeatEvents(st: SimState, period: number) {
  *  actual skater differential — a 5-on-3 (diff 2) is far more dangerous than a
  *  plain 5-on-4 (diff 1), which strengthAt's plain EV/PP/SH tri-state can't
  *  distinguish on its own. */
-function strengthDiffAt(team: SimTeam, opp: SimTeam, t: number, active: Penalty[]): { state: "EV" | "PP" | "SH"; diff: number } {
+function strengthDiffAt(team: SimTeam, opp: SimTeam, t: number, active: Penalty[]): { state: "EV" | "PP" | "SH"; diff: number; skatersFor: number; skatersAgainst: number } {
   let mine = 0, theirs = 0;
   for (const p of active) {
     if (p.expired || t < p.start || t >= p.end) continue;
     if (p.team === team.id) mine++; else if (p.team === opp.id) theirs++;
   }
   const diff = theirs - mine;
-  return { state: diff > 0 ? "PP" : diff < 0 ? "SH" : "EV", diff: Math.abs(diff) };
+  return {
+    state: diff > 0 ? "PP" : diff < 0 ? "SH" : "EV",
+    diff: Math.abs(diff),
+    skatersFor: 5 - Math.min(2, mine),
+    skatersAgainst: 5 - Math.min(2, theirs),
+  };
 }
 /** Manpower situation for `team` at time t (within-period seconds). */
 function strengthAt(team: SimTeam, opp: SimTeam, t: number, active: Penalty[]): "EV" | "PP" | "SH" {
@@ -1144,12 +1154,12 @@ function simulatePeriodPossession(st: SimState, period: number) {
   // special-teams personnel + the live man-advantage state per team. During a PP a
   // club ices its PP unit; shorthanded, its PK unit — so shots, goals, +/- and TOI
   // all go to the RIGHT players, not whatever line happened to be rotating.
-  const stUnit: Record<number, { pp: StUnit[]; pk: StUnit[]; pk3: StUnit[] }> = { [home.id]: resolveStUnits(home), [away.id]: resolveStUnits(away) };
+  const stUnit: Record<number, { pp: StUnit[]; pp4: StUnit[]; pk: StUnit[]; pk3: StUnit[] }> = { [home.id]: resolveStUnits(home), [away.id]: resolveStUnits(away) };
   const curStr: Record<number, "EV" | "PP" | "SH"> = { [home.id]: "EV", [away.id]: "EV" };
   // the actual skater differential alongside curStr's tri-state — a true 5-on-3
   // (diff 2) kills with its own dedicated PK3 personnel/formation, not just a
   // trimmed-down PK1/PK2 (4-on-5) unit. See onIceF/onIceD below.
-  const curDiff: Record<number, number> = { [home.id]: 0, [away.id]: 0 };
+  const curSkaters: Record<number, number> = { [home.id]: 5, [away.id]: 5 };
   // special-teams shift rotation: which unit (0 = PP1/PK1, 1 = PP2/PK2) is out, and how
   // long it has been out. Real ST shifts run ~35s, so PP1/PP2 (and PK1/PK2) alternate
   // instead of one unit killing the whole penalty. Resets to unit 1 when back to even.
@@ -1174,18 +1184,18 @@ function simulatePeriodPossession(st: SimState, period: number) {
   };
   const onIceF = (team: SimTeam) => {
     const s = curStr[team.id];
-    if (s === "PP") { const u = stUnit[team.id].pp[stIdx(team, stUnit[team.id].pp)]; if (u?.f.length) return subMis(team, u.f, false); }
+    if (s === "PP") { const pool = curSkaters[team.id] === 4 ? stUnit[team.id].pp4 : stUnit[team.id].pp; const u = pool[stIdx(team, pool)]; if (u?.f.length) return subMis(team, u.f, false); }
     if (s === "SH") {
-      const pool = curDiff[team.id] >= 2 ? stUnit[team.id].pk3 : stUnit[team.id].pk;
+      const pool = curSkaters[team.id] === 3 ? stUnit[team.id].pk3 : stUnit[team.id].pk;
       const u = pool[stIdx(team, pool)]; if (u?.f.length) return subMis(team, u.f, false);
     }
     const sh = shifts[team.id]; return subMis(team, sh.fLines[sh.fIdx] ?? team.forwards, false);
   };
   const onIceD = (team: SimTeam) => {
     const s = curStr[team.id];
-    if (s === "PP") { const u = stUnit[team.id].pp[stIdx(team, stUnit[team.id].pp)]; if (u?.d.length) return subMis(team, u.d, true); }
+    if (s === "PP") { const pool = curSkaters[team.id] === 4 ? stUnit[team.id].pp4 : stUnit[team.id].pp; const u = pool[stIdx(team, pool)]; if (u?.d.length) return subMis(team, u.d, true); }
     if (s === "SH") {
-      const pool = curDiff[team.id] >= 2 ? stUnit[team.id].pk3 : stUnit[team.id].pk;
+      const pool = curSkaters[team.id] === 3 ? stUnit[team.id].pk3 : stUnit[team.id].pk;
       const u = pool[stIdx(team, pool)]; if (u?.d.length) return subMis(team, u.d, true);
     }
     const sh = shifts[team.id]; return subMis(team, sh.dPairs[sh.dIdx] ?? team.defense, true);
@@ -1215,9 +1225,12 @@ function simulatePeriodPossession(st: SimState, period: number) {
   const defNames = (line: SimSkater[]) => line.map((s) => cleanName(s.name));
   const unitLabel = (team: SimTeam, kind: "F" | "D") => {
     const s = curStr[team.id];
-    if (s === "PP") return `PP${stIdx(team, stUnit[team.id].pp) + 1}`;
+    if (s === "PP") {
+      const pool = curSkaters[team.id] === 4 ? stUnit[team.id].pp4 : stUnit[team.id].pp;
+      return `${curSkaters[team.id] === 4 ? "PP4v3" : "PP"}${stIdx(team, pool) + 1}`;
+    }
     if (s === "SH") {
-      if (curDiff[team.id] >= 2) return `PK3-${stIdx(team, stUnit[team.id].pk3) + 1}`;
+      if (curSkaters[team.id] === 3) return `PK3-${stIdx(team, stUnit[team.id].pk3) + 1}`;
       return `PK${stIdx(team, stUnit[team.id].pk) + 1}`;
     }
     const sh = shifts[team.id];
@@ -1256,8 +1269,8 @@ function simulatePeriodPossession(st: SimState, period: number) {
     // resolve the man-advantage FIRST so the on-ice snapshot uses PP/PK units
     const hStr = strengthDiffAt(home, away, tick, active);
     const aStr = strengthDiffAt(away, home, tick, active);
-    curStr[home.id] = hStr.state; curDiff[home.id] = hStr.diff;
-    curStr[away.id] = aStr.state; curDiff[away.id] = aStr.diff;
+    curStr[home.id] = hStr.state; curSkaters[home.id] = hStr.skatersFor;
+    curStr[away.id] = aStr.state; curSkaters[away.id] = aStr.skatersFor;
     // PP_START/PP_END: fire when a team's strength crosses into/out of "PP". Game-level
     // st.onPp (not reset per period) so a penalty carried into the next period doesn't
     // fire a spurious duplicate pair at the intermission boundary.
@@ -1516,6 +1529,7 @@ function simulatePeriodPossession(st: SimState, period: number) {
       const strengthInfo = strengthDiffAt(carrierTeam, def, tick, active);
       const strength = strengthInfo.state;
       const manAdv3 = strength === "PP" && strengthInfo.diff >= 2; // true 5-on-3 (or better)
+      const fourOnThree = strength === "PP" && strengthInfo.skatersFor === 4 && strengthInfo.skatersAgainst === 3;
       const gLine = liveGoalieLine(st, def.id);
       const gSim = liveGoalie(st, def);
       st.box[carrierTeam.id].shots++;
@@ -1535,12 +1549,12 @@ function simulatePeriodPossession(st: SimState, period: number) {
       // leaks net-front; Box suppresses evenly; Aggressive is boom-or-bust).
       // EV/SH shots are untouched.
       const { sector, shotType } = strength === "PP"
-        ? ppShotProfile(rng, carrierTeam.ppUnitStyleByPlayer.get(carrier.id) ?? carrierTeam.teamTactics.ppStyle ?? "balanced", {
+        ? ppShotProfile(rng, (fourOnThree ? carrierTeam.pp4UnitStyleByPlayer : carrierTeam.ppUnitStyleByPlayer).get(carrier.id) ?? carrierTeam.teamTactics.ppStyle ?? "balanced", {
             isDefense: carrier.isDefense, setup, manAdv3,
             // a true 5-on-3 reads its OWN unit's structure (PK3 tab), not the
             // 4-on-5 PK1/PK2 map — the defender actually on the ice for a 5v3
             // is now genuinely drawn from the PK3 personnel (see onIceF/onIceD).
-            pkStyle: (manAdv3 ? def.pk3UnitStyleByPlayer.get(dman.id) : def.pkUnitStyleByPlayer.get(dman.id)) ?? def.teamTactics.pkStyle ?? "balanced",
+            pkStyle: (strengthInfo.skatersAgainst === 3 ? def.pk3UnitStyleByPlayer.get(dman.id) : def.pkUnitStyleByPlayer.get(dman.id)) ?? def.teamTactics.pkStyle ?? "balanced",
           })
         : shotProfile(rng, { isDefense: carrier.isDefense, setup, danger, dangerBias });
       // Off-wing one-timer bonus (PP only — the seat side comes from that unit's
@@ -1550,7 +1564,7 @@ function simulatePeriodPossession(st: SimState, period: number) {
       // both the tracked xG stat and the real conversion odds below (`p`), not
       // just the display number.
       const handMult = strength === "PP"
-        ? oneTimerHandednessMult(shotType, carrierTeam.ppUnitSideByPlayer.get(carrier.id), carrier.shoots)
+        ? oneTimerHandednessMult(shotType, (fourOnThree ? carrierTeam.pp4UnitSideByPlayer : carrierTeam.ppUnitSideByPlayer).get(carrier.id), carrier.shoots)
         : 1;
       const xg = expectedGoal(rng, sector, shotType, strengthKey) * handMult;
       const hd = isHighDanger(sector);

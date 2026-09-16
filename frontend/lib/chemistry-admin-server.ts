@@ -19,8 +19,9 @@ export type TeamChemistryView = {
   stUnits: { label: string; sig: string; value: number | null }[];
 };
 
-const ST_LABELS: { key: "pp" | "pp2" | "pk" | "pk2" | "pk3" | "pk3-2" | "ot" | "ot2" | "ot3"; label: string }[] = [
+const ST_LABELS: { key: "pp" | "pp2" | "pp4" | "pp4-2" | "pk" | "pk2" | "pk3" | "pk3-2" | "ot" | "ot2" | "ot3"; label: string }[] = [
   { key: "pp", label: "PP1" }, { key: "pp2", label: "PP2" },
+  { key: "pp4", label: "PP 4-on-3 A" }, { key: "pp4-2", label: "PP 4-on-3 B" },
   { key: "pk", label: "PK1" }, { key: "pk2", label: "PK2" },
   { key: "pk3", label: "PK3 (5-on-3) A" }, { key: "pk3-2", label: "PK3 (5-on-3) B" },
   { key: "ot", label: "OT 1" }, { key: "ot2", label: "OT 2" }, { key: "ot3", label: "OT 3" },
@@ -38,7 +39,7 @@ export async function teamChemistryView(teamId: number): Promise<TeamChemistryVi
   const ids = new Set<number>();
   for (const l of lines.forwardLines) [l.lw, l.c, l.rw].forEach((id) => id != null && ids.add(id));
   for (const p of lines.defensePairs) [p.ld, p.rd].forEach((id) => id != null && ids.add(id));
-  for (const u of [...lines.situations.pp, ...lines.situations.pk4, ...lines.situations.pk3, ...lines.situations.overtime])
+  for (const u of [...lines.situations.pp, ...lines.situations.pp4, ...lines.situations.pk4, ...lines.situations.pk3, ...lines.situations.overtime])
     u.players.forEach((id) => id != null && ids.add(id));
   const players = await prisma.player.findMany({ where: { id: { in: [...ids] } }, select: { id: true, name: true } });
   const nameOf = new Map(players.map((p) => [p.id, cleanName(p.name)]));
@@ -72,12 +73,13 @@ export async function teamChemistryView(teamId: number): Promise<TeamChemistryVi
   const stUnitOf = (key: (typeof ST_LABELS)[number]["key"]): { players: (number | null)[] } | undefined => {
     switch (key) {
       case "pp": return lines.situations.pp[0]; case "pp2": return lines.situations.pp[1];
+      case "pp4": return lines.situations.pp4[0]; case "pp4-2": return lines.situations.pp4[1];
       case "pk": return lines.situations.pk4[0]; case "pk2": return lines.situations.pk4[1];
       case "pk3": return lines.situations.pk3[0]; case "pk3-2": return lines.situations.pk3[1];
       case "ot": return lines.situations.overtime[0]; case "ot2": return lines.situations.overtime[1]; case "ot3": return lines.situations.overtime[2];
     }
   };
-  const minMembers = (key: string) => (key === "pp" || key === "pp2" || key === "pk" || key === "pk2" ? 3 : 2);
+  const minMembers = (key: string) => (["pp", "pp2", "pp4", "pp4-2", "pk", "pk2"].includes(key) ? 3 : 2);
   for (const { key, label } of ST_LABELS) {
     const members = (stUnitOf(key)?.players ?? []).filter((x): x is number => x != null);
     if (members.length < minMembers(key)) continue;

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { autoFill, autoLines } from "../lib/sim/lines-core";
+import { autoFill, autoLines, normalize } from "../lib/sim/lines-core";
+import { buildStUnits } from "../lib/sim/chemistry";
 
 const skaters = [
   ...Array.from({ length: 13 }, (_, i) => ({ id: i + 1, position: i % 3 === 0 ? "C" : i % 3 === 1 ? "LW" : "RW", overall: 90 - i, df: 50 + i })),
@@ -18,6 +19,7 @@ test("special teams only use skaters dressed in the 12F + 6D lineup", () => {
   const dressed = dressedIds(lines);
   const situational = [
     ...lines.situations.pp,
+    ...lines.situations.pp4,
     ...lines.situations.fourVFour,
     ...lines.situations.pk4,
     ...lines.situations.pk3,
@@ -39,4 +41,19 @@ test("a stale PK player outside the game lineup is removed and replaced", () => 
 
   assert.ok(!safe.situations.pk4.flatMap((u) => u.players).includes(extra.id));
   assert.ok(safe.situations.pk4.flatMap((u) => u.players).filter((id): id is number => id != null).every((id) => dressed.has(id)));
+});
+
+test("legacy lines gain two valid 4-on-3 power-play units", () => {
+  const lines = autoLines(skaters, goalies);
+  const dressed = dressedIds(lines);
+
+  const legacy = structuredClone(lines);
+  delete (legacy.situations as Partial<typeof legacy.situations>).pp4;
+  const safe = autoFill(normalize(legacy), skaters, goalies);
+
+  assert.equal(safe.situations.pp4.length, 2);
+  assert.deepEqual(safe.situations.pp4.map((u) => u.players.length), [4, 4]);
+  assert.ok(safe.situations.pp4.flatMap((u) => u.players).filter((id): id is number => id != null).every((id) => dressed.has(id)));
+  assert.ok(buildStUnits(safe).some((u) => u.sig.startsWith("pp4:")));
+  assert.ok(buildStUnits(safe).some((u) => u.sig.startsWith("pp4-2:")));
 });

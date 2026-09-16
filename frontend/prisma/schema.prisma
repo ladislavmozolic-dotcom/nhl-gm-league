@@ -1334,7 +1334,7 @@ model TeamLines {
   defensePairs Json     @default("[]") // [{ld,rd,timePct}] x3
   ppUnits      Json     @default("[]") // legacy — special teams now in `situations`
   pkUnits      Json     @default("[]") // legacy
-  situations   Json     @default("{}") // pp, fourVFour, pk4, pk3, overtime, others, lastMin
+  situations   Json     @default("{}") // pp, pp4, fourVFour, pk4, pk3, overtime, others, lastMin
   strategy     Json     @default("{}") // 5 game-states {phy,df,of} + goaliePull
   system       Json?    // Phase 3 team-system dials { tempo, forecheck, puckStyle, dZone, preset }
   chemistry    Json     @default("{}") // { [unitSignature]: value 0..100 } — line chemistry

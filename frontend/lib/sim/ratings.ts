@@ -13,7 +13,7 @@ import type { TeamLinesData } from "./lines";
 import { buildUnits, buildStUnits, depthChartUnits, playerChemistry, unitSignature } from "./chemistry";
 import { roleFitOf as roleFitPure } from "./role-fit";
 import { resolveTactics, resolveLineTactics, mergeTactics, type RosterProfile, type TeamTactics, type PpStyle, type PkStyle } from "./tactics";
-import { PP_LAYOUTS } from "./formation-layout";
+import { PP_LAYOUTS, PP4_LAYOUTS } from "./formation-layout";
 
 const clamp = (v: number, lo = 20, hi = 99) => Math.max(lo, Math.min(hi, v));
 const w = (parts: Array<[number, number]>) => {
@@ -354,6 +354,18 @@ export function buildTeam(input: {
       ppUnitSideByPlayer.set(id, !role || role.x === 50 ? null : role.x < 50 ? "L" : "R");
     });
   }
+  const pp4UnitStyleByPlayer = new Map<number, PpStyle>();
+  const pp4UnitSideByPlayer = new Map<number, "L" | "R" | null>();
+  for (const u of input.lines?.situations?.pp4 ?? []) {
+    const style = u.style ?? teamTac.ppStyle ?? "balanced";
+    for (const id of u.players) if (id != null) pp4UnitStyleByPlayer.set(id, style as PpStyle);
+    const layout = PP4_LAYOUTS[style] ?? PP4_LAYOUTS.balanced;
+    u.players.forEach((id, i) => {
+      if (id == null) return;
+      const role = layout[i];
+      pp4UnitSideByPlayer.set(id, !role || role.x === 50 ? null : role.x < 50 ? "L" : "R");
+    });
+  }
   // Same idea for the PK: which structure THIS unit's own defenders run, so
   // the shot-generation site can pick the actual on-ice kill's formation
   // instead of always the team default.
@@ -401,6 +413,8 @@ export function buildTeam(input: {
     teamTactics: teamTac,
     ppUnitStyleByPlayer,
     ppUnitSideByPlayer,
+    pp4UnitStyleByPlayer,
+    pp4UnitSideByPlayer,
     pkUnitStyleByPlayer,
     pk3UnitStyleByPlayer,
     profile,

@@ -28,6 +28,7 @@ export type LastMin = { off: (number | null)[]; def: (number | null)[] }; // 6 s
 
 export type Situations = {
   pp: SpecialUnit[];        // 2 units × 5 slots (3F + 2D)
+  pp4: SpecialUnit[];       // 2 units × 4 slots (3F + 1D), used for 4-on-3 power plays
   fourVFour: SpecialUnit[]; // 2 units × 4 slots (2F + 2D)
   pk4: SpecialUnit[];       // 2 units × 4 slots (2F + 2D)
   pk3: SpecialUnit[];       // 2 units × 3 slots
@@ -88,6 +89,10 @@ const fitSlots = (arr: (number | null)[] | undefined, n: number): (number | null
 export function emptySituations(): Situations {
   return {
     pp: [{ players: nSlots(5), timePct: 60, tactic: { ...PP_TACTIC } }, { players: nSlots(5), timePct: 40, tactic: { ...PP_TACTIC } }],
+    pp4: [
+      { players: nSlots(4), timePct: 60, tactic: { ...PP_TACTIC }, dTactic: { ...PP_TACTIC } },
+      { players: nSlots(4), timePct: 40, tactic: { ...PP_TACTIC }, dTactic: { ...PP_TACTIC } },
+    ],
     fourVFour: [{ players: nSlots(4), timePct: 60, tactic: { ...EV44_TACTIC } }, { players: nSlots(4), timePct: 40, tactic: { ...EV44_TACTIC } }],
     pk4: [{ players: nSlots(4), timePct: 60, tactic: { ...PK_TACTIC } }, { players: nSlots(4), timePct: 40, tactic: { ...PK_TACTIC } }],
     pk3: [{ players: nSlots(3), timePct: 60, tactic: { ...PK_TACTIC } }, { players: nSlots(3), timePct: 40, tactic: { ...PK_TACTIC } }],
@@ -196,7 +201,7 @@ export function autoFill(data: TeamLinesData, skaters: Skater[], goalies: Goalie
   const scrub = (id: number | null) => (id != null && validSkater.has(id) ? id : null);
   for (const l of d.forwardLines) { l.lw = scrub(l.lw); l.c = scrub(l.c); l.rw = scrub(l.rw); }
   for (const p of d.defensePairs) { p.ld = scrub(p.ld); p.rd = scrub(p.rd); }
-  for (const group of [d.situations.pp, d.situations.fourVFour, d.situations.pk4, d.situations.pk3, d.situations.overtime]) {
+  for (const group of [d.situations.pp, d.situations.pp4, d.situations.fourVFour, d.situations.pk4, d.situations.pk3, d.situations.overtime]) {
     for (const u of group) u.players = u.players.map(scrub);
   }
   {
@@ -258,7 +263,7 @@ export function autoFill(data: TeamLinesData, skaters: Skater[], goalies: Goalie
   const dressedDef = def.filter((p) => dressedIds.has(p.id));
   const dressedAll = all.filter((p) => dressedIds.has(p.id));
   const scrubDressed = (id: number | null) => (id != null && dressedIds.has(id) ? id : null);
-  for (const group of [d.situations.pp, d.situations.fourVFour, d.situations.pk4, d.situations.pk3, d.situations.overtime])
+  for (const group of [d.situations.pp, d.situations.pp4, d.situations.fourVFour, d.situations.pk4, d.situations.pk3, d.situations.overtime])
     for (const u of group) u.players = u.players.map(scrubDressed);
   d.situations.others.subPP = scrubDressed(d.situations.others.subPP);
   d.situations.others.subPK1 = scrubDressed(d.situations.others.subPK1);
@@ -307,6 +312,7 @@ export function autoFill(data: TeamLinesData, skaters: Skater[], goalies: Goalie
   const fwdByDf = [...dressedFwd].sort((a, b) => dfKey(b) - dfKey(a)); // defensive forwards first (for the PK)
   const defByDf = [...dressedDef].sort((a, b) => dfKey(b) - dfKey(a));
   splitFill(d.situations.pp, 3, dressedFwd, dressedDef);           // PP: best forwards (overall) + best D
+  splitFill(d.situations.pp4, 3, dressedFwd, dressedDef);          // 4-on-3 PP: 3 forwards + 1 D
   splitFill(d.situations.fourVFour, 2, dressedFwd, dressedDef);
   // PK: prefer the most defensive forwards, and NOT the PP forwards (both PP units)
   const ppFwds = new Set(d.situations.pp.flatMap((u) => u.players.slice(0, 3)).filter((x): x is number => x != null));
@@ -414,7 +420,7 @@ export function normalize(data: Partial<TeamLinesData>): TeamLinesData {
     forwardLines: (data.forwardLines?.length ? data.forwardLines : []).map((l, i) => withTactic(l, defaultTactic("F", i))),
     defensePairs: (data.defensePairs?.length ? data.defensePairs : []).map((p, i) => withTactic(p, defaultTactic("D", i))),
     situations: {
-      pp: spec(s.pp, base.pp, "PP"), fourVFour: spec(s.fourVFour, base.fourVFour, "44"), pk4: spec(s.pk4, base.pk4, "PK"),
+      pp: spec(s.pp, base.pp, "PP"), pp4: spec(s.pp4, base.pp4, "PP"), fourVFour: spec(s.fourVFour, base.fourVFour, "44"), pk4: spec(s.pk4, base.pk4, "PK"),
       pk3: spec(s.pk3, base.pk3, "PK"), overtime: spec(s.overtime, base.overtime, "OT"),
       others: { ...base.others, ...(s.others ?? {}) },
       // off = pulled goalie (6 skaters); def = goalie in net (5). Coerce legacy 6-slot def.

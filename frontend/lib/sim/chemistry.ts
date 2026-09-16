@@ -61,6 +61,10 @@ export function buildStUnits(lines: TeamLinesData | null | undefined): LineUnit[
   if (pp1.length >= 3) units.push({ sig: "pp:" + unitSignature(pp1), members: pp1, isDef: false });
   const pp2 = (lines.situations?.pp?.[1]?.players ?? []).filter((x): x is number => x != null);
   if (pp2.length >= 3) units.push({ sig: "pp2:" + unitSignature(pp2), members: pp2, isDef: false });
+  const pp4a = (lines.situations?.pp4?.[0]?.players ?? []).filter((x): x is number => x != null);
+  if (pp4a.length >= 3) units.push({ sig: "pp4:" + unitSignature(pp4a), members: pp4a, isDef: false });
+  const pp4b = (lines.situations?.pp4?.[1]?.players ?? []).filter((x): x is number => x != null);
+  if (pp4b.length >= 3) units.push({ sig: "pp4-2:" + unitSignature(pp4b), members: pp4b, isDef: false });
   const pk1 = (lines.situations?.pk4?.[0]?.players ?? []).filter((x): x is number => x != null);
   if (pk1.length >= 3) units.push({ sig: "pk:" + unitSignature(pk1), members: pk1, isDef: true });
   const pk2 = (lines.situations?.pk4?.[1]?.players ?? []).filter((x): x is number => x != null);
