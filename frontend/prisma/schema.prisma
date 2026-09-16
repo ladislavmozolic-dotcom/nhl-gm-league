@@ -110,6 +110,7 @@ model Player {
   weight               Int?
   capWagesSlug         String?
   capHit               Float?
+  ahlSalary            Float?        // salary paid while assigned to AHL; null for one-way and legacy $100k farm-only deals
   contractYears        Int?
   contractExpiry       Int?
   // deferred EXTENSION: a re-signed pending-UFA finishes his current deal this season,
@@ -316,6 +317,7 @@ model SigningLog {
   createdAt      DateTime @default(now())
   // pre-signing snapshot (used to restore on revert)
   prevCapHit     Int?
+  prevAhlSalary  Int?
   prevYears      Int?
   prevExpiry     Int?
   prevType       String?

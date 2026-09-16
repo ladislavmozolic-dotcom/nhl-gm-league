@@ -50,7 +50,7 @@ export async function processFinances(season = "2026-27", league = "NHL") {
         id: true, capacity: true, arenaSections: true, popularity: true,
         profinhlBank: true, ledgerAdj: true,
         players: { where: { rosterType: league }, select: { capHit: true, retainedSalary: true, contractYears: true } },
-        affiliateTeams: { select: { players: { where: { rosterType: "AHL" }, select: { capHit: true, contractYears: true } } } },
+        affiliateTeams: { select: { players: { where: { rosterType: "AHL" }, select: { capHit: true, ahlSalary: true, contractType: true, contractYears: true } } } },
       },
     }),
     computeStandings(season, league),
@@ -90,8 +90,8 @@ export async function processFinances(season = "2026-27", league = "NHL") {
         selloutRevenue: selloutRevenue(getArenaSections(t)),
         // real dollars owed by THIS club — a player it acquired with retention
         // only costs it the post-retention share; the retaining club carries the
-        // rest. Farm (AHL) contracts above the budgeting threshold drain the bank
-        // too, same as NHL salaries, but never touch the NHL cap.
+        // rest. Farm contracts use their AHL salary on two-way deals and their
+        // listed salary otherwise; they never touch the NHL cap.
         salary: t.players.reduce((s, p) => s + Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0)), 0)
           + farmSalaryExpense(t.affiliateTeams.flatMap((a) => a.players)),
         homeGamesPlayed: homeGames,

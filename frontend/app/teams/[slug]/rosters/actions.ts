@@ -5,10 +5,11 @@ import { canManageTeam } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { ROSTER_LIMITS, isNhlSide, isScratchSide, type MoveRow } from "@/lib/roster-rules";
 import { canAddCapHit } from "@/lib/cap";
-import { money, liveCapHit } from "@/lib/finance";
+import { computeContractExpiry, liveCapHit, money, TWO_WAY_AHL_SALARY } from "@/lib/finance";
 import { loadSettings } from "@/lib/sim/settings";
 import { placeOnWaivers, recallExemptions } from "@/lib/waivers-server";
 import { getLeagueDate } from "@/lib/calendar-server";
+import { twoWayObjection } from "@/lib/free-agency";
 
 export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
   const team = await prisma.team.findUnique({
@@ -169,4 +170,51 @@ export async function placeOnWaiversFromRoster(slug: string, playerId: number) {
     revalidatePath("/waivers");
   }
   return r;
+}
+
+/** Offer a real two-way contract to a player who is currently on the legacy
+ * $100k AHL-only deal. The NHL salary is used on call-up; the fixed $100k AHL
+ * salary is used while he remains on the farm. */
+export async function offerTwoWayFromRoster(slug: string, playerId: number, requestedSalary: number, requestedYears: number) {
+  const team = await prisma.team.findUnique({
+    where: { slug },
+    select: { id: true, code: true, affiliateTeams: { select: { id: true } } },
+  });
+  if (!team) return { ok: false as const, error: "Team not found." };
+  if (!(await canManageTeam(team.id))) return { ok: false as const, error: "You don't manage this team." };
+  const orgIds = [team.id, ...team.affiliateTeams.map((a) => a.id)];
+  const player = await prisma.player.findFirst({
+    where: { id: playerId, teamId: { in: orgIds }, rosterType: "AHL" },
+    select: { id: true, name: true, capHit: true, age: true, overall: true, lastSeasonGP: true },
+  });
+  if (!player) return { ok: false as const, error: "Player isn't on your farm roster." };
+  if (player.capHit !== TWO_WAY_AHL_SALARY) return { ok: false as const, error: "Only an existing $100k farm-only deal can use this conversion." };
+
+  const salary = Math.round(Number(requestedSalary) / 50_000) * 50_000;
+  const years = Math.round(Number(requestedYears));
+  if (!Number.isFinite(salary) || salary < 775_000) return { ok: false as const, error: "The NHL salary must be at least $775,000." };
+  if (!Number.isFinite(years) || years < 1 || years > 8) return { ok: false as const, error: "The contract term must be between 1 and 8 years." };
+
+  const s = await loadSettings();
+  const objection = twoWayObjection(true, player, years, salary, {
+    olderAge: s.faTwoWayOlderAge, gpLimit: s.faTwoWayNhlGpLimit,
+    weakOverall: s.faTwoWayWeakOverall, maxYears: s.faTwoWayMaxYears,
+    ahlMaxYears: s.faTwoWayAhlMaxYears, fewGpMaxYears: s.faTwoWayFewGpMaxYears,
+    maxSalary: s.faTwoWayMaxSalary,
+  });
+  if (objection) return { ok: false as const, error: objection };
+
+  const expiry = computeContractExpiry(years);
+  const contractText = `$${salary.toLocaleString("en-US")} NHL / $${TWO_WAY_AHL_SALARY.toLocaleString("en-US")} AHL × ${years}yr (2-way, through ${expiry})`;
+  await prisma.$transaction([
+    prisma.player.update({
+      where: { id: player.id },
+      data: { capHit: salary, ahlSalary: TWO_WAY_AHL_SALARY, contractYears: years, contractExpiry: expiry, contractType: "TWO_WAY", contractText },
+    }),
+    prisma.transaction.create({
+      data: { type: "SIGNING", playerId: player.id, message: `${team.code ?? "?"} converted ${player.name} to a two-way contract — $${(salary / 1_000_000).toFixed(2)}M NHL / $0.10M AHL × ${years}yr` },
+    }),
+  ]);
+  for (const path of [`/teams/${slug}/rosters`, `/teams/${slug}`, `/teams/${slug}/salary`, "/salary-cap", "/finance", "/signings"]) revalidatePath(path);
+  return { ok: true as const, name: player.name, capHit: salary, ahlSalary: TWO_WAY_AHL_SALARY, years };
 }

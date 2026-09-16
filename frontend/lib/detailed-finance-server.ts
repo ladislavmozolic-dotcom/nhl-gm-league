@@ -14,7 +14,7 @@ import { seasonTickets, arenaFor, type TicketPricing } from "./season-tickets";
 import { attendancePct } from "./attendance";
 import { teamMerch, jerseyUnits } from "./merchandise";
 import { clubRevenueLines, clubRevenueTotal, clubExpenseLines, clubExpenseTotal, type FinanceLine } from "./club-finance";
-import { liveCapHit } from "./finance";
+import { farmSalaryExpense, liveCapHit } from "./finance";
 
 const asPricing = (s: string | null | undefined): TicketPricing => (s === "LOW" || s === "PREMIUM" ? s : "STANDARD");
 
@@ -25,7 +25,7 @@ export async function leagueDetailedFinance(): Promise<Map<number, { revenue: nu
   const [fans, stars, teams] = await Promise.all([
     leagueFanInterest(),
     allStarPowers(),
-    prisma.team.findMany({ where: { league: "NHL", isAffiliate: false }, select: { id: true, ticketPricing: true, sponsorDeal: true, capacity: true, headCoach: { select: { salary: true } }, affiliateTeams: { select: { headCoach: { select: { salary: true } }, players: { where: { rosterType: "AHL" }, select: { capHit: true, contractYears: true } } } }, players: { where: { rosterType: "NHL" }, select: { capHit: true, retainedSalary: true, contractYears: true } } } }),
+    prisma.team.findMany({ where: { league: "NHL", isAffiliate: false }, select: { id: true, ticketPricing: true, sponsorDeal: true, capacity: true, headCoach: { select: { salary: true } }, affiliateTeams: { select: { headCoach: { select: { salary: true } }, players: { where: { rosterType: "AHL" }, select: { capHit: true, ahlSalary: true, contractType: true, contractYears: true } } } }, players: { where: { rosterType: "NHL" }, select: { capHit: true, retainedSalary: true, contractYears: true } } } }),
   ]);
   const jerseyByTeam = new Map<number, number>();
   for (const s of stars) if (s.teamId != null) jerseyByTeam.set(s.teamId, (jerseyByTeam.get(s.teamId) ?? 0) + jerseyUnits(s.score));
@@ -46,7 +46,7 @@ export async function leagueDetailedFinance(): Promise<Map<number, { revenue: nu
     // post-retention share; the retaining club carries the rest.
     const salary = t.players.reduce((s, p) => s + Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0)), 0);
     const coachSalary = (t.headCoach?.salary ?? 0) + t.affiliateTeams.reduce((s, a) => s + (a.headCoach?.salary ?? 0), 0);
-    const ahlSalary = t.affiliateTeams.reduce((s, a) => s + a.players.reduce((x, p) => x + liveCapHit(p), 0), 0);
+    const ahlSalary = farmSalaryExpense(t.affiliateTeams.flatMap((a) => a.players));
     out.set(t.id, { revenue, salary, net: revenue - clubExpenseTotal(salary, coachSalary, ahlSalary) });
   }
   return out;
@@ -62,7 +62,7 @@ export type TeamDashboard = {
 };
 
 export async function teamDashboard(teamId: number): Promise<TeamDashboard | null> {
-  const team = await prisma.team.findUnique({ where: { id: teamId }, select: { id: true, name: true, league: true, isAffiliate: true, bankAccount: true, ticketPricing: true, headCoach: { select: { salary: true } }, affiliateTeams: { select: { headCoach: { select: { salary: true } }, players: { where: { rosterType: "AHL" }, select: { capHit: true, contractYears: true } } } } } });
+  const team = await prisma.team.findUnique({ where: { id: teamId }, select: { id: true, name: true, league: true, isAffiliate: true, bankAccount: true, ticketPricing: true, headCoach: { select: { salary: true } }, affiliateTeams: { select: { headCoach: { select: { salary: true } }, players: { where: { rosterType: "AHL" }, select: { capHit: true, ahlSalary: true, contractType: true, contractYears: true } } } } } });
   if (!team || team.league !== "NHL" || team.isAffiliate) return null;
 
   const [fan, st, att, merch, sponsor, merchBoard, roster] = await Promise.all([
@@ -81,7 +81,7 @@ export async function teamDashboard(teamId: number): Promise<TeamDashboard | nul
   const revenue = revenueLines.reduce((t, l) => t + l.amount, 0);
   const salary = roster.reduce((t, p) => t + Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0)), 0);
   const coachSalary = (team.headCoach?.salary ?? 0) + team.affiliateTeams.reduce((s, a) => s + (a.headCoach?.salary ?? 0), 0);
-  const ahlSalary = team.affiliateTeams.reduce((s, a) => s + a.players.reduce((x, p) => x + liveCapHit(p), 0), 0);
+  const ahlSalary = farmSalaryExpense(team.affiliateTeams.flatMap((a) => a.players));
   const expenseLines = clubExpenseLines(salary, coachSalary, ahlSalary);
   const expenses = expenseLines.reduce((t, l) => t + l.amount, 0);
   const profit = revenue - expenses;

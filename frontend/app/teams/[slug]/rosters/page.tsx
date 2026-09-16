@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { notFound, redirect } from "next/navigation";
 import { canManageTeam } from "@/lib/auth";
 import RosterMover from "@/components/RosterMover";
-import { saveRosterMoves, releasePlayer, placeOnWaiversFromRoster } from "./actions";
+import { saveRosterMoves, releasePlayer, placeOnWaiversFromRoster, offerTwoWayFromRoster } from "./actions";
 import { liveCapHit } from "@/lib/finance";
 import { recallExemptions } from "@/lib/waivers-server";
 import { livePlayerOverall } from "@/lib/player-overall";
@@ -25,7 +25,7 @@ export default async function RostersPage({ params }: { params: Promise<{ slug: 
     // only real roster players (NHL/AHL) — released UFAs, prospects and retirees keep a
     // team id (schema requires one) but must never surface in the roster manager.
     where: { teamId: { in: orgTeamIds }, rosterType: { in: ["NHL", "AHL"] } },
-    select: { id: true, name: true, position: true, overall: true, isGoalie: true, rosterType: true, contractType: true, capHit: true, contractYears: true, scratched: true, teamId: true, waiverStatus: true, lastRecalledAt: true, goalieRating: { select: { overall: true } } },
+    select: { id: true, name: true, position: true, overall: true, isGoalie: true, rosterType: true, contractType: true, capHit: true, ahlSalary: true, contractYears: true, scratched: true, teamId: true, waiverStatus: true, lastRecalledAt: true, goalieRating: { select: { overall: true } } },
     orderBy: [{ isGoalie: "asc" }, { overall: "desc" }],
   });
 
@@ -48,6 +48,8 @@ export default async function RostersPage({ params }: { params: Promise<{ slug: 
           side: (p.rosterType === "AHL" ? (p.scratched ? "farm-scratched" : "farm") : (p.scratched ? "pro-scratched" : "pro")) as "pro" | "pro-scratched" | "farm" | "farm-scratched",
           contractType: (p.contractType as "ONE_WAY" | "TWO_WAY" | null) ?? null,
           capHit: liveCapHit(p),
+          ahlSalary: p.ahlSalary,
+          contractYears: p.contractYears ?? 0,
           onWaivers: p.waiverStatus === "ON_WAIVERS",
           recallExempt: r?.exempt ?? false,
           recallDaysLeft: r?.daysLeft ?? 0,
@@ -57,6 +59,7 @@ export default async function RostersPage({ params }: { params: Promise<{ slug: 
       onSave={saveRosterMoves}
       onRelease={releasePlayer}
       onWaiver={placeOnWaiversFromRoster}
+      onOfferTwoWay={offerTwoWayFromRoster}
     />
   );
 }

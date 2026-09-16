@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { canManageTeam, getTeamSession, isAdmin, isComishTier } from "@/lib/auth";
 import { getLeagueClock, getLeagueDate } from "@/lib/calendar-server";
 import { addDays } from "@/lib/calendar";
-import { CURRENT_SEASON_START, capCeilingForPhase, ltirRelief, accruedCapSpace, liveCapHit } from "@/lib/finance";
+import { CURRENT_SEASON_START, TWO_WAY_AHL_SALARY, capCeilingForPhase, ltirRelief, accruedCapSpace, liveCapHit } from "@/lib/finance";
 import { teamCapCommitted } from "@/lib/cap";
 import {
   loadMarketPool, teamContentionMap, teamAsk, evaluateTeamOffer, loadLeagueCap, weakestTeams,
@@ -586,7 +586,10 @@ async function signFaOffer(playerId: number, player: { name: string; age: number
     teamId: o.teamId, rosterType: "NHL",
     capHit: salary, contractYears: years, contractExpiry: expiry,
     contractType: twoWay ? "TWO_WAY" : "ONE_WAY",
-    contractText: `$${salary.toLocaleString("en-US")} × ${years}yr (through ${expiry})`,
+    ahlSalary: twoWay ? TWO_WAY_AHL_SALARY : null,
+    contractText: twoWay
+      ? `$${salary.toLocaleString("en-US")} NHL / $${TWO_WAY_AHL_SALARY.toLocaleString("en-US")} AHL × ${years}yr (2-way, through ${expiry})`
+      : `$${salary.toLocaleString("en-US")} × ${years}yr (through ${expiry})`,
     signPromiseLine: o.line, signPromisePP: o.pp, signPromisePK: o.pk,
     tradeClause: clause, noTradeTeams,
     disgruntled: false, tradeRequested: false, promiseWarnGame: null,
@@ -596,7 +599,7 @@ async function signFaOffer(playerId: number, player: { name: string; age: number
     // update also makes concurrent automatic/manual resolvers idempotent: only
     // the first one can move a player who is still a signable free agent.
     const [prev, team] = await Promise.all([
-      tx.player.findUnique({ where: { id: playerId }, select: { capHit: true, contractYears: true, contractExpiry: true, contractType: true, tradeClause: true, noTradeTeams: true, rosterType: true, teamId: true, contractText: true } }),
+      tx.player.findUnique({ where: { id: playerId }, select: { capHit: true, ahlSalary: true, contractYears: true, contractExpiry: true, contractType: true, tradeClause: true, noTradeTeams: true, rosterType: true, teamId: true, contractText: true } }),
       tx.team.findUnique({ where: { id: o.teamId }, select: { code: true } }),
     ]);
     const moved = await tx.player.updateMany({
@@ -609,6 +612,7 @@ async function signFaOffer(playerId: number, player: { name: string; age: number
     await tx.signingLog.create({ data: {
       playerId, playerName: player.name, teamCode: team?.code ?? null, kind: "SIGN", salary, years,
       prevCapHit: prev?.capHit != null ? Math.round(prev.capHit) : null, prevYears: prev?.contractYears ?? null, prevExpiry: prev?.contractExpiry ?? null,
+      prevAhlSalary: prev?.ahlSalary != null ? Math.round(prev.ahlSalary) : null,
       prevType: prev?.contractType ?? null, prevClause: prev?.tradeClause ?? null, prevNoTrade: prev?.noTradeTeams ?? [],
       prevRosterType: prev?.rosterType ?? null, prevTeamId: prev?.teamId ?? null, prevContractText: prev?.contractText ?? null,
     } });
@@ -1016,6 +1020,7 @@ export async function applyElcAction(playerId: number) {
     where: { id: playerId },
     data: {
       capHit: c.capHit, contractYears: c.years, contractExpiry: expiry, contractType: "TWO_WAY",
+      ahlSalary: TWO_WAY_AHL_SALARY,
       contractText: `$${c.base.toLocaleString("en-US")} + $${c.bonus.toLocaleString("en-US")} bonus × ${c.years}yr (ELC, through ${expiry})`,
     },
   });
@@ -1058,6 +1063,7 @@ export async function applyAllElcAction() {
       where: { id: r.id },
       data: {
         capHit: r.capHit, contractYears: r.years, contractExpiry: expiry, contractType: "TWO_WAY",
+        ahlSalary: TWO_WAY_AHL_SALARY,
         contractText: `$${r.base.toLocaleString("en-US")} + $${r.bonus.toLocaleString("en-US")} bonus × ${r.years}yr (ELC, through ${expiry})`,
       },
     });
@@ -1102,7 +1108,7 @@ export async function extendContractAction(
 ) {
   if (!(await canManageTeam(teamId))) return { ok: false as const, error: "You don't manage this team." };
   const player = await prisma.player.findUnique({
-    where: { id: playerId }, select: { teamId: true, contractYears: true, capHit: true, contractExpiry: true, contractType: true, tradeClause: true, noTradeTeams: true, contractText: true, age: true, name: true, lastSeasonGP: true, resignRound: true, resignStatus: true, resignOfferSalary: true, rosterType: true, franchiseTag: true, overall: true, realFarmTeamId: true },
+    where: { id: playerId }, select: { teamId: true, contractYears: true, capHit: true, ahlSalary: true, contractExpiry: true, contractType: true, tradeClause: true, noTradeTeams: true, contractText: true, age: true, name: true, lastSeasonGP: true, resignRound: true, resignStatus: true, resignOfferSalary: true, rosterType: true, franchiseTag: true, overall: true, realFarmTeamId: true },
   });
   if (!player) return { ok: false as const, error: "Player not found." };
   // the club may re-sign its own NHL players AND its farm (AHL affiliate) players
@@ -1209,7 +1215,9 @@ export async function extendContractAction(
   // delay to next season's rollover).
   const expiry = CURRENT_SEASON_START + years;
   const noTradeTeams = clause === "M_NTC" ? await weakestTeams(breadth ?? 12, teamId) : [];
-  const contractText = `$${salary.toLocaleString("en-US")} × ${years}yr (through ${expiry})`;
+  const contractText = twoWay
+    ? `$${salary.toLocaleString("en-US")} NHL / $${TWO_WAY_AHL_SALARY.toLocaleString("en-US")} AHL × ${years}yr (2-way, through ${expiry})`
+    : `$${salary.toLocaleString("en-US")} × ${years}yr (through ${expiry})`;
   // Non-roster release: an RFA benched at regular-season opening day for staying
   // unsigned (sweepUnsignedRfasToNonRoster) is usable again the moment his own club
   // actually re-signs him — back onto the active NHL roster (a GM can send him to
@@ -1222,6 +1230,7 @@ export async function extendContractAction(
       ...releaseNonRoster,
       capHit: salary, contractYears: years, contractExpiry: expiry,
       contractType: twoWay ? "TWO_WAY" : "ONE_WAY", tradeClause: clause, noTradeTeams, contractText,
+      ahlSalary: twoWay ? TWO_WAY_AHL_SALARY : null,
       extCapHit: null, extYears: null, extContractType: null, extClause: null, extNoTradeTeams: [], extText: null,
       signPromiseLine: dep.line, signPromisePP: pp, signPromisePK: pk,
       resignRound: 0, resignStatus: null, resignCounterSalary: null, resignCounterYears: null,
@@ -1235,6 +1244,7 @@ export async function extendContractAction(
   await prisma.signingLog.create({ data: {
     playerId, playerName: player.name, teamCode: team?.code ?? null, kind: "EXTEND", salary, years,
     prevCapHit: player.capHit, prevYears: player.contractYears, prevExpiry: player.contractExpiry,
+    prevAhlSalary: player.ahlSalary != null ? Math.round(player.ahlSalary) : null,
     prevType: player.contractType, prevClause: player.tradeClause, prevNoTrade: player.noTradeTeams,
     prevRosterType: player.rosterType, prevTeamId: player.teamId, prevContractText: player.contractText,
   } });

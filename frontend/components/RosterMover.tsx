@@ -9,7 +9,7 @@ import { ROSTER_LIMITS, WAIVER_CAP_HIT_LIMIT, isNhlSide, type MoveRow, type Rost
 type Player = {
   id: number; name: string; position: string; overall: number;
   isGoalie: boolean; side: RosterSide; contractType: "ONE_WAY" | "TWO_WAY" | null;
-  capHit: number; onWaivers?: boolean;
+  capHit: number; ahlSalary?: number | null; contractYears: number; onWaivers?: boolean;
   // Rule 30/10 recall pass — riding a free (no-waivers) trip back to the farm since
   // his last AHL→NHL call-up (≤30 days AND ≤10 NHL games played since then).
   recallExempt?: boolean; recallDaysLeft?: number; recallGamesLeft?: number;
@@ -33,9 +33,10 @@ type Props = {
   players: Player[]; onSave: (slug: string, rows: MoveRow[]) => Promise<{ ok: boolean; error?: string } | void>;
   onRelease: (slug: string, playerId: number) => Promise<{ ok: boolean; error?: string; name?: string }>;
   onWaiver: (slug: string, playerId: number) => Promise<{ ok: boolean; error?: string }>;
+  onOfferTwoWay: (slug: string, playerId: number, salary: number, years: number) => Promise<{ ok: boolean; error?: string; name?: string; capHit?: number; ahlSalary?: number; years?: number }>;
 };
 
-export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffiliate, players, onSave, onRelease, onWaiver }: Props) {
+export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffiliate, players, onSave, onRelease, onWaiver, onOfferTwoWay }: Props) {
   const [rows, setRows] = useState<Player[]>(players);
   const [pending, start] = useTransition();
   const [saved, setSaved] = useState(false);
@@ -64,6 +65,29 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
         const r = await onWaiver(teamSlug, p.id);
         if (!r.ok) setErr(r.error ?? "Couldn't place him on waivers.");
         else { setRows((prev) => prev.map((x) => (x.id === p.id ? { ...x, onWaivers: true } : x))); setNote(`${p.name} placed on waivers.`); }
+      } catch (e) { setErr((e as Error).message); }
+    });
+  };
+
+  const offerTwoWay = (p: Player) => {
+    const salaryRaw = window.prompt(`NHL salary for ${p.name} (minimum $775,000; AHL salary stays $100,000):`, "800000");
+    if (salaryRaw == null) return;
+    const yearsRaw = window.prompt("Contract length in years:", "1");
+    if (yearsRaw == null) return;
+    const salary = Number(salaryRaw.replace(/[^0-9.]/g, ""));
+    const years = Number(yearsRaw);
+    start(async () => {
+      setErr(null); setNote(null);
+      try {
+        const r = await onOfferTwoWay(teamSlug, p.id, salary, years);
+        if (!r.ok) setErr(r.error ?? "The player rejected the two-way offer.");
+        else {
+          setRows((prev) => prev.map((x) => x.id === p.id ? {
+            ...x, capHit: r.capHit ?? salary, ahlSalary: r.ahlSalary ?? 100_000,
+            contractYears: r.years ?? years, contractType: "TWO_WAY",
+          } : x));
+          setNote(`${r.name ?? p.name} accepted the two-way contract.`);
+        }
       } catch (e) { setErr((e as Error).message); }
     });
   };
@@ -167,7 +191,7 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
           <span title="Minor-league (AHL-only) contract — below the NHL minimum salary, can't be called up"
             className="text-[10px] font-bold px-1.5 py-0.5 rounded border border-emerald-600/50 text-emerald-400">AHL only</span>
         ) : (
-          <span title={oneWay ? "One-way contract — can't be sent to the farm" : "Two-way contract — can be sent to the farm"}
+          <span title={oneWay ? "One-way contract — can't be sent to the farm" : `Two-way contract — $${p.capHit.toLocaleString("en-US")} NHL / $${(p.ahlSalary ?? 100_000).toLocaleString("en-US")} AHL`}
             className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${oneWay ? "border-amber-600/60 text-amber-400" : "border-slate-700 text-slate-400"}`}>
             {oneWay ? "1-way" : "2-way"}
           </span>
@@ -177,6 +201,9 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
             className="text-[10px] font-bold px-1.5 py-0.5 rounded border border-emerald-600/50 text-emerald-400 whitespace-nowrap">🔓 Recall pass</span>
         )}
         <div className="flex items-center gap-1 shrink-0">
+          {ahlOnly && <button onClick={() => offerTwoWay(p)} disabled={pending}
+            title="Offer a real two-way deal: NHL salary on call-up, $100k salary on the farm"
+            className="text-[11px] px-2 py-0.5 rounded bg-blue-900/70 hover:bg-blue-800 text-blue-200 disabled:opacity-30 whitespace-nowrap">Offer 2-way</button>}
           {/* a one-way player already on the wire: nothing left to do here but wait */}
           {oneWay && p.onWaivers && (p.side === "pro" || p.side === "pro-scratched") && (
             <span title="Waiting for the one-day waiver window to close — check the Waivers page"

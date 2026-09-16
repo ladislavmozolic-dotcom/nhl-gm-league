@@ -5,7 +5,7 @@
 
 import { prisma } from "./prisma";
 import { computeELC } from "./elc";
-import { CURRENT_SEASON_START } from "./finance";
+import { CURRENT_SEASON_START, TWO_WAY_AHL_SALARY } from "./finance";
 
 export type ReconAction = "DELETE" | "TO_PROSPECTS" | "LTIR_PROSPECT" | "ACTIVATE_NHL" | "ACTIVATE_NHL_ELC" | "ACTIVATE_AHL" | "NONE";
 
@@ -110,6 +110,7 @@ export async function applyReconcileOne(id: number): Promise<boolean> {
     await prisma.player.update({ where: { id }, data: {
       rosterType: "NHL", ...(parent ? { teamId: parent } : {}),
       capHit: c.capHit, contractYears: c.years, contractExpiry: expiry, contractType: "TWO_WAY",
+      ahlSalary: TWO_WAY_AHL_SALARY,
       contractText: `$${c.base.toLocaleString("en-US")} + $${c.bonus.toLocaleString("en-US")} bonus × ${c.years}yr (ELC, through ${expiry})`,
     } });
   } else if (action === "ACTIVATE_AHL") {
@@ -118,7 +119,7 @@ export async function applyReconcileOne(id: number): Promise<boolean> {
     // as a PROSPECT, same as ACTIVATE_NHL moves the other way).
     await prisma.player.update({ where: { id }, data: {
       rosterType: "AHL", ...(affiliateId ? { teamId: affiliateId } : {}),
-      capHit: 100_000, contractType: "TWO_WAY", contractText: "$100,000 × 1yr (farm)",
+      capHit: 100_000, ahlSalary: null, contractType: "TWO_WAY", contractText: "$100,000 × 1yr (farm)",
     } });
   } else return false;
   return true;

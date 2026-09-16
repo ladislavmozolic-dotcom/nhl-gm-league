@@ -65,6 +65,21 @@ export function liveCapHit(p: { capHit: number | null; contractYears?: number | 
   return (p.contractYears ?? 0) > 0 ? (p.capHit ?? 0) : 0;
 }
 
+export const TWO_WAY_AHL_SALARY = 100_000;
+
+/** Actual cash salary while a player is assigned to the farm. Two-way deals use
+ * their AHL salary; one-way and legacy farm contracts keep their listed salary. */
+export function liveAhlSalary(p: {
+  capHit: number | null; contractYears?: number | null;
+  contractType?: string | null; ahlSalary?: number | null;
+}): number {
+  if ((p.contractYears ?? 0) <= 0) return 0;
+  if (p.contractType === "TWO_WAY" && (p.capHit ?? 0) > TWO_WAY_AHL_SALARY) {
+    return p.ahlSalary ?? TWO_WAY_AHL_SALARY;
+  }
+  return p.capHit ?? 0;
+}
+
 /** The NHL's own UFA/RFA cutoff: age as of June 30 of `year`, not a plain
  *  year-count added to the player's current age — a summer/fall birthday
  *  shouldn't get credited a year early just because "age + years" rounds up. */
@@ -259,13 +274,13 @@ export function buyoutTerms(
   return { perYear, years, totalCost: perYear * years, pct };
 }
 
-// A parent club still pays real money for its farm team's roster, but only
-// contracts worth actually budgeting for — cheap two-way/entry deals are
-// rounding error. This never touches the NHL salary cap; it only drains
-// the bank, same as NHL salaries do.
-export const FARM_SALARY_THRESHOLD = 100_000;
-export function farmSalaryExpense(players: Array<{ capHit: number | null; contractYears?: number | null }>): number {
-  return players.reduce((s, p) => { const hit = liveCapHit(p); return s + (hit > FARM_SALARY_THRESHOLD ? hit : 0); }, 0);
+// A parent club pays the salary applicable to each player while he is assigned
+// to its farm. This never touches the NHL salary cap; it only drains the bank.
+export function farmSalaryExpense(players: Array<{
+  capHit: number | null; contractYears?: number | null;
+  contractType?: string | null; ahlSalary?: number | null;
+}>): number {
+  return players.reduce((s, p) => s + liveAhlSalary(p), 0);
 }
 
 export type TeamFinance = {

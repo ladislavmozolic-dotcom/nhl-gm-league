@@ -16,7 +16,7 @@ export default async function FinancePage() {
         id: true, name: true, slug: true, logoUrl: true, popularity: true,
         capacity: true, arenaSections: true, ledgerAdj: true,
         players: { where: { rosterType: "NHL" }, select: { capHit: true, retainedSalary: true, contractYears: true } },
-        affiliateTeams: { select: { players: { where: { rosterType: "AHL" }, select: { capHit: true, contractYears: true } } } },
+        affiliateTeams: { select: { players: { where: { rosterType: "AHL" }, select: { capHit: true, ahlSalary: true, contractType: true, contractYears: true } } } },
       },
     }),
     loadSettings(),

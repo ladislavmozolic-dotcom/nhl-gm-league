@@ -15,7 +15,7 @@ export async function revertSigningAction(logId: number) {
   await prisma.player.update({
     where: { id: log.playerId },
     data: {
-      capHit: log.prevCapHit ?? 0, contractYears: log.prevYears, contractExpiry: log.prevExpiry,
+      capHit: log.prevCapHit ?? 0, ahlSalary: log.prevAhlSalary, contractYears: log.prevYears, contractExpiry: log.prevExpiry,
       contractType: log.prevType, tradeClause: log.prevClause, noTradeTeams: log.prevNoTrade,
       rosterType: log.prevRosterType ?? "NHL", teamId: log.prevTeamId ?? undefined,
       contractText: log.prevContractText,

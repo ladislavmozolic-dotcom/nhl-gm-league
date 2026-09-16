@@ -5,7 +5,7 @@ import { isAdmin, isComishOrCoComish } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { SKATER_FIELDS } from "@/lib/skater-fields";
-import { computeContractExpiry } from "@/lib/finance";
+import { computeContractExpiry, TWO_WAY_AHL_SALARY } from "@/lib/finance";
 
 const slugify = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 
@@ -32,13 +32,15 @@ export async function createPlayer(formData: FormData) {
   const capHit = num("capHit");
   const contractYears = num("contractYears");
 
+  const contractType = str("contractType");
   const data: Record<string, unknown> = {
     slug, name, position, isGoalie,
     teamId, rosterType: str("rosterType") ?? "NHL",
     nationality: str("nationality"), shoots: str("shoots"),
     height: heightCm ? `${heightCm} cm` : null, weight: num("weightKg"),
     birthDate: str("birthDate"), number: num("number"),
-    capHit, contractYears, contractExpiry: contractYears ? computeContractExpiry(contractYears) : null, contractType: str("contractType"),
+    capHit, contractYears, contractExpiry: contractYears ? computeContractExpiry(contractYears) : null, contractType,
+    ahlSalary: contractType === "TWO_WAY" && (capHit ?? 0) > TWO_WAY_AHL_SALARY ? TWO_WAY_AHL_SALARY : null,
     contractText: capHit ? `${capHit.toLocaleString("en-US")}$ / ${contractYears ?? 0}yr${contractYears === 1 ? "" : "s"}` : null,
     condition: 100, morale: 50,
   };
@@ -73,7 +75,7 @@ export async function updateContract(formData: FormData) {
 
   await prisma.player.update({
     where: { slug },
-    data: { capHit, contractYears, contractExpiry, contractText, contractType },
+    data: { capHit, contractYears, contractExpiry, contractText, contractType, ahlSalary: contractType === "TWO_WAY" && capHit > TWO_WAY_AHL_SALARY ? TWO_WAY_AHL_SALARY : null },
   });
 
   for (const p of ["/admin/contracts", `/admin/contracts/${slug}`, "/salary-cap", `/players/${slug}`]) revalidatePath(p);

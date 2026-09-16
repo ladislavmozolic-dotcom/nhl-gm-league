@@ -36,7 +36,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
     select: {
       id: true, name: true, code: true, logoUrl: true, arena: true, popularity: true, arenaSections: true, capacity: true, bankAccount: true,
       players: { where: { rosterType: "NHL" }, select: { id: true, name: true, position: true, age: true, birthDate: true, isGoalie: true, capHit: true, retainedSalary: true, contractYears: true, injuryDaysLeft: true, condition: true, tradeClause: true, noTradeTeams: true }, orderBy: [{ isGoalie: "asc" }, { capHit: "desc" }] },
-      affiliateTeams: { select: { players: { where: { rosterType: "AHL" }, select: { id: true, name: true, position: true, age: true, birthDate: true, isGoalie: true, capHit: true, contractYears: true }, orderBy: [{ isGoalie: "asc" }, { capHit: "desc" }] } } },
+      affiliateTeams: { select: { players: { where: { rosterType: "AHL" }, select: { id: true, name: true, position: true, age: true, birthDate: true, isGoalie: true, capHit: true, ahlSalary: true, contractType: true, contractYears: true }, orderBy: [{ isGoalie: "asc" }, { capHit: "desc" }] } } },
     },
   });
   if (!team) notFound();

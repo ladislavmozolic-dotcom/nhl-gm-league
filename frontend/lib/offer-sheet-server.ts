@@ -13,7 +13,7 @@ import { twoWayObjection } from "./free-agency";
 import { evaluateTeamOffer, weakestTeams, loadLeagueCap } from "./free-agency-server";
 import { canManageTeam } from "./auth";
 import { getLeagueClock } from "./calendar-server";
-import { CURRENT_SEASON_START, capCeilingForPhase, ltirRelief, liveCapHit } from "./finance";
+import { CURRENT_SEASON_START, TWO_WAY_AHL_SALARY, capCeilingForPhase, ltirRelief, liveCapHit } from "./finance";
 import { teamCapCommitted } from "./cap";
 
 type Ok = { ok: true };
@@ -185,7 +185,10 @@ async function executeOfferSheet(os: OfferSheetRow, playerName: string): Promise
         teamId: os.fromTeamId, rosterType: "NHL",
         capHit: os.salary, contractYears: os.years, contractExpiry: expiry,
         contractType: os.twoWay ? "TWO_WAY" : "ONE_WAY",
-        contractText: `$${os.salary.toLocaleString("en-US")} × ${os.years}yr (through ${expiry})`,
+        ahlSalary: os.twoWay ? TWO_WAY_AHL_SALARY : null,
+        contractText: os.twoWay
+          ? `$${os.salary.toLocaleString("en-US")} NHL / $${TWO_WAY_AHL_SALARY.toLocaleString("en-US")} AHL × ${os.years}yr (2-way, through ${expiry})`
+          : `$${os.salary.toLocaleString("en-US")} × ${os.years}yr (through ${expiry})`,
         signPromiseLine: os.line, signPromisePP: os.pp, signPromisePK: os.pk,
         tradeClause: clause, noTradeTeams,
         franchiseTag: false, resignStatus: null, resignRound: 0, resignCounterSalary: null, resignCounterYears: null, resignOfferSalary: null,
