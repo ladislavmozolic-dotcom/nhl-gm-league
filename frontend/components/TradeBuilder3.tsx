@@ -57,17 +57,34 @@ function retainedInForTeam(
   return { count, dollars };
 }
 
+/** Already-retained-salary players THIS side is selected to send away in the
+ *  trade being drafted. `status.retentionSlotsInUsed` is a static roster
+ *  snapshot taken before this trade existed, so a retained player leaving
+ *  here must be backed out of it — otherwise he still counts against this
+ *  club's own IN baseline even though the trade removes him from the roster,
+ *  on top of whatever OUT slot this trade newly adds for him. */
+function retainedInLeaving(playerIds: Set<number>, assets: Assets): { count: number; dollars: number } {
+  let count = 0, dollars = 0;
+  for (const id of playerIds) {
+    const p = assets.players.find((pl) => pl.id === id);
+    if (!p || p.farm || !(p.retainedAmount ?? 0)) continue;
+    count++; dollars += p.retainedAmount ?? 0;
+  }
+  return { count, dollars };
+}
+
 // This club's retention CAPACITY: "slots" is ONE combined pool — contracts
 // it's retaining on (OUT) plus retained-salary players it rosters (IN) —
 // against a single max, and the dollar amount of both together is checked
 // against a single % of the cap. Both are enforced server-side in
 // lib/trade-exec.ts, so this is a live preview of the same check.
-function RetentionCapacity({ status, newOutSlots, newOutPct, newIn }: { status: CapSnapshot; newOutSlots: number; newOutPct: number; newIn: { count: number; dollars: number } }) {
+function RetentionCapacity({ status, newOutSlots, newOutPct, newIn, leavingIn }: { status: CapSnapshot; newOutSlots: number; newOutPct: number; newIn: { count: number; dollars: number }; leavingIn: { count: number; dollars: number } }) {
   const outAfter = status.retentionSlotsOutUsed + newOutSlots;
-  const inAfter = status.retentionSlotsInUsed + newIn.count;
+  const inAfter = status.retentionSlotsInUsed - leavingIn.count + newIn.count;
   const slotsAfter = outAfter + inAfter;
   const newInPct = status.capUpper > 0 ? (newIn.dollars / status.capUpper) * 100 : 0;
-  const pctAfter = status.retentionPctUsed + newOutPct + newInPct;
+  const leavingInPct = status.capUpper > 0 ? (leavingIn.dollars / status.capUpper) * 100 : 0;
+  const pctAfter = status.retentionPctUsed - leavingInPct + newOutPct + newInPct;
   const over = slotsAfter > status.retentionSlotsMax || pctAfter > status.retentionPctMax;
   return (
     <div className={`bg-slate-900/40 border rounded-lg px-3 py-2 text-xs space-y-1 ${over ? "border-amber-700/60" : "border-slate-800"}`} title="Retention capacity vs. the league's configured limits — one combined pool of slots (retained-on + rostered-retained) and one combined % of the cap. Existing (out/in) reflects retentions this club already carries from PAST trades, unrelated to what's selected here.">
@@ -104,6 +121,7 @@ function TeamColumn({ team, others, assets, dest, setDest, playerIds, setPlayerI
   };
   const setRet = (id: number, pct: number) => setRetentions({ ...retentions, [id]: Math.max(0, Math.min(capStatus.retentionMaxPct, pct)) });
   const added = retentionAdded(retentions, assets, capStatus.capUpper);
+  const leavingIn = retainedInLeaving(playerIds, assets);
 
   const togglePlayer = (p: Player) => {
     const wasOn = playerIds.has(p.id);
@@ -139,7 +157,7 @@ function TeamColumn({ team, others, assets, dest, setDest, playerIds, setPlayerI
         </select>
       </div>
 
-      <RetentionCapacity status={capStatus} newOutSlots={added.slots} newOutPct={added.pct} newIn={newIn} />
+      <RetentionCapacity status={capStatus} newOutSlots={added.slots} newOutPct={added.pct} newIn={newIn} leavingIn={leavingIn} />
 
       <div className="bg-slate-900/40 border border-slate-800 rounded-lg overflow-hidden">
         <div className="px-3 py-2 bg-slate-800/40 text-xs font-bold uppercase tracking-wide text-slate-400">Players ({assets.players.length})</div>

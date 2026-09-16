@@ -67,6 +67,22 @@ function retainedInAdded(incomingMap: Record<number, number>, incomingAssets: As
   return { count, dollars };
 }
 
+/** Already-retained-salary players THIS side is selected to send away in the
+ *  trade being drafted. `status.retentionSlotsInUsed` is a static roster
+ *  snapshot taken before this trade existed, so a retained player leaving
+ *  here must be backed out of it — otherwise he still counts against this
+ *  club's own IN baseline even though the trade removes him from the roster,
+ *  on top of whatever OUT slot this trade newly adds for him. */
+function retainedInLeaving(pmap: Record<number, number>, assets: Assets): { count: number; dollars: number } {
+  let count = 0, dollars = 0;
+  for (const id of Object.keys(pmap)) {
+    const p = assets.players.find((pl) => pl.id === Number(id));
+    if (!p || p.farm || !(p.retainedAmount ?? 0)) continue;
+    count++; dollars += p.retainedAmount ?? 0;
+  }
+  return { count, dollars };
+}
+
 function CapImpact({ status, delta }: { status: CapSnapshot; delta: number }) {
   const spaceNow = status.strictSpace;
   const spaceAfter = spaceNow - delta;
@@ -98,12 +114,13 @@ function CapImpact({ status, delta }: { status: CapSnapshot; delta: number }) {
 // against a single max, and the dollar amount of both together is checked
 // against a single % of the cap. Both are enforced server-side in
 // lib/trade-exec.ts, so this is a live preview of the same check.
-function RetentionCapacity({ status, newOutSlots, newOutPct, newIn }: { status: CapSnapshot; newOutSlots: number; newOutPct: number; newIn: { count: number; dollars: number } }) {
+function RetentionCapacity({ status, newOutSlots, newOutPct, newIn, leavingIn }: { status: CapSnapshot; newOutSlots: number; newOutPct: number; newIn: { count: number; dollars: number }; leavingIn: { count: number; dollars: number } }) {
   const outAfter = status.retentionSlotsOutUsed + newOutSlots;
-  const inAfter = status.retentionSlotsInUsed + newIn.count;
+  const inAfter = status.retentionSlotsInUsed - leavingIn.count + newIn.count;
   const slotsAfter = outAfter + inAfter;
   const newInPct = status.capUpper > 0 ? (newIn.dollars / status.capUpper) * 100 : 0;
-  const pctAfter = status.retentionPctUsed + newOutPct + newInPct;
+  const leavingInPct = status.capUpper > 0 ? (leavingIn.dollars / status.capUpper) * 100 : 0;
+  const pctAfter = status.retentionPctUsed - leavingInPct + newOutPct + newInPct;
   const over = slotsAfter > status.retentionSlotsMax || pctAfter > status.retentionPctMax;
   return (
     <div className={`bg-slate-900/40 border rounded-lg px-3 py-2 text-xs space-y-1 ${over ? "border-amber-700/60" : "border-slate-800"}`} title="Retention capacity vs. the league's configured limits — one combined pool of slots (retained-on + rostered-retained) and one combined % of the cap. Existing (out/in) reflects retentions this club already carries from PAST trades, unrelated to what's selected here.">
@@ -264,6 +281,7 @@ function Side({ team, assets, pmap, setPmap, pk, setPk, pro, setPro, cash, setCa
 }) {
   const added = retentionAdded(pmap, assets, capStatus.capUpper);
   const addedIn = retainedInAdded(incomingPmap, incomingAssets);
+  const leavingIn = retainedInLeaving(pmap, assets);
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-center gap-2 font-bold">
@@ -271,7 +289,7 @@ function Side({ team, assets, pmap, setPmap, pk, setPk, pro, setPro, cash, setCa
         {team.name} sends
       </div>
       <CapImpact status={capStatus} delta={capDelta} />
-      <RetentionCapacity status={capStatus} newOutSlots={added.slots} newOutPct={added.pct} newIn={addedIn} />
+      <RetentionCapacity status={capStatus} newOutSlots={added.slots} newOutPct={added.pct} newIn={addedIn} leavingIn={leavingIn} />
       <PlayerTable title="Players" list={assets.players} pmap={pmap} setPmap={setPmap} destTeamId={destTeamId} ownerTeamId={team.id} terms={terms} fees={fees} onToggleClause={onToggleClause} onAgreeFee={onAgreeFee} maxRetentionPct={capStatus.retentionMaxPct}
         conditionSpec={conditionSpec && assets.players.some((pl) => pl.id === conditionSpec.playerId) ? conditionSpec : null}
         onOpenCondition={(p) => onOpenCondition(p, destTeamId, incomingAssets.picks)}
