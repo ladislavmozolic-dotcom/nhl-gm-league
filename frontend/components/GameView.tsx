@@ -352,17 +352,50 @@ function hashUnit(s: string): number {
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
   return (h >>> 0) / 4294967296;
 }
-// Half-rink zones (net near the bottom, blue line at the top) the 5 tracked
-// sectors map onto. PERIMETER and CIRCLE each have a left/right cluster; which
-// side a given dot lands on is picked by hash, not tracked by the sim (the
-// sector data has no left/right distinction).
+// Half-rink zones (net near the bottom, blue line at y=42) the 5 tracked
+// sectors map onto. Every shooting ellipse sits fully inside the offensive
+// zone. Multiple clusters give the chart natural left/right and high/low
+// variety even though the engine stores a sector rather than exact coordinates.
 const SHOT_ZONES: Record<string, { cx: number; cy: number; rx: number; ry: number }[]> = {
-  POINT: [{ cx: 100, cy: 34, rx: 58, ry: 14 }],
-  PERIMETER: [{ cx: 28, cy: 108, rx: 15, ry: 58 }, { cx: 172, cy: 108, rx: 15, ry: 58 }],
-  CIRCLE: [{ cx: 64, cy: 128, rx: 19, ry: 19 }, { cx: 136, cy: 128, rx: 19, ry: 19 }],
-  SLOT: [{ cx: 100, cy: 154, rx: 30, ry: 24 }],
-  NET_FRONT: [{ cx: 100, cy: 189, rx: 17, ry: 10 }],
+  POINT: [{ cx: 55, cy: 58, rx: 38, ry: 12 }, { cx: 145, cy: 58, rx: 38, ry: 12 }],
+  PERIMETER: [{ cx: 28, cy: 111, rx: 15, ry: 53 }, { cx: 172, cy: 111, rx: 15, ry: 53 }],
+  CIRCLE: [{ cx: 64, cy: 128, rx: 20, ry: 22 }, { cx: 136, cy: 128, rx: 20, ry: 22 }],
+  SLOT: [{ cx: 100, cy: 158, rx: 31, ry: 25 }],
+  NET_FRONT: [{ cx: 100, cy: 184, rx: 20, ry: 10 }],
 };
+
+type ShotDot = NonNullable<Side["shotDots"]>[number];
+
+/** Stable visual coordinates for a shot sector. Using polar coordinates inside
+ * an ellipse avoids the artificial diagonal rows created when the old code
+ * hashed near-identical `key + "x"` and `key + "y"` strings. A small share of
+ * net-front goals are bank/wraparound plays originating behind the goal line. */
+function shotPosition(d: ShotDot, key: string): { x: number; y: number; behindNet: boolean } | null {
+  const zones = SHOT_ZONES[d.sector];
+  if (!zones?.length) return null;
+
+  // Roughly 4% of NET_FRONT goals; net-front accounts for only part of all
+  // scoring, so this remains a genuinely rare (~1% overall) lacrosse/bank/
+  // wraparound-looking goal rather than a common chart artefact.
+  const behindNet = d.goal && d.sector === "NET_FRONT" && hashUnit(`behind:${key}`) < 0.04;
+  if (behindNet) {
+    const side = hashUnit(`behind-side:${key}`) < 0.5 ? -1 : 1;
+    return {
+      x: 100 + side * (13 + hashUnit(`behind-x:${key}`) * 12),
+      y: 204 + hashUnit(`behind-y:${key}`) * 4,
+      behindNet: true,
+    };
+  }
+
+  const zone = zones[Math.min(zones.length - 1, Math.floor(hashUnit(`cluster:${key}`) * zones.length))];
+  const angle = hashUnit(`angle:${key}`) * Math.PI * 2;
+  const radius = Math.sqrt(hashUnit(`radius:${key}`)); // uniform area, not a centre-heavy blob
+  return {
+    x: zone.cx + Math.cos(angle) * zone.rx * radius,
+    y: zone.cy + Math.sin(angle) * zone.ry * radius,
+    behindNet: false,
+  };
+}
 
 function HalfRink() {
   return (
@@ -371,8 +404,9 @@ function HalfRink() {
       <line x1="8" y1="42" x2="192" y2="42" className="text-sky-800/70" strokeWidth="1.6" />
       <circle cx="64" cy="128" r="19" />
       <circle cx="136" cy="128" r="19" />
-      <circle cx="100" cy="197" r="15" className="text-slate-800" strokeDasharray="2 2" />
-      <rect x="90" y="203" width="20" height="8" className="text-slate-500" fill="currentColor" fillOpacity="0.25" />
+      <line x1="8" y1="198" x2="192" y2="198" className="text-red-900/60" strokeWidth="0.8" />
+      <circle cx="100" cy="191" r="15" className="text-slate-800" strokeDasharray="2 2" />
+      <rect x="90" y="196" width="20" height="7" className="text-slate-500" fill="currentColor" fillOpacity="0.25" />
     </g>
   );
 }
@@ -384,21 +418,18 @@ function ShotChartPanel({ data }: { data: Data }) {
   const Dots = ({ dots, side }: { dots: NonNullable<Side["shotDots"]>; side: "away" | "home" }) => (
     <>
       {dots.map((d, i) => {
-        const zones = SHOT_ZONES[d.sector];
-        if (!zones) return null;
         const key = `${d.sector}-${i}-${d.playerName ?? ""}`;
-        const zone = zones[zones.length > 1 && hashUnit(key + "z") < 0.5 ? 0 : zones.length - 1];
-        const cx = zone.cx + (hashUnit(key + "x") * 2 - 1) * zone.rx;
-        const cy = zone.cy + (hashUnit(key + "y") * 2 - 1) * zone.ry;
+        const pos = shotPosition(d, key);
+        if (!pos) return null;
         const color = d.goal ? "text-amber-400" : side === "home" ? "text-rose-400" : "text-sky-400";
         return (
           <g key={i} className={color}>
             {d.goal ? (
-              <circle cx={cx} cy={cy} r="4.2" fill="currentColor" stroke="#0f172a" strokeWidth="1" />
+              <circle cx={pos.x} cy={pos.y} r="4.2" fill="currentColor" stroke="#0f172a" strokeWidth="1" />
             ) : (
-              <circle cx={cx} cy={cy} r="2.6" fill="currentColor" fillOpacity="0.55" />
+              <circle cx={pos.x} cy={pos.y} r="2.6" fill="currentColor" fillOpacity="0.55" />
             )}
-            <title>{d.playerName ?? "Unknown"}{d.goal ? " — GOAL" : ""}{d.xg != null ? ` — xG ${d.xg.toFixed(2)}` : ""}</title>
+            <title>{d.playerName ?? "Unknown"}{d.goal ? " — GOAL" : ""}{pos.behindNet ? " — bank/wraparound from behind the net" : ""}{d.xg != null ? ` — xG ${d.xg.toFixed(2)}` : ""}</title>
           </g>
         );
       })}
