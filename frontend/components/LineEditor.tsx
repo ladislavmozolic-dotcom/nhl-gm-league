@@ -37,6 +37,12 @@ type Props = {
 };
 
 const isD = (p: string) => /(^|\/)D(\/|$)/.test(p) || p === "D";
+// Dual-eligible players (e.g. "RW/D") are real — a listed position string can
+// carry both an F token (C/LW/RW) and D, and such a player should be
+// selectable on either side rather than forced into just one. These two
+// checks are NOT mutually exclusive, unlike isD() above.
+const isEligibleF = (p: string) => /(^|\/)(C|LW|RW)(\/|$)/.test(p);
+const isEligibleD = isD;
 const STATES: Array<{ key: keyof Omit<GameStrategy, "goaliePull">; label: string }> = [
   { key: "winning2", label: "Winning by 2+" },
   { key: "winning1", label: "Winning by 1" },
@@ -92,8 +98,8 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
     return p ? { id: p.id, name: displayName(p.name), isD: i >= dStartIndex } : null;
   });
   const byName = (a: Player, b: Player) => a.name.localeCompare(b.name);
-  const forwards = useMemo(() => players.filter((p) => !isD(p.position)).sort(byName), [players]);
-  const defense = useMemo(() => players.filter((p) => isD(p.position)).sort(byName), [players]);
+  const forwards = useMemo(() => players.filter((p) => isEligibleF(p.position)).sort(byName), [players]);
+  const defense = useMemo(() => players.filter((p) => isEligibleD(p.position)).sort(byName), [players]);
   const dressedIds = useMemo(() => {
     const ids = new Set<number>();
     for (const l of data.forwardLines) for (const id of [l.lw, l.c, l.rw]) if (id != null) ids.add(id);
@@ -761,8 +767,8 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
       {tab === "Last Min" && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Fixed seats by position, same as Forward Lines/Defense Pairs — the F
-              slots pool forwards, the D slots pool defensemen, so a center can't
-              land in a blue-line seat and vice versa. off = pulled goalie (an
+              slots pool forwards (incl. dual F/D-eligible players), the D slots
+              pool defensemen (incl. dual-eligible). off = pulled goalie (an
               extra attacker up front, still 2 D back); def = goalie in net (a
               normal 3F+2D shift). */}
           <UnitBlock title="Offensive — chase the tie (goalie pulled)" head={["Pos", "Player"]}>

@@ -91,14 +91,20 @@ export async function loadSimTeam(teamId: number, rosterType?: string, opts?: { 
   let deployDefIds: number[] = [];
   {
     const keep = new Set<number>();
+    // A dual F/D-eligible player (e.g. "RW/D") deploys on whichever side the GM
+    // actually put him in the Lines editor — not wherever isDef() defaults him —
+    // so the sim honors the same F/D choice the GM made there. Only players NOT
+    // placed in either group fall back to position eligibility.
+    const lineSide = new Map<number, "F" | "D">();
     if (dbLines) {
-      for (const l of dbLines.forwardLines) for (const id of [l.lw, l.c, l.rw]) if (id != null) keep.add(id);
-      for (const p of dbLines.defensePairs) for (const id of [p.ld, p.rd]) if (id != null) keep.add(id);
+      for (const l of dbLines.forwardLines) for (const id of [l.lw, l.c, l.rw]) if (id != null) { keep.add(id); lineSide.set(id, "F"); }
+      for (const p of dbLines.defensePairs) for (const id of [p.ld, p.rd]) if (id != null) { keep.add(id); lineSide.set(id, "D"); }
     }
     const rank = (a: typeof skaterRows[number], b: typeof skaterRows[number]) =>
       (keep.has(b.id) ? 1 : 0) - (keep.has(a.id) ? 1 : 0) || (b.overall ?? 0) - (a.overall ?? 0);
-    const fwds = skaterRows.filter((p) => !isDef(p.position)).sort(rank);
-    const defs = skaterRows.filter((p) => isDef(p.position)).sort(rank);
+    const sideOf = (p: typeof skaterRows[number]) => lineSide.get(p.id) ?? (isDef(p.position) ? "D" : "F");
+    const fwds = skaterRows.filter((p) => sideOf(p) === "F").sort(rank);
+    const defs = skaterRows.filter((p) => sideOf(p) === "D").sort(rank);
     // Guarantee a FULLY DISTINCT lineup: 12 different forwards + 6 different D, so
     // no NHL skater is iced in two units. FORWARDS come first (the priority: 12
     // different forwards every night); each role fills by natural position, then

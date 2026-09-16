@@ -120,6 +120,9 @@ const isWinger = (p: string) => isLWpos(p) || isRWpos(p) || isGenericW(p);
 const canCenter = (p: string) => isC(p) || isGenericF(p);
 const canLeft = (p: string) => isLWpos(p) || isGenericW(p);
 const canRight = (p: string) => isRWpos(p) || isGenericW(p);
+// A dual-listed player (e.g. "RW/D") is eligible on BOTH sides — not exclusive
+// with isD(), unlike the old single-side split this replaced.
+const isEligibleF = (p: string) => canCenter(p) || canLeft(p) || canRight(p);
 // a forward's natural wing side (generic wingers / centers fall back to shoots)
 const wingSide = (s: Skater): "L" | "R" => {
   const p = (s.position || "").toUpperCase();
@@ -135,7 +138,7 @@ const dSide = (s: Skater): "L" | "R" => (s.shoots === "R" ? "R" : "L");
  * only placed out of position once every natural fit for that slot is used up.
  */
 export function autoLines(skaters: Skater[], goalies: Goalie[] = []): TeamLinesData {
-  const fwd = skaters.filter((s) => !isD(s.position)).sort((a, b) => b.overall - a.overall);
+  const fwd = skaters.filter((s) => isEligibleF(s.position)).sort((a, b) => b.overall - a.overall);
   const def = skaters.filter((s) => isD(s.position)).sort((a, b) => b.overall - a.overall);
   const used = new Set<number>();
   const best = (pool: Skater[]) => pool.find((s) => !used.has(s.id));
@@ -187,7 +190,7 @@ export function autoLines(skaters: Skater[], goalies: Goalie[] = []): TeamLinesD
  */
 export function autoFill(data: TeamLinesData, skaters: Skater[], goalies: Goalie[] = []): TeamLinesData {
   const d = structuredClone(data);
-  const fwd = skaters.filter((s) => !isD(s.position)).sort((a, b) => b.overall - a.overall);
+  const fwd = skaters.filter((s) => isEligibleF(s.position)).sort((a, b) => b.overall - a.overall);
   const def = skaters.filter((s) => isD(s.position)).sort((a, b) => b.overall - a.overall);
   const all = [...skaters].sort((a, b) => b.overall - a.overall);
   const gk = [...goalies].sort((a, b) => b.overall - a.overall);
@@ -238,8 +241,10 @@ export function autoFill(data: TeamLinesData, skaters: Skater[], goalies: Goalie
     if (line.rw == null) line.rw = pickF(rightNatural, anyRight, fwd);
   }
 
-  // defense: each blue-liner used at most once across the three pairs
-  const dUsed = new Set<number>();
+  // defense: each blue-liner used at most once across the three pairs. Seeded
+  // with fUsed too — a dual F/D-eligible player already auto-placed up front
+  // can't also be auto-placed on the blue line in the same fill.
+  const dUsed = new Set<number>(fUsed);
   for (const p of d.defensePairs) for (const id of [p.ld, p.rd]) if (id != null) dUsed.add(id);
   const pickD = () => {
     const p = def.find((x) => !dUsed.has(x.id));
@@ -330,8 +335,11 @@ export function autoFill(data: TeamLinesData, skaters: Skater[], goalies: Goalie
     const used = new Set(list.filter((x): x is number => x != null));
     for (let i = 0; i < list.length; i++) if (list[i] == null) { const p = pool.find((x) => !used.has(x.id)); if (p) { list[i] = p.id; used.add(p.id); } }
   };
-  fillList(o.extraForwards, fwd);
-  fillList(o.extraDefense, def);
+  // A dual F/D-eligible player must not land in BOTH extra lists at once —
+  // fillList's own `used` set only sees its own list, so pre-seed each call
+  // with whatever the other list already claimed.
+  fillList(o.extraForwards, fwd.filter((s) => !o.extraDefense.includes(s.id)));
+  fillList(o.extraDefense, def.filter((s) => !o.extraForwards.includes(s.id)));
   if (o.subPP == null) o.subPP = dressedFwd[0]?.id ?? null;
   if (o.subPK1 == null) o.subPK1 = dressedDef[0]?.id ?? null;
   if (o.subPK2 == null) o.subPK2 = dressedDef[1]?.id ?? null;
