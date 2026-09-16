@@ -8,7 +8,7 @@ import { displayName } from "@/lib/playerName";
 import { clauseTermsAction } from "@/app/trades/build/actions";
 import { proposeTradeGroupAction, type GroupLeg } from "@/app/trades/build3/actions";
 
-type Player = { id: number; name: string; position: string; capHit: number; farm: boolean; clause?: string | null; noTradeTeams?: number[]; retainedAmount?: number };
+type Player = { id: number; name: string; position: string; capHit: number; farm: boolean; clause?: string | null; noTradeTeams?: number[]; retainedAmount?: number; tradeFreezeDaysLeft?: number };
 type Pick = { id: number; label: string; logoUrl?: string | null; locked?: boolean };
 type Assets = { players: Player[]; picks: Pick[]; prospects: Pick[] };
 type Team = { id: number; name: string; logoUrl?: string | null };
@@ -165,15 +165,18 @@ function TeamColumn({ team, others, assets, dest, setDest, playerIds, setPlayerI
           {assets.players.length === 0 && <div className="px-3 py-3 text-slate-600 text-sm">none</div>}
           {assets.players.map((p) => {
             const on = playerIds.has(p.id);
+            const frozen = (p.tradeFreezeDaysLeft ?? 0) > 0;
             const needsWaiver = dest != null && !!p.clause && (p.clause !== "M_NTC" || (p.noTradeTeams ?? []).includes(dest));
             return (
               <div key={p.id} className={`px-3 py-2 ${on ? "bg-blue-950/30" : ""}`}>
-                <label className="flex items-center gap-2.5 cursor-pointer">
-                  <input type="checkbox" disabled={!dest} checked={on} onChange={() => togglePlayer(p)} className="accent-blue-500 w-4 h-4" />
+                <label className={`flex items-center gap-2.5 ${frozen ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
+                  title={frozen ? `A retention on his contract freezes him from any trade for ${p.tradeFreezeDaysLeft} more in-season day(s).` : undefined}>
+                  <input type="checkbox" disabled={!dest || frozen} checked={on} onChange={() => togglePlayer(p)} className="accent-blue-500 w-4 h-4" />
                   <span className="flex-1 truncate"><PlayerLink id={p.id} name={displayName(p.name)} /> <span className="text-slate-500 text-xs">{p.position}{p.farm ? " · AHL" : ""}</span></span>
                   <span className="text-slate-400 tabular-nums text-sm">{money(p.capHit)}</span>
                 </label>
-                {!dest && <p className="mt-1 ml-6.5 text-[11px] text-slate-600">pick a destination first</p>}
+                {frozen && <p className="mt-1 ml-6.5 text-xs text-amber-400">🔒 Retention freeze — {p.tradeFreezeDaysLeft} more in-season day(s) before he can be traded.</p>}
+                {!frozen && !dest && <p className="mt-1 ml-6.5 text-[11px] text-slate-600">pick a destination first</p>}
                 {on && needsWaiver && (() => {
                   const t = terms[p.id];
                   if (!t || t === "loading") return <p className="mt-2 ml-6.5 text-xs text-slate-500">⚖ Checking with his agent…</p>;

@@ -73,7 +73,7 @@ export type EngineSettings = {
   retentionMinSalary: number; // new team must carry at least this
   retentionMaxPlayers: number;// max retained players per team
   retentionMaxPerContract: number; // max number of times ONE contract may ever carry retention (NHL: 2)
-  retentionCooldownDays: number;   // in-season days that must pass before a 2nd retention on the same contract (NHL's 75-day rule)
+  retentionCooldownDays: number;   // in-season days a player is frozen from ANY trade after a retention transaction on his contract (NHL's 75-day rule, extended league-wide to the trade itself, not just a 2nd retention)
   retentionReacquireBanDays: number; // days a club that retained on a player must wait before reacquiring him (trade or waivers) — NHL: 365
   clausesEnabled: boolean;    // enforce NTC / NMC / M-NTC contract clauses in trades (off = no-CBA league)
   // Total retention SLOTS a club may hold at once — ONE combined pool of

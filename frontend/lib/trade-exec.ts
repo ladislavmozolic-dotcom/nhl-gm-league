@@ -18,7 +18,7 @@ import { describeConditionSpec, type ConditionSpec } from "@/lib/trade-condition
  *  the NHL's real "75-day rule" for a 2nd retention on the same contract.
  *  Only correct within one season; a retention that straddles a season
  *  boundary is a rare enough edge case that we don't special-case it here. */
-function regularSeasonDaysBetween(d1: Date, d2: Date): number {
+export function regularSeasonDaysBetween(d1: Date, d2: Date): number {
   return Math.max(0, Math.max(0, roundForDate(d2)) - Math.max(0, roundForDate(d1)));
 }
 
@@ -112,6 +112,18 @@ export async function collectMoveOps(pkg: TradePackage) {
       if (block) throw new Error(block);
 
       const history = retentionHistoryByPlayer.get(pl.id) ?? [];
+      // League house rule (stricter than the real NHL, which only freezes a
+      // 2nd retention transaction): once a contract has had ANY retention
+      // transaction on it, the PLAYER HIMSELF can't be traded again at all —
+      // with or without adding more retention — until retentionCooldownDays
+      // have passed since the most recent one.
+      if (history.length > 0) {
+        const last = history[history.length - 1];
+        const elapsed = regularSeasonDaysBetween(last.leagueDate ?? last.createdAt, nowLeagueDate);
+        if (elapsed < settings.retentionCooldownDays) {
+          throw new Error(`${displayName(pl.name)} can't be traded yet — ${settings.retentionCooldownDays - elapsed} more in-season day(s) needed since the last retention on his contract.`);
+        }
+      }
       // Rule: a club that retained salary on this player can't reacquire him
       // (trade or waivers) for retentionReacquireBanDays, unless the specific
       // contract it retained on has since fully run out.
@@ -139,13 +151,9 @@ export async function collectMoveOps(pkg: TradePackage) {
       let retainedSalary = pl.retainedSalary ?? 0;
       if (tp.retentionPct > 0 && capHit) {
         if (history.length >= settings.retentionMaxPerContract) throw new Error(`${displayName(pl.name)}'s contract has already been retained ${history.length} time(s) — no further retention is allowed.`);
-        if (history.length > 0) {
-          const last = history[history.length - 1];
-          const elapsed = regularSeasonDaysBetween(last.leagueDate ?? last.createdAt, nowLeagueDate);
-          if (elapsed < settings.retentionCooldownDays) {
-            throw new Error(`A 2nd retention on ${displayName(pl.name)}'s contract needs ${settings.retentionCooldownDays - elapsed} more in-season day(s) since the first.`);
-          }
-        }
+        // The retentionCooldownDays wait is already enforced above for ANY
+        // trade of this player once he's had a retention, so a 2nd retention
+        // specifically never reaches this point still within the cooldown.
         // A 2nd (or 3rd) retention is a % of what the SENDING club has actually
         // been paying (capHit net of any EARLIER retention still owed by a prior
         // club) — same "Salary after Retention" figure shown everywhere else —

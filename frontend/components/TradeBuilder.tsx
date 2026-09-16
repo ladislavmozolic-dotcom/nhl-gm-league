@@ -10,7 +10,7 @@ import ConditionModal from "@/components/ConditionModal";
 import { describeConditionSpec, type ConditionSpec } from "@/lib/trade-conditions-shared";
 import { t, type Lang } from "@/lib/i18n";
 
-type Player = { id: number; name: string; position: string; capHit: number; farm: boolean; clause?: string | null; noTradeTeams?: number[]; retainedAmount?: number };
+type Player = { id: number; name: string; position: string; capHit: number; farm: boolean; clause?: string | null; noTradeTeams?: number[]; retainedAmount?: number; tradeFreezeDaysLeft?: number };
 type Pick = { id: number; round?: number; label: string; logoUrl?: string | null; locked?: boolean };
 type Assets = { players: Player[]; picks: Pick[]; prospects: Pick[] };
 type Team = { id: number; name: string; logoUrl?: string | null };
@@ -171,14 +171,17 @@ function PlayerTable({ title, list, pmap, setPmap, destTeamId, ownerTeamId, term
         {list.length === 0 && <div className="px-3 py-3 text-slate-600 text-sm">none</div>}
         {list.map((p) => {
           const on = p.id in pmap;
+          const frozen = (p.tradeFreezeDaysLeft ?? 0) > 0;
           const needsWaiver = !!p.clause && (p.clause !== "M_NTC" || (p.noTradeTeams ?? []).includes(destTeamId));
           return (
             <div key={p.id} className={`px-3 py-2 ${on ? "bg-blue-950/30" : ""}`}>
-              <label className="flex items-center gap-2.5 cursor-pointer">
-                <input type="checkbox" checked={on} onChange={() => onToggleClause(pmap, setPmap, p, destTeamId, ownerTeamId)} className="accent-blue-500 w-4 h-4" />
+              <label className={`flex items-center gap-2.5 ${frozen ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
+                title={frozen ? `A retention on his contract freezes him from any trade for ${p.tradeFreezeDaysLeft} more in-season day(s).` : undefined}>
+                <input type="checkbox" checked={on} disabled={frozen} onChange={() => !frozen && onToggleClause(pmap, setPmap, p, destTeamId, ownerTeamId)} className="accent-blue-500 w-4 h-4" />
                 <span className="flex-1 truncate"><PlayerLink id={p.id} name={displayName(p.name)} /> <span className="text-slate-500 text-xs">{p.position}{p.farm ? " · AHL" : ""}</span></span>
                 <span className="text-slate-400 tabular-nums text-sm">{money(p.capHit)}</span>
               </label>
+              {frozen && <p className="mt-1 ml-6.5 text-xs text-amber-400">🔒 Retention freeze — {p.tradeFreezeDaysLeft} more in-season day(s) before he can be traded.</p>}
               {on && needsWaiver && (() => {
                 const t = terms[p.id];
                 if (!t || t === "loading") return <p className="mt-2 ml-6.5 text-xs text-slate-500">⚖ Checking with his agent…</p>;
