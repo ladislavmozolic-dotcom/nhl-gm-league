@@ -184,7 +184,9 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   const { id } = await params;
   const [p, loggedIn, gmTeamId] = await Promise.all([getPlayer(id) as Promise<any>, isLoggedIn(), getTeamSession()]);
   const isGoalie: boolean = p.isGoalie || p.position === "G";
-  const ratings = isGoalie ? { ...(p.goalieRating ?? {}) } : p;
+  // goalieRating.mo is never touched by the sim (it only writes the live
+  // value to Player.mo/morale) — keep the live one, not the stale copy.
+  const ratings = isGoalie ? { ...(p.goalieRating ?? {}), mo: p.mo } : p;
   const attrs = isGoalie ? GOALIE_ATTRS : SKATER_ATTRS;
   const overall: number | null = isGoalie ? (p.goalieRating?.overall ?? p.overall) : p.overall;
   const grp = posGroup(p.position, isGoalie);
