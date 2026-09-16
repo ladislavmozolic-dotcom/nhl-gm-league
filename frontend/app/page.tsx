@@ -83,8 +83,8 @@ export default async function HomePage() {
     id: a.id, body: a.body, linkUrl: a.linkUrl, linkLabel: a.linkLabel, date: fmtDate(a.createdAt), unread: me != null && !readIds.has(a.id),
   }));
   // Tonight's Best — the nightly digest for the "Around the League" box
-  const digestRound = await latestDigestRound(SEASON);
-  const digest = digestRound ? await dailyDigest(SEASON, digestRound) : null;
+  const digestRound = await latestDigestRound(activeSeason);
+  const digest = digestRound ? await dailyDigest(activeSeason, digestRound) : null;
 
   // Trade Block — who's available around the league (flat list for the home card)
   const tbBoard = await tradeBlockBoard();

@@ -28,7 +28,7 @@ const SEASON = "2026-27";
 async function recoverOneDay() {
   const settings = await loadSettings();
   const skRec = Math.max(1, Math.round(settings.skaterConRecovery));
-  const where = { team: { league: "NHL" as const } };
+  const where = { team: { league: { in: ["NHL", "AHL"] } } };
   await prisma.player.updateMany({ where: { ...where, isGoalie: false, injuryDaysLeft: { lte: 0 } }, data: { condition: { increment: skRec } } });
   await prisma.player.updateMany({ where: { ...where, isGoalie: true }, data: { condition: { increment: 2 } } });
   await prisma.player.updateMany({ where: { ...where, condition: { gt: 100 } }, data: { condition: 100 } });
@@ -60,6 +60,7 @@ export async function simulateLeagueDay(day: Date) {
     where: { season: SEASON, status: "SCHEDULED", seriesId: null, gameDate: { gte: start, lt: end } },
     select: { round: true }, orderBy: { round: "asc" },
   });
+  const preDue = await prisma.game.count({ where: { season: PRE_SEASON, status: "SCHEDULED", gameDate: { gte: start, lt: end } } });
   let played = 0;
   // AI GM runs EVERY day — tactics, cap compliance, and Advanced-AI trade negotiation
   // (accept/decline/counter/offer) — regardless of whether games are scheduled, so a
@@ -71,13 +72,12 @@ export async function simulateLeagueDay(day: Date) {
     const r = await playScheduledGames({ season: SEASON, round: dayGames[0].round, actor: await commissionerName() });
     played = r.played;
     await processFinances(SEASON, "NHL");
-  } else if (phToday === "regular" || phToday === "playoffs") {
+  } else if (phToday === "regular" || phToday === "playoffs" || (phToday === "preseason" && preDue === 0)) {
     await recoverOneDay();
   }
   // Pre-season games scheduled for this day play out too (exhibition; own season
   // string, so they never touch standings/stats/careers). Lets the calendar roll the
   // whole pre-season out day-by-day before the regular season begins.
-  const preDue = await prisma.game.count({ where: { season: PRE_SEASON, status: "SCHEDULED", gameDate: { gte: start, lt: end } } });
   if (preDue > 0) {
     await autoFillRosters("NHL").catch(() => {});
     await autoFillRosters("AHL").catch(() => {});

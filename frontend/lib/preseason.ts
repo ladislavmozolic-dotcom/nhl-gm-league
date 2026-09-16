@@ -1,15 +1,15 @@
 // PRE-SEASON — 6 exhibition games per NHL club, a rest day between each round.
 // Every NHL fixture is mirrored by its two AHL affiliates on the same date.
 // Fully isolated from the real season by a distinct Game.season string, so it
-// never touches standings, stats, careers or records. The sim persists ONLY the
-// Game score + play-by-play — no PlayerGameStat/GoalieGameStat rows, no injuries,
-// no condition/morale/chemistry/finance side-effects. Purely exhibition.
+// never touches regular-season standings, careers or records. Full preseason
+// boxscores are stored under their own season key. Conditioning and injuries do
+// carry over because they affect who can dress; morale/chemistry/finance do not.
 
 import { prisma } from "./prisma";
 import { loadSimTeam, fixtureSeed } from "./sim";
 import { simulateGame } from "./sim/engine";
 import { saveGameResult } from "./sim/persist";
-import { syncChem } from "./sim/season";
+import { injuryConTarget, syncChem, updateInjuryCon } from "./sim/season";
 import { loadSettings } from "./sim/settings";
 import { activeSimEngine, engineVersionFor } from "./sim/version";
 import type { SimTeam } from "./sim/types";
@@ -114,7 +114,51 @@ export async function playPreseason(): Promise<{ played: number }> {
   return simPreseason({ season: PRE_SEASON, status: "SCHEDULED" });
 }
 
-/** Shared pre-season simmer — full box score, no profile/career/condition impact. */
+/** One rest day between exhibition rounds. Preseason games now carry real
+ * conditioning and injuries, so the scheduled off-day must heal/recover them too. */
+async function recoverPreseasonRestDay() {
+  const settings = await loadSettings();
+  const skRec = Math.max(1, Math.round(settings.skaterConRecovery));
+  const leagueTeams = { team: { league: { in: ["NHL", "AHL"] } } };
+  await prisma.player.updateMany({ where: { ...leagueTeams, isGoalie: false, injuryDaysLeft: { lte: 0 } }, data: { condition: { increment: skRec } } });
+  await prisma.player.updateMany({ where: { ...leagueTeams, isGoalie: true }, data: { condition: { increment: 2 } } });
+  await prisma.player.updateMany({ where: { ...leagueTeams, condition: { gt: 100 } }, data: { condition: 100 } });
+  await prisma.player.updateMany({ where: { ...leagueTeams, injuryDaysLeft: { gt: 0 } }, data: { injuryDaysLeft: { decrement: 1 } } });
+  await prisma.player.updateMany({ where: { ...leagueTeams, injuryDaysLeft: { lt: 0 } }, data: { injuryDaysLeft: 0 } });
+  await updateInjuryCon();
+}
+
+/** Persist the two preseason effects that matter for roster availability:
+ * post-game CON and injuries. Standings/career/morale/chemistry/finance remain
+ * isolated under the preseason season string. */
+async function persistPreseasonPlayerState(result: ReturnType<typeof simulateGame>, home: SimTeam, away: SimTeam) {
+  const injured = new Map(result.injuries.map((i) => [i.playerId, i]));
+  const updates: ReturnType<typeof prisma.player.update>[] = [];
+  for (const [box, team] of [[result.home, home], [result.away, away]] as const) {
+    const skaters = new Map([...team.forwards, ...team.defense].map((s) => [s.id, s]));
+    for (const row of box.skaters) {
+      const injury = injured.get(row.id);
+      const con = injury ? injuryConTarget(injury.days) : Math.round(row.conAfter);
+      const local = skaters.get(row.id);
+      if (local) local.con = con;
+      updates.push(prisma.player.update({
+        where: { id: row.id },
+        data: injury
+          ? { condition: con, injuryDaysLeft: injury.days, injuryDesc: `${injury.desc} (${injury.mechanism})`, injurySeverity: injury.severity }
+          : { condition: con },
+      }));
+    }
+    for (const row of [box.goalie, box.backupGoalie].filter((g): g is NonNullable<typeof g> => g != null)) {
+      const local = team.goalies.find((g) => g.id === row.id);
+      const con = Math.round(row.conAfter);
+      if (local) local.con = con;
+      updates.push(prisma.player.update({ where: { id: row.id }, data: { condition: con } }));
+    }
+  }
+  if (updates.length) await prisma.$transaction(updates);
+}
+
+/** Shared pre-season simmer — full box score plus real CON/injury effects. */
 async function simPreseason(where: object): Promise<{ played: number }> {
   const settings = await loadSettings();
   const engineVersion = engineVersionFor(await activeSimEngine());
@@ -136,7 +180,16 @@ async function simPreseason(where: object): Promise<{ played: number }> {
   };
 
   let played = 0;
+  let previousRound: number | null = null;
   for (const gm of scheduled) {
+    // `playPreseason()` can process all six rounds in one call. Reproduce the
+    // scheduled rest day between rounds; day-by-day calls contain one round and
+    // recover through simulateLeagueDay instead.
+    if (previousRound != null && gm.round != null && gm.round !== previousRound) {
+      await recoverPreseasonRestDay();
+      cache.clear();
+    }
+    previousRound = gm.round;
     const [home, away] = await Promise.all([getTeam(gm.homeTeamId), getTeam(gm.awayTeamId)]);
     if (!home || !away) continue;
     for (const [team, tid] of [[home, gm.homeTeamId], [away, gm.awayTeamId]] as const) {
@@ -154,12 +207,11 @@ async function simPreseason(where: object): Promise<{ played: number }> {
     const rivalry = home.rivalTeamIds.includes(away.id) || away.rivalTeamIds.includes(home.id);
     const league = gm.league === "AHL" ? "AHL" : "NHL";
     const result = simulateGame(home, away, { seed, settings, rivalry, league, engineVersion });
-    // Full box score (players, goalies, goals, penalties, events) is persisted under the
-    // PRE season string → complete pre-season stats/standings/scoreboard, while every
-    // player-profile / career / regular-season aggregation (keyed on the regular season
-    // string) ignores it. NO Player condition/injury/morale side-effects — that lives in
-    // playScheduledGames, which we deliberately don't call here. Purely exhibition.
+    // Full box score stays isolated under the PRE season string; CON and injuries
+    // carry over because they affect who can dress for the next exhibition game.
     await saveGameResult(result, { gameId: gm.id, season: PRE_SEASON, gameDate: gm.gameDate ?? preseasonDate(gm.round ?? 0), round: gm.round ?? 0 });
+    await persistPreseasonPlayerState(result, home, away);
+    for (const injury of result.injuries) cache.delete(injury.teamId);
     played++;
   }
   return { played };

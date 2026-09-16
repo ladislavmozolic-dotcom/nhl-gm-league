@@ -200,15 +200,15 @@ function newPlayerLine(s: SimSkater): PlayerLine {
   };
 }
 
-// Post-game skater conditioning. A heavy regulation workload shaves 1 CON point
-// (F >= fwdConMinutes, D >= defConMinutes). A playoff OT game is a marathon —
-// everyone is overworked, and each extra OT period costs another point, so a game
-// ending in the 1st OT leaves the value at 98, the 2nd OT at 97, and so on.
+// Post-game skater conditioning. Reaching the configured heavy-work threshold
+// costs one CON point, with another point for every additional 10 minutes. This
+// keeps an ordinary 22–27 minute workload cheap while making emergency 40–60
+// minute nights visibly exhausting. A playoff OT period adds another point.
 function skaterConAfter(conBefore: number, toiSec: number, isDefense: boolean, otPeriods: number, pkUnits = 0): number {
   const mins = toiSec / 60;
   const threshold = isDefense ? CFG.skaterDefConMinutes : CFG.skaterFwdConMinutes;
-  const overworked = otPeriods > 0 || mins >= threshold;
-  let drop = (overworked ? CFG.skaterConDrop : 0) + otPeriods * CFG.skaterOtDrop;
+  const workloadSteps = mins >= threshold ? 1 + Math.floor((mins - threshold) / 10) : 0;
+  let drop = workloadSteps * CFG.skaterConDrop + otPeriods * CFG.skaterOtDrop;
   // Penalty-kill is high-effort → it costs extra CON: +10% for a player on one PK unit,
   // +30% if he's stacked on BOTH PK units. Felt even when he's not otherwise overworked.
   const pkExtra = pkUnits >= 2 ? 0.30 : pkUnits === 1 ? 0.10 : 0;
@@ -769,8 +769,7 @@ function maybeInjureFighter(st: SimState, team: SimTeam, fighter: SimSkater, per
   const cal = INJURY_BASE / 0.55;
   const scale = (CFG.injuryChancePct / 100) * cal;
   if (st.rng.chance(0.06 * scale)) {
-    addInjury(st, team, fighter, "Fight", period, seconds);
-    st.injured.add(fighter.id);
+    if (addInjury(st, team, fighter, "Fight", period, seconds)) st.injured.add(fighter.id);
   }
 }
 
@@ -1785,9 +1784,17 @@ function pickHitter(st: SimState, team: SimTeam): SimSkater {
   return pool[st.rng.weighted(pool.map((s) => s.hitting * s.iceTime * physFactor(s.weight)))] ?? pool[0];
 }
 
-function addInjury(st: SimState, team: SimTeam, victim: SimSkater, mech: InjuryMechanism, period: number, seconds: number, by?: SimSkater) {
+function addInjury(st: SimState, team: SimTeam, victim: SimSkater, mech: InjuryMechanism, period: number, seconds: number, by?: SimSkater): boolean {
   // a player already hurt this game is out — he can't pick up a second injury
-  if (st.injuries.some((i) => i.playerId === victim.id)) return;
+  if (st.injuries.some((i) => i.playerId === victim.id)) return false;
+  // Roster-safety rule: a club can lose at most one defenceman during a game.
+  // Without this guard, the live per-second exposure model can snowball: after
+  // one D goes down the remaining D play more, receive more injury rolls and can
+  // leave the club with only one or two defencemen for most of the game.
+  if (victim.isDefense) {
+    const defenseIds = new Set(team.defense.map((d) => d.id));
+    if (st.injuries.some((i) => i.teamId === team.id && defenseIds.has(i.playerId))) return false;
+  }
   const part = INJ_PARTS[mech][st.rng.int(INJ_PARTS[mech].length)];
   const days = injuryDays(st, mech, part);
   st.injuries.push({
@@ -1801,6 +1808,7 @@ function addInjury(st: SimState, team: SimTeam, victim: SimSkater, mech: InjuryM
     importance: days >= 20 ? "MAJOR" : "NOTABLE",
     meta: { part, days, mechanism: mech, severity: severityOf(days) },
   });
+  return true;
 }
 
 // Injuries are driven by the physical play, not a flat random roll: a heavy,
@@ -1848,9 +1856,10 @@ function maybeInjureOnIce(st: SimState, team: SimTeam, opp: SimTeam, onIce: SimS
       // (≥20 min — overplayed workhorse); everyone else is a generic vague knock.
       mech = toi >= 1200 ? "Fatigue" : "Non-contact";
     }
-    addInjury(st, team, s, mech, period, tick, by);
-    st.injured.add(s.id);
-    hurt.push(s);
+    if (addInjury(st, team, s, mech, period, tick, by)) {
+      st.injured.add(s.id);
+      hurt.push(s);
+    }
   }
   return hurt;
 }
@@ -1869,8 +1878,7 @@ function generateFightInjuries(st: SimState, period: number) {
       if (st.injured.has(f.playerId)) continue;
       if (st.rng.chance(0.06 * scale)) {
         const victim = pool.find((s) => s.id === f.playerId) ?? pool[0];
-        addInjury(st, team, victim, "Fight", f.period, f.seconds);
-        st.injured.add(victim.id);
+        if (addInjury(st, team, victim, "Fight", f.period, f.seconds)) st.injured.add(victim.id);
       }
     }
   }
