@@ -51,7 +51,7 @@ const STRATEGY_META: Record<keyof Omit<GameStrategy, "goaliePull">, { tone: stri
   losing2: { tone: "attack", cue: "All-out attack" },
 };
 const TAB_GROUPS = [
-  { label: "5v5", tabs: ["Forward", "Defense"] },
+  { label: "5v5", tabs: ["Forward", "Defense", "Goalies"] },
   { label: "Special Teams", tabs: ["PP 5v4", "PP 4v3", "4 vs 4", "PK4", "PK3"] },
   { label: "Situations", tabs: ["Others", "Last Min", "Overtime"] },
   { label: "Tactics", tabs: ["Strategy"] },
@@ -331,7 +331,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
           <SysSelect value={unit?.style} dial={dial} opts={DIAL_LABELS[dial]} onChange={(v) => setUnitStyle(unitKey, ui, v)} />
         </div>
         <div className="p-3">
-          <RinkFormationMap roles={layouts[effective] ?? layouts.balanced} players={slotPlayersFixed(unit?.players ?? [], dStartIndex)} accent={accent} goalAtTop={unitKey === "pp"} />
+          <RinkFormationMap roles={layouts[effective] ?? layouts.balanced} players={slotPlayersFixed(unit?.players ?? [], dStartIndex)} accent={accent} goalAtTop={unitKey === "pp" || unitKey === "pp4"} />
         </div>
       </div>
     );
@@ -571,6 +571,44 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
     change((d) => { d.situations.others[k][i] = v; });
   const setLastMin = (k: "off" | "def", i: number, v: number | null) => change((d) => { d.situations.lastMin[k][i] = v; });
 
+  const GoalieDepthCard = ({ role, value, onChange, starter = false }: { role: string; value: number | null; onChange: (v: number | null) => void; starter?: boolean }) => {
+    const goalie = value == null ? null : byId.get(value) ?? null;
+    const lastName = goalie ? displayName(goalie.name).trim().split(/\s+/).pop() : null;
+    return (
+      <article className={`lines-goalie-depth-card ${starter ? "is-starter" : ""}`}>
+        <div className="lines-goalie-stage" aria-hidden="true">
+          <svg className="lines-goalie-net" viewBox="0 0 280 190" preserveAspectRatio="none">
+            <path d="M20 170 L36 28 Q140 3 244 28 L260 170" />
+            <path d="M36 28 L52 170 M70 20 L77 170 M105 13 L108 170 M140 9 L140 170 M175 13 L172 170 M210 20 L203 170 M244 28 L228 170" />
+            <path d="M28 55 H252 M25 83 H255 M23 112 H257 M21 141 H259 M20 170 H260" />
+          </svg>
+          <div className="lines-goalie-figure">
+            <span className="lines-goalie-mask"><i /><b /></span>
+            <JerseyChip teamSlug={jerseyTeamSlug} number={goalie?.number} lastName={lastName} size={184} />
+            <span className="lines-goalie-pad pad-left" />
+            <span className="lines-goalie-pad pad-right" />
+          </div>
+          <span className="lines-goalie-role">{role}</span>
+        </div>
+        <div className="lines-goalie-details">
+          <p className="lines-kicker">{starter ? "Starting goalie" : "Backup goalie"}</p>
+          <h2>{goalie ? displayName(goalie.name) : "No goalie selected"}</h2>
+          {goalie ? (
+            <div className="lines-goalie-stats">
+              <span><strong>{goalie.overall}</strong> Overall</span>
+              <span className={(goalie.con ?? 100) < 90 ? "is-warning" : ""}><strong>{goalie.con ?? 100}%</strong> Condition</span>
+              <span><strong>#{goalie.number ?? "—"}</strong> Jersey</span>
+            </div>
+          ) : <p className="text-xs text-slate-500">Choose a goalie for this role.</p>}
+          <label className="lines-goalie-picker">
+            <span>{starter ? "Choose starter" : "Choose backup"}</span>
+            <Select value={value} onChange={onChange} pool={goaliesByName} />
+          </label>
+        </div>
+      </article>
+    );
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 pb-28">
       <div className="flex items-start justify-between mb-4 flex-wrap gap-2">
@@ -652,6 +690,19 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
       <div className="lines-rink-board">
       {tab === "Forward" && <>{ForwardSection}<p className="text-xs text-slate-500 mt-2 px-1">💡 <strong>System</strong>: give a line its own Puck Style (else it inherits the team system from <em>Team → System</em>). E.g. set your 4th line to <em>Cycle</em> while the team runs <em>Rush</em>. Tempo &amp; Forecheck stay team-wide.</p></>}
       {tab === "Defense" && <>{DefenseSection}<p className="text-xs text-slate-500 mt-2 px-1">💡 <strong>System</strong>: give a pair its own D-Zone (else it inherits the team system). E.g. a <em>Collapse</em> shut-down pair for defending a lead.</p></>}
+      {tab === "Goalies" && (
+        <section className="space-y-4">
+          <div>
+            <p className="lines-kicker">Your crease</p>
+            <h2 className="text-xl font-extrabold tracking-tight text-white">Goalie Depth Chart</h2>
+            <p className="text-xs text-slate-400 mt-1">Set the starter and backup used by the next simulation.</p>
+          </div>
+          <div className="lines-goalie-depth-grid">
+            <GoalieDepthCard role="G1" value={others.starter} onChange={(v) => setOther("starter", v)} starter />
+            <GoalieDepthCard role="G2" value={others.backup} onChange={(v) => setOther("backup", v)} />
+          </div>
+        </section>
+      )}
       {tab === "PP 5v4" && <>
         {FormationPicker("ppStyle", "Power-play formation (team default)")}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
@@ -692,10 +743,6 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
 
       {tab === "Others" && (
         <div className="space-y-6">
-          <UnitBlock title="Goalies" head={["Role", "Goalie"]}>
-            <ORow label="Starter"><Select value={others.starter} onChange={(v) => setOther("starter", v)} pool={goaliesByName} /></ORow>
-            <ORow label="Backup"><Select value={others.backup} onChange={(v) => setOther("backup", v)} pool={goaliesByName} /></ORow>
-          </UnitBlock>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <ListBlock title="Extra Forwards" values={others.extraForwards} pool={forwards} onSet={(i, v) => setOtherList("extraForwards", i, v)} Select={Select} />
             <ListBlock title="Extra Defense" values={others.extraDefense} pool={defense} onSet={(i, v) => setOtherList("extraDefense", i, v)} Select={Select} />
