@@ -55,7 +55,7 @@ export default function RosterRows({ players, attrs, isGoalie, farm, hideAttrs =
           <tr className="border-b border-slate-800 text-slate-500 text-[10px] uppercase tracking-wider bg-slate-800/30">
             {cols.map((c, i) => (
               <th key={c.key} onClick={() => click(c)} title="Sort"
-                className={`${thBase} ${sort?.key === c.key ? "text-blue-400" : ""} ${i === 0 ? "text-left sticky left-0 bg-slate-900 z-10 min-w-[160px]" : c.key === "salary" ? "text-right" : "text-center"} ${c.num && c.key !== "salary" ? "w-11" : ""}`}>
+                className={`${thBase} ${sort?.key === c.key ? "text-blue-400" : ""} ${i === 0 ? "text-left sticky left-0 bg-slate-900 z-10 min-w-[190px]" : c.key === "salary" ? "text-right" : "text-center"} ${c.num && c.key !== "salary" ? "w-11" : ""}`}>
                 {c.label}{arrow(c.key)}
               </th>
             ))}
@@ -72,8 +72,8 @@ export default function RosterRows({ players, attrs, isGoalie, farm, hideAttrs =
                 <td className="px-3 py-2 sticky left-0 bg-slate-900 z-10">
                   <div className="flex items-center gap-2">
                     <PlayerAvatar src={player.photoUrl} alt={player.name} size={32} />
-                    <div className="min-w-0">
-                      <Link href={`/players/${player.slug}`} className="font-medium text-sm text-white hover:text-blue-400 transition-colors truncate block">
+                    <div className="min-w-max">
+                      <Link href={`/players/${player.slug}`} className="font-medium text-sm text-white hover:text-blue-400 transition-colors whitespace-nowrap block">
                         {cleanName(player.name)}
                         {(player.capRole ?? player.captaincy) && <span className={`ml-1 text-[10px] font-bold ${(player.capRole ?? player.captaincy) === "C" ? "text-amber-400" : "text-slate-400"}`}>({player.capRole ?? player.captaincy})</span>}
                         {isGoalie && isWorthyGoalie(player) && <span className="ml-1 text-green-400" title="Worthy goalie — meets the league's minimum-goalie rule">●</span>}
@@ -108,9 +108,11 @@ export default function RosterRows({ players, attrs, isGoalie, farm, hideAttrs =
                   {nhlSalary === 100_000 ? (
                     <button onClick={() => onOfferTwoWay(player)}
                       title="Offer a real two-way deal: NHL salary on call-up, $100k salary on the farm"
-                      className="text-[11px] px-2.5 py-1 rounded bg-blue-900/70 hover:bg-blue-800 text-blue-200">Offer 2-way</button>
+                      className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-900/70 hover:bg-blue-800 text-blue-200">2W</button>
                   ) : player.contractType === "TWO_WAY" ? (
                     <span className="text-[10px] font-bold text-amber-400" title={player.ahlSalary != null ? `$${nhlSalary.toLocaleString("en-US")} NHL / $${player.ahlSalary.toLocaleString("en-US")} AHL` : `Legacy contract — $${nhlSalary.toLocaleString("en-US")} on NHL and AHL roster`}>2-way</span>
+                  ) : player.contractType === "ONE_WAY" ? (
+                    <span className="text-[10px] font-bold text-emerald-400" title={`One-way contract — $${nhlSalary.toLocaleString("en-US")} on the AHL roster`}>1-way</span>
                   ) : <span className="text-slate-700">—</span>}
                 </td>}
               </tr>
