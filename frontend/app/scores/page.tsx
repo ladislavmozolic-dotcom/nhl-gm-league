@@ -46,7 +46,7 @@ export default async function ScoresPage({ searchParams }: { searchParams: Promi
   const auto = sp.phase ? null : await defaultStatsPhase();
   const phase = sp.phase ? (normalizePhase(sp.phase) === "pre" ? "pre" : "regular") : (auto === "pre" ? "pre" : "regular"); // scoreboard: pre or regular (playoffs → /playoffs)
   const SEASON = seasonForPhase(phase);
-  const onlyAhl = sp.league === "AHL" && phase !== "pre"; // pre-season is NHL-only
+  const onlyAhl = sp.league === "AHL";
   const leagueFilter = onlyAhl ? { league: "AHL" } : {};
   const qPhase = phase === "pre" ? "&phase=pre" : "";
   const dates = await prisma.game.findMany({
@@ -111,14 +111,12 @@ export default async function ScoresPage({ searchParams }: { searchParams: Promi
         </section>
       )}
 
-      {phase !== "pre" && (
-        <section>
-          <h2 className="text-lg font-bold text-emerald-400 mb-3 flex items-center gap-2"><span className="w-2 h-2 bg-emerald-500 rounded-full" /> AHL <span className="text-slate-500 font-normal text-sm">({ahl.length})</span></h2>
-          {ahl.length === 0 ? <p className="text-slate-600 text-sm">No AHL games.</p> : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">{ahl.map((g) => <ScoreCard key={g.id} g={g} />)}</div>
-          )}
-        </section>
-      )}
+      <section>
+        <h2 className="text-lg font-bold text-emerald-400 mb-3 flex items-center gap-2"><span className="w-2 h-2 bg-emerald-500 rounded-full" /> AHL <span className="text-slate-500 font-normal text-sm">({ahl.length})</span></h2>
+        {ahl.length === 0 ? <p className="text-slate-600 text-sm">No AHL games.</p> : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">{ahl.map((g) => <ScoreCard key={g.id} g={g} />)}</div>
+        )}
+      </section>
     </div>
   );
 }

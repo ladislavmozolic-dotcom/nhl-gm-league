@@ -10,7 +10,7 @@ export default function PhaseTabs({ active, league, basePath, playoffsHref = "/p
   const lg = league === "AHL" ? "league=AHL" : "";
   const q = (extra: string) => { const parts = [extra, lg].filter(Boolean); return parts.length ? `?${parts.join("&")}` : ""; };
   const tabs: { key: Phase; label: string; href: string }[] = [
-    ...(league === "NHL" ? [{ key: "pre" as Phase, label: "Pre-season", href: `${basePath}${q("phase=pre")}` }] : []),
+    { key: "pre" as Phase, label: "Pre-season", href: `${basePath}${q("phase=pre")}` },
     { key: "regular", label: "Regular Season", href: `${basePath}${q("")}` },
     ...(showPlayoffs ? [{ key: "playoffs" as Phase, label: "Playoffs", href: `${playoffsHref}${league === "AHL" ? "?league=AHL" : ""}` }] : []),
   ];
