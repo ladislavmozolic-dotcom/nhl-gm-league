@@ -12,14 +12,22 @@ export type Rivalry = {
   score: number; factors: RivalryFactor[];
   gp: number; wins: number; losses: number; playoffSeries: number; fights: number; injuries: number; trades: number;
   sameDivision: boolean; declared: boolean;
+  override: number | null; // commissioner-forced score for this pair, if any (see RivalryOverride)
 };
 
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
+/** Canonical (lower id, higher id) ordering for a RivalryOverride row — the pair
+ *  is order-independent, so writes/reads always normalize to this shape. */
+export const rivalryPairIds = (a: number, b: number): [number, number] => (a < b ? [a, b] : [b, a]);
 
 export async function teamRivalries(teamId: number, league = "NHL"): Promise<Rivalry[]> {
   const me = await prisma.team.findUnique({ where: { id: teamId }, select: { division: true, conference: true, rivalTeamIds: true } });
   if (!me) return [];
   const others = await prisma.team.findMany({ where: { league, id: { not: teamId } }, select: { id: true, code: true, name: true, slug: true, logoUrl: true, division: true, conference: true, rivalTeamIds: true } });
+
+  const overrideRows = await prisma.rivalryOverride.findMany({ where: { OR: [{ teamAId: teamId }, { teamBId: teamId }] } });
+  const overrideByOpp = new Map<number, number>();
+  for (const r of overrideRows) overrideByOpp.set(r.teamAId === teamId ? r.teamBId : r.teamAId, r.score);
 
   // all my games (reg + playoff), with the opponent + result + gameId
   const games = await prisma.game.findMany({
@@ -85,13 +93,18 @@ export async function teamRivalries(teamId: number, league = "NHL"): Promise<Riv
     add("Injuries in their games", Math.min(12, injuries * 0.6));
     add("Trades", Math.min(12, tr * 4));
 
-    const score = clamp(factors.reduce((t, f) => t + f.points, 0));
+    const organicScore = clamp(factors.reduce((t, f) => t + f.points, 0));
+    const override = overrideByOpp.get(o.id);
+    const score = override != null ? clamp(override) : organicScore;
+    // Surface the override as its own line so the breakdown still sums to the
+    // final score, rather than silently replacing the organic factors.
+    if (override != null && score !== organicScore) factors.unshift({ label: "Commissioner override", points: score - organicScore });
     if (score <= 0 && !declared && rec.gp === 0) continue;
     out.push({
       teamId: o.id, code: o.code, name: o.name, slug: o.slug, logoUrl: o.logoUrl,
       score, factors: factors.sort((a, b) => b.points - a.points),
       gp: rec.gp, wins: rec.w, losses: rec.l, playoffSeries: ser.count, fights, injuries, trades: tr,
-      sameDivision: sameDiv, declared,
+      sameDivision: sameDiv, declared, override: override ?? null,
     });
   }
   return out.sort((a, b) => b.score - a.score);

@@ -1397,6 +1397,20 @@ model PlayerGameStat {
   @@index([playerId])
 }
 
+// Commissioner-set rivalry score for one team pair — forces lib/rivalry-server.ts's
+// otherwise fully history-derived 0-100 score for that pair (e.g. a rivalry the
+// commissioner wants running hot from day one, before any real games/fights/
+// playoff meetings exist to earn it organically). teamAId is always the lower
+// team id of the pair, teamBId the higher — order-independent lookup.
+model RivalryOverride {
+  id      Int @id @default(autoincrement())
+  teamAId Int
+  teamBId Int
+  score   Int
+
+  @@unique([teamAId, teamBId])
+}
+
 model GoalieGameStat {
   id           Int     @id @default(autoincrement())
   gameId       Int

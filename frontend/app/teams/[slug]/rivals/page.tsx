@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
-import { canManageTeam } from "@/lib/auth";
+import { canManageTeam, isAdmin } from "@/lib/auth";
 import { PageHeader, Card } from "@/components/ui";
 import RivalsEditor from "@/components/RivalsEditor";
+import RivalryOverrideEditor from "@/components/RivalryOverrideEditor";
 import { teamRivalries, type Rivalry } from "@/lib/rivalry-server";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +24,7 @@ function RivalRow({ r }: { r: Rivalry }) {
         {r.logoUrl && <img src={r.logoUrl} alt="" className="w-6 h-6 object-contain shrink-0" />}
         <Link href={`/teams/${r.slug}`} className="font-semibold hover:text-blue-400 flex-1 truncate">{r.name}</Link>
         {r.declared && <span className="text-[10px] uppercase tracking-wide text-red-400/80">declared</span>}
+        {r.override != null && <span className="text-[10px] uppercase tracking-wide text-amber-400/80" title="Commissioner-forced score">⚙ override</span>}
         <span className={`text-xs font-bold uppercase tracking-wide ${h.tone}`}>{h.label}</span>
         <span className="text-2xl font-black tabular-nums w-10 text-right">{r.score}</span>
       </div>
@@ -44,12 +46,13 @@ export default async function TeamRivalsPage({ params }: { params: Promise<{ slu
   const team = await prisma.team.findUnique({ where: { slug }, select: { id: true, name: true, rivalTeamIds: true } });
   if (!team) notFound();
 
-  const [canManage, rivalries] = await Promise.all([canManageTeam(team.id), teamRivalries(team.id)]);
+  const [canManage, admin, rivalries] = await Promise.all([canManageTeam(team.id), isAdmin(), teamRivalries(team.id)]);
   const top = rivalries.filter((r) => r.score > 0).slice(0, 10);
 
-  const teams = canManage
+  const teams = canManage || admin
     ? await prisma.team.findMany({ where: { league: "NHL", id: { not: team.id } }, select: { id: true, name: true, code: true, logoUrl: true, division: true }, orderBy: [{ division: "asc" }, { name: "asc" }] })
     : [];
+  const currentOverrides = rivalries.filter((r) => r.override != null).map((r) => ({ teamId: r.teamId, score: r.override! }));
 
   return (
     <div className="space-y-6 py-2">
@@ -70,6 +73,12 @@ export default async function TeamRivalsPage({ params }: { params: Promise<{ slu
         <Card title="Declare your rivals" accent="text-slate-300">
           <p className="text-xs text-slate-500 mb-3">Flagged teams add heat (more fights, scrums, misconducts in your games) and boost the rivalry score both ways.</p>
           <RivalsEditor teamId={team.id} teams={teams} initial={team.rivalTeamIds} />
+        </Card>
+      )}
+
+      {admin && (
+        <Card title="⚙ Force rivalry score" accent="text-amber-400">
+          <RivalryOverrideEditor teamId={team.id} teams={teams} initialOverrides={currentOverrides} />
         </Card>
       )}
     </div>
