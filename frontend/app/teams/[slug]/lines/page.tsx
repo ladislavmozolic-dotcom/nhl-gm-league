@@ -11,7 +11,10 @@ export const dynamic = "force-dynamic";
 
 export default async function LinesPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const team = await prisma.team.findUnique({ where: { slug } });
+  const team = await prisma.team.findUnique({
+    where: { slug },
+    include: { parentTeam: { select: { slug: true } } },
+  });
   if (!team) notFound();
 
   // require login as this team, OR any admin GM (who can manage every team)
@@ -55,6 +58,7 @@ export default async function LinesPage({ params }: { params: Promise<{ slug: st
     <LineEditor
       teamName={team.name}
       teamSlug={slug}
+      jerseyTeamSlug={team.league === "AHL" ? (team.parentTeam?.slug ?? slug) : slug}
       players={players}
       goalies={goalies}
       initial={lines}

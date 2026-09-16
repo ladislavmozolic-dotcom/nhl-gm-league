@@ -22,7 +22,7 @@ type Player = {
 };
 type SuggestResult = { ok: false; error: string } | { ok: true; lines: TeamLinesData; system: string; rationale: string[] };
 type Props = {
-  teamName: string; teamSlug: string;
+  teamName: string; teamSlug: string; jerseyTeamSlug?: string;
   players: Player[]; goalies: Player[];
   initial: TeamLinesData;
   chemistry?: Record<string, number>;
@@ -43,7 +43,7 @@ const STATES: Array<{ key: keyof Omit<GameStrategy, "goaliePull">; label: string
 ];
 const TABS = ["Forward", "Defense", "PP", "4 vs 4", "PK4", "PK3", "Others", "Last Min", "Overtime", "Strategy"] as const;
 
-export default function LineEditor({ teamName, teamSlug, players, goalies, initial, chemistry, chemBase = 35, chemNeutral = 70, chemEnabled = true, onSave, onSuggest }: Props) {
+export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSlug, players, goalies, initial, chemistry, chemBase = 35, chemNeutral = 70, chemEnabled = true, onSave, onSuggest }: Props) {
   const lang = useLang();
   const [data, setData] = useState<TeamLinesData>(initial);
   const [tab, setTab] = useState<(typeof TABS)[number]>("Forward");
@@ -345,7 +345,7 @@ export default function LineEditor({ teamName, teamSlug, players, goalies, initi
     return (
       <div className="relative flex items-center gap-3 bg-slate-900/60 border border-slate-700 rounded-lg p-2.5 cursor-pointer hover:border-slate-600">
         <div className="relative flex-none">
-          <JerseyChip teamSlug={teamSlug} number={p?.number} lastName={cleanLastName} size={128} />
+          <JerseyChip teamSlug={jerseyTeamSlug} number={p?.number} lastName={cleanLastName} size={128} />
           <div className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-blue-600 border-2 border-slate-950 flex items-center justify-center pointer-events-none">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" />
