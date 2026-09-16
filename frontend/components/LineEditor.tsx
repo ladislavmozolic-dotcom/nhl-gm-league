@@ -19,6 +19,7 @@ import type { GameStrategy, StratWeights } from "@/lib/sim/types";
 type Player = {
   id: number; name: string; position: string; overall: number; injured?: boolean; df?: number | null; con?: number; cap?: "C" | "A" | null;
   number?: number | null;
+  photoUrl?: string | null;
   pa?: number | null; sk?: number | null; sc?: number | null; ck?: number | null; fo?: number | null; st?: number | null;
   en?: number | null; weight?: number | null; shoots?: string | null;
 };
@@ -576,19 +577,20 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
     const lastName = goalie ? displayName(goalie.name).trim().split(/\s+/).pop() : null;
     return (
       <article className={`lines-goalie-depth-card ${starter ? "is-starter" : ""}`}>
-        <div className="lines-goalie-stage" aria-hidden="true">
-          <svg className="lines-goalie-net" viewBox="0 0 280 190" preserveAspectRatio="none">
+        <div className="lines-goalie-stage">
+          <svg className="lines-goalie-net" viewBox="0 0 280 190" preserveAspectRatio="none" aria-hidden="true">
             <path d="M20 170 L36 28 Q140 3 244 28 L260 170" />
             <path d="M36 28 L52 170 M70 20 L77 170 M105 13 L108 170 M140 9 L140 170 M175 13 L172 170 M210 20 L203 170 M244 28 L228 170" />
             <path d="M28 55 H252 M25 83 H255 M23 112 H257 M21 141 H259 M20 170 H260" />
           </svg>
-          <div className="lines-goalie-figure">
+          <div className="lines-goalie-figure" aria-hidden="true">
             <span className="lines-goalie-mask"><i /><b /></span>
+            {goalie?.photoUrl && <img src={goalie.photoUrl} alt="" className="lines-goalie-face" onError={(event) => { event.currentTarget.style.display = "none"; }} />}
             <JerseyChip teamSlug={jerseyTeamSlug} number={goalie?.number} lastName={lastName} size={184} />
-            <span className="lines-goalie-pad pad-left" />
-            <span className="lines-goalie-pad pad-right" />
           </div>
           <span className="lines-goalie-role">{role}</span>
+          <span className="lines-goalie-swap">↻ Change goalie</span>
+          <Select value={value} onChange={onChange} pool={goaliesByName} overlay />
         </div>
         <div className="lines-goalie-details">
           <p className="lines-kicker">{starter ? "Starting goalie" : "Backup goalie"}</p>

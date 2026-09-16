@@ -155,9 +155,11 @@ input[type="number"] {
 .lines-goalie-mask { position: absolute; z-index: 4; top: 5px; left: 50%; width: 52px; height: 59px; transform: translateX(-50%); border: 3px solid #94a3b8; border-radius: 48% 48% 42% 42%; background: linear-gradient(145deg, #dbe4ee, #64748b 60%, #334155); box-shadow: inset 0 0 0 3px rgba(15,23,42,.5), 0 4px 12px rgba(0,0,0,.38); }
 .lines-goalie-mask::before, .lines-goalie-mask::after, .lines-goalie-mask i, .lines-goalie-mask b { content: ""; position: absolute; left: 7px; right: 7px; height: 2px; background: rgba(15,23,42,.72); transform-origin: center; }
 .lines-goalie-mask::before { top: 18px; transform: rotate(15deg); }.lines-goalie-mask::after { top: 18px; transform: rotate(-15deg); }.lines-goalie-mask i { top: 30px; }.lines-goalie-mask b { top: 40px; }
-.lines-goalie-pad { position: absolute; z-index: 5; bottom: 7px; width: 43px; height: 92px; border: 2px solid #94a3b8; border-radius: 12px 12px 7px 7px; background: repeating-linear-gradient(0deg, #dce5ee 0 13px, #94a3b8 14px 15px); box-shadow: inset 0 0 13px rgba(15,23,42,.25); }
-.lines-goalie-pad.pad-left { left: 48px; transform: rotate(5deg); }.lines-goalie-pad.pad-right { right: 48px; transform: rotate(-5deg); }
+.lines-goalie-face { position: absolute; z-index: 5; top: 1px; left: 50%; width: 72px; height: 72px; transform: translateX(-50%); border: 3px solid #cbd5e1; border-radius: 50%; background: #1e293b; object-fit: cover; object-position: center 18%; box-shadow: 0 0 0 3px rgba(15,23,42,.72), 0 7px 16px rgba(0,0,0,.48); }
 .lines-goalie-role { position: absolute; z-index: 6; top: 15px; left: 15px; display: grid; place-items: center; width: 42px; height: 42px; border: 1px solid rgba(56,189,248,.55); border-radius: 50%; background: rgba(3,15,29,.82); color: #7dd3fc; font-size: .76rem; font-weight: 900; box-shadow: 0 0 18px rgba(14,165,233,.18); }
+.lines-goalie-swap { position: absolute; z-index: 9; right: 12px; bottom: 12px; padding: .36rem .58rem; border: 1px solid rgba(56,189,248,.45); border-radius: 999px; background: rgba(3,15,29,.84); color: #7dd3fc; font-size: .62rem; font-weight: 850; letter-spacing: .04em; pointer-events: none; }
+.lines-goalie-stage > select { z-index: 10; }
+.lines-goalie-stage:hover .lines-goalie-swap { border-color: #38bdf8; color: #e0f2fe; background: rgba(3,25,48,.94); }
 .lines-goalie-details { display: flex; flex-direction: column; justify-content: center; gap: .75rem; min-width: 0; padding: 1.35rem; }
 .lines-goalie-details h2 { overflow: hidden; color: #f8fafc; font-size: 1.2rem; font-weight: 850; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
 .lines-goalie-stats { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: .45rem; }
