@@ -101,10 +101,9 @@ export async function checkPromises(): Promise<{ warned: number; requested: numb
       });
       warned++; notes.push(`${name} warned ${p.team?.code}`);
     } else if (!p.tradeRequested && p.promiseWarnGame != null && teamGames - p.promiseWarnGame >= GRACE_GAMES && frac >= REQUEST_FRACTION) {
-      await prisma.player.update({
-        where: { id: p.id },
-        data: { tradeRequested: true, disgruntled: true, morale: Math.min(p.morale ?? 50, 30) },
-      });
+      const m = Math.min(p.morale ?? 50, 30);
+      // `mo` mirrors `morale` so the Ratings-strip "MO" parameter stays live too.
+      await prisma.player.update({ where: { id: p.id }, data: { tradeRequested: true, disgruntled: true, morale: m, mo: m } });
       await prisma.transaction.create({
         data: { type: "TRADE_REQUEST", message: `${p.team?.code ?? "?"}: ${name} has requested a trade — the club never gave him the role promised at signing.` },
       });

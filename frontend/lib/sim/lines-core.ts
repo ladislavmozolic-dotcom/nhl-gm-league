@@ -330,6 +330,9 @@ export function autoFill(data: TeamLinesData, skaters: Skater[], goalies: Goalie
   // others
   const o = d.situations.others;
   if (o.starter == null) o.starter = gk[0]?.id ?? null;
+  // A goalie can't back himself up — this also self-heals any lineup saved
+  // before the UI enforced it (a stale duplicate id in both slots).
+  if (o.backup != null && o.backup === o.starter) o.backup = null;
   if (o.backup == null) o.backup = gk.find((g) => g.id !== o.starter)?.id ?? null;
   const fillList = (list: (number | null)[], pool: Skater[]) => {
     const used = new Set(list.filter((x): x is number => x != null));

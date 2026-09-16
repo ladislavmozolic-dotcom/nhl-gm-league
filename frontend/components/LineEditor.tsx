@@ -578,7 +578,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
     change((d) => { d.situations.others[k][i] = v; });
   const setLastMin = (k: "off" | "def", i: number, v: number | null) => change((d) => { d.situations.lastMin[k][i] = v; });
 
-  const GoalieDepthCard = ({ role, value, onChange, starter = false }: { role: string; value: number | null; onChange: (v: number | null) => void; starter?: boolean }) => {
+  const GoalieDepthCard = ({ role, value, onChange, starter = false, pool = goaliesByName }: { role: string; value: number | null; onChange: (v: number | null) => void; starter?: boolean; pool?: Player[] }) => {
     const goalie = value == null ? null : byId.get(value) ?? null;
     const lastName = goalie ? displayName(goalie.name).trim().split(/\s+/).pop() : null;
     return (
@@ -596,7 +596,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
           </div>
           <span className="lines-goalie-role">{role}</span>
           <span className="lines-goalie-swap">↻ Change goalie</span>
-          <Select value={value} onChange={onChange} pool={goaliesByName} overlay />
+          <Select value={value} onChange={onChange} pool={pool} overlay />
         </div>
         <div className="lines-goalie-details">
           <p className="lines-kicker">{starter ? "Starting goalie" : "Backup goalie"}</p>
@@ -610,7 +610,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
           ) : <p className="text-xs text-slate-500">Choose a goalie for this role.</p>}
           <label className="lines-goalie-picker">
             <span>{starter ? "Choose starter" : "Choose backup"}</span>
-            <Select value={value} onChange={onChange} pool={goaliesByName} />
+            <Select value={value} onChange={onChange} pool={pool} />
           </label>
         </div>
       </article>
@@ -706,8 +706,10 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
             <p className="text-xs text-slate-400 mt-1">Set the starter and backup used by the next simulation.</p>
           </div>
           <div className="lines-goalie-depth-grid">
-            <GoalieDepthCard role="G1" value={others.starter} onChange={(v) => setOther("starter", v)} starter />
-            <GoalieDepthCard role="G2" value={others.backup} onChange={(v) => setOther("backup", v)} />
+            <GoalieDepthCard role="G1" value={others.starter} onChange={(v) => setOther("starter", v)} starter
+              pool={goaliesByName.filter((g) => g.id !== others.backup || g.id === others.starter)} />
+            <GoalieDepthCard role="G2" value={others.backup} onChange={(v) => setOther("backup", v)}
+              pool={goaliesByName.filter((g) => g.id !== others.starter || g.id === others.backup)} />
           </div>
         </section>
       )}

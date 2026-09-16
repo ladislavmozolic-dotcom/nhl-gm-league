@@ -81,9 +81,11 @@ export async function gmDashboard(teamId: number): Promise<GmDashboard | null> {
   if (!linesOk) attention.push({ icon: "📋", tone: "text-amber-400", text: "Lines not submitted — set your lineup", href: `${teamHref}/lines` });
   if (!rosterOk) attention.push({ icon: "⛔", tone: "text-rose-400", text: `Illegal lineup — short ${gaps.join(", ")}`, href: `${teamHref}/roster` });
   if (cap && cap.overBy > 0) attention.push({ icon: "💰", tone: "text-rose-400", text: `Over the cap by ${money(cap.overBy)}`, href: `${teamHref}/salary` });
-  // low morale
+  // low morale — the live, game-to-game mood (wins/losses, ice time, production),
+  // same number shown as his MO parameter on the Ratings strip/Player Compare
+  // (mo is kept in sync with morale at every write, see lib/sim/season.ts).
   for (const p of roster.filter((p) => !p.isGoalie && (p.morale ?? 75) < 62 && (p.overall ?? 0) >= 55).sort((a, b) => (a.morale ?? 75) - (b.morale ?? 75)).slice(0, 3))
-    attention.push({ icon: "⚠", tone: "text-amber-400", text: `${cleanName(p.name)} — low morale (${Math.round(p.morale ?? 0)})`, href: p.slug ? `/players/${p.slug}` : undefined });
+    attention.push({ icon: "⚠", tone: "text-amber-400", text: `${cleanName(p.name)} — low morale (MO ${Math.round(p.morale ?? 0)})`, href: p.slug ? `/players/${p.slug}` : undefined });
   // skater fatigue (CON worn down)
   for (const p of roster.filter((p) => !p.isGoalie && (p.condition ?? 100) < 92).sort((a, b) => (a.condition ?? 100) - (b.condition ?? 100)).slice(0, 2))
     attention.push({ icon: "🔋", tone: "text-amber-400", text: `${cleanName(p.name)} — fatigue elevated (CON ${Math.round(p.condition ?? 0)})`, href: p.slug ? `/players/${p.slug}` : undefined });

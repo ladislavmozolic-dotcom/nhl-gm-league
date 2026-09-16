@@ -392,13 +392,19 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
   }
 
   // persist final CON + morale back to the players (goalies + skaters), using the
-  // season-long state maps so even players whose team was reloaded keep their evolution
+  // season-long state maps so even players whose team was reloaded keep their evolution.
+  // `mo` (the Ratings-strip/Player Compare "MO" parameter) is written to the same
+  // value every time so it's always the live mood, not a separate frozen number.
   const updates: Promise<unknown>[] = [];
   for (const team of cache.values()) {
-    for (const g of team?.goalies ?? [])
-      updates.push(prisma.player.update({ where: { id: g.id }, data: { condition: Math.round(g.con), morale: Math.round(moraleState.get(g.id) ?? g.morale) } }));
-    for (const s of [...(team?.forwards ?? []), ...(team?.defense ?? [])])
-      updates.push(prisma.player.update({ where: { id: s.id }, data: { condition: Math.round(s.con), morale: Math.round(moraleState.get(s.id) ?? s.morale) } }));
+    for (const g of team?.goalies ?? []) {
+      const gm = Math.round(moraleState.get(g.id) ?? g.morale);
+      updates.push(prisma.player.update({ where: { id: g.id }, data: { condition: Math.round(g.con), morale: gm, mo: gm } }));
+    }
+    for (const s of [...(team?.forwards ?? []), ...(team?.defense ?? [])]) {
+      const sm = Math.round(moraleState.get(s.id) ?? s.morale);
+      updates.push(prisma.player.update({ where: { id: s.id }, data: { condition: Math.round(s.con), morale: sm, mo: sm } }));
+    }
     // persist evolved line chemistry back to the team's lines
     if (team && team.units.length)
       updates.push(prisma.teamLines.update({ where: { teamId: team.id }, data: { chemistry: team.chemistry } }).catch(() => undefined));
@@ -422,6 +428,6 @@ export async function resetConditions() {
   // baseline morale (MO 50 — everyone even; it diverges over the season)
   await prisma.player.updateMany({
     where: { team: { league: "NHL" } },
-    data: { condition: 100, morale: 50, injuryDaysLeft: 0, injuryDesc: null, injurySeverity: null },
+    data: { condition: 100, morale: 50, mo: 50, injuryDaysLeft: 0, injuryDesc: null, injurySeverity: null },
   });
 }
