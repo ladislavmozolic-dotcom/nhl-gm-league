@@ -1343,7 +1343,7 @@ model TeamLines {
 }
 
 model GamePenalty {
-  id         Int    @id @default(autoincrement())
+  id         Int     @id @default(autoincrement())
   gameId     Int
   period     Int
   seconds    Int
@@ -1354,7 +1354,8 @@ model GamePenalty {
   type       String
   minutes    Int
   severity   String
-  game       Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  givesPP    Boolean @default(true) // false for a coincidental/offsetting infraction (fight, brawl roughing) — no PP for either side
+  game       Game    @relation(fields: [gameId], references: [id], onDelete: Cascade)
 
   @@index([gameId])
 }

@@ -109,7 +109,7 @@ export async function saveGameResult(result: GameResult, meta: GameMeta = {}) {
     gameId, period: p.period, seconds: p.seconds,
     teamId: p.team, teamCode: p.teamCode,
     playerId: p.playerId, playerName: p.playerName,
-    type: p.type, minutes: p.minutes, severity: p.severity,
+    type: p.type, minutes: p.minutes, severity: p.severity, givesPP: p.givesPP,
   }));
   const eventRows = (gameId: number) => (result.events ?? []).map((e) => ({
     gameId, seq: e.seq, period: e.period, seconds: e.seconds, type: e.type,

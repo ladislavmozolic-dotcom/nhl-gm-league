@@ -37,7 +37,7 @@ type Side = {
 };
 type GoalAssist = { name: string; slug: string | null; total: number | null };
 type GoalE = { period: number; seconds: number; teamId: number; scorerName: string; scorerSlug?: string | null; scorerSeasonGoal?: number; assistNames: string[]; assists?: GoalAssist[]; strength: string; emptyNet: boolean; onIceForNames?: string[]; onIceAgainstNames?: string[] };
-type PenE = { period: number; seconds: number; teamId: number; playerName: string; type: string; minutes: number; severity: string };
+type PenE = { period: number; seconds: number; teamId: number; playerName: string; type: string; minutes: number; severity: string; givesPP: boolean };
 type PbpE = { period: number; seconds: number; time: string; teamId: number | null; kind: string; text: string; major: boolean };
 type ShootoutE = { round: number; teamId: number; teamCode: string | null; shooterName: string; shooterSlug: string | null; result: "goal" | "save" | "miss" };
 type InjuryRow = { period: number; seconds: number; teamId: number | null; playerName: string; playerSlug: string | null; part: string; mechanism: string; severity: string; days: number; byName: string | null };
@@ -539,7 +539,10 @@ export default function GameView({ data }: { data: Data }) {
   const periods = Array.from(new Set([...data.goals.map((g) => g.period), ...data.penalties.map((p) => p.period)])).sort((a, b) => a - b);
 
   const ppFor = (teamId: number) => data.goals.filter((g) => g.teamId === teamId && g.strength === "PP").length;
-  const ppOpp = (teamId: number) => data.penalties.filter((p) => p.teamId !== teamId).length;
+  // Fighting majors, misconducts and offsetting/brawl minors never put the other
+  // team on the man advantage — only count infractions the engine actually flagged
+  // as giving a power play (see lib/sim/engine.ts's addPenalty givesPP).
+  const ppOpp = (teamId: number) => data.penalties.filter((p) => p.teamId !== teamId && p.givesPP).length;
   const teamSum = (side: Side, k: keyof Skater) => side.skaters.reduce((t, s) => t + (s[k] as number), 0);
   const foPct = (side: Side) => {
     const w = teamSum(side, "faceoffWins"), l = teamSum(side, "faceoffLosses");
@@ -650,6 +653,7 @@ export default function GameView({ data }: { data: Data }) {
                         <div key={i} className="px-4 py-1.5 text-sm leading-snug">
                           <span className="text-slate-500 tabular-nums mr-2">{mmss(x.seconds)}</span>
                           <span className="font-semibold">{cleanName(x.playerName)}</span> <span className="text-slate-500">({codeOf(x.teamId)})</span> for {x.type}<span className="text-slate-500"> ({x.severity})</span>
+                          {!x.givesPP && <span className="ml-1 text-[10px] font-bold text-slate-500" title="No power play — offset by a penalty to the other team at the same stoppage">(offsetting)</span>}
                         </div>
                       ))}
                     </div>

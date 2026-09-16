@@ -629,7 +629,7 @@ function addPenalty(
   }
   st.penalties.push({
     period, seconds: at, time: fmt(at), team: team.id, teamCode: team.code,
-    playerId: offender.id, playerName: offender.name, type, minutes, severity,
+    playerId: offender.id, playerName: offender.name, type, minutes, severity, givesPP,
   });
   st.sink.emit({
     period, seconds: at, type: "PENALTY",
@@ -678,6 +678,37 @@ function generatePenalties(st: SimState, team: SimTeam, period: number, active: 
       const gm = roll < 0.02;
       addPenalty(st, team, offender, period, at, gm ? "Game Misconduct" : "Misconduct",
         gm ? 20 : 10, gm ? "Game Misconduct" : "Misconduct", false);
+    }
+  }
+}
+
+/**
+ * Coincidental minors: `generatePenalties` rolls each team's infractions
+ * independently, so two opposing players can rarely land a penalty in the
+ * SAME second by chance (outside a deliberate brawl, which already marks
+ * itself offsetting). A real ref calls those offsetting — 4-on-4, no PP for
+ * either side — so pair up any same-second, opposite-team entries created
+ * since `fromIdx` and un-flag them: clear their PP from `active` (so the
+ * actual on-ice strength reflects it) and from the persisted penalty record.
+ */
+function resolveCoincidentalPenalties(st: SimState, active: Penalty[], period: number, fromIdx: number) {
+  const fresh = active.slice(fromIdx).filter((p) => !p.expired);
+  const byStart = new Map<number, Penalty[]>();
+  for (const p of fresh) {
+    const list = byStart.get(p.start);
+    if (list) list.push(p); else byStart.set(p.start, [p]);
+  }
+  for (const group of byStart.values()) {
+    const home = group.filter((p) => p.team === st.home.id);
+    const away = group.filter((p) => p.team === st.away.id);
+    for (let i = 0; i < Math.min(home.length, away.length); i++) {
+      home[i].expired = true;
+      away[i].expired = true;
+      st.box[st.away.id].ppOpp = Math.max(0, st.box[st.away.id].ppOpp - 1);
+      st.box[st.home.id].ppOpp = Math.max(0, st.box[st.home.id].ppOpp - 1);
+      const rec = (team: number) => st.penalties.find((x) => x.team === team && x.period === period && x.seconds === home[i].start && x.givesPP);
+      const hr = rec(st.home.id); if (hr) hr.givesPP = false;
+      const ar = rec(st.away.id); if (ar) ar.givesPP = false;
     }
   }
 }
@@ -902,6 +933,7 @@ function simulatePeriod(st: SimState, period: number, homeShots: number, awaySho
   const active: Penalty[] = [];
   generatePenalties(st, home, period, active);
   generatePenalties(st, away, period, active);
+  resolveCoincidentalPenalties(st, active, period, 0);
 
   type Shot = { team: SimTeam; opp: SimTeam; isHome: boolean; t: number };
   const shots: Shot[] = [];
@@ -1137,8 +1169,10 @@ function simulatePeriodPossession(st: SimState, period: number) {
   // carry over the remaining time of any penalty still running at the last buzzer
   for (const cp of st.carryPenalties) active.push({ ...cp });
   st.carryPenalties = [];
+  const freshFromIdx = active.length;
   generatePenalties(st, home, period, active);
   generatePenalties(st, away, period, active);
+  resolveCoincidentalPenalties(st, active, period, freshFromIdx);
   const base = (period - 1) * PERIOD_SECONDS;
   const shifts: Record<number, ShiftState> = { [home.id]: buildShifts(home), [away.id]: buildShifts(away) };
   const other = (t: SimTeam) => (t === home ? away : home);

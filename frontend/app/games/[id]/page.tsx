@@ -223,7 +223,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
     }),
     penalties: game.penaltyEvents.map((p) => ({
       period: p.period, seconds: p.seconds, teamId: p.teamId,
-      playerName: p.playerName, type: p.type, minutes: p.minutes, severity: p.severity,
+      playerName: p.playerName, type: p.type, minutes: p.minutes, severity: p.severity, givesPP: p.givesPP,
     })),
     injuries,
     story,
