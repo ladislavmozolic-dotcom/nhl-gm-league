@@ -94,7 +94,7 @@ export function drawLottery(nonPlayoff: number[]): LotteryDraw {
 }
 
 export type LotteryOutcome = {
-  round1: { pick: number; teamId: number; viaLottery: boolean; combo: number[] | null }[];
+  round1: { pick: number; teamId: number; viaLottery: boolean; combo: number[] | null; prePos: number | null }[];
   winners: LotteryWinner[];
 };
 /** Compute a full round-1 order from one lottery draw (no persistence). */
@@ -103,11 +103,15 @@ export async function computeLotteryOrder(year: number): Promise<LotteryOutcome>
   const draw = drawLottery(nonPlayoff.map((t) => t.teamId));
   const winnerSet = new Set(draw.winners.map((w) => w.teamId));
   const ballsOf = new Map(draw.winners.map((w) => [w.teamId, w.balls]));
+  // pre-lottery rank (worst record first, 1-16) for each lottery-eligible club —
+  // lets the final order show how far a club climbed or fell versus where it
+  // would have picked before the draw. Playoff clubs never move, so null.
+  const prePosOf = new Map(nonPlayoff.map((t, i) => [t.teamId, i + 1]));
   const teamOrder = [...draw.order, ...playoff.map((p) => p.teamId)]; // 32 teams
   return {
     round1: teamOrder.map((teamId, i) => {
       const viaLottery = i < LOTTERY_DRAWS && winnerSet.has(teamId);
-      return { pick: i + 1, teamId, viaLottery, combo: viaLottery ? ballsOf.get(teamId) ?? null : null };
+      return { pick: i + 1, teamId, viaLottery, combo: viaLottery ? ballsOf.get(teamId) ?? null : null, prePos: prePosOf.get(teamId) ?? null };
     }),
     winners: draw.winners,
   };
@@ -123,7 +127,7 @@ export async function runLottery(year: number) {
   const outcome = await computeLotteryOrder(year);
   await prisma.$transaction([
     prisma.draftLottery.deleteMany({ where: { year } }),
-    prisma.draftLottery.createMany({ data: outcome.round1.map((r) => ({ year, pick: r.pick, teamId: r.teamId, viaLottery: r.viaLottery, combo: r.combo ? r.combo.join("-") : null })) }),
+    prisma.draftLottery.createMany({ data: outcome.round1.map((r) => ({ year, pick: r.pick, teamId: r.teamId, viaLottery: r.viaLottery, combo: r.combo ? r.combo.join("-") : null, prePos: r.prePos })) }),
   ]);
   // A protected 1st-rounder (TradeCondition with a LOTTERY_PROTECTION clause)
   // is only ever resolvable once ITS year's lottery has actually been drawn —

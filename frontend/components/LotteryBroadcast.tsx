@@ -6,7 +6,21 @@ import { startLotteryBroadcastAction, resetLotteryAction, practiceLotteryAction 
 import DraftChat from "@/components/DraftChat";
 
 export type OddsRow = { pos: number; code: string; logo: string | null; points: number; pct: number };
-type Row = { pick: number; code: string; name: string; logo: string | null; viaLottery: boolean; combo?: number[] | null };
+type Row = { pick: number; code: string; name: string; logo: string | null; viaLottery: boolean; combo?: number[] | null; prePos?: number | null };
+
+/** How many spots a club climbed (+) or fell (-) versus its pre-lottery rank.
+ *  Only lottery-eligible clubs have a prePos — playoff clubs never move. */
+function MoveBadge({ prePos, pick }: { prePos?: number | null; pick: number }) {
+  if (prePos == null) return null;
+  const delta = prePos - pick;
+  if (delta === 0) return <span className="text-[11px] font-semibold text-slate-500" title={`No movement — picked at its pre-lottery rank (#${prePos})`}>—</span>;
+  const up = delta > 0;
+  return (
+    <span className={`text-[11px] font-bold tabular-nums ${up ? "text-emerald-400" : "text-rose-400"}`} title={`Pre-lottery rank #${prePos} → pick #${pick}`}>
+      {up ? "▲" : "▼"} {Math.abs(delta)}
+    </span>
+  );
+}
 
 // cumulative phase timeline (seconds from startedAt)
 const T = { intro: 4, draw2: 11, reveal2: 15, draw1: 22, reveal1: 26 };
@@ -160,14 +174,17 @@ export default function LotteryBroadcast({ year, odds, admin, myTeamId }: { year
         </div>
         {phase === "done" && (
           <div>
-            <div className="text-sm text-slate-400 mb-2">{isPractice && <span className="text-amber-400 font-semibold mr-2">PRACTICE — not saved.</span>}Full round-1 order</div>
+            <div className="text-sm text-slate-400 mb-2">{isPractice && <span className="text-amber-400 font-semibold mr-2">PRACTICE — not saved.</span>}Full round-1 order <span className="text-xs text-slate-600">(▲/▼ = spots climbed/fell vs. pre-lottery rank)</span></div>
             <div className="grid gap-1.5 sm:grid-cols-2">
               {order.map((o) => (
                 <div key={o.pick} className={`flex items-center gap-3 rounded-lg border px-3 py-1.5 ${o.viaLottery ? "border-amber-500/40 bg-amber-500/10" : "border-slate-800 bg-slate-900/40"}`}>
                   <span className="w-8 text-center text-sm font-bold text-slate-500 tabular-nums">{o.pick}</span>
                   {o.logo && <img src={o.logo} alt="" className="w-7 h-7 object-contain" />}
                   <span className="font-medium text-slate-100">{o.name}</span>
-                  {o.viaLottery && <span className="ml-auto text-xs font-semibold text-amber-400">🎰</span>}
+                  <span className="ml-auto flex items-center gap-2">
+                    <MoveBadge prePos={o.prePos} pick={o.pick} />
+                    {o.viaLottery && <span className="text-xs font-semibold text-amber-400">🎰</span>}
+                  </span>
                 </div>
               ))}
             </div>

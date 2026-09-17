@@ -19,6 +19,6 @@ export async function GET(req: Request) {
   const t = new Map(teams.map((x) => [x.id, x]));
   return NextResponse.json({
     startedAt: run.startedAt.toISOString(),
-    order: rows.map((r) => ({ pick: r.pick, code: t.get(r.teamId)?.code ?? "—", name: t.get(r.teamId)?.name ?? "—", logo: t.get(r.teamId)?.logoUrl ?? null, viaLottery: r.viaLottery, combo: r.combo ? r.combo.split("-").map(Number) : null })),
+    order: rows.map((r) => ({ pick: r.pick, code: t.get(r.teamId)?.code ?? "—", name: t.get(r.teamId)?.name ?? "—", logo: t.get(r.teamId)?.logoUrl ?? null, viaLottery: r.viaLottery, combo: r.combo ? r.combo.split("-").map(Number) : null, prePos: r.prePos })),
   });
 }

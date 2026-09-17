@@ -1300,6 +1300,7 @@ model DraftLottery {
   teamId     Int
   viaLottery Boolean @default(false) // true for the two lottery-won top picks
   combo      String? // winning 4-ball combination for lottery picks, e.g. "3-7-9-14"
+  prePos     Int?    // 1-16 pre-lottery rank (worst record first) for the 16 lottery-eligible clubs; null for playoff clubs (they don't move)
   createdAt  DateTime @default(now())
 
   @@unique([year, pick])

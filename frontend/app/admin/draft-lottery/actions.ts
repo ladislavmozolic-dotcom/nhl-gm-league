@@ -5,12 +5,12 @@ import { isAdmin } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { runLottery, simulateLottery, type LotteryOutcome } from "@/lib/draft-lottery";
 
-export type LotteryResultRow = { pick: number; teamId: number; code: string; name: string; logo: string | null; viaLottery: boolean; combo: number[] | null };
+export type LotteryResultRow = { pick: number; teamId: number; code: string; name: string; logo: string | null; viaLottery: boolean; combo: number[] | null; prePos: number | null };
 
 async function withTeams(o: LotteryOutcome): Promise<LotteryResultRow[]> {
   const teams = await prisma.team.findMany({ where: { id: { in: o.round1.map((r) => r.teamId) } }, select: { id: true, code: true, name: true, logoUrl: true } });
   const t = new Map(teams.map((x) => [x.id, x]));
-  return o.round1.map((r) => ({ pick: r.pick, teamId: r.teamId, code: t.get(r.teamId)?.code ?? "—", name: t.get(r.teamId)?.name ?? "—", logo: t.get(r.teamId)?.logoUrl ?? null, viaLottery: r.viaLottery, combo: r.combo }));
+  return o.round1.map((r) => ({ pick: r.pick, teamId: r.teamId, code: t.get(r.teamId)?.code ?? "—", name: t.get(r.teamId)?.name ?? "—", logo: t.get(r.teamId)?.logoUrl ?? null, viaLottery: r.viaLottery, combo: r.combo, prePos: r.prePos }));
 }
 
 /** Draw the lottery for a draft year and persist the round-1 order (admin only). */
