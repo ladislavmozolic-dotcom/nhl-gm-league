@@ -8,7 +8,7 @@ import { mergeTactics, type TeamTactics } from "@/lib/sim/tactics";
 /** Save this team's system tactics (the 4 dials + preset). GM- or admin-gated.
  *  Stored on the team's TeamLines.system Json; the sim reads it on the next game. */
 export async function saveSystem(teamId: number, tactics: TeamTactics) {
-  if (!(await canManageTeam(teamId))) return { ok: false, error: "not authorized" };
+  if (!(await canManageTeam(teamId))) return { ok: false as const, error: "not authorized" };
 
   const clean = mergeTactics(tactics);
   const existing = await prisma.teamLines.findUnique({ where: { teamId }, select: { id: true } });
@@ -19,8 +19,9 @@ export async function saveSystem(teamId: number, tactics: TeamTactics) {
     await prisma.teamLines.create({ data: { teamId, system: clean as object } });
   }
 
-  revalidatePath(`/teams`, "layout");
-  return { ok: true };
+  const saved = await prisma.teamLines.findUnique({ where: { teamId }, select: { system: true } });
+  revalidatePath("/teams/[slug]/tactics", "page");
+  return { ok: true as const, tactics: mergeTactics((saved?.system as Partial<TeamTactics>) ?? clean) };
 }
 
 /** Apply one Coach-Advice suggestion: flip a single dial on the current system. */
@@ -32,6 +33,6 @@ export async function applyCoachSuggestionAction(teamId: number, dial: string, v
   const clean = mergeTactics({ ...current, [dial]: value } as TeamTactics);
   if (row) await prisma.teamLines.update({ where: { teamId }, data: { system: clean as object } });
   else await prisma.teamLines.create({ data: { teamId, system: clean as object } });
-  revalidatePath(`/teams`, "layout");
+  revalidatePath("/teams/[slug]/tactics", "page");
   return { ok: true as const };
 }

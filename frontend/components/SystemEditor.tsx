@@ -52,9 +52,20 @@ export default function SystemEditor({ teamId, profile, initial, coachEx = 70 }:
   const set = <K extends keyof TeamTactics>(k: K, v: TeamTactics[K]) => { setTac((t) => ({ ...t, [k]: v, preset: undefined })); setSaved(false); setError(null); };
   const applyPreset = (name: string) => { setTac(mergeTactics(PRESETS[name])); setSaved(false); setError(null); };
   const save = () => start(async () => {
-    const res = await saveSystem(teamId, tac);
-    setSaved(res.ok);
-    setError(res.ok ? null : res.error ?? "save failed");
+    try {
+      const res = await saveSystem(teamId, tac);
+      if (res.ok) {
+        setTac(res.tactics);
+        setSaved(true);
+        setError(null);
+      } else {
+        setSaved(false);
+        setError(res.error ?? "save failed");
+      }
+    } catch (e) {
+      setSaved(false);
+      setError(e instanceof Error ? e.message : "save failed");
+    }
   });
 
   return (
@@ -71,7 +82,7 @@ export default function SystemEditor({ teamId, profile, initial, coachEx = 70 }:
           <div className="text-xs uppercase tracking-wide text-slate-500 mb-2">{tr("sys.presets")} <span className="normal-case text-slate-600">{tr("sys.presetsHint")}</span></div>
           <div className="flex flex-wrap gap-2">
             {Object.keys(PRESETS).map((name) => (
-              <button key={name} onClick={() => applyPreset(name)}
+              <button type="button" key={name} onClick={() => applyPreset(name)}
                 className={`px-3 py-1.5 rounded-md text-[13px] font-semibold border transition-colors ${
                   tac.preset === name ? "bg-sky-600 text-white border-sky-500" : "border-slate-700 text-slate-300 hover:bg-slate-800/60"
                 }`}>
@@ -93,7 +104,7 @@ export default function SystemEditor({ teamId, profile, initial, coachEx = 70 }:
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {Object.keys(opts).map((k) => (
-                  <button key={k}
+                  <button type="button" key={k}
                     onClick={() => set(d.key, k as Tempo & Forecheck & PuckStyle & DZone)}
                     className={`px-3 py-2 rounded-md text-sm font-medium border transition-colors ${
                       val === k ? "bg-blue-600 text-white border-blue-500" : "border-slate-700 text-slate-300 hover:bg-slate-800/60"
@@ -136,7 +147,7 @@ export default function SystemEditor({ teamId, profile, initial, coachEx = 70 }:
           <p className="text-[11px] text-slate-600 mt-2">{tr("sys.effectLegend")}</p>
         </div>
 
-        <button onClick={save} disabled={pending}
+        <button type="button" onClick={save} disabled={pending}
           className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-semibold transition-colors">
           {pending ? tr("sys.saving") : saved ? tr("sys.savedTick") : tr("sys.save")}
         </button>
