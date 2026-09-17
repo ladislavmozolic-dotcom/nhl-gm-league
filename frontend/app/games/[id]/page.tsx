@@ -692,22 +692,58 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
     homeSystem: (game.homeSystem as Record<string, string> | null) ?? null,
     awaySystem: (game.awaySystem as Record<string, string> | null) ?? null,
     // Also clean already-persisted games created before names were normalized
-    // at the simulation boundary and sanitize regular season overtime events past 5:00.
-    playByPlay: ((game.playByPlay as unknown as PbpEvent[] | null) ?? [])
-      .filter((e) => {
-        if (game.seriesId == null && e.period === 4 && e.kind !== "period" && e.seconds > 300) return false;
-        return true;
-      })
-      .map((e) => {
-        let seconds = e.seconds;
-        let time = e.time;
-        const text = cleanName(e.text);
-        if (game.seriesId == null && e.period === 4 && e.text.includes("End of the overtime")) {
-          seconds = 300;
-          time = "5:00";
+    // at the simulation boundary, sanitize regular season overtime events past 5:00,
+    // and synthesize missing OT period events for games ending in OT/SO where period 4 was omitted.
+    playByPlay: (() => {
+      const hasOt = game.endedIn === "OT" || game.endedIn === "SO" || (game.otPeriods ?? 0) > 0;
+      let pbp = ((game.playByPlay as unknown as PbpEvent[] | null) ?? [])
+        .filter((e) => {
+          if (game.seriesId == null && e.period === 4 && e.kind !== "period" && e.seconds > 300) return false;
+          return true;
+        })
+        .map((e) => {
+          let seconds = e.seconds;
+          let time = e.time;
+          const text = cleanName(e.text);
+          if (game.seriesId == null && e.period === 4 && e.text.includes("End of the overtime")) {
+            seconds = 300;
+            time = "5:00";
+          }
+          return { ...e, seconds, time, text };
+        });
+
+      if (hasOt && !pbp.some((e) => e.period === 4)) {
+        const otGoal = game.goalEvents.find((g) => g.period === 4);
+        const otEvents: PbpEvent[] = [
+          { period: 4, seconds: 0, time: "0:00", teamId: null, kind: "period", text: "Start of the overtime.", major: true },
+        ];
+        if (otGoal) {
+          const goalTag = otGoal.strength && otGoal.strength !== "EV" ? ` (${otGoal.strength})` : "";
+          otEvents.push({
+            period: 4,
+            seconds: otGoal.seconds,
+            time: `${Math.floor(otGoal.seconds / 60)}:${Math.floor(otGoal.seconds % 60).toString().padStart(2, "0")}`,
+            teamId: otGoal.teamId,
+            kind: "goal",
+            text: `GOAL${goalTag} scored by ${cleanName(otGoal.scorerName)}${otGoal.assistNames.length ? ` assisted by ${otGoal.assistNames.map(cleanName).join(" and ")}` : " unassisted"}. Game over.`,
+            major: true,
+          });
+        } else {
+          otEvents.push({
+            period: 4,
+            seconds: 300,
+            time: "5:00",
+            teamId: null,
+            kind: "period",
+            text: "End of the overtime.",
+            major: true,
+          });
         }
-        return { ...e, seconds, time, text };
-      }),
+        pbp = [...pbp, ...otEvents].sort((a, b) => a.period - b.period || a.seconds - b.seconds);
+      }
+
+      return pbp;
+    })(),
     shootout: ((game.shootout as unknown as ShootoutAttempt[] | null) ?? []).map((a) => ({
       ...a, teamCode: a.teamId === game.homeTeamId ? game.homeTeam.code : game.awayTeam.code,
       shooterSlug: slugById.get(a.shooterId) ?? null,

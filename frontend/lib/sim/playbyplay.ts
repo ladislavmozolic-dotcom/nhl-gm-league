@@ -194,7 +194,9 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
     const pMaxSec = maxPeriodSeconds(period);
     events.push({ period, seconds: Math.max(0, Math.min(pMaxSec, Math.round(seconds))), time: fmt(seconds), teamId, kind, text, major });
   };
-  const maxRegPeriod = Math.max(3, ...stream.map((e) => e.period));
+  const otCount = (result.otPeriods ?? 0) > 0 ? result.otPeriods! : (result.endedIn === "OT" || result.endedIn === "SO" || (result.periods ?? 3) >= 4 ? 1 : 0);
+  const minPeriods = 3 + otCount;
+  const maxRegPeriod = Math.max(minPeriods, ...stream.map((e) => e.period));
 
   for (let p = 1; p <= maxRegPeriod; p++) {
     const pMaxSec = maxPeriodSeconds(p);
