@@ -121,6 +121,386 @@ async function buildLineGroups(teamId: number, snapshot: TeamLinesData | null | 
   return reconstructFromBoxScore(gameId, teamId);
 }
 
+import GamePreviewView, { type MatchPreviewData } from "@/components/GamePreviewView";
+import { computeStandings } from "@/lib/sim/standings";
+import { skaterTotals, goalieTotals } from "@/lib/stats-server";
+import { loadTeamLines } from "@/lib/sim/lines";
+
+import type { TeamTactics } from "@/lib/sim/tactics";
+
+async function buildMatchPreviewData(game: any, me: number | null): Promise<MatchPreviewData> {
+  const league = game.league ?? "NHL";
+  const season = game.season;
+
+  const [standings, allSkaters, allGoalies, homeLines, awayLines, homeLast5, awayLast5, h2hGames] = await Promise.all([
+    computeStandings(season, league).catch(() => []),
+    skaterTotals(season, league).catch(() => []),
+    goalieTotals(season, league).catch(() => []),
+    loadTeamLines(game.homeTeamId).catch(() => null),
+    loadTeamLines(game.awayTeamId).catch(() => null),
+    prisma.game.findMany({
+      where: {
+        status: "FINAL",
+        season,
+        league,
+        seriesId: null,
+        OR: [{ homeTeamId: game.homeTeamId }, { awayTeamId: game.homeTeamId }],
+        ...(game.gameDate ? { gameDate: { lt: game.gameDate } } : {}),
+      },
+      orderBy: [{ gameDate: "desc" }, { id: "desc" }],
+      take: 5,
+      include: {
+        homeTeam: { select: { id: true, code: true, name: true, logoUrl: true } },
+        awayTeam: { select: { id: true, code: true, name: true, logoUrl: true } },
+      },
+    }),
+    prisma.game.findMany({
+      where: {
+        status: "FINAL",
+        season,
+        league,
+        seriesId: null,
+        OR: [{ homeTeamId: game.awayTeamId }, { awayTeamId: game.awayTeamId }],
+        ...(game.gameDate ? { gameDate: { lt: game.gameDate } } : {}),
+      },
+      orderBy: [{ gameDate: "desc" }, { id: "desc" }],
+      take: 5,
+      include: {
+        homeTeam: { select: { id: true, code: true, name: true, logoUrl: true } },
+        awayTeam: { select: { id: true, code: true, name: true, logoUrl: true } },
+      },
+    }),
+    prisma.game.findMany({
+      where: {
+        status: "FINAL",
+        season,
+        league,
+        seriesId: null,
+        OR: [
+          { homeTeamId: game.homeTeamId, awayTeamId: game.awayTeamId },
+          { homeTeamId: game.awayTeamId, awayTeamId: game.homeTeamId },
+        ],
+      },
+      orderBy: [{ gameDate: "desc" }, { id: "desc" }],
+      take: 5,
+      include: {
+        homeTeam: { select: { id: true, code: true, name: true, logoUrl: true } },
+        awayTeam: { select: { id: true, code: true, name: true, logoUrl: true } },
+      },
+    }),
+  ]);
+
+  // Standings lookup
+  const homeStIdx = standings.findIndex((s) => s.teamId === game.homeTeamId);
+  const awayStIdx = standings.findIndex((s) => s.teamId === game.awayTeamId);
+  const homeSt = homeStIdx >= 0 ? standings[homeStIdx] : null;
+  const awaySt = awayStIdx >= 0 ? standings[awayStIdx] : null;
+  const confRankOf = (st: typeof homeSt) => {
+    if (!st) return 0;
+    const sameConf = standings.filter((s) => s.conference === st.conference);
+    return sameConf.findIndex((s) => s.teamId === st.teamId) + 1;
+  };
+
+  // Top skaters per team
+  const homeTopSkaters = allSkaters
+    .filter((s) => s.teamId === game.homeTeamId)
+    .sort((a, b) => b.points - a.points || b.goals - a.goals)
+    .slice(0, 5);
+  const awayTopSkaters = allSkaters
+    .filter((s) => s.teamId === game.awayTeamId)
+    .sort((a, b) => b.points - a.points || b.goals - a.goals)
+    .slice(0, 5);
+
+  const neededPlayerIds = [
+    ...homeTopSkaters.map((s) => s.playerId),
+    ...awayTopSkaters.map((s) => s.playerId),
+    homeLines?.situations?.others?.starter,
+    homeLines?.situations?.others?.backup,
+    awayLines?.situations?.others?.starter,
+    awayLines?.situations?.others?.backup,
+  ].filter((id): id is number => id != null);
+
+  const playerMeta = neededPlayerIds.length
+    ? await prisma.player.findMany({
+        where: { id: { in: neededPlayerIds } },
+        select: { id: true, name: true, slug: true, position: true, overall: true, number: true, photoUrl: true, age: true, shoots: true },
+      })
+    : [];
+  const pMetaMap = new Map(playerMeta.map((p) => [p.id, p]));
+
+  // Goalies
+  const getGoalieObj = async (teamId: number, lines: typeof homeLines) => {
+    const starterId = lines?.situations?.others?.starter;
+    const backupId = lines?.situations?.others?.backup;
+    let sPlayer = starterId ? pMetaMap.get(starterId) : null;
+    let bPlayer = backupId ? pMetaMap.get(backupId) : null;
+
+    if (!sPlayer) {
+      const fallbackGoalies = await prisma.player.findMany({
+        where: { teamId, isGoalie: true, rosterType: league === "AHL" ? "AHL" : "NHL", scratched: false },
+        orderBy: { overall: "desc" },
+        take: 2,
+        select: { id: true, name: true, slug: true, position: true, overall: true, number: true, photoUrl: true, age: true, shoots: true },
+      });
+      if (fallbackGoalies[0]) sPlayer = fallbackGoalies[0];
+      if (fallbackGoalies[1]) bPlayer = fallbackGoalies[1];
+    }
+
+    const sStats = sPlayer ? allGoalies.find((g) => g.playerId === sPlayer!.id && g.teamId === teamId) : null;
+    const bStats = bPlayer ? allGoalies.find((g) => g.playerId === bPlayer!.id && g.teamId === teamId) : null;
+
+    return {
+      starter: sPlayer
+        ? {
+            id: sPlayer.id,
+            name: cleanName(sPlayer.name),
+            slug: sPlayer.slug,
+            overall: sPlayer.overall ?? 75,
+            age: sPlayer.age ?? undefined,
+            catches: sPlayer.shoots ?? "L",
+            photoUrl: sPlayer.photoUrl,
+            stats: sStats
+              ? { gp: sStats.gp, w: sStats.wins, l: sStats.losses, otl: sStats.otl, gaa: sStats.gaa, svPct: sStats.svPct, shutouts: sStats.shutouts }
+              : undefined,
+          }
+        : null,
+      backup: bPlayer
+        ? {
+            id: bPlayer.id,
+            name: cleanName(bPlayer.name),
+            slug: bPlayer.slug,
+            overall: bPlayer.overall ?? 70,
+            age: bPlayer.age ?? undefined,
+            catches: bPlayer.shoots ?? "L",
+            photoUrl: bPlayer.photoUrl,
+            stats: bStats
+              ? { gp: bStats.gp, w: bStats.wins, l: bStats.losses, otl: bStats.otl, gaa: bStats.gaa, svPct: bStats.svPct, shutouts: bStats.shutouts }
+              : undefined,
+          }
+        : null,
+    };
+  };
+
+  const [homeGoalies, awayGoalies] = await Promise.all([
+    getGoalieObj(game.homeTeamId, homeLines),
+    getGoalieObj(game.awayTeamId, awayLines),
+  ]);
+
+  const mapForm = (gamesList: typeof homeLast5, teamId: number) => {
+    return gamesList.map((g) => {
+      const isHome = g.homeTeamId === teamId;
+      const opp = isHome ? g.awayTeam : g.homeTeam;
+      const goalsFor = isHome ? g.homeGoals ?? 0 : g.awayGoals ?? 0;
+      const goalsAgainst = isHome ? g.awayGoals ?? 0 : g.homeGoals ?? 0;
+      let result = "L";
+      if (goalsFor > goalsAgainst) {
+        result = g.endedIn === "REG" ? "W" : "OTW";
+      } else {
+        result = g.endedIn === "REG" ? "L" : "OTL";
+      }
+      const d = g.gameDate ? new Date(g.gameDate) : null;
+      const date = d ? `${d.getUTCDate()}.${d.getUTCMonth() + 1}.` : "—";
+      return {
+        gameId: g.id,
+        isHome,
+        oppCode: opp.code ?? opp.name,
+        oppName: opp.name,
+        oppLogo: opp.logoUrl,
+        goalsFor,
+        goalsAgainst,
+        result,
+        endedIn: g.endedIn ?? "REG",
+        date,
+      };
+    });
+  };
+
+  const mapH2h = h2hGames.map((g) => {
+    const d = g.gameDate ? new Date(g.gameDate) : null;
+    const date = d ? `${d.getUTCDate()}.${d.getUTCMonth() + 1}.` : "—";
+    return {
+      gameId: g.id,
+      homeTeamCode: g.homeTeam.code ?? g.homeTeam.name,
+      homeTeamLogo: g.homeTeam.logoUrl,
+      homeGoals: g.homeGoals ?? 0,
+      awayTeamCode: g.awayTeam.code ?? g.awayTeam.name,
+      awayTeamLogo: g.awayTeam.logoUrl,
+      awayGoals: g.awayGoals ?? 0,
+      endedIn: g.endedIn ?? "REG",
+      date,
+    };
+  });
+
+  // Tactics
+  const defaultTactics: TeamTactics = { tempo: "balanced", forecheck: "balanced", puckStyle: "balanced", dZone: "balanced", ppStyle: "balanced", pkStyle: "balanced" };
+  const homeSys: TeamTactics = (homeLines?.system as TeamTactics) ?? defaultTactics;
+  const awaySys: TeamTactics = (awayLines?.system as TeamTactics) ?? defaultTactics;
+
+  // Build projected lines
+  const buildLinesForTeam = async (teamId: number, lines: typeof homeLines) => {
+    if (!lines) return [];
+    const teamPlayers = await prisma.player.findMany({
+      where: { teamId },
+      select: { id: true, name: true, slug: true, position: true },
+    });
+    const pMap = new Map(teamPlayers.map((p) => [p.id, { id: p.id, name: cleanName(p.name), slug: p.slug, pos: p.position ?? undefined }]));
+    const getP = (id: number | null | undefined) => (id ? pMap.get(id) ?? null : null);
+
+    return [
+      {
+        title: "5 vs 5 Forward Lines",
+        cols: ["LW", "C", "RW"],
+        units: lines.forwardLines.map((l, i) => ({
+          n: i + 1,
+          players: [getP(l.lw), getP(l.c), getP(l.rw)],
+          tactic: l.tactic,
+        })),
+      },
+      {
+        title: "5 vs 5 Defense Pairs",
+        cols: ["LD", "RD"],
+        units: lines.defensePairs.map((p, i) => ({
+          n: i + 1,
+          players: [getP(p.ld), getP(p.rd)],
+          tactic: p.tactic,
+        })),
+      },
+    ];
+  };
+
+  const [homeLineGroups, awayLineGroups] = await Promise.all([
+    buildLinesForTeam(game.homeTeamId, homeLines),
+    buildLinesForTeam(game.awayTeamId, awayLines),
+  ]);
+
+  return {
+    gameId: game.id,
+    season: game.season,
+    league: game.league,
+    gameDate: game.gameDate ? game.gameDate.toISOString() : null,
+    round: game.round,
+    status: game.status,
+    homeTeam: {
+      id: game.homeTeam.id,
+      name: game.homeTeam.name,
+      code: game.homeTeam.code ?? game.homeTeam.name,
+      slug: game.homeTeam.slug,
+      logoUrl: game.homeTeam.logoUrl,
+      conference: game.homeTeam.conference,
+      division: game.homeTeam.division,
+      arena: game.homeTeam.arena,
+      standing: homeSt
+        ? {
+            gp: homeSt.gp,
+            w: homeSt.w,
+            l: homeSt.l,
+            otl: homeSt.otl,
+            pts: homeSt.points,
+            rank: homeStIdx + 1,
+            confRank: confRankOf(homeSt),
+            gf: homeSt.gf,
+            ga: homeSt.ga,
+            diff: homeSt.diff,
+            streak: "",
+          }
+        : null,
+    },
+    awayTeam: {
+      id: game.awayTeam.id,
+      name: game.awayTeam.name,
+      code: game.awayTeam.code ?? game.awayTeam.name,
+      slug: game.awayTeam.slug,
+      logoUrl: game.awayTeam.logoUrl,
+      conference: game.awayTeam.conference,
+      division: game.awayTeam.division,
+      arena: game.awayTeam.arena,
+      standing: awaySt
+        ? {
+            gp: awaySt.gp,
+            w: awaySt.w,
+            l: awaySt.l,
+            otl: awaySt.otl,
+            pts: awaySt.points,
+            rank: awayStIdx + 1,
+            confRank: confRankOf(awaySt),
+            gf: awaySt.gf,
+            ga: awaySt.ga,
+            diff: awaySt.diff,
+            streak: "",
+          }
+        : null,
+    },
+    startingGoalies: {
+      home: homeGoalies,
+      away: awayGoalies,
+    },
+    topScorers: {
+      home: homeTopSkaters.map((s) => {
+        const pm = pMetaMap.get(s.playerId);
+        return {
+          id: s.playerId,
+          name: s.name,
+          slug: pm?.slug ?? null,
+          position: s.position,
+          number: s.number,
+          overall: pm?.overall ?? 75,
+          gp: s.gp,
+          goals: s.goals,
+          assists: s.assists,
+          points: s.points,
+          plusMinus: s.plusMinus,
+        };
+      }),
+      away: awayTopSkaters.map((s) => {
+        const pm = pMetaMap.get(s.playerId);
+        return {
+          id: s.playerId,
+          name: s.name,
+          slug: pm?.slug ?? null,
+          position: s.position,
+          number: s.number,
+          overall: pm?.overall ?? 75,
+          gp: s.gp,
+          goals: s.goals,
+          assists: s.assists,
+          points: s.points,
+          plusMinus: s.plusMinus,
+        };
+      }),
+    },
+    recentForm: {
+      home: mapForm(homeLast5, game.homeTeamId),
+      away: mapForm(awayLast5, game.awayTeamId),
+    },
+    h2h: mapH2h,
+    tactics: {
+      home: {
+        preset: homeSys.preset,
+        tempo: homeSys.tempo,
+        forecheck: homeSys.forecheck,
+        puckStyle: homeSys.puckStyle,
+        dZone: homeSys.dZone,
+        ppStyle: homeSys.ppStyle,
+        pkStyle: homeSys.pkStyle,
+      },
+      away: {
+        preset: awaySys.preset,
+        tempo: awaySys.tempo,
+        forecheck: awaySys.forecheck,
+        puckStyle: awaySys.puckStyle,
+        dZone: awaySys.dZone,
+        ppStyle: awaySys.ppStyle,
+        pkStyle: awaySys.pkStyle,
+      },
+    },
+    lines: {
+      home: homeLineGroups,
+      away: awayLineGroups,
+    },
+    userTeamId: me,
+  };
+}
+
 export default async function GamePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const game = await prisma.game.findUnique({
@@ -134,7 +514,14 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
       goalieStats: { include: { player: { select: { name: true, slug: true } } } },
     },
   });
-  if (!game || game.status !== "FINAL") notFound();
+  if (!game) notFound();
+
+  const me = await getTeamSession();
+
+  if (game.status !== "FINAL") {
+    const previewData = await buildMatchPreviewData(game, me);
+    return <GamePreviewView data={previewData} />;
+  }
 
   const teamMeta = (t: typeof game.homeTeam) => ({
     teamId: t.id, name: t.name, slug: t.slug, logoUrl: t.logoUrl, code: t.code,
