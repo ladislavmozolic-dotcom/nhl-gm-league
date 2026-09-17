@@ -26,9 +26,10 @@ export default function GoalieAnalyticsCard({ a }: { a: GoalieAnalytics }) {
   return (
     <Card title="Goalie Analytics" accent="text-emerald-400">
       {/* headline tiles */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
         <Tile big={`${(a.svPct * 100).toFixed(1)}`} label="SV%" tone={svTone(a.svPct, "all")} />
         <Tile big={`${a.gsax >= 0 ? "+" : ""}${a.gsax}`} label="GSAx" tone={a.gsax >= 0 ? "text-emerald-400" : "text-rose-400"} sub="goals saved vs xG" />
+        <Tile big={String(a.steals)} label="Steals" tone="text-amber-400" sub="ukradnuté zápasy" />
         <Tile big={`${a.xga.toFixed(1)}`} label="xGA" sub={`${a.goalsAgainst} allowed`} />
         <Tile big={a.gaa.toFixed(2)} label="GAA" sub={`${a.gp} GP`} />
       </div>

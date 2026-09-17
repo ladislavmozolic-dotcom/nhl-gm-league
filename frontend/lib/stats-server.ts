@@ -20,6 +20,7 @@ export type GoalieTotal = {
   shotsAgainst: number; saves: number; goalsAgainst: number; toiMin: number;
   svPct: number; gaa: number;
   xga: number; gsax: number; // Phase 2: expected goals against + goals saved above expected
+  steals: number; // Games won where GSAx > margin of victory (excl. empty-net goals)
 };
 
 export type SituationTotal = {
@@ -119,7 +120,25 @@ export async function skaterSituationTotals(
 export async function goalieTotals(season: string, league = "NHL", playoffs = false): Promise<GoalieTotal[]> {
   const rows = await prisma.goalieGameStat.findMany({
     where: { game: gameWhere({ season, league, playoffs }) },
-    select: { playerId: true, teamId: true, shotsAgainst: true, saves: true, goalsAgainst: true, decision: true, started: true, xga: true },
+    select: {
+      playerId: true,
+      teamId: true,
+      shotsAgainst: true,
+      saves: true,
+      goalsAgainst: true,
+      decision: true,
+      started: true,
+      xga: true,
+      game: {
+        select: {
+          homeTeamId: true,
+          awayTeamId: true,
+          homeGoals: true,
+          awayGoals: true,
+          goalEvents: { where: { emptyNet: true }, select: { teamId: true } },
+        },
+      },
+    },
   });
   type Acc = Omit<GoalieTotal, "name" | "teamCode" | "teamSlug" | "teamLogo" | "svPct" | "gaa"> & { teamId: number | null };
   // key by (goalie, team-played-for) so a called-up farm goalie who covered an
@@ -131,13 +150,49 @@ export async function goalieTotals(season: string, league = "NHL", playoffs = fa
     if (!r.started && r.shotsAgainst === 0) continue;
     const key = `${r.playerId}:${r.teamId}`;
     let a = acc.get(key);
-    if (!a) { a = { playerId: r.playerId, teamId: r.teamId ?? null, gp: 0, wins: 0, losses: 0, otl: 0, shutouts: 0, shotsAgainst: 0, saves: 0, goalsAgainst: 0, toiMin: 0, xga: 0, gsax: 0 }; acc.set(key, a); }
+    if (!a) {
+      a = {
+        playerId: r.playerId,
+        teamId: r.teamId ?? null,
+        gp: 0,
+        wins: 0,
+        losses: 0,
+        otl: 0,
+        shutouts: 0,
+        shotsAgainst: 0,
+        saves: 0,
+        goalsAgainst: 0,
+        toiMin: 0,
+        xga: 0,
+        gsax: 0,
+        steals: 0,
+      };
+      acc.set(key, a);
+    }
     a.gp++;
-    a.shotsAgainst += r.shotsAgainst; a.saves += r.saves; a.goalsAgainst += r.goalsAgainst; a.xga += r.xga ?? 0;
+    a.shotsAgainst += r.shotsAgainst;
+    a.saves += r.saves;
+    a.goalsAgainst += r.goalsAgainst;
+    a.xga += r.xga ?? 0;
     a.toiMin += 60; // one full game ≈ 60 min (no per-goalie TOI stored)
-    if (r.decision === "W") a.wins++;
-    else if (r.decision === "L") a.losses++;
-    else if (r.decision === "OTL") a.otl++;
+    if (r.decision === "W") {
+      a.wins++;
+      // Steal: GSAx > margin of victory (excl. empty-net goals)
+      const isHome = r.teamId === r.game.homeTeamId;
+      const teamGoals = (isHome ? r.game.homeGoals : r.game.awayGoals) ?? 0;
+      const oppGoals = (isHome ? r.game.awayGoals : r.game.homeGoals) ?? 0;
+      const enGoals = r.game.goalEvents.filter((g) => g.teamId === r.teamId).length;
+      const effectiveTeamGoals = teamGoals - enGoals;
+      const margin = Math.max(0, effectiveTeamGoals - oppGoals);
+      const gameGsax = (r.xga ?? 0) - r.goalsAgainst;
+      if (gameGsax > margin) {
+        a.steals++;
+      }
+    } else if (r.decision === "L") {
+      a.losses++;
+    } else if (r.decision === "OTL") {
+      a.otl++;
+    }
     if (r.goalsAgainst === 0) a.shutouts++;
   }
   const [players, teams] = await Promise.all([

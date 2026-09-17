@@ -23,6 +23,7 @@ type Goalie = {
   conBefore: number | null; conAfter: number | null; fatigued: boolean; decision: string | null;
   record?: { w: number; l: number; otl: number };
   xga?: number;
+  isSteal?: boolean;
   hdShotsAg?: number; hdSaves?: number; mdShotsAg?: number; mdSaves?: number; ldShotsAg?: number; ldSaves?: number;
 };
 type LineGroup = { title: string; cols: string[]; units: { n: number; players: (string | null)[]; tactic?: { phy: number; df: number; of: number }; wanted?: number }[] };
@@ -169,6 +170,11 @@ function GoalieBlock({ side }: { side: Side }) {
               )}
               {!g.started && <span className="text-[10px] uppercase text-slate-500 border border-slate-700 rounded px-1">backup</span>}
               {g.fatigued && <span className="text-[10px] uppercase text-amber-500 border border-amber-700/50 rounded px-1">b2b</span>}
+              {g.isSteal && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-amber-300 bg-amber-500/20 border border-amber-500/40 rounded px-1.5 py-0.5 shadow-sm" title="Ukradnutý zápas (Steal) — brankárov GSAx prevýšil gólový náskok tímu (bez gólov do prázdnej brány).">
+                  🧤 Steal
+                </span>
+              )}
             </span>
             <span className="text-slate-300 tabular-nums text-right whitespace-nowrap">
               {g.started

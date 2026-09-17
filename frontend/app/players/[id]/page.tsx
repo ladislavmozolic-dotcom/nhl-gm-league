@@ -104,12 +104,15 @@ function aggSkater(rows: {
 // aggregate goalie per-game rows into a single stat line
 function aggGoalie(rows: {
   started: boolean; shotsAgainst: number; saves: number; goalsAgainst: number; decision: string | null;
+  xga?: number | null; isSteal?: boolean;
 }[]) {
   const started = rows.filter((r) => r.started);
   const gp = started.length || rows.length;
   const sa = rows.reduce((s, r) => s + r.shotsAgainst, 0);
   const sv = rows.reduce((s, r) => s + r.saves, 0);
   const ga = rows.reduce((s, r) => s + r.goalsAgainst, 0);
+  const xga = rows.reduce((s, r) => s + (r.xga ?? 0), 0);
+  const steals = rows.filter((r) => r.isSteal).length;
   return {
     gp,
     w: rows.filter((r) => r.decision === "W").length,
@@ -117,6 +120,8 @@ function aggGoalie(rows: {
     otl: rows.filter((r) => r.decision === "OTL").length,
     svPct: sa ? sv / sa : null,
     gaa: gp ? ga / gp : 0,
+    gsax: xga - ga,
+    steals,
     so: rows.filter((r) => r.started && r.goalsAgainst === 0).length,
     sa, sv, ga,
     toi: `${gp * 60}:00`,
@@ -135,11 +140,17 @@ const svpFmt = (v: number | null) => (v == null ? "—" : v.toFixed(3).replace(/
 const COL_TITLES: Record<string, string> = {
   TOI: "Average total time on ice per game", EV: "Average even-strength ice time per game",
   PP: "Average power-play ice time per game", PK: "Average penalty-kill ice time per game",
+  GSAx: "Goals Saved Above Expected (xGA − GA)",
+  STL: "Steals — games won where GSAx > margin of victory (excl. empty-net goals)",
 };
 const SK_COLS = ["GP", "G", "A", "PTS", "+/-", "PIM", "PPG", "SHG", "GWG", "S", "S%", "HITS", "BKS", "FO%", "TOI", "EV", "PP", "PK", "P/PG"];
 const skCells = (a: SkAgg) => [a.gp, a.g, a.a, a.pts, pmFmt(a.pm), a.pim, a.ppg, a.shg, a.gwg, a.s, pctFmt(a.sPct), a.hits, a.bks, a.foPct == null ? "—" : a.foPct.toFixed(1), a.toi, a.evToi, a.ppToi, a.pkToi, a.pPg.toFixed(2)];
-const GL_COLS = ["GP", "W", "L", "OTL", "SV%", "GAA", "SO", "SA", "SV", "GA", "TOI"];
-const glCells = (a: GlAgg) => [a.gp, a.w, a.l, a.otl, svpFmt(a.svPct), a.gaa.toFixed(2), a.so, a.sa, a.sv, a.ga, a.toi];
+const GL_COLS = ["GP", "W", "L", "OTL", "SV%", "GAA", "GSAx", "STL", "SO", "SA", "SV", "GA", "TOI"];
+const glCells = (a: GlAgg) => [
+  a.gp, a.w, a.l, a.otl, svpFmt(a.svPct), a.gaa.toFixed(2),
+  (a.gsax >= 0 ? "+" : "") + a.gsax.toFixed(1), a.steals,
+  a.so, a.sa, a.sv, a.ga, a.toi,
+];
 
 // A league block: "<LEAGUE> Seasons" (season row + career) and, if any, "<LEAGUE> Playoffs".
 function StatBlock({ league, cols, reg, po, cellsOf, team }: {
@@ -204,9 +215,28 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   if (isGoalie) {
     const rows = await prisma.goalieGameStat.findMany({
       where: { playerId: p.id, game: { season: SEASON, status: "FINAL" } },
-      select: { started: true, shotsAgainst: true, saves: true, goalsAgainst: true, decision: true, game: { select: { league: true, seriesId: true } } },
+      select: {
+        started: true, shotsAgainst: true, saves: true, goalsAgainst: true, decision: true,
+        xga: true, teamId: true,
+        game: {
+          select: {
+            league: true, seriesId: true, homeTeamId: true, awayTeamId: true, homeGoals: true, awayGoals: true,
+            goalEvents: { where: { emptyNet: true }, select: { teamId: true } },
+          },
+        },
+      },
     });
-    for (const r of rows) gB[bucketKey(r.game.league, r.game.seriesId)].push(r);
+    for (const r of rows) {
+      const isHome = r.teamId === r.game.homeTeamId;
+      const teamGoals = (isHome ? r.game.homeGoals : r.game.awayGoals) ?? 0;
+      const oppGoals = (isHome ? r.game.awayGoals : r.game.homeGoals) ?? 0;
+      const enGoals = r.game.goalEvents.filter((g) => g.teamId === r.teamId).length;
+      const effectiveTeamGoals = teamGoals - enGoals;
+      const margin = Math.max(0, effectiveTeamGoals - oppGoals);
+      const gameGsax = (r.xga ?? 0) - r.goalsAgainst;
+      const isSteal = r.decision === "W" && gameGsax > margin;
+      gB[bucketKey(r.game.league, r.game.seriesId)].push({ ...r, isSteal });
+    }
   } else {
     const rows = await prisma.playerGameStat.findMany({
       where: { playerId: p.id, game: { season: SEASON, status: "FINAL" } },
@@ -249,11 +279,30 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     select: { teamId: true, goals: true, assists: true, points: true, shots: true, pim: true, plusMinus: true, hits: true, blocks: true, toi: true, ppToi: true, pkToi: true, game: { select: gameSel } },
     orderBy: { game: { gameDate: "desc" } },
   });
-  const goalieLog = isGoalie ? await prisma.goalieGameStat.findMany({
+  const goalieLogRaw = isGoalie ? await prisma.goalieGameStat.findMany({
     where: { playerId: p.id, started: true, game: nhlGL },
-    select: { shotsAgainst: true, saves: true, goalsAgainst: true, decision: true, game: { select: gameSel } },
+    select: {
+      teamId: true, shotsAgainst: true, saves: true, goalsAgainst: true, decision: true, xga: true,
+      game: {
+        select: {
+          ...gameSel,
+          goalEvents: { where: { emptyNet: true }, select: { teamId: true } },
+        },
+      },
+    },
     orderBy: { game: { gameDate: "desc" } },
   }) : [];
+  const goalieLog = goalieLogRaw.map((r) => {
+    const isHome = r.teamId === r.game.homeTeamId;
+    const teamGoals = (isHome ? r.game.homeGoals : r.game.awayGoals) ?? 0;
+    const oppGoals = (isHome ? r.game.awayGoals : r.game.homeGoals) ?? 0;
+    const enGoals = r.game.goalEvents.filter((g) => g.teamId === r.teamId).length;
+    const effectiveTeamGoals = teamGoals - enGoals;
+    const margin = Math.max(0, effectiveTeamGoals - oppGoals);
+    const gameGsax = (r.xga ?? 0) - r.goalsAgainst;
+    const isSteal = r.decision === "W" && gameGsax > margin;
+    return { ...r, isSteal };
+  });
 
   // teamId always points somewhere (schema requires it, even for a free agent — it's
   // his last club before hitting the market), so p.team alone can't tell "on a roster"

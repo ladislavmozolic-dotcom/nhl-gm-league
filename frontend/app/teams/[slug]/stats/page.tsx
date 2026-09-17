@@ -39,6 +39,8 @@ const GOALIE_COLS: Col[] = [
   { key: "otl", label: "OTL", title: "Overtime Losses", num: true },
   { key: "svPct", label: "PCT", title: "Save Percentage", num: true, format: "pct3" },
   { key: "gaa", label: "GAA", title: "Goals-Against Average", num: true, format: "dec2" },
+  { key: "gsax", label: "GSAx", title: "Goals Saved Above Expected (xGA − GA)", num: true, format: "plusDec1", info: "Goals Saved Above Expected (xGA − GA)." },
+  { key: "steals", label: "STL", title: "Steals (Ukradnuté zápasy)", num: true, info: "Ukradnuté zápasy (Steals): Zápasy s výhrou, kde brankárov GSAx prevýšil gólový náskok tímu (bez gólov do prázdnej brány)." },
   { key: "mp", label: "MP", title: "Minutes Played", num: true },
   { key: "pim", label: "PIM", title: "Penalty Minutes (not tracked)", num: true, format: "dash" },
   { key: "shutouts", label: "SO", title: "Shutouts", num: true },
@@ -81,7 +83,7 @@ export default async function TeamStatsPage({ params }: { params: Promise<{ slug
 
   const goalieRows = gk.map((g) => ({
     name: g.name, gp: g.gp, wins: g.wins, losses: g.losses, otl: g.otl,
-    svPct: g.svPct, gaa: g.gaa, mp: g.toiMin, pim: 0, shutouts: g.shutouts,
+    svPct: g.svPct, gaa: g.gaa, gsax: g.gsax, steals: g.steals, mp: g.toiMin, pim: 0, shutouts: g.shutouts,
     goalsAgainst: g.goalsAgainst, shotsAgainst: g.shotsAgainst, saves: g.saves,
     a: 0, eg: 0, psPct: 0, psa: 0, st: 0, bg: 0, s1: 0, s2: 0, s3: 0,
   }));

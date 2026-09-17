@@ -10,6 +10,7 @@ export type DangerSplit = { shots: number; saves: number; svPct: number };
 export type GoalieAnalytics = {
   gp: number; shotsAgainst: number; saves: number; goalsAgainst: number;
   svPct: number; xga: number; gsax: number; gaa: number;
+  steals: number;
   high: DangerSplit; mid: DangerSplit; low: DangerSplit;
   last10: { gp: number; gsax: number; svPct: number };
   fatigue: { level: "Fresh" | "Normal" | "Elevated" | "High"; recentStarts: number; recentWindow: number; condition: number; note: string };
@@ -30,6 +31,36 @@ export async function goalieAnalytics(playerId: number): Promise<GoalieAnalytics
   const s = agg._sum;
   const shotsAgainst = s.shotsAgainst ?? 0, saves = s.saves ?? 0, goalsAgainst = s.goalsAgainst ?? 0, xga = s.xga ?? 0;
   const gp = agg._count._all;
+
+  // steals: games won where GSAx > margin of victory (excl. EN)
+  const allStarts = await prisma.goalieGameStat.findMany({
+    where: { ...where, decision: "W" },
+    select: {
+      teamId: true,
+      goalsAgainst: true,
+      xga: true,
+      game: {
+        select: {
+          homeTeamId: true,
+          awayTeamId: true,
+          homeGoals: true,
+          awayGoals: true,
+          goalEvents: { where: { emptyNet: true }, select: { teamId: true } },
+        },
+      },
+    },
+  });
+  let steals = 0;
+  for (const r of allStarts) {
+    const isHome = r.teamId === r.game.homeTeamId;
+    const teamGoals = (isHome ? r.game.homeGoals : r.game.awayGoals) ?? 0;
+    const oppGoals = (isHome ? r.game.awayGoals : r.game.homeGoals) ?? 0;
+    const enGoals = r.game.goalEvents.filter((g) => g.teamId === r.teamId).length;
+    const effectiveTeamGoals = teamGoals - enGoals;
+    const margin = Math.max(0, effectiveTeamGoals - oppGoals);
+    const gameGsax = (r.xga ?? 0) - r.goalsAgainst;
+    if (gameGsax > margin) steals++;
+  }
 
   // last 10 starts → GSAx trend
   const last = await prisma.goalieGameStat.findMany({ where, orderBy: { game: { gameDate: "desc" } }, take: 10, select: { saves: true, shotsAgainst: true, goalsAgainst: true, xga: true } });
@@ -58,6 +89,7 @@ export async function goalieAnalytics(playerId: number): Promise<GoalieAnalytics
   return {
     gp, shotsAgainst, saves, goalsAgainst,
     svPct: shotsAgainst ? saves / shotsAgainst : 0, xga: +xga.toFixed(1), gsax: +(xga - goalsAgainst).toFixed(1), gaa: gp ? goalsAgainst / gp : 0,
+    steals,
     high: split(s.hdShotsAg ?? 0, s.hdSaves ?? 0), mid: split(s.mdShotsAg ?? 0, s.mdSaves ?? 0), low: split(s.ldShotsAg ?? 0, s.ldSaves ?? 0),
     last10: { gp: last.length, gsax: +l10gsax.toFixed(1), svPct: l10sa ? l10sv / l10sa : 0 },
     fatigue: { level, recentStarts, recentWindow, condition: con, note },

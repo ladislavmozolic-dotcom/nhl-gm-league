@@ -18,6 +18,7 @@ const COLS: Col[] = [
   { key: "svPct", label: "PCT", title: "Save Percentage", num: true, format: "pct3" },
   { key: "gaa", label: "GAA", title: "Goals-Against Average", num: true, format: "dec2" },
   { key: "gsax", label: "GSAx", title: "Goals Saved Above Expected (xGA − GA)", num: true, format: "plusDec1", info: "Goals Saved Above Expected (xGA − GA). Positive values mean the goalie stopped more goals than expected given shot danger." },
+  { key: "steals", label: "STL", title: "Steals (Ukradnuté zápasy)", num: true, info: "Ukradnuté zápasy (Steals): Zápasy s výhrou, kde brankárov GSAx prevýšil gólový náskok tímu (bez gólov do prázdnej brány)." },
   { key: "mp", label: "MP", title: "Minutes Played", num: true },
   { key: "shutouts", label: "SO", title: "Shutouts", num: true },
   { key: "goalsAgainst", label: "GA", title: "Goals Against", num: true },
@@ -46,7 +47,7 @@ export default async function GoalieStatsPage({ searchParams }: { searchParams: 
   const gk = await goalieTotals(SEASON, league);
   const rows = gk.map((g) => ({
     _pid: g.playerId, name: g.name, teamCode: g.teamCode ?? "—", _teamSlug: g.teamSlug ?? "", _teamLogo: g.teamLogo ?? "", gp: g.gp, wins: g.wins, losses: g.losses, otl: g.otl,
-    svPct: g.svPct, gaa: g.gaa, gsax: g.gsax, mp: g.toiMin, pim: 0, shutouts: g.shutouts,
+    svPct: g.svPct, gaa: g.gaa, gsax: g.gsax, steals: g.steals, mp: g.toiMin, pim: 0, shutouts: g.shutouts,
     goalsAgainst: g.goalsAgainst, shotsAgainst: g.shotsAgainst, saves: g.saves,
     xga: g.xga,
     a: 0, eg: 0, psPct: 0, psa: 0, st: 0, bg: 0, s1: 0, s2: 0, s3: 0,

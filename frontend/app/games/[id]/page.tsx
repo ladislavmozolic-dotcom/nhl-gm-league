@@ -580,15 +580,26 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
 
   const goalies = (teamId: number) => game.goalieStats
     .filter((s) => s.teamId === teamId)
-    .map((s) => ({
-      id: s.playerId, name: s.player.name, slug: s.player.slug, started: s.started,
-      shotsAgainst: s.shotsAgainst, saves: s.saves, goalsAgainst: s.goalsAgainst,
-      conBefore: s.conBefore, conAfter: s.conAfter, fatigued: s.fatigued, decision: s.decision,
-      record: recOf.get(s.playerId) ?? { w: 0, l: 0, otl: 0 },
-      xga: s.xga,
-      hdShotsAg: s.hdShotsAg, hdSaves: s.hdSaves, mdShotsAg: s.mdShotsAg, mdSaves: s.mdSaves,
-      ldShotsAg: s.ldShotsAg, ldSaves: s.ldSaves,
-    }))
+    .map((s) => {
+      const isHome = teamId === game.homeTeamId;
+      const teamGoals = (isHome ? game.homeGoals : game.awayGoals) ?? 0;
+      const oppGoals = (isHome ? game.awayGoals : game.homeGoals) ?? 0;
+      const enGoals = game.goalEvents.filter((g) => g.teamId === teamId && g.emptyNet).length;
+      const effectiveTeamGoals = teamGoals - enGoals;
+      const margin = Math.max(0, effectiveTeamGoals - oppGoals);
+      const gsax = (s.xga ?? 0) - s.goalsAgainst;
+      const isSteal = s.decision === "W" && gsax > margin;
+      return {
+        id: s.playerId, name: s.player.name, slug: s.player.slug, started: s.started,
+        shotsAgainst: s.shotsAgainst, saves: s.saves, goalsAgainst: s.goalsAgainst,
+        conBefore: s.conBefore, conAfter: s.conAfter, fatigued: s.fatigued, decision: s.decision,
+        record: recOf.get(s.playerId) ?? { w: 0, l: 0, otl: 0 },
+        xga: s.xga,
+        isSteal,
+        hdShotsAg: s.hdShotsAg, hdSaves: s.hdSaves, mdShotsAg: s.mdShotsAg, mdSaves: s.mdSaves,
+        ldShotsAg: s.ldShotsAg, ldSaves: s.ldSaves,
+      };
+    })
     .sort((a, b) => Number(b.started) - Number(a.started));
 
   const [homeLines, awayLines] = await Promise.all([
