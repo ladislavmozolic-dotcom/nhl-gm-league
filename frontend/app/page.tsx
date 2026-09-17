@@ -147,7 +147,7 @@ export default async function HomePage() {
   const lastDay = await prisma.game.findFirst({ where: { season: activeSeason, status: "FINAL", seriesId: null, gameDate: { not: null } }, orderBy: { gameDate: "desc" }, select: { gameDate: true } });
   let ticker: { id: number; league: string; hg: number | null; ag: number | null; home: any; away: any }[] = [];
   let highlights: string[] = [];
-  let stars: { name: string; teamCode: string; logoUrl: string | null; g: number; a: number; pts: number }[] = [];
+  let stars: { id?: number; slug?: string | null; name: string; teamCode: string; teamSlug?: string | null; logoUrl: string | null; g: number; a: number; pts: number }[] = [];
   let dayGoals = 0, dayPoints = 0;
   if (lastDay?.gameDate) {
     const d = lastDay.gameDate;
@@ -170,7 +170,7 @@ export default async function HomePage() {
     const top3 = [...stats].sort((a, b) => b.points - a.points || b.goals - a.goals).slice(0, 3);
     const need = [...new Set([...notable, ...top3].map((s) => s.playerId))];
     if (need.length) {
-      const pById = new Map((await prisma.player.findMany({ where: { id: { in: need } }, select: { id: true, name: true, team: { select: { code: true, logoUrl: true } } } })).map((p) => [p.id, p]));
+      const pById = new Map((await prisma.player.findMany({ where: { id: { in: need } }, select: { id: true, name: true, slug: true, team: { select: { code: true, slug: true, logoUrl: true } } } })).map((p) => [p.id, p]));
       highlights = notable.map((n) => {
         const p = pById.get(n.playerId);
         const nm = cleanName(p?.name ?? "Player"); const tc = p?.team?.code ?? "";
@@ -179,7 +179,7 @@ export default async function HomePage() {
       });
       stars = top3.map((s) => {
         const p = pById.get(s.playerId);
-        return { name: cleanName(p?.name ?? "Player"), teamCode: p?.team?.code ?? "", logoUrl: p?.team?.logoUrl ?? null, g: s.goals, a: s.assists, pts: s.points };
+        return { id: s.playerId, slug: p?.slug ?? null, name: cleanName(p?.name ?? "Player"), teamCode: p?.team?.code ?? "", teamSlug: p?.team?.slug ?? null, logoUrl: p?.team?.logoUrl ?? null, g: s.goals, a: s.assists, pts: s.points };
       });
     }
   }
@@ -227,20 +227,51 @@ export default async function HomePage() {
         </div>
 
         {/* 3 Stars of the Day */}
-        <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg shadow-black/20">
-          <p className="text-xs uppercase tracking-wide text-slate-400 mb-2">{T("home.threeStars")}</p>
-          {stars.length === 0 ? <p className="text-sm text-slate-500">After the next sim.</p> : (
-            <div className="space-y-1.5">
-              {stars.map((s, i) => (
-                <div key={i} className="flex items-center gap-2 text-sm">
-                  <span className="text-amber-400 text-xs">{"★".repeat(3 - i)}</span>
-                  {s.logoUrl && <img src={s.logoUrl} alt="" className="w-4 h-4 object-contain" />}
-                  <span className="flex-1 truncate font-medium">{s.name}</span>
-                  <span className="text-slate-400 tabular-nums text-xs">{s.g}-{s.a}-{s.pts}</span>
-                </div>
-              ))}
+        <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg shadow-black/20 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs uppercase tracking-wide text-amber-400 font-bold flex items-center gap-1.5">
+                <span>⭐</span> {T("home.threeStars")}
+              </p>
+              <Link href="/players/three-stars" className="text-xs text-slate-400 hover:text-blue-400 transition-colors">
+                {T("ui.viewAll")}
+              </Link>
             </div>
-          )}
+            {stars.length === 0 ? <p className="text-sm text-slate-500 py-4 text-center">After the next sim.</p> : (
+              <div className="space-y-2.5">
+                {stars.map((s, i) => {
+                  const starIcons = i === 0 ? "★★★" : i === 1 ? "★★" : "★";
+                  const starColor = i === 0 ? "text-amber-400" : i === 1 ? "text-amber-300/90" : "text-amber-500/80";
+                  return (
+                    <div key={i} className="flex items-center justify-between gap-2.5 p-2 rounded-xl bg-slate-800/40 border border-slate-800/60 hover:bg-slate-800/70 transition-colors">
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <span className={`text-sm font-black tracking-tight shrink-0 w-7 text-center ${starColor}`} title={`${i + 1}. star`}>
+                          {starIcons}
+                        </span>
+                        {s.logoUrl && <img src={s.logoUrl} alt="" className="w-5 h-5 object-contain shrink-0" />}
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-semibold text-slate-100 truncate">
+                            {s.slug ? <Link href={`/players/${s.slug}`} className="hover:text-blue-400 transition-colors">{s.name}</Link> : s.name}
+                          </div>
+                          <div className="text-[11px] text-slate-400">
+                            {s.teamCode}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="text-sm font-bold text-amber-300 tabular-nums">
+                          {s.pts} <span className="text-[10px] font-semibold text-slate-400 uppercase">PTS</span>
+                        </div>
+                        <div className="text-[11px] text-slate-400 tabular-nums">
+                          {s.g}G + {s.a}A
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Trade Tracker — the latest completed deals around the league */}
