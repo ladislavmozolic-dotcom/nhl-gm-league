@@ -363,10 +363,10 @@ export default async function HomePage() {
                   return (
                     <div key={i} className="flex items-center justify-between gap-2.5 p-2 rounded-xl bg-slate-800/40 border border-slate-800/60 hover:bg-slate-800/70 transition-colors">
                       <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                        <span className={`text-sm font-black tracking-tight shrink-0 w-7 text-center ${starColor}`} title={`${i + 1}. star`}>
+                        <span className={`text-sm font-black tracking-tight shrink-0 w-8 text-center ${starColor}`} title={`${i + 1}. star`}>
                           {starIcons}
                         </span>
-                        {s.logoUrl && <img src={s.logoUrl} alt="" className="w-5 h-5 object-contain shrink-0" />}
+                        {s.logoUrl && <img src={s.logoUrl} alt="" className="w-5 h-5 object-contain shrink-0 ml-0.5" />}
                         <div className="min-w-0 flex-1">
                           <div className="text-sm font-semibold text-slate-100 truncate">
                             {s.slug ? <Link href={`/players/${s.slug}`} className="hover:text-blue-400 transition-colors">{s.name}</Link> : s.name}
