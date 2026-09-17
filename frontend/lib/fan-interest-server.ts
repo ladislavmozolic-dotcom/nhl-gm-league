@@ -8,6 +8,7 @@ import { prisma } from "./prisma";
 import { computeStandings } from "./sim/standings";
 import { teamStarPeaks } from "./star-power-server";
 import { fanInterest, type ExpectationTier, type FanInterest } from "./fan-interest";
+import { teamContentionMap } from "./free-agency-server";
 
 const SEASON = "2026-27";
 
@@ -15,34 +16,6 @@ export type TeamFan = {
   teamId: number; code: string | null; name: string;
   tier: ExpectationTier; star: { score: number; name: string } | null;
 } & FanInterest;
-
-/** Preseason expectation tier for every NHL club, by roster strength rank
- *  (top-9 overall as the core proxy). */
-async function expectationTiers(): Promise<Map<number, ExpectationTier>> {
-  const players = await prisma.player.findMany({
-    where: { rosterType: "NHL" },
-    select: { teamId: true, overall: true },
-  });
-  const byTeam = new Map<number, number[]>();
-  for (const p of players) {
-    if (p.teamId == null) continue;
-    const arr = byTeam.get(p.teamId) ?? [];
-    arr.push(p.overall ?? 60);
-    byTeam.set(p.teamId, arr);
-  }
-  const strength = [...byTeam.entries()].map(([teamId, ovrs]) => {
-    const core = ovrs.sort((a, b) => b - a).slice(0, 9);
-    return { teamId, s: core.reduce((t, x) => t + x, 0) / Math.max(1, core.length) };
-  });
-  strength.sort((a, b) => b.s - a.s);
-  const n = strength.length;
-  const tiers = new Map<number, ExpectationTier>();
-  strength.forEach((row, i) => {
-    const pct = i / Math.max(1, n);
-    tiers.set(row.teamId, pct < 0.25 ? "Championship Contender" : pct < 0.55 ? "Playoff Team" : pct < 0.80 ? "Bubble Team" : "Rebuilding Team");
-  });
-  return tiers;
-}
 
 /** Last-10 points and current streak per team, from finished games. */
 async function formAndStreak(): Promise<Map<number, { last10: number; streak: number }>> {
@@ -80,12 +53,12 @@ async function formAndStreak(): Promise<Map<number, { last10: number; streak: nu
 /** Fan Interest for every NHL club, sorted highest first. */
 export async function leagueFanInterest(): Promise<TeamFan[]> {
   const [standings, tiers, form, peaks] = await Promise.all([
-    computeStandings(SEASON, "NHL"), expectationTiers(), formAndStreak(), teamStarPeaks(),
+    computeStandings(SEASON, "NHL"), teamContentionMap(), formAndStreak(), teamStarPeaks(),
   ]);
   const half = Math.ceil(standings.length / 2);
 
   const rows: TeamFan[] = standings.map((s, rank) => {
-    const tier = tiers.get(s.teamId) ?? "Bubble Team";
+    const tier: ExpectationTier = tiers.get(s.teamId) ?? "middle";
     const f = form.get(s.teamId);
     const peak = peaks.get(s.teamId) ?? null;
     const fi = fanInterest({

@@ -1,27 +1,29 @@
 // Fan Interest + Expectations — the heart of the Detailed Finance system. Each
 // club carries a dynamic 0–100 Fan Interest that swings with results relative to
-// what the fans EXPECTED before the season. The same result lands differently:
+// what the fans expect from its current contention tier. The same result lands differently:
 // a contender bounced in round 1 disappoints; a rebuilder sneaking into the
 // playoffs delights. Pure — no DB.
 
-export type ExpectationTier = "Championship Contender" | "Playoff Team" | "Bubble Team" | "Rebuilding Team";
+import { CONTENTION_LABELS, type Contention } from "./free-agency";
 
-// The points % the fans expect from each preseason tier. Over/underperforming
+export type ExpectationTier = Contention;
+
+// The points % the fans expect from each contention tier. Over/underperforming
 // this is the single biggest driver of Fan Interest.
 export const EXPECTATION_PACE: Record<ExpectationTier, number> = {
-  "Championship Contender": 0.62,
-  "Playoff Team": 0.55,
-  "Bubble Team": 0.50,
-  "Rebuilding Team": 0.42,
+  contender: 0.62,
+  middle: 0.52,
+  rising: 0.48,
+  rebuild: 0.42,
 };
 
 // A hotter baseline for clubs the fans already rate — expectation stands in for
 // market heat since we don't model market size directly.
 const TIER_BASE: Record<ExpectationTier, number> = {
-  "Championship Contender": 72,
-  "Playoff Team": 64,
-  "Bubble Team": 56,
-  "Rebuilding Team": 48,
+  contender: 72,
+  middle: 60,
+  rising: 56,
+  rebuild: 48,
 };
 
 export type FanInterestInput = {
@@ -49,7 +51,7 @@ export function fanInterest(i: FanInterestInput): FanInterest {
 
   if (i.gp <= 0) {
     // preseason: nothing has happened yet — interest sits at the baseline
-    const reasons: string[] = [`Preseason expectation: ${i.tier}`];
+    const reasons: string[] = [`Team direction: ${CONTENTION_LABELS[i.tier]}`];
     if (starBump >= 6) reasons.push("Marquee star power on the roster");
     return { interest: baseline, baseline, delta: 0, reasons };
   }

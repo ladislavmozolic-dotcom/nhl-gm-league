@@ -326,6 +326,14 @@ export type LineSlot = "L1" | "L2" | "L3" | "L4" | "XF" | "P1" | "P2" | "P3" | "
 // A plain "rebuild" has none of that: just a bad team today with nothing coming.
 export type Contention = "contender" | "middle" | "rebuild" | "rising";
 
+/** Shared labels for the contention tiers used by Free Agency and Fan Interest. */
+export const CONTENTION_LABELS: Record<Contention, string> = {
+  contender: "Contender",
+  middle: "Middle of the pack",
+  rebuild: "Rebuild",
+  rising: "Rising — real 2–3yr window",
+};
+
 /** Where a player of `market` rating slots in on a team, given that team's
  *  same-position ratings (sorted desc). */
 export function slotForRank(grp: FaPos, rankFromTop: number): LineSlot {

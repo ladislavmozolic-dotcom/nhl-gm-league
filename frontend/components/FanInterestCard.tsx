@@ -2,13 +2,14 @@ import Link from "next/link";
 import { Card } from "@/components/ui";
 import InfoTip from "@/components/InfoTip";
 import { interestArrow, interestAccent, type ExpectationTier } from "@/lib/fan-interest";
+import { CONTENTION_LABELS } from "@/lib/free-agency";
 import type { TeamFan } from "@/lib/fan-interest-server";
 
 const tierAccent: Record<ExpectationTier, string> = {
-  "Championship Contender": "text-fuchsia-300",
-  "Playoff Team": "text-sky-300",
-  "Bubble Team": "text-amber-300",
-  "Rebuilding Team": "text-slate-400",
+  contender: "text-green-300",
+  middle: "text-slate-300",
+  rising: "text-sky-300",
+  rebuild: "text-amber-300",
 };
 
 /** A club's Fan Interest gauge — value, swing vs preseason baseline, expectation
@@ -28,8 +29,8 @@ export default function FanInterestCard({ fan, teamSlug }: { fan: TeamFan; teamS
           </div>
         </div>
         <div className="text-sm">
-          <div className="text-slate-400">Preseason expectation</div>
-          <div className={`font-semibold ${tierAccent[fan.tier]}`}>{fan.tier}</div>
+          <div className="text-slate-400">Team direction</div>
+          <div className={`font-semibold ${tierAccent[fan.tier]}`}>{CONTENTION_LABELS[fan.tier]}</div>
           {fan.star && <div className="mt-1 text-[12px] text-slate-500">Marquee: <span className="text-slate-300">{fan.star.name}</span> · {fan.star.score}</div>}
         </div>
       </div>
@@ -42,7 +43,7 @@ export default function FanInterestCard({ fan, teamSlug }: { fan: TeamFan; teamS
           </ul>
         </div>
       )}
-      {teamSlug && <Link href={`/finance/fan-interest`} className="mt-3 inline-block text-xs text-blue-400 hover:underline">League fan-interest board →</Link>}
+      {teamSlug && <Link href="/league/fan-interest" className="mt-3 inline-block text-xs text-blue-400 hover:underline">League fan-interest board →</Link>}
     </Card>
   );
 }

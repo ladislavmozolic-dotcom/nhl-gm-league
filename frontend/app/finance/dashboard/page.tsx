@@ -155,7 +155,7 @@ export default async function FinanceDashboardPage() {
 
       <div className="flex flex-wrap gap-2 text-xs pt-1">
         <span className="text-slate-500 py-1.5">League tables:</span>
-        {[["Fan Interest", "/finance/fan-interest"], ["Season Tickets", "/finance/season-tickets"], ["Attendance", "/finance/attendance"], ["Merchandise", "/finance/merchandise"], ["Sponsorship", "/finance/sponsorship"]].map(([l, h]) => (
+        {[["Fan Interest", "/league/fan-interest"], ["Season Tickets", "/finance/season-tickets"], ["Attendance", "/finance/attendance"], ["Merchandise", "/finance/merchandise"], ["Sponsorship", "/finance/sponsorship"]].map(([l, h]) => (
           <Link key={h} href={h} className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300">{l} →</Link>
         ))}
       </div>

@@ -44,10 +44,10 @@ export const DEFAULT_MENU: MenuItem[] = [
   ] },
   { key: "league", label: "League", href: "/league", children: [
     { label: "📖 Rules", href: "/rules" },
+    { label: "📣 Fan Interest", href: "/league/fan-interest" },
     { label: "💰 Finance", href: "/finance", children: [
       { label: "🏦 Finance (bank & income)", href: "/finance" },
       { label: "🧢 Salary Cap (Cap Central)", href: "/salary-cap" },
-      { label: "📣 Fan Interest — league", href: "/finance/fan-interest" },
       { label: "🎟️ Season Tickets — league", href: "/finance/season-tickets" },
       { label: "🏟️ Attendance — league", href: "/finance/attendance" },
       { label: "🛍️ Merchandise — league", href: "/finance/merchandise" },
