@@ -25,8 +25,8 @@ const COLS: Col[] = [
   { key: "shtPct", label: "SHT%", title: "Shooting %", num: true, format: "dec1" },
   { key: "xg", label: "xG", title: "Individual Expected Goals", num: true, format: "dec1" },
   { key: "blocks", label: "SB", title: "Shots Blocked", num: true },
-  { key: "toi", label: "TOI", title: "Total Time on Ice (minutes)", num: true, format: "dec1" },
-  { key: "mp", label: "TOI/GP", title: "Average Time on Ice per Game", num: true, format: "dec2" },
+  { key: "toi", label: "TOI", title: "Total Time on Ice", num: true, format: "minutesClock" },
+  { key: "mp", label: "TOI/GP", title: "Average Time on Ice per Game", num: true, format: "minutesClock" },
   { key: "ppGoals", label: "PPG", title: "Power-Play Goals", num: true },
   { key: "ppa", label: "PPA", title: "Power-Play Assists", num: true },
   { key: "ppp", label: "PPP", title: "Power-Play Points (PPG + PPA)", num: true },
@@ -51,8 +51,8 @@ const SITUATION_COLS: Col[] = [
   { key: "shtPct", label: "SHT%", title: "Shooting %", num: true, format: "dec1" },
   { key: "xg", label: "xG", title: "Individual Expected Goals", num: true, format: "dec1" },
   { key: "gax", label: "G-xG", title: "Goals Above Expected", num: true, format: "plusDec1" },
-  { key: "toi", label: "TOI", title: "Time on Ice in this situation", num: true, format: "dec1" },
-  { key: "mp", label: "TOI/GP", title: "Average situation TOI per Game", num: true, format: "dec2" },
+  { key: "toi", label: "TOI", title: "Time on Ice in this situation", num: true, format: "minutesClock" },
+  { key: "mp", label: "TOI/GP", title: "Average situation TOI per Game", num: true, format: "minutesClock" },
   { key: "p60", label: "P/60", title: "Points per 60 situation minutes", num: true, format: "dec2" },
 ];
 
