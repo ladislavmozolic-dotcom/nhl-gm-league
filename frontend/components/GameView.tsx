@@ -161,16 +161,16 @@ function GoalieBlock({ side }: { side: Side }) {
       {side.goalies.map((g) => {
         const con = g.conBefore != null && g.conAfter != null ? `${g.conBefore}→${g.conAfter}` : g.conAfter ?? "—";
         return (
-          <div key={g.id} className="flex items-center justify-between text-sm py-1.5 border-b border-slate-800/60">
-            <span className="flex items-center gap-2">
-              <Link href={`/players/${g.slug ?? g.id}`} className="font-semibold hover:text-blue-400">{g.name}</Link>
+          <div key={g.id} className="flex flex-wrap sm:flex-nowrap items-center justify-between text-sm py-1.5 border-b border-slate-800/60 gap-2">
+            <span className="flex items-center gap-2 flex-wrap">
+              <Link href={`/players/${g.slug ?? g.id}`} className="font-semibold hover:text-blue-400 whitespace-nowrap">{g.name}</Link>
               {g.record && (g.record.w + g.record.l + g.record.otl > 0) && (
-                <span className="text-[11px] text-slate-500 tabular-nums" title="Season record W-L-OTL (through this game)">{g.record.w}-{g.record.l}-{g.record.otl}</span>
+                <span className="text-[11px] text-slate-500 tabular-nums whitespace-nowrap" title="Season record W-L-OTL (through this game)">{g.record.w}-{g.record.l}-{g.record.otl}</span>
               )}
               {!g.started && <span className="text-[10px] uppercase text-slate-500 border border-slate-700 rounded px-1">backup</span>}
               {g.fatigued && <span className="text-[10px] uppercase text-amber-500 border border-amber-700/50 rounded px-1">b2b</span>}
             </span>
-            <span className="text-slate-300 tabular-nums text-right">
+            <span className="text-slate-300 tabular-nums text-right whitespace-nowrap">
               {g.started
                 ? <>{g.saves}/{g.shotsAgainst} · {(svp(g) * 100).toFixed(1)}% · {g.goalsAgainst} GA{g.decision && <span className={`ml-2 text-xs font-bold ${g.decision === "W" ? "text-green-400" : "text-slate-500"}`}>[{g.decision}]</span>}</>
                 : <span className="text-slate-500">DNP</span>}
@@ -225,7 +225,7 @@ function SkaterTable({ side }: { side: Side }) {
   const sortHead = (sortKey: SortKey, label: string, align: "left" | "right" = "right", title?: string) => {
     const active = sort.key === sortKey;
     return (
-      <th key={sortKey} className={`${align === "left" ? "text-left" : "text-right"} ${sortKey === "name" ? "py-1.5 pr-2" : "px-2"}`} aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}>
+      <th key={sortKey} className={`${align === "left" ? "text-left" : "text-right"} ${sortKey === "name" ? "py-1.5 pr-2 whitespace-nowrap" : "px-2 whitespace-nowrap"}`} aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}>
         <button type="button" onClick={() => chooseSort(sortKey)} title={title ?? `Sort by ${label}`} className={`inline-flex items-center gap-1 hover:text-slate-200 transition-colors ${active ? "text-sky-400" : ""}`}>
           {label}<span className={`text-[9px] w-2 ${active ? "opacity-100" : "opacity-0"}`} aria-hidden="true">{sort.dir === "asc" ? "▲" : "▼"}</span>
         </button>
@@ -247,8 +247,8 @@ function SkaterTable({ side }: { side: Side }) {
             const fo = s.faceoffWins + s.faceoffLosses ? `${s.faceoffWins}-${s.faceoffLosses}` : "—";
             return (
               <tr key={s.id} className="border-b border-slate-800/60 hover:bg-slate-800/30">
-                <td className="py-1.5 pr-2"><Link href={`/players/${s.slug ?? s.id}`} className="hover:text-blue-400">{s.name}</Link></td>
-                <td className="px-1 text-slate-500 text-xs">{s.position}</td>
+                <td className="py-1.5 pr-2 whitespace-nowrap"><Link href={`/players/${s.slug ?? s.id}`} className="hover:text-blue-400">{s.name}</Link></td>
+                <td className="px-1 text-slate-500 text-xs whitespace-nowrap">{s.position}</td>
                 <td className="px-2 text-right font-semibold tabular-nums">{s.goals}</td>
                 <td className="px-2 text-right font-semibold tabular-nums">{s.assists}</td>
                 <td className="px-2 text-right font-bold tabular-nums">{s.points}</td>
@@ -258,11 +258,11 @@ function SkaterTable({ side }: { side: Side }) {
                 <td className="px-2 text-right tabular-nums text-slate-300">{s.pim}</td>
                 <td className="px-2 text-right tabular-nums text-slate-300">{s.hits}</td>
                 <td className="px-2 text-right tabular-nums text-slate-300">{s.blocks}</td>
-                <td className="px-2 text-right tabular-nums text-slate-400">{fo}</td>
-                <td className="px-2 text-right tabular-nums text-slate-400">{mmss(s.toi)}</td>
-                <td className="px-2 text-right tabular-nums text-emerald-400/80" title="Power-play TOI">{s.ppToi ? mmss(s.ppToi) : "—"}</td>
-                <td className="px-2 text-right tabular-nums text-sky-400/80" title="Penalty-kill TOI">{s.pkToi ? mmss(s.pkToi) : "—"}</td>
-                <td className={`px-2 text-right tabular-nums ${s.conAfter != null && s.conAfter < 100 ? "text-amber-400" : "text-slate-600"}`}>{s.conAfter ?? "—"}</td>
+                <td className="px-2 text-right tabular-nums text-slate-400 whitespace-nowrap">{fo}</td>
+                <td className="px-2 text-right tabular-nums text-slate-400 whitespace-nowrap">{mmss(s.toi)}</td>
+                <td className="px-2 text-right tabular-nums text-emerald-400/80 whitespace-nowrap" title="Power-play TOI">{s.ppToi ? mmss(s.ppToi) : "—"}</td>
+                <td className="px-2 text-right tabular-nums text-sky-400/80 whitespace-nowrap" title="Penalty-kill TOI">{s.pkToi ? mmss(s.pkToi) : "—"}</td>
+                <td className={`px-2 text-right tabular-nums whitespace-nowrap ${s.conAfter != null && s.conAfter < 100 ? "text-amber-400" : "text-slate-600"}`}>{s.conAfter ?? "—"}</td>
               </tr>
             );
           })}
@@ -654,12 +654,30 @@ export default function GameView({ data }: { data: Data }) {
       >← Back</button>
 
       {/* scoreboard */}
-      <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
-        <div className="text-center text-xs font-bold text-amber-400 tracking-widest mb-4">{finalTag}</div>
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-6">
+      <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 sm:p-6">
+        <div className="text-center text-xs font-bold text-amber-400 tracking-widest mb-3 sm:mb-4">{finalTag}</div>
+        {/* Desktop view */}
+        <div className="hidden sm:grid sm:grid-cols-[1fr_auto_1fr] items-center gap-6">
           <TeamHeader side={data.away} align="left" />
           <div className="text-slate-600 font-bold">@</div>
           <TeamHeader side={data.home} align="right" />
+        </div>
+        {/* Mobile view */}
+        <div className="sm:hidden flex flex-col gap-2.5">
+          <div className="flex items-center justify-between gap-3 bg-slate-800/40 p-3 rounded-lg border border-slate-800/60">
+            <div className="flex items-center gap-3 min-w-0">
+              {data.away.logoUrl && <img src={data.away.logoUrl} alt="" className="w-10 h-10 object-contain shrink-0" />}
+              <Link href={`/teams/${data.away.slug}`} className="text-base font-bold hover:text-blue-400 truncate">{data.away.name}</Link>
+            </div>
+            <div className="text-2xl font-black tabular-nums shrink-0">{data.away.goals}</div>
+          </div>
+          <div className="flex items-center justify-between gap-3 bg-slate-800/40 p-3 rounded-lg border border-slate-800/60">
+            <div className="flex items-center gap-3 min-w-0">
+              {data.home.logoUrl && <img src={data.home.logoUrl} alt="" className="w-10 h-10 object-contain shrink-0" />}
+              <Link href={`/teams/${data.home.slug}`} className="text-base font-bold hover:text-blue-400 truncate">{data.home.name}</Link>
+            </div>
+            <div className="text-2xl font-black tabular-nums shrink-0">{data.home.goals}</div>
+          </div>
         </div>
       </div>
 
