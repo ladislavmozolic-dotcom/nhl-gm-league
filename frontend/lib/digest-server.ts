@@ -8,7 +8,20 @@ import { computeStandings } from "./sim/standings";
 import { recordThresholds } from "./records-server";
 
 export type DigestGame = { id: number; away: string; home: string; awaySlug: string | null; homeSlug: string | null; awayGoals: number; homeGoals: number; endedIn: string };
-export type NightPlayer = { name: string; slug: string | null; team: string | null; teamSlug: string | null; line: string };
+export type NightPlayer = {
+  name: string;
+  slug: string | null;
+  team: string | null;
+  teamSlug: string | null;
+  line: string;
+  goals?: number;
+  assists?: number;
+  points?: number;
+  saves?: number;
+  shotsAgainst?: number;
+  svPct?: number;
+  gsax?: number;
+};
 export type NightInjury = { name: string; slug: string | null; team: string | null; part: string; mechanism: string; severity: string; days: number; byName: string | null };
 export type DailyDigest = {
   season: string; round: number; date: string | null; gameCount: number;
@@ -133,6 +146,7 @@ export async function dailyDigest(season: string, round: number): Promise<DailyD
   const playerOfNight: NightPlayer | null = topSk ? {
     name: cleanName(topSk.player.name), slug: topSk.player.slug, team: teamOf.get(topSk.teamId)?.code ?? null, teamSlug: teamOf.get(topSk.teamId)?.slug ?? null,
     line: `${topSk.goals}G ${topSk.assists}A${topSk.points ? ` — ${topSk.points} point${topSk.points === 1 ? "" : "s"}` : ""}`,
+    goals: topSk.goals, assists: topSk.assists, points: topSk.points,
   } : null;
 
   // BEST GOALIE: top GSAx (xga - GA) among starters with a real workload.
@@ -141,6 +155,9 @@ export async function dailyDigest(season: string, round: number): Promise<DailyD
   const bestGoalie: NightPlayer | null = bg ? {
     name: cleanName(bg.player.name), slug: bg.player.slug, team: teamOf.get(bg.teamId)?.code ?? null, teamSlug: teamOf.get(bg.teamId)?.slug ?? null,
     line: `${bg.saves}/${bg.shotsAgainst} · ${((bg.saves / Math.max(1, bg.shotsAgainst)) * 100).toFixed(1)}% · ${(bg.xga - bg.goalsAgainst >= 0 ? "+" : "")}${(bg.xga - bg.goalsAgainst).toFixed(1)} GSAx`,
+    saves: bg.saves, shotsAgainst: bg.shotsAgainst,
+    svPct: bg.shotsAgainst > 0 ? (bg.saves / bg.shotsAgainst) * 100 : 0,
+    gsax: bg.xga - bg.goalsAgainst,
   } : null;
 
   // INJURIES + BIGGEST HIT (a hit that hurt someone — the most days lost).

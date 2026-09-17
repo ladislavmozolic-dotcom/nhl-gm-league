@@ -2090,27 +2090,48 @@ function simulateOvertime(st: SimState): { winner: number | null; seconds: numbe
   // PP/PK units rotate the bench rather than picking from all 18 skaters.
   const otUnits: Record<number, StUnit[]> = { [home.id]: resolveOtUnits(home), [away.id]: resolveOtUnits(away) };
   const otIdx: Record<number, number> = { [home.id]: 0, [away.id]: 0 };
-  const deployOt = (team: SimTeam) => {
+  const announceOtUnit = (team: SimTeam, seconds: number) => {
+    if (!CFG.playByPlayEnabled) return;
+    const oi = st.currentOnIce[team.id];
+    const names = [...oi.f, ...oi.d].map((s) => cleanName(s.name));
+    if (!names.length) return;
+    st.sink.emit({
+      period: 4, seconds, type: "LINE_CHANGE", teamId: team.id, teamCode: team.code ?? undefined,
+      importance: "MINOR",
+      meta: { unit: "OT", label: `OT${otIdx[team.id] + 1}`, names },
+    });
+  };
+  const deployOt = (team: SimTeam, seconds: number) => {
     const unit = otUnits[team.id][otIdx[team.id]];
     const f = unit.f.filter((s) => !st.injured.has(s.id));
     const d = unit.d.filter((s) => !st.injured.has(s.id));
     if (f.length || d.length) st.currentOnIce[team.id] = { f, d };
     else setFreshUnitOT(st, team); // the whole deployed trio is hurt (rare) — sample fresh from who's left
+    announceOtUnit(team, seconds);
   };
-  const rotateOt = (team: SimTeam) => {
+  const rotateOt = (team: SimTeam, seconds: number) => {
     const units = otUnits[team.id];
     if (units.length > 1) {
       const w = OT_UNIT_WEIGHTS.map((x, i) => (i === otIdx[team.id] ? 0 : x));
       otIdx[team.id] = rng.weighted(w);
     }
-    deployOt(team);
+    deployOt(team, seconds);
   };
-  deployOt(home); deployOt(away);
+  // OT used to update currentOnIce silently, so the full play-by-play showed no
+  // 3-on-3 units at all. Announce the opening trios and every subsequent change,
+  // just like the possession loop does for regulation lines.
+  deployOt(home, 0); deployOt(away, 0);
+  let hasOtShot = false;
+  // A 5-minute period with literally no recorded action made the engine look as
+  // though it had skipped OT. Keep the normal stochastic chance model, but if it
+  // has produced no shot by the final 15 seconds, guarantee one attempt. The side
+  // is chosen up front so the fallback does not create a home-team bias.
+  const fallbackShooterId = rng.chance(0.5) ? home.id : away.id;
   for (let t = step; t <= OT_SECONDS; t += step) {
     // bench change every 15s, same cadence the injury roll already used —
     // rotate BEFORE the injury check so it rolls against whoever is actually
     // deployed this interval, not last interval's trio.
-    rotateOt(home); rotateOt(away);
+    rotateOt(home, t); rotateOt(away, t);
     for (const team of [home, away]) {
       const opp = team === home ? away : home;
       const oi = st.currentOnIce[team.id];
@@ -2125,7 +2146,8 @@ function simulateOvertime(st: SimState): { winner: number | null; seconds: numbe
     for (const [att, def, isHome] of [[home, away, true], [away, home, false]] as const) {
       // 3-on-3 is wide open: elevated chance rate scaled by offense
       const rate = 0.07 * (att.offenseRating / LEAGUE.avgOffense);
-      if (!rng.chance(rate)) continue;
+      const fallbackAttempt = !hasOtShot && t === OT_SECONDS - step && att.id === fallbackShooterId;
+      if (!fallbackAttempt && !rng.chance(rate)) continue;
       // the injury roll just above can hurt someone from this very on-ice set,
       // so re-filter rather than trusting deployOt's snapshot from this tick.
       const attOnIce = [...st.currentOnIce[att.id].f, ...st.currentOnIce[att.id].d].filter((s) => !st.injured.has(s.id));
@@ -2134,6 +2156,7 @@ function simulateOvertime(st: SimState): { winner: number | null; seconds: numbe
       const { sector, shotType } = shotProfile(rng, { isDefense: shooter.isDefense, setup: "carry", danger: 1.25 });
       const xg = expectedGoal(rng, sector, shotType, "EV");
       const tracked = trackSpecialShot(st, att, def, shooter, 4, t, sector, shotType, xg, true, "3V3");
+      hasOtShot = true;
       const p = conversion(shooter.offense, effGoalieQuality(liveGoalie(st, def)), isHome, "EV") * 2.2;
       if (rng.chance(p)) {
         tracked.goalie!.goalsAgainst++;

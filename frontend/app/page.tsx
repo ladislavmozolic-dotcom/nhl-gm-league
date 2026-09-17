@@ -71,6 +71,8 @@ export default async function HomePage() {
     prisma.team.findMany({ select: { id: true, name: true, code: true, logoUrl: true, gm: true, gmNickname: true, gmFirstName: true, gmLastName: true, slug: true } }),
   ]);
   const teamById = new Map(teams.map((t) => [t.id, t]));
+  const teamByCode = new Map(teams.map((t) => [t.code ?? t.name, t]));
+  const teamBySlug = new Map(teams.map((t) => [t.slug, t]));
   const leader = standings[0];
 
   // commissioner announcements + this GM's unread state (their "DM" inbox)
@@ -205,6 +207,7 @@ export default async function HomePage() {
   const myNextGame = me != null
     ? await prisma.game.findFirst({
         where: {
+          season: activeSeason,
           status: "SCHEDULED",
           seriesId: null,
           gameDate: { not: null },
@@ -430,30 +433,132 @@ export default async function HomePage() {
         </Link>
 
         {/* Tonight's Best — the story of the night, straight from our league */}
-        <Link href="/league/digest" className="block bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg shadow-black/20 hover:border-amber-500/40 transition-colors">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs uppercase tracking-wide text-amber-400">🌙 {T("home.tonightsBest")}</p>
-            <span className="text-xs text-slate-400">{T("home.storyOfNight")}</span>
-          </div>
-          {digest && digest.gameCount > 0 ? (
-            <div className="space-y-1.5 text-sm">
-              {digest.gameOfNight && (
-                <p className="text-slate-200"><span className="text-amber-400">🌟</span> {digest.gameOfNight.away} {digest.gameOfNight.awayGoals}–{digest.gameOfNight.homeGoals} {digest.gameOfNight.home}{digest.gameOfNight.endedIn !== "REG" ? <span className="text-amber-400"> ({digest.gameOfNight.endedIn})</span> : ""} <span className="text-slate-500">· Game of the Night</span></p>
-              )}
-              {digest.playerOfNight && (
-                <p className="text-slate-200"><span className="text-sky-400">⭐</span> {digest.playerOfNight.name} <span className="text-slate-500">({digest.playerOfNight.team})</span> — {digest.playerOfNight.line}</p>
-              )}
-              {digest.bestGoalie && (
-                <p className="text-slate-200 truncate"><span className="text-emerald-400">🧤</span> {digest.bestGoalie.name} <span className="text-slate-500">({digest.bestGoalie.team})</span> — {digest.bestGoalie.line}</p>
-              )}
-              {!digest.gameOfNight && !digest.playerOfNight && !digest.bestGoalie && (
-                <p className="text-slate-500">Highlights appear here after each simulation.</p>
-              )}
+        <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg shadow-black/20 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs uppercase tracking-wide text-amber-400 font-bold flex items-center gap-1.5">
+                <span>🌙</span> {T("home.tonightsBest")}
+              </p>
+              <Link href="/league/digest" className="text-xs text-slate-400 hover:text-blue-400 transition-colors">
+                {T("ui.viewAll")}
+              </Link>
             </div>
-          ) : (
-            <p className="text-sm text-slate-500">The night&apos;s best — Game &amp; Player of the Night, upsets, biggest hits — appear here after each simulation.</p>
-          )}
-        </Link>
+            {digest && digest.gameCount > 0 && (digest.gameOfNight || digest.playerOfNight || digest.bestGoalie) ? (
+              <div className="space-y-2.5">
+                {/* 1. Game of the Night */}
+                {digest.gameOfNight && (() => {
+                  const gon = digest.gameOfNight;
+                  const aTeam = gon.awaySlug ? teamBySlug.get(gon.awaySlug) : (gon.away ? teamByCode.get(gon.away) : null);
+                  const hTeam = gon.homeSlug ? teamBySlug.get(gon.homeSlug) : (gon.home ? teamByCode.get(gon.home) : null);
+                  return (
+                    <Link
+                      href={`/games/${gon.id}`}
+                      className="flex items-center justify-between gap-2.5 p-2 rounded-xl bg-slate-800/40 border border-slate-800/60 hover:bg-slate-800/70 transition-colors group"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <span className="text-sm font-black tracking-tight shrink-0 w-7 text-center text-amber-400" title="Game of the Night">
+                          🌟
+                        </span>
+                        <div className="flex items-center -space-x-1.5 shrink-0">
+                          {aTeam?.logoUrl ? (
+                            <img src={aTeam.logoUrl} alt="" className="w-5 h-5 object-contain relative z-10" />
+                          ) : (
+                            <span className="text-xs font-bold text-slate-400">{gon.away}</span>
+                          )}
+                          {hTeam?.logoUrl && (
+                            <img src={hTeam.logoUrl} alt="" className="w-5 h-5 object-contain" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-semibold text-slate-100 truncate group-hover:text-blue-400 transition-colors">
+                            {gon.away} <span className="text-slate-500 font-normal">@</span> {gon.home}
+                          </div>
+                          <div className="text-[11px] text-slate-400 truncate">
+                            Game of the Night
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="text-sm font-bold text-amber-300 tabular-nums">
+                          {gon.awayGoals} : {gon.homeGoals}
+                        </div>
+                        <div className="text-[11px] text-slate-400 uppercase font-semibold">
+                          {gon.endedIn !== "REG" ? gon.endedIn : "FINAL"}
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })()}
+
+                {/* 2. Player of the Night */}
+                {digest.playerOfNight && (() => {
+                  const pon = digest.playerOfNight;
+                  const pTeam = pon.teamSlug ? teamBySlug.get(pon.teamSlug) : (pon.team ? teamByCode.get(pon.team) : null);
+                  return (
+                    <div className="flex items-center justify-between gap-2.5 p-2 rounded-xl bg-slate-800/40 border border-slate-800/60 hover:bg-slate-800/70 transition-colors">
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <span className="text-sm font-black tracking-tight shrink-0 w-7 text-center text-sky-400" title="Player of the Night">
+                          ⭐
+                        </span>
+                        {pTeam?.logoUrl && <img src={pTeam.logoUrl} alt="" className="w-5 h-5 object-contain shrink-0" />}
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-semibold text-slate-100 truncate">
+                            {pon.slug ? <Link href={`/players/${pon.slug}`} className="hover:text-blue-400 transition-colors">{pon.name}</Link> : pon.name}
+                          </div>
+                          <div className="text-[11px] text-slate-400">
+                            {pon.team ?? "Player of the Night"}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="text-sm font-bold text-sky-300 tabular-nums">
+                          {pon.points != null ? `${pon.points} PTS` : pon.line}
+                        </div>
+                        <div className="text-[11px] text-slate-400 tabular-nums">
+                          {pon.goals != null && pon.assists != null ? `${pon.goals}G + ${pon.assists}A` : "Top Performer"}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* 3. Goalie of the Night */}
+                {digest.bestGoalie && (() => {
+                  const bg = digest.bestGoalie;
+                  const gTeam = bg.teamSlug ? teamBySlug.get(bg.teamSlug) : (bg.team ? teamByCode.get(bg.team) : null);
+                  return (
+                    <div className="flex items-center justify-between gap-2.5 p-2 rounded-xl bg-slate-800/40 border border-slate-800/60 hover:bg-slate-800/70 transition-colors">
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <span className="text-sm font-black tracking-tight shrink-0 w-7 text-center text-emerald-400" title="Goalie of the Night">
+                          🧤
+                        </span>
+                        {gTeam?.logoUrl && <img src={gTeam.logoUrl} alt="" className="w-5 h-5 object-contain shrink-0" />}
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-semibold text-slate-100 truncate">
+                            {bg.slug ? <Link href={`/players/${bg.slug}`} className="hover:text-blue-400 transition-colors">{bg.name}</Link> : bg.name}
+                          </div>
+                          <div className="text-[11px] text-slate-400">
+                            {bg.team ?? "Best Goalie"}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="text-sm font-bold text-emerald-300 tabular-nums">
+                          {bg.svPct != null ? `${bg.svPct.toFixed(1)}%` : bg.line}
+                        </div>
+                        <div className="text-[11px] text-slate-400 tabular-nums">
+                          {bg.saves != null && bg.shotsAgainst != null ? `${bg.saves}/${bg.shotsAgainst} SVS` : "Top Goalie"}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            ) : (
+              <p className="text-sm text-slate-500 py-4 text-center">After the next sim.</p>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* 3 columns */}
