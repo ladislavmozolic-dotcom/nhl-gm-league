@@ -1062,6 +1062,7 @@ function chunk<T>(arr: T[], n: number): T[][] {
 type ShiftState = {
   fLines: SimSkater[][]; dPairs: SimSkater[][];
   fWeights: number[]; dWeights: number[];
+  fCenterIds: Array<number | undefined>;
   fIdx: number; dIdx: number; fElapsed: number; dElapsed: number;
   fTopIdx: number; fCheckIdx: number; // which fLines index is this team's top-scoring / most defensive trio
 };
@@ -1112,21 +1113,27 @@ function buildShifts(team: SimTeam): ShiftState {
       .map((unit) => ({
         players: unit.members.map((id) => byId.get(id)).filter((s): s is SimSkater => !!s),
         weight: Math.max(0, unit.timePct ?? 0),
+        centerId: unit.centerId,
       }))
       .filter((x) => x.players.length >= size - 1);
     if (u.length) return {
       lines: u.map((x) => x.players),
       weights: u.map((x, i) => x.weight || defaults[i] || 1),
+      centerIds: u.map((x) => x.centerId),
     };
     const lines = isDef ? chunk([...fallback].sort((a, b) => b.iceTime - a.iceTime), size) : buildForwardLines(fallback);
-    return { lines, weights: lines.map((_, i) => defaults[i] ?? 1) };
+    return {
+      lines,
+      weights: lines.map((_, i) => defaults[i] ?? 1),
+      centerIds: lines.map((line) => line.find((s) => s.isCenter)?.id),
+    };
   };
   const f = res(false, 3, team.forwards, [35, 30, 25, 10]);
   const d = res(true, 2, team.defense, [40, 35, 25]);
   const fLines = f.lines;
   const { topIdx: fTopIdx, checkIdx: fCheckIdx } = classifyLines(fLines);
   return {
-    fLines, dPairs: d.lines, fWeights: f.weights, dWeights: d.weights,
+    fLines, dPairs: d.lines, fWeights: f.weights, dWeights: d.weights, fCenterIds: f.centerIds,
     fIdx: 0, dIdx: 0, fElapsed: 0, dElapsed: 0, fTopIdx, fCheckIdx,
   };
 }
@@ -1329,8 +1336,10 @@ function simulatePeriodPossession(st: SimState, period: number) {
   // forwards → LW · C · RW (one designated centre in the middle; extra natural
   // centres show as wings); defence → the pair as-is. Names are cleaned of the
   // captaincy / clause tags baked into the DB name string.
-  const fwdNames = (line: SimSkater[]) => {
-    const pivot = line.find((s) => s.isCenter) ?? null;
+  const fwdNames = (team: SimTeam, line: SimSkater[]) => {
+    const sh = shifts[team.id];
+    const designated = curStr[team.id] === "EV" ? sh.fCenterIds[sh.fIdx] : undefined;
+    const pivot = line.find((s) => s.id === designated) ?? line.find((s) => s.isCenter) ?? null;
     const wings = line.filter((s) => s !== pivot);
     const order = pivot ? [wings[0], pivot, wings[1], ...wings.slice(2)].filter(Boolean) as SimSkater[] : line;
     return order.map((s) => `${cleanName(s.name)}${s === pivot ? " (C)" : ""}`);
@@ -1356,7 +1365,7 @@ function simulatePeriodPossession(st: SimState, period: number) {
       st.sink.emit({
         period, seconds: tick, type: "LINE_CHANGE", teamId: team.id, teamCode: team.code ?? undefined,
         importance: "MINOR",
-        meta: { unit: kind, label, names: kind === "F" ? fwdNames(line) : defNames(line) },
+        meta: { unit: kind, label, names: kind === "F" ? fwdNames(team, line) : defNames(line) },
       });
     };
     // Re-announce on any PERSONNEL change, not just a label/unit change — a mid-shift
@@ -1475,7 +1484,11 @@ function simulatePeriodPossession(st: SimState, period: number) {
       // ice with the best FO takes it there regardless of listed position.
       const bestFo = (pool: SimSkater[]) => pool.length ? pool.reduce((best, s) => ((s.attrs.fo ?? 50) > (best.attrs.fo ?? 50) ? s : best)) : null;
       const pickCenter = (team: SimTeam, oi: SimSkater[]) => {
-        if (curStr[team.id] === "EV") return oi.find((s) => s.isCenter) ?? bestFo(oi) ?? team.forwards[0] ?? team.defense[0];
+        if (curStr[team.id] === "EV") {
+          const sh = shifts[team.id];
+          const designated = sh.fCenterIds[sh.fIdx];
+          return oi.find((s) => s.id === designated) ?? oi.find((s) => s.isCenter) ?? bestFo(oi) ?? team.forwards[0] ?? team.defense[0];
+        }
         return bestFo(oi) ?? bestFo(onIceD(team)) ?? team.forwards[0] ?? team.defense[0];
       };
       const hC = pickCenter(home, onIceF(home));
@@ -2124,13 +2137,19 @@ function simulateShootout(st: SimState): number {
 
 function simulateFaceoffs(st: SimState) {
   const centers = (t: SimTeam) => {
+    const byId = new Map(t.forwards.map((f) => [f.id, f]));
+    const assigned = t.units
+      .filter((u) => !u.isDef && u.centerId != null)
+      .map((u) => ({ player: byId.get(u.centerId!), weight: Math.max(1, u.timePct ?? 1) }))
+      .filter((x): x is { player: SimSkater; weight: number } => !!x.player);
+    if (assigned.length) return assigned;
     const c = t.forwards.filter((f) => f.isCenter);
-    return c.length ? c : t.forwards;
+    return (c.length ? c : t.forwards).map((player) => ({ player, weight: Math.max(0.01, player.iceTime) }));
   };
   const hC = centers(st.home), aC = centers(st.away);
   for (let i = 0; i < LEAGUE.faceoffsPerGame; i++) {
-    const h = hC[st.rng.weighted(hC.map((s) => s.iceTime))];
-    const a = aC[st.rng.weighted(aC.map((s) => s.iceTime))];
+    const h = hC[st.rng.weighted(hC.map((x) => x.weight))].player;
+    const a = aC[st.rng.weighted(aC.map((x) => x.weight))].player;
     const pHome = h.faceoff / (h.faceoff + a.faceoff);
     if (st.rng.chance(pHome)) {
       st.box[st.home.id].faceoffWins++; st.box[st.away.id].faceoffLosses++;

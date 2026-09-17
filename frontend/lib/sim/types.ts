@@ -50,6 +50,8 @@ export type LineUnit = {
   sig: string;
   members: number[];
   isDef: boolean;
+  /** Player explicitly assigned to the C slot in Lines (5v5 forward units only). */
+  centerId?: number;
   /** GM-set share of even-strength ice time. Undefined for generated/fallback units. */
   timePct?: number;
 };
