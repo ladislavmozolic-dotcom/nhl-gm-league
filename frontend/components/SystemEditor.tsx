@@ -5,7 +5,6 @@ import {
   resolveTactics, PRESETS, DIAL_LABELS, EFFECT_DESC, mergeTactics,
   type TeamTactics, type RosterProfile, type Tempo, type Forecheck, type PuckStyle, type DZone,
 } from "@/lib/sim/tactics";
-import { saveSystem } from "@/app/teams/[slug]/tactics/actions";
 import { useT, useLang } from "@/components/LangProvider";
 import { dialLabel, dialDesc } from "@/lib/tactics-i18n";
 
@@ -53,7 +52,12 @@ export default function SystemEditor({ teamId, profile, initial, coachEx = 70 }:
   const applyPreset = (name: string) => { setTac(mergeTactics(PRESETS[name])); setSaved(false); setError(null); };
   const save = () => start(async () => {
     try {
-      const res = await saveSystem(teamId, tac);
+      const response = await fetch(`/api/teams/${teamId}/tactics`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(tac),
+      });
+      const res = await response.json() as { ok: true; tactics: TeamTactics } | { ok: false; error?: string };
       if (res.ok) {
         setTac(res.tactics);
         setSaved(true);
