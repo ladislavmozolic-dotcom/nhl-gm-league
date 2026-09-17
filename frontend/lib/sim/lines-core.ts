@@ -186,7 +186,7 @@ export function autoLines(skaters: Skater[], goalies: Goalie[] = []): TeamLinesD
  * AT MOST ONCE across the four forward lines and the three D pairs — no
  * double-shifting. If the roster is too thin to fill all twelve forward / six
  * defence slots, the extra slots are left EMPTY (a call-up prompt) rather than
- * repeating a body. Game-day completeness is handled separately by deployDistinct.
+ * repeating a body. Game-day completeness is handled separately by deployConfiguredLines.
  */
 export function autoFill(data: TeamLinesData, skaters: Skater[], goalies: Goalie[] = []): TeamLinesData {
   const d = structuredClone(data);
@@ -366,33 +366,20 @@ export function autoFill(data: TeamLinesData, skaters: Skater[], goalies: Goalie
 }
 
 /**
- * Force a legal, fully-distinct 5v5 deployment onto a set of lines: the dressed
- * forwards spread one-each across the 4 forward lines (12 DIFFERENT forwards),
- * and the dressed D across the 3 pairs (6 different). A manager may repeat a star
- * (a double-shift) or leave depth players out — STHS still dresses 12 different
- * forwards every night, so any duplicate / empty / non-dressed slot is swapped
- * for an un-deployed dressed skater (best-first). On a thin roster the distinct
- * pool runs out and the last slots fall back to a double-shift (a body in two
- * slots, never twice in one unit) so the lineup is always complete and no game
- * is ever skipped. `dressedF` / `dressedD` must be ordered best-first. Mutates
- * and returns `lines`. Used by BOTH the sim (loadSimTeam) and the Lines display
- * so what you see is exactly what was iced.
+ * Reconcile the GM's 5v5 deployment with the dressed roster. A deliberate
+ * double-shift across DIFFERENT lines is preserved (e.g. a star on line 1 and
+ * line 4). Only an invalid/missing player, or the same player occupying two
+ * positions inside one trio/pair, is replaced. The club still dresses a legal
+ * 12F/6D roster; the GM decides which of those players receive line slots.
  */
-export function deployDistinct(lines: TeamLinesData, dressedF: number[], dressedD: number[]): TeamLinesData {
+export function deployConfiguredLines(lines: TeamLinesData, dressedF: number[], dressedD: number[]): TeamLinesData {
   const fill = (units: Array<Record<string, number | null>>, slots: string[], dressed: number[]) => {
-    const seen = new Set<number>();
     const ok = new Set(dressed);
-    for (const u of units) for (const k of slots) {
-      const id = u[k];
-      if (id != null && ok.has(id) && !seen.has(id)) { seen.add(id); continue; }
-      const next = dressed.find((d) => !seen.has(d)) ?? null;
-      u[k] = next; if (next != null) seen.add(next);
-    }
-    // emergency double-shift for thin rosters — never leave a slot empty
     for (const u of units) {
-      const inUnit = new Set(slots.map((k) => u[k]).filter((x): x is number => x != null));
+      const inUnit = new Set<number>();
       for (const k of slots) {
-        if (u[k] != null) continue;
+        const id = u[k];
+        if (id != null && ok.has(id) && !inUnit.has(id)) { inUnit.add(id); continue; }
         const next = dressed.find((d) => !inUnit.has(d)) ?? dressed[0] ?? null;
         u[k] = next; if (next != null) inUnit.add(next);
       }

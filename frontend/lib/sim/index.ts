@@ -3,7 +3,7 @@
 import { prisma } from "../prisma";
 import { buildSkater, buildGoalie, buildTeam } from "./ratings";
 import { simulateGame } from "./engine";
-import { loadTeamLines, loadTeamSystem, autoLines, deployDistinct } from "./lines";
+import { loadTeamLines, loadTeamSystem, autoLines, deployConfiguredLines } from "./lines";
 import type { SimTeam, SkaterAttrs, GoalieAttrs } from "./types";
 import type { TeamLinesData } from "./lines-core";
 
@@ -106,14 +106,14 @@ export async function loadSimTeam(teamId: number, rosterType?: string, opts?: { 
     const sideOf = (p: typeof skaterRows[number]) => lineSide.get(p.id) ?? (isDef(p.position) ? "D" : "F");
     const fwds = skaterRows.filter((p) => sideOf(p) === "F").sort(rank);
     const defs = skaterRows.filter((p) => sideOf(p) === "D").sort(rank);
-    // Guarantee a FULLY DISTINCT lineup: 12 different forwards + 6 different D, so
-    // no NHL skater is iced in two units. FORWARDS come first (the priority: 12
-    // different forwards every night); each role fills by natural position, then
+    // Guarantee a fully staffed active game roster: 12 forwards + 6 D. The GM may
+    // still double-shift one of them across two line units; this block only chooses
+    // which 18 distinct skaters are available to dress. Each role fills by natural position, then
     // tops up any shortfall from the leftover pool regardless of position — a
     // spare D covers wing, a spare forward covers a pair, off-position but a real
     // distinct body. Works whenever the club can dress 18 skaters (call-ups from
     // the farm bring it there); only a genuinely depleted org (<18 healthy skaters
-    // across the whole system) falls back to a double-shift in deployDistinct.
+    // across the whole system) may require emergency reuse in deployConfiguredLines.
     const dressedF = fwds.slice(0, MIN_F);
     const dressedD = defs.slice(0, MIN_D);
     const used = new Set([...dressedF, ...dressedD].map((p) => p.id));
@@ -189,12 +189,9 @@ export async function loadSimTeam(teamId: number, rosterType?: string, opts?: { 
     skaterRows.map((p) => ({ id: p.id, position: p.position ?? "C", overall: p.overall ?? 50, shoots: p.shoots, df: p.df })),
     goalieRows.map((g) => ({ id: g.id, overall: g.overall ?? 50 })),
   );
-  // Guarantee a legal, fully-distinct 5v5 deployment (12 different forwards + 6
-  // different D). Same helper the Lines display uses, so what's iced == what's
-  // shown. See deployDistinct for the double-shift / thin-roster handling.
-  // Deploy from the slot assignment computed above (spare-D-at-wing included in
-  // deployFwdIds), so what's iced is exactly 12 different forwards + 6 different D.
-  deployDistinct(lines, deployFwdIds, deployDefIds);
+  // Preserve the GM's deliberate double-shifts across different units while
+  // replacing only stale/invalid ids or a duplicate inside one trio/pair.
+  deployConfiguredLines(lines, deployFwdIds, deployDefIds);
   // current line chemistry (unit signature -> value); unseen units start at chemBase
   let chemistry: Record<string, number> = {};
   {

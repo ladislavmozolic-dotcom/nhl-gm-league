@@ -180,21 +180,16 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
     );
   };
 
-  // 5v5 must use 18 distinct skaters because the sim deploys four separate
-  // trios and three separate pairs. Special-team units only forbid a duplicate
-  // inside the same unit; reusing a player on PP1 and PK1 is legitimate.
+  // A player may deliberately double-shift on two different lines. The invalid
+  // case is occupying two positions inside the SAME line/pair/unit.
   const dupes = useMemo(() => {
     const bad = new Set<string>();
     const scan = (ids: (number | null)[]) => {
       const seen = new Set<number>();
       for (const id of ids) if (id != null) { if (seen.has(id)) bad.add(nameOf(id)); seen.add(id); }
     };
-    scan(data.forwardLines.flatMap((l) => [l.lw, l.c, l.rw]));
-    scan(data.defensePairs.flatMap((p) => [p.ld, p.rd]));
-    scan([
-      ...data.forwardLines.flatMap((l) => [l.lw, l.c, l.rw]),
-      ...data.defensePairs.flatMap((p) => [p.ld, p.rd]),
-    ]);
+    for (const l of data.forwardLines) scan([l.lw, l.c, l.rw]);
+    for (const p of data.defensePairs) scan([p.ld, p.rd]);
     for (const key of ["pp", "pp4", "fourVFour", "pk4", "pk3", "overtime"] as const)
       for (const u of data.situations[key]) scan(u.players);
     return [...bad];
@@ -289,30 +284,8 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
   };
 
   // ---------- section renderers ----------
-  const setFwd = (i: number, slot: "lw" | "c" | "rw", v: number | null) => change((d) => {
-    const old = d.forwardLines[i][slot];
-    if (v != null && v !== old) {
-      let swapped = false;
-      d.forwardLines.forEach((line, li) => (["lw", "c", "rw"] as const).forEach((key) => {
-        if (li === i && key === slot) return;
-        if (line[key] === v) { line[key] = swapped ? null : old; swapped = true; }
-      }));
-      d.defensePairs.forEach((pair) => (["ld", "rd"] as const).forEach((key) => { if (pair[key] === v) pair[key] = null; }));
-    }
-    d.forwardLines[i][slot] = v;
-  });
-  const setDef = (i: number, slot: "ld" | "rd", v: number | null) => change((d) => {
-    const old = d.defensePairs[i][slot];
-    if (v != null && v !== old) {
-      let swapped = false;
-      d.defensePairs.forEach((pair, pi) => (["ld", "rd"] as const).forEach((key) => {
-        if (pi === i && key === slot) return;
-        if (pair[key] === v) { pair[key] = swapped ? null : old; swapped = true; }
-      }));
-      d.forwardLines.forEach((line) => (["lw", "c", "rw"] as const).forEach((key) => { if (line[key] === v) line[key] = null; }));
-    }
-    d.defensePairs[i][slot] = v;
-  });
+  const setFwd = (i: number, slot: "lw" | "c" | "rw", v: number | null) => change((d) => { d.forwardLines[i][slot] = v; });
+  const setDef = (i: number, slot: "ld" | "rd", v: number | null) => change((d) => { d.defensePairs[i][slot] = v; });
 
   // per-line tactic (PHY/DF/OF; each row must total 5). tac() supplies the neutral
   // baseline for any line that has no tactic yet (legacy / newly added).

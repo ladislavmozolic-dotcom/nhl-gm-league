@@ -74,7 +74,17 @@ export async function saveTeamLines(teamId: number, data: TeamLinesData, opts: {
   if (opts.strict && (normalized.forwardLines.length !== 4 || fIds.some((id) => id == null))) throw new Error("Fill all 12 forward slots before saving.");
   if (opts.strict && (normalized.defensePairs.length !== 3 || dIds.some((id) => id == null))) throw new Error("Fill all 6 defense slots before saving.");
   const fiveOnFive = [...fIds, ...dIds].filter((id): id is number => id != null);
-  if (opts.strict && new Set(fiveOnFive).size !== fiveOnFive.length) throw new Error("Each player can appear only once in the 5v5 lineup.");
+  const duplicateInsideUnit = [
+    ...normalized.forwardLines.map((l) => [l.lw, l.c, l.rw]),
+    ...normalized.defensePairs.map((p) => [p.ld, p.rd]),
+  ].some((unit) => {
+    const ids = unit.filter((id): id is number => id != null);
+    return new Set(ids).size !== ids.length;
+  });
+  if (opts.strict && duplicateInsideUnit) throw new Error("A player cannot occupy two positions in the same line or pair.");
+  const isDefense = (position: string) => /(^|\/)D(\/|$)/.test(position) || position === "D";
+  if (opts.strict && skaters.filter((p) => !isDefense(p.position)).length < 12) throw new Error("The active roster must contain at least 12 forwards.");
+  if (opts.strict && skaters.filter((p) => isDefense(p.position)).length < 6) throw new Error("The active roster must contain at least 6 defensemen.");
   const activeIds = new Set(skaters.map((p) => p.id));
   if (opts.strict && fiveOnFive.some((id) => !activeIds.has(id))) throw new Error("The lineup contains a player who is no longer on the active roster. Reload Lines and try again.");
 

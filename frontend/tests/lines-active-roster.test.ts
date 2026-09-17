@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { autoFill, autoLines, normalize } from "../lib/sim/lines-core";
+import { autoFill, autoLines, deployConfiguredLines, normalize } from "../lib/sim/lines-core";
 import { buildStUnits } from "../lib/sim/chemistry";
 
 const skaters = [
@@ -56,4 +56,20 @@ test("legacy lines gain two valid 4-on-3 power-play units", () => {
   assert.ok(safe.situations.pp4.flatMap((u) => u.players).filter((id): id is number => id != null).every((id) => dressed.has(id)));
   assert.ok(buildStUnits(safe).some((u) => u.sig.startsWith("pp4:")));
   assert.ok(buildStUnits(safe).some((u) => u.sig.startsWith("pp4-2:")));
+});
+
+test("a GM double-shift across lines is preserved but a duplicate inside one line is repaired", () => {
+  const lines = autoLines(skaters, goalies);
+  const star = lines.forwardLines[0].c!;
+  lines.forwardLines[3].c = star;
+  const dressedF = skaters.filter((p) => p.id < 100).slice(0, 12).map((p) => p.id);
+  const dressedD = skaters.filter((p) => p.id >= 100).map((p) => p.id);
+
+  deployConfiguredLines(lines, dressedF, dressedD);
+  assert.equal(lines.forwardLines[0].c, star);
+  assert.equal(lines.forwardLines[3].c, star);
+
+  lines.forwardLines[3].lw = star;
+  deployConfiguredLines(lines, dressedF, dressedD);
+  assert.equal([lines.forwardLines[3].lw, lines.forwardLines[3].c, lines.forwardLines[3].rw].filter((id) => id === star).length, 1);
 });
