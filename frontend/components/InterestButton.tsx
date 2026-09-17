@@ -31,6 +31,12 @@ const slotLabels: Record<string, string> = {
   L1: "1st line", L2: "2nd line", L3: "3rd line", L4: "4th line", XF: "extra forward",
   P1: "top pair", P2: "2nd pair", P3: "3rd pair", XD: "7th D", G1: "starter", G2: "backup", G3: "3rd goalie",
 };
+const contentionLabels: Record<string, string> = {
+  contender: "contender", middle: "middle of the pack", rebuild: "rebuild", rising: "rising — real 2-3yr window",
+};
+const contentionStyle: Record<string, string> = {
+  contender: "text-green-300", rebuild: "text-amber-300", rising: "text-sky-300", middle: "text-slate-300",
+};
 
 const bidStatusStyle: Record<string, string> = {
   PENDING: "bg-blue-600/20 text-blue-300",
@@ -210,7 +216,7 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
                 <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-3 mb-3 text-sm">
                   <p className="text-slate-300">
                     Projects as your <b className="text-blue-300">{slotLabels[i.slot] ?? "—"}</b> ·{" "}
-                    <span className={i.contention === "contender" ? "text-green-300" : i.contention === "rebuild" ? "text-amber-300" : "text-slate-300"}>{i.contention}</span>
+                    <span className={contentionStyle[i.contention] ?? "text-slate-300"}>{contentionLabels[i.contention] ?? i.contention}</span>
                   </p>
                   <p className="text-slate-400 mt-1">
                     Wants {i.wantPP ? "PP time" : "no PP"} · {i.wantPK ? "PK time" : "no PK"}

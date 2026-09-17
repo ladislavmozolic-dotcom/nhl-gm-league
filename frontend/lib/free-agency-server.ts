@@ -4,6 +4,7 @@
 import { prisma } from "./prisma";
 import { getLeagueClock } from "./calendar-server";
 import { computeStandings } from "./sim/standings";
+import { CURRENT_SEASON_START } from "./finance";
 import {
   faPosGroup, skaterMarket, goalieMarket, anchorFromPool, buildDemand,
   slotForRank, slotToLine, desiredDeployment, deploymentDemand, offerUtility, offerAcceptable, clauseDiscount, termPremium,
@@ -161,25 +162,113 @@ const VET_FLOOR_LATE = 1_000_000;  // deep-in-the-season floor (market's gone co
 
 // --- Team context: contention tier + where a free agent slots on a given club ---
 
-/** Contender / middle / rebuild for every NHL team, from roster strength
- *  (mean OV of its top-18 skaters), split into thirds. */
+/** Future-outlook score (0..1, relative to the other rebuild-tier clubs) for each
+ *  team id in `teamIds`: how real is this rebuild's window, not just how bad is
+ *  it today. Blends three forward-looking signals — nothing here reads current
+ *  NHL performance, which teamContentionMap already scored separately:
+ *   - prospect pool: the org's top-5 best prospects by quality, from BOTH
+ *     prospect sources this app has — a drafted-but-not-yet-signed `Prospect`
+ *     row (quality proxied by draft slot: a 1st overall projects far better than
+ *     a 5th-rounder) and an already-signed `Player` row sitting at rosterType
+ *     PROSPECT (quality = his actual computed OV). Same pool as the team's own
+ *     /teams/[slug]/prospects page, so this reads the SAME prospects a GM sees there.
+ *   - draft capital: owned picks over the next 3 drafts, weighted by round
+ *     (a 1st is worth 5x a 5th-or-later — this is about high-end talent odds,
+ *     not organizational pick COUNT)
+ *   - core age: how young the CURRENT NHL roster already is (a young core has
+ *     more years left to grow into the prospects' arrival)
+ *  Each signal is normalized against the max within this rebuild group (not the
+ *  whole league) so "rising" picks out the relatively promising half of THIS
+ *  tier, the only place the distinction matters. */
+async function teamOutlookScores(teamIds: number[], avgAgeById: Map<number, number>): Promise<Map<number, number>> {
+  if (teamIds.length === 0) return new Map();
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true } });
+  const source = cfg?.rosterMode === "real" ? "real" : "profinhl";
+  const [drafted, activated, picks] = await Promise.all([
+    prisma.prospect.findMany({
+      where: { teamId: { in: teamIds }, source },
+      select: { teamId: true, overallPick: true, undrafted: true },
+    }),
+    prisma.player.findMany({
+      where: { rosterType: "PROSPECT", teamId: { in: teamIds } },
+      select: { teamId: true, overall: true },
+    }),
+    prisma.draftPick.findMany({
+      where: { teamId: { in: teamIds }, year: { gt: CURRENT_SEASON_START, lte: CURRENT_SEASON_START + 3 } },
+      select: { teamId: true, round: true },
+    }),
+  ]);
+  // A drafted prospect has no rating yet — proxy his quality from where he was
+  // picked (1st overall ≈ elite, mid-round tails off, undrafted/unknown = low).
+  const pickSlotQuality = (overallPick: number | null, undrafted: boolean) =>
+    undrafted || overallPick == null ? 35 : Math.max(30, Math.min(95, 95 - overallPick * 0.5));
+  const prospectByTeam = new Map<number, number[]>();
+  for (const p of drafted) {
+    const a = prospectByTeam.get(p.teamId) ?? [];
+    a.push(pickSlotQuality(p.overallPick, p.undrafted)); prospectByTeam.set(p.teamId, a);
+  }
+  for (const p of activated) {
+    if (p.overall == null) continue;
+    const a = prospectByTeam.get(p.teamId) ?? [];
+    a.push(p.overall); prospectByTeam.set(p.teamId, a);
+  }
+  const pickWeight = (round: number) => Math.max(1, 6 - round); // 1st=5 · 2nd=4 · 3rd=3 · 4th=2 · 5th+=1
+  const pickScoreByTeam = new Map<number, number>();
+  for (const pk of picks) pickScoreByTeam.set(pk.teamId, (pickScoreByTeam.get(pk.teamId) ?? 0) + pickWeight(pk.round));
+
+  const raw = teamIds.map((id) => {
+    const top5 = (prospectByTeam.get(id) ?? []).sort((a, b) => b - a).slice(0, 5);
+    const prospectScore = top5.length ? top5.reduce((a, b) => a + b, 0) / top5.length : 0;
+    const pickScore = pickScoreByTeam.get(id) ?? 0;
+    const ageScore = Math.max(0, 30 - (avgAgeById.get(id) ?? 27)); // younger core → higher
+    return { id, prospectScore, pickScore, ageScore };
+  });
+  const norm = (xs: number[]) => { const max = Math.max(1e-6, ...xs); return xs.map((x) => x / max); };
+  const prospectN = norm(raw.map((r) => r.prospectScore));
+  const pickN = norm(raw.map((r) => r.pickScore));
+  const ageN = norm(raw.map((r) => r.ageScore));
+  const out = new Map<number, number>();
+  raw.forEach((r, i) => out.set(r.id, 0.45 * prospectN[i] + 0.35 * pickN[i] + 0.20 * ageN[i]));
+  return out;
+}
+
+/** Contender / middle / rebuild / rising for every NHL team. The base split is
+ *  from CURRENT roster strength (mean OV of the top-18 skaters), thirds — same
+ *  as before. The bottom third (the "rebuild" tier) is then split again by
+ *  teamOutlookScores: the half of it with a real near-term window (prospects +
+ *  picks + a young core) becomes "rising" instead of a plain "rebuild", so a
+ *  young/unhappy free agent can weigh a genuine rebuild timeline against just
+ *  chasing whichever club is best today (see contentionModifier/Bonus). */
 export async function teamContentionMap(): Promise<Map<number, Contention>> {
   const players = await prisma.player.findMany({
-    where: { rosterType: "NHL", isGoalie: false }, select: { teamId: true, overall: true },
+    where: { rosterType: "NHL", isGoalie: false }, select: { teamId: true, overall: true, age: true },
   });
-  const byTeam = new Map<number, number[]>();
+  const byTeam = new Map<number, { ov: number[]; age: number[] }>();
   for (const p of players) {
     if (p.overall == null) continue;
-    const a = byTeam.get(p.teamId) ?? [];
-    a.push(p.overall); byTeam.set(p.teamId, a);
+    const e = byTeam.get(p.teamId) ?? { ov: [], age: [] };
+    e.ov.push(p.overall);
+    if (p.age != null) e.age.push(p.age);
+    byTeam.set(p.teamId, e);
   }
-  const strength = [...byTeam.entries()].map(([id, ovs]) => {
-    const top = ovs.sort((a, b) => b - a).slice(0, 18);
-    return { id, s: top.reduce((x, y) => x + y, 0) / Math.max(1, top.length) };
+  const strength = [...byTeam.entries()].map(([id, e]) => {
+    const top = [...e.ov].sort((a, b) => b - a).slice(0, 18);
+    const avgAge = e.age.length ? e.age.reduce((a, b) => a + b, 0) / e.age.length : 27;
+    return { id, s: top.reduce((x, y) => x + y, 0) / Math.max(1, top.length), avgAge };
   }).sort((a, b) => b.s - a.s);
   const n = strength.length, third = Math.max(1, Math.round(n / 3));
+
+  const rebuildTeams = strength.slice(n - third);
+  const outlook = await teamOutlookScores(rebuildTeams.map((t) => t.id), new Map(strength.map((t) => [t.id, t.avgAge])));
+  const outlookVals = [...outlook.values()].sort((a, b) => a - b);
+  const outlookMedian = outlookVals.length ? outlookVals[Math.floor(outlookVals.length / 2)] : 0;
+
   const map = new Map<number, Contention>();
-  strength.forEach((t, i) => map.set(t.id, i < third ? "contender" : i >= n - third ? "rebuild" : "middle"));
+  strength.forEach((t, i) => {
+    if (i < third) { map.set(t.id, "contender"); return; }
+    if (i >= n - third) { map.set(t.id, (outlook.get(t.id) ?? 0) >= outlookMedian ? "rising" : "rebuild"); return; }
+    map.set(t.id, "middle");
+  });
   return map;
 }
 
@@ -231,7 +320,7 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
   const desired = desiredDeployment(grp, line, p.df);
   // projected ask = the club gives him the role he projects into, plus the ST he wants
   const projDeploy: Deployment = { line, pp: desired.wantPP, pk: desired.wantPK };
-  const ask = deploymentDemand(base, grp, projDeploy, desired, ctx.contention);
+  const ask = deploymentDemand(base, grp, projDeploy, desired, ctx.contention, p.age);
   return { grp, base, slot, line, contention: ctx.contention, desired, ask, age: p.age };
 }
 
@@ -243,7 +332,7 @@ export async function evaluateTeamOffer(
 ): Promise<{ acceptable: boolean; ask: Demand; utility: number; base: TeamAsk } | null> {
   const info = await teamAsk(playerId, teamId, pool, cmap, round);
   if (!info) return null;
-  const raw = deploymentDemand(info.base, info.grp, deploy, info.desired, info.contention);
+  const raw = deploymentDemand(info.base, info.grp, deploy, info.desired, info.contention, info.age);
   // granting a clause lets him sign for less — discount his floor + headline ask.
   const disc = clauseDiscount(grant?.clause, grant?.breadth);
   // longer term than his sweet spot raises the price (always negotiable, never a refusal)
@@ -253,7 +342,7 @@ export async function evaluateTeamOffer(
     ? { ...raw, floorSalary: Math.round((raw.floorSalary * f) / 50_000) * 50_000, salary: Math.round((raw.salary * f) / 50_000) * 50_000 }
     : raw;
   const acceptable = offerAcceptable(ask, salary, years);
-  const utility = offerUtility(salary, info.grp, deploy, info.desired, info.contention) + disc * raw.salary;
+  const utility = offerUtility(salary, info.grp, deploy, info.desired, info.contention, info.age) + disc * raw.salary;
   return { acceptable, ask, utility, base: info };
 }
 

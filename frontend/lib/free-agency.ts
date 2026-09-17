@@ -320,7 +320,11 @@ export function buildDemand(input: {
 // ---------------------------------------------------------------------------
 
 export type LineSlot = "L1" | "L2" | "L3" | "L4" | "XF" | "P1" | "P2" | "P3" | "XD" | "G1" | "G2" | "G3";
-export type Contention = "contender" | "middle" | "rebuild";
+// "rising" = a rebuild-tier club with a REAL near-term window (strong prospect
+// pool + real draft-pick capital + a young current core) — see teamOutlookScores
+// in free-agency-server.ts, which upgrades the top half of the rebuild tier here.
+// A plain "rebuild" has none of that: just a bad team today with nothing coming.
+export type Contention = "contender" | "middle" | "rebuild" | "rising";
 
 /** Where a player of `market` rating slots in on a team, given that team's
  *  same-position ratings (sorted desc). */
@@ -351,13 +355,23 @@ export function roleModifier(slot: LineSlot): number {
     default: return 1.22; // XF / XD / G3
   }
 }
-export function contentionModifier(c: Contention): number {
-  return c === "contender" ? 0.94 : c === "rebuild" ? 1.10 : 1.0;
+/** A "rising" rebuild is a real sell to a young player buying into its window —
+ *  worth almost as much as a contender — but means nothing to a vet who won't
+ *  still be there in 2-3 years: he gets no better than a plain rebuild's terms. */
+export function contentionModifier(c: Contention, age?: number | null): number {
+  if (c === "contender") return 0.94;
+  if (c === "rebuild") return 1.10;
+  if (c === "middle") return 1.0;
+  const a = age ?? 27;
+  if (a <= 24) return 0.94;
+  if (a <= 27) return 0.99;
+  if (a <= 31) return 1.04;
+  return 1.10;
 }
 
 /** The player's team-specific ask: his open-market demand bent by role + contention. */
-export function teamDemand(base: Demand, slot: LineSlot, c: Contention): Demand {
-  const m = roleModifier(slot) * contentionModifier(c);
+export function teamDemand(base: Demand, slot: LineSlot, c: Contention, age?: number | null): Demand {
+  const m = roleModifier(slot) * contentionModifier(c, age);
   const salary = Math.max(LEAGUE_MIN, Math.round((base.salary * m) / 50_000) * 50_000);
   const floorSalary = Math.max(LEAGUE_MIN, Math.round((base.floorSalary * m) / 50_000) * 50_000);
   return { ...base, salary, floorSalary };
@@ -365,9 +379,17 @@ export function teamDemand(base: Demand, slot: LineSlot, c: Contention): Demand 
 
 /** When comparing standing offers, the player values a big role and a winner in
  *  $-equivalent terms — so a contender's 1st-line offer can beat a bigger cheque
- *  from a rebuild's 3rd line. */
-export function contentionBonus(c: Contention): number {
-  return c === "contender" ? 500_000 : c === "rebuild" ? -400_000 : 0;
+ *  from a rebuild's 3rd line. Same age gate as contentionModifier: a "rising"
+ *  club's future window is worth real money to a young player, nothing to a vet. */
+export function contentionBonus(c: Contention, age?: number | null): number {
+  if (c === "contender") return 500_000;
+  if (c === "rebuild") return -400_000;
+  if (c === "middle") return 0;
+  const a = age ?? 27;
+  if (a <= 24) return 400_000;
+  if (a <= 27) return 100_000;
+  if (a <= 31) return -150_000;
+  return -400_000;
 }
 /** Would the player sign this offer at this club at all? (clears team-specific floor + term.) */
 export function offerAcceptable(td: Demand, offerSalary: number, offerYears: number): boolean {
@@ -432,9 +454,9 @@ export function roleGapModifier(gap: number): number {
 /** Team-specific ask given a concrete deployment PROMISE (the GM's counter).
  *  A role worse than he wants raises his salary AND shortens the term he'll accept
  *  (he takes a short "prove-it" deal rather than commit long to a lesser role). */
-export function deploymentDemand(base: Demand, grp: FaPos, dep: Deployment, desired: Desired, c: Contention): Demand {
+export function deploymentDemand(base: Demand, grp: FaPos, dep: Deployment, desired: Desired, c: Contention, age?: number | null): Demand {
   const gap = dep.line - desired.line;
-  const m = roleGapModifier(gap) * stModifier(desired, dep.pp, dep.pk) * contentionModifier(c);
+  const m = roleGapModifier(gap) * stModifier(desired, dep.pp, dep.pk) * contentionModifier(c, age);
   const salary = Math.max(LEAGUE_MIN, Math.round((base.salary * m) / 50_000) * 50_000);
   const floorSalary = Math.max(LEAGUE_MIN, Math.round((base.floorSalary * m) / 50_000) * 50_000);
   const maxYears = gap > 0 ? Math.max(1, base.maxYears - gap) : base.maxYears;
@@ -449,8 +471,8 @@ export function deployRoleBonus(grp: FaPos, line: number): number {
   return line <= 1 ? 1_600_000 : line === 2 ? 700_000 : line === 3 ? 0 : -600_000;
 }
 /** How attractive an offer is to the player when picking among clubs (with usage). */
-export function offerUtility(offerSalary: number, grp: FaPos, dep: Deployment, desired: Desired, c: Contention): number {
-  let u = offerSalary + deployRoleBonus(grp, dep.line) + contentionBonus(c);
+export function offerUtility(offerSalary: number, grp: FaPos, dep: Deployment, desired: Desired, c: Contention, age?: number | null): number {
+  let u = offerSalary + deployRoleBonus(grp, dep.line) + contentionBonus(c, age);
   if (desired.wantPP && dep.pp) u += 400_000;
   if (desired.wantPK && dep.pk) u += 300_000;
   return u;

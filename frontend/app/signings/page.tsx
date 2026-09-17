@@ -56,7 +56,7 @@ export default async function SigningsPage({ searchParams }: { searchParams: Pro
     for (const o of offers) {
       const ev = await evaluateTeamOffer(playerId, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, round, { clause: o.grantClause, breadth: o.mNtcBreadth });
       const roleBonus = ev ? deployRoleBonus(ev.base.grp, o.line) : 0;
-      const contBonus = ev ? contentionBonus(ev.base.contention) : 0;
+      const contBonus = ev ? contentionBonus(ev.base.contention, ev.base.age) : 0;
       const stBonus = ev ? (ev.base.desired.wantPP && o.pp ? 400_000 : 0) + (ev.base.desired.wantPK && o.pk ? 300_000 : 0) : 0;
       scored.push({ teamId: o.teamId, salary: o.salary, years: o.years, line: o.line, pp: o.pp, pk: o.pk, status: o.status, utility: ev?.utility ?? null, acceptable: ev?.acceptable ?? false, roleBonus, contBonus, stBonus });
     }
