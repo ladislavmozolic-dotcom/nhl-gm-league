@@ -104,6 +104,7 @@ export default async function LeadersPage({ searchParams }: { searchParams: Prom
   const repMin = Math.max(1, Math.round(QUAL_PCT * maxTeamGP));
   const goalieCards: Array<{ title: string; rows: Row[] }> = [
     { title: "Wins", rows: top(gk, (g) => g.wins).map((g) => gkRow(g, String(g.wins), `${g.gp} GP`)) },
+    { title: "Goals Saved Above Expected (GSAx)", rows: top(gk, (g) => g.gsax).map((g) => gkRow(g, (g.gsax > 0 ? "+" : "") + g.gsax.toFixed(1), `${g.goalsAgainst} GA · ${g.xga.toFixed(1)} xGA`)) },
     { title: "Save Percentage", rows: top(qualGk, (g) => g.svPct).map((g) => gkRow(g, g.svPct.toFixed(3).replace(/^0/, ""), `${g.gp} GP`)) },
     { title: "Goals-Against Average", rows: top(qualGk, (g) => -g.gaa).map((g) => gkRow(g, g.gaa.toFixed(2), `${g.gp} GP`)) },
     { title: "Minutes Played", rows: top(gk, (g) => g.toiMin).map((g) => gkRow(g, String(g.toiMin), `${g.gp} GP`)) },

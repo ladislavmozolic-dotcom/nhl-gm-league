@@ -77,7 +77,7 @@ export default function StatTable({ cols, rows, initialSort, minWidth = 720 }: {
             <tr className="text-xs text-slate-500 border-b border-slate-800 bg-slate-800/40">
               {visible.map((c) => (
                 <th key={c.key} onClick={() => click(c.key)} title={c.title}
-                  className={`px-2.5 py-2.5 cursor-pointer hover:text-slate-200 select-none whitespace-nowrap ${c.num ? "text-right" : "text-left"}`}>
+                  className={`px-2.5 py-2.5 cursor-pointer hover:text-slate-200 select-none whitespace-nowrap ${c.num ? "text-right" : "text-left"} ${c.frozen ? "sticky left-0 z-20 bg-slate-900 shadow-[2px_0_4px_rgba(0,0,0,0.3)]" : ""}`}>
                   {c.label}{c.info && <InfoTip text={c.info} />}{arrow(c.key)}
                 </th>
               ))}
@@ -85,9 +85,9 @@ export default function StatTable({ cols, rows, initialSort, minWidth = 720 }: {
           </thead>
           <tbody>
             {sorted.map((r, i) => (
-              <tr key={i} className="border-b border-slate-800/60 hover:bg-slate-800/30">
+              <tr key={i} className="border-b border-slate-800/60 hover:bg-slate-800/30 group">
                 {visible.map((c) => (
-                  <td key={c.key} className={`px-2.5 py-2 ${c.num ? "text-right tabular-nums" : ""} ${c.frozen ? "font-medium" : c.num ? "text-slate-300" : "text-slate-400"}`}>
+                  <td key={c.key} className={`px-2.5 py-2 ${c.num ? "text-right tabular-nums" : ""} ${c.frozen ? "sticky left-0 z-10 bg-slate-900 group-hover:bg-slate-850 shadow-[2px_0_4px_rgba(0,0,0,0.3)] font-medium" : c.num ? "text-slate-300" : "text-slate-400"}`}>
                     {c.team ? (
                       r._teamSlug ? (
                         <Link href={`/teams/${r._teamSlug}`} className="inline-flex items-center gap-1.5 hover:text-blue-400 transition-colors">

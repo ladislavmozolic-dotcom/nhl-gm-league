@@ -17,21 +17,23 @@ const COLS: Col[] = [
   { key: "otl", label: "OTL", title: "Overtime Losses", num: true },
   { key: "svPct", label: "PCT", title: "Save Percentage", num: true, format: "pct3" },
   { key: "gaa", label: "GAA", title: "Goals-Against Average", num: true, format: "dec2" },
+  { key: "gsax", label: "GSAx", title: "Goals Saved Above Expected (xGA − GA)", num: true, format: "plusDec1", info: "Goals Saved Above Expected (xGA − GA). Positive values mean the goalie stopped more goals than expected given shot danger." },
   { key: "mp", label: "MP", title: "Minutes Played", num: true },
-  { key: "pim", label: "PIM", title: "Penalty Minutes (not tracked)", num: true, format: "dash" },
   { key: "shutouts", label: "SO", title: "Shutouts", num: true },
   { key: "goalsAgainst", label: "GA", title: "Goals Against", num: true },
   { key: "shotsAgainst", label: "SA", title: "Shots Against", num: true },
   { key: "saves", label: "SV", title: "Saves", num: true },
-  { key: "a", label: "A", title: "Assists (not tracked)", num: true, format: "dash" },
-  { key: "eg", label: "EG", title: "Empty-Net Goals Against (not tracked)", num: true, format: "dash" },
-  { key: "psPct", label: "PS %", title: "Penalty-Shot Save % (not tracked)", num: true, format: "dash" },
-  { key: "psa", label: "PSA", title: "Penalty Shots Against (not tracked)", num: true, format: "dash" },
-  { key: "st", label: "ST", title: "Shootout attempts (not tracked)", num: true, format: "dash" },
-  { key: "bg", label: "BG", title: "Shootout goals against (not tracked)", num: true, format: "dash" },
-  { key: "s1", label: "S1", title: "Shootout round 1 (not tracked)", num: true, format: "dash" },
-  { key: "s2", label: "S2", title: "Shootout round 2 (not tracked)", num: true, format: "dash" },
-  { key: "s3", label: "S3", title: "Shootout round 3 (not tracked)", num: true, format: "dash" },
+  { key: "xga", label: "xGA", title: "Expected Goals Against", num: true, format: "dec1", defaultHidden: true },
+  { key: "pim", label: "PIM", title: "Penalty Minutes (not tracked)", num: true, format: "dash", defaultHidden: true },
+  { key: "a", label: "A", title: "Assists (not tracked)", num: true, format: "dash", defaultHidden: true },
+  { key: "eg", label: "EG", title: "Empty-Net Goals Against (not tracked)", num: true, format: "dash", defaultHidden: true },
+  { key: "psPct", label: "PS %", title: "Penalty-Shot Save % (not tracked)", num: true, format: "dash", defaultHidden: true },
+  { key: "psa", label: "PSA", title: "Penalty Shots Against (not tracked)", num: true, format: "dash", defaultHidden: true },
+  { key: "st", label: "ST", title: "Shootout attempts (not tracked)", num: true, format: "dash", defaultHidden: true },
+  { key: "bg", label: "BG", title: "Shootout goals against (not tracked)", num: true, format: "dash", defaultHidden: true },
+  { key: "s1", label: "S1", title: "Shootout round 1 (not tracked)", num: true, format: "dash", defaultHidden: true },
+  { key: "s2", label: "S2", title: "Shootout round 2 (not tracked)", num: true, format: "dash", defaultHidden: true },
+  { key: "s3", label: "S3", title: "Shootout round 3 (not tracked)", num: true, format: "dash", defaultHidden: true },
 ];
 
 export default async function GoalieStatsPage({ searchParams }: { searchParams: Promise<{ league?: string; phase?: string }> }) {
@@ -44,8 +46,9 @@ export default async function GoalieStatsPage({ searchParams }: { searchParams: 
   const gk = await goalieTotals(SEASON, league);
   const rows = gk.map((g) => ({
     _pid: g.playerId, name: g.name, teamCode: g.teamCode ?? "—", _teamSlug: g.teamSlug ?? "", _teamLogo: g.teamLogo ?? "", gp: g.gp, wins: g.wins, losses: g.losses, otl: g.otl,
-    svPct: g.svPct, gaa: g.gaa, mp: g.toiMin, pim: 0, shutouts: g.shutouts,
+    svPct: g.svPct, gaa: g.gaa, gsax: g.gsax, mp: g.toiMin, pim: 0, shutouts: g.shutouts,
     goalsAgainst: g.goalsAgainst, shotsAgainst: g.shotsAgainst, saves: g.saves,
+    xga: g.xga,
     a: 0, eg: 0, psPct: 0, psa: 0, st: 0, bg: 0, s1: 0, s2: 0, s3: 0,
   }));
   return (
