@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import NewsTicker from "@/components/NewsTicker";
+import ScoreScrollRow from "@/components/ScoreScrollRow";
 
 type TeamLite = { code: string | null; logoUrl: string | null };
 
@@ -61,7 +62,7 @@ export default async function ScoreTracker() {
             {/* One scrollable row: today's finished results first, then — same
                 row, no separate section — whatever's still to be simmed (today's
                 remainder, or the next scheduled day once today is complete). */}
-            <div className="flex gap-2 overflow-x-auto p-2 no-scrollbar">
+            <ScoreScrollRow>
               {results.map((g) => {
                 const aw = (g.awayGoals ?? 0) > (g.homeGoals ?? 0), hw = (g.homeGoals ?? 0) > (g.awayGoals ?? 0);
                 return (
@@ -77,7 +78,7 @@ export default async function ScoreTracker() {
                   <TeamRow t={g.homeTeam} score={null} win={false} />
                 </div>
               ))}
-            </div>
+            </ScoreScrollRow>
           </div>
         </div>
       )}
