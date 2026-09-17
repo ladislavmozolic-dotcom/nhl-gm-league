@@ -32,7 +32,7 @@ type Props = {
   chemBase?: number;
   chemNeutral?: number;
   chemEnabled?: boolean;
-  onSave: (slug: string, data: TeamLinesData) => Promise<void>;
+  onSave: (slug: string, data: TeamLinesData) => Promise<TeamLinesData>;
   onSuggest?: (slug: string) => Promise<SuggestResult>;
 };
 
@@ -71,6 +71,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
   const [tab, setTab] = useState<(typeof TABS)[number]>("Forward");
   const [pending, start] = useTransition();
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   // GM Assist — a suggested lineup + tactics the GM can Apply or discard
   const [aiPending, aiStart] = useTransition();
   const [ai, setAi] = useState<SuggestResult | null>(null);
@@ -179,15 +180,21 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
     );
   };
 
-  // duplicates that matter: the same player twice inside ONE line/pair/unit
+  // 5v5 must use 18 distinct skaters because the sim deploys four separate
+  // trios and three separate pairs. Special-team units only forbid a duplicate
+  // inside the same unit; reusing a player on PP1 and PK1 is legitimate.
   const dupes = useMemo(() => {
     const bad = new Set<string>();
     const scan = (ids: (number | null)[]) => {
       const seen = new Set<number>();
       for (const id of ids) if (id != null) { if (seen.has(id)) bad.add(nameOf(id)); seen.add(id); }
     };
-    for (const l of data.forwardLines) scan([l.lw, l.c, l.rw]);
-    for (const p of data.defensePairs) scan([p.ld, p.rd]);
+    scan(data.forwardLines.flatMap((l) => [l.lw, l.c, l.rw]));
+    scan(data.defensePairs.flatMap((p) => [p.ld, p.rd]));
+    scan([
+      ...data.forwardLines.flatMap((l) => [l.lw, l.c, l.rw]),
+      ...data.defensePairs.flatMap((p) => [p.ld, p.rd]),
+    ]);
     for (const key of ["pp", "pp4", "fourVFour", "pk4", "pk3", "overtime"] as const)
       for (const u of data.situations[key]) scan(u.players);
     return [...bad];
@@ -216,10 +223,23 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
     // the split-unit DEFENSE game plans (PP/PK4/PK3/4v4) must also total 5
     ...([data.situations.pp, data.situations.pp4, data.situations.pk4, data.situations.pk3, data.situations.fourVFour].flatMap((us) => us.map((u) => tSum(u.dTactic)))),
   ].some((s) => s !== 5);
-  const invalid = dupes.length > 0 || badTime.length > 0 || badTactics.length > 0 || badLineTactics;
+  const missingFiveOnFive = data.forwardLines.length !== 4 || data.defensePairs.length !== 3
+    || data.forwardLines.some((l) => [l.lw, l.c, l.rw].some((id) => id == null))
+    || data.defensePairs.some((p) => [p.ld, p.rd].some((id) => id == null));
+  const invalid = dupes.length > 0 || missingFiveOnFive || badTime.length > 0 || badTactics.length > 0 || badLineTactics;
 
-  const change = (fn: (d: TeamLinesData) => void) => { setData((d) => { const c = structuredClone(d); fn(c); return c; }); setSaved(false); };
-  const save = () => start(async () => { await onSave(teamSlug, data); setSaved(true); });
+  const change = (fn: (d: TeamLinesData) => void) => { setData((d) => { const c = structuredClone(d); fn(c); return c; }); setSaved(false); setSaveError(null); };
+  const save = () => start(async () => {
+    try {
+      const canonical = await onSave(teamSlug, data);
+      setData(canonical);
+      setSaved(true);
+      setSaveError(null);
+    } catch {
+      setSaved(false);
+      setSaveError("Lines could not be saved. Reload the page and try again.");
+    }
+  });
   // rebuild the lineup: clear the 5v5 forward + defence slots (keep each line's
   // tactics/ice-time and the special-teams units), then fill best-available. This
   // actually re-does the lines even when they're already full (autoFill alone only
@@ -269,8 +289,30 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
   };
 
   // ---------- section renderers ----------
-  const setFwd = (i: number, slot: keyof ForwardLine, v: number | null) => change((d) => { (d.forwardLines[i][slot] as number | null) = v; });
-  const setDef = (i: number, slot: keyof DefensePair, v: number | null) => change((d) => { (d.defensePairs[i][slot] as number | null) = v; });
+  const setFwd = (i: number, slot: "lw" | "c" | "rw", v: number | null) => change((d) => {
+    const old = d.forwardLines[i][slot];
+    if (v != null && v !== old) {
+      let swapped = false;
+      d.forwardLines.forEach((line, li) => (["lw", "c", "rw"] as const).forEach((key) => {
+        if (li === i && key === slot) return;
+        if (line[key] === v) { line[key] = swapped ? null : old; swapped = true; }
+      }));
+      d.defensePairs.forEach((pair) => (["ld", "rd"] as const).forEach((key) => { if (pair[key] === v) pair[key] = null; }));
+    }
+    d.forwardLines[i][slot] = v;
+  });
+  const setDef = (i: number, slot: "ld" | "rd", v: number | null) => change((d) => {
+    const old = d.defensePairs[i][slot];
+    if (v != null && v !== old) {
+      let swapped = false;
+      d.defensePairs.forEach((pair, pi) => (["ld", "rd"] as const).forEach((key) => {
+        if (pi === i && key === slot) return;
+        if (pair[key] === v) { pair[key] = swapped ? null : old; swapped = true; }
+      }));
+      d.forwardLines.forEach((line) => (["lw", "c", "rw"] as const).forEach((key) => { if (line[key] === v) line[key] = null; }));
+    }
+    d.defensePairs[i][slot] = v;
+  });
 
   // per-line tactic (PHY/DF/OF; each row must total 5). tac() supplies the neutral
   // baseline for any line that has no tactic yet (legacy / newly added).
@@ -421,7 +463,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
           <div key={i} className="lines-card bg-slate-900/40 border border-slate-800 rounded-lg p-3 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-bold text-slate-300">Line {i + 1}</span><ChemBadge ids={[l.lw, l.c, l.rw]} /><RoleFitBadge ids={[l.lw, l.c, l.rw]} isDef={false} /><TacticalFitBadge ids={[l.lw, l.c, l.rw]} isDef={false} puck={l.puck} /></div>
-              <div className="flex items-center gap-2"><span className="text-[11px] uppercase tracking-wide text-slate-500">Time</span><Stepper value={l.timePct} step={1} onChange={(v) => setFwd(i, "timePct", v as unknown as number)} /><span className="text-slate-500 text-sm">%</span></div>
+              <div className="flex items-center gap-2"><span className="text-[11px] uppercase tracking-wide text-slate-500">Time</span><Stepper value={l.timePct} step={1} onChange={(v) => change((d) => { d.forwardLines[i].timePct = v; })} /><span className="text-slate-500 text-sm">%</span></div>
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
               <div className="flex-1 min-w-0"><Slot label="Left Wing" value={l.lw} onChange={(v) => setFwd(i, "lw", v)} pool={forwards} /></div>
@@ -454,7 +496,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
           <div key={i} className="lines-card bg-slate-900/40 border border-slate-800 rounded-lg p-3 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-bold text-slate-300">Pair {i + 1}</span><ChemBadge ids={[p.ld, p.rd]} /><RoleFitBadge ids={[p.ld, p.rd]} isDef={true} /><TacticalFitBadge ids={[p.ld, p.rd]} isDef={true} dZone={p.dzone} /></div>
-              <div className="flex items-center gap-2"><span className="text-[11px] uppercase tracking-wide text-slate-500">Time</span><Stepper value={p.timePct} step={1} onChange={(v) => setDef(i, "timePct", v as unknown as number)} /><span className="text-slate-500 text-sm">%</span></div>
+              <div className="flex items-center gap-2"><span className="text-[11px] uppercase tracking-wide text-slate-500">Time</span><Stepper value={p.timePct} step={1} onChange={(v) => change((d) => { d.defensePairs[i].timePct = v; })} /><span className="text-slate-500 text-sm">%</span></div>
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
               <div className="flex-1 min-w-0"><Slot label="Left Defense" value={p.ld} onChange={(v) => setDef(i, "ld", v)} pool={defense} /></div>
@@ -855,9 +897,10 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
             {pending ? "Saving…" : "Save Lines"}
           </button>
           {invalid && <span className="text-red-400 text-sm">
-            {dupes.length ? "Fix duplicate players" : badTime.length ? "Time must total 100%" : "Tactics must total 5 points"} to save
+            {dupes.length ? "Fix duplicate players" : missingFiveOnFive ? "Fill every 5v5 position" : badTime.length ? "Time must total 100%" : "Tactics must total 5 points"} to save
           </span>}
           {saved && <span className="text-green-400 text-sm">✓ Saved — used in the next simulation</span>}
+          {saveError && <span className="text-red-400 text-sm">{saveError}</span>}
         </div>
       </div>
     </div>

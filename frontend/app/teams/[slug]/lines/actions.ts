@@ -11,8 +11,9 @@ export async function saveLines(slug: string, data: TeamLinesData) {
   const team = await prisma.team.findUnique({ where: { slug }, select: { id: true } });
   if (!team) throw new Error("Team not found");
   if (!(await canManageTeam(team.id))) throw new Error("Not authorized for this team");
-  await saveTeamLines(team.id, data);
+  const saved = await saveTeamLines(team.id, data, { strict: true });
   revalidatePath(`/teams/${slug}/lines`);
+  return saved;
 }
 
 type Atk = { id: number; name: string; position: string; overall: number; shoots: string | null; sc: number; pa: number; ck: number; df: number; st: number; fg: number; sk: number; en: number; weight: number };

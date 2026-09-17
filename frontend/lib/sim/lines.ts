@@ -52,7 +52,7 @@ export async function loadTeamSystem(teamId: number): Promise<TeamTactics | null
   return (row?.system as TeamTactics | null) ?? null;
 }
 
-export async function saveTeamLines(teamId: number, data: TeamLinesData): Promise<void> {
+export async function saveTeamLines(teamId: number, data: TeamLinesData, opts: { strict?: boolean } = {}): Promise<TeamLinesData> {
   const team = await prisma.team.findUnique({
     where: { id: teamId },
     select: {
@@ -68,7 +68,19 @@ export async function saveTeamLines(teamId: number, data: TeamLinesData): Promis
   const active = team.players.filter((p) => p.rosterType === rosterType);
   const skaters = active.filter((p) => !p.isGoalie).map((p) => ({ id: p.id, position: p.position, overall: p.overall ?? 0, shoots: p.shoots, df: p.df }));
   const goalies = active.filter((p) => p.isGoalie).map((p) => ({ id: p.id, overall: p.overall ?? 0 }));
-  const safe = autoFill(normalize(data), skaters, goalies);
+  const normalized = normalize(data);
+  const fIds = normalized.forwardLines.flatMap((l) => [l.lw, l.c, l.rw]);
+  const dIds = normalized.defensePairs.flatMap((p) => [p.ld, p.rd]);
+  if (opts.strict && (normalized.forwardLines.length !== 4 || fIds.some((id) => id == null))) throw new Error("Fill all 12 forward slots before saving.");
+  if (opts.strict && (normalized.defensePairs.length !== 3 || dIds.some((id) => id == null))) throw new Error("Fill all 6 defense slots before saving.");
+  const fiveOnFive = [...fIds, ...dIds].filter((id): id is number => id != null);
+  if (opts.strict && new Set(fiveOnFive).size !== fiveOnFive.length) throw new Error("Each player can appear only once in the 5v5 lineup.");
+  const activeIds = new Set(skaters.map((p) => p.id));
+  if (opts.strict && fiveOnFive.some((id) => !activeIds.has(id))) throw new Error("The lineup contains a player who is no longer on the active roster. Reload Lines and try again.");
+
+  // 5v5 is already complete and valid, so autoFill leaves the GM's exact lines
+  // untouched and only reconciles/fills ancillary special-situation slots.
+  const safe = autoFill(normalized, skaters, goalies);
   const payload = {
     forwardLines: safe.forwardLines as object,
     defensePairs: safe.defensePairs as object,
@@ -77,4 +89,5 @@ export async function saveTeamLines(teamId: number, data: TeamLinesData): Promis
     ...(safe.system ? { system: safe.system as object } : {}),
   };
   await prisma.teamLines.upsert({ where: { teamId }, create: { teamId, ...payload }, update: payload });
+  return safe;
 }
