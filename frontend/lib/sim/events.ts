@@ -3,8 +3,8 @@
 // The possession tick loop emits a typed stream of micro-events through an
 // EventSink. That stream is the single source of truth: play-by-play, the box
 // score and (later) xG / advanced stats are all *derived* from it rather than
-// reconstructed post-hoc. Only NOTABLE-and-above events are persisted to the
-// GameEvent table — the thousands of transient ticks stay in memory.
+// reconstructed post-hoc. Every on-target SHOT/SAVE and all NOTABLE-and-above
+// events are persisted; the thousands of transient possession ticks stay in memory.
 
 export type EventType =
   | "PERIOD_START"
@@ -75,6 +75,13 @@ export class EventSink {
   notable(min: Importance = "NOTABLE"): SimEvent[] {
     const floor = RANK[min];
     return this.events.filter((e) => RANK[e.importance] >= floor);
+  }
+
+  /** Events stored with the game. Keep the full on-target shot chain so xG flow,
+   * shot maps and goalie reports can reproduce the box score exactly; retain the
+   * previous NOTABLE threshold for every other kind of micro-event. */
+  persistable(): SimEvent[] {
+    return this.events.filter((e) => e.type === "SHOT" || e.type === "SAVE" || RANK[e.importance] >= RANK.NOTABLE);
   }
 
   get count(): number {

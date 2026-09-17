@@ -868,9 +868,9 @@ model GameGoal {
   @@index([gameId])
 }
 
-// Next-gen event stream (v2 engine): the persisted, NOTABLE micro-events a game is
-// built from — the single source of truth for play-by-play, advanced stats and xG.
-// Transient ticks are NOT stored; only events above an importance threshold.
+// Next-gen event stream (v2 engine): every on-target SHOT/SAVE plus the NOTABLE
+// micro-events a game is built from — the source for play-by-play, advanced stats
+// and xG flow. Transient possession ticks are not stored.
 model GameEvent {
   id         Int      @id @default(autoincrement())
   gameId     Int

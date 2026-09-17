@@ -29,7 +29,18 @@ type Ev = { type: string; period: number; seconds: number; teamId: number | null
 export async function gameStory(gameId: number): Promise<{ report: GameReport; flow: GameFlow } | null> {
   const game = await prisma.game.findUnique({
     where: { id: gameId },
-    select: { homeTeamId: true, awayTeamId: true, homeGoals: true, awayGoals: true, endedIn: true, homeTeam: { select: { code: true, name: true } }, awayTeam: { select: { code: true, name: true } } },
+    select: {
+      homeTeamId: true, awayTeamId: true, homeGoals: true, awayGoals: true,
+      homeXg: true, awayXg: true, endedIn: true,
+      homeTeam: { select: { code: true, name: true } },
+      awayTeam: { select: { code: true, name: true } },
+      playerStats: {
+        select: {
+          teamId: true, goals: true, assists: true, points: true, shots: true, xg: true,
+          player: { select: { name: true } },
+        },
+      },
+    },
   });
   if (!game) return null;
   const events = (await prisma.gameEvent.findMany({
@@ -52,9 +63,27 @@ export async function gameStory(gameId: number): Promise<{ report: GameReport; f
   // ---------- FLOW ----------
   // xG timeline from SHOT events (each attributed to the shooting team). Cumulative
   // (home − away) over the game; goals marked; binned into 5-minute windows.
-  const shotPts = shots.map((e) => ({ t: absT(e.period, e.seconds), home: isHome(e.teamId), xg: e.xg ?? 0 }))
-    .concat(goals.filter((g) => (g.xg ?? 0) < 0.12).map((g) => ({ t: absT(g.period, g.seconds), home: isHome(g.teamId), xg: g.xg ?? 0 }))) // add low-danger goals (no persisted SHOT)
+  // Older games stored only high-danger SHOT events. Add any goal whose matching
+  // SHOT is absent, then scale each side's visible chances to the official team xG
+  // from the box score. New games persist every shot, so their scale is exactly 1.
+  const shotKeys = new Set(shots.map((s) => `${s.teamId}:${s.playerId}:${s.period}:${s.seconds}`));
+  const rawShotPts = shots.map((e) => ({ t: absT(e.period, e.seconds), home: isHome(e.teamId), xg: e.xg ?? 0 }))
+    .concat(goals
+      .filter((g) => !shotKeys.has(`${g.teamId}:${g.playerId}:${g.period}:${g.seconds}`) && g.strength !== "SO")
+      .map((g) => ({
+        t: absT(g.period, g.seconds), home: isHome(g.teamId),
+        // A few pre-fix OT goals have no saved xG at all. Give the historical
+        // chart a conservative chance value; team scaling keeps its total exact.
+        xg: g.xg != null && g.xg > 0 ? g.xg : 0.05,
+      })))
     .sort((a, b) => a.t - b.t);
+  const rawHomeXg = rawShotPts.filter((s) => s.home).reduce((n, s) => n + s.xg, 0);
+  const rawAwayXg = rawShotPts.filter((s) => !s.home).reduce((n, s) => n + s.xg, 0);
+  const officialHomeXg = game.homeXg ?? rawHomeXg;
+  const officialAwayXg = game.awayXg ?? rawAwayXg;
+  const homeScale = rawHomeXg > 0 ? officialHomeXg / rawHomeXg : 1;
+  const awayScale = rawAwayXg > 0 ? officialAwayXg / rawAwayXg : 1;
+  const shotPts = rawShotPts.map((s) => ({ ...s, xg: s.xg * (s.home ? homeScale : awayScale) }));
   let cum = 0;
   const points: GameFlow["points"] = [{ t: 0, diff: 0 }];
   let homeXg = 0, awayXg = 0;
@@ -73,7 +102,7 @@ export async function gameStory(gameId: number): Promise<{ report: GameReport; f
     const end = start + 300;
     const inWin = (t: number) => t >= start && t < end;
     let hx = 0, ax = 0;
-    for (const s of shots) { const t = absT(s.period, s.seconds); if (inWin(t)) { if (isHome(s.teamId)) hx += s.xg ?? 0; else ax += s.xg ?? 0; } }
+    for (const s of shotPts) { if (inWin(s.t)) { if (s.home) hx += s.xg; else ax += s.xg; } }
     const plays: string[] = [];
     for (const g of goals) { const t = absT(g.period, g.seconds); if (inWin(t)) plays.push(`${mmss(g.seconds)} ${periodLabel(g.period)} — 🚨 ${codeOf(g.teamId)} ${nm(g.playerId)}${g.strength && g.strength !== "EV" ? ` (${g.strength})` : ""}`); }
     for (const sv of saves) { const t = absT(sv.period, sv.seconds); if (inWin(t) && (sv.xg ?? 0) >= 0.18) plays.push(`${mmss(sv.seconds)} ${periodLabel(sv.period)} — 🧤 ${nm(sv.playerId)} denies ${nm(sv.targetId)}`); }
@@ -88,7 +117,11 @@ export async function gameStory(gameId: number): Promise<{ report: GameReport; f
 }
 
 function buildReport(
-  game: { homeGoals: number | null; awayGoals: number | null; endedIn: string | null; homeTeam: { code: string | null; name: string }; awayTeam: { code: string | null; name: string } },
+  game: {
+    homeGoals: number | null; awayGoals: number | null; endedIn: string | null;
+    homeTeam: { code: string | null; name: string }; awayTeam: { code: string | null; name: string };
+    playerStats: Array<{ teamId: number; goals: number; assists: number; points: number; shots: number; xg: number; player: { name: string } }>;
+  },
   events: Ev[], goals: Ev[], saves: Ev[],
   h: { nm: (id: number | null) => string; codeOf: (id: number | null) => string; isHome: (id: number | null) => boolean; homeId: number; awayId: number },
 ): GameReport {
@@ -102,17 +135,13 @@ function buildReport(
   const perPeriod = (teamId: number, p: number) => goals.filter((g) => g.teamId === teamId && g.period === p && g.strength !== "SO").length;
   const firstPeriodLoserGoals = perPeriod(loserId, 1), firstPeriodWinnerGoals = perPeriod(winnerId, 1);
 
-  // top scorer of the winning team (goals + assists from meta.assistNames)
-  const pts = new Map<number, { g: number; a: number; name: string }>();
-  for (const gl of goals) {
-    if (gl.playerId != null) { const e = pts.get(gl.playerId) ?? { g: 0, a: 0, name: h.nm(gl.playerId) }; e.g++; pts.set(gl.playerId, e); }
-  }
-  const topScorer = [...pts.values()].sort((a, b) => (b.g + b.a) - (a.g + a.a) || b.g - a.g)[0];
-
-  // winning goalie line (saves / shots against) from SAVE + GOAL events against them
-  const savesBy = (goalieTeamId: number) => saves.filter((s) => s.teamId === goalieTeamId).length;
-  const goalsAgainst = (teamId: number) => goals.filter((g) => g.teamId !== teamId).length;
-  // NB: persisted SAVE events are high-danger only, so this is an approximation for flavour.
+  // Pick the winning team's actual box-score leader. The old event-only version
+  // omitted assists and considered both clubs, so the first losing-team scorer
+  // could incorrectly be described as having led the winner.
+  const topScorer = game.playerStats
+    .filter((s) => s.teamId === winnerId)
+    .map((s) => ({ name: cleanName(s.player.name), g: s.goals, a: s.assists, p: s.points, xg: s.xg, shots: s.shots }))
+    .sort((a, b) => b.p - a.p || b.xg - a.xg || b.g - a.g || b.shots - a.shots)[0];
 
   // summary sentences
   const parts: string[] = [];

@@ -2353,7 +2353,7 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     winner: winnerId, loser: loserId, endedIn, periods, otPeriods,
     goals: st.goals, penalties: st.penalties, injuries: st.injuries, playByPlay: [], shootout: st.shootout, seed,
     engineVersion: opts.engineVersion ?? ENGINE_VERSION,
-    events: st.sink.notable(),
+    events: st.sink.persistable(),
     homeSystem: home.teamTactics,
     awaySystem: away.teamTactics,
   };
