@@ -22,7 +22,7 @@ const COLS: Col[] = [
   { key: "shutouts", label: "SO", title: "Shutouts", num: true },
   { key: "goalsAgainst", label: "GA", title: "Goals Against", num: true },
   { key: "shotsAgainst", label: "SA", title: "Shots Against", num: true },
-  { key: "saves", label: "SAR", title: "Saves", num: true },
+  { key: "saves", label: "SV", title: "Saves", num: true },
   { key: "a", label: "A", title: "Assists (not tracked)", num: true, format: "dash" },
   { key: "eg", label: "EG", title: "Empty-Net Goals Against (not tracked)", num: true, format: "dash" },
   { key: "psPct", label: "PS %", title: "Penalty-Shot Save % (not tracked)", num: true, format: "dash" },

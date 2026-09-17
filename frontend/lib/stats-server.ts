@@ -9,7 +9,7 @@ export type SkaterTotal = {
   playerId: number; name: string; rookie: boolean; position: string; number: number | null;
   teamId: number | null; teamCode: string | null; teamSlug: string | null; teamLogo: string | null;
   gp: number; goals: number; assists: number; points: number; shots: number;
-  pim: number; plusMinus: number; ppGoals: number; shGoals: number; ppAssists: number; shAssists: number; gwg: number;
+  pim: number; plusMinus: number; plusMinus5v5: number; ppGoals: number; shGoals: number; ppAssists: number; shAssists: number; gwg: number;
   hits: number; blocks: number; toi: number;
   xg: number; hdShots: number; // Phase 2 shot quality
 };
@@ -42,11 +42,29 @@ export async function skaterTotals(season: string, league = "NHL", playoffs = fa
     _sum: { goals: true, assists: true, points: true, shots: true, pim: true, plusMinus: true, ppGoals: true, shGoals: true, ppAssists: true, shAssists: true, gwg: true, hits: true, blocks: true, toi: true, xg: true, hdShots: true },
     _count: { _all: true },
   });
-  const [players, teams] = await Promise.all([
+  const [players, teams, evenGoals] = await Promise.all([
     prisma.player.findMany({ where: { id: { in: grouped.map((g) => g.playerId) } }, select: { id: true, name: true, position: true, number: true, teamId: true } }),
     teamLookup(),
+    // Exact 5-on-5 +/- reconstructed from the players actually on the ice.
+    // This deliberately excludes PP, SH, empty-net, 4-on-4 and 3-on-3 goals.
+    prisma.gameGoal.findMany({
+      where: { game: gameWhere({ season, league, playoffs }), strength: "EV", emptyNet: false },
+      select: { teamId: true, onIceForIds: true, onIceAgainstIds: true, game: { select: { homeTeamId: true, awayTeamId: true } } },
+    }),
   ]);
   const pById = new Map(players.map((p) => [p.id, p]));
+  const pm5v5 = new Map<string, number>();
+  const bumpPm = (playerId: number, teamId: number, delta: number) => {
+    const key = `${playerId}:${teamId}`;
+    pm5v5.set(key, (pm5v5.get(key) ?? 0) + delta);
+  };
+  for (const goal of evenGoals) {
+    // Old game rows without frozen on-ice players cannot be classified safely.
+    if (goal.onIceForIds.length !== 5 || goal.onIceAgainstIds.length !== 5) continue;
+    const againstTeamId = goal.teamId === goal.game.homeTeamId ? goal.game.awayTeamId : goal.game.homeTeamId;
+    for (const id of goal.onIceForIds) bumpPm(id, goal.teamId, 1);
+    for (const id of goal.onIceAgainstIds) bumpPm(id, againstTeamId, -1);
+  }
   return grouped.map((g) => {
     const p = pById.get(g.playerId);
     const t = g.teamId ? teams.get(g.teamId) : null; // team the player actually played for
@@ -55,7 +73,8 @@ export async function skaterTotals(season: string, league = "NHL", playoffs = fa
       playerId: g.playerId, name: cleanName(p?.name ?? "—"), rookie: isRookieName(p?.name ?? ""),
       position: p?.position ?? "—", number: p?.number ?? null, teamId: g.teamId ?? null, teamCode: t?.code ?? null, teamSlug: t?.slug ?? null, teamLogo: t?.logoUrl ?? null,
       gp: g._count._all, goals: s.goals ?? 0, assists: s.assists ?? 0, points: s.points ?? 0, shots: s.shots ?? 0,
-      pim: s.pim ?? 0, plusMinus: s.plusMinus ?? 0, ppGoals: s.ppGoals ?? 0, shGoals: s.shGoals ?? 0, ppAssists: s.ppAssists ?? 0, shAssists: s.shAssists ?? 0, gwg: s.gwg ?? 0,
+      pim: s.pim ?? 0, plusMinus: s.plusMinus ?? 0, plusMinus5v5: pm5v5.get(`${g.playerId}:${g.teamId}`) ?? 0,
+      ppGoals: s.ppGoals ?? 0, shGoals: s.shGoals ?? 0, ppAssists: s.ppAssists ?? 0, shAssists: s.shAssists ?? 0, gwg: s.gwg ?? 0,
       hits: s.hits ?? 0, blocks: s.blocks ?? 0, toi: s.toi ?? 0,
       xg: s.xg ?? 0, hdShots: s.hdShots ?? 0,
     };
@@ -245,15 +264,16 @@ export type TeamStatTotal = {
   shutouts: number;
   goals: number; assists: number; pim: number; hits: number; blocks: number;
   ppGoals: number; shGoals: number;
+  xgf5v5: number; xga5v5: number; xgf60: number; xga60: number; xgfPct: number;
 };
 
 /** Full team stat line for the Team Stats page: standings + goal/shot splits + team player totals. */
 export async function teamStatTotals(season: string, league = "NHL"): Promise<TeamStatTotal[]> {
-  const [standings, games, playerAgg, teams] = await Promise.all([
+  const [standings, games, playerAgg, teams, evEvents, toiAgg] = await Promise.all([
     computeStandings(season, league),
     prisma.game.findMany({
       where: { season, league, status: "FINAL", seriesId: null },
-      select: { homeTeamId: true, awayTeamId: true, homeGoals: true, awayGoals: true, homeShots: true, awayShots: true, endedIn: true, winnerTeamId: true },
+      select: { id: true, homeTeamId: true, awayTeamId: true, homeGoals: true, awayGoals: true, homeShots: true, awayShots: true, endedIn: true, winnerTeamId: true },
     }),
     prisma.playerGameStat.groupBy({
       by: ["teamId"],
@@ -261,10 +281,37 @@ export async function teamStatTotals(season: string, league = "NHL"): Promise<Te
       _sum: { goals: true, assists: true, pim: true, hits: true, blocks: true, ppGoals: true, shGoals: true },
     }),
     prisma.team.findMany({ select: { id: true, slug: true, logoUrl: true } }),
+    prisma.gameEvent.findMany({
+      where: { game: gameWhere({ season, league, playoffs: false }), type: { in: ["SHOT", "GOAL"] }, strength: "EV", xg: { not: null }, period: { lte: 3 } },
+      select: { gameId: true, period: true, seconds: true, teamId: true, type: true, xg: true },
+    }),
+    prisma.playerGameStat.groupBy({
+      by: ["teamId"], where: { game: gameWhere({ season, league, playoffs: false }) },
+      _sum: { toi: true, ppToi: true, pkToi: true },
+    }),
   ]);
   const slugById = new Map(teams.map((t) => [t.id, t.slug]));
   const logoById = new Map(teams.map((t) => [t.id, t.logoUrl]));
   const pAgg = new Map(playerAgg.map((p) => [p.teamId, p._sum]));
+  const evToiByTeam = new Map(toiAgg.map((r) => [r.teamId, Math.max(0, (r._sum.toi ?? 0) - (r._sum.ppToi ?? 0) - (r._sum.pkToi ?? 0)) / 5]));
+
+  // A high-danger goal may have a SHOT twin at the same instant. Keep the GOAL
+  // row so xG is counted once, matching the game report's shot-map logic.
+  const goalKeys = new Set(evEvents.filter((e) => e.type === "GOAL").map((e) => `${e.gameId}:${e.period}:${e.seconds}:${e.teamId}`));
+  const xgf5 = new Map<number, number>();
+  const xgByGameTeam = new Map<string, number>();
+  for (const e of evEvents) {
+    if (e.teamId == null || e.xg == null) continue;
+    if (e.type === "SHOT" && goalKeys.has(`${e.gameId}:${e.period}:${e.seconds}:${e.teamId}`)) continue;
+    xgf5.set(e.teamId, (xgf5.get(e.teamId) ?? 0) + e.xg);
+    const gameTeamKey = `${e.gameId}:${e.teamId}`;
+    xgByGameTeam.set(gameTeamKey, (xgByGameTeam.get(gameTeamKey) ?? 0) + e.xg);
+  }
+  const xga5 = new Map<number, number>();
+  for (const g of games) {
+    xga5.set(g.homeTeamId, (xga5.get(g.homeTeamId) ?? 0) + (xgByGameTeam.get(`${g.id}:${g.awayTeamId}`) ?? 0));
+    xga5.set(g.awayTeamId, (xga5.get(g.awayTeamId) ?? 0) + (xgByGameTeam.get(`${g.id}:${g.homeTeamId}`) ?? 0));
+  }
 
   type Ext = { shotsFor: number; shotsAgainst: number; shutouts: number; otw: number; sow: number; otl: number; sol: number };
   const ext = new Map<number, Ext>();
@@ -287,6 +334,9 @@ export async function teamStatTotals(season: string, league = "NHL"): Promise<Te
     const e = ext.get(s.teamId) ?? { shotsFor: 0, shotsAgainst: 0, shutouts: 0, otw: 0, sow: 0, otl: 0, sol: 0 };
     const pa = pAgg.get(s.teamId);
     const gp = s.gp || 1;
+    const xgf5v5 = xgf5.get(s.teamId) ?? 0;
+    const xga5v5 = xga5.get(s.teamId) ?? 0;
+    const evSeconds = evToiByTeam.get(s.teamId) ?? 0;
     return {
       teamId: s.teamId, name: s.name, code: s.code, slug: slugById.get(s.teamId) ?? null, logoUrl: logoById.get(s.teamId) ?? null,
       gp: s.gp, w: s.w, l: s.l, otw: e.otw, otl: s.otl, sow: e.sow, sol: e.sol, rw: s.rw,
@@ -296,6 +346,10 @@ export async function teamStatTotals(season: string, league = "NHL"): Promise<Te
       shutouts: e.shutouts,
       goals: pa?.goals ?? 0, assists: pa?.assists ?? 0, pim: pa?.pim ?? 0, hits: pa?.hits ?? 0, blocks: pa?.blocks ?? 0,
       ppGoals: pa?.ppGoals ?? 0, shGoals: pa?.shGoals ?? 0,
+      xgf5v5, xga5v5,
+      xgf60: evSeconds ? xgf5v5 * 3600 / evSeconds : 0,
+      xga60: evSeconds ? xga5v5 * 3600 / evSeconds : 0,
+      xgfPct: xgf5v5 + xga5v5 ? xgf5v5 / (xgf5v5 + xga5v5) : 0,
     };
   });
 }

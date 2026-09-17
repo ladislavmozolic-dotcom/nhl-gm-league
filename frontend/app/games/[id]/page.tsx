@@ -263,7 +263,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
       xg: game.homeXg ?? null, hd: game.homeHd ?? null,
       ozPct: game.homeOzPct ?? null, nzPct: game.homeNzPct ?? null, dzPct: game.homeDzPct ?? null,
       shotSectors: game.homeShotSectors ?? [],
-      topShot: game.homeTopShot ?? null, topShotBy: game.homeTopShotBy ?? null, avgShot: game.homeAvgShot ?? null,
+      topShot: game.homeTopShot ?? null, topShotBy: game.homeTopShotBy ? cleanName(game.homeTopShotBy) : null, avgShot: game.homeAvgShot ?? null,
       goalsByPeriod: game.homeGoalsByPeriod, shotsByPeriod: game.homeShotsByPeriod,
       skaters: skaters(game.homeTeamId), goalies: goalies(game.homeTeamId), lines: homeLines,
       shotDots: shotDots(game.homeTeamId),
@@ -273,7 +273,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
       xg: game.awayXg ?? null, hd: game.awayHd ?? null,
       ozPct: game.awayOzPct ?? null, nzPct: game.awayNzPct ?? null, dzPct: game.awayDzPct ?? null,
       shotSectors: game.awayShotSectors ?? [],
-      topShot: game.awayTopShot ?? null, topShotBy: game.awayTopShotBy ?? null, avgShot: game.awayAvgShot ?? null,
+      topShot: game.awayTopShot ?? null, topShotBy: game.awayTopShotBy ? cleanName(game.awayTopShotBy) : null, avgShot: game.awayAvgShot ?? null,
       goalsByPeriod: game.awayGoalsByPeriod, shotsByPeriod: game.awayShotsByPeriod,
       skaters: skaters(game.awayTeamId), goalies: goalies(game.awayTeamId), lines: awayLines,
       shotDots: shotDots(game.awayTeamId),
@@ -285,26 +285,28 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
       runningGoal.set(g.scorerId, n);
       return {
         period: g.period, seconds: g.seconds, teamId: g.teamId,
-        scorerName: g.scorerName, scorerSlug: slugById.get(g.scorerId) ?? null,
+        scorerName: cleanName(g.scorerName), scorerSlug: slugById.get(g.scorerId) ?? null,
         scorerSeasonGoal: (priorGoalMap.get(g.scorerId) ?? 0) + n,
-        assistNames: g.assistNames,
+        assistNames: g.assistNames.map(cleanName),
         assists: g.assistIds.map((aid, i) => {
           const ra = (runningAssist.get(aid) ?? 0) + 1; runningAssist.set(aid, ra);
-          return { name: g.assistNames[i] ?? "", slug: slugById.get(aid) ?? null, total: (priorAssistMap.get(aid) ?? 0) + ra };
+          return { name: cleanName(g.assistNames[i] ?? ""), slug: slugById.get(aid) ?? null, total: (priorAssistMap.get(aid) ?? 0) + ra };
         }),
         strength: g.strength, emptyNet: g.emptyNet,
-        onIceForNames: g.onIceForNames, onIceAgainstNames: g.onIceAgainstNames,
+        onIceForNames: g.onIceForNames.map(cleanName), onIceAgainstNames: g.onIceAgainstNames.map(cleanName),
       };
     }),
     penalties: game.penaltyEvents.map((p) => ({
       period: p.period, seconds: p.seconds, teamId: p.teamId,
-      playerName: p.playerName, type: p.type, minutes: p.minutes, severity: p.severity, givesPP: p.givesPP,
+      playerName: cleanName(p.playerName), type: p.type, minutes: p.minutes, severity: p.severity, givesPP: p.givesPP,
     })),
     injuries,
     story,
     homeSystem: (game.homeSystem as Record<string, string> | null) ?? null,
     awaySystem: (game.awaySystem as Record<string, string> | null) ?? null,
-    playByPlay: (game.playByPlay as unknown as PbpEvent[] | null) ?? [],
+    // Also clean already-persisted games created before names were normalized
+    // at the simulation boundary.
+    playByPlay: ((game.playByPlay as unknown as PbpEvent[] | null) ?? []).map((e) => ({ ...e, text: cleanName(e.text) })),
     shootout: ((game.shootout as unknown as ShootoutAttempt[] | null) ?? []).map((a) => ({
       ...a, teamCode: a.teamId === game.homeTeamId ? game.homeTeam.code : game.awayTeam.code,
       shooterSlug: slugById.get(a.shooterId) ?? null,

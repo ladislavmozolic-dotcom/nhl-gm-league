@@ -14,6 +14,7 @@ import { buildUnits, buildStUnits, depthChartUnits, playerChemistry, unitSignatu
 import { roleFitOf as roleFitPure } from "./role-fit";
 import { resolveTactics, resolveLineTactics, mergeTactics, type RosterProfile, type TeamTactics, type PpStyle, type PkStyle } from "./tactics";
 import { PP_LAYOUTS, PP4_LAYOUTS } from "./formation-layout";
+import { cleanName } from "../playerName";
 
 const clamp = (v: number, lo = 20, hi = 99) => Math.max(lo, Math.min(hi, v));
 const w = (parts: Array<[number, number]>) => {
@@ -65,7 +66,9 @@ export function buildSkater(row: {
   const a = row.attrs;
   return {
     id: row.id,
-    name: row.name,
+    // Simulation output must never inherit captaincy / contract markers stored
+    // in the roster import. This covers PBP, box scores and tracking leaders.
+    name: cleanName(row.name),
     position: row.position,
     isDefense,
     isCenter,
@@ -95,7 +98,7 @@ export function buildGoalie(row: {
 }): SimGoalie {
   return {
     id: row.id,
-    name: row.name,
+    name: cleanName(row.name),
     overall: row.overall ?? 50,
     attrs: row.attrs,
     quality: goalieQuality(row.attrs, row.overall ?? 50),

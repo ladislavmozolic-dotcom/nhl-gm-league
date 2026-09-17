@@ -20,6 +20,9 @@ const COLS: Col[] = [
   { key: "diff", label: "DIFF", title: "Goal Differential", num: true, format: "plusMinus" },
   { key: "gfPerGame", label: "GF/G", title: "Goals For per Game", num: true, format: "dec2" },
   { key: "gaPerGame", label: "GA/G", title: "Goals Against per Game", num: true, format: "dec2" },
+  { key: "xgf60", label: "xGF/60", title: "Expected Goals For per 60 minutes at 5-on-5", num: true, format: "dec2" },
+  { key: "xga60", label: "xGA/60", title: "Expected Goals Against per 60 minutes at 5-on-5", num: true, format: "dec2" },
+  { key: "xgfPct", label: "xGF%", title: "Share of expected goals at 5-on-5", num: true, format: "pct1" },
   // extras — hidden until enabled in the filter
   { key: "rw", label: "RW", title: "Regulation Wins", num: true, defaultHidden: true },
   { key: "otw", label: "OTW", title: "Overtime Wins", num: true, defaultHidden: true },
@@ -50,6 +53,7 @@ export default async function TeamStatsPage({ searchParams }: { searchParams: Pr
     shotsFor: t.shotsFor, shotsAgainst: t.shotsAgainst, sfPerGame: t.sfPerGame, saPerGame: t.saPerGame,
     shutouts: t.shutouts, goals: t.goals, assists: t.assists, pim: t.pim, hits: t.hits, blocks: t.blocks,
     ppGoals: t.ppGoals, shGoals: t.shGoals,
+    xgf60: t.xgf60, xga60: t.xga60, xgfPct: t.xgfPct,
   }));
   return (
     <div className="space-y-6 py-2">

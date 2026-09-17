@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import InfoTip from "@/components/InfoTip";
 
-export type ColFormat = "plusMinus" | "plusDec1" | "pct3" | "dec1" | "dec2" | "jersey" | "dash";
+export type ColFormat = "plusMinus" | "plusDec1" | "pct3" | "pct1" | "dec1" | "dec2" | "jersey" | "dash";
 export type Col = {
   key: string; label: string; num?: boolean; frozen?: boolean;
   title?: string;         // tooltip (full stat name)
@@ -23,6 +23,7 @@ function render(v: number | string, format?: ColFormat): string {
     case "plusMinus": return n > 0 ? "+" + n : String(n);
     case "plusDec1": return (n > 0 ? "+" : "") + n.toFixed(1);
     case "pct3": return n.toFixed(3).replace(/^0/, "");
+    case "pct1": return (n * 100).toFixed(1) + "%";
     case "dec1": return n.toFixed(1);
     case "dec2": return n.toFixed(2);
     default: return String(v);

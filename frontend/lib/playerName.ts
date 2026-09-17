@@ -2,13 +2,21 @@
 // `Nikita Kucherov ''A''` or `Sidney Crosby ''C''`, and rookies a trailing `(R)`.
 // These helpers keep display clean while preserving the underlying data.
 
-const CAP_RE = /\s*''[CA]''|\s*"[CA]"|\s*\((?:C|A)\)/g;
+const CAP_RE = /\s*(?:''[CA]''|"[CA]"|\((?:C|A)\))/gi;
 // Contract markers (no-trade / no-move clause) that leak into some names.
-const CLAUSE_RE = /\s*\((?:NTC|NMC|NTC-M|UFA|RFA)\)/gi;
+// Some imports wrap the whole marker in straight/smart quotes, for example
+// `Connor McDavid (C) "(NTC)"`; consume those quotes together with the marker.
+const CLAUSE_RE = /\s*(?:''|["“”])?\((?:NTC|NMC|NTC-M|M-NTC|UFA|RFA)\)(?:''|["“”])?/gi;
 
 /** Strip captaincy + contract-clause markers from a name; keeps the rookie (R) tag. */
 export function cleanName(name: string): string {
-  return name.replace(CAP_RE, "").replace(CLAUSE_RE, "").replace(/\s{2,}/g, " ").trim();
+  return name
+    .replace(CAP_RE, "")
+    .replace(CLAUSE_RE, "")
+    // Defensive cleanup for an orphaned quote left by older imported formats.
+    .replace(/\s+(?:''|"")\s*$/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 /** Captaincy from the raw name: "C", "A", or null. */

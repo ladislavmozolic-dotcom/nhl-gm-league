@@ -554,8 +554,8 @@ function EdgePanel({ data }: { data: Data }) {
           <div>
             <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Shot speed <span className="normal-case text-slate-600">· top / avg</span></div>
             <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="tabular-nums"><span className="text-lg font-bold">{away.topShot!.toFixed(1)}</span> <span className="text-slate-500 text-xs">mph {away.topShotBy}</span>{away.avgShot != null && <span className="text-slate-500 text-xs"> · avg {away.avgShot.toFixed(0)}</span>}</div>
-              <div className="tabular-nums text-right">{home.avgShot != null && <span className="text-slate-500 text-xs">avg {home.avgShot.toFixed(0)} · </span>}<span className="text-slate-500 text-xs">{home.topShotBy} mph</span> <span className="text-lg font-bold">{home.topShot!.toFixed(1)}</span></div>
+              <div className="tabular-nums"><span className="text-lg font-bold">{away.topShot!.toFixed(1)}</span> <span className="text-slate-500 text-xs">mph {away.topShotBy ? cleanName(away.topShotBy) : ""}</span>{away.avgShot != null && <span className="text-slate-500 text-xs"> · avg {away.avgShot.toFixed(0)}</span>}</div>
+              <div className="tabular-nums text-right">{home.avgShot != null && <span className="text-slate-500 text-xs">avg {home.avgShot.toFixed(0)} · </span>}<span className="text-slate-500 text-xs">{home.topShotBy ? cleanName(home.topShotBy) : ""} mph</span> <span className="text-lg font-bold">{home.topShot!.toFixed(1)}</span></div>
             </div>
           </div>
         )}

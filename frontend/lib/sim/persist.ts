@@ -4,6 +4,7 @@
 import { prisma } from "../prisma";
 import type { GameResult, TeamBox } from "./types";
 import type { TeamLinesData } from "./lines-core";
+import { cleanName } from "../playerName";
 
 export type GameMeta = {
   season?: string;
@@ -83,8 +84,8 @@ export async function saveGameResult(result: GameResult, meta: GameMeta = {}) {
     awayShotSectors: result.away.shotSectors,
     homeTopShot: result.home.topShotSpeed || null,
     awayTopShot: result.away.topShotSpeed || null,
-    homeTopShotBy: result.home.topShotBy || null,
-    awayTopShotBy: result.away.topShotBy || null,
+    homeTopShotBy: result.home.topShotBy ? cleanName(result.home.topShotBy) : null,
+    awayTopShotBy: result.away.topShotBy ? cleanName(result.away.topShotBy) : null,
     homeAvgShot: result.home.shots ? result.home.shotSpeedSum / result.home.shots : null,
     awayAvgShot: result.away.shots ? result.away.shotSpeedSum / result.away.shots : null,
     homeSystem: (result.homeSystem ?? undefined) as object | undefined,
@@ -96,7 +97,7 @@ export async function saveGameResult(result: GameResult, meta: GameMeta = {}) {
     winnerTeamId: result.winner,
     seed: result.seed,
     engineVersion: result.engineVersion ?? null,
-    playByPlay: result.playByPlay,
+    playByPlay: result.playByPlay.map((e) => ({ ...e, text: cleanName(e.text) })),
     shootout: result.shootout ?? [],
     playedAt: new Date(),
   };
@@ -104,16 +105,16 @@ export async function saveGameResult(result: GameResult, meta: GameMeta = {}) {
   const goalRows = (gameId: number) => result.goals.map((g) => ({
     gameId, period: g.period, seconds: g.seconds,
     teamId: g.team, teamCode: g.teamCode,
-    scorerId: g.scorer, scorerName: g.scorerName,
-    assistIds: g.assists, assistNames: g.assistNames,
+    scorerId: g.scorer, scorerName: cleanName(g.scorerName),
+    assistIds: g.assists, assistNames: g.assistNames.map(cleanName),
     strength: g.strength, emptyNet: g.emptyNet,
-    onIceForIds: g.onIceForIds, onIceForNames: g.onIceForNames,
-    onIceAgainstIds: g.onIceAgainstIds, onIceAgainstNames: g.onIceAgainstNames,
+    onIceForIds: g.onIceForIds, onIceForNames: g.onIceForNames.map(cleanName),
+    onIceAgainstIds: g.onIceAgainstIds, onIceAgainstNames: g.onIceAgainstNames.map(cleanName),
   }));
   const penaltyRows = (gameId: number) => result.penalties.map((p) => ({
     gameId, period: p.period, seconds: p.seconds,
     teamId: p.team, teamCode: p.teamCode,
-    playerId: p.playerId, playerName: p.playerName,
+    playerId: p.playerId, playerName: cleanName(p.playerName),
     type: p.type, minutes: p.minutes, severity: p.severity, givesPP: p.givesPP,
   }));
   const eventRows = (gameId: number) => (result.events ?? []).map((e) => ({
