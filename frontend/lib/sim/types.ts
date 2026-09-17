@@ -133,6 +133,18 @@ export type ShootoutAttempt = {
   result: "goal" | "save" | "miss"; // scored / stopped by goalie / missed the net
 };
 
+export const SITUATION_KEYS = ["5V5", "4V4", "3V3", "PP", "PK", "EN_OWN", "EN_OPP"] as const;
+export type SituationKey = typeof SITUATION_KEYS[number];
+export type SituationLine = {
+  toi: number;
+  goals: number;
+  assists: number;
+  points: number;
+  shots: number;
+  xg: number;
+  plusMinus: number;
+};
+
 export type PlayerLine = {
   id: number;
   name: string;
@@ -163,6 +175,7 @@ export type PlayerLine = {
   shifts: number;        // shifts taken (Shift Quality)
   positiveShifts: number;// shifts with a positive on-ice xG differential
   shotZones: number[];   // ALL shots by rink zone [POINT,PERIMETER,CIRCLE,SLOT,NET_FRONT]
+  situations: Record<SituationKey, SituationLine>; // exact clock/event split for situation filters
 };
 
 export type GoalieLine = {

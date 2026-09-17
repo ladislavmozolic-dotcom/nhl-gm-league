@@ -13,7 +13,7 @@ import { ENGINE_V2 } from "./version";
 import type {
   SimTeam, SimSkater, SimGoalie, GameResult, TeamBox, PlayerLine, GoalieLine,
   GoalEvent, PenaltyEvent, InjuryEvent, ShootoutAttempt, LineTactic,
-  InjuryMechanism, InjurySeverity,
+  InjuryMechanism, InjurySeverity, SituationKey, SituationLine,
 } from "./types";
 
 // Engine version stamped on every simulated Game (for reproducibility, history and
@@ -188,6 +188,7 @@ function fmt(sec: number): string {
 }
 
 function newPlayerLine(s: SimSkater): PlayerLine {
+  const situation = (): SituationLine => ({ toi: 0, goals: 0, assists: 0, points: 0, shots: 0, xg: 0, plusMinus: 0 });
   return {
     id: s.id, name: s.name, position: s.position,
     goals: 0, assists: 0, points: 0, shots: 0, pim: 0, plusMinus: 0,
@@ -197,7 +198,26 @@ function newPlayerLine(s: SimSkater): PlayerLine {
     xg: 0, hdShots: 0, topShotSpeed: 0,
     shifts: 0, positiveShifts: 0,
     shotZones: [0, 0, 0, 0, 0],
+    situations: {
+      "5V5": situation(), "4V4": situation(), "3V3": situation(),
+      PP: situation(), PK: situation(), EN_OWN: situation(), EN_OPP: situation(),
+    },
   };
+}
+
+function situationFor(
+  st: SimState, off: SimTeam, def: SimTeam, period: number,
+  strength: "EV" | "PP" | "SH" | "SO",
+  offSkaters?: number, defSkaters?: number,
+): SituationKey | null {
+  if (strength === "SO") return null;
+  if (st.emptyNet[off.id]) return "EN_OWN";
+  if (st.emptyNet[def.id]) return "EN_OPP";
+  if (strength === "PP") return "PP";
+  if (strength === "SH") return "PK";
+  if (period >= 4 || (offSkaters === 3 && defSkaters === 3)) return "3V3";
+  if (offSkaters === 4 && defSkaters === 4) return "4V4";
+  return "5V5";
 }
 
 // Post-game skater conditioning. Reaching the configured heavy-work threshold
@@ -523,6 +543,7 @@ function recordGoal(
   st: SimState, off: SimTeam, def: SimTeam, period: number, seconds: number,
   strength: GoalEvent["strength"], emptyNet = false, explicitScorer?: SimSkater,
   shot?: { sector: string; shotType: string; xg: number },
+  explicitSituation?: SituationKey,
 ) {
   // when no explicit scorer is passed (the endgame's synthetic extra-attempt
   // model — OT always passes one), fall back to a shooter excluding anyone
@@ -537,10 +558,18 @@ function recordGoal(
   const offIce = st.currentOnIce[off.id];
   let onFor: SimSkater[] = offIce && (offIce.f.length || offIce.d.length) ? [...offIce.f, ...offIce.d] : pickOnIce(st.rng, off);
   if (!onFor.some((s) => s.id === scorer.id)) onFor = [scorer, ...onFor].slice(0, 5); // guarantee the scorer is on the ice
+  // conceding side: the real unit that was on the ice against (PK unit on a PP goal, etc.).
+  const defIce = st.currentOnIce[def.id];
+  const onAgainst: SimSkater[] = defIce && (defIce.f.length || defIce.d.length) ? [...defIce.f, ...defIce.d] : pickOnIce(st.rng, def);
   const assists = strength === "SO" ? [] : pickAssists(st.rng, onFor, scorer.id);
+  const situation = explicitSituation ?? situationFor(st, off, def, period, strength, onFor.length, onAgainst.length);
   const offLines = st.lines[off.id];
   const sl = offLines[scorer.id];
   sl.goals++; sl.points++;
+  if (situation) {
+    sl.situations[situation].goals++;
+    sl.situations[situation].points++;
+  }
   if (strength === "PP") sl.ppGoals++;
   if (strength === "SH") sl.shGoals++;
   const assistNames: string[] = [];
@@ -548,20 +577,24 @@ function recordGoal(
     offLines[aId].assists++; offLines[aId].points++;
     if (strength === "PP") offLines[aId].ppAssists++;
     else if (strength === "SH") offLines[aId].shAssists++;
+    if (situation) {
+      offLines[aId].situations[situation].assists++;
+      offLines[aId].situations[situation].points++;
+    }
     assistNames.push(offLines[aId].name);
   }
   st.box[off.id].goals++;
   if (strength === "PP") st.box[off.id].ppGoals++;
   if (period <= 4) st.box[off.id].goalsByPeriod[period - 1]++;
 
-  // conceding side: the real unit that was on the ice against (PK unit on a PP goal, etc.).
-  const defIce = st.currentOnIce[def.id];
-  const onAgainst: SimSkater[] = defIce && (defIce.f.length || defIce.d.length) ? [...defIce.f, ...defIce.d] : pickOnIce(st.rng, def);
-
   // +/- : even-strength AND short-handed goals count (real NHL rule); PP and SO don't.
   if (strength === "EV" || strength === "SH") {
     for (const s of onFor) st.lines[off.id][s.id].plusMinus += 1;
     for (const s of onAgainst) st.lines[def.id][s.id].plusMinus -= 1;
+  }
+  if (situation === "5V5") {
+    for (const s of onFor) st.lines[off.id][s.id].situations["5V5"].plusMinus += 1;
+    for (const s of onAgainst) st.lines[def.id][s.id].situations["5V5"].plusMinus -= 1;
   }
 
   st.goals.push({
@@ -594,6 +627,7 @@ function trackSpecialShot(
   st: SimState, off: SimTeam, def: SimTeam, shooter: SimSkater,
   period: number, seconds: number, sector: ShotSector, shotType: ShotType,
   xg: number, goalieInNet = true,
+  explicitSituation?: SituationKey,
 ): { goalie: GoalieLine | null; zoneIndex: number; danger: "hd" | "md" | "ld" } {
   const box = st.box[off.id];
   const line = st.lines[off.id][shooter.id];
@@ -601,6 +635,11 @@ function trackSpecialShot(
   if (period <= 4) box.shotsByPeriod[period - 1]++;
   line.shots++;
   line.xg += xg;
+  const situation = explicitSituation ?? situationFor(st, off, def, period, "EV");
+  if (situation) {
+    line.situations[situation].shots++;
+    line.situations[situation].xg += xg;
+  }
   box.xgFor += xg;
 
   const hd = isHighDanger(sector);
@@ -631,7 +670,7 @@ function trackSpecialShot(
     targetId: goalie ? liveGoalie(st, def).id : undefined,
     targetName: goalie ? liveGoalie(st, def).name : undefined,
     zone: "OFF", sector, shotType, strength: "EV", xg,
-    importance: hd ? "NOTABLE" : "MINOR", meta: { specialSituation: goalieInNet ? (period === 4 ? "OT" : "6v5") : "EN", mph: Math.round(mph) },
+    importance: hd ? "NOTABLE" : "MINOR", meta: { specialSituation: situation, mph: Math.round(mph) },
   });
   return { goalie, zoneIndex, danger };
 }
@@ -1018,6 +1057,8 @@ function simulatePeriod(st: SimState, period: number, homeShots: number, awaySho
     box.shots++;
     if (period <= 4) box.shotsByPeriod[period - 1]++;
     st.lines[shot.team.id][shooter.id].shots++;
+    const situation = situationFor(st, shot.team, shot.opp, period, strength);
+    if (situation) st.lines[shot.team.id][shooter.id].situations[situation].shots++;
     st.box[shot.opp.id].goalie.shotsAgainst++;
     const margin = st.box[shot.team.id].goals - st.box[shot.opp.id].goals;
     // offense chemistry + morale and defense chemistry are symmetric direct factors
@@ -1455,10 +1496,14 @@ function simulatePeriodPossession(st: SimState, period: number) {
     for (const team of [home, away]) {
       const s = curStr[team.id];
       const oi = st.currentOnIce[team.id];
+      const opp = team === home ? away : home;
+      const oppOi = st.currentOnIce[opp.id];
+      const situation = situationFor(st, team, opp, period, s, oi.f.length + oi.d.length, oppOi.f.length + oppOi.d.length);
       for (const p of [...oi.f, ...oi.d]) {
         const pl = st.lines[team.id][p.id]; if (!pl) continue;
         pl.toi += 1;
         if (s === "PP") pl.ppToi += 1; else if (s === "SH") pl.pkToi += 1;
+        if (situation) pl.situations[situation].toi += 1;
       }
     }
     const absT = base + tick;
@@ -1697,6 +1742,11 @@ function simulatePeriodPossession(st: SimState, period: number) {
       // Shift Quality: this chance's xG lifts the shooters' on-ice shift, dents the defenders'
       creditShiftXg(st, [...onIceF(carrierTeam), ...onIceD(carrierTeam)], [...onIceF(def), ...onIceD(def)], xg);
       st.lines[carrierTeam.id][carrier.id].xg += xg;
+      const shotSituation = situationFor(st, carrierTeam, def, period, strength, strengthInfo.skatersFor, strengthInfo.skatersAgainst);
+      if (shotSituation) {
+        st.lines[carrierTeam.id][carrier.id].situations[shotSituation].shots++;
+        st.lines[carrierTeam.id][carrier.id].situations[shotSituation].xg += xg;
+      }
       if (hd) st.lines[carrierTeam.id][carrier.id].hdShots++;
       st.box[carrierTeam.id].xgFor += xg;
       if (hd) st.box[carrierTeam.id].hdFor++;
@@ -1773,7 +1823,7 @@ function simulatePeriodPossession(st: SimState, period: number) {
         zone: "OFF", sector, shotType,
         strength: strength as SimEvent["strength"], xg,
         importance: hd ? "NOTABLE" : "MINOR",
-        meta: { danger, setup, mph: Math.round(mph) },
+        meta: { danger, setup, mph: Math.round(mph), situation: shotSituation },
       });
       if (rng.chance(p)) {
         gLine.goalsAgainst++;
@@ -2004,19 +2054,19 @@ function simulateEndgame(st: SimState) {
       const shooter = pickShooter(rng, leading);
       const { sector, shotType } = shotProfile(rng, { isDefense: shooter.isDefense, setup: "carry", danger: 1 });
       const xg = 0.65; // an on-target attempt at an empty net
-      trackSpecialShot(st, leading, trailing, shooter, 3, t, sector, shotType, xg, false);
-      recordGoal(st, leading, trailing, 3, t, "EV", true, shooter, { sector, shotType, xg });
+      trackSpecialShot(st, leading, trailing, shooter, 3, t, sector, shotType, xg, false, "EN_OPP");
+      recordGoal(st, leading, trailing, 3, t, "EV", true, shooter, { sector, shotType, xg }, "EN_OPP");
       return; // game iced
     }
     // 6-on-5 push for the trailing team
     const shooter = pickShooter(rng, trailing);
     const { sector, shotType } = shotProfile(rng, { isDefense: shooter.isDefense, setup: "pass", danger: 1.35 });
     const xg = expectedGoal(rng, sector, shotType, "EV");
-    const tracked = trackSpecialShot(st, trailing, leading, shooter, 3, t, sector, shotType, xg);
+    const tracked = trackSpecialShot(st, trailing, leading, shooter, 3, t, sector, shotType, xg, true, "EN_OWN");
     if (rng.chance(tieP)) {
       tracked.goalie!.goalsAgainst++;
       setFreshUnit(st, trailing); setFreshUnit(st, leading);
-      recordGoal(st, trailing, leading, 3, t, "EV", false, shooter, { sector, shotType, xg });
+      recordGoal(st, trailing, leading, 3, t, "EV", false, shooter, { sector, shotType, xg }, "EN_OWN");
       margin = st.box[home.id].goals - st.box[away.id].goals;
       if (margin === 0) return; // tied it up -> heading to OT
     } else {
@@ -2064,6 +2114,12 @@ function simulateOvertime(st: SimState): { winner: number | null; seconds: numbe
     for (const team of [home, away]) {
       const opp = team === home ? away : home;
       const oi = st.currentOnIce[team.id];
+      for (const p of [...oi.f, ...oi.d]) {
+        const line = st.lines[team.id][p.id];
+        if (!line) continue;
+        line.toi += step;
+        line.situations["3V3"].toi += step;
+      }
       maybeInjureOnIce(st, team, opp, [...oi.f, ...oi.d], 4, t, step);
     }
     for (const [att, def, isHome] of [[home, away, true], [away, home, false]] as const) {
@@ -2077,14 +2133,14 @@ function simulateOvertime(st: SimState): { winner: number | null; seconds: numbe
       const shooter = pickShooterFromPool(rng, attOnIce);
       const { sector, shotType } = shotProfile(rng, { isDefense: shooter.isDefense, setup: "carry", danger: 1.25 });
       const xg = expectedGoal(rng, sector, shotType, "EV");
-      const tracked = trackSpecialShot(st, att, def, shooter, 4, t, sector, shotType, xg);
+      const tracked = trackSpecialShot(st, att, def, shooter, 4, t, sector, shotType, xg, true, "3V3");
       const p = conversion(shooter.offense, effGoalieQuality(liveGoalie(st, def)), isHome, "EV") * 2.2;
       if (rng.chance(p)) {
         tracked.goalie!.goalsAgainst++;
         // st.currentOnIce already holds the real deployed trio for both teams
         // this interval — recordGoal reads it directly for assists/+/-, same
         // as 5-on-5, instead of re-randomizing a set after the fact.
-        recordGoal(st, att, def, 4, t, "EV", false, shooter, { sector, shotType, xg });
+        recordGoal(st, att, def, 4, t, "EV", false, shooter, { sector, shotType, xg }, "3V3");
         return { winner: att.id, seconds: t };
       }
       saveSpecialShot(st, def, shooter, 4, t, sector, shotType, xg, tracked);

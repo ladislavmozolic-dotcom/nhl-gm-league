@@ -259,6 +259,7 @@ model Player {
   team                 Team          @relation(fields: [teamId], references: [id])
   skaterRating         SkaterRating?
   gameStats            PlayerGameStat[]
+  situationGameStats   PlayerSituationGameStat[]
   goalieGameStats      GoalieGameStat[]
 }
 
@@ -836,6 +837,7 @@ model Game {
   homeTeam          Team             @relation("HomeGames", fields: [homeTeamId], references: [id])
   awayTeam          Team             @relation("AwayGames", fields: [awayTeamId], references: [id])
   playerStats       PlayerGameStat[]
+  situationStats    PlayerSituationGameStat[]
   goalieStats       GoalieGameStat[]
   goalEvents        GameGoal[]
   penaltyEvents     GamePenalty[]
@@ -1398,6 +1400,29 @@ model PlayerGameStat {
 
   @@unique([gameId, playerId])
   @@index([playerId])
+}
+
+// Exact per-game skater splits produced directly by the simulation clock.
+// situation: 5V5 | 4V4 | 3V3 | PP | PK | EN_OWN | EN_OPP
+model PlayerSituationGameStat {
+  id        Int    @id @default(autoincrement())
+  gameId    Int
+  playerId  Int
+  teamId    Int
+  situation String
+  toi       Int    @default(0)
+  goals     Int    @default(0)
+  assists   Int    @default(0)
+  points    Int    @default(0)
+  shots     Int    @default(0)
+  xg        Float  @default(0)
+  plusMinus Int    @default(0)
+  game      Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  player    Player @relation(fields: [playerId], references: [id])
+
+  @@unique([gameId, playerId, situation])
+  @@index([playerId, situation])
+  @@index([teamId, situation])
 }
 
 // Commissioner-set rivalry score for one team pair — forces lib/rivalry-server.ts's

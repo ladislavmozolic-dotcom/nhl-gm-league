@@ -22,6 +22,13 @@ export type GoalieTotal = {
   xga: number; gsax: number; // Phase 2: expected goals against + goals saved above expected
 };
 
+export type SituationTotal = {
+  playerId: number; name: string; position: string; number: number | null;
+  teamId: number | null; teamCode: string | null; teamSlug: string | null; teamLogo: string | null;
+  gp: number; goals: number; assists: number; points: number; shots: number;
+  toi: number; xg: number; plusMinus: number;
+};
+
 type GameFilter = { season: string; league: string; playoffs: boolean };
 const gameWhere = ({ season, league, playoffs }: GameFilter) =>
   ({ season, league, status: "FINAL", ...(playoffs ? { seriesId: { not: null } } : { seriesId: null }) });
@@ -77,6 +84,34 @@ export async function skaterTotals(season: string, league = "NHL", playoffs = fa
       ppGoals: s.ppGoals ?? 0, shGoals: s.shGoals ?? 0, ppAssists: s.ppAssists ?? 0, shAssists: s.shAssists ?? 0, gwg: s.gwg ?? 0,
       hits: s.hits ?? 0, blocks: s.blocks ?? 0, toi: s.toi ?? 0,
       xg: s.xg ?? 0, hdShots: s.hdShots ?? 0,
+    };
+  });
+}
+
+/** Exact situation splits. Rows exist only for games simulated after situation
+ * tracking was introduced; older games are intentionally not estimated. */
+export async function skaterSituationTotals(
+  season: string, league: string, situation: string, playoffs = false,
+): Promise<SituationTotal[]> {
+  const grouped = await prisma.playerSituationGameStat.groupBy({
+    by: ["playerId", "teamId"],
+    where: { situation, game: gameWhere({ season, league, playoffs }) },
+    _sum: { goals: true, assists: true, points: true, shots: true, toi: true, xg: true, plusMinus: true },
+    _count: { _all: true },
+  });
+  const [players, teams] = await Promise.all([
+    prisma.player.findMany({ where: { id: { in: grouped.map((g) => g.playerId) } }, select: { id: true, name: true, position: true, number: true } }),
+    teamLookup(),
+  ]);
+  const pById = new Map(players.map((p) => [p.id, p]));
+  return grouped.map((g) => {
+    const p = pById.get(g.playerId);
+    const t = teams.get(g.teamId);
+    return {
+      playerId: g.playerId, name: cleanName(p?.name ?? "—"), position: p?.position ?? "—", number: p?.number ?? null,
+      teamId: g.teamId, teamCode: t?.code ?? null, teamSlug: t?.slug ?? null, teamLogo: t?.logoUrl ?? null,
+      gp: g._count._all, goals: g._sum.goals ?? 0, assists: g._sum.assists ?? 0, points: g._sum.points ?? 0,
+      shots: g._sum.shots ?? 0, toi: g._sum.toi ?? 0, xg: g._sum.xg ?? 0, plusMinus: g._sum.plusMinus ?? 0,
     };
   });
 }

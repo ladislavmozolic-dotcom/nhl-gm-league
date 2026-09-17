@@ -45,6 +45,16 @@ function skaterRows(box: TeamBox, gameId: number) {
     }));
 }
 
+function situationRows(box: TeamBox, gameId: number) {
+  return box.skaters.flatMap((s) => Object.entries(s.situations)
+    .filter(([, line]) => line.toi || line.goals || line.assists || line.shots || line.xg || line.plusMinus)
+    .map(([situation, line]) => ({
+      gameId, playerId: s.id, teamId: box.teamId, situation,
+      toi: line.toi, goals: line.goals, assists: line.assists, points: line.points,
+      shots: line.shots, xg: line.xg, plusMinus: line.plusMinus,
+    })));
+}
+
 function goalieRows(box: TeamBox, gameId: number) {
   const lines = [box.goalie, ...(box.backupGoalie ? [box.backupGoalie] : [])];
   return lines.map((g) => ({
@@ -141,6 +151,7 @@ export async function saveGameResult(result: GameResult, meta: GameMeta = {}) {
       });
       gameId = meta.gameId;
       await tx.playerGameStat.deleteMany({ where: { gameId } });
+      await tx.playerSituationGameStat.deleteMany({ where: { gameId } });
       await tx.goalieGameStat.deleteMany({ where: { gameId } });
       await tx.gameGoal.deleteMany({ where: { gameId } });
       await tx.gamePenalty.deleteMany({ where: { gameId } });
@@ -164,6 +175,8 @@ export async function saveGameResult(result: GameResult, meta: GameMeta = {}) {
 
     const players = [...skaterRows(result.home, gameId), ...skaterRows(result.away, gameId)];
     if (players.length) await tx.playerGameStat.createMany({ data: players });
+    const situations = [...situationRows(result.home, gameId), ...situationRows(result.away, gameId)];
+    if (situations.length) await tx.playerSituationGameStat.createMany({ data: situations });
     await tx.goalieGameStat.createMany({
       data: [...goalieRows(result.home, gameId), ...goalieRows(result.away, gameId)],
     });
