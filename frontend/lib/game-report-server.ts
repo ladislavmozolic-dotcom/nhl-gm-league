@@ -155,7 +155,7 @@ function buildReport(
   const lead = `${winCode} won ${wG}–${lG}${game.endedIn && game.endedIn !== "REG" ? ` in ${game.endedIn}` : ""}`;
   let summary = `${parts.join(" ")}. ${lead}.`;
   if (topScorer && topScorer.g >= 2) summary += ` ${topScorer.name} scored ${topScorer.g === 2 ? "twice" : `${topScorer.g} times`}.`;
-  else if (topScorer && topScorer.g === 1) summary += ` ${topScorer.name} led the way.`;
+  else if (topScorer && topScorer.p > 0) summary += ` ${topScorer.name} led the way.`;
 
   // TURNING POINT — the game-winning goal (winner's goal that made the lead they never lost)
   let turningPoint: ReportBit = null;
