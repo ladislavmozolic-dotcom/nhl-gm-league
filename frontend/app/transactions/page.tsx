@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { PageHeader, Card } from "@/components/ui";
+import LocalDateTime from "@/components/LocalDateTime";
 
 export const dynamic = "force-dynamic";
 
@@ -85,13 +86,7 @@ export default async function TransactionsPage() {
                   <p className="text-xs text-slate-500 mt-0.5">{tx.type}</p>
                 </div>
                 <p className="text-xs text-slate-500 flex-shrink-0">
-                  {tx.createdAt.toLocaleDateString("sk-SK", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
+                  <LocalDateTime value={tx.createdAt} />
                 </p>
               </div>
             );

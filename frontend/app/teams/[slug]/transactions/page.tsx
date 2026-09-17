@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { PageHeader, Card } from "@/components/ui";
 import { TX_WHERE } from "@/app/transactions/page";
+import LocalDateTime from "@/components/LocalDateTime";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,7 @@ export default async function TeamTransactionsPage({ params }: { params: Promise
                 <p className="font-medium text-sm">{tx.message}</p>
                 <p className="text-[11px] text-slate-500 mt-0.5">{tx.type}</p>
               </div>
-              <p className="text-xs text-slate-500 shrink-0">{tx.createdAt.toLocaleDateString("sk-SK", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
+              <p className="text-xs text-slate-500 shrink-0"><LocalDateTime value={tx.createdAt} withYear={false} /></p>
             </div>
           ))}
         </div>

@@ -10,6 +10,7 @@ const ZONES = [
   { id: "UTC", label: "UTC" },
   { id: "America/New_York", label: "New York" },
 ];
+const ZONE_KEY = "unhl-time-zone";
 
 /** `frenzyAt` = a pending one-shot Free Agent Frenzy auto-open moment (ISO, real
  *  UTC instant) — when it's set and still in the future, the card counts down to
@@ -27,7 +28,13 @@ export default function NextSimCountdown({ frenzyAt, frenzyOpen, frenzyRound, fr
 }) {
   const [now, setNow] = useState<Date | null>(null);
   const [zone, setZone] = useState("Europe/Bratislava");
-  useEffect(() => { setNow(new Date()); const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, []);
+  useEffect(() => {
+    setNow(new Date());
+    const stored = window.localStorage.getItem(ZONE_KEY);
+    if (stored && ZONES.some((z) => z.id === stored)) setZone(stored);
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   if (!now) return <div className="text-3xl font-black text-slate-100 tabular-nums">--:--:--</div>;
   const frenzyMs = frenzyAt ? new Date(frenzyAt).getTime() : null;
@@ -56,7 +63,7 @@ export default function NextSimCountdown({ frenzyAt, frenzyOpen, frenzyRound, fr
       <p className="text-3xl font-black text-slate-100 tabular-nums leading-none">{d > 0 && `${d}d `}{pad(h)}:{pad(m)}:{pad(s)}</p>
       <div className="flex items-center justify-between gap-2 mt-2">
         <p className="text-xs text-slate-400">{frenzyPending ? "Opens" : roundActive ? "Closes" : "Sim"} at {targetLabel}</p>
-        <select value={zone} onChange={(e) => setZone(e.target.value)}
+        <select value={zone} onChange={(e) => { setZone(e.target.value); window.localStorage.setItem(ZONE_KEY, e.target.value); }}
           className="bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-[11px] text-slate-300">
           {ZONES.map((z) => <option key={z.id} value={z.id}>{z.label}</option>)}
         </select>
