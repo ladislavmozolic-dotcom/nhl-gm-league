@@ -74,18 +74,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   });
   const years = Array.from({ length: SPAN }, (_, i) => CURRENT_SEASON_START + i);
 
-  // ---- Multi-year cap projection ----
-  // Find the furthest contract year across NHL roster, farm, and buyouts/retentions.
-  const maxContractYear = Math.max(
-    CURRENT_SEASON_START + 1, // always show at least next season
-    ...team.players.map((p) => CURRENT_SEASON_START + (p.contractYears ?? 0)),
-    ...farm.map((p) => CURRENT_SEASON_START + (p.contractYears ?? 0)),
-    ...buyouts.map((b) => b.startYear + b.years - 1),
-  );
-  const projYears = Array.from(
-    { length: maxContractYear - CURRENT_SEASON_START + 1 },
-    (_, i) => CURRENT_SEASON_START + i,
-  );
+  // ---- Multi-year cap projection (same SPAN=5 as the roster tables) ----
   /** Sum of cap hits for players with a live contract in a given offset year (0 = current). */
   const nhlCapHitForYear = (offsetYear: number) =>
     team.players.reduce((s, p) => {
@@ -296,7 +285,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
           <thead>
             <tr className="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-800 bg-slate-800/30">
               <th className="text-left px-4 py-2.5 font-medium w-52">Season</th>
-              {projYears.map((y) => (
+              {years.map((y) => (
                 <th key={y} className={`text-center px-3 py-2.5 whitespace-nowrap font-medium ${y === CURRENT_SEASON_START ? "text-blue-400" : ""}`}>
                   {seasonLabel(y)}
                 </th>
@@ -309,7 +298,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
               <td className="px-4 py-2 text-slate-400 text-xs font-medium whitespace-nowrap" title="Salary cap ceiling for this season">
                 Projected Upper Limit
               </td>
-              {projYears.map((y) => (
+              {years.map((y) => (
                 <td key={y} className="px-3 py-2 text-center tabular-nums text-slate-300 text-xs">
                   {money(cap.upper)}
                 </td>
@@ -320,7 +309,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
               <td className="px-4 py-2 text-slate-400 text-xs font-medium whitespace-nowrap" title="Total NHL roster cap hit + dead money (buyouts / retained salary) for that season">
                 NHL Cap Hit
               </td>
-              {projYears.map((y, i) => {
+              {years.map((y, i) => {
                 const hit = nhlCapHitForYear(i);
                 const over = hit > cap.upper;
                 return (
@@ -335,7 +324,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
               <td className="px-4 py-2 text-slate-400 text-xs font-medium whitespace-nowrap" title="Upper Limit minus NHL Cap Hit — how much room remains to add players">
                 NHL Cap Space
               </td>
-              {projYears.map((y, i) => {
+              {years.map((y, i) => {
                 const space = cap.upper - nhlCapHitForYear(i);
                 return (
                   <td key={y} className={`px-3 py-2 text-center tabular-nums text-xs font-bold ${space < 0 ? "text-red-400" : space > 10_000_000 ? "text-emerald-400" : "text-green-300"}`}>
@@ -349,7 +338,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
               <td className="px-4 py-2 text-slate-400 text-xs font-medium whitespace-nowrap" title="Number of NHL players under contract / max active NHL roster size (23)">
                 NHL Roster Contracts
               </td>
-              {projYears.map((y, i) => {
+              {years.map((y, i) => {
                 const count = nhlContractsForYear(i);
                 const over = count > ROSTER_LIMITS.proMax;
                 return (
@@ -365,7 +354,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
               <td className="px-4 py-2 text-slate-400 text-xs font-medium whitespace-nowrap" title="Total contracts in the organization (NHL + AHL) / max org roster size (55)">
                 All Contracts
               </td>
-              {projYears.map((y, i) => {
+              {years.map((y, i) => {
                 const count = allContractsForYear(i);
                 const over = count > ROSTER_LIMITS.orgMax;
                 return (
