@@ -189,18 +189,61 @@ function GoalieBlock({ side }: { side: Side }) {
 }
 
 function SkaterTable({ side }: { side: Side }) {
-  const H = ["G", "A", "P", "+/-", "S", "xG", "PIM", "HIT", "BLK", "FO", "TOI", "PP", "PK", "CON"];
+  type SortKey = "name" | "position" | "goals" | "assists" | "points" | "plusMinus" | "shots" | "xg" | "pim" | "hits" | "blocks" | "fo" | "toi" | "ppToi" | "pkToi" | "conAfter";
+  const columns: Array<{ key: SortKey; label: string; title?: string }> = [
+    { key: "goals", label: "G" }, { key: "assists", label: "A" }, { key: "points", label: "P" },
+    { key: "plusMinus", label: "+/-" }, { key: "shots", label: "S" }, { key: "xg", label: "xG" },
+    { key: "pim", label: "PIM" }, { key: "hits", label: "HIT" }, { key: "blocks", label: "BLK" },
+    { key: "fo", label: "FO", title: "Sort by faceoff percentage" }, { key: "toi", label: "TOI" },
+    { key: "ppToi", label: "PP" }, { key: "pkToi", label: "PK" }, { key: "conAfter", label: "CON" },
+  ];
+  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "points", dir: "desc" });
+  const sortValue = (s: Skater, key: SortKey): string | number | null => {
+    if (key === "name") return cleanName(s.name).toLocaleLowerCase();
+    if (key === "position") return (s.position ?? "").toLocaleLowerCase();
+    if (key === "fo") {
+      const attempts = s.faceoffWins + s.faceoffLosses;
+      return attempts ? s.faceoffWins / attempts : null;
+    }
+    if (key === "xg") return s.xg ?? null;
+    if (key === "ppToi") return s.ppToi ?? null;
+    if (key === "pkToi") return s.pkToi ?? null;
+    if (key === "conAfter") return s.conAfter;
+    return s[key];
+  };
+  const sortedSkaters = side.skaters.map((skater, index) => ({ skater, index })).sort((a, b) => {
+    const av = sortValue(a.skater, sort.key), bv = sortValue(b.skater, sort.key);
+    if (av == null && bv == null) return a.index - b.index;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    const compared = typeof av === "string" && typeof bv === "string" ? av.localeCompare(bv) : Number(av) - Number(bv);
+    return (sort.dir === "asc" ? compared : -compared) || a.index - b.index;
+  }).map(({ skater }) => skater);
+  const chooseSort = (key: SortKey) => setSort((old) => old.key === key
+    ? { key, dir: old.dir === "desc" ? "asc" : "desc" }
+    : { key, dir: key === "name" || key === "position" ? "asc" : "desc" });
+  const sortHead = (sortKey: SortKey, label: string, align: "left" | "right" = "right", title?: string) => {
+    const active = sort.key === sortKey;
+    return (
+      <th key={sortKey} className={`${align === "left" ? "text-left" : "text-right"} ${sortKey === "name" ? "py-1.5 pr-2" : "px-2"}`} aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}>
+        <button type="button" onClick={() => chooseSort(sortKey)} title={title ?? `Sort by ${label}`} className={`inline-flex items-center gap-1 hover:text-slate-200 transition-colors ${active ? "text-sky-400" : ""}`}>
+          {label}<span className={`text-[9px] w-2 ${active ? "opacity-100" : "opacity-0"}`} aria-hidden="true">{sort.dir === "asc" ? "▲" : "▼"}</span>
+        </button>
+      </th>
+    );
+  };
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm min-w-[600px]">
         <thead>
           <tr className="text-xs text-slate-500 border-b border-slate-700">
-            <th className="text-left py-1.5 pr-2">Player</th><th className="text-left px-1">Pos</th>
-            {H.map((h) => <th key={h} className="px-2 text-right">{h}</th>)}
+            {sortHead("name", "Player", "left")}
+            {sortHead("position", "Pos", "left")}
+            {columns.map((c) => sortHead(c.key, c.label, "right", c.title))}
           </tr>
         </thead>
         <tbody>
-          {side.skaters.map((s) => {
+          {sortedSkaters.map((s) => {
             const fo = s.faceoffWins + s.faceoffLosses ? `${s.faceoffWins}-${s.faceoffLosses}` : "—";
             return (
               <tr key={s.id} className="border-b border-slate-800/60 hover:bg-slate-800/30">
