@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/ui";
 import { dailyDigest, latestDigestRound, playedRounds } from "@/lib/digest-server";
+import { defaultStatsPhase } from "@/lib/calendar-server";
+import { REGULAR_SEASON, PRE_SEASON } from "@/lib/phase";
 
 export const dynamic = "force-dynamic";
-const SEASON = "2026-27";
 
 function Card({ title, accent, children }: { title: string; accent: string; children: React.ReactNode }) {
   return (
@@ -18,10 +19,14 @@ const tlink = (code: string | null, slug: string | null) => slug ? <Link href={`
 
 export default async function DigestPage({ searchParams }: { searchParams: Promise<{ round?: string }> }) {
   const sp = await searchParams;
-  const rounds = await playedRounds(SEASON);
-  const latest = await latestDigestRound(SEASON);
+  // Same "which season string is live right now" the home page uses, so the
+  // widget's "view →" link lands on the same night it just teased — during
+  // preseason that's PRE_SEASON, whose games all share round 0.
+  const season = (await defaultStatsPhase()) === "pre" ? PRE_SEASON : REGULAR_SEASON;
+  const rounds = await playedRounds(season);
+  const latest = await latestDigestRound(season);
   const round = sp.round ? Number(sp.round) : latest;
-  const d = await dailyDigest(SEASON, round);
+  const d = await dailyDigest(season, round);
 
   const idx = rounds.indexOf(round);
   const prev = idx > 0 ? rounds[idx - 1] : null;
