@@ -119,15 +119,37 @@ export async function playPreseason(actor = "System"): Promise<{ played: number 
 /** One rest day between exhibition rounds. Preseason games now carry real
  * conditioning and injuries, so the scheduled off-day must heal/recover them too. */
 async function recoverPreseasonRestDay() {
+  const teams = await prisma.team.findMany({ where: { league: { in: ["NHL", "AHL"] } }, select: { id: true } });
+  await recoverPreseasonTeams(teams.map((t) => t.id));
+}
+
+/** Give selected clubs one genuine pre-season off-day. This is also used by the
+ * split schedule: while eight fixtures play, every club not on that day's slate
+ * still receives its normal CON/injury recovery. */
+export async function recoverPreseasonTeams(teamIds: number[]) {
+  const ids = [...new Set(teamIds)];
+  if (!ids.length) return;
   const settings = await loadSettings();
   const skRec = Math.max(1, Math.round(settings.skaterConRecovery));
-  const leagueTeams = { team: { league: { in: ["NHL", "AHL"] } } };
-  await prisma.player.updateMany({ where: { ...leagueTeams, isGoalie: false, injuryDaysLeft: { lte: 0 } }, data: { condition: { increment: skRec } } });
-  await prisma.player.updateMany({ where: { ...leagueTeams, isGoalie: true }, data: { condition: { increment: 2 } } });
-  await prisma.player.updateMany({ where: { ...leagueTeams, condition: { gt: 100 } }, data: { condition: 100 } });
-  await prisma.player.updateMany({ where: { ...leagueTeams, injuryDaysLeft: { gt: 0 } }, data: { injuryDaysLeft: { decrement: 1 } } });
-  await prisma.player.updateMany({ where: { ...leagueTeams, injuryDaysLeft: { lt: 0 } }, data: { injuryDaysLeft: 0 } });
+  const selected = { teamId: { in: ids } };
+  await prisma.player.updateMany({ where: { ...selected, isGoalie: false, injuryDaysLeft: { lte: 0 } }, data: { condition: { increment: skRec } } });
+  await prisma.player.updateMany({ where: { ...selected, isGoalie: true }, data: { condition: { increment: 2 } } });
+  await prisma.player.updateMany({ where: { ...selected, condition: { gt: 100 } }, data: { condition: 100 } });
+  await prisma.player.updateMany({ where: { ...selected, injuryDaysLeft: { gt: 0 } }, data: { injuryDaysLeft: { decrement: 1 } } });
+  await prisma.player.updateMany({ where: { ...selected, injuryDaysLeft: { lt: 0 } }, data: { injuryDaysLeft: 0 } });
   await updateInjuryCon();
+}
+
+export async function recoverPreseasonIdleTeams(dayStart: Date, dayEnd: Date) {
+  const games = await prisma.game.findMany({
+    where: { season: PRE_SEASON, status: "SCHEDULED", gameDate: { gte: dayStart, lt: dayEnd } },
+    select: { homeTeamId: true, awayTeamId: true },
+  });
+  const playing = new Set(games.flatMap((g) => [g.homeTeamId, g.awayTeamId]));
+  const idle = await prisma.team.findMany({
+    where: { league: { in: ["NHL", "AHL"] }, id: { notIn: [...playing] } }, select: { id: true },
+  });
+  await recoverPreseasonTeams(idle.map((t) => t.id));
 }
 
 /** Persist the two preseason effects that matter for roster availability:

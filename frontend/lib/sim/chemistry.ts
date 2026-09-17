@@ -39,11 +39,11 @@ export function buildUnits(lines: TeamLinesData | null | undefined): LineUnit[] 
   const units: LineUnit[] = [];
   for (const l of lines.forwardLines ?? []) {
     const members = [l.lw, l.c, l.rw].filter((x): x is number => x != null);
-    if (members.length >= 2) units.push({ sig: unitSignature(members), members, isDef: false });
+    if (members.length >= 2) units.push({ sig: unitSignature(members), members, isDef: false, timePct: l.timePct });
   }
   for (const p of lines.defensePairs ?? []) {
     const members = [p.ld, p.rd].filter((x): x is number => x != null);
-    if (members.length >= 2) units.push({ sig: unitSignature(members), members, isDef: true });
+    if (members.length >= 2) units.push({ sig: unitSignature(members), members, isDef: true, timePct: p.timePct });
   }
   return units;
 }

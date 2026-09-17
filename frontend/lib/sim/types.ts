@@ -46,7 +46,13 @@ export type SimSkater = {
 };
 
 /** A forward trio or defense pair, keyed by a stable signature (sorted ids). */
-export type LineUnit = { sig: string; members: number[]; isDef: boolean };
+export type LineUnit = {
+  sig: string;
+  members: number[];
+  isDef: boolean;
+  /** GM-set share of even-strength ice time. Undefined for generated/fallback units. */
+  timePct?: number;
+};
 
 export type SimGoalie = {
   id: number;

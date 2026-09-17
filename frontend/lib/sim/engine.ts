@@ -1061,6 +1061,7 @@ function chunk<T>(arr: T[], n: number): T[][] {
 // depth-chart chunks), a current on-ice unit, and shift timers for fatigue.
 type ShiftState = {
   fLines: SimSkater[][]; dPairs: SimSkater[][];
+  fWeights: number[]; dWeights: number[];
   fIdx: number; dIdx: number; fElapsed: number; dElapsed: number;
   fTopIdx: number; fCheckIdx: number; // which fLines index is this team's top-scoring / most defensive trio
 };
@@ -1106,17 +1107,26 @@ function buildForwardLines(fwds: SimSkater[]): SimSkater[][] {
 
 function buildShifts(team: SimTeam): ShiftState {
   const byId = new Map([...team.forwards, ...team.defense].map((s) => [s.id, s]));
-  const res = (isDef: boolean, size: number, fallback: SimSkater[]) => {
+  const res = (isDef: boolean, size: number, fallback: SimSkater[], defaults: number[]) => {
     const u = team.units.filter((x) => x.isDef === isDef)
-      .map((x) => x.members.map((id) => byId.get(id)).filter((s): s is SimSkater => !!s))
-      .filter((l) => l.length >= size - 1);
-    if (u.length) return u;
-    return isDef ? chunk([...fallback].sort((a, b) => b.iceTime - a.iceTime), size) : buildForwardLines(fallback);
+      .map((unit) => ({
+        players: unit.members.map((id) => byId.get(id)).filter((s): s is SimSkater => !!s),
+        weight: Math.max(0, unit.timePct ?? 0),
+      }))
+      .filter((x) => x.players.length >= size - 1);
+    if (u.length) return {
+      lines: u.map((x) => x.players),
+      weights: u.map((x, i) => x.weight || defaults[i] || 1),
+    };
+    const lines = isDef ? chunk([...fallback].sort((a, b) => b.iceTime - a.iceTime), size) : buildForwardLines(fallback);
+    return { lines, weights: lines.map((_, i) => defaults[i] ?? 1) };
   };
-  const fLines = res(false, 3, team.forwards);
+  const f = res(false, 3, team.forwards, [35, 30, 25, 10]);
+  const d = res(true, 2, team.defense, [40, 35, 25]);
+  const fLines = f.lines;
   const { topIdx: fTopIdx, checkIdx: fCheckIdx } = classifyLines(fLines);
   return {
-    fLines, dPairs: res(true, 2, team.defense),
+    fLines, dPairs: d.lines, fWeights: f.weights, dWeights: d.weights,
     fIdx: 0, dIdx: 0, fElapsed: 0, dElapsed: 0, fTopIdx, fCheckIdx,
   };
 }
@@ -1131,7 +1141,7 @@ function fatigueMult(shiftSec: number, en: number): number {
 // currently-deployed line — a flat multiplier on that line's rotation weight, on top
 // of the existing depth-chart weighting. Not absolute (real matching isn't perfect
 // either — defensive-zone draws, fatigue, etc. all still compete for the next unit).
-const LAST_CHANGE_MATCHUP_BOOST = 2.4;
+const LAST_CHANGE_MATCHUP_BOOST = 1.35;
 
 // Advance a team's shift timers by `dur`; rotate a unit off when its shift is up
 // (new unit weighted toward the top of the depth chart). Accrues TOI on the ice.
@@ -1142,9 +1152,9 @@ function advanceShift(st: SimState, teamId: number, sh: ShiftState, dur: number,
   sh.fElapsed += dur; sh.dElapsed += dur;
   // TOI is accrued in the possession tick loop against the ACTUAL on-ice unit (which
   // is the PP/PK unit during a man-advantage) — not here against the rotating line.
-  const pick = (lines: SimSkater[][], cur: number, biasIdx?: number) => {
+  const pick = (lines: SimSkater[][], weights: number[], cur: number, biasIdx?: number) => {
     if (lines.length <= 1) return 0;
-    const w = lines.map((_, i) => (i === cur ? 0 : [0.34, 0.28, 0.22, 0.16][i] ?? 0.1));
+    const w = lines.map((_, i) => (i === cur ? 0 : Math.max(0.01, weights[i] ?? 1)));
     if (biasIdx !== undefined && biasIdx !== cur && biasIdx < w.length) w[biasIdx] *= LAST_CHANGE_MATCHUP_BOOST;
     return rng.weighted(w);
   };
@@ -1160,10 +1170,10 @@ function advanceShift(st: SimState, teamId: number, sh: ShiftState, dur: number,
       if (oppFIdx === matchup.oppSh.fTopIdx && sh.fCheckIdx !== sh.fTopIdx) bias = sh.fCheckIdx;
       else if (oppFIdx === matchup.oppSh.fCheckIdx) bias = sh.fTopIdx;
     }
-    sh.fIdx = pick(sh.fLines, sh.fIdx, bias);
+    sh.fIdx = pick(sh.fLines, sh.fWeights, sh.fIdx, bias);
     sh.fElapsed = 0;
   }
-  if (sh.dElapsed >= 42 + rng.int(20)) { flushShift(st, teamId, sh.dPairs[sh.dIdx] ?? []); sh.dIdx = pick(sh.dPairs, sh.dIdx); sh.dElapsed = 0; }
+  if (sh.dElapsed >= 42 + rng.int(20)) { flushShift(st, teamId, sh.dPairs[sh.dIdx] ?? []); sh.dIdx = pick(sh.dPairs, sh.dWeights, sh.dIdx); sh.dElapsed = 0; }
 }
 // A shift ends for these players: record it, and whether their on-ice xG differential
 // over the shift was positive (Shift Quality → Positive Shift %). Resets the accrual.

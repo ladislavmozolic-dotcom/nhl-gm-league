@@ -12,7 +12,7 @@ import { aiGmDaily } from "@/lib/ai-gm";
 import { getLeagueDate, computePhase } from "@/lib/calendar-server";
 import { addDays, utcDay, frenzyRound, roundForDate } from "@/lib/calendar";
 import { processWaivers } from "@/lib/waivers-server";
-import { playPreseasonDay, PRE_SEASON } from "@/lib/preseason";
+import { playPreseasonDay, recoverPreseasonIdleTeams, PRE_SEASON } from "@/lib/preseason";
 import { postWeeklyIfDue } from "@/lib/weekly-digest";
 import { resolveFrenzy, processRoundEnd, resolveInSeasonWindows } from "@/app/free-agents/actions";
 import { sweepExpiredContractsToUfa, sweepUnsignedRfasToNonRoster } from "@/lib/free-agency-server";
@@ -79,6 +79,7 @@ export async function simulateLeagueDay(day: Date) {
   // string, so they never touch standings/stats/careers). Lets the calendar roll the
   // whole pre-season out day-by-day before the regular season begins.
   if (preDue > 0) {
+    await recoverPreseasonIdleTeams(start, end);
     await autoFillRosters("NHL").catch(() => {});
     await autoFillRosters("AHL").catch(() => {});
     const pr = await playPreseasonDay(start, end, await commissionerName());
