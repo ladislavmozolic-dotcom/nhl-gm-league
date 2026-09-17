@@ -664,7 +664,7 @@ export default function GameView({ data }: { data: Data }) {
       </div>
 
       {/* tab bar */}
-      <div className="flex gap-5 border-b border-slate-800 overflow-x-auto justify-center">
+      <div className="flex gap-5 border-b border-slate-800 overflow-x-auto overflow-y-hidden justify-center">
         {tabs.map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className={`px-2 py-3 text-base font-bold uppercase tracking-wide whitespace-nowrap border-b-2 -mb-px transition ${tab === t.id ? "border-blue-500 text-white" : "border-transparent text-slate-500 hover:text-slate-300"}`}>
