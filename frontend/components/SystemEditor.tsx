@@ -41,6 +41,7 @@ export default function SystemEditor({ teamId, profile, initial, coachEx = 70 }:
   const tr = useT();
   const lang = useLang();
   const [tac, setTac] = useState<TeamTactics>(mergeTactics(initial));
+  const [savedTac, setSavedTac] = useState<TeamTactics>(mergeTactics(initial));
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -48,8 +49,15 @@ export default function SystemEditor({ teamId, profile, initial, coachEx = 70 }:
   const eff = useMemo(() => resolveTactics(tac, profile, coachEx), [tac, profile, coachEx]);
   const fl = fitLabel(eff.fit);
 
-  const set = <K extends keyof TeamTactics>(k: K, v: TeamTactics[K]) => { setTac((t) => ({ ...t, [k]: v, preset: undefined })); setSaved(false); setError(null); };
-  const applyPreset = (name: string) => { setTac(mergeTactics(PRESETS[name])); setSaved(false); setError(null); };
+  const set = <K extends keyof TeamTactics>(k: K, v: TeamTactics[K]) => { setTac((t) => ({ ...t, [k]: v })); setSaved(false); setError(null); };
+  const applyPreset = (name: string) => {
+    // A preset is also the name of the GM's saved customized variant. Returning
+    // to that preset restores the saved dials instead of reapplying its factory
+    // defaults and making the customization appear to have vanished.
+    setTac(savedTac.preset === name ? savedTac : mergeTactics(PRESETS[name]));
+    setSaved(false);
+    setError(null);
+  };
   const save = () => start(async () => {
     try {
       const response = await fetch(`/api/teams/${teamId}/tactics`, {
@@ -60,6 +68,7 @@ export default function SystemEditor({ teamId, profile, initial, coachEx = 70 }:
       const res = await response.json() as { ok: true; tactics: TeamTactics } | { ok: false; error?: string };
       if (res.ok) {
         setTac(res.tactics);
+        setSavedTac(res.tactics);
         setSaved(true);
         setError(null);
       } else {
