@@ -292,7 +292,7 @@ export async function teamEdge(season: string, league = "NHL"): Promise<TeamEdge
 
 export type TeamStatTotal = {
   teamId: number; name: string; code: string | null; slug: string | null; logoUrl: string | null;
-  gp: number; w: number; l: number; otw: number; otl: number; sow: number; sol: number; rw: number;
+  gp: number; w: number; l: number; otw: number; otl: number; sow: number; sol: number; rw: number; row: number;
   points: number; pct: number; gf: number; ga: number; diff: number;
   gfPerGame: number; gaPerGame: number;
   shotsFor: number; shotsAgainst: number; sfPerGame: number; saPerGame: number;
@@ -374,7 +374,7 @@ export async function teamStatTotals(season: string, league = "NHL"): Promise<Te
     const evSeconds = evToiByTeam.get(s.teamId) ?? 0;
     return {
       teamId: s.teamId, name: s.name, code: s.code, slug: slugById.get(s.teamId) ?? null, logoUrl: logoById.get(s.teamId) ?? null,
-      gp: s.gp, w: s.w, l: s.l, otw: e.otw, otl: s.otl, sow: e.sow, sol: e.sol, rw: s.rw,
+      gp: s.gp, w: s.w, l: s.l, otw: s.otw ?? e.otw, otl: s.otl, sow: s.sow ?? e.sow, sol: s.sol ?? e.sol, rw: s.rw, row: s.row,
       points: s.points, pct: s.pointsPct, gf: s.gf, ga: s.ga, diff: s.diff,
       gfPerGame: s.gf / gp, gaPerGame: s.ga / gp,
       shotsFor: e.shotsFor, shotsAgainst: e.shotsAgainst, sfPerGame: e.shotsFor / gp, saPerGame: e.shotsAgainst / gp,

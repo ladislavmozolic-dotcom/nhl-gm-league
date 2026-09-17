@@ -14,6 +14,10 @@ export type TeamStanding = {
   l: number;      // regulation losses
   otl: number;    // overtime/shootout losses
   rw: number;     // regulation wins (tiebreak)
+  row: number;    // regulation + overtime wins (tiebreak)
+  otw: number;    // overtime wins
+  sow: number;    // shootout wins
+  sol: number;    // shootout losses
   gf: number;
   ga: number;
   diff: number;
@@ -41,7 +45,8 @@ export async function computeStandings(season = "2026-27", league = "NHL"): Prom
     table.set(t.id, {
       teamId: t.id, name: t.name, code: t.code,
       conference: t.conference, division: t.division,
-      gp: 0, w: 0, l: 0, otl: 0, rw: 0, gf: 0, ga: 0, diff: 0,
+      gp: 0, w: 0, l: 0, otl: 0, rw: 0, row: 0, otw: 0, sow: 0, sol: 0,
+      gf: 0, ga: 0, diff: 0,
       points: 0, pointsPct: 0,
     });
   }
@@ -57,11 +62,28 @@ export async function computeStandings(season = "2026-27", league = "NHL"): Prom
 
     const winner = g.winnerTeamId === g.homeTeamId ? home : away;
     const loser = winner === home ? away : home;
-    const reg = g.endedIn === "REG";
+    const endedIn = g.endedIn ?? "REG";
     winner.w++;
-    winner.points += reg ? settings.winPts : settings.otWinPts;
-    if (reg) { loser.l++; winner.rw++; loser.points += settings.lossPts; }
-    else { loser.otl++; loser.points += settings.otLossPts; }
+
+    if (endedIn === "REG") {
+      winner.rw++;
+      winner.row++;
+      loser.l++;
+      winner.points += settings.winPts;
+      loser.points += settings.lossPts;
+    } else if (endedIn === "OT") {
+      winner.otw++;
+      winner.row++;
+      loser.otl++;
+      winner.points += settings.otWinPts;
+      loser.points += settings.otLossPts;
+    } else { // "SO"
+      winner.sow++;
+      loser.sol++;
+      loser.otl++;
+      winner.points += settings.otWinPts;
+      loser.points += settings.otLossPts;
+    }
   }
 
   const standings = [...table.values()];
@@ -69,9 +91,16 @@ export async function computeStandings(season = "2026-27", league = "NHL"): Prom
     s.diff = s.gf - s.ga;
     s.pointsPct = s.gp ? s.points / (s.gp * 2) : 0;
   }
-  // sort: points, then points%, then regulation wins, then goal diff
+  // sort: points, then points%, then regulation wins, then ROW, then total wins, then goal diff, then goals for
   standings.sort((a, b) =>
-    b.points - a.points || b.pointsPct - a.pointsPct || b.rw - a.rw || b.diff - a.diff);
+    b.points - a.points ||
+    b.pointsPct - a.pointsPct ||
+    b.rw - a.rw ||
+    b.row - a.row ||
+    b.w - a.w ||
+    b.diff - a.diff ||
+    b.gf - a.gf
+  );
   return standings;
 }
 

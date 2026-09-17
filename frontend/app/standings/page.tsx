@@ -86,7 +86,7 @@ export default async function StandingsPage({ searchParams }: { searchParams: Pr
         groups.map((g) => (
           <section key={g.title}>
             <h2 className={`text-lg font-bold ${g.color} mb-4`}>{g.title}</h2>
-            <StandingsTable rows={g.teams.map((t) => ({ teamId: t.teamId, name: t.name, gp: t.gp, w: t.w, l: t.l, otl: t.otl, points: t.points, gf: t.gf, ga: t.ga, diff: t.diff, logoUrl: meta.get(t.teamId)?.logoUrl ?? null, slug: meta.get(t.teamId)?.slug ?? null }))} />
+            <StandingsTable rows={g.teams.map((t) => ({ teamId: t.teamId, name: t.name, gp: t.gp, w: t.w, l: t.l, otl: t.otl, points: t.points, rw: t.rw, row: t.row, sow: t.sow, sol: t.sol, gf: t.gf, ga: t.ga, diff: t.diff, logoUrl: meta.get(t.teamId)?.logoUrl ?? null, slug: meta.get(t.teamId)?.slug ?? null }))} />
           </section>
         ))
       )}

@@ -31,7 +31,7 @@ export default async function TeamStandingsPage({ params }: { params: Promise<{ 
               <tr className="border-b border-slate-800 text-slate-500 text-xs uppercase tracking-wider bg-slate-800/30">
                 <th className="px-3 py-3 text-left font-medium w-8">#</th>
                 <th className="px-3 py-3 text-left font-medium">Team</th>
-                {["GP", "W", "L", "OTL", "PTS", "GF", "GA", "DIFF"].map((h) => <th key={h} className="px-3 py-3 text-right font-medium">{h}</th>)}
+                {["GP", "W", "L", "OTL", "PTS", "RW", "ROW", "SO", "GF", "GA", "DIFF"].map((h) => <th key={h} className="px-3 py-3 text-right font-medium">{h}</th>)}
               </tr>
             </thead>
             <tbody>
@@ -51,7 +51,10 @@ export default async function TeamStandingsPage({ params }: { params: Promise<{ 
                     <td className="px-3 py-2.5 text-right tabular-nums">{s.w}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums">{s.l}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums">{s.otl}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums font-bold">{s.points}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums font-bold text-white">{s.points}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-slate-300">{s.rw}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-slate-300">{s.row}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-slate-400">{s.sow}-{s.sol}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums text-slate-400">{s.gf}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums text-slate-400">{s.ga}</td>
                     <td className={`px-3 py-2.5 text-right tabular-nums ${s.diff > 0 ? "text-green-400" : s.diff < 0 ? "text-red-400" : "text-slate-400"}`}>{s.diff > 0 ? `+${s.diff}` : s.diff}</td>
