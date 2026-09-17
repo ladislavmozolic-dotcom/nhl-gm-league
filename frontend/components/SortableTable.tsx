@@ -37,8 +37,8 @@ function exportCell(r: SortRow, c: SortCol): string | number {
   return r[c.key] ?? "";
 }
 
-export default function SortableTable({ cols, rows, initialSort, minWidth = 720, interestCtx, csvFilename, focusId }: {
-  cols: SortCol[]; rows: SortRow[]; initialSort?: string; minWidth?: number; interestCtx?: InterestCtx;
+export default function SortableTable({ cols, rows, initialSort, initialSortDir, minWidth = 720, interestCtx, csvFilename, focusId }: {
+  cols: SortCol[]; rows: SortRow[]; initialSort?: string; initialSortDir?: "asc" | "desc"; minWidth?: number; interestCtx?: InterestCtx;
   /** Set to show an "Export Excel" button that downloads the CURRENTLY sorted/
    *  filtered rows as a formatted .xlsx — real columns (numbers stay numbers),
    *  sized to fit their content, autofilter dropdowns on every column so Excel/
@@ -48,8 +48,10 @@ export default function SortableTable({ cols, rows, initialSort, minWidth = 720,
    *  link lands here instead of a generic page link. */
   focusId?: number;
 }) {
+  const initCol = initialSort ? cols.find((x) => x.key === initialSort) : null;
+  const initDir = initialSortDir ?? (initCol ? (numeric(initCol.kind) ? "desc" : "asc") : "desc");
   const [sort, setSort] = useState<string | null>(initialSort ?? null);
-  const [dir, setDir] = useState<"asc" | "desc">("desc");
+  const [dir, setDir] = useState<"asc" | "desc">(initDir);
   const [q, setQ] = useState("");
   const [highlighted, setHighlighted] = useState(focusId != null);
 
