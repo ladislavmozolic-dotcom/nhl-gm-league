@@ -8,7 +8,7 @@ import { cleanName } from "../playerName";
 import { generatePlayByPlay } from "./playbyplay";
 import { DEFAULT_SETTINGS, chemCurveBonusPct, type EngineSettings } from "./settings";
 import { EventSink, type SimEvent } from "./events";
-import { shotProfile, ppShotProfile, expectedGoal, isHighDanger, shotSpeed, sectorIndex, oneTimerHandednessMult, type ShotStrength } from "./shot-quality";
+import { shotProfile, ppShotProfile, expectedGoal, isHighDanger, shotSpeed, sectorIndex, oneTimerHandednessMult, type ShotSector, type ShotStrength, type ShotType } from "./shot-quality";
 import { ENGINE_V2 } from "./version";
 import type {
   SimTeam, SimSkater, SimGoalie, GameResult, TeamBox, PlayerLine, GoalieLine,
@@ -584,6 +584,76 @@ function recordGoal(
     strength: strength === "SO" ? "EV" : (strength === "PP" ? "PP" : strength === "SH" ? "SH" : "EV"),
     importance: "HIGHLIGHT",
     meta: { emptyNet, assistIds: assists, assistNames, seasonGoal: sl.goals, so: strength === "SO" },
+  });
+}
+
+/** Record one of the compact endgame/OT model's shots with the same accounting
+ * as a possession-loop shot. These paths used to increment only the team total,
+ * leaving player shots, xG, rink sectors and goalie danger splits incomplete. */
+function trackSpecialShot(
+  st: SimState, off: SimTeam, def: SimTeam, shooter: SimSkater,
+  period: number, seconds: number, sector: ShotSector, shotType: ShotType,
+  xg: number, goalieInNet = true,
+): { goalie: GoalieLine | null; zoneIndex: number; danger: "hd" | "md" | "ld" } {
+  const box = st.box[off.id];
+  const line = st.lines[off.id][shooter.id];
+  box.shots++;
+  if (period <= 4) box.shotsByPeriod[period - 1]++;
+  line.shots++;
+  line.xg += xg;
+  box.xgFor += xg;
+
+  const hd = isHighDanger(sector);
+  if (hd) { line.hdShots++; box.hdFor++; }
+  const zoneIndex = sectorIndex(sector);
+  box.shotSectors[zoneIndex]++;
+  line.shotZones[zoneIndex]++;
+
+  const mph = shotSpeed(st.rng, shotType, shooter.attrs.sc ?? 50);
+  box.shotSpeedSum += mph;
+  if (mph > line.topShotSpeed) line.topShotSpeed = mph;
+  if (mph > box.topShotSpeed) { box.topShotSpeed = mph; box.topShotBy = shooter.name; }
+
+  const danger: "hd" | "md" | "ld" = hd ? "hd" : sector === "CIRCLE" ? "md" : "ld";
+  const goalie = goalieInNet ? liveGoalieLine(st, def.id) : null;
+  if (goalie) {
+    goalie.shotsAgainst++;
+    goalie.xga += xg;
+    goalie.faceZones[zoneIndex]++;
+    if (danger === "hd") goalie.hdShotsAg++;
+    else if (danger === "md") goalie.mdShotsAg++;
+    else goalie.ldShotsAg++;
+  }
+
+  st.sink.emit({
+    period, seconds, type: "SHOT", teamId: off.id, teamCode: off.code ?? undefined,
+    playerId: shooter.id, playerName: shooter.name,
+    targetId: goalie ? liveGoalie(st, def).id : undefined,
+    targetName: goalie ? liveGoalie(st, def).name : undefined,
+    zone: "OFF", sector, shotType, strength: "EV", xg,
+    importance: hd ? "NOTABLE" : "MINOR", meta: { specialSituation: goalieInNet ? (period === 4 ? "OT" : "6v5") : "EN", mph: Math.round(mph) },
+  });
+  return { goalie, zoneIndex, danger };
+}
+
+function saveSpecialShot(
+  st: SimState, def: SimTeam, shooter: SimSkater, period: number, seconds: number,
+  sector: ShotSector, shotType: ShotType, xg: number,
+  tracked: { goalie: GoalieLine | null; zoneIndex: number; danger: "hd" | "md" | "ld" },
+) {
+  if (!tracked.goalie) return;
+  tracked.goalie.saves++;
+  tracked.goalie.saveZones[tracked.zoneIndex]++;
+  if (tracked.danger === "hd") tracked.goalie.hdSaves++;
+  else if (tracked.danger === "md") tracked.goalie.mdSaves++;
+  else tracked.goalie.ldSaves++;
+  st.sink.emit({
+    period, seconds, type: "SAVE", teamId: def.id, teamCode: def.code ?? undefined,
+    playerId: liveGoalie(st, def).id, playerName: liveGoalie(st, def).name,
+    targetId: shooter.id, targetName: shooter.name,
+    zone: "OFF", sector, shotType, strength: "EV", xg,
+    importance: isHighDanger(sector) ? "NOTABLE" : "MINOR",
+    meta: { specialSituation: period === 4 ? "OT" : "6v5" },
   });
 }
 
@@ -1907,26 +1977,27 @@ function simulateEndgame(st: SimState) {
     const t = 1120 + i * 30; // ~18:40 and ~19:10 of the 3rd
     // empty-net goal for the leader (trailing team's net is empty)
     if (rng.chance(engP)) {
-      st.box[leading.id].shots++;
-      st.box[leading.id].shotsByPeriod[2]++;
       setFreshUnit(st, leading); setFreshUnit(st, trailing);
-      recordGoal(st, leading, trailing, 3, t, "EV", true);
+      const shooter = pickShooter(rng, leading);
+      const { sector, shotType } = shotProfile(rng, { isDefense: shooter.isDefense, setup: "carry", danger: 1 });
+      const xg = 0.65; // an on-target attempt at an empty net
+      trackSpecialShot(st, leading, trailing, shooter, 3, t, sector, shotType, xg, false);
+      recordGoal(st, leading, trailing, 3, t, "EV", true, shooter, { sector, shotType, xg });
       return; // game iced
     }
     // 6-on-5 push for the trailing team
     const shooter = pickShooter(rng, trailing);
-    st.box[trailing.id].shots++;
-    st.box[trailing.id].shotsByPeriod[2]++;
-    st.lines[trailing.id][shooter.id].shots++;
-    st.box[leading.id].goalie.shotsAgainst++;
+    const { sector, shotType } = shotProfile(rng, { isDefense: shooter.isDefense, setup: "pass", danger: 1.35 });
+    const xg = expectedGoal(rng, sector, shotType, "EV");
+    const tracked = trackSpecialShot(st, trailing, leading, shooter, 3, t, sector, shotType, xg);
     if (rng.chance(tieP)) {
-      st.box[leading.id].goalie.goalsAgainst++;
+      tracked.goalie!.goalsAgainst++;
       setFreshUnit(st, trailing); setFreshUnit(st, leading);
-      recordGoal(st, trailing, leading, 3, t, "EV");
+      recordGoal(st, trailing, leading, 3, t, "EV", false, shooter, { sector, shotType, xg });
       margin = st.box[home.id].goals - st.box[away.id].goals;
       if (margin === 0) return; // tied it up -> heading to OT
     } else {
-      st.box[leading.id].goalie.saves++;
+      saveSpecialShot(st, leading, shooter, 3, t, sector, shotType, xg, tracked);
     }
   }
 }
@@ -1974,28 +2045,26 @@ function simulateOvertime(st: SimState): { winner: number | null; seconds: numbe
     }
     for (const [att, def, isHome] of [[home, away, true], [away, home, false]] as const) {
       // 3-on-3 is wide open: elevated chance rate scaled by offense
-      const rate = 0.055 * (att.offenseRating / LEAGUE.avgOffense);
+      const rate = 0.07 * (att.offenseRating / LEAGUE.avgOffense);
       if (!rng.chance(rate)) continue;
       // the injury roll just above can hurt someone from this very on-ice set,
       // so re-filter rather than trusting deployOt's snapshot from this tick.
       const attOnIce = [...st.currentOnIce[att.id].f, ...st.currentOnIce[att.id].d].filter((s) => !st.injured.has(s.id));
       if (!attOnIce.length) continue;
       const shooter = pickShooterFromPool(rng, attOnIce);
-      const gLine = liveGoalieLine(st, def.id);
-      st.box[att.id].shots++;
-      st.box[att.id].shotsByPeriod[3]++;
-      st.lines[att.id][shooter.id].shots++;
-      gLine.shotsAgainst++;
+      const { sector, shotType } = shotProfile(rng, { isDefense: shooter.isDefense, setup: "carry", danger: 1.25 });
+      const xg = expectedGoal(rng, sector, shotType, "EV");
+      const tracked = trackSpecialShot(st, att, def, shooter, 4, t, sector, shotType, xg);
       const p = conversion(shooter.offense, effGoalieQuality(liveGoalie(st, def)), isHome, "EV") * 2.2;
       if (rng.chance(p)) {
-        gLine.goalsAgainst++;
+        tracked.goalie!.goalsAgainst++;
         // st.currentOnIce already holds the real deployed trio for both teams
         // this interval — recordGoal reads it directly for assists/+/-, same
         // as 5-on-5, instead of re-randomizing a set after the fact.
-        recordGoal(st, att, def, 4, t, "EV", false, shooter);
+        recordGoal(st, att, def, 4, t, "EV", false, shooter, { sector, shotType, xg });
         return { winner: att.id, seconds: t };
       }
-      gLine.saves++;
+      saveSpecialShot(st, def, shooter, 4, t, sector, shotType, xg, tracked);
     }
   }
   return { winner: null, seconds: OT_SECONDS };
@@ -2226,7 +2295,7 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
       generateHeatEvents(st, period);
       continue;
     }
-    let hShare = period === 3 ? 0.34 : 0.33;
+    const hShare = period === 3 ? 0.34 : 0.33;
     let hp = Math.round(homeShotsTotal * hShare);
     let ap = Math.round(awayShotsTotal * hShare);
 

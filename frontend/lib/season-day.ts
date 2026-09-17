@@ -81,7 +81,7 @@ export async function simulateLeagueDay(day: Date) {
   if (preDue > 0) {
     await autoFillRosters("NHL").catch(() => {});
     await autoFillRosters("AHL").catch(() => {});
-    const pr = await playPreseasonDay(start, end);
+    const pr = await playPreseasonDay(start, end, await commissionerName());
     played += pr.played;
   }
   // Playoff games scheduled for today play out (day-by-day, no back-to-backs). When a

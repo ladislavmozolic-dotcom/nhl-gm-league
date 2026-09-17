@@ -309,7 +309,7 @@ export async function setPreseasonPublicAction(pub: boolean) {
 
 export async function simPreseasonAction() {
   if (!(await isAdmin())) throw new Error("Only a league admin can simulate the pre-season.");
-  const r = await playPreseason();
+  const r = await playPreseason(await commissionerName());
   revalidatePath("/admin/season");
   revalidatePath("/preseason");
   return r;

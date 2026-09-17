@@ -12,6 +12,7 @@ import { saveGameResult } from "./sim/persist";
 import { injuryConTarget, syncChem, updateInjuryCon } from "./sim/season";
 import { loadSettings } from "./sim/settings";
 import { activeSimEngine, engineVersionFor } from "./sim/version";
+import { recordSimAudit } from "./audit-server";
 import type { SimTeam } from "./sim/types";
 import type { TeamLinesData } from "./sim/lines-core";
 import { PRE_SEASON, REGULAR_SEASON } from "./phase";
@@ -106,13 +107,13 @@ export async function generatePreseason(startDate?: Date): Promise<{ games: numb
 }
 
 /** Simulate the pre-season games due on one calendar day (for the calendar day-loop). */
-export async function playPreseasonDay(dayStart: Date, dayEnd: Date): Promise<{ played: number }> {
-  return simPreseason({ season: PRE_SEASON, status: "SCHEDULED", gameDate: { gte: dayStart, lt: dayEnd } });
+export async function playPreseasonDay(dayStart: Date, dayEnd: Date, actor = "System"): Promise<{ played: number }> {
+  return simPreseason({ season: PRE_SEASON, status: "SCHEDULED", gameDate: { gte: dayStart, lt: dayEnd } }, actor);
 }
 
 /** Simulate every scheduled pre-season game at once (admin "Simulate all"). */
-export async function playPreseason(): Promise<{ played: number }> {
-  return simPreseason({ season: PRE_SEASON, status: "SCHEDULED" });
+export async function playPreseason(actor = "System"): Promise<{ played: number }> {
+  return simPreseason({ season: PRE_SEASON, status: "SCHEDULED" }, actor);
 }
 
 /** One rest day between exhibition rounds. Preseason games now carry real
@@ -160,7 +161,7 @@ async function persistPreseasonPlayerState(result: ReturnType<typeof simulateGam
 }
 
 /** Shared pre-season simmer — full box score plus real CON/injury effects. */
-async function simPreseason(where: object): Promise<{ played: number }> {
+async function simPreseason(where: object, actor: string): Promise<{ played: number }> {
   const settings = await loadSettings();
   const engineVersion = engineVersionFor(await activeSimEngine());
   const scheduled = await prisma.game.findMany({
@@ -181,6 +182,7 @@ async function simPreseason(where: object): Promise<{ played: number }> {
   };
 
   let played = 0;
+  const playedIds: number[] = [];
   let previousRound: number | null = null;
   for (const gm of scheduled) {
     // `playPreseason()` can process all six rounds in one call. Reproduce the
@@ -217,7 +219,9 @@ async function simPreseason(where: object): Promise<{ played: number }> {
     await persistPreseasonPlayerState(result, home, away);
     for (const injury of result.injuries) cache.delete(injury.teamId);
     played++;
+    playedIds.push(gm.id);
   }
+  await recordSimAudit(playedIds, actor);
   return { played };
 }
 

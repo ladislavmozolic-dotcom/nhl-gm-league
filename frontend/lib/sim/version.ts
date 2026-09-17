@@ -19,8 +19,8 @@ import { prisma } from "../prisma";
 
 export type SimEngineChoice = "current" | "nextgen";
 
-export const ENGINE_V1 = "1.0.0"; // stable
-export const ENGINE_V2 = "2.0.0"; // next-gen — same sim math, richer presentation (see engine.ts ENGINE_VERSION)
+export const ENGINE_V1 = "1.0.1"; // stable — complete OT/endgame shot accounting
+export const ENGINE_V2 = "2.1.0"; // next-gen — complete OT/endgame shot accounting + tuning
 
 /** The league's active sim engine. Defaults to "current" (stable). */
 export async function activeSimEngine(): Promise<SimEngineChoice> {
