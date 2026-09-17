@@ -427,6 +427,16 @@ model LeagueConfig {
   updatedAt       DateTime @updatedAt
 }
 
+// Per-season projected salary cap limits — editable by admin from /admin/cap-projection.
+// If no row exists for a given year, the league's current salaryCapUpper / salaryCapLower is used as fallback.
+model CapProjection {
+  id         Int  @id @default(autoincrement())
+  year       Int  @unique  // season start year, e.g. 2026 = "2026-27"
+  upperLimit Int           // projected cap ceiling for that season ($)
+  lowerLimit Int           // projected cap floor for that season ($)
+  note       String?       // optional admin note (e.g. "Confirmed by NHL/NHLPA" or "Estimated")
+}
+
 // A GM's request to manage a team. Registration no longer claims a team instantly —
 // it creates a pending JoinRequest that a league admin approves (→ credentials move
 // onto the Team) or rejects. Admin sees a pending-count badge + /admin/join-requests.

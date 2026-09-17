@@ -42,7 +42,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   if (!team) notFound();
   const farm = team.affiliateTeams[0]?.players ?? [];
 
-  const [settings, session, buyouts, standings, homeGames, totalGames, retention, dayProgress, allTeams] = await Promise.all([
+  const [settings, session, buyouts, standings, homeGames, totalGames, retention, dayProgress, allTeams, capProjections] = await Promise.all([
     loadSettings(), getTeamSession(),
     prisma.buyout.findMany({ where: { teamId: team.id }, select: { id: true, playerId: true, playerName: true, perYear: true, startYear: true, years: true, totalCost: true } }),
     computeStandings(SEASON, "NHL"),
@@ -51,6 +51,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
     teamRetentionStatus(team.id),
     regularSeasonDayProgress(),
     prisma.team.findMany({ select: { id: true, code: true } }),
+    prisma.capProjection.findMany({ orderBy: { year: "asc" } }),
   ]);
   // For an M-NTC player's protected-teams tooltip.
   const teamCodeById = new Map(allTeams.map((t) => [t.id, t.code]));
@@ -279,30 +280,43 @@ export default async function TeamCapView({ slug }: { slug: string }) {
       <div className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 overflow-x-auto">
         <div className="px-4 py-2.5 bg-slate-800/30 border-b border-slate-800 flex items-center justify-between">
           <span className="text-xs font-bold uppercase tracking-wide text-slate-400">Cap Projection</span>
-          <span className="text-xs text-slate-500">Future seasons — based on current contracts</span>
+          <span className="text-xs text-slate-500">Future seasons — based on current contracts &amp; projected cap limits</span>
         </div>
         <table className="w-full text-sm">
           <thead>
             <tr className="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-800 bg-slate-800/30">
               <th className="text-left px-4 py-2.5 font-medium w-52">Season</th>
-              {years.map((y) => (
-                <th key={y} className={`text-center px-3 py-2.5 whitespace-nowrap font-medium ${y === CURRENT_SEASON_START ? "text-blue-400" : ""}`}>
-                  {seasonLabel(y)}
-                </th>
-              ))}
+              {years.map((y) => {
+                const proj = capProjections.find((p) => p.year === y);
+                return (
+                  <th key={y} className={`text-center px-3 py-2.5 whitespace-nowrap font-medium ${y === CURRENT_SEASON_START ? "text-blue-400" : ""}`}>
+                    <div>{seasonLabel(y)}</div>
+                    {proj?.note && (
+                      <div className={`text-[9px] font-normal mt-0.5 ${proj.note.toLowerCase().includes("confirm") ? "text-emerald-500" : "text-slate-600"}`}>
+                        {proj.note}
+                      </div>
+                    )}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/50">
             {/* Row 1: Projected Upper Limit */}
             <tr className="hover:bg-slate-800/20">
-              <td className="px-4 py-2 text-slate-400 text-xs font-medium whitespace-nowrap" title="Salary cap ceiling for this season">
+              <td className="px-4 py-2 text-slate-400 text-xs font-medium whitespace-nowrap" title="Salary cap ceiling for this season — set by admin in Cap Projection settings">
                 Projected Upper Limit
               </td>
-              {years.map((y) => (
-                <td key={y} className="px-3 py-2 text-center tabular-nums text-slate-300 text-xs">
-                  {money(cap.upper)}
-                </td>
-              ))}
+              {years.map((y) => {
+                const proj = capProjections.find((p) => p.year === y);
+                const upper = proj?.upperLimit ?? cap.upper;
+                const isCustom = proj != null;
+                return (
+                  <td key={y} className={`px-3 py-2 text-center tabular-nums text-xs ${isCustom ? "text-sky-300" : "text-slate-300"}`}>
+                    {money(upper)}
+                  </td>
+                );
+              })}
             </tr>
             {/* Row 2: NHL Cap Hit */}
             <tr className="hover:bg-slate-800/20">
@@ -310,8 +324,10 @@ export default async function TeamCapView({ slug }: { slug: string }) {
                 NHL Cap Hit
               </td>
               {years.map((y, i) => {
+                const proj = capProjections.find((p) => p.year === y);
+                const upper = proj?.upperLimit ?? cap.upper;
                 const hit = nhlCapHitForYear(i);
-                const over = hit > cap.upper;
+                const over = hit > upper;
                 return (
                   <td key={y} className={`px-3 py-2 text-center tabular-nums text-xs font-semibold ${over ? "text-red-400" : i === 0 ? "text-slate-100" : "text-slate-300"}`}>
                     {money(hit)}
@@ -325,7 +341,9 @@ export default async function TeamCapView({ slug }: { slug: string }) {
                 NHL Cap Space
               </td>
               {years.map((y, i) => {
-                const space = cap.upper - nhlCapHitForYear(i);
+                const proj = capProjections.find((p) => p.year === y);
+                const upper = proj?.upperLimit ?? cap.upper;
+                const space = upper - nhlCapHitForYear(i);
                 return (
                   <td key={y} className={`px-3 py-2 text-center tabular-nums text-xs font-bold ${space < 0 ? "text-red-400" : space > 10_000_000 ? "text-emerald-400" : "text-green-300"}`}>
                     {money(space)}
@@ -368,6 +386,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
           </tbody>
         </table>
       </div>
+
 
       {/* NHL cap table — split by position, capwages-style */}
       <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400">NHL Roster ({team.players.length})</h2>
