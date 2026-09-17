@@ -8,7 +8,7 @@ import { cleanName, displayName } from "@/lib/playerName";
 import { money } from "@/lib/finance";
 import NextSimCountdown from "@/components/home/NextSimCountdown";
 import { getLeagueClock, defaultStatsPhase } from "@/lib/calendar-server";
-import { fmtLeagueDate } from "@/lib/calendar";
+import { fmtLeagueDate, daysBetween } from "@/lib/calendar";
 import { PRE_SEASON } from "@/lib/phase";
 import { getTeamSession } from "@/lib/auth";
 import { activeAnnouncements } from "@/lib/announcements";
@@ -200,6 +200,50 @@ export default async function HomePage() {
   const T = (k: string) => tt(lang, k);
   const homeBlocks = ((await loadSiteConfig()).homeBlocks as HomeBlock[] | null ?? []).filter((b) => b.visible && (b.title?.trim() || b.body?.trim()));
 
+  // Next game for the logged in GM
+  const myTeam = me != null ? teamById.get(me) ?? null : null;
+  const myNextGame = me != null
+    ? await prisma.game.findFirst({
+        where: {
+          status: "SCHEDULED",
+          seriesId: null,
+          gameDate: { not: null },
+          OR: [{ homeTeamId: me }, { awayTeamId: me }],
+        },
+        orderBy: { gameDate: "asc" },
+        select: {
+          id: true,
+          gameDate: true,
+          homeTeamId: true,
+          awayTeamId: true,
+          homeTeam: { select: { id: true, name: true, code: true, logoUrl: true, slug: true } },
+          awayTeam: { select: { id: true, name: true, code: true, logoUrl: true, slug: true } },
+        },
+      })
+    : null;
+
+  let myNextGameWhen: string | null = null;
+  let myNextOpponent: { name: string; code: string | null; logoUrl: string | null; slug: string } | null = null;
+  let isMyGameHome = false;
+  if (myNextGame && myNextGame.gameDate) {
+    isMyGameHome = myNextGame.homeTeamId === me;
+    myNextOpponent = isMyGameHome ? myNextGame.awayTeam : myNextGame.homeTeam;
+    const gDate = new Date(myNextGame.gameDate);
+    const diff = daysBetween(clock.date, gDate);
+    const weekday = gDate.toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" });
+    const dayMonth = `${gDate.getUTCDate()}.${gDate.getUTCMonth() + 1}.`;
+    const dateFormatted = `${weekday}, ${dayMonth}`;
+    if (diff === 0) {
+      myNextGameWhen = `Today · ${dateFormatted}`;
+    } else if (diff === 1) {
+      myNextGameWhen = `Tomorrow · ${dateFormatted}`;
+    } else if (diff > 1 && diff <= 5) {
+      myNextGameWhen = `In ${diff}d · ${dateFormatted}`;
+    } else {
+      myNextGameWhen = dateFormatted;
+    }
+  }
+
   return (
     <div className="py-2">
       {homeBlocks.length > 0 && (
@@ -215,15 +259,85 @@ export default async function HomePage() {
       {dash && <SeasonDashboard data={dash} />}
       {/* Stat row */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-        <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg shadow-black/20">
-          <NextSimCountdown
-            frenzyAt={cfg?.frenzyAutoOpenAt?.toISOString() ?? null}
-            frenzyOpen={clock.frenzyOpen} frenzyRound={clock.frenzyRound} frenzyDay={clock.frenzyDay}
-            frenzyRoundStartedAt={clock.frenzyRoundStartedAt}
-            frenzyStage={clock.frenzyStage}
-            nextGameDate={nextGame?.gameDate?.toISOString() ?? null}
-          />
-          <p className="text-xs text-slate-500 mt-2">{fmtLeagueDate(clock.date)} · <span className="text-slate-400">{clock.phaseLabel}</span></p>
+        <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg shadow-black/20 flex flex-col justify-between">
+          <div>
+            <NextSimCountdown
+              frenzyAt={cfg?.frenzyAutoOpenAt?.toISOString() ?? null}
+              frenzyOpen={clock.frenzyOpen} frenzyRound={clock.frenzyRound} frenzyDay={clock.frenzyDay}
+              frenzyRoundStartedAt={clock.frenzyRoundStartedAt}
+              frenzyStage={clock.frenzyStage}
+              nextGameDate={nextGame?.gameDate?.toISOString() ?? null}
+            />
+            <p className="text-xs text-slate-500 mt-2">{fmtLeagueDate(clock.date)} · <span className="text-slate-400">{clock.phaseLabel}</span></p>
+          </div>
+
+          <div className="border-t border-slate-800/80 pt-3.5 mt-3.5">
+            {me != null ? (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    {T("home.yourNextGame")}
+                  </p>
+                  {myTeam && (
+                    <Link
+                      href={`/teams/${myTeam.slug}/lines`}
+                      className="text-[11px] text-slate-400 hover:text-blue-400 transition-colors"
+                    >
+                      {T("home.editLines")}
+                    </Link>
+                  )}
+                </div>
+                {myNextGame && myNextOpponent ? (
+                  <Link
+                    href={`/games/${myNextGame.id}`}
+                    className="flex items-center justify-between gap-2.5 p-2 rounded-xl bg-slate-800/40 border border-slate-800/60 hover:bg-slate-800/70 hover:border-slate-700 transition-all group"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      {myNextOpponent.logoUrl ? (
+                        <img src={myNextOpponent.logoUrl} alt="" className="w-7 h-7 object-contain shrink-0" />
+                      ) : (
+                        <div className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-400 shrink-0">
+                          {myNextOpponent.code?.slice(0, 3) ?? "?"}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-bold text-slate-200 flex items-center gap-1.5 group-hover:text-white transition-colors truncate">
+                          <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded ${isMyGameHome ? "bg-blue-900/50 text-blue-300 border border-blue-700/50" : "bg-amber-900/50 text-amber-300 border border-amber-700/50"}`}>
+                            {isMyGameHome ? "VS" : "@"}
+                          </span>
+                          <span className="truncate font-semibold">{myNextOpponent.name}</span>
+                        </div>
+                        <div className="text-[11px] text-slate-400 font-medium mt-0.5 flex items-center gap-1.5">
+                          <span className="text-blue-400 font-semibold">{myNextGameWhen}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-xs text-slate-500 group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all shrink-0">
+                      →
+                    </span>
+                  </Link>
+                ) : (
+                  <p className="text-xs text-slate-500 py-1">{T("home.noNextGame")}</p>
+                )}
+              </div>
+            ) : (
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <span>🏒</span>
+                    {T("home.yourNextGame")}
+                  </p>
+                  <Link href="/login" className="text-[11px] text-blue-400 hover:text-blue-300 transition-colors">
+                    {T("ui.gmLogin")} →
+                  </Link>
+                </div>
+                <p className="text-xs text-slate-500">
+                  {T("home.loginPrompt")}
+                </p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* 3 Stars of the Day */}
