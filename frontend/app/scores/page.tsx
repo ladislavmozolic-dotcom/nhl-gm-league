@@ -11,31 +11,54 @@ const iso = (d: Date) => d.toISOString().slice(0, 10);
 const pretty = (d: Date) => d.toLocaleDateString("sk-SK", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
 type GameRow = {
-  id: number; homeGoals: number | null; awayGoals: number | null; endedIn: string | null;
+  id: number; status: string; homeGoals: number | null; awayGoals: number | null; endedIn: string | null;
   homeTeam: { name: string; code: string | null; logoUrl: string | null; slug: string };
   awayTeam: { name: string; code: string | null; logoUrl: string | null; slug: string };
 };
 
 function ScoreCard({ g }: { g: GameRow }) {
-  const hw = (g.homeGoals ?? 0) > (g.awayGoals ?? 0);
-  const aw = (g.awayGoals ?? 0) > (g.homeGoals ?? 0);
+  const isFinal = g.status === "FINAL";
+  const hw = isFinal && (g.homeGoals ?? 0) > (g.awayGoals ?? 0);
+  const aw = isFinal && (g.awayGoals ?? 0) > (g.homeGoals ?? 0);
   const Team = ({ t, goals, win }: { t: GameRow["homeTeam"]; goals: number | null; win: boolean }) => (
     <div className="flex items-center justify-between gap-3">
       <div className="flex items-center gap-2 min-w-0">
         {t.logoUrl && <img src={t.logoUrl} alt="" className="w-6 h-6 object-contain shrink-0" />}
-        <span className={`truncate text-sm ${win ? "font-bold text-white" : "text-slate-400"}`}>{t.name}</span>
+        <span className={`truncate text-sm ${isFinal ? (win ? "font-bold text-white" : "text-slate-400") : "font-medium text-slate-200"}`}>{t.name}</span>
       </div>
-      <span className={`tabular-nums text-lg ${win ? "font-bold text-white" : "text-slate-400"}`}>{goals ?? "–"}</span>
+      <span className={`tabular-nums text-lg ${isFinal ? (win ? "font-bold text-white" : "text-slate-400") : "text-slate-500 font-normal"}`}>
+        {isFinal ? (goals ?? "–") : "–"}
+      </span>
     </div>
   );
-  return (
-    <Link href={`/games/${g.id}`} className="block bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 p-3 hover:border-slate-600 transition-colors">
-      <div className="space-y-1.5">
-        <Team t={g.awayTeam} goals={g.awayGoals} win={aw} />
-        <Team t={g.homeTeam} goals={g.homeGoals} win={hw} />
+
+  const cardContent = (
+    <div className="space-y-1.5">
+      <Team t={g.awayTeam} goals={g.awayGoals} win={aw} />
+      <Team t={g.homeTeam} goals={g.homeGoals} win={hw} />
+      <div className="flex items-center justify-between pt-1 border-t border-slate-800/60 mt-1.5 text-[10px]">
+        <span className="text-slate-500">{isFinal ? "Final" : "Scheduled"}</span>
+        {isFinal && g.endedIn && g.endedIn !== "REG" ? (
+          <span className="text-amber-400 font-bold uppercase">{g.endedIn}</span>
+        ) : !isFinal ? (
+          <span className="text-sky-400 font-semibold uppercase tracking-wider">UPCOMING</span>
+        ) : null}
       </div>
-      {g.endedIn && g.endedIn !== "REG" && <div className="text-[10px] text-amber-400 font-bold mt-1.5 text-right">FINAL / {g.endedIn}</div>}
-    </Link>
+    </div>
+  );
+
+  if (isFinal) {
+    return (
+      <Link href={`/games/${g.id}`} className="block bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 p-3 hover:border-slate-600 transition-colors">
+        {cardContent}
+      </Link>
+    );
+  }
+
+  return (
+    <div className="block bg-slate-900/40 border border-slate-800/80 rounded-2xl shadow-lg shadow-black/20 p-3">
+      {cardContent}
+    </div>
   );
 }
 
@@ -50,23 +73,27 @@ export default async function ScoresPage({ searchParams }: { searchParams: Promi
   const leagueFilter = onlyAhl ? { league: "AHL" } : {};
   const qPhase = phase === "pre" ? "&phase=pre" : "";
   const dates = await prisma.game.findMany({
-    where: { season: SEASON, status: "FINAL", seriesId: null, gameDate: { not: null }, ...leagueFilter },
-    select: { gameDate: true }, distinct: ["gameDate"], orderBy: { gameDate: "asc" },
+    where: { season: SEASON, seriesId: null, gameDate: { not: null }, ...leagueFilter },
+    select: { gameDate: true, status: true },
+    orderBy: { gameDate: "asc" },
   });
   const dayList = dates.map((d) => iso(d.gameDate!));
   const uniqueDays = [...new Set(dayList)];
+  const playedDays = [...new Set(dates.filter((d) => d.status === "FINAL").map((d) => iso(d.gameDate!)))];
 
   if (uniqueDays.length === 0) {
     return (
       <div className="space-y-4 py-2">
-        <PageHeader title={phase === "pre" ? "Pre-season Scores" : "Scores"} subtitle="No games have been simulated yet." />
+        <PageHeader title={phase === "pre" ? "Pre-season Scores" : "Scores"} subtitle="No games have been scheduled yet." />
         <PhaseTabs active={phase} league={onlyAhl ? "AHL" : "NHL"} basePath="/scores" />
       </div>
     );
   }
 
+  const defaultDay = playedDays.length > 0 ? playedDays[playedDays.length - 1] : uniqueDays[0];
   const date = sp.date;
-  const current = date && uniqueDays.includes(date) ? date : uniqueDays[uniqueDays.length - 1];
+  const current = date && uniqueDays.includes(date) ? date : defaultDay;
+  const isLatest = current === defaultDay;
   const idx = uniqueDays.indexOf(current);
   const prev = idx > 0 ? uniqueDays[idx - 1] : null;
   const next = idx < uniqueDays.length - 1 ? uniqueDays[idx + 1] : null;
@@ -75,9 +102,9 @@ export default async function ScoresPage({ searchParams }: { searchParams: Promi
   const start = new Date(current + "T00:00:00.000Z");
   const end = new Date(current + "T23:59:59.999Z");
   const games = await prisma.game.findMany({
-    where: { season: SEASON, status: "FINAL", seriesId: null, gameDate: { gte: start, lte: end }, ...leagueFilter },
+    where: { season: SEASON, seriesId: null, gameDate: { gte: start, lte: end }, ...leagueFilter },
     select: {
-      id: true, league: true, homeGoals: true, awayGoals: true, endedIn: true,
+      id: true, league: true, status: true, homeGoals: true, awayGoals: true, endedIn: true,
       homeTeam: { select: { name: true, code: true, logoUrl: true, slug: true } },
       awayTeam: { select: { name: true, code: true, logoUrl: true, slug: true } },
     },
@@ -92,6 +119,11 @@ export default async function ScoresPage({ searchParams }: { searchParams: Promi
         title={`${onlyAhl ? "AHL " : ""}Scores`}
         right={
           <div className="flex items-center gap-2">
+            {!isLatest && defaultDay && (
+              <Link href={`/scores?date=${defaultDay}${qLeague}${qPhase}`} className="px-2.5 py-1.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-semibold">
+                Latest Played
+              </Link>
+            )}
             {prev ? <Link href={`/scores?date=${prev}${qLeague}${qPhase}`} className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm">← Prev</Link>
               : <span className="px-3 py-1.5 rounded-lg bg-slate-900 text-slate-700 text-sm">← Prev</span>}
             {next ? <Link href={`/scores?date=${next}${qLeague}${qPhase}`} className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm">Next →</Link>

@@ -50,23 +50,61 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
   const allGames = [...preGames.map((g) => ({ ...g, isPre: true as const })), ...games.map((g) => ({ ...g, isPre: false as const }))]
     .sort((a, b) => (a.gameDate?.getTime() ?? 0) - (b.gameDate?.getTime() ?? 0));
 
-  // group games by month (pre-season's own dates fall naturally right before the
-  // regular-season opener, so they slot into the timeline with no special-casing)
+  // group games by month and then by day
   const monthKey = (d: Date | null) => (d ? `${d.getUTCFullYear()}-${d.getUTCMonth()}` : "tbd");
   const monthLabel = (d: Date | null) => (d ? d.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" }) : "Unscheduled");
-  const months: { key: string; label: string; games: typeof allGames }[] = [];
+  const dayKey = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : "tbd");
+  const dayLabel = (d: Date | null) =>
+    d ? d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : "Unscheduled";
+  const fmtDayShort = (d: Date | null) =>
+    d ? d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }) : "—";
+
+  type DayGroup = { key: string; label: string; shortLabel: string; games: typeof allGames };
+  type MonthGroup = { key: string; label: string; totalGames: number; days: DayGroup[] };
+
+  const months: MonthGroup[] = [];
   for (const g of allGames) {
-    const k = monthKey(g.gameDate);
+    const mk = monthKey(g.gameDate);
     let m = months[months.length - 1];
-    if (!m || m.key !== k) { m = { key: k, label: monthLabel(g.gameDate), games: [] }; months.push(m); }
-    m.games.push(g);
+    if (!m || m.key !== mk) {
+      m = { key: mk, label: monthLabel(g.gameDate), totalGames: 0, days: [] };
+      months.push(m);
+    }
+    m.totalGames++;
+
+    const dk = dayKey(g.gameDate);
+    let d = m.days[m.days.length - 1];
+    if (!d || d.key !== dk) {
+      d = { key: dk, label: dayLabel(g.gameDate), shortLabel: fmtDayShort(g.gameDate), games: [] };
+      m.days.push(d);
+    }
+    d.games.push(g);
   }
 
-  const TeamSide = ({ t, score, win, align }: { t: { code: string | null; name: string; logoUrl: string | null }; score: number | null; win: boolean; align: "left" | "right" }) => (
-    <div className={`flex items-center gap-1.5 min-w-0 ${align === "right" ? "flex-row-reverse" : ""}`}>
-      {t.logoUrl && <img src={t.logoUrl} alt="" className="w-5 h-5 object-contain shrink-0" />}
-      <span className={`truncate ${win ? "font-bold text-white" : "text-slate-300"}`}>{t.code ?? t.name}</span>
-      {score != null && <span className={`tabular-nums w-5 text-center ${win ? "font-bold text-white" : "text-slate-400"}`}>{score}</span>}
+  const TeamSide = ({
+    t,
+    score,
+    win,
+    align,
+  }: {
+    t: { code: string | null; name: string; logoUrl: string | null };
+    score: number | null;
+    win: boolean;
+    align: "left" | "right";
+  }) => (
+    <div className={`flex items-center gap-2 min-w-0 ${align === "right" ? "flex-row-reverse text-right" : "text-left"}`}>
+      {t.logoUrl && <img src={t.logoUrl} alt="" className="w-5 h-5 sm:w-6 sm:h-6 object-contain shrink-0" />}
+      <span className={`truncate text-sm ${win ? "font-bold text-white" : "text-slate-300"}`}>
+        <span className="hidden md:inline">{t.name}</span>
+        <span className="md:hidden">{t.code ?? t.name}</span>
+      </span>
+      {score != null && (
+        <span className={`tabular-nums text-sm px-1.5 py-0.5 rounded font-bold shrink-0 ${
+          win ? "bg-white/10 text-white" : "text-slate-400"
+        }`}>
+          {score}
+        </span>
+      )}
     </div>
   );
 
@@ -94,39 +132,66 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
         {months.length === 0 && <p className="text-slate-500 text-center py-10">No games scheduled yet.</p>}
         {months.map((m) => (
           <div key={m.key}>
-            <div className="px-4 py-2 bg-green-950/30 border-y border-green-500/40 flex items-center justify-between">
+            <div className="px-4 py-2.5 bg-green-950/40 border-y border-green-500/40 flex items-center justify-between">
               <span className="text-sm font-bold text-green-400 uppercase tracking-wide">{m.label}</span>
-              <span className="text-[11px] text-slate-500">{m.games.length} games</span>
+              <span className="text-xs text-slate-400 font-medium">{m.totalGames} games</span>
             </div>
-            <div className="divide-y divide-slate-800/60">
-              {m.games.map((g) => {
-                const homeWin = g.winnerTeamId === g.homeTeamId;
-                const awayWin = g.winnerTeamId === g.awayTeamId;
-                const isFinal = g.status === "FINAL";
-                const tag = g.endedIn && g.endedIn !== "REG" ? g.endedIn : "";
-                const row = (
-                  <div className={`flex items-center gap-3 px-3 sm:px-4 py-2.5 hover:bg-slate-800/30 transition-colors ${g.isPre ? "bg-sky-950/20" : ""}`}>
-                    <span className={`text-[11px] tabular-nums w-8 shrink-0 ${g.isPre ? "text-sky-500 font-semibold" : "text-slate-600"}`}>
-                      {g.isPre ? "PRE" : `#${numById.get(g.id)}`}
-                    </span>
-                    <span className="text-[11px] text-slate-500 w-14 shrink-0">{fmtDate(g.gameDate)}</span>
-                    <div className="flex-1 grid grid-cols-[1fr_auto_1fr] items-center gap-2 min-w-0">
-                      <TeamSide t={g.awayTeam} score={isFinal ? g.awayGoals : null} win={awayWin} align="right" />
-                      <span className="text-[11px] text-slate-600 px-1">{isFinal ? "" : "@"}</span>
-                      <TeamSide t={g.homeTeam} score={isFinal ? g.homeGoals : null} win={homeWin} align="left" />
+            <div>
+              {m.days.map((d) => (
+                <div key={d.key} className="border-t-2 border-slate-700/80 first:border-t-0">
+                  <div className="px-3 sm:px-4 py-1.5 bg-slate-800/60 border-b border-slate-800/80 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+                      <span className="text-xs font-bold text-slate-200 tracking-wide">{d.label}</span>
                     </div>
-                    <span className={`text-[10px] font-semibold tracking-wide w-16 text-right shrink-0 ${isFinal ? "text-slate-500" : "text-blue-400/70"}`}>
-                      {isFinal ? `FINAL${tag ? `/${tag}` : ""}` : "SCHEDULED"}
-                    </span>
+                    <span className="text-[11px] text-slate-400">{d.games.length} {d.games.length === 1 ? "game" : "games"}</span>
                   </div>
-                );
-                const anchor = g.id === currentId ? { id: "current-day", className: "scroll-mt-36 ring-1 ring-inset ring-blue-500/30 bg-blue-500/[0.04]" } : {};
-                return isFinal ? (
-                  <Link key={g.id} href={`/games/${g.id}`} className="block">{row}</Link>
-                ) : (
-                  <div key={g.id} {...anchor}>{row}</div>
-                );
-              })}
+                  <div className="divide-y divide-slate-800/50">
+                    {d.games.map((g) => {
+                      const homeWin = g.winnerTeamId === g.homeTeamId;
+                      const awayWin = g.winnerTeamId === g.awayTeamId;
+                      const isFinal = g.status === "FINAL";
+                      const tag = g.endedIn && g.endedIn !== "REG" ? g.endedIn : "";
+                      const row = (
+                        <div className={`flex items-center gap-2 sm:gap-4 px-3 sm:px-4 py-2.5 hover:bg-slate-800/40 transition-colors ${g.isPre ? "bg-sky-950/20" : ""}`}>
+                          <span className={`text-[11px] tabular-nums w-8 sm:w-10 shrink-0 ${g.isPre ? "text-sky-400 font-semibold" : "text-slate-500 font-mono"}`}>
+                            {g.isPre ? "PRE" : `#${numById.get(g.id)}`}
+                          </span>
+                          <span className="hidden sm:inline-block text-xs text-slate-400 w-28 shrink-0 font-medium truncate">
+                            {d.shortLabel}
+                          </span>
+                          <div className="flex-1 grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-3 min-w-0">
+                            <TeamSide t={g.awayTeam} score={isFinal ? g.awayGoals : null} win={awayWin} align="right" />
+                            <span className="text-xs text-slate-500 font-semibold px-1 text-center shrink-0">
+                              {isFinal ? "-" : "@"}
+                            </span>
+                            <TeamSide t={g.homeTeam} score={isFinal ? g.homeGoals : null} win={homeWin} align="left" />
+                          </div>
+                          <div className="w-20 sm:w-28 text-right shrink-0">
+                            {isFinal ? (
+                              <span className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                tag ? "bg-amber-500/15 text-amber-400 border border-amber-500/30" : "bg-slate-800 text-slate-300 border border-slate-700/60"
+                              }`}>
+                                FINAL{tag ? `/${tag}` : ""}
+                              </span>
+                            ) : (
+                              <span className="inline-block text-[10px] font-semibold text-blue-400/90 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20 tracking-wide">
+                                SCHEDULED
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                      const anchor = g.id === currentId ? { id: "current-day", className: "scroll-mt-36 ring-1 ring-inset ring-blue-500/30 bg-blue-500/[0.04]" } : {};
+                      return isFinal ? (
+                        <Link key={g.id} href={`/games/${g.id}`} className="block">{row}</Link>
+                      ) : (
+                        <div key={g.id} {...anchor}>{row}</div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         ))}

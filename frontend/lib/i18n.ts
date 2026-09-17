@@ -110,6 +110,7 @@ export const DICT: Dict = {
   "admin.profile.d": { en: "Find a player and edit his bio — birth date, birthplace, nationality, height, weight, jersey number, shoots.", cs: "Nájdi hráča a uprav jeho profil — dátum narodenia, miesto narodenia, národnosť, výšku, váhu, číslo dresu, streľbu." },
   "admin.conditions.d": { en: "Track conditional trades; trigger settlement once conditions are met.", cs: "Sleduj podmienené trejdy; spusti vyrovnanie po splnení podmienok." },
   "admin.finance.d": { en: "Set popularity — drives attendance and ticket revenue.", cs: "Nastav popularitu — poháňa návštevnosť a príjmy zo vstupného." },
+  "admin.capProjection.d": { en: "Set projected salary cap ceilings for future seasons.", cs: "Nastav projektované cap limity pre budúce sezóny." },
   "admin.lottery.d": { en: "Draw the NHL-style lottery (16 non-playoff clubs, 2 weighted picks).", cs: "Vyžrebuj NHL-štýl lotériu (16 nepostupujúcich, 2 vážené picky)." },
   "admin.realDrafts.d": { en: "Load real NHL drafts (2019+) into real-roster Draft History.", cs: "Nahraj reálne NHL drafty (2019+) do real-roster Draft History." },
   "admin.siteEditor.d": { en: "Customize the site — branding, theme & colours, menu, homepage, custom pages.", cs: "Prispôsob stránku — branding, téma & farby, menu, domovská stránka, vlastné stránky." },
