@@ -62,7 +62,7 @@ export default async function AdminTradesPage() {
                     {([[ft?.name, labels(t.id, "FROM")], [tt?.name, labels(t.id, "TO")]] as const).map(([nm, ls], k) => (
                       <div key={k} className="bg-slate-950/50 rounded-lg p-2.5">
                         <div className="text-slate-500 mb-1">{nm} would send</div>
-                        {ls.length === 0 ? <div className="text-slate-600">nothing</div> : ls.map((l, i) => <div key={i} className="text-slate-200">{l}</div>)}
+                        {ls.length === 0 ? <div className="text-slate-400 italic">future considerations</div> : ls.map((l, i) => <div key={i} className="text-slate-200">{l}</div>)}
                       </div>
                     ))}
                   </div>
@@ -93,7 +93,7 @@ export default async function AdminTradesPage() {
                   {([[ft?.name, labels(t.id, "FROM")], [tt?.name, labels(t.id, "TO")]] as const).map(([nm, ls], k) => (
                     <div key={k} className="bg-slate-950/50 rounded-lg p-2.5">
                       <div className="text-slate-500 mb-1">{nm} sent</div>
-                      {ls.length === 0 ? <div className="text-slate-600">nothing</div> : ls.map((l, i) => <div key={i} className="text-slate-200">{l}</div>)}
+                      {ls.length === 0 ? <div className="text-slate-400 italic">future considerations</div> : ls.map((l, i) => <div key={i} className="text-slate-200">{l}</div>)}
                     </div>
                   ))}
                 </div>

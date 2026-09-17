@@ -231,7 +231,7 @@ function AssetList({ team, labels, verb }: { team?: { name: string }; labels: As
   return (
     <div className="flex-1 min-w-0">
       <p className="text-xs text-slate-500 mb-1">{team?.name || "Team"} {verb}</p>
-      {labels.length === 0 ? <p className="text-slate-600 text-sm">nothing</p> : (
+      {labels.length === 0 ? <p className="text-slate-400 text-xs italic">future considerations</p> : (
         <div className="flex flex-wrap gap-1.5">
           {labels.map((l, i) => <AssetChip key={i} l={l} />)}
         </div>
@@ -319,7 +319,7 @@ function TradeGroupCard({ group, canRespond, isCommishReview }: {
         {group.legs.map((l) => (
           <div key={l.id} className="flex items-center gap-2 text-sm flex-wrap">
             <span className="text-slate-400 shrink-0">{l.fromTeam?.name ?? "?"} sends</span>
-            {l.assetLabels.length === 0 ? <span className="text-slate-600">nothing</span> : l.assetLabels.map((t, i) => (
+            {l.assetLabels.length === 0 ? <span className="text-slate-400 text-xs italic">future considerations</span> : l.assetLabels.map((t, i) => (
               <AssetChip key={i} l={t} />
             ))}
             <span className="text-slate-500 shrink-0">→ {l.toTeam?.name ?? "?"}</span>
