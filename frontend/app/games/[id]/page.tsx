@@ -692,8 +692,22 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
     homeSystem: (game.homeSystem as Record<string, string> | null) ?? null,
     awaySystem: (game.awaySystem as Record<string, string> | null) ?? null,
     // Also clean already-persisted games created before names were normalized
-    // at the simulation boundary.
-    playByPlay: ((game.playByPlay as unknown as PbpEvent[] | null) ?? []).map((e) => ({ ...e, text: cleanName(e.text) })),
+    // at the simulation boundary and sanitize regular season overtime events past 5:00.
+    playByPlay: ((game.playByPlay as unknown as PbpEvent[] | null) ?? [])
+      .filter((e) => {
+        if (game.seriesId == null && e.period === 4 && e.kind !== "period" && e.seconds > 300) return false;
+        return true;
+      })
+      .map((e) => {
+        let seconds = e.seconds;
+        let time = e.time;
+        const text = cleanName(e.text);
+        if (game.seriesId == null && e.period === 4 && e.text.includes("End of the overtime")) {
+          seconds = 300;
+          time = "5:00";
+        }
+        return { ...e, seconds, time, text };
+      }),
     shootout: ((game.shootout as unknown as ShootoutAttempt[] | null) ?? []).map((a) => ({
       ...a, teamCode: a.teamId === game.homeTeamId ? game.homeTeam.code : game.awayTeam.code,
       shooterSlug: slugById.get(a.shooterId) ?? null,

@@ -10,6 +10,7 @@ import type { GameResult, SimTeam, SimSkater, PbpEvent, PbpKind, InjuryEvent } f
 import type { SimEvent } from "./events";
 
 const PERIOD_SECONDS = 1200;
+const OT_SECONDS = 300; // 5:00 for regular season OT
 const fmt = (s: number) => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, "0")}`;
 
 // Mechanism-flavoured injury narration — shares `desc` (a bare body-part label
@@ -150,9 +151,12 @@ function legacyPlayByPlay(result: GameResult, home: SimTeam, away: SimTeam): Pbp
   // overtime goal, if any
   const otGoal = result.goals.find((g) => g.period === 4);
   if (otGoal) {
-    add(4, 0, null, "period", `Start of overtime.`, true);
+    add(4, 0, null, "period", `Start of the overtime.`, true);
     add(4, otGoal.seconds, otGoal.team, "goal",
       `GOAL scored by ${otGoal.scorerName}${otGoal.assistNames.length ? ` assisted by ${otGoal.assistNames.join(" and ")}` : ""}. Game over.`, true);
+  } else if (result.endedIn === "SO" || result.periods >= 4) {
+    add(4, 0, null, "period", `Start of the overtime.`, true);
+    add(4, OT_SECONDS, null, "period", `End of the overtime.`, true);
   }
   if (result.endedIn === "SO") add(5, 0, null, "period", `Shootout — won by ${sideOf(result.winner).name}.`, true);
 
@@ -182,14 +186,19 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
     return pick[rng.weighted(pick.map((s) => s.iceTime))];
   };
 
-  const events: PbpEvent[] = [];
-  const add = (period: number, seconds: number, teamId: number | null, kind: PbpKind, text: string, major = false) =>
-    events.push({ period, seconds: Math.max(0, Math.min(PERIOD_SECONDS - 1, Math.round(seconds))), time: fmt(seconds), teamId, kind, text, major });
+  const isPlayoff = (result.otPeriods ?? 0) > 0;
+  const maxPeriodSeconds = (p: number) => (p >= 4 && !isPlayoff ? OT_SECONDS : PERIOD_SECONDS);
 
+  const events: PbpEvent[] = [];
+  const add = (period: number, seconds: number, teamId: number | null, kind: PbpKind, text: string, major = false) => {
+    const pMaxSec = maxPeriodSeconds(period);
+    events.push({ period, seconds: Math.max(0, Math.min(pMaxSec, Math.round(seconds))), time: fmt(seconds), teamId, kind, text, major });
+  };
   const maxRegPeriod = Math.max(3, ...stream.map((e) => e.period));
 
   for (let p = 1; p <= maxRegPeriod; p++) {
-    const label = p <= 3 ? `${p}${["st", "nd", "rd"][p - 1]} period` : p === 4 ? "overtime" : "period";
+    const pMaxSec = maxPeriodSeconds(p);
+    const label = p <= 3 ? `${p}${["st", "nd", "rd"][p - 1]} period` : p === 4 ? "overtime" : `overtime ${p - 3}`;
     add(p, 0, null, "period", `Start of the ${label}.`, true);
 
     // opening faceoff. v2: the real first draw of the period (engine.ts's tick-loop
@@ -207,7 +216,7 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
     }
 
     // sudden-death OT ends on the goal — cap all filler/colour to before it.
-    const cap = p >= 4 ? (stream.find((e) => e.period === p && e.type === "GOAL")?.seconds ?? PERIOD_SECONDS) : PERIOD_SECONDS;
+    const cap = p >= 4 ? (stream.find((e) => e.period === p && e.type === "GOAL")?.seconds ?? pMaxSec) : pMaxSec;
     const rt = () => 5 + rng.int(Math.max(1, cap - 10));
 
     // atmospheric filler (not simulated as timed events): icings/offsides have no
@@ -312,7 +321,7 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
 
     // no end-of-period line once a sudden-death OT goal has ended the game
     const otEnded = p >= 4 && stream.some((e) => e.period === p && e.type === "GOAL");
-    if (p <= 3 || (p === 4 && !otEnded)) add(p, PERIOD_SECONDS, null, "period", `End of the ${label}.`, p <= 3);
+    if (p <= 3 || (p >= 4 && !otEnded)) add(p, pMaxSec, null, "period", `End of the ${label}.`, p <= 3);
   }
 
   if (result.endedIn === "SO") add(5, 0, null, "period", `Shootout — won by ${sideOf(result.winner).name}.`, true);
