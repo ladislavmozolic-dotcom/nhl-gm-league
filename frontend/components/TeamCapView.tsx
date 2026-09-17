@@ -18,7 +18,7 @@ import { buyoutPlayer } from "@/app/finance/[slug]/actions";
 
 const SEASON = "2026-27";
 const SPAN = 5;
-type CP = { id: number; name: string; position: string; age: number | null; birthDate?: string | Date | null; isGoalie: boolean; capHit: number | null; contractYears: number | null; retainedSalary?: number | null; tradeClause?: string | null; noTradeTeams?: number[] };
+type CP = { id: number; name: string; position: string; age: number | null; birthDate?: string | Date | null; isGoalie: boolean; capHit: number | null; contractYears: number | null; contractType?: string | null; retainedSalary?: number | null; tradeClause?: string | null; noTradeTeams?: number[] };
 const CLAUSE_LABEL: Record<string, string> = { NTC: "NTC", NMC: "NMC", M_NTC: "M-NTC" };
 const isD = (pos: string) => /(^|\/)D(\/|$)/.test(pos) || pos === "D";
 /** capwages-style split: Forwards / Defense / Goalies as their own groups
@@ -35,8 +35,8 @@ export default async function TeamCapView({ slug }: { slug: string }) {
     where: { slug },
     select: {
       id: true, name: true, code: true, logoUrl: true, arena: true, popularity: true, arenaSections: true, capacity: true, bankAccount: true,
-      players: { where: { rosterType: "NHL" }, select: { id: true, name: true, position: true, age: true, birthDate: true, isGoalie: true, capHit: true, retainedSalary: true, contractYears: true, injuryDaysLeft: true, condition: true, tradeClause: true, noTradeTeams: true }, orderBy: [{ isGoalie: "asc" }, { capHit: "desc" }] },
-      affiliateTeams: { select: { players: { where: { rosterType: "AHL" }, select: { id: true, name: true, position: true, age: true, birthDate: true, isGoalie: true, capHit: true, ahlSalary: true, contractType: true, contractYears: true }, orderBy: [{ isGoalie: "asc" }, { capHit: "desc" }] } } },
+      players: { where: { rosterType: "NHL" }, select: { id: true, name: true, position: true, age: true, birthDate: true, isGoalie: true, capHit: true, retainedSalary: true, contractType: true, contractYears: true, injuryDaysLeft: true, condition: true, tradeClause: true, noTradeTeams: true }, orderBy: [{ isGoalie: "asc" }, { capHit: "desc" }] },
+      affiliateTeams: { select: { players: { where: { rosterType: "AHL" }, select: { id: true, name: true, position: true, age: true, birthDate: true, isGoalie: true, capHit: true, ahlSalary: true, contractType: true, contractYears: true, tradeClause: true, noTradeTeams: true }, orderBy: [{ isGoalie: "asc" }, { capHit: "desc" }] } } },
     },
   });
   if (!team) notFound();
@@ -102,6 +102,29 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   const Badge = ({ s }: { s: "UFA" | "RFA" }) => (
     <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${s === "UFA" ? "bg-red-600 text-white" : "bg-blue-600 text-white"}`}>{s}</span>
   );
+  const TypeBadge = ({ type }: { type?: string | null }) => {
+    if (type === "ONE_WAY") {
+      return (
+        <span
+          className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-950/70 border border-emerald-800/60 text-emerald-300"
+          title="One-way contract (full salary in NHL or AHL)"
+        >
+          1-way
+        </span>
+      );
+    }
+    if (type === "TWO_WAY") {
+      return (
+        <span
+          className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-950/70 border border-indigo-800/60 text-indigo-300"
+          title="Two-way contract (discounted salary when assigned to AHL)"
+        >
+          2-way
+        </span>
+      );
+    }
+    return <span className="text-slate-600 text-xs">—</span>;
+  };
   const FRow = ({ k, v, cls = "", title }: { k: string; v: string; cls?: string; title?: string }) => (
     <div className="flex justify-between px-4 py-2 border-b border-slate-800/60 text-sm" title={title}><span className="text-slate-400">{k}</span><span className={`tabular-nums ${cls}`}>{v}</span></div>
   );
@@ -121,6 +144,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
           <td className="px-3 py-1.5"><PlayerLink id={p.id} name={p.name} /></td>
           <td className="px-2 py-1.5 text-center text-slate-500 text-xs">{p.position}</td>
           <td className="px-2 py-1.5 text-center text-slate-400 tabular-nums">{p.age ?? "—"}</td>
+          <td className="px-2 py-1.5 text-center"><TypeBadge type={p.contractType} /></td>
           <td className="px-2 py-1.5 text-center text-slate-400 tabular-nums" title={protectedTeams ? `Protected against: ${protectedTeams}` : undefined}>
             {p.tradeClause ? (CLAUSE_LABEL[p.tradeClause] ?? p.tradeClause) : ""}
           </td>
@@ -134,7 +158,12 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   const Thead = ({ gm }: { gm: boolean }) => (
     <thead>
       <tr className="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-800 bg-slate-800/30">
-        <th className="text-left px-3 py-2 font-medium">Player</th><th className="px-2 py-2 font-medium">Pos</th><th className="px-2 py-2 font-medium">Age</th><th className="px-2 py-2 font-medium">Terms</th><th className="text-right px-3 py-2 font-medium">Cap Hit</th>
+        <th className="text-left px-3 py-2 font-medium">Player</th>
+        <th className="px-2 py-2 font-medium text-center">Pos</th>
+        <th className="px-2 py-2 font-medium text-center">Age</th>
+        <th className="px-2 py-2 font-medium text-center" title="Contract type: 1-way (full salary in AHL) or 2-way (reduced AHL salary)">Type</th>
+        <th className="px-2 py-2 font-medium text-center" title="Trade protection clause">Clause</th>
+        <th className="text-right px-3 py-2 font-medium">Cap Hit</th>
         {years.map((y) => <th key={y} className="text-right px-3 py-2 whitespace-nowrap">{seasonLabel(y)}</th>)}
         {gm && <th />}
       </tr>
@@ -151,7 +180,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
       <table className="w-full text-sm min-w-[960px]">
         <Thead gm={gm} />
         <tbody>
-          {list.length > 0 ? <CapRows list={list} gm={gm} /> : <tr><td colSpan={5 + SPAN + (gm ? 1 : 0)} className="px-3 py-3 text-slate-600 text-sm">None on this roster.</td></tr>}
+          {list.length > 0 ? <CapRows list={list} gm={gm} /> : <tr><td colSpan={6 + SPAN + (gm ? 1 : 0)} className="px-3 py-3 text-slate-600 text-sm">None on this roster.</td></tr>}
         </tbody>
       </table>
     </div>
