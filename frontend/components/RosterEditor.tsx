@@ -13,6 +13,59 @@ type Props = {
   embedded?: boolean; // true when rendered under LinesNav (hide the own title/back links)
 };
 
+function RosterTable({ title, list, dupNums, onChange }: {
+  title: string;
+  list: Player[];
+  dupNums: Set<number>;
+  onChange: (id: number, patch: Partial<Player>) => void;
+}) {
+  return (
+    <div className="mb-6">
+      <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400 mb-2">{title}</h2>
+      <div className="bg-slate-900/40 border border-slate-800 rounded-lg overflow-x-auto">
+        <table className="w-full text-sm min-w-[520px]">
+          <thead>
+            <tr className="text-xs text-slate-500 border-b border-slate-800">
+              <th className="text-left px-3 py-2 w-20">Number</th>
+              <th className="text-left px-3 py-2">Player</th>
+              <th className="text-left px-2 py-2 w-16">Pos</th>
+              <th className="text-left px-2 py-2 w-14">OVR</th>
+              <th className="text-left px-3 py-2 w-28">Letter</th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.map((p) => (
+              <tr key={p.id} className="border-b border-slate-800/60">
+                <td className="px-3 py-1.5">
+                  <input type="number" min={0} max={99} value={p.number ?? ""}
+                    onChange={(e) => onChange(p.id, { number: e.target.value ? Number(e.target.value) : null })}
+                    className={`w-16 bg-slate-900 border rounded px-2 py-1 text-right tabular-nums ${p.number != null && dupNums.has(p.number) ? "border-red-500 text-red-300" : "border-slate-700"}`} />
+                </td>
+                <td className="px-3 py-1.5">
+                  <PlayerLink id={p.id} name={p.name} />
+                  {p.captaincy && <span className="ml-1.5 text-[10px] font-bold text-amber-400">{p.captaincy}</span>}
+                </td>
+                <td className="px-2 py-1.5 text-slate-500 text-xs">{p.position}</td>
+                <td className="px-2 py-1.5 text-slate-400 tabular-nums">{p.overall}</td>
+                <td className="px-3 py-1.5">
+                  {!p.isGoalie ? (
+                    <select value={p.captaincy ?? ""} onChange={(e) => onChange(p.id, { captaincy: (e.target.value || null) as "C" | "A" | null })}
+                      className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm">
+                      <option value="">—</option>
+                      <option value="C">Captain (C)</option>
+                      <option value="A">Alternate (A)</option>
+                    </select>
+                  ) : <span className="text-slate-600 text-xs">—</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function RosterEditor({ teamName, teamSlug, players, onSave, embedded = false }: Props) {
   const [rows, setRows] = useState<Player[]>(players);
   const [pending, start] = useTransition();
@@ -45,52 +98,6 @@ export default function RosterEditor({ teamName, teamSlug, players, onSave, embe
     } catch (e) { setErr((e as Error).message); }
   });
 
-  const Table = ({ title, list }: { title: string; list: Player[] }) => (
-    <div className="mb-6">
-      <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400 mb-2">{title}</h2>
-      <div className="bg-slate-900/40 border border-slate-800 rounded-lg overflow-x-auto">
-        <table className="w-full text-sm min-w-[520px]">
-          <thead>
-            <tr className="text-xs text-slate-500 border-b border-slate-800">
-              <th className="text-left px-3 py-2 w-20">Number</th>
-              <th className="text-left px-3 py-2">Player</th>
-              <th className="text-left px-2 py-2 w-16">Pos</th>
-              <th className="text-left px-2 py-2 w-14">OVR</th>
-              <th className="text-left px-3 py-2 w-28">Letter</th>
-            </tr>
-          </thead>
-          <tbody>
-            {list.map((p) => (
-              <tr key={p.id} className="border-b border-slate-800/60">
-                <td className="px-3 py-1.5">
-                  <input type="number" min={0} max={99} value={p.number ?? ""}
-                    onChange={(e) => set(p.id, { number: e.target.value ? Number(e.target.value) : null })}
-                    className={`w-16 bg-slate-900 border rounded px-2 py-1 text-right tabular-nums ${p.number != null && dupNums.has(p.number) ? "border-red-500 text-red-300" : "border-slate-700"}`} />
-                </td>
-                <td className="px-3 py-1.5">
-                  <PlayerLink id={p.id} name={p.name} />
-                  {p.captaincy && <span className="ml-1.5 text-[10px] font-bold text-amber-400">{p.captaincy}</span>}
-                </td>
-                <td className="px-2 py-1.5 text-slate-500 text-xs">{p.position}</td>
-                <td className="px-2 py-1.5 text-slate-400 tabular-nums">{p.overall}</td>
-                <td className="px-3 py-1.5">
-                  {!p.isGoalie ? (
-                    <select value={p.captaincy ?? ""} onChange={(e) => set(p.id, { captaincy: (e.target.value || null) as "C" | "A" | null })}
-                      className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm">
-                      <option value="">—</option>
-                      <option value="C">Captain (C)</option>
-                      <option value="A">Alternate (A)</option>
-                    </select>
-                  ) : <span className="text-slate-600 text-xs">—</span>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-
   const skaters = rows.filter((r) => !r.isGoalie);
   const goalies = rows.filter((r) => r.isGoalie);
 
@@ -120,8 +127,8 @@ export default function RosterEditor({ teamName, teamSlug, players, onSave, embe
         </div>
       )}
 
-      <Table title="Skaters" list={skaters} />
-      <Table title="Goaltenders" list={goalies} />
+      <RosterTable title="Skaters" list={skaters} dupNums={dupNums} onChange={set} />
+      <RosterTable title="Goaltenders" list={goalies} dupNums={dupNums} onChange={set} />
 
       <div className="fixed bottom-0 left-0 right-0 bg-slate-950/90 border-t border-slate-800 backdrop-blur px-4 py-3">
         <div className="max-w-3xl mx-auto flex items-center gap-3">

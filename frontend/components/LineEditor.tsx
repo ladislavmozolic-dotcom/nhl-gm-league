@@ -65,6 +65,24 @@ const TAB_GROUPS = [
 ] as const;
 const TABS = TAB_GROUPS.flatMap((g) => g.tabs);
 
+function Stepper({ value, onChange, min = 0, max = 99, step = 1, w = "w-14", compact = false }: {
+  value: number; onChange: (v: number) => void; min?: number; max?: number; step?: number; w?: string; compact?: boolean;
+}) {
+  const clamp = (v: number) => Math.max(min, Math.min(max, v));
+  const btn = compact ? "w-6 h-7 text-sm" : "w-7 h-8 text-base";
+  const inp = compact ? "w-8 px-1 py-1" : `${w} px-2 py-1.5`;
+  return (
+    <div className={`lines-stepper inline-flex items-center ${compact ? "gap-1" : "gap-2"}`}>
+      <button type="button" onClick={() => onChange(clamp(value - step))}
+        className={`${btn} lines-stepper-btn rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 leading-none`}>−</button>
+      <input type="number" min={min} max={max} value={value} onChange={(e) => onChange(clamp(Number(e.target.value)))}
+        className={`${inp} lines-stepper-value bg-slate-900 border border-slate-700 rounded text-sm text-center tabular-nums`} />
+      <button type="button" onClick={() => onChange(clamp(value + step))}
+        className={`${btn} lines-stepper-btn rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 leading-none`}>+</button>
+    </div>
+  );
+}
+
 export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSlug, players, goalies, initial, chemistry, chemBase = 35, chemNeutral = 70, chemEnabled = true, onSave, onSuggest }: Props) {
   const lang = useLang();
   const [data, setData] = useState<TeamLinesData>(initial);
@@ -262,26 +280,6 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
       {pool.map((p) => <option key={p.id} value={p.id} disabled={p.injured} style={{ backgroundColor: "#0f172a", color: "#e2e8f0" }}>{p.name}{p.cap ? ` (${p.cap})` : ""} · {p.position} ({p.overall}){p.con != null ? ` · CON ${p.con}%${p.con < 90 ? " ⚠️" : ""}` : ""}{p.injured ? " 🤕 INJ" : ""}</option>)}
     </select>
   );
-
-  // number field with visibly separated − / + steppers. `compact` shrinks it for
-  // the 0-5 tactic cells so the player-name columns keep their width.
-  const Stepper = ({ value, onChange, min = 0, max = 99, step = 1, w = "w-14", compact = false }: {
-    value: number; onChange: (v: number) => void; min?: number; max?: number; step?: number; w?: string; compact?: boolean;
-  }) => {
-    const clamp = (v: number) => Math.max(min, Math.min(max, v));
-    const btn = compact ? "w-6 h-7 text-sm" : "w-7 h-8 text-base";
-    const inp = compact ? "w-8 px-1 py-1" : `${w} px-2 py-1.5`;
-    return (
-      <div className={`lines-stepper inline-flex items-center ${compact ? "gap-1" : "gap-2"}`}>
-        <button type="button" onClick={() => onChange(clamp(value - step))}
-          className={`${btn} lines-stepper-btn rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 leading-none`}>−</button>
-        <input type="number" min={min} max={max} value={value} onChange={(e) => onChange(clamp(Number(e.target.value)))}
-          className={`${inp} lines-stepper-value bg-slate-900 border border-slate-700 rounded text-sm text-center tabular-nums`} />
-        <button type="button" onClick={() => onChange(clamp(value + step))}
-          className={`${btn} lines-stepper-btn rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 leading-none`}>+</button>
-      </div>
-    );
-  };
 
   // ---------- section renderers ----------
   const setFwd = (i: number, slot: "lw" | "c" | "rw", v: number | null) => change((d) => { d.forwardLines[i][slot] = v; });
