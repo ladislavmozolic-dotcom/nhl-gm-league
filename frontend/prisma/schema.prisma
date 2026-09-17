@@ -184,6 +184,7 @@ model Player {
   injuryDaysLeft       Int           @default(0)
   injuryDesc           String?
   injurySeverity       String?       // "Day-to-Day" | "Week-to-Week" | "Multi-week" | "Long-term" | "Season-ending" (persisted from the sim for current-injury depth)
+  injuredAt            DateTime?     // date when the injury occurred (from sim or gameDate)
   captaincy            String?       // "C" | "A" | null
   contractType         String?       // "ONE_WAY" | "TWO_WAY" (one-way can't be sent to farm)
   tradeClause          String?       // null | "NTC" (no-trade) | "NMC" (no-movement) | "M_NTC" (modified — blocks the teams in noTradeTeams)

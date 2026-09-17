@@ -9,7 +9,7 @@ import { onLtir, liveCapHit } from "./finance";
 export type CurrentInjury = {
   playerId: number; name: string; slug: string | null; position: string;
   teamId: number | null; teamCode: string | null; teamName: string | null; teamSlug: string | null; teamLogo: string | null; league: string | null;
-  desc: string; daysLeft: number; severity: string;
+  desc: string; daysLeft: number; severity: string; injuredAt: Date | null;
   isGoalie: boolean; capHit: number; onLtir: boolean; // onLtir = injury drives cap relief (skater, CON < 90)
 };
 
@@ -39,10 +39,28 @@ export async function currentInjuries(opts?: { teamId?: number; league?: string 
     include: { team: { select: { id: true, code: true, name: true, slug: true, logoUrl: true, league: true } } },
     orderBy: { injuryDaysLeft: "desc" },
   });
+
+  // If injuredAt is not set on player, check latest GameEvent for that player
+  const needingDate = rows.filter((p) => !p.injuredAt).map((p) => p.id);
+  const eventDateByPid = new Map<number, Date>();
+  if (needingDate.length > 0) {
+    const events = await prisma.gameEvent.findMany({
+      where: { playerId: { in: needingDate }, type: "INJURY" },
+      include: { game: { select: { gameDate: true } } },
+      orderBy: { id: "desc" },
+    });
+    for (const e of events) {
+      if (e.playerId && !eventDateByPid.has(e.playerId) && e.game?.gameDate) {
+        eventDateByPid.set(e.playerId, e.game.gameDate);
+      }
+    }
+  }
+
   return rows.map((p) => ({
     playerId: p.id, name: cleanName(p.name), slug: p.slug, position: p.position ?? "—",
     teamId: p.team?.id ?? null, teamCode: p.team?.code ?? null, teamName: p.team?.name ?? null, teamSlug: p.team?.slug ?? null, teamLogo: p.team?.logoUrl ?? null, league: p.team?.league ?? null,
     desc: p.injuryDesc ?? "Injury", daysLeft: p.injuryDaysLeft, severity: p.injurySeverity ?? severityFromDays(p.injuryDaysLeft),
+    injuredAt: p.injuredAt ?? eventDateByPid.get(p.id) ?? null,
     isGoalie: p.isGoalie, capHit: liveCapHit(p),
     onLtir: onLtir({ capHit: liveCapHit(p), injuryDaysLeft: p.injuryDaysLeft, condition: p.condition, isGoalie: p.isGoalie }),
   }));

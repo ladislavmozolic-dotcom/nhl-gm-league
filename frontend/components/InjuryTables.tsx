@@ -13,12 +13,18 @@ const MECH_ICON: Record<string, string> = { Hit: "💥", "Blocked shot": "🛡�
 // remaining days → human return estimate
 const returnEta = (d: number) => d <= 6 ? `${d}d` : d < 14 ? "~1 wk" : d < 45 ? `~${Math.round(d / 7)} wks` : d < 120 ? `~${Math.round(d / 30)} mo` : "season";
 
+const fmtDate = (d: Date | string | null) => {
+  if (!d) return "—";
+  const dt = typeof d === "string" ? new Date(d) : d;
+  return dt.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+};
+
 export function CurrentInjuryTable({ rows, showTeam = true }: { rows: CurrentInjury[]; showTeam?: boolean }) {
   if (rows.length === 0) return <p className="text-emerald-400 text-center py-10 text-lg font-semibold">No current injuries. 🎉</p>;
   const reliefTotal = rows.reduce((s, p) => s + (p.onLtir ? p.capHit : 0), 0);
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm min-w-[640px]">
+      <table className="w-full text-sm min-w-[720px]">
         <thead>
           <tr className="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-800">
             <th className="text-left px-3 py-2">Player</th>
@@ -27,6 +33,7 @@ export function CurrentInjuryTable({ rows, showTeam = true }: { rows: CurrentInj
             <th className="text-left px-3 py-2">Injury</th>
             <th className="text-left px-3 py-2">Severity</th>
             <th className="text-left px-3 py-2">Status</th>
+            <th className="text-left px-3 py-2">Injured</th>
             <th className="text-right px-3 py-2">Return</th>
           </tr>
         </thead>
@@ -47,6 +54,7 @@ export function CurrentInjuryTable({ rows, showTeam = true }: { rows: CurrentInj
                   ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-300" title="Injured Reserve — out multiple weeks (no cap relief; goalie or CON ≥ 90)">IR</span>
                   : <span className="text-slate-600 text-xs">active roster</span>}
               </td>
+              <td className="px-3 py-2 text-slate-400 text-xs whitespace-nowrap tabular-nums">{fmtDate(p.injuredAt)}</td>
               <td className="px-3 py-2 text-right tabular-nums font-semibold text-amber-400 whitespace-nowrap" title={`${p.daysLeft} days left`}>{returnEta(p.daysLeft)}</td>
             </tr>
           );})}
@@ -65,7 +73,7 @@ export function SeasonInjuryTable({ rows, showTeam = true }: { rows: SeasonInjur
   if (rows.length === 0) return <p className="text-slate-500 text-center py-10">No injuries recorded this season yet.</p>;
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm min-w-[680px]">
+      <table className="w-full text-sm min-w-[720px]">
         <thead>
           <tr className="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-800">
             <th className="text-left px-3 py-2">Player</th>
@@ -74,6 +82,7 @@ export function SeasonInjuryTable({ rows, showTeam = true }: { rows: SeasonInjur
             <th className="text-left px-3 py-2">Cause</th>
             <th className="text-left px-3 py-2">Severity</th>
             <th className="text-right px-3 py-2">Days</th>
+            <th className="text-left px-3 py-2">Date</th>
             <th className="text-right px-3 py-2">Game</th>
           </tr>
         </thead>
@@ -86,6 +95,7 @@ export function SeasonInjuryTable({ rows, showTeam = true }: { rows: SeasonInjur
               <td className="px-3 py-2 text-slate-400">{MECH_ICON[r.mechanism] ?? ""} {r.mechanism}{r.byName ? <span className="text-slate-600"> · by {r.byName}</span> : ""}</td>
               <td className={`px-3 py-2 ${sevCls(r.severity)}`}>{r.severity}</td>
               <td className="px-3 py-2 text-right tabular-nums text-slate-400">{r.days}</td>
+              <td className="px-3 py-2 text-slate-400 text-xs whitespace-nowrap tabular-nums">{fmtDate(r.gameDate)}</td>
               <td className="px-3 py-2 text-right"><Link href={`/games/${r.gameId}`} className="text-slate-500 hover:text-blue-400 text-xs">view</Link></td>
             </tr>
           ))}
