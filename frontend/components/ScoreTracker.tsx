@@ -7,13 +7,26 @@ type TeamLite = { code: string | null; logoUrl: string | null };
 
 const dateStr = (d: Date) => d.toLocaleDateString("sk-SK", { day: "numeric", month: "short" });
 
-const TeamRow = ({ t, score, win }: { t: TeamLite; score: number | null; win: boolean }) => (
-  <div className="flex items-center justify-between gap-3">
+const TeamRow = ({
+  t,
+  score,
+  win,
+  extra,
+}: {
+  t: TeamLite;
+  score: number | null;
+  win: boolean;
+  extra?: React.ReactNode;
+}) => (
+  <div className="flex items-center justify-between gap-2.5">
     <div className="flex items-center gap-1.5 min-w-0">
-      {t.logoUrl && <img src={t.logoUrl} alt="" className="w-5 h-5 object-contain" />}
-      <span className={`text-sm ${win ? "font-bold text-white" : "text-slate-400"}`}>{t.code}</span>
+      {t.logoUrl && <img src={t.logoUrl} alt="" className="w-4 h-4 object-contain shrink-0" />}
+      <span className={`text-xs ${win ? "font-bold text-white" : "text-slate-400"}`}>{t.code}</span>
     </div>
-    {score != null && <span className={`text-base tabular-nums ${win ? "font-bold text-white" : "text-slate-400"}`}>{score}</span>}
+    <div className="flex items-center gap-1.5 shrink-0">
+      {extra}
+      {score != null && <span className={`text-sm tabular-nums ${win ? "font-bold text-white" : "text-slate-400"}`}>{score}</span>}
+    </div>
   </div>
 );
 
@@ -27,13 +40,20 @@ export default async function ScoreTracker() {
     prisma.game.findFirst({ where: { status: "SCHEDULED", seriesId: null, league: "NHL", gameDate: { not: null } }, orderBy: { gameDate: "asc" }, select: { gameDate: true } }),
   ]);
 
-  let results: { id: number; homeGoals: number | null; awayGoals: number | null; homeTeam: TeamLite; awayTeam: TeamLite }[] = [];
+  let results: { id: number; homeGoals: number | null; awayGoals: number | null; endedIn: string | null; homeTeam: TeamLite; awayTeam: TeamLite }[] = [];
   if (lastDay?.gameDate) {
     const start = new Date(lastDay.gameDate); start.setHours(0, 0, 0, 0);
     const end = new Date(lastDay.gameDate); end.setHours(23, 59, 59, 999);
     results = await prisma.game.findMany({
       where: { status: "FINAL", seriesId: null, league: "NHL", gameDate: { gte: start, lte: end } },
-      select: { id: true, homeGoals: true, awayGoals: true, homeTeam: { select: { code: true, logoUrl: true } }, awayTeam: { select: { code: true, logoUrl: true } } },
+      select: {
+        id: true,
+        homeGoals: true,
+        awayGoals: true,
+        endedIn: true,
+        homeTeam: { select: { code: true, logoUrl: true } },
+        awayTeam: { select: { code: true, logoUrl: true } },
+      },
       orderBy: { id: "asc" },
     });
   }
@@ -64,16 +84,22 @@ export default async function ScoreTracker() {
                 remainder, or the next scheduled day once today is complete). */}
             <ScoreScrollRow>
               {results.map((g) => {
-                const aw = (g.awayGoals ?? 0) > (g.homeGoals ?? 0), hw = (g.homeGoals ?? 0) > (g.awayGoals ?? 0);
+                const aw = (g.awayGoals ?? 0) > (g.homeGoals ?? 0);
+                const hw = (g.homeGoals ?? 0) > (g.awayGoals ?? 0);
+                const otTag = g.endedIn && g.endedIn !== "REG" ? (
+                  <span className="text-[9px] font-extrabold px-1 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 leading-none">
+                    {g.endedIn}
+                  </span>
+                ) : null;
                 return (
-                  <Link key={g.id} href={`/games/${g.id}`} className="shrink-0 min-w-[128px] bg-slate-800/40 hover:bg-slate-800 rounded-lg px-3 py-1.5 border border-slate-800 transition-colors">
+                  <Link key={g.id} href={`/games/${g.id}`} className="shrink-0 min-w-[128px] bg-slate-800/40 hover:bg-slate-800 rounded-lg px-2.5 py-1.5 border border-slate-800 transition-colors">
                     <TeamRow t={g.awayTeam} score={g.awayGoals} win={aw} />
-                    <TeamRow t={g.homeTeam} score={g.homeGoals} win={hw} />
+                    <TeamRow t={g.homeTeam} score={g.homeGoals} win={hw} extra={otTag} />
                   </Link>
                 );
               })}
               {upcoming.map((g) => (
-                <div key={g.id} className="shrink-0 min-w-[128px] bg-slate-800/40 rounded-lg px-3 py-1.5 border border-slate-800 border-dashed opacity-70">
+                <div key={g.id} className="shrink-0 min-w-[128px] bg-slate-800/40 rounded-lg px-2.5 py-1.5 border border-slate-800 border-dashed opacity-70">
                   <TeamRow t={g.awayTeam} score={null} win={false} />
                   <TeamRow t={g.homeTeam} score={null} win={false} />
                 </div>
