@@ -402,7 +402,7 @@ export async function executeAcceptedTrade(tradeId: number) {
   const { ops, fromTeam, toTeam, fromNames, toNames } = await collectMoveOps(pkg);
   ops.push(prisma.trade.update({ where: { id: tradeId }, data: { status: "ACCEPTED", respondedAt: new Date() } }));
   ops.push(prisma.transaction.create({
-    data: { type: "TRADE", tradeId, message: `${fromTeam.name} traded ${fromNames.join(", ") || "assets"} to ${toTeam.name} for ${toNames.join(", ") || "assets"}.` },
+    data: { type: "TRADE", tradeId, message: `${fromTeam.name} traded ${fromNames.join(", ") || "future considerations"} to ${toTeam.name} for ${toNames.join(", ") || "future considerations"}.` },
   }));
   await prisma.$transaction(ops);
   // a structured conditional-pick clause was captured at proposal time

@@ -20,6 +20,12 @@ export const TX_WHERE = {
   ] },
 };
 
+export function cleanTxMessage(msg: string): string {
+  return msg
+    .replace(/\bfor assets\./gi, "for future considerations.")
+    .replace(/\btraded assets to\b/gi, "traded future considerations to");
+}
+
 export default async function TransactionsPage() {
   const [transactions, teams] = await Promise.all([
     prisma.transaction.findMany({ where: TX_WHERE, take: 50, orderBy: { createdAt: "desc" } }),
@@ -57,7 +63,8 @@ export default async function TransactionsPage() {
       ) : (
         <div className="space-y-3">
           {transactions.map((tx) => {
-            const logos = logosFor(tx.message);
+            const cleanMsg = cleanTxMessage(tx.message);
+            const logos = logosFor(cleanMsg);
             return (
               <div
                 key={tx.id}
@@ -82,7 +89,7 @@ export default async function TransactionsPage() {
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium">{tx.message}</p>
+                  <p className="font-medium">{cleanMsg}</p>
                   <p className="text-xs text-slate-500 mt-0.5">{tx.type}</p>
                 </div>
                 <p className="text-xs text-slate-500 flex-shrink-0">

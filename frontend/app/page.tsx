@@ -119,11 +119,12 @@ export default async function HomePage() {
     // a quieter detail line underneath instead of one long run-on sentence.
     let fromAssets: string | null = null, toAssets: string | null = null;
     if (fromTeam && toTeam && toIdx >= 0) {
-      // displayName() also scrubs captaincy/clause/rookie markers ("(NTC)", "''A''",
-      // "(R)") that leaked into the raw Transaction.message text at logging time —
-      // applying it here at render time cleans historical rows too, not just new ones.
-      fromAssets = displayName(tr.message.slice(fromTeam.name.length, toIdx).replace(/^\s*traded\s*/, "").trim());
-      toAssets = displayName(afterTo.slice(toTeam.name.length).replace(/^\s*for\s*/, "").replace(/\.\s*$/, "").trim());
+      let fromClean = displayName(tr.message.slice(fromTeam.name.length, toIdx).replace(/^\s*traded\s*/, "").trim());
+      let toClean = displayName(afterTo.slice(toTeam.name.length).replace(/^\s*for\s*/, "").replace(/\.\s*$/, "").trim());
+      if (fromClean.toLowerCase() === "assets") fromClean = "future considerations";
+      if (toClean.toLowerCase() === "assets") toClean = "future considerations";
+      fromAssets = fromClean;
+      toAssets = toClean;
     }
     return {
       ...tr,

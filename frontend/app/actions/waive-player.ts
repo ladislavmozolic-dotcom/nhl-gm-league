@@ -22,15 +22,16 @@ export async function waivePlayer(
       waiverStatus: "ON_WAIVERS",
     },
   });
-  console.log("CREATING TRANSACTION");
-  // Prisma client may not expose a 'transaction' property in some setups; use any cast to access model dynamically
+  const team = player.teamId ? await prisma.team.findUnique({ where: { id: player.teamId }, select: { code: true } }) : null;
+  const teamTag = team?.code ? ` (${team.code})` : "";
   await (prisma as any).transaction.create({
     data: {
       type: "WAIVER",
-      message: `${player.name} placed on waivers`,
+      playerId: player.id,
+      teamId: player.teamId,
+      message: `${player.name}${teamTag} was placed on waivers.`,
     },
   });
-  console.log("TRANSACTION CREATED");
 
   revalidatePath("/teams");
   revalidatePath("/waivers");
