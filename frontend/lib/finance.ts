@@ -47,6 +47,15 @@ export const CURRENT_SEASON_START = 2026; // 2026-27
 export const seasonLabel = (startYear: number) =>
   `${startYear}-${String((startYear + 1) % 100).padStart(2, "0")}`;
 
+/** Default projected cap limits per season based on real NHL/NHLPA agreements and revenue estimates. */
+export const DEFAULT_PROJECTED_CAPS: Record<number, { upper: number; lower: number; note: string }> = {
+  2026: { upper: 104_000_000, lower: 76_900_000, note: "Confirmed" },
+  2027: { upper: 113_500_000, lower: 83_900_000, note: "Confirmed" },
+  2028: { upper: 123_000_000, lower: 91_000_000, note: "Estimated" },
+  2029: { upper: 132_500_000, lower: 98_000_000, note: "Estimated" },
+  2030: { upper: 142_000_000, lower: 105_000_000, note: "Estimated" },
+};
+
 /** A contract's expiry season, derived from years remaining — the single
  *  source of truth every contractYears write should use instead of trusting
  *  a separately-typed Player.contractExpiry to stay in sync by hand. */

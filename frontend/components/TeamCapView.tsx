@@ -8,6 +8,7 @@ import {
   getArenaSections, selloutRevenue, computeTeamFinance, teamCapSummary, projectedPointsPct,
   playerCapYears, deadMoneyForYear, money, CURRENT_SEASON_START, seasonLabel,
   accruedCapSpace, ltirRelief, capCeilingForPhase, farmSalaryExpense, liveCapHit,
+  DEFAULT_PROJECTED_CAPS,
 } from "@/lib/finance";
 import { getLeagueClock, regularSeasonDayProgress } from "@/lib/calendar-server";
 import { getTeamSession } from "@/lib/auth";
@@ -161,16 +162,16 @@ export default async function TeamCapView({ slug }: { slug: string }) {
       const protectedTeams = p.tradeClause === "M_NTC" ? (p.noTradeTeams ?? []).map((id) => teamCodeById.get(id)).filter(Boolean).join(", ") : "";
       return (
         <tr key={p.id} className="border-b border-slate-800/60 hover:bg-slate-800/30">
-          <td className="px-3 py-1.5"><PlayerLink id={p.id} name={p.name} /></td>
-          <td className="px-2 py-1.5 text-center text-slate-500 text-xs">{p.position}</td>
-          <td className="px-2 py-1.5 text-center text-slate-400 tabular-nums">{p.age ?? "—"}</td>
-          <td className="px-2 py-1.5 text-center"><TypeBadge type={p.contractType} /></td>
-          <td className="px-2 py-1.5 text-center text-slate-400 tabular-nums" title={protectedTeams ? `Protected against: ${protectedTeams}` : undefined}>
+          <td className="px-3 py-1.5 whitespace-nowrap sticky left-0 bg-slate-900 z-10"><PlayerLink id={p.id} name={p.name} /></td>
+          <td className="px-2 py-1.5 text-center text-slate-500 text-xs whitespace-nowrap">{p.position}</td>
+          <td className="px-2 py-1.5 text-center text-slate-400 tabular-nums whitespace-nowrap">{p.age ?? "—"}</td>
+          <td className="px-2 py-1.5 text-center whitespace-nowrap"><TypeBadge type={p.contractType} /></td>
+          <td className="px-2 py-1.5 text-center text-slate-400 tabular-nums whitespace-nowrap" title={protectedTeams ? `Protected against: ${protectedTeams}` : undefined}>
             {p.tradeClause ? (CLAUSE_LABEL[p.tradeClause] ?? p.tradeClause) : ""}
           </td>
-          <td className="px-3 py-1.5 text-right tabular-nums font-medium text-xs">{netCapHit ? money(netCapHit) : "—"}</td>
-          {cells.map((c, i) => <td key={i} className="px-3 py-1.5 text-right tabular-nums text-xs">{c.salary != null ? <span className="text-green-400">{money(c.salary)}</span> : c.status ? <Badge s={c.status} /> : ""}</td>)}
-          {gm && <td className="px-2 py-1.5 text-right">{p.capHit && p.contractYears ? <BuyoutButton slug={slug} playerId={p.id} playerName={p.name} onBuyout={buyoutPlayer} /> : null}</td>}
+          <td className="px-3 py-1.5 text-right tabular-nums font-medium text-xs whitespace-nowrap">{netCapHit ? money(netCapHit) : "—"}</td>
+          {cells.map((c, i) => <td key={i} className="px-3 py-1.5 text-right tabular-nums text-xs whitespace-nowrap">{c.salary != null ? <span className="text-green-400">{money(c.salary)}</span> : c.status ? <Badge s={c.status} /> : ""}</td>)}
+          {gm && <td className="px-2 py-1.5 text-right whitespace-nowrap">{p.capHit && p.contractYears ? <BuyoutButton slug={slug} playerId={p.id} playerName={p.name} onBuyout={buyoutPlayer} /> : null}</td>}
         </tr>
       );
     })}</>
@@ -178,14 +179,14 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   const Thead = ({ gm }: { gm: boolean }) => (
     <thead>
       <tr className="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-800 bg-slate-800/30">
-        <th className="text-left px-3 py-2 font-medium">Player</th>
-        <th className="px-2 py-2 font-medium text-center">Pos</th>
-        <th className="px-2 py-2 font-medium text-center">Age</th>
-        <th className="px-2 py-2 font-medium text-center" title="Contract type: 1-way (full salary in AHL) or 2-way (reduced AHL salary)">Type</th>
-        <th className="px-2 py-2 font-medium text-center" title="Trade protection clause">Clause</th>
-        <th className="text-right px-3 py-2 font-medium">Cap Hit</th>
+        <th className="text-left px-3 py-2 font-medium whitespace-nowrap sticky left-0 bg-slate-900 z-10 min-w-[170px]">Player</th>
+        <th className="px-2 py-2 font-medium text-center whitespace-nowrap">Pos</th>
+        <th className="px-2 py-2 font-medium text-center whitespace-nowrap">Age</th>
+        <th className="px-2 py-2 font-medium text-center whitespace-nowrap" title="Contract type: 1-way (full salary in AHL) or 2-way (reduced AHL salary)">Type</th>
+        <th className="px-2 py-2 font-medium text-center whitespace-nowrap" title="Trade protection clause">Clause</th>
+        <th className="text-right px-3 py-2 font-medium whitespace-nowrap">Cap Hit</th>
         {years.map((y) => <th key={y} className="text-right px-3 py-2 whitespace-nowrap">{seasonLabel(y)}</th>)}
-        {gm && <th />}
+        {gm && <th className="whitespace-nowrap" />}
       </tr>
     </thead>
   );
@@ -223,36 +224,22 @@ export default async function TeamCapView({ slug }: { slug: string }) {
           <p className="text-sm text-slate-500">{team.arena} · popularity {team.popularity} · attendance {(fin.attendance * 100).toFixed(0)}%</p>
           {isGm && <Link href={`/teams/${slug}/finance`} className="text-xs text-blue-400 hover:underline">Ticket prices →</Link>}
         </div>
-        <div className="text-sm grid grid-cols-2 gap-x-6 gap-y-1 tabular-nums">
-          <span className="text-slate-400" title="NHL + AHL players in the organization, vs. the league's max org roster size">Roster Size</span>
-          <span className={`text-right ${orgTotal > ROSTER_LIMITS.orgMax ? "text-red-400 font-semibold" : ""}`}>
-            {orgTotal}/{ROSTER_LIMITS.orgMax} <span className="text-slate-500 text-xs">({team.players.length} NHL: {posCounts.forwards.length}F·{posCounts.defense.length}D·{posCounts.goalies.length}G · {farm.length} AHL)</span>
-          </span>
-          <span className="text-slate-400" title="Sum of each player's Cap Hit — already net of any retention someone else pays">Total Salaries</span><span className="text-right">{money(cap.totalSalaries)}</span>
-          <span className="text-slate-400" title="Dead cap from this club's bought-out contracts">Dead Cap — Buyouts</span><span className="text-right">{realBuyoutsDeadMoney ? money(realBuyoutsDeadMoney) : "—"}</span>
-          <span className="text-slate-400" title="Salary this club retains on players it traded away">Retained Salary</span><span className="text-right">{deadCapAmount ? money(deadCapAmount) : "—"}</span>
-          <span className="text-slate-400" title="Contracts retained on (out) + retained-salary players rostered (in) — one combined pool vs. the league's configured max per team">Retention slots</span>
-          <span className={`text-right ${retention.slotsOutUsed + retention.slotsInUsed >= retention.slotsMax ? "text-red-400 font-semibold" : ""}`}>
-            {retention.slotsOutUsed + retention.slotsInUsed}/{retention.slotsMax} <span className="text-slate-500 font-normal text-xs">({retention.slotsOutUsed} out, {retention.slotsInUsed} in)</span>
-          </span>
-          <span className="text-slate-400" title="Dead Cap as a % of the cap ceiling vs. the league's configured max">Retention % of cap</span>
-          <span className={`text-right ${retention.pctOfCap >= retention.pctMax ? "text-red-400 font-semibold" : ""}`}>{retention.pctOfCap.toFixed(1)}% <span className="text-slate-500">/ {retention.pctMax}%</span></span>
-          <span className="text-slate-400" title="Total Salaries + Buyout Dead Cap + Retained Salary">Actual Cap Hit</span><span className="text-right font-semibold">{money(cap.capHit)}</span>
-          <span className="text-slate-400" title={`Ceiling ${money(cap.upper)} − Actual Cap Hit`}>Actual Cap Space</span><span className={`text-right font-semibold ${cap.capSpace < 0 ? "text-red-400" : "text-green-400"}`}>{money(cap.capSpace)}</span>
-          <span className="text-slate-400" title="Max total cap hit you may carry for the rest of the season">Projected Cap Hit</span><span className="text-right tabular-nums text-slate-200">{money(maxCapHit)}</span>
-          <span className="text-slate-400" title={`Biggest full-season cap hit you can still add and stay legal — unused cap banks each calendar day of the regular season (grows toward the deadline). Day ${accrued.played}/${dayProgress.daysTotal}.`}>
-            Projected Cap Space <span className="text-slate-600">(day {accrued.played}/{dayProgress.daysTotal})</span>
-          </span>
-          <span className={`text-right font-bold ${accrued.actual < 0 ? "text-red-400" : "text-emerald-400"}`}>{money(accrued.actual)}</span>
-          {ltir > 0 && (<>
-            <span className="text-slate-400" title="Long-Term Injured Reserve — cap hits of skaters injured below CON 90. You may exceed the cap by this much to replace them.">LTIR Relief</span>
-            <span className="text-right font-semibold text-sky-300">+{money(ltir)}</span>
-          </>)}
-          <span className="text-slate-400" title={cushioned ? "Off-season: up to +10% over the cap allowed; must be compliant by opening day." : "Regular season: must stay under the ceiling (incl. LTIR relief)."}>Cap Status</span>
-          <span className={`text-right font-bold ${overBy > 0 ? "text-red-400" : "text-green-400"}`}>
-            {overBy > 0 ? `Over by ${money(overBy)}` : cushioned ? "OK · off-season" : "Compliant ✓"}
-          </span>
-          <span className="text-slate-400">Bank Account</span><span className="text-right text-amber-300 font-semibold">{money(team.bankAccount)}</span>
+        <div className="text-sm grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 tabular-nums w-full lg:w-auto">
+          <div className="flex justify-between gap-4"><span className="text-slate-400" title="NHL + AHL players in the organization, vs. the league's max org roster size">Roster Size</span><span className={`${orgTotal > ROSTER_LIMITS.orgMax ? "text-red-400 font-semibold" : ""}`}>{orgTotal}/{ROSTER_LIMITS.orgMax} <span className="text-slate-500 text-xs">({team.players.length} NHL · {farm.length} AHL)</span></span></div>
+          <div className="flex justify-between gap-4"><span className="text-slate-400" title="Sum of each player's Cap Hit — already net of any retention someone else pays">Total Salaries</span><span className="text-right">{money(cap.totalSalaries)}</span></div>
+          <div className="flex justify-between gap-4"><span className="text-slate-400" title="Dead cap from this club's bought-out contracts">Dead Cap — Buyouts</span><span className="text-right">{realBuyoutsDeadMoney ? money(realBuyoutsDeadMoney) : "—"}</span></div>
+          <div className="flex justify-between gap-4"><span className="text-slate-400" title="Salary this club retains on players it traded away">Retained Salary</span><span className="text-right">{deadCapAmount ? money(deadCapAmount) : "—"}</span></div>
+          <div className="flex justify-between gap-4"><span className="text-slate-400" title="Contracts retained on (out) + retained-salary players rostered (in) — one combined pool vs. the league's configured max per team">Retention slots</span><span className={`text-right ${retention.slotsOutUsed + retention.slotsInUsed >= retention.slotsMax ? "text-red-400 font-semibold" : ""}`}>{retention.slotsOutUsed + retention.slotsInUsed}/{retention.slotsMax}</span></div>
+          <div className="flex justify-between gap-4"><span className="text-slate-400" title="Dead Cap as a % of the cap ceiling vs. the league's configured max">Retention % of cap</span><span className={`text-right ${retention.pctOfCap >= retention.pctMax ? "text-red-400 font-semibold" : ""}`}>{retention.pctOfCap.toFixed(1)}% <span className="text-slate-500">/ {retention.pctMax}%</span></span></div>
+          <div className="flex justify-between gap-4"><span className="text-slate-400" title="Total Salaries + Buyout Dead Cap + Retained Salary">Actual Cap Hit</span><span className="text-right font-semibold">{money(cap.capHit)}</span></div>
+          <div className="flex justify-between gap-4"><span className="text-slate-400" title={`Ceiling ${money(cap.upper)} − Actual Cap Hit`}>Actual Cap Space</span><span className={`text-right font-semibold ${cap.capSpace < 0 ? "text-red-400" : "text-green-400"}`}>{money(cap.capSpace)}</span></div>
+          <div className="flex justify-between gap-4"><span className="text-slate-400" title="Max total cap hit you may carry for the rest of the season">Projected Cap Hit</span><span className="text-right tabular-nums text-slate-200">{money(maxCapHit)}</span></div>
+          <div className="flex justify-between gap-4"><span className="text-slate-400" title="Projected Cap Space">Projected Cap Space</span><span className={`text-right font-bold ${accrued.actual < 0 ? "text-red-400" : "text-emerald-400"}`}>{money(accrued.actual)}</span></div>
+          {ltir > 0 && (
+            <div className="flex justify-between gap-4"><span className="text-slate-400" title="Long-Term Injured Reserve">LTIR Relief</span><span className="text-right font-semibold text-sky-300">+{money(ltir)}</span></div>
+          )}
+          <div className="flex justify-between gap-4"><span className="text-slate-400">Cap Status</span><span className={`text-right font-bold ${overBy > 0 ? "text-red-400" : "text-green-400"}`}>{overBy > 0 ? `Over by ${money(overBy)}` : cushioned ? "OK · off-season" : "Compliant ✓"}</span></div>
+          <div className="flex justify-between gap-4"><span className="text-slate-400">Bank Account</span><span className="text-right text-amber-300 font-semibold">{money(team.bankAccount)}</span></div>
         </div>
       </div>
 
@@ -288,12 +275,13 @@ export default async function TeamCapView({ slug }: { slug: string }) {
               <th className="text-left px-4 py-2.5 font-medium w-52">Season</th>
               {years.map((y) => {
                 const proj = capProjections.find((p) => p.year === y);
+                const note = proj?.note ?? DEFAULT_PROJECTED_CAPS[y]?.note;
                 return (
                   <th key={y} className={`text-center px-3 py-2.5 whitespace-nowrap font-medium ${y === CURRENT_SEASON_START ? "text-blue-400" : ""}`}>
                     <div>{seasonLabel(y)}</div>
-                    {proj?.note && (
-                      <div className={`text-[9px] font-normal mt-0.5 ${proj.note.toLowerCase().includes("confirm") ? "text-emerald-500" : "text-slate-600"}`}>
-                        {proj.note}
+                    {note && (
+                      <div className={`text-[9px] font-normal mt-0.5 ${note.toLowerCase().includes("confirm") ? "text-emerald-500" : "text-slate-600"}`}>
+                        {note}
                       </div>
                     )}
                   </th>
@@ -309,8 +297,8 @@ export default async function TeamCapView({ slug }: { slug: string }) {
               </td>
               {years.map((y) => {
                 const proj = capProjections.find((p) => p.year === y);
-                const upper = proj?.upperLimit ?? cap.upper;
-                const isCustom = proj != null;
+                const upper = proj?.upperLimit ?? DEFAULT_PROJECTED_CAPS[y]?.upper ?? cap.upper;
+                const isCustom = proj != null || DEFAULT_PROJECTED_CAPS[y] != null;
                 return (
                   <td key={y} className={`px-3 py-2 text-center tabular-nums text-xs ${isCustom ? "text-sky-300" : "text-slate-300"}`}>
                     {money(upper)}
@@ -325,7 +313,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
               </td>
               {years.map((y, i) => {
                 const proj = capProjections.find((p) => p.year === y);
-                const upper = proj?.upperLimit ?? cap.upper;
+                const upper = proj?.upperLimit ?? DEFAULT_PROJECTED_CAPS[y]?.upper ?? cap.upper;
                 const hit = nhlCapHitForYear(i);
                 const over = hit > upper;
                 return (
@@ -342,7 +330,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
               </td>
               {years.map((y, i) => {
                 const proj = capProjections.find((p) => p.year === y);
-                const upper = proj?.upperLimit ?? cap.upper;
+                const upper = proj?.upperLimit ?? DEFAULT_PROJECTED_CAPS[y]?.upper ?? cap.upper;
                 const space = upper - nhlCapHitForYear(i);
                 return (
                   <td key={y} className={`px-3 py-2 text-center tabular-nums text-xs font-bold ${space < 0 ? "text-red-400" : space > 10_000_000 ? "text-emerald-400" : "text-green-300"}`}>
@@ -403,17 +391,17 @@ export default async function TeamCapView({ slug }: { slug: string }) {
           <table className="w-full text-sm min-w-[720px]">
             <thead>
               <tr className="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-800 bg-slate-800/30">
-                <th className="text-left px-3 py-2 font-medium">Player</th>
-                <th className="text-right px-3 py-2 font-medium">Cap Hit</th>
+                <th className="text-left px-3 py-2 font-medium whitespace-nowrap sticky left-0 bg-slate-900 z-10 min-w-[170px]">Player</th>
+                <th className="text-right px-3 py-2 font-medium whitespace-nowrap">Cap Hit</th>
                 {years.map((y) => <th key={y} className="text-right px-3 py-2 whitespace-nowrap">{seasonLabel(y)}</th>)}
               </tr>
             </thead>
             <tbody>
               {realBuyouts.map((b) => (
                 <tr key={`b${b.id}`} className="border-b border-slate-800/60 bg-red-950/10">
-                  <td className="px-3 py-1.5 text-slate-400 italic">{b.playerId ? <PlayerLink id={b.playerId} name={b.playerName} /> : b.playerName} <span className="text-[10px] text-red-400">(bought out)</span></td>
-                  <td className="px-3 py-1.5 text-right text-red-300 tabular-nums">{money(b.perYear)}</td>
-                  {years.map((y, i) => <td key={i} className="px-3 py-1.5 text-right tabular-nums">{y >= b.startYear && y < b.startYear + b.years ? <span className="text-red-300">{money(b.perYear)}</span> : ""}</td>)}
+                  <td className="px-3 py-1.5 text-slate-400 italic whitespace-nowrap sticky left-0 bg-slate-900 z-10">{b.playerId ? <PlayerLink id={b.playerId} name={b.playerName} /> : b.playerName} <span className="text-[10px] text-red-400">(bought out)</span></td>
+                  <td className="px-3 py-1.5 text-right text-red-300 tabular-nums whitespace-nowrap">{money(b.perYear)}</td>
+                  {years.map((y, i) => <td key={i} className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap">{y >= b.startYear && y < b.startYear + b.years ? <span className="text-red-300">{money(b.perYear)}</span> : ""}</td>)}
                 </tr>
               ))}
             </tbody>
@@ -433,19 +421,19 @@ export default async function TeamCapView({ slug }: { slug: string }) {
           <table className="w-full text-sm min-w-[720px]">
             <thead>
               <tr className="text-xs uppercase tracking-wider text-slate-500 border-b border-slate-800 bg-slate-800/30">
-                <th className="text-left px-3 py-2 font-medium">Player</th>
-                <th className="text-right px-3 py-2 font-medium">Retained</th>
+                <th className="text-left px-3 py-2 font-medium whitespace-nowrap sticky left-0 bg-slate-900 z-10 min-w-[170px]">Player</th>
+                <th className="text-right px-3 py-2 font-medium whitespace-nowrap">Retained</th>
                 {years.map((y) => <th key={y} className="text-right px-3 py-2 whitespace-nowrap">{seasonLabel(y)}</th>)}
               </tr>
             </thead>
             <tbody>
               {retentions.map((r) => (
                 <tr key={`r${r.id}`} className="border-b border-slate-800/60 hover:bg-slate-800/30">
-                  <td className="px-3 py-1.5">
+                  <td className="px-3 py-1.5 whitespace-nowrap sticky left-0 bg-slate-900 z-10">
                     {r.playerId ? <PlayerLink id={r.playerId} name={r.playerName} /> : <span className="italic text-slate-400">{r.playerName}</span>}
                   </td>
                   <td
-                    className="px-3 py-1.5 text-right tabular-nums font-medium"
+                    className="px-3 py-1.5 text-right tabular-nums font-medium whitespace-nowrap"
                     // A little running gag for the Edmonton GM — everything else in
                     // this column is plain white, his "Retained" figure gets a
                     // temporary pride-flag gradient instead.
@@ -453,7 +441,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
                   >
                     {money(r.perYear)}
                   </td>
-                  {years.map((y, i) => <td key={i} className="px-3 py-1.5 text-right tabular-nums">{y >= r.startYear && y < r.startYear + r.years ? <span className="text-red-400">{money(r.perYear)}</span> : ""}</td>)}
+                  {years.map((y, i) => <td key={i} className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap">{y >= r.startYear && y < r.startYear + r.years ? <span className="text-red-400">{money(r.perYear)}</span> : ""}</td>)}
                 </tr>
               ))}
             </tbody>
