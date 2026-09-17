@@ -55,7 +55,7 @@ function Tooltip({ children, text }: { children: React.ReactNode; text: string }
   return (
     <span className="relative group/tip cursor-help">
       {children}
-      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 w-max max-w-[220px] rounded bg-slate-700 border border-slate-600 px-2.5 py-1.5 text-xs text-slate-200 leading-snug shadow-lg opacity-0 group-hover/tip:opacity-100 transition-opacity text-center">
+      <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1 z-50 w-max max-w-[220px] rounded bg-slate-700 border border-slate-600 px-2.5 py-1.5 text-xs text-slate-200 leading-snug shadow-lg opacity-0 group-hover/tip:opacity-100 transition-opacity text-center">
         {text}
       </span>
     </span>
