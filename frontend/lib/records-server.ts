@@ -4,17 +4,26 @@ import { ACTIVE_SEASON } from "@/lib/career-server";
 import { PRE_SEASON, REGULAR_SEASON } from "@/lib/phase";
 import { teamManagerLabel } from "@/lib/team-gm";
 
+export type LeaderTeamInfo = {
+  code: string;
+  slug?: string | null;
+  logoUrl?: string | null;
+};
+
 export type LeaderItem = {
   rank: number;
   name: string;
   sub?: string;
   value: string | number;
   slug?: string | null;
+  photoUrl?: string | null;
   gmSlug?: string | null;
   teamCode?: string | null;
   teamSlug?: string | null;
   teamLogo?: string | null;
+  teams?: LeaderTeamInfo[];
   extraList?: string[];
+  hideTeam?: boolean;
 };
 
 export type RecordPhase = "all" | "regular" | "playoffs" | "pre";
@@ -49,6 +58,31 @@ export type LeagueRecordsData = {
 function parseSeasonYear(s: string): number {
   const m = s.match(/^(\d{4})/);
   return m ? parseInt(m[1], 10) : 2026;
+}
+
+function resolveTeams(teamIds: Set<number>, teamById: Map<number, any>): {
+  teams?: LeaderTeamInfo[];
+  teamCode?: string | null;
+  teamLogo?: string | null;
+  teamSlug?: string | null;
+} {
+  const list = [...teamIds]
+    .map((id) => teamById.get(id))
+    .filter(Boolean) as Array<{ code: string; slug?: string | null; logoUrl?: string | null }>;
+  if (!list.length) return {};
+  if (list.length === 1) {
+    return {
+      teamCode: list[0].code,
+      teamLogo: list[0].logoUrl,
+      teamSlug: list[0].slug,
+    };
+  }
+  return {
+    teams: list.map((t) => ({ code: t.code, slug: t.slug, logoUrl: t.logoUrl })),
+    teamCode: list.map((t) => t.code).join(" / "),
+    teamLogo: null,
+    teamSlug: null,
+  };
 }
 
 function calculateAge(birthDateStr: string | null | undefined, targetDate: Date | null, fallbackAge?: number | null): { years: number; days: number; formatted: string } | null {
@@ -102,36 +136,30 @@ export async function getLeagueRecords(
         select: {
           id: true,
           name: true,
+          code: true,
+          slug: true,
           gm: true,
           gmFirstName: true,
           gmLastName: true,
           gmNickname: true,
           passwordHash: true,
-          logoUrl: true,
-          code: true,
-          slug: true,
         },
       },
     },
   });
 
-  const teamById = new Map(allTeams.map((t) => [t.id, t]));
-  const getTeamGm = (teamId: number): string => {
-    const t = teamById.get(teamId);
-    if (!t) return "—";
-    const label = teamManagerLabel(t);
-    return label === "🤖 AI GM" ? "—" : label;
+  const teamById = new Map<number, (typeof allTeams)[number]>();
+  allTeams.forEach((t) => teamById.set(t.id, t));
+
+  const getTeamGm = (teamId: number | null | undefined): string => {
+    if (!teamId) return "—";
+    const tm = teamById.get(teamId);
+    if (!tm) return "—";
+    return teamManagerLabel(tm.parentTeam ? tm.parentTeam : tm);
   };
 
-  // 2. Fetch Archived Data
-  const [
-    seasonRecords,
-    seasonAwards,
-    archivedSkaters,
-    archivedGoalies,
-    archivedTeams,
-    allPlayersWithBirth,
-  ] = await Promise.all([
+  // 2. Fetch Archived / Historical Record Data
+  const [seasonRecords, seasonAwards, archivedSkaters, archivedGoalies, archivedTeams, allPlayersWithBirth] = await Promise.all([
     prisma.seasonRecord.findMany({ where: { league } }),
     prisma.seasonAward.findMany({ where: { league } }),
     prisma.playerSeasonStat.findMany({ where: { league, isPlayoff: false } }),
@@ -139,7 +167,7 @@ export async function getLeagueRecords(
     prisma.teamSeasonStat.findMany({ where: { league } }),
     prisma.player.findMany({
       where: { rosterType: isAhl ? "AHL" : "NHL" },
-      select: { id: true, name: true, slug: true, position: true, isGoalie: true, birthDate: true, age: true, teamId: true, overall: true },
+      select: { id: true, name: true, slug: true, photoUrl: true, position: true, isGoalie: true, birthDate: true, age: true, teamId: true, overall: true },
     }),
   ]);
 
@@ -230,7 +258,7 @@ export async function getLeagueRecords(
   if (missingIds.length) {
     const extra = await prisma.player.findMany({
       where: { id: { in: missingIds } },
-      select: { id: true, name: true, slug: true, position: true, isGoalie: true, birthDate: true, age: true, teamId: true, overall: true },
+      select: { id: true, name: true, slug: true, photoUrl: true, position: true, isGoalie: true, birthDate: true, age: true, teamId: true, overall: true },
     });
     extra.forEach((p) => playerMap.set(p.id, p));
   }
@@ -285,7 +313,7 @@ export async function getLeagueRecords(
       };
     })
     .sort((a, b) => b.rawVal - a.rawVal || a.name.localeCompare(b.name))
-    .slice(0, 35)
+    .slice(0, 5)
     .map((item, idx) => ({ ...item, rank: idx + 1 }));
 
   const gmOneTeamLeader: LeaderItem[] = [...gmTeamSeasons.values()]
@@ -307,7 +335,7 @@ export async function getLeagueRecords(
       };
     })
     .sort((a, b) => b.rawVal - a.rawVal || a.name.localeCompare(b.name))
-    .slice(0, 35)
+    .slice(0, 5)
     .map((item, idx) => ({ ...item, rank: idx + 1 }));
 
   const gmStreakLeader: LeaderItem[] = [...gmTotalSeasons.values()]
@@ -359,7 +387,7 @@ export async function getLeagueRecords(
       };
     })
     .sort((a, b) => b.rawVal - a.rawVal || a.name.localeCompare(b.name))
-    .slice(0, 35)
+    .slice(0, 5)
     .map((item, idx) => ({ ...item, rank: idx + 1 }));
 
   // ==========================================
@@ -390,10 +418,10 @@ export async function getLeagueRecords(
       };
     })
     .sort((a, b) => b.rawVal - a.rawVal)
-    .slice(0, 10)
+    .slice(0, 5)
     .map((item, idx) => ({ ...item, rank: idx + 1 }));
 
-  const gmCups = new Map<string, Array<{ season: string; teamName: string; teamCode?: string | null }>>();
+  const gmCups = new Map<string, Array<{ season: string; teamName: string; teamCode?: string }>>();
   for (const r of champRecords) {
     if (!r.championTeamId) continue;
     const tm = teamById.get(r.championTeamId);
@@ -417,7 +445,7 @@ export async function getLeagueRecords(
       rawVal: items.length,
     }))
     .sort((a, b) => b.rawVal - a.rawVal)
-    .slice(0, 10)
+    .slice(0, 5)
     .map((item, idx) => ({ ...item, rank: idx + 1 }));
 
   const champSeasonTeam = new Map<string, number>();
@@ -456,14 +484,12 @@ export async function getLeagueRecords(
       const tm = teamById.get(r.teamId);
       return `${r.season} (${tm?.code ?? tm?.name ?? "Tím"})`;
     });
-    const curTeam = p.teamId ? teamById.get(p.teamId) : null;
     const row: LeaderItem & { rawVal: number } = {
       rank: 1,
       name: cleanName(p.name),
       slug: p.slug,
-      teamCode: curTeam?.code,
-      teamSlug: curTeam?.slug,
-      teamLogo: curTeam?.logoUrl,
+      photoUrl: p.photoUrl,
+      hideTeam: true,
       value: `${rings.length}× ${cupName}`,
       sub: items.join(", "),
       extraList: items,
@@ -477,11 +503,11 @@ export async function getLeagueRecords(
   }
 
   skaterRingsLeader.sort((a, b) => (b as any).rawVal - (a as any).rawVal);
-  skaterRingsLeader.splice(10);
+  skaterRingsLeader.splice(5);
   skaterRingsLeader.forEach((item, idx) => { item.rank = idx + 1; });
 
   goalieRingsLeader.sort((a, b) => (b as any).rawVal - (a as any).rawVal);
-  goalieRingsLeader.splice(10);
+  goalieRingsLeader.splice(5);
   goalieRingsLeader.forEach((item, idx) => { item.rank = idx + 1; });
 
   // Playoff Career Points from real playoff game stats
@@ -502,17 +528,15 @@ export async function getLeagueRecords(
   const playoffCareerPoints: LeaderItem[] = [...playoffSkaterAcc.values()]
     .filter((s) => s.points > 0)
     .sort((a, b) => b.points - a.points || b.goals - a.goals)
-    .slice(0, 10)
+    .slice(0, 5)
     .map((s, idx) => {
       const p = playerMap.get(s.playerId);
-      const tm = s.teamId ? teamById.get(s.teamId) : null;
       return {
         rank: idx + 1,
         name: p ? cleanName(p.name) : "Hráč",
         slug: p?.slug,
-        teamCode: tm?.code,
-        teamSlug: tm?.slug,
-        teamLogo: tm?.logoUrl,
+        photoUrl: p?.photoUrl,
+        hideTeam: true,
         value: `${s.points} PTS`,
         sub: `${s.gp} GP (${s.goals}G + ${s.assists}A)`,
       };
@@ -536,17 +560,15 @@ export async function getLeagueRecords(
   const playoffCareerWins: LeaderItem[] = [...playoffGoalieAcc.values()]
     .filter((g) => g.wins > 0)
     .sort((a, b) => b.wins - a.wins || b.saves - a.saves)
-    .slice(0, 10)
+    .slice(0, 5)
     .map((g, idx) => {
       const p = playerMap.get(g.playerId);
-      const tm = g.teamId ? teamById.get(g.teamId) : null;
       return {
         rank: idx + 1,
         name: p ? cleanName(p.name) : "Brankár",
         slug: p?.slug,
-        teamCode: tm?.code,
-        teamSlug: tm?.slug,
-        teamLogo: tm?.logoUrl,
+        photoUrl: p?.photoUrl,
+        hideTeam: true,
         value: `${g.wins} W`,
         sub: `${g.gp} GP · ${g.shutouts} SO`,
       };
@@ -555,7 +577,7 @@ export async function getLeagueRecords(
   // ==========================================
   // C. AWARDS & TROPHIES
   // ==========================================
-  const awardCategoryCounts = new Map<string, Map<string, { name: string; slug?: string | null; teamId?: number | null; count: number; seasons: string[] }>>();
+  const awardCategoryCounts = new Map<string, Map<string, { name: string; slug?: string | null; photoUrl?: string | null; teamId?: number | null; count: number; seasons: string[] }>>();
 
   for (const a of seasonAwards) {
     let cat = a.category;
@@ -577,6 +599,7 @@ export async function getLeagueRecords(
     let winnerKey = "";
     let winnerName = "";
     let winnerSlug: string | null = null;
+    let winnerPhotoUrl: string | null = null;
     let teamId = a.teamId;
 
     if (a.playerId) {
@@ -584,6 +607,7 @@ export async function getLeagueRecords(
       const p = playerMap.get(a.playerId);
       winnerName = p ? cleanName(p.name) : cleanName(a.playerName || "—");
       winnerSlug = p?.slug ?? null;
+      winnerPhotoUrl = p?.photoUrl ?? null;
       if (!teamId && p?.teamId) teamId = p.teamId;
     } else if (a.playerName) {
       winnerKey = `name_${a.playerName}`;
@@ -597,7 +621,7 @@ export async function getLeagueRecords(
     }
 
     if (!catMap.has(winnerKey)) {
-      catMap.set(winnerKey, { name: winnerName, slug: winnerSlug, teamId, count: 0, seasons: [] });
+      catMap.set(winnerKey, { name: winnerName, slug: winnerSlug, photoUrl: winnerPhotoUrl, teamId, count: 0, seasons: [] });
     }
     const entry = catMap.get(winnerKey)!;
     entry.count++;
@@ -605,7 +629,7 @@ export async function getLeagueRecords(
   }
 
   const buildAwardLeader = (catTitle: string, aliasKeys: string[], awardPhase: RecordPhase = "all"): RecordSection => {
-    let combinedMap = new Map<string, { name: string; slug?: string | null; teamId?: number | null; count: number; seasons: string[] }>();
+    let combinedMap = new Map<string, { name: string; slug?: string | null; photoUrl?: string | null; teamId?: number | null; count: number; seasons: string[] }>();
     for (const k of aliasKeys) {
       const m = awardCategoryCounts.get(k);
       if (m) {
@@ -625,14 +649,12 @@ export async function getLeagueRecords(
       .sort((a, b) => b.count - a.count)
       .slice(0, 5)
       .map((entry, idx) => {
-        const tm = entry.teamId ? teamById.get(entry.teamId) : null;
         return {
           rank: idx + 1,
           name: entry.name,
           slug: entry.slug,
-          teamCode: tm?.code,
-          teamSlug: tm?.slug,
-          teamLogo: tm?.logoUrl,
+          photoUrl: entry.photoUrl,
+          hideTeam: true,
           value: `${entry.count}×`,
           sub: entry.seasons.sort().join(", "),
         };
@@ -785,14 +807,12 @@ export async function getLeagueRecords(
 
   const skRowItem = (s: SkaterCareerAcc, val: string | number, sub?: string): LeaderItem => {
     const p = playerMap.get(s.playerId);
-    const tm = s.teamId ? teamById.get(s.teamId) : (p?.teamId ? teamById.get(p.teamId) : null);
     return {
       rank: 1,
       name: p ? cleanName(p.name) : "—",
       slug: p?.slug,
-      teamCode: tm?.code,
-      teamSlug: tm?.slug,
-      teamLogo: tm?.logoUrl,
+      photoUrl: p?.photoUrl,
+      hideTeam: true,
       value: val,
       sub,
     };
@@ -800,14 +820,12 @@ export async function getLeagueRecords(
 
   const glRowItem = (g: GoalieCareerAcc, val: string | number, sub?: string): LeaderItem => {
     const p = playerMap.get(g.playerId);
-    const tm = g.teamId ? teamById.get(g.teamId) : (p?.teamId ? teamById.get(p.teamId) : null);
     return {
       rank: 1,
       name: p ? cleanName(p.name) : "—",
       slug: p?.slug,
-      teamCode: tm?.code,
-      teamSlug: tm?.slug,
-      teamLogo: tm?.logoUrl,
+      photoUrl: p?.photoUrl,
+      hideTeam: true,
       value: val,
       sub,
     };
@@ -820,14 +838,14 @@ export async function getLeagueRecords(
     [...skList]
       .filter((s) => fn(s) > 0)
       .sort((a, b) => fn(b) - fn(a))
-      .slice(0, 10)
+      .slice(0, 5)
       .map((s, idx) => ({ ...skRowItem(s, valFmt(s), subFmt?.(s)), rank: idx + 1 }));
 
   const topGoalies = (fn: (g: GoalieCareerAcc) => number, valFmt: (g: GoalieCareerAcc) => string | number, subFmt?: (g: GoalieCareerAcc) => string) =>
     [...glList]
       .filter((g) => fn(g) !== 0)
       .sort((a, b) => fn(b) - fn(a))
-      .slice(0, 10)
+      .slice(0, 5)
       .map((g, idx) => ({ ...glRowItem(g, valFmt(g), subFmt?.(g)), rank: idx + 1 }));
 
   const careerGpItems = topSkaters((s) => s.gp, (s) => `${s.gp} GP`, (s) => `${s.goals}G + ${s.assists}A · ${s.points} PTS`);
@@ -837,7 +855,7 @@ export async function getLeagueRecords(
 
   const careerWinsItems = topGoalies((g) => g.wins, (g) => `${g.wins} W`, (g) => `${g.gp} GP · ${g.shutouts} SO`);
   const careerStealsItems = topGoalies((g) => g.steals, (g) => `${g.steals} STL`, (g) => `${g.wins} W · ${g.gp} GP`);
-  const careerGsaxItems = topGoalies((g) => g.gsax, (g) => (g.gsax > 0 ? `+${g.gsax.toFixed(1)}` : g.gsax.toFixed(1)), (g) => `${g.gp} GP · ${g.goalsAgainst} GA`);
+  const careerGsaxItems = topGoalies((g) => g.gsax, (g) => (g.gsax > 0 ? `+${g.gsax.toFixed(1)} GSAx` : `${g.gsax.toFixed(1)} GSAx`), (g) => `${g.gp} GP · ${g.goalsAgainst} GA`);
   const careerShutoutsItems = topGoalies((g) => g.shutouts, (g) => `${g.shutouts} SO`, (g) => `${g.gp} GP · ${g.wins} W`);
 
   const skaterCareerSections: RecordSection[] = [
@@ -1233,6 +1251,7 @@ export async function getLeagueRecords(
         rank: idx + 1,
         name: cleanName(p.name),
         slug: p.slug,
+        photoUrl: p.photoUrl,
         teamCode: tm?.code,
         teamSlug: tm?.slug,
         teamLogo: tm?.logoUrl,
@@ -1250,6 +1269,7 @@ export async function getLeagueRecords(
         rank: idx + 1,
         name: cleanName(p.name),
         slug: p.slug,
+        photoUrl: p.photoUrl,
         teamCode: tm?.code,
         teamSlug: tm?.slug,
         teamLogo: tm?.logoUrl,
@@ -1325,11 +1345,11 @@ export async function getLeagueRecords(
 
   // 2. Preseason Top Scorers
   const preSkaterStats = allSkaterStats.filter((s) => s.game.season.endsWith("-PRE") || s.game.season === PRE_SEASON);
-  const preSkaterAcc = new Map<number, { playerId: number; teamId: number | null; gp: number; goals: number; assists: number; points: number; shots: number; pim: number }>();
+  const preSkaterAcc = new Map<number, { playerId: number; teamIds: Set<number>; gp: number; goals: number; assists: number; points: number; shots: number; pim: number }>();
 
   for (const s of preSkaterStats) {
     if (!preSkaterAcc.has(s.playerId)) {
-      preSkaterAcc.set(s.playerId, { playerId: s.playerId, teamId: s.teamId, gp: 0, goals: 0, assists: 0, points: 0, shots: 0, pim: 0 });
+      preSkaterAcc.set(s.playerId, { playerId: s.playerId, teamIds: new Set(), gp: 0, goals: 0, assists: 0, points: 0, shots: 0, pim: 0 });
     }
     const acc = preSkaterAcc.get(s.playerId)!;
     acc.gp += 1;
@@ -1338,7 +1358,7 @@ export async function getLeagueRecords(
     acc.points += s.points;
     acc.shots += s.shots;
     acc.pim += s.pim;
-    if (s.teamId) acc.teamId = s.teamId;
+    if (s.teamId) acc.teamIds.add(s.teamId);
   }
 
   const preSeasonScorers: LeaderItem[] = [...preSkaterAcc.values()]
@@ -1347,14 +1367,13 @@ export async function getLeagueRecords(
     .slice(0, 5)
     .map((s, idx) => {
       const p = playerMap.get(s.playerId);
-      const tm = s.teamId ? teamById.get(s.teamId) : null;
+      const tmInfo = resolveTeams(s.teamIds, teamById);
       return {
         rank: idx + 1,
         name: p ? cleanName(p.name) : "Hráč",
         slug: p?.slug,
-        teamCode: tm?.code,
-        teamSlug: tm?.slug,
-        teamLogo: tm?.logoUrl,
+        photoUrl: p?.photoUrl,
+        ...tmInfo,
         value: `${s.points} PTS`,
         sub: `${s.goals}G + ${s.assists}A (${s.gp} GP · Príprava ${ACTIVE_SEASON})`,
       };
@@ -1366,14 +1385,13 @@ export async function getLeagueRecords(
     .slice(0, 5)
     .map((s, idx) => {
       const p = playerMap.get(s.playerId);
-      const tm = s.teamId ? teamById.get(s.teamId) : null;
+      const tmInfo = resolveTeams(s.teamIds, teamById);
       return {
         rank: idx + 1,
         name: p ? cleanName(p.name) : "Hráč",
         slug: p?.slug,
-        teamCode: tm?.code,
-        teamSlug: tm?.slug,
-        teamLogo: tm?.logoUrl,
+        photoUrl: p?.photoUrl,
+        ...tmInfo,
         value: `${s.goals} G`,
         sub: `${s.points} PTS (${s.gp} GP · Príprava ${ACTIVE_SEASON})`,
       };
@@ -1385,14 +1403,13 @@ export async function getLeagueRecords(
     .slice(0, 5)
     .map((s, idx) => {
       const p = playerMap.get(s.playerId);
-      const tm = s.teamId ? teamById.get(s.teamId) : null;
+      const tmInfo = resolveTeams(s.teamIds, teamById);
       return {
         rank: idx + 1,
         name: p ? cleanName(p.name) : "Hráč",
         slug: p?.slug,
-        teamCode: tm?.code,
-        teamSlug: tm?.slug,
-        teamLogo: tm?.logoUrl,
+        photoUrl: p?.photoUrl,
+        ...tmInfo,
         value: `${s.assists} A`,
         sub: `${s.points} PTS (${s.gp} GP · Príprava ${ACTIVE_SEASON})`,
       };
@@ -1411,6 +1428,7 @@ export async function getLeagueRecords(
         rank: idx + 1,
         name: p ? cleanName(p.name) : "Hráč",
         slug: p?.slug,
+        photoUrl: p?.photoUrl,
         teamCode: tm?.code,
         teamSlug: tm?.slug,
         teamLogo: tm?.logoUrl,
@@ -1421,11 +1439,11 @@ export async function getLeagueRecords(
 
   // 4. Preseason Goalie Saves
   const preGoalieStats = allGoalieStats.filter((g) => g.game.season.endsWith("-PRE") || g.game.season === PRE_SEASON);
-  const preGoalieAcc = new Map<number, { playerId: number; teamId: number | null; gp: number; wins: number; saves: number; shots: number; ga: number; shutouts: number }>();
+  const preGoalieAcc = new Map<number, { playerId: number; teamIds: Set<number>; gp: number; wins: number; saves: number; shots: number; ga: number; shutouts: number }>();
 
   for (const g of preGoalieStats) {
     if (!preGoalieAcc.has(g.playerId)) {
-      preGoalieAcc.set(g.playerId, { playerId: g.playerId, teamId: g.teamId, gp: 0, wins: 0, saves: 0, shots: 0, ga: 0, shutouts: 0 });
+      preGoalieAcc.set(g.playerId, { playerId: g.playerId, teamIds: new Set(), gp: 0, wins: 0, saves: 0, shots: 0, ga: 0, shutouts: 0 });
     }
     const acc = preGoalieAcc.get(g.playerId)!;
     acc.gp += 1;
@@ -1434,7 +1452,7 @@ export async function getLeagueRecords(
     acc.shots += g.shotsAgainst;
     acc.ga += g.goalsAgainst;
     if (g.goalsAgainst === 0) acc.shutouts += 1;
-    if (g.teamId) acc.teamId = g.teamId;
+    if (g.teamId) acc.teamIds.add(g.teamId);
   }
 
   const preGoalieSaves: LeaderItem[] = [...preGoalieAcc.values()]
@@ -1443,15 +1461,14 @@ export async function getLeagueRecords(
     .slice(0, 5)
     .map((g, idx) => {
       const p = playerMap.get(g.playerId);
-      const tm = g.teamId ? teamById.get(g.teamId) : null;
+      const tmInfo = resolveTeams(g.teamIds, teamById);
       const svPct = g.shots > 0 ? ((g.saves / g.shots) * 100).toFixed(1) : "0.0";
       return {
         rank: idx + 1,
         name: p ? cleanName(p.name) : "Brankár",
         slug: p?.slug,
-        teamCode: tm?.code,
-        teamSlug: tm?.slug,
-        teamLogo: tm?.logoUrl,
+        photoUrl: p?.photoUrl,
+        ...tmInfo,
         value: `${g.saves} zákrokov`,
         sub: `${svPct}% SV% · ${g.wins} W (${g.gp} GP · Príprava ${ACTIVE_SEASON})`,
       };

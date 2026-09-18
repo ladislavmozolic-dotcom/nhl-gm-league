@@ -1,20 +1,17 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/ui";
 import HistoryNav from "@/components/HistoryNav";
+import PlayerAvatar from "@/components/playerAvatar";
 import { getLeagueRecords, type LeaderItem, type RecordSection, type RecordPhase } from "@/lib/records-server";
 
 export const dynamic = "force-dynamic";
 
-function medalCls(rank: number) {
-  if (rank === 1) return "bg-amber-400/20 text-amber-300 ring-1 ring-amber-400/50 shadow-sm shadow-amber-500/10";
-  if (rank === 2) return "bg-slate-300/15 text-slate-200 ring-1 ring-slate-400/40";
-  if (rank === 3) return "bg-orange-500/15 text-orange-300 ring-1 ring-orange-500/40";
-  return "bg-slate-800/60 text-slate-400 ring-1 ring-slate-700/50";
-}
-
 function RecordCard({ record, cupName }: { record: RecordSection; cupName: string }) {
+  const first = record.items[0];
+  const rest = record.items.slice(1, 5);
+
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden flex flex-col shadow-sm">
+    <div className="rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden flex flex-col shadow-sm transition-all hover:border-slate-700/80">
       <div className="flex items-start justify-between gap-2.5 px-3.5 py-2.5 border-b border-slate-800/80 bg-slate-800/30 min-h-[46px]">
         <div className="flex items-start gap-2 min-w-0 flex-1">
           <span className="text-base leading-snug shrink-0 mt-0.5" aria-hidden>{record.icon}</span>
@@ -36,76 +33,172 @@ function RecordCard({ record, cupName }: { record: RecordSection; cupName: strin
           </span>
         )}
       </div>
-      <div className="flex-1 p-2">
-        {record.items.length === 0 ? (
+
+      <div className="flex-1 p-2.5 flex flex-col justify-between">
+        {!first ? (
           <p className="px-3 py-6 text-xs text-slate-500 text-center italic">Zatiaľ žiadne zaznamenané údaje</p>
         ) : (
-          <ol className="divide-y divide-slate-800/50">
-            {record.items.map((item, i) => (
-              <li
-                key={`${item.rank}-${item.name}-${i}`}
-                className={`px-2.5 py-2 transition-colors rounded-lg ${
-                  item.rank === 1 ? "bg-gradient-to-r from-amber-500/[0.07] to-transparent" : "hover:bg-slate-800/20"
-                }`}
-              >
-                <div className="flex items-center gap-2.5 text-sm">
-                  <span
-                    className={`grid place-items-center w-5 h-5 shrink-0 rounded-full text-[10px] font-bold tabular-nums ${medalCls(
-                      item.rank
-                    )}`}
-                  >
-                    {item.rank}
+          <div className="space-y-2">
+            {/* Dominant #1 Hero Row */}
+            <div className="rounded-lg bg-gradient-to-br from-amber-500/15 via-slate-800/70 to-slate-900/90 border border-amber-500/30 p-2.5 relative overflow-hidden shadow-sm">
+              <div className="flex items-center gap-2.5">
+                {/* #1 Rank Medal Badge */}
+                <div className="relative shrink-0">
+                  <span className="w-5 h-5 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-300 text-slate-950 font-black text-[10px] flex items-center justify-center shadow-sm ring-1 ring-amber-400/50">
+                    1
                   </span>
+                </div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
+                {/* Avatar / Photo / Logo */}
+                <div className="shrink-0">
+                  {first.slug ? (
+                    <Link href={`/players/${first.slug}`} className="block hover:opacity-90 transition-opacity">
+                      <PlayerAvatar src={first.photoUrl ?? null} alt={first.name} size={42} />
+                    </Link>
+                  ) : first.teamLogo ? (
+                    <Link href={first.teamSlug ? `/teams/${first.teamSlug}` : "#"} className="block hover:opacity-90 transition-opacity">
+                      <img src={first.teamLogo} alt="" className="w-9 h-9 object-contain drop-shadow" />
+                    </Link>
+                  ) : first.gmSlug ? (
+                    <Link href={`/gm/${first.gmSlug}`} className="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 text-sm hover:border-amber-400/50 transition-colors">
+                      👔
+                    </Link>
+                  ) : (
+                    <div className="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400 text-[10px] font-bold">
+                      #1
+                    </div>
+                  )}
+                </div>
+
+                {/* Player Name, Team, Sub */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {first.slug ? (
+                      <Link
+                        href={`/players/${first.slug}`}
+                        className="font-bold text-sm text-white hover:text-amber-300 transition-colors truncate"
+                      >
+                        {first.name}
+                      </Link>
+                    ) : first.gmSlug ? (
+                      <Link
+                        href={`/gm/${first.gmSlug}`}
+                        className="font-bold text-sm text-white hover:text-amber-300 transition-colors truncate"
+                      >
+                        {first.name}
+                      </Link>
+                    ) : (
+                      <span className="font-bold text-sm text-white truncate">{first.name}</span>
+                    )}
+
+                    {first.teams && first.teams.length > 1 && !first.hideTeam ? (
+                      <div className="inline-flex items-center gap-1.5 flex-wrap">
+                        {first.teams.map((t, tIdx) => (
+                          <span key={t.code} className="inline-flex items-center gap-1 text-[11px] text-slate-300 font-medium">
+                            <Link
+                              href={t.slug ? `/teams/${t.slug}` : "#"}
+                              className="inline-flex items-center gap-1 hover:text-blue-400 transition-colors"
+                            >
+                              {t.logoUrl && <img src={t.logoUrl} alt="" className="w-3.5 h-3.5 object-contain shrink-0" />}
+                              <span>{t.code}</span>
+                            </Link>
+                            {tIdx < first.teams!.length - 1 && <span className="text-slate-500">/</span>}
+                          </span>
+                        ))}
+                      </div>
+                    ) : first.teamCode && !first.hideTeam ? (
+                      <Link
+                        href={first.teamSlug ? `/teams/${first.teamSlug}` : "#"}
+                        className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-blue-400 transition-colors shrink-0 font-medium"
+                      >
+                        {first.teamLogo && (
+                          <img src={first.teamLogo} alt="" className="w-3.5 h-3.5 object-contain shrink-0" />
+                        )}
+                        <span>{first.teamCode}</span>
+                      </Link>
+                    ) : null}
+                  </div>
+
+                  {first.sub && (
+                    <p className="text-[11px] text-slate-400 mt-0.5 leading-tight truncate" title={first.sub}>
+                      {first.sub}
+                    </p>
+                  )}
+                </div>
+
+                {/* Value */}
+                <div className="text-right shrink-0">
+                  <span className="text-sm sm:text-base font-black tabular-nums text-amber-300 tracking-tight">
+                    {first.value}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Ranks 2 to 5: Clean minimal single rows */}
+            {rest.length > 0 && (
+              <div className="divide-y divide-slate-800/40 pt-0.5">
+                {rest.map((item, idx) => (
+                  <div
+                    key={`${item.rank}-${item.name}-${idx}`}
+                    className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-slate-800/30 text-xs transition-colors"
+                  >
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <span className="w-4 text-center font-bold text-slate-500 text-[11px] shrink-0 tabular-nums">
+                        {item.rank}
+                      </span>
+
+                      {item.teams && item.teams.length > 1 && !item.hideTeam ? (
+                        <span className="inline-flex items-center gap-1 shrink-0">
+                          {item.teams.map((t, tIdx) => (
+                            <span key={t.code} className="inline-flex items-center gap-0.5 text-[10px] text-slate-400 font-medium">
+                              {t.logoUrl && <img src={t.logoUrl} alt="" className="w-3 h-3 object-contain shrink-0" />}
+                              <span>{t.code}</span>
+                              {tIdx < item.teams!.length - 1 && <span className="text-slate-600">/</span>}
+                            </span>
+                          ))}
+                        </span>
+                      ) : (
+                        !item.hideTeam && item.teamLogo && (
+                          <img src={item.teamLogo} alt="" className="w-3.5 h-3.5 object-contain shrink-0" />
+                        )
+                      )}
+
                       {item.slug ? (
                         <Link
                           href={`/players/${item.slug}`}
-                          className="font-semibold text-slate-100 hover:text-blue-400 transition-colors truncate"
+                          className="font-medium text-slate-200 hover:text-blue-400 transition-colors truncate"
                         >
                           {item.name}
                         </Link>
                       ) : item.gmSlug ? (
                         <Link
                           href={`/gm/${item.gmSlug}`}
-                          className="font-semibold text-slate-100 hover:text-blue-400 transition-colors truncate"
+                          className="font-medium text-slate-200 hover:text-blue-400 transition-colors truncate"
                         >
                           {item.name}
                         </Link>
                       ) : (
-                        <span className="font-semibold text-slate-100 truncate">{item.name}</span>
+                        <span className="font-medium text-slate-200 truncate">{item.name}</span>
                       )}
 
-                      {item.teamCode && (
-                        <Link
-                          href={item.teamSlug ? `/teams/${item.teamSlug}` : "#"}
-                          className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-blue-400 transition-colors shrink-0"
-                        >
-                          {item.teamLogo && (
-                            <img src={item.teamLogo} alt="" className="w-3.5 h-3.5 object-contain shrink-0" />
-                          )}
-                          <span>{item.teamCode}</span>
-                        </Link>
+                      {(!item.teams || item.teams.length <= 1) && item.teamCode && !item.hideTeam && (
+                        <span className="text-[10px] text-slate-500 font-medium shrink-0">
+                          {item.teamCode}
+                        </span>
                       )}
                     </div>
 
-                    {item.sub && (
-                      <p className="text-[11px] text-slate-400 mt-0.5 leading-tight truncate" title={item.sub}>
-                        {item.sub}
-                      </p>
-                    )}
+                    <div className="text-right shrink-0 ml-2">
+                      <span className="font-bold tabular-nums text-slate-300 text-xs">
+                        {item.value}
+                      </span>
+                    </div>
                   </div>
-
-                  <div className="text-right shrink-0">
-                    <span className={`text-xs font-bold tabular-nums ${item.rank === 1 ? "text-amber-300" : "text-slate-200"}`}>
-                      {item.value}
-                    </span>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ol>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>
