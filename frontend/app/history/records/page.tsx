@@ -106,15 +106,16 @@ function RecordCard({ record, cupName }: { record: RecordSection; cupName: strin
                           </span>
                         ))}
                       </div>
-                    ) : first.teamCode && !first.hideTeam ? (
+                    ) : (first.teamLogo || first.teamCode) && !first.hideTeam ? (
                       <Link
                         href={first.teamSlug ? `/teams/${first.teamSlug}` : "#"}
                         className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-blue-400 transition-colors shrink-0 font-medium"
                       >
-                        {first.teamLogo && (
-                          <img src={first.teamLogo} alt="" className="w-3.5 h-3.5 object-contain shrink-0" />
+                        {first.teamLogo ? (
+                          <img src={first.teamLogo} alt="" className="w-4 h-4 object-contain shrink-0" />
+                        ) : (
+                          <span>{first.teamCode}</span>
                         )}
-                        <span>{first.teamCode}</span>
                       </Link>
                     ) : null}
                   </div>
@@ -152,7 +153,7 @@ function RecordCard({ record, cupName }: { record: RecordSection; cupName: strin
                         <span className="inline-flex items-center gap-1 shrink-0">
                           {item.teams.map((t, tIdx) => (
                             <span key={t.code} className="inline-flex items-center gap-0.5 text-[10px] text-slate-400 font-medium">
-                              {t.logoUrl && <img src={t.logoUrl} alt="" className="w-3 h-3 object-contain shrink-0" />}
+                              {t.logoUrl && <img src={t.logoUrl} alt="" className="w-3.5 h-3.5 object-contain shrink-0" />}
                               <span>{t.code}</span>
                               {tIdx < item.teams!.length - 1 && <span className="text-slate-600">/</span>}
                             </span>
@@ -182,7 +183,7 @@ function RecordCard({ record, cupName }: { record: RecordSection; cupName: strin
                         <span className="font-medium text-slate-200 truncate">{item.name}</span>
                       )}
 
-                      {(!item.teams || item.teams.length <= 1) && item.teamCode && !item.hideTeam && (
+                      {(!item.teams || item.teams.length <= 1) && !item.teamLogo && item.teamCode && !item.hideTeam && (
                         <span className="text-[10px] text-slate-500 font-medium shrink-0">
                           {item.teamCode}
                         </span>
