@@ -1,10 +1,10 @@
-import Link from "next/link";
 import { PageHeader, Card } from "@/components/ui";
 import InfoTip from "@/components/InfoTip";
 import { loadSettings } from "@/lib/sim/settings";
 import { leagueFanInterest } from "@/lib/fan-interest-server";
 import { interestArrow, interestAccent, type ExpectationTier } from "@/lib/fan-interest";
 import { CONTENTION_LABELS } from "@/lib/free-agency";
+import FinanceNav from "@/components/FinanceNav";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +22,7 @@ export default async function FanInterestBoardPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 space-y-5">
       <PageHeader title="Fan Interest" subtitle="Performance and team direction — the pulse of every fanbase" />
+      <FinanceNav current="fan-interest" />
       {settings.financeMode !== "detailed" && (
         <Card><p className="text-sm text-amber-400/80">This league runs the <b>base</b> finance system. The Fan Interest board remains available as a live league overview.</p></Card>
       )}

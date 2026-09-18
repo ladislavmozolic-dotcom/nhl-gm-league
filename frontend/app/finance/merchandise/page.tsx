@@ -3,6 +3,7 @@ import { PageHeader, Card } from "@/components/ui";
 import InfoTip from "@/components/InfoTip";
 import { loadSettings } from "@/lib/sim/settings";
 import { leagueMerch, topJerseys } from "@/lib/merchandise-server";
+import FinanceNav from "@/components/FinanceNav";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ export default async function MerchandisePage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 space-y-5">
       <PageHeader title="Merchandise" subtitle="Jerseys, apparel & the league's best-sellers" />
+      <FinanceNav current="merchandise" />
       {settings.financeMode !== "detailed" && (
         <Card><p className="text-sm text-amber-400/80">Part of the <b>Detailed Finance</b> system — switch it on in engine settings. Live preview below.</p></Card>
       )}

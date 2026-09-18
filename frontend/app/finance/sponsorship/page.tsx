@@ -1,6 +1,7 @@
 import { PageHeader, Card } from "@/components/ui";
 import { loadSettings } from "@/lib/sim/settings";
 import { leagueSponsors } from "@/lib/sponsorship-server";
+import FinanceNav from "@/components/FinanceNav";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ export default async function SponsorshipPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 space-y-5">
       <PageHeader title="Sponsorship" subtitle="League-wide sponsorship deals" />
+      <FinanceNav current="sponsorship" />
       {settings.financeMode !== "detailed" && (
         <Card><p className="text-sm text-amber-400/80">Part of the <b>Detailed Finance</b> system — switch it on in engine settings. Sign your own deal in your club&apos;s Finance → Dashboard.</p></Card>
       )}

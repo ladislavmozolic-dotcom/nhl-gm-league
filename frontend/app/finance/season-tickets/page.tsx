@@ -2,6 +2,7 @@ import { PageHeader, Card } from "@/components/ui";
 import InfoTip from "@/components/InfoTip";
 import { loadSettings } from "@/lib/sim/settings";
 import { leagueSeasonTickets } from "@/lib/season-tickets-server";
+import FinanceNav from "@/components/FinanceNav";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ export default async function SeasonTicketsBoardPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 space-y-5">
       <PageHeader title="Season Tickets" subtitle="Preseason campaign — every club's season-ticket base" />
+      <FinanceNav current="season-tickets" />
       {settings.financeMode !== "detailed" && (
         <Card><p className="text-sm text-amber-400/80">Part of the <b>Detailed Finance</b> system — switch it on in engine settings. Live preview below.</p></Card>
       )}

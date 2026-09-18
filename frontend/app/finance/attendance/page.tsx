@@ -2,6 +2,7 @@ import { PageHeader, Card } from "@/components/ui";
 import InfoTip from "@/components/InfoTip";
 import { loadSettings } from "@/lib/sim/settings";
 import { leagueAttendance } from "@/lib/attendance-server";
+import FinanceNav from "@/components/FinanceNav";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ export default async function AttendanceBoardPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 space-y-5">
       <PageHeader title="Attendance & Pricing" subtitle="Who fills the building — league-wide" />
+      <FinanceNav current="attendance" />
       {settings.financeMode !== "detailed" && (
         <Card><p className="text-sm text-amber-400/80">Part of the <b>Detailed Finance</b> system — switch it on in engine settings. Live preview below. Set your own pricing in your club&apos;s Finance → Dashboard.</p></Card>
       )}

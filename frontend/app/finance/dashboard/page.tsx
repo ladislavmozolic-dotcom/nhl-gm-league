@@ -11,6 +11,7 @@ import { getArenaSections, selloutRevenue, computeTeamFinance, projectedPointsPc
 import { REGULAR_SEASON } from "@/lib/phase";
 import PricingControl from "@/components/PricingControl";
 import SponsorPicker from "@/components/SponsorPicker";
+import FinanceNav from "@/components/FinanceNav";
 
 export const dynamic = "force-dynamic";
 
@@ -78,6 +79,7 @@ export default async function FinanceDashboardPage() {
         subtitle={detailed ? "Detailed Finance dashboard" : "Finances"}
         right={team?.slug ? <BackPill href={`/teams/${team.slug}`}>Team menu</BackPill> : undefined}
       />
+      <FinanceNav current="dashboard" />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {tile("Cash", M(dash.cash))}
