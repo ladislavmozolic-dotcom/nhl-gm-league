@@ -80,8 +80,14 @@ export default function RosterRows({ players, attrs, isGoalie, farm, hideAttrs =
                       </Link>
                       {farm && player.affiliate && <p className="text-[10px] text-emerald-300/60">{player.affiliate.code || player.affiliate.name}</p>}
                       {(player.injuryDaysLeft ?? 0) > 0 && (
-                        <p className="text-[10px] font-semibold text-red-400 flex items-center gap-1 whitespace-nowrap" title={player.injuryDesc || "Injured"}>
-                          <span aria-hidden>🤕</span> IR · {player.injuryDaysLeft}d{player.injuryDesc ? ` · ${player.injuryDesc}` : ""}
+                        <p className={`text-[10px] font-semibold flex items-center gap-1 whitespace-nowrap ${(player.condition ?? 100) < 90 && !player.isGoalie ? "text-sky-300" : "text-red-400"}`} title={player.injuryDesc || "Injured"}>
+                          <span aria-hidden>🤕</span>
+                          {(player.condition ?? 100) < 90 && !player.isGoalie ? (
+                            <span className="font-bold bg-sky-500/20 px-1 py-0.5 rounded border border-sky-500/40">LTIR</span>
+                          ) : (
+                            <span>IR</span>
+                          )}
+                          <span>· {player.injuryDaysLeft}d{player.injuryDesc ? ` · ${player.injuryDesc}` : ""}</span>
                         </p>
                       )}
                     </div>

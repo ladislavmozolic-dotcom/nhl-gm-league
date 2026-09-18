@@ -7,7 +7,7 @@ import { cleanName } from "@/lib/playerName";
 import { Card } from "@/components/ui";
 import { salaryOf, fmtM } from "@/components/TeamRosterTable";
 import { teamRetentionStatus } from "@/lib/cap";
-import { deadMoneyForYear, CURRENT_SEASON_START } from "@/lib/finance";
+import { deadMoneyForYear, CURRENT_SEASON_START, ltirRelief } from "@/lib/finance";
 import { teamManagerLabel } from "@/lib/team-gm";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +28,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
       // rosterType-filtered — a player parked as PROSPECT/UFA/RETIRED/RELEASED keeps
       // this teamId (schema requires one) but must never count toward roster size,
       // cap total, captains or injured list once he's off the active roster.
-      players: { where: { rosterType: { in: ["NHL", "AHL"] } }, orderBy: { overall: "desc" }, select: { id: true, rosterType: true, isGoalie: true, position: true, age: true, capHit: true, contractYears: true, retainedSalary: true, contractText: true, name: true, slug: true, photoUrl: true, captaincy: true, nationality: true, injuryDaysLeft: true, injuryDesc: true } },
+      players: { where: { rosterType: { in: ["NHL", "AHL"] } }, orderBy: { overall: "desc" }, select: { id: true, rosterType: true, isGoalie: true, position: true, age: true, capHit: true, contractYears: true, retainedSalary: true, contractText: true, name: true, slug: true, photoUrl: true, captaincy: true, nationality: true, injuryDaysLeft: true, condition: true, injuryDesc: true } },
       // NOT counted in players above (deliberately excluded from roster size/cap) — an
       // RFA-age player benched at regular-season opening day for staying unsigned
       // (sweepUnsignedRfasToNonRoster). Fetched separately just for a visibility count.
@@ -54,11 +54,15 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
   // Cap purposes: NHL roster only (farm salaries never count against the NHL
   // cap) plus dead money from buyouts and retained-salary trades — same figure
   // as the team's own Salary Cap page, so the two never disagree.
-  const nhlSalaries = team.players.filter((p) => p.rosterType === "NHL").reduce((s, p) => s + Math.max(0, salaryOf(p) - (p.retainedSalary ?? 0)), 0);
+  const nhlPlayers = team.players.filter((p) => p.rosterType === "NHL");
+  const nhlSalaries = nhlPlayers.reduce((s, p) => s + Math.max(0, salaryOf(p) - (p.retainedSalary ?? 0)), 0);
   const deadMoney = deadMoneyForYear(buyouts, CURRENT_SEASON_START);
   const totalCap = nhlSalaries + deadMoney;
+  const ltir = isNhl ? ltirRelief(nhlPlayers.map((p) => ({ ...p, capHit: Math.max(0, salaryOf(p) - (p.retainedSalary ?? 0)) }))) : 0;
+  const effectiveCeiling = capCeiling + ltir;
   const capSpace = capCeiling - totalCap;
-  const capPct = Math.min(100, capCeiling ? (totalCap / capCeiling) * 100 : 0);
+  const effectiveSpace = effectiveCeiling - totalCap;
+  const capPct = Math.min(100, effectiveCeiling ? (totalCap / effectiveCeiling) * 100 : 0);
   const avgAge = proCount ? (team.players.reduce((s, p) => s + (p.age || 0), 0) / proCount).toFixed(1) : "0";
   const captains = team.players.filter((p) => p.captaincy === "C" || p.captaincy === "A").sort((a) => (a.captaincy === "C" ? -1 : 1));
   const injured = team.players.filter((p) => (p.injuryDaysLeft ?? 0) > 0).sort((a, b) => (b.injuryDaysLeft ?? 0) - (a.injuryDaysLeft ?? 0));
@@ -194,14 +198,23 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
           <Card title="Salary Cap" accent="text-green-400" right={<Link href={`/teams/${slug}/salary`} className="text-xs text-slate-400 hover:text-blue-400">details →</Link>}>
             <div className="flex items-baseline justify-between mb-2">
               <span className="text-lg font-black">{fmtM(totalCap)}</span>
-              <span className="text-xs text-slate-500">of {fmtM(capCeiling)}</span>
+              <span className="text-xs text-slate-500">
+                of {fmtM(capCeiling)} {ltir > 0 && <span className="text-sky-400 font-semibold">(+{fmtM(ltir)} LTIR)</span>}
+              </span>
             </div>
             <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
-              <div className={`h-full ${capPct >= 100 ? "bg-red-500" : capPct >= 90 ? "bg-amber-500" : "bg-green-500"}`} style={{ width: `${capPct}%` }} />
+              <div className={`h-full ${totalCap > effectiveCeiling ? "bg-red-500" : (totalCap / effectiveCeiling) >= 0.9 ? "bg-amber-500" : "bg-green-500"}`} style={{ width: `${capPct}%` }} />
             </div>
             <div className="mt-3 space-y-2">
-              <InfoRow label="Cap space" value={<span className={capSpace < 0 ? "text-red-400" : "text-green-400"}>{fmtM(Math.abs(capSpace))}</span>} />
-              <InfoRow label="Ceiling" value={fmtM(capCeiling)} />
+              <InfoRow
+                label={ltir > 0 ? "Call-up space (LTIR)" : "Cap space"}
+                value={
+                  <span className={effectiveSpace < 0 ? "text-red-400 font-semibold" : "text-green-400 font-semibold"}>
+                    {fmtM(effectiveSpace)}
+                  </span>
+                }
+              />
+              <InfoRow label="Ceiling" value={ltir > 0 ? `${fmtM(capCeiling)} (+${fmtM(ltir)} LTIR)` : fmtM(capCeiling)} />
               {retention && (
                 <>
                   <InfoRow label="Retention slots" value={

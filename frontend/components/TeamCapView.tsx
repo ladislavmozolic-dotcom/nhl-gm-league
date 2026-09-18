@@ -7,7 +7,7 @@ import { computeStandings } from "@/lib/sim/standings";
 import {
   getArenaSections, selloutRevenue, computeTeamFinance, teamCapSummary, projectedPointsPct,
   playerCapYears, deadMoneyForYear, money, CURRENT_SEASON_START, seasonLabel,
-  accruedCapSpace, ltirRelief, capCeilingForPhase, farmSalaryExpense, liveCapHit,
+  accruedCapSpace, onLtir, ltirRelief, capCeilingForPhase, farmSalaryExpense, liveCapHit,
   DEFAULT_PROJECTED_CAPS,
 } from "@/lib/finance";
 import { getLeagueClock, regularSeasonDayProgress } from "@/lib/calendar-server";
@@ -19,7 +19,7 @@ import { buyoutPlayer } from "@/app/finance/[slug]/actions";
 
 const SEASON = "2026-27";
 const SPAN = 5;
-type CP = { id: number; name: string; position: string; age: number | null; birthDate?: string | Date | null; isGoalie: boolean; capHit: number | null; contractYears: number | null; contractType?: string | null; retainedSalary?: number | null; tradeClause?: string | null; noTradeTeams?: number[] };
+type CP = { id: number; name: string; position: string; age: number | null; birthDate?: string | Date | null; isGoalie: boolean; capHit: number | null; contractYears: number | null; contractType?: string | null; retainedSalary?: number | null; tradeClause?: string | null; noTradeTeams?: number[]; injuryDaysLeft?: number | null; condition?: number | null };
 const CLAUSE_LABEL: Record<string, string> = { NTC: "NTC", NMC: "NMC", M_NTC: "M-NTC" };
 const isD = (pos: string) => /(^|\/)D(\/|$)/.test(pos) || pos === "D";
 /** capwages-style split: Forwards / Defense / Goalies as their own groups
@@ -160,9 +160,19 @@ export default async function TeamCapView({ slug }: { slug: string }) {
       const netCapHit = Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0));
       const cells = playerCapYears({ ...p, capHit: netCapHit }, CURRENT_SEASON_START, SPAN);
       const protectedTeams = p.tradeClause === "M_NTC" ? (p.noTradeTeams ?? []).map((id) => teamCodeById.get(id)).filter(Boolean).join(", ") : "";
+      const isLtir = onLtir({ capHit: p.capHit, injuryDaysLeft: p.injuryDaysLeft, condition: p.condition, isGoalie: p.isGoalie });
       return (
         <tr key={p.id} className="border-b border-slate-800/60 hover:bg-slate-800/30">
-          <td className="px-3 py-1.5 whitespace-nowrap sticky left-0 bg-slate-900 z-10"><PlayerLink id={p.id} name={p.name} /></td>
+          <td className="px-3 py-1.5 whitespace-nowrap sticky left-0 bg-slate-900 z-10">
+            <div className="flex items-center gap-1.5">
+              <PlayerLink id={p.id} name={p.name} />
+              {isLtir && (
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/20 border border-sky-500/40 text-sky-300" title={`On LTIR (injured, CON < 90) — grants +${money(netCapHit)} relief for call-ups`}>
+                  LTIR · +{money(netCapHit)}
+                </span>
+              )}
+            </div>
+          </td>
           <td className="px-2 py-1.5 text-center text-slate-500 text-xs whitespace-nowrap">{p.position}</td>
           <td className="px-2 py-1.5 text-center text-slate-400 tabular-nums whitespace-nowrap">{p.age ?? "—"}</td>
           <td className="px-2 py-1.5 text-center whitespace-nowrap"><TypeBadge type={p.contractType} /></td>
@@ -224,22 +234,39 @@ export default async function TeamCapView({ slug }: { slug: string }) {
           <p className="text-sm text-slate-500">{team.arena} · popularity {team.popularity} · attendance {(fin.attendance * 100).toFixed(0)}%</p>
           {isGm && <Link href={`/teams/${slug}/finance`} className="text-xs text-blue-400 hover:underline">Ticket prices →</Link>}
         </div>
-        <div className="text-sm grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 tabular-nums w-full lg:w-auto">
-          <div className="flex justify-between gap-4"><span className="text-slate-400" title="NHL + AHL players in the organization, vs. the league's max org roster size">Roster Size</span><span className={`${orgTotal > ROSTER_LIMITS.orgMax ? "text-red-400 font-semibold" : ""}`}>{orgTotal}/{ROSTER_LIMITS.orgMax} <span className="text-slate-500 text-xs">({team.players.length} NHL · {farm.length} AHL)</span></span></div>
-          <div className="flex justify-between gap-4"><span className="text-slate-400" title="Sum of each player's Cap Hit — already net of any retention someone else pays">Total Salaries</span><span className="text-right">{money(cap.totalSalaries)}</span></div>
-          <div className="flex justify-between gap-4"><span className="text-slate-400" title="Dead cap from this club's bought-out contracts">Dead Cap — Buyouts</span><span className="text-right">{realBuyoutsDeadMoney ? money(realBuyoutsDeadMoney) : "—"}</span></div>
-          <div className="flex justify-between gap-4"><span className="text-slate-400" title="Salary this club retains on players it traded away">Retained Salary</span><span className="text-right">{deadCapAmount ? money(deadCapAmount) : "—"}</span></div>
-          <div className="flex justify-between gap-4"><span className="text-slate-400" title="Contracts retained on (out) + retained-salary players rostered (in) — one combined pool vs. the league's configured max per team">Retention Slots</span><span className={`text-right ${retention.slotsOutUsed + retention.slotsInUsed >= retention.slotsMax ? "text-red-400 font-semibold" : ""}`}>{retention.slotsOutUsed + retention.slotsInUsed}/{retention.slotsMax}</span></div>
-          <div className="flex justify-between gap-4"><span className="text-slate-400" title="Dead Cap as a % of the cap ceiling vs. the league's configured max">Retention % of Cap</span><span className={`text-right ${retention.pctOfCap >= retention.pctMax ? "text-red-400 font-semibold" : ""}`}>{retention.pctOfCap.toFixed(1)}% <span className="text-slate-500">/ {retention.pctMax}%</span></span></div>
-          <div className="flex justify-between gap-4"><span className="text-slate-400" title="Total Salaries + Buyout Dead Cap + Retained Salary">Actual Cap Hit</span><span className="text-right font-semibold">{money(cap.capHit)}</span></div>
-          <div className="flex justify-between gap-4"><span className="text-slate-400" title={`Ceiling ${money(cap.upper)} − Actual Cap Hit`}>Actual Cap Space</span><span className={`text-right font-semibold ${cap.capSpace < 0 ? "text-red-400" : "text-green-400"}`}>{money(cap.capSpace)}</span></div>
-          <div className="flex justify-between gap-4"><span className="text-slate-400" title="Salary cap upper limit / ceiling">Upper Limit</span><span className="text-right tabular-nums text-slate-200">{money(cap.upper)}</span></div>
-          <div className="flex justify-between gap-4"><span className="text-slate-400" title="Projected Cap Space">Projected Cap Space</span><span className={`text-right font-bold ${accrued.actual < 0 ? "text-red-400" : "text-emerald-400"}`}>{money(accrued.actual)}</span></div>
-          {ltir > 0 && (
-            <div className="flex justify-between gap-4"><span className="text-slate-400" title="Long-Term Injured Reserve">LTIR Relief</span><span className="text-right font-semibold text-sky-300">+{money(ltir)}</span></div>
-          )}
-          <div className="flex justify-between gap-4"><span className="text-slate-400">Cap Status</span><span className={`text-right font-bold ${overBy > 0 ? "text-red-400" : "text-green-400"}`}>{overBy > 0 ? `Over by ${money(overBy)}` : cushioned ? "OK · off-season" : "Compliant ✓"}</span></div>
-          <div className="flex justify-between gap-4"><span className="text-slate-400">Bank Account</span><span className="text-right text-amber-300 font-semibold">{money(team.bankAccount)}</span></div>
+        <div className="text-sm grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1.5 tabular-nums w-full lg:w-auto">
+          {/* Left Column: Contracts & Organization */}
+          <div className="space-y-1.5">
+            <div className="flex justify-between gap-4"><span className="text-slate-400" title="NHL + AHL players in the organization, vs. the league's max org roster size">Roster Size</span><span className={`${orgTotal > ROSTER_LIMITS.orgMax ? "text-red-400 font-semibold" : ""}`}>{orgTotal}/{ROSTER_LIMITS.orgMax} <span className="text-slate-500 text-xs">({team.players.length} NHL · {farm.length} AHL)</span></span></div>
+            <div className="flex justify-between gap-4"><span className="text-slate-400" title="Sum of each player's Cap Hit — already net of any retention someone else pays">Total Salaries</span><span className="text-right">{money(cap.totalSalaries)}</span></div>
+            <div className="flex justify-between gap-4"><span className="text-slate-400" title="Dead cap from this club's bought-out contracts">Dead Cap — Buyouts</span><span className="text-right">{realBuyoutsDeadMoney ? money(realBuyoutsDeadMoney) : "—"}</span></div>
+            <div className="flex justify-between gap-4"><span className="text-slate-400" title="Salary this club retains on players it traded away">Retained Salary</span><span className="text-right">{deadCapAmount ? money(deadCapAmount) : "—"}</span></div>
+            <div className="flex justify-between gap-4"><span className="text-slate-400" title="Contracts retained on (out) + retained-salary players rostered (in) — one combined pool vs. the league's configured max per team">Retention Slots</span><span className={`text-right ${retention.slotsOutUsed + retention.slotsInUsed >= retention.slotsMax ? "text-red-400 font-semibold" : ""}`}>{retention.slotsOutUsed + retention.slotsInUsed}/{retention.slotsMax}</span></div>
+            <div className="flex justify-between gap-4"><span className="text-slate-400" title="Dead Cap as a % of the cap ceiling vs. the league's configured max">Retention % of Cap</span><span className={`text-right ${retention.pctOfCap >= retention.pctMax ? "text-red-400 font-semibold" : ""}`}>{retention.pctOfCap.toFixed(1)}% <span className="text-slate-500">/ {retention.pctMax}%</span></span></div>
+            <div className="flex justify-between gap-4"><span className="text-slate-400">Bank Account</span><span className="text-right text-amber-300 font-semibold">{money(team.bankAccount)}</span></div>
+          </div>
+
+          {/* Right Column: Salary Cap & Room */}
+          <div className="space-y-1.5">
+            <div className="flex justify-between gap-4"><span className="text-slate-400" title="Total Salaries + Buyout Dead Cap + Retained Salary">Actual Cap Hit</span><span className="text-right font-semibold">{money(cap.capHit)}</span></div>
+            <div className="flex justify-between gap-4"><span className="text-slate-400" title="Salary cap upper limit / ceiling">Upper Limit (Base)</span><span className="text-right tabular-nums text-slate-200">{money(cap.upper)}</span></div>
+            {ltir > 0 && (
+              <>
+                <div className="flex justify-between gap-4"><span className="text-slate-400" title="Long-Term Injured Reserve relief pool from injured skaters (CON < 90)">LTIR Relief</span><span className="text-right font-semibold text-sky-300">+{money(ltir)}</span></div>
+                <div className="flex justify-between gap-4"><span className="text-slate-400" title="Maximum allowed cap hit including LTIR Relief (Upper Limit + LTIR Relief)">Effective Ceiling</span><span className="text-right font-semibold text-sky-200">{money(effectiveCeiling)}</span></div>
+                <div className="flex justify-between gap-4 bg-emerald-950/40 px-2 py-0.5 -mx-2 rounded border border-emerald-800/40">
+                  <span className="text-emerald-300 font-medium" title="Real available space to call up players from AHL or add salaries (Effective Ceiling − Actual Cap Hit)">Available Cap (with LTIR)</span>
+                  <span className={`text-right font-bold ${effectiveCeiling - cap.capHit < 0 ? "text-red-400" : "text-emerald-400"}`}>{money(effectiveCeiling - cap.capHit)}</span>
+                </div>
+                <div className="flex justify-between gap-4"><span className="text-slate-400 text-xs" title={`Base Ceiling ${money(cap.upper)} − Actual Cap Hit (without LTIR)`}>Base Space (excl. LTIR)</span><span className={`text-right text-xs ${cap.capSpace < 0 ? "text-red-400" : "text-slate-300"}`}>{money(cap.capSpace)}</span></div>
+              </>
+            )}
+            {ltir === 0 && (
+              <div className="flex justify-between gap-4"><span className="text-slate-400" title={`Ceiling ${money(cap.upper)} − Actual Cap Hit`}>Actual Cap Space</span><span className={`text-right font-semibold ${cap.capSpace < 0 ? "text-red-400" : "text-green-400"}`}>{money(cap.capSpace)}</span></div>
+            )}
+            <div className="flex justify-between gap-4"><span className="text-slate-400" title="Projected Cap Space">Projected Cap Space</span><span className={`text-right font-bold ${accrued.actual < 0 ? "text-red-400" : "text-emerald-400"}`}>{money(accrued.actual)}</span></div>
+            <div className="flex justify-between gap-4"><span className="text-slate-400">Cap Status</span><span className={`text-right font-bold ${overBy > 0 ? "text-red-400" : ltir > 0 ? "text-sky-300" : "text-green-400"}`}>{overBy > 0 ? `Over by ${money(overBy)}` : ltir > 0 ? "Compliant (LTIR) ✓" : cushioned ? "OK · off-season" : "Compliant ✓"}</span></div>
+          </div>
         </div>
       </div>
 
