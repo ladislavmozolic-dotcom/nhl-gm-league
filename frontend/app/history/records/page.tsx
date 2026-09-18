@@ -340,21 +340,6 @@ function getCategories(lang: Lang): CategoryMeta[] {
           : "Crowd attendance, high-scoring games, record blowout wins and age milestones.",
       accentColor: "from-indigo-500/20 to-blue-500/10 border-indigo-500/30 text-indigo-300",
     },
-    {
-      key: "pre",
-      label: lang === "cs" ? "Príprava (Pre-season)" : lang === "de" ? "Vorbereitung (Pre-season)" : lang === "ru" ? "Предсезонка (Pre-season)" : "Pre-season",
-      shortLabel: lang === "cs" ? "Príprava" : lang === "de" ? "Pre-season" : lang === "ru" ? "Предсезонка" : "Pre-season",
-      icon: "☀️",
-      description:
-        lang === "cs"
-          ? "Reálne tímové a individuálne štatistiky z predsezónnej prípravy."
-          : lang === "de"
-          ? "Reale Team- und Einzelstatistiken aus den Vorbereitungsspielen."
-          : lang === "ru"
-          ? "Реальные командные и индивидуальные показатели предсезонной подготовки."
-          : "Real team and individual performance data from pre-season exhibitions.",
-      accentColor: "from-orange-500/20 to-amber-500/10 border-orange-500/30 text-orange-300",
-    },
   ];
 }
 
@@ -374,7 +359,7 @@ export default async function LeagueRecordsPage({
 
   const rawCat = sp.cat as MainRecordCategory | undefined;
   const category: MainRecordCategory =
-    rawCat && ["all", "skaters", "goalies", "gms", "teams", "trophies", "games", "pre"].includes(rawCat)
+    rawCat && ["all", "skaters", "goalies", "gms", "teams", "trophies", "games"].includes(rawCat)
       ? rawCat
       : "all";
 

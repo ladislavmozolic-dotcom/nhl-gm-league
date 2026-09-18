@@ -28,7 +28,7 @@ export type LeaderItem = {
 };
 
 export type RecordPhase = "all" | "regular" | "playoffs" | "pre";
-export type MainRecordCategory = "all" | "skaters" | "goalies" | "gms" | "teams" | "trophies" | "games" | "pre";
+export type MainRecordCategory = "all" | "skaters" | "goalies" | "gms" | "teams" | "trophies" | "games";
 
 export type RecordSection = {
   id: string;
@@ -46,7 +46,7 @@ export type RecordCategoryGroup = {
   title: string;
   icon: string;
   phase?: RecordPhase;
-  mainCategory: "skaters" | "goalies" | "gms" | "teams" | "trophies" | "games" | "pre";
+  mainCategory: "skaters" | "goalies" | "gms" | "teams" | "trophies" | "games";
   records: RecordSection[];
 };
 
@@ -229,6 +229,24 @@ export function getGroupTitle(id: string, lang: Lang, cupName: string): string {
       cs: "Prípravné zápasy (Pre-season rekordy)",
       de: "Vorbereitungsspiele (Pre-season Rekorde)",
       ru: "Предсезонные матчи (Рекорды предсезонки)",
+    },
+    "pre-skaters": {
+      en: "Pre-season Exhibition Records (Skaters)",
+      cs: "Prípravné zápasy (Korčuliari)",
+      de: "Vorbereitungsspiele (Feldspieler)",
+      ru: "Предсезонные матчи (Полевые игроки)",
+    },
+    "pre-goalies": {
+      en: "Pre-season Exhibition Records (Goalies)",
+      cs: "Prípravné zápasy (Brankári)",
+      de: "Vorbereitungsspiele (Torhüter)",
+      ru: "Предсезонные матчи (Вратари)",
+    },
+    "pre-teams": {
+      en: "Pre-season Exhibition Records (Teams)",
+      cs: "Prípravné zápasy (Tímy)",
+      de: "Vorbereitungsspiele (Teams)",
+      ru: "Предсезонные матчи (Команды)",
     },
   };
   return map[id]?.[lang] ?? map[id]?.en ?? id;
@@ -3270,20 +3288,12 @@ export async function getLeagueRecords(
       ],
     },
     {
-      id: "pre-season-group",
-      title: getGroupTitle("pre-season-group", lang, cupName),
+      id: "pre-skaters",
+      title: getGroupTitle("pre-skaters", lang, cupName),
       icon: "☀️",
       phase: "pre",
-      mainCategory: "pre",
+      mainCategory: "skaters",
       records: [
-        {
-          id: "pre-best-team",
-          title: getSectionTitle("pre-best-team", lang, league, cupName),
-          icon: "🥇",
-          phase: "pre",
-          phaseBadge: badgePre,
-          items: preSeasonBestTeams,
-        },
         {
           id: "pre-top-scorer",
           title: getSectionTitle("pre-top-scorer", lang, league, cupName),
@@ -3316,6 +3326,15 @@ export async function getLeagueRecords(
           phaseBadge: badgePre,
           items: preSingleGamePoints,
         },
+      ],
+    },
+    {
+      id: "pre-goalies",
+      title: getGroupTitle("pre-goalies", lang, cupName),
+      icon: "☀️",
+      phase: "pre",
+      mainCategory: "goalies",
+      records: [
         {
           id: "pre-goalie-saves",
           title: getSectionTitle("pre-goalie-saves", lang, league, cupName),
@@ -3323,6 +3342,23 @@ export async function getLeagueRecords(
           phase: "pre",
           phaseBadge: badgePre,
           items: preGoalieSaves,
+        },
+      ],
+    },
+    {
+      id: "pre-teams",
+      title: getGroupTitle("pre-teams", lang, cupName),
+      icon: "☀️",
+      phase: "pre",
+      mainCategory: "teams",
+      records: [
+        {
+          id: "pre-best-team",
+          title: getSectionTitle("pre-best-team", lang, league, cupName),
+          icon: "🥇",
+          phase: "pre",
+          phaseBadge: badgePre,
+          items: preSeasonBestTeams,
         },
       ],
     },
@@ -3341,7 +3377,7 @@ export async function getLeagueRecords(
         ...g,
         records: g.records.filter((r) => r.phase === "regular" || r.phase === "all"),
       }))
-      .filter((g) => g.records.length > 0 && g.id !== "pre-season-group" && g.id !== "championships");
+      .filter((g) => g.records.length > 0 && g.phase !== "pre" && g.id !== "championships");
   } else if (phase === "playoffs") {
     filteredGroups = filteredGroups
       .map((g) => ({
