@@ -728,14 +728,14 @@ export default function GameView({ data }: { data: Data }) {
                         const opponentScore = homeScored ? g.awayScoreAfter : g.homeScoreAfter;
                         return (
                           <div key={i} className="px-4 py-1.5 text-sm leading-snug">
+                            <span title="Score after goal" className="mr-2 inline-flex align-middle whitespace-nowrap rounded border border-slate-700 bg-slate-800/70 px-1.5 py-px text-[10px] font-bold tabular-nums text-slate-300">
+                              {scoringCode} {scoringScore}–{opponentScore} {opponentCode}
+                            </span>
                             <span className="text-slate-500 tabular-nums mr-2">{mmss(g.seconds)}</span>
                             <span title="Goal">🚨</span>{" "}
                             {g.scorerSlug ? <Link href={`/players/${g.scorerSlug}`} className="font-semibold hover:text-blue-400">{cleanName(g.scorerName)}</Link> : <span className="font-semibold">{cleanName(g.scorerName)}</span>}
                             {g.scorerSeasonGoal != null && <span className="text-amber-400/70" title="Season goal total"> ({g.scorerSeasonGoal})</span>}
                             {tag && <span className="ml-1 text-[10px] font-bold text-amber-400">({tag})</span>}
-                            <span title="Score after goal" className="ml-1.5 inline-flex align-middle whitespace-nowrap rounded border border-slate-700 bg-slate-800/70 px-1.5 py-px text-[10px] font-bold tabular-nums text-slate-300">
-                              {scoringCode} {scoringScore}–{opponentScore} {opponentCode}
-                            </span>
                             {g.assists && g.assists.length > 0 ? (
                               <span className="text-slate-400"> <span title="Assists">🍎</span> {g.assists.map((a, j) => (
                                 <span key={j}>{a.slug ? <Link href={`/players/${a.slug}`} className="hover:text-blue-400">{cleanName(a.name)}</Link> : cleanName(a.name)}{a.total != null && <span className="text-amber-400/70"> ({a.total})</span>}{j < g.assists!.length - 1 ? ", " : ""}</span>
