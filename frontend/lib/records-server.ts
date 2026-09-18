@@ -141,10 +141,10 @@ export function getRecordBadge(key: "regular" | "playoffs" | "pre" | "history" |
 export function getGroupTitle(id: string, lang: Lang, cupName: string): string {
   const map: Record<string, Record<Lang, string>> = {
     "gm-records": {
-      en: "General Manager Records (GM)",
-      cs: "Manažérske rekordy (GM)",
-      de: "General-Manager-Rekorde (GM)",
-      ru: "Рекорды генеральных менеджеров (GM)",
+      en: "General Manager Records",
+      cs: "Manažérske rekordy",
+      de: "General-Manager-Rekorde",
+      ru: "Рекорды генеральных менеджеров",
     },
     "career-skaters": {
       en: "Individual Career Records — Skaters (RS)",

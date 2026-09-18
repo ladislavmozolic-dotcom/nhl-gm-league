@@ -282,7 +282,7 @@ function getCategories(lang: Lang): CategoryMeta[] {
     },
     {
       key: "gms",
-      label: lang === "cs" ? "Manažéri (GM)" : lang === "de" ? "General Manager (GM)" : lang === "ru" ? "Генеральные менеджеры (GM)" : "General Managers (GM)",
+      label: lang === "cs" ? "Manažéri" : lang === "de" ? "General Manager" : lang === "ru" ? "Генеральные менеджеры" : "General Managers",
       shortLabel: lang === "cs" ? "Manažéri" : lang === "de" ? "GMs" : lang === "ru" ? "GM" : "GMs",
       icon: "👔",
       description:
