@@ -716,6 +716,8 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
     }));
 
   const story = game.status === "FINAL" ? await gameStory(game.id).catch(() => null) : null;
+  let runningHomeScore = 0;
+  let runningAwayScore = 0;
 
   const data = {
     id: game.id,
@@ -743,10 +745,17 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
     homeTeamId: game.homeTeamId,
     awayTeamId: game.awayTeamId,
     goals: game.goalEvents.map((g) => {
+      // Shootout attempts have their own report. Only official game goals advance
+      // the score shown beside each scoring play.
+      if (g.strength !== "SO") {
+        if (g.teamId === game.homeTeamId) runningHomeScore++;
+        else if (g.teamId === game.awayTeamId) runningAwayScore++;
+      }
       const n = (runningGoal.get(g.scorerId) ?? 0) + 1;
       runningGoal.set(g.scorerId, n);
       return {
         period: g.period, seconds: g.seconds, teamId: g.teamId,
+        homeScoreAfter: runningHomeScore, awayScoreAfter: runningAwayScore,
         scorerName: cleanName(g.scorerName), scorerSlug: slugById.get(g.scorerId) ?? null,
         scorerSeasonGoal: (priorGoalMap.get(g.scorerId) ?? 0) + n,
         assistNames: g.assistNames.map(cleanName),

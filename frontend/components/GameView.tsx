@@ -37,7 +37,7 @@ type Side = {
   skaters: Skater[]; goalies: Goalie[]; lines?: LineGroup[];
 };
 type GoalAssist = { name: string; slug: string | null; total: number | null };
-type GoalE = { period: number; seconds: number; teamId: number; scorerName: string; scorerSlug?: string | null; scorerSeasonGoal?: number; assistNames: string[]; assists?: GoalAssist[]; strength: string; emptyNet: boolean; onIceForNames?: string[]; onIceAgainstNames?: string[] };
+type GoalE = { period: number; seconds: number; teamId: number; scorerName: string; scorerSlug?: string | null; scorerSeasonGoal?: number; assistNames: string[]; assists?: GoalAssist[]; strength: string; emptyNet: boolean; homeScoreAfter: number; awayScoreAfter: number; onIceForNames?: string[]; onIceAgainstNames?: string[] };
 type PenE = { period: number; seconds: number; teamId: number; playerName: string; type: string; minutes: number; severity: string; givesPP: boolean };
 type PbpE = { period: number; seconds: number; time: string; teamId: number | null; kind: string; text: string; major: boolean };
 type ShootoutE = { round: number; teamId: number; teamCode: string | null; shooterName: string; shooterSlug: string | null; result: "goal" | "save" | "miss" };
@@ -721,14 +721,21 @@ export default function GameView({ data }: { data: Data }) {
                       {goals.length === 0 && <div className="px-4 py-2 text-slate-600 text-sm">—</div>}
                       {goals.map((g, i) => {
                         const tag = strengthTag(g);
+                        const homeScored = g.teamId === data.home.teamId;
+                        const scoringCode = codeOf(g.teamId);
+                        const opponentCode = codeOf(homeScored ? data.away.teamId : data.home.teamId);
+                        const scoringScore = homeScored ? g.homeScoreAfter : g.awayScoreAfter;
+                        const opponentScore = homeScored ? g.awayScoreAfter : g.homeScoreAfter;
                         return (
                           <div key={i} className="px-4 py-1.5 text-sm leading-snug">
                             <span className="text-slate-500 tabular-nums mr-2">{mmss(g.seconds)}</span>
-                            <span className="text-slate-500 font-semibold mr-1.5">{codeOf(g.teamId)}</span>
                             <span title="Goal">🚨</span>{" "}
                             {g.scorerSlug ? <Link href={`/players/${g.scorerSlug}`} className="font-semibold hover:text-blue-400">{cleanName(g.scorerName)}</Link> : <span className="font-semibold">{cleanName(g.scorerName)}</span>}
                             {g.scorerSeasonGoal != null && <span className="text-amber-400/70" title="Season goal total"> ({g.scorerSeasonGoal})</span>}
                             {tag && <span className="ml-1 text-[10px] font-bold text-amber-400">({tag})</span>}
+                            <span title="Score after goal" className="ml-1.5 inline-flex align-middle whitespace-nowrap rounded border border-slate-700 bg-slate-800/70 px-1.5 py-px text-[10px] font-bold tabular-nums text-slate-300">
+                              {scoringCode} {scoringScore}–{opponentScore} {opponentCode}
+                            </span>
                             {g.assists && g.assists.length > 0 ? (
                               <span className="text-slate-400"> <span title="Assists">🍎</span> {g.assists.map((a, j) => (
                                 <span key={j}>{a.slug ? <Link href={`/players/${a.slug}`} className="hover:text-blue-400">{cleanName(a.name)}</Link> : cleanName(a.name)}{a.total != null && <span className="text-amber-400/70"> ({a.total})</span>}{j < g.assists!.length - 1 ? ", " : ""}</span>
