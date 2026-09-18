@@ -2227,7 +2227,8 @@ export async function getLeagueRecords(
   // ==========================================
   // E. ATTENDANCE & GAME RECORDS (Návštevnosť a zápasy)
   // ==========================================
-  const gamesWithAtt = allFinalGames.filter((g) => (g.attendance ?? 0) > 0);
+  const nonPreGames = allFinalGames.filter((g) => !g.season.endsWith("-PRE") && g.season !== PRE_SEASON);
+  const gamesWithAtt = nonPreGames.filter((g) => (g.attendance ?? 0) > 0);
 
   const highestAttGames: LeaderItem[] = [...gamesWithAtt]
     .sort((a, b) => (b.attendance ?? 0) - (a.attendance ?? 0))
@@ -2330,7 +2331,7 @@ export async function getLeagueRecords(
 
   const unitGoals = lang === "cs" ? "gólov" : lang === "de" ? "Tore" : lang === "ru" ? "голов" : "goals";
 
-  const highestScoringGames: LeaderItem[] = [...allFinalGames]
+  const highestScoringGames: LeaderItem[] = [...nonPreGames]
     .map((g) => ({
       g,
       totalGoals: (g.homeGoals ?? 0) + (g.awayGoals ?? 0),
@@ -2354,7 +2355,7 @@ export async function getLeagueRecords(
       };
     });
 
-  const highestVictoryGames: LeaderItem[] = [...allFinalGames]
+  const highestVictoryGames: LeaderItem[] = [...nonPreGames]
     .map((g) => {
       const hg = g.homeGoals ?? 0;
       const ag = g.awayGoals ?? 0;
