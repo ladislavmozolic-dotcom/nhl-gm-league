@@ -245,7 +245,7 @@ export async function collectMoveOps(pkg: TradePackage) {
   const fromOrgIds = orgIds(fromTeam), toOrgIds = orgIds(toTeam);
   const allPickIds = [...pkg.fromPicks, ...pkg.toPicks];
   const picks = allPickIds.length
-    ? await prisma.draftPick.findMany({ where: { id: { in: allPickIds } }, select: { id: true, teamId: true, year: true, round: true } })
+    ? await prisma.draftPick.findMany({ where: { id: { in: allPickIds } }, select: { id: true, teamId: true, year: true, round: true, ownerLogoId: true } })
     : [];
   const pkById = new Map(picks.map((p) => [p.id, p]));
   if (allPickIds.length) {
@@ -286,10 +286,23 @@ export async function collectMoveOps(pkg: TradePackage) {
   // Full asset labels (not just players) so the trade log never falls back to
   // a bare "assets" placeholder when a side is all picks/prospects/cash.
   const ordinal = (n: number) => `${n}${n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th"}`;
+  // A pick's ownerLogoId is the ORIGINAL team it belongs to — tag it in the log
+  // ("3rd round pick 2027 (CBJ)") so a multi-pick trade doesn't read as if the
+  // same pick were listed twice, same convention as lib/trade-assets.ts.
+  const pickOwnerLogoIds = picks.map((p) => p.ownerLogoId).filter((x): x is number => x != null);
+  const origTeams = pickOwnerLogoIds.length
+    ? await prisma.team.findMany({ where: { profinhlLogoId: { in: pickOwnerLogoIds } }, select: { profinhlLogoId: true, code: true, name: true } })
+    : [];
+  const origTeamByLogoId = new Map(origTeams.map((t) => [t.profinhlLogoId, t]));
   const assetLabels = (pls: TradePlayer[], pickIds: number[], prospectIds: number[], cash: number): string[] => {
     const out: string[] = [];
     for (const p of pls) { const nm = pById.get(p.playerId)?.name; if (nm) out.push(displayName(nm)); }
-    for (const id of pickIds) { const pk = pkById.get(id); if (pk) out.push(`${pk.year} ${ordinal(pk.round)}-round pick`); }
+    for (const id of pickIds) {
+      const pk = pkById.get(id);
+      if (!pk) continue;
+      const orig = pk.ownerLogoId != null ? origTeamByLogoId.get(pk.ownerLogoId) : null;
+      out.push(`${ordinal(pk.round)} round pick ${pk.year}${orig ? ` (${orig.code ?? orig.name})` : ""}`);
+    }
     for (const id of prospectIds) { const pr = prById.get(id); if (pr) out.push(displayName(pr.name)); }
     if (cash) out.push(`$${cash.toLocaleString("en-US")} cash`);
     return out;
