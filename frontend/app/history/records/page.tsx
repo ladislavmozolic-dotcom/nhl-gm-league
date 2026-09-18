@@ -66,6 +66,13 @@ function RecordCard({ record, cupName }: { record: RecordSection; cupName: strin
                         >
                           {item.name}
                         </Link>
+                      ) : item.gmSlug ? (
+                        <Link
+                          href={`/gm/${item.gmSlug}`}
+                          className="font-semibold text-slate-100 hover:text-blue-400 transition-colors truncate"
+                        >
+                          {item.name}
+                        </Link>
                       ) : (
                         <span className="font-semibold text-slate-100 truncate">{item.name}</span>
                       )}

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { cleanName } from "@/lib/playerName";
 import { ACTIVE_SEASON } from "@/lib/career-server";
 import { PRE_SEASON, REGULAR_SEASON } from "@/lib/phase";
+import { teamManagerLabel } from "@/lib/team-gm";
 
 export type LeaderItem = {
   rank: number;
@@ -9,6 +10,7 @@ export type LeaderItem = {
   sub?: string;
   value: string | number;
   slug?: string | null;
+  gmSlug?: string | null;
   teamCode?: string | null;
   teamSlug?: string | null;
   teamLogo?: string | null;
@@ -89,10 +91,27 @@ export async function getLeagueRecords(
       slug: true,
       logoUrl: true,
       gm: true,
+      gmFirstName: true,
+      gmLastName: true,
+      gmNickname: true,
+      passwordHash: true,
       arena: true,
       capacity: true,
       parentTeamId: true,
-      parentTeam: { select: { id: true, name: true, gm: true, logoUrl: true, code: true, slug: true } },
+      parentTeam: {
+        select: {
+          id: true,
+          name: true,
+          gm: true,
+          gmFirstName: true,
+          gmLastName: true,
+          gmNickname: true,
+          passwordHash: true,
+          logoUrl: true,
+          code: true,
+          slug: true,
+        },
+      },
     },
   });
 
@@ -100,10 +119,8 @@ export async function getLeagueRecords(
   const getTeamGm = (teamId: number): string => {
     const t = teamById.get(teamId);
     if (!t) return "—";
-    if (isAhl) {
-      return t.gm || t.parentTeam?.gm || t.name;
-    }
-    return t.gm || t.name;
+    const label = teamManagerLabel(t);
+    return label === "🤖 AI GM" ? "—" : label;
   };
 
   // 2. Fetch Archived Data
@@ -221,66 +238,81 @@ export async function getLeagueRecords(
   // ==========================================
   // A. GM RECORDS (Manažérske rekordy)
   // ==========================================
-  const gmTotalSeasons = new Map<string, Set<string>>();
+  const gmTotalSeasons = new Map<string, { gm: string; teamId: number; seasons: Set<string> }>();
   const gmTeamSeasons = new Map<string, { gm: string; teamId: number; seasons: Set<string> }>();
 
   // Add historical seasons from archived teams
   for (const t of archivedTeams) {
     const gm = getTeamGm(t.teamId);
     if (!gm || gm === "—") continue;
-    if (!gmTotalSeasons.has(gm)) gmTotalSeasons.set(gm, new Set());
-    gmTotalSeasons.get(gm)!.add(t.season);
+    if (!gmTotalSeasons.has(gm)) gmTotalSeasons.set(gm, { gm, teamId: t.teamId, seasons: new Set() });
+    gmTotalSeasons.get(gm)!.seasons.add(t.season);
 
     const key = `${gm}::${t.teamId}`;
     if (!gmTeamSeasons.has(key)) gmTeamSeasons.set(key, { gm, teamId: t.teamId, seasons: new Set() });
     gmTeamSeasons.get(key)!.seasons.add(t.season);
   }
 
-  // Add active current season for all GMs
-  for (const tm of allTeams) {
+  // Add active current season for all real registered GMs
+  const activeLeagueTeams = allTeams.filter((t) => t.code !== "FA" && t.name !== "Free Agents");
+  for (const tm of activeLeagueTeams) {
     const gm = getTeamGm(tm.id);
     if (!gm || gm === "—") continue;
-    if (!gmTotalSeasons.has(gm)) gmTotalSeasons.set(gm, new Set());
-    gmTotalSeasons.get(gm)!.add(ACTIVE_SEASON);
+    if (!gmTotalSeasons.has(gm)) gmTotalSeasons.set(gm, { gm, teamId: tm.id, seasons: new Set() });
+    gmTotalSeasons.get(gm)!.seasons.add(ACTIVE_SEASON);
 
     const key = `${gm}::${tm.id}`;
     if (!gmTeamSeasons.has(key)) gmTeamSeasons.set(key, { gm, teamId: tm.id, seasons: new Set() });
     gmTeamSeasons.get(key)!.seasons.add(ACTIVE_SEASON);
   }
 
-  const gmSeasonsLeader: LeaderItem[] = [...gmTotalSeasons.entries()]
-    .map(([gm, sSet]) => ({
-      rank: 1,
-      name: gm,
-      value: `${sSet.size} ${sSet.size === 1 ? "sezóna" : sSet.size < 5 ? "sezóny" : "sezón"}`,
-      sub: [...sSet].sort().join(", "),
-      rawVal: sSet.size,
-    }))
-    .sort((a, b) => b.rawVal - a.rawVal || a.name.localeCompare(b.name))
-    .slice(0, 15)
-    .map((item, idx) => ({ ...item, rank: idx + 1 }));
-
-  const gmOneTeamLeader: LeaderItem[] = [...gmTeamSeasons.values()]
+  const gmSeasonsLeader: LeaderItem[] = [...gmTotalSeasons.values()]
     .map((entry) => {
       const tm = teamById.get(entry.teamId);
+      const parentTm = tm?.parentTeam ? tm.parentTeam : tm;
+      const nick = parentTm?.gmNickname ? `@${parentTm.gmNickname}` : null;
+      const sub = [nick, tm?.name].filter(Boolean).join(" · ");
       return {
         rank: 1,
         name: entry.gm,
-        sub: tm ? `${tm.name} (${[...entry.seasons].sort().join(", ")})` : undefined,
+        sub: sub || undefined,
         teamCode: tm?.code ?? tm?.name,
         teamSlug: tm?.slug,
         teamLogo: tm?.logoUrl,
+        gmSlug: parentTm?.slug,
         value: `${entry.seasons.size} ${entry.seasons.size === 1 ? "sezóna" : entry.seasons.size < 5 ? "sezóny" : "sezón"}`,
         rawVal: entry.seasons.size,
       };
     })
     .sort((a, b) => b.rawVal - a.rawVal || a.name.localeCompare(b.name))
-    .slice(0, 15)
+    .slice(0, 35)
     .map((item, idx) => ({ ...item, rank: idx + 1 }));
 
-  const gmStreakLeader: LeaderItem[] = [...gmTotalSeasons.entries()]
-    .map(([gm, sSet]) => {
-      const sortedSeasons = [...sSet].sort();
+  const gmOneTeamLeader: LeaderItem[] = [...gmTeamSeasons.values()]
+    .map((entry) => {
+      const tm = teamById.get(entry.teamId);
+      const parentTm = tm?.parentTeam ? tm.parentTeam : tm;
+      const nick = parentTm?.gmNickname ? `@${parentTm.gmNickname}` : null;
+      const sub = [nick, tm?.name].filter(Boolean).join(" · ");
+      return {
+        rank: 1,
+        name: entry.gm,
+        sub: sub || undefined,
+        teamCode: tm?.code ?? tm?.name,
+        teamSlug: tm?.slug,
+        teamLogo: tm?.logoUrl,
+        gmSlug: parentTm?.slug,
+        value: `${entry.seasons.size} ${entry.seasons.size === 1 ? "sezóna" : entry.seasons.size < 5 ? "sezóny" : "sezón"}`,
+        rawVal: entry.seasons.size,
+      };
+    })
+    .sort((a, b) => b.rawVal - a.rawVal || a.name.localeCompare(b.name))
+    .slice(0, 35)
+    .map((item, idx) => ({ ...item, rank: idx + 1 }));
+
+  const gmStreakLeader: LeaderItem[] = [...gmTotalSeasons.values()]
+    .map((entry) => {
+      const sortedSeasons = [...entry.seasons].sort();
       let maxStreak = 1;
       let currentStreak = 1;
       let bestStart = sortedSeasons[0] ?? ACTIVE_SEASON;
@@ -308,17 +340,26 @@ export async function getLeagueRecords(
         bestEnd = sortedSeasons[sortedSeasons.length - 1];
       }
 
+      const tm = teamById.get(entry.teamId);
+      const parentTm = tm?.parentTeam ? tm.parentTeam : tm;
+      const nick = parentTm?.gmNickname ? `@${parentTm.gmNickname}` : null;
       const spanText = bestStart === bestEnd ? bestStart : `${bestStart} až ${bestEnd}`;
+      const sub = [nick, spanText].filter(Boolean).join(" · ");
+
       return {
         rank: 1,
-        name: gm,
-        sub: spanText,
+        name: entry.gm,
+        sub,
+        teamCode: tm?.code ?? tm?.name,
+        teamSlug: tm?.slug,
+        teamLogo: tm?.logoUrl,
+        gmSlug: parentTm?.slug,
         value: `${maxStreak} v rade`,
         rawVal: maxStreak,
       };
     })
     .sort((a, b) => b.rawVal - a.rawVal || a.name.localeCompare(b.name))
-    .slice(0, 15)
+    .slice(0, 35)
     .map((item, idx) => ({ ...item, rank: idx + 1 }));
 
   // ==========================================
