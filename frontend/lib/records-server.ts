@@ -2222,10 +2222,11 @@ export async function getLeagueRecords(
       const unitFans = lang === "cs" ? "divákov" : lang === "de" ? "Zuschauer" : lang === "ru" ? "зрителей" : "fans";
       return {
         rank: idx + 1,
-        name: `${home?.name ?? tHome} vs ${away?.name ?? tAway}`,
+        name: `${home?.code ?? home?.name ?? tHome} vs ${away?.code ?? away?.name ?? tAway}`,
         teamCode: home?.code,
         teamSlug: home?.slug,
         teamLogo: home?.logoUrl,
+        hideTeam: true,
         value: `${numFmt} ${unitFans}`,
         sub: `${g.season} · ${dateStr} · ${tScore}: ${g.homeGoals}:${g.awayGoals}`,
       };
@@ -2242,10 +2243,11 @@ export async function getLeagueRecords(
       const unitFans = lang === "cs" ? "divákov" : lang === "de" ? "Zuschauer" : lang === "ru" ? "зрителей" : "fans";
       return {
         rank: idx + 1,
-        name: `${home?.name ?? tHome} vs ${away?.name ?? tAway}`,
+        name: `${home?.code ?? home?.name ?? tHome} vs ${away?.code ?? away?.name ?? tAway}`,
         teamCode: home?.code,
         teamSlug: home?.slug,
         teamLogo: home?.logoUrl,
+        hideTeam: true,
         value: `${numFmt} ${unitFans}`,
         sub: `${g.season} · ${dateStr} · ${tScore}: ${g.homeGoals}:${g.awayGoals}`,
       };
@@ -2324,10 +2326,11 @@ export async function getLeagueRecords(
       const dateStr = g.gameDate ? formatRecordDate(new Date(g.gameDate), lang) : g.season;
       return {
         rank: idx + 1,
-        name: `${home?.name ?? tHome} vs ${away?.name ?? tAway}`,
+        name: `${home?.code ?? home?.name ?? tHome} vs ${away?.code ?? away?.name ?? tAway}`,
         teamCode: home?.code,
         teamSlug: home?.slug,
         teamLogo: home?.logoUrl,
+        hideTeam: true,
         value: `${totalGoals} ${unitGoals}`,
         sub: `${tResult} ${g.homeGoals}:${g.awayGoals} · ${g.season} (${dateStr})`,
       };
@@ -2351,7 +2354,6 @@ export async function getLeagueRecords(
       const winTeam = teamById.get(winnerId);
       const loseTeam = teamById.get(loserId);
       const dateStr = g.gameDate ? formatRecordDate(new Date(g.gameDate), lang) : g.season;
-      const vsWord = lang === "cs" ? "nad" : lang === "de" ? "gegen" : lang === "ru" ? "против" : "vs";
       const valText =
         lang === "cs"
           ? `o ${diff} gólov (${winScore}:${loseScore})`
@@ -2362,10 +2364,11 @@ export async function getLeagueRecords(
           : `by ${diff} goals (${winScore}:${loseScore})`;
       return {
         rank: idx + 1,
-        name: `${winTeam?.name ?? tWinner} ${vsWord} ${loseTeam?.name ?? tLoser}`,
+        name: `${winTeam?.code ?? winTeam?.name ?? tWinner} vs ${loseTeam?.code ?? loseTeam?.name ?? tLoser}`,
         teamCode: winTeam?.code,
         teamSlug: winTeam?.slug,
         teamLogo: winTeam?.logoUrl,
+        hideTeam: true,
         value: valText,
         sub: `${g.season} · ${dateStr}`,
       };

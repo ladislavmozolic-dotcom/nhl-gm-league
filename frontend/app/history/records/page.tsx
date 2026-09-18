@@ -124,7 +124,7 @@ function RecordCard({ record, cupName, lang }: { record: RecordSection; cupName:
                           </span>
                         ))}
                       </div>
-                    ) : (first.teamLogo || first.teamCode) && !first.hideTeam ? (
+                    ) : (first.teamLogo || first.teamCode) && !first.hideTeam && Boolean(first.slug) ? (
                       <Link
                         href={first.teamSlug ? `/teams/${first.teamSlug}` : "#"}
                         className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-blue-400 transition-colors shrink-0 font-medium"
