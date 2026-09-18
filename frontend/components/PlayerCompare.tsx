@@ -18,8 +18,8 @@ const GOALIE_ATTRS: Array<[string, string]> = [
   ["ps", "Positioning"], ["ex", "Experience"], ["ld", "Leadership"], ["mo", "Morale"],
 ];
 
-function SlotPicker({ pool, value, onPick, onClear }: {
-  pool: ComparePlayer[]; value: ComparePlayer | null; onPick: (p: ComparePlayer) => void; onClear: () => void;
+function SlotPicker({ pool, value, onPick, onClear, alignRight = false }: {
+  pool: ComparePlayer[]; value: ComparePlayer | null; onPick: (p: ComparePlayer) => void; onClear: () => void; alignRight?: boolean;
 }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
@@ -43,7 +43,10 @@ function SlotPicker({ pool, value, onPick, onClear }: {
         onBlur={() => setTimeout(() => setOpen(false), 150)} placeholder="Search player…"
         className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-sm" />
       {open && matches.length > 0 && (
-        <div className="absolute z-30 mt-1 w-full max-h-64 overflow-y-auto bg-[#0f1d32] border border-slate-700 rounded-lg shadow-2xl">
+        // Wider than the (narrow, ~150px) column it sits in — only one slot's dropdown
+        // is ever open at once, so it's safe to overlay neighbouring columns rather than
+        // truncate names down to nothing.
+        <div className={`absolute z-30 mt-1 w-72 max-h-64 overflow-y-auto bg-[#0f1d32] border border-slate-700 rounded-lg shadow-2xl ${alignRight ? "right-0" : "left-0"}`}>
           {matches.map((p) => (
             <button key={p.id} onMouseDown={() => { onPick(p); setQ(""); setOpen(false); }}
               className="w-full text-left px-2.5 py-1.5 text-sm hover:bg-slate-700/50 flex items-center justify-between gap-2">
@@ -111,7 +114,7 @@ export default function PlayerCompare({ skaters, goalies, initialId, hideAttrs =
               <th className="px-3 py-2 text-left text-xs text-slate-500 sticky left-0 bg-slate-800/40 min-w-[130px]">Attribute</th>
               {sel.map((_, i) => (
                 <th key={i} className="px-2 py-2 min-w-[150px]">
-                  <SlotPicker pool={pool} value={chosen[i]} onPick={(p) => setSlot(i, p)} onClear={() => setSlot(i, null)} />
+                  <SlotPicker pool={pool} value={chosen[i]} onPick={(p) => setSlot(i, p)} onClear={() => setSlot(i, null)} alignRight={i >= sel.length - 2} />
                 </th>
               ))}
             </tr>
