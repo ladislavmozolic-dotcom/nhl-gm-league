@@ -248,6 +248,12 @@ export function getGroupTitle(id: string, lang: Lang, cupName: string): string {
       de: "Vorbereitungsspiele (Teams)",
       ru: "Предсезонные матчи (Команды)",
     },
+    "pre-games": {
+      en: "Pre-season Exhibition Records (Games & Attendance)",
+      cs: "Prípravné zápasy (Zápasy a diváci)",
+      de: "Vorbereitungsspiele (Spiele & Zuschauer)",
+      ru: "Предсезонные матчи (Матчи и зрители)",
+    },
   };
   return map[id]?.[lang] ?? map[id]?.en ?? id;
 }
@@ -859,6 +865,24 @@ export function getSectionTitle(id: string, lang: Lang, league: string, cupName:
       cs: "Najviac zákrokov brankára v príprave",
       de: "Meiste Torhüter-Paraden in der Vorbereitung",
       ru: "Больше всего сейвов вратаря в предсезонке",
+    },
+    "pre-highest-scoring-game": {
+      en: "Highest scoring game in pre-season",
+      cs: "Najviac gólov v zápase prípravy",
+      de: "Torreichstes Vorbereitungsspiel",
+      ru: "Самый результативный предсезонный матч",
+    },
+    "pre-largest-victory": {
+      en: "Largest margin of victory in pre-season",
+      cs: "Najvyššie víťazstvo v príprave",
+      de: "Höchster Sieg in der Vorbereitung",
+      ru: "Самая крупная победа в предсезонке",
+    },
+    "pre-highest-attendance": {
+      en: "Highest single-game attendance in pre-season",
+      cs: "Najvyššia návštevnosť v príprave",
+      de: "Höchste Zuschauerzahl in der Vorbereitung",
+      ru: "Наибольшая посещаемость в предсезонке",
     },
   };
   return map[id]?.[lang] ?? map[id]?.en ?? id;
@@ -2860,6 +2884,91 @@ export async function getLeagueRecords(
       };
     });
 
+  // 5. Preseason Game & Attendance Records
+  const preHighestScoringGames: LeaderItem[] = [...preGames]
+    .map((g) => ({
+      g,
+      totalGoals: (g.homeGoals ?? 0) + (g.awayGoals ?? 0),
+    }))
+    .filter((x) => x.totalGoals > 0)
+    .sort((a, b) => b.totalGoals - a.totalGoals)
+    .slice(0, 5)
+    .map(({ g, totalGoals }, idx) => {
+      const home = teamById.get(g.homeTeamId);
+      const away = teamById.get(g.awayTeamId);
+      const dateStr = g.gameDate ? formatRecordDate(new Date(g.gameDate), lang) : g.season;
+      return {
+        rank: idx + 1,
+        name: `${home?.code ?? home?.name ?? tHome} vs ${away?.code ?? away?.name ?? tAway}`,
+        teamCode: home?.code,
+        teamSlug: home?.slug,
+        teamLogo: home?.logoUrl,
+        hideTeam: true,
+        value: `${totalGoals} ${unitGoals}`,
+        sub: `${tResult} ${g.homeGoals}:${g.awayGoals} · ${g.season} (${dateStr})`,
+      };
+    });
+
+  const preHighestVictoryGames: LeaderItem[] = [...preGames]
+    .map((g) => {
+      const hg = g.homeGoals ?? 0;
+      const ag = g.awayGoals ?? 0;
+      const diff = Math.abs(hg - ag);
+      const winnerId = hg > ag ? g.homeTeamId : g.awayTeamId;
+      const loserId = hg > ag ? g.awayTeamId : g.homeTeamId;
+      const winScore = Math.max(hg, ag);
+      const loseScore = Math.min(hg, ag);
+      return { g, diff, winnerId, loserId, winScore, loseScore };
+    })
+    .filter((x) => x.diff > 0)
+    .sort((a, b) => b.diff - a.diff || b.winScore - a.winScore)
+    .slice(0, 5)
+    .map(({ g, diff, winnerId, loserId, winScore, loseScore }, idx) => {
+      const winTeam = teamById.get(winnerId);
+      const loseTeam = teamById.get(loserId);
+      const dateStr = g.gameDate ? formatRecordDate(new Date(g.gameDate), lang) : g.season;
+      const valText =
+        lang === "cs"
+          ? `o ${diff} gólov (${winScore}:${loseScore})`
+          : lang === "de"
+          ? `um ${diff} Tore (${winScore}:${loseScore})`
+          : lang === "ru"
+          ? `на ${diff} голов (${winScore}:${loseScore})`
+          : `by ${diff} goals (${winScore}:${loseScore})`;
+      return {
+        rank: idx + 1,
+        name: `${winTeam?.code ?? winTeam?.name ?? tWinner} vs ${loseTeam?.code ?? loseTeam?.name ?? tLoser}`,
+        teamCode: winTeam?.code,
+        teamSlug: winTeam?.slug,
+        teamLogo: winTeam?.logoUrl,
+        hideTeam: true,
+        value: valText,
+        sub: `${g.season} · ${dateStr}`,
+      };
+    });
+
+  const preGamesWithAtt = preGames.filter((g) => (g.attendance ?? 0) > 0);
+  const preHighestAttGames: LeaderItem[] = [...preGamesWithAtt]
+    .sort((a, b) => (b.attendance ?? 0) - (a.attendance ?? 0))
+    .slice(0, 5)
+    .map((g, idx) => {
+      const home = teamById.get(g.homeTeamId);
+      const away = teamById.get(g.awayTeamId);
+      const dateStr = g.gameDate ? formatRecordDate(new Date(g.gameDate), lang) : g.season;
+      const numFmt = (g.attendance ?? 0).toLocaleString(lang === "cs" ? "sk-SK" : lang === "de" ? "de-DE" : lang === "ru" ? "ru-RU" : "en-US");
+      const unitFans = lang === "cs" ? "divákov" : lang === "de" ? "Zuschauer" : lang === "ru" ? "зрителей" : "fans";
+      return {
+        rank: idx + 1,
+        name: `${home?.code ?? home?.name ?? tHome} vs ${away?.code ?? away?.name ?? tAway}`,
+        teamCode: home?.code,
+        teamSlug: home?.slug,
+        teamLogo: home?.logoUrl,
+        hideTeam: true,
+        value: `${numFmt} ${unitFans}`,
+        sub: `${g.season} · ${dateStr} · ${tScore}: ${g.homeGoals}:${g.awayGoals}`,
+      };
+    });
+
   // ==========================================
   // I. AWARDS & TROPHIES
   // ==========================================
@@ -3361,6 +3470,43 @@ export async function getLeagueRecords(
           phaseBadge: badgePre,
           items: preSeasonBestTeams,
         },
+      ],
+    },
+    {
+      id: "pre-games",
+      title: getGroupTitle("pre-games", lang, cupName),
+      icon: "🏟️",
+      phase: "pre",
+      mainCategory: "games",
+      records: [
+        {
+          id: "pre-highest-scoring-game",
+          title: getSectionTitle("pre-highest-scoring-game", lang, league, cupName),
+          icon: "🚨",
+          phase: "pre",
+          phaseBadge: badgePre,
+          items: preHighestScoringGames,
+        },
+        {
+          id: "pre-largest-victory",
+          title: getSectionTitle("pre-largest-victory", lang, league, cupName),
+          icon: "⚡",
+          phase: "pre",
+          phaseBadge: badgePre,
+          items: preHighestVictoryGames,
+        },
+        ...(preHighestAttGames.length
+          ? [
+              {
+                id: "pre-highest-attendance",
+                title: getSectionTitle("pre-highest-attendance", lang, league, cupName),
+                icon: "👥",
+                phase: "pre" as const,
+                phaseBadge: badgePre,
+                items: preHighestAttGames,
+              },
+            ]
+          : []),
       ],
     },
   ];
