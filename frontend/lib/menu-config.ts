@@ -72,7 +72,7 @@ export const DEFAULT_MENU: MenuItem[] = [
   ] },
   { key: "history", label: "History", href: "/history", children: [
     { label: "🕰️ League History", href: "/history" },
-    { label: "📜 Records (Rekordy)", href: "/history/records" },
+    { label: "📜 Records", href: "/history/records" },
     { label: "🏅 Hall of Fame", href: "/hall-of-fame" },
     { label: "🏵️ Awards", href: "/awards" },
     { label: "🗳️ Award Voting", href: "/awards/vote" },
