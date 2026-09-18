@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { cleanName } from "@/lib/playerName";
+import { cleanName, isRookieName } from "@/lib/playerName";
 import { ACTIVE_SEASON } from "@/lib/career-server";
 import { PRE_SEASON, REGULAR_SEASON } from "@/lib/phase";
 import { teamManagerLabel } from "@/lib/team-gm";
@@ -162,8 +162,8 @@ export async function getLeagueRecords(
   const [seasonRecords, seasonAwards, archivedSkaters, archivedGoalies, archivedTeams, allPlayersWithBirth] = await Promise.all([
     prisma.seasonRecord.findMany({ where: { league } }),
     prisma.seasonAward.findMany({ where: { league } }),
-    prisma.playerSeasonStat.findMany({ where: { league, isPlayoff: false } }),
-    prisma.goalieSeasonStat.findMany({ where: { league, isPlayoff: false } }),
+    prisma.playerSeasonStat.findMany({ where: { league } }),
+    prisma.goalieSeasonStat.findMany({ where: { league } }),
     prisma.teamSeasonStat.findMany({ where: { league } }),
     prisma.player.findMany({
       where: { rosterType: isAhl ? "AHL" : "NHL" },
@@ -218,10 +218,14 @@ export async function getLeagueRecords(
             points: true,
             pim: true,
             plusMinus: true,
+            ppGoals: true,
+            ppAssists: true,
+            shGoals: true,
+            shAssists: true,
             shots: true,
             hits: true,
             blocks: true,
-            game: { select: { gameDate: true, playedAt: true, season: true, seriesId: true, round: true, league: true } },
+            game: { select: { id: true, gameDate: true, playedAt: true, season: true, seriesId: true, round: true, league: true, homeTeamId: true, awayTeamId: true, homeGoals: true, awayGoals: true } },
           },
         })
       : Promise.resolve([]),
@@ -237,7 +241,7 @@ export async function getLeagueRecords(
             goalsAgainst: true,
             decision: true,
             xga: true,
-            game: { select: { gameDate: true, playedAt: true, season: true, seriesId: true, round: true, homeTeamId: true, awayTeamId: true, homeGoals: true, awayGoals: true, goalEvents: true, league: true } },
+            game: { select: { id: true, gameDate: true, playedAt: true, season: true, seriesId: true, round: true, homeTeamId: true, awayTeamId: true, homeGoals: true, awayGoals: true, goalEvents: true, league: true } },
           },
         })
       : Promise.resolve([]),
@@ -510,182 +514,49 @@ export async function getLeagueRecords(
   goalieRingsLeader.splice(5);
   goalieRingsLeader.forEach((item, idx) => { item.rank = idx + 1; });
 
-  // Playoff Career Points from real playoff game stats
-  const playoffSkaterAcc = new Map<number, { playerId: number; teamId: number | null; gp: number; goals: number; assists: number; points: number }>();
-  for (const s of allSkaterStats) {
-    if (s.game.seriesId == null) continue;
-    if (!playoffSkaterAcc.has(s.playerId)) {
-      playoffSkaterAcc.set(s.playerId, { playerId: s.playerId, teamId: s.teamId, gp: 0, goals: 0, assists: 0, points: 0 });
-    }
-    const acc = playoffSkaterAcc.get(s.playerId)!;
-    acc.gp += 1;
-    acc.goals += s.goals;
-    acc.assists += s.assists;
-    acc.points += s.points;
-    if (s.teamId) acc.teamId = s.teamId;
+  // ==========================================
+  // D. SKATER & GOALIE SPLITS & DEBUT TRACKING
+  // ==========================================
+  const archivedRegSkaters = archivedSkaters.filter((s) => !s.isPlayoff);
+  const archivedPlayoffSkaters = archivedSkaters.filter((s) => s.isPlayoff);
+  const archivedRegGoalies = archivedGoalies.filter((g) => !g.isPlayoff);
+  const archivedPlayoffGoalies = archivedGoalies.filter((g) => g.isPlayoff);
+
+  const regSkaterStats = allSkaterStats.filter((s) => !s.game.season.endsWith("-PRE") && s.game.season !== PRE_SEASON && s.game.seriesId == null);
+  const playoffSkaterStats = allSkaterStats.filter((s) => s.game.seriesId != null);
+  const preSkaterStats = allSkaterStats.filter((s) => s.game.season.endsWith("-PRE") || s.game.season === PRE_SEASON);
+
+  const regGoalieStats = allGoalieStats.filter((g) => !g.game.season.endsWith("-PRE") && g.game.season !== PRE_SEASON && g.game.seriesId == null);
+  const playoffGoalieStats = allGoalieStats.filter((g) => g.game.seriesId != null);
+  const preGoalieStats = allGoalieStats.filter((g) => g.game.season.endsWith("-PRE") || g.game.season === PRE_SEASON);
+
+  // Debut season determination for rookie records
+  const allSeasonOccurrences = new Map<number, Set<string>>();
+  archivedSkaters.forEach((s) => {
+    if (!allSeasonOccurrences.has(s.playerId)) allSeasonOccurrences.set(s.playerId, new Set());
+    allSeasonOccurrences.get(s.playerId)!.add(s.season);
+  });
+  archivedGoalies.forEach((g) => {
+    if (!allSeasonOccurrences.has(g.playerId)) allSeasonOccurrences.set(g.playerId, new Set());
+    allSeasonOccurrences.get(g.playerId)!.add(g.season);
+  });
+  allSkaterStats.forEach((s) => {
+    if (!allSeasonOccurrences.has(s.playerId)) allSeasonOccurrences.set(s.playerId, new Set());
+    allSeasonOccurrences.get(s.playerId)!.add(s.game.season);
+  });
+  allGoalieStats.forEach((g) => {
+    if (!allSeasonOccurrences.has(g.playerId)) allSeasonOccurrences.set(g.playerId, new Set());
+    allSeasonOccurrences.get(g.playerId)!.add(g.game.season);
+  });
+
+  const playerDebutSeason = new Map<number, string>();
+  for (const [pId, seasons] of allSeasonOccurrences.entries()) {
+    const sorted = [...seasons].sort();
+    if (sorted.length) playerDebutSeason.set(pId, sorted[0]);
   }
 
-  const playoffCareerPoints: LeaderItem[] = [...playoffSkaterAcc.values()]
-    .filter((s) => s.points > 0)
-    .sort((a, b) => b.points - a.points || b.goals - a.goals)
-    .slice(0, 5)
-    .map((s, idx) => {
-      const p = playerMap.get(s.playerId);
-      return {
-        rank: idx + 1,
-        name: p ? cleanName(p.name) : "Hráč",
-        slug: p?.slug,
-        photoUrl: p?.photoUrl,
-        hideTeam: true,
-        value: `${s.points} PTS`,
-        sub: `${s.gp} GP (${s.goals}G + ${s.assists}A)`,
-      };
-    });
-
-  // Playoff Career Wins from real playoff goalie stats
-  const playoffGoalieAcc = new Map<number, { playerId: number; teamId: number | null; gp: number; wins: number; saves: number; shutouts: number }>();
-  for (const g of allGoalieStats) {
-    if (g.game.seriesId == null) continue;
-    if (!playoffGoalieAcc.has(g.playerId)) {
-      playoffGoalieAcc.set(g.playerId, { playerId: g.playerId, teamId: g.teamId, gp: 0, wins: 0, saves: 0, shutouts: 0 });
-    }
-    const acc = playoffGoalieAcc.get(g.playerId)!;
-    acc.gp += 1;
-    if (g.decision === "W") acc.wins += 1;
-    acc.saves += g.saves;
-    if (g.goalsAgainst === 0) acc.shutouts += 1;
-    if (g.teamId) acc.teamId = g.teamId;
-  }
-
-  const playoffCareerWins: LeaderItem[] = [...playoffGoalieAcc.values()]
-    .filter((g) => g.wins > 0)
-    .sort((a, b) => b.wins - a.wins || b.saves - a.saves)
-    .slice(0, 5)
-    .map((g, idx) => {
-      const p = playerMap.get(g.playerId);
-      return {
-        rank: idx + 1,
-        name: p ? cleanName(p.name) : "Brankár",
-        slug: p?.slug,
-        photoUrl: p?.photoUrl,
-        hideTeam: true,
-        value: `${g.wins} W`,
-        sub: `${g.gp} GP · ${g.shutouts} SO`,
-      };
-    });
-
   // ==========================================
-  // C. AWARDS & TROPHIES
-  // ==========================================
-  const awardCategoryCounts = new Map<string, Map<string, { name: string; slug?: string | null; photoUrl?: string | null; teamId?: number | null; count: number; seasons: string[] }>>();
-
-  for (const a of seasonAwards) {
-    let cat = a.category;
-    if (cat === "Hart" || cat === "Hart Memorial") cat = "Hart Memorial Trophy";
-    else if (cat === "Art Ross") cat = "Art Ross Trophy";
-    else if (cat === "Rocket Richard") cat = "Maurice 'Rocket' Richard Trophy";
-    else if (cat === "Norris" || cat === "James Norris") cat = "James Norris Memorial Trophy";
-    else if (cat === "Vezina" || cat === "Vézina") cat = "Vézina Trophy";
-    else if (cat === "Conn Smythe") cat = "Conn Smythe Trophy";
-    else if (cat === "Ted Lindsay") cat = "Ted Lindsay Award";
-    else if (cat === "Selke" || cat === "Frank J. Selke") cat = "Frank J. Selke Trophy";
-    else if (cat === "Lady Byng") cat = "Lady Byng Trophy";
-    else if (cat === "Plus-Minus" || cat === "NHL Plus - Minus Award") cat = "NHL Plus - Minus Award";
-    else if (cat === "GM of the Year" || cat === "General Manager of the Year" || cat === "Sam Pollock") cat = "Sam Pollock Trophy (GM of the Year)";
-
-    if (!awardCategoryCounts.has(cat)) awardCategoryCounts.set(cat, new Map());
-    const catMap = awardCategoryCounts.get(cat)!;
-
-    let winnerKey = "";
-    let winnerName = "";
-    let winnerSlug: string | null = null;
-    let winnerPhotoUrl: string | null = null;
-    let teamId = a.teamId;
-
-    if (a.playerId) {
-      winnerKey = `p_${a.playerId}`;
-      const p = playerMap.get(a.playerId);
-      winnerName = p ? cleanName(p.name) : cleanName(a.playerName || "—");
-      winnerSlug = p?.slug ?? null;
-      winnerPhotoUrl = p?.photoUrl ?? null;
-      if (!teamId && p?.teamId) teamId = p.teamId;
-    } else if (a.playerName) {
-      winnerKey = `name_${a.playerName}`;
-      winnerName = cleanName(a.playerName);
-    } else if (a.teamId) {
-      winnerKey = `t_${a.teamId}`;
-      const tm = teamById.get(a.teamId);
-      winnerName = (cat.includes("GM") || cat.includes("Pollock")) ? getTeamGm(a.teamId) : (tm?.name ?? "Tím");
-    } else {
-      continue;
-    }
-
-    if (!catMap.has(winnerKey)) {
-      catMap.set(winnerKey, { name: winnerName, slug: winnerSlug, photoUrl: winnerPhotoUrl, teamId, count: 0, seasons: [] });
-    }
-    const entry = catMap.get(winnerKey)!;
-    entry.count++;
-    entry.seasons.push(a.season);
-  }
-
-  const buildAwardLeader = (catTitle: string, aliasKeys: string[], awardPhase: RecordPhase = "all"): RecordSection => {
-    let combinedMap = new Map<string, { name: string; slug?: string | null; photoUrl?: string | null; teamId?: number | null; count: number; seasons: string[] }>();
-    for (const k of aliasKeys) {
-      const m = awardCategoryCounts.get(k);
-      if (m) {
-        for (const [key, val] of m.entries()) {
-          if (!combinedMap.has(key)) {
-            combinedMap.set(key, { ...val, seasons: [...val.seasons] });
-          } else {
-            const existing = combinedMap.get(key)!;
-            existing.count += val.count;
-            existing.seasons.push(...val.seasons);
-          }
-        }
-      }
-    }
-
-    const items: LeaderItem[] = [...combinedMap.values()]
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5)
-      .map((entry, idx) => {
-        return {
-          rank: idx + 1,
-          name: entry.name,
-          slug: entry.slug,
-          photoUrl: entry.photoUrl,
-          hideTeam: true,
-          value: `${entry.count}×`,
-          sub: entry.seasons.sort().join(", "),
-        };
-      });
-
-    return {
-      id: catTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-      title: catTitle,
-      icon: "🏵️",
-      phase: awardPhase,
-      phaseBadge: awardPhase === "playoffs" ? "Play-off" : awardPhase === "pre" ? "Príprava" : "ZČ",
-      items,
-    };
-  };
-
-  const trophySections: RecordSection[] = [
-    buildAwardLeader("Hart Memorial Trophy", ["Hart Memorial Trophy", "Hart", "Hart (MVP)"], "regular"),
-    buildAwardLeader("Art Ross Trophy", ["Art Ross Trophy", "Art Ross", "Art Ross (Points)"], "regular"),
-    buildAwardLeader("Maurice 'Rocket' Richard Trophy", ["Maurice 'Rocket' Richard Trophy", "Rocket Richard", "Rocket Richard (Goals)"], "regular"),
-    buildAwardLeader("James Norris Memorial Trophy", ["James Norris Memorial Trophy", "Norris", "Norris (Defense)"], "regular"),
-    buildAwardLeader("Vézina Trophy", ["Vézina Trophy", "Vezina", "Vezina Trophy", "Vezina (Goalie)"], "regular"),
-    buildAwardLeader("Conn Smythe Trophy", ["Conn Smythe Trophy", "Conn Smythe", "Conn Smythe (Playoffs)"], "playoffs"),
-    buildAwardLeader("Ted Lindsay Award", ["Ted Lindsay Award", "Ted Lindsay"], "regular"),
-    buildAwardLeader("Frank J. Selke Trophy", ["Frank J. Selke Trophy", "Selke", "Selke (Def. Fwd)"], "regular"),
-    buildAwardLeader("Lady Byng Trophy", ["Lady Byng Trophy", "Lady Byng"], "regular"),
-    buildAwardLeader("NHL Plus - Minus Award", ["NHL Plus - Minus Award", "Plus-Minus"], "regular"),
-    buildAwardLeader("Sam Pollock Trophy (GM of the Year)", ["Sam Pollock Trophy (GM of the Year)", "GM of the Year", "General Manager of the Year Award"], "all"),
-  ];
-
-  // ==========================================
-  // D. CAREER REGULAR-SEASON RECORDS (ZČ Kariéra)
+  // E. CAREER REGULAR-SEASON RECORDS (ZČ Kariéra)
   // ==========================================
   type SkaterCareerAcc = {
     playerId: number;
@@ -696,6 +567,12 @@ export async function getLeagueRecords(
     shots: number;
     pim: number;
     plusMinus: number;
+    ppGoals: number;
+    ppAssists: number;
+    ppPoints: number;
+    shGoals: number;
+    shAssists: number;
+    shPoints: number;
     teamId: number | null;
   };
 
@@ -720,7 +597,23 @@ export async function getLeagueRecords(
   const getSkAcc = (id: number): SkaterCareerAcc => {
     let acc = skCareerMap.get(id);
     if (!acc) {
-      acc = { playerId: id, gp: 0, goals: 0, assists: 0, points: 0, shots: 0, pim: 0, plusMinus: 0, teamId: null };
+      acc = {
+        playerId: id,
+        gp: 0,
+        goals: 0,
+        assists: 0,
+        points: 0,
+        shots: 0,
+        pim: 0,
+        plusMinus: 0,
+        ppGoals: 0,
+        ppAssists: 0,
+        ppPoints: 0,
+        shGoals: 0,
+        shAssists: 0,
+        shPoints: 0,
+        teamId: null,
+      };
       skCareerMap.set(id, acc);
     }
     return acc;
@@ -736,7 +629,7 @@ export async function getLeagueRecords(
   };
 
   // 1. Archived career stats (Regular season)
-  for (const s of archivedSkaters) {
+  for (const s of archivedRegSkaters) {
     const a = getSkAcc(s.playerId);
     a.gp += s.gp;
     a.goals += s.goals;
@@ -745,10 +638,16 @@ export async function getLeagueRecords(
     a.shots += s.shots;
     a.pim += s.pim;
     a.plusMinus += s.plusMinus;
+    a.ppGoals += s.ppGoals ?? 0;
+    a.ppAssists += s.ppAssists ?? 0;
+    a.ppPoints += (s.ppGoals ?? 0) + (s.ppAssists ?? 0);
+    a.shGoals += s.shGoals ?? 0;
+    a.shAssists += s.shAssists ?? 0;
+    a.shPoints += (s.shGoals ?? 0) + (s.shAssists ?? 0);
     a.teamId = s.teamId;
   }
 
-  for (const g of archivedGoalies) {
+  for (const g of archivedRegGoalies) {
     const a = getGlAcc(g.playerId);
     a.gp += g.gp;
     a.wins += g.wins;
@@ -762,7 +661,6 @@ export async function getLeagueRecords(
   }
 
   // 2. Add regular season game stats from live games
-  const regSkaterStats = allSkaterStats.filter((s) => !s.game.season.endsWith("-PRE") && s.game.season !== PRE_SEASON && s.game.seriesId == null);
   for (const s of regSkaterStats) {
     const a = getSkAcc(s.playerId);
     a.gp += 1;
@@ -772,10 +670,15 @@ export async function getLeagueRecords(
     a.shots += s.shots;
     a.pim += s.pim;
     a.plusMinus += s.plusMinus;
+    a.ppGoals += s.ppGoals ?? 0;
+    a.ppAssists += s.ppAssists ?? 0;
+    a.ppPoints += (s.ppGoals ?? 0) + (s.ppAssists ?? 0);
+    a.shGoals += s.shGoals ?? 0;
+    a.shAssists += s.shAssists ?? 0;
+    a.shPoints += (s.shGoals ?? 0) + (s.shAssists ?? 0);
     if (s.teamId) a.teamId = s.teamId;
   }
 
-  const regGoalieStats = allGoalieStats.filter((g) => !g.game.season.endsWith("-PRE") && g.game.season !== PRE_SEASON && g.game.seriesId == null);
   for (const g of regGoalieStats) {
     const a = getGlAcc(g.playerId);
     a.gp += 1;
@@ -805,7 +708,7 @@ export async function getLeagueRecords(
     }
   }
 
-  const skRowItem = (s: SkaterCareerAcc, val: string | number, sub?: string): LeaderItem => {
+  const skRowItem = (s: { playerId: number }, val: string | number, sub?: string): LeaderItem => {
     const p = playerMap.get(s.playerId);
     return {
       rank: 1,
@@ -818,7 +721,7 @@ export async function getLeagueRecords(
     };
   };
 
-  const glRowItem = (g: GoalieCareerAcc, val: string | number, sub?: string): LeaderItem => {
+  const glRowItem = (g: { playerId: number }, val: string | number, sub?: string): LeaderItem => {
     const p = playerMap.get(g.playerId);
     return {
       rank: 1,
@@ -834,10 +737,10 @@ export async function getLeagueRecords(
   const skList = [...skCareerMap.values()];
   const glList = [...glCareerMap.values()];
 
-  const topSkaters = (fn: (s: SkaterCareerAcc) => number, valFmt: (s: SkaterCareerAcc) => string | number, subFmt?: (s: SkaterCareerAcc) => string) =>
+  const topSkaters = (fn: (s: SkaterCareerAcc) => number, valFmt: (s: SkaterCareerAcc) => string | number, subFmt?: (s: SkaterCareerAcc) => string, sortAsc = false) =>
     [...skList]
-      .filter((s) => fn(s) > 0)
-      .sort((a, b) => fn(b) - fn(a))
+      .filter((s) => (sortAsc ? fn(s) < 0 : fn(s) > 0))
+      .sort((a, b) => (sortAsc ? fn(a) - fn(b) : fn(b) - fn(a)))
       .slice(0, 5)
       .map((s, idx) => ({ ...skRowItem(s, valFmt(s), subFmt?.(s)), rank: idx + 1 }));
 
@@ -852,18 +755,665 @@ export async function getLeagueRecords(
   const careerGoalsItems = topSkaters((s) => s.goals, (s) => `${s.goals} G`, (s) => `${s.gp} GP · ${s.points} PTS`);
   const careerAssistsItems = topSkaters((s) => s.assists, (s) => `${s.assists} A`, (s) => `${s.gp} GP · ${s.points} PTS`);
   const careerPointsItems = topSkaters((s) => s.points, (s) => `${s.points} PTS`, (s) => `${s.goals}G + ${s.assists}A (${s.gp} GP)`);
+  const careerPimItems = topSkaters((s) => s.pim, (s) => `${s.pim} TM`, (s) => `${s.gp} GP · ${s.points} PTS`);
+  const careerPlusMinusBestItems = topSkaters((s) => s.plusMinus, (s) => `+${s.plusMinus} +/-`, (s) => `${s.gp} GP · ${s.points} PTS`);
+  const careerPlusMinusWorstItems = topSkaters((s) => s.plusMinus, (s) => `${s.plusMinus} +/-`, (s) => `${s.gp} GP · ${s.points} PTS`, true);
 
+  const careerPpGoalsItems = topSkaters((s) => s.ppGoals, (s) => `${s.ppGoals} PPG`, (s) => `${s.goals} G celkovo · ${s.gp} GP`);
+  const careerPpAssistsItems = topSkaters((s) => s.ppAssists, (s) => `${s.ppAssists} PPA`, (s) => `${s.assists} A celkovo · ${s.gp} GP`);
+  const careerPpPointsItems = topSkaters((s) => s.ppPoints, (s) => `${s.ppPoints} PPP`, (s) => `${s.ppGoals} PPG + ${s.ppAssists} PPA (${s.points} PTS)`);
+
+  const careerShGoalsItems = topSkaters((s) => s.shGoals, (s) => `${s.shGoals} SHG`, (s) => `${s.goals} G celkovo · ${s.gp} GP`);
+  const careerShAssistsItems = topSkaters((s) => s.shAssists, (s) => `${s.shAssists} SHA`, (s) => `${s.assists} A celkovo · ${s.gp} GP`);
+  const careerShPointsItems = topSkaters((s) => s.shPoints, (s) => `${s.shPoints} SHP`, (s) => `${s.shGoals} SHG + ${s.shAssists} SHA (${s.points} PTS)`);
+
+  // Streaks across regular season games
+  const playerRegGameStats = new Map<number, typeof regSkaterStats>();
+  for (const s of regSkaterStats) {
+    if (!playerRegGameStats.has(s.playerId)) playerRegGameStats.set(s.playerId, []);
+    playerRegGameStats.get(s.playerId)!.push(s);
+  }
+
+  for (const [, list] of playerRegGameStats.entries()) {
+    list.sort((a, b) => {
+      const da = a.game.gameDate ? new Date(a.game.gameDate).getTime() : 0;
+      const db = b.game.gameDate ? new Date(b.game.gameDate).getTime() : 0;
+      return da - db || a.gameId - b.gameId;
+    });
+  }
+
+  type StreakInfo = { playerId: number; streak: number; startSeason: string; endSeason: string };
+  const goalStreaks: StreakInfo[] = [];
+  const assistStreaks: StreakInfo[] = [];
+  const pointStreaks: StreakInfo[] = [];
+  const ironmanStreaks: StreakInfo[] = [];
+
+  for (const [pId, list] of playerRegGameStats.entries()) {
+    let maxG = 0, curG = 0, startG = "", curStartG = "", endG = "";
+    let maxA = 0, curA = 0, startA = "", curStartA = "", endA = "";
+    let maxP = 0, curP = 0, startP = "", curStartP = "", endP = "";
+    let maxIron = 0, curIron = 0, startIron = "", curStartIron = "", endIron = "";
+
+    for (let i = 0; i < list.length; i++) {
+      const g = list[i];
+      const seas = g.game.season;
+
+      // Iron
+      if (curIron === 0) curStartIron = seas;
+      curIron++;
+      if (curIron > maxIron) {
+        maxIron = curIron;
+        startIron = curStartIron;
+        endIron = seas;
+      }
+
+      // Goal
+      if (g.goals > 0) {
+        if (curG === 0) curStartG = seas;
+        curG++;
+        if (curG > maxG) {
+          maxG = curG;
+          startG = curStartG;
+          endG = seas;
+        }
+      } else {
+        curG = 0;
+      }
+
+      // Assist
+      if (g.assists > 0) {
+        if (curA === 0) curStartA = seas;
+        curA++;
+        if (curA > maxA) {
+          maxA = curA;
+          startA = curStartA;
+          endA = seas;
+        }
+      } else {
+        curA = 0;
+      }
+
+      // Point
+      if (g.points > 0) {
+        if (curP === 0) curStartP = seas;
+        curP++;
+        if (curP > maxP) {
+          maxP = curP;
+          startP = curStartP;
+          endP = seas;
+        }
+      } else {
+        curP = 0;
+      }
+    }
+
+    if (maxIron > 0) ironmanStreaks.push({ playerId: pId, streak: maxIron, startSeason: startIron, endSeason: endIron });
+    if (maxG > 0) goalStreaks.push({ playerId: pId, streak: maxG, startSeason: startG, endSeason: endG });
+    if (maxA > 0) assistStreaks.push({ playerId: pId, streak: maxA, startSeason: startA, endSeason: endA });
+    if (maxP > 0) pointStreaks.push({ playerId: pId, streak: maxP, startSeason: startP, endSeason: endP });
+  }
+
+  const buildStreakLeader = (list: StreakInfo[], unitSuffix: string): LeaderItem[] =>
+    list
+      .filter((s) => s.streak > 0)
+      .sort((a, b) => b.streak - a.streak)
+      .slice(0, 5)
+      .map((item, idx) => {
+        const p = playerMap.get(item.playerId);
+        const spanText = item.startSeason === item.endSeason ? `Sezóna ${item.startSeason}` : `${item.startSeason} až ${item.endSeason}`;
+        return {
+          rank: idx + 1,
+          name: p ? cleanName(p.name) : "Hráč",
+          slug: p?.slug,
+          photoUrl: p?.photoUrl,
+          hideTeam: true,
+          value: `${item.streak} ${unitSuffix}`,
+          sub: spanText,
+        };
+      });
+
+  const ironmanLeader = buildStreakLeader(ironmanStreaks, "zápasov v rade");
+  const goalStreakLeader = buildStreakLeader(goalStreaks, "zápasov s gólom");
+  const assistStreakLeader = buildStreakLeader(assistStreaks, "zápasov s asistenciou");
+  const pointStreakLeader = buildStreakLeader(pointStreaks, "zápasov s bodom");
+
+  // Player first match and last match dates for debut / oldest appearance
+  type PlayerMatchSpan = { playerId: number; firstDate: Date; lastDate: Date; firstSeason: string; lastSeason: string };
+  const playerMatchDates = new Map<number, PlayerMatchSpan>();
+
+  const recordPlayerGameDate = (playerId: number, gameDate: Date | null, season: string) => {
+    const d = gameDate ? new Date(gameDate) : new Date("2026-01-01");
+    if (!playerMatchDates.has(playerId)) {
+      playerMatchDates.set(playerId, { playerId, firstDate: d, lastDate: d, firstSeason: season, lastSeason: season });
+    } else {
+      const span = playerMatchDates.get(playerId)!;
+      if (d.getTime() < span.firstDate.getTime()) {
+        span.firstDate = d;
+        span.firstSeason = season;
+      }
+      if (d.getTime() > span.lastDate.getTime()) {
+        span.lastDate = d;
+        span.lastSeason = season;
+      }
+    }
+  };
+
+  for (const s of regSkaterStats) {
+    recordPlayerGameDate(s.playerId, s.game.gameDate, s.game.season);
+  }
+  for (const g of regGoalieStats) {
+    recordPlayerGameDate(g.playerId, g.game.gameDate, g.game.season);
+  }
+
+  const matchDebutYoungest: LeaderItem[] = [...playerMatchDates.values()]
+    .map((span) => {
+      const p = playerMap.get(span.playerId);
+      if (!p) return null;
+      const age = calculateAge(p.birthDate, span.firstDate, p.age);
+      if (!age || age.years < 15 || age.years > 65) return null;
+      const totalDays = age.years * 365 + age.days;
+      return { span, p, age, totalDays };
+    })
+    .filter((x): x is NonNullable<typeof x> => x != null)
+    .sort((a, b) => a.totalDays - b.totalDays)
+    .slice(0, 5)
+    .map(({ span, p, age }, idx) => ({
+      rank: idx + 1,
+      name: cleanName(p.name),
+      slug: p.slug,
+      photoUrl: p.photoUrl,
+      hideTeam: true,
+      value: age.formatted,
+      sub: `Debut v sezóne ${span.firstSeason} (${span.firstDate.toLocaleDateString("sk-SK")})`,
+    }));
+
+  const matchAppearanceOldest: LeaderItem[] = [...playerMatchDates.values()]
+    .map((span) => {
+      const p = playerMap.get(span.playerId);
+      if (!p) return null;
+      const age = calculateAge(p.birthDate, span.lastDate, p.age);
+      if (!age || age.years < 15 || age.years > 65) return null;
+      const totalDays = age.years * 365 + age.days;
+      return { span, p, age, totalDays };
+    })
+    .filter((x): x is NonNullable<typeof x> => x != null)
+    .sort((a, b) => b.totalDays - a.totalDays)
+    .slice(0, 5)
+    .map(({ span, p, age }, idx) => ({
+      rank: idx + 1,
+      name: cleanName(p.name),
+      slug: p.slug,
+      photoUrl: p.photoUrl,
+      hideTeam: true,
+      value: age.formatted,
+      sub: `Zápas v sezóne ${span.lastSeason} (${span.lastDate.toLocaleDateString("sk-SK")})`,
+    }));
+
+  const skaterCareerSections: RecordSection[] = [
+    { id: "career-gp", title: "Najviac odohraných zápasov v kariére", icon: "🏒", phase: "regular", phaseBadge: "ZČ", items: careerGpItems },
+    { id: "career-goals", title: "Najviac gólov v kariére", icon: "🎯", phase: "regular", phaseBadge: "ZČ", items: careerGoalsItems },
+    { id: "career-assists", title: "Najviac asistencií v kariére", icon: "🪄", phase: "regular", phaseBadge: "ZČ", items: careerAssistsItems },
+    { id: "career-points", title: "Najviac bodov v kariére", icon: "⭐", phase: "regular", phaseBadge: "ZČ", items: careerPointsItems },
+    { id: "career-pim", title: "Najviac trestných minút v kariére", icon: "⏱️", phase: "regular", phaseBadge: "ZČ", items: careerPimItems },
+    { id: "career-plus-minus-best", title: "Najlepší +/- v kariére", icon: "🟢", phase: "regular", phaseBadge: "ZČ", items: careerPlusMinusBestItems },
+    { id: "career-plus-minus-worst", title: "Najhorší +/- v kariére", icon: "🔴", phase: "regular", phaseBadge: "ZČ", items: careerPlusMinusWorstItems },
+    { id: "career-pp-goals", title: "Najviac presilovkových gólov v kariére (PPG)", icon: "⚡", phase: "regular", phaseBadge: "ZČ", items: careerPpGoalsItems },
+    { id: "career-pp-assists", title: "Najviac presilovkových asistencií v kariére (PPA)", icon: "🏒", phase: "regular", phaseBadge: "ZČ", items: careerPpAssistsItems },
+    { id: "career-pp-points", title: "Najviac presilovkových bodov v kariére (PPP)", icon: "⭐", phase: "regular", phaseBadge: "ZČ", items: careerPpPointsItems },
+    { id: "career-sh-goals", title: "Najviac oslabovkových gólov v kariére (SHG)", icon: "🛡️", phase: "regular", phaseBadge: "ZČ", items: careerShGoalsItems },
+    { id: "career-sh-assists", title: "Najviac oslabovkových asistencií v kariére (SHA)", icon: "🧤", phase: "regular", phaseBadge: "ZČ", items: careerShAssistsItems },
+    { id: "career-sh-points", title: "Najviac oslabovkových bodov v kariére (SHP)", icon: "⭐", phase: "regular", phaseBadge: "ZČ", items: careerShPointsItems },
+    { id: "career-ironman", title: "Najviac odohraných zápasov v rade (Ironman streak)", icon: "🛡️", phase: "regular", phaseBadge: "ZČ", items: ironmanLeader },
+    { id: "career-goal-streak", title: "Najdlhšia gólová séria v rade (zápasy s gólom)", icon: "🔥", phase: "regular", phaseBadge: "ZČ", items: goalStreakLeader },
+    { id: "career-assist-streak", title: "Najdlhšia asistenčná séria v rade (zápasy s asistenciou)", icon: "🪄", phase: "regular", phaseBadge: "ZČ", items: assistStreakLeader },
+    { id: "career-point-streak", title: "Najdlhšia bodová séria v rade (zápasy s bodom)", icon: "⚡", phase: "regular", phaseBadge: "ZČ", items: pointStreakLeader },
+    { id: "career-youngest-debut", title: "Najmladší hráč pri debute v zápase", icon: "👶", phase: "regular", phaseBadge: "ZČ", items: matchDebutYoungest },
+    { id: "career-oldest-appearance", title: "Najstarší hráč v zápase", icon: "👴", phase: "regular", phaseBadge: "ZČ", items: matchAppearanceOldest },
+  ];
+
+  // ==========================================
+  // F. SINGLE SEASON SKATER RECORDS (ZČ Jedna sezóna)
+  // ==========================================
+  type SeasonSkaterAcc = {
+    playerId: number;
+    season: string;
+    teamIds: Set<number>;
+    gp: number;
+    goals: number;
+    assists: number;
+    points: number;
+    pim: number;
+    plusMinus: number;
+    ppGoals: number;
+    ppAssists: number;
+    ppPoints: number;
+    shGoals: number;
+    shAssists: number;
+    shPoints: number;
+  };
+
+  const seasonSkaterMap = new Map<string, SeasonSkaterAcc>();
+
+  for (const s of archivedRegSkaters) {
+    const key = `${s.playerId}::${s.season}`;
+    if (!seasonSkaterMap.has(key)) {
+      seasonSkaterMap.set(key, {
+        playerId: s.playerId,
+        season: s.season,
+        teamIds: new Set(),
+        gp: 0,
+        goals: 0,
+        assists: 0,
+        points: 0,
+        pim: 0,
+        plusMinus: 0,
+        ppGoals: 0,
+        ppAssists: 0,
+        ppPoints: 0,
+        shGoals: 0,
+        shAssists: 0,
+        shPoints: 0,
+      });
+    }
+    const acc = seasonSkaterMap.get(key)!;
+    acc.gp += s.gp;
+    acc.goals += s.goals;
+    acc.assists += s.assists;
+    acc.points += s.points;
+    acc.pim += s.pim;
+    acc.plusMinus += s.plusMinus;
+    acc.ppGoals += s.ppGoals ?? 0;
+    acc.ppAssists += s.ppAssists ?? 0;
+    acc.ppPoints += (s.ppGoals ?? 0) + (s.ppAssists ?? 0);
+    acc.shGoals += s.shGoals ?? 0;
+    acc.shAssists += s.shAssists ?? 0;
+    acc.shPoints += (s.shGoals ?? 0) + (s.shAssists ?? 0);
+    if (s.teamId) acc.teamIds.add(s.teamId);
+  }
+
+  for (const s of regSkaterStats) {
+    const season = s.game.season;
+    const key = `${s.playerId}::${season}`;
+    if (!seasonSkaterMap.has(key)) {
+      seasonSkaterMap.set(key, {
+        playerId: s.playerId,
+        season,
+        teamIds: new Set(),
+        gp: 0,
+        goals: 0,
+        assists: 0,
+        points: 0,
+        pim: 0,
+        plusMinus: 0,
+        ppGoals: 0,
+        ppAssists: 0,
+        ppPoints: 0,
+        shGoals: 0,
+        shAssists: 0,
+        shPoints: 0,
+      });
+    }
+    const acc = seasonSkaterMap.get(key)!;
+    acc.gp += 1;
+    acc.goals += s.goals;
+    acc.assists += s.assists;
+    acc.points += s.points;
+    acc.pim += s.pim;
+    acc.plusMinus += s.plusMinus;
+    acc.ppGoals += s.ppGoals ?? 0;
+    acc.ppAssists += s.ppAssists ?? 0;
+    acc.ppPoints += (s.ppGoals ?? 0) + (s.ppAssists ?? 0);
+    acc.shGoals += s.shGoals ?? 0;
+    acc.shAssists += s.shAssists ?? 0;
+    acc.shPoints += (s.shGoals ?? 0) + (s.shAssists ?? 0);
+    if (s.teamId) acc.teamIds.add(s.teamId);
+  }
+
+  const allSeasonSkaters = [...seasonSkaterMap.values()];
+
+  const buildSeasonSkaterLeader = (
+    list: SeasonSkaterAcc[],
+    sortFn: (a: SeasonSkaterAcc, b: SeasonSkaterAcc) => number,
+    filterFn: (s: SeasonSkaterAcc) => boolean,
+    valFmt: (s: SeasonSkaterAcc) => string | number,
+    subFmt: (s: SeasonSkaterAcc) => string
+  ): LeaderItem[] =>
+    list
+      .filter(filterFn)
+      .sort(sortFn)
+      .slice(0, 5)
+      .map((entry, idx) => {
+        const p = playerMap.get(entry.playerId);
+        const tmInfo = resolveTeams(entry.teamIds, teamById);
+        return {
+          rank: idx + 1,
+          name: p ? cleanName(p.name) : "Hráč",
+          slug: p?.slug,
+          photoUrl: p?.photoUrl,
+          ...tmInfo,
+          value: valFmt(entry),
+          sub: subFmt(entry),
+        };
+      });
+
+  const seasonGoalsLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.goals - a.goals || b.points - a.points, (s) => s.goals > 0, (s) => `${s.goals} G`, (s) => `Sezóna ${s.season} · ${s.points} PTS (${s.gp} GP)`);
+  const seasonAssistsLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.assists - a.assists || b.points - a.points, (s) => s.assists > 0, (s) => `${s.assists} A`, (s) => `Sezóna ${s.season} · ${s.points} PTS (${s.gp} GP)`);
+  const seasonPointsLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.points - a.points || b.goals - a.goals, (s) => s.points > 0, (s) => `${s.points} PTS`, (s) => `Sezóna ${s.season} · ${s.goals}G + ${s.assists}A (${s.gp} GP)`);
+  const seasonPimLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.pim - a.pim, (s) => s.pim > 0, (s) => `${s.pim} TM`, (s) => `Sezóna ${s.season} · ${s.gp} GP`);
+  const seasonPlusMinusBestLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.plusMinus - a.plusMinus || b.points - a.points, (s) => s.plusMinus > 0, (s) => `+${s.plusMinus} +/-`, (s) => `Sezóna ${s.season} · ${s.points} PTS (${s.gp} GP)`);
+  const seasonPlusMinusWorstLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => a.plusMinus - b.plusMinus || a.points - b.points, (s) => s.plusMinus < 0, (s) => `${s.plusMinus} +/-`, (s) => `Sezóna ${s.season} · ${s.points} PTS (${s.gp} GP)`);
+  const seasonPpGoalsLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.ppGoals - a.ppGoals || b.goals - a.goals, (s) => s.ppGoals > 0, (s) => `${s.ppGoals} PPG`, (s) => `Sezóna ${s.season} · ${s.goals} G celkovo (${s.gp} GP)`);
+  const seasonPpAssistsLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.ppAssists - a.ppAssists || b.assists - a.assists, (s) => s.ppAssists > 0, (s) => `${s.ppAssists} PPA`, (s) => `Sezóna ${s.season} · ${s.assists} A celkovo (${s.gp} GP)`);
+  const seasonPpPointsLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.ppPoints - a.ppPoints || b.points - a.points, (s) => s.ppPoints > 0, (s) => `${s.ppPoints} PPP`, (s) => `Sezóna ${s.season} · ${s.ppGoals} PPG + ${s.ppAssists} PPA (${s.points} PTS)`);
+  const seasonShGoalsLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.shGoals - a.shGoals || b.goals - a.goals, (s) => s.shGoals > 0, (s) => `${s.shGoals} SHG`, (s) => `Sezóna ${s.season} · ${s.goals} G celkovo (${s.gp} GP)`);
+  const seasonShAssistsLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.shAssists - a.shAssists || b.assists - a.assists, (s) => s.shAssists > 0, (s) => `${s.shAssists} SHA`, (s) => `Sezóna ${s.season} · ${s.assists} A celkovo (${s.gp} GP)`);
+  const seasonShPointsLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.shPoints - a.shPoints || b.points - a.points, (s) => s.shPoints > 0, (s) => `${s.shPoints} SHP`, (s) => `Sezóna ${s.season} · ${s.shGoals} SHG + ${s.shAssists} SHA (${s.points} PTS)`);
+
+  const skaterSeasonSections: RecordSection[] = [
+    { id: "season-goals", title: "Najviac gólov v jednej sezóne", icon: "🎯", phase: "regular", phaseBadge: "ZČ", items: seasonGoalsLeader },
+    { id: "season-assists", title: "Najviac asistencií v jednej sezóne", icon: "🪄", phase: "regular", phaseBadge: "ZČ", items: seasonAssistsLeader },
+    { id: "season-points", title: "Najviac bodov v jednej sezóne", icon: "⭐", phase: "regular", phaseBadge: "ZČ", items: seasonPointsLeader },
+    { id: "season-pim", title: "Najviac trestných minút v jednej sezóne", icon: "⏱️", phase: "regular", phaseBadge: "ZČ", items: seasonPimLeader },
+    { id: "season-plus-minus-best", title: "Najlepší +/- v jednej sezóne", icon: "🟢", phase: "regular", phaseBadge: "ZČ", items: seasonPlusMinusBestLeader },
+    { id: "season-plus-minus-worst", title: "Najhorší +/- v jednej sezóne", icon: "🔴", phase: "regular", phaseBadge: "ZČ", items: seasonPlusMinusWorstLeader },
+    { id: "season-pp-goals", title: "Najviac presilovkových gólov v jednej sezóne (PPG)", icon: "⚡", phase: "regular", phaseBadge: "ZČ", items: seasonPpGoalsLeader },
+    { id: "season-pp-assists", title: "Najviac presilovkových asistencií v jednej sezóne (PPA)", icon: "🏒", phase: "regular", phaseBadge: "ZČ", items: seasonPpAssistsLeader },
+    { id: "season-pp-points", title: "Najviac presilovkových bodov v jednej sezóne (PPP)", icon: "⭐", phase: "regular", phaseBadge: "ZČ", items: seasonPpPointsLeader },
+    { id: "season-sh-goals", title: "Najviac oslabovkových gólov v jednej sezóne (SHG)", icon: "🛡️", phase: "regular", phaseBadge: "ZČ", items: seasonShGoalsLeader },
+    { id: "season-sh-assists", title: "Najviac oslabovkových asistencií v jednej sezóne (SHA)", icon: "🧤", phase: "regular", phaseBadge: "ZČ", items: seasonShAssistsLeader },
+    { id: "season-sh-points", title: "Najviac oslabovkových bodov v jednej sezóne (SHP)", icon: "⭐", phase: "regular", phaseBadge: "ZČ", items: seasonShPointsLeader },
+  ];
+
+  // ==========================================
+  // G. ROOKIE REGULAR-SEASON RECORDS (ZČ Nováčikovia)
+  // ==========================================
+  const rookieSeasonSkaters = allSeasonSkaters.filter((s) => {
+    const p = playerMap.get(s.playerId);
+    return playerDebutSeason.get(s.playerId) === s.season || (p && isRookieName(p.name));
+  });
+
+  const rookieGoalsLeader = buildSeasonSkaterLeader(rookieSeasonSkaters, (a, b) => b.goals - a.goals || b.points - a.points, (s) => s.goals > 0, (s) => `${s.goals} G`, (s) => `Sezóna nováčika ${s.season} · ${s.points} PTS (${s.gp} GP)`);
+  const rookieAssistsLeader = buildSeasonSkaterLeader(rookieSeasonSkaters, (a, b) => b.assists - a.assists || b.points - a.points, (s) => s.assists > 0, (s) => `${s.assists} A`, (s) => `Sezóna nováčika ${s.season} · ${s.points} PTS (${s.gp} GP)`);
+  const rookiePointsLeader = buildSeasonSkaterLeader(rookieSeasonSkaters, (a, b) => b.points - a.points || b.goals - a.goals, (s) => s.points > 0, (s) => `${s.points} PTS`, (s) => `Sezóna nováčika ${s.season} · ${s.goals}G + ${s.assists}A (${s.gp} GP)`);
+  const rookiePimLeader = buildSeasonSkaterLeader(rookieSeasonSkaters, (a, b) => b.pim - a.pim, (s) => s.pim > 0, (s) => `${s.pim} TM`, (s) => `Sezóna nováčika ${s.season} · ${s.gp} GP`);
+  const rookiePlusMinusBestLeader = buildSeasonSkaterLeader(rookieSeasonSkaters, (a, b) => b.plusMinus - a.plusMinus || b.points - a.points, (s) => s.plusMinus > 0, (s) => `+${s.plusMinus} +/-`, (s) => `Sezóna nováčika ${s.season} · ${s.points} PTS (${s.gp} GP)`);
+  const rookiePlusMinusWorstLeader = buildSeasonSkaterLeader(rookieSeasonSkaters, (a, b) => a.plusMinus - b.plusMinus || a.points - b.points, (s) => s.plusMinus < 0, (s) => `${s.plusMinus} +/-`, (s) => `Sezóna nováčika ${s.season} · ${s.points} PTS (${s.gp} GP)`);
+
+  const rookieSections: RecordSection[] = [
+    { id: "rookie-season-goals", title: "Najviac gólov v nováčikovskej sezóne", icon: "🎯", phase: "regular", phaseBadge: "ZČ", items: rookieGoalsLeader },
+    { id: "rookie-season-assists", title: "Najviac asistencií v nováčikovskej sezóne", icon: "🪄", phase: "regular", phaseBadge: "ZČ", items: rookieAssistsLeader },
+    { id: "rookie-season-points", title: "Najviac bodov v nováčikovskej sezóne", icon: "⭐", phase: "regular", phaseBadge: "ZČ", items: rookiePointsLeader },
+    { id: "rookie-season-pim", title: "Najviac trestných minút v nováčikovskej sezóne", icon: "⏱️", phase: "regular", phaseBadge: "ZČ", items: rookiePimLeader },
+    { id: "rookie-season-plus-minus-best", title: "Najlepší +/- v nováčikovskej sezóne", icon: "🟢", phase: "regular", phaseBadge: "ZČ", items: rookiePlusMinusBestLeader },
+    { id: "rookie-season-plus-minus-worst", title: "Najhorší +/- v nováčikovskej sezóne", icon: "🔴", phase: "regular", phaseBadge: "ZČ", items: rookiePlusMinusWorstLeader },
+  ];
+
+  // ==========================================
+  // H. SINGLE GAME SKATER RECORDS (ZČ Jeden zápas)
+  // ==========================================
+  const buildGameSkaterLeader = (
+    list: typeof regSkaterStats,
+    sortFn: (a: (typeof regSkaterStats)[0], b: (typeof regSkaterStats)[0]) => number,
+    filterFn: (s: (typeof regSkaterStats)[0]) => boolean,
+    valFmt: (s: (typeof regSkaterStats)[0]) => string | number,
+    subFmt: (s: (typeof regSkaterStats)[0]) => string
+  ): LeaderItem[] =>
+    list
+      .filter(filterFn)
+      .sort(sortFn)
+      .slice(0, 5)
+      .map((s, idx) => {
+        const p = playerMap.get(s.playerId);
+        const tm = s.teamId ? teamById.get(s.teamId) : null;
+        return {
+          rank: idx + 1,
+          name: p ? cleanName(p.name) : "Hráč",
+          slug: p?.slug,
+          photoUrl: p?.photoUrl,
+          teamCode: tm?.code,
+          teamSlug: tm?.slug,
+          teamLogo: tm?.logoUrl,
+          value: valFmt(s),
+          sub: subFmt(s),
+        };
+      });
+
+  const getGameDateStr = (g: any) => (g?.gameDate ? new Date(g.gameDate).toLocaleDateString("sk-SK") : g?.season ?? "");
+
+  const gameGoalsLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => b.goals - a.goals || b.points - a.points, (s) => s.goals > 0, (s) => `${s.goals} G v zápase`, (s) => `${s.game.season} (${getGameDateStr(s.game)}) · ${s.points} PTS`);
+  const gameAssistsLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => b.assists - a.assists || b.points - a.points, (s) => s.assists > 0, (s) => `${s.assists} A v zápase`, (s) => `${s.game.season} (${getGameDateStr(s.game)}) · ${s.points} PTS`);
+  const gamePointsLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => b.points - a.points || b.goals - a.goals, (s) => s.points > 0, (s) => `${s.points} PTS v zápase`, (s) => `${s.goals}G + ${s.assists}A · ${s.game.season} (${getGameDateStr(s.game)})`);
+  const gamePimLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => b.pim - a.pim, (s) => s.pim > 0, (s) => `${s.pim} TM v zápase`, (s) => `${s.game.season} (${getGameDateStr(s.game)})`);
+  const gamePlusMinusBestLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => b.plusMinus - a.plusMinus || b.points - a.points, (s) => s.plusMinus > 0, (s) => `+${s.plusMinus} +/- v zápase`, (s) => `${s.game.season} (${getGameDateStr(s.game)}) · ${s.points} PTS`);
+  const gamePlusMinusWorstLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => a.plusMinus - b.plusMinus || a.points - b.points, (s) => s.plusMinus < 0, (s) => `${s.plusMinus} +/- v zápase`, (s) => `${s.game.season} (${getGameDateStr(s.game)}) · ${s.points} PTS`);
+  const gamePpGoalsLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => (b.ppGoals ?? 0) - (a.ppGoals ?? 0) || b.goals - a.goals, (s) => (s.ppGoals ?? 0) > 0, (s) => `${s.ppGoals} PPG v zápase`, (s) => `${s.goals} G celkovo · ${s.game.season} (${getGameDateStr(s.game)})`);
+  const gamePpAssistsLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => (b.ppAssists ?? 0) - (a.ppAssists ?? 0) || b.assists - a.assists, (s) => (s.ppAssists ?? 0) > 0, (s) => `${s.ppAssists} PPA v zápase`, (s) => `${s.assists} A celkovo · ${s.game.season} (${getGameDateStr(s.game)})`);
+  const gamePpPointsLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => ((b.ppGoals ?? 0) + (b.ppAssists ?? 0)) - ((a.ppGoals ?? 0) + (a.ppAssists ?? 0)) || b.points - a.points, (s) => (s.ppGoals ?? 0) + (s.ppAssists ?? 0) > 0, (s) => `${(s.ppGoals ?? 0) + (s.ppAssists ?? 0)} PPP v zápase`, (s) => `${s.ppGoals} PPG + ${s.ppAssists} PPA · ${s.game.season}`);
+  const gameShGoalsLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => (b.shGoals ?? 0) - (a.shGoals ?? 0) || b.goals - a.goals, (s) => (s.shGoals ?? 0) > 0, (s) => `${s.shGoals} SHG v zápase`, (s) => `${s.goals} G celkovo · ${s.game.season} (${getGameDateStr(s.game)})`);
+  const gameShAssistsLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => (b.shAssists ?? 0) - (a.shAssists ?? 0) || b.assists - a.assists, (s) => (s.shAssists ?? 0) > 0, (s) => `${s.shAssists} SHA v zápase`, (s) => `${s.assists} A celkovo · ${s.game.season} (${getGameDateStr(s.game)})`);
+  const gameShPointsLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => ((b.shGoals ?? 0) + (b.shAssists ?? 0)) - ((a.shGoals ?? 0) + (a.shAssists ?? 0)) || b.points - a.points, (s) => (s.shGoals ?? 0) + (s.shAssists ?? 0) > 0, (s) => `${(s.shGoals ?? 0) + (s.shAssists ?? 0)} SHP v zápase`, (s) => `${s.shGoals} SHG + ${s.shAssists} SHA · ${s.game.season}`);
+
+  const skaterGameSections: RecordSection[] = [
+    { id: "game-goals", title: "Najviac gólov v jednom zápase", icon: "🎯", phase: "regular", phaseBadge: "ZČ", items: gameGoalsLeader },
+    { id: "game-assists", title: "Najviac asistencií v jednom zápase", icon: "🪄", phase: "regular", phaseBadge: "ZČ", items: gameAssistsLeader },
+    { id: "game-points", title: "Najviac bodov v jednom zápase", icon: "⭐", phase: "regular", phaseBadge: "ZČ", items: gamePointsLeader },
+    { id: "game-pim", title: "Najviac trestných minút v jednom zápase", icon: "⏱️", phase: "regular", phaseBadge: "ZČ", items: gamePimLeader },
+    { id: "game-plus-minus-best", title: "Najlepší +/- v jednom zápase", icon: "🟢", phase: "regular", phaseBadge: "ZČ", items: gamePlusMinusBestLeader },
+    { id: "game-plus-minus-worst", title: "Najhorší +/- v jednom zápase", icon: "🔴", phase: "regular", phaseBadge: "ZČ", items: gamePlusMinusWorstLeader },
+    { id: "game-pp-goals", title: "Najviac presilovkových gólov v jednom zápase (PPG)", icon: "⚡", phase: "regular", phaseBadge: "ZČ", items: gamePpGoalsLeader },
+    { id: "game-pp-assists", title: "Najviac presilovkových asistencií v jednom zápase (PPA)", icon: "🏒", phase: "regular", phaseBadge: "ZČ", items: gamePpAssistsLeader },
+    { id: "game-pp-points", title: "Najviac presilovkových bodov v jednom zápase (PPP)", icon: "⭐", phase: "regular", phaseBadge: "ZČ", items: gamePpPointsLeader },
+    { id: "game-sh-goals", title: "Najviac oslabovkových gólov v jednom zápase (SHG)", icon: "🛡️", phase: "regular", phaseBadge: "ZČ", items: gameShGoalsLeader },
+    { id: "game-sh-assists", title: "Najviac oslabovkových asistencií v jednom zápase (SHA)", icon: "🧤", phase: "regular", phaseBadge: "ZČ", items: gameShAssistsLeader },
+    { id: "game-sh-points", title: "Najviac oslabovkových bodov v jednom zápase (SHP)", icon: "⭐", phase: "regular", phaseBadge: "ZČ", items: gameShPointsLeader },
+  ];
+
+  // ==========================================
+  // I. PLAYOFF SKATER RECORDS (Play-off Kariéra, Sezóna, Zápas)
+  // ==========================================
+  // 1. Playoff Career Skaters
+  const poSkCareerMap = new Map<number, SkaterCareerAcc>();
+  const getPoSkAcc = (id: number): SkaterCareerAcc => {
+    let acc = poSkCareerMap.get(id);
+    if (!acc) {
+      acc = {
+        playerId: id,
+        gp: 0,
+        goals: 0,
+        assists: 0,
+        points: 0,
+        shots: 0,
+        pim: 0,
+        plusMinus: 0,
+        ppGoals: 0,
+        ppAssists: 0,
+        ppPoints: 0,
+        shGoals: 0,
+        shAssists: 0,
+        shPoints: 0,
+        teamId: null,
+      };
+      poSkCareerMap.set(id, acc);
+    }
+    return acc;
+  };
+
+  for (const s of archivedPlayoffSkaters) {
+    const a = getPoSkAcc(s.playerId);
+    a.gp += s.gp;
+    a.goals += s.goals;
+    a.assists += s.assists;
+    a.points += s.points;
+    a.pim += s.pim;
+    a.plusMinus += s.plusMinus;
+    a.teamId = s.teamId;
+  }
+  for (const s of playoffSkaterStats) {
+    const a = getPoSkAcc(s.playerId);
+    a.gp += 1;
+    a.goals += s.goals;
+    a.assists += s.assists;
+    a.points += s.points;
+    a.pim += s.pim;
+    a.plusMinus += s.plusMinus;
+    if (s.teamId) a.teamId = s.teamId;
+  }
+
+  const poSkCareerList = [...poSkCareerMap.values()];
+
+  const poCareerGpLeader = poSkCareerList.filter((s) => s.gp > 0).sort((a, b) => b.gp - a.gp).slice(0, 5).map((s, idx) => ({ ...skRowItem(s, `${s.gp} GP`, `${s.goals}G + ${s.assists}A · ${s.points} PTS`), rank: idx + 1 }));
+  const poCareerGoalsLeader = poSkCareerList.filter((s) => s.goals > 0).sort((a, b) => b.goals - a.goals || b.points - a.points).slice(0, 5).map((s, idx) => ({ ...skRowItem(s, `${s.goals} G`, `${s.gp} GP · ${s.points} PTS`), rank: idx + 1 }));
+  const poCareerAssistsLeader = poSkCareerList.filter((s) => s.assists > 0).sort((a, b) => b.assists - a.assists || b.points - a.points).slice(0, 5).map((s, idx) => ({ ...skRowItem(s, `${s.assists} A`, `${s.gp} GP · ${s.points} PTS`), rank: idx + 1 }));
+  const poCareerPointsLeader = poSkCareerList.filter((s) => s.points > 0).sort((a, b) => b.points - a.points || b.goals - a.goals).slice(0, 5).map((s, idx) => ({ ...skRowItem(s, `${s.points} PTS`, `${s.goals}G + ${s.assists}A (${s.gp} GP)`), rank: idx + 1 }));
+  const poCareerPimLeader = poSkCareerList.filter((s) => s.pim > 0).sort((a, b) => b.pim - a.pim).slice(0, 5).map((s, idx) => ({ ...skRowItem(s, `${s.pim} TM`, `${s.gp} GP · ${s.points} PTS`), rank: idx + 1 }));
+  const poCareerPlusMinusBestLeader = poSkCareerList.filter((s) => s.plusMinus > 0).sort((a, b) => b.plusMinus - a.plusMinus).slice(0, 5).map((s, idx) => ({ ...skRowItem(s, `+${s.plusMinus} +/-`, `${s.gp} GP · ${s.points} PTS`), rank: idx + 1 }));
+  const poCareerPlusMinusWorstLeader = poSkCareerList.filter((s) => s.plusMinus < 0).sort((a, b) => a.plusMinus - b.plusMinus).slice(0, 5).map((s, idx) => ({ ...skRowItem(s, `${s.plusMinus} +/-`, `${s.gp} GP · ${s.points} PTS`), rank: idx + 1 }));
+
+  const playoffSkaterCareerSections: RecordSection[] = [
+    { id: "playoff-career-gp", title: "Najviac odohraných zápasov v play-off v kariére", icon: "🏒", phase: "playoffs", phaseBadge: "Play-off", items: poCareerGpLeader },
+    { id: "playoff-career-goals", title: "Najviac gólov v play-off v kariére", icon: "🎯", phase: "playoffs", phaseBadge: "Play-off", items: poCareerGoalsLeader },
+    { id: "playoff-career-assists", title: "Najviac asistencií v play-off v kariére", icon: "🪄", phase: "playoffs", phaseBadge: "Play-off", items: poCareerAssistsLeader },
+    { id: "playoff-career-points", title: "Najviac bodov v play-off v kariére", icon: "⭐", phase: "playoffs", phaseBadge: "Play-off", items: poCareerPointsLeader },
+    { id: "playoff-career-pim", title: "Najviac trestných minút v play-off v kariére", icon: "⏱️", phase: "playoffs", phaseBadge: "Play-off", items: poCareerPimLeader },
+    { id: "playoff-career-plus-minus-best", title: "Najlepší +/- v play-off v kariére", icon: "🟢", phase: "playoffs", phaseBadge: "Play-off", items: poCareerPlusMinusBestLeader },
+    { id: "playoff-career-plus-minus-worst", title: "Najhorší +/- v play-off v kariére", icon: "🔴", phase: "playoffs", phaseBadge: "Play-off", items: poCareerPlusMinusWorstLeader },
+  ];
+
+  // 2. Playoff Single Season / Run Skaters
+  const poSeasonSkaterMap = new Map<string, SeasonSkaterAcc>();
+  for (const s of archivedPlayoffSkaters) {
+    const key = `${s.playerId}::${s.season}`;
+    if (!poSeasonSkaterMap.has(key)) {
+      poSeasonSkaterMap.set(key, {
+        playerId: s.playerId,
+        season: s.season,
+        teamIds: new Set(),
+        gp: 0,
+        goals: 0,
+        assists: 0,
+        points: 0,
+        pim: 0,
+        plusMinus: 0,
+        ppGoals: 0,
+        ppAssists: 0,
+        ppPoints: 0,
+        shGoals: 0,
+        shAssists: 0,
+        shPoints: 0,
+      });
+    }
+    const acc = poSeasonSkaterMap.get(key)!;
+    acc.gp += s.gp;
+    acc.goals += s.goals;
+    acc.assists += s.assists;
+    acc.points += s.points;
+    acc.pim += s.pim;
+    acc.plusMinus += s.plusMinus;
+    if (s.teamId) acc.teamIds.add(s.teamId);
+  }
+  for (const s of playoffSkaterStats) {
+    const season = s.game.season;
+    const key = `${s.playerId}::${season}`;
+    if (!poSeasonSkaterMap.has(key)) {
+      poSeasonSkaterMap.set(key, {
+        playerId: s.playerId,
+        season,
+        teamIds: new Set(),
+        gp: 0,
+        goals: 0,
+        assists: 0,
+        points: 0,
+        pim: 0,
+        plusMinus: 0,
+        ppGoals: 0,
+        ppAssists: 0,
+        ppPoints: 0,
+        shGoals: 0,
+        shAssists: 0,
+        shPoints: 0,
+      });
+    }
+    const acc = poSeasonSkaterMap.get(key)!;
+    acc.gp += 1;
+    acc.goals += s.goals;
+    acc.assists += s.assists;
+    acc.points += s.points;
+    acc.pim += s.pim;
+    acc.plusMinus += s.plusMinus;
+    if (s.teamId) acc.teamIds.add(s.teamId);
+  }
+
+  const allPoSeasonSkaters = [...poSeasonSkaterMap.values()];
+
+  const poSeasonGoalsLeader = buildSeasonSkaterLeader(allPoSeasonSkaters, (a, b) => b.goals - a.goals || b.points - a.points, (s) => s.goals > 0, (s) => `${s.goals} G`, (s) => `Play-off ${s.season} · ${s.points} PTS (${s.gp} GP)`);
+  const poSeasonAssistsLeader = buildSeasonSkaterLeader(allPoSeasonSkaters, (a, b) => b.assists - a.assists || b.points - a.points, (s) => s.assists > 0, (s) => `${s.assists} A`, (s) => `Play-off ${s.season} · ${s.points} PTS (${s.gp} GP)`);
+  const poSeasonPointsLeader = buildSeasonSkaterLeader(allPoSeasonSkaters, (a, b) => b.points - a.points || b.goals - a.goals, (s) => s.points > 0, (s) => `${s.points} PTS`, (s) => `Play-off ${s.season} · ${s.goals}G + ${s.assists}A (${s.gp} GP)`);
+  const poSeasonPimLeader = buildSeasonSkaterLeader(allPoSeasonSkaters, (a, b) => b.pim - a.pim, (s) => s.pim > 0, (s) => `${s.pim} TM`, (s) => `Play-off ${s.season} · ${s.gp} GP`);
+  const poSeasonPlusMinusBestLeader = buildSeasonSkaterLeader(allPoSeasonSkaters, (a, b) => b.plusMinus - a.plusMinus || b.points - a.points, (s) => s.plusMinus > 0, (s) => `+${s.plusMinus} +/-`, (s) => `Play-off ${s.season} · ${s.points} PTS (${s.gp} GP)`);
+  const poSeasonPlusMinusWorstLeader = buildSeasonSkaterLeader(allPoSeasonSkaters, (a, b) => a.plusMinus - b.plusMinus || a.points - b.points, (s) => s.plusMinus < 0, (s) => `${s.plusMinus} +/-`, (s) => `Play-off ${s.season} · ${s.points} PTS (${s.gp} GP)`);
+
+  const playoffSkaterSeasonSections: RecordSection[] = [
+    { id: "playoff-season-goals", title: "Najviac gólov v jednom play-off", icon: "🎯", phase: "playoffs", phaseBadge: "Play-off", items: poSeasonGoalsLeader },
+    { id: "playoff-season-assists", title: "Najviac asistencií v jednom play-off", icon: "🪄", phase: "playoffs", phaseBadge: "Play-off", items: poSeasonAssistsLeader },
+    { id: "playoff-season-points", title: "Najviac bodov v jednom play-off", icon: "⭐", phase: "playoffs", phaseBadge: "Play-off", items: poSeasonPointsLeader },
+    { id: "playoff-season-pim", title: "Najviac trestných minút v jednom play-off", icon: "⏱️", phase: "playoffs", phaseBadge: "Play-off", items: poSeasonPimLeader },
+    { id: "playoff-season-plus-minus-best", title: "Najlepší +/- v jednom play-off", icon: "🟢", phase: "playoffs", phaseBadge: "Play-off", items: poSeasonPlusMinusBestLeader },
+    { id: "playoff-season-plus-minus-worst", title: "Najhorší +/- v jednom play-off", icon: "🔴", phase: "playoffs", phaseBadge: "Play-off", items: poSeasonPlusMinusWorstLeader },
+  ];
+
+  // 3. Playoff Single Game Skaters
+  const poGameGoalsLeader = buildGameSkaterLeader(playoffSkaterStats, (a, b) => b.goals - a.goals || b.points - a.points, (s) => s.goals > 0, (s) => `${s.goals} G v zápase PO`, (s) => `${s.game.season} (${getGameDateStr(s.game)}) · ${s.points} PTS`);
+  const poGameAssistsLeader = buildGameSkaterLeader(playoffSkaterStats, (a, b) => b.assists - a.assists || b.points - a.points, (s) => s.assists > 0, (s) => `${s.assists} A v zápase PO`, (s) => `${s.game.season} (${getGameDateStr(s.game)}) · ${s.points} PTS`);
+  const poGamePointsLeader = buildGameSkaterLeader(playoffSkaterStats, (a, b) => b.points - a.points || b.goals - a.goals, (s) => s.points > 0, (s) => `${s.points} PTS v zápase PO`, (s) => `${s.goals}G + ${s.assists}A · ${s.game.season} (${getGameDateStr(s.game)})`);
+  const poGamePimLeader = buildGameSkaterLeader(playoffSkaterStats, (a, b) => b.pim - a.pim, (s) => s.pim > 0, (s) => `${s.pim} TM v zápase PO`, (s) => `${s.game.season} (${getGameDateStr(s.game)})`);
+  const poGamePlusMinusBestLeader = buildGameSkaterLeader(playoffSkaterStats, (a, b) => b.plusMinus - a.plusMinus || b.points - a.points, (s) => s.plusMinus > 0, (s) => `+${s.plusMinus} +/- v zápase PO`, (s) => `${s.game.season} (${getGameDateStr(s.game)}) · ${s.points} PTS`);
+  const poGamePlusMinusWorstLeader = buildGameSkaterLeader(playoffSkaterStats, (a, b) => a.plusMinus - b.plusMinus || a.points - b.points, (s) => s.plusMinus < 0, (s) => `${s.plusMinus} +/- v zápase PO`, (s) => `${s.game.season} (${getGameDateStr(s.game)}) · ${s.points} PTS`);
+
+  const playoffSkaterGameSections: RecordSection[] = [
+    { id: "playoff-game-goals", title: "Najviac gólov v zápase play-off", icon: "🎯", phase: "playoffs", phaseBadge: "Play-off", items: poGameGoalsLeader },
+    { id: "playoff-game-assists", title: "Najviac asistencií v zápase play-off", icon: "🪄", phase: "playoffs", phaseBadge: "Play-off", items: poGameAssistsLeader },
+    { id: "playoff-game-points", title: "Najviac bodov v zápase play-off", icon: "⭐", phase: "playoffs", phaseBadge: "Play-off", items: poGamePointsLeader },
+    { id: "playoff-game-pim", title: "Najviac trestných minút v zápase play-off", icon: "⏱️", phase: "playoffs", phaseBadge: "Play-off", items: poGamePimLeader },
+    { id: "playoff-game-plus-minus-best", title: "Najlepší +/- v zápase play-off", icon: "🟢", phase: "playoffs", phaseBadge: "Play-off", items: poGamePlusMinusBestLeader },
+    { id: "playoff-game-plus-minus-worst", title: "Najhorší +/- v zápase play-off", icon: "🔴", phase: "playoffs", phaseBadge: "Play-off", items: poGamePlusMinusWorstLeader },
+  ];
+
+  // Playoff Career Wins from real playoff goalie stats
+  const playoffGoalieAcc = new Map<number, { playerId: number; teamId: number | null; gp: number; wins: number; saves: number; shutouts: number }>();
+  for (const g of playoffGoalieStats) {
+    if (!playoffGoalieAcc.has(g.playerId)) {
+      playoffGoalieAcc.set(g.playerId, { playerId: g.playerId, teamId: g.teamId, gp: 0, wins: 0, saves: 0, shutouts: 0 });
+    }
+    const acc = playoffGoalieAcc.get(g.playerId)!;
+    acc.gp += 1;
+    if (g.decision === "W") acc.wins += 1;
+    acc.saves += g.saves;
+    if (g.goalsAgainst === 0) acc.shutouts += 1;
+    if (g.teamId) acc.teamId = g.teamId;
+  }
+
+  const playoffCareerWins: LeaderItem[] = [...playoffGoalieAcc.values()]
+    .filter((g) => g.wins > 0)
+    .sort((a, b) => b.wins - a.wins || b.saves - a.saves)
+    .slice(0, 5)
+    .map((g, idx) => {
+      const p = playerMap.get(g.playerId);
+      return {
+        rank: idx + 1,
+        name: p ? cleanName(p.name) : "Brankár",
+        slug: p?.slug,
+        photoUrl: p?.photoUrl,
+        hideTeam: true,
+        value: `${g.wins} W`,
+        sub: `${g.gp} GP · ${g.shutouts} SO`,
+      };
+    });
+
+  // Goalie Regular Season Career Records
   const careerWinsItems = topGoalies((g) => g.wins, (g) => `${g.wins} W`, (g) => `${g.gp} GP · ${g.shutouts} SO`);
   const careerStealsItems = topGoalies((g) => g.steals, (g) => `${g.steals} STL`, (g) => `${g.wins} W · ${g.gp} GP`);
   const careerGsaxItems = topGoalies((g) => g.gsax, (g) => (g.gsax > 0 ? `+${g.gsax.toFixed(1)} GSAx` : `${g.gsax.toFixed(1)} GSAx`), (g) => `${g.gp} GP · ${g.goalsAgainst} GA`);
   const careerShutoutsItems = topGoalies((g) => g.shutouts, (g) => `${g.shutouts} SO`, (g) => `${g.gp} GP · ${g.wins} W`);
-
-  const skaterCareerSections: RecordSection[] = [
-    { id: "career-gp", title: "Najviac odohraných zápasov v kariére (hráč)", icon: "🏒", phase: "regular", phaseBadge: "ZČ", items: careerGpItems },
-    { id: "career-goals", title: "Najviac gólov v kariére", icon: "🎯", phase: "regular", phaseBadge: "ZČ", items: careerGoalsItems },
-    { id: "career-assists", title: "Najviac asistencií v kariére", icon: "🪄", phase: "regular", phaseBadge: "ZČ", items: careerAssistsItems },
-    { id: "career-points", title: "Najviac bodov v kariére", icon: "⭐", phase: "regular", phaseBadge: "ZČ", items: careerPointsItems },
-  ];
 
   const goalieCareerSections: RecordSection[] = [
     { id: "career-wins", title: "Najviac výhier v kariére (brankár)", icon: "🧤", phase: "regular", phaseBadge: "ZČ", items: careerWinsItems },
@@ -1344,7 +1894,6 @@ export async function getLeagueRecords(
     });
 
   // 2. Preseason Top Scorers
-  const preSkaterStats = allSkaterStats.filter((s) => s.game.season.endsWith("-PRE") || s.game.season === PRE_SEASON);
   const preSkaterAcc = new Map<number, { playerId: number; teamIds: Set<number>; gp: number; goals: number; assists: number; points: number; shots: number; pim: number }>();
 
   for (const s of preSkaterStats) {
@@ -1438,7 +1987,6 @@ export async function getLeagueRecords(
     });
 
   // 4. Preseason Goalie Saves
-  const preGoalieStats = allGoalieStats.filter((g) => g.game.season.endsWith("-PRE") || g.game.season === PRE_SEASON);
   const preGoalieAcc = new Map<number, { playerId: number; teamIds: Set<number>; gp: number; wins: number; saves: number; shots: number; ga: number; shutouts: number }>();
 
   for (const g of preGoalieStats) {
@@ -1475,7 +2023,117 @@ export async function getLeagueRecords(
     });
 
   // ==========================================
-  // I. COMPOSE FINAL CATEGORY GROUPS
+  // I. AWARDS & TROPHIES
+  // ==========================================
+  const awardCategoryCounts = new Map<string, Map<string, { name: string; slug?: string | null; photoUrl?: string | null; teamId?: number | null; count: number; seasons: string[] }>>();
+
+  for (const a of seasonAwards) {
+    let cat = a.category;
+    if (cat === "Hart" || cat === "Hart Memorial") cat = "Hart Memorial Trophy";
+    else if (cat === "Art Ross") cat = "Art Ross Trophy";
+    else if (cat === "Rocket Richard") cat = "Maurice 'Rocket' Richard Trophy";
+    else if (cat === "Norris" || cat === "James Norris") cat = "James Norris Memorial Trophy";
+    else if (cat === "Vezina" || cat === "Vézina") cat = "Vézina Trophy";
+    else if (cat === "Conn Smythe") cat = "Conn Smythe Trophy";
+    else if (cat === "Ted Lindsay") cat = "Ted Lindsay Award";
+    else if (cat === "Selke" || cat === "Frank J. Selke") cat = "Frank J. Selke Trophy";
+    else if (cat === "Lady Byng") cat = "Lady Byng Trophy";
+    else if (cat === "Plus-Minus" || cat === "NHL Plus - Minus Award") cat = "NHL Plus - Minus Award";
+    else if (cat === "GM of the Year" || cat === "General Manager of the Year" || cat === "Sam Pollock") cat = "Sam Pollock Trophy (GM of the Year)";
+
+    if (!awardCategoryCounts.has(cat)) awardCategoryCounts.set(cat, new Map());
+    const catMap = awardCategoryCounts.get(cat)!;
+
+    let winnerKey = "";
+    let winnerName = "";
+    let winnerSlug: string | null = null;
+    let winnerPhotoUrl: string | null = null;
+    let teamId = a.teamId;
+
+    if (a.playerId) {
+      winnerKey = `p_${a.playerId}`;
+      const p = playerMap.get(a.playerId);
+      winnerName = p ? cleanName(p.name) : cleanName(a.playerName || "—");
+      winnerSlug = p?.slug ?? null;
+      winnerPhotoUrl = p?.photoUrl ?? null;
+      if (!teamId && p?.teamId) teamId = p.teamId;
+    } else if (a.playerName) {
+      winnerKey = `name_${a.playerName}`;
+      winnerName = cleanName(a.playerName);
+    } else if (a.teamId) {
+      winnerKey = `t_${a.teamId}`;
+      const tm = teamById.get(a.teamId);
+      winnerName = (cat.includes("GM") || cat.includes("Pollock")) ? getTeamGm(a.teamId) : (tm?.name ?? "Tím");
+    } else {
+      continue;
+    }
+
+    if (!catMap.has(winnerKey)) {
+      catMap.set(winnerKey, { name: winnerName, slug: winnerSlug, photoUrl: winnerPhotoUrl, teamId, count: 0, seasons: [] });
+    }
+    const entry = catMap.get(winnerKey)!;
+    entry.count++;
+    entry.seasons.push(a.season);
+  }
+
+  const buildAwardLeader = (catTitle: string, aliasKeys: string[], awardPhase: RecordPhase = "all"): RecordSection => {
+    let combinedMap = new Map<string, { name: string; slug?: string | null; photoUrl?: string | null; teamId?: number | null; count: number; seasons: string[] }>();
+    for (const k of aliasKeys) {
+      const m = awardCategoryCounts.get(k);
+      if (m) {
+        for (const [key, val] of m.entries()) {
+          if (!combinedMap.has(key)) {
+            combinedMap.set(key, { ...val, seasons: [...val.seasons] });
+          } else {
+            const existing = combinedMap.get(key)!;
+            existing.count += val.count;
+            existing.seasons.push(...val.seasons);
+          }
+        }
+      }
+    }
+
+    const items: LeaderItem[] = [...combinedMap.values()]
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5)
+      .map((entry, idx) => {
+        return {
+          rank: idx + 1,
+          name: entry.name,
+          slug: entry.slug,
+          photoUrl: entry.photoUrl,
+          hideTeam: true,
+          value: `${entry.count}×`,
+          sub: entry.seasons.sort().join(", "),
+        };
+      });
+
+    return {
+      id: catTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+      title: catTitle,
+      icon: "🏵️",
+      phase: awardPhase,
+      phaseBadge: awardPhase === "playoffs" ? "Play-off" : awardPhase === "pre" ? "Príprava" : "ZČ",
+      items,
+    };
+  };
+
+  const trophySections: RecordSection[] = [
+    buildAwardLeader("Hart Memorial Trophy", ["Hart Memorial Trophy", "Hart", "Hart (MVP)"], "regular"),
+    buildAwardLeader("Art Ross Trophy", ["Art Ross Trophy", "Art Ross", "Art Ross (Points)"], "regular"),
+    buildAwardLeader("Maurice 'Rocket' Richard Trophy", ["Maurice 'Rocket' Richard Trophy", "Rocket Richard", "Rocket Richard (Goals)"], "regular"),
+    buildAwardLeader("James Norris Memorial Trophy", ["James Norris Memorial Trophy", "Norris", "Norris (Defense)"], "regular"),
+    buildAwardLeader("Vézina Trophy", ["Vézina Trophy", "Vezina", "Vezina Trophy", "Vezina (Goalie)"], "regular"),
+    buildAwardLeader("Conn Smythe Trophy", ["Conn Smythe Trophy", "Conn Smythe", "Conn Smythe (Playoffs)"], "playoffs"),
+    buildAwardLeader("Ted Lindsay Award", ["Ted Lindsay Award", "Ted Lindsay"], "regular"),
+    buildAwardLeader("Frank J. Selke Trophy", ["Frank J. Selke Trophy", "Selke", "Selke (Def. Fwd)"], "regular"),
+    buildAwardLeader("Lady Byng Trophy", ["Lady Byng Trophy", "Lady Byng"], "regular"),
+    buildAwardLeader("NHL Plus - Minus Award", ["NHL Plus - Minus Award", "Plus-Minus"], "regular"),
+    buildAwardLeader("Sam Pollock Trophy (GM of the Year)", ["Sam Pollock Trophy (GM of the Year)", "GM of the Year", "General Manager of the Year Award"], "all"),
+  ];
+
+  // ==========================================
+  // J. COMPOSE FINAL CATEGORY GROUPS
   // ==========================================
   const rawGroups: RecordCategoryGroup[] = [
     {
@@ -1549,76 +2207,12 @@ export async function getLeagueRecords(
           items: goalieRingsLeader,
         },
         {
-          id: "playoff-career-points",
-          title: "Najviac bodov v play-off v kariére",
-          icon: "⭐",
-          phase: "playoffs",
-          phaseBadge: "Play-off",
-          items: playoffCareerPoints,
-        },
-        {
           id: "playoff-career-wins",
           title: "Najviac výhier brankára v play-off",
           icon: "🧤",
           phase: "playoffs",
           phaseBadge: "Play-off",
           items: playoffCareerWins,
-        },
-      ],
-    },
-    {
-      id: "pre-season-group",
-      title: "Prípravné zápasy (Pre-season rekordy)",
-      icon: "☀️",
-      phase: "pre",
-      records: [
-        {
-          id: "pre-best-team",
-          title: "Najlepšia bilancia v príprave (Pre-season)",
-          icon: "🥇",
-          phase: "pre",
-          phaseBadge: "Príprava",
-          items: preSeasonBestTeams,
-        },
-        {
-          id: "pre-top-scorer",
-          title: "Najproduktívnejší hráč v príprave (Top Scorer)",
-          icon: "⭐",
-          phase: "pre",
-          phaseBadge: "Príprava",
-          items: preSeasonScorers,
-        },
-        {
-          id: "pre-goals",
-          title: "Najlepší strelec v príprave (Góly)",
-          icon: "🎯",
-          phase: "pre",
-          phaseBadge: "Príprava",
-          items: preSeasonGoals,
-        },
-        {
-          id: "pre-assists",
-          title: "Najviac asistencií v príprave",
-          icon: "🪄",
-          phase: "pre",
-          phaseBadge: "Príprava",
-          items: preSeasonAssists,
-        },
-        {
-          id: "pre-single-game-pts",
-          title: "Najviac bodov v jednom zápase prípravy",
-          icon: "⚡",
-          phase: "pre",
-          phaseBadge: "Príprava",
-          items: preSingleGamePoints,
-        },
-        {
-          id: "pre-goalie-saves",
-          title: "Najviac zákrokov brankára v príprave",
-          icon: "🧤",
-          phase: "pre",
-          phaseBadge: "Príprava",
-          items: preGoalieSaves,
         },
       ],
     },
@@ -1635,6 +2229,48 @@ export async function getLeagueRecords(
       icon: "🏒",
       phase: "regular",
       records: skaterCareerSections,
+    },
+    {
+      id: "season-skaters",
+      title: "Individuálne sezónne rekordy — Korčuliari (ZČ)",
+      icon: "📅",
+      phase: "regular",
+      records: skaterSeasonSections,
+    },
+    {
+      id: "game-skaters",
+      title: "Individuálne zápasové rekordy — Korčuliari (ZČ)",
+      icon: "⚡",
+      phase: "regular",
+      records: skaterGameSections,
+    },
+    {
+      id: "rookie-records",
+      title: "Individuálne sezónne rekordy nováčikov (ZČ)",
+      icon: "👶",
+      phase: "regular",
+      records: rookieSections,
+    },
+    {
+      id: "playoff-career-skaters",
+      title: "Kariérne rekordy v play-off — Korčuliari",
+      icon: "⭐",
+      phase: "playoffs",
+      records: playoffSkaterCareerSections,
+    },
+    {
+      id: "playoff-season-skaters",
+      title: "Rekordy v jednom play-off — Korčuliari",
+      icon: "🔥",
+      phase: "playoffs",
+      records: playoffSkaterSeasonSections,
+    },
+    {
+      id: "playoff-game-skaters",
+      title: "Zápasové rekordy v play-off — Korčuliari",
+      icon: "⚡",
+      phase: "playoffs",
+      records: playoffSkaterGameSections,
     },
     {
       id: "career-goalies",
@@ -1787,6 +2423,62 @@ export async function getLeagueRecords(
         },
       ],
     },
+    {
+      id: "pre-season-group",
+      title: "Prípravné zápasy (Pre-season rekordy)",
+      icon: "☀️",
+      phase: "pre",
+      records: [
+        {
+          id: "pre-best-team",
+          title: "Najlepšia bilancia v príprave (Pre-season)",
+          icon: "🥇",
+          phase: "pre",
+          phaseBadge: "Príprava",
+          items: preSeasonBestTeams,
+        },
+        {
+          id: "pre-top-scorer",
+          title: "Najproduktívnejší hráč v príprave (Top Scorer)",
+          icon: "⭐",
+          phase: "pre",
+          phaseBadge: "Príprava",
+          items: preSeasonScorers,
+        },
+        {
+          id: "pre-goals",
+          title: "Najlepší strelec v príprave (Góly)",
+          icon: "🎯",
+          phase: "pre",
+          phaseBadge: "Príprava",
+          items: preSeasonGoals,
+        },
+        {
+          id: "pre-assists",
+          title: "Najviac asistencií v príprave",
+          icon: "🪄",
+          phase: "pre",
+          phaseBadge: "Príprava",
+          items: preSeasonAssists,
+        },
+        {
+          id: "pre-single-game-pts",
+          title: "Najviac bodov v jednom zápase prípravy",
+          icon: "⚡",
+          phase: "pre",
+          phaseBadge: "Príprava",
+          items: preSingleGamePoints,
+        },
+        {
+          id: "pre-goalie-saves",
+          title: "Najviac zákrokov brankára v príprave",
+          icon: "🧤",
+          phase: "pre",
+          phaseBadge: "Príprava",
+          items: preGoalieSaves,
+        },
+      ],
+    },
   ];
 
   // Filter groups according to the selected phase
@@ -1797,7 +2489,7 @@ export async function getLeagueRecords(
         ...g,
         records: g.records.filter((r) => r.phase === "regular" || r.phase === "all"),
       }))
-      .filter((g) => g.records.length > 0 && g.id !== "pre-season-group");
+      .filter((g) => g.records.length > 0 && g.id !== "pre-season-group" && g.id !== "championships");
   } else if (phase === "playoffs") {
     filteredGroups = rawGroups
       .map((g) => ({
