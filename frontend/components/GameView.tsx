@@ -108,7 +108,7 @@ function threeStars(data: Data) {
       if (!s.points && !s.shots) continue;
       const score = s.goals * 3.2 + s.assists * 2 + s.plusMinus * 0.4 + s.shots * 0.08 + s.gwg * 1.5;
       cands.push({
-        name: s.name, slug: s.slug, teamId: side.teamId,
+        name: cleanName(s.name), slug: s.slug, teamId: side.teamId,
         line: `${s.goals}G ${s.assists}A`, score,
       });
     }
@@ -120,7 +120,7 @@ function threeStars(data: Data) {
       const savesAbove = g.saves - g.shotsAgainst * 0.915;
       const score = savesAbove * 3 + (g.goalsAgainst === 0 ? 2 : 0);
       cands.push({
-        name: g.name, slug: g.slug, teamId: side.teamId,
+        name: cleanName(g.name), slug: g.slug, teamId: side.teamId,
         line: `${g.saves}/${g.shotsAgainst}, ${(svp(g) * 100).toFixed(1)}%`, score,
       });
     }
@@ -164,7 +164,7 @@ function GoalieBlock({ side }: { side: Side }) {
         return (
           <div key={g.id} className="flex flex-wrap sm:flex-nowrap items-center justify-between text-sm py-1.5 border-b border-slate-800/60 gap-2">
             <span className="flex items-center gap-2 flex-wrap">
-              <Link href={`/players/${g.slug ?? g.id}`} className="font-semibold hover:text-blue-400 whitespace-nowrap">{g.name}</Link>
+              <Link href={`/players/${g.slug ?? g.id}`} className="font-semibold hover:text-blue-400 whitespace-nowrap">{cleanName(g.name)}</Link>
               {g.record && (g.record.w + g.record.l + g.record.otl > 0) && (
                 <span className="text-[11px] text-slate-500 tabular-nums whitespace-nowrap" title="Season record W-L-OTL (through this game)">{g.record.w}-{g.record.l}-{g.record.otl}</span>
               )}
@@ -253,7 +253,7 @@ function SkaterTable({ side }: { side: Side }) {
             const fo = s.faceoffWins + s.faceoffLosses ? `${s.faceoffWins}-${s.faceoffLosses}` : "—";
             return (
               <tr key={s.id} className="border-b border-slate-800/60 hover:bg-slate-800/30">
-                <td className="py-1.5 pr-2 whitespace-nowrap"><Link href={`/players/${s.slug ?? s.id}`} className="hover:text-blue-400">{s.name}</Link></td>
+                <td className="py-1.5 pr-2 whitespace-nowrap"><Link href={`/players/${s.slug ?? s.id}`} className="hover:text-blue-400">{cleanName(s.name)}</Link></td>
                 <td className="px-1 text-slate-500 text-xs whitespace-nowrap">{s.position}</td>
                 <td className="px-2 text-right font-semibold tabular-nums">{s.goals}</td>
                 <td className="px-2 text-right font-semibold tabular-nums">{s.assists}</td>
@@ -571,7 +571,7 @@ function EdgePanel({ data }: { data: Data }) {
             <div className="grid grid-cols-2 gap-4 text-xs">
               {[[gA, away] as const, [gH, home] as const].map(([g, side], i) => (
                 <div key={i} className={i === 1 ? "text-right" : ""}>
-                  <div className="text-slate-400 mb-0.5">{g!.name}</div>
+                  <div className="text-slate-400 mb-0.5">{cleanName(g!.name)}</div>
                   <span className="text-amber-400">HD {svById(g, g!.hdShotsAg!, g!.hdSaves!)?.toFixed(0) ?? "—"}%</span>
                   <span className="text-slate-500"> · MD {svById(g, g!.mdShotsAg!, g!.mdSaves!)?.toFixed(0) ?? "—"}%</span>
                   <span className="text-slate-500"> · LD {svById(g, g!.ldShotsAg!, g!.ldSaves!)?.toFixed(0) ?? "—"}%</span>
@@ -824,7 +824,7 @@ export default function GameView({ data }: { data: Data }) {
                 <div key={i} className="bg-slate-900/50 border border-slate-800 rounded-lg p-4 flex items-center gap-3">
                   <div className="text-2xl font-black text-amber-400">{"★".repeat(i + 1)}</div>
                   <div>
-                    <Link href={`/players/${s.slug ?? s.name}`} className="font-bold hover:text-blue-400">{s.name}</Link>
+                    <Link href={`/players/${s.slug ?? s.name}`} className="font-bold hover:text-blue-400">{cleanName(s.name)}</Link>
                     <div className="text-xs text-slate-400">{nameOf(s.teamId)} · {s.line}</div>
                   </div>
                 </div>

@@ -27,9 +27,9 @@ export interface GoalieGameSwing {
   playerId: number;
   name: string;
   savePct: number;
-  seasonSavePct: number;
+  seasonSavePct: number | null;
   gsax: number;
-  seasonGsaxPerGame: number;
+  seasonGsaxPerGame: number | null;
   gamesInBaseline: number;
 }
 
@@ -49,7 +49,7 @@ const round1 = (n: number) => Math.round(n * 10) / 10;
 const pct = (n: number) => Math.round(n * 1000) / 10; // fraction -> percent, 1 decimal
 
 async function teamSwings(teamId: number, isHome: boolean, game: {
-  season: string; league: string; round: number | null; id: number;
+  season: string; league: string; round: number | null; gameDate: Date | null; id: number;
   homeShots: number | null; awayShots: number | null; homeGoals: number | null; awayGoals: number | null;
   homeXg: number | null; awayXg: number | null; homeHd: number | null; awayHd: number | null;
 }): Promise<TeamGameSwing[]> {
@@ -58,7 +58,9 @@ async function teamSwings(teamId: number, isHome: boolean, game: {
   const xgFor = isHome ? game.homeXg : game.awayXg;
   const hdFor = isHome ? game.homeHd : game.awayHd;
 
-  const priorWhere = game.round != null
+  const priorWhere = game.gameDate
+    ? { status: "FINAL" as const, seriesId: null, season: game.season, league: game.league, gameDate: { lt: game.gameDate } }
+    : game.round != null
     ? { status: "FINAL" as const, seriesId: null, season: game.season, league: game.league, round: { lt: game.round } }
     : { status: "FINAL" as const, seriesId: null, season: game.season, league: game.league, id: { lt: game.id } };
 
@@ -106,14 +108,16 @@ async function teamSwings(teamId: number, isHome: boolean, game: {
   return swings.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
 }
 
-async function goalieSwings(gameId: number, season: string, league: string, round: number | null): Promise<GoalieGameSwing[]> {
+async function goalieSwings(gameId: number, season: string, league: string, round: number | null, gameDate: Date | null): Promise<GoalieGameSwing[]> {
   const stats = await prisma.goalieGameStat.findMany({
     where: { gameId, shotsAgainst: { gt: 0 } },
     select: { playerId: true, saves: true, shotsAgainst: true, goalsAgainst: true, xga: true, player: { select: { name: true } } },
   });
   if (!stats.length) return [];
 
-  const priorWhere = round != null
+  const priorWhere = gameDate
+    ? { status: "FINAL" as const, seriesId: null, season, league, gameDate: { lt: gameDate } }
+    : round != null
     ? { status: "FINAL" as const, seriesId: null, season, league, round: { lt: round } }
     : { status: "FINAL" as const, seriesId: null, season, league, id: { lt: gameId } };
 
@@ -123,14 +127,28 @@ async function goalieSwings(gameId: number, season: string, league: string, roun
       where: { playerId: s.playerId, shotsAgainst: { gt: 0 }, game: priorWhere },
       select: { saves: true, shotsAgainst: true, goalsAgainst: true, xga: true },
     });
-    if (!prior.length) continue; // no baseline yet this season — nothing to compare against
+    if (!prior.length) {
+      out.push({
+        playerId: s.playerId,
+        name: s.player.name,
+        savePct: pct(s.saves / s.shotsAgainst),
+        seasonSavePct: null,
+        gsax: round1(s.xga - s.goalsAgainst),
+        seasonGsaxPerGame: null,
+        gamesInBaseline: 0,
+      });
+      continue;
+    }
     const priorSaves = prior.reduce((sum, p) => sum + p.saves, 0);
     const priorShots = prior.reduce((sum, p) => sum + p.shotsAgainst, 0);
     const priorGsaxSum = prior.reduce((sum, p) => sum + (p.xga - p.goalsAgainst), 0);
     out.push({
-      playerId: s.playerId, name: s.player.name,
-      savePct: pct(s.saves / s.shotsAgainst), seasonSavePct: pct(priorSaves / priorShots),
-      gsax: round1(s.xga - s.goalsAgainst), seasonGsaxPerGame: round1(priorGsaxSum / prior.length),
+      playerId: s.playerId,
+      name: s.player.name,
+      savePct: pct(s.saves / s.shotsAgainst),
+      seasonSavePct: pct(priorSaves / priorShots),
+      gsax: round1(s.xga - s.goalsAgainst),
+      seasonGsaxPerGame: round1(priorGsaxSum / prior.length),
       gamesInBaseline: prior.length,
     });
   }
@@ -141,7 +159,7 @@ export async function postGameIntel(gameId: number): Promise<PostGameIntelResult
   const game = await prisma.game.findUnique({
     where: { id: gameId },
     select: {
-      id: true, season: true, league: true, round: true, status: true,
+      id: true, season: true, league: true, round: true, gameDate: true, status: true,
       homeTeamId: true, awayTeamId: true, homeShots: true, awayShots: true, homeGoals: true, awayGoals: true,
       homeXg: true, awayXg: true, homeHd: true, awayHd: true,
       homeTeam: { select: { code: true } }, awayTeam: { select: { code: true } },
@@ -152,7 +170,7 @@ export async function postGameIntel(gameId: number): Promise<PostGameIntelResult
   const [homeSw, awaySw, goalies] = await Promise.all([
     teamSwings(game.homeTeamId, true, game),
     teamSwings(game.awayTeamId, false, game),
-    goalieSwings(game.id, game.season, game.league, game.round),
+    goalieSwings(game.id, game.season, game.league, game.round, game.gameDate),
   ]);
 
   return {

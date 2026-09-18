@@ -2,12 +2,18 @@ import { postGameIntel, type TeamGameSwing, type GoalieGameSwing, type TeamPostG
 import { Card } from "@/components/ui";
 import { cleanName } from "@/lib/playerName";
 
+function gamePlural(n: number): string {
+  if (n === 1) return "zápas";
+  if (n >= 2 && n <= 4) return "zápasy";
+  return "zápasov";
+}
+
 function SwingRow({ s, unit = "" }: { s: TeamGameSwing; unit?: string }) {
   return (
     <div className="flex items-center justify-between text-xs border border-slate-800 rounded-lg px-3 py-2">
       <span className="text-slate-300">{s.label}</span>
       <span className="text-slate-400">
-        {s.gameValue}{unit} vs. sezónny priemer {s.seasonAvg}{unit} ({s.gamesInBaseline} zápasov)
+        {s.gameValue}{unit} vs. sezónny priemer {s.seasonAvg}{unit} ({s.gamesInBaseline} {gamePlural(s.gamesInBaseline)})
         <span className={`ml-2 font-semibold ${s.delta > 0 ? "text-emerald-400" : s.delta < 0 ? "text-red-400" : "text-slate-500"}`}>
           {s.delta > 0 ? `+${s.delta}` : s.delta}{unit}
         </span>
@@ -57,6 +63,19 @@ export default async function PostGameIntelCard({ gameId }: { gameId: number }) 
           <div className="text-sm font-bold text-slate-200 mb-1">Brankári</div>
           <div className="flex flex-col gap-1.5">
             {intel.goalies.map((g: GoalieGameSwing) => {
+              if (g.gamesInBaseline === 0 || g.seasonSavePct == null || g.seasonGsaxPerGame == null) {
+                return (
+                  <div key={g.playerId} className="border border-slate-800 rounded-lg px-3 py-2 text-xs">
+                    <div className="text-slate-200 font-medium mb-1">
+                      {cleanName(g.name)} <span className="text-slate-500 font-normal text-[11px]">(1. štart v sezóne)</span>
+                    </div>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-slate-400">
+                      <span>SV% {g.savePct}%</span>
+                      <span>GSAx {g.gsax >= 0 ? `+${g.gsax}` : g.gsax}</span>
+                    </div>
+                  </div>
+                );
+              }
               const svDelta = Math.round((g.savePct - g.seasonSavePct) * 10) / 10;
               const gsaxDelta = Math.round((g.gsax - g.seasonGsaxPerGame) * 10) / 10;
               return (
@@ -64,7 +83,7 @@ export default async function PostGameIntelCard({ gameId }: { gameId: number }) 
                   <div className="text-slate-200 font-medium mb-1">{cleanName(g.name)}</div>
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-slate-400">
                     <span>
-                      SV% {g.savePct}% vs. priemer {g.seasonSavePct}% ({g.gamesInBaseline} zápasov)
+                      SV% {g.savePct}% vs. priemer {g.seasonSavePct}% ({g.gamesInBaseline} {gamePlural(g.gamesInBaseline)})
                       <span className={`ml-1.5 font-semibold ${svDelta > 0 ? "text-emerald-400" : svDelta < 0 ? "text-red-400" : "text-slate-500"}`}>
                         {svDelta > 0 ? `+${svDelta}` : svDelta}%
                       </span>

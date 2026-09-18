@@ -9,6 +9,8 @@ import PostGameIntelCard from "@/components/PostGameIntelCard";
 import { gameStory } from "@/lib/game-report-server";
 import { getTeamSession } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 // Resolve an already-fully-deployed TeamLinesData into the Lines tab's display
 // groups (player ids -> names). Shared by the frozen game-time snapshot and the
 // live-lines fallback below.
@@ -594,7 +596,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
   const skaters = (teamId: number) => game.playerStats
     .filter((s) => s.teamId === teamId)
     .map((s) => ({
-      id: s.playerId, name: s.player.name, position: s.player.position, slug: s.player.slug,
+      id: s.playerId, name: cleanName(s.player.name), position: s.player.position, slug: s.player.slug,
       goals: s.goals, assists: s.assists, points: s.points, shots: s.shots, pim: s.pim,
       plusMinus: s.plusMinus, ppGoals: s.ppGoals, shGoals: s.shGoals, gwg: s.gwg,
       hits: s.hits, blocks: s.blocks, faceoffWins: s.faceoffWins, faceoffLosses: s.faceoffLosses,
@@ -654,14 +656,12 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
       const gsax = (s.xga ?? 0) - s.goalsAgainst;
       const isSteal = s.decision === "W" && gsax > margin;
       return {
-        id: s.playerId, name: s.player.name, slug: s.player.slug, started: s.started,
+        id: s.playerId, name: cleanName(s.player.name), slug: s.player.slug, started: s.started,
         shotsAgainst: s.shotsAgainst, saves: s.saves, goalsAgainst: s.goalsAgainst,
         conBefore: s.conBefore, conAfter: s.conAfter, fatigued: s.fatigued, decision: s.decision,
         record: recOf.get(s.playerId) ?? { w: 0, l: 0, otl: 0 },
-        xga: s.xga,
-        isSteal,
-        hdShotsAg: s.hdShotsAg, hdSaves: s.hdSaves, mdShotsAg: s.mdShotsAg, mdSaves: s.mdSaves,
-        ldShotsAg: s.ldShotsAg, ldSaves: s.ldSaves,
+        isSteal, gsax, xga: s.xga,
+        hdShotsAg: s.hdShotsAg, hdSaves: s.hdSaves, mdShotsAg: s.mdShotsAg, mdSaves: s.mdSaves, ldShotsAg: s.ldShotsAg, ldSaves: s.ldSaves,
       };
     })
     .sort((a, b) => Number(b.started) - Number(a.started));

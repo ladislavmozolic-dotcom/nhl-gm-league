@@ -45,13 +45,21 @@ export type TeamForm = {
   streakType: "W" | "L" | "OT" | null; streakLen: number; // active streak
 };
 
-/** Per-team form up to and including `round`: active streak + last-10 record. */
-export async function leagueForm(season: string, round: number, league = "NHL"): Promise<TeamForm[]> {
+/** Per-team form up to and including `target`: active streak + last-10 record. */
+export async function leagueForm(season: string, target?: { date?: Date; round?: number } | number, league = "NHL"): Promise<TeamForm[]> {
   const teams = await prisma.team.findMany({ where: { league }, select: { id: true, name: true, code: true, slug: true } });
+  const whereGame = typeof target === "number"
+    ? { season, league, status: "FINAL" as const, seriesId: null, round: { lte: target } }
+    : target?.date
+    ? { season, league, status: "FINAL" as const, seriesId: null, gameDate: { lte: target.date } }
+    : target?.round != null
+    ? { season, league, status: "FINAL" as const, seriesId: null, round: { lte: target.round } }
+    : { season, league, status: "FINAL" as const, seriesId: null };
+
   const games = await prisma.game.findMany({
-    where: { season, league, status: "FINAL", seriesId: null, round: { lte: round } },
+    where: whereGame,
     select: { homeTeamId: true, awayTeamId: true, homeGoals: true, awayGoals: true, endedIn: true, round: true, id: true },
-    orderBy: [{ round: "asc" }, { id: "asc" }],
+    orderBy: [{ gameDate: "asc" }, { round: "asc" }, { id: "asc" }],
   });
   // per-team chronological result list: "W" | "L" | "OT" (OT/SO loss)
   const seq = new Map<number, ("W" | "L" | "OT")[]>();
@@ -81,8 +89,34 @@ export async function leagueForm(season: string, round: number, league = "NHL"):
   });
 }
 
+export type DigestNight = { id: string; label: string; date: string | null; round: number | null };
+
+export async function playedNights(season: string): Promise<DigestNight[]> {
+  const games = await prisma.game.findMany({
+    where: { season, league: "NHL", status: "FINAL", seriesId: null },
+    select: { gameDate: true, round: true },
+    orderBy: [{ gameDate: "asc" }, { round: "asc" }, { id: "asc" }],
+  });
+  const map = new Map<string, DigestNight>();
+  for (const g of games) {
+    if (g.gameDate) {
+      const key = g.gameDate.toISOString().slice(0, 10);
+      if (!map.has(key)) {
+        const label = g.gameDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+        map.set(key, { id: key, label, date: g.gameDate.toISOString(), round: g.round });
+      }
+    } else if (g.round != null) {
+      const key = `round-${g.round}`;
+      if (!map.has(key)) {
+        map.set(key, { id: String(g.round), label: `Round ${g.round}`, date: null, round: g.round });
+      }
+    }
+  }
+  return [...map.values()];
+}
+
 export async function latestDigestRound(season: string): Promise<number> {
-  const g = await prisma.game.findFirst({ where: { season, league: "NHL", status: "FINAL", seriesId: null }, orderBy: { round: "desc" }, select: { round: true } });
+  const g = await prisma.game.findFirst({ where: { season, league: "NHL", status: "FINAL", seriesId: null }, orderBy: [{ gameDate: "desc" }, { round: "desc" }, { id: "desc" }], select: { round: true } });
   return g?.round ?? 0;
 }
 
@@ -91,13 +125,42 @@ export async function playedRounds(season: string): Promise<number[]> {
   return rows.map((r) => r.round!).filter((r) => r != null);
 }
 
-export async function dailyDigest(season: string, round: number): Promise<DailyDigest> {
+export async function dailyDigest(season: string, target?: string | number | null): Promise<DailyDigest> {
+  let gamesWhere: any;
+  if (typeof target === "string" && /^\d{4}-\d{2}-\d{2}/.test(target)) {
+    const [y, m, d] = target.slice(0, 10).split("-").map(Number);
+    const start = new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0));
+    const end = new Date(Date.UTC(y, m - 1, d + 1, 0, 0, 0, 0));
+    gamesWhere = { season, league: "NHL", status: "FINAL", seriesId: null, gameDate: { gte: start, lt: end } };
+  } else if (typeof target === "number" || (typeof target === "string" && !isNaN(Number(target)))) {
+    const r = Number(target);
+    gamesWhere = { season, league: "NHL", status: "FINAL", seriesId: null, round: r };
+  } else {
+    const latestGame = await prisma.game.findFirst({
+      where: { season, league: "NHL", status: "FINAL", seriesId: null },
+      orderBy: [{ gameDate: "desc" }, { round: "desc" }, { id: "desc" }],
+      select: { gameDate: true, round: true },
+    });
+    if (!latestGame) {
+      return { season, round: 0, date: null, gameCount: 0, scores: [], gameOfNight: null, playerOfNight: null, upset: null, bestGoalie: null, biggestHit: null, injuries: [], hottest: null, coldest: null, powerRanking: [], recordAlerts: [], milestones: [] };
+    }
+    if (latestGame.gameDate) {
+      const gd = latestGame.gameDate;
+      const start = new Date(Date.UTC(gd.getUTCFullYear(), gd.getUTCMonth(), gd.getUTCDate(), 0, 0, 0, 0));
+      const end = new Date(Date.UTC(gd.getUTCFullYear(), gd.getUTCMonth(), gd.getUTCDate() + 1, 0, 0, 0, 0));
+      gamesWhere = { season, league: "NHL", status: "FINAL", seriesId: null, gameDate: { gte: start, lt: end } };
+    } else {
+      gamesWhere = { season, league: "NHL", status: "FINAL", seriesId: null, round: latestGame.round ?? 0 };
+    }
+  }
+
   const games = await prisma.game.findMany({
-    where: { season, league: "NHL", status: "FINAL", seriesId: null, round },
+    where: gamesWhere,
     include: { homeTeam: { select: { name: true, code: true, slug: true } }, awayTeam: { select: { name: true, code: true, slug: true } } },
     orderBy: { id: "asc" },
   });
   const date = games.find((g) => g.gameDate)?.gameDate ?? null;
+  const round = games[0]?.round ?? (typeof target === "number" ? target : 0);
   const gids = games.map((g) => g.id);
 
   const scores: DigestGame[] = games.map((g) => ({
@@ -179,7 +242,7 @@ export async function dailyDigest(season: string, round: number): Promise<DailyD
   } : null;
 
   // STREAKS + POWER RANKING — the league's shape up to this night.
-  const form = await leagueForm(season, round);
+  const form = await leagueForm(season, date ? { date: new Date(date) } : round);
   const hotCand = form.filter((f) => f.streakType === "W" && f.streakLen >= 3).sort((a, b) => b.streakLen - a.streakLen)[0];
   const coldCand = form.filter((f) => f.streakType === "L" && f.streakLen >= 3).sort((a, b) => b.streakLen - a.streakLen)[0];
   const hottest = hotCand ? { code: hotCand.code, slug: hotCand.slug, name: hotCand.name, streakLen: hotCand.streakLen, last10: hotCand.last10 } : null;
@@ -222,7 +285,15 @@ export async function dailyDigest(season: string, round: number): Promise<DailyD
       by: ["playerId"],
       where: {
         playerId: { in: nightIds },
-        game: { league: "NHL", status: "FINAL", seriesId: null, OR: [{ season: { lt: season } }, { season, round: { lte: round } }] },
+        game: {
+          league: "NHL", status: "FINAL", seriesId: null,
+          OR: [
+            { season: { lt: season } },
+            date
+              ? { season, gameDate: { lte: new Date(date) } }
+              : { season, round: { lte: round } }
+          ],
+        },
       },
       _sum: { points: true, goals: true, assists: true }, _count: { _all: true },
     });

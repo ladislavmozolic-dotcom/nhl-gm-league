@@ -85,11 +85,7 @@ export default async function HomePage() {
     id: a.id, body: a.body, linkUrl: a.linkUrl, linkLabel: a.linkLabel, date: fmtDate(a.createdAt), unread: me != null && !readIds.has(a.id),
   }));
   // Tonight's Best — the nightly digest for the "Around the League" box.
-  // digestRound is 0 for EVERY preseason night (preseason games don't carry a
-  // real round number), so a truthy check here treated a legitimate night as
-  // "nothing to show" — always run dailyDigest and let its own gameCount speak.
-  const digestRound = await latestDigestRound(activeSeason);
-  const digest = await dailyDigest(activeSeason, digestRound);
+  const digest = await dailyDigest(activeSeason);
 
   // Trade Block — who's available around the league (flat list for the home card)
   const tbBoard = await tradeBlockBoard();

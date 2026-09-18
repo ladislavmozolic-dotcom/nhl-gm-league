@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/ui";
-import { dailyDigest, latestDigestRound, playedRounds } from "@/lib/digest-server";
+import { dailyDigest, playedNights } from "@/lib/digest-server";
 import { defaultStatsPhase } from "@/lib/calendar-server";
 import { REGULAR_SEASON, PRE_SEASON } from "@/lib/phase";
 
@@ -17,30 +17,35 @@ function Card({ title, accent, children }: { title: string; accent: string; chil
 const plink = (name: string, slug: string | null) => slug ? <Link href={`/players/${slug}`} className="font-semibold hover:text-blue-400">{name}</Link> : <span className="font-semibold">{name}</span>;
 const tlink = (code: string | null, slug: string | null) => slug ? <Link href={`/teams/${slug}`} className="text-slate-400 hover:text-blue-400">{code}</Link> : <span className="text-slate-400">{code}</span>;
 
-export default async function DigestPage({ searchParams }: { searchParams: Promise<{ round?: string }> }) {
+export default async function DigestPage({ searchParams }: { searchParams: Promise<{ round?: string; date?: string }> }) {
   const sp = await searchParams;
-  // Same "which season string is live right now" the home page uses, so the
-  // widget's "view →" link lands on the same night it just teased — during
-  // preseason that's PRE_SEASON, whose games all share round 0.
   const season = (await defaultStatsPhase()) === "pre" ? PRE_SEASON : REGULAR_SEASON;
-  const rounds = await playedRounds(season);
-  const latest = await latestDigestRound(season);
-  const round = sp.round ? Number(sp.round) : latest;
-  const d = await dailyDigest(season, round);
+  const nights = await playedNights(season);
+  const target = sp.date ?? sp.round ?? (nights.length ? nights[nights.length - 1].id : null);
+  const d = await dailyDigest(season, target);
 
-  const idx = rounds.indexOf(round);
-  const prev = idx > 0 ? rounds[idx - 1] : null;
-  const next = idx >= 0 && idx < rounds.length - 1 ? rounds[idx + 1] : null;
-  const dateStr = d.date ? new Date(d.date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }) : `Day ${round}`;
+  const curId = d.date ? d.date.slice(0, 10) : (target ? String(target) : (nights[nights.length - 1]?.id ?? ""));
+  const idx = nights.findIndex((n) => n.id === curId || (d.date && n.date && n.date.slice(0, 10) === d.date.slice(0, 10)) || (sp.round && n.round === Number(sp.round)));
+  const prev = idx > 0 ? nights[idx - 1] : null;
+  const next = idx >= 0 && idx < nights.length - 1 ? nights[idx + 1] : null;
+  const dateStr = d.date ? new Date(d.date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" }) : `Day ${d.round}`;
 
   return (
     <div className="space-y-6 py-2">
       <PageHeader title="Tonight's Best" subtitle={`The story of the night — ${dateStr} · ${d.gameCount} games`} />
 
       <div className="flex items-center justify-between">
-        {prev != null ? <Link href={`/league/digest?round=${prev}`} className="px-3 py-1.5 rounded-md bg-slate-800/60 text-sm hover:bg-slate-800">← Previous night</Link> : <span />}
+        {prev != null ? (
+          <Link href={`/league/digest?${prev.date ? `date=${prev.id}` : `round=${prev.round}`}`} className="px-3 py-1.5 rounded-md bg-slate-800/60 text-sm hover:bg-slate-800">
+            ← Previous night ({prev.label})
+          </Link>
+        ) : <span />}
         <span className="text-slate-500 text-sm">{dateStr}</span>
-        {next != null ? <Link href={`/league/digest?round=${next}`} className="px-3 py-1.5 rounded-md bg-slate-800/60 text-sm hover:bg-slate-800">Next night →</Link> : <span />}
+        {next != null ? (
+          <Link href={`/league/digest?${next.date ? `date=${next.id}` : `round=${next.round}`}`} className="px-3 py-1.5 rounded-md bg-slate-800/60 text-sm hover:bg-slate-800">
+            Next night ({next.label}) →
+          </Link>
+        ) : <span />}
       </div>
 
       {d.recordAlerts.length > 0 && (
