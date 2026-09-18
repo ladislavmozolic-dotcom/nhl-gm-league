@@ -5,7 +5,7 @@ import { cleanName } from "@/lib/playerName";
 import HistorySeasonTabs from "@/components/HistorySeasonTabs";
 import HistoryNav from "@/components/HistoryNav";
 import { ACTIVE_SEASON } from "@/lib/career-server";
-import { computeSeasonFinalists } from "@/lib/awards";
+import { PRE_SEASON, REGULAR_SEASON } from "@/lib/phase";
 
 export const dynamic = "force-dynamic";
 
@@ -24,148 +24,218 @@ const AWARD_LABEL: Record<string, string> = {
   "Jack Adams": "Jack Adams (Coach)",
 };
 
+type PreseasonTeamSummary = {
+  id: number;
+  name: string;
+  code: string | null;
+  slug: string | null;
+  logoUrl: string | null;
+  gp: number;
+  w: number;
+  l: number;
+  otl: number;
+  points: number;
+};
+
 export default async function HistoryPage() {
-  const [records, awards, preRecords, teams, topPlayers, topGoalies] = await Promise.all([
-    prisma.seasonRecord.findMany(),
+  const [
+    archivedRecords,
+    archivedAwards,
+    archivedPreRecords,
+    allTeams,
+    preFinalGames,
+    preSkaterStats,
+    preGoalieStats,
+  ] = await Promise.all([
+    prisma.seasonRecord.findMany({ orderBy: { season: "desc" } }),
     prisma.seasonAward.findMany(),
     prisma.seasonPreseasonRecord.findMany(),
-    prisma.team.findMany({ select: { id: true, name: true, slug: true, logoUrl: true, league: true, isAffiliate: true, coach: true, gm: true } }),
-    prisma.player.findMany({
-      where: { isGoalie: false },
-      orderBy: { overall: "desc" },
-      take: 20,
-      select: { id: true, name: true, slug: true, position: true, overall: true, teamId: true },
+    prisma.team.findMany({
+      select: { id: true, name: true, code: true, slug: true, logoUrl: true, league: true, isAffiliate: true, coach: true, gm: true },
     }),
-    prisma.player.findMany({
-      where: { isGoalie: true },
-      orderBy: { overall: "desc" },
-      take: 10,
-      select: { id: true, name: true, slug: true, position: true, overall: true, teamId: true },
+    prisma.game.findMany({
+      where: { season: PRE_SEASON, status: "FINAL" },
+      select: {
+        id: true,
+        league: true,
+        homeTeamId: true,
+        awayTeamId: true,
+        homeGoals: true,
+        awayGoals: true,
+        endedIn: true,
+        winnerTeamId: true,
+      },
+    }),
+    prisma.playerGameStat.findMany({
+      where: { game: { season: PRE_SEASON, status: "FINAL" } },
+      select: {
+        playerId: true,
+        teamId: true,
+        goals: true,
+        assists: true,
+        points: true,
+        game: { select: { league: true } },
+      },
+    }),
+    prisma.goalieGameStat.findMany({
+      where: { game: { season: PRE_SEASON, status: "FINAL" }, started: true },
+      select: {
+        playerId: true,
+        teamId: true,
+        saves: true,
+        decision: true,
+        goalsAgainst: true,
+        game: { select: { league: true } },
+      },
     }),
   ]);
 
-  const teamMap = new Map(teams.map((t) => [t.id, t]));
-  const isFreshLeague = records.length === 0;
+  const teamMap = new Map(allTeams.map((t) => [t.id, t]));
 
-  const nhlTeams = teams.filter((t) => !t.isAffiliate);
-  const ahlTeams = teams.filter((t) => t.isAffiliate);
+  // Cache players from pre-season stats
+  const prePlayerIds = [
+    ...new Set([
+      ...preSkaterStats.map((s) => s.playerId),
+      ...preGoalieStats.map((g) => g.playerId),
+      ...archivedAwards.map((a) => a.playerId).filter((id): id is number => id != null),
+    ]),
+  ];
 
-  let activeRecords = records;
-  let activeAwards = awards;
-  let activePreRecords = preRecords;
-
-  if (isFreshLeague) {
-    activeRecords = [
-      {
-        id: 1,
-        season: ACTIVE_SEASON,
-        league: "NHL",
-        presidentsTeamId: nhlTeams[0]?.id ?? null,
-        championTeamId: nhlTeams[0]?.id ?? null,
-        runnerUpTeamId: nhlTeams[1]?.id ?? null,
-        createdAt: new Date(),
-      },
-      {
-        id: 2,
-        season: ACTIVE_SEASON,
-        league: "AHL",
-        presidentsTeamId: ahlTeams[0]?.id ?? null,
-        championTeamId: ahlTeams[0]?.id ?? null,
-        runnerUpTeamId: ahlTeams[1]?.id ?? null,
-        createdAt: new Date(),
-      },
-    ];
-
-    const dmen = topPlayers.filter((p) => p.position.includes("D"));
-    const fwds = topPlayers.filter((p) => !p.position.includes("D") && p.position !== "G");
-    const topG = topGoalies[0];
-    const topD = dmen[0] ?? topPlayers[1];
-    const topF = fwds[0] ?? topPlayers[0];
-    const fwd2 = fwds[1] ?? topPlayers[2];
-    const fwd3 = fwds[2] ?? topPlayers[3];
-
-    activeAwards = [
-      // NHL awards preview
-      { id: 101, season: ACTIVE_SEASON, league: "NHL", category: "Hart", playerId: topF?.id ?? null, playerName: topF?.name ?? "Connor McDavid", teamId: topF?.teamId ?? nhlTeams[0]?.id, detail: "138 pts (Priebežne)" },
-      { id: 102, season: ACTIVE_SEASON, league: "NHL", category: "Art Ross", playerId: topF?.id ?? null, playerName: topF?.name ?? "Connor McDavid", teamId: topF?.teamId ?? nhlTeams[0]?.id, detail: "138 pts" },
-      { id: 103, season: ACTIVE_SEASON, league: "NHL", category: "Rocket Richard", playerId: fwd2?.id ?? null, playerName: fwd2?.name ?? "Auston Matthews", teamId: fwd2?.teamId ?? nhlTeams[1]?.id, detail: "62 G" },
-      { id: 104, season: ACTIVE_SEASON, league: "NHL", category: "Norris", playerId: topD?.id ?? null, playerName: topD?.name ?? "Cale Makar", teamId: topD?.teamId ?? nhlTeams[2]?.id, detail: "92 pts, +34" },
-      { id: 105, season: ACTIVE_SEASON, league: "NHL", category: "Vezina", playerId: topG?.id ?? null, playerName: topG?.name ?? "Igor Shesterkin", teamId: topG?.teamId ?? nhlTeams[0]?.id, detail: "92.8% SV%, 2.15 GAA" },
-      { id: 106, season: ACTIVE_SEASON, league: "NHL", category: "Calder", playerId: fwd3?.id ?? null, playerName: fwd3?.name ?? "Macklin Celebrini", teamId: fwd3?.teamId ?? nhlTeams[3]?.id, detail: "74 pts" },
-      { id: 107, season: ACTIVE_SEASON, league: "NHL", category: "Selke", playerId: topF?.id ?? null, playerName: topF?.name ?? "Aleksander Barkov", teamId: topF?.teamId ?? nhlTeams[0]?.id, detail: "+38, 4 SHG, 98 BLK" },
-      { id: 108, season: ACTIVE_SEASON, league: "NHL", category: "Lady Byng", playerId: topD?.id ?? null, playerName: topD?.name ?? "Jaccob Slavin", teamId: topD?.teamId ?? nhlTeams[1]?.id, detail: "54 pts, 6 PIM" },
-      { id: 109, season: ACTIVE_SEASON, league: "NHL", category: "Jack Adams", playerId: null, playerName: nhlTeams[0]?.coach || "Hlavný tréner", teamId: nhlTeams[0]?.id ?? null, detail: "118 pts · Best record" },
-      { id: 110, season: ACTIVE_SEASON, league: "NHL", category: "Conn Smythe", playerId: topF?.id ?? null, playerName: topF?.name ?? "Nathan MacKinnon", teamId: topF?.teamId ?? nhlTeams[0]?.id, detail: "32 pts (22 GP)" },
-
-      // AHL awards preview
-      { id: 201, season: ACTIVE_SEASON, league: "AHL", category: "Hart", playerId: topPlayers[4]?.id ?? null, playerName: topPlayers[4]?.name ?? "AHL Top Scorer", teamId: ahlTeams[0]?.id ?? null, detail: "96 pts" },
-      { id: 202, season: ACTIVE_SEASON, league: "AHL", category: "Art Ross", playerId: topPlayers[4]?.id ?? null, playerName: topPlayers[4]?.name ?? "AHL Top Scorer", teamId: ahlTeams[0]?.id ?? null, detail: "96 pts" },
-      { id: 203, season: ACTIVE_SEASON, league: "AHL", category: "Rocket Richard", playerId: topPlayers[5]?.id ?? null, playerName: topPlayers[5]?.name ?? "AHL Top Sniper", teamId: ahlTeams[1]?.id ?? null, detail: "44 G" },
-      { id: 204, season: ACTIVE_SEASON, league: "AHL", category: "Norris", playerId: dmen[1]?.id ?? null, playerName: dmen[1]?.name ?? "AHL Top Defenseman", teamId: ahlTeams[0]?.id ?? null, detail: "68 pts" },
-      { id: 205, season: ACTIVE_SEASON, league: "AHL", category: "Vezina", playerId: topGoalies[1]?.id ?? null, playerName: topGoalies[1]?.name ?? "AHL Top Goalie", teamId: ahlTeams[0]?.id ?? null, detail: "92.4% SV%, 2.20 GAA" },
-      { id: 206, season: ACTIVE_SEASON, league: "AHL", category: "Calder", playerId: topPlayers[6]?.id ?? null, playerName: topPlayers[6]?.name ?? "AHL Top Rookie", teamId: ahlTeams[2]?.id ?? null, detail: "62 pts" },
-      { id: 207, season: ACTIVE_SEASON, league: "AHL", category: "Selke", playerId: topPlayers[7]?.id ?? null, playerName: topPlayers[7]?.name ?? "AHL Def Forward", teamId: ahlTeams[1]?.id ?? null, detail: "+26, 3 SHG" },
-      { id: 208, season: ACTIVE_SEASON, league: "AHL", category: "Lady Byng", playerId: topPlayers[8]?.id ?? null, playerName: topPlayers[8]?.name ?? "AHL Gentleman", teamId: ahlTeams[0]?.id ?? null, detail: "58 pts, 8 PIM" },
-      { id: 209, season: ACTIVE_SEASON, league: "AHL", category: "Jack Adams", playerId: null, playerName: ahlTeams[0]?.coach || "Tréner farmy", teamId: ahlTeams[0]?.id ?? null, detail: "Best farm record" },
-      { id: 210, season: ACTIVE_SEASON, league: "AHL", category: "Conn Smythe", playerId: topPlayers[4]?.id ?? null, playerName: topPlayers[4]?.name ?? "AHL Playoff MVP", teamId: ahlTeams[0]?.id ?? null, detail: "26 pts (19 GP)" },
-    ];
-
-    activePreRecords = [
-      {
-        id: 1,
-        season: ACTIVE_SEASON,
-        league: "NHL",
-        gamesPlayed: 18,
-        bestTeamId: nhlTeams[0]?.id ?? null,
-        topScorerId: topF?.id ?? null,
-        topScorerName: topF?.name ?? "Connor McDavid",
-        topScorerPoints: 9,
-        createdAt: new Date(),
-      },
-      {
-        id: 2,
-        season: ACTIVE_SEASON,
-        league: "AHL",
-        gamesPlayed: 12,
-        bestTeamId: ahlTeams[0]?.id ?? null,
-        topScorerId: topPlayers[4]?.id ?? null,
-        topScorerName: topPlayers[4]?.name ?? "AHL Top Scorer",
-        topScorerPoints: 7,
-        createdAt: new Date(),
-      },
-    ];
-  }
-
-  const pids = [...new Set([
-    ...activeAwards.map((a) => a.playerId),
-    ...activePreRecords.map((r) => r.topScorerId),
-  ].filter((x): x is number => !!x))];
-
-  const pRows = pids.length
-    ? await prisma.player.findMany({ where: { id: { in: pids } }, select: { id: true, name: true, slug: true } })
+  const players = prePlayerIds.length
+    ? await prisma.player.findMany({
+        where: { id: { in: prePlayerIds } },
+        select: { id: true, name: true, slug: true, position: true, isGoalie: true, teamId: true },
+      })
     : [];
-  const playerMap = new Map(pRows.map((p) => [p.id, p]));
 
-  const seasons = [...new Set(activeRecords.map((r) => r.season))].sort().reverse();
+  const playerMap = new Map(players.map((p) => [p.id, p]));
 
-  const TeamChip = ({ id, label, tone }: { id: number | null; label: string; tone: string }) => {
-    const t = id ? teamMap.get(id) : null;
-    return (
-      <div className="flex items-center gap-2">
-        <span className={`text-[10px] font-bold uppercase tracking-wider w-24 shrink-0 ${tone}`}>{label}</span>
-        {t ? (
-          <Link href={`/teams/${t.slug}`} className="flex items-center gap-2 group">
-            {t.logoUrl && <img src={t.logoUrl} alt="" className="w-6 h-6 object-contain" />}
-            <span className="text-sm font-semibold text-slate-200 group-hover:text-blue-400">{t.name}</span>
-          </Link>
-        ) : (
-          <span className="text-sm text-slate-500">—</span>
-        )}
-      </div>
-    );
+  // Helper: compute pre-season standings & top scorers from real DB games
+  const computePreseasonStats = (league: "NHL" | "AHL") => {
+    const leagueGames = preFinalGames.filter((g) => g.league === league);
+    const leagueTeams = allTeams.filter((t) => (league === "AHL" ? t.isAffiliate : !t.isAffiliate));
+
+    const teamAcc = new Map<number, PreseasonTeamSummary>();
+    for (const t of leagueTeams) {
+      teamAcc.set(t.id, {
+        id: t.id,
+        name: t.name,
+        code: t.code,
+        slug: t.slug,
+        logoUrl: t.logoUrl,
+        gp: 0,
+        w: 0,
+        l: 0,
+        otl: 0,
+        points: 0,
+      });
+    }
+
+    for (const g of leagueGames) {
+      const h = teamAcc.get(g.homeTeamId);
+      const a = teamAcc.get(g.awayTeamId);
+      const hg = g.homeGoals ?? 0;
+      const ag = g.awayGoals ?? 0;
+      const isOt = g.endedIn != null && g.endedIn !== "";
+
+      if (h) {
+        h.gp += 1;
+        if (hg > ag) {
+          h.w += 1;
+          h.points += 2;
+        } else if (isOt) {
+          h.otl += 1;
+          h.points += 1;
+        } else {
+          h.l += 1;
+        }
+      }
+
+      if (a) {
+        a.gp += 1;
+        if (ag > hg) {
+          a.w += 1;
+          a.points += 2;
+        } else if (isOt) {
+          a.otl += 1;
+          a.points += 1;
+        } else {
+          a.l += 1;
+        }
+      }
+    }
+
+    const sortedTeams = [...teamAcc.values()]
+      .filter((t) => t.gp > 0)
+      .sort((a, b) => b.points - a.points || b.w - a.w || a.l - b.l);
+
+    const bestTeam = sortedTeams[0] ?? null;
+
+    // Top Skater in Preseason
+    const skAcc = new Map<number, { playerId: number; teamId: number | null; goals: number; assists: number; points: number; gp: number }>();
+    for (const s of preSkaterStats) {
+      if (s.game.league !== league) continue;
+      if (!skAcc.has(s.playerId)) {
+        skAcc.set(s.playerId, { playerId: s.playerId, teamId: s.teamId, goals: 0, assists: 0, points: 0, gp: 0 });
+      }
+      const acc = skAcc.get(s.playerId)!;
+      acc.gp += 1;
+      acc.goals += s.goals;
+      acc.assists += s.assists;
+      acc.points += s.points;
+      if (s.teamId) acc.teamId = s.teamId;
+    }
+
+    const sortedSkaters = [...skAcc.values()]
+      .filter((s) => s.points > 0 || s.goals > 0)
+      .sort((a, b) => b.points - a.points || b.goals - a.goals);
+
+    const topScorer = sortedSkaters[0] ?? null;
+    const topScorerPlayer = topScorer ? playerMap.get(topScorer.playerId) : null;
+    const topScorerTeam = topScorer?.teamId ? teamMap.get(topScorer.teamId) : null;
+
+    // Top Goalie in Preseason
+    const glAcc = new Map<number, { playerId: number; teamId: number | null; wins: number; saves: number; ga: number; shutouts: number; gp: number }>();
+    for (const g of preGoalieStats) {
+      if (g.game.league !== league) continue;
+      if (!glAcc.has(g.playerId)) {
+        glAcc.set(g.playerId, { playerId: g.playerId, teamId: g.teamId, wins: 0, saves: 0, ga: 0, shutouts: 0, gp: 0 });
+      }
+      const acc = glAcc.get(g.playerId)!;
+      acc.gp += 1;
+      acc.saves += g.saves;
+      acc.ga += g.goalsAgainst;
+      if (g.decision === "W") acc.wins += 1;
+      if (g.goalsAgainst === 0) acc.shutouts += 1;
+      if (g.teamId) acc.teamId = g.teamId;
+    }
+
+    const sortedGoalies = [...glAcc.values()]
+      .filter((g) => g.gp > 0)
+      .sort((a, b) => b.wins - a.wins || b.saves - a.saves);
+
+    const topGoalie = sortedGoalies[0] ?? null;
+    const topGoaliePlayer = topGoalie ? playerMap.get(topGoalie.playerId) : null;
+    const topGoalieTeam = topGoalie?.teamId ? teamMap.get(topGoalie.teamId) : null;
+
+    return {
+      gamesPlayed: leagueGames.length,
+      bestTeam,
+      topScorer: topScorer ? { ...topScorer, player: topScorerPlayer, team: topScorerTeam } : null,
+      topGoalie: topGoalie ? { ...topGoalie, player: topGoaliePlayer, team: topGoalieTeam } : null,
+    };
   };
 
-  const AwardRow = ({ a }: { a: (typeof activeAwards)[number] }) => {
+  const nhlPreStats = computePreseasonStats("NHL");
+  const ahlPreStats = computePreseasonStats("AHL");
+
+  const seasonsList = archivedRecords.length > 0
+    ? [...new Set(archivedRecords.map((r) => r.season))].sort().reverse()
+    : [ACTIVE_SEASON];
+
+  const isCurrentFirstSeason = archivedRecords.length === 0;
+
+  const AwardRow = ({ a }: { a: (typeof archivedAwards)[number] }) => {
     const p = a.playerId ? playerMap.get(a.playerId) : null;
     const name = p ? cleanName(p.name) : a.playerName ? cleanName(a.playerName) : "—";
     const team = a.teamId ? teamMap.get(a.teamId) : null;
@@ -185,21 +255,129 @@ export default async function HistoryPage() {
     );
   };
 
-  const LeagueBlock = ({ season, league }: { season: string; league: string }) => {
-    const rec = activeRecords.find((r) => r.season === season && r.league === league);
-    if (!rec) return null;
-    const seasonAwards = activeAwards.filter((a) => a.season === season && a.league === league);
+  const LeagueBlock = ({ season, league }: { season: string; league: "NHL" | "AHL" }) => {
+    const cupName = league === "AHL" ? "Calder Cup" : "Stanley Cup";
+    const isLiveSeason = season === ACTIVE_SEASON && isCurrentFirstSeason;
+    const preStats = league === "AHL" ? ahlPreStats : nhlPreStats;
+
+    if (isLiveSeason) {
+      // PRE-SEASON TAB (Live Real Data)
+      const preContent = (
+        <div className="space-y-4">
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="space-y-2 p-3 rounded-xl bg-slate-800/40 border border-slate-800">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-green-400">Najlepší tím prípravy</span>
+                {preStats.bestTeam && (
+                  <span className="text-xs text-slate-400 font-semibold">({preStats.bestTeam.points} b · {preStats.bestTeam.w}-{preStats.bestTeam.l}-{preStats.bestTeam.otl})</span>
+                )}
+              </div>
+              {preStats.bestTeam ? (
+                <Link href={`/teams/${preStats.bestTeam.slug}`} className="flex items-center gap-2.5 group">
+                  {preStats.bestTeam.logoUrl && <img src={preStats.bestTeam.logoUrl} alt="" className="w-7 h-7 object-contain" />}
+                  <span className="text-sm font-bold text-white group-hover:text-blue-400">{preStats.bestTeam.name}</span>
+                </Link>
+              ) : (
+                <span className="text-sm text-slate-500">Prípravné zápasy prebiehajú</span>
+              )}
+              <p className="text-xs text-slate-400">{preStats.gamesPlayed} odohraných zápasov v príprave.</p>
+            </div>
+
+            <div className="space-y-2 p-3 rounded-xl bg-slate-800/40 border border-slate-800">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">Líder bodovania prípravy</span>
+              {preStats.topScorer && preStats.topScorer.player ? (
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {preStats.topScorer.team?.logoUrl && <img src={preStats.topScorer.team.logoUrl} alt="" className="w-5 h-5 object-contain shrink-0" />}
+                    <Link href={`/players/${preStats.topScorer.player.slug}`} className="text-sm font-bold text-slate-100 hover:text-blue-400 truncate">
+                      {cleanName(preStats.topScorer.player.name)}
+                    </Link>
+                  </div>
+                  <span className="text-xs font-bold text-amber-300 whitespace-nowrap bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded">
+                    {preStats.topScorer.points} b ({preStats.topScorer.goals}G + {preStats.topScorer.assists}A)
+                  </span>
+                </div>
+              ) : (
+                <span className="text-sm text-slate-500">Zatiaľ žiadne body</span>
+              )}
+
+              {preStats.topGoalie && preStats.topGoalie.player && (
+                <div className="flex items-center justify-between gap-3 pt-1 border-t border-slate-800">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Najlepší brankár:</span>
+                    <Link href={`/players/${preStats.topGoalie.player.slug}`} className="text-xs font-semibold text-slate-200 hover:text-blue-400 truncate">
+                      {cleanName(preStats.topGoalie.player.name)}
+                    </Link>
+                  </div>
+                  <span className="text-[11px] font-semibold text-slate-300 whitespace-nowrap">
+                    {preStats.topGoalie.wins} W · {preStats.topGoalie.saves} zákrokov
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+
+      // REGULAR SEASON TAB (Live Status)
+      const regularContent = (
+        <div className="p-4 rounded-xl bg-slate-800/30 border border-slate-800 text-center space-y-2">
+          <p className="text-sm font-semibold text-slate-200">
+            Základná časť sezóny {ACTIVE_SEASON} odštartuje po skončení prípravy (Pre-season).
+          </p>
+          <p className="text-xs text-slate-400">
+            Po odohraní prvých zápasov základnej časti sa tu začnú v reálnom čase zobrazovať tabuľky, víťaz President&apos;s Trophy a nominácie na ligové ocenenia.
+          </p>
+        </div>
+      );
+
+      // PLAYOFFS TAB (Live Status)
+      const playoffsContent = (
+        <div className="p-4 rounded-xl bg-slate-800/30 border border-slate-800 text-center space-y-2">
+          <p className="text-sm font-semibold text-slate-200">
+            Play-off a súboje o {cupName} sezóny {ACTIVE_SEASON} začnú po ukončení základnej časti.
+          </p>
+          <p className="text-xs text-slate-400">
+            Víťaz {cupName}u a ocenenie Conn Smythe Trophy budú zapísané do histórie po finálovej sérii.
+          </p>
+        </div>
+      );
+
+      return (
+        <Card title={`${league} — ${cupName}`} accent={league === "AHL" ? "text-orange-400" : "text-blue-400"}>
+          <HistorySeasonTabs pre={preContent} regular={regularContent} playoffs={playoffsContent} />
+        </Card>
+      );
+    }
+
+    // Historical archived season block
+    const rec = archivedRecords.find((r) => r.season === season && r.league === league);
+    const seasonAwards = archivedAwards.filter((a) => a.season === season && a.league === league);
     const regularAwards = seasonAwards.filter((a) => REGULAR_AWARD_ORDER.includes(a.category))
       .sort((a, b) => REGULAR_AWARD_ORDER.indexOf(a.category) - REGULAR_AWARD_ORDER.indexOf(b.category));
     const playoffAwards = seasonAwards.filter((a) => PLAYOFF_AWARD_ORDER.includes(a.category))
       .sort((a, b) => PLAYOFF_AWARD_ORDER.indexOf(a.category) - PLAYOFF_AWARD_ORDER.indexOf(b.category));
-    const pre = activePreRecords.find((r) => r.season === season && r.league === league);
-    const cupName = league === "AHL" ? "Calder Cup" : "Stanley Cup";
+    const pre = archivedPreRecords.find((r) => r.season === season && r.league === league);
+
+    const presTeam = rec?.presidentsTeamId ? teamMap.get(rec.presidentsTeamId) : null;
+    const champTeam = rec?.championTeamId ? teamMap.get(rec.championTeamId) : null;
+    const runnerTeam = rec?.runnerUpTeamId ? teamMap.get(rec.runnerUpTeamId) : null;
+    const preTeam = pre?.bestTeamId ? teamMap.get(pre.bestTeamId) : null;
 
     const regularContent = (
       <div className="grid md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <TeamChip id={rec.presidentsTeamId} label={league === "AHL" ? "Best record" : "President's"} tone="text-green-400" />
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider w-24 shrink-0 text-green-400">
+              {league === "AHL" ? "Best record" : "President's"}
+            </span>
+            {presTeam ? (
+              <Link href={`/teams/${presTeam.slug}`} className="flex items-center gap-2 group">
+                {presTeam.logoUrl && <img src={presTeam.logoUrl} alt="" className="w-6 h-6 object-contain" />}
+                <span className="text-sm font-semibold text-slate-200 group-hover:text-blue-400">{presTeam.name}</span>
+              </Link>
+            ) : <span className="text-sm text-slate-500">—</span>}
+          </div>
         </div>
         <div>
           {regularAwards.length ? regularAwards.map((a) => <AwardRow key={a.id} a={a} />) : <p className="text-sm text-slate-500">Žiadne ocenenia nezaznamenané.</p>}
@@ -210,8 +388,24 @@ export default async function HistoryPage() {
     const playoffsContent = (
       <div className="grid md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <TeamChip id={rec.championTeamId} label="Champion" tone="text-amber-400" />
-          <TeamChip id={rec.runnerUpTeamId} label="Runner-up" tone="text-slate-400" />
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider w-24 shrink-0 text-amber-400">Champion</span>
+            {champTeam ? (
+              <Link href={`/teams/${champTeam.slug}`} className="flex items-center gap-2 group">
+                {champTeam.logoUrl && <img src={champTeam.logoUrl} alt="" className="w-6 h-6 object-contain" />}
+                <span className="text-sm font-semibold text-slate-200 group-hover:text-blue-400">{champTeam.name}</span>
+              </Link>
+            ) : <span className="text-sm text-slate-500">—</span>}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider w-24 shrink-0 text-slate-400">Runner-up</span>
+            {runnerTeam ? (
+              <Link href={`/teams/${runnerTeam.slug}`} className="flex items-center gap-2 group">
+                {runnerTeam.logoUrl && <img src={runnerTeam.logoUrl} alt="" className="w-6 h-6 object-contain" />}
+                <span className="text-sm font-semibold text-slate-200 group-hover:text-blue-400">{runnerTeam.name}</span>
+              </Link>
+            ) : <span className="text-sm text-slate-500">—</span>}
+          </div>
         </div>
         <div>
           {playoffAwards.length ? playoffAwards.map((a) => <AwardRow key={a.id} a={a} />) : <p className="text-sm text-slate-500">Play-off ocenenia sa zapíšu po finále.</p>}
@@ -219,17 +413,15 @@ export default async function HistoryPage() {
       </div>
     );
 
-    const topScorer = pre?.topScorerId ? playerMap.get(pre.topScorerId) : null;
-    const bestTeam = pre?.bestTeamId ? teamMap.get(pre.bestTeamId) : null;
     const preContent = pre ? (
       <div className="grid md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-bold uppercase tracking-wider w-24 shrink-0 text-green-400">Best record</span>
-            {bestTeam ? (
-              <Link href={`/teams/${bestTeam.slug}`} className="flex items-center gap-2 group">
-                {bestTeam.logoUrl && <img src={bestTeam.logoUrl} alt="" className="w-6 h-6 object-contain" />}
-                <span className="text-sm font-semibold text-slate-200 group-hover:text-blue-400">{bestTeam.name}</span>
+            {preTeam ? (
+              <Link href={`/teams/${preTeam.slug}`} className="flex items-center gap-2 group">
+                {preTeam.logoUrl && <img src={preTeam.logoUrl} alt="" className="w-6 h-6 object-contain" />}
+                <span className="text-sm font-semibold text-slate-200 group-hover:text-blue-400">{preTeam.name}</span>
               </Link>
             ) : <span className="text-sm text-slate-500">—</span>}
           </div>
@@ -239,18 +431,14 @@ export default async function HistoryPage() {
           <div className="flex items-center justify-between gap-3 py-1.5">
             <span className="text-[11px] text-slate-400 w-40 shrink-0">Top scorer</span>
             <div className="flex-1 min-w-0">
-              {topScorer ? (
-                <Link href={`/players/${topScorer.slug}`} className="text-sm font-semibold text-slate-100 hover:text-blue-400 truncate">{cleanName(topScorer.name)}</Link>
-              ) : (
-                <span className="text-sm font-semibold text-slate-100 truncate">{pre.topScorerName ? cleanName(pre.topScorerName) : "—"}</span>
-              )}
+              <span className="text-sm font-semibold text-slate-100 truncate">{pre.topScorerName ? cleanName(pre.topScorerName) : "—"}</span>
             </div>
             <span className="text-xs text-amber-400/90 whitespace-nowrap">{pre.topScorerPoints ?? 0} pts</span>
           </div>
         </div>
       </div>
     ) : (
-      <p className="text-sm text-slate-500">Prípravné zápasy prebiehajú pred štartom základnej časti.</p>
+      <p className="text-sm text-slate-500">Žiadne záznamy z prípravy.</p>
     );
 
     return (
@@ -262,19 +450,18 @@ export default async function HistoryPage() {
 
   return (
     <div className="space-y-6 py-2">
-      <PageHeader title="League History" subtitle="Pre-season, regular season and playoffs, archived season by season." />
+      <PageHeader title="História ligy" subtitle="Príprava, základná časť a play-off uNHL & uAHL archivované po sezónach." />
       <HistoryNav active="history" />
 
-      {isFreshLeague && (
+      {isCurrentFirstSeason && (
         <div className="bg-gradient-to-r from-blue-950/40 via-indigo-950/30 to-slate-900 border border-blue-800/40 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-500 text-white uppercase tracking-wider">Živý náhľad</span>
-              <span className="text-sm font-bold text-white">Prebiehajúca sezóna {ACTIVE_SEASON}</span>
+              <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-500 text-white uppercase tracking-wider">Úvodný ročník</span>
+              <span className="text-sm font-bold text-white">Prebieha 1. sezóna {ACTIVE_SEASON}</span>
             </div>
             <p className="text-xs text-slate-300">
-              Môžete prepínať medzi záložkami <strong>Pre-season</strong>, <strong>Regular Season</strong> a <strong>Playoffs</strong> u každého bloku.
-              Kompletné historické štatistiky a série nájdete v sekcii <Link href="/history/records" className="text-blue-400 font-semibold underline hover:text-blue-300">Historické rekordy →</Link>
+              Aktuálne prebiehajú zápasy <strong>Prípravy (Pre-season)</strong>. Po ich skončení nadviaže <strong>Základná časť</strong> a <strong>Play-off</strong>.
             </p>
           </div>
           <Link
@@ -286,10 +473,10 @@ export default async function HistoryPage() {
         </div>
       )}
 
-      {seasons.map((season) => (
+      {seasonsList.map((season) => (
         <div key={season} className="space-y-3">
           <h2 className="text-lg font-black tracking-tight text-white flex items-center gap-3">
-            <span className="text-2xl">🏆</span> {season} {isFreshLeague && <span className="text-xs font-normal text-amber-400/90 border border-amber-500/30 px-2 py-0.5 rounded-full bg-amber-500/10">Priebežný stav</span>}
+            <span className="text-2xl">🏆</span> {season} {isCurrentFirstSeason && <span className="text-xs font-normal text-amber-400/90 border border-amber-500/30 px-2 py-0.5 rounded-full bg-amber-500/10">Prebiehajúca sezóna</span>}
           </h2>
           <div className="grid gap-4">
             <LeagueBlock season={season} league="NHL" />
