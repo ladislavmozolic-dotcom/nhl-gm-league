@@ -29,6 +29,18 @@ export default async function TeamDraftPicksPage({ params }: { params: Promise<{
     if (!draftPickMap.has(key)) draftPickMap.set(key, []);
     draftPickMap.get(key)!.push(pick);
   });
+  // Multiple picks in the same round: this club's own original pick goes first,
+  // then the rest alphabetically by the name of the club they originally belonged to.
+  for (const picks of draftPickMap.values()) {
+    picks.sort((a, b) => {
+      const aOwn = a.ownerLogoId === team.profinhlLogoId;
+      const bOwn = b.ownerLogoId === team.profinhlLogoId;
+      if (aOwn !== bOwn) return aOwn ? -1 : 1;
+      const aName = allTeams.find((t) => t.profinhlLogoId === a.ownerLogoId)?.name ?? "";
+      const bName = allTeams.find((t) => t.profinhlLogoId === b.ownerLogoId)?.name ?? "";
+      return aName.localeCompare(bName);
+    });
+  }
   const years = [...new Set(team.draftPicks.map((p) => p.year))].sort((a, b) => a - b);
 
   return (
