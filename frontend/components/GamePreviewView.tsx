@@ -152,7 +152,14 @@ export default function GamePreviewView({ data }: { data: MatchPreviewData }) {
           </div>
 
           {/* Home Team */}
-          <div className="md:col-span-5 flex flex-col sm:flex-row-reverse items-center justify-center sm:justify-start gap-4 text-center sm:text-left">
+          <div className="md:col-span-5 flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-4 text-center sm:text-left">
+            {data.homeTeam.logoUrl ? (
+              <img src={data.homeTeam.logoUrl} alt="" className="w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-md" />
+            ) : (
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-slate-800 flex items-center justify-center text-xl font-bold text-slate-300">
+                {data.homeTeam.code}
+              </div>
+            )}
             <div>
               <Link href={`/teams/${data.homeTeam.slug}`} className="hover:underline">
                 <h2 className="text-xl sm:text-2xl font-black text-white">{data.homeTeam.name}</h2>
@@ -171,13 +178,6 @@ export default function GamePreviewView({ data }: { data: MatchPreviewData }) {
                 </p>
               )}
             </div>
-            {data.homeTeam.logoUrl ? (
-              <img src={data.homeTeam.logoUrl} alt="" className="w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-md" />
-            ) : (
-              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-slate-800 flex items-center justify-center text-xl font-bold text-slate-300">
-                {data.homeTeam.code}
-              </div>
-            )}
           </div>
         </div>
 
