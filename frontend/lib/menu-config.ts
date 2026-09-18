@@ -15,7 +15,7 @@ export const DEFAULT_MENU: MenuItem[] = [
     { label: "🔁 Trade Room", href: "/trades/build" },
     { label: "🧱 Trade Block", href: "/trade-block" },
     { label: "📝 Waiver Wire", href: "/waivers" },
-    { label: "📋 Trade tracker", href: "/trades" },
+    { label: "📋 Trade Tracker", href: "/trades" },
     { label: "🧾 Transactions", href: "/transactions" },
   ] },
   { key: "teams", label: "Teams", href: "#", mega: true },
