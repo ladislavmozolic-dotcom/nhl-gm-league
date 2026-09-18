@@ -1681,6 +1681,42 @@ export function getSectionTitle(id: string, lang: Lang, league: string, cupName:
       de: "Meiste Team-Strafminuten in der Vorbereitung",
       ru: "Больше всего штрафных минут команды в предсезонке",
     },
+    "pre-team-pp": {
+      en: "Most team power-play goals in a single pre-season (PPG)",
+      cs: "Najviac presilovkových gólov tímu v príprave (PPG)",
+      de: "Meiste Team-Überzahltore in der Vorbereitung (PPG)",
+      ru: "Больше всего голов в большинстве команды в предсезонке (PPG)",
+    },
+    "pre-team-sh": {
+      en: "Most team shorthanded goals in a single pre-season (SHG)",
+      cs: "Najviac oslabovkových gólov tímu v príprave (SHG)",
+      de: "Meiste Team-Unterzahltore in der Vorbereitung (SHG)",
+      ru: "Больше всего голов в меньшинстве команды в предсезонке (SHG)",
+    },
+    "pre-team-highest-att-game": {
+      en: "Highest single-game attendance in pre-season",
+      cs: "Najvyššia návštevnosť v jednom zápase prípravy",
+      de: "Höchste Zuschauerzahl in einem Vorbereitungsspiel",
+      ru: "Наибольшая посещаемость в одном матче предсезонки",
+    },
+    "pre-team-lowest-att-game": {
+      en: "Lowest single-game attendance in pre-season",
+      cs: "Najnižšia návštevnosť v jednom zápase prípravy",
+      de: "Niedrigste Zuschauerzahl in einem Vorbereitungsspiel",
+      ru: "Наименьшая посещаемость в одном матче предсезонки",
+    },
+    "pre-team-highest-avg-att": {
+      en: "Highest average attendance in a single pre-season",
+      cs: "Najvyššia priemerná návštevnosť v jednej príprave",
+      de: "Höchster Zuschauerschnitt in einer Vorbereitung",
+      ru: "Наивысшая средняя посещаемость за предсезонку",
+    },
+    "pre-team-lowest-avg-att": {
+      en: "Lowest average attendance in a single pre-season",
+      cs: "Najnižšia priemerná návštevnosť v jednej príprave",
+      de: "Niedrigster Zuschauerschnitt in einer Vorbereitung",
+      ru: "Наименьшая средняя посещаемость за предсезонку",
+    },
 
     // ================= Pre-season Games & Attendance =================
     "pre-highest-scoring-game": {
@@ -5094,7 +5130,7 @@ export async function getLeagueRecords(
   ];
 
   // 9. Pre-season Teams (Standings & Single-Season Maximums)
-  type PreTeamSeasonAcc = { teamId: number; season: string; gp: number; wins: number; losses: number; otl: number; points: number; gf: number; ga: number; pim: number; totalLosses: number };
+  type PreTeamSeasonAcc = { teamId: number; season: string; gp: number; wins: number; losses: number; otl: number; points: number; gf: number; ga: number; pim: number; totalLosses: number; ppGoals: number; shGoals: number };
   const preTeamSeasonMap = new Map<string, PreTeamSeasonAcc>();
 
   for (const g of preGames) {
@@ -5103,10 +5139,10 @@ export async function getLeagueRecords(
     const aKey = `${g.awayTeamId}::${seas}`;
 
     if (!preTeamSeasonMap.has(hKey)) {
-      preTeamSeasonMap.set(hKey, { teamId: g.homeTeamId, season: seas, gp: 0, wins: 0, losses: 0, otl: 0, points: 0, gf: 0, ga: 0, pim: 0, totalLosses: 0 });
+      preTeamSeasonMap.set(hKey, { teamId: g.homeTeamId, season: seas, gp: 0, wins: 0, losses: 0, otl: 0, points: 0, gf: 0, ga: 0, pim: 0, totalLosses: 0, ppGoals: 0, shGoals: 0 });
     }
     if (!preTeamSeasonMap.has(aKey)) {
-      preTeamSeasonMap.set(aKey, { teamId: g.awayTeamId, season: seas, gp: 0, wins: 0, losses: 0, otl: 0, points: 0, gf: 0, ga: 0, pim: 0, totalLosses: 0 });
+      preTeamSeasonMap.set(aKey, { teamId: g.awayTeamId, season: seas, gp: 0, wins: 0, losses: 0, otl: 0, points: 0, gf: 0, ga: 0, pim: 0, totalLosses: 0, ppGoals: 0, shGoals: 0 });
     }
 
     const h = preTeamSeasonMap.get(hKey)!;
@@ -5152,10 +5188,96 @@ export async function getLeagueRecords(
     const key = `${s.teamId}::${seas}`;
     if (preTeamSeasonMap.has(key)) {
       preTeamSeasonMap.get(key)!.pim += s.pim;
+      preTeamSeasonMap.get(key)!.ppGoals += s.ppGoals ?? 0;
+      preTeamSeasonMap.get(key)!.shGoals += s.shGoals ?? 0;
     }
   }
 
   const allPreTeamSeasons = [...preTeamSeasonMap.values()];
+
+  // Pre-season team PP/SH goals per season leaders
+  const preTeamPpLeader: LeaderItem[] = [...allPreTeamSeasons]
+    .filter((t) => t.ppGoals > 0)
+    .sort((a, b) => b.ppGoals - a.ppGoals)
+    .slice(0, 5)
+    .map((t, idx) => {
+      const tm = teamById.get(t.teamId);
+      return { rank: idx + 1, name: tm?.name ?? tTeam, teamCode: tm?.code, teamSlug: tm?.slug, teamLogo: tm?.logoUrl, value: `${t.ppGoals} ${unitPpGoals}`, sub: `${tPreseason} ${t.season}` };
+    });
+
+  const preTeamShLeader: LeaderItem[] = [...allPreTeamSeasons]
+    .filter((t) => t.shGoals > 0)
+    .sort((a, b) => b.shGoals - a.shGoals)
+    .slice(0, 5)
+    .map((t, idx) => {
+      const tm = teamById.get(t.teamId);
+      return { rank: idx + 1, name: tm?.name ?? tTeam, teamCode: tm?.code, teamSlug: tm?.slug, teamLogo: tm?.logoUrl, value: `${t.shGoals} ${unitShGoals}`, sub: `${tPreseason} ${t.season}` };
+    });
+
+  // Pre-season attendance records (single game)
+  const preGamesWithAtt = preGames.filter((g) => (g.attendance ?? 0) > 0);
+  const preHighestAttGame: LeaderItem[] = [...preGamesWithAtt]
+    .sort((a, b) => (b.attendance ?? 0) - (a.attendance ?? 0))
+    .slice(0, 5)
+    .map((g, idx) => {
+      const home = teamById.get(g.homeTeamId);
+      const away = teamById.get(g.awayTeamId);
+      const dateStr = g.gameDate ? formatRecordDate(new Date(g.gameDate), lang) : g.season;
+      const numFmt = (g.attendance ?? 0).toLocaleString(lang === "cs" ? "sk-SK" : lang === "de" ? "de-DE" : lang === "ru" ? "ru-RU" : "en-US");
+      return {
+        rank: idx + 1,
+        name: `${home?.code ?? home?.name ?? tHome} vs ${away?.code ?? away?.name ?? tAway}`,
+        teamCode: home?.code, teamSlug: home?.slug, teamLogo: home?.logoUrl, hideTeam: true,
+        value: `${numFmt} ${unitFansT}`,
+        sub: `${g.season} · ${dateStr} · ${tScore}: ${g.homeGoals}:${g.awayGoals}`,
+      };
+    });
+
+  const preLowestAttGame: LeaderItem[] = [...preGamesWithAtt]
+    .sort((a, b) => (a.attendance ?? 0) - (b.attendance ?? 0))
+    .slice(0, 5)
+    .map((g, idx) => {
+      const home = teamById.get(g.homeTeamId);
+      const away = teamById.get(g.awayTeamId);
+      const dateStr = g.gameDate ? formatRecordDate(new Date(g.gameDate), lang) : g.season;
+      const numFmt = (g.attendance ?? 0).toLocaleString(lang === "cs" ? "sk-SK" : lang === "de" ? "de-DE" : lang === "ru" ? "ru-RU" : "en-US");
+      return {
+        rank: idx + 1,
+        name: `${home?.code ?? home?.name ?? tHome} vs ${away?.code ?? away?.name ?? tAway}`,
+        teamCode: home?.code, teamSlug: home?.slug, teamLogo: home?.logoUrl, hideTeam: true,
+        value: `${numFmt} ${unitFansT}`,
+        sub: `${g.season} · ${dateStr} · ${tScore}: ${g.homeGoals}:${g.awayGoals}`,
+      };
+    });
+
+  // Pre-season avg attendance per season by team
+  const preSeasonAttMap = new Map<string, { teamId: number; season: string; totalAtt: number; games: number }>();
+  for (const g of preGamesWithAtt) {
+    const key = `${g.homeTeamId}::${g.season}`;
+    if (!preSeasonAttMap.has(key)) preSeasonAttMap.set(key, { teamId: g.homeTeamId, season: g.season, totalAtt: 0, games: 0 });
+    const acc = preSeasonAttMap.get(key)!;
+    acc.totalAtt += g.attendance ?? 0;
+    acc.games += 1;
+  }
+  const preSeasonAttList = [...preSeasonAttMap.values()].filter((e) => e.games >= 1).map((e) => ({ ...e, avg: Math.round(e.totalAtt / e.games) }));
+
+  const preHighestAvgAtt: LeaderItem[] = [...preSeasonAttList]
+    .sort((a, b) => b.avg - a.avg)
+    .slice(0, 5)
+    .map((entry, idx) => {
+      const tm = teamById.get(entry.teamId);
+      const numFmt = entry.avg.toLocaleString(lang === "cs" ? "sk-SK" : lang === "de" ? "de-DE" : lang === "ru" ? "ru-RU" : "en-US");
+      return { rank: idx + 1, name: tm?.name ?? tTeam, teamCode: tm?.code, teamSlug: tm?.slug, teamLogo: tm?.logoUrl, value: `${numFmt} ${unitPerGame}`, sub: `${tPreseason} ${entry.season} (${entry.games} ${unitHomeGames})` };
+    });
+
+  const preLowestAvgAtt: LeaderItem[] = [...preSeasonAttList]
+    .sort((a, b) => a.avg - b.avg)
+    .slice(0, 5)
+    .map((entry, idx) => {
+      const tm = teamById.get(entry.teamId);
+      const numFmt = entry.avg.toLocaleString(lang === "cs" ? "sk-SK" : lang === "de" ? "de-DE" : lang === "ru" ? "ru-RU" : "en-US");
+      return { rank: idx + 1, name: tm?.name ?? tTeam, teamCode: tm?.code, teamSlug: tm?.slug, teamLogo: tm?.logoUrl, value: `${numFmt} ${unitPerGame}`, sub: `${tPreseason} ${entry.season} (${entry.games} ${unitHomeGames})` };
+    });
 
   // Team streaks in pre-season
   const preTeamGamesMap = new Map<number, Array<{ gameId: number; gameDate: string | null; season: string; isWin: boolean }>>();
@@ -5271,6 +5393,12 @@ export async function getLeagueRecords(
     { id: "pre-team-gf", title: getSectionTitle("pre-team-gf", lang, league, cupName), icon: "🎯", phase: "pre", phaseBadge: secBadgePre, items: preTeamGfLeader },
     { id: "pre-team-ga", title: getSectionTitle("pre-team-ga", lang, league, cupName), icon: "🛡️", phase: "pre", phaseBadge: secBadgePre, items: preTeamGaLeader },
     { id: "pre-team-pim", title: getSectionTitle("pre-team-pim", lang, league, cupName), icon: "⏱️", phase: "pre", phaseBadge: secBadgePre, items: preTeamPimLeader },
+    { id: "pre-team-pp", title: getSectionTitle("pre-team-pp", lang, league, cupName), icon: "⚡", phase: "pre", phaseBadge: secBadgePre, items: preTeamPpLeader },
+    { id: "pre-team-sh", title: getSectionTitle("pre-team-sh", lang, league, cupName), icon: "🛡️", phase: "pre", phaseBadge: secBadgePre, items: preTeamShLeader },
+    { id: "pre-team-highest-att-game", title: getSectionTitle("pre-team-highest-att-game", lang, league, cupName), icon: "👥", phase: "pre", phaseBadge: secBadgePre, items: preHighestAttGame },
+    { id: "pre-team-lowest-att-game", title: getSectionTitle("pre-team-lowest-att-game", lang, league, cupName), icon: "👤", phase: "pre", phaseBadge: secBadgePre, items: preLowestAttGame },
+    { id: "pre-team-highest-avg-att", title: getSectionTitle("pre-team-highest-avg-att", lang, league, cupName), icon: "📈", phase: "pre", phaseBadge: secBadgePre, items: preHighestAvgAtt },
+    { id: "pre-team-lowest-avg-att", title: getSectionTitle("pre-team-lowest-avg-att", lang, league, cupName), icon: "📉", phase: "pre", phaseBadge: secBadgePre, items: preLowestAvgAtt },
   ];
 
   // 10. Pre-season Game & Attendance Records
@@ -5336,7 +5464,6 @@ export async function getLeagueRecords(
       };
     });
 
-  const preGamesWithAtt = preGames.filter((g) => (g.attendance ?? 0) > 0);
   const preHighestAttGames: LeaderItem[] = [...preGamesWithAtt]
     .sort((a, b) => (b.attendance ?? 0) - (a.attendance ?? 0))
     .slice(0, 5)
