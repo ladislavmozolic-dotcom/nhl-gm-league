@@ -112,10 +112,11 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   // LTIR relief is based on what this club actually carries for the injured player
   // (net of any retention it benefits from), matching `cap.capHit` above.
   const ltirRoster = team.players.map((p) => ({ ...p, capHit: Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0)) }));
-  const ltir = ltirRelief(ltirRoster); // cap relief from skaters on LTIR (injured, CON < 90)
+  const ltir = ltirRelief(ltirRoster);
   const { phase } = await getLeagueClock();
-  const effectiveCeiling = capCeilingForPhase(cap.upper, phase) + ltir;
-  const overBy = Math.max(0, cap.capHit - effectiveCeiling);
+  const effectiveCeiling = cap.upper + ltir;
+  const phaseComplianceCeiling = capCeilingForPhase(cap.upper, phase) + ltir;
+  const overBy = Math.max(0, cap.capHit - phaseComplianceCeiling);
   const cushioned = phase !== "regular" && phase !== "playoffs";
   const posCounts = splitByPos(team.players);
   const orgTotal = team.players.length + farm.length; // NHL + AHL, vs. ROSTER_LIMITS.orgMax
