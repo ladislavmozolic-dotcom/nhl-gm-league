@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, BackPill } from "@/components/ui";
 import { getTeamSession, canManageTeam } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { loadSettings } from "@/lib/sim/settings";
@@ -73,7 +73,11 @@ export default async function FinanceDashboardPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 space-y-5">
-      <PageHeader title={`${dash.name} — Finances`} subtitle={detailed ? "Detailed Finance dashboard" : "Finances"} />
+      <PageHeader
+        title={`${dash.name} — Finances`}
+        subtitle={detailed ? "Detailed Finance dashboard" : "Finances"}
+        right={team?.slug ? <BackPill href={`/teams/${team.slug}`}>Team menu</BackPill> : undefined}
+      />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {tile("Cash", M(dash.cash))}
