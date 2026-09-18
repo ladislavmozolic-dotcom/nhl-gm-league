@@ -242,6 +242,12 @@ export function getGroupTitle(id: string, lang: Lang, cupName: string): string {
       de: "Team-Saison- und Serienrekorde (HR)",
       ru: "Командные сезонные и серийные рекорды (РС)",
     },
+    "po-team-seasons": {
+      en: "Playoff Team Season Records",
+      cs: "Tímové rekordy v play-off (sezóna)",
+      de: "Team-Playoff-Saisonrekorde",
+      ru: "Командные рекорды сезона плей-офф",
+    },
     "trophies": {
       en: "Trophies & Awards",
       cs: "Trofeje a ocenenia",
@@ -1015,6 +1021,90 @@ export function getSectionTitle(id: string, lang: Lang, league: string, cupName:
       cs: "Najviac trestných minút v jednej sezóne",
       de: "Meiste Strafminuten in einer Saison",
       ru: "Больше всего штрафных минут за один сезон",
+    },
+    "team-pp-season": {
+      en: "Most power-play goals in a single season",
+      cs: "Najviac presilovkových gólov v jednej sezóne (PPG)",
+      de: "Meiste Überzahltore in einer Saison (PPG)",
+      ru: "Больше всего голов в большинстве за один сезон (PPG)",
+    },
+    "team-sh-season": {
+      en: "Most shorthanded goals in a single season",
+      cs: "Najviac oslabovkových gólov v jednej sezóne (SHG)",
+      de: "Meiste Unterzahltore in einer Saison (SHG)",
+      ru: "Больше всего голов в меньшинстве за один сезон (SHG)",
+    },
+    "team-highest-att-game": {
+      en: "Highest single-game attendance (RS)",
+      cs: "Najvyššia návštevnosť v jednom zápase (ZČ)",
+      de: "Höchste Zuschauerzahl in einem Spiel (HR)",
+      ru: "Наибольшая посещаемость в одном матче (РС)",
+    },
+    "team-lowest-att-game": {
+      en: "Lowest single-game attendance (RS)",
+      cs: "Najnižšia návštevnosť v jednom zápase (ZČ)",
+      de: "Niedrigste Zuschauerzahl in einem Spiel (HR)",
+      ru: "Наименьшая посещаемость в одном матче (РС)",
+    },
+    "team-highest-avg-att": {
+      en: "Highest average attendance in a season (RS)",
+      cs: "Najvyššia priemerná návštevnosť v jednej sezóne (ZČ)",
+      de: "Höchster Zuschauerschnitt in einer Saison (HR)",
+      ru: "Наивысшая средняя посещаемость за сезон (РС)",
+    },
+    "team-lowest-avg-att": {
+      en: "Lowest average attendance in a season (RS)",
+      cs: "Najnižšia priemerná návštevnosť v jednej sezóne (ZČ)",
+      de: "Niedrigster Zuschauerschnitt in einer Saison (HR)",
+      ru: "Наименьшая средняя посещаемость за сезон (РС)",
+    },
+    "team-sc-finals": {
+      en: `${cupName} Finals appearances`,
+      cs: `Účasť vo finále ${cupName}`,
+      de: `${cupName}-Finale-Teilnahmen`,
+      ru: `Участие в финале ${cupName}`,
+    },
+    "team-conf-finals": {
+      en: "Conference Finals appearances",
+      cs: "Účasť vo finále konferencie",
+      de: "Konferenzfinale-Teilnahmen",
+      ru: "Участие в финале конференции",
+    },
+    "team-po-appearances": {
+      en: "Playoff appearances",
+      cs: "Účasť v play-off",
+      de: "Play-off-Teilnahmen",
+      ru: "Участие в плей-офф",
+    },
+    "po-team-gf-season": {
+      en: "Most goals scored in a single playoff",
+      cs: "Najviac strelených gólov v jednom play-off",
+      de: "Meiste erzielte Tore in einem Playoff",
+      ru: "Больше всего забитых голов в одном плей-офф",
+    },
+    "po-team-ga-season": {
+      en: "Most goals conceded in a single playoff",
+      cs: "Najviac inkasovaných gólov v jednom play-off",
+      de: "Meiste Gegentore in einem Playoff",
+      ru: "Больше всего пропущенных голов в одном плей-офф",
+    },
+    "po-team-pim-season": {
+      en: "Most penalty minutes in a single playoff",
+      cs: "Najviac trestných minút v jednom play-off",
+      de: "Meiste Strafminuten in einem Playoff",
+      ru: "Больше всего штрафных минут в одном плей-офф",
+    },
+    "po-team-pp-season": {
+      en: "Most power-play goals in a single playoff",
+      cs: "Najviac presilovkových gólov v jednom play-off (PPG)",
+      de: "Meiste Überzahltore in einem Playoff (PPG)",
+      ru: "Больше всего голов в большинстве в одном плей-офф (PPG)",
+    },
+    "po-team-sh-season": {
+      en: "Most shorthanded goals in a single playoff",
+      cs: "Najviac oslabovkových gólov v jednom play-off (SHG)",
+      de: "Meiste Unterzahltore in einem Playoff (SHG)",
+      ru: "Больше всего голов в меньшинстве в одном плей-офф (SHG)",
     },
     "highest-attendance": {
       en: "Highest single-game attendance",
@@ -3850,6 +3940,371 @@ export async function getLeagueRecords(
   teamLoseStreaks.splice(5);
   teamLoseStreaks.forEach((item, idx) => { item.rank = idx + 1; });
 
+  // -- Team PP/SH goals per season (ZČ) --
+  const teamSeasonPpMap = new Map<string, { teamId: number; season: string; ppGoals: number; shGoals: number }>();
+  // from archived skaters (reg season, isPlayoff=false)
+  for (const s of archivedRegSkaters) {
+    const key = `${s.teamId}::${s.season}`;
+    if (!teamSeasonPpMap.has(key)) teamSeasonPpMap.set(key, { teamId: s.teamId, season: s.season, ppGoals: 0, shGoals: 0 });
+    const acc = teamSeasonPpMap.get(key)!;
+    acc.ppGoals += s.ppGoals;
+    acc.shGoals += s.shGoals;
+  }
+  // from live reg skater stats
+  for (const s of regSkaterStats) {
+    if (!s.teamId) continue;
+    const season = s.game.season;
+    const key = `${s.teamId}::${season}`;
+    if (!teamSeasonPpMap.has(key)) teamSeasonPpMap.set(key, { teamId: s.teamId, season, ppGoals: 0, shGoals: 0 });
+    const acc = teamSeasonPpMap.get(key)!;
+    acc.ppGoals += s.ppGoals ?? 0;
+    acc.shGoals += s.shGoals ?? 0;
+  }
+
+  const unitPpGoals = lang === "cs" ? "PPG" : lang === "de" ? "PPT" : lang === "ru" ? "ГБ" : "PPG";
+  const unitShGoals = lang === "cs" ? "SHG" : lang === "de" ? "UZT" : lang === "ru" ? "ГМ" : "SHG";
+
+  const mostPpGoalsSeason: LeaderItem[] = [...teamSeasonPpMap.values()]
+    .sort((a, b) => b.ppGoals - a.ppGoals)
+    .slice(0, 5)
+    .map((entry, idx) => {
+      const tm = teamById.get(entry.teamId);
+      return {
+        rank: idx + 1,
+        name: tm?.name ?? tTeam,
+        teamCode: tm?.code,
+        teamSlug: tm?.slug,
+        teamLogo: tm?.logoUrl,
+        value: `${entry.ppGoals} ${unitPpGoals}`,
+        sub: `${tSeason} ${entry.season}`,
+      };
+    });
+
+  const mostShGoalsSeason: LeaderItem[] = [...teamSeasonPpMap.values()]
+    .sort((a, b) => b.shGoals - a.shGoals)
+    .slice(0, 5)
+    .map((entry, idx) => {
+      const tm = teamById.get(entry.teamId);
+      return {
+        rank: idx + 1,
+        name: tm?.name ?? tTeam,
+        teamCode: tm?.code,
+        teamSlug: tm?.slug,
+        teamLogo: tm?.logoUrl,
+        value: `${entry.shGoals} ${unitShGoals}`,
+        sub: `${tSeason} ${entry.season}`,
+      };
+    });
+
+  // -- Reg season attendance records BY TEAM (single game) --
+  const regGamesWithAtt = regularGames.filter((g) => (g.attendance ?? 0) > 0);
+  const unitFansT = lang === "cs" ? "divákov" : lang === "de" ? "Zuschauer" : lang === "ru" ? "зрителей" : "fans";
+
+  const teamHighestAttGame: LeaderItem[] = [...regGamesWithAtt]
+    .sort((a, b) => (b.attendance ?? 0) - (a.attendance ?? 0))
+    .slice(0, 5)
+    .map((g, idx) => {
+      const home = teamById.get(g.homeTeamId);
+      const away = teamById.get(g.awayTeamId);
+      const dateStr = g.gameDate ? formatRecordDate(new Date(g.gameDate), lang) : g.season;
+      const numFmt = (g.attendance ?? 0).toLocaleString(lang === "cs" ? "sk-SK" : lang === "de" ? "de-DE" : lang === "ru" ? "ru-RU" : "en-US");
+      return {
+        rank: idx + 1,
+        name: `${home?.code ?? home?.name ?? tHome} vs ${away?.code ?? away?.name ?? tAway}`,
+        teamCode: home?.code,
+        teamSlug: home?.slug,
+        teamLogo: home?.logoUrl,
+        hideTeam: true,
+        value: `${numFmt} ${unitFansT}`,
+        sub: `${g.season} · ${dateStr} · ${tScore}: ${g.homeGoals}:${g.awayGoals}`,
+      };
+    });
+
+  const teamLowestAttGame: LeaderItem[] = [...regGamesWithAtt]
+    .sort((a, b) => (a.attendance ?? 0) - (b.attendance ?? 0))
+    .slice(0, 5)
+    .map((g, idx) => {
+      const home = teamById.get(g.homeTeamId);
+      const away = teamById.get(g.awayTeamId);
+      const dateStr = g.gameDate ? formatRecordDate(new Date(g.gameDate), lang) : g.season;
+      const numFmt = (g.attendance ?? 0).toLocaleString(lang === "cs" ? "sk-SK" : lang === "de" ? "de-DE" : lang === "ru" ? "ru-RU" : "en-US");
+      return {
+        rank: idx + 1,
+        name: `${home?.code ?? home?.name ?? tHome} vs ${away?.code ?? away?.name ?? tAway}`,
+        teamCode: home?.code,
+        teamSlug: home?.slug,
+        teamLogo: home?.logoUrl,
+        hideTeam: true,
+        value: `${numFmt} ${unitFansT}`,
+        sub: `${g.season} · ${dateStr} · ${tScore}: ${g.homeGoals}:${g.awayGoals}`,
+      };
+    });
+
+  // -- Per-season avg attendance BY TEAM (ZČ only) --
+  const teamRegSeasonAttMap = new Map<string, { teamId: number; season: string; totalAtt: number; games: number }>();
+  for (const g of regGamesWithAtt) {
+    const key = `${g.homeTeamId}::${g.season}`;
+    if (!teamRegSeasonAttMap.has(key)) teamRegSeasonAttMap.set(key, { teamId: g.homeTeamId, season: g.season, totalAtt: 0, games: 0 });
+    const acc = teamRegSeasonAttMap.get(key)!;
+    acc.totalAtt += g.attendance ?? 0;
+    acc.games += 1;
+  }
+  const teamRegSeasonAttList = [...teamRegSeasonAttMap.values()]
+    .filter((e) => e.games >= 2)
+    .map((e) => ({ ...e, avg: Math.round(e.totalAtt / e.games) }));
+
+  const teamHighestAvgAtt: LeaderItem[] = [...teamRegSeasonAttList]
+    .sort((a, b) => b.avg - a.avg)
+    .slice(0, 5)
+    .map((entry, idx) => {
+      const tm = teamById.get(entry.teamId);
+      const numFmt = entry.avg.toLocaleString(lang === "cs" ? "sk-SK" : lang === "de" ? "de-DE" : lang === "ru" ? "ru-RU" : "en-US");
+      return {
+        rank: idx + 1,
+        name: tm?.name ?? tTeam,
+        teamCode: tm?.code,
+        teamSlug: tm?.slug,
+        teamLogo: tm?.logoUrl,
+        value: `${numFmt} ${unitPerGame}`,
+        sub: `${tSeason} ${entry.season} (${entry.games} ${unitHomeGames})`,
+      };
+    });
+
+  const teamLowestAvgAtt: LeaderItem[] = [...teamRegSeasonAttList]
+    .sort((a, b) => a.avg - b.avg)
+    .slice(0, 5)
+    .map((entry, idx) => {
+      const tm = teamById.get(entry.teamId);
+      const numFmt = entry.avg.toLocaleString(lang === "cs" ? "sk-SK" : lang === "de" ? "de-DE" : lang === "ru" ? "ru-RU" : "en-US");
+      return {
+        rank: idx + 1,
+        name: tm?.name ?? tTeam,
+        teamCode: tm?.code,
+        teamSlug: tm?.slug,
+        teamLogo: tm?.logoUrl,
+        value: `${numFmt} ${unitPerGame}`,
+        sub: `${tSeason} ${entry.season} (${entry.games} ${unitHomeGames})`,
+      };
+    });
+
+  // ==========================================
+  // F2. TEAM CAREER CHAMPIONSHIP RECORDS (SC Finále, Konf Finále, PO účasť)
+  // ==========================================
+
+  // SC Finals appearances (champion + runnerUp from seasonRecords)
+  const teamScFinals = new Map<number, string[]>();
+  for (const r of seasonRecords) {
+    if (r.championTeamId) {
+      if (!teamScFinals.has(r.championTeamId)) teamScFinals.set(r.championTeamId, []);
+      teamScFinals.get(r.championTeamId)!.push(r.season);
+    }
+    if (r.runnerUpTeamId) {
+      if (!teamScFinals.has(r.runnerUpTeamId)) teamScFinals.set(r.runnerUpTeamId, []);
+      teamScFinals.get(r.runnerUpTeamId)!.push(r.season);
+    }
+  }
+  const teamScFinalsLeaders: LeaderItem[] = [...teamScFinals.entries()]
+    .map(([teamId, seasons]) => {
+      const tm = teamById.get(teamId);
+      const sorted = [...new Set(seasons)].sort();
+      return {
+        rank: 1, name: tm?.name ?? tTeam,
+        teamCode: tm?.code, teamSlug: tm?.slug, teamLogo: tm?.logoUrl,
+        value: `${sorted.length}×`,
+        sub: sorted.join(", "),
+        extraList: sorted,
+        rawVal: sorted.length,
+      };
+    })
+    .sort((a, b) => (b as any).rawVal - (a as any).rawVal)
+    .slice(0, 5)
+    .map((item, idx) => ({ ...item, rank: idx + 1 }));
+
+  // Conference Finals appearances — use archivedTeams.playoffResult
+  const confFinalResultValues = ["Champion", "Final", "Conf Final"];
+  const teamConfFinals = new Map<number, string[]>();
+  for (const t of archivedTeams) {
+    if (t.playoffResult && confFinalResultValues.includes(t.playoffResult)) {
+      if (!teamConfFinals.has(t.teamId)) teamConfFinals.set(t.teamId, []);
+      teamConfFinals.get(t.teamId)!.push(t.season);
+    }
+  }
+  // also add from seasonRecords champion/runner-up (they definitely were in conf finals)
+  for (const r of seasonRecords) {
+    if (r.championTeamId) {
+      if (!teamConfFinals.has(r.championTeamId)) teamConfFinals.set(r.championTeamId, []);
+      if (!teamConfFinals.get(r.championTeamId)!.includes(r.season)) teamConfFinals.get(r.championTeamId)!.push(r.season);
+    }
+    if (r.runnerUpTeamId) {
+      if (!teamConfFinals.has(r.runnerUpTeamId)) teamConfFinals.set(r.runnerUpTeamId, []);
+      if (!teamConfFinals.get(r.runnerUpTeamId)!.includes(r.season)) teamConfFinals.get(r.runnerUpTeamId)!.push(r.season);
+    }
+  }
+  const teamConfFinalsLeaders: LeaderItem[] = [...teamConfFinals.entries()]
+    .map(([teamId, seasons]) => {
+      const tm = teamById.get(teamId);
+      const sorted = [...new Set(seasons)].sort();
+      return {
+        rank: 1, name: tm?.name ?? tTeam,
+        teamCode: tm?.code, teamSlug: tm?.slug, teamLogo: tm?.logoUrl,
+        value: `${sorted.length}×`,
+        sub: sorted.join(", "),
+        extraList: sorted,
+        rawVal: sorted.length,
+      };
+    })
+    .sort((a, b) => (b as any).rawVal - (a as any).rawVal)
+    .slice(0, 5)
+    .map((item, idx) => ({ ...item, rank: idx + 1 }));
+
+  // Playoff appearances — any season where team appeared in any playoff game
+  const teamPoAppearances = new Map<number, Set<string>>();
+  for (const g of playoffGames) {
+    [g.homeTeamId, g.awayTeamId].forEach((tid) => {
+      if (!teamPoAppearances.has(tid)) teamPoAppearances.set(tid, new Set());
+      teamPoAppearances.get(tid)!.add(g.season);
+    });
+  }
+  // also count from archivedTeams if playoffResult != null and not "Missed"
+  for (const t of archivedTeams) {
+    if (t.playoffResult && t.playoffResult !== "Missed") {
+      if (!teamPoAppearances.has(t.teamId)) teamPoAppearances.set(t.teamId, new Set());
+      teamPoAppearances.get(t.teamId)!.add(t.season);
+    }
+  }
+  const teamPoAppLeaders: LeaderItem[] = [...teamPoAppearances.entries()]
+    .map(([teamId, seasons]) => {
+      const tm = teamById.get(teamId);
+      const sorted = [...seasons].sort();
+      return {
+        rank: 1, name: tm?.name ?? tTeam,
+        teamCode: tm?.code, teamSlug: tm?.slug, teamLogo: tm?.logoUrl,
+        value: `${sorted.length}×`,
+        sub: sorted.join(", "),
+        extraList: sorted,
+        rawVal: sorted.length,
+      };
+    })
+    .sort((a, b) => (b as any).rawVal - (a as any).rawVal)
+    .slice(0, 5)
+    .map((item, idx) => ({ ...item, rank: idx + 1 }));
+
+  // ==========================================
+  // F3. PLAYOFF TEAM SEASON RECORDS (GF, GA, PIM, PP, SH)
+  // ==========================================
+
+  // Aggregate from archivedPlayoffSkaters + playoffSkaterStats
+  const poTeamSeasonMap = new Map<string, { teamId: number; season: string; gf: number; ga: number; pim: number; ppGoals: number; shGoals: number }>();
+
+  for (const s of archivedPlayoffSkaters) {
+    const key = `${s.teamId}::${s.season}`;
+    if (!poTeamSeasonMap.has(key)) poTeamSeasonMap.set(key, { teamId: s.teamId, season: s.season, gf: 0, ga: 0, pim: 0, ppGoals: 0, shGoals: 0 });
+    const acc = poTeamSeasonMap.get(key)!;
+    acc.pim += s.pim;
+    acc.ppGoals += s.ppGoals;
+    acc.shGoals += s.shGoals;
+  }
+  for (const s of playoffSkaterStats) {
+    if (!s.teamId) continue;
+    const season = s.game.season;
+    const key = `${s.teamId}::${season}`;
+    if (!poTeamSeasonMap.has(key)) poTeamSeasonMap.set(key, { teamId: s.teamId, season, gf: 0, ga: 0, pim: 0, ppGoals: 0, shGoals: 0 });
+    const acc = poTeamSeasonMap.get(key)!;
+    acc.pim += s.pim ?? 0;
+    acc.ppGoals += s.ppGoals ?? 0;
+    acc.shGoals += s.shGoals ?? 0;
+  }
+
+  // Compute GF/GA from playoffGames goal events
+  for (const g of playoffGames) {
+    const hg = g.homeGoals ?? 0;
+    const ag = g.awayGoals ?? 0;
+    const homeKey = `${g.homeTeamId}::${g.season}`;
+    const awayKey = `${g.awayTeamId}::${g.season}`;
+    if (!poTeamSeasonMap.has(homeKey)) poTeamSeasonMap.set(homeKey, { teamId: g.homeTeamId, season: g.season, gf: 0, ga: 0, pim: 0, ppGoals: 0, shGoals: 0 });
+    if (!poTeamSeasonMap.has(awayKey)) poTeamSeasonMap.set(awayKey, { teamId: g.awayTeamId, season: g.season, gf: 0, ga: 0, pim: 0, ppGoals: 0, shGoals: 0 });
+    poTeamSeasonMap.get(homeKey)!.gf += hg;
+    poTeamSeasonMap.get(homeKey)!.ga += ag;
+    poTeamSeasonMap.get(awayKey)!.gf += ag;
+    poTeamSeasonMap.get(awayKey)!.ga += hg;
+  }
+
+  const poTeamSeasonList = [...poTeamSeasonMap.values()];
+  const secBadgePo2 = getRecordBadge("playoffs", lang);
+
+  const poMostGfSeason: LeaderItem[] = [...poTeamSeasonList]
+    .sort((a, b) => b.gf - a.gf)
+    .slice(0, 5)
+    .map((entry, idx) => {
+      const tm = teamById.get(entry.teamId);
+      return {
+        rank: idx + 1, name: tm?.name ?? tTeam,
+        teamCode: tm?.code, teamSlug: tm?.slug, teamLogo: tm?.logoUrl,
+        value: `${entry.gf} ${unitGf}`,
+        sub: `${tSeason} ${entry.season}`,
+      };
+    });
+
+  const poMostGaSeason: LeaderItem[] = [...poTeamSeasonList]
+    .sort((a, b) => b.ga - a.ga)
+    .slice(0, 5)
+    .map((entry, idx) => {
+      const tm = teamById.get(entry.teamId);
+      return {
+        rank: idx + 1, name: tm?.name ?? tTeam,
+        teamCode: tm?.code, teamSlug: tm?.slug, teamLogo: tm?.logoUrl,
+        value: `${entry.ga} ${unitGa}`,
+        sub: `${tSeason} ${entry.season}`,
+      };
+    });
+
+  const poMostPimSeason: LeaderItem[] = [...poTeamSeasonList]
+    .sort((a, b) => b.pim - a.pim)
+    .slice(0, 5)
+    .map((entry, idx) => {
+      const tm = teamById.get(entry.teamId);
+      return {
+        rank: idx + 1, name: tm?.name ?? tTeam,
+        teamCode: tm?.code, teamSlug: tm?.slug, teamLogo: tm?.logoUrl,
+        value: `${entry.pim} ${tPim}`,
+        sub: `${tSeason} ${entry.season}`,
+      };
+    });
+
+  const poMostPpGoalsSeason: LeaderItem[] = [...poTeamSeasonList]
+    .sort((a, b) => b.ppGoals - a.ppGoals)
+    .slice(0, 5)
+    .map((entry, idx) => {
+      const tm = teamById.get(entry.teamId);
+      return {
+        rank: idx + 1, name: tm?.name ?? tTeam,
+        teamCode: tm?.code, teamSlug: tm?.slug, teamLogo: tm?.logoUrl,
+        value: `${entry.ppGoals} ${unitPpGoals}`,
+        sub: `${tSeason} ${entry.season}`,
+      };
+    });
+
+  const poMostShGoalsSeason: LeaderItem[] = [...poTeamSeasonList]
+    .sort((a, b) => b.shGoals - a.shGoals)
+    .slice(0, 5)
+    .map((entry, idx) => {
+      const tm = teamById.get(entry.teamId);
+      return {
+        rank: idx + 1, name: tm?.name ?? tTeam,
+        teamCode: tm?.code, teamSlug: tm?.slug, teamLogo: tm?.logoUrl,
+        value: `${entry.shGoals} ${unitShGoals}`,
+        sub: `${tSeason} ${entry.season}`,
+      };
+    });
+
+  const poTeamSections: RecordSection[] = [
+    { id: "po-team-gf-season", title: getSectionTitle("po-team-gf-season", lang, league, cupName), icon: "🎯", phase: "playoffs", phaseBadge: secBadgePo2, items: poMostGfSeason },
+    { id: "po-team-ga-season", title: getSectionTitle("po-team-ga-season", lang, league, cupName), icon: "🛡️", phase: "playoffs", phaseBadge: secBadgePo2, items: poMostGaSeason },
+    { id: "po-team-pim-season", title: getSectionTitle("po-team-pim-season", lang, league, cupName), icon: "⏱️", phase: "playoffs", phaseBadge: secBadgePo2, items: poMostPimSeason },
+    { id: "po-team-pp-season", title: getSectionTitle("po-team-pp-season", lang, league, cupName), icon: "⚡", phase: "playoffs", phaseBadge: secBadgePo2, items: poMostPpGoalsSeason },
+    { id: "po-team-sh-season", title: getSectionTitle("po-team-sh-season", lang, league, cupName), icon: "🛡️", phase: "playoffs", phaseBadge: secBadgePo2, items: poMostShGoalsSeason },
+  ];
+
   // ==========================================
   // G. AGE RECORDS (Vekové rekordy)
   // ==========================================
@@ -5231,7 +5686,39 @@ export async function getLeagueRecords(
           phaseBadge: secBadgePo,
           items: goalieRingsLeader,
         },
+        {
+          id: "team-sc-finals",
+          title: getSectionTitle("team-sc-finals", lang, league, cupName),
+          icon: "🥈",
+          phase: "playoffs",
+          phaseBadge: secBadgePo,
+          items: teamScFinalsLeaders,
+        },
+        {
+          id: "team-conf-finals",
+          title: getSectionTitle("team-conf-finals", lang, league, cupName),
+          icon: "🏒",
+          phase: "playoffs",
+          phaseBadge: secBadgePo,
+          items: teamConfFinalsLeaders,
+        },
+        {
+          id: "team-po-appearances",
+          title: getSectionTitle("team-po-appearances", lang, league, cupName),
+          icon: "📋",
+          phase: "playoffs",
+          phaseBadge: secBadgePo,
+          items: teamPoAppLeaders,
+        },
       ],
+    },
+    {
+      id: "po-team-seasons",
+      title: getGroupTitle("po-team-seasons", lang, cupName),
+      icon: "📊",
+      phase: "playoffs",
+      mainCategory: "teams",
+      records: poTeamSections,
     },
     {
       id: "team-seasons",
@@ -5295,6 +5782,54 @@ export async function getLeagueRecords(
           phase: "regular",
           phaseBadge: secBadgeReg,
           items: mostPimSeason,
+        },
+        {
+          id: "team-pp-season",
+          title: getSectionTitle("team-pp-season", lang, league, cupName),
+          icon: "⚡",
+          phase: "regular",
+          phaseBadge: secBadgeReg,
+          items: mostPpGoalsSeason,
+        },
+        {
+          id: "team-sh-season",
+          title: getSectionTitle("team-sh-season", lang, league, cupName),
+          icon: "🛡️",
+          phase: "regular",
+          phaseBadge: secBadgeReg,
+          items: mostShGoalsSeason,
+        },
+        {
+          id: "team-highest-att-game",
+          title: getSectionTitle("team-highest-att-game", lang, league, cupName),
+          icon: "👥",
+          phase: "regular",
+          phaseBadge: secBadgeReg,
+          items: teamHighestAttGame,
+        },
+        {
+          id: "team-lowest-att-game",
+          title: getSectionTitle("team-lowest-att-game", lang, league, cupName),
+          icon: "👤",
+          phase: "regular",
+          phaseBadge: secBadgeReg,
+          items: teamLowestAttGame,
+        },
+        {
+          id: "team-highest-avg-att",
+          title: getSectionTitle("team-highest-avg-att", lang, league, cupName),
+          icon: "📈",
+          phase: "regular",
+          phaseBadge: secBadgeReg,
+          items: teamHighestAvgAtt,
+        },
+        {
+          id: "team-lowest-avg-att",
+          title: getSectionTitle("team-lowest-avg-att", lang, league, cupName),
+          icon: "📉",
+          phase: "regular",
+          phaseBadge: secBadgeReg,
+          items: teamLowestAvgAtt,
         },
       ],
     },
