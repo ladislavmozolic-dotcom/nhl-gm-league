@@ -5,6 +5,7 @@ import ComingSoon from "@/components/ComingSoon";
 import { cleanName } from "@/lib/playerName";
 import { ceremonyFinalists } from "@/lib/award-voting";
 import AwardsCeremony, { type CeremonyCategory, type Nominee } from "@/components/AwardsCeremony";
+import HistoryNav from "@/components/HistoryNav";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,7 @@ export default async function AwardsPage({ searchParams }: { searchParams: Promi
     return (
       <div className="space-y-6 py-2">
         <PageHeader title="Awards Ceremony" subtitle="End-of-season trophies" />
+        <HistoryNav active="awards" league={league} />
         <ComingSoon title="No season archived yet" points={["Play a season through to the Cup Final", "Then Admin → Season Control → Archive season", "Come back here for the awards ceremony"]} />
       </div>
     );
@@ -99,6 +101,7 @@ export default async function AwardsPage({ searchParams }: { searchParams: Promi
   return (
     <div className="space-y-6 py-2">
       <PageHeader title={`${season} Awards Ceremony`} subtitle={`${league} · nominees & trophy winners`} />
+      <HistoryNav active="awards" league={league} />
 
       {/* season / league switcher */}
       <div className="flex flex-wrap items-center gap-2">

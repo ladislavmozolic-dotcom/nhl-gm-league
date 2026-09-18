@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/ui";
 import { hallOfFame, type Resume } from "@/lib/hof-server";
+import HistoryNav from "@/components/HistoryNav";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,7 @@ export default async function HallOfFamePage() {
   return (
     <div className="space-y-8 py-2">
       <PageHeader title="Hall of Fame" subtitle="Inducted on a career résumé — production, hardware, cups, longevity. The Hall fills in as legends retire." />
+      <HistoryNav active="hof" />
 
       {/* Inducted */}
       <section>

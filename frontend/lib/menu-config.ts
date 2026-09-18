@@ -72,6 +72,7 @@ export const DEFAULT_MENU: MenuItem[] = [
   ] },
   { key: "history", label: "History", href: "/history", children: [
     { label: "🕰️ League History", href: "/history" },
+    { label: "📜 Records (Rekordy)", href: "/history/records" },
     { label: "🏅 Hall of Fame", href: "/hall-of-fame" },
     { label: "🏵️ Awards", href: "/awards" },
     { label: "🗳️ Award Voting", href: "/awards/vote" },
@@ -92,6 +93,7 @@ export const DEFAULT_MENU: MenuItem[] = [
     { label: "📅 AHL Schedule", href: "/schedule?league=AHL" },
     { label: "🔢 AHL Scores", href: "/scores?league=AHL" },
     { label: "🥇 Individual Leaders", href: "/stats/leaders?league=AHL" },
+    { label: "📜 AHL Records", href: "/history/records?league=AHL" },
     { label: "🛰️ EDGE Tracking", href: "/stats/edge?league=AHL" },
     { label: "👤 Player Stats", href: "/stats/players?league=AHL" },
     { label: "🥅 Goalie Stats", href: "/stats/goalies?league=AHL" },
