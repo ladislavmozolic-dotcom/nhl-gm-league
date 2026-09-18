@@ -189,10 +189,46 @@ export function getGroupTitle(id: string, lang: Lang, cupName: string): string {
       ru: "Рекорды одного матча в плей-офф — Полевые игроки",
     },
     "career-goalies": {
-      en: "Individual Career Records — Goalies (RS)",
-      cs: "Individuálne kariérne rekordy — Brankári (ZČ)",
-      de: "Individuelle Karriererekorde — Torhüter (HR)",
-      ru: "Индивидуальные рекорды карьеры — Вратари (РС)",
+      en: "Career Goalie Records (RS)",
+      cs: "Kariérne rekordy brankárov (ZČ)",
+      de: "Karriere-Torhüterrekorde (HR)",
+      ru: "Рекорды карьеры вратарей (РС)",
+    },
+    "season-goalies": {
+      en: "Single-Season Goalie Records (RS)",
+      cs: "Sezónne rekordy brankárov (ZČ)",
+      de: "Saisonrekorde der Torhüter (HR)",
+      ru: "Рекорды одного сезона для вратарей (РС)",
+    },
+    "streak-goalies": {
+      en: "Goalie Streak Records (RS)",
+      cs: "Série brankárov (ZČ)",
+      de: "Torhüter-Serienrekorde (HR)",
+      ru: "Серии вратарей (РС)",
+    },
+    "game-goalies": {
+      en: "Single-Game Goalie Records (RS)",
+      cs: "Zápasové rekordy brankárov (ZČ)",
+      de: "Einzelspiel-Torhüterrekorde (HR)",
+      ru: "Рекорды одного матча для вратарей (РС)",
+    },
+    "playoff-career-goalies": {
+      en: "Playoff Career Goalie Records",
+      cs: "Kariérne rekordy brankárov (Play-off)",
+      de: "Playoff-Karriere-Torhüterrekorde",
+      ru: "Рекорды плей-офф в карьере для вратарей",
+    },
+    "playoff-season-goalies": {
+      en: "Playoff Single-Season Goalie Records",
+      cs: "Sezónne rekordy brankárov v play-off",
+      de: "Playoff-Saisonrekorde der Torhüter",
+      ru: "Рекорды одного сезона плей-офф для вратарей",
+    },
+    "playoff-game-goalies": {
+      en: "Playoff Single-Game Goalie Records",
+      cs: "Zápasové rekordy brankárov v play-off",
+      de: "Playoff-Einzelspiel-Torhüterrekorde",
+      ru: "Рекорды одного матча плей-офф для вратарей",
     },
     "championships": {
       en: `${cupName} & Team Titles`,
@@ -692,6 +728,12 @@ export function getSectionTitle(id: string, lang: Lang, league: string, cupName:
       de: "Schlechteste +/- in einem Playoff-Spiel",
       ru: "Худший +/- в матче плей-офф",
     },
+    "career-goalie-gp": {
+      en: "Most career games played (Goalies)",
+      cs: "Najviac odohraných zápasov v kariére (brankár)",
+      de: "Meiste Karrierespiele (Torhüter)",
+      ru: "Больше всего матчей в карьере (Вратари)",
+    },
     "career-wins": {
       en: "Most career wins (Goalies)",
       cs: "Najviac výhier v kariére (brankár)",
@@ -700,21 +742,183 @@ export function getSectionTitle(id: string, lang: Lang, league: string, cupName:
     },
     "career-steals": {
       en: "Most career stolen games (steals)",
-      cs: "Najviac ukradnutých zápasov (steals) v kariére",
-      de: "Meiste gestohlene Spiele (Steals) in der Karriere",
-      ru: "Больше всего украденных матчей (steals) в карьере",
+      cs: "Najviac ukradnutých zápasov v kariére",
+      de: "Meiste gestohlene Spiele in der Karriere",
+      ru: "Больше всего украденных матчей в карьере",
     },
     "career-gsax": {
       en: "Best career GSAx (Goals Saved Above Expected)",
-      cs: "Najlepší GSAx (Goals Saved Above Expected) v kariére",
-      de: "Bestes Karriere-GSAx (Goals Saved Above Expected)",
-      ru: "Лучший GSAx за карьеру (Goals Saved Above Expected)",
+      cs: "Najlepší GSAx v kariére",
+      de: "Bestes Karriere-GSAx",
+      ru: "Лучший GSAx за карьеру",
     },
     "career-shutouts": {
       en: "Most career shutouts",
       cs: "Najviac čistých kont v kariére",
       de: "Meiste Karriere-Shutouts",
       ru: "Больше всего сухих матчей за карьеру",
+    },
+    "career-goalie-saves": {
+      en: "Most career saves",
+      cs: "Najviac chycených strieľ v kariére (zákroky)",
+      de: "Meiste Karriere-Paraden",
+      ru: "Больше всего сейвов в карьере",
+    },
+    "season-goalie-gp": {
+      en: "Most games played in a single season (Goalies)",
+      cs: "Najviac odohraných zápasov v jednej sezóne (brankár)",
+      de: "Meiste Spiele in einer Saison (Torhüter)",
+      ru: "Больше всего матчей за сезон (Вратари)",
+    },
+    "season-goalie-wins": {
+      en: "Most goalie wins in a single season",
+      cs: "Najviac výhier brankára v jednej sezóne",
+      de: "Meiste Torhütersiege in einer Saison",
+      ru: "Больше всего побед вратаря за сезон",
+    },
+    "season-goalie-steals": {
+      en: "Most stolen games (steals) in a single season",
+      cs: "Najviac ukradnutých zápasov v jednej sezóne",
+      de: "Meiste gestohlene Spiele in einer Saison",
+      ru: "Больше всего украденных матчей за сезон",
+    },
+    "season-goalie-gsax": {
+      en: "Best single-season GSAx",
+      cs: "Najlepší GSAx v jednej sezóne",
+      de: "Beste GSAx in einer Saison",
+      ru: "Лучший GSAx за сезон",
+    },
+    "season-goalie-shutouts": {
+      en: "Most shutouts in a single season",
+      cs: "Najviac čistých kont v jednej sezóne",
+      de: "Meiste Shutouts in einer Saison",
+      ru: "Больше всего сухих матчей за сезон",
+    },
+    "season-goalie-saves": {
+      en: "Most saves in a single season",
+      cs: "Najviac chycených strieľ v jednej sezóne",
+      de: "Meiste Paraden in einer Saison",
+      ru: "Больше всего сейвов за сезон",
+    },
+    "streak-goalie-gp": {
+      en: "Longest consecutive games started streak",
+      cs: "Najviac odchytaných zápasov v rade",
+      de: "Meiste Einsätze in Folge (Torhüter)",
+      ru: "Самая длинная серия матчей в старте подряд",
+    },
+    "streak-goalie-wins": {
+      en: "Longest winning streak (Goalies)",
+      cs: "Najviac výhier v rade (brankár)",
+      de: "Längste Siegesserie (Torhüter)",
+      ru: "Самая длинная победная серия (Вратари)",
+    },
+    "streak-goalie-steals": {
+      en: "Longest stolen games streak",
+      cs: "Najviac ukradnutých zápasov v rade",
+      de: "Längste Steal-Serie (Torhüter)",
+      ru: "Самая длинная серия украденных матчей",
+    },
+    "streak-goalie-shutouts": {
+      en: "Longest consecutive shutout streak",
+      cs: "Najviac čistých kont v rade",
+      de: "Meiste Shutouts in Folge",
+      ru: "Самая длинная серия сухих матчей",
+    },
+    "game-goalie-gsax": {
+      en: "Highest single-game GSAx",
+      cs: "Najvyšší GSAx v jednom zápase",
+      de: "Höchste GSAx in einem Spiel",
+      ru: "Лучший GSAx в одном матче",
+    },
+    "game-goalie-saves": {
+      en: "Most saves in a single game",
+      cs: "Najviac chycených strieľ v jednom zápase",
+      de: "Meiste Paraden in einem Spiel",
+      ru: "Больше всего сейвов в одном матче",
+    },
+    "playoff-career-goalie-gp": {
+      en: "Most playoff career games played (Goalies)",
+      cs: "Najviac odohraných zápasov v play-off v kariére (brankár)",
+      de: "Meiste Playoff-Karrierespiele (Torhüter)",
+      ru: "Больше всего матчей в плей-офф в карьере (Вратари)",
+    },
+    "playoff-career-goalie-wins": {
+      en: "Most playoff career wins (Goalies)",
+      cs: "Najviac výhier v play-off v kariére (brankár)",
+      de: "Meiste Playoff-Karrieresiege (Torhüter)",
+      ru: "Больше всего побед в плей-офф в карьере (Вратари)",
+    },
+    "playoff-career-goalie-steals": {
+      en: "Most playoff career stolen games (steals)",
+      cs: "Najviac ukradnutých zápasov v play-off v kariére",
+      de: "Meiste Playoff-Karriere-Steals",
+      ru: "Больше всего украденных матчей в плей-офф в карьере",
+    },
+    "playoff-career-goalie-gsax": {
+      en: "Best playoff career GSAx",
+      cs: "Najlepší GSAx v play-off v kariére",
+      de: "Beste Playoff-Karriere-GSAx",
+      ru: "Лучший GSAx в плей-офф в карьере",
+    },
+    "playoff-career-goalie-shutouts": {
+      en: "Most playoff career shutouts",
+      cs: "Najviac čistých kont v play-off v kariére",
+      de: "Meiste Playoff-Karriere-Shutouts",
+      ru: "Больше всего сухих матчей в плей-офф в карьере",
+    },
+    "playoff-career-goalie-saves": {
+      en: "Most playoff career saves",
+      cs: "Najviac chycených strieľ v play-off v kariére",
+      de: "Meiste Playoff-Karriere-Paraden",
+      ru: "Больше всего сейвов в плей-офф в карьере",
+    },
+    "playoff-season-goalie-gp": {
+      en: "Most games played in a single playoff run",
+      cs: "Najviac odohraných zápasov v jednom play-off (brankár)",
+      de: "Meiste Spiele in einer Playoff-Saison",
+      ru: "Больше всего матчей в одном плей-офф (вратарь)",
+    },
+    "playoff-season-goalie-wins": {
+      en: "Most goalie wins in a single playoff run",
+      cs: "Najviac výhier brankára v jednom play-off",
+      de: "Meiste Torhütersiege in einer Playoff-Saison",
+      ru: "Больше всего побед вратаря в одном плей-офф",
+    },
+    "playoff-season-goalie-steals": {
+      en: "Most stolen games (steals) in a single playoff run",
+      cs: "Najviac ukradnutých zápasov v jednom play-off",
+      de: "Meiste gestohlene Spiele in einer Playoff-Saison",
+      ru: "Больше всего украденных матчей в одном плей-офф",
+    },
+    "playoff-season-goalie-gsax": {
+      en: "Best single-playoff GSAx",
+      cs: "Najlepší GSAx v jednom play-off",
+      de: "Beste GSAx in einer Playoff-Saison",
+      ru: "Лучший GSAx в одном плей-офф",
+    },
+    "playoff-season-goalie-shutouts": {
+      en: "Most shutouts in a single playoff run",
+      cs: "Najviac čistých kont v jednom play-off",
+      de: "Meiste Shutouts in einer Playoff-Saison",
+      ru: "Больше всего сухих матчей в одном плей-офф",
+    },
+    "playoff-season-goalie-saves": {
+      en: "Most saves in a single playoff run",
+      cs: "Najviac chycených strieľ v jednom play-off",
+      de: "Meiste Paraden in einer Playoff-Saison",
+      ru: "Больше всего сейвов в одном плей-офф",
+    },
+    "playoff-game-goalie-gsax": {
+      en: "Highest single-game playoff GSAx",
+      cs: "Najvyšší GSAx v jednom zápase play-off",
+      de: "Höchste GSAx in einem Playoff-Spiel",
+      ru: "Лучший GSAx в одном матче плей-офф",
+    },
+    "playoff-game-goalie-saves": {
+      en: "Most saves in a single playoff game",
+      cs: "Najviac chycených strieľ v jednom zápase play-off",
+      de: "Meiste Paraden in einem Playoff-Spiel",
+      ru: "Больше всего сейвов в одном матче плей-офф",
     },
     "team-cups": {
       en: `Most ${cupName} titles won (as team)`,
@@ -2204,48 +2408,519 @@ export async function getLeagueRecords(
     { id: "playoff-game-plus-minus-worst", title: getSectionTitle("playoff-game-plus-minus-worst", lang, league, cupName), icon: "🔴", phase: "playoffs", phaseBadge: secBadgePo, items: poGamePlusMinusWorstLeader },
   ];
 
-  // Playoff Career Wins from real playoff goalie stats
-  const playoffGoalieAcc = new Map<number, { playerId: number; teamId: number | null; gp: number; wins: number; saves: number; shutouts: number }>();
-  for (const g of playoffGoalieStats) {
-    if (!playoffGoalieAcc.has(g.playerId)) {
-      playoffGoalieAcc.set(g.playerId, { playerId: g.playerId, teamId: g.teamId, gp: 0, wins: 0, saves: 0, shutouts: 0 });
-    }
-    const acc = playoffGoalieAcc.get(g.playerId)!;
-    acc.gp += 1;
-    if (g.decision === "W") acc.wins += 1;
-    acc.saves += g.saves;
-    if (g.goalsAgainst === 0) acc.shutouts += 1;
-    if (g.teamId) acc.teamId = g.teamId;
-  }
-
-  const playoffCareerWins: LeaderItem[] = [...playoffGoalieAcc.values()]
-    .filter((g) => g.wins > 0)
-    .sort((a, b) => b.wins - a.wins || b.saves - a.saves)
-    .slice(0, 5)
-    .map((g, idx) => {
-      const p = playerMap.get(g.playerId);
-      return {
-        rank: idx + 1,
-        name: p ? cleanName(p.name) : tGoalie,
-        slug: p?.slug,
-        photoUrl: p?.photoUrl,
-        hideTeam: true,
-        value: `${g.wins} W`,
-        sub: `${g.gp} GP · ${g.shutouts} SO`,
-      };
-    });
-
-  // Goalie Regular Season Career Records
+  // ==========================================
+  // J. GOALIE RECORDS (Kompletné rekordy brankárov)
+  // ==========================================
+  // 1. Regular Season Goalie Career
+  const careerGoalieGpItems = topGoalies((g) => g.gp, (g) => `${g.gp} GP`, (g) => `${g.wins} W · ${g.shutouts} SO`);
   const careerWinsItems = topGoalies((g) => g.wins, (g) => `${g.wins} W`, (g) => `${g.gp} GP · ${g.shutouts} SO`);
   const careerStealsItems = topGoalies((g) => g.steals, (g) => `${g.steals} STL`, (g) => `${g.wins} W · ${g.gp} GP`);
   const careerGsaxItems = topGoalies((g) => g.gsax, (g) => (g.gsax > 0 ? `+${g.gsax.toFixed(1)} GSAx` : `${g.gsax.toFixed(1)} GSAx`), (g) => `${g.gp} GP · ${g.goalsAgainst} GA`);
   const careerShutoutsItems = topGoalies((g) => g.shutouts, (g) => `${g.shutouts} SO`, (g) => `${g.gp} GP · ${g.wins} W`);
+  const careerSavesItems = topGoalies(
+    (g) => g.saves,
+    (g) => `${g.saves} ${unitSaves}`,
+    (g) => `${g.shotsAgainst > 0 ? ((g.saves / g.shotsAgainst) * 100).toFixed(1) : "0.0"}% SV% · ${g.gp} GP`
+  );
 
   const goalieCareerSections: RecordSection[] = [
+    { id: "career-goalie-gp", title: getSectionTitle("career-goalie-gp", lang, league, cupName), icon: "📅", phase: "regular", phaseBadge: secBadgeReg, items: careerGoalieGpItems },
     { id: "career-wins", title: getSectionTitle("career-wins", lang, league, cupName), icon: "🧤", phase: "regular", phaseBadge: secBadgeReg, items: careerWinsItems },
     { id: "career-steals", title: getSectionTitle("career-steals", lang, league, cupName), icon: "🥷", phase: "regular", phaseBadge: secBadgeReg, items: careerStealsItems },
     { id: "career-gsax", title: getSectionTitle("career-gsax", lang, league, cupName), icon: "📊", phase: "regular", phaseBadge: secBadgeReg, items: careerGsaxItems },
     { id: "career-shutouts", title: getSectionTitle("career-shutouts", lang, league, cupName), icon: "🧱", phase: "regular", phaseBadge: secBadgeReg, items: careerShutoutsItems },
+    { id: "career-goalie-saves", title: getSectionTitle("career-goalie-saves", lang, league, cupName), icon: "🛡️", phase: "regular", phaseBadge: secBadgeReg, items: careerSavesItems },
+    { id: "goalie-cups", title: getSectionTitle("goalie-cups", lang, league, cupName), icon: "🏆", phase: "playoffs", phaseBadge: secBadgePo, items: goalieRingsLeader },
+  ];
+
+  // 2. Regular Season Single-Season Goalies
+  type SeasonGoalieAcc = {
+    playerId: number;
+    season: string;
+    teamIds: Set<number>;
+    gp: number;
+    wins: number;
+    losses: number;
+    otl: number;
+    shutouts: number;
+    shotsAgainst: number;
+    saves: number;
+    goalsAgainst: number;
+    steals: number;
+    gsax: number;
+  };
+
+  const seasonGoalieMap = new Map<string, SeasonGoalieAcc>();
+
+  for (const g of archivedRegGoalies) {
+    const key = `${g.playerId}::${g.season}`;
+    if (!seasonGoalieMap.has(key)) {
+      seasonGoalieMap.set(key, {
+        playerId: g.playerId,
+        season: g.season,
+        teamIds: new Set(),
+        gp: 0,
+        wins: 0,
+        losses: 0,
+        otl: 0,
+        shutouts: 0,
+        shotsAgainst: 0,
+        saves: 0,
+        goalsAgainst: 0,
+        steals: 0,
+        gsax: 0,
+      });
+    }
+    const acc = seasonGoalieMap.get(key)!;
+    acc.gp += g.gp;
+    acc.wins += g.wins;
+    acc.losses += g.losses;
+    acc.otl += g.otl;
+    acc.shutouts += g.shutouts;
+    acc.shotsAgainst += g.shotsAgainst;
+    acc.saves += g.saves;
+    acc.goalsAgainst += g.goalsAgainst;
+    if (g.teamId) acc.teamIds.add(g.teamId);
+  }
+
+  for (const g of regGoalieStats) {
+    const season = g.game?.season ?? "";
+    const key = `${g.playerId}::${season}`;
+    if (!seasonGoalieMap.has(key)) {
+      seasonGoalieMap.set(key, {
+        playerId: g.playerId,
+        season,
+        teamIds: new Set(),
+        gp: 0,
+        wins: 0,
+        losses: 0,
+        otl: 0,
+        shutouts: 0,
+        shotsAgainst: 0,
+        saves: 0,
+        goalsAgainst: 0,
+        steals: 0,
+        gsax: 0,
+      });
+    }
+    const acc = seasonGoalieMap.get(key)!;
+    acc.gp += 1;
+    acc.shotsAgainst += g.shotsAgainst;
+    acc.saves += g.saves;
+    acc.goalsAgainst += g.goalsAgainst;
+    if (g.decision === "W") acc.wins += 1;
+    else if (g.decision === "OTL") acc.otl += 1;
+    else if (g.decision === "L") acc.losses += 1;
+    if (g.goalsAgainst === 0) acc.shutouts += 1;
+    const gsax = (g.xga ?? 0) - g.goalsAgainst;
+    acc.gsax += gsax;
+    if (g.decision === "W" && g.game) {
+      const isHome = g.teamId === g.game.homeTeamId;
+      const teamGoals = (isHome ? g.game.homeGoals : g.game.awayGoals) ?? 0;
+      const oppGoals = (isHome ? g.game.awayGoals : g.game.homeGoals) ?? 0;
+      const enGoals = g.game.goalEvents.filter((ev) => ev.teamId === g.teamId).length;
+      const margin = Math.max(0, teamGoals - enGoals - oppGoals);
+      if (gsax > margin) {
+        acc.steals += 1;
+      }
+    }
+    if (g.teamId) acc.teamIds.add(g.teamId);
+  }
+
+  const allSeasonGoalies = [...seasonGoalieMap.values()];
+
+  const buildSeasonGoalieLeader = (
+    list: SeasonGoalieAcc[],
+    sortFn: (a: SeasonGoalieAcc, b: SeasonGoalieAcc) => number,
+    filterFn: (g: SeasonGoalieAcc) => boolean,
+    valFmt: (g: SeasonGoalieAcc) => string | number,
+    subFmt: (g: SeasonGoalieAcc) => string
+  ): LeaderItem[] =>
+    list
+      .filter(filterFn)
+      .sort(sortFn)
+      .slice(0, 5)
+      .map((entry, idx) => {
+        const p = playerMap.get(entry.playerId);
+        const tmInfo = resolveTeams(entry.teamIds, teamById);
+        return {
+          rank: idx + 1,
+          name: p ? cleanName(p.name) : tGoalie,
+          slug: p?.slug,
+          photoUrl: p?.photoUrl,
+          ...tmInfo,
+          value: valFmt(entry),
+          sub: subFmt(entry),
+        };
+      });
+
+  const seasonGoalieGpLeader = buildSeasonGoalieLeader(allSeasonGoalies, (a, b) => b.gp - a.gp || b.wins - a.wins, (g) => g.gp > 0, (g) => `${g.gp} GP`, (g) => `${tSeason} ${g.season} · ${g.wins} W`);
+  const seasonGoalieWinsLeader = buildSeasonGoalieLeader(allSeasonGoalies, (a, b) => b.wins - a.wins || b.gp - a.gp, (g) => g.wins > 0, (g) => `${g.wins} W`, (g) => `${tSeason} ${g.season} · ${g.gp} GP · ${g.shutouts} SO`);
+  const seasonGoalieStealsLeader = buildSeasonGoalieLeader(allSeasonGoalies, (a, b) => b.steals - a.steals || b.wins - a.wins, (g) => g.steals > 0, (g) => `${g.steals} STL`, (g) => `${tSeason} ${g.season} · ${g.wins} W · ${g.gp} GP`);
+  const seasonGoalieGsaxLeader = buildSeasonGoalieLeader(allSeasonGoalies, (a, b) => b.gsax - a.gsax || b.wins - a.wins, (g) => g.gsax > 0, (g) => `+${g.gsax.toFixed(1)} GSAx`, (g) => `${tSeason} ${g.season} · ${g.gp} GP · ${g.goalsAgainst} GA`);
+  const seasonGoalieShutoutsLeader = buildSeasonGoalieLeader(allSeasonGoalies, (a, b) => b.shutouts - a.shutouts || b.wins - a.wins, (g) => g.shutouts > 0, (g) => `${g.shutouts} SO`, (g) => `${tSeason} ${g.season} · ${g.gp} GP · ${g.wins} W`);
+  const seasonGoalieSavesLeader = buildSeasonGoalieLeader(allSeasonGoalies, (a, b) => b.saves - a.saves || b.shotsAgainst - a.shotsAgainst, (g) => g.saves > 0, (g) => `${g.saves} ${unitSaves}`, (g) => `${tSeason} ${g.season} · ${g.shotsAgainst > 0 ? ((g.saves / g.shotsAgainst) * 100).toFixed(1) : "0.0"}% SV% · ${g.gp} GP`);
+
+  const goalieSeasonSections: RecordSection[] = [
+    { id: "season-goalie-gp", title: getSectionTitle("season-goalie-gp", lang, league, cupName), icon: "📅", phase: "regular", phaseBadge: secBadgeReg, items: seasonGoalieGpLeader },
+    { id: "season-goalie-wins", title: getSectionTitle("season-goalie-wins", lang, league, cupName), icon: "🧤", phase: "regular", phaseBadge: secBadgeReg, items: seasonGoalieWinsLeader },
+    { id: "season-goalie-steals", title: getSectionTitle("season-goalie-steals", lang, league, cupName), icon: "🥷", phase: "regular", phaseBadge: secBadgeReg, items: seasonGoalieStealsLeader },
+    { id: "season-goalie-gsax", title: getSectionTitle("season-goalie-gsax", lang, league, cupName), icon: "📊", phase: "regular", phaseBadge: secBadgeReg, items: seasonGoalieGsaxLeader },
+    { id: "season-goalie-shutouts", title: getSectionTitle("season-goalie-shutouts", lang, league, cupName), icon: "🧱", phase: "regular", phaseBadge: secBadgeReg, items: seasonGoalieShutoutsLeader },
+    { id: "season-goalie-saves", title: getSectionTitle("season-goalie-saves", lang, league, cupName), icon: "🛡️", phase: "regular", phaseBadge: secBadgeReg, items: seasonGoalieSavesLeader },
+  ];
+
+  // 3. Regular Season Goalie Streaks
+  const playerRegGoalieGameStats = new Map<number, typeof regGoalieStats>();
+  for (const g of regGoalieStats) {
+    if (!playerRegGoalieGameStats.has(g.playerId)) playerRegGoalieGameStats.set(g.playerId, []);
+    playerRegGoalieGameStats.get(g.playerId)!.push(g);
+  }
+
+  for (const [, list] of playerRegGoalieGameStats.entries()) {
+    list.sort((a, b) => {
+      const da = a.game?.gameDate ? new Date(a.game.gameDate).getTime() : 0;
+      const db = b.game?.gameDate ? new Date(b.game.gameDate).getTime() : 0;
+      return da - db || a.gameId - b.gameId;
+    });
+  }
+
+  const glIronmanStreaks: StreakInfo[] = [];
+  const glWinStreaks: StreakInfo[] = [];
+  const glStealsStreaks: StreakInfo[] = [];
+  const glShutoutStreaks: StreakInfo[] = [];
+
+  for (const [pId, list] of playerRegGoalieGameStats.entries()) {
+    let maxIron = 0, curIron = 0, startIron = "", curStartIron = "", endIron = "";
+    let maxW = 0, curW = 0, startW = "", curStartW = "", endW = "";
+    let maxS = 0, curS = 0, startS = "", curStartS = "", endS = "";
+    let maxSO = 0, curSO = 0, startSO = "", curStartSO = "", endSO = "";
+
+    for (let i = 0; i < list.length; i++) {
+      const g = list[i];
+      const seas = g.game?.season ?? "";
+
+      // Consecutive games started
+      if (curIron === 0) curStartIron = seas;
+      curIron++;
+      if (curIron > maxIron) {
+        maxIron = curIron;
+        startIron = curStartIron;
+        endIron = seas;
+      }
+
+      // Wins streak
+      if (g.decision === "W") {
+        if (curW === 0) curStartW = seas;
+        curW++;
+        if (curW > maxW) {
+          maxW = curW;
+          startW = curStartW;
+          endW = seas;
+        }
+      } else {
+        curW = 0;
+      }
+
+      // Steals streak
+      const gsax = (g.xga ?? 0) - g.goalsAgainst;
+      let isSteal = false;
+      if (g.decision === "W" && g.game) {
+        const isHome = g.teamId === g.game.homeTeamId;
+        const teamGoals = (isHome ? g.game.homeGoals : g.game.awayGoals) ?? 0;
+        const oppGoals = (isHome ? g.game.awayGoals : g.game.homeGoals) ?? 0;
+        const enGoals = g.game.goalEvents.filter((ev) => ev.teamId === g.teamId).length;
+        const margin = Math.max(0, teamGoals - enGoals - oppGoals);
+        if (gsax > margin) isSteal = true;
+      }
+
+      if (isSteal) {
+        if (curS === 0) curStartS = seas;
+        curS++;
+        if (curS > maxS) {
+          maxS = curS;
+          startS = curStartS;
+          endS = seas;
+        }
+      } else {
+        curS = 0;
+      }
+
+      // Shutout streak
+      if (g.goalsAgainst === 0) {
+        if (curSO === 0) curStartSO = seas;
+        curSO++;
+        if (curSO > maxSO) {
+          maxSO = curSO;
+          startSO = curStartSO;
+          endSO = seas;
+        }
+      } else {
+        curSO = 0;
+      }
+    }
+
+    if (maxIron > 0) glIronmanStreaks.push({ playerId: pId, streak: maxIron, startSeason: startIron, endSeason: endIron });
+    if (maxW > 0) glWinStreaks.push({ playerId: pId, streak: maxW, startSeason: startW, endSeason: endW });
+    if (maxS > 0) glStealsStreaks.push({ playerId: pId, streak: maxS, startSeason: startS, endSeason: endS });
+    if (maxSO > 0) glShutoutStreaks.push({ playerId: pId, streak: maxSO, startSeason: startSO, endSeason: endSO });
+  }
+
+  const glIronmanLeader = buildStreakLeader(glIronmanStreaks, lang === "cs" ? "odchytaných zápasov v rade" : lang === "de" ? "Spiele in Folge" : lang === "ru" ? "матчей подряд" : "consecutive starts");
+  const glWinStreakLeader = buildStreakLeader(glWinStreaks, lang === "cs" ? "výhier v rade" : lang === "de" ? "Siege in Folge" : lang === "ru" ? "побед подряд" : "consecutive wins");
+  const glStealsStreakLeader = buildStreakLeader(glStealsStreaks, lang === "cs" ? "ukradnutých zápasov v rade" : lang === "de" ? "Steals in Folge" : lang === "ru" ? "украденных матчей подряд" : "consecutive steals");
+  const glShutoutStreakLeader = buildStreakLeader(glShutoutStreaks, lang === "cs" ? "čistých kont v rade" : lang === "de" ? "Shutouts in Folge" : lang === "ru" ? "сухих матчей подряд" : "consecutive shutouts");
+
+  const goalieStreakSections: RecordSection[] = [
+    { id: "streak-goalie-gp", title: getSectionTitle("streak-goalie-gp", lang, league, cupName), icon: "🔥", phase: "regular", phaseBadge: secBadgeReg, items: glIronmanLeader },
+    { id: "streak-goalie-wins", title: getSectionTitle("streak-goalie-wins", lang, league, cupName), icon: "🏆", phase: "regular", phaseBadge: secBadgeReg, items: glWinStreakLeader },
+    { id: "streak-goalie-steals", title: getSectionTitle("streak-goalie-steals", lang, league, cupName), icon: "🥷", phase: "regular", phaseBadge: secBadgeReg, items: glStealsStreakLeader },
+    { id: "streak-goalie-shutouts", title: getSectionTitle("streak-goalie-shutouts", lang, league, cupName), icon: "🧱", phase: "regular", phaseBadge: secBadgeReg, items: glShutoutStreakLeader },
+  ];
+
+  // 4. Regular Season Goalie Single-Game
+  const buildGameGoalieLeader = (
+    list: typeof regGoalieStats,
+    sortFn: (a: (typeof regGoalieStats)[0], b: (typeof regGoalieStats)[0]) => number,
+    filterFn: (g: (typeof regGoalieStats)[0]) => boolean,
+    valFmt: (g: (typeof regGoalieStats)[0]) => string | number,
+    subFmt: (g: (typeof regGoalieStats)[0]) => string
+  ): LeaderItem[] =>
+    list
+      .filter(filterFn)
+      .sort(sortFn)
+      .slice(0, 5)
+      .map((g, idx) => {
+        const p = playerMap.get(g.playerId);
+        const tm = g.teamId ? teamById.get(g.teamId) : null;
+        return {
+          rank: idx + 1,
+          name: p ? cleanName(p.name) : tGoalie,
+          slug: p?.slug,
+          photoUrl: p?.photoUrl,
+          teamCode: tm?.code,
+          teamSlug: tm?.slug,
+          teamLogo: tm?.logoUrl,
+          value: valFmt(g),
+          sub: subFmt(g),
+        };
+      });
+
+  const gameGoalieGsaxLeader = buildGameGoalieLeader(
+    regGoalieStats,
+    (a, b) => ((b.xga ?? 0) - b.goalsAgainst) - ((a.xga ?? 0) - a.goalsAgainst) || b.saves - a.saves,
+    (g) => (g.xga ?? 0) - g.goalsAgainst > 0,
+    (g) => `+${((g.xga ?? 0) - g.goalsAgainst).toFixed(2)} GSAx ${tInGame}`,
+    (g) => `${g.saves}/${g.shotsAgainst} ${unitSaves} · ${g.game?.season ?? ""} (${getGameDateStr(g.game)})`
+  );
+
+  const gameGoalieSavesLeader = buildGameGoalieLeader(
+    regGoalieStats,
+    (a, b) => b.saves - a.saves || b.shotsAgainst - a.shotsAgainst,
+    (g) => g.saves > 0,
+    (g) => `${g.saves} ${unitSaves} ${tInGame}`,
+    (g) => `${g.shotsAgainst > 0 ? ((g.saves / g.shotsAgainst) * 100).toFixed(1) : "0.0"}% SV% · ${g.game?.season ?? ""} (${getGameDateStr(g.game)})`
+  );
+
+  const goalieGameSections: RecordSection[] = [
+    { id: "game-goalie-gsax", title: getSectionTitle("game-goalie-gsax", lang, league, cupName), icon: "📊", phase: "regular", phaseBadge: secBadgeReg, items: gameGoalieGsaxLeader },
+    { id: "game-goalie-saves", title: getSectionTitle("game-goalie-saves", lang, league, cupName), icon: "🧤", phase: "regular", phaseBadge: secBadgeReg, items: gameGoalieSavesLeader },
+  ];
+
+  // 5. Playoff Career Goalies
+  const poGlCareerMap = new Map<number, GoalieCareerAcc>();
+  const getPoGlAcc = (id: number): GoalieCareerAcc => {
+    let acc = poGlCareerMap.get(id);
+    if (!acc) {
+      acc = { playerId: id, gp: 0, wins: 0, losses: 0, otl: 0, shutouts: 0, shotsAgainst: 0, saves: 0, goalsAgainst: 0, steals: 0, gsax: 0, teamId: null };
+      poGlCareerMap.set(id, acc);
+    }
+    return acc;
+  };
+
+  for (const g of archivedPlayoffGoalies) {
+    const a = getPoGlAcc(g.playerId);
+    a.gp += g.gp;
+    a.wins += g.wins;
+    a.losses += g.losses;
+    a.otl += g.otl;
+    a.shutouts += g.shutouts;
+    a.shotsAgainst += g.shotsAgainst;
+    a.saves += g.saves;
+    a.goalsAgainst += g.goalsAgainst;
+    if (g.teamId) a.teamId = g.teamId;
+  }
+
+  for (const g of playoffGoalieStats) {
+    const a = getPoGlAcc(g.playerId);
+    a.gp += 1;
+    a.shotsAgainst += g.shotsAgainst;
+    a.saves += g.saves;
+    a.goalsAgainst += g.goalsAgainst;
+    if (g.decision === "W") a.wins++;
+    else if (g.decision === "OTL") a.otl++;
+    else if (g.decision === "L") a.losses++;
+    if (g.goalsAgainst === 0) a.shutouts++;
+    const gsax = (g.xga ?? 0) - g.goalsAgainst;
+    a.gsax += gsax;
+    if (g.decision === "W" && g.game) {
+      const isHome = g.teamId === g.game.homeTeamId;
+      const teamGoals = (isHome ? g.game.homeGoals : g.game.awayGoals) ?? 0;
+      const oppGoals = (isHome ? g.game.awayGoals : g.game.homeGoals) ?? 0;
+      const enGoals = g.game.goalEvents.filter((ev) => ev.teamId === g.teamId).length;
+      const margin = Math.max(0, teamGoals - enGoals - oppGoals);
+      if (gsax > margin) {
+        a.steals++;
+      }
+    }
+    if (g.teamId) a.teamId = g.teamId;
+  }
+
+  const poGlList = [...poGlCareerMap.values()];
+
+  const topPoGoalies = (fn: (g: GoalieCareerAcc) => number, valFmt: (g: GoalieCareerAcc) => string | number, subFmt?: (g: GoalieCareerAcc) => string) =>
+    [...poGlList]
+      .filter((g) => fn(g) > 0)
+      .sort((a, b) => fn(b) - fn(a) || b.wins - a.wins)
+      .slice(0, 5)
+      .map((g, idx) => ({ ...glRowItem(g, valFmt(g), subFmt?.(g)), rank: idx + 1 }));
+
+  const poCareerGoalieGpLeader = topPoGoalies((g) => g.gp, (g) => `${g.gp} GP`, (g) => `${g.wins} W · ${g.shutouts} SO`);
+  const poCareerWinsLeader = topPoGoalies((g) => g.wins, (g) => `${g.wins} W`, (g) => `${g.gp} GP · ${g.shutouts} SO`);
+  const poCareerStealsLeader = topPoGoalies((g) => g.steals, (g) => `${g.steals} STL`, (g) => `${g.wins} W · ${g.gp} GP`);
+  const poCareerGsaxLeader = topPoGoalies((g) => g.gsax, (g) => (g.gsax > 0 ? `+${g.gsax.toFixed(1)} GSAx` : `${g.gsax.toFixed(1)} GSAx`), (g) => `${g.gp} GP · ${g.goalsAgainst} GA`);
+  const poCareerShutoutsLeader = topPoGoalies((g) => g.shutouts, (g) => `${g.shutouts} SO`, (g) => `${g.gp} GP · ${g.wins} W`);
+  const poCareerSavesLeader = topPoGoalies(
+    (g) => g.saves,
+    (g) => `${g.saves} ${unitSaves}`,
+    (g) => `${g.shotsAgainst > 0 ? ((g.saves / g.shotsAgainst) * 100).toFixed(1) : "0.0"}% SV% · ${g.gp} GP`
+  );
+
+  const playoffGoalieCareerSections: RecordSection[] = [
+    { id: "playoff-career-goalie-gp", title: getSectionTitle("playoff-career-goalie-gp", lang, league, cupName), icon: "📅", phase: "playoffs", phaseBadge: secBadgePo, items: poCareerGoalieGpLeader },
+    { id: "playoff-career-goalie-wins", title: getSectionTitle("playoff-career-goalie-wins", lang, league, cupName), icon: "🧤", phase: "playoffs", phaseBadge: secBadgePo, items: poCareerWinsLeader },
+    { id: "playoff-career-goalie-steals", title: getSectionTitle("playoff-career-goalie-steals", lang, league, cupName), icon: "🥷", phase: "playoffs", phaseBadge: secBadgePo, items: poCareerStealsLeader },
+    { id: "playoff-career-goalie-gsax", title: getSectionTitle("playoff-career-goalie-gsax", lang, league, cupName), icon: "📊", phase: "playoffs", phaseBadge: secBadgePo, items: poCareerGsaxLeader },
+    { id: "playoff-career-goalie-shutouts", title: getSectionTitle("playoff-career-goalie-shutouts", lang, league, cupName), icon: "🧱", phase: "playoffs", phaseBadge: secBadgePo, items: poCareerShutoutsLeader },
+    { id: "playoff-career-goalie-saves", title: getSectionTitle("playoff-career-goalie-saves", lang, league, cupName), icon: "🛡️", phase: "playoffs", phaseBadge: secBadgePo, items: poCareerSavesLeader },
+  ];
+
+  // 6. Playoff Single-Season Goalies
+  const poSeasonGoalieMap = new Map<string, SeasonGoalieAcc>();
+
+  for (const g of archivedPlayoffGoalies) {
+    const key = `${g.playerId}::${g.season}`;
+    if (!poSeasonGoalieMap.has(key)) {
+      poSeasonGoalieMap.set(key, {
+        playerId: g.playerId,
+        season: g.season,
+        teamIds: new Set(),
+        gp: 0,
+        wins: 0,
+        losses: 0,
+        otl: 0,
+        shutouts: 0,
+        shotsAgainst: 0,
+        saves: 0,
+        goalsAgainst: 0,
+        steals: 0,
+        gsax: 0,
+      });
+    }
+    const acc = poSeasonGoalieMap.get(key)!;
+    acc.gp += g.gp;
+    acc.wins += g.wins;
+    acc.losses += g.losses;
+    acc.otl += g.otl;
+    acc.shutouts += g.shutouts;
+    acc.shotsAgainst += g.shotsAgainst;
+    acc.saves += g.saves;
+    acc.goalsAgainst += g.goalsAgainst;
+    if (g.teamId) acc.teamIds.add(g.teamId);
+  }
+
+  for (const g of playoffGoalieStats) {
+    const season = g.game?.season ?? "";
+    const key = `${g.playerId}::${season}`;
+    if (!poSeasonGoalieMap.has(key)) {
+      poSeasonGoalieMap.set(key, {
+        playerId: g.playerId,
+        season,
+        teamIds: new Set(),
+        gp: 0,
+        wins: 0,
+        losses: 0,
+        otl: 0,
+        shutouts: 0,
+        shotsAgainst: 0,
+        saves: 0,
+        goalsAgainst: 0,
+        steals: 0,
+        gsax: 0,
+      });
+    }
+    const acc = poSeasonGoalieMap.get(key)!;
+    acc.gp += 1;
+    acc.shotsAgainst += g.shotsAgainst;
+    acc.saves += g.saves;
+    acc.goalsAgainst += g.goalsAgainst;
+    if (g.decision === "W") acc.wins += 1;
+    else if (g.decision === "OTL") acc.otl += 1;
+    else if (g.decision === "L") acc.losses += 1;
+    if (g.goalsAgainst === 0) acc.shutouts += 1;
+    const gsax = (g.xga ?? 0) - g.goalsAgainst;
+    acc.gsax += gsax;
+    if (g.decision === "W" && g.game) {
+      const isHome = g.teamId === g.game.homeTeamId;
+      const teamGoals = (isHome ? g.game.homeGoals : g.game.awayGoals) ?? 0;
+      const oppGoals = (isHome ? g.game.awayGoals : g.game.homeGoals) ?? 0;
+      const enGoals = g.game.goalEvents.filter((ev) => ev.teamId === g.teamId).length;
+      const margin = Math.max(0, teamGoals - enGoals - oppGoals);
+      if (gsax > margin) {
+        acc.steals += 1;
+      }
+    }
+    if (g.teamId) acc.teamIds.add(g.teamId);
+  }
+
+  const allPoSeasonGoalies = [...poSeasonGoalieMap.values()];
+
+  const poSeasonGoalieGpLeader = buildSeasonGoalieLeader(allPoSeasonGoalies, (a, b) => b.gp - a.gp || b.wins - a.wins, (g) => g.gp > 0, (g) => `${g.gp} GP`, (g) => `${tPlayoffs} ${g.season} · ${g.wins} W`);
+  const poSeasonGoalieWinsLeader = buildSeasonGoalieLeader(allPoSeasonGoalies, (a, b) => b.wins - a.wins || b.gp - a.gp, (g) => g.wins > 0, (g) => `${g.wins} W`, (g) => `${tPlayoffs} ${g.season} · ${g.gp} GP · ${g.shutouts} SO`);
+  const poSeasonGoalieStealsLeader = buildSeasonGoalieLeader(allPoSeasonGoalies, (a, b) => b.steals - a.steals || b.wins - a.wins, (g) => g.steals > 0, (g) => `${g.steals} STL`, (g) => `${tPlayoffs} ${g.season} · ${g.wins} W · ${g.gp} GP`);
+  const poSeasonGoalieGsaxLeader = buildSeasonGoalieLeader(allPoSeasonGoalies, (a, b) => b.gsax - a.gsax || b.wins - a.wins, (g) => g.gsax > 0, (g) => `+${g.gsax.toFixed(1)} GSAx`, (g) => `${tPlayoffs} ${g.season} · ${g.gp} GP · ${g.goalsAgainst} GA`);
+  const poSeasonGoalieShutoutsLeader = buildSeasonGoalieLeader(allPoSeasonGoalies, (a, b) => b.shutouts - a.shutouts || b.wins - a.wins, (g) => g.shutouts > 0, (g) => `${g.shutouts} SO`, (g) => `${tPlayoffs} ${g.season} · ${g.gp} GP · ${g.wins} W`);
+  const poSeasonGoalieSavesLeader = buildSeasonGoalieLeader(allPoSeasonGoalies, (a, b) => b.saves - a.saves || b.shotsAgainst - a.shotsAgainst, (g) => g.saves > 0, (g) => `${g.saves} ${unitSaves}`, (g) => `${tPlayoffs} ${g.season} · ${g.shotsAgainst > 0 ? ((g.saves / g.shotsAgainst) * 100).toFixed(1) : "0.0"}% SV% · ${g.gp} GP`);
+
+  const playoffGoalieSeasonSections: RecordSection[] = [
+    { id: "playoff-season-goalie-gp", title: getSectionTitle("playoff-season-goalie-gp", lang, league, cupName), icon: "📅", phase: "playoffs", phaseBadge: secBadgePo, items: poSeasonGoalieGpLeader },
+    { id: "playoff-season-goalie-wins", title: getSectionTitle("playoff-season-goalie-wins", lang, league, cupName), icon: "🧤", phase: "playoffs", phaseBadge: secBadgePo, items: poSeasonGoalieWinsLeader },
+    { id: "playoff-season-goalie-steals", title: getSectionTitle("playoff-season-goalie-steals", lang, league, cupName), icon: "🥷", phase: "playoffs", phaseBadge: secBadgePo, items: poSeasonGoalieStealsLeader },
+    { id: "playoff-season-goalie-gsax", title: getSectionTitle("playoff-season-goalie-gsax", lang, league, cupName), icon: "📊", phase: "playoffs", phaseBadge: secBadgePo, items: poSeasonGoalieGsaxLeader },
+    { id: "playoff-season-goalie-shutouts", title: getSectionTitle("playoff-season-goalie-shutouts", lang, league, cupName), icon: "🧱", phase: "playoffs", phaseBadge: secBadgePo, items: poSeasonGoalieShutoutsLeader },
+    { id: "playoff-season-goalie-saves", title: getSectionTitle("playoff-season-goalie-saves", lang, league, cupName), icon: "🛡️", phase: "playoffs", phaseBadge: secBadgePo, items: poSeasonGoalieSavesLeader },
+  ];
+
+  // 7. Playoff Goalie Single-Game
+  const poGameGoalieGsaxLeader = buildGameGoalieLeader(
+    playoffGoalieStats,
+    (a, b) => ((b.xga ?? 0) - b.goalsAgainst) - ((a.xga ?? 0) - a.goalsAgainst) || b.saves - a.saves,
+    (g) => (g.xga ?? 0) - g.goalsAgainst > 0,
+    (g) => `+${((g.xga ?? 0) - g.goalsAgainst).toFixed(2)} GSAx ${tInGamePo}`,
+    (g) => `${g.saves}/${g.shotsAgainst} ${unitSaves} · ${g.game?.season ?? ""} (${getGameDateStr(g.game)})`
+  );
+
+  const poGameGoalieSavesLeader = buildGameGoalieLeader(
+    playoffGoalieStats,
+    (a, b) => b.saves - a.saves || b.shotsAgainst - a.shotsAgainst,
+    (g) => g.saves > 0,
+    (g) => `${g.saves} ${unitSaves} ${tInGamePo}`,
+    (g) => `${g.shotsAgainst > 0 ? ((g.saves / g.shotsAgainst) * 100).toFixed(1) : "0.0"}% SV% · ${g.game?.season ?? ""} (${getGameDateStr(g.game)})`
+  );
+
+  const playoffGoalieGameSections: RecordSection[] = [
+    { id: "playoff-game-goalie-gsax", title: getSectionTitle("playoff-game-goalie-gsax", lang, league, cupName), icon: "📊", phase: "playoffs", phaseBadge: secBadgePo, items: poGameGoalieGsaxLeader },
+    { id: "playoff-game-goalie-saves", title: getSectionTitle("playoff-game-goalie-saves", lang, league, cupName), icon: "🧤", phase: "playoffs", phaseBadge: secBadgePo, items: poGameGoalieSavesLeader },
   ];
 
   // ==========================================
@@ -3202,6 +3877,54 @@ export async function getLeagueRecords(
       records: goalieCareerSections,
     },
     {
+      id: "season-goalies",
+      title: getGroupTitle("season-goalies", lang, cupName),
+      icon: "📅",
+      phase: "regular",
+      mainCategory: "goalies",
+      records: goalieSeasonSections,
+    },
+    {
+      id: "streak-goalies",
+      title: getGroupTitle("streak-goalies", lang, cupName),
+      icon: "🔥",
+      phase: "regular",
+      mainCategory: "goalies",
+      records: goalieStreakSections,
+    },
+    {
+      id: "game-goalies",
+      title: getGroupTitle("game-goalies", lang, cupName),
+      icon: "⚡",
+      phase: "regular",
+      mainCategory: "goalies",
+      records: goalieGameSections,
+    },
+    {
+      id: "playoff-career-goalies",
+      title: getGroupTitle("playoff-career-goalies", lang, cupName),
+      icon: "⭐",
+      phase: "playoffs",
+      mainCategory: "goalies",
+      records: playoffGoalieCareerSections,
+    },
+    {
+      id: "playoff-season-goalies",
+      title: getGroupTitle("playoff-season-goalies", lang, cupName),
+      icon: "🔥",
+      phase: "playoffs",
+      mainCategory: "goalies",
+      records: playoffGoalieSeasonSections,
+    },
+    {
+      id: "playoff-game-goalies",
+      title: getGroupTitle("playoff-game-goalies", lang, cupName),
+      icon: "⚡",
+      phase: "playoffs",
+      mainCategory: "goalies",
+      records: playoffGoalieGameSections,
+    },
+    {
       id: "championships",
       title: getGroupTitle("championships", lang, cupName),
       icon: "🏆",
@@ -3231,14 +3954,6 @@ export async function getLeagueRecords(
           phase: "playoffs",
           phaseBadge: secBadgePo,
           items: goalieRingsLeader,
-        },
-        {
-          id: "playoff-career-wins",
-          title: getSectionTitle("playoff-career-wins", lang, league, cupName),
-          icon: "🧤",
-          phase: "playoffs",
-          phaseBadge: secBadgePo,
-          items: playoffCareerWins,
         },
       ],
     },
