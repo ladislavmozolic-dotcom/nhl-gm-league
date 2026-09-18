@@ -150,7 +150,7 @@ export default async function HomePage() {
   const lastDay = await prisma.game.findFirst({ where: { season: activeSeason, status: "FINAL", seriesId: null, gameDate: { not: null } }, orderBy: { gameDate: "desc" }, select: { gameDate: true } });
   let ticker: { id: number; league: string; hg: number | null; ag: number | null; home: any; away: any }[] = [];
   let highlights: string[] = [];
-  let stars: { id?: number; slug?: string | null; name: string; teamCode: string; teamSlug?: string | null; logoUrl: string | null; g: number; a: number; pts: number }[] = [];
+  let stars: { id?: number; slug?: string | null; name: string; teamCode: string; teamSlug?: string | null; logoUrl: string | null; g: number; a: number; pts: number; gameId: number }[] = [];
   let dayGoals = 0, dayPoints = 0;
   if (lastDay?.gameDate) {
     const d = lastDay.gameDate;
@@ -165,7 +165,7 @@ export default async function HomePage() {
 
     const stats = await prisma.playerGameStat.findMany({
       where: { game: { gameDate: { gte: start, lte: end }, status: "FINAL", season: activeSeason, league: "NHL" } },
-      select: { playerId: true, goals: true, assists: true, points: true },
+      select: { playerId: true, gameId: true, goals: true, assists: true, points: true },
     });
     dayGoals = stats.reduce((t, s) => t + s.goals, 0);
     dayPoints = stats.reduce((t, s) => t + s.points, 0);
@@ -182,7 +182,7 @@ export default async function HomePage() {
       });
       stars = top3.map((s) => {
         const p = pById.get(s.playerId);
-        return { id: s.playerId, slug: p?.slug ?? null, name: cleanName(p?.name ?? "Player"), teamCode: p?.team?.code ?? "", teamSlug: p?.team?.slug ?? null, logoUrl: p?.team?.logoUrl ?? null, g: s.goals, a: s.assists, pts: s.points };
+        return { id: s.playerId, slug: p?.slug ?? null, name: cleanName(p?.name ?? "Player"), teamCode: p?.team?.code ?? "", teamSlug: p?.team?.slug ?? null, logoUrl: p?.team?.logoUrl ?? null, g: s.goals, a: s.assists, pts: s.points, gameId: s.gameId };
       });
     }
   }
@@ -358,13 +358,17 @@ export default async function HomePage() {
             {stars.length === 0 ? <p className="text-sm text-slate-500 py-4 text-center">After the next sim.</p> : (
               <div className="space-y-2.5">
                 {stars.map((s, i) => {
-                  const starIcons = i === 0 ? "★★★" : i === 1 ? "★★" : "★";
-                  const starColor = i === 0 ? "text-amber-400" : i === 1 ? "text-amber-300/90" : "text-amber-500/80";
+                  const starCount = 3 - i;
+                  // 2nd star reads silver against 1st's gold/bronze-amber, so the three
+                  // ranks are told apart at a glance rather than all blending into amber.
+                  const starColor = i === 0 ? "text-amber-400" : i === 1 ? "text-slate-300" : "text-amber-500/80";
                   return (
                     <div key={i} className="flex items-center justify-between gap-2.5 p-2 rounded-xl bg-slate-800/40 border border-slate-800/60 hover:bg-slate-800/70 transition-colors">
                       <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                        <span className={`text-sm font-black tracking-tight shrink-0 w-8 text-center ${starColor}`} title={`${i + 1}. star`}>
-                          {starIcons}
+                        {/* Fixed-width, centered regardless of star count (1 vs 3 glyphs
+                            in one text run don't optically center the same way). */}
+                        <span className={`shrink-0 w-8 flex items-center justify-center gap-0.5 text-sm font-black ${starColor}`} title={`${i + 1}. star`}>
+                          {Array.from({ length: starCount }, (_, j) => <span key={j}>★</span>)}
                         </span>
                         {s.logoUrl && <img src={s.logoUrl} alt="" className="w-5 h-5 object-contain shrink-0 ml-0.5" />}
                         <div className="min-w-0 flex-1">
@@ -376,14 +380,14 @@ export default async function HomePage() {
                           </div>
                         </div>
                       </div>
-                      <div className="text-right shrink-0">
-                        <div className="text-sm font-bold text-amber-300 tabular-nums">
+                      <Link href={`/games/${s.gameId}`} className="text-right shrink-0 group/pts">
+                        <div className="text-sm font-bold text-amber-300 tabular-nums group-hover/pts:text-blue-400 transition-colors">
                           {s.pts} <span className="text-[10px] font-semibold text-slate-400 uppercase">PTS</span>
                         </div>
                         <div className="text-[11px] text-slate-400 tabular-nums">
                           {s.g}G + {s.a}A
                         </div>
-                      </div>
+                      </Link>
                     </div>
                   );
                 })}
