@@ -1469,7 +1469,7 @@ export async function getLeagueRecords(
       records: [
         {
           id: "gm-seasons-total",
-          title: `Najviac odohraných sezón v u${league} (jako GM)`,
+          title: `Najviac odohraných sezón v u${league} (ako GM)`,
           icon: "📅",
           phase: "all",
           phaseBadge: "História",
@@ -1493,7 +1493,7 @@ export async function getLeagueRecords(
         },
         {
           id: "gm-cups",
-          title: `Počet vyhraných ${cupName}ov (jako GM)`,
+          title: `Počet vyhraných ${cupName}ov (ako GM)`,
           icon: "🏆",
           phase: "playoffs",
           phaseBadge: "Play-off",
@@ -1509,7 +1509,7 @@ export async function getLeagueRecords(
       records: [
         {
           id: "team-cups",
-          title: `Počet vyhraných ${cupName}ov (jako tím)`,
+          title: `Počet vyhraných ${cupName}ov (ako tím)`,
           icon: "🏆",
           phase: "playoffs",
           phaseBadge: "Play-off",
