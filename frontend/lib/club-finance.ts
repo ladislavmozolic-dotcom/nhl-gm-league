@@ -6,12 +6,13 @@ import type { TicketPricing } from "./season-tickets";
 export type FinanceLine = { label: string; amount: number };
 
 export const HOME_GAMES = 41;
+export const MEDIA_AND_LEAGUE_LABEL = "National media & league distribution";
+export const REVENUE_SHARING_LABEL = "Revenue sharing";
+export const MEDIA_AND_LEAGUE_DISTRIBUTION = 55_000_000;
 const SEASON_PRICE: Record<TicketPricing, number> = { LOW: 3000, STANDARD: 3800, PREMIUM: 4800 };
 const SINGLE_PRICE: Record<TicketPricing, number> = { LOW: 75, STANDARD: 100, PREMIUM: 130 };
 const PREMIUM_SEATING = 19_000_000; // club seats + suites — softer for a cold club
-const MEDIA = 26_000_000;           // local media & other + national share (mostly fixed TV)
 const DEFAULT_SPONSOR = 2_000_000;  // a bare-minimum sponsor if the GM signs nothing
-const OVERHEAD = 44_000_000;        // arena ops, staff, travel, minor-league, coaching, etc.
 
 export type ClubRevenueInput = {
   pricing: TicketPricing;
@@ -22,9 +23,8 @@ export type ClubRevenueInput = {
   sponsorAav: number; // 0 = unsigned → a bare default applies
 };
 
-/** The club's season revenue, itemised. Ticket, premium and media lines all lean
- *  on fan heat, so a struggling club (low interest → soft attendance) earns far
- *  less — and with a big payroll can finish the season in the red. */
+/** The club's season revenue, itemised. Local commercial income leans on fan heat;
+ *  national media and central league income is shared equally by all 32 clubs. */
 export function clubRevenueLines(i: ClubRevenueInput): FinanceLine[] {
   // heat: interest 100 → 1.30×, 60 → 1.00×, 40 → 0.85× — cold clubs sell less
   const heat = 0.55 + i.fanInterest * 0.0075;
@@ -34,12 +34,43 @@ export function clubRevenueLines(i: ClubRevenueInput): FinanceLine[] {
     { label: "Premium seating & suites", amount: Math.round(PREMIUM_SEATING * heat) },
     { label: "Merchandise", amount: i.merchTotal },
     { label: "Sponsorship", amount: i.sponsorAav > 0 ? i.sponsorAav : DEFAULT_SPONSOR },
-    { label: "Media & league", amount: Math.round(MEDIA * heat) },
+    { label: MEDIA_AND_LEAGUE_LABEL, amount: MEDIA_AND_LEAGUE_DISTRIBUTION },
   ];
 }
 
 export function clubRevenueTotal(i: ClubRevenueInput): number {
   return clubRevenueLines(i).reduce((t, l) => t + l.amount, 0);
+}
+
+/** NHL-style revenue sharing. Clubs above the league-average local commercial
+ * revenue contribute 20% of their excess; the complete pool is distributed to
+ * below-average clubs in proportion to their revenue gap. The transfer is
+ * league-wide zero-sum: it narrows market inequality without creating money. */
+export function revenueSharingTransfers(clubs: Array<{ teamId: number; localRevenue: number }>): Map<number, number> {
+  const transfers = new Map(clubs.map((c) => [c.teamId, 0]));
+  if (clubs.length === 0) return transfers;
+
+  const average = clubs.reduce((sum, c) => sum + c.localRevenue, 0) / clubs.length;
+  const contributions = clubs.map((c) => Math.round(Math.max(0, c.localRevenue - average) * 0.20));
+  const pool = contributions.reduce((sum, amount) => sum + amount, 0);
+  const recipients = clubs
+    .map((c, index) => ({ index, gap: Math.max(0, average - c.localRevenue) }))
+    .filter((r) => r.gap > 0);
+  const totalGap = recipients.reduce((sum, r) => sum + r.gap, 0);
+
+  clubs.forEach((c, index) => transfers.set(c.teamId, contributions[index] === 0 ? 0 : -contributions[index]));
+  if (pool === 0 || totalGap === 0 || recipients.length === 0) return transfers;
+
+  let distributed = 0;
+  recipients.forEach((r, receiverIndex) => {
+    const receipt = receiverIndex === recipients.length - 1
+      ? pool - distributed
+      : Math.round(pool * r.gap / totalGap);
+    distributed += receipt;
+    const teamId = clubs[r.index].teamId;
+    transfers.set(teamId, (transfers.get(teamId) ?? 0) + receipt);
+  });
+  return transfers;
 }
 
 // Fixed operating overhead (arena, travel, admin) — coaching and the minor-league

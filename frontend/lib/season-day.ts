@@ -94,6 +94,9 @@ export async function simulateLeagueDay(day: Date) {
       const po = await advancePlayoffDay(SEASON, lg, start, end);
       played += po.played;
     }
+    // Playoff gates, merchandise uplift and earned sponsor bonuses are real cash,
+    // so refresh the same Detailed Finance ledger after every playoff day too.
+    await processFinances(SEASON, "NHL");
   }
   // weekly newsletter — auto-posts once when a 7-round week completes (self-dedupes)
   await postWeeklyIfDue(roundForDate(day)).catch(() => {});

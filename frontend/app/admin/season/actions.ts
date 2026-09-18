@@ -341,8 +341,10 @@ export async function runPlayoffsAction() {
   if (!(await isAdmin())) throw new Error("Only a league admin can manage the season.");
   const nhl = await runPlayoffs(SEASON, "NHL");
   await runPlayoffs(SEASON, "AHL");
+  await processFinances(SEASON, "NHL");
   revalidatePath("/admin/season");
   revalidatePath("/playoffs");
+  revalidatePath("/finance");
   return { champion: nhl.championTeamId };
 }
 

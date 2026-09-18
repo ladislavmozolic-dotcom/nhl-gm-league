@@ -75,7 +75,7 @@ export async function applyRosterMode(mode: "profinhl" | "real") {
   if (mode === "profinhl") {
     await prisma.$executeRawUnsafe(`UPDATE "Player" SET "teamId"="profinhlTeamId", "rosterType"=COALESCE("profinhlRosterType",'NHL'), "capHit"="profinhlCapHit", "tradeClause"="profinhlTradeClause" WHERE "profinhlTeamId" IS NOT NULL`);
     // ProfiNHL mode: real scraped bank balances (fallback the configured starting capital); reset the transaction ledger
-    await prisma.$executeRawUnsafe(`UPDATE "Team" SET "bankAccount"=COALESCE("profinhlBank", ${startingCapital}), "ledgerAdj"=0`);
+    await prisma.$executeRawUnsafe(`UPDATE "Team" SET "bankAccount"=COALESCE("profinhlBank", ${startingCapital}), "ledgerAdj"=0, "financeSeason"=NULL, "seasonOpeningBank"=NULL`);
   } else {
     // NHL 23-man roster — real cap hit AND real clause (kept separate from ProfiNHL)
     await prisma.$executeRawUnsafe(`UPDATE "Player" SET "teamId"="realTeamId", "rosterType"='NHL', "capHit"=COALESCE("realCapHit","profinhlCapHit"), "tradeClause"="realTradeClause", "contractYears"=LEAST(COALESCE("realContractYears","contractYears"), 4), "contractExpiry"=${CURRENT_SEASON_START}+LEAST(COALESCE("realContractYears","contractYears"), 4) WHERE "realTeamId" IS NOT NULL`);
@@ -91,7 +91,7 @@ export async function applyRosterMode(mode: "profinhl" | "real") {
     // everyone else → free agents
     await prisma.$executeRawUnsafe(`UPDATE "Player" SET "rosterType"='UFA' WHERE "realTeamId" IS NULL AND "realFarmTeamId" IS NULL AND "rosterType" IN ('NHL','AHL')`);
     // NHL mode: every team starts with the commissioner's configured starting capital; reset the transaction ledger
-    await prisma.$executeRawUnsafe(`UPDATE "Team" SET "bankAccount"=${startingCapital}, "ledgerAdj"=0`);
+    await prisma.$executeRawUnsafe(`UPDATE "Team" SET "bankAccount"=${startingCapital}, "ledgerAdj"=0, "financeSeason"=NULL, "seasonOpeningBank"=NULL`);
   }
 
   // swap the league salary-cap ceiling to match the mode

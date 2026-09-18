@@ -9,7 +9,7 @@ const sections = [
   ["sponsorship", "Sponsorship", "/finance/sponsorship"],
 ] as const;
 
-export default function FinanceNav({ current }: { current: "dashboard" | (typeof sections)[number][0] }) {
+export default function FinanceNav({ current }: { current: "dashboard" | "league" | (typeof sections)[number][0] }) {
   return (
     <nav aria-label="Finance sections" className="flex flex-wrap items-center gap-2">
       {current !== "dashboard" && <BackPill href="/finance/dashboard">Finance Dashboard</BackPill>}

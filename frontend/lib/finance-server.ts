@@ -3,7 +3,7 @@
 // salaries out over the schedule. Idempotent — sets the balance.
 
 import { prisma } from "./prisma";
-import { getArenaSections, selloutRevenue, computeTeamFinance, projectedPointsPct, farmSalaryExpense, liveCapHit, STARTING_BANK } from "./finance";
+import { getArenaSections, selloutRevenue, computeTeamFinance, projectedPointsPct, farmSalaryExpense, liveCapHit } from "./finance";
 import { computeStandings } from "./sim/standings";
 import { loadSettings } from "./sim/settings";
 
@@ -43,30 +43,29 @@ export async function computeRewards(season: string): Promise<Map<number, number
 }
 
 export async function processFinances(season = "2026-27", league = "NHL") {
-  const [teams, standings, cfg] = await Promise.all([
+  const [teams, standings] = await Promise.all([
     prisma.team.findMany({
       where: { league, isAffiliate: false },
       select: {
         id: true, capacity: true, arenaSections: true, popularity: true,
-        profinhlBank: true, ledgerAdj: true,
+        bankAccount: true, ledgerAdj: true, financeSeason: true, seasonOpeningBank: true,
         players: { where: { rosterType: league }, select: { capHit: true, retainedSalary: true, contractYears: true } },
         affiliateTeams: { select: { players: { where: { rosterType: "AHL" }, select: { capHit: true, ahlSalary: true, contractType: true, contractYears: true } } } },
       },
     }),
     computeStandings(season, league),
-    prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true } }),
   ]);
   const stById = new Map(standings.map((s) => [s.teamId, s]));
   const rewards = league === "NHL" ? await computeRewards(season) : new Map<number, number>();
 
-  // Season-opening bank: a uniform commissioner-set starting capital for every club
-  // (a level playing field). Detailed Finance then drives the bank off the fan-
-  // interest → demand → revenue model, pro-rated by how much of the season is played.
+  // The first Detailed Finance season opens at the commissioner-set capital. Every
+  // later season carries the prior closing balance forward. seasonOpeningBank makes
+  // the daily recompute idempotent while ledgerAdj preserves in-season cash moves.
   const { loadSettings } = await import("./sim/settings");
   const settings = await loadSettings();
   const startBankUniform = settings.startingCapital;
   const detailed = league === "NHL" && settings.financeMode === "detailed";
-  const detailedFin = detailed ? await (await import("./detailed-finance-server")).leagueDetailedFinance() : null;
+  const detailedFin = detailed ? await (await import("./detailed-finance-server")).leagueDetailedFinance(season) : null;
 
   const updates: Promise<unknown>[] = [];
   for (const t of teams) {
@@ -75,7 +74,11 @@ export async function processFinances(season = "2026-27", league = "NHL") {
       prisma.game.count({ where: { season, league, status: "FINAL", seriesId: null, OR: [{ homeTeamId: t.id }, { awayTeamId: t.id }] } }),
     ]);
     const st = stById.get(t.id);
-    const startBank = startBankUniform;
+    const rollingIntoNewSeason = t.financeSeason != null && t.financeSeason !== season;
+    const startBank = rollingIntoNewSeason
+      ? (t.bankAccount ?? startBankUniform)
+      : (t.seasonOpeningBank ?? startBankUniform);
+    const ledgerAdj = rollingIntoNewSeason ? 0 : (t.ledgerAdj ?? 0);
     const reward = rewards.get(t.id) ?? 0;
 
     let bank: number;
@@ -100,8 +103,17 @@ export async function processFinances(season = "2026-27", league = "NHL") {
       });
       bank = fin.bankAccount;
     }
-    // ledgerAdj preserves GM cash moves (trades/buyouts/fines) across this recompute
-    updates.push(prisma.team.update({ where: { id: t.id }, data: { bankAccount: Math.round(bank + reward + (t.ledgerAdj ?? 0)) } }));
+    // ledgerAdj preserves GM cash moves (trades/buyouts/fines) across this season's
+    // recomputes; once carried into a new opening balance it resets to zero.
+    updates.push(prisma.team.update({
+      where: { id: t.id },
+      data: {
+        bankAccount: Math.round(bank + reward + ledgerAdj),
+        financeSeason: season,
+        seasonOpeningBank: startBank,
+        ...(rollingIntoNewSeason ? { ledgerAdj: 0 } : {}),
+      },
+    }));
   }
   await Promise.all(updates);
   return { teams: teams.length };

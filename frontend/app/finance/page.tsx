@@ -4,6 +4,8 @@ import { computeStandings } from "@/lib/sim/standings";
 import { getArenaSections, selloutRevenue, computeTeamFinance, projectedPointsPct, farmSalaryExpense, liveCapHit, money } from "@/lib/finance";
 import FinanceTable, { type FinanceRow } from "@/components/FinanceTable";
 import { PageHeader } from "@/components/ui";
+import FinanceNav from "@/components/FinanceNav";
+import { leagueDetailedFinance } from "@/lib/detailed-finance-server";
 
 export const dynamic = "force-dynamic";
 const SEASON = "2026-27";
@@ -14,7 +16,7 @@ export default async function FinancePage() {
       where: { league: "NHL", isAffiliate: false },
       select: {
         id: true, name: true, slug: true, logoUrl: true, popularity: true,
-        capacity: true, arenaSections: true, ledgerAdj: true,
+        capacity: true, arenaSections: true, bankAccount: true, ledgerAdj: true, seasonOpeningBank: true,
         players: { where: { rosterType: "NHL" }, select: { capHit: true, retainedSalary: true, contractYears: true } },
         affiliateTeams: { select: { players: { where: { rosterType: "AHL" }, select: { capHit: true, ahlSalary: true, contractType: true, contractYears: true } } } },
       },
@@ -29,9 +31,25 @@ export default async function FinancePage() {
   ]);
   const stById = new Map(standings.map((s) => [s.teamId, s]));
   const homeById = new Map(homeCounts.map((h) => [h.homeTeamId, h._count._all]));
+  const detailed = settings.financeMode === "detailed" ? await leagueDetailedFinance(SEASON) : null;
 
   const rows: FinanceRow[] = teams.map((t) => {
     const st = stById.get(t.id);
+    const df = detailed?.get(t.id);
+    if (df) {
+      const progress = Math.min(1, (st?.gp ?? 0) / 82);
+      const openingBank = t.seasonOpeningBank ?? settings.startingCapital;
+      const ledger = t.ledgerAdj ?? 0;
+      return {
+        id: t.id, name: t.name, slug: t.slug, logoUrl: t.logoUrl,
+        popularity: t.popularity,
+        actualIncome: Math.round(df.revenue * progress), projectedIncome: df.revenue,
+        actualExpenses: Math.round(df.expenses * progress), projectedExpenses: df.expenses,
+        projectedResult: df.net,
+        bankAccount: t.bankAccount ?? openingBank,
+        projectedBankAccount: openingBank + df.net + ledger,
+      };
+    }
     // the league's actual configured starting capital — matches what processFinances
     // (the function that sets the real team.bankAccount) uses, not the legacy
     // realMode/profinhlBank fallback this used to read, which could disagree with it.
@@ -63,6 +81,7 @@ export default async function FinancePage() {
         title={`${SEASON} Finance`}
         subtitle={`Salary cap ${money(settings.salaryCapUpper)} · floor ${money(settings.salaryCapLower)} · click a column to sort`}
       />
+      <FinanceNav current="league" />
       <FinanceTable rows={rows} />
     </div>
   );

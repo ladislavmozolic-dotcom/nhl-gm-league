@@ -42,6 +42,29 @@ export function playoffMerchBoost(round: number): number {
   return 1 + round * 0.07; // +7% per round deep
 }
 
+export type SponsorMilestones = {
+  madePlayoffs: boolean;
+  reachedConferenceFinal: boolean;
+  wonChampionship: boolean;
+};
+
+/** Earned performance bonuses from the signed sponsor deal. The offer labels are
+ * persisted as JSON, so matching is intentionally tolerant of wording/case. */
+export function sponsorBonusEarned(deal: SponsorOffer | null, milestones: SponsorMilestones): number {
+  if (!deal) return 0;
+  return deal.bonuses.reduce((total, bonus) => {
+    const condition = bonus.when.toLowerCase();
+    const earned = condition.includes("championship")
+      ? milestones.wonChampionship
+      : condition.includes("conference final")
+        ? milestones.reachedConferenceFinal
+        : condition.includes("playoff")
+          ? milestones.madePlayoffs
+          : false;
+    return total + (earned ? bonus.amount : 0);
+  }, 0);
+}
+
 function clamp(x: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, x));
 }

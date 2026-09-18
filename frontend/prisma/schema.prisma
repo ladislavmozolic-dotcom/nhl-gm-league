@@ -30,73 +30,75 @@ model Coach {
 }
 
 model Team {
-  id                Int         @id @default(autoincrement())
-  slug              String      @unique
-  code              String?     @unique
+  id                Int             @id @default(autoincrement())
+  slug              String          @unique
+  code              String?         @unique
   name              String
   logoUrl           String?
   gm                String
   arena             String
-  league            String      @default("NHL")
+  league            String          @default("NHL")
   eliteProspectsUrl String?
   parentTeamId      Int?
-  profinhlName      String?     @unique
+  profinhlName      String?         @unique
   profinhlLogoId    Int?
   coach             String?
-  headCoach         Coach?      // STHS head coach (own coach per NHL club AND per farm club)
+  headCoach         Coach? // STHS head coach (own coach per NHL club AND per farm club)
   conference        String?
   division          String?
   capacity          Int?
-  isAffiliate       Boolean     @default(false)
-  profinhlId        Int?        @unique
-  arenaSections     Json?       // [{level,capacity,price}] — ticket pricing
-  bankAccount       Float       @default(50000000) // team funds; ticket revenue in, salaries out (recomputed by processFinances = startBank + ticket − salary + rewards + ledgerAdj)
-  ledgerAdj         Float       @default(0) // net of GM cash transactions (trades, buyouts, coach fines) that must survive each processFinances recompute
-  profinhlBank      Int?        // real ProfiNHL bank balance (scraped from profinhl Finance.php); used in ProfiNHL roster mode
-  popularity        Int         @default(100) // affects attendance / ticket revenue (admin-set)
-  rivalTeamIds      Int[]       @default([]) // rivalries — heated games (more fights, scrums, misconducts)
-  needs             String[]    @default([]) // Trade Block: positions this team is shopping for (C/LW/RW/D/G)
-  lastWaiverClaimAt DateTime?   // when this club last won a contested waiver claim outside the regular season/playoffs — null (or oldest) sorts first for the next contested claim, so a club that just claimed drops to the back of the line. Ignored in-season, where reverse standings decide priority instead.
+  isAffiliate       Boolean         @default(false)
+  profinhlId        Int?            @unique
+  arenaSections     Json? // [{level,capacity,price}] — ticket pricing
+  bankAccount       Float           @default(50000000) // team funds; ticket revenue in, salaries out (recomputed by processFinances = startBank + ticket − salary + rewards + ledgerAdj)
+  ledgerAdj         Float           @default(0) // net of GM cash transactions (trades, buyouts, coach fines) that must survive each processFinances recompute
+  financeSeason     String? // season whose idempotent finance calculation currently drives bankAccount
+  seasonOpeningBank Float? // cash carried into financeSeason; preserves multi-season continuity
+  profinhlBank      Int? // real ProfiNHL bank balance (scraped from profinhl Finance.php); used in ProfiNHL roster mode
+  popularity        Int             @default(100) // affects attendance / ticket revenue (admin-set)
+  rivalTeamIds      Int[]           @default([]) // rivalries — heated games (more fights, scrums, misconducts)
+  needs             String[]        @default([]) // Trade Block: positions this team is shopping for (C/LW/RW/D/G)
+  lastWaiverClaimAt DateTime? // when this club last won a contested waiver claim outside the regular season/playoffs — null (or oldest) sorts first for the next contested claim, so a club that just claimed drops to the back of the line. Ignored in-season, where reverse standings decide priority instead.
   draftPicks        DraftPick[]
   players           Player[]
   prospects         Prospect[]
   draftRankings     DraftRanking[]
-  parentTeam        Team?       @relation("Affiliates", fields: [parentTeamId], references: [id])
-  affiliateTeams    Team[]      @relation("Affiliates")
-  homeGames         Game[]      @relation("HomeGames")
-  awayGames         Game[]      @relation("AwayGames")
+  parentTeam        Team?           @relation("Affiliates", fields: [parentTeamId], references: [id])
+  affiliateTeams    Team[]          @relation("Affiliates")
+  homeGames         Game[]          @relation("HomeGames")
+  awayGames         Game[]          @relation("AwayGames")
   joinRequests      JoinRequest[]
-  dmSent            DmMessage[]  @relation("DmFrom")
-  dmReceived        DmMessage[]  @relation("DmTo")
+  dmSent            DmMessage[]     @relation("DmFrom")
+  dmReceived        DmMessage[]     @relation("DmTo")
   forumThreads      ForumThread[]
   forumPosts        ForumPost[]
   forumReactions    ForumReaction[]
   lines             TeamLines?
-  sessionVersion    Int         @default(0) // Increment to revoke every session for this team seat
+  sessionVersion    Int             @default(0) // Increment to revoke every session for this team seat
   passwordHash      String?
-  isAdmin           Boolean     @default(false) // this team's GM login also has league-admin powers (manage any team)
-  gmRole            String      @default("gm")  // gm | agent | co_comish | comish — league role (comish-tier gets a 1-day FA head-start)
-  rookieGm          Boolean     @default(false)  // (R) new GM under commission oversight — his trades need commission approval
-  aiMode            String      @default("base") // base | advanced — for GM-less (AI-run) clubs: advanced also negotiates trades with human GMs
-  retainsBuyouts    Int         @default(0)     // net retention / buyout dead-money adjustment (± dollars); counts into the cap hit
-  ticketPricing     String      @default("STANDARD") // Detailed Finance: LOW | STANDARD | PREMIUM — trades revenue-per-seat vs demand
-  sponsorDeal       Json?       // Detailed Finance: chosen main sponsorship { label, aav, years, bonuses:[{when,amount}] }
+  isAdmin           Boolean         @default(false) // this team's GM login also has league-admin powers (manage any team)
+  gmRole            String          @default("gm") // gm | agent | co_comish | comish — league role (comish-tier gets a 1-day FA head-start)
+  rookieGm          Boolean         @default(false) // (R) new GM under commission oversight — his trades need commission approval
+  aiMode            String          @default("base") // base | advanced — for GM-less (AI-run) clubs: advanced also negotiates trades with human GMs
+  retainsBuyouts    Int             @default(0) // net retention / buyout dead-money adjustment (± dollars); counts into the cap hit
+  ticketPricing     String          @default("STANDARD") // Detailed Finance: LOW | STANDARD | PREMIUM — trades revenue-per-seat vs demand
+  sponsorDeal       Json? // Detailed Finance: chosen main sponsorship { label, aav, years, bonuses:[{when,amount}] }
   gmEmail           String?
   gmFirstName       String?
   gmLastName        String?
-  gmNickname        String?     // shown in the top menu when this team's GM is signed in
+  gmNickname        String? // shown in the top menu when this team's GM is signed in
   lastLoginAt       DateTime?
-  forumSeenAt       DateTime?   // last time this GM viewed the forum — drives the "new posts" menu badge
+  forumSeenAt       DateTime? // last time this GM viewed the forum — drives the "new posts" menu badge
 }
 
 model Player {
-  id                   Int           @id @default(autoincrement())
-  slug                 String        @unique
+  id                   Int                       @id @default(autoincrement())
+  slug                 String                    @unique
   name                 String
   position             String
   positions            String?
-  nhlId                Int?          @unique
-  profinhlId           Int?          // ← PRIDANÉ
+  nhlId                Int?                      @unique
+  profinhlId           Int? // ← PRIDANÉ
   number               Int?
   photoUrl             String?
   frozenPoolId         Int?
@@ -110,7 +112,7 @@ model Player {
   weight               Int?
   capWagesSlug         String?
   capHit               Float?
-  ahlSalary            Float?        // salary paid while assigned to AHL; null for one-way and legacy $100k farm-only deals
+  ahlSalary            Float? // salary paid while assigned to AHL; null for one-way and legacy $100k farm-only deals
   contractYears        Int?
   contractExpiry       Int?
   // deferred EXTENSION: a re-signed pending-UFA finishes his current deal this season,
@@ -119,18 +121,18 @@ model Player {
   extYears             Int?
   extContractType      String?
   extClause            String?
-  extNoTradeTeams      Int[]         @default([])
+  extNoTradeTeams      Int[]                     @default([])
   extText              String?
   age                  Int?
   overall              Int?
   contractText         String?
   rosterType           String?
-  scratched            Boolean       @default(false) // AHL org player beyond the active AHL roster — a healthy scratch, dresses nowhere
-  retainedSalary       Int           @default(0)     // salary retained by a former club (STHS retention/buyout) — imported from profinhl RetainedSalary.php
-  retiredSeason        String?       // season the player retired (rosterType=RETIRED) — for Hall of Fame / career close
-  hofSeason            String?       // season inducted into the Hall of Fame (null = not inducted)
-  onBlock              Boolean       @default(false) // GM has listed this player on the Trade Block
-  blockNote            String?       // GM's note on the Trade Block listing (asking price / context)
+  scratched            Boolean                   @default(false) // AHL org player beyond the active AHL roster — a healthy scratch, dresses nowhere
+  retainedSalary       Int                       @default(0) // salary retained by a former club (STHS retention/buyout) — imported from profinhl RetainedSalary.php
+  retiredSeason        String? // season the player retired (rosterType=RETIRED) — for Hall of Fame / career close
+  hofSeason            String? // season inducted into the Hall of Fame (null = not inducted)
+  onBlock              Boolean                   @default(false) // GM has listed this player on the Trade Block
+  blockNote            String? // GM's note on the Trade Block listing (asking price / context)
   teamId               Int
   ck                   Int?
   condition            Float?
@@ -175,52 +177,52 @@ model Player {
   // promoteParamSetAction) — lets the commissioner switch the whole league's live
   // parameters back to the original STHS numbers later without losing them.
   sthsBackup           Json?
-  isGoalie             Boolean       @default(false)
+  isGoalie             Boolean                   @default(false)
   sourceType           String?
-  onTradeBlock         Boolean       @default(false)
-  waiverStatus         String?       @default("NONE")
-  lastRecalledAt       DateTime?     // league-calendar date of the most recent AHL→NHL call-up — starts the
-                                      // Rule 30/10 recall-exemption clock (see lib/waivers-server.ts recallExemptions)
-  injuryDaysLeft       Int           @default(0)
+  onTradeBlock         Boolean                   @default(false)
+  waiverStatus         String?                   @default("NONE")
+  lastRecalledAt       DateTime? // league-calendar date of the most recent AHL→NHL call-up — starts the
+  // Rule 30/10 recall-exemption clock (see lib/waivers-server.ts recallExemptions)
+  injuryDaysLeft       Int                       @default(0)
   injuryDesc           String?
-  injurySeverity       String?       // "Day-to-Day" | "Week-to-Week" | "Multi-week" | "Long-term" | "Season-ending" (persisted from the sim for current-injury depth)
-  injuredAt            DateTime?     // date when the injury occurred (from sim or gameDate)
-  captaincy            String?       // "C" | "A" | null
-  contractType         String?       // "ONE_WAY" | "TWO_WAY" (one-way can't be sent to farm)
-  tradeClause          String?       // null | "NTC" (no-trade) | "NMC" (no-movement) | "M_NTC" (modified — blocks the teams in noTradeTeams)
-  noTradeTeams         Int[]         // for M_NTC: team ids the player won't accept a trade to
-  profinhlTeamId       Int?          // snapshot of the ProfiNHL assignment (for roster switching)
+  injurySeverity       String? // "Day-to-Day" | "Week-to-Week" | "Multi-week" | "Long-term" | "Season-ending" (persisted from the sim for current-injury depth)
+  injuredAt            DateTime? // date when the injury occurred (from sim or gameDate)
+  captaincy            String? // "C" | "A" | null
+  contractType         String? // "ONE_WAY" | "TWO_WAY" (one-way can't be sent to farm)
+  tradeClause          String? // null | "NTC" (no-trade) | "NMC" (no-movement) | "M_NTC" (modified — blocks the teams in noTradeTeams)
+  noTradeTeams         Int[] // for M_NTC: team ids the player won't accept a trade to
+  profinhlTeamId       Int? // snapshot of the ProfiNHL assignment (for roster switching)
   profinhlRosterType   String?
-  realTeamId           Int?          // the player's real current NHL team (from the NHL API)
-  realFarmTeamId       Int?          // NHL parent org whose AHL affiliate this player is on (from theahl.com)
-  realCapHit           Int?          // real current NHL cap hit (from spotrac)
-  realContractYears    Int?          // real years remaining on the deal (from CapWages)
+  realTeamId           Int? // the player's real current NHL team (from the NHL API)
+  realFarmTeamId       Int? // NHL parent org whose AHL affiliate this player is on (from theahl.com)
+  realCapHit           Int? // real current NHL cap hit (from spotrac)
+  realContractYears    Int? // real years remaining on the deal (from CapWages)
   realContractText     String?
-  profinhlCapHit       Int?          // snapshot of the ProfiNHL cap hit (for roster switching)
-  realTradeClause      String?       // real NTC/NMC/M_NTC (from CapWages) — used in Real NHL mode
-  profinhlTradeClause  String?       // snapshot of the ProfiNHL clause (for roster switching)
-  realOnly             Boolean       @default(false) // exists only in the Real NHL dataset (real free agent); hidden in ProfiNHL mode
-  faDemandOverride     Int?          // Free Agent Frenzy: league Agent / admin hand-set contract demand ($ cap hit); overrides the computed market value
-  franchiseTag         Boolean       @default(false) // RFA tagged as the club's Franchise player (1/team) → gets 2 re-sign rounds before offer sheets
-  resignRound          Int           @default(0)  // own-player re-sign: 0 = no offer yet, 1/2 = after that round's offer (max 2)
-  faDecisionAt         DateTime?     // in-season UFA market: when his deliberation window resolves (collect offers 7d → counter 3d → sign)
-  faCountered          Boolean       @default(false) // in-season UFA market: he has issued counters (phase 2 — bidders match, then he signs)
-  resignStatus         String?                     // null | open | countered | walkedToUFA | osEligible (RFA who declined → offer sheets)
-  resignCounterSalary  Int?                        // the player's counter in the current re-sign round
+  profinhlCapHit       Int? // snapshot of the ProfiNHL cap hit (for roster switching)
+  realTradeClause      String? // real NTC/NMC/M_NTC (from CapWages) — used in Real NHL mode
+  profinhlTradeClause  String? // snapshot of the ProfiNHL clause (for roster switching)
+  realOnly             Boolean                   @default(false) // exists only in the Real NHL dataset (real free agent); hidden in ProfiNHL mode
+  faDemandOverride     Int? // Free Agent Frenzy: league Agent / admin hand-set contract demand ($ cap hit); overrides the computed market value
+  franchiseTag         Boolean                   @default(false) // RFA tagged as the club's Franchise player (1/team) → gets 2 re-sign rounds before offer sheets
+  resignRound          Int                       @default(0) // own-player re-sign: 0 = no offer yet, 1/2 = after that round's offer (max 2)
+  faDecisionAt         DateTime? // in-season UFA market: when his deliberation window resolves (collect offers 7d → counter 3d → sign)
+  faCountered          Boolean                   @default(false) // in-season UFA market: he has issued counters (phase 2 — bidders match, then he signs)
+  resignStatus         String? // null | open | countered | walkedToUFA | osEligible (RFA who declined → offer sheets)
+  resignCounterSalary  Int? // the player's counter in the current re-sign round
   resignCounterYears   Int?
-  resignOfferSalary    Int?                        // club's last standing re-sign offer (the AAV an offer sheet must beat)
-  signPromiseLine      Int?          // deployment promised at signing: F line 1-4 / D pair 1-3 / G 1-2
-  signPromisePP        Boolean?      // power-play time promised at signing
-  signPromisePK        Boolean?      // penalty-kill time promised at signing
-  promiseWarnGame      Int?          // team games played when the player warned the GM his promise was broken (grace period start)
-  disgruntled          Boolean       @default(false) // promise broken past grace + unhappy: runtime -20% attributes + morale hit; cleared on trade
-  tradeRequested       Boolean       @default(false) // player has formally requested a trade (shown in Around The League)
-  ltir                 Boolean       @default(false) // parked on LTIR (played <10 games last season) — sits in prospects/reserve, off the cap
-  lastSeasonGP         Int?          // real last-season games played (imported from the Players Calculator / hockey-reference)
-  lastSeasonPts        Int?          // real last-season points (G + A) — feeds the FA demand engine's performance signal
-  lastSeasonSvPct      Float?        // real last-season goalie save % (from NHL.com) — feeds the ELC goalie bonus
-  lastSeasonAhlGP      Int?          // real last-season AHL games played (from theahl.com HockeyTech) — post-season roster reconciliation
-  lastSeasonG          Int?          // last-season goals / assists / hits / blocks — drive the Player Calculator param projection
+  resignOfferSalary    Int? // club's last standing re-sign offer (the AAV an offer sheet must beat)
+  signPromiseLine      Int? // deployment promised at signing: F line 1-4 / D pair 1-3 / G 1-2
+  signPromisePP        Boolean? // power-play time promised at signing
+  signPromisePK        Boolean? // penalty-kill time promised at signing
+  promiseWarnGame      Int? // team games played when the player warned the GM his promise was broken (grace period start)
+  disgruntled          Boolean                   @default(false) // promise broken past grace + unhappy: runtime -20% attributes + morale hit; cleared on trade
+  tradeRequested       Boolean                   @default(false) // player has formally requested a trade (shown in Around The League)
+  ltir                 Boolean                   @default(false) // parked on LTIR (played <10 games last season) — sits in prospects/reserve, off the cap
+  lastSeasonGP         Int? // real last-season games played (imported from the Players Calculator / hockey-reference)
+  lastSeasonPts        Int? // real last-season points (G + A) — feeds the FA demand engine's performance signal
+  lastSeasonSvPct      Float? // real last-season goalie save % (from NHL.com) — feeds the ELC goalie bonus
+  lastSeasonAhlGP      Int? // real last-season AHL games played (from theahl.com HockeyTech) — post-season roster reconciliation
+  lastSeasonG          Int? // last-season goals / assists / hits / blocks — drive the Player Calculator param projection
   lastSeasonA          Int?
   lastSeasonHits       Int?
   lastSeasonBlocks     Int?
@@ -234,30 +236,30 @@ model Player {
   lastSeasonTK         Int?
   lastSeasonGV         Int?
   lastSeasonShToi      Float?
-  curSeasonGP          Int?          // CURRENT real-season stats (empty in the off-season; projection activates at ~game 10)
+  curSeasonGP          Int? // CURRENT real-season stats (empty in the off-season; projection activates at ~game 10)
   curSeasonG           Int?
   curSeasonA           Int?
   curSeasonHits        Int?
   curSeasonBlocks      Int?
-  curSeasonPM          Int?          // +/-  (DF input)
-  curSeasonTK          Int?          // takeaways (DF input)
-  curSeasonGV          Int?          // giveaways (DF input)
-  curSeasonShToi       Float?        // player short-handed TOI per game, seconds (DF input, NHL timeonice)
-  curSeasonTeamShToi   Float?        // team penalty-kill TOI per game, seconds (DF input, NHL penaltykill)
+  curSeasonPM          Int? // +/-  (DF input)
+  curSeasonTK          Int? // takeaways (DF input)
+  curSeasonGV          Int? // giveaways (DF input)
+  curSeasonShToi       Float? // player short-handed TOI per game, seconds (DF input, NHL timeonice)
+  curSeasonTeamShToi   Float? // team penalty-kill TOI per game, seconds (DF input, NHL penaltykill)
   // Edge Parameters real-NHL inputs (25-26 = the 80% season, updates in-season)
-  curSeasonToi         Float?        // TOI per game, seconds (per-60 base)
+  curSeasonToi         Float? // TOI per game, seconds (per-60 base)
   curSeasonShots       Int?
   curSeasonPim         Int?
   curSeasonFoPct       Float?
   curSeasonPpG         Int?
-  goalieAdvanced       Json?         // MoneyPuck goalie metrics for the Edge engine: { cur:{...}, last:{...} } — GSAx, danger SV% splits, rebound control, sample
-  ahlStats             Json?         // AHL scoring for the Edge engine, imported for ANY player who played the AHL (incl. NHL-roster call-ups like Kaliyev) so it never overwrites their NHL cur/last fields: { cur:{gp,g,a,sh,pim,ppG}, last:{...} }
-  edgeSpeed            Json?         // NHL EDGE player-tracking percentiles (api-web skater-detail) for the SK param: { cur:{spd,brst,dist}, last:{...} } — speedMax / burstsOver20 / distance percentiles (0-1)
-  mpSkater             Json?         // MoneyPuck advanced skater totals per season for the Next Gen Parameters: { "2025":{gp,toi,g,ixg,a1,a2,sh,ong,ppa1,toi5v5,a1_5v5,a2_5v5,onIceAxg5v5,toi4v5,onIceAxg4v5,offIceAxg5v5,offIceToi5v5,offIceAxg4v5,offIceToi4v5}, "2024":{...}, "2023":{...} } — ixG/primary-assists/on-ice-goals + 5v5/PK on-ice AND off-ice (team-without-him) splits for true relative xGA, icetime in seconds
-  careerGP             Json?         // NHL API career totals (api-web player landing) for the Next Gen EXPERIENCE param: { reg: number, po: number } — regular-season and playoff games played, career-to-date
-  edgeRatings          Json?         // persisted Edge Parameters (analytics; separate from the STHS ck/sc/... the sim uses)
+  goalieAdvanced       Json? // MoneyPuck goalie metrics for the Edge engine: { cur:{...}, last:{...} } — GSAx, danger SV% splits, rebound control, sample
+  ahlStats             Json? // AHL scoring for the Edge engine, imported for ANY player who played the AHL (incl. NHL-roster call-ups like Kaliyev) so it never overwrites their NHL cur/last fields: { cur:{gp,g,a,sh,pim,ppG}, last:{...} }
+  edgeSpeed            Json? // NHL EDGE player-tracking percentiles (api-web skater-detail) for the SK param: { cur:{spd,brst,dist}, last:{...} } — speedMax / burstsOver20 / distance percentiles (0-1)
+  mpSkater             Json? // MoneyPuck advanced skater totals per season for the Next Gen Parameters: { "2025":{gp,toi,g,ixg,a1,a2,sh,ong,ppa1,toi5v5,a1_5v5,a2_5v5,onIceAxg5v5,toi4v5,onIceAxg4v5,offIceAxg5v5,offIceToi5v5,offIceAxg4v5,offIceToi4v5}, "2024":{...}, "2023":{...} } — ixG/primary-assists/on-ice-goals + 5v5/PK on-ice AND off-ice (team-without-him) splits for true relative xGA, icetime in seconds
+  careerGP             Json? // NHL API career totals (api-web player landing) for the Next Gen EXPERIENCE param: { reg: number, po: number } — regular-season and playoff games played, career-to-date
+  edgeRatings          Json? // persisted Edge Parameters (analytics; separate from the STHS ck/sc/... the sim uses)
   goalieRating         GoalieRating?
-  team                 Team          @relation(fields: [teamId], references: [id])
+  team                 Team                      @relation(fields: [teamId], references: [id])
   skaterRating         SkaterRating?
   gameStats            PlayerGameStat[]
   situationGameStats   PlayerSituationGameStat[]
@@ -269,16 +271,17 @@ model Transaction {
   type      String
   message   String
   playerId  Int? // set for player-scoped events (TRADE_BLOCK, WAIVER) so a
-                 // player's Transaction History can be queried directly instead
-                 // of text-matching `message` — older rows predating this field
-                 // stay null and just won't surface there.
+  // player's Transaction History can be queried directly instead
+  // of text-matching `message` — older rows predating this field
+  // stay null and just won't surface there.
   teamId    Int? // the club the event is about (e.g. who placed/claimed a
-                 // waiver) — lets Transaction History show a team chip/logo.
+  // waiver) — lets Transaction History show a team chip/logo.
   tradeId   Int? // links a "X traded ... to Y" row back to the Trade it describes
-                 // (2-team accept path only — a 3-team group's one summary line
-                 // can't point at a single leg) — lets deleting/revoking that Trade
-                 // also retract the line from the home page's Trade Tracker.
+  // (2-team accept path only — a 3-team group's one summary line
+  // can't point at a single leg) — lets deleting/revoking that Trade
+  // also retract the line from the home page's Trade Tracker.
   createdAt DateTime @default(now())
+
   @@index([playerId])
   @@index([tradeId])
 }
@@ -287,65 +290,68 @@ model Transaction {
 // snapshot so an admin can undo it from the "Coach Signings" page — same
 // pattern as SigningLog below, for the Coach model instead of Player.
 model CoachSigningLog {
-  id         Int      @id @default(autoincrement())
-  coachId    Int
-  coachName  String
-  teamId     Int?     // the club that hired/fired him
-  teamCode   String?
-  kind       String   // "HIRE" | "FIRE"
-  salary     Int      // new salary (HIRE) or his salary at the moment of firing (FIRE)
-  years      Int      // new contract term (HIRE) or years left when fired (FIRE)
-  payout     Int      @default(0) // buyout paid from the bank (FIRE only)
-  reverted   Boolean  @default(false)
-  createdAt  DateTime @default(now())
+  id           Int      @id @default(autoincrement())
+  coachId      Int
+  coachName    String
+  teamId       Int? // the club that hired/fired him
+  teamCode     String?
+  kind         String // "HIRE" | "FIRE"
+  salary       Int // new salary (HIRE) or his salary at the moment of firing (FIRE)
+  years        Int // new contract term (HIRE) or years left when fired (FIRE)
+  payout       Int      @default(0) // buyout paid from the bank (FIRE only)
+  reverted     Boolean  @default(false)
+  createdAt    DateTime @default(now())
   // pre-action snapshot (used to restore on revert)
   prevTeamId   Int?
   prevSalary   Int?
   prevContract Int?
+
   @@index([createdAt])
 }
 
 // A revertible record of every UFA signing / extension, with the pre-signing
 // contract snapshot so an admin can undo it from the "Latest Signings" page.
 model SigningLog {
-  id             Int      @id @default(autoincrement())
-  playerId       Int
-  playerName     String
-  teamCode       String?
-  kind           String   // "EXTEND" (deferred) | "SIGN" (immediate)
-  salary         Int
-  years          Int
-  reverted       Boolean  @default(false)
-  createdAt      DateTime @default(now())
+  id               Int      @id @default(autoincrement())
+  playerId         Int
+  playerName       String
+  teamCode         String?
+  kind             String // "EXTEND" (deferred) | "SIGN" (immediate)
+  salary           Int
+  years            Int
+  reverted         Boolean  @default(false)
+  createdAt        DateTime @default(now())
   // pre-signing snapshot (used to restore on revert)
-  prevCapHit     Int?
-  prevAhlSalary  Int?
-  prevYears      Int?
-  prevExpiry     Int?
-  prevType       String?
-  prevClause     String?
-  prevNoTrade    Int[]    @default([])
-  prevRosterType String?
-  prevTeamId     Int?
+  prevCapHit       Int?
+  prevAhlSalary    Int?
+  prevYears        Int?
+  prevExpiry       Int?
+  prevType         String?
+  prevClause       String?
+  prevNoTrade      Int[]    @default([])
+  prevRosterType   String?
+  prevTeamId       Int?
   prevContractText String?
+
   @@index([createdAt])
 }
 
 model Trade {
-  id          Int      @id @default(autoincrement())
-  fromTeamId  Int
-  toTeamId    Int
-  status      String   @default("PENDING") // PENDING | ACCEPTED | DECLINED | CANCELLED | AWAITING_COMMISH | MODIFY | MODIFIED | REVERTED
-  commishNote String?  // commission note when a rookie trade is sent back to modify
-  condition   String?
-  respondedAt DateTime?
-  createdAt   DateTime @default(now())
-  leagueDay   Int?     // league-calendar day the trade was created (throttles AI-initiated offers)
-  waivedClauses Int[]  // player ids whose NTC/NMC/M-NTC was waived to allow this deal
-  clauseFees  Json?    // [{ playerId, feeAmount, payTeamId }] — agent-set waiver fees the giving team pays the player
-  groupId     Int?     // set only for one leg of a 3-team TradeGroup — a one-directional
-                        // asset move (fromTeamId → toTeamId only; the "TO" side of THIS
-                        // row stays empty, this team's return comes via a different leg)
+  id            Int       @id @default(autoincrement())
+  fromTeamId    Int
+  toTeamId      Int
+  status        String    @default("PENDING") // PENDING | ACCEPTED | DECLINED | CANCELLED | AWAITING_COMMISH | MODIFY | MODIFIED | REVERTED
+  commishNote   String? // commission note when a rookie trade is sent back to modify
+  condition     String?
+  respondedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  leagueDay     Int? // league-calendar day the trade was created (throttles AI-initiated offers)
+  waivedClauses Int[] // player ids whose NTC/NMC/M-NTC was waived to allow this deal
+  clauseFees    Json? // [{ playerId, feeAmount, payTeamId }] — agent-set waiver fees the giving team pays the player
+  groupId       Int? // set only for one leg of a 3-team TradeGroup — a one-directional
+
+  // asset move (fromTeamId → toTeamId only; the "TO" side of THIS
+  // row stays empty, this team's return comes via a different leg)
   @@index([groupId])
 }
 
@@ -368,18 +374,19 @@ model TradeGroupResponse {
   teamId      Int
   status      String    @default("PENDING") // PENDING | ACCEPTED | DECLINED
   respondedAt DateTime?
+
   @@unique([groupId, teamId])
   @@index([groupId])
 }
 
 model Waiver {
-  id             Int      @id @default(autoincrement())
-  playerId       Int      @unique          // one active waiver per player — a player waived again reuses this same row
-  fromTeamId     Int                        // the club that placed him (pays him until resolution)
-  placedDay      Int                        // roundForDate(leagueDate) when placed — clears the next day
-  status         String   @default("ACTIVE") // ACTIVE | CLAIMED | CLEARED | CANCELLED
+  id              Int           @id @default(autoincrement())
+  playerId        Int           @unique // one active waiver per player — a player waived again reuses this same row
+  fromTeamId      Int // the club that placed him (pays him until resolution)
+  placedDay       Int // roundForDate(leagueDate) when placed — clears the next day
+  status          String        @default("ACTIVE") // ACTIVE | CLAIMED | CLEARED | CANCELLED
   claimedByTeamId Int?
-  createdAt      DateTime @default(now())
+  createdAt       DateTime      @default(now())
   // Real wall-clock moment of the CURRENT placement — refreshed every time
   // placeOnWaivers reuses this row for a repeat trip. createdAt is set once,
   // forever, by Prisma's @default(now()); processWaivers' 48h stale-safety-net
@@ -387,9 +394,10 @@ model Waiver {
   // than 48h ago) got resolved almost instantly on his next trip instead of
   // waiting out the real one-day window, since his original placement already
   // looked "stuck" by that check. placedAt is what the safety net reads now.
-  placedAt       DateTime @default(now())
-  resolvedAt     DateTime?
-  claims         WaiverClaim[]
+  placedAt        DateTime      @default(now())
+  resolvedAt      DateTime?
+  claims          WaiverClaim[]
+
   @@index([status])
 }
 
@@ -399,43 +407,44 @@ model WaiverClaim {
   teamId    Int
   createdAt DateTime @default(now())
   waiver    Waiver   @relation(fields: [waiverId], references: [id], onDelete: Cascade)
+
   @@unique([waiverId, teamId])
 }
 
 model LeagueConfig {
-  id              Int      @id @default(1)
-  rosterMode      String   @default("profinhl") // profinhl | real
-  profinhlCapUpper Int     @default(85900000)
-  profinhlCapLower Int     @default(51500000)
-  realCapUpper    Int      @default(104000000) // real 2026-27 NHL upper limit
-  realCapLower    Int      @default(76500000)
-  faOpen          Boolean  @default(false) // Free Agent Frenzy window: manual override to force the window open (normally derived from the calendar)
-  faDay           Int      @default(0)     // Free Agent Frenzy round counter — advanced by admin/Agent to resolve standing offers
-  leagueDate      DateTime?                 // the league clock — a 365-day calendar starting July 1 19:00 (real free-agency open); null = not yet started
-  phaseOverride   String?                   // admin manual phase: "offseason" | "preseason" | "regular" | "playoffs" | "frenzy" · null = follow the calendar (see effectivePhase)
-  simEngine       String   @default("current") // "current" (stable v1) | "nextgen" (v2 rework) — whole-league engine toggle, see lib/sim/version.ts
-  paramMode       String   @default("sths")    // "sths" | "edge" — which player-parameter calculator is active; only its Tools link is shown
-  draftTestMode   Boolean  @default(false)     // testing: a draft pick advances the board but does NOT write the player onto the team (no Prospect row), so names stay for re-testing
-  lastWeeklyWeek  Int?                          // last week index whose weekly newsletter was auto-posted (dedupe)
-  lastSimulatedDay DateTime?                    // the `leagueDate` value whose evening game-sim has already completed — dedupes the 20:30 Europe/Bratislava cron window to one run per league day, and gates the separate day-rollover check (lib/season-cron.ts) so the calendar never flips to a day that hasn't actually been simulated yet.
-  preseasonPublic Boolean  @default(false)      // is the auto-generated pre-season schedule visible on the public /preseason page yet? Admins always see it in Season Control regardless.
-  preseasonPhaseAt DateTime?                    // admin-configurable real date the "preseason" phase begins (Auto mode only) — null = derive from the generated pre-season schedule's first game, else the hardcoded Sep 21 fallback. See lib/calendar-server.ts resolvePhaseThresholds.
-  regularPhaseAt  DateTime?                     // admin-configurable real date the "regular" phase begins (Auto mode only) — null = derive from the regular-season schedule's first game, else the hardcoded Oct 1 fallback.
-  frenzyAutoOpenAt DateTime?                    // admin-configurable real moment to auto-flip faOpen=true (force the Free Agent Frenzy window open for every GM) — a one-shot trigger, checked every cron tick (lib/season-cron.ts autoOpenFrenzyIfDue) and cleared to null once it fires, so a later manual close of faOpen sticks.
-  frenzyRoundStartedAt DateTime?                // real wall-clock start of the current global stage; BIDDING ends after 4d, IMPROVEMENT after 2d, null in CONTINUOUS
-  frenzyForcedRound Int      @default(1)        // active force-opened round (1-3); advances only after its 2-day improvement stage has been resolved
-  frenzyStage       String   @default("BIDDING") // BIDDING (4d, new clubs may bid) | IMPROVEMENT (2d, existing bidders may raise) | CONTINUOUS (after round 3: 24h offer window, then 24h improvement when contested)
-  updatedAt       DateTime @updatedAt
+  id                   Int       @id @default(1)
+  rosterMode           String    @default("profinhl") // profinhl | real
+  profinhlCapUpper     Int       @default(85900000)
+  profinhlCapLower     Int       @default(51500000)
+  realCapUpper         Int       @default(104000000) // real 2026-27 NHL upper limit
+  realCapLower         Int       @default(76500000)
+  faOpen               Boolean   @default(false) // Free Agent Frenzy window: manual override to force the window open (normally derived from the calendar)
+  faDay                Int       @default(0) // Free Agent Frenzy round counter — advanced by admin/Agent to resolve standing offers
+  leagueDate           DateTime? // the league clock — a 365-day calendar starting July 1 19:00 (real free-agency open); null = not yet started
+  phaseOverride        String? // admin manual phase: "offseason" | "preseason" | "regular" | "playoffs" | "frenzy" · null = follow the calendar (see effectivePhase)
+  simEngine            String    @default("current") // "current" (stable v1) | "nextgen" (v2 rework) — whole-league engine toggle, see lib/sim/version.ts
+  paramMode            String    @default("sths") // "sths" | "edge" — which player-parameter calculator is active; only its Tools link is shown
+  draftTestMode        Boolean   @default(false) // testing: a draft pick advances the board but does NOT write the player onto the team (no Prospect row), so names stay for re-testing
+  lastWeeklyWeek       Int? // last week index whose weekly newsletter was auto-posted (dedupe)
+  lastSimulatedDay     DateTime? // the `leagueDate` value whose evening game-sim has already completed — dedupes the 20:30 Europe/Bratislava cron window to one run per league day, and gates the separate day-rollover check (lib/season-cron.ts) so the calendar never flips to a day that hasn't actually been simulated yet.
+  preseasonPublic      Boolean   @default(false) // is the auto-generated pre-season schedule visible on the public /preseason page yet? Admins always see it in Season Control regardless.
+  preseasonPhaseAt     DateTime? // admin-configurable real date the "preseason" phase begins (Auto mode only) — null = derive from the generated pre-season schedule's first game, else the hardcoded Sep 21 fallback. See lib/calendar-server.ts resolvePhaseThresholds.
+  regularPhaseAt       DateTime? // admin-configurable real date the "regular" phase begins (Auto mode only) — null = derive from the regular-season schedule's first game, else the hardcoded Oct 1 fallback.
+  frenzyAutoOpenAt     DateTime? // admin-configurable real moment to auto-flip faOpen=true (force the Free Agent Frenzy window open for every GM) — a one-shot trigger, checked every cron tick (lib/season-cron.ts autoOpenFrenzyIfDue) and cleared to null once it fires, so a later manual close of faOpen sticks.
+  frenzyRoundStartedAt DateTime? // real wall-clock start of the current global stage; BIDDING ends after 4d, IMPROVEMENT after 2d, null in CONTINUOUS
+  frenzyForcedRound    Int       @default(1) // active force-opened round (1-3); advances only after its 2-day improvement stage has been resolved
+  frenzyStage          String    @default("BIDDING") // BIDDING (4d, new clubs may bid) | IMPROVEMENT (2d, existing bidders may raise) | CONTINUOUS (after round 3: 24h offer window, then 24h improvement when contested)
+  updatedAt            DateTime  @updatedAt
 }
 
 // Per-season projected salary cap limits — editable by admin from /admin/cap-projection.
 // If no row exists for a given year, the league's current salaryCapUpper / salaryCapLower is used as fallback.
 model CapProjection {
-  id         Int  @id @default(autoincrement())
-  year       Int  @unique  // season start year, e.g. 2026 = "2026-27"
-  upperLimit Int           // projected cap ceiling for that season ($)
-  lowerLimit Int           // projected cap floor for that season ($)
-  note       String?       // optional admin note (e.g. "Confirmed by NHL/NHLPA" or "Estimated")
+  id         Int     @id @default(autoincrement())
+  year       Int     @unique // season start year, e.g. 2026 = "2026-27"
+  upperLimit Int // projected cap ceiling for that season ($)
+  lowerLimit Int // projected cap floor for that season ($)
+  note       String? // optional admin note (e.g. "Confirmed by NHL/NHLPA" or "Estimated")
 }
 
 // A GM's request to manage a team. Registration no longer claims a team instantly —
@@ -449,10 +458,10 @@ model JoinRequest {
   lastName     String
   nickname     String
   email        String
-  passwordHash String                       // pre-hashed; on approval it moves onto Team.passwordHash
-  note         String?                      // optional message from the applicant
+  passwordHash String // pre-hashed; on approval it moves onto Team.passwordHash
+  note         String? // optional message from the applicant
   status       String    @default("pending") // pending | approved | rejected
-  decidedBy    String?                      // admin who approved/rejected
+  decidedBy    String? // admin who approved/rejected
   decidedAt    DateTime?
   createdAt    DateTime  @default(now())
 
@@ -464,38 +473,38 @@ model JoinRequest {
 // scalar; menu / homepage blocks are JSON so their shape can evolve without a
 // migration. See lib/site-config.ts for defaults + the merged loader.
 model SiteConfig {
-  id          Int      @id @default(1)
+  id            Int      @id @default(1)
   // Branding
-  leagueName  String   @default("ProfiNHL")
-  tagline     String   @default("CZ & SK Online Hockey Manager")
-  logoUrl     String?
-  nameImageUrl String?  // banner wordmark image — shown INSTEAD of the leagueName text when set
+  leagueName    String   @default("ProfiNHL")
+  tagline       String   @default("CZ & SK Online Hockey Manager")
+  logoUrl       String?
+  nameImageUrl  String? // banner wordmark image — shown INSTEAD of the leagueName text when set
   // Banner layout — sizes in px, arrangement of logo vs name
-  logoHeight  Int      @default(56)
-  nameHeight  Int      @default(56)
-  bannerAlign String   @default("center") // left | center | right
-  bannerLayout String  @default("row")    // row (side by side) | stack (logo above name)
-  logoFirst   Boolean  @default(true)      // logo before the name, or name first
-  bannerHeight Int     @default(0)         // fixed banner band height in px (0 = auto-fit content)
-  socialLinks Json?                        // [{ type: "facebook"|"instagram"|..., url }] shown in the banner corner
-  accentColor String   @default("#60a5fa") // header/tagline accent (was blue-400)
-  bgColor     String   @default("#0a1628") // page background
-  footerText  String?
-  navLight    Boolean  @default(false)     // white/light nav bar instead of the default dark one
+  logoHeight    Int      @default(56)
+  nameHeight    Int      @default(56)
+  bannerAlign   String   @default("center") // left | center | right
+  bannerLayout  String   @default("row") // row (side by side) | stack (logo above name)
+  logoFirst     Boolean  @default(true) // logo before the name, or name first
+  bannerHeight  Int      @default(0) // fixed banner band height in px (0 = auto-fit content)
+  socialLinks   Json? // [{ type: "facebook"|"instagram"|..., url }] shown in the banner corner
+  accentColor   String   @default("#60a5fa") // header/tagline accent (was blue-400)
+  bgColor       String   @default("#0a1628") // page background
+  footerText    String?
+  navLight      Boolean  @default(false) // white/light nav bar instead of the default dark one
   // Theme tokens — remapped onto the app's common Tailwind classes site-wide
-  surfaceColor String  @default("#0f172a") // cards / cells (bg-slate-900)
-  surface2Color String @default("#1e293b") // inputs / secondary surfaces (bg-slate-800)
-  borderColor String   @default("#1e293b") // borders (border-slate-800/700)
-  textColor   String   @default("#ffffff") // body base + headings/values (text-slate-100/200/300, body text)
-  text2Color  String   @default("#94a3b8") // secondary text (text-slate-400)
-  text3Color  String   @default("#64748b") // muted text (text-slate-500)
-  radiusPx    Int      @default(12)        // corner roundness
-  fontKey     String   @default("inter")   // body font stack key (see lib/site-theme.ts)
+  surfaceColor  String   @default("#0f172a") // cards / cells (bg-slate-900)
+  surface2Color String   @default("#1e293b") // inputs / secondary surfaces (bg-slate-800)
+  borderColor   String   @default("#1e293b") // borders (border-slate-800/700)
+  textColor     String   @default("#ffffff") // body base + headings/values (text-slate-100/200/300, body text)
+  text2Color    String   @default("#94a3b8") // secondary text (text-slate-400)
+  text3Color    String   @default("#64748b") // muted text (text-slate-500)
+  radiusPx      Int      @default(12) // corner roundness
+  fontKey       String   @default("inter") // body font stack key (see lib/site-theme.ts)
   // Menu — [{ key, label, href, visible, order, children:[{label,href,visible}] }]
-  menu        Json?
+  menu          Json?
   // Homepage — [{ type, visible, order, config }]
-  homeBlocks  Json?
-  updatedAt   DateTime @updatedAt
+  homeBlocks    Json?
+  updatedAt     DateTime @updatedAt
 }
 
 // Web Editor — a saved appearance template (a named snapshot of the look: colours +
@@ -503,7 +512,7 @@ model SiteConfig {
 model SiteTemplate {
   id        Int      @id @default(autoincrement())
   name      String
-  style     Json     // { accentColor, bgColor, bannerAlign, bannerLayout, logoFirst, logoHeight, nameHeight }
+  style     Json // { accentColor, bgColor, bannerAlign, bannerLayout, logoFirst, logoHeight, nameHeight }
   createdAt DateTime @default(now())
 }
 
@@ -515,7 +524,7 @@ model CustomPage {
   body      String   @default("") // markdown
   published Boolean  @default(false)
   inMenu    Boolean  @default(false)
-  menuLabel String?  // label in the nav (defaults to title)
+  menuLabel String? // label in the nav (defaults to title)
   order     Int      @default(0)
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
@@ -526,24 +535,25 @@ model CustomPage {
 // unsigned player compare all his PENDING offers and pick the best (money + fit
 // + contention). Plain FK scalars (no relations) — joined manually, like Transaction.
 model FaOffer {
-  id        Int      @id @default(autoincrement())
-  playerId  Int
-  teamId    Int
-  salary    Int
-  years     Int
-  line      Int      @default(3)          // promised deployment: F line 1-4 · D pair 1-3 · G 1-2
-  pp        Boolean  @default(false)       // promised power-play time
-  pk        Boolean  @default(false)       // promised penalty-kill time
-  status    String   @default("PENDING") // PENDING | COUNTERED | SHORTLISTED | ACCEPTED | REJECTED | WITHDRAWN
-  round     Int      @default(0)          // frenzy round the offer was placed / last raised
-  counterSalary Int?                       // the player's counter (what he wants from this team) after a round
+  id            Int      @id @default(autoincrement())
+  playerId      Int
+  teamId        Int
+  salary        Int
+  years         Int
+  line          Int      @default(3) // promised deployment: F line 1-4 · D pair 1-3 · G 1-2
+  pp            Boolean  @default(false) // promised power-play time
+  pk            Boolean  @default(false) // promised penalty-kill time
+  status        String   @default("PENDING") // PENDING | COUNTERED | SHORTLISTED | ACCEPTED | REJECTED | WITHDRAWN
+  round         Int      @default(0) // frenzy round the offer was placed / last raised
+  counterSalary Int? // the player's counter (what he wants from this team) after a round
   counterYears  Int?
-  grantClause String?                      // clause the GM offers to grant: NTC | NMC | M_NTC (→ signing discount)
-  mNtcBreadth Int?                         // M-NTC list breadth the GM offers: 6 | 12 | 18 | 24 teams
-  twoWay    Boolean  @default(false)        // GM offers a two-way (AHL) deal rather than a one-way
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  @@unique([playerId, teamId])            // one standing offer per team per player
+  grantClause   String? // clause the GM offers to grant: NTC | NMC | M_NTC (→ signing discount)
+  mNtcBreadth   Int? // M-NTC list breadth the GM offers: 6 | 12 | 18 | 24 teams
+  twoWay        Boolean  @default(false) // GM offers a two-way (AHL) deal rather than a one-way
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([playerId, teamId]) // one standing offer per team per player
   @@index([playerId])
   @@index([teamId])
 }
@@ -559,6 +569,7 @@ model FaBid {
   years     Int
   round     Int      @default(0)
   createdAt DateTime @default(now())
+
   @@index([playerId, id])
 }
 
@@ -569,8 +580,8 @@ model FaBid {
 model OfferSheet {
   id          Int      @id @default(autoincrement())
   playerId    Int
-  fromTeamId  Int                              // the club submitting the offer sheet
-  toTeamId    Int                              // the player's current club (gets compensation)
+  fromTeamId  Int // the club submitting the offer sheet
+  toTeamId    Int // the player's current club (gets compensation)
   salary      Int
   years       Int
   twoWay      Boolean  @default(false)
@@ -579,12 +590,13 @@ model OfferSheet {
   pk          Boolean  @default(false)
   grantClause String?
   mNtcBreadth Int?
-  compPickIds Int[]    @default([])            // DraftPick ids reserved as compensation (transferred on sign)
-  status      String   @default("PENDING")     // PENDING | ACCEPTED | DECLINED | WITHDRAWN
-  note        String?                          // player's decision note
+  compPickIds Int[]    @default([]) // DraftPick ids reserved as compensation (transferred on sign)
+  status      String   @default("PENDING") // PENDING | ACCEPTED | DECLINED | WITHDRAWN
+  note        String? // player's decision note
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  @@unique([playerId, fromTeamId])             // one offer sheet per club per player
+
+  @@unique([playerId, fromTeamId]) // one offer sheet per club per player
   @@index([playerId])
   @@index([fromTeamId])
 }
@@ -594,7 +606,7 @@ model AutoSim {
   enabled     Boolean  @default(true)
   hour        Int      @default(20) // Bratislava local hour
   minute      Int      @default(30)
-  lastRunDate String?  // YYYY-MM-DD (Bratislava) of the last automatic run
+  lastRunDate String? // YYYY-MM-DD (Bratislava) of the last automatic run
   updatedAt   DateTime @updatedAt
 }
 
@@ -615,18 +627,18 @@ model CommissionerAnnouncement {
   id        Int                @id @default(autoincrement())
   body      String
   linkUrl   String?
-  linkLabel String?            // shown for the link; defaults to "click here"
+  linkLabel String? // shown for the link; defaults to "click here"
   active    Boolean            @default(true)
   createdAt DateTime           @default(now())
   reads     AnnouncementRead[]
 }
 
 model AnnouncementRead {
-  id             Int                       @id @default(autoincrement())
+  id             Int                      @id @default(autoincrement())
   announcementId Int
   teamId         Int
-  readAt         DateTime                  @default(now())
-  announcement   CommissionerAnnouncement  @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  readAt         DateTime                 @default(now())
+  announcement   CommissionerAnnouncement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
 
   @@unique([announcementId, teamId])
 }
@@ -671,15 +683,15 @@ model TradeCondition {
   // false. Mirrors a real conditional-pick clause ("conveys as a 2nd unless
   // X, in which case a 3rd") as well as a classic protected first-rounder
   // ("conveys unless it lands in the top 10, in which case a future 1st").
-  playerId    Int?    // the tracked player — absent for a LOTTERY_PROTECTION-only condition
+  playerId Int? // the tracked player — absent for a LOTTERY_PROTECTION-only condition
   // ConditionClause[] (see lib/trade-conditions-shared.ts) — 1-3 clauses,
   // each carrying its own `kind` (STAT / PLAYOFF_ROUND / CONTRACT_EXT /
   // LOTTERY_PROTECTION) and `logic` (how it combines with the clauses before
   // it; ignored on the first clause). Replaces the old flat metric/op/
   // threshold(×3) columns now that a clause can be several different shapes.
-  clauses     Json?
-  pickAId     Int?    // the upgrade — conveys INSTEAD of pickB if `clauses` evaluates true
-  pickBId     Int?    // the default — conveys as-is if `clauses` evaluates false
+  clauses  Json?
+  pickAId  Int? // the upgrade — conveys INSTEAD of pickB if `clauses` evaluates true
+  pickBId  Int? // the default — conveys as-is if `clauses` evaluates false
 }
 
 model TradeAsset {
@@ -720,24 +732,24 @@ model SkaterRating {
 }
 
 model GoalieRating {
-  id        Int    @id @default(autoincrement())
-  playerId  Int    @unique
-  condition Float?
-  sk        Int?
-  du        Int?
-  en        Int?
-  sz        Int?
-  ag        Int?
-  rb        Int?
-  sc        Int?
-  hs        Int?
-  rt        Int?
-  ph        Int?
-  ps        Int?
-  ex        Int?
-  ld        Int?
-  mo        Int?
-  overall   Int?
+  id          Int    @id @default(autoincrement())
+  playerId    Int    @unique
+  condition   Float?
+  sk          Int?
+  du          Int?
+  en          Int?
+  sz          Int?
+  ag          Int?
+  rb          Int?
+  sc          Int?
+  hs          Int?
+  rt          Int?
+  ph          Int?
+  ps          Int?
+  ex          Int?
+  ld          Int?
+  mo          Int?
+  overall     Int?
   // UNHL Parameters — a second, independently-editable rating set (goalies), seeded
   // from the values above (see Player.unhl* for the skater side of the same set).
   unhlSk      Int?
@@ -758,31 +770,31 @@ model GoalieRating {
   // Snapshot of the live SK/DU/EN/... values taken the FIRST time this goalie's live
   // set is ever promoted away from STHS — see Player.sthsBackup.
   sthsBackup  Json?
-  player    Player @relation(fields: [playerId], references: [id])
+  player      Player @relation(fields: [playerId], references: [id])
 }
 
 model Prospect {
-  id          Int    @id @default(autoincrement())
+  id          Int     @id @default(autoincrement())
   name        String
   draftYear   Int?
   overallPick Int?
   teamId      Int
-  source      String @default("profinhl") // profinhl | real
+  source      String  @default("profinhl") // profinhl | real
   nhlId       Int?
   position    String?
   epUrl       String? // EliteProspects profile URL (scraped from profinhl ProspectReport)
   undrafted   Boolean @default(false) // confirmed to have gone undrafted (real NHL) — shows "Undrafted" instead of "—"
-  team        Team   @relation(fields: [teamId], references: [id])
+  team        Team    @relation(fields: [teamId], references: [id])
 }
 
 model DraftPick {
-  id          Int    @id @default(autoincrement())
-  year        Int
-  round       Int
-  teamId      Int
-  ownerLogoId Int
-  source      String @default("profinhl") // profinhl | real
-  team        Team   @relation(fields: [teamId], references: [id])
+  id                  Int    @id @default(autoincrement())
+  year                Int
+  round               Int
+  teamId              Int
+  ownerLogoId         Int
+  source              String @default("profinhl") // profinhl | real
+  team                Team   @relation(fields: [teamId], references: [id])
   // Set while this pick is one of the two candidates on a PENDING structured
   // TradeCondition (see that model) — assertOwnership refuses to let a locked
   // pick into any OTHER trade until the condition resolves and clears this.
@@ -790,25 +802,25 @@ model DraftPick {
 }
 
 model Game {
-  id                Int              @id @default(autoincrement())
-  season            String           @default("2026-27")
-  league            String           @default("NHL") // NHL | AHL
-  round             Int?             // scheduling round / day index
+  id                Int                       @id @default(autoincrement())
+  season            String                    @default("2026-27")
+  league            String                    @default("NHL") // NHL | AHL
+  round             Int? // scheduling round / day index
   gameDate          DateTime?
   homeTeamId        Int
   awayTeamId        Int
-  status            String           @default("SCHEDULED") // SCHEDULED | FINAL
+  status            String                    @default("SCHEDULED") // SCHEDULED | FINAL
   homeGoals         Int?
   awayGoals         Int?
   homeShots         Int?
   awayShots         Int?
-  homeGoalsByPeriod Int[]            @default([])
-  awayGoalsByPeriod Int[]            @default([])
-  homeShotsByPeriod Int[]            @default([])
-  awayShotsByPeriod Int[]            @default([])
-  homeXg            Float?           // team expected goals (Phase 2 shot quality)
+  homeGoalsByPeriod Int[]                     @default([])
+  awayGoalsByPeriod Int[]                     @default([])
+  homeShotsByPeriod Int[]                     @default([])
+  awayShotsByPeriod Int[]                     @default([])
+  homeXg            Float? // team expected goals (Phase 2 shot quality)
   awayXg            Float?
-  homeHd            Int?             // high-danger shots for
+  homeHd            Int? // high-danger shots for
   awayHd            Int?
   // NHL EDGE-style tracking — zone occupancy % (OZ/NZ/DZ), sums ~100
   homeOzPct         Float?
@@ -817,36 +829,36 @@ model Game {
   awayOzPct         Float?
   awayNzPct         Float?
   awayDzPct         Float?
-  homeShotSectors   Int[]            @default([]) // shots by [POINT,PERIMETER,CIRCLE,SLOT,NET_FRONT]
-  awayShotSectors   Int[]            @default([])
-  homeTopShot       Float?           // fastest shot (mph)
+  homeShotSectors   Int[]                     @default([]) // shots by [POINT,PERIMETER,CIRCLE,SLOT,NET_FRONT]
+  awayShotSectors   Int[]                     @default([])
+  homeTopShot       Float? // fastest shot (mph)
   awayTopShot       Float?
   homeTopShotBy     String?
   awayTopShotBy     String?
-  homeAvgShot       Float?           // average shot speed (mph)
+  homeAvgShot       Float? // average shot speed (mph)
   awayAvgShot       Float?
-  homeSystem        Json?            // team-system dials the home side played (scouting)
+  homeSystem        Json? // team-system dials the home side played (scouting)
   awaySystem        Json?
-  homeLines         Json?            // exact TeamLinesData actually iced by the home side (Lines tab snapshot — lines can change after the game)
+  homeLines         Json? // exact TeamLinesData actually iced by the home side (Lines tab snapshot — lines can change after the game)
   awayLines         Json?
-  endedIn           String?          // REG | OT | SO
-  otPeriods         Int?             @default(0) // sudden-death OT periods played (playoff marathons: 1=OT, 2=2OT…)
+  endedIn           String? // REG | OT | SO
+  otPeriods         Int?                      @default(0) // sudden-death OT periods played (playoff marathons: 1=OT, 2=2OT…)
   winnerTeamId      Int?
   seed              Int?
-  engineVersion     String?          // sim engine that produced this game (e.g. "1.0.0")
-  simCount          Int              @default(0) // how many times this game has been simulated (>1 = re-simulated)
-  attendance        Int?             // actual crowd at this (home) game, stored at sim time
-  gate              Int?             // actual ticket gate revenue for this game, stored at sim time
-  lastSimBy         String?          // who ran the most recent simulation (commissioner name / "Auto-sim")
-  lastSimAt         DateTime?        // when the most recent simulation ran
+  engineVersion     String? // sim engine that produced this game (e.g. "1.0.0")
+  simCount          Int                       @default(0) // how many times this game has been simulated (>1 = re-simulated)
+  attendance        Int? // actual crowd at this (home) game, stored at sim time
+  gate              Int? // actual ticket gate revenue for this game, stored at sim time
+  lastSimBy         String? // who ran the most recent simulation (commissioner name / "Auto-sim")
+  lastSimAt         DateTime? // when the most recent simulation ran
   playByPlay        Json?
-  shootout          Json?            // shootout attempts (shooter, result) when the game went to SO
-  seriesId          Int?             // set for playoff games
-  gameNum           Int?             // game number within the series
+  shootout          Json? // shootout attempts (shooter, result) when the game went to SO
+  seriesId          Int? // set for playoff games
+  gameNum           Int? // game number within the series
   playedAt          DateTime?
-  createdAt         DateTime         @default(now())
-  homeTeam          Team             @relation("HomeGames", fields: [homeTeamId], references: [id])
-  awayTeam          Team             @relation("AwayGames", fields: [awayTeamId], references: [id])
+  createdAt         DateTime                  @default(now())
+  homeTeam          Team                      @relation("HomeGames", fields: [homeTeamId], references: [id])
+  awayTeam          Team                      @relation("AwayGames", fields: [awayTeamId], references: [id])
   playerStats       PlayerGameStat[]
   situationStats    PlayerSituationGameStat[]
   goalieStats       GoalieGameStat[]
@@ -860,23 +872,23 @@ model Game {
 }
 
 model GameGoal {
-  id          Int      @id @default(autoincrement())
-  gameId      Int
-  period      Int
-  seconds     Int
-  teamId      Int
-  teamCode    String?
-  scorerId    Int
-  scorerName  String
-  assistIds   Int[]    @default([])
-  assistNames String[] @default([])
-  strength    String   // EV | PP | SH | SO
-  emptyNet    Boolean  @default(false)
-  onIceForIds      Int[]    @default([]) // skaters on ice for the scoring team (scorer + linemates)
-  onIceForNames    String[] @default([])
-  onIceAgainstIds  Int[]    @default([]) // skaters on ice for the conceding team
+  id                Int      @id @default(autoincrement())
+  gameId            Int
+  period            Int
+  seconds           Int
+  teamId            Int
+  teamCode          String?
+  scorerId          Int
+  scorerName        String
+  assistIds         Int[]    @default([])
+  assistNames       String[] @default([])
+  strength          String // EV | PP | SH | SO
+  emptyNet          Boolean  @default(false)
+  onIceForIds       Int[]    @default([]) // skaters on ice for the scoring team (scorer + linemates)
+  onIceForNames     String[] @default([])
+  onIceAgainstIds   Int[]    @default([]) // skaters on ice for the conceding team
   onIceAgainstNames String[] @default([])
-  game        Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  game              Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
 
   @@index([gameId])
 }
@@ -885,23 +897,23 @@ model GameGoal {
 // micro-events a game is built from — the source for play-by-play, advanced stats
 // and xG flow. Transient possession ticks are not stored.
 model GameEvent {
-  id         Int      @id @default(autoincrement())
+  id         Int     @id @default(autoincrement())
   gameId     Int
-  seq        Int      // order within the game
+  seq        Int // order within the game
   period     Int
-  seconds    Int      // clock within the period
-  type       String   // FACEOFF|SHOT|GOAL|SAVE|BLOCK|MISS|REBOUND|HIT|TAKEAWAY|GIVEAWAY|PENALTY|ZONE_ENTRY|...
-  teamId     Int?     // acting team
-  playerId   Int?     // primary actor
-  targetId   Int?     // e.g. hit target, goalie, defender
-  zone       String?  // DEF|NEU|OFF
-  sector     String?  // e.g. SLOT|POINT|LEFT_CIRCLE|NET_FRONT (shot location, later)
-  shotType   String?  // WRIST|SLAP|SNAP|BACKHAND|TIP|ONE_TIMER
-  strength   String?  // EV|PP|SH|EN
-  xg         Float?   // shot-quality / expected-goal probability at the moment
-  importance String   @default("MINOR") // MINOR|NOTABLE|MAJOR|HIGHLIGHT
-  meta       Json?    // small extra payload (assist ids, danger, etc.)
-  game       Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  seconds    Int // clock within the period
+  type       String // FACEOFF|SHOT|GOAL|SAVE|BLOCK|MISS|REBOUND|HIT|TAKEAWAY|GIVEAWAY|PENALTY|ZONE_ENTRY|...
+  teamId     Int? // acting team
+  playerId   Int? // primary actor
+  targetId   Int? // e.g. hit target, goalie, defender
+  zone       String? // DEF|NEU|OFF
+  sector     String? // e.g. SLOT|POINT|LEFT_CIRCLE|NET_FRONT (shot location, later)
+  shotType   String? // WRIST|SLAP|SNAP|BACKHAND|TIP|ONE_TIMER
+  strength   String? // EV|PP|SH|EN
+  xg         Float? // shot-quality / expected-goal probability at the moment
+  importance String  @default("MINOR") // MINOR|NOTABLE|MAJOR|HIGHLIGHT
+  meta       Json? // small extra payload (assist ids, danger, etc.)
+  game       Game    @relation(fields: [gameId], references: [id], onDelete: Cascade)
 
   @@index([gameId, seq])
 }
@@ -916,8 +928,8 @@ model SimSettings {
 model LoginLog {
   id        Int      @id @default(autoincrement())
   type      String   @default("gm") // gm | visit
-  teamId    Int?     // the signed-in GM's club, if any (null = guest)
-  path      String?  // landing path (for visits)
+  teamId    Int? // the signed-in GM's club, if any (null = guest)
+  path      String? // landing path (for visits)
   ip        String?
   country   String?
   region    String?
@@ -931,25 +943,25 @@ model LoginLog {
 
 // League forum — public discussion threads for every GM.
 model ForumThread {
-  id         Int      @id @default(autoincrement())
-  teamId     Int      // author
+  id         Int         @id @default(autoincrement())
+  teamId     Int // author
   title      String
-  category   String   @default("discussion") // discussion | trades | offtopic | comish
-  pinned     Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  lastPostAt DateTime @default(now())
-  team       Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  category   String      @default("discussion") // discussion | trades | offtopic | comish
+  pinned     Boolean     @default(false)
+  createdAt  DateTime    @default(now())
+  lastPostAt DateTime    @default(now())
+  team       Team        @relation(fields: [teamId], references: [id], onDelete: Cascade)
   posts      ForumPost[]
 
   @@index([category, lastPostAt])
 }
 
 model ForumPost {
-  id        Int      @id @default(autoincrement())
+  id        Int             @id @default(autoincrement())
   threadId  Int
-  teamId    Int      // author
+  teamId    Int // author
   body      String
-  createdAt DateTime @default(now())
+  createdAt DateTime        @default(now())
   editedAt  DateTime? // set when the author edits the post
   thread    ForumThread     @relation(fields: [threadId], references: [id], onDelete: Cascade)
   team      Team            @relation(fields: [teamId], references: [id], onDelete: Cascade)
@@ -959,7 +971,7 @@ model ForumPost {
 }
 
 model ForumReaction {
-  id     Int    @id @default(autoincrement())
+  id     Int       @id @default(autoincrement())
   postId Int
   teamId Int
   emoji  String
@@ -977,7 +989,7 @@ model DmMessage {
   fromTeamId Int
   toTeamId   Int
   body       String
-  tradeUrl   String?   // optional attached trade-proposal link
+  tradeUrl   String? // optional attached trade-proposal link
   readAt     DateTime?
   createdAt  DateTime  @default(now())
   fromTeam   Team      @relation("DmFrom", fields: [fromTeamId], references: [id], onDelete: Cascade)
@@ -988,18 +1000,18 @@ model DmMessage {
 }
 
 model Buyout {
-  id         Int      @id @default(autoincrement())
+  id         Int       @id @default(autoincrement())
   teamId     Int
   playerId   Int?
   playerName String
-  perYear    Int      // dead-money cap hit per season
-  years      Int      // number of seasons it applies
-  startYear  Int      // first season (e.g. 2026)
-  totalCost  Int      // total dead-cap obligation — 0 marks a trade-retention record, not a real buyout
-  inSeason   Boolean  @default(true)
+  perYear    Int // dead-money cap hit per season
+  years      Int // number of seasons it applies
+  startYear  Int // first season (e.g. 2026)
+  totalCost  Int // total dead-cap obligation — 0 marks a trade-retention record, not a real buyout
+  inSeason   Boolean   @default(true)
   leagueDate DateTime? // in-LEAGUE date this was recorded (not createdAt's real wall-clock time) —
-                        // lets retention cooldown/re-acquire rules count in-league days correctly
-  createdAt  DateTime @default(now())
+  // lets retention cooldown/re-acquire rules count in-league days correctly
+  createdAt  DateTime  @default(now())
 
   @@index([teamId])
   @@index([playerId])
@@ -1009,9 +1021,9 @@ model PlayoffSeries {
   id             Int      @id @default(autoincrement())
   season         String
   league         String   @default("NHL") // NHL | AHL
-  round          Int      // 1=R1, 2=R2, 3=conf final, 4=cup final
-  conference     String?  // null for the cup final
-  slot           Int      // bracket position within the round
+  round          Int // 1=R1, 2=R2, 3=conf final, 4=cup final
+  conference     String? // null for the cup final
+  slot           Int // bracket position within the round
   highSeedTeamId Int
   lowSeedTeamId  Int
   highSeed       Int
@@ -1033,7 +1045,7 @@ model SeasonRecord {
   league           String   @default("NHL")
   championTeamId   Int?
   runnerUpTeamId   Int?
-  presidentsTeamId Int?     // best regular-season record
+  presidentsTeamId Int? // best regular-season record
   createdAt        DateTime @default(now())
 
   @@unique([season, league])
@@ -1046,10 +1058,10 @@ model SeasonRecord {
 // Keyed on the REGULAR season it preceded, not on its own (non-yearly) season string.
 model SeasonPreseasonRecord {
   id              Int      @id @default(autoincrement())
-  season          String   // the regular season this pre-season led into, e.g. "2026-27"
+  season          String // the regular season this pre-season led into, e.g. "2026-27"
   league          String   @default("NHL")
   gamesPlayed     Int
-  bestTeamId      Int?     // best pre-season W-L(-OTL) record
+  bestTeamId      Int? // best pre-season W-L(-OTL) record
   topScorerId     Int?
   topScorerName   String?
   topScorerPoints Int?
@@ -1059,14 +1071,14 @@ model SeasonPreseasonRecord {
 }
 
 model SeasonAward {
-  id       Int     @id @default(autoincrement())
-  season   String
-  league   String  @default("NHL")
-  category String  // Hart | Art Ross | Rocket Richard | Norris | Vezina | Calder | Conn Smythe | Presidents
-  playerId Int?
+  id         Int     @id @default(autoincrement())
+  season     String
+  league     String  @default("NHL")
+  category   String // Hart | Art Ross | Rocket Richard | Norris | Vezina | Calder | Conn Smythe | Presidents
+  playerId   Int?
   playerName String?
-  teamId   Int?
-  detail   String? // e.g. "112 pts", "1.98 GAA"
+  teamId     Int?
+  detail     String? // e.g. "112 pts", "1.98 GAA"
 
   @@index([season, league])
 }
@@ -1082,8 +1094,8 @@ model GameAudit {
   gameId        Int
   season        String
   league        String   @default("NHL")
-  action        String   // SIMULATE | RESIMULATE
-  byName        String   // commissioner / actor who triggered it
+  action        String // SIMULATE | RESIMULATE
+  byName        String // commissioner / actor who triggered it
   engineVersion String?
   seed          Int?
   homeTeamId    Int?
@@ -1104,7 +1116,7 @@ model GameAudit {
 model CommishIntelAudit {
   id        Int      @id @default(autoincrement())
   byName    String
-  summary   String   // short plain-text roll-up of what was flagged at view time
+  summary   String // short plain-text roll-up of what was flagged at view time
   createdAt DateTime @default(now())
 
   @@index([createdAt])
@@ -1170,7 +1182,7 @@ model TeamSeasonStat {
   points        Int     @default(0)
   gf            Int     @default(0)
   ga            Int     @default(0)
-  finish        Int?    // regular-season rank within the league
+  finish        Int? // regular-season rank within the league
   playoffResult String? // Champion | Final | Conf Final | Round 2 | Playoffs | Missed
 
   @@unique([teamId, season, league])
@@ -1185,13 +1197,13 @@ model TeamSeasonStat {
 // NHL API, /v1/draft/rankings/{year}/{category}). One row per draft-eligible
 // prospect; draftedByTeamId is null until a club selects him in the Draft Room.
 model DraftProspect {
-  id              Int     @id @default(autoincrement())
+  id              Int            @id @default(autoincrement())
   draftYear       Int
   source          String? // null/"profinhl" = this league's own draft · "real" = imported real NHL draft history (shown only in real-roster mode)
   firstName       String
   lastName        String
-  name            String  // "First Last" — display / matching
-  position        String  // C | LW | RW | D | G
+  name            String // "First Last" — display / matching
+  position        String // C | LW | RW | D | G
   shoots          String? // L | R
   heightIn        Int?
   weightLb        Int?
@@ -1199,16 +1211,16 @@ model DraftProspect {
   country         String?
   amateurClub     String?
   amateurLeague   String?
-  csRank          Int?    // NHL Central Scouting final rank (within its category)
-  category        Int     // 1 NA skater · 2 Intl skater · 3 NA goalie · 4 Intl goalie
-  ov              Int     // derived draft-day rating
-  potential       Int     // derived ceiling
-  draftedByTeamId Int?    // null = still available
-  overallPick     Int?    // set when selected
-  playerId        Int?    // the Player row created on selection
-  offBoard        Boolean @default(false) // GM-added pick, not on the scouting board
+  csRank          Int? // NHL Central Scouting final rank (within its category)
+  category        Int // 1 NA skater · 2 Intl skater · 3 NA goalie · 4 Intl goalie
+  ov              Int // derived draft-day rating
+  potential       Int // derived ceiling
+  draftedByTeamId Int? // null = still available
+  overallPick     Int? // set when selected
+  playerId        Int? // the Player row created on selection
+  offBoard        Boolean        @default(false) // GM-added pick, not on the scouting board
   epLink          String? // EliteProspects link the GM supplied for an off-board pick
-  verified        Boolean @default(false) // admin confirmed an off-board pick is eligible
+  verified        Boolean        @default(false) // admin confirmed an off-board pick is eligible
   rankings        DraftRanking[]
 
   @@index([draftYear, draftedByTeamId])
@@ -1243,13 +1255,13 @@ model DraftRanking {
 // Live Draft Room state. One row per draft year. The admin opens a round; picks
 // advance the pointer. (Real-time clock — deadlines/accelerate/defer — layered next.)
 model DraftState {
-  id          Int      @id @default(autoincrement())
-  year        Int      @unique
-  liveRound   Int      @default(0)  // the round currently open for picking (0 = none)
-  currentPick Int      @default(33) // next overall pick to make (R1 done = starts at 33)
-  status      String   @default("IDLE") // IDLE | LIVE | ROUND_DONE | DONE
-  onClockAt   DateTime?               // when the current team went on the clock
-  updatedAt   DateTime @updatedAt
+  id          Int       @id @default(autoincrement())
+  year        Int       @unique
+  liveRound   Int       @default(0) // the round currently open for picking (0 = none)
+  currentPick Int       @default(33) // next overall pick to make (R1 done = starts at 33)
+  status      String    @default("IDLE") // IDLE | LIVE | ROUND_DONE | DONE
+  onClockAt   DateTime? // when the current team went on the clock
+  updatedAt   DateTime  @updatedAt
 }
 
 // Admin-granted BONUS picks in extra rounds (8, 9, …) beyond the standard 7 — awarded
@@ -1257,10 +1269,10 @@ model DraftState {
 model DraftBonusPick {
   id        Int      @id @default(autoincrement())
   year      Int
-  round     Int      // 8, 9, … (extra rounds appended after round 7)
+  round     Int // 8, 9, … (extra rounds appended after round 7)
   teamId    Int
-  reason    String?  // why it was awarded (e.g. "Article of the month")
-  source    String?  // null/"profinhl" | "real" — which roster world it belongs to
+  reason    String? // why it was awarded (e.g. "Article of the month")
+  source    String? // null/"profinhl" | "real" — which roster world it belongs to
   seq       Int      @default(0) // selection order within the round — set by the admin's Randomise draw (0 = not drawn yet)
   createdAt DateTime @default(now())
 
@@ -1283,9 +1295,9 @@ model ChatMessage {
 model DraftDeferral {
   id         Int      @id @default(autoincrement())
   year       Int
-  round      Int      // the round the missed pick belonged to
-  teamId     Int      // the club that must still select
-  sourcePick Int      // the base overall pick they let expire
+  round      Int // the round the missed pick belonged to
+  teamId     Int // the club that must still select
+  sourcePick Int // the base overall pick they let expire
   createdAt  DateTime @default(now())
 
   @@index([year])
@@ -1294,13 +1306,13 @@ model DraftDeferral {
 // Result of an NHL-style draft lottery — the Round 1 order for a draft year.
 // Drawn once (random) and stored; the draft room reads it for round 1.
 model DraftLottery {
-  id         Int     @id @default(autoincrement())
+  id         Int      @id @default(autoincrement())
   year       Int
-  pick       Int     // 1-32 overall slot in round 1
+  pick       Int // 1-32 overall slot in round 1
   teamId     Int
-  viaLottery Boolean @default(false) // true for the two lottery-won top picks
+  viaLottery Boolean  @default(false) // true for the two lottery-won top picks
   combo      String? // winning 4-ball combination for lottery picks, e.g. "3-7-9-14"
-  prePos     Int?    // 1-16 pre-lottery rank (worst record first) for the 16 lottery-eligible clubs; null for playoff clubs (they don't move)
+  prePos     Int? // 1-16 pre-lottery rank (worst record first) for the 16 lottery-eligible clubs; null for playoff clubs (they don't move)
   createdAt  DateTime @default(now())
 
   @@unique([year, pick])
@@ -1332,11 +1344,11 @@ model AwardVote {
   season      String
   league      String  @default("NHL")
   category    String
-  voterTeamId Int     // the GM (team) who cast this ballot slot
-  rank        Int     // 1 = top pick
-  points      Int     // 5-4-3-2-1 (5 picks) or 3-2-1 (3 picks)
-  playerId    Int?    // player-based awards
-  teamId      Int?    // coach (Jack Adams) / GM (GM of the Year) awards — the subject team
+  voterTeamId Int // the GM (team) who cast this ballot slot
+  rank        Int // 1 = top pick
+  points      Int // 5-4-3-2-1 (5 picks) or 3-2-1 (3 picks)
+  playerId    Int? // player-based awards
+  teamId      Int? // coach (Jack Adams) / GM (GM of the Year) awards — the subject team
   isAi        Boolean @default(false) // stat-based auto-ballot vs a human GM's ballot
 
   @@unique([season, league, category, voterTeamId, rank])
@@ -1352,7 +1364,7 @@ model TeamLines {
   pkUnits      Json     @default("[]") // legacy
   situations   Json     @default("{}") // pp, pp4, fourVFour, pk4, pk3, overtime, others, lastMin
   strategy     Json     @default("{}") // 5 game-states {phy,df,of} + goaliePull
-  system       Json?    // Phase 3 team-system dials { tempo, forecheck, puckStyle, dZone, preset }
+  system       Json? // Phase 3 team-system dials { tempo, forecheck, puckStyle, dZone, preset }
   chemistry    Json     @default("{}") // { [unitSignature]: value 0..100 } — line chemistry
   updatedAt    DateTime @updatedAt
   team         Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
@@ -1377,38 +1389,38 @@ model GamePenalty {
 }
 
 model PlayerGameStat {
-  id            Int    @id @default(autoincrement())
-  gameId        Int
-  playerId      Int
-  teamId        Int
-  goals         Int    @default(0)
-  assists       Int    @default(0)
-  points        Int    @default(0)
-  shots         Int    @default(0)
-  pim           Int    @default(0)
-  plusMinus     Int    @default(0)
-  ppGoals       Int    @default(0)
-  shGoals       Int    @default(0)
-  ppAssists     Int    @default(0)
-  shAssists     Int    @default(0)
-  gwg           Int    @default(0)
-  hits          Int    @default(0)
-  blocks        Int    @default(0)
-  faceoffWins   Int    @default(0)
-  faceoffLosses Int    @default(0)
-  toi           Int    @default(0)
-  ppToi         Int    @default(0) // power-play time on ice (seconds)
-  pkToi         Int    @default(0) // penalty-kill time on ice (seconds)
-  conBefore     Int?
-  conAfter      Int?
-  xg            Float  @default(0) // individual expected goals (Phase 2 shot quality)
-  hdShots       Int    @default(0) // high-danger shots (slot / net-front)
-  topShot       Float  @default(0) // fastest shot fired (mph) — EDGE
-  shifts        Int    @default(0) // shifts taken (Shift Quality)
-  positiveShifts Int   @default(0) // shifts where on-ice net xG was positive → Positive Shift %
-  shotZones     Int[]  @default([]) // ALL shots by rink zone [POINT,PERIMETER,CIRCLE,SLOT,NET_FRONT] — full shot map
-  game          Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  player        Player @relation(fields: [playerId], references: [id])
+  id             Int    @id @default(autoincrement())
+  gameId         Int
+  playerId       Int
+  teamId         Int
+  goals          Int    @default(0)
+  assists        Int    @default(0)
+  points         Int    @default(0)
+  shots          Int    @default(0)
+  pim            Int    @default(0)
+  plusMinus      Int    @default(0)
+  ppGoals        Int    @default(0)
+  shGoals        Int    @default(0)
+  ppAssists      Int    @default(0)
+  shAssists      Int    @default(0)
+  gwg            Int    @default(0)
+  hits           Int    @default(0)
+  blocks         Int    @default(0)
+  faceoffWins    Int    @default(0)
+  faceoffLosses  Int    @default(0)
+  toi            Int    @default(0)
+  ppToi          Int    @default(0) // power-play time on ice (seconds)
+  pkToi          Int    @default(0) // penalty-kill time on ice (seconds)
+  conBefore      Int?
+  conAfter       Int?
+  xg             Float  @default(0) // individual expected goals (Phase 2 shot quality)
+  hdShots        Int    @default(0) // high-danger shots (slot / net-front)
+  topShot        Float  @default(0) // fastest shot fired (mph) — EDGE
+  shifts         Int    @default(0) // shifts taken (Shift Quality)
+  positiveShifts Int    @default(0) // shifts where on-ice net xG was positive → Positive Shift %
+  shotZones      Int[]  @default([]) // ALL shots by rink zone [POINT,PERIMETER,CIRCLE,SLOT,NET_FRONT] — full shot map
+  game           Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  player         Player @relation(fields: [playerId], references: [id])
 
   @@unique([gameId, playerId])
   @@index([playerId])
