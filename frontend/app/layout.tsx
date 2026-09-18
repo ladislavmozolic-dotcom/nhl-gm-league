@@ -106,10 +106,14 @@ export default async function RootLayout({
         ...item,
         children: item.children
           .filter((c) => !(financeHidden && c.href === "/finance")) // legacy hide-finance → drop the whole Finance submenu
+          .filter((c) => c.href !== "/signings" || t?.isAdmin) // commish-only — page itself redirects non-admins
           .map((c) =>
             c.children ? { ...c, children: detailedFinance ? c.children : c.children.filter((sub) => !DETAILED_FINANCE_HREFS.has(sub.href)) } : c
           ),
       };
+    }
+    if (item.key === "frenzy" && item.children) {
+      return { ...item, children: item.children.filter((c) => c.href !== "/signings" || t?.isAdmin) };
     }
     return item;
   });
