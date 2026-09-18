@@ -260,35 +260,65 @@ export function getGroupTitle(id: string, lang: Lang, cupName: string): string {
       de: "Altersrekorde (Ligakader)",
       ru: "Возрастные рекорды (Составы лиги)",
     },
-    "pre-season-group": {
-      en: "Pre-season Exhibition Records",
-      cs: "Prípravné zápasy (Pre-season rekordy)",
-      de: "Vorbereitungsspiele (Pre-season Rekorde)",
-      ru: "Предсезонные матчи (Рекорды предсезонки)",
+    "pre-career-skaters": {
+      en: "Career Pre-season Records — Skaters",
+      cs: "Kariérne rekordy v príprave — Korčuliari",
+      de: "Karriere-Vorbereitungsrekorde — Feldspieler",
+      ru: "Рекорды предсезонки в карьере — Полевые игроки",
     },
-    "pre-skaters": {
-      en: "Pre-season Exhibition Records (Skaters)",
-      cs: "Prípravné zápasy (Korčuliari)",
-      de: "Vorbereitungsspiele (Feldspieler)",
-      ru: "Предсезонные матчи (Полевые игроки)",
+    "pre-season-skaters": {
+      en: "Single-Season Pre-season Records — Skaters",
+      cs: "Sezónne rekordy v príprave — Korčuliari",
+      de: "Saison-Vorbereitungsrekorde — Feldspieler",
+      ru: "Рекорды одного сезона предсезонки — Полевые игроки",
     },
-    "pre-goalies": {
-      en: "Pre-season Exhibition Records (Goalies)",
-      cs: "Prípravné zápasy (Brankári)",
-      de: "Vorbereitungsspiele (Torhüter)",
-      ru: "Предсезонные матчи (Вратари)",
+    "pre-streak-skaters": {
+      en: "Pre-season Streak Records — Skaters",
+      cs: "Série v príprave — Korčuliari",
+      de: "Vorbereitungs-Serienrekorde — Feldspieler",
+      ru: "Серии в предсезонке — Полевые игроки",
+    },
+    "pre-game-skaters": {
+      en: "Single-Game Pre-season Records — Skaters",
+      cs: "Zápasové rekordy v príprave — Korčuliari",
+      de: "Einzelspiel-Vorbereitungsrekorde — Feldspieler",
+      ru: "Рекорды одного матча предсезонки — Полевые игроки",
+    },
+    "pre-career-goalies": {
+      en: "Career Pre-season Records — Goalies",
+      cs: "Kariérne rekordy v príprave — Brankári",
+      de: "Karriere-Vorbereitungsrekorde — Torhüter",
+      ru: "Рекорды предсезонки в карьере — Вратари",
+    },
+    "pre-season-goalies": {
+      en: "Single-Season Pre-season Records — Goalies",
+      cs: "Sezónne rekordy v príprave — Brankári",
+      de: "Saison-Vorbereitungsrekorde — Torhüter",
+      ru: "Рекорды одного сезона предсезонки — Вратари",
+    },
+    "pre-streak-goalies": {
+      en: "Pre-season Streak Records — Goalies",
+      cs: "Série v príprave — Brankári",
+      de: "Vorbereitungs-Serienrekorde — Torhüter",
+      ru: "Серии в предсезонке — Вратари",
+    },
+    "pre-game-goalies": {
+      en: "Single-Game Pre-season Records — Goalies",
+      cs: "Zápasové rekordy v príprave — Brankári",
+      de: "Einzelspiel-Vorbereitungsrekorde — Torhüter",
+      ru: "Рекорды одного матча предсезонки — Вратари",
     },
     "pre-teams": {
-      en: "Pre-season Exhibition Records (Teams)",
-      cs: "Prípravné zápasy (Tímy)",
-      de: "Vorbereitungsspiele (Teams)",
-      ru: "Предсезонные матчи (Команды)",
+      en: "Pre-season Team Records",
+      cs: "Tímové rekordy v príprave",
+      de: "Team-Vorbereitungsrekorde",
+      ru: "Командные рекорды предсезонки",
     },
     "pre-games": {
-      en: "Pre-season Exhibition Records (Games & Attendance)",
-      cs: "Prípravné zápasy (Zápasy a diváci)",
-      de: "Vorbereitungsspiele (Spiele & Zuschauer)",
-      ru: "Предсезонные матчи (Матчи и зрители)",
+      en: "Pre-season Game & Attendance Records",
+      cs: "Zápasy a návštevnosť v príprave",
+      de: "Spiele & Zuschauer in der Vorbereitung",
+      ru: "Матчи и посещаемость в предсезонке",
     },
   };
   return map[id]?.[lang] ?? map[id]?.en ?? id;
@@ -1034,57 +1064,550 @@ export function getSectionTitle(id: string, lang: Lang, league: string, cupName:
       de: `Ältester aktiver Spieler in der u${league}`,
       ru: `Самый возрастной активный игрок в u${league}`,
     },
-    "pre-best-team": {
-      en: "Best record in pre-season",
-      cs: "Najlepšia bilancia v príprave (Pre-season)",
-      de: "Beste Vorbereitungsbilanz (Pre-season)",
-      ru: "Лучший результат в предсезонке",
+    // ================= Pre-season Skater Career =================
+    "pre-career-gp": {
+      en: "Most career pre-season games played",
+      cs: "Najviac odohraných zápasov v príprave",
+      de: "Meiste Spiele in der Vorbereitung",
+      ru: "Больше всего матчей в предсезонке",
     },
-    "pre-top-scorer": {
-      en: "Pre-season scoring leader",
-      cs: "Najproduktívnejší hráč v príprave (Top Scorer)",
-      de: "Topscorer der Vorbereitung",
-      ru: "Лучший бомбардир предсезонки",
+    "pre-career-goals": {
+      en: "Most career pre-season goals",
+      cs: "Najviac gólov v príprave (Kariéra)",
+      de: "Meiste Tore in der Vorbereitung (Karriere)",
+      ru: "Больше всего голов в предсезонке (Карьера)",
     },
-    "pre-goals": {
-      en: "Pre-season top goalscorer",
-      cs: "Najlepší strelec v príprave (Góly)",
-      de: "Bester Torschütze der Vorbereitung",
-      ru: "Лучший снайпер предсезонки",
+    "pre-career-assists": {
+      en: "Most career pre-season assists",
+      cs: "Najviac asistencií v príprave (Kariéra)",
+      de: "Meiste Assists in der Vorbereitung (Karriere)",
+      ru: "Больше всего передач в предсезонке (Карьера)",
     },
-    "pre-assists": {
-      en: "Most assists in pre-season",
-      cs: "Najviac asistencií v príprave",
-      de: "Meiste Assists in der Vorbereitung",
-      ru: "Больше всего передач в предсезонке",
+    "pre-career-points": {
+      en: "Most career pre-season points",
+      cs: "Najviac bodov v príprave (Kariéra)",
+      de: "Meiste Punkte in der Vorbereitung (Karriere)",
+      ru: "Больше всего очков в предсезонке (Карьера)",
     },
-    "pre-single-game-pts": {
+    "pre-career-pim": {
+      en: "Most career pre-season penalty minutes",
+      cs: "Najviac trestných minút v príprave (Kariéra)",
+      de: "Meiste Strafminuten in der Vorbereitung (Karriere)",
+      ru: "Больше всего штрафных минут в предсезонке (Карьера)",
+    },
+    "pre-career-plus-minus-best": {
+      en: "Best career pre-season +/-",
+      cs: "Najlepší +/- v príprave (Kariéra)",
+      de: "Beste Vorbereitungs-+/- (Karriere)",
+      ru: "Лучший +/- в предсезонке (Карьера)",
+    },
+    "pre-career-plus-minus-worst": {
+      en: "Worst career pre-season +/-",
+      cs: "Najhorší +/- v príprave (Kariéra)",
+      de: "Schlechteste Vorbereitungs-+/- (Karriere)",
+      ru: "Худший +/- в предсезонке (Карьера)",
+    },
+    "pre-career-pp-goals": {
+      en: "Most career pre-season power-play goals (PPG)",
+      cs: "Najviac presilovkových gólov v príprave (PPG)",
+      de: "Meiste Überzahltore in der Vorbereitung (PPG)",
+      ru: "Больше всего голов в большинстве в предсезонке (PPG)",
+    },
+    "pre-career-pp-assists": {
+      en: "Most career pre-season power-play assists (PPA)",
+      cs: "Najviac presilovkových asistencií v príprave (PPA)",
+      de: "Meiste Überzahl-Assists in der Vorbereitung (PPA)",
+      ru: "Больше всего передач в большинстве в предсезонке (PPA)",
+    },
+    "pre-career-pp-points": {
+      en: "Most career pre-season power-play points (PPP)",
+      cs: "Najviac presilovkových bodov v príprave (PPP)",
+      de: "Meiste Überzahlpunkte in der Vorbereitung (PPP)",
+      ru: "Больше всего очков в большинстве в предсезонке (PPP)",
+    },
+    "pre-career-sh-goals": {
+      en: "Most career pre-season short-handed goals (SHG)",
+      cs: "Najviac oslabovkových gólov v príprave (SHG)",
+      de: "Meiste Unterzahltore in der Vorbereitung (SHG)",
+      ru: "Больше всего голов в меньшинстве в предсезонке (SHG)",
+    },
+    "pre-career-sh-assists": {
+      en: "Most career pre-season short-handed assists (SHA)",
+      cs: "Najviac oslabovkových asistencií v príprave (SHA)",
+      de: "Meiste Unterzahl-Assists in der Vorbereitung (SHA)",
+      ru: "Больше всего передач в меньшинстве в предсезонке (SHA)",
+    },
+    "pre-career-sh-points": {
+      en: "Most career pre-season short-handed points (SHP)",
+      cs: "Najviac oslabovkových bodov v príprave (SHP)",
+      de: "Meiste Unterzahlpunkte in der Vorbereitung (SHP)",
+      ru: "Больше всего очков в меньшинстве в предсезонке (SHP)",
+    },
+    "pre-career-gwg": {
+      en: "Most career pre-season game-winning goals (GWG)",
+      cs: "Najviac víťazných gólov v príprave (GWG)",
+      de: "Meiste Siegtore in der Vorbereitung (GWG)",
+      ru: "Больше всего победных голов в предсезонке (GWG)",
+    },
+    "pre-career-shots": {
+      en: "Most career pre-season shots on goal (SOG)",
+      cs: "Najviac striel na bránku v príprave (SOG)",
+      de: "Meiste Torschüsse in der Vorbereitung (Karriere)",
+      ru: "Больше всего бросков в створ в предсезонке (Карьера)",
+    },
+    "pre-career-shooting-pct": {
+      en: "Highest career pre-season shooting percentage (min. 10 SOG)",
+      cs: "Najvyššia úspešnosť streľby v príprave (min. 10 striel)",
+      de: "Höchste Schussgenauigkeit in der Vorbereitung (min. 10 Schüsse)",
+      ru: "Лучший процент реализации бросков в предсезонке (мин. 10 бросков)",
+    },
+    "pre-career-hits": {
+      en: "Most career pre-season hits",
+      cs: "Najviac hitov v príprave (Kariéra)",
+      de: "Meiste Hits in der Vorbereitung (Karriere)",
+      ru: "Больше всего силовых приемов в предсезонке (Карьера)",
+    },
+    "pre-career-blocks": {
+      en: "Most career pre-season blocked shots",
+      cs: "Najviac zblokovaných striel v príprave (Kariéra)",
+      de: "Meiste geblockte Schüsse in der Vorbereitung (Karriere)",
+      ru: "Больше всего заблокированных бросков в предсезонке (Карьера)",
+    },
+    "pre-career-takeaways": {
+      en: "Most career pre-season takeaways",
+      cs: "Najviac získaných pukov v príprave (Kariéra)",
+      de: "Meiste Scheibeneroberungen in der Vorbereitung (Karriere)",
+      ru: "Больше всего перехватов в предсезонке (Карьера)",
+    },
+    "pre-career-giveaways": {
+      en: "Most career pre-season giveaways",
+      cs: "Najviac stratených pukov v príprave (Kariéra)",
+      de: "Meiste Scheibenverluste in der Vorbereitung (Karriere)",
+      ru: "Больше всего потерь в предсезонке (Карьера)",
+    },
+    "pre-career-fo-wins": {
+      en: "Most career pre-season faceoff wins",
+      cs: "Najviac vyhraných vhadzovaní v príprave (Kariéra)",
+      de: "Meiste gewonnene Bullys in der Vorbereitung (Karriere)",
+      ru: "Больше всего выигранных вбрасываний в предсезонке (Карьера)",
+    },
+    "pre-career-fo-pct": {
+      en: "Highest career pre-season faceoff percentage (min. 20 FO)",
+      cs: "Najvyššia úspešnosť na vhadzovaniach v príprave (min. 20 buly)",
+      de: "Beste Bully-Quote in der Vorbereitung (min. 20 Bullys)",
+      ru: "Лучший процент на вбрасываниях в предсезонке (мин. 20 вбрасываний)",
+    },
+    "pre-career-d-points": {
+      en: "Most career pre-season points by a defenseman",
+      cs: "Najviac bodov obrancu v príprave (Kariéra)",
+      de: "Meiste Verteidigerpunkte in der Vorbereitung (Karriere)",
+      ru: "Больше всего очков защитника в предсезонке (Карьера)",
+    },
+    "pre-career-d-goals": {
+      en: "Most career pre-season goals by a defenseman",
+      cs: "Najviac gólov obrancu v príprave (Kariéra)",
+      de: "Meiste Verteidigertore in der Vorbereitung (Karriere)",
+      ru: "Больше всего голов защитника в предсезонке (Карьера)",
+    },
+    "pre-career-d-assists": {
+      en: "Most career pre-season assists by a defenseman",
+      cs: "Najviac asistencií obrancu v príprave (Kariéra)",
+      de: "Meiste Verteidiger-Assists in der Vorbereitung (Karriere)",
+      ru: "Больше всего передач защитника в предсезонке (Карьера)",
+    },
+
+    // ================= Pre-season Skater Single Season =================
+    "pre-season-points": {
+      en: "Most points in a single pre-season",
+      cs: "Najviac bodov v jednej príprave",
+      de: "Meiste Punkte in einer Vorbereitung",
+      ru: "Больше всего очков за одну предсезонку",
+    },
+    "pre-season-goals": {
+      en: "Most goals in a single pre-season",
+      cs: "Najviac gólov v jednej príprave",
+      de: "Meiste Tore in einer Vorbereitung",
+      ru: "Больше всего голов за одну предсезонку",
+    },
+    "pre-season-assists": {
+      en: "Most assists in a single pre-season",
+      cs: "Najviac asistencií v jednej príprave",
+      de: "Meiste Assists in einer Vorbereitung",
+      ru: "Больше всего передач за одну предсезонку",
+    },
+    "pre-season-pim": {
+      en: "Most penalty minutes in a single pre-season",
+      cs: "Najviac trestných minút v jednej príprave",
+      de: "Meiste Strafminuten in einer Vorbereitung",
+      ru: "Больше всего штрафных минут за одну предсезонку",
+    },
+    "pre-season-plus-minus-best": {
+      en: "Best +/- in a single pre-season",
+      cs: "Najlepší +/- v jednej príprave",
+      de: "Beste +/- in einer Vorbereitung",
+      ru: "Лучший +/- за одну предсезонку",
+    },
+    "pre-season-plus-minus-worst": {
+      en: "Worst +/- in a single pre-season",
+      cs: "Najhorší +/- v jednej príprave",
+      de: "Schlechteste +/- in einer Vorbereitung",
+      ru: "Худший +/- за одну предсезонку",
+    },
+    "pre-season-pp-goals": {
+      en: "Most power-play goals in a single pre-season (PPG)",
+      cs: "Najviac presilovkových gólov v jednej príprave (PPG)",
+      de: "Meiste Überzahltore in einer Vorbereitung (PPG)",
+      ru: "Больше всего голов в большинстве за одну предсезонку (PPG)",
+    },
+    "pre-season-pp-assists": {
+      en: "Most power-play assists in a single pre-season (PPA)",
+      cs: "Najviac presilovkových asistencií v jednej príprave (PPA)",
+      de: "Meiste Überzahl-Assists in einer Vorbereitung (PPA)",
+      ru: "Больше всего передач в большинстве за одну предсезонку (PPA)",
+    },
+    "pre-season-pp-points": {
+      en: "Most power-play points in a single pre-season (PPP)",
+      cs: "Najviac presilovkových bodov v jednej príprave (PPP)",
+      de: "Meiste Überzahlpunkte in einer Vorbereitung (PPP)",
+      ru: "Больше всего очков в большинстве за одну предсезонку (PPP)",
+    },
+    "pre-season-sh-goals": {
+      en: "Most short-handed goals in a single pre-season (SHG)",
+      cs: "Najviac oslabovkových gólov v jednej príprave (SHG)",
+      de: "Meiste Unterzahltore in einer Vorbereitung (SHG)",
+      ru: "Больше всего голов в меньшинстве за одну предсезонку (SHG)",
+    },
+    "pre-season-sh-assists": {
+      en: "Most short-handed assists in a single pre-season (SHA)",
+      cs: "Najviac oslabovkových asistencií v jednej príprave (SHA)",
+      de: "Meiste Unterzahl-Assists in einer Vorbereitung (SHA)",
+      ru: "Больше всего передач в меньшинстве за одну предсезонку (SHA)",
+    },
+    "pre-season-sh-points": {
+      en: "Most short-handed points in a single pre-season (SHP)",
+      cs: "Najviac oslabovkových bodov v jednej príprave (SHP)",
+      de: "Meiste Unterzahlpunkte in einer Vorbereitung (SHP)",
+      ru: "Больше всего очков в меньшинстве за одну предсезонку (SHP)",
+    },
+    "pre-season-gwg": {
+      en: "Most game-winning goals in a single pre-season (GWG)",
+      cs: "Najviac víťazných gólov v jednej príprave (GWG)",
+      de: "Meiste Siegtore in einer Vorbereitung (GWG)",
+      ru: "Больше всего победных голов за одну предсезонку (GWG)",
+    },
+    "pre-season-shots": {
+      en: "Most shots on goal in a single pre-season (SOG)",
+      cs: "Najviac striel na bránku v jednej príprave (SOG)",
+      de: "Meiste Torschüsse in einer Vorbereitung (SOG)",
+      ru: "Больше всего бросков в створ за одну предсезонку (SOG)",
+    },
+    "pre-season-shooting-pct": {
+      en: "Highest shooting percentage in a single pre-season (min. 5 SOG)",
+      cs: "Najvyššia úspešnosť streľby v jednej príprave (min. 5 striel)",
+      de: "Höchste Schussgenauigkeit in einer Vorbereitung (min. 5 Schüsse)",
+      ru: "Лучший процент реализации бросков за одну предсезонку (мин. 5 бросков)",
+    },
+    "pre-season-hits": {
+      en: "Most hits in a single pre-season",
+      cs: "Najviac hitov v jednej príprave",
+      de: "Meiste Hits in einer Vorbereitung",
+      ru: "Больше всего силовых приемов за одну предсезонку",
+    },
+    "pre-season-blocks": {
+      en: "Most blocked shots in a single pre-season",
+      cs: "Najviac zblokovaných striel v jednej príprave",
+      de: "Meiste geblockte Schüsse in einer Vorbereitung",
+      ru: "Больше всего заблокированных бросков за одну предсезонку",
+    },
+    "pre-season-takeaways": {
+      en: "Most takeaways in a single pre-season",
+      cs: "Najviac získaných pukov v jednej príprave",
+      de: "Meiste Scheibeneroberungen in einer Vorbereitung",
+      ru: "Больше всего перехватов за одну предсезонку",
+    },
+    "pre-season-giveaways": {
+      en: "Most giveaways in a single pre-season",
+      cs: "Najviac stratených pukov v jednej príprave",
+      de: "Meiste Scheibenverluste in einer Vorbereitung",
+      ru: "Больше всего потерь за одну предсезонку",
+    },
+    "pre-season-fo-wins": {
+      en: "Most faceoff wins in a single pre-season",
+      cs: "Najviac vyhraných vhadzovaní v jednej príprave",
+      de: "Meiste gewonnene Bullys in einer Vorbereitung",
+      ru: "Больше всего выигранных вбрасываний за одну предсезонку",
+    },
+    "pre-season-fo-pct": {
+      en: "Highest faceoff percentage in a single pre-season (min. 10 FO)",
+      cs: "Najvyššia úspešnosť na vhadzovaniach v jednej príprave (min. 10 buly)",
+      de: "Beste Bully-Quote in einer Vorbereitung (min. 10 Bullys)",
+      ru: "Лучший процент на вбрасываниях за одну предсезонку (мин. 10 вбрасываний)",
+    },
+    "pre-season-d-points": {
+      en: "Most points by a defenseman in a single pre-season",
+      cs: "Najviac bodov obrancu v jednej príprave",
+      de: "Meiste Verteidigerpunkte in einer Vorbereitung",
+      ru: "Больше всего очков защитника за одну предсезонку",
+    },
+    "pre-season-d-goals": {
+      en: "Most goals by a defenseman in a single pre-season",
+      cs: "Najviac gólov obrancu v jednej príprave",
+      de: "Meiste Verteidigertore in einer Vorbereitung",
+      ru: "Больше всего голов защитника за одну предсезонку",
+    },
+    "pre-season-d-assists": {
+      en: "Most assists by a defenseman in a single pre-season",
+      cs: "Najviac asistencií obrancu v jednej príprave",
+      de: "Meiste Verteidiger-Assists in einer Vorbereitung",
+      ru: "Больше всего передач защитника за одну предсезонку",
+    },
+
+    // ================= Pre-season Skater Streaks =================
+    "pre-streak-points": {
+      en: "Longest point streak in pre-season",
+      cs: "Najdlhšia bodová séria v príprave",
+      de: "Längste Punkteserie in der Vorbereitung",
+      ru: "Самая длинная результативная серия в предсезонке",
+    },
+    "pre-streak-goals": {
+      en: "Longest goal streak in pre-season",
+      cs: "Najdlhšia gólová séria v príprave",
+      de: "Längste Torserie in der Vorbereitung",
+      ru: "Самая длинная голевая серия в предсезонке",
+    },
+    "pre-streak-assists": {
+      en: "Longest assist streak in pre-season",
+      cs: "Najdlhšia asistenčná séria v príprave",
+      de: "Längste Assistserie in der Vorbereitung",
+      ru: "Самая длинная ассистентская серия в предсезонке",
+    },
+    "pre-streak-ironman": {
+      en: "Most consecutive pre-season games played (Ironman)",
+      cs: "Najviac odohraných zápasov v rade v príprave (Ironman)",
+      de: "Meiste Vorbereitungsspiele in Folge (Ironman)",
+      ru: "Больше всего матчей подряд в предсезонке (Ironman)",
+    },
+
+    // ================= Pre-season Skater Single Game =================
+    "pre-game-points": {
       en: "Most points in a single pre-season game",
       cs: "Najviac bodov v jednom zápase prípravy",
       de: "Meiste Punkte in einem Vorbereitungsspiel",
       ru: "Больше всего очков в одном матче предсезонки",
     },
-    "pre-goalie-saves": {
-      en: "Most goalie saves in pre-season",
-      cs: "Najviac zákrokov brankára v príprave",
-      de: "Meiste Torhüter-Paraden in der Vorbereitung",
-      ru: "Больше всего сейвов вратаря в предсезонке",
+    "pre-game-goals": {
+      en: "Most goals in a single pre-season game",
+      cs: "Najviac gólov v jednom zápase prípravy",
+      de: "Meiste Tore in einem Vorbereitungsspiel",
+      ru: "Больше всего голов в одном матче предсезонки",
     },
+    "pre-game-assists": {
+      en: "Most assists in a single pre-season game",
+      cs: "Najviac asistencií v jednom zápase prípravy",
+      de: "Meiste Assists in einem Vorbereitungsspiel",
+      ru: "Больше всего передач в одном матче предсезонки",
+    },
+    "pre-game-shots": {
+      en: "Most shots on goal in a single pre-season game",
+      cs: "Najviac striel na bránku v jednom zápase prípravy",
+      de: "Meiste Torschüsse in einem Vorbereitungsspiel",
+      ru: "Больше всего бросков в створ в одном матче предсезонки",
+    },
+    "pre-game-hits": {
+      en: "Most hits in a single pre-season game",
+      cs: "Najviac hitov v jednom zápase prípravy",
+      de: "Meiste Hits in einem Vorbereitungsspiel",
+      ru: "Больше всего силовых приемов в одном матче предсезонки",
+    },
+    "pre-game-blocks": {
+      en: "Most blocked shots in a single pre-season game",
+      cs: "Najviac zblokovaných striel v jednom zápase prípravy",
+      de: "Meiste geblockte Schüsse in einem Vorbereitungsspiel",
+      ru: "Больше всего заблокированных бросков в одном матче предсезонки",
+    },
+
+    // ================= Pre-season Goalie Career =================
+    "pre-career-goalie-gp": {
+      en: "Most career pre-season goalie appearances",
+      cs: "Najviac odchytaných zápasov v príprave (Kariéra)",
+      de: "Meiste Vorbereitungsspiele als Torhüter (Karriere)",
+      ru: "Больше всего матчей вратаря в предсезонке (Карьера)",
+    },
+    "pre-career-goalie-wins": {
+      en: "Most career pre-season goalie wins",
+      cs: "Najviac výhier brankára v príprave (Kariéra)",
+      de: "Meiste Vorbereitungssiege als Torhüter (Karriere)",
+      ru: "Больше всего побед вратаря в предсезонке (Карьера)",
+    },
+    "pre-career-goalie-steals": {
+      en: "Most career pre-season goalie steals",
+      cs: "Najviac ukradnutých zápasov v príprave (Kariéra)",
+      de: "Meiste Vorbereitungs-Steals als Torhüter (Karriere)",
+      ru: "Больше всего украденных матчей в предсезонке (Карьера)",
+    },
+    "pre-career-goalie-gsax": {
+      en: "Best career pre-season GSAx",
+      cs: "Najlepšie GSAx v príprave (Kariéra)",
+      de: "Bestes Vorbereitungs-GSAx (Karriere)",
+      ru: "Лучший GSAx в предсезонке (Карьера)",
+    },
+    "pre-career-goalie-shutouts": {
+      en: "Most career pre-season shutouts",
+      cs: "Najviac čistých kont v príprave (Kariéra)",
+      de: "Meiste Vorbereitungs-Shutouts (Karriere)",
+      ru: "Больше всего сухих матчей в предсезонке (Карьера)",
+    },
+    "pre-career-goalie-saves": {
+      en: "Most career pre-season goalie saves",
+      cs: "Najviac chytených striel v príprave (Kariéra)",
+      de: "Meiste Torhüter-Paraden in der Vorbereitung (Karriere)",
+      ru: "Больше всего сейвов вратаря в предсезонке (Карьера)",
+    },
+
+    // ================= Pre-season Goalie Single Season =================
+    "pre-season-goalie-gp": {
+      en: "Most goalie appearances in a single pre-season",
+      cs: "Najviac odchytaných zápasov v jednej príprave",
+      de: "Meiste Torhüterspiele in einer Vorbereitung",
+      ru: "Больше всего матчей вратаря за одну предсезонку",
+    },
+    "pre-season-goalie-wins": {
+      en: "Most goalie wins in a single pre-season",
+      cs: "Najviac výhier brankára v jednej príprave",
+      de: "Meiste Torhütersiege in einer Vorbereitung",
+      ru: "Больше всего побед вратаря за одну предсезонку",
+    },
+    "pre-season-goalie-steals": {
+      en: "Most goalie steals in a single pre-season",
+      cs: "Najviac ukradnutých zápasov v jednej príprave",
+      de: "Meiste Torhüter-Steals in einer Vorbereitung",
+      ru: "Больше всего украденных матчей за одну предсезонку",
+    },
+    "pre-season-goalie-gsax": {
+      en: "Best GSAx in a single pre-season",
+      cs: "Najlepšie GSAx v jednej príprave",
+      de: "Bestes GSAx in einer Vorbereitung",
+      ru: "Лучший GSAx за одну предсезонку",
+    },
+    "pre-season-goalie-shutouts": {
+      en: "Most shutouts in a single pre-season",
+      cs: "Najviac čistých kont v jednej príprave",
+      de: "Meiste Shutouts in einer Vorbereitung",
+      ru: "Больше всего сухих матчей за одну предсезонку",
+    },
+    "pre-season-goalie-saves": {
+      en: "Most goalie saves in a single pre-season",
+      cs: "Najviac chytených striel v jednej príprave",
+      de: "Meiste Torhüter-Paraden in einer Vorbereitung",
+      ru: "Больше всего сейвов вратаря за одну предсезонку",
+    },
+
+    // ================= Pre-season Goalie Streaks =================
+    "pre-streak-goalie-gp": {
+      en: "Most consecutive pre-season goalie starts",
+      cs: "Najviac odchytaných zápasov v rade v príprave",
+      de: "Meiste Torhüter-Spiele in Folge (Vorbereitung)",
+      ru: "Больше всего матчей вратаря подряд в предсезонке",
+    },
+    "pre-streak-goalie-wins": {
+      en: "Longest goalie winning streak in pre-season",
+      cs: "Najdlhšia víťazná séria brankára v príprave",
+      de: "Längste Torhüter-Siegesserie (Vorbereitung)",
+      ru: "Самая длинная победная серия вратаря в предсезонке",
+    },
+    "pre-streak-goalie-steals": {
+      en: "Longest goalie steals streak in pre-season",
+      cs: "Najdlhšia séria ukradnutých zápasov v príprave",
+      de: "Längste Steals-Serie (Vorbereitung)",
+      ru: "Самая длинная серия украденных матчей в предсезонке",
+    },
+    "pre-streak-goalie-shutouts": {
+      en: "Longest shutout streak in pre-season",
+      cs: "Najdlhšia séria čistých kont v príprave",
+      de: "Längste Shutout-Serie (Vorbereitung)",
+      ru: "Самая длинная сухая серия в предсезонке",
+    },
+
+    // ================= Pre-season Goalie Single Game =================
+    "pre-game-goalie-gsax": {
+      en: "Highest single-game GSAx in pre-season",
+      cs: "Najvyššie GSAx v jednom zápase prípravy",
+      de: "Bestes Einzelspiel-GSAx in der Vorbereitung",
+      ru: "Лучший GSAx в одном матче предсезонки",
+    },
+    "pre-game-goalie-saves": {
+      en: "Most goalie saves in a single pre-season game",
+      cs: "Najviac chytených striel v jednom zápase prípravy",
+      de: "Meiste Torhüter-Paraden in einem Vorbereitungsspiel",
+      ru: "Больше всего сейвов вратаря в одном матче предсезонки",
+    },
+
+    // ================= Pre-season Teams =================
+    "pre-team-points": {
+      en: "Most team points in a single pre-season",
+      cs: "Najviac bodov tímu v príprave",
+      de: "Meiste Teampunkte in der Vorbereitung",
+      ru: "Больше всего очков команды в предсезонке",
+    },
+    "pre-team-wins": {
+      en: "Most team wins in a single pre-season",
+      cs: "Najviac výher tímu v príprave",
+      de: "Meiste Teamsiege in der Vorbereitung",
+      ru: "Больше всего побед команды в предсезонке",
+    },
+    "pre-team-losses": {
+      en: "Most team losses in a single pre-season",
+      cs: "Najviac prehier tímu v príprave (L + OTL)",
+      de: "Meiste Team-Niederlagen in der Vorbereitung",
+      ru: "Больше всего поражений команды в предсезонке",
+    },
+    "pre-team-win-streak": {
+      en: "Longest team winning streak in pre-season",
+      cs: "Najdlhšia víťazná séria tímu v príprave",
+      de: "Längste Team-Siegesserie in der Vorbereitung",
+      ru: "Самая длинная победная серия команды в предсезонке",
+    },
+    "pre-team-lose-streak": {
+      en: "Longest team losing streak in pre-season",
+      cs: "Najdlhšia séria prehier tímu v príprave",
+      de: "Längste Team-Niederlagenserie in der Vorbereitung",
+      ru: "Самая длинная серия поражений команды в предсезонке",
+    },
+    "pre-team-gf": {
+      en: "Most goals scored by a team in a single pre-season",
+      cs: "Najviac strelených gólov tímu v príprave",
+      de: "Meiste Teamtore in der Vorbereitung",
+      ru: "Больше всего забитых голов команды в предсезонке",
+    },
+    "pre-team-ga": {
+      en: "Most goals conceded by a team in a single pre-season",
+      cs: "Najviac inkasovaných gólov tímu v príprave",
+      de: "Meiste Team-Gegentore in der Vorbereitung",
+      ru: "Больше всего пропущенных голов команды в предсезонке",
+    },
+    "pre-team-pim": {
+      en: "Most team penalty minutes in a single pre-season",
+      cs: "Najviac trestných minút tímu v príprave",
+      de: "Meiste Team-Strafminuten in der Vorbereitung",
+      ru: "Больше всего штрафных минут команды в предсезонке",
+    },
+
+    // ================= Pre-season Games & Attendance =================
     "pre-highest-scoring-game": {
       en: "Highest scoring game in pre-season",
-      cs: "Najviac gólov v zápase prípravy",
-      de: "Torreichstes Vorbereitungsspiel",
-      ru: "Самый результативный предсезонный матч",
+      cs: "Highest scoring game v príprave (Najviac gólov)",
+      de: "Torreichstes Vorbereitungsspiel (Meiste Tore)",
+      ru: "Самый результативный матч в предсезонке",
     },
     "pre-largest-victory": {
       en: "Largest margin of victory in pre-season",
-      cs: "Najvyššie víťazstvo v príprave",
+      cs: "Najvyššie víťazstvo v príprave (Gólový rozdiel)",
       de: "Höchster Sieg in der Vorbereitung",
       ru: "Самая крупная победа в предсезонке",
     },
     "pre-highest-attendance": {
       en: "Highest single-game attendance in pre-season",
-      cs: "Najvyššia návštevnosť v príprave",
+      cs: "Najvyššia návštevnosť v jednom zápase prípravy",
       de: "Höchste Zuschauerzahl in der Vorbereitung",
       ru: "Наибольшая посещаемость в предсезонке",
     },
@@ -1211,6 +1734,9 @@ export async function getLeagueRecords(
             shots: true,
             hits: true,
             blocks: true,
+            gwg: true,
+            faceoffWins: true,
+            faceoffLosses: true,
             game: { select: { id: true, gameDate: true, playedAt: true, season: true, seriesId: true, round: true, league: true, homeTeamId: true, awayTeamId: true, homeGoals: true, awayGoals: true } },
           },
         })
@@ -1302,6 +1828,19 @@ export async function getLeagueRecords(
   const tResult = lang === "cs" ? "Výsledok" : lang === "de" ? "Ergebnis" : lang === "ru" ? "Результат" : "Result";
   const tPlayer = lang === "cs" ? "Hráč" : lang === "de" ? "Spieler" : lang === "ru" ? "Игрок" : "Player";
   const tGoalie = lang === "cs" ? "Brankár" : lang === "de" ? "Torhüter" : lang === "ru" ? "Вратарь" : "Goalie";
+
+  const unitSaves = lang === "cs" ? "zákrokov" : lang === "de" ? "Fangparaden" : lang === "ru" ? "сейвов" : "saves";
+  const unitShots = lang === "cs" ? "striel" : lang === "de" ? "Schüsse" : lang === "ru" ? "бросков" : "shots";
+  const unitHits = lang === "cs" ? "hitov" : lang === "de" ? "Hits" : lang === "ru" ? "силовых" : "hits";
+  const unitBlocks = lang === "cs" ? "blokov" : lang === "de" ? "Blocks" : lang === "ru" ? "блоков" : "blocks";
+  const unitTk = lang === "cs" ? "odobratí puku" : lang === "de" ? "Takeaways" : lang === "ru" ? "отборов" : "takeaways";
+  const unitGv = lang === "cs" ? "strát puku" : lang === "de" ? "Giveaways" : lang === "ru" ? "потерь" : "giveaways";
+  const tWins = lang === "cs" ? "výhier" : lang === "de" ? "Siege" : lang === "ru" ? "побед" : "wins";
+  const tWinsInRow = lang === "cs" ? "výhier v rade" : lang === "de" ? "Siege in Folge" : lang === "ru" ? "побед подряд" : "wins in a row";
+  const tConsecutiveGames = lang === "cs" ? "zápasov v rade" : lang === "de" ? "Spiele in Folge" : lang === "ru" ? "матчей подряд" : "consecutive GP";
+  const tGoalStreakUnit = lang === "cs" ? "zápasov s gólom" : lang === "de" ? "Torspiele in Folge" : lang === "ru" ? "матчей с голом" : "game goal streak";
+  const tAssistStreakUnit = lang === "cs" ? "zápasov s asistenciou" : lang === "de" ? "Assist-Spiele in Folge" : lang === "ru" ? "матчей с передачей" : "game assist streak";
+  const tPointStreakUnit = lang === "cs" ? "zápasov s bodom" : lang === "de" ? "Punktespiele in Folge" : lang === "ru" ? "матчей с очками" : "game point streak";
 
   const fmtSeasonsCount = (count: number) => {
     if (lang === "cs") return `${count} ${count === 1 ? "sezóna" : count < 5 ? "sezóny" : "sezón"}`;
@@ -3364,202 +3903,922 @@ export async function getLeagueRecords(
     });
 
   // ==========================================
-  // H. PRE-SEASON RECORDS (Reálne dáta z prípravy)
+  // H. PRE-SEASON RECORDS (Kompletné dáta z prípravy)
   // ==========================================
-  // 1. Preseason Standings (Real teams W-L-OTL)
-  type PreTeamAcc = { teamId: number; gp: number; w: number; l: number; otl: number; points: number; gf: number; ga: number };
-  const preTeamMap = new Map<number, PreTeamAcc>();
-  for (const t of allTeams) {
-    preTeamMap.set(t.id, { teamId: t.id, gp: 0, w: 0, l: 0, otl: 0, points: 0, gf: 0, ga: 0 });
-  }
+  const secBadgePre = getRecordBadge("pre", lang);
 
-  for (const g of preGames) {
-    const h = preTeamMap.get(g.homeTeamId);
-    const a = preTeamMap.get(g.awayTeamId);
-    const hg = g.homeGoals ?? 0;
-    const ag = g.awayGoals ?? 0;
-    const isOt = g.endedIn != null && g.endedIn !== "";
+  // 1. Pre-season Skater Career
+  type PreSkaterCareerAcc = {
+    playerId: number;
+    gp: number;
+    goals: number;
+    assists: number;
+    points: number;
+    shots: number;
+    pim: number;
+    plusMinus: number;
+    ppGoals: number;
+    ppAssists: number;
+    ppPoints: number;
+    shGoals: number;
+    shAssists: number;
+    shPoints: number;
+    gwg: number;
+    hits: number;
+    blocks: number;
+    faceoffsWon: number;
+    faceoffsLost: number;
+    teamId: number | null;
+  };
 
-    if (h) {
-      h.gp += 1;
-      h.gf += hg;
-      h.ga += ag;
-      if (hg > ag) {
-        h.w += 1;
-        h.points += 2;
-      } else if (isOt) {
-        h.otl += 1;
-        h.points += 1;
-      } else {
-        h.l += 1;
-      }
-    }
-
-    if (a) {
-      a.gp += 1;
-      a.gf += ag;
-      a.ga += hg;
-      if (ag > hg) {
-        a.w += 1;
-        a.points += 2;
-      } else if (isOt) {
-        a.otl += 1;
-        a.points += 1;
-      } else {
-        a.l += 1;
-      }
-    }
-  }
-
-  const preSeasonBestTeams: LeaderItem[] = [...preTeamMap.values()]
-    .filter((t) => t.gp > 0)
-    .sort((a, b) => b.points - a.points || b.w - a.w || (b.gf - b.ga) - (a.gf - a.ga))
-    .slice(0, 5)
-    .map((t, idx) => {
-      const tm = teamById.get(t.teamId);
-      return {
-        rank: idx + 1,
-        name: tm?.name ?? tTeam,
-        teamCode: tm?.code,
-        teamSlug: tm?.slug,
-        teamLogo: tm?.logoUrl,
-        value: `${t.points} ${unitPts} (${t.w}-${t.l}-${t.otl})`,
-        sub: `${tScore} ${t.gf}:${t.ga} (${t.gp} GP · ${tPreseason} ${ACTIVE_SEASON})`,
+  const preSkCareerMap = new Map<number, PreSkaterCareerAcc>();
+  const getPreSkAcc = (id: number): PreSkaterCareerAcc => {
+    let acc = preSkCareerMap.get(id);
+    if (!acc) {
+      acc = {
+        playerId: id,
+        gp: 0,
+        goals: 0,
+        assists: 0,
+        points: 0,
+        shots: 0,
+        pim: 0,
+        plusMinus: 0,
+        ppGoals: 0,
+        ppAssists: 0,
+        ppPoints: 0,
+        shGoals: 0,
+        shAssists: 0,
+        shPoints: 0,
+        gwg: 0,
+        hits: 0,
+        blocks: 0,
+        faceoffsWon: 0,
+        faceoffsLost: 0,
+        teamId: null,
       };
-    });
-
-  // 2. Preseason Top Scorers
-  const preSkaterAcc = new Map<number, { playerId: number; teamIds: Set<number>; gp: number; goals: number; assists: number; points: number; shots: number; pim: number }>();
+      preSkCareerMap.set(id, acc);
+    }
+    return acc;
+  };
 
   for (const s of preSkaterStats) {
-    if (!preSkaterAcc.has(s.playerId)) {
-      preSkaterAcc.set(s.playerId, { playerId: s.playerId, teamIds: new Set(), gp: 0, goals: 0, assists: 0, points: 0, shots: 0, pim: 0 });
+    const a = getPreSkAcc(s.playerId);
+    a.gp += 1;
+    a.goals += s.goals;
+    a.assists += s.assists;
+    a.points += s.points;
+    a.shots += s.shots;
+    a.pim += s.pim;
+    a.plusMinus += s.plusMinus;
+    a.hits += s.hits;
+    a.blocks += s.blocks;
+    a.faceoffsWon += s.faceoffWins;
+    a.faceoffsLost += s.faceoffLosses;
+    a.gwg += s.gwg ? 1 : 0;
+    a.ppGoals += s.ppGoals ?? 0;
+    a.ppAssists += s.ppAssists ?? 0;
+    a.ppPoints += (s.ppGoals ?? 0) + (s.ppAssists ?? 0);
+    a.shGoals += s.shGoals ?? 0;
+    a.shAssists += s.shAssists ?? 0;
+    a.shPoints += (s.shGoals ?? 0) + (s.shAssists ?? 0);
+    if (s.teamId) a.teamId = s.teamId;
+  }
+
+  const preSkList = [...preSkCareerMap.values()];
+
+  const topPreSkaters = (
+    fn: (s: PreSkaterCareerAcc) => number,
+    valFmt: (s: PreSkaterCareerAcc) => string | number,
+    subFmt?: (s: PreSkaterCareerAcc) => string,
+    sortAsc = false
+  ) =>
+    [...preSkList]
+      .filter((s) => (sortAsc ? fn(s) < 0 : fn(s) > 0))
+      .sort((a, b) => (sortAsc ? fn(a) - fn(b) : fn(b) - fn(a)))
+      .slice(0, 5)
+      .map((s, idx) => ({ ...skRowItem(s, valFmt(s), subFmt?.(s)), rank: idx + 1 }));
+
+  const preCareerGpItems = topPreSkaters((s) => s.gp, (s) => `${s.gp} GP`, (s) => `${s.goals}G + ${s.assists}A · ${s.points} PTS`);
+  const preCareerGoalsItems = topPreSkaters((s) => s.goals, (s) => `${s.goals} G`, (s) => `${s.gp} GP · ${s.points} PTS`);
+  const preCareerAssistsItems = topPreSkaters((s) => s.assists, (s) => `${s.assists} A`, (s) => `${s.gp} GP · ${s.points} PTS`);
+  const preCareerPointsItems = topPreSkaters((s) => s.points, (s) => `${s.points} PTS`, (s) => `${s.goals}G + ${s.assists}A (${s.gp} GP)`);
+  const preCareerPimItems = topPreSkaters((s) => s.pim, (s) => `${s.pim} ${tPim}`, (s) => `${s.gp} GP · ${s.points} PTS`);
+  const preCareerPlusMinusBestItems = topPreSkaters((s) => s.plusMinus, (s) => `+${s.plusMinus} +/-`, (s) => `${s.gp} GP · ${s.points} PTS`);
+  const preCareerPlusMinusWorstItems = topPreSkaters((s) => s.plusMinus, (s) => `${s.plusMinus} +/-`, (s) => `${s.gp} GP · ${s.points} PTS`, true);
+
+  const preCareerPpGoalsItems = topPreSkaters((s) => s.ppGoals, (s) => `${s.ppGoals} PPG`, (s) => `${s.goals} G ${tTotal} · ${s.gp} GP`);
+  const preCareerPpAssistsItems = topPreSkaters((s) => s.ppAssists, (s) => `${s.ppAssists} PPA`, (s) => `${s.assists} A ${tTotal} · ${s.gp} GP`);
+  const preCareerPpPointsItems = topPreSkaters((s) => s.ppPoints, (s) => `${s.ppPoints} PPP`, (s) => `${s.ppGoals} PPG + ${s.ppAssists} PPA (${s.points} PTS)`);
+
+  const preCareerShGoalsItems = topPreSkaters((s) => s.shGoals, (s) => `${s.shGoals} SHG`, (s) => `${s.goals} G ${tTotal} · ${s.gp} GP`);
+  const preCareerShAssistsItems = topPreSkaters((s) => s.shAssists, (s) => `${s.shAssists} SHA`, (s) => `${s.assists} A ${tTotal} · ${s.gp} GP`);
+  const preCareerShPointsItems = topPreSkaters((s) => s.shPoints, (s) => `${s.shPoints} SHP`, (s) => `${s.shGoals} SHG + ${s.shAssists} SHA (${s.points} PTS)`);
+
+  const preCareerGwgItems = topPreSkaters((s) => s.gwg, (s) => `${s.gwg} GWG`, (s) => `${s.goals} G · ${s.gp} GP`);
+  const preCareerShotsItems = topPreSkaters((s) => s.shots, (s) => `${s.shots} ${unitShots}`, (s) => `${s.goals} G · ${s.gp} GP`);
+  const preCareerShootingPctItems = [...preSkList]
+    .filter((s) => s.shots >= 10 && s.goals > 0)
+    .sort((a, b) => b.goals / b.shots - a.goals / a.shots || b.goals - a.goals)
+    .slice(0, 5)
+    .map((s, idx) => ({
+      ...skRowItem(s, `${((s.goals / s.shots) * 100).toFixed(1)}%`, `${s.goals} G / ${s.shots} SOG (${s.gp} GP)`),
+      rank: idx + 1,
+    }));
+  const preCareerHitsItems = topPreSkaters((s) => s.hits, (s) => `${s.hits} ${unitHits}`, (s) => `${s.gp} GP`);
+  const preCareerBlocksItems = topPreSkaters((s) => s.blocks, (s) => `${s.blocks} ${unitBlocks}`, (s) => `${s.gp} GP`);
+  const preCareerFoWinsItems = topPreSkaters((s) => s.faceoffsWon, (s) => `${s.faceoffsWon} FOW`, (s) => `${s.faceoffsWon + s.faceoffsLost} FO · ${s.gp} GP`);
+  const preCareerFoPctItems = [...preSkList]
+    .filter((s) => s.faceoffsWon + s.faceoffsLost >= 20)
+    .sort((a, b) => b.faceoffsWon / (b.faceoffsWon + b.faceoffsLost) - a.faceoffsWon / (a.faceoffsWon + a.faceoffsLost) || b.faceoffsWon - a.faceoffsWon)
+    .slice(0, 5)
+    .map((s, idx) => {
+      const tot = s.faceoffsWon + s.faceoffsLost;
+      const pct = tot > 0 ? ((s.faceoffsWon / tot) * 100).toFixed(1) : "0.0";
+      return { ...skRowItem(s, `${pct}%`, `${s.faceoffsWon} FOW / ${tot} FO (${s.gp} GP)`), rank: idx + 1 };
+    });
+
+  const preDefenders = preSkList.filter((s) => playerMap.get(s.playerId)?.position === "D");
+  const topPreDefenders = (fn: (s: PreSkaterCareerAcc) => number, valFmt: (s: PreSkaterCareerAcc) => string | number, subFmt?: (s: PreSkaterCareerAcc) => string) =>
+    [...preDefenders]
+      .filter((s) => fn(s) > 0)
+      .sort((a, b) => fn(b) - fn(a) || b.points - a.points)
+      .slice(0, 5)
+      .map((s, idx) => ({ ...skRowItem(s, valFmt(s), subFmt?.(s)), rank: idx + 1 }));
+
+  const preCareerDPointsItems = topPreDefenders((s) => s.points, (s) => `${s.points} PTS (D)`, (s) => `${s.goals}G + ${s.assists}A (${s.gp} GP)`);
+  const preCareerDGoalsItems = topPreDefenders((s) => s.goals, (s) => `${s.goals} G (D)`, (s) => `${s.points} PTS · ${s.gp} GP`);
+  const preCareerDAssistsItems = topPreDefenders((s) => s.assists, (s) => `${s.assists} A (D)`, (s) => `${s.points} PTS · ${s.gp} GP`);
+
+  const preSkaterCareerSections: RecordSection[] = [
+    { id: "pre-career-gp", title: getSectionTitle("pre-career-gp", lang, league, cupName), icon: "🏒", phase: "pre", phaseBadge: secBadgePre, items: preCareerGpItems },
+    { id: "pre-career-goals", title: getSectionTitle("pre-career-goals", lang, league, cupName), icon: "🎯", phase: "pre", phaseBadge: secBadgePre, items: preCareerGoalsItems },
+    { id: "pre-career-assists", title: getSectionTitle("pre-career-assists", lang, league, cupName), icon: "🪄", phase: "pre", phaseBadge: secBadgePre, items: preCareerAssistsItems },
+    { id: "pre-career-points", title: getSectionTitle("pre-career-points", lang, league, cupName), icon: "⭐", phase: "pre", phaseBadge: secBadgePre, items: preCareerPointsItems },
+    { id: "pre-career-pim", title: getSectionTitle("pre-career-pim", lang, league, cupName), icon: "⏱️", phase: "pre", phaseBadge: secBadgePre, items: preCareerPimItems },
+    { id: "pre-career-plus-minus-best", title: getSectionTitle("pre-career-plus-minus-best", lang, league, cupName), icon: "🟢", phase: "pre", phaseBadge: secBadgePre, items: preCareerPlusMinusBestItems },
+    { id: "pre-career-plus-minus-worst", title: getSectionTitle("pre-career-plus-minus-worst", lang, league, cupName), icon: "🔴", phase: "pre", phaseBadge: secBadgePre, items: preCareerPlusMinusWorstItems },
+    { id: "pre-career-pp-goals", title: getSectionTitle("pre-career-pp-goals", lang, league, cupName), icon: "⚡", phase: "pre", phaseBadge: secBadgePre, items: preCareerPpGoalsItems },
+    { id: "pre-career-pp-assists", title: getSectionTitle("pre-career-pp-assists", lang, league, cupName), icon: "🏒", phase: "pre", phaseBadge: secBadgePre, items: preCareerPpAssistsItems },
+    { id: "pre-career-pp-points", title: getSectionTitle("pre-career-pp-points", lang, league, cupName), icon: "⭐", phase: "pre", phaseBadge: secBadgePre, items: preCareerPpPointsItems },
+    { id: "pre-career-sh-goals", title: getSectionTitle("pre-career-sh-goals", lang, league, cupName), icon: "🛡️", phase: "pre", phaseBadge: secBadgePre, items: preCareerShGoalsItems },
+    { id: "pre-career-sh-assists", title: getSectionTitle("pre-career-sh-assists", lang, league, cupName), icon: "🧤", phase: "pre", phaseBadge: secBadgePre, items: preCareerShAssistsItems },
+    { id: "pre-career-sh-points", title: getSectionTitle("pre-career-sh-points", lang, league, cupName), icon: "⭐", phase: "pre", phaseBadge: secBadgePre, items: preCareerShPointsItems },
+    { id: "pre-career-gwg", title: getSectionTitle("pre-career-gwg", lang, league, cupName), icon: "🚨", phase: "pre", phaseBadge: secBadgePre, items: preCareerGwgItems },
+    { id: "pre-career-shots", title: getSectionTitle("pre-career-shots", lang, league, cupName), icon: "🏒", phase: "pre", phaseBadge: secBadgePre, items: preCareerShotsItems },
+    { id: "pre-career-shooting-pct", title: getSectionTitle("pre-career-shooting-pct", lang, league, cupName), icon: "🎯", phase: "pre", phaseBadge: secBadgePre, items: preCareerShootingPctItems },
+    { id: "pre-career-hits", title: getSectionTitle("pre-career-hits", lang, league, cupName), icon: "💥", phase: "pre", phaseBadge: secBadgePre, items: preCareerHitsItems },
+    { id: "pre-career-blocks", title: getSectionTitle("pre-career-blocks", lang, league, cupName), icon: "🧱", phase: "pre", phaseBadge: secBadgePre, items: preCareerBlocksItems },
+    { id: "pre-career-fo-wins", title: getSectionTitle("pre-career-fo-wins", lang, league, cupName), icon: "🤝", phase: "pre", phaseBadge: secBadgePre, items: preCareerFoWinsItems },
+    { id: "pre-career-fo-pct", title: getSectionTitle("pre-career-fo-pct", lang, league, cupName), icon: "📊", phase: "pre", phaseBadge: secBadgePre, items: preCareerFoPctItems },
+    { id: "pre-career-d-points", title: getSectionTitle("pre-career-d-points", lang, league, cupName), icon: "🛡️", phase: "pre", phaseBadge: secBadgePre, items: preCareerDPointsItems },
+    { id: "pre-career-d-goals", title: getSectionTitle("pre-career-d-goals", lang, league, cupName), icon: "🛡️", phase: "pre", phaseBadge: secBadgePre, items: preCareerDGoalsItems },
+    { id: "pre-career-d-assists", title: getSectionTitle("pre-career-d-assists", lang, league, cupName), icon: "🛡️", phase: "pre", phaseBadge: secBadgePre, items: preCareerDAssistsItems },
+  ];
+
+  // 2. Pre-season Skater Single-Season
+  type PreSeasonSkaterAcc = {
+    playerId: number;
+    season: string;
+    teamIds: Set<number>;
+    gp: number;
+    goals: number;
+    assists: number;
+    points: number;
+    shots: number;
+    pim: number;
+    plusMinus: number;
+    ppGoals: number;
+    ppAssists: number;
+    ppPoints: number;
+    shGoals: number;
+    shAssists: number;
+    shPoints: number;
+    gwg: number;
+    hits: number;
+    blocks: number;
+    faceoffsWon: number;
+    faceoffsLost: number;
+  };
+
+  const preSeasonSkaterMap = new Map<string, PreSeasonSkaterAcc>();
+
+  for (const s of preSkaterStats) {
+    const season = s.game?.season ?? ACTIVE_SEASON;
+    const key = `${s.playerId}::${season}`;
+    if (!preSeasonSkaterMap.has(key)) {
+      preSeasonSkaterMap.set(key, {
+        playerId: s.playerId,
+        season,
+        teamIds: new Set(),
+        gp: 0,
+        goals: 0,
+        assists: 0,
+        points: 0,
+        shots: 0,
+        pim: 0,
+        plusMinus: 0,
+        ppGoals: 0,
+        ppAssists: 0,
+        ppPoints: 0,
+        shGoals: 0,
+        shAssists: 0,
+        shPoints: 0,
+        gwg: 0,
+        hits: 0,
+        blocks: 0,
+        faceoffsWon: 0,
+        faceoffsLost: 0,
+      });
     }
-    const acc = preSkaterAcc.get(s.playerId)!;
+    const acc = preSeasonSkaterMap.get(key)!;
     acc.gp += 1;
     acc.goals += s.goals;
     acc.assists += s.assists;
     acc.points += s.points;
     acc.shots += s.shots;
     acc.pim += s.pim;
+    acc.plusMinus += s.plusMinus;
+    acc.hits += s.hits;
+    acc.blocks += s.blocks;
+    acc.faceoffsWon += s.faceoffWins;
+    acc.faceoffsLost += s.faceoffLosses;
+    acc.gwg += s.gwg ? 1 : 0;
+    acc.ppGoals += s.ppGoals ?? 0;
+    acc.ppAssists += s.ppAssists ?? 0;
+    acc.ppPoints += (s.ppGoals ?? 0) + (s.ppAssists ?? 0);
+    acc.shGoals += s.shGoals ?? 0;
+    acc.shAssists += s.shAssists ?? 0;
+    acc.shPoints += (s.shGoals ?? 0) + (s.shAssists ?? 0);
     if (s.teamId) acc.teamIds.add(s.teamId);
   }
 
-  const preSeasonScorers: LeaderItem[] = [...preSkaterAcc.values()]
-    .filter((s) => s.points > 0)
-    .sort((a, b) => b.points - a.points || b.goals - a.goals)
-    .slice(0, 5)
-    .map((s, idx) => {
-      const p = playerMap.get(s.playerId);
-      const tmInfo = resolveTeams(s.teamIds, teamById);
-      return {
-        rank: idx + 1,
-        name: p ? cleanName(p.name) : tPlayer,
-        slug: p?.slug,
-        photoUrl: p?.photoUrl,
-        ...tmInfo,
-        value: `${s.points} PTS`,
-        sub: `${s.goals}G + ${s.assists}A (${s.gp} GP · ${tPreseason} ${ACTIVE_SEASON})`,
-      };
-    });
+  const allPreSeasonSkaters = [...preSeasonSkaterMap.values()];
 
-  const preSeasonGoals: LeaderItem[] = [...preSkaterAcc.values()]
-    .filter((s) => s.goals > 0)
-    .sort((a, b) => b.goals - a.goals || b.points - a.points)
-    .slice(0, 5)
-    .map((s, idx) => {
-      const p = playerMap.get(s.playerId);
-      const tmInfo = resolveTeams(s.teamIds, teamById);
-      return {
-        rank: idx + 1,
-        name: p ? cleanName(p.name) : tPlayer,
-        slug: p?.slug,
-        photoUrl: p?.photoUrl,
-        ...tmInfo,
-        value: `${s.goals} G`,
-        sub: `${s.points} PTS (${s.gp} GP · ${tPreseason} ${ACTIVE_SEASON})`,
-      };
-    });
+  const buildPreSeasonSkaterLeader = (
+    list: PreSeasonSkaterAcc[],
+    sortFn: (a: PreSeasonSkaterAcc, b: PreSeasonSkaterAcc) => number,
+    filterFn: (s: PreSeasonSkaterAcc) => boolean,
+    valFmt: (s: PreSeasonSkaterAcc) => string | number,
+    subFmt: (s: PreSeasonSkaterAcc) => string
+  ): LeaderItem[] =>
+    list
+      .filter(filterFn)
+      .sort(sortFn)
+      .slice(0, 5)
+      .map((entry, idx) => {
+        const p = playerMap.get(entry.playerId);
+        const tmInfo = resolveTeams(entry.teamIds, teamById);
+        return {
+          rank: idx + 1,
+          name: p ? cleanName(p.name) : tPlayer,
+          slug: p?.slug,
+          photoUrl: p?.photoUrl,
+          ...tmInfo,
+          value: valFmt(entry),
+          sub: subFmt(entry),
+        };
+      });
 
-  const preSeasonAssists: LeaderItem[] = [...preSkaterAcc.values()]
-    .filter((s) => s.assists > 0)
-    .sort((a, b) => b.assists - a.assists || b.points - a.points)
-    .slice(0, 5)
-    .map((s, idx) => {
-      const p = playerMap.get(s.playerId);
-      const tmInfo = resolveTeams(s.teamIds, teamById);
-      return {
-        rank: idx + 1,
-        name: p ? cleanName(p.name) : tPlayer,
-        slug: p?.slug,
-        photoUrl: p?.photoUrl,
-        ...tmInfo,
-        value: `${s.assists} A`,
-        sub: `${s.points} PTS (${s.gp} GP · ${tPreseason} ${ACTIVE_SEASON})`,
-      };
-    });
+  const preSeasonPointsLeader = buildPreSeasonSkaterLeader(allPreSeasonSkaters, (a, b) => b.points - a.points || b.goals - a.goals, (s) => s.points > 0, (s) => `${s.points} PTS`, (s) => `${s.goals}G + ${s.assists}A (${s.gp} GP · ${tPreseason} ${s.season})`);
+  const preSeasonGoalsLeader = buildPreSeasonSkaterLeader(allPreSeasonSkaters, (a, b) => b.goals - a.goals || b.points - a.points, (s) => s.goals > 0, (s) => `${s.goals} G`, (s) => `${s.points} PTS (${s.gp} GP · ${tPreseason} ${s.season})`);
+  const preSeasonAssistsLeader = buildPreSeasonSkaterLeader(allPreSeasonSkaters, (a, b) => b.assists - a.assists || b.points - a.points, (s) => s.assists > 0, (s) => `${s.assists} A`, (s) => `${s.points} PTS (${s.gp} GP · ${tPreseason} ${s.season})`);
+  const preSeasonPimLeader = buildPreSeasonSkaterLeader(allPreSeasonSkaters, (a, b) => b.pim - a.pim, (s) => s.pim > 0, (s) => `${s.pim} ${tPim}`, (s) => `${s.gp} GP · ${tPreseason} ${s.season}`);
+  const preSeasonPlusMinusBestLeader = buildPreSeasonSkaterLeader(allPreSeasonSkaters, (a, b) => b.plusMinus - a.plusMinus || b.points - a.points, (s) => s.plusMinus > 0, (s) => `+${s.plusMinus} +/-`, (s) => `${s.gp} GP · ${tPreseason} ${s.season}`);
+  const preSeasonPlusMinusWorstLeader = buildPreSeasonSkaterLeader(allPreSeasonSkaters, (a, b) => a.plusMinus - b.plusMinus, (s) => s.plusMinus < 0, (s) => `${s.plusMinus} +/-`, (s) => `${s.gp} GP · ${tPreseason} ${s.season}`);
 
-  // 3. Preseason Single-game scoring records
-  const preSingleGamePoints: LeaderItem[] = [...preSkaterStats]
-    .filter((s) => s.points > 0)
-    .sort((a, b) => b.points - a.points || b.goals - a.goals)
-    .slice(0, 5)
-    .map((s, idx) => {
-      const p = playerMap.get(s.playerId);
-      const tm = s.teamId ? teamById.get(s.teamId) : null;
-      const dateStr = s.game?.gameDate ? formatRecordDate(new Date(s.game.gameDate), lang) : "";
-      return {
-        rank: idx + 1,
-        name: p ? cleanName(p.name) : tPlayer,
-        slug: p?.slug,
-        photoUrl: p?.photoUrl,
-        teamCode: tm?.code,
-        teamSlug: tm?.slug,
-        teamLogo: tm?.logoUrl,
-        value: `${s.points} PTS ${tInGame}`,
-        sub: `${s.goals}G + ${s.assists}A · ${dateStr}`,
-      };
-    });
+  const preSeasonPpGoalsLeader = buildPreSeasonSkaterLeader(allPreSeasonSkaters, (a, b) => b.ppGoals - a.ppGoals || b.goals - a.goals, (s) => s.ppGoals > 0, (s) => `${s.ppGoals} PPG`, (s) => `${s.goals} G ${tTotal} (${s.gp} GP · ${tPreseason} ${s.season})`);
+  const preSeasonPpAssistsLeader = buildPreSeasonSkaterLeader(allPreSeasonSkaters, (a, b) => b.ppAssists - a.ppAssists || b.assists - a.assists, (s) => s.ppAssists > 0, (s) => `${s.ppAssists} PPA`, (s) => `${s.assists} A ${tTotal} (${s.gp} GP · ${tPreseason} ${s.season})`);
+  const preSeasonPpPointsLeader = buildPreSeasonSkaterLeader(allPreSeasonSkaters, (a, b) => b.ppPoints - a.ppPoints || b.points - a.points, (s) => s.ppPoints > 0, (s) => `${s.ppPoints} PPP`, (s) => `${s.ppGoals} PPG + ${s.ppAssists} PPA (${s.gp} GP · ${tPreseason} ${s.season})`);
 
-  // 4. Preseason Goalie Saves
-  const preGoalieAcc = new Map<number, { playerId: number; teamIds: Set<number>; gp: number; wins: number; saves: number; shots: number; ga: number; shutouts: number }>();
+  const preSeasonShGoalsLeader = buildPreSeasonSkaterLeader(allPreSeasonSkaters, (a, b) => b.shGoals - a.shGoals || b.goals - a.goals, (s) => s.shGoals > 0, (s) => `${s.shGoals} SHG`, (s) => `${s.goals} G ${tTotal} (${s.gp} GP · ${tPreseason} ${s.season})`);
+  const preSeasonShAssistsLeader = buildPreSeasonSkaterLeader(allPreSeasonSkaters, (a, b) => b.shAssists - a.shAssists || b.assists - a.assists, (s) => s.shAssists > 0, (s) => `${s.shAssists} SHA`, (s) => `${s.assists} A ${tTotal} (${s.gp} GP · ${tPreseason} ${s.season})`);
+  const preSeasonShPointsLeader = buildPreSeasonSkaterLeader(allPreSeasonSkaters, (a, b) => b.shPoints - a.shPoints || b.points - a.points, (s) => s.shPoints > 0, (s) => `${s.shPoints} SHP`, (s) => `${s.shGoals} SHG + ${s.shAssists} SHA (${s.gp} GP · ${tPreseason} ${s.season})`);
+
+  const preSeasonGwgLeader = buildPreSeasonSkaterLeader(allPreSeasonSkaters, (a, b) => b.gwg - a.gwg || b.goals - a.goals, (s) => s.gwg > 0, (s) => `${s.gwg} GWG`, (s) => `${s.goals} G (${s.gp} GP · ${tPreseason} ${s.season})`);
+  const preSeasonShotsLeader = buildPreSeasonSkaterLeader(allPreSeasonSkaters, (a, b) => b.shots - a.shots || b.goals - a.goals, (s) => s.shots > 0, (s) => `${s.shots} ${unitShots}`, (s) => `${s.goals} G (${s.gp} GP · ${tPreseason} ${s.season})`);
+  const preSeasonShootingPctLeader = buildPreSeasonSkaterLeader(
+    allPreSeasonSkaters,
+    (a, b) => b.goals / b.shots - a.goals / a.shots || b.goals - a.goals,
+    (s) => s.shots >= 5 && s.goals > 0,
+    (s) => `${((s.goals / s.shots) * 100).toFixed(1)}%`,
+    (s) => `${s.goals} G / ${s.shots} SOG (${s.gp} GP · ${tPreseason} ${s.season})`
+  );
+  const preSeasonHitsLeader = buildPreSeasonSkaterLeader(allPreSeasonSkaters, (a, b) => b.hits - a.hits, (s) => s.hits > 0, (s) => `${s.hits} ${unitHits}`, (s) => `${s.gp} GP · ${tPreseason} ${s.season}`);
+  const preSeasonBlocksLeader = buildPreSeasonSkaterLeader(allPreSeasonSkaters, (a, b) => b.blocks - a.blocks, (s) => s.blocks > 0, (s) => `${s.blocks} ${unitBlocks}`, (s) => `${s.gp} GP · ${tPreseason} ${s.season}`);
+  const preSeasonFoWinsLeader = buildPreSeasonSkaterLeader(allPreSeasonSkaters, (a, b) => b.faceoffsWon - a.faceoffsWon, (s) => s.faceoffsWon > 0, (s) => `${s.faceoffsWon} FOW`, (s) => `${s.faceoffsWon + s.faceoffsLost} FO (${s.gp} GP · ${tPreseason} ${s.season})`);
+  const preSeasonFoPctLeader = buildPreSeasonSkaterLeader(
+    allPreSeasonSkaters,
+    (a, b) => b.faceoffsWon / (b.faceoffsWon + b.faceoffsLost) - a.faceoffsWon / (a.faceoffsWon + a.faceoffsLost) || b.faceoffsWon - a.faceoffsWon,
+    (s) => s.faceoffsWon + s.faceoffsLost >= 10,
+    (s) => `${(((s.faceoffsWon) / (s.faceoffsWon + s.faceoffsLost)) * 100).toFixed(1)}%`,
+    (s) => `${s.faceoffsWon} FOW / ${s.faceoffsWon + s.faceoffsLost} FO (${s.gp} GP · ${tPreseason} ${s.season})`
+  );
+
+  const preSeasonDefenders = allPreSeasonSkaters.filter((s) => playerMap.get(s.playerId)?.position === "D");
+  const preSeasonDPointsLeader = buildPreSeasonSkaterLeader(preSeasonDefenders, (a, b) => b.points - a.points || b.goals - a.goals, (s) => s.points > 0, (s) => `${s.points} PTS (D)`, (s) => `${s.goals}G + ${s.assists}A (${s.gp} GP · ${tPreseason} ${s.season})`);
+  const preSeasonDGoalsLeader = buildPreSeasonSkaterLeader(preSeasonDefenders, (a, b) => b.goals - a.goals || b.points - a.points, (s) => s.goals > 0, (s) => `${s.goals} G (D)`, (s) => `${s.points} PTS (${s.gp} GP · ${tPreseason} ${s.season})`);
+  const preSeasonDAssistsLeader = buildPreSeasonSkaterLeader(preSeasonDefenders, (a, b) => b.assists - a.assists || b.points - a.points, (s) => s.assists > 0, (s) => `${s.assists} A (D)`, (s) => `${s.points} PTS (${s.gp} GP · ${tPreseason} ${s.season})`);
+
+  const preSkaterSeasonSections: RecordSection[] = [
+    { id: "pre-season-points", title: getSectionTitle("pre-season-points", lang, league, cupName), icon: "⭐", phase: "pre", phaseBadge: secBadgePre, items: preSeasonPointsLeader },
+    { id: "pre-season-goals", title: getSectionTitle("pre-season-goals", lang, league, cupName), icon: "🎯", phase: "pre", phaseBadge: secBadgePre, items: preSeasonGoalsLeader },
+    { id: "pre-season-assists", title: getSectionTitle("pre-season-assists", lang, league, cupName), icon: "🪄", phase: "pre", phaseBadge: secBadgePre, items: preSeasonAssistsLeader },
+    { id: "pre-season-pim", title: getSectionTitle("pre-season-pim", lang, league, cupName), icon: "⏱️", phase: "pre", phaseBadge: secBadgePre, items: preSeasonPimLeader },
+    { id: "pre-season-plus-minus-best", title: getSectionTitle("pre-season-plus-minus-best", lang, league, cupName), icon: "🟢", phase: "pre", phaseBadge: secBadgePre, items: preSeasonPlusMinusBestLeader },
+    { id: "pre-season-plus-minus-worst", title: getSectionTitle("pre-season-plus-minus-worst", lang, league, cupName), icon: "🔴", phase: "pre", phaseBadge: secBadgePre, items: preSeasonPlusMinusWorstLeader },
+    { id: "pre-season-pp-goals", title: getSectionTitle("pre-season-pp-goals", lang, league, cupName), icon: "⚡", phase: "pre", phaseBadge: secBadgePre, items: preSeasonPpGoalsLeader },
+    { id: "pre-season-pp-assists", title: getSectionTitle("pre-season-pp-assists", lang, league, cupName), icon: "🏒", phase: "pre", phaseBadge: secBadgePre, items: preSeasonPpAssistsLeader },
+    { id: "pre-season-pp-points", title: getSectionTitle("pre-season-pp-points", lang, league, cupName), icon: "⭐", phase: "pre", phaseBadge: secBadgePre, items: preSeasonPpPointsLeader },
+    { id: "pre-season-sh-goals", title: getSectionTitle("pre-season-sh-goals", lang, league, cupName), icon: "🛡️", phase: "pre", phaseBadge: secBadgePre, items: preSeasonShGoalsLeader },
+    { id: "pre-season-sh-assists", title: getSectionTitle("pre-season-sh-assists", lang, league, cupName), icon: "🧤", phase: "pre", phaseBadge: secBadgePre, items: preSeasonShAssistsLeader },
+    { id: "pre-season-sh-points", title: getSectionTitle("pre-season-sh-points", lang, league, cupName), icon: "⭐", phase: "pre", phaseBadge: secBadgePre, items: preSeasonShPointsLeader },
+    { id: "pre-season-gwg", title: getSectionTitle("pre-season-gwg", lang, league, cupName), icon: "🚨", phase: "pre", phaseBadge: secBadgePre, items: preSeasonGwgLeader },
+    { id: "pre-season-shots", title: getSectionTitle("pre-season-shots", lang, league, cupName), icon: "🏒", phase: "pre", phaseBadge: secBadgePre, items: preSeasonShotsLeader },
+    { id: "pre-season-shooting-pct", title: getSectionTitle("pre-season-shooting-pct", lang, league, cupName), icon: "🎯", phase: "pre", phaseBadge: secBadgePre, items: preSeasonShootingPctLeader },
+    { id: "pre-season-hits", title: getSectionTitle("pre-season-hits", lang, league, cupName), icon: "💥", phase: "pre", phaseBadge: secBadgePre, items: preSeasonHitsLeader },
+    { id: "pre-season-blocks", title: getSectionTitle("pre-season-blocks", lang, league, cupName), icon: "🧱", phase: "pre", phaseBadge: secBadgePre, items: preSeasonBlocksLeader },
+    { id: "pre-season-fo-wins", title: getSectionTitle("pre-season-fo-wins", lang, league, cupName), icon: "🤝", phase: "pre", phaseBadge: secBadgePre, items: preSeasonFoWinsLeader },
+    { id: "pre-season-fo-pct", title: getSectionTitle("pre-season-fo-pct", lang, league, cupName), icon: "📊", phase: "pre", phaseBadge: secBadgePre, items: preSeasonFoPctLeader },
+    { id: "pre-season-d-points", title: getSectionTitle("pre-season-d-points", lang, league, cupName), icon: "🛡️", phase: "pre", phaseBadge: secBadgePre, items: preSeasonDPointsLeader },
+    { id: "pre-season-d-goals", title: getSectionTitle("pre-season-d-goals", lang, league, cupName), icon: "🛡️", phase: "pre", phaseBadge: secBadgePre, items: preSeasonDGoalsLeader },
+    { id: "pre-season-d-assists", title: getSectionTitle("pre-season-d-assists", lang, league, cupName), icon: "🛡️", phase: "pre", phaseBadge: secBadgePre, items: preSeasonDAssistsLeader },
+  ];
+
+  // 3. Pre-season Skater Streaks
+  const playerPreGameStats = new Map<number, typeof preSkaterStats>();
+  for (const s of preSkaterStats) {
+    if (!playerPreGameStats.has(s.playerId)) playerPreGameStats.set(s.playerId, []);
+    playerPreGameStats.get(s.playerId)!.push(s);
+  }
+
+  for (const [, list] of playerPreGameStats.entries()) {
+    list.sort((a, b) => {
+      const da = a.game?.gameDate ? new Date(a.game.gameDate).getTime() : 0;
+      const db = b.game?.gameDate ? new Date(b.game.gameDate).getTime() : 0;
+      return da - db || a.gameId - b.gameId;
+    });
+  }
+
+  const preIronmanStreaks: StreakInfo[] = [];
+  const preGoalStreaks: StreakInfo[] = [];
+  const preAssistStreaks: StreakInfo[] = [];
+  const prePointStreaks: StreakInfo[] = [];
+
+  for (const [pId, list] of playerPreGameStats.entries()) {
+    let maxIron = 0, curIron = 0, startIron = "", curStartIron = "", endIron = "";
+    let maxG = 0, curG = 0, startG = "", curStartG = "", endG = "";
+    let maxA = 0, curA = 0, startA = "", curStartA = "", endA = "";
+    let maxP = 0, curP = 0, startP = "", curStartP = "", endP = "";
+
+    for (let i = 0; i < list.length; i++) {
+      const s = list[i];
+      const seas = s.game?.season ?? "";
+
+      if (curIron === 0) curStartIron = seas;
+      curIron++;
+      if (curIron > maxIron) {
+        maxIron = curIron;
+        startIron = curStartIron;
+        endIron = seas;
+      }
+
+      if (s.goals > 0) {
+        if (curG === 0) curStartG = seas;
+        curG++;
+        if (curG > maxG) {
+          maxG = curG;
+          startG = curStartG;
+          endG = seas;
+        }
+      } else {
+        curG = 0;
+      }
+
+      if (s.assists > 0) {
+        if (curA === 0) curStartA = seas;
+        curA++;
+        if (curA > maxA) {
+          maxA = curA;
+          startA = curStartA;
+          endA = seas;
+        }
+      } else {
+        curA = 0;
+      }
+
+      if (s.points > 0) {
+        if (curP === 0) curStartP = seas;
+        curP++;
+        if (curP > maxP) {
+          maxP = curP;
+          startP = curStartP;
+          endP = seas;
+        }
+      } else {
+        curP = 0;
+      }
+    }
+
+    if (maxIron > 0) preIronmanStreaks.push({ playerId: pId, streak: maxIron, startSeason: startIron, endSeason: endIron });
+    if (maxG > 0) preGoalStreaks.push({ playerId: pId, streak: maxG, startSeason: startG, endSeason: endG });
+    if (maxA > 0) preAssistStreaks.push({ playerId: pId, streak: maxA, startSeason: startA, endSeason: endA });
+    if (maxP > 0) prePointStreaks.push({ playerId: pId, streak: maxP, startSeason: startP, endSeason: endP });
+  }
+
+  const preIronmanLeader = buildStreakLeader(preIronmanStreaks, tConsecutiveGames);
+  const preGoalStreakLeader = buildStreakLeader(preGoalStreaks, tGoalStreakUnit);
+  const preAssistStreakLeader = buildStreakLeader(preAssistStreaks, tAssistStreakUnit);
+  const prePointStreakLeader = buildStreakLeader(prePointStreaks, tPointStreakUnit);
+
+  const preSkaterStreakSections: RecordSection[] = [
+    { id: "pre-streak-points", title: getSectionTitle("pre-streak-points", lang, league, cupName), icon: "⚡", phase: "pre", phaseBadge: secBadgePre, items: prePointStreakLeader },
+    { id: "pre-streak-goals", title: getSectionTitle("pre-streak-goals", lang, league, cupName), icon: "🔥", phase: "pre", phaseBadge: secBadgePre, items: preGoalStreakLeader },
+    { id: "pre-streak-assists", title: getSectionTitle("pre-streak-assists", lang, league, cupName), icon: "🪄", phase: "pre", phaseBadge: secBadgePre, items: preAssistStreakLeader },
+    { id: "pre-streak-ironman", title: getSectionTitle("pre-streak-ironman", lang, league, cupName), icon: "🛡️", phase: "pre", phaseBadge: secBadgePre, items: preIronmanLeader },
+  ];
+
+  // 4. Pre-season Skater Single-Game
+  const buildPreGameSkaterLeader = (
+    list: typeof preSkaterStats,
+    sortFn: (a: (typeof preSkaterStats)[0], b: (typeof preSkaterStats)[0]) => number,
+    filterFn: (s: (typeof preSkaterStats)[0]) => boolean,
+    valFmt: (s: (typeof preSkaterStats)[0]) => string | number,
+    subFmt: (s: (typeof preSkaterStats)[0]) => string
+  ): LeaderItem[] =>
+    list
+      .filter(filterFn)
+      .sort(sortFn)
+      .slice(0, 5)
+      .map((s, idx) => {
+        const p = playerMap.get(s.playerId);
+        const tm = s.teamId ? teamById.get(s.teamId) : null;
+        return {
+          rank: idx + 1,
+          name: p ? cleanName(p.name) : tPlayer,
+          slug: p?.slug,
+          photoUrl: p?.photoUrl,
+          teamCode: tm?.code,
+          teamSlug: tm?.slug,
+          teamLogo: tm?.logoUrl,
+          value: valFmt(s),
+          sub: subFmt(s),
+        };
+      });
+
+  const preGamePointsLeader = buildPreGameSkaterLeader(preSkaterStats, (a, b) => b.points - a.points || b.goals - a.goals, (s) => s.points > 0, (s) => `${s.points} PTS ${tInGame}`, (s) => `${s.goals}G + ${s.assists}A · ${s.game?.season ?? ""} (${getGameDateStr(s.game)})`);
+  const preGameGoalsLeader = buildPreGameSkaterLeader(preSkaterStats, (a, b) => b.goals - a.goals || b.points - a.points, (s) => s.goals > 0, (s) => `${s.goals} G ${tInGame}`, (s) => `${s.points} PTS · ${s.game?.season ?? ""} (${getGameDateStr(s.game)})`);
+  const preGameAssistsLeader = buildPreGameSkaterLeader(preSkaterStats, (a, b) => b.assists - a.assists || b.points - a.points, (s) => s.assists > 0, (s) => `${s.assists} A ${tInGame}`, (s) => `${s.points} PTS · ${s.game?.season ?? ""} (${getGameDateStr(s.game)})`);
+  const preGameShotsLeader = buildPreGameSkaterLeader(preSkaterStats, (a, b) => b.shots - a.shots, (s) => s.shots > 0, (s) => `${s.shots} ${unitShots} ${tInGame}`, (s) => `${s.goals} G · ${s.game?.season ?? ""} (${getGameDateStr(s.game)})`);
+  const preGameHitsLeader = buildPreGameSkaterLeader(preSkaterStats, (a, b) => b.hits - a.hits, (s) => s.hits > 0, (s) => `${s.hits} ${unitHits} ${tInGame}`, (s) => `${s.game?.season ?? ""} (${getGameDateStr(s.game)})`);
+  const preGameBlocksLeader = buildPreGameSkaterLeader(preSkaterStats, (a, b) => b.blocks - a.blocks, (s) => s.blocks > 0, (s) => `${s.blocks} ${unitBlocks} ${tInGame}`, (s) => `${s.game?.season ?? ""} (${getGameDateStr(s.game)})`);
+
+  const preSkaterGameSections: RecordSection[] = [
+    { id: "pre-game-points", title: getSectionTitle("pre-game-points", lang, league, cupName), icon: "⭐", phase: "pre", phaseBadge: secBadgePre, items: preGamePointsLeader },
+    { id: "pre-game-goals", title: getSectionTitle("pre-game-goals", lang, league, cupName), icon: "🎯", phase: "pre", phaseBadge: secBadgePre, items: preGameGoalsLeader },
+    { id: "pre-game-assists", title: getSectionTitle("pre-game-assists", lang, league, cupName), icon: "🪄", phase: "pre", phaseBadge: secBadgePre, items: preGameAssistsLeader },
+    { id: "pre-game-shots", title: getSectionTitle("pre-game-shots", lang, league, cupName), icon: "🏒", phase: "pre", phaseBadge: secBadgePre, items: preGameShotsLeader },
+    { id: "pre-game-hits", title: getSectionTitle("pre-game-hits", lang, league, cupName), icon: "💥", phase: "pre", phaseBadge: secBadgePre, items: preGameHitsLeader },
+    { id: "pre-game-blocks", title: getSectionTitle("pre-game-blocks", lang, league, cupName), icon: "🧱", phase: "pre", phaseBadge: secBadgePre, items: preGameBlocksLeader },
+  ];
+
+  // 5. Pre-season Goalie Career
+  const preGlCareerMap = new Map<number, GoalieCareerAcc>();
+  const getPreGlAcc = (id: number): GoalieCareerAcc => {
+    let acc = preGlCareerMap.get(id);
+    if (!acc) {
+      acc = { playerId: id, gp: 0, wins: 0, losses: 0, otl: 0, shutouts: 0, shotsAgainst: 0, saves: 0, goalsAgainst: 0, steals: 0, gsax: 0, teamId: null };
+      preGlCareerMap.set(id, acc);
+    }
+    return acc;
+  };
 
   for (const g of preGoalieStats) {
-    if (!preGoalieAcc.has(g.playerId)) {
-      preGoalieAcc.set(g.playerId, { playerId: g.playerId, teamIds: new Set(), gp: 0, wins: 0, saves: 0, shots: 0, ga: 0, shutouts: 0 });
+    const a = getPreGlAcc(g.playerId);
+    a.gp += 1;
+    a.shotsAgainst += g.shotsAgainst;
+    a.saves += g.saves;
+    a.goalsAgainst += g.goalsAgainst;
+    if (g.decision === "W") a.wins++;
+    else if (g.decision === "OTL") a.otl++;
+    else if (g.decision === "L") a.losses++;
+    if (g.goalsAgainst === 0) a.shutouts++;
+    const gsax = (g.xga ?? 0) - g.goalsAgainst;
+    a.gsax += gsax;
+    if (g.decision === "W" && g.game) {
+      const isHome = g.teamId === g.game.homeTeamId;
+      const teamGoals = (isHome ? g.game.homeGoals : g.game.awayGoals) ?? 0;
+      const oppGoals = (isHome ? g.game.awayGoals : g.game.homeGoals) ?? 0;
+      const enGoals = g.game.goalEvents.filter((ev) => ev.teamId === g.teamId).length;
+      const margin = Math.max(0, teamGoals - enGoals - oppGoals);
+      if (gsax > margin) {
+        a.steals++;
+      }
     }
-    const acc = preGoalieAcc.get(g.playerId)!;
+    if (g.teamId) a.teamId = g.teamId;
+  }
+
+  const preGlList = [...preGlCareerMap.values()];
+
+  const topPreGoalies = (fn: (g: GoalieCareerAcc) => number, valFmt: (g: GoalieCareerAcc) => string | number, subFmt?: (g: GoalieCareerAcc) => string) =>
+    [...preGlList]
+      .filter((g) => fn(g) > 0)
+      .sort((a, b) => fn(b) - fn(a) || b.wins - a.wins)
+      .slice(0, 5)
+      .map((g, idx) => ({ ...glRowItem(g, valFmt(g), subFmt?.(g)), rank: idx + 1 }));
+
+  const preCareerGoalieGpLeader = topPreGoalies((g) => g.gp, (g) => `${g.gp} GP`, (g) => `${g.wins} W · ${g.shutouts} SO`);
+  const preCareerGoalieWinsLeader = topPreGoalies((g) => g.wins, (g) => `${g.wins} W`, (g) => `${g.gp} GP · ${g.shutouts} SO`);
+  const preCareerGoalieStealsLeader = topPreGoalies((g) => g.steals, (g) => `${g.steals} STL`, (g) => `${g.wins} W · ${g.gp} GP`);
+  const preCareerGoalieGsaxLeader = topPreGoalies((g) => g.gsax, (g) => (g.gsax > 0 ? `+${g.gsax.toFixed(1)} GSAx` : `${g.gsax.toFixed(1)} GSAx`), (g) => `${g.gp} GP · ${g.goalsAgainst} GA`);
+  const preCareerGoalieShutoutsLeader = topPreGoalies((g) => g.shutouts, (g) => `${g.shutouts} SO`, (g) => `${g.gp} GP · ${g.wins} W`);
+  const preCareerGoalieSavesLeader = topPreGoalies(
+    (g) => g.saves,
+    (g) => `${g.saves} ${unitSaves}`,
+    (g) => `${g.shotsAgainst > 0 ? ((g.saves / g.shotsAgainst) * 100).toFixed(1) : "0.0"}% SV% · ${g.gp} GP`
+  );
+
+  const preGoalieCareerSections: RecordSection[] = [
+    { id: "pre-career-goalie-gp", title: getSectionTitle("pre-career-goalie-gp", lang, league, cupName), icon: "📅", phase: "pre", phaseBadge: secBadgePre, items: preCareerGoalieGpLeader },
+    { id: "pre-career-goalie-wins", title: getSectionTitle("pre-career-goalie-wins", lang, league, cupName), icon: "🧤", phase: "pre", phaseBadge: secBadgePre, items: preCareerGoalieWinsLeader },
+    { id: "pre-career-goalie-steals", title: getSectionTitle("pre-career-goalie-steals", lang, league, cupName), icon: "🥷", phase: "pre", phaseBadge: secBadgePre, items: preCareerGoalieStealsLeader },
+    { id: "pre-career-goalie-gsax", title: getSectionTitle("pre-career-goalie-gsax", lang, league, cupName), icon: "📊", phase: "pre", phaseBadge: secBadgePre, items: preCareerGoalieGsaxLeader },
+    { id: "pre-career-goalie-shutouts", title: getSectionTitle("pre-career-goalie-shutouts", lang, league, cupName), icon: "🧱", phase: "pre", phaseBadge: secBadgePre, items: preCareerGoalieShutoutsLeader },
+    { id: "pre-career-goalie-saves", title: getSectionTitle("pre-career-goalie-saves", lang, league, cupName), icon: "🛡️", phase: "pre", phaseBadge: secBadgePre, items: preCareerGoalieSavesLeader },
+  ];
+
+  // 6. Pre-season Goalie Single-Season
+  const preSeasonGoalieMap = new Map<string, SeasonGoalieAcc>();
+
+  for (const g of preGoalieStats) {
+    const season = g.game?.season ?? ACTIVE_SEASON;
+    const key = `${g.playerId}::${season}`;
+    if (!preSeasonGoalieMap.has(key)) {
+      preSeasonGoalieMap.set(key, {
+        playerId: g.playerId,
+        season,
+        teamIds: new Set(),
+        gp: 0,
+        wins: 0,
+        losses: 0,
+        otl: 0,
+        shutouts: 0,
+        shotsAgainst: 0,
+        saves: 0,
+        goalsAgainst: 0,
+        steals: 0,
+        gsax: 0,
+      });
+    }
+    const acc = preSeasonGoalieMap.get(key)!;
     acc.gp += 1;
-    if (g.decision === "W") acc.wins += 1;
+    acc.shotsAgainst += g.shotsAgainst;
     acc.saves += g.saves;
-    acc.shots += g.shotsAgainst;
-    acc.ga += g.goalsAgainst;
+    acc.goalsAgainst += g.goalsAgainst;
+    if (g.decision === "W") acc.wins += 1;
+    else if (g.decision === "OTL") acc.otl += 1;
+    else if (g.decision === "L") acc.losses += 1;
     if (g.goalsAgainst === 0) acc.shutouts += 1;
+    const gsax = (g.xga ?? 0) - g.goalsAgainst;
+    acc.gsax += gsax;
+    if (g.decision === "W" && g.game) {
+      const isHome = g.teamId === g.game.homeTeamId;
+      const teamGoals = (isHome ? g.game.homeGoals : g.game.awayGoals) ?? 0;
+      const oppGoals = (isHome ? g.game.awayGoals : g.game.homeGoals) ?? 0;
+      const enGoals = g.game.goalEvents.filter((ev) => ev.teamId === g.teamId).length;
+      const margin = Math.max(0, teamGoals - enGoals - oppGoals);
+      if (gsax > margin) {
+        acc.steals += 1;
+      }
+    }
     if (g.teamId) acc.teamIds.add(g.teamId);
   }
 
-  const unitSaves = lang === "cs" ? "zákrokov" : lang === "de" ? "Paraden" : lang === "ru" ? "сейвов" : "saves";
+  const allPreSeasonGoalies = [...preSeasonGoalieMap.values()];
 
-  const preGoalieSaves: LeaderItem[] = [...preGoalieAcc.values()]
-    .filter((g) => g.saves > 0)
-    .sort((a, b) => b.saves - a.saves || b.wins - a.wins)
-    .slice(0, 5)
-    .map((g, idx) => {
-      const p = playerMap.get(g.playerId);
-      const tmInfo = resolveTeams(g.teamIds, teamById);
-      const svPct = g.shots > 0 ? ((g.saves / g.shots) * 100).toFixed(1) : "0.0";
-      return {
-        rank: idx + 1,
-        name: p ? cleanName(p.name) : tGoalie,
-        slug: p?.slug,
-        photoUrl: p?.photoUrl,
-        ...tmInfo,
-        value: `${g.saves} ${unitSaves}`,
-        sub: `${svPct}% SV% · ${g.wins} W (${g.gp} GP · ${tPreseason} ${ACTIVE_SEASON})`,
-      };
+  const preSeasonGoalieGpLeader = buildSeasonGoalieLeader(allPreSeasonGoalies, (a, b) => b.gp - a.gp || b.wins - a.wins, (g) => g.gp > 0, (g) => `${g.gp} GP`, (g) => `${tPreseason} ${g.season} · ${g.wins} W`);
+  const preSeasonGoalieWinsLeader = buildSeasonGoalieLeader(allPreSeasonGoalies, (a, b) => b.wins - a.wins || b.gp - a.gp, (g) => g.wins > 0, (g) => `${g.wins} W`, (g) => `${tPreseason} ${g.season} · ${g.gp} GP · ${g.shutouts} SO`);
+  const preSeasonGoalieStealsLeader = buildSeasonGoalieLeader(allPreSeasonGoalies, (a, b) => b.steals - a.steals || b.wins - a.wins, (g) => g.steals > 0, (g) => `${g.steals} STL`, (g) => `${tPreseason} ${g.season} · ${g.wins} W · ${g.gp} GP`);
+  const preSeasonGoalieGsaxLeader = buildSeasonGoalieLeader(allPreSeasonGoalies, (a, b) => b.gsax - a.gsax || b.wins - a.wins, (g) => g.gsax > 0, (g) => `+${g.gsax.toFixed(1)} GSAx`, (g) => `${tPreseason} ${g.season} · ${g.gp} GP · ${g.goalsAgainst} GA`);
+  const preSeasonGoalieShutoutsLeader = buildSeasonGoalieLeader(allPreSeasonGoalies, (a, b) => b.shutouts - a.shutouts || b.wins - a.wins, (g) => g.shutouts > 0, (g) => `${g.shutouts} SO`, (g) => `${tPreseason} ${g.season} · ${g.gp} GP · ${g.wins} W`);
+  const preSeasonGoalieSavesLeader = buildSeasonGoalieLeader(allPreSeasonGoalies, (a, b) => b.saves - a.saves || b.shotsAgainst - a.shotsAgainst, (g) => g.saves > 0, (g) => `${g.saves} ${unitSaves}`, (g) => `${tPreseason} ${g.season} · ${g.shotsAgainst > 0 ? ((g.saves / g.shotsAgainst) * 100).toFixed(1) : "0.0"}% SV% · ${g.gp} GP`);
+
+  const preGoalieSeasonSections: RecordSection[] = [
+    { id: "pre-season-goalie-gp", title: getSectionTitle("pre-season-goalie-gp", lang, league, cupName), icon: "📅", phase: "pre", phaseBadge: secBadgePre, items: preSeasonGoalieGpLeader },
+    { id: "pre-season-goalie-wins", title: getSectionTitle("pre-season-goalie-wins", lang, league, cupName), icon: "🧤", phase: "pre", phaseBadge: secBadgePre, items: preSeasonGoalieWinsLeader },
+    { id: "pre-season-goalie-steals", title: getSectionTitle("pre-season-goalie-steals", lang, league, cupName), icon: "🥷", phase: "pre", phaseBadge: secBadgePre, items: preSeasonGoalieStealsLeader },
+    { id: "pre-season-goalie-gsax", title: getSectionTitle("pre-season-goalie-gsax", lang, league, cupName), icon: "📊", phase: "pre", phaseBadge: secBadgePre, items: preSeasonGoalieGsaxLeader },
+    { id: "pre-season-goalie-shutouts", title: getSectionTitle("pre-season-goalie-shutouts", lang, league, cupName), icon: "🧱", phase: "pre", phaseBadge: secBadgePre, items: preSeasonGoalieShutoutsLeader },
+    { id: "pre-season-goalie-saves", title: getSectionTitle("pre-season-goalie-saves", lang, league, cupName), icon: "🛡️", phase: "pre", phaseBadge: secBadgePre, items: preSeasonGoalieSavesLeader },
+  ];
+
+  // 7. Pre-season Goalie Streaks
+  const playerPreGoalieGameStats = new Map<number, typeof preGoalieStats>();
+  for (const g of preGoalieStats) {
+    if (!playerPreGoalieGameStats.has(g.playerId)) playerPreGoalieGameStats.set(g.playerId, []);
+    playerPreGoalieGameStats.get(g.playerId)!.push(g);
+  }
+
+  for (const [, list] of playerPreGoalieGameStats.entries()) {
+    list.sort((a, b) => {
+      const da = a.game?.gameDate ? new Date(a.game.gameDate).getTime() : 0;
+      const db = b.game?.gameDate ? new Date(b.game.gameDate).getTime() : 0;
+      return da - db || a.gameId - b.gameId;
+    });
+  }
+
+  const preGlIronmanStreaks: StreakInfo[] = [];
+  const preGlWinStreaks: StreakInfo[] = [];
+  const preGlStealsStreaks: StreakInfo[] = [];
+  const preGlShutoutStreaks: StreakInfo[] = [];
+
+  for (const [pId, list] of playerPreGoalieGameStats.entries()) {
+    let maxIron = 0, curIron = 0, startIron = "", curStartIron = "", endIron = "";
+    let maxW = 0, curW = 0, startW = "", curStartW = "", endW = "";
+    let maxS = 0, curS = 0, startS = "", curStartS = "", endS = "";
+    let maxSO = 0, curSO = 0, startSO = "", curStartSO = "", endSO = "";
+
+    for (let i = 0; i < list.length; i++) {
+      const g = list[i];
+      const seas = g.game?.season ?? "";
+
+      if (curIron === 0) curStartIron = seas;
+      curIron++;
+      if (curIron > maxIron) {
+        maxIron = curIron;
+        startIron = curStartIron;
+        endIron = seas;
+      }
+
+      if (g.decision === "W") {
+        if (curW === 0) curStartW = seas;
+        curW++;
+        if (curW > maxW) {
+          maxW = curW;
+          startW = curStartW;
+          endW = seas;
+        }
+      } else {
+        curW = 0;
+      }
+
+      const gsax = (g.xga ?? 0) - g.goalsAgainst;
+      let isSteal = false;
+      if (g.decision === "W" && g.game) {
+        const isHome = g.teamId === g.game.homeTeamId;
+        const teamGoals = (isHome ? g.game.homeGoals : g.game.awayGoals) ?? 0;
+        const oppGoals = (isHome ? g.game.awayGoals : g.game.homeGoals) ?? 0;
+        const enGoals = g.game.goalEvents.filter((ev) => ev.teamId === g.teamId).length;
+        const margin = Math.max(0, teamGoals - enGoals - oppGoals);
+        if (gsax > margin) isSteal = true;
+      }
+
+      if (isSteal) {
+        if (curS === 0) curStartS = seas;
+        curS++;
+        if (curS > maxS) {
+          maxS = curS;
+          startS = curStartS;
+          endS = seas;
+        }
+      } else {
+        curS = 0;
+      }
+
+      if (g.goalsAgainst === 0) {
+        if (curSO === 0) curStartSO = seas;
+        curSO++;
+        if (curSO > maxSO) {
+          maxSO = curSO;
+          startSO = curStartSO;
+          endSO = seas;
+        }
+      } else {
+        curSO = 0;
+      }
+    }
+
+    if (maxIron > 0) preGlIronmanStreaks.push({ playerId: pId, streak: maxIron, startSeason: startIron, endSeason: endIron });
+    if (maxW > 0) preGlWinStreaks.push({ playerId: pId, streak: maxW, startSeason: startW, endSeason: endW });
+    if (maxS > 0) preGlStealsStreaks.push({ playerId: pId, streak: maxS, startSeason: startS, endSeason: endS });
+    if (maxSO > 0) preGlShutoutStreaks.push({ playerId: pId, streak: maxSO, startSeason: startSO, endSeason: endSO });
+  }
+
+  const preGlIronmanLeader = buildStreakLeader(preGlIronmanStreaks, lang === "cs" ? "odchytaných zápasov v rade" : lang === "de" ? "Spiele in Folge" : lang === "ru" ? "матчей подряд" : "consecutive starts");
+  const preGlWinStreakLeader = buildStreakLeader(preGlWinStreaks, lang === "cs" ? "výhier v rade" : lang === "de" ? "Siege in Folge" : lang === "ru" ? "побед подряд" : "consecutive wins");
+  const preGlStealsStreakLeader = buildStreakLeader(preGlStealsStreaks, lang === "cs" ? "ukradnutých zápasov v rade" : lang === "de" ? "Steals in Folge" : lang === "ru" ? "украденных матчей подряд" : "consecutive steals");
+  const preGlShutoutStreakLeader = buildStreakLeader(preGlShutoutStreaks, lang === "cs" ? "čistých kont v rade" : lang === "de" ? "Shutouts in Folge" : lang === "ru" ? "сухих матчей подряд" : "consecutive shutouts");
+
+  const preGoalieStreakSections: RecordSection[] = [
+    { id: "pre-streak-goalie-gp", title: getSectionTitle("pre-streak-goalie-gp", lang, league, cupName), icon: "🔥", phase: "pre", phaseBadge: secBadgePre, items: preGlIronmanLeader },
+    { id: "pre-streak-goalie-wins", title: getSectionTitle("pre-streak-goalie-wins", lang, league, cupName), icon: "🏆", phase: "pre", phaseBadge: secBadgePre, items: preGlWinStreakLeader },
+    { id: "pre-streak-goalie-steals", title: getSectionTitle("pre-streak-goalie-steals", lang, league, cupName), icon: "🥷", phase: "pre", phaseBadge: secBadgePre, items: preGlStealsStreakLeader },
+    { id: "pre-streak-goalie-shutouts", title: getSectionTitle("pre-streak-goalie-shutouts", lang, league, cupName), icon: "🧱", phase: "pre", phaseBadge: secBadgePre, items: preGlShutoutStreakLeader },
+  ];
+
+  // 8. Pre-season Goalie Single-Game
+  const preGameGoalieGsaxLeader = buildGameGoalieLeader(
+    preGoalieStats,
+    (a, b) => ((b.xga ?? 0) - b.goalsAgainst) - ((a.xga ?? 0) - a.goalsAgainst) || b.saves - a.saves,
+    (g) => (g.xga ?? 0) - g.goalsAgainst > 0,
+    (g) => `+${((g.xga ?? 0) - g.goalsAgainst).toFixed(2)} GSAx ${tInGame}`,
+    (g) => `${g.saves}/${g.shotsAgainst} ${unitSaves} · ${g.game?.season ?? ""} (${getGameDateStr(g.game)})`
+  );
+
+  const preGameGoalieSavesLeader = buildGameGoalieLeader(
+    preGoalieStats,
+    (a, b) => b.saves - a.saves || b.shotsAgainst - a.shotsAgainst,
+    (g) => g.saves > 0,
+    (g) => `${g.saves} ${unitSaves} ${tInGame}`,
+    (g) => `${g.shotsAgainst > 0 ? ((g.saves / g.shotsAgainst) * 100).toFixed(1) : "0.0"}% SV% · ${g.game?.season ?? ""} (${getGameDateStr(g.game)})`
+  );
+
+  const preGoalieGameSections: RecordSection[] = [
+    { id: "pre-game-goalie-gsax", title: getSectionTitle("pre-game-goalie-gsax", lang, league, cupName), icon: "📊", phase: "pre", phaseBadge: secBadgePre, items: preGameGoalieGsaxLeader },
+    { id: "pre-game-goalie-saves", title: getSectionTitle("pre-game-goalie-saves", lang, league, cupName), icon: "🧤", phase: "pre", phaseBadge: secBadgePre, items: preGameGoalieSavesLeader },
+  ];
+
+  // 9. Pre-season Teams (Standings & Single-Season Maximums)
+  type PreTeamSeasonAcc = { teamId: number; season: string; gp: number; wins: number; losses: number; otl: number; points: number; gf: number; ga: number; pim: number; totalLosses: number };
+  const preTeamSeasonMap = new Map<string, PreTeamSeasonAcc>();
+
+  for (const g of preGames) {
+    const seas = g.season || ACTIVE_SEASON;
+    const hKey = `${g.homeTeamId}::${seas}`;
+    const aKey = `${g.awayTeamId}::${seas}`;
+
+    if (!preTeamSeasonMap.has(hKey)) {
+      preTeamSeasonMap.set(hKey, { teamId: g.homeTeamId, season: seas, gp: 0, wins: 0, losses: 0, otl: 0, points: 0, gf: 0, ga: 0, pim: 0, totalLosses: 0 });
+    }
+    if (!preTeamSeasonMap.has(aKey)) {
+      preTeamSeasonMap.set(aKey, { teamId: g.awayTeamId, season: seas, gp: 0, wins: 0, losses: 0, otl: 0, points: 0, gf: 0, ga: 0, pim: 0, totalLosses: 0 });
+    }
+
+    const h = preTeamSeasonMap.get(hKey)!;
+    const a = preTeamSeasonMap.get(aKey)!;
+    const hg = g.homeGoals ?? 0;
+    const ag = g.awayGoals ?? 0;
+    const isOt = g.endedIn != null && g.endedIn !== "";
+
+    h.gp += 1;
+    h.gf += hg;
+    h.ga += ag;
+
+    a.gp += 1;
+    a.gf += ag;
+    a.ga += hg;
+
+    if (hg > ag) {
+      h.wins += 1;
+      h.points += 2;
+      if (isOt) {
+        a.otl += 1;
+        a.points += 1;
+      } else {
+        a.losses += 1;
+      }
+    } else {
+      a.wins += 1;
+      a.points += 2;
+      if (isOt) {
+        h.otl += 1;
+        h.points += 1;
+      } else {
+        h.losses += 1;
+      }
+    }
+    h.totalLosses = h.losses + h.otl;
+    a.totalLosses = a.losses + a.otl;
+  }
+
+  for (const s of preSkaterStats) {
+    if (!s.teamId) continue;
+    const seas = s.game?.season ?? ACTIVE_SEASON;
+    const key = `${s.teamId}::${seas}`;
+    if (preTeamSeasonMap.has(key)) {
+      preTeamSeasonMap.get(key)!.pim += s.pim;
+    }
+  }
+
+  const allPreTeamSeasons = [...preTeamSeasonMap.values()];
+
+  // Team streaks in pre-season
+  const preTeamGamesMap = new Map<number, Array<{ gameId: number; gameDate: string | null; season: string; isWin: boolean }>>();
+  for (const g of preGames) {
+    const hg = g.homeGoals ?? 0;
+    const ag = g.awayGoals ?? 0;
+    if (!preTeamGamesMap.has(g.homeTeamId)) preTeamGamesMap.set(g.homeTeamId, []);
+    if (!preTeamGamesMap.has(g.awayTeamId)) preTeamGamesMap.set(g.awayTeamId, []);
+    preTeamGamesMap.get(g.homeTeamId)!.push({ gameId: g.id, gameDate: g.gameDate ? g.gameDate.toISOString() : null, season: g.season, isWin: hg > ag });
+    preTeamGamesMap.get(g.awayTeamId)!.push({ gameId: g.id, gameDate: g.gameDate ? g.gameDate.toISOString() : null, season: g.season, isWin: ag > hg });
+  }
+
+  const preTeamWinStreaks: LeaderItem[] = [];
+  const preTeamLoseStreaks: LeaderItem[] = [];
+
+  for (const [tId, gList] of preTeamGamesMap.entries()) {
+    gList.sort((a, b) => {
+      const da = a.gameDate ? new Date(a.gameDate).getTime() : 0;
+      const db = b.gameDate ? new Date(b.gameDate).getTime() : 0;
+      return da - db || a.gameId - b.gameId;
     });
 
-  // 5. Preseason Game & Attendance Records
+    let maxW = 0, curW = 0, startW = "", endW = "", curStartW = "";
+    let maxL = 0, curL = 0, startL = "", endL = "", curStartL = "";
+
+    for (const item of gList) {
+      if (item.isWin) {
+        if (curW === 0) curStartW = item.season;
+        curW++;
+        if (curW > maxW) {
+          maxW = curW;
+          startW = curStartW;
+          endW = item.season;
+        }
+        curL = 0;
+      } else {
+        if (curL === 0) curStartL = item.season;
+        curL++;
+        if (curL > maxL) {
+          maxL = curL;
+          startL = curStartL;
+          endL = item.season;
+        }
+        curW = 0;
+      }
+    }
+
+    const tm = teamById.get(tId);
+    if (maxW > 0) {
+      preTeamWinStreaks.push({
+        rank: 1,
+        name: tm?.name ?? tTeam,
+        teamCode: tm?.code,
+        teamSlug: tm?.slug,
+        teamLogo: tm?.logoUrl,
+        value: `${maxW} ${tWinsInRow}`,
+        sub: startW === endW ? `${tPreseason} ${startW}` : `${tPreseason} ${startW} – ${endW}`,
+      });
+    }
+    if (maxL > 0) {
+      preTeamLoseStreaks.push({
+        rank: 1,
+        name: tm?.name ?? tTeam,
+        teamCode: tm?.code,
+        teamSlug: tm?.slug,
+        teamLogo: tm?.logoUrl,
+        value: `${maxL} ${unitLossesStreak}`,
+        sub: startL === endL ? `${tPreseason} ${startL}` : `${tPreseason} ${startL} – ${endL}`,
+      });
+    }
+  }
+
+  const topPreTeamWinStreakLeader = preTeamWinStreaks.sort((a, b) => parseInt(String(b.value), 10) - parseInt(String(a.value), 10)).slice(0, 5).map((x, idx) => ({ ...x, rank: idx + 1 }));
+  const topPreTeamLoseStreakLeader = preTeamLoseStreaks.sort((a, b) => parseInt(String(b.value), 10) - parseInt(String(a.value), 10)).slice(0, 5).map((x, idx) => ({ ...x, rank: idx + 1 }));
+
+  const buildPreTeamLeader = (
+    list: PreTeamSeasonAcc[],
+    sortFn: (a: PreTeamSeasonAcc, b: PreTeamSeasonAcc) => number,
+    filterFn: (t: PreTeamSeasonAcc) => boolean,
+    valFmt: (t: PreTeamSeasonAcc) => string | number,
+    subFmt: (t: PreTeamSeasonAcc) => string
+  ): LeaderItem[] =>
+    list
+      .filter(filterFn)
+      .sort(sortFn)
+      .slice(0, 5)
+      .map((t, idx) => {
+        const tm = teamById.get(t.teamId);
+        return {
+          rank: idx + 1,
+          name: tm?.name ?? tTeam,
+          teamCode: tm?.code,
+          teamSlug: tm?.slug,
+          teamLogo: tm?.logoUrl,
+          value: valFmt(t),
+          sub: subFmt(t),
+        };
+      });
+
+  const preTeamPointsLeader = buildPreTeamLeader(allPreTeamSeasons, (a, b) => b.points - a.points || b.wins - a.wins, (t) => t.gp > 0, (t) => `${t.points} ${unitPts}`, (t) => `${tPreseason} ${t.season} · ${t.wins}-${t.losses}-${t.otl} (${t.gp} GP)`);
+  const preTeamWinsLeader = buildPreTeamLeader(allPreTeamSeasons, (a, b) => b.wins - a.wins || b.points - a.points, (t) => t.wins > 0, (t) => `${t.wins} ${tWins}`, (t) => `${tPreseason} ${t.season} · ${t.points} ${unitPts} (${t.gp} GP)`);
+  const preTeamLossesLeader = buildPreTeamLeader(allPreTeamSeasons, (a, b) => b.totalLosses - a.totalLosses || b.losses - a.losses, (t) => t.totalLosses > 0, (t) => `${t.totalLosses} ${unitLosses}`, (t) => `${tPreseason} ${t.season} (${t.losses} L + ${t.otl} OTL/SOL)`);
+  const preTeamGfLeader = buildPreTeamLeader(allPreTeamSeasons, (a, b) => b.gf - a.gf, (t) => t.gf > 0, (t) => `${t.gf} ${unitGf}`, (t) => `${tPreseason} ${t.season} (${t.gp > 0 ? (t.gf / t.gp).toFixed(2) : "0.00"} ${unitGPerGame})`);
+  const preTeamGaLeader = buildPreTeamLeader(allPreTeamSeasons, (a, b) => b.ga - a.ga, (t) => t.ga > 0, (t) => `${t.ga} ${unitGa}`, (t) => `${tPreseason} ${t.season} (${t.gp > 0 ? (t.ga / t.gp).toFixed(2) : "0.00"} ${unitGaPerGame})`);
+  const preTeamPimLeader = buildPreTeamLeader(allPreTeamSeasons, (a, b) => b.pim - a.pim, (t) => t.pim > 0, (t) => `${t.pim} ${tPim}`, (t) => `${tPreseason} ${t.season} · ${t.gp} GP`);
+
+  const preTeamSections: RecordSection[] = [
+    { id: "pre-team-points", title: getSectionTitle("pre-team-points", lang, league, cupName), icon: "🥇", phase: "pre", phaseBadge: secBadgePre, items: preTeamPointsLeader },
+    { id: "pre-team-wins", title: getSectionTitle("pre-team-wins", lang, league, cupName), icon: "🏆", phase: "pre", phaseBadge: secBadgePre, items: preTeamWinsLeader },
+    { id: "pre-team-losses", title: getSectionTitle("pre-team-losses", lang, league, cupName), icon: "📉", phase: "pre", phaseBadge: secBadgePre, items: preTeamLossesLeader },
+    { id: "pre-team-win-streak", title: getSectionTitle("pre-team-win-streak", lang, league, cupName), icon: "🔥", phase: "pre", phaseBadge: secBadgePre, items: topPreTeamWinStreakLeader },
+    { id: "pre-team-lose-streak", title: getSectionTitle("pre-team-lose-streak", lang, league, cupName), icon: "🧊", phase: "pre", phaseBadge: secBadgePre, items: topPreTeamLoseStreakLeader },
+    { id: "pre-team-gf", title: getSectionTitle("pre-team-gf", lang, league, cupName), icon: "🎯", phase: "pre", phaseBadge: secBadgePre, items: preTeamGfLeader },
+    { id: "pre-team-ga", title: getSectionTitle("pre-team-ga", lang, league, cupName), icon: "🛡️", phase: "pre", phaseBadge: secBadgePre, items: preTeamGaLeader },
+    { id: "pre-team-pim", title: getSectionTitle("pre-team-pim", lang, league, cupName), icon: "⏱️", phase: "pre", phaseBadge: secBadgePre, items: preTeamPimLeader },
+  ];
+
+  // 10. Pre-season Game & Attendance Records
   const preHighestScoringGames: LeaderItem[] = [...preGames]
     .map((g) => ({
       g,
@@ -3643,6 +4902,23 @@ export async function getLeagueRecords(
         sub: `${g.season} · ${dateStr} · ${tScore}: ${g.homeGoals}:${g.awayGoals}`,
       };
     });
+
+  const preGameSections: RecordSection[] = [
+    { id: "pre-highest-scoring-game", title: getSectionTitle("pre-highest-scoring-game", lang, league, cupName), icon: "🚨", phase: "pre", phaseBadge: secBadgePre, items: preHighestScoringGames },
+    { id: "pre-largest-victory", title: getSectionTitle("pre-largest-victory", lang, league, cupName), icon: "⚡", phase: "pre", phaseBadge: secBadgePre, items: preHighestVictoryGames },
+    ...(preHighestAttGames.length
+      ? [
+          {
+            id: "pre-highest-attendance",
+            title: getSectionTitle("pre-highest-attendance", lang, league, cupName),
+            icon: "👥",
+            phase: "pre" as const,
+            phaseBadge: secBadgePre,
+            items: preHighestAttGames,
+          },
+        ]
+      : []),
+  ];
 
   // ==========================================
   // I. AWARDS & TROPHIES
@@ -4113,62 +5389,68 @@ export async function getLeagueRecords(
       ],
     },
     {
-      id: "pre-skaters",
-      title: getGroupTitle("pre-skaters", lang, cupName),
-      icon: "☀️",
+      id: "pre-career-skaters",
+      title: getGroupTitle("pre-career-skaters", lang, cupName),
+      icon: "🏒",
       phase: "pre",
       mainCategory: "skaters",
-      records: [
-        {
-          id: "pre-top-scorer",
-          title: getSectionTitle("pre-top-scorer", lang, league, cupName),
-          icon: "⭐",
-          phase: "pre",
-          phaseBadge: badgePre,
-          items: preSeasonScorers,
-        },
-        {
-          id: "pre-goals",
-          title: getSectionTitle("pre-goals", lang, league, cupName),
-          icon: "🎯",
-          phase: "pre",
-          phaseBadge: badgePre,
-          items: preSeasonGoals,
-        },
-        {
-          id: "pre-assists",
-          title: getSectionTitle("pre-assists", lang, league, cupName),
-          icon: "🪄",
-          phase: "pre",
-          phaseBadge: badgePre,
-          items: preSeasonAssists,
-        },
-        {
-          id: "pre-single-game-pts",
-          title: getSectionTitle("pre-single-game-pts", lang, league, cupName),
-          icon: "⚡",
-          phase: "pre",
-          phaseBadge: badgePre,
-          items: preSingleGamePoints,
-        },
-      ],
+      records: preSkaterCareerSections,
     },
     {
-      id: "pre-goalies",
-      title: getGroupTitle("pre-goalies", lang, cupName),
-      icon: "☀️",
+      id: "pre-season-skaters",
+      title: getGroupTitle("pre-season-skaters", lang, cupName),
+      icon: "📅",
+      phase: "pre",
+      mainCategory: "skaters",
+      records: preSkaterSeasonSections,
+    },
+    {
+      id: "pre-streak-skaters",
+      title: getGroupTitle("pre-streak-skaters", lang, cupName),
+      icon: "🔥",
+      phase: "pre",
+      mainCategory: "skaters",
+      records: preSkaterStreakSections,
+    },
+    {
+      id: "pre-game-skaters",
+      title: getGroupTitle("pre-game-skaters", lang, cupName),
+      icon: "⚡",
+      phase: "pre",
+      mainCategory: "skaters",
+      records: preSkaterGameSections,
+    },
+    {
+      id: "pre-career-goalies",
+      title: getGroupTitle("pre-career-goalies", lang, cupName),
+      icon: "🧤",
       phase: "pre",
       mainCategory: "goalies",
-      records: [
-        {
-          id: "pre-goalie-saves",
-          title: getSectionTitle("pre-goalie-saves", lang, league, cupName),
-          icon: "🧤",
-          phase: "pre",
-          phaseBadge: badgePre,
-          items: preGoalieSaves,
-        },
-      ],
+      records: preGoalieCareerSections,
+    },
+    {
+      id: "pre-season-goalies",
+      title: getGroupTitle("pre-season-goalies", lang, cupName),
+      icon: "📅",
+      phase: "pre",
+      mainCategory: "goalies",
+      records: preGoalieSeasonSections,
+    },
+    {
+      id: "pre-streak-goalies",
+      title: getGroupTitle("pre-streak-goalies", lang, cupName),
+      icon: "🔥",
+      phase: "pre",
+      mainCategory: "goalies",
+      records: preGoalieStreakSections,
+    },
+    {
+      id: "pre-game-goalies",
+      title: getGroupTitle("pre-game-goalies", lang, cupName),
+      icon: "⚡",
+      phase: "pre",
+      mainCategory: "goalies",
+      records: preGoalieGameSections,
     },
     {
       id: "pre-teams",
@@ -4176,16 +5458,7 @@ export async function getLeagueRecords(
       icon: "☀️",
       phase: "pre",
       mainCategory: "teams",
-      records: [
-        {
-          id: "pre-best-team",
-          title: getSectionTitle("pre-best-team", lang, league, cupName),
-          icon: "🥇",
-          phase: "pre",
-          phaseBadge: badgePre,
-          items: preSeasonBestTeams,
-        },
-      ],
+      records: preTeamSections,
     },
     {
       id: "pre-games",
@@ -4193,36 +5466,7 @@ export async function getLeagueRecords(
       icon: "🏟️",
       phase: "pre",
       mainCategory: "games",
-      records: [
-        {
-          id: "pre-highest-scoring-game",
-          title: getSectionTitle("pre-highest-scoring-game", lang, league, cupName),
-          icon: "🚨",
-          phase: "pre",
-          phaseBadge: badgePre,
-          items: preHighestScoringGames,
-        },
-        {
-          id: "pre-largest-victory",
-          title: getSectionTitle("pre-largest-victory", lang, league, cupName),
-          icon: "⚡",
-          phase: "pre",
-          phaseBadge: badgePre,
-          items: preHighestVictoryGames,
-        },
-        ...(preHighestAttGames.length
-          ? [
-              {
-                id: "pre-highest-attendance",
-                title: getSectionTitle("pre-highest-attendance", lang, league, cupName),
-                icon: "👥",
-                phase: "pre" as const,
-                phaseBadge: badgePre,
-                items: preHighestAttGames,
-              },
-            ]
-          : []),
-      ],
+      records: preGameSections,
     },
   ];
 
