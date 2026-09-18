@@ -66,7 +66,7 @@ function LineCard({ line, scale }: { line: BuiltLine; scale: LineProfile }) {
         <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1" title="Bar width is relative to the league's current best in that attribute, not a flat 100 — a full bar means nobody in the league rates higher.">Profile</div>
         <Bar label="Playmaking" value={p.playmaking} max={scale.playmaking} />
         <Bar label="Shooting" value={p.shooting} max={scale.shooting} />
-        <Bar label="Transition" value={p.transition} max={scale.transition} />
+        <Bar label="Skating" value={p.skating} max={scale.skating} />
         <Bar label="Physical" value={p.physical} max={scale.physical} />
         <Bar label="Defense" value={p.defense} max={scale.defense} />
       </div>
