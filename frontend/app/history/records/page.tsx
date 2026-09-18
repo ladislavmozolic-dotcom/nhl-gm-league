@@ -433,7 +433,7 @@ export default async function LeagueRecordsPage({
     <div className="space-y-6 py-2">
       <PageHeader title={pageTitle} subtitle={pageSubtitle} />
 
-      <HistoryNav active="records" league={league} />
+      <HistoryNav active="records" league={league} lang={lang} />
 
       {/* Main Bar: League switch + Category Filter + Phase tabs */}
       <div className="space-y-4 bg-slate-900/80 p-4 rounded-2xl border border-slate-800 shadow-md">

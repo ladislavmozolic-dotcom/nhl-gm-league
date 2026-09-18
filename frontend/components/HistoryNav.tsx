@@ -1,16 +1,41 @@
 import Link from "next/link";
+import { getLang } from "@/lib/lang-server";
+import { type Lang } from "@/lib/i18n";
 
 type Props = {
   active: "history" | "records" | "hof" | "awards";
   league?: "NHL" | "AHL";
+  lang?: Lang;
 };
 
-export default function HistoryNav({ active, league = "NHL" }: Props) {
+export default async function HistoryNav({ active, league = "NHL", lang: propLang }: Props) {
+  const lang = propLang ?? (await getLang());
+
   const tabs = [
-    { key: "history", label: "Sezóny", href: "/history", icon: "🕰️" },
-    { key: "records", label: "Rekordy", href: `/history/records${league === "AHL" ? "?league=AHL" : ""}`, icon: "📜" },
-    { key: "hof", label: "Hall of Fame", href: "/hall-of-fame", icon: "🏅" },
-    { key: "awards", label: "Ocenenia", href: "/awards", icon: "🏵️" },
+    {
+      key: "history",
+      label: lang === "cs" ? "Sezóny" : lang === "de" ? "Saisons" : lang === "ru" ? "Сезоны" : "Seasons",
+      href: "/history",
+      icon: "🕰️",
+    },
+    {
+      key: "records",
+      label: lang === "cs" ? "Rekordy" : lang === "de" ? "Rekorde" : lang === "ru" ? "Рекорды" : "Records",
+      href: `/history/records${league === "AHL" ? "?league=AHL" : ""}`,
+      icon: "📜",
+    },
+    {
+      key: "hof",
+      label: lang === "cs" ? "Sieň slávy" : lang === "de" ? "Ruhmeshalle" : lang === "ru" ? "Зал славы" : "Hall of Fame",
+      href: "/hall-of-fame",
+      icon: "🏅",
+    },
+    {
+      key: "awards",
+      label: lang === "cs" ? "Ocenenia" : lang === "de" ? "Auszeichnungen" : lang === "ru" ? "Награды" : "Awards",
+      href: "/awards",
+      icon: "🏵️",
+    },
   ];
 
   return (
