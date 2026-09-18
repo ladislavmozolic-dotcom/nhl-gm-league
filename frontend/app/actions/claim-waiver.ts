@@ -22,12 +22,16 @@ if (!player) return;
       waiverStatus: "CLAIMED",
     },
   });
+  const team = player.teamId ? await prisma.team.findUnique({ where: { id: player.teamId }, select: { code: true } }) : null;
+  const teamTag = team?.code ? ` (${team.code})` : "";
   await (prisma as any).transaction.create({
-  data: {
-    type: "CLAIM",
-    message: `${player.name} claimed off waivers`,
-  },
-});
+    data: {
+      type: "CLAIM",
+      playerId: player.id,
+      teamId: player.teamId,
+      message: `${player.name}${teamTag} claimed off waivers`,
+    },
+  });
 
   revalidatePath("/waivers");
 }

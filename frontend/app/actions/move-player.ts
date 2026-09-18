@@ -81,7 +81,9 @@ export async function movePlayer(
     await (prisma as any).transaction.create({
       data: {
         type: "CALL_UP",
-        message: `${player.name} recalled from AHL`,
+        playerId: player.id,
+        teamId: parentTeam.id,
+        message: `${player.name} (${parentTeam.code}) recalled from AHL`,
       },
     });
   }
