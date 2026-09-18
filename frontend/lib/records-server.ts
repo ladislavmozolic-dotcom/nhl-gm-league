@@ -27,6 +27,7 @@ export type LeaderItem = {
 };
 
 export type RecordPhase = "all" | "regular" | "playoffs" | "pre";
+export type MainRecordCategory = "all" | "skaters" | "goalies" | "gms" | "teams" | "trophies" | "games" | "pre";
 
 export type RecordSection = {
   id: string;
@@ -44,6 +45,7 @@ export type RecordCategoryGroup = {
   title: string;
   icon: string;
   phase?: RecordPhase;
+  mainCategory: "skaters" | "goalies" | "gms" | "teams" | "trophies" | "games" | "pre";
   records: RecordSection[];
 };
 
@@ -51,6 +53,7 @@ export type LeagueRecordsData = {
   league: "NHL" | "AHL";
   cupName: string;
   phase: RecordPhase;
+  category: MainRecordCategory;
   groups: RecordCategoryGroup[];
   isLiveOrPreview?: boolean;
 };
@@ -110,7 +113,8 @@ function calculateAge(birthDateStr: string | null | undefined, targetDate: Date 
 
 export async function getLeagueRecords(
   league: "NHL" | "AHL" = "NHL",
-  phase: RecordPhase = "all"
+  phase: RecordPhase = "all",
+  category: MainRecordCategory = "all"
 ): Promise<LeagueRecordsData> {
   const isAhl = league === "AHL";
   const cupName = isAhl ? "Calder Cup" : "Stanley Cup";
@@ -2141,6 +2145,7 @@ export async function getLeagueRecords(
       title: "Manažérske rekordy (GM)",
       icon: "👔",
       phase: "all",
+      mainCategory: "gms",
       records: [
         {
           id: "gm-seasons-total",
@@ -2177,10 +2182,75 @@ export async function getLeagueRecords(
       ],
     },
     {
+      id: "career-skaters",
+      title: "Individuálne kariérne rekordy — Korčuliari (ZČ)",
+      icon: "🏒",
+      phase: "regular",
+      mainCategory: "skaters",
+      records: skaterCareerSections,
+    },
+    {
+      id: "season-skaters",
+      title: "Individuálne sezónne rekordy — Korčuliari (ZČ)",
+      icon: "📅",
+      phase: "regular",
+      mainCategory: "skaters",
+      records: skaterSeasonSections,
+    },
+    {
+      id: "game-skaters",
+      title: "Individuálne zápasové rekordy — Korčuliari (ZČ)",
+      icon: "⚡",
+      phase: "regular",
+      mainCategory: "skaters",
+      records: skaterGameSections,
+    },
+    {
+      id: "rookie-records",
+      title: "Individuálne sezónne rekordy nováčikov (ZČ)",
+      icon: "👶",
+      phase: "regular",
+      mainCategory: "skaters",
+      records: rookieSections,
+    },
+    {
+      id: "playoff-career-skaters",
+      title: "Kariérne rekordy v play-off — Korčuliari",
+      icon: "⭐",
+      phase: "playoffs",
+      mainCategory: "skaters",
+      records: playoffSkaterCareerSections,
+    },
+    {
+      id: "playoff-season-skaters",
+      title: "Rekordy v jednom play-off — Korčuliari",
+      icon: "🔥",
+      phase: "playoffs",
+      mainCategory: "skaters",
+      records: playoffSkaterSeasonSections,
+    },
+    {
+      id: "playoff-game-skaters",
+      title: "Zápasové rekordy v play-off — Korčuliari",
+      icon: "⚡",
+      phase: "playoffs",
+      mainCategory: "skaters",
+      records: playoffSkaterGameSections,
+    },
+    {
+      id: "career-goalies",
+      title: "Individuálne kariérne rekordy — Brankári (ZČ)",
+      icon: "🧤",
+      phase: "regular",
+      mainCategory: "goalies",
+      records: goalieCareerSections,
+    },
+    {
       id: "championships",
       title: `${cupName} & Tímové tituly`,
       icon: "🏆",
       phase: "playoffs",
+      mainCategory: "teams",
       records: [
         {
           id: "team-cups",
@@ -2217,129 +2287,11 @@ export async function getLeagueRecords(
       ],
     },
     {
-      id: "trophies",
-      title: "Trofeje a ocenenia",
-      icon: "🏵️",
-      phase: "all",
-      records: trophySections,
-    },
-    {
-      id: "career-skaters",
-      title: "Individuálne kariérne rekordy — Korčuliari (ZČ)",
-      icon: "🏒",
-      phase: "regular",
-      records: skaterCareerSections,
-    },
-    {
-      id: "season-skaters",
-      title: "Individuálne sezónne rekordy — Korčuliari (ZČ)",
-      icon: "📅",
-      phase: "regular",
-      records: skaterSeasonSections,
-    },
-    {
-      id: "game-skaters",
-      title: "Individuálne zápasové rekordy — Korčuliari (ZČ)",
-      icon: "⚡",
-      phase: "regular",
-      records: skaterGameSections,
-    },
-    {
-      id: "rookie-records",
-      title: "Individuálne sezónne rekordy nováčikov (ZČ)",
-      icon: "👶",
-      phase: "regular",
-      records: rookieSections,
-    },
-    {
-      id: "playoff-career-skaters",
-      title: "Kariérne rekordy v play-off — Korčuliari",
-      icon: "⭐",
-      phase: "playoffs",
-      records: playoffSkaterCareerSections,
-    },
-    {
-      id: "playoff-season-skaters",
-      title: "Rekordy v jednom play-off — Korčuliari",
-      icon: "🔥",
-      phase: "playoffs",
-      records: playoffSkaterSeasonSections,
-    },
-    {
-      id: "playoff-game-skaters",
-      title: "Zápasové rekordy v play-off — Korčuliari",
-      icon: "⚡",
-      phase: "playoffs",
-      records: playoffSkaterGameSections,
-    },
-    {
-      id: "career-goalies",
-      title: "Individuálne kariérne rekordy — Brankári (ZČ)",
-      icon: "🧤",
-      phase: "regular",
-      records: goalieCareerSections,
-    },
-    {
-      id: "attendance-games",
-      title: "Návštevnosť a zápasové rekordy (ZČ / Všetko)",
-      icon: "🏟️",
-      phase: "all",
-      records: [
-        {
-          id: "highest-attendance",
-          title: "Najvyššia návštevnosť v jednom zápase",
-          icon: "👥",
-          phase: "all",
-          phaseBadge: "Zápas",
-          items: highestAttGames,
-        },
-        {
-          id: "lowest-attendance",
-          title: "Najnižšia návštevnosť v jednom zápase",
-          icon: "👤",
-          phase: "all",
-          phaseBadge: "Zápas",
-          items: lowestAttGames,
-        },
-        {
-          id: "highest-avg-attendance",
-          title: "Najvyššia priemerná návštevnosť v jednej sezóne",
-          icon: "📈",
-          phase: "all",
-          phaseBadge: "Sezóna",
-          items: highestAvgAtt,
-        },
-        {
-          id: "lowest-avg-attendance",
-          title: "Najnižšia priemerná návštevnosť v jednej sezóne",
-          icon: "📉",
-          phase: "all",
-          phaseBadge: "Sezóna",
-          items: lowestAvgAtt,
-        },
-        {
-          id: "highest-scoring-game",
-          title: "Highest scoring game (Najviac gólov v zápase)",
-          icon: "🚨",
-          phase: "all",
-          phaseBadge: "Zápas",
-          items: highestScoringGames,
-        },
-        {
-          id: "largest-victory",
-          title: "Najvyššie víťazstvo (Najväčší gólový rozdiel)",
-          icon: "⚡",
-          phase: "all",
-          phaseBadge: "Zápas",
-          items: highestVictoryGames,
-        },
-      ],
-    },
-    {
       id: "team-seasons",
       title: "Tímové sezónne a sériové rekordy (ZČ)",
       icon: "📊",
       phase: "regular",
+      mainCategory: "teams",
       records: [
         {
           id: "team-points-season",
@@ -2400,10 +2352,76 @@ export async function getLeagueRecords(
       ],
     },
     {
+      id: "trophies",
+      title: "Trofeje a ocenenia",
+      icon: "🏵️",
+      phase: "all",
+      mainCategory: "trophies",
+      records: trophySections,
+    },
+    {
+      id: "attendance-games",
+      title: "Návštevnosť a zápasové rekordy (ZČ / Všetko)",
+      icon: "🏟️",
+      phase: "all",
+      mainCategory: "games",
+      records: [
+        {
+          id: "highest-attendance",
+          title: "Najvyššia návštevnosť v jednom zápase",
+          icon: "👥",
+          phase: "all",
+          phaseBadge: "Zápas",
+          items: highestAttGames,
+        },
+        {
+          id: "lowest-attendance",
+          title: "Najnižšia návštevnosť v jednom zápase",
+          icon: "👤",
+          phase: "all",
+          phaseBadge: "Zápas",
+          items: lowestAttGames,
+        },
+        {
+          id: "highest-avg-attendance",
+          title: "Najvyššia priemerná návštevnosť v jednej sezóne",
+          icon: "📈",
+          phase: "all",
+          phaseBadge: "Sezóna",
+          items: highestAvgAtt,
+        },
+        {
+          id: "lowest-avg-attendance",
+          title: "Najnižšia priemerná návštevnosť v jednej sezóne",
+          icon: "📉",
+          phase: "all",
+          phaseBadge: "Sezóna",
+          items: lowestAvgAtt,
+        },
+        {
+          id: "highest-scoring-game",
+          title: "Highest scoring game (Najviac gólov v zápase)",
+          icon: "🚨",
+          phase: "all",
+          phaseBadge: "Zápas",
+          items: highestScoringGames,
+        },
+        {
+          id: "largest-victory",
+          title: "Najvyššie víťazstvo (Najväčší gólový rozdiel)",
+          icon: "⚡",
+          phase: "all",
+          phaseBadge: "Zápas",
+          items: highestVictoryGames,
+        },
+      ],
+    },
+    {
       id: "age-records",
       title: "Vekové rekordy (Súpisky ligy)",
       icon: "🎂",
       phase: "all",
+      mainCategory: "games",
       records: [
         {
           id: "youngest-player",
@@ -2428,6 +2446,7 @@ export async function getLeagueRecords(
       title: "Prípravné zápasy (Pre-season rekordy)",
       icon: "☀️",
       phase: "pre",
+      mainCategory: "pre",
       records: [
         {
           id: "pre-best-team",
@@ -2481,24 +2500,29 @@ export async function getLeagueRecords(
     },
   ];
 
-  // Filter groups according to the selected phase
+  // Filter groups according to the selected category and phase
   let filteredGroups = rawGroups;
+
+  if (category !== "all") {
+    filteredGroups = filteredGroups.filter((g) => g.mainCategory === category);
+  }
+
   if (phase === "regular") {
-    filteredGroups = rawGroups
+    filteredGroups = filteredGroups
       .map((g) => ({
         ...g,
         records: g.records.filter((r) => r.phase === "regular" || r.phase === "all"),
       }))
       .filter((g) => g.records.length > 0 && g.id !== "pre-season-group" && g.id !== "championships");
   } else if (phase === "playoffs") {
-    filteredGroups = rawGroups
+    filteredGroups = filteredGroups
       .map((g) => ({
         ...g,
         records: g.records.filter((r) => r.phase === "playoffs"),
       }))
       .filter((g) => g.records.length > 0);
   } else if (phase === "pre") {
-    filteredGroups = rawGroups
+    filteredGroups = filteredGroups
       .map((g) => ({
         ...g,
         records: g.records.filter((r) => r.phase === "pre"),
@@ -2510,6 +2534,7 @@ export async function getLeagueRecords(
     league,
     cupName,
     phase,
+    category,
     groups: filteredGroups,
     isLiveOrPreview: seasonRecords.length === 0,
   };

@@ -2,7 +2,14 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui";
 import HistoryNav from "@/components/HistoryNav";
 import PlayerAvatar from "@/components/playerAvatar";
-import { getLeagueRecords, type LeaderItem, type RecordSection, type RecordPhase } from "@/lib/records-server";
+import {
+  getLeagueRecords,
+  type LeaderItem,
+  type RecordSection,
+  type RecordPhase,
+  type MainRecordCategory,
+  type RecordCategoryGroup,
+} from "@/lib/records-server";
 
 export const dynamic = "force-dynamic";
 
@@ -206,10 +213,86 @@ function RecordCard({ record, cupName }: { record: RecordSection; cupName: strin
   );
 }
 
+type CategoryMeta = {
+  key: MainRecordCategory;
+  label: string;
+  shortLabel: string;
+  icon: string;
+  description: string;
+  accentColor: string;
+};
+
+const CATEGORIES: CategoryMeta[] = [
+  {
+    key: "all",
+    label: "Všetky kategórie",
+    shortLabel: "Všetko",
+    icon: "🌐",
+    description: "Kompletný prehľad všetkých historických a sezónnych rekordov ligy.",
+    accentColor: "from-blue-500/20 to-purple-500/10 border-blue-500/30 text-blue-300",
+  },
+  {
+    key: "skaters",
+    label: "Hráči (Korčuliari)",
+    shortLabel: "Korčuliari",
+    icon: "🏒",
+    description: "Individuálne kariérne, sezónne, zápasové rekordy korčuliarov, nováčikov a play-off.",
+    accentColor: "from-cyan-500/20 to-blue-500/10 border-cyan-500/30 text-cyan-300",
+  },
+  {
+    key: "goalies",
+    label: "Brankári",
+    shortLabel: "Brankári",
+    icon: "🧤",
+    description: "Kariérne a sezónne rekordy brankárov — výhry, čisté kontá, ukradnuté zápasy a GSAx.",
+    accentColor: "from-emerald-500/20 to-teal-500/10 border-emerald-500/30 text-emerald-300",
+  },
+  {
+    key: "gms",
+    label: "Manažéri (GM)",
+    shortLabel: "Manažéri",
+    icon: "👔",
+    description: "Historické míľniky generálnych manažérov — odohrané sezóny, série a tituly.",
+    accentColor: "from-amber-500/20 to-yellow-500/10 border-amber-500/30 text-amber-300",
+  },
+  {
+    key: "teams",
+    label: "Tímy & Poháre",
+    shortLabel: "Tímy",
+    icon: "🏆",
+    description: "Tímové víťazstvá, zisky pohárov, sezónne a sériové maximá klubov.",
+    accentColor: "from-yellow-500/20 to-amber-500/10 border-yellow-500/30 text-yellow-300",
+  },
+  {
+    key: "trophies",
+    label: "Trofeje & Ocenenia",
+    shortLabel: "Trofeje",
+    icon: "🏵️",
+    description: "Historický prehľad víťazov individuálnych trofejí a ocenení.",
+    accentColor: "from-purple-500/20 to-pink-500/10 border-purple-500/30 text-purple-300",
+  },
+  {
+    key: "games",
+    label: "Zápasy & Diváci",
+    shortLabel: "Zápasy",
+    icon: "🏟️",
+    description: "Divácka návštevnosť, gólové prestrelky, rekordné výhry a vekové míľniky.",
+    accentColor: "from-indigo-500/20 to-blue-500/10 border-indigo-500/30 text-indigo-300",
+  },
+  {
+    key: "pre",
+    label: "Príprava (Pre-season)",
+    shortLabel: "Príprava",
+    icon: "☀️",
+    description: "Reálne tímové a individuálne štatistiky z predsezónnej prípravy.",
+    accentColor: "from-orange-500/20 to-amber-500/10 border-orange-500/30 text-orange-300",
+  },
+];
+
 export default async function LeagueRecordsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ league?: string; phase?: string }>;
+  searchParams: Promise<{ league?: string; phase?: string; cat?: string }>;
 }) {
   const sp = await searchParams;
   const league = sp.league === "AHL" ? "AHL" : "NHL";
@@ -219,34 +302,45 @@ export default async function LeagueRecordsPage({
       ? rawPhase
       : "all";
 
-  const data = await getLeagueRecords(league, phase);
+  const rawCat = sp.cat as MainRecordCategory | undefined;
+  const category: MainRecordCategory =
+    rawCat && ["all", "skaters", "goalies", "gms", "teams", "trophies", "games", "pre"].includes(rawCat)
+      ? rawCat
+      : "all";
+
+  const data = await getLeagueRecords(league, phase, category);
 
   const phasesList: Array<{ key: RecordPhase; label: string; icon: string }> = [
-    { key: "all", label: "Všetky rekordy (All-Time)", icon: "🌐" },
-    { key: "regular", label: "Základná časť (Regular Season)", icon: "🏒" },
-    { key: "playoffs", label: "Play-off (Playoffs)", icon: "🏆" },
-    { key: "pre", label: "Príprava (Pre-season)", icon: "☀️" },
+    { key: "all", label: "Všetky fázy", icon: "🌐" },
+    { key: "regular", label: "Základná časť", icon: "🏒" },
+    { key: "playoffs", label: "Play-off", icon: "🏆" },
+    { key: "pre", label: "Príprava", icon: "☀️" },
   ];
+
+  // Group the resulting categories by their overarching mainCategory for clear visual separation
+  const majorSectionsOrder: Array<{ cat: MainRecordCategory; meta: CategoryMeta }> = CATEGORIES
+    .filter((c) => c.key !== "all")
+    .map((meta) => ({ cat: meta.key, meta }));
 
   return (
     <div className="space-y-6 py-2">
       <PageHeader
         title="Historické rekordy ligy"
-        subtitle={`Všetky historické a sezónne rekordy ${league} — GM, tímy, hráči, brankári, Stanley Cupy, trofeje a série.`}
+        subtitle={`Všetky historické a sezónne rekordy ${league} — prehľadne rozdelené podľa kategórií: hráči, brankári, GM, tímy, trofeje a zápasy.`}
       />
 
       <HistoryNav active="records" league={league} />
 
-      {/* Main Bar: League switch + Phase tabs */}
-      <div className="space-y-3 bg-slate-900/60 p-3.5 rounded-xl border border-slate-800">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          {/* League switcher */}
+      {/* Main Bar: League switch + Category Filter + Phase tabs */}
+      <div className="space-y-4 bg-slate-900/80 p-4 rounded-2xl border border-slate-800 shadow-md">
+        {/* Row 1: League Switcher & Header */}
+        <div className="flex items-center justify-between gap-4 flex-wrap pb-3 border-b border-slate-800/80">
           <div className="flex items-center gap-2">
             <Link
-              href={`/history/records?league=NHL&phase=${phase}`}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+              href={`/history/records?league=NHL&phase=${phase}&cat=${category}`}
+              className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${
                 league === "NHL"
-                  ? "bg-blue-600 text-white shadow-sm shadow-blue-500/20"
+                  ? "bg-blue-600 text-white shadow-md shadow-blue-500/25 ring-2 ring-blue-400/50"
                   : "bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
               }`}
             >
@@ -254,10 +348,10 @@ export default async function LeagueRecordsPage({
               <span>NHL Rekordy</span>
             </Link>
             <Link
-              href={`/history/records?league=AHL&phase=${phase}`}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+              href={`/history/records?league=AHL&phase=${phase}&cat=${category}`}
+              className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${
                 league === "AHL"
-                  ? "bg-orange-600 text-white shadow-sm shadow-orange-500/20"
+                  ? "bg-orange-600 text-white shadow-md shadow-orange-500/25 ring-2 ring-orange-400/50"
                   : "bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
               }`}
             >
@@ -266,35 +360,54 @@ export default async function LeagueRecordsPage({
             </Link>
           </div>
 
-          {/* Quick jump anchor links */}
-          <div className="flex items-center gap-1.5 flex-wrap text-xs text-slate-400">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase mr-1">Prejsť na:</span>
-            {data.groups.map((group) => (
-              <a
-                key={group.id}
-                href={`#${group.id}`}
-                className="px-2.5 py-1 rounded bg-slate-800/80 hover:bg-slate-700 hover:text-blue-300 border border-slate-700/50 transition-colors flex items-center gap-1"
-              >
-                <span>{group.icon}</span>
-                <span>{group.title.split("—")[0].trim()}</span>
-              </a>
-            ))}
+          {/* Active section info badge */}
+          <div className="text-xs text-slate-400 flex items-center gap-1.5">
+            <span className="font-semibold text-slate-300">Zobrazených:</span>
+            <span className="px-2.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 font-bold text-amber-400">
+              {data.groups.reduce((sum, g) => sum + g.records.length, 0)} rekordov
+            </span>
           </div>
         </div>
 
-        {/* Phase selector tabs */}
-        <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-slate-800/70">
-          <span className="text-xs font-bold uppercase text-slate-500 mr-1">Fáza súťaže:</span>
+        {/* Row 2: Category Selector Tabs */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Kategória rekordov:</span>
+          </div>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {CATEGORIES.map((c) => {
+              const isActive = category === c.key;
+              return (
+                <Link
+                  key={c.key}
+                  href={`/history/records?league=${league}&phase=${phase}&cat=${c.key}`}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+                    isActive
+                      ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-600/30 ring-1 ring-blue-400"
+                      : "bg-slate-800/80 text-slate-300 hover:bg-slate-700/90 border border-slate-700/60"
+                  }`}
+                >
+                  <span>{c.icon}</span>
+                  <span>{c.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Row 3: Phase Selector Tabs */}
+        <div className="flex items-center gap-2 flex-wrap pt-3 border-t border-slate-800/80">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mr-1">Fáza súťaže:</span>
           {phasesList.map((p) => {
             const isActive = phase === p.key;
             return (
               <Link
                 key={p.key}
-                href={`/history/records?league=${league}&phase=${p.key}`}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                href={`/history/records?league=${league}&phase=${p.key}&cat=${category}`}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
                   isActive
-                    ? "bg-slate-100 text-slate-900 shadow font-bold"
-                    : "bg-slate-800/80 text-slate-300 hover:bg-slate-700 border border-slate-700/50"
+                    ? "bg-slate-100 text-slate-900 shadow font-black"
+                    : "bg-slate-800/70 text-slate-400 hover:bg-slate-700 hover:text-slate-200 border border-slate-700/40"
                 }`}
               >
                 <span>{p.icon}</span>
@@ -305,25 +418,66 @@ export default async function LeagueRecordsPage({
         </div>
       </div>
 
-      {/* Record category groups */}
-      <div className="space-y-10">
-        {data.groups.map((group) => (
-          <section key={group.id} id={group.id} className="space-y-4 scroll-mt-6">
-            <div className="flex items-center gap-2.5 pb-2 border-b border-slate-800/80">
-              <span className="text-xl" aria-hidden>{group.icon}</span>
-              <h2 className="text-lg font-black tracking-tight text-white">{group.title}</h2>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-medium">
-                {group.records.length} {group.records.length === 1 ? "rekord" : group.records.length < 5 ? "rekordy" : "rekordov"}
-              </span>
-            </div>
+      {/* Render Major Category Blocks */}
+      <div className="space-y-12">
+        {data.groups.length === 0 ? (
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-12 text-center">
+            <p className="text-slate-400 text-sm">V tejto kombinácii kategórie a fázy súťaže sa nenachádzajú žiadne rekordy.</p>
+            <Link
+              href={`/history/records?league=${league}&phase=all&cat=all`}
+              className="inline-block mt-3 text-xs font-bold text-blue-400 hover:underline"
+            >
+              Zobraziť všetky rekordy
+            </Link>
+          </div>
+        ) : (
+          majorSectionsOrder.map(({ cat, meta }) => {
+            const groupsInCat = data.groups.filter((g) => g.mainCategory === cat);
+            if (!groupsInCat.length) return null;
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {group.records.map((record) => (
-                <RecordCard key={record.id} record={record} cupName={data.cupName} />
-              ))}
-            </div>
-          </section>
-        ))}
+            return (
+              <div key={cat} className="space-y-6 pt-2 first:pt-0">
+                {/* Major Category Banner Divider */}
+                <div className={`rounded-2xl bg-gradient-to-r ${meta.accentColor} border p-4 shadow-sm flex items-center justify-between gap-4 flex-wrap`}>
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl" aria-hidden>{meta.icon}</span>
+                    <div>
+                      <h2 className="text-base sm:text-lg font-black tracking-tight text-white flex items-center gap-2">
+                        <span>{meta.label}</span>
+                      </h2>
+                      <p className="text-xs text-slate-400 mt-0.5">{meta.description}</p>
+                    </div>
+                  </div>
+
+                  <span className="text-xs font-bold px-3 py-1 rounded-full bg-slate-950/60 border border-slate-700/80 text-slate-300 shrink-0">
+                    {groupsInCat.length} {groupsInCat.length === 1 ? "skupina" : groupsInCat.length < 5 ? "skupiny" : "skupín"} · {groupsInCat.reduce((sum, g) => sum + g.records.length, 0)} rekordov
+                  </span>
+                </div>
+
+                {/* Sub-groups within this Major Category */}
+                <div className="space-y-8 pl-1 sm:pl-2">
+                  {groupsInCat.map((group) => (
+                    <section key={group.id} id={group.id} className="space-y-3.5 scroll-mt-6">
+                      <div className="flex items-center gap-2 pb-1.5 border-b border-slate-800/60">
+                        <span className="text-lg" aria-hidden>{group.icon}</span>
+                        <h3 className="text-sm font-black tracking-tight text-slate-200">{group.title}</h3>
+                        <span className="text-[11px] px-2 py-0.2 rounded bg-slate-800/80 text-slate-400 font-semibold ml-auto">
+                          {group.records.length} {group.records.length === 1 ? "rekord" : group.records.length < 5 ? "rekordy" : "rekordov"}
+                        </span>
+                      </div>
+
+                      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                        {group.records.map((record) => (
+                          <RecordCard key={record.id} record={record} cupName={data.cupName} />
+                        ))}
+                      </div>
+                    </section>
+                  ))}
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );
