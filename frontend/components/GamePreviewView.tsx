@@ -45,8 +45,8 @@ export type MatchPreviewData = {
     };
   };
   topScorers: {
-    home: Array<{ id: number; name: string; slug: string | null; position: string; number: number | null; overall: number; gp: number; goals: number; assists: number; points: number; plusMinus: number }>;
-    away: Array<{ id: number; name: string; slug: string | null; position: string; number: number | null; overall: number; gp: number; goals: number; assists: number; points: number; plusMinus: number }>;
+    home: Array<{ id: number; name: string; slug: string | null; position: string; number: number | null; overall: number; gp: number; goals: number; assists: number; points: number; plusMinus: number; photoUrl?: string | null; age?: number }>;
+    away: Array<{ id: number; name: string; slug: string | null; position: string; number: number | null; overall: number; gp: number; goals: number; assists: number; points: number; plusMinus: number; photoUrl?: string | null; age?: number }>;
   };
   recentForm: {
     home: Array<{ gameId: number; isHome: boolean; oppCode: string; oppName: string; oppLogo: string | null; goalsFor: number; goalsAgainst: number; result: string; endedIn: string; date: string }>;
@@ -363,95 +363,163 @@ export default function GamePreviewView({ data }: { data: MatchPreviewData }) {
             </div>
           </div>
 
-          {/* Top Scorers & Leaders */}
+          {/* Top Scorers & Key Skaters */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Away Leaders */}
-            <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg">
-              <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-2.5">
+            <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-lg">
+              <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
                 <div className="flex items-center gap-2">
                   {data.awayTeam.logoUrl && <img src={data.awayTeam.logoUrl} alt="" className="w-5 h-5 object-contain" />}
-                  <h3 className="text-xs font-bold uppercase tracking-wide text-slate-200">
-                    {data.awayTeam.code} Top Scorers
+                  <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wide text-slate-200">
+                    {data.awayTeam.code} Key Skaters &amp; Scorers
                   </h3>
                 </div>
-                <span className="text-[11px] text-slate-400">PTS (G+A)</span>
+                <span className="text-[11px] font-semibold text-slate-400">
+                  {data.topScorers.away.some((s) => s.gp > 0) ? "PTS (G+A)" : "TOP PLAYERS"}
+                </span>
               </div>
 
               {data.topScorers.away.length > 0 ? (
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                   {data.topScorers.away.map((s, idx) => (
-                    <div key={s.id} className="flex items-center justify-between p-2 rounded-xl bg-slate-800/30 border border-slate-800/60 hover:bg-slate-800/60 transition-colors">
-                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                        <span className={`w-5 text-center text-xs font-black ${idx === 0 ? "text-amber-400" : "text-slate-500"}`}>
+                    <div
+                      key={s.id}
+                      className="flex items-center justify-between p-2.5 sm:p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700/80 transition-colors gap-3"
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <span className={`w-4 text-center text-xs font-black shrink-0 ${idx === 0 ? "text-amber-400" : "text-slate-500"}`}>
                           {idx + 1}
                         </span>
+                        <div className="relative shrink-0">
+                          <PlayerAvatar
+                            src={s.photoUrl ?? null}
+                            alt={s.name}
+                            size={44}
+                          />
+                          <span className="absolute -bottom-1 -right-1 bg-blue-600 text-[10px] font-black text-white px-1.5 py-0.2 rounded-full shadow border border-slate-900">
+                            {s.overall}
+                          </span>
+                        </div>
                         <div className="min-w-0 flex-1">
-                          <div className="text-xs font-bold text-slate-100 truncate">
-                            {s.slug ? <Link href={`/players/${s.slug}`} className="hover:text-blue-400">{s.name}</Link> : s.name}
+                          <div className="text-xs sm:text-sm font-bold text-white truncate">
+                            {s.slug ? (
+                              <Link href={`/players/${s.slug}`} className="hover:text-blue-400 transition-colors">
+                                {s.name}
+                              </Link>
+                            ) : (
+                              s.name
+                            )}
                           </div>
-                          <div className="text-[10px] text-slate-400">
-                            {s.position} · {s.overall} OVR · {s.gp} GP
+                          <div className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                            <span className="px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 font-semibold text-[10px]">
+                              {s.position}
+                            </span>
+                            {s.number != null && <span>#{s.number}</span>}
+                            {s.age != null && <span className="text-slate-500">· {s.age} yrs</span>}
                           </div>
                         </div>
                       </div>
+
                       <div className="text-right shrink-0">
-                        <span className="text-xs font-extrabold text-amber-300 tabular-nums">
-                          {s.points} <span className="text-[10px] font-semibold text-slate-400">PTS</span>
-                        </span>
-                        <div className="text-[10px] text-slate-400 tabular-nums">
-                          {s.goals}G, {s.assists}A ({s.plusMinus > 0 ? `+${s.plusMinus}` : s.plusMinus})
-                        </div>
+                        {s.gp > 0 ? (
+                          <>
+                            <div className="text-xs sm:text-sm font-black text-amber-300 tabular-nums">
+                              {s.points} <span className="text-[10px] font-bold text-amber-500/80">PTS</span>
+                            </div>
+                            <div className="text-[10px] text-slate-400 tabular-nums mt-0.5">
+                              {s.goals}G · {s.assists}A ({s.plusMinus > 0 ? `+${s.plusMinus}` : s.plusMinus})
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-[11px] font-medium text-slate-400 bg-slate-900/80 px-2 py-0.5 rounded border border-slate-800">
+                            0 GP
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-slate-400 py-3 text-center">No season stats recorded yet.</p>
+                <p className="text-xs text-slate-400 py-3 text-center">No skaters available.</p>
               )}
             </div>
 
             {/* Home Leaders */}
-            <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg">
-              <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-2.5">
+            <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-lg">
+              <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
                 <div className="flex items-center gap-2">
                   {data.homeTeam.logoUrl && <img src={data.homeTeam.logoUrl} alt="" className="w-5 h-5 object-contain" />}
-                  <h3 className="text-xs font-bold uppercase tracking-wide text-slate-200">
-                    {data.homeTeam.code} Top Scorers
+                  <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wide text-slate-200">
+                    {data.homeTeam.code} Key Skaters &amp; Scorers
                   </h3>
                 </div>
-                <span className="text-[11px] text-slate-400">PTS (G+A)</span>
+                <span className="text-[11px] font-semibold text-slate-400">
+                  {data.topScorers.home.some((s) => s.gp > 0) ? "PTS (G+A)" : "TOP PLAYERS"}
+                </span>
               </div>
 
               {data.topScorers.home.length > 0 ? (
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                   {data.topScorers.home.map((s, idx) => (
-                    <div key={s.id} className="flex items-center justify-between p-2 rounded-xl bg-slate-800/30 border border-slate-800/60 hover:bg-slate-800/60 transition-colors">
-                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                        <span className={`w-5 text-center text-xs font-black ${idx === 0 ? "text-amber-400" : "text-slate-500"}`}>
+                    <div
+                      key={s.id}
+                      className="flex items-center justify-between p-2.5 sm:p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700/80 transition-colors gap-3"
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <span className={`w-4 text-center text-xs font-black shrink-0 ${idx === 0 ? "text-amber-400" : "text-slate-500"}`}>
                           {idx + 1}
                         </span>
+                        <div className="relative shrink-0">
+                          <PlayerAvatar
+                            src={s.photoUrl ?? null}
+                            alt={s.name}
+                            size={44}
+                          />
+                          <span className="absolute -bottom-1 -right-1 bg-blue-600 text-[10px] font-black text-white px-1.5 py-0.2 rounded-full shadow border border-slate-900">
+                            {s.overall}
+                          </span>
+                        </div>
                         <div className="min-w-0 flex-1">
-                          <div className="text-xs font-bold text-slate-100 truncate">
-                            {s.slug ? <Link href={`/players/${s.slug}`} className="hover:text-blue-400">{s.name}</Link> : s.name}
+                          <div className="text-xs sm:text-sm font-bold text-white truncate">
+                            {s.slug ? (
+                              <Link href={`/players/${s.slug}`} className="hover:text-blue-400 transition-colors">
+                                {s.name}
+                              </Link>
+                            ) : (
+                              s.name
+                            )}
                           </div>
-                          <div className="text-[10px] text-slate-400">
-                            {s.position} · {s.overall} OVR · {s.gp} GP
+                          <div className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                            <span className="px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 font-semibold text-[10px]">
+                              {s.position}
+                            </span>
+                            {s.number != null && <span>#{s.number}</span>}
+                            {s.age != null && <span className="text-slate-500">· {s.age} yrs</span>}
                           </div>
                         </div>
                       </div>
+
                       <div className="text-right shrink-0">
-                        <span className="text-xs font-extrabold text-amber-300 tabular-nums">
-                          {s.points} <span className="text-[10px] font-semibold text-slate-400">PTS</span>
-                        </span>
-                        <div className="text-[10px] text-slate-400 tabular-nums">
-                          {s.goals}G, {s.assists}A ({s.plusMinus > 0 ? `+${s.plusMinus}` : s.plusMinus})
-                        </div>
+                        {s.gp > 0 ? (
+                          <>
+                            <div className="text-xs sm:text-sm font-black text-amber-300 tabular-nums">
+                              {s.points} <span className="text-[10px] font-bold text-amber-500/80">PTS</span>
+                            </div>
+                            <div className="text-[10px] text-slate-400 tabular-nums mt-0.5">
+                              {s.goals}G · {s.assists}A ({s.plusMinus > 0 ? `+${s.plusMinus}` : s.plusMinus})
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-[11px] font-medium text-slate-400 bg-slate-900/80 px-2 py-0.5 rounded border border-slate-800">
+                            0 GP
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-slate-400 py-3 text-center">No season stats recorded yet.</p>
+                <p className="text-xs text-slate-400 py-3 text-center">No skaters available.</p>
               )}
             </div>
           </div>

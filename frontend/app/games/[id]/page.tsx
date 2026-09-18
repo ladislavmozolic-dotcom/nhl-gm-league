@@ -125,6 +125,7 @@ import GamePreviewView, { type MatchPreviewData } from "@/components/GamePreview
 import { computeStandings } from "@/lib/sim/standings";
 import { skaterTotals, goalieTotals } from "@/lib/stats-server";
 import { loadTeamLines } from "@/lib/sim/lines";
+import { livePlayerOverall } from "@/lib/player-overall";
 
 import type { TeamTactics } from "@/lib/sim/tactics";
 
@@ -203,17 +204,38 @@ async function buildMatchPreviewData(game: any, me: number | null): Promise<Matc
 
   // Top skaters per team
   const homeTopSkaters = allSkaters
-    .filter((s) => s.teamId === game.homeTeamId)
+    .filter((s) => s.teamId === game.homeTeamId && s.gp > 0)
     .sort((a, b) => b.points - a.points || b.goals - a.goals)
     .slice(0, 5);
   const awayTopSkaters = allSkaters
-    .filter((s) => s.teamId === game.awayTeamId)
+    .filter((s) => s.teamId === game.awayTeamId && s.gp > 0)
     .sort((a, b) => b.points - a.points || b.goals - a.goals)
     .slice(0, 5);
+
+  const [fallbackHomeSkaters, fallbackAwaySkaters] = await Promise.all([
+    homeTopSkaters.length === 0
+      ? prisma.player.findMany({
+          where: { teamId: game.homeTeamId, isGoalie: false, rosterType: league === "AHL" ? "AHL" : "NHL", scratched: false },
+          orderBy: { overall: "desc" },
+          take: 5,
+          select: { id: true, name: true, slug: true, position: true, overall: true, number: true, photoUrl: true, age: true, shoots: true, isGoalie: true },
+        })
+      : Promise.resolve([]),
+    awayTopSkaters.length === 0
+      ? prisma.player.findMany({
+          where: { teamId: game.awayTeamId, isGoalie: false, rosterType: league === "AHL" ? "AHL" : "NHL", scratched: false },
+          orderBy: { overall: "desc" },
+          take: 5,
+          select: { id: true, name: true, slug: true, position: true, overall: true, number: true, photoUrl: true, age: true, shoots: true, isGoalie: true },
+        })
+      : Promise.resolve([]),
+  ]);
 
   const neededPlayerIds = [
     ...homeTopSkaters.map((s) => s.playerId),
     ...awayTopSkaters.map((s) => s.playerId),
+    ...fallbackHomeSkaters.map((s) => s.id),
+    ...fallbackAwaySkaters.map((s) => s.id),
     homeLines?.situations?.others?.starter,
     homeLines?.situations?.others?.backup,
     awayLines?.situations?.others?.starter,
@@ -223,7 +245,7 @@ async function buildMatchPreviewData(game: any, me: number | null): Promise<Matc
   const playerMeta = neededPlayerIds.length
     ? await prisma.player.findMany({
         where: { id: { in: neededPlayerIds } },
-        select: { id: true, name: true, slug: true, position: true, overall: true, number: true, photoUrl: true, age: true, shoots: true },
+        select: { id: true, name: true, slug: true, position: true, overall: true, number: true, photoUrl: true, age: true, shoots: true, isGoalie: true, goalieRating: { select: { overall: true } } },
       })
     : [];
   const pMetaMap = new Map(playerMeta.map((p) => [p.id, p]));
@@ -238,10 +260,10 @@ async function buildMatchPreviewData(game: any, me: number | null): Promise<Matc
     if (!sPlayer) {
       const fallbackGoalies = await prisma.player.findMany({
         where: { teamId, isGoalie: true, rosterType: league === "AHL" ? "AHL" : "NHL", scratched: false },
+        include: { goalieRating: { select: { overall: true } } },
         orderBy: { overall: "desc" },
-        take: 2,
-        select: { id: true, name: true, slug: true, position: true, overall: true, number: true, photoUrl: true, age: true, shoots: true },
       });
+      fallbackGoalies.sort((a, b) => (livePlayerOverall(b) ?? 0) - (livePlayerOverall(a) ?? 0));
       if (fallbackGoalies[0]) sPlayer = fallbackGoalies[0];
       if (fallbackGoalies[1]) bPlayer = fallbackGoalies[1];
     }
@@ -255,7 +277,7 @@ async function buildMatchPreviewData(game: any, me: number | null): Promise<Matc
             id: sPlayer.id,
             name: cleanName(sPlayer.name),
             slug: sPlayer.slug,
-            overall: sPlayer.overall ?? 75,
+            overall: livePlayerOverall(sPlayer) ?? 75,
             age: sPlayer.age ?? undefined,
             catches: sPlayer.shoots ?? "L",
             photoUrl: sPlayer.photoUrl,
@@ -269,7 +291,7 @@ async function buildMatchPreviewData(game: any, me: number | null): Promise<Matc
             id: bPlayer.id,
             name: cleanName(bPlayer.name),
             slug: bPlayer.slug,
-            overall: bPlayer.overall ?? 70,
+            overall: livePlayerOverall(bPlayer) ?? 70,
             age: bPlayer.age ?? undefined,
             catches: bPlayer.shoots ?? "L",
             photoUrl: bPlayer.photoUrl,
@@ -435,38 +457,80 @@ async function buildMatchPreviewData(game: any, me: number | null): Promise<Matc
       away: awayGoalies,
     },
     topScorers: {
-      home: homeTopSkaters.map((s) => {
-        const pm = pMetaMap.get(s.playerId);
-        return {
-          id: s.playerId,
-          name: s.name,
-          slug: pm?.slug ?? null,
-          position: s.position,
-          number: s.number,
-          overall: pm?.overall ?? 75,
-          gp: s.gp,
-          goals: s.goals,
-          assists: s.assists,
-          points: s.points,
-          plusMinus: s.plusMinus,
-        };
-      }),
-      away: awayTopSkaters.map((s) => {
-        const pm = pMetaMap.get(s.playerId);
-        return {
-          id: s.playerId,
-          name: s.name,
-          slug: pm?.slug ?? null,
-          position: s.position,
-          number: s.number,
-          overall: pm?.overall ?? 75,
-          gp: s.gp,
-          goals: s.goals,
-          assists: s.assists,
-          points: s.points,
-          plusMinus: s.plusMinus,
-        };
-      }),
+      home: homeTopSkaters.length > 0
+        ? homeTopSkaters.map((s) => {
+            const pm = pMetaMap.get(s.playerId);
+            return {
+              id: s.playerId,
+              name: cleanName(s.name),
+              slug: pm?.slug ?? null,
+              position: s.position,
+              number: s.number,
+              overall: (pm ? livePlayerOverall(pm) : null) ?? 75,
+              photoUrl: pm?.photoUrl ?? null,
+              age: pm?.age ?? undefined,
+              gp: s.gp,
+              goals: s.goals,
+              assists: s.assists,
+              points: s.points,
+              plusMinus: s.plusMinus,
+            };
+          })
+        : fallbackHomeSkaters.map((p) => {
+            const pm = pMetaMap.get(p.id) ?? p;
+            return {
+              id: p.id,
+              name: cleanName(p.name),
+              slug: p.slug ?? null,
+              position: p.position ?? "F",
+              number: p.number ?? null,
+              overall: livePlayerOverall(pm) ?? 75,
+              photoUrl: p.photoUrl ?? null,
+              age: p.age ?? undefined,
+              gp: 0,
+              goals: 0,
+              assists: 0,
+              points: 0,
+              plusMinus: 0,
+            };
+          }),
+      away: awayTopSkaters.length > 0
+        ? awayTopSkaters.map((s) => {
+            const pm = pMetaMap.get(s.playerId);
+            return {
+              id: s.playerId,
+              name: cleanName(s.name),
+              slug: pm?.slug ?? null,
+              position: s.position,
+              number: s.number,
+              overall: (pm ? livePlayerOverall(pm) : null) ?? 75,
+              photoUrl: pm?.photoUrl ?? null,
+              age: pm?.age ?? undefined,
+              gp: s.gp,
+              goals: s.goals,
+              assists: s.assists,
+              points: s.points,
+              plusMinus: s.plusMinus,
+            };
+          })
+        : fallbackAwaySkaters.map((p) => {
+            const pm = pMetaMap.get(p.id) ?? p;
+            return {
+              id: p.id,
+              name: cleanName(p.name),
+              slug: p.slug ?? null,
+              position: p.position ?? "F",
+              number: p.number ?? null,
+              overall: livePlayerOverall(pm) ?? 75,
+              photoUrl: p.photoUrl ?? null,
+              age: p.age ?? undefined,
+              gp: 0,
+              goals: 0,
+              assists: 0,
+              points: 0,
+              plusMinus: 0,
+            };
+          }),
     },
     recentForm: {
       home: mapForm(homeLast5, game.homeTeamId),
