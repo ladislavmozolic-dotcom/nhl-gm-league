@@ -3,6 +3,7 @@ import { cleanName, isRookieName } from "@/lib/playerName";
 import { ACTIVE_SEASON } from "@/lib/career-server";
 import { PRE_SEASON, REGULAR_SEASON } from "@/lib/phase";
 import { teamManagerLabel } from "@/lib/team-gm";
+import { normalizeLang, type Lang } from "@/lib/i18n";
 
 export type LeaderTeamInfo = {
   code: string;
@@ -88,7 +89,12 @@ function resolveTeams(teamIds: Set<number>, teamById: Map<number, any>): {
   };
 }
 
-function calculateAge(birthDateStr: string | null | undefined, targetDate: Date | null, fallbackAge?: number | null): { years: number; days: number; formatted: string } | null {
+function calculateAge(
+  birthDateStr: string | null | undefined,
+  targetDate: Date | null,
+  fallbackAge?: number | null,
+  lang: Lang = "en"
+): { years: number; days: number; formatted: string } | null {
   if (birthDateStr) {
     const birth = new Date(birthDateStr);
     if (!isNaN(birth.getTime())) {
@@ -102,19 +108,749 @@ function calculateAge(birthDateStr: string | null | undefined, targetDate: Date 
       lastBirthday.setFullYear(birth.getFullYear() + years);
       const diffMs = target.getTime() - lastBirthday.getTime();
       const days = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
-      return { years, days, formatted: `${years}r ${days}d` };
+      const unitY = lang === "cs" ? "r" : lang === "de" ? "J" : lang === "ru" ? "г" : "y";
+      const unitD = lang === "cs" ? "d" : lang === "de" ? "T" : lang === "ru" ? "д" : "d";
+      return { years, days, formatted: `${years}${unitY} ${days}${unitD}` };
     }
   }
   if (fallbackAge != null && fallbackAge > 0) {
-    return { years: fallbackAge, days: 0, formatted: `${fallbackAge} rokov` };
+    const unitYears = lang === "cs" ? "rokov" : lang === "de" ? "Jahre" : lang === "ru" ? "лет" : "years old";
+    return { years: fallbackAge, days: 0, formatted: `${fallbackAge} ${unitYears}` };
   }
   return null;
+}
+
+export function formatRecordDate(date: Date, lang: Lang): string {
+  const loc = lang === "cs" ? "sk-SK" : lang === "de" ? "de-DE" : lang === "ru" ? "ru-RU" : "en-US";
+  return date.toLocaleDateString(loc);
+}
+
+export function getRecordBadge(key: "regular" | "playoffs" | "pre" | "history" | "game" | "season" | "age", lang: Lang): string {
+  const map: Record<string, Record<Lang, string>> = {
+    regular: { en: "RS", cs: "ZČ", de: "HR", ru: "РС" },
+    playoffs: { en: "Playoffs", cs: "Play-off", de: "Playoffs", ru: "Плей-офф" },
+    pre: { en: "Pre-season", cs: "Príprava", de: "Pre-season", ru: "Предсезонка" },
+    history: { en: "History", cs: "História", de: "Historie", ru: "История" },
+    game: { en: "Game", cs: "Zápas", de: "Spiel", ru: "Матч" },
+    season: { en: "Season", cs: "Sezóna", de: "Saison", ru: "Сезон" },
+    age: { en: "Age", cs: "Vek", de: "Alter", ru: "Возраст" },
+  };
+  return map[key]?.[lang] ?? map[key]?.en ?? key;
+}
+
+export function getGroupTitle(id: string, lang: Lang, cupName: string): string {
+  const map: Record<string, Record<Lang, string>> = {
+    "gm-records": {
+      en: "General Manager Records (GM)",
+      cs: "Manažérske rekordy (GM)",
+      de: "General-Manager-Rekorde (GM)",
+      ru: "Рекорды генеральных менеджеров (GM)",
+    },
+    "career-skaters": {
+      en: "Individual Career Records — Skaters (RS)",
+      cs: "Individuálne kariérne rekordy — Korčuliari (ZČ)",
+      de: "Individuelle Karriererekorde — Feldspieler (HR)",
+      ru: "Индивидуальные рекорды карьеры — Полевые игроки (РС)",
+    },
+    "season-skaters": {
+      en: "Individual Single-Season Records — Skaters (RS)",
+      cs: "Individuálne sezónne rekordy — Korčuliari (ZČ)",
+      de: "Individuelle Saisonrekorde — Feldspieler (HR)",
+      ru: "Индивидуальные рекорды сезона — Полевые игроки (РС)",
+    },
+    "game-skaters": {
+      en: "Individual Single-Game Records — Skaters (RS)",
+      cs: "Individuálne zápasové rekordy — Korčuliari (ZČ)",
+      de: "Individuelle Spielrekorde — Feldspieler (HR)",
+      ru: "Индивидуальные рекорды матча — Полевые игроки (РС)",
+    },
+    "rookie-records": {
+      en: "Individual Rookie Season Records (RS)",
+      cs: "Individuálne sezónne rekordy nováčikov (ZČ)",
+      de: "Individuelle Rookie-Saisonrekorde (HR)",
+      ru: "Индивидуальные рекорды новичков в сезоне (РС)",
+    },
+    "playoff-career-skaters": {
+      en: "Career Playoff Records — Skaters",
+      cs: "Kariérne rekordy v play-off — Korčuliari",
+      de: "Karriere-Playoff-Rekorde — Feldspieler",
+      ru: "Рекорды плей-офф в карьере — Полевые игроки",
+    },
+    "playoff-season-skaters": {
+      en: "Single-Playoff Records — Skaters",
+      cs: "Rekordy v jednom play-off — Korčuliari",
+      de: "Rekorde in einer Playoff-Saison — Feldspieler",
+      ru: "Рекорды одного плей-офф — Полевые игроки",
+    },
+    "playoff-game-skaters": {
+      en: "Single-Game Playoff Records — Skaters",
+      cs: "Zápasové rekordy v play-off — Korčuliari",
+      de: "Einzelspiel-Playoff-Rekorde — Feldspieler",
+      ru: "Рекорды одного матча в плей-офф — Полевые игроки",
+    },
+    "career-goalies": {
+      en: "Individual Career Records — Goalies (RS)",
+      cs: "Individuálne kariérne rekordy — Brankári (ZČ)",
+      de: "Individuelle Karriererekorde — Torhüter (HR)",
+      ru: "Индивидуальные рекорды карьеры — Вратари (РС)",
+    },
+    "championships": {
+      en: `${cupName} & Team Titles`,
+      cs: `${cupName} & Tímové tituly`,
+      de: `${cupName} & Team-Titel`,
+      ru: `${cupName} и командные титулы`,
+    },
+    "team-seasons": {
+      en: "Team Season & Streak Records (RS)",
+      cs: "Tímové sezónne a sériové rekordy (ZČ)",
+      de: "Team-Saison- und Serienrekorde (HR)",
+      ru: "Командные сезонные и серийные рекорды (РС)",
+    },
+    "trophies": {
+      en: "Trophies & Awards",
+      cs: "Trofeje a ocenenia",
+      de: "Trophäen & Auszeichnungen",
+      ru: "Трофеи и награды",
+    },
+    "attendance-games": {
+      en: "Attendance & Game Records (RS / All)",
+      cs: "Návštevnosť a zápasové rekordy (ZČ / Všetko)",
+      de: "Zuschauer- und Spielrekorde (HR / Alle)",
+      ru: "Посещаемость и рекорды матчей (РС / Все)",
+    },
+    "age-records": {
+      en: "Age Records (League Rosters)",
+      cs: "Vekové rekordy (Súpisky ligy)",
+      de: "Altersrekorde (Ligakader)",
+      ru: "Возрастные рекорды (Составы лиги)",
+    },
+    "pre-season-group": {
+      en: "Pre-season Exhibition Records",
+      cs: "Prípravné zápasy (Pre-season rekordy)",
+      de: "Vorbereitungsspiele (Pre-season Rekorde)",
+      ru: "Предсезонные матчи (Рекорды предсезонки)",
+    },
+  };
+  return map[id]?.[lang] ?? map[id]?.en ?? id;
+}
+
+export function getSectionTitle(id: string, lang: Lang, league: string, cupName: string): string {
+  const map: Record<string, Record<Lang, string>> = {
+    "gm-seasons-total": {
+      en: `Most seasons in u${league} (as GM)`,
+      cs: `Najviac odohraných sezón v u${league} (ako GM)`,
+      de: `Meiste gespielte Saisons in u${league} (als GM)`,
+      ru: `Больше всего сезонов в u${league} (как GM)`,
+    },
+    "gm-seasons-one-team": {
+      en: `Most seasons in u${league} with one team`,
+      cs: `Najviac odohraných sezón v u${league} u jedného tímu`,
+      de: `Meiste Saisons in u${league} bei einem Team`,
+      ru: `Больше всего сезонов в u${league} в одной команде`,
+    },
+    "gm-seasons-streak": {
+      en: `Longest consecutive season streak in u${league}`,
+      cs: `Najviac odohraných sezón v u${league} v rade`,
+      de: `Meiste Saisons in Folge in u${league}`,
+      ru: `Самая длинная серия сезонов подряд в u${league}`,
+    },
+    "gm-cups": {
+      en: `Most ${cupName} titles won (as GM)`,
+      cs: `Počet vyhraných ${cupName}ov (ako GM)`,
+      de: `Gewonnene ${cupName}-Titel (als GM)`,
+      ru: `Количество завоеванных ${cupName} (как GM)`,
+    },
+    "career-gp": {
+      en: "Most career games played",
+      cs: "Najviac odohraných zápasov v kariére",
+      de: "Meiste Karrierespiele",
+      ru: "Больше всего матчей в карьере",
+    },
+    "career-goals": {
+      en: "Most career goals",
+      cs: "Najviac gólov v kariére",
+      de: "Meiste Karrieretore",
+      ru: "Больше всего голов в карьере",
+    },
+    "career-assists": {
+      en: "Most career assists",
+      cs: "Najviac asistencií v kariére",
+      de: "Meiste Karriere-Assists",
+      ru: "Больше всего передач в карьере",
+    },
+    "career-points": {
+      en: "Most career points",
+      cs: "Najviac bodov v kariére",
+      de: "Meiste Karrierepunkte",
+      ru: "Больше всего очков в карьере",
+    },
+    "career-pim": {
+      en: "Most career penalty minutes",
+      cs: "Najviac trestných minút v kariére",
+      de: "Meiste Karrierestrafminuten",
+      ru: "Больше всего штрафных минут в карьере",
+    },
+    "career-plus-minus-best": {
+      en: "Best career +/-",
+      cs: "Najlepší +/- v kariére",
+      de: "Beste Karriere-+/-",
+      ru: "Лучший +/- в карьере",
+    },
+    "career-plus-minus-worst": {
+      en: "Worst career +/-",
+      cs: "Najhorší +/- v kariére",
+      de: "Schlechteste Karriere-+/-",
+      ru: "Худший +/- в карьере",
+    },
+    "career-pp-goals": {
+      en: "Most career power-play goals (PPG)",
+      cs: "Najviac presilovkových gólov v kariére (PPG)",
+      de: "Meiste Karriere-Überzahltore (PPG)",
+      ru: "Больше всего голов в большинстве в карьере (PPG)",
+    },
+    "career-pp-assists": {
+      en: "Most career power-play assists (PPA)",
+      cs: "Najviac presilovkových asistencií v kariére (PPA)",
+      de: "Meiste Karriere-Überzahl-Assists (PPA)",
+      ru: "Больше всего передач в большинстве в карьере (PPA)",
+    },
+    "career-pp-points": {
+      en: "Most career power-play points (PPP)",
+      cs: "Najviac presilovkových bodov v kariére (PPP)",
+      de: "Meiste Karriere-Überzahlpunkte (PPP)",
+      ru: "Больше всего очков в большинстве в карьере (PPP)",
+    },
+    "career-sh-goals": {
+      en: "Most career shorthanded goals (SHG)",
+      cs: "Najviac oslabovkových gólov v kariére (SHG)",
+      de: "Meiste Karriere-Unterzahltore (SHG)",
+      ru: "Больше всего голов в меньшинстве в карьере (SHG)",
+    },
+    "career-sh-assists": {
+      en: "Most career shorthanded assists (SHA)",
+      cs: "Najviac oslabovkových asistencií v kariére (SHA)",
+      de: "Meiste Karriere-Unterzahl-Assists (SHA)",
+      ru: "Больше всего передач в меньшинстве в карьере (SHA)",
+    },
+    "career-sh-points": {
+      en: "Most career shorthanded points (SHP)",
+      cs: "Najviac oslabovkových bodov v kariére (SHP)",
+      de: "Meiste Karriere-Unterzahlpunkte (SHP)",
+      ru: "Больше всего очков в меньшинстве в карьере (SHP)",
+    },
+    "career-ironman": {
+      en: "Longest consecutive games played streak (Ironman)",
+      cs: "Najviac odohraných zápasov v rade (Ironman streak)",
+      de: "Längste Serie gespielter Spiele in Folge (Ironman)",
+      ru: "Самая длинная серия сыгранных матчей подряд (Ironman)",
+    },
+    "career-goal-streak": {
+      en: "Longest consecutive goal-scoring streak",
+      cs: "Najdlhšia gólová séria v rade (zápasy s gólom)",
+      de: "Längste Torserie in Folge",
+      ru: "Самая длинная голевая серия подряд",
+    },
+    "career-assist-streak": {
+      en: "Longest consecutive assist streak",
+      cs: "Najdlhšia asistenčná séria v rade (zápasy s asistenciou)",
+      de: "Längste Assist-Serie in Folge",
+      ru: "Самая длинная ассистентская серия подряд",
+    },
+    "career-point-streak": {
+      en: "Longest consecutive point-scoring streak",
+      cs: "Najdlhšia bodová séria v rade (zápasy s bodom)",
+      de: "Längste Punkteserie in Folge",
+      ru: "Самая длинная результативная серия подряд",
+    },
+    "career-youngest-debut": {
+      en: "Youngest player at game debut",
+      cs: "Najmladší hráč pri debute v zápase",
+      de: "Jüngster Spieler beim Spieldebüt",
+      ru: "Самый молодой игрок при дебюте в матче",
+    },
+    "career-oldest-appearance": {
+      en: "Oldest player in a game",
+      cs: "Najstarší hráč v zápase",
+      de: "Ältester Spieler in einem Spiel",
+      ru: "Самый возрастной игрок в матче",
+    },
+    "season-goals": {
+      en: "Most goals in a single season",
+      cs: "Najviac gólov v jednej sezóne",
+      de: "Meiste Tore in einer Saison",
+      ru: "Больше всего голов за один сезон",
+    },
+    "season-assists": {
+      en: "Most assists in a single season",
+      cs: "Najviac asistencií v jednej sezóne",
+      de: "Meiste Assists in einer Saison",
+      ru: "Больше всего передач за один сезон",
+    },
+    "season-points": {
+      en: "Most points in a single season",
+      cs: "Najviac bodov v jednej sezóne",
+      de: "Meiste Punkte in einer Saison",
+      ru: "Больше всего очков за один сезон",
+    },
+    "season-pim": {
+      en: "Most penalty minutes in a single season",
+      cs: "Najviac trestných minút v jednej sezóne",
+      de: "Meiste Strafminuten in einer Saison",
+      ru: "Больше всего штрафных минут за один сезон",
+    },
+    "season-plus-minus-best": {
+      en: "Best +/- in a single season",
+      cs: "Najlepší +/- v jednej sezóne",
+      de: "Beste +/- in einer Saison",
+      ru: "Лучший +/- за один сезон",
+    },
+    "season-plus-minus-worst": {
+      en: "Worst +/- in a single season",
+      cs: "Najhorší +/- v jednej sezóne",
+      de: "Schlechteste +/- in einer Saison",
+      ru: "Худший +/- за один сезон",
+    },
+    "season-pp-goals": {
+      en: "Most power-play goals in a season (PPG)",
+      cs: "Najviac presilovkových gólov v jednej sezóne (PPG)",
+      de: "Meiste Überzahltore in einer Saison (PPG)",
+      ru: "Больше всего голов в большинстве за сезон (PPG)",
+    },
+    "season-pp-assists": {
+      en: "Most power-play assists in a season (PPA)",
+      cs: "Najviac presilovkových asistencií v jednej sezóne (PPA)",
+      de: "Meiste Überzahl-Assists in einer Saison (PPA)",
+      ru: "Больше всего передач в большинстве за сезон (PPA)",
+    },
+    "season-pp-points": {
+      en: "Most power-play points in a season (PPP)",
+      cs: "Najviac presilovkových bodov v jednej sezóne (PPP)",
+      de: "Meiste Überzahlpunkte in einer Saison (PPP)",
+      ru: "Больше всего очков в большинстве за сезон (PPP)",
+    },
+    "season-sh-goals": {
+      en: "Most shorthanded goals in a season (SHG)",
+      cs: "Najviac oslabovkových gólov v jednej sezóne (SHG)",
+      de: "Meiste Unterzahltore in einer Saison (SHG)",
+      ru: "Больше всего голов в меньшинстве за сезон (SHG)",
+    },
+    "season-sh-assists": {
+      en: "Most shorthanded assists in a season (SHA)",
+      cs: "Najviac oslabovkových asistencií v jednej sezóne (SHA)",
+      de: "Meiste Unterzahl-Assists in einer Saison (SHA)",
+      ru: "Больше всего передач в меньшинстве за сезон (SHA)",
+    },
+    "season-sh-points": {
+      en: "Most shorthanded points in a season (SHP)",
+      cs: "Najviac oslabovkových bodov v jednej sezóne (SHP)",
+      de: "Meiste Unterzahlpunkte in einer Saison (SHP)",
+      ru: "Больше всего очков в меньшинстве за сезон (SHP)",
+    },
+    "rookie-season-goals": {
+      en: "Most goals in a rookie season",
+      cs: "Najviac gólov v nováčikovskej sezóne",
+      de: "Meiste Tore in der Rookie-Saison",
+      ru: "Больше всего голов в сезоне новичка",
+    },
+    "rookie-season-assists": {
+      en: "Most assists in a rookie season",
+      cs: "Najviac asistencií v nováčikovskej sezóne",
+      de: "Meiste Assists in der Rookie-Saison",
+      ru: "Больше всего передач в сезоне новичка",
+    },
+    "rookie-season-points": {
+      en: "Most points in a rookie season",
+      cs: "Najviac bodov v nováčikovskej sezóne",
+      de: "Meiste Punkte in der Rookie-Saison",
+      ru: "Больше всего очков в сезоне новичка",
+    },
+    "rookie-season-pim": {
+      en: "Most penalty minutes in a rookie season",
+      cs: "Najviac trestných minút v nováčikovskej sezóne",
+      de: "Meiste Strafminuten in der Rookie-Saison",
+      ru: "Больше всего штрафных минут в сезоне новичка",
+    },
+    "rookie-season-plus-minus-best": {
+      en: "Best +/- in a rookie season",
+      cs: "Najlepší +/- v nováčikovskej sezóne",
+      de: "Beste +/- in der Rookie-Saison",
+      ru: "Лучший +/- в сезоне новичка",
+    },
+    "rookie-season-plus-minus-worst": {
+      en: "Worst +/- in a rookie season",
+      cs: "Najhorší +/- v nováčikovskej sezóne",
+      de: "Schlechteste +/- in der Rookie-Saison",
+      ru: "Худший +/- в сезоне новичка",
+    },
+    "game-goals": {
+      en: "Most goals in a single game",
+      cs: "Najviac gólov v jednom zápase",
+      de: "Meiste Tore in einem Spiel",
+      ru: "Больше всего голов в одном матче",
+    },
+    "game-assists": {
+      en: "Most assists in a single game",
+      cs: "Najviac asistencií v jednom zápase",
+      de: "Meiste Assists in einem Spiel",
+      ru: "Больше всего передач в одном матче",
+    },
+    "game-points": {
+      en: "Most points in a single game",
+      cs: "Najviac bodov v jednom zápase",
+      de: "Meiste Punkte in einem Spiel",
+      ru: "Больше всего очков в одном матче",
+    },
+    "game-pim": {
+      en: "Most penalty minutes in a single game",
+      cs: "Najviac trestných minút v jednom zápase",
+      de: "Meiste Strafminuten in einem Spiel",
+      ru: "Больше всего штрафных минут в одном матче",
+    },
+    "game-plus-minus-best": {
+      en: "Best +/- in a single game",
+      cs: "Najlepší +/- v jednom zápase",
+      de: "Beste +/- in einem Spiel",
+      ru: "Лучший +/- в одном матче",
+    },
+    "game-plus-minus-worst": {
+      en: "Worst +/- in a single game",
+      cs: "Najhorší +/- v jednom zápase",
+      de: "Schlechteste +/- in einem Spiel",
+      ru: "Худший +/- в одном матче",
+    },
+    "game-pp-goals": {
+      en: "Most power-play goals in a game (PPG)",
+      cs: "Najviac presilovkových gólov v jednom zápase (PPG)",
+      de: "Meiste Überzahltore in einem Spiel (PPG)",
+      ru: "Больше всего голов в большинстве в матче (PPG)",
+    },
+    "game-pp-assists": {
+      en: "Most power-play assists in a game (PPA)",
+      cs: "Najviac presilovkových asistencií v jednom zápase (PPA)",
+      de: "Meiste Überzahl-Assists in einem Spiel (PPA)",
+      ru: "Больше всего передач в большинстве в матче (PPA)",
+    },
+    "game-pp-points": {
+      en: "Most power-play points in a game (PPP)",
+      cs: "Najviac presilovkových bodov v jednom zápase (PPP)",
+      de: "Meiste Überzahlpunkte in einem Spiel (PPP)",
+      ru: "Больше всего очков в большинстве в матче (PPP)",
+    },
+    "game-sh-goals": {
+      en: "Most shorthanded goals in a game (SHG)",
+      cs: "Najviac oslabovkových gólov v jednom zápase (SHG)",
+      de: "Meiste Unterzahltore in einem Spiel (SHG)",
+      ru: "Больше всего голов в меньшинстве в матче (SHG)",
+    },
+    "game-sh-assists": {
+      en: "Most shorthanded assists in a game (SHA)",
+      cs: "Najviac oslabovkových asistencií v jednom zápase (SHA)",
+      de: "Meiste Unterzahl-Assists in einem Spiel (SHA)",
+      ru: "Больше всего передач в меньшинстве в матче (SHA)",
+    },
+    "game-sh-points": {
+      en: "Most shorthanded points in a game (SHP)",
+      cs: "Najviac oslabovkových bodov v jednom zápase (SHP)",
+      de: "Meiste Unterzahlpunkte in einem Spiel (SHP)",
+      ru: "Больше всего очков в меньшинстве в матче (SHP)",
+    },
+    "playoff-career-gp": {
+      en: "Most career playoff games played",
+      cs: "Najviac odohraných zápasov v play-off v kariére",
+      de: "Meiste Playoff-Spiele in der Karriere",
+      ru: "Больше всего матчей в плей-офф в карьере",
+    },
+    "playoff-career-goals": {
+      en: "Most career playoff goals",
+      cs: "Najviac gólov v play-off v kariére",
+      de: "Meiste Playoff-Tore in der Karriere",
+      ru: "Больше всего голов в плей-офф в карьере",
+    },
+    "playoff-career-assists": {
+      en: "Most career playoff assists",
+      cs: "Najviac asistencií v play-off v kariére",
+      de: "Meiste Playoff-Assists in der Karriere",
+      ru: "Больше всего передач в плей-офф в карьере",
+    },
+    "playoff-career-points": {
+      en: "Most career playoff points",
+      cs: "Najviac bodov v play-off v kariére",
+      de: "Meiste Playoff-Punkte in der Karriere",
+      ru: "Больше всего очков в плей-офф в карьере",
+    },
+    "playoff-career-pim": {
+      en: "Most career playoff penalty minutes",
+      cs: "Najviac trestných minút v play-off v kariére",
+      de: "Meiste Playoff-Strafminuten in der Karriere",
+      ru: "Больше всего штрафных минут в плей-офф в карьере",
+    },
+    "playoff-career-plus-minus-best": {
+      en: "Best career playoff +/-",
+      cs: "Najlepší +/- v play-off v kariére",
+      de: "Beste Playoff-+/- in der Karriere",
+      ru: "Лучший +/- в плей-офф в карьере",
+    },
+    "playoff-career-plus-minus-worst": {
+      en: "Worst career playoff +/-",
+      cs: "Najhorší +/- v play-off v kariére",
+      de: "Schlechteste Playoff-+/- in der Karriere",
+      ru: "Худший +/- в плей-офф в карьере",
+    },
+    "playoff-season-goals": {
+      en: "Most goals in a single playoff season",
+      cs: "Najviac gólov v jednom play-off",
+      de: "Meiste Tore in einer Playoff-Saison",
+      ru: "Больше всего голов в одном плей-офф",
+    },
+    "playoff-season-assists": {
+      en: "Most assists in a single playoff season",
+      cs: "Najviac asistencií v jednom play-off",
+      de: "Meiste Assists in einer Playoff-Saison",
+      ru: "Больше всего передач в одном плей-офф",
+    },
+    "playoff-season-points": {
+      en: "Most points in a single playoff season",
+      cs: "Najviac bodov v jednom play-off",
+      de: "Meiste Punkte in einer Playoff-Saison",
+      ru: "Больше всего очков в одном плей-офф",
+    },
+    "playoff-season-pim": {
+      en: "Most penalty minutes in a single playoff season",
+      cs: "Najviac trestných minút v jednom play-off",
+      de: "Meiste Strafminuten in einer Playoff-Saison",
+      ru: "Больше всего штрафных минут в одном плей-офф",
+    },
+    "playoff-season-plus-minus-best": {
+      en: "Best +/- in a single playoff season",
+      cs: "Najlepší +/- v jednom play-off",
+      de: "Beste +/- in einer Playoff-Saison",
+      ru: "Лучший +/- в одном плей-офф",
+    },
+    "playoff-season-plus-minus-worst": {
+      en: "Worst +/- in a single playoff season",
+      cs: "Najhorší +/- v jednom play-off",
+      de: "Schlechteste +/- in einer Playoff-Saison",
+      ru: "Худший +/- в одном плей-офф",
+    },
+    "playoff-game-goals": {
+      en: "Most goals in a playoff game",
+      cs: "Najviac gólov v zápase play-off",
+      de: "Meiste Tore in einem Playoff-Spiel",
+      ru: "Больше всего голов в матче плей-офф",
+    },
+    "playoff-game-assists": {
+      en: "Most assists in a playoff game",
+      cs: "Najviac asistencií v zápase play-off",
+      de: "Meiste Assists in einem Playoff-Spiel",
+      ru: "Больше всего передач в матче плей-офф",
+    },
+    "playoff-game-points": {
+      en: "Most points in a playoff game",
+      cs: "Najviac bodov v zápase play-off",
+      de: "Meiste Punkte in einem Playoff-Spiel",
+      ru: "Больше всего очков в матче плей-офф",
+    },
+    "playoff-game-pim": {
+      en: "Most penalty minutes in a playoff game",
+      cs: "Najviac trestných minút v zápase play-off",
+      de: "Meiste Strafminuten in einem Playoff-Spiel",
+      ru: "Больше всего штрафных минут в матче плей-офф",
+    },
+    "playoff-game-plus-minus-best": {
+      en: "Best +/- in a playoff game",
+      cs: "Najlepší +/- v zápase play-off",
+      de: "Beste +/- in einem Playoff-Spiel",
+      ru: "Лучший +/- в матче плей-офф",
+    },
+    "playoff-game-plus-minus-worst": {
+      en: "Worst +/- in a playoff game",
+      cs: "Najhorší +/- v zápase play-off",
+      de: "Schlechteste +/- in einem Playoff-Spiel",
+      ru: "Худший +/- в матче плей-офф",
+    },
+    "career-wins": {
+      en: "Most career wins (Goalies)",
+      cs: "Najviac výhier v kariére (brankár)",
+      de: "Meiste Karrieresiege (Torhüter)",
+      ru: "Больше всего побед в карьере (Вратари)",
+    },
+    "career-steals": {
+      en: "Most career stolen games (steals)",
+      cs: "Najviac ukradnutých zápasov (steals) v kariére",
+      de: "Meiste gestohlene Spiele (Steals) in der Karriere",
+      ru: "Больше всего украденных матчей (steals) в карьере",
+    },
+    "career-gsax": {
+      en: "Best career GSAx (Goals Saved Above Expected)",
+      cs: "Najlepší GSAx (Goals Saved Above Expected) v kariére",
+      de: "Bestes Karriere-GSAx (Goals Saved Above Expected)",
+      ru: "Лучший GSAx за карьеру (Goals Saved Above Expected)",
+    },
+    "career-shutouts": {
+      en: "Most career shutouts",
+      cs: "Najviac čistých kont v kariére",
+      de: "Meiste Karriere-Shutouts",
+      ru: "Больше всего сухих матчей за карьеру",
+    },
+    "team-cups": {
+      en: `Most ${cupName} titles won (as team)`,
+      cs: `Počet vyhraných ${cupName}ov (ako tím)`,
+      de: `Gewonnene ${cupName}-Titel (als Team)`,
+      ru: `Количество завоеванных ${cupName} (команда)`,
+    },
+    "skater-cups": {
+      en: `Most ${cupName} titles won (Skater)`,
+      cs: `Počet vyhraných ${cupName}ov (hráč / korčuliar)`,
+      de: `Gewonnene ${cupName}-Titel (Feldspieler)`,
+      ru: `Количество завоеванных ${cupName} (полевой игрок)`,
+    },
+    "goalie-cups": {
+      en: `Most ${cupName} titles won (Goalie)`,
+      cs: `Počet vyhraných ${cupName}ov (brankár)`,
+      de: `Gewonnene ${cupName}-Titel (Torhüter)`,
+      ru: `Количество завоеванных ${cupName} (вратарь)`,
+    },
+    "playoff-career-wins": {
+      en: "Most career playoff wins (Goalies)",
+      cs: "Najviac výhier brankára v play-off",
+      de: "Meiste Playoff-Siege (Torhüter)",
+      ru: "Больше всего побед в плей-офф (Вратари)",
+    },
+    "team-points-season": {
+      en: "Most points in a single season",
+      cs: "Najviac získaných bodov v jednej sezóne",
+      de: "Meiste Punkte in einer Saison",
+      ru: "Больше всего очков за один сезон",
+    },
+    "team-losses-season": {
+      en: "Most losses in a single season (L + OTL/SOL)",
+      cs: "Najviac prehraných zápasov v jednej sezóne (L + OTL/SOL)",
+      de: "Meiste Niederlagen in einer Saison (L + OTL/SOL)",
+      ru: "Больше всего поражений за один сезон (L + OTL/SOL)",
+    },
+    "team-win-streak": {
+      en: "Longest winning streak",
+      cs: "Najviac vyhraných zápasov v rade (Winning streak)",
+      de: "Längste Siegesserie in Folge",
+      ru: "Самая длинная победная серия подряд",
+    },
+    "team-lose-streak": {
+      en: "Longest losing streak",
+      cs: "Najviac prehraných zápasov v rade (Losing streak)",
+      de: "Längste Niederlagenserie in Folge",
+      ru: "Самая длинная серия поражений подряд",
+    },
+    "team-gf-season": {
+      en: "Most goals scored in a single season",
+      cs: "Najviac strelených gólov v jednej sezóne",
+      de: "Meiste erzielte Tore in einer Saison",
+      ru: "Больше всего забитых голов за один сезон",
+    },
+    "team-ga-season": {
+      en: "Most goals conceded in a single season",
+      cs: "Najviac inkasovaných gólov v jednej sezóne",
+      de: "Meiste Gegentore in einer Saison",
+      ru: "Больше всего пропущенных голов за один сезон",
+    },
+    "team-pim-season": {
+      en: "Most penalty minutes in a single season",
+      cs: "Najviac trestných minút v jednej sezóne",
+      de: "Meiste Strafminuten in einer Saison",
+      ru: "Больше всего штрафных минут за один сезон",
+    },
+    "highest-attendance": {
+      en: "Highest single-game attendance",
+      cs: "Najvyššia návštevnosť v jednom zápase",
+      de: "Höchste Zuschauerzahl in einem Spiel",
+      ru: "Наивысшая посещаемость в одном матче",
+    },
+    "lowest-attendance": {
+      en: "Lowest single-game attendance",
+      cs: "Najnižšia návštevnosť v jednom zápase",
+      de: "Niedrigste Zuschauerzahl in einem Spiel",
+      ru: "Наименьшая посещаемость в одном матче",
+    },
+    "highest-avg-attendance": {
+      en: "Highest average attendance in a season",
+      cs: "Najvyššia priemerná návštevnosť v jednej sezóne",
+      de: "Höchster Zuschauerschnitt in einer Saison",
+      ru: "Наивысшая средняя посещаемость за сезон",
+    },
+    "lowest-avg-attendance": {
+      en: "Lowest average attendance in a season",
+      cs: "Najnižšia priemerná návštevnosť v jednej sezóne",
+      de: "Niedrigster Zuschauerschnitt in einer Saison",
+      ru: "Наименьшая средняя посещаемость за сезон",
+    },
+    "highest-scoring-game": {
+      en: "Highest scoring game (Most goals in a game)",
+      cs: "Highest scoring game (Najviac gólov v zápase)",
+      de: "Torreichstes Spiel (Meiste Tore)",
+      ru: "Самый результативный матч (Больше всего голов)",
+    },
+    "largest-victory": {
+      en: "Largest margin of victory",
+      cs: "Najvyššie víťazstvo (Najväčší gólový rozdiel)",
+      de: "Höchster Sieg (Größte Tordifferenz)",
+      ru: "Самая крупная победа (Наибольшая разница голов)",
+    },
+    "youngest-player": {
+      en: `Youngest active player in u${league}`,
+      cs: `Najmladší hráč v lige u${league}`,
+      de: `Jüngster aktiver Spieler in der u${league}`,
+      ru: `Самый молодой активный игрок в u${league}`,
+    },
+    "oldest-player": {
+      en: `Oldest active player in u${league}`,
+      cs: `Najstarší hráč v lige u${league}`,
+      de: `Ältester aktiver Spieler in der u${league}`,
+      ru: `Самый возрастной активный игрок в u${league}`,
+    },
+    "pre-best-team": {
+      en: "Best record in pre-season",
+      cs: "Najlepšia bilancia v príprave (Pre-season)",
+      de: "Beste Vorbereitungsbilanz (Pre-season)",
+      ru: "Лучший результат в предсезонке",
+    },
+    "pre-top-scorer": {
+      en: "Pre-season scoring leader",
+      cs: "Najproduktívnejší hráč v príprave (Top Scorer)",
+      de: "Topscorer der Vorbereitung",
+      ru: "Лучший бомбардир предсезонки",
+    },
+    "pre-goals": {
+      en: "Pre-season top goalscorer",
+      cs: "Najlepší strelec v príprave (Góly)",
+      de: "Bester Torschütze der Vorbereitung",
+      ru: "Лучший снайпер предсезонки",
+    },
+    "pre-assists": {
+      en: "Most assists in pre-season",
+      cs: "Najviac asistencií v príprave",
+      de: "Meiste Assists in der Vorbereitung",
+      ru: "Больше всего передач в предсезонке",
+    },
+    "pre-single-game-pts": {
+      en: "Most points in a single pre-season game",
+      cs: "Najviac bodov v jednom zápase prípravy",
+      de: "Meiste Punkte in einem Vorbereitungsspiel",
+      ru: "Больше всего очков в одном матче предсезонки",
+    },
+    "pre-goalie-saves": {
+      en: "Most goalie saves in pre-season",
+      cs: "Najviac zákrokov brankára v príprave",
+      de: "Meiste Torhüter-Paraden in der Vorbereitung",
+      ru: "Больше всего сейвов вратаря в предсезонке",
+    },
+  };
+  return map[id]?.[lang] ?? map[id]?.en ?? id;
 }
 
 export async function getLeagueRecords(
   league: "NHL" | "AHL" = "NHL",
   phase: RecordPhase = "all",
-  category: MainRecordCategory = "all"
+  category: MainRecordCategory = "all",
+  lang: Lang = "en"
 ): Promise<LeagueRecordsData> {
   const isAhl = league === "AHL";
   const cupName = isAhl ? "Calder Cup" : "Stanley Cup";
@@ -302,6 +1038,47 @@ export async function getLeagueRecords(
     gmTeamSeasons.get(key)!.seasons.add(ACTIVE_SEASON);
   }
 
+  const tTeam = lang === "cs" ? "Tím" : lang === "de" ? "Team" : lang === "ru" ? "Команда" : "Team";
+  const tHome = lang === "cs" ? "Domáci" : lang === "de" ? "Heim" : lang === "ru" ? "Хозяева" : "Home";
+  const tAway = lang === "cs" ? "Hostia" : lang === "de" ? "Gast" : lang === "ru" ? "Гости" : "Away";
+  const tWinner = lang === "cs" ? "Víťaz" : lang === "de" ? "Sieger" : lang === "ru" ? "Победитель" : "Winner";
+  const tLoser = lang === "cs" ? "Porazený" : lang === "de" ? "Verlierer" : lang === "ru" ? "Проигравший" : "Loser";
+  const tBorn = lang === "cs" ? "Narodený" : lang === "de" ? "Geboren" : lang === "ru" ? "Родился" : "Born";
+  const tPreseason = lang === "cs" ? "Príprava" : lang === "de" ? "Vorbereitung" : lang === "ru" ? "Предсезонка" : "Pre-season";
+  const tPlayoffs = lang === "cs" ? "Play-off" : lang === "de" ? "Playoffs" : lang === "ru" ? "Плей-офф" : "Playoffs";
+  const tSeason = lang === "cs" ? "Sezóna" : lang === "de" ? "Saison" : lang === "ru" ? "Сезон" : "Season";
+  const tRookieSeason = lang === "cs" ? "Sezóna nováčika" : lang === "de" ? "Rookie-Saison" : lang === "ru" ? "Сезон новичка" : "Rookie season";
+  const tPim = lang === "cs" ? "TM" : lang === "de" ? "Strafmin." : lang === "ru" ? "ШМ" : "PIM";
+  const tTotal = lang === "cs" ? "celkovo" : lang === "de" ? "gesamt" : lang === "ru" ? "всего" : "total";
+  const tInGame = lang === "cs" ? "v zápase" : lang === "de" ? "im Spiel" : lang === "ru" ? "за матч" : "in a game";
+  const tInGamePo = lang === "cs" ? "v zápase PO" : lang === "de" ? "im Playoff-Spiel" : lang === "ru" ? "в матче плей-офф" : "in playoff game";
+  const tScore = lang === "cs" ? "Skóre" : lang === "de" ? "Ergebnis" : lang === "ru" ? "Счет" : "Score";
+  const tResult = lang === "cs" ? "Výsledok" : lang === "de" ? "Ergebnis" : lang === "ru" ? "Результат" : "Result";
+  const tPlayer = lang === "cs" ? "Hráč" : lang === "de" ? "Spieler" : lang === "ru" ? "Игрок" : "Player";
+  const tGoalie = lang === "cs" ? "Brankár" : lang === "de" ? "Torhüter" : lang === "ru" ? "Вратарь" : "Goalie";
+
+  const fmtSeasonsCount = (count: number) => {
+    if (lang === "cs") return `${count} ${count === 1 ? "sezóna" : count < 5 ? "sezóny" : "sezón"}`;
+    if (lang === "de") return `${count} ${count === 1 ? "Saison" : "Saisons"}`;
+    if (lang === "ru") return `${count} ${count === 1 ? "сезон" : count < 5 ? "сезона" : "сезонов"}`;
+    return `${count} ${count === 1 ? "season" : "seasons"}`;
+  };
+
+  const fmtStreakInRow = (count: number) => {
+    if (lang === "cs") return `${count} v rade`;
+    if (lang === "de") return `${count} in Folge`;
+    if (lang === "ru") return `${count} подряд`;
+    return `${count} consecutive`;
+  };
+
+  const fmtSpan = (start: string, end: string) => {
+    if (start === end) return start;
+    if (lang === "cs") return `${start} až ${end}`;
+    if (lang === "de") return `${start} bis ${end}`;
+    if (lang === "ru") return `${start} по ${end}`;
+    return `${start} to ${end}`;
+  };
+
   const gmSeasonsLeader: LeaderItem[] = [...gmTotalSeasons.values()]
     .map((entry) => {
       const tm = teamById.get(entry.teamId);
@@ -316,7 +1093,7 @@ export async function getLeagueRecords(
         teamSlug: tm?.slug,
         teamLogo: tm?.logoUrl,
         gmSlug: parentTm?.slug,
-        value: `${entry.seasons.size} ${entry.seasons.size === 1 ? "sezóna" : entry.seasons.size < 5 ? "sezóny" : "sezón"}`,
+        value: fmtSeasonsCount(entry.seasons.size),
         rawVal: entry.seasons.size,
       };
     })
@@ -338,7 +1115,7 @@ export async function getLeagueRecords(
         teamSlug: tm?.slug,
         teamLogo: tm?.logoUrl,
         gmSlug: parentTm?.slug,
-        value: `${entry.seasons.size} ${entry.seasons.size === 1 ? "sezóna" : entry.seasons.size < 5 ? "sezóny" : "sezón"}`,
+        value: fmtSeasonsCount(entry.seasons.size),
         rawVal: entry.seasons.size,
       };
     })
@@ -379,7 +1156,7 @@ export async function getLeagueRecords(
       const tm = teamById.get(entry.teamId);
       const parentTm = tm?.parentTeam ? tm.parentTeam : tm;
       const nick = parentTm?.gmNickname ? `@${parentTm.gmNickname}` : null;
-      const spanText = bestStart === bestEnd ? bestStart : `${bestStart} až ${bestEnd}`;
+      const spanText = fmtSpan(bestStart, bestEnd);
       const sub = [nick, spanText].filter(Boolean).join(" · ");
 
       return {
@@ -390,7 +1167,7 @@ export async function getLeagueRecords(
         teamSlug: tm?.slug,
         teamLogo: tm?.logoUrl,
         gmSlug: parentTm?.slug,
-        value: `${maxStreak} v rade`,
+        value: fmtStreakInRow(maxStreak),
         rawVal: maxStreak,
       };
     })
@@ -415,7 +1192,7 @@ export async function getLeagueRecords(
       const tm = teamById.get(teamId);
       return {
         rank: 1,
-        name: tm?.name ?? "Tím",
+        name: tm?.name ?? tTeam,
         teamCode: tm?.code,
         teamSlug: tm?.slug,
         teamLogo: tm?.logoUrl,
@@ -490,7 +1267,7 @@ export async function getLeagueRecords(
     const isGoalie = p.position === "G" || p.isGoalie;
     const items = rings.map((r) => {
       const tm = teamById.get(r.teamId);
-      return `${r.season} (${tm?.code ?? tm?.name ?? "Tím"})`;
+      return `${r.season} (${tm?.code ?? tm?.name ?? tTeam})`;
     });
     const row: LeaderItem & { rawVal: number } = {
       rank: 1,
@@ -759,16 +1536,16 @@ export async function getLeagueRecords(
   const careerGoalsItems = topSkaters((s) => s.goals, (s) => `${s.goals} G`, (s) => `${s.gp} GP · ${s.points} PTS`);
   const careerAssistsItems = topSkaters((s) => s.assists, (s) => `${s.assists} A`, (s) => `${s.gp} GP · ${s.points} PTS`);
   const careerPointsItems = topSkaters((s) => s.points, (s) => `${s.points} PTS`, (s) => `${s.goals}G + ${s.assists}A (${s.gp} GP)`);
-  const careerPimItems = topSkaters((s) => s.pim, (s) => `${s.pim} TM`, (s) => `${s.gp} GP · ${s.points} PTS`);
+  const careerPimItems = topSkaters((s) => s.pim, (s) => `${s.pim} ${tPim}`, (s) => `${s.gp} GP · ${s.points} PTS`);
   const careerPlusMinusBestItems = topSkaters((s) => s.plusMinus, (s) => `+${s.plusMinus} +/-`, (s) => `${s.gp} GP · ${s.points} PTS`);
   const careerPlusMinusWorstItems = topSkaters((s) => s.plusMinus, (s) => `${s.plusMinus} +/-`, (s) => `${s.gp} GP · ${s.points} PTS`, true);
 
-  const careerPpGoalsItems = topSkaters((s) => s.ppGoals, (s) => `${s.ppGoals} PPG`, (s) => `${s.goals} G celkovo · ${s.gp} GP`);
-  const careerPpAssistsItems = topSkaters((s) => s.ppAssists, (s) => `${s.ppAssists} PPA`, (s) => `${s.assists} A celkovo · ${s.gp} GP`);
+  const careerPpGoalsItems = topSkaters((s) => s.ppGoals, (s) => `${s.ppGoals} PPG`, (s) => `${s.goals} G ${tTotal} · ${s.gp} GP`);
+  const careerPpAssistsItems = topSkaters((s) => s.ppAssists, (s) => `${s.ppAssists} PPA`, (s) => `${s.assists} A ${tTotal} · ${s.gp} GP`);
   const careerPpPointsItems = topSkaters((s) => s.ppPoints, (s) => `${s.ppPoints} PPP`, (s) => `${s.ppGoals} PPG + ${s.ppAssists} PPA (${s.points} PTS)`);
 
-  const careerShGoalsItems = topSkaters((s) => s.shGoals, (s) => `${s.shGoals} SHG`, (s) => `${s.goals} G celkovo · ${s.gp} GP`);
-  const careerShAssistsItems = topSkaters((s) => s.shAssists, (s) => `${s.shAssists} SHA`, (s) => `${s.assists} A celkovo · ${s.gp} GP`);
+  const careerShGoalsItems = topSkaters((s) => s.shGoals, (s) => `${s.shGoals} SHG`, (s) => `${s.goals} G ${tTotal} · ${s.gp} GP`);
+  const careerShAssistsItems = topSkaters((s) => s.shAssists, (s) => `${s.shAssists} SHA`, (s) => `${s.assists} A ${tTotal} · ${s.gp} GP`);
   const careerShPointsItems = topSkaters((s) => s.shPoints, (s) => `${s.shPoints} SHP`, (s) => `${s.shGoals} SHG + ${s.shAssists} SHA (${s.points} PTS)`);
 
   // Streaks across regular season games
@@ -864,10 +1641,10 @@ export async function getLeagueRecords(
       .slice(0, 5)
       .map((item, idx) => {
         const p = playerMap.get(item.playerId);
-        const spanText = item.startSeason === item.endSeason ? `Sezóna ${item.startSeason}` : `${item.startSeason} až ${item.endSeason}`;
+        const spanText = item.startSeason === item.endSeason ? `${tSeason} ${item.startSeason}` : fmtSpan(item.startSeason, item.endSeason);
         return {
           rank: idx + 1,
-          name: p ? cleanName(p.name) : "Hráč",
+          name: p ? cleanName(p.name) : tPlayer,
           slug: p?.slug,
           photoUrl: p?.photoUrl,
           hideTeam: true,
@@ -876,10 +1653,10 @@ export async function getLeagueRecords(
         };
       });
 
-  const ironmanLeader = buildStreakLeader(ironmanStreaks, "zápasov v rade");
-  const goalStreakLeader = buildStreakLeader(goalStreaks, "zápasov s gólom");
-  const assistStreakLeader = buildStreakLeader(assistStreaks, "zápasov s asistenciou");
-  const pointStreakLeader = buildStreakLeader(pointStreaks, "zápasov s bodom");
+  const ironmanLeader = buildStreakLeader(ironmanStreaks, lang === "cs" ? "zápasov v rade" : lang === "de" ? "Spiele in Folge" : lang === "ru" ? "матчей подряд" : "consecutive GP");
+  const goalStreakLeader = buildStreakLeader(goalStreaks, lang === "cs" ? "zápasov s gólom" : lang === "de" ? "Torspiele in Folge" : lang === "ru" ? "матчей с голом" : "game goal streak");
+  const assistStreakLeader = buildStreakLeader(assistStreaks, lang === "cs" ? "zápasov s asistenciou" : lang === "de" ? "Assist-Spiele in Folge" : lang === "ru" ? "матчей с передачей" : "game assist streak");
+  const pointStreakLeader = buildStreakLeader(pointStreaks, lang === "cs" ? "zápasov s bodom" : lang === "de" ? "Punktespiele in Folge" : lang === "ru" ? "матчей с очками" : "game point streak");
 
   // Player first match and last match dates for debut / oldest appearance
   type PlayerMatchSpan = { playerId: number; firstDate: Date; lastDate: Date; firstSeason: string; lastSeason: string };
@@ -913,7 +1690,7 @@ export async function getLeagueRecords(
     .map((span) => {
       const p = playerMap.get(span.playerId);
       if (!p) return null;
-      const age = calculateAge(p.birthDate, span.firstDate, p.age);
+      const age = calculateAge(p.birthDate, span.firstDate, p.age, lang);
       if (!age || age.years < 15 || age.years > 65) return null;
       const totalDays = age.years * 365 + age.days;
       return { span, p, age, totalDays };
@@ -928,14 +1705,14 @@ export async function getLeagueRecords(
       photoUrl: p.photoUrl,
       hideTeam: true,
       value: age.formatted,
-      sub: `Debut v sezóne ${span.firstSeason} (${span.firstDate.toLocaleDateString("sk-SK")})`,
+      sub: `${lang === "cs" ? "Debut v sezóne" : lang === "de" ? "Debüt in Saison" : lang === "ru" ? "Дебют в сезоне" : "Debut in season"} ${span.firstSeason} (${formatRecordDate(span.firstDate, lang)})`,
     }));
 
   const matchAppearanceOldest: LeaderItem[] = [...playerMatchDates.values()]
     .map((span) => {
       const p = playerMap.get(span.playerId);
       if (!p) return null;
-      const age = calculateAge(p.birthDate, span.lastDate, p.age);
+      const age = calculateAge(p.birthDate, span.lastDate, p.age, lang);
       if (!age || age.years < 15 || age.years > 65) return null;
       const totalDays = age.years * 365 + age.days;
       return { span, p, age, totalDays };
@@ -950,29 +1727,31 @@ export async function getLeagueRecords(
       photoUrl: p.photoUrl,
       hideTeam: true,
       value: age.formatted,
-      sub: `Zápas v sezóne ${span.lastSeason} (${span.lastDate.toLocaleDateString("sk-SK")})`,
+      sub: `${lang === "cs" ? "Zápas v sezóne" : lang === "de" ? "Spiel in Saison" : lang === "ru" ? "Матч в сезоне" : "Game in season"} ${span.lastSeason} (${formatRecordDate(span.lastDate, lang)})`,
     }));
 
+  const secBadgeReg = getRecordBadge("regular", lang);
+
   const skaterCareerSections: RecordSection[] = [
-    { id: "career-gp", title: "Najviac odohraných zápasov v kariére", icon: "🏒", phase: "regular", phaseBadge: "ZČ", items: careerGpItems },
-    { id: "career-goals", title: "Najviac gólov v kariére", icon: "🎯", phase: "regular", phaseBadge: "ZČ", items: careerGoalsItems },
-    { id: "career-assists", title: "Najviac asistencií v kariére", icon: "🪄", phase: "regular", phaseBadge: "ZČ", items: careerAssistsItems },
-    { id: "career-points", title: "Najviac bodov v kariére", icon: "⭐", phase: "regular", phaseBadge: "ZČ", items: careerPointsItems },
-    { id: "career-pim", title: "Najviac trestných minút v kariére", icon: "⏱️", phase: "regular", phaseBadge: "ZČ", items: careerPimItems },
-    { id: "career-plus-minus-best", title: "Najlepší +/- v kariére", icon: "🟢", phase: "regular", phaseBadge: "ZČ", items: careerPlusMinusBestItems },
-    { id: "career-plus-minus-worst", title: "Najhorší +/- v kariére", icon: "🔴", phase: "regular", phaseBadge: "ZČ", items: careerPlusMinusWorstItems },
-    { id: "career-pp-goals", title: "Najviac presilovkových gólov v kariére (PPG)", icon: "⚡", phase: "regular", phaseBadge: "ZČ", items: careerPpGoalsItems },
-    { id: "career-pp-assists", title: "Najviac presilovkových asistencií v kariére (PPA)", icon: "🏒", phase: "regular", phaseBadge: "ZČ", items: careerPpAssistsItems },
-    { id: "career-pp-points", title: "Najviac presilovkových bodov v kariére (PPP)", icon: "⭐", phase: "regular", phaseBadge: "ZČ", items: careerPpPointsItems },
-    { id: "career-sh-goals", title: "Najviac oslabovkových gólov v kariére (SHG)", icon: "🛡️", phase: "regular", phaseBadge: "ZČ", items: careerShGoalsItems },
-    { id: "career-sh-assists", title: "Najviac oslabovkových asistencií v kariére (SHA)", icon: "🧤", phase: "regular", phaseBadge: "ZČ", items: careerShAssistsItems },
-    { id: "career-sh-points", title: "Najviac oslabovkových bodov v kariére (SHP)", icon: "⭐", phase: "regular", phaseBadge: "ZČ", items: careerShPointsItems },
-    { id: "career-ironman", title: "Najviac odohraných zápasov v rade (Ironman streak)", icon: "🛡️", phase: "regular", phaseBadge: "ZČ", items: ironmanLeader },
-    { id: "career-goal-streak", title: "Najdlhšia gólová séria v rade (zápasy s gólom)", icon: "🔥", phase: "regular", phaseBadge: "ZČ", items: goalStreakLeader },
-    { id: "career-assist-streak", title: "Najdlhšia asistenčná séria v rade (zápasy s asistenciou)", icon: "🪄", phase: "regular", phaseBadge: "ZČ", items: assistStreakLeader },
-    { id: "career-point-streak", title: "Najdlhšia bodová séria v rade (zápasy s bodom)", icon: "⚡", phase: "regular", phaseBadge: "ZČ", items: pointStreakLeader },
-    { id: "career-youngest-debut", title: "Najmladší hráč pri debute v zápase", icon: "👶", phase: "regular", phaseBadge: "ZČ", items: matchDebutYoungest },
-    { id: "career-oldest-appearance", title: "Najstarší hráč v zápase", icon: "👴", phase: "regular", phaseBadge: "ZČ", items: matchAppearanceOldest },
+    { id: "career-gp", title: getSectionTitle("career-gp", lang, league, cupName), icon: "🏒", phase: "regular", phaseBadge: secBadgeReg, items: careerGpItems },
+    { id: "career-goals", title: getSectionTitle("career-goals", lang, league, cupName), icon: "🎯", phase: "regular", phaseBadge: secBadgeReg, items: careerGoalsItems },
+    { id: "career-assists", title: getSectionTitle("career-assists", lang, league, cupName), icon: "🪄", phase: "regular", phaseBadge: secBadgeReg, items: careerAssistsItems },
+    { id: "career-points", title: getSectionTitle("career-points", lang, league, cupName), icon: "⭐", phase: "regular", phaseBadge: secBadgeReg, items: careerPointsItems },
+    { id: "career-pim", title: getSectionTitle("career-pim", lang, league, cupName), icon: "⏱️", phase: "regular", phaseBadge: secBadgeReg, items: careerPimItems },
+    { id: "career-plus-minus-best", title: getSectionTitle("career-plus-minus-best", lang, league, cupName), icon: "🟢", phase: "regular", phaseBadge: secBadgeReg, items: careerPlusMinusBestItems },
+    { id: "career-plus-minus-worst", title: getSectionTitle("career-plus-minus-worst", lang, league, cupName), icon: "🔴", phase: "regular", phaseBadge: secBadgeReg, items: careerPlusMinusWorstItems },
+    { id: "career-pp-goals", title: getSectionTitle("career-pp-goals", lang, league, cupName), icon: "⚡", phase: "regular", phaseBadge: secBadgeReg, items: careerPpGoalsItems },
+    { id: "career-pp-assists", title: getSectionTitle("career-pp-assists", lang, league, cupName), icon: "🏒", phase: "regular", phaseBadge: secBadgeReg, items: careerPpAssistsItems },
+    { id: "career-pp-points", title: getSectionTitle("career-pp-points", lang, league, cupName), icon: "⭐", phase: "regular", phaseBadge: secBadgeReg, items: careerPpPointsItems },
+    { id: "career-sh-goals", title: getSectionTitle("career-sh-goals", lang, league, cupName), icon: "🛡️", phase: "regular", phaseBadge: secBadgeReg, items: careerShGoalsItems },
+    { id: "career-sh-assists", title: getSectionTitle("career-sh-assists", lang, league, cupName), icon: "🧤", phase: "regular", phaseBadge: secBadgeReg, items: careerShAssistsItems },
+    { id: "career-sh-points", title: getSectionTitle("career-sh-points", lang, league, cupName), icon: "⭐", phase: "regular", phaseBadge: secBadgeReg, items: careerShPointsItems },
+    { id: "career-ironman", title: getSectionTitle("career-ironman", lang, league, cupName), icon: "🛡️", phase: "regular", phaseBadge: secBadgeReg, items: ironmanLeader },
+    { id: "career-goal-streak", title: getSectionTitle("career-goal-streak", lang, league, cupName), icon: "🔥", phase: "regular", phaseBadge: secBadgeReg, items: goalStreakLeader },
+    { id: "career-assist-streak", title: getSectionTitle("career-assist-streak", lang, league, cupName), icon: "🪄", phase: "regular", phaseBadge: secBadgeReg, items: assistStreakLeader },
+    { id: "career-point-streak", title: getSectionTitle("career-point-streak", lang, league, cupName), icon: "⚡", phase: "regular", phaseBadge: secBadgeReg, items: pointStreakLeader },
+    { id: "career-youngest-debut", title: getSectionTitle("career-youngest-debut", lang, league, cupName), icon: "👶", phase: "regular", phaseBadge: secBadgeReg, items: matchDebutYoungest },
+    { id: "career-oldest-appearance", title: getSectionTitle("career-oldest-appearance", lang, league, cupName), icon: "👴", phase: "regular", phaseBadge: secBadgeReg, items: matchAppearanceOldest },
   ];
 
   // ==========================================
@@ -1100,32 +1879,32 @@ export async function getLeagueRecords(
         };
       });
 
-  const seasonGoalsLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.goals - a.goals || b.points - a.points, (s) => s.goals > 0, (s) => `${s.goals} G`, (s) => `Sezóna ${s.season} · ${s.points} PTS (${s.gp} GP)`);
-  const seasonAssistsLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.assists - a.assists || b.points - a.points, (s) => s.assists > 0, (s) => `${s.assists} A`, (s) => `Sezóna ${s.season} · ${s.points} PTS (${s.gp} GP)`);
-  const seasonPointsLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.points - a.points || b.goals - a.goals, (s) => s.points > 0, (s) => `${s.points} PTS`, (s) => `Sezóna ${s.season} · ${s.goals}G + ${s.assists}A (${s.gp} GP)`);
-  const seasonPimLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.pim - a.pim, (s) => s.pim > 0, (s) => `${s.pim} TM`, (s) => `Sezóna ${s.season} · ${s.gp} GP`);
-  const seasonPlusMinusBestLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.plusMinus - a.plusMinus || b.points - a.points, (s) => s.plusMinus > 0, (s) => `+${s.plusMinus} +/-`, (s) => `Sezóna ${s.season} · ${s.points} PTS (${s.gp} GP)`);
-  const seasonPlusMinusWorstLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => a.plusMinus - b.plusMinus || a.points - b.points, (s) => s.plusMinus < 0, (s) => `${s.plusMinus} +/-`, (s) => `Sezóna ${s.season} · ${s.points} PTS (${s.gp} GP)`);
-  const seasonPpGoalsLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.ppGoals - a.ppGoals || b.goals - a.goals, (s) => s.ppGoals > 0, (s) => `${s.ppGoals} PPG`, (s) => `Sezóna ${s.season} · ${s.goals} G celkovo (${s.gp} GP)`);
-  const seasonPpAssistsLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.ppAssists - a.ppAssists || b.assists - a.assists, (s) => s.ppAssists > 0, (s) => `${s.ppAssists} PPA`, (s) => `Sezóna ${s.season} · ${s.assists} A celkovo (${s.gp} GP)`);
-  const seasonPpPointsLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.ppPoints - a.ppPoints || b.points - a.points, (s) => s.ppPoints > 0, (s) => `${s.ppPoints} PPP`, (s) => `Sezóna ${s.season} · ${s.ppGoals} PPG + ${s.ppAssists} PPA (${s.points} PTS)`);
-  const seasonShGoalsLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.shGoals - a.shGoals || b.goals - a.goals, (s) => s.shGoals > 0, (s) => `${s.shGoals} SHG`, (s) => `Sezóna ${s.season} · ${s.goals} G celkovo (${s.gp} GP)`);
-  const seasonShAssistsLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.shAssists - a.shAssists || b.assists - a.assists, (s) => s.shAssists > 0, (s) => `${s.shAssists} SHA`, (s) => `Sezóna ${s.season} · ${s.assists} A celkovo (${s.gp} GP)`);
-  const seasonShPointsLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.shPoints - a.shPoints || b.points - a.points, (s) => s.shPoints > 0, (s) => `${s.shPoints} SHP`, (s) => `Sezóna ${s.season} · ${s.shGoals} SHG + ${s.shAssists} SHA (${s.points} PTS)`);
+  const seasonGoalsLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.goals - a.goals || b.points - a.points, (s) => s.goals > 0, (s) => `${s.goals} G`, (s) => `${tSeason} ${s.season} · ${s.points} PTS (${s.gp} GP)`);
+  const seasonAssistsLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.assists - a.assists || b.points - a.points, (s) => s.assists > 0, (s) => `${s.assists} A`, (s) => `${tSeason} ${s.season} · ${s.points} PTS (${s.gp} GP)`);
+  const seasonPointsLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.points - a.points || b.goals - a.goals, (s) => s.points > 0, (s) => `${s.points} PTS`, (s) => `${tSeason} ${s.season} · ${s.goals}G + ${s.assists}A (${s.gp} GP)`);
+  const seasonPimLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.pim - a.pim, (s) => s.pim > 0, (s) => `${s.pim} ${tPim}`, (s) => `${tSeason} ${s.season} · ${s.gp} GP`);
+  const seasonPlusMinusBestLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.plusMinus - a.plusMinus || b.points - a.points, (s) => s.plusMinus > 0, (s) => `+${s.plusMinus} +/-`, (s) => `${tSeason} ${s.season} · ${s.points} PTS (${s.gp} GP)`);
+  const seasonPlusMinusWorstLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => a.plusMinus - b.plusMinus || a.points - b.points, (s) => s.plusMinus < 0, (s) => `${s.plusMinus} +/-`, (s) => `${tSeason} ${s.season} · ${s.points} PTS (${s.gp} GP)`);
+  const seasonPpGoalsLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.ppGoals - a.ppGoals || b.goals - a.goals, (s) => s.ppGoals > 0, (s) => `${s.ppGoals} PPG`, (s) => `${tSeason} ${s.season} · ${s.goals} G ${tTotal} (${s.gp} GP)`);
+  const seasonPpAssistsLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.ppAssists - a.ppAssists || b.assists - a.assists, (s) => s.ppAssists > 0, (s) => `${s.ppAssists} PPA`, (s) => `${tSeason} ${s.season} · ${s.assists} A ${tTotal} (${s.gp} GP)`);
+  const seasonPpPointsLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.ppPoints - a.ppPoints || b.points - a.points, (s) => s.ppPoints > 0, (s) => `${s.ppPoints} PPP`, (s) => `${tSeason} ${s.season} · ${s.ppGoals} PPG + ${s.ppAssists} PPA (${s.points} PTS)`);
+  const seasonShGoalsLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.shGoals - a.shGoals || b.goals - a.goals, (s) => s.shGoals > 0, (s) => `${s.shGoals} SHG`, (s) => `${tSeason} ${s.season} · ${s.goals} G ${tTotal} (${s.gp} GP)`);
+  const seasonShAssistsLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.shAssists - a.shAssists || b.assists - a.assists, (s) => s.shAssists > 0, (s) => `${s.shAssists} SHA`, (s) => `${tSeason} ${s.season} · ${s.assists} A ${tTotal} (${s.gp} GP)`);
+  const seasonShPointsLeader = buildSeasonSkaterLeader(allSeasonSkaters, (a, b) => b.shPoints - a.shPoints || b.points - a.points, (s) => s.shPoints > 0, (s) => `${s.shPoints} SHP`, (s) => `${tSeason} ${s.season} · ${s.shGoals} SHG + ${s.shAssists} SHA (${s.points} PTS)`);
 
   const skaterSeasonSections: RecordSection[] = [
-    { id: "season-goals", title: "Najviac gólov v jednej sezóne", icon: "🎯", phase: "regular", phaseBadge: "ZČ", items: seasonGoalsLeader },
-    { id: "season-assists", title: "Najviac asistencií v jednej sezóne", icon: "🪄", phase: "regular", phaseBadge: "ZČ", items: seasonAssistsLeader },
-    { id: "season-points", title: "Najviac bodov v jednej sezóne", icon: "⭐", phase: "regular", phaseBadge: "ZČ", items: seasonPointsLeader },
-    { id: "season-pim", title: "Najviac trestných minút v jednej sezóne", icon: "⏱️", phase: "regular", phaseBadge: "ZČ", items: seasonPimLeader },
-    { id: "season-plus-minus-best", title: "Najlepší +/- v jednej sezóne", icon: "🟢", phase: "regular", phaseBadge: "ZČ", items: seasonPlusMinusBestLeader },
-    { id: "season-plus-minus-worst", title: "Najhorší +/- v jednej sezóne", icon: "🔴", phase: "regular", phaseBadge: "ZČ", items: seasonPlusMinusWorstLeader },
-    { id: "season-pp-goals", title: "Najviac presilovkových gólov v jednej sezóne (PPG)", icon: "⚡", phase: "regular", phaseBadge: "ZČ", items: seasonPpGoalsLeader },
-    { id: "season-pp-assists", title: "Najviac presilovkových asistencií v jednej sezóne (PPA)", icon: "🏒", phase: "regular", phaseBadge: "ZČ", items: seasonPpAssistsLeader },
-    { id: "season-pp-points", title: "Najviac presilovkových bodov v jednej sezóne (PPP)", icon: "⭐", phase: "regular", phaseBadge: "ZČ", items: seasonPpPointsLeader },
-    { id: "season-sh-goals", title: "Najviac oslabovkových gólov v jednej sezóne (SHG)", icon: "🛡️", phase: "regular", phaseBadge: "ZČ", items: seasonShGoalsLeader },
-    { id: "season-sh-assists", title: "Najviac oslabovkových asistencií v jednej sezóne (SHA)", icon: "🧤", phase: "regular", phaseBadge: "ZČ", items: seasonShAssistsLeader },
-    { id: "season-sh-points", title: "Najviac oslabovkových bodov v jednej sezóne (SHP)", icon: "⭐", phase: "regular", phaseBadge: "ZČ", items: seasonShPointsLeader },
+    { id: "season-goals", title: getSectionTitle("season-goals", lang, league, cupName), icon: "🎯", phase: "regular", phaseBadge: secBadgeReg, items: seasonGoalsLeader },
+    { id: "season-assists", title: getSectionTitle("season-assists", lang, league, cupName), icon: "🪄", phase: "regular", phaseBadge: secBadgeReg, items: seasonAssistsLeader },
+    { id: "season-points", title: getSectionTitle("season-points", lang, league, cupName), icon: "⭐", phase: "regular", phaseBadge: secBadgeReg, items: seasonPointsLeader },
+    { id: "season-pim", title: getSectionTitle("season-pim", lang, league, cupName), icon: "⏱️", phase: "regular", phaseBadge: secBadgeReg, items: seasonPimLeader },
+    { id: "season-plus-minus-best", title: getSectionTitle("season-plus-minus-best", lang, league, cupName), icon: "🟢", phase: "regular", phaseBadge: secBadgeReg, items: seasonPlusMinusBestLeader },
+    { id: "season-plus-minus-worst", title: getSectionTitle("season-plus-minus-worst", lang, league, cupName), icon: "🔴", phase: "regular", phaseBadge: secBadgeReg, items: seasonPlusMinusWorstLeader },
+    { id: "season-pp-goals", title: getSectionTitle("season-pp-goals", lang, league, cupName), icon: "⚡", phase: "regular", phaseBadge: secBadgeReg, items: seasonPpGoalsLeader },
+    { id: "season-pp-assists", title: getSectionTitle("season-pp-assists", lang, league, cupName), icon: "🏒", phase: "regular", phaseBadge: secBadgeReg, items: seasonPpAssistsLeader },
+    { id: "season-pp-points", title: getSectionTitle("season-pp-points", lang, league, cupName), icon: "⭐", phase: "regular", phaseBadge: secBadgeReg, items: seasonPpPointsLeader },
+    { id: "season-sh-goals", title: getSectionTitle("season-sh-goals", lang, league, cupName), icon: "🛡️", phase: "regular", phaseBadge: secBadgeReg, items: seasonShGoalsLeader },
+    { id: "season-sh-assists", title: getSectionTitle("season-sh-assists", lang, league, cupName), icon: "🧤", phase: "regular", phaseBadge: secBadgeReg, items: seasonShAssistsLeader },
+    { id: "season-sh-points", title: getSectionTitle("season-sh-points", lang, league, cupName), icon: "⭐", phase: "regular", phaseBadge: secBadgeReg, items: seasonShPointsLeader },
   ];
 
   // ==========================================
@@ -1136,20 +1915,20 @@ export async function getLeagueRecords(
     return playerDebutSeason.get(s.playerId) === s.season || (p && isRookieName(p.name));
   });
 
-  const rookieGoalsLeader = buildSeasonSkaterLeader(rookieSeasonSkaters, (a, b) => b.goals - a.goals || b.points - a.points, (s) => s.goals > 0, (s) => `${s.goals} G`, (s) => `Sezóna nováčika ${s.season} · ${s.points} PTS (${s.gp} GP)`);
-  const rookieAssistsLeader = buildSeasonSkaterLeader(rookieSeasonSkaters, (a, b) => b.assists - a.assists || b.points - a.points, (s) => s.assists > 0, (s) => `${s.assists} A`, (s) => `Sezóna nováčika ${s.season} · ${s.points} PTS (${s.gp} GP)`);
-  const rookiePointsLeader = buildSeasonSkaterLeader(rookieSeasonSkaters, (a, b) => b.points - a.points || b.goals - a.goals, (s) => s.points > 0, (s) => `${s.points} PTS`, (s) => `Sezóna nováčika ${s.season} · ${s.goals}G + ${s.assists}A (${s.gp} GP)`);
-  const rookiePimLeader = buildSeasonSkaterLeader(rookieSeasonSkaters, (a, b) => b.pim - a.pim, (s) => s.pim > 0, (s) => `${s.pim} TM`, (s) => `Sezóna nováčika ${s.season} · ${s.gp} GP`);
-  const rookiePlusMinusBestLeader = buildSeasonSkaterLeader(rookieSeasonSkaters, (a, b) => b.plusMinus - a.plusMinus || b.points - a.points, (s) => s.plusMinus > 0, (s) => `+${s.plusMinus} +/-`, (s) => `Sezóna nováčika ${s.season} · ${s.points} PTS (${s.gp} GP)`);
-  const rookiePlusMinusWorstLeader = buildSeasonSkaterLeader(rookieSeasonSkaters, (a, b) => a.plusMinus - b.plusMinus || a.points - b.points, (s) => s.plusMinus < 0, (s) => `${s.plusMinus} +/-`, (s) => `Sezóna nováčika ${s.season} · ${s.points} PTS (${s.gp} GP)`);
+  const rookieGoalsLeader = buildSeasonSkaterLeader(rookieSeasonSkaters, (a, b) => b.goals - a.goals || b.points - a.points, (s) => s.goals > 0, (s) => `${s.goals} G`, (s) => `${tRookieSeason} ${s.season} · ${s.points} PTS (${s.gp} GP)`);
+  const rookieAssistsLeader = buildSeasonSkaterLeader(rookieSeasonSkaters, (a, b) => b.assists - a.assists || b.points - a.points, (s) => s.assists > 0, (s) => `${s.assists} A`, (s) => `${tRookieSeason} ${s.season} · ${s.points} PTS (${s.gp} GP)`);
+  const rookiePointsLeader = buildSeasonSkaterLeader(rookieSeasonSkaters, (a, b) => b.points - a.points || b.goals - a.goals, (s) => s.points > 0, (s) => `${s.points} PTS`, (s) => `${tRookieSeason} ${s.season} · ${s.goals}G + ${s.assists}A (${s.gp} GP)`);
+  const rookiePimLeader = buildSeasonSkaterLeader(rookieSeasonSkaters, (a, b) => b.pim - a.pim, (s) => s.pim > 0, (s) => `${s.pim} ${tPim}`, (s) => `${tRookieSeason} ${s.season} · ${s.gp} GP`);
+  const rookiePlusMinusBestLeader = buildSeasonSkaterLeader(rookieSeasonSkaters, (a, b) => b.plusMinus - a.plusMinus || b.points - a.points, (s) => s.plusMinus > 0, (s) => `+${s.plusMinus} +/-`, (s) => `${tRookieSeason} ${s.season} · ${s.points} PTS (${s.gp} GP)`);
+  const rookiePlusMinusWorstLeader = buildSeasonSkaterLeader(rookieSeasonSkaters, (a, b) => a.plusMinus - b.plusMinus || a.points - b.points, (s) => s.plusMinus < 0, (s) => `${s.plusMinus} +/-`, (s) => `${tRookieSeason} ${s.season} · ${s.points} PTS (${s.gp} GP)`);
 
   const rookieSections: RecordSection[] = [
-    { id: "rookie-season-goals", title: "Najviac gólov v nováčikovskej sezóne", icon: "🎯", phase: "regular", phaseBadge: "ZČ", items: rookieGoalsLeader },
-    { id: "rookie-season-assists", title: "Najviac asistencií v nováčikovskej sezóne", icon: "🪄", phase: "regular", phaseBadge: "ZČ", items: rookieAssistsLeader },
-    { id: "rookie-season-points", title: "Najviac bodov v nováčikovskej sezóne", icon: "⭐", phase: "regular", phaseBadge: "ZČ", items: rookiePointsLeader },
-    { id: "rookie-season-pim", title: "Najviac trestných minút v nováčikovskej sezóne", icon: "⏱️", phase: "regular", phaseBadge: "ZČ", items: rookiePimLeader },
-    { id: "rookie-season-plus-minus-best", title: "Najlepší +/- v nováčikovskej sezóne", icon: "🟢", phase: "regular", phaseBadge: "ZČ", items: rookiePlusMinusBestLeader },
-    { id: "rookie-season-plus-minus-worst", title: "Najhorší +/- v nováčikovskej sezóne", icon: "🔴", phase: "regular", phaseBadge: "ZČ", items: rookiePlusMinusWorstLeader },
+    { id: "rookie-season-goals", title: getSectionTitle("rookie-season-goals", lang, league, cupName), icon: "🎯", phase: "regular", phaseBadge: secBadgeReg, items: rookieGoalsLeader },
+    { id: "rookie-season-assists", title: getSectionTitle("rookie-season-assists", lang, league, cupName), icon: "🪄", phase: "regular", phaseBadge: secBadgeReg, items: rookieAssistsLeader },
+    { id: "rookie-season-points", title: getSectionTitle("rookie-season-points", lang, league, cupName), icon: "⭐", phase: "regular", phaseBadge: secBadgeReg, items: rookiePointsLeader },
+    { id: "rookie-season-pim", title: getSectionTitle("rookie-season-pim", lang, league, cupName), icon: "⏱️", phase: "regular", phaseBadge: secBadgeReg, items: rookiePimLeader },
+    { id: "rookie-season-plus-minus-best", title: getSectionTitle("rookie-season-plus-minus-best", lang, league, cupName), icon: "🟢", phase: "regular", phaseBadge: secBadgeReg, items: rookiePlusMinusBestLeader },
+    { id: "rookie-season-plus-minus-worst", title: getSectionTitle("rookie-season-plus-minus-worst", lang, league, cupName), icon: "🔴", phase: "regular", phaseBadge: secBadgeReg, items: rookiePlusMinusWorstLeader },
   ];
 
   // ==========================================
@@ -1171,7 +1950,7 @@ export async function getLeagueRecords(
         const tm = s.teamId ? teamById.get(s.teamId) : null;
         return {
           rank: idx + 1,
-          name: p ? cleanName(p.name) : "Hráč",
+          name: p ? cleanName(p.name) : tPlayer,
           slug: p?.slug,
           photoUrl: p?.photoUrl,
           teamCode: tm?.code,
@@ -1182,34 +1961,34 @@ export async function getLeagueRecords(
         };
       });
 
-  const getGameDateStr = (g: any) => (g?.gameDate ? new Date(g.gameDate).toLocaleDateString("sk-SK") : g?.season ?? "");
+  const getGameDateStr = (g: any) => (g?.gameDate ? formatRecordDate(new Date(g.gameDate), lang) : g?.season ?? "");
 
-  const gameGoalsLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => b.goals - a.goals || b.points - a.points, (s) => s.goals > 0, (s) => `${s.goals} G v zápase`, (s) => `${s.game.season} (${getGameDateStr(s.game)}) · ${s.points} PTS`);
-  const gameAssistsLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => b.assists - a.assists || b.points - a.points, (s) => s.assists > 0, (s) => `${s.assists} A v zápase`, (s) => `${s.game.season} (${getGameDateStr(s.game)}) · ${s.points} PTS`);
-  const gamePointsLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => b.points - a.points || b.goals - a.goals, (s) => s.points > 0, (s) => `${s.points} PTS v zápase`, (s) => `${s.goals}G + ${s.assists}A · ${s.game.season} (${getGameDateStr(s.game)})`);
-  const gamePimLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => b.pim - a.pim, (s) => s.pim > 0, (s) => `${s.pim} TM v zápase`, (s) => `${s.game.season} (${getGameDateStr(s.game)})`);
-  const gamePlusMinusBestLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => b.plusMinus - a.plusMinus || b.points - a.points, (s) => s.plusMinus > 0, (s) => `+${s.plusMinus} +/- v zápase`, (s) => `${s.game.season} (${getGameDateStr(s.game)}) · ${s.points} PTS`);
-  const gamePlusMinusWorstLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => a.plusMinus - b.plusMinus || a.points - b.points, (s) => s.plusMinus < 0, (s) => `${s.plusMinus} +/- v zápase`, (s) => `${s.game.season} (${getGameDateStr(s.game)}) · ${s.points} PTS`);
-  const gamePpGoalsLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => (b.ppGoals ?? 0) - (a.ppGoals ?? 0) || b.goals - a.goals, (s) => (s.ppGoals ?? 0) > 0, (s) => `${s.ppGoals} PPG v zápase`, (s) => `${s.goals} G celkovo · ${s.game.season} (${getGameDateStr(s.game)})`);
-  const gamePpAssistsLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => (b.ppAssists ?? 0) - (a.ppAssists ?? 0) || b.assists - a.assists, (s) => (s.ppAssists ?? 0) > 0, (s) => `${s.ppAssists} PPA v zápase`, (s) => `${s.assists} A celkovo · ${s.game.season} (${getGameDateStr(s.game)})`);
-  const gamePpPointsLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => ((b.ppGoals ?? 0) + (b.ppAssists ?? 0)) - ((a.ppGoals ?? 0) + (a.ppAssists ?? 0)) || b.points - a.points, (s) => (s.ppGoals ?? 0) + (s.ppAssists ?? 0) > 0, (s) => `${(s.ppGoals ?? 0) + (s.ppAssists ?? 0)} PPP v zápase`, (s) => `${s.ppGoals} PPG + ${s.ppAssists} PPA · ${s.game.season}`);
-  const gameShGoalsLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => (b.shGoals ?? 0) - (a.shGoals ?? 0) || b.goals - a.goals, (s) => (s.shGoals ?? 0) > 0, (s) => `${s.shGoals} SHG v zápase`, (s) => `${s.goals} G celkovo · ${s.game.season} (${getGameDateStr(s.game)})`);
-  const gameShAssistsLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => (b.shAssists ?? 0) - (a.shAssists ?? 0) || b.assists - a.assists, (s) => (s.shAssists ?? 0) > 0, (s) => `${s.shAssists} SHA v zápase`, (s) => `${s.assists} A celkovo · ${s.game.season} (${getGameDateStr(s.game)})`);
-  const gameShPointsLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => ((b.shGoals ?? 0) + (b.shAssists ?? 0)) - ((a.shGoals ?? 0) + (a.shAssists ?? 0)) || b.points - a.points, (s) => (s.shGoals ?? 0) + (s.shAssists ?? 0) > 0, (s) => `${(s.shGoals ?? 0) + (s.shAssists ?? 0)} SHP v zápase`, (s) => `${s.shGoals} SHG + ${s.shAssists} SHA · ${s.game.season}`);
+  const gameGoalsLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => b.goals - a.goals || b.points - a.points, (s) => s.goals > 0, (s) => `${s.goals} G ${tInGame}`, (s) => `${s.game.season} (${getGameDateStr(s.game)}) · ${s.points} PTS`);
+  const gameAssistsLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => b.assists - a.assists || b.points - a.points, (s) => s.assists > 0, (s) => `${s.assists} A ${tInGame}`, (s) => `${s.game.season} (${getGameDateStr(s.game)}) · ${s.points} PTS`);
+  const gamePointsLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => b.points - a.points || b.goals - a.goals, (s) => s.points > 0, (s) => `${s.points} PTS ${tInGame}`, (s) => `${s.goals}G + ${s.assists}A · ${s.game.season} (${getGameDateStr(s.game)})`);
+  const gamePimLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => b.pim - a.pim, (s) => s.pim > 0, (s) => `${s.pim} ${tPim} ${tInGame}`, (s) => `${s.game.season} (${getGameDateStr(s.game)})`);
+  const gamePlusMinusBestLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => b.plusMinus - a.plusMinus || b.points - a.points, (s) => s.plusMinus > 0, (s) => `+${s.plusMinus} +/- ${tInGame}`, (s) => `${s.game.season} (${getGameDateStr(s.game)}) · ${s.points} PTS`);
+  const gamePlusMinusWorstLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => a.plusMinus - b.plusMinus || a.points - b.points, (s) => s.plusMinus < 0, (s) => `${s.plusMinus} +/- ${tInGame}`, (s) => `${s.game.season} (${getGameDateStr(s.game)}) · ${s.points} PTS`);
+  const gamePpGoalsLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => (b.ppGoals ?? 0) - (a.ppGoals ?? 0) || b.goals - a.goals, (s) => (s.ppGoals ?? 0) > 0, (s) => `${s.ppGoals} PPG ${tInGame}`, (s) => `${s.goals} G ${tTotal} · ${s.game.season} (${getGameDateStr(s.game)})`);
+  const gamePpAssistsLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => (b.ppAssists ?? 0) - (a.ppAssists ?? 0) || b.assists - a.assists, (s) => (s.ppAssists ?? 0) > 0, (s) => `${s.ppAssists} PPA ${tInGame}`, (s) => `${s.assists} A ${tTotal} · ${s.game.season} (${getGameDateStr(s.game)})`);
+  const gamePpPointsLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => ((b.ppGoals ?? 0) + (b.ppAssists ?? 0)) - ((a.ppGoals ?? 0) + (a.ppAssists ?? 0)) || b.points - a.points, (s) => (s.ppGoals ?? 0) + (s.ppAssists ?? 0) > 0, (s) => `${(s.ppGoals ?? 0) + (s.ppAssists ?? 0)} PPP ${tInGame}`, (s) => `${s.ppGoals} PPG + ${s.ppAssists} PPA · ${s.game.season}`);
+  const gameShGoalsLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => (b.shGoals ?? 0) - (a.shGoals ?? 0) || b.goals - a.goals, (s) => (s.shGoals ?? 0) > 0, (s) => `${s.shGoals} SHG ${tInGame}`, (s) => `${s.goals} G ${tTotal} · ${s.game.season} (${getGameDateStr(s.game)})`);
+  const gameShAssistsLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => (b.shAssists ?? 0) - (a.shAssists ?? 0) || b.assists - a.assists, (s) => (s.shAssists ?? 0) > 0, (s) => `${s.shAssists} SHA ${tInGame}`, (s) => `${s.assists} A ${tTotal} · ${s.game.season} (${getGameDateStr(s.game)})`);
+  const gameShPointsLeader = buildGameSkaterLeader(regSkaterStats, (a, b) => ((b.shGoals ?? 0) + (b.shAssists ?? 0)) - ((a.shGoals ?? 0) + (a.shAssists ?? 0)) || b.points - a.points, (s) => (s.shGoals ?? 0) + (s.shAssists ?? 0) > 0, (s) => `${(s.shGoals ?? 0) + (s.shAssists ?? 0)} SHP ${tInGame}`, (s) => `${s.shGoals} SHG + ${s.shAssists} SHA · ${s.game.season}`);
 
   const skaterGameSections: RecordSection[] = [
-    { id: "game-goals", title: "Najviac gólov v jednom zápase", icon: "🎯", phase: "regular", phaseBadge: "ZČ", items: gameGoalsLeader },
-    { id: "game-assists", title: "Najviac asistencií v jednom zápase", icon: "🪄", phase: "regular", phaseBadge: "ZČ", items: gameAssistsLeader },
-    { id: "game-points", title: "Najviac bodov v jednom zápase", icon: "⭐", phase: "regular", phaseBadge: "ZČ", items: gamePointsLeader },
-    { id: "game-pim", title: "Najviac trestných minút v jednom zápase", icon: "⏱️", phase: "regular", phaseBadge: "ZČ", items: gamePimLeader },
-    { id: "game-plus-minus-best", title: "Najlepší +/- v jednom zápase", icon: "🟢", phase: "regular", phaseBadge: "ZČ", items: gamePlusMinusBestLeader },
-    { id: "game-plus-minus-worst", title: "Najhorší +/- v jednom zápase", icon: "🔴", phase: "regular", phaseBadge: "ZČ", items: gamePlusMinusWorstLeader },
-    { id: "game-pp-goals", title: "Najviac presilovkových gólov v jednom zápase (PPG)", icon: "⚡", phase: "regular", phaseBadge: "ZČ", items: gamePpGoalsLeader },
-    { id: "game-pp-assists", title: "Najviac presilovkových asistencií v jednom zápase (PPA)", icon: "🏒", phase: "regular", phaseBadge: "ZČ", items: gamePpAssistsLeader },
-    { id: "game-pp-points", title: "Najviac presilovkových bodov v jednom zápase (PPP)", icon: "⭐", phase: "regular", phaseBadge: "ZČ", items: gamePpPointsLeader },
-    { id: "game-sh-goals", title: "Najviac oslabovkových gólov v jednom zápase (SHG)", icon: "🛡️", phase: "regular", phaseBadge: "ZČ", items: gameShGoalsLeader },
-    { id: "game-sh-assists", title: "Najviac oslabovkových asistencií v jednom zápase (SHA)", icon: "🧤", phase: "regular", phaseBadge: "ZČ", items: gameShAssistsLeader },
-    { id: "game-sh-points", title: "Najviac oslabovkových bodov v jednom zápase (SHP)", icon: "⭐", phase: "regular", phaseBadge: "ZČ", items: gameShPointsLeader },
+    { id: "game-goals", title: getSectionTitle("game-goals", lang, league, cupName), icon: "🎯", phase: "regular", phaseBadge: secBadgeReg, items: gameGoalsLeader },
+    { id: "game-assists", title: getSectionTitle("game-assists", lang, league, cupName), icon: "🪄", phase: "regular", phaseBadge: secBadgeReg, items: gameAssistsLeader },
+    { id: "game-points", title: getSectionTitle("game-points", lang, league, cupName), icon: "⭐", phase: "regular", phaseBadge: secBadgeReg, items: gamePointsLeader },
+    { id: "game-pim", title: getSectionTitle("game-pim", lang, league, cupName), icon: "⏱️", phase: "regular", phaseBadge: secBadgeReg, items: gamePimLeader },
+    { id: "game-plus-minus-best", title: getSectionTitle("game-plus-minus-best", lang, league, cupName), icon: "🟢", phase: "regular", phaseBadge: secBadgeReg, items: gamePlusMinusBestLeader },
+    { id: "game-plus-minus-worst", title: getSectionTitle("game-plus-minus-worst", lang, league, cupName), icon: "🔴", phase: "regular", phaseBadge: secBadgeReg, items: gamePlusMinusWorstLeader },
+    { id: "game-pp-goals", title: getSectionTitle("game-pp-goals", lang, league, cupName), icon: "⚡", phase: "regular", phaseBadge: secBadgeReg, items: gamePpGoalsLeader },
+    { id: "game-pp-assists", title: getSectionTitle("game-pp-assists", lang, league, cupName), icon: "🏒", phase: "regular", phaseBadge: secBadgeReg, items: gamePpAssistsLeader },
+    { id: "game-pp-points", title: getSectionTitle("game-pp-points", lang, league, cupName), icon: "⭐", phase: "regular", phaseBadge: secBadgeReg, items: gamePpPointsLeader },
+    { id: "game-sh-goals", title: getSectionTitle("game-sh-goals", lang, league, cupName), icon: "🛡️", phase: "regular", phaseBadge: secBadgeReg, items: gameShGoalsLeader },
+    { id: "game-sh-assists", title: getSectionTitle("game-sh-assists", lang, league, cupName), icon: "🧤", phase: "regular", phaseBadge: secBadgeReg, items: gameShAssistsLeader },
+    { id: "game-sh-points", title: getSectionTitle("game-sh-points", lang, league, cupName), icon: "⭐", phase: "regular", phaseBadge: secBadgeReg, items: gameShPointsLeader },
   ];
 
   // ==========================================
@@ -1264,23 +2043,24 @@ export async function getLeagueRecords(
   }
 
   const poSkCareerList = [...poSkCareerMap.values()];
+  const secBadgePo = getRecordBadge("playoffs", lang);
 
   const poCareerGpLeader = poSkCareerList.filter((s) => s.gp > 0).sort((a, b) => b.gp - a.gp).slice(0, 5).map((s, idx) => ({ ...skRowItem(s, `${s.gp} GP`, `${s.goals}G + ${s.assists}A · ${s.points} PTS`), rank: idx + 1 }));
   const poCareerGoalsLeader = poSkCareerList.filter((s) => s.goals > 0).sort((a, b) => b.goals - a.goals || b.points - a.points).slice(0, 5).map((s, idx) => ({ ...skRowItem(s, `${s.goals} G`, `${s.gp} GP · ${s.points} PTS`), rank: idx + 1 }));
   const poCareerAssistsLeader = poSkCareerList.filter((s) => s.assists > 0).sort((a, b) => b.assists - a.assists || b.points - a.points).slice(0, 5).map((s, idx) => ({ ...skRowItem(s, `${s.assists} A`, `${s.gp} GP · ${s.points} PTS`), rank: idx + 1 }));
   const poCareerPointsLeader = poSkCareerList.filter((s) => s.points > 0).sort((a, b) => b.points - a.points || b.goals - a.goals).slice(0, 5).map((s, idx) => ({ ...skRowItem(s, `${s.points} PTS`, `${s.goals}G + ${s.assists}A (${s.gp} GP)`), rank: idx + 1 }));
-  const poCareerPimLeader = poSkCareerList.filter((s) => s.pim > 0).sort((a, b) => b.pim - a.pim).slice(0, 5).map((s, idx) => ({ ...skRowItem(s, `${s.pim} TM`, `${s.gp} GP · ${s.points} PTS`), rank: idx + 1 }));
+  const poCareerPimLeader = poSkCareerList.filter((s) => s.pim > 0).sort((a, b) => b.pim - a.pim).slice(0, 5).map((s, idx) => ({ ...skRowItem(s, `${s.pim} ${tPim}`, `${s.gp} GP · ${s.points} PTS`), rank: idx + 1 }));
   const poCareerPlusMinusBestLeader = poSkCareerList.filter((s) => s.plusMinus > 0).sort((a, b) => b.plusMinus - a.plusMinus).slice(0, 5).map((s, idx) => ({ ...skRowItem(s, `+${s.plusMinus} +/-`, `${s.gp} GP · ${s.points} PTS`), rank: idx + 1 }));
   const poCareerPlusMinusWorstLeader = poSkCareerList.filter((s) => s.plusMinus < 0).sort((a, b) => a.plusMinus - b.plusMinus).slice(0, 5).map((s, idx) => ({ ...skRowItem(s, `${s.plusMinus} +/-`, `${s.gp} GP · ${s.points} PTS`), rank: idx + 1 }));
 
   const playoffSkaterCareerSections: RecordSection[] = [
-    { id: "playoff-career-gp", title: "Najviac odohraných zápasov v play-off v kariére", icon: "🏒", phase: "playoffs", phaseBadge: "Play-off", items: poCareerGpLeader },
-    { id: "playoff-career-goals", title: "Najviac gólov v play-off v kariére", icon: "🎯", phase: "playoffs", phaseBadge: "Play-off", items: poCareerGoalsLeader },
-    { id: "playoff-career-assists", title: "Najviac asistencií v play-off v kariére", icon: "🪄", phase: "playoffs", phaseBadge: "Play-off", items: poCareerAssistsLeader },
-    { id: "playoff-career-points", title: "Najviac bodov v play-off v kariére", icon: "⭐", phase: "playoffs", phaseBadge: "Play-off", items: poCareerPointsLeader },
-    { id: "playoff-career-pim", title: "Najviac trestných minút v play-off v kariére", icon: "⏱️", phase: "playoffs", phaseBadge: "Play-off", items: poCareerPimLeader },
-    { id: "playoff-career-plus-minus-best", title: "Najlepší +/- v play-off v kariére", icon: "🟢", phase: "playoffs", phaseBadge: "Play-off", items: poCareerPlusMinusBestLeader },
-    { id: "playoff-career-plus-minus-worst", title: "Najhorší +/- v play-off v kariére", icon: "🔴", phase: "playoffs", phaseBadge: "Play-off", items: poCareerPlusMinusWorstLeader },
+    { id: "playoff-career-gp", title: getSectionTitle("playoff-career-gp", lang, league, cupName), icon: "🏒", phase: "playoffs", phaseBadge: secBadgePo, items: poCareerGpLeader },
+    { id: "playoff-career-goals", title: getSectionTitle("playoff-career-goals", lang, league, cupName), icon: "🎯", phase: "playoffs", phaseBadge: secBadgePo, items: poCareerGoalsLeader },
+    { id: "playoff-career-assists", title: getSectionTitle("playoff-career-assists", lang, league, cupName), icon: "🪄", phase: "playoffs", phaseBadge: secBadgePo, items: poCareerAssistsLeader },
+    { id: "playoff-career-points", title: getSectionTitle("playoff-career-points", lang, league, cupName), icon: "⭐", phase: "playoffs", phaseBadge: secBadgePo, items: poCareerPointsLeader },
+    { id: "playoff-career-pim", title: getSectionTitle("playoff-career-pim", lang, league, cupName), icon: "⏱️", phase: "playoffs", phaseBadge: secBadgePo, items: poCareerPimLeader },
+    { id: "playoff-career-plus-minus-best", title: getSectionTitle("playoff-career-plus-minus-best", lang, league, cupName), icon: "🟢", phase: "playoffs", phaseBadge: secBadgePo, items: poCareerPlusMinusBestLeader },
+    { id: "playoff-career-plus-minus-worst", title: getSectionTitle("playoff-career-plus-minus-worst", lang, league, cupName), icon: "🔴", phase: "playoffs", phaseBadge: secBadgePo, items: poCareerPlusMinusWorstLeader },
   ];
 
   // 2. Playoff Single Season / Run Skaters
@@ -1349,37 +2129,37 @@ export async function getLeagueRecords(
 
   const allPoSeasonSkaters = [...poSeasonSkaterMap.values()];
 
-  const poSeasonGoalsLeader = buildSeasonSkaterLeader(allPoSeasonSkaters, (a, b) => b.goals - a.goals || b.points - a.points, (s) => s.goals > 0, (s) => `${s.goals} G`, (s) => `Play-off ${s.season} · ${s.points} PTS (${s.gp} GP)`);
-  const poSeasonAssistsLeader = buildSeasonSkaterLeader(allPoSeasonSkaters, (a, b) => b.assists - a.assists || b.points - a.points, (s) => s.assists > 0, (s) => `${s.assists} A`, (s) => `Play-off ${s.season} · ${s.points} PTS (${s.gp} GP)`);
-  const poSeasonPointsLeader = buildSeasonSkaterLeader(allPoSeasonSkaters, (a, b) => b.points - a.points || b.goals - a.goals, (s) => s.points > 0, (s) => `${s.points} PTS`, (s) => `Play-off ${s.season} · ${s.goals}G + ${s.assists}A (${s.gp} GP)`);
-  const poSeasonPimLeader = buildSeasonSkaterLeader(allPoSeasonSkaters, (a, b) => b.pim - a.pim, (s) => s.pim > 0, (s) => `${s.pim} TM`, (s) => `Play-off ${s.season} · ${s.gp} GP`);
-  const poSeasonPlusMinusBestLeader = buildSeasonSkaterLeader(allPoSeasonSkaters, (a, b) => b.plusMinus - a.plusMinus || b.points - a.points, (s) => s.plusMinus > 0, (s) => `+${s.plusMinus} +/-`, (s) => `Play-off ${s.season} · ${s.points} PTS (${s.gp} GP)`);
-  const poSeasonPlusMinusWorstLeader = buildSeasonSkaterLeader(allPoSeasonSkaters, (a, b) => a.plusMinus - b.plusMinus || a.points - b.points, (s) => s.plusMinus < 0, (s) => `${s.plusMinus} +/-`, (s) => `Play-off ${s.season} · ${s.points} PTS (${s.gp} GP)`);
+  const poSeasonGoalsLeader = buildSeasonSkaterLeader(allPoSeasonSkaters, (a, b) => b.goals - a.goals || b.points - a.points, (s) => s.goals > 0, (s) => `${s.goals} G`, (s) => `${tPlayoffs} ${s.season} · ${s.points} PTS (${s.gp} GP)`);
+  const poSeasonAssistsLeader = buildSeasonSkaterLeader(allPoSeasonSkaters, (a, b) => b.assists - a.assists || b.points - a.points, (s) => s.assists > 0, (s) => `${s.assists} A`, (s) => `${tPlayoffs} ${s.season} · ${s.points} PTS (${s.gp} GP)`);
+  const poSeasonPointsLeader = buildSeasonSkaterLeader(allPoSeasonSkaters, (a, b) => b.points - a.points || b.goals - a.goals, (s) => s.points > 0, (s) => `${s.points} PTS`, (s) => `${tPlayoffs} ${s.season} · ${s.goals}G + ${s.assists}A (${s.gp} GP)`);
+  const poSeasonPimLeader = buildSeasonSkaterLeader(allPoSeasonSkaters, (a, b) => b.pim - a.pim, (s) => s.pim > 0, (s) => `${s.pim} ${tPim}`, (s) => `${tPlayoffs} ${s.season} · ${s.gp} GP`);
+  const poSeasonPlusMinusBestLeader = buildSeasonSkaterLeader(allPoSeasonSkaters, (a, b) => b.plusMinus - a.plusMinus || b.points - a.points, (s) => s.plusMinus > 0, (s) => `+${s.plusMinus} +/-`, (s) => `${tPlayoffs} ${s.season} · ${s.points} PTS (${s.gp} GP)`);
+  const poSeasonPlusMinusWorstLeader = buildSeasonSkaterLeader(allPoSeasonSkaters, (a, b) => a.plusMinus - b.plusMinus || a.points - b.points, (s) => s.plusMinus < 0, (s) => `${s.plusMinus} +/-`, (s) => `${tPlayoffs} ${s.season} · ${s.points} PTS (${s.gp} GP)`);
 
   const playoffSkaterSeasonSections: RecordSection[] = [
-    { id: "playoff-season-goals", title: "Najviac gólov v jednom play-off", icon: "🎯", phase: "playoffs", phaseBadge: "Play-off", items: poSeasonGoalsLeader },
-    { id: "playoff-season-assists", title: "Najviac asistencií v jednom play-off", icon: "🪄", phase: "playoffs", phaseBadge: "Play-off", items: poSeasonAssistsLeader },
-    { id: "playoff-season-points", title: "Najviac bodov v jednom play-off", icon: "⭐", phase: "playoffs", phaseBadge: "Play-off", items: poSeasonPointsLeader },
-    { id: "playoff-season-pim", title: "Najviac trestných minút v jednom play-off", icon: "⏱️", phase: "playoffs", phaseBadge: "Play-off", items: poSeasonPimLeader },
-    { id: "playoff-season-plus-minus-best", title: "Najlepší +/- v jednom play-off", icon: "🟢", phase: "playoffs", phaseBadge: "Play-off", items: poSeasonPlusMinusBestLeader },
-    { id: "playoff-season-plus-minus-worst", title: "Najhorší +/- v jednom play-off", icon: "🔴", phase: "playoffs", phaseBadge: "Play-off", items: poSeasonPlusMinusWorstLeader },
+    { id: "playoff-season-goals", title: getSectionTitle("playoff-season-goals", lang, league, cupName), icon: "🎯", phase: "playoffs", phaseBadge: secBadgePo, items: poSeasonGoalsLeader },
+    { id: "playoff-season-assists", title: getSectionTitle("playoff-season-assists", lang, league, cupName), icon: "🪄", phase: "playoffs", phaseBadge: secBadgePo, items: poSeasonAssistsLeader },
+    { id: "playoff-season-points", title: getSectionTitle("playoff-season-points", lang, league, cupName), icon: "⭐", phase: "playoffs", phaseBadge: secBadgePo, items: poSeasonPointsLeader },
+    { id: "playoff-season-pim", title: getSectionTitle("playoff-season-pim", lang, league, cupName), icon: "⏱️", phase: "playoffs", phaseBadge: secBadgePo, items: poSeasonPimLeader },
+    { id: "playoff-season-plus-minus-best", title: getSectionTitle("playoff-season-plus-minus-best", lang, league, cupName), icon: "🟢", phase: "playoffs", phaseBadge: secBadgePo, items: poSeasonPlusMinusBestLeader },
+    { id: "playoff-season-plus-minus-worst", title: getSectionTitle("playoff-season-plus-minus-worst", lang, league, cupName), icon: "🔴", phase: "playoffs", phaseBadge: secBadgePo, items: poSeasonPlusMinusWorstLeader },
   ];
 
   // 3. Playoff Single Game Skaters
-  const poGameGoalsLeader = buildGameSkaterLeader(playoffSkaterStats, (a, b) => b.goals - a.goals || b.points - a.points, (s) => s.goals > 0, (s) => `${s.goals} G v zápase PO`, (s) => `${s.game.season} (${getGameDateStr(s.game)}) · ${s.points} PTS`);
-  const poGameAssistsLeader = buildGameSkaterLeader(playoffSkaterStats, (a, b) => b.assists - a.assists || b.points - a.points, (s) => s.assists > 0, (s) => `${s.assists} A v zápase PO`, (s) => `${s.game.season} (${getGameDateStr(s.game)}) · ${s.points} PTS`);
-  const poGamePointsLeader = buildGameSkaterLeader(playoffSkaterStats, (a, b) => b.points - a.points || b.goals - a.goals, (s) => s.points > 0, (s) => `${s.points} PTS v zápase PO`, (s) => `${s.goals}G + ${s.assists}A · ${s.game.season} (${getGameDateStr(s.game)})`);
-  const poGamePimLeader = buildGameSkaterLeader(playoffSkaterStats, (a, b) => b.pim - a.pim, (s) => s.pim > 0, (s) => `${s.pim} TM v zápase PO`, (s) => `${s.game.season} (${getGameDateStr(s.game)})`);
-  const poGamePlusMinusBestLeader = buildGameSkaterLeader(playoffSkaterStats, (a, b) => b.plusMinus - a.plusMinus || b.points - a.points, (s) => s.plusMinus > 0, (s) => `+${s.plusMinus} +/- v zápase PO`, (s) => `${s.game.season} (${getGameDateStr(s.game)}) · ${s.points} PTS`);
-  const poGamePlusMinusWorstLeader = buildGameSkaterLeader(playoffSkaterStats, (a, b) => a.plusMinus - b.plusMinus || a.points - b.points, (s) => s.plusMinus < 0, (s) => `${s.plusMinus} +/- v zápase PO`, (s) => `${s.game.season} (${getGameDateStr(s.game)}) · ${s.points} PTS`);
+  const poGameGoalsLeader = buildGameSkaterLeader(playoffSkaterStats, (a, b) => b.goals - a.goals || b.points - a.points, (s) => s.goals > 0, (s) => `${s.goals} G ${tInGamePo}`, (s) => `${s.game.season} (${getGameDateStr(s.game)}) · ${s.points} PTS`);
+  const poGameAssistsLeader = buildGameSkaterLeader(playoffSkaterStats, (a, b) => b.assists - a.assists || b.points - a.points, (s) => s.assists > 0, (s) => `${s.assists} A ${tInGamePo}`, (s) => `${s.game.season} (${getGameDateStr(s.game)}) · ${s.points} PTS`);
+  const poGamePointsLeader = buildGameSkaterLeader(playoffSkaterStats, (a, b) => b.points - a.points || b.goals - a.goals, (s) => s.points > 0, (s) => `${s.points} PTS ${tInGamePo}`, (s) => `${s.goals}G + ${s.assists}A · ${s.game.season} (${getGameDateStr(s.game)})`);
+  const poGamePimLeader = buildGameSkaterLeader(playoffSkaterStats, (a, b) => b.pim - a.pim, (s) => s.pim > 0, (s) => `${s.pim} ${tPim} ${tInGamePo}`, (s) => `${s.game.season} (${getGameDateStr(s.game)})`);
+  const poGamePlusMinusBestLeader = buildGameSkaterLeader(playoffSkaterStats, (a, b) => b.plusMinus - a.plusMinus || b.points - a.points, (s) => s.plusMinus > 0, (s) => `+${s.plusMinus} +/- ${tInGamePo}`, (s) => `${s.game.season} (${getGameDateStr(s.game)}) · ${s.points} PTS`);
+  const poGamePlusMinusWorstLeader = buildGameSkaterLeader(playoffSkaterStats, (a, b) => a.plusMinus - b.plusMinus || a.points - b.points, (s) => s.plusMinus < 0, (s) => `${s.plusMinus} +/- ${tInGamePo}`, (s) => `${s.game.season} (${getGameDateStr(s.game)}) · ${s.points} PTS`);
 
   const playoffSkaterGameSections: RecordSection[] = [
-    { id: "playoff-game-goals", title: "Najviac gólov v zápase play-off", icon: "🎯", phase: "playoffs", phaseBadge: "Play-off", items: poGameGoalsLeader },
-    { id: "playoff-game-assists", title: "Najviac asistencií v zápase play-off", icon: "🪄", phase: "playoffs", phaseBadge: "Play-off", items: poGameAssistsLeader },
-    { id: "playoff-game-points", title: "Najviac bodov v zápase play-off", icon: "⭐", phase: "playoffs", phaseBadge: "Play-off", items: poGamePointsLeader },
-    { id: "playoff-game-pim", title: "Najviac trestných minút v zápase play-off", icon: "⏱️", phase: "playoffs", phaseBadge: "Play-off", items: poGamePimLeader },
-    { id: "playoff-game-plus-minus-best", title: "Najlepší +/- v zápase play-off", icon: "🟢", phase: "playoffs", phaseBadge: "Play-off", items: poGamePlusMinusBestLeader },
-    { id: "playoff-game-plus-minus-worst", title: "Najhorší +/- v zápase play-off", icon: "🔴", phase: "playoffs", phaseBadge: "Play-off", items: poGamePlusMinusWorstLeader },
+    { id: "playoff-game-goals", title: getSectionTitle("playoff-game-goals", lang, league, cupName), icon: "🎯", phase: "playoffs", phaseBadge: secBadgePo, items: poGameGoalsLeader },
+    { id: "playoff-game-assists", title: getSectionTitle("playoff-game-assists", lang, league, cupName), icon: "🪄", phase: "playoffs", phaseBadge: secBadgePo, items: poGameAssistsLeader },
+    { id: "playoff-game-points", title: getSectionTitle("playoff-game-points", lang, league, cupName), icon: "⭐", phase: "playoffs", phaseBadge: secBadgePo, items: poGamePointsLeader },
+    { id: "playoff-game-pim", title: getSectionTitle("playoff-game-pim", lang, league, cupName), icon: "⏱️", phase: "playoffs", phaseBadge: secBadgePo, items: poGamePimLeader },
+    { id: "playoff-game-plus-minus-best", title: getSectionTitle("playoff-game-plus-minus-best", lang, league, cupName), icon: "🟢", phase: "playoffs", phaseBadge: secBadgePo, items: poGamePlusMinusBestLeader },
+    { id: "playoff-game-plus-minus-worst", title: getSectionTitle("playoff-game-plus-minus-worst", lang, league, cupName), icon: "🔴", phase: "playoffs", phaseBadge: secBadgePo, items: poGamePlusMinusWorstLeader },
   ];
 
   // Playoff Career Wins from real playoff goalie stats
@@ -1404,7 +2184,7 @@ export async function getLeagueRecords(
       const p = playerMap.get(g.playerId);
       return {
         rank: idx + 1,
-        name: p ? cleanName(p.name) : "Brankár",
+        name: p ? cleanName(p.name) : tGoalie,
         slug: p?.slug,
         photoUrl: p?.photoUrl,
         hideTeam: true,
@@ -1420,10 +2200,10 @@ export async function getLeagueRecords(
   const careerShutoutsItems = topGoalies((g) => g.shutouts, (g) => `${g.shutouts} SO`, (g) => `${g.gp} GP · ${g.wins} W`);
 
   const goalieCareerSections: RecordSection[] = [
-    { id: "career-wins", title: "Najviac výhier v kariére (brankár)", icon: "🧤", phase: "regular", phaseBadge: "ZČ", items: careerWinsItems },
-    { id: "career-steals", title: "Najviac ukradnutých zápasov (steals) v kariére", icon: "🥷", phase: "regular", phaseBadge: "ZČ", items: careerStealsItems },
-    { id: "career-gsax", title: "Najlepší GSAx (Goals Saved Above Expected) v kariére", icon: "📊", phase: "regular", phaseBadge: "ZČ", items: careerGsaxItems },
-    { id: "career-shutouts", title: "Najviac čistých kont v kariére", icon: "🧱", phase: "regular", phaseBadge: "ZČ", items: careerShutoutsItems },
+    { id: "career-wins", title: getSectionTitle("career-wins", lang, league, cupName), icon: "🧤", phase: "regular", phaseBadge: secBadgeReg, items: careerWinsItems },
+    { id: "career-steals", title: getSectionTitle("career-steals", lang, league, cupName), icon: "🥷", phase: "regular", phaseBadge: secBadgeReg, items: careerStealsItems },
+    { id: "career-gsax", title: getSectionTitle("career-gsax", lang, league, cupName), icon: "📊", phase: "regular", phaseBadge: secBadgeReg, items: careerGsaxItems },
+    { id: "career-shutouts", title: getSectionTitle("career-shutouts", lang, league, cupName), icon: "🧱", phase: "regular", phaseBadge: secBadgeReg, items: careerShutoutsItems },
   ];
 
   // ==========================================
@@ -1437,15 +2217,17 @@ export async function getLeagueRecords(
     .map((g, idx) => {
       const home = teamById.get(g.homeTeamId);
       const away = teamById.get(g.awayTeamId);
-      const dateStr = g.gameDate ? new Date(g.gameDate).toLocaleDateString("sk-SK") : g.season;
+      const dateStr = g.gameDate ? formatRecordDate(new Date(g.gameDate), lang) : g.season;
+      const numFmt = (g.attendance ?? 0).toLocaleString(lang === "cs" ? "sk-SK" : lang === "de" ? "de-DE" : lang === "ru" ? "ru-RU" : "en-US");
+      const unitFans = lang === "cs" ? "divákov" : lang === "de" ? "Zuschauer" : lang === "ru" ? "зрителей" : "fans";
       return {
         rank: idx + 1,
-        name: `${home?.name ?? "Domáci"} vs ${away?.name ?? "Hostia"}`,
+        name: `${home?.name ?? tHome} vs ${away?.name ?? tAway}`,
         teamCode: home?.code,
         teamSlug: home?.slug,
         teamLogo: home?.logoUrl,
-        value: `${(g.attendance ?? 0).toLocaleString("sk-SK")} divákov`,
-        sub: `${g.season} · ${dateStr} · Skóre: ${g.homeGoals}:${g.awayGoals}`,
+        value: `${numFmt} ${unitFans}`,
+        sub: `${g.season} · ${dateStr} · ${tScore}: ${g.homeGoals}:${g.awayGoals}`,
       };
     });
 
@@ -1455,15 +2237,17 @@ export async function getLeagueRecords(
     .map((g, idx) => {
       const home = teamById.get(g.homeTeamId);
       const away = teamById.get(g.awayTeamId);
-      const dateStr = g.gameDate ? new Date(g.gameDate).toLocaleDateString("sk-SK") : g.season;
+      const dateStr = g.gameDate ? formatRecordDate(new Date(g.gameDate), lang) : g.season;
+      const numFmt = (g.attendance ?? 0).toLocaleString(lang === "cs" ? "sk-SK" : lang === "de" ? "de-DE" : lang === "ru" ? "ru-RU" : "en-US");
+      const unitFans = lang === "cs" ? "divákov" : lang === "de" ? "Zuschauer" : lang === "ru" ? "зрителей" : "fans";
       return {
         rank: idx + 1,
-        name: `${home?.name ?? "Domáci"} vs ${away?.name ?? "Hostia"}`,
+        name: `${home?.name ?? tHome} vs ${away?.name ?? tAway}`,
         teamCode: home?.code,
         teamSlug: home?.slug,
         teamLogo: home?.logoUrl,
-        value: `${(g.attendance ?? 0).toLocaleString("sk-SK")} divákov`,
-        sub: `${g.season} · ${dateStr} · Skóre: ${g.homeGoals}:${g.awayGoals}`,
+        value: `${numFmt} ${unitFans}`,
+        sub: `${g.season} · ${dateStr} · ${tScore}: ${g.homeGoals}:${g.awayGoals}`,
       };
     });
 
@@ -1487,19 +2271,23 @@ export async function getLeagueRecords(
       avg: Math.round(entry.totalAtt / entry.games),
     }));
 
+  const unitPerGame = lang === "cs" ? "/ zápas" : lang === "de" ? "/ Spiel" : lang === "ru" ? "/ матч" : "/ game";
+  const unitHomeGames = lang === "cs" ? "domácich zápasov" : lang === "de" ? "Heimspiele" : lang === "ru" ? "домашних матчей" : "home games";
+
   const highestAvgAtt: LeaderItem[] = [...teamSeasonAttList]
     .sort((a, b) => b.avg - a.avg)
     .slice(0, 5)
     .map((entry, idx) => {
       const tm = teamById.get(entry.teamId);
+      const numFmt = entry.avg.toLocaleString(lang === "cs" ? "sk-SK" : lang === "de" ? "de-DE" : lang === "ru" ? "ru-RU" : "en-US");
       return {
         rank: idx + 1,
-        name: tm?.name ?? "Tím",
+        name: tm?.name ?? tTeam,
         teamCode: tm?.code,
         teamSlug: tm?.slug,
         teamLogo: tm?.logoUrl,
-        value: `${entry.avg.toLocaleString("sk-SK")} / zápas`,
-        sub: `Sezóna ${entry.season} (${entry.games} domácich zápasov)`,
+        value: `${numFmt} ${unitPerGame}`,
+        sub: `${tSeason} ${entry.season} (${entry.games} ${unitHomeGames})`,
       };
     });
 
@@ -1508,16 +2296,19 @@ export async function getLeagueRecords(
     .slice(0, 5)
     .map((entry, idx) => {
       const tm = teamById.get(entry.teamId);
+      const numFmt = entry.avg.toLocaleString(lang === "cs" ? "sk-SK" : lang === "de" ? "de-DE" : lang === "ru" ? "ru-RU" : "en-US");
       return {
         rank: idx + 1,
-        name: tm?.name ?? "Tím",
+        name: tm?.name ?? tTeam,
         teamCode: tm?.code,
         teamSlug: tm?.slug,
         teamLogo: tm?.logoUrl,
-        value: `${entry.avg.toLocaleString("sk-SK")} / zápas`,
-        sub: `Sezóna ${entry.season} (${entry.games} domácich zápasov)`,
+        value: `${numFmt} ${unitPerGame}`,
+        sub: `${tSeason} ${entry.season} (${entry.games} ${unitHomeGames})`,
       };
     });
+
+  const unitGoals = lang === "cs" ? "gólov" : lang === "de" ? "Tore" : lang === "ru" ? "голов" : "goals";
 
   const highestScoringGames: LeaderItem[] = [...allFinalGames]
     .map((g) => ({
@@ -1530,15 +2321,15 @@ export async function getLeagueRecords(
     .map(({ g, totalGoals }, idx) => {
       const home = teamById.get(g.homeTeamId);
       const away = teamById.get(g.awayTeamId);
-      const dateStr = g.gameDate ? new Date(g.gameDate).toLocaleDateString("sk-SK") : g.season;
+      const dateStr = g.gameDate ? formatRecordDate(new Date(g.gameDate), lang) : g.season;
       return {
         rank: idx + 1,
-        name: `${home?.name ?? "Domáci"} vs ${away?.name ?? "Hostia"}`,
+        name: `${home?.name ?? tHome} vs ${away?.name ?? tAway}`,
         teamCode: home?.code,
         teamSlug: home?.slug,
         teamLogo: home?.logoUrl,
-        value: `${totalGoals} gólov`,
-        sub: `Výsledok ${g.homeGoals}:${g.awayGoals} · ${g.season} (${dateStr})`,
+        value: `${totalGoals} ${unitGoals}`,
+        sub: `${tResult} ${g.homeGoals}:${g.awayGoals} · ${g.season} (${dateStr})`,
       };
     });
 
@@ -1559,14 +2350,23 @@ export async function getLeagueRecords(
     .map(({ g, diff, winnerId, loserId, winScore, loseScore }, idx) => {
       const winTeam = teamById.get(winnerId);
       const loseTeam = teamById.get(loserId);
-      const dateStr = g.gameDate ? new Date(g.gameDate).toLocaleDateString("sk-SK") : g.season;
+      const dateStr = g.gameDate ? formatRecordDate(new Date(g.gameDate), lang) : g.season;
+      const vsWord = lang === "cs" ? "nad" : lang === "de" ? "gegen" : lang === "ru" ? "против" : "vs";
+      const valText =
+        lang === "cs"
+          ? `o ${diff} gólov (${winScore}:${loseScore})`
+          : lang === "de"
+          ? `um ${diff} Tore (${winScore}:${loseScore})`
+          : lang === "ru"
+          ? `на ${diff} голов (${winScore}:${loseScore})`
+          : `by ${diff} goals (${winScore}:${loseScore})`;
       return {
         rank: idx + 1,
-        name: `${winTeam?.name ?? "Víťaz"} nad ${loseTeam?.name ?? "Porazený"}`,
+        name: `${winTeam?.name ?? tWinner} ${vsWord} ${loseTeam?.name ?? tLoser}`,
         teamCode: winTeam?.code,
         teamSlug: winTeam?.slug,
         teamLogo: winTeam?.logoUrl,
-        value: `o ${diff} gólov (${winScore}:${loseScore})`,
+        value: valText,
         sub: `${g.season} · ${dateStr}`,
       };
     });
@@ -1600,6 +2400,13 @@ export async function getLeagueRecords(
     totalLosses: t.losses + t.otl,
   }));
 
+  const unitPts = lang === "cs" ? "bodov" : lang === "de" ? "Punkte" : lang === "ru" ? "очков" : "points";
+  const unitLosses = lang === "cs" ? "prehier" : lang === "de" ? "Niederlagen" : lang === "ru" ? "поражений" : "losses";
+  const unitGf = lang === "cs" ? "strelených gólov" : lang === "de" ? "erzielte Tore" : lang === "ru" ? "забитых голов" : "goals scored";
+  const unitGa = lang === "cs" ? "inkasovaných gólov" : lang === "de" ? "Gegentore" : lang === "ru" ? "пропущенных голов" : "goals against";
+  const unitGPerGame = lang === "cs" ? "G/Zápas" : lang === "de" ? "Tore/Spiel" : lang === "ru" ? "Г/Матч" : "G/Game";
+  const unitGaPerGame = lang === "cs" ? "GA/Zápas" : lang === "de" ? "Gegentore/Spiel" : lang === "ru" ? "ПГ/Матч" : "GA/Game";
+
   const mostPointsSeason: LeaderItem[] = [...teamSeasons]
     .sort((a, b) => b.points - a.points || b.wins - a.wins)
     .slice(0, 5)
@@ -1607,12 +2414,12 @@ export async function getLeagueRecords(
       const tm = teamById.get(t.teamId);
       return {
         rank: idx + 1,
-        name: tm?.name ?? "Tím",
+        name: tm?.name ?? tTeam,
         teamCode: tm?.code,
         teamSlug: tm?.slug,
         teamLogo: tm?.logoUrl,
-        value: `${t.points} bodov`,
-        sub: `Sezóna ${t.season} · ${t.wins}-${t.losses}-${t.otl} (${t.gp} GP)`,
+        value: `${t.points} ${unitPts}`,
+        sub: `${tSeason} ${t.season} · ${t.wins}-${t.losses}-${t.otl} (${t.gp} GP)`,
       };
     });
 
@@ -1623,12 +2430,12 @@ export async function getLeagueRecords(
       const tm = teamById.get(t.teamId);
       return {
         rank: idx + 1,
-        name: tm?.name ?? "Tím",
+        name: tm?.name ?? tTeam,
         teamCode: tm?.code,
         teamSlug: tm?.slug,
         teamLogo: tm?.logoUrl,
-        value: `${t.totalLosses} prehier`,
-        sub: `Sezóna ${t.season} (${t.losses} L + ${t.otl} OTL/SOL)`,
+        value: `${t.totalLosses} ${unitLosses}`,
+        sub: `${tSeason} ${t.season} (${t.losses} L + ${t.otl} OTL/SOL)`,
       };
     });
 
@@ -1640,12 +2447,12 @@ export async function getLeagueRecords(
       const perGame = t.gp > 0 ? (t.gf / t.gp).toFixed(2) : "0.00";
       return {
         rank: idx + 1,
-        name: tm?.name ?? "Tím",
+        name: tm?.name ?? tTeam,
         teamCode: tm?.code,
         teamSlug: tm?.slug,
         teamLogo: tm?.logoUrl,
-        value: `${t.gf} strelených gólov`,
-        sub: `Sezóna ${t.season} (${perGame} G/Zápas)`,
+        value: `${t.gf} ${unitGf}`,
+        sub: `${tSeason} ${t.season} (${perGame} ${unitGPerGame})`,
       };
     });
 
@@ -1657,12 +2464,12 @@ export async function getLeagueRecords(
       const perGame = t.gp > 0 ? (t.ga / t.gp).toFixed(2) : "0.00";
       return {
         rank: idx + 1,
-        name: tm?.name ?? "Tím",
+        name: tm?.name ?? tTeam,
         teamCode: tm?.code,
         teamSlug: tm?.slug,
         teamLogo: tm?.logoUrl,
-        value: `${t.ga} inkasovaných gólov`,
-        sub: `Sezóna ${t.season} (${perGame} GA/Zápas)`,
+        value: `${t.ga} ${unitGa}`,
+        sub: `${tSeason} ${t.season} (${perGame} ${unitGaPerGame})`,
       };
     });
 
@@ -1687,14 +2494,17 @@ export async function getLeagueRecords(
       const tm = teamById.get(entry.teamId);
       return {
         rank: idx + 1,
-        name: tm?.name ?? "Tím",
+        name: tm?.name ?? tTeam,
         teamCode: tm?.code,
         teamSlug: tm?.slug,
         teamLogo: tm?.logoUrl,
-        value: `${entry.pim} TM`,
-        sub: `Sezóna ${entry.season}`,
+        value: `${entry.pim} ${tPim}`,
+        sub: `${tSeason} ${entry.season}`,
       };
     });
+
+  const unitWinsStreak = lang === "cs" ? "výhier v rade" : lang === "de" ? "Siege in Folge" : lang === "ru" ? "побед подряд" : "consecutive wins";
+  const unitLossesStreak = lang === "cs" ? "prehier v rade" : lang === "de" ? "Niederlagen in Folge" : lang === "ru" ? "поражений подряд" : "consecutive losses";
 
   const teamWinStreaks: LeaderItem[] = [];
   const teamLoseStreaks: LeaderItem[] = [];
@@ -1752,7 +2562,7 @@ export async function getLeagueRecords(
         teamCode: team.code,
         teamSlug: team.slug,
         teamLogo: team.logoUrl,
-        value: `${maxWinStreak} výhier v rade`,
+        value: `${maxWinStreak} ${unitWinsStreak}`,
         sub: winStartGame === winEndGame ? winStartGame : `${winStartGame} → ${winEndGame}`,
         rawVal: maxWinStreak,
       } as any);
@@ -1765,7 +2575,7 @@ export async function getLeagueRecords(
         teamCode: team.code,
         teamSlug: team.slug,
         teamLogo: team.logoUrl,
-        value: `${maxLoseStreak} prehier v rade`,
+        value: `${maxLoseStreak} ${unitLossesStreak}`,
         sub: loseStartGame === loseEndGame ? loseStartGame : `${loseStartGame} → ${loseEndGame}`,
         rawVal: maxLoseStreak,
       } as any);
@@ -1786,7 +2596,7 @@ export async function getLeagueRecords(
   const now = new Date();
   const playerAges = allPlayersWithBirth
     .map((p) => {
-      const age = calculateAge(p.birthDate, now, p.age);
+      const age = calculateAge(p.birthDate, now, p.age, lang);
       if (!age || age.years < 15 || age.years > 65) return null;
       return {
         p,
@@ -1810,7 +2620,7 @@ export async function getLeagueRecords(
         teamSlug: tm?.slug,
         teamLogo: tm?.logoUrl,
         value: age.formatted,
-        sub: `${tm?.name ?? "Tím"} · Narodený ${p.birthDate}`,
+        sub: `${tm?.name ?? tTeam} · ${tBorn} ${p.birthDate}`,
       };
     });
 
@@ -1828,7 +2638,7 @@ export async function getLeagueRecords(
         teamSlug: tm?.slug,
         teamLogo: tm?.logoUrl,
         value: age.formatted,
-        sub: `${tm?.name ?? "Tím"} · Narodený ${p.birthDate}`,
+        sub: `${tm?.name ?? tTeam} · ${tBorn} ${p.birthDate}`,
       };
     });
 
@@ -1888,12 +2698,12 @@ export async function getLeagueRecords(
       const tm = teamById.get(t.teamId);
       return {
         rank: idx + 1,
-        name: tm?.name ?? "Tím",
+        name: tm?.name ?? tTeam,
         teamCode: tm?.code,
         teamSlug: tm?.slug,
         teamLogo: tm?.logoUrl,
-        value: `${t.points} bodov (${t.w}-${t.l}-${t.otl})`,
-        sub: `Skóre ${t.gf}:${t.ga} (${t.gp} GP · Príprava ${ACTIVE_SEASON})`,
+        value: `${t.points} ${unitPts} (${t.w}-${t.l}-${t.otl})`,
+        sub: `${tScore} ${t.gf}:${t.ga} (${t.gp} GP · ${tPreseason} ${ACTIVE_SEASON})`,
       };
     });
 
@@ -1923,12 +2733,12 @@ export async function getLeagueRecords(
       const tmInfo = resolveTeams(s.teamIds, teamById);
       return {
         rank: idx + 1,
-        name: p ? cleanName(p.name) : "Hráč",
+        name: p ? cleanName(p.name) : tPlayer,
         slug: p?.slug,
         photoUrl: p?.photoUrl,
         ...tmInfo,
         value: `${s.points} PTS`,
-        sub: `${s.goals}G + ${s.assists}A (${s.gp} GP · Príprava ${ACTIVE_SEASON})`,
+        sub: `${s.goals}G + ${s.assists}A (${s.gp} GP · ${tPreseason} ${ACTIVE_SEASON})`,
       };
     });
 
@@ -1941,12 +2751,12 @@ export async function getLeagueRecords(
       const tmInfo = resolveTeams(s.teamIds, teamById);
       return {
         rank: idx + 1,
-        name: p ? cleanName(p.name) : "Hráč",
+        name: p ? cleanName(p.name) : tPlayer,
         slug: p?.slug,
         photoUrl: p?.photoUrl,
         ...tmInfo,
         value: `${s.goals} G`,
-        sub: `${s.points} PTS (${s.gp} GP · Príprava ${ACTIVE_SEASON})`,
+        sub: `${s.points} PTS (${s.gp} GP · ${tPreseason} ${ACTIVE_SEASON})`,
       };
     });
 
@@ -1959,12 +2769,12 @@ export async function getLeagueRecords(
       const tmInfo = resolveTeams(s.teamIds, teamById);
       return {
         rank: idx + 1,
-        name: p ? cleanName(p.name) : "Hráč",
+        name: p ? cleanName(p.name) : tPlayer,
         slug: p?.slug,
         photoUrl: p?.photoUrl,
         ...tmInfo,
         value: `${s.assists} A`,
-        sub: `${s.points} PTS (${s.gp} GP · Príprava ${ACTIVE_SEASON})`,
+        sub: `${s.points} PTS (${s.gp} GP · ${tPreseason} ${ACTIVE_SEASON})`,
       };
     });
 
@@ -1976,16 +2786,16 @@ export async function getLeagueRecords(
     .map((s, idx) => {
       const p = playerMap.get(s.playerId);
       const tm = s.teamId ? teamById.get(s.teamId) : null;
-      const dateStr = s.game?.gameDate ? new Date(s.game.gameDate).toLocaleDateString("sk-SK") : "";
+      const dateStr = s.game?.gameDate ? formatRecordDate(new Date(s.game.gameDate), lang) : "";
       return {
         rank: idx + 1,
-        name: p ? cleanName(p.name) : "Hráč",
+        name: p ? cleanName(p.name) : tPlayer,
         slug: p?.slug,
         photoUrl: p?.photoUrl,
         teamCode: tm?.code,
         teamSlug: tm?.slug,
         teamLogo: tm?.logoUrl,
-        value: `${s.points} PTS v zápase`,
+        value: `${s.points} PTS ${tInGame}`,
         sub: `${s.goals}G + ${s.assists}A · ${dateStr}`,
       };
     });
@@ -2007,6 +2817,8 @@ export async function getLeagueRecords(
     if (g.teamId) acc.teamIds.add(g.teamId);
   }
 
+  const unitSaves = lang === "cs" ? "zákrokov" : lang === "de" ? "Paraden" : lang === "ru" ? "сейвов" : "saves";
+
   const preGoalieSaves: LeaderItem[] = [...preGoalieAcc.values()]
     .filter((g) => g.saves > 0)
     .sort((a, b) => b.saves - a.saves || b.wins - a.wins)
@@ -2017,12 +2829,12 @@ export async function getLeagueRecords(
       const svPct = g.shots > 0 ? ((g.saves / g.shots) * 100).toFixed(1) : "0.0";
       return {
         rank: idx + 1,
-        name: p ? cleanName(p.name) : "Brankár",
+        name: p ? cleanName(p.name) : tGoalie,
         slug: p?.slug,
         photoUrl: p?.photoUrl,
         ...tmInfo,
-        value: `${g.saves} zákrokov`,
-        sub: `${svPct}% SV% · ${g.wins} W (${g.gp} GP · Príprava ${ACTIVE_SEASON})`,
+        value: `${g.saves} ${unitSaves}`,
+        sub: `${svPct}% SV% · ${g.wins} W (${g.gp} GP · ${tPreseason} ${ACTIVE_SEASON})`,
       };
     });
 
@@ -2067,7 +2879,7 @@ export async function getLeagueRecords(
     } else if (a.teamId) {
       winnerKey = `t_${a.teamId}`;
       const tm = teamById.get(a.teamId);
-      winnerName = (cat.includes("GM") || cat.includes("Pollock")) ? getTeamGm(a.teamId) : (tm?.name ?? "Tím");
+      winnerName = (cat.includes("GM") || cat.includes("Pollock")) ? getTeamGm(a.teamId) : (tm?.name ?? tTeam);
     } else {
       continue;
     }
@@ -2112,12 +2924,19 @@ export async function getLeagueRecords(
         };
       });
 
+    const awardBadge =
+      awardPhase === "playoffs"
+        ? getRecordBadge("playoffs", lang)
+        : awardPhase === "pre"
+        ? getRecordBadge("pre", lang)
+        : getRecordBadge("regular", lang);
+
     return {
       id: catTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
       title: catTitle,
       icon: "🏵️",
       phase: awardPhase,
-      phaseBadge: awardPhase === "playoffs" ? "Play-off" : awardPhase === "pre" ? "Príprava" : "ZČ",
+      phaseBadge: awardBadge,
       items,
     };
   };
@@ -2139,51 +2958,57 @@ export async function getLeagueRecords(
   // ==========================================
   // J. COMPOSE FINAL CATEGORY GROUPS
   // ==========================================
+  const badgeHistory = getRecordBadge("history", lang);
+  const badgeGame = getRecordBadge("game", lang);
+  const badgeSeason = getRecordBadge("season", lang);
+  const badgeAge = getRecordBadge("age", lang);
+  const badgePre = getRecordBadge("pre", lang);
+
   const rawGroups: RecordCategoryGroup[] = [
     {
       id: "gm-records",
-      title: "Manažérske rekordy (GM)",
+      title: getGroupTitle("gm-records", lang, cupName),
       icon: "👔",
       phase: "all",
       mainCategory: "gms",
       records: [
         {
           id: "gm-seasons-total",
-          title: `Najviac odohraných sezón v u${league} (ako GM)`,
+          title: getSectionTitle("gm-seasons-total", lang, league, cupName),
           icon: "📅",
           phase: "all",
-          phaseBadge: "História",
+          phaseBadge: badgeHistory,
           items: gmSeasonsLeader,
         },
         {
           id: "gm-seasons-one-team",
-          title: `Najviac odohraných sezón v u${league} u jedného tímu`,
+          title: getSectionTitle("gm-seasons-one-team", lang, league, cupName),
           icon: "🏢",
           phase: "all",
-          phaseBadge: "História",
+          phaseBadge: badgeHistory,
           items: gmOneTeamLeader,
         },
         {
           id: "gm-seasons-streak",
-          title: `Najviac odohraných sezón v u${league} v rade`,
+          title: getSectionTitle("gm-seasons-streak", lang, league, cupName),
           icon: "🔥",
           phase: "all",
-          phaseBadge: "História",
+          phaseBadge: badgeHistory,
           items: gmStreakLeader,
         },
         {
           id: "gm-cups",
-          title: `Počet vyhraných ${cupName}ov (ako GM)`,
+          title: getSectionTitle("gm-cups", lang, league, cupName),
           icon: "🏆",
           phase: "playoffs",
-          phaseBadge: "Play-off",
+          phaseBadge: secBadgePo,
           items: gmCupLeaders,
         },
       ],
     },
     {
       id: "career-skaters",
-      title: "Individuálne kariérne rekordy — Korčuliari (ZČ)",
+      title: getGroupTitle("career-skaters", lang, cupName),
       icon: "🏒",
       phase: "regular",
       mainCategory: "skaters",
@@ -2191,7 +3016,7 @@ export async function getLeagueRecords(
     },
     {
       id: "season-skaters",
-      title: "Individuálne sezónne rekordy — Korčuliari (ZČ)",
+      title: getGroupTitle("season-skaters", lang, cupName),
       icon: "📅",
       phase: "regular",
       mainCategory: "skaters",
@@ -2199,7 +3024,7 @@ export async function getLeagueRecords(
     },
     {
       id: "game-skaters",
-      title: "Individuálne zápasové rekordy — Korčuliari (ZČ)",
+      title: getGroupTitle("game-skaters", lang, cupName),
       icon: "⚡",
       phase: "regular",
       mainCategory: "skaters",
@@ -2207,7 +3032,7 @@ export async function getLeagueRecords(
     },
     {
       id: "rookie-records",
-      title: "Individuálne sezónne rekordy nováčikov (ZČ)",
+      title: getGroupTitle("rookie-records", lang, cupName),
       icon: "👶",
       phase: "regular",
       mainCategory: "skaters",
@@ -2215,7 +3040,7 @@ export async function getLeagueRecords(
     },
     {
       id: "playoff-career-skaters",
-      title: "Kariérne rekordy v play-off — Korčuliari",
+      title: getGroupTitle("playoff-career-skaters", lang, cupName),
       icon: "⭐",
       phase: "playoffs",
       mainCategory: "skaters",
@@ -2223,7 +3048,7 @@ export async function getLeagueRecords(
     },
     {
       id: "playoff-season-skaters",
-      title: "Rekordy v jednom play-off — Korčuliari",
+      title: getGroupTitle("playoff-season-skaters", lang, cupName),
       icon: "🔥",
       phase: "playoffs",
       mainCategory: "skaters",
@@ -2231,7 +3056,7 @@ export async function getLeagueRecords(
     },
     {
       id: "playoff-game-skaters",
-      title: "Zápasové rekordy v play-off — Korčuliari",
+      title: getGroupTitle("playoff-game-skaters", lang, cupName),
       icon: "⚡",
       phase: "playoffs",
       mainCategory: "skaters",
@@ -2239,7 +3064,7 @@ export async function getLeagueRecords(
     },
     {
       id: "career-goalies",
-      title: "Individuálne kariérne rekordy — Brankári (ZČ)",
+      title: getGroupTitle("career-goalies", lang, cupName),
       icon: "🧤",
       phase: "regular",
       mainCategory: "goalies",
@@ -2247,113 +3072,113 @@ export async function getLeagueRecords(
     },
     {
       id: "championships",
-      title: `${cupName} & Tímové tituly`,
+      title: getGroupTitle("championships", lang, cupName),
       icon: "🏆",
       phase: "playoffs",
       mainCategory: "teams",
       records: [
         {
           id: "team-cups",
-          title: `Počet vyhraných ${cupName}ov (ako tím)`,
+          title: getSectionTitle("team-cups", lang, league, cupName),
           icon: "🏆",
           phase: "playoffs",
-          phaseBadge: "Play-off",
+          phaseBadge: secBadgePo,
           items: teamCupLeaders,
         },
         {
           id: "skater-cups",
-          title: `Počet vyhraných ${cupName}ov (hráč / korčuliar)`,
+          title: getSectionTitle("skater-cups", lang, league, cupName),
           icon: "💍",
           phase: "playoffs",
-          phaseBadge: "Play-off",
+          phaseBadge: secBadgePo,
           items: skaterRingsLeader,
         },
         {
           id: "goalie-cups",
-          title: `Počet vyhraných ${cupName}ov (brankár)`,
+          title: getSectionTitle("goalie-cups", lang, league, cupName),
           icon: "🧤",
           phase: "playoffs",
-          phaseBadge: "Play-off",
+          phaseBadge: secBadgePo,
           items: goalieRingsLeader,
         },
         {
           id: "playoff-career-wins",
-          title: "Najviac výhier brankára v play-off",
+          title: getSectionTitle("playoff-career-wins", lang, league, cupName),
           icon: "🧤",
           phase: "playoffs",
-          phaseBadge: "Play-off",
+          phaseBadge: secBadgePo,
           items: playoffCareerWins,
         },
       ],
     },
     {
       id: "team-seasons",
-      title: "Tímové sezónne a sériové rekordy (ZČ)",
+      title: getGroupTitle("team-seasons", lang, cupName),
       icon: "📊",
       phase: "regular",
       mainCategory: "teams",
       records: [
         {
           id: "team-points-season",
-          title: "Najviac získaných bodov v jednej sezóne",
+          title: getSectionTitle("team-points-season", lang, league, cupName),
           icon: "🥇",
           phase: "regular",
-          phaseBadge: "ZČ",
+          phaseBadge: secBadgeReg,
           items: mostPointsSeason,
         },
         {
           id: "team-losses-season",
-          title: "Najviac prehraných zápasov v jednej sezóne (L + OTL/SOL)",
+          title: getSectionTitle("team-losses-season", lang, league, cupName),
           icon: "💔",
           phase: "regular",
-          phaseBadge: "ZČ",
+          phaseBadge: secBadgeReg,
           items: mostLossesSeason,
         },
         {
           id: "team-win-streak",
-          title: "Najviac vyhraných zápasov v rade (Winning streak)",
+          title: getSectionTitle("team-win-streak", lang, league, cupName),
           icon: "🔥",
           phase: "regular",
-          phaseBadge: "ZČ",
+          phaseBadge: secBadgeReg,
           items: teamWinStreaks,
         },
         {
           id: "team-lose-streak",
-          title: "Najviac prehraných zápasov v rade (Losing streak)",
+          title: getSectionTitle("team-lose-streak", lang, league, cupName),
           icon: "🧊",
           phase: "regular",
-          phaseBadge: "ZČ",
+          phaseBadge: secBadgeReg,
           items: teamLoseStreaks,
         },
         {
           id: "team-gf-season",
-          title: "Najviac strelených gólov v jednej sezóne",
+          title: getSectionTitle("team-gf-season", lang, league, cupName),
           icon: "🎯",
           phase: "regular",
-          phaseBadge: "ZČ",
+          phaseBadge: secBadgeReg,
           items: mostGfSeason,
         },
         {
           id: "team-ga-season",
-          title: "Najviac inkasovaných gólov v jednej sezóne",
+          title: getSectionTitle("team-ga-season", lang, league, cupName),
           icon: "🛡️",
           phase: "regular",
-          phaseBadge: "ZČ",
+          phaseBadge: secBadgeReg,
           items: mostGaSeason,
         },
         {
           id: "team-pim-season",
-          title: "Najviac trestných minút v jednej sezóne",
+          title: getSectionTitle("team-pim-season", lang, league, cupName),
           icon: "⏱️",
           phase: "regular",
-          phaseBadge: "ZČ",
+          phaseBadge: secBadgeReg,
           items: mostPimSeason,
         },
       ],
     },
     {
       id: "trophies",
-      title: "Trofeje a ocenenia",
+      title: getGroupTitle("trophies", lang, cupName),
       icon: "🏵️",
       phase: "all",
       mainCategory: "trophies",
@@ -2361,139 +3186,139 @@ export async function getLeagueRecords(
     },
     {
       id: "attendance-games",
-      title: "Návštevnosť a zápasové rekordy (ZČ / Všetko)",
+      title: getGroupTitle("attendance-games", lang, cupName),
       icon: "🏟️",
       phase: "all",
       mainCategory: "games",
       records: [
         {
           id: "highest-attendance",
-          title: "Najvyššia návštevnosť v jednom zápase",
+          title: getSectionTitle("highest-attendance", lang, league, cupName),
           icon: "👥",
           phase: "all",
-          phaseBadge: "Zápas",
+          phaseBadge: badgeGame,
           items: highestAttGames,
         },
         {
           id: "lowest-attendance",
-          title: "Najnižšia návštevnosť v jednom zápase",
+          title: getSectionTitle("lowest-attendance", lang, league, cupName),
           icon: "👤",
           phase: "all",
-          phaseBadge: "Zápas",
+          phaseBadge: badgeGame,
           items: lowestAttGames,
         },
         {
           id: "highest-avg-attendance",
-          title: "Najvyššia priemerná návštevnosť v jednej sezóne",
+          title: getSectionTitle("highest-avg-attendance", lang, league, cupName),
           icon: "📈",
           phase: "all",
-          phaseBadge: "Sezóna",
+          phaseBadge: badgeSeason,
           items: highestAvgAtt,
         },
         {
           id: "lowest-avg-attendance",
-          title: "Najnižšia priemerná návštevnosť v jednej sezóne",
+          title: getSectionTitle("lowest-avg-attendance", lang, league, cupName),
           icon: "📉",
           phase: "all",
-          phaseBadge: "Sezóna",
+          phaseBadge: badgeSeason,
           items: lowestAvgAtt,
         },
         {
           id: "highest-scoring-game",
-          title: "Highest scoring game (Najviac gólov v zápase)",
+          title: getSectionTitle("highest-scoring-game", lang, league, cupName),
           icon: "🚨",
           phase: "all",
-          phaseBadge: "Zápas",
+          phaseBadge: badgeGame,
           items: highestScoringGames,
         },
         {
           id: "largest-victory",
-          title: "Najvyššie víťazstvo (Najväčší gólový rozdiel)",
+          title: getSectionTitle("largest-victory", lang, league, cupName),
           icon: "⚡",
           phase: "all",
-          phaseBadge: "Zápas",
+          phaseBadge: badgeGame,
           items: highestVictoryGames,
         },
       ],
     },
     {
       id: "age-records",
-      title: "Vekové rekordy (Súpisky ligy)",
+      title: getGroupTitle("age-records", lang, cupName),
       icon: "🎂",
       phase: "all",
       mainCategory: "games",
       records: [
         {
           id: "youngest-player",
-          title: `Najmladší hráč v lige u${league}`,
+          title: getSectionTitle("youngest-player", lang, league, cupName),
           icon: "👶",
           phase: "all",
-          phaseBadge: "Vek",
+          phaseBadge: badgeAge,
           items: youngestPlayers,
         },
         {
           id: "oldest-player",
-          title: `Najstarší hráč v lige u${league}`,
+          title: getSectionTitle("oldest-player", lang, league, cupName),
           icon: "👴",
           phase: "all",
-          phaseBadge: "Vek",
+          phaseBadge: badgeAge,
           items: oldestPlayers,
         },
       ],
     },
     {
       id: "pre-season-group",
-      title: "Prípravné zápasy (Pre-season rekordy)",
+      title: getGroupTitle("pre-season-group", lang, cupName),
       icon: "☀️",
       phase: "pre",
       mainCategory: "pre",
       records: [
         {
           id: "pre-best-team",
-          title: "Najlepšia bilancia v príprave (Pre-season)",
+          title: getSectionTitle("pre-best-team", lang, league, cupName),
           icon: "🥇",
           phase: "pre",
-          phaseBadge: "Príprava",
+          phaseBadge: badgePre,
           items: preSeasonBestTeams,
         },
         {
           id: "pre-top-scorer",
-          title: "Najproduktívnejší hráč v príprave (Top Scorer)",
+          title: getSectionTitle("pre-top-scorer", lang, league, cupName),
           icon: "⭐",
           phase: "pre",
-          phaseBadge: "Príprava",
+          phaseBadge: badgePre,
           items: preSeasonScorers,
         },
         {
           id: "pre-goals",
-          title: "Najlepší strelec v príprave (Góly)",
+          title: getSectionTitle("pre-goals", lang, league, cupName),
           icon: "🎯",
           phase: "pre",
-          phaseBadge: "Príprava",
+          phaseBadge: badgePre,
           items: preSeasonGoals,
         },
         {
           id: "pre-assists",
-          title: "Najviac asistencií v príprave",
+          title: getSectionTitle("pre-assists", lang, league, cupName),
           icon: "🪄",
           phase: "pre",
-          phaseBadge: "Príprava",
+          phaseBadge: badgePre,
           items: preSeasonAssists,
         },
         {
           id: "pre-single-game-pts",
-          title: "Najviac bodov v jednom zápase prípravy",
+          title: getSectionTitle("pre-single-game-pts", lang, league, cupName),
           icon: "⚡",
           phase: "pre",
-          phaseBadge: "Príprava",
+          phaseBadge: badgePre,
           items: preSingleGamePoints,
         },
         {
           id: "pre-goalie-saves",
-          title: "Najviac zákrokov brankára v príprave",
+          title: getSectionTitle("pre-goalie-saves", lang, league, cupName),
           icon: "🧤",
           phase: "pre",
-          phaseBadge: "Príprava",
+          phaseBadge: badgePre,
           items: preGoalieSaves,
         },
       ],
