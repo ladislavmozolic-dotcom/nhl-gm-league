@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { coachDemand, coachBuyout } from "@/lib/coach-contract";
 import { fireCoachAction, hireCoachAction } from "@/app/teams/[slug]/coach/actions";
+import { Tooltip } from "@/components/CoachesTable";
 
 type Coach = { id: number; name: string; country: string | null; style: string; overall: number; age: number | null;
   ph: number; df: number; of: number; pd: number; ex: number; ld: number; salary: number; contract: number };
@@ -13,7 +14,14 @@ const STYLE_CLASS: Record<string, string> = {
   Offensive: "bg-rose-500/15 text-rose-300 border-rose-500/30", Defensive: "bg-sky-500/15 text-sky-300 border-sky-500/30",
   Physical: "bg-amber-500/15 text-amber-300 border-amber-500/30", Balanced: "bg-slate-600/20 text-slate-300 border-slate-600/40",
 };
-const RAT = [["PH", "ph"], ["DF", "df"], ["OF", "of"], ["PD", "pd"], ["EX", "ex"], ["LD", "ld"]] as const;
+const RAT = [
+  ["PH", "ph", "Physical — emphasis on hitting and physical play"],
+  ["DF", "df", "Defense — how much the coach tightens defensive structure"],
+  ["OF", "of", "Offense — how much the coach boosts offensive play"],
+  ["PD", "pd", "Player Discipline — fewer penalties taken by the team"],
+  ["EX", "ex", "Experience — steadies the team in clutch moments and late-game situations"],
+  ["LD", "ld", "Leadership — motivates players, improves morale and development"],
+] as const;
 const ratColor = (v: number) => v >= 85 ? "text-emerald-400" : v >= 78 ? "text-green-400" : v >= 70 ? "text-blue-400" : v >= 62 ? "text-amber-400" : "text-slate-400";
 
 export default function CoachManager({ teamId, slug, teamName, current, freeAgents, canManage, bank }:
@@ -55,10 +63,18 @@ export default function CoachManager({ teamId, slug, teamName, current, freeAgen
               <div className="text-lg font-bold">{current.name}</div>
               <div className="text-xs text-slate-500">{current.country ?? "—"} · age {current.age ?? "—"}</div>
             </div>
-            <span className={`inline-block px-2 py-0.5 rounded border text-xs font-semibold ${STYLE_CLASS[current.style] ?? STYLE_CLASS.Balanced}`}>{current.style}</span>
+            <Tooltip text="Coaching philosophy and game-plan style">
+              <span className={`inline-block px-2 py-0.5 rounded border text-xs font-semibold ${STYLE_CLASS[current.style] ?? STYLE_CLASS.Balanced}`}>{current.style}</span>
+            </Tooltip>
             <div className="flex items-center gap-3 text-sm tabular-nums">
-              {RAT.map(([label, key]) => <span key={key} className="text-slate-500">{label}<span className={`ml-1 font-semibold ${ratColor(current[key])}`}>{current[key]}</span></span>)}
-              <span className="text-slate-500">OV<span className={`ml-1 font-bold ${ratColor(current.overall)}`}>{current.overall}</span></span>
+              {RAT.map(([label, key, title]) => (
+                <Tooltip key={key} text={title}>
+                  <span className="text-slate-500">{label}<span className={`ml-1 font-semibold ${ratColor(current[key])}`}>{current[key]}</span></span>
+                </Tooltip>
+              ))}
+              <Tooltip text="Overall coach rating">
+                <span className="text-slate-500">OV<span className={`ml-1 font-bold ${ratColor(current.overall)}`}>{current.overall}</span></span>
+              </Tooltip>
             </div>
             <div className="text-sm text-slate-300 ml-auto">{money(current.salary)} × {current.contract} yr{current.contract === 1 ? "" : "s"}</div>
             {canManage && (
@@ -89,9 +105,9 @@ export default function CoachManager({ teamId, slug, teamName, current, freeAgen
             <thead>
               <tr className="text-xs text-slate-500 uppercase tracking-wider border-b border-slate-800 bg-slate-800/30">
                 <th className="text-left px-3 py-2.5 font-medium">Coach</th>
-                <th className="text-left px-3 py-2.5 font-medium">Style</th>
-                {RAT.map(([l]) => <th key={l} className="text-right px-2 py-2.5 font-medium">{l}</th>)}
-                <th className="text-right px-2 py-2.5 font-medium">OV</th>
+                <th className="text-left px-3 py-2.5 font-medium"><Tooltip text="Coaching philosophy and game-plan style">Style</Tooltip></th>
+                {RAT.map(([l, k, title]) => <th key={k} className="text-right px-2 py-2.5 font-medium"><Tooltip text={title}>{l}</Tooltip></th>)}
+                <th className="text-right px-2 py-2.5 font-medium"><Tooltip text="Overall coach rating">OV</Tooltip></th>
                 <th className="text-right px-3 py-2.5 font-medium">Asking</th>
                 {canManage && <th className="px-3 py-2.5" />}
               </tr>

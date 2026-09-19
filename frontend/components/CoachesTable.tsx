@@ -51,7 +51,7 @@ const COLS: { key: "of" | "df" | "pd" | "ph" | "ex" | "ld"; label: string; title
   { key: "ld", label: "LD", title: "Leadership — motivates players, improves morale and development" },
 ];
 
-function Tooltip({ children, text }: { children: React.ReactNode; text: string }) {
+export function Tooltip({ children, text }: { children: React.ReactNode; text: string }) {
   return (
     <span className="relative group/tip cursor-help">
       {children}
