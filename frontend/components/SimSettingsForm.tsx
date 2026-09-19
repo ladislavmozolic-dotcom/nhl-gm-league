@@ -283,6 +283,19 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
         </div>
       </Card>
 
+      <Card title="NHL Expansion">
+        <label className="flex items-center justify-between gap-3 text-sm py-1 mb-2 border-b border-slate-800 pb-3">
+          <span className="text-slate-300">Protection ruleset</span>
+          <select value={s.expansionRuleset} onChange={(e) => set("expansionRuleset", e.target.value as EngineSettings["expansionRuleset"])}
+            className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm">
+            <option value="real2021">Real 2021 — entry-level/two-way players exempt</option>
+            <option value="simplified">Simplified — no exemption layer</option>
+          </select>
+        </label>
+        <NumField k="expansionCapFloorPct" label="Post-draft cap floor (× league floor)" step={0.05} w="w-24" />
+        <div className="mt-1"><Toggle k="expansionRequireGoalie" label="Warn if no goalie was selected" /></div>
+      </Card>
+
       <Card title="Goalie Fatigue (CON)">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
           <div>

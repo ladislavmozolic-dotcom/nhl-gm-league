@@ -109,6 +109,10 @@ export type EngineSettings = {
   faSignLock: boolean;               // when true, ordinary GMs can't sign UFAs (commissioner-only); a comish toggle unlocks it
   financeMode: "base" | "detailed";  // base = ticket-revenue finance; detailed = richer model (pending)
   waiversEnabled: boolean;           // enforce the waiver wire (claims / re-entry) on demotions
+  // NHL Expansion
+  expansionRuleset: "real2021" | "simplified"; // real2021 = NMC forces protection + entry-level/two-way exemption layer active; simplified = skip the exemption layer (NMC still forces protection either way)
+  expansionCapFloorPct: number;      // post-draft committed cap must be ≥ this % of the league's cap floor to pass the advisory check on the results page — real-2021-calibrated default
+  expansionRequireGoalie: boolean;   // warn on the results page if no goalie was selected across all picks
   rosterOverFinePerDay: number; // fine per excess player per day
   rewardPlayoff: number;      // to bank on making the playoffs
   rewardCup: number;          // Stanley Cup winner bonus
@@ -220,6 +224,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   faTwoWayWeakOverall: 55, faTwoWayWeakRound: 3, faTwoWayAhlMaxYears: 3, faTwoWayFewGpMaxYears: 2, faTwoWayMaxSalary: 1_300_000,
   rfaMaxAge: 26, osOpenDay: 1, osCloseDay: 8, osDecisionDay: 10,
   faMode: "full", faSignLock: true, financeMode: "base", waiversEnabled: true,
+  expansionRuleset: "real2021", expansionCapFloorPct: 0.6, expansionRequireGoalie: true,
   rosterOverFinePerDay: 200000,
   rewardPlayoff: 8000000, rewardCup: 3000000, rewardAhlCup: 4000000, rewardAhlFinalist: 2000000,
   duHighThreshold: 90, conRecovery: 1, conRecoveryHighDu: 2,

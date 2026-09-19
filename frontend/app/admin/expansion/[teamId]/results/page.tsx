@@ -3,10 +3,10 @@ import { redirect, notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { PageHeader, Card, BackPill } from "@/components/ui";
 import { checkExpansionRoster } from "@/lib/expansion-server";
+import { loadSettings } from "@/lib/sim/settings";
 
 export const dynamic = "force-dynamic";
 
-const CAP_FLOOR_PCT = 0.6; // real-2021-calibrated default — becomes commissioner-tunable in a later phase
 const fmt = (n: number) => `$${(n / 1_000_000).toFixed(1)}M`;
 
 export default async function ExpansionResultsPage({ params }: { params: Promise<{ teamId: string }> }) {
@@ -25,7 +25,8 @@ export default async function ExpansionResultsPage({ params }: { params: Promise
   const players = await prisma.player.findMany({ where: { id: { in: picks.map((p) => p.playerId) } }, select: { id: true, name: true, position: true, overall: true } });
   const playerOf = new Map(players.map((p) => [p.id, p]));
 
-  const check = draft.status === "DONE" ? await checkExpansionRoster(expansionTeamId, CAP_FLOOR_PCT) : null;
+  const settings = await loadSettings();
+  const check = draft.status === "DONE" ? await checkExpansionRoster(expansionTeamId, settings.expansionCapFloorPct) : null;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-2 space-y-6">
@@ -37,9 +38,11 @@ export default async function ExpansionResultsPage({ params }: { params: Promise
 
       {check && (
         <div className="grid sm:grid-cols-2 gap-3">
-          <div className={`rounded-lg border px-4 py-3 text-sm ${check.hasGoalie ? "border-emerald-800 bg-emerald-950/30 text-emerald-300" : "border-red-800 bg-red-950/30 text-red-300"}`}>
-            {check.hasGoalie ? `✓ ${check.goalieCount} goalie(s) selected` : "⚠ No goalie was selected"}
-          </div>
+          {settings.expansionRequireGoalie && (
+            <div className={`rounded-lg border px-4 py-3 text-sm ${check.hasGoalie ? "border-emerald-800 bg-emerald-950/30 text-emerald-300" : "border-red-800 bg-red-950/30 text-red-300"}`}>
+              {check.hasGoalie ? `✓ ${check.goalieCount} goalie(s) selected` : "⚠ No goalie was selected"}
+            </div>
+          )}
           <div className={`rounded-lg border px-4 py-3 text-sm ${check.underFloorBy === 0 ? "border-emerald-800 bg-emerald-950/30 text-emerald-300" : "border-amber-800 bg-amber-950/30 text-amber-300"}`}>
             {check.underFloorBy === 0
               ? `✓ Committed cap ${fmt(check.committedCap)} meets the ${fmt(check.capFloor)} floor`

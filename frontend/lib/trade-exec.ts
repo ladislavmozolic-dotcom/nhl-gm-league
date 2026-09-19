@@ -61,6 +61,13 @@ export async function collectMoveOps(pkg: TradePackage) {
     getLeagueDate(),
   ]);
   if (!fromTeam || !toTeam) throw new Error("Team not found");
+  // Real NHL rule: existing clubs can't trade while an expansion draft's protection
+  // window is open (SETUP) or the draft itself is running (LIVE) — stops a club
+  // dodging a hard exposure decision by shuffling a player away at the last minute.
+  // The single choke point both 2-team (executeAcceptedTrade) and 3-team
+  // (executeTradeGroup) trades share, so gating here covers both.
+  const activeFreeze = await prisma.expansionDraftState.findFirst({ where: { status: { in: ["SETUP", "LIVE"] }, tradeFreeze: true }, select: { id: true } });
+  if (activeFreeze) throw new Error("Trades are frozen while an expansion draft is in progress.");
   const fromAff = fromTeam.affiliateTeams[0]?.id ?? null;
   const toAff = toTeam.affiliateTeams[0]?.id ?? null;
 

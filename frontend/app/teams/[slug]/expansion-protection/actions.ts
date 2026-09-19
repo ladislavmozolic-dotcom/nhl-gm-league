@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { canManageTeam, getTeamSession } from "@/lib/auth";
 import { protectionRosterFor, validateProtection, type ProtectionFormat } from "@/lib/expansion-server";
+import { loadSettings } from "@/lib/sim/settings";
 import { revalidatePath } from "next/cache";
 
 export async function submitProtectionListAction(input: { teamId: number; slug: string; expansionDraftId: number; format: ProtectionFormat; playerIds: number[] }) {
@@ -13,8 +14,8 @@ export async function submitProtectionListAction(input: { teamId: number; slug: 
   if (draft.status !== "SETUP") return { ok: false as const, error: "The protection window is closed — the draft has already started." };
   if (draft.teamId === input.teamId) return { ok: false as const, error: "The expansion team doesn't submit a protection list." };
 
-  const roster = await protectionRosterFor(input.teamId);
-  const v = validateProtection(roster, input.format, input.playerIds);
+  const [roster, settings] = await Promise.all([protectionRosterFor(input.teamId), loadSettings()]);
+  const v = validateProtection(roster, input.format, input.playerIds, settings.expansionRuleset);
   if (!v.ok) return { ok: false as const, error: v.error };
 
   const me = await getTeamSession();

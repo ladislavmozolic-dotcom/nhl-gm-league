@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { canManageTeam } from "@/lib/auth";
 import { PageHeader, Card } from "@/components/ui";
 import { protectionRosterFor, isForcedProtect, isAutoExempt, isFwd, isDef } from "@/lib/expansion-server";
+import { loadSettings } from "@/lib/sim/settings";
 import ExpansionProtectionForm from "@/components/ExpansionProtectionForm";
 import { submitProtectionListAction } from "./actions";
 
@@ -25,10 +26,11 @@ export default async function ExpansionProtectionPage({ params }: { params: Prom
     );
   }
 
-  const [roster, expansionTeams, submissions] = await Promise.all([
+  const [roster, expansionTeams, submissions, settings] = await Promise.all([
     protectionRosterFor(team.id),
     prisma.team.findMany({ where: { id: { in: drafts.map((d) => d.teamId) } }, select: { id: true, name: true, logoUrl: true } }),
     prisma.expansionProtection.findMany({ where: { teamId: team.id, expansionDraftId: { in: drafts.map((d) => d.id) } } }),
+    loadSettings(),
   ]);
   const expTeamOf = new Map(expansionTeams.map((t) => [t.id, t]));
   const subOf = new Map(submissions.map((s) => [s.expansionDraftId, s]));
@@ -37,7 +39,7 @@ export default async function ExpansionProtectionPage({ params }: { params: Prom
     ...p,
     posGroup: (p.isGoalie ? "G" : isFwd(p.position) ? "F" : isDef(p.position) ? "D" : "F") as "F" | "D" | "G",
     forced: isForcedProtect(p),
-    exempt: isAutoExempt(p),
+    exempt: isAutoExempt(p, settings.expansionRuleset),
   }));
 
   return (

@@ -29,11 +29,17 @@ export function isForcedProtect(p: Pick<ProtEligPlayer, "tradeClause">): boolean
   return p.tradeClause === "NMC";
 }
 
+export type ExpansionRuleset = "real2021" | "simplified";
+
 /** Auto-exempt: not protectable and not selectable by the expansion team at all.
  *  The codebase has no years-of-service field, so this approximates the real
  *  "first/second-year pro" exemption with the two-way/entry-level signal already
- *  used elsewhere for a similar "still developing" concept (see lib/ai-gm.ts). */
-export function isAutoExempt(p: Pick<ProtEligPlayer, "contractType" | "contractText">): boolean {
+ *  used elsewhere for a similar "still developing" concept (see lib/ai-gm.ts).
+ *  Commissioner-skippable (SimSettings.expansionRuleset = "simplified") for a
+ *  league that doesn't want the approximation — NMC still forces protection
+ *  either way (isForcedProtect is a real field, not an approximation). */
+export function isAutoExempt(p: Pick<ProtEligPlayer, "contractType" | "contractText">, ruleset: ExpansionRuleset = "real2021"): boolean {
+  if (ruleset === "simplified") return false;
   return p.contractType === "TWO_WAY" || !!p.contractText?.toUpperCase().includes("ELC");
 }
 
@@ -48,11 +54,11 @@ export type ProtectionValidation = { ok: true } | { ok: false; error: string };
  *  fresh from the roster (never trusts stored/client state) and checks the chosen
  *  format's slot counts exactly. `chosenIds` = the GM's voluntary picks (excludes
  *  forced-protected players, who are implicit). */
-export function validateProtection(roster: ProtEligPlayer[], format: ProtectionFormat, chosenIds: number[]): ProtectionValidation {
+export function validateProtection(roster: ProtEligPlayer[], format: ProtectionFormat, chosenIds: number[], ruleset: ExpansionRuleset = "real2021"): ProtectionValidation {
   const byId = new Map(roster.map((p) => [p.id, p]));
   const forced = roster.filter(isForcedProtect);
   const forcedIds = new Set(forced.map((p) => p.id));
-  const exemptIds = new Set(roster.filter(isAutoExempt).map((p) => p.id));
+  const exemptIds = new Set(roster.filter((p) => isAutoExempt(p, ruleset)).map((p) => p.id));
 
   for (const id of chosenIds) {
     const p = byId.get(id);
@@ -95,12 +101,14 @@ export async function protectionRosterFor(teamId: number): Promise<ProtEligPlaye
  *  players, minus whatever that team explicitly chose to protect. Always re-derived
  *  live from the roster + their stored submission — never trusts a cached list. */
 export async function exposedPlayersFor(sourceTeamId: number, expansionDraftId: number): Promise<ProtEligPlayer[]> {
-  const [roster, submission] = await Promise.all([
+  const { loadSettings } = await import("./sim/settings");
+  const [roster, submission, settings] = await Promise.all([
     protectionRosterFor(sourceTeamId),
     prisma.expansionProtection.findUnique({ where: { expansionDraftId_teamId: { expansionDraftId, teamId: sourceTeamId } } }),
+    loadSettings(),
   ]);
   const chosenIds = new Set(submission?.playerIds ?? []);
-  return roster.filter((p) => !isAutoExempt(p) && !isForcedProtect(p) && !chosenIds.has(p.id));
+  return roster.filter((p) => !isAutoExempt(p, settings.expansionRuleset) && !isForcedProtect(p) && !chosenIds.has(p.id));
 }
 
 /** Worst-first pick order for an expansion draft: every OTHER active NHL club, once
