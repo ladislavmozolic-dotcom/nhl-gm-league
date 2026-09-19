@@ -25,6 +25,7 @@ export interface TeamGameSwing {
 
 export interface GoalieGameSwing {
   playerId: number;
+  teamId: number;
   name: string;
   savePct: number;
   seasonSavePct: number | null;
@@ -37,6 +38,7 @@ export interface TeamPostGame {
   teamId: number;
   teamCode: string | null;
   swings: TeamGameSwing[];
+  goalies: GoalieGameSwing[];
 }
 
 export interface PostGameIntelResult {
@@ -138,6 +140,7 @@ async function goalieSwings(game: { id: number; season: string; league: string; 
     if (!prior.length) {
       out.push({
         playerId: s.playerId,
+        teamId: s.teamId,
         name: s.player.name,
         savePct: pct(s.saves / s.shotsAgainst),
         seasonSavePct: null,
@@ -152,6 +155,7 @@ async function goalieSwings(game: { id: number; season: string; league: string; 
     const priorGsaxSum = prior.reduce((sum, p) => sum + (p.xga - p.goalsAgainst), 0);
     out.push({
       playerId: s.playerId,
+      teamId: s.teamId,
       name: s.player.name,
       savePct: pct(s.saves / s.shotsAgainst),
       seasonSavePct: pct(priorSaves / priorShots),
@@ -181,9 +185,12 @@ export async function postGameIntel(gameId: number): Promise<PostGameIntelResult
     goalieSwings(game),
   ]);
 
+  const homeGoalies = goalies.filter((g) => g.teamId === game.homeTeamId);
+  const awayGoalies = goalies.filter((g) => g.teamId === game.awayTeamId);
+
   return {
-    home: { teamId: game.homeTeamId, teamCode: game.homeTeam.code, swings: homeSw },
-    away: { teamId: game.awayTeamId, teamCode: game.awayTeam.code, swings: awaySw },
+    home: { teamId: game.homeTeamId, teamCode: game.homeTeam.code, swings: homeSw, goalies: homeGoalies },
+    away: { teamId: game.awayTeamId, teamCode: game.awayTeam.code, swings: awaySw, goalies: awayGoalies },
     goalies,
   };
 }
