@@ -110,6 +110,20 @@ export default function MegaMenu({ gm, items, lang = "en", light = false, hideFo
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Lock the page behind the drawer while it's open. Without this, a fast
+  // swipe inside the drawer's own scroll panel can still bleed through to the
+  // body underneath (rubber-banding / pull-to-refresh, especially inside the
+  // installed mobile app's webview) — which some hosts read as a dismiss
+  // gesture and close the drawer mid-scroll. Locking body scroll keeps every
+  // touch contained in the drawer's own overflow-y-auto, so it only closes on
+  // an actual tap (a menu link or the X).
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prevOverflow; };
+  }, [mobileOpen]);
+
   const nhlTeams = teams.filter((tm) => tm.id <= 33);
   const eastern = nhlTeams.filter((tm) =>
     tm.conference?.includes("Eastern")
