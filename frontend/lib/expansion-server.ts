@@ -89,3 +89,48 @@ export async function protectionRosterFor(teamId: number): Promise<ProtEligPlaye
     orderBy: { overall: "desc" },
   });
 }
+
+/** The players an expansion team may actually select from a given source team right
+ *  now: the NHL roster minus auto-exempt players, minus force-protected (NMC)
+ *  players, minus whatever that team explicitly chose to protect. Always re-derived
+ *  live from the roster + their stored submission — never trusts a cached list. */
+export async function exposedPlayersFor(sourceTeamId: number, expansionDraftId: number): Promise<ProtEligPlayer[]> {
+  const [roster, submission] = await Promise.all([
+    protectionRosterFor(sourceTeamId),
+    prisma.expansionProtection.findUnique({ where: { expansionDraftId_teamId: { expansionDraftId, teamId: sourceTeamId } } }),
+  ]);
+  const chosenIds = new Set(submission?.playerIds ?? []);
+  return roster.filter((p) => !isAutoExempt(p) && !isForcedProtect(p) && !chosenIds.has(p.id));
+}
+
+/** Worst-first pick order for an expansion draft: every OTHER active NHL club, once
+ *  each, by reverse current standings. The expansion team itself is always excluded
+ *  (a fresh 0-GP club can otherwise land anywhere in a reversed points-pct sort). */
+export async function expansionPickOrder(expansionTeamId: number, season = "2026-27"): Promise<number[]> {
+  const { reverseStandingsOrder } = await import("./draft-order");
+  const order = await reverseStandingsOrder(season);
+  return order.filter((id) => id !== expansionTeamId);
+}
+
+export type ExpansionRosterCheck = {
+  goalieCount: number;
+  hasGoalie: boolean;
+  committedCap: number;
+  capFloor: number;
+  underFloorBy: number;
+};
+
+/** Post-draft sanity check on the expansion team's freshly-picked roster — advisory,
+ *  not a hard block (see lib/sim/settings.ts expansionCapFloorPct / expansionRequireGoalie). */
+export async function checkExpansionRoster(expansionTeamId: number, capFloorPct: number): Promise<ExpansionRosterCheck> {
+  const { loadLeagueCap } = await import("./free-agency-server");
+  const { liveCapHit } = await import("./finance");
+  const [roster, cap] = await Promise.all([
+    prisma.player.findMany({ where: { teamId: expansionTeamId, rosterType: "NHL" }, select: { isGoalie: true, capHit: true, contractYears: true } }),
+    loadLeagueCap(),
+  ]);
+  const goalieCount = roster.filter((p) => p.isGoalie).length;
+  const committedCap = roster.reduce((s, p) => s + liveCapHit(p), 0);
+  const capFloor = Math.round(cap.lower * capFloorPct);
+  return { goalieCount, hasGoalie: goalieCount > 0, committedCap, capFloor, underFloorBy: Math.max(0, capFloor - committedCap) };
+}
