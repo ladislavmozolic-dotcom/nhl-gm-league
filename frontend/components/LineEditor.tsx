@@ -615,12 +615,6 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
             {goalie?.photoUrl && <img src={goalie.photoUrl} alt="" className="lines-goalie-face" onError={(event) => { event.currentTarget.style.display = "none"; }} />}
             <JerseyChip teamSlug={jerseyTeamSlug} number={goalie?.number} lastName={lastName} size={184} />
           </div>
-          {starter && (
-            <>
-              <span className="lines-goalie-swap">↻ Change goalie</span>
-              <Select value={value} onChange={onChange} pool={pool} overlay />
-            </>
-          )}
         </div>
         <div className="lines-goalie-details">
           <p className="lines-kicker">{starter ? "Starting goalie" : "Backup goalie"}</p>
