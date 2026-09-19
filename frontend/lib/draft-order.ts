@@ -7,7 +7,28 @@
 import { prisma } from "./prisma";
 import { computeStandings } from "./sim/standings";
 
+// Legacy fallback only (the league's original 32-team count) — anywhere that can't
+// await should fall back to this, but every real computation below uses the live
+// active-club count instead, so an expansion team is picked up automatically.
 export const PICKS_PER_ROUND = 32;
+
+/** Active NHL club count — the real basis for pick-number arithmetic (rounds 2-7 use
+ *  one slot per active club per round). Replaces the hardcoded 32 now that expansion
+ *  can add clubs mid-league. */
+export async function activeNhlTeamCount(): Promise<number> {
+  return prisma.team.count({ where: { league: "NHL", isAffiliate: false } });
+}
+
+/** Same as activeNhlTeamCount() — named to match its use as "picks per round". */
+export async function picksPerRound(): Promise<number> {
+  return activeNhlTeamCount();
+}
+
+/** 7 full rounds' worth of picks at the current club count — after this come bonus
+ *  rounds, then deferred picks. */
+export async function lastBasePick(): Promise<number> {
+  return 7 * (await picksPerRound());
+}
 
 export type OrderPick = {
   overallPick: number;
@@ -63,12 +84,13 @@ export async function draftOrder(year: number, season = "2026-27"): Promise<Orde
     });
   }
 
+  const ppr = teams.length; // active club count — the live basis for pick numbering
   for (let round = 2; round <= 7; round++) {
     slotOrder.forEach((originalTeamId, slot) => {
       const logo = logoOf.get(originalTeamId);
       const owner = logo != null ? ownerByRoundLogo.get(`${round}:${logo}`) : undefined;
       out.push({
-        overallPick: (round - 1) * PICKS_PER_ROUND + slot + 1,
+        overallPick: (round - 1) * ppr + slot + 1,
         round, slotInRound: slot,
         pickerTeamId: owner ?? originalTeamId, // no trade record → original team keeps it
         originalTeamId,
@@ -79,7 +101,7 @@ export async function draftOrder(year: number, season = "2026-27"): Promise<Orde
   // Extra rounds (8, 9, …): admin-granted bonus picks, numbered contiguously right
   // after round 7 and grouped by round in the order they were awarded.
   const roundCounters = new Map<number, number>();
-  let nextBonusPick = LAST_BASE_PICK + 1;
+  let nextBonusPick = 7 * ppr + 1;
   for (const b of bonus) {
     const slot = roundCounters.get(b.round) ?? 0;
     roundCounters.set(b.round, slot + 1);
@@ -106,6 +128,7 @@ export async function reverseStandingsOrder(season = "2026-27"): Promise<number[
   return [...standings].reverse().map((s) => s.teamId);
 }
 
+// Legacy fallback only — see lastBasePick() for the real (dynamic) value.
 export const LAST_BASE_PICK = 7 * PICKS_PER_ROUND; // 224 — after this come deferred picks
 
 /** The draft order INCLUDING expired picks that were moved to the end (deferrals),
@@ -116,14 +139,15 @@ export async function effectiveOrder(year: number, season = "2026-27"): Promise<
     prisma.draftDeferral.findMany({ where: { year }, orderBy: { id: "asc" } }),
   ]);
   const revStd = await reverseStandingsOrder(season);
+  const ppr = revStd.length; // active club count — the live basis for pick numbering
   // deferrals sit after everything scheduled — including any bonus rounds
-  const lastScheduled = base.reduce((m, p) => Math.max(m, p.overallPick), LAST_BASE_PICK);
+  const lastScheduled = base.reduce((m, p) => Math.max(m, p.overallPick), 7 * ppr);
   const tail: OrderPick[] = deferrals.map((d, i) => ({
     overallPick: lastScheduled + i + 1,
     round: d.round,
     slotInRound: -1,
     pickerTeamId: d.teamId,
-    originalTeamId: revStd[(d.sourcePick - 1) % PICKS_PER_ROUND] ?? d.teamId,
+    originalTeamId: revStd[(d.sourcePick - 1) % ppr] ?? d.teamId,
     deferred: true,
     sourcePick: d.sourcePick,
   }));

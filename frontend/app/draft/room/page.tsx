@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { PageHeader, Card } from "@/components/ui";
 import { getTeamSession, isAdmin } from "@/lib/auth";
-import { effectiveOrder, reverseStandingsOrder, PICKS_PER_ROUND } from "@/lib/draft-order";
+import { effectiveOrder, reverseStandingsOrder } from "@/lib/draft-order";
 import { countryFlag } from "@/lib/flags";
 import DraftAvailableBoard, { type BoardProspect } from "@/components/DraftAvailableBoard";
 import DraftQueuePanel, { type QueueItem } from "@/components/DraftQueuePanel";
@@ -50,8 +50,10 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
   const bonusRaw = await prisma.draftBonusPick.findMany({ where: { year: DRAFT_YEAR, ...src }, orderBy: [{ round: "asc" }, { seq: "asc" }, { id: "asc" }], select: { id: true, round: true, teamId: true, reason: true, seq: true } });
   const bonusRows: BonusRow[] = bonusRaw.map((b) => ({ id: b.id, round: b.round, teamCode: teamOf.get(b.teamId)?.code ?? "—", reason: b.reason, seq: b.seq }));
   const bonusTeams: BonusTeam[] = teams.map((t) => ({ id: t.id, code: t.code ?? "", name: t.name }));
+  // active club count — the live basis for pick-number arithmetic (was a hardcoded 32)
+  const ppr = revStd.length;
   // original owner of any overall pick = the team at that fixed worst-first slot
-  const originalOwnerOf = (overallPick: number) => revStd[(overallPick - 1) % PICKS_PER_ROUND];
+  const originalOwnerOf = (overallPick: number) => revStd[(overallPick - 1) % ppr];
   const state = stateRaw ?? { liveRound: 0, currentPick: 33, status: "IDLE" as string };
   const fullView = sp.round === "full";
   // extra rounds (8, 9, …) exist once the admin awards bonus picks
@@ -63,8 +65,8 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
 
   // the selected round's pick range from the order (base rounds are 32-wide; bonus rounds vary)
   const roundSlots = order.filter((p) => p.round === round && !p.deferred).map((p) => p.overallPick).sort((a, b) => a - b);
-  const roundLo = roundSlots[0] ?? (round - 1) * PICKS_PER_ROUND + 1;
-  const roundHi = roundSlots[roundSlots.length - 1] ?? round * PICKS_PER_ROUND;
+  const roundLo = roundSlots[0] ?? (round - 1) * ppr + 1;
+  const roundHi = roundSlots[roundSlots.length - 1] ?? round * ppr;
   const roundPicks = drafted.filter((p) => (p.overallPick ?? 0) >= roundLo && (p.overallPick ?? 0) <= roundHi);
   const roundComplete = roundSlots.length > 0 && roundPicks.length >= roundSlots.length;
 
@@ -145,12 +147,12 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
             <div className="space-y-1">
               {allPicks.map((p) => {
                 const t = p.draftedByTeamId ? teamOf.get(p.draftedByTeamId) : undefined;
-                const origId = (p.overallPick ?? 0) > PICKS_PER_ROUND ? originalOwnerOf(p.overallPick!) : undefined;
+                const origId = (p.overallPick ?? 0) > ppr ? originalOwnerOf(p.overallPick!) : undefined;
                 const orig = origId && origId !== p.draftedByTeamId ? teamOf.get(origId) : undefined;
-                const newRound = (p.overallPick ?? 0) % PICKS_PER_ROUND === 1;
+                const newRound = (p.overallPick ?? 0) % ppr === 1;
                 return (
                   <div key={p.id}>
-                    {newRound && <div className="text-[10px] uppercase tracking-wider text-slate-600 pt-2 pb-1 px-1">Round {Math.ceil((p.overallPick ?? 0) / PICKS_PER_ROUND)}</div>}
+                    {newRound && <div className="text-[10px] uppercase tracking-wider text-slate-600 pt-2 pb-1 px-1">Round {Math.ceil((p.overallPick ?? 0) / ppr)}</div>}
                     <div className="flex items-center gap-3 rounded-lg border border-slate-800/70 bg-slate-900/40 px-3 py-1.5">
                       <span className="w-8 text-center text-sm font-bold text-slate-500 tabular-nums">{p.overallPick}</span>
                       {t?.logoUrl && <img src={t.logoUrl} alt="" className="w-6 h-6 object-contain" />}
@@ -174,7 +176,7 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
               const t = p.draftedByTeamId ? teamOf.get(p.draftedByTeamId) : undefined;
               // original owner only for rounds 2-7 (round 1 ran on the real draft
               // order/lottery, not our reverse-standings slots, so we can't derive it)
-              const origId = (p.overallPick ?? 0) > PICKS_PER_ROUND ? originalOwnerOf(p.overallPick!) : undefined;
+              const origId = (p.overallPick ?? 0) > ppr ? originalOwnerOf(p.overallPick!) : undefined;
               const orig = origId && origId !== p.draftedByTeamId ? teamOf.get(origId) : undefined;
               return (
                 <div key={p.id} className="flex items-center gap-3 rounded-lg border border-slate-800 bg-slate-900/50 px-3 py-2">

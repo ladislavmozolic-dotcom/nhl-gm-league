@@ -115,6 +115,9 @@ export default async function RootLayout({
     if (item.key === "frenzy" && item.children) {
       return { ...item, children: item.children.filter((c) => c.href !== "/signings" || t?.isAdmin) };
     }
+    if (item.key === "draft" && item.children) {
+      return { ...item, children: item.children.filter((c) => c.href !== "/admin/expansion" || t?.isAdmin) }; // commish-only — page itself redirects non-admins
+    }
     return item;
   });
 

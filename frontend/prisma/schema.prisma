@@ -1264,6 +1264,45 @@ model DraftState {
   updatedAt   DateTime  @updatedAt
 }
 
+// NHL Expansion — a one-off, single-round event tied to a specific new team (not
+// year-keyed like DraftState, which is entangled with 7-round/32-team Entry Draft math).
+model ExpansionDraftState {
+  id          Int      @id @default(autoincrement())
+  teamId      Int      @unique // the expansion team this draft is for
+  status      String   @default("SETUP") // SETUP (protection windows open) | LIVE | DONE
+  pickOrder   Int[]    @default([]) // existing team ids, pick order, frozen when started (LIVE)
+  currentIdx  Int      @default(0) // index into pickOrder currently on the clock
+  tradeFreeze Boolean  @default(true) // blocks trades among existing teams while status != DONE
+  updatedAt   DateTime @updatedAt
+}
+
+// One existing team's protection-list submission for a given expansion draft (self-service,
+// resubmittable until the draft goes LIVE). playerIds excludes auto-forced (NMC) and
+// auto-exempt (entry-level/two-way) players — those are re-derived live, not stored here.
+model ExpansionProtection {
+  id               Int      @id @default(autoincrement())
+  expansionDraftId Int
+  teamId           Int      @unique
+  format           String // "7-3-1" | "8-1"
+  playerIds        Int[]
+  submittedAt      DateTime @default(now())
+  submittedBy      String?
+}
+
+// One row per pick made in an expansion draft — the structured results record (a Transaction
+// row is also created per pick for the existing transactions-log/homepage-tracker surfaces).
+model ExpansionPick {
+  id               Int      @id @default(autoincrement())
+  expansionDraftId Int
+  fromTeamId       Int
+  toTeamId         Int
+  playerId         Int
+  pickNumber       Int
+  createdAt        DateTime @default(now())
+
+  @@index([expansionDraftId])
+}
+
 // Admin-granted BONUS picks in extra rounds (8, 9, …) beyond the standard 7 — awarded
 // to clubs as prizes (best article, etc.). Ordered within a round by insertion (id).
 model DraftBonusPick {

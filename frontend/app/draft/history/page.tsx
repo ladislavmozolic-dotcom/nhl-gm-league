@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/ui";
 import { countryFlag } from "@/lib/flags";
 import { currentDraftYear } from "@/lib/draft-class-import";
 import { seasonForDraftYear } from "@/lib/draft-lottery";
-import { PICKS_PER_ROUND } from "@/lib/draft-order";
+import { picksPerRound } from "@/lib/draft-order";
 import DraftHistoryBrowser, { type HistDraft } from "@/components/DraftHistoryBrowser";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +22,10 @@ export default async function DraftHistoryPage() {
     select: { id: true, name: true, position: true, country: true, overallPick: true, draftYear: true, draftedByTeamId: true, amateurLeague: true },
   });
   const teams = await prisma.team.findMany({ where: { league: "NHL", isAffiliate: false }, select: { id: true, code: true, logoUrl: true } });
+  // heuristic only — assumes a stable club count across a given draft's own 7 rounds;
+  // older years drafted with fewer clubs than today's (post-expansion) count still read
+  // as "complete" once their own max pick clears round 7 in practice, so this is safe.
+  const ppr = await picksPerRound();
   const teamOf = new Map(teams.map((t) => [t.id, t]));
 
   // one tab per draft year. In ProfiNHL mode always include the live league draft (a
@@ -36,7 +40,7 @@ export default async function DraftHistoryPage() {
     return {
       year,
       season: seasonForDraftYear(year),
-      complete: maxPick > 6 * PICKS_PER_ROUND, // reached round 7 ⇒ the draft is done
+      complete: maxPick > 6 * ppr, // reached round 7 ⇒ the draft is done
       picks: picks.map((p) => {
         const t = p.draftedByTeamId ? teamOf.get(p.draftedByTeamId) : undefined;
         return {

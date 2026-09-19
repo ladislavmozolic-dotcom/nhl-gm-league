@@ -100,6 +100,7 @@ export const DICT: Dict = {
   "admin.calibration.d": { en: "Grade the engine against NHL targets — rates, balance, xG, EDGE, injuries.", cs: "Ohodnoť engine voči NHL cieľom — rates, balans, xG, EDGE, zranenia." },
   "admin.simGuide.d": { en: "How chemistry forms and how ratings work together — a reference guide.", cs: "Ako vzniká chémia a ako spolupracujú ratingy — referenčný sprievodca." },
   "admin.lines.d": { en: "When each GM last submitted lines before the simulation.", cs: "Kedy naposledy každý GM odovzdal zostavy pred simuláciou." },
+  "admin.expansion.d": { en: "Add a new NHL club and run its expansion draft.", cs: "Pridaj nový NHL klub a spusti jeho expansion draft." },
   "admin.rosters.d": { en: "Start the season with ProfiNHL rosters or the real NHL rosters.", cs: "Začni sezónu s ProfiNHL súpiskami alebo reálnymi NHL súpiskami." },
   "admin.rosterMoves.d": { en: "Pick two clubs and move any player directly between them — no trade proposal needed.", cs: "Vyber dva kluby a presuň medzi nimi hráča priamo — bez ponuky výmeny." },
   "admin.teamLines.d": { en: "Open any club's line editor — players, tactics, ice-time.", cs: "Otvor editor zostáv ľubovoľného klubu — hráči, taktiky, ice-time." },

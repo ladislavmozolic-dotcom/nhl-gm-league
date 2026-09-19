@@ -23,6 +23,7 @@ const GROUPS: Group[] = [
   {
     titleKey: "admin.grpRosters",
     items: [
+      { href: "/admin/expansion", title: "🏒 NHL Expansion", descKey: "admin.expansion.d" },
       { href: "/admin/rosters", title: "Roster Source", descKey: "admin.rosters.d" },
       { href: "/admin/roster-moves", title: "Roster Moves — Move Players", descKey: "admin.rosterMoves.d" },
       { href: "/admin/team-lines", title: "Team Lines & Tactics", descKey: "admin.teamLines.d" },

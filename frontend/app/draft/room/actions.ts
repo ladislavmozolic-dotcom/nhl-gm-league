@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { getTeamSession, isAdmin } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
-import { effectiveOrder, PICKS_PER_ROUND, LAST_BASE_PICK } from "@/lib/draft-order";
+import { effectiveOrder, lastBasePick } from "@/lib/draft-order";
 import { currentDraftYear } from "@/lib/draft-class-import";
 import { currentDraftSourceWhere } from "@/lib/draft-source";
 import { getLeagueDate } from "@/lib/calendar-server";
@@ -34,7 +34,7 @@ async function commitOffBoard(pickerTeamId: number, expectPick: number, YEAR: nu
   if (!slot) return { ok: false as const, error: "Draft is complete." };
   const nextPick = expectPick + 1;
   const deferralCount = await prisma.draftDeferral.count({ where: { year: YEAR } });
-  const lastScheduled = order.filter((p) => !p.deferred).reduce((m, p) => Math.max(m, p.overallPick), LAST_BASE_PICK);
+  const lastScheduled = order.filter((p) => !p.deferred).reduce((m, p) => Math.max(m, p.overallPick), await lastBasePick());
   const maxPick = lastScheduled + deferralCount;
   const nextSlot = order.find((p) => p.overallPick === nextPick);
   const done = nextPick > maxPick;
@@ -80,7 +80,7 @@ export async function processDraftClockAction() {
 
   // expired → defer scheduled picks to the end (a pick that was already deferred and
   // expires again is simply skipped), then put the next club on the clock.
-  const lastScheduled = order.filter((p) => !p.deferred).reduce((m, p) => Math.max(m, p.overallPick), LAST_BASE_PICK);
+  const lastScheduled = order.filter((p) => !p.deferred).reduce((m, p) => Math.max(m, p.overallPick), await lastBasePick());
   const willDefer = !slot.deferred && slot.overallPick <= lastScheduled;
   const priorDeferrals = await prisma.draftDeferral.count({ where: { year: YEAR } });
   const maxPick = lastScheduled + priorDeferrals + (willDefer ? 1 : 0);
@@ -150,7 +150,7 @@ export async function autoPickIfExpiringAction() {
   const testMode = !!cfg?.draftTestMode;
   const nextPick = s.currentPick + 1;
   const deferralCount = await prisma.draftDeferral.count({ where: { year: YEAR } });
-  const lastScheduled = order.filter((p) => !p.deferred).reduce((m, p) => Math.max(m, p.overallPick), LAST_BASE_PICK);
+  const lastScheduled = order.filter((p) => !p.deferred).reduce((m, p) => Math.max(m, p.overallPick), await lastBasePick());
   const maxPick = lastScheduled + deferralCount;
   const nextSlot = order.find((p) => p.overallPick === nextPick);
   const done = nextPick > maxPick;
@@ -237,7 +237,7 @@ export async function makePickAction(prospectId: number) {
 
   const nextPick = s.currentPick + 1;
   const deferralCount = await prisma.draftDeferral.count({ where: { year: YEAR } });
-  const lastScheduled = order.filter((p) => !p.deferred).reduce((m, p) => Math.max(m, p.overallPick), LAST_BASE_PICK);
+  const lastScheduled = order.filter((p) => !p.deferred).reduce((m, p) => Math.max(m, p.overallPick), await lastBasePick());
   const maxPick = lastScheduled + deferralCount;
   const nextSlot = order.find((p) => p.overallPick === nextPick);
   const done = nextPick > maxPick;
@@ -329,7 +329,7 @@ export async function makeOffBoardPickAction(input: { name: string; birthDate: s
 
   const nextPick = s.currentPick + 1;
   const deferralCount = await prisma.draftDeferral.count({ where: { year: YEAR } });
-  const lastScheduled = order.filter((p) => !p.deferred).reduce((m, p) => Math.max(m, p.overallPick), LAST_BASE_PICK);
+  const lastScheduled = order.filter((p) => !p.deferred).reduce((m, p) => Math.max(m, p.overallPick), await lastBasePick());
   const maxPick = lastScheduled + deferralCount;
   const nextSlot = order.find((p) => p.overallPick === nextPick);
   const done = nextPick > maxPick;
