@@ -38,6 +38,7 @@ export interface TeamPostGame {
   teamId: number;
   teamCode: string | null;
   teamName?: string | null;
+  teamLogo?: string | null;
   swings: TeamGameSwing[];
   goalies: GoalieGameSwing[];
 }
@@ -175,7 +176,7 @@ export async function postGameIntel(gameId: number): Promise<PostGameIntelResult
       id: true, season: true, league: true, round: true, gameDate: true, status: true,
       homeTeamId: true, awayTeamId: true, homeShots: true, awayShots: true, homeGoals: true, awayGoals: true,
       homeXg: true, awayXg: true, homeHd: true, awayHd: true,
-      homeTeam: { select: { code: true, name: true } }, awayTeam: { select: { code: true, name: true } },
+      homeTeam: { select: { code: true, name: true, logoUrl: true } }, awayTeam: { select: { code: true, name: true, logoUrl: true } },
     },
   });
   if (!game || game.status !== "FINAL") return null;
@@ -194,6 +195,7 @@ export async function postGameIntel(gameId: number): Promise<PostGameIntelResult
       teamId: game.homeTeamId,
       teamCode: game.homeTeam.code || game.homeTeam.name,
       teamName: game.homeTeam.name,
+      teamLogo: game.homeTeam.logoUrl,
       swings: homeSw,
       goalies: homeGoalies,
     },
@@ -201,6 +203,7 @@ export async function postGameIntel(gameId: number): Promise<PostGameIntelResult
       teamId: game.awayTeamId,
       teamCode: game.awayTeam.code || game.awayTeam.name,
       teamName: game.awayTeam.name,
+      teamLogo: game.awayTeam.logoUrl,
       swings: awaySw,
       goalies: awayGoalies,
     },

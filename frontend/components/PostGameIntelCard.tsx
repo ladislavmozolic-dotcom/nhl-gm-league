@@ -61,10 +61,14 @@ function GoalieRow({ g }: { g: GoalieGameSwing }) {
 
 function TeamColumn({ team }: { team: TeamPostGame }) {
   if (!team.swings.length && !team.goalies.length) return null;
+  const displayName = team.teamCode || team.teamName || "Team";
   return (
     <div className="flex flex-col gap-3">
       <div>
-        <div className="text-sm font-bold text-slate-200 mb-1.5">{team.teamCode ?? "Team"}</div>
+        <div className="flex items-center gap-2 mb-1.5 min-w-0">
+          {team.teamLogo && <img src={team.teamLogo} alt="" className="w-5 h-5 object-contain shrink-0" />}
+          <span className="text-sm font-bold text-slate-200 truncate">{displayName}</span>
+        </div>
         <div className="flex flex-col gap-1.5">
           {team.swings.map((s) => <SwingRow key={s.key} s={s} unit={s.key === "faceoff" ? "%" : ""} />)}
         </div>
