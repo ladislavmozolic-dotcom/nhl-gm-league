@@ -37,6 +37,7 @@ export interface GoalieGameSwing {
 export interface TeamPostGame {
   teamId: number;
   teamCode: string | null;
+  teamName?: string | null;
   swings: TeamGameSwing[];
   goalies: GoalieGameSwing[];
 }
@@ -174,7 +175,7 @@ export async function postGameIntel(gameId: number): Promise<PostGameIntelResult
       id: true, season: true, league: true, round: true, gameDate: true, status: true,
       homeTeamId: true, awayTeamId: true, homeShots: true, awayShots: true, homeGoals: true, awayGoals: true,
       homeXg: true, awayXg: true, homeHd: true, awayHd: true,
-      homeTeam: { select: { code: true } }, awayTeam: { select: { code: true } },
+      homeTeam: { select: { code: true, name: true } }, awayTeam: { select: { code: true, name: true } },
     },
   });
   if (!game || game.status !== "FINAL") return null;
@@ -189,8 +190,20 @@ export async function postGameIntel(gameId: number): Promise<PostGameIntelResult
   const awayGoalies = goalies.filter((g) => g.teamId === game.awayTeamId);
 
   return {
-    home: { teamId: game.homeTeamId, teamCode: game.homeTeam.code, swings: homeSw, goalies: homeGoalies },
-    away: { teamId: game.awayTeamId, teamCode: game.awayTeam.code, swings: awaySw, goalies: awayGoalies },
+    home: {
+      teamId: game.homeTeamId,
+      teamCode: game.homeTeam.code || game.homeTeam.name,
+      teamName: game.homeTeam.name,
+      swings: homeSw,
+      goalies: homeGoalies,
+    },
+    away: {
+      teamId: game.awayTeamId,
+      teamCode: game.awayTeam.code || game.awayTeam.name,
+      teamName: game.awayTeam.name,
+      swings: awaySw,
+      goalies: awayGoalies,
+    },
     goalies,
   };
 }
