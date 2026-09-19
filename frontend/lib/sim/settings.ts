@@ -171,6 +171,7 @@ export type EngineSettings = {
   moraleDroughtGames: number;  // a forward this many games without a goal starts losing morale
   moraleDroughtDrop: number;   // morale lost per game once in a scoring drought
   moraleRoleDrop: number;      // morale lost when a high-overall player is buried in low ice-time (misused elite)
+  moraleTradeSwing: number;    // max morale swing applied right after a trade (bigger role and/or a stronger new club lifts it, a demotion or worse club sinks it)
   // Line chemistry
   chemistryEnabled: boolean;   // apply chemistry effects in the sim
   chemistryBase: number;       // starting chemistry of a brand-new line (0..100)
@@ -240,7 +241,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   clutchEnabled: true, clutchBoostPct: 0.22, clutchWindowSec: 300, clutchPlayoffMult: 1.5,
   moraleEnabled: true, moraleBase: 50, moraleWin: 2, moraleNeutral: 50, moraleSlope: 0.0018,
   moraleGoalieSlope: 0.0008, moraleFrustrationPct: 0.006,
-  moraleDroughtGames: 10, moraleDroughtDrop: 1.5, moraleRoleDrop: 4,
+  moraleDroughtGames: 10, moraleDroughtDrop: 1.5, moraleRoleDrop: 4, moraleTradeSwing: 12,
   chemistryEnabled: true, chemistryBase: 35, chemistryGrowth: 2, chemistryDrop: 25,
   chemistryCurve: [
     { chem: 0, bonusPct: -15 },

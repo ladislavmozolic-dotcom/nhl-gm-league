@@ -11,6 +11,18 @@
 
 export type ClauseType = "NTC" | "NMC" | "M_NTC";
 
+/** How much a move helps or hurts a player, −1 (clear downgrade) … +1 (clear
+ *  upgrade), blending his projected lineup slot (line, 1 = best) with each
+ *  club's standings strength (points%, 0..1). Shared by the clause agent
+ *  (fee negotiation) and the post-trade morale bump — a player who lands a
+ *  bigger role on a stronger club is happy about the move; one buried deeper
+ *  on a weaker club is not. */
+export function tradeImprovement(input: { fromLine: number; toLine: number; fromPointsPct: number; toPointsPct: number }): number {
+  const roleDelta = input.fromLine - input.toLine;                 // + = better role
+  const standDelta = Math.max(-1, Math.min(1, (input.toPointsPct - input.fromPointsPct) * 2.5)); // + = better team
+  return Math.max(-1, Math.min(1, 0.5 * (roleDelta / 3) + 0.5 * standDelta));
+}
+
 export type ClauseVerdict = {
   clause: ClauseType;
   feePct: number;       // % of remaining salary the OLD team pays him to waive
@@ -31,11 +43,7 @@ export function clauseVerdict(input: {
   const remaining = Math.max(0, (input.capHit || 0) * Math.max(1, input.contractYears || 1));
   const round500 = (n: number) => Math.round(n / 500) * 500;
 
-  // situation delta: a lower line number on the new team is a better role; a
-  // higher points% is a better team. Blend the two into −1..+1.
-  const roleDelta = input.fromLine - input.toLine;                 // + = better role
-  const standDelta = Math.max(-1, Math.min(1, (input.toPointsPct - input.fromPointsPct) * 2.5)); // + = better team
-  const improvement = Math.max(-1, Math.min(1, 0.5 * (roleDelta / 3) + 0.5 * standDelta));
+  const improvement = tradeImprovement(input);
 
   const mk = (feePct: number, fullPayout: boolean, reason: string): ClauseVerdict => {
     feePct = Math.max(0, Math.min(100, Math.round(feePct)));

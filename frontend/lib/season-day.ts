@@ -19,6 +19,7 @@ import { sweepExpiredContractsToUfa, sweepUnsignedRfasToNonRoster } from "@/lib/
 import { checkPromises } from "@/lib/promises";
 import { leagueCapCompliance } from "@/lib/cap";
 import { money } from "@/lib/finance";
+import { runLiveCalculatorRecompute } from "@/lib/live-calculator-engine";
 
 const SEASON = "2026-27";
 
@@ -146,7 +147,12 @@ export async function simulateLeagueDay(day: Date) {
     // sweepUnsignedRfasToNonRoster's own doc comment for why.
     await sweepUnsignedRfasToNonRoster();
   }
-  for (const p of ["/calendar", "/schedule", "/standings", "/scores", "/admin/season", "/finance", "/free-agents", "/signings", "/waivers", "/"]) revalidatePath(p);
+  if (played > 0) {
+    runLiveCalculatorRecompute().catch((err) =>
+      console.error("[LiveCalculator] Auto recompute error:", err)
+    );
+  }
+  for (const p of ["/calendar", "/schedule", "/standings", "/scores", "/admin/season", "/finance", "/free-agents", "/signings", "/waivers", "/tools/player-calculator", "/"]) revalidatePath(p);
   return { date: day, phase: phToday, played, signed, warned: promises.warned, requested: promises.requested, capOffenders, expiredToUfa, waiverClaims: waivers.claimed, waiverClears: waivers.cleared };
 }
 

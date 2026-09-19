@@ -6,6 +6,8 @@ import {
   CUR_WEIGHT,
   ACTIVATE_AT_GP,
 } from "@/lib/param-projection";
+import { getLiveCalculatorConfig } from "@/lib/live-calculator-config";
+import { isAdmin } from "@/lib/auth";
 import PlayerCalculatorView from "@/components/PlayerCalculatorView";
 
 export const dynamic = "force-dynamic";
@@ -43,14 +45,18 @@ export default async function PlayerCalculatorPage({
 
   const selectedTeam = teams.find((t) => t.slug === teamSlug) ?? teams[0];
 
-  // Fetch all skaters projected data
-  const { rows: allSkaters, active } = await projectAllSkaters();
+  // Fetch all skaters projected data, live config and admin rights
+  const [{ rows: allSkaters, active }, liveConfig, admin] = await Promise.all([
+    projectAllSkaters(),
+    getLiveCalculatorConfig(),
+    isAdmin(),
+  ]);
 
   return (
     <div className="space-y-6 py-2">
       <PageHeader
-        title="Player Calculator"
-        subtitle="Kompletný prehľad a prepočet parametrov korčuliarov podľa reálnej formy (20 % minulá + 80 % táto sezóna)"
+        title="Live Player Calculator"
+        subtitle="Kompletný prehľad a živý prepočet parametrov korčuliarov (NextGen V10 model: MoneyPuck, NHL API, EDGE a AHL)"
       />
 
       <PlayerCalculatorView
@@ -58,9 +64,11 @@ export default async function PlayerCalculatorPage({
         selectedTeam={selectedTeam}
         allSkaters={allSkaters}
         active={active}
-        lastWeight={LAST_WEIGHT}
-        curWeight={CUR_WEIGHT}
-        activateAtGp={ACTIVATE_AT_GP}
+        lastWeight={liveConfig.previousWeight}
+        curWeight={liveConfig.latestWeight}
+        activateAtGp={liveConfig.nhlGpLatestMin || ACTIVATE_AT_GP}
+        liveConfig={liveConfig}
+        isAdmin={admin}
       />
     </div>
   );

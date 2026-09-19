@@ -12,6 +12,7 @@ import { getLeagueDate } from "@/lib/calendar-server";
 import { roundForDate, daysBetween } from "@/lib/calendar";
 import { displayName } from "@/lib/playerName";
 import { loadLeagueCap } from "@/lib/free-agency-server";
+import { tradeMoraleDeltas } from "@/lib/clause-agent-server";
 import { describeConditionSpec, type ConditionSpec } from "@/lib/trade-conditions-shared";
 
 /** In-season days between two league dates (off-season time doesn't count) —
@@ -74,10 +75,21 @@ export async function collectMoveOps(pkg: TradePackage) {
   const allPlayerIds = [...pkg.fromPlayers, ...pkg.toPlayers].map((p) => p.playerId);
   const players = await prisma.player.findMany({
     where: { id: { in: allPlayerIds } },
-    select: { id: true, name: true, teamId: true, rosterType: true, capHit: true, retainedSalary: true, contractYears: true, tradeClause: true, noTradeTeams: true },
+    select: { id: true, name: true, teamId: true, rosterType: true, capHit: true, retainedSalary: true, contractYears: true, tradeClause: true, noTradeTeams: true, morale: true },
   });
   const pById = new Map(players.map((p) => [p.id, p]));
   const waived = new Set([...(pkg.waived ?? []), ...(pkg.clauseFees ?? []).map((f) => f.playerId)]);
+
+  // MO reacts to the trade itself: a bigger projected role and/or a stronger new
+  // club lifts it, a demotion or a weaker club sinks it — same read the clause
+  // agent uses to price a waiver fee, applied to every moved skater/goalie.
+  const moraleDeltas = await tradeMoraleDeltas(
+    [
+      ...pkg.fromPlayers.map((p) => ({ playerId: p.playerId, fromTeamId: pkg.fromTeamId, toTeamId: pkg.toTeamId })),
+      ...pkg.toPlayers.map((p) => ({ playerId: p.playerId, fromTeamId: pkg.toTeamId, toTeamId: pkg.fromTeamId })),
+    ],
+    settings.moraleEnabled ? settings.moraleTradeSwing : 0,
+  );
 
   // Every past trade-retention record (totalCost=0 marks retention, not a real
   // buyout) for the players in this deal — feeds the "max 2 retentions per
@@ -178,7 +190,9 @@ export async function collectMoveOps(pkg: TradePackage) {
       }
       // being shopped was the OLD club's decision — it doesn't carry over to whoever
       // just acquired him, so clear the trade-block flag on every trade.
-      ops.push(prisma.player.update({ where: { id: pl.id }, data: { teamId: destId, rosterType: destRoster, capHit, retainedSalary, captaincy: null, onBlock: false, blockNote: null } }));
+      const moraleDelta = moraleDeltas.get(pl.id);
+      const morale = moraleDelta != null ? Math.max(1, Math.min(100, Math.round((pl.morale ?? 50) + moraleDelta))) : undefined;
+      ops.push(prisma.player.update({ where: { id: pl.id }, data: { teamId: destId, rosterType: destRoster, capHit, retainedSalary, captaincy: null, onBlock: false, blockNote: null, ...(morale != null ? { morale, mo: morale } : {}) } }));
       if (destRoster === "NHL" && retainedSalary > 0) {
         acquiredRetainedCount.set(toNhlId, (acquiredRetainedCount.get(toNhlId) ?? 0) + 1);
         acquiredRetainedDollars.set(toNhlId, (acquiredRetainedDollars.get(toNhlId) ?? 0) + retainedSalary);

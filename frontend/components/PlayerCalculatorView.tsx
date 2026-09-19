@@ -12,6 +12,8 @@ import {
   type SkaterParamKey,
   type ProjSkater,
 } from "@/lib/param-projection";
+import LiveCalculatorConfigModal from "@/components/LiveCalculatorConfigModal";
+import type { LiveCalcConfigData } from "@/lib/live-calculator-config";
 
 interface TeamItem {
   id: number;
@@ -69,6 +71,8 @@ export default function PlayerCalculatorView({
   lastWeight,
   curWeight,
   activateAtGp,
+  liveConfig,
+  isAdmin = false,
 }: {
   teams: TeamItem[];
   selectedTeam: TeamItem;
@@ -77,6 +81,8 @@ export default function PlayerCalculatorView({
   lastWeight: number;
   curWeight: number;
   activateAtGp: number;
+  liveConfig?: LiveCalcConfigData;
+  isAdmin?: boolean;
 }) {
   const router = useRouter();
 
@@ -85,6 +91,7 @@ export default function PlayerCalculatorView({
   const [posFilter, setPosFilter] = useState<PosFilter>("ALL");
   const [viewMode, setViewMode] = useState<ViewMode>("diff");
   const [onlyChanges, setOnlyChanges] = useState(false);
+  const [configModalOpen, setConfigModalOpen] = useState(false);
 
   // Sorting state (default: overall desc)
   const [sort, setSort] = useState<SortConfig>({ key: "ov", dir: "desc" });
@@ -367,21 +374,40 @@ export default function PlayerCalculatorView({
             </div>
           </div>
 
-          {/* Quick Status Pill */}
-          <div className="flex sm:flex-col items-end gap-1.5 text-right w-full sm:w-auto">
-            <div
-              className={`text-xs font-semibold px-3 py-1.5 rounded-xl border inline-flex items-center gap-1.5 ${
-                active
-                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
-                  : "bg-amber-500/10 border-amber-500/30 text-amber-300"
-              }`}
-            >
-              <span className="w-2 h-2 rounded-full bg-current animate-pulse" />
-              <span>{active ? "Live NHL Form Active" : "Off-season / Reference Model"}</span>
+          {/* Quick Status Pill & Admin Tuning */}
+          <div className="flex sm:flex-col items-end gap-2 text-right w-full sm:w-auto">
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setConfigModalOpen(true)}
+                className="text-xs font-semibold px-3 py-1.5 rounded-xl border border-indigo-500/40 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 transition flex items-center gap-1.5 shadow-sm hover:scale-[1.02]"
+              >
+                <span>⚙️</span>
+                <span>Tuning & Nastavenia</span>
+              </button>
+
+              <div
+                className={`text-xs font-semibold px-3 py-1.5 rounded-xl border inline-flex items-center gap-1.5 ${
+                  active
+                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                    : "bg-amber-500/10 border-amber-500/30 text-amber-300"
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full bg-current animate-pulse" />
+                <span>{active ? "Live NHL Form Active" : "Off-season / Reference Model"}</span>
+              </div>
             </div>
-            <span className="text-[11px] text-slate-500">
-              Formula: {Math.round(lastWeight * 100)}% minulá + {Math.round(curWeight * 100)}% táto sezóna
-            </span>
+
+            <div className="flex flex-col items-end text-[11px] text-slate-500">
+              <span>
+                Váhy: {Math.round(lastWeight * 100)}% minulá + {Math.round(curWeight * 100)}% táto sezóna
+              </span>
+              {liveConfig?.lastCalculatedAt && (
+                <span className="text-[10px] text-slate-400">
+                  Prepočítané: {new Date(liveConfig.lastCalculatedAt).toLocaleString("sk-SK")}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -580,6 +606,16 @@ export default function PlayerCalculatorView({
           <strong className="text-slate-300">Penalizácia za zranenia (GP):</strong> Hráč, ktorý vynechá ≥25 % zápasov, stráca −1 zo všetkých odhadov, pri ≥50 % stráca −2 a pri ≥75 % −3.
         </p>
       </div>
+
+      {/* Admin configuration and tuning modal */}
+      {liveConfig && (
+        <LiveCalculatorConfigModal
+          isOpen={configModalOpen}
+          onClose={() => setConfigModalOpen(false)}
+          initialConfig={liveConfig}
+          isAdmin={isAdmin}
+        />
+      )}
     </div>
   );
 }
@@ -811,9 +847,32 @@ function RosterSection({
 
                     {/* Overall */}
                     <td className="py-2 px-2 text-center tabular-nums border-r border-slate-800/80 bg-blue-950/10">
-                      <span className="inline-block px-1.5 py-0.5 rounded font-black text-blue-300 bg-blue-500/15 border border-blue-500/30">
-                        {p.overall ?? "—"}
-                      </span>
+                      {viewMode === "diff" ? (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-black text-blue-300 bg-blue-500/15 border border-blue-500/30">
+                          <span>{p.overall ?? "—"}</span>
+                          {p.overallProjected != null && p.overall != null && p.overallProjected !== p.overall && (
+                            <span
+                              className={`text-[10px] font-black ${
+                                p.overallProjected > p.overall ? "text-emerald-400" : "text-rose-400"
+                              }`}
+                            >
+                              {p.overallProjected > p.overall
+                                ? `▲+${p.overallProjected - p.overall}`
+                                : `▼${p.overallProjected - p.overall}`}
+                            </span>
+                          )}
+                        </span>
+                      ) : viewMode === "compare" ? (
+                        <div className="flex items-center justify-center gap-1.5 text-xs">
+                          <span className="text-slate-300 font-bold">{p.overall ?? "—"}</span>
+                          <span className="text-slate-600">→</span>
+                          <span className="text-blue-300 font-black">{p.overallProjected ?? p.overall ?? "—"}</span>
+                        </div>
+                      ) : (
+                        <span className="inline-block px-1.5 py-0.5 rounded font-black text-blue-300 bg-blue-500/15 border border-blue-500/30">
+                          {p.overallProjected ?? p.overall ?? "—"}
+                        </span>
+                      )}
                     </td>
 
                     {/* 15 Skater Parameters */}
@@ -948,13 +1007,24 @@ function PlayerHoverComparisonCard({
               >
                 {p.position ?? "—"}
               </span>
+              {p.classification && (
+                <span
+                  className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${
+                    p.classification === "NHL"
+                      ? "text-sky-300 bg-sky-500/10 border-sky-500/30"
+                      : "text-purple-300 bg-purple-500/10 border-purple-500/30"
+                  }`}
+                >
+                  {p.classification}
+                </span>
+              )}
             </div>
             <div className="text-xs text-slate-400 mt-1 flex items-center gap-2.5 flex-wrap">
               {p.age != null && <span><b>{p.age}</b> rokov</span>}
               {p.gp > 0 && (
                 <>
                   <span className="text-slate-600">·</span>
-                  <span><b>{p.gp}</b> GP (NHL)</span>
+                  <span><b>{p.gp}</b> GP ({p.classification ?? "NHL"})</span>
                 </>
               )}
               {p.missedPenalty > 0 && (
@@ -971,8 +1041,26 @@ function PlayerHoverComparisonCard({
             <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">
               Celkový Rating
             </div>
-            <div className="text-2xl font-black text-blue-300 px-3 py-1 rounded-xl bg-blue-600/20 border border-blue-500/40 tabular-nums">
-              {p.overall ?? "—"} <span className="text-xs font-bold text-blue-400">OV</span>
+            <div className="flex items-center gap-2">
+              <div className="text-lg font-bold text-slate-300 px-2.5 py-1 rounded-xl bg-slate-800/80 border border-slate-700/80 tabular-nums">
+                {p.overall ?? "—"} <span className="text-[10px] font-semibold text-slate-400">Akt</span>
+              </div>
+              <span className="text-slate-500 font-bold">→</span>
+              <div className="text-lg font-black text-blue-300 px-2.5 py-1 rounded-xl bg-blue-600/20 border border-blue-500/40 tabular-nums flex items-center gap-1">
+                <span>{p.overallProjected ?? p.overall ?? "—"}</span>
+                <span className="text-[10px] font-bold text-blue-400">Proj</span>
+                {p.overallProjected != null && p.overall != null && p.overallProjected !== p.overall && (
+                  <span
+                    className={`text-xs font-black ml-0.5 ${
+                      p.overallProjected > p.overall ? "text-emerald-400" : "text-rose-400"
+                    }`}
+                  >
+                    {p.overallProjected > p.overall
+                      ? `+${p.overallProjected - p.overall}`
+                      : p.overallProjected - p.overall}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -1004,6 +1092,9 @@ function PlayerHoverComparisonCard({
                   </span>
                 </th>
               ))}
+              <th className="py-1.5 px-2 min-w-[44px] text-blue-300 font-black border-l border-slate-800">
+                OV
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60 font-mono">
@@ -1020,6 +1111,9 @@ function PlayerHoverComparisonCard({
                   {p.actual[k] ?? "—"}
                 </td>
               ))}
+              <td className="py-2.5 px-2 font-bold text-slate-300 border-l border-slate-800 bg-slate-900/40">
+                {p.overall ?? "—"}
+              </td>
             </tr>
 
             {/* Row 2: Projected */}
@@ -1046,6 +1140,9 @@ function PlayerHoverComparisonCard({
                   </td>
                 );
               })}
+              <td className="py-2.5 px-2 font-black text-[15px] text-blue-300 border-l border-slate-800 bg-blue-950/20">
+                {p.overallProjected ?? p.overall ?? "—"}
+              </td>
             </tr>
 
             {/* Row 3: Rozdiel */}
@@ -1072,6 +1169,24 @@ function PlayerHoverComparisonCard({
                   </td>
                 );
               })}
+              {(() => {
+                const actOv = p.overall ?? 50;
+                const projOv = p.overallProjected ?? actOv;
+                const ovDiff = projOv - actOv;
+                return (
+                  <td
+                    className={`py-1.5 px-2 font-black text-xs border-l border-slate-800 ${
+                      ovDiff > 0
+                        ? "text-emerald-400"
+                        : ovDiff < 0
+                        ? "text-rose-400"
+                        : "text-slate-600"
+                    }`}
+                  >
+                    {ovDiff > 0 ? `+${ovDiff}` : ovDiff < 0 ? ovDiff : "·"}
+                  </td>
+                );
+              })()}
             </tr>
           </tbody>
         </table>

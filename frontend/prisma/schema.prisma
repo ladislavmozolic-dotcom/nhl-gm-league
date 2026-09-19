@@ -258,6 +258,7 @@ model Player {
   mpSkater             Json? // MoneyPuck advanced skater totals per season for the Next Gen Parameters: { "2025":{gp,toi,g,ixg,a1,a2,sh,ong,ppa1,toi5v5,a1_5v5,a2_5v5,onIceAxg5v5,toi4v5,onIceAxg4v5,offIceAxg5v5,offIceToi5v5,offIceAxg4v5,offIceToi4v5}, "2024":{...}, "2023":{...} } — ixG/primary-assists/on-ice-goals + 5v5/PK on-ice AND off-ice (team-without-him) splits for true relative xGA, icetime in seconds
   careerGP             Json? // NHL API career totals (api-web player landing) for the Next Gen EXPERIENCE param: { reg: number, po: number } — regular-season and playoff games played, career-to-date
   edgeRatings          Json? // persisted Edge Parameters (analytics; separate from the STHS ck/sc/... the sim uses)
+  liveCalculatorRatings Json? // NextGen Live Calculator projected ratings, deltas and component data
   goalieRating         GoalieRating?
   team                 Team                      @relation(fields: [teamId], references: [id])
   skaterRating         SkaterRating?
@@ -1532,4 +1533,23 @@ model GoalieGameStat {
 
   @@unique([gameId, playerId])
   @@index([playerId])
+}
+
+// NextGen Live Calculator configuration (weights, seasons, thresholds)
+model LiveCalcConfig {
+  id               Int       @id @default(1)
+  latestSeason     String    @default("20252026")
+  previousSeason   String    @default("20242025")
+  latestMpYear     Int       @default(2025)
+  previousMpYear   Int       @default(2024)
+  latestWeight     Float     @default(0.8)
+  previousWeight   Float     @default(0.2)
+  nhlGpLatestMin   Int       @default(10)
+  nhlGpPrevMin     Int       @default(10)
+  ahlNhleLatest    Float     @default(0.446)
+  ahlNhlePrevious  Float     @default(0.448)
+  weightsJson      Json?
+  lastCalculatedAt DateTime?
+  lastSyncedAt     DateTime?
+  updatedAt        DateTime  @updatedAt
 }
