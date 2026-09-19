@@ -26,9 +26,10 @@ const STATUS_STYLE: Record<string, string> = {
 const APPROVED_STATUSES = new Set(["ACCEPTED", "COMPLETED"]);
 const PENDING_STATUSES = new Set(["PENDING", "AWAITING_COMMISH", "MODIFY", "MODIFIED"]);
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, declinedBy }: { status: string; declinedBy?: string | null }) {
   return (
-    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${STATUS_STYLE[status] ?? "bg-slate-700/40 text-slate-400 border-slate-600/30"}`}>
+    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${STATUS_STYLE[status] ?? "bg-slate-700/40 text-slate-400 border-slate-600/30"}`}
+      title={status === "DECLINED" && declinedBy ? `Declined by ${declinedBy}` : undefined}>
       {status}
     </span>
   );
@@ -97,7 +98,7 @@ export default async function TeamTradesPage({ params }: { params: Promise<{ slu
               <TeamMark id={otherTeamId} big />
             </div>
             <div className="flex items-center gap-3">
-              <StatusBadge status={t.status} />
+              <StatusBadge status={t.status} declinedBy={t.declinedBy} />
               <span className="text-xs text-slate-500 whitespace-nowrap">
                 {fmtDate((t.status === "ACCEPTED" || t.status === "COMPLETED") ? (t.respondedAt ?? t.createdAt) : t.createdAt)}
               </span>

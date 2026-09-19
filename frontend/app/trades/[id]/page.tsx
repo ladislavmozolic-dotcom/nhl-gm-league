@@ -131,7 +131,10 @@ export default async function TradePage({ params }: { params: Promise<{ id: stri
             <span className="text-slate-600 text-lg">⇄</span>
             <TeamHead team={toTeam} />
           </div>
-          <span className={`text-xs font-bold px-3 py-1 rounded-full ${STATUS_STYLE[trade.status] ?? "bg-slate-700 text-slate-300"}`}>{STATUS_LABEL[trade.status] ?? trade.status}</span>
+          <span className={`text-xs font-bold px-3 py-1 rounded-full ${STATUS_STYLE[trade.status] ?? "bg-slate-700 text-slate-300"}`}
+            title={trade.status === "DECLINED" && trade.declinedBy ? `Declined by ${trade.declinedBy}` : undefined}>
+            {STATUS_LABEL[trade.status] ?? trade.status}
+          </span>
         </div>
         {/* fromTeam is always the club whose GM clicked "Propose a trade" — proposeTrade
             requires session === fromTeamId, so this is a reliable "who initiated it" signal. */}

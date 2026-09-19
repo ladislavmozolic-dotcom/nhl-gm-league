@@ -276,9 +276,12 @@ export async function respondToTrade(tradeId: number, accept: boolean) {
   if (session !== trade.toTeamId && !admin) throw new Error("Only the receiving GM (or the commissioner) can respond to this trade.");
 
   if (!accept) {
-    await prisma.trade.update({ where: { id: tradeId }, data: { status: "DECLINED", respondedAt: new Date() } });
     // tell the proposer privately (a pending proposal is private → no public log)
     const decliner = (await prisma.team.findUnique({ where: { id: trade.toTeamId }, select: { name: true } }))?.name ?? "The other club";
+    // the commissioner can decline "on behalf of" the receiving GM (session !== toTeamId,
+    // caught by the admin check above) — the badge should say so, not just name the club.
+    const declinedBy = session !== trade.toTeamId ? `${decliner} (via Commissioner)` : decliner;
+    await prisma.trade.update({ where: { id: tradeId }, data: { status: "DECLINED", respondedAt: new Date(), declinedBy } });
     await prisma.dmMessage.create({ data: { fromTeamId: trade.toTeamId, toTeamId: trade.fromTeamId, body: `❌ ${decliner} declined your trade proposal (#${tradeId}).`, tradeUrl: `/trades/${tradeId}` } }).catch(() => {});
     revalidatePath("/trades"); revalidatePath("/messages");
     return { status: "DECLINED" as const };
@@ -340,7 +343,11 @@ export async function commishRespondTrade(tradeId: number, action: "accept" | "d
     return { status: "ACCEPTED" as const };
   }
   if (action === "decline") {
-    await prisma.trade.update({ where: { id: tradeId }, data: { status: "DECLINED", respondedAt: new Date(), commishNote: note || null } });
+    const actingName = actingTeamId != null
+      ? (await prisma.team.findUnique({ where: { id: actingTeamId }, select: { name: true } }))?.name
+      : null;
+    const declinedBy = actingName ? `Commission (${actingName})` : "Commission";
+    await prisma.trade.update({ where: { id: tradeId }, data: { status: "DECLINED", respondedAt: new Date(), commishNote: note || null, declinedBy } });
     for (const tid of [trade.fromTeamId, trade.toTeamId])
       await prisma.dmMessage.create({ data: { fromTeamId: tid, toTeamId: tid, body: `❌ Commission DECLINED trade #${tradeId}.${note ? ` — ${note}` : ""}`, tradeUrl: `/trades/${tradeId}` } }).catch(() => {});
     revalidatePath("/trades"); revalidatePath("/trades/commish"); revalidatePath("/messages");
@@ -460,7 +467,7 @@ export async function restoreDeclinedTradeAction(tradeId: number) {
   const trade = await prisma.trade.findUnique({ where: { id: tradeId } });
   if (!trade) return { ok: false as const, error: "Trade not found — it may already have been swept for good." };
   if (trade.status !== "DECLINED") return { ok: false as const, error: "Only a declined trade can be restored." };
-  await prisma.trade.update({ where: { id: tradeId }, data: { status: "PENDING", respondedAt: null, commishNote: null } });
+  await prisma.trade.update({ where: { id: tradeId }, data: { status: "PENDING", respondedAt: null, commishNote: null, declinedBy: null } });
   const [fromTeam, toTeam] = await Promise.all([
     prisma.team.findUnique({ where: { id: trade.fromTeamId }, select: { name: true } }),
     prisma.team.findUnique({ where: { id: trade.toTeamId }, select: { name: true } }),

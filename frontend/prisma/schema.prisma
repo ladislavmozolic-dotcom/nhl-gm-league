@@ -341,6 +341,7 @@ model Trade {
   fromTeamId    Int
   toTeamId      Int
   status        String    @default("PENDING") // PENDING | ACCEPTED | DECLINED | CANCELLED | AWAITING_COMMISH | MODIFY | MODIFIED | REVERTED
+  declinedBy    String? // who declined — the receiving GM's club name, or "Commission (<name>)" for a rookie-oversight decline
   commishNote   String? // commission note when a rookie trade is sent back to modify
   condition     String?
   respondedAt   DateTime?
@@ -1282,11 +1283,13 @@ model ExpansionDraftState {
 model ExpansionProtection {
   id               Int      @id @default(autoincrement())
   expansionDraftId Int
-  teamId           Int      @unique
+  teamId           Int
   format           String // "7-3-1" | "8-1"
   playerIds        Int[]
   submittedAt      DateTime @default(now())
   submittedBy      String?
+
+  @@unique([expansionDraftId, teamId]) // one submission per team PER expansion draft — resubmittable until LIVE, but a future expansion event gets its own fresh row
 }
 
 // One row per pick made in an expansion draft — the structured results record (a Transaction
