@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import PlayerLink from "@/components/PlayerLink";
@@ -88,6 +88,31 @@ export default function PlayerCalculatorView({
 
   // Sorting state (default: overall desc)
   const [sort, setSort] = useState<SortConfig>({ key: "ov", dir: "desc" });
+
+  // Hover card state for instant parameter comparison
+  const [hovered, setHovered] = useState<{
+    player: ProjSkater;
+    x: number;
+    y: number;
+  } | null>(null);
+  const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handlePlayerMouseEnter = (e: React.MouseEvent, player: ProjSkater) => {
+    if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+    const r = e.currentTarget.getBoundingClientRect();
+    const x = r.left;
+    const y = r.bottom;
+    hoverTimeout.current = setTimeout(() => {
+      setHovered({ player, x, y });
+    }, 120);
+  };
+
+  const handlePlayerMouseLeave = () => {
+    if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+    hoverTimeout.current = setTimeout(() => {
+      setHovered(null);
+    }, 100);
+  };
 
   const affiliate = selectedTeam.affiliateTeams?.[0] ?? null;
   const orgTeamIds = useMemo(
@@ -506,6 +531,8 @@ export default function PlayerCalculatorView({
         viewMode={viewMode}
         sort={sort}
         onSort={toggleSort}
+        onRowMouseEnter={handlePlayerMouseEnter}
+        onRowMouseLeave={handlePlayerMouseLeave}
         emptyMessage={
           search || posFilter !== "ALL" || onlyChanges
             ? "Žiadni NHL hráči nezodpovedajú filtrom."
@@ -531,6 +558,8 @@ export default function PlayerCalculatorView({
         viewMode={viewMode}
         sort={sort}
         onSort={toggleSort}
+        onRowMouseEnter={handlePlayerMouseEnter}
+        onRowMouseLeave={handlePlayerMouseLeave}
         emptyMessage={
           search || posFilter !== "ALL" || onlyChanges
             ? "Žiadni AHL hráči nezodpovedajú filtrom."
@@ -538,11 +567,14 @@ export default function PlayerCalculatorView({
         }
       />
 
+      {/* Hover comparison popover card */}
+      <PlayerHoverComparisonCard hovered={hovered} />
+
       {/* FOOTER EXPLANATION */}
       <div className="rounded-xl border border-slate-800/80 bg-slate-900/40 p-4 text-xs text-slate-500 space-y-1.5">
         <p>
           <strong className="text-slate-300">Všetky parametre pripravené na prepočet:</strong>{" "}
-          Zobrazuje kompletných 15 parametrov (CK, FG, DI, SK, ST, EN, DU, PH, FO, PA, SC, DF, PS, EX, LD). Parametre s aktívnymi vzorcami (CK, SC, PA, DF) sú zvýraznené hviezdičkou <span className="text-amber-400 font-bold">*</span>. Ostatné parametre sú pripravené na doplnenie ďalších vzorcov.
+          Zobrazuje kompletných 15 parametrov (CK, FG, DI, SK, ST, EN, DU, PH, FO, PA, SC, DF, PS, EX, LD). Parametre s aktívnymi vzorcami (CK, SC, PA, DF) sú zvýraznené hviezdičkou <span className="text-amber-400 font-bold">*</span>. Ostatné parametre sú pripravené na doplnenie ďalších vzorcov. Prejdením myšou (hover) na hráča sa zobrazí okamžité porovnanie aktuálnych hodnôt a odhadov.
         </p>
         <p>
           <strong className="text-slate-300">Penalizácia za zranenia (GP):</strong> Hráč, ktorý vynechá ≥25 % zápasov, stráca −1 zo všetkých odhadov, pri ≥50 % stráca −2 a pri ≥75 % −3.
@@ -566,6 +598,8 @@ function RosterSection({
   viewMode,
   sort,
   onSort,
+  onRowMouseEnter,
+  onRowMouseLeave,
   emptyMessage,
 }: {
   title: string;
@@ -580,6 +614,8 @@ function RosterSection({
   viewMode: ViewMode;
   sort: SortConfig;
   onSort: (k: SortConfig["key"]) => void;
+  onRowMouseEnter: (e: React.MouseEvent, p: ProjSkater) => void;
+  onRowMouseLeave: () => void;
   emptyMessage: string;
 }) {
   const arrow = (k: SortConfig["key"]) =>
@@ -712,7 +748,9 @@ function RosterSection({
                 return (
                   <tr
                     key={p.id}
-                    className="hover:bg-slate-800/40 transition-colors group"
+                    onMouseEnter={(e) => onRowMouseEnter(e, p)}
+                    onMouseLeave={onRowMouseLeave}
+                    className="hover:bg-slate-800/40 transition-colors group cursor-default"
                   >
                     {/* Sticky Name Cell */}
                     <td className="py-2 px-3 sticky left-0 z-10 bg-slate-900/95 group-hover:bg-slate-850/95 backdrop-blur-sm border-r border-slate-800/80">
@@ -846,3 +884,186 @@ function RosterSection({
     </div>
   );
 }
+
+// Floating comparison card displayed on row hover
+function PlayerHoverComparisonCard({
+  hovered,
+}: {
+  hovered: { player: ProjSkater; x: number; y: number } | null;
+}) {
+  if (!hovered) return null;
+  const { player: p, x, y } = hovered;
+
+  const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
+  const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+
+  const cardWidth = 590;
+  const cardHeight = 220;
+
+  // Position vertically: below cursor row if space, else above
+  let top = y + 6;
+  if (top + cardHeight > vh - 16) {
+    top = Math.max(8, y - cardHeight - 38);
+  }
+
+  // Position horizontally: keep within screen padding
+  let left = Math.max(12, Math.min(x, vw - cardWidth - 16));
+
+  const changes = ALL_SKATER_PARAMS.map((k) => {
+    const act = p.actual[k];
+    const proj = p.projected[k];
+    const diff = act != null && proj != null ? proj - act : 0;
+    return { key: k, meta: SKATER_PARAM_META[k], act, proj, diff };
+  }).filter((c) => c.diff !== 0);
+
+  return (
+    <div
+      style={{ position: "fixed", top, left, width: Math.min(cardWidth, vw - 24), zIndex: 100 }}
+      className="pointer-events-none rounded-2xl border border-slate-700/90 bg-slate-950/95 p-3.5 shadow-2xl backdrop-blur-2xl ring-1 ring-white/10 animate-in fade-in zoom-in-95 duration-100"
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3 pb-2.5 mb-2.5 border-b border-slate-800">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <PlayerAvatar src={p.photoUrl} alt={p.name} size={36} />
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {p.number != null && (
+                <span className="text-xs font-mono text-slate-500">#{p.number}</span>
+              )}
+              <span className="font-bold text-white text-sm truncate">{cleanName(p.name)}</span>
+              <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded border ${posBadgeColor(p.position)}`}>
+                {p.position ?? "—"}
+              </span>
+            </div>
+            <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-2">
+              {p.age != null && <span>{p.age} rokov</span>}
+              {p.gp > 0 && (
+                <>
+                  <span className="text-slate-600">·</span>
+                  <span>{p.gp} GP</span>
+                </>
+              )}
+              {p.missedPenalty > 0 && (
+                <span className="text-[10px] text-rose-400 font-semibold bg-rose-500/10 border border-rose-500/30 px-1 rounded">
+                  Penalizácia −{p.missedPenalty}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="text-right">
+            <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Overall</div>
+            <div className="text-base font-black text-blue-300">{p.overall ?? "—"}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Comparison Matrix: Tento rok vs Projected */}
+      <div className="overflow-x-auto pb-1">
+        <table className="w-full text-center text-xs">
+          <thead>
+            <tr className="border-b border-slate-800/80 text-[10px] uppercase font-bold text-slate-400">
+              <th className="py-1 px-1.5 text-left text-slate-500 min-w-[70px]">Stav</th>
+              {ALL_SKATER_PARAMS.map((k) => (
+                <th
+                  key={k}
+                  className={`py-1 px-1 min-w-[30px] ${
+                    SKATER_PARAM_META[k].hasFormula ? "text-amber-300 font-black" : "text-slate-400"
+                  }`}
+                  title={SKATER_PARAM_META[k].name}
+                >
+                  {SKATER_PARAM_META[k].label}
+                  {SKATER_PARAM_META[k].hasFormula && <span className="text-amber-400 text-[9px]">*</span>}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-800/50 font-mono text-[11px]">
+            {/* Row 1: Tento rok */}
+            <tr>
+              <td className="py-1 px-1.5 text-left font-sans text-[11px] font-semibold text-slate-400">
+                Tento rok
+              </td>
+              {ALL_SKATER_PARAMS.map((k) => (
+                <td key={k} className={`py-1 px-1 font-semibold ${ratingColor(p.actual[k])}`}>
+                  {p.actual[k] ?? "—"}
+                </td>
+              ))}
+            </tr>
+            {/* Row 2: Projected */}
+            <tr className="bg-slate-900/80">
+              <td className="py-1 px-1.5 text-left font-sans text-[11px] font-bold text-blue-300">
+                Projected
+              </td>
+              {ALL_SKATER_PARAMS.map((k) => {
+                const act = p.actual[k];
+                const proj = p.projected[k];
+                const diff = act != null && proj != null ? proj - act : 0;
+                return (
+                  <td
+                    key={k}
+                    className={`py-1 px-1 font-bold ${
+                      diff > 0 ? "text-emerald-400" : diff < 0 ? "text-rose-400" : "text-slate-300"
+                    }`}
+                  >
+                    {proj ?? act ?? "—"}
+                  </td>
+                );
+              })}
+            </tr>
+            {/* Row 3: Rozdiel */}
+            <tr className="text-[10px]">
+              <td className="py-0.5 px-1.5 text-left font-sans font-medium text-slate-500">
+                Zmena
+              </td>
+              {ALL_SKATER_PARAMS.map((k) => {
+                const act = p.actual[k];
+                const proj = p.projected[k];
+                const diff = act != null && proj != null ? proj - act : 0;
+                return (
+                  <td
+                    key={k}
+                    className={`py-0.5 px-1 font-bold ${
+                      diff > 0 ? "text-emerald-400" : diff < 0 ? "text-rose-400" : "text-slate-600"
+                    }`}
+                  >
+                    {diff > 0 ? `+${diff}` : diff < 0 ? diff : "·"}
+                  </td>
+                );
+              })}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* Changes breakdown pills */}
+      <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2 text-[11px] flex-wrap">
+        {changes.length > 0 ? (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-slate-500 font-medium">Zmeny:</span>
+            {changes.map((c) => (
+              <span
+                key={c.key}
+                className={`px-1.5 py-0.2 rounded font-semibold text-[10px] ${
+                  c.diff > 0
+                    ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-300"
+                    : "bg-rose-500/10 border border-rose-500/30 text-rose-300"
+                }`}
+              >
+                {c.meta.label} {c.diff > 0 ? `+${c.diff}` : c.diff}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <span className="text-slate-500 italic">Všetky parametre zatiaľ stabilné (bez zmeny)</span>
+        )}
+        <span className="text-[10px] text-slate-500 ml-auto">
+          * Vzorce aktívne
+        </span>
+      </div>
+    </div>
+  );
+}
+
