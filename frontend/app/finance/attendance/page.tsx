@@ -1,16 +1,17 @@
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, RankBadge, Meter, Pill, TeamCell } from "@/components/ui";
 import InfoTip from "@/components/InfoTip";
 import { loadSettings } from "@/lib/sim/settings";
 import { leagueAttendance } from "@/lib/attendance-server";
+import { teamLogoMap } from "@/lib/team-logos";
 import FinanceNav from "@/components/FinanceNav";
 
 export const dynamic = "force-dynamic";
 
 const N = (n: number) => n.toLocaleString("en-US");
+const pricingPill = { LOW: "slate", STANDARD: "sky", PREMIUM: "amber" } as const;
 
 export default async function AttendanceBoardPage() {
-  const settings = await loadSettings();
-  const rows = await leagueAttendance();
+  const [settings, rows, logos] = await Promise.all([loadSettings(), leagueAttendance(), teamLogoMap()]);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 space-y-5">
@@ -28,23 +29,27 @@ export default async function AttendanceBoardPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
-                <th className="px-4 py-2 w-10">#</th>
-                <th className="px-4 py-2">Club</th>
-                <th className="px-2 py-2">Pricing</th>
-                <th className="px-2 py-2 text-right">Avg</th>
-                <th className="px-2 py-2 text-right">% cap</th>
-                <th className="px-2 py-2 text-right hidden sm:table-cell">Trend</th>
+                <th className="px-4 py-2.5 w-10">#</th>
+                <th className="px-2 py-2.5">Club</th>
+                <th className="px-2 py-2.5">Pricing</th>
+                <th className="px-2 py-2.5 w-36">Avg / capacity</th>
+                <th className="px-2 py-2.5 text-right hidden sm:table-cell">Trend</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.teamId} className="border-b border-slate-800/50 hover:bg-slate-800/30">
-                  <td className="px-4 py-2 tabular-nums text-slate-500">{r.rank}</td>
-                  <td className="px-4 py-2 font-semibold">{r.name}</td>
-                  <td className="px-2 py-2 text-[12px] text-slate-400">{r.pricing[0] + r.pricing.slice(1).toLowerCase()}</td>
-                  <td className="px-2 py-2 text-right tabular-nums">{N(r.avg)}</td>
-                  <td className="px-2 py-2 text-right tabular-nums font-semibold">{Math.round(r.pct * 100)}%</td>
-                  <td className={`px-2 py-2 text-right tabular-nums hidden sm:table-cell ${r.pct >= r.prevPct ? "text-emerald-400" : "text-rose-400"}`}>{r.pct >= r.prevPct ? "+" : ""}{Math.round((r.pct - r.prevPct) * 100)}%</td>
+                  <td className="px-4 py-2.5"><RankBadge rank={r.rank} /></td>
+                  <td className="px-2 py-2.5"><TeamCell logoUrl={logos.get(r.teamId)} name={r.name} /></td>
+                  <td className="px-2 py-2.5"><Pill tone={pricingPill[r.pricing]}>{r.pricing[0] + r.pricing.slice(1).toLowerCase()}</Pill></td>
+                  <td className="px-2 py-2.5">
+                    <div className="flex items-baseline justify-between gap-1 tabular-nums text-[12px]">
+                      <span className="font-semibold">{N(r.avg)}</span>
+                      <span className="text-slate-500">{Math.round(r.pct * 100)}%</span>
+                    </div>
+                    <Meter pct={r.pct * 100} tone="sky" className="mt-1" />
+                  </td>
+                  <td className={`px-2 py-2.5 text-right tabular-nums hidden sm:table-cell ${r.pct >= r.prevPct ? "text-emerald-400" : "text-rose-400"}`}>{r.pct >= r.prevPct ? "+" : ""}{Math.round((r.pct - r.prevPct) * 100)}%</td>
                 </tr>
               ))}
             </tbody>

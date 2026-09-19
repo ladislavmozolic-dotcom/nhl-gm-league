@@ -66,6 +66,57 @@ export function SectionTitle({ children, count, accent, action }: { children: Re
  *  should pop real browser history when available (falling back to a fixed
  *  parent otherwise), use BackLink instead — this one always goes straight to
  *  `href`. */
+/** #1/2/3 get a medal-colored circle; everyone else a plain slate one. Use for
+ *  any ranked list (leaderboards, finance boards) instead of a bare number. */
+export function RankBadge({ rank }: { rank: number }) {
+  const tone =
+    rank === 1 ? "bg-gradient-to-br from-yellow-300 to-yellow-600 text-yellow-950 shadow-[0_0_10px_-2px] shadow-yellow-500/50"
+    : rank === 2 ? "bg-gradient-to-br from-slate-300 to-slate-500 text-slate-950"
+    : rank === 3 ? "bg-gradient-to-br from-amber-600 to-amber-800 text-amber-50"
+    : "bg-slate-800/80 text-slate-500";
+  return <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-black tabular-nums shrink-0 ${tone}`}>{rank}</span>;
+}
+
+const METER_TONES = { blue: "bg-blue-500", emerald: "bg-emerald-500", fuchsia: "bg-fuchsia-500", amber: "bg-amber-500", sky: "bg-sky-500", rose: "bg-rose-500", slate: "bg-slate-500" };
+/** A thin rounded progress bar (0–100). Pairs a number with an at-a-glance
+ *  visual weight — use anywhere a table shows a %, a share of a cap, etc. */
+export function Meter({ pct, tone = "blue", className = "" }: { pct: number; tone?: keyof typeof METER_TONES; className?: string }) {
+  const w = Math.max(0, Math.min(100, pct));
+  return (
+    <div className={`h-1.5 w-full rounded-full bg-slate-800 overflow-hidden ${className}`}>
+      <div className={`h-full rounded-full ${METER_TONES[tone]}`} style={{ width: `${w}%` }} />
+    </div>
+  );
+}
+
+const PILL_TONES = {
+  green: "bg-green-500/15 text-green-300 border-green-500/30",
+  emerald: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+  slate: "bg-slate-700/40 text-slate-300 border-slate-600/40",
+  sky: "bg-sky-500/15 text-sky-300 border-sky-500/30",
+  amber: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  rose: "bg-rose-500/15 text-rose-300 border-rose-500/30",
+};
+/** A small rounded-pill status/category badge (team direction, pricing tier,
+ *  signed/open, ...) — reads better in a table cell than plain colored text. */
+export function Pill({ tone, children }: { tone: keyof typeof PILL_TONES; children: React.ReactNode }) {
+  return <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ${PILL_TONES[tone]}`}>{children}</span>;
+}
+
+/** A club's logo (if any) + name, sized for a table row. */
+export function TeamCell({ logoUrl, name }: { logoUrl?: string | null; name: string }) {
+  return (
+    <span className="inline-flex items-center gap-2 min-w-0">
+      {logoUrl ? (
+        <img src={logoUrl} alt="" className="w-5 h-5 object-contain shrink-0" />
+      ) : (
+        <span className="w-5 h-5 rounded-full bg-slate-800 shrink-0" />
+      )}
+      <span className="font-semibold truncate">{name}</span>
+    </span>
+  );
+}
+
 export function BackPill({ href, children, className = "" }: { href: string; children: React.ReactNode; className?: string }) {
   return (
     <Link href={href}

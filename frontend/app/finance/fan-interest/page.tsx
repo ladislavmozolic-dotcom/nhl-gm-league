@@ -1,23 +1,23 @@
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, RankBadge, Meter, Pill, TeamCell } from "@/components/ui";
 import InfoTip from "@/components/InfoTip";
 import { loadSettings } from "@/lib/sim/settings";
 import { leagueFanInterest } from "@/lib/fan-interest-server";
+import { teamLogoMap } from "@/lib/team-logos";
 import { interestArrow, interestAccent, type ExpectationTier } from "@/lib/fan-interest";
 import { CONTENTION_LABELS } from "@/lib/free-agency";
 import FinanceNav from "@/components/FinanceNav";
 
 export const dynamic = "force-dynamic";
 
-const tierAccent: Record<ExpectationTier, string> = {
-  contender: "text-green-300",
-  middle: "text-slate-300",
-  rising: "text-sky-300",
-  rebuild: "text-amber-300",
+const tierPill: Record<ExpectationTier, "green" | "slate" | "sky" | "amber"> = {
+  contender: "green",
+  middle: "slate",
+  rising: "sky",
+  rebuild: "amber",
 };
 
 export default async function FanInterestBoardPage() {
-  const settings = await loadSettings();
-  const rows = await leagueFanInterest();
+  const [settings, rows, logos] = await Promise.all([loadSettings(), leagueFanInterest(), teamLogoMap()]);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 space-y-5">
@@ -34,24 +34,27 @@ export default async function FanInterestBoardPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
-                <th className="px-4 py-2 w-10">#</th>
-                <th className="px-4 py-2">Club</th>
-                <th className="px-2 py-2">Team direction</th>
-                <th className="px-2 py-2 text-right">Interest</th>
-                <th className="px-4 py-2 hidden sm:table-cell">Main reasons</th>
+                <th className="px-4 py-2.5 w-10">#</th>
+                <th className="px-2 py-2.5">Club</th>
+                <th className="px-2 py-2.5">Team direction</th>
+                <th className="px-2 py-2.5 w-40">Interest</th>
+                <th className="px-4 py-2.5 hidden sm:table-cell">Main reasons</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r, i) => (
                 <tr key={r.teamId} className="border-b border-slate-800/50 hover:bg-slate-800/30">
-                  <td className="px-4 py-2 tabular-nums text-slate-500">{i + 1}</td>
-                  <td className="px-4 py-2 font-semibold">{r.name}</td>
-                  <td className={`px-2 py-2 text-[12px] font-semibold ${tierAccent[r.tier]}`}>{CONTENTION_LABELS[r.tier]}</td>
-                  <td className="px-2 py-2 text-right">
-                    <span className="tabular-nums font-bold">{r.interest}</span>
-                    <span className={`ml-1.5 text-xs font-bold ${interestAccent(r.delta)}`}>{interestArrow(r.delta)}{r.delta !== 0 ? Math.abs(r.delta) : ""}</span>
+                  <td className="px-4 py-2.5"><RankBadge rank={i + 1} /></td>
+                  <td className="px-2 py-2.5"><TeamCell logoUrl={logos.get(r.teamId)} name={r.name} /></td>
+                  <td className="px-2 py-2.5"><Pill tone={tierPill[r.tier]}>{CONTENTION_LABELS[r.tier]}</Pill></td>
+                  <td className="px-2 py-2.5">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="tabular-nums font-bold">{r.interest}</span>
+                      <span className={`text-xs font-bold ${interestAccent(r.delta)}`}>{interestArrow(r.delta)}{r.delta !== 0 ? Math.abs(r.delta) : ""}</span>
+                    </div>
+                    <Meter pct={r.interest} tone="fuchsia" className="mt-1" />
                   </td>
-                  <td className="px-4 py-2 text-[12px] text-slate-400 hidden sm:table-cell">{r.reasons.join(" · ") || "—"}</td>
+                  <td className="px-4 py-2.5 text-[12px] text-slate-400 hidden sm:table-cell">{r.reasons.join(" · ") || "—"}</td>
                 </tr>
               ))}
             </tbody>
