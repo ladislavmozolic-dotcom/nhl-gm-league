@@ -29,6 +29,16 @@ export default async function TeamLayout({
   // the parent NHL club's GM manages its farm too, so GM controls show there
   const isGm = canManage;
 
+  // Expansion protection nudge — only worth a query for a signed-in GM of an NHL club.
+  let pendingExpansion = 0;
+  if (isGm && team.league === "NHL" && !team.isAffiliate) {
+    const openDrafts = await prisma.expansionDraftState.findMany({ where: { status: "SETUP", NOT: { teamId: team.id } }, select: { id: true } });
+    if (openDrafts.length > 0) {
+      const submitted = await prisma.expansionProtection.count({ where: { teamId: team.id, expansionDraftId: { in: openDrafts.map((d) => d.id) } } });
+      pendingExpansion = openDrafts.length - submitted;
+    }
+  }
+
   // this team's record + conference rank
   const row = standings.find((s: any) => s.teamId === team.id) as any;
   const confRows = row?.conference ? standings.filter((s: any) => s.conference === row.conference) : [];
@@ -66,6 +76,13 @@ export default async function TeamLayout({
           </div>
         )}
       </div>
+
+      {pendingExpansion > 0 && (
+        <Link href={`/teams/${slug}/expansion-protection`}
+          className="block rounded-lg border border-amber-700/60 bg-amber-950/30 px-4 py-2.5 text-sm text-amber-300 hover:bg-amber-950/50 transition-colors">
+          🏒 Expansion draft protection list open — submit your protected players →
+        </Link>
+      )}
 
       <TeamSubNav slug={slug} isGm={isGm} isAffiliate={team.league === "AHL" || team.isAffiliate} farmSlug={farmSlug} parentSlug={parentSlug} />
 

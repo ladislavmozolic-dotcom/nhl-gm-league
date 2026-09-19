@@ -42,7 +42,7 @@ export default async function ExpansionHubPage({ searchParams }: { searchParams:
               const t = teamOf.get(d.teamId);
               if (!t) return null;
               return (
-                <Link key={d.id} href={`/teams/${t.slug}`} className="flex items-center gap-3 rounded-lg border border-slate-800 px-3 py-2.5 hover:border-slate-600">
+                <Link key={d.id} href={`/admin/expansion/${d.teamId}`} className="flex items-center gap-3 rounded-lg border border-slate-800 px-3 py-2.5 hover:border-slate-600">
                   {t.logoUrl && <img src={t.logoUrl} alt="" className="w-8 h-8 object-contain" />}
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-sm text-slate-100 truncate">{t.name}</div>
