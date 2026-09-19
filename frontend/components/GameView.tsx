@@ -525,8 +525,12 @@ function EdgePanel({ data }: { data: Data }) {
 
   const secA = away.shotSectors ?? [];
   const secH = home.shotSectors ?? [];
-  const gA = away.goalies.find((g) => g.started);
-  const gH = home.goalies.find((g) => g.started);
+  // Pick whoever faced the most shots — when a goalie change happens mid-game
+  // both the starter and the reliever can be flagged "started", so the most
+  // representative one for this shot-danger breakdown is whoever saw the most rubber.
+  const mostShots = (goalies: Goalie[]) => goalies.reduce<Goalie | undefined>((best, g) => (!best || g.shotsAgainst > best.shotsAgainst ? g : best), undefined);
+  const gA = mostShots(away.goalies);
+  const gH = mostShots(home.goalies);
   const svById = (g: Goalie | undefined, sh: number, sv: number) => (g && sh ? (sv / sh) * 100 : null);
 
   // a stacked OZ/NZ/DZ zone-time bar for one team
