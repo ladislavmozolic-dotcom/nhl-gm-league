@@ -8,7 +8,7 @@ import {
   getArenaSections, selloutRevenue, computeTeamFinance, teamCapSummary, projectedPointsPct,
   playerCapYears, deadMoneyForYear, money, CURRENT_SEASON_START, seasonLabel,
   accruedCapSpace, onLtir, ltirRelief, capCeilingForPhase, farmSalaryExpense, liveCapHit,
-  DEFAULT_PROJECTED_CAPS,
+  DEFAULT_PROJECTED_CAPS, buyoutTerms,
 } from "@/lib/finance";
 import { getLeagueClock, regularSeasonDayProgress } from "@/lib/calendar-server";
 import { getTeamSession } from "@/lib/auth";
@@ -118,6 +118,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   const phaseComplianceCeiling = capCeilingForPhase(cap.upper, phase) + ltir;
   const overBy = Math.max(0, cap.capHit - phaseComplianceCeiling);
   const cushioned = phase !== "regular" && phase !== "playoffs";
+  const buyoutInSeason = !cushioned;
   const posCounts = splitByPos(team.players);
   const orgTotal = team.players.length + farm.length; // NHL + AHL, vs. ROSTER_LIMITS.orgMax
 
@@ -182,7 +183,16 @@ export default async function TeamCapView({ slug }: { slug: string }) {
           </td>
           <td className="px-3 py-1.5 text-right tabular-nums font-medium text-xs whitespace-nowrap">{netCapHit ? money(netCapHit) : "—"}</td>
           {cells.map((c, i) => <td key={i} className="px-3 py-1.5 text-right tabular-nums text-xs whitespace-nowrap">{c.salary != null ? <span className="text-green-400">{money(c.salary)}</span> : c.status ? <Badge s={c.status} /> : ""}</td>)}
-          {gm && <td className="px-2 py-1.5 text-right whitespace-nowrap">{p.capHit && p.contractYears ? <BuyoutButton slug={slug} playerId={p.id} playerName={p.name} onBuyout={buyoutPlayer} /> : null}</td>}
+          {gm && (
+            <td className="px-2 py-1.5 text-right whitespace-nowrap">
+              {p.capHit && p.contractYears ? (
+                <BuyoutButton
+                  slug={slug} playerId={p.id} playerName={p.name} onBuyout={buyoutPlayer}
+                  terms={buyoutTerms(p.capHit, p.contractYears, buyoutInSeason, settings)}
+                />
+              ) : null}
+            </td>
+          )}
         </tr>
       );
     })}</>
