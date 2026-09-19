@@ -163,7 +163,17 @@ input[type="number"] {
 .lines-goalie-stats span { padding: .55rem .4rem; border: 1px solid rgba(51,65,85,.72); border-radius: .65rem; background: rgba(7,19,36,.72); color: #64748b; font-size: .62rem; text-align: center; text-transform: uppercase; }
 .lines-goalie-stats strong { display: block; color: #e2e8f0; font-size: .85rem; }.lines-goalie-stats .is-warning strong { color: #fbbf24; }
 .lines-goalie-picker { display: grid; gap: .35rem; margin-top: .2rem; color: #64748b; font-size: .65rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
-.lines-goalie-picker select { text-transform: none; letter-spacing: normal; }
+.lines-goalie-select {
+  width: 100%; text-transform: none; letter-spacing: normal; cursor: pointer; appearance: none;
+  padding: .55rem 2.1rem .55rem 1rem; border-radius: 999px;
+  border: 1px solid rgba(56,189,248,.45); background-color: rgba(3,15,29,.84); color: #7dd3fc;
+  font-size: .8rem; font-weight: 850;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%237dd3fc'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z' clip-rule='evenodd'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right .85rem center; background-size: 14px;
+  transition: border-color .15s ease, color .15s ease, background-color .15s ease;
+}
+.lines-goalie-select:hover { border-color: #38bdf8; color: #e0f2fe; background-color: rgba(3,25,48,.94); }
+.lines-goalie-select:focus { outline: none; border-color: #38bdf8; box-shadow: 0 0 0 3px rgba(56,189,248,.12); }
 
 .strategy-lane {
   --lane: #64748b;

@@ -272,11 +272,11 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
   // select (opacity-0, so it has no visible bg/text of its own) lets the
   // browser fall back to its native popup styling, which on a dark-mode OS
   // can render white-on-white until an option is hovered/highlighted.
-  const Select = ({ value, onChange, pool, overlay = false }: { value: number | null; onChange: (v: number | null) => void; pool: Player[]; overlay?: boolean }) => (
+  const Select = ({ value, onChange, pool, overlay = false, pill = false, allowEmpty = true }: { value: number | null; onChange: (v: number | null) => void; pool: Player[]; overlay?: boolean; pill?: boolean; allowEmpty?: boolean }) => (
     <select value={value != null && pool.some((p) => p.id === value) ? value : ""} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
       style={{ colorScheme: "dark" }}
-      className={overlay ? "absolute inset-0 w-full h-full opacity-0 cursor-pointer" : "lines-select w-full min-w-[132px] bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-sm"}>
-      <option value="" style={{ backgroundColor: "#0f172a", color: "#e2e8f0" }}>— empty —</option>
+      className={overlay ? "absolute inset-0 w-full h-full opacity-0 cursor-pointer" : pill ? "lines-goalie-select" : "lines-select w-full min-w-[132px] bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-sm"}>
+      {allowEmpty && <option value="" style={{ backgroundColor: "#0f172a", color: "#e2e8f0" }}>— empty —</option>}
       {pool.map((p) => <option key={p.id} value={p.id} disabled={p.injured} style={{ backgroundColor: "#0f172a", color: "#e2e8f0" }}>{p.name}{p.cap ? ` (${p.cap})` : ""} · {p.position} ({p.overall}){p.con != null ? ` · CON ${p.con}%${p.con < 90 ? " ⚠️" : ""}` : ""}{p.injured ? " 🤕 INJ" : ""}</option>)}
     </select>
   );
@@ -629,7 +629,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
           {starter && (
             <label className="lines-goalie-picker">
               <span>Choose starter</span>
-              <Select value={value} onChange={onChange} pool={pool} />
+              <Select value={value} onChange={onChange} pool={pool} pill allowEmpty={false} />
             </label>
           )}
         </div>
