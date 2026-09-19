@@ -897,17 +897,17 @@ function PlayerHoverComparisonCard({
   const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
   const vh = typeof window !== "undefined" ? window.innerHeight : 800;
 
-  const cardWidth = 590;
-  const cardHeight = 220;
+  const cardWidth = 760;
+  const cardHeight = 290;
 
   // Position vertically: below cursor row if space, else above
-  let top = y + 6;
+  let top = y + 8;
   if (top + cardHeight > vh - 16) {
-    top = Math.max(8, y - cardHeight - 38);
+    top = Math.max(10, y - cardHeight - 44);
   }
 
   // Position horizontally: keep within screen padding
-  let left = Math.max(12, Math.min(x, vw - cardWidth - 16));
+  let left = Math.max(16, Math.min(x, vw - cardWidth - 20));
 
   const changes = ALL_SKATER_PARAMS.map((k) => {
     const act = p.actual[k];
@@ -918,83 +918,113 @@ function PlayerHoverComparisonCard({
 
   return (
     <div
-      style={{ position: "fixed", top, left, width: Math.min(cardWidth, vw - 24), zIndex: 100 }}
-      className="pointer-events-none rounded-2xl border border-slate-700/90 bg-slate-950/95 p-3.5 shadow-2xl backdrop-blur-2xl ring-1 ring-white/10 animate-in fade-in zoom-in-95 duration-100"
+      style={{
+        position: "fixed",
+        top,
+        left,
+        width: Math.min(cardWidth, vw - 32),
+        zIndex: 100,
+      }}
+      className="pointer-events-none rounded-3xl border border-slate-700/90 bg-slate-950/98 p-5 shadow-2xl backdrop-blur-3xl ring-2 ring-white/10 animate-in fade-in zoom-in-95 duration-100"
     >
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3 pb-2.5 mb-2.5 border-b border-slate-800">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <PlayerAvatar src={p.photoUrl} alt={p.name} size={36} />
+      {/* Header with larger avatar and prominent Overall */}
+      <div className="flex items-center justify-between gap-4 pb-3.5 mb-3.5 border-b border-slate-800">
+        <div className="flex items-center gap-3.5 min-w-0">
+          <PlayerAvatar src={p.photoUrl} alt={p.name} size={48} />
           <div className="min-w-0">
-            <div className="flex items-center gap-1.5 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
               {p.number != null && (
-                <span className="text-xs font-mono text-slate-500">#{p.number}</span>
+                <span className="text-sm font-mono text-slate-500 font-bold">
+                  #{p.number}
+                </span>
               )}
-              <span className="font-bold text-white text-sm truncate">{cleanName(p.name)}</span>
-              <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded border ${posBadgeColor(p.position)}`}>
+              <span className="font-black text-white text-lg tracking-tight truncate">
+                {cleanName(p.name)}
+              </span>
+              <span
+                className={`text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded-lg border ${posBadgeColor(
+                  p.position
+                )}`}
+              >
                 {p.position ?? "—"}
               </span>
             </div>
-            <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-2">
-              {p.age != null && <span>{p.age} rokov</span>}
+            <div className="text-xs text-slate-400 mt-1 flex items-center gap-2.5 flex-wrap">
+              {p.age != null && <span><b>{p.age}</b> rokov</span>}
               {p.gp > 0 && (
                 <>
                   <span className="text-slate-600">·</span>
-                  <span>{p.gp} GP</span>
+                  <span><b>{p.gp}</b> GP (NHL)</span>
                 </>
               )}
               {p.missedPenalty > 0 && (
-                <span className="text-[10px] text-rose-400 font-semibold bg-rose-500/10 border border-rose-500/30 px-1 rounded">
-                  Penalizácia −{p.missedPenalty}
+                <span className="text-xs text-rose-400 font-bold bg-rose-500/15 border border-rose-500/40 px-2 py-0.5 rounded-lg">
+                  Penalizácia za zranenia −{p.missedPenalty}
                 </span>
               )}
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-3 shrink-0">
           <div className="text-right">
-            <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Overall</div>
-            <div className="text-base font-black text-blue-300">{p.overall ?? "—"}</div>
+            <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">
+              Celkový Rating
+            </div>
+            <div className="text-2xl font-black text-blue-300 px-3 py-1 rounded-xl bg-blue-600/20 border border-blue-500/40 tabular-nums">
+              {p.overall ?? "—"} <span className="text-xs font-bold text-blue-400">OV</span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Comparison Matrix: Tento rok vs Projected */}
-      <div className="overflow-x-auto pb-1">
-        <table className="w-full text-center text-xs">
+      {/* Comparison Matrix: Tento rok vs Projected (Larger size) */}
+      <div className="overflow-x-auto pb-1.5 scrollbar-thin">
+        <table className="w-full text-center text-sm">
           <thead>
-            <tr className="border-b border-slate-800/80 text-[10px] uppercase font-bold text-slate-400">
-              <th className="py-1 px-1.5 text-left text-slate-500 min-w-[70px]">Stav</th>
+            <tr className="border-b border-slate-800 text-xs uppercase font-extrabold text-slate-400">
+              <th className="py-1.5 px-2 text-left text-slate-500 min-w-[85px]">
+                Stav
+              </th>
               {ALL_SKATER_PARAMS.map((k) => (
                 <th
                   key={k}
-                  className={`py-1 px-1 min-w-[30px] ${
-                    SKATER_PARAM_META[k].hasFormula ? "text-amber-300 font-black" : "text-slate-400"
+                  className={`py-1.5 px-1.5 min-w-[38px] ${
+                    SKATER_PARAM_META[k].hasFormula
+                      ? "text-amber-300 font-black"
+                      : "text-slate-400 font-bold"
                   }`}
                   title={SKATER_PARAM_META[k].name}
                 >
-                  {SKATER_PARAM_META[k].label}
-                  {SKATER_PARAM_META[k].hasFormula && <span className="text-amber-400 text-[9px]">*</span>}
+                  <span className="inline-flex items-center justify-center gap-0.5">
+                    <span>{SKATER_PARAM_META[k].label}</span>
+                    {SKATER_PARAM_META[k].hasFormula && (
+                      <span className="text-amber-400 text-xs font-black">*</span>
+                    )}
+                  </span>
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800/50 font-mono text-[11px]">
+          <tbody className="divide-y divide-slate-800/60 font-mono">
             {/* Row 1: Tento rok */}
             <tr>
-              <td className="py-1 px-1.5 text-left font-sans text-[11px] font-semibold text-slate-400">
+              <td className="py-2.5 px-2 text-left font-sans text-xs font-bold text-slate-400">
                 Tento rok
               </td>
               {ALL_SKATER_PARAMS.map((k) => (
-                <td key={k} className={`py-1 px-1 font-semibold ${ratingColor(p.actual[k])}`}>
+                <td
+                  key={k}
+                  className={`py-2.5 px-1.5 font-bold ${ratingColor(p.actual[k])}`}
+                >
                   {p.actual[k] ?? "—"}
                 </td>
               ))}
             </tr>
+
             {/* Row 2: Projected */}
-            <tr className="bg-slate-900/80">
-              <td className="py-1 px-1.5 text-left font-sans text-[11px] font-bold text-blue-300">
+            <tr className="bg-slate-900/90">
+              <td className="py-2.5 px-2 text-left font-sans text-xs font-black text-blue-300">
                 Projected
               </td>
               {ALL_SKATER_PARAMS.map((k) => {
@@ -1004,8 +1034,12 @@ function PlayerHoverComparisonCard({
                 return (
                   <td
                     key={k}
-                    className={`py-1 px-1 font-bold ${
-                      diff > 0 ? "text-emerald-400" : diff < 0 ? "text-rose-400" : "text-slate-300"
+                    className={`py-2.5 px-1.5 font-black text-[15px] ${
+                      diff > 0
+                        ? "text-emerald-400"
+                        : diff < 0
+                        ? "text-rose-400"
+                        : "text-slate-300"
                     }`}
                   >
                     {proj ?? act ?? "—"}
@@ -1013,10 +1047,11 @@ function PlayerHoverComparisonCard({
                 );
               })}
             </tr>
+
             {/* Row 3: Rozdiel */}
-            <tr className="text-[10px]">
-              <td className="py-0.5 px-1.5 text-left font-sans font-medium text-slate-500">
-                Zmena
+            <tr className="text-xs">
+              <td className="py-1.5 px-2 text-left font-sans font-semibold text-slate-500">
+                Zmena (Δ)
               </td>
               {ALL_SKATER_PARAMS.map((k) => {
                 const act = p.actual[k];
@@ -1025,8 +1060,12 @@ function PlayerHoverComparisonCard({
                 return (
                   <td
                     key={k}
-                    className={`py-0.5 px-1 font-bold ${
-                      diff > 0 ? "text-emerald-400" : diff < 0 ? "text-rose-400" : "text-slate-600"
+                    className={`py-1.5 px-1.5 font-black text-xs ${
+                      diff > 0
+                        ? "text-emerald-400"
+                        : diff < 0
+                        ? "text-rose-400"
+                        : "text-slate-600"
                     }`}
                   >
                     {diff > 0 ? `+${diff}` : diff < 0 ? diff : "·"}
@@ -1039,31 +1078,35 @@ function PlayerHoverComparisonCard({
       </div>
 
       {/* Changes breakdown pills */}
-      <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2 text-[11px] flex-wrap">
+      <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center justify-between gap-3 text-xs flex-wrap">
         {changes.length > 0 ? (
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-slate-500 font-medium">Zmeny:</span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-slate-400 font-semibold">Odhadované zmeny:</span>
             {changes.map((c) => (
               <span
                 key={c.key}
-                className={`px-1.5 py-0.2 rounded font-semibold text-[10px] ${
+                className={`px-2.5 py-1 rounded-lg font-bold text-xs inline-flex items-center gap-1 ${
                   c.diff > 0
-                    ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-300"
-                    : "bg-rose-500/10 border border-rose-500/30 text-rose-300"
+                    ? "bg-emerald-500/15 border border-emerald-500/40 text-emerald-300"
+                    : "bg-rose-500/15 border border-rose-500/40 text-rose-300"
                 }`}
               >
-                {c.meta.label} {c.diff > 0 ? `+${c.diff}` : c.diff}
+                <span>{c.meta.label}</span>
+                <span>{c.diff > 0 ? `+${c.diff}` : c.diff}</span>
               </span>
             ))}
           </div>
         ) : (
-          <span className="text-slate-500 italic">Všetky parametre zatiaľ stabilné (bez zmeny)</span>
+          <span className="text-slate-500 italic text-xs">
+            Všetky parametre zatiaľ stabilné (bez odhadovanej zmeny)
+          </span>
         )}
-        <span className="text-[10px] text-slate-500 ml-auto">
-          * Vzorce aktívne
+        <span className="text-[11px] text-slate-500 ml-auto">
+          * Parametre s aktívnym vzorcom
         </span>
       </div>
     </div>
   );
 }
+
 
