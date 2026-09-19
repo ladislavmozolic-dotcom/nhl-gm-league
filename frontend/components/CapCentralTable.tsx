@@ -61,7 +61,7 @@ export default function CapCentralTable({ rows }: { rows: CapRow[] }) {
               <td className="px-3 py-2.5 text-right tabular-nums text-slate-400">{t.buyouts ? money(t.buyouts) : "—"}</td>
               <td className="px-3 py-2.5 text-right tabular-nums text-slate-400">{t.deadCap ? money(t.deadCap) : "—"}</td>
               <td className={`px-3 py-2.5 text-right tabular-nums font-semibold ${t.capSpace < 0 ? "text-red-400" : ""}`}>{money(t.capHit)}</td>
-              <td className="px-3 py-2.5 text-right tabular-nums text-sky-400 font-medium">{t.ltir ? `+${money(t.ltir)}` : "—"}</td>
+              <td className="px-3 py-2.5 text-right tabular-nums text-sky-400 font-medium whitespace-nowrap">{t.ltir ? `+${money(t.ltir)}` : "—"}</td>
               <td className={`px-3 py-2.5 text-right tabular-nums ${t.capSpace < 0 ? ((t.ltir ?? 0) >= -t.capSpace ? "text-sky-300 font-medium" : "text-red-400") : "text-green-400"}`}>{money(t.capSpace)}</td>
               <td className="px-3 py-2.5 text-right tabular-nums text-slate-300">{money(t.projCapHit)}</td>
               <td className={`px-3 py-2.5 text-right tabular-nums font-bold ${t.projCapSpace < 0 ? "text-red-400" : "text-emerald-400"}`}>{money(t.projCapSpace)}</td>
