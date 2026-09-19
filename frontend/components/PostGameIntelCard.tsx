@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { postGameIntel, type TeamGameSwing, type GoalieGameSwing, type TeamPostGame } from "@/lib/gm-assistant/postGameIntel";
 import { Card } from "@/components/ui";
 import { cleanName } from "@/lib/playerName";
@@ -67,7 +68,13 @@ function TeamColumn({ team }: { team: TeamPostGame }) {
       <div>
         <div className="flex items-center gap-2 mb-1.5 min-w-0">
           {team.teamLogo && <img src={team.teamLogo} alt="" className="w-5 h-5 object-contain shrink-0" />}
-          <span className="text-sm font-bold text-slate-200 truncate">{displayName}</span>
+          {team.teamSlug ? (
+            <Link href={`/teams/${team.teamSlug}`} className="text-sm font-bold text-slate-200 hover:text-blue-400 truncate">
+              {displayName}
+            </Link>
+          ) : (
+            <span className="text-sm font-bold text-slate-200 truncate">{displayName}</span>
+          )}
         </div>
         <div className="flex flex-col gap-1.5">
           {team.swings.map((s) => <SwingRow key={s.key} s={s} unit={s.key === "faceoff" ? "%" : ""} />)}
