@@ -104,16 +104,72 @@ export function projectDF(pos: Pos, i: DFInputs): number | null {
   });
 }
 
+export const ALL_SKATER_PARAMS = [
+  "ck", "fg", "di", "sk", "st", "en", "du", "ph", "fo", "pa", "sc", "df", "ps", "ex", "ld",
+] as const;
+export type SkaterParamKey = (typeof ALL_SKATER_PARAMS)[number];
+
+export const SKATER_PARAM_META: Record<SkaterParamKey, { label: string; name: string; hasFormula: boolean }> = {
+  ck: { label: "CK", name: "Checking (hits)", hasFormula: true },
+  fg: { label: "FG", name: "Fighting", hasFormula: false },
+  di: { label: "DI", name: "Discipline", hasFormula: false },
+  sk: { label: "SK", name: "Skating", hasFormula: false },
+  st: { label: "ST", name: "Strength", hasFormula: false },
+  en: { label: "EN", name: "Endurance", hasFormula: false },
+  du: { label: "DU", name: "Durability", hasFormula: false },
+  ph: { label: "PH", name: "Puck Handling", hasFormula: false },
+  fo: { label: "FO", name: "Faceoffs", hasFormula: false },
+  pa: { label: "PA", name: "Passing (assists)", hasFormula: true },
+  sc: { label: "SC", name: "Scoring (goals)", hasFormula: true },
+  df: { label: "DF", name: "Defense (blocks/PK/+-)", hasFormula: true },
+  ps: { label: "PS", name: "Penalty Shot", hasFormula: false },
+  ex: { label: "EX", name: "Experience", hasFormula: false },
+  ld: { label: "LD", name: "Leadership", hasFormula: false },
+};
+
 export type ProjSkater = {
-  id: number; name: string; position: string | null; teamId: number;
-  gp: number; missedPenalty: number;
-  actual: Record<ParamKey, number | null>;
-  projected: Record<ParamKey, number | null>;
+  id: number;
+  slug: string;
+  name: string;
+  position: string | null;
+  teamId: number;
+  rosterType: string | null;
+  age: number | null;
+  number: number | null;
+  photoUrl: string | null;
+  overall: number | null;
+  gp: number;
+  missedPenalty: number;
+  actual: Record<SkaterParamKey, number | null>;
+  projected: Record<SkaterParamKey, number | null>;
 };
 
 type Row = {
-  id: number; name: string; position: string | null; teamId: number;
-  ck: number | null; sc: number | null; pa: number | null; df: number | null;
+  id: number;
+  slug: string;
+  name: string;
+  position: string | null;
+  teamId: number;
+  rosterType: string | null;
+  age: number | null;
+  number: number | null;
+  photoUrl: string | null;
+  overall: number | null;
+  ck: number | null;
+  fg: number | null;
+  di: number | null;
+  sk: number | null;
+  st: number | null;
+  en: number | null;
+  du: number | null;
+  ph: number | null;
+  fo: number | null;
+  pa: number | null;
+  sc: number | null;
+  df: number | null;
+  ps: number | null;
+  ex: number | null;
+  ld: number | null;
 } & Record<string, number | null | string>;
 
 /** Project every skater from real form using the calculator's exact tables. */
@@ -121,8 +177,10 @@ export async function projectAllSkaters(): Promise<{ rows: ProjSkater[]; active:
   const players = await prisma.player.findMany({
     where: { isGoalie: false, rosterType: { in: ["NHL", "AHL"] } },
     select: {
-      id: true, name: true, position: true, teamId: true,
-      ck: true, sc: true, pa: true, df: true,
+      id: true, slug: true, name: true, position: true, teamId: true, rosterType: true,
+      age: true, overall: true, number: true, photoUrl: true,
+      ck: true, fg: true, di: true, sk: true, st: true, en: true, du: true,
+      ph: true, fo: true, pa: true, sc: true, df: true, ps: true, ex: true, ld: true,
       lastSeasonGP: true, lastSeasonHits: true, lastSeasonG: true, lastSeasonA: true,
       curSeasonGP: true, curSeasonHits: true, curSeasonG: true, curSeasonA: true,
       curSeasonPM: true, curSeasonBlocks: true, curSeasonTK: true, curSeasonGV: true,
@@ -134,9 +192,18 @@ export async function projectAllSkaters(): Promise<{ rows: ProjSkater[]; active:
 
   const rows: ProjSkater[] = players.map((p) => {
     const pos = posOf(p.position);
-    const actual: Record<ParamKey, number | null> = { ck: p.ck, sc: p.sc, pa: p.pa, df: p.df };
-    const projected: Record<ParamKey, number | null> = { ck: p.ck, sc: p.sc, pa: p.pa, df: p.df };
+    
+    // Initialize actual ratings for all 15 parameters
+    const actual = {} as Record<SkaterParamKey, number | null>;
+    const projected = {} as Record<SkaterParamKey, number | null>;
+    for (const key of ALL_SKATER_PARAMS) {
+      const val = typeof p[key] === "number" ? (p[key] as number) : null;
+      actual[key] = val;
+      projected[key] = val; // Default: projected = actual (ready for future formulas)
+    }
+
     if (active) {
+      // CK, SC, PA use their empirical hit/goal/assist tables
       for (const s of SPEC) {
         const lastR = rate(Number(p[s.last] ?? 0), Number(p.lastSeasonGP ?? 0));
         const curR = rate(Number(p[s.cur] ?? 0), Number(p.curSeasonGP ?? 0));
@@ -159,16 +226,33 @@ export async function projectAllSkaters(): Promise<{ rows: ProjSkater[]; active:
       });
       if (dfProj != null) projected.df = dfProj;
     }
+
     // games-missed penalty: discount each projected param when the player sat out
     // a big chunk of the season (only applies once the season is live/active).
     const gp = Number(p.curSeasonGP ?? 0);
     const missedPenalty = active ? gamesMissedPenalty(gp) : 0;
     if (missedPenalty > 0) {
-      for (const k of ["ck", "sc", "pa", "df"] as ParamKey[]) {
+      for (const k of ["ck", "sc", "pa", "df"] as SkaterParamKey[]) {
         if (projected[k] != null) projected[k] = Math.max(20, (projected[k] as number) - missedPenalty);
       }
     }
-    return { id: p.id, name: p.name, position: p.position, teamId: p.teamId, gp, missedPenalty, actual, projected };
+
+    return {
+      id: p.id,
+      slug: p.slug,
+      name: p.name,
+      position: p.position,
+      teamId: p.teamId,
+      rosterType: p.rosterType,
+      age: p.age,
+      number: p.number,
+      photoUrl: p.photoUrl,
+      overall: p.overall,
+      gp,
+      missedPenalty,
+      actual,
+      projected,
+    };
   });
 
   return { rows, active };
