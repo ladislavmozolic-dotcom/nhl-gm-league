@@ -544,6 +544,342 @@ export default function LiveCalculatorConfigModal({
                 </div>
               </div>
 
+              {/* DF - Defensemen */}
+              <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
+                <h4 className="font-semibold text-cyan-400 text-sm flex items-center justify-between">
+                  <span>Defense (DF) Váhy — Obrancovia (D)</span>
+                  <span className="text-xs text-slate-400 font-mono">
+                    Súčet: {(
+                      ((config.weights?.dfD?.pkToiPg ?? DEFAULT_LIVE_CALC_WEIGHTS.dfD.pkToiPg) +
+                        (config.weights?.dfD?.xga5 ?? DEFAULT_LIVE_CALC_WEIGHTS.dfD.xga5) +
+                        (config.weights?.dfD?.relXga5 ?? DEFAULT_LIVE_CALC_WEIGHTS.dfD.relXga5) +
+                        (config.weights?.dfD?.ga5 ?? DEFAULT_LIVE_CALC_WEIGHTS.dfD.ga5) +
+                        (config.weights?.dfD?.relXgaPk ?? DEFAULT_LIVE_CALC_WEIGHTS.dfD.relXgaPk) +
+                        (config.weights?.dfD?.blk60 ?? DEFAULT_LIVE_CALC_WEIGHTS.dfD.blk60) +
+                        (config.weights?.dfD?.xgfPct ?? DEFAULT_LIVE_CALC_WEIGHTS.dfD.xgfPct)) *
+                      100
+                    ).toFixed(0)}%
+                  </span>
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div>
+                    <label className="block text-slate-400 mb-1">PK TOI/GP (Oslabenia):</label>
+                    <input
+                      type="number"
+                      step="0.05"
+                      value={config.weights?.dfD?.pkToiPg ?? DEFAULT_LIVE_CALC_WEIGHTS.dfD.pkToiPg}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          weights: {
+                            ...config.weights,
+                            dfD: {
+                              ...(config.weights?.dfD ?? DEFAULT_LIVE_CALC_WEIGHTS.dfD),
+                              pkToiPg: parseFloat(e.target.value) || 0,
+                            },
+                          },
+                        })
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-cyan-400 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 mb-1">inv xGA/60 5v5:</label>
+                    <input
+                      type="number"
+                      step="0.05"
+                      value={config.weights?.dfD?.xga5 ?? DEFAULT_LIVE_CALC_WEIGHTS.dfD.xga5}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          weights: {
+                            ...config.weights,
+                            dfD: {
+                              ...(config.weights?.dfD ?? DEFAULT_LIVE_CALC_WEIGHTS.dfD),
+                              xga5: parseFloat(e.target.value) || 0,
+                            },
+                          },
+                        })
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-cyan-400 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 mb-1">inv Rel xGA/60 5v5:</label>
+                    <input
+                      type="number"
+                      step="0.05"
+                      value={config.weights?.dfD?.relXga5 ?? DEFAULT_LIVE_CALC_WEIGHTS.dfD.relXga5}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          weights: {
+                            ...config.weights,
+                            dfD: {
+                              ...(config.weights?.dfD ?? DEFAULT_LIVE_CALC_WEIGHTS.dfD),
+                              relXga5: parseFloat(e.target.value) || 0,
+                            },
+                          },
+                        })
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-cyan-400 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 mb-1">inv GA/60 5v5:</label>
+                    <input
+                      type="number"
+                      step="0.05"
+                      value={config.weights?.dfD?.ga5 ?? DEFAULT_LIVE_CALC_WEIGHTS.dfD.ga5}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          weights: {
+                            ...config.weights,
+                            dfD: {
+                              ...(config.weights?.dfD ?? DEFAULT_LIVE_CALC_WEIGHTS.dfD),
+                              ga5: parseFloat(e.target.value) || 0,
+                            },
+                          },
+                        })
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-cyan-400 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 mb-1">inv Rel xGA PK:</label>
+                    <input
+                      type="number"
+                      step="0.05"
+                      value={config.weights?.dfD?.relXgaPk ?? DEFAULT_LIVE_CALC_WEIGHTS.dfD.relXgaPk}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          weights: {
+                            ...config.weights,
+                            dfD: {
+                              ...(config.weights?.dfD ?? DEFAULT_LIVE_CALC_WEIGHTS.dfD),
+                              relXgaPk: parseFloat(e.target.value) || 0,
+                            },
+                          },
+                        })
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-cyan-400 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 mb-1">Blocks/60 (Bloky):</label>
+                    <input
+                      type="number"
+                      step="0.05"
+                      value={config.weights?.dfD?.blk60 ?? DEFAULT_LIVE_CALC_WEIGHTS.dfD.blk60}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          weights: {
+                            ...config.weights,
+                            dfD: {
+                              ...(config.weights?.dfD ?? DEFAULT_LIVE_CALC_WEIGHTS.dfD),
+                              blk60: parseFloat(e.target.value) || 0,
+                            },
+                          },
+                        })
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-cyan-400 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 mb-1">xGF% (Očakávané góly %):</label>
+                    <input
+                      type="number"
+                      step="0.05"
+                      value={config.weights?.dfD?.xgfPct ?? DEFAULT_LIVE_CALC_WEIGHTS.dfD.xgfPct}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          weights: {
+                            ...config.weights,
+                            dfD: {
+                              ...(config.weights?.dfD ?? DEFAULT_LIVE_CALC_WEIGHTS.dfD),
+                              xgfPct: parseFloat(e.target.value) || 0,
+                            },
+                          },
+                        })
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-cyan-400 outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* DF - Forwards */}
+              <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
+                <h4 className="font-semibold text-blue-400 text-sm flex items-center justify-between">
+                  <span>Defense (DF) Váhy — Útočníci (F)</span>
+                  <span className="text-xs text-slate-400 font-mono">
+                    Súčet: {(
+                      ((config.weights?.dfF?.pkToiPg ?? DEFAULT_LIVE_CALC_WEIGHTS.dfF.pkToiPg) +
+                        (config.weights?.dfF?.relXgaPk ?? DEFAULT_LIVE_CALC_WEIGHTS.dfF.relXgaPk) +
+                        (config.weights?.dfF?.relXga5 ?? DEFAULT_LIVE_CALC_WEIGHTS.dfF.relXga5) +
+                        (config.weights?.dfF?.xga5 ?? DEFAULT_LIVE_CALC_WEIGHTS.dfF.xga5) +
+                        (config.weights?.dfF?.ga5 ?? DEFAULT_LIVE_CALC_WEIGHTS.dfF.ga5) +
+                        (config.weights?.dfF?.xgfPct ?? DEFAULT_LIVE_CALC_WEIGHTS.dfF.xgfPct) +
+                        (config.weights?.dfF?.blk60 ?? DEFAULT_LIVE_CALC_WEIGHTS.dfF.blk60)) *
+                      100
+                    ).toFixed(0)}%
+                  </span>
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div>
+                    <label className="block text-slate-400 mb-1">PK TOI/GP (Oslabenia):</label>
+                    <input
+                      type="number"
+                      step="0.05"
+                      value={config.weights?.dfF?.pkToiPg ?? DEFAULT_LIVE_CALC_WEIGHTS.dfF.pkToiPg}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          weights: {
+                            ...config.weights,
+                            dfF: {
+                              ...(config.weights?.dfF ?? DEFAULT_LIVE_CALC_WEIGHTS.dfF),
+                              pkToiPg: parseFloat(e.target.value) || 0,
+                            },
+                          },
+                        })
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-blue-400 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 mb-1">inv Rel xGA PK:</label>
+                    <input
+                      type="number"
+                      step="0.05"
+                      value={config.weights?.dfF?.relXgaPk ?? DEFAULT_LIVE_CALC_WEIGHTS.dfF.relXgaPk}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          weights: {
+                            ...config.weights,
+                            dfF: {
+                              ...(config.weights?.dfF ?? DEFAULT_LIVE_CALC_WEIGHTS.dfF),
+                              relXgaPk: parseFloat(e.target.value) || 0,
+                            },
+                          },
+                        })
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-blue-400 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 mb-1">inv Rel xGA/60 5v5:</label>
+                    <input
+                      type="number"
+                      step="0.05"
+                      value={config.weights?.dfF?.relXga5 ?? DEFAULT_LIVE_CALC_WEIGHTS.dfF.relXga5}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          weights: {
+                            ...config.weights,
+                            dfF: {
+                              ...(config.weights?.dfF ?? DEFAULT_LIVE_CALC_WEIGHTS.dfF),
+                              relXga5: parseFloat(e.target.value) || 0,
+                            },
+                          },
+                        })
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-blue-400 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 mb-1">inv xGA/60 5v5:</label>
+                    <input
+                      type="number"
+                      step="0.05"
+                      value={config.weights?.dfF?.xga5 ?? DEFAULT_LIVE_CALC_WEIGHTS.dfF.xga5}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          weights: {
+                            ...config.weights,
+                            dfF: {
+                              ...(config.weights?.dfF ?? DEFAULT_LIVE_CALC_WEIGHTS.dfF),
+                              xga5: parseFloat(e.target.value) || 0,
+                            },
+                          },
+                        })
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-blue-400 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 mb-1">inv GA/60 5v5:</label>
+                    <input
+                      type="number"
+                      step="0.05"
+                      value={config.weights?.dfF?.ga5 ?? DEFAULT_LIVE_CALC_WEIGHTS.dfF.ga5}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          weights: {
+                            ...config.weights,
+                            dfF: {
+                              ...(config.weights?.dfF ?? DEFAULT_LIVE_CALC_WEIGHTS.dfF),
+                              ga5: parseFloat(e.target.value) || 0,
+                            },
+                          },
+                        })
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-blue-400 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 mb-1">xGF% (Očakávané góly %):</label>
+                    <input
+                      type="number"
+                      step="0.05"
+                      value={config.weights?.dfF?.xgfPct ?? DEFAULT_LIVE_CALC_WEIGHTS.dfF.xgfPct}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          weights: {
+                            ...config.weights,
+                            dfF: {
+                              ...(config.weights?.dfF ?? DEFAULT_LIVE_CALC_WEIGHTS.dfF),
+                              xgfPct: parseFloat(e.target.value) || 0,
+                            },
+                          },
+                        })
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-blue-400 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 mb-1">Blocks/60 (Bloky):</label>
+                    <input
+                      type="number"
+                      step="0.05"
+                      value={config.weights?.dfF?.blk60 ?? DEFAULT_LIVE_CALC_WEIGHTS.dfF.blk60}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          weights: {
+                            ...config.weights,
+                            dfF: {
+                              ...(config.weights?.dfF ?? DEFAULT_LIVE_CALC_WEIGHTS.dfF),
+                              blk60: parseFloat(e.target.value) || 0,
+                            },
+                          },
+                        })
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-blue-400 outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
               {/* CK & DI */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
@@ -628,6 +964,119 @@ export default function LiveCalculatorConfigModal({
                       />
                     </div>
                   </div>
+                </div>
+              </div>
+
+              {/* SK, ST & EX */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
+                  <h4 className="font-semibold text-teal-400 text-sm">Skating (SK) Váhy</h4>
+                  <div>
+                    <label className="block text-slate-400 mb-1">NHL EDGE Bursts &gt;20mph:</label>
+                    <input
+                      type="number"
+                      step="0.05"
+                      value={config.weights?.sk?.edgeBursts20 ?? DEFAULT_LIVE_CALC_WEIGHTS.sk.edgeBursts20}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          weights: {
+                            ...config.weights,
+                            sk: {
+                              ...(config.weights?.sk ?? DEFAULT_LIVE_CALC_WEIGHTS.sk),
+                              edgeBursts20: parseFloat(e.target.value) || 0,
+                            },
+                          },
+                        })
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-teal-400 outline-none"
+                    />
+                    <p className="text-[10px] text-slate-500 mt-1">Frekvencia rýchlostných šprintov &gt; 32 km/h za 60 minút.</p>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
+                  <h4 className="font-semibold text-orange-400 text-sm">Strength (ST) Váhy</h4>
+                  <div>
+                    <label className="block text-slate-400 mb-1">Hmotnosť hráča (Weight %):</label>
+                    <input
+                      type="number"
+                      step="0.05"
+                      value={config.weights?.st?.weightPct ?? DEFAULT_LIVE_CALC_WEIGHTS.st.weightPct}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          weights: {
+                            ...config.weights,
+                            st: {
+                              ...(config.weights?.st ?? DEFAULT_LIVE_CALC_WEIGHTS.st),
+                              weightPct: parseFloat(e.target.value) || 0,
+                            },
+                          },
+                        })
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-orange-400 outline-none"
+                    />
+                    <p className="text-[10px] text-slate-500 mt-1">Percentil hmotnosti v rámci ligy (fyzická sila).</p>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
+                  <h4 className="font-semibold text-violet-400 text-sm flex items-center justify-between">
+                    <span>Experience (EX) Váhy</span>
+                    <span className="text-xs text-slate-400 font-mono">
+                      Súčet: {(
+                        ((config.weights?.ex?.careerRegGP ?? DEFAULT_LIVE_CALC_WEIGHTS.ex.careerRegGP) +
+                          (config.weights?.ex?.careerPoGP ?? DEFAULT_LIVE_CALC_WEIGHTS.ex.careerPoGP)) *
+                        100
+                      ).toFixed(0)}%
+                    </span>
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-slate-400 mb-1">Kariéra reg. GP:</label>
+                      <input
+                        type="number"
+                        step="0.05"
+                        value={config.weights?.ex?.careerRegGP ?? DEFAULT_LIVE_CALC_WEIGHTS.ex.careerRegGP}
+                        onChange={(e) =>
+                          setConfig({
+                            ...config,
+                            weights: {
+                              ...config.weights,
+                              ex: {
+                                ...(config.weights?.ex ?? DEFAULT_LIVE_CALC_WEIGHTS.ex),
+                                careerRegGP: parseFloat(e.target.value) || 0,
+                              },
+                            },
+                          })
+                        }
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-violet-400 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 mb-1">Kariéra play-off GP:</label>
+                      <input
+                        type="number"
+                        step="0.05"
+                        value={config.weights?.ex?.careerPoGP ?? DEFAULT_LIVE_CALC_WEIGHTS.ex.careerPoGP}
+                        onChange={(e) =>
+                          setConfig({
+                            ...config,
+                            weights: {
+                              ...config.weights,
+                              ex: {
+                                ...(config.weights?.ex ?? DEFAULT_LIVE_CALC_WEIGHTS.ex),
+                                careerPoGP: parseFloat(e.target.value) || 0,
+                              },
+                            },
+                          })
+                        }
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-violet-400 outline-none"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-500">Skúsenosti na základe odohratých zápasov v NHL.</p>
                 </div>
               </div>
             </div>
