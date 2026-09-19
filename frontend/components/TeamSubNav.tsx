@@ -52,8 +52,10 @@ export default function TeamSubNav({ slug, isGm, isAffiliate, farmSlug, parentSl
           { label: "Injuries", href: `${base}/injuries` },
           // Roster moves for an AHL club actually live on its NHL parent's /rosters
           // page (RosterMover shows both org sides at once) — deep-link there rather
-          // than duplicating that page/data-fetch for the affiliate's own slug.
-          ...(parentSlug ? [{ label: "Roster Moves", href: `/teams/${parentSlug}/rosters`, gm: true }] : []),
+          // than duplicating that page/data-fetch for the affiliate's own slug. The
+          // `?from=farm` flag lets that page send "Lines"/"Back" back to the farm
+          // side instead of stranding the GM on the NHL team.
+          ...(parentSlug ? [{ label: "Roster Moves", href: `/teams/${parentSlug}/rosters?from=farm`, gm: true }] : []),
           { label: "Lines", href: `${base}/lines`, gm: true },
           { label: "System", href: `${base}/tactics`, gm: true },
         ] },
@@ -97,8 +99,9 @@ export default function TeamSubNav({ slug, isGm, isAffiliate, farmSlug, parentSl
 
   const isActive = (href: string) => {
     if (href.includes("#")) return false;
-    if (href === base) return pathname === base;
-    return pathname === href || pathname.startsWith(href + "/");
+    const path = href.split("?")[0];
+    if (path === base) return pathname === base;
+    return pathname === path || pathname.startsWith(path + "/");
   };
   const visible = (it: Item) => !it.gm || isGm;
 

@@ -29,13 +29,13 @@ const ovColor = (ov: number) =>
 const isReleasable = (p: Player) => p.capHit === 100_000;
 
 type Props = {
-  teamName: string; teamSlug: string; affiliateName: string; hasAffiliate: boolean;
+  teamName: string; teamSlug: string; fromFarmSlug?: string | null; affiliateName: string; hasAffiliate: boolean;
   players: Player[]; onSave: (slug: string, rows: MoveRow[]) => Promise<{ ok: boolean; error?: string } | void>;
   onRelease: (slug: string, playerId: number) => Promise<{ ok: boolean; error?: string; name?: string }>;
   onWaiver: (slug: string, playerId: number) => Promise<{ ok: boolean; error?: string }>;
 };
 
-export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffiliate, players, onSave, onRelease, onWaiver }: Props) {
+export default function RosterMover({ teamName, teamSlug, fromFarmSlug, affiliateName, hasAffiliate, players, onSave, onRelease, onWaiver }: Props) {
   const [rows, setRows] = useState<Player[]>(players);
   const [pending, start] = useTransition();
   const [saved, setSaved] = useState(false);
@@ -247,10 +247,11 @@ export default function RosterMover({ teamName, teamSlug, affiliateName, hasAffi
         <div className="flex gap-3 text-sm mt-1 items-center">
           {/* History-aware: a GM who reached this page from the AHL affiliate's own
               "Roster Moves" link (which deep-links here using the NHL parent's slug)
-              should land back on the AHL page, not on the NHL team this URL is scoped to. */}
-          <BackLink fallback={`/teams/${teamSlug}`} label="team" />
-          <Link href={`/teams/${teamSlug}/lines`} className="text-slate-400 hover:text-blue-400">Lines →</Link>
-          <Link href={`/teams/${teamSlug}/roster/edit`} className="text-slate-400 hover:text-blue-400">Numbers &amp; captains →</Link>
+              should land back on the AHL page, not on the NHL team this URL is scoped to.
+              fromFarmSlug covers the non-history cases (new tab, direct link) the same way. */}
+          <BackLink fallback={`/teams/${fromFarmSlug ?? teamSlug}`} label="team" />
+          <Link href={`/teams/${fromFarmSlug ?? teamSlug}/lines`} className="text-slate-400 hover:text-blue-400">Lines →</Link>
+          <Link href={`/teams/${fromFarmSlug ?? teamSlug}/roster/edit`} className="text-slate-400 hover:text-blue-400">Numbers &amp; captains →</Link>
         </div>
         <p className="text-xs text-slate-500 mt-1">Choose which <b>20 dress</b> (NHL) vs the healthy scratches, and manage the farm. One-way contracts can&apos;t be sent down directly — put them on <b>Farm/Waivers</b> instead (a player over <b>${(WAIVER_CAP_HIT_LIMIT / 1e6).toFixed(1)}M</b> cap hit is too valuable to clear waivers, so that button is disabled for him), unless he still has a <b>🔓 Recall pass</b> from his last call-up — sent up from the AHL within the last 30 days/10 games, he goes back down freely; AHL-only / $100k minor-league deals can&apos;t be called up. <b>NHL Scratched</b> still count against the cap; <b>Farm Scratched</b> dress nowhere. A <b>$100k</b> minor-league player can be <b>Released</b> from Farm Scratched straight to the UFA market.</p>
       </div>

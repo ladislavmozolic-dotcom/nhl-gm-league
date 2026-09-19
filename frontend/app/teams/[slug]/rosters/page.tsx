@@ -9,16 +9,20 @@ import { livePlayerOverall } from "@/lib/player-overall";
 
 export const dynamic = "force-dynamic";
 
-export default async function RostersPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function RostersPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ from?: string }> }) {
   const { slug } = await params;
+  const { from } = await searchParams;
   const team = await prisma.team.findUnique({
     where: { slug },
-    include: { affiliateTeams: { select: { id: true, name: true } } },
+    include: { affiliateTeams: { select: { id: true, name: true, slug: true } } },
   });
   if (!team) notFound();
   if (!(await canManageTeam(team.id))) redirect(`/teams/${slug}/login`);
 
   const affiliate = team.affiliateTeams[0] ?? null;
+  // Reached here via the AHL affiliate's own "Roster Moves" link (which deep-links
+  // to this NHL-scoped page) — send "Lines"/"Back" to the farm side, not the NHL club.
+  const fromFarmSlug = from === "farm" && affiliate ? affiliate.slug : null;
   const orgTeamIds = [team.id, ...(affiliate ? [affiliate.id] : [])];
 
   const players = await prisma.player.findMany({
@@ -38,6 +42,7 @@ export default async function RostersPage({ params }: { params: Promise<{ slug: 
     <RosterMover
       teamName={team.name}
       teamSlug={slug}
+      fromFarmSlug={fromFarmSlug}
       affiliateName={affiliate?.name ?? "(no affiliate)"}
       hasAffiliate={!!affiliate}
       players={players.map((p) => {
