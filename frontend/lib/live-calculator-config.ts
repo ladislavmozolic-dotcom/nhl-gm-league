@@ -1,5 +1,14 @@
 import { prisma } from "./prisma";
 
+export type CustomMetricConfig = {
+  id: string;
+  metricKey: string;
+  label: string;
+  source: string;
+  weight: number;
+  invert: boolean;
+};
+
 export type LiveCalcWeights = {
   pa: { apg: number; a60All: number; a60_5v5: number };
   sc: { gpg: number; g60: number; xg60: number; g_xg60: number };
@@ -10,6 +19,7 @@ export type LiveCalcWeights = {
   sk: { edgeBursts20: number };
   st: { weightPct: number };
   ex: { careerRegGP: number; careerPoGP: number };
+  customMetrics?: Record<string, CustomMetricConfig[]>;
   ahl: {
     scEqGpg: number;
     scShots: number;
@@ -35,6 +45,7 @@ export const DEFAULT_LIVE_CALC_WEIGHTS: LiveCalcWeights = {
   sk: { edgeBursts20: 1.0 },
   st: { weightPct: 1.0 },
   ex: { careerRegGP: 0.70, careerPoGP: 0.30 },
+  customMetrics: {},
   ahl: {
     scEqGpg: 0.80,
     scShots: 0.10,

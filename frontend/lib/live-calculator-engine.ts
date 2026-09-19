@@ -1,5 +1,5 @@
 import { prisma } from "./prisma";
-import { getLiveCalculatorConfig, LiveCalcConfigData } from "./live-calculator-config";
+import { getLiveCalculatorConfig, LiveCalcConfigData, CustomMetricConfig } from "./live-calculator-config";
 import {
   getBaselinePlayer,
   lookupRatingFromPercentile,
@@ -7,6 +7,7 @@ import {
   ParamKey,
 } from "./live-calculator-baseline";
 import { percentileOf } from "./edge-params";
+import { METRIC_BY_KEY } from "./live-calculator-catalog";
 
 export const SKATER_PARAMS: ParamKey[] = [
   "ck", "fg", "di", "sk", "st",
@@ -374,6 +375,51 @@ export async function runLiveCalculatorRecompute(): Promise<{
     }
   }
 
+  // 2b. Collect custom metrics pools (for both F and D)
+  const allCustomMetrics: CustomMetricConfig[] = Object.values(config.weights.customMetrics ?? {}).flat();
+  const customPools: Record<"F" | "D", Record<string, number[]>> = { F: {}, D: {} };
+
+  for (const cm of allCustomMetrics) {
+    if (!customPools.F[cm.metricKey]) customPools.F[cm.metricKey] = [];
+    if (!customPools.D[cm.metricKey]) customPools.D[cm.metricKey] = [];
+  }
+
+  for (const e of enriched) {
+    for (const cm of allCustomMetrics) {
+      const metricDef = METRIC_BY_KEY[cm.metricKey];
+      if (metricDef) {
+        const val = metricDef.getValue(e.p, config);
+        if (val != null && !isNaN(val)) {
+          customPools[e.posGroup][cm.metricKey].push(val);
+        }
+      }
+    }
+  }
+
+  for (const g of ["F", "D"] as const) {
+    for (const arr of Object.values(customPools[g])) {
+      arr.sort((a, b) => a - b);
+    }
+  }
+
+  const evalCustom = (groupKey: string, posGroup: "F" | "D", pRow: any): { sum: number; weight: number } => {
+    const list = config.weights.customMetrics?.[groupKey] ?? [];
+    let sum = 0;
+    let weight = 0;
+    for (const cm of list) {
+      if (cm.weight <= 0) continue;
+      const def = METRIC_BY_KEY[cm.metricKey];
+      if (!def) continue;
+      const val = def.getValue(pRow, config);
+      const arr = customPools[posGroup][cm.metricKey] ?? [];
+      let pct = val != null && arr.length > 0 ? percentileOf(val, arr) : 0.5;
+      if (cm.invert) pct = 1 - pct;
+      sum += pct * cm.weight;
+      weight += cm.weight;
+    }
+    return { sum, weight };
+  };
+
   const w = config.weights;
   let nhlCount = 0;
   let ahlCount = 0;
@@ -402,28 +448,34 @@ export async function runLiveCalculatorRecompute(): Promise<{
     if (e.isNhl) {
       nhlCount++;
 
-      // PA (Passing): 45% A/GP + 30% A/60 all + 25% A/60 5v5
+      // PA (Passing): 45% A/GP + 30% A/60 all + 25% A/60 5v5 + custom
       if (e.apg != null && e.a60 != null) {
         const pctApg = percentileOf(e.apg, pool.apg);
         const pctA60 = percentileOf(e.a60, pool.a60);
         const pctA605v5 = e.a60_5v5 != null ? percentileOf(e.a60_5v5, pool.a60_5v5) : pctA60;
-        const compPA = w.pa.apg * pctApg + w.pa.a60All * pctA60 + w.pa.a60_5v5 * pctA605v5;
+        const stdPA = w.pa.apg * pctApg + w.pa.a60All * pctA60 + w.pa.a60_5v5 * pctA605v5;
+        const { sum: cSumPA, weight: cWeightPA } = evalCustom("pa", e.posGroup, e.p);
+        const totW_PA = (w.pa.apg + w.pa.a60All + w.pa.a60_5v5) + cWeightPA;
+        const compPA = totW_PA > 0 ? (stdPA + cSumPA) / totW_PA : 0.5;
         projected.pa = lookupRatingFromPercentile("PA", e.posGroup, compPA);
       }
 
-      // SC (Scoring): 45% G/GP + 25% G/60 + 20% xG/60 + 10% (G-xG)/60
+      // SC (Scoring): 45% G/GP + 25% G/60 + 20% xG/60 + 10% (G-xG)/60 + custom
       if (e.gpg != null && e.g60 != null) {
         const pctGpg = percentileOf(e.gpg, pool.gpg);
         const pctG60 = percentileOf(e.g60, pool.g60);
         const pctXg60 = e.xg60 != null ? percentileOf(e.xg60, pool.xg60) : pctG60;
         const pctGxg = e.g_xg60 != null ? percentileOf(e.g_xg60, pool.g_xg60) : 0.5;
-        const compSC = w.sc.gpg * pctGpg + w.sc.g60 * pctG60 + w.sc.xg60 * pctXg60 + w.sc.g_xg60 * pctGxg;
+        const stdSC = w.sc.gpg * pctGpg + w.sc.g60 * pctG60 + w.sc.xg60 * pctXg60 + w.sc.g_xg60 * pctGxg;
+        const { sum: cSumSC, weight: cWeightSC } = evalCustom("sc", e.posGroup, e.p);
+        const totW_SC = (w.sc.gpg + w.sc.g60 + w.sc.xg60 + w.sc.g_xg60) + cWeightSC;
+        const compSC = totW_SC > 0 ? (stdSC + cSumSC) / totW_SC : 0.5;
         projected.sc = lookupRatingFromPercentile("SC", e.posGroup, compSC);
       }
 
-      // DF (Defense): Position specific
+      // DF (Defense): Position specific + custom
       if (e.isD) {
-        // D: 25% PK TOI/GP + 15% inv xGA5 + 10% inv RelxGA5 + 20% inv GA5 + 10% inv RelxGA PK + 10% Blocks/60 + 10% xGF%
+        // D: 25% PK TOI/GP + 15% inv xGA5 + 10% inv RelxGA5 + 20% inv GA5 + 10% inv RelxGA PK + 10% Blocks/60 + 10% xGF% + custom
         const pctPk = e.pkToiPg != null ? percentileOf(e.pkToiPg, pool.pkToiPg) : 0.5;
         const pctXga5 = e.xga5 != null ? 1 - percentileOf(e.xga5, pool.xga5) : 0.5;
         const pctRelXga5 = e.relXga5 != null ? 1 - percentileOf(e.relXga5, pool.relXga5) : 0.5;
@@ -432,7 +484,7 @@ export async function runLiveCalculatorRecompute(): Promise<{
         const pctBlk = e.blk60 != null ? percentileOf(e.blk60, pool.blk60) : 0.5;
         const pctXgf = e.xgfPct != null ? percentileOf(e.xgfPct, pool.xgfPct) : 0.5;
 
-        const compDF =
+        const stdDF =
           w.dfD.pkToiPg * pctPk +
           w.dfD.xga5 * pctXga5 +
           w.dfD.relXga5 * pctRelXga5 +
@@ -440,9 +492,14 @@ export async function runLiveCalculatorRecompute(): Promise<{
           w.dfD.relXgaPk * pctRelXgaPk +
           w.dfD.blk60 * pctBlk +
           w.dfD.xgfPct * pctXgf;
+        const { sum: cSumDF, weight: cWeightDF } = evalCustom("dfD", "D", e.p);
+        const totW_DF =
+          (w.dfD.pkToiPg + w.dfD.xga5 + w.dfD.relXga5 + w.dfD.ga5 + w.dfD.relXgaPk + w.dfD.blk60 + w.dfD.xgfPct) +
+          cWeightDF;
+        const compDF = totW_DF > 0 ? (stdDF + cSumDF) / totW_DF : 0.5;
         projected.df = lookupRatingFromPercentile("DF", "D", compDF);
       } else {
-        // F: 30% PK TOI/GP + 15% inv RelxGA PK + 15% inv RelxGA5 + 15% inv xGA5 + 10% inv GA5 + 10% xGF% + 5% Blocks/60
+        // F: 30% PK TOI/GP + 15% inv RelxGA PK + 15% inv RelxGA5 + 15% inv xGA5 + 10% inv GA5 + 10% xGF% + 5% Blocks/60 + custom
         const pctPk = e.pkToiPg != null ? percentileOf(e.pkToiPg, pool.pkToiPg) : 0.5;
         const pctRelXgaPk = e.relXgaPk != null ? 1 - percentileOf(e.relXgaPk, pool.relXgaPk) : 0.5;
         const pctRelXga5 = e.relXga5 != null ? 1 - percentileOf(e.relXga5, pool.relXga5) : 0.5;
@@ -451,7 +508,7 @@ export async function runLiveCalculatorRecompute(): Promise<{
         const pctXgf = e.xgfPct != null ? percentileOf(e.xgfPct, pool.xgfPct) : 0.5;
         const pctBlk = e.blk60 != null ? percentileOf(e.blk60, pool.blk60) : 0.5;
 
-        const compDF =
+        const stdDF =
           w.dfF.pkToiPg * pctPk +
           w.dfF.relXgaPk * pctRelXgaPk +
           w.dfF.relXga5 * pctRelXga5 +
@@ -459,42 +516,65 @@ export async function runLiveCalculatorRecompute(): Promise<{
           w.dfF.ga5 * pctGa5 +
           w.dfF.xgfPct * pctXgf +
           w.dfF.blk60 * pctBlk;
+        const { sum: cSumDF, weight: cWeightDF } = evalCustom("dfF", "F", e.p);
+        const totW_DF =
+          (w.dfF.pkToiPg + w.dfF.relXgaPk + w.dfF.relXga5 + w.dfF.xga5 + w.dfF.ga5 + w.dfF.xgfPct + w.dfF.blk60) +
+          cWeightDF;
+        const compDF = totW_DF > 0 ? (stdDF + cSumDF) / totW_DF : 0.5;
         projected.df = lookupRatingFromPercentile("DF", "F", compDF);
       }
 
-      // CK (Checking): 60% Hits/60 + 40% Hits/GP
+      // CK (Checking): 60% Hits/60 + 40% Hits/GP + custom
       if (e.hit60 != null && e.hitPg != null) {
         const pctHit60 = percentileOf(e.hit60, pool.hit60);
         const pctHitPg = percentileOf(e.hitPg, pool.hitPg);
-        const compCK = w.ck.hit60 * pctHit60 + w.ck.hitPg * pctHitPg;
+        const stdCK = w.ck.hit60 * pctHit60 + w.ck.hitPg * pctHitPg;
+        const { sum: cSumCK, weight: cWeightCK } = evalCustom("ck", e.posGroup, e.p);
+        const totW_CK = (w.ck.hit60 + w.ck.hitPg) + cWeightCK;
+        const compCK = totW_CK > 0 ? (stdCK + cSumCK) / totW_CK : 0.5;
         projected.ck = lookupRatingFromPercentile("CK", e.posGroup, compCK);
       }
 
-      // DI (Discipline): 60% Penalty Balance/60 + 40% inv penalties/60
+      // DI (Discipline): 60% Penalty Balance/60 + 40% inv penalties/60 + custom
       if (e.pim60 != null) {
         const pctPim = 1 - percentileOf(e.pim60, pool.pim60);
         const pctBal = e.penBal60 != null ? percentileOf(e.penBal60, pool.penBal60) : pctPim;
-        const compDI = w.di.penaltyBalance * pctBal + w.di.invPim60 * pctPim;
+        const stdDI = w.di.penaltyBalance * pctBal + w.di.invPim60 * pctPim;
+        const { sum: cSumDI, weight: cWeightDI } = evalCustom("di", e.posGroup, e.p);
+        const totW_DI = (w.di.penaltyBalance + w.di.invPim60) + cWeightDI;
+        const compDI = totW_DI > 0 ? (stdDI + cSumDI) / totW_DI : 0.5;
         projected.di = lookupRatingFromPercentile("DI", e.posGroup, compDI);
       }
 
-      // SK (Skating): EDGE speed bursts >20mph
+      // SK (Skating): EDGE speed bursts >20mph + custom
       if (e.burst20 != null) {
         const pctBurst = percentileOf(e.burst20, pool.burst20);
-        projected.sk = lookupRatingFromPercentile("SK", e.posGroup, pctBurst);
+        const stdSK = w.sk.edgeBursts20 * pctBurst;
+        const { sum: cSumSK, weight: cWeightSK } = evalCustom("sk", e.posGroup, e.p);
+        const totW_SK = w.sk.edgeBursts20 + cWeightSK;
+        const compSK = totW_SK > 0 ? (stdSK + cSumSK) / totW_SK : 0.5;
+        projected.sk = lookupRatingFromPercentile("SK", e.posGroup, compSK);
       }
 
-      // ST (Strength): Weight
+      // ST (Strength): Weight + custom
       if (e.weight != null) {
         const pctWeight = percentileOf(e.weight, pool.weight);
-        projected.st = lookupRatingFromPercentile("ST", e.posGroup, pctWeight);
+        const stdST = w.st.weightPct * pctWeight;
+        const { sum: cSumST, weight: cWeightST } = evalCustom("st", e.posGroup, e.p);
+        const totW_ST = w.st.weightPct + cWeightST;
+        const compST = totW_ST > 0 ? (stdST + cSumST) / totW_ST : 0.5;
+        projected.st = lookupRatingFromPercentile("ST", e.posGroup, compST);
       }
 
-      // EX (Experience): Career GP
+      // EX (Experience): Career GP + custom
       if (e.careerRegGP != null) {
         const tot = e.careerRegGP * w.ex.careerRegGP + (e.careerPoGP ?? 0) * w.ex.careerPoGP;
         const pctEx = percentileOf(tot, pool.careerTotal);
-        projected.ex = lookupRatingFromPercentile("EX", e.posGroup, pctEx);
+        const stdEX = 1.0 * pctEx;
+        const { sum: cSumEX, weight: cWeightEX } = evalCustom("ex", e.posGroup, e.p);
+        const totW_EX = 1.0 + cWeightEX;
+        const compEX = totW_EX > 0 ? (stdEX + cSumEX) / totW_EX : 0.5;
+        projected.ex = lookupRatingFromPercentile("EX", e.posGroup, compEX);
       }
     } else {
       // AHL / FARM Skater
