@@ -21,7 +21,6 @@ const COLS: Col[] = [
   { key: "capHit", label: "Actual Cap Hit", money: true, title: "Total Salaries + Buyout Dead Cap + Retained Salary" },
   { key: "ltir", label: "LTIR Relief", money: true, title: "Cap relief pool from long-term injured players (CON < 90)" },
   { key: "capSpace", label: "Actual Cap Space", money: true, space: true, title: "Upper ceiling − Actual Cap Hit (can be negative)" },
-  { key: "projCapHit", label: "Upper Limit", money: true, title: "Max total cap hit you may carry for the rest of the season" },
   { key: "projCapSpace", label: "Projected Cap Space", money: true, space: true, title: "The biggest full-season cap hit you can still add and stay legal — unused cap banks each game, so it grows toward the deadline." },
 ];
 
@@ -71,7 +70,6 @@ export default function CapCentralTable({ rows }: { rows: CapRow[] }) {
               <td className={`px-3 py-2.5 text-right tabular-nums font-semibold ${t.capSpace < 0 ? "text-red-400" : ""}`}>{money(t.capHit)}</td>
               <td className="px-3 py-2.5 text-right tabular-nums text-sky-400 font-medium whitespace-nowrap">{t.ltir ? `+${money(t.ltir)}` : "—"}</td>
               <td className={`px-3 py-2.5 text-right tabular-nums ${t.capSpace < 0 ? ((t.ltir ?? 0) >= -t.capSpace ? "text-sky-300 font-medium" : "text-red-400") : "text-green-400"}`}>{money(t.capSpace)}</td>
-              <td className="px-3 py-2.5 text-right tabular-nums text-slate-300">{money(t.projCapHit)}</td>
               <td className={`px-3 py-2.5 text-right tabular-nums font-bold ${t.projCapSpace < 0 ? "text-red-400" : "text-emerald-400"}`}>{money(t.projCapSpace)}</td>
               <td className="px-3 py-2.5 text-right whitespace-nowrap">
                 {t.capSpace < 0 ? (
