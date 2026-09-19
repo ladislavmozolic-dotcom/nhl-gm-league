@@ -22,8 +22,29 @@ export default function PullToRefresh() {
     setStandalone(isStandalone);
     if (!isStandalone) return;
 
+    // Returns true when the touch originates inside a scrollable overflow
+    // container (e.g. the mobile menu drawer).  In that case pull-to-refresh
+    // must be suppressed — window.scrollY stays 0 while the inner div scrolls,
+    // so without this guard the gesture was treated as a page pull and
+    // window.location.reload() fired once the 70 px threshold was crossed.
+    const isInsideScrollable = (target: EventTarget | null): boolean => {
+      let el = target as HTMLElement | null;
+      while (el && el !== document.body && el !== document.documentElement) {
+        const style = window.getComputedStyle(el);
+        const oy = style.overflowY;
+        if ((oy === "auto" || oy === "scroll") && el.scrollHeight > el.clientHeight) {
+          return true;
+        }
+        el = el.parentElement;
+      }
+      return false;
+    };
     const onTouchStart = (e: TouchEvent) => {
-      startY.current = window.scrollY === 0 ? e.touches[0].clientY : null;
+      if (window.scrollY !== 0 || isInsideScrollable(e.target)) {
+        startY.current = null;
+        return;
+      }
+      startY.current = e.touches[0].clientY;
     };
     const onTouchMove = (e: TouchEvent) => {
       if (startY.current == null || window.scrollY > 0) return;

@@ -615,9 +615,12 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
             {goalie?.photoUrl && <img src={goalie.photoUrl} alt="" className="lines-goalie-face" onError={(event) => { event.currentTarget.style.display = "none"; }} />}
             <JerseyChip teamSlug={jerseyTeamSlug} number={goalie?.number} lastName={lastName} size={184} />
           </div>
-          <span className="lines-goalie-role">{role}</span>
-          <span className="lines-goalie-swap">↻ Change goalie</span>
-          <Select value={value} onChange={onChange} pool={pool} overlay />
+          {starter && (
+            <>
+              <span className="lines-goalie-swap">↻ Change goalie</span>
+              <Select value={value} onChange={onChange} pool={pool} overlay />
+            </>
+          )}
         </div>
         <div className="lines-goalie-details">
           <p className="lines-kicker">{starter ? "Starting goalie" : "Backup goalie"}</p>
@@ -628,11 +631,13 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
               <span className={(goalie.con ?? 100) < 90 ? "is-warning" : ""}><strong>{goalie.con ?? 100}%</strong> Condition</span>
               <span><strong>#{goalie.number ?? "—"}</strong> Jersey</span>
             </div>
-          ) : <p className="text-xs text-slate-500">Choose a goalie for this role.</p>}
-          <label className="lines-goalie-picker">
-            <span>{starter ? "Choose starter" : "Choose backup"}</span>
-            <Select value={value} onChange={onChange} pool={pool} />
-          </label>
+          ) : <p className="text-xs text-slate-500">{starter ? "Choose a goalie for this role." : "Automatically set when you change the starter."}</p>}
+          {starter && (
+            <label className="lines-goalie-picker">
+              <span>Choose starter</span>
+              <Select value={value} onChange={onChange} pool={pool} />
+            </label>
+          )}
         </div>
       </article>
     );

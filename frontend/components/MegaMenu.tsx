@@ -176,6 +176,7 @@ export default function MegaMenu({ gm, items, lang = "en", light = false, hideFo
   };
 
   return (
+    <>
     <nav
       className={`sticky top-0 z-50 border-b ${navBorder} transition-all duration-300 ${
         scrolled
@@ -437,76 +438,85 @@ export default function MegaMenu({ gm, items, lang = "en", light = false, hideFo
             )}
           </div>
         </div>
-
-        {/* Mobile drawer — tap-to-expand accordion (hover has no touch equivalent) */}
-        {mobileOpen && (
-          <div className={`md:hidden border-t ${navBorder} -mx-4 px-0 max-h-[calc(100vh-3.5rem)] overflow-y-auto ${mobileBg}`}>
-            {menuItems.map((item) => (
-              <MobileNode key={item.key} node={item} path={item.key} depth={0} />
-            ))}
-
-            <div className={`border-t ${dividerLine} my-1`} />
-            {!hideForum && (
-              <Link href="/forum" onClick={closeMobile} className={`flex items-center gap-1.5 py-2.5 px-3 text-[14px] ${mobileText}`}>
-                🗣️ Forum
-                {(gm?.forumNew ?? 0) > 0 && <span className="min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm!.forumNew}</span>}
-              </Link>
-            )}
-            {gm && (
-              <Link href="/messages" onClick={closeMobile} className={`flex items-center gap-1.5 py-2.5 px-3 text-[14px] ${mobileText}`}>
-                💬 Messages
-                {(gm.unreadDm ?? 0) > 0 && <span className="min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm.unreadDm}</span>}
-              </Link>
-            )}
-            <InstallAppButton lang={lang} className={`w-full flex items-center gap-1.5 py-2.5 px-3 text-[14px] text-left ${mobileText}`} />
-
-            <div className={`border-t ${dividerLine} my-1`} />
-            {gm ? (
-              <>
-                <div className={`px-3 py-2 flex items-center gap-2 ${mobileGmMuted}`}>
-                  <span className="w-7 h-7 rounded-full bg-blue-600 grid place-items-center text-[12px] font-black text-white shrink-0">{gm.nickname[0]?.toUpperCase()}</span>
-                  <span className="text-[14px] font-semibold">{gm.nickname}</span>
-                </div>
-                <Link href={`/teams/${gm.slug}`} onClick={closeMobile} className={`block py-2 px-3 pl-11 text-[13px] ${mobileGmMuted}`}>{tr("ui.myTeam")}</Link>
-                <Link href={`/teams/${gm.slug}/profile`} onClick={closeMobile} className={`block py-2 px-3 pl-11 text-[13px] ${mobileGmMuted}`}>{tr("ui.profile")}</Link>
-                <Link href={`/teams/${gm.slug}/lines`} onClick={closeMobile} className={`block py-2 px-3 pl-11 text-[13px] ${mobileGmMuted}`}>{tr("ui.linesTactics")}</Link>
-                {gm.admin && (
-                  <MobileNode
-                    path="__admin"
-                    depth={0}
-                    node={{
-                      label: `⚙️ ${tr("ui.admin")}${(gm.pendingJoins ?? 0) > 0 ? ` (${gm.pendingJoins})` : ""}`,
-                      href: "#",
-                      children: [
-                        { label: tr("ui.adminPanel"), href: "/admin" },
-                        { label: "Žiadosti o vstup", href: "/admin/join-requests" },
-                        { label: "League Calendar", href: "/calendar" },
-                        { label: "ELC Rookies", href: "/admin/elc" },
-                        { label: "Roster Update", href: "/admin/roster-update" },
-                        { label: "Season Control", href: "/admin/season" },
-                        { label: "Latest Signings", href: "/admin/signings" },
-                        { label: "Simulation Engine", href: "/admin/simulation" },
-                        { label: "Team Lines & Tactics", href: "/admin/team-lines" },
-                      ],
-                    }}
-                  />
-                )}
-                <div className={`border-t ${dividerLine} my-1`} />
-                <Link href="/login" onClick={closeMobile} className={`block py-2.5 px-3 text-[13px] ${mobileGmMuted}`}>{tr("ui.switchTeam")}</Link>
-                <Link href={`/teams/${gm.slug}/logout`} onClick={() => { closeMobile(); clearRememberToken(); }} className="block py-2.5 px-3 text-[13px] text-red-400">{tr("ui.logout")}</Link>
-              </>
-            ) : (
-              <Link href="/login" onClick={closeMobile} className={`block py-2.5 px-3 text-[14px] font-semibold ${mobileGmSwitch}`}>{tr("ui.gmLogin")}</Link>
-            )}
-
-            <div className={`border-t ${dividerLine} my-1`} />
-            <div className="px-3 py-2.5 flex items-center justify-between gap-2">
-              <span className={`text-sm ${mobileGmMuted}`}>{tr("ui.language")}</span>
-              <LangSwitcher lang={lang} />
-            </div>
-          </div>
-        )}
       </div>
     </nav>
+
+    {/* Mobile drawer — rendered OUTSIDE the sticky <nav> so that iOS Safari's
+        known bug (overflow-y:auto inside sticky parents doesn't scroll) is avoided.
+        Position: fixed, sitting flush below the 3.5rem (56px) nav bar.
+        Using 100dvh (dynamic viewport height) so the iOS bottom toolbar is
+        accounted for; overscroll-behavior:contain stops any residual touch
+        leakage from reaching the page behind the drawer. */}
+    {mobileOpen && (
+      <div
+        className={`md:hidden fixed inset-x-0 top-14 bottom-0 z-40 overflow-y-auto overscroll-contain border-t ${navBorder} ${mobileBg}`}
+        style={{ WebkitOverflowScrolling: "touch" }}
+      >
+        {menuItems.map((item) => (
+          <MobileNode key={item.key} node={item} path={item.key} depth={0} />
+        ))}
+
+        <div className={`border-t ${dividerLine} my-1`} />
+        {!hideForum && (
+          <Link href="/forum" onClick={closeMobile} className={`flex items-center gap-1.5 py-2.5 px-3 text-[14px] ${mobileText}`}>
+            🗣️ Forum
+            {(gm?.forumNew ?? 0) > 0 && <span className="min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm!.forumNew}</span>}
+          </Link>
+        )}
+        {gm && (
+          <Link href="/messages" onClick={closeMobile} className={`flex items-center gap-1.5 py-2.5 px-3 text-[14px] ${mobileText}`}>
+            💬 Messages
+            {(gm.unreadDm ?? 0) > 0 && <span className="min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm.unreadDm}</span>}
+          </Link>
+        )}
+        <InstallAppButton lang={lang} className={`w-full flex items-center gap-1.5 py-2.5 px-3 text-[14px] text-left ${mobileText}`} />
+
+        <div className={`border-t ${dividerLine} my-1`} />
+        {gm ? (
+          <>
+            <div className={`px-3 py-2 flex items-center gap-2 ${mobileGmMuted}`}>
+              <span className="w-7 h-7 rounded-full bg-blue-600 grid place-items-center text-[12px] font-black text-white shrink-0">{gm.nickname[0]?.toUpperCase()}</span>
+              <span className="text-[14px] font-semibold">{gm.nickname}</span>
+            </div>
+            <Link href={`/teams/${gm.slug}`} onClick={closeMobile} className={`block py-2 px-3 pl-11 text-[13px] ${mobileGmMuted}`}>{tr("ui.myTeam")}</Link>
+            <Link href={`/teams/${gm.slug}/profile`} onClick={closeMobile} className={`block py-2 px-3 pl-11 text-[13px] ${mobileGmMuted}`}>{tr("ui.profile")}</Link>
+            <Link href={`/teams/${gm.slug}/lines`} onClick={closeMobile} className={`block py-2 px-3 pl-11 text-[13px] ${mobileGmMuted}`}>{tr("ui.linesTactics")}</Link>
+            {gm.admin && (
+              <MobileNode
+                path="__admin"
+                depth={0}
+                node={{
+                  label: `⚙️ ${tr("ui.admin")}${(gm.pendingJoins ?? 0) > 0 ? ` (${gm.pendingJoins})` : ""}`,
+                  href: "#",
+                  children: [
+                    { label: tr("ui.adminPanel"), href: "/admin" },
+                    { label: "Žiadosti o vstup", href: "/admin/join-requests" },
+                    { label: "League Calendar", href: "/calendar" },
+                    { label: "ELC Rookies", href: "/admin/elc" },
+                    { label: "Roster Update", href: "/admin/roster-update" },
+                    { label: "Season Control", href: "/admin/season" },
+                    { label: "Latest Signings", href: "/admin/signings" },
+                    { label: "Simulation Engine", href: "/admin/simulation" },
+                    { label: "Team Lines & Tactics", href: "/admin/team-lines" },
+                  ],
+                }}
+              />
+            )}
+            <div className={`border-t ${dividerLine} my-1`} />
+            <Link href="/login" onClick={closeMobile} className={`block py-2.5 px-3 text-[13px] ${mobileGmMuted}`}>{tr("ui.switchTeam")}</Link>
+            <Link href={`/teams/${gm.slug}/logout`} onClick={() => { closeMobile(); clearRememberToken(); }} className="block py-2.5 px-3 text-[13px] text-red-400">{tr("ui.logout")}</Link>
+          </>
+        ) : (
+          <Link href="/login" onClick={closeMobile} className={`block py-2.5 px-3 text-[14px] font-semibold ${mobileGmSwitch}`}>{tr("ui.gmLogin")}</Link>
+        )}
+
+        <div className={`border-t ${dividerLine} my-1`} />
+        <div className="px-3 py-2.5 flex items-center justify-between gap-2">
+          <span className={`text-sm ${mobileGmMuted}`}>{tr("ui.language")}</span>
+          <LangSwitcher lang={lang} />
+        </div>
+      </div>
+    )}
+    </>
   );
 }
