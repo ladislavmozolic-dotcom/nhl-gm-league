@@ -178,7 +178,15 @@ export default function MegaMenu({ gm, items, lang = "en", light = false, hideFo
   return (
     <>
     <nav
-      className={`sticky top-0 z-50 border-b ${navBorder} transition-all duration-300 ${
+      // Normally "sticky" — in-flow until scrolled past, then pinned. But when
+      // the mobile drawer opens near the top of a page with hero content above
+      // the nav (e.g. the home page's logo/banner), the nav hasn't started
+      // sticking yet and still sits at its natural in-flow position further
+      // down the page — where, being z-50 (above the drawer's z-40), it punches
+      // through the drawer's overlay mid-list instead of showing at the top.
+      // Forcing it to `fixed` while the drawer is open guarantees it renders at
+      // the true viewport top, flush with the drawer's own top-14 offset.
+      className={`${mobileOpen ? "fixed inset-x-0" : "sticky"} top-0 z-50 border-b ${navBorder} transition-all duration-300 ${
         scrolled
           ? `${navSurface} backdrop-blur-xl ${navShadow}`
           : `${navSurfaceIdle} backdrop-blur-md`
