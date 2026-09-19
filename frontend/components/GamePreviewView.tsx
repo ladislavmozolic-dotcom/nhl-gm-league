@@ -371,7 +371,7 @@ export default function GamePreviewView({ data }: { data: MatchPreviewData }) {
                 <div className="flex items-center gap-2">
                   {data.awayTeam.logoUrl && <img src={data.awayTeam.logoUrl} alt="" className="w-5 h-5 object-contain" />}
                   <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wide text-slate-200">
-                    {data.awayTeam.code} Key Skaters &amp; Scorers
+                    {data.awayTeam.code}{" "}Key Skaters &amp; Scorers
                   </h3>
                 </div>
                 <span className="text-[11px] font-semibold text-slate-400">
@@ -450,7 +450,7 @@ export default function GamePreviewView({ data }: { data: MatchPreviewData }) {
                 <div className="flex items-center gap-2">
                   {data.homeTeam.logoUrl && <img src={data.homeTeam.logoUrl} alt="" className="w-5 h-5 object-contain" />}
                   <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wide text-slate-200">
-                    {data.homeTeam.code} Key Skaters &amp; Scorers
+                    {data.homeTeam.code}{" "}Key Skaters &amp; Scorers
                   </h3>
                 </div>
                 <span className="text-[11px] font-semibold text-slate-400">
