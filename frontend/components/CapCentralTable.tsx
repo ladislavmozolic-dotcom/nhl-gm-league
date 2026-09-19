@@ -21,7 +21,7 @@ const COLS: Col[] = [
   { key: "capHit", label: "Actual Cap Hit", money: true, title: "Total Salaries + Buyout Dead Cap + Retained Salary" },
   { key: "ltir", label: "LTIR Relief", money: true, title: "Cap relief pool from long-term injured players (CON < 90)" },
   { key: "capSpace", label: "Actual Cap Space", money: true, space: true, title: "Upper ceiling − Actual Cap Hit (can be negative)" },
-  { key: "projCapHit", label: "Projected Cap Hit", money: true, title: "Max total cap hit you may carry for the rest of the season" },
+  { key: "projCapHit", label: "Upper Limit", money: true, title: "Max total cap hit you may carry for the rest of the season" },
   { key: "projCapSpace", label: "Projected Cap Space", money: true, space: true, title: "The biggest full-season cap hit you can still add and stay legal — unused cap banks each game, so it grows toward the deadline." },
 ];
 
@@ -36,11 +36,19 @@ export default function CapCentralTable({ rows }: { rows: CapRow[] }) {
   const arrow = (key: keyof CapRow) => (sort.key === key ? (sort.dir === -1 ? " ▾" : " ▴") : "");
 
   return (
-    <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-x-auto">
+    <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
+      {/* A horizontally-scrolling ancestor (overflow-x-auto) forces overflow-y to
+          compute "auto" too on that SAME element by CSS spec, which breaks
+          position:sticky against the page — so this div is its own bounded
+          scroll panel (max-height + a real overflow-y-auto) instead, and the
+          thead sticks to ITS top. The Team column is likewise frozen (sticky
+          left-0) with a fixed min-width so it never squeezes down to a
+          3-line-tall team name while the rest of the row scrolls under it. */}
+      <div className="overflow-auto max-h-[640px]">
       <table className="w-full text-sm min-w-[1000px]">
         <thead>
-          <tr className="text-xs text-slate-500 border-b border-slate-800 bg-slate-800/40">
-            <th onClick={() => click("name")} className="text-left px-4 py-2.5 cursor-pointer hover:text-slate-200 select-none">Team{arrow("name")}</th>
+          <tr className="text-xs text-slate-500 border-b border-slate-800 bg-slate-800 sticky top-0 z-20">
+            <th onClick={() => click("name")} className="text-left px-4 py-2.5 cursor-pointer hover:text-slate-200 select-none sticky left-0 z-30 bg-slate-800 min-w-[190px]">Team{arrow("name")}</th>
             {COLS.map((c) => (
               <th key={c.key} onClick={() => click(c.key)} title={c.title} className="text-right px-3 py-2.5 cursor-pointer hover:text-slate-200 select-none whitespace-nowrap">{c.label}{arrow(c.key)}</th>
             ))}
@@ -50,9 +58,9 @@ export default function CapCentralTable({ rows }: { rows: CapRow[] }) {
         <tbody>
           {sorted.map((t) => (
             <tr key={t.id} className="border-b border-slate-800/60 hover:bg-slate-800/30">
-              <td className="px-4 py-2.5">
-                <Link href={`/finance/${t.slug}`} className="flex items-center gap-2 hover:text-blue-400">
-                  {t.logoUrl && <img src={t.logoUrl} alt="" className="w-6 h-6 object-contain" />}
+              <td className="px-4 py-2.5 sticky left-0 z-10 bg-slate-900 min-w-[190px]">
+                <Link href={`/finance/${t.slug}`} className="flex items-center gap-2 hover:text-blue-400 whitespace-nowrap">
+                  {t.logoUrl && <img src={t.logoUrl} alt="" className="w-6 h-6 object-contain shrink-0" />}
                   <span className="font-medium">{t.name}</span>
                 </Link>
               </td>
@@ -84,6 +92,7 @@ export default function CapCentralTable({ rows }: { rows: CapRow[] }) {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
