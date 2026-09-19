@@ -832,6 +832,9 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
       ...a, teamCode: a.teamId === game.homeTeamId ? game.homeTeam.code : game.awayTeam.code,
       shooterSlug: slugById.get(a.shooterId) ?? null,
     })),
+    attendance: game.attendance,
+    arena: game.homeTeam.arena,
+    gameDate: game.gameDate,
   };
 
   return (

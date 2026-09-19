@@ -48,6 +48,7 @@ type Data = {
   goals: GoalE[]; penalties: PenE[]; playByPlay: PbpE[]; shootout?: ShootoutE[];
   injuries?: InjuryRow[]; homeSystem?: SystemDials; awaySystem?: SystemDials;
   story?: { report: GameReport; flow: GameFlow } | null;
+  attendance?: number | null; arena?: string | null; gameDate?: string | Date | null;
 };
 
 function ShootoutView({ data }: { data: Data }) {
@@ -689,6 +690,13 @@ export default function GameView({ data }: { data: Data }) {
             <div className="text-2xl font-black tabular-nums shrink-0">{data.home.goals}</div>
           </div>
         </div>
+
+        {(data.arena || data.attendance != null) && (
+          <div className="text-center text-xs text-slate-400 mt-3 pt-3 border-t border-slate-800/60 flex items-center justify-center flex-wrap gap-x-3 gap-y-1">
+            {data.arena && <span>🏟️ {data.arena}</span>}
+            {data.attendance != null && <span>👥 {data.attendance.toLocaleString()} fans</span>}
+          </div>
+        )}
       </div>
 
       {/* tab bar */}

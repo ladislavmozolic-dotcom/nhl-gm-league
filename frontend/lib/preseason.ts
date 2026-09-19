@@ -16,6 +16,7 @@ import { recordSimAudit } from "./audit-server";
 import type { SimTeam } from "./sim/types";
 import type { TeamLinesData } from "./sim/lines-core";
 import { PRE_SEASON, REGULAR_SEASON } from "./phase";
+import { getArenaSections, attendanceRate, priceAttendanceFactor } from "./finance";
 
 export { PRE_SEASON };
 export const PRE_ROUNDS = 6;
@@ -203,6 +204,38 @@ async function simPreseason(where: object, actor: string): Promise<{ played: num
     } catch { cache.set(id, null); return null; }
   };
 
+  const finTeams = await prisma.team.findMany({
+    where: { league: "NHL" },
+    select: { id: true, popularity: true, capacity: true, arenaSections: true },
+  });
+  const finBy = new Map(
+    finTeams.map((t) => {
+      const secs = getArenaSections(t);
+      return [
+        t.id,
+        {
+          pop: t.popularity ?? 100,
+          capacity: secs.reduce((a, x) => a + x.capacity, 0),
+          pf: priceAttendanceFactor(secs),
+        },
+      ];
+    })
+  );
+  const storePreseasonAttendance = async (gm: { id: number; homeTeamId: number; awayTeamId: number; league: string | null }) => {
+    if (gm.league === "AHL") return;
+    const fin = finBy.get(gm.homeTeamId);
+    if (!fin || fin.capacity <= 0) return;
+    // Pre-season attendance: standard baseline ~60-95% capacity without ticket pricing revenue impact
+    const base = attendanceRate(fin.pop, 0.5) * fin.pf * 0.90;
+    const jitter = (((gm.id * 2654435761) >>> 0) % 1000) / 1000;
+    const frac = Math.max(0.40, Math.min(0.98, base * (1 + (jitter - 0.5) * 0.12)));
+    const crowd = Math.round(fin.capacity * frac);
+    await prisma.game.update({
+      where: { id: gm.id },
+      data: { attendance: crowd, gate: 0 },
+    });
+  };
+
   let played = 0;
   const playedIds: number[] = [];
   let previousRound: number | null = null;
@@ -238,6 +271,7 @@ async function simPreseason(where: object, actor: string): Promise<{ played: num
       gameId: gm.id, season: PRE_SEASON, gameDate: gm.gameDate ?? preseasonDate(gm.round ?? 0), round: gm.round ?? 0,
       homeLines: home.linesUsed, awayLines: away.linesUsed,
     });
+    await storePreseasonAttendance(gm);
     await persistPreseasonPlayerState(result, home, away);
     for (const injury of result.injuries) cache.delete(injury.teamId);
     played++;
@@ -245,6 +279,46 @@ async function simPreseason(where: object, actor: string): Promise<{ played: num
   }
   await recordSimAudit(playedIds, actor);
   return { played };
+}
+
+export async function backfillPreseasonAttendance(): Promise<number> {
+  const games = await prisma.game.findMany({
+    where: { season: PRE_SEASON, status: "FINAL", league: "NHL", attendance: null },
+    select: { id: true, homeTeamId: true, awayTeamId: true, league: true },
+  });
+  if (!games.length) return 0;
+  const finTeams = await prisma.team.findMany({
+    where: { league: "NHL" },
+    select: { id: true, popularity: true, capacity: true, arenaSections: true },
+  });
+  const finBy = new Map(
+    finTeams.map((t) => {
+      const secs = getArenaSections(t);
+      return [
+        t.id,
+        {
+          pop: t.popularity ?? 100,
+          capacity: secs.reduce((a, x) => a + x.capacity, 0),
+          pf: priceAttendanceFactor(secs),
+        },
+      ];
+    })
+  );
+  let updated = 0;
+  for (const gm of games) {
+    const fin = finBy.get(gm.homeTeamId);
+    if (!fin || fin.capacity <= 0) continue;
+    const base = attendanceRate(fin.pop, 0.5) * fin.pf * 0.90;
+    const jitter = (((gm.id * 2654435761) >>> 0) % 1000) / 1000;
+    const frac = Math.max(0.40, Math.min(0.98, base * (1 + (jitter - 0.5) * 0.12)));
+    const crowd = Math.round(fin.capacity * frac);
+    await prisma.game.update({
+      where: { id: gm.id },
+      data: { attendance: crowd, gate: 0 },
+    });
+    updated++;
+  }
+  return updated;
 }
 
 export type PreGameRow = {

@@ -108,18 +108,26 @@ async function teamSwings(teamId: number, isHome: boolean, game: {
   return swings.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
 }
 
-async function goalieSwings(gameId: number, season: string, league: string, round: number | null, gameDate: Date | null): Promise<GoalieGameSwing[]> {
+async function goalieSwings(game: { id: number; season: string; league: string; round: number | null; gameDate: Date | null; homeTeamId: number; awayTeamId: number }): Promise<GoalieGameSwing[]> {
   const stats = await prisma.goalieGameStat.findMany({
-    where: { gameId, shotsAgainst: { gt: 0 } },
-    select: { playerId: true, saves: true, shotsAgainst: true, goalsAgainst: true, xga: true, player: { select: { name: true } } },
+    where: { gameId: game.id, shotsAgainst: { gt: 0 } },
+    select: { playerId: true, teamId: true, started: true, saves: true, shotsAgainst: true, goalsAgainst: true, xga: true, player: { select: { name: true } } },
   });
   if (!stats.length) return [];
 
-  const priorWhere = gameDate
-    ? { status: "FINAL" as const, seriesId: null, season, league, gameDate: { lt: gameDate } }
-    : round != null
-    ? { status: "FINAL" as const, seriesId: null, season, league, round: { lt: round } }
-    : { status: "FINAL" as const, seriesId: null, season, league, id: { lt: gameId } };
+  // Sort: Away team goalies first, Home team goalies second; within team, starter first
+  stats.sort((a, b) => {
+    const aTeamOrder = a.teamId === game.awayTeamId ? 0 : 1;
+    const bTeamOrder = b.teamId === game.awayTeamId ? 0 : 1;
+    if (aTeamOrder !== bTeamOrder) return aTeamOrder - bTeamOrder;
+    return (b.started ? 1 : 0) - (a.started ? 1 : 0);
+  });
+
+  const priorWhere = game.gameDate
+    ? { status: "FINAL" as const, seriesId: null, season: game.season, league: game.league, gameDate: { lt: game.gameDate } }
+    : game.round != null
+    ? { status: "FINAL" as const, seriesId: null, season: game.season, league: game.league, round: { lt: game.round } }
+    : { status: "FINAL" as const, seriesId: null, season: game.season, league: game.league, id: { lt: game.id } };
 
   const out: GoalieGameSwing[] = [];
   for (const s of stats) {
@@ -170,7 +178,7 @@ export async function postGameIntel(gameId: number): Promise<PostGameIntelResult
   const [homeSw, awaySw, goalies] = await Promise.all([
     teamSwings(game.homeTeamId, true, game),
     teamSwings(game.awayTeamId, false, game),
-    goalieSwings(game.id, game.season, game.league, game.round, game.gameDate),
+    goalieSwings(game),
   ]);
 
   return {

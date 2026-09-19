@@ -52,8 +52,8 @@ export default async function PostGameIntelCard({ gameId }: { gameId: number }) 
         <div>
           <div className="text-xs text-slate-400 mb-2">Tímové čísla tohto zápasu oproti vlastnému sezónnemu priemeru — najväčšie výkyvy hore.</div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <TeamSwings team={intel.home} />
             <TeamSwings team={intel.away} />
+            <TeamSwings team={intel.home} />
           </div>
         </div>
       )}
