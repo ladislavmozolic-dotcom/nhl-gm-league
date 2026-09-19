@@ -202,7 +202,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   rivalryEnabled: true, rivalryFightMult: 1.8, rivalryPenaltyMult: 1.5,
   scrumChance: 0.25, brawlChance: 0.02, abuseOfficialChance: 0.06, coachFinePimThreshold: 24, coachFineAmount: 100000,
   fightsEnabled: true, penaltiesEnabled: true, playByPlayEnabled: true,
-  injuriesEnabled: true, injuryChancePct: 20,
+  injuriesEnabled: true, injuryChancePct: 8,
   starExponent: 2.1,
   winPts: 2, otWinPts: 2, otLossPts: 1, lossPts: 0,
   playoffFormat: "division", playoffTeamsPerConf: 8, playoffBestOf: 7,
