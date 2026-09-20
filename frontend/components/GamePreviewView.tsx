@@ -4,6 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { cleanName } from "@/lib/playerName";
 import PlayerAvatar from "@/components/playerAvatar";
+import { useLang } from "@/components/LangProvider";
+import { presetLabel } from "@/lib/tactics-i18n";
 
 export type MatchPreviewData = {
   gameId: number;
@@ -66,6 +68,7 @@ export type MatchPreviewData = {
 
 export default function GamePreviewView({ data }: { data: MatchPreviewData }) {
   const [tab, setTab] = useState<"overview" | "lines" | "comparison">("overview");
+  const lang = useLang();
 
   const isUserHome = data.userTeamId === data.homeTeam.id;
   const isUserAway = data.userTeamId === data.awayTeam.id;
@@ -789,7 +792,7 @@ export default function GamePreviewView({ data }: { data: MatchPreviewData }) {
                     <span className="text-xs font-bold text-slate-200">{data.awayTeam.name}</span>
                   </div>
                   <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800/50">
-                    {data.tactics.away.preset ?? "Custom"}
+                    {data.tactics.away.preset ? presetLabel(lang, data.tactics.away.preset) : (lang === "cs" ? "Vlastný" : "Custom")}
                   </span>
                 </div>
 
@@ -834,7 +837,7 @@ export default function GamePreviewView({ data }: { data: MatchPreviewData }) {
                     <span className="text-xs font-bold text-slate-200">{data.homeTeam.name}</span>
                   </div>
                   <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800/50">
-                    {data.tactics.home.preset ?? "Custom"}
+                    {data.tactics.home.preset ? presetLabel(lang, data.tactics.home.preset) : (lang === "cs" ? "Vlastný" : "Custom")}
                   </span>
                 </div>
 

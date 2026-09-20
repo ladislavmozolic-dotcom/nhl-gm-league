@@ -11,6 +11,7 @@ import {
   DEFAULT_PROJECTED_CAPS, buyoutTerms,
 } from "@/lib/finance";
 import { getLeagueClock, regularSeasonDayProgress } from "@/lib/calendar-server";
+import { teamDashboard } from "@/lib/detailed-finance-server";
 import { getTeamSession } from "@/lib/auth";
 import { teamRetentionStatus } from "@/lib/cap";
 import { ROSTER_LIMITS } from "@/lib/roster-rules";
@@ -65,6 +66,13 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   // Farm (AHL) contracts worth budgeting for drain the bank like NHL salaries do,
   // but never touch the NHL cap — kept entirely out of every cap figure below.
   const farmExpense = farmSalaryExpense(farm);
+  // League-wide Detailed Finance (fan interest → demand → revenue) replaces the
+  // base ticket-only model below once the commish turns it on — it's a full-
+  // season revenue/expense model (no "games played so far" split), so it doesn't
+  // map onto the base model's Actual/Projected rows; see the income/expenses
+  // cards further down for how each mode renders.
+  const detailedMode = settings.financeMode === "detailed";
+  const dash = detailedMode ? await teamDashboard(team.id) : null;
   const fin = computeTeamFinance({
     popularity: team.popularity, pointsPct: projectedPointsPct(st),
     selloutRevenue: selloutRevenue(getArenaSections(team)),
@@ -242,7 +250,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
         {team.logoUrl && <img src={team.logoUrl} alt="" className="w-16 h-16 object-contain" />}
         <div className="flex-1 min-w-[180px]">
           <h1 className="text-2xl font-bold">{team.name}</h1>
-          <p className="text-sm text-slate-500">{team.arena} · popularity {team.popularity} · attendance {(fin.attendance * 100).toFixed(0)}%</p>
+          <p className="text-sm text-slate-500">{team.arena} · popularity {team.popularity} · attendance {((dash?.attendancePct ?? fin.attendance) * 100).toFixed(0)}%</p>
           {isGm && <Link href={`/teams/${slug}/finance`} className="text-xs text-blue-400 hover:underline">Ticket prices →</Link>}
         </div>
         <div className="text-sm grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1.5 tabular-nums w-full lg:w-auto">
@@ -281,23 +289,47 @@ export default async function TeamCapView({ slug }: { slug: string }) {
         </div>
       </div>
 
-      {/* income / expenses */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 overflow-hidden">
-          <div className="px-4 py-2.5 bg-slate-800/30 border-b border-slate-800 text-xs font-bold uppercase tracking-wide text-slate-400">Income (tickets)</div>
-          <FRow k="Actual" v={money(fin.actualIncome)} /><FRow k="Projected" v={money(fin.projectedIncome)} cls="text-slate-400" />
+      {/* income / expenses — Detailed Finance (fan interest → demand → revenue) once the
+          commish turns it on, otherwise the base ticket-only model. Detailed is a full-season
+          revenue model (season tickets, gate, merch, sponsorship, league revenue sharing), so
+          it doesn't have the base model's "games played so far" Actual row — it shows the
+          season projection plus a link to the full breakdown instead. */}
+      {dash ? (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 overflow-hidden">
+            <div className="px-4 py-2.5 bg-slate-800/30 border-b border-slate-800 text-xs font-bold uppercase tracking-wide text-slate-400">Revenue (Detailed Finance)</div>
+            <FRow k="Projected (season)" v={money(dash.revenue)} title="Season tickets, gate, merchandise, sponsorship and league revenue sharing — full-season projection." />
+          </div>
+          <div className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 overflow-hidden">
+            <div className="px-4 py-2.5 bg-slate-800/30 border-b border-slate-800 text-xs font-bold uppercase tracking-wide text-slate-400">Expenses</div>
+            <FRow k="Projected (season)" v={money(dash.expenses)} />
+            <FRow k="of which Farm (AHL)" v={farmExpense ? money(farmExpense) : "—"} cls="text-slate-500" title="Farm contracts over $100K — drains the bank like an NHL salary, but never counts against the NHL cap" />
+          </div>
+          <div className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 overflow-hidden">
+            <div className="px-4 py-2.5 bg-slate-800/30 border-b border-slate-800 text-xs font-bold uppercase tracking-wide text-slate-400">Result</div>
+            <FRow k="Projected profit" v={money(dash.profit)} cls={dash.profit < 0 ? "text-red-400" : "text-green-400"} />
+            <FRow k="Bank" v={money(dash.cash)} cls="text-slate-400" />
+            {isGm && <div className="px-4 py-2 text-xs"><Link href="/finance/dashboard" className="text-blue-400 hover:underline">Full breakdown →</Link></div>}
+          </div>
         </div>
-        <div className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 overflow-hidden">
-          <div className="px-4 py-2.5 bg-slate-800/30 border-b border-slate-800 text-xs font-bold uppercase tracking-wide text-slate-400">Expenses (salaries)</div>
-          <FRow k="Actual" v={money(fin.actualExpenses)} /><FRow k="Projected" v={money(fin.projectedExpenses)} cls="text-slate-400" />
-          <FRow k="of which Farm (AHL)" v={farmExpense ? money(farmExpense) : "—"} cls="text-slate-500" title="Farm contracts over $100K — drains the bank like an NHL salary, but never counts against the NHL cap" />
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 overflow-hidden">
+            <div className="px-4 py-2.5 bg-slate-800/30 border-b border-slate-800 text-xs font-bold uppercase tracking-wide text-slate-400">Income (tickets)</div>
+            <FRow k="Actual" v={money(fin.actualIncome)} /><FRow k="Projected" v={money(fin.projectedIncome)} cls="text-slate-400" />
+          </div>
+          <div className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 overflow-hidden">
+            <div className="px-4 py-2.5 bg-slate-800/30 border-b border-slate-800 text-xs font-bold uppercase tracking-wide text-slate-400">Expenses (salaries)</div>
+            <FRow k="Actual" v={money(fin.actualExpenses)} /><FRow k="Projected" v={money(fin.projectedExpenses)} cls="text-slate-400" />
+            <FRow k="of which Farm (AHL)" v={farmExpense ? money(farmExpense) : "—"} cls="text-slate-500" title="Farm contracts over $100K — drains the bank like an NHL salary, but never counts against the NHL cap" />
+          </div>
+          <div className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 overflow-hidden">
+            <div className="px-4 py-2.5 bg-slate-800/30 border-b border-slate-800 text-xs font-bold uppercase tracking-wide text-slate-400">Result</div>
+            <FRow k="Projected result" v={money(fin.projectedResult)} cls={fin.projectedResult < 0 ? "text-red-400" : "text-green-400"} />
+            <FRow k="Proj. bank" v={money(fin.projectedBankAccount)} cls="text-slate-400" />
+          </div>
         </div>
-        <div className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 overflow-hidden">
-          <div className="px-4 py-2.5 bg-slate-800/30 border-b border-slate-800 text-xs font-bold uppercase tracking-wide text-slate-400">Result</div>
-          <FRow k="Projected result" v={money(fin.projectedResult)} cls={fin.projectedResult < 0 ? "text-red-400" : "text-green-400"} />
-          <FRow k="Proj. bank" v={money(fin.projectedBankAccount)} cls="text-slate-400" />
-        </div>
-      </div>
+      )}
 
       <div className="text-xs text-slate-500">▲ Upper limit: {money(cap.upper)} · ▼ Lower limit: {money(cap.lower)}</div>
 

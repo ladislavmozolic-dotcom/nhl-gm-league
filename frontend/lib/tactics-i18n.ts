@@ -3,11 +3,27 @@
 // lang === "cs" and a translation exists, otherwise the English sim data. de/ru fall
 // back to English. Used by SystemEditor + LineEditor.
 
-import { DIAL_LABELS, DIAL_DESC } from "./sim/tactics";
+import { DIAL_LABELS, DIAL_DESC, PRESETS } from "./sim/tactics";
 import type { Lang } from "./i18n";
 
 type Sub = Record<string, string>;
 type Group = Record<string, Sub>;
+
+// Preset names (lib/sim/tactics.ts's PRESETS keys, e.g. "Shutdown") are sim
+// data, kept in English so they stay stable engine identifiers — "Shutdown" in
+// particular reads to a non-native speaker like "turned off", when it's really
+// hockey shorthand for a defensive, shot-suppressing system. Translated for
+// display only; never used as a lookup key into PRESETS. Typed against
+// PRESETS' own keys so a new/renamed preset fails the build here instead of
+// silently showing untranslated English forever.
+const PRESET_LABELS_CS: Record<keyof typeof PRESETS, string> = {
+  "Balanced": "Vyvážený",
+  "Run-and-Gun": "Útočná otvorená hra",
+  "Trap": "Pasca",
+  "Heavy Forecheck": "Tvrdý forček",
+  "Shot Volume": "Vysoký objem striel",
+  "Shutdown": "Obranný systém",
+};
 
 const LABELS_CS: Group = {
   tempo: { slow: "Pomalé / Kontrola", balanced: "Vyvážené", fast: "Rýchle / Tempo" },
@@ -64,4 +80,12 @@ export function dialLabel(lang: Lang, dial: DialKey, opt: string): string {
 export function dialDesc(lang: Lang, dial: DialKey, opt: string): string {
   if (lang === "cs" && DESC_CS[dial]?.[opt]) return DESC_CS[dial][opt];
   return DIAL_DESC[dial]?.[opt] ?? "";
+}
+
+/** Display name for a tactical preset (PRESETS key) — translated for lang "cs",
+ *  English elsewhere. Falls back to the raw name for a GM's saved custom variant
+ *  (also stored under `preset`, but not one of the fixed PRESETS keys). */
+export function presetLabel(lang: Lang, name: string): string {
+  if (lang === "cs" && name in PRESET_LABELS_CS) return PRESET_LABELS_CS[name as keyof typeof PRESETS];
+  return name;
 }

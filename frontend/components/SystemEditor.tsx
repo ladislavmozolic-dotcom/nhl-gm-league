@@ -6,7 +6,7 @@ import {
   type TeamTactics, type RosterProfile, type Tempo, type Forecheck, type PuckStyle, type DZone,
 } from "@/lib/sim/tactics";
 import { useT, useLang } from "@/components/LangProvider";
-import { dialLabel, dialDesc } from "@/lib/tactics-i18n";
+import { dialLabel, dialDesc, presetLabel } from "@/lib/tactics-i18n";
 
 const DIALS = [
   { key: "tempo", labelKey: "sys.dTempo", hintKey: "sys.hintTempo" },
@@ -99,7 +99,7 @@ export default function SystemEditor({ teamId, profile, initial, coachEx = 70 }:
                 className={`px-3 py-1.5 rounded-md text-[13px] font-semibold border transition-colors ${
                   tac.preset === name ? "bg-sky-600 text-white border-sky-500" : "border-slate-700 text-slate-300 hover:bg-slate-800/60"
                 }`}>
-                {name}
+                {presetLabel(lang, name)}
               </button>
             ))}
           </div>

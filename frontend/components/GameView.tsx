@@ -7,6 +7,8 @@ import { cleanName } from "@/lib/playerName";
 import type { GameReport, GameFlow } from "@/lib/game-report-server";
 import GameReportCard from "@/components/GameReportCard";
 import GameFlowChart from "@/components/GameFlowChart";
+import { useLang } from "@/components/LangProvider";
+import { presetLabel } from "@/lib/tactics-i18n";
 
 // ---- types (shape passed from the server page) ------------------------------
 type Skater = {
@@ -89,11 +91,12 @@ const DIAL_LABEL: Record<string, string> = {
   cycle: "Cycle", rush: "Rush", shotVolume: "Shot Volume", collapse: "Collapse",
 };
 function SystemSummary({ s }: { s: { tempo?: string; forecheck?: string; puckStyle?: string; dZone?: string; preset?: string } | null | undefined }) {
-  if (!s) return <span className="text-slate-500 text-sm">Balanced</span>;
-  if (s.preset && s.preset !== "Balanced") return <span className="text-sky-300 text-sm font-semibold">{s.preset}</span>;
+  const lang = useLang();
+  if (!s) return <span className="text-slate-500 text-sm">{presetLabel(lang, "Balanced")}</span>;
+  if (s.preset && s.preset !== "Balanced") return <span className="text-sky-300 text-sm font-semibold">{presetLabel(lang, s.preset)}</span>;
   const dials = ([["Tempo", s.tempo], ["Forecheck", s.forecheck], ["Puck", s.puckStyle], ["D-Zone", s.dZone]] as const)
     .filter(([, v]) => v && v !== "balanced");
-  if (dials.length === 0) return <span className="text-slate-400 text-sm">Balanced</span>;
+  if (dials.length === 0) return <span className="text-slate-400 text-sm">{presetLabel(lang, "Balanced")}</span>;
   return <span className="text-sm text-slate-300">{dials.map(([k, v]) => `${k}: ${DIAL_LABEL[v as string] ?? v}`).join(" · ")}</span>;
 }
 const periodLabel = (p: number) => (p === 4 ? "Overtime" : p === 5 ? "Shootout" : `${p}${["st", "nd", "rd"][p - 1]} Period`);
