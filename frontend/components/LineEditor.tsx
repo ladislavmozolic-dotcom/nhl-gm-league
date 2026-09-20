@@ -86,6 +86,10 @@ function Stepper({ value, onChange, min = 0, max = 99, step = 1, w = "w-14", com
 export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSlug, players, goalies, initial, chemistry, chemBase = 35, chemNeutral = 70, chemEnabled = true, onSave, onSuggest }: Props) {
   const lang = useLang();
   const [data, setData] = useState<TeamLinesData>(initial);
+  // the last persisted snapshot — compared against `data` to know whether
+  // there's anything to save, so the button doesn't just stay lit forever.
+  const [savedSnapshot, setSavedSnapshot] = useState<TeamLinesData>(initial);
+  const dirty = useMemo(() => JSON.stringify(data) !== JSON.stringify(savedSnapshot), [data, savedSnapshot]);
   const [tab, setTab] = useState<(typeof TABS)[number]>("Forward");
   const [pending, start] = useTransition();
   const [saved, setSaved] = useState(false);
@@ -246,6 +250,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
     try {
       const canonical = await onSave(teamSlug, data);
       setData(canonical);
+      setSavedSnapshot(canonical);
       setSaved(true);
       setSaveError(null);
     } catch {
@@ -880,8 +885,8 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
 
       <div className="fixed bottom-0 left-0 right-0 bg-slate-950/90 border-t border-slate-800 backdrop-blur px-4 py-3">
         <div className="max-w-5xl mx-auto flex items-center gap-3">
-          <button onClick={save} disabled={pending || invalid}
-            className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 font-semibold text-sm disabled:opacity-50">
+          <button onClick={save} disabled={pending || invalid || !dirty}
+            className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 font-semibold text-sm disabled:opacity-50 disabled:hover:bg-blue-600">
             {pending ? "Saving…" : "Save Lines"}
           </button>
           {invalid && <span className="text-red-400 text-sm">
