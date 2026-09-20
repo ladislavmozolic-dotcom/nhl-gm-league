@@ -46,13 +46,25 @@ function key(name: string): string {
 
 type MpRow = {
   gp: number; toi: number; g: number; ixg: number; a1: number; a2: number; sh: number; ong: number; ppa1: number;
-  toi5v5: number; a1_5v5: number; a2_5v5: number; onIceAxg5v5: number; // 5-on-5 split (Passing, Defense)
+  toi5v5: number; a1_5v5: number; a2_5v5: number; onIceAxg5v5: number; onIceFxg5v5: number; // 5-on-5 split (Passing, Defense)
   toi4v5: number; onIceAxg4v5: number;                                 // penalty-kill split (Defense)
   offIceAxg5v5: number; offIceToi5v5: number;                          // team-without-him, 5v5 (Defense: true Rel)
   offIceAxg4v5: number; offIceToi4v5: number;                          // team-without-him, PK (Defense: true Rel)
   onIceGa5v5: number; offIceGa5v5: number;                             // actual (not expected) on-ice/off-ice GA, 5v5
   hits: number; tk: number; gv: number; blk: number; onGaAll: number;  // box-score counts (UNHL calculator recompute)
   penalties: number; pim: number; penaltiesDrawn: number; pimDrawn: number; // Penalty & powerplay drawing stats
+  gameScore: number; shifts: number;
+  shotAttempts: number; unblockedAttempts: number; missedShots: number; blockedAttempts: number;
+  reboundsCreated: number; reboundGoals: number; freeze: number;
+  dZoneGiveaways: number;
+  hdShots: number; mdShots: number; ldShots: number;
+  hdGoals: number; mdGoals: number; ldGoals: number;
+  hdXg: number; mdXg: number; ldXg: number;
+  oZoneShiftStarts: number; dZoneShiftStarts: number; neutralZoneShiftStarts: number; flyShiftStarts: number;
+  faceoffsWon: number; faceoffsLost: number;
+  onIceXgPct: number; offIceXgPct: number;
+  onIceCorsiPct: number; offIceCorsiPct: number;
+  onIceFenwickPct: number; offIceFenwickPct: number;
 };
 
 function parseCsv(text: string): string[][] {
@@ -98,8 +110,45 @@ async function fetchSeason(year: number): Promise<Map<string, MpRow>> {
   const iSh = col("I_F_shotsOnGoal"), iOnG = col("OnIce_F_goals"), iOnAxg = col("OnIce_A_xGoals"), iOnGa = col("OnIce_A_goals");
   const iHits = col("I_F_hits"), iTk = col("I_F_takeaways"), iGv = col("I_F_giveaways"), iBlk = col("shotsBlockedByPlayer");
   const iPen = col("penalties"), iPim = col("penalityMinutes"), iPenDrawn = col("penaltiesDrawn"), iPimDrawn = col("penalityMinutesDrawn");
+  
+  // Expanded MoneyPuck columns
+  const iGameScore = col("gameScore"), iShifts = col("shifts");
+  const iShotAtt = col("I_F_shotAttempts"), iUnblkAtt = col("I_F_unblockedShotAttempts"), iMissedSh = col("I_F_missedShots"), iBlkAtt = col("I_F_blockedShotAttempts");
+  const iRebCr = col("I_F_rebounds"), iRebG = col("I_F_reboundGoals"), iFreeze = col("I_F_freeze");
+  const iDzGv = col("I_F_dZoneGiveaways");
+  const iHdS = col("I_F_highDangerShots"), iMdS = col("I_F_mediumDangerShots"), iLdS = col("I_F_lowDangerShots");
+  const iHdG = col("I_F_highDangerGoals"), iMdG = col("I_F_mediumDangerGoals"), iLdG = col("I_F_lowDangerGoals");
+  const iHdXg = col("I_F_highDangerxGoals"), iMdXg = col("I_F_mediumDangerxGoals"), iLdXg = col("I_F_lowDangerxGoals");
+  const iOzStarts = col("I_F_oZoneShiftStarts"), iDzStarts = col("I_F_dZoneShiftStarts"), iNzStarts = col("I_F_neutralZoneShiftStarts"), iFlyStarts = col("I_F_flyShiftStarts");
+  const iFoW = col("faceoffsWon"), iFoL = col("faceoffsLost");
+  const iOnXgPct = col("onIce_xGoalsPercentage"), iOffXgPct = col("offIce_xGoalsPercentage");
+  const iOnCorsi = col("onIce_corsiPercentage"), iOffCorsi = col("offIce_corsiPercentage");
+  const iOnFenwick = col("onIce_fenwickPercentage"), iOffFenwick = col("offIce_fenwickPercentage");
+  const iOnFxg = col("OnIce_F_xGoals");
+
   const num = (r: string[], i: number) => { const v = Number(r[i]); return Number.isFinite(v) ? v : 0; };
-  const blank = (): MpRow => ({ gp: 0, toi: 0, g: 0, ixg: 0, a1: 0, a2: 0, sh: 0, ong: 0, ppa1: 0, toi5v5: 0, a1_5v5: 0, a2_5v5: 0, onIceAxg5v5: 0, toi4v5: 0, onIceAxg4v5: 0, offIceAxg5v5: 0, offIceToi5v5: 0, offIceAxg4v5: 0, offIceToi4v5: 0, onIceGa5v5: 0, offIceGa5v5: 0, hits: 0, tk: 0, gv: 0, blk: 0, onGaAll: 0, penalties: 0, pim: 0, penaltiesDrawn: 0, pimDrawn: 0 });
+  const blank = (): MpRow => ({
+    gp: 0, toi: 0, g: 0, ixg: 0, a1: 0, a2: 0, sh: 0, ong: 0, ppa1: 0,
+    toi5v5: 0, a1_5v5: 0, a2_5v5: 0, onIceAxg5v5: 0, onIceFxg5v5: 0,
+    toi4v5: 0, onIceAxg4v5: 0,
+    offIceAxg5v5: 0, offIceToi5v5: 0, offIceAxg4v5: 0, offIceToi4v5: 0,
+    onIceGa5v5: 0, offIceGa5v5: 0,
+    hits: 0, tk: 0, gv: 0, blk: 0, onGaAll: 0,
+    penalties: 0, pim: 0, penaltiesDrawn: 0, pimDrawn: 0,
+    gameScore: 0, shifts: 0,
+    shotAttempts: 0, unblockedAttempts: 0, missedShots: 0, blockedAttempts: 0,
+    reboundsCreated: 0, reboundGoals: 0, freeze: 0,
+    dZoneGiveaways: 0,
+    hdShots: 0, mdShots: 0, ldShots: 0,
+    hdGoals: 0, mdGoals: 0, ldGoals: 0,
+    hdXg: 0, mdXg: 0, ldXg: 0,
+    oZoneShiftStarts: 0, dZoneShiftStarts: 0, neutralZoneShiftStarts: 0, flyShiftStarts: 0,
+    faceoffsWon: 0, faceoffsLost: 0,
+    onIceXgPct: 0, offIceXgPct: 0,
+    onIceCorsiPct: 0, offIceCorsiPct: 0,
+    onIceFenwickPct: 0, offIceFenwickPct: 0,
+  });
+
   const out = new Map<string, MpRow>();
   for (const r of rows.slice(1)) {
     const sit = r[iSit];
@@ -117,6 +166,39 @@ async function fetchSeason(year: number): Promise<Map<string, MpRow>> {
       m.pim = num(r, iPim);
       m.penaltiesDrawn = num(r, iPenDrawn);
       m.pimDrawn = num(r, iPimDrawn);
+
+      // Expanded columns
+      m.gameScore = num(r, iGameScore);
+      m.shifts = num(r, iShifts);
+      m.shotAttempts = num(r, iShotAtt);
+      m.unblockedAttempts = num(r, iUnblkAtt);
+      m.missedShots = num(r, iMissedSh);
+      m.blockedAttempts = num(r, iBlkAtt);
+      m.reboundsCreated = num(r, iRebCr);
+      m.reboundGoals = num(r, iRebG);
+      m.freeze = num(r, iFreeze);
+      m.dZoneGiveaways = num(r, iDzGv);
+      m.hdShots = num(r, iHdS);
+      m.mdShots = num(r, iMdS);
+      m.ldShots = num(r, iLdS);
+      m.hdGoals = num(r, iHdG);
+      m.mdGoals = num(r, iMdG);
+      m.ldGoals = num(r, iLdG);
+      m.hdXg = num(r, iHdXg);
+      m.mdXg = num(r, iMdXg);
+      m.ldXg = num(r, iLdXg);
+      m.oZoneShiftStarts = num(r, iOzStarts);
+      m.dZoneShiftStarts = num(r, iDzStarts);
+      m.neutralZoneShiftStarts = num(r, iNzStarts);
+      m.flyShiftStarts = num(r, iFlyStarts);
+      m.faceoffsWon = num(r, iFoW);
+      m.faceoffsLost = num(r, iFoL);
+      m.onIceXgPct = num(r, iOnXgPct);
+      m.offIceXgPct = num(r, iOffXgPct);
+      m.onIceCorsiPct = num(r, iOnCorsi);
+      m.offIceCorsiPct = num(r, iOffCorsi);
+      m.onIceFenwickPct = num(r, iOnFenwick);
+      m.offIceFenwickPct = num(r, iOffFenwick);
     } else if (sit === "5on4") { // PP primary assists only
       m.ppa1 = num(r, iA1);
     } else if (sit === "5on5" || sit === "4on5") {
@@ -127,6 +209,7 @@ async function fetchSeason(year: number): Promise<Map<string, MpRow>> {
       if (sit === "5on5") {
         const onGa = num(r, iOnGa);
         m.toi5v5 = toi; m.onIceAxg5v5 = onAxg; m.onIceGa5v5 = onGa;
+        m.onIceFxg5v5 = num(r, iOnFxg);
         if (t) {
           m.offIceAxg5v5 = Math.max(0, t.xga5v5 - onAxg); m.offIceToi5v5 = Math.max(0, t.toi5v5 - toi);
           m.offIceGa5v5 = Math.max(0, t.ga5v5 - onGa);

@@ -4,6 +4,7 @@ import { useState, useEffect, useTransition } from "react";
 import {
   DEFAULT_CONFIG,
   DEFAULT_LIVE_CALC_WEIGHTS,
+  DEFAULT_GOALIE_WEIGHTS,
   LiveCalcConfigData,
   CustomMetricConfig,
 } from "@/lib/live-calculator-config";
@@ -11,6 +12,8 @@ import {
   CATALOG_METRICS,
   METRIC_SOURCES,
   METRIC_BY_KEY,
+  GOALIE_CATALOG_METRICS,
+  GOALIE_METRIC_BY_KEY,
   MetricSource,
 } from "@/lib/live-calculator-catalog";
 import {
@@ -40,7 +43,7 @@ export default function LiveCalculatorConfigModal({
 }) {
   const isPermitted = isAdmin || canManage;
   const [config, setConfig] = useState<LiveCalcConfigData>(initialConfig);
-  const [activeTab, setActiveTab] = useState<"general" | "weights" | "ahl" | "promotion">("general");
+  const [activeTab, setActiveTab] = useState<"general" | "weights" | "goalies" | "ahl" | "promotion">("general");
   const [isPending, startTransition] = useTransition();
   const [statusMsg, setStatusMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [promoStatus, setPromoStatus] = useState<PromotionStatus | null>(null);
@@ -52,6 +55,7 @@ export default function LiveCalculatorConfigModal({
   const [addModal, setAddModal] = useState<{
     groupKey: string;
     groupName: string;
+    targetType: "skater" | "goalie";
   } | null>(null);
 
   const [newSource, setNewSource] = useState<MetricSource>("nhl");
@@ -60,22 +64,24 @@ export default function LiveCalculatorConfigModal({
   const [newWeight, setNewWeight] = useState<number>(0.1);
   const [newInvert, setNewInvert] = useState<boolean>(false);
 
-  const openAddModal = (groupKey: string, groupName: string) => {
-    const initialSource: MetricSource = "nhl";
-    const sourceMetrics = CATALOG_METRICS.filter((m) => m.source === initialSource);
-    const firstMetric = sourceMetrics[0];
+  const openAddModal = (groupKey: string, groupName: string, targetType: "skater" | "goalie" = "skater") => {
+    const catalog = targetType === "goalie" ? GOALIE_CATALOG_METRICS : CATALOG_METRICS;
+    const initialSource: MetricSource = targetType === "goalie" ? "moneypuck" : "nhl";
+    const sourceMetrics = catalog.filter((m) => m.source === initialSource);
+    const firstMetric = sourceMetrics[0] || catalog[0];
 
-    setNewSource(initialSource);
+    setNewSource(firstMetric ? (firstMetric.source as MetricSource) : initialSource);
     setNewMetricKey(firstMetric ? firstMetric.key : "");
     setNewLabel(firstMetric ? firstMetric.label : "");
     setNewWeight(0.1);
     setNewInvert(firstMetric ? firstMetric.defaultInvert : false);
-    setAddModal({ groupKey, groupName });
+    setAddModal({ groupKey, groupName, targetType });
   };
 
   const handleSourceChange = (src: MetricSource) => {
     setNewSource(src);
-    const sourceMetrics = CATALOG_METRICS.filter((m) => m.source === src);
+    const catalog = addModal?.targetType === "goalie" ? GOALIE_CATALOG_METRICS : CATALOG_METRICS;
+    const sourceMetrics = catalog.filter((m) => m.source === src);
     const firstMetric = sourceMetrics[0];
     if (firstMetric) {
       setNewMetricKey(firstMetric.key);
@@ -89,7 +95,8 @@ export default function LiveCalculatorConfigModal({
 
   const handleMetricKeyChange = (key: string) => {
     setNewMetricKey(key);
-    const def = METRIC_BY_KEY[key];
+    const dict = addModal?.targetType === "goalie" ? GOALIE_METRIC_BY_KEY : METRIC_BY_KEY;
+    const def = dict[key];
     if (def) {
       setNewLabel(def.label);
       setNewInvert(def.defaultInvert);
@@ -100,7 +107,8 @@ export default function LiveCalculatorConfigModal({
     if (e) e.preventDefault();
     if (!addModal || !newMetricKey) return;
 
-    const def = METRIC_BY_KEY[newMetricKey];
+    const dict = addModal.targetType === "goalie" ? GOALIE_METRIC_BY_KEY : METRIC_BY_KEY;
+    const def = dict[newMetricKey];
     const newMetric: CustomMetricConfig = {
       id: `cm_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       metricKey: newMetricKey,
@@ -111,58 +119,115 @@ export default function LiveCalculatorConfigModal({
     };
 
     const groupKey = addModal.groupKey;
-    const currentList = config.weights?.customMetrics?.[groupKey] ?? [];
-    setConfig({
-      ...config,
-      weights: {
-        ...config.weights,
-        customMetrics: {
-          ...(config.weights?.customMetrics ?? {}),
-          [groupKey]: [...currentList, newMetric],
+    if (addModal.targetType === "goalie") {
+      const currentList = config.goalieWeights?.customMetrics?.[groupKey] ?? [];
+      setConfig({
+        ...config,
+        goalieWeights: {
+          ...(config.goalieWeights ?? DEFAULT_GOALIE_WEIGHTS),
+          customMetrics: {
+            ...(config.goalieWeights?.customMetrics ?? {}),
+            [groupKey]: [...currentList, newMetric],
+          },
         },
-      },
-    });
+      });
+    } else {
+      const currentList = config.weights?.customMetrics?.[groupKey] ?? [];
+      setConfig({
+        ...config,
+        weights: {
+          ...config.weights,
+          customMetrics: {
+            ...(config.weights?.customMetrics ?? {}),
+            [groupKey]: [...currentList, newMetric],
+          },
+        },
+      });
+    }
 
     setAddModal(null);
   };
 
-  const handleCustomMetricWeightChange = (groupKey: string, id: string, val: number) => {
-    const currentList = config.weights?.customMetrics?.[groupKey] ?? [];
-    const updatedList = currentList.map((cm) => (cm.id === id ? { ...cm, weight: val } : cm));
-    setConfig({
-      ...config,
-      weights: {
-        ...config.weights,
-        customMetrics: {
-          ...(config.weights?.customMetrics ?? {}),
-          [groupKey]: updatedList,
+  const handleCustomMetricWeightChange = (
+    groupKey: string,
+    id: string,
+    val: number,
+    targetType: "skater" | "goalie" = "skater"
+  ) => {
+    if (targetType === "goalie") {
+      const currentList = config.goalieWeights?.customMetrics?.[groupKey] ?? [];
+      const updatedList = currentList.map((cm) => (cm.id === id ? { ...cm, weight: val } : cm));
+      setConfig({
+        ...config,
+        goalieWeights: {
+          ...(config.goalieWeights ?? DEFAULT_GOALIE_WEIGHTS),
+          customMetrics: {
+            ...(config.goalieWeights?.customMetrics ?? {}),
+            [groupKey]: updatedList,
+          },
         },
-      },
-    });
+      });
+    } else {
+      const currentList = config.weights?.customMetrics?.[groupKey] ?? [];
+      const updatedList = currentList.map((cm) => (cm.id === id ? { ...cm, weight: val } : cm));
+      setConfig({
+        ...config,
+        weights: {
+          ...config.weights,
+          customMetrics: {
+            ...(config.weights?.customMetrics ?? {}),
+            [groupKey]: updatedList,
+          },
+        },
+      });
+    }
   };
 
-  const handleRemoveCustomMetric = (groupKey: string, id: string) => {
-    const currentList = config.weights?.customMetrics?.[groupKey] ?? [];
-    const updatedList = currentList.filter((cm) => cm.id !== id);
-    setConfig({
-      ...config,
-      weights: {
-        ...config.weights,
-        customMetrics: {
-          ...(config.weights?.customMetrics ?? {}),
-          [groupKey]: updatedList,
+  const handleRemoveCustomMetric = (
+    groupKey: string,
+    id: string,
+    targetType: "skater" | "goalie" = "skater"
+  ) => {
+    if (targetType === "goalie") {
+      const currentList = config.goalieWeights?.customMetrics?.[groupKey] ?? [];
+      const updatedList = currentList.filter((cm) => cm.id !== id);
+      setConfig({
+        ...config,
+        goalieWeights: {
+          ...(config.goalieWeights ?? DEFAULT_GOALIE_WEIGHTS),
+          customMetrics: {
+            ...(config.goalieWeights?.customMetrics ?? {}),
+            [groupKey]: updatedList,
+          },
         },
-      },
-    });
+      });
+    } else {
+      const currentList = config.weights?.customMetrics?.[groupKey] ?? [];
+      const updatedList = currentList.filter((cm) => cm.id !== id);
+      setConfig({
+        ...config,
+        weights: {
+          ...config.weights,
+          customMetrics: {
+            ...(config.weights?.customMetrics ?? {}),
+            [groupKey]: updatedList,
+          },
+        },
+      });
+    }
   };
 
   const renderCardHeader = (
     title: string,
     titleColor: string,
     groupKey: string,
-    stdSum: number
+    stdSum: number,
+    targetType: "skater" | "goalie" = "skater"
   ) => {
-    const customList = config.weights?.customMetrics?.[groupKey] ?? [];
+    const customList =
+      targetType === "goalie"
+        ? config.goalieWeights?.customMetrics?.[groupKey] ?? []
+        : config.weights?.customMetrics?.[groupKey] ?? [];
     const customSum = customList.reduce((acc, cm) => acc + (cm.weight || 0), 0);
     const totalSum = stdSum + customSum;
 
@@ -185,9 +250,13 @@ export default function LiveCalculatorConfigModal({
           </span>
           <button
             type="button"
-            onClick={() => openAddModal(groupKey, title)}
+            onClick={() => openAddModal(groupKey, title, targetType)}
             className="px-2.5 py-1 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 text-sky-400 hover:text-sky-300 border border-sky-500/30 text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 shadow-sm"
-            title="Pridať novú metriku z NHL API, MoneyPuck, EDGE, AHL alebo Biometrie"
+            title={
+              targetType === "goalie"
+                ? "Pridať novú metriku pre brankára"
+                : "Pridať novú metriku z NHL API, MoneyPuck, EDGE, AHL alebo Biometrie"
+            }
           >
             <span className="text-sm leading-none font-bold">+</span>
             <span>Pridať metriku</span>
@@ -197,9 +266,14 @@ export default function LiveCalculatorConfigModal({
     );
   };
 
-  const renderCustomMetricsSection = (groupKey: string) => {
-    const list = config.weights?.customMetrics?.[groupKey] ?? [];
+  const renderCustomMetricsSection = (groupKey: string, targetType: "skater" | "goalie" = "skater") => {
+    const list =
+      targetType === "goalie"
+        ? config.goalieWeights?.customMetrics?.[groupKey] ?? []
+        : config.weights?.customMetrics?.[groupKey] ?? [];
     if (list.length === 0) return null;
+
+    const dict = targetType === "goalie" ? GOALIE_METRIC_BY_KEY : METRIC_BY_KEY;
 
     return (
       <div className="pt-3 mt-3 border-t border-slate-700/60 space-y-2">
@@ -214,7 +288,7 @@ export default function LiveCalculatorConfigModal({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           {list.map((cm) => {
             const sourceMeta = METRIC_SOURCES[cm.source as MetricSource];
-            const def = METRIC_BY_KEY[cm.metricKey];
+            const def = dict[cm.metricKey];
             return (
               <div
                 key={cm.id}
@@ -253,14 +327,14 @@ export default function LiveCalculatorConfigModal({
                       max="1"
                       value={cm.weight}
                       onChange={(e) =>
-                        handleCustomMetricWeightChange(groupKey, cm.id, parseFloat(e.target.value) || 0)
+                        handleCustomMetricWeightChange(groupKey, cm.id, parseFloat(e.target.value) || 0, targetType)
                       }
                       className="w-20 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-slate-100 font-mono text-xs focus:border-sky-400 outline-none"
                     />
                   </div>
                   <button
                     type="button"
-                    onClick={() => handleRemoveCustomMetric(groupKey, cm.id)}
+                    onClick={() => handleRemoveCustomMetric(groupKey, cm.id, targetType)}
                     className="w-7 h-7 rounded-lg bg-rose-500/10 hover:bg-rose-500/25 border border-rose-500/30 text-rose-400 hover:text-rose-200 flex items-center justify-center text-xs transition"
                     title="Odstrániť metriku"
                   >
@@ -418,7 +492,24 @@ export default function LiveCalculatorConfigModal({
     });
   };
 
-  const selectedMetricDef = METRIC_BY_KEY[newMetricKey];
+  const activeCatalog = addModal?.targetType === "goalie" ? GOALIE_CATALOG_METRICS : CATALOG_METRICS;
+  const activeDict = addModal?.targetType === "goalie" ? GOALIE_METRIC_BY_KEY : METRIC_BY_KEY;
+  const selectedMetricDef = activeDict[newMetricKey];
+  const availableSources = Array.from(new Set(activeCatalog.map((m) => m.source))) as MetricSource[];
+
+  const gw = config.goalieWeights ?? DEFAULT_GOALIE_WEIGHTS;
+  const updateGw = (attr: string, field: string, val: number) => {
+    setConfig({
+      ...config,
+      goalieWeights: {
+        ...gw,
+        [attr]: {
+          ...((gw as any)[attr] ?? {}),
+          [field]: val,
+        },
+      },
+    });
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 overflow-y-auto">
@@ -433,7 +524,9 @@ export default function LiveCalculatorConfigModal({
                   +
                 </div>
                 <div>
-                  <h3 className="font-bold text-white text-sm">Pridať novú metriku do výpočtu</h3>
+                  <h3 className="font-bold text-white text-sm">
+                    Pridať novú metriku do výpočtu {addModal.targetType === "goalie" ? "(Brankári)" : "(Korčuliari)"}
+                  </h3>
                   <p className="text-[11px] text-slate-400">
                     Cieľový parameter: <span className="text-sky-300 font-semibold">{addModal.groupName}</span>
                   </p>
@@ -456,7 +549,7 @@ export default function LiveCalculatorConfigModal({
                   1. Dátový server / zdroj hodnôt:
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {(Object.keys(METRIC_SOURCES) as MetricSource[]).map((src) => {
+                  {availableSources.map((src) => {
                     const meta = METRIC_SOURCES[src];
                     const isSelected = newSource === src;
                     return (
@@ -470,10 +563,10 @@ export default function LiveCalculatorConfigModal({
                             : "bg-slate-800/60 border-slate-700/60 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
                         }`}
                       >
-                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border inline-block w-fit mb-1 ${meta.color}`}>
-                          {meta.badge}
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border inline-block w-fit mb-1 ${meta?.color ?? ""}`}>
+                          {meta?.badge ?? src}
                         </span>
-                        <span className="text-xs font-medium line-clamp-1">{meta.name}</span>
+                        <span className="text-xs font-medium line-clamp-1">{meta?.name ?? src}</span>
                       </button>
                     );
                   })}
@@ -493,7 +586,7 @@ export default function LiveCalculatorConfigModal({
                   onChange={(e) => handleMetricKeyChange(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 text-xs focus:border-sky-400 outline-none"
                 >
-                  {CATALOG_METRICS.filter((m) => m.source === newSource).map((m) => (
+                  {activeCatalog.filter((m) => m.source === newSource).map((m) => (
                     <option key={m.key} value={m.key} className="bg-slate-900 text-white">
                       {m.label} {m.unit ? `(${m.unit})` : ""}
                     </option>
@@ -664,7 +757,18 @@ export default function LiveCalculatorConfigModal({
                 : "border-transparent text-slate-400 hover:text-slate-200"
             }`}
           >
-            Váhy komponentov (PA, SC, DF, CK, DI)
+            Váhy korčuliarov (PA, SC, DF, CK, DI)
+          </button>
+          <button
+            onClick={() => setActiveTab("goalies")}
+            className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition flex items-center gap-1.5 ${
+              activeTab === "goalies"
+                ? "border-emerald-400 text-emerald-400"
+                : "border-transparent text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <span>🥅</span>
+            <span>Váhy brankárov (SC, RT, HS, AG...)</span>
           </button>
           <button
             onClick={() => setActiveTab("ahl")}
@@ -1733,6 +1837,386 @@ export default function LiveCalculatorConfigModal({
                   <p className="text-[10px] text-slate-500">Skúsenosti na základe odohratých zápasov v NHL.</p>
                   {renderCustomMetricsSection("ex")}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "goalies" && (
+            <div className="space-y-6">
+              <div className="p-4 rounded-xl bg-slate-800/60 border border-emerald-500/30 flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-white text-sm flex items-center gap-2">
+                    <span>🥅</span> Váhy atribútov brankárov (STHS Goalie Ratings)
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Prepočet brankárov z MoneyPuck pokročilých metrík (GSAx, HD SV%, Rebound Control...), NHL štatistík a biometrie. Morálka (MO) zostáva chránená a nedotknutá.
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                    13 parametrov
+                  </span>
+                </div>
+              </div>
+
+              {/* SC */}
+              <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
+                {renderCardHeader(
+                  "Style Control (SC) – Pokrytie striel a priestoru",
+                  "text-sky-400",
+                  "sc",
+                  (gw.sc?.ldSv ?? 0.4) + (gw.sc?.mdSv ?? 0.35) + (gw.sc?.gsax60 ?? 0.25),
+                  "goalie"
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-slate-400 mb-1">Low-Danger SV% (Strely z diaľky):</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={gw.sc?.ldSv ?? 0.4}
+                      onChange={(e) => updateGw("sc", "ldSv", parseFloat(e.target.value) || 0)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-sky-400 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 mb-1">Medium-Danger SV% (Stredná vzdialenosť):</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={gw.sc?.mdSv ?? 0.35}
+                      onChange={(e) => updateGw("sc", "mdSv", parseFloat(e.target.value) || 0)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-sky-400 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 mb-1">GSAx / 60 min (Chytené góly nad očakávanie):</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={gw.sc?.gsax60 ?? 0.25}
+                      onChange={(e) => updateGw("sc", "gsax60", parseFloat(e.target.value) || 0)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-sky-400 outline-none"
+                    />
+                  </div>
+                </div>
+                {renderCustomMetricsSection("sc", "goalie")}
+              </div>
+
+              {/* RT */}
+              <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
+                {renderCardHeader(
+                  "Reaction Time (RT) – Bleskové reakcie a tutovky",
+                  "text-emerald-400",
+                  "rt",
+                  (gw.rt?.hdSv ?? 0.6) + (gw.rt?.hdGsax ?? 0.4),
+                  "goalie"
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-400 mb-1">High-Danger SV% (Úspešnosť pri tutovkách):</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={gw.rt?.hdSv ?? 0.6}
+                      onChange={(e) => updateGw("rt", "hdSv", parseFloat(e.target.value) || 0)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-emerald-400 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 mb-1">HD GSAx (Chytené góly z tutoviek):</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={gw.rt?.hdGsax ?? 0.4}
+                      onChange={(e) => updateGw("rt", "hdGsax", parseFloat(e.target.value) || 0)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-emerald-400 outline-none"
+                    />
+                  </div>
+                </div>
+                {renderCustomMetricsSection("rt", "goalie")}
+              </div>
+
+              {/* HS */}
+              <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
+                {renderCardHeader(
+                  "Hand Speed (HS) – Rýchlosť rúk (Lapačka & Vyrážačka)",
+                  "text-amber-400",
+                  "hs",
+                  (gw.hs?.hdSv ?? 0.5) + (gw.hs?.gsax60 ?? 0.5),
+                  "goalie"
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-400 mb-1">High-Danger SV%:</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={gw.hs?.hdSv ?? 0.5}
+                      onChange={(e) => updateGw("hs", "hdSv", parseFloat(e.target.value) || 0)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-amber-400 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 mb-1">GSAx / 60 min:</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={gw.hs?.gsax60 ?? 0.5}
+                      onChange={(e) => updateGw("hs", "gsax60", parseFloat(e.target.value) || 0)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-amber-400 outline-none"
+                    />
+                  </div>
+                </div>
+                {renderCustomMetricsSection("hs", "goalie")}
+              </div>
+
+              {/* AG */}
+              <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
+                {renderCardHeader(
+                  "Agility (AG) – Pohyblivosť v bránkovisku",
+                  "text-teal-400",
+                  "ag",
+                  (gw.ag?.mdSv ?? 0.5) + (gw.ag?.hdSv ?? 0.5),
+                  "goalie"
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-400 mb-1">Medium-Danger SV%:</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={gw.ag?.mdSv ?? 0.5}
+                      onChange={(e) => updateGw("ag", "mdSv", parseFloat(e.target.value) || 0)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-teal-400 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 mb-1">High-Danger SV%:</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={gw.ag?.hdSv ?? 0.5}
+                      onChange={(e) => updateGw("ag", "hdSv", parseFloat(e.target.value) || 0)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-teal-400 outline-none"
+                    />
+                  </div>
+                </div>
+                {renderCustomMetricsSection("ag", "goalie")}
+              </div>
+
+              {/* RB */}
+              <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
+                {renderCardHeader(
+                  "Rebound Control (RB) – Kontrola dorážok",
+                  "text-indigo-400",
+                  "rb",
+                  gw.rb?.rebCtrl ?? 1.0,
+                  "goalie"
+                )}
+                <div>
+                  <label className="block text-slate-400 mb-1">
+                    Rebound Control (xRebounds − Inkasované dorážky):
+                  </label>
+                  <input
+                    type="number"
+                    step="0.05"
+                    value={gw.rb?.rebCtrl ?? 1.0}
+                    onChange={(e) => updateGw("rb", "rebCtrl", parseFloat(e.target.value) || 0)}
+                    className="w-full sm:w-1/2 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-indigo-400 outline-none"
+                  />
+                </div>
+                {renderCustomMetricsSection("rb", "goalie")}
+              </div>
+
+              {/* EN */}
+              <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
+                {renderCardHeader(
+                  "Endurance (EN) – Fyzická výdrž & vyťaženie",
+                  "text-orange-400",
+                  "en",
+                  gw.en?.icetime ?? 1.0,
+                  "goalie"
+                )}
+                <div>
+                  <label className="block text-slate-400 mb-1">
+                    Ice Time (Celkový odchytaný čas v minútach):
+                  </label>
+                  <input
+                    type="number"
+                    step="0.05"
+                    value={gw.en?.icetime ?? 1.0}
+                    onChange={(e) => updateGw("en", "icetime", parseFloat(e.target.value) || 0)}
+                    className="w-full sm:w-1/2 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-orange-400 outline-none"
+                  />
+                </div>
+                {renderCustomMetricsSection("en", "goalie")}
+              </div>
+
+              {/* SZ */}
+              <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
+                {renderCardHeader(
+                  "Size (SZ) – Fyzické rozmery a výška",
+                  "text-blue-400",
+                  "sz",
+                  gw.sz?.sz ?? 1.0,
+                  "goalie"
+                )}
+                <div>
+                  <label className="block text-slate-400 mb-1">Výška brankára (Height cm):</label>
+                  <input
+                    type="number"
+                    step="0.05"
+                    value={gw.sz?.sz ?? 1.0}
+                    onChange={(e) => updateGw("sz", "sz", parseFloat(e.target.value) || 0)}
+                    className="w-full sm:w-1/2 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-blue-400 outline-none"
+                  />
+                </div>
+                {renderCustomMetricsSection("sz", "goalie")}
+              </div>
+
+              {/* EX */}
+              <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
+                {renderCardHeader(
+                  "Experience (EX) – Kariérne skúsenosti v NHL",
+                  "text-purple-400",
+                  "ex",
+                  (gw.ex?.careerRegGP ?? 0.7) + (gw.ex?.careerPoGP ?? 0.3),
+                  "goalie"
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-400 mb-1">Kariérne zápasy základná časť (Reg GP):</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={gw.ex?.careerRegGP ?? 0.7}
+                      onChange={(e) => updateGw("ex", "careerRegGP", parseFloat(e.target.value) || 0)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-purple-400 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 mb-1">Kariérne zápasy play-off (PO GP):</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={gw.ex?.careerPoGP ?? 0.3}
+                      onChange={(e) => updateGw("ex", "careerPoGP", parseFloat(e.target.value) || 0)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-purple-400 outline-none"
+                    />
+                  </div>
+                </div>
+                {renderCustomMetricsSection("ex", "goalie")}
+              </div>
+
+              {/* DU */}
+              <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
+                {renderCardHeader(
+                  "Durability (DU) – Odolnosť a štartovacia stabilita",
+                  "text-pink-400",
+                  "du",
+                  gw.du?.availability ?? 1.0,
+                  "goalie"
+                )}
+                <div>
+                  <label className="block text-slate-400 mb-1">Dostupnosť / Štartované zápasy v sezóne:</label>
+                  <input
+                    type="number"
+                    step="0.05"
+                    value={gw.du?.availability ?? 1.0}
+                    onChange={(e) => updateGw("du", "availability", parseFloat(e.target.value) || 0)}
+                    className="w-full sm:w-1/2 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-pink-400 outline-none"
+                  />
+                </div>
+                {renderCustomMetricsSection("du", "goalie")}
+              </div>
+
+              {/* PH */}
+              <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
+                {renderCardHeader(
+                  "Puck Handling & Freeze (PH) – Práca s pukom a podržanie",
+                  "text-cyan-400",
+                  "ph",
+                  gw.ph?.freezePct ?? 1.0,
+                  "goalie"
+                )}
+                <div>
+                  <label className="block text-slate-400 mb-1">Freeze % (Pomer podržaných pukov):</label>
+                  <input
+                    type="number"
+                    step="0.05"
+                    value={gw.ph?.freezePct ?? 1.0}
+                    onChange={(e) => updateGw("ph", "freezePct", parseFloat(e.target.value) || 0)}
+                    className="w-full sm:w-1/2 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-cyan-400 outline-none"
+                  />
+                </div>
+                {renderCustomMetricsSection("ph", "goalie")}
+              </div>
+
+              {/* SK */}
+              <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
+                {renderCardHeader(
+                  "Skating (SK) – Korčuľovanie a mobilita",
+                  "text-lime-400",
+                  "sk",
+                  gw.sk?.agility ?? 1.0,
+                  "goalie"
+                )}
+                <div>
+                  <label className="block text-slate-400 mb-1">Mobilita v bránkovisku:</label>
+                  <input
+                    type="number"
+                    step="0.05"
+                    value={gw.sk?.agility ?? 1.0}
+                    onChange={(e) => updateGw("sk", "agility", parseFloat(e.target.value) || 0)}
+                    className="w-full sm:w-1/2 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-lime-400 outline-none"
+                  />
+                </div>
+                {renderCustomMetricsSection("sk", "goalie")}
+              </div>
+
+              {/* PS */}
+              <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
+                {renderCardHeader(
+                  "Penalty Shot (PS) – Samostatné nájazdy a čisté brejky",
+                  "text-rose-400",
+                  "ps",
+                  gw.ps?.hdSv ?? 1.0,
+                  "goalie"
+                )}
+                <div>
+                  <label className="block text-slate-400 mb-1">High-Danger SV%:</label>
+                  <input
+                    type="number"
+                    step="0.05"
+                    value={gw.ps?.hdSv ?? 1.0}
+                    onChange={(e) => updateGw("ps", "hdSv", parseFloat(e.target.value) || 0)}
+                    className="w-full sm:w-1/2 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-rose-400 outline-none"
+                  />
+                </div>
+                {renderCustomMetricsSection("ps", "goalie")}
+              </div>
+
+              {/* LD */}
+              <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
+                {renderCardHeader(
+                  "Leadership (LD) – Vodcovstvo a rešpekt",
+                  "text-amber-300",
+                  "ld",
+                  gw.ld?.experience ?? 1.0,
+                  "goalie"
+                )}
+                <div>
+                  <label className="block text-slate-400 mb-1">Skúsenosti & veteránstvo:</label>
+                  <input
+                    type="number"
+                    step="0.05"
+                    value={gw.ld?.experience ?? 1.0}
+                    onChange={(e) => updateGw("ld", "experience", parseFloat(e.target.value) || 0)}
+                    className="w-full sm:w-1/2 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-amber-300 outline-none"
+                  />
+                </div>
+                {renderCustomMetricsSection("ld", "goalie")}
               </div>
             </div>
           )}

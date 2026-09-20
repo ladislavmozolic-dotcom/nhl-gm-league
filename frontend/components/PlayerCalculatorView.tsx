@@ -11,7 +11,13 @@ import {
   SKATER_PARAM_META,
   type SkaterParamKey,
   type ProjSkater,
+  ALL_GOALIE_PARAMS,
+  type ProjGoalie,
 } from "@/lib/param-projection";
+import GoalieCalculatorSection, {
+  type GoalieSortConfig,
+  type GoalieSortKey,
+} from "@/components/GoalieCalculatorSection";
 import LiveCalculatorConfigModal from "@/components/LiveCalculatorConfigModal";
 import type { LiveCalcConfigData } from "@/lib/live-calculator-config";
 
@@ -67,6 +73,7 @@ export default function PlayerCalculatorView({
   teams,
   selectedTeam,
   allSkaters,
+  allGoalies = [],
   active,
   lastWeight,
   curWeight,
@@ -78,6 +85,7 @@ export default function PlayerCalculatorView({
   teams: TeamItem[];
   selectedTeam: TeamItem;
   allSkaters: ProjSkater[];
+  allGoalies?: ProjGoalie[];
   active: boolean;
   lastWeight: number;
   curWeight: number;
@@ -88,6 +96,9 @@ export default function PlayerCalculatorView({
 }) {
   const router = useRouter();
 
+  // Mode Switcher: Skaters vs Goalies
+  const [playerType, setPlayerType] = useState<"skaters" | "goalies">("skaters");
+
   // Search & Filters state
   const [search, setSearch] = useState("");
   const [posFilter, setPosFilter] = useState<PosFilter>("ALL");
@@ -97,6 +108,14 @@ export default function PlayerCalculatorView({
 
   // Sorting state (default: overall desc)
   const [sort, setSort] = useState<SortConfig>({ key: "ov", dir: "desc" });
+  const [goalieSort, setGoalieSort] = useState<GoalieSortConfig>({ key: "ov", dir: "desc" });
+
+  const toggleGoalieSort = (key: GoalieSortKey) => {
+    setGoalieSort((prev) => ({
+      key,
+      dir: prev.key === key && prev.dir === "desc" ? "asc" : "desc",
+    }));
+  };
 
   // Hover card state for instant parameter comparison
   const [hovered, setHovered] = useState<{
@@ -268,6 +287,112 @@ export default function PlayerCalculatorView({
     ).length;
   }, [ahlSkaters]);
 
+  // Separate goalies into NHL vs AHL for the selected team
+  const { nhlGoalies, ahlGoalies, otherGoalieMatches } = useMemo(() => {
+    const q = search.trim().toLowerCase();
+
+    const nhl: ProjGoalie[] = [];
+    const ahl: ProjGoalie[] = [];
+    const otherMatches: Array<{ goalie: ProjGoalie; team: TeamItem }> = [];
+
+    const teamsById = new Map<number, TeamItem>();
+    teams.forEach((t) => {
+      teamsById.set(t.id, t);
+      t.affiliateTeams?.forEach((a) => {
+        teamsById.set(a.id, t);
+      });
+    });
+
+    for (const g of allGoalies) {
+      const isMyOrg = orgTeamIds.has(g.teamId);
+      const matchesSearch = !q || cleanName(g.name).toLowerCase().includes(q);
+
+      let hasChanges = false;
+      if (onlyChanges) {
+        hasChanges = ALL_GOALIE_PARAMS.some(
+          (k) => (g.projected[k] ?? 0) !== (g.actual[k] ?? 0)
+        );
+      }
+
+      if (isMyOrg) {
+        if (!matchesSearch) continue;
+        if (onlyChanges && !hasChanges) continue;
+
+        if (g.rosterType === "AHL" || (affiliate && g.teamId === affiliate.id)) {
+          ahl.push(g);
+        } else {
+          nhl.push(g);
+        }
+      } else if (q && q.length >= 2 && matchesSearch) {
+        const ownerTeam = teamsById.get(g.teamId);
+        if (ownerTeam) {
+          otherMatches.push({ goalie: g, team: ownerTeam });
+        }
+      }
+    }
+
+    const sortFn = (a: ProjGoalie, b: ProjGoalie) => {
+      let av: any = 0;
+      let bv: any = 0;
+
+      if (goalieSort.key === "name") {
+        return goalieSort.dir === "asc"
+          ? a.name.localeCompare(b.name)
+          : b.name.localeCompare(a.name);
+      } else if (goalieSort.key === "ov") {
+        av = a.overallProjected ?? a.overall ?? 0;
+        bv = b.overallProjected ?? b.overall ?? 0;
+      } else if (goalieSort.key === "age") {
+        av = a.age ?? 0;
+        bv = b.age ?? 0;
+      } else if (goalieSort.key === "gp") {
+        av = a.gp ?? 0;
+        bv = b.gp ?? 0;
+      } else if (goalieSort.key === "svPct") {
+        av = a.stats?.svPct ?? 0;
+        bv = b.stats?.svPct ?? 0;
+      } else if (goalieSort.key === "gaa") {
+        av = a.stats?.gaa ?? 99;
+        bv = b.stats?.gaa ?? 99;
+      } else if (goalieSort.key === "gsax") {
+        av = a.stats?.gsax ?? -99;
+        bv = b.stats?.gsax ?? -99;
+      } else if (goalieSort.key === "gsax60") {
+        av = a.stats?.gsax60 ?? -99;
+        bv = b.stats?.gsax60 ?? -99;
+      } else if (goalieSort.key === "hdSv") {
+        av = a.stats?.hdSv ?? 0;
+        bv = b.stats?.hdSv ?? 0;
+      } else if (goalieSort.key === "rebCtrl") {
+        av = a.stats?.rebCtrl ?? -99;
+        bv = b.stats?.rebCtrl ?? -99;
+      } else if (goalieSort.key === "freezePct") {
+        av = a.stats?.freezePct ?? 0;
+        bv = b.stats?.freezePct ?? 0;
+      } else {
+        av = a.projected[goalieSort.key] ?? a.actual[goalieSort.key] ?? 0;
+        bv = b.projected[goalieSort.key] ?? b.actual[goalieSort.key] ?? 0;
+      }
+
+      return goalieSort.dir === "asc" ? av - bv : bv - av;
+    };
+
+    nhl.sort(sortFn);
+    ahl.sort(sortFn);
+
+    return { nhlGoalies: nhl, ahlGoalies: ahl, otherGoalieMatches: otherMatches };
+  }, [allGoalies, orgTeamIds, search, onlyChanges, goalieSort, teams, affiliate]);
+
+  const nhlAvgGoalieOv = useMemo(() => {
+    if (!nhlGoalies.length) return "0";
+    return (nhlGoalies.reduce((a, b) => a + (b.overallProjected ?? b.overall ?? 0), 0) / nhlGoalies.length).toFixed(1);
+  }, [nhlGoalies]);
+
+  const ahlAvgGoalieOv = useMemo(() => {
+    if (!ahlGoalies.length) return "0";
+    return (ahlGoalies.reduce((a, b) => a + (b.overallProjected ?? b.overall ?? 0), 0) / ahlGoalies.length).toFixed(1);
+  }, [ahlGoalies]);
+
   return (
     <div className="space-y-6">
       {/* 1. TEAM SELECTOR STRIP */}
@@ -349,13 +474,27 @@ export default function PlayerCalculatorView({
                 )}
               </div>
               <div className="flex items-center gap-2 mt-1.5 flex-wrap text-xs text-slate-400">
-                <span>
-                  <b>{nhlSkaters.length}</b> NHL Skaters (Avg OV: <b>{nhlAvgOv}</b>)
-                </span>
-                <span className="text-slate-600">·</span>
-                <span>
-                  <b>{ahlSkaters.length}</b> AHL Skaters (Avg OV: <b>{ahlAvgOv}</b>)
-                </span>
+                {playerType === "skaters" ? (
+                  <>
+                    <span>
+                      <b>{nhlSkaters.length}</b> NHL Skaters (Avg OV: <b>{nhlAvgOv}</b>)
+                    </span>
+                    <span className="text-slate-600">·</span>
+                    <span>
+                      <b>{ahlSkaters.length}</b> AHL Skaters (Avg OV: <b>{ahlAvgOv}</b>)
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span>
+                      <b>{nhlGoalies.length}</b> NHL Brankári (Avg OV: <b>{nhlAvgGoalieOv}</b>)
+                    </span>
+                    <span className="text-slate-600">·</span>
+                    <span>
+                      <b>{ahlGoalies.length}</b> AHL Brankári (Avg OV: <b>{ahlAvgGoalieOv}</b>)
+                    </span>
+                  </>
+                )}
                 {affiliate && (
                   <>
                     <span className="text-slate-600">·</span>
@@ -384,7 +523,7 @@ export default function PlayerCalculatorView({
                 href="/api/tools/player-calculator/export"
                 download
                 className="text-xs font-semibold px-3 py-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 transition flex items-center gap-1.5 shadow-sm hover:scale-[1.02]"
-                title="Stiahnuť kompletný Excel zošit s hárkami NHL_PLAYERS a AHL_PLAYERS"
+                title="Stiahnuť kompletný Excel zošit so všetkými hárkami (korčuliari a brankári)"
               >
                 <span>📥</span>
                 <span>Export do Excelu (.xlsx)</span>
@@ -429,6 +568,51 @@ export default function PlayerCalculatorView({
 
       {/* 3. TOOLBAR: SEARCH, POSITION TABS, VIEW MODES */}
       <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 space-y-3.5 shadow-lg">
+        {/* Top Switcher: Skaters vs Goalies */}
+        <div className="flex items-center gap-2 border-b border-slate-800/80 pb-3">
+          <button
+            type="button"
+            onClick={() => setPlayerType("skaters")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              playerType === "skaters"
+                ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-900/30 scale-[1.01]"
+                : "bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-800"
+            }`}
+          >
+            <span>🏒 Korčuliari (Skaters)</span>
+            <span
+              className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
+                playerType === "skaters"
+                  ? "bg-white/20 text-white"
+                  : "bg-slate-700/60 text-slate-400"
+              }`}
+            >
+              {allSkaters.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setPlayerType("goalies")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              playerType === "goalies"
+                ? "bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-md shadow-amber-900/30 scale-[1.01]"
+                : "bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-800"
+            }`}
+          >
+            <span>🥅 Brankári (Goalies)</span>
+            <span
+              className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
+                playerType === "goalies"
+                  ? "bg-white/20 text-white"
+                  : "bg-slate-700/60 text-slate-400"
+              }`}
+            >
+              {allGoalies.length}
+            </span>
+          </button>
+        </div>
+
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           {/* Live Search Input */}
           <div className="relative flex-1 max-w-md">
@@ -439,7 +623,7 @@ export default function PlayerCalculatorView({
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search player by name or position..."
+              placeholder={playerType === "skaters" ? "Search skater by name or position..." : "Hľadať brankára podľa mena..."}
               className="w-full pl-9 pr-8 py-2 text-sm bg-slate-950/80 border border-slate-700/80 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
             />
             {search && (
@@ -455,74 +639,69 @@ export default function PlayerCalculatorView({
           </div>
 
           {/* View Mode Toggle */}
-          <div className="flex items-center gap-1 p-1 bg-slate-950/60 rounded-xl border border-slate-800 text-xs font-semibold self-start md:self-auto">
-            <button
-              type="button"
-              onClick={() => setViewMode("diff")}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
-                viewMode === "diff"
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "text-slate-400 hover:text-white"
-              }`}
-              title="Všetky parametre s indikátormi prepočítaných zmien"
-            >
-              All Params (Diff)
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("compare")}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
-                viewMode === "compare"
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "text-slate-400 hover:text-white"
-              }`}
-              title="Porovnanie Aktuálne → Prepočítané"
-            >
-              Compare
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("projected")}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
-                viewMode === "projected"
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "text-slate-400 hover:text-white"
-              }`}
-              title="Zobraziť s aplikovanými prepočítanými hodnotami"
-            >
-              Projected
-            </button>
-          </div>
-        </div>
-
-        {/* Secondary filters row */}
-        <div className="flex items-center justify-between gap-3 flex-wrap pt-1 border-t border-slate-800/60 text-xs">
-          {/* Position Pills */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-slate-500 font-medium mr-1">Position:</span>
+          <div className="flex items-center gap-1.5 bg-slate-950/80 p-1 rounded-xl border border-slate-800 self-start md:self-auto">
+            <span className="text-[11px] font-semibold text-slate-400 px-2 hidden sm:inline">
+              Zobrazenie:
+            </span>
             {(
               [
-                { key: "ALL", label: "All Skaters" },
-                { key: "F", label: "Forwards" },
-                { key: "D", label: "Defense" },
-                { key: "C", label: "Centers" },
-                { key: "W", label: "Wings" },
+                { key: "diff", label: "Diff (Rozdiel)", icon: "▲" },
+                { key: "compare", label: "Porovnanie", icon: "⇄" },
+                { key: "projected", label: "Projektované", icon: "★" },
               ] as const
             ).map((item) => (
               <button
                 key={item.key}
                 type="button"
-                onClick={() => setPosFilter(item.key)}
-                className={`px-2.5 py-1 rounded-lg border transition-all ${
-                  posFilter === item.key
-                    ? "bg-slate-700 border-slate-500 text-white font-semibold"
-                    : "bg-slate-800/40 border-slate-800 text-slate-400 hover:border-slate-600 hover:text-slate-200"
+                onClick={() => setViewMode(item.key)}
+                className={`px-3 py-1.5 rounded-lg font-semibold text-xs transition-all flex items-center gap-1.5 ${
+                  viewMode === item.key
+                    ? "bg-blue-600 text-white shadow-md shadow-blue-900/40"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-850"
                 }`}
               >
-                {item.label}
+                <span>{item.icon}</span>
+                <span>{item.label}</span>
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2 border-t border-slate-800/60 text-xs">
+          {/* Position Pills (Skaters only) */}
+          {playerType === "skaters" ? (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-slate-500 font-medium mr-1">Position:</span>
+              {(
+                [
+                  { key: "ALL", label: "All Skaters" },
+                  { key: "F", label: "Forwards" },
+                  { key: "D", label: "Defense" },
+                  { key: "C", label: "Centers" },
+                  { key: "W", label: "Wings" },
+                ] as const
+              ).map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setPosFilter(item.key)}
+                  className={`px-2.5 py-1 rounded-lg border transition-all ${
+                    posFilter === item.key
+                      ? "bg-slate-700 border-slate-500 text-white font-semibold"
+                      : "bg-slate-800/40 border-slate-800 text-slate-400 hover:border-slate-600 hover:text-slate-200"
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="text-slate-400 flex items-center gap-2">
+              <span className="text-amber-400 font-bold">🥅 Brankári</span>
+              <span className="text-slate-600">·</span>
+              <span>Sledované štatistiky: SV%, GAA, GSAx, GSAx/60, HD SV%, RebCtrl, Freeze%</span>
+            </div>
+          )}
 
           {/* Only Changes Toggle */}
           <label className="flex items-center gap-2 cursor-pointer select-none text-slate-300 hover:text-white">
@@ -537,7 +716,7 @@ export default function PlayerCalculatorView({
         </div>
 
         {/* Cross-Team Search Prompt */}
-        {otherTeamMatches.length > 0 && (
+        {playerType === "skaters" && otherTeamMatches.length > 0 && (
           <div className="pt-2 border-t border-slate-800/60 flex items-center gap-2 flex-wrap text-xs text-slate-400">
             <span className="text-amber-300 font-semibold">💡 Nájdené v iných tímoch:</span>
             {otherTeamMatches.map(({ skater, team: t }) => (
@@ -555,61 +734,101 @@ export default function PlayerCalculatorView({
             ))}
           </div>
         )}
+
+        {playerType === "goalies" && otherGoalieMatches.length > 0 && (
+          <div className="pt-2 border-t border-slate-800/60 flex items-center gap-2 flex-wrap text-xs text-slate-400">
+            <span className="text-amber-300 font-semibold">💡 Nájdené v iných tímoch:</span>
+            {otherGoalieMatches.map(({ goalie, team: t }) => (
+              <button
+                key={goalie.id}
+                type="button"
+                onClick={() => router.push(`/tools/player-calculator?team=${t.slug}`)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 transition-all"
+              >
+                {t.logoUrl && <img src={t.logoUrl} alt="" className="w-3.5 h-3.5 object-contain" />}
+                <span className="font-semibold text-white">{cleanName(goalie.name)}</span>
+                <span className="text-slate-400">({t.code})</span>
+                <span className="text-amber-400 ml-0.5">→</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 4. ROSTER SECTIONS */}
-      {/* SECTION A: NHL ROSTER */}
-      <RosterSection
-        title={`${selectedTeam.name} — NHL Roster`}
-        badgeText="NHL"
-        badgeColor="bg-blue-600/20 text-blue-300 border-blue-500/30"
-        teamLogo={selectedTeam.logoUrl}
-        skaters={sortedNhl}
-        totalCount={nhlSkaters.length}
-        changesCount={nhlChangesCount}
-        avgOv={nhlAvgOv}
-        active={active}
-        viewMode={viewMode}
-        sort={sort}
-        onSort={toggleSort}
-        onRowMouseEnter={handlePlayerMouseEnter}
-        onRowMouseLeave={handlePlayerMouseLeave}
-        emptyMessage={
-          search || posFilter !== "ALL" || onlyChanges
-            ? "Žiadni NHL hráči nezodpovedajú filtrom."
-            : "Tento tím nemá žiadnych korčuliarov na NHL súpiske."
-        }
-      />
+      {playerType === "skaters" ? (
+        <>
+          {/* SECTION A: NHL ROSTER */}
+          <RosterSection
+            title={`${selectedTeam.name} — NHL Roster`}
+            badgeText="NHL"
+            badgeColor="bg-blue-600/20 text-blue-300 border-blue-500/30"
+            teamLogo={selectedTeam.logoUrl}
+            skaters={sortedNhl}
+            totalCount={nhlSkaters.length}
+            changesCount={nhlChangesCount}
+            avgOv={nhlAvgOv}
+            active={active}
+            viewMode={viewMode}
+            sort={sort}
+            onSort={toggleSort}
+            onRowMouseEnter={handlePlayerMouseEnter}
+            onRowMouseLeave={handlePlayerMouseLeave}
+            emptyMessage={
+              search || posFilter !== "ALL" || onlyChanges
+                ? "Žiadni NHL hráči nezodpovedajú filtrom."
+                : "Tento tím nemá žiadnych korčuliarov na NHL súpiske."
+            }
+          />
 
-      {/* SECTION B: AHL ROSTER (FARM) */}
-      <RosterSection
-        title={
-          affiliate
-            ? `${affiliate.name} — AHL Farm Roster`
-            : `${selectedTeam.name} — AHL Farm Roster`
-        }
-        badgeText="AHL"
-        badgeColor="bg-purple-600/20 text-purple-300 border-purple-500/30"
-        teamLogo={affiliate?.logoUrl ?? selectedTeam.logoUrl}
-        skaters={sortedAhl}
-        totalCount={ahlSkaters.length}
-        changesCount={ahlChangesCount}
-        avgOv={ahlAvgOv}
-        active={active}
-        viewMode={viewMode}
-        sort={sort}
-        onSort={toggleSort}
-        onRowMouseEnter={handlePlayerMouseEnter}
-        onRowMouseLeave={handlePlayerMouseLeave}
-        emptyMessage={
-          search || posFilter !== "ALL" || onlyChanges
-            ? "Žiadni AHL hráči nezodpovedajú filtrom."
-            : "Tento tím nemá žiadnych korčuliarov na AHL súpiske."
-        }
-      />
+          {/* SECTION B: AHL ROSTER (FARM) */}
+          <RosterSection
+            title={
+              affiliate
+                ? `${affiliate.name} — AHL Farm Roster`
+                : `${selectedTeam.name} — AHL Farm Roster`
+            }
+            badgeText="AHL"
+            badgeColor="bg-purple-600/20 text-purple-300 border-purple-500/30"
+            teamLogo={affiliate?.logoUrl ?? selectedTeam.logoUrl}
+            skaters={sortedAhl}
+            totalCount={ahlSkaters.length}
+            changesCount={ahlChangesCount}
+            avgOv={ahlAvgOv}
+            active={active}
+            viewMode={viewMode}
+            sort={sort}
+            onSort={toggleSort}
+            onRowMouseEnter={handlePlayerMouseEnter}
+            onRowMouseLeave={handlePlayerMouseLeave}
+            emptyMessage={
+              search || posFilter !== "ALL" || onlyChanges
+                ? "Žiadni AHL hráči nezodpovedajú filtrom."
+                : "Tento tím nemá žiadnych korčuliarov na AHL súpiske."
+            }
+          />
 
-      {/* Hover comparison popover card */}
-      <PlayerHoverComparisonCard hovered={hovered} />
+          {/* Hover comparison popover card */}
+          <PlayerHoverComparisonCard hovered={hovered} />
+        </>
+      ) : (
+        <GoalieCalculatorSection
+          selectedTeam={selectedTeam}
+          affiliate={affiliate}
+          nhlGoalies={nhlGoalies}
+          ahlGoalies={ahlGoalies}
+          otherMatches={otherGoalieMatches}
+          viewMode={viewMode}
+          sort={goalieSort}
+          onSort={toggleGoalieSort}
+          active={active}
+          emptyMessage={
+            search || onlyChanges
+              ? "Žiadni brankári nezodpovedajú filtrom."
+              : "Tento tím nemá žiadnych brankárov na súpiske."
+          }
+        />
+      )}
 
       {/* FOOTER EXPLANATION */}
       <div className="rounded-xl border border-slate-800/80 bg-slate-900/40 p-4 text-xs text-slate-500 space-y-1.5">

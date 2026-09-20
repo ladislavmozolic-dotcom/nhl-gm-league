@@ -11,8 +11,29 @@ const CSV = (season: number) => `https://moneypuck.com/moneypuck/playerData/seas
 const key = (name: string) => name.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z]/g, "");
 
 export type GoalieMetrics = {
-  gp: number; shots: number; icetime: number;
-  gsax: number; svPct: number; hdSv: number; mdSv: number; ldSv: number; hdGsax: number; rebCtrl: number;
+  gp: number;
+  shots: number;
+  icetime: number;
+  goals: number;
+  xGoals: number;
+  gaa: number;
+  gsax: number;
+  gsax60: number;
+  svPct: number;
+  hdSv: number;
+  mdSv: number;
+  ldSv: number;
+  hdGsax: number;
+  rebCtrl: number;
+  rebounds: number;
+  xRebounds: number;
+  freeze: number;
+  xFreeze: number;
+  freezePct: number;
+  penalties: number;
+  pim: number;
+  flurryAxg: number;
+  unblockedShots: number;
 };
 
 function parseCsv(text: string): Record<string, string>[] {
@@ -28,18 +49,44 @@ function parseCsv(text: string): Record<string, string>[] {
 
 function metricsFromRow(r: Record<string, string>): GoalieMetrics {
   const n = (k: string) => Number(r[k] ?? 0) || 0;
-  const shots = n("ongoal"), goals = n("goals");
+  const shots = n("ongoal"), goals = n("goals"), toiSec = n("icetime");
+  const xGoals = n("xGoals");
+  const gsax = xGoals - goals;
+  const gsax60 = toiSec > 0 ? (gsax / toiSec) * 3600 : 0;
+  const gaa = toiSec > 0 ? (goals / toiSec) * 3600 : 0;
   const hdS = n("highDangerShots"), hdG = n("highDangerGoals");
   const mdS = n("mediumDangerShots"), mdG = n("mediumDangerGoals");
   const ldS = n("lowDangerShots"), ldG = n("lowDangerGoals");
   const sv = (s: number, g: number) => (s > 0 ? 1 - g / s : 0);
+  const rebounds = n("rebounds"), xRebounds = n("xRebounds");
+  const freeze = n("freeze"), xFreeze = n("xFreeze");
+  const rebCtrl = (xRebounds - rebounds) / Math.max(1, shots);
+  const freezePct = shots > 0 ? freeze / shots : 0;
+
   return {
-    gp: n("games_played"), shots, icetime: n("icetime"),
-    gsax: n("xGoals") - goals,
+    gp: n("games_played"),
+    shots,
+    icetime: toiSec,
+    goals,
+    xGoals,
+    gaa,
+    gsax,
+    gsax60,
     svPct: sv(shots, goals),
-    hdSv: sv(hdS, hdG), mdSv: sv(mdS, mdG), ldSv: sv(ldS, ldG),
+    hdSv: sv(hdS, hdG),
+    mdSv: sv(mdS, mdG),
+    ldSv: sv(ldS, ldG),
     hdGsax: n("highDangerxGoals") - hdG,
-    rebCtrl: (n("xRebounds") - n("rebounds")) / Math.max(1, shots), // + = allows fewer rebounds than expected
+    rebCtrl,
+    rebounds,
+    xRebounds,
+    freeze,
+    xFreeze,
+    freezePct,
+    penalties: n("penalties"),
+    pim: n("penalityMinutes"),
+    flurryAxg: n("flurryAdjustedxGoals"),
+    unblockedShots: n("unblocked_shot_attempts"),
   };
 }
 

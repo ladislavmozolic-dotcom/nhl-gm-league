@@ -8,6 +8,7 @@ import {
   LiveCalcConfigData,
 } from "./live-calculator-config";
 import { runLiveCalculatorRecompute } from "./live-calculator-engine";
+import { runLiveCalculatorGoalieRecompute } from "./live-calculator-goalie-engine";
 import { syncLiveCalculatorData } from "./live-calculator-sync";
 import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
@@ -45,9 +46,19 @@ export async function triggerLiveCalculatorRecomputeAction() {
   if (!(await canManageLiveCalculator())) {
     throw new Error("Nemáte oprávnenie spustiť prepočet kalkulátora.");
   }
-  const result = await runLiveCalculatorRecompute();
+  const [skaters, goalies] = await Promise.all([
+    runLiveCalculatorRecompute(),
+    runLiveCalculatorGoalieRecompute(),
+  ]);
   revalidatePath("/tools/player-calculator");
-  return { success: true, ...result };
+  return {
+    success: true,
+    totalProcessed: skaters.totalProcessed + goalies.totalProcessed,
+    nhlCount: skaters.nhlCount + goalies.nhlCount,
+    ahlCount: skaters.ahlCount + goalies.ahlCount,
+    skaters,
+    goalies,
+  };
 }
 
 export async function triggerLiveCalculatorSyncAction() {
@@ -55,9 +66,12 @@ export async function triggerLiveCalculatorSyncAction() {
     throw new Error("Nemáte oprávnenie spustiť synchronizáciu dát.");
   }
   const syncResult = await syncLiveCalculatorData();
-  const recomputeResult = await runLiveCalculatorRecompute();
+  const [skaters, goalies] = await Promise.all([
+    runLiveCalculatorRecompute(),
+    runLiveCalculatorGoalieRecompute(),
+  ]);
   revalidatePath("/tools/player-calculator");
-  return { success: true, sync: syncResult, recompute: recomputeResult };
+  return { success: true, sync: syncResult, recompute: skaters, goalieRecompute: goalies };
 }
 
 export type TeamAssignmentItem = {
@@ -100,6 +114,8 @@ export type PromotionStatus = {
   backupCount: number;
   totalSkaters: number;
   calculatedSkaters: number;
+  totalGoalies: number;
+  calculatedGoalies: number;
 };
 
 export async function checkIsAdminAction(): Promise<boolean> {
@@ -113,39 +129,54 @@ export async function checkCanManageAction(): Promise<{ isAdmin: boolean; canMan
 }
 
 /**
- * Get current status of STHS backup and promotion readiness.
+ * Get current status of STHS backup and promotion readiness for skaters and goalies.
  */
 export async function getPromotionStatusAction(): Promise<PromotionStatus> {
-  const [totalSkaters, backupCount, calculatedSkaters] = await Promise.all([
-    prisma.player.count({ where: { isGoalie: false } }),
-    prisma.player.count({
-      where: {
-        isGoalie: false,
-        sthsBackup: { not: Prisma.DbNull },
-      },
-    }),
-    prisma.player.count({
-      where: {
-        isGoalie: false,
-        liveCalculatorRatings: { not: Prisma.DbNull },
-      },
-    }),
-  ]);
+  const [totalSkaters, skaterBackupCount, calculatedSkaters, totalGoalies, goalieBackupCount, calculatedGoalies] =
+    await Promise.all([
+      prisma.player.count({ where: { isGoalie: false } }),
+      prisma.player.count({
+        where: {
+          isGoalie: false,
+          sthsBackup: { not: Prisma.DbNull },
+        },
+      }),
+      prisma.player.count({
+        where: {
+          isGoalie: false,
+          liveCalculatorRatings: { not: Prisma.DbNull },
+        },
+      }),
+      prisma.player.count({ where: { isGoalie: true } }),
+      prisma.goalieRating.count({
+        where: {
+          sthsBackup: { not: Prisma.DbNull },
+        },
+      }),
+      prisma.player.count({
+        where: {
+          isGoalie: true,
+          liveCalculatorRatings: { not: Prisma.DbNull },
+        },
+      }),
+    ]);
 
   return {
-    hasBackup: backupCount > 0,
-    backupCount,
+    hasBackup: skaterBackupCount > 0 || goalieBackupCount > 0,
+    backupCount: skaterBackupCount + goalieBackupCount,
     totalSkaters,
     calculatedSkaters,
+    totalGoalies,
+    calculatedGoalies,
   };
 }
 
 /**
- * Snapshot current player live ratings into sthsBackup where sthsBackup IS NULL,
+ * Snapshot current player and goalie live ratings into sthsBackup where sthsBackup IS NULL,
  * ensuring the original baseline STHS numbers are permanently preserved.
  */
 async function backupLiveSthsIfNeeded(): Promise<number> {
-  const result = await prisma.$executeRawUnsafe(`
+  const skaterResult = await prisma.$executeRawUnsafe(`
     UPDATE "Player"
     SET "sthsBackup" = jsonb_build_object(
       'ck', ck, 'fg', fg, 'di', di, 'sk', sk, 'st', st,
@@ -155,12 +186,24 @@ async function backupLiveSthsIfNeeded(): Promise<number> {
     )
     WHERE "sthsBackup" IS NULL AND "isGoalie" = false
   `);
-  return Number(result);
+
+  const goalieResult = await prisma.$executeRawUnsafe(`
+    UPDATE "GoalieRating"
+    SET "sthsBackup" = jsonb_build_object(
+      'sk', sk, 'du', du, 'en', en, 'sz', sz, 'ag', ag,
+      'rb', rb, 'sc', sc, 'hs', hs, 'rt', rt, 'ph', ph,
+      'ps', ps, 'ex', ex, 'ld', ld, 'mo', mo,
+      'overall', overall
+    )
+    WHERE "sthsBackup" IS NULL
+  `);
+
+  return Number(skaterResult) + Number(goalieResult);
 }
 
 /**
  * Promote Live Calculator projected ratings into active STHS player ratings.
- * Skaters only; Morale (MO) is untouched.
+ * Covers skaters and goalies; Morale (MO) is strictly untouched.
  */
 export async function promoteLiveCalculatorRatingsAction(): Promise<{
   success: boolean;
@@ -172,11 +215,11 @@ export async function promoteLiveCalculatorRatingsAction(): Promise<{
     throw new Error("Iba administrátor ligy môže aplikovať ratingy do STHS.");
   }
 
-  // 1. Ensure permanent STHS snapshot exists
+  // 1. Ensure permanent STHS snapshot exists for both skaters and goalies
   const backedUpCount = await backupLiveSthsIfNeeded();
 
   // 2. Fetch all skaters with calculated live ratings
-  const players = await prisma.player.findMany({
+  const skaters = await prisma.player.findMany({
     where: {
       isGoalie: false,
       liveCalculatorRatings: { not: Prisma.DbNull },
@@ -187,15 +230,27 @@ export async function promoteLiveCalculatorRatingsAction(): Promise<{
     },
   });
 
-  if (!players.length) {
-    throw new Error("Žiadny hráči nemajú vypočítané Live ratingy. Najprv spustite prepočet.");
+  const goalies = await prisma.player.findMany({
+    where: {
+      isGoalie: true,
+      liveCalculatorRatings: { not: Prisma.DbNull },
+    },
+    select: {
+      id: true,
+      liveCalculatorRatings: true,
+    },
+  });
+
+  if (!skaters.length && !goalies.length) {
+    throw new Error("Žiadny hráči ani brankári nemajú vypočítané Live ratingy. Najprv spustite prepočet.");
   }
 
   const CHUNK_SIZE = 100;
   let updatedCount = 0;
 
-  for (let i = 0; i < players.length; i += CHUNK_SIZE) {
-    const chunk = players.slice(i, i + CHUNK_SIZE);
+  // 3. Promote skaters
+  for (let i = 0; i < skaters.length; i += CHUNK_SIZE) {
+    const chunk = skaters.slice(i, i + CHUNK_SIZE);
 
     await prisma.$transaction(async (tx) => {
       for (const p of chunk) {
@@ -241,6 +296,52 @@ export async function promoteLiveCalculatorRatingsAction(): Promise<{
     });
   }
 
+  // 4. Promote goalies
+  for (let i = 0; i < goalies.length; i += CHUNK_SIZE) {
+    const chunk = goalies.slice(i, i + CHUNK_SIZE);
+
+    await prisma.$transaction(async (tx) => {
+      for (const g of chunk) {
+        const live = g.liveCalculatorRatings as any;
+        const proj = live?.projected;
+        if (!proj) continue;
+
+        const ovProj = live?.overallProjected ?? undefined;
+
+        const goalieData: any = {
+          sk: typeof proj.sk === "number" ? proj.sk : undefined,
+          du: typeof proj.du === "number" ? proj.du : undefined,
+          en: typeof proj.en === "number" ? proj.en : undefined,
+          sz: typeof proj.sz === "number" ? proj.sz : undefined,
+          ag: typeof proj.ag === "number" ? proj.ag : undefined,
+          rb: typeof proj.rb === "number" ? proj.rb : undefined,
+          sc: typeof proj.sc === "number" ? proj.sc : undefined,
+          hs: typeof proj.hs === "number" ? proj.hs : undefined,
+          rt: typeof proj.rt === "number" ? proj.rt : undefined,
+          ph: typeof proj.ph === "number" ? proj.ph : undefined,
+          ps: typeof proj.ps === "number" ? proj.ps : undefined,
+          ex: typeof proj.ex === "number" ? proj.ex : undefined,
+          ld: typeof proj.ld === "number" ? proj.ld : undefined,
+          overall: typeof ovProj === "number" ? ovProj : undefined,
+        };
+
+        if (typeof ovProj === "number") {
+          await tx.player.update({
+            where: { id: g.id },
+            data: { overall: ovProj },
+          });
+        }
+
+        await tx.goalieRating.updateMany({
+          where: { playerId: g.id },
+          data: goalieData,
+        });
+
+        updatedCount++;
+      }
+    });
+  }
+
   revalidatePath("/tools/player-calculator");
   revalidatePath("/players");
   revalidatePath("/roster");
@@ -255,7 +356,7 @@ export async function promoteLiveCalculatorRatingsAction(): Promise<{
 }
 
 /**
- * Restore original STHS ratings from sthsBackup for all skaters.
+ * Restore original STHS ratings from sthsBackup for all skaters and goalies.
  */
 export async function restoreSthsBackupAction(): Promise<{
   success: boolean;
@@ -265,7 +366,7 @@ export async function restoreSthsBackupAction(): Promise<{
     throw new Error("Iba administrátor ligy môže obnoviť ratingy zo zálohy.");
   }
 
-  // Restore Player table
+  // Restore Player table for skaters
   const playerResult = await prisma.$executeRawUnsafe(`
     UPDATE "Player" SET
       ck = ("sthsBackup"->>'ck')::int,
@@ -313,6 +414,36 @@ export async function restoreSthsBackupAction(): Promise<{
     WHERE sr."playerId" = p.id AND p."sthsBackup" IS NOT NULL AND p."isGoalie" = false
   `);
 
+  // Restore GoalieRating table
+  const goalieResult = await prisma.$executeRawUnsafe(`
+    UPDATE "GoalieRating" gr
+    SET
+      sk = (gr."sthsBackup"->>'sk')::int,
+      du = (gr."sthsBackup"->>'du')::int,
+      en = (gr."sthsBackup"->>'en')::int,
+      sz = (gr."sthsBackup"->>'sz')::int,
+      ag = (gr."sthsBackup"->>'ag')::int,
+      rb = (gr."sthsBackup"->>'rb')::int,
+      sc = (gr."sthsBackup"->>'sc')::int,
+      hs = (gr."sthsBackup"->>'hs')::int,
+      rt = (gr."sthsBackup"->>'rt')::int,
+      ph = (gr."sthsBackup"->>'ph')::int,
+      ps = (gr."sthsBackup"->>'ps')::int,
+      ex = (gr."sthsBackup"->>'ex')::int,
+      ld = (gr."sthsBackup"->>'ld')::int,
+      mo = (gr."sthsBackup"->>'mo')::int,
+      overall = (gr."sthsBackup"->>'overall')::int
+    WHERE gr."sthsBackup" IS NOT NULL
+  `);
+
+  // Restore Player.overall for goalies
+  await prisma.$executeRawUnsafe(`
+    UPDATE "Player" p
+    SET overall = (gr."sthsBackup"->>'overall')::int
+    FROM "GoalieRating" gr
+    WHERE p.id = gr."playerId" AND gr."sthsBackup" IS NOT NULL
+  `);
+
   revalidatePath("/tools/player-calculator");
   revalidatePath("/players");
   revalidatePath("/roster");
@@ -320,7 +451,7 @@ export async function restoreSthsBackupAction(): Promise<{
 
   return {
     success: true,
-    restoredCount: Number(playerResult),
+    restoredCount: Number(playerResult) + Number(goalieResult),
   };
 }
 

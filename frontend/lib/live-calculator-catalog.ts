@@ -650,6 +650,248 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
       return blend(cVal, lVal, c.gp ?? 0, l.gp ?? 0, cfg.latestWeight, cfg.previousWeight);
     },
   },
+  {
+    key: "mpGameScorePg",
+    label: "Game Score / GP (Celkový vplyv na hru MoneyPuck)",
+    source: "moneypuck",
+    description: "Komplexné hodnotenie výkonu hráča (Dom Luszczyszyn / MoneyPuck model) na zápas.",
+    defaultInvert: false,
+    unit: "GS/GP",
+    getValue: (p, cfg) => {
+      const mp = (p.mpSkater as any) ?? {};
+      const c = mp[String(cfg.latestMpYear)] ?? {};
+      const l = mp[String(cfg.previousMpYear)] ?? {};
+      const cVal = safeRate(c.gameScore, c.gp ?? 0);
+      const lVal = safeRate(l.gameScore, l.gp ?? 0);
+      return blend(cVal, lVal, c.gp ?? 0, l.gp ?? 0, cfg.latestWeight, cfg.previousWeight);
+    },
+  },
+  {
+    key: "mpShotAttempts60",
+    label: "Shot Attempts / 60 (Individuálny Corsi For za 60 min)",
+    source: "moneypuck",
+    description: "Všetky vlastné strelecké pokusy hráča (na bránu, mimo, blokované) za 60 minút.",
+    defaultInvert: false,
+    unit: "/60 min",
+    getValue: (p, cfg) => {
+      const mp = (p.mpSkater as any) ?? {};
+      const c = mp[String(cfg.latestMpYear)] ?? {};
+      const l = mp[String(cfg.previousMpYear)] ?? {};
+      const cVal = safePer60(c.shotAttempts, c.toi);
+      const lVal = safePer60(l.shotAttempts, l.toi);
+      return blend(cVal, lVal, c.gp ?? 0, l.gp ?? 0, cfg.latestWeight, cfg.previousWeight);
+    },
+  },
+  {
+    key: "mpUnblockedAttempts60",
+    label: "Unblocked Shot Attempts / 60 (Fenwick For za 60 min)",
+    source: "moneypuck",
+    description: "Vlastné neblokované strely hráča na bránu a mimo nej za 60 minút.",
+    defaultInvert: false,
+    unit: "/60 min",
+    getValue: (p, cfg) => {
+      const mp = (p.mpSkater as any) ?? {};
+      const c = mp[String(cfg.latestMpYear)] ?? {};
+      const l = mp[String(cfg.previousMpYear)] ?? {};
+      const cVal = safePer60(c.unblockedAttempts, c.toi);
+      const lVal = safePer60(l.unblockedAttempts, l.toi);
+      return blend(cVal, lVal, c.gp ?? 0, l.gp ?? 0, cfg.latestWeight, cfg.previousWeight);
+    },
+  },
+  {
+    key: "mpReboundsCreated60",
+    label: "Rebounds Created / 60 (Vytvorené dorážky)",
+    source: "moneypuck",
+    description: "Počet vytvorených dorážok zo striel hráča za 60 minút na ľade.",
+    defaultInvert: false,
+    unit: "dorážky/60",
+    getValue: (p, cfg) => {
+      const mp = (p.mpSkater as any) ?? {};
+      const c = mp[String(cfg.latestMpYear)] ?? {};
+      const l = mp[String(cfg.previousMpYear)] ?? {};
+      const cVal = safePer60(c.reboundsCreated, c.toi);
+      const lVal = safePer60(l.reboundsCreated, l.toi);
+      return blend(cVal, lVal, c.gp ?? 0, l.gp ?? 0, cfg.latestWeight, cfg.previousWeight);
+    },
+  },
+  {
+    key: "mpReboundGoalsPg",
+    label: "Rebound Goals / GP (Góly z dorážok na zápas)",
+    source: "moneypuck",
+    description: "Góly strelené z dorážok pred bránkoviskom na zápas.",
+    defaultInvert: false,
+    unit: "G/GP",
+    getValue: (p, cfg) => {
+      const mp = (p.mpSkater as any) ?? {};
+      const c = mp[String(cfg.latestMpYear)] ?? {};
+      const l = mp[String(cfg.previousMpYear)] ?? {};
+      const cVal = safeRate(c.reboundGoals, c.gp ?? 0);
+      const lVal = safeRate(l.reboundGoals, l.gp ?? 0);
+      return blend(cVal, lVal, c.gp ?? 0, l.gp ?? 0, cfg.latestWeight, cfg.previousWeight);
+    },
+  },
+  {
+    key: "mpDzoneGiveaways60",
+    label: "D-Zone Giveaways / 60 (Straty puku vo vlastnom pásme)",
+    source: "moneypuck",
+    description: "Straty puku vo vlastnom obrannom pásme za 60 minút (menej = lepšie).",
+    defaultInvert: true,
+    unit: "/60 min",
+    getValue: (p, cfg) => {
+      const mp = (p.mpSkater as any) ?? {};
+      const c = mp[String(cfg.latestMpYear)] ?? {};
+      const l = mp[String(cfg.previousMpYear)] ?? {};
+      const cVal = safePer60(c.dZoneGiveaways, c.toi);
+      const lVal = safePer60(l.dZoneGiveaways, l.toi);
+      return blend(cVal, lVal, c.gp ?? 0, l.gp ?? 0, cfg.latestWeight, cfg.previousWeight);
+    },
+  },
+  {
+    key: "mpHdShots60",
+    label: "High-Danger Shots / 60 (Strely z bezprostrednej blízkosti)",
+    source: "moneypuck",
+    description: "Vlastné strely z nebezpečného pásma pred bránkou za 60 minút.",
+    defaultInvert: false,
+    unit: "/60 min",
+    getValue: (p, cfg) => {
+      const mp = (p.mpSkater as any) ?? {};
+      const c = mp[String(cfg.latestMpYear)] ?? {};
+      const l = mp[String(cfg.previousMpYear)] ?? {};
+      const cVal = safePer60(c.hdShots, c.toi);
+      const lVal = safePer60(l.hdShots, l.toi);
+      return blend(cVal, lVal, c.gp ?? 0, l.gp ?? 0, cfg.latestWeight, cfg.previousWeight);
+    },
+  },
+  {
+    key: "mpHdGoalsPg",
+    label: "High-Danger Goals / GP (Góly z tutoviek na zápas)",
+    source: "moneypuck",
+    description: "Góly strelené z bezprostrednej blízkosti pred bránou na zápas.",
+    defaultInvert: false,
+    unit: "G/GP",
+    getValue: (p, cfg) => {
+      const mp = (p.mpSkater as any) ?? {};
+      const c = mp[String(cfg.latestMpYear)] ?? {};
+      const l = mp[String(cfg.previousMpYear)] ?? {};
+      const cVal = safeRate(c.hdGoals, c.gp ?? 0);
+      const lVal = safeRate(l.hdGoals, l.gp ?? 0);
+      return blend(cVal, lVal, c.gp ?? 0, l.gp ?? 0, cfg.latestWeight, cfg.previousWeight);
+    },
+  },
+  {
+    key: "mpHdXg60",
+    label: "High-Danger xG / 60 (Očakávané góly z tutoviek / 60)",
+    source: "moneypuck",
+    description: "Kvalita vytvorených nebezpečných šancí v slote za 60 minút.",
+    defaultInvert: false,
+    unit: "HD xG/60",
+    getValue: (p, cfg) => {
+      const mp = (p.mpSkater as any) ?? {};
+      const c = mp[String(cfg.latestMpYear)] ?? {};
+      const l = mp[String(cfg.previousMpYear)] ?? {};
+      const cVal = safePer60(c.hdXg, c.toi);
+      const lVal = safePer60(l.hdXg, l.toi);
+      return blend(cVal, lVal, c.gp ?? 0, l.gp ?? 0, cfg.latestWeight, cfg.previousWeight);
+    },
+  },
+  {
+    key: "mpMdShots60",
+    label: "Medium-Danger Shots / 60 (Strely zo strednej vzdialenosti)",
+    source: "moneypuck",
+    description: "Strely z kruhov a strednej vzdialenosti za 60 minút.",
+    defaultInvert: false,
+    unit: "/60 min",
+    getValue: (p, cfg) => {
+      const mp = (p.mpSkater as any) ?? {};
+      const c = mp[String(cfg.latestMpYear)] ?? {};
+      const l = mp[String(cfg.previousMpYear)] ?? {};
+      const cVal = safePer60(c.mdShots, c.toi);
+      const lVal = safePer60(l.mdShots, l.toi);
+      return blend(cVal, lVal, c.gp ?? 0, l.gp ?? 0, cfg.latestWeight, cfg.previousWeight);
+    },
+  },
+  {
+    key: "mpLdShots60",
+    label: "Low-Danger Shots / 60 (Strely z diaľky / od modrej)",
+    source: "moneypuck",
+    description: "Strely z diaľky a od mantinelov za 60 minút.",
+    defaultInvert: false,
+    unit: "/60 min",
+    getValue: (p, cfg) => {
+      const mp = (p.mpSkater as any) ?? {};
+      const c = mp[String(cfg.latestMpYear)] ?? {};
+      const l = mp[String(cfg.previousMpYear)] ?? {};
+      const cVal = safePer60(c.ldShots, c.toi);
+      const lVal = safePer60(l.ldShots, l.toi);
+      return blend(cVal, lVal, c.gp ?? 0, l.gp ?? 0, cfg.latestWeight, cfg.previousWeight);
+    },
+  },
+  {
+    key: "mpOzoneStartsPct",
+    label: "O-Zone Start % (Vhadzovania v útočnom pásme)",
+    source: "moneypuck",
+    description: "Percento striedaní začatých v útočnom pásme oproti obrannému.",
+    defaultInvert: false,
+    unit: "%",
+    getValue: (p, cfg) => {
+      const mp = (p.mpSkater as any) ?? {};
+      const c = mp[String(cfg.latestMpYear)] ?? {};
+      const l = mp[String(cfg.previousMpYear)] ?? {};
+      const cTot = (c.oZoneShiftStarts ?? 0) + (c.dZoneShiftStarts ?? 0);
+      const lTot = (l.oZoneShiftStarts ?? 0) + (l.dZoneShiftStarts ?? 0);
+      const cVal = cTot > 0 ? (c.oZoneShiftStarts ?? 0) / cTot : null;
+      const lVal = lTot > 0 ? (l.oZoneShiftStarts ?? 0) / lTot : null;
+      return blend(cVal, lVal, c.gp ?? 0, l.gp ?? 0, cfg.latestWeight, cfg.previousWeight);
+    },
+  },
+  {
+    key: "mpOnIceCorsiPct",
+    label: "On-Ice Corsi % (CF% Pomer striel tímu na ľade)",
+    source: "moneypuck",
+    description: "Percentuálny pomer všetkých streleckých pokusov tímu s hráčom na ľade (>50% = dominancia).",
+    defaultInvert: false,
+    unit: "%",
+    getValue: (p, cfg) => {
+      const mp = (p.mpSkater as any) ?? {};
+      const c = mp[String(cfg.latestMpYear)] ?? {};
+      const l = mp[String(cfg.previousMpYear)] ?? {};
+      const cVal = c.onIceCorsiPct != null && c.onIceCorsiPct > 0 ? c.onIceCorsiPct * 100 : null;
+      const lVal = l.onIceCorsiPct != null && l.onIceCorsiPct > 0 ? l.onIceCorsiPct * 100 : null;
+      return blend(cVal, lVal, c.gp ?? 0, l.gp ?? 0, cfg.latestWeight, cfg.previousWeight);
+    },
+  },
+  {
+    key: "mpOnIceFenwickPct",
+    label: "On-Ice Fenwick % (FF% Pomer neblokovaných striel)",
+    source: "moneypuck",
+    description: "Percentuálny pomer neblokovaných striel tímu, keď je hráč na ľade.",
+    defaultInvert: false,
+    unit: "%",
+    getValue: (p, cfg) => {
+      const mp = (p.mpSkater as any) ?? {};
+      const c = mp[String(cfg.latestMpYear)] ?? {};
+      const l = mp[String(cfg.previousMpYear)] ?? {};
+      const cVal = c.onIceFenwickPct != null && c.onIceFenwickPct > 0 ? c.onIceFenwickPct * 100 : null;
+      const lVal = l.onIceFenwickPct != null && l.onIceFenwickPct > 0 ? l.onIceFenwickPct * 100 : null;
+      return blend(cVal, lVal, c.gp ?? 0, l.gp ?? 0, cfg.latestWeight, cfg.previousWeight);
+    },
+  },
+  {
+    key: "mpShiftsPg",
+    label: "Shifts / GP (Počet striedaní na zápas)",
+    source: "moneypuck",
+    description: "Priemerný počet odohraných striedaní za zápas.",
+    defaultInvert: false,
+    unit: "striedania/GP",
+    getValue: (p, cfg) => {
+      const mp = (p.mpSkater as any) ?? {};
+      const c = mp[String(cfg.latestMpYear)] ?? {};
+      const l = mp[String(cfg.previousMpYear)] ?? {};
+      const cVal = safeRate(c.shifts, c.gp ?? 0);
+      const lVal = safeRate(l.shifts, l.gp ?? 0);
+      return blend(cVal, lVal, c.gp ?? 0, l.gp ?? 0, cfg.latestWeight, cfg.previousWeight);
+    },
+  },
 
   // ========================= NHL EDGE =========================
   {
@@ -829,3 +1071,496 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
 export const METRIC_BY_KEY: Record<string, CatalogMetricItem> = Object.fromEntries(
   CATALOG_METRICS.map((m) => [m.key, m])
 );
+
+// ========================= GOALIE METRIC CATALOG =========================
+export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
+  // ========================= MONEYPUCK GOALIE =========================
+  {
+    key: "svPct",
+    label: "Save % (Celková úspešnosť zásahov)",
+    source: "moneypuck",
+    description: "Celková percentuálna úspešnosť zásahov brankára (SV%).",
+    defaultInvert: false,
+    unit: "%",
+    getValue: (p, cfg) => {
+      const adv = (p.goalieAdvanced as any) ?? {};
+      return blend(
+        adv.cur?.svPct,
+        adv.last?.svPct,
+        adv.cur?.gp ?? p.curSeasonGP ?? 0,
+        adv.last?.gp ?? p.lastSeasonGP ?? 0,
+        cfg.latestWeight,
+        cfg.previousWeight
+      );
+    },
+  },
+  {
+    key: "gaa",
+    label: "GAA (Priemer inkasovaných gólov / 60 min)",
+    source: "moneypuck",
+    description: "Priemerný počet inkasovaných gólov za 60 minút hry (menej je lepšie).",
+    defaultInvert: true,
+    unit: "GAA",
+    getValue: (p, cfg) => {
+      const adv = (p.goalieAdvanced as any) ?? {};
+      return blend(
+        adv.cur?.gaa,
+        adv.last?.gaa,
+        adv.cur?.gp ?? p.curSeasonGP ?? 0,
+        adv.last?.gp ?? p.lastSeasonGP ?? 0,
+        cfg.latestWeight,
+        cfg.previousWeight
+      );
+    },
+  },
+  {
+    key: "gsax",
+    label: "GSAx (Chytené góly nad očakávanie celkovo)",
+    source: "moneypuck",
+    description: "Celkový počet gólov, ktoré brankár chytil navyše oproti očakávaniu (xG − inkasované góly).",
+    defaultInvert: false,
+    unit: "GSAx",
+    getValue: (p, cfg) => {
+      const adv = (p.goalieAdvanced as any) ?? {};
+      return blend(
+        adv.cur?.gsax,
+        adv.last?.gsax,
+        adv.cur?.gp ?? p.curSeasonGP ?? 0,
+        adv.last?.gp ?? p.lastSeasonGP ?? 0,
+        cfg.latestWeight,
+        cfg.previousWeight
+      );
+    },
+  },
+  {
+    key: "gsax60",
+    label: "GSAx / 60 min (Chytené góly nad očakávanie za zápas)",
+    source: "moneypuck",
+    description: "GSAx prepočítané na 60 minút čistého času brankára na ľade.",
+    defaultInvert: false,
+    unit: "GSAx/60",
+    getValue: (p, cfg) => {
+      const adv = (p.goalieAdvanced as any) ?? {};
+      return blend(
+        adv.cur?.gsax60,
+        adv.last?.gsax60,
+        adv.cur?.gp ?? p.curSeasonGP ?? 0,
+        adv.last?.gp ?? p.lastSeasonGP ?? 0,
+        cfg.latestWeight,
+        cfg.previousWeight
+      );
+    },
+  },
+  {
+    key: "hdSv",
+    label: "High-Danger SV% (Úspešnosť pri tutovkách a dorážkach)",
+    source: "moneypuck",
+    description: "Úspešnosť zásahov proti strelám z bezprostrednej blízkosti a slotu (HD SV%).",
+    defaultInvert: false,
+    unit: "%",
+    getValue: (p, cfg) => {
+      const adv = (p.goalieAdvanced as any) ?? {};
+      return blend(
+        adv.cur?.hdSv,
+        adv.last?.hdSv,
+        adv.cur?.gp ?? p.curSeasonGP ?? 0,
+        adv.last?.gp ?? p.lastSeasonGP ?? 0,
+        cfg.latestWeight,
+        cfg.previousWeight
+      );
+    },
+  },
+  {
+    key: "hdGsax",
+    label: "High-Danger GSAx (Chytené góly z tutoviek)",
+    source: "moneypuck",
+    description: "GSAx vygenerované výhradne proti strelám s vysokou nebezpečnosťou.",
+    defaultInvert: false,
+    unit: "HD GSAx",
+    getValue: (p, cfg) => {
+      const adv = (p.goalieAdvanced as any) ?? {};
+      return blend(
+        adv.cur?.hdGsax,
+        adv.last?.hdGsax,
+        adv.cur?.gp ?? p.curSeasonGP ?? 0,
+        adv.last?.gp ?? p.lastSeasonGP ?? 0,
+        cfg.latestWeight,
+        cfg.previousWeight
+      );
+    },
+  },
+  {
+    key: "mdSv",
+    label: "Medium-Danger SV% (Úspešnosť striel zo strednej vzdialenosti)",
+    source: "moneypuck",
+    description: "Úspešnosť zásahov zo stredného pásma a kruhov (MD SV%).",
+    defaultInvert: false,
+    unit: "%",
+    getValue: (p, cfg) => {
+      const adv = (p.goalieAdvanced as any) ?? {};
+      return blend(
+        adv.cur?.mdSv,
+        adv.last?.mdSv,
+        adv.cur?.gp ?? p.curSeasonGP ?? 0,
+        adv.last?.gp ?? p.lastSeasonGP ?? 0,
+        cfg.latestWeight,
+        cfg.previousWeight
+      );
+    },
+  },
+  {
+    key: "ldSv",
+    label: "Low-Danger SV% (Úspešnosť z diaľky / modrej čiary)",
+    source: "moneypuck",
+    description: "Úspešnosť zásahov proti strelám z diaľky a od mantinelov (LD SV%).",
+    defaultInvert: false,
+    unit: "%",
+    getValue: (p, cfg) => {
+      const adv = (p.goalieAdvanced as any) ?? {};
+      return blend(
+        adv.cur?.ldSv,
+        adv.last?.ldSv,
+        adv.cur?.gp ?? p.curSeasonGP ?? 0,
+        adv.last?.gp ?? p.lastSeasonGP ?? 0,
+        cfg.latestWeight,
+        cfg.previousWeight
+      );
+    },
+  },
+  {
+    key: "rebCtrl",
+    label: "Rebound Control (Kontrola dorážok xRebounds − Rebounds)",
+    source: "moneypuck",
+    description: "Miera eliminácie nebezpečných dorážok súperom oproti očakávaniu (kladné = menej dorážok).",
+    defaultInvert: false,
+    unit: "RebCtrl",
+    getValue: (p, cfg) => {
+      const adv = (p.goalieAdvanced as any) ?? {};
+      return blend(
+        adv.cur?.rebCtrl,
+        adv.last?.rebCtrl,
+        adv.cur?.gp ?? p.curSeasonGP ?? 0,
+        adv.last?.gp ?? p.lastSeasonGP ?? 0,
+        cfg.latestWeight,
+        cfg.previousWeight
+      );
+    },
+  },
+  {
+    key: "freezePct",
+    label: "Freeze % (Prerušenie hry / podržanie pukov)",
+    source: "moneypuck",
+    description: "Percento zásahov, po ktorých brankár bezpečne prikryl puk a prerušil hru.",
+    defaultInvert: false,
+    unit: "%",
+    getValue: (p, cfg) => {
+      const adv = (p.goalieAdvanced as any) ?? {};
+      return blend(
+        adv.cur?.freezePct,
+        adv.last?.freezePct,
+        adv.cur?.gp ?? p.curSeasonGP ?? 0,
+        adv.last?.gp ?? p.lastSeasonGP ?? 0,
+        cfg.latestWeight,
+        cfg.previousWeight
+      );
+    },
+  },
+  {
+    key: "icetime",
+    label: "Ice Time / Vyťaženie brankára (Celkový čas v minútach)",
+    source: "moneypuck",
+    description: "Celkový odchytaný čas v sezóne vyjadrený v minútach (vytrvalosť & jednotka tímu).",
+    defaultInvert: false,
+    unit: "min",
+    getValue: (p, cfg) => {
+      const adv = (p.goalieAdvanced as any) ?? {};
+      const c = adv.cur?.icetime != null ? adv.cur.icetime / 60 : null;
+      const l = adv.last?.icetime != null ? adv.last.icetime / 60 : null;
+      return blend(
+        c,
+        l,
+        adv.cur?.gp ?? p.curSeasonGP ?? 0,
+        adv.last?.gp ?? p.lastSeasonGP ?? 0,
+        cfg.latestWeight,
+        cfg.previousWeight
+      );
+    },
+  },
+  {
+    key: "gp",
+    label: "Games Played (Odchytané zápasy v sezóne)",
+    source: "nhl",
+    description: "Počet odchytaných zápasov v aktuálnej a predchádzajúcej sezóne.",
+    defaultInvert: false,
+    unit: "GP",
+    getValue: (p, cfg) => {
+      const adv = (p.goalieAdvanced as any) ?? {};
+      const c = adv.cur?.gp ?? p.curSeasonGP ?? null;
+      const l = adv.last?.gp ?? p.lastSeasonGP ?? null;
+      return blend(c, l, c ?? 0, l ?? 0, cfg.latestWeight, cfg.previousWeight);
+    },
+  },
+  {
+    key: "sz",
+    label: "Výška brankára (Height cm)",
+    source: "bio",
+    description: "Výška brankára v centimetroch (veľkosť a priestorové pokrytie brány).",
+    defaultInvert: false,
+    unit: "cm",
+    getValue: (p) => {
+      const m = (p.height ?? "").match(/(\d+)\s*cm/);
+      return m ? Number(m[1]) : (p.height ? Number(p.height) : null);
+    },
+  },
+  {
+    key: "weight",
+    label: "Hmotnosť brankára (Weight lbs)",
+    source: "bio",
+    description: "Hmotnosť brankára v librách.",
+    defaultInvert: false,
+    unit: "lbs",
+    getValue: (p) => (p.weight != null && p.weight > 0 ? p.weight : null),
+  },
+  {
+    key: "careerRegGP",
+    label: "Kariérne zápasy ZČ (Career Regular GP)",
+    source: "bio",
+    description: "Celkový počet odohratých zápasov v základnej časti NHL.",
+    defaultInvert: false,
+    unit: "GP",
+    getValue: (p) => (p.careerGP as any)?.reg ?? null,
+  },
+  {
+    key: "careerPoGP",
+    label: "Kariérne zápasy Play-off (Career Playoff GP)",
+    source: "bio",
+    description: "Celkový počet odohratých zápasov v play-off NHL.",
+    defaultInvert: false,
+    unit: "GP",
+    getValue: (p) => (p.careerGP as any)?.po ?? null,
+  },
+  {
+    key: "goals",
+    label: "Inkasované góly (Goals Against)",
+    source: "moneypuck",
+    description: "Celkový počet inkasovaných gólov brankára (menej je lepšie).",
+    defaultInvert: true,
+    unit: "GA",
+    getValue: (p, cfg) => {
+      const adv = (p.goalieAdvanced as any) ?? {};
+      return blend(
+        adv.cur?.goals,
+        adv.last?.goals,
+        adv.cur?.gp ?? p.curSeasonGP ?? 0,
+        adv.last?.gp ?? p.lastSeasonGP ?? 0,
+        cfg.latestWeight,
+        cfg.previousWeight
+      );
+    },
+  },
+  {
+    key: "xGoals",
+    label: "xGoals (Očakávané inkasované góly súpera)",
+    source: "moneypuck",
+    description: "Súčet xG všetkých striel, ktorým brankár čelil.",
+    defaultInvert: false,
+    unit: "xGA",
+    getValue: (p, cfg) => {
+      const adv = (p.goalieAdvanced as any) ?? {};
+      return blend(
+        adv.cur?.xGoals,
+        adv.last?.xGoals,
+        adv.cur?.gp ?? p.curSeasonGP ?? 0,
+        adv.last?.gp ?? p.lastSeasonGP ?? 0,
+        cfg.latestWeight,
+        cfg.previousWeight
+      );
+    },
+  },
+  {
+    key: "shots",
+    label: "Shots Against (Čelené strely na bránu)",
+    source: "moneypuck",
+    description: "Celkový počet striel smerujúcich do priestoru brány.",
+    defaultInvert: false,
+    unit: "SA",
+    getValue: (p, cfg) => {
+      const adv = (p.goalieAdvanced as any) ?? {};
+      return blend(
+        adv.cur?.shots,
+        adv.last?.shots,
+        adv.cur?.gp ?? p.curSeasonGP ?? 0,
+        adv.last?.gp ?? p.lastSeasonGP ?? 0,
+        cfg.latestWeight,
+        cfg.previousWeight
+      );
+    },
+  },
+  {
+    key: "rebounds",
+    label: "Rebounds Allowed (Vyprodukované dorážky pre súpera)",
+    source: "moneypuck",
+    description: "Počet dorážok, ktoré súper získal po zásahu brankára (menej je lepšie).",
+    defaultInvert: true,
+    unit: "Reb",
+    getValue: (p, cfg) => {
+      const adv = (p.goalieAdvanced as any) ?? {};
+      return blend(
+        adv.cur?.rebounds,
+        adv.last?.rebounds,
+        adv.cur?.gp ?? p.curSeasonGP ?? 0,
+        adv.last?.gp ?? p.lastSeasonGP ?? 0,
+        cfg.latestWeight,
+        cfg.previousWeight
+      );
+    },
+  },
+  {
+    key: "xRebounds",
+    label: "Expected Rebounds (Očakávané dorážky podľa typu striel)",
+    source: "moneypuck",
+    description: "Očakávaný počet dorážok vygenerovaný na základe kvality a trajektórie striel.",
+    defaultInvert: false,
+    unit: "xReb",
+    getValue: (p, cfg) => {
+      const adv = (p.goalieAdvanced as any) ?? {};
+      return blend(
+        adv.cur?.xRebounds,
+        adv.last?.xRebounds,
+        adv.cur?.gp ?? p.curSeasonGP ?? 0,
+        adv.last?.gp ?? p.lastSeasonGP ?? 0,
+        cfg.latestWeight,
+        cfg.previousWeight
+      );
+    },
+  },
+  {
+    key: "freeze",
+    label: "Puk prikrytý / Freezes (Počet prerušení hry)",
+    source: "moneypuck",
+    description: "Absolútny počet prerušení hry prikrytím alebo zovretím puku po strele.",
+    defaultInvert: false,
+    unit: "Frz",
+    getValue: (p, cfg) => {
+      const adv = (p.goalieAdvanced as any) ?? {};
+      return blend(
+        adv.cur?.freeze,
+        adv.last?.freeze,
+        adv.cur?.gp ?? p.curSeasonGP ?? 0,
+        adv.last?.gp ?? p.lastSeasonGP ?? 0,
+        cfg.latestWeight,
+        cfg.previousWeight
+      );
+    },
+  },
+  {
+    key: "xFreeze",
+    label: "Expected Freezes (Očakávané prerušenia)",
+    source: "moneypuck",
+    description: "Očakávaný počet prerušení hry podľa trajektórie a nebezpečnosti striel.",
+    defaultInvert: false,
+    unit: "xFrz",
+    getValue: (p, cfg) => {
+      const adv = (p.goalieAdvanced as any) ?? {};
+      return blend(
+        adv.cur?.xFreeze,
+        adv.last?.xFreeze,
+        adv.cur?.gp ?? p.curSeasonGP ?? 0,
+        adv.last?.gp ?? p.lastSeasonGP ?? 0,
+        cfg.latestWeight,
+        cfg.previousWeight
+      );
+    },
+  },
+  {
+    key: "penalties",
+    label: "Penalties (Tresty brankára)",
+    source: "moneypuck",
+    description: "Počet menších alebo väčších trestov udelených brankárovi (menej je lepšie).",
+    defaultInvert: true,
+    unit: "Pen",
+    getValue: (p, cfg) => {
+      const adv = (p.goalieAdvanced as any) ?? {};
+      return blend(
+        adv.cur?.penalties,
+        adv.last?.penalties,
+        adv.cur?.gp ?? p.curSeasonGP ?? 0,
+        adv.last?.gp ?? p.lastSeasonGP ?? 0,
+        cfg.latestWeight,
+        cfg.previousWeight
+      );
+    },
+  },
+  {
+    key: "pim",
+    label: "PIM (Trestné minúty brankára)",
+    source: "moneypuck",
+    description: "Celkové trestné minúty brankára (menej je lepšie).",
+    defaultInvert: true,
+    unit: "min",
+    getValue: (p, cfg) => {
+      const adv = (p.goalieAdvanced as any) ?? {};
+      return blend(
+        adv.cur?.pim,
+        adv.last?.pim,
+        adv.cur?.gp ?? p.curSeasonGP ?? 0,
+        adv.last?.gp ?? p.lastSeasonGP ?? 0,
+        cfg.latestWeight,
+        cfg.previousWeight
+      );
+    },
+  },
+  {
+    key: "flurryAxg",
+    label: "Flurry-Adjusted xG Against",
+    source: "moneypuck",
+    description: "Očakávané góly proti po očistení o rýchle opakované strely zblízka.",
+    defaultInvert: false,
+    unit: "xGA",
+    getValue: (p, cfg) => {
+      const adv = (p.goalieAdvanced as any) ?? {};
+      return blend(
+        adv.cur?.flurryAxg,
+        adv.last?.flurryAxg,
+        adv.cur?.gp ?? p.curSeasonGP ?? 0,
+        adv.last?.gp ?? p.lastSeasonGP ?? 0,
+        cfg.latestWeight,
+        cfg.previousWeight
+      );
+    },
+  },
+  {
+    key: "unblockedShots",
+    label: "Unblocked Shot Attempts Against (Nezblokované strely súpera)",
+    source: "moneypuck",
+    description: "Počet striel a striel mimo brány, ktoré neboli zblokované hráčmi v poli.",
+    defaultInvert: false,
+    unit: "USAT",
+    getValue: (p, cfg) => {
+      const adv = (p.goalieAdvanced as any) ?? {};
+      return blend(
+        adv.cur?.unblockedShots,
+        adv.last?.unblockedShots,
+        adv.cur?.gp ?? p.curSeasonGP ?? 0,
+        adv.last?.gp ?? p.lastSeasonGP ?? 0,
+        cfg.latestWeight,
+        cfg.previousWeight
+      );
+    },
+  },
+  {
+    key: "age",
+    label: "Vek brankára (Age)",
+    source: "bio",
+    description: "Aktuálny vek brankára.",
+    defaultInvert: false,
+    unit: "rokov",
+    getValue: (p) => (p.age != null && p.age > 0 ? p.age : null),
+  },
+];
+
+export const GOALIE_METRIC_BY_KEY: Record<string, CatalogMetricItem> = Object.fromEntries(
+  GOALIE_CATALOG_METRICS.map((m) => [m.key, m])
+);
+
+

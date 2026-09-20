@@ -61,6 +61,40 @@ export const DEFAULT_LIVE_CALC_WEIGHTS: LiveCalcWeights = {
   },
 };
 
+export type LiveCalcGoalieWeights = {
+  sc: { ldSv: number; mdSv: number; gsax60: number };
+  rt: { hdSv: number; hdGsax: number };
+  hs: { hdSv: number; gsax60: number };
+  ag: { mdSv: number; hdSv: number };
+  rb: { rebCtrl: number };
+  en: { icetime: number };
+  sz: { sz: number };
+  ex: { careerRegGP: number; careerPoGP: number };
+  du: { availability: number };
+  ph: { freezePct: number };
+  sk: { agility: number };
+  ps: { hdSv: number };
+  ld: { experience: number };
+  customMetrics?: Record<string, CustomMetricConfig[]>;
+};
+
+export const DEFAULT_GOALIE_WEIGHTS: LiveCalcGoalieWeights = {
+  sc: { ldSv: 0.40, mdSv: 0.35, gsax60: 0.25 },
+  rt: { hdSv: 0.60, hdGsax: 0.40 },
+  hs: { hdSv: 0.50, gsax60: 0.50 },
+  ag: { mdSv: 0.50, hdSv: 0.50 },
+  rb: { rebCtrl: 1.0 },
+  en: { icetime: 1.0 },
+  sz: { sz: 1.0 },
+  ex: { careerRegGP: 0.70, careerPoGP: 0.30 },
+  du: { availability: 1.0 },
+  ph: { freezePct: 1.0 },
+  sk: { agility: 1.0 },
+  ps: { hdSv: 1.0 },
+  ld: { experience: 1.0 },
+  customMetrics: {},
+};
+
 export type LiveCalcConfigData = {
   latestSeason: string;
   previousSeason: string;
@@ -73,6 +107,7 @@ export type LiveCalcConfigData = {
   ahlNhleLatest: number;
   ahlNhlePrevious: number;
   weights: LiveCalcWeights;
+  goalieWeights: LiveCalcGoalieWeights;
   managerTeamIds?: number[];
   lastCalculatedAt: Date | null;
   lastSyncedAt: Date | null;
@@ -90,6 +125,7 @@ export const DEFAULT_CONFIG: LiveCalcConfigData = {
   ahlNhleLatest: 0.446,
   ahlNhlePrevious: 0.448,
   weights: DEFAULT_LIVE_CALC_WEIGHTS,
+  goalieWeights: DEFAULT_GOALIE_WEIGHTS,
   managerTeamIds: [],
   lastCalculatedAt: null,
   lastSyncedAt: null,
@@ -102,11 +138,19 @@ export async function getLiveCalculatorConfig(): Promise<LiveCalcConfigData> {
     if (!row) return DEFAULT_CONFIG;
 
     let weights = DEFAULT_LIVE_CALC_WEIGHTS;
+    let goalieWeights = DEFAULT_GOALIE_WEIGHTS;
     if (row.weightsJson && typeof row.weightsJson === "object") {
+      const wj = row.weightsJson as any;
       weights = {
         ...DEFAULT_LIVE_CALC_WEIGHTS,
-        ...(row.weightsJson as Partial<LiveCalcWeights>),
+        ...(wj as Partial<LiveCalcWeights>),
       };
+      if (wj.goalieWeights && typeof wj.goalieWeights === "object") {
+        goalieWeights = {
+          ...DEFAULT_GOALIE_WEIGHTS,
+          ...wj.goalieWeights,
+        };
+      }
     }
 
     return {
@@ -121,6 +165,7 @@ export async function getLiveCalculatorConfig(): Promise<LiveCalcConfigData> {
       ahlNhleLatest: row.ahlNhleLatest ?? DEFAULT_CONFIG.ahlNhleLatest,
       ahlNhlePrevious: row.ahlNhlePrevious ?? DEFAULT_CONFIG.ahlNhlePrevious,
       weights,
+      goalieWeights,
       managerTeamIds: row.managerTeamIds ?? [],
       lastCalculatedAt: row.lastCalculatedAt,
       lastSyncedAt: row.lastSyncedAt,
@@ -142,6 +187,15 @@ export async function updateLiveCalculatorConfig(data: Partial<LiveCalcConfigDat
       ...current.weights,
       ...(data.weights ?? {}),
     },
+    goalieWeights: {
+      ...current.goalieWeights,
+      ...(data.goalieWeights ?? {}),
+    },
+  };
+
+  const weightsJsonToSave = {
+    ...merged.weights,
+    goalieWeights: merged.goalieWeights,
   };
 
   await prisma.liveCalcConfig.upsert({
@@ -157,7 +211,7 @@ export async function updateLiveCalculatorConfig(data: Partial<LiveCalcConfigDat
       nhlGpPrevMin: merged.nhlGpPrevMin,
       ahlNhleLatest: merged.ahlNhleLatest,
       ahlNhlePrevious: merged.ahlNhlePrevious,
-      weightsJson: merged.weights as any,
+      weightsJson: weightsJsonToSave as any,
       managerTeamIds: merged.managerTeamIds ?? [],
     },
     create: {
@@ -172,7 +226,7 @@ export async function updateLiveCalculatorConfig(data: Partial<LiveCalcConfigDat
       nhlGpPrevMin: merged.nhlGpPrevMin,
       ahlNhleLatest: merged.ahlNhleLatest,
       ahlNhlePrevious: merged.ahlNhlePrevious,
-      weightsJson: merged.weights as any,
+      weightsJson: weightsJsonToSave as any,
       managerTeamIds: merged.managerTeamIds ?? [],
     },
   });

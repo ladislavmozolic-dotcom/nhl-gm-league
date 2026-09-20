@@ -293,3 +293,145 @@ export function projectParam(param: "ck" | "sc" | "pa", pos: Pos, lastStat: numb
   const blended = LAST_WEIGHT * lastR + CUR_WEIGHT * curR;
   return lookup(pos === "D" ? s.D : s.F, blended);
 }
+
+// ========================= GOALIES =========================
+export const ALL_GOALIE_PARAMS = [
+  "sk", "du", "en", "sz", "ag", "rb", "sc", "hs", "rt", "ph", "ps", "ex", "ld",
+] as const;
+export type GoalieParamKey = (typeof ALL_GOALIE_PARAMS)[number];
+
+export const GOALIE_PARAM_META: Record<GoalieParamKey, { label: string; name: string }> = {
+  sk: { label: "SK", name: "Skating (Agility & mobility)" },
+  du: { label: "DU", name: "Durability (Game availability)" },
+  en: { label: "EN", name: "Endurance (Ice time / Starter workload)" },
+  sz: { label: "SZ", name: "Size (Height cm)" },
+  ag: { label: "AG", name: "Agility (Lateral / mid-range coverage)" },
+  rb: { label: "RB", name: "Rebound Control (Fewer rebounds allowed)" },
+  sc: { label: "SC", name: "Style Control (Low/med danger stops & GSAx)" },
+  hs: { label: "HS", name: "Hand Speed (Quick stops & high-danger saves)" },
+  rt: { label: "RT", name: "Reaction Time (High-danger stops & HD GSAx)" },
+  ph: { label: "PH", name: "Puck Handling (Freeze % & puck control)" },
+  ps: { label: "PS", name: "Penalty Shot (High-danger 1-on-1 stopping)" },
+  ex: { label: "EX", name: "Experience (Career GP: regular & playoff)" },
+  ld: { label: "LD", name: "Leadership (Experience & captaincy)" },
+};
+
+export type ProjGoalie = {
+  id: number;
+  slug: string;
+  name: string;
+  position: string | null;
+  teamId: number;
+  rosterType: string | null;
+  age: number | null;
+  number: number | null;
+  photoUrl: string | null;
+  overall: number | null;
+  overallProjected?: number | null;
+  classification?: "NHL" | "AHL/FARM" | null;
+  statusText?: string | null;
+  gp: number;
+  actual: Record<GoalieParamKey, number | null>;
+  projected: Record<GoalieParamKey, number | null>;
+  stats?: {
+    svPct?: number | null;
+    gaa?: number | null;
+    gsax?: number | null;
+    gsax60?: number | null;
+    hdSv?: number | null;
+    mdSv?: number | null;
+    ldSv?: number | null;
+    rebCtrl?: number | null;
+    freezePct?: number | null;
+    toi?: number | null;
+    shots?: number | null;
+  };
+};
+
+/** Project every goalie from live calculated ratings or existing GoalieRating. */
+export async function projectAllGoalies(): Promise<{ rows: ProjGoalie[]; active: boolean }> {
+  const goalies = await prisma.player.findMany({
+    where: { isGoalie: true, rosterType: { in: ["NHL", "AHL"] } },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      position: true,
+      teamId: true,
+      rosterType: true,
+      age: true,
+      number: true,
+      photoUrl: true,
+      overall: true,
+      curSeasonGP: true,
+      lastSeasonGP: true,
+      liveCalculatorRatings: true,
+      goalieRating: {
+        select: {
+          sk: true, du: true, en: true, sz: true, ag: true, rb: true,
+          sc: true, hs: true, rt: true, ph: true, ps: true, ex: true,
+          ld: true, mo: true, overall: true,
+        },
+      },
+    },
+    orderBy: [{ overall: "desc" }, { name: "asc" }],
+  });
+
+  const active = goalies.filter((g) => Number(g.curSeasonGP ?? 0) >= 10).length >= 10;
+
+  const rows: ProjGoalie[] = goalies.map((g) => {
+    const live = g.liveCalculatorRatings as any;
+
+    if (live && live.actual && live.projected) {
+      const gp = Number(live.nhlGpLatest || g.curSeasonGP || 0);
+      return {
+        id: g.id,
+        slug: g.slug,
+        name: g.name,
+        position: g.position || "G",
+        teamId: g.teamId,
+        rosterType: g.rosterType,
+        age: g.age,
+        number: g.number,
+        photoUrl: g.photoUrl,
+        overall: live.overallActual ?? g.goalieRating?.overall ?? g.overall,
+        overallProjected: live.overallProjected ?? g.goalieRating?.overall ?? g.overall,
+        classification: live.classification ?? null,
+        statusText: live.status ?? null,
+        gp,
+        actual: live.actual,
+        projected: live.projected,
+        stats: live.stats,
+      };
+    }
+
+    const actual = {} as Record<GoalieParamKey, number | null>;
+    const projected = {} as Record<GoalieParamKey, number | null>;
+    for (const key of ALL_GOALIE_PARAMS) {
+      const val = g.goalieRating ? (g.goalieRating as any)[key] ?? null : null;
+      actual[key] = val;
+      projected[key] = val;
+    }
+
+    return {
+      id: g.id,
+      slug: g.slug,
+      name: g.name,
+      position: g.position || "G",
+      teamId: g.teamId,
+      rosterType: g.rosterType,
+      age: g.age,
+      number: g.number,
+      photoUrl: g.photoUrl,
+      overall: g.goalieRating?.overall ?? g.overall,
+      overallProjected: g.goalieRating?.overall ?? g.overall,
+      classification: g.rosterType === "NHL" ? "NHL" : "AHL/FARM",
+      statusText: "STHS Baseline",
+      gp: Number(g.curSeasonGP ?? 0),
+      actual,
+      projected,
+    };
+  });
+
+  return { rows, active };
+}

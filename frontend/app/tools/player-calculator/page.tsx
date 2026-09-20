@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui";
 import {
   projectAllSkaters,
+  projectAllGoalies,
   LAST_WEIGHT,
   CUR_WEIGHT,
   ACTIVATE_AT_GP,
@@ -46,9 +47,16 @@ export default async function PlayerCalculatorPage({
 
   const selectedTeam = teams.find((t) => t.slug === teamSlug) ?? teams[0];
 
-  // Fetch all skaters projected data, live config, admin rights and calculator manager rights
-  const [{ rows: allSkaters, active }, liveConfig, admin, canManage] = await Promise.all([
+  // Fetch all skaters & goalies projected data, live config, admin rights and calculator manager rights
+  const [
+    { rows: allSkaters, active },
+    { rows: allGoalies },
+    liveConfig,
+    admin,
+    canManage,
+  ] = await Promise.all([
     projectAllSkaters(),
+    projectAllGoalies(),
     getLiveCalculatorConfig(),
     isAdmin(),
     canManageLiveCalculator(),
@@ -58,13 +66,14 @@ export default async function PlayerCalculatorPage({
     <div className="space-y-6 py-2">
       <PageHeader
         title="Live Player Calculator"
-        subtitle="Kompletný prehľad a živý prepočet parametrov korčuliarov (NextGen V10 model: MoneyPuck, NHL API, EDGE a AHL)"
+        subtitle="Kompletný prehľad a živý prepočet parametrov korčuliarov a brankárov (NextGen V10 model: MoneyPuck, NHL API, EDGE a AHL)"
       />
 
       <PlayerCalculatorView
         teams={teams}
         selectedTeam={selectedTeam}
         allSkaters={allSkaters}
+        allGoalies={allGoalies}
         active={active}
         lastWeight={liveConfig.previousWeight}
         curWeight={liveConfig.latestWeight}

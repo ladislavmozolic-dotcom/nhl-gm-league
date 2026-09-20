@@ -1,11 +1,13 @@
 import { prisma } from "./prisma";
 import { importMoneyPuckSkaters } from "./moneypuck-skater-import";
+import { importMoneyPuckGoalies } from "./moneypuck-import-server";
 import { fetchAhlSkaterStats, importAhlSkaterStats } from "./ahl-import";
 import { getLiveCalculatorConfig } from "./live-calculator-config";
 
 export type SyncResult = {
   success: boolean;
   moneyPuckMatched: number;
+  moneyPuckGoaliesMatched?: number;
   ahlMatchedCur: number;
   ahlMatchedLast: number;
   timestamp: string;
@@ -14,7 +16,7 @@ export type SyncResult = {
 
 /**
  * Synchronize live data from external sources:
- * - MoneyPuck (2025 and 2024 skaters & teams CSVs)
+ * - MoneyPuck (skaters & goalies CSVs)
  * - AHL HockeyTech (current season 90 and previous seasons)
  */
 export async function syncLiveCalculatorData(): Promise<SyncResult> {
@@ -22,14 +24,24 @@ export async function syncLiveCalculatorData(): Promise<SyncResult> {
     const config = await getLiveCalculatorConfig();
     console.log("[LiveCalcSync] Starting live data ingestion...");
 
-    // 1. Ingest MoneyPuck data (covers goals, assists, xG, hits, blocks, situational splits)
+    // 1. Ingest MoneyPuck skaters data
     let mpMatched = 0;
     try {
       const mpRes = await importMoneyPuckSkaters();
       mpMatched = mpRes.matched;
-      console.log(`[LiveCalcSync] MoneyPuck synced: ${mpMatched} players matched across seasons.`);
+      console.log(`[LiveCalcSync] MoneyPuck skaters synced: ${mpMatched} players matched.`);
     } catch (e: any) {
-      console.warn("[LiveCalcSync] MoneyPuck sync warning:", e?.message);
+      console.warn("[LiveCalcSync] MoneyPuck skaters sync warning:", e?.message);
+    }
+
+    // 1b. Ingest MoneyPuck goalies data
+    let mpGoaliesMatched = 0;
+    try {
+      const gRes = await importMoneyPuckGoalies();
+      mpGoaliesMatched = gRes.matched;
+      console.log(`[LiveCalcSync] MoneyPuck goalies synced: ${mpGoaliesMatched} goalies matched.`);
+    } catch (e: any) {
+      console.warn("[LiveCalcSync] MoneyPuck goalies sync warning:", e?.message);
     }
 
     // 2. Ingest AHL stats
@@ -62,6 +74,7 @@ export async function syncLiveCalculatorData(): Promise<SyncResult> {
     return {
       success: true,
       moneyPuckMatched: mpMatched,
+      moneyPuckGoaliesMatched: mpGoaliesMatched,
       ahlMatchedCur: ahlCurMatched,
       ahlMatchedLast: ahlLastMatched,
       timestamp: now.toISOString(),
