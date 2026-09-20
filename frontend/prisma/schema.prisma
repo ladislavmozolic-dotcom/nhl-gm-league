@@ -1549,6 +1549,7 @@ model LiveCalcConfig {
   ahlNhleLatest    Float     @default(0.446)
   ahlNhlePrevious  Float     @default(0.448)
   weightsJson      Json?
+  managerTeamIds   Int[]     @default([])
   lastCalculatedAt DateTime?
   lastSyncedAt     DateTime?
   updatedAt        DateTime  @updatedAt

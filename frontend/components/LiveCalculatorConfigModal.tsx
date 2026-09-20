@@ -20,6 +20,8 @@ import {
   getPromotionStatusAction,
   promoteLiveCalculatorRatingsAction,
   restoreSthsBackupAction,
+  getAllTeamsForAssignmentAction,
+  TeamAssignmentItem,
   PromotionStatus,
 } from "@/lib/live-calculator-actions";
 
@@ -28,17 +30,22 @@ export default function LiveCalculatorConfigModal({
   onClose,
   initialConfig,
   isAdmin,
+  canManage = false,
 }: {
   isOpen: boolean;
   onClose: () => void;
   initialConfig: LiveCalcConfigData;
   isAdmin: boolean;
+  canManage?: boolean;
 }) {
+  const isPermitted = isAdmin || canManage;
   const [config, setConfig] = useState<LiveCalcConfigData>(initialConfig);
   const [activeTab, setActiveTab] = useState<"general" | "weights" | "ahl" | "promotion">("general");
   const [isPending, startTransition] = useTransition();
   const [statusMsg, setStatusMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [promoStatus, setPromoStatus] = useState<PromotionStatus | null>(null);
+  const [eligibleTeams, setEligibleTeams] = useState<TeamAssignmentItem[]>([]);
+  const [teamFilter, setTeamFilter] = useState("");
 
   // Add Custom Metric Modal State
   const [addModal, setAddModal] = useState<{
@@ -275,9 +282,22 @@ export default function LiveCalculatorConfigModal({
 
   useEffect(() => {
     if (isOpen) {
-      loadPromoStatus();
+      if (isAdmin) {
+        loadPromoStatus();
+        getAllTeamsForAssignmentAction()
+          .then(setEligibleTeams)
+          .catch((err) => console.error("Failed to load eligible teams:", err));
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, isAdmin]);
+
+  const handleToggleManagerTeam = (teamId: number) => {
+    const current = config.managerTeamIds ?? [];
+    const next = current.includes(teamId)
+      ? current.filter((id) => id !== teamId)
+      : [...current, teamId];
+    setConfig({ ...config, managerTeamIds: next });
+  };
 
   if (!isOpen) return null;
 
@@ -655,26 +675,28 @@ export default function LiveCalculatorConfigModal({
           >
             AHL & NHLe (V10 Ochrana)
           </button>
-          <button
-            onClick={() => {
-              setActiveTab("promotion");
-              loadPromoStatus();
-            }}
-            className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition flex items-center gap-1.5 ${
-              activeTab === "promotion"
-                ? "border-amber-400 text-amber-400"
-                : "border-transparent text-slate-400 hover:text-slate-200"
-            }`}
-          >
-            <span>👑</span>
-            <span>Aplikovať do STHS (Komisár)</span>
-            {promoStatus?.hasBackup && (
-              <span
-                title="Záloha existuje"
-                className="w-2 h-2 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50 inline-block ml-0.5"
-              />
-            )}
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => {
+                setActiveTab("promotion");
+                loadPromoStatus();
+              }}
+              className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition flex items-center gap-1.5 ${
+                activeTab === "promotion"
+                  ? "border-amber-400 text-amber-400"
+                  : "border-transparent text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <span>👑</span>
+              <span>Aplikovať do STHS (Komisár)</span>
+              {promoStatus?.hasBackup && (
+                <span
+                  title="Záloha existuje"
+                  className="w-2 h-2 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50 inline-block ml-0.5"
+                />
+              )}
+            </button>
+          )}
         </div>
 
         {/* Content */}
@@ -799,6 +821,88 @@ export default function LiveCalculatorConfigModal({
                     </div>
                   </div>
                 </div>
+
+                {/* Admin GM Delegation for Live Calculator */}
+                {isAdmin && (
+                  <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3 sm:col-span-2">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <h3 className="font-semibold text-slate-200 text-sm flex items-center gap-2">
+                          <span>👥</span> Poverení GMovia (Správa Live Kalkulátora)
+                        </h3>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          Označte tímy / GM, ktorí budú mať prístup <strong>výhradne k tomuto kalkulátoru</strong> (úprava váh, sync, prepočet), bez administrátorských práv nad ligou.
+                        </p>
+                      </div>
+                      <span className="text-xs px-2.5 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-semibold font-mono">
+                        {(config.managerTeamIds ?? []).length} poverených
+                      </span>
+                    </div>
+
+                    {/* Team search input */}
+                    <div className="pt-1">
+                      <input
+                        type="text"
+                        placeholder="Filtrovať podľa tímu, kódu alebo mena GM..."
+                        value={teamFilter}
+                        onChange={(e) => setTeamFilter(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 placeholder-slate-500 text-xs focus:border-sky-400 outline-none"
+                      />
+                    </div>
+
+                    {/* Teams grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-56 overflow-y-auto pr-1 border border-slate-800 rounded-lg p-2.5 bg-slate-950/40">
+                      {eligibleTeams
+                        .filter((t) => {
+                          if (!teamFilter) return true;
+                          const q = teamFilter.toLowerCase();
+                          return (
+                            t.name.toLowerCase().includes(q) ||
+                            (t.code && t.code.toLowerCase().includes(q)) ||
+                            t.gmName.toLowerCase().includes(q)
+                          );
+                        })
+                        .map((team) => {
+                          const isAssigned = (config.managerTeamIds ?? []).includes(team.id);
+                          return (
+                            <label
+                              key={team.id}
+                              className={`flex items-start gap-2.5 p-2 rounded-lg border cursor-pointer transition ${
+                                isAssigned
+                                  ? "bg-indigo-950/50 border-indigo-500/60 text-white"
+                                  : "bg-slate-900/50 border-slate-800 text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isAssigned}
+                                onChange={() => handleToggleManagerTeam(team.id)}
+                                className="mt-0.5 rounded border-slate-700 text-indigo-600 focus:ring-indigo-500 bg-slate-800"
+                              />
+                              <div className="min-w-0 flex-1 leading-tight">
+                                <div className="text-xs font-semibold truncate flex items-center justify-between gap-1">
+                                  <span>{team.name}</span>
+                                  {team.code && (
+                                    <span className="text-[10px] text-slate-500 font-mono">
+                                      {team.code}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[10px] text-slate-400 truncate mt-0.5">
+                                  GM: <span className={isAssigned ? "text-indigo-300 font-medium" : "text-slate-300"}>{team.gmName}</span>
+                                </div>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      {eligibleTeams.length === 0 && (
+                        <div className="col-span-full text-center py-4 text-slate-500 text-xs">
+                          Načítavam zoznam tímov...
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1568,7 +1672,7 @@ export default function LiveCalculatorConfigModal({
             </div>
           )}
 
-          {activeTab === "promotion" && (
+          {activeTab === "promotion" && isAdmin && (
             <div className="space-y-6">
               {/* Alert note */}
               <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-2">
@@ -1719,7 +1823,7 @@ export default function LiveCalculatorConfigModal({
         <div className="px-6 py-4 border-t border-slate-800 bg-slate-900/90 flex items-center justify-between gap-3">
           <button
             onClick={handleResetDefaults}
-            disabled={!isAdmin || isPending}
+            disabled={!isPermitted || isPending}
             className="text-xs text-slate-400 hover:text-slate-200 underline transition disabled:opacity-50"
           >
             Obnoviť predvolené
@@ -1728,7 +1832,7 @@ export default function LiveCalculatorConfigModal({
           <div className="flex items-center gap-3">
             <button
               onClick={handleSync}
-              disabled={!isAdmin || isPending}
+              disabled={!isPermitted || isPending}
               className="px-3.5 py-2 rounded-xl bg-indigo-600/80 hover:bg-indigo-600 text-white font-medium text-xs transition flex items-center gap-1.5 shadow-md shadow-indigo-600/20 disabled:opacity-50"
             >
               <span>{isPending ? "⏳" : "🔄"}</span>
@@ -1737,7 +1841,7 @@ export default function LiveCalculatorConfigModal({
 
             <button
               onClick={handleRecompute}
-              disabled={!isAdmin || isPending}
+              disabled={!isPermitted || isPending}
               className="px-3.5 py-2 rounded-xl bg-emerald-600/80 hover:bg-emerald-600 text-white font-medium text-xs transition flex items-center gap-1.5 shadow-md shadow-emerald-600/20 disabled:opacity-50"
             >
               <span>{isPending ? "⏳" : "⚡"}</span>
@@ -1746,7 +1850,7 @@ export default function LiveCalculatorConfigModal({
 
             <button
               onClick={handleSave}
-              disabled={!isAdmin || isPending}
+              disabled={!isPermitted || isPending}
               className="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs transition shadow-md shadow-sky-500/20 disabled:opacity-50"
             >
               {isPending ? "Ukladám…" : "Uložiť nastavenia"}

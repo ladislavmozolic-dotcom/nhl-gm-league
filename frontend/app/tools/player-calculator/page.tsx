@@ -8,6 +8,7 @@ import {
 } from "@/lib/param-projection";
 import { getLiveCalculatorConfig } from "@/lib/live-calculator-config";
 import { isAdmin } from "@/lib/auth";
+import { canManageLiveCalculator } from "@/lib/live-calculator-actions";
 import PlayerCalculatorView from "@/components/PlayerCalculatorView";
 
 export const dynamic = "force-dynamic";
@@ -45,11 +46,12 @@ export default async function PlayerCalculatorPage({
 
   const selectedTeam = teams.find((t) => t.slug === teamSlug) ?? teams[0];
 
-  // Fetch all skaters projected data, live config and admin rights
-  const [{ rows: allSkaters, active }, liveConfig, admin] = await Promise.all([
+  // Fetch all skaters projected data, live config, admin rights and calculator manager rights
+  const [{ rows: allSkaters, active }, liveConfig, admin, canManage] = await Promise.all([
     projectAllSkaters(),
     getLiveCalculatorConfig(),
     isAdmin(),
+    canManageLiveCalculator(),
   ]);
 
   return (
@@ -69,6 +71,7 @@ export default async function PlayerCalculatorPage({
         activateAtGp={liveConfig.nhlGpLatestMin || ACTIVATE_AT_GP}
         liveConfig={liveConfig}
         isAdmin={admin}
+        canManage={canManage}
       />
     </div>
   );

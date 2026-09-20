@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { isAdmin } from "./auth";
+import { isAdmin, getTeamSession } from "./auth";
 import {
   getLiveCalculatorConfig,
   updateLiveCalculatorConfig,
@@ -16,18 +16,34 @@ export async function fetchLiveCalculatorConfigAction(): Promise<LiveCalcConfigD
   return getLiveCalculatorConfig();
 }
 
+/** Check if the current user is commissioner or a designated Live Calculator manager. */
+export async function canManageLiveCalculator(): Promise<boolean> {
+  const teamId = await getTeamSession();
+  if (teamId == null) return false;
+  if (await isAdmin()) return true;
+  const config = await getLiveCalculatorConfig();
+  return (config.managerTeamIds ?? []).includes(teamId);
+}
+
 export async function saveLiveCalculatorConfigAction(data: Partial<LiveCalcConfigData>) {
-  if (!(await isAdmin())) {
-    throw new Error("Iba administrátor ligy môže meniť konfiguráciu kalkulátora.");
+  const isFullAdmin = await isAdmin();
+  const canManage = isFullAdmin || (await canManageLiveCalculator());
+  if (!canManage) {
+    throw new Error("Nemáte oprávnenie meniť konfiguráciu kalkulátora.");
   }
-  const updated = await updateLiveCalculatorConfig(data);
+  // Only the full league administrator (commissioner) can change manager team assignments
+  const updateData = { ...data };
+  if (!isFullAdmin && "managerTeamIds" in updateData) {
+    delete updateData.managerTeamIds;
+  }
+  const updated = await updateLiveCalculatorConfig(updateData);
   revalidatePath("/tools/player-calculator");
   return { success: true, config: updated };
 }
 
 export async function triggerLiveCalculatorRecomputeAction() {
-  if (!(await isAdmin())) {
-    throw new Error("Iba administrátor ligy môže spustiť prepočet kalkulátora.");
+  if (!(await canManageLiveCalculator())) {
+    throw new Error("Nemáte oprávnenie spustiť prepočet kalkulátora.");
   }
   const result = await runLiveCalculatorRecompute();
   revalidatePath("/tools/player-calculator");
@@ -35,13 +51,48 @@ export async function triggerLiveCalculatorRecomputeAction() {
 }
 
 export async function triggerLiveCalculatorSyncAction() {
-  if (!(await isAdmin())) {
-    throw new Error("Iba administrátor ligy môže spustiť synchronizáciu dát.");
+  if (!(await canManageLiveCalculator())) {
+    throw new Error("Nemáte oprávnenie spustiť synchronizáciu dát.");
   }
   const syncResult = await syncLiveCalculatorData();
   const recomputeResult = await runLiveCalculatorRecompute();
   revalidatePath("/tools/player-calculator");
   return { success: true, sync: syncResult, recompute: recomputeResult };
+}
+
+export type TeamAssignmentItem = {
+  id: number;
+  name: string;
+  code: string | null;
+  gmName: string;
+  gmEmail: string | null;
+};
+
+export async function getAllTeamsForAssignmentAction(): Promise<TeamAssignmentItem[]> {
+  if (!(await isAdmin())) {
+    return [];
+  }
+  const teams = await prisma.team.findMany({
+    where: { league: "NHL" },
+    select: {
+      id: true,
+      name: true,
+      code: true,
+      gmFirstName: true,
+      gmLastName: true,
+      gmNickname: true,
+      gmEmail: true,
+    },
+    orderBy: { name: "asc" },
+  });
+
+  return teams.map((t) => ({
+    id: t.id,
+    name: t.name,
+    code: t.code,
+    gmName: t.gmNickname || [t.gmFirstName, t.gmLastName].filter(Boolean).join(" ") || "Bez priradeného GM",
+    gmEmail: t.gmEmail,
+  }));
 }
 
 export type PromotionStatus = {
@@ -53,6 +104,12 @@ export type PromotionStatus = {
 
 export async function checkIsAdminAction(): Promise<boolean> {
   return isAdmin();
+}
+
+export async function checkCanManageAction(): Promise<{ isAdmin: boolean; canManage: boolean }> {
+  const isFullAdmin = await isAdmin();
+  const canManage = isFullAdmin || (await canManageLiveCalculator());
+  return { isAdmin: isFullAdmin, canManage };
 }
 
 /**

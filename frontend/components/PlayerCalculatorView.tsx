@@ -73,6 +73,7 @@ export default function PlayerCalculatorView({
   activateAtGp,
   liveConfig,
   isAdmin = false,
+  canManage = false,
 }: {
   teams: TeamItem[];
   selectedTeam: TeamItem;
@@ -83,6 +84,7 @@ export default function PlayerCalculatorView({
   activateAtGp: number;
   liveConfig?: LiveCalcConfigData;
   isAdmin?: boolean;
+  canManage?: boolean;
 }) {
   const router = useRouter();
 
@@ -374,17 +376,30 @@ export default function PlayerCalculatorView({
             </div>
           </div>
 
-          {/* Quick Status Pill & Admin Tuning */}
+          {/* Quick Status Pill, Excel Export & Tuning */}
           <div className="flex sm:flex-col items-end gap-2 text-right w-full sm:w-auto">
             <div className="flex items-center gap-2 flex-wrap">
-              <button
-                type="button"
-                onClick={() => setConfigModalOpen(true)}
-                className="text-xs font-semibold px-3 py-1.5 rounded-xl border border-indigo-500/40 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 transition flex items-center gap-1.5 shadow-sm hover:scale-[1.02]"
+              {/* Excel Export Button */}
+              <a
+                href="/api/tools/player-calculator/export"
+                download
+                className="text-xs font-semibold px-3 py-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 transition flex items-center gap-1.5 shadow-sm hover:scale-[1.02]"
+                title="Stiahnuť kompletný Excel zošit s hárkami NHL_PLAYERS a AHL_PLAYERS"
               >
-                <span>⚙️</span>
-                <span>Tuning & Nastavenia</span>
-              </button>
+                <span>📥</span>
+                <span>Export do Excelu (.xlsx)</span>
+              </a>
+
+              {(isAdmin || canManage) && (
+                <button
+                  type="button"
+                  onClick={() => setConfigModalOpen(true)}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-xl border border-indigo-500/40 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 transition flex items-center gap-1.5 shadow-sm hover:scale-[1.02]"
+                >
+                  <span>⚙️</span>
+                  <span>Tuning & Nastavenia</span>
+                </button>
+              )}
 
               <div
                 className={`text-xs font-semibold px-3 py-1.5 rounded-xl border inline-flex items-center gap-1.5 ${
@@ -614,6 +629,7 @@ export default function PlayerCalculatorView({
           onClose={() => setConfigModalOpen(false)}
           initialConfig={liveConfig}
           isAdmin={isAdmin}
+          canManage={canManage}
         />
       )}
     </div>

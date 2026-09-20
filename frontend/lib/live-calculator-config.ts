@@ -73,6 +73,7 @@ export type LiveCalcConfigData = {
   ahlNhleLatest: number;
   ahlNhlePrevious: number;
   weights: LiveCalcWeights;
+  managerTeamIds?: number[];
   lastCalculatedAt: Date | null;
   lastSyncedAt: Date | null;
 };
@@ -89,6 +90,7 @@ export const DEFAULT_CONFIG: LiveCalcConfigData = {
   ahlNhleLatest: 0.446,
   ahlNhlePrevious: 0.448,
   weights: DEFAULT_LIVE_CALC_WEIGHTS,
+  managerTeamIds: [],
   lastCalculatedAt: null,
   lastSyncedAt: null,
 };
@@ -119,6 +121,7 @@ export async function getLiveCalculatorConfig(): Promise<LiveCalcConfigData> {
       ahlNhleLatest: row.ahlNhleLatest ?? DEFAULT_CONFIG.ahlNhleLatest,
       ahlNhlePrevious: row.ahlNhlePrevious ?? DEFAULT_CONFIG.ahlNhlePrevious,
       weights,
+      managerTeamIds: row.managerTeamIds ?? [],
       lastCalculatedAt: row.lastCalculatedAt,
       lastSyncedAt: row.lastSyncedAt,
     };
@@ -134,6 +137,7 @@ export async function updateLiveCalculatorConfig(data: Partial<LiveCalcConfigDat
   const merged: LiveCalcConfigData = {
     ...current,
     ...data,
+    managerTeamIds: data.managerTeamIds ?? current.managerTeamIds ?? [],
     weights: {
       ...current.weights,
       ...(data.weights ?? {}),
@@ -154,6 +158,7 @@ export async function updateLiveCalculatorConfig(data: Partial<LiveCalcConfigDat
       ahlNhleLatest: merged.ahlNhleLatest,
       ahlNhlePrevious: merged.ahlNhlePrevious,
       weightsJson: merged.weights as any,
+      managerTeamIds: merged.managerTeamIds ?? [],
     },
     create: {
       id: 1,
@@ -168,6 +173,7 @@ export async function updateLiveCalculatorConfig(data: Partial<LiveCalcConfigDat
       ahlNhleLatest: merged.ahlNhleLatest,
       ahlNhlePrevious: merged.ahlNhlePrevious,
       weightsJson: merged.weights as any,
+      managerTeamIds: merged.managerTeamIds ?? [],
     },
   });
 
