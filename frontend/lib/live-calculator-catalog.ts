@@ -549,6 +549,107 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
       return blend(cVal, lVal, c.gp ?? 0, l.gp ?? 0, cfg.latestWeight, cfg.previousWeight);
     },
   },
+  {
+    key: "mpPenaltiesDrawnPg",
+    label: "Penalties Drawn / GP (Vybojované presilovky na zápas)",
+    source: "moneypuck",
+    description: "Počet vybojovaných faulov/presiloviek pre tím v prepočte na zápas.",
+    defaultInvert: false,
+    unit: "fauly/GP",
+    getValue: (p, cfg) => {
+      const mp = (p.mpSkater as any) ?? {};
+      const c = mp[String(cfg.latestMpYear)] ?? {};
+      const l = mp[String(cfg.previousMpYear)] ?? {};
+      const cVal = safeRate(c.penaltiesDrawn, c.gp ?? 0);
+      const lVal = safeRate(l.penaltiesDrawn, l.gp ?? 0);
+      return blend(cVal, lVal, c.gp ?? 0, l.gp ?? 0, cfg.latestWeight, cfg.previousWeight);
+    },
+  },
+  {
+    key: "mpPenaltiesDrawn60",
+    label: "Penalties Drawn / 60 (Vybojované presilovky / 60 min)",
+    source: "moneypuck",
+    description: "Frekvencia vybojovaných faulov/presiloviek súpera za 60 minút na ľade.",
+    defaultInvert: false,
+    unit: "fauly/60",
+    getValue: (p, cfg) => {
+      const mp = (p.mpSkater as any) ?? {};
+      const c = mp[String(cfg.latestMpYear)] ?? {};
+      const l = mp[String(cfg.previousMpYear)] ?? {};
+      const cVal = safePer60(c.penaltiesDrawn, c.toi);
+      const lVal = safePer60(l.penaltiesDrawn, l.toi);
+      return blend(cVal, lVal, c.gp ?? 0, l.gp ?? 0, cfg.latestWeight, cfg.previousWeight);
+    },
+  },
+  {
+    key: "mpPenaltiesTakenPg",
+    label: "Penalties Taken / GP (Spáchané fauly na zápas)",
+    source: "moneypuck",
+    description: "Počet menších a väčších trestov udelených hráčovi na zápas (menej = lepšie).",
+    defaultInvert: true,
+    unit: "fauly/GP",
+    getValue: (p, cfg) => {
+      const mp = (p.mpSkater as any) ?? {};
+      const c = mp[String(cfg.latestMpYear)] ?? {};
+      const l = mp[String(cfg.previousMpYear)] ?? {};
+      const cVal = safeRate(c.penalties, c.gp ?? 0);
+      const lVal = safeRate(l.penalties, l.gp ?? 0);
+      return blend(cVal, lVal, c.gp ?? 0, l.gp ?? 0, cfg.latestWeight, cfg.previousWeight);
+    },
+  },
+  {
+    key: "mpPenaltiesTaken60",
+    label: "Penalties Taken / 60 (Spáchané fauly / 60 min)",
+    source: "moneypuck",
+    description: "Frekvencia udelených trestov za 60 minút na ľade (menej = lepšie).",
+    defaultInvert: true,
+    unit: "fauly/60",
+    getValue: (p, cfg) => {
+      const mp = (p.mpSkater as any) ?? {};
+      const c = mp[String(cfg.latestMpYear)] ?? {};
+      const l = mp[String(cfg.previousMpYear)] ?? {};
+      const cVal = safePer60(c.penalties, c.toi);
+      const lVal = safePer60(l.penalties, l.toi);
+      return blend(cVal, lVal, c.gp ?? 0, l.gp ?? 0, cfg.latestWeight, cfg.previousWeight);
+    },
+  },
+  {
+    key: "mpPenaltyBalance",
+    label: "Net Penalties / 60 (Čistá bilancia faulov Drawn − Taken)",
+    source: "moneypuck",
+    description: "Rozdiel medzi vybojovanými a spáchanými faulami za 60 minút (Penalty Differential).",
+    defaultInvert: false,
+    unit: "rozdiel/60",
+    getValue: (p, cfg) => {
+      const mp = (p.mpSkater as any) ?? {};
+      const c = mp[String(cfg.latestMpYear)] ?? {};
+      const l = mp[String(cfg.previousMpYear)] ?? {};
+      const cD = safePer60(c.penaltiesDrawn, c.toi);
+      const cT = safePer60(c.penalties, c.toi);
+      const cVal = cD != null && cT != null ? cD - cT : null;
+
+      const lD = safePer60(l.penaltiesDrawn, l.toi);
+      const lT = safePer60(l.penalties, l.toi);
+      const lVal = lD != null && lT != null ? lD - lT : null;
+      return blend(cVal, lVal, c.gp ?? 0, l.gp ?? 0, cfg.latestWeight, cfg.previousWeight);
+    },
+  },
+  {
+    key: "mpPimDrawnPg",
+    label: "PIM Drawn / GP (Vybojované trestné minúty / zápas)",
+    source: "moneypuck",
+    description: "Koľko trestných minút súperov hráč vybojoval pre svoj tím na zápas.",
+    defaultInvert: false,
+    unit: "min/GP",
+    getValue: (p, cfg) => {
+      const mp = (p.mpSkater as any) ?? {};
+      const c = mp[String(cfg.latestMpYear)] ?? {};
+      const l = mp[String(cfg.previousMpYear)] ?? {};
+      const cVal = safeRate(c.pimDrawn, c.gp ?? 0);
+      const lVal = safeRate(l.pimDrawn, l.gp ?? 0);
+      return blend(cVal, lVal, c.gp ?? 0, l.gp ?? 0, cfg.latestWeight, cfg.previousWeight);
+    },
+  },
 
   // ========================= NHL EDGE =========================
   {
