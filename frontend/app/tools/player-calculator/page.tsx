@@ -45,7 +45,19 @@ export default async function PlayerCalculatorPage({
     orderBy: { name: "asc" },
   });
 
-  const selectedTeam = teams.find((t) => t.slug === teamSlug) ?? teams[0];
+  const ALL_TEAM = {
+    id: 0,
+    slug: "all",
+    code: "ALL",
+    name: "Všetky tímy ligy (All Teams)",
+    logoUrl: null,
+    conference: null,
+    division: null,
+    affiliateTeams: [],
+  };
+
+  const isAll = teamSlug === "all" || !teamSlug;
+  const selectedTeam = isAll ? ALL_TEAM : (teams.find((t) => t.slug === teamSlug) ?? ALL_TEAM);
 
   // Fetch all skaters & goalies projected data, live config, admin rights and calculator manager rights
   const [

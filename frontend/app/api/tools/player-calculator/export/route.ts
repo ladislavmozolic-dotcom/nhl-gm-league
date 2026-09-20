@@ -5,11 +5,29 @@ import { getLiveCalculatorConfig } from "@/lib/live-calculator-config";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url);
+    const teamSlug = searchParams.get("team");
+
+    let targetTeamIds: number[] | null = null;
+    if (teamSlug && teamSlug !== "all") {
+      const t = await prisma.team.findFirst({
+        where: { slug: teamSlug },
+        include: { affiliateTeams: { select: { id: true } } },
+      });
+      if (t) {
+        targetTeamIds = [t.id, ...(t.affiliateTeams?.map((a) => a.id) ?? [])];
+      }
+    }
+
     const [players, goalies, config, teams] = await Promise.all([
       prisma.player.findMany({
-        where: { isGoalie: false, rosterType: { in: ["NHL", "AHL"] } },
+        where: {
+          isGoalie: false,
+          rosterType: { in: ["NHL", "AHL"] },
+          ...(targetTeamIds ? { teamId: { in: targetTeamIds } } : {}),
+        },
         select: {
           id: true,
           slug: true,
@@ -52,7 +70,11 @@ export async function GET() {
         orderBy: [{ overall: "desc" }, { name: "asc" }],
       }),
       prisma.player.findMany({
-        where: { isGoalie: true, rosterType: { in: ["NHL", "AHL"] } },
+        where: {
+          isGoalie: true,
+          rosterType: { in: ["NHL", "AHL"] },
+          ...(targetTeamIds ? { teamId: { in: targetTeamIds } } : {}),
+        },
         select: {
           id: true,
           slug: true,
@@ -292,10 +314,47 @@ export async function GET() {
       ["Brankári v NHL. Vypočítané Live parametre V10 (MoneyPuck & NHL API)."],
       [],
       [
-        "Player", "Team", "Pos", "NHL ID", "League bucket",
-        "NHL GP latest", "NHL GP previous", "Data status",
-        "SK", "DU", "EN", "SZ", "AG", "RB", "SC", "HS", "RT", "PH", "PS", "EX", "LD", "MO", "OV",
-        "SV%", "GAA", "GSAx", "GSAx/60", "HD SV%", "MD SV%", "LD SV%", "RebCtrl", "Freeze %",
+        "Player",
+        "Team",
+        "Pos",
+        "NHL ID",
+        "Age",
+        "League bucket",
+        "NHL GP latest",
+        "NHL GP previous",
+        "Data status",
+        "SK",
+        "DU",
+        "EN",
+        "SZ",
+        "AG",
+        "RB",
+        "SC",
+        "HS",
+        "RT",
+        "PH",
+        "PS",
+        "EX",
+        "LD",
+        "MO",
+        "OV nový",
+        "OV baseline",
+        "OV rozdiel",
+        "SV%",
+        "GAA",
+        "GSAx",
+        "GSAx/60",
+        "HD SV%",
+        "MD SV%",
+        "LD SV%",
+        "RebCtrl",
+        "Freeze %",
+        "TOI min",
+        "SA",
+        "GA",
+        "xGA",
+        "Kariéra ZČ",
+        "Kariéra PO",
       ],
     ];
 
@@ -305,10 +364,47 @@ export async function GET() {
       ["Brankári v AHL/FARM tímoch. Live parametre V10."],
       [],
       [
-        "Player", "Team", "Pos", "NHL ID", "League bucket",
-        "NHL GP latest", "NHL GP previous", "Data status",
-        "SK", "DU", "EN", "SZ", "AG", "RB", "SC", "HS", "RT", "PH", "PS", "EX", "LD", "MO", "OV",
-        "SV%", "GAA", "GSAx", "GSAx/60", "HD SV%", "MD SV%", "LD SV%", "RebCtrl", "Freeze %",
+        "Player",
+        "Team",
+        "Pos",
+        "NHL ID",
+        "Age",
+        "League bucket",
+        "NHL GP latest",
+        "NHL GP previous",
+        "Data status",
+        "SK",
+        "DU",
+        "EN",
+        "SZ",
+        "AG",
+        "RB",
+        "SC",
+        "HS",
+        "RT",
+        "PH",
+        "PS",
+        "EX",
+        "LD",
+        "MO",
+        "OV nový",
+        "OV baseline",
+        "OV rozdiel",
+        "SV%",
+        "GAA",
+        "GSAx",
+        "GSAx/60",
+        "HD SV%",
+        "MD SV%",
+        "LD SV%",
+        "RebCtrl",
+        "Freeze %",
+        "TOI min",
+        "SA",
+        "GA",
+        "xGA",
+        "Kariéra ZČ",
+        "Kariéra PO",
       ],
     ];
 
@@ -337,7 +433,10 @@ export async function GET() {
       const ex = prj.ex ?? gr.ex ?? "";
       const ld = prj.ld ?? gr.ld ?? "";
       const mo = act.mo ?? gr.mo ?? ""; // Morale untouched
-      const ov = live.overallProjected ?? gr.overall ?? "";
+      const ovNew = live.overallProjected ?? gr.overall ?? g.overall ?? "";
+      const ovOld = gr.overall ?? g.overall ?? "";
+      const ovDiff = ovNew && ovOld ? Number(ovNew) - Number(ovOld) : 0;
+      const ovDiffText = ovDiff > 0 ? `+${ovDiff}` : (ovDiff < 0 ? String(ovDiff) : "0");
 
       const stats = live.stats ?? {};
       const svPct = stats.svPct != null ? (stats.svPct * 100).toFixed(1) + " %" : "";
@@ -349,18 +448,55 @@ export async function GET() {
       const ldSv = stats.ldSv != null ? (stats.ldSv * 100).toFixed(1) + " %" : "";
       const rebCtrl = stats.rebCtrl != null ? stats.rebCtrl.toFixed(3) : "";
       const freezePct = stats.freezePct != null ? (stats.freezePct * 100).toFixed(1) + " %" : "";
+      const toiMin = stats.icetime != null ? Math.round(stats.icetime / 60) : "";
+      const sa = stats.shots != null ? stats.shots : "";
+      const ga = stats.goals != null ? stats.goals : "";
+      const xga = stats.xGoals != null ? stats.xGoals.toFixed(1) : "";
+      const carReg = (g.careerGP as any)?.reg ?? "";
+      const carPo = (g.careerGP as any)?.po ?? "";
 
       const row = [
         g.name,
         teamCode,
         g.position || "G",
         g.nhlId ?? "",
+        g.age ?? "",
         live.classification ?? (g.rosterType ?? "NHL"),
         nhlGpLatest,
         nhlGpPrev,
         live.status ?? "STHS Baseline",
-        sk, du, en, sz, ag, rb, sc, hs, rt, ph, ps, ex, ld, mo, ov,
-        svPct, gaa, gsax, gsax60, hdSv, mdSv, ldSv, rebCtrl, freezePct,
+        sk,
+        du,
+        en,
+        sz,
+        ag,
+        rb,
+        sc,
+        hs,
+        rt,
+        ph,
+        ps,
+        ex,
+        ld,
+        mo,
+        ovNew,
+        ovOld,
+        ovDiffText,
+        svPct,
+        gaa,
+        gsax,
+        gsax60,
+        hdSv,
+        mdSv,
+        ldSv,
+        rebCtrl,
+        freezePct,
+        toiMin,
+        sa,
+        ga,
+        xga,
+        carReg,
+        carPo,
       ];
 
       if (isAhl) ahlGoaliesAoa.push(row);
@@ -372,6 +508,7 @@ export async function GET() {
       ["UNHL Live Calculator — Konfigurácia & Parametre"],
       [],
       ["Parameter", "Hodnota"],
+      ["Filter tímov", targetTeamIds ? (teamSlug?.toUpperCase() ?? "Vybraný tím") : "Všetky tímy ligy (ALL)"],
       ["Aktuálna sezóna", config.latestSeason],
       ["Predošlá sezóna", config.previousSeason],
       ["Váha aktuálnej sezóny", `${(config.latestWeight * 100).toFixed(1).replace(/\.0$/, "")} %`],
@@ -414,8 +551,8 @@ export async function GET() {
     // Build workbook
     const wb = XLSX.utils.book_new();
     const wsNhl = XLSX.utils.aoa_to_sheet(nhlAoa);
-    const wsAhl = XLSX.utils.aoa_to_sheet(ahlAoa);
     const wsNhlGoalies = XLSX.utils.aoa_to_sheet(nhlGoaliesAoa);
+    const wsAhl = XLSX.utils.aoa_to_sheet(ahlAoa);
     const wsAhlGoalies = XLSX.utils.aoa_to_sheet(ahlGoaliesAoa);
     const wsCfg = XLSX.utils.aoa_to_sheet(cfgAoa);
 
@@ -459,11 +596,15 @@ export async function GET() {
       { wch: 8 },  // Team
       { wch: 6 },  // Pos
       { wch: 10 }, // NHL ID
+      { wch: 6 },  // Age
       { wch: 14 }, // Bucket
       { wch: 14 }, // GP latest
       { wch: 14 }, // GP prev
       { wch: 25 }, // Status
-      ...Array(15).fill({ wch: 6 }), // Ratings SK..OV
+      ...Array(14).fill({ wch: 6 }), // Ratings SK..MO
+      { wch: 9 },  // OV nový
+      { wch: 11 }, // OV baseline
+      { wch: 11 }, // OV rozdiel
       { wch: 10 }, // SV%
       { wch: 8 },  // GAA
       { wch: 8 },  // GSAx
@@ -473,6 +614,12 @@ export async function GET() {
       { wch: 10 }, // LD SV%
       { wch: 10 }, // RebCtrl
       { wch: 10 }, // Freeze %
+      { wch: 10 }, // TOI min
+      { wch: 8 },  // SA
+      { wch: 8 },  // GA
+      { wch: 8 },  // xGA
+      { wch: 12 }, // Kariéra ZČ
+      { wch: 12 }, // Kariéra PO
     ];
     wsNhlGoalies["!cols"] = goalieCols;
     wsAhlGoalies["!cols"] = goalieCols;
@@ -480,14 +627,15 @@ export async function GET() {
     wsCfg["!cols"] = [{ wch: 28 }, { wch: 70 }];
 
     XLSX.utils.book_append_sheet(wb, wsNhl, "NHL_PLAYERS");
-    XLSX.utils.book_append_sheet(wb, wsAhl, "AHL_PLAYERS");
     XLSX.utils.book_append_sheet(wb, wsNhlGoalies, "NHL_GOALIES");
+    XLSX.utils.book_append_sheet(wb, wsAhl, "AHL_PLAYERS");
     XLSX.utils.book_append_sheet(wb, wsAhlGoalies, "AHL_GOALIES");
     XLSX.utils.book_append_sheet(wb, wsCfg, "CONFIG_V10");
 
     const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
 
-    const filename = `UNHL_Live_Player_Ratings_V10_${new Date().toISOString().split("T")[0]}.xlsx`;
+    const prefix = targetTeamIds && teamSlug ? `UNHL_${teamSlug.toUpperCase()}` : "UNHL";
+    const filename = `${prefix}_Live_Player_Ratings_V10_${new Date().toISOString().split("T")[0]}.xlsx`;
 
     return new Response(buf, {
       status: 200,

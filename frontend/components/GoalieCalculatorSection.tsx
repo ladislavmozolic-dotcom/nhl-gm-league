@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import Link from "next/link";
 import PlayerLink from "@/components/PlayerLink";
 import PlayerAvatar from "@/components/playerAvatar";
 import { cleanName } from "@/lib/playerName";
@@ -60,6 +61,8 @@ export default function GoalieCalculatorSection({
   onSort,
   active,
   emptyMessage,
+  showTeamBadge,
+  teamMap,
 }: {
   selectedTeam: TeamItem;
   affiliate: TeamItem | null;
@@ -71,6 +74,8 @@ export default function GoalieCalculatorSection({
   onSort: (k: GoalieSortKey) => void;
   active: boolean;
   emptyMessage: string;
+  showTeamBadge?: boolean;
+  teamMap?: Map<number, { id: number; slug: string; code: string; name: string; logoUrl: string | null }>;
 }) {
   const [hovered, setHovered] = useState<{
     player: ProjGoalie;
@@ -96,6 +101,8 @@ export default function GoalieCalculatorSection({
     }, 100);
   };
 
+  const isAll = selectedTeam.slug === "all" || selectedTeam.id === 0;
+
   const nhlAvgOv =
     nhlGoalies.length > 0
       ? (nhlGoalies.reduce((a, b) => a + (b.overallProjected ?? b.overall ?? 0), 0) / nhlGoalies.length).toFixed(1)
@@ -105,14 +112,24 @@ export default function GoalieCalculatorSection({
       ? (ahlGoalies.reduce((a, b) => a + (b.overallProjected ?? b.overall ?? 0), 0) / ahlGoalies.length).toFixed(1)
       : "0";
 
+  const nhlTitle = isAll
+    ? "NHL — Všetci brankári ligy"
+    : `${selectedTeam.name} — NHL Brankári`;
+
+  const ahlTitle = isAll
+    ? "AHL — Všetci brankári ligy (Farma)"
+    : affiliate
+    ? `${affiliate.name} — AHL Farm Brankári`
+    : `${selectedTeam.name} — AHL Farm Brankári`;
+
   return (
     <div className="space-y-6">
       {/* SECTION A: NHL GOALIES */}
       <GoalieTable
-        title={`${selectedTeam.name} — NHL Brankári`}
+        title={nhlTitle}
         badgeText="NHL"
         badgeColor="bg-amber-600/20 text-amber-300 border-amber-500/30"
-        teamLogo={selectedTeam.logoUrl}
+        teamLogo={isAll ? null : selectedTeam.logoUrl}
         goalies={nhlGoalies}
         avgOv={nhlAvgOv}
         viewMode={viewMode}
@@ -122,18 +139,16 @@ export default function GoalieCalculatorSection({
         onRowMouseEnter={handleMouseEnter}
         onRowMouseLeave={handleMouseLeave}
         emptyMessage={emptyMessage || "Žiadni brankári na NHL súpiske nezodpovedajú filtru."}
+        showTeamBadge={showTeamBadge}
+        teamMap={teamMap}
       />
 
       {/* SECTION B: AHL GOALIES */}
       <GoalieTable
-        title={
-          affiliate
-            ? `${affiliate.name} — AHL Farm Brankári`
-            : `${selectedTeam.name} — AHL Farm Brankári`
-        }
+        title={ahlTitle}
         badgeText="AHL"
         badgeColor="bg-purple-600/20 text-purple-300 border-purple-500/30"
-        teamLogo={affiliate?.logoUrl ?? selectedTeam.logoUrl}
+        teamLogo={isAll ? null : affiliate?.logoUrl ?? selectedTeam.logoUrl}
         goalies={ahlGoalies}
         avgOv={ahlAvgOv}
         viewMode={viewMode}
@@ -143,6 +158,8 @@ export default function GoalieCalculatorSection({
         onRowMouseEnter={handleMouseEnter}
         onRowMouseLeave={handleMouseLeave}
         emptyMessage={emptyMessage || "Žiadni brankári na AHL súpiske nezodpovedajú filtru."}
+        showTeamBadge={showTeamBadge}
+        teamMap={teamMap}
       />
 
       {/* Hover comparison popover card */}
@@ -165,6 +182,8 @@ function GoalieTable({
   onRowMouseEnter,
   onRowMouseLeave,
   emptyMessage,
+  showTeamBadge,
+  teamMap,
 }: {
   title: string;
   badgeText: string;
@@ -179,6 +198,8 @@ function GoalieTable({
   onRowMouseEnter: (e: React.MouseEvent, p: ProjGoalie) => void;
   onRowMouseLeave: () => void;
   emptyMessage: string;
+  showTeamBadge?: boolean;
+  teamMap?: Map<number, { id: number; slug: string; code: string; name: string; logoUrl: string | null }>;
 }) {
   const arrow = (k: GoalieSortKey) =>
     sort.key === k ? (sort.dir === "asc" ? " ▲" : " ▾") : "";
@@ -334,7 +355,7 @@ function GoalieTable({
                       <div className="flex items-center gap-2.5 min-w-[170px]">
                         <PlayerAvatar src={p.photoUrl} alt={p.name} size={28} />
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             {p.number != null && (
                               <span className="text-[10px] font-mono text-slate-500">
                                 #{p.number}
@@ -346,6 +367,16 @@ function GoalieTable({
                               name={p.name}
                               className="font-semibold text-white truncate hover:underline"
                             />
+                            {showTeamBadge && p.teamId && teamMap?.has(p.teamId) && (
+                              <Link
+                                href={`/tools/player-calculator?team=${teamMap.get(p.teamId)?.slug ?? "all"}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="shrink-0 px-1.5 py-0.2 rounded text-[10px] font-bold font-mono bg-slate-800/90 hover:bg-amber-600/30 text-slate-300 hover:text-amber-200 border border-slate-700/80 transition"
+                                title={teamMap.get(p.teamId)?.name ?? "Prejsť na tím"}
+                              >
+                                {teamMap.get(p.teamId)?.code ?? "—"}
+                              </Link>
+                            )}
                           </div>
                         </div>
                       </div>
