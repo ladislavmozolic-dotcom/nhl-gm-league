@@ -46,6 +46,7 @@ export default function LiveCalculatorConfigModal({
   const [promoStatus, setPromoStatus] = useState<PromotionStatus | null>(null);
   const [eligibleTeams, setEligibleTeams] = useState<TeamAssignmentItem[]>([]);
   const [teamFilter, setTeamFilter] = useState("");
+  const [autoBalanceSeasons, setAutoBalanceSeasons] = useState<boolean>(true);
 
   // Add Custom Metric Modal State
   const [addModal, setAddModal] = useState<{
@@ -247,7 +248,7 @@ export default function LiveCalculatorConfigModal({
                     <label className="block text-[9px] text-slate-500 mb-0.5 font-mono">Váha:</label>
                     <input
                       type="number"
-                      step="0.05"
+                      step="0.01"
                       min="0"
                       max="1"
                       value={cm.weight}
@@ -704,43 +705,157 @@ export default function LiveCalculatorConfigModal({
           {activeTab === "general" && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
-                  <h3 className="font-semibold text-slate-200 text-sm flex items-center gap-2">
-                    <span>🗓️</span> Váhy sezón
-                  </h3>
-                  <div>
-                    <label className="block text-slate-400 mb-1">
-                      Aktuálna sezóna váha (LatestWeight): {(config.latestWeight * 100).toFixed(0)}%
+                <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-slate-200 text-sm flex items-center gap-2">
+                      <span>🗓️</span> Váhy sezón
+                    </h3>
+                    <label className="flex items-center gap-1.5 cursor-pointer text-slate-400 hover:text-slate-200 text-[11px] select-none">
+                      <input
+                        type="checkbox"
+                        checked={autoBalanceSeasons}
+                        onChange={(e) => setAutoBalanceSeasons(e.target.checked)}
+                        className="rounded border-slate-700 text-sky-500 focus:ring-sky-400 bg-slate-900 w-3.5 h-3.5"
+                      />
+                      <span>Dopočítavať do 100%</span>
                     </label>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-400 mb-1 font-medium text-[11px]">
+                        Aktuálna sezóna (LatestWeight):
+                      </label>
+                      <div className="relative flex items-center">
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          value={parseFloat((config.latestWeight * 100).toFixed(2))}
+                          onChange={(e) => {
+                            const pct = parseFloat(e.target.value);
+                            const val = isNaN(pct) ? 0 : pct / 100;
+                            if (autoBalanceSeasons) {
+                              const prevPct = Math.max(0, 100 - (isNaN(pct) ? 0 : pct));
+                              setConfig({
+                                ...config,
+                                latestWeight: val,
+                                previousWeight: parseFloat((prevPct / 100).toFixed(4)),
+                              });
+                            } else {
+                              setConfig({
+                                ...config,
+                                latestWeight: val,
+                              });
+                            }
+                          }}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 pr-8 text-slate-100 font-mono text-xs focus:border-sky-400 outline-none"
+                        />
+                        <span className="absolute right-3 text-slate-400 text-xs font-mono select-none">
+                          %
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-500 font-mono mt-0.5 block">
+                        Koeficient: {config.latestWeight.toFixed(3)}
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-400 mb-1 font-medium text-[11px]">
+                        Predošlá sezóna (PreviousWeight):
+                      </label>
+                      <div className="relative flex items-center">
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          value={parseFloat((config.previousWeight * 100).toFixed(2))}
+                          onChange={(e) => {
+                            const pct = parseFloat(e.target.value);
+                            const val = isNaN(pct) ? 0 : pct / 100;
+                            if (autoBalanceSeasons) {
+                              const latestPct = Math.max(0, 100 - (isNaN(pct) ? 0 : pct));
+                              setConfig({
+                                ...config,
+                                previousWeight: val,
+                                latestWeight: parseFloat((latestPct / 100).toFixed(4)),
+                              });
+                            } else {
+                              setConfig({
+                                ...config,
+                                previousWeight: val,
+                              });
+                            }
+                          }}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 pr-8 text-slate-100 font-mono text-xs focus:border-sky-400 outline-none"
+                        />
+                        <span className="absolute right-3 text-slate-400 text-xs font-mono select-none">
+                          %
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-500 font-mono mt-0.5 block">
+                        Koeficient: {config.previousWeight.toFixed(3)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+                      <span>Pomer sezón (posuvník):</span>
+                      <span className="font-mono text-slate-200">
+                        {(config.latestWeight * 100).toFixed(1).replace(/\.0$/, "")}% : {(config.previousWeight * 100).toFixed(1).replace(/\.0$/, "")}%
+                      </span>
+                    </div>
                     <input
                       type="range"
                       min="0"
                       max="1"
-                      step="0.05"
-                      value={config.latestWeight}
+                      step="0.001"
+                      value={
+                        config.latestWeight + config.previousWeight > 0
+                          ? config.latestWeight / (config.latestWeight + config.previousWeight)
+                          : 0.5
+                      }
                       onChange={(e) => {
-                        const val = parseFloat(e.target.value);
+                        const ratio = parseFloat(e.target.value);
+                        const total = autoBalanceSeasons ? 1 : (config.latestWeight + config.previousWeight || 1);
                         setConfig({
                           ...config,
-                          latestWeight: val,
-                          previousWeight: parseFloat((1 - val).toFixed(2)),
+                          latestWeight: parseFloat((ratio * total).toFixed(4)),
+                          previousWeight: parseFloat(((1 - ratio) * total).toFixed(4)),
                         });
                       }}
-                      className="w-full accent-sky-400"
+                      className="w-full accent-sky-400 cursor-pointer"
                     />
                   </div>
-                  <div>
-                    <label className="block text-slate-400 mb-1">
-                      Predošlá sezóna váha (PreviousWeight): {(config.previousWeight * 100).toFixed(0)}%
-                    </label>
-                    <input
-                      type="number"
-                      step="0.05"
-                      value={config.previousWeight}
-                      readOnly
-                      className="w-full bg-slate-900/60 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-300 font-mono text-xs"
-                    />
-                  </div>
+
+                  {Math.abs(config.latestWeight + config.previousWeight - 1) > 0.001 && (
+                    <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-between flex-wrap gap-1.5 text-[11px]">
+                      <div className="text-amber-300">
+                        <span>Súčet: </span>
+                        <strong className="font-mono">{((config.latestWeight + config.previousWeight) * 100).toFixed(1)}%</strong>
+                        <span className="text-slate-400 ml-1">
+                          (efektívne {((config.latestWeight / (config.latestWeight + config.previousWeight || 1)) * 100).toFixed(1)}% / {((config.previousWeight / (config.latestWeight + config.previousWeight || 1)) * 100).toFixed(1)}%)
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const sum = config.latestWeight + config.previousWeight;
+                          if (sum > 0) {
+                            setConfig({
+                              ...config,
+                              latestWeight: parseFloat((config.latestWeight / sum).toFixed(4)),
+                              previousWeight: parseFloat((config.previousWeight / sum).toFixed(4)),
+                            });
+                          }
+                        }}
+                        className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 text-[10px] font-semibold border border-amber-500/30 transition"
+                      >
+                        Normalizovať na 100%
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
@@ -924,7 +1039,7 @@ export default function LiveCalculatorConfigModal({
                     <label className="block text-slate-400 mb-1">A/GP (Asistencie / zápas):</label>
                     <input
                       type="number"
-                      step="0.05"
+                      step="0.01"
                       value={config.weights.pa.apg}
                       onChange={(e) =>
                         setConfig({
@@ -942,7 +1057,7 @@ export default function LiveCalculatorConfigModal({
                     <label className="block text-slate-400 mb-1">A/60 All (Všetky herné situácie):</label>
                     <input
                       type="number"
-                      step="0.05"
+                      step="0.01"
                       value={config.weights.pa.a60All}
                       onChange={(e) =>
                         setConfig({
@@ -960,7 +1075,7 @@ export default function LiveCalculatorConfigModal({
                     <label className="block text-slate-400 mb-1">A/60 5v5 (Rovnovážny stav):</label>
                     <input
                       type="number"
-                      step="0.05"
+                      step="0.01"
                       value={config.weights.pa.a60_5v5}
                       onChange={(e) =>
                         setConfig({
@@ -994,7 +1109,7 @@ export default function LiveCalculatorConfigModal({
                     <label className="block text-slate-400 mb-1">G/GP (Góly / zápas):</label>
                     <input
                       type="number"
-                      step="0.05"
+                      step="0.01"
                       value={config.weights.sc.gpg}
                       onChange={(e) =>
                         setConfig({
@@ -1012,7 +1127,7 @@ export default function LiveCalculatorConfigModal({
                     <label className="block text-slate-400 mb-1">G/60 (Góly / 60 min):</label>
                     <input
                       type="number"
-                      step="0.05"
+                      step="0.01"
                       value={config.weights.sc.g60}
                       onChange={(e) =>
                         setConfig({
@@ -1030,7 +1145,7 @@ export default function LiveCalculatorConfigModal({
                     <label className="block text-slate-400 mb-1">xG/60 (Očakávané góly):</label>
                     <input
                       type="number"
-                      step="0.05"
+                      step="0.01"
                       value={config.weights.sc.xg60}
                       onChange={(e) =>
                         setConfig({
@@ -1048,7 +1163,7 @@ export default function LiveCalculatorConfigModal({
                     <label className="block text-slate-400 mb-1">(G - xG)/60 (Finishing):</label>
                     <input
                       type="number"
-                      step="0.05"
+                      step="0.01"
                       value={config.weights.sc.g_xg60}
                       onChange={(e) =>
                         setConfig({
@@ -1085,7 +1200,7 @@ export default function LiveCalculatorConfigModal({
                     <label className="block text-slate-400 mb-1">PK TOI/GP (Oslabenia):</label>
                     <input
                       type="number"
-                      step="0.05"
+                      step="0.01"
                       value={config.weights?.dfD?.pkToiPg ?? DEFAULT_LIVE_CALC_WEIGHTS.dfD.pkToiPg}
                       onChange={(e) =>
                         setConfig({
@@ -1106,7 +1221,7 @@ export default function LiveCalculatorConfigModal({
                     <label className="block text-slate-400 mb-1">inv xGA/60 5v5:</label>
                     <input
                       type="number"
-                      step="0.05"
+                      step="0.01"
                       value={config.weights?.dfD?.xga5 ?? DEFAULT_LIVE_CALC_WEIGHTS.dfD.xga5}
                       onChange={(e) =>
                         setConfig({
@@ -1127,7 +1242,7 @@ export default function LiveCalculatorConfigModal({
                     <label className="block text-slate-400 mb-1">inv Rel xGA/60 5v5:</label>
                     <input
                       type="number"
-                      step="0.05"
+                      step="0.01"
                       value={config.weights?.dfD?.relXga5 ?? DEFAULT_LIVE_CALC_WEIGHTS.dfD.relXga5}
                       onChange={(e) =>
                         setConfig({
@@ -1148,7 +1263,7 @@ export default function LiveCalculatorConfigModal({
                     <label className="block text-slate-400 mb-1">inv GA/60 5v5:</label>
                     <input
                       type="number"
-                      step="0.05"
+                      step="0.01"
                       value={config.weights?.dfD?.ga5 ?? DEFAULT_LIVE_CALC_WEIGHTS.dfD.ga5}
                       onChange={(e) =>
                         setConfig({
@@ -1169,7 +1284,7 @@ export default function LiveCalculatorConfigModal({
                     <label className="block text-slate-400 mb-1">inv Rel xGA PK:</label>
                     <input
                       type="number"
-                      step="0.05"
+                      step="0.01"
                       value={config.weights?.dfD?.relXgaPk ?? DEFAULT_LIVE_CALC_WEIGHTS.dfD.relXgaPk}
                       onChange={(e) =>
                         setConfig({
@@ -1190,7 +1305,7 @@ export default function LiveCalculatorConfigModal({
                     <label className="block text-slate-400 mb-1">Blocks/60 (Bloky):</label>
                     <input
                       type="number"
-                      step="0.05"
+                      step="0.01"
                       value={config.weights?.dfD?.blk60 ?? DEFAULT_LIVE_CALC_WEIGHTS.dfD.blk60}
                       onChange={(e) =>
                         setConfig({
@@ -1211,7 +1326,7 @@ export default function LiveCalculatorConfigModal({
                     <label className="block text-slate-400 mb-1">xGF% (Očakávané góly %):</label>
                     <input
                       type="number"
-                      step="0.05"
+                      step="0.01"
                       value={config.weights?.dfD?.xgfPct ?? DEFAULT_LIVE_CALC_WEIGHTS.dfD.xgfPct}
                       onChange={(e) =>
                         setConfig({
@@ -1251,7 +1366,7 @@ export default function LiveCalculatorConfigModal({
                     <label className="block text-slate-400 mb-1">PK TOI/GP (Oslabenia):</label>
                     <input
                       type="number"
-                      step="0.05"
+                      step="0.01"
                       value={config.weights?.dfF?.pkToiPg ?? DEFAULT_LIVE_CALC_WEIGHTS.dfF.pkToiPg}
                       onChange={(e) =>
                         setConfig({
@@ -1272,7 +1387,7 @@ export default function LiveCalculatorConfigModal({
                     <label className="block text-slate-400 mb-1">inv Rel xGA PK:</label>
                     <input
                       type="number"
-                      step="0.05"
+                      step="0.01"
                       value={config.weights?.dfF?.relXgaPk ?? DEFAULT_LIVE_CALC_WEIGHTS.dfF.relXgaPk}
                       onChange={(e) =>
                         setConfig({
@@ -1293,7 +1408,7 @@ export default function LiveCalculatorConfigModal({
                     <label className="block text-slate-400 mb-1">inv Rel xGA/60 5v5:</label>
                     <input
                       type="number"
-                      step="0.05"
+                      step="0.01"
                       value={config.weights?.dfF?.relXga5 ?? DEFAULT_LIVE_CALC_WEIGHTS.dfF.relXga5}
                       onChange={(e) =>
                         setConfig({
@@ -1314,7 +1429,7 @@ export default function LiveCalculatorConfigModal({
                     <label className="block text-slate-400 mb-1">inv xGA/60 5v5:</label>
                     <input
                       type="number"
-                      step="0.05"
+                      step="0.01"
                       value={config.weights?.dfF?.xga5 ?? DEFAULT_LIVE_CALC_WEIGHTS.dfF.xga5}
                       onChange={(e) =>
                         setConfig({
@@ -1335,7 +1450,7 @@ export default function LiveCalculatorConfigModal({
                     <label className="block text-slate-400 mb-1">inv GA/60 5v5:</label>
                     <input
                       type="number"
-                      step="0.05"
+                      step="0.01"
                       value={config.weights?.dfF?.ga5 ?? DEFAULT_LIVE_CALC_WEIGHTS.dfF.ga5}
                       onChange={(e) =>
                         setConfig({
@@ -1356,7 +1471,7 @@ export default function LiveCalculatorConfigModal({
                     <label className="block text-slate-400 mb-1">xGF% (Očakávané góly %):</label>
                     <input
                       type="number"
-                      step="0.05"
+                      step="0.01"
                       value={config.weights?.dfF?.xgfPct ?? DEFAULT_LIVE_CALC_WEIGHTS.dfF.xgfPct}
                       onChange={(e) =>
                         setConfig({
@@ -1377,7 +1492,7 @@ export default function LiveCalculatorConfigModal({
                     <label className="block text-slate-400 mb-1">Blocks/60 (Bloky):</label>
                     <input
                       type="number"
-                      step="0.05"
+                      step="0.01"
                       value={config.weights?.dfF?.blk60 ?? DEFAULT_LIVE_CALC_WEIGHTS.dfF.blk60}
                       onChange={(e) =>
                         setConfig({
@@ -1412,7 +1527,7 @@ export default function LiveCalculatorConfigModal({
                       <label className="block text-slate-400 mb-1">Hits/60:</label>
                       <input
                         type="number"
-                        step="0.05"
+                        step="0.01"
                         value={config.weights.ck.hit60}
                         onChange={(e) =>
                           setConfig({
@@ -1430,7 +1545,7 @@ export default function LiveCalculatorConfigModal({
                       <label className="block text-slate-400 mb-1">Hits/GP:</label>
                       <input
                         type="number"
-                        step="0.05"
+                        step="0.01"
                         value={config.weights.ck.hitPg}
                         onChange={(e) =>
                           setConfig({
@@ -1460,7 +1575,7 @@ export default function LiveCalculatorConfigModal({
                       <label className="block text-slate-400 mb-1">Penalty balance/60:</label>
                       <input
                         type="number"
-                        step="0.05"
+                        step="0.01"
                         value={config.weights.di.penaltyBalance}
                         onChange={(e) =>
                           setConfig({
@@ -1478,7 +1593,7 @@ export default function LiveCalculatorConfigModal({
                       <label className="block text-slate-400 mb-1">Inverse PIM/60:</label>
                       <input
                         type="number"
-                        step="0.05"
+                        step="0.01"
                         value={config.weights.di.invPim60}
                         onChange={(e) =>
                           setConfig({
@@ -1510,7 +1625,7 @@ export default function LiveCalculatorConfigModal({
                     <label className="block text-slate-400 mb-1">NHL EDGE Bursts &gt;20mph:</label>
                     <input
                       type="number"
-                      step="0.05"
+                      step="0.01"
                       value={config.weights?.sk?.edgeBursts20 ?? DEFAULT_LIVE_CALC_WEIGHTS.sk.edgeBursts20}
                       onChange={(e) =>
                         setConfig({
@@ -1542,7 +1657,7 @@ export default function LiveCalculatorConfigModal({
                     <label className="block text-slate-400 mb-1">Hmotnosť hráča (Weight %):</label>
                     <input
                       type="number"
-                      step="0.05"
+                      step="0.01"
                       value={config.weights?.st?.weightPct ?? DEFAULT_LIVE_CALC_WEIGHTS.st.weightPct}
                       onChange={(e) =>
                         setConfig({
@@ -1576,7 +1691,7 @@ export default function LiveCalculatorConfigModal({
                       <label className="block text-slate-400 mb-1">Kariéra reg. GP:</label>
                       <input
                         type="number"
-                        step="0.05"
+                        step="0.01"
                         value={config.weights?.ex?.careerRegGP ?? DEFAULT_LIVE_CALC_WEIGHTS.ex.careerRegGP}
                         onChange={(e) =>
                           setConfig({
@@ -1597,7 +1712,7 @@ export default function LiveCalculatorConfigModal({
                       <label className="block text-slate-400 mb-1">Kariéra play-off GP:</label>
                       <input
                         type="number"
-                        step="0.05"
+                        step="0.01"
                         value={config.weights?.ex?.careerPoGP ?? DEFAULT_LIVE_CALC_WEIGHTS.ex.careerPoGP}
                         onChange={(e) =>
                           setConfig({

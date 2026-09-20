@@ -96,8 +96,9 @@ export async function runLiveCalculatorRecompute(): Promise<{
     },
   });
 
-  const REC_CUR = config.latestWeight;
-  const REC_LAST = config.previousWeight;
+  const sumSeasonW = (config.latestWeight || 0) + (config.previousWeight || 0);
+  const REC_CUR = sumSeasonW > 0 ? config.latestWeight / sumSeasonW : 0.8;
+  const REC_LAST = sumSeasonW > 0 ? config.previousWeight / sumSeasonW : 0.2;
 
   // 1. Gather stats and classify each player
   type EnrichedPlayer = {

@@ -93,7 +93,12 @@ const blend = (
 ): number | null => {
   const hasC = curVal != null && !isNaN(curVal) && curGP > 0;
   const hasL = lastVal != null && !isNaN(lastVal) && lastGP > 0;
-  if (hasC && hasL) return curVal! * wCur + lastVal! * wLast;
+  if (hasC && hasL) {
+    const sumW = (wCur || 0) + (wLast || 0);
+    const normCur = sumW > 0 ? wCur / sumW : 0.8;
+    const normLast = sumW > 0 ? wLast / sumW : 0.2;
+    return curVal! * normCur + lastVal! * normLast;
+  }
   if (hasC) return curVal!;
   if (hasL) return lastVal!;
   return null;
