@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { syncLiveCalculatorData } from "@/lib/live-calculator-sync";
 import { runLiveCalculatorRecompute } from "@/lib/live-calculator-engine";
+import { runLiveCalculatorGoalieRecompute } from "@/lib/live-calculator-goalie-engine";
 
 export async function POST(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -13,11 +14,13 @@ export async function POST(req: NextRequest) {
     console.log("[Cron LiveCalculator] Starting scheduled sync and recompute...");
     const syncRes = await syncLiveCalculatorData();
     const recomputeRes = await runLiveCalculatorRecompute();
+    const goalieRecomputeRes = await runLiveCalculatorGoalieRecompute();
 
     return NextResponse.json({
       success: true,
       sync: syncRes,
       recompute: recomputeRes,
+      goalieRecompute: goalieRecomputeRes,
       timestamp: new Date().toISOString(),
     });
   } catch (err: any) {
