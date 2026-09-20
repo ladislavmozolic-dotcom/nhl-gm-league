@@ -406,9 +406,27 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
           </div>
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-[10px] font-extrabold tracking-wide text-blue-400 uppercase">{SHORT_SLOT[label] ?? label}</div>
-          <div className={`text-[13px] font-bold truncate ${p ? "text-white" : "text-slate-500 italic font-normal"}`}>{p ? p.name : "— empty —"}</div>
-          {p && <div className="text-slate-500 text-[11px]">OV {p.overall}{p.con != null && <> · CON {p.con}%{p.con < 90 && " ⚠️"}</>}{p.injured && " · 🤕 INJ"}</div>}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] font-extrabold tracking-wide text-blue-400 uppercase">{SHORT_SLOT[label] ?? label}</span>
+            {p && (
+              <span className="text-[11px] font-semibold text-slate-400 tabular-nums">
+                OV {p.overall}{p.con != null && <> · CON {p.con}%{p.con < 90 && " ⚠️"}</>}
+              </span>
+            )}
+          </div>
+          <div className={`text-[13px] font-bold truncate ${p ? "text-white" : "text-slate-500 italic font-normal"}`}>
+            {p ? p.name : "— empty —"}{p?.injured && <span className="text-rose-400 font-semibold"> · 🤕 INJ</span>}
+          </div>
+          {p && (
+            <div className="flex items-center gap-2.5 mt-1">
+              {[{ k: "CK", v: p.ck }, { k: "PA", v: p.pa }, { k: "SC", v: p.sc }, { k: "DF", v: p.df }].map((s) => (
+                <span key={s.k} className="text-[10px] leading-none whitespace-nowrap">
+                  <span className="text-slate-600 font-bold">{s.k}</span>{" "}
+                  <span className="text-slate-300 font-semibold tabular-nums">{s.v ?? "–"}</span>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         <Select value={value} onChange={onChange} pool={pool} overlay />
       </div>
