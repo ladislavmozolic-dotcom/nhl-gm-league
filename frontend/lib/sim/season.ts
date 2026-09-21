@@ -170,10 +170,15 @@ function chooseStarter(team: SeasonTeam, prevRound: number, state: Map<number, G
     });
   // Auto-rotation: a goalie must be at CON >= GOALIE_REST_CON to start. If his CON has
   // dipped below it, the fresher goalie gets the net — so no starter is ridden into the
-  // ground. If BOTH are below the bar (shouldn't happen once rest-day recovery tops
-  // them up), the freshest one starts anyway (can't forfeit for lack of a rested goalie).
+  // ground.
   const eligible = scored.filter((s) => s.g.con >= GOALIE_REST_CON);
   if (eligible.length) return eligible.sort((a, b) => b.score - a.score)[0].g;
+  // Nobody's fully rested. A goalie below PLAY_CON is genuinely gassed and must not
+  // start — fall back to whoever is still fit to dress (>= PLAY_CON) instead.
+  const fit = scored.filter((s) => s.g.con >= PLAY_CON);
+  if (fit.length) return fit.sort((a, b) => b.score - a.score)[0].g;
+  // Both goalies are below PLAY_CON (shouldn't happen once rest-day recovery tops
+  // them up) — can't forfeit for lack of a fit netminder, so the freshest starts anyway.
   return scored.sort((a, b) => b.g.con - a.g.con)[0].g;
 }
 
@@ -414,15 +419,20 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
   // season-long state maps so even players whose team was reloaded keep their evolution.
   // `mo` (the Ratings-strip/Player Compare "MO" parameter) is written to the same
   // value every time so it's always the live mood, not a separate frozen number.
+  // CON is stored to 2 decimal places (the column is a Float) instead of rounded to a
+  // whole number — otherwise every point of in-season shot-load/TOI/PK nuance the engine
+  // already computes (e.g. the PK-workload fractional penalty in skaterConAfter) gets
+  // thrown away the moment it's saved.
+  const con2 = (v: number) => Math.round(v * 100) / 100;
   const updates: Promise<unknown>[] = [];
   for (const team of cache.values()) {
     for (const g of team?.goalies ?? []) {
       const gm = Math.round(moraleState.get(g.id) ?? g.morale);
-      updates.push(prisma.player.update({ where: { id: g.id }, data: { condition: Math.round(g.con), morale: gm, mo: gm } }));
+      updates.push(prisma.player.update({ where: { id: g.id }, data: { condition: con2(g.con), morale: gm, mo: gm } }));
     }
     for (const s of [...(team?.forwards ?? []), ...(team?.defense ?? [])]) {
       const sm = Math.round(moraleState.get(s.id) ?? s.morale);
-      updates.push(prisma.player.update({ where: { id: s.id }, data: { condition: Math.round(s.con), morale: sm, mo: sm } }));
+      updates.push(prisma.player.update({ where: { id: s.id }, data: { condition: con2(s.con), morale: sm, mo: sm } }));
     }
     // persist evolved line chemistry back to the team's lines
     if (team && team.units.length)
