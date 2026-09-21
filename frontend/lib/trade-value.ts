@@ -17,8 +17,24 @@ export const ageFactor = (age: number | null): number => {
     : a <= 25 ? 1.1 : a <= 28 ? 1.0 : a <= 30 ? 0.9 : a <= 32 ? 0.8 : a <= 34 ? 0.7 : 0.6;
 };
 
-export const playerValue = (overall: number, age: number | null): number =>
-  Math.round(Math.pow(Math.max(1, overall - 35), 2) * ageFactor(age));
+// Real-life form: whether the player's REAL NHL counterpart is currently playing
+// real NHL minutes or is down in the real AHL right now (curSeasonGP vs
+// ahlStats.cur.gp — both imported from the NHL API / theahl.com). Only relevant
+// while a player is still establishing a real-life role (<=23) and only once
+// there's a real sample this season; otherwise it's a no-op. Kept as a small
+// nudge (±8%), not a primary driver — it's a signal on top of the rated
+// parameters, not a replacement for them.
+const REAL_FORM_MAX = 0.08;
+export const realFormFactor = (age: number | null, realNhlGP: number | null, realAhlGP: number | null): number => {
+  if (age == null || age > 23) return 1;
+  const nhl = realNhlGP ?? 0, ahl = realAhlGP ?? 0, total = nhl + ahl;
+  if (total < 5) return 1;
+  const nhlShare = nhl / total;
+  return 1 + (nhlShare - 0.5) * 2 * REAL_FORM_MAX;
+};
+
+export const playerValue = (overall: number, age: number | null, realForm = 1): number =>
+  Math.round(Math.pow(Math.max(1, overall - 35), 2) * ageFactor(age) * realForm);
 
 // Draft-pick trade value by absolute draft slot (1 = 1st overall, N+1 = 2nd-round
 // first pick, etc — see slotOfPick in trades/build/actions.ts). A single smooth

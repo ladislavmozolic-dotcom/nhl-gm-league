@@ -7,7 +7,8 @@ import { loadSettings } from "@/lib/sim/settings";
 import { CURRENT_SEASON_START, money, liveCapHit } from "@/lib/finance";
 import { revalidatePath } from "next/cache";
 import { clauseBlock, assertOwnership, assertConditionSpec, packageFromTrade, executeAcceptedTrade, createTradeRecord, collectMoveOps, reverseTradeOps, type TradePlayer, type TradePackage } from "@/lib/trade-exec";
-import { playerValue, pickValueBySlot } from "@/lib/trade-value";
+import { playerValue, pickValueBySlot, realFormFactor } from "@/lib/trade-value";
+import { livePlayerOverall } from "@/lib/player-overall";
 import { hasWorthyGoalie } from "@/lib/goalie-rule";
 import { displayName } from "@/lib/playerName";
 
@@ -32,8 +33,17 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
   const norm = (s: string) => clean(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
   const pidAll = [...pkg.fromPlayers, ...pkg.toPlayers].map((p) => p.playerId);
-  const players = await prisma.player.findMany({ where: { id: { in: pidAll } }, select: { id: true, name: true, overall: true, age: true, capHit: true, contractYears: true, position: true, isGoalie: true, lastSeasonGP: true, lastSeasonSvPct: true, goalieRating: { select: { overall: true } } } });
+  const players = await prisma.player.findMany({ where: { id: { in: pidAll } }, select: { id: true, name: true, overall: true, age: true, capHit: true, contractYears: true, position: true, isGoalie: true, lastSeasonGP: true, lastSeasonSvPct: true, goalieRating: { select: { overall: true } }, ck: true, pa: true, sc: true, df: true, curSeasonGP: true, ahlStats: true } });
   const pById = new Map(players.map((p) => [p.id, p]));
+
+  // live rating, not a possibly-stale cached column — a goalie's real overall
+  // lives on goalieRating (Player.overall can lag behind it); used everywhere
+  // below so GM Assist always values a trade off CURRENT parameters.
+  const ovOf = (id: number) => { const p = pById.get(id); return p ? (livePlayerOverall(p) ?? 45) : 45; };
+  // real-life NHL vs AHL games this season for the player's REAL counterpart —
+  // see realFormFactor in lib/trade-value.ts.
+  const ahlGpOf = (p: { ahlStats: unknown }) => ((p.ahlStats as { cur?: { gp?: number } } | null)?.cur?.gp ?? 0);
+  const realFormOf = (id: number) => { const p = pById.get(id); if (!p) return 1; return realFormFactor(p.age, p.curSeasonGP, ahlGpOf(p)); };
 
   // --- draft-order-aware picks: value follows the estimated slot the pick lands at,
   //     and (if we have a board for that year) the name likely picked there. ------
@@ -71,7 +81,7 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
   const cashV = (c: number) => Math.round((c / 1_000_000) * 30);
 
   const sideValue = (pls: TradePlayer[], pk: number[], pr: number[], cash: number) =>
-    pls.reduce((s, x) => s + playerValue(pById.get(x.playerId)?.overall ?? 45, pById.get(x.playerId)?.age ?? null), 0)
+    pls.reduce((s, x) => s + playerValue(ovOf(x.playerId), pById.get(x.playerId)?.age ?? null, realFormOf(x.playerId)), 0)
     + pk.reduce((s, id) => s + kv(id), 0) + pr.reduce((s, id) => s + prv(id), 0) + cashV(cash);
 
   const meGives = sideValue(pkg.fromPlayers, pkg.fromPicks, pkg.fromProspects, pkg.fromCash);
@@ -80,7 +90,7 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
   // itemised breakdown of every selected asset per side
   const sideItems = (pls: TradePlayer[], pk: number[], pr: number[], cash: number): { label: string; value: number }[] => {
     const out: { label: string; value: number }[] = [];
-    for (const x of pls) { const p = pById.get(x.playerId); out.push({ label: `${p ? clean(p.name) : `#${x.playerId}`}${p?.overall ? ` (${p.overall} OV${p.position ? `, ${p.position}` : ""})` : ""}${x.retentionPct ? ` · ${x.retentionPct}% ret.` : ""}`, value: playerValue(p?.overall ?? 45, p?.age ?? null) }); }
+    for (const x of pls) { const p = pById.get(x.playerId); const ov = ovOf(x.playerId); out.push({ label: `${p ? clean(p.name) : `#${x.playerId}`}${p ? ` (${ov} OV${p.position ? `, ${p.position}` : ""})` : ""}${x.retentionPct ? ` · ${x.retentionPct}% ret.` : ""}`, value: playerValue(ov, p?.age ?? null, realFormOf(x.playerId)) }); }
     for (const id of pk) out.push({ label: kLabel(id), value: kv(id) });
     for (const id of pr) out.push({ label: prLabel(id), value: prv(id) });
     if (cash > 0) out.push({ label: `Cash $${cash.toLocaleString("en-US")}`, value: cashV(cash) });
@@ -112,15 +122,34 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
   }
   const retained = [...pkg.fromPlayers, ...pkg.toPlayers].filter((p) => p.retentionPct > 0);
   if (retained.length) reasoning.push(`Retencia: ${retained.length} hráč(ov) so zadržaným platom — mení reálny cap náklad.`);
+  // parameter profile (CK/PA/SC/DF) — decomposed, not folded only into a single
+  // OV number (see memory: OV is orientational, build on the specific ratings)
+  const skaterParams = (pls: TradePlayer[]) => {
+    const rows = pls.map((x) => pById.get(x.playerId)).filter((p): p is NonNullable<typeof p> => !!p && !p.isGoalie && p.ck != null && p.pa != null && p.sc != null && p.df != null);
+    if (!rows.length) return null;
+    const avg = (k: "ck" | "pa" | "sc" | "df") => rows.reduce((s, p) => s + (p[k] as number), 0) / rows.length;
+    return { ck: avg("ck"), pa: avg("pa"), sc: avg("sc"), df: avg("df") };
+  };
+  const paramsIn = skaterParams(pkg.toPlayers), paramsOut = skaterParams(pkg.fromPlayers);
+  if (paramsIn && paramsOut) {
+    const parts = (["ck", "pa", "sc", "df"] as const)
+      .map((k) => ({ k, v: Math.round(paramsIn[k] - paramsOut[k]) }))
+      .filter((x) => Math.abs(x.v) >= 3);
+    if (parts.length) reasoning.push(`Parametre: <b>${fromTeam.name}</b> mení profil hráčov oproti odchádzajúcim — ${parts.map((x) => `${x.k.toUpperCase()} ${x.v > 0 ? "+" : ""}${x.v}`).join(", ")}.`);
+  }
   reasoning.push(tilt === "even" ? "Doporučenie: férová výmena, dá sa akceptovať." : `Doporučenie: ${winner} z nej ťaží — druhá strana by mala pridať hodnotu alebo zvážiť odmietnutie.`);
 
   // roster-fit: where would each incoming player slot on his NEW club, and does he
   // fill a need there? (fromPlayers go TO toTeam; toPlayers go TO fromTeam)
   const grp = (pos: string | null) => { const P = (pos ?? "").toUpperCase(); if (/G/.test(P)) return "G"; if (/(^|\/)D(\/|$)|^D$/.test(P)) return "D"; if (/C/.test(P)) return "C"; return "W"; };
-  const [fromRoster, toRoster] = await Promise.all([
+  const [fromRoster0, toRoster0] = await Promise.all([
     prisma.player.findMany({ where: { teamId: pkg.fromTeamId, rosterType: "NHL" }, select: { id: true, overall: true, position: true, isGoalie: true, lastSeasonGP: true, lastSeasonSvPct: true, goalieRating: { select: { overall: true } } } }),
     prisma.player.findMany({ where: { teamId: pkg.toTeamId, rosterType: "NHL" }, select: { id: true, overall: true, position: true, isGoalie: true, lastSeasonGP: true, lastSeasonSvPct: true, goalieRating: { select: { overall: true } } } }),
   ]);
+  // normalise to LIVE overall (a goalie's overall can lag his goalieRating) once,
+  // so every roster comparison below uses current values, not a stale column.
+  const fromRoster = fromRoster0.map((r) => ({ ...r, overall: livePlayerOverall(r) }));
+  const toRoster = toRoster0.map((r) => ({ ...r, overall: livePlayerOverall(r) }));
   const grpLabel: Record<string, string> = { C: "centra", W: "krídla", D: "obrancu", G: "brankára" };
   const slotFor = (g: string, slot: number) => {
     if (g === "G") return slot === 1 ? "brankársku jednotku" : "brankársku dvojku";
@@ -131,7 +160,7 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
   const analyzeFit = (movers: TradePlayer[], destRoster: { overall: number | null; position: string | null; isGoalie: boolean }[], destName: string) => {
     for (const x of movers) {
       const p = pById.get(x.playerId); if (!p) continue;
-      const g = grp(p.position); const ov = p.overall ?? 45;
+      const g = grp(p.position); const ov = livePlayerOverall(p) ?? 45;
       const same = destRoster.filter((r) => grp(r.position) === g);
       const better = same.filter((r) => (r.overall ?? 0) > ov).length;
       const goodAt = same.filter((r) => (r.overall ?? 0) >= 55).length;
@@ -144,7 +173,7 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
   const analyzeOut = (movers: TradePlayer[], ownRoster: { overall: number | null; position: string | null; isGoalie: boolean }[], teamName: string) => {
     for (const x of movers) {
       const p = pById.get(x.playerId); if (!p) continue;
-      const g = grp(p.position); const ov = p.overall ?? 45;
+      const g = grp(p.position); const ov = livePlayerOverall(p) ?? 45;
       const same = ownRoster.filter((r) => grp(r.position) === g);
       const better = same.filter((r) => (r.overall ?? 0) > ov).length;
       const goodLeft = same.filter((r) => (r.overall ?? 0) >= 55).length - (ov >= 55 ? 1 : 0);
@@ -158,6 +187,22 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
   analyzeFit(pkg.toPlayers, fromRoster, fromTeam.name);
   analyzeOut(pkg.toPlayers, toRoster, toTeam.name);
 
+  // real-life signal for young players: is his REAL NHL counterpart currently
+  // playing real NHL minutes or down in the real AHL right now (curSeasonGP vs
+  // ahlStats.cur.gp)? Advisory only — no data outside the season/import window.
+  const realFormNote = (movers: TradePlayer[]) => {
+    for (const x of movers) {
+      const p = pById.get(x.playerId); if (!p || p.isGoalie || p.age == null || p.age > 23) continue;
+      const nhlGp = p.curSeasonGP ?? 0, ahlGp = ahlGpOf(p);
+      if (nhlGp + ahlGp < 5) continue;
+      const nhlShare = nhlGp / (nhlGp + ahlGp);
+      const tag = nhlShare >= 0.6 ? "pravidelne hráva reálnu NHL" : nhlShare <= 0.3 ? "v reálnom živote zatiaľ skôr v AHL" : "delí čas medzi reálnou NHL a AHL";
+      fit.push(`📡 <b>${clean(p.name)}</b> (${p.age} r., reálny vývoj): ${tag} — ${nhlGp} NHL / ${ahlGp} AHL zápasov v reálnej sezóne.`);
+    }
+  };
+  realFormNote(pkg.fromPlayers);
+  realFormNote(pkg.toPlayers);
+
   // League rule: every club needs a "worthy" goalie (lib/goalie-rule.ts). Advisory
   // only — doesn't block the trade — but flag a side that would lose its last
   // qualifying goalie in this deal.
@@ -165,11 +210,10 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
   const outToIds = new Set(pkg.toPlayers.map((p) => p.playerId));
   const incomingToFrom = pkg.toPlayers.map((p) => pById.get(p.playerId)).filter((p): p is NonNullable<typeof p> => !!p?.isGoalie);
   const incomingToTo = pkg.fromPlayers.map((p) => pById.get(p.playerId)).filter((p): p is NonNullable<typeof p> => !!p?.isGoalie);
-  // a goalie's live OV lives on goalieRating (Player.overall can lag behind it) —
-  // use the live value here, same as the player bio page and roster page do.
-  const liveOv = (p: { overall: number | null; goalieRating?: { overall: number | null } | null }) => p.goalieRating?.overall ?? p.overall;
-  const postFromGoalies = [...fromRoster.filter((r) => r.isGoalie && !outFromIds.has(r.id)), ...incomingToFrom].map((p) => ({ ...p, overall: liveOv(p) }));
-  const postToGoalies = [...toRoster.filter((r) => r.isGoalie && !outToIds.has(r.id)), ...incomingToTo].map((p) => ({ ...p, overall: liveOv(p) }));
+  // fromRoster/toRoster are already normalised to live overall above; incoming
+  // goalies (from pById) still need it applied.
+  const postFromGoalies = [...fromRoster.filter((r) => r.isGoalie && !outFromIds.has(r.id)), ...incomingToFrom.map((p) => ({ ...p, overall: livePlayerOverall(p) }))];
+  const postToGoalies = [...toRoster.filter((r) => r.isGoalie && !outToIds.has(r.id)), ...incomingToTo.map((p) => ({ ...p, overall: livePlayerOverall(p) }))];
   if (!hasWorthyGoalie(postFromGoalies)) fit.push(`⚠️ <b>${fromTeam.name}</b> by po tomto trejde nemal žiadneho dostojného brankára — podľa pravidiel ligy jeho súpiska nie je pripravená na zápas.`);
   if (!hasWorthyGoalie(postToGoalies)) fit.push(`⚠️ <b>${toTeam.name}</b> by po tomto trejde nemal žiadneho dostojného brankára — podľa pravidiel ligy jeho súpiska nie je pripravená na zápas.`);
 
