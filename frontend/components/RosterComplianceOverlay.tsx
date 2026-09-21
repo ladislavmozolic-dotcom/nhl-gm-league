@@ -6,7 +6,7 @@ import { rosterComplianceAction, DRESS_TARGET, type RosterComplianceResult } fro
 type Issue = Extract<RosterComplianceResult, { compliant: false }>;
 
 const KEY = "dismissedRosterCompliance";
-const sigOf = (r: Issue) => `${r.teamSlug}:${r.counts.F}-${r.counts.D}-${r.counts.G}`;
+const sigOf = (r: Issue) => `${r.teamSlug}:${r.sides.map((s) => `${s.level}-${s.counts.F}-${s.counts.D}-${s.counts.G}`).join(",")}`;
 
 export default function RosterComplianceOverlay() {
   const [issue, setIssue] = useState<Issue | null>(null);
@@ -45,6 +45,7 @@ export default function RosterComplianceOverlay() {
       </div>
     );
   };
+  const levelLabel: Record<"NHL" | "AHL", string> = { NHL: "NHL zostava", AHL: "AHL zostava" };
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={close}>
@@ -52,12 +53,17 @@ export default function RosterComplianceOverlay() {
         className="w-full max-w-md rounded-2xl border border-amber-500/40 bg-[#1a1408] p-6 shadow-2xl shadow-amber-500/10">
         <h2 className="text-lg font-black text-white mb-1 flex items-center gap-2">⚠️ Zostava nie je v poriadku</h2>
         <p className="text-xs text-slate-400 mb-4">
-          Do zápasu smie nastúpiť presne 20 hráčov — 12 útočníkov, 6 obrancov, 2 brankári. Zvyšní hráči na NHL súpiske musia byť označení ako <b>scratched</b>.
+          Do zápasu smie nastúpiť presne 20 hráčov — 12 útočníkov, 6 obrancov, 2 brankári — v NHL aj v AHL. Zvyšní hráči na súpiske musia byť označení ako <b>scratched</b>.
         </p>
-        <div className="rounded-xl bg-slate-900/70 border border-slate-800 p-3 mb-5 text-sm space-y-1.5">
-          {row("Útočníci (F)", issue.counts.F, DRESS_TARGET.F)}
-          {row("Obrancovia (D)", issue.counts.D, DRESS_TARGET.D)}
-          {row("Brankári (G)", issue.counts.G, DRESS_TARGET.G)}
+        <div className="space-y-3 mb-5">
+          {issue.sides.map((s) => (
+            <div key={s.level} className="rounded-xl bg-slate-900/70 border border-slate-800 p-3 text-sm space-y-1.5">
+              <div className="text-[11px] font-bold uppercase tracking-wide text-amber-300 mb-1">{levelLabel[s.level]} · {s.teamName}</div>
+              {row("Útočníci (F)", s.counts.F, DRESS_TARGET.F)}
+              {row("Obrancovia (D)", s.counts.D, DRESS_TARGET.D)}
+              {row("Brankári (G)", s.counts.G, DRESS_TARGET.G)}
+            </div>
+          ))}
         </div>
         <div className="flex items-center gap-3">
           <a href={`/teams/${issue.teamSlug}/rosters`} onClick={close}
