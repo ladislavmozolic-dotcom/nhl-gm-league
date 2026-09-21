@@ -3,12 +3,13 @@
 import { prisma } from "@/lib/prisma";
 import { getTeamSession } from "@/lib/auth";
 import { posGroup } from "@/lib/ratingBands";
+import { DRESS_TARGET } from "@/lib/roster-rules";
 
-// Game-day dressed lineup: exactly 20 of the 23-man NHL roster suit up —
-// 12 forwards, 6 defensemen, 2 goalies — and the same 12/6/2 split applies to
-// the 20-man active AHL roster. Anyone else on either side must be a healthy
-// scratch (Player.scratched). See memory: roster-farm-mechanics.
-export const DRESS_TARGET = { F: 12, D: 6, G: 2 } as const;
+// A "use server" file may only export async functions — DRESS_TARGET (a plain
+// object) lives in lib/roster-rules.ts instead; re-exporting it from here broke
+// EVERY server action in the app (Next.js refused to build the actions
+// manifest), not just this one — see the "A 'use server' file can only export
+// async functions" error. Import DRESS_TARGET directly from roster-rules.
 
 export type SideCounts = { F: number; D: number; G: number };
 export type ComplianceSide = { level: "NHL" | "AHL"; teamName: string; counts: SideCounts };

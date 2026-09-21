@@ -14,6 +14,12 @@ export const ROSTER_LIMITS = {
   orgMax: 55, orgMaxGoalies: 8, // NHL + AHL combined
 };
 
+// Game-day dressed lineup: exactly 20 of the 23-man NHL roster suit up — 12
+// forwards, 6 defensemen, 2 goalies — and the same 12/6/2 split applies to the
+// 20-man active AHL roster. Anyone else on either side must be a healthy
+// scratch (Player.scratched). See memory: roster-farm-mechanics.
+export const DRESS_TARGET = { F: 12, D: 6, G: 2 } as const;
+
 // Flat cap-hit ceiling for a waiver placement (lib/waivers-server.ts) — a
 // simple stand-in for real NHL waiver-exemption rules until something more
 // nuanced is built. A player above this is too valuable to realistically

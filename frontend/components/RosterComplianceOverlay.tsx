@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { rosterComplianceAction, DRESS_TARGET, type RosterComplianceResult } from "@/lib/roster-compliance-server";
+import { rosterComplianceAction, type RosterComplianceResult } from "@/lib/roster-compliance-server";
+import { DRESS_TARGET } from "@/lib/roster-rules";
 
 type Issue = Extract<RosterComplianceResult, { compliant: false }>;
 
