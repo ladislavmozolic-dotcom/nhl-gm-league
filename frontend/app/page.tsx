@@ -392,47 +392,6 @@ export default async function HomePage() {
           </div>
         </div>
 
-        {/* Trade Tracker — the latest completed deals around the league */}
-        <Link href="/trades" className="block bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg shadow-black/20 hover:border-blue-500/40 transition-colors">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs uppercase tracking-wide text-blue-400">🔁 Recent Trades</p>
-            <span className="text-xs text-slate-400">{T("ui.viewAll")}</span>
-          </div>
-          {recentTrades.length ? (
-            <ul className="space-y-2.5">
-              {recentTrades.map((t) => (
-                <li key={t.id}>
-                  <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-100">
-                    {t.from ? (
-                      <span className="flex items-center gap-1.5 min-w-0" title={t.from.name}>
-                        {t.from.logoUrl && <img src={t.from.logoUrl} alt="" className="w-4 h-4 object-contain shrink-0" />}
-                        <span className="truncate">{t.from.code}</span>
-                      </span>
-                    ) : <span className="text-blue-400">•</span>}
-                    {t.to && (
-                      <>
-                        <span className="text-slate-500 shrink-0 text-xs">⇄</span>
-                        <span className="flex items-center gap-1.5 min-w-0" title={t.to.name}>
-                          {t.to.logoUrl && <img src={t.to.logoUrl} alt="" className="w-4 h-4 object-contain shrink-0" />}
-                          <span className="truncate">{t.to.code}</span>
-                        </span>
-                      </>
-                    )}
-                    <span className="ml-auto shrink-0 text-slate-500 text-[11px] font-normal tabular-nums">{fmtDate(t.createdAt)}</span>
-                  </div>
-                  <p className="text-slate-400 text-xs mt-0.5 line-clamp-2">
-                    {t.fromAssets && t.toAssets
-                      ? <>traded <span className="text-slate-300">{t.fromAssets}</span> for <span className="text-slate-300">{t.toAssets}</span></>
-                      : t.message}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-slate-500">No trades yet — completed deals show up here.</p>
-          )}
-        </Link>
-
         {/* Tonight's Best — the story of the night, straight from our league */}
         <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg shadow-black/20 flex flex-col justify-between">
           <div>
@@ -560,6 +519,47 @@ export default async function HomePage() {
             )}
           </div>
         </div>
+
+        {/* Trade Tracker — the latest completed deals around the league */}
+        <Link href="/trades" className="block bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg shadow-black/20 hover:border-blue-500/40 transition-colors">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs uppercase tracking-wide text-blue-400">🔁 Recent Trades</p>
+            <span className="text-xs text-slate-400">{T("ui.viewAll")}</span>
+          </div>
+          {recentTrades.length ? (
+            <ul className="space-y-2.5">
+              {recentTrades.map((t) => (
+                <li key={t.id}>
+                  <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-100">
+                    {t.from ? (
+                      <span className="flex items-center gap-1.5 min-w-0" title={t.from.name}>
+                        {t.from.logoUrl && <img src={t.from.logoUrl} alt="" className="w-4 h-4 object-contain shrink-0" />}
+                        <span className="truncate">{t.from.code}</span>
+                      </span>
+                    ) : <span className="text-blue-400">•</span>}
+                    {t.to && (
+                      <>
+                        <span className="text-slate-500 shrink-0 text-xs">⇄</span>
+                        <span className="flex items-center gap-1.5 min-w-0" title={t.to.name}>
+                          {t.to.logoUrl && <img src={t.to.logoUrl} alt="" className="w-4 h-4 object-contain shrink-0" />}
+                          <span className="truncate">{t.to.code}</span>
+                        </span>
+                      </>
+                    )}
+                    <span className="ml-auto shrink-0 text-slate-500 text-[11px] font-normal tabular-nums">{fmtDate(t.createdAt)}</span>
+                  </div>
+                  <p className="text-slate-400 text-xs mt-0.5 line-clamp-2">
+                    {t.fromAssets && t.toAssets
+                      ? <>traded <span className="text-slate-300">{t.fromAssets}</span> for <span className="text-slate-300">{t.toAssets}</span></>
+                      : t.message}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-slate-500">No trades yet — completed deals show up here.</p>
+          )}
+        </Link>
       </div>
 
       {/* 3 columns */}
