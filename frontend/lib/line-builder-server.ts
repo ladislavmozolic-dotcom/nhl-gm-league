@@ -9,6 +9,8 @@ import { pairSig, unitChemistry } from "./sim/chemistry";
 import { tacticalFitDefense, tacticalFitForwards, type TacticalFitPlayer } from "./sim/tactical-fit";
 import { DEFAULT_TACTICS } from "./sim/tactics";
 import { cleanName } from "./playerName";
+import { percentileOf } from "./edge-params";
+import { posGroup } from "./ratingBands";
 
 type Attrs = { pa: number; sc: number; sk: number; ck: number; df: number; st: number; fo: number; en: number; weight: number };
 type P = { id: number; name: string; slug: string | null; position: string; shoots: string | null; overall: number; a: Attrs };
@@ -19,18 +21,47 @@ export type BuiltLine = {
   kind: "F" | "D"; index: number; slots: LineSlot[];
   chemistry: number; gelled: boolean; pairs: PairBond[]; tacticalFit: number; profile: LineProfile; summary: string;
 };
-export type TeamLineBuild = { forwards: BuiltLine[]; defense: BuiltLine[]; scale: LineProfile } | null;
+export type TeamLineBuild = { forwards: BuiltLine[]; defense: BuiltLine[] } | null;
 
 const avg = (ns: number[]) => (ns.length ? ns.reduce((a, b) => a + b, 0) / ns.length : 0);
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
 
-function profileOf(ps: P[]): LineProfile {
+// Each bar is a PERCENTILE against other NHL players at the same position group
+// (forwards vs. forwards, defensemen vs. defensemen) — never a flat 0-100 or a
+// raw rating average (see memory: composite-rating-scale-normalization — rank
+// each player against his own distribution first, then average the ranks, not
+// the raw numbers). 100 = nobody at that position rates higher right now; 50 =
+// dead average for the position. Always benchmarked against the NHL pool, even
+// when viewing AHL lines, so "how this pair stacks up" stays honest.
+type RatingPop = { pa: number[]; sc: number[]; sk: number[]; ck: number[]; df: number[] };
+async function positionPopulations(): Promise<{ F: RatingPop; D: RatingPop }> {
+  const rows = await prisma.player.findMany({
+    where: { rosterType: "NHL", isGoalie: false },
+    select: { position: true, pa: true, sc: true, sk: true, ck: true, df: true },
+  });
+  const empty = (): RatingPop => ({ pa: [], sc: [], sk: [], ck: [], df: [] });
+  const pops = { F: empty(), D: empty() };
+  for (const r of rows) {
+    const bucket = posGroup(r.position, false) === "D" ? pops.D : pops.F;
+    if (r.pa != null) bucket.pa.push(r.pa);
+    if (r.sc != null) bucket.sc.push(r.sc);
+    if (r.sk != null) bucket.sk.push(r.sk);
+    if (r.ck != null) bucket.ck.push(r.ck);
+    if (r.df != null) bucket.df.push(r.df);
+  }
+  for (const pop of [pops.F, pops.D]) for (const key of ["pa", "sc", "sk", "ck", "df"] as const) pop[key].sort((a, b) => a - b);
+  return pops;
+}
+
+function profileOf(ps: P[], kind: "F" | "D", pops: { F: RatingPop; D: RatingPop }): LineProfile {
+  const pop = kind === "D" ? pops.D : pops.F;
+  const pctl = (key: keyof RatingPop, vals: number[]) => clamp(avg(vals.map((v) => percentileOf(v, pop[key]) * 100)));
   return {
-    playmaking: clamp(avg(ps.map((p) => p.a.pa))),
-    shooting: clamp(avg(ps.map((p) => p.a.sc))),
-    skating: clamp(avg(ps.map((p) => p.a.sk))),
-    physical: clamp(avg(ps.map((p) => p.a.ck))),
-    defense: clamp(avg(ps.map((p) => p.a.df))),
+    playmaking: pctl("pa", ps.map((p) => p.a.pa)),
+    shooting: pctl("sc", ps.map((p) => p.a.sc)),
+    skating: pctl("sk", ps.map((p) => p.a.sk)),
+    physical: pctl("ck", ps.map((p) => p.a.ck)),
+    defense: pctl("df", ps.map((p) => p.a.df)),
   };
 }
 
@@ -51,32 +82,14 @@ const fitPlayer = (player: P | null): TacticalFitPlayer | null => player == null
   ? null
   : { ...player.a, position: player.position, shoots: player.shoots };
 
-// The bars in the UI read as "how close to the league's best" rather than "how
-// close to a theoretical 100" — no skater actually runs a rating near 100 on
-// any of these, so a flat 0-100 scale made every line look weak on every bar.
-// Ceiling = the single highest NHL rating anyone in the league carries in that
-// attribute right now (e.g. McDavid's Playmaking), so a bar can actually reach
-// full width for a truly elite unit. Always benchmarked against the NHL pool,
-// even when viewing AHL lines, so "how far from the NHL's best" stays honest.
-async function leagueMaxProfile(): Promise<LineProfile> {
-  const agg = await prisma.player.aggregate({
-    where: { rosterType: "NHL", isGoalie: false },
-    _max: { pa: true, sc: true, sk: true, ck: true, df: true },
-  });
-  return {
-    playmaking: agg._max.pa ?? 100, shooting: agg._max.sc ?? 100, skating: agg._max.sk ?? 100,
-    physical: agg._max.ck ?? 100, defense: agg._max.df ?? 100,
-  };
-}
-
 export async function teamLineBuilder(teamId: number, league = "NHL"): Promise<TeamLineBuild> {
   const rosterType = league === "AHL" ? "AHL" : "NHL";
-  const [rows, scale] = await Promise.all([
+  const [rows, pops] = await Promise.all([
     prisma.player.findMany({
       where: { teamId, rosterType, isGoalie: false, scratched: false },
       select: { id: true, name: true, slug: true, position: true, shoots: true, overall: true, pa: true, sc: true, sk: true, ck: true, df: true, st: true, fo: true, en: true, weight: true },
     }),
-    leagueMaxProfile(),
+    positionPopulations(),
   ]);
   if (!rows.length) return null;
   // the GM's saved lines, else the same position-aware auto lines the sim uses
@@ -114,7 +127,7 @@ export async function teamLineBuilder(teamId: number, league = "NHL"): Promise<T
     const roles = ["LW", "C", "RW"];
     const slots: LineSlot[] = ps.map((p, idx) => ({ role: roles[idx], id: p?.id ?? null, name: p?.name ?? null, slug: p?.slug ?? null, overall: p?.overall ?? null,
       offSlot: !!p && !(roles[idx] === "C" ? /C|F/.test((p.position || "").toUpperCase()) : ((p.position || "").toUpperCase().includes(roles[idx]) || /\bW\b|F/.test((p.position || "").toUpperCase()))) }));
-    const profile = profileOf(present);
+    const profile = profileOf(present, "F", pops);
     const tacticalFit = tacticalFitForwards(ps.map(fitPlayer), tactics, l.puck);
     const { chemistry, gelled, pairs } = chemFor(slots.map((s) => ({ role: s.role, id: s.id })), tacticalFit);
     return { kind: "F", index: i, slots, chemistry, gelled, pairs, tacticalFit, profile, summary: summaryOf(profile, "F") };
@@ -126,11 +139,11 @@ export async function teamLineBuilder(teamId: number, league = "NHL"): Promise<T
     const roles = ["LD", "RD"];
     const slots: LineSlot[] = ps.map((p, idx) => ({ role: roles[idx], id: p?.id ?? null, name: p?.name ?? null, slug: p?.slug ?? null, overall: p?.overall ?? null,
       offSlot: !!p && ((idx === 0 && p.shoots === "R") || (idx === 1 && p.shoots === "L")) }));
-    const profile = profileOf(present);
+    const profile = profileOf(present, "D", pops);
     const tacticalFit = tacticalFitDefense(ps.map(fitPlayer), tactics, l.dzone);
     const { chemistry, gelled, pairs } = chemFor(slots.map((s) => ({ role: s.role, id: s.id })), tacticalFit);
     return { kind: "D", index: i, slots, chemistry, gelled, pairs, tacticalFit, profile, summary: summaryOf(profile, "D") };
   });
 
-  return { forwards, defense, scale };
+  return { forwards, defense };
 }

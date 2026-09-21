@@ -1,25 +1,24 @@
 import Link from "next/link";
-import type { BuiltLine, LineProfile, TeamLineBuild } from "@/lib/line-builder-server";
+import type { BuiltLine, TeamLineBuild } from "@/lib/line-builder-server";
 
 const scoreTone = (n: number) => (n >= 80 ? "text-emerald-400" : n >= 60 ? "text-sky-400" : n >= 45 ? "text-amber-400" : "text-rose-400");
 
-// Bar width is relative to the league's own ceiling for that attribute (e.g.
-// McDavid's Playmaking), not a flat 0-100 — nobody actually rates near 100, so
-// a flat scale made every line look weak everywhere. `max` is that ceiling.
-function Bar({ label, value, max }: { label: string; value: number; max: number }) {
-  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
+// `value` is already a percentile (0-100) against other NHL players at the
+// same position group — see lib/line-builder-server.ts profileOf — so the bar
+// width IS the value, no separate ceiling/scale needed.
+function Bar({ label, value }: { label: string; value: number }) {
   return (
     <div className="flex items-center gap-2">
       <span className="w-20 text-[11px] text-slate-400 shrink-0">{label}</span>
       <div className="flex-1 h-2 rounded-full bg-slate-800 overflow-hidden">
-        <div className="h-full rounded-full bg-gradient-to-r from-sky-500 to-emerald-400" style={{ width: `${pct}%` }} />
+        <div className="h-full rounded-full bg-gradient-to-r from-sky-500 to-emerald-400" style={{ width: `${value}%` }} />
       </div>
       <span className="w-7 text-right text-[11px] tabular-nums text-slate-400">{value}</span>
     </div>
   );
 }
 
-function LineCard({ line, scale }: { line: BuiltLine; scale: LineProfile }) {
+function LineCard({ line }: { line: BuiltLine }) {
   const p = line.profile;
   return (
     <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4">
@@ -63,12 +62,12 @@ function LineCard({ line, scale }: { line: BuiltLine; scale: LineProfile }) {
 
       {/* offensive profile */}
       <div className="space-y-1 mb-3">
-        <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1" title="Bar width is relative to the league's current best in that attribute, not a flat 100 — a full bar means nobody in the league rates higher.">Profile</div>
-        <Bar label="Playmaking" value={p.playmaking} max={scale.playmaking} />
-        <Bar label="Shooting" value={p.shooting} max={scale.shooting} />
-        <Bar label="Skating" value={p.skating} max={scale.skating} />
-        <Bar label="Physical" value={p.physical} max={scale.physical} />
-        <Bar label="Defense" value={p.defense} max={scale.defense} />
+        <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1" title={`Percentile vs. other NHL ${line.kind === "D" ? "defensemen" : "forwards"} — 100 means nobody at the position rates higher, 50 is dead average.`}>Profile</div>
+        <Bar label="Playmaking" value={p.playmaking} />
+        <Bar label="Shooting" value={p.shooting} />
+        <Bar label="Skating" value={p.skating} />
+        <Bar label="Physical" value={p.physical} />
+        <Bar label="Defense" value={p.defense} />
       </div>
 
       <p className="text-xs text-slate-300 leading-snug">{line.summary}</p>
@@ -91,11 +90,11 @@ export default function LineBuilderView({ build }: { build: TeamLineBuild }) {
       </details>
       <div>
         <div className="text-xs uppercase tracking-wide text-slate-400 mb-2">Forward Lines</div>
-        <div className="grid gap-4 md:grid-cols-2">{build.forwards.map((l) => <LineCard key={`f${l.index}`} line={l} scale={build.scale} />)}</div>
+        <div className="grid gap-4 md:grid-cols-2">{build.forwards.map((l) => <LineCard key={`f${l.index}`} line={l} />)}</div>
       </div>
       <div>
         <div className="text-xs uppercase tracking-wide text-slate-400 mb-2">Defense Pairs</div>
-        <div className="grid gap-4 md:grid-cols-2">{build.defense.map((l) => <LineCard key={`d${l.index}`} line={l} scale={build.scale} />)}</div>
+        <div className="grid gap-4 md:grid-cols-2">{build.defense.map((l) => <LineCard key={`d${l.index}`} line={l} />)}</div>
       </div>
     </div>
   );
