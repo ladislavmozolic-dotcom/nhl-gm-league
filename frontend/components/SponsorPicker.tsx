@@ -34,7 +34,7 @@ export default function SponsorPicker({ sponsor }: { sponsor: TeamSponsor }) {
                 {o.bonuses.length === 0 ? <li className="text-slate-500">No bonuses</li> : o.bonuses.map((b, j) => <li key={j}>+ {M(b.amount)} — {b.when}</li>)}
               </ul>
               <div className="text-[11px] text-slate-500 mt-1">Max value {M(sponsorMax(o))}</div>
-              <button onClick={() => choose(i)} disabled={pending || active}
+              <button onClick={() => choose(i)} disabled={pending || active || activeAav != null}
                 className={`mt-2 w-full py-1.5 rounded-lg text-sm font-semibold disabled:opacity-60 ${active ? "bg-emerald-700/40 text-emerald-300" : "bg-blue-600 hover:bg-blue-500 text-white"}`}>
                 {active ? "✓ Signed" : "Sign"}
               </button>
@@ -42,6 +42,7 @@ export default function SponsorPicker({ sponsor }: { sponsor: TeamSponsor }) {
           );
         })}
       </div>
+      {activeAav != null && <div className="mt-2 text-xs text-slate-500">You&apos;ve signed a sponsor deal — the other offers are locked for now.</div>}
       {msg && <div className="mt-2 text-xs text-rose-300">{msg}</div>}
     </div>
   );

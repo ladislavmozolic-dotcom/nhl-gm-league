@@ -49,6 +49,10 @@ export async function chooseSponsorAction(teamId: number, offerIndex: number): P
   if (!(await canManageTeam(teamId))) return { ok: false, error: "You don't manage this team." };
   const s = await teamSponsor(teamId);
   if (!s) return { ok: false, error: "Team not found." };
+  // A one-time preseason choice (safety vs upside) — once a deal is signed it
+  // stands for its term, so a GM can't swap to a richer offer mid-season once
+  // results (and the brand-strength-driven offers) start looking better.
+  if (s.deal) return { ok: false, error: "You've already signed a sponsor deal this term." };
   const offer = s.offers[offerIndex];
   if (!offer) return { ok: false, error: "No such offer." };
   await prisma.team.update({ where: { id: teamId }, data: { sponsorDeal: offer as object } });
