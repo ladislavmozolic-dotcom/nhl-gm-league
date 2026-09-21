@@ -15,7 +15,28 @@ export default async function TeamTransactionsPage({ params }: { params: Promise
 
   const recent = await prisma.transaction.findMany({ where: TX_WHERE, orderBy: { createdAt: "desc" }, take: 400 });
   const codeRe = team.code ? new RegExp(`\\b${team.code.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`) : null;
-  const mine = recent.filter((t) => (team.name && t.message.includes(team.name)) || (codeRe && codeRe.test(t.message))).slice(0, 80);
+  const textMatch = (t: { message: string }) => (team.name && t.message.includes(team.name)) || (codeRe && codeRe.test(t.message));
+
+  // A 2-team trade row (tradeId set) is matched by the Trade's actual two parties,
+  // not by scanning the message text — a traded draft pick's label includes its
+  // ORIGINAL owner in parentheses (e.g. "1st round pick 2028 (NYR)"), so text
+  // matching alone used to pull an unrelated club's trade into this club's feed
+  // whenever it happened to be a traded pick's original owner. A 3-team group's
+  // summary line has no single tradeId (see the field's comment in schema.prisma)
+  // and falls back to the text match like before.
+  const tradeIds = [...new Set(recent.filter((t) => t.type === "TRADE" && t.tradeId != null).map((t) => t.tradeId!))];
+  const tradeById = new Map(
+    tradeIds.length
+      ? (await prisma.trade.findMany({ where: { id: { in: tradeIds } }, select: { id: true, fromTeamId: true, toTeamId: true } })).map((t) => [t.id, t])
+      : [],
+  );
+  const mine = recent.filter((t) => {
+    if (t.type === "TRADE" && t.tradeId != null) {
+      const trade = tradeById.get(t.tradeId);
+      if (trade) return trade.fromTeamId === team.id || trade.toTeamId === team.id;
+    }
+    return textMatch(t);
+  }).slice(0, 80);
 
   return (
     <div className="space-y-5">
