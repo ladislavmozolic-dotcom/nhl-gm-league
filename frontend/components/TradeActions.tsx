@@ -98,7 +98,7 @@ export default function TradeActions({ tradeId, role, admin, pending: isPending 
                 <ul className="space-y-1.5 mb-3">
                   {ai.reasoning.map((r, i) => <li key={i} className="text-sm text-slate-200 flex gap-2"><span className="text-violet-400">•</span><span dangerouslySetInnerHTML={{ __html: r }} /></li>)}
                 </ul>
-                <p className="text-[11px] text-slate-500 mb-3">Heuristická analýza (overall, vek, cap, pick hodnota) — orientačná.</p>
+                <p className="text-[11px] text-slate-500 mb-3">Heuristická analýza (parametre CK/PA/SC/DF, vek, reálny NHL/AHL vývoj, cap, pick hodnota) — orientačná.</p>
                 <button onClick={() => setAi(null)} className="px-5 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 font-semibold text-sm">Zavrieť</button>
               </>
             )}

@@ -508,7 +508,7 @@ export default function TradeBuilder({ me, opp, mine, theirs, meCap, oppCap, onP
                     <ul className="space-y-1">
                       {ai.reasoning.map((r, i) => <li key={i} className="text-xs text-slate-300 flex gap-1.5"><span className="text-violet-400 shrink-0">•</span><span dangerouslySetInnerHTML={{ __html: r }} /></li>)}
                     </ul>
-                    <p className="text-[10px] text-slate-500">Heuristika (overall, vek, cap, hodnota pickov) — orientačná.</p>
+                    <p className="text-[10px] text-slate-500">Heuristika (parametre CK/PA/SC/DF, vek, reálny NHL/AHL vývoj, cap, hodnota pickov) — orientačná.</p>
                   </div>
                 )}
               </div>
