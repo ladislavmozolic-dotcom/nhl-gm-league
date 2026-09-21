@@ -2450,7 +2450,20 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     simulatePeriod(st, period, hp, ap);
   }
 
-  simulateEndgame(st);
+  // legacy "volume" model only — simulatePeriod() never models the pulled-goalie
+  // endgame itself, so this bolts it on afterward from the FINAL regulation margin.
+  // The possession model already tracks trailBy live, tick-by-tick, all period long
+  // (st.emptyNet / the eligible check inside simulatePeriodPossession) and pulls the
+  // goalie for real once a team is actually trailing — running this a second time
+  // on top of that, unconditionally, used to insert a fabricated goal at a FIXED
+  // clock position (~18:40) using nothing but the eventual final score, with no
+  // regard for what the score genuinely was at that instant or for whether the
+  // "trailing" team had actually pulled its goalie (its on-ice list was still a
+  // normal 5 skaters) — producing "(EN)" goals in games that were tied, or still
+  // in progress, at that exact moment.
+  if (CFG.engineModel !== "possession") {
+    simulateEndgame(st);
+  }
   // legacy "volume" model only — the possession model already generated these
   // per-period, live, inside the loop above (including their injuries).
   if (CFG.engineModel !== "possession") {
