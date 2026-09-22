@@ -1344,19 +1344,37 @@ function simulatePeriodPossession(st: SimState, period: number) {
   // from the box, but nothing was checking that a configured PK player might BE the
   // guy who just went to the box.
   let curTick = 0;
-  const subMis = (team: SimTeam, unit: SimSkater[], isDefUnit: boolean): SimSkater[] => {
+  // ids currently unavailable for this team RIGHT NOW: in the box (penalty or
+  // misconduct) or hurt this game. Shared by subMis (swap a benched body out of
+  // a unit) and the empty-net extra attacker (pick a fresh body FOR a unit).
+  const benchedIds = (team: SimTeam): Set<number> => {
     const misBenched = st.misconducts.length
       ? st.misconducts.filter((m) => m.teamId === team.id && m.period === period && curTick >= m.start && curTick < m.end).map((m) => m.playerId)
       : [];
     const penBenched = active.length
       ? active.filter((p) => p.team === team.id && p.playerId != null && !p.expired && curTick >= p.start && curTick < p.end).map((p) => p.playerId!)
       : [];
-    if (!misBenched.length && !penBenched.length && !st.injured.size) return unit;
-    const benched = new Set([...misBenched, ...penBenched, ...st.injured]);
+    return new Set([...misBenched, ...penBenched, ...st.injured]);
+  };
+  const subMis = (team: SimTeam, unit: SimSkater[], isDefUnit: boolean): SimSkater[] => {
+    const benched = benchedIds(team);
     if (!benched.size || !unit.some((s) => benched.has(s.id))) return unit;
     const pool = (isDefUnit ? team.defense : team.forwards).filter((s) => !benched.has(s.id) && !unit.some((u) => u.id === s.id));
     let pi = 0;
     return unit.map((s) => (benched.has(s.id) ? (pool[pi++] ?? s) : s));
+  };
+  // Pulled goalie for the extra attacker: the bench's best available forward
+  // (by SC+PA — a real coach sends his top offensive option, not just whoever's
+  // fresh) joins the forward line, so the on-ice count actually goes 6-on-5
+  // instead of just a hidden probability bump.
+  const extraAttacker = (team: SimTeam, line: SimSkater[]): SimSkater[] => {
+    const benched = benchedIds(team);
+    const onIce = new Set(line.map((s) => s.id));
+    const pool = team.forwards.filter((f) => !benched.has(f.id) && !onIce.has(f.id));
+    if (!pool.length) return line;
+    const extra = pool.reduce((best, f) =>
+      (f.attrs.sc ?? 50) + (f.attrs.pa ?? 50) > (best.attrs.sc ?? 50) + (best.attrs.pa ?? 50) ? f : best);
+    return [...line, extra];
   };
   const onIceF = (team: SimTeam) => {
     const s = curStr[team.id];
@@ -1370,7 +1388,9 @@ function simulatePeriodPossession(st: SimState, period: number) {
       const u = pool[stIdx(team, pool)];
       if (u?.f.length) return subMis(team, u.f, false);
     }
-    const sh = shifts[team.id]; return subMis(team, sh.fLines[sh.fIdx] ?? team.forwards, false);
+    const sh = shifts[team.id];
+    const line = subMis(team, sh.fLines[sh.fIdx] ?? team.forwards, false);
+    return st.emptyNet[team.id] ? extraAttacker(team, line) : line;
   };
   const onIceD = (team: SimTeam) => {
     const s = curStr[team.id];
