@@ -1733,10 +1733,16 @@ function simulatePeriodPossession(st: SimState, period: number) {
       const fourOnThree = strength === "PP" && strengthInfo.skatersFor === 4 && strengthInfo.skatersAgainst === 3;
       const gLine = liveGoalieLine(st, def.id);
       const gSim = liveGoalie(st, def);
+      // Net empty (def pulled its own goalie for the extra attacker): nobody is
+      // actually in net facing this shot, so none of it — shots/saves/goals
+      // against, xG, zone charts — should land on the real goaltender's box
+      // score. Real NHL convention: an EN goal never counts against a keeper's
+      // individual save% / GAA, only the team total.
+      const defEmptyNet = st.emptyNet[def.id] === true;
       st.box[carrierTeam.id].shots++;
       if (period <= 4) st.box[carrierTeam.id].shotsByPeriod[period - 1]++;
       st.lines[carrierTeam.id][carrier.id].shots++;
-      gLine.shotsAgainst++;
+      if (!defEmptyNet) gLine.shotsAgainst++;
       // Phase 2 — shot quality: tag the shot with a location, type and expected
       // goals (independent of shooter finishing / goalie quality). Accumulate the
       // xG into the shooter, his team, and the goalie facing it (→ GSAx).
@@ -1780,12 +1786,12 @@ function simulatePeriodPossession(st: SimState, period: number) {
       if (hd) st.lines[carrierTeam.id][carrier.id].hdShots++;
       st.box[carrierTeam.id].xgFor += xg;
       if (hd) st.box[carrierTeam.id].hdFor++;
-      gLine.xga += xg;
+      if (!defEmptyNet) gLine.xga += xg;
       // EDGE: shot location distribution + shot speed (fastest + avg tracked per team)
       const zi = sectorIndex(sector);
       st.box[carrierTeam.id].shotSectors[zi]++;
       st.lines[carrierTeam.id][carrier.id].shotZones[zi]++; // per-shooter full shot map (all zones)
-      gLine.faceZones[zi]++;                                 // per-goalie full save map (all zones)
+      if (!defEmptyNet) gLine.faceZones[zi]++;               // per-goalie full save map (all zones)
       const mph = shotSpeed(rng, shotType, carrier.attrs.sc ?? 50);
       st.box[carrierTeam.id].shotSpeedSum += mph;
       const shooterLine = st.lines[carrierTeam.id][carrier.id];
@@ -1799,7 +1805,7 @@ function simulatePeriodPossession(st: SimState, period: number) {
       // one-timer / rebound (danger≥1.5) = HD, a forward's carry look = MD, a point
       // shot (danger~0.35) = LD.
       const danger3: "hd" | "md" | "ld" = danger >= 1.5 ? "hd" : danger >= 0.6 ? "md" : "ld";
-      if (danger3 === "hd") gLine.hdShotsAg++; else if (danger3 === "md") gLine.mdShotsAg++; else gLine.ldShotsAg++;
+      if (!defEmptyNet) { if (danger3 === "hd") gLine.hdShotsAg++; else if (danger3 === "md") gLine.mdShotsAg++; else gLine.ldShotsAg++; }
       press++; // sustained pressure: screening / traffic / a tiring goalie
       if (press === 3) momoSwing(st, carrierTeam.id, absT, CFG.momentumFlurry); // shot flurry lifts the bench
       const pressBonus = 1 + 0.06 * Math.min(press - 1, 4);
@@ -1842,7 +1848,6 @@ function simulatePeriodPossession(st: SimState, period: number) {
       // choice; see st.emptyNet below). carrierTeam pulled: 6-on-5 pressure. def
       // pulled: an open net — a shot on target goes in almost every time.
       const attackerEmptyNet = st.emptyNet[carrierTeam.id] === true;
-      const defEmptyNet = st.emptyNet[def.id] === true;
       if (attackerEmptyNet) p *= 1.22;
       if (defEmptyNet) p = 0.82;
       st.sink.emit({
@@ -1856,25 +1861,29 @@ function simulatePeriodPossession(st: SimState, period: number) {
         meta: { danger, setup, mph: Math.round(mph), situation: shotSituation },
       });
       if (rng.chance(p)) {
-        gLine.goalsAgainst++;
+        if (!defEmptyNet) gLine.goalsAgainst++;
         recordGoal(st, carrierTeam, def, period, tick, strength, defEmptyNet, carrier, { sector, shotType, xg });
         momoOnGoal(st, carrierTeam.id, def.id, absT);
-        maybePullGoalie(st, def); // yank the starter if he's been shelled
+        if (!defEmptyNet) maybePullGoalie(st, def); // yank the starter if he's been shelled
         if (strength === "PP") expireOnePenalty(def.id, tick, active);
         state = "FACEOFF"; setup = "carry"; continue;
       }
-      gLine.saves++;
-      gLine.saveZones[zi]++; // per-goalie full save map (all zones)
-      if (danger3 === "hd") gLine.hdSaves++; else if (danger3 === "md") gLine.mdSaves++; else gLine.ldSaves++;
-      st.sink.emit({
-        period, seconds: tick, type: "SAVE",
-        teamId: def.id, teamCode: def.code ?? undefined,
-        playerId: gSim.id, playerName: gSim.name,
-        targetId: carrier.id, targetName: carrier.name,
-        zone: "OFF", sector, shotType, xg,
-        importance: hd ? "NOTABLE" : "MINOR",
-        meta: { danger, setup },
-      });
+      // Missed/wide of the empty net — nobody made a save, so no goalie stat or
+      // "save by X" narration; the puck just stays loose for the next battle.
+      if (!defEmptyNet) {
+        gLine.saves++;
+        gLine.saveZones[zi]++; // per-goalie full save map (all zones)
+        if (danger3 === "hd") gLine.hdSaves++; else if (danger3 === "md") gLine.mdSaves++; else gLine.ldSaves++;
+        st.sink.emit({
+          period, seconds: tick, type: "SAVE",
+          teamId: def.id, teamCode: def.code ?? undefined,
+          playerId: gSim.id, playerName: gSim.name,
+          targetId: carrier.id, targetName: carrier.name,
+          zone: "OFF", sector, shotType, xg,
+          importance: hd ? "NOTABLE" : "MINOR",
+          meta: { danger, setup },
+        });
+      }
       const rb = gSim.attrs.rb ?? 50;
       if (rng.chance(Math.max(0.05, 0.32 - rb / 300))) {
         carrier = pickByAttr(rng, onIceF(carrierTeam), (s) => involvement(s.attrs.sc ?? 50) * 60) ?? carrier; setup = "rebound"; // rebound in the slot (press stays → escalating danger)
