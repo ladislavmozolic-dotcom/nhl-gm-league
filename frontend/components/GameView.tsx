@@ -40,7 +40,7 @@ type Side = {
 };
 type GoalAssist = { name: string; slug: string | null; total: number | null };
 type GoalE = { period: number; seconds: number; teamId: number; scorerName: string; scorerSlug?: string | null; scorerSeasonGoal?: number; assistNames: string[]; assists?: GoalAssist[]; strength: string; emptyNet: boolean; homeScoreAfter: number; awayScoreAfter: number; onIceForNames?: string[]; onIceAgainstNames?: string[] };
-type PenE = { period: number; seconds: number; teamId: number; playerName: string; type: string; minutes: number; severity: string; givesPP: boolean };
+type PenE = { period: number; seconds: number; teamId: number; playerName: string; type: string; minutes: number; severity: string; givesPP: boolean; offsetting: boolean };
 type PbpE = { period: number; seconds: number; time: string; teamId: number | null; kind: string; text: string; major: boolean };
 type ShootoutE = { round: number; teamId: number; teamCode: string | null; shooterName: string; shooterSlug: string | null; result: "goal" | "save" | "miss" };
 type InjuryRow = { period: number; seconds: number; teamId: number | null; playerName: string; playerSlug: string | null; part: string; mechanism: string; severity: string; days: number; byName: string | null };
@@ -773,7 +773,7 @@ export default function GameView({ data }: { data: Data }) {
                         <div key={i} className="px-4 py-1.5 text-sm leading-snug">
                           <span className="text-slate-500 tabular-nums mr-2">{mmss(x.seconds)}</span>
                           <span className="font-semibold">{cleanName(x.playerName)}</span> <span className="text-slate-500">({codeOf(x.teamId)})</span> for {x.type}<span className="text-slate-500"> ({x.severity})</span>
-                          {!x.givesPP && <span className="ml-1 text-[10px] font-bold text-slate-500" title="No power play — offset by a penalty to the other team at the same stoppage">(offsetting)</span>}
+                          {x.offsetting && <span className="ml-1 text-[10px] font-bold text-slate-500" title="No power play — offset by a penalty to the other team at the same stoppage">(offsetting)</span>}
                         </div>
                       ))}
                     </div>
