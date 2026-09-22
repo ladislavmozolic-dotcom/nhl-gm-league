@@ -86,6 +86,10 @@ export function buildStUnits(lines: TeamLinesData | null | undefined): LineUnit[
   if (ot2.length >= 2) units.push({ sig: "ot2:" + unitSignature(ot2), members: ot2, isDef: false });
   const ot3 = (lines.situations?.overtime?.[2]?.players ?? []).filter((x): x is number => x != null);
   if (ot3.length >= 2) units.push({ sig: "ot3:" + unitSignature(ot3), members: ot3, isDef: false });
+  // Pulled-goalie offense (6 skaters — the manager's own picks, not just whoever's
+  // rotating on shift) — see resolveLastMinOff in engine.ts.
+  const lastMinOff = (lines.situations?.lastMin?.off ?? []).filter((x): x is number => x != null);
+  if (lastMinOff.length >= 2) units.push({ sig: "lastminoff:" + unitSignature(lastMinOff), members: lastMinOff, isDef: false });
   return units;
 }
 

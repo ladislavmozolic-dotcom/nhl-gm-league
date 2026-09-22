@@ -533,6 +533,20 @@ function resolveOtUnits(team: SimTeam): StUnit[] {
   return [t0, t1, t2];
 }
 
+/** The manager's own pulled-goalie offense (Lines → "Offensive — chase the tie") —
+ *  6 skaters (4F + 2D) he picked, not whoever happens to be rotating on shift. Only
+ *  used once genuinely set (>=2 real bodies); otherwise the empty-net code falls
+ *  back to the live shift + best-available extra attacker. */
+function resolveLastMinOff(team: SimTeam): StUnit | null {
+  const byId = new Map([...team.forwards, ...team.defense].map((s) => [s.id, s]));
+  const isD = (s: SimSkater) => team.defense.some((d) => d.id === s.id);
+  const u = team.stUnits.find((x) => x.sig.startsWith("lastminoff:"));
+  if (!u) return null;
+  const players = u.members.map((id) => byId.get(id)).filter((s): s is SimSkater => !!s);
+  const unit: StUnit = { f: players.filter((s) => !isD(s)), d: players.filter(isD) };
+  return unit.f.length + unit.d.length >= 2 ? unit : null;
+}
+
 function weightedSample(rng: RNG, pool: SimSkater[], n: number): SimSkater[] {
   const avail = [...pool];
   const out: SimSkater[] = [];
@@ -1323,6 +1337,8 @@ function simulatePeriodPossession(st: SimState, period: number) {
   // club ices its PP unit; shorthanded, its PK unit — so shots, goals, +/- and TOI
   // all go to the RIGHT players, not whatever line happened to be rotating.
   const stUnit: Record<number, { pp: StUnit[]; pp4: StUnit[]; fourVFour: StUnit[]; pk: StUnit[]; pk3: StUnit[] }> = { [home.id]: resolveStUnits(home), [away.id]: resolveStUnits(away) };
+  // the manager's own pulled-goalie offense (Lines), if he actually set one
+  const lastMinOffUnit: Record<number, StUnit | null> = { [home.id]: resolveLastMinOff(home), [away.id]: resolveLastMinOff(away) };
   const curStr: Record<number, "EV" | "PP" | "SH"> = { [home.id]: "EV", [away.id]: "EV" };
   // the actual skater differential alongside curStr's tri-state — a true 5-on-3
   // (diff 2) kills with its own dedicated PK3 personnel/formation, not just a
@@ -1363,10 +1379,10 @@ function simulatePeriodPossession(st: SimState, period: number) {
     let pi = 0;
     return unit.map((s) => (benched.has(s.id) ? (pool[pi++] ?? s) : s));
   };
-  // Pulled goalie for the extra attacker: the bench's best available forward
-  // (by SC+PA — a real coach sends his top offensive option, not just whoever's
-  // fresh) joins the forward line, so the on-ice count actually goes 6-on-5
-  // instead of just a hidden probability bump.
+  // Pulled goalie, and the manager never set his own "chase the tie" unit (or the
+  // roster's too thin to fill it): fall back to the bench's best available forward
+  // (by SC+PA) joining whichever line happens to be rotating, so the on-ice count
+  // still goes 6-on-5 instead of silently staying at 5.
   const extraAttacker = (team: SimTeam, line: SimSkater[]): SimSkater[] => {
     const benched = benchedIds(team);
     const onIce = new Set(line.map((s) => s.id));
@@ -1388,6 +1404,12 @@ function simulatePeriodPossession(st: SimState, period: number) {
       const u = pool[stIdx(team, pool)];
       if (u?.f.length) return subMis(team, u.f, false);
     }
+    // Pulled goalie: ice the manager's own "chase the tie" unit (Lines) if he set
+    // one, before falling back to the live shift + an auto-picked extra attacker.
+    if (st.emptyNet[team.id]) {
+      const u = lastMinOffUnit[team.id];
+      if (u?.f.length) return subMis(team, u.f, false);
+    }
     const sh = shifts[team.id];
     const line = subMis(team, sh.fLines[sh.fIdx] ?? team.forwards, false);
     return st.emptyNet[team.id] ? extraAttacker(team, line) : line;
@@ -1402,6 +1424,10 @@ function simulatePeriodPossession(st: SimState, period: number) {
     if (curSkaters[home.id] === 4 && curSkaters[away.id] === 4) {
       const pool = stUnit[team.id].fourVFour;
       const u = pool[stIdx(team, pool)];
+      if (u?.d.length) return subMis(team, u.d, true);
+    }
+    if (st.emptyNet[team.id]) {
+      const u = lastMinOffUnit[team.id];
       if (u?.d.length) return subMis(team, u.d, true);
     }
     const sh = shifts[team.id]; return subMis(team, sh.dPairs[sh.dIdx] ?? team.defense, true);
