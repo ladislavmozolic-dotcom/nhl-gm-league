@@ -2511,7 +2511,14 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     st.nightDef[team.id] = Math.max(0.66, Math.min(1.28, 1 - rng.gauss() * CFG.nightSigmaGoalie * vScale * tired)); // <1 = goalie stole it; tired = wider boom/bust
   }
 
-  simulateFaceoffs(st);
+  // legacy "volume" model only — the possession model already draws a REAL
+  // faceoff (real centers, real per-stoppage frequency) every time the tick loop
+  // hits its FACEOFF state, so running this flat +46-per-game statistical model
+  // on top, unconditionally, was DOUBLE-counting every draw (a center could rack
+  // up 40-50 faceoffs in one period).
+  if (CFG.engineModel !== "possession") {
+    simulateFaceoffs(st);
+  }
 
   const homeShotsTotal = Math.max(12, Math.round(rng.poisson(expectedShots(home, away, true))));
   const awayShotsTotal = Math.max(12, Math.round(rng.poisson(expectedShots(away, home, false))));
