@@ -115,7 +115,11 @@ const SEVERE_TYPES = ["Boarding", "Cross-checking", "Checking to the head", "Sle
 
 // playerId is who's actually serving the box time — subMis reads it so the guy
 // who took the penalty can't also be the one on the ice killing it (see subMis).
-type Penalty = { team: number; start: number; end: number; expired: boolean; playerId?: number };
+// offsetting = a fighting major / line-brawl roughing minor / coincidental minor
+// pair — draws no power play, so strengthDiffAt and the PK-killed momentum credit
+// both skip it (the TEAM stays at full strength), but the offender still can't
+// take the ice for real, so subMis still benches him (it only ever checks `expired`).
+type Penalty = { team: number; start: number; end: number; expired: boolean; playerId?: number; offsetting?: boolean };
 
 type SimState = {
   rng: RNG;
@@ -747,14 +751,23 @@ function addPenalty(
 ) {
   st.lines[team.id][offender.id].pim += minutes;
   st.box[team.id].pim += minutes;
+  const isMisconduct = /Misconduct/i.test(type);
   if (givesPP) {
     const opp = team.id === st.home.id ? st.away : st.home;
     st.box[opp.id].ppOpp += 1;
     active_push(st, { team: team.id, start: at, end: at + minutes * 60, expired: false, playerId: offender.id });
+  } else if (!isMisconduct) {
+    // No power play — a fighting major or a line-brawl roughing minor matched on
+    // the other bench — so the TEAM stays at full strength (offsetting: true keeps
+    // it out of strengthDiffAt's manpower count and the PK-killed momentum credit).
+    // The offender still can't take the ice for real though, so he still needs to
+    // land in `active` or subMis (which only ever checks `expired`, never `givesPP`)
+    // would have no idea he's sitting a real 5-minute major.
+    active_push(st, { team: team.id, start: at, end: at + minutes * 60, expired: false, playerId: offender.id, offsetting: true });
   }
   // a misconduct (10) / game misconduct (20) puts the player in the box — no PP, but he
   // can't take the ice for that time, so a teammate rotates into his spot.
-  if (/Misconduct/i.test(type)) {
+  if (isMisconduct) {
     st.misconducts.push({ playerId: offender.id, teamId: team.id, period, start: at, end: at + minutes * 60 });
   }
   st.penalties.push({
@@ -816,10 +829,15 @@ function generatePenalties(st: SimState, team: SimTeam, period: number, active: 
  * Coincidental minors: `generatePenalties` rolls each team's infractions
  * independently, so two opposing players can rarely land a penalty in the
  * SAME second by chance (outside a deliberate brawl, which already marks
- * itself offsetting). A real ref calls those offsetting — 4-on-4, no PP for
- * either side — so pair up any same-second, opposite-team entries created
- * since `fromIdx` and un-flag them: clear their PP from `active` (so the
- * actual on-ice strength reflects it) and from the persisted penalty record.
+ * itself offsetting). A real ref calls those offsetting — both benches stay
+ * at full strength (a substitute takes each box-bound player's shift), no PP
+ * for either side — so pair up any same-second, opposite-team entries created
+ * since `fromIdx` and mark them offsetting: out of `active`'s manpower count
+ * (so the on-ice strength reflects it) and off the persisted penalty record's
+ * PP credit, but — unlike the old `expired = true` this replaced — NOT
+ * actually expired, so subMis (which only ever checks `expired`) still benches
+ * the two offenders for their real, full box time instead of freeing them the
+ * instant they're paired up.
  */
 function resolveCoincidentalPenalties(st: SimState, active: Penalty[], period: number, fromIdx: number) {
   const fresh = active.slice(fromIdx).filter((p) => !p.expired);
@@ -832,8 +850,8 @@ function resolveCoincidentalPenalties(st: SimState, active: Penalty[], period: n
     const home = group.filter((p) => p.team === st.home.id);
     const away = group.filter((p) => p.team === st.away.id);
     for (let i = 0; i < Math.min(home.length, away.length); i++) {
-      home[i].expired = true;
-      away[i].expired = true;
+      home[i].offsetting = true;
+      away[i].offsetting = true;
       st.box[st.away.id].ppOpp = Math.max(0, st.box[st.away.id].ppOpp - 1);
       st.box[st.home.id].ppOpp = Math.max(0, st.box[st.home.id].ppOpp - 1);
       const rec = (team: number) => st.penalties.find((x) => x.team === team && x.period === period && x.seconds === home[i].start && x.givesPP);
@@ -1029,7 +1047,10 @@ function generateHeatEvents(st: SimState, period: number) {
 function strengthDiffAt(team: SimTeam, opp: SimTeam, t: number, active: Penalty[]): { state: "EV" | "PP" | "SH"; diff: number; skatersFor: number; skatersAgainst: number } {
   let mine = 0, theirs = 0;
   for (const p of active) {
-    if (p.expired || t < p.start || t >= p.end) continue;
+    // offsetting (a fight, a line-brawl roughing minor, a coincidental pair) draws
+    // no power play — both benches stay at full strength, so it must NOT count
+    // toward either side's manpower here (only toward who's benched — see subMis).
+    if (p.expired || p.offsetting || t < p.start || t >= p.end) continue;
     if (p.team === team.id) mine++; else if (p.team === opp.id) theirs++;
   }
   const diff = theirs - mine;
@@ -1049,7 +1070,9 @@ function strengthAt(team: SimTeam, opp: SimTeam, t: number, active: Penalty[]): 
 function expireOnePenalty(penalizedTeamId: number, t: number, active: Penalty[]) {
   let best: Penalty | null = null;
   for (const p of active) {
-    if (p.expired || p.team !== penalizedTeamId || t < p.start || t >= p.end) continue;
+    // an offsetting penalty (fight major, etc.) never gave a power play, so a PP
+    // goal has nothing to do with it and must not release the offender early.
+    if (p.expired || p.offsetting || p.team !== penalizedTeamId || t < p.start || t >= p.end) continue;
     if (!best || p.end < best.end) best = p;
   }
   if (best) best.expired = true;
@@ -1587,7 +1610,9 @@ function simulatePeriodPossession(st: SimState, period: number) {
     // PK KILL momentum: a penalty that runs its full time (not ended by a PP goal)
     // is a kill — the shorthanded team's bench gets a lift.
     for (const p of active) {
-      if (!p.expired && tick >= p.end && !killedPens.has(p)) {
+      // offsetting (fight major, etc.) never put p.team on the PK, so it's not a
+      // "kill" — skip the momentum credit.
+      if (!p.expired && !p.offsetting && tick >= p.end && !killedPens.has(p)) {
         killedPens.add(p);
         momoSwing(st, p.team, absT, CFG.momentumPkKill); // p.team was shorthanded → they killed it
       }
@@ -1955,7 +1980,7 @@ function simulatePeriodPossession(st: SimState, period: number) {
   // any penalty still running at the buzzer carries its remaining time to next period
   st.carryPenalties = active
     .filter((p) => !p.expired && p.end > PERIOD_SECONDS)
-    .map((p) => ({ team: p.team, start: 0, end: p.end - PERIOD_SECONDS, expired: false, playerId: p.playerId }));
+    .map((p) => ({ team: p.team, start: 0, end: p.end - PERIOD_SECONDS, expired: false, playerId: p.playerId, offsetting: p.offsetting }));
   // same carry-over for a misconduct that's still running at the buzzer — otherwise
   // subMis's `m.period === period` check drops the bench the instant the period ends,
   // letting the guy back on the ice before his 10/20 minutes are actually up.
@@ -2420,8 +2445,9 @@ function distributeCounting(st: SimState) {
     // takeaways (event-only, for the defensive map) — stick-checking, smart D/centres
     const takeaways = st.rng.poisson(7); // ~7/team
     for (let i = 0; i < takeaways; i++) {
-      const s = roster[st.rng.weighted(roster.map((r) => ((r.attrs.df ?? 50) + (r.attrs.sk ?? 50)) * r.iceTime))];
-      emitAction("TAKEAWAY", s, pickZone(st.rng, TAKE_ZONES));
+      const { period, seconds, pool } = availableAt();
+      const s = pool[st.rng.weighted(pool.map((r) => ((r.attrs.df ?? 50) + (r.attrs.sk ?? 50)) * r.iceTime))];
+      emitAction("TAKEAWAY", s, pickZone(st.rng, TAKE_ZONES), undefined, { period, seconds });
     }
     // missed shots (wide / off the iron) — the possession model now emits these for
     // REAL, live, from the O-zone shot-resolution branch (see MISS_COMPENSATION and
