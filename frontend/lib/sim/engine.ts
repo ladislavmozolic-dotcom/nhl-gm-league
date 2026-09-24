@@ -1558,12 +1558,23 @@ function simulatePeriodPossession(st: SimState, period: number) {
     // maybeInjureOnIce's header comment for why this replaced the old post-game pass.
     const hurtHome = maybeInjureOnIce(st, home, away, [...st.currentOnIce[home.id].f, ...st.currentOnIce[home.id].d], period, tick);
     const hurtAway = maybeInjureOnIce(st, away, home, [...st.currentOnIce[away.id].f, ...st.currentOnIce[away.id].d], period, tick);
-    // if a penalty just started, or the puck carrier is no longer on the ice (due to line change or injury),
-    // the play stops and resets to a faceoff draw.
-    const carrierOnIce = [...st.currentOnIce[carrierTeam.id].f, ...st.currentOnIce[carrierTeam.id].d].some((s) => s.id === carrier.id);
+    // A penalty starting, or the carrier going down hurt, genuinely stops play.
+    // A routine on-the-fly line change swapping the carrier off the ice does NOT —
+    // real teams change mid-possession (especially retrieving it in their own
+    // zone) without a whistle, so the puck just stays live with a new teammate
+    // instead of forcing an (unrealistic) extra faceoff every time a shift ends
+    // mid-possession.
+    const onIcePool = [...st.currentOnIce[carrierTeam.id].f, ...st.currentOnIce[carrierTeam.id].d];
+    const carrierOnIce = onIcePool.some((s) => s.id === carrier.id);
     const penStarts = active.some((p) => p.start === tick && !p.expired);
-    if (penStarts || !carrierOnIce || hurtHome.some((s) => s.id === carrier.id) || hurtAway.some((s) => s.id === carrier.id)) {
+    // Most real shift changes DO happen to land on an actual whistle (teams wait
+    // for one when they can), so most of these still go to a draw — but a clean
+    // minority are genuinely on-the-fly, mid-possession, no stoppage at all.
+    if (penStarts || hurtHome.some((s) => s.id === carrier.id) || hurtAway.some((s) => s.id === carrier.id)) {
       state = "FACEOFF"; setup = "carry"; press = 0;
+    } else if (!carrierOnIce) {
+      if (onIcePool.length && !rng.chance(0.75)) carrier = pickByAttr(rng, onIcePool, (s) => s.attrs.sk ?? 50) ?? carrier;
+      else { state = "FACEOFF"; setup = "carry"; press = 0; }
     }
     announceChange(home, tick); announceChange(away, tick);
     // Empty net: a team trailing late in regulation, at even strength, may pull the
