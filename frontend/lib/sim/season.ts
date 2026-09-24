@@ -368,6 +368,15 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
       const starter = team.goalie;
       starter.con = box.goalie.conAfter;
       gState.set(starter.id, { lastStartRound: round, starts: (gState.get(starter.id)?.starts ?? 0) + 1 });
+      // The backup didn't dress, so the game itself never touches his CON — but his
+      // team IS excluded from the rest-day bulk recovery above (that logic assumes
+      // "team playing tonight" means "handled by the game"), which was only true for
+      // the starter. Without this he'd sit frozen at whatever CON he had, forever,
+      // any night his team plays and he isn't the guy in net. One rest day's worth
+      // of recovery, same rate as the bulk formula.
+      if (team.backup && team.backup.id !== starter.id) {
+        team.backup.con = Math.min(100, team.backup.con + (team.backup.du >= DU_HIGH ? 2 : 1));
+      }
       // carry each skater's post-game conditioning into the next game
       const skMap = new Map([...team.forwards, ...team.defense].map((s) => [s.id, s]));
       for (const sb of box.skaters) { const s = skMap.get(sb.id); if (s) s.con = sb.conAfter; }
