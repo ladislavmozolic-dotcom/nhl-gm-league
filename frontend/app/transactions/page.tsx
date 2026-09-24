@@ -40,12 +40,23 @@ export default async function TransactionsPage() {
     .filter((t) => t.logoUrl && !(t.code && PSEUDO.has(t.code)))
     .map((t) => ({ ...t, codeRe: t.code ? new RegExp(`\\b${esc(t.code)}\\b`) : null }));
   const logosFor = (msg: string) => {
-    const hits: { id: number; code: string | null; logoUrl: string | null }[] = [];
-    for (const t of withLogo) {
-      const byName = !!t.name && msg.includes(t.name);
-      const byCode = !!t.codeRe && t.codeRe.test(msg);
-      if (byName || byCode) hits.push(t);
-    }
+    // Strip parenthetical asides before scanning — a trade message can carry a
+    // draft pick's ORIGINAL-team annotation ("1st round pick 2028 (NYR)"), which
+    // names a club with no actual part in the deal. Left in, it could be picked
+    // up as one of the trade's own teams. Rank by where each match first
+    // appears in the text, not by team-table order, so the two (or three) clubs
+    // actually named in the sentence win over an unrelated later/earlier mention.
+    const scanMsg = msg.replace(/\([^)]*\)/g, " ");
+    const hits = withLogo
+      .map((t) => {
+        const byCode = t.codeRe ? scanMsg.search(t.codeRe) : -1;
+        const byName = scanMsg.indexOf(t.name);
+        const idx = byCode >= 0 && (byName < 0 || byCode < byName) ? byCode : byName;
+        return { t, idx };
+      })
+      .filter((m) => m.idx >= 0)
+      .sort((a, b) => a.idx - b.idx)
+      .map((m) => m.t);
     return hits.slice(0, 3);
   };
 

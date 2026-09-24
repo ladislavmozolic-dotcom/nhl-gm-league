@@ -77,10 +77,15 @@ export default async function NewsTicker() {
     const found: TeamLite[] = [];
     const primary = teamId != null ? teamById.get(teamId) : undefined;
     if (primary) found.push(primary);
+    // Strip parenthetical asides before scanning — a trade message can carry a
+    // draft pick's ORIGINAL-team annotation ("1st round pick 2028 (NYR)"), which
+    // names a club with no actual part in this trade. Left in, it can out-rank
+    // the real counterparty (named later, unparenthesized) for the second logo.
+    const scanMsg = msg.replace(/\([^)]*\)/g, " ");
     const ranked = withLogo
       .map((t) => {
-        const byCode = t.codeRe ? msg.search(t.codeRe) : -1;
-        const byName = msg.indexOf(t.name);
+        const byCode = t.codeRe ? scanMsg.search(t.codeRe) : -1;
+        const byName = scanMsg.indexOf(t.name);
         const idx = byCode >= 0 && (byName < 0 || byCode < byName) ? byCode : byName;
         return { t, idx };
       })
