@@ -4,14 +4,14 @@
 import { RNG } from "./sim/rng";
 
 export type SkillsEntrant = {
-  id: number; name: string; side: "A" | "B"; teamCode: string | null; isGoalie: boolean;
+  id: number; name: string; side: string; teamCode: string | null; isGoalie: boolean;
   sk: number; sc: number; st: number; pa: number; di: number; // skater ratings (50 when unknown)
   gq: number; // goalie quality 0..100 (goalies only)
 };
 
-export type SkillsRow = { id: number; name: string; side: "A" | "B"; teamCode: string | null; value: number; display: string; detail?: string };
-export type SkillsEventResult = { key: SkillsKey; title: string; unit: string; lowerIsBetter: boolean; rows: SkillsRow[]; winner: SkillsRow | null; winnerSide: "A" | "B" | null };
-export type SkillsResult = { events: SkillsEventResult[]; points: { A: number; B: number }; seed: number };
+export type SkillsRow = { id: number; name: string; side: string; teamCode: string | null; value: number; display: string; detail?: string };
+export type SkillsEventResult = { key: SkillsKey; title: string; unit: string; lowerIsBetter: boolean; rows: SkillsRow[]; winner: SkillsRow | null; winnerSide: string | null };
+export type SkillsResult = { events: SkillsEventResult[]; points: Record<string, number>; seed: number };
 
 export type SkillsKey = "fastest" | "hardest" | "accuracy" | "passing" | "breakaway";
 export const SKILLS_EVENTS: { key: SkillsKey; title: string; about: string }[] = [
@@ -19,7 +19,7 @@ export const SKILLS_EVENTS: { key: SkillsKey; title: string; about: string }[] =
   { key: "hardest", title: "Hardest Shot", about: "Two slap shots each, best counts — shooting (SC) and strength (ST)." },
   { key: "accuracy", title: "Accuracy Shooting", about: "Hit all four corner targets as fast as possible — shooting (SC) and deking (DI)." },
   { key: "passing", title: "Passing Challenge", about: "Timed passing course — passing (PA)." },
-  { key: "breakaway", title: "Breakaway Challenge", about: "Every shooter gets 3 breakaways against the other team's All-Star goalies." },
+  { key: "breakaway", title: "Breakaway Challenge", about: "Every shooter gets 3 breakaways against goalies from the other All-Star teams." },
 ];
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -31,14 +31,14 @@ function rank(key: SkillsKey, title: string, unit: string, lowerIsBetter: boolea
   return { key, title, unit, lowerIsBetter, rows, winner, winnerSide: winner?.side ?? null };
 }
 
-/** Top N entrants per side by a rating — who each team sends to an event. */
+/** Top N entrants per team by a rating — who each All-Star team sends to an event. */
 export function pickEntrants(all: SkillsEntrant[], by: (e: SkillsEntrant) => number, perSide: number): SkillsEntrant[] {
   const out: SkillsEntrant[] = [];
-  for (const side of ["A", "B"] as const) out.push(...all.filter((e) => e.side === side && !e.isGoalie).sort((a, b) => by(b) - by(a)).slice(0, perSide));
+  for (const side of [...new Set(all.map((e) => e.side))]) out.push(...all.filter((e) => e.side === side && !e.isGoalie).sort((a, b) => by(b) - by(a)).slice(0, perSide));
   return out;
 }
 
-export function runSkills(entrants: SkillsEntrant[], seed: number, perSide = 3): SkillsResult {
+export function runSkills(entrants: SkillsEntrant[], seed: number, perSide = 2): SkillsResult {
   const rng = new RNG(seed);
   const events: SkillsEventResult[] = [];
   const row = (e: SkillsEntrant, value: number, display: string, detail?: string): SkillsRow => ({ id: e.id, name: e.name, side: e.side, teamCode: e.teamCode, value, display, detail });
@@ -103,7 +103,7 @@ export function runSkills(entrants: SkillsEntrant[], seed: number, perSide = 3):
   breakaway.rows.push(...gRows);
   events.push(breakaway);
 
-  const points = { A: 0, B: 0 };
-  for (const e of events) if (e.winnerSide) points[e.winnerSide]++;
+  const points: Record<string, number> = Object.fromEntries([...new Set(entrants.map((e) => e.side))].map((k) => [k, 0]));
+  for (const e of events) if (e.winnerSide) points[e.winnerSide] = (points[e.winnerSide] ?? 0) + 1;
   return { events, points, seed };
 }

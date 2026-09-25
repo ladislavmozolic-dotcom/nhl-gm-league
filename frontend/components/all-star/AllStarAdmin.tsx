@@ -3,15 +3,11 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
-  saveAllStarEventAction, buildRostersAction, runAllStarNowAction, resetAllStarResultsAction,
-  deleteAllStarEventAction, editRosterAction, type EventForm,
+  saveAllStarEventAction, setAllStarTeamAction, sendNominationsNowAction, closeNominationsNowAction,
+  autoFillTeamAction, runAllStarNowAction, resetAllStarResultsAction, deleteAllStarEventAction, type EventForm,
 } from "@/app/admin/all-star/actions";
 
-type Side = "A" | "B";
-type Slot = "F" | "D" | "G";
-type P = { id: number; name: string; side: Side; slot: Slot; teamCode: string | null };
-type SideRoster = { F: number[]; D: number[]; G: number[]; starters: number[] };
-
+type DivKey = "ATL" | "MET" | "CEN" | "PAC";
 const input = "bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-sm text-slate-200 w-full";
 const btn = "px-3.5 py-1.5 rounded-lg font-semibold text-sm disabled:opacity-50";
 
@@ -27,104 +23,82 @@ function useAct() {
       catch (e) { setMsg({ ok: false, text: (e as Error).message }); }
     });
   };
-  return { pending, msg, run };
+  const Msg = () => (msg ? <span className={`text-xs ${msg.ok ? "text-emerald-400" : "text-red-400"}`}>{msg.text}</span> : null);
+  return { pending, run, Msg };
 }
+
+/** "YYYY-MM-DDTHH:mm" ± days, as plain wall-clock arithmetic (the input is Bratislava time). */
+const shift = (local: string, days: number) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(local);
+  if (!m) return "";
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3] + days, +m[4], +m[5]));
+  return d.toISOString().slice(0, 16);
+};
 
 export function AllStarEventForm({ initial }: { initial: EventForm }) {
   const [f, setF] = useState<EventForm>(initial);
-  const { pending, msg, run } = useAct();
+  const { pending, run, Msg } = useAct();
   const set = <K extends keyof EventForm>(k: K, v: EventForm[K]) => setF({ ...f, [k]: v });
+  const standard = () => f.eventAt && setF({ ...f, nomOpensAt: shift(f.eventAt, -7), nomClosesAt: shift(f.eventAt, -2), coachDeadlineAt: shift(f.eventAt, 0) });
   return (
     <div className="space-y-3">
       <div className="grid gap-3 md:grid-cols-2">
         <label className="text-xs text-slate-400 space-y-1 md:col-span-2 block">Event title<input className={input} value={f.title} onChange={(e) => set("title", e.target.value)} /></label>
-        <label className="text-xs text-slate-400 space-y-1 block">🏒 Skills + Game (Bratislava time)<input type="datetime-local" className={input} value={f.eventAt} onChange={(e) => set("eventAt", e.target.value)} /></label>
-        <div />
-        <label className="text-xs text-slate-400 space-y-1 block">🗳️ Voting opens<input type="datetime-local" className={input} value={f.votingOpensAt} onChange={(e) => set("votingOpensAt", e.target.value)} /></label>
-        <label className="text-xs text-slate-400 space-y-1 block">🗳️ Voting closes<input type="datetime-local" className={input} value={f.votingClosesAt} onChange={(e) => set("votingClosesAt", e.target.value)} /></label>
-        <label className="text-xs text-slate-400 space-y-1 block">Eastern team name<input className={input} value={f.teamAName} onChange={(e) => set("teamAName", e.target.value)} /></label>
-        <label className="text-xs text-slate-400 space-y-1 block">Western team name<input className={input} value={f.teamBName} onChange={(e) => set("teamBName", e.target.value)} /></label>
-        <label className="text-xs text-slate-400 space-y-1 block">Fan share of the vote (%) — GMs get the rest
-          <input type="number" min={0} max={100} className={input} value={f.fanWeightPct} onChange={(e) => set("fanWeightPct", Number(e.target.value))} /></label>
-        <label className="flex items-center gap-2 text-sm text-slate-300 pt-5"><input type="checkbox" checked={f.lowDefense} onChange={(e) => set("lowDefense", e.target.checked)} /> All-Star style (little defense, few penalties, more goals)</label>
+        <label className="text-xs text-slate-400 space-y-1 block">🏒 Game day & time — Skills + 3-on-3 tournament (Bratislava)
+          <input type="datetime-local" className={input} value={f.eventAt} onChange={(e) => set("eventAt", e.target.value)} /></label>
+        <div className="flex items-end"><button type="button" className={`${btn} border border-slate-700 text-slate-200 hover:bg-slate-800`} onClick={standard} disabled={!f.eventAt}>↺ Standard schedule (−7 d / −2 d)</button></div>
+        <label className="text-xs text-slate-400 space-y-1 block">🗳️ GM nominations open<input type="datetime-local" className={input} value={f.nomOpensAt} onChange={(e) => set("nomOpensAt", e.target.value)} /></label>
+        <label className="text-xs text-slate-400 space-y-1 block">🗳️ GM nominations close<input type="datetime-local" className={input} value={f.nomClosesAt} onChange={(e) => set("nomClosesAt", e.target.value)} /></label>
+        <label className="text-xs text-slate-400 space-y-1 block">📋 Coaches&apos; lineups due (blank = game time)<input type="datetime-local" className={input} value={f.coachDeadlineAt} onChange={(e) => set("coachDeadlineAt", e.target.value)} /></label>
+        <label className="text-xs text-slate-400 space-y-1 block">🏆 MVP&apos;s club gets a bonus pick in round (0 = none)
+          <input type="number" min={0} max={20} className={input} value={f.mvpBonusRound} onChange={(e) => set("mvpBonusRound", Number(e.target.value))} /></label>
+        <label className="flex items-center gap-2 text-sm text-slate-300 md:col-span-2"><input type="checkbox" checked={f.lowDefense} onChange={(e) => set("lowDefense", e.target.checked)} /> All-Star style — wide-open, no penalties (~8-10 goals a game)</label>
       </div>
       <div className="flex items-center gap-3">
         <button className={`${btn} bg-blue-600 hover:bg-blue-500 text-white`} disabled={pending} onClick={() => run(() => saveAllStarEventAction(f), "Saved.")}>{pending ? "…" : f.id ? "Save changes" : "Create event"}</button>
-        {msg && <span className={`text-xs ${msg.ok ? "text-emerald-400" : "text-red-400"}`}>{msg.text}</span>}
+        <Msg />
       </div>
-      <p className="text-xs text-slate-500">When voting opens, an announcement with a &quot;Vote now&quot; link goes to every GM automatically. When it closes, rosters are built. At the event time the Skills Competition and the game are played and the results are posted to News — all by the 5-minute cron, no button needed.</p>
+      <p className="text-xs text-slate-500">The cron does the rest: at the nomination opening every GM gets a message with the nomination form; at the close missing clubs are auto-nominated and the four coaches are messaged; at game time any unfinished lineup is filled in, the Skills Competition + semis + final are played, the MVP&apos;s club gets its bonus pick and the results go to News.</p>
     </div>
   );
 }
 
-export function AllStarControls({ eventId, hasRosters, done }: { eventId: number; hasRosters: boolean; done: boolean }) {
-  const { pending, msg, run } = useAct();
+export function AllStarTeamRow({ eventId, div, name, coachTeamId, gms, status }: {
+  eventId: number; div: DivKey; name: string; coachTeamId: number | null; gms: { id: number; label: string }[]; status: string;
+}) {
+  const [n, setN] = useState(name);
+  const [c, setC] = useState<number | null>(coachTeamId);
+  const { pending, run, Msg } = useAct();
+  return (
+    <div className="grid gap-2 md:grid-cols-[1fr_1fr_auto_auto] items-center border-b border-slate-800 pb-3">
+      <input className={input} value={n} onChange={(e) => setN(e.target.value)} />
+      <select className={input} value={c ?? ""} onChange={(e) => setC(e.target.value ? Number(e.target.value) : null)}>
+        <option value="">— no coach (auto lineup) —</option>
+        {gms.map((g) => <option key={g.id} value={g.id}>{g.label}</option>)}
+      </select>
+      <button className={`${btn} bg-blue-600 hover:bg-blue-500 text-white`} disabled={pending} onClick={() => run(() => setAllStarTeamAction(eventId, div, n, c), "Saved.")}>Save</button>
+      <div className="flex items-center gap-2">
+        <a href={`/all-star/coach?div=${div}`} className="text-xs text-blue-400 hover:underline whitespace-nowrap">Coach room →</a>
+        <button className="text-xs text-slate-400 hover:text-white whitespace-nowrap" disabled={pending} onClick={() => run(() => autoFillTeamAction(eventId, div), "Auto lineup set.", "Replace this team's lineup with the automatic one?")}>Auto lineup</button>
+      </div>
+      <div className="md:col-span-4 text-xs text-slate-500">{status} <Msg /></div>
+    </div>
+  );
+}
+
+export function AllStarControls({ eventId, done }: { eventId: number; done: boolean }) {
+  const { pending, run, Msg } = useAct();
+  const b2 = `${btn} border border-slate-700 text-slate-200 hover:bg-slate-800`;
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-2">
-        <button className={`${btn} border border-slate-700 text-slate-200 hover:bg-slate-800`} disabled={pending}
-          onClick={() => run(() => buildRostersAction(eventId), "Rosters built.", hasRosters ? "Rebuild both rosters from the current vote? Manual edits will be lost." : undefined)}>
-          {hasRosters ? "Rebuild rosters" : "Build rosters now"}
-        </button>
-        <button className={`${btn} bg-amber-600 hover:bg-amber-500 text-white`} disabled={pending}
-          onClick={() => run(() => runAllStarNowAction(eventId), "Played — results are live.", done ? "Results already exist. Re-run everything (new results)?" : "Play the Skills Competition and the game now?")}>
-          ▶ Play now
-        </button>
-        {done && <button className={`${btn} border border-slate-700 text-slate-200 hover:bg-slate-800`} disabled={pending} onClick={() => run(() => resetAllStarResultsAction(eventId), "Results cleared.", "Clear the results (rosters and votes stay)?")}>Clear results</button>}
-        <button className={`${btn} border border-red-800 text-red-300 hover:bg-red-950`} disabled={pending} onClick={() => run(() => deleteAllStarEventAction(eventId), "Deleted.", "Delete this event with all votes and results?")}>Delete event</button>
+        <button className={b2} disabled={pending} onClick={() => run(() => sendNominationsNowAction(eventId), "Nomination messages sent.", "Send the nomination message to every GM now?")}>📨 Send nomination messages now</button>
+        <button className={b2} disabled={pending} onClick={() => run(() => closeNominationsNowAction(eventId), "Nominations closed, coaches notified.", "Close nominations now (auto-fill missing clubs) and message the coaches?")}>🔒 Close nominations now</button>
+        <button className={`${btn} bg-amber-600 hover:bg-amber-500 text-white`} disabled={pending} onClick={() => run(() => runAllStarNowAction(eventId), "Played — results are live.", done ? "Results already exist. Re-play everything?" : "Play the Skills Competition and the tournament now?")}>▶ Play now</button>
+        {done && <button className={b2} disabled={pending} onClick={() => run(() => resetAllStarResultsAction(eventId), "Results cleared.", "Clear results and take back the MVP bonus pick? Nominations and lineups stay.")}>Clear results</button>}
+        <button className={`${btn} border border-red-800 text-red-300 hover:bg-red-950`} disabled={pending} onClick={() => run(() => deleteAllStarEventAction(eventId), "Deleted.", "Delete this event with all nominations and results?")}>Delete event</button>
       </div>
-      {msg && <div className={`text-xs ${msg.ok ? "text-emerald-400" : "text-red-400"}`}>{msg.text}</div>}
-    </div>
-  );
-}
-
-export function AllStarRosterEditor({ eventId, rosters, players, names, sideNames }: {
-  eventId: number; rosters: Record<Side, SideRoster>; players: P[]; names: Record<number, string>; sideNames: Record<Side, string>;
-}) {
-  const { pending, msg, run } = useAct();
-  const [q, setQ] = useState<Record<string, string>>({});
-  return (
-    <div className="space-y-3">
-      <div className="grid gap-6 md:grid-cols-2">
-        {(["A", "B"] as const).map((side) => (
-          <div key={side}>
-            <div className="font-bold mb-2 text-slate-200">{sideNames[side]}</div>
-            {(["F", "D", "G"] as const).map((slot) => {
-              const key = side + slot;
-              const term = (q[key] ?? "").toLowerCase();
-              const all = new Set([...rosters.A.F, ...rosters.A.D, ...rosters.A.G, ...rosters.B.F, ...rosters.B.D, ...rosters.B.G]);
-              const matches = term.length < 2 ? [] : players.filter((p) => p.slot === slot && !all.has(p.id) && p.name.toLowerCase().includes(term)).slice(0, 6);
-              return (
-                <div key={slot} className="mb-3">
-                  <div className="text-[11px] uppercase tracking-wider text-slate-500 mb-1">{slot === "F" ? "Forwards" : slot === "D" ? "Defense" : "Goalies"} ({rosters[side][slot].length})</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {rosters[side][slot].map((id) => (
-                      <button key={id} disabled={pending} onClick={() => run(() => editRosterAction(eventId, side, slot, "remove", id), "Removed.")}
-                        className="rounded-full border border-slate-700 px-2.5 py-0.5 text-xs text-slate-200 hover:border-red-600 hover:text-red-300" title="Remove">
-                        {rosters[side].starters.includes(id) ? "★ " : ""}{names[id] ?? id} ✕
-                      </button>
-                    ))}
-                  </div>
-                  <div className="relative mt-1.5">
-                    <input className={input} placeholder="Add a player…" value={q[key] ?? ""} onChange={(e) => setQ({ ...q, [key]: e.target.value })} />
-                    {matches.length > 0 && (
-                      <div className="absolute z-10 mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 shadow-xl">
-                        {matches.map((p) => (
-                          <button key={p.id} className="block w-full px-3 py-1.5 text-left text-sm hover:bg-slate-800" disabled={pending}
-                            onClick={() => { setQ({ ...q, [key]: "" }); run(() => editRosterAction(eventId, side, slot, "add", p.id), "Added."); }}>
-                            {p.name} <span className="text-xs text-slate-500">{p.teamCode}{p.side !== side ? " · other conference" : ""}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-      {msg && <div className={`text-xs ${msg.ok ? "text-emerald-400" : "text-red-400"}`}>{msg.text}</div>}
+      <Msg />
     </div>
   );
 }

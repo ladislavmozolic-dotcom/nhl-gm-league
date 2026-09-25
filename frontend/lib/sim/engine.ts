@@ -2218,9 +2218,14 @@ function simulateEndgame(st: SimState) {
 // shift pattern used for 5-on-5 forward lines (advanceShift's `pick`).
 const OT_UNIT_WEIGHTS = [0.5, 0.32, 0.18];
 
-function simulateOvertime(st: SimState): { winner: number | null; seconds: number } {
+function simulateOvertime(st: SimState, cfg: { period?: number; seconds?: number; suddenDeath?: boolean; chanceMult?: number; finishMult?: number } = {}): { winner: number | null; seconds: number } {
   const { home, away, rng } = st;
   const step = 15;
+  // defaults = the regular 5:00 sudden-death OT (period 4). The All-Star 3-on-3
+  // format reuses this loop for whole 10:00 halves where every goal counts.
+  const per = cfg.period ?? 4;
+  const periodLen = cfg.seconds ?? OT_SECONDS;
+  const suddenDeath = cfg.suddenDeath ?? true;
   // Three rotating trios per team (resolveOtUnits: manager-set OT lines when
   // genuinely distinct, else roster tiers by offense) instead of sampling the
   // whole healthy roster fresh on every attempt — mirrors how 5-on-5 lines and
@@ -2233,7 +2238,7 @@ function simulateOvertime(st: SimState): { winner: number | null; seconds: numbe
     const names = [...oi.f, ...oi.d].map((s) => cleanName(s.name));
     if (!names.length) return;
     st.sink.emit({
-      period: 4, seconds, type: "LINE_CHANGE", teamId: team.id, teamCode: team.code ?? undefined,
+      period: per, seconds, type: "LINE_CHANGE", teamId: team.id, teamCode: team.code ?? undefined,
       importance: "MINOR",
       meta: { unit: "OT", label: `OT${otIdx[team.id] + 1}`, names },
     });
@@ -2264,7 +2269,7 @@ function simulateOvertime(st: SimState): { winner: number | null; seconds: numbe
   // has produced no shot by the final 15 seconds, guarantee one attempt. The side
   // is chosen up front so the fallback does not create a home-team bias.
   const fallbackShooterId = rng.chance(0.5) ? home.id : away.id;
-  for (let t = step; t <= OT_SECONDS; t += step) {
+  for (let t = step; t <= periodLen; t += step) {
     // bench change every 15s, same cadence the injury roll already used —
     // rotate BEFORE the injury check so it rolls against whoever is actually
     // deployed this interval, not last interval's trio.
@@ -2278,12 +2283,12 @@ function simulateOvertime(st: SimState): { winner: number | null; seconds: numbe
         line.toi += step;
         line.situations["3V3"].toi += step;
       }
-      maybeInjureOnIce(st, team, opp, [...oi.f, ...oi.d], 4, t, step);
+      maybeInjureOnIce(st, team, opp, [...oi.f, ...oi.d], per, t, step);
     }
     for (const [att, def, isHome] of [[home, away, true], [away, home, false]] as const) {
       // 3-on-3 is wide open: elevated chance rate scaled by offense
-      const rate = 0.07 * (att.offenseRating / LEAGUE.avgOffense);
-      const fallbackAttempt = !hasOtShot && t === OT_SECONDS - step && att.id === fallbackShooterId;
+      const rate = 0.07 * (att.offenseRating / LEAGUE.avgOffense) * (cfg.chanceMult ?? 1);
+      const fallbackAttempt = !hasOtShot && t === periodLen - step && att.id === fallbackShooterId;
       if (!fallbackAttempt && !rng.chance(rate)) continue;
       // the injury roll just above can hurt someone from this very on-ice set,
       // so re-filter rather than trusting deployOt's snapshot from this tick.
@@ -2292,21 +2297,22 @@ function simulateOvertime(st: SimState): { winner: number | null; seconds: numbe
       const shooter = pickShooterFromPool(rng, attOnIce);
       const { sector, shotType } = shotProfile(rng, { isDefense: shooter.isDefense, setup: "carry", danger: 1.25 });
       const xg = expectedGoal(rng, sector, shotType, "EV");
-      const tracked = trackSpecialShot(st, att, def, shooter, 4, t, sector, shotType, xg, true, "3V3");
+      const tracked = trackSpecialShot(st, att, def, shooter, per, t, sector, shotType, xg, true, "3V3");
       hasOtShot = true;
-      const p = conversion(shooter.offense, effGoalieQuality(liveGoalie(st, def)), isHome, "EV") * 2.2;
+      const p = conversion(shooter.offense, effGoalieQuality(liveGoalie(st, def)), isHome, "EV") * 2.2 * (cfg.finishMult ?? 1);
       if (rng.chance(p)) {
         tracked.goalie!.goalsAgainst++;
         // st.currentOnIce already holds the real deployed trio for both teams
         // this interval — recordGoal reads it directly for assists/+/-, same
         // as 5-on-5, instead of re-randomizing a set after the fact.
-        recordGoal(st, att, def, 4, t, "EV", false, shooter, { sector, shotType, xg }, "3V3");
-        return { winner: att.id, seconds: t };
+        recordGoal(st, att, def, per, t, "EV", false, shooter, { sector, shotType, xg }, "3V3");
+        if (suddenDeath) return { winner: att.id, seconds: t };
+        continue; // a full 3-on-3 half: play on
       }
-      saveSpecialShot(st, def, shooter, 4, t, sector, shotType, xg, tracked);
+      saveSpecialShot(st, def, shooter, per, t, sector, shotType, xg, tracked);
     }
   }
-  return { winner: null, seconds: OT_SECONDS };
+  return { winner: null, seconds: periodLen };
 }
 
 function simulateShootout(st: SimState): number {
@@ -2494,7 +2500,12 @@ function distributeCounting(st: SimState) {
 
 // ---- main -------------------------------------------------------------------
 
-export type SimOptions = { seed?: number; settings?: EngineSettings; noShootout?: boolean; rivalry?: boolean; league?: "NHL" | "AHL"; engineVersion?: string };
+export type SimOptions = {
+  seed?: number; settings?: EngineSettings; noShootout?: boolean; rivalry?: boolean; league?: "NHL" | "AHL"; engineVersion?: string;
+  // All-Star format: the whole game is 3-on-3 — `periods` halves of `periodSeconds`,
+  // every goal counts, goalies swap at the break, a tie goes straight to a shootout.
+  threeOnThree?: { periods: number; periodSeconds: number; chanceMult?: number; finishMult?: number };
+};
 
 export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}): GameResult {
   CFG = opts.settings ?? DEFAULT_SETTINGS;
@@ -2560,7 +2571,17 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
   const homeShotsTotal = Math.max(12, Math.round(rng.poisson(expectedShots(home, away, true))));
   const awayShotsTotal = Math.max(12, Math.round(rng.poisson(expectedShots(away, home, false))));
 
-  for (let period = 1; period <= 3; period++) {
+  if (opts.threeOnThree) {
+    const { periods: n, periodSeconds, chanceMult, finishMult } = opts.threeOnThree;
+    for (let p = 1; p <= n; p++) {
+      if (p > 1) for (const team of [home, away]) {
+        // All-Star tradition: the second goalie plays the second half
+        if (team.backup && st.box[team.id].backupGoalie) { st.pulled[team.id] = true; st.box[team.id].backupGoalie!.started = true; }
+      }
+      simulateOvertime(st, { period: p, seconds: periodSeconds, suddenDeath: false, chanceMult, finishMult });
+    }
+  }
+  for (let period = 1; period <= (opts.threeOnThree ? 0 : 3); period++) {
     if (CFG.engineModel === "possession") {
       // the main fight/line-brawl path now lives INSIDE simulatePeriodPossession's
       // tick loop (maybeStartFight, hooked to real stoppages) — genuinely live, not
@@ -2603,12 +2624,12 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
   // "trailing" team had actually pulled its goalie (its on-ice list was still a
   // normal 5 skaters) — producing "(EN)" goals in games that were tied, or still
   // in progress, at that exact moment.
-  if (CFG.engineModel !== "possession") {
+  if (CFG.engineModel !== "possession" && !opts.threeOnThree) {
     simulateEndgame(st);
   }
   // legacy "volume" model only — the possession model already generated these
   // per-period, live, inside the loop above (including their injuries).
-  if (CFG.engineModel !== "possession") {
+  if (CFG.engineModel !== "possession" && !opts.threeOnThree) {
     for (let p = 1; p <= 3; p++) { generateFights(st, p); generateHeatEvents(st, p); generateFightInjuries(st, p); }
   }
 
@@ -2618,7 +2639,9 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
   let otPeriods = 0; // full sudden-death OT periods (playoff marathons)
   const hG = st.box[home.id].goals, aG = st.box[away.id].goals;
 
-  if (hG === aG) {
+  if (hG === aG && opts.threeOnThree) {
+    winnerId = simulateShootout(st); endedIn = "SO"; periods = opts.threeOnThree.periods + 1;
+  } else if (hG === aG) {
     if (opts.noShootout) {
       // playoff sudden death: keep playing OT periods until someone scores
       let w: number | null = null, guard = 0;

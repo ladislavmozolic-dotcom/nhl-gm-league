@@ -1573,30 +1573,41 @@ model FaLowball {
   @@unique([playerId, teamId])
 }
 
-// All-Star Weekend (lib/all-star-server.ts). One row per event; admin plans it at
-// /admin/all-star. Voting (fans + GMs) → rosters → Skills Competition + game,
-// run automatically at `eventAt` by the advance-day cron (or by the admin).
+// All-Star Weekend (lib/all-star-server.ts) — real NHL format: 4 division teams,
+// 3-on-3 semis + final. Planned by the commissioner at /admin/all-star:
+//   votingOpensAt..votingClosesAt = GM NOMINATION window (each club: 3F/2D/1G of its own)
+//   votingClosesAt..coachDeadlineAt = the 4 All-Star coaches (GMs) pick 6F/3D/2G + lines
+//   eventAt = Skills Competition + tournament, run by the advance-day cron.
 model AllStarEvent {
-  id               Int            @id @default(autoincrement())
-  season           String
-  title            String         @default("UNHL All-Star Weekend")
-  eventAt          DateTime // when skills + game are played (real instant)
-  votingOpensAt    DateTime?
-  votingClosesAt   DateTime?
-  teamAName        String         @default("Eastern All-Stars") // Eastern conference
-  teamBName        String         @default("Western All-Stars") // Western conference
-  fanWeightPct     Int            @default(50) // fan vs GM share of the vote
-  lowDefense       Boolean        @default(true) // All-Star hockey: defense takes the night off
-  status           String         @default("SCHEDULED") // SCHEDULED | DONE
-  rosters          Json? // { A: { F: number[], D: number[], G: number[], starters: number[] }, B: {...} }
-  skills           Json? // SkillsResult
-  game             Json? // AllStarGameResult
-  votingAnnounced  Boolean        @default(false)
-  resultsPublished Boolean        @default(false)
-  createdAt        DateTime       @default(now())
-  votes            AllStarVote[]
+  id                Int           @id @default(autoincrement())
+  season            String
+  title             String        @default("UNHL All-Star Weekend")
+  eventAt           DateTime
+  votingOpensAt     DateTime? // nominations open
+  votingClosesAt    DateTime? // nominations close
+  coachDeadlineAt   DateTime? // coaches' rosters + lines due (defaults to eventAt)
+  teams             Json? // AsTeam[] — per division: name, coach, roster, 3-on-3 units, goalie, shootout order
+  lowDefense        Boolean       @default(true) // All-Star style: wide-open hockey
+  status            String        @default("SCHEDULED") // SCHEDULED | DONE
+  skills            Json? // SkillsResult
+  game              Json? // AllStarTournament
+  votingAnnounced   Boolean       @default(false) // nomination messages sent
+  nominationsClosed Boolean       @default(false) // missing clubs auto-nominated, coaches notified
+  resultsPublished  Boolean       @default(false)
+  mvpBonusRound     Int           @default(8) // MVP's club gets a DraftBonusPick in this round of the next draft (0 = off)
+  mvpBonusPickId    Int? // the DraftBonusPick it created (removed again if results are cleared)
+  // unused since the division format (kept so no column is dropped on deploy)
+  teamAName         String        @default("Eastern All-Stars")
+  teamBName         String        @default("Western All-Stars")
+  fanWeightPct      Int           @default(0)
+  rosters           Json?
+  createdAt         DateTime      @default(now())
+  votes             AllStarVote[]
 }
 
+// A club's All-Star NOMINATION (one row per nominated player). voterKey
+// "gm:<teamId>" (the GM sent it) | "auto:<teamId>" (filled in at the deadline);
+// side = division key (ATL/MET/CEN/PAC), slot = F/D/G.
 model AllStarVote {
   id        Int          @id @default(autoincrement())
   eventId   Int

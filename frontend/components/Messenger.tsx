@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import NominationForm from "@/components/all-star/NominationForm";
 import { sendDm, getConversation, listConversations, type ConversationMsg, type ConvTeam } from "@/app/messages/actions";
 
 const EMOJIS = ["👍", "😂", "🔥", "🏒", "🥅", "💰", "🤝", "🤔", "😅", "😎", "👀", "🙌", "❌", "✅", "😱", "🎯", "💪", "🍺", "🫡", "🤯"];
@@ -118,7 +119,9 @@ export default function Messenger({ initialTeams, initialActive }: { initialTeam
                 <div key={m.id} className={`flex ${m.mine ? "justify-end" : "justify-start"}`}>
                   <div className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${m.mine ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-100"}`}>
                     <div className="whitespace-pre-wrap break-words">{m.body}</div>
-                    {m.tradeUrl && <Link href={m.tradeUrl} className={`mt-1 inline-block text-xs font-semibold underline ${m.mine ? "text-blue-100" : "text-emerald-400"}`}>🔁 View trade proposal →</Link>}
+                    {m.tradeUrl === "/all-star/nominate" ? <NominationForm compact />
+                      : m.tradeUrl === "/all-star/coach" ? <Link href={m.tradeUrl} className="mt-2 inline-block rounded-lg bg-amber-600 hover:bg-amber-500 px-3 py-1.5 text-xs font-bold text-white">📋 Open the coach room →</Link>
+                      : m.tradeUrl && <Link href={m.tradeUrl} className={`mt-1 inline-block text-xs font-semibold underline ${m.mine ? "text-blue-100" : "text-emerald-400"}`}>{m.tradeUrl.startsWith("/trades") ? "🔁 View trade proposal →" : "Open →"}</Link>}
                     <div className={`mt-0.5 text-[10px] flex items-center gap-1 justify-end ${m.mine ? "text-blue-200/80" : "text-slate-500"}`}>
                       {fmtTime(m.at)}
                       {m.mine && <span title={m.read ? "Read" : "Delivered"}>{m.read ? "✓✓" : "✓"}</span>}
