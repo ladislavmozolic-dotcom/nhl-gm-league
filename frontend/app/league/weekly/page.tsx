@@ -6,10 +6,10 @@ import { tradeGrades, dynastyLeaderboard } from "@/lib/gm-awards";
 
 export const dynamic = "force-dynamic";
 
-type Tab = "stars" | "team" | "player" | "goalie" | "surprise" | "trade" | "gm" | "grades" | "dynasty";
+type Tab = "power" | "stars" | "team" | "worst" | "player" | "goalie" | "surprise" | "trade" | "injuries" | "gm" | "grades" | "dynasty";
 const TABS: { key: Tab; label: string; allTime?: boolean }[] = [
-  { key: "stars", label: "⭐ 3 Stars" }, { key: "team", label: "🏆 Team" }, { key: "player", label: "🌟 Player" },
-  { key: "goalie", label: "🧤 Goalie" }, { key: "surprise", label: "😮 Surprise" }, { key: "trade", label: "🔁 Trade" },
+  { key: "power", label: "📊 Power Rankings" }, { key: "stars", label: "⭐ 3 Stars" }, { key: "team", label: "🏆 Team" }, { key: "worst", label: "📉 Rough Week" }, { key: "player", label: "🌟 Player" },
+  { key: "goalie", label: "🧤 Goalie" }, { key: "surprise", label: "😮 Surprise" }, { key: "trade", label: "🔁 Trades" }, { key: "injuries", label: "🏥 Injuries" },
   { key: "gm", label: "🧑‍💼 GM" }, { key: "grades", label: "📋 Trade Grades", allTime: true }, { key: "dynasty", label: "🏰 Dynasty", allTime: true },
 ];
 const gradeColor = (g: string) => g.startsWith("A") ? "text-emerald-400" : g.startsWith("B") ? "text-sky-400" : g === "C" ? "text-amber-400" : "text-red-400";
@@ -23,7 +23,7 @@ const svp = (v: number) => v.toFixed(3).replace(/^0/, "");
 export default async function WeeklyPage({ searchParams }: { searchParams: Promise<{ tab?: string; period?: string }> }) {
   const sp = await searchParams;
   const period = sp.period === "month" ? "month" : "week";
-  const tab = (TABS.find((t) => t.key === sp.tab)?.key ?? "stars") as Tab;
+  const tab = (TABS.find((t) => t.key === sp.tab)?.key ?? "power") as Tab;
   const d = await weeklyDigest(undefined, period === "month" ? 28 : 7);
   const grades = tab === "grades" ? await tradeGrades(10) : [];
   const dynasty = tab === "dynasty" ? await dynastyLeaderboard() : [];
@@ -112,6 +112,52 @@ export default async function WeeklyPage({ searchParams }: { searchParams: Promi
   }
 
   const section = (() => {
+    if (tab === "power") return (
+      <Card title={`📊 Power Rankings — ${P} ${period === "week" ? d.weekNo : ""}`} accent="text-blue-400" bodyClassName="p-0">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[560px]">
+            <thead><tr className="border-b border-slate-800 bg-slate-800/30 text-slate-500 text-xs uppercase tracking-wider">
+              <th className="px-3 py-2.5 text-left">#</th><th className="px-2 py-2.5 text-center" title="Places gained vs. the previous window">±</th><th className="px-3 py-2.5 text-left">Club</th>
+              <th className="px-3 py-2.5 text-center">{P}</th><th className="px-3 py-2.5 text-center">Season</th>
+              <th className="px-3 py-2.5 text-center" title="Goal differential per game (season)">GD/GP</th><th className="px-3 py-2.5 text-center">Score</th>
+            </tr></thead>
+            <tbody>
+              {d.powerRankings.map((r) => (
+                <tr key={r.teamId} className="border-b border-slate-800/40 hover:bg-slate-800/30 last:border-0">
+                  <td className="px-3 py-2 text-slate-400 tabular-nums font-bold">{r.rank}</td>
+                  <td className={`px-2 py-2 text-center tabular-nums text-xs font-bold ${r.move == null || r.move === 0 ? "text-slate-600" : r.move > 0 ? "text-emerald-400" : "text-red-400"}`}>{r.move == null ? "—" : r.move === 0 ? "=" : r.move > 0 ? `▲${r.move}` : `▼${-r.move}`}</td>
+                  <td className="px-3 py-2">{r.slug ? <Link href={`/teams/${r.slug}`} className="inline-flex items-center gap-2 hover:text-blue-400">{r.logo && <img src={r.logo} alt="" className="w-5 h-5 object-contain" />}<span className="font-medium">{r.name}</span></Link> : r.name}</td>
+                  <td className="px-3 py-2 text-center tabular-nums text-slate-300">{r.weekRec}</td>
+                  <td className="px-3 py-2 text-center tabular-nums text-slate-400">{r.seasonRec}</td>
+                  <td className={`px-3 py-2 text-center tabular-nums ${r.gdPerGp > 0 ? "text-emerald-400" : r.gdPerGp < 0 ? "text-red-400" : "text-slate-400"}`}>{r.gdPerGp > 0 ? "+" : ""}{r.gdPerGp.toFixed(2)}</td>
+                  <td className="px-3 py-2 text-center tabular-nums font-bold text-white">{(r.score * 100).toFixed(1)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="px-4 py-3 text-xs text-slate-500 border-t border-slate-800">Score = 60 % season points-% + 40 % this {period}&apos;s points-% (ties broken by goal differential per game). ± = places gained or lost vs. the previous {period}.</p>
+      </Card>
+    );
+    if (tab === "worst") return (
+      <Card title={`📉 Rough ${P}`} accent="text-red-400">
+        {d.worstTeam ? (<><TeamLine name={d.worstTeam.name} slug={d.worstTeam.slug} logo={d.worstTeam.logo} /><p className="text-sm text-slate-300 mt-2 tabular-nums">{d.worstTeam.w}-{d.worstTeam.l}-{d.worstTeam.otl} · {d.worstTeam.points} pts · {d.worstTeam.gf}-{d.worstTeam.ga} goals</p></>) : <p className="text-slate-500 text-sm">—</p>}
+      </Card>
+    );
+    if (tab === "injuries") return (
+      <Card title={`🏥 New injuries this ${period}`} accent="text-rose-400" bodyClassName="p-0">
+        <div className="divide-y divide-slate-800/60">
+          {d.injuries.length === 0 && <div className="px-4 py-4 text-slate-500 text-sm">No new injuries — a clean bill of health.</div>}
+          {d.injuries.map((i, k) => (
+            <div key={k} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+              {i.teamLogo && <img src={i.teamLogo} alt="" className="w-5 h-5 object-contain" />}
+              <span className="flex-1 min-w-0 truncate">{i.playerId != null ? <PlayerLink id={i.playerId} name={i.name} slug={i.slug ?? undefined} clean={false} /> : i.name} <span className="text-slate-500 text-xs">{i.team}</span></span>
+              <span className="text-slate-400 text-xs whitespace-nowrap">{i.part} · {i.severity}{i.days ? ` · ~${i.days} d` : ""}</span>
+            </div>
+          ))}
+        </div>
+      </Card>
+    );
     if (tab === "stars") return (
       <Card title={`⭐ 3 Stars of the ${P}`} accent="text-amber-400" bodyClassName="p-0">
         <div className="divide-y divide-slate-800/60">
@@ -163,8 +209,13 @@ export default async function WeeklyPage({ searchParams }: { searchParams: Promi
       </Card>
     );
     return (
-      <Card title={`🔁 Trade of the ${P}`} accent="text-blue-400">
-        {d.tradeOfWeek ? <p className="text-sm text-slate-200">{d.tradeOfWeek}</p> : <p className="text-slate-500 text-sm">No completed trades recently.</p>}
+      <Card title={`🔁 Trades this ${period}`} accent="text-blue-400" bodyClassName="p-0">
+        <div className="divide-y divide-slate-800/60">
+          {d.trades.length === 0 && <div className="px-4 py-4 text-slate-500 text-sm">No trades this {period}.{d.tradeOfWeek ? <> Latest deal: <span className="text-slate-300">{d.tradeOfWeek}</span></> : null}</div>}
+          {d.trades.map((t) => (
+            <div key={t.id} className="px-4 py-2.5 text-sm text-slate-200">{t.message} <span className="text-slate-600 text-xs ml-1">{new Date(t.createdAt).toLocaleDateString("sk-SK")}</span></div>
+          ))}
+        </div>
       </Card>
     );
   })();
