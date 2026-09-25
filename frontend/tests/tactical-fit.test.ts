@@ -56,14 +56,16 @@ test("4th-line fit rewards checking/defensive forwards over top-line skill types
   assert.ok(grindOn4th > grindOn1st, "a checking/defensive trio should fit the 4th line better than the 1st");
 });
 
-test("2nd line gives partial credit to a power-forward-style Forechecker/Grinder", () => {
+test("both scoring lines (1st and 2nd) give credit, not a penalty, to a power-forward-style Forechecker/Grinder", () => {
   // Raw rule (player-type.ts): CK>=75 & PA+SC<110 & DF<69 -> Forechecker/Grinder,
   // even with a decent PA+SC (105 here) — a power forward, not a pure energy guy.
   const powerForward = (pos: string) => forward(pos, { pa: 55, sc: 50, sk: 60, ck: 76, df: 60, st: 65 });
   const trio = [powerForward("LW"), powerForward("C"), powerForward("RW")];
+  const neutral = tacticalFitForwards(trio, DEFAULT_TACTICS); // no lineIndex -> no archetype effect
   const on1st = tacticalFitForwards(trio, DEFAULT_TACTICS, undefined, 0);
   const on2nd = tacticalFitForwards(trio, DEFAULT_TACTICS, undefined, 1);
-  assert.ok(on2nd > on1st, "a power-forward-style Grinder trio should now fit the 2nd line better than the 1st");
+  assert.ok(on1st >= neutral, "a power-forward-style Grinder trio should no longer be penalized on the 1st line");
+  assert.ok(on2nd >= neutral, "a power-forward-style Grinder trio should no longer be penalized on the 2nd line");
 });
 
 test("3rd D pair rewards a true shut-down (Stay-at-Home) D more than a merely Defensive one", () => {

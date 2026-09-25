@@ -28,14 +28,16 @@ type ArchetypeSlot = { weights: Record<string, number>; strictness: number };
 // Defenceman" so it doesn't score identically to a true shutdown Stay-at-Home).
 const full = (types: string[]): Record<string, number> => Object.fromEntries(types.map((t) => [t, 1]));
 
+// A power-forward-style Forechecker/Grinder (high CK who still carries decent
+// offense — playerType()'s percentile-fallback tier only tags him Grinder
+// because checking edges out his offense, not because he has none) is a real
+// plus on EITHER scoring line, not just tolerated — a Brady Tkachuk/Tom Wilson
+// type belongs on a 1st line same as a 2nd — so both give him partial credit
+// rather than the 0 he'd get on the checking lines below.
+const SKILL_F = full(["Elite Forward", "Dual-Threat", "Sniper", "Playmaker", "Offensive Forward"]);
 const LINE_ARCHETYPE_F: ArchetypeSlot[] = [
-  { weights: full(["Elite Forward", "Dual-Threat", "Sniper", "Playmaker", "Offensive Forward"]), strictness: 1.0 },
-  // 2nd line still wants skill first, but a power-forward-style Forechecker/
-  // Grinder (high CK who still carries decent offense — playerType()'s
-  // percentile-fallback tier only tags him Grinder because checking edges out
-  // his offense, not because he has none) is a real plus, not just tolerated,
-  // so he gets partial credit rather than the 0 he'd get elsewhere.
-  { weights: { ...full(["Elite Forward", "Dual-Threat", "Sniper", "Playmaker", "Offensive Forward", "Two-Way Forward"]), "Forechecker / Grinder": 0.6 }, strictness: 0.7 },
+  { weights: { ...SKILL_F, "Forechecker / Grinder": 0.6 }, strictness: 1.0 },
+  { weights: { ...SKILL_F, "Two-Way Forward": 1, "Forechecker / Grinder": 0.6 }, strictness: 0.7 },
   { weights: full(["Two-Way Forward", "Defensive Forward", "Forechecker / Grinder"]), strictness: 0.7 },
   { weights: full(["Forechecker / Grinder", "Defensive Forward"]), strictness: 1.0 },
 ];
