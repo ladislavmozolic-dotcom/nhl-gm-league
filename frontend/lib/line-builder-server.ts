@@ -12,7 +12,7 @@ import { cleanName } from "./playerName";
 import { percentileOf } from "./edge-params";
 import { posGroup } from "./ratingBands";
 
-type Attrs = { pa: number; sc: number; sk: number; ck: number; df: number; st: number; fo: number; en: number; weight: number };
+type Attrs = { pa: number; sc: number; sk: number; ck: number; df: number; st: number; fo: number; en: number; weight: number; ph: number };
 type P = { id: number; name: string; slug: string | null; position: string; shoots: string | null; overall: number; a: Attrs };
 export type LineSlot = { role: string; id: number | null; name: string | null; slug: string | null; overall: number | null; offSlot: boolean };
 export type LineProfile = { playmaking: number; shooting: number; skating: number; physical: number; defense: number };
@@ -87,7 +87,7 @@ export async function teamLineBuilder(teamId: number, league = "NHL"): Promise<T
   const [rows, pops] = await Promise.all([
     prisma.player.findMany({
       where: { teamId, rosterType, isGoalie: false, scratched: false },
-      select: { id: true, name: true, slug: true, position: true, shoots: true, overall: true, pa: true, sc: true, sk: true, ck: true, df: true, st: true, fo: true, en: true, weight: true },
+      select: { id: true, name: true, slug: true, position: true, shoots: true, overall: true, pa: true, sc: true, sk: true, ck: true, df: true, st: true, fo: true, en: true, weight: true, ph: true },
     }),
     positionPopulations(),
   ]);
@@ -100,7 +100,7 @@ export async function teamLineBuilder(teamId: number, league = "NHL"): Promise<T
   const chem = ((chemRow?.chemistry ?? {}) as Record<string, number>) || {};
   const byId = new Map<number, P>(rows.map((r) => [r.id, {
     id: r.id, name: cleanName(r.name), slug: r.slug, position: r.position, shoots: r.shoots, overall: r.overall ?? 0,
-    a: { pa: r.pa ?? 50, sc: r.sc ?? 50, sk: r.sk ?? 50, ck: r.ck ?? 50, df: r.df ?? 50, st: r.st ?? 50, fo: r.fo ?? 50, en: r.en ?? 50, weight: r.weight ?? 90 },
+    a: { pa: r.pa ?? 50, sc: r.sc ?? 50, sk: r.sk ?? 50, ck: r.ck ?? 50, df: r.df ?? 50, st: r.st ?? 50, fo: r.fo ?? 50, en: r.en ?? 50, weight: r.weight ?? 90, ph: r.ph ?? 75 },
   }]));
 
   const base = 46;
@@ -128,7 +128,7 @@ export async function teamLineBuilder(teamId: number, league = "NHL"): Promise<T
     const slots: LineSlot[] = ps.map((p, idx) => ({ role: roles[idx], id: p?.id ?? null, name: p?.name ?? null, slug: p?.slug ?? null, overall: p?.overall ?? null,
       offSlot: !!p && !(roles[idx] === "C" ? /C|F/.test((p.position || "").toUpperCase()) : ((p.position || "").toUpperCase().includes(roles[idx]) || /\bW\b|F/.test((p.position || "").toUpperCase()))) }));
     const profile = profileOf(present, "F", pops);
-    const tacticalFit = tacticalFitForwards(ps.map(fitPlayer), tactics, l.puck);
+    const tacticalFit = tacticalFitForwards(ps.map(fitPlayer), tactics, l.puck, i);
     const { chemistry, gelled, pairs } = chemFor(slots.map((s) => ({ role: s.role, id: s.id })), tacticalFit);
     return { kind: "F", index: i, slots, chemistry, gelled, pairs, tacticalFit, profile, summary: summaryOf(profile, "F") };
   });
@@ -140,7 +140,7 @@ export async function teamLineBuilder(teamId: number, league = "NHL"): Promise<T
     const slots: LineSlot[] = ps.map((p, idx) => ({ role: roles[idx], id: p?.id ?? null, name: p?.name ?? null, slug: p?.slug ?? null, overall: p?.overall ?? null,
       offSlot: !!p && ((idx === 0 && p.shoots === "R") || (idx === 1 && p.shoots === "L")) }));
     const profile = profileOf(present, "D", pops);
-    const tacticalFit = tacticalFitDefense(ps.map(fitPlayer), tactics, l.dzone);
+    const tacticalFit = tacticalFitDefense(ps.map(fitPlayer), tactics, l.dzone, i);
     const { chemistry, gelled, pairs } = chemFor(slots.map((s) => ({ role: s.role, id: s.id })), tacticalFit);
     return { kind: "D", index: i, slots, chemistry, gelled, pairs, tacticalFit, profile, summary: summaryOf(profile, "D") };
   });

@@ -34,3 +34,35 @@ test("per-line system override changes the same tactical-fit score", () => {
   const cycle = tacticalFitForwards(line, DEFAULT_TACTICS, "cycle");
   assert.notEqual(cycle, balanced);
 });
+
+test("4th-line fit rewards checking/defensive forwards over top-line skill types", () => {
+  // playerType() thresholds (lib/player-type.ts): high SC/PA -> Sniper/Playmaker
+  // (skill); high CK with low offense -> Forechecker/Grinder or Defensive Forward.
+  const skillLine = [
+    forward("LW", { pa: 55, sc: 80, sk: 78, ck: 55, df: 55, st: 60 }),
+    forward("C", { pa: 80, sc: 55, sk: 75, ck: 55, df: 55, st: 60 }),
+    forward("RW", { pa: 55, sc: 80, sk: 78, ck: 55, df: 55, st: 60 }),
+  ];
+  const grindLine = [
+    forward("LW", { pa: 45, sc: 45, sk: 55, ck: 80, df: 75, st: 65 }),
+    forward("C", { pa: 45, sc: 45, sk: 55, ck: 80, df: 75, st: 65 }),
+    forward("RW", { pa: 45, sc: 45, sk: 55, ck: 80, df: 75, st: 65 }),
+  ];
+  const skillOn1st = tacticalFitForwards(skillLine, DEFAULT_TACTICS, undefined, 0);
+  const skillOn4th = tacticalFitForwards(skillLine, DEFAULT_TACTICS, undefined, 3);
+  const grindOn1st = tacticalFitForwards(grindLine, DEFAULT_TACTICS, undefined, 0);
+  const grindOn4th = tacticalFitForwards(grindLine, DEFAULT_TACTICS, undefined, 3);
+  assert.ok(skillOn1st > skillOn4th, "a skill trio should fit the 1st line better than the 4th");
+  assert.ok(grindOn4th > grindOn1st, "a checking/defensive trio should fit the 4th line better than the 1st");
+});
+
+test("no lineIndex leaves the score unaffected by depth-chart archetype", () => {
+  const line = [
+    forward("LW", { pa: 80, sc: 55, sk: 75 }),
+    forward("C", { pa: 55, sc: 80, sk: 75 }),
+    forward("RW", { ck: 82, df: 77, st: 80 }),
+  ];
+  const noIndex = tacticalFitForwards(line, DEFAULT_TACTICS);
+  const explicitUndefined = tacticalFitForwards(line, DEFAULT_TACTICS, undefined, undefined);
+  assert.equal(noIndex, explicitUndefined);
+});
