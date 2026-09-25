@@ -3,9 +3,11 @@ import { skaterEdge, goalieEdge, teamEdge } from "@/lib/stats-server";
 import StatsTabs from "@/components/StatsTabs";
 import StatTable, { type Col } from "@/components/StatTable";
 import { PageHeader } from "@/components/ui";
+import PhaseTabs from "@/components/PhaseTabs";
+import { seasonForPhase } from "@/lib/phase";
+import { defaultStatsPhase } from "@/lib/calendar-server";
 
 export const dynamic = "force-dynamic";
-const SEASON = "2026-27";
 
 type View = "teams" | "skaters" | "goalies";
 const VIEWS: { key: View; label: string }[] = [
@@ -49,11 +51,16 @@ const TEAM_COLS: Col[] = [
   { key: "skate", label: "Avg Speed", title: "Roster average top skating speed, mph (modelled)", num: true, format: "dec1" },
 ];
 
-export default async function EdgeStatsPage({ searchParams }: { searchParams: Promise<{ league?: string; view?: string }> }) {
+export default async function EdgeStatsPage({ searchParams }: { searchParams: Promise<{ league?: string; view?: string; phase?: string }> }) {
   const sp = await searchParams;
   const league = sp.league === "AHL" ? "AHL" : "NHL";
+  // same rule as Player Stats: explicit ?phase= wins, else follow the league clock
+  const explicit = sp.phase === "pre" || sp.phase === "regular" ? sp.phase : null;
+  const auto = league === "NHL" ? await defaultStatsPhase() : "regular";
+  const phase: "pre" | "regular" = league !== "NHL" ? "regular" : explicit ?? (auto === "playoffs" ? "regular" : auto);
+  const SEASON = seasonForPhase(phase);
   const view: View = sp.view === "goalies" ? "goalies" : sp.view === "teams" ? "teams" : "skaters";
-  const q = league === "AHL" ? "&league=AHL" : "";
+  const q = `${league === "AHL" ? "&league=AHL" : ""}&phase=${phase}`;
 
   let rows: Record<string, string | number>[] = [];
   let cols = SKATER_COLS;
@@ -93,8 +100,9 @@ export default async function EdgeStatsPage({ searchParams }: { searchParams: Pr
 
   return (
     <div className="space-y-6 py-2">
-      <PageHeader title="Statistics" subtitle={`NHL EDGE — puck & player tracking · ${league} ${SEASON}`} />
+      <PageHeader title="Statistics" subtitle={`NHL EDGE — puck & player tracking · ${league} 2026-27 ${phase === "pre" ? "pre-season" : "regular season"}`} />
       <StatsTabs active="edge" league={league} />
+      <PhaseTabs active={phase} league={league} basePath="/stats/edge" showPlayoffs={false} keep={`view=${view}`} />
 
       <div className="flex flex-wrap gap-1.5">
         {VIEWS.map((v) => (

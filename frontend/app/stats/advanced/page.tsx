@@ -2,9 +2,11 @@ import { skaterTotals, goalieTotals } from "@/lib/stats-server";
 import StatsTabs from "@/components/StatsTabs";
 import StatTable, { type Col } from "@/components/StatTable";
 import { PageHeader } from "@/components/ui";
+import PhaseTabs from "@/components/PhaseTabs";
+import { seasonForPhase } from "@/lib/phase";
+import { defaultStatsPhase } from "@/lib/calendar-server";
 
 export const dynamic = "force-dynamic";
-const SEASON = "2026-27";
 
 // Phase 2 shot-quality leaderboards: individual expected goals + finishing for
 // skaters, goals-saved-above-expected for goalies. All derived from the sim's
@@ -36,8 +38,13 @@ const GOALIE_COLS: Col[] = [
   { key: "shotsAgainst", label: "SA", title: "Shots Against", num: true },
 ];
 
-export default async function AdvancedStatsPage({ searchParams }: { searchParams: Promise<{ league?: string }> }) {
-  const league = (await searchParams).league === "AHL" ? "AHL" : "NHL";
+export default async function AdvancedStatsPage({ searchParams }: { searchParams: Promise<{ league?: string; phase?: string }> }) {
+  const sp = await searchParams;
+  const league = sp.league === "AHL" ? "AHL" : "NHL";
+  const explicit = sp.phase === "pre" || sp.phase === "regular" ? sp.phase : null;
+  const auto = league === "NHL" ? await defaultStatsPhase() : "regular";
+  const phase: "pre" | "regular" = league !== "NHL" ? "regular" : explicit ?? (auto === "playoffs" ? "regular" : auto);
+  const SEASON = seasonForPhase(phase);
   const [sk, gk] = await Promise.all([skaterTotals(SEASON, league), goalieTotals(SEASON, league)]);
 
   // adaptive minimums — show from the early games, tighten as the sample grows
@@ -61,8 +68,9 @@ export default async function AdvancedStatsPage({ searchParams }: { searchParams
 
   return (
     <div className="space-y-6 py-2">
-      <PageHeader title="Statistics" subtitle={`Advanced — shot quality & expected goals · ${league} ${SEASON}`} />
+      <PageHeader title="Statistics" subtitle={`Advanced — shot quality & expected goals · ${league} 2026-27 ${phase === "pre" ? "pre-season" : "regular season"}`} />
       <StatsTabs active="advanced" league={league} />
+      <PhaseTabs active={phase} league={league} basePath="/stats/advanced" showPlayoffs={false} />
       <p className="text-slate-400 text-sm">
         Expected goals (xG) rate every shot by its location, type and situation — independent of who shot it or who was
         in net. A skater’s <strong>G−xG</strong> is pure finishing; a goalie’s <strong>GSAx</strong> is goals saved

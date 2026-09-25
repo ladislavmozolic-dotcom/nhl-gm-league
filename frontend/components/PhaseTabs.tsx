@@ -4,14 +4,15 @@ import { type Phase } from "@/lib/phase";
 /** Phase switcher shared by Scores / Standings / Stats. Pre-season & Regular swap
  *  the season the page reads; Playoffs links to the bracket / playoff views.
  *  Pre-season is NHL-only. */
-export default function PhaseTabs({ active, league, basePath, playoffsHref = "/playoffs", showPlayoffs = true }: {
-  active: Phase; league: "NHL" | "AHL"; basePath: string; playoffsHref?: string; showPlayoffs?: boolean;
+export default function PhaseTabs({ active, league, basePath, playoffsHref = "/playoffs", showPlayoffs = true, keep = "" }: {
+  active: Phase; league: "NHL" | "AHL"; basePath: string; playoffsHref?: string; showPlayoffs?: boolean; keep?: string; // keep = extra query to carry over, e.g. "view=goalies"
 }) {
   const lg = league === "AHL" ? "league=AHL" : "";
-  const q = (extra: string) => { const parts = [extra, lg].filter(Boolean); return parts.length ? `?${parts.join("&")}` : ""; };
+  const q = (extra: string) => { const parts = [extra, keep, lg].filter(Boolean); return parts.length ? `?${parts.join("&")}` : ""; };
   const tabs: { key: Phase; label: string; href: string }[] = [
     { key: "pre" as Phase, label: "Pre-season", href: `${basePath}${q("phase=pre")}` },
-    { key: "regular", label: "Regular Season", href: `${basePath}${q("")}` },
+    // explicit phase=regular — otherwise the page follows the league clock, which is pre-season during pre-season
+    { key: "regular", label: "Regular Season", href: `${basePath}${q("phase=regular")}` },
     ...(showPlayoffs ? [{ key: "playoffs" as Phase, label: "Playoffs", href: `${playoffsHref}${league === "AHL" ? "?league=AHL" : ""}` }] : []),
   ];
   return (
