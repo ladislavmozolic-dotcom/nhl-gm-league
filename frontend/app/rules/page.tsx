@@ -162,6 +162,16 @@ const SECTIONS: Sec[] = [
         "No-trade / no-move clauses must be respected — a protected player has to consent.",
         "Depending on league settings, trades may require commissioner approval. Every trade is logged.",
       ] },
+      { h: "Player morale & trade requests", points: [
+        "Every NHL player compares his ice time with what his talent earns on YOUR club — e.g. a 2nd-line-calibre forward vs. the average minutes of your 2nd-line tier over the last 10 games (goalies: share of starts). A healthy scratch counts as 0:00. Only games since he first dressed for you count, and new arrivals get two weeks to settle.",
+        "Below the league's threshold (default 80 %) he's unhappy and his morale drains. After 5 unhappy days his agent messages you (League Notifications); after 20 he publicly requests a trade.",
+        "While he's unhappy — or has asked out — he won't negotiate an extension with you.",
+        "Give him the minutes back and it unwinds: the warning clears and an ice-time trade request is withdrawn. Trading him wipes it with the new club.",
+      ] },
+      { h: "Negotiating with free agents", points: [
+        "Lowballs have a cost: an offer well under his floor (default below 85 %) insults him — his ask to YOUR club goes up by about how deep the lowball was (up to +25 % in total) until he signs anywhere. Other clubs aren't affected.",
+        "Promise him a worse line than he wants and he charges a premium, takes a shorter deal — and a no-trade clause no longer buys a discount: he wants to be free to move on.",
+      ] },
       { h: "Trade deadline", points: [
         "The commissioner sets the trade deadline (date + time, Bratislava time). A countdown runs site-wide for the final 14 days, and on deadline day every page shows a live 🚨 breaking-trades ticker.",
         "A trade must be fully completed (accepted, and approved if it needs commission review) BEFORE the deadline — a proposal still pending at the deadline can no longer go through.",
