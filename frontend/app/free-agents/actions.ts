@@ -9,6 +9,7 @@ import { CURRENT_SEASON_START, TWO_WAY_AHL_SALARY, capCeilingForPhase, ltirRelie
 import { teamCapCommitted } from "@/lib/cap";
 import {
   loadMarketPool, teamContentionMap, teamAsk, evaluateTeamOffer, loadLeagueCap, weakestTeams,
+  recordLowball, clearLowballs, lowballNote,
 } from "@/lib/free-agency-server";
 import { MAX_TERM, faPosGroup, willingnessNote, twoWayObjection, type Deployment } from "@/lib/free-agency";
 import { loadSettings, saveSettings } from "@/lib/sim/settings";
@@ -112,6 +113,7 @@ export async function getInterestAction(playerId: number, teamId: number) {
     minYears: info.ask.minYears,
     maxYears: info.ask.maxYears,
     moraleNote: willingnessNote(info.ask.willingness),
+    lowballNote: lowballNote(info.lowballBump),
     round: clock.frenzyRound,
     existing: existing && !mayStartFresh ? {
       salary: existing.salary, years: existing.years, line: existing.line, pp: existing.pp, pk: existing.pk,
@@ -443,6 +445,9 @@ export async function submitOfferAction(
   const breadth = clause === "M_NTC" ? ([6, 12, 18, 24].includes(mNtcBreadth ?? 0) ? mNtcBreadth! : 12) : null;
   const dep: Deployment = { line: clampLine(line), pp, pk };
   const evalr = await evaluateTeamOffer(playerId, teamId, salary, years, dep, undefined, undefined, undefined, { clause, breadth });
+  // judged against his pre-offer ask; a lowball then raises what he'll want from THIS club
+  const bumped = evalr && !evalr.acceptable ? await recordLowball(playerId, teamId, salary, evalr.ask.floorSalary) : null;
+  const insult = bumped ? `😠 That lowball insulted him — from now on he'll ask your club about ${Math.round((bumped - 1) * 100)}% more.` : null;
   // a raise re-enters contention; a shortlisted offer stays shortlisted
   const newStatus = existing?.status === "SHORTLISTED" ? "SHORTLISTED" : "PENDING";
   // A raise during an active decision window keeps the round that opened it.
@@ -471,7 +476,7 @@ export async function submitOfferAction(
     revalidatePath("/free-agents");
     return {
       ok: true as const, deliberating: true as const, raised: wasActiveOffer,
-      decisionAt: decideAt.toISOString(), countered: player.faCountered, postFrenzy: win.postFrenzy, capWarning,
+      decisionAt: decideAt.toISOString(), countered: player.faCountered, postFrenzy: win.postFrenzy, capWarning, insult,
       clears: evalr?.acceptable ?? false,
       floor: evalr?.ask.floorSalary ?? 0,
       askYears: evalr ? { min: evalr.ask.minYears, max: evalr.ask.maxYears } : null,
@@ -493,7 +498,7 @@ export async function submitOfferAction(
     await prisma.faOffer.deleteMany({ where: { playerId, teamId } });
     revalidatePath("/free-agents");
     return {
-      ok: true as const, signed: false as const, clears: false as const, capWarning,
+      ok: true as const, signed: false as const, clears: false as const, capWarning, insult,
       floor: evalr?.ask.floorSalary ?? 0,
       askYears: evalr ? { min: evalr.ask.minYears, max: evalr.ask.maxYears } : null,
     };
@@ -501,7 +506,7 @@ export async function submitOfferAction(
 
   revalidatePath("/free-agents");
   return {
-    ok: true as const, capWarning,
+    ok: true as const, capWarning, insult,
     raised: wasActiveOffer,
     clears: evalr?.acceptable ?? false,
     floor: evalr?.ask.floorSalary ?? 0,
@@ -593,8 +598,9 @@ async function signFaOffer(playerId: number, player: { name: string; age: number
     signPromiseLine: o.line, signPromisePP: o.pp, signPromisePK: o.pk,
     tradeClause: clause, noTradeTeams,
     disgruntled: false, tradeRequested: false, promiseWarnGame: null,
+    tradeRequestReason: null, iceUnhappyChecks: 0, iceWarnedAt: null,
   };
-  return prisma.$transaction(async (tx) => {
+  const code = await prisma.$transaction(async (tx) => {
     // Snapshot and every resulting write belong to one transaction. The guarded
     // update also makes concurrent automatic/manual resolvers idempotent: only
     // the first one can move a player who is still a signable free agent.
@@ -619,6 +625,8 @@ async function signFaOffer(playerId: number, player: { name: string; age: number
     await tx.transaction.create({ data: { type: "SIGNING", message: `${team?.code ?? "?"} signed ${player.name} — $${(salary / 1e6).toFixed(2)}M × ${years}yr` } });
     return team?.code ?? "?";
   });
+  if (code) await clearLowballs(playerId);
+  return code;
 }
 
 /** Best acceptable offer for a player at `judgeRound`; with `allowSoleFloor`, a lone
@@ -1108,7 +1116,7 @@ export async function extendContractAction(
 ) {
   if (!(await canManageTeam(teamId))) return { ok: false as const, error: "You don't manage this team." };
   const player = await prisma.player.findUnique({
-    where: { id: playerId }, select: { teamId: true, contractYears: true, capHit: true, ahlSalary: true, contractExpiry: true, contractType: true, tradeClause: true, noTradeTeams: true, contractText: true, age: true, name: true, lastSeasonGP: true, resignRound: true, resignStatus: true, resignOfferSalary: true, rosterType: true, franchiseTag: true, overall: true, realFarmTeamId: true },
+    where: { id: playerId }, select: { teamId: true, contractYears: true, capHit: true, ahlSalary: true, contractExpiry: true, contractType: true, tradeClause: true, noTradeTeams: true, contractText: true, age: true, name: true, lastSeasonGP: true, resignRound: true, resignStatus: true, resignOfferSalary: true, rosterType: true, franchiseTag: true, overall: true, realFarmTeamId: true, iceWarnedAt: true, iceUnhappyChecks: true, promiseWarnGame: true, tradeRequested: true },
   });
   if (!player) return { ok: false as const, error: "Player not found." };
   // the club may re-sign its own NHL players AND its farm (AHL affiliate) players
@@ -1128,6 +1136,12 @@ export async function extendContractAction(
   // Matches the same gate ContractSection uses to decide who's shown in the list.
   if (player.contractYears === 1 && phase !== "regular" && phase !== "playoffs") {
     return { ok: false as const, error: "Final-year extensions open once the regular season starts." };
+  }
+  // unhappy with his ice time (or a broken signing promise) → he won't talk about
+  // staying until the club fixes his role. See lib/player-morale.ts / lib/promises.ts.
+  if (player.tradeRequested) return { ok: false as const, error: "He's asked to be traded — he won't discuss an extension with your club." };
+  if (player.iceWarnedAt || player.promiseWarnGame != null) {
+    return { ok: false as const, error: "He's unhappy with his ice time — he won't negotiate an extension until he gets the role he expects. Move him up the lineup and try again once he's settled." };
   }
   if (salary < 775_000) return { ok: false as const, error: "Below the league minimum salary." };
   years = Math.max(1, Math.min(MAX_TERM, Math.round(years)));
@@ -1169,6 +1183,8 @@ export async function extendContractAction(
   if (!ev) return { ok: false as const, error: "Could not value the player." };
   const team = await prisma.team.findUnique({ where: { id: teamId }, select: { code: true, slug: true } });
 
+  const bumped = !ev.acceptable ? await recordLowball(playerId, teamId, salary, ev.ask.floorSalary) : null;
+  const insult = bumped ? ` 😠 The lowball insulted him — his ask to your club is now about ${Math.round((bumped - 1) * 100)}% higher.` : "";
   if (!ev.acceptable) {
     // structured re-sign: you get 2 rounds. He counters after round 1; if the deal's
     // still not there after round 2 — or he's a little-used/older player who'd rather
@@ -1195,7 +1211,7 @@ export async function extendContractAction(
         ok: false as const, walked: true, toUFA: !isRFA,
         reason: isRFA
           ? (player.franchiseTag ? "Two rounds and no deal — as your franchise RFA he's now open to offer sheets." : "No deal — negotiations pause; he'll be open to offer sheets, and further rounds resume after that period.")
-          : nextRound > maxRounds ? "Two rounds and no deal — he'll test the market when the season ends." : "That's well short — he'd rather test free agency than take it.",
+          : (nextRound > maxRounds ? "Two rounds and no deal — he'll test the market when the season ends." : "That's well short — he'd rather test free agency than take it.") + insult,
       };
     }
     // he counters (kept fuzzy — you don't see his exact number, just a range)
@@ -1205,7 +1221,7 @@ export async function extendContractAction(
     await prisma.player.update({ where: { id: playerId }, data: { resignRound: nextRound, resignStatus: "countered", resignCounterSalary: counterSalary, resignCounterYears: counterYears, resignOfferSalary: bestOffer } });
     return {
       ok: false as const, rejected: true, round: nextRound,
-      reason: `Round ${nextRound} of ${maxRounds} — he's countering around ${fmtM(counterSalary * 0.97)}–${fmtM(counterSalary * 1.06)} over ${counterYears}yr.${nextRound >= maxRounds ? " Last round before he walks." : ""}`,
+      reason: `Round ${nextRound} of ${maxRounds} — he's countering around ${fmtM(counterSalary * 0.97)}–${fmtM(counterSalary * 1.06)} over ${counterYears}yr.${nextRound >= maxRounds ? " Last round before he walks." : ""}${insult}`,
       floor: ev.ask.floorSalary, minYears: ev.ask.minYears, maxYears: ev.ask.maxYears,
     };
   }
@@ -1235,8 +1251,10 @@ export async function extendContractAction(
       signPromiseLine: dep.line, signPromisePP: pp, signPromisePK: pk,
       resignRound: 0, resignStatus: null, resignCounterSalary: null, resignCounterYears: null,
       disgruntled: false, tradeRequested: false, promiseWarnGame: null,
+      tradeRequestReason: null, iceUnhappyChecks: 0, iceWarnedAt: null,
     },
   });
+  await clearLowballs(playerId);
   await prisma.transaction.create({
     data: { type: "SIGNING", message: `${team?.code ?? "?"} re-signed ${player.name} — $${(salary / 1e6).toFixed(2)}M × ${years}yr` },
   });

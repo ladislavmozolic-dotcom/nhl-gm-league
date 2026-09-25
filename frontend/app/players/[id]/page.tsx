@@ -447,6 +447,12 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                       <InfoTip text={`Star Power — business & media value (no on-ice effect). Drives merchandise, jersey sales, fan interest, ticket demand and sponsorships.${star.reasons.length ? " " + star.reasons.join(" · ") + "." : ""}`} />
                     </span>
                   )}
+                  {p.tradeRequested && (
+                    <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-red-500/15 text-red-300 border border-red-500/30"
+                      title={p.tradeRequestReason === "ice" ? "Unhappy with his ice time — has asked to be traded" : "Has asked to be traded"}>
+                      📣 Trade requested
+                    </span>
+                  )}
                   {gmTeamId != null && (
                     <Link href={`/players/${p.id}/intelligence`}
                       className="ml-auto inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-blue-950/50 hover:bg-blue-900/60 text-blue-300 border border-blue-800/60 transition-colors">

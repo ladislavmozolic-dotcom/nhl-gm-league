@@ -87,7 +87,7 @@ export async function checkPromises(): Promise<{ warned: number; requested: numb
 
     if (!broken) {
       if (p.promiseWarnGame != null || p.disgruntled || p.tradeRequested) {
-        await prisma.player.update({ where: { id: p.id }, data: { promiseWarnGame: null, disgruntled: false, tradeRequested: false } });
+        await prisma.player.update({ where: { id: p.id }, data: { promiseWarnGame: null, disgruntled: false, tradeRequested: false, tradeRequestReason: null } });
       }
       continue;
     }
@@ -103,7 +103,7 @@ export async function checkPromises(): Promise<{ warned: number; requested: numb
     } else if (!p.tradeRequested && p.promiseWarnGame != null && teamGames - p.promiseWarnGame >= GRACE_GAMES && frac >= REQUEST_FRACTION) {
       const m = Math.min(p.morale ?? 50, 30);
       // `mo` mirrors `morale` so the Ratings-strip "MO" parameter stays live too.
-      await prisma.player.update({ where: { id: p.id }, data: { tradeRequested: true, disgruntled: true, morale: m, mo: m } });
+      await prisma.player.update({ where: { id: p.id }, data: { tradeRequested: true, tradeRequestReason: "promise", disgruntled: true, morale: m, mo: m } });
       await prisma.transaction.create({
         data: { type: "TRADE_REQUEST", message: `${p.team?.code ?? "?"}: ${name} has requested a trade — the club never gave him the role promised at signing.` },
       });

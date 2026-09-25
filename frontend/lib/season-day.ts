@@ -17,6 +17,7 @@ import { postWeeklyIfDue } from "@/lib/weekly-digest";
 import { resolveFrenzy, processRoundEnd, resolveInSeasonWindows } from "@/app/free-agents/actions";
 import { sweepExpiredContractsToUfa, sweepUnsignedRfasToNonRoster } from "@/lib/free-agency-server";
 import { checkPromises } from "@/lib/promises";
+import { checkIceTimeMorale } from "@/lib/player-morale";
 import { leagueCapCompliance } from "@/lib/cap";
 import { money } from "@/lib/finance";
 import { runLiveCalculatorRecompute } from "@/lib/live-calculator-engine";
@@ -103,6 +104,8 @@ export async function simulateLeagueDay(day: Date) {
   await postWeeklyIfDue(roundForDate(day)).catch(() => {});
   // ice-time promise check (self-gates to the regular season past 1/3)
   const promises = await checkPromises();
+  // ice-time morale for everyone else: warn → trade request → unwinds when fixed
+  await checkIceTimeMorale().catch((e) => console.error("[ice-morale]", e));
   // waivers: resolve any whose one-day window closed (claimed by priority, else clear to AHL)
   const waivers = await processWaivers(roundForDate(day), phToday);
   // Free Agent Frenzy round transitions (3 weekly rounds). Crossing a week

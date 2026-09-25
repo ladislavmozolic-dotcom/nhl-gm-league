@@ -135,6 +135,7 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
       }
       // over-cap? the offer still went through — append the soft cap warning.
       if ("capWarning" in r && r.capWarning) setResult((prev) => (prev ? { ...prev, s: `${prev.s}  ${r.capWarning}` } : { t: "ok", s: r.capWarning as string }));
+      if ("insult" in r && r.insult) setResult((prev) => (prev ? { ...prev, s: `${prev.s}  ${r.insult}` } : { t: "err", s: r.insult as string }));
       load(teamId);
     });
   };
@@ -222,6 +223,11 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
                     <p className={`mt-1 text-xs font-medium ${i.moraleNote.startsWith("Happy") ? "text-emerald-400" : "text-amber-400"}`}>
                       {i.moraleNote.startsWith("Happy") ? "😀 " : "😕 "}{i.moraleNote}
                       <InfoTip text="Based on the player's morale (MO). An unhappy player holds out for more money than his baseline ask; a happy one signs for a little less. A bigger star swings this harder." />
+                    </p>
+                  )}
+                  {i.lowballNote && (
+                    <p className="mt-1 text-xs font-medium text-red-400">😠 {i.lowballNote}
+                      <InfoTip text="Your club offered well under his floor earlier. He remembers — his ask to YOUR club stays higher until he signs somewhere. Other clubs aren't affected." />
                     </p>
                   )}
                   {i.existing?.status === "COUNTERED" && i.existing.counterSalary != null ? (

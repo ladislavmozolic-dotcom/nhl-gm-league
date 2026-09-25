@@ -114,6 +114,12 @@ export type EngineSettings = {
   finTradeBoostPct: number; finTradeBoostHalfLife: number;
   finPlayoffSeatBase: number; finPlayoffSeatPerRound: number; finPlayoffMerchPct: number;
   finSponsorBase: number; finSponsorRange: number;
+  // FA negotiation behaviour + ice-time morale (lib/free-agency-server.ts, lib/player-morale.ts)
+  faLowballPct: number;        // an offer below this % of his floor is a lowball (default 85)
+  faLowballMaxBumpPct: number; // max total ask increase a club can cause itself by lowballing (default 25)
+  iceUnhappyPct: number;       // unhappy when his avg TOI is below this % of what his role expects (default 80)
+  iceWarnDays: number;         // unhappy days before he tells his GM (default 5)
+  iceRequestDays: number;      // unhappy days before he publicly requests a trade (default 20)
   intelligenceRollout: "hidden" | "basic" | "full"; // UNHL Intelligence for GMs: hidden = commish only; basic = Analyze My Roster + Line Fit; full = every tool
   // NHL Expansion
   expansionRuleset: "real2021" | "simplified"; // real2021 = NMC forces protection + entry-level/two-way exemption layer active; simplified = skip the exemption layer (NMC still forces protection either way)
@@ -231,6 +237,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   faTwoWayWeakOverall: 55, faTwoWayWeakRound: 3, faTwoWayAhlMaxYears: 3, faTwoWayFewGpMaxYears: 2, faTwoWayMaxSalary: 1_300_000,
   rfaMaxAge: 26, osOpenDay: 1, osCloseDay: 8, osDecisionDay: 10,
   faMode: "full", faSignLock: true, financeMode: "base", waiversEnabled: true, intelligenceRollout: "full",
+  faLowballPct: 85, faLowballMaxBumpPct: 25, iceUnhappyPct: 80, iceWarnDays: 5, iceRequestDays: 20,
   finJerseyNet: 120, finJerseyScale: 40000, finApparelBase: 3200000, finOtherBase: 1400000,
   finTradeBoostPct: 60, finTradeBoostHalfLife: 21,
   finPlayoffSeatBase: 65, finPlayoffSeatPerRound: 22, finPlayoffMerchPct: 7,

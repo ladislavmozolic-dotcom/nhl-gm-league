@@ -2,6 +2,7 @@
 // every signed contract, then values free agents / re-sign candidates against it.
 
 import { prisma } from "./prisma";
+import { loadSettings } from "./sim/settings";
 import { getLeagueClock } from "./calendar-server";
 import { computeStandings } from "./sim/standings";
 import { CURRENT_SEASON_START } from "./finance";
@@ -296,7 +297,46 @@ export function projectSlot(ctx: TeamContext, grp: FaPos, market: number): { slo
 export type TeamAsk = {
   grp: FaPos; base: Demand; slot: LineSlot; line: number;
   contention: Contention; desired: Desired; ask: Demand; age: number | null;
+  lowballBump: number; // >1 when this club insulted him with a lowball earlier (his ask to THEM is up)
 };
+
+// ---- lowball memory --------------------------------------------------------
+// A club that offers well under his floor insults the player: his ask TO THAT
+// CLUB rises by the depth of the lowball (offer 18 % under → +18 %), compounding
+// up to a cap, until he signs anywhere. Other clubs see his normal number.
+const LOWBALL_MEMORY_DAYS = 200;
+
+export async function lowballBump(playerId: number, teamId: number): Promise<number> {
+  const row = await prisma.faLowball.findUnique({ where: { playerId_teamId: { playerId, teamId } } }).catch(() => null);
+  if (!row || Date.now() - row.updatedAt.getTime() > LOWBALL_MEMORY_DAYS * 86400000) return 1;
+  return row.bump;
+}
+
+/** Call AFTER judging an offer against the pre-offer ask. Returns the new bump
+ *  when this offer counted as a lowball, else null. */
+export async function recordLowball(playerId: number, teamId: number, salary: number, floor: number): Promise<number | null> {
+  const s = await loadSettings();
+  if (!(floor > 0) || salary >= floor * (s.faLowballPct / 100)) return null;
+  const depth = 1 - salary / floor;
+  const prev = await lowballBump(playerId, teamId);
+  const bump = Math.min(1 + s.faLowballMaxBumpPct / 100, prev * (1 + depth));
+  await prisma.faLowball.upsert({
+    where: { playerId_teamId: { playerId, teamId } },
+    create: { playerId, teamId, bump, count: 1 },
+    update: { bump, count: { increment: 1 } },
+  });
+  return bump;
+}
+
+/** He signed — every club's slate is wiped clean. */
+export async function clearLowballs(playerId: number): Promise<void> {
+  await prisma.faLowball.deleteMany({ where: { playerId } }).catch(() => {});
+}
+
+export function lowballNote(bump: number): string | null {
+  const pct = Math.round((bump - 1) * 100);
+  return pct >= 1 ? `Insulted by your earlier lowball — asking your club ${pct}% more` : null;
+}
 
 /** The Interest feedback: what the player would want to sign at THIS club, given
  *  the role he projects into there + whether the club is a contender. */
@@ -313,7 +353,11 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
   // A player re-signing with his OWN club is NOT stale on the open market — no season
   // decay. The "nobody's biting" softening only applies to unsigned market UFAs.
   const isOwn = p.teamId === teamId;
-  const base = p.faDemandOverride != null ? rawBase : scaleDemand(rawBase, isOwn ? 1 : await faStaleFactor());
+  const unbumped = p.faDemandOverride != null ? rawBase : scaleDemand(rawBase, isOwn ? 1 : await faStaleFactor());
+  const bump = await lowballBump(playerId, teamId);
+  const base = bump > 1
+    ? { ...unbumped, salary: Math.min(16_000_000, round50k(unbumped.salary * bump)), floorSalary: Math.min(16_000_000, round50k(unbumped.floorSalary * bump)) }
+    : unbumped;
 
   const ctx = await loadTeamContext(teamId, cmap);
   const { slot, line } = projectSlot(ctx, grp, market);
@@ -321,7 +365,7 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
   // projected ask = the club gives him the role he projects into, plus the ST he wants
   const projDeploy: Deployment = { line, pp: desired.wantPP, pk: desired.wantPK };
   const ask = deploymentDemand(base, grp, projDeploy, desired, ctx.contention, p.age);
-  return { grp, base, slot, line, contention: ctx.contention, desired, ask, age: p.age };
+  return { grp, base, slot, line, contention: ctx.contention, desired, ask, age: p.age, lowballBump: bump };
 }
 
 /** Evaluate a concrete offer (money + term + promised deployment) at a club. */
@@ -334,7 +378,10 @@ export async function evaluateTeamOffer(
   if (!info) return null;
   const raw = deploymentDemand(info.base, info.grp, deploy, info.desired, info.contention, info.age);
   // granting a clause lets him sign for less — discount his floor + headline ask.
-  const disc = clauseDiscount(grant?.clause, grant?.breadth);
+  // EXCEPT when the club promises him a worse role than he wants: then he wants to
+  // be free to move on, so a no-trade clause is worth nothing to him.
+  const roleWorse = deploy.line > info.desired.line;
+  const disc = roleWorse ? 0 : clauseDiscount(grant?.clause, grant?.breadth);
   // longer term than his sweet spot raises the price (always negotiable, never a refusal)
   const tp = termPremium(years, raw.years, info.age);
   const f = (1 - disc) * tp;

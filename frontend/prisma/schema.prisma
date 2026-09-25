@@ -217,6 +217,9 @@ model Player {
   promiseWarnGame      Int? // team games played when the player warned the GM his promise was broken (grace period start)
   disgruntled          Boolean                   @default(false) // promise broken past grace + unhappy: runtime -20% attributes + morale hit; cleared on trade
   tradeRequested       Boolean                   @default(false) // player has formally requested a trade (shown in Around The League)
+  tradeRequestReason   String? // "promise" (broken signing promise, lib/promises.ts) | "ice" (ice time below his role, lib/player-morale.ts)
+  iceUnhappyChecks     Int                       @default(0) // consecutive daily checks with ice time below what his talent expects (lib/player-morale.ts)
+  iceWarnedAt          DateTime? // when he told his GM he's unhappy with his ice time (cleared once it's fixed)
   ltir                 Boolean                   @default(false) // parked on LTIR (played <10 games last season) — sits in prospects/reserve, off the cap
   lastSeasonGP         Int? // real last-season games played (imported from the Players Calculator / hockey-reference)
   lastSeasonPts        Int? // real last-season points (G + A) — feeds the FA demand engine's performance signal
@@ -1555,4 +1558,17 @@ model LiveCalcConfig {
   lastCalculatedAt DateTime?
   lastSyncedAt     DateTime?
   updatedAt        DateTime  @updatedAt
+}
+
+// A club's lowball insulted a free agent / pending re-sign: his ask FROM THAT CLUB
+// is multiplied by `bump` (capped) until he signs anywhere. lib/free-agency-server.ts.
+model FaLowball {
+  id        Int      @id @default(autoincrement())
+  playerId  Int
+  teamId    Int
+  bump      Float    @default(1)
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([playerId, teamId])
 }

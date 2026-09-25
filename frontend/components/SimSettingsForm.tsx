@@ -314,6 +314,19 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
             <div className="mt-1"><Toggle k="aiInitiateTrades" label="Advanced AI GM initiates trade offers" /></div>
           </div>
         </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 mt-3 pt-3 border-t border-slate-800">
+          <div>
+            <div className="text-xs text-slate-500 mb-1">Negotiation behaviour</div>
+            <NumField k="faLowballPct" label="Lowball = offer below % of his floor" />
+            <NumField k="faLowballMaxBumpPct" label="Max ask increase from lowballs (%)" />
+          </div>
+          <div>
+            <div className="text-xs text-slate-500 mb-1">Ice-time morale</div>
+            <NumField k="iceUnhappyPct" label="Unhappy below % of role's ice time" />
+            <NumField k="iceWarnDays" label="Unhappy days before he tells the GM" />
+            <NumField k="iceRequestDays" label="Unhappy days before a trade request" />
+          </div>
+        </div>
       </Card>
 
       <Card title="NHL Expansion">

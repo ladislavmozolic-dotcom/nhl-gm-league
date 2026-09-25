@@ -1,3 +1,5 @@
+import { cleanName } from "@/lib/playerName";
+import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui";
 import PlayerAvatar from "@/components/playerAvatar";
@@ -58,13 +60,36 @@ function TeamBoard({ t }: { t: BlockTeam }) {
 // is one ORGANIZATION — an AHL-rostered player still shows under his NHL parent's
 // card (tagged "· AHL"), not a separate card for the affiliate.
 export default async function TradeBlockPage() {
-  const board = await tradeBlockBoard();
+  const [board, requests] = await Promise.all([
+    tradeBlockBoard(),
+    prisma.player.findMany({
+      where: { tradeRequested: true, rosterType: { in: ["NHL", "AHL"] } },
+      select: { id: true, name: true, slug: true, position: true, tradeRequestReason: true, team: { select: { code: true, logoUrl: true, parentTeam: { select: { code: true } } } } },
+      orderBy: { name: "asc" },
+    }),
+  ]);
   const totalListed = board.reduce((t, b) => t + b.players.length, 0);
 
   return (
     <div className="space-y-6 py-2">
       <PageHeader title="Trade Block" subtitle={`${totalListed} player${totalListed === 1 ? "" : "s"} listed across ${board.length} team${board.length === 1 ? "" : "s"}`} />
       <p className="text-sm text-slate-500">Players around the league whose GMs have made them available. To list or unlist your own, go to your team&apos;s <b className="text-slate-300">Trades</b> page.</p>
+
+      {requests.length > 0 && (
+        <section className="rounded-xl border border-red-900/50 bg-red-950/20">
+          <div className="px-4 py-2.5 border-b border-red-900/40 text-sm font-bold text-red-300">📣 Trade requests ({requests.length})</div>
+          <div className="divide-y divide-red-900/20">
+            {requests.map((r) => (
+              <div key={r.id} className="flex items-center gap-3 px-4 py-2 text-sm">
+                {r.team?.logoUrl && <img src={r.team.logoUrl} alt="" className="w-5 h-5 object-contain" />}
+                <Link href={`/players/${r.slug ?? r.id}`} className="font-semibold hover:text-blue-400">{cleanName(r.name)}</Link>
+                <span className="text-xs text-slate-500">{r.position} · {r.team?.parentTeam?.code ?? r.team?.code ?? "—"}</span>
+                <span className="ml-auto text-xs text-slate-400">{r.tradeRequestReason === "ice" ? "unhappy with his ice time" : r.tradeRequestReason === "promise" ? "role promised at signing not given" : "wants out"}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {board.length === 0 ? (
         <p className="text-slate-500 text-sm">No players are on the block yet.</p>

@@ -192,9 +192,11 @@ async function executeOfferSheet(os: OfferSheetRow, playerName: string): Promise
         signPromiseLine: os.line, signPromisePP: os.pp, signPromisePK: os.pk,
         tradeClause: clause, noTradeTeams,
         franchiseTag: false, resignStatus: null, resignRound: 0, resignCounterSalary: null, resignCounterYears: null, resignOfferSalary: null,
-        disgruntled: false, tradeRequested: false,
+        disgruntled: false, tradeRequested: false, promiseWarnGame: null,
+        tradeRequestReason: null, iceUnhappyChecks: 0, iceWarnedAt: null,
       },
     }),
+    prisma.faLowball.deleteMany({ where: { playerId: os.playerId } }),
     // compensation picks go to the old club (ownerLogoId stays — they remain that club's originals now returning home / arriving)
     prisma.draftPick.updateMany({ where: { id: { in: os.compPickIds } }, data: { teamId: os.toTeamId } }),
     prisma.offerSheet.update({ where: { id: os.id }, data: { status: "ACCEPTED" } }),

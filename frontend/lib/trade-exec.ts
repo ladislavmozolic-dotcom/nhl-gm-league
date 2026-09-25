@@ -193,7 +193,11 @@ export async function collectMoveOps(pkg: TradePackage) {
       // just acquired him, so clear the trade-block flag on every trade.
       const moraleDelta = moraleDeltas.get(pl.id);
       const morale = moraleDelta != null ? Math.max(1, Math.min(100, Math.round((pl.morale ?? 50) + moraleDelta))) : undefined;
-      ops.push(prisma.player.update({ where: { id: pl.id }, data: { teamId: destId, rosterType: destRoster, capHit, retainedSalary, captaincy: null, onBlock: false, blockNote: null, ...(morale != null ? { morale, mo: morale } : {}) } }));
+      ops.push(prisma.player.update({ where: { id: pl.id }, data: { teamId: destId, rosterType: destRoster, capHit, retainedSalary, captaincy: null, onBlock: false, blockNote: null, ...(morale != null ? { morale, mo: morale } : {}),
+        // a trade resolves any grievance with the OLD club: its signing promise, his
+        // ice-time complaint and a trade request don't follow him to the new one
+        disgruntled: false, tradeRequested: false, tradeRequestReason: null, promiseWarnGame: null,
+        signPromiseLine: null, signPromisePP: null, signPromisePK: null, iceUnhappyChecks: 0, iceWarnedAt: null } }));
       if (destRoster === "NHL" && retainedSalary > 0) {
         acquiredRetainedCount.set(toNhlId, (acquiredRetainedCount.get(toNhlId) ?? 0) + 1);
         acquiredRetainedDollars.set(toNhlId, (acquiredRetainedDollars.get(toNhlId) ?? 0) + retainedSalary);
