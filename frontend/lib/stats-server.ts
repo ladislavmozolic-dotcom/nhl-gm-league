@@ -355,6 +355,12 @@ export type TeamStatTotal = {
   goals: number; assists: number; pim: number; hits: number; blocks: number;
   ppGoals: number; shGoals: number;
   xgf5v5: number; xga5v5: number; xgf60: number; xga60: number; xgfPct: number;
+  // special teams — from the PP_START event stream (one per power-play opportunity)
+  ppOpp: number; ppGoalsFor: number; ppPct: number; timesSh: number; ppGoalsAgainst: number; pkPct: number; shGoalsFor: number;
+  // 5-on-5 luck/quality split — shots on goal = SHOT ∪ GOAL events (twins deduped)
+  evShPct: number; evSvPct: number; pdo: number;
+  // high-danger chances (SLOT / NET_FRONT shots on goal, all strengths)
+  hdcf: number; hdca: number; hdcfPct: number; hdGoalsFor: number;
 };
 
 /** Full team stat line for the Team Stats page: standings + goal/shot splits + team player totals. */
@@ -380,6 +386,10 @@ export async function teamStatTotals(season: string, league = "NHL"): Promise<Te
       _sum: { toi: true, ppToi: true, pkToi: true },
     }),
   ]);
+  const stEvents = await prisma.gameEvent.findMany({
+    where: { game: gameWhere({ season, league, playoffs: false }), type: { in: ["SHOT", "GOAL", "PP_START"] } },
+    select: { gameId: true, period: true, seconds: true, teamId: true, type: true, strength: true, sector: true },
+  });
   const slugById = new Map(teams.map((t) => [t.id, t.slug]));
   const logoById = new Map(teams.map((t) => [t.id, t.logoUrl]));
   const pAgg = new Map(playerAgg.map((p) => [p.teamId, p._sum]));
@@ -401,6 +411,37 @@ export async function teamStatTotals(season: string, league = "NHL"): Promise<Te
   for (const g of games) {
     xga5.set(g.homeTeamId, (xga5.get(g.homeTeamId) ?? 0) + (xgByGameTeam.get(`${g.id}:${g.awayTeamId}`) ?? 0));
     xga5.set(g.awayTeamId, (xga5.get(g.awayTeamId) ?? 0) + (xgByGameTeam.get(`${g.id}:${g.homeTeamId}`) ?? 0));
+  }
+
+  // ---- special teams + PDO + high danger ----
+  type St = { ppOpp: number; ppG: number; shG: number; evSog: number; evG: number; hd: number; hdG: number };
+  const stBy = new Map<number, St>();
+  const stOf = (id: number) => { let r = stBy.get(id); if (!r) { r = { ppOpp: 0, ppG: 0, shG: 0, evSog: 0, evG: 0, hd: 0, hdG: 0 }; stBy.set(id, r); } return r; };
+  const perGame = new Map<string, St>(); // `${gameId}:${teamId}` → same counters, to derive "against"
+  const pgOf = (g: number, t: number) => { const k = `${g}:${t}`; let r = perGame.get(k); if (!r) { r = { ppOpp: 0, ppG: 0, shG: 0, evSog: 0, evG: 0, hd: 0, hdG: 0 }; perGame.set(k, r); } return r; };
+  const goalAt = new Set(stEvents.filter((e) => e.type === "GOAL").map((e) => `${e.gameId}:${e.period}:${e.seconds}:${e.teamId}`));
+  for (const e of stEvents) {
+    if (e.teamId == null) continue;
+    const bumpBoth = (f: (r: St) => void) => { f(stOf(e.teamId!)); f(pgOf(e.gameId, e.teamId!)); };
+    if (e.type === "PP_START") { bumpBoth((r) => r.ppOpp++); continue; }
+    if (e.type === "SHOT" && goalAt.has(`${e.gameId}:${e.period}:${e.seconds}:${e.teamId}`)) continue; // goal twin
+    const isGoal = e.type === "GOAL";
+    const hd = e.sector === "SLOT" || e.sector === "NET_FRONT";
+    bumpBoth((r) => {
+      if (isGoal && e.strength === "PP") r.ppG++;
+      if (isGoal && e.strength === "SH") r.shG++;
+      if (e.strength === "EV" && e.sector) { r.evSog++; if (isGoal) r.evG++; } // no sector = empty-net/penalty-shot, not a 5v5 SOG
+      if (hd) { r.hd++; if (isGoal) r.hdG++; }
+    });
+  }
+  const against = new Map<number, St>();
+  const zero = (): St => ({ ppOpp: 0, ppG: 0, shG: 0, evSog: 0, evG: 0, hd: 0, hdG: 0 });
+  for (const g of games) {
+    for (const [me, opp] of [[g.homeTeamId, g.awayTeamId], [g.awayTeamId, g.homeTeamId]] as const) {
+      const o = perGame.get(`${g.id}:${opp}`); if (!o) continue;
+      let a = against.get(me); if (!a) { a = zero(); against.set(me, a); }
+      a.ppOpp += o.ppOpp; a.ppG += o.ppG; a.evSog += o.evSog; a.evG += o.evG; a.hd += o.hd; a.hdG += o.hdG;
+    }
   }
 
   type Ext = { shotsFor: number; shotsAgainst: number; shutouts: number; otw: number; sow: number; otl: number; sol: number };
@@ -440,6 +481,18 @@ export async function teamStatTotals(season: string, league = "NHL"): Promise<Te
       xgf60: evSeconds ? xgf5v5 * 3600 / evSeconds : 0,
       xga60: evSeconds ? xga5v5 * 3600 / evSeconds : 0,
       xgfPct: xgf5v5 + xga5v5 ? xgf5v5 / (xgf5v5 + xga5v5) : 0,
+      ...specialTeams(stBy.get(s.teamId) ?? zero(), against.get(s.teamId) ?? zero()),
     };
   });
+}
+
+function specialTeams(f: { ppOpp: number; ppG: number; shG: number; evSog: number; evG: number; hd: number; hdG: number }, a: typeof f) {
+  const evShPct = f.evSog ? f.evG / f.evSog : 0;
+  const evSvPct = a.evSog ? 1 - a.evG / a.evSog : 0;
+  return {
+    ppOpp: f.ppOpp, ppGoalsFor: f.ppG, ppPct: f.ppOpp ? f.ppG / f.ppOpp : 0,
+    timesSh: a.ppOpp, ppGoalsAgainst: a.ppG, pkPct: a.ppOpp ? 1 - a.ppG / a.ppOpp : 0, shGoalsFor: f.shG,
+    evShPct, evSvPct, pdo: f.evSog && a.evSog ? (evShPct + evSvPct) * 100 : 0,
+    hdcf: f.hd, hdca: a.hd, hdcfPct: f.hd + a.hd ? f.hd / (f.hd + a.hd) : 0, hdGoalsFor: f.hdG,
+  };
 }
