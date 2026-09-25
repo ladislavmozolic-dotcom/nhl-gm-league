@@ -25,6 +25,7 @@ const SETTLE_DAYS = 14;          // just traded / signed → give him two weeks 
 const MORALE_DROP_PER_DAY = 1.5; // each unhappy day
 const MORALE_FLOOR = 25;
 const MIN_GAMES = 5;             // games with THIS club inside the window before he's judged
+const MIN_GAMES_G = 10;          // goalie starts are lumpy — need the full window
 const GOALIE_SHARE: Record<number, number> = { 1: 0.65, 2: 0.25 };
 // tier of TOI ranks each line maps to (1-based ranks within F / D)
 const F_TIER: Record<number, [number, number]> = { 1: [1, 3], 2: [4, 6], 3: [7, 9], 4: [10, 12] };
@@ -100,7 +101,8 @@ export async function checkIceTimeMorale(opts: { dryRun?: boolean; season?: stri
     const isD = (pos: string | null) => (pos ?? "").toUpperCase().startsWith("D");
     // per-game TOI of every regular in the group, ranked → the average of a tier
     const tierAvg = (group: typeof skaters, tier: [number, number]) => {
-      const perGame = group.map((p) => { const n = memberGames(p.id); return n ? (toiBy.get(p.id) ?? 0) / n : 0; }).sort((a, b) => b - a).slice(tier[0] - 1, tier[1]);
+      // only established regulars (≥ MIN_GAMES here) set the bar — one-off call-ups skew it
+      const perGame = group.filter((p) => memberGames(p.id) >= MIN_GAMES).map((p) => (toiBy.get(p.id) ?? 0) / memberGames(p.id)).sort((a, b) => b - a).slice(tier[0] - 1, tier[1]);
       return perGame.length ? perGame.reduce((a, b) => a + b, 0) / perGame.length : 0;
     };
     const windowStart = new Date(Date.now() - 30 * 86400000);
@@ -117,6 +119,7 @@ export async function checkIceTimeMorale(opts: { dryRun?: boolean; season?: stri
 
       let unhappy: boolean, actualTxt: string, expectTxt: string, ratio: number;
       if (p.isGoalie) {
+        if (n < MIN_GAMES_G) continue;
         const share = (startsBy.get(p.id) ?? 0) / n;
         const want = GOALIE_SHARE[line] ?? 0.25;
         ratio = share / want;
