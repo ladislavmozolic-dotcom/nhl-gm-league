@@ -58,6 +58,7 @@ export const DEFAULT_MENU: MenuItem[] = [
     { label: "📰 Weekly / Monthly Report", href: "/league/weekly" },
     { label: "🎯 Milestone Watch", href: "/league/milestones" },
     { label: "🏆 League Records", href: "/league/records" },
+    { label: "⭐ All-Star Game", href: "/all-star" },
     { label: "📊 Parameters", href: "/league/parameters" },
     { label: "🔍 Audit Log", href: "/league/audit" },
     { label: "👔 Team / GM", href: "/league" },

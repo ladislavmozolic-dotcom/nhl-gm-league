@@ -14,6 +14,7 @@ const GROUPS: Group[] = [
     items: [
       { href: "/admin/dashboard", title: "⭐ Commissioner Dashboard", descKey: "admin.dashboard.d" },
       { href: "/admin/season", title: "Season Control", descKey: "admin.season.d" },
+      { href: "/admin/all-star", title: "⭐ All-Star Weekend", descKey: "admin.allStar.d" },
       { href: "/admin/simulation", title: "Simulation Engine", descKey: "admin.simulation.d" },
       { href: "/admin/calibration", title: "Calibration Lab", descKey: "admin.calibration.d" },
       { href: "/admin/sim-guide", title: "How the Sim Works", descKey: "admin.simGuide.d" },

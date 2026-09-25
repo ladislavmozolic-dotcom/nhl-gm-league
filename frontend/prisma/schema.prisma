@@ -1572,3 +1572,42 @@ model FaLowball {
 
   @@unique([playerId, teamId])
 }
+
+// All-Star Weekend (lib/all-star-server.ts). One row per event; admin plans it at
+// /admin/all-star. Voting (fans + GMs) → rosters → Skills Competition + game,
+// run automatically at `eventAt` by the advance-day cron (or by the admin).
+model AllStarEvent {
+  id               Int            @id @default(autoincrement())
+  season           String
+  title            String         @default("UNHL All-Star Weekend")
+  eventAt          DateTime // when skills + game are played (real instant)
+  votingOpensAt    DateTime?
+  votingClosesAt   DateTime?
+  teamAName        String         @default("Eastern All-Stars") // Eastern conference
+  teamBName        String         @default("Western All-Stars") // Western conference
+  fanWeightPct     Int            @default(50) // fan vs GM share of the vote
+  lowDefense       Boolean        @default(true) // All-Star hockey: defense takes the night off
+  status           String         @default("SCHEDULED") // SCHEDULED | DONE
+  rosters          Json? // { A: { F: number[], D: number[], G: number[], starters: number[] }, B: {...} }
+  skills           Json? // SkillsResult
+  game             Json? // AllStarGameResult
+  votingAnnounced  Boolean        @default(false)
+  resultsPublished Boolean        @default(false)
+  createdAt        DateTime       @default(now())
+  votes            AllStarVote[]
+}
+
+model AllStarVote {
+  id        Int          @id @default(autoincrement())
+  eventId   Int
+  voterKey  String // "gm:<teamId>" | "fan:<cookie id>"
+  isGm      Boolean      @default(false)
+  playerId  Int
+  side      String // "A" | "B"
+  slot      String // "F" | "D" | "G"
+  createdAt DateTime     @default(now())
+  event     AllStarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, voterKey, playerId])
+  @@index([eventId, playerId])
+}

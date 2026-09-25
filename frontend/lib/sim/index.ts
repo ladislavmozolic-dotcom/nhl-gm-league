@@ -11,14 +11,14 @@ export * from "./types";
 export { simulateGame } from "./engine";
 export { fixtureSeed } from "./rng";
 
-const skaterAttrs = (p: any): SkaterAttrs => ({
+export const skaterAttrs = (p: any): SkaterAttrs => ({
   ck: p.ck ?? 50, fg: p.fg ?? 50, di: p.di ?? 50, sk: p.sk ?? 50,
   st: p.st ?? 50, en: p.en ?? 50, du: p.du ?? 50, ph: p.ph ?? 50,
   fo: p.fo ?? 50, pa: p.pa ?? 50, sc: p.sc ?? 50, df: p.df ?? 50,
   ps: p.ps ?? 50, ex: p.ex ?? 50, ld: p.ld ?? 50, mo: p.mo ?? 50,
 });
 
-const goalieAttrs = (g: any): GoalieAttrs => ({
+export const goalieAttrs = (g: any): GoalieAttrs => ({
   sk: g?.sk ?? 50, du: g?.du ?? 50, en: g?.en ?? 50, sz: g?.sz ?? 50,
   ag: g?.ag ?? 50, rb: g?.rb ?? 50, sc: g?.sc ?? 50, hs: g?.hs ?? 50,
   rt: g?.rt ?? 50, ph: g?.ph ?? 50, ps: g?.ps ?? 50, ex: g?.ex ?? 50,

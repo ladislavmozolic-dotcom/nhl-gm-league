@@ -95,6 +95,7 @@ export const DICT: Dict = {
   "admin.grpFinance": { en: "Finance & Draft", cs: "Financie & Draft" },
   "admin.grpContent": { en: "Content & Site", cs: "Obsah & Stránka" },
   "admin.dashboard.d": { en: "Today at a glance — games ready, missing lines, pending trades — and Simulate Day.", cs: "Dnešok na jednom mieste — pripravené zápasy, chýbajúce zostavy, čakajúce trejdy — a Simulate Day." },
+  "admin.allStar.d": { en: "Plan the All-Star Weekend: voting window, rosters, Skills Competition and the game.", cs: "Naplánuj All-Star víkend: hlasovanie, súpisky, Skills Competition a zápas." },
   "admin.season.d": { en: "Generate the schedule, play the season, run the playoffs.", cs: "Vygeneruj rozpis, odohraj sezónu, spusti playoff." },
   "admin.simulation.d": { en: "Tune goals, shots, penalties, fights, goalie fatigue, playoff format.", cs: "Ladenie gólov, striel, trestov, bitiek, únavy brankára, formátu PO." },
   "admin.calibration.d": { en: "Grade the engine against NHL targets — rates, balance, xG, EDGE, injuries.", cs: "Ohodnoť engine voči NHL cieľom — rates, balans, xG, EDGE, zranenia." },

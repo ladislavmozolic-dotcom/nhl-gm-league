@@ -4,6 +4,7 @@
 // after midnight). Protected by a shared secret since it mutates league state
 // (plays games, moves money, resolves waivers) with no user session behind it.
 import { NextRequest, NextResponse } from "next/server";
+import { runAllStarIfDue } from "@/lib/all-star-server";
 import { simulateDayIfDue, rolloverLeagueDateIfDue, autoOpenFrenzyIfDue, cleanupDeclinedTrades } from "@/lib/season-cron";
 
 export async function POST(req: NextRequest) {
@@ -22,5 +23,6 @@ export async function POST(req: NextRequest) {
   const rollover = await rolloverLeagueDateIfDue(now);
   const frenzy = await autoOpenFrenzyIfDue(now);
   const declinedCleanup = await cleanupDeclinedTrades();
-  return NextResponse.json({ ...result, rollover, frenzy, declinedCleanup });
+  const allStar = await runAllStarIfDue(now).catch((e) => `error: ${(e as Error).message}`);
+  return NextResponse.json({ ...result, rollover, frenzy, declinedCleanup, allStar });
 }
