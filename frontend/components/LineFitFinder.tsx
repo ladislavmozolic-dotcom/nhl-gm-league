@@ -11,6 +11,8 @@ type Pickable = FitPlayer & { teamCode: string | null };
 
 const F_ROLES = ["LW", "C", "RW"];
 const D_ROLES = ["LD", "RD"];
+const F_SLOTS = ["1st Line", "2nd Line", "3rd Line", "4th Line"];
+const D_SLOTS = ["1st Pair", "2nd Pair", "3rd Pair"];
 
 function SlotPicker({ pool, value, onPick, onClear }: {
   pool: Pickable[]; value: Pickable | null; onPick: (p: Pickable) => void; onClear: () => void;
@@ -58,11 +60,13 @@ export default function LineFitFinder({ players, chem, tactics, pops, hasTeam }:
 }) {
   const [kind, setKind] = useState<"F" | "D">("F");
   const [sel, setSel] = useState<(Pickable | null)[]>([null, null, null]);
+  const [lineIndex, setLineIndex] = useState(0);
   const roles = kind === "F" ? F_ROLES : D_ROLES;
+  const slotLabels = kind === "F" ? F_SLOTS : D_SLOTS;
   const slotsUsed = sel.slice(0, roles.length);
 
   const setSlot = (i: number, p: Pickable | null) => setSel((s) => { const n = [...s]; n[i] = p; return n; });
-  const switchKind = (k: "F" | "D") => { setKind(k); setSel([null, null, null]); };
+  const switchKind = (k: "F" | "D") => { setKind(k); setSel([null, null, null]); setLineIndex(0); };
 
   const line: BuiltLine = useMemo(() => {
     const present = slotsUsed.filter((p): p is Pickable => !!p);
@@ -72,11 +76,11 @@ export default function LineFitFinder({ players, chem, tactics, pops, hasTeam }:
     }));
     const profile = profileOf(present, kind, pops);
     const tacticalFit = kind === "F"
-      ? tacticalFitForwards(slotsUsed.map(fitPlayer), tactics)
-      : tacticalFitDefense(slotsUsed.map(fitPlayer), tactics);
+      ? tacticalFitForwards(slotsUsed.map(fitPlayer), tactics, undefined, lineIndex)
+      : tacticalFitDefense(slotsUsed.map(fitPlayer), tactics, undefined, lineIndex);
     const { chemistry, gelled, pairs } = chemFor(chem, slots.map((s) => ({ role: s.role, id: s.id })), tacticalFit);
     return { kind, index: 0, slots, chemistry, gelled, pairs, tacticalFit, profile, summary: present.length >= 2 ? summaryOf(profile, kind) : "Pick at least two players to preview a fit." };
-  }, [slotsUsed, kind, pops, tactics, chem, roles]);
+  }, [slotsUsed, kind, pops, tactics, chem, roles, lineIndex]);
 
   return (
     <div className="space-y-6">
@@ -92,6 +96,20 @@ export default function LineFitFinder({ players, chem, tactics, pops, hasTeam }:
             {k === "F" ? "Forward Line" : "Defense Pair"}
           </button>
         ))}
+      </div>
+
+      <div>
+        <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1">
+          Depth-chart slot — affects Tactical Fit&apos;s archetype match (a checking trio scores better as a 4th line than a 1st, etc.)
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {slotLabels.map((label, i) => (
+            <button key={label} onClick={() => setLineIndex(i)}
+              className={`px-2.5 py-1 rounded text-xs font-semibold ${lineIndex === i ? "bg-blue-600 text-white" : "border border-slate-700 text-slate-400 hover:bg-slate-800"}`}>
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${roles.length}, minmax(0, 1fr))` }}>
