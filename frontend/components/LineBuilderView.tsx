@@ -31,6 +31,7 @@ export function LineCard({ line }: { line: BuiltLine }) {
               <Link href={s.slug ? `/players/${s.slug}` : "#"} className="font-bold text-sm hover:text-blue-400 leading-tight block truncate">{s.name}{s.offSlot && <span className="text-amber-400" title="Off natural position/side"> *</span>}</Link>
             ) : <span className="text-slate-600">—</span>}
             {s.overall != null && <div className="text-[11px] text-slate-500">{s.overall} OV</div>}
+            {s.type && <div className="text-[10px] text-slate-500 truncate" title="Real scouting player type — see Rules §16, Depth-Chart Archetype Fit">{s.type}</div>}
           </div>
         ))}
       </div>

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { tacticalFitDefense, tacticalFitForwards, type TacticalFitPlayer } from "@/lib/sim/tactical-fit";
-import { profileOf, summaryOf, chemFor, offSlotForward, offSlotDefense, type FitPlayer, type RatingPop } from "@/lib/sim/line-fit-calc";
+import { profileOf, summaryOf, chemFor, offSlotForward, offSlotDefense, slotType, type FitPlayer, type RatingPop } from "@/lib/sim/line-fit-calc";
 import type { TeamTactics } from "@/lib/sim/tactics";
 import { LineCard } from "@/components/LineBuilderView";
 import type { BuiltLine } from "@/lib/line-builder-server";
@@ -73,6 +73,7 @@ export default function LineFitFinder({ players, chem, tactics, pops, hasTeam }:
     const slots = slotsUsed.map((p, idx) => ({
       role: roles[idx], id: p?.id ?? null, name: p?.name ?? null, slug: p?.slug ?? null, overall: p?.overall ?? null,
       offSlot: !!p && (kind === "F" ? offSlotForward(roles[idx], p.position) : offSlotDefense(idx as 0 | 1, p.shoots)),
+      type: slotType(p ?? null),
     }));
     const profile = profileOf(present, kind, pops);
     const tacticalFit = kind === "F"

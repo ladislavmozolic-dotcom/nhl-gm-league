@@ -7,6 +7,7 @@ import { autoFill, type TeamLinesData, type ForwardLine, type DefensePair, type 
 import { unitChemistry } from "@/lib/sim/chemistry";
 import { roleFitOf } from "@/lib/sim/role-fit";
 import { tacticalFitDefense, tacticalFitForwards } from "@/lib/sim/tactical-fit";
+import { playerType } from "@/lib/player-type";
 import { DIAL_LABELS, mergeTactics, type PuckStyle, type DZone, type PpStyle, type PkStyle } from "@/lib/sim/tactics";
 import { PP_LAYOUTS, PP4_LAYOUTS, PK_LAYOUTS, PK3_LAYOUTS, type FormationRole } from "@/lib/sim/formation-layout";
 import { displayName } from "@/lib/playerName";
@@ -399,6 +400,10 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
   const Slot = ({ label, value, onChange, pool }: { label: string; value: number | null; onChange: (v: number | null) => void; pool: Player[] }) => {
     const p = value != null ? byId.get(value) : null;
     const cleanLastName = p ? displayName(p.name).trim().split(/\s+/).pop() : null;
+    // Real scouting TYPE (Sniper, Forechecker/Grinder, Two-Way Defenceman, ...) —
+    // the same label shown on his profile page and used by Tactical Fit's
+    // Depth-Chart Archetype Fit (Rules §16) to judge whether he suits THIS slot.
+    const ptype = p ? playerType({ position: p.position, sc: p.sc, pa: p.pa, df: p.df, ck: p.ck, st: p.st, sk: p.sk, ph: p.ph }) : null;
     return (
       <div className="lines-player-slot relative flex items-center gap-3 bg-slate-900/60 border border-slate-700 rounded-lg p-2.5 cursor-pointer hover:border-slate-600">
         <div className="relative flex-none">
@@ -418,6 +423,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
                 OV {p.overall}{p.con != null && <> · CON {p.con}%{p.con < 90 && " ⚠️"}</>}
               </span>
             )}
+            {ptype && <span className="text-[10px] font-semibold text-sky-400/80 truncate" title="Real scouting player type — see Rules §16, Depth-Chart Archetype Fit">{ptype}</span>}
           </div>
           <div className={`text-[13px] font-bold truncate ${p ? "text-white" : "text-slate-500 italic font-normal"}`}>
             {p ? p.name : "— empty —"}{p?.injured && <span className="text-rose-400 font-semibold"> · 🤕 INJ</span>}

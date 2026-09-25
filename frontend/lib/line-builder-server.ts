@@ -10,7 +10,7 @@ import { DEFAULT_TACTICS } from "./sim/tactics";
 import { cleanName } from "./playerName";
 import { posGroup } from "./ratingBands";
 import {
-  profileOf, summaryOf, chemFor, offSlotForward, offSlotDefense,
+  profileOf, summaryOf, chemFor, offSlotForward, offSlotDefense, slotType,
   type FitPlayer as P, type LineSlot, type LineProfile, type PairBond, type RatingPop,
 } from "./sim/line-fit-calc";
 
@@ -77,7 +77,7 @@ export async function teamLineBuilder(teamId: number, league = "NHL"): Promise<T
     const present = ps.filter((p): p is P => !!p);
     const roles = ["LW", "C", "RW"];
     const slots: LineSlot[] = ps.map((p, idx) => ({ role: roles[idx], id: p?.id ?? null, name: p?.name ?? null, slug: p?.slug ?? null, overall: p?.overall ?? null,
-      offSlot: !!p && offSlotForward(roles[idx], p.position) }));
+      offSlot: !!p && offSlotForward(roles[idx], p.position), type: slotType(p) }));
     const profile = profileOf(present, "F", pops);
     const tacticalFit = tacticalFitForwards(ps.map(fitPlayer), tactics, l.puck, i);
     const { chemistry, gelled, pairs } = chemFor(chem, slots.map((s) => ({ role: s.role, id: s.id })), tacticalFit);
@@ -89,7 +89,7 @@ export async function teamLineBuilder(teamId: number, league = "NHL"): Promise<T
     const present = ps.filter((p): p is P => !!p);
     const roles = ["LD", "RD"];
     const slots: LineSlot[] = ps.map((p, idx) => ({ role: roles[idx], id: p?.id ?? null, name: p?.name ?? null, slug: p?.slug ?? null, overall: p?.overall ?? null,
-      offSlot: !!p && offSlotDefense(idx as 0 | 1, p.shoots) }));
+      offSlot: !!p && offSlotDefense(idx as 0 | 1, p.shoots), type: slotType(p) }));
     const profile = profileOf(present, "D", pops);
     const tacticalFit = tacticalFitDefense(ps.map(fitPlayer), tactics, l.dzone, i);
     const { chemistry, gelled, pairs } = chemFor(chem, slots.map((s) => ({ role: s.role, id: s.id })), tacticalFit);

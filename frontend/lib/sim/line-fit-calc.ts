@@ -6,10 +6,11 @@
 
 import { pairSig, unitChemistry } from "./chemistry";
 import { percentileOf } from "../edge-params";
+import { playerType } from "../player-type";
 
 export type Attrs = { pa: number; sc: number; sk: number; ck: number; df: number; st: number; fo: number; en: number; weight: number; ph?: number };
 export type FitPlayer = { id: number; name: string; slug: string | null; position: string; shoots: string | null; overall: number; a: Attrs };
-export type LineSlot = { role: string; id: number | null; name: string | null; slug: string | null; overall: number | null; offSlot: boolean };
+export type LineSlot = { role: string; id: number | null; name: string | null; slug: string | null; overall: number | null; offSlot: boolean; type: string | null };
 export type LineProfile = { playmaking: number; shooting: number; skating: number; physical: number; defense: number };
 export type PairBond = { label: string; value: number; gelled: boolean };
 export type RatingPop = { pa: number[]; sc: number[]; sk: number[]; ck: number[]; df: number[] };
@@ -63,6 +64,16 @@ export function chemFor(chem: Record<string, number>, slots: { role: string; id:
   const anyStored = pairs.some((p) => p.gelled);
   const chemistry = anyStored ? clamp100(unitChemistry(members, chem, base)) : proj;
   return { chemistry, gelled: anyStored, pairs };
+}
+
+/** The real scouting TYPE shown on a player's profile page (Sniper, Playmaker,
+ *  Forechecker / Grinder, Two-Way Defenceman, ... — see lib/player-type.ts and
+ *  Rules §16's Depth-Chart Archetype Fit), for showing right on a line/pair
+ *  card next to the Tactical Fit number it feeds into. Null when there isn't
+ *  enough rating data to classify him yet. */
+export function slotType(p: FitPlayer | null): string | null {
+  if (!p) return null;
+  return playerType({ position: p.position, sc: p.a.sc, pa: p.a.pa, df: p.a.df, ck: p.a.ck, st: p.a.st, sk: p.a.sk, ph: p.a.ph });
 }
 
 /** Whether a forward slotted at `role` (LW/C/RW) is off his natural position. */
