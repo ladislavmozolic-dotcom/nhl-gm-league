@@ -18,7 +18,7 @@ function Bar({ label, value }: { label: string; value: number }) {
   );
 }
 
-function LineCard({ line }: { line: BuiltLine }) {
+export function LineCard({ line }: { line: BuiltLine }) {
   const p = line.profile;
   return (
     <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4">

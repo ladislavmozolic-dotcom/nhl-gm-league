@@ -20,6 +20,12 @@ const tools = [
     href: "/tools/buyout-calculator",
     icon: "🧮",
   },
+  {
+    title: "Line Fit Finder",
+    description: "Pick any players — including trade targets and UFAs — and preview the chemistry & tactical fit if they lined up together",
+    href: "/tools/line-fit",
+    icon: "🧪",
+  },
 ];
 
 export default async function ToolsPage() {
