@@ -22,6 +22,8 @@ import { prisma } from "./prisma";
 import { simulateLeagueDay } from "@/lib/season-day";
 import { addDays } from "./calendar";
 import { sweepExpiredContractsToUfa } from "./free-agency-server";
+import { loadCommissionerIntel } from "./gm-assistant/commissionerIntel";
+import { sendAdminAlert } from "./email";
 
 const TZ = "Europe/Bratislava";
 const TRIGGER_HOUR = 20;
@@ -33,7 +35,7 @@ const WINDOW_MINUTES = 10;
 
 /** Europe/Bratislava wall-clock date + time for `d`, DST-proof via Intl (no reliance
  *  on the server OS's own timezone, which is plain UTC — see DEPLOY.md). */
-function bratislavaParts(d: Date): { dateStr: string; hour: number; minute: number } {
+export function bratislavaParts(d: Date): { dateStr: string; hour: number; minute: number } {
   const fmt = new Intl.DateTimeFormat("en-CA", {
     timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false,
   });
@@ -67,9 +69,29 @@ export async function simulateDayIfDue(now: Date = new Date()): Promise<AutoAdva
 
   if (cfg.lastSimulatedDay?.getTime() === cfg.leagueDate.getTime()) return { ran: false, reason: "today's league day is already simulated" };
 
+  await preSimHealthCheck(cfg.leagueDate);
   const result = await simulateLeagueDay(cfg.leagueDate);
   await prisma.leagueConfig.update({ where: { id: 1 }, data: { lastSimulatedDay: cfg.leagueDate } });
   return { ran: true, ...result };
+}
+
+/** Runs the Commissioner Intelligence scans right before the nightly sim and mails
+ *  the admin if anything is CRITICAL. Advisory only — it never blocks the sim (a
+ *  stuck league is worse than one sim night with a flagged roster), and a failing
+ *  scan must not stop the games either. */
+async function preSimHealthCheck(day: Date): Promise<void> {
+  try {
+    const intel = await loadCommissionerIntel();
+    const critical = intel.findings.filter((f) => f.severity === "critical");
+    if (!critical.length) return;
+    const body = critical.map((f) => [
+      `■ ${f.label} — ${f.summary}`,
+      ...f.rows.slice(0, 15).map((r) => `   · ${[r.teamName, r.playerName].filter(Boolean).join(" / ")}: ${r.detail}`),
+    ].join("\n")).join("\n\n");
+    await sendAdminAlert(`Pre-sim check ${isoDateStr(day)}: ${critical.length} critical`, `Before tonight's sim the integrity scan flagged:\n\n${body}\n\nThe sim ran anyway. Details: https://unhl.eu/tools/assistant/commissioner`);
+  } catch (err) {
+    console.error("[pre-sim] health check failed", err);
+  }
 }
 
 export type RolloverResult = { rolled: false; reason: string } | { rolled: true; to: Date };

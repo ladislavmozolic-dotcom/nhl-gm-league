@@ -133,13 +133,20 @@ Workflow: ja upravím kód → ty `git push` (alebo ja ti dám commit) → na se
 
 ---
 
-## 9. Zálohy (odporúčam)
-Databáza:
-```bash
-docker compose exec -T db pg_dump -U profinhl profinhl > backup-$(date +%F).sql
-```
-Daj si to do cronu (denne). Uploady sú vo volume `uploads` — zálohuj podobne alebo
-`docker run --rm -v frontend_uploads:/u -v $PWD:/b alpine tar czf /b/uploads.tgz -C /u .`
+## 9. Zálohy a monitoring (`scripts/ops/`)
+Inštalácia raz na serveri: do `.env` pridaj `ALERT_EMAIL=tvoj@email`, potom
+`./scripts/ops/install.sh` (idempotentné). Nainštaluje:
+- **03:30 UTC denne** `backup-db.sh` → `/opt/unhl-backups/unhl-*.dump` (pg_dump -Fc, 14 posledných, `latest.dump` symlink).
+  `deploy.sh` navyše pred každým deployom spraví `*-predeploy.dump` (5 posledných) a ak zlyhá, deploy sa preruší.
+- **každých 10 min** `watchdog.sh` → `/api/health` (DB, zmeškaná 20:30 simulácia, zaseknutý kalendár),
+  vek poslednej zálohy (>26 h), disk ≥ 90 %. E-mail cez Resend (max 1× za 6 h na problém + „Recovered“).
+- Pred každou nočnou simuláciou sa spustí Commissioner Intelligence scan; kritické nálezy idú e-mailom (sim sa nezastaví).
+
+Mac (off-server kópia): `scripts/ops/mac/pull-backup.sh` → `~/UNHL-Backups/` + launchd `eu.unhl.backup-pull.plist` (denne 10:00, 30 posledných).
+
+Obnova: `cat unhl-XXXX.dump | docker compose exec -T db pg_restore -U profinhl -d profinhl --clean --if-exists`
+
+Uploady sú vo volume `uploads` — `docker run --rm -v frontend_uploads:/u -v $PWD:/b alpine tar czf /b/uploads.tgz -C /u .`
 
 ---
 

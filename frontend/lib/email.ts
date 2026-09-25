@@ -132,3 +132,16 @@ function welcomeHtml(opts: { gmName: string; teamName: string; leagueName: strin
 </body>
 </html>`;
 }
+
+/** Ops alert to the league admin (ALERT_EMAIL in the server's .env). Same
+ *  best-effort rule as every other mail here: never throws. */
+export async function sendAdminAlert(subject: string, text: string): Promise<void> {
+  const r = resend();
+  const to = process.env.ALERT_EMAIL;
+  if (!r || !to) { console.warn("[email] RESEND_API_KEY / ALERT_EMAIL not set — skipping alert:", subject); return; }
+  try {
+    await r.emails.send({ from: FROM, to, subject: `[UNHL] ${subject}`, text });
+  } catch (err) {
+    console.error("[email] sendAdminAlert failed", err);
+  }
+}

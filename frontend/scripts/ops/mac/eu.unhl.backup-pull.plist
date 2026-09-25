@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- cp to ~/Library/LaunchAgents/ and: launchctl load ~/Library/LaunchAgents/eu.unhl.backup-pull.plist -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>eu.unhl.backup-pull</string>
+  <key>ProgramArguments</key>
+  <array><string>/bin/bash</string><string>-lc</string><string>$HOME/UNHL-Backups/pull-backup.sh</string></array>
+  <key>StartCalendarInterval</key><dict><key>Hour</key><integer>10</integer><key>Minute</key><integer>0</integer></dict>
+  <key>StandardOutPath</key><string>/tmp/unhl-backup-pull.log</string>
+  <key>StandardErrorPath</key><string>/tmp/unhl-backup-pull.log</string>
+</dict>
+</plist>
