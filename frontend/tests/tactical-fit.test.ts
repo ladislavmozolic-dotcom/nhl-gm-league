@@ -56,6 +56,30 @@ test("4th-line fit rewards checking/defensive forwards over top-line skill types
   assert.ok(grindOn4th > grindOn1st, "a checking/defensive trio should fit the 4th line better than the 1st");
 });
 
+test("2nd line gives partial credit to a power-forward-style Forechecker/Grinder", () => {
+  // Raw rule (player-type.ts): CK>=75 & PA+SC<110 & DF<69 -> Forechecker/Grinder,
+  // even with a decent PA+SC (105 here) — a power forward, not a pure energy guy.
+  const powerForward = (pos: string) => forward(pos, { pa: 55, sc: 50, sk: 60, ck: 76, df: 60, st: 65 });
+  const trio = [powerForward("LW"), powerForward("C"), powerForward("RW")];
+  const on1st = tacticalFitForwards(trio, DEFAULT_TACTICS, undefined, 0);
+  const on2nd = tacticalFitForwards(trio, DEFAULT_TACTICS, undefined, 1);
+  assert.ok(on2nd > on1st, "a power-forward-style Grinder trio should now fit the 2nd line better than the 1st");
+});
+
+test("3rd D pair rewards a true shut-down (Stay-at-Home) D more than a merely Defensive one", () => {
+  // playerType() raw thresholds (lib/player-type.ts): P<53 & PA+SC<105 & DF>=78
+  // -> Stay-at-Home Defenceman; SK>=40 & P>=53 & PA+SC<105 & DF>=78 -> Defensive
+  // Defenceman. Both members mirrored L/R so roleFitOf/positionFactor are
+  // identical across the two pairs — only the archetype match should differ.
+  const stayAtHomeL = forward("D", { shoots: "L", pa: 45, sc: 40, sk: 55, df: 82, st: 75, ck: 78 });
+  const stayAtHomeR = forward("D", { shoots: "R", pa: 45, sc: 40, sk: 55, df: 82, st: 75, ck: 78 });
+  const defensiveL = forward("D", { shoots: "L", pa: 55, sc: 45, sk: 45, df: 80, st: 72, ck: 74 });
+  const defensiveR = forward("D", { shoots: "R", pa: 55, sc: 45, sk: 45, df: 80, st: 72, ck: 74 });
+  const stayAtHomeFit = tacticalFitDefense([stayAtHomeL, stayAtHomeR], DEFAULT_TACTICS, undefined, 2);
+  const defensiveFit = tacticalFitDefense([defensiveL, defensiveR], DEFAULT_TACTICS, undefined, 2);
+  assert.ok(stayAtHomeFit > defensiveFit, "a true Stay-at-Home pairing should fit the 3rd pair better than a merely Defensive pairing");
+});
+
 test("no lineIndex leaves the score unaffected by depth-chart archetype", () => {
   const line = [
     forward("LW", { pa: 80, sc: 55, sk: 75 }),
