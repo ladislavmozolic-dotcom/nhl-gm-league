@@ -29,12 +29,12 @@ export default async function LinesPage({ params }: { params: Promise<{ slug: st
   const [skaterRows, goalieRows] = await Promise.all([
     prisma.player.findMany({
       where: { teamId: team.id, rosterType, isGoalie: false, scratched: false },
-      select: { id: true, name: true, position: true, shoots: true, overall: true, injuryDaysLeft: true, df: true, condition: true, captaincy: true, pa: true, sk: true, sc: true, ck: true, fo: true, st: true, en: true, weight: true, ph: true, number: true },
+      select: { id: true, name: true, position: true, shoots: true, overall: true, injuryDaysLeft: true, suspendedGames: true, df: true, condition: true, captaincy: true, pa: true, sk: true, sc: true, ck: true, fo: true, st: true, en: true, weight: true, ph: true, number: true },
       orderBy: { overall: "desc" },
     }),
     prisma.player.findMany({
       where: { teamId: team.id, rosterType, isGoalie: true, scratched: false },
-      select: { id: true, name: true, position: true, photoUrl: true, overall: true, injuryDaysLeft: true, condition: true, captaincy: true, number: true },
+      select: { id: true, name: true, position: true, photoUrl: true, overall: true, injuryDaysLeft: true, suspendedGames: true, condition: true, captaincy: true, number: true },
       orderBy: { overall: "desc" },
     }),
   ]);
@@ -42,8 +42,8 @@ export default async function LinesPage({ params }: { params: Promise<{ slug: st
   // name marker only for a club that never set it (matches Rosters / League → Captains).
   const capHasField = [...skaterRows, ...goalieRows].some((p) => p.captaincy === "C" || p.captaincy === "A");
   const capOf = (p: { captaincy: string | null; name: string }) => (capHasField ? ((p.captaincy as "C" | "A" | null) ?? null) : captaincyFromName(p.name));
-  const players = skaterRows.map((p) => ({ id: p.id, name: cleanName(p.name), position: p.position, shoots: p.shoots, overall: p.overall ?? 0, injured: (p.injuryDaysLeft ?? 0) > 0, df: p.df, con: Math.round(p.condition ?? 100), cap: capOf(p), pa: p.pa, sk: p.sk, sc: p.sc, ck: p.ck, fo: p.fo, st: p.st, en: p.en, weight: p.weight, ph: p.ph, number: p.number }));
-  const goalies = goalieRows.map((p) => ({ id: p.id, name: cleanName(p.name), position: "G", photoUrl: p.photoUrl, overall: p.overall ?? 0, injured: (p.injuryDaysLeft ?? 0) > 0, tired: (p.condition ?? 100) < PLAY_CON, con: Math.round(p.condition ?? 100), cap: capOf(p), number: p.number }));
+  const players = skaterRows.map((p) => ({ id: p.id, name: cleanName(p.name), position: p.position, shoots: p.shoots, overall: p.overall ?? 0, injured: (p.injuryDaysLeft ?? 0) > 0 || p.suspendedGames > 0, df: p.df, con: Math.round(p.condition ?? 100), cap: capOf(p), pa: p.pa, sk: p.sk, sc: p.sc, ck: p.ck, fo: p.fo, st: p.st, en: p.en, weight: p.weight, ph: p.ph, number: p.number }));
+  const goalies = goalieRows.map((p) => ({ id: p.id, name: cleanName(p.name), position: "G", photoUrl: p.photoUrl, overall: p.overall ?? 0, injured: (p.injuryDaysLeft ?? 0) > 0 || p.suspendedGames > 0, tired: (p.condition ?? 100) < PLAY_CON, con: Math.round(p.condition ?? 100), cap: capOf(p), number: p.number }));
 
   const saved = await loadTeamLines(team.id);
   const lines = saved ?? autoLines(players, goalies);

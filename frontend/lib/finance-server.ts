@@ -6,6 +6,7 @@ import { prisma } from "./prisma";
 import { getArenaSections, selloutRevenue, computeTeamFinance, projectedPointsPct, farmSalaryExpense, liveCapHit } from "./finance";
 import { computeStandings } from "./sim/standings";
 import { loadSettings } from "./sim/settings";
+import { specialEventIncome } from "./special-games";
 
 /**
  * Season-end rewards paid into the NHL team's bank:
@@ -29,6 +30,10 @@ export async function computeRewards(season: string): Promise<Map<number, number
   for (const id of playoffTeams) add(id, s.rewardPlayoff);
   const nhlFinal = nhlSeries.find((x) => x.round === 4 && x.winnerTeamId);
   add(nhlFinal?.winnerTeamId, s.rewardCup);
+
+  // special events (outdoor games / Global Series) actually played this season
+  const events = await prisma.game.findMany({ where: { season, league: "NHL", status: "FINAL", eventKind: { not: null } }, select: { homeTeamId: true, awayTeamId: true, eventKind: true } });
+  for (const [id, v] of specialEventIncome(events, s)) add(id, v);
 
   // AHL: Cup champion + finalist earn for the parent NHL club
   const ahlFinal = await prisma.playoffSeries.findFirst({ where: { season, league: "AHL", round: 4, status: "DONE" }, select: { highSeedTeamId: true, lowSeedTeamId: true, winnerTeamId: true } });

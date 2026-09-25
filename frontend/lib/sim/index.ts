@@ -38,7 +38,7 @@ export async function loadSimTeam(teamId: number, rosterType?: string, opts?: { 
   const players = await prisma.player.findMany({
     // injured and healthy-scratched players don't dress (the GM's roster-mover scratches
     // — NHL or AHL — sit out; the affiliate auto-fill below covers any resulting shortfall)
-    where: { teamId, rosterType: rt, injuryDaysLeft: { lte: 0 }, scratched: false },
+    where: { teamId, rosterType: rt, injuryDaysLeft: { lte: 0 }, suspendedGames: { lte: 0 }, scratched: false },
     include: { goalieRating: true },
   });
 
@@ -62,7 +62,7 @@ export async function loadSimTeam(teamId: number, rosterType?: string, opts?: { 
     // forwards up to MIN_F, defense up to MIN_D, then top up to MIN_SKATERS.
     const pool = await prisma.player.findMany({
       where: {
-        teamId: { in: affIds }, isGoalie: false, injuryDaysLeft: { lte: 0 },
+        teamId: { in: affIds }, isGoalie: false, injuryDaysLeft: { lte: 0 }, suspendedGames: { lte: 0 },
         id: { notIn: skaterRows.map((s) => s.id) },
       },
       include: { goalieRating: true },
@@ -148,7 +148,7 @@ export async function loadSimTeam(teamId: number, rosterType?: string, opts?: { 
   if (goalieRows.length < MIN_GOALIES && affIds.length) {
     const callups = await prisma.player.findMany({
       where: {
-        teamId: { in: affIds }, isGoalie: true, injuryDaysLeft: { lte: 0 },
+        teamId: { in: affIds }, isGoalie: true, injuryDaysLeft: { lte: 0 }, suspendedGames: { lte: 0 },
         id: { notIn: goalieRows.map((g) => g.id) },
       },
       include: { goalieRating: true },

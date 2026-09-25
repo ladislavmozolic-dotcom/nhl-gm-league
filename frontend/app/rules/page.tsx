@@ -166,6 +166,27 @@ const SECTIONS: Sec[] = [
         "Regular season (as in the NHL): a tie after 60 minutes goes to 5:00 of sudden-death 3-on-3 overtime, then a shootout. The loser gets a point.",
         "Playoffs (as in the NHL): no shootout — full 20-minute periods of 5-on-5 sudden death, with normal lines, power plays and penalties, as many as it takes until someone scores.",
       ] },
+      { h: "Player Safety (suspensions)", points: [
+        "After every night's games the Department of Player Safety reviews game misconducts, majors for violent infractions (boarding, cross-checking, elbowing…) and hits that injure an opponent. Most incidents draw nothing; some a fine (max $5,000), some a suspension of 1–10 games — about 35 a season, like the NHL.",
+        "A repeat offender (suspended within the last 18 months) is punished harder. A suspended player can't dress (NHL or AHL) and serves in his NHL club's games.",
+        "Forfeited salary follows the CBA: a first offence costs 1/(days in the season) of his salary per game, a repeat offender 1/82 per game — the club doesn't pay it, so it's credited to its bank.",
+        "The GM can appeal to the commissioner within 48 hours (Player Safety page). The player keeps serving while the appeal is heard; the commissioner upholds, reduces or overturns.",
+      ] },
+      { h: "Trade deadline", points: [
+        "The trade deadline follows the NHL calendar (2026-27: Monday, March 1, 20:00 Bratislava — before that night's sim, so it runs on the new rosters). After it, no trades until your season is over.",
+        "Every GM is reminded 24 hours before. Deadline Day (Trades menu) shows every deal of the final week live with UNHL Intelligence grades, and a winners-and-losers recap is posted to League News once it passes.",
+      ] },
+      { h: "Special games", points: [
+        "The real NHL outdoor games and Global Series are on our schedule: Heritage Classic (WPG–MTL, Oct 25), Global Series Finland (SEA–CAR, Nov 12 & 14), Global Series Germany (OTT–CHI, Dec 18 & 20), Winter Classic (UTA–COL, Dec 31) and Stadium Series (DAL–VGK, Feb 20).",
+        "They're simulated like any other game, but the crowd is the stadium's, and both clubs earn event income on top (commissioner-set).",
+      ] },
+      { h: "Retired numbers", points: [
+        "Every club carries its real NHL retired numbers (and Gretzky's 99 is retired league-wide). A retired number can't be handed to anyone else on that club.",
+        "A GM can retire a number for a player who has retired from playing — or is in the UNHL Hall of Fame — and played enough UNHL games for the club (default 300). The ceremony is announced in League News.",
+      ] },
+      { h: "Playoff odds", points: [
+        "Standings ▸ Odds: a nightly Monte Carlo of the rest of the season (5,000 runs). Team strength blends today's results and goal differential with a roster prior that fades over the first ~25 games; the playoffs follow the NHL bracket and the #1-pick odds use our real draft lottery.",
+      ] },
       { h: "Player morale & trade requests", points: [
         "Every NHL player compares his ice time with what his talent earns on YOUR club — e.g. a 2nd-line-calibre forward vs. the average minutes of your 2nd-line tier over the last 10 games (goalies: share of starts). A healthy scratch counts as 0:00. Only games since he first dressed for you count, and new arrivals get two weeks to settle.",
         "Below the league's threshold (default 80 %) he's unhappy and his morale drains. After 5 unhappy days his agent messages you (League Notifications); after 20 he publicly requests a trade.",

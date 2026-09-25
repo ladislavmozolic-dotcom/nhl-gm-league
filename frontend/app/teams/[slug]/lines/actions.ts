@@ -34,7 +34,7 @@ export async function suggestLinesAction(slug: string): Promise<{ ok: false; err
   if (!(await canManageTeam(team.id))) return { ok: false, error: "Not authorized for this team." };
   const rosterType = team.league === "AHL" ? "AHL" : "NHL";
   const rows = await prisma.player.findMany({
-    where: { teamId: team.id, rosterType, injuryDaysLeft: { lte: 0 }, scratched: false },
+    where: { teamId: team.id, rosterType, injuryDaysLeft: { lte: 0 }, suspendedGames: { lte: 0 }, scratched: false },
     select: { id: true, name: true, position: true, overall: true, isGoalie: true, shoots: true, sc: true, pa: true, ck: true, df: true, st: true, fg: true, fo: true, ph: true, sk: true, en: true, weight: true },
   });
   const skaters: Atk[] = rows.filter((p) => !p.isGoalie).map((p) => ({ id: p.id, name: p.name, position: p.position ?? "C", overall: p.overall ?? 50, shoots: p.shoots, sc: A(p.sc), pa: A(p.pa), ck: A(p.ck), df: A(p.df), st: A(p.st), fg: A(p.fg), fo: A(p.fo), ph: A(p.ph, 75), sk: A(p.sk), en: A(p.en), weight: p.weight ?? 90 }));

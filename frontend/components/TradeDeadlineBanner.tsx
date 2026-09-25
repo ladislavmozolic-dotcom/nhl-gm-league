@@ -67,7 +67,7 @@ export default function TradeDeadlineBanner({ initial, variant = "strip" }: { in
               <div className="whitespace-nowrap truncate"><span className="font-bold mr-2">BREAKING:</span>{feed.trades.map((t) => `${time(t.at)} ${t.message}`).join("   •   ")}</div>
             ) : <span className="text-red-100/80">No deals yet — every trade lands here live.</span>}
           </div>
-          <Link href="/trades" className="whitespace-nowrap underline text-xs">Trade Tracker →</Link>
+          <Link href="/trades/deadline" className="whitespace-nowrap underline text-xs">Deadline Day →</Link>
         </div>
       </div>
     );
@@ -79,7 +79,7 @@ export default function TradeDeadlineBanner({ initial, variant = "strip" }: { in
           <span className="font-bold whitespace-nowrap">⏰ Trade deadline in</span>
           <span className="tabular-nums font-bold">{p.d > 0 ? `${p.d} d ` : ""}{pad(p.h)}:{pad(p.m)}:{pad(p.s)}</span>
           <span className="text-amber-200/70 text-xs hidden sm:inline">{new Date(dl).toLocaleString("sk-SK", { timeZone: "Europe/Bratislava", dateStyle: "medium", timeStyle: "short" })}</span>
-          <Link href="/trades/build" className="ml-auto whitespace-nowrap underline text-xs">Trade Room →</Link>
+          <Link href="/trades/deadline" className="ml-auto whitespace-nowrap underline text-xs">Deadline Day →</Link>
         </div>
       </div>
     );

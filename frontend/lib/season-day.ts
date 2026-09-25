@@ -21,6 +21,8 @@ import { checkIceTimeMorale } from "@/lib/player-morale";
 import { leagueCapCompliance } from "@/lib/cap";
 import { money } from "@/lib/finance";
 import { runLiveCalculatorRecompute } from "@/lib/live-calculator-engine";
+import { refreshPlayoffOdds } from "@/lib/playoff-odds";
+import { reviewGames, serveSuspensions } from "@/lib/discipline-server";
 
 const SEASON = "2026-27";
 
@@ -58,6 +60,7 @@ export async function simulateLeagueDay(day: Date) {
   const phYesterday = await computePhase(yesterday, cfg0?.phaseOverride);
   const phToday = await computePhase(day, cfg0?.phaseOverride);
   const start = utcDay(day), end = addDays(day, 1);
+  const simStart = new Date(); // suspensions issued before tonight's games get these games counted
   const dayGames = await prisma.game.findMany({
     where: { season: SEASON, status: "SCHEDULED", seriesId: null, gameDate: { gte: start, lt: end } },
     select: { round: true }, orderBy: { round: "asc" },
@@ -74,6 +77,8 @@ export async function simulateLeagueDay(day: Date) {
     const r = await playScheduledGames({ season: SEASON, round: dayGames[0].round, actor: await commissionerName() });
     played = r.played;
     await processFinances(SEASON, "NHL");
+    // tonight's Monte Carlo playoff / Cup / lottery odds (Standings ▸ Odds)
+    await refreshPlayoffOdds(day).catch((e) => console.error("[odds]", e));
   } else if (phToday === "regular" || phToday === "playoffs" || (phToday === "preseason" && preDue === 0)) {
     await recoverOneDay();
   }
@@ -99,6 +104,13 @@ export async function simulateLeagueDay(day: Date) {
     // Playoff gates, merchandise uplift and earned sponsor bonuses are real cash,
     // so refresh the same Detailed Finance ledger after every playoff day too.
     await processFinances(SEASON, "NHL");
+  }
+  // Player Safety: tonight's games count toward suspensions already handed out,
+  // then tonight's incidents are reviewed (new suspensions start with the next game)
+  if (played > 0) {
+    const tonight = (await prisma.game.findMany({ where: { season: SEASON, league: "NHL", status: "FINAL", gameDate: { gte: start, lt: end } }, select: { id: true } })).map((g) => g.id);
+    await serveSuspensions(tonight, simStart).catch((e) => console.error("[discipline:serve]", e));
+    await reviewGames(tonight).catch((e) => console.error("[discipline:review]", e));
   }
   // weekly newsletter — auto-posts once when a 7-round week completes (self-dedupes)
   await postWeeklyIfDue(roundForDate(day)).catch(() => {});

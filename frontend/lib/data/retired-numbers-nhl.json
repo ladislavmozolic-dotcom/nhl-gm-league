@@ -1,0 +1,1118 @@
+[
+{
+"name": "Sid Abel",
+"team": "Detroit Red Wings",
+"number": 12,
+"year": 1995
+},
+{
+"name": "Daniel Alfredsson",
+"team": "Ottawa Senators",
+"number": 11,
+"year": 2016
+},
+{
+"name": "Glenn Anderson",
+"team": "Edmonton Oilers",
+"number": 9,
+"year": 2009
+},
+{
+"name": "Syl Apps",
+"team": "Toronto Maple Leafs",
+"number": 10,
+"year": 2016
+},
+{
+"name": "George Armstrong",
+"team": "Toronto Maple Leafs",
+"number": 10,
+"year": 2016
+},
+{
+"name": "Barry Ashbee",
+"team": "Philadelphia Flyers",
+"number": 4,
+"year": 1977
+},
+{
+"name": "Ace Bailey",
+"team": "Toronto Maple Leafs",
+"number": 6,
+"year": 1934
+},
+{
+"name": "Bill Barber",
+"team": "Philadelphia Flyers",
+"number": 7,
+"year": 1990
+},
+{
+"name": "Bill Barilko",
+"team": "Toronto Maple Leafs",
+"number": 5,
+"year": 1992
+},
+{
+"name": "Andy Bathgate",
+"team": "New York Rangers",
+"number": 9,
+"year": 2009
+},
+{
+"name": "Jean Beliveau",
+"team": "Montreal Canadiens",
+"number": 4,
+"year": 1971
+},
+{
+"name": "Patrice Bergeron",
+"team": "Boston Bruins",
+"number": 37,
+"year": 2026
+},
+{
+"name": "Rob Blake",
+"team": "Los Angeles Kings",
+"number": 4,
+"year": 2015
+},
+{
+"name": "Mike Bossy",
+"team": "New York Islanders",
+"number": 22,
+"year": 1992
+},
+{
+"name": "Émile Bouchard",
+"team": "Montreal Canadiens",
+"number": 3,
+"year": 2009
+},
+{
+"name": "Ray Bourque",
+"team": "Boston Bruins",
+"number": 77,
+"year": 2001
+},
+{
+"name": "Ray Bourque",
+"team": "Colorado Avalanche",
+"number": 77,
+"year": 2001
+},
+{
+"name": "Johnny Bower",
+"team": "Toronto Maple Leafs",
+"number": 1,
+"year": 2016
+},
+{
+"name": "Michel Briere",
+"team": "Pittsburgh Penguins",
+"number": 21,
+"year": 2001
+},
+{
+"name": "Rod Brind'Amour",
+"team": "Carolina Hurricanes",
+"number": 17,
+"year": 2011
+},
+{
+"name": "Turk Broda",
+"team": "Toronto Maple Leafs",
+"number": 1,
+"year": 2016
+},
+{
+"name": "Martin Brodeur",
+"team": "New Jersey Devils",
+"number": 30,
+"year": 2016
+},
+{
+"name": "Neal Broten",
+"team": "Dallas Stars",
+"number": 7,
+"year": 1998
+},
+{
+"name": "Dustin Brown",
+"team": "Los Angeles Kings",
+"number": 23,
+"year": 2023
+},
+{
+"name": "Johnny Bucyk",
+"team": "Boston Bruins",
+"number": 9,
+"year": 1980
+},
+{
+"name": "Pavel Bure",
+"team": "Vancouver Canucks",
+"number": 10,
+"year": 2013
+},
+{
+"name": "Zdeno Chara",
+"team": "Boston Bruins",
+"number": 33,
+"year": 2026
+},
+{
+"name": "Chris Chelios",
+"team": "Chicago Blackhawks",
+"number": 7,
+"year": 2024
+},
+{
+"name": "King Clancy",
+"team": "Toronto Maple Leafs",
+"number": 7,
+"year": 2016
+},
+{
+"name": "Dit Clapper",
+"team": "Boston Bruins",
+"number": 5,
+"year": 1947
+},
+{
+"name": "Wendel Clark",
+"team": "Toronto Maple Leafs",
+"number": 17,
+"year": 2016
+},
+{
+"name": "Bobby Clarke",
+"team": "Philadelphia Flyers",
+"number": 16,
+"year": 1984
+},
+{
+"name": "Paul Coffey",
+"team": "Edmonton Oilers",
+"number": 7,
+"year": 2005
+},
+{
+"name": "Charlie Conacher",
+"team": "Toronto Maple Leafs",
+"number": 9,
+"year": 2016
+},
+{
+"name": "Yvan Cournoyer",
+"team": "Montreal Canadiens",
+"number": 12,
+"year": 2005
+},
+{
+"name": "Ken Daneyko",
+"team": "New Jersey Devils",
+"number": 3,
+"year": 2006
+},
+{
+"name": "Hap Day",
+"team": "Toronto Maple Leafs",
+"number": 4,
+"year": 2016
+},
+{
+"name": "Alex Delvecchio",
+"team": "Detroit Red Wings",
+"number": 10,
+"year": 1991
+},
+{
+"name": "Marcel Dionne",
+"team": "Los Angeles Kings",
+"number": 16,
+"year": 1990
+},
+{
+"name": "Ken Dryden",
+"team": "Montreal Canadiens",
+"number": 29,
+"year": 2007
+},
+{
+"name": "Patrik Elias",
+"team": "New Jersey Devils",
+"number": 26,
+"year": 2018
+},
+{
+"name": "Phil Esposito",
+"team": "Boston Bruins",
+"number": 7,
+"year": 1987
+},
+{
+"name": "Tony Esposito",
+"team": "Chicago Blackhawks",
+"number": 35,
+"year": 1988
+},
+{
+"name": "Bernie Federko",
+"team": "St. Louis Blues",
+"number": 24,
+"year": 1991
+},
+{
+"name": "Sergei Fedorov",
+"team": "Detroit Red Wings",
+"number": 91,
+"year": 2026
+},
+{
+"name": "Frank Finnigan",
+"team": "Ottawa Senators",
+"number": 8,
+"year": 1992
+},
+{
+"name": "Adam Foote",
+"team": "Colorado Avalanche",
+"number": 52,
+"year": 2013
+},
+{
+"name": "Peter Forsberg",
+"team": "Colorado Avalanche",
+"number": 21,
+"year": null
+},
+{
+"name": "Ron Francis",
+"team": "Carolina Hurricanes",
+"number": 10,
+"year": 2006
+},
+{
+"name": "Grant Fuhr",
+"team": "Edmonton Oilers",
+"number": 31,
+"year": 2003
+},
+{
+"name": "Bob Gainey",
+"team": "Montreal Canadiens",
+"number": 23,
+"year": 2008
+},
+{
+"name": "Danny Gare",
+"team": "Buffalo Sabres",
+"number": 18,
+"year": 2005
+},
+{
+"name": "Mike Gartner",
+"team": "Washington Capitals",
+"number": 11,
+"year": 2008
+},
+{
+"name": "Bob Gassoff",
+"team": "St. Louis Blues",
+"number": 3,
+"year": 1977
+},
+{
+"name": "Bernie Geoffrion",
+"team": "Montreal Canadiens",
+"number": 5,
+"year": 2006
+},
+{
+"name": "Ryan Getzlaf",
+"team": "Anaheim Ducks",
+"number": 15,
+"year": 2027
+},
+{
+"name": "Eddie Giacomin",
+"team": "New York Rangers",
+"number": 1,
+"year": 1989
+},
+{
+"name": "Rod Gilbert",
+"team": "New York Rangers",
+"number": 7,
+"year": 1979
+},
+{
+"name": "Clark Gillies",
+"team": "New York Islanders",
+"number": 9,
+"year": 1996
+},
+{
+"name": "Doug Gilmour",
+"team": "Toronto Maple Leafs",
+"number": 93,
+"year": 2016
+},
+{
+"name": "Bill Goldsworthy",
+"team": "Dallas Stars",
+"number": 8,
+"year": 1992
+},
+{
+"name": "Butch Goring",
+"team": "New York Islanders",
+"number": 91,
+"year": 2020
+},
+{
+"name": "Adam Graves",
+"team": "New York Rangers",
+"number": 9,
+"year": 2009
+},
+{
+"name": "Wayne Gretzky",
+"team": "ALL",
+"number": 99,
+"year": 2000
+},
+{
+"name": "Wayne Gretzky",
+"team": "Edmonton Oilers",
+"number": 99,
+"year": 1999
+},
+{
+"name": "Wayne Gretzky",
+"team": "Los Angeles Kings",
+"number": 99,
+"year": 2002
+},
+{
+"name": "Vic Hadfield",
+"team": "New York Rangers",
+"number": 11,
+"year": 2018
+},
+{
+"name": "Glenn Hall",
+"team": "Chicago Blackhawks",
+"number": 1,
+"year": 1988
+},
+{
+"name": "Al Hamilton",
+"team": "Edmonton Oilers",
+"number": 3,
+"year": 1980
+},
+{
+"name": "Doug Harvey",
+"team": "Montreal Canadiens",
+"number": 2,
+"year": 1985
+},
+{
+"name": "Dominik Hasek",
+"team": "Buffalo Sabres",
+"number": 39,
+"year": 2015
+},
+{
+"name": "Milan Hejduk",
+"team": "Colorado Avalanche",
+"number": 23,
+"year": 2018
+},
+{
+"name": "Lionel Hitchman",
+"team": "Boston Bruins",
+"number": 3,
+"year": 1934
+},
+{
+"name": "Tim Horton",
+"team": "Buffalo Sabres",
+"number": 2,
+"year": 1996
+},
+{
+"name": "Tim Horton",
+"team": "Toronto Maple Leafs",
+"number": 7,
+"year": 2016
+},
+{
+"name": "Marian Hossa",
+"team": "Chicago Blackhawks",
+"number": 81,
+"year": 2022
+},
+{
+"name": "Gordie Howe",
+"team": "Detroit Red Wings",
+"number": 9,
+"year": 1972
+},
+{
+"name": "Mark Howe",
+"team": "Philadelphia Flyers",
+"number": 2,
+"year": 2012
+},
+{
+"name": "Harry Howell",
+"team": "New York Rangers",
+"number": 3,
+"year": 2009
+},
+{
+"name": "Wayne Huizenga",
+"team": "Florida Panthers",
+"number": 37,
+"year": 2018
+},
+{
+"name": "Bobby Hull",
+"team": "Chicago Blackhawks",
+"number": 9,
+"year": 1983
+},
+{
+"name": "Brett Hull",
+"team": "St. Louis Blues",
+"number": 16,
+"year": 2006
+},
+{
+"name": "Dale Hunter",
+"team": "Washington Capitals",
+"number": 32,
+"year": 2000
+},
+{
+"name": "Jarome Iginla",
+"team": "Calgary Flames",
+"number": 12,
+"year": 2019
+},
+{
+"name": "Jaromir Jagr",
+"team": "Pittsburgh Penguins",
+"number": 68,
+"year": 2024
+},
+{
+"name": "Paul Kariya",
+"team": "Anaheim Ducks",
+"number": 9,
+"year": 2018
+},
+{
+"name": "Red Kelly",
+"team": "Toronto Maple Leafs",
+"number": 4,
+"year": 2016
+},
+{
+"name": "Red Kelly",
+"team": "Detroit Red Wings",
+"number": 4,
+"year": 2019
+},
+{
+"name": "Ted Kennedy",
+"team": "Toronto Maple Leafs",
+"number": 9,
+"year": 2016
+},
+{
+"name": "Dave Keon",
+"team": "Toronto Maple Leafs",
+"number": 14,
+"year": 2016
+},
+{
+"name": "Miikka Kiprusoff",
+"team": "Calgary Flames",
+"number": 34,
+"year": 2024
+},
+{
+"name": "Mikko Koivu",
+"team": "Minnesota Wild",
+"number": 9,
+"year": 2022
+},
+{
+"name": "Anze Kopitar",
+"team": "Los Angeles Kings",
+"number": 11,
+"year": 2027
+},
+{
+"name": "Jari Kurri",
+"team": "Edmonton Oilers",
+"number": 17,
+"year": 2001
+},
+{
+"name": "Yvon Labre",
+"team": "Washington Capitals",
+"number": 7,
+"year": 1981
+},
+{
+"name": "Elmer Lach",
+"team": "Montreal Canadiens",
+"number": 16,
+"year": 2009
+},
+{
+"name": "Guy Lafleur",
+"team": "Montreal Canadiens",
+"number": 10,
+"year": 1985
+},
+{
+"name": "Pat LaFontaine",
+"team": "Buffalo Sabres",
+"number": 16,
+"year": 2006
+},
+{
+"name": "Rod Langway",
+"team": "Washington Capitals",
+"number": 5,
+"year": 1997
+},
+{
+"name": "Guy Lapointe",
+"team": "Montreal Canadiens",
+"number": 5,
+"year": 2014
+},
+{
+"name": "Vincent Lecavalier",
+"team": "Tampa Bay Lightning",
+"number": 4,
+"year": 2018
+},
+{
+"name": "Brian Leetch",
+"team": "New York Rangers",
+"number": 2,
+"year": 2008
+},
+{
+"name": "Jere Lehtinen",
+"team": "Dallas Stars",
+"number": 26,
+"year": 2017
+},
+{
+"name": "Mario Lemieux",
+"team": "Pittsburgh Penguins",
+"number": 66,
+"year": 1997
+},
+{
+"name": "Nicklas Lidstrom",
+"team": "Detroit Red Wings",
+"number": 5,
+"year": 2014
+},
+{
+"name": "Trevor Linden",
+"team": "Vancouver Canucks",
+"number": 16,
+"year": 2008
+},
+{
+"name": "Eric Lindros",
+"team": "Philadelphia Flyers",
+"number": 88,
+"year": 2018
+},
+{
+"name": "Ted Lindsay",
+"team": "Detroit Red Wings",
+"number": 7,
+"year": 1991
+},
+{
+"name": "Kevin Lowe",
+"team": "Edmonton Oilers",
+"number": 4,
+"year": 2021
+},
+{
+"name": "Henrik Lundqvist",
+"team": "New York Rangers",
+"number": 30,
+"year": 2022
+},
+{
+"name": "Roberto Luongo",
+"team": "Florida Panthers",
+"number": 1,
+"year": 2020
+},
+{
+"name": "Al MacInnis",
+"team": "St. Louis Blues",
+"number": 2,
+"year": 2006
+},
+{
+"name": "Keith Magnuson",
+"team": "Chicago Blackhawks",
+"number": 3,
+"year": 2008
+},
+{
+"name": "Frank Mahovlich",
+"team": "Toronto Maple Leafs",
+"number": 27,
+"year": 2016
+},
+{
+"name": "Patrick Marleau",
+"team": "San Jose Sharks",
+"number": 12,
+"year": 2023
+},
+{
+"name": "Rick Martin",
+"team": "Buffalo Sabres",
+"number": 7,
+"year": 1995
+},
+{
+"name": "Bill Masterton",
+"team": "Dallas Stars",
+"number": 19,
+"year": 1987
+},
+{
+"name": "Lanny McDonald",
+"team": "Calgary Flames",
+"number": 9,
+"year": 1990
+},
+{
+"name": "Mark Messier",
+"team": "New York Rangers",
+"number": 11,
+"year": 2006
+},
+{
+"name": "Mark Messier",
+"team": "Edmonton Oilers",
+"number": 11,
+"year": 2007
+},
+{
+"name": "Rick Middleton",
+"team": "Boston Bruins",
+"number": 16,
+"year": 2018
+},
+{
+"name": "Stan Mikita",
+"team": "Chicago Blackhawks",
+"number": 21,
+"year": 1980
+},
+{
+"name": "Ryan Miller",
+"team": "Buffalo Sabres",
+"number": 30,
+"year": 2023
+},
+{
+"name": "nolink=1 Minnesota Wild",
+"team": "Minnesota Wild",
+"number": 1,
+"year": 2000
+},
+{
+"name": "Mike Modano",
+"team": "Dallas Stars",
+"number": 9,
+"year": 2014
+},
+{
+"name": "Dickie Moore",
+"team": "Montreal Canadiens",
+"number": 12,
+"year": 2005
+},
+{
+"name": "Howie Morenz",
+"team": "Montreal Canadiens",
+"number": 7,
+"year": 1937
+},
+{
+"name": "Rick Nash",
+"team": "Columbus Blue Jackets",
+"number": 61,
+"year": 2022
+},
+{
+"name": "Markus Naslund",
+"team": "Vancouver Canucks",
+"number": 19,
+"year": 2010
+},
+{
+"name": "Scott Niedermayer",
+"team": "Anaheim Ducks",
+"number": 27,
+"year": 2019
+},
+{
+"name": "Scott Niedermayer",
+"team": "New Jersey Devils",
+"number": 27,
+"year": 2011
+},
+{
+"name": "Cam Neely",
+"team": "Boston Bruins",
+"number": 8,
+"year": 2004
+},
+{
+"name": "Chris Neil",
+"team": "Ottawa Senators",
+"number": 25,
+"year": 2023
+},
+{
+"name": "Bob Nystrom",
+"team": "New York Islanders",
+"number": 23,
+"year": 1995
+},
+{
+"name": "Willie O'Ree",
+"team": "Boston Bruins",
+"number": 22,
+"year": 2022
+},
+{
+"name": "Terry O'Reilly",
+"team": "Boston Bruins",
+"number": 24,
+"year": 2002
+},
+{
+"name": "Bobby Orr",
+"team": "Boston Bruins",
+"number": 4,
+"year": 1979
+},
+{
+"name": "Bernie Parent",
+"team": "Philadelphia Flyers",
+"number": 1,
+"year": 1979
+},
+{
+"name": "Gilbert Perreault",
+"team": "Buffalo Sabres",
+"number": 11,
+"year": 1990
+},
+{
+"name": "Chris Phillips",
+"team": "Ottawa Senators",
+"number": 4,
+"year": 2020
+},
+{
+"name": "Pierre Pilote",
+"team": "Chicago Blackhawks",
+"number": 3,
+"year": 2008
+},
+{
+"name": "Barclay Plager",
+"team": "St. Louis Blues",
+"number": 8,
+"year": 1981
+},
+{
+"name": "Bob Plager",
+"team": "St. Louis Blues",
+"number": 5,
+"year": 2017
+},
+{
+"name": "Jacques Plante",
+"team": "Montreal Canadiens",
+"number": 1,
+"year": 1995
+},
+{
+"name": "Denis Potvin",
+"team": "New York Islanders",
+"number": 5,
+"year": 1992
+},
+{
+"name": "Chris Pronger",
+"team": "St. Louis Blues",
+"number": 44,
+"year": 2022
+},
+{
+"name": "Jean Ratelle",
+"team": "New York Rangers",
+"number": 19,
+"year": 2018
+},
+{
+"name": "Henri Richard",
+"team": "Montreal Canadiens",
+"number": 16,
+"year": 1975
+},
+{
+"name": "Maurice Richard",
+"team": "Montreal Canadiens",
+"number": 9,
+"year": 1960
+},
+{
+"name": "Mike Richter",
+"team": "New York Rangers",
+"number": 35,
+"year": 2004
+},
+{
+"name": "Pekka Rinne",
+"team": "Nashville Predators",
+"number": 35,
+"year": 2022
+},
+{
+"name": "Rene Robert",
+"team": "Buffalo Sabres",
+"number": 14,
+"year": 1995
+},
+{
+"name": "Larry Robinson",
+"team": "Montreal Canadiens",
+"number": 19,
+"year": 2007
+},
+{
+"name": "Luc Robitaille",
+"team": "Los Angeles Kings",
+"number": 20,
+"year": 2007
+},
+{
+"name": "Patrick Roy",
+"team": "Colorado Avalanche",
+"number": 33,
+"year": 2003
+},
+{
+"name": "Patrick Roy",
+"team": "Montreal Canadiens",
+"number": 33,
+"year": 2008
+},
+{
+"name": "Joe Sakic",
+"team": "Colorado Avalanche",
+"number": 19,
+"year": 2009
+},
+{
+"name": "Borje Salming",
+"team": "Toronto Maple Leafs",
+"number": 21,
+"year": 2016
+},
+{
+"name": "Denis Savard",
+"team": "Chicago Blackhawks",
+"number": 18,
+"year": 1998
+},
+{
+"name": "Serge Savard",
+"team": "Montreal Canadiens",
+"number": 18,
+"year": 2006
+},
+{
+"name": "Terry Sawchuk",
+"team": "Detroit Red Wings",
+"number": 1,
+"year": 1994
+},
+{
+"name": "Milt Schmidt",
+"team": "Boston Bruins",
+"number": 15,
+"year": 1980
+},
+{
+"name": "nolink=1 Seattle Kraken",
+"team": "Seattle Kraken",
+"number": 32,
+"year": 2021
+},
+{
+"name": "Daniel Sedin",
+"team": "Vancouver Canucks",
+"number": 22,
+"year": 2020
+},
+{
+"name": "Henrik Sedin",
+"team": "Vancouver Canucks",
+"number": 33,
+"year": 2020
+},
+{
+"name": "Teemu Selanne",
+"team": "Anaheim Ducks",
+"number": 8,
+"year": 2015
+},
+{
+"name": "Eddie Shore",
+"team": "Boston Bruins",
+"number": 2,
+"year": 1947
+},
+{
+"name": "Darryl Sittler",
+"team": "Toronto Maple Leafs",
+"number": 27,
+"year": 2016
+},
+{
+"name": "Billy Smith",
+"team": "New York Islanders",
+"number": 31,
+"year": 1993
+},
+{
+"name": "Stan Smyl",
+"team": "Vancouver Canucks",
+"number": 12,
+"year": 1991
+},
+{
+"name": "Martin St. Louis",
+"team": "Tampa Bay Lightning",
+"number": 26,
+"year": 2017
+},
+{
+"name": "Eric Staal",
+"team": "Carolina Hurricanes",
+"number": 12,
+"year": 2025
+},
+{
+"name": "Scott Stevens",
+"team": "New Jersey Devils",
+"number": 4,
+"year": 2006
+},
+{
+"name": "Mats Sundin",
+"team": "Toronto Maple Leafs",
+"number": 13,
+"year": 2016
+},
+{
+"name": "Brian Sutter",
+"team": "St. Louis Blues",
+"number": 11,
+"year": 1988
+},
+{
+"name": "Dave Taylor",
+"team": "Los Angeles Kings",
+"number": 18,
+"year": 1995
+},
+{
+"name": "Joe Thornton",
+"team": "San Jose Sharks",
+"number": 19,
+"year": 2024
+},
+{
+"name": "John Tonelli",
+"team": "New York Islanders",
+"number": 27,
+"year": 2020
+},
+{
+"name": "Bill Torrey",
+"team": "Florida Panthers",
+"number": 93,
+"year": 2010
+},
+{
+"name": "Bryan Trottier",
+"team": "New York Islanders",
+"number": 19,
+"year": 2001
+},
+{
+"name": "Rogie Vachon",
+"team": "Los Angeles Kings",
+"number": 30,
+"year": 1985
+},
+{
+"name": "Mike Vernon",
+"team": "Calgary Flames",
+"number": 30,
+"year": 2007
+},
+{
+"name": "nolink=1 [[2017 Las Vegas shooting]]",
+"team": "Vegas Golden Knights",
+"number": 58,
+"year": 2018
+},
+{
+"name": "Glen Wesley",
+"team": "Carolina Hurricanes",
+"number": 2,
+"year": null
+},
+{
+"name": "Steve Yzerman",
+"team": "Detroit Red Wings",
+"number": 19,
+"year": 2007
+},
+{
+"name": "Sergei Zubov",
+"team": "Dallas Stars",
+"number": 56,
+"year": 2022
+}
+]

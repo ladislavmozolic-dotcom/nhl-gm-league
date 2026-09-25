@@ -447,6 +447,11 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                       <InfoTip text={`Star Power — business & media value (no on-ice effect). Drives merchandise, jersey sales, fan interest, ticket demand and sponsorships.${star.reasons.length ? " " + star.reasons.join(" · ") + "." : ""}`} />
                     </span>
                   )}
+                  {(p.suspendedGames ?? 0) > 0 && (
+                    <Link href="/league/player-safety" className="text-xs font-bold px-2.5 py-1 rounded-full bg-red-700/30 text-red-200 border border-red-600/40" title="Suspended by Player Safety — doesn't dress until served">
+                      🚫 Suspended · {p.suspendedGames} game{p.suspendedGames === 1 ? "" : "s"} left
+                    </Link>
+                  )}
                   {p.tradeRequested && (
                     <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-red-500/15 text-red-300 border border-red-500/30"
                       title={p.tradeRequestReason === "ice" ? "Unhappy with his ice time — has asked to be traded" : "Has asked to be traded"}>

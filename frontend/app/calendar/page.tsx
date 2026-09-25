@@ -5,6 +5,7 @@ import { getLeagueClock } from "@/lib/calendar-server";
 import { utcDay, addDays, fmtLeagueDate, SEASON_LABEL } from "@/lib/calendar";
 import { PageHeader, Card } from "@/components/ui";
 import CalendarControls from "@/components/CalendarControls";
+import { leagueKeyDates } from "@/lib/special-games";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,11 @@ export default async function CalendarPage() {
     orderBy: [{ gameDate: "asc" }], take: 6,
     select: { id: true, gameDate: true, homeTeam: { select: { code: true } }, awayTeam: { select: { code: true } } },
   });
+  const keyDates = await leagueKeyDates().catch(() => []);
+  const today0 = utcDay(clock.date).getTime();
+  const fmtKey = (d: Date, timed: boolean) => timed
+    ? d.toLocaleString("sk-SK", { timeZone: "Europe/Bratislava", weekday: "short", day: "numeric", month: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })
+    : d.toLocaleDateString("sk-SK", { timeZone: "UTC", weekday: "short", day: "numeric", month: "numeric", year: "numeric" });
   const nextDate = upcoming[0]?.gameDate ?? null;
   const nextDayGames = nextDate
     ? upcoming.filter((g) => g.gameDate && utcDay(g.gameDate).getTime() === utcDay(nextDate).getTime())
@@ -55,6 +61,27 @@ export default async function CalendarPage() {
           </p>
         )}
       </Card>
+
+      {keyDates.length > 0 && (
+        <Card title="📅 Key dates" accent="text-amber-400">
+          <ul className="divide-y divide-slate-800/70">
+            {keyDates.map((k, i) => {
+              const past = utcDay(k.at).getTime() < today0;
+              const inner = (
+                <div className={`flex items-center gap-3 py-2 ${past ? "opacity-50" : ""}`}>
+                  <span className="text-lg w-7 text-center shrink-0">{k.icon}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold text-slate-100 truncate">{k.title}</div>
+                    {k.detail && <div className="text-xs text-slate-500 truncate">{k.detail}</div>}
+                  </div>
+                  <span className="text-xs text-slate-400 tabular-nums shrink-0 text-right">{fmtKey(k.at, k.timed)}</span>
+                </div>
+              );
+              return <li key={i}>{k.href ? <Link href={k.href} className="block hover:bg-slate-800/40 rounded px-1">{inner}</Link> : <div className="px-1">{inner}</div>}</li>;
+            })}
+          </ul>
+        </Card>
+      )}
 
       <Card title="Next scheduled games" accent="text-blue-400">
         {nextDate ? (

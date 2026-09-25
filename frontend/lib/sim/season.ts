@@ -201,7 +201,7 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
     where,
     orderBy: [{ round: "asc" }, { id: "asc" }],
     ...(opts.limit ? { take: opts.limit } : {}),
-    select: { id: true, homeTeamId: true, awayTeamId: true, round: true, league: true, gameDate: true, simCount: true },
+    select: { id: true, homeTeamId: true, awayTeamId: true, round: true, league: true, gameDate: true, simCount: true, eventCapacity: true },
   });
 
   const settings = await loadSettings();
@@ -304,8 +304,15 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
     const secs = getArenaSections(t);
     return [t.id, { pop: t.popularity ?? 100, capacity: secs.reduce((a, x) => a + x.capacity, 0), sellout: selloutRevenue(secs), pf: priceAttendanceFactor(secs) }];
   }));
-  const storeAttendance = async (gm: { id: number; homeTeamId: number; awayTeamId: number; league: string | null }) => {
+  const storeAttendance = async (gm: { id: number; homeTeamId: number; awayTeamId: number; league: string | null; eventCapacity?: number | null }) => {
     if (gm.league === "AHL") return;
+    // special event (outdoor / Global Series): the venue's crowd — these sell out
+    if (gm.eventCapacity) {
+      const fin = finBy.get(gm.homeTeamId);
+      const fill = 0.97 + ((((gm.id * 2654435761) >>> 0) % 1000) / 1000) * 0.03;
+      await prisma.game.update({ where: { id: gm.id }, data: { attendance: Math.round(gm.eventCapacity * fill), gate: fin?.sellout ?? 0 } });
+      return;
+    }
     const fin = finBy.get(gm.homeTeamId);
     if (!fin || fin.capacity <= 0) return;
     const base = attendanceRate(fin.pop, pctBy.get(gm.homeTeamId) ?? 0.5) * fin.pf; // cheaper tickets → more fans

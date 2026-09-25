@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { kindOf } from "@/lib/special-games-shared";
 import { notFound } from "next/navigation";
 import GameView from "@/components/GameView";
 import type { PbpEvent, ShootoutAttempt } from "@/lib/sim/types";
@@ -833,7 +834,8 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
       shooterSlug: slugById.get(a.shooterId) ?? null,
     })),
     attendance: game.attendance,
-    arena: game.homeTeam.arena,
+    arena: game.eventVenue ?? game.homeTeam.arena,
+    event: game.eventKind ? { icon: kindOf(game.eventKind)?.icon ?? "⭐", title: game.eventTitle ?? kindOf(game.eventKind)?.label ?? "Special event" } : null,
     gameDate: game.gameDate,
   };
 

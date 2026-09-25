@@ -256,6 +256,23 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
         </div>
       </Card>
 
+      <Card title="Special games · Player Safety · Retired numbers">
+        <div className="grid gap-x-6 md:grid-cols-3">
+          <div>
+            <NumField k="specialHomeBonus" label="Outdoor game: host club income" step={250000} w="w-32" />
+            <NumField k="specialAwayBonus" label="Outdoor game: visiting club income" step={250000} w="w-32" />
+            <NumField k="globalSeriesBonus" label="Global Series: income per club" step={250000} w="w-32" />
+          </div>
+          <div>
+            <div className="mb-1"><Toggle k="disciplineEnabled" label="Player Safety reviews (suspensions)" /></div>
+            <NumField k="disciplinePct" label="Discipline frequency % (100 = NHL-like)" />
+          </div>
+          <div>
+            <NumField k="retireMinGames" label="Games for the club to retire a number (0 = Hall of Fame only)" step={10} />
+          </div>
+        </div>
+      </Card>
+
       <Card title="Offer-sheet compensation">
         <div className="mb-2"><Toggle k="osCompEnabled" label="Enforce offer-sheet draft-pick compensation" /></div>
         <p className="text-[11px] text-slate-500 mb-3">Picks the poaching club owes the old club, by the offer sheet&apos;s yearly salary. AAV cap in $M (0 = the top open-ended tier). A club may only surrender its own original picks — the engine verifies ownership.</p>

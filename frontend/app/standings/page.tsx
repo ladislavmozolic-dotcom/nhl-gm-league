@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { computeStandings, powerRanking } from "@/lib/sim/standings";
+import { latestOdds, type OddsSnapshotData } from "@/lib/playoff-odds";
 import { playoffRace, type RaceConference, type RaceTeam } from "@/lib/playoff-race";
 import StandingsTable from "@/components/StandingsTable";
 import type { TeamStanding, PowerRow } from "@/lib/sim/standings";
@@ -10,7 +11,7 @@ import { seasonForPhase } from "@/lib/phase";
 import { defaultStatsPhase } from "@/lib/calendar-server";
 
 export const dynamic = "force-dynamic";
-type View = "league" | "conference" | "division" | "power" | "race";
+type View = "league" | "conference" | "division" | "power" | "race" | "odds";
 type TeamMeta = Map<number, { logoUrl: string | null; slug: string }>;
 
 export default async function StandingsPage({ searchParams }: { searchParams: Promise<{ league?: string; view?: string; phase?: string }> }) {
@@ -20,13 +21,14 @@ export default async function StandingsPage({ searchParams }: { searchParams: Pr
   const auto = league === "NHL" ? await defaultStatsPhase() : "regular";
   const phase: "pre" | "regular" = league !== "NHL" ? "regular" : explicit ?? (auto === "playoffs" ? "regular" : auto);
   const SEASON = seasonForPhase(phase);
-  const view: View = sp.view === "league" || sp.view === "division" || sp.view === "power" || sp.view === "race" ? sp.view : "conference";
+  const view: View = sp.view === "league" || sp.view === "division" || sp.view === "power" || sp.view === "race" || sp.view === "odds" ? sp.view : "conference";
   const [standings, power, teams, race] = await Promise.all([
     computeStandings(SEASON, league),
     powerRanking(SEASON, league, 10),
     prisma.team.findMany({ select: { id: true, logoUrl: true, slug: true } }),
     view === "race" && phase !== "pre" ? playoffRace(SEASON, league) : Promise.resolve([] as RaceConference[]),
   ]);
+  const odds = view === "odds" && league === "NHL" && phase !== "pre" ? await latestOdds(SEASON) : null;
   const meta: TeamMeta = new Map(teams.map((t) => [t.id, { logoUrl: t.logoUrl, slug: t.slug }]));
   const played = standings.reduce((t, s) => t + s.gp, 0) / 2;
   const q = (v: View) => `/standings?${league === "AHL" ? "league=AHL&" : ""}${phase === "pre" ? "phase=pre&" : ""}view=${v}`;
@@ -63,12 +65,15 @@ export default async function StandingsPage({ searchParams }: { searchParams: Pr
             <Tab v="division" label="Division" />
             <Tab v="power" label="⚡ Power Ranking" />
             {phase !== "pre" && <Tab v="race" label="🎯 Playoff Race" />}
+            {phase !== "pre" && league === "NHL" && <Tab v="odds" label="🎲 Odds" />}
           </div>
         }
       />
       <PhaseTabs active={phase} league={league} basePath="/standings" />
 
-      {view === "race" ? (
+      {view === "odds" ? (
+        <OddsView odds={odds} meta={meta} />
+      ) : view === "race" ? (
         <section className="space-y-8">
           <p className="text-slate-500 text-xs">
             Top 3 per division + 2 wild cards make the playoffs. <b className="text-emerald-400">x</b> = clinched berth ·
@@ -204,5 +209,52 @@ function PowerTable({ rows, meta }: { rows: PowerRow[]; meta: TeamMeta }) {
       </table>
       </div>
     </Card>
+  );
+}
+
+function OddsView({ odds, meta }: { odds: { day: Date; data: OddsSnapshotData } | null; meta: TeamMeta }) {
+  if (!odds) return <Card><p className="text-sm text-slate-400">Odds are calculated every night after the sim once the regular season is under way.</p></Card>;
+  const { data } = odds;
+  const confs = [...new Set(data.rows.map((r) => r.conference ?? "League"))].sort();
+  const cell = (v: number, strong = false) => {
+    const tone = v >= 99.95 ? "text-emerald-300 font-bold" : v >= 50 ? "text-emerald-400" : v >= 10 ? "text-slate-200" : v > 0 ? "text-slate-400" : "text-slate-700";
+    return <td className={`px-2 py-2 text-center tabular-nums ${tone} ${strong ? "font-semibold" : ""}`}>{v >= 99.95 ? "100" : v > 0 && v < 0.1 ? "<0.1" : v === 0 ? "—" : v.toFixed(1)}</td>;
+  };
+  return (
+    <section className="space-y-8">
+      <p className="text-slate-500 text-xs">
+        {data.sims.toLocaleString()} simulations of the {data.remaining} remaining games · updated {new Date(data.at).toLocaleString("sk-SK", { timeZone: "Europe/Bratislava", dateStyle: "medium", timeStyle: "short" })}.
+        {" "}Strength = today&apos;s win-% and goal differential, blended with a roster prior that fades over the first ~25 games; every game has a home-ice edge and a 23 % overtime chance.
+        The playoffs follow the NHL bracket and the #1 pick uses our real lottery draw.
+      </p>
+      {confs.map((c) => (
+        <div key={c}>
+          <h2 className={`text-lg font-bold mb-3 ${c.toLowerCase().startsWith("east") ? "text-blue-400" : "text-red-400"}`}>{c}</h2>
+          <Card bodyClassName="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[820px]">
+                <thead className="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Team</th><th className="px-2 py-2">GP</th><th className="px-2 py-2">PTS</th><th className="px-2 py-2" title="Average final points">Proj.</th>
+                    <th className="px-2 py-2">Playoffs %</th><th className="px-2 py-2">Division %</th><th className="px-2 py-2">2nd rd %</th><th className="px-2 py-2">Conf. final %</th><th className="px-2 py-2">Final %</th><th className="px-2 py-2">🏆 Cup %</th><th className="px-2 py-2" title="Wins the #1 overall pick in the draft lottery">#1 pick %</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {data.rows.filter((r) => (r.conference ?? "League") === c).sort((a, b) => b.playoffPct - a.playoffPct || b.projPoints - a.projPoints).map((r) => (
+                    <tr key={r.teamId} className="hover:bg-slate-800/30">
+                      <td className="px-3 py-2"><TeamCell id={r.teamId} name={r.name} meta={meta} /></td>
+                      <td className="px-2 py-2 text-center tabular-nums text-slate-400">{r.gp}</td>
+                      <td className="px-2 py-2 text-center tabular-nums font-bold text-white">{r.points}</td>
+                      <td className="px-2 py-2 text-center tabular-nums text-slate-300">{r.projPoints}</td>
+                      {cell(r.playoffPct, true)}{cell(r.divisionPct)}{cell(r.round2Pct)}{cell(r.confFinalPct)}{cell(r.finalPct)}{cell(r.cupPct, true)}{cell(r.firstPickPct)}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
+      ))}
+    </section>
   );
 }

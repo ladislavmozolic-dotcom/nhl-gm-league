@@ -126,6 +126,12 @@ export type EngineSettings = {
   expansionCapFloorPct: number;      // post-draft committed cap must be ≥ this % of the league's cap floor to pass the advisory check on the results page — real-2021-calibrated default
   expansionRequireGoalie: boolean;   // warn on the results page if no goalie was selected across all picks
   rosterOverFinePerDay: number; // fine per excess player per day
+  specialHomeBonus: number;   // outdoor game (Heritage/Winter Classic/Stadium Series) — extra income to the host club
+  specialAwayBonus: number;   // …and to the visiting club
+  globalSeriesBonus: number;  // each club in a Global Series (neutral-site) game
+  disciplineEnabled: boolean; // Player Safety reviews majors / game misconducts / injurious hits after every game
+  disciplinePct: number;      // scales how often an incident draws supplementary discipline (100 = NHL-like ~35 suspensions/season)
+  retireMinGames: number;     // UNHL games for the club a retired player needs before his GM can retire his number (0 = HoF only)
   rewardPlayoff: number;      // to bank on making the playoffs
   rewardCup: number;          // Stanley Cup winner bonus
   rewardAhlCup: number;       // Calder Cup winner
@@ -244,6 +250,8 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   finSponsorBase: 5000000, finSponsorRange: 8000000,
   expansionRuleset: "real2021", expansionCapFloorPct: 0.6, expansionRequireGoalie: true,
   rosterOverFinePerDay: 200000,
+  specialHomeBonus: 3000000, specialAwayBonus: 1000000, globalSeriesBonus: 1500000,
+  disciplineEnabled: true, disciplinePct: 100, retireMinGames: 300,
   rewardPlayoff: 8000000, rewardCup: 3000000, rewardAhlCup: 4000000, rewardAhlFinalist: 2000000,
   duHighThreshold: 90, conRecovery: 1, conRecoveryHighDu: 2,
   conSlope: 0.015, b2bFatigue: 0.885,

@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { canManageTeam } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { assertNumbersAllowed } from "@/lib/retired-numbers-server";
 
 export type RosterRow = { id: number; number: number | null; captaincy: "C" | "A" | null };
 
@@ -16,6 +17,8 @@ export async function saveRoster(slug: string, rows: RosterRow[]) {
   const alts = rows.filter((r) => r.captaincy === "A").length;
   if (caps > 1) throw new Error("Only one captain allowed");
   if (alts > 2) throw new Error("At most two alternate captains allowed");
+
+  await assertNumbersAllowed(team.id, rows);
 
   // only touch this team's players
   const ids = new Set((await prisma.player.findMany({ where: { teamId: team.id }, select: { id: true } })).map((p) => p.id));

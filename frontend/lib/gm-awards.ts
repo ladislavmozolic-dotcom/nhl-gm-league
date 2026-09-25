@@ -14,6 +14,21 @@ export type TradeGrade = {
   fromGrade: string; toGrade: string; verdict: string;
 };
 
+/** One trade's grade, cached on Trade.grade the first time it's asked for (the
+ *  value model reads the assets as they were right after the deal). */
+export async function gradeTradeCached(tradeId: number): Promise<TradeGrade | null> {
+  const t = await prisma.trade.findUnique({ where: { id: tradeId }, select: { grade: true } });
+  if (t?.grade) return t.grade as unknown as TradeGrade;
+  try {
+    const pkg = await packageFromTrade(tradeId);
+    const a = await analyzeTradeAction(pkg);
+    if (!a.ok) return null;
+    const g: TradeGrade = { id: tradeId, fromName: a.fromName, toName: a.toName, fromGives: a.fromItems.map((i) => i.label), toGives: a.toItems.map((i) => i.label), fromGrade: gradeOf(a.meGets / Math.max(1, a.meGives)), toGrade: gradeOf(a.meGives / Math.max(1, a.meGets)), verdict: a.verdict };
+    await prisma.trade.update({ where: { id: tradeId }, data: { grade: g as object } });
+    return g;
+  } catch { return null; }
+}
+
 export async function tradeGrades(limit = 10): Promise<TradeGrade[]> {
   const trades = await prisma.trade.findMany({ where: { status: "ACCEPTED" }, orderBy: [{ respondedAt: "desc" }, { id: "desc" }], take: limit, select: { id: true } });
   const out: TradeGrade[] = [];

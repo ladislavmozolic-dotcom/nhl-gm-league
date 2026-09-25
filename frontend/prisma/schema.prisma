@@ -92,182 +92,183 @@ model Team {
 }
 
 model Player {
-  id                   Int                       @id @default(autoincrement())
-  slug                 String                    @unique
-  name                 String
-  position             String
-  positions            String?
-  nhlId                Int?                      @unique
-  profinhlId           Int? // ← PRIDANÉ
-  number               Int?
-  photoUrl             String?
-  frozenPoolId         Int?
-  frozenPoolUrl        String?
-  frozenPoolPlayerSlug String?
-  birthDate            String?
-  birthPlace           String?
-  nationality          String?
-  shoots               String?
-  height               String?
-  weight               Int?
-  capWagesSlug         String?
-  capHit               Float?
-  ahlSalary            Float? // salary paid while assigned to AHL; null for one-way and legacy $100k farm-only deals
-  contractYears        Int?
-  contractExpiry       Int?
+  id                    Int                       @id @default(autoincrement())
+  slug                  String                    @unique
+  name                  String
+  position              String
+  positions             String?
+  nhlId                 Int?                      @unique
+  profinhlId            Int? // ← PRIDANÉ
+  number                Int?
+  photoUrl              String?
+  frozenPoolId          Int?
+  frozenPoolUrl         String?
+  frozenPoolPlayerSlug  String?
+  birthDate             String?
+  birthPlace            String?
+  nationality           String?
+  shoots                String?
+  height                String?
+  weight                Int?
+  capWagesSlug          String?
+  capHit                Float?
+  ahlSalary             Float? // salary paid while assigned to AHL; null for one-way and legacy $100k farm-only deals
+  contractYears         Int?
+  contractExpiry        Int?
   // deferred EXTENSION: a re-signed pending-UFA finishes his current deal this season,
   // and this new contract activates at the next-season rollover (doesn't touch the cap now).
-  extCapHit            Int?
-  extYears             Int?
-  extContractType      String?
-  extClause            String?
-  extNoTradeTeams      Int[]                     @default([])
-  extText              String?
-  age                  Int?
-  overall              Int?
-  contractText         String?
-  rosterType           String?
-  scratched            Boolean                   @default(false) // AHL org player beyond the active AHL roster — a healthy scratch, dresses nowhere
-  retainedSalary       Int                       @default(0) // salary retained by a former club (STHS retention/buyout) — imported from profinhl RetainedSalary.php
-  retiredSeason        String? // season the player retired (rosterType=RETIRED) — for Hall of Fame / career close
-  hofSeason            String? // season inducted into the Hall of Fame (null = not inducted)
-  onBlock              Boolean                   @default(false) // GM has listed this player on the Trade Block
-  blockNote            String? // GM's note on the Trade Block listing (asking price / context)
-  teamId               Int
-  ck                   Int?
-  condition            Float?
-  morale               Float?
-  df                   Int?
-  di                   Int?
-  du                   Int?
-  en                   Int?
-  ex                   Int?
-  fg                   Int?
-  fo                   Int?
-  ld                   Int?
-  mo                   Int?
-  pa                   Int?
-  ph                   Int?
-  ps                   Int?
-  sc                   Int?
-  sk                   Int?
-  st                   Int?
+  extCapHit             Int?
+  extYears              Int?
+  extContractType       String?
+  extClause             String?
+  extNoTradeTeams       Int[]                     @default([])
+  extText               String?
+  age                   Int?
+  overall               Int?
+  contractText          String?
+  rosterType            String?
+  scratched             Boolean                   @default(false) // AHL org player beyond the active AHL roster — a healthy scratch, dresses nowhere
+  retainedSalary        Int                       @default(0) // salary retained by a former club (STHS retention/buyout) — imported from profinhl RetainedSalary.php
+  retiredSeason         String? // season the player retired (rosterType=RETIRED) — for Hall of Fame / career close
+  suspendedGames        Int                       @default(0) // games still to serve on an active suspension (Player Safety) — doesn't dress while > 0
+  hofSeason             String? // season inducted into the Hall of Fame (null = not inducted)
+  onBlock               Boolean                   @default(false) // GM has listed this player on the Trade Block
+  blockNote             String? // GM's note on the Trade Block listing (asking price / context)
+  teamId                Int
+  ck                    Int?
+  condition             Float?
+  morale                Float?
+  df                    Int?
+  di                    Int?
+  du                    Int?
+  en                    Int?
+  ex                    Int?
+  fg                    Int?
+  fo                    Int?
+  ld                    Int?
+  mo                    Int?
+  pa                    Int?
+  ph                    Int?
+  ps                    Int?
+  sc                    Int?
+  sk                    Int?
+  st                    Int?
   // UNHL Parameters — a second, independently-editable rating set (skaters), seeded
   // from the values above but tracked separately so it can diverge and drive its own
   // tools without touching the primary CK/FG/DI/... set everything else already uses.
-  unhlCk               Int?
-  unhlDf               Int?
-  unhlDi               Int?
-  unhlDu               Int?
-  unhlEn               Int?
-  unhlEx               Int?
-  unhlFg               Int?
-  unhlFo               Int?
-  unhlLd               Int?
-  unhlMo               Int?
-  unhlPa               Int?
-  unhlPh               Int?
-  unhlPs               Int?
-  unhlSc               Int?
-  unhlSk               Int?
-  unhlSt               Int?
-  unhlOverall          Int?
+  unhlCk                Int?
+  unhlDf                Int?
+  unhlDi                Int?
+  unhlDu                Int?
+  unhlEn                Int?
+  unhlEx                Int?
+  unhlFg                Int?
+  unhlFo                Int?
+  unhlLd                Int?
+  unhlMo                Int?
+  unhlPa                Int?
+  unhlPh                Int?
+  unhlPs                Int?
+  unhlSc                Int?
+  unhlSk                Int?
+  unhlSt                Int?
+  unhlOverall           Int?
   // Snapshot of the live CK/FG/DI/... values taken the FIRST time this player's live
   // set is ever promoted away from STHS (see app/admin/simulation/actions.ts
   // promoteParamSetAction) — lets the commissioner switch the whole league's live
   // parameters back to the original STHS numbers later without losing them.
-  sthsBackup           Json?
-  isGoalie             Boolean                   @default(false)
-  sourceType           String?
-  onTradeBlock         Boolean                   @default(false)
-  waiverStatus         String?                   @default("NONE")
-  lastRecalledAt       DateTime? // league-calendar date of the most recent AHL→NHL call-up — starts the
+  sthsBackup            Json?
+  isGoalie              Boolean                   @default(false)
+  sourceType            String?
+  onTradeBlock          Boolean                   @default(false)
+  waiverStatus          String?                   @default("NONE")
+  lastRecalledAt        DateTime? // league-calendar date of the most recent AHL→NHL call-up — starts the
   // Rule 30/10 recall-exemption clock (see lib/waivers-server.ts recallExemptions)
-  injuryDaysLeft       Int                       @default(0)
-  injuryDesc           String?
-  injurySeverity       String? // "Day-to-Day" | "Week-to-Week" | "Multi-week" | "Long-term" | "Season-ending" (persisted from the sim for current-injury depth)
-  injuredAt            DateTime? // date when the injury occurred (from sim or gameDate)
-  captaincy            String? // "C" | "A" | null
-  contractType         String? // "ONE_WAY" | "TWO_WAY" (one-way can't be sent to farm)
-  tradeClause          String? // null | "NTC" (no-trade) | "NMC" (no-movement) | "M_NTC" (modified — blocks the teams in noTradeTeams)
-  noTradeTeams         Int[] // for M_NTC: team ids the player won't accept a trade to
-  profinhlTeamId       Int? // snapshot of the ProfiNHL assignment (for roster switching)
-  profinhlRosterType   String?
-  realTeamId           Int? // the player's real current NHL team (from the NHL API)
-  realFarmTeamId       Int? // NHL parent org whose AHL affiliate this player is on (from theahl.com)
-  realCapHit           Int? // real current NHL cap hit (from spotrac)
-  realContractYears    Int? // real years remaining on the deal (from CapWages)
-  realContractText     String?
-  profinhlCapHit       Int? // snapshot of the ProfiNHL cap hit (for roster switching)
-  realTradeClause      String? // real NTC/NMC/M_NTC (from CapWages) — used in Real NHL mode
-  profinhlTradeClause  String? // snapshot of the ProfiNHL clause (for roster switching)
-  realOnly             Boolean                   @default(false) // exists only in the Real NHL dataset (real free agent); hidden in ProfiNHL mode
-  faDemandOverride     Int? // Free Agent Frenzy: league Agent / admin hand-set contract demand ($ cap hit); overrides the computed market value
-  franchiseTag         Boolean                   @default(false) // RFA tagged as the club's Franchise player (1/team) → gets 2 re-sign rounds before offer sheets
-  resignRound          Int                       @default(0) // own-player re-sign: 0 = no offer yet, 1/2 = after that round's offer (max 2)
-  faDecisionAt         DateTime? // in-season UFA market: when his deliberation window resolves (collect offers 7d → counter 3d → sign)
-  faCountered          Boolean                   @default(false) // in-season UFA market: he has issued counters (phase 2 — bidders match, then he signs)
-  resignStatus         String? // null | open | countered | walkedToUFA | osEligible (RFA who declined → offer sheets)
-  resignCounterSalary  Int? // the player's counter in the current re-sign round
-  resignCounterYears   Int?
-  resignOfferSalary    Int? // club's last standing re-sign offer (the AAV an offer sheet must beat)
-  signPromiseLine      Int? // deployment promised at signing: F line 1-4 / D pair 1-3 / G 1-2
-  signPromisePP        Boolean? // power-play time promised at signing
-  signPromisePK        Boolean? // penalty-kill time promised at signing
-  promiseWarnGame      Int? // team games played when the player warned the GM his promise was broken (grace period start)
-  disgruntled          Boolean                   @default(false) // promise broken past grace + unhappy: runtime -20% attributes + morale hit; cleared on trade
-  tradeRequested       Boolean                   @default(false) // player has formally requested a trade (shown in Around The League)
-  tradeRequestReason   String? // "promise" (broken signing promise, lib/promises.ts) | "ice" (ice time below his role, lib/player-morale.ts)
-  iceUnhappyChecks     Int                       @default(0) // consecutive daily checks with ice time below what his talent expects (lib/player-morale.ts)
-  iceWarnedAt          DateTime? // when he told his GM he's unhappy with his ice time (cleared once it's fixed)
-  ltir                 Boolean                   @default(false) // parked on LTIR (played <10 games last season) — sits in prospects/reserve, off the cap
-  lastSeasonGP         Int? // real last-season games played (imported from the Players Calculator / hockey-reference)
-  lastSeasonPts        Int? // real last-season points (G + A) — feeds the FA demand engine's performance signal
-  lastSeasonSvPct      Float? // real last-season goalie save % (from NHL.com) — feeds the ELC goalie bonus
-  lastSeasonAhlGP      Int? // real last-season AHL games played (from theahl.com HockeyTech) — post-season roster reconciliation
-  lastSeasonG          Int? // last-season goals / assists / hits / blocks — drive the Player Calculator param projection
-  lastSeasonA          Int?
-  lastSeasonHits       Int?
-  lastSeasonBlocks     Int?
+  injuryDaysLeft        Int                       @default(0)
+  injuryDesc            String?
+  injurySeverity        String? // "Day-to-Day" | "Week-to-Week" | "Multi-week" | "Long-term" | "Season-ending" (persisted from the sim for current-injury depth)
+  injuredAt             DateTime? // date when the injury occurred (from sim or gameDate)
+  captaincy             String? // "C" | "A" | null
+  contractType          String? // "ONE_WAY" | "TWO_WAY" (one-way can't be sent to farm)
+  tradeClause           String? // null | "NTC" (no-trade) | "NMC" (no-movement) | "M_NTC" (modified — blocks the teams in noTradeTeams)
+  noTradeTeams          Int[] // for M_NTC: team ids the player won't accept a trade to
+  profinhlTeamId        Int? // snapshot of the ProfiNHL assignment (for roster switching)
+  profinhlRosterType    String?
+  realTeamId            Int? // the player's real current NHL team (from the NHL API)
+  realFarmTeamId        Int? // NHL parent org whose AHL affiliate this player is on (from theahl.com)
+  realCapHit            Int? // real current NHL cap hit (from spotrac)
+  realContractYears     Int? // real years remaining on the deal (from CapWages)
+  realContractText      String?
+  profinhlCapHit        Int? // snapshot of the ProfiNHL cap hit (for roster switching)
+  realTradeClause       String? // real NTC/NMC/M_NTC (from CapWages) — used in Real NHL mode
+  profinhlTradeClause   String? // snapshot of the ProfiNHL clause (for roster switching)
+  realOnly              Boolean                   @default(false) // exists only in the Real NHL dataset (real free agent); hidden in ProfiNHL mode
+  faDemandOverride      Int? // Free Agent Frenzy: league Agent / admin hand-set contract demand ($ cap hit); overrides the computed market value
+  franchiseTag          Boolean                   @default(false) // RFA tagged as the club's Franchise player (1/team) → gets 2 re-sign rounds before offer sheets
+  resignRound           Int                       @default(0) // own-player re-sign: 0 = no offer yet, 1/2 = after that round's offer (max 2)
+  faDecisionAt          DateTime? // in-season UFA market: when his deliberation window resolves (collect offers 7d → counter 3d → sign)
+  faCountered           Boolean                   @default(false) // in-season UFA market: he has issued counters (phase 2 — bidders match, then he signs)
+  resignStatus          String? // null | open | countered | walkedToUFA | osEligible (RFA who declined → offer sheets)
+  resignCounterSalary   Int? // the player's counter in the current re-sign round
+  resignCounterYears    Int?
+  resignOfferSalary     Int? // club's last standing re-sign offer (the AAV an offer sheet must beat)
+  signPromiseLine       Int? // deployment promised at signing: F line 1-4 / D pair 1-3 / G 1-2
+  signPromisePP         Boolean? // power-play time promised at signing
+  signPromisePK         Boolean? // penalty-kill time promised at signing
+  promiseWarnGame       Int? // team games played when the player warned the GM his promise was broken (grace period start)
+  disgruntled           Boolean                   @default(false) // promise broken past grace + unhappy: runtime -20% attributes + morale hit; cleared on trade
+  tradeRequested        Boolean                   @default(false) // player has formally requested a trade (shown in Around The League)
+  tradeRequestReason    String? // "promise" (broken signing promise, lib/promises.ts) | "ice" (ice time below his role, lib/player-morale.ts)
+  iceUnhappyChecks      Int                       @default(0) // consecutive daily checks with ice time below what his talent expects (lib/player-morale.ts)
+  iceWarnedAt           DateTime? // when he told his GM he's unhappy with his ice time (cleared once it's fixed)
+  ltir                  Boolean                   @default(false) // parked on LTIR (played <10 games last season) — sits in prospects/reserve, off the cap
+  lastSeasonGP          Int? // real last-season games played (imported from the Players Calculator / hockey-reference)
+  lastSeasonPts         Int? // real last-season points (G + A) — feeds the FA demand engine's performance signal
+  lastSeasonSvPct       Float? // real last-season goalie save % (from NHL.com) — feeds the ELC goalie bonus
+  lastSeasonAhlGP       Int? // real last-season AHL games played (from theahl.com HockeyTech) — post-season roster reconciliation
+  lastSeasonG           Int? // last-season goals / assists / hits / blocks — drive the Player Calculator param projection
+  lastSeasonA           Int?
+  lastSeasonHits        Int?
+  lastSeasonBlocks      Int?
   // Edge Parameters real-NHL inputs (24-25 = the 20% season). TOI in seconds/game.
-  lastSeasonToi        Float?
-  lastSeasonShots      Int?
-  lastSeasonPim        Int?
-  lastSeasonFoPct      Float?
-  lastSeasonPpG        Int?
-  lastSeasonPM         Int?
-  lastSeasonTK         Int?
-  lastSeasonGV         Int?
-  lastSeasonShToi      Float?
-  curSeasonGP          Int? // CURRENT real-season stats (empty in the off-season; projection activates at ~game 10)
-  curSeasonG           Int?
-  curSeasonA           Int?
-  curSeasonHits        Int?
-  curSeasonBlocks      Int?
-  curSeasonPM          Int? // +/-  (DF input)
-  curSeasonTK          Int? // takeaways (DF input)
-  curSeasonGV          Int? // giveaways (DF input)
-  curSeasonShToi       Float? // player short-handed TOI per game, seconds (DF input, NHL timeonice)
-  curSeasonTeamShToi   Float? // team penalty-kill TOI per game, seconds (DF input, NHL penaltykill)
+  lastSeasonToi         Float?
+  lastSeasonShots       Int?
+  lastSeasonPim         Int?
+  lastSeasonFoPct       Float?
+  lastSeasonPpG         Int?
+  lastSeasonPM          Int?
+  lastSeasonTK          Int?
+  lastSeasonGV          Int?
+  lastSeasonShToi       Float?
+  curSeasonGP           Int? // CURRENT real-season stats (empty in the off-season; projection activates at ~game 10)
+  curSeasonG            Int?
+  curSeasonA            Int?
+  curSeasonHits         Int?
+  curSeasonBlocks       Int?
+  curSeasonPM           Int? // +/-  (DF input)
+  curSeasonTK           Int? // takeaways (DF input)
+  curSeasonGV           Int? // giveaways (DF input)
+  curSeasonShToi        Float? // player short-handed TOI per game, seconds (DF input, NHL timeonice)
+  curSeasonTeamShToi    Float? // team penalty-kill TOI per game, seconds (DF input, NHL penaltykill)
   // Edge Parameters real-NHL inputs (25-26 = the 80% season, updates in-season)
-  curSeasonToi         Float? // TOI per game, seconds (per-60 base)
-  curSeasonShots       Int?
-  curSeasonPim         Int?
-  curSeasonFoPct       Float?
-  curSeasonPpG         Int?
-  goalieAdvanced       Json? // MoneyPuck goalie metrics for the Edge engine: { cur:{...}, last:{...} } — GSAx, danger SV% splits, rebound control, sample
-  ahlStats             Json? // AHL scoring for the Edge engine, imported for ANY player who played the AHL (incl. NHL-roster call-ups like Kaliyev) so it never overwrites their NHL cur/last fields: { cur:{gp,g,a,sh,pim,ppG}, last:{...} }
-  edgeSpeed            Json? // NHL EDGE player-tracking percentiles (api-web skater-detail) for the SK param: { cur:{spd,brst,dist}, last:{...} } — speedMax / burstsOver20 / distance percentiles (0-1)
-  mpSkater             Json? // MoneyPuck advanced skater totals per season for the Next Gen Parameters: { "2025":{gp,toi,g,ixg,a1,a2,sh,ong,ppa1,toi5v5,a1_5v5,a2_5v5,onIceAxg5v5,toi4v5,onIceAxg4v5,offIceAxg5v5,offIceToi5v5,offIceAxg4v5,offIceToi4v5}, "2024":{...}, "2023":{...} } — ixG/primary-assists/on-ice-goals + 5v5/PK on-ice AND off-ice (team-without-him) splits for true relative xGA, icetime in seconds
-  careerGP             Json? // NHL API career totals (api-web player landing) for the Next Gen EXPERIENCE param: { reg: number, po: number } — regular-season and playoff games played, career-to-date
-  edgeRatings          Json? // persisted Edge Parameters (analytics; separate from the STHS ck/sc/... the sim uses)
+  curSeasonToi          Float? // TOI per game, seconds (per-60 base)
+  curSeasonShots        Int?
+  curSeasonPim          Int?
+  curSeasonFoPct        Float?
+  curSeasonPpG          Int?
+  goalieAdvanced        Json? // MoneyPuck goalie metrics for the Edge engine: { cur:{...}, last:{...} } — GSAx, danger SV% splits, rebound control, sample
+  ahlStats              Json? // AHL scoring for the Edge engine, imported for ANY player who played the AHL (incl. NHL-roster call-ups like Kaliyev) so it never overwrites their NHL cur/last fields: { cur:{gp,g,a,sh,pim,ppG}, last:{...} }
+  edgeSpeed             Json? // NHL EDGE player-tracking percentiles (api-web skater-detail) for the SK param: { cur:{spd,brst,dist}, last:{...} } — speedMax / burstsOver20 / distance percentiles (0-1)
+  mpSkater              Json? // MoneyPuck advanced skater totals per season for the Next Gen Parameters: { "2025":{gp,toi,g,ixg,a1,a2,sh,ong,ppa1,toi5v5,a1_5v5,a2_5v5,onIceAxg5v5,toi4v5,onIceAxg4v5,offIceAxg5v5,offIceToi5v5,offIceAxg4v5,offIceToi4v5}, "2024":{...}, "2023":{...} } — ixG/primary-assists/on-ice-goals + 5v5/PK on-ice AND off-ice (team-without-him) splits for true relative xGA, icetime in seconds
+  careerGP              Json? // NHL API career totals (api-web player landing) for the Next Gen EXPERIENCE param: { reg: number, po: number } — regular-season and playoff games played, career-to-date
+  edgeRatings           Json? // persisted Edge Parameters (analytics; separate from the STHS ck/sc/... the sim uses)
   liveCalculatorRatings Json? // NextGen Live Calculator projected ratings, deltas and component data
-  goalieRating         GoalieRating?
-  team                 Team                      @relation(fields: [teamId], references: [id])
-  skaterRating         SkaterRating?
-  gameStats            PlayerGameStat[]
-  situationGameStats   PlayerSituationGameStat[]
-  goalieGameStats      GoalieGameStat[]
+  goalieRating          GoalieRating?
+  team                  Team                      @relation(fields: [teamId], references: [id])
+  skaterRating          SkaterRating?
+  gameStats             PlayerGameStat[]
+  situationGameStats    PlayerSituationGameStat[]
+  goalieGameStats       GoalieGameStat[]
 }
 
 model Transaction {
@@ -353,6 +354,7 @@ model Trade {
   leagueDay     Int? // league-calendar day the trade was created (throttles AI-initiated offers)
   waivedClauses Int[] // player ids whose NTC/NMC/M-NTC was waived to allow this deal
   clauseFees    Json? // [{ playerId, feeAmount, payTeamId }] — agent-set waiver fees the giving team pays the player
+  grade         Json? // cached UNHL Intelligence grade { from, to, verdict } (Deadline Day feed)
   groupId       Int? // set only for one leg of a 3-team TradeGroup — a one-directional
 
   // asset move (fromTeamId → toTeamId only; the "TO" side of THIS
@@ -439,6 +441,8 @@ model LeagueConfig {
   frenzyAutoOpenAt     DateTime? // admin-configurable real moment to auto-flip faOpen=true (force the Free Agent Frenzy window open for every GM) — a one-shot trigger, checked every cron tick (lib/season-cron.ts autoOpenFrenzyIfDue) and cleared to null once it fires, so a later manual close of faOpen sticks.
   frenzyRoundStartedAt DateTime? // real wall-clock start of the current global stage; BIDDING ends after 4d, IMPROVEMENT after 2d, null in CONTINUOUS
   frenzyForcedRound    Int       @default(1) // active force-opened round (1-3); advances only after its 2-day improvement stage has been resolved
+  deadlineReminderAt   DateTime? // the tradeDeadlineAt value whose 24h "deadline tomorrow" notice was sent (dedupe)
+  deadlineRecapAt      DateTime? // the tradeDeadlineAt value whose Deadline Day recap article was posted (dedupe)
   frenzyStage          String    @default("BIDDING") // BIDDING (4d, new clubs may bid) | IMPROVEMENT (2d, existing bidders may raise) | CONTINUOUS (after round 3: 24h offer window, then 24h improvement when contested)
   updatedAt            DateTime  @updatedAt
 }
@@ -861,6 +865,11 @@ model Game {
   shootout          Json? // shootout attempts (shooter, result) when the game went to SO
   seriesId          Int? // set for playoff games
   gameNum           Int? // game number within the series
+  // special event (real NHL schedule): HERITAGE | WINTER | STADIUM (outdoor) | GLOBAL (neutral-site Global Series)
+  eventKind         String?
+  eventTitle        String?
+  eventVenue        String? // "Rice-Eccles Stadium, Salt Lake City"
+  eventCapacity     Int? // crowd for the event (replaces the home arena's capacity)
   playedAt          DateTime?
   createdAt         DateTime                  @default(now())
   homeTeam          Team                      @relation("HomeGames", fields: [homeTeamId], references: [id])
@@ -1621,4 +1630,63 @@ model AllStarVote {
 
   @@unique([eventId, voterKey, playerId])
   @@index([eventId, playerId])
+}
+
+// Player Safety — supplementary discipline after a game (auto review of majors,
+// game misconducts and injurious hits) or issued by the commissioner. Games are
+// served in the player's club's NHL games; forfeited salary follows the CBA
+// (non-repeat: per season day, repeat offender: per game). The GM may appeal.
+model Suspension {
+  id              Int       @id @default(autoincrement())
+  season          String
+  playerId        Int
+  playerName      String
+  teamId          Int? // NHL organisation when suspended
+  gameId          Int?
+  incident        String // what happened ("Boarding major on X, 2nd 12:31")
+  kind            String    @default("SUSPENSION") // SUSPENSION | FINE
+  games           Int       @default(0)
+  gamesServed     Int       @default(0)
+  forfeit         Int       @default(0) // salary forfeited ($), credited back to the club
+  fine            Int       @default(0) // FINE only
+  repeatOffender  Boolean   @default(false)
+  status          String    @default("ACTIVE") // ACTIVE | SERVED | OVERTURNED
+  source          String    @default("AUTO") // AUTO | MANUAL
+  appealStatus    String? // PENDING | UPHELD | REDUCED | OVERTURNED
+  appealText      String?
+  appealAt        DateTime?
+  appealNote      String?
+  appealDecidedAt DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([playerId])
+  @@index([season, status])
+}
+
+// Retired jersey numbers — real franchise history (historic) plus numbers a GM
+// retires for a club legend. A retired number can't be worn by that club.
+model RetiredNumber {
+  id         Int      @id @default(autoincrement())
+  teamId     Int
+  number     Int
+  playerName String
+  playerId   Int?
+  season     String? // season retired in UNHL (null = real NHL history)
+  note       String?
+  historic   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@unique([teamId, number, playerName])
+  @@index([teamId])
+}
+
+// Nightly Monte Carlo playoff / Cup / lottery odds — one row per league day.
+model OddsSnapshot {
+  id        Int      @id @default(autoincrement())
+  season    String
+  day       DateTime
+  data      Json // OddsRow[]
+  createdAt DateTime @default(now())
+
+  @@unique([season, day])
 }
