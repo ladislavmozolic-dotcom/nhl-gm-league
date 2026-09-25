@@ -56,7 +56,7 @@ export function syncChem(team: SimTeam, base: number) {
   for (const u of team.units) { const v = team.chemistry[u.sig] ?? base; for (const id of u.members) map.set(id, v); }
   for (const s of [...team.forwards, ...team.defense]) s.chem = map.get(s.id) ?? 100;
 }
-function evolveChem(team: SimTeam, cfg: EngineSettings) {
+export function evolveChem(team: SimTeam, cfg: EngineSettings) {
   const dressed = new Set([...team.forwards, ...team.defense].map((s) => s.id));
   const slow = new Set(team.slowChem ?? []);
   // 5v5 chemistry is PAIRWISE: each bond in an intact line/pair gels; bonds that
