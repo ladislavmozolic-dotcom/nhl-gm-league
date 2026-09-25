@@ -99,7 +99,9 @@ function SystemSummary({ s }: { s: { tempo?: string; forecheck?: string; puckSty
   if (dials.length === 0) return <span className="text-slate-400 text-sm">{presetLabel(lang, "Balanced")}</span>;
   return <span className="text-sm text-slate-300">{dials.map(([k, v]) => `${k}: ${DIAL_LABEL[v as string] ?? v}`).join(" · ")}</span>;
 }
-const periodLabel = (p: number) => (p === 4 ? "Overtime" : p === 5 ? "Shootout" : `${p}${["st", "nd", "rd"][p - 1]} Period`);
+// 4 = OT; beyond that it's a shootout in the regular season, or 2nd/3rd… OT in a playoff marathon
+const periodLabel = (p: number, endedIn?: string) =>
+  p <= 3 ? `${p}${["st", "nd", "rd"][p - 1]} Period` : p === 4 ? "Overtime" : endedIn === "SO" ? "Shootout" : `${p - 3}${["st", "nd", "rd"][p - 4] ?? "th"} Overtime`;
 const strengthTag = (g: { strength: string; emptyNet: boolean }) => (g.emptyNet ? "EN" : g.strength !== "EV" ? g.strength : "");
 const svp = (g: Goalie) => (g.shotsAgainst ? g.saves / g.shotsAgainst : 0);
 
@@ -729,7 +731,7 @@ export default function GameView({ data }: { data: Data }) {
               const pens = data.penalties.filter((x) => x.period === p);
               return (
                 <div key={p} className="border-b border-slate-800 last:border-0">
-                  <div className="px-4 py-1.5 bg-green-950/30 border-l-2 border-green-500 text-xs font-bold text-green-400 uppercase tracking-wide">{periodLabel(p)}</div>
+                  <div className="px-4 py-1.5 bg-green-950/30 border-l-2 border-green-500 text-xs font-bold text-green-400 uppercase tracking-wide">{periodLabel(p, data.endedIn)}</div>
                   <div className="grid grid-cols-1 md:grid-cols-2">
                     {/* Goals column */}
                     <div className="md:border-r border-slate-800">

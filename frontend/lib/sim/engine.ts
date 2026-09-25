@@ -610,7 +610,7 @@ function recordGoal(
   }
   st.box[off.id].goals++;
   if (strength === "PP") st.box[off.id].ppGoals++;
-  if (period <= 4) st.box[off.id].goalsByPeriod[period - 1]++;
+  st.box[off.id].goalsByPeriod[Math.min(period, 4) - 1]++; // every OT period folds into the OT column
 
   // +/- : even-strength AND short-handed goals count (real NHL rule); PP and SO don't.
   if (strength === "EV" || strength === "SH") {
@@ -657,7 +657,7 @@ function trackSpecialShot(
   const box = st.box[off.id];
   const line = st.lines[off.id][shooter.id];
   box.shots++;
-  if (period <= 4) box.shotsByPeriod[period - 1]++;
+  box.shotsByPeriod[Math.min(period, 4) - 1]++;
   line.shots++;
   line.xg += xg;
   const situation = explicitSituation ?? situationFor(st, off, def, period, "EV");
@@ -1099,7 +1099,7 @@ function simulatePeriod(st: SimState, period: number, homeShots: number, awaySho
     const absT = (period - 1) * PERIOD_SECONDS + shot.t;
     const box = st.box[shot.team.id];
     box.shots++;
-    if (period <= 4) box.shotsByPeriod[period - 1]++;
+    box.shotsByPeriod[Math.min(period, 4) - 1]++;
     st.lines[shot.team.id][shooter.id].shots++;
     const situation = situationFor(st, shot.team, shot.opp, period, strength);
     if (situation) st.lines[shot.team.id][shooter.id].situations[situation].shots++;
@@ -1334,8 +1334,11 @@ function lineTilt(t: LineTactic | undefined): { of: number; df: number } {
 // decision tree (keep vs turnover: SK vs DF; then pass vs shoot: SC vs PA; pass:
 // PA vs DF; shot: calibrated conversion + rebound RB). "Final skill" at every
 // node = base attribute × tactics × chemistry × morale × fatigue.
-function simulatePeriodPossession(st: SimState, period: number) {
+/** One 20:00 period of the possession engine. With `suddenDeath` (playoff OT) the
+ *  period ends the instant someone scores; returns that team's id (else null). */
+function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDeath?: boolean } = {}): number | null {
   const { home, away, rng } = st;
+  let suddenWinner: number | null = null;
   const active: Penalty[] = [];
   // carry over the remaining time of any penalty still running at the last buzzer
   for (const cp of st.carryPenalties) active.push({ ...cp });
@@ -1822,7 +1825,7 @@ function simulatePeriodPossession(st: SimState, period: number) {
       // individual save% / GAA, only the team total.
       const defEmptyNet = st.emptyNet[def.id] === true;
       st.box[carrierTeam.id].shots++;
-      if (period <= 4) st.box[carrierTeam.id].shotsByPeriod[period - 1]++;
+      st.box[carrierTeam.id].shotsByPeriod[Math.min(period, 4) - 1]++;
       st.lines[carrierTeam.id][carrier.id].shots++;
       if (!defEmptyNet) gLine.shotsAgainst++;
       // Phase 2 — shot quality: tag the shot with a location, type and expected
@@ -1945,6 +1948,7 @@ function simulatePeriodPossession(st: SimState, period: number) {
       if (rng.chance(p)) {
         if (!defEmptyNet) gLine.goalsAgainst++;
         recordGoal(st, carrierTeam, def, period, tick, strength, defEmptyNet, carrier, { sector, shotType, xg });
+        if (opts.suddenDeath) { suddenWinner = carrierTeam.id; break; } // overtime winner — game over
         momoOnGoal(st, carrierTeam.id, def.id, absT);
         if (!defEmptyNet) maybePullGoalie(st, def); // yank the starter if he's been shelled
         if (strength === "PP") expireOnePenalty(def.id, tick, active);
@@ -1998,6 +2002,7 @@ function simulatePeriodPossession(st: SimState, period: number) {
   for (const m of st.misconducts) {
     if (m.period === period && m.end > PERIOD_SECONDS) { m.period = period + 1; m.start = 0; m.end -= PERIOD_SECONDS; }
   }
+  return suddenWinner;
 }
 
 // ---- injuries ---------------------------------------------------------------
@@ -2643,10 +2648,16 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     winnerId = simulateShootout(st); endedIn = "SO"; periods = opts.threeOnThree.periods + 1;
   } else if (hG === aG) {
     if (opts.noShootout) {
-      // playoff sudden death: keep playing OT periods until someone scores
+      // playoff sudden death, NHL rules: full 20:00 periods of 5-on-5 (the regular
+      // possession engine — lines, PP/PK, penalties, fatigue all live) until someone
+      // scores. The legacy volume model keeps the old 3-on-3 OT loop.
       let w: number | null = null, guard = 0;
-      while (w == null && guard++ < 12) { w = simulateOvertime(st).winner; otPeriods++; }
-      winnerId = w ?? home.id; endedIn = "OT"; periods = 4;
+      if (CFG.engineModel === "possession") {
+        while (w == null && guard++ < 12) { otPeriods++; w = simulatePeriodPossession(st, 3 + otPeriods, { suddenDeath: true }); }
+      } else {
+        while (w == null && guard++ < 12) { w = simulateOvertime(st).winner; otPeriods++; }
+      }
+      winnerId = w ?? home.id; endedIn = "OT"; periods = 3 + Math.max(1, otPeriods);
     } else {
       const ot = simulateOvertime(st);
       if (ot.winner != null) { winnerId = ot.winner; endedIn = "OT"; periods = 4; }

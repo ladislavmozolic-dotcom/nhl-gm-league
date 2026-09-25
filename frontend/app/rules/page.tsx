@@ -162,6 +162,10 @@ const SECTIONS: Sec[] = [
         "No-trade / no-move clauses must be respected — a protected player has to consent.",
         "Depending on league settings, trades may require commissioner approval. Every trade is logged.",
       ] },
+      { h: "Overtime", points: [
+        "Regular season (as in the NHL): a tie after 60 minutes goes to 5:00 of sudden-death 3-on-3 overtime, then a shootout. The loser gets a point.",
+        "Playoffs (as in the NHL): no shootout — full 20-minute periods of 5-on-5 sudden death, with normal lines, power plays and penalties, as many as it takes until someone scores.",
+      ] },
       { h: "Player morale & trade requests", points: [
         "Every NHL player compares his ice time with what his talent earns on YOUR club — e.g. a 2nd-line-calibre forward vs. the average minutes of your 2nd-line tier over the last 10 games (goalies: share of starts). A healthy scratch counts as 0:00. Only games since he first dressed for you count, and new arrivals get two weeks to settle.",
         "Below the league's threshold (default 80 %) he's unhappy and his morale drains. After 5 unhappy days his agent messages you (League Notifications); after 20 he publicly requests a trade.",

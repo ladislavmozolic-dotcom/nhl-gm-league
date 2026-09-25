@@ -149,7 +149,7 @@ function legacyPlayByPlay(result: GameResult, home: SimTeam, away: SimTeam): Pbp
   }
 
   // overtime goal, if any
-  const otGoal = result.goals.find((g) => g.period === 4);
+  const otGoal = result.goals.find((g) => g.period >= 4 && g.strength !== "SO");
   if (otGoal) {
     add(4, 0, null, "period", `Start of the overtime.`, true);
     add(4, otGoal.seconds, otGoal.team, "goal",
