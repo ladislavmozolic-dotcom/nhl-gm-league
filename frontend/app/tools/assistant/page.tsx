@@ -110,6 +110,9 @@ export default async function GmAssistantPage() {
         <Card title="🧪 Scenario Engine" accent="text-blue-400" href="/tools/assistant/scenario">
           <p className="text-sm text-slate-400">„Čo ak?“ — podpíš, obchoduj alebo pusti hráča nanečisto a uvidíš dopad na cap, rebríček aj vek kádra, bez zápisu do ligy.</p>
         </Card>
+        <Card title="🧩 Line Fit Finder" accent="text-blue-400" href="/tools/line-fit">
+          <p className="text-sm text-slate-400">Zostav lajnu z ľubovoľných hráčov — vlastný roster, voľný agent alebo hráč iného klubu — a uvidíš projekciu chémie aj taktického fitu, ešte pred akoukoľvek dohodou.</p>
+        </Card>
       </div>
 
       {admin && (
