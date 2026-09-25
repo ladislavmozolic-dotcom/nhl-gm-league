@@ -99,7 +99,9 @@ export default async function RootLayout({
       const children = item.children.filter((c) => c.href !== hiddenCalc);
       // UNHL Intelligence — open to any logged-in GM (see memory: gm-assistant-intelligence);
       // the route itself 404s for anyone not logged in, this just keeps it off the menu for guests.
-      if (t) children.push({ label: "🧠 UNHL Intelligence", href: "/tools/assistant" });
+      const rollout = settings?.intelligenceRollout ?? "full";
+      if (t && (rollout !== "hidden" || t.isAdmin)) children.push({ label: "🧠 UNHL Intelligence", href: "/tools/assistant" });
+      children.push({ label: "🧩 Line Fit Finder", href: "/tools/line-fit" });
       return { ...item, children };
     }
     if (item.key === "league" && item.children) {

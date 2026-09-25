@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getTeamSession, isAdmin } from "@/lib/auth";
+import { getTeamSession } from "@/lib/auth";
+import { intelligenceAccess } from "@/lib/gm-assistant/access";
 import { analyzeRoster, type RosterFinding } from "@/lib/gm-assistant/analyzeRoster";
 import { slotById, slotPositionFilter } from "@/lib/gm-assistant/leagueSlots";
 import { cleanName } from "@/lib/playerName";
@@ -15,8 +16,11 @@ export const dynamic = "force-dynamic";
 export default async function GmAssistantPage() {
   const teamId = await getTeamSession();
   if (teamId == null) notFound();
+  const access = await intelligenceAccess();
+  if (!access.basic) notFound();
+  const admin = access.admin;
 
-  const [analysis, admin] = await Promise.all([analyzeRoster(teamId), isAdmin()]);
+  const analysis = await analyzeRoster(teamId);
 
   const severityStyle: Record<RosterFinding["severity"], { text: string; bg: string; label: string }> = {
     critical: { text: "text-red-400", bg: "bg-red-950/40 border-red-900/60", label: "Slabé miesto" },
@@ -62,7 +66,7 @@ export default async function GmAssistantPage() {
                         </Link>
                       ))}
                     </div>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    {access.full && <div className="flex flex-wrap gap-x-4 gap-y-1">
                       <Link href={`/tools/assistant/find-trade-partner?slot=${f.id}`} className="text-xs text-blue-400 hover:text-blue-300 font-semibold">
                         Nájsť trade partnera →
                       </Link>
@@ -71,7 +75,7 @@ export default async function GmAssistantPage() {
                           Nájsť voľného agenta →
                         </Link>
                       )}
-                    </div>
+                    </div>}
                   </div>
                 );
               })}
@@ -101,6 +105,7 @@ export default async function GmAssistantPage() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {access.full ? <>
         <Card title="Find Player" accent="text-blue-400" href="/tools/assistant/find-player">
           <p className="text-sm text-slate-400">Filtruj hráčov podľa pozície, ratingu, cap hitu, veku a statusu — presné, zoraditeľné výsledky, žiadny model.</p>
         </Card>
@@ -110,6 +115,11 @@ export default async function GmAssistantPage() {
         <Card title="🧪 Scenario Engine" accent="text-blue-400" href="/tools/assistant/scenario">
           <p className="text-sm text-slate-400">„Čo ak?“ — podpíš, obchoduj alebo pusti hráča nanečisto a uvidíš dopad na cap, rebríček aj vek kádra, bez zápisu do ligy.</p>
         </Card>
+        </> : (
+          <Card title="Čoskoro" accent="text-slate-500" className="md:col-span-2">
+            <p className="text-sm text-slate-400">Find Player, Find Trade Partner a Scenario Engine komisár sprístupní v ďalšej vlne.</p>
+          </Card>
+        )}
         <Card title="🧩 Line Fit Finder" accent="text-blue-400" href="/tools/line-fit">
           <p className="text-sm text-slate-400">Zostav lajnu z ľubovoľných hráčov — vlastný roster, voľný agent alebo hráč iného klubu — a uvidíš projekciu chémie aj taktického fitu, ešte pred akoukoľvek dohodou.</p>
         </Card>

@@ -190,6 +190,19 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
         </div>
       </Card>
 
+      <Card title="🧠 UNHL Intelligence">
+        <label className="flex items-center justify-between gap-3 text-sm py-1">
+          <span className="text-slate-300">Rollout to GMs</span>
+          <select value={s.intelligenceRollout} onChange={(e) => set("intelligenceRollout", e.target.value as EngineSettings["intelligenceRollout"])}
+            className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm">
+            <option value="hidden">Hidden — commissioner only</option>
+            <option value="basic">Basic — Analyze My Roster + Line Fit Finder</option>
+            <option value="full">Full — every tool (Find Player, Trade Partner, Scenario)</option>
+          </select>
+        </label>
+        <p className="text-xs text-slate-500 mt-1">The commissioner always sees every tool. Player-profile, Draft Room and post-game panels are not affected.</p>
+      </Card>
+
       <Card title="Finance & Salary Cap">
         <label className="flex items-center justify-between gap-3 text-sm py-1 mb-2 border-b border-slate-800 pb-3">
           <span className="text-slate-300">Finance system</span>

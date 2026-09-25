@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { intelligenceAccess } from "@/lib/gm-assistant/access";
 import { getTeamSession } from "@/lib/auth";
 import { cleanName } from "@/lib/playerName";
 import { money } from "@/lib/finance";
@@ -20,6 +21,7 @@ const labelCls = "block text-xs uppercase tracking-wide text-slate-400 mb-1";
 export default async function ScenarioPage({ searchParams }: { searchParams: Promise<{ moves?: string; qsign?: string; partner?: string }> }) {
   const teamId = await getTeamSession();
   if (teamId == null) notFound();
+  if (!(await intelligenceAccess()).full) notFound();
 
   const sp = await searchParams;
   const movesRaw = sp.moves ?? "";

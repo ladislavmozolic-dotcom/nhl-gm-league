@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { intelligenceAccess } from "@/lib/gm-assistant/access";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getTeamSession } from "@/lib/auth";
@@ -70,6 +71,7 @@ function parseFilters(sp: Record<string, string | string[] | undefined>): Filter
 
 export default async function FindPlayerPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   if ((await getTeamSession()) == null) notFound();
+  if (!(await intelligenceAccess()).full) notFound();
 
   const sp = await searchParams;
   const f = parseFilters(sp);

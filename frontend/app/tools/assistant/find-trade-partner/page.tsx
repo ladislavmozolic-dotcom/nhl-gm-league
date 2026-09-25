@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { intelligenceAccess } from "@/lib/gm-assistant/access";
 import { notFound } from "next/navigation";
 import { getTeamSession } from "@/lib/auth";
 import { findTradePartners } from "@/lib/gm-assistant/findTradePartners";
@@ -23,6 +24,7 @@ const labelCls = "block text-xs uppercase tracking-wide text-slate-400 mb-1";
 export default async function FindTradePartnerPage({ searchParams }: { searchParams: Promise<{ slot?: string }> }) {
   const teamId = await getTeamSession();
   if (teamId == null) notFound();
+  if (!(await intelligenceAccess()).full) notFound();
 
   const { slot: slotParam } = await searchParams;
   const slotId = SLOTS.some((s) => s.id === slotParam) ? (slotParam as string) : SLOTS[0].id;

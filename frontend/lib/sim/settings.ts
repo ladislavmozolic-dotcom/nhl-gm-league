@@ -109,6 +109,7 @@ export type EngineSettings = {
   faSignLock: boolean;               // when true, ordinary GMs can't sign UFAs (commissioner-only); a comish toggle unlocks it
   financeMode: "base" | "detailed";  // base = ticket-revenue finance; detailed = richer model (pending)
   waiversEnabled: boolean;           // enforce the waiver wire (claims / re-entry) on demotions
+  intelligenceRollout: "hidden" | "basic" | "full"; // UNHL Intelligence for GMs: hidden = commish only; basic = Analyze My Roster + Line Fit; full = every tool
   // NHL Expansion
   expansionRuleset: "real2021" | "simplified"; // real2021 = NMC forces protection + entry-level/two-way exemption layer active; simplified = skip the exemption layer (NMC still forces protection either way)
   expansionCapFloorPct: number;      // post-draft committed cap must be ≥ this % of the league's cap floor to pass the advisory check on the results page — real-2021-calibrated default
@@ -224,7 +225,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   faTwoWayOlderAge: 25, faTwoWayNhlGpLimit: 30, faTwoWayMaxYears: 1, faTwoWayRelaxRound: 2,
   faTwoWayWeakOverall: 55, faTwoWayWeakRound: 3, faTwoWayAhlMaxYears: 3, faTwoWayFewGpMaxYears: 2, faTwoWayMaxSalary: 1_300_000,
   rfaMaxAge: 26, osOpenDay: 1, osCloseDay: 8, osDecisionDay: 10,
-  faMode: "full", faSignLock: true, financeMode: "base", waiversEnabled: true,
+  faMode: "full", faSignLock: true, financeMode: "base", waiversEnabled: true, intelligenceRollout: "full",
   expansionRuleset: "real2021", expansionCapFloorPct: 0.6, expansionRequireGoalie: true,
   rosterOverFinePerDay: 200000,
   rewardPlayoff: 8000000, rewardCup: 3000000, rewardAhlCup: 4000000, rewardAhlFinalist: 2000000,
