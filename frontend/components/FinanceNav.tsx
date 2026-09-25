@@ -7,6 +7,7 @@ const sections = [
   ["attendance", "Attendance", "/finance/attendance"],
   ["merchandise", "Merchandise", "/finance/merchandise"],
   ["sponsorship", "Sponsorship", "/finance/sponsorship"],
+  ["playoffs", "Playoff Revenue", "/finance/playoffs"],
 ] as const;
 
 export default function FinanceNav({ current }: { current: "dashboard" | "league" | (typeof sections)[number][0] }) {

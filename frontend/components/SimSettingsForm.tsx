@@ -209,9 +209,29 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
           <select value={s.financeMode} onChange={(e) => set("financeMode", e.target.value as EngineSettings["financeMode"])}
             className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm">
             <option value="base">Base — ticket-revenue finance</option>
-            <option value="detailed">Detailed — fan interest, merch, sponsors (coming soon)</option>
+            <option value="detailed">Detailed — fan interest, merch, sponsors</option>
           </select>
         </label>
+        <details className="mb-3 border-b border-slate-800 pb-3">
+          <summary className="text-sm text-slate-300 cursor-pointer">Detailed-finance revenue constants</summary>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 mt-2">
+            <div>
+              <NumField k="finJerseyNet" label="Net $ per jersey" step={5} />
+              <NumField k="finJerseyScale" label="Jerseys @ Star Power 100" step={1000} w="w-32" />
+              <NumField k="finApparelBase" label="Apparel $ (neutral fans)" step={100000} w="w-32" />
+              <NumField k="finOtherBase" label="Other goods $ (neutral fans)" step={100000} w="w-32" />
+              <NumField k="finTradeBoostPct" label="New-arrival jersey spike %" />
+              <NumField k="finTradeBoostHalfLife" label="Spike half-life (days)" />
+            </div>
+            <div>
+              <NumField k="finPlayoffSeatBase" label="Playoff $/seat base" />
+              <NumField k="finPlayoffSeatPerRound" label="+ $/seat per round" />
+              <NumField k="finPlayoffMerchPct" label="Playoff merch +% per round" />
+              <NumField k="finSponsorBase" label="Sponsor AAV — weakest brand" step={100000} w="w-32" />
+              <NumField k="finSponsorRange" label="+ AAV at full brand strength" step={100000} w="w-32" />
+            </div>
+          </div>
+        </details>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
           <div>
             <NumField k="startingCapital" label="Starting capital / club" step={1000000} w="w-32" />

@@ -5,6 +5,7 @@ import { canManageTeam } from "./auth";
 import { leagueFanInterest } from "./fan-interest-server";
 import { teamStarPeaks } from "./star-power-server";
 import { sponsorOffers, sponsorMax, type SponsorOffer } from "./sponsorship";
+import { loadFinanceTuning } from "./finance-tuning-server";
 
 export type TeamSponsor = {
   teamId: number; code: string | null; name: string;
@@ -30,11 +31,11 @@ const asDeal = (j: unknown): SponsorOffer | null => {
 
 /** Offers + current deal for every NHL club. */
 export async function leagueSponsors(): Promise<TeamSponsor[]> {
-  const strengths = await brandStrengths();
+  const [strengths, tuning] = await Promise.all([brandStrengths(), loadFinanceTuning()]);
   const teams = await prisma.team.findMany({ where: { league: "NHL", isAffiliate: false }, select: { id: true, code: true, name: true, sponsorDeal: true } });
   return teams.map((t) => {
     const bs = strengths.get(t.id) ?? 0.3;
-    return { teamId: t.id, code: t.code, name: t.name, brandStrength: bs, offers: sponsorOffers(bs), deal: asDeal(t.sponsorDeal) };
+    return { teamId: t.id, code: t.code, name: t.name, brandStrength: bs, offers: sponsorOffers(bs, tuning), deal: asDeal(t.sponsorDeal) };
   }).sort((a, b) => sponsorMax(b.deal ?? b.offers[0]) - sponsorMax(a.deal ?? a.offers[0]));
 }
 

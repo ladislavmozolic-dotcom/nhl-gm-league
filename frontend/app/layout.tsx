@@ -86,7 +86,7 @@ export default async function RootLayout({
   // base finance → hide the Detailed-Finance league pages from the League ▸ Finance submenu
   const settings = await loadSettings().catch(() => null);
   const detailedFinance = settings?.financeMode === "detailed";
-  const DETAILED_FINANCE_HREFS = new Set(["/finance/season-tickets", "/finance/attendance", "/finance/merchandise", "/finance/sponsorship"]);
+  const DETAILED_FINANCE_HREFS = new Set(["/finance/season-tickets", "/finance/attendance", "/finance/merchandise", "/finance/sponsorship", "/finance/playoffs"]);
   // Finance moved from a top-level item into League ▸ Finance — honour a legacy
   // "hide finance" override so admins who hid it before the move keep it hidden.
   const menuHidden = new Set(((site.menu as MenuOverrides | null)?.hidden) ?? []);

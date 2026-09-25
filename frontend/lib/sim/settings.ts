@@ -109,6 +109,11 @@ export type EngineSettings = {
   faSignLock: boolean;               // when true, ordinary GMs can't sign UFAs (commissioner-only); a comish toggle unlocks it
   financeMode: "base" | "detailed";  // base = ticket-revenue finance; detailed = richer model (pending)
   waiversEnabled: boolean;           // enforce the waiver wire (claims / re-entry) on demotions
+  // Detailed-Finance revenue constants (lib/finance-tuning.ts maps these)
+  finJerseyNet: number; finJerseyScale: number; finApparelBase: number; finOtherBase: number;
+  finTradeBoostPct: number; finTradeBoostHalfLife: number;
+  finPlayoffSeatBase: number; finPlayoffSeatPerRound: number; finPlayoffMerchPct: number;
+  finSponsorBase: number; finSponsorRange: number;
   intelligenceRollout: "hidden" | "basic" | "full"; // UNHL Intelligence for GMs: hidden = commish only; basic = Analyze My Roster + Line Fit; full = every tool
   // NHL Expansion
   expansionRuleset: "real2021" | "simplified"; // real2021 = NMC forces protection + entry-level/two-way exemption layer active; simplified = skip the exemption layer (NMC still forces protection either way)
@@ -226,6 +231,10 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   faTwoWayWeakOverall: 55, faTwoWayWeakRound: 3, faTwoWayAhlMaxYears: 3, faTwoWayFewGpMaxYears: 2, faTwoWayMaxSalary: 1_300_000,
   rfaMaxAge: 26, osOpenDay: 1, osCloseDay: 8, osDecisionDay: 10,
   faMode: "full", faSignLock: true, financeMode: "base", waiversEnabled: true, intelligenceRollout: "full",
+  finJerseyNet: 120, finJerseyScale: 40000, finApparelBase: 3200000, finOtherBase: 1400000,
+  finTradeBoostPct: 60, finTradeBoostHalfLife: 21,
+  finPlayoffSeatBase: 65, finPlayoffSeatPerRound: 22, finPlayoffMerchPct: 7,
+  finSponsorBase: 5000000, finSponsorRange: 8000000,
   expansionRuleset: "real2021", expansionCapFloorPct: 0.6, expansionRequireGoalie: true,
   rosterOverFinePerDay: 200000,
   rewardPlayoff: 8000000, rewardCup: 3000000, rewardAhlCup: 4000000, rewardAhlFinalist: 2000000,

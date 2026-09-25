@@ -52,6 +52,7 @@ export const DEFAULT_MENU: MenuItem[] = [
       { label: "🏟️ Attendance — league", href: "/finance/attendance" },
       { label: "🛍️ Merchandise — league", href: "/finance/merchandise" },
       { label: "🤝 Sponsorships — league", href: "/finance/sponsorship" },
+      { label: "🏆 Playoff Revenue — league", href: "/finance/playoffs" },
     ] },
     { label: "🌟 Tonight's Best", href: "/league/digest" },
     { label: "📰 Weekly / Monthly Report", href: "/league/weekly" },

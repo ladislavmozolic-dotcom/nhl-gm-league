@@ -52,7 +52,7 @@ export default async function MerchandisePage() {
         </Card>
 
         <Card bodyClassName="p-0">
-          <div className="px-4 py-2 border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-500">Top selling jerseys<InfoTip text="League-wide jersey unit sales. Driven by each player's Star Power — a superstar moves far more units than a depth player, whatever the club." /></div>
+          <div className="px-4 py-2 border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-500">Top selling jerseys<InfoTip text="League-wide jersey unit sales. Driven by each player's Star Power — a superstar moves far more units than a depth player, whatever the club. A player acquired by trade gets a new-team spike that fades over the following weeks." /></div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead><tr className="text-left text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
@@ -62,7 +62,7 @@ export default async function MerchandisePage() {
                 {jerseys.map((r, i) => (
                   <tr key={r.playerId} className="border-b border-slate-800/50 hover:bg-slate-800/30">
                     <td className="px-4 py-2.5"><RankBadge rank={i + 1} /></td>
-                    <td className="px-3 py-2.5"><Link href={`/players/${r.playerId}`} className="font-semibold hover:text-blue-400">{r.name}</Link><span className="ml-1.5 text-[11px] text-slate-500">{r.position}</span></td>
+                    <td className="px-3 py-2.5"><Link href={`/players/${r.playerId}`} className="font-semibold hover:text-blue-400">{r.name}</Link><span className="ml-1.5 text-[11px] text-slate-500">{r.position}</span>{r.boostPct > 0 && <span className="ml-1.5 text-[10px] font-bold text-amber-400" title="Recently acquired by trade — new-team jersey spike, decaying">🔥 +{r.boostPct}% new arrival</span>}</td>
                     <td className="px-2 py-2.5 text-slate-400">{r.teamCode ?? "—"}</td>
                     <td className="px-2 py-2.5">
                       <div className="text-right tabular-nums font-semibold text-[12px]">{N(r.units)}</div>
