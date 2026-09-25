@@ -2,14 +2,15 @@
 // Every NHL fixture is mirrored by its two AHL affiliates on the same date.
 // Fully isolated from the real season by a distinct Game.season string, so it
 // never touches regular-season standings, careers or records. Full preseason
-// boxscores are stored under their own season key. Conditioning and injuries do
-// carry over because they affect who can dress; morale/chemistry/finance do not.
+// boxscores are stored under their own season key. Conditioning, injuries and
+// line chemistry do carry over — a line that gels in camp should show up gelled
+// on opening night, not reset to a projection — but morale/finance do not.
 
 import { prisma } from "./prisma";
 import { loadSimTeam, fixtureSeed } from "./sim";
 import { simulateGame } from "./sim/engine";
 import { saveGameResult } from "./sim/persist";
-import { injuryConTarget, syncChem, updateInjuryCon } from "./sim/season";
+import { evolveChem, injuryConTarget, syncChem, updateInjuryCon } from "./sim/season";
 import { loadSettings } from "./sim/settings";
 import { activeSimEngine, engineVersionFor } from "./sim/version";
 import { recordSimAudit } from "./audit-server";
@@ -154,8 +155,10 @@ export async function recoverPreseasonIdleTeams(dayStart: Date, dayEnd: Date) {
 }
 
 /** Persist the two preseason effects that matter for roster availability:
- * post-game CON and injuries. Standings/career/morale/chemistry/finance remain
- * isolated under the preseason season string. */
+ * post-game CON and injuries. Line chemistry is persisted separately (see
+ * simPreseason's end-of-call flush, same pattern as the regular season).
+ * Standings/career/morale/finance remain isolated under the preseason season
+ * string. */
 async function persistPreseasonPlayerState(result: ReturnType<typeof simulateGame>, home: SimTeam, away: SimTeam) {
   const injured = new Map(result.injuries.map((i) => [i.playerId, i]));
   const updates: ReturnType<typeof prisma.player.update>[] = [];
@@ -273,10 +276,21 @@ async function simPreseason(where: object, actor: string): Promise<{ played: num
     });
     await storePreseasonAttendance(gm);
     await persistPreseasonPlayerState(result, home, away);
+    // gel/decay pairwise chemistry from this exhibition game too (flushed to
+    // TeamLines below) — a camp line that stays together should show up gelled,
+    // not still "(proj.)", once the regular season opens.
+    evolveChem(home, settings);
+    evolveChem(away, settings);
     for (const injury of result.injuries) cache.delete(injury.teamId);
     played++;
     playedIds.push(gm.id);
   }
+  const chemUpdates: Promise<unknown>[] = [];
+  for (const team of cache.values()) {
+    if (team && team.units.length)
+      chemUpdates.push(prisma.teamLines.update({ where: { teamId: team.id }, data: { chemistry: team.chemistry } }).catch(() => undefined));
+  }
+  await Promise.all(chemUpdates);
   await recordSimAudit(playedIds, actor);
   return { played };
 }

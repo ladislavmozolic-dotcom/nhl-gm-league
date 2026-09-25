@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { notFound, redirect } from "next/navigation";
 import { loadTeamLines, autoLines } from "@/lib/sim/lines";
 import { loadSettings, chemistryNeutralPoint } from "@/lib/sim/settings";
+import { PLAY_CON } from "@/lib/sim/season";
 import { canManageTeam } from "@/lib/auth";
 import { cleanName, captaincyFromName } from "@/lib/playerName";
 import LineEditor from "@/components/LineEditor";
@@ -42,7 +43,7 @@ export default async function LinesPage({ params }: { params: Promise<{ slug: st
   const capHasField = [...skaterRows, ...goalieRows].some((p) => p.captaincy === "C" || p.captaincy === "A");
   const capOf = (p: { captaincy: string | null; name: string }) => (capHasField ? ((p.captaincy as "C" | "A" | null) ?? null) : captaincyFromName(p.name));
   const players = skaterRows.map((p) => ({ id: p.id, name: cleanName(p.name), position: p.position, shoots: p.shoots, overall: p.overall ?? 0, injured: (p.injuryDaysLeft ?? 0) > 0, df: p.df, con: Math.round(p.condition ?? 100), cap: capOf(p), pa: p.pa, sk: p.sk, sc: p.sc, ck: p.ck, fo: p.fo, st: p.st, en: p.en, weight: p.weight, ph: p.ph, number: p.number }));
-  const goalies = goalieRows.map((p) => ({ id: p.id, name: cleanName(p.name), position: "G", photoUrl: p.photoUrl, overall: p.overall ?? 0, injured: (p.injuryDaysLeft ?? 0) > 0, con: Math.round(p.condition ?? 100), cap: capOf(p), number: p.number }));
+  const goalies = goalieRows.map((p) => ({ id: p.id, name: cleanName(p.name), position: "G", photoUrl: p.photoUrl, overall: p.overall ?? 0, injured: (p.injuryDaysLeft ?? 0) > 0, tired: (p.condition ?? 100) < PLAY_CON, con: Math.round(p.condition ?? 100), cap: capOf(p), number: p.number }));
 
   const saved = await loadTeamLines(team.id);
   const lines = saved ?? autoLines(players, goalies);

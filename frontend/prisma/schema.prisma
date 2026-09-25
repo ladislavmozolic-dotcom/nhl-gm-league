@@ -1425,7 +1425,8 @@ model GamePenalty {
   type       String
   minutes    Int
   severity   String
-  givesPP    Boolean @default(true) // false for a coincidental/offsetting infraction (fight, brawl roughing) — no PP for either side
+  givesPP    Boolean @default(true) // false for a coincidental/offsetting infraction, OR a type that inherently never draws a PP (Misconduct, Fighting)
+  offsetting Boolean @default(false) // true only when THIS specific penalty was cancelled out by a same-second infraction on the other team — NOT the same as !givesPP (a lone misconduct/fight major is !givesPP but isn't offsetting anything)
   game       Game    @relation(fields: [gameId], references: [id], onDelete: Cascade)
 
   @@index([gameId])

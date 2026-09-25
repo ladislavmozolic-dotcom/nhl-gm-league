@@ -230,7 +230,8 @@ export type PenaltyEvent = {
   type: string;          // e.g. "Tripping"
   minutes: number;       // 2, 4, 5
   severity: string;      // "Minor" | "Double Minor" | "Major"
-  givesPP: boolean;      // false for a coincidental/offsetting infraction (fight, brawl roughing) — no PP for either side
+  givesPP: boolean;      // false for a coincidental/offsetting infraction, OR a type that inherently never draws a PP (Misconduct, Fighting)
+  offsetting: boolean;   // true only when THIS penalty was cancelled out by a same-second infraction on the other team
 };
 
 export type TeamBox = {

@@ -17,7 +17,7 @@ import { dialLabel, dialDesc } from "@/lib/tactics-i18n";
 import type { GameStrategy, StratWeights } from "@/lib/sim/types";
 
 type Player = {
-  id: number; name: string; position: string; overall: number; injured?: boolean; df?: number | null; con?: number; cap?: "C" | "A" | null;
+  id: number; name: string; position: string; overall: number; injured?: boolean; tired?: boolean; df?: number | null; con?: number; cap?: "C" | "A" | null;
   number?: number | null;
   photoUrl?: string | null;
   pa?: number | null; sk?: number | null; sc?: number | null; ck?: number | null; fo?: number | null; st?: number | null;
@@ -266,8 +266,8 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
     const d = structuredClone(data);
     d.forwardLines.forEach((l) => { l.lw = null; l.c = null; l.rw = null; });
     d.defensePairs.forEach((p) => { p.ld = null; p.rd = null; });
-    // don't auto-dress injured players
-    setData(autoFill(d, players.filter((p) => !p.injured), goalies.filter((p) => !p.injured)));
+    // don't auto-dress injured players, or a goalie too gassed to go (CON < PLAY_CON)
+    setData(autoFill(d, players.filter((p) => !p.injured), goalies.filter((p) => !p.injured && !p.tired)));
     setSaved(false);
   };
 
@@ -282,7 +282,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
       style={{ colorScheme: "dark" }}
       className={overlay ? "absolute inset-0 w-full h-full opacity-0 cursor-pointer" : pill ? "lines-goalie-select" : "lines-select w-full min-w-[132px] bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-sm"}>
       {allowEmpty && <option value="" style={{ backgroundColor: "#0f172a", color: "#e2e8f0" }}>— empty —</option>}
-      {pool.map((p) => <option key={p.id} value={p.id} disabled={p.injured} style={{ backgroundColor: "#0f172a", color: "#e2e8f0" }}>{p.name}{p.cap ? ` (${p.cap})` : ""} · {p.position} ({p.overall}){p.con != null ? ` · CON ${p.con}%${p.con < 90 ? " ⚠️" : ""}` : ""}{p.injured ? " 🤕 INJ" : ""}</option>)}
+      {pool.map((p) => <option key={p.id} value={p.id} disabled={p.injured || p.tired} style={{ backgroundColor: "#0f172a", color: "#e2e8f0" }}>{p.name}{p.cap ? ` (${p.cap})` : ""} · {p.position} ({p.overall}){p.con != null ? ` · CON ${p.con}%${p.con < 90 ? " ⚠️" : ""}` : ""}{p.injured ? " 🤕 INJ" : p.tired ? " 😮‍💨 UNAVAILABLE" : ""}</option>)}
     </select>
   );
 
@@ -649,6 +649,9 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
               <span><strong>#{goalie.number ?? "—"}</strong> Jersey</span>
             </div>
           ) : <p className="text-xs text-slate-500">{starter ? "Choose a goalie for this role." : "Automatically set when you change the starter."}</p>}
+          {starter && goalie?.tired && (
+            <p className="text-xs text-rose-400 font-semibold">😮‍💨 Too gassed to start (CON below 95) — the sim will hand the net to the fresher goalie instead.</p>
+          )}
           {starter && (
             <label className="lines-goalie-picker">
               <span>Choose starter</span>
