@@ -162,6 +162,12 @@ const SECTIONS: Sec[] = [
         "No-trade / no-move clauses must be respected — a protected player has to consent.",
         "Depending on league settings, trades may require commissioner approval. Every trade is logged.",
       ] },
+      { h: "Trade deadline", points: [
+        "The commissioner sets the trade deadline (date + time, Bratislava time). A countdown runs site-wide for the final 14 days, and on deadline day every page shows a live 🚨 breaking-trades ticker.",
+        "A trade must be fully completed (accepted, and approved if it needs commission review) BEFORE the deadline — a proposal still pending at the deadline can no longer go through.",
+        "NHL rule: after the deadline no club may trade until its own season is over — clubs that miss the playoffs once the regular season ends, playoff clubs once they're eliminated. Both clubs in a deal must be done. Everyone can trade again in the off-season.",
+        "Waivers, call-ups and free-agent signings are not affected by the deadline.",
+      ] },
       { h: "Salary retention", points: [
         "A club may retain up to the league's max % of a player's cap hit in a trade — the acquiring club only carries the reduced cap hit; the retaining club carries the retained slice as dead money for the rest of that contract.",
         "Re-traded again, no further retention: once acquired, a club can deal him again at any time without adding retention of its own — the ORIGINAL retaining club keeps paying its share until that contract runs out, no matter how many more times he's traded.",

@@ -416,3 +416,15 @@ export async function resetSeasonAction() {
   revalidatePath("/schedule");
   revalidatePath("/playoffs");
 }
+
+/** Set (or clear) the NHL trade deadline. `local` is a Europe/Bratislava wall-clock
+ *  "YYYY-MM-DDTHH:mm"; null/"" removes the deadline (no freeze at all). */
+export async function setTradeDeadlineAction(local: string | null) {
+  if (!(await isAdmin())) return { ok: false as const, error: "Admin only." };
+  const { bratislavaLocalToUtc } = await import("@/lib/trade-deadline");
+  const at = local ? bratislavaLocalToUtc(local) : null;
+  if (local && !at) return { ok: false as const, error: "Invalid date/time." };
+  await prisma.leagueConfig.upsert({ where: { id: 1 }, update: { tradeDeadlineAt: at }, create: { id: 1, tradeDeadlineAt: at } });
+  for (const p of ["/", "/admin/season", "/trades", "/trades/build", "/rules"]) revalidatePath(p);
+  return { ok: true as const };
+}

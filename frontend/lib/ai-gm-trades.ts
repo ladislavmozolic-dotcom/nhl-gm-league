@@ -5,6 +5,7 @@
 // weaker return, and it weighs its contention window (contender vs rebuild) and
 // roster needs — like a video-game GM.
 
+import { tradeWindow } from "./trade-deadline";
 import { prisma } from "./prisma";
 import { loadSettings } from "./sim/settings";
 import { teamContentionMap } from "./free-agency-server";
@@ -199,6 +200,9 @@ async function orgIdsOf(teamId: number): Promise<number[]> {
 export async function aiGmTradesDaily(): Promise<{ handled: number; details: string[] }> {
   const settings = await loadSettings();
   if (!settings.aiTradesEnabled) return { handled: 0, details: [] };
+  // after the deadline, stay out of the market entirely (per-trade checks still guard
+  // any late-season club that's allowed again — this just avoids a daily wall of errors)
+  if ((await tradeWindow()).frozen) return { handled: 0, details: ["trade deadline freeze"] };
 
   const aiTeams = await prisma.team.findMany({
     where: { passwordHash: null, aiMode: "advanced", league: "NHL", isAffiliate: false },

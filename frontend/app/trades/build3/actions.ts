@@ -1,5 +1,6 @@
 "use server";
 
+import { assertTradeWindowOpen } from "@/lib/trade-deadline";
 import { prisma } from "@/lib/prisma";
 import { getTeamSession, isAdmin, isCommission } from "@/lib/auth";
 import { loadSettings } from "@/lib/sim/settings";
@@ -40,6 +41,7 @@ export async function proposeTradeGroupAction(legs: GroupLeg[]) {
   for (const l of legs) { teamIds.add(l.fromTeamId); teamIds.add(l.toTeamId); }
   if (teamIds.size !== 3) throw new Error("A 3-team trade needs exactly 3 different clubs.");
   if (!teamIds.has(session)) throw new Error("You can only propose a trade your own team is part of.");
+  await assertTradeWindowOpen([...teamIds]);
 
   // must form a proper closed cycle: each club sends exactly once, receives exactly once
   const fromCounts = new Map<number, number>(), toCounts = new Map<number, number>();

@@ -16,6 +16,8 @@ import CommissionerBanner, { type BannerItem } from "@/components/CommissionerBa
 import { dailyDigest, latestDigestRound } from "@/lib/digest-server";
 import { gmDashboard } from "@/lib/gm-dashboard-server";
 import SeasonDashboard from "@/components/SeasonDashboard";
+import TradeDeadlineBanner from "@/components/TradeDeadlineBanner";
+import { deadlineFeedAction } from "@/app/actions/trade-deadline-feed";
 import { tradeBlockBoard } from "@/lib/trade-block-server";
 import { activeWaivers } from "@/lib/waivers-server";
 import { loadSiteConfig } from "@/lib/site-config";
@@ -244,8 +246,11 @@ export default async function HomePage() {
     }
   }
 
+  const deadlineFeed = await deadlineFeedAction().catch(() => null);
+
   return (
     <div className="py-2">
+      {deadlineFeed?.isDeadlineDay && <div className="mb-6"><TradeDeadlineBanner initial={deadlineFeed} variant="feed" /></div>}
       {homeBlocks.length > 0 && (
         <div className="space-y-4 mb-6">
           {homeBlocks.map((b) => (

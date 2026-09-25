@@ -10,6 +10,8 @@ import { loadSettings } from "@/lib/sim/settings";
 import { getLang } from "@/lib/lang-server";
 import { t as translate } from "@/lib/i18n";
 import ScoreTracker from "@/components/ScoreTracker";
+import TradeDeadlineBanner from "@/components/TradeDeadlineBanner";
+import { deadlineFeedAction } from "@/app/actions/trade-deadline-feed";
 import MessageNotifier from "@/components/MessageNotifier";
 import SessionResume from "@/components/SessionResume";
 import PullToRefresh from "@/components/PullToRefresh";
@@ -79,6 +81,7 @@ export default async function RootLayout({
   const customPages = await prisma.customPage.findMany({ where: { published: true, inMenu: true }, orderBy: { order: "asc" }, select: { slug: true, title: true, menuLabel: true } }).catch(() => []);
   const extra = customPages.map((p) => ({ key: `page:${p.slug}`, label: p.menuLabel || p.title, href: `/p/${p.slug}` }));
   const lang = await getLang();
+  const deadlineFeed = await deadlineFeedAction().catch(() => ({ deadline: null, isDeadlineDay: false, trades: [] }));
   // which player-parameter calculator is active — only its Tools link shows
   const lc = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { paramMode: true } }).catch(() => null);
   const paramMode = lc?.paramMode === "edge" ? "edge" : "sths";
@@ -143,6 +146,7 @@ export default async function RootLayout({
       >
         <LangProvider lang={lang}>
           <ScoreTracker />
+          {deadlineFeed.deadline && <TradeDeadlineBanner initial={deadlineFeed} />}
           <VisitBeacon />
           <PullToRefresh />
           {gm && <MessageNotifier initialUnread={gm.unreadDm} />}

@@ -4,6 +4,7 @@
 // can call the SAME validated executor. Nothing here is a server action, so none of
 // it is remotely invokable by a client — the auth checks stay in the action layer.
 
+import { assertTradeWindowOpen } from "./trade-deadline";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { loadSettings } from "@/lib/sim/settings";
@@ -430,6 +431,7 @@ export async function executeAcceptedTrade(tradeId: number) {
   if (!trade) throw new Error("Trade not found");
   // executable straight from a GM accept (PENDING) or after commission review of a rookie deal
   if (!["PENDING", "AWAITING_COMMISH", "MODIFIED"].includes(trade.status)) throw new Error("This trade is no longer pending.");
+  await assertTradeWindowOpen([trade.fromTeamId, trade.toTeamId]);
   const pkg = await packageFromTrade(tradeId);
   pkg.waived = trade.waivedClauses ?? [];
   pkg.clauseFees = (trade.clauseFees as TradePackage["clauseFees"]) ?? [];
@@ -454,6 +456,7 @@ export async function executeAcceptedTrade(tradeId: number) {
  *  consent checks are the CALLER's responsibility (the human action does them; the AI
  *  only builds clause-clean packages). Returns the new trade id. */
 export async function createTradeRecord(pkg: TradePackage, opts: { fromName: string; toName: string; dmBody?: string; aiFrom?: boolean; leagueDay?: number; groupId?: number; skipDm?: boolean } ) {
+  await assertTradeWindowOpen([pkg.fromTeamId, pkg.toTeamId]);
   const trade = await prisma.trade.create({ data: { fromTeamId: pkg.fromTeamId, toTeamId: pkg.toTeamId, status: "PENDING", condition: pkg.condition || null, leagueDay: opts.leagueDay ?? null, groupId: opts.groupId ?? null, waivedClauses: [...(pkg.waived ?? []), ...(pkg.clauseFees ?? []).map((f) => f.playerId)], clauseFees: (pkg.clauseFees ?? []) as object } });
   const rows: Array<{ tradeId: number; assetType: string; side: string; playerId?: number; prospectId?: number; draftPickId?: number; cashAmount?: number; retentionPct?: number }> = [];
   for (const p of pkg.fromPlayers) rows.push({ tradeId: trade.id, assetType: "PLAYER", side: "FROM", playerId: p.playerId, retentionPct: p.retentionPct || undefined });
@@ -545,6 +548,7 @@ export async function executeTradeGroup(groupId: number) {
   const legs = await prisma.trade.findMany({ where: { groupId } });
   if (!legs.length) throw new Error("Trade group has no legs.");
   const teamIds = [...new Set(legs.flatMap((l) => [l.fromTeamId, l.toTeamId]))];
+  await assertTradeWindowOpen(teamIds);
   const teams = await prisma.team.findMany({ where: { id: { in: teamIds } }, select: { id: true, name: true } });
   const nameOf = (id: number) => teams.find((t) => t.id === id)?.name ?? "?";
 

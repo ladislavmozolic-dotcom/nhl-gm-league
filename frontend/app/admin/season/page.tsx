@@ -10,6 +10,8 @@ import PrepareNextDraftButton from "@/components/PrepareNextDraftButton";
 import DraftPickControls from "@/components/DraftPickControls";
 import PhaseControl from "@/components/PhaseControl";
 import PhaseDatesControl from "@/components/PhaseDatesControl";
+import TradeDeadlineControl from "@/components/TradeDeadlineControl";
+import { utcToBratislavaLocal } from "@/lib/trade-deadline";
 import PreseasonControls from "@/components/PreseasonControls";
 import PlayoffStartControls from "@/components/PlayoffStartControls";
 import { getLeagueClock } from "@/lib/calendar-server";
@@ -59,7 +61,7 @@ export default async function SeasonAdminPage() {
     prisma.playoffSeries.count({ where: { season: SEASON } }),
     prisma.playoffSeries.findFirst({ where: { season: SEASON, round: 4, status: "DONE" }, select: { winnerTeamId: true } }),
     getLeagueClock(),
-    prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { phaseOverride: true, lastSimulatedDay: true, preseasonPublic: true, preseasonPhaseAt: true, regularPhaseAt: true } }),
+    prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { phaseOverride: true, lastSimulatedDay: true, preseasonPublic: true, preseasonPhaseAt: true, regularPhaseAt: true, tradeDeadlineAt: true } }),
     prisma.game.count({ where: { season: PRE_SEASON, status: "SCHEDULED" } }),
     prisma.game.count({ where: { season: PRE_SEASON, status: "FINAL" } }),
   ]);
@@ -86,6 +88,10 @@ export default async function SeasonAdminPage() {
             <PhaseDatesControl preseasonAt={cfg?.preseasonPhaseAt?.toISOString() ?? null} regularAt={cfg?.regularPhaseAt?.toISOString() ?? null} />
           </div>
         </div>
+      </Card>
+
+      <Card title="⏰ Trade deadline" accent="text-red-400">
+        <TradeDeadlineControl local={cfg?.tradeDeadlineAt ? utcToBratislavaLocal(cfg.tradeDeadlineAt) : null} />
       </Card>
 
       <Card title="Pre-season (exhibition)" accent="text-sky-400">
