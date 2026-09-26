@@ -192,6 +192,7 @@ const SECTIONS: Sec[] = [
         "Below the league's threshold (default 80 %) he's unhappy and his morale drains. After 5 unhappy days his agent messages you (League Notifications); after 20 he publicly requests a trade.",
         "While he's unhappy — or has asked out — he won't negotiate an extension with you.",
         "Give him the minutes back and it unwinds: the warning clears and an ice-time trade request is withdrawn. Trading him wipes it with the new club.",
+        "Putting a player on the Trade Block costs him 8 morale (MO) once. It doesn't recover while he stays listed; once he's off the block (and isn't unhappy) it climbs back — through games, and +1 on every day his club doesn't play, up to the league baseline (50).",
       ] },
       { h: "Negotiating with free agents", points: [
         "Lowballs have a cost: an offer well under his floor (default below 85 %) insults him — his ask to YOUR club goes up by about how deep the lowball was (up to +25 % in total) until he signs anywhere. Other clubs aren't affected.",

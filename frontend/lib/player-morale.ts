@@ -181,3 +181,21 @@ export async function checkIceTimeMorale(opts: { dryRun?: boolean; season?: stri
 async function notify(teamId: number, body: string) {
   await prisma.dmMessage.create({ data: { fromTeamId: teamId, toTeamId: teamId, body } }).catch(() => {});
 }
+
+
+/** Off-day morale recovery: a player whose morale sits below the league baseline
+ *  drifts back +1 a day on days his club doesn't play a (regular-season/playoff)
+ *  game — games already mean-revert morale themselves. Nobody who's still being
+ *  shopped (Trade Block), has asked out or is unhappy with his role recovers. */
+export async function recoverMoraleOffDays(playedTeamIds: number[]): Promise<number> {
+  const { loadSettings } = await import("./sim/settings");
+  const s = await loadSettings();
+  if (!s.moraleEnabled) return 0;
+  const base = Math.round(s.moraleBase);
+  const exclude = playedTeamIds.length ? `AND ("teamId" IS NULL OR "teamId" NOT IN (${playedTeamIds.map((n) => Math.trunc(n)).join(",")}))` : "";
+  return prisma.$executeRawUnsafe(
+    `UPDATE "Player" SET morale = LEAST(${base}, morale + 1), mo = ROUND(LEAST(${base}, morale + 1))
+     WHERE morale < ${base} AND "rosterType" IN ('NHL','AHL') AND "onBlock" = false AND "tradeRequested" = false
+       AND disgruntled = false AND "iceWarnedAt" IS NULL AND "iceUnhappyChecks" = 0 ${exclude}`,
+  );
+}

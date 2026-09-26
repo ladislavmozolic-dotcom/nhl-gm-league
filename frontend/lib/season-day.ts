@@ -17,7 +17,7 @@ import { postWeeklyIfDue } from "@/lib/weekly-digest";
 import { resolveFrenzy, processRoundEnd, resolveInSeasonWindows } from "@/app/free-agents/actions";
 import { sweepExpiredContractsToUfa, sweepUnsignedRfasToNonRoster } from "@/lib/free-agency-server";
 import { checkPromises } from "@/lib/promises";
-import { checkIceTimeMorale } from "@/lib/player-morale";
+import { checkIceTimeMorale, recoverMoraleOffDays } from "@/lib/player-morale";
 import { leagueCapCompliance } from "@/lib/cap";
 import { money } from "@/lib/finance";
 import { runLiveCalculatorRecompute } from "@/lib/live-calculator-engine";
@@ -118,6 +118,11 @@ export async function simulateLeagueDay(day: Date) {
   const promises = await checkPromises();
   // ice-time morale for everyone else: warn → trade request → unwinds when fixed
   await checkIceTimeMorale().catch((e) => console.error("[ice-morale]", e));
+  // …and anyone below the baseline who isn't still upset drifts back on off-days
+  {
+    const g = await prisma.game.findMany({ where: { season: SEASON, status: "FINAL", gameDate: { gte: start, lt: end } }, select: { homeTeamId: true, awayTeamId: true } });
+    await recoverMoraleOffDays([...new Set(g.flatMap((x) => [x.homeTeamId, x.awayTeamId]))]).catch((e) => console.error("[morale-recover]", e));
+  }
   // waivers: resolve any whose one-day window closed (claimed by priority, else clear to AHL)
   const waivers = await processWaivers(roundForDate(day), phToday);
   // Free Agent Frenzy round transitions (3 weekly rounds). Crossing a week

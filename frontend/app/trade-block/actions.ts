@@ -13,7 +13,8 @@ export async function setPlayerBlockAction(playerId: number, on: boolean, note: 
     onBlock: on, blockNote: on ? (note.trim().slice(0, 200) || null) : null,
   };
   // being shopped stings — a one-time morale dip when a player is first listed
-  // (morale recovers naturally through games; unlisting doesn't auto-restore it).
+  // (while he stays listed it doesn't recover; once he's off the block it drifts
+  // back through games and +1 per off-day — lib/player-morale.ts recoverMoraleOffDays).
   // `mo` mirrors `morale` so the Ratings-strip "MO" parameter stays live too.
   if (on && !p.onBlock) { const m = Math.max(30, (p.morale ?? 75) - 8); data.morale = m; data.mo = m; }
   await prisma.player.update({ where: { id: playerId }, data });
