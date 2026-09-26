@@ -13,8 +13,9 @@ import { ENGINE_V2 } from "./version";
 import type {
   SimTeam, SimSkater, SimGoalie, GameResult, TeamBox, PlayerLine, GoalieLine,
   GoalEvent, PenaltyEvent, InjuryEvent, ShootoutAttempt, LineTactic,
-  InjuryMechanism, InjurySeverity, SituationKey, SituationLine,
+  InjuryMechanism, InjurySeverity, SituationKey, SituationLine, CoachingPrefs,
 } from "./types";
+import { DEFAULT_COACHING } from "./types";
 
 // Engine version stamped on every simulated Game (for reproducibility, history and
 // calibration). The current (stable v1) engine is "1.0.0"; the next-gen rework will
@@ -119,7 +120,7 @@ const SEVERE_TYPES = ["Boarding", "Cross-checking", "Checking to the head", "Sle
 // pair — draws no power play, so strengthDiffAt and the PK-killed momentum credit
 // both skip it (the TEAM stays at full strength), but the offender still can't
 // take the ice for real, so subMis still benches him (it only ever checks `expired`).
-type Penalty = { team: number; start: number; end: number; expired: boolean; playerId?: number; offsetting?: boolean };
+type Penalty = { team: number; start: number; end: number; expired: boolean; playerId?: number; offsetting?: boolean; fourOnFour?: boolean; minutes?: number };
 
 type SimState = {
   rng: RNG;
@@ -151,7 +152,15 @@ type SimState = {
   shootout: ShootoutAttempt[];      // shootout attempts (empty unless the game went to a shootout)
   sink: EventSink;                  // next-gen typed event stream (v2)
   isNextGen: boolean;                // v2 only — gates real (non-narration) gameplay differences like line matchups
+  officials: { penaltyMult: number; evenUp: number } | null; // tonight's referee crew (null = neutral)
+  timeoutUsed: Record<number, boolean>;
+  challengeFailed: Record<number, boolean>; // a failed challenge ends a bench's challenges for the night
 };
+
+/** A bench's game-management preferences (Lines → Strategy; AI clubs = defaults). */
+function coachingOf(team: SimTeam): CoachingPrefs {
+  return { ...DEFAULT_COACHING, ...(team.strategy?.coaching ?? {}) };
+}
 
 // Absolute game-clock seconds → period + clock-within-period, for events.
 function clockOf(absSeconds: number): { period: number; seconds: number } {
@@ -261,7 +270,7 @@ function initTeamBox(team: SimTeam): TeamBox {
   } : null;
   return {
     teamId: team.id, name: team.name, code: team.code,
-    goals: 0, shots: 0, pim: 0, ppGoals: 0, ppOpp: 0,
+    goals: 0, shots: 0, pim: 0, ppGoals: 0, ppOpp: 0, icings: 0, challenges: 0, challengesWon: 0, timeouts: 0, fourOnFourSec: 0,
     faceoffWins: 0, faceoffLosses: 0, hits: 0, blocks: 0,
     goalsByPeriod: [0, 0, 0, 0], shotsByPeriod: [0, 0, 0, 0],
     xgFor: 0, hdFor: 0,
@@ -755,7 +764,7 @@ function addPenalty(
   if (givesPP) {
     const opp = team.id === st.home.id ? st.away : st.home;
     st.box[opp.id].ppOpp += 1;
-    active_push(st, { team: team.id, start: at, end: at + minutes * 60, expired: false, playerId: offender.id });
+    active_push(st, { team: team.id, start: at, end: at + minutes * 60, expired: false, playerId: offender.id, minutes });
   } else if (!isMisconduct) {
     // No power play — a fighting major or a line-brawl roughing minor matched on
     // the other bench — so the TEAM stays at full strength (offsetting: true keeps
@@ -763,7 +772,7 @@ function addPenalty(
     // The offender still can't take the ice for real though, so he still needs to
     // land in `active` or subMis (which only ever checks `expired`, never `givesPP`)
     // would have no idea he's sitting a real 5-minute major.
-    active_push(st, { team: team.id, start: at, end: at + minutes * 60, expired: false, playerId: offender.id, offsetting: true });
+    active_push(st, { team: team.id, start: at, end: at + minutes * 60, expired: false, playerId: offender.id, offsetting: true, minutes });
   }
   // a misconduct (10) / game misconduct (20) puts the player in the box — no PP, but he
   // can't take the ice for that time, so a teammate rotates into his spot.
@@ -801,7 +810,15 @@ function generatePenalties(st: SimState, team: SimTeam, period: number, active: 
   // coach discipline: a disciplined bench (high PD) takes fewer penalties; a
   // physical-style coach's team takes more.
   const lambda = (LEAGUE.penaltiesPerTeam / 3) * (LEAGUE.avgDefense / Math.max(30, avgDiscipline(team))) * phyFactor * frustration * moraleFrust * team.coachDisc * rival * team.tactics.penaltyMult * (CFG.penaltiesPct / 100);
-  const count = st.rng.poisson(lambda);
+  // the referee crew: a strict crew calls more, and a crew that "manages the game"
+  // leans on whichever bench has been called less so far tonight (evening up)
+  let crew = 1;
+  if (st.officials) {
+    const called = (id: number) => st.penalties.filter((x) => x.team === id && x.givesPP).length;
+    const gap = Math.max(-3, Math.min(3, called(opp.id) - called(team.id)));
+    crew = st.officials.penaltyMult * Math.max(0.7, 1 + st.officials.evenUp * 0.1 * gap);
+  }
+  const count = st.rng.poisson(lambda * crew);
   // exclude anyone already hurt (from an earlier period) — can't take a penalty
   // once he's out of the game. A player hurt LATER in this same period can still
   // be picked here (this runs before that period's ticks — unavoidable, same as
@@ -849,9 +866,15 @@ function resolveCoincidentalPenalties(st: SimState, active: Penalty[], period: n
   for (const group of byStart.values()) {
     const home = group.filter((p) => p.team === st.home.id);
     const away = group.filter((p) => p.team === st.away.id);
-    for (let i = 0; i < Math.min(home.length, away.length); i++) {
-      home[i].offsetting = true;
-      away[i].offsetting = true;
+    const pairs = Math.min(home.length, away.length);
+    // NHL Rule 19: ONE minor to each side at full strength → play 4-on-4 (no PP).
+    // Any other coincidental combination is substituted (both benches stay at 5).
+    const fullStrength = (t: number) => !active.some((q) => !group.includes(q) && !q.expired && !q.offsetting && t >= q.start && t < q.end);
+    const fourOnFour = CFG.fourOnFourEnabled && pairs === 1 && home.length === 1 && away.length === 1
+      && (home[0].minutes ?? 2) === 2 && (away[0].minutes ?? 2) === 2 && fullStrength(home[0].start);
+    for (let i = 0; i < pairs; i++) {
+      if (fourOnFour) { home[i].fourOnFour = true; away[i].fourOnFour = true; }
+      else { home[i].offsetting = true; away[i].offsetting = true; }
       st.box[st.away.id].ppOpp = Math.max(0, st.box[st.away.id].ppOpp - 1);
       st.box[st.home.id].ppOpp = Math.max(0, st.box[st.home.id].ppOpp - 1);
       const rec = (team: number) => st.penalties.find((x) => x.team === team && x.period === period && x.seconds === home[i].start && x.givesPP);
@@ -1234,19 +1257,25 @@ function fatigueMult(shiftSec: number, en: number): number {
 // of the existing depth-chart weighting. Not absolute (real matching isn't perfect
 // either — defensive-zone draws, fatigue, etc. all still compete for the next unit).
 const LAST_CHANGE_MATCHUP_BOOST = 1.35;
+// per-tick chance a defensive-zone carrier ices it (× icingRatePct/100, fatigue, forecheck)
+const ICING_RATE = 0.0055;
+// 4-on-4: more open ice → more shot attempts per possession tick
+const FOUR_ON_FOUR_SHOTS = 1.15;
 
 // Advance a team's shift timers by `dur`; rotate a unit off when its shift is up
 // (new unit weighted toward the top of the depth chart). Accrues TOI on the ice.
 // `matchup` (v2/home only): lets the home coach react to whichever forward line the
 // away team currently has out — send the checking line vs their top trio, or the top
 // trio vs their checking line — mirroring real "last change" home-ice advantage.
-function advanceShift(st: SimState, teamId: number, sh: ShiftState, dur: number, rng: RNG, hold = false, matchup?: { oppSh: ShiftState; isHome: boolean }) {
+function advanceShift(st: SimState, teamId: number, sh: ShiftState, dur: number, rng: RNG, hold = false, matchup?: { oppSh: ShiftState; isHome: boolean }, shorten = false) {
   sh.fElapsed += dur; sh.dElapsed += dur;
   // TOI is accrued in the possession tick loop against the ACTUAL on-ice unit (which
   // is the PP/PK unit during a man-advantage) — not here against the rotating line.
-  const pick = (lines: SimSkater[][], weights: number[], cur: number, biasIdx?: number) => {
+  // `shorten`: a close game late (or playoff OT) — the coach shortens his bench, so
+  // the 4th line and the 3rd pair barely see the ice.
+  const pick = (lines: SimSkater[][], weights: number[], cur: number, biasIdx?: number, deepFrom = 99) => {
     if (lines.length <= 1) return 0;
-    const w = lines.map((_, i) => (i === cur ? 0 : Math.max(0.01, weights[i] ?? 1)));
+    const w = lines.map((_, i) => (i === cur ? 0 : Math.max(0.01, weights[i] ?? 1) * (shorten && i >= deepFrom ? (deepFrom === 3 ? 0.2 : 0.4) : 1)));
     if (biasIdx !== undefined && biasIdx !== cur && biasIdx < w.length) w[biasIdx] *= LAST_CHANGE_MATCHUP_BOOST;
     return rng.weighted(w);
   };
@@ -1262,10 +1291,10 @@ function advanceShift(st: SimState, teamId: number, sh: ShiftState, dur: number,
       if (oppFIdx === matchup.oppSh.fTopIdx && sh.fCheckIdx !== sh.fTopIdx) bias = sh.fCheckIdx;
       else if (oppFIdx === matchup.oppSh.fCheckIdx) bias = sh.fTopIdx;
     }
-    sh.fIdx = pick(sh.fLines, sh.fWeights, sh.fIdx, bias);
+    sh.fIdx = pick(sh.fLines, sh.fWeights, sh.fIdx, bias, 3);
     sh.fElapsed = 0;
   }
-  if (sh.dElapsed >= 42 + rng.int(20)) { flushShift(st, teamId, sh.dPairs[sh.dIdx] ?? []); sh.dIdx = pick(sh.dPairs, sh.dWeights, sh.dIdx); sh.dElapsed = 0; }
+  if (sh.dElapsed >= 42 + rng.int(20)) { flushShift(st, teamId, sh.dPairs[sh.dIdx] ?? []); sh.dIdx = pick(sh.dPairs, sh.dWeights, sh.dIdx, undefined, 2); sh.dElapsed = 0; }
 }
 // A shift ends for these players: record it, and whether their on-ice xG differential
 // over the shift was positive (Shift Quality → Positive Shift %). Resets the accrual.
@@ -1386,6 +1415,7 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
   // from the box, but nothing was checking that a configured PK player might BE the
   // guy who just went to the box.
   let curTick = 0;
+  let delayedFor: number | null = null; // team with the extra attacker on a delayed call (see the tick loop)
   // ids currently unavailable for this team RIGHT NOW: in the box (penalty or
   // misconduct) or hurt this game. Shared by subMis (swap a benched body out of
   // a unit) and the empty-net extra attacker (pick a fresh body FOR a unit).
@@ -1438,7 +1468,7 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
     }
     const sh = shifts[team.id];
     const line = subMis(team, sh.fLines[sh.fIdx] ?? team.forwards, false);
-    return st.emptyNet[team.id] ? extraAttacker(team, line) : line;
+    return st.emptyNet[team.id] || delayedFor === team.id ? extraAttacker(team, line) : line;
   };
   const onIceD = (team: SimTeam) => {
     const s = curStr[team.id];
@@ -1523,18 +1553,66 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
   // opening units for this period
   announceChange(home, 0); announceChange(away, 0);
 
+  // ---- game management (bench, officials, stoppages) ----
+  const coach: Record<number, CoachingPrefs> = { [home.id]: coachingOf(home), [away.id]: coachingOf(away) };
+  let foZone: number | null = null;            // team whose DEFENSIVE zone hosts the next draw (null = centre ice)
+  const noChange: Record<number, boolean> = {}; // iced the puck → that unit stays out for the draw
+  const delayedSeen = new Set<Penalty>();
+  const regulation = period <= 3;
+  const shortenFor = (team: SimTeam, tick: number) => {
+    if (!CFG.benchShortenEnabled || !coach[team.id].benchShorten) return false;
+    if (!regulation) return st.playoff; // playoff sudden death: shortened throughout
+    if (period !== 3 || Math.abs(st.box[home.id].goals - st.box[away.id].goals) > 1) return false;
+    return PERIOD_SECONDS - tick <= (st.playoff ? 600 : 420);
+  };
+  // from the 3rd period the bench adjusts to the score: press when behind, tighten when ahead
+  const adapt = (team: SimTeam, marginFor: number) => {
+    if (!CFG.coachAdaptEnabled || !coach[team.id].coachAdapt || period !== 3 || marginFor === 0) return { shots: 1, allow: 1 };
+    // net effect favours the chasing team (a push that sometimes gets burned)
+    return marginFor < 0 ? { shots: 1.1, allow: 1.04 } : { shots: 0.94, allow: 0.97 };
+  };
+  const useTimeout = (team: SimTeam, tick: number, why: string) => {
+    if (!CFG.timeoutEnabled || !coach[team.id].timeout || st.timeoutUsed[team.id]) return;
+    st.timeoutUsed[team.id] = true;
+    st.box[team.id].timeouts++;
+    shifts[team.id].fElapsed = 0; shifts[team.id].dElapsed = 0; // the unit on the ice gets its breath back
+    st.sink.emit({ period, seconds: tick, type: "TIMEOUT", teamId: team.id, teamCode: team.code ?? undefined, importance: "NOTABLE", meta: { why } });
+  };
+
   for (let tick = 0; tick < PERIOD_SECONDS; tick++) {
     curTick = tick; // for misconduct-box substitution inside onIceF/onIceD
     // hold a team's line change while it is carrying the puck up ice (not in its own
     // zone) — no mid-rush changes, so the scorer always matches the on-ice unit.
     const carrying = (team: SimTeam) => state === "PLAY" && carrierTeam.id === team.id && zone !== "DEF";
-    advanceShift(st, home.id, shifts[home.id], 1, rng, carrying(home), { oppSh: shifts[away.id], isHome: true });
-    advanceShift(st, away.id, shifts[away.id], 1, rng, carrying(away), { oppSh: shifts[home.id], isHome: false });
+    advanceShift(st, home.id, shifts[home.id], 1, rng, carrying(home) || !!noChange[home.id], { oppSh: shifts[away.id], isHome: true }, shortenFor(home, tick));
+    advanceShift(st, away.id, shifts[away.id], 1, rng, carrying(away) || !!noChange[away.id], { oppSh: shifts[home.id], isHome: false }, shortenFor(away, tick));
+    // Delayed penalty: the referee's arm is up — the other side pulls its goalie for
+    // an extra attacker until an offender touches the puck (whistle; the penalty
+    // starts right then). A goal in the meantime washes a plain minor out.
+    delayedFor = null;
+    if (CFG.delayedPenaltyEnabled && state === "PLAY") {
+      const pend = active.find((p) => !p.expired && !p.offsetting && !p.fourOnFour && p.start > tick && p.start - tick <= 4 + ((p.start * 7 + p.team) % 9));
+      if (pend) {
+        if (carrierTeam.id === pend.team) {
+          const oldStart = pend.start;
+          pend.end = tick + (pend.end - pend.start); pend.start = tick;
+          for (const r of st.penalties) if (r.team === pend.team && r.period === period && r.seconds === oldStart && r.playerId === pend.playerId) { r.seconds = tick; r.time = fmt(tick); }
+          for (const e of st.sink.all()) if (e.type === "PENALTY" && e.period === period && e.seconds === oldStart && e.playerId === pend.playerId) e.seconds = tick;
+        } else {
+          delayedFor = carrierTeam.id;
+          if (!delayedSeen.has(pend)) {
+            delayedSeen.add(pend);
+            st.sink.emit({ period, seconds: tick, type: "DELAYED_PENALTY", teamId: carrierTeam.id, teamCode: carrierTeam.code ?? undefined, importance: "NOTABLE" });
+          }
+        }
+      }
+    }
     // resolve the man-advantage FIRST so the on-ice snapshot uses PP/PK units
     const hStr = strengthDiffAt(home, away, tick, active);
     const aStr = strengthDiffAt(away, home, tick, active);
     curStr[home.id] = hStr.state; curSkaters[home.id] = hStr.skatersFor;
     curStr[away.id] = aStr.state; curSkaters[away.id] = aStr.skatersFor;
+    if (curSkaters[home.id] === 4 && curSkaters[away.id] === 4 && curStr[home.id] === "EV") { st.box[home.id].fourOnFourSec++; st.box[away.id].fourOnFourSec++; }
     // PP_START/PP_END: fire when a team's strength crosses into/out of "PP". Game-level
     // st.onPp (not reset per period) so a penalty carried into the next period doesn't
     // fire a spurious duplicate pair at the intermission boundary.
@@ -1575,9 +1653,13 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
     // minority are genuinely on-the-fly, mid-possession, no stoppage at all.
     if (penStarts || hurtHome.some((s) => s.id === carrier.id) || hurtAway.some((s) => s.id === carrier.id)) {
       state = "FACEOFF"; setup = "carry"; press = 0;
+      // after a penalty the draw is in the offending team's end (NHL Rule 76)
+      const called = penStarts ? active.find((p) => p.start === tick && !p.expired && !p.offsetting && !p.fourOnFour) : undefined;
+      foZone = CFG.zoneFaceoffsEnabled && called ? called.team : null;
     } else if (!carrierOnIce) {
-      if (onIcePool.length && !rng.chance(0.75)) carrier = pickByAttr(rng, onIcePool, (s) => s.attrs.sk ?? 50) ?? carrier;
-      else { state = "FACEOFF"; setup = "carry"; press = 0; }
+      // (icings now add their own real whistles, so fewer changes wait for one)
+      if (onIcePool.length && !rng.chance(CFG.icingEnabled ? 0.62 : 0.75)) carrier = pickByAttr(rng, onIcePool, (s) => s.attrs.sk ?? 50) ?? carrier;
+      else { state = "FACEOFF"; setup = "carry"; press = 0; foZone = null; }
     }
     announceChange(home, tick); announceChange(away, tick);
     // Empty net: a team trailing late in regulation, at even strength, may pull the
@@ -1597,6 +1679,7 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
       const trailWindow = trailBy === 1 ? pullWindow : trailBy === 2 ? pullWindow * 0.7 : pullWindow * 0.35;
       const eligible = period === 3 && curStr[team.id] === "EV" && trailBy >= 1 && trailBy <= 3 && PERIOD_SECONDS - tick <= trailWindow;
       if (eligible !== !!st.emptyNet[team.id]) {
+        if (eligible) useTimeout(team, tick, "before pulling the goalie");
         st.emptyNet[team.id] = eligible;
         st.sink.emit({
           period, seconds: tick, type: "GOALIE_PULL", teamId: team.id, teamCode: team.code ?? undefined,
@@ -1626,7 +1709,7 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
     for (const p of active) {
       // offsetting (fight major, etc.) never put p.team on the PK, so it's not a
       // "kill" — skip the momentum credit.
-      if (!p.expired && !p.offsetting && tick >= p.end && !killedPens.has(p)) {
+      if (!p.expired && !p.offsetting && !p.fourOnFour && tick >= p.end && !killedPens.has(p)) {
         killedPens.add(p);
         momoSwing(st, p.team, absT, CFG.momentumPkKill); // p.team was shorthanded → they killed it
       }
@@ -1636,6 +1719,20 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
       // a scrum at the whistle, before the draw — the natural real-hockey moment
       // for a fight to break out (see maybeStartFight's header comment)
       maybeStartFight(st, home, away, period, tick);
+      // after-the-whistle scrum: one roughing minor each — at full strength that's 4-on-4
+      if (CFG.penaltiesEnabled && CFG.scrumMinorsPerGame > 0 && rng.chance((CFG.scrumMinorsPerGame / 60) * (st.officials?.penaltyMult ?? 1))) {
+        const benchedNow = (t: SimTeam) => benchedIds(t);
+        const pickScrum = (t: SimTeam) => { const pool = [...onIceF(t), ...onIceD(t)].filter((x) => !benchedNow(t).has(x.id)); return pool.length ? pool[rng.weighted(pool.map((x) => (x.attrs.fg ?? 30) + (105 - x.discipline)))] : null; };
+        const hs = pickScrum(home), as = pickScrum(away);
+        if (hs && as) {
+          const before = active.length;
+          const fullStrength = curSkaters[home.id] === 5 && curSkaters[away.id] === 5;
+          addPenalty(st, home, hs, period, tick, "Roughing", 2, "Minor", false);
+          addPenalty(st, away, as, period, tick, "Roughing", 2, "Minor", false);
+          if (CFG.fourOnFourEnabled && fullStrength) for (const q of active.slice(before)) { q.offsetting = false; q.fourOnFour = true; }
+          st.sink.emit({ period, seconds: tick, type: "COINCIDENTAL", importance: "NOTABLE", meta: { fourOnFour: CFG.fourOnFourEnabled && fullStrength, names: [hs.name, as.name] } });
+        }
+      }
       // At 5-on-5 the real, listed center still takes the draw (falling back to
       // best FO on the ice only if nobody out there is actually a center) —
       // real-position identity matters at even strength. On the PP/PK (and a
@@ -1664,7 +1761,11 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
         targetId: foLoser.id, targetName: foLoser.name,
         zone: "NEU", importance: "MINOR",
       });
-      zone = "NEU"; state = "PLAY"; setup = "carry"; press = 0;
+      // a draw in one team's end: winning it there = possession in that zone
+      zone = foZone == null ? "NEU" : carrierTeam.id === foZone ? "DEF" : "OFF";
+      if (foZone != null) { const fe = st.sink.all(); const last = fe[fe.length - 1]; if (last?.type === "FACEOFF") last.zone = zone; }
+      foZone = null; noChange[home.id] = false; noChange[away.id] = false;
+      state = "PLAY"; setup = "carry"; press = 0;
       continue;
     }
 
@@ -1728,6 +1829,21 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
       }
     }
 
+    // 2a) ICING: a clearance from the defensive zone that goes the length of the ice
+    // (a tired unit under forecheck pressure does it most). Legal when shorthanded.
+    if (zone === "DEF" && CFG.icingEnabled && curStr[carrierTeam.id] !== "SH") {
+      const tiredMult = fat(carrierTeam, carrier) < 0.93 ? 1.7 : 1;
+      if (rng.chance(ICING_RATE * (CFG.icingRatePct / 100) * tiredMult * (defFx.takeaway ?? 1))) {
+        st.box[carrierTeam.id].icings++;
+        st.sink.emit({ period, seconds: tick, type: "ICING", teamId: carrierTeam.id, teamCode: carrierTeam.code ?? undefined, playerId: carrier.id, playerName: carrier.name, importance: "NOTABLE" });
+        state = "FACEOFF"; setup = "carry"; press = 0;
+        foZone = CFG.zoneFaceoffsEnabled ? carrierTeam.id : null;
+        noChange[carrierTeam.id] = true; // no change for the icing team
+        // late and protecting a lead / a tie: burn the timeout to rest the stuck unit
+        if (regulation && period === 3 && PERIOD_SECONDS - tick <= 300 && margin >= 0 && margin <= 1) useTimeout(carrierTeam, tick, "after the icing");
+        continue;
+      }
+    }
     // 2) advance the puck toward the offensive zone (zone entry: SK+PH vs DF+SK)
     if (zone !== "OFF") {
       if (rng.chance(0.28)) {
@@ -1756,7 +1872,10 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
     // of always reaching the net, so the upstream rate is boosted to keep the actual
     // on-goal (SOG) rate the calibration is tuned against unchanged.
     const lateShell = st.isNextGen ? lateShellShotMult(period, tick, margin) : 1;
-    if (!rng.chance(0.29 * atkFx.shotRate * def.tactics.oppShotRate * MISS_COMPENSATION * lateShell)) continue;
+    const adaptAtk = adapt(carrierTeam, margin).shots, adaptDef = adapt(def, -margin).allow;
+    const openIce = curSkaters[home.id] === 4 && curSkaters[away.id] === 4 && curStr[carrierTeam.id] === "EV" ? FOUR_ON_FOUR_SHOTS : 1;
+    const armUp = delayedFor === carrierTeam.id ? 1.2 : 1;
+    if (!rng.chance(0.29 * atkFx.shotRate * def.tactics.oppShotRate * MISS_COMPENSATION * lateShell * adaptAtk * adaptDef * openIce * armUp)) continue;
     // Shoot-or-pass decision FIRST. A forward who elects to SHOOT sometimes walks
     // the puck back to the point for a D one-timer instead — this is how D rack up
     // their goals. But a forward who would PASS keeps the puck (→ his linemate's
@@ -1946,8 +2065,50 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
         meta: { danger, setup, mph: Math.round(mph), situation: shotSituation },
       });
       if (rng.chance(p)) {
+        // Coach's challenge: a few goals are reviewable (offside / goaltender
+        // interference). The defending bench decides from its video read.
+        const pref = coach[def.id].challenge;
+        let failedChallenge: string | null = null;
+        if (CFG.challengeEnabled && !defEmptyNet && pref !== "never" && !st.challengeFailed[def.id]) {
+          const r = rng.next();
+          const kind = r < 0.03 ? "offside" : r < 0.06 ? "goaltender interference" : null;
+          if (kind) {
+            const wrong = rng.chance(kind === "offside" ? 0.45 : 0.4);
+            // the video coach's read is noisy: a real call looks convincing ~60 % of the time
+            const read = (wrong ? 0.6 : 0.4) + (rng.next() - 0.5) * 0.9;
+            const tight = period >= 3 && margin >= -1 && margin <= 0; // the goal would tie it / put them ahead
+            if (pref === "always" || read >= (tight ? 0.42 : 0.55)) {
+              st.box[def.id].challenges++;
+              if (wrong) {
+                st.box[def.id].challengesWon++;
+                st.sink.emit({ period, seconds: tick, type: "CHALLENGE", teamId: def.id, teamCode: def.code ?? undefined, playerId: carrier.id, playerName: carrier.name, importance: "MAJOR", meta: { kind, won: true } });
+                gLine.saves++; // no goal — the shot stands as a save
+                state = "FACEOFF"; setup = "carry"; press = 0; foZone = null;
+                continue;
+              }
+              st.challengeFailed[def.id] = true;
+              failedChallenge = kind;
+            }
+          }
+        }
         if (!defEmptyNet) gLine.goalsAgainst++;
         recordGoal(st, carrierTeam, def, period, tick, strength, defEmptyNet, carrier, { sector, shotType, xg });
+        if (failedChallenge) {
+          st.sink.emit({ period, seconds: tick, type: "CHALLENGE", teamId: def.id, teamCode: def.code ?? undefined, playerId: carrier.id, playerName: carrier.name, importance: "MAJOR", meta: { kind: failedChallenge, won: false } });
+          const server = onIceF(def)[0] ?? def.forwards[0];
+          if (server) addPenalty(st, def, server, period, tick, "Delay of game (failed challenge)", 2, "Minor", true);
+        }
+        // a goal on the delayed call washes a plain minor out
+        if (delayedFor === carrierTeam.id) {
+          const pend = active.find((q) => !q.expired && !q.offsetting && !q.fourOnFour && q.team === def.id && q.start > tick && (q.minutes ?? 2) === 2);
+          if (pend) {
+            pend.expired = true;
+            const ri = st.penalties.findIndex((x) => x.team === def.id && x.period === period && x.seconds === pend.start && x.playerId === pend.playerId);
+            if (ri >= 0) { const r = st.penalties[ri]; st.lines[def.id][r.playerId] && (st.lines[def.id][r.playerId].pim -= r.minutes); st.box[def.id].pim -= r.minutes; st.penalties.splice(ri, 1); }
+            st.box[carrierTeam.id].ppOpp = Math.max(0, st.box[carrierTeam.id].ppOpp - 1);
+            for (const e of st.sink.all()) if (e.type === "PENALTY" && e.period === period && e.seconds === pend.start && e.playerId === pend.playerId) e.meta = { ...(e.meta ?? {}), washedOut: true };
+          }
+        }
         if (opts.suddenDeath) { suddenWinner = carrierTeam.id; break; } // overtime winner — game over
         momoOnGoal(st, carrierTeam.id, def.id, absT);
         if (!defEmptyNet) maybePullGoalie(st, def); // yank the starter if he's been shelled
@@ -1978,7 +2139,7 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
           playerId: carrier.id, playerName: carrier.name, zone: "OFF", importance: "NOTABLE",
         });
       }
-      else if (rng.chance(0.12)) { state = "FACEOFF"; setup = "carry"; press = 0; } // goalie freezes it → whistle
+      else if (rng.chance(CFG.zoneFaceoffsEnabled ? 0.095 : 0.12)) { state = "FACEOFF"; setup = "carry"; press = 0; foZone = CFG.zoneFaceoffsEnabled ? def.id : null; } // goalie freezes it → whistle, draw in his end
       else { carrierTeam = def; carrier = pickByAttr(rng, onIceD(def).concat(onIceF(def)), (s) => s.attrs.pa ?? 50) ?? dman; zone = "DEF"; setup = "carry"; press = 0; } // covered & cleared, play on
       continue;
     }
@@ -1995,7 +2156,7 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
   // any penalty still running at the buzzer carries its remaining time to next period
   st.carryPenalties = active
     .filter((p) => !p.expired && p.end > PERIOD_SECONDS)
-    .map((p) => ({ team: p.team, start: 0, end: p.end - PERIOD_SECONDS, expired: false, playerId: p.playerId, offsetting: p.offsetting }));
+    .map((p) => ({ team: p.team, start: 0, end: p.end - PERIOD_SECONDS, expired: false, playerId: p.playerId, offsetting: p.offsetting, fourOnFour: p.fourOnFour, minutes: p.minutes }));
   // same carry-over for a misconduct that's still running at the buzzer — otherwise
   // subMis's `m.period === period` check drops the bench the instant the period ends,
   // letting the guy back on the ice before his 10/20 minutes are actually up.
@@ -2510,6 +2671,9 @@ export type SimOptions = {
   // All-Star format: the whole game is 3-on-3 — `periods` halves of `periodSeconds`,
   // every goal counts, goalies swap at the break, a tie goes straight to a shootout.
   threeOnThree?: { periods: number; periodSeconds: number; chanceMult?: number; finishMult?: number };
+  // tonight's referee crew: penaltyMult scales how many infractions get called
+  // (a strict crew >1), evenUp 0..1 how much it "manages the game" (evens up calls)
+  officials?: { penaltyMult: number; evenUp: number };
 };
 
 export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}): GameResult {
@@ -2534,6 +2698,9 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     shootout: [],
     sink: new EventSink(),
     isNextGen: (opts.engineVersion ?? ENGINE_VERSION) === ENGINE_V2,
+    officials: CFG.officialsEnabled && opts.officials ? opts.officials : null,
+    timeoutUsed: {},
+    challengeFailed: {},
   };
   for (const team of [home, away]) {
     for (const s of [...team.forwards, ...team.defense]) {

@@ -51,7 +51,7 @@ type Data = {
   goals: GoalE[]; penalties: PenE[]; playByPlay: PbpE[]; shootout?: ShootoutE[];
   injuries?: InjuryRow[]; homeSystem?: SystemDials; awaySystem?: SystemDials;
   story?: { report: GameReport; flow: GameFlow } | null;
-  attendance?: number | null; arena?: string | null; event?: { kind: string; title: string; venue: string | null } | null; gameDate?: string | Date | null;
+  attendance?: number | null; arena?: string | null; event?: { kind: string; title: string; venue: string | null } | null; officials?: { name: string; number: number | null; role: string }[]; gameDate?: string | Date | null;
 };
 
 function ShootoutView({ data }: { data: Data }) {
@@ -706,6 +706,12 @@ export default function GameView({ data }: { data: Data }) {
           <div className="text-center text-xs text-slate-400 mt-3 pt-3 border-t border-slate-800/60 flex items-center justify-center flex-wrap gap-x-3 gap-y-1">
             {data.arena && <span>🏟️ {data.arena}</span>}
             {data.attendance != null && <span>👥 {data.attendance.toLocaleString()} fans</span>}
+          </div>
+        )}
+        {!!data.officials?.length && (
+          <div className="text-center text-[11px] text-slate-500 mt-1.5 flex items-center justify-center flex-wrap gap-x-3 gap-y-1">
+            <Link href="/league/officials" className="hover:text-slate-300">🦓 Referees: {data.officials.filter((o) => o.role === "REF").map((o) => `${o.name}${o.number ? ` #${o.number}` : ""}`).join(", ")}</Link>
+            <span>Linesmen: {data.officials.filter((o) => o.role !== "REF").map((o) => `${o.name}${o.number ? ` #${o.number}` : ""}`).join(", ")}</span>
           </div>
         )}
       </div>

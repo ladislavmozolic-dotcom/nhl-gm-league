@@ -166,6 +166,14 @@ const SECTIONS: Sec[] = [
         "Regular season (as in the NHL): a tie after 60 minutes goes to 5:00 of sudden-death 3-on-3 overtime, then a shootout. The loser gets a point.",
         "Playoffs (as in the NHL): no shootout — full 20-minute periods of 5-on-5 sudden death, with normal lines, power plays and penalties, as many as it takes until someone scores.",
       ] },
+      { h: "Game flow & bench decisions", points: [
+        "Icing: a clearance from your own end that goes the length of the ice stops play — your unit on the ice can't change and the draw is in your zone (a tired line under forecheck ices it most). Shorthanded teams may ice it. About 4 per team per game.",
+        "Zone faceoffs: after an icing, a frozen puck or a penalty, the draw is in that team's end — win it there and you start with the puck in the zone. A power play therefore starts with an offensive-zone draw.",
+        "Delayed penalty: while the referee's arm is up the other side pulls its goalie for an extra attacker until an offender touches the puck; a goal in the meantime washes a minor out.",
+        "Coincidental minors (one to each side, e.g. an after-the-whistle scrum) at full strength → 4-on-4, as in the NHL. Other coincidental combinations are substituted.",
+        "Lines → Strategy → Bench decisions (your choice): shorten the bench (close game in the last minutes of the 3rd and in playoff OT — lines 1–3 and pairs 1–2 carry the load), adjust to the score from the 3rd period (push when behind, tighten when ahead), use the timeout (late after an icing when leading/tied, or right before pulling the goalie), and the coach's challenge (offside / goaltender interference: 'when the video looks good', always or never). A failed challenge costs a 2-minute minor.",
+        "Referees: every NHL game gets two referees and two linesmen from the real 2025-26 NHL roster (League → Officials). A strict crew calls more penalties, a lenient one fewer, based on each referee's real penalties per game.",
+      ] },
       { h: "Player Safety (suspensions)", points: [
         "After every night's games the Department of Player Safety reviews game misconducts, majors for violent infractions (boarding, cross-checking, elbowing…) and hits that injure an opponent. Most incidents draw nothing; some a fine (max $5,000), some a suspension of 1–10 games — about 35 a season, like the NHL.",
         "A repeat offender (suspended within the last 18 months) is punished harder. A suspended player can't dress (NHL or AHL) and serves in his NHL club's games.",

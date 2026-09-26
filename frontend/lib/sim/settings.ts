@@ -126,6 +126,18 @@ export type EngineSettings = {
   expansionCapFloorPct: number;      // post-draft committed cap must be ≥ this % of the league's cap floor to pass the advisory check on the results page — real-2021-calibrated default
   expansionRequireGoalie: boolean;   // warn on the results page if no goalie was selected across all picks
   rosterOverFinePerDay: number; // fine per excess player per day
+  // game-flow realism (lib/sim/engine.ts)
+  benchShortenEnabled: boolean;    // close-game / playoff bench shortening (per club: Lines → Strategy)
+  coachAdaptEnabled: boolean;      // 3rd-period score adjustment (per club: Lines → Strategy)
+  fourOnFourEnabled: boolean;      // coincidental minors at full strength → 4-on-4 (NHL Rule 19)
+  scrumMinorsPerGame: number;      // after-the-whistle coincidental roughing pairs per game (live, at stoppages)
+  delayedPenaltyEnabled: boolean;  // extra attacker on a delayed call; a goal washes out the minor
+  icingEnabled: boolean;           // icing: whistle, draw in the icing team's zone, no line change
+  icingRatePct: number;            // scales icings (100 ≈ 4–5 per team per game)
+  zoneFaceoffsEnabled: boolean;    // draws after icing / a frozen puck are in the zone, not at centre
+  challengeEnabled: boolean;       // coach's challenge (offside / goaltender interference)
+  timeoutEnabled: boolean;         // one timeout per team
+  officialsEnabled: boolean;       // referee crews: each crew's strictness + game management
   specialHomeBonus: number;   // outdoor game (Heritage/Winter Classic/Stadium Series) — extra income to the host club
   specialAwayBonus: number;   // …and to the visiting club
   globalSeriesBonus: number;  // each club in a Global Series (neutral-site) game
@@ -250,6 +262,9 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   finSponsorBase: 5000000, finSponsorRange: 8000000,
   expansionRuleset: "real2021", expansionCapFloorPct: 0.6, expansionRequireGoalie: true,
   rosterOverFinePerDay: 200000,
+  benchShortenEnabled: true, coachAdaptEnabled: true, fourOnFourEnabled: true, scrumMinorsPerGame: 0.3,
+  delayedPenaltyEnabled: true, icingEnabled: true, icingRatePct: 100, zoneFaceoffsEnabled: true,
+  challengeEnabled: true, timeoutEnabled: true, officialsEnabled: true,
   specialHomeBonus: 3000000, specialAwayBonus: 1000000, globalSeriesBonus: 1500000,
   disciplineEnabled: true, disciplinePct: 100, retireMinGames: 300,
   rewardPlayoff: 8000000, rewardCup: 3000000, rewardAhlCup: 4000000, rewardAhlFinalist: 2000000,

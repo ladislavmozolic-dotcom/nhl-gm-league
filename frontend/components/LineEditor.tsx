@@ -15,7 +15,8 @@ import RinkFormationMap from "@/components/RinkFormationMap";
 import JerseyChip from "@/components/JerseyChip";
 import { useLang } from "@/components/LangProvider";
 import { dialLabel, dialDesc } from "@/lib/tactics-i18n";
-import type { GameStrategy, StratWeights } from "@/lib/sim/types";
+import type { GameStrategy, StratWeights, CoachingPrefs } from "@/lib/sim/types";
+import { DEFAULT_COACHING } from "@/lib/sim/types";
 
 type Player = {
   id: number; name: string; position: string; overall: number; injured?: boolean; tired?: boolean; df?: number | null; con?: number; cap?: "C" | "A" | null;
@@ -44,14 +45,14 @@ const isD = (p: string) => /(^|\/)D(\/|$)/.test(p) || p === "D";
 // checks are NOT mutually exclusive, unlike isD() above.
 const isEligibleF = (p: string) => /(^|\/)(C|LW|RW)(\/|$)/.test(p);
 const isEligibleD = isD;
-const STATES: Array<{ key: keyof Omit<GameStrategy, "goaliePull">; label: string }> = [
+const STATES: Array<{ key: keyof Omit<GameStrategy, "goaliePull" | "coaching">; label: string }> = [
   { key: "winning2", label: "Winning by 2+" },
   { key: "winning1", label: "Winning by 1" },
   { key: "tied", label: "Score tied" },
   { key: "losing1", label: "Losing by 1" },
   { key: "losing2", label: "Losing by 2+" },
 ];
-const STRATEGY_META: Record<keyof Omit<GameStrategy, "goaliePull">, { tone: string; cue: string }> = {
+const STRATEGY_META: Record<keyof Omit<GameStrategy, "goaliePull" | "coaching">, { tone: string; cue: string }> = {
   winning2: { tone: "protect", cue: "Protect the lead" },
   winning1: { tone: "steady", cue: "Stay structured" },
   tied: { tone: "balanced", cue: "Control the play" },
@@ -888,6 +889,28 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
             <label className="lines-goalie-card"><span className="lines-setting-icon">⇄</span><span>Swap goalie under SV%</span>
               <Stepper value={data.strategy.goaliePull.savePctUnder} min={0} max={100} step={5} w="w-14" onChange={(v) => change((d) => { d.strategy.goaliePull.savePctUnder = v; })} /></label>
           </section>
+          {(() => {
+            const cp: CoachingPrefs = { ...DEFAULT_COACHING, ...(data.strategy.coaching ?? {}) };
+            const setCp = (patch: Partial<CoachingPrefs>) => change((d) => { d.strategy.coaching = { ...DEFAULT_COACHING, ...(d.strategy.coaching ?? {}), ...patch }; });
+            const toggle = (k: "benchShorten" | "coachAdapt" | "timeout", icon: string, label: string, hint: string) => (
+              <label key={k} className="lines-goalie-card cursor-pointer" title={hint}><span className="lines-setting-icon">{icon}</span><span>{label}<span className="block text-[10px] font-normal text-slate-400">{hint}</span></span>
+                <input type="checkbox" className="h-4 w-4 accent-blue-500" checked={cp[k]} onChange={(e) => setCp({ [k]: e.target.checked } as Partial<CoachingPrefs>)} /></label>
+            );
+            return (
+              <section className="lines-goalie-panel">
+                <div className="sm:col-span-3"><p className="lines-kicker">Bench decisions</p></div>
+                {toggle("benchShorten", "⇶", "Shorten the bench", "Close game, last minutes of the 3rd & playoff OT: lean on lines 1–3 and pairs 1–2")}
+                {toggle("coachAdapt", "↯", "Adjust to the score", "From the 3rd: push when behind, tighten up when ahead")}
+                {toggle("timeout", "⏸", "Use the timeout", "Late after an icing (leading/tied) or right before pulling the goalie")}
+                <label className="lines-goalie-card" title="When to use the coach's challenge on a reviewable goal against (offside / goaltender interference). A failed challenge = 2-minute minor."><span className="lines-setting-icon">🎥</span><span>Coach&apos;s challenge<span className="block text-[10px] font-normal text-slate-400">Failed challenge = 2-min minor</span></span>
+                  <select className="rounded bg-slate-800 border border-slate-700 px-1.5 py-1 text-xs" value={cp.challenge} onChange={(e) => setCp({ challenge: e.target.value as CoachingPrefs["challenge"] })}>
+                    <option value="smart">When video looks good</option>
+                    <option value="always">Always</option>
+                    <option value="never">Never</option>
+                  </select></label>
+              </section>
+            );
+          })()}
         </div>
       )}
       </div>

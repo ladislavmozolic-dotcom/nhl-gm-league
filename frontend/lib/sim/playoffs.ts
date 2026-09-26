@@ -1,6 +1,7 @@
 // Playoff bracket: seed from standings, run best-of-7 series, advance rounds
 // until a champion. Playoff games are regular Game rows tagged with seriesId.
 
+import { assignCrews } from "../officials-server";
 import { prisma } from "./../prisma";
 import { loadSimTeam } from "./index";
 import { simulateGame } from "./engine";
@@ -247,6 +248,7 @@ export async function advancePlayoffDay(season: string, league: string, dayStart
   const teamCache = new Map<number, Awaited<ReturnType<typeof loadSimTeam>>>();
   const getTeam = async (id: number) => teamCache.get(id) ?? teamCache.set(id, await loadSimTeam(id)).get(id)!;
 
+  const crews = league === "NHL" ? await assignCrews(due.map((g) => g.id), { playoffs: true }).catch(() => new Map()) : new Map();
   for (const g of due) {
     const s = await prisma.playoffSeries.findUnique({ where: { id: g.seriesId! } });
     if (!s) continue;
@@ -259,7 +261,9 @@ export async function advancePlayoffDay(season: string, league: string, dayStart
     const [high, low] = await Promise.all([getTeam(s.highSeedTeamId), getTeam(s.lowSeedTeamId)]);
     const home = highHome ? high : low, away = highHome ? low : high;
     const seed = fixtureSeed(s.id * 101 + (g.gameNum ?? 1), s.highSeedTeamId, s.round);
-    const result = simulateGame(home, away, { seed, settings, noShootout: true, engineVersion });
+    const crew = crews.get(g.id);
+    const result = simulateGame(home, away, { seed, settings, noShootout: true, engineVersion, officials: crew ? { penaltyMult: crew.penaltyMult, evenUp: crew.evenUp } : undefined });
+    if (crew) await prisma.game.update({ where: { id: g.id }, data: { officialIds: crew.ids } }).catch(() => {});
     await saveGameResult(result, {
       gameId: g.id, season, league, round: s.round, seriesId: s.id, gameNum: g.gameNum ?? 1, gameDate: g.gameDate ?? dayStart,
       homeLines: home.linesUsed, awayLines: away.linesUsed,

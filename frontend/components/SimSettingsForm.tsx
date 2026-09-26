@@ -256,6 +256,29 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
         </div>
       </Card>
 
+      <Card title="Game flow — bench, stoppages, officials">
+        <p className="text-[11px] text-slate-500 mb-3">Real-hockey game management. Bench shortening, score adjustment, the timeout and the coach&apos;s challenge are also per-club choices (Lines → Strategy → Bench decisions); these switches turn a mechanic off league-wide.</p>
+        <div className="grid gap-x-6 gap-y-1 md:grid-cols-3">
+          <div>
+            <Toggle k="benchShortenEnabled" label="Bench shortening (close late 3rd / playoff OT)" />
+            <Toggle k="coachAdaptEnabled" label="3rd-period score adjustment" />
+            <Toggle k="timeoutEnabled" label="Timeouts" />
+            <Toggle k="challengeEnabled" label="Coach's challenge" />
+          </div>
+          <div>
+            <Toggle k="fourOnFourEnabled" label="Coincidental minors → 4-on-4" />
+            <NumField k="scrumMinorsPerGame" label="After-whistle scrums (roughing pairs) / game" step={0.05} />
+            <Toggle k="delayedPenaltyEnabled" label="Delayed penalty (extra attacker, wash-out)" />
+          </div>
+          <div>
+            <Toggle k="icingEnabled" label="Icing (no change, draw in own end)" />
+            <NumField k="icingRatePct" label="Icing frequency % (100 ≈ 4 / team / game)" />
+            <Toggle k="zoneFaceoffsEnabled" label="Zone faceoffs (after icing / freeze / penalty)" />
+            <Toggle k="officialsEnabled" label="Referee crews (strictness, evening up)" />
+          </div>
+        </div>
+      </Card>
+
       <Card title="Special games · Player Safety · Retired numbers">
         <div className="grid gap-x-6 md:grid-cols-3">
           <div>

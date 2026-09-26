@@ -1,0 +1,667 @@
+[
+{
+"name": "Cody Beach",
+"number": 12,
+"country": "CAN",
+"role": "REF",
+"minor": false,
+"sampleGames": 75,
+"penaltiesPerGame": 7.9
+},
+{
+"name": "Ben Betker",
+"number": 42,
+"country": "CAN",
+"role": "REF",
+"minor": true,
+"sampleGames": 1,
+"penaltiesPerGame": 5.0
+},
+{
+"name": "Brandon Blandina",
+"number": 39,
+"country": "USA",
+"role": "REF",
+"minor": false,
+"sampleGames": 75,
+"penaltiesPerGame": 7.5
+},
+{
+"name": "Riley Brace",
+"number": 49,
+"country": "CAN",
+"role": "REF",
+"minor": true,
+"sampleGames": 16,
+"penaltiesPerGame": 8.6
+},
+{
+"name": "Jake Brenk",
+"number": 26,
+"country": "USA",
+"role": "REF",
+"minor": false,
+"sampleGames": 76,
+"penaltiesPerGame": 7.7
+},
+{
+"name": "Francis Charron",
+"number": 6,
+"country": "CAN",
+"role": "REF",
+"minor": false,
+"sampleGames": 76,
+"penaltiesPerGame": 7.8
+},
+{
+"name": "Tom Chmielewski",
+"number": 18,
+"country": "USA",
+"role": "REF",
+"minor": false,
+"sampleGames": 76,
+"penaltiesPerGame": 7.3
+},
+{
+"name": "Mitch Dunning",
+"number": 20,
+"country": "CAN",
+"role": "REF",
+"minor": false,
+"sampleGames": 55,
+"penaltiesPerGame": 7.9
+},
+{
+"name": "Gord Dwyer",
+"number": 19,
+"country": "CAN",
+"role": "REF",
+"minor": false,
+"sampleGames": 70,
+"penaltiesPerGame": 7.5
+},
+{
+"name": "Eric Furlatt",
+"number": 27,
+"country": "CAN",
+"role": "REF",
+"minor": false,
+"sampleGames": 69,
+"penaltiesPerGame": 7.9
+},
+{
+"name": "Beaudry Halkidis",
+"number": 48,
+"country": "CAN",
+"role": "REF",
+"minor": true,
+"sampleGames": 42,
+"penaltiesPerGame": 7.3
+},
+{
+"name": "Graedy Hamilton",
+"number": 41,
+"country": "CAN",
+"role": "REF",
+"minor": true,
+"sampleGames": 31,
+"penaltiesPerGame": 6.5
+},
+{
+"name": "Trevor Hanson",
+"number": 14,
+"country": "CAN",
+"role": "REF",
+"minor": false,
+"sampleGames": 76,
+"penaltiesPerGame": 7.2
+},
+{
+"name": "Jean Hebert",
+"number": 15,
+"country": "CAN",
+"role": "REF",
+"minor": false,
+"sampleGames": 63,
+"penaltiesPerGame": 8.0
+},
+{
+"name": "Stephen Hiff",
+"number": 46,
+"country": "CAN",
+"role": "REF",
+"minor": true,
+"sampleGames": 45,
+"penaltiesPerGame": 7.7
+},
+{
+"name": "Justin Kea",
+"number": 36,
+"country": "CAN",
+"role": "REF",
+"minor": false,
+"sampleGames": 76,
+"penaltiesPerGame": 7.4
+},
+{
+"name": "Steve Kozari",
+"number": 40,
+"country": "CAN",
+"role": "REF",
+"minor": false
+},
+{
+"name": "Pierre Lambert",
+"number": 25,
+"country": "CAN",
+"role": "REF",
+"minor": false,
+"sampleGames": 75,
+"penaltiesPerGame": 7.0
+},
+{
+"name": "Frederick L'Ecuyer",
+"number": 17,
+"country": "CAN",
+"role": "REF",
+"minor": false,
+"sampleGames": 75,
+"penaltiesPerGame": 7.4
+},
+{
+"name": "Chris Lee",
+"number": 28,
+"country": "CAN",
+"role": "REF",
+"minor": false
+},
+{
+"name": "Alex Lepkowski",
+"number": 44,
+"country": "USA",
+"role": "REF",
+"minor": false,
+"sampleGames": 23,
+"penaltiesPerGame": 7.0
+},
+{
+"name": "TJ Luxmore",
+"number": 21,
+"country": "CAN",
+"role": "REF",
+"minor": false,
+"sampleGames": 76,
+"penaltiesPerGame": 7.7
+},
+{
+"name": "Liam Maaskant",
+"number": 45,
+"country": "CAN",
+"role": "REF",
+"minor": true,
+"sampleGames": 28,
+"penaltiesPerGame": 7.0
+},
+{
+"name": "Peter MacDougall",
+"number": 38,
+"country": "CAN",
+"role": "REF",
+"minor": false,
+"sampleGames": 65,
+"penaltiesPerGame": 7.5
+},
+{
+"name": "Morgan MacPhee",
+"number": 43,
+"country": "CAN",
+"role": "REF",
+"minor": true,
+"sampleGames": 34,
+"penaltiesPerGame": 6.6
+},
+{
+"name": "Michael Markovic",
+"number": 31,
+"country": "CAN",
+"role": "REF",
+"minor": false,
+"sampleGames": 75,
+"penaltiesPerGame": 7.9
+},
+{
+"name": "Wes McCauley",
+"number": 4,
+"country": "CAN",
+"role": "REF",
+"minor": false,
+"sampleGames": 77,
+"penaltiesPerGame": 7.1
+},
+{
+"name": "Jon McIsaac",
+"number": 2,
+"country": "CAN",
+"role": "REF",
+"minor": false,
+"sampleGames": 75,
+"penaltiesPerGame": 6.3
+},
+{
+"name": "Kendrick Nicholson",
+"number": 30,
+"country": "CAN",
+"role": "REF",
+"minor": false,
+"sampleGames": 76,
+"penaltiesPerGame": 6.9
+},
+{
+"name": "Dan O'Rourke",
+"number": 9,
+"country": "CAN",
+"role": "REF",
+"minor": false,
+"sampleGames": 23,
+"penaltiesPerGame": 5.7
+},
+{
+"name": "Brian Pochmara",
+"number": 16,
+"country": "USA",
+"role": "REF",
+"minor": false,
+"sampleGames": 43,
+"penaltiesPerGame": 7.8
+},
+{
+"name": "Garrett Rank",
+"number": 7,
+"country": "CAN",
+"role": "REF",
+"minor": false,
+"sampleGames": 76,
+"penaltiesPerGame": 8.3
+},
+{
+"name": "Kyle Rehman",
+"number": 10,
+"country": "CAN",
+"role": "REF",
+"minor": false,
+"sampleGames": 76,
+"penaltiesPerGame": 7.6
+},
+{
+"name": "Chris Rooney",
+"number": 5,
+"country": "USA",
+"role": "REF",
+"minor": false,
+"sampleGames": 38,
+"penaltiesPerGame": 7.7
+},
+{
+"name": "Jordan Samuels-Thomas",
+"number": 37,
+"country": "USA",
+"role": "REF",
+"minor": false,
+"sampleGames": 75,
+"penaltiesPerGame": 8.3
+},
+{
+"name": "Carter Sandlak",
+"number": 29,
+"country": "CAN",
+"role": "REF",
+"minor": false,
+"sampleGames": 71,
+"penaltiesPerGame": 6.4
+},
+{
+"name": "Chris Schlenker",
+"number": 3,
+"country": "CAN",
+"role": "REF",
+"minor": false,
+"sampleGames": 76,
+"penaltiesPerGame": 7.6
+},
+{
+"name": "Brandon Schrader",
+"number": 34,
+"country": "USA",
+"role": "REF",
+"minor": false,
+"sampleGames": 75,
+"penaltiesPerGame": 6.9
+},
+{
+"name": "Graham Skilliter",
+"number": 24,
+"country": "CAN",
+"role": "REF",
+"minor": false,
+"sampleGames": 76,
+"penaltiesPerGame": 7.2
+},
+{
+"name": "Furman South",
+"number": 13,
+"country": "USA",
+"role": "REF",
+"minor": false,
+"sampleGames": 76,
+"penaltiesPerGame": 6.9
+},
+{
+"name": "François St-Laurent",
+"number": 8,
+"country": "CAN",
+"role": "REF",
+"minor": false,
+"sampleGames": 59,
+"penaltiesPerGame": 7.6
+},
+{
+"name": "Michael Sullivan",
+"number": 47,
+"country": "CAN",
+"role": "REF",
+"minor": true,
+"sampleGames": 38,
+"penaltiesPerGame": 6.9
+},
+{
+"name": "Kelly Sutherland",
+"number": 11,
+"country": "CAN",
+"role": "REF",
+"minor": false,
+"sampleGames": 76,
+"penaltiesPerGame": 8.2
+},
+{
+"name": "Corey Syvret",
+"number": 23,
+"country": "CAN",
+"role": "REF",
+"minor": false,
+"sampleGames": 76,
+"penaltiesPerGame": 6.6
+},
+{
+"name": "Shandor Alphonso",
+"number": 52,
+"country": "CAN",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Caleb Apperson",
+"number": 77,
+"country": "CAN",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Tyson Baker",
+"number": 88,
+"country": "CAN",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Steve Barton",
+"number": 59,
+"country": "CAN",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Devin Berg",
+"number": 87,
+"country": "CAN",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Dylan Blujus",
+"number": 57,
+"country": "USA",
+"role": "LINESMAN",
+"minor": true
+},
+{
+"name": "David Brisebois",
+"number": 96,
+"country": "CAN",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Scott Cherrey",
+"number": 50,
+"country": "CAN",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Michel Cormier",
+"number": 76,
+"country": "CAN",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Ryan Daisy",
+"number": 81,
+"country": "USA",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Jonathan Deschamps",
+"number": 80,
+"country": "CAN",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Jeremy Faucher",
+"number": 97,
+"country": "CAN",
+"role": "LINESMAN",
+"minor": true
+},
+{
+"name": "Kyle Flemington",
+"number": 55,
+"country": "CAN",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Julien Fournier",
+"number": 56,
+"country": "CAN",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Brandon Gawryletz",
+"number": 64,
+"country": "CAN",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Travis Gawryletz",
+"number": 67,
+"country": "CAN",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Ryan Gibbons",
+"number": 58,
+"country": "CAN",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Brandon Grillo",
+"number": 75,
+"country": "USA",
+"role": "LINESMAN",
+"minor": true
+},
+{
+"name": "Tommy Hughes",
+"number": 65,
+"country": "CAN",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Ryan Jackson",
+"number": 84,
+"country": "CAN",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Dan Kelly",
+"number": 98,
+"country": "USA",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Trent Knorr",
+"number": 74,
+"country": "CAN",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Brad Kovachik",
+"number": 71,
+"country": "CAN",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Matt MacPherson",
+"number": 83,
+"country": "CAN",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Joseph Mahon",
+"number": 89,
+"country": "CAN",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Jesse Marquis",
+"number": 86,
+"country": "CAN",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Kilian McNamara",
+"number": 93,
+"country": "USA",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Bevan Mills",
+"number": 53,
+"country": "CAN",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Kiel Murchison",
+"number": 79,
+"country": "CAN",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "CJ Murray",
+"number": 68,
+"country": "USA",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Jonny Murray",
+"number": 95,
+"country": "CAN",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Ben O'Quinn",
+"number": 91,
+"country": "CAN",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Shawn Oliver",
+"number": 66,
+"country": "CAN",
+"role": "LINESMAN",
+"minor": true
+},
+{
+"name": "Bryan Pancich",
+"number": 94,
+"country": "USA",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Mark Shewchyk",
+"number": 92,
+"country": "CAN",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Andrew Smith",
+"number": 51,
+"country": "CAN",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Libor Suchanek",
+"number": 60,
+"country": "CZE",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "James Tobias",
+"number": 61,
+"country": "USA",
+"role": "LINESMAN",
+"minor": false
+},
+{
+"name": "Travis Toomey",
+"number": 90,
+"country": "CAN",
+"role": "LINESMAN",
+"minor": false
+}
+]

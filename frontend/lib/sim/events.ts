@@ -27,7 +27,12 @@ export type EventType =
   | "EMPTY_NET"
   | "FIGHT"
   | "INJURY"
-  | "LINE_CHANGE"; // a fresh forward line / D pair hops the boards
+  | "LINE_CHANGE" // a fresh forward line / D pair hops the boards
+  | "ICING"             // an icing whistle — the icing team can't change, draw in its own zone
+  | "DELAYED_PENALTY"   // arm up: the other side pulls its goalie until the offenders touch the puck
+  | "CHALLENGE"         // coach's challenge on a goal (offside / goaltender interference)
+  | "TIMEOUT"           // a bench's one timeout
+  | "COINCIDENTAL";     // coincidental minors at full strength → 4-on-4
 
 // Rising importance — controls what gets persisted and how loud the PBP is.
 export type Importance = "MINOR" | "NOTABLE" | "MAJOR" | "HIGHLIGHT";

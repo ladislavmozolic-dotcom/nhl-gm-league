@@ -870,6 +870,7 @@ model Game {
   eventTitle        String?
   eventVenue        String? // "Rice-Eccles Stadium, Salt Lake City"
   eventCapacity     Int? // crowd for the event (replaces the home arena's capacity)
+  officialIds       Int[]                     @default([]) // [referee, referee, linesman, linesman] (Official ids) — NHL games
   playedAt          DateTime?
   createdAt         DateTime                  @default(now())
   homeTeam          Team                      @relation("HomeGames", fields: [homeTeamId], references: [id])
@@ -1689,4 +1690,21 @@ model OddsSnapshot {
   createdAt DateTime @default(now())
 
   @@unique([season, day])
+}
+
+// NHL on-ice officials (real 2025-26 roster). Referees carry a strictness from their
+// real penalties-per-game (Scouting The Refs), shrunk toward the league mean for
+// small samples; the crew's average scales how many infractions get called.
+model Official {
+  id               Int     @id @default(autoincrement())
+  name             String  @unique
+  number           Int?
+  country          String?
+  role             String // REF | LINESMAN
+  minor            Boolean @default(false) // NHL/AHL minor-league contract
+  penaltiesPerGame Float? // real 2025-26 penalties per game he worked (referees)
+  sampleGames      Int? // …over this many games
+  strictness       Float   @default(1) // penalty-rate multiplier (1 = league average)
+  evenUp           Float   @default(0.5) // 0..1 how much he "manages the game" (evens up calls)
+  active           Boolean @default(true)
 }

@@ -237,7 +237,9 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
         add(p, sec, t.id, "hit", `${victim.name} is hit by ${hit.name} and loses puck.`);
       }
     }
-    for (let i = 0; i < 2 + rng.int(3); i++) {
+    // icings are real simulated events now (ICING below) — colour only when the
+    // icing rule is switched off in the engine settings
+    if (!stream.some((x) => x.type === "ICING")) for (let i = 0; i < 2 + rng.int(3); i++) {
       const t = rng.chance(0.5) ? home : away;
       const sec = rt();
       const pl = availableAt(t, p, sec);
@@ -276,9 +278,26 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
           else add(p, e.seconds + 1, null, "faceoff", `${center(home, p, e.seconds).name} wins face-off versus ${center(away, p, e.seconds).name} in neutral zone.`);
         }
       } else if (e.type === "PENALTY") {
-        const m = e.meta as { penalty?: string; minutes?: number; severity?: string } | undefined;
+        const m = e.meta as { penalty?: string; minutes?: number; severity?: string; washedOut?: boolean } | undefined;
         if (m?.penalty === "Fighting") continue; // paired into a fight line below
+        if (m?.washedOut) { add(p, e.seconds, tId, "penalty", `The delayed penalty on ${e.playerName} (${m?.penalty ?? "infraction"}) is washed out by the goal.`); continue; }
         add(p, e.seconds, tId, "penalty", `${e.playerName} penalty for ${m?.penalty ?? "infraction"} (${m?.minutes ?? 2} min, ${m?.severity ?? "Minor"}).`, true);
+      } else if (e.type === "ICING") {
+        add(p, e.seconds, tId, "icing", `Icing by ${e.playerName ?? e.teamCode ?? "?"} — ${e.teamCode ?? "they"} can't change; the draw is in their end.`);
+      } else if (e.type === "DELAYED_PENALTY") {
+        add(p, e.seconds, tId, "change", `Delayed penalty — ${e.teamCode ?? sideOf(e.teamId ?? home.id).name} pulls the goalie for the extra attacker.`);
+      } else if (e.type === "COINCIDENTAL") {
+        const m = e.meta as { fourOnFour?: boolean; names?: string[] } | undefined;
+        add(p, e.seconds, null, "penalty", `After-the-whistle scrum: ${(m?.names ?? []).join(" and ")} both get roughing minors${m?.fourOnFour ? " — the teams play 4-on-4" : ""}.`, true);
+      } else if (e.type === "TIMEOUT") {
+        const why = (e.meta as { why?: string } | undefined)?.why;
+        add(p, e.seconds, tId, "change", `${e.teamCode ?? sideOf(e.teamId ?? home.id).name} calls its timeout${why ? ` ${why}` : ""}.`, true);
+      } else if (e.type === "CHALLENGE") {
+        const m = e.meta as { kind?: string; won?: boolean } | undefined;
+        const who = e.teamCode ?? sideOf(e.teamId ?? home.id).name;
+        add(p, e.seconds, tId, "goal", m?.won
+          ? `🎥 ${who} challenges for ${m?.kind}. After review the goal by ${e.playerName} is OVERTURNED — no goal!`
+          : `🎥 ${who} challenges for ${m?.kind}. After review the call on the ice stands — goal counts, and ${who} gets a delay-of-game minor.`, true);
       } else if (e.type === "LINE_CHANGE") {
         const m = e.meta as { unit?: string; label?: string; lineNo?: number; names?: string[] } | undefined;
         const who = e.teamCode ?? sideOf(e.teamId ?? home.id).name;

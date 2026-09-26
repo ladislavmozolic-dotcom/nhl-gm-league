@@ -7,6 +7,7 @@
 //   - a goalie starting on consecutive days is "fatigued" (back-to-back)
 //   Each round is treated as one day (until a real NHL schedule is imported).
 
+import { assignCrews, type Crew } from "../officials-server";
 import { prisma } from "../prisma";
 import { loadSimTeam } from "./index";
 import { simulateGame } from "./engine";
@@ -322,6 +323,8 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
     await prisma.game.update({ where: { id: gm.id }, data: { attendance: Math.round(fin.capacity * frac), gate: Math.round(frac * fin.sellout) } });
   };
 
+  // tonight's referee crews (NHL games only; real 2025-26 officials)
+  const crews = await assignCrews(scheduled.filter((g) => g.league !== "AHL").map((g) => g.id)).catch(() => new Map<number, Crew>());
   let played = 0;
   const playedIds: number[] = [];
   const skippedIds: number[] = [];
@@ -347,7 +350,9 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
     // the very same row unchanged stays reproducible.
     const seed = fixtureSeed(gm.homeTeamId, gm.awayTeamId, round + (gm.simCount ?? 0) * 1_000_003 + gm.id * 7);
     const rivalry = home.rivalTeamIds.includes(away.id) || away.rivalTeamIds.includes(home.id);
-    const result = simulateGame(home, away, { seed, settings, rivalry, league: gm.league === "AHL" ? "AHL" : "NHL", engineVersion });
+    const crew = crews.get(gm.id);
+    const result = simulateGame(home, away, { seed, settings, rivalry, league: gm.league === "AHL" ? "AHL" : "NHL", engineVersion, officials: crew ? { penaltyMult: crew.penaltyMult, evenUp: crew.evenUp } : undefined });
+    if (crew) await prisma.game.update({ where: { id: gm.id }, data: { officialIds: crew.ids } }).catch(() => {});
     await saveGameResult(result, {
       gameId: gm.id, season, gameDate: gm.gameDate ?? seasonDateFor(season, round),
       homeLines: home.linesUsed, awayLines: away.linesUsed,

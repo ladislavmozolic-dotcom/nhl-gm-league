@@ -75,7 +75,17 @@ export type GameStrategy = {
   winning2: StratWeights; winning1: StratWeights; tied: StratWeights;
   losing1: StratWeights; losing2: StratWeights;
   goaliePull: { minGoals: number; savePctUnder: number; pullSec: number };
+  // bench management (Lines → Strategy). Undefined = the defaults below.
+  coaching?: CoachingPrefs;
 };
+
+export type CoachingPrefs = {
+  benchShorten: boolean;                     // close late 3rd / playoff OT: lean on the top 3 lines + top 2 pairs
+  coachAdapt: boolean;                       // from the 3rd period: press when behind, tighten when ahead
+  challenge: "smart" | "always" | "never";   // coach's challenge on a reviewable goal against
+  timeout: boolean;                          // use the one timeout (tired unit iced late / before the goalie pull)
+};
+export const DEFAULT_COACHING: CoachingPrefs = { benchShorten: true, coachAdapt: true, challenge: "smart", timeout: true };
 
 export type SimTeam = {
   id: number;
@@ -243,6 +253,11 @@ export type TeamBox = {
   pim: number;
   ppGoals: number;
   ppOpp: number;         // power-play opportunities
+  icings: number;        // icings committed
+  challenges: number;    // coach's challenges made
+  challengesWon: number; // …that overturned the goal
+  timeouts: number;      // timeouts used (0/1)
+  fourOnFourSec: number; // seconds played 4-on-4
   faceoffWins: number;
   faceoffLosses: number;
   hits: number;
