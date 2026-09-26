@@ -138,6 +138,9 @@ export type EngineSettings = {
   challengeEnabled: boolean;       // coach's challenge (offside / goaltender interference)
   timeoutEnabled: boolean;         // one timeout per team
   officialsEnabled: boolean;       // referee crews: each crew's strictness + game management
+  faceoffSpecialistEnabled: boolean; // zone draws: the bench sends its best faceoff / right line out
+  knocksEnabled: boolean;          // shaken-up players leave and return later in the game
+  crowdEnabled: boolean;           // home crowd: a packed (or playoff) building lifts the home side, a half-empty one less
   specialHomeBonus: number;   // outdoor game (Heritage/Winter Classic/Stadium Series) — extra income to the host club
   specialAwayBonus: number;   // …and to the visiting club
   globalSeriesBonus: number;  // each club in a Global Series (neutral-site) game
@@ -265,6 +268,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   benchShortenEnabled: true, coachAdaptEnabled: true, fourOnFourEnabled: true, scrumMinorsPerGame: 0.3,
   delayedPenaltyEnabled: true, icingEnabled: true, icingRatePct: 100, zoneFaceoffsEnabled: true,
   challengeEnabled: true, timeoutEnabled: true, officialsEnabled: true,
+  faceoffSpecialistEnabled: true, knocksEnabled: true, crowdEnabled: true,
   specialHomeBonus: 3000000, specialAwayBonus: 1000000, globalSeriesBonus: 1500000,
   disciplineEnabled: true, disciplinePct: 100, retireMinGames: 300,
   rewardPlayoff: 8000000, rewardCup: 3000000, rewardAhlCup: 4000000, rewardAhlFinalist: 2000000,

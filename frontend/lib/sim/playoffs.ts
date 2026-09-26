@@ -262,7 +262,7 @@ export async function advancePlayoffDay(season: string, league: string, dayStart
     const home = highHome ? high : low, away = highHome ? low : high;
     const seed = fixtureSeed(s.id * 101 + (g.gameNum ?? 1), s.highSeedTeamId, s.round);
     const crew = crews.get(g.id);
-    const result = simulateGame(home, away, { seed, settings, noShootout: true, engineVersion, officials: crew ? { penaltyMult: crew.penaltyMult, evenUp: crew.evenUp } : undefined });
+    const result = simulateGame(home, away, { seed, settings, noShootout: true, engineVersion, officials: crew ? { penaltyMult: crew.penaltyMult, evenUp: crew.evenUp } : undefined, crowd: league === "NHL" ? { fill: 1 } : undefined });
     if (crew) await prisma.game.update({ where: { id: g.id }, data: { officialIds: crew.ids } }).catch(() => {});
     await saveGameResult(result, {
       gameId: g.id, season, league, round: s.round, seriesId: s.id, gameNum: g.gameNum ?? 1, gameDate: g.gameDate ?? dayStart,

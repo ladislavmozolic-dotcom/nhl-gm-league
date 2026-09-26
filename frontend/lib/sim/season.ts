@@ -202,7 +202,7 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
     where,
     orderBy: [{ round: "asc" }, { id: "asc" }],
     ...(opts.limit ? { take: opts.limit } : {}),
-    select: { id: true, homeTeamId: true, awayTeamId: true, round: true, league: true, gameDate: true, simCount: true, eventCapacity: true },
+    select: { id: true, homeTeamId: true, awayTeamId: true, round: true, league: true, gameDate: true, simCount: true, eventCapacity: true, eventKind: true },
   });
 
   const settings = await loadSettings();
@@ -305,22 +305,26 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
     const secs = getArenaSections(t);
     return [t.id, { pop: t.popularity ?? 100, capacity: secs.reduce((a, x) => a + x.capacity, 0), sellout: selloutRevenue(secs), pf: priceAttendanceFactor(secs) }];
   }));
-  const storeAttendance = async (gm: { id: number; homeTeamId: number; awayTeamId: number; league: string | null; eventCapacity?: number | null }) => {
-    if (gm.league === "AHL") return;
+  // tonight's crowd (deterministic per game) — decided BEFORE the puck drops, so the
+  // engine's home-crowd factor and the stored attendance are the same number
+  const crowdOf = (gm: { id: number; homeTeamId: number; awayTeamId: number; league: string | null; eventCapacity?: number | null; eventKind?: string | null }) => {
+    if (gm.league === "AHL") return null;
+    const fin = finBy.get(gm.homeTeamId);
     // special event (outdoor / Global Series): the venue's crowd — these sell out
     if (gm.eventCapacity) {
-      const fin = finBy.get(gm.homeTeamId);
       const fill = 0.97 + ((((gm.id * 2654435761) >>> 0) % 1000) / 1000) * 0.03;
-      await prisma.game.update({ where: { id: gm.id }, data: { attendance: Math.round(gm.eventCapacity * fill), gate: fin?.sellout ?? 0 } });
-      return;
+      return { frac: fill, attendance: Math.round(gm.eventCapacity * fill), gate: fin?.sellout ?? 0, neutral: gm.eventKind === "GLOBAL" };
     }
-    const fin = finBy.get(gm.homeTeamId);
-    if (!fin || fin.capacity <= 0) return;
+    if (!fin || fin.capacity <= 0) return null;
     const base = attendanceRate(fin.pop, pctBy.get(gm.homeTeamId) ?? 0.5) * fin.pf; // cheaper tickets → more fans
     const jitter = (((gm.id * 2654435761) >>> 0) % 1000) / 1000;
     const oppDraw = ((pctBy.get(gm.awayTeamId) ?? 0.5) - 0.5) * 0.10;
     const frac = Math.max(0.4, Math.min(1, base * (1 + (jitter - 0.5) * 0.08 + oppDraw)));
-    await prisma.game.update({ where: { id: gm.id }, data: { attendance: Math.round(fin.capacity * frac), gate: Math.round(frac * fin.sellout) } });
+    return { frac, attendance: Math.round(fin.capacity * frac), gate: Math.round(frac * fin.sellout), neutral: false };
+  };
+  const storeAttendance = async (gm: Parameters<typeof crowdOf>[0]) => {
+    const c = crowdOf(gm);
+    if (c) await prisma.game.update({ where: { id: gm.id }, data: { attendance: c.attendance, gate: c.gate } });
   };
 
   // tonight's referee crews (NHL games only; real 2025-26 officials)
@@ -351,7 +355,8 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
     const seed = fixtureSeed(gm.homeTeamId, gm.awayTeamId, round + (gm.simCount ?? 0) * 1_000_003 + gm.id * 7);
     const rivalry = home.rivalTeamIds.includes(away.id) || away.rivalTeamIds.includes(home.id);
     const crew = crews.get(gm.id);
-    const result = simulateGame(home, away, { seed, settings, rivalry, league: gm.league === "AHL" ? "AHL" : "NHL", engineVersion, officials: crew ? { penaltyMult: crew.penaltyMult, evenUp: crew.evenUp } : undefined });
+    const crowd = crowdOf(gm);
+    const result = simulateGame(home, away, { seed, settings, rivalry, league: gm.league === "AHL" ? "AHL" : "NHL", engineVersion, officials: crew ? { penaltyMult: crew.penaltyMult, evenUp: crew.evenUp } : undefined, crowd: crowd ? { fill: crowd.frac, neutral: crowd.neutral } : undefined });
     if (crew) await prisma.game.update({ where: { id: gm.id }, data: { officialIds: crew.ids } }).catch(() => {});
     await saveGameResult(result, {
       gameId: gm.id, season, gameDate: gm.gameDate ?? seasonDateFor(season, round),

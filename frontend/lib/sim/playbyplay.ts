@@ -289,6 +289,11 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
       } else if (e.type === "COINCIDENTAL") {
         const m = e.meta as { fourOnFour?: boolean; names?: string[] } | undefined;
         add(p, e.seconds, null, "penalty", `After-the-whistle scrum: ${(m?.names ?? []).join(" and ")} both get roughing minors${m?.fourOnFour ? " — the teams play 4-on-4" : ""}.`, true);
+      } else if (e.type === "KNOCK") {
+        const m = e.meta as { part?: string; mechanism?: string } | undefined;
+        add(p, e.seconds, tId, "injury", `${e.playerName ?? "?"} is shaken up${m?.mechanism === "Hit" ? " after a hit" : m?.mechanism === "Blocked shot" ? " blocking a shot" : ""} and heads to the room (${(m?.part ?? "undisclosed").toLowerCase()}).`);
+      } else if (e.type === "RETURN") {
+        add(p, e.seconds, tId, "change", `${e.playerName ?? "?"} is back on the bench.`);
       } else if (e.type === "TIMEOUT") {
         const why = (e.meta as { why?: string } | undefined)?.why;
         add(p, e.seconds, tId, "change", `${e.teamCode ?? sideOf(e.teamId ?? home.id).name} calls its timeout${why ? ` ${why}` : ""}.`, true);

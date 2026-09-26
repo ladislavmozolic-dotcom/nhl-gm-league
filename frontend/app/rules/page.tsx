@@ -172,6 +172,9 @@ const SECTIONS: Sec[] = [
         "Delayed penalty: while the referee's arm is up the other side pulls its goalie for an extra attacker until an offender touches the puck; a goal in the meantime washes a minor out.",
         "Coincidental minors (one to each side, e.g. an after-the-whistle scrum) at full strength → 4-on-4, as in the NHL. Other coincidental combinations are substituted.",
         "Lines → Strategy → Bench decisions (your choice): shorten the bench (a one-goal game in the last 7 minutes of the 3rd: the 4th line and 3rd pair sit more; playoff OT: only a mild lean, since OT can run for periods), adjust to the score from the 3rd period (push when behind, tighten when ahead), use the timeout (late after an icing when leading/tied, or right before pulling the goalie), and the coach's challenge (offside / goaltender interference: 'when the video looks good', always or never). A failed challenge costs a 2-minute minor.",
+        "Zone draws: when a faceoff is in one end, each bench that can change (not a team that just iced it) may send the right unit — its best faceoff / checking line to defend its own end (almost always late in a close 3rd), its top line for an offensive-zone draw — and the best faceoff man on the ice takes it.",
+        "Shaken up: many hits, blocked shots and knocks send a player to the room for a few minutes; he returns later in the game. Only real injuries keep him out (and show on the injury report).",
+        "Home crowd: a packed building lifts the home side a little (up to ~+2 % shot attempts; +2 % more in the playoffs), a half-empty arena gives less. Global Series games are neutral.",
         "Referees: every NHL game gets two referees and two linesmen from the real 2025-26 NHL roster (League → Officials). A strict crew calls more penalties, a lenient one fewer, based on each referee's real penalties per game.",
       ] },
       { h: "Player Safety (suspensions)", points: [

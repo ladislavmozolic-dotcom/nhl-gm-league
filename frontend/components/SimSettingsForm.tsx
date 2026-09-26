@@ -275,6 +275,9 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
             <NumField k="icingRatePct" label="Icing frequency % (100 ≈ 4 / team / game)" />
             <Toggle k="zoneFaceoffsEnabled" label="Zone faceoffs (after icing / freeze / penalty)" />
             <Toggle k="officialsEnabled" label="Referee crews (strictness, evening up)" />
+            <Toggle k="faceoffSpecialistEnabled" label="Zone-draw deployment (faceoff specialist)" />
+            <Toggle k="knocksEnabled" label="Shaken-up players return to the game" />
+            <Toggle k="crowdEnabled" label="Home crowd (attendance / playoffs)" />
           </div>
         </div>
       </Card>

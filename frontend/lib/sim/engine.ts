@@ -155,6 +155,8 @@ type SimState = {
   officials: { penaltyMult: number; evenUp: number } | null; // tonight's referee crew (null = neutral)
   timeoutUsed: Record<number, boolean>;
   challengeFailed: Record<number, boolean>; // a failed challenge ends a bench's challenges for the night
+  knocks: Map<number, { teamId: number; back: number; name: string }>; // shaken-up players: back at abs game-second `back`
+  crowdMult: number;                // home team's shot-attempt lift from its crowd (1 = neutral)
 };
 
 /** A bench's game-management preferences (Lines → Strategy; AI clubs = defaults). */
@@ -1259,6 +1261,8 @@ function fatigueMult(shiftSec: number, en: number): number {
 const LAST_CHANGE_MATCHUP_BOOST = 1.35;
 // per-tick chance a defensive-zone carrier ices it (× icingRatePct/100, fatigue, forecheck)
 const ICING_RATE = 0.0055;
+// shaken-up knocks per real injury (they return to the game)
+const KNOCK_RATIO = 0.9;
 // 4-on-4: more open ice → more shot attempts per possession tick
 const FOUR_ON_FOUR_SHOTS = 1.15;
 
@@ -1583,6 +1587,7 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
 
   for (let tick = 0; tick < PERIOD_SECONDS; tick++) {
     curTick = tick; // for misconduct-box substitution inside onIceF/onIceD
+    releaseKnocks(st, period, tick);
     // hold a team's line change while it is carrying the puck up ice (not in its own
     // zone) — no mid-rush changes, so the scorer always matches the on-ice unit.
     const carrying = (team: SimTeam) => state === "PLAY" && carrierTeam.id === team.id && zone !== "DEF";
@@ -1750,8 +1755,30 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
         }
         return bestFo(oi) ?? bestFo(onIceD(team)) ?? team.forwards[0] ?? team.defense[0];
       };
-      const hC = pickCenter(home, onIceF(home));
-      const aC = pickCenter(away, onIceF(away));
+      // a draw in one team's end: each bench that CAN change (not the icing team) may
+      // send the right unit — its best faceoff / checking line to defend its own end,
+      // its top line for an offensive-zone draw — and the best faceoff man takes it
+      if (foZone != null && CFG.faceoffSpecialistEnabled) {
+        const late = regulation && period === 3 && PERIOD_SECONDS - tick <= 300 && Math.abs(st.box[home.id].goals - st.box[away.id].goals) <= 1;
+        for (const team of [home, away]) {
+          if (noChange[team.id] || curStr[team.id] !== "EV" || st.emptyNet[team.id]) continue;
+          const defending = foZone === team.id;
+          if (!rng.chance(defending ? (late ? 0.9 : 0.6) : 0.45)) continue;
+          const sh = shifts[team.id];
+          const score = (line: SimSkater[]) => {
+            const fo = Math.max(0, ...line.map((x) => x.attrs.fo ?? 50));
+            const avg = (f: (x: SimSkater) => number) => line.reduce((t, x) => t + f(x), 0) / Math.max(1, line.length);
+            return defending ? fo * 0.6 + avg((x) => x.defense) * 0.4 : fo * 0.4 + avg((x) => x.offense) * 0.6;
+          };
+          let best = sh.fIdx;
+          sh.fLines.forEach((l, i) => { if (score(l) > score(sh.fLines[best] ?? [])) best = i; });
+          if (best !== sh.fIdx) { flushShift(st, team.id, sh.fLines[sh.fIdx] ?? []); sh.fIdx = best; sh.fElapsed = 0; }
+        }
+      }
+      const zoneDraw = foZone != null && CFG.faceoffSpecialistEnabled;
+      const hOn = onIceF(home), aOn = onIceF(away);
+      const hC = (zoneDraw && curStr[home.id] === "EV" ? bestFo(hOn) : null) ?? pickCenter(home, hOn);
+      const aC = (zoneDraw && curStr[away.id] === "EV" ? bestFo(aOn) : null) ?? pickCenter(away, aOn);
       const homeWin = rng.chance(ratio((hC.attrs.fo ?? 50) * fat(home, hC), (aC.attrs.fo ?? 50) * fat(away, aC), 0.8));
       if (homeWin) { st.box[home.id].faceoffWins++; st.box[away.id].faceoffLosses++; st.lines[home.id][hC.id].faceoffWins++; st.lines[away.id][aC.id].faceoffLosses++; carrierTeam = home; carrier = hC; }
       else { st.box[away.id].faceoffWins++; st.box[home.id].faceoffLosses++; st.lines[away.id][aC.id].faceoffWins++; st.lines[home.id][hC.id].faceoffLosses++; carrierTeam = away; carrier = aC; }
@@ -1877,7 +1904,8 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
     const adaptAtk = adapt(carrierTeam, margin).shots, adaptDef = adapt(def, -margin).allow;
     const openIce = curSkaters[home.id] === 4 && curSkaters[away.id] === 4 && curStr[carrierTeam.id] === "EV" ? FOUR_ON_FOUR_SHOTS : 1;
     const armUp = delayedFor === carrierTeam.id ? 1.2 : 1;
-    if (!rng.chance(0.29 * atkFx.shotRate * def.tactics.oppShotRate * MISS_COMPENSATION * lateShell * adaptAtk * adaptDef * openIce * armUp)) continue;
+    const crowd = carrierTeam === home ? st.crowdMult : 1;
+    if (!rng.chance(0.29 * atkFx.shotRate * def.tactics.oppShotRate * MISS_COMPENSATION * lateShell * adaptAtk * adaptDef * openIce * armUp * crowd)) continue;
     // Shoot-or-pass decision FIRST. A forward who elects to SHOOT sometimes walks
     // the puck back to the point for a D one-timer instead — this is how D rack up
     // their goals. But a forward who would PASS keeps the puck (→ his linemate's
@@ -2281,7 +2309,20 @@ function maybeInjureOnIce(st: SimState, team: SimTeam, opp: SimTeam, onIce: SimS
     // 3-on-3 model samples a fresh on-ice trio every 15 game-seconds instead) —
     // scale the per-second hazard up by however much real time this call covers.
     const hazard = Math.min(0.02 * intervalSec, (lambdaPerGame / ticksPerGame) * rust * intervalSec);
-    if (!st.rng.chance(hazard)) continue;
+    if (!st.rng.chance(hazard)) {
+      // far more often a player is just shaken up: to the room, back a few minutes later
+      if (CFG.knocksEnabled && st.rng.chance(hazard * KNOCK_RATIO)) {
+        const r = st.rng.next() * (contactShare + blockShare + wearShare);
+        const mech: InjuryMechanism = r < contactShare ? "Hit" : r < contactShare + blockShare ? "Blocked shot" : "Non-contact";
+        const part = mech === "Hit" ? (st.rng.chance(0.5) ? "Upper Body" : "Shoulder") : mech === "Blocked shot" ? (st.rng.chance(0.5) ? "Hand" : "Foot") : "Lower Body";
+        const away = 90 + st.rng.int(600); // 1:30 – 11:30 of game time
+        st.injured.add(s.id);
+        st.knocks.set(s.id, { teamId: team.id, back: (period - 1) * PERIOD_SECONDS + tick + away, name: s.name });
+        st.sink.emit({ period, seconds: tick, type: "KNOCK", teamId: team.id, teamCode: team.code ?? undefined, playerId: s.id, playerName: s.name, importance: "NOTABLE", meta: { part, mechanism: mech } });
+        hurt.push(s);
+      }
+      continue;
+    }
     const total = contactShare + blockShare + wearShare;
     const r = st.rng.next() * total;
     let mech: InjuryMechanism;
@@ -2300,6 +2341,19 @@ function maybeInjureOnIce(st: SimState, team: SimTeam, opp: SimTeam, onIce: SimS
     }
   }
   return hurt;
+}
+
+/** Shaken-up players whose time is up come back to the bench. */
+function releaseKnocks(st: SimState, period: number, tick: number) {
+  if (!st.knocks.size) return;
+  const abs = (period - 1) * PERIOD_SECONDS + tick;
+  for (const [id, k] of st.knocks) {
+    if (abs < k.back) continue;
+    st.knocks.delete(id);
+    // a real injury picked up meanwhile keeps him out (st.injuries has him)
+    if (!st.injuries.some((i) => i.playerId === id)) st.injured.delete(id);
+    st.sink.emit({ period, seconds: tick, type: "RETURN", teamId: k.teamId, playerId: id, playerName: k.name, importance: "NOTABLE" });
+  }
 }
 
 // FIGHT injuries stay a post-hoc pass, tied to generateFights() (itself a
@@ -2438,6 +2492,7 @@ function simulateOvertime(st: SimState, cfg: { period?: number; seconds?: number
   // is chosen up front so the fallback does not create a home-team bias.
   const fallbackShooterId = rng.chance(0.5) ? home.id : away.id;
   for (let t = step; t <= periodLen; t += step) {
+    releaseKnocks(st, per, t);
     // bench change every 15s, same cadence the injury roll already used —
     // rotate BEFORE the injury check so it rolls against whoever is actually
     // deployed this interval, not last interval's trio.
@@ -2676,6 +2731,8 @@ export type SimOptions = {
   // tonight's referee crew: penaltyMult scales how many infractions get called
   // (a strict crew >1), evenUp 0..1 how much it "manages the game" (evens up calls)
   officials?: { penaltyMult: number; evenUp: number };
+  // tonight's crowd as a share of capacity (0..1). A packed building lifts the home side.
+  crowd?: { fill: number; neutral?: boolean };
 };
 
 export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}): GameResult {
@@ -2703,6 +2760,10 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     officials: CFG.officialsEnabled && opts.officials ? opts.officials : null,
     timeoutUsed: {},
     challengeFailed: {},
+    knocks: new Map(),
+    crowdMult: CFG.crowdEnabled && opts.crowd && !opts.crowd.neutral
+      ? Math.max(0.94, Math.min(1.045, 1 + (Math.max(0, Math.min(1, opts.crowd.fill)) - 0.85) * 0.15 + (opts.noShootout ? 0.02 : 0)))
+      : 1,
   };
   for (const team of [home, away]) {
     for (const s of [...team.forwards, ...team.defense]) {

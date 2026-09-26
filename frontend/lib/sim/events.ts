@@ -32,7 +32,9 @@ export type EventType =
   | "DELAYED_PENALTY"   // arm up: the other side pulls its goalie until the offenders touch the puck
   | "CHALLENGE"         // coach's challenge on a goal (offside / goaltender interference)
   | "TIMEOUT"           // a bench's one timeout
-  | "COINCIDENTAL";     // coincidental minors at full strength → 4-on-4
+  | "COINCIDENTAL"      // coincidental minors at full strength → 4-on-4
+  | "KNOCK"             // shaken up — to the room for a few minutes
+  | "RETURN";           // …and back on the bench
 
 // Rising importance — controls what gets persisted and how loud the PBP is.
 export type Importance = "MINOR" | "NOTABLE" | "MAJOR" | "HIGHLIGHT";
