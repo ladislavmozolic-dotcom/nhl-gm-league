@@ -9,7 +9,7 @@ import type { RosterRow } from "@/app/teams/[slug]/roster/actions";
 type Player = { id: number; name: string; position: string; number: number | null; overall: number; captaincy: "C" | "A" | null; isGoalie: boolean };
 type Props = {
   teamName: string; teamSlug: string; players: Player[];
-  onSave: (slug: string, rows: RosterRow[]) => Promise<void>;
+  onSave: (slug: string, rows: RosterRow[]) => Promise<{ ok: boolean; error?: string } | void>;
   embedded?: boolean; // true when rendered under LinesNav (hide the own title/back links)
 };
 
@@ -93,7 +93,8 @@ export default function RosterEditor({ teamName, teamSlug, players, onSave, embe
   const save = () => start(async () => {
     setErr(null);
     try {
-      await onSave(teamSlug, rows.map((r) => ({ id: r.id, number: r.number, captaincy: r.captaincy })));
+      const res = await onSave(teamSlug, rows.map((r) => ({ id: r.id, number: r.number, captaincy: r.captaincy })));
+      if (res && !res.ok) { setErr(res.error ?? "Couldn't save."); return; }
       setSaved(true);
     } catch (e) { setErr((e as Error).message); }
   });

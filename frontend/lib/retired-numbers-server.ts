@@ -89,9 +89,20 @@ export async function assertNumbersAllowed(teamId: number, rows: { id: number; n
   const org = await prisma.team.findUnique({ where: { id: teamId }, select: { id: true, league: true, parentTeamId: true } });
   const clubId = org?.league === "NHL" ? org.id : org?.parentTeamId;
   if (!clubId) return;
-  const retired = await retiredSet(clubId);
-  if (!retired.size) return;
-  const current = new Map((await prisma.player.findMany({ where: { id: { in: rows.map((r) => r.id) } }, select: { id: true, number: true } })).map((p) => [p.id, p.number]));
-  const bad = rows.filter((r) => r.number != null && retired.has(r.number) && current.get(r.id) !== r.number);
-  if (bad.length) throw new Error(`#${[...new Set(bad.map((b) => b.number))].join(", #")} ${bad.length === 1 ? "is" : "are"} retired by the club.`);
+  const retiredRows = await prisma.retiredNumber.findMany({ where: { teamId: clubId }, select: { number: true, playerName: true, playerId: true } });
+  if (!retiredRows.length) return;
+  const club = await prisma.team.findUnique({ where: { id: clubId }, select: { name: true } });
+  const players = new Map((await prisma.player.findMany({ where: { id: { in: rows.map((r) => r.id) } }, select: { id: true, number: true, name: true } })).map((p) => [p.id, p]));
+  const norm = (s: string) => cleanName(s).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const msgs: string[] = [];
+  for (const r of rows) {
+    const p = players.get(r.id);
+    if (r.number == null || !p || p.number === r.number) continue; // unchanged numbers are grandfathered
+    const hits = retiredRows.filter((x) => x.number === r.number);
+    if (!hits.length) continue;
+    // the honoured player himself may always wear his own number
+    if (hits.some((x) => x.playerId === p.id || norm(x.playerName) === norm(p.name))) continue;
+    msgs.push(`#${r.number} can't be given to ${cleanName(p.name)} — ${club?.name ?? "the club"} retired it for ${hits.map((x) => x.playerName).join(" and ")}.`);
+  }
+  if (msgs.length) throw new Error(`${msgs.join(" ")} Pick another number.`);
 }

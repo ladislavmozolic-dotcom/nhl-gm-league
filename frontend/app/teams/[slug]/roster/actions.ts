@@ -7,7 +7,14 @@ import { assertNumbersAllowed } from "@/lib/retired-numbers-server";
 
 export type RosterRow = { id: number; number: number | null; captaincy: "C" | "A" | null };
 
-export async function saveRoster(slug: string, rows: RosterRow[]) {
+// Returns the validation message instead of throwing — a thrown server-action error
+// is replaced by a generic "Server Components render" message in production.
+export async function saveRoster(slug: string, rows: RosterRow[]): Promise<{ ok: true } | { ok: false; error: string }> {
+  try { await saveRosterInner(slug, rows); return { ok: true }; }
+  catch (e) { return { ok: false, error: (e as Error).message }; }
+}
+
+async function saveRosterInner(slug: string, rows: RosterRow[]) {
   const team = await prisma.team.findUnique({ where: { slug }, select: { id: true } });
   if (!team) throw new Error("Team not found");
   if (!(await canManageTeam(team.id))) throw new Error("Not authorized for this team");
