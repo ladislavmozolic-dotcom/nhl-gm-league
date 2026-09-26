@@ -899,7 +899,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
             return (
               <section className="lines-goalie-panel">
                 <div className="sm:col-span-3"><p className="lines-kicker">Bench decisions</p></div>
-                {toggle("benchShorten", "⇶", "Shorten the bench", "Close game, last minutes of the 3rd & playoff OT: lean on lines 1–3 and pairs 1–2")}
+                {toggle("benchShorten", "⇶", "Shorten the bench", "One-goal game, last 7 min of the 3rd: 4th line & 3rd pair sit more · playoff OT: a mild lean")}
                 {toggle("coachAdapt", "↯", "Adjust to the score", "From the 3rd: push when behind, tighten up when ahead")}
                 {toggle("timeout", "⏸", "Use the timeout", "Late after an icing (leading/tied) or right before pulling the goalie")}
                 <label className="lines-goalie-card" title="When to use the coach's challenge on a reviewable goal against (offside / goaltender interference). A failed challenge = 2-minute minor."><span className="lines-setting-icon">🎥</span><span>Coach&apos;s challenge<span className="block text-[10px] font-normal text-slate-400">Failed challenge = 2-min minor</span></span>

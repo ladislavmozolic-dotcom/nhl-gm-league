@@ -1267,15 +1267,17 @@ const FOUR_ON_FOUR_SHOTS = 1.15;
 // `matchup` (v2/home only): lets the home coach react to whichever forward line the
 // away team currently has out — send the checking line vs their top trio, or the top
 // trio vs their checking line — mirroring real "last change" home-ice advantage.
-function advanceShift(st: SimState, teamId: number, sh: ShiftState, dur: number, rng: RNG, hold = false, matchup?: { oppSh: ShiftState; isHome: boolean }, shorten = false) {
+function advanceShift(st: SimState, teamId: number, sh: ShiftState, dur: number, rng: RNG, hold = false, matchup?: { oppSh: ShiftState; isHome: boolean }, shorten: 0 | 1 | 2 = 0) {
   sh.fElapsed += dur; sh.dElapsed += dur;
   // TOI is accrued in the possession tick loop against the ACTUAL on-ice unit (which
   // is the PP/PK unit during a man-advantage) — not here against the rotating line.
-  // `shorten`: a close game late (or playoff OT) — the coach shortens his bench, so
-  // the 4th line and the 3rd pair barely see the ice.
+  // `shorten`: 1 = a close game late in the 3rd — the 4th line and 3rd pair sit more;
+  // 2 = playoff overtime — a milder lean (OT can run for periods, so the depth still
+  // has to play: the 4th line gets roughly half its usual shifts).
   const pick = (lines: SimSkater[][], weights: number[], cur: number, biasIdx?: number, deepFrom = 99) => {
     if (lines.length <= 1) return 0;
-    const w = lines.map((_, i) => (i === cur ? 0 : Math.max(0.01, weights[i] ?? 1) * (shorten && i >= deepFrom ? (deepFrom === 3 ? 0.2 : 0.4) : 1)));
+    const deep = shorten === 2 ? (deepFrom === 3 ? 0.55 : 0.75) : shorten === 1 ? (deepFrom === 3 ? 0.35 : 0.6) : 1;
+    const w = lines.map((_, i) => (i === cur ? 0 : Math.max(0.01, weights[i] ?? 1) * (i >= deepFrom ? deep : 1)));
     if (biasIdx !== undefined && biasIdx !== cur && biasIdx < w.length) w[biasIdx] *= LAST_CHANGE_MATCHUP_BOOST;
     return rng.weighted(w);
   };
@@ -1559,11 +1561,11 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
   const noChange: Record<number, boolean> = {}; // iced the puck → that unit stays out for the draw
   const delayedSeen = new Set<Penalty>();
   const regulation = period <= 3;
-  const shortenFor = (team: SimTeam, tick: number) => {
-    if (!CFG.benchShortenEnabled || !coach[team.id].benchShorten) return false;
-    if (!regulation) return st.playoff; // playoff sudden death: shortened throughout
-    if (period !== 3 || Math.abs(st.box[home.id].goals - st.box[away.id].goals) > 1) return false;
-    return PERIOD_SECONDS - tick <= (st.playoff ? 600 : 420);
+  const shortenFor = (team: SimTeam, tick: number): 0 | 1 | 2 => {
+    if (!CFG.benchShortenEnabled || !coach[team.id].benchShorten) return 0;
+    if (!regulation) return st.playoff ? 2 : 0; // playoff sudden death: a mild lean throughout
+    if (period !== 3 || Math.abs(st.box[home.id].goals - st.box[away.id].goals) > 1) return 0;
+    return PERIOD_SECONDS - tick <= 420 ? 1 : 0;
   };
   // from the 3rd period the bench adjusts to the score: press when behind, tighten when ahead
   const adapt = (team: SimTeam, marginFor: number) => {
