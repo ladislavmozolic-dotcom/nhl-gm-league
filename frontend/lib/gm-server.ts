@@ -5,6 +5,7 @@
 import { prisma } from "./prisma";
 import { franchiseHistory } from "./career-server";
 import { draftSourceFilter } from "./prospect-dev-server";
+import { cleanName } from "./playerName";
 
 export type Achievement = { key: string; icon: string; label: string; desc: string; earned: boolean };
 export type DraftPickRow = { name: string; position: string; year: number; round: number; overallPick: number; ov: number; potential: number; playerSlug: string | null; status: string | null; overall: number | null };
@@ -106,4 +107,62 @@ async function franchiseLongestStreak(teamId: number, league: string): Promise<n
     if (won) { cur++; mx = Math.max(mx, cur); } else cur = 0;
   }
   return mx;
+}
+
+// ---------------------------------------------------------------------------
+// Extended career: season-by-season, trade record (UNHL Intelligence grades),
+// biggest free-agent signings and extensions.
+// ---------------------------------------------------------------------------
+
+const GRADE_PTS: Record<string, number> = { "A+": 4.3, A: 4, "B+": 3.3, B: 3, C: 2, D: 1, F: 0 };
+const letterOf = (avg: number) => avg >= 4.15 ? "A+" : avg >= 3.65 ? "A" : avg >= 3.15 ? "B+" : avg >= 2.5 ? "B" : avg >= 1.5 ? "C" : avg >= 0.5 ? "D" : "F";
+
+export type GmTradeRow = { id: number; at: Date | null; partner: string; partnerSlug: string | null; gave: string[]; got: string[]; grade: string; verdict: string };
+export type GmSigningRow = { playerId: number; name: string; slug: string | null; position: string | null; salary: number; years: number; at: Date; overallNow: number | null; stillHere: boolean };
+export type GmCareerExtras = {
+  seasons: { season: string; gp: number; w: number; l: number; otl: number; points: number; finish: number | null; playoffResult: string | null }[];
+  trades: { count: number; graded: number; avgGrade: string | null; wins: number; losses: number; best: GmTradeRow | null; worst: GmTradeRow | null; list: GmTradeRow[] };
+  signings: { count: number; total: number; top: GmSigningRow[] };
+  extensions: { count: number; top: { name: string; slug: string | null; salary: number; years: number; at: Date }[] };
+};
+
+export async function gmCareerExtras(teamId: number): Promise<GmCareerExtras> {
+  const { gradeTradeCached } = await import("./gm-awards");
+  const team = await prisma.team.findUnique({ where: { id: teamId }, select: { code: true, league: true } });
+  const fh = await franchiseHistory(teamId, team?.league ?? "NHL");
+
+  // trades — grade from THIS club's side of each deal
+  const trades = await prisma.trade.findMany({ where: { status: "ACCEPTED", OR: [{ fromTeamId: teamId }, { toTeamId: teamId }] }, orderBy: [{ respondedAt: "desc" }, { id: "desc" }], select: { id: true, respondedAt: true, fromTeamId: true, toTeamId: true } });
+  const partners = await prisma.team.findMany({ where: { id: { in: [...new Set(trades.flatMap((t) => [t.fromTeamId, t.toTeamId]))] } }, select: { id: true, name: true, slug: true } });
+  const pBy = new Map(partners.map((p) => [p.id, p]));
+  const rows: GmTradeRow[] = [];
+  for (const t of trades) {
+    const g = await gradeTradeCached(t.id);
+    if (!g) continue;
+    const mine = t.fromTeamId === teamId;
+    const partner = pBy.get(mine ? t.toTeamId : t.fromTeamId);
+    rows.push({ id: t.id, at: t.respondedAt, partner: partner?.name ?? "?", partnerSlug: partner?.slug ?? null,
+      gave: mine ? g.fromGives : g.toGives, got: mine ? g.toGives : g.fromGives, grade: mine ? g.fromGrade : g.toGrade, verdict: g.verdict });
+  }
+  const pts = rows.map((r) => GRADE_PTS[r.grade] ?? 2);
+  const avg = pts.length ? pts.reduce((a, b) => a + b, 0) / pts.length : null;
+  const sorted = [...rows].sort((a, b) => (GRADE_PTS[b.grade] ?? 2) - (GRADE_PTS[a.grade] ?? 2));
+
+  // free-agent signings (accepted offers) and extensions
+  const offers = await prisma.faOffer.findMany({ where: { teamId, status: "ACCEPTED" }, orderBy: { salary: "desc" }, select: { playerId: true, salary: true, years: true, updatedAt: true } });
+  const pl = await prisma.player.findMany({ where: { id: { in: offers.map((o) => o.playerId) } }, select: { id: true, name: true, slug: true, position: true, overall: true, teamId: true, team: { select: { parentTeamId: true } } } });
+  const plBy = new Map(pl.map((p) => [p.id, p]));
+  const top: GmSigningRow[] = offers.slice(0, 8).map((o) => {
+    const p = plBy.get(o.playerId);
+    return { playerId: o.playerId, name: cleanName(p?.name ?? "?"), slug: p?.slug ?? null, position: p?.position ?? null, salary: o.salary, years: o.years, at: o.updatedAt, overallNow: p?.overall ?? null, stillHere: !!p && (p.teamId === teamId || p.team?.parentTeamId === teamId) };
+  });
+  const ext = team?.code ? await prisma.signingLog.findMany({ where: { kind: "EXTEND", reverted: false, teamCode: team.code }, orderBy: { salary: "desc" }, select: { playerId: true, playerName: true, salary: true, years: true, createdAt: true } }) : [];
+  const extSlugs = new Map((await prisma.player.findMany({ where: { id: { in: ext.map((e) => e.playerId) } }, select: { id: true, slug: true } })).map((p) => [p.id, p.slug]));
+
+  return {
+    seasons: fh.seasons.map((s) => ({ season: s.season, gp: s.gp, w: s.wins, l: s.losses, otl: s.otl, points: s.points, finish: s.finish ?? null, playoffResult: s.playoffResult ?? null })).reverse(),
+    trades: { count: trades.length, graded: rows.length, avgGrade: avg == null ? null : letterOf(avg), wins: pts.filter((p) => p >= 3.3).length, losses: pts.filter((p) => p <= 2).length, best: sorted[0] ?? null, worst: sorted.length > 1 ? sorted[sorted.length - 1] : null, list: rows.slice(0, 15) },
+    signings: { count: offers.length, total: offers.reduce((t, o) => t + o.salary * o.years, 0), top },
+    extensions: { count: ext.length, top: ext.slice(0, 6).map((e) => ({ name: cleanName(e.playerName), slug: extSlugs.get(e.playerId) ?? null, salary: e.salary, years: e.years, at: e.createdAt })) },
+  };
 }
