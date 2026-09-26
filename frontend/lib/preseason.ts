@@ -7,6 +7,7 @@
 // on opening night, not reset to a projection — but morale/finance do not.
 
 import { prisma } from "./prisma";
+import { assignCrews, type Crew } from "./officials-server";
 import { loadSimTeam, fixtureSeed } from "./sim";
 import { simulateGame } from "./sim/engine";
 import { saveGameResult } from "./sim/persist";
@@ -242,6 +243,14 @@ async function simPreseason(where: object, actor: string): Promise<{ played: num
   let played = 0;
   const playedIds: number[] = [];
   let previousRound: number | null = null;
+  // referee crews per night (NHL games; one official can't work two games a night)
+  const crewsByRound = new Map<number, Map<number, Crew>>();
+  const crewFor = async (gm: { id: number; round: number | null; league: string | null }) => {
+    if (gm.league === "AHL") return undefined;
+    const r = gm.round ?? 0;
+    if (!crewsByRound.has(r)) crewsByRound.set(r, await assignCrews(scheduled.filter((g) => (g.round ?? 0) === r && g.league !== "AHL").map((g) => g.id)).catch(() => new Map()));
+    return crewsByRound.get(r)!.get(gm.id);
+  };
   for (const gm of scheduled) {
     // `playPreseason()` can process all six rounds in one call. Reproduce the
     // scheduled rest day between rounds; day-by-day calls contain one round and
@@ -267,7 +276,9 @@ async function simPreseason(where: object, actor: string): Promise<{ played: num
     const seed = fixtureSeed(gm.homeTeamId, gm.awayTeamId, (gm.round ?? 0) + gm.id * 7);
     const rivalry = home.rivalTeamIds.includes(away.id) || away.rivalTeamIds.includes(home.id);
     const league = gm.league === "AHL" ? "AHL" : "NHL";
-    const result = simulateGame(home, away, { seed, settings, rivalry, league, engineVersion });
+    const crew = await crewFor(gm);
+    const result = simulateGame(home, away, { seed, settings, rivalry, league, engineVersion, officials: crew ? { penaltyMult: crew.penaltyMult, evenUp: crew.evenUp } : undefined });
+    if (crew) await prisma.game.update({ where: { id: gm.id }, data: { officialIds: crew.ids } }).catch(() => {});
     // Full box score stays isolated under the PRE season string; CON and injuries
     // carry over because they affect who can dress for the next exhibition game.
     await saveGameResult(result, {
