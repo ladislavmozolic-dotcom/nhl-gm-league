@@ -5,7 +5,7 @@ import { isAdmin } from "@/lib/auth";
 import DaySimControls from "@/components/DaySimControls";
 import ScrollToCurrent from "@/components/ScrollToCurrent";
 import { PRE_SEASON } from "@/lib/phase";
-import { kindOf } from "@/lib/special-games-shared";
+import EventBadge from "@/components/EventBadge";
 
 export const dynamic = "force-dynamic";
 const SEASON = "2026-27";
@@ -169,7 +169,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
                             <TeamSide t={g.homeTeam} score={isFinal ? g.homeGoals : null} win={homeWin} align="left" />
                           </div>
                           <div className="w-20 sm:w-28 text-right shrink-0">
-                            {"eventKind" in g && g.eventKind && <span title={`${g.eventTitle ?? ""} — ${g.eventVenue ?? ""}`} className="mr-1 text-sm">{kindOf(g.eventKind)?.icon}</span>}
+                            {"eventKind" in g && g.eventKind && <EventBadge kind={g.eventKind} title={g.eventTitle} venue={g.eventVenue} size={26} className="mr-1.5 align-middle" />}
                             {isFinal ? (
                               <span className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded ${
                                 tag ? "bg-amber-500/15 text-amber-400 border border-amber-500/30" : "bg-slate-800 text-slate-300 border border-slate-700/60"

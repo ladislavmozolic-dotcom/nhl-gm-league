@@ -67,7 +67,7 @@ export function specialEventIncome(games: { homeTeamId: number; awayTeamId: numb
   return out;
 }
 
-export type KeyDate = { at: Date; icon: string; title: string; detail?: string; href?: string; timed: boolean };
+export type KeyDate = { at: Date; icon: string; title: string; detail?: string; href?: string; timed: boolean; eventKind?: string | null; venue?: string | null };
 
 /** The season's key dates for the League Calendar — special events, All-Star
  *  Weekend, the trade deadline and the last day of the regular season. */
@@ -80,7 +80,7 @@ export async function leagueKeyDates(season = REGULAR_SEASON): Promise<KeyDate[]
   ]);
   const out: KeyDate[] = events.filter((g) => g.gameDate).map((g) => ({
     at: g.gameDate!, icon: kindOf(g.eventKind)?.icon ?? "⭐", title: g.eventTitle ?? kindOf(g.eventKind)?.label ?? "Special event",
-    detail: `${g.awayTeam.code} @ ${g.homeTeam.code}${g.eventVenue ? ` · ${g.eventVenue}` : ""}`, href: `/games/${g.id}`, timed: false,
+    detail: `${g.awayTeam.code} @ ${g.homeTeam.code}${g.eventVenue ? ` · ${g.eventVenue}` : ""}`, href: `/games/${g.id}`, timed: false, eventKind: g.eventKind, venue: g.eventVenue,
   }));
   if (allStar) {
     if (allStar.votingOpensAt) out.push({ at: allStar.votingOpensAt, icon: "🗳️", title: "All-Star nominations open", detail: "Every GM nominates 3 F · 2 D · 1 G", href: "/all-star", timed: true });

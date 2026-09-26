@@ -1,5 +1,6 @@
 "use client";
 
+import EventBadge from "@/components/EventBadge";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -50,7 +51,7 @@ type Data = {
   goals: GoalE[]; penalties: PenE[]; playByPlay: PbpE[]; shootout?: ShootoutE[];
   injuries?: InjuryRow[]; homeSystem?: SystemDials; awaySystem?: SystemDials;
   story?: { report: GameReport; flow: GameFlow } | null;
-  attendance?: number | null; arena?: string | null; event?: { icon: string; title: string } | null; gameDate?: string | Date | null;
+  attendance?: number | null; arena?: string | null; event?: { kind: string; title: string; venue: string | null } | null; gameDate?: string | Date | null;
 };
 
 function ShootoutView({ data }: { data: Data }) {
@@ -698,7 +699,7 @@ export default function GameView({ data }: { data: Data }) {
 
         {data.event && (
           <div className="text-center mt-3 pt-3 border-t border-slate-800/60">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs font-bold text-amber-300">{data.event.icon} {data.event.title}</span>
+            <span className="inline-flex items-center gap-2 rounded-full border border-amber-500/40 bg-amber-500/10 pl-1 pr-3 py-1 text-xs font-bold text-amber-300"><EventBadge kind={data.event.kind} title={data.event.title} venue={data.event.venue} size={48} />{data.event.title}</span>
           </div>
         )}
         {(data.arena || data.attendance != null) && (

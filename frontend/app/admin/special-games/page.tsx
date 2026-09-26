@@ -2,7 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { isAdmin } from "@/lib/auth";
 import { PageHeader, Card, BackPill } from "@/components/ui";
-import { specialGames, kindOf, type EventKind } from "@/lib/special-games";
+import { specialGames, type EventKind } from "@/lib/special-games";
+import EventBadge from "@/components/EventBadge";
 import { ApplyRealButton, SpecialGameForm } from "@/components/admin/SpecialGamesAdmin";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +24,7 @@ export default async function AdminSpecialGamesPage() {
             {games.map((g) => (
               <div key={g.id} className="border-b border-slate-800/70 pb-3">
                 <div className="text-sm mb-2">
-                  <span className="mr-1">{kindOf(g.eventKind)?.icon}</span>
+                  <EventBadge kind={g.eventKind} title={g.eventTitle} venue={g.eventVenue} size={32} className="mr-2 align-middle" />
                   <b>{g.eventTitle}</b> · <Link href={`/games/${g.id}`} className="text-blue-400 hover:underline">{g.awayTeam.code} @ {g.homeTeam.code}</Link>
                   <span className="text-slate-500"> · {g.gameDate?.toISOString().slice(0, 10)} · #{g.id}{g.status === "FINAL" ? ` · ${g.awayGoals}–${g.homeGoals} · ${g.attendance?.toLocaleString()} fans` : ""}</span>
                 </div>

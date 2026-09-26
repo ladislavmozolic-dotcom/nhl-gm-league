@@ -835,7 +835,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
     })),
     attendance: game.attendance,
     arena: game.eventVenue ?? game.homeTeam.arena,
-    event: game.eventKind ? { icon: kindOf(game.eventKind)?.icon ?? "⭐", title: game.eventTitle ?? kindOf(game.eventKind)?.label ?? "Special event" } : null,
+    event: game.eventKind ? { kind: game.eventKind, title: game.eventTitle ?? kindOf(game.eventKind)?.label ?? "Special event", venue: game.eventVenue } : null,
     gameDate: game.gameDate,
   };
 
