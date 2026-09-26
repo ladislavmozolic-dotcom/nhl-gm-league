@@ -95,8 +95,11 @@ async function fetchTeamTotals(year: number): Promise<Map<string, TeamTotals>> {
   return out;
 }
 
-/** Fetch one season, return a name-key → MpRow map. */
-async function fetchSeason(year: number): Promise<Map<string, MpRow>> {
+/** Fetch one season: rows keyed by MoneyPuck's playerId (= NHL id), plus a name-key
+ *  → ids index. Keyed by id, NOT by name: two players can share a name (Elias
+ *  Pettersson F / D) and a name-keyed map silently merged/overwrote their rows. */
+type SeasonData = { byId: Map<string, MpRow>; idsByName: Map<string, Set<string>> };
+async function fetchSeason(year: number): Promise<SeasonData> {
   const [res, teams] = await Promise.all([
     fetch(`https://moneypuck.com/moneypuck/playerData/seasonSummary/${year}/regular/skaters.csv`, { headers: { "User-Agent": UA } }),
     fetchTeamTotals(year),
@@ -150,11 +153,15 @@ async function fetchSeason(year: number): Promise<Map<string, MpRow>> {
   });
 
   const out = new Map<string, MpRow>();
+  const idsByName = new Map<string, Set<string>>();
+  const iPid = col("playerId");
   for (const r of rows.slice(1)) {
     const sit = r[iSit];
     if (sit !== "all" && sit !== "5on4" && sit !== "5on5" && sit !== "4on5") continue;
-    const k = key(r[iName]);
-    if (!k) continue;
+    const nk = key(r[iName]);
+    if (!nk) continue;
+    const k = iPid >= 0 && r[iPid] ? String(r[iPid]).trim() : `name:${nk}`;
+    (idsByName.get(nk) ?? idsByName.set(nk, new Set()).get(nk)!).add(k);
     let m = out.get(k);
     if (!m) { m = blank(); out.set(k, m); }
     if (sit === "all") {
@@ -220,28 +227,35 @@ async function fetchSeason(year: number): Promise<Map<string, MpRow>> {
       }
     }
   }
-  return out;
+  return { byId: out, idsByName };
 }
 
 /** Import MoneyPuck skater totals for MP_SEASONS into Player.mpSkater (name-matched). */
 export async function importMoneyPuckSkaters(): Promise<{ seasons: Record<number, number>; matched: number }> {
-  const seasonMaps: Record<number, Map<string, MpRow>> = {};
+  const seasonMaps: Record<number, SeasonData> = {};
   for (const y of MP_SEASONS) seasonMaps[y] = await fetchSeason(y);
 
-  const players = await prisma.player.findMany({ where: { isGoalie: false }, select: { id: true, name: true } });
+  const players = await prisma.player.findMany({ where: { isGoalie: false }, select: { id: true, name: true, nhlId: true } });
   // full-name key → player id, unambiguous only (skip name collisions like the imports before)
   const byKey = new Map<string, number>(); const dup = new Set<string>();
   for (const p of players) { const k = key(p.name); if (byKey.has(k)) dup.add(k); else byKey.set(k, p.id); }
 
   const seasons: Record<number, number> = {};
-  for (const y of MP_SEASONS) seasons[y] = seasonMaps[y].size;
+  for (const y of MP_SEASONS) seasons[y] = seasonMaps[y].byId.size;
 
+  const ownerOfNhlId = new Map(players.filter((o) => o.nhlId != null).map((o) => [String(o.nhlId), o.id]));
   let matched = 0;
   for (const p of players) {
     const k = key(p.name);
-    if (dup.has(k)) continue;
     const blob: Record<string, MpRow> = {};
-    for (const y of MP_SEASONS) { const m = seasonMaps[y].get(k); if (m && m.toi > 0) blob[String(y)] = m; }
+    for (const y of MP_SEASONS) {
+      const sd = seasonMaps[y];
+      // 1) the NHL id is authoritative; 2) else the name — only if it's unique on
+      // both sides (a shared name like Elias Pettersson F/D never falls back)
+      let m = p.nhlId != null ? sd.byId.get(String(p.nhlId)) : undefined;
+      if (!m && !dup.has(k)) { const ids = sd.idsByName.get(k); if (ids && ids.size === 1) { const only = [...ids][0]; const takenByOther = ownerOfNhlId.has(only) && ownerOfNhlId.get(only) !== p.id; if (!takenByOther) m = sd.byId.get(only); } }
+      if (m && m.toi > 0) blob[String(y)] = m;
+    }
     if (Object.keys(blob).length === 0) continue;
     await prisma.player.update({ where: { id: p.id }, data: { mpSkater: blob } });
     matched++;
