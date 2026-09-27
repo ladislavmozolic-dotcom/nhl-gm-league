@@ -131,6 +131,15 @@ export function performanceFactor(pace: number | null | undefined): number {
   return Math.max(0.8, Math.min(1.2, pace));
 }
 
+/** Availability: games played last season vs. a full workload (85 % of the league's
+ *  full slate; a goalie's full workload is half of that). Played it all → 1; played a
+ *  third → ~0.82; barely played → 0.7. No record (e.g. rookie, no data) → 1. */
+export function availabilityFactor(gp: number | null | undefined, fullGP: number, goalie = false): number {
+  if (gp == null || !(fullGP > 0)) return 1;
+  const full = fullGP * 0.85 * (goalie ? 0.5 : 1);
+  return 0.7 + 0.3 * Math.max(0, Math.min(1, gp / full));
+}
+
 /** Term the player wants, bounded by his age. */
 export function wantedYears(market: number, grp: FaPos, age: number | null | undefined): number {
   const a = age ?? 27;
@@ -283,6 +292,8 @@ export function buildDemand(input: {
   openingPremium?: boolean;
   /** RFA leverage: an own-club RFA has no open market to test (offer sheets only) */
   rfaFactor?: number;
+  /** games-played availability multiplier (1 = played a full season) — see availabilityFactor */
+  availability?: number;
   realCapHit?: number | null; // his actual real-NHL cap hit, if known — see REAL_FLOOR_RATIO
 }): Demand {
   const { market, grp, age, anchor, comps } = input;
@@ -298,22 +309,25 @@ export function buildDemand(input: {
   // morale/reputation bends the ask (skipped when an admin override is set exact).
   const willingness = overridden ? 1 : willingnessFactor(input.morale, market);
   salary *= willingness;
+  // missed a big part of last season → clubs pay for the risk, he signs for less
+  const avail = overridden ? 1 : (input.availability ?? 1);
+  salary *= avail;
   // opening ask (round 1) never comes in UNDER his current pay — a re-signing player
   // wants at least a small raise, and more when he's producing (perf > 1).
   // (only when he's actually producing — a declining vet doesn't get a raise floor)
-  if (!overridden && (input.round ?? 1) <= 1 && input.currentSalary && input.currentSalary > 0 && (input.perf ?? 1) >= 1) {
+  if (!overridden && (input.round ?? 1) <= 1 && input.currentSalary && input.currentSalary > 0 && (input.perf ?? 1) >= 1 && avail >= 0.95) {
     const raise = 1.03 + Math.max(0, (input.perf ?? 1) - 1) * 0.6;
     salary = Math.max(salary, input.currentSalary * raise);
   }
   // A veteran (32+) past his peak doesn't get a raise unless he just had a big year —
   // his current deal is the ceiling (Doughty/Karlsson-type contracts only go down).
   if (!overridden && (input.age ?? 27) >= 32 && input.currentSalary && input.currentSalary > 0) {
-    salary = Math.min(salary, input.currentSalary * ((input.perf ?? 1) >= 1.08 ? 1.1 : 1));
+    salary = Math.min(salary, input.currentSalary * ((input.perf ?? 1) >= 1.08 && (input.age ?? 27) < 35 && avail >= 0.95 ? 1.1 : 1) * avail);
   }
   // Real-world tether — never let his demand fall too far below what he actually
   // earns in reality, regardless of what our internal comps pool computes.
   if (!overridden && input.realCapHit && input.realCapHit > 0) {
-    salary = Math.max(salary, input.realCapHit * REAL_FLOOR_RATIO);
+    salary = Math.max(salary, input.realCapHit * REAL_FLOOR_RATIO * avail);
   }
   salary = Math.max(LEAGUE_MIN, Math.min(salary, 16_000_000));
   salary = Math.round(salary / 50_000) * 50_000;

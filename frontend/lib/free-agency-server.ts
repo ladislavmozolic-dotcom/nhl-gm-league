@@ -7,7 +7,7 @@ import { getLeagueClock } from "./calendar-server";
 import { computeStandings } from "./sim/standings";
 import { CURRENT_SEASON_START } from "./finance";
 import {
-  faPosGroup, skaterMarket, goalieMarket, anchorFromPool, buildDemand, percentile,
+  faPosGroup, skaterMarket, goalieMarket, anchorFromPool, buildDemand, percentile, availabilityFactor,
   slotForRank, slotToLine, desiredDeployment, deploymentDemand, offerUtility, offerAcceptable, clauseDiscount, termPremium,
   type MarketRow, type Demand, type FaPos, type Contention, type Deployment, type Desired, type LineSlot,
 } from "./free-agency";
@@ -189,6 +189,7 @@ function demandFromRow(
   const demand = buildDemand({
     market, grp, age: p.age, anchor, comps: count,
     override: p.faDemandOverride, capGrowth: 1, round, priorBidders, perf: performanceOf(p, grp, market, pool),
+    availability: availabilityFactor(p.lastSeasonGP, fullGP, grp === "G"),
     downSeason: isDownSeason(p.lastSeasonGP, fullGP, grp === "G"), morale: p.morale, currentSalary: p.capHit,
     realCapHit: p.realCapHit,
   });
@@ -423,6 +424,7 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
   const rawBase = buildDemand({
     market, grp, age: p.age, anchor, comps: count, override: p.faDemandOverride, capGrowth: 1, round: rnd, priorBidders,
     perf: performanceOf(p, grp, market, marketPool),
+    availability: availabilityFactor(p.lastSeasonGP, fullGP, grp === "G"),
     downSeason: isDownSeason(p.lastSeasonGP, fullGP, grp === "G"), morale: p.morale, currentSalary: p.capHit, realCapHit: p.realCapHit,
     openingPremium: !extension, rfaFactor: rfa ? RFA_EXTENSION_FACTOR : 1,
   });
@@ -447,8 +449,11 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
   let ask = deploymentDemand(base, grp, projDeploy, desired, ctx.contention, p.age);
   // a 32+ vet re-signing without a big year: his current deal stays the ceiling even
   // after the role/contention bend (the base already respects it — see buildDemand)
-  if (extension && p.faDemandOverride == null && (p.age ?? 27) >= 32 && (p.capHit ?? 0) > 0 && performanceOf(p, grp, market, marketPool) < 1.08 && ask.salary > p.capHit!) {
-    ask = { ...ask, salary: round50k(p.capHit!), floorSalary: Math.min(ask.floorSalary, round50k(p.capHit! * 0.92)) };
+  if (extension && p.faDemandOverride == null && (p.age ?? 27) >= 32 && (p.capHit ?? 0) > 0) {
+    const avail = availabilityFactor(p.lastSeasonGP, await leagueFullGP(), grp === "G");
+    const big = performanceOf(p, grp, market, marketPool) >= 1.08 && (p.age ?? 27) < 35 && avail >= 0.95;
+    const cap = round50k(p.capHit! * (big ? 1.1 : 1) * avail);
+    if (ask.salary > cap) ask = { ...ask, salary: cap, floorSalary: Math.min(ask.floorSalary, round50k(cap * 0.92)) };
   }
   return { grp, base, slot, line, contention: ctx.contention, desired, ask, age: p.age, lowballBump: bump };
 }
