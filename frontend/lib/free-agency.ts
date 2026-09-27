@@ -92,20 +92,22 @@ export function roundPremium(round: number, priorBidders?: number): number {
   return round === 2 ? 1.10 : 1.05;
 }
 
-/** The market anchor for a player: median cap hit of comparably-rated signings
- *  of the same position group. Widens the rating band until it has enough comps. */
+/** The market anchor for a player: what the players RANKED around him (same position
+ *  group, by rating) earn. A rank window, not a rating band — the rating scale is
+ *  compressed (a 24th-percentile D is only ~1.5 points under the median), so a fixed
+ *  ±2.5 band swept in most of the position and paid everyone like an average player. */
 export function anchorFromPool(
-  pool: MarketRow[], grp: FaPos, market: number,
+  pool: MarketRow[], grp: FaPos, market: number, pctl = ANCHOR_PCTL,
 ): { anchor: number; band: number; count: number } {
-  const same = pool.filter((r) => r.grp === grp && r.capHit > 0);
-  for (let band = 2.5; band <= 14; band += 2.5) {
-    const comps = same.filter((r) => Math.abs(r.market - market) <= band);
-    if (comps.length >= 5 || band >= 14) {
-      const anchor = comps.length ? percentile(comps.map((c) => c.capHit), ANCHOR_PCTL) : (same.length ? percentile(same.map((c) => c.capHit), ANCHOR_PCTL) : 2_000_000);
-      return { anchor, band, count: comps.length };
-    }
-  }
-  return { anchor: 2_000_000, band: 14, count: 0 };
+  const same = pool.filter((r) => r.grp === grp && r.capHit > 0).sort((a, b) => a.market - b.market);
+  if (!same.length) return { anchor: 2_000_000, band: 14, count: 0 };
+  const n = same.length;
+  const w = Math.max(8, Math.round(n * 0.07));
+  const idx = same.filter((r) => r.market < market).length;
+  const lo = Math.max(0, Math.min(idx - w, n - 2 * w)), hi = Math.min(n, lo + 2 * w);
+  const comps = same.slice(lo, hi);
+  const band = comps.length ? Math.max(Math.abs(comps[0].market - market), Math.abs(comps[comps.length - 1].market - market)) : 14;
+  return { anchor: percentile(comps.map((c) => c.capHit), pctl), band, count: comps.length };
 }
 
 /** Age / trajectory multiplier — "will his parameters go up or down?".
@@ -302,6 +304,11 @@ export function buildDemand(input: {
   if (!overridden && (input.round ?? 1) <= 1 && input.currentSalary && input.currentSalary > 0 && (input.perf ?? 1) >= 1) {
     const raise = 1.03 + Math.max(0, (input.perf ?? 1) - 1) * 0.6;
     salary = Math.max(salary, input.currentSalary * raise);
+  }
+  // A veteran (32+) past his peak doesn't get a raise unless he just had a big year —
+  // his current deal is the ceiling (Doughty/Karlsson-type contracts only go down).
+  if (!overridden && (input.age ?? 27) >= 32 && input.currentSalary && input.currentSalary > 0) {
+    salary = Math.min(salary, input.currentSalary * ((input.perf ?? 1) >= 1.08 ? 1.1 : 1));
   }
   // Real-world tether — never let his demand fall too far below what he actually
   // earns in reality, regardless of what our internal comps pool computes.

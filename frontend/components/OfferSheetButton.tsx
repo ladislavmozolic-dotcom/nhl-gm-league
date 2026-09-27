@@ -1,5 +1,6 @@
 "use client";
 
+import SalaryStepper from "@/components/SalaryStepper";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { getOsCompPlanAction, submitOfferSheetAction, withdrawOfferSheetAction } from "@/lib/offer-sheet-server";
@@ -83,8 +84,7 @@ export default function OfferSheetButton({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-slate-400 block mb-1">Salary ($M / yr)</label>
-                  <input type="number" step="0.05" min="0.775" value={salaryM} onChange={(e) => setSalaryM(e.target.value)}
-                    className="w-full px-2 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-sm tabular-nums" />
+                  <SalaryStepper value={salaryM} onChange={setSalaryM} />
                 </div>
                 <div>
                   <label className="text-xs text-slate-400 block mb-1">Term (years)</label>

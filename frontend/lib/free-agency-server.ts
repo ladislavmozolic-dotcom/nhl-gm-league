@@ -406,9 +406,6 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
   const rnd = round ?? (await currentFrenzyRound());
   const priorBidders = (await priorRoundBidderCounts([playerId], rnd)).get(playerId);
   const { grp, market } = playerMarket(p as PoolPlayer);
-  const rated = anchorFromPool(marketPool, grp, market);
-  const role = roleAnchor(p, grp, marketPool);
-  const anchor = role != null ? (rated.anchor + role) / 2 : rated.anchor, count = rated.count;
   // A player re-signing with his OWN club is NOT stale on the open market — no season
   // decay. The "nobody's biting" softening only applies to unsigned market UFAs.
   const ownOrg = await prisma.team.findUnique({ where: { id: teamId }, select: { affiliateTeams: { select: { id: true } } } });
@@ -419,6 +416,10 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
   const extension = isOwn && !clock.frenzyOpen;
   const s = await loadSettings();
   const rfa = extension && s.faMode !== "simple" && (p.age ?? 27) < 27;
+  // not testing the market ⇒ the middle of his peer group, not its upper part
+  const rated = anchorFromPool(marketPool, grp, market, extension ? 0.5 : undefined);
+  const role = roleAnchor(p, grp, marketPool);
+  const anchor = role != null ? (rated.anchor + role) / 2 : rated.anchor, count = rated.count;
   const rawBase = buildDemand({
     market, grp, age: p.age, anchor, comps: count, override: p.faDemandOverride, capGrowth: 1, round: rnd, priorBidders,
     perf: performanceOf(p, grp, market, marketPool),
@@ -443,7 +444,12 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
   const desired = desiredDeployment(grp, line, p.df, slot === "XD" || slot === "XF");
   // projected ask = the club gives him the role he projects into, plus the ST he wants
   const projDeploy: Deployment = { line, pp: desired.wantPP, pk: desired.wantPK };
-  const ask = deploymentDemand(base, grp, projDeploy, desired, ctx.contention, p.age);
+  let ask = deploymentDemand(base, grp, projDeploy, desired, ctx.contention, p.age);
+  // a 32+ vet re-signing without a big year: his current deal stays the ceiling even
+  // after the role/contention bend (the base already respects it — see buildDemand)
+  if (extension && p.faDemandOverride == null && (p.age ?? 27) >= 32 && (p.capHit ?? 0) > 0 && performanceOf(p, grp, market, marketPool) < 1.08 && ask.salary > p.capHit!) {
+    ask = { ...ask, salary: round50k(p.capHit!), floorSalary: Math.min(ask.floorSalary, round50k(p.capHit! * 0.92)) };
+  }
   return { grp, base, slot, line, contention: ctx.contention, desired, ask, age: p.age, lowballBump: bump };
 }
 
