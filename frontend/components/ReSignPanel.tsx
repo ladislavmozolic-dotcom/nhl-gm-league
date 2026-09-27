@@ -55,7 +55,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
   const grp = i?.grp ?? "F";
 
   const router = useRouter();
-  const [result, setResult] = useState<{ salary: number; years: number } | null>(null);
+  const [result, setResult] = useState<{ salary: number; years: number; next?: boolean } | null>(null);
   const submit = () => start(async () => {
     setMsg(null);
     const salary = Math.round(parseFloat(salaryM) * 1e6);
@@ -66,7 +66,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
     } catch (e) { setMsg({ t: "err", s: friendlyActionError(e) }); return; }
     // don't refresh yet — that would unmount this modal before the confirmation shows;
     // refresh when the GM closes it (Done button).
-    if (r.ok) { setResult({ salary: r.salary, years: r.years }); setDone(true); return; }
+    if (r.ok) { setResult({ salary: r.salary, years: r.years, next: !!r.startsNextSeason }); setDone(true); return; }
     const rr = r as { walked?: boolean; rejected?: boolean; reason?: string; error?: string };
     if (rr.walked) { setDone(true); setMsg({ t: "err", s: rr.reason ?? "He walked away." }); return; }
     setMsg({ t: "err", s: rr.rejected ? (rr.reason ?? "") : (rr.error ?? "Failed.") });
@@ -87,7 +87,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
             <div className="text-xs uppercase tracking-wide text-emerald-400/80">Contract signed</div>
             <div className="text-2xl font-black text-white mt-1">{cleanName(player.name)}</div>
             <div className="text-lg text-emerald-400 font-bold mt-1 tabular-nums">{M(result.salary)} × {result.years}yr</div>
-            <div className="text-xs text-slate-500 mt-1">stays with the club through {new Date().getUTCFullYear()}</div>
+            <div className="text-xs text-slate-500 mt-1">{result.next ? "Extension — plays out his current deal this season; the new one starts next season." : `stays with the club through ${new Date().getUTCFullYear() + result.years}`}</div>
             <button onClick={() => { router.refresh(); onClose(); }} className="mt-6 px-8 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-sm font-bold">Done</button>
           </div>
         )}

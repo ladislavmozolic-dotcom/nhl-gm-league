@@ -353,7 +353,8 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   const contractYearsN = p.contractYears ?? 0;
   const untilYear = contractYearsN > 0 ? seasonLabel(CURRENT_SEASON_START + contractYearsN - 1) : null;
   const expiryYear = CURRENT_SEASON_START + contractYearsN;
-  const ageAtExpiry = p.birthDate != null ? ageAsOfJune30(p.birthDate, expiryYear) : (p.age ?? 0) + contractYearsN;
+  const extN = p.extCapHit && p.extYears ? p.extYears : 0;
+  const ageAtExpiry = p.birthDate != null ? ageAsOfJune30(p.birthDate, expiryYear + extN) : (p.age ?? 0) + contractYearsN + extN;
   const expiryStatus = contractYearsN > 0 ? (ageAtExpiry >= 27 ? "UFA" : "RFA") : null;
   const rightInfo: [string, React.ReactNode][] = [
     ["Contract Length", p.contractYears != null ? `${p.contractYears} yr${p.contractYears === 1 ? "" : "s"}` : "—"],
@@ -368,6 +369,8 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     // Only worth its own row when there IS a current deal — otherwise it's
     // just "Previous Cap Hit" repeated under a second label.
     ...(hasContract ? ([["Last Year Salary", capHit]] as [string, React.ReactNode][]) : []),
+    // signed in-season extension — kicks in once the current deal runs out
+    ...(p.extCapHit && p.extYears ? ([["Extension", <span key="ext" className="text-emerald-300">{money(p.extCapHit)} × {p.extYears} yr{p.extYears === 1 ? "" : "s"} <span className="text-slate-400 font-normal">from {seasonLabel(expiryYear)}</span></span>]] as [string, React.ReactNode][]) : []),
   ];
 
   const InfoRow = ({ label, value, valueClass }: { label: string; value: React.ReactNode; valueClass?: string }) => (

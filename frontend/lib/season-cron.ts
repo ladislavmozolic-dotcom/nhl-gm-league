@@ -19,6 +19,7 @@
 //      displayed date tracks real time immediately, without waiting for
 //      tonight's game-sim window.
 import { prisma } from "./prisma";
+import { applyPendingExtensions } from "./contract-extensions";
 import { simulateLeagueDay } from "@/lib/season-day";
 import { addDays } from "./calendar";
 import { sweepExpiredContractsToUfa } from "./free-agency-server";
@@ -123,6 +124,7 @@ export async function rolloverLeagueDateIfDue(now: Date = new Date()): Promise<R
         AND age IS DISTINCT FROM date_part('year', age(${to}::date, "birthDate"::date))::int
     `,
   ]);
+  await applyPendingExtensions().catch((e) => console.error("[rollover] extensions", e));
   return { rolled: true, to };
 }
 

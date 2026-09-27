@@ -61,7 +61,11 @@ export const DEFAULT_PROJECTED_CAPS: Record<number, { upper: number; lower: numb
  *  a separately-typed Player.contractExpiry to stay in sync by hand. */
 export const computeContractExpiry = (years: number, from = CURRENT_SEASON_START) => from + years;
 
-export type CapPlayer = { capHit: number | null; contractYears: number | null; age: number | null; birthDate?: string | Date | null };
+export type CapPlayer = {
+  capHit: number | null; contractYears: number | null; age: number | null; birthDate?: string | Date | null;
+  /** a signed extension that starts once the current deal runs out */
+  extCapHit?: number | null; extYears?: number | null;
+};
 
 /** A player's Cap Hit once his contract has fully run out (contractYears <= 0)
  *  is a frozen historical number, not a live salary — Player.capHit deliberately
@@ -99,11 +103,14 @@ export function ageAsOfJune30(birthDate: string | Date, year: number): number {
 /** Per-year cap for a player over `span` seasons: salary while under contract,
  *  then a UFA/RFA marker the season it expires (UFA if 27+ on June 30 of that year). */
 export function playerCapYears(p: CapPlayer, startYear = CURRENT_SEASON_START, span = 8) {
-  const years = p.contractYears ?? 0;
+  const cur = p.contractYears ?? 0;
+  const ext = p.extCapHit && p.extYears ? p.extYears : 0;
+  const years = cur + ext;
   const out: Array<{ year: string; salary: number | null; status: "UFA" | "RFA" | null }> = [];
   for (let i = 0; i < span; i++) {
     const label = seasonLabel(startYear + i);
-    if (i < years) out.push({ year: label, salary: p.capHit ?? 0, status: null });
+    if (i < cur) out.push({ year: label, salary: p.capHit ?? 0, status: null });
+    else if (i < years) out.push({ year: label, salary: p.extCapHit ?? 0, status: null });
     else if (i === years) {
       const ageAtExpiry = p.birthDate != null ? ageAsOfJune30(p.birthDate, startYear + i) : (p.age ?? 0) + i;
       out.push({ year: label, salary: null, status: ageAtExpiry >= 27 ? "UFA" : "RFA" });

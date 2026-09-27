@@ -59,7 +59,7 @@ export async function gmDashboard(teamId: number): Promise<GmDashboard | null> {
   // READINESS: lines / roster / cap
   const [linesRow, roster, cap] = await Promise.all([
     prisma.teamLines.findUnique({ where: { teamId }, select: { forwardLines: true } }),
-    prisma.player.findMany({ where: { teamId, rosterType: league === "AHL" ? "AHL" : "NHL" }, select: { name: true, slug: true, position: true, injuryDaysLeft: true, morale: true, condition: true, contractYears: true, isGoalie: true, overall: true } }),
+    prisma.player.findMany({ where: { teamId, rosterType: league === "AHL" ? "AHL" : "NHL" }, select: { name: true, slug: true, position: true, injuryDaysLeft: true, morale: true, condition: true, contractYears: true, extCapHit: true, isGoalie: true, overall: true } }),
     teamCapStatus(teamId).catch(() => null),
   ]);
   const linesOk = Array.isArray(linesRow?.forwardLines) && (linesRow!.forwardLines as unknown[]).length > 0;
@@ -100,7 +100,7 @@ export async function gmDashboard(teamId: number): Promise<GmDashboard | null> {
   if (build) for (const l of build.forwards.filter((l) => l.gelled && l.chemistry < 62).slice(0, 2))
     attention.push({ icon: "🧪", tone: "text-amber-400", text: `Line ${l.index + 1} chemistry dropped to ${l.chemistry}`, href: `${teamHref}/lines/builder` });
   // expiring contracts (final year)
-  for (const p of roster.filter((p) => p.contractYears === 1 && (p.overall ?? 0) >= 60).slice(0, 2))
+  for (const p of roster.filter((p) => p.contractYears === 1 && !p.extCapHit && (p.overall ?? 0) >= 60).slice(0, 2))
     attention.push({ icon: "📄", tone: "text-sky-400", text: `${cleanName(p.name)} — contract expires end of season`, href: p.slug ? `/players/${p.slug}` : undefined });
 
   // FORM
@@ -193,7 +193,7 @@ export async function gmDashboard(teamId: number): Promise<GmDashboard | null> {
       prisma.player.count({ where: { rosterType: { notIn: ["NHL", "AHL", "RETIRED", "PROSPECT", "RELEASED", "NONROSTER"] } } }),
       prisma.transaction.findMany({ orderBy: { createdAt: "desc" }, take: 5, select: { message: true } }),
     ]);
-    const expiring = roster.filter((p) => (p.contractYears ?? 9) <= 1 && (p.overall ?? 0) >= 55)
+    const expiring = roster.filter((p) => (p.contractYears ?? 9) <= 1 && !p.extCapHit && (p.overall ?? 0) >= 55)
       .map((p) => ({ name: cleanName(p.name), slug: p.slug }));
     return { ...base, mode: "offseason", attention: [], offseason: { expiring, freeAgents, recentMoves: moves.map((m) => m.message) } };
   }

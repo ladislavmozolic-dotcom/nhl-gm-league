@@ -1166,7 +1166,9 @@ export async function extendContractAction(
   // cap check — replace his current hit with the new one (off-season +10% cushion, + LTIR
   // relief). Skipped for a FARM player: his deal sits on the AHL, off the NHL cap.
   const onFarm = player.rosterType === "AHL";
-  if (!onFarm) {
+  // an in-season final-year extension doesn't touch this season's cap (see below)
+  const deferred = (player.contractYears ?? 0) >= 1 && (phase === "regular" || phase === "playoffs");
+  if (!onFarm && !deferred) {
     const cap = await loadLeagueCap();
     const info = await teamCapInfo(teamId);
     const committed = info.committed - liveCapHit(player);
@@ -1226,10 +1228,12 @@ export async function extendContractAction(
     };
   }
 
-  // The new deal replaces the current one immediately — salary/term update the
-  // moment the offer is accepted, same as any other signing (no deferred-extension
-  // delay to next season's rollover).
-  const expiry = CURRENT_SEASON_START + years;
+  // NHL rule: a final-year player extended once the regular season is underway
+  // keeps playing out his current deal — the new one starts next season (stored
+  // in ext*, activated by applyPendingExtensions when the current deal runs out).
+  // An already-expired (0-year) deal is replaced immediately, as before.
+  const startYear = CURRENT_SEASON_START + (deferred ? (player.contractYears ?? 1) : 0);
+  const expiry = startYear + years;
   const noTradeTeams = clause === "M_NTC" ? await weakestTeams(breadth ?? 12, teamId) : [];
   const contractText = twoWay
     ? `$${salary.toLocaleString("en-US")} NHL / $${TWO_WAY_AHL_SALARY.toLocaleString("en-US")} AHL × ${years}yr (2-way, through ${expiry})`
@@ -1240,23 +1244,28 @@ export async function extendContractAction(
   // the farm afterward via the roster mover like any other player, same as a fresh
   // signing would be).
   const releaseNonRoster = player.rosterType === "NONROSTER" ? { rosterType: "NHL" } : {};
+  const newDeal = deferred
+    ? { extCapHit: salary, extYears: years, extContractType: twoWay ? "TWO_WAY" : "ONE_WAY", extClause: clause, extNoTradeTeams: noTradeTeams, extText: contractText, resignStatus: "extended" }
+    : {
+        capHit: salary, contractYears: years, contractExpiry: expiry,
+        contractType: twoWay ? "TWO_WAY" : "ONE_WAY", tradeClause: clause, noTradeTeams, contractText,
+        ahlSalary: twoWay ? TWO_WAY_AHL_SALARY : null,
+        extCapHit: null, extYears: null, extContractType: null, extClause: null, extNoTradeTeams: [], extText: null, resignStatus: null,
+      };
   await prisma.player.update({
     where: { id: playerId },
     data: {
       ...releaseNonRoster,
-      capHit: salary, contractYears: years, contractExpiry: expiry,
-      contractType: twoWay ? "TWO_WAY" : "ONE_WAY", tradeClause: clause, noTradeTeams, contractText,
-      ahlSalary: twoWay ? TWO_WAY_AHL_SALARY : null,
-      extCapHit: null, extYears: null, extContractType: null, extClause: null, extNoTradeTeams: [], extText: null,
+      ...newDeal,
       signPromiseLine: dep.line, signPromisePP: pp, signPromisePK: pk,
-      resignRound: 0, resignStatus: null, resignCounterSalary: null, resignCounterYears: null,
+      resignRound: 0, resignCounterSalary: null, resignCounterYears: null,
       disgruntled: false, tradeRequested: false, promiseWarnGame: null,
       tradeRequestReason: null, iceUnhappyChecks: 0, iceWarnedAt: null,
     },
   });
   await clearLowballs(playerId);
   await prisma.transaction.create({
-    data: { type: "SIGNING", message: `${team?.code ?? "?"} re-signed ${player.name} — $${(salary / 1e6).toFixed(2)}M × ${years}yr` },
+    data: { type: "SIGNING", message: `${team?.code ?? "?"} re-signed ${player.name} — $${(salary / 1e6).toFixed(2)}M × ${years}yr${deferred ? ` (from ${startYear}-${String((startYear + 1) % 100).padStart(2, "0")})` : ""}` },
   });
   // revertible record — restores the exact prior contract snapshot on revert
   await prisma.signingLog.create({ data: {
@@ -1267,5 +1276,5 @@ export async function extendContractAction(
     prevRosterType: player.rosterType, prevTeamId: player.teamId, prevContractText: player.contractText,
   } });
   // no revalidatePath — it would unmount the confirmation modal; client refreshes on Done.
-  return { ok: true as const, signed: true, salary, years, name: player.name };
+  return { ok: true as const, signed: true, salary, years, name: player.name, startsNextSeason: deferred };
 }
