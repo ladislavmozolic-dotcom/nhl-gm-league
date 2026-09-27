@@ -54,7 +54,10 @@ export type EngineSettings = {
   injuryChancePct: number;   // scales the base injury rate
   // Star separation (higher = more concentrated scoring)
   starExponent: number;
-  finishExponent: number;     // how steeply finishing (SC) separates shooters' conversion (higher = elite snipers pull away)
+  finishExponent: number;
+  depthParityPct: number;     // 0..100: pulls each skater's possession/finishing edge toward his team's positional average (more depth scoring, flatter lines)
+  pointShotPct: number;       // 100 = default rate at which forwards defer to the point (D shots / goals)
+  dAssistPct: number;         // D share of assists vs forwards (100 = the old 0.29 weight)     // how steeply finishing (SC) separates shooters' conversion (higher = elite snipers pull away)
   // Points system
   winPts: number;
   otWinPts: number;
@@ -238,7 +241,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   scrumChance: 0.25, brawlChance: 0.02, abuseOfficialChance: 0.06, coachFinePimThreshold: 24, coachFineAmount: 100000,
   fightsEnabled: true, penaltiesEnabled: true, playByPlayEnabled: true,
   injuriesEnabled: true, injuryChancePct: 8,
-  starExponent: 2.1, finishExponent: 1.7,
+  starExponent: 2.1, finishExponent: 1.7, depthParityPct: 0, pointShotPct: 100, dAssistPct: 100,
   winPts: 2, otWinPts: 2, otLossPts: 1, lossPts: 0,
   playoffFormat: "division", playoffTeamsPerConf: 8, playoffBestOf: 7,
   salaryCapUpper: 85900000, salaryCapLower: 51500000, startingCapital: 40000000,

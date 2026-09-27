@@ -411,7 +411,7 @@ function pickAssists(rng: RNG, onIce: SimSkater[], scorerId: number): number[] {
   const picked: number[] = [];
   for (let i = 0; i < n && pool.length; i++) {
     const weights = pool.map((s) =>
-      involvement(s.playmaking * conFactor(s.con)) * s.iceTime * (s.isDefense ? D_ASSIST : 1));
+      involvement(s.playmaking * conFactor(s.con)) * s.iceTime * (s.isDefense ? D_ASSIST * ((CFG.dAssistPct ?? 100) / 100) : 1));
     const idx = rng.weighted(weights);
     picked.push(pool[idx].id);
     pool.splice(idx, 1);
@@ -1261,6 +1261,17 @@ function fatigueMult(shiftSec: number, en: number): number {
 const LAST_CHANGE_MATCHUP_BOOST = 1.35;
 // per-tick chance a defensive-zone carrier ices it (× icingRatePct/100, fatigue, forecheck)
 const ICING_RATE = 0.0055;
+// ice-time-weighted team average offense of its forwards / defencemen (depth parity anchor)
+const _posAvgCache = new WeakMap<SimTeam, { f: number; d: number }>();
+function posAvgOff(team: SimTeam, isDefense: boolean): number {
+  let c = _posAvgCache.get(team);
+  if (!c) {
+    const avg = (xs: SimSkater[]) => { const w = xs.reduce((t, s) => t + s.iceTime, 0); return w ? xs.reduce((t, s) => t + s.offense * s.iceTime, 0) / w : 55; };
+    c = { f: avg(team.forwards), d: avg(team.defense) };
+    _posAvgCache.set(team, c);
+  }
+  return isDefense ? c.d : c.f;
+}
 // shaken-up knocks per real injury (they return to the game)
 const KNOCK_RATIO = 0.9;
 // 4-on-4: more open ice → more shot attempts per possession tick
@@ -1789,7 +1800,8 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
       if (rng.chance(0.75)) {
         const winTeam = homeWin ? home : away;
         const pool = [...onIceD(winTeam), ...onIceF(winTeam).filter((x) => x.id !== foWinner.id)];
-        if (pool.length) carrier = pickByAttr(rng, pool, (x) => (x.attrs.pa ?? 50) + 20) ?? carrier;
+        // a D takes it back mostly to move it up, so a winger is the likelier carrier
+        if (pool.length) carrier = pickByAttr(rng, pool, (x) => ((x.attrs.pa ?? 50) + 20) * (x.isDefense ? 0.45 : 1)) ?? carrier;
       }
       st.sink.emit({
         period, seconds: tick, type: "FACEOFF",
@@ -1844,7 +1856,12 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
     const teamMult = Math.max(0.68, Math.min(1.32, 1 + ovGap * 0.035 * CFG.possessionSkillPct));
 
     // final-skill helper: base × tactics × chemistry × morale × fatigue × score-effect × team edge
-    const atkSkill = (v: number, of = true) => v * (of ? tOff.of * atkTilt.of : 1) * chemFactor(carrier.chem, carrier.roleFit) * moraleFactor(carrier.morale) * fat(carrierTeam, carrier) * catchUp * teamMult;
+    // depth parity: a top-liner's edge (and a depth player's deficit) in the puck battles
+    // is pulled toward his team's positional average — flatter lines, more depth scoring
+    const dp = Math.max(0, Math.min(1, (CFG.depthParityPct ?? 0) / 100));
+    // (forwards only — an elite offensive D keeps his edge, as the Makars and Hugheses do)
+    const depthAdj = dp > 0 && !carrier.isDefense ? Math.max(0.8, Math.min(1.25, 1 + dp * ((posAvgOff(carrierTeam, false) / Math.max(1, carrier.offense)) - 1))) : 1;
+    const atkSkill = (v: number, of = true) => v * (of ? tOff.of * atkTilt.of : 1) * chemFactor(carrier.chem, carrier.roleFit) * moraleFactor(carrier.morale) * fat(carrierTeam, carrier) * catchUp * teamMult * depthAdj;
     const defSkill = (v: number) => v * tDef.df * defTilt.df * dfat(def, dman);
     // puck-protection: SK still leads (skating/hands to evade pressure), but PH
     // (stickhandling) is now a real secondary factor in keeping it on the tape.
@@ -1925,7 +1942,7 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
     // 82+ sniper (McDavid) never gives it up, a grinder defers up to ~1/3 the time.
     // This keeps the point shots (→ D goals) coming off DEPTH possessions instead of
     // taxing the elite scorers' own looks, so the scoring race stays intact.
-    const deferRate = Math.max(0, Math.min(0.40, 0.40 * (85 - (carrier.attrs.sc ?? 50)) / 45));
+    const deferRate = Math.max(0, Math.min(0.40, 0.40 * (85 - (carrier.attrs.sc ?? 50)) / 45)) * ((CFG.pointShotPct ?? 100) / 100);
     // only a plain CARRY defers to the point — a forward who just took a cross-ice
     // feed or a rebound shoots his high-danger look himself (never downgraded to a
     // point shot), so the diversion adds D goals without destroying scoring chances.
@@ -2063,7 +2080,8 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
       // ice on top of the formation/chemistry edge, not a replacement for it.
       const manAdvMult = manAdv3 ? 1.35 : 1;
       const ppMod = strength === "PP" ? (carrierTeam.ppChem / def.pkChem) * atkFx.ppConv * defFx.pkSuppress * manAdvMult : 1; // gelled PP1 + PP formation vs gelled PK1 + PK structure
-      const shOff = strength !== "EV" ? carrier.offense / carrier.posPenalty : carrier.offense; // off-position waived on ST
+      const shOffRaw = strength !== "EV" ? carrier.offense / carrier.posPenalty : carrier.offense; // off-position waived on ST
+      const shOff = dp > 0 && !carrier.isDefense ? shOffRaw + dp * (posAvgOff(carrierTeam, false) - shOffRaw) * 0.5 : shOffRaw;
       // PARITY: compress the talent mismatch so favourites don't run away. The
       // shooter×goalie conversion is pulled toward the SAME situation with a
       // league-average shooter & keeper (danger/strength/home preserved), and the
