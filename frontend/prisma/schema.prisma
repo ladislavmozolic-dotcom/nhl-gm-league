@@ -421,6 +421,7 @@ model WaiverClaim {
 model LeagueConfig {
   id                   Int       @id @default(1)
   rosterMode           String    @default("profinhl") // profinhl | real
+  contractYear         Int       @default(2026) // league year (July start) every Player.contractYears counts from — bumped by rollContractsIfDue
   profinhlCapUpper     Int       @default(85900000)
   profinhlCapLower     Int       @default(51500000)
   realCapUpper         Int       @default(104000000) // real 2026-27 NHL upper limit

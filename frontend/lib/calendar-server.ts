@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { setCurrentSeasonStart } from "./finance";
 import {
   defaultLeagueDate, frenzyDay, frenzyRound, isFrenzyOpen, addDays, utcDay, daysBetween,
   seasonOpen, FRENZY_WINDOW_DAYS, SEASON_START_YEAR, PHASES, PHASE_LABEL, type Phase,
@@ -94,7 +95,8 @@ function faWindowFor(phase: Phase, frenzyOpen: boolean, postFrenzyOpen = false):
 
 /** Everything the UI needs about "what day is it in the league". */
 export async function getLeagueClock(): Promise<LeagueClock> {
-  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { leagueDate: true, faOpen: true, phaseOverride: true, frenzyRoundStartedAt: true, frenzyForcedRound: true, frenzyStage: true } });
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { leagueDate: true, faOpen: true, phaseOverride: true, frenzyRoundStartedAt: true, frenzyForcedRound: true, frenzyStage: true, contractYear: true } });
+  if (cfg?.contractYear) setCurrentSeasonStart(cfg.contractYear);
   const date = cfg?.leagueDate ?? defaultLeagueDate();
   const phase = await computePhase(date, cfg?.phaseOverride);
   const faForced = !!cfg?.faOpen;

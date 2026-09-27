@@ -43,7 +43,12 @@ export function priceAttendanceFactor(sections: ArenaSection[]): number {
 
 // ---- salary cap ------------------------------------------------------------
 
-export const CURRENT_SEASON_START = 2026; // 2026-27
+/** The league year (July 1 start) contract terms count from — 2026 = 2026-27.
+ *  A live binding: starts from the calendar, then follows LeagueConfig.contractYear
+ *  (synced by getLeagueClock / the contract rollover in lib/contract-extensions.ts),
+ *  so every "years left" → season label/expiry stays in step after July 1. */
+export let CURRENT_SEASON_START = ((d) => (d.getUTCMonth() >= 6 ? d.getUTCFullYear() : d.getUTCFullYear() - 1))(new Date());
+export function setCurrentSeasonStart(year: number) { if (Number.isInteger(year) && year > 2000) CURRENT_SEASON_START = year; }
 export const seasonLabel = (startYear: number) =>
   `${startYear}-${String((startYear + 1) % 100).padStart(2, "0")}`;
 

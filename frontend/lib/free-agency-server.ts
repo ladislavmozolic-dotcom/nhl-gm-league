@@ -426,8 +426,10 @@ const UFA_AGE = 27;
  *  agree on exactly who's affected. */
 async function expiredContractCandidates(): Promise<{ ufaIds: number[]; rfaIds: number[] }> {
   const { loadSettings } = await import("./sim/settings");
-  // an expired deal with a signed extension waiting isn't free agency — start it instead
-  const { applyPendingExtensions } = await import("./contract-extensions");
+  // make sure the league year has rolled (deals expired, extensions started) first —
+  // an expired deal with a signed extension waiting isn't free agency
+  const { rollContractsIfDue, applyPendingExtensions } = await import("./contract-extensions");
+  await rollContractsIfDue();
   await applyPendingExtensions();
   const [settings, candidates] = await Promise.all([
     loadSettings(),
