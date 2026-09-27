@@ -7,7 +7,7 @@ import { getLeagueClock } from "./calendar-server";
 import { computeStandings } from "./sim/standings";
 import { CURRENT_SEASON_START } from "./finance";
 import {
-  faPosGroup, skaterMarket, goalieMarket, anchorFromPool, buildDemand,
+  faPosGroup, skaterMarket, goalieMarket, anchorFromPool, buildDemand, percentile,
   slotForRank, slotToLine, desiredDeployment, deploymentDemand, offerUtility, offerAcceptable, clauseDiscount, termPremium,
   type MarketRow, type Demand, type FaPos, type Contention, type Deployment, type Desired, type LineSlot,
 } from "./free-agency";
@@ -32,7 +32,7 @@ export async function loadLeagueCap(): Promise<LeagueCap> {
 
 const SEL = {
   id: true, isGoalie: true, position: true, age: true, capHit: true, rosterType: true,
-  sc: true, pa: true, df: true, sk: true, lastSeasonGP: true, lastSeasonPts: true, morale: true,
+  sc: true, pa: true, df: true, sk: true, lastSeasonGP: true, lastSeasonPts: true, lastSeasonSvPct: true, lastSeasonToi: true, morale: true,
   realCapHit: true,
   goalieRating: { select: { ag: true, rb: true, sc: true, hs: true } },
 } as const;
@@ -47,8 +47,9 @@ export async function leagueFullGP(): Promise<number> {
 }
 
 /** Coming off a down season if he's played under 60% of the full slate. */
-export function isDownSeason(lastSeasonGP: number | null | undefined, fullGP: number): boolean {
-  return fullGP > 0 && lastSeasonGP != null && lastSeasonGP > 0 && lastSeasonGP < 0.6 * fullGP;
+export function isDownSeason(lastSeasonGP: number | null | undefined, fullGP: number, goalie = false): boolean {
+  // a goalie shares the net — 46 starts is a full workload for him, not a down year
+  return fullGP > 0 && lastSeasonGP != null && lastSeasonGP > 0 && lastSeasonGP < (goalie ? 0.35 : 0.6) * fullGP;
 }
 
 /** Distinct clubs with an active bid on each player in the round BEFORE `round`
@@ -105,8 +106,59 @@ export async function loadMarketPool(): Promise<MarketRow[]> {
   });
   return signed.map((p) => {
     const { grp, market } = playerMarket(p as PoolPlayer);
-    return { grp, market, capHit: p.capHit ?? 0 };
+    const ppg = grp !== "G" && (p.lastSeasonGP ?? 0) >= 20 ? (p.lastSeasonPts ?? 0) / p.lastSeasonGP! : null;
+    const toi = grp !== "G" && (p.lastSeasonGP ?? 0) >= 20 && (p.lastSeasonToi ?? 0) > 0 ? p.lastSeasonToi : null;
+    return { grp, market, capHit: p.capHit ?? 0, ppg, toi, age: p.age };
   });
+}
+
+/** Role anchor — what clubs pay players who DID what he did last season (similar
+ *  points/GP and, when known, similar minutes), ELCs excluded (their pay is set by
+ *  the CBA, not the market). Blended 50/50 with the rating anchor: ratings alone
+ *  can't tell a bottom-pair D from a top-pair one earning twice as much. */
+export function roleAnchor(
+  p: { lastSeasonGP?: number | null; lastSeasonPts?: number | null; lastSeasonToi?: number | null },
+  grp: FaPos, pool: MarketRow[],
+): number | null {
+  if (grp === "G" || (p.lastSeasonGP ?? 0) < 20) return null;
+  const ppg = (p.lastSeasonPts ?? 0) / p.lastSeasonGP!;
+  const toi = p.lastSeasonToi ?? null;
+  const elc = (r: MarketRow) => r.capHit < 1_000_000 && (r.age ?? 30) <= 24;
+  const ppgBand = grp === "D" ? 0.08 : 0.1, toiBand = grp === "D" ? 75 : 90;
+  const comps = pool.filter((r) => r.grp === grp && r.ppg != null && !elc(r) && Math.abs(r.ppg - ppg) <= ppgBand
+    && (toi == null || r.toi == null || Math.abs(r.toi - toi) <= toiBand));
+  if (comps.length < 10) return null;
+  return percentile(comps.map((c) => c.capHit), 0.55);
+}
+
+/** Last season's production vs. players rated like him → the demand's performance
+ *  multiplier (1 = produced like his rating says). Skaters: points/GP against the
+ *  same-rating comps (a D's points count less — his job isn't scoring). Goalies:
+ *  save % against a league-average .903. No real sample → neutral. */
+export function performanceOf(
+  p: { lastSeasonGP?: number | null; lastSeasonPts?: number | null; lastSeasonSvPct?: number | null; lastSeasonToi?: number | null },
+  grp: FaPos, market: number, pool: MarketRow[],
+): number {
+  const gp = p.lastSeasonGP ?? 0;
+  if (grp === "G") {
+    const sv = p.lastSeasonSvPct;
+    if (gp < 15 || sv == null || !(sv > 0.8)) return 1;
+    return Math.max(0.85, Math.min(1.15, 1 + (sv - 0.903) * 8));
+  }
+  if (gp < 20) return 1;
+  const comps = pool.filter((r) => r.grp === grp && r.ppg != null && Math.abs(r.market - market) <= 3);
+  if (comps.length < 8) return 1;
+  const exp = comps.reduce((t, r) => t + r.ppg!, 0) / comps.length;
+  if (!(exp > 0.05)) return 1;
+  const ratio = ((p.lastSeasonPts ?? 0) / gp) / exp;
+  let f = 1 + (ratio - 1) * (grp === "D" ? 0.25 : 0.45);
+  // a D is paid for his minutes as much as his points — bottom-pair TOI ⇒ bottom-pair money
+  const toiComps = comps.filter((r) => r.toi != null);
+  if (grp === "D" && (p.lastSeasonToi ?? 0) > 0 && toiComps.length >= 8) {
+    const expToi = toiComps.reduce((t, r) => t + r.toi!, 0) / toiComps.length;
+    f *= 1 + (p.lastSeasonToi! / expToi - 1) * 1.2;
+  }
+  return Math.max(0.8, Math.min(1.2, f));
 }
 
 export type DemandFor = { demand: Demand; grp: FaPos };
@@ -131,11 +183,13 @@ function demandFromRow(
   pool: MarketRow[], fullGP: number, round: number, stale = 1, priorBidders?: number,
 ): DemandFor {
   const { grp, market } = playerMarket(p);
-  const { anchor, count } = anchorFromPool(pool, grp, market);
+  const rated = anchorFromPool(pool, grp, market);
+  const role = roleAnchor(p, grp, pool);
+  const anchor = role != null ? (rated.anchor + role) / 2 : rated.anchor, count = rated.count;
   const demand = buildDemand({
     market, grp, age: p.age, anchor, comps: count,
-    override: p.faDemandOverride, capGrowth: 1, round, priorBidders,
-    downSeason: isDownSeason(p.lastSeasonGP, fullGP), morale: p.morale, currentSalary: p.capHit,
+    override: p.faDemandOverride, capGrowth: 1, round, priorBidders, perf: performanceOf(p, grp, market, pool),
+    downSeason: isDownSeason(p.lastSeasonGP, fullGP, grp === "G"), morale: p.morale, currentSalary: p.capHit,
     realCapHit: p.realCapHit,
   });
   // a manual override is the commissioner's word — never soften it
@@ -338,6 +392,10 @@ export function lowballNote(bump: number): string | null {
   return pct >= 1 ? `Insulted by your earlier lowball — asking your club ${pct}% more` : null;
 }
 
+/** An own-club RFA extension: no UFA market to test, only offer sheets — he signs
+ *  for less than a UFA of the same rating would ask. */
+const RFA_EXTENSION_FACTOR = 0.85;
+
 /** The Interest feedback: what the player would want to sign at THIS club, given
  *  the role he projects into there + whether the club is a contender. */
 export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow[], cmap?: Map<number, Contention>, round?: number): Promise<TeamAsk | null> {
@@ -348,20 +406,41 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
   const rnd = round ?? (await currentFrenzyRound());
   const priorBidders = (await priorRoundBidderCounts([playerId], rnd)).get(playerId);
   const { grp, market } = playerMarket(p as PoolPlayer);
-  const { anchor, count } = anchorFromPool(marketPool, grp, market);
-  const rawBase = buildDemand({ market, grp, age: p.age, anchor, comps: count, override: p.faDemandOverride, capGrowth: 1, round: rnd, priorBidders, downSeason: isDownSeason(p.lastSeasonGP, fullGP), morale: p.morale, currentSalary: p.capHit, realCapHit: p.realCapHit });
+  const rated = anchorFromPool(marketPool, grp, market);
+  const role = roleAnchor(p, grp, marketPool);
+  const anchor = role != null ? (rated.anchor + role) / 2 : rated.anchor, count = rated.count;
   // A player re-signing with his OWN club is NOT stale on the open market — no season
   // decay. The "nobody's biting" softening only applies to unsigned market UFAs.
-  const isOwn = p.teamId === teamId;
+  const ownOrg = await prisma.team.findUnique({ where: { id: teamId }, select: { affiliateTeams: { select: { id: true } } } });
+  const isOwn = p.teamId === teamId || !!ownOrg?.affiliateTeams.some((a) => a.id === p.teamId);
+  // Own-club extension outside the Frenzy: he isn't testing the market, so no opening
+  // premium — and an RFA (no UFA market, offer sheets only) has less leverage still.
+  const clock = await getLeagueClock();
+  const extension = isOwn && !clock.frenzyOpen;
+  const s = await loadSettings();
+  const rfa = extension && s.faMode !== "simple" && (p.age ?? 27) < 27;
+  const rawBase = buildDemand({
+    market, grp, age: p.age, anchor, comps: count, override: p.faDemandOverride, capGrowth: 1, round: rnd, priorBidders,
+    perf: performanceOf(p, grp, market, marketPool),
+    downSeason: isDownSeason(p.lastSeasonGP, fullGP, grp === "G"), morale: p.morale, currentSalary: p.capHit, realCapHit: p.realCapHit,
+    openingPremium: !extension, rfaFactor: rfa ? RFA_EXTENSION_FACTOR : 1,
+  });
   const unbumped = p.faDemandOverride != null ? rawBase : scaleDemand(rawBase, isOwn ? 1 : await faStaleFactor());
   const bump = await lowballBump(playerId, teamId);
-  const base = bump > 1
+  let base = bump > 1
     ? { ...unbumped, salary: Math.min(16_000_000, round50k(unbumped.salary * bump)), floorSalary: Math.min(16_000_000, round50k(unbumped.floorSalary * bump)) }
     : unbumped;
 
-  const ctx = await loadTeamContext(teamId, cmap);
+  const ctx0 = await loadTeamContext(teamId, cmap);
+  // staying put isn't "joining a rebuild" — no rebuild premium on his own club's extension
+  const ctx = extension && ctx0.contention === "rebuild" ? { ...ctx0, contention: "middle" as Contention } : ctx0;
   const { slot, line } = projectSlot(ctx, grp, market);
-  const desired = desiredDeployment(grp, line, p.df);
+  // his own club knows his role: a spare / bottom-pair / 4th-liner re-signs as one
+  if (extension && p.faDemandOverride == null) {
+    const rf = slot === "XD" || slot === "XF" ? 0.7 : slot === "P3" || slot === "L4" ? 0.88 : 1;
+    if (rf < 1) base = { ...base, salary: Math.max(775_000, round50k(base.salary * rf)), floorSalary: Math.max(775_000, round50k(base.floorSalary * rf)) };
+  }
+  const desired = desiredDeployment(grp, line, p.df, slot === "XD" || slot === "XF");
   // projected ask = the club gives him the role he projects into, plus the ST he wants
   const projDeploy: Deployment = { line, pp: desired.wantPP, pk: desired.wantPK };
   const ask = deploymentDemand(base, grp, projDeploy, desired, ctx.contention, p.age);

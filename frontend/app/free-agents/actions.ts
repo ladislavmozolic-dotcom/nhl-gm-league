@@ -1223,7 +1223,7 @@ export async function extendContractAction(
     await prisma.player.update({ where: { id: playerId }, data: { resignRound: nextRound, resignStatus: "countered", resignCounterSalary: counterSalary, resignCounterYears: counterYears, resignOfferSalary: bestOffer } });
     return {
       ok: false as const, rejected: true, round: nextRound,
-      reason: `Round ${nextRound} of ${maxRounds} — he's countering around ${fmtM(counterSalary * 0.97)}–${fmtM(counterSalary * 1.06)} over ${counterYears}yr.${nextRound >= maxRounds ? " Last round before he walks." : ""}${insult}`,
+      reason: `Round ${nextRound} of ${maxRounds} — he's countering around ${fmtM(counterSalary)}–${fmtM(counterSalary * 1.06)} over ${counterYears}yr.${nextRound >= maxRounds ? " Last round before he walks." : ""}${insult}`,
       floor: ev.ask.floorSalary, minYears: ev.ask.minYears, maxYears: ev.ask.maxYears,
     };
   }

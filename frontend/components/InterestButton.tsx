@@ -231,7 +231,7 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
                     </p>
                   )}
                   {i.existing?.status === "COUNTERED" && i.existing.counterSalary != null ? (
-                    <p className="mt-2 text-slate-200">He countered around <b className="text-amber-300">{M(i.existing.counterSalary * 0.97)}–{M(i.existing.counterSalary * 1.06)}</b> <span className="text-slate-500">× {i.existing.counterYears}yr</span>
+                    <p className="mt-2 text-slate-200">He countered around <b className="text-amber-300">{M(i.existing.counterSalary)}–{M(i.existing.counterSalary * 1.06)}</b> <span className="text-slate-500">× {i.existing.counterYears}yr</span>
                       <InfoTip text="His counter after your last offer — a rough range, his agent won't name an exact figure. Land in it (or above) and he signs." />
                     </p>
                   ) : i.existing?.status === "COUNTERED" ? (

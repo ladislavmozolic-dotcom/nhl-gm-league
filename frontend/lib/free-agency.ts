@@ -46,7 +46,14 @@ export function goalieMarket(g: GoalieAttrs): number {
 }
 
 /** One row of the "market" = every signed player's rating + what they earn. */
-export type MarketRow = { grp: FaPos; market: number; capHit: number };
+export type MarketRow = {
+  grp: FaPos; market: number; capHit: number;
+  /** last-season production: points/GP (skaters, 20+ GP) — the performance baseline */
+  ppg?: number | null;
+  /** last-season TOI per game in seconds (20+ GP) — a D's role baseline */
+  toi?: number | null;
+  age?: number | null;
+};
 
 export function median(xs: number[]): number {
   if (xs.length === 0) return 0;
@@ -110,7 +117,8 @@ export function trendFactor(age: number | null | undefined): number {
   if (a <= 31) return 0.98;
   if (a <= 33) return 0.94;
   if (a <= 35) return 0.87;
-  return 0.78;
+  if (a <= 37) return 0.78;
+  return 0.62; // 38+: one year at a time, paid like the risk it is
 }
 
 /** Current-season production vs. expectation → ±. `pace` is points/GP (skaters)
@@ -118,7 +126,7 @@ export function trendFactor(age: number | null | undefined): number {
  *  pass 1 when there is no season sample yet. */
 export function performanceFactor(pace: number | null | undefined): number {
   if (pace == null) return 1;
-  return Math.max(0.85, Math.min(1.2, pace));
+  return Math.max(0.8, Math.min(1.2, pace));
 }
 
 /** Term the player wants, bounded by his age. */
@@ -150,7 +158,7 @@ export type Demand = {
 // market rating = "reputation") has the leverage to lean on his mood hard; a
 // fringe player needs a job, so his mood barely moves the number.
 // ---------------------------------------------------------------------------
-export const MO_NEUTRAL = 70;
+export const MO_NEUTRAL = 50; // the league's typical settled morale (most players sit at 50)
 export function willingnessFactor(morale: number | null | undefined, market: number): number {
   if (morale == null) return 1;
   const moodDelta = (MO_NEUTRAL - morale) / MO_NEUTRAL;             // >0 = unhappy → wants more
@@ -269,10 +277,14 @@ export function buildDemand(input: {
   round?: number;
   priorBidders?: number; // distinct clubs that bid on him in the round before this one
   currentSalary?: number | null; // his existing cap hit — the opening ask won't come in under it
+  /** false = no "testing the market" opening premium (own-club extension outside the Frenzy) */
+  openingPremium?: boolean;
+  /** RFA leverage: an own-club RFA has no open market to test (offer sheets only) */
+  rfaFactor?: number;
   realCapHit?: number | null; // his actual real-NHL cap hit, if known — see REAL_FLOOR_RATIO
 }): Demand {
   const { market, grp, age, anchor, comps } = input;
-  const premium = roundPremium(input.round ?? 1, input.priorBidders); // default = opening ask (high)
+  const premium = (input.openingPremium === false ? 1 : roundPremium(input.round ?? 1, input.priorBidders)) * (input.rfaFactor ?? 1); // default = opening ask (high)
   let salary: number;
   let overridden = false;
   if (input.override && input.override > 0) {
@@ -286,7 +298,8 @@ export function buildDemand(input: {
   salary *= willingness;
   // opening ask (round 1) never comes in UNDER his current pay — a re-signing player
   // wants at least a small raise, and more when he's producing (perf > 1).
-  if (!overridden && (input.round ?? 1) <= 1 && input.currentSalary && input.currentSalary > 0) {
+  // (only when he's actually producing — a declining vet doesn't get a raise floor)
+  if (!overridden && (input.round ?? 1) <= 1 && input.currentSalary && input.currentSalary > 0 && (input.perf ?? 1) >= 1) {
     const raise = 1.03 + Math.max(0, (input.perf ?? 1) - 1) * 0.6;
     salary = Math.max(salary, input.currentSalary * raise);
   }
@@ -426,11 +439,15 @@ export function slotToLine(slot: LineSlot): number {
 
 /** What the player wants: at least his projected line, PP if he's a top-6/top-4
  *  talent, PK if his defensive game (DF) warrants it. */
-export function desiredDeployment(grp: FaPos, projLine: number, df: number | null | undefined): Desired {
+export const PK_DF_D = 79;
+export const PK_DF_F = 70;
+export function desiredDeployment(grp: FaPos, projLine: number, df: number | null | undefined, extra = false): Desired {
   return {
     line: projLine,
-    wantPP: grp !== "G" && projLine <= 2,
-    wantPK: grp !== "G" && (df ?? 0) >= 68,
+    wantPP: grp !== "G" && projLine <= 2 && !extra,
+    // PK is for genuinely strong defenders — top quartile of HIS position (league DF:
+    // D p75 ≈ 79, F p75 ≈ 69-71); a spare (7th D / 13th F) doesn't expect it at all
+    wantPK: grp !== "G" && (df ?? 0) >= (grp === "D" ? PK_DF_D : PK_DF_F) && !extra,
   };
 }
 
