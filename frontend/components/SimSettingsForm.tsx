@@ -157,6 +157,7 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
           <Toggle k="playByPlayEnabled" label="Play-by-play output" />
           <div className="mt-3 pt-3 border-t border-slate-800">
             <NumField k="starExponent" label="Star separation (exponent)" step={0.1} />
+            <NumField k="finishExponent" label="Finishing spread (SC → conversion exponent)" step={0.1} />
             <p className="text-[11px] text-slate-500 mt-1">Higher = elite players take a bigger share of scoring.</p>
           </div>
         </Card>

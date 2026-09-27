@@ -297,7 +297,7 @@ function conversion(
 ): number {
   // finishing amplified around the league mean so an elite finisher clearly out-scores
   // a similar-looking one — the compressed ratings still separate the snipers.
-  const shooterMod = Math.pow(shooterFinishing / 60, 1.7);
+  const shooterMod = Math.pow(shooterFinishing / 60, CFG.finishExponent ?? 1.7);
   // goalie spread (^1.7): tightens the top so an elite keeper tops out ~92.5% SV over a
   // season (real ceiling) instead of running to ~94%, and slightly narrows the band.
   // (2.2 → elite too good; 1.9 still let mid-season elites reach 94%; now 1.7.)
@@ -1783,6 +1783,14 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
       if (homeWin) { st.box[home.id].faceoffWins++; st.box[away.id].faceoffLosses++; st.lines[home.id][hC.id].faceoffWins++; st.lines[away.id][aC.id].faceoffLosses++; carrierTeam = home; carrier = hC; }
       else { st.box[away.id].faceoffWins++; st.box[home.id].faceoffLosses++; st.lines[away.id][aC.id].faceoffWins++; st.lines[home.id][hC.id].faceoffLosses++; carrierTeam = away; carrier = aC; }
       const foWinner = homeWin ? hC : aC, foLoser = homeWin ? aC : hC;
+      // the draw is won BACK — to a defenceman or a winger — not kept by the centre
+      // himself (who used to become the carrier every time, handing centres a huge
+      // share of every team's shots). He still gets the puck back ~1 time in 4.
+      if (rng.chance(0.75)) {
+        const winTeam = homeWin ? home : away;
+        const pool = [...onIceD(winTeam), ...onIceF(winTeam).filter((x) => x.id !== foWinner.id)];
+        if (pool.length) carrier = pickByAttr(rng, pool, (x) => (x.attrs.pa ?? 50) + 20) ?? carrier;
+      }
       st.sink.emit({
         period, seconds: tick, type: "FACEOFF",
         teamId: carrierTeam.id, teamCode: carrierTeam.code ?? undefined,
