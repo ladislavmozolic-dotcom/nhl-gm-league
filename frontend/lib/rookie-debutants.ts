@@ -6,11 +6,8 @@
 
 import { prisma } from "./prisma";
 import { NHL_ABBREVS, norm, fiKeyOf } from "./real-roster-import";
-import { fetchNhlCurrentStats, fetchNhlGoalieStats, importNhlSkaterStats } from "./nhl-api-import";
+import { fetchNhlCurrentStats, fetchNhlGoalieStats, importNhlSkaterStats, type NhlStatRow } from "./nhl-api-import";
 import { getLiveCalculatorConfig } from "./live-calculator-config";
-import { edgeRatings, type SyntheticSkater } from "./edge-params-server";
-import { applyRookieSamplePenalty } from "./edge-params";
-import { fetchOne as fetchEdgeSpeedOne, EDGE_SEASON_CUR, EDGE_SEASON_LAST } from "./nhl-edge-speed-import";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -129,61 +126,14 @@ export async function findMissingNhlPlayers(): Promise<{ ok: boolean; candidates
   return { ok: true, candidates };
 }
 
-function ageFromBirthDate(iso: string | null): number | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  const now = new Date();
-  let age = now.getFullYear() - d.getFullYear();
-  if (now.getMonth() < d.getMonth() || (now.getMonth() === d.getMonth() && now.getDate() < d.getDate())) age--;
-  return age;
-}
-
-/** Preview what a debutant's Next Gen rating WOULD be, scored against the real,
- *  live league population — WITHOUT creating anything or writing to the DB. Pulls
- *  his real current-season stat line AND his real NHL EDGE skating-speed data (so
- *  SK isn't blank — a rookie's own tracked speed, not a guess from similar
- *  players), then runs him through the exact same edgeRatings() pipeline as every
- *  actual player via a synthetic row, plus the same small-sample humility penalty
- *  (rookieSamplePenalty) applied when he's actually activated, so the preview
- *  matches the real post-creation rating exactly. */
-export async function previewDebutantRating(c: DebutantCandidate): Promise<{ ok: boolean; ratings?: Record<string, number>; error?: string }> {
-  if (c.isGoalie) return { ok: false, error: "Živý náhľad pre brankárov zatiaľ nie je podporovaný." };
-
-  const { latestSeason } = await getLiveCalculatorConfig();
-  const [stats, edgeCur, edgeLast] = await Promise.all([
-    fetchNhlCurrentStats(Number(latestSeason)),
-    fetchEdgeSpeedOne(c.nhlId, EDGE_SEASON_CUR),
-    fetchEdgeSpeedOne(c.nhlId, EDGE_SEASON_LAST),
-  ]);
-  const row = stats.find((s) => norm(s.name) === norm(c.name));
-  if (!row) return { ok: false, error: "Nenašli sa jeho aktuálne štatistiky." };
-
-  const synthetic: SyntheticSkater = {
-    id: -c.nhlId, name: c.name, position: c.position, teamCode: c.teamAbbrev,
-    age: ageFromBirthDate(c.birthDate), weight: c.weightKg,
-    stat: {
-      gp: row.gp, g: row.g, a: row.a, hits: row.hits, blocks: row.blocks, pm: row.pm, tk: row.tk, gv: row.gv,
-      shToi: row.shToi, teamShToi: row.teamShToi, toi: row.toi, shots: row.shots, pim: row.pim, foPct: row.foPct,
-    },
-    edgeSpeed: (edgeCur || edgeLast) ? { cur: edgeCur, last: edgeLast } : null,
-  };
-  const all = await edgeRatings("NHL", true, [synthetic]);
-  const mine = all.find((r) => r.playerId === -c.nhlId);
-  if (!mine) return { ok: false, error: "Výpočet zlyhal." };
-  return { ok: true, ratings: applyRookieSamplePenalty(mine.ratings, row.gp) };
-}
-
 const slugify = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 
 /** Create a brand-new Player row for a real NHL debutant we've never tracked,
- *  parked in his real club's PROSPECT pool (Player.rosterType = "PROSPECT"), and
- *  immediately pull his current-season stats (skaters only — no live goalie feed
- *  exists yet) so a debutant who already has real games shows up with real
- *  parameter details right away, instead of waiting for the next unrelated
- *  whole-league stat refresh to happen to run. Nothing about any existing roster
- *  is touched; a genuine 0-GP prospect just gets curSeasonGP: 0, as expected. */
-export async function createDebutantAsProspect(c: DebutantCandidate): Promise<{ ok: boolean; playerId?: number; statsGP?: number; error?: string }> {
+ *  parked in his real club's PROSPECT pool (Player.rosterType = "PROSPECT").
+ *  Stats are NOT pulled here — the caller (scanAndSyncDebutants) does one shared
+ *  league-wide stat fetch/import after every candidate is created, so a batch of
+ *  N new debutants doesn't refetch the same NHL stats endpoint N+1 times. */
+async function createDebutantAsProspect(c: DebutantCandidate): Promise<{ ok: boolean; playerId?: number; error?: string }> {
   const dupe = await prisma.player.findFirst({ where: { nhlId: c.nhlId }, select: { id: true } });
   if (dupe) return { ok: false, error: "Already tracked (nhlId already on file)." };
 
@@ -203,19 +153,46 @@ export async function createDebutantAsProspect(c: DebutantCandidate): Promise<{ 
       condition: 100, morale: 50,
     },
   });
+  return { ok: true, playerId: player.id };
+}
 
-  let statsGP: number | undefined;
-  if (!c.isGoalie) {
-    try {
-      const { latestSeason } = await getLiveCalculatorConfig();
-      const rows = await fetchNhlCurrentStats(Number(latestSeason));
-      await importNhlSkaterStats(rows, "cur");
-      const refreshed = await prisma.player.findUnique({ where: { id: player.id }, select: { curSeasonGP: true } });
-      statsGP = refreshed?.curSeasonGP ?? 0;
-    } catch {
-      // creation already succeeded; a failed live-stat pull just means he waits
-      // for the next regular refresh, same as before this fix.
-    }
+export type ScanAndSyncResult = {
+  ok: boolean;
+  created: { name: string; teamAbbrev: string; isGoalie: boolean; gp: number; alreadyProspect: boolean; prospectTeamCode: string | null; error?: string }[];
+  statsRefreshed: number;
+  error?: string;
+};
+
+/** The full "Skenovať" action: find every real NHL debutant we've never tracked,
+ *  create a Player row for each one automatically (no manual per-player review —
+ *  a real GP > 0 already means he's worth tracking), then ALSO re-pull current-
+ *  season stats for the WHOLE league (every rosterType, including players already
+ *  sitting in a PROSPECT pool from an earlier scan) so re-running the scan later
+ *  keeps every rookie's underlying stats — and therefore his live-computed rating
+ *  in rookieCalculatorRows() — current, not just newly discovered names. One
+ *  shared stat fetch is reused for both steps instead of hitting the NHL API once
+ *  per candidate. */
+export async function scanAndSyncDebutants(): Promise<ScanAndSyncResult> {
+  const found = await findMissingNhlPlayers();
+  if (!found.ok) return { ok: false, created: [], statsRefreshed: 0, error: found.error };
+
+  const { latestSeason } = await getLiveCalculatorConfig();
+  const statRows: NhlStatRow[] = await fetchNhlCurrentStats(Number(latestSeason)).catch(() => []);
+  const gpByName = new Map(statRows.map((r) => [norm(r.name), r.gp ?? 0]));
+
+  const created: ScanAndSyncResult["created"] = [];
+  for (const c of found.candidates) {
+    const res = await createDebutantAsProspect(c);
+    created.push({
+      name: c.name, teamAbbrev: c.teamAbbrev, isGoalie: c.isGoalie, gp: gpByName.get(norm(c.name)) ?? c.gp,
+      alreadyProspect: c.alreadyProspect, prospectTeamCode: c.prospectTeamCode, error: res.ok ? undefined : res.error,
+    });
   }
-  return { ok: true, playerId: player.id, statsGP };
+
+  let statsRefreshed = 0;
+  if (statRows.length) {
+    try { statsRefreshed = (await importNhlSkaterStats(statRows, "cur")).matched; } catch { /* creation already succeeded either way */ }
+  }
+
+  return { ok: true, created, statsRefreshed };
 }
