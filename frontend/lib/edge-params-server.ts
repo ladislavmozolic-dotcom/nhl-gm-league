@@ -217,9 +217,23 @@ function calibrateSkaters(rows: EdgeRow[], ref: Ref, map = CAL_MAP): EdgeRow[] {
   return rows;
 }
 
+/** A not-yet-created player scored against the real population WITHOUT writing
+ *  anything to the DB — used to preview a Rookie Calculator debutant's rating
+ *  before deciding to actually create his Player row. `id` should be a sentinel
+ *  that can't collide with a real Player id (e.g. a negated nhlId). */
+export type SyntheticSkater = {
+  id: number; name: string; position: string; teamCode: string | null; age: number | null; weight: number | null;
+  stat: {
+    gp: number; g: number; a: number; hits: number; blocks: number; pm: number; tk: number; gv: number;
+    shToi: number; teamShToi: number; toi: number; shots: number; pim: number; foPct: number;
+  };
+};
+
 /** Compute Edge ratings for every skater in a league (default NHL). `calibrate`
- *  (default on) maps the absolute ability ratings onto the STHS value scale. */
-export async function edgeRatings(league = "NHL", calibrate = true): Promise<EdgeRow[]> {
+ *  (default on) maps the absolute ability ratings onto the STHS value scale.
+ *  `synthetic` lets a caller score one or more not-yet-created players against
+ *  this SAME real population (a true dry-run preview — nothing is persisted). */
+export async function edgeRatings(league = "NHL", calibrate = true, synthetic: SyntheticSkater[] = []): Promise<EdgeRow[]> {
   // Free agents (UFA) keep whatever rosterType their last team roster had, but a
   // released/expired player's real NHL performance data still lives on their
   // Player row — fold them into the same league population rather than losing
@@ -238,6 +252,22 @@ export async function edgeRatings(league = "NHL", calibrate = true): Promise<Edg
     age: p.age ?? null, captaincy: p.captaincy ?? null,
     curGP: p.curSeasonGP ?? 0, lastGP: p.lastSeasonGP ?? 0, metrics: metricsFor(p),
   }));
+  for (const s of synthetic) {
+    const fake = {
+      curSeasonGP: s.stat.gp, curSeasonToi: s.stat.toi, curSeasonG: s.stat.g, curSeasonA: s.stat.a,
+      curSeasonShots: s.stat.shots, curSeasonGV: s.stat.gv, curSeasonHits: s.stat.hits, curSeasonBlocks: s.stat.blocks,
+      curSeasonTK: s.stat.tk, curSeasonPM: s.stat.pm, curSeasonPim: s.stat.pim, curSeasonShToi: s.stat.shToi,
+      curSeasonFoPct: s.stat.foPct, weight: s.weight,
+      lastSeasonGP: 0, lastSeasonToi: 0, lastSeasonG: 0, lastSeasonA: 0, lastSeasonShots: 0, lastSeasonHits: 0,
+      lastSeasonBlocks: 0, lastSeasonTK: 0, lastSeasonGV: 0, lastSeasonPM: 0, lastSeasonPim: 0, lastSeasonShToi: 0, lastSeasonFoPct: 0,
+      edgeSpeed: null, mpSkater: null, careerGP: null,
+    };
+    rows.push({
+      id: s.id, name: s.name, position: s.position, league, teamCode: s.teamCode,
+      gp: s.stat.gp, mins: (s.stat.toi / 60) * s.stat.gp,
+      age: s.age, captaincy: null, curGP: s.stat.gp, lastGP: 0, metrics: metricsFor(fake),
+    });
+  }
 
   const groups: Record<"F" | "D", Row[]> = { F: [], D: [] };
   for (const r of rows) groups[isDef(r.position) ? "D" : "F"].push(r);

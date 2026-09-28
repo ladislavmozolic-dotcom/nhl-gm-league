@@ -8,6 +8,7 @@ import { prisma } from "./prisma";
 import { NHL_ABBREVS, norm, fiKeyOf } from "./real-roster-import";
 import { fetchNhlCurrentStats, fetchNhlGoalieStats, importNhlSkaterStats } from "./nhl-api-import";
 import { getLiveCalculatorConfig } from "./live-calculator-config";
+import { edgeRatings, type SyntheticSkater } from "./edge-params-server";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -124,6 +125,43 @@ export async function findMissingNhlPlayers(): Promise<{ ok: boolean; candidates
     })
     .filter((c) => c.gp > 0);
   return { ok: true, candidates };
+}
+
+function ageFromBirthDate(iso: string | null): number | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - d.getFullYear();
+  if (now.getMonth() < d.getMonth() || (now.getMonth() === d.getMonth() && now.getDate() < d.getDate())) age--;
+  return age;
+}
+
+/** Preview what a debutant's Next Gen rating WOULD be, scored against the real,
+ *  live league population — WITHOUT creating anything or writing to the DB. Pulls
+ *  his real current-season stat line, then runs him through the exact same
+ *  edgeRatings() pipeline as every actual player via a synthetic row, so the
+ *  preview and the real post-creation rating are computed identically. */
+export async function previewDebutantRating(c: DebutantCandidate): Promise<{ ok: boolean; ratings?: Record<string, number>; error?: string }> {
+  if (c.isGoalie) return { ok: false, error: "Živý náhľad pre brankárov zatiaľ nie je podporovaný." };
+
+  const { latestSeason } = await getLiveCalculatorConfig();
+  const stats = await fetchNhlCurrentStats(Number(latestSeason));
+  const row = stats.find((s) => norm(s.name) === norm(c.name));
+  if (!row) return { ok: false, error: "Nenašli sa jeho aktuálne štatistiky." };
+
+  const synthetic: SyntheticSkater = {
+    id: -c.nhlId, name: c.name, position: c.position, teamCode: c.teamAbbrev,
+    age: ageFromBirthDate(c.birthDate), weight: c.weightKg,
+    stat: {
+      gp: row.gp, g: row.g, a: row.a, hits: row.hits, blocks: row.blocks, pm: row.pm, tk: row.tk, gv: row.gv,
+      shToi: row.shToi, teamShToi: row.teamShToi, toi: row.toi, shots: row.shots, pim: row.pim, foPct: row.foPct,
+    },
+  };
+  const all = await edgeRatings("NHL", true, [synthetic]);
+  const mine = all.find((r) => r.playerId === -c.nhlId);
+  if (!mine) return { ok: false, error: "Výpočet zlyhal." };
+  return { ok: true, ratings: mine.ratings };
 }
 
 const slugify = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");

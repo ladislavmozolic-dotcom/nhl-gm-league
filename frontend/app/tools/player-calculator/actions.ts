@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { isAdmin } from "@/lib/auth";
 import { promotePlayerToNextGen } from "@/lib/edge-params-server";
-import { findMissingNhlPlayers, createDebutantAsProspect, type DebutantCandidate } from "@/lib/rookie-debutants";
+import { findMissingNhlPlayers, createDebutantAsProspect, previewDebutantRating, type DebutantCandidate } from "@/lib/rookie-debutants";
 
 export async function promoteRookieAction(playerId: number) {
   if (!(await isAdmin())) return { ok: false as const, error: "Admin only." };
@@ -24,4 +24,10 @@ export async function createDebutantAction(c: DebutantCandidate) {
   const result = await createDebutantAsProspect(c);
   if (result.ok) revalidatePath("/tools/player-calculator");
   return result;
+}
+
+/** Read-only — computes a rating preview without creating or writing anything. */
+export async function previewDebutantAction(c: DebutantCandidate) {
+  if (!(await isAdmin())) return { ok: false as const, error: "Admin only." };
+  return previewDebutantRating(c);
 }
