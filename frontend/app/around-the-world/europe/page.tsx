@@ -5,6 +5,8 @@ import { WORLD_LEAGUE_CATALOG } from "@/lib/world-catalog";
 import { epPlayerSearchUrl } from "@/lib/playerName";
 import { BackPill, Card, PageHeader, StatTile } from "@/components/ui";
 import WorldLeagueStats from "@/components/WorldLeagueStats";
+import { getTeamSession } from "@/lib/auth";
+import { worldScoutingMeta } from "@/lib/world-scouting";
 
 export const dynamic = "force-dynamic";
 
@@ -14,19 +16,22 @@ export default async function EuropeProspectsPage({ searchParams }: { searchPara
   const seasons = await prisma.worldPlayerSeasonStat.findMany({ where: { league: { region: "Europe", active: true } }, distinct: ["season"], select: { season: true }, orderBy: { season: "desc" } });
   const season = seasons.find((s) => s.season === requestedSeason)?.season ?? seasons[0]?.season;
   const stats = season ? await prisma.worldPlayerSeasonStat.findMany({ where: { season, league: { region: "Europe", active: true } }, include: { player: true, league: true, team: true }, orderBy: [{ points: "desc" }, { gamesPlayed: "desc" }] }) : [];
-  const importedLeagueCodes = new Set(stats.map((s) => s.league.code));
+  const teamId = await getTeamSession();
+  const { year: draftYear, meta } = await worldScoutingMeta(stats.map((s) => s.player), teamId);
+  const visibleStats = stats.filter((s) => { const state = meta.get(s.playerId); return state?.rights || state?.draftable; });
+  const importedLeagueCodes = new Set(visibleStats.map((s) => s.league.code));
   const teamCounts = new Map<number, number>();
-  stats.forEach((s) => { if (s.teamId) teamCounts.set(s.teamId, (teamCounts.get(s.teamId) ?? 0) + 1); });
+  visibleStats.forEach((s) => { if (s.teamId) teamCounts.set(s.teamId, (teamCounts.get(s.teamId) ?? 0) + 1); });
   const syncedAt = stats.reduce<Date | null>((latest, s) => !latest || s.syncedAt > latest ? s.syncedAt : latest, null);
-  const skaters = stats.filter((s) => !s.isGoalie).length;
+  const skaters = visibleStats.filter((s) => !s.isGoalie).length;
 
   return <div className="space-y-6 py-2">
     <BackPill href="/around-the-world">Around the World</BackPill>
     <PageHeader title="🇪🇺 European Prospects" subtitle="One table for prospects across European competitions, with country, league and team age category." />
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-      <StatTile label="Prospect stat lines" value={stats.length} sub={season || "No season yet"} color="text-violet-300" />
+      <StatTile label="Prospect stat lines" value={visibleStats.length} sub={season || "No season yet"} color="text-violet-300" />
       <StatTile label="Skaters" value={skaters} color="text-emerald-300" />
-      <StatTile label="Goalies" value={stats.length - skaters} color="text-sky-300" />
+      <StatTile label="Goalies" value={visibleStats.length - skaters} color="text-sky-300" />
       <StatTile label="Last sync" value={syncedAt ? syncedAt.toLocaleDateString("sk-SK", { timeZone: "Europe/Bratislava" }) : "—"} color="text-amber-300" />
     </div>
 
@@ -34,8 +39,10 @@ export default async function EuropeProspectsPage({ searchParams }: { searchPara
 
     {season ? <>
       {seasons.length > 1 && <div className="flex flex-wrap items-center gap-2 text-sm"><span className="text-slate-400">Season:</span>{seasons.map((item) => <Link key={item.season} href={`/around-the-world/europe?season=${encodeURIComponent(item.season)}`} className={`rounded-lg px-3 py-1.5 border ${season === item.season ? "border-violet-500/40 bg-violet-500/15 text-violet-300" : "border-slate-800 text-slate-400 hover:text-white"}`}>{item.season}</Link>)}</div>}
-      <WorldLeagueStats leagueCode="EUROPE" season={season} stats={stats.map((s) => ({
-        id: s.id, playerName: s.player.name, position: s.player.position, epUrl: s.player.epUrl ?? epPlayerSearchUrl(s.player.name),
+      <WorldLeagueStats leagueCode="EUROPE" season={season} draftYear={draftYear} canSave={teamId != null} stats={visibleStats.map((s) => ({
+        id: s.id, worldPlayerId: s.playerId, playerName: s.player.name, position: s.player.position, epUrl: s.player.epUrl ?? epPlayerSearchUrl(s.player.name),
+        birthDate: s.player.birthDate, age: meta.get(s.playerId)?.age ?? null, rights: meta.get(s.playerId)?.rights ?? null,
+        draftable: meta.get(s.playerId)?.draftable ?? false, saved: meta.get(s.playerId)?.saved ?? false,
         teamId: s.teamId, teamName: s.team?.name ?? "—", teamLogoUrl: s.team?.logoUrl ?? null,
         leagueCode: s.league.code, leagueName: s.league.name, country: s.league.country ?? s.league.region,
         level: worldTeamLevel(s.league.name, s.team?.name ?? ""),

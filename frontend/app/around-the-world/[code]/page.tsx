@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { BackPill, Card, PageHeader, StatTile } from "@/components/ui";
 import WorldLeagueStats from "@/components/WorldLeagueStats";
 import { epPlayerSearchUrl } from "@/lib/playerName";
+import { getTeamSession } from "@/lib/auth";
+import { worldScoutingMeta } from "@/lib/world-scouting";
 
 export const dynamic = "force-dynamic";
 
@@ -25,11 +27,14 @@ export default async function WorldLeaguePage({ params, searchParams }: {
     include: { player: true, team: true },
     orderBy: [{ points: "desc" }, { gamesPlayed: "desc" }],
   }) : [];
+  const teamId = await getTeamSession();
+  const { year: draftYear, meta } = await worldScoutingMeta(stats.map((s) => s.player), teamId);
+  const visibleStats = stats.filter((s) => { const state = meta.get(s.playerId); return state?.rights || state?.draftable; });
   const syncedAt = stats.reduce<Date | null>((latest, s) => !latest || s.syncedAt > latest ? s.syncedAt : latest, null);
-  const skaters = stats.filter((s) => !s.isGoalie);
-  const goalies = stats.filter((s) => s.isGoalie);
+  const skaters = visibleStats.filter((s) => !s.isGoalie);
+  const goalies = visibleStats.filter((s) => s.isGoalie);
   const teamCounts = new Map<number, number>();
-  stats.forEach((s) => { if (s.teamId) teamCounts.set(s.teamId, (teamCounts.get(s.teamId) ?? 0) + 1); });
+  visibleStats.forEach((s) => { if (s.teamId) teamCounts.set(s.teamId, (teamCounts.get(s.teamId) ?? 0) + 1); });
 
   return <div className="space-y-6 py-2">
     <BackPill href="/around-the-world">Around the World</BackPill>
@@ -48,8 +53,10 @@ export default async function WorldLeaguePage({ params, searchParams }: {
 
     {season ? <>
       {seasons.length > 1 && <div className="flex flex-wrap items-center gap-2 text-sm"><span className="text-slate-400">Season:</span>{seasons.map((item) => <Link key={item.season} href={`/around-the-world/${league.code.toLowerCase()}?season=${encodeURIComponent(item.season)}`} className={`rounded-lg px-3 py-1.5 border ${season === item.season ? "border-sky-500/40 bg-sky-500/15 text-sky-300" : "border-slate-800 text-slate-400 hover:text-white"}`}>{item.season}</Link>)}</div>}
-      <WorldLeagueStats season={season} leagueCode={league.code} stats={stats.map((s) => ({
-        id: s.id, playerName: s.player.name, position: s.player.position, epUrl: s.player.epUrl ?? epPlayerSearchUrl(s.player.name),
+      <WorldLeagueStats season={season} leagueCode={league.code} draftYear={draftYear} canSave={teamId != null} stats={visibleStats.map((s) => ({
+        id: s.id, worldPlayerId: s.playerId, playerName: s.player.name, position: s.player.position, epUrl: s.player.epUrl ?? epPlayerSearchUrl(s.player.name),
+        birthDate: s.player.birthDate, age: meta.get(s.playerId)?.age ?? null, rights: meta.get(s.playerId)?.rights ?? null,
+        draftable: meta.get(s.playerId)?.draftable ?? false, saved: meta.get(s.playerId)?.saved ?? false,
         teamId: s.teamId, teamName: s.team?.name ?? "—", teamLogoUrl: s.team?.logoUrl ?? null,
         isGoalie: s.isGoalie, gamesPlayed: s.gamesPlayed, goals: s.goals, assists: s.assists,
         points: s.points, plusMinus: s.plusMinus, penaltyMinutes: s.penaltyMinutes,

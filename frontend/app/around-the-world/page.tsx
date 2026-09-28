@@ -5,6 +5,7 @@ import Link from "next/link";
 import YourProspectTracker from "@/components/YourProspectTracker";
 import { worldTeamLevel } from "@/lib/world-team-level";
 import { epPlayerSearchUrl } from "@/lib/playerName";
+import { worldScoutingMeta } from "@/lib/world-scouting";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,7 @@ export default async function AroundTheWorldPage({ searchParams }: { searchParam
     }),
     prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true } }),
     prisma.worldPlayerSeasonStat.findMany({
-      orderBy: [{ points: "desc" }, { gamesPlayed: "desc" }], take: 10,
+      orderBy: [{ points: "desc" }, { gamesPlayed: "desc" }], take: 100,
       include: { player: { include: { currentTeam: true } }, league: true, team: true },
     }),
   ]);
@@ -30,8 +31,9 @@ export default async function AroundTheWorldPage({ searchParams }: { searchParam
     orderBy: { name: "asc" },
   });
   const linked = myProspects.filter((p) => p.worldPlayer?.stats.length);
+  const { meta: leaderMeta } = await worldScoutingMeta(allStats.map((s) => s.player), teamId);
   const noData = leagues.length === 0;
-  const leaders = allStats.filter((s) => !s.isGoalie);
+  const leaders = allStats.filter((s) => !s.isGoalie && (leaderMeta.get(s.playerId)?.rights || leaderMeta.get(s.playerId)?.draftable)).slice(0, 10);
   const juniorLeagues = leagues.filter((l) => l.region !== "Europe").sort((a, b) => Number(b._count.stats > 0) - Number(a._count.stats > 0) || a.name.localeCompare(b.name));
   const europeanLeagues = leagues.filter((l) => l.region === "Europe");
   const europeanStats = europeanLeagues.reduce((total, l) => total + l._count.stats, 0);
@@ -42,7 +44,7 @@ export default async function AroundTheWorldPage({ searchParams }: { searchParam
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatTile label="Tracked leagues" value={leagues.length} sub="Junior, college & Europe" color="text-sky-300" />
-        <StatTile label="Live stat lines" value={leagues.reduce((n, l) => n + l._count.stats, 0)} sub="Current imported snapshots" color="text-emerald-300" />
+        <StatTile label="Imported stat lines" value={leagues.reduce((n, l) => n + l._count.stats, 0)} sub="Before eligibility filtering" color="text-emerald-300" />
         <StatTile label="Your prospects" value={myProspects.length} sub={teamId ? `${linked.length} with real-world stats` : "Sign in to see yours"} color="text-amber-300" />
         <StatTile label="Sync model" value="Daily" sub="Official-source import ready" color="text-violet-300" />
       </div>
@@ -69,7 +71,7 @@ export default async function AroundTheWorldPage({ searchParams }: { searchParam
         </section>
       )}
 
-      {(view === "leaders" || allStats.length > 0) && <section>
+      {(view === "leaders" || leaders.length > 0) && <section>
         <SectionTitle count={leaders.length} accent="text-sky-300">World League Leaders</SectionTitle>
         <Card bodyClassName="p-0"><div className="overflow-x-auto"><table className="w-full min-w-[650px] text-sm"><thead><tr className="bg-slate-800/30 border-b border-slate-800 text-xs uppercase tracking-wider text-slate-500"><th className="text-left px-4 py-3">Player</th><th className="text-left px-3 py-3">League</th><th className="text-left px-3 py-3">Club</th><th className="text-right px-4 py-3">GP</th><th className="text-right px-3 py-3">G</th><th className="text-right px-3 py-3">A</th><th className="text-right px-4 py-3">P</th></tr></thead><tbody>{leaders.map((s) => <tr key={s.id} className="border-b border-slate-800/50 last:border-0"><td className="px-4 py-3 font-semibold">{s.player.name}</td><td className="px-3 py-3 text-slate-400">{s.league.code}</td><td className="px-3 py-3 text-slate-400">{s.team?.name || s.player.currentTeam?.name || "—"}</td><td className="px-4 py-3 text-right tabular-nums">{s.gamesPlayed}</td><td className="px-3 py-3 text-right tabular-nums">{s.goals}</td><td className="px-3 py-3 text-right tabular-nums">{s.assists}</td><td className="px-4 py-3 text-right tabular-nums font-black text-sky-300">{s.points}</td></tr>)}</tbody></table></div></Card>
       </section>}

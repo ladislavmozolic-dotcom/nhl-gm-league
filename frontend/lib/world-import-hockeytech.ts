@@ -52,10 +52,25 @@ async function importSeason(code: HockeyTechLeague["code"]) {
   const teams = (((teamsRaw.SiteKit as Json | undefined)?.Teamsbyseason ?? []) as Json[]);
   const byExternalId = new Map<string, number>();
   const byCode = new Map<string, number>();
+  const birthDates = new Map<string, string>();
   for (const team of teams) {
     const externalId = String(team.id); const code = String(team.code ?? externalId);
     const saved = await prisma.worldTeam.upsert({ where: { leagueId_externalId: { leagueId: league.id, externalId } }, update: { name: String(team.name), city: String(team.city ?? "") || null, slug: code.toLowerCase() }, create: { leagueId: league.id, externalId, name: String(team.name), city: String(team.city ?? "") || null, slug: code.toLowerCase() } });
     byExternalId.set(externalId, saved.id); byCode.set(code, saved.id);
+  }
+  // The standings feed has no DOB; official team rosters do. Keep this compact
+  // (one request per club) and match on HockeyTech's stable player ID.
+  const teamIds = teams.map((team) => String(team.id));
+  for (let offset = 0; offset < teamIds.length; offset += 6) {
+    await Promise.all(teamIds.slice(offset, offset + 6).map(async (teamId) => {
+      try {
+        const roster = await hockeyTech(url(config, { feed: "modulekit", view: "roster", season_id: seasonId, team_id: teamId }));
+        for (const member of ((roster.SiteKit as Json | undefined)?.Roster ?? []) as Json[]) {
+          const birthDate = String(member.rawbirthdate ?? member.birthdate ?? "");
+          if (/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) birthDates.set(String(member.player_id ?? member.id), birthDate);
+        }
+      } catch (error) { console.warn(`${code} roster ${teamId}: DOB unavailable`, error); }
+    }));
   }
   const sectionRows = (raw: Json) => (((raw as unknown as Json[])[0]?.sections as Json[] | undefined)?.[0]?.data ?? []) as Json[];
   const goalieRows = sectionRows(goaliesRaw);
@@ -71,7 +86,8 @@ async function importSeason(code: HockeyTechLeague["code"]) {
     const name = String(data.name ?? (prop.shortname as Json | undefined)?.seoName ?? "").trim();
     if (!name) continue;
     const teamId = byExternalId.get(String(data.team_id ?? "")) ?? byCode.get(String(data.team_code ?? "")) ?? null;
-    const player = await prisma.worldPlayer.upsert({ where: { externalId }, update: { name, normalizedName: normalize(name), position: goalie ? "G" : String(data.position ?? "") || null, currentTeamId: teamId }, create: { externalId, name, normalizedName: normalize(name), position: goalie ? "G" : String(data.position ?? "") || null, currentTeamId: teamId } });
+    const birthDate = birthDates.get(String(data.player_id));
+    const player = await prisma.worldPlayer.upsert({ where: { externalId }, update: { name, normalizedName: normalize(name), position: goalie ? "G" : String(data.position ?? "") || null, currentTeamId: teamId, ...(birthDate ? { birthDate } : {}) }, create: { externalId, name, normalizedName: normalize(name), position: goalie ? "G" : String(data.position ?? "") || null, currentTeamId: teamId, birthDate } });
     await prisma.worldPlayerSeasonStat.upsert({ where: { playerId_leagueId_season: { playerId: player.id, leagueId: league.id, season: seasonName } }, update: { teamId, isGoalie: goalie, gamesPlayed: integer(data.games_played), goals: integer(data.goals), assists: integer(data.assists), points: integer(data.points), plusMinus: goalie ? null : integer(data.plus_minus), penaltyMinutes: integer(data.penalty_minutes), wins: goalie ? integer(data.wins) : null, losses: goalie ? integer(data.losses) : null, overtimeLosses: goalie ? integer(data.ot_losses ?? data.overtime_losses) : null, savePercentage: goalie && data.save_percentage != null ? Number(data.save_percentage) : null, goalsAgainstAverage: goalie && data.goals_against_average != null ? Number(data.goals_against_average) : null, shutouts: goalie ? integer(data.shutouts) : null, source: "official-feed", syncedAt: new Date() }, create: { playerId: player.id, leagueId: league.id, teamId, season: seasonName, isGoalie: goalie, gamesPlayed: integer(data.games_played), goals: integer(data.goals), assists: integer(data.assists), points: integer(data.points), plusMinus: goalie ? null : integer(data.plus_minus), penaltyMinutes: integer(data.penalty_minutes), wins: goalie ? integer(data.wins) : null, losses: goalie ? integer(data.losses) : null, overtimeLosses: goalie ? integer(data.ot_losses ?? data.overtime_losses) : null, savePercentage: goalie && data.save_percentage != null ? Number(data.save_percentage) : null, goalsAgainstAverage: goalie && data.goals_against_average != null ? Number(data.goals_against_average) : null, shutouts: goalie ? integer(data.shutouts) : null, source: "official-feed" } });
     const matching = prospectsByName.get(normalize(name)) ?? [];
     if (matching.length === 1) {
