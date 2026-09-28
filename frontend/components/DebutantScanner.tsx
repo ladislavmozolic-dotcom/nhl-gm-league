@@ -12,7 +12,7 @@ export default function DebutantScanner() {
   const [pending, start] = useTransition();
   const [candidates, setCandidates] = useState<DebutantCandidate[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [created, setCreated] = useState<Record<number, boolean>>({});
+  const [created, setCreated] = useState<Record<number, { gp?: number }>>({});
 
   const scan = () => start(async () => {
     setError(null);
@@ -23,7 +23,7 @@ export default function DebutantScanner() {
 
   const create = (c: DebutantCandidate) => start(async () => {
     const r = await createDebutantAction(c);
-    if (r.ok) setCreated((s) => ({ ...s, [c.nhlId]: true }));
+    if (r.ok) setCreated((s) => ({ ...s, [c.nhlId]: { gp: r.statsGP } }));
     else setError(r.error ?? "Zlyhalo.");
   });
 
@@ -55,7 +55,11 @@ export default function DebutantScanner() {
                   <td className="px-2 py-1.5 text-center text-slate-400">{c.position}</td>
                   <td className="px-2 py-1.5 text-right">
                     {created[c.nhlId]
-                      ? <span className="text-xs text-green-400 font-semibold">Created ✓</span>
+                      ? (
+                        <span className="text-xs text-green-400 font-semibold">
+                          Created ✓{created[c.nhlId].gp != null ? ` (${created[c.nhlId].gp} GP)` : ""}
+                        </span>
+                      )
                       : (
                         <button onClick={() => create(c)} disabled={pending}
                           className="px-3 py-1 rounded-md bg-green-600/80 hover:bg-green-500 text-white text-xs font-semibold disabled:opacity-50">

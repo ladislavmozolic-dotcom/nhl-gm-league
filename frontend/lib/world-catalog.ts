@@ -13,6 +13,8 @@ export const WORLD_LEAGUE_CATALOG = [
   { code: "CZE", name: "Czech Extraliga", country: "Czechia", region: "Europe" },
   { code: "SVK", name: "Tipos Extraliga", country: "Slovakia", region: "Europe" },
   { code: "DEL", name: "Deutsche Eishockey Liga", country: "Germany", region: "Europe" },
+  { code: "KHL", name: "Kontinental Hockey League", country: "Russia", region: "Europe" },
+  { code: "MHL", name: "Molodezhnaya Hockey League", country: "Russia", region: "Europe" },
 ] as const;
 
 export async function seedWorldLeagueCatalog() {

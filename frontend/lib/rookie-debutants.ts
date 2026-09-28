@@ -6,6 +6,8 @@
 
 import { prisma } from "./prisma";
 import { NHL_ABBREVS, norm, fiKeyOf } from "./real-roster-import";
+import { fetchNhlCurrentStats, importNhlSkaterStats } from "./nhl-api-import";
+import { getLiveCalculatorConfig } from "./live-calculator-config";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -94,11 +96,13 @@ export async function findMissingNhlPlayers(): Promise<{ ok: boolean; candidates
 const slugify = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 
 /** Create a brand-new Player row for a real NHL debutant we've never tracked,
- *  parked in his real club's PROSPECT pool (Player.rosterType = "PROSPECT") so the
- *  existing NHL stat refresh (which matches by name across the WHOLE Player table)
- *  picks him up automatically, and the Rookie Calculator can rate him for real once
- *  he has games on the books. Nothing about any existing roster is touched. */
-export async function createDebutantAsProspect(c: DebutantCandidate): Promise<{ ok: boolean; playerId?: number; error?: string }> {
+ *  parked in his real club's PROSPECT pool (Player.rosterType = "PROSPECT"), and
+ *  immediately pull his current-season stats (skaters only — no live goalie feed
+ *  exists yet) so a debutant who already has real games shows up with real
+ *  parameter details right away, instead of waiting for the next unrelated
+ *  whole-league stat refresh to happen to run. Nothing about any existing roster
+ *  is touched; a genuine 0-GP prospect just gets curSeasonGP: 0, as expected. */
+export async function createDebutantAsProspect(c: DebutantCandidate): Promise<{ ok: boolean; playerId?: number; statsGP?: number; error?: string }> {
   const dupe = await prisma.player.findFirst({ where: { nhlId: c.nhlId }, select: { id: true } });
   if (dupe) return { ok: false, error: "Already tracked (nhlId already on file)." };
 
@@ -118,5 +122,19 @@ export async function createDebutantAsProspect(c: DebutantCandidate): Promise<{ 
       condition: 100, morale: 50,
     },
   });
-  return { ok: true, playerId: player.id };
+
+  let statsGP: number | undefined;
+  if (!c.isGoalie) {
+    try {
+      const { latestSeason } = await getLiveCalculatorConfig();
+      const rows = await fetchNhlCurrentStats(Number(latestSeason));
+      await importNhlSkaterStats(rows, "cur");
+      const refreshed = await prisma.player.findUnique({ where: { id: player.id }, select: { curSeasonGP: true } });
+      statsGP = refreshed?.curSeasonGP ?? 0;
+    } catch {
+      // creation already succeeded; a failed live-stat pull just means he waits
+      // for the next regular refresh, same as before this fix.
+    }
+  }
+  return { ok: true, playerId: player.id, statsGP };
 }

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { worldTeamLevel } from "@/lib/world-team-level";
+import { WORLD_LEAGUE_CATALOG } from "@/lib/world-catalog";
 import { BackPill, Card, PageHeader, StatTile } from "@/components/ui";
 import WorldLeagueStats from "@/components/WorldLeagueStats";
 
@@ -12,7 +13,7 @@ export default async function EuropeProspectsPage({ searchParams }: { searchPara
   const seasons = await prisma.worldPlayerSeasonStat.findMany({ where: { league: { region: "Europe", active: true } }, distinct: ["season"], select: { season: true }, orderBy: { season: "desc" } });
   const season = seasons.find((s) => s.season === requestedSeason)?.season ?? seasons[0]?.season;
   const stats = season ? await prisma.worldPlayerSeasonStat.findMany({ where: { season, league: { region: "Europe", active: true } }, include: { player: true, league: true, team: true }, orderBy: [{ points: "desc" }, { gamesPlayed: "desc" }] }) : [];
-  const importedLeagueIds = new Set(stats.map((s) => s.leagueId));
+  const importedLeagueCodes = new Set(stats.map((s) => s.league.code));
   const teamCounts = new Map<number, number>();
   stats.forEach((s) => { if (s.teamId) teamCounts.set(s.teamId, (teamCounts.get(s.teamId) ?? 0) + 1); });
   const syncedAt = stats.reduce<Date | null>((latest, s) => !latest || s.syncedAt > latest ? s.syncedAt : latest, null);
@@ -28,7 +29,7 @@ export default async function EuropeProspectsPage({ searchParams }: { searchPara
       <StatTile label="Last sync" value={syncedAt ? syncedAt.toLocaleDateString("sk-SK", { timeZone: "Europe/Bratislava" }) : "—"} color="text-amber-300" />
     </div>
 
-    <Card title="European competitions"><div className="flex flex-wrap gap-2">{leagues.map((league) => <span key={league.id} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${importedLeagueIds.has(league.id) ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : "border-slate-700 bg-slate-800/40 text-slate-500"}`} title={importedLeagueIds.has(league.id) ? "Imported" : "Awaiting source import"}>{league.country} · {league.name}{!importedLeagueIds.has(league.id) && " (awaiting data)"}</span>)}</div><p className="mt-3 text-xs text-slate-500">Only competitions with imported prospect data appear in the statistics below. U20/U18 labels are shown when the competition or team identifies that age group.</p></Card>
+    <Card title="European competitions"><div className="flex flex-wrap gap-2">{WORLD_LEAGUE_CATALOG.filter((league) => league.region === "Europe").map((league) => <span key={league.code} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${importedLeagueCodes.has(league.code) ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : "border-slate-700 bg-slate-800/40 text-slate-500"}`} title={importedLeagueCodes.has(league.code) ? "Imported" : "Awaiting source import"}>{league.country} · {league.name}{!importedLeagueCodes.has(league.code) && " (awaiting data)"}</span>)}</div><p className="mt-3 text-xs text-slate-500">Only competitions with imported prospect data appear in the statistics below. U20/U18 labels are shown when the competition or team identifies that age group.</p></Card>
 
     {season ? <>
       {seasons.length > 1 && <div className="flex flex-wrap items-center gap-2 text-sm"><span className="text-slate-400">Season:</span>{seasons.map((item) => <Link key={item.season} href={`/around-the-world/europe?season=${encodeURIComponent(item.season)}`} className={`rounded-lg px-3 py-1.5 border ${season === item.season ? "border-violet-500/40 bg-violet-500/15 text-violet-300" : "border-slate-800 text-slate-400 hover:text-white"}`}>{item.season}</Link>)}</div>}
