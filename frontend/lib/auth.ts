@@ -109,6 +109,19 @@ export async function isComishOrCoComish(): Promise<boolean> {
   return !!t?.isAdmin || t?.gmRole === "co_comish";
 }
 
+/** Teams the commissioner has personally delegated FA Tuning's per-player contract-demand
+ *  override to, without handing them full admin powers or a gmRole tier — scoped to that
+ *  one tool only (Admin → FA Tuning → Player Demand Overrides), not the market-weight
+ *  formula or anything else in Admin. */
+const CONTRACT_EDITOR_SLUGS = ["st-louis-blues", "edmonton-oilers"];
+export async function canEditPlayerContracts(): Promise<boolean> {
+  if (await isAdmin()) return true;
+  const id = await getTeamSession();
+  if (id == null) return false;
+  const t = await prisma.team.findUnique({ where: { id }, select: { slug: true } });
+  return !!t?.slug && CONTRACT_EDITOR_SLUGS.includes(t.slug);
+}
+
 /** Commission = the commissioner (isAdmin) or a (co-)commissioner. These may review and
  *  Accept / Decline / Modify a rookie GM's trades. Excludes plain "agent". */
 export async function isCommission(): Promise<boolean> {

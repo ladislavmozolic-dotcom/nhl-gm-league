@@ -1,4 +1,4 @@
-import { isAdmin } from "@/lib/auth";
+import { isAdmin, canEditPlayerContracts } from "@/lib/auth";
 import { PageHeader, Card, BackPill } from "@/components/ui";
 import { loadSettings } from "@/lib/sim/settings";
 import FaWeightsForm from "@/components/FaWeightsForm";
@@ -9,8 +9,8 @@ import { recentFaAuditAction } from "./actions";
 export const dynamic = "force-dynamic";
 
 export default async function FaTuningAdminPage({ searchParams }: { searchParams: Promise<{ player?: string; name?: string }> }) {
-  const admin = await isAdmin();
-  if (!admin) {
+  const [admin, canEdit, sp] = await Promise.all([isAdmin(), canEditPlayerContracts(), searchParams]);
+  if (!canEdit) {
     return (
       <div className="space-y-6 py-2">
         <PageHeader title="FA Tuning" subtitle="Free Agency market-weight & override tool" />
@@ -18,7 +18,23 @@ export default async function FaTuningAdminPage({ searchParams }: { searchParams
       </div>
     );
   }
-  const [settings, audit, sp] = await Promise.all([loadSettings(), recentFaAuditAction(), searchParams]);
+
+  // a delegated (non-admin) team only gets the player-override tool — the
+  // market-weight formula and the full change log stay commissioner-only.
+  if (!admin) {
+    return (
+      <div className="space-y-6 py-2">
+        <PageHeader
+          title="FA Tuning"
+          subtitle="Hand-set a player's asking price. Every change here is logged for the commissioner."
+          right={<BackPill href="/admin">Admin</BackPill>}
+        />
+        <FaPlayerOverride initialQuery={sp.name} />
+      </div>
+    );
+  }
+
+  const [settings, audit] = await Promise.all([loadSettings(), recentFaAuditAction()]);
 
   return (
     <div className="space-y-6 py-2">

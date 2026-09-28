@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { isAdmin, getTeamSession } from "@/lib/auth";
+import { isAdmin, canEditPlayerContracts, getTeamSession } from "@/lib/auth";
 import { loadSettings, saveSettings, mergeSettings, DEFAULT_SETTINGS } from "@/lib/sim/settings";
 import { loadMarketPool, loadFaWeights, playerMarket, eliteTarget, maxContract, type FaMarketWeights } from "@/lib/free-agency-server";
 import { faPosGroup, type FWeights, type DWeights, type GWeights } from "@/lib/free-agency";
@@ -11,8 +11,8 @@ import { faPosGroup, type FWeights, type DWeights, type GWeights } from "@/lib/f
 async function actorName(): Promise<string> {
   const id = await getTeamSession();
   if (!id) return "Admin";
-  const t = await prisma.team.findUnique({ where: { id }, select: { gmNickname: true } });
-  return t?.gmNickname || "Admin";
+  const t = await prisma.team.findUnique({ where: { id }, select: { gmNickname: true, name: true } });
+  return t?.gmNickname || t?.name || "Admin";
 }
 
 const fmtW = (w: { [k: string]: number }) => Object.entries(w).map(([k, v]) => `${k}:${v.toFixed(2)}`).join(" ");
@@ -113,7 +113,7 @@ export type OverrideRow = {
 };
 
 export async function searchPlayersForOverrideAction(query: string): Promise<OverrideRow[]> {
-  if (!(await isAdmin())) return [];
+  if (!(await canEditPlayerContracts())) return [];
   const q = query.trim();
   if (q.length < 2) return [];
   const rows = await prisma.player.findMany({
@@ -136,7 +136,7 @@ const ladderSummary = (l: OverrideLadder) => ([1, 2, 3, 4] as const).map((t) => 
  *  override), so a hand-set ladder actually steers real negotiations too, not
  *  just the Demand Watch preview. Passing an all-null ladder clears both. */
 export async function setPlayerOverrideAction(playerId: number, ladder: OverrideLadder, note?: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (!(await isAdmin())) return { ok: false, error: "Admin only." };
+  if (!(await canEditPlayerContracts())) return { ok: false, error: "You don't have contract-edit access." };
   const before = await prisma.player.findUnique({ where: { id: playerId }, select: { name: true, faOverrideLadder: true } });
   if (!before) return { ok: false, error: "Player not found." };
   const beforeLadder = parseLadder(before.faOverrideLadder);
