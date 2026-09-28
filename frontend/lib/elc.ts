@@ -22,8 +22,14 @@ const MIN_GP_CONTRACT = 10; // fewer than this last season → not signed to an 
 const MIN_GP_SKATER = 40;   // bonus threshold for skaters
 const MIN_GP_GOALIE = 15;   // bonus threshold for goalies
 
-/** Forward performance bonus by points-per-game. */
+/** Forward performance bonus by points-per-game. The ladder used to flatten out
+ *  at 0.9 PPG — a true generational rookie (1.3-1.7 PPG, McDavid/Celebrini
+ *  territory) earned the exact same bonus as someone barely above 0.9, which
+ *  underpaid the league's actual best players. Extended upward so the bonus
+ *  keeps climbing with real production instead of capping early. */
 export function elcForwardBonus(ppg: number): number {
+  if (ppg >= 1.3) return 3_200_000;
+  if (ppg >= 1.1) return 2_700_000;
   if (ppg >= 0.9) return 2_100_000;
   if (ppg >= 0.8) return 1_700_000;
   if (ppg >= 0.7) return 1_300_000;
@@ -35,6 +41,8 @@ export function elcForwardBonus(ppg: number): number {
 
 /** Defenseman bonus — the HIGHER of his points-per-game bonus and his DF/PK bonus. */
 export function elcDefensePointsBonus(ppg: number): number {
+  if (ppg >= 1.0) return 2_100_000;
+  if (ppg >= 0.8) return 1_800_000;
   if (ppg >= 0.6) return 1_500_000;
   if (ppg >= 0.5) return 1_200_000;
   if (ppg >= 0.4) return 900_000;

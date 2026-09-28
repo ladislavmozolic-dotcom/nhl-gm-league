@@ -140,6 +140,25 @@ function groupScores(pool: MarketRow[], grp: FaPos): { scoreOf: (market: number,
   return { scoreOf, sorted };
 }
 
+/** Elite-ladder age curve — forwards and goalies fade a year earlier and drop
+ *  faster (a 33-year-old's legs/reflexes are already the bigger question mark);
+ *  defensemen, who typically peak later and age more gradually on skill/reads
+ *  alone, get one extra year at full value and a gentler slope after. */
+function eliteAgeScale(grp: FaPos, age: number): number {
+  if (grp === "D") {
+    if (age <= 33) return 1;
+    if (age === 34) return 0.85;
+    if (age === 35) return 0.70;
+    if (age === 36) return 0.55;
+    return 0.40;
+  }
+  if (age <= 32) return 1;
+  if (age === 33) return 0.80;
+  if (age === 34) return 0.60;
+  if (age === 35) return 0.45;
+  return 0.30;
+}
+
 export function eliteTarget(
   p: { lastSeasonGP?: number | null; lastSeasonPts?: number | null; age?: number | null },
   grp: FaPos, market: number, pool: MarketRow[], maxSalary: number,
@@ -152,8 +171,7 @@ export function eliteTarget(
   const nTop = Math.max(3, Math.ceil(sorted.length * 0.07));
   if (rank > nTop) return 0;
   const tier = 1 - (rank - 1) / nTop; // 1 = the best at his position
-  const a = p.age ?? 27;
-  const ageScale = a <= 33 ? 1 : a === 34 ? 0.8 : a === 35 ? 0.65 : 0.5;
+  const ageScale = eliteAgeScale(grp, p.age ?? 27);
   const frac = grp === "G" ? 0.3 + 0.3 * tier : 0.45 + 0.43 * Math.pow(tier, 1.3);
   return Math.round((maxSalary * frac * ageScale) / 50_000) * 50_000;
 }
