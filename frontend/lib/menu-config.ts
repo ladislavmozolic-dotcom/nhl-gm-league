@@ -41,6 +41,7 @@ export const DEFAULT_MENU: MenuItem[] = [
     { label: "🔥 Hot & Cold Players", href: "/players/hot-cold" },
     { label: "⭐ Three Stars", href: "/players/three-stars" },
     { label: "📑 Contracts", href: "/players/contracts" },
+    { label: "💰 Demand Watch", href: "/admin/expiring-contracts" },
     { label: "👥 All Players", href: "/players/all" },
   ] },
   { key: "league", label: "League", href: "/league", children: [

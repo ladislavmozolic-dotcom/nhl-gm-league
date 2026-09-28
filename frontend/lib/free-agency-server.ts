@@ -172,7 +172,12 @@ export function eliteTarget(
   if (rank > nTop) return 0;
   const tier = 1 - (rank - 1) / nTop; // 1 = the best at his position
   const ageScale = eliteAgeScale(grp, p.age ?? 27);
-  const frac = grp === "G" ? 0.3 + 0.3 * tier : 0.45 + 0.43 * Math.pow(tier, 1.3);
+  // goalies sit below skaters at every rung, not just at the very top — real
+  // goalie deals top out well under the league's best skater deals AND a
+  // "pretty good, not truly elite" goalie shouldn't be paid like one just for
+  // clearing the top-7% cutoff. Same power curve as skaters (mid-tier gets
+  // compressed toward the floor, not spread linearly) on a lower 22-52% band.
+  const frac = grp === "G" ? 0.20 + 0.32 * Math.pow(tier, 1.3) : 0.45 + 0.43 * Math.pow(tier, 1.3);
   return Math.round((maxSalary * frac * ageScale) / 50_000) * 50_000;
 }
 

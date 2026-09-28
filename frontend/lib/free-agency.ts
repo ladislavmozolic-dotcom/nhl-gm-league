@@ -428,12 +428,30 @@ export function roleModifier(slot: LineSlot): number {
     default: return 1.22; // XF / XD / G3
   }
 }
+/** How much a player's age scales his sensitivity to team quality at all. A
+ *  young player (ELC-age through RFA-age) is driven by ROLE, not by chasing a
+ *  contender's logo — in real hockey that's the single most common reason a
+ *  younger player changes teams: he wants a real top-6/top-4 job, and he'll
+ *  take it wherever it's offered rather than discount his price to ride a good
+ *  team's bench (roleModifier/deploymentDemand already price the role itself —
+ *  this only controls the SEPARATE team-quality bend on top of that). A
+ *  veteran with a short window left leans on it hard: a real discount to grab
+ *  "one more shot" at a contender, and no vet signs for free on a team going
+ *  nowhere. */
+function contentionWeight(age?: number | null): number {
+  const a = age ?? 27;
+  if (a <= 23) return 0.15;
+  if (a <= 26) return 0.55;
+  if (a <= 31) return 1.0;
+  return 1.25;
+}
+
 /** A "rising" rebuild is a real sell to a young player buying into its window —
  *  worth almost as much as a contender — but means nothing to a vet who won't
  *  still be there in 2-3 years: he gets no better than a plain rebuild's terms. */
 export function contentionModifier(c: Contention, age?: number | null): number {
-  if (c === "contender") return 0.94;
-  if (c === "rebuild") return 1.10;
+  if (c === "contender") return 1 - 0.06 * contentionWeight(age);
+  if (c === "rebuild") return 1 + 0.10 * contentionWeight(age);
   if (c === "middle") return 1.0;
   const a = age ?? 27;
   if (a <= 24) return 0.94;
@@ -452,11 +470,13 @@ export function teamDemand(base: Demand, slot: LineSlot, c: Contention, age?: nu
 
 /** When comparing standing offers, the player values a big role and a winner in
  *  $-equivalent terms — so a contender's 1st-line offer can beat a bigger cheque
- *  from a rebuild's 3rd line. Same age gate as contentionModifier: a "rising"
- *  club's future window is worth real money to a young player, nothing to a vet. */
+ *  from a rebuild's 3rd line. Scaled by the same age weight as contentionModifier
+ *  (a young ELC/RFA-age player is barely swayed by team quality — role bonuses
+ *  above already do the real work of pricing his opportunity). A "rising" club's
+ *  future window is worth real money to a young player, nothing to a vet. */
 export function contentionBonus(c: Contention, age?: number | null): number {
-  if (c === "contender") return 500_000;
-  if (c === "rebuild") return -400_000;
+  if (c === "contender") return Math.round(500_000 * contentionWeight(age));
+  if (c === "rebuild") return -Math.round(400_000 * contentionWeight(age));
   if (c === "middle") return 0;
   const a = age ?? 27;
   if (a <= 24) return 400_000;

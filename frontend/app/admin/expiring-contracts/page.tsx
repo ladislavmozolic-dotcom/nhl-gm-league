@@ -30,11 +30,20 @@ type Row = {
 // AHL-only or fringe/no-rating players don't get a meaningful market read (no
 // comps pool for them) — this tool is about real re-sign/arbitration planning,
 // so it's scoped to the NHL roster like the rest of the Free Agent Frenzy engine.
-export default async function ExpiringContractsPage({ searchParams }: { searchParams: Promise<{ q?: string; sort?: string; dir?: string }> }) {
+const STATUS_TABS = [
+  { key: "all", label: "All" },
+  { key: "ufa", label: "UFA" },
+  { key: "rfa", label: "RFA" },
+] as const;
+type StatusFilter = (typeof STATUS_TABS)[number]["key"];
+const isStatusFilter = (v: string | undefined): v is StatusFilter => v === "all" || v === "ufa" || v === "rfa";
+
+export default async function ExpiringContractsPage({ searchParams }: { searchParams: Promise<{ q?: string; sort?: string; dir?: string; status?: string }> }) {
   const sp = await searchParams;
   const q = sp.q?.trim() ?? "";
   const sort: SortKey = isSortKey(sp.sort) ? sp.sort : "capHit";
   const dir: "asc" | "desc" = sp.dir === "asc" || sp.dir === "desc" ? sp.dir : DEFAULT_DIR[sort];
+  const status: StatusFilter = isStatusFilter(sp.status) ? sp.status : "all";
 
   const [players, settings] = await Promise.all([
     prisma.player.findMany({
@@ -89,6 +98,8 @@ export default async function ExpiringContractsPage({ searchParams }: { searchPa
     }
   };
   rows.sort((a, b) => (dir === "asc" ? cmp(a, b) : -cmp(a, b)));
+  const shown = status === "all" ? rows : rows.filter((r) => (status === "ufa" ? r.ufa : !r.ufa));
+  const counts = { ufa: rows.filter((r) => r.ufa).length, rfa: rows.filter((r) => !r.ufa).length };
 
   // preserves q, swaps sort/dir — clicking an already-active column flips
   // direction, clicking a new one starts at that column's own natural default.
@@ -96,8 +107,17 @@ export default async function ExpiringContractsPage({ searchParams }: { searchPa
     const nextDir = sort === col ? (dir === "asc" ? "desc" : "asc") : DEFAULT_DIR[col];
     const params = new URLSearchParams();
     if (q) params.set("q", q);
+    if (status !== "all") params.set("status", status);
     params.set("sort", col);
     params.set("dir", nextDir);
+    return `/admin/expiring-contracts?${params.toString()}`;
+  };
+  const statusHref = (s: StatusFilter) => {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (s !== "all") params.set("status", s);
+    params.set("sort", sort);
+    params.set("dir", dir);
     return `/admin/expiring-contracts?${params.toString()}`;
   };
   const ALIGN = { left: "text-left", right: "text-right", center: "text-center" } as const;
@@ -119,10 +139,23 @@ export default async function ExpiringContractsPage({ searchParams }: { searchPa
       />
 
       <form className="flex gap-2" action="/admin/expiring-contracts">
+        {status !== "all" && <input type="hidden" name="status" value={status} />}
         <input name="q" defaultValue={q} placeholder="Search player by name…"
           className="flex-1 max-w-sm bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm" />
         <button className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-sm font-semibold">Search</button>
       </form>
+
+      <div className="flex flex-wrap gap-2">
+        {STATUS_TABS.map((t) => (
+          <Link key={t.key} href={statusHref(t.key)}
+            className={`text-sm font-semibold px-3 py-1.5 rounded-lg transition-colors ${
+              status === t.key ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+            }`}>
+            {t.label}
+            {t.key !== "all" && <span className="ml-1.5 text-xs opacity-80">{counts[t.key]}</span>}
+          </Link>
+        ))}
+      </div>
 
       <Card bodyClassName="p-0">
         <div className="overflow-x-auto">
@@ -143,7 +176,7 @@ export default async function ExpiringContractsPage({ searchParams }: { searchPa
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ p, ufa, ladder, roleLabel, depth, preferredYears }) => (
+              {shown.map(({ p, ufa, ladder, roleLabel, depth, preferredYears }) => (
                 <tr key={p.id} className="border-b border-slate-800/40 hover:bg-slate-800/30 transition-colors last:border-0">
                   <td className="px-4 py-3 font-medium">
                     <Link href={`/players/${p.slug}`} className="hover:text-blue-400">{cleanName(p.name)}</Link>
@@ -177,7 +210,7 @@ export default async function ExpiringContractsPage({ searchParams }: { searchPa
                   ))}
                 </tr>
               ))}
-              {rows.length === 0 && (
+              {shown.length === 0 && (
                 <tr><td colSpan={7 + TERMS.length} className="px-4 py-8 text-center text-slate-500">No player in the final year of his deal{q ? ` matches "${q}"` : ""}.</td></tr>
               )}
             </tbody>
