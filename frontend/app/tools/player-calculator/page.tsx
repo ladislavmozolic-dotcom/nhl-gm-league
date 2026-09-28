@@ -13,7 +13,7 @@ import { isAdmin } from "@/lib/auth";
 import { canManageLiveCalculator } from "@/lib/live-calculator-actions";
 import PlayerCalculatorView from "@/components/PlayerCalculatorView";
 import RookieCalculatorPanel from "@/components/RookieCalculatorPanel";
-import { rookieCalculatorRows, cameoRookieRows } from "@/lib/edge-params-server";
+import { rookieCalculatorRows } from "@/lib/edge-params-server";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +25,7 @@ export default async function PlayerCalculatorPage({
   const { team: teamSlug, view } = await searchParams;
 
   if (view === "rookies") {
-    const [rookies, cameo, admin] = await Promise.all([rookieCalculatorRows(), cameoRookieRows(5, 9), isAdmin()]);
+    const [rookies, admin] = await Promise.all([rookieCalculatorRows(), isAdmin()]);
     return (
       <div className="space-y-6 py-2">
         <PageHeader
@@ -33,7 +33,7 @@ export default async function PlayerCalculatorPage({
           subtitle="Prospekti, ktorí už odohrali reálne zápasy a zatiaľ nemajú vlastný rating"
           right={<Link href="/tools/player-calculator" className="text-sm text-blue-400 hover:text-blue-300">← Live Calculator</Link>}
         />
-        <RookieCalculatorPanel rookies={rookies} cameo={cameo} isAdmin={admin} />
+        <RookieCalculatorPanel rookies={rookies} isAdmin={admin} />
       </div>
     );
   }

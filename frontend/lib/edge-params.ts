@@ -161,6 +161,32 @@ export function leadershipFrom(captaincy: string | null | undefined, ex: number)
   return Math.round(clamp(base + (ex - 70) * 0.2, 50, 99));
 }
 
+/** Rookie Calculator small-sample humility, mirroring the Parameter Calculator's
+ *  own games-missed penalty (lib/param-projection.ts gamesMissedPenalty): the
+ *  built-in reliability regression already pulls a tiny sample toward the
+ *  position mean, but a genuine NHL/AHL debutant with only a handful of games on
+ *  the books still deserves an extra conservative discount on the sim-critical
+ *  params, the same way the main calculator won't fully trust anyone under
+ *  ACTIVATE_AT_GP=10 games. <3 GP → -5, <6 GP → -3, <10 GP → -1, ≥10 GP → 0. */
+export function rookieSamplePenalty(totalGp: number): number {
+  if (totalGp < 3) return 5;
+  if (totalGp < 6) return 3;
+  if (totalGp < 10) return 1;
+  return 0;
+}
+
+/** Apply rookieSamplePenalty to the four sim-critical params (CK/SC/PA/DF),
+ *  floored at 20 like the Parameter Calculator's own penalty. Mutates a copy. */
+export function applyRookieSamplePenalty(ratings: Record<string, number>, totalGp: number): Record<string, number> {
+  const penalty = rookieSamplePenalty(totalGp);
+  if (penalty === 0) return ratings;
+  const out = { ...ratings };
+  for (const k of ["CK", "SC", "PA", "DF"]) {
+    if (out[k] != null) out[k] = Math.max(20, out[k] - penalty);
+  }
+  return out;
+}
+
 export const EDGE_MO_DEFAULT = 50; // morale starts at league default, then our universe moves it
 
 // Goalie composites (MoneyPuck-driven). The danger splits let the primary abilities

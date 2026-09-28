@@ -9,6 +9,8 @@ import { NHL_ABBREVS, norm, fiKeyOf } from "./real-roster-import";
 import { fetchNhlCurrentStats, fetchNhlGoalieStats, importNhlSkaterStats } from "./nhl-api-import";
 import { getLiveCalculatorConfig } from "./live-calculator-config";
 import { edgeRatings, type SyntheticSkater } from "./edge-params-server";
+import { applyRookieSamplePenalty } from "./edge-params";
+import { fetchOne as fetchEdgeSpeedOne, EDGE_SEASON_CUR, EDGE_SEASON_LAST } from "./nhl-edge-speed-import";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -139,14 +141,21 @@ function ageFromBirthDate(iso: string | null): number | null {
 
 /** Preview what a debutant's Next Gen rating WOULD be, scored against the real,
  *  live league population — WITHOUT creating anything or writing to the DB. Pulls
- *  his real current-season stat line, then runs him through the exact same
- *  edgeRatings() pipeline as every actual player via a synthetic row, so the
- *  preview and the real post-creation rating are computed identically. */
+ *  his real current-season stat line AND his real NHL EDGE skating-speed data (so
+ *  SK isn't blank — a rookie's own tracked speed, not a guess from similar
+ *  players), then runs him through the exact same edgeRatings() pipeline as every
+ *  actual player via a synthetic row, plus the same small-sample humility penalty
+ *  (rookieSamplePenalty) applied when he's actually activated, so the preview
+ *  matches the real post-creation rating exactly. */
 export async function previewDebutantRating(c: DebutantCandidate): Promise<{ ok: boolean; ratings?: Record<string, number>; error?: string }> {
   if (c.isGoalie) return { ok: false, error: "Živý náhľad pre brankárov zatiaľ nie je podporovaný." };
 
   const { latestSeason } = await getLiveCalculatorConfig();
-  const stats = await fetchNhlCurrentStats(Number(latestSeason));
+  const [stats, edgeCur, edgeLast] = await Promise.all([
+    fetchNhlCurrentStats(Number(latestSeason)),
+    fetchEdgeSpeedOne(c.nhlId, EDGE_SEASON_CUR),
+    fetchEdgeSpeedOne(c.nhlId, EDGE_SEASON_LAST),
+  ]);
   const row = stats.find((s) => norm(s.name) === norm(c.name));
   if (!row) return { ok: false, error: "Nenašli sa jeho aktuálne štatistiky." };
 
@@ -157,11 +166,12 @@ export async function previewDebutantRating(c: DebutantCandidate): Promise<{ ok:
       gp: row.gp, g: row.g, a: row.a, hits: row.hits, blocks: row.blocks, pm: row.pm, tk: row.tk, gv: row.gv,
       shToi: row.shToi, teamShToi: row.teamShToi, toi: row.toi, shots: row.shots, pim: row.pim, foPct: row.foPct,
     },
+    edgeSpeed: (edgeCur || edgeLast) ? { cur: edgeCur, last: edgeLast } : null,
   };
   const all = await edgeRatings("NHL", true, [synthetic]);
   const mine = all.find((r) => r.playerId === -c.nhlId);
   if (!mine) return { ok: false, error: "Výpočet zlyhal." };
-  return { ok: true, ratings: mine.ratings };
+  return { ok: true, ratings: applyRookieSamplePenalty(mine.ratings, row.gp) };
 }
 
 const slugify = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");

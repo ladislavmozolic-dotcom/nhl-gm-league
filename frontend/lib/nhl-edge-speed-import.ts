@@ -11,9 +11,9 @@ const UA = "Mozilla/5.0 (compatible; ProfiNHL-League/1.0)";
 export const EDGE_SEASON_CUR = 20252026;
 export const EDGE_SEASON_LAST = 20242025;
 
-type SpeedRow = { spd: number | null; brst: number | null; dist: number | null };
+export type SpeedRow = { spd: number | null; brst: number | null; dist: number | null };
 
-async function fetchOne(nhlId: number, season: number): Promise<SpeedRow | null> {
+export async function fetchOne(nhlId: number, season: number): Promise<SpeedRow | null> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 15_000);
   try {
