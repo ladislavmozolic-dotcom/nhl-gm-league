@@ -5,7 +5,7 @@ import { PageHeader, Card } from "@/components/ui";
 import { cleanName } from "@/lib/playerName";
 import { isAdmin } from "@/lib/auth";
 import { evaluateTeamOffer, loadMarketPool, teamContentionMap } from "@/lib/free-agency-server";
-import { deployRoleBonus, contentionBonus } from "@/lib/free-agency";
+import { deployRoleBonus, contentionBonus, churnBonus } from "@/lib/free-agency";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +48,7 @@ export default async function SigningsPage({ searchParams }: { searchParams: Pro
   // instead of a raw $ comparison.
   const pool = await loadMarketPool();
   const cmap = await teamContentionMap();
-  type Scored = { teamId: number; salary: number; years: number; line: number; pp: boolean; pk: boolean; status: string; utility: number | null; acceptable: boolean; roleBonus: number; contBonus: number; stBonus: number };
+  type Scored = { teamId: number; salary: number; years: number; line: number; pp: boolean; pk: boolean; status: string; utility: number | null; acceptable: boolean; roleBonus: number; contBonus: number; churnBonus: number; stBonus: number };
   const scoredByPlayer = new Map<number, Scored[]>();
   for (const playerId of pIds) {
     const offers = [...(accepted.filter((o) => o.playerId === playerId)), ...(rivalsByPlayer.get(playerId) ?? [])];
@@ -57,8 +57,9 @@ export default async function SigningsPage({ searchParams }: { searchParams: Pro
       const ev = await evaluateTeamOffer(playerId, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, round, { clause: o.grantClause, breadth: o.mNtcBreadth });
       const roleBonus = ev ? deployRoleBonus(ev.base.grp, o.line) : 0;
       const contBonus = ev ? contentionBonus(ev.base.contention, ev.base.age) : 0;
+      const churnB = ev ? churnBonus(ev.base.churn, ev.base.age) : 0;
       const stBonus = ev ? (ev.base.desired.wantPP && o.pp ? 400_000 : 0) + (ev.base.desired.wantPK && o.pk ? 300_000 : 0) : 0;
-      scored.push({ teamId: o.teamId, salary: o.salary, years: o.years, line: o.line, pp: o.pp, pk: o.pk, status: o.status, utility: ev?.utility ?? null, acceptable: ev?.acceptable ?? false, roleBonus, contBonus, stBonus });
+      scored.push({ teamId: o.teamId, salary: o.salary, years: o.years, line: o.line, pp: o.pp, pk: o.pk, status: o.status, utility: ev?.utility ?? null, acceptable: ev?.acceptable ?? false, roleBonus, contBonus, churnBonus: churnB, stBonus });
     }
     scored.sort((a, b) => (b.utility ?? -Infinity) - (a.utility ?? -Infinity));
     scoredByPlayer.set(playerId, scored);
@@ -110,6 +111,7 @@ export default async function SigningsPage({ searchParams }: { searchParams: Pro
                           <th className="text-center py-1.5 px-2 font-medium">ST</th>
                           <th className="text-right py-1.5 px-2 font-medium">Role bonus</th>
                           <th className="text-right py-1.5 px-2 font-medium">Contention</th>
+                          <th className="text-right py-1.5 px-2 font-medium">Churn</th>
                           <th className="text-right py-1.5 px-2 font-medium">ST bonus</th>
                           <th className="text-right py-1.5 pl-2 font-medium">Utility</th>
                         </tr>
@@ -125,6 +127,7 @@ export default async function SigningsPage({ searchParams }: { searchParams: Pro
                               <td className="py-1.5 px-2 text-center text-slate-400">{[s.pp && "PP", s.pk && "PK"].filter(Boolean).join("/") || "—"}</td>
                               <td className={`py-1.5 px-2 text-right tabular-nums ${s.roleBonus >= 0 ? "text-slate-300" : "text-rose-400"}`}>{s.roleBonus >= 0 ? "+" : ""}{M(s.roleBonus)}</td>
                               <td className={`py-1.5 px-2 text-right tabular-nums ${s.contBonus >= 0 ? "text-slate-300" : "text-rose-400"}`}>{s.contBonus >= 0 ? "+" : ""}{M(s.contBonus)}</td>
+                              <td className={`py-1.5 px-2 text-right tabular-nums ${s.churnBonus >= 0 ? "text-slate-500" : "text-rose-400"}`}>{s.churnBonus < 0 ? M(s.churnBonus) : "—"}</td>
                               <td className="py-1.5 px-2 text-right tabular-nums text-slate-300">{s.stBonus > 0 ? `+${M(s.stBonus)}` : "—"}</td>
                               <td className="py-1.5 pl-2 text-right tabular-nums font-semibold">{s.utility != null ? M(s.utility) : "—"}{!s.acceptable && <span className="ml-1 text-[10px] text-rose-400" title="Below his floor / wrong term">✗</span>}</td>
                             </tr>
@@ -137,7 +140,7 @@ export default async function SigningsPage({ searchParams }: { searchParams: Pro
                         {winner.salary >= runnerUp.salary
                           ? `${code.get(winner.teamId)} simply offered more (${M(winner.salary)} vs ${M(runnerUp.salary)}).`
                           : `${code.get(winner.teamId)} won on fit, not money (${M(winner.salary)} vs ${code.get(runnerUp.teamId)}'s ${M(runnerUp.salary)}) — `
-                            + [winner.roleBonus > runnerUp.roleBonus && "a better promised role", winner.contBonus > runnerUp.contBonus && "contender status", winner.stBonus > runnerUp.stBonus && "the PP/PK time he wanted"].filter(Boolean).join(" + ") + "."}
+                            + [winner.roleBonus > runnerUp.roleBonus && "a better promised role", winner.contBonus > runnerUp.contBonus && "contender status", winner.churnBonus > runnerUp.churnBonus && "a steadier front office", winner.stBonus > runnerUp.stBonus && "the PP/PK time he wanted"].filter(Boolean).join(" + ") + "."}
                       </p>
                     )}
                   </div>

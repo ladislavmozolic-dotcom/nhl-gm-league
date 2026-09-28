@@ -8,7 +8,7 @@ import { addDays } from "@/lib/calendar";
 import { CURRENT_SEASON_START, TWO_WAY_AHL_SALARY, capCeilingForPhase, ltirRelief, accruedCapSpace, liveCapHit } from "@/lib/finance";
 import { teamCapCommitted } from "@/lib/cap";
 import {
-  loadMarketPool, teamContentionMap, teamAsk, evaluateTeamOffer, loadLeagueCap, weakestTeams,
+  loadMarketPool, teamContentionMap, teamChurnMap, teamAsk, evaluateTeamOffer, loadLeagueCap, weakestTeams,
   recordLowball, clearLowballs, lowballNote,
   ufaAtExpiry, resignLockedUntil,
 } from "@/lib/free-agency-server";
@@ -636,14 +636,14 @@ async function signFaOffer(playerId: number, player: { name: string; age: number
 async function pickAndSign(
   playerId: number, player: { name: string; age: number | null }, offers: FaOfferRow[],
   judgeRound: number, pool: Awaited<ReturnType<typeof loadMarketPool>>, cmap: Awaited<ReturnType<typeof teamContentionMap>>,
-  allowSoleFloor: boolean,
+  allowSoleFloor: boolean, churnMap?: Awaited<ReturnType<typeof teamChurnMap>>,
 ): Promise<string | null> {
   const cap = await loadLeagueCap();
   const clockPhase = (await getLeagueClock()).phase;
   let best: { offer: FaOfferRow; salary: number; years: number; utility: number } | null = null;
   let soleEv: Awaited<ReturnType<typeof evaluateTeamOffer>> = null;
   for (const o of offers) {
-    const ev = await evaluateTeamOffer(playerId, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, judgeRound, { clause: o.grantClause, breadth: o.mNtcBreadth });
+    const ev = await evaluateTeamOffer(playerId, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, judgeRound, { clause: o.grantClause, breadth: o.mNtcBreadth }, churnMap);
     if (offers.length === 1) soleEv = ev;
     // A club already over the cap can still win a signing here — same as real
     // hockey, going over on a signing is legal in the moment; the club just
@@ -677,6 +677,7 @@ async function pickAndSign(
 export async function resolveFrenzy(judgeRound = 3): Promise<{ signed: number; details: string[] }> {
   const pool = await loadMarketPool();
   const cmap = await teamContentionMap();
+  const churnMap = await teamChurnMap();
   const pending = await prisma.faOffer.findMany({ where: { status: { in: ACTIVE } } });
 
   const byPlayer = new Map<number, typeof pending>();
@@ -692,7 +693,7 @@ export async function resolveFrenzy(judgeRound = 3): Promise<{ signed: number; d
     const player = await prisma.player.findUnique({ where: { id: playerId }, select: { name: true, rosterType: true, age: true } });
     if (!player || (player.rosterType && ["NHL", "AHL", "RETIRED"].includes(player.rosterType))) continue; // already signed / retired
     // best acceptable at the round being resolved; a lone suitor falls back to his floor
-    const detail = await pickAndSign(playerId, player, offers, judgeRound, pool, cmap, true);
+    const detail = await pickAndSign(playerId, player, offers, judgeRound, pool, cmap, true, churnMap);
     if (detail) { details.push(detail); signed++; }
   }
   return { signed, details };
@@ -719,6 +720,7 @@ export async function resolveInSeasonWindows(asOf: Date): Promise<{ signed: numb
   if (due.length === 0) return { signed: 0, countered: 0, details: [] };
   const pool = await loadMarketPool();
   const cmap = await teamContentionMap();
+  const churnMap = await teamChurnMap();
   const faId = await faPoolTeamId();
   let signed = 0, countered = 0; const details: string[] = [];
   const nice = (s: string) => s.replace(/''[A-Za-z]''|\s*\([^)]*\)/g, "").trim();
@@ -739,7 +741,7 @@ export async function resolveInSeasonWindows(asOf: Date): Promise<{ signed: numb
       // pushes his price UP, it never asks for less than someone already offered.
       const round50k = (v: number) => Math.max(775_000, Math.round(v / 50_000) * 50_000);
       const evd = [] as { o: (typeof offers)[number]; ev: Awaited<ReturnType<typeof evaluateTeamOffer>> }[];
-      for (const o of offers) evd.push({ o, ev: await evaluateTeamOffer(p.id, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, 2, { clause: o.grantClause, breadth: o.mNtcBreadth }) });
+      for (const o of offers) evd.push({ o, ev: await evaluateTeamOffer(p.id, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, 2, { clause: o.grantClause, breadth: o.mNtcBreadth }, churnMap) });
       const serious = evd.filter((x) => x.ev && x.o.salary >= x.ev.ask.floorSalary * 0.6);
       const bestOffer = serious.reduce((m, x) => Math.max(m, x.o.salary), 0);
       const leverage = serious.length >= 3 ? 1.10 : serious.length >= 2 ? 1.05 : 1.0; // more suitors → push higher
@@ -769,7 +771,7 @@ export async function resolveInSeasonWindows(asOf: Date): Promise<{ signed: numb
       // Phase 2 — match window closed: he signs the best (a lone suitor → his floor). Notify
       // the winning GM (a message that pops on their screen) and every other bidder.
       const bidders = [...new Set(offers.map((o) => o.teamId))];
-      const detail = await pickAndSign(p.id, player, offers, 3, pool, cmap, true);
+      const detail = await pickAndSign(p.id, player, offers, 3, pool, cmap, true, churnMap);
       if (detail) {
         details.push(detail); signed++;
         const after = await prisma.player.findUnique({ where: { id: p.id }, select: { teamId: true } });
@@ -796,6 +798,7 @@ export async function resolveInSeasonWindows(asOf: Date): Promise<{ signed: numb
 export async function processRoundEnd(endedRound: number, sharedDecisionAt = new Date(Date.now() + FRENZY_IMPROVEMENT_DAYS * 86_400_000)): Promise<{ decided: number; eliminated: number; signed: number }> {
   const pool = await loadMarketPool();
   const cmap = await teamContentionMap();
+  const churnMap = await teamChurnMap();
   const faId = await faPoolTeamId();
   const agentDm = async (toTeamId: number, body: string, playerId: number, isGoalie: boolean) => {
     await prisma.dmMessage.create({ data: { fromTeamId: faId, toTeamId, body, tradeUrl: faFocusUrl(playerId, isGoalie) } }).catch(() => {});
@@ -824,7 +827,7 @@ export async function processRoundEnd(endedRound: number, sharedDecisionAt = new
     // Value every offer, drop hopeless lowballs, and start one shared
     // two-day window for every surviving bidder.
     const scored = [] as { o: (typeof list)[number]; ev: Awaited<ReturnType<typeof evaluateTeamOffer>> }[];
-    for (const o of list) scored.push({ o, ev: await evaluateTeamOffer(playerId, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, endedRound, { clause: o.grantClause, breadth: o.mNtcBreadth }) });
+    for (const o of list) scored.push({ o, ev: await evaluateTeamOffer(playerId, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, endedRound, { clause: o.grantClause, breadth: o.mNtcBreadth }, churnMap) });
 
     const soleOffer = list.length === 1;
     const bestSalary = Math.max(...list.map((o) => o.salary));
@@ -882,6 +885,7 @@ export async function resolveFrenzyDecisions(asOf: Date = new Date()): Promise<{
   if (due.length === 0) return { signed: 0, unsigned: 0 };
   const pool = await loadMarketPool();
   const cmap = await teamContentionMap();
+  const churnMap = await teamChurnMap();
   const faId = await faPoolTeamId();
   const agentDm = async (toTeamId: number, body: string, playerId: number, isGoalie: boolean) => {
     await prisma.dmMessage.create({ data: { fromTeamId: faId, toTeamId, body, tradeUrl: faFocusUrl(playerId, isGoalie) } }).catch(() => {});
@@ -893,7 +897,7 @@ export async function resolveFrenzyDecisions(asOf: Date = new Date()): Promise<{
     const nm = nice(p.name);
     if (offers.length === 0) { await prisma.player.update({ where: { id: p.id }, data: { faDecisionAt: null, faCountered: false } }); continue; }
     const bidders = [...new Set(offers.map((o) => o.teamId))];
-    const detail = await pickAndSign(p.id, { name: p.name, age: p.age }, offers, 3, pool, cmap, true);
+    const detail = await pickAndSign(p.id, { name: p.name, age: p.age }, offers, 3, pool, cmap, true, churnMap);
     if (detail) {
       signed++;
       const after = await prisma.player.findUnique({ where: { id: p.id }, select: { teamId: true } });
@@ -941,6 +945,7 @@ export async function resolvePostFrenzyWindows(asOf: Date = new Date()): Promise
   if (due.length === 0) return { signed: 0, unsigned: 0, countered: 0 };
   const pool = await loadMarketPool();
   const cmap = await teamContentionMap();
+  const churnMap = await teamChurnMap();
   const faId = await faPoolTeamId();
   const nice = (s: string) => s.replace(/''[A-Za-z]''|\s*\([^)]*\)/g, "").trim();
   const agentDm = async (toTeamId: number, body: string, playerId: number, isGoalie: boolean) => {
@@ -956,7 +961,7 @@ export async function resolvePostFrenzyWindows(asOf: Date = new Date()): Promise
 
     if (!p.faCountered && offers.length > 1) {
       const scored = [] as { o: (typeof offers)[number]; ev: Awaited<ReturnType<typeof evaluateTeamOffer>> }[];
-      for (const o of offers) scored.push({ o, ev: await evaluateTeamOffer(p.id, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, 3, { clause: o.grantClause, breadth: o.mNtcBreadth }) });
+      for (const o of offers) scored.push({ o, ev: await evaluateTeamOffer(p.id, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, 3, { clause: o.grantClause, breadth: o.mNtcBreadth }, churnMap) });
       const bestSalary = Math.max(...offers.map((o) => o.salary));
       const closeRace = offers.filter((o) => o.salary >= bestSalary * 0.90).length >= 2;
       let survivors = 0;
@@ -990,7 +995,7 @@ export async function resolvePostFrenzyWindows(asOf: Date = new Date()): Promise
       continue;
     }
 
-    const detail = await pickAndSign(p.id, { name: p.name, age: p.age }, offers, 3, pool, cmap, true);
+    const detail = await pickAndSign(p.id, { name: p.name, age: p.age }, offers, 3, pool, cmap, true, churnMap);
     if (detail) {
       signed++;
       const after = await prisma.player.findUnique({ where: { id: p.id }, select: { teamId: true } });

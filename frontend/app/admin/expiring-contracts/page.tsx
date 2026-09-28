@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { PageHeader, Card, BackPill } from "@/components/ui";
 import { money } from "@/lib/finance";
 import { cleanName } from "@/lib/playerName";
-import { loadMarketPool, teamContentionMap, teamAsk, ufaAtExpiry } from "@/lib/free-agency-server";
+import { loadMarketPool, teamContentionMap, teamChurnMap, teamAsk, ufaAtExpiry } from "@/lib/free-agency-server";
 import { termPremium, isDepthSlot, slotLabel, MAX_TERM, LEAGUE_MIN } from "@/lib/free-agency";
 import { loadSettings } from "@/lib/sim/settings";
 
@@ -74,10 +74,10 @@ export default async function ExpiringContractsPage({ searchParams }: { searchPa
     loadSettings(),
   ]);
 
-  const [pool, cmap] = await Promise.all([loadMarketPool(), teamContentionMap()]);
+  const [pool, cmap, churnMap] = await Promise.all([loadMarketPool(), teamContentionMap(), teamChurnMap()]);
 
   const rows: Row[] = await Promise.all(players.map(async (p) => {
-    const info = await teamAsk(p.id, p.teamId, pool, cmap);
+    const info = await teamAsk(p.id, p.teamId, pool, cmap, undefined, churnMap);
     const ufa = settings.faMode === "simple" || ufaAtExpiry(p);
     // Admin → FA Tuning hand-set ladder (any subset of terms) overrides the
     // computed rung for those terms — the rest still come from the engine.

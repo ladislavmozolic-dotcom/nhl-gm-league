@@ -523,6 +523,33 @@ export function contentionBonus(c: Contention, age?: number | null): number {
   if (a <= 31) return -150_000;
   return -400_000;
 }
+/** How much a player's age weighs a team's trade-happy reputation — a settled
+ *  veteran with roots (family, a house) is the one who actually gets rattled by a
+ *  front office that keeps flipping players; a young player with nothing set down
+ *  yet barely factors it in. */
+function churnWeight(age?: number | null): number {
+  const a = age ?? 27;
+  if (a <= 23) return 0.2;
+  if (a <= 27) return 0.6;
+  if (a <= 31) return 1.0;
+  return 1.3;
+}
+
+/** Salary bend from a team's recent trade-churn score (0 = trades at/under the league
+ *  average, 1.5 = a serial flipper — see teamChurnMap). Deliberately mild — a couple
+ *  of percent at most for an old vet at the league's most active trader — this is a
+ *  background wariness, not a hard "won't sign there." */
+export function churnModifier(churn: number, age?: number | null): number {
+  return 1 + 0.015 * churnWeight(age) * Math.max(0, Math.min(1.5, churn));
+}
+
+/** $-equivalent penalty in offer comparisons — on top of the small salary bend, a
+ *  churn-heavy club's offer looks a bit less attractive next to an equal-money offer
+ *  from a stable club when the player picks among suitors. */
+export function churnBonus(churn: number, age?: number | null): number {
+  return -Math.round(250_000 * churnWeight(age) * Math.max(0, Math.min(1.5, churn)));
+}
+
 /** Would the player sign this offer at this club at all? (clears team-specific floor + term.) */
 export function offerAcceptable(td: Demand, offerSalary: number, offerYears: number): boolean {
   return offerSalary >= td.floorSalary && offerYears >= td.minYears && offerYears <= td.maxYears;
@@ -590,9 +617,9 @@ export function roleGapModifier(gap: number): number {
 /** Team-specific ask given a concrete deployment PROMISE (the GM's counter).
  *  A role worse than he wants raises his salary AND shortens the term he'll accept
  *  (he takes a short "prove-it" deal rather than commit long to a lesser role). */
-export function deploymentDemand(base: Demand, grp: FaPos, dep: Deployment, desired: Desired, c: Contention, age?: number | null): Demand {
+export function deploymentDemand(base: Demand, grp: FaPos, dep: Deployment, desired: Desired, c: Contention, age?: number | null, churn = 0): Demand {
   const gap = dep.line - desired.line;
-  const m = roleGapModifier(gap) * stModifier(desired, dep.pp, dep.pk) * contentionModifier(c, age);
+  const m = roleGapModifier(gap) * stModifier(desired, dep.pp, dep.pk) * contentionModifier(c, age) * churnModifier(churn, age);
   const salary = Math.max(LEAGUE_MIN, Math.round((base.salary * m) / 50_000) * 50_000);
   const floorSalary = Math.max(LEAGUE_MIN, Math.round((base.floorSalary * m) / 50_000) * 50_000);
   const maxYears = gap > 0 ? Math.max(1, base.maxYears - gap) : base.maxYears;
@@ -607,8 +634,8 @@ export function deployRoleBonus(grp: FaPos, line: number): number {
   return line <= 1 ? 1_600_000 : line === 2 ? 700_000 : line === 3 ? 0 : -600_000;
 }
 /** How attractive an offer is to the player when picking among clubs (with usage). */
-export function offerUtility(offerSalary: number, grp: FaPos, dep: Deployment, desired: Desired, c: Contention, age?: number | null): number {
-  let u = offerSalary + deployRoleBonus(grp, dep.line) + contentionBonus(c, age);
+export function offerUtility(offerSalary: number, grp: FaPos, dep: Deployment, desired: Desired, c: Contention, age?: number | null, churn = 0): number {
+  let u = offerSalary + deployRoleBonus(grp, dep.line) + contentionBonus(c, age) + churnBonus(churn, age);
   if (desired.wantPP && dep.pp) u += 400_000;
   if (desired.wantPK && dep.pk) u += 300_000;
   return u;

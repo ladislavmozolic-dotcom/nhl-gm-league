@@ -455,9 +455,67 @@ export async function teamContentionMap(): Promise<Map<number, Contention>> {
   return map;
 }
 
-export type TeamContext = { contention: Contention; markets: Record<FaPos, number[]> };
+/** How often a team trades away players it controls, over the trailing ~9 months,
+ *  scored relative to the league average (0 = at/under it, up to 1.5 = a serial
+ *  flipper) — see churnModifier/churnBonus for how gently it bends a free agent's
+ *  price and offer preference. A trade counts DOUBLE when the player it sends out
+ *  had signed there as a free agent within the previous year — flipping a guy you
+ *  just signed is the exact pattern that makes other players wary of signing there
+ *  at all, so it weighs more than trading a long-tenured piece. */
+export async function teamChurnMap(): Promise<Map<number, number>> {
+  const teams = await prisma.team.findMany({ where: { league: "NHL", isAffiliate: false }, select: { id: true, code: true } });
+  const CHURN_WINDOW_DAYS = 270;
+  const since = new Date(Date.now() - CHURN_WINDOW_DAYS * 86_400_000);
+  const trades = await prisma.trade.findMany({
+    where: { status: "ACCEPTED", createdAt: { gte: since } },
+    select: { id: true, fromTeamId: true, toTeamId: true, createdAt: true },
+  });
+  const score = new Map<number, number>();
+  if (trades.length) {
+    const tradeById = new Map(trades.map((t) => [t.id, t]));
+    const assets = await prisma.tradeAsset.findMany({
+      where: { tradeId: { in: trades.map((t) => t.id) }, assetType: "PLAYER" },
+      select: { tradeId: true, side: true, playerId: true },
+    });
+    const outgoing = assets
+      .map((a) => {
+        const t = tradeById.get(a.tradeId);
+        if (!t || a.playerId == null) return null;
+        return { teamId: a.side === "FROM" ? t.fromTeamId : t.toTeamId, playerId: a.playerId, tradedAt: t.createdAt };
+      })
+      .filter((x): x is { teamId: number; playerId: number; tradedAt: Date } => x != null);
 
-export async function loadTeamContext(teamId: number, cmap?: Map<number, Contention>): Promise<TeamContext> {
+    const codeById = new Map(teams.map((t) => [t.id, t.code]));
+    const signings = outgoing.length
+      ? await prisma.signingLog.findMany({
+          where: { kind: "SIGN", reverted: false, playerId: { in: outgoing.map((o) => o.playerId) } },
+          select: { playerId: true, teamCode: true, createdAt: true },
+        })
+      : [];
+    const lastSignAt = new Map<string, Date>(); // key = `${playerId}:${teamCode}`
+    for (const s of signings) {
+      if (!s.teamCode) continue;
+      const k = `${s.playerId}:${s.teamCode}`;
+      const prev = lastSignAt.get(k);
+      if (!prev || s.createdAt > prev) lastSignAt.set(k, s.createdAt);
+    }
+    for (const o of outgoing) {
+      const code = codeById.get(o.teamId);
+      const signedAt = code ? lastSignAt.get(`${o.playerId}:${code}`) : undefined;
+      const flip = signedAt != null && o.tradedAt > signedAt && o.tradedAt.getTime() - signedAt.getTime() <= 365 * 86_400_000;
+      score.set(o.teamId, (score.get(o.teamId) ?? 0) + (flip ? 2 : 1));
+    }
+  }
+  const counts = teams.map((t) => score.get(t.id) ?? 0);
+  const mean = counts.reduce((a, b) => a + b, 0) / Math.max(1, counts.length);
+  const churn = new Map<number, number>();
+  for (const t of teams) churn.set(t.id, mean > 0 ? Math.max(0, Math.min(1.5, ((score.get(t.id) ?? 0) - mean) / mean)) : 0);
+  return churn;
+}
+
+export type TeamContext = { contention: Contention; churn: number; markets: Record<FaPos, number[]> };
+
+export async function loadTeamContext(teamId: number, cmap?: Map<number, Contention>, churnMap?: Map<number, number>): Promise<TeamContext> {
   const [roster, weights] = await Promise.all([
     prisma.player.findMany({ where: { teamId, rosterType: "NHL" }, select: SEL }),
     loadFaWeights(),
@@ -469,7 +527,8 @@ export async function loadTeamContext(teamId: number, cmap?: Map<number, Content
   }
   (Object.keys(markets) as FaPos[]).forEach((k) => markets[k].sort((a, b) => b - a));
   const contentionMap = cmap ?? (await teamContentionMap());
-  return { contention: contentionMap.get(teamId) ?? "middle", markets };
+  const churns = churnMap ?? (await teamChurnMap());
+  return { contention: contentionMap.get(teamId) ?? "middle", churn: churns.get(teamId) ?? 0, markets };
 }
 
 /** Where the player slots on this club: strictly better ratings ahead of him → rank. */
@@ -481,7 +540,7 @@ export function projectSlot(ctx: TeamContext, grp: FaPos, market: number): { slo
 
 export type TeamAsk = {
   grp: FaPos; base: Demand; slot: LineSlot; line: number;
-  contention: Contention; desired: Desired; ask: Demand; age: number | null;
+  contention: Contention; churn: number; desired: Desired; ask: Demand; age: number | null;
   lowballBump: number; // >1 when this club insulted him with a lowball earlier (his ask to THEM is up)
   elite: number; // elite-ladder price (0 = not elite)
 };
@@ -532,7 +591,7 @@ const CHEAP_DEAL_MAX = 1_500_000;
 
 /** The Interest feedback: what the player would want to sign at THIS club, given
  *  the role he projects into there + whether the club is a contender. */
-export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow[], cmap?: Map<number, Contention>, round?: number): Promise<TeamAsk | null> {
+export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow[], cmap?: Map<number, Contention>, round?: number, churnMap?: Map<number, number>): Promise<TeamAsk | null> {
   const p = await prisma.player.findUnique({ where: { id: playerId }, select: { ...SEL, age: true, faDemandOverride: true, df: true, teamId: true, birthDate: true, contractYears: true } });
   if (!p) return null;
   const marketPool = pool ?? (await loadMarketPool());
@@ -580,7 +639,7 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
     ? { ...unbumped, salary: Math.min(maxSalary, round50k(unbumped.salary * bump)), floorSalary: Math.min(maxSalary, round50k(unbumped.floorSalary * bump)) }
     : unbumped;
 
-  const ctx0 = await loadTeamContext(teamId, cmap);
+  const ctx0 = await loadTeamContext(teamId, cmap, churnMap);
   // staying put isn't "joining a rebuild" — no rebuild premium on his own club's extension
   // …and an elite player's price is his ladder spot, whoever he plays for
   const ctx = (extension && ctx0.contention === "rebuild") || elite > 0 ? { ...ctx0, contention: "middle" as Contention } : ctx0;
@@ -597,7 +656,7 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
   const desired = desiredDeployment(grp, line, p.df, slot === "XD" || slot === "XF");
   // projected ask = the club gives him the role he projects into, plus the ST he wants
   const projDeploy: Deployment = { line, pp: desired.wantPP, pk: desired.wantPK };
-  let ask = deploymentDemand(base, grp, projDeploy, desired, ctx.contention, dealAge);
+  let ask = deploymentDemand(base, grp, projDeploy, desired, ctx.contention, dealAge, ctx.churn);
   // an elite player's projected price is his ladder spot — the small PP/PK bends would
   // otherwise shuffle the order (a PK-capable Makar dipping under Werenski)
   if (elite > 0) ask = { ...ask, salary: base.salary, floorSalary: base.floorSalary };
@@ -614,7 +673,7 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
   // …unless he's one of the league's elite: then his ladder spot is the ceiling (Celebrini ≈ Carlsson)
   const ceiling = rfa && expAge <= 23 ? Math.max(round50k(maxSalary * 0.7), elite) : maxSalary;
   if (ask.salary > ceiling) ask = { ...ask, salary: ceiling, floorSalary: Math.min(ask.floorSalary, round50k(ceiling * 0.92)) };
-  return { grp, base, slot, line, contention: ctx.contention, desired, ask, age: dealAge, lowballBump: bump, elite };
+  return { grp, base, slot, line, contention: ctx.contention, churn: ctx.churn, desired, ask, age: dealAge, lowballBump: bump, elite };
 }
 
 /** Evaluate a concrete offer (money + term + promised deployment) at a club. */
@@ -622,10 +681,11 @@ export async function evaluateTeamOffer(
   playerId: number, teamId: number, salary: number, years: number, deploy: Deployment,
   pool?: MarketRow[], cmap?: Map<number, Contention>, round?: number,
   grant?: { clause?: string | null; breadth?: number | null },
+  churnMap?: Map<number, number>,
 ): Promise<{ acceptable: boolean; ask: Demand; utility: number; base: TeamAsk } | null> {
-  const info = await teamAsk(playerId, teamId, pool, cmap, round);
+  const info = await teamAsk(playerId, teamId, pool, cmap, round, churnMap);
   if (!info) return null;
-  const raw = deploymentDemand(info.base, info.grp, deploy, info.desired, info.contention, info.age);
+  const raw = deploymentDemand(info.base, info.grp, deploy, info.desired, info.contention, info.age, info.churn);
   // granting a clause lets him sign for less — discount his floor + headline ask.
   // EXCEPT when the club promises him a worse role than he wants: then he wants to
   // be free to move on, so a no-trade clause is worth nothing to him.
@@ -638,7 +698,7 @@ export async function evaluateTeamOffer(
     ? { ...raw, floorSalary: Math.max(775_000, Math.round((raw.floorSalary * f) / 50_000) * 50_000), salary: Math.max(775_000, Math.round((raw.salary * f) / 50_000) * 50_000) }
     : raw;
   const acceptable = offerAcceptable(ask, salary, years);
-  const utility = offerUtility(salary, info.grp, deploy, info.desired, info.contention, info.age) + disc * raw.salary;
+  const utility = offerUtility(salary, info.grp, deploy, info.desired, info.contention, info.age, info.churn) + disc * raw.salary;
   return { acceptable, ask, utility, base: info };
 }
 
