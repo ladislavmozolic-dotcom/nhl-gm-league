@@ -8,7 +8,7 @@ import { recentFaAuditAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function FaTuningAdminPage() {
+export default async function FaTuningAdminPage({ searchParams }: { searchParams: Promise<{ player?: string; name?: string }> }) {
   const admin = await isAdmin();
   if (!admin) {
     return (
@@ -18,7 +18,7 @@ export default async function FaTuningAdminPage() {
       </div>
     );
   }
-  const [settings, audit] = await Promise.all([loadSettings(), recentFaAuditAction()]);
+  const [settings, audit, sp] = await Promise.all([loadSettings(), recentFaAuditAction(), searchParams]);
 
   return (
     <div className="space-y-6 py-2">
@@ -30,7 +30,7 @@ export default async function FaTuningAdminPage() {
 
       <FaWeightsForm initial={{ f: settings.faWeightF, d: settings.faWeightD, g: settings.faWeightG }} />
 
-      <FaPlayerOverride />
+      <FaPlayerOverride initialQuery={sp.name} />
 
       <FaTuningAuditLog initial={audit} />
     </div>

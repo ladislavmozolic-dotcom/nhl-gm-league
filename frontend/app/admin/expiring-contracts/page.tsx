@@ -135,7 +135,14 @@ export default async function ExpiringContractsPage({ searchParams }: { searchPa
       <PageHeader
         title="Expiring Contracts — Demand Watch"
         subtitle="Every NHL player in the final year of his deal, with his projected asking price at 1–4 years (the same engine Free Agent Frenzy uses) — plan re-signings before the market opens."
-        right={<BackPill href="/admin">Admin</BackPill>}
+        right={
+          <div className="flex items-center gap-2">
+            <Link href="/admin/fa-tuning" className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white whitespace-nowrap">
+              🎛️ Edit market weights
+            </Link>
+            <BackPill href="/admin">Admin</BackPill>
+          </div>
+        }
       />
 
       <form className="flex gap-2" action="/admin/expiring-contracts">
@@ -159,9 +166,10 @@ export default async function ExpiringContractsPage({ searchParams }: { searchPa
 
       <Card bodyClassName="p-0">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[900px]">
+          <table className="w-full text-sm min-w-[940px]">
             <thead>
               <tr className="text-xs text-slate-500 uppercase tracking-wider border-b border-slate-800 bg-slate-800/30">
+                <th className="px-2 py-3 font-medium w-8"></th>
                 <SortHeader col="name" />
                 <SortHeader col="team" />
                 <SortHeader col="age" align="center" />
@@ -178,6 +186,12 @@ export default async function ExpiringContractsPage({ searchParams }: { searchPa
             <tbody>
               {shown.map(({ p, ufa, ladder, roleLabel, depth, preferredYears }) => (
                 <tr key={p.id} className="border-b border-slate-800/40 hover:bg-slate-800/30 transition-colors last:border-0">
+                  <td className="px-2 py-3 text-center">
+                    <Link href={`/admin/fa-tuning?name=${encodeURIComponent(p.name)}`} title="Hand-override his demand"
+                      className="text-slate-500 hover:text-amber-400">
+                      ✏️
+                    </Link>
+                  </td>
                   <td className="px-4 py-3 font-medium">
                     <Link href={`/players/${p.slug}`} className="hover:text-blue-400">{cleanName(p.name)}</Link>
                     <span className="text-slate-600 text-xs ml-1">{p.position}</span>
@@ -211,14 +225,14 @@ export default async function ExpiringContractsPage({ searchParams }: { searchPa
                 </tr>
               ))}
               {shown.length === 0 && (
-                <tr><td colSpan={7 + TERMS.length} className="px-4 py-8 text-center text-slate-500">No player in the final year of his deal{q ? ` matches "${q}"` : ""}.</td></tr>
+                <tr><td colSpan={8 + TERMS.length} className="px-4 py-8 text-center text-slate-500">No player in the final year of his deal{q ? ` matches "${q}"` : ""}.</td></tr>
               )}
             </tbody>
           </table>
         </div>
       </Card>
       <p className="text-xs text-slate-500 px-1">
-        RFA/UFA status uses the real CBA rule (age 27 as of June 30 of the expiry year). The highlighted column is the player&apos;s own preferred term — shorter terms never carry a premium, longer ones do (steeper for very young or very old players). Click a column header to sort.
+        RFA/UFA status uses the real CBA rule (age 27 as of June 30 of the expiry year). The highlighted column is the player&apos;s own preferred term — shorter terms never carry a premium, longer ones do (steeper for very young or very old players). Click a column header to sort. The ✏️ opens FA Tuning with him already searched, to hand-override his demand.
       </p>
       <p className="text-xs text-slate-500 px-1">
         Real Cap Hit is his actual real-life NHL salary from CapWages (Admin → Roster Source → &quot;Fill Real Cap Hits&quot;) — re-run that sync to pick up a real-life extension. 🔒 flags a player whose real deal runs longer than our {MAX_TERM}yr cap.

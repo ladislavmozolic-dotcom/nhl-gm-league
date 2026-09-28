@@ -1,17 +1,18 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect, useRef } from "react";
 import { Card } from "@/components/ui";
 import { money } from "@/lib/finance";
 import { searchPlayersForOverrideAction, setPlayerOverrideAction, type OverrideRow } from "@/app/admin/fa-tuning/actions";
 
-export default function FaPlayerOverride() {
-  const [q, setQ] = useState("");
+export default function FaPlayerOverride({ initialQuery }: { initialQuery?: string }) {
+  const [q, setQ] = useState(initialQuery ?? "");
   const [rows, setRows] = useState<OverrideRow[]>([]);
   const [drafts, setDrafts] = useState<Record<number, string>>({});
   const [notes, setNotes] = useState<Record<number, string>>({});
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
+  const sectionRef = useRef<HTMLDivElement>(null);
 
   const search = (value: string) => {
     setQ(value);
@@ -21,6 +22,15 @@ export default function FaPlayerOverride() {
       setRows(r);
     });
   };
+
+  // arrived from a "✏️ Edit" link elsewhere (e.g. Demand Watch) with a player
+  // already named — run the search immediately and scroll this section into view.
+  useEffect(() => {
+    if (!initialQuery) return;
+    search(initialQuery);
+    sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQuery]);
 
   const save = (id: number, current: number | null) => start(async () => {
     const raw = drafts[id];
@@ -41,6 +51,7 @@ export default function FaPlayerOverride() {
 
   return (
     <Card title="Player Demand Overrides" accent="text-amber-400">
+      <div ref={sectionRef} />
       <p className="text-xs text-slate-500 mb-3">
         Hand-set one player's asking price — overrides everything the engine would otherwise compute for him
         (weights, elite ladder, age curve, all of it). Leave the note field to explain why, for your own audit trail below.
