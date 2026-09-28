@@ -26,7 +26,7 @@ export async function worldScoutingMeta(players: WorldIdentity[], teamId: number
   const ids = players.map((p) => p.id);
   const names = [...new Set(players.map((p) => p.name))];
   const [rights, draftRows, rankings] = await Promise.all([
-    prisma.prospect.findMany({ where: { source, OR: [{ worldPlayerId: { in: ids } }, { name: { in: names } }] }, select: { worldPlayerId: true, name: true, team: { select: { name: true, logoUrl: true } } } }),
+    prisma.prospect.findMany({ where: { OR: [{ worldPlayerId: { in: ids } }, { source, name: { in: names } }] }, select: { source: true, worldPlayerId: true, name: true, team: { select: { name: true, logoUrl: true } } } }),
     prisma.draftProspect.findMany({ where: { ...draftSourceWhere(config?.rosterMode), draftYear: year, name: { in: names } }, select: { id: true, name: true, birthDate: true, draftedByTeamId: true } }),
     teamId == null ? Promise.resolve([]) : prisma.draftRanking.findMany({ where: { teamId, OR: [{ customYear: year, draftProspectId: null }, { prospect: { draftYear: year } }] }, select: { customName: true, customBirth: true, draftProspectId: true } }),
   ]);
@@ -34,7 +34,7 @@ export async function worldScoutingMeta(players: WorldIdentity[], teamId: number
   const nameCount = new Map<string, number>();
   for (const p of players) nameCount.set(p.normalizedName, (nameCount.get(p.normalizedName) ?? 0) + 1);
   const rightsByName = new Map<string, typeof rights>();
-  for (const r of rights) {
+  for (const r of rights.filter((item) => item.source === source)) {
     const key = r.name.toLocaleLowerCase();
     rightsByName.set(key, [...(rightsByName.get(key) ?? []), r]);
   }
