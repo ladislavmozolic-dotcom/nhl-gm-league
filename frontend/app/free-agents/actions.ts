@@ -10,6 +10,7 @@ import { teamCapCommitted } from "@/lib/cap";
 import {
   loadMarketPool, teamContentionMap, teamAsk, evaluateTeamOffer, loadLeagueCap, weakestTeams,
   recordLowball, clearLowballs, lowballNote,
+  ufaAtExpiry,
 } from "@/lib/free-agency-server";
 import { MAX_TERM, faPosGroup, willingnessNote, twoWayObjection, type Deployment } from "@/lib/free-agency";
 import { loadSettings, saveSettings } from "@/lib/sim/settings";
@@ -1116,7 +1117,7 @@ export async function extendContractAction(
 ) {
   if (!(await canManageTeam(teamId))) return { ok: false as const, error: "You don't manage this team." };
   const player = await prisma.player.findUnique({
-    where: { id: playerId }, select: { teamId: true, contractYears: true, capHit: true, ahlSalary: true, contractExpiry: true, contractType: true, tradeClause: true, noTradeTeams: true, contractText: true, age: true, name: true, lastSeasonGP: true, resignRound: true, resignStatus: true, resignOfferSalary: true, rosterType: true, franchiseTag: true, overall: true, realFarmTeamId: true, iceWarnedAt: true, iceUnhappyChecks: true, promiseWarnGame: true, tradeRequested: true },
+    where: { id: playerId }, select: { teamId: true, contractYears: true, capHit: true, ahlSalary: true, contractExpiry: true, contractType: true, tradeClause: true, noTradeTeams: true, contractText: true, age: true, birthDate: true, name: true, lastSeasonGP: true, resignRound: true, resignStatus: true, resignOfferSalary: true, rosterType: true, franchiseTag: true, overall: true, realFarmTeamId: true, iceWarnedAt: true, iceUnhappyChecks: true, promiseWarnGame: true, tradeRequested: true },
   });
   if (!player) return { ok: false as const, error: "Player not found." };
   // the club may re-sign its own NHL players AND its farm (AHL affiliate) players
@@ -1194,7 +1195,7 @@ export async function extendContractAction(
     const round = player.resignRound ?? 0;
     const nextRound = round + 1;
     // in the simple system there are no RFA rights — everyone tests free agency.
-    const isUFA = tw.faMode === "simple" || (player.age ?? 27) >= 27;
+    const isUFA = tw.faMode === "simple" || ufaAtExpiry(player);
     const isRFA = !isUFA;
     // an RFA gets ONE round unless he's the club's Franchise tag (then 2); a UFA gets 2.
     const maxRounds = isRFA && !player.franchiseTag ? 1 : 2;

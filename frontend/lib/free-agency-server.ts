@@ -5,7 +5,7 @@ import { prisma } from "./prisma";
 import { loadSettings } from "./sim/settings";
 import { getLeagueClock } from "./calendar-server";
 import { computeStandings } from "./sim/standings";
-import { CURRENT_SEASON_START } from "./finance";
+import { CURRENT_SEASON_START, ageAsOfJune30 } from "./finance";
 import {
   faPosGroup, skaterMarket, goalieMarket, anchorFromPool, buildDemand, percentile, availabilityFactor, isDepthSlot,
   slotForRank, slotToLine, desiredDeployment, deploymentDemand, offerUtility, offerAcceptable, clauseDiscount, termPremium,
@@ -400,7 +400,7 @@ const RFA_EXTENSION_FACTOR = 0.85;
 /** The Interest feedback: what the player would want to sign at THIS club, given
  *  the role he projects into there + whether the club is a contender. */
 export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow[], cmap?: Map<number, Contention>, round?: number): Promise<TeamAsk | null> {
-  const p = await prisma.player.findUnique({ where: { id: playerId }, select: { ...SEL, age: true, faDemandOverride: true, df: true, teamId: true } });
+  const p = await prisma.player.findUnique({ where: { id: playerId }, select: { ...SEL, age: true, faDemandOverride: true, df: true, teamId: true, birthDate: true, contractYears: true } });
   if (!p) return null;
   const marketPool = pool ?? (await loadMarketPool());
   const fullGP = await leagueFullGP();
@@ -416,9 +416,14 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
   const clock = await getLeagueClock();
   const extension = isOwn && !clock.frenzyOpen;
   const s = await loadSettings();
-  const rfa = extension && s.faMode !== "simple" && (p.age ?? 27) < 27;
-  // not testing the market ⇒ the middle of his peer group, not its upper part
-  const rated = anchorFromPool(marketPool, grp, market, extension ? 0.5 : undefined);
+  const rfa = extension && s.faMode !== "simple" && !ufaAtExpiry(p);
+  // RFA leverage: a young RFA (no arbitration yet, ≤ 23 at expiry) has almost none;
+  // an arbitration-eligible one (24-26) gets close to market (an arbitrator would).
+  const expAge = p.birthDate ? ageAsOfJune30(p.birthDate, CURRENT_SEASON_START + Math.max(0, p.contractYears ?? 0)) : (p.age ?? 27);
+  const rfaFactor = rfa ? (expAge <= 23 ? RFA_EXTENSION_FACTOR : 0.95) : 1;
+  // an RFA isn't testing the market ⇒ the middle of his peer group; a pending UFA
+  // could walk to it, so he's priced like the market (upper part of the group)
+  const rated = anchorFromPool(marketPool, grp, market, rfa ? 0.5 : undefined);
   const role = roleAnchor(p, grp, marketPool);
   const anchor = role != null ? (rated.anchor + role) / 2 : rated.anchor, count = rated.count;
   const rawBase = buildDemand({
@@ -426,7 +431,7 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
     perf: performanceOf(p, grp, market, marketPool),
     availability: availabilityFactor(p.lastSeasonGP, fullGP, grp === "G"),
     downSeason: isDownSeason(p.lastSeasonGP, fullGP, grp === "G"), morale: p.morale, currentSalary: p.capHit, realCapHit: p.realCapHit,
-    openingPremium: !extension, rfaFactor: rfa ? RFA_EXTENSION_FACTOR : 1,
+    openingPremium: !extension, rfaFactor,
   });
   const unbumped = p.faDemandOverride != null ? rawBase : scaleDemand(rawBase, isOwn ? 1 : await faStaleFactor());
   const bump = await lowballBump(playerId, teamId);
@@ -512,6 +517,15 @@ export async function demandForPlayers(
 // the "simple" faMode has no RFA restriction at all, everyone tests the open market.
 const UFA_AGE = 27;
 
+/** CBA status at the END of his current deal: UFA if he's 27 on June 30 of the year
+ *  it expires (not his age today — Quinn Hughes is 26 now but 27 by June 30, 2027).
+ *  An already-expired deal (0 years) is judged at the June 30 just passed. */
+export function ufaAtExpiry(p: { age: number | null; birthDate?: string | Date | null; contractYears?: number | null }): boolean {
+  const expiry = CURRENT_SEASON_START + Math.max(0, p.contractYears ?? 0);
+  if (p.birthDate) return ageAsOfJune30(p.birthDate, expiry) >= UFA_AGE;
+  return (p.age ?? UFA_AGE) + Math.max(0, (p.contractYears ?? 0) - 1) >= UFA_AGE;
+}
+
 /** Every NHL/AHL player whose contract has run dry (0 years, not a $100k farm-filler
  *  placeholder) — split into UFA-age and RFA-age buckets by the same rule
  *  submitOfferAction uses. Shared by both sweep functions below so they always
@@ -527,13 +541,13 @@ async function expiredContractCandidates(): Promise<{ ufaIds: number[]; rfaIds: 
     loadSettings(),
     prisma.player.findMany({
       where: { rosterType: { in: ["NHL", "AHL"] }, contractYears: 0, NOT: { capHit: 100_000 } },
-      select: { id: true, age: true },
+      select: { id: true, age: true, birthDate: true, contractYears: true },
     }),
   ]);
-  const isUfaAge = (age: number | null) => settings.faMode === "simple" || (age ?? UFA_AGE) >= UFA_AGE;
+  const isUfaAge = (p: { age: number | null; birthDate: string | Date | null; contractYears: number | null }) => settings.faMode === "simple" || ufaAtExpiry(p);
   return {
-    ufaIds: candidates.filter((p) => isUfaAge(p.age)).map((p) => p.id),
-    rfaIds: candidates.filter((p) => !isUfaAge(p.age)).map((p) => p.id),
+    ufaIds: candidates.filter((p) => isUfaAge(p)).map((p) => p.id),
+    rfaIds: candidates.filter((p) => !isUfaAge(p)).map((p) => p.id),
   };
 }
 

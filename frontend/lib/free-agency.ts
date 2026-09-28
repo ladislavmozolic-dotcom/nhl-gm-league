@@ -107,7 +107,11 @@ export function anchorFromPool(
   const lo = Math.max(0, Math.min(idx - w, n - 2 * w)), hi = Math.min(n, lo + 2 * w);
   const comps = same.slice(lo, hi);
   const band = comps.length ? Math.max(Math.abs(comps[0].market - market), Math.abs(comps[comps.length - 1].market - market)) : 14;
-  return { anchor: percentile(comps.map((c) => c.capHit), pctl), band, count: comps.length };
+  // at the ends of the ranking the window can't be centred on him — shift the percentile
+  // by where he actually sits in it (the league's best D anchors near the top of the top group)
+  const pos = comps.length > 1 ? (idx - lo) / comps.length : 0.5;
+  const eff = Math.max(0.05, Math.min(0.97, pctl + (pos - 0.5)));
+  return { anchor: percentile(comps.map((c) => c.capHit), eff), band, count: comps.length };
 }
 
 /** Age / trajectory multiplier — "will his parameters go up or down?".
@@ -199,7 +203,8 @@ export function termPremium(offerYears: number, preferredYears: number, age: num
 
 /** Bottom-of-the-lineup slots: 3rd/4th line, 3rd pair, extras. */
 export function isDepthSlot(slot: LineSlot): boolean {
-  return slot === "L3" || slot === "L4" || slot === "XF" || slot === "P3" || slot === "XD";
+  // a backup/third goalie is the depth case in net (Levi-type bridge candidates)
+  return slot === "L3" || slot === "L4" || slot === "XF" || slot === "P3" || slot === "XD" || slot === "G2" || slot === "G3";
 }
 
 /** Signing discount when the GM GRANTS a no-trade / no-movement clause: the
