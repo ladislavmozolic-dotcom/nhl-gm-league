@@ -180,17 +180,20 @@ export function willingnessFactor(morale: number | null | undefined, market: num
 /** Salary multiplier for the OFFERED term vs the player's sweet spot. More years
  *  than he'd like → he wants a raise (steeper for older players who see the risk);
  *  fewer years → no premium (he's happy to go short). Never a refusal. */
-export function termPremium(offerYears: number, preferredYears: number, age: number | null | undefined, slot?: LineSlot): number {
+export function termPremium(offerYears: number, preferredYears: number, age: number | null | undefined, slot?: LineSlot, salary?: number): number {
   const extra = offerYears - preferredYears;
   if (extra <= 0) return 1;
   const a = age ?? 27;
   // U-shape: a YOUNG player charges a lot to lock up his prime years, an OLDER one
   // charges for the risk of a long deal; a prime-age vet is the cheapest to extend.
   // A young depth player (bridge-deal candidate) is the extreme case: every year past
-  // his 2-year bridge sells a season he expects to be worth much more — 4 years
-  // instead of 2 costs about double.
+  // his 2-year bridge sells a season he expects to be worth much more — at a ~$1M
+  // salary 4 years instead of 2 costs about double. The relative jump shrinks as the
+  // salary grows (a $3.6M player's upside is a smaller share of his pay): +50 %/yr
+  // at ≤$1.2M, ~+17 %/yr at $3.6M, never under the top-role +15 %.
   const young = a <= 25;
-  const perYear = young ? (slot && isDepthSlot(slot) ? 0.5 : 0.15) : a >= 33 ? 0.15 : a >= 30 ? 0.10 : 0.07;
+  const depthRate = Math.max(0.15, Math.min(0.5, 0.5 * (1_200_000 / Math.max(1, salary ?? 1_200_000))));
+  const perYear = young ? (slot && isDepthSlot(slot) ? depthRate : 0.15) : a >= 33 ? 0.15 : a >= 30 ? 0.10 : 0.07;
   return 1 + extra * perYear;
 }
 

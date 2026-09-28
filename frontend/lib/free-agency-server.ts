@@ -475,7 +475,7 @@ export async function evaluateTeamOffer(
   const roleWorse = deploy.line > info.desired.line;
   const disc = roleWorse ? 0 : clauseDiscount(grant?.clause, grant?.breadth);
   // longer term than his sweet spot raises the price (always negotiable, never a refusal)
-  const tp = termPremium(years, raw.years, info.age, info.slot);
+  const tp = termPremium(years, raw.years, info.age, info.slot, raw.floorSalary);
   const f = (1 - disc) * tp;
   const ask: Demand = f !== 1
     ? { ...raw, floorSalary: Math.round((raw.floorSalary * f) / 50_000) * 50_000, salary: Math.round((raw.salary * f) / 50_000) * 50_000 }
