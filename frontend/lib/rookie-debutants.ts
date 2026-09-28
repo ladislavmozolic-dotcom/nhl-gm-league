@@ -8,6 +8,7 @@ import { prisma } from "./prisma";
 import { NHL_ABBREVS, norm, fiKeyOf } from "./real-roster-import";
 import { fetchNhlCurrentStats, fetchNhlGoalieStats, importNhlSkaterStats, type NhlStatRow } from "./nhl-api-import";
 import { getLiveCalculatorConfig } from "./live-calculator-config";
+import { fetchOne as fetchEdgeSpeedOne, EDGE_SEASON_CUR, EDGE_SEASON_LAST } from "./nhl-edge-speed-import";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -203,6 +204,19 @@ export async function scanAndSyncDebutants(): Promise<ScanAndSyncResult> {
       alreadyProspect: c.alreadyProspect, prospectTeamCode: c.prospectTeamCode, error: res.ok ? undefined : res.error,
     });
   }
+
+  // Real NHL EDGE skating-speed data (SK) for every Rookie Calculator player, new
+  // or already tracked — SK was silently staying blank because nothing ever called
+  // this until now (see syncLiveCalculatorData for the same fix league-wide). The
+  // PROSPECT pool is small, so doing every one of them here (not just the ones
+  // founded just now) is cheap, unlike a full-league edge-speed pass.
+  try {
+    const prospects = await prisma.player.findMany({ where: { rosterType: "PROSPECT", isGoalie: false, nhlId: { not: null } }, select: { id: true, nhlId: true } });
+    for (const p of prospects) {
+      const [cur, last] = await Promise.all([fetchEdgeSpeedOne(p.nhlId!, EDGE_SEASON_CUR), fetchEdgeSpeedOne(p.nhlId!, EDGE_SEASON_LAST)]);
+      if (cur || last) await prisma.player.update({ where: { id: p.id }, data: { edgeSpeed: { cur: cur ?? undefined, last: last ?? undefined } } });
+    }
+  } catch { /* best-effort — SK just waits for the next scan or the general Sync Live Data */ }
 
   let statsRefreshed = 0;
   try {

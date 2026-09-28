@@ -5,11 +5,16 @@
 // and blend 80% cur (2025-26) / 20% last (2024-25), matching the rest of Edge.
 
 import { prisma } from "./prisma";
+import { CURRENT_SEASON_START } from "./finance";
 
 const BASE = "https://api-web.nhle.com/v1/edge/skater-detail";
 const UA = "Mozilla/5.0 (compatible; ProfiNHL-League/1.0)";
-export const EDGE_SEASON_CUR = 20252026;
-export const EDGE_SEASON_LAST = 20242025;
+// Derived from today's date (CURRENT_SEASON_START), not a hardcoded pair of years —
+// this had drifted a full season behind before (still "20252026" once the real
+// 2026-27 season started), same class of bug as latestSeason/previousSeason in
+// live-calculator-config.ts.
+export const EDGE_SEASON_CUR = CURRENT_SEASON_START * 10000 + (CURRENT_SEASON_START + 1);
+export const EDGE_SEASON_LAST = (CURRENT_SEASON_START - 1) * 10000 + CURRENT_SEASON_START;
 
 export type SpeedRow = { spd: number | null; brst: number | null; dist: number | null };
 

@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import { CURRENT_SEASON_START } from "./finance";
+import { type RookiePenaltyBand, DEFAULT_ROOKIE_PENALTY_BANDS } from "./edge-params";
 
 /** The real NHL season ids ("20262027") for the current and prior season, derived
  *  from today's date (CURRENT_SEASON_START itself rolls over every July 1) — NOT
@@ -35,6 +36,10 @@ export type LiveCalcWeights = {
   st: { weightPct: number };
   ex: { careerRegGP: number; careerPoGP: number };
   customMetrics?: Record<string, CustomMetricConfig[]>;
+  /** Rookie Calculator small-sample humility bands (see rookieSamplePenalty in
+   *  lib/edge-params.ts) — admin-tunable from the Rookie Calculator's own
+   *  "Tuning" panel, independent of every other Live Calculator weight above. */
+  rookie?: { penaltyBands: RookiePenaltyBand[] };
   ahl: {
     scEqGpg: number;
     scShots: number;
@@ -61,6 +66,7 @@ export const DEFAULT_LIVE_CALC_WEIGHTS: LiveCalcWeights = {
   st: { weightPct: 1.0 },
   ex: { careerRegGP: 0.70, careerPoGP: 0.30 },
   customMetrics: {},
+  rookie: { penaltyBands: DEFAULT_ROOKIE_PENALTY_BANDS },
   ahl: {
     scEqGpg: 0.80,
     scShots: 0.10,
@@ -190,8 +196,17 @@ export async function getLiveCalculatorConfig(): Promise<LiveCalcConfigData> {
   }
 }
 
+/** Same as Partial<LiveCalcConfigData>, but weights/goalieWeights only need to
+ *  carry the sub-keys actually being changed (e.g. just `rookie`) — the merge
+ *  below is shallow at the top level of `weights`, so a caller updating one
+ *  group (pa/sc/rookie/...) doesn't have to round-trip every other group too. */
+export type LiveCalcConfigUpdate = Omit<Partial<LiveCalcConfigData>, "weights" | "goalieWeights"> & {
+  weights?: Partial<LiveCalcWeights>;
+  goalieWeights?: Partial<LiveCalcGoalieWeights>;
+};
+
 /** Update Live Calculator configuration. */
-export async function updateLiveCalculatorConfig(data: Partial<LiveCalcConfigData>): Promise<LiveCalcConfigData> {
+export async function updateLiveCalculatorConfig(data: LiveCalcConfigUpdate): Promise<LiveCalcConfigData> {
   const current = await getLiveCalculatorConfig();
   const merged: LiveCalcConfigData = {
     ...current,

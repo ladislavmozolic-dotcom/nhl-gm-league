@@ -6,6 +6,7 @@ import {
   getLiveCalculatorConfig,
   updateLiveCalculatorConfig,
   LiveCalcConfigData,
+  LiveCalcConfigUpdate,
 } from "./live-calculator-config";
 import { runLiveCalculatorRecompute } from "./live-calculator-engine";
 import { runLiveCalculatorGoalieRecompute } from "./live-calculator-goalie-engine";
@@ -26,7 +27,7 @@ export async function canManageLiveCalculator(): Promise<boolean> {
   return (config.managerTeamIds ?? []).includes(teamId);
 }
 
-export async function saveLiveCalculatorConfigAction(data: Partial<LiveCalcConfigData>) {
+export async function saveLiveCalculatorConfigAction(data: LiveCalcConfigUpdate) {
   const isFullAdmin = await isAdmin();
   const canManage = isFullAdmin || (await canManageLiveCalculator());
   if (!canManage) {

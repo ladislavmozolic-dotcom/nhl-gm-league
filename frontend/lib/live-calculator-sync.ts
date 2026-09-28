@@ -3,6 +3,7 @@ import { importMoneyPuckSkaters } from "./moneypuck-skater-import";
 import { importMoneyPuckGoalies } from "./moneypuck-import-server";
 import { fetchAhlSkaterStats, importAhlSkaterStats } from "./ahl-import";
 import { fetchNhlCurrentStats, importNhlCurrentStats } from "./nhl-api-import";
+import { importNhlEdgeSpeed } from "./nhl-edge-speed-import";
 import { CURRENT_SEASON_START } from "./finance";
 import { getLiveCalculatorConfig } from "./live-calculator-config";
 
@@ -13,6 +14,7 @@ export type SyncResult = {
   ahlMatchedCur: number;
   ahlMatchedLast: number;
   nhlSkaterMatched?: number;
+  edgeSpeedMatched?: number;
   timestamp: string;
   error?: string;
 };
@@ -83,6 +85,18 @@ export async function syncLiveCalculatorData(): Promise<SyncResult> {
       console.warn("[LiveCalcSync] AHL sync warning:", e?.message);
     }
 
+    // 3. Ingest NHL EDGE skating-speed percentiles (Next Gen SK) — was defined but
+    // never actually wired into any sync path, so SK silently stayed blank for
+    // every skater, rookies included, until this call.
+    let edgeSpeedMatched = 0;
+    try {
+      const res = await importNhlEdgeSpeed();
+      edgeSpeedMatched = res.matched;
+      console.log(`[LiveCalcSync] NHL EDGE skating speed synced: ${edgeSpeedMatched} players matched.`);
+    } catch (e: any) {
+      console.warn("[LiveCalcSync] NHL EDGE speed sync warning:", e?.message);
+    }
+
     const now = new Date();
     await prisma.liveCalcConfig.upsert({
       where: { id: 1 },
@@ -97,6 +111,7 @@ export async function syncLiveCalculatorData(): Promise<SyncResult> {
       ahlMatchedCur: ahlCurMatched,
       ahlMatchedLast: ahlLastMatched,
       nhlSkaterMatched,
+      edgeSpeedMatched,
       timestamp: now.toISOString(),
     };
   } catch (err: any) {

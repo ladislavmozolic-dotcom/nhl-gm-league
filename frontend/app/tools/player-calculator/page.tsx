@@ -25,7 +25,7 @@ export default async function PlayerCalculatorPage({
   const { team: teamSlug, view } = await searchParams;
 
   if (view === "rookies") {
-    const [rookies, admin] = await Promise.all([rookieCalculatorRows(), isAdmin()]);
+    const [rookies, admin, rookieLiveConfig] = await Promise.all([rookieCalculatorRows(), isAdmin(), getLiveCalculatorConfig()]);
     return (
       <div className="space-y-6 py-2">
         <PageHeader
@@ -33,7 +33,7 @@ export default async function PlayerCalculatorPage({
           subtitle="Prospekti, ktorí už odohrali reálne zápasy a zatiaľ nemajú vlastný rating"
           right={<Link href="/tools/player-calculator" className="text-sm text-blue-400 hover:text-blue-300">← Live Calculator</Link>}
         />
-        <RookieCalculatorPanel rookies={rookies} isAdmin={admin} />
+        <RookieCalculatorPanel rookies={rookies} isAdmin={admin} penaltyBands={rookieLiveConfig.weights.rookie?.penaltyBands ?? []} />
       </div>
     );
   }

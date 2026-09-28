@@ -161,30 +161,41 @@ export function leadershipFrom(captaincy: string | null | undefined, ex: number)
   return Math.round(clamp(base + (ex - 70) * 0.2, 50, 99));
 }
 
+export type RookiePenaltyBand = { gp: number; penalty: number };
+
+/** Default bands, admin-tunable from the Rookie Calculator's own "Tuning" panel
+ *  (stored in LiveCalcConfig.weightsJson.rookie.penaltyBands — see
+ *  lib/live-calculator-config.ts) — this is just the fallback when nothing has
+ *  been configured yet. Bands run past ACTIVATE_AT_GP=10 (the main Parameter
+ *  Calculator's own "counts now" threshold) out to 20 GP, since a debutant has
+ *  zero track record behind him, unlike a returning veteran who merely missed
+ *  time. <3 GP → -12, <6 GP → -8, <10 GP → -5, <15 GP → -3, <20 GP → -1, ≥20 GP
+ *  → 0. */
+export const DEFAULT_ROOKIE_PENALTY_BANDS: RookiePenaltyBand[] = [
+  { gp: 3, penalty: 12 },
+  { gp: 6, penalty: 8 },
+  { gp: 10, penalty: 5 },
+  { gp: 15, penalty: 3 },
+  { gp: 20, penalty: 1 },
+];
+
 /** Rookie Calculator small-sample humility, mirroring the Parameter Calculator's
  *  own games-missed penalty (lib/param-projection.ts gamesMissedPenalty): the
  *  built-in reliability regression already pulls a tiny sample toward the
  *  position mean, but a genuine NHL/AHL debutant with only a handful of games on
  *  the books still deserves an extra conservative discount on the sim-critical
  *  params — a hot 4G/6A week-one stretch is exactly the kind of small-sample
- *  spike a real scout wouldn't bank on yet. Bands run past ACTIVATE_AT_GP=10
- *  (the main calculator's own "counts now" threshold) out to 20 GP, since a
- *  debutant has zero track record behind him, unlike a returning veteran who
- *  merely missed time. <3 GP → -12, <6 GP → -8, <10 GP → -5, <15 GP → -3,
- *  <20 GP → -1, ≥20 GP → 0. */
-export function rookieSamplePenalty(totalGp: number): number {
-  if (totalGp < 3) return 12;
-  if (totalGp < 6) return 8;
-  if (totalGp < 10) return 5;
-  if (totalGp < 15) return 3;
-  if (totalGp < 20) return 1;
+ *  spike a real scout wouldn't bank on yet. `bands` must be sorted ascending by
+ *  `gp`; the first band whose threshold the player hasn't reached yet wins. */
+export function rookieSamplePenalty(totalGp: number, bands: RookiePenaltyBand[] = DEFAULT_ROOKIE_PENALTY_BANDS): number {
+  for (const b of bands) if (totalGp < b.gp) return b.penalty;
   return 0;
 }
 
 /** Apply rookieSamplePenalty to the four sim-critical params (CK/SC/PA/DF),
  *  floored at 20 like the Parameter Calculator's own penalty. Mutates a copy. */
-export function applyRookieSamplePenalty(ratings: Record<string, number>, totalGp: number): Record<string, number> {
-  const penalty = rookieSamplePenalty(totalGp);
+export function applyRookieSamplePenalty(ratings: Record<string, number>, totalGp: number, bands?: RookiePenaltyBand[]): Record<string, number> {
+  const penalty = rookieSamplePenalty(totalGp, bands);
   if (penalty === 0) return ratings;
   const out = { ...ratings };
   for (const k of ["CK", "SC", "PA", "DF"]) {
