@@ -180,14 +180,23 @@ export function willingnessFactor(morale: number | null | undefined, market: num
 /** Salary multiplier for the OFFERED term vs the player's sweet spot. More years
  *  than he'd like → he wants a raise (steeper for older players who see the risk);
  *  fewer years → no premium (he's happy to go short). Never a refusal. */
-export function termPremium(offerYears: number, preferredYears: number, age: number | null | undefined): number {
+export function termPremium(offerYears: number, preferredYears: number, age: number | null | undefined, slot?: LineSlot): number {
   const extra = offerYears - preferredYears;
   if (extra <= 0) return 1;
   const a = age ?? 27;
   // U-shape: a YOUNG player charges a lot to lock up his prime years, an OLDER one
   // charges for the risk of a long deal; a prime-age vet is the cheapest to extend.
-  const perYear = a <= 25 ? 0.13 : a >= 33 ? 0.15 : a >= 30 ? 0.10 : 0.07;
+  // A young depth player (bridge-deal candidate) is the extreme case: every year past
+  // his 2-year bridge sells a season he expects to be worth much more — 4 years
+  // instead of 2 costs about double.
+  const young = a <= 25;
+  const perYear = young ? (slot && isDepthSlot(slot) ? 0.5 : 0.15) : a >= 33 ? 0.15 : a >= 30 ? 0.10 : 0.07;
   return 1 + extra * perYear;
+}
+
+/** Bottom-of-the-lineup slots: 3rd/4th line, 3rd pair, extras. */
+export function isDepthSlot(slot: LineSlot): boolean {
+  return slot === "L3" || slot === "L4" || slot === "XF" || slot === "P3" || slot === "XD";
 }
 
 /** Signing discount when the GM GRANTS a no-trade / no-movement clause: the

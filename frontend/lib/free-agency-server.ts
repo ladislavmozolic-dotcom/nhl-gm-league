@@ -7,7 +7,7 @@ import { getLeagueClock } from "./calendar-server";
 import { computeStandings } from "./sim/standings";
 import { CURRENT_SEASON_START } from "./finance";
 import {
-  faPosGroup, skaterMarket, goalieMarket, anchorFromPool, buildDemand, percentile, availabilityFactor,
+  faPosGroup, skaterMarket, goalieMarket, anchorFromPool, buildDemand, percentile, availabilityFactor, isDepthSlot,
   slotForRank, slotToLine, desiredDeployment, deploymentDemand, offerUtility, offerAcceptable, clauseDiscount, termPremium,
   type MarketRow, type Demand, type FaPos, type Contention, type Deployment, type Desired, type LineSlot,
 } from "./free-agency";
@@ -438,6 +438,8 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
   // staying put isn't "joining a rebuild" — no rebuild premium on his own club's extension
   const ctx = extension && ctx0.contention === "rebuild" ? { ...ctx0, contention: "middle" as Contention } : ctx0;
   const { slot, line } = projectSlot(ctx, grp, market);
+  // a young depth player wants a 2-year bridge — prove himself, then cash in
+  if ((p.age ?? 27) <= 25 && isDepthSlot(slot) && base.years > 2) base = { ...base, years: 2 };
   // his own club knows his role: a spare / bottom-pair / 4th-liner re-signs as one
   if (extension && p.faDemandOverride == null) {
     const rf = slot === "XD" || slot === "XF" ? 0.7 : slot === "P3" || slot === "L4" ? 0.88 : 1;
@@ -473,7 +475,7 @@ export async function evaluateTeamOffer(
   const roleWorse = deploy.line > info.desired.line;
   const disc = roleWorse ? 0 : clauseDiscount(grant?.clause, grant?.breadth);
   // longer term than his sweet spot raises the price (always negotiable, never a refusal)
-  const tp = termPremium(years, raw.years, info.age);
+  const tp = termPremium(years, raw.years, info.age, info.slot);
   const f = (1 - disc) * tp;
   const ask: Demand = f !== 1
     ? { ...raw, floorSalary: Math.round((raw.floorSalary * f) / 50_000) * 50_000, salary: Math.round((raw.salary * f) / 50_000) * 50_000 }
