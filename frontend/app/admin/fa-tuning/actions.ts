@@ -157,6 +157,36 @@ export async function setPlayerOverrideAction(playerId: number, ladder: Override
   return { ok: true };
 }
 
+/** One-off: apply the commissioner's Smlouvy.xlsx (FA 2027 tab) demand ladders in bulk —
+ *  same write + audit trail as setPlayerOverrideAction, just looped over the whole sheet
+ *  instead of one player at a time. Full-admin only (not delegated contract editors) since
+ *  it touches every listed player at once. */
+export async function bulkImportFaOverridesAction(): Promise<{ ok: true; applied: number; skipped: string[] } | { ok: false; error: string }> {
+  if (!(await isAdmin())) return { ok: false, error: "Admin only." };
+  const { FA_BULK_IMPORT_2027 } = await import("@/lib/fa-bulk-import-2027");
+  const who = await actorName();
+  let applied = 0;
+  const skipped: string[] = [];
+  for (const row of FA_BULK_IMPORT_2027) {
+    const before = await prisma.player.findUnique({ where: { id: row.id }, select: { name: true, faOverrideLadder: true } });
+    if (!before) { skipped.push(`${row.name} (id ${row.id} not found)`); continue; }
+    const beforeLadder = parseLadder(before.faOverrideLadder);
+    const ladder: OverrideLadder = { 1: row.ladder[0], 2: row.ladder[1], 3: row.ladder[2], 4: row.ladder[3] };
+    await prisma.player.update({ where: { id: row.id }, data: { faOverrideLadder: ladder, faDemandOverride: ladder[1] } });
+    await prisma.faTuningAudit.create({
+      data: {
+        byName: who,
+        playerId: row.id,
+        summary: `${before.name}: demand ladder [${ladderSummary(beforeLadder)}] → [${ladderSummary(ladder)}] — bulk import (Smlouvy.xlsx)`,
+      },
+    });
+    applied++;
+  }
+  revalidatePath("/admin/fa-tuning");
+  revalidatePath("/admin/expiring-contracts");
+  return { ok: true, applied, skipped };
+}
+
 export type AuditRow = { id: number; byName: string; playerId: number | null; summary: string; createdAt: string };
 
 export async function recentFaAuditAction(): Promise<AuditRow[]> {

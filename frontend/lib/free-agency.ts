@@ -343,6 +343,27 @@ export function willingnessNote(w: number): string | null {
   return null;
 }
 
+/** How far below his headline ask he'll actually settle without complaint — a flat $
+ *  gap calibrated to real comps: about $250K on a modest ask, $500K once it's a real
+ *  contract (it doesn't keep growing past that — see lowballTier for the much bigger
+ *  cut that genuinely offends him instead of just being a normal opening haggle). */
+function settleGap(salary: number): number {
+  return salary <= 3_000_000 ? 250_000 : 500_000;
+}
+
+/** How much a GM can undershoot the player's headline ask before it's a real insult
+ *  (not just a normal opening haggle), and the flat $ he salts onto his NEXT ask at
+ *  that specific club when it happens — both tiered by the size of the ask itself: a
+ *  modest earner tolerates a much bigger % cut than a $16M+ ask does, which barely
+ *  tolerates one at all. */
+export function lowballTier(ask: number): { maxUndershootPct: number; bumpAmount: number } {
+  if (ask <= 3_000_000) return { maxUndershootPct: 0.33, bumpAmount: 500_000 };
+  if (ask <= 5_000_000) return { maxUndershootPct: 0.25, bumpAmount: 750_000 };
+  if (ask <= 10_000_000) return { maxUndershootPct: 0.20, bumpAmount: 1_000_000 };
+  if (ask <= 15_000_000) return { maxUndershootPct: 0.15, bumpAmount: 1_500_000 };
+  return { maxUndershootPct: 0.10, bumpAmount: 2_000_000 };
+}
+
 export function buildDemand(input: {
   market: number; grp: FaPos; age: number | null | undefined;
   anchor: number; comps: number;
@@ -414,7 +435,9 @@ export function buildDemand(input: {
   const downSeason = input.downSeason ?? (input.perf != null && input.perf < 0.9);
   if (downSeason) years = 1;
 
-  const floorSalary = Math.round((salary * 0.92) / 50_000) * 50_000;
+  // The gap between his headline ask and what he'll actually sign for without complaint
+  // is a flat $ amount, not a % — real comps barely widen it past a modest ask.
+  const floorSalary = Math.max(LEAGUE_MIN, Math.round((salary - settleGap(salary)) / 50_000) * 50_000);
   return { salary, years, floorSalary, minYears, maxYears, market, anchor, comps, overridden, willingness };
 }
 

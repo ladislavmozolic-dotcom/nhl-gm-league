@@ -206,7 +206,7 @@ const SECTIONS: Sec[] = [
         "Putting a player on the Trade Block costs him 8 morale (MO) once. It doesn't recover while he stays listed; once he's off the block (and isn't unhappy) it climbs back — through games, and +1 on every day his club doesn't play, up to the league baseline (50).",
       ] },
       { h: "Negotiating with free agents", points: [
-        "Lowballs have a cost: an offer well under his floor (default below 85 %) insults him — his ask to YOUR club goes up by about how deep the lowball was (up to +25 % in total) until he signs anywhere. Other clubs aren't affected.",
+        "Lowballs have a cost: undershoot his headline ask past a tiered line (33 % on a modest ask, down to just 10 % on a $15M+ one) and he's insulted — his ask to YOUR club specifically goes up by a flat amount tied to that same tier ($500K on a small deal, up to $2M on a huge one), capped at +25 % total, until he signs anywhere. Other clubs aren't affected. Short of that line he'll still settle a touch below his headline number without holding a grudge.",
         "Promise him a worse line than he wants and he charges a premium, takes a shorter deal — and a no-trade clause no longer buys a discount: he wants to be free to move on.",
       ] },
       { h: "Trade deadline", points: [

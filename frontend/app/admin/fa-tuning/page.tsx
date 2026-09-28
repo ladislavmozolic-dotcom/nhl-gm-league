@@ -4,6 +4,7 @@ import { loadSettings } from "@/lib/sim/settings";
 import FaWeightsForm from "@/components/FaWeightsForm";
 import FaPlayerOverride from "@/components/FaPlayerOverride";
 import FaTuningAuditLog from "@/components/FaTuningAuditLog";
+import FaBulkImportButton from "@/components/FaBulkImportButton";
 import { recentFaAuditAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -45,6 +46,8 @@ export default async function FaTuningAdminPage({ searchParams }: { searchParams
       />
 
       <FaWeightsForm initial={{ f: settings.faWeightF, d: settings.faWeightD, g: settings.faWeightG }} />
+
+      <FaBulkImportButton />
 
       <FaPlayerOverride initialQuery={sp.name} />
 

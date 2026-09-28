@@ -447,7 +447,7 @@ export async function submitOfferAction(
   const dep: Deployment = { line: clampLine(line), pp, pk };
   const evalr = await evaluateTeamOffer(playerId, teamId, salary, years, dep, undefined, undefined, undefined, { clause, breadth });
   // judged against his pre-offer ask; a lowball then raises what he'll want from THIS club
-  const bumped = evalr && !evalr.acceptable ? await recordLowball(playerId, teamId, salary, evalr.ask.floorSalary) : null;
+  const bumped = evalr && !evalr.acceptable ? await recordLowball(playerId, teamId, salary, evalr.ask.salary) : null;
   const insult = bumped ? `😠 That lowball insulted him — from now on he'll ask your club about ${Math.round((bumped - 1) * 100)}% more.` : null;
   // a raise re-enters contention; a shortlisted offer stays shortlisted
   const newStatus = existing?.status === "SHORTLISTED" ? "SHORTLISTED" : "PENDING";
@@ -1198,7 +1198,7 @@ export async function extendContractAction(
   if (!ev) return { ok: false as const, error: "Could not value the player." };
   const team = await prisma.team.findUnique({ where: { id: teamId }, select: { code: true, slug: true } });
 
-  const bumped = !ev.acceptable ? await recordLowball(playerId, teamId, salary, ev.ask.floorSalary) : null;
+  const bumped = !ev.acceptable ? await recordLowball(playerId, teamId, salary, ev.ask.salary) : null;
   const insult = bumped ? ` 😠 The lowball insulted him — his ask to your club is now about ${Math.round((bumped - 1) * 100)}% higher.` : "";
   if (!ev.acceptable) {
     // structured re-sign: you get 2 rounds. He counters after round 1; if the deal's

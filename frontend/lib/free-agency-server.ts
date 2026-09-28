@@ -8,7 +8,7 @@ import { computeStandings } from "./sim/standings";
 import { CURRENT_SEASON_START, ageAsOfJune30 } from "./finance";
 import {
   faPosGroup, skaterMarket, goalieMarket, anchorFromPool, buildDemand, percentile, availabilityFactor, isDepthSlot,
-  slotForRank, slotToLine, desiredDeployment, deploymentDemand, offerUtility, offerAcceptable, clauseDiscount, termPremium,
+  slotForRank, slotToLine, desiredDeployment, deploymentDemand, offerUtility, offerAcceptable, clauseDiscount, termPremium, lowballTier,
   type MarketRow, type Demand, type FaPos, type Contention, type Deployment, type Desired, type LineSlot,
   type FWeights, type DWeights, type GWeights,
 } from "./free-agency";
@@ -557,14 +557,16 @@ export async function lowballBump(playerId: number, teamId: number): Promise<num
   return row.bump;
 }
 
-/** Call AFTER judging an offer against the pre-offer ask. Returns the new bump
- *  when this offer counted as a lowball, else null. */
-export async function recordLowball(playerId: number, teamId: number, salary: number, floor: number): Promise<number | null> {
+/** Call AFTER judging an offer against the pre-offer ask (his headline ask AT THIS TERM,
+ *  not the discounted floor — see lowballTier). Returns the new bump when this offer
+ *  counted as a real insult, else null. */
+export async function recordLowball(playerId: number, teamId: number, salary: number, ask: number): Promise<number | null> {
+  if (!(ask > 0)) return null;
+  const { maxUndershootPct, bumpAmount } = lowballTier(ask);
+  if (salary >= ask * (1 - maxUndershootPct)) return null;
   const s = await loadSettings();
-  if (!(floor > 0) || salary >= floor * (s.faLowballPct / 100)) return null;
-  const depth = 1 - salary / floor;
   const prev = await lowballBump(playerId, teamId);
-  const bump = Math.min(1 + s.faLowballMaxBumpPct / 100, prev * (1 + depth));
+  const bump = Math.min(1 + s.faLowballMaxBumpPct / 100, prev * (1 + bumpAmount / ask));
   await prisma.faLowball.upsert({
     where: { playerId_teamId: { playerId, teamId } },
     create: { playerId, teamId, bump, count: 1 },

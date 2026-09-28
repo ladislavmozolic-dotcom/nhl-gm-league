@@ -364,7 +364,7 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 mt-3 pt-3 border-t border-slate-800">
           <div>
             <div className="text-xs text-slate-500 mb-1">Negotiation behaviour</div>
-            <NumField k="faLowballPct" label="Lowball = offer below % of his floor" />
+            <p className="text-[11px] text-slate-500 mb-1">Lowball threshold is a fixed tiered table by ask size (see lowballTier) — not tunable here.</p>
             <NumField k="faLowballMaxBumpPct" label="Max ask increase from lowballs (%)" />
             <NumField k="resignLockDays" label="Extensions closed for first N regular-season days" />
           </div>

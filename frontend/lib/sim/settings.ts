@@ -127,7 +127,8 @@ export type EngineSettings = {
   finPlayoffSeatBase: number; finPlayoffSeatPerRound: number; finPlayoffMerchPct: number;
   finSponsorBase: number; finSponsorRange: number;
   // FA negotiation behaviour + ice-time morale (lib/free-agency-server.ts, lib/player-morale.ts)
-  faLowballPct: number;        // an offer below this % of his floor is a lowball (default 85)
+  // (the lowball THRESHOLD itself is a fixed tiered table by ask size — see lowballTier
+  // in lib/free-agency.ts — this setting only caps how far repeated lowballs can push him)
   faLowballMaxBumpPct: number; // max total ask increase a club can cause itself by lowballing (default 25)
   iceUnhappyPct: number;       // unhappy when his avg TOI is below this % of what his role expects (default 80)
   iceWarnDays: number;         // unhappy days before he tells his GM (default 5)
@@ -274,7 +275,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   faWeightD: { df: 0.40, pa: 0.30, sc: 0.20, sk: 0.10 },
   faWeightG: { ag: 0.34, sc: 0.30, rb: 0.26, hs: 0.10 },
   faMode: "full", faSignLock: true, financeMode: "base", waiversEnabled: true, intelligenceRollout: "full",
-  faLowballPct: 85, faLowballMaxBumpPct: 25, iceUnhappyPct: 80, iceWarnDays: 5, iceRequestDays: 20, resignLockDays: 10,
+  faLowballMaxBumpPct: 25, iceUnhappyPct: 80, iceWarnDays: 5, iceRequestDays: 20, resignLockDays: 10,
   finJerseyNet: 120, finJerseyScale: 40000, finApparelBase: 3200000, finOtherBase: 1400000,
   finTradeBoostPct: 60, finTradeBoostHalfLife: 21,
   finPlayoffSeatBase: 65, finPlayoffSeatPerRound: 22, finPlayoffMerchPct: 7,
