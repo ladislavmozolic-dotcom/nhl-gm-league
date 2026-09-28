@@ -38,12 +38,22 @@ const STATUS_TABS = [
 type StatusFilter = (typeof STATUS_TABS)[number]["key"];
 const isStatusFilter = (v: string | undefined): v is StatusFilter => v === "all" || v === "ufa" || v === "rfa";
 
-export default async function ExpiringContractsPage({ searchParams }: { searchParams: Promise<{ q?: string; sort?: string; dir?: string; status?: string }> }) {
+export default async function ExpiringContractsPage({ searchParams }: { searchParams: Promise<{ q?: string; sort?: string; dir?: string; status?: string; team?: string }> }) {
   const sp = await searchParams;
   const q = sp.q?.trim() ?? "";
   const sort: SortKey = isSortKey(sp.sort) ? sp.sort : "capHit";
   const dir: "asc" | "desc" = sp.dir === "asc" || sp.dir === "desc" ? sp.dir : DEFAULT_DIR[sort];
   const status: StatusFilter = isStatusFilter(sp.status) ? sp.status : "all";
+
+  // team-logo switcher, same pattern as /tools/all-rosters — "all" (no team) is
+  // its own state here (unlike All Rosters, which always picks one), since the
+  // whole point of this page is usually the LEAGUE-WIDE view.
+  const teams = await prisma.team.findMany({
+    where: { league: "NHL", isAffiliate: false },
+    select: { id: true, slug: true, name: true, code: true, logoUrl: true },
+    orderBy: { name: "asc" },
+  });
+  const team = teams.find((t) => t.slug === sp.team) ?? null;
 
   const [players, settings] = await Promise.all([
     prisma.player.findMany({
@@ -51,6 +61,7 @@ export default async function ExpiringContractsPage({ searchParams }: { searchPa
         contractYears: 1,
         rosterType: "NHL",
         team: { league: "NHL" },
+        ...(team ? { teamId: team.id } : {}),
         ...(q ? { name: { contains: q, mode: "insensitive" } } : {}),
       },
       select: {
@@ -101,12 +112,13 @@ export default async function ExpiringContractsPage({ searchParams }: { searchPa
   const shown = status === "all" ? rows : rows.filter((r) => (status === "ufa" ? r.ufa : !r.ufa));
   const counts = { ufa: rows.filter((r) => r.ufa).length, rfa: rows.filter((r) => !r.ufa).length };
 
-  // preserves q, swaps sort/dir — clicking an already-active column flips
+  // preserves q/team, swaps sort/dir — clicking an already-active column flips
   // direction, clicking a new one starts at that column's own natural default.
   const sortHref = (col: SortKey) => {
     const nextDir = sort === col ? (dir === "asc" ? "desc" : "asc") : DEFAULT_DIR[col];
     const params = new URLSearchParams();
     if (q) params.set("q", q);
+    if (team) params.set("team", team.slug);
     if (status !== "all") params.set("status", status);
     params.set("sort", col);
     params.set("dir", nextDir);
@@ -115,7 +127,17 @@ export default async function ExpiringContractsPage({ searchParams }: { searchPa
   const statusHref = (s: StatusFilter) => {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
+    if (team) params.set("team", team.slug);
     if (s !== "all") params.set("status", s);
+    params.set("sort", sort);
+    params.set("dir", dir);
+    return `/admin/expiring-contracts?${params.toString()}`;
+  };
+  const teamHref = (slug: string | null) => {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (slug) params.set("team", slug);
+    if (status !== "all") params.set("status", status);
     params.set("sort", sort);
     params.set("dir", dir);
     return `/admin/expiring-contracts?${params.toString()}`;
@@ -145,8 +167,26 @@ export default async function ExpiringContractsPage({ searchParams }: { searchPa
         }
       />
 
+      {/* team-logo switcher — same pattern as /tools/all-rosters, plus an "All" pill */}
+      <div className="flex flex-wrap gap-1.5 border border-slate-800 bg-slate-900/70 rounded-2xl p-2 sticky top-14 z-20 backdrop-blur shadow-lg shadow-black/20">
+        <Link href={teamHref(null)} title="All teams"
+          className={`px-2.5 h-7 grid place-items-center rounded text-xs font-bold transition-colors ${
+            !team ? "bg-blue-600/30 ring-1 ring-blue-500 text-white" : "hover:bg-slate-800 text-slate-400"
+          }`}>
+          ALL
+        </Link>
+        {teams.map((t) => (
+          <Link key={t.id} href={teamHref(t.slug)} title={t.name}
+            className={`p-1 rounded transition-colors ${t.id === team?.id ? "bg-blue-600/30 ring-1 ring-blue-500" : "hover:bg-slate-800"}`}>
+            {t.logoUrl ? <img src={t.logoUrl} alt={t.code ?? ""} className="w-7 h-7 object-contain" />
+              : <span className="w-7 h-7 grid place-items-center text-[10px] text-slate-400">{t.code}</span>}
+          </Link>
+        ))}
+      </div>
+
       <form className="flex gap-2" action="/admin/expiring-contracts">
         {status !== "all" && <input type="hidden" name="status" value={status} />}
+        {team && <input type="hidden" name="team" value={team.slug} />}
         <input name="q" defaultValue={q} placeholder="Search player by name…"
           className="flex-1 max-w-sm bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm" />
         <button className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-sm font-semibold">Search</button>
@@ -171,7 +211,7 @@ export default async function ExpiringContractsPage({ searchParams }: { searchPa
               <tr className="text-xs text-slate-500 uppercase tracking-wider border-b border-slate-800 bg-slate-800/30">
                 <th className="px-2 py-3 font-medium w-8"></th>
                 <SortHeader col="name" />
-                <SortHeader col="team" />
+                {!team && <SortHeader col="team" />}
                 <SortHeader col="age" align="center" />
                 <SortHeader col="status" align="center" />
                 <SortHeader col="capHit" align="right" />
@@ -196,10 +236,12 @@ export default async function ExpiringContractsPage({ searchParams }: { searchPa
                     <Link href={`/players/${p.slug}`} className="hover:text-blue-400">{cleanName(p.name)}</Link>
                     <span className="text-slate-600 text-xs ml-1">{p.position}</span>
                   </td>
-                  <td className="px-3 py-3 text-slate-400 flex items-center gap-1.5">
-                    {p.team.logoUrl && <img src={p.team.logoUrl} alt="" className="w-4 h-4 object-contain" />}
-                    {p.team.code || p.team.name}
-                  </td>
+                  {!team && (
+                    <td className="px-3 py-3 text-slate-400 flex items-center gap-1.5">
+                      {p.team.logoUrl && <img src={p.team.logoUrl} alt="" className="w-4 h-4 object-contain" />}
+                      {p.team.code || p.team.name}
+                    </td>
+                  )}
                   <td className="px-3 py-3 text-center text-slate-400">{p.age ?? "—"}</td>
                   <td className="px-3 py-3 text-center">
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${ufa ? "bg-red-500/15 text-red-400 border border-red-500/30" : "bg-sky-500/15 text-sky-400 border border-sky-500/30"}`}>
@@ -225,7 +267,9 @@ export default async function ExpiringContractsPage({ searchParams }: { searchPa
                 </tr>
               ))}
               {shown.length === 0 && (
-                <tr><td colSpan={8 + TERMS.length} className="px-4 py-8 text-center text-slate-500">No player in the final year of his deal{q ? ` matches "${q}"` : ""}.</td></tr>
+                <tr><td colSpan={team ? 7 + TERMS.length : 8 + TERMS.length} className="px-4 py-8 text-center text-slate-500">
+                  No player in the final year of his deal{q ? ` matches "${q}"` : ""}{team ? ` for ${team.name}` : ""}.
+                </td></tr>
               )}
             </tbody>
           </table>
