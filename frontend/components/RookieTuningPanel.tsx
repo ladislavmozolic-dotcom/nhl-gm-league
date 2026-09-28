@@ -3,18 +3,27 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveLiveCalculatorConfigAction } from "@/lib/live-calculator-actions";
-import { DEFAULT_ROOKIE_TUNING, type RookieTuningConfig } from "@/lib/edge-params";
+import {
+  DEFAULT_ROOKIE_TUNING, type RookieTuningConfig,
+  EDGE_COMPOSITES, EDGE_METRIC_LABELS, ROOKIE_TUNABLE_COMPOSITES,
+} from "@/lib/edge-params";
 
 const PARAM_COLS = ["CK", "FG", "DI", "SK", "ST", "EN", "DU", "PH", "FO", "PA", "SC", "DF", "PS", "EX", "LD", "OV"];
 
 /** Admin/manager-only "Tuning" panel for the Rookie Calculator — deliberately
- *  scoped to ONLY this feature (never the shared Next Gen/Edge engine that also
- *  powers the league-wide Next Gen Parameters calculator), with the same kind of
- *  multi-section depth as the Live Calculator's own tuning modal:
+ *  scoped to ONLY this feature. Note this is NOT the same engine as the "Live
+ *  Calculator — Nastavenia & Tuning" modal (lib/live-calculator-engine.ts, its
+ *  own V10 baseline-percentile model) — the Rookie Calculator shares its engine
+ *  with the separate "Next Gen Parameters" calculator (/tools/edge-calculator,
+ *  lib/edge-params-server.ts), and every knob here (including section 5's
+ *  composite weights) is applied ONLY to rosterType PROSPECT rows, never
+ *  changing how that page scores everyone else in the league. Sections, with
+ *  the same kind of multi-part depth as the Live Calculator's own modal:
  *   1. Small-sample penalty bands (GP threshold → point discount)
  *   2. Which of the 16 rating params take that discount
  *   3. The floor a penalized param can't drop below
  *   4. The debutant scanner's minimum real-GP filter
+ *   5. Sub-metric weights within SC/PA/DF/PH/FG/PS (rookies only)
  *  Stored alongside every other Live Calculator weight
  *  (LiveCalcConfig.weightsJson.rookie), so it survives redeploys and applies
  *  everywhere the config is read: the main table, "Activate rating", and the
@@ -46,6 +55,26 @@ export default function RookieTuningPanel({ initialConfig }: { initialConfig: Ro
     const n = Number(raw);
     if (raw !== "" && !Number.isFinite(n)) return;
     setConfig((c) => (raw === "" ? c : { ...c, [field]: n }));
+  };
+
+  const weightOf = (param: string, key: string): number =>
+    config.composites?.[param]?.find((m) => m.key === key)?.weight ?? EDGE_COMPOSITES[param]?.find((m) => m.key === key)?.weight ?? 0;
+
+  const setCompositeWeight = (param: string, key: string, raw: string) => {
+    const n = Number(raw);
+    if (raw === "" || !Number.isFinite(n)) return;
+    setConfig((c) => {
+      const base = c.composites?.[param] ?? EDGE_COMPOSITES[param];
+      return { ...c, composites: { ...c.composites, [param]: base.map((m) => (m.key === key ? { ...m, weight: n } : m)) } };
+    });
+  };
+
+  const resetComposite = (param: string) => {
+    setConfig((c) => {
+      const rest = { ...c.composites };
+      delete rest[param];
+      return { ...c, composites: rest };
+    });
   };
 
   const save = () => start(async () => {
@@ -123,7 +152,7 @@ export default function RookieTuningPanel({ initialConfig }: { initialConfig: Ro
                 className="w-24 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
             </section>
 
-            <section className="mb-2">
+            <section className="mb-5">
               <h4 className="text-sm font-semibold text-slate-200 mb-1">4. Filter skenera</h4>
               <p className="text-xs text-slate-500 mb-2">
                 Minimálny počet reálnych zápasov (NHL + AHL spolu), aby sa hráč vôbec objavil (a automaticky založil) v skeneri
@@ -131,6 +160,47 @@ export default function RookieTuningPanel({ initialConfig }: { initialConfig: Ro
               </p>
               <input type="number" min={0} value={config.minScanGp} onChange={(e) => setNum("minScanGp", e.target.value)}
                 className="w-24 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+            </section>
+
+            <section className="mb-2">
+              <h4 className="text-sm font-semibold text-slate-200 mb-1">5. Váhy sub-metrík (SC/PA/DF/PH/FG/PS)</h4>
+              <p className="text-xs text-slate-500 mb-3">
+                Ako sa reálne štatistiky kombinujú do jednotlivých parametrov — rovnaký princíp ako váhy v Live Calculatore, ale
+                platí to VÝHRADNE pre hráčov v Rookie Calculatore. Next Gen Parameters kalkulátor pre zvyšok ligy počíta naďalej
+                s pôvodnými váhami (CK/DI/EN/FO/ST/SK/EX majú jedinú metriku, tam nie je čo prerozdeľovať).
+              </p>
+              <div className="space-y-3">
+                {ROOKIE_TUNABLE_COMPOSITES.map(({ param, label, metricKeys }) => {
+                  const overridden = !!config.composites?.[param];
+                  const sum = metricKeys.reduce((s, k) => s + weightOf(param, k), 0);
+                  return (
+                    <div key={param} className="bg-slate-800/40 border border-slate-800 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-semibold text-slate-200">{label}</span>
+                        <span className="text-xs text-slate-500">Súčet: {Math.round(sum * 100)}%</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {metricKeys.map((key) => {
+                          const m = (config.composites?.[param] ?? EDGE_COMPOSITES[param])?.find((mm) => mm.key === key);
+                          return (
+                            <label key={key} className="text-[11px] text-slate-400 leading-tight">
+                              {EDGE_METRIC_LABELS[key] ?? key}{m?.invert ? " ↓" : ""}
+                              <input type="number" step={0.05} min={0} max={1} value={weightOf(param, key)}
+                                onChange={(e) => setCompositeWeight(param, key, e.target.value)}
+                                className="mt-1 w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+                            </label>
+                          );
+                        })}
+                      </div>
+                      {overridden && (
+                        <button onClick={() => resetComposite(param)} className="mt-2 text-[11px] text-slate-500 hover:text-slate-300 underline">
+                          Obnoviť predvolené váhy ({param})
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </section>
 
             <div className="flex items-center justify-between mt-5 pt-3 border-t border-slate-800">

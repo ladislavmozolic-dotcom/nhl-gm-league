@@ -178,7 +178,47 @@ export type RookieTuningConfig = {
   /** Minimum real GP (cur + last real season combined) for the debutant scanner
    *  to surface/auto-create a player at all — see findMissingNhlPlayers. */
   minScanGp: number;
+  /** Per-param sub-metric weight overrides (e.g. SC's g60-vs-gxg60 split), applied
+   *  ONLY to rosterType PROSPECT players in edgeRatings() — see ROOKIE_TUNABLE_COMPOSITES
+   *  below for which params can be tuned and their default (= EDGE_COMPOSITES) weights.
+   *  An absent or empty entry for a param just falls back to EDGE_COMPOSITES. */
+  composites?: Partial<Record<string, Metric[]>>;
 };
+
+/** Friendly Slovak labels for the sub-metrics used in EDGE_COMPOSITES, for the
+ *  Rookie Tuning panel's sliders — purely cosmetic, keyed by the same metric
+ *  key metricsFor()/edgeRatings() already produce. */
+export const EDGE_METRIC_LABELS: Record<string, string> = {
+  g60: "Góly / 60 min",
+  gxg60: "Góly nad xG / 60 (finishing)",
+  a60: "Asistencie / 60 (všetky situácie)",
+  a605v5: "Asistencie / 60 (5v5)",
+  relxga5v5: "Rel. xGA / 60 (5v5)",
+  relga5v5: "Rel. GA / 60 (5v5)",
+  relxgapk: "Rel. xGA / 60 (oslabenie)",
+  axga5v5: "Abs. xGA / 60 (5v5)",
+  aga5v5: "Abs. GA / 60 (5v5)",
+  blk60: "Bloky / 60",
+  off60: "Ofenzívne akcie / 60 (G+A)",
+  tk60: "Zisky puku / 60",
+  gv60: "Straty puku / 60",
+  pim60: "Trestné minúty / 60",
+  hit60: "Hity / 60",
+  shpct: "Úspešnosť streľby %",
+};
+
+/** Which Edge composites the Rookie Tuning panel lets an admin re-weight, and
+ *  their default (= EDGE_COMPOSITES) split. Only composites with 2+ sub-metrics
+ *  are worth exposing — CK/DI/EN/FO/ST/SK/EX are single-metric (weight is
+ *  always 100%, nothing to redistribute). */
+export const ROOKIE_TUNABLE_COMPOSITES: { param: string; label: string; metricKeys: string[] }[] = [
+  { param: "SC", label: "Scoring (SC)", metricKeys: ["g60", "gxg60"] },
+  { param: "PA", label: "Passing (PA)", metricKeys: ["a60", "a605v5"] },
+  { param: "DF", label: "Defense (DF)", metricKeys: ["relxga5v5", "relga5v5", "relxgapk", "axga5v5", "aga5v5", "blk60"] },
+  { param: "PH", label: "Puck Handling (PH)", metricKeys: ["off60", "tk60", "gv60"] },
+  { param: "FG", label: "Fighting (FG)", metricKeys: ["pim60", "hit60"] },
+  { param: "PS", label: "Penalty Shot (PS)", metricKeys: ["shpct", "off60", "g60"] },
+];
 
 /** Default bands — a genuine NHL/AHL debutant with only a handful of games on
  *  the books still deserves an extra conservative discount on the sim-critical
@@ -202,6 +242,7 @@ export const DEFAULT_ROOKIE_TUNING: RookieTuningConfig = {
   penaltyParams: ["CK", "SC", "PA", "DF"],
   penaltyFloor: 20,
   minScanGp: 1,
+  composites: {},
 };
 
 export function rookieSamplePenalty(totalGp: number, bands: RookiePenaltyBand[] = DEFAULT_ROOKIE_PENALTY_BANDS): number {

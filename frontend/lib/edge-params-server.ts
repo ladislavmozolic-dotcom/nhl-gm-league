@@ -7,7 +7,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { cleanName } from "./playerName";
-import { per60, blend, percentileOf, ratingFromCurve, EDGE_COMPOSITES, EDGE_GOALIE_COMPOSITES, experienceFromAge, durabilityFromAvailability, leadershipFrom, EDGE_MO_DEFAULT, applyRookieSamplePenalty } from "./edge-params";
+import { per60, blend, percentileOf, ratingFromCurve, EDGE_COMPOSITES, EDGE_GOALIE_COMPOSITES, experienceFromAge, durabilityFromAvailability, leadershipFrom, EDGE_MO_DEFAULT, applyRookieSamplePenalty, type Metric } from "./edge-params";
 import { getLiveCalculatorConfig } from "./live-calculator-config";
 
 const CUR_SEASON_GAMES = 82; // real season length reference for durability
@@ -16,7 +16,7 @@ const isDef = (pos = "") => /(^|\/)D(\/|$)/.test(pos) || pos === "D";
 
 type Row = {
   id: number; name: string; position: string; league: string; teamCode: string | null;
-  gp: number; mins: number; age: number | null; captaincy: string | null;
+  gp: number; mins: number; age: number | null; captaincy: string | null; rosterType: string | null;
   curGP: number; lastGP: number; metrics: Record<string, number | null>;
 };
 
@@ -234,8 +234,16 @@ export type SyntheticSkater = {
 /** Compute Edge ratings for every skater in a league (default NHL). `calibrate`
  *  (default on) maps the absolute ability ratings onto the STHS value scale.
  *  `synthetic` lets a caller score one or more not-yet-created players against
- *  this SAME real population (a true dry-run preview — nothing is persisted). */
-export async function edgeRatings(league = "NHL", calibrate = true, synthetic: SyntheticSkater[] = []): Promise<EdgeRow[]> {
+ *  this SAME real population (a true dry-run preview — nothing is persisted).
+ *  `compositeOverrides` re-weights a composite's sub-metrics (e.g. SC's g60 vs
+ *  gxg60 split) but ONLY for rosterType PROSPECT rows — the Rookie Calculator's
+ *  own "Tuning" panel, kept from ever touching how the league-wide Next Gen
+ *  Parameters calculator (/tools/edge-calculator) scores everyone else. Safe to
+ *  do per-row like this because the underlying per-metric percentile
+ *  populations (pops/popsAll below) are built from the raw regressed values,
+ *  independent of how a composite later blends them — reweighting the blend
+ *  doesn't touch anyone else's ranking. */
+export async function edgeRatings(league = "NHL", calibrate = true, synthetic: SyntheticSkater[] = [], compositeOverrides: Partial<Record<string, Metric[]>> = {}): Promise<EdgeRow[]> {
   // Free agents (UFA) keep whatever rosterType their last team roster had, but a
   // released/expired player's real NHL performance data still lives on their
   // Player row — fold them into the same league population rather than losing
@@ -251,7 +259,7 @@ export async function edgeRatings(league = "NHL", calibrate = true, synthetic: S
     id: p.id, name: cleanName(p.name), position: p.position ?? "", league,
     teamCode: p.teamId != null ? codeById.get(p.teamId) ?? null : null,
     gp: (p.curSeasonGP ?? 0) + (p.lastSeasonGP ?? 0), mins: minsOf(p),
-    age: p.age ?? null, captaincy: p.captaincy ?? null,
+    age: p.age ?? null, captaincy: p.captaincy ?? null, rosterType: p.rosterType ?? null,
     curGP: p.curSeasonGP ?? 0, lastGP: p.lastSeasonGP ?? 0, metrics: metricsFor(p),
   }));
   for (const s of synthetic) {
@@ -267,7 +275,7 @@ export async function edgeRatings(league = "NHL", calibrate = true, synthetic: S
     rows.push({
       id: s.id, name: s.name, position: s.position, league, teamCode: s.teamCode,
       gp: s.stat.gp, mins: (s.stat.toi / 60) * s.stat.gp,
-      age: s.age, captaincy: null, curGP: s.stat.gp, lastGP: 0, metrics: metricsFor(fake),
+      age: s.age, captaincy: null, rosterType: "PROSPECT", curGP: s.stat.gp, lastGP: 0, metrics: metricsFor(fake),
     });
   }
 
@@ -325,7 +333,8 @@ export async function edgeRatings(league = "NHL", calibrate = true, synthetic: S
     const grp = isDef(r.position) ? "D" : "F";
     const ratings: Record<string, number> = {};
     const posPct: Record<string, number> = {}; // analytics: percentile within own position
-    for (const [param, metrics] of Object.entries(EDGE_COMPOSITES)) {
+    for (const param of Object.keys(EDGE_COMPOSITES)) {
+      const metrics = (r.rosterType === "PROSPECT" && compositeOverrides[param]?.length) ? compositeOverrides[param]! : EDGE_COMPOSITES[param];
       const usePos = POS_SPECIFIC.has(param);
       const scBlend = param === "SC" && grp === "D" ? SC_POS_BLEND : 0;
       let wsum = 0, wtot = 0, wposSum = 0;
@@ -701,13 +710,13 @@ export async function promotePlayerToNextGen(playerId: number): Promise<{ ok: bo
 
   const ahlBlob = (player.ahlStats as any) ?? {};
   const ahlGp = (ahlBlob.cur?.gp ?? 0) + (ahlBlob.last?.gp ?? 0);
+  const { weights } = await getLiveCalculatorConfig();
   const row = ahlGp > 0
     ? (await edgeAhlSkaterRatings(true)).find((r) => r.playerId === playerId)
-    : (await edgeRatings("NHL", true)).find((r) => r.playerId === playerId);
+    : (await edgeRatings("NHL", true, [], weights.rookie?.composites)).find((r) => r.playerId === playerId);
   if (!row) return { ok: false, error: "No Edge rating could be computed for this player (no real stats yet)." };
 
   const totalGp = (player.curSeasonGP ?? 0) + (player.lastSeasonGP ?? 0) + ahlGp;
-  const { weights } = await getLiveCalculatorConfig();
   const ratings = applyRookieSamplePenalty(row.ratings, totalGp, weights.rookie);
 
   await prisma.player.update({
@@ -798,8 +807,12 @@ export async function rookieCalculatorRows(): Promise<RookieRow[]> {
   }));
   const idSet = new Set(infoById.keys());
 
-  const [nhl, ahl, liveConfig] = await Promise.all([edgeRatings("NHL", true), edgeAhlSkaterRatings(true), getLiveCalculatorConfig()]);
+  const liveConfig = await getLiveCalculatorConfig();
   const rookieConfig = liveConfig.weights.rookie;
+  const [nhl, ahl] = await Promise.all([
+    edgeRatings("NHL", true, [], rookieConfig?.composites),
+    edgeAhlSkaterRatings(true), // AHL SC/PA/DI use their own translated-rate formula, not EDGE_COMPOSITES — composite tuning doesn't apply there
+  ]);
   const out: RookieRow[] = [];
   const seen = new Set<number>();
   for (const r of ahl) {
