@@ -25,11 +25,13 @@ export default function RookieCalculatorPanel({ rookies, cameo, isAdmin }: { roo
       </Card>
 
       {isAdmin && (
-        <Card title="Chýbajúci reální NHL hráči (žiadny záznam u nás)" accent="text-amber-400">
+        <Card title="Chýbajúci reální NHL hráči — žiadny Player záznam u nás" accent="text-amber-400">
           <p className="text-xs text-slate-500 mb-3">
-            Skutočný debutant, ktorého sme nikdy nemali — ani ako prospekta, ani ako hráča. Skenovanie prejde všetkých 32 reálnych NHL rostrov
-            (chvíľu trvá — preto sa nespúšťa automaticky pri načítaní stránky). &quot;Create as prospect&quot; ho založí do jeho reálneho klubu
-            (<code>rosterType = PROSPECT</code>) a ďalší bežný import NHL štatistík mu už sám doplní reálne zápasy.
+            Zobrazuje len hráčov, ktorí <b>už odohrali aspoň 1 reálny NHL zápas</b> tento sezónny ročník a nemajú u nás vôbec žiadny <code>Player</code> záznam
+            (nedraftovaní juniori bez zápasu sa tu preto neukazujú — nemá ich čo hodnotiť). Stĺpec &quot;Prospect pool?&quot; ukazuje, či hráča už
+            máme scoutovaného v <code>Prospect</code> tabuľke niektorého tímu — ak áno, <b>nejde o duplicitu</b>: &quot;Založiť hráča&quot; vytvára
+            samostatný <code>Player</code> záznam (<code>rosterType = PROSPECT</code>), lebo len ten sa dá reálne ohodnotiť a zaradiť do tabuľky nižšie.
+            Skenovanie prejde všetkých 32 reálnych NHL rostrov (chvíľu trvá — preto sa nespúšťa automaticky pri načítaní stránky).
           </p>
           <DebutantScanner />
         </Card>

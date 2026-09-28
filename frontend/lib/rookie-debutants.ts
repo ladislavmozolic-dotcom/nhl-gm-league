@@ -6,7 +6,7 @@
 
 import { prisma } from "./prisma";
 import { NHL_ABBREVS, norm, fiKeyOf } from "./real-roster-import";
-import { fetchNhlCurrentStats, importNhlSkaterStats } from "./nhl-api-import";
+import { fetchNhlCurrentStats, fetchNhlGoalieStats, importNhlSkaterStats } from "./nhl-api-import";
 import { getLiveCalculatorConfig } from "./live-calculator-config";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -23,6 +23,9 @@ export type DebutantCandidate = {
   shoots: string | null;
   number: number | null;
   photoUrl: string | null;
+  gp: number; // real games played THIS season — only players who have actually debuted show up
+  alreadyProspect: boolean; // already sitting in a team's Prospect (scouting) pool
+  prospectTeamCode: string | null;
 };
 
 type NhlRosterPlayer = {
@@ -38,11 +41,18 @@ type NhlRosterPlayer = {
   headshot?: string;
 };
 
+type RosterRow = Omit<DebutantCandidate, "gp" | "alreadyProspect" | "prospectTeamCode">;
+
 /** Scan every real NHL club roster for players whose name/nhlId matches NOTHING
- *  in our Player table — a genuine gap where the normal import jobs never had a
- *  row to attach real stats to in the first place. */
+ *  in our Player table AND who have actually logged a real NHL game this season —
+ *  a genuine "started playing, nobody in the league has him" gap. A drafted junior
+ *  who hasn't debuted yet (e.g. still property of a club but playing major junior)
+ *  is deliberately excluded here: there is nothing to rate yet, and he's almost
+ *  always already sitting in that team's Prospect (scouting) pool, which is a
+ *  separate, lighter-weight table this function also checks so the admin can see
+ *  a real debutant is already scouted rather than assuming a duplicate. */
 export async function findMissingNhlPlayers(): Promise<{ ok: boolean; candidates: DebutantCandidate[]; error?: string }> {
-  const rosterRows: DebutantCandidate[] = [];
+  const rosterRows: RosterRow[] = [];
   let fetched = 0;
   for (const ab of NHL_ABBREVS) {
     let data: Record<string, NhlRosterPlayer[]> | null = null;
@@ -83,13 +93,36 @@ export async function findMissingNhlPlayers(): Promise<{ ok: boolean; candidates
   const nameSet = new Set(existing.map((p) => norm(p.name)));
   const fiSet = new Set(existing.map((p) => fiKeyOf(norm(p.name))));
 
-  const candidates = rosterRows.filter((r) => {
+  const notYetTracked = rosterRows.filter((r) => {
     if (nhlIdSet.has(r.nhlId)) return false;
     const n = norm(r.name);
     if (nameSet.has(n)) return false;
     if (fiSet.has(fiKeyOf(n))) return false; // nickname/spelling variant already tracked
     return true;
   });
+  if (!notYetTracked.length) return { ok: true, candidates: [] };
+
+  // real GP this season, so a not-yet-debuted draftee (0 games) doesn't flood the list
+  const { latestSeason } = await getLiveCalculatorConfig();
+  const seasonId = Number(latestSeason);
+  const [skaterStats, goalieStats] = await Promise.all([
+    fetchNhlCurrentStats(seasonId).catch(() => []),
+    fetchNhlGoalieStats(seasonId).catch(() => []),
+  ]);
+  const gpByName = new Map<string, number>();
+  for (const s of skaterStats) gpByName.set(norm(s.name), s.gp ?? 0);
+  for (const g of goalieStats) gpByName.set(norm(g.name), g.gp ?? 0);
+
+  // already scouted in a team's Prospect pool — informational, not exclusionary
+  const prospects = await prisma.prospect.findMany({ select: { name: true, team: { select: { code: true } } } });
+  const prospectTeamByName = new Map(prospects.map((p) => [norm(p.name), p.team.code]));
+
+  const candidates: DebutantCandidate[] = notYetTracked
+    .map((r) => {
+      const n = norm(r.name);
+      return { ...r, gp: gpByName.get(n) ?? 0, alreadyProspect: prospectTeamByName.has(n), prospectTeamCode: prospectTeamByName.get(n) ?? null };
+    })
+    .filter((c) => c.gp > 0);
   return { ok: true, candidates };
 }
 
