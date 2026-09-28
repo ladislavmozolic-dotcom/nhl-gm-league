@@ -9,6 +9,12 @@ const tools = [
     icon: "👥",
   },
   {
+    title: "All Contracts",
+    description: "Every club's expiring UFA / RFA / ELC contracts in one place",
+    href: "/tools/all-contracts",
+    icon: "📄",
+  },
+  {
     title: "Player Compare",
     description: "Search up to five skaters or goalies and compare them attribute by attribute",
     href: "/tools/compare",
