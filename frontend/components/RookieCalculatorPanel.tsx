@@ -1,7 +1,6 @@
-import PlayerLink from "@/components/PlayerLink";
 import { Card } from "@/components/ui";
-import RookiePromoteButton from "@/components/RookiePromoteButton";
 import DebutantScanner from "@/components/DebutantScanner";
+import RookieTableRow from "@/components/RookieTableRow";
 import type { RookieRow } from "@/lib/edge-params-server";
 
 const PARAM_COLS = ["CK", "FG", "DI", "SK", "ST", "EN", "DU", "PH", "FO", "PA", "SC", "DF", "PS", "EX", "LD", "OV"];
@@ -19,8 +18,8 @@ export default function RookieCalculatorPanel({ rookies, isAdmin }: { rookies: R
           <li>Rovnaký engine ako <b>Next Gen Parameters</b> (<code>/tools/edge-calculator</code>) — reálny výkon per-60, percentil voči lige, regresia k priemeru pri malej vzorke, kalibrácia na STHS škálu, plus dodatočný discount za malú vzorku zápasov.</li>
           <li>Zobrazujú sa len hráči, ktorí sú v <b>prospect poole</b> nejakého tímu (<code>rosterType = PROSPECT</code>) a už odohrali reálne NHL/AHL zápasy — teda ešte nemajú vlastný rating, nie hráči už ohodnotení pri importe (napr. skutoční voľní hráči/veteráni).</li>
           {isAdmin
-            ? <li>&quot;Activate rating&quot; zapíše vypočítané hodnoty priamo do CK/SC/PA/DF/... polí hráča — nemení jeho rosterType ani tím, len rating.</li>
-            : <li>Prihlás sa ako admin, ak chceš rating aj aktivovať — tu ho zatiaľ len vidíš.</li>}
+            ? <li>Každá bunka s hodnotou je <b>editovateľná</b> — ak ti vypočítané číslo pripadá príliš vysoké/nízke (napr. PA/SC z pár zápasov horúcej série), priamo si ho preprav. &quot;Activate rating&quot; potom zapíše presne to, čo je v bunkách, do CK/SC/PA/DF/... polí hráča — nemení jeho rosterType ani tím, len rating.</li>
+            : <li>Prihlás sa ako admin, ak chceš rating aj aktivovať alebo upraviť — tu ho zatiaľ len vidíš.</li>}
         </ul>
       </Card>
 
@@ -56,22 +55,7 @@ export default function RookieCalculatorPanel({ rookies, isAdmin }: { rookies: R
               </tr>
             </thead>
             <tbody>
-              {rookies.map((r) => (
-                <tr key={r.playerId} className="border-b border-slate-800/40 hover:bg-slate-800/30">
-                  <td className="px-3 py-1.5 font-medium"><PlayerLink id={r.playerId} slug={r.slug} name={r.name} /></td>
-                  <td className="px-2 py-1.5 text-center text-slate-400">{r.teamCode ?? "—"}</td>
-                  <td className="px-2 py-1.5 text-center text-slate-400">{r.position}</td>
-                  <td className="px-2 py-1.5 text-center tabular-nums">{r.age ?? "—"}</td>
-                  <td className="px-2 py-1.5 text-center text-slate-400">{r.source}</td>
-                  <td className="px-2 py-1.5 text-center tabular-nums">{r.source === "AHL" ? r.ahlGP : (r.curSeasonGP || r.lastSeasonGP)}</td>
-                  <td className="px-2 py-1.5 text-center tabular-nums">{r.g}</td>
-                  <td className="px-2 py-1.5 text-center tabular-nums">{r.a}</td>
-                  {PARAM_COLS.map((k) => (
-                    <td key={k} className="px-1.5 py-1.5 text-right tabular-nums text-slate-300">{r.ratings[k] ?? "—"}</td>
-                  ))}
-                  {isAdmin && <td className="px-2 py-1.5 text-right"><RookiePromoteButton playerId={r.playerId} /></td>}
-                </tr>
-              ))}
+              {rookies.map((r) => <RookieTableRow key={r.playerId} row={r} isAdmin={isAdmin} />)}
               {rookies.length === 0 && (
                 <tr><td colSpan={PARAM_COLS.length + (isAdmin ? 8 : 7)} className="px-4 py-8 text-center text-slate-500">Žiadny prospekt so skutočnými zápasmi zatiaľ nečaká na rating.</td></tr>
               )}

@@ -721,6 +721,40 @@ export async function promotePlayerToNextGen(playerId: number): Promise<{ ok: bo
   return { ok: true, applied: ratings };
 }
 
+const ROOKIE_RATING_FIELD: Record<string, string> = {
+  CK: "ck", DF: "df", DI: "di", DU: "du", EN: "en", EX: "ex", FG: "fg", FO: "fo",
+  LD: "ld", MO: "mo", PA: "pa", PH: "ph", PS: "ps", SC: "sc", SK: "sk", ST: "st", OV: "overall",
+};
+
+/** Write a GM-adjusted rating for one Rookie Calculator player directly onto his
+ *  live ck/sc/pa/... fields, bypassing edgeRatings() entirely. The Rookie
+ *  Calculator's engine is a model, not an oracle — a real GM's own read on a
+ *  tiny sample (e.g. a torrid 9-game debut inflating SC/PA) should be able to
+ *  win over the computed number instead of being stuck with it. Only known
+ *  rating keys are accepted, each clamped to [1, 99] and rounded, so a bad or
+ *  malformed payload can't corrupt the row; unknown keys are silently ignored. */
+export async function applyRookieRatingsOverride(playerId: number, ratings: Record<string, number>): Promise<{ ok: boolean; applied?: Record<string, number>; error?: string }> {
+  const player = await prisma.player.findUnique({ where: { id: playerId }, select: { id: true, isGoalie: true, rosterType: true } });
+  if (!player) return { ok: false, error: "Player not found." };
+  if (player.isGoalie) return { ok: false, error: "Goalie rating overrides aren't supported here." };
+  if (player.rosterType !== "PROSPECT") return { ok: false, error: "Only Rookie Calculator (PROSPECT) players can be adjusted here." };
+  await backupLiveIfNeeded();
+
+  const applied: Record<string, number> = {};
+  const data: Record<string, number> = {};
+  for (const [param, field] of Object.entries(ROOKIE_RATING_FIELD)) {
+    const raw = ratings[param];
+    if (raw == null || !Number.isFinite(raw)) continue;
+    const v = Math.round(Math.max(1, Math.min(99, raw)));
+    applied[param] = v;
+    data[field] = v;
+  }
+  if (!Object.keys(data).length) return { ok: false, error: "No valid rating values supplied." };
+
+  await prisma.player.update({ where: { id: playerId }, data });
+  return { ok: true, applied };
+}
+
 export type RookieRow = {
   playerId: number; name: string; slug: string; position: string; teamCode: string | null;
   age: number | null; curSeasonGP: number; lastSeasonGP: number; ahlGP: number; g: number; a: number; source: "NHL" | "AHL";
