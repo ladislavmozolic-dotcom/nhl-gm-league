@@ -160,7 +160,10 @@ export function wantedYears(market: number, grp: FaPos, age: number | null | und
   const base = grp === "G"
     ? (market >= 88 ? 4 : market >= 80 ? 4 : 3)
     : (market >= 70 ? 4 : market >= 62 ? 4 : market >= 55 ? 3 : 2);
-  const ageCap = a >= 35 ? 1 : a >= 34 ? 2 : a >= 32 ? 3 : MAX_TERM;
+  // a young player (RFA-age, still climbing) wants to re-test his price soon rather than
+  // lock in early — his sweet spot is short no matter how good he already is; a rising cap
+  // only makes a long deal signed today a bigger bargain for the CLUB, so he resists it.
+  const ageCap = a >= 35 ? 1 : a >= 34 ? 2 : a >= 32 ? 3 : a <= 20 ? 1 : a <= 22 ? 2 : MAX_TERM;
   return Math.max(1, Math.min(base, ageCap, MAX_TERM));
 }
 
@@ -217,8 +220,12 @@ export function termPremium(offerYears: number, preferredYears: number, age: num
   // Younger: a YOUNG player charges a lot to lock up his prime years, a 30-31 vet a
   // little for the risk; a prime-age (26-29) player is the cheapest to extend.
   const young = a <= 25;
+  // an RFA-age kid (≤22) charges the steepest rate of anyone for term past his sweet spot —
+  // he's the one giving up the most real value by pricing several rising-cap seasons off
+  // today's smaller cap, so buying his extra years out isn't cheap.
+  const veryYoung = a <= 22;
   const depthRate = Math.max(0.15, Math.min(0.5, 0.5 * (1_200_000 / Math.max(1, salary ?? 1_200_000))));
-  const perYear = young ? (slot && isDepthSlot(slot) ? depthRate : 0.15) : a >= 30 ? 0.10 : 0.07;
+  const perYear = young ? (slot && isDepthSlot(slot) ? depthRate : veryYoung ? 0.22 : 0.15) : a >= 30 ? 0.10 : 0.07;
   // going SHORTER than his sweet spot is only a small discount (the steep young-depth
   // rate prices extra years he'd be selling, not years he isn't) — max 5 %/yr, ≥ 0.85
   if (extra < 0) return Math.max(0.85, 1 + extra * Math.min(perYear, 0.05));
