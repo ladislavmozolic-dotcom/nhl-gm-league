@@ -7,9 +7,10 @@ import { getLeagueClock } from "./calendar-server";
 import { computeStandings } from "./sim/standings";
 import { CURRENT_SEASON_START, ageAsOfJune30 } from "./finance";
 import {
-  faPosGroup, skaterMarket, goalieMarket, anchorFromPool, buildDemand, percentile, availabilityFactor, isDepthSlot, 
+  faPosGroup, skaterMarket, goalieMarket, anchorFromPool, buildDemand, percentile, availabilityFactor, isDepthSlot,
   slotForRank, slotToLine, desiredDeployment, deploymentDemand, offerUtility, offerAcceptable, clauseDiscount, termPremium,
   type MarketRow, type Demand, type FaPos, type Contention, type Deployment, type Desired, type LineSlot,
+  type FWeights, type DWeights, type GWeights,
 } from "./free-agency";
 
 /** Current weekly negotiation round (1..3); 1 = opening ask outside the window. */
@@ -96,21 +97,29 @@ type PoolPlayer = {
   goalieRating: { ag: number | null; rb: number | null; sc: number | null; hs: number | null } | null;
 };
 
+export type FaMarketWeights = { f: FWeights; d: DWeights; g: GWeights };
+/** The league's currently-configured F/D/G market weights (Admin → FA Tuning). */
+export async function loadFaWeights(): Promise<FaMarketWeights> {
+  const s = await loadSettings();
+  return { f: s.faWeightF, d: s.faWeightD, g: s.faWeightG };
+}
+
 /** Sim-weighted market rating for any player row (skater attrs or goalie card). */
-export function playerMarket(p: PoolPlayer): { grp: FaPos; market: number } {
+export function playerMarket(p: PoolPlayer, w?: FaMarketWeights): { grp: FaPos; market: number } {
   const grp = faPosGroup(p.position, p.isGoalie);
-  if (grp === "G") return { grp, market: goalieMarket(p.goalieRating ?? {}) };
-  return { grp, market: skaterMarket(p, grp) };
+  if (grp === "G") return { grp, market: goalieMarket(p.goalieRating ?? {}, w?.g) };
+  return { grp, market: skaterMarket(p, grp, grp === "D" ? w?.d : w?.f) };
 }
 
 /** Every signed contract becomes one comparable row. */
-export async function loadMarketPool(): Promise<MarketRow[]> {
+export async function loadMarketPool(weights?: FaMarketWeights): Promise<MarketRow[]> {
   const signed = await prisma.player.findMany({
     where: { rosterType: { in: ["NHL", "AHL"] }, capHit: { gt: 0 }, contractYears: { gt: 0 } },
     select: SEL,
   });
+  const w = weights ?? (await loadFaWeights());
   return signed.map((p) => {
-    const { grp, market } = playerMarket(p as PoolPlayer);
+    const { grp, market } = playerMarket(p as PoolPlayer, w);
     const ppg = grp !== "G" && (p.lastSeasonGP ?? 0) >= 20 ? (p.lastSeasonPts ?? 0) / p.lastSeasonGP! : null;
     const toi = grp !== "G" && (p.lastSeasonGP ?? 0) >= 20 && (p.lastSeasonToi ?? 0) > 0 ? p.lastSeasonToi : null;
     return { grp, market, capHit: p.capHit ?? 0, ppg, toi, age: p.age };
@@ -244,14 +253,15 @@ export async function demandForPlayerId(playerId: number, pool?: MarketRow[]): P
   const round = await currentFrenzyRound();
   const stale = await faStaleFactor();
   const priorBidders = (await priorRoundBidderCounts([playerId], round)).get(playerId);
-  return demandFromRow(p as PoolPlayer & { id: number; age: number | null; faDemandOverride: number | null }, marketPool, fullGP, round, stale, priorBidders, await maxContract());
+  const weights = await loadFaWeights();
+  return demandFromRow(p as PoolPlayer & { id: number; age: number | null; faDemandOverride: number | null }, marketPool, fullGP, round, stale, priorBidders, await maxContract(), weights);
 }
 
 function demandFromRow(
   p: PoolPlayer & { id: number; age: number | null; faDemandOverride: number | null },
-  pool: MarketRow[], fullGP: number, round: number, stale = 1, priorBidders?: number, maxSalary = 16_000_000,
+  pool: MarketRow[], fullGP: number, round: number, stale = 1, priorBidders?: number, maxSalary = 16_000_000, weights?: FaMarketWeights,
 ): DemandFor {
-  const { grp, market } = playerMarket(p);
+  const { grp, market } = playerMarket(p, weights);
   const rated = anchorFromPool(pool, grp, market);
   const role = roleAnchor(p, grp, pool);
   const anchor = role != null ? (rated.anchor + role) / 2 : rated.anchor, count = rated.count;
@@ -401,10 +411,13 @@ export async function teamContentionMap(): Promise<Map<number, Contention>> {
 export type TeamContext = { contention: Contention; markets: Record<FaPos, number[]> };
 
 export async function loadTeamContext(teamId: number, cmap?: Map<number, Contention>): Promise<TeamContext> {
-  const roster = await prisma.player.findMany({ where: { teamId, rosterType: "NHL" }, select: SEL });
+  const [roster, weights] = await Promise.all([
+    prisma.player.findMany({ where: { teamId, rosterType: "NHL" }, select: SEL }),
+    loadFaWeights(),
+  ]);
   const markets: Record<FaPos, number[]> = { F: [], D: [], G: [] };
   for (const p of roster) {
-    const { grp, market } = playerMarket(p as PoolPlayer);
+    const { grp, market } = playerMarket(p as PoolPlayer, weights);
     markets[grp].push(market);
   }
   (Object.keys(markets) as FaPos[]).forEach((k) => markets[k].sort((a, b) => b - a));
@@ -478,7 +491,8 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
   const fullGP = await leagueFullGP();
   const rnd = round ?? (await currentFrenzyRound());
   const priorBidders = (await priorRoundBidderCounts([playerId], rnd)).get(playerId);
-  const { grp, market } = playerMarket(p as PoolPlayer);
+  const s = await loadSettings();
+  const { grp, market } = playerMarket(p as PoolPlayer, { f: s.faWeightF, d: s.faWeightD, g: s.faWeightG });
   // A player re-signing with his OWN club is NOT stale on the open market — no season
   // decay. The "nobody's biting" softening only applies to unsigned market UFAs.
   const ownOrg = await prisma.team.findUnique({ where: { id: teamId }, select: { affiliateTeams: { select: { id: true } } } });
@@ -487,7 +501,6 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
   // premium — and an RFA (no UFA market, offer sheets only) has less leverage still.
   const clock = await getLeagueClock();
   const extension = isOwn && !clock.frenzyOpen;
-  const s = await loadSettings();
   const rfa = extension && s.faMode !== "simple" && !ufaAtExpiry(p);
   // RFA leverage: a young RFA (no arbitration yet, ≤ 23 at expiry) has almost none;
   // an arbitration-eligible one (24-26) gets close to market (an arbitrator would).
@@ -595,7 +608,8 @@ export async function demandForPlayers(
   const priorBidders = await priorRoundBidderCounts(players.map((p) => p.id), round);
   const out = new Map<number, DemandFor>();
   const maxSalary = await maxContract();
-  for (const p of players) out.set(p.id, demandFromRow(p, marketPool, fullGP, round, stale, priorBidders.get(p.id), maxSalary));
+  const weights = await loadFaWeights();
+  for (const p of players) out.set(p.id, demandFromRow(p, marketPool, fullGP, round, stale, priorBidders.get(p.id), maxSalary, weights));
   return out;
 }
 

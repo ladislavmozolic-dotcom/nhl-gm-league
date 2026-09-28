@@ -111,6 +111,7 @@ export const DICT: Dict = {
   "admin.chemistry.d": { en: "Directly set a line's chemistry — takes effect in the next sim.", cs: "Priamo nastav chémiu formácie — prejaví sa hneď v ďalšej simulácii." },
   "admin.contracts.d": { en: "Edit player cap hits and contract terms.", cs: "Uprav cap hity a podmienky kontraktov hráčov." },
   "admin.expiringContracts.d": { en: "Every NHL player in the final year of his deal, with his projected asking price at 1–4 years — plan re-signings before the market opens.", cs: "Všetci hráči v poslednom roku zmluvy, s odhadovanou požiadavkou na 1–4 roky — naplánuj re-signingy pred otvorením trhu." },
+  "admin.faTuning.d": { en: "Tune the F/D/G market-rating weights, hand-override a player's demand, and see who changed what.", cs: "Nastav váhy F/D/G pre trhové hodnotenie, ruč­ne priprav výnimku pre hráča a sleduj, kto čo zmenil." },
   "admin.trades.d": { en: "Every completed trade — revoke one to return all assets.", cs: "Všetky dokončené výmeny — revoke vráti všetky aktíva." },
   "admin.signings.d": { en: "Every UFA signing & extension — click a player for his bid trail; revert a deal.", cs: "Všetky podpisy a predĺženia — klik na hráča ukáže priebeh ponúk; revert vráti zmluvu." },
   "admin.coachSignings.d": { en: "Every head-coach hire & fire — revert one to restore his prior contract.", cs: "Všetky prijatia a prepustenia trénerov — revert vráti jeho predchádzajúcu zmluvu." },

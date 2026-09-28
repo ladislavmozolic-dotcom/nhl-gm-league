@@ -108,6 +108,14 @@ export type EngineSettings = {
   osOpenDay: number;          // offer-sheet window opens (off-season day, July 1 = 1)
   osCloseDay: number;         // offer-sheet window closes
   osDecisionDay: number;      // offer sheets are decided by this day
+  // Free Agency market-rating weights (Admin → FA Tuning) — how a player's raw
+  // attributes turn into the "market" score the whole demand engine (comps
+  // anchor, elite ladder rank, everything) is built on. Each position group's
+  // weights should sum to ~1.0, though nothing enforces that — a skewed sum
+  // just scales that group's ratings up or down relative to the others.
+  faWeightF: { sc: number; pa: number; df: number; sk: number };
+  faWeightD: { df: number; pa: number; sc: number; sk: number };
+  faWeightG: { ag: number; sc: number; rb: number; hs: number };
   // Pluggable league systems the commissioner picks
   faMode: "full" | "simple";        // full = RFA/franchise/offer-sheets; simple = everyone a UFA to the open market
   faSignLock: boolean;               // when true, ordinary GMs can't sign UFAs (commissioner-only); a comish toggle unlocks it
@@ -259,8 +267,11 @@ export const DEFAULT_SETTINGS: EngineSettings = {
     { maxAav: 0, picks: [1, 1, 1, 1] },     // > $8M → four 1sts
   ],
   faTwoWayOlderAge: 25, faTwoWayNhlGpLimit: 30, faTwoWayMaxYears: 1, faTwoWayRelaxRound: 2,
-  faTwoWayWeakOverall: 55, faTwoWayWeakRound: 3, faTwoWayAhlMaxYears: 3, faTwoWayFewGpMaxYears: 2, faTwoWayMaxSalary: 1_300_000,
+  faTwoWayWeakOverall: 55, faTwoWayWeakRound: 3, faTwoWayAhlMaxYears: 2, faTwoWayFewGpMaxYears: 2, faTwoWayMaxSalary: 1_300_000,
   rfaMaxAge: 26, osOpenDay: 1, osCloseDay: 8, osDecisionDay: 10,
+  faWeightF: { sc: 0.42, pa: 0.38, df: 0.12, sk: 0.08 },
+  faWeightD: { df: 0.40, pa: 0.30, sc: 0.20, sk: 0.10 },
+  faWeightG: { ag: 0.34, sc: 0.30, rb: 0.26, hs: 0.10 },
   faMode: "full", faSignLock: true, financeMode: "base", waiversEnabled: true, intelligenceRollout: "full",
   faLowballPct: 85, faLowballMaxBumpPct: 25, iceUnhappyPct: 80, iceWarnDays: 5, iceRequestDays: 20,
   finJerseyNet: 120, finJerseyScale: 40000, finApparelBase: 3200000, finOtherBase: 1400000,

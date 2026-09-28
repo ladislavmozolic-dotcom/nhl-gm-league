@@ -35,14 +35,24 @@ export function faPosGroup(position: string | null | undefined, isGoalie: boolea
 export type SkaterAttrs = { sc?: number | null; pa?: number | null; df?: number | null; sk?: number | null };
 export type GoalieAttrs = { ag?: number | null; rb?: number | null; sc?: number | null; hs?: number | null };
 
+export type FWeights = { sc: number; pa: number; df: number; sk: number };
+export type DWeights = { df: number; pa: number; sc: number; sk: number };
+export type GWeights = { ag: number; sc: number; rb: number; hs: number };
+/** The calibrated baseline — used whenever a caller doesn't pass league-configured
+ *  weights (Admin → FA Tuning overrides these; see lib/sim/settings.ts). */
+export const DEFAULT_F_WEIGHTS: FWeights = { sc: 0.42, pa: 0.38, df: 0.12, sk: 0.08 };
+export const DEFAULT_D_WEIGHTS: DWeights = { df: 0.40, pa: 0.30, sc: 0.20, sk: 0.10 };
+export const DEFAULT_G_WEIGHTS: GWeights = { ag: 0.34, sc: 0.30, rb: 0.26, hs: 0.10 };
+
 /** Sim-weighted market rating — the value the SIMULATION actually rewards. */
-export function skaterMarket(p: SkaterAttrs, grp: "F" | "D"): number {
+export function skaterMarket(p: SkaterAttrs, grp: "F" | "D", w?: FWeights | DWeights): number {
   const sc = n(p.sc), pa = n(p.pa), df = n(p.df), sk = n(p.sk);
-  if (grp === "D") return 0.40 * df + 0.30 * pa + 0.20 * sc + 0.10 * sk;
-  return 0.42 * sc + 0.38 * pa + 0.12 * df + 0.08 * sk; // forward: offense-heavy
+  if (grp === "D") { const d = (w as DWeights) ?? DEFAULT_D_WEIGHTS; return d.df * df + d.pa * pa + d.sc * sc + d.sk * sk; }
+  const f = (w as FWeights) ?? DEFAULT_F_WEIGHTS;
+  return f.sc * sc + f.pa * pa + f.df * df + f.sk * sk; // forward: offense-heavy
 }
-export function goalieMarket(g: GoalieAttrs): number {
-  return 0.34 * n(g.ag) + 0.30 * n(g.sc) + 0.26 * n(g.rb) + 0.10 * n(g.hs);
+export function goalieMarket(g: GoalieAttrs, w: GWeights = DEFAULT_G_WEIGHTS): number {
+  return w.ag * n(g.ag) + w.sc * n(g.sc) + w.rb * n(g.rb) + w.hs * n(g.hs);
 }
 
 /** One row of the "market" = every signed player's rating + what they earn. */

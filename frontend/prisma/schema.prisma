@@ -1130,6 +1130,20 @@ model GameAudit {
 // design doc requires every commissioner query to be audit-logged, same
 // principle as GameAudit above but for a read-only advisory view rather than
 // a state-changing action.
+// Audit trail for the Free Agency tuning tool (Admin → FA Tuning): both a global
+// market-weight change (playerId null) and a per-player demand override
+// (playerId set) log here, so the commissioner can see who changed what and when.
+model FaTuningAudit {
+  id        Int      @id @default(autoincrement())
+  byName    String
+  playerId  Int?
+  summary   String // short plain-text description of the change (old → new)
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([playerId])
+}
+
 model CommishIntelAudit {
   id        Int      @id @default(autoincrement())
   byName    String
