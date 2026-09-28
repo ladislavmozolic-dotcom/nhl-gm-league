@@ -2,6 +2,8 @@ import { prisma } from "./prisma";
 import { importMoneyPuckSkaters } from "./moneypuck-skater-import";
 import { importMoneyPuckGoalies } from "./moneypuck-import-server";
 import { fetchAhlSkaterStats, importAhlSkaterStats } from "./ahl-import";
+import { fetchNhlCurrentStats, importNhlCurrentStats } from "./nhl-api-import";
+import { CURRENT_SEASON_START } from "./finance";
 import { getLiveCalculatorConfig } from "./live-calculator-config";
 
 export type SyncResult = {
@@ -10,6 +12,7 @@ export type SyncResult = {
   moneyPuckGoaliesMatched?: number;
   ahlMatchedCur: number;
   ahlMatchedLast: number;
+  nhlSkaterMatched?: number;
   timestamp: string;
   error?: string;
 };
@@ -42,6 +45,22 @@ export async function syncLiveCalculatorData(): Promise<SyncResult> {
       console.log(`[LiveCalcSync] MoneyPuck goalies synced: ${mpGoaliesMatched} goalies matched.`);
     } catch (e: any) {
       console.warn("[LiveCalcSync] MoneyPuck goalies sync warning:", e?.message);
+    }
+
+    // 1c. Ingest the CURRENT real season's skater box score (goals/assists/GP/TOI) from
+    // the NHL.com stats API — feeds both the Player Calculator projection AND the FA
+    // demand engine's in-season performance blend (see performanceOf in free-agency-server).
+    let nhlSkaterMatched = 0;
+    try {
+      const seasonId = CURRENT_SEASON_START * 10000 + (CURRENT_SEASON_START + 1);
+      const nhlRows = await fetchNhlCurrentStats(seasonId);
+      if (nhlRows.length > 0) {
+        const res = await importNhlCurrentStats(nhlRows);
+        nhlSkaterMatched = res.matched;
+      }
+      console.log(`[LiveCalcSync] NHL current-season skater stats synced: ${nhlSkaterMatched} players matched.`);
+    } catch (e: any) {
+      console.warn("[LiveCalcSync] NHL current-season skater sync warning:", e?.message);
     }
 
     // 2. Ingest AHL stats
@@ -77,6 +96,7 @@ export async function syncLiveCalculatorData(): Promise<SyncResult> {
       moneyPuckGoaliesMatched: mpGoaliesMatched,
       ahlMatchedCur: ahlCurMatched,
       ahlMatchedLast: ahlLastMatched,
+      nhlSkaterMatched,
       timestamp: now.toISOString(),
     };
   } catch (err: any) {

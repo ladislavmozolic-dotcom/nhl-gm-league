@@ -55,6 +55,9 @@ const SEL = {
   id: true, isGoalie: true, position: true, age: true, capHit: true, rosterType: true,
   sc: true, pa: true, df: true, sk: true, lastSeasonGP: true, lastSeasonPts: true, lastSeasonSvPct: true, lastSeasonToi: true, morale: true,
   realCapHit: true,
+  // the NEW real season, once it's ~10 games in — blended into performanceOf() alongside
+  // last season so demands start reacting to this year's actual form, not just last year's.
+  curSeasonGP: true, curSeasonG: true, curSeasonA: true, curSeasonToi: true, goalieAdvanced: true,
   goalieRating: { select: { ag: true, rb: true, sc: true, hs: true } },
 } as const;
 
@@ -229,34 +232,58 @@ export function roleAnchor(
   return percentile(comps.map((c) => c.capHit), 0.55);
 }
 
-/** Last season's production vs. players rated like him → the demand's performance
- *  multiplier (1 = produced like his rating says). Skaters: points/GP against the
- *  same-rating comps (a D's points count less — his job isn't scoring). Goalies:
- *  save % against a league-average .903. No real sample → neutral. */
+/** Production vs. players rated like him → the demand's performance multiplier
+ *  (1 = produced like his rating says). Skaters: points/GP against the same-rating
+ *  comps (a D's points count less — his job isn't scoring). Goalies: save % against
+ *  a league-average .903. No real sample → neutral.
+ *
+ *  Blends TWO samples: last season (the full, settled baseline) and the CURRENT
+ *  real season once it has enough games to mean something (10+, matching the
+ *  Player Calculator's own "projection activates at ~game 10" convention) — so a
+ *  breakout or a slump this year moves his price during the season, not a year
+ *  later. The current season's weight ramps from 0 at game 10 to fully replacing
+ *  last season by game 41 (half a season) — early-season noise stays damped, a
+ *  half-season sample is trusted on its own. */
 export function performanceOf(
-  p: { lastSeasonGP?: number | null; lastSeasonPts?: number | null; lastSeasonSvPct?: number | null; lastSeasonToi?: number | null },
+  p: {
+    lastSeasonGP?: number | null; lastSeasonPts?: number | null; lastSeasonSvPct?: number | null; lastSeasonToi?: number | null;
+    curSeasonGP?: number | null; curSeasonG?: number | null; curSeasonA?: number | null; curSeasonToi?: number | null;
+    goalieAdvanced?: unknown;
+  },
   grp: FaPos, market: number, pool: MarketRow[],
 ): number {
-  const gp = p.lastSeasonGP ?? 0;
+  const curGp = p.curSeasonGP ?? 0;
+  const curWeight = Math.max(0, Math.min(1, (curGp - 10) / 31));
+
   if (grp === "G") {
-    const sv = p.lastSeasonSvPct;
-    if (gp < 15 || sv == null || !(sv > 0.8)) return 1;
-    return Math.max(0.85, Math.min(1.15, 1 + (sv - 0.903) * 8));
+    const goalieFactor = (sv: number | null | undefined, gp: number): number | null =>
+      gp >= 10 && sv != null && sv > 0.8 ? Math.max(0.85, Math.min(1.15, 1 + (sv - 0.903) * 8)) : null;
+    const lastF = (p.lastSeasonGP ?? 0) >= 15 ? goalieFactor(p.lastSeasonSvPct, p.lastSeasonGP ?? 0) : null;
+    const adv = (p.goalieAdvanced ?? null) as { cur?: { svPct?: number; gp?: number } | null } | null;
+    const curF = goalieFactor(adv?.cur?.svPct, adv?.cur?.gp ?? 0);
+    if (lastF == null) return curF ?? 1;
+    if (curF == null) return lastF;
+    return lastF * (1 - curWeight) + curF * curWeight;
   }
-  if (gp < 20) return 1;
+
   const comps = pool.filter((r) => r.grp === grp && r.ppg != null && Math.abs(r.market - market) <= 3);
-  if (comps.length < 8) return 1;
-  const exp = comps.reduce((t, r) => t + r.ppg!, 0) / comps.length;
-  if (!(exp > 0.05)) return 1;
-  const ratio = ((p.lastSeasonPts ?? 0) / gp) / exp;
-  let f = 1 + (ratio - 1) * (grp === "D" ? 0.25 : 0.45);
-  // a D is paid for his minutes as much as his points — bottom-pair TOI ⇒ bottom-pair money
+  const exp = comps.length >= 8 ? comps.reduce((t, r) => t + r.ppg!, 0) / comps.length : 0;
   const toiComps = comps.filter((r) => r.toi != null);
-  if (grp === "D" && (p.lastSeasonToi ?? 0) > 0 && toiComps.length >= 8) {
-    const expToi = toiComps.reduce((t, r) => t + r.toi!, 0) / toiComps.length;
-    f *= 1 + (p.lastSeasonToi! / expToi - 1) * 1.2;
-  }
-  return Math.max(0.8, Math.min(1.2, f));
+  const expToi = grp === "D" && toiComps.length >= 8 ? toiComps.reduce((t, r) => t + r.toi!, 0) / toiComps.length : 0;
+
+  const skaterFactor = (gp: number, pts: number, toi: number | null | undefined): number | null => {
+    if (gp < 1 || !(exp > 0.05)) return null;
+    let f = 1 + ((pts / gp) / exp - 1) * (grp === "D" ? 0.25 : 0.45);
+    // a D is paid for his minutes as much as his points — bottom-pair TOI ⇒ bottom-pair money
+    if (grp === "D" && (toi ?? 0) > 0 && expToi > 0) f *= 1 + ((toi! / expToi) - 1) * 1.2;
+    return Math.max(0.8, Math.min(1.2, f));
+  };
+
+  const lastF = (p.lastSeasonGP ?? 0) >= 20 ? skaterFactor(p.lastSeasonGP ?? 0, p.lastSeasonPts ?? 0, p.lastSeasonToi) : null;
+  const curF = curGp >= 10 ? skaterFactor(curGp, (p.curSeasonG ?? 0) + (p.curSeasonA ?? 0), p.curSeasonToi) : null;
+  if (lastF == null) return curF ?? 1;
+  if (curF == null) return lastF;
+  return lastF * (1 - curWeight) + curF * curWeight;
 }
 
 export type DemandFor = { demand: Demand; grp: FaPos };
