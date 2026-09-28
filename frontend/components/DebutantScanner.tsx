@@ -9,12 +9,14 @@ import type { ScanAndSyncResult } from "@/lib/rookie-debutants";
  *  row in our database at all who have already logged a real NHL game this
  *  season, creates a Player row for every one of them automatically (rosterType
  *  PROSPECT — no manual per-player review, since a real GP > 0 already means
- *  he's worth tracking), and refreshes current-season stats for the WHOLE league
- *  so anyone already sitting in a PROSPECT pool from an earlier scan also gets
- *  his rating recomputed with today's numbers. Everything then shows up in the
- *  "Prospekti s reálnymi zápasmi" table below right away (router.refresh()) — it
- *  does NOT touch the separate Prospect (scouting) table, so a "Už v
- *  prospektoch" tag just means he's also scouted there, not a duplicate. */
+ *  he's worth tracking), refreshes current-season stats for the WHOLE league,
+ *  and finally triggers a Live Calculator recompute (the same engine every other
+ *  player's rating comes from) so everyone's Player.liveCalculatorRatings blob —
+ *  new debutants and anyone already sitting in a PROSPECT pool from an earlier
+ *  scan alike — is fresh. Everything then shows up in the "Prospekti s reálnymi
+ *  zápasmi" table below right away (router.refresh()) — it does NOT touch the
+ *  separate Prospect (scouting) table, so a "Už v prospektoch" tag just means
+ *  he's also scouted there, not a duplicate. */
 export default function DebutantScanner() {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -34,15 +36,16 @@ export default function DebutantScanner() {
       <div className="flex items-center gap-3 flex-wrap">
         <button onClick={scan} disabled={pending}
           className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-sm font-semibold">
-          {pending ? "Skenujem 32 tímov a obnovujem štatistiky…" : "Skenovať reálne NHL rostre"}
+          {pending ? "Skenujem 32 tímov, obnovujem štatistiky a prepočítavam ratingy…" : "Skenovať reálne NHL rostre"}
         </button>
         {error && <span className="text-sm text-red-400">{error}</span>}
       </div>
       {result && (
         <div className="text-sm space-y-2">
           <p className="text-slate-400">
-            Štatistiky obnovené u <b className="text-slate-200">{result.statsRefreshed}</b> hráčov v databáze
-            (vrátane už skôr založených prospektov nižšie).
+            Štatistiky obnovené u <b className="text-slate-200">{result.statsRefreshed}</b> hráčov, ratingy prepočítané cez Live
+            Calculator engine u <b className="text-slate-200">{result.ratingsRecomputed}</b> hráčov (vrátane už skôr založených
+            prospektov nižšie).
           </p>
           {result.created.length === 0 ? (
             <p className="text-slate-500">Žiadny nový reálny NHL debutant sa nenašiel — všetci s odohratým zápasom už u nás majú Player záznam.</p>
@@ -73,7 +76,7 @@ export default function DebutantScanner() {
                         {c.error
                           ? <span className="text-red-400">{c.error}</span>
                           : c.isGoalie
-                            ? <span className="text-amber-300">Založený — brankári zatiaľ nemajú Next Gen rating</span>
+                            ? <span className="text-amber-300">Založený — brankári zatiaľ nie sú v Rookie Calculatore podporovaní</span>
                             : <span className="text-green-400">Založený ✓, pridaný do tabuľky nižšie</span>}
                       </td>
                     </tr>

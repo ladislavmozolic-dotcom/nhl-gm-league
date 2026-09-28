@@ -17,7 +17,7 @@ export default function RookieCalculatorPanel({ rookies, isAdmin, tuningConfig }
     <>
       <Card title="Ako to funguje" accent="text-slate-200">
         <ul className="text-sm text-slate-300 space-y-1 list-disc pl-5">
-          <li>Rovnaký engine ako <b>Next Gen Parameters</b> (<code>/tools/edge-calculator</code>) — reálny výkon per-60, percentil voči lige, regresia k priemeru pri malej vzorke, kalibrácia na STHS škálu, plus dodatočný discount za malú vzorku zápasov.</li>
+          <li>Rovnaký engine ako celá liga — <b>Live Calculator</b> (V10, cez &quot;⚙️ Tuning &amp; Nastavenia&quot; na hlavnej stránke Live Calculatora): percentil voči reálnej populácii, vlastná ochrana pri malej vzorke zápasov (tzv. FARM tiers). Žiadny samostatný Next Gen engine, žiadne duplicitné čísla — jedno miesto, kde sa ladia váhy pre celú ligu vrátane rookies.</li>
           <li>Zobrazujú sa len hráči, ktorí sú v <b>prospect poole</b> nejakého tímu (<code>rosterType = PROSPECT</code>) a už odohrali reálne NHL/AHL zápasy — teda ešte nemajú vlastný rating, nie hráči už ohodnotení pri importe (napr. skutoční voľní hráči/veteráni).</li>
           {isAdmin
             ? <li>Každá bunka s hodnotou je <b>editovateľná</b> — ak ti vypočítané číslo pripadá príliš vysoké/nízke (napr. PA/SC z pár zápasov horúcej série), priamo si ho preprav. &quot;Activate rating&quot; potom zapíše presne to, čo je v bunkách, do CK/SC/PA/DF/... polí hráča — nemení jeho rosterType ani tím, len rating.</li>
@@ -31,7 +31,8 @@ export default function RookieCalculatorPanel({ rookies, isAdmin, tuningConfig }
             Nájde hráčov, ktorí <b>už odohrali aspoň 1 reálny NHL zápas</b> tento sezónny ročník a nemajú u nás vôbec žiadny <code>Player</code> záznam
             (nedraftovaní juniori bez zápasu sa tu preto neukazujú — nemá ich čo hodnotiť), a <b>automaticky ich založí</b> ako <code>Player</code>
             (<code>rosterType = PROSPECT</code>) — bez ďalšieho potvrdzovania po jednom. Zároveň obnoví aktuálne štatistiky pre všetkých hráčov v
-            databáze (aj tých založených pri predošlom skenovaní), takže sa im live prepočíta rating podľa aktuálnej sezóny. Stĺpec vo výsledku ukáže, či
+            databáze (aj tých založených pri predošlom skenovaní) a spustí prepočet cez Live Calculator engine, takže ratingy v tabuľke nižšie
+            sú vždy čerstvé. Stĺpec vo výsledku ukáže, či
             bol hráč predtým aj scoutovaný v <code>Prospect</code> tabuľke niektorého tímu — to nie je duplicita, len iná, ľahšia tabuľka na scouting.
             Skenovanie prejde všetkých 32 reálnych NHL rostrov (chvíľu trvá — preto sa nespúšťa automaticky pri načítaní stránky).
           </p>

@@ -161,110 +161,22 @@ export function leadershipFrom(captaincy: string | null | undefined, ex: number)
   return Math.round(clamp(base + (ex - 70) * 0.2, 50, 99));
 }
 
-export type RookiePenaltyBand = { gp: number; penalty: number };
-
-/** Every knob the Rookie Calculator's own "Tuning" panel exposes — deliberately
- *  scoped to ONLY this feature (never touches the shared Next Gen/Edge engine
- *  that also powers the league-wide Next Gen Parameters calculator), stored in
+/** The Rookie Calculator's own tuning knob — deliberately minimal, since rating
+ *  computation itself now runs entirely through the shared "Live Calculator —
+ *  Nastavenia & Tuning" engine (lib/live-calculator-engine.ts), tuned in exactly
+ *  one place for the whole league, rookies included. This is the one thing that
+ *  IS still Rookie Calculator-specific: which candidates the debutant scanner
+ *  even bothers surfacing/auto-creating. Stored in
  *  LiveCalcConfig.weightsJson.rookie (see lib/live-calculator-config.ts). */
 export type RookieTuningConfig = {
-  /** GP thresholds → point discount on `penaltyParams`. Sorted ascending by gp;
-   *  the first band whose threshold the player hasn't reached yet wins. */
-  penaltyBands: RookiePenaltyBand[];
-  /** Which of the 16 rating params take the small-sample discount. */
-  penaltyParams: string[];
-  /** A penalized param never drops below this floor. */
-  penaltyFloor: number;
   /** Minimum real GP (cur + last real season combined) for the debutant scanner
    *  to surface/auto-create a player at all — see findMissingNhlPlayers. */
   minScanGp: number;
-  /** Per-param sub-metric weight overrides (e.g. SC's g60-vs-gxg60 split), applied
-   *  ONLY to rosterType PROSPECT players in edgeRatings() — see ROOKIE_TUNABLE_COMPOSITES
-   *  below for which params can be tuned and their default (= EDGE_COMPOSITES) weights.
-   *  An absent or empty entry for a param just falls back to EDGE_COMPOSITES. */
-  composites?: Partial<Record<string, Metric[]>>;
 };
-
-/** Friendly Slovak labels for the sub-metrics used in EDGE_COMPOSITES, for the
- *  Rookie Tuning panel's sliders — purely cosmetic, keyed by the same metric
- *  key metricsFor()/edgeRatings() already produce. */
-export const EDGE_METRIC_LABELS: Record<string, string> = {
-  g60: "Góly / 60 min",
-  gxg60: "Góly nad xG / 60 (finishing)",
-  a60: "Asistencie / 60 (všetky situácie)",
-  a605v5: "Asistencie / 60 (5v5)",
-  relxga5v5: "Rel. xGA / 60 (5v5)",
-  relga5v5: "Rel. GA / 60 (5v5)",
-  relxgapk: "Rel. xGA / 60 (oslabenie)",
-  axga5v5: "Abs. xGA / 60 (5v5)",
-  aga5v5: "Abs. GA / 60 (5v5)",
-  blk60: "Bloky / 60",
-  off60: "Ofenzívne akcie / 60 (G+A)",
-  tk60: "Zisky puku / 60",
-  gv60: "Straty puku / 60",
-  pim60: "Trestné minúty / 60",
-  hit60: "Hity / 60",
-  shpct: "Úspešnosť streľby %",
-};
-
-/** Which Edge composites the Rookie Tuning panel lets an admin re-weight, and
- *  their default (= EDGE_COMPOSITES) split. Only composites with 2+ sub-metrics
- *  are worth exposing — CK/DI/EN/FO/ST/SK/EX are single-metric (weight is
- *  always 100%, nothing to redistribute). */
-export const ROOKIE_TUNABLE_COMPOSITES: { param: string; label: string; metricKeys: string[] }[] = [
-  { param: "SC", label: "Scoring (SC)", metricKeys: ["g60", "gxg60"] },
-  { param: "PA", label: "Passing (PA)", metricKeys: ["a60", "a605v5"] },
-  { param: "DF", label: "Defense (DF)", metricKeys: ["relxga5v5", "relga5v5", "relxgapk", "axga5v5", "aga5v5", "blk60"] },
-  { param: "PH", label: "Puck Handling (PH)", metricKeys: ["off60", "tk60", "gv60"] },
-  { param: "FG", label: "Fighting (FG)", metricKeys: ["pim60", "hit60"] },
-  { param: "PS", label: "Penalty Shot (PS)", metricKeys: ["shpct", "off60", "g60"] },
-];
-
-/** Default bands — a genuine NHL/AHL debutant with only a handful of games on
- *  the books still deserves an extra conservative discount on the sim-critical
- *  params, on top of the engine's own sample-size regression: a hot 4G/6A
- *  week-one stretch is exactly the kind of small-sample spike a real scout
- *  wouldn't bank on yet. Bands run past ACTIVATE_AT_GP=10 (the main Parameter
- *  Calculator's own "counts now" threshold) out to 20 GP, since a debutant has
- *  zero track record behind him, unlike a returning veteran who merely missed
- *  time. <3 GP → -12, <6 GP → -8, <10 GP → -5, <15 GP → -3, <20 GP → -1, ≥20 GP
- *  → 0. */
-export const DEFAULT_ROOKIE_PENALTY_BANDS: RookiePenaltyBand[] = [
-  { gp: 3, penalty: 12 },
-  { gp: 6, penalty: 8 },
-  { gp: 10, penalty: 5 },
-  { gp: 15, penalty: 3 },
-  { gp: 20, penalty: 1 },
-];
 
 export const DEFAULT_ROOKIE_TUNING: RookieTuningConfig = {
-  penaltyBands: DEFAULT_ROOKIE_PENALTY_BANDS,
-  penaltyParams: ["CK", "SC", "PA", "DF"],
-  penaltyFloor: 20,
   minScanGp: 1,
-  composites: {},
 };
-
-export function rookieSamplePenalty(totalGp: number, bands: RookiePenaltyBand[] = DEFAULT_ROOKIE_PENALTY_BANDS): number {
-  for (const b of bands) if (totalGp < b.gp) return b.penalty;
-  return 0;
-}
-
-/** Apply the configured small-sample discount to the configured params, floored
- *  at the configured minimum. Mutates a copy; any field left out of `config`
- *  falls back to the matching DEFAULT_ROOKIE_TUNING value. */
-export function applyRookieSamplePenalty(ratings: Record<string, number>, totalGp: number, config?: Partial<RookieTuningConfig>): Record<string, number> {
-  const bands = config?.penaltyBands ?? DEFAULT_ROOKIE_TUNING.penaltyBands;
-  const params = config?.penaltyParams ?? DEFAULT_ROOKIE_TUNING.penaltyParams;
-  const floor = config?.penaltyFloor ?? DEFAULT_ROOKIE_TUNING.penaltyFloor;
-  const penalty = rookieSamplePenalty(totalGp, bands);
-  if (penalty === 0) return ratings;
-  const out = { ...ratings };
-  for (const k of params) {
-    if (out[k] != null) out[k] = Math.max(floor, out[k] - penalty);
-  }
-  return out;
-}
 
 export const EDGE_MO_DEFAULT = 50; // morale starts at league default, then our universe moves it
 

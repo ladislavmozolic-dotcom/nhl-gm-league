@@ -9,6 +9,7 @@ import { NHL_ABBREVS, norm, fiKeyOf } from "./real-roster-import";
 import { fetchNhlCurrentStats, fetchNhlGoalieStats, importNhlSkaterStats, type NhlStatRow } from "./nhl-api-import";
 import { getLiveCalculatorConfig } from "./live-calculator-config";
 import { fetchOne as fetchEdgeSpeedOne, EDGE_SEASON_CUR, EDGE_SEASON_LAST } from "./nhl-edge-speed-import";
+import { runLiveCalculatorRecompute } from "./live-calculator-engine";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -169,6 +170,7 @@ export type ScanAndSyncResult = {
   ok: boolean;
   created: { name: string; teamAbbrev: string; isGoalie: boolean; gp: number; alreadyProspect: boolean; prospectTeamCode: string | null; error?: string }[];
   statsRefreshed: number;
+  ratingsRecomputed: number;
   error?: string;
 };
 
@@ -177,17 +179,19 @@ export type ScanAndSyncResult = {
  *  real GP > 0 in EITHER real season already means he's worth tracking), then
  *  ALSO re-pull BOTH the current and the prior real season's stats for the WHOLE
  *  league (every rosterType, including players already sitting in a PROSPECT pool
- *  from an earlier scan) — exactly the two seasons edgeRatings() blends, same as
- *  the Live Calculator. This matters most right when a new real season hasn't
- *  started yet (curSeasonGP is 0 for literally everyone): without the "last"
- *  season backfill, a genuine rookie from the season that just ended would show
- *  up with no games anywhere and no rating, instead of being judged on the real
- *  rookie season he actually just had. Re-running the scan later keeps every
- *  rookie's underlying stats — and therefore his live-computed rating in
- *  rookieCalculatorRows() — current, not just newly discovered names. */
+ *  from an earlier scan) — exactly the two seasons the Live Calculator engine
+ *  blends. This matters most right when a new real season hasn't started yet
+ *  (curSeasonGP is 0 for literally everyone): without the "last" season backfill,
+ *  a genuine rookie from the season that just ended would show up with no games
+ *  anywhere and no rating, instead of being judged on the real rookie season he
+ *  actually just had. Finally triggers runLiveCalculatorRecompute() — the SAME
+ *  engine every other player's rating comes from (Live Calculator — Nastavenia &
+ *  Tuning) — so every prospect's Player.liveCalculatorRatings blob is fresh and
+ *  rookieCalculatorRows() has something to read immediately, not just newly
+ *  discovered names. */
 export async function scanAndSyncDebutants(): Promise<ScanAndSyncResult> {
   const found = await findMissingNhlPlayers();
-  if (!found.ok) return { ok: false, created: [], statsRefreshed: 0, error: found.error };
+  if (!found.ok) return { ok: false, created: [], statsRefreshed: 0, ratingsRecomputed: 0, error: found.error };
 
   const { latestSeason, previousSeason } = await getLiveCalculatorConfig();
   const [curRows, lastRows]: [NhlStatRow[], NhlStatRow[]] = await Promise.all([
@@ -225,5 +229,10 @@ export async function scanAndSyncDebutants(): Promise<ScanAndSyncResult> {
     if (lastRows.length) await importNhlSkaterStats(lastRows, "last");
   } catch { /* creation already succeeded either way */ }
 
-  return { ok: true, created, statsRefreshed };
+  let ratingsRecomputed = 0;
+  try {
+    ratingsRecomputed = (await runLiveCalculatorRecompute()).totalProcessed;
+  } catch { /* stats already refreshed either way — an admin can also hit "Prepočítať ratingy" directly */ }
+
+  return { ok: true, created, statsRefreshed, ratingsRecomputed };
 }

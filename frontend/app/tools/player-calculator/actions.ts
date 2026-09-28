@@ -2,12 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { isAdmin } from "@/lib/auth";
-import { promotePlayerToNextGen, applyRookieRatingsOverride } from "@/lib/edge-params-server";
+import { activateRookieLiveRating, applyRookieRatingsOverride } from "@/lib/edge-params-server";
 import { scanAndSyncDebutants } from "@/lib/rookie-debutants";
 
 export async function promoteRookieAction(playerId: number) {
   if (!(await isAdmin())) return { ok: false as const, error: "Admin only." };
-  const result = await promotePlayerToNextGen(playerId);
+  const result = await activateRookieLiveRating(playerId);
   if (result.ok) revalidatePath("/tools/player-calculator");
   return result;
 }
@@ -29,7 +29,7 @@ export async function promoteRookieWithOverridesAction(playerId: number, ratings
  *  refreshes stats for everyone already tracked, so the "Prospekti s reálnymi
  *  zápasmi" table below is fully up to date right after this returns. */
 export async function scanAndSyncDebutantsAction() {
-  if (!(await isAdmin())) return { ok: false as const, created: [], statsRefreshed: 0, error: "Admin only." };
+  if (!(await isAdmin())) return { ok: false as const, created: [], statsRefreshed: 0, ratingsRecomputed: 0, error: "Admin only." };
   const result = await scanAndSyncDebutants();
   if (result.ok) revalidatePath("/tools/player-calculator");
   return result;
