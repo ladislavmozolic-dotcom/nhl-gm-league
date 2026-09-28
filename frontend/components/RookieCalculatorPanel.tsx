@@ -1,6 +1,7 @@
 import PlayerLink from "@/components/PlayerLink";
 import { Card } from "@/components/ui";
 import RookiePromoteButton from "@/components/RookiePromoteButton";
+import DebutantScanner from "@/components/DebutantScanner";
 import type { RookieRow, CameoRow } from "@/lib/edge-params-server";
 
 const PARAM_COLS = ["CK", "FG", "DI", "SK", "ST", "EN", "DU", "PH", "FO", "PA", "SC", "DF", "PS", "EX", "LD", "OV"];
@@ -22,6 +23,17 @@ export default function RookieCalculatorPanel({ rookies, cameo, isAdmin }: { roo
             : <li>Prihlás sa ako admin, ak chceš rating aj aktivovať — tu ho zatiaľ len vidíš.</li>}
         </ul>
       </Card>
+
+      {isAdmin && (
+        <Card title="Chýbajúci reální NHL hráči (žiadny záznam u nás)" accent="text-amber-400">
+          <p className="text-xs text-slate-500 mb-3">
+            Skutočný debutant, ktorého sme nikdy nemali — ani ako prospekta, ani ako hráča. Skenovanie prejde všetkých 32 reálnych NHL rostrov
+            (chvíľu trvá — preto sa nespúšťa automaticky pri načítaní stránky). &quot;Create as prospect&quot; ho založí do jeho reálneho klubu
+            (<code>rosterType = PROSPECT</code>) a ďalší bežný import NHL štatistík mu už sám doplní reálne zápasy.
+          </p>
+          <DebutantScanner />
+        </Card>
+      )}
 
       <Card title={`Prospekti s reálnymi zápasmi, zatiaľ bez ratingu (${rookies.length})`} accent="text-green-400">
         <div className="overflow-x-auto">

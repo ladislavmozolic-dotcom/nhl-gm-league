@@ -7,14 +7,14 @@ import { computeContractExpiry } from "./finance";
 // — one call per club returns the real 23-man roster. We match our players to it
 // by a normalised name so the ~200 players the original real-roster load missed
 // (mostly names carrying suffixes like ''A'' / (NTC) / (R)) finally get a real team.
-const NHL_ABBREVS = [
+export const NHL_ABBREVS = [
   "ANA", "BOS", "BUF", "CAR", "CBJ", "CGY", "CHI", "COL", "DAL", "DET", "EDM", "FLA",
   "LAK", "MIN", "MTL", "NJD", "NSH", "NYI", "NYR", "OTT", "PHI", "PIT", "SEA", "SJS",
   "STL", "TBL", "TOR", "UTA", "VAN", "VGK", "WPG", "WSH",
 ];
 
 /** normalise a name for matching: strip captaincy/clause suffixes, accents, punctuation. */
-const norm = (s: string) =>
+export const norm = (s: string) =>
   epSearchName(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z ]/g, " ").replace(/\s{2,}/g, " ").trim();
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -22,7 +22,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 // single hyphen (so "Ryan O'Reilly" → ryan-o-reilly, "J.J. Moser" → j-j-moser).
 const capwagesSlug = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 const dollars = (s: string) => { const n = parseInt(s.replace(/[^0-9]/g, ""), 10); return Number.isFinite(n) ? n : null; };
-const fiKeyOf = (n: string) => { const p = n.split(" "); return p.length >= 2 ? `${p[0][0]} ${p[p.length - 1]}` : ""; };
+export const fiKeyOf = (n: string) => { const p = n.split(" "); return p.length >= 2 ? `${p[0][0]} ${p[p.length - 1]}` : ""; };
 
 async function fetchJson(url: string): Promise<unknown | null> {
   for (let i = 0; i < 4; i++) {
