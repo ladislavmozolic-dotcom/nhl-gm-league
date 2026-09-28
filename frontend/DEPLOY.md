@@ -174,6 +174,9 @@ season/Playoffs tlačidlo) toto pozastaví — admin má vtedy plnú ručnú kon
    pridaj riadok (nahraď `TVOJ_SECRET` hodnotou z kroku 1):
    ```
    */5 * * * * curl -fsS -X POST https://TVOJA_DOMENA/api/cron/advance-day -H "Authorization: Bearer TVOJ_SECRET" >> /var/log/unhl-cron.log 2>&1
+
+   # Obnoví WHL, OHL, QMJHL a cielené Liiga prospect stats každý deň o 06:15 serverového času.
+   15 6 * * * curl -fsS -X POST https://TVOJA_DOMENA/api/cron/world-leagues -H "Authorization: Bearer TVOJ_SECRET" >> /var/log/unhl-world-leagues.log 2>&1
    ```
 
 Over: `tail -f /var/log/unhl-cron.log` okolo 20:30 — mal by sa objaviť JSON

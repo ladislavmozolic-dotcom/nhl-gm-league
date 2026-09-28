@@ -52,6 +52,7 @@ const GROUPS: Group[] = [
       { href: "/admin/cap-projection", title: "💰 Cap Limit Projections", descKey: "admin.capProjection.d" },
       { href: "/draft/lottery", title: "Draft Lottery", descKey: "admin.lottery.d" },
       { href: "/admin/real-drafts", title: "Real Draft Import", descKey: "admin.realDrafts.d" },
+      { href: "/admin/world-data", title: "🌍 Around the World Data", descKey: "admin.worldData.d" },
       { href: "/admin/salary-retention", title: "Salary Retention Rules", descKey: "admin.retention.d" },
     ],
   },

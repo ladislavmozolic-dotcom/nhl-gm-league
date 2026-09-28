@@ -98,6 +98,7 @@ model Player {
   position              String
   positions             String?
   nhlId                 Int?                      @unique
+  worldPlayerId         Int?                      @unique // live real-world profile for a player tracked in Around the World
   profinhlId            Int? // ← PRIDANÉ
   number                Int?
   photoUrl              String?
@@ -135,6 +136,7 @@ model Player {
   onBlock               Boolean                   @default(false) // GM has listed this player on the Trade Block
   blockNote             String? // GM's note on the Trade Block listing (asking price / context)
   teamId                Int
+  worldPlayer           WorldPlayer?              @relation("WorldPlayerUNHLPlayers", fields: [worldPlayerId], references: [id])
   ck                    Int?
   condition             Float?
   morale                Float?
@@ -786,17 +788,108 @@ model GoalieRating {
 }
 
 model Prospect {
-  id          Int     @id @default(autoincrement())
-  name        String
-  draftYear   Int?
-  overallPick Int?
-  teamId      Int
-  source      String  @default("profinhl") // profinhl | real
-  nhlId       Int?
-  position    String?
-  epUrl       String? // EliteProspects profile URL (scraped from profinhl ProspectReport)
-  undrafted   Boolean @default(false) // confirmed to have gone undrafted (real NHL) — shows "Undrafted" instead of "—"
-  team        Team    @relation(fields: [teamId], references: [id])
+  id            Int          @id @default(autoincrement())
+  name          String
+  draftYear     Int?
+  overallPick   Int?
+  teamId        Int
+  source        String       @default("profinhl") // profinhl | real
+  nhlId         Int?
+  worldPlayerId Int?         @unique // optional link to the one real-world profile; never duplicate stats in the UNHL database
+  position      String?
+  epUrl         String? // EliteProspects profile URL (scraped from profinhl ProspectReport)
+  undrafted     Boolean      @default(false) // confirmed to have gone undrafted (real NHL) — shows "Undrafted" instead of "—"
+  team          Team         @relation(fields: [teamId], references: [id])
+  worldPlayer   WorldPlayer? @relation("WorldPlayerProspects", fields: [worldPlayerId], references: [id])
+}
+
+// Real-world competitions used for draft research and prospect tracking. These
+// records deliberately contain no player imagery and no per-game logs: a compact
+// season-stat snapshot is enough for the league's scouting workflow.
+model WorldLeague {
+  id        Int                     @id @default(autoincrement())
+  code      String                  @unique // WHL | OHL | QMJHL | NCAA | SHL | LIIGA | CZE | SVK | DEL ...
+  name      String
+  country   String?
+  logoUrl   String?
+  region    String                  @default("North America") // North America | Europe
+  active    Boolean                 @default(true)
+  createdAt DateTime                @default(now())
+  updatedAt DateTime                @updatedAt
+  teams     WorldTeam[]
+  stats     WorldPlayerSeasonStat[]
+}
+
+model WorldTeam {
+  id         Int                     @id @default(autoincrement())
+  leagueId   Int
+  externalId String?
+  name       String
+  slug       String
+  city       String?
+  logoUrl    String?
+  league     WorldLeague             @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  players    WorldPlayer[]
+  stats      WorldPlayerSeasonStat[]
+  createdAt  DateTime                @default(now())
+  updatedAt  DateTime                @updatedAt
+
+  @@unique([leagueId, slug])
+  @@unique([leagueId, externalId])
+  @@index([leagueId])
+}
+
+model WorldPlayer {
+  id               Int                     @id @default(autoincrement())
+  externalId       String?                 @unique // provider-specific stable ID, when an official feed exposes one
+  eliteProspectsId Int?                    @unique
+  name             String
+  normalizedName   String
+  position         String?
+  birthDate        String?
+  nationality      String?
+  epUrl            String?
+  currentTeamId    Int?
+  active           Boolean                 @default(true)
+  currentTeam      WorldTeam?              @relation(fields: [currentTeamId], references: [id], onDelete: SetNull)
+  stats            WorldPlayerSeasonStat[]
+  prospects        Prospect[]              @relation("WorldPlayerProspects")
+  unhlPlayers      Player[]                @relation("WorldPlayerUNHLPlayers")
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  @@index([normalizedName])
+  @@index([currentTeamId])
+}
+
+model WorldPlayerSeasonStat {
+  id                  Int         @id @default(autoincrement())
+  playerId            Int
+  leagueId            Int
+  teamId              Int?
+  season              String // e.g. 2026-27
+  isGoalie            Boolean     @default(false)
+  gamesPlayed         Int         @default(0)
+  goals               Int         @default(0)
+  assists             Int         @default(0)
+  points              Int         @default(0)
+  plusMinus           Int?
+  penaltyMinutes      Int         @default(0)
+  wins                Int?
+  losses              Int?
+  overtimeLosses      Int?
+  savePercentage      Float?
+  goalsAgainstAverage Float?
+  shutouts            Int?
+  source              String      @default("manual") // manual | official-feed | importer
+  syncedAt            DateTime    @default(now())
+  player              WorldPlayer @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  league              WorldLeague @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  team                WorldTeam?  @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  @@unique([playerId, leagueId, season])
+  @@index([leagueId, season, points])
+  @@index([teamId, season])
 }
 
 model DraftPick {

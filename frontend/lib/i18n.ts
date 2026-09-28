@@ -41,6 +41,7 @@ export const DICT: Dict = {
     ru: 'Нажмите кнопку "Поделиться" внизу Safari, затем "На экран «Домой»".',
   },
   "admin.retention.d": { en: "Configure salary retention limits and trade rules.", cs: "Nastavení limitů retence platu a pravidel výměn." },
+  "admin.worldData.d": { en: "Initialize real-world junior and European competitions for prospect tracking.", cs: "Inicializace juniorských a evropských soutěží pro sledování prospektů." },
   "ui.installHintMac": {
     en: 'In the Safari menu bar, click File → Add to Dock.',
     cs: 'V liště Safari klikněte na Soubor → Přidat do Docku.',

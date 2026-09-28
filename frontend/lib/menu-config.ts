@@ -43,6 +43,7 @@ export const DEFAULT_MENU: MenuItem[] = [
     { label: "📑 Contracts", href: "/players/contracts" },
     { label: "💰 Demand Watch", href: "/admin/expiring-contracts" },
     { label: "👥 All Players", href: "/players/all" },
+    { label: "🌍 Around the World", href: "/around-the-world" },
   ] },
   { key: "league", label: "League", href: "/league", children: [
     { label: "📖 Rules", href: "/rules" },
