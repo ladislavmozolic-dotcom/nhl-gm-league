@@ -7,7 +7,7 @@ import { getLeagueClock } from "./calendar-server";
 import { computeStandings } from "./sim/standings";
 import { CURRENT_SEASON_START, ageAsOfJune30 } from "./finance";
 import {
-  faPosGroup, skaterMarket, goalieMarket, anchorFromPool, buildDemand, percentile, availabilityFactor, isDepthSlot,
+  faPosGroup, skaterMarket, goalieMarket, anchorFromPool, buildDemand, percentile, availabilityFactor, isDepthSlot, eliteFactor,
   slotForRank, slotToLine, desiredDeployment, deploymentDemand, offerUtility, offerAcceptable, clauseDiscount, termPremium,
   type MarketRow, type Demand, type FaPos, type Contention, type Deployment, type Desired, type LineSlot,
 } from "./free-agency";
@@ -15,6 +15,11 @@ import {
 /** Current weekly negotiation round (1..3); 1 = opening ask outside the window. */
 export async function currentFrenzyRound(): Promise<number> {
   return (await getLeagueClock()).frenzyRound || 1;
+}
+
+/** CBA max contract: 20 % of the league's upper cap. */
+export async function maxContract(): Promise<number> {
+  return Math.round(((await loadLeagueCap()).upper * 0.2) / 50_000) * 50_000;
 }
 
 export type LeagueCap = { mode: string; upper: number; lower: number; faOpen: boolean };
@@ -112,6 +117,23 @@ export async function loadMarketPool(): Promise<MarketRow[]> {
   });
 }
 
+/** eliteFactor inputs for one player: rating rank + production rank in his group. */
+export function eliteOf(
+  p: { lastSeasonGP?: number | null; lastSeasonPts?: number | null; age?: number | null },
+  grp: FaPos, market: number, pool: MarketRow[],
+): number {
+  const same = pool.filter((r) => r.grp === grp);
+  if (same.length < 20) return 1;
+  const ratingPct = same.filter((r) => r.market < market).length / same.length;
+  let prodPct: number | null = null;
+  if (grp !== "G" && (p.lastSeasonGP ?? 0) >= 40) {
+    const ppg = (p.lastSeasonPts ?? 0) / p.lastSeasonGP!;
+    const prod = same.filter((r) => r.ppg != null);
+    if (prod.length >= 20) prodPct = prod.filter((r) => r.ppg! < ppg).length / prod.length;
+  }
+  return eliteFactor(ratingPct, prodPct, p.age, grp === "G");
+}
+
 /** Role anchor — what clubs pay players who DID what he did last season (similar
  *  points/GP and, when known, similar minutes), ELCs excluded (their pay is set by
  *  the CBA, not the market). Blended 50/50 with the rating anchor: ratings alone
@@ -175,12 +197,12 @@ export async function demandForPlayerId(playerId: number, pool?: MarketRow[]): P
   const round = await currentFrenzyRound();
   const stale = await faStaleFactor();
   const priorBidders = (await priorRoundBidderCounts([playerId], round)).get(playerId);
-  return demandFromRow(p as PoolPlayer & { id: number; age: number | null; faDemandOverride: number | null }, marketPool, fullGP, round, stale, priorBidders);
+  return demandFromRow(p as PoolPlayer & { id: number; age: number | null; faDemandOverride: number | null }, marketPool, fullGP, round, stale, priorBidders, await maxContract());
 }
 
 function demandFromRow(
   p: PoolPlayer & { id: number; age: number | null; faDemandOverride: number | null },
-  pool: MarketRow[], fullGP: number, round: number, stale = 1, priorBidders?: number,
+  pool: MarketRow[], fullGP: number, round: number, stale = 1, priorBidders?: number, maxSalary = 16_000_000,
 ): DemandFor {
   const { grp, market } = playerMarket(p);
   const rated = anchorFromPool(pool, grp, market);
@@ -190,6 +212,7 @@ function demandFromRow(
     market, grp, age: p.age, anchor, comps: count,
     override: p.faDemandOverride, capGrowth: 1, round, priorBidders, perf: performanceOf(p, grp, market, pool),
     availability: availabilityFactor(p.lastSeasonGP, fullGP, grp === "G"),
+    elite: eliteOf(p, grp, market, pool), maxSalary,
     downSeason: isDownSeason(p.lastSeasonGP, fullGP, grp === "G"), morale: p.morale, currentSalary: p.capHit,
     realCapHit: p.realCapHit,
   });
@@ -424,19 +447,22 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
   // an RFA isn't testing the market ⇒ the middle of his peer group; a pending UFA
   // could walk to it, so he's priced like the market (upper part of the group)
   const rated = anchorFromPool(marketPool, grp, market, rfa ? 0.5 : undefined);
+  const elite = eliteOf(p, grp, market, marketPool);
+  const maxSalary = await maxContract();
   const role = roleAnchor(p, grp, marketPool);
   const anchor = role != null ? (rated.anchor + role) / 2 : rated.anchor, count = rated.count;
   const rawBase = buildDemand({
     market, grp, age: p.age, anchor, comps: count, override: p.faDemandOverride, capGrowth: 1, round: rnd, priorBidders,
     perf: performanceOf(p, grp, market, marketPool),
     availability: availabilityFactor(p.lastSeasonGP, fullGP, grp === "G"),
+    elite, maxSalary,
     downSeason: isDownSeason(p.lastSeasonGP, fullGP, grp === "G"), morale: p.morale, currentSalary: p.capHit, realCapHit: p.realCapHit,
     openingPremium: !extension, rfaFactor,
   });
   const unbumped = p.faDemandOverride != null ? rawBase : scaleDemand(rawBase, isOwn ? 1 : await faStaleFactor());
   const bump = await lowballBump(playerId, teamId);
   let base = bump > 1
-    ? { ...unbumped, salary: Math.min(16_000_000, round50k(unbumped.salary * bump)), floorSalary: Math.min(16_000_000, round50k(unbumped.floorSalary * bump)) }
+    ? { ...unbumped, salary: Math.min(maxSalary, round50k(unbumped.salary * bump)), floorSalary: Math.min(maxSalary, round50k(unbumped.floorSalary * bump)) }
     : unbumped;
 
   const ctx0 = await loadTeamContext(teamId, cmap);
@@ -456,12 +482,16 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
   let ask = deploymentDemand(base, grp, projDeploy, desired, ctx.contention, p.age);
   // a 32+ vet re-signing without a big year: his current deal stays the ceiling even
   // after the role/contention bend (the base already respects it — see buildDemand)
-  if (extension && p.faDemandOverride == null && (p.age ?? 27) >= 32 && (p.capHit ?? 0) > 0) {
+  if (extension && p.faDemandOverride == null && elite < 1.15 && (p.age ?? 27) >= 32 && (p.capHit ?? 0) > 0) {
     const avail = availabilityFactor(p.lastSeasonGP, await leagueFullGP(), grp === "G");
     const big = performanceOf(p, grp, market, marketPool) >= 1.08 && (p.age ?? 27) < 35 && avail >= 0.95;
     const cap = round50k(p.capHit! * (big ? 1.1 : 1) * avail);
     if (ask.salary > cap) ask = { ...ask, salary: cap, floorSalary: Math.min(ask.floorSalary, round50k(cap * 0.92)) };
   }
+  // a young RFA with no arbitration rights yet (≤ 23 at expiry) can't command the max —
+  // his leverage tops out around 70 % of it (Celebrini-type second deals)
+  const ceiling = rfa && expAge <= 23 ? round50k(maxSalary * 0.7) : maxSalary;
+  if (ask.salary > ceiling) ask = { ...ask, salary: ceiling, floorSalary: Math.min(ask.floorSalary, round50k(ceiling * 0.92)) };
   return { grp, base, slot, line, contention: ctx.contention, desired, ask, age: p.age, lowballBump: bump };
 }
 
@@ -508,7 +538,8 @@ export async function demandForPlayers(
   const stale = await faStaleFactor();
   const priorBidders = await priorRoundBidderCounts(players.map((p) => p.id), round);
   const out = new Map<number, DemandFor>();
-  for (const p of players) out.set(p.id, demandFromRow(p, marketPool, fullGP, round, stale, priorBidders.get(p.id)));
+  const maxSalary = await maxContract();
+  for (const p of players) out.set(p.id, demandFromRow(p, marketPool, fullGP, round, stale, priorBidders.get(p.id), maxSalary));
   return out;
 }
 
