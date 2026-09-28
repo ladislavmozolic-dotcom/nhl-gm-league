@@ -1012,14 +1012,18 @@ export async function resolvePostFrenzyWindows(asOf: Date = new Date()): Promise
   return { signed, unsigned, countered };
 }
 
+/** A real contract on file (running or expired)? $100K is the farm-filler placeholder. */
+const hasHadContract = (p: { capHit: number | null }) => (p.capHit ?? 0) > 0 && p.capHit !== 100_000;
+
 /** Compute + apply a player's Entry-Level Contract from the auto-formula
  *  (base by pedigree + performance bonus from last season, term by age). */
 export async function applyElcAction(playerId: number) {
   const p = await prisma.player.findUnique({
     where: { id: playerId },
-    select: { name: true, teamId: true, age: true, position: true, isGoalie: true, df: true, lastSeasonGP: true, lastSeasonPts: true, lastSeasonSvPct: true },
+    select: { name: true, teamId: true, age: true, position: true, isGoalie: true, df: true, lastSeasonGP: true, lastSeasonPts: true, lastSeasonSvPct: true, capHit: true },
   });
   if (!p) return { ok: false as const, error: "Player not found." };
+  if (hasHadContract(p)) return { ok: false as const, error: `${p.name} already has (or just finished) a contract — his next deal is an RFA/UFA contract, not an ELC. Use Re-sign.` };
   if (!(await canManageTeam(p.teamId))) return { ok: false as const, error: "You don't manage this team." };
   const pos = p.isGoalie ? "G" : faPosGroup(p.position, false);
   const c = computeELC({ pos, age: p.age, df: p.df, lastSeasonGP: p.lastSeasonGP, lastSeasonPts: p.lastSeasonPts, lastSeasonSvPct: p.lastSeasonSvPct });
@@ -1043,7 +1047,8 @@ export async function applyElcAction(playerId: number) {
  *  be signed, with his auto-computed deal (for the admin to review before applying). */
 export async function previewLeagueElc() {
   const players = await prisma.player.findMany({
-    where: { age: { lte: 23, gte: 16 }, rosterType: { in: ["NHL", "AHL"] }, lastSeasonGP: { gte: 10 } },
+    // first contracts only — anyone with a real deal (running or just expired) re-signs as an RFA/UFA
+    where: { age: { lte: 23, gte: 16 }, rosterType: { in: ["NHL", "AHL"] }, lastSeasonGP: { gte: 10 }, OR: [{ capHit: null }, { capHit: 0 }, { capHit: 100_000 }] },
     select: {
       id: true, name: true, age: true, position: true, isGoalie: true, df: true, capHit: true,
       lastSeasonGP: true, lastSeasonPts: true, lastSeasonSvPct: true,

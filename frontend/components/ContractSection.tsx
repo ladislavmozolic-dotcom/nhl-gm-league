@@ -9,31 +9,8 @@ import { faPosGroup } from "@/lib/free-agency";
 import { loadSettings } from "@/lib/sim/settings";
 import { getLeagueClock } from "@/lib/calendar-server";
 import { cleanName } from "@/lib/playerName";
-
-// A player entering his final year is up for renewal. Status by age (our rule):
-// under 26 at June 30 → RFA, 26+ → UFA; the youngest cheap deals are still ELC
-// (entry-level — an auto-contract formula will handle those) — UNLESS he's
-// already well past his entry deal despite the young age (e.g. a age-21
-// player already on his SECOND contract): the real max ELC term is 3 years,
-// so 3+ real pro seasons already on file (`mpSkater`) means his entry-level
-// window has already elapsed and this renewal is a real 2nd contract, not
-// a first-time rookie activation — route him through normal RFA negotiation
-// instead of re-offering the flat entry-level formula.
-type Group = "ELC" | "RFA" | "UFA";
-// ProfiNHL Čl. 32: RFA = contract expiring and 26-or-younger at June 30; UFA = 27+.
-// The very youngest (entry-level age) are still on an ELC auto-formula, unless
-// they've already burned through a full ELC term's worth of real seasons.
-function statusOf(age: number | null, seasonsOnFile: number): Group {
-  const a = age ?? 27;
-  if (a <= 21 && seasonsOnFile < 3) return "ELC";
-  return a <= 26 ? "RFA" : "UFA";
-}
-
-const META: Record<Group, { title: string; blurb: string; accent: string }> = {
-  UFA: { title: "UFA — Unrestricted", blurb: "27+ at June 30 — free to sign anywhere if they reach the market. Re-sign to keep them.", accent: "text-red-400" },
-  RFA: { title: "RFA — Restricted", blurb: "26 or younger at June 30 — you hold their rights. Re-sign before they reach free agency.", accent: "text-blue-400" },
-  ELC: { title: "ELC — Entry-Level", blurb: "Entry-level age (≤21) — their next deal is set by the ELC auto-formula (base + performance bonus).", accent: "text-green-400" },
-};
+import { CONTRACT_GROUP_META as META, type ContractGroup as Group } from "@/lib/contract-status";
+import { ufaAtExpiry } from "@/lib/free-agency-server";
 
 export default async function ContractSection({ teamId }: { teamId: number }) {
   const canManage = await canManageTeam(teamId);
@@ -65,10 +42,9 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
     // unsigned (see sweepUnsignedRfasToNonRoster) — still owned by this club and must
     // stay visible here, since re-signing him is the ONLY way he gets un-benched.
     where: { teamId: { in: orgIds }, rosterType: { in: ["NHL", "AHL", "NONROSTER"] }, contractYears: yearsFilter, extCapHit: null, NOT: { capHit: 100_000 } },
-    select: { id: true, name: true, age: true, capHit: true, contractYears: true, contractText: true, position: true, isGoalie: true, df: true, lastSeasonGP: true, lastSeasonPts: true, lastSeasonSvPct: true, rosterType: true, franchiseTag: true, mpSkater: true },
+    select: { id: true, name: true, age: true, capHit: true, contractYears: true, contractText: true, position: true, isGoalie: true, df: true, lastSeasonGP: true, lastSeasonPts: true, lastSeasonSvPct: true, rosterType: true, franchiseTag: true, birthDate: true },
     orderBy: { capHit: "desc" },
   });
-  const seasonsOnFile = (mp: unknown) => (mp && typeof mp === "object" ? Object.keys(mp as object).length : 0);
 
   if (expiring.length === 0) {
     return (
@@ -79,7 +55,9 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
   }
 
   const groups: Record<Group, typeof expiring> = { UFA: [], RFA: [], ELC: [] };
-  for (const p of expiring) groups[statusOf(p.age, seasonsOnFile(p.mpSkater))].push(p);
+  // everyone on this list is finishing a contract → his next one is an RFA/UFA deal,
+  // never an ELC (that's only a first contract). Status at June 30 of the expiry year.
+  for (const p of expiring) groups[ufaAtExpiry(p) ? "UFA" : "RFA"].push(p);
 
   return (
     <div className="space-y-4">
@@ -87,7 +65,6 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
         <div className="flex flex-wrap gap-4 text-sm">
           <span className="text-red-400 font-semibold">UFA {groups.UFA.length}</span>
           <span className="text-blue-400 font-semibold">RFA {groups.RFA.length}</span>
-          <span className="text-green-400 font-semibold">ELC {groups.ELC.length}</span>
           {!canManage && <span className="text-slate-500 text-xs ml-auto self-center">Sign in as this club&apos;s GM to re-sign.</span>}
         </div>
       </Card>
