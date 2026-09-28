@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { scanMissingNhlPlayersAction, createDebutantAction, previewDebutantAction } from "@/app/tools/player-calculator/actions";
 import type { DebutantCandidate } from "@/lib/rookie-debutants";
 
@@ -10,14 +11,16 @@ type PreviewState = { loading?: boolean; ratings?: Record<string, number>; error
 
 /** Admin tool: on click, scans all 32 real NHL rosters for players with NO Player
  *  row in our database at all who have already logged a real NHL game this
- *  season. "Náhľad" computes his full Next Gen rating against the REAL live
- *  population WITHOUT writing anything — a true dry run, so you can see his
+ *  season. "Náhľad ratingu" computes his full Next Gen rating against the REAL
+ *  live population WITHOUT writing anything — a true dry run, so you can see his
  *  parameters before deciding to create him. "Založiť hráča" then creates a
- *  Player row (rosterType PROSPECT) so he can pick up that same real rating
- *  through the Rookie Calculator table above once his stats import — it does NOT
- *  touch the separate Prospect (scouting) table, so a "Už v prospektoch" tag just
- *  means he's also scouted there, not a duplicate. */
+ *  Player row (rosterType PROSPECT), immediately pulls his real stats, and
+ *  refreshes the page so he shows up in the "Prospekti s reálnymi zápasmi" table
+ *  above right away — it does NOT touch the separate Prospect (scouting) table,
+ *  so a "Už v prospektoch" tag just means he's also scouted there, not a
+ *  duplicate. */
 export default function DebutantScanner() {
+  const router = useRouter();
   const [pending, start] = useTransition();
   const [candidates, setCandidates] = useState<DebutantCandidate[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -41,8 +44,10 @@ export default function DebutantScanner() {
 
   const create = (c: DebutantCandidate) => start(async () => {
     const r = await createDebutantAction(c);
-    if (r.ok) setCreated((s) => ({ ...s, [c.nhlId]: { gp: r.statsGP } }));
-    else setError(r.error ?? "Zlyhalo.");
+    if (r.ok) {
+      setCreated((s) => ({ ...s, [c.nhlId]: { gp: r.statsGP } }));
+      router.refresh(); // pulls him into the "Prospekti s reálnymi zápasmi" table below without a manual page reload
+    } else setError(r.error ?? "Zlyhalo.");
   });
 
   return (
@@ -86,7 +91,7 @@ export default function DebutantScanner() {
                       <td className="px-2 py-1.5 text-right">
                         <button onClick={() => preview(c)} disabled={pending}
                           className="px-3 py-1 rounded-md bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold disabled:opacity-50">
-                          {pv?.loading ? "…" : "Náhľad"}
+                          {pv?.loading ? "…" : "Náhľad ratingu"}
                         </button>
                       </td>
                       <td className="px-2 py-1.5 text-right">

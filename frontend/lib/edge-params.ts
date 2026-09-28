@@ -166,12 +166,18 @@ export function leadershipFrom(captaincy: string | null | undefined, ex: number)
  *  built-in reliability regression already pulls a tiny sample toward the
  *  position mean, but a genuine NHL/AHL debutant with only a handful of games on
  *  the books still deserves an extra conservative discount on the sim-critical
- *  params, the same way the main calculator won't fully trust anyone under
- *  ACTIVATE_AT_GP=10 games. <3 GP → -5, <6 GP → -3, <10 GP → -1, ≥10 GP → 0. */
+ *  params — a hot 4G/6A week-one stretch is exactly the kind of small-sample
+ *  spike a real scout wouldn't bank on yet. Bands run past ACTIVATE_AT_GP=10
+ *  (the main calculator's own "counts now" threshold) out to 20 GP, since a
+ *  debutant has zero track record behind him, unlike a returning veteran who
+ *  merely missed time. <3 GP → -12, <6 GP → -8, <10 GP → -5, <15 GP → -3,
+ *  <20 GP → -1, ≥20 GP → 0. */
 export function rookieSamplePenalty(totalGp: number): number {
-  if (totalGp < 3) return 5;
-  if (totalGp < 6) return 3;
-  if (totalGp < 10) return 1;
+  if (totalGp < 3) return 12;
+  if (totalGp < 6) return 8;
+  if (totalGp < 10) return 5;
+  if (totalGp < 15) return 3;
+  if (totalGp < 20) return 1;
   return 0;
 }
 
