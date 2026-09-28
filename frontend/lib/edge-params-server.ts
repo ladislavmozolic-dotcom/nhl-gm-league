@@ -668,28 +668,34 @@ export async function promoteParamSet(target: ParamSet): Promise<{ skaters: numb
 }
 
 // ---- Rookie Calculator ------------------------------------------------------
-// Rates prospects/rookies who don't have an established rating yet, using the
-// SAME engine and weights as the "Live Calculator — Nastavenia & Tuning" modal
-// (lib/live-calculator-engine.ts's runLiveCalculatorRecompute, the V10 baseline-
-// percentile model) — deliberately NOT the separate Next Gen Parameters engine
-// above (edgeRatings/EDGE_COMPOSITES), so a rookie's rating always matches
-// whatever the rest of the league is computed with, tuned in exactly one place.
-// runLiveCalculatorRecompute() already processes every non-goalie Player row
-// with no rosterType filter, so a PROSPECT gets folded into the same population
-// and picks up the engine's own small-sample "V10 Protection Rules" (FARM tiers)
-// automatically — nothing rookie-specific needed on the population/regression
-// side, only on reading the result back out for this table.
-
-const ROOKIE_PARAM_FIELD: Record<string, string> = {
-  CK: "ck", DF: "df", DI: "di", DU: "du", EN: "en", EX: "ex", FG: "fg", FO: "fo",
-  LD: "ld", PA: "pa", PH: "ph", PS: "ps", SC: "sc", SK: "sk", ST: "st",
+// Rates prospects/rookies who don't have an established rating yet. PA/SC/DF/CK/
+// DI/SK/ST/EX come from the SAME engine and weights as the "Live Calculator —
+// Nastavenia & Tuning" modal (lib/live-calculator-engine.ts's
+// runLiveCalculatorRecompute, the V10 baseline-percentile model), per explicit
+// direction that those 8 must always match what the rest of the league is
+// computed with, tuned in exactly one place. That engine, however, does NOT
+// compute the other 7 skater params at all (EN/DU/PH/FO/LD/PS/FG) — it just
+// passes through whatever was already on the row (a static baseline snapshot,
+// or a flat default for a brand-new player) — so those 7 are supplemented from
+// the Next Gen/Edge engine above (edgeRatings/EDGE_COMPOSITES), which already
+// has real working formulas for all of them, so a rookie doesn't show a
+// meaningless flat default where a real one is available.
+const LIVE_CALC_PARAMS: Record<string, string> = { PA: "pa", SC: "sc", DF: "df", CK: "ck", DI: "di", SK: "sk", ST: "st", EX: "ex" };
+const EDGE_SUPPLEMENT_PARAMS = ["EN", "DU", "PH", "FO", "LD", "PS", "FG"] as const;
+// Every rating field an admin can edit/activate — used to look up the DB column
+// name for any of the 16 param columns, regardless of which engine produced it.
+const ROOKIE_RATING_FIELD: Record<string, string> = {
+  ...LIVE_CALC_PARAMS,
+  EN: "en", DU: "du", PH: "ph", FO: "fo", LD: "ld", PS: "ps", FG: "fg",
+  OV: "overall",
 };
 
-/** Copy a Rookie Calculator player's already-computed Live Calculator projection
- *  (Player.liveCalculatorRatings, written by runLiveCalculatorRecompute — see
- *  scanAndSyncDebutants, which triggers a recompute after every scan) onto his
- *  live ck/sc/pa/... fields. Nothing is (re)computed here — this only activates
- *  a number the shared engine already produced. */
+/** Copy a Rookie Calculator player's rating onto his live ck/sc/pa/... fields:
+ *  PA/SC/DF/CK/DI/SK/ST/EX/OV from his already-computed Live Calculator
+ *  projection (Player.liveCalculatorRatings, written by runLiveCalculatorRecompute
+ *  — see scanAndSyncDebutants, which triggers a recompute after every scan);
+ *  EN/DU/PH/FO/LD/PS/FG from the Edge engine, which is the only one of the two
+ *  that actually computes them. */
 export async function activateRookieLiveRating(playerId: number): Promise<{ ok: boolean; applied?: Record<string, number>; error?: string }> {
   const player = await prisma.player.findUnique({ where: { id: playerId }, select: { isGoalie: true, liveCalculatorRatings: true } });
   if (!player) return { ok: false, error: "Player not found." };
@@ -700,7 +706,7 @@ export async function activateRookieLiveRating(playerId: number): Promise<{ ok: 
   await backupLiveIfNeeded();
   const applied: Record<string, number> = {};
   const data: Record<string, number> = {};
-  for (const [param, field] of Object.entries(ROOKIE_PARAM_FIELD)) {
+  for (const [param, field] of Object.entries(LIVE_CALC_PARAMS)) {
     const v = live.projected[field];
     if (v == null) continue;
     const rounded = Math.round(v);
@@ -711,13 +717,21 @@ export async function activateRookieLiveRating(playerId: number): Promise<{ ok: 
     applied.OV = Math.round(live.overallProjected);
     data.overall = applied.OV;
   }
+
+  const edgeRow = (await edgeRatings("NHL", true)).find((r) => r.playerId === playerId);
+  if (edgeRow) {
+    for (const param of EDGE_SUPPLEMENT_PARAMS) {
+      const v = edgeRow.ratings[param];
+      if (v == null) continue;
+      applied[param] = v;
+      data[ROOKIE_RATING_FIELD[param]] = v;
+    }
+  }
   if (!Object.keys(data).length) return { ok: false, error: "No computed rating available yet." };
 
   await prisma.player.update({ where: { id: playerId }, data });
   return { ok: true, applied };
 }
-
-const ROOKIE_RATING_FIELD: Record<string, string> = { ...ROOKIE_PARAM_FIELD, OV: "overall" };
 
 /** Write a GM-adjusted rating for one Rookie Calculator player directly onto his
  *  live ck/sc/pa/... fields, bypassing edgeRatings() entirely. The Rookie
@@ -762,9 +776,12 @@ export type RookieRow = {
  *  rookie and must NOT show up here — only genuine PROSPECT-rosterType players do.
  *  Reads Player.liveCalculatorRatings — the SAME blob every other player's rating
  *  comes from — instead of running its own separate computation, so a rookie's
- *  number always matches what the shared "Live Calculator — Nastavenia & Tuning"
- *  engine (lib/live-calculator-engine.ts) would give him. A prospect whose blob
- *  hasn't been computed yet (never scanned/recomputed) is simply skipped here —
+ *  PA/SC/DF/CK/DI/SK/ST/EX/OV always match what the shared "Live Calculator —
+ *  Nastavenia & Tuning" engine (lib/live-calculator-engine.ts) would give him.
+ *  That engine doesn't compute EN/DU/PH/FO/LD/PS/FG at all, so those 7 are
+ *  supplemented from the Edge engine (edgeRatings/EDGE_COMPOSITES) below, which
+ *  already has real formulas for them. A prospect whose blob hasn't been
+ *  computed yet (never scanned/recomputed) is simply skipped here —
  *  scanAndSyncDebutants() always triggers a fresh recompute, so this should be
  *  rare; an admin can also always hit "Prepočítať ratingy" in Live Calculator. */
 export async function rookieCalculatorRows(): Promise<RookieRow[]> {
@@ -786,6 +803,7 @@ export async function rookieCalculatorRows(): Promise<RookieRow[]> {
 
   const teams = await prisma.team.findMany({ select: { id: true, code: true } });
   const codeById = new Map(teams.map((t) => [t.id, t.code]));
+  const edgeById = new Map((await edgeRatings("NHL", true)).map((r) => [r.playerId, r.ratings]));
 
   const out: RookieRow[] = [];
   for (const p of withProduction) {
@@ -795,11 +813,13 @@ export async function rookieCalculatorRows(): Promise<RookieRow[]> {
     const ahl = (p.ahlStats as any) ?? {};
     const ahlGP = (ahl.cur?.gp ?? 0) + (ahl.last?.gp ?? 0);
     const ratings: Record<string, number> = {};
-    for (const [param, field] of Object.entries(ROOKIE_PARAM_FIELD)) {
+    for (const [param, field] of Object.entries(LIVE_CALC_PARAMS)) {
       const v = live.projected[field];
       if (v != null) ratings[param] = Math.round(v);
     }
     if (live.overallProjected != null) ratings.OV = Math.round(live.overallProjected);
+    const edge = edgeById.get(p.id);
+    if (edge) for (const param of EDGE_SUPPLEMENT_PARAMS) if (edge[param] != null) ratings[param] = edge[param];
 
     out.push({
       playerId: p.id, name: cleanName(p.name), slug: p.slug, position: p.position ?? "",
