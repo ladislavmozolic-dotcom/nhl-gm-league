@@ -144,19 +144,6 @@ export function availabilityFactor(gp: number | null | undefined, fullGP: number
   return 0.7 + 0.3 * Math.max(0, Math.min(1, gp / full));
 }
 
-/** Star premium from how elite he is WITHIN his position: the better of his rating
- *  rank and his production rank (points/GP, 40+ GP). Outside the top 7 % → 1; the
- *  very best → ×1.65, so Makar/Kucherov-level players ask $16M+ instead of a
- *  comps-median number. Fades from 34 (a 36-year-old star is paid for what's left),
- *  and goalies get less of it (their ratings don't separate starters as cleanly). */
-export function eliteFactor(ratingPct: number, prodPct: number | null, age?: number | null, goalie = false): number {
-  const e = Math.max(ratingPct, prodPct ?? 0);
-  if (e <= 0.93) return 1;
-  const a = age ?? 27;
-  const ageScale = a <= 33 ? 1 : a === 34 ? 0.55 : a === 35 ? 0.35 : 0.2;
-  return 1 + 0.65 * Math.pow(Math.min(1, (e - 0.93) / 0.07), 1.5) * ageScale * (goalie ? 0.4 : 1);
-}
-
 /** Term the player wants, bounded by his age. */
 export function wantedYears(market: number, grp: FaPos, age: number | null | undefined): number {
   const a = age ?? 27;
@@ -324,8 +311,8 @@ export function buildDemand(input: {
   rfaFactor?: number;
   /** games-played availability multiplier (1 = played a full season) — see availabilityFactor */
   availability?: number;
-  /** star premium (1 = not elite) — see eliteFactor */
-  elite?: number;
+  /** elite ladder salary (0 = not elite) — the ask never falls below it; see eliteTarget */
+  eliteTarget?: number;
   /** max contract (CBA: 20 % of the upper cap); default $16M */
   maxSalary?: number;
   realCapHit?: number | null; // his actual real-NHL cap hit, if known — see REAL_FLOOR_RATIO
@@ -346,9 +333,9 @@ export function buildDemand(input: {
   // missed a big part of last season → clubs pay for the risk, he signs for less
   const avail = overridden ? 1 : (input.availability ?? 1);
   salary *= avail;
-  // the league's elite are paid on a different scale from the comps around them
-  const elite = overridden ? 1 : (input.elite ?? 1);
-  salary *= elite;
+  // the league's elite are paid off the max contract, in rank order — not off the comps
+  const eliteT = overridden ? 0 : (input.eliteTarget ?? 0) * avail;
+  if (eliteT > 0) salary = eliteT; // his ladder spot IS his price — keeps the elite in rank order
   // opening ask (round 1) never comes in UNDER his current pay — a re-signing player
   // wants at least a small raise, and more when he's producing (perf > 1).
   // (only when he's actually producing — a declining vet doesn't get a raise floor)
@@ -358,7 +345,7 @@ export function buildDemand(input: {
   }
   // A veteran (32+) past his peak doesn't get a raise unless he just had a big year —
   // his current deal is the ceiling (Doughty/Karlsson-type contracts only go down).
-  if (!overridden && elite < 1.15 && (input.age ?? 27) >= 32 && input.currentSalary && input.currentSalary > 0) {
+  if (!overridden && eliteT === 0 && (input.age ?? 27) >= 32 && input.currentSalary && input.currentSalary > 0) {
     salary = Math.min(salary, input.currentSalary * ((input.perf ?? 1) >= 1.08 && (input.age ?? 27) < 35 && avail >= 0.95 ? 1.1 : 1) * avail);
   }
   // Real-world tether — never let his demand fall too far below what he actually
