@@ -49,3 +49,9 @@ export function epSearchName(name: string): string {
 export function epProfileUrl(name: string): string {
   return `https://duckduckgo.com/?q=${encodeURIComponent("\\" + epSearchName(name) + " eliteprospects player")}`;
 }
+
+/** Safe fallback when no verified player ID is known: show EliteProspects'
+ * own search results instead of guessing a direct profile for a namesake. */
+export function epPlayerSearchUrl(name: string): string {
+  return `https://www.eliteprospects.com/search/player?q=${encodeURIComponent(epSearchName(name))}`;
+}

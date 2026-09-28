@@ -4,6 +4,7 @@ import { Card, PageHeader, Pill, SectionTitle, StatTile } from "@/components/ui"
 import Link from "next/link";
 import YourProspectTracker from "@/components/YourProspectTracker";
 import { worldTeamLevel } from "@/lib/world-team-level";
+import { epPlayerSearchUrl } from "@/lib/playerName";
 
 export const dynamic = "force-dynamic";
 
@@ -57,7 +58,7 @@ export default async function AroundTheWorldPage({ searchParams }: { searchParam
       {teamId != null && (
         <section>
           <YourProspectTracker prospects={myProspects.map((p) => { const w = p.worldPlayer; const s = w?.stats[0]; const league = s?.league ?? w?.currentTeam?.league; const club = s?.team ?? w?.currentTeam; return {
-            id: p.id, name: p.name, position: p.position ?? w?.position ?? null, epUrl: p.epUrl ?? w?.epUrl ?? null,
+            id: p.id, name: p.name, position: p.position ?? w?.position ?? null, epUrl: p.epUrl ?? w?.epUrl ?? epPlayerSearchUrl(p.name),
             club: club?.name ?? null, league: league?.name ?? null, leagueCode: league?.code ?? null,
             country: league?.country ?? null, level: league ? worldTeamLevel(league.name, club?.name ?? "") : null,
             teamLogoUrl: club?.logoUrl ?? null, season: s?.season ?? null,

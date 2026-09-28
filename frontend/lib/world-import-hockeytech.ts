@@ -58,17 +58,21 @@ async function importSeason(code: HockeyTechLeague["code"]) {
     byExternalId.set(externalId, saved.id); byCode.set(code, saved.id);
   }
   const sectionRows = (raw: Json) => (((raw as unknown as Json[])[0]?.sections as Json[] | undefined)?.[0]?.data ?? []) as Json[];
-  const all = [...sectionRows(skatersRaw).map((v) => ({ data: (v.row ?? {}) as Json, goalie: false })), ...sectionRows(goaliesRaw).map((v) => ({ data: (v.row ?? {}) as Json, goalie: true }))];
+  const goalieRows = sectionRows(goaliesRaw);
+  const all = [...sectionRows(skatersRaw).map((v) => ({ data: (v.row ?? {}) as Json, prop: (v.prop ?? {}) as Json, goalie: false })), ...goalieRows.map((v) => ({ data: (v.row ?? {}) as Json, prop: (v.prop ?? {}) as Json, goalie: true }))];
   const unmatched = await prisma.prospect.findMany({ where: { worldPlayerId: null }, select: { id: true, name: true, epUrl: true } });
   const prospectsByName = new Map<string, typeof unmatched>();
   for (const prospect of unmatched) { const key = normalize(prospect.name); prospectsByName.set(key, [...(prospectsByName.get(key) ?? []), prospect]); }
   let linked = 0;
-  for (const { data, goalie } of all) {
-    const externalId = `${code.toLowerCase()}:${String(data.player_id)}`; const name = String(data.name ?? "").trim();
+  for (const { data, prop, goalie } of all) {
+    const externalId = `${code.toLowerCase()}:${String(data.player_id)}`;
+    // HockeyTech goalie rows use "shortname" (initial + surname); the full
+    // name is in prop.shortname.seoName. Skaters instead use row.name.
+    const name = String(data.name ?? (prop.shortname as Json | undefined)?.seoName ?? "").trim();
     if (!name) continue;
     const teamId = byExternalId.get(String(data.team_id ?? "")) ?? byCode.get(String(data.team_code ?? "")) ?? null;
-    const player = await prisma.worldPlayer.upsert({ where: { externalId }, update: { name, normalizedName: normalize(name), position: String(data.position ?? "") || null, currentTeamId: teamId }, create: { externalId, name, normalizedName: normalize(name), position: String(data.position ?? "") || null, currentTeamId: teamId } });
-    await prisma.worldPlayerSeasonStat.upsert({ where: { playerId_leagueId_season: { playerId: player.id, leagueId: league.id, season: seasonName } }, update: { teamId, isGoalie: goalie, gamesPlayed: integer(data.games_played), goals: integer(data.goals), assists: integer(data.assists), points: integer(data.points), plusMinus: goalie ? null : integer(data.plus_minus), penaltyMinutes: integer(data.penalty_minutes), wins: goalie ? integer(data.wins) : null, losses: goalie ? integer(data.losses) : null, overtimeLosses: goalie ? integer(data.overtime_losses) : null, savePercentage: goalie && data.save_percentage != null ? Number(data.save_percentage) : null, goalsAgainstAverage: goalie && data.goals_against_average != null ? Number(data.goals_against_average) : null, shutouts: goalie ? integer(data.shutouts) : null, source: "official-feed", syncedAt: new Date() }, create: { playerId: player.id, leagueId: league.id, teamId, season: seasonName, isGoalie: goalie, gamesPlayed: integer(data.games_played), goals: integer(data.goals), assists: integer(data.assists), points: integer(data.points), plusMinus: goalie ? null : integer(data.plus_minus), penaltyMinutes: integer(data.penalty_minutes), wins: goalie ? integer(data.wins) : null, losses: goalie ? integer(data.losses) : null, overtimeLosses: goalie ? integer(data.overtime_losses) : null, savePercentage: goalie && data.save_percentage != null ? Number(data.save_percentage) : null, goalsAgainstAverage: goalie && data.goals_against_average != null ? Number(data.goals_against_average) : null, shutouts: goalie ? integer(data.shutouts) : null, source: "official-feed" } });
+    const player = await prisma.worldPlayer.upsert({ where: { externalId }, update: { name, normalizedName: normalize(name), position: goalie ? "G" : String(data.position ?? "") || null, currentTeamId: teamId }, create: { externalId, name, normalizedName: normalize(name), position: goalie ? "G" : String(data.position ?? "") || null, currentTeamId: teamId } });
+    await prisma.worldPlayerSeasonStat.upsert({ where: { playerId_leagueId_season: { playerId: player.id, leagueId: league.id, season: seasonName } }, update: { teamId, isGoalie: goalie, gamesPlayed: integer(data.games_played), goals: integer(data.goals), assists: integer(data.assists), points: integer(data.points), plusMinus: goalie ? null : integer(data.plus_minus), penaltyMinutes: integer(data.penalty_minutes), wins: goalie ? integer(data.wins) : null, losses: goalie ? integer(data.losses) : null, overtimeLosses: goalie ? integer(data.ot_losses ?? data.overtime_losses) : null, savePercentage: goalie && data.save_percentage != null ? Number(data.save_percentage) : null, goalsAgainstAverage: goalie && data.goals_against_average != null ? Number(data.goals_against_average) : null, shutouts: goalie ? integer(data.shutouts) : null, source: "official-feed", syncedAt: new Date() }, create: { playerId: player.id, leagueId: league.id, teamId, season: seasonName, isGoalie: goalie, gamesPlayed: integer(data.games_played), goals: integer(data.goals), assists: integer(data.assists), points: integer(data.points), plusMinus: goalie ? null : integer(data.plus_minus), penaltyMinutes: integer(data.penalty_minutes), wins: goalie ? integer(data.wins) : null, losses: goalie ? integer(data.losses) : null, overtimeLosses: goalie ? integer(data.ot_losses ?? data.overtime_losses) : null, savePercentage: goalie && data.save_percentage != null ? Number(data.save_percentage) : null, goalsAgainstAverage: goalie && data.goals_against_average != null ? Number(data.goals_against_average) : null, shutouts: goalie ? integer(data.shutouts) : null, source: "official-feed" } });
     const matching = prospectsByName.get(normalize(name)) ?? [];
     if (matching.length === 1) {
       const prospect = matching[0];
@@ -82,7 +86,7 @@ async function importSeason(code: HockeyTechLeague["code"]) {
   // Backfill direct EP profiles for links made by a previous import run too.
   const linkedProfiles = await prisma.prospect.findMany({ where: { worldPlayerId: { not: null }, epUrl: { not: null } }, select: { worldPlayerId: true, epUrl: true } });
   await Promise.all(linkedProfiles.map((p) => prisma.worldPlayer.update({ where: { id: p.worldPlayerId! }, data: { epUrl: p.epUrl } })));
-  return { season: seasonName, teams: teams.length, players: all.length, linked };
+  return { season: seasonName, teams: teams.length, players: all.length, goalies: goalieRows.length, linked };
 }
 
 export const importWhlSeason = () => importSeason("WHL");

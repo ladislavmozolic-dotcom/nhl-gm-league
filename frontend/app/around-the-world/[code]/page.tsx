@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { BackPill, Card, PageHeader, StatTile } from "@/components/ui";
 import WorldLeagueStats from "@/components/WorldLeagueStats";
+import { epPlayerSearchUrl } from "@/lib/playerName";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +49,7 @@ export default async function WorldLeaguePage({ params, searchParams }: {
     {season ? <>
       {seasons.length > 1 && <div className="flex flex-wrap items-center gap-2 text-sm"><span className="text-slate-400">Season:</span>{seasons.map((item) => <Link key={item.season} href={`/around-the-world/${league.code.toLowerCase()}?season=${encodeURIComponent(item.season)}`} className={`rounded-lg px-3 py-1.5 border ${season === item.season ? "border-sky-500/40 bg-sky-500/15 text-sky-300" : "border-slate-800 text-slate-400 hover:text-white"}`}>{item.season}</Link>)}</div>}
       <WorldLeagueStats season={season} leagueCode={league.code} stats={stats.map((s) => ({
-        id: s.id, playerName: s.player.name, position: s.player.position, epUrl: s.player.epUrl,
+        id: s.id, playerName: s.player.name, position: s.player.position, epUrl: s.player.epUrl ?? epPlayerSearchUrl(s.player.name),
         teamId: s.teamId, teamName: s.team?.name ?? "—", teamLogoUrl: s.team?.logoUrl ?? null,
         isGoalie: s.isGoalie, gamesPlayed: s.gamesPlayed, goals: s.goals, assists: s.assists,
         points: s.points, plusMinus: s.plusMinus, penaltyMinutes: s.penaltyMinutes,

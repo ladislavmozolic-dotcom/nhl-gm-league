@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { worldTeamLevel } from "@/lib/world-team-level";
 import { WORLD_LEAGUE_CATALOG } from "@/lib/world-catalog";
+import { epPlayerSearchUrl } from "@/lib/playerName";
 import { BackPill, Card, PageHeader, StatTile } from "@/components/ui";
 import WorldLeagueStats from "@/components/WorldLeagueStats";
 
@@ -34,7 +35,7 @@ export default async function EuropeProspectsPage({ searchParams }: { searchPara
     {season ? <>
       {seasons.length > 1 && <div className="flex flex-wrap items-center gap-2 text-sm"><span className="text-slate-400">Season:</span>{seasons.map((item) => <Link key={item.season} href={`/around-the-world/europe?season=${encodeURIComponent(item.season)}`} className={`rounded-lg px-3 py-1.5 border ${season === item.season ? "border-violet-500/40 bg-violet-500/15 text-violet-300" : "border-slate-800 text-slate-400 hover:text-white"}`}>{item.season}</Link>)}</div>}
       <WorldLeagueStats leagueCode="EUROPE" season={season} stats={stats.map((s) => ({
-        id: s.id, playerName: s.player.name, position: s.player.position, epUrl: s.player.epUrl,
+        id: s.id, playerName: s.player.name, position: s.player.position, epUrl: s.player.epUrl ?? epPlayerSearchUrl(s.player.name),
         teamId: s.teamId, teamName: s.team?.name ?? "—", teamLogoUrl: s.team?.logoUrl ?? null,
         leagueCode: s.league.code, leagueName: s.league.name, country: s.league.country ?? s.league.region,
         level: worldTeamLevel(s.league.name, s.team?.name ?? ""),
