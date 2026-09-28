@@ -33,6 +33,7 @@ const GROUPS: Group[] = [
       { href: "/admin/team-lines", title: "Team Lines & Tactics", descKey: "admin.teamLines.d" },
       { href: "/admin/chemistry", title: "Chemistry Editor", descKey: "admin.chemistry.d" },
       { href: "/admin/contracts", title: "Contracts", descKey: "admin.contracts.d" },
+      { href: "/admin/expiring-contracts", title: "📋 Expiring Contracts", descKey: "admin.expiringContracts.d" },
       { href: "/admin/trades", title: "Completed Trades", descKey: "admin.trades.d" },
       { href: "/admin/signings", title: "Latest Signings", descKey: "admin.signings.d" },
       { href: "/admin/coach-signings", title: "Coach Signings", descKey: "admin.coachSignings.d" },
