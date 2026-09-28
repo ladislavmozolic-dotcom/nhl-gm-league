@@ -13,6 +13,21 @@ import {
   type FWeights, type DWeights, type GWeights,
 } from "./free-agency";
 
+/** Extensions are closed for the first `resignLockDays` days of the regular season
+ *  (counted from the regular-season phase start). Returns the league date they open
+ *  on while locked, else null. */
+export async function resignLockedUntil(): Promise<Date | null> {
+  const s = await loadSettings();
+  const days = Math.max(0, Math.round(s.resignLockDays ?? 0));
+  if (!days) return null;
+  const clock = await getLeagueClock();
+  if (clock.phase !== "regular") return null;
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { regularPhaseAt: true } });
+  if (!cfg?.regularPhaseAt) return null;
+  const opens = new Date(cfg.regularPhaseAt.getTime() + days * 86_400_000);
+  return clock.date.getTime() < opens.getTime() ? opens : null;
+}
+
 /** Current weekly negotiation round (1..3); 1 = opening ask outside the window. */
 export async function currentFrenzyRound(): Promise<number> {
   return (await getLeagueClock()).frenzyRound || 1;
@@ -154,7 +169,9 @@ function groupScores(pool: MarketRow[], grp: FaPos): { scoreOf: (market: number,
  *  defensemen, who typically peak later and age more gradually on skill/reads
  *  alone, get one extra year at full value and a gentler slope after. */
 function eliteAgeScale(grp: FaPos, age: number): number {
-  if (grp === "D") {
+  // top skaters (F and D) hold their value through 33 — Kucherov-type elite forwards
+  // don't fall off a cliff; goalies keep the earlier fade below
+  if (grp !== "G") {
     if (age <= 33) return 1;
     if (age === 34) return 0.85;
     if (age === 35) return 0.70;
@@ -436,6 +453,7 @@ export type TeamAsk = {
   grp: FaPos; base: Demand; slot: LineSlot; line: number;
   contention: Contention; desired: Desired; ask: Demand; age: number | null;
   lowballBump: number; // >1 when this club insulted him with a lowball earlier (his ask to THEM is up)
+  elite: number; // elite-ladder price (0 = not elite)
 };
 
 // ---- lowball memory --------------------------------------------------------
@@ -566,7 +584,7 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
   // …unless he's one of the league's elite: then his ladder spot is the ceiling (Celebrini ≈ Carlsson)
   const ceiling = rfa && expAge <= 23 ? Math.max(round50k(maxSalary * 0.7), elite) : maxSalary;
   if (ask.salary > ceiling) ask = { ...ask, salary: ceiling, floorSalary: Math.min(ask.floorSalary, round50k(ceiling * 0.92)) };
-  return { grp, base, slot, line, contention: ctx.contention, desired, ask, age: dealAge, lowballBump: bump };
+  return { grp, base, slot, line, contention: ctx.contention, desired, ask, age: dealAge, lowballBump: bump, elite };
 }
 
 /** Evaluate a concrete offer (money + term + promised deployment) at a club. */
@@ -584,7 +602,7 @@ export async function evaluateTeamOffer(
   const roleWorse = deploy.line > info.desired.line;
   const disc = roleWorse ? 0 : clauseDiscount(grant?.clause, grant?.breadth);
   // longer term than his sweet spot raises the price (always negotiable, never a refusal)
-  const tp = termPremium(years, raw.years, info.age, info.slot, raw.floorSalary);
+  const tp = termPremium(years, raw.years, info.age, info.slot, raw.floorSalary, info.elite > 0);
   const f = (1 - disc) * tp;
   const ask: Demand = f !== 1
     ? { ...raw, floorSalary: Math.max(775_000, Math.round((raw.floorSalary * f) / 50_000) * 50_000), salary: Math.max(775_000, Math.round((raw.salary * f) / 50_000) * 50_000) }

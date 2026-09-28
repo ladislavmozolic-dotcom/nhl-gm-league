@@ -10,7 +10,7 @@ import { teamCapCommitted } from "@/lib/cap";
 import {
   loadMarketPool, teamContentionMap, teamAsk, evaluateTeamOffer, loadLeagueCap, weakestTeams,
   recordLowball, clearLowballs, lowballNote,
-  ufaAtExpiry,
+  ufaAtExpiry, resignLockedUntil,
 } from "@/lib/free-agency-server";
 import { MAX_TERM, faPosGroup, willingnessNote, twoWayObjection, type Deployment } from "@/lib/free-agency";
 import { loadSettings, saveSettings } from "@/lib/sim/settings";
@@ -1137,6 +1137,8 @@ export async function extendContractAction(
   if (phase === "frenzy") {
     return { ok: false as const, error: "Extensions are closed during the Free Agent Frenzy — use the market offer flow instead." };
   }
+  const lockedUntil = await resignLockedUntil();
+  if (lockedUntil) return { ok: false as const, error: `Extensions are closed for the first days of the regular season — they open on ${lockedUntil.toISOString().slice(0, 10)}.` };
   // A "1 year left" deal only means something once a real season is underway — before
   // regular season starts, only already-expired (0-year) deals are up for renewal.
   // Matches the same gate ContractSection uses to decide who's shown in the list.

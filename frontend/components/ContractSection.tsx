@@ -10,7 +10,7 @@ import { loadSettings } from "@/lib/sim/settings";
 import { getLeagueClock } from "@/lib/calendar-server";
 import { cleanName } from "@/lib/playerName";
 import { CONTRACT_GROUP_META as META, type ContractGroup as Group } from "@/lib/contract-status";
-import { ufaAtExpiry } from "@/lib/free-agency-server";
+import { ufaAtExpiry, resignLockedUntil } from "@/lib/free-agency-server";
 
 export default async function ContractSection({ teamId }: { teamId: number }) {
   const canManage = await canManageTeam(teamId);
@@ -20,7 +20,8 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
   // market. Blocked only during the Free Agent Frenzy itself, which has its own
   // dedicated offer/counter flow for players who've actually reached free agency.
   const phase = (await getLeagueClock()).phase;
-  const canNegotiate = phase !== "frenzy";
+  const lockedUntil = await resignLockedUntil();
+  const canNegotiate = phase !== "frenzy" && !lockedUntil;
   // include the club's AHL/farm players whose deals are up too
   const org = await prisma.team.findUnique({ where: { id: teamId }, select: { affiliateTeams: { select: { id: true } } } });
   const orgIds = [teamId, ...(org?.affiliateTeams.map((a) => a.id) ?? [])];
@@ -66,6 +67,7 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
           <span className="text-red-400 font-semibold">UFA {groups.UFA.length}</span>
           <span className="text-blue-400 font-semibold">RFA {groups.RFA.length}</span>
           {!canManage && <span className="text-slate-500 text-xs ml-auto self-center">Sign in as this club&apos;s GM to re-sign.</span>}
+          {lockedUntil && <span className="text-amber-300 text-xs ml-auto self-center">🔒 Extensions open on {lockedUntil.toISOString().slice(0, 10)} (first days of the regular season are closed)</span>}
         </div>
       </Card>
 

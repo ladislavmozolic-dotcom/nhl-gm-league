@@ -366,6 +366,7 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
             <div className="text-xs text-slate-500 mb-1">Negotiation behaviour</div>
             <NumField k="faLowballPct" label="Lowball = offer below % of his floor" />
             <NumField k="faLowballMaxBumpPct" label="Max ask increase from lowballs (%)" />
+            <NumField k="resignLockDays" label="Extensions closed for first N regular-season days" />
           </div>
           <div>
             <div className="text-xs text-slate-500 mb-1">Ice-time morale</div>

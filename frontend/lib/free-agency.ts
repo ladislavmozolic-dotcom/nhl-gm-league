@@ -200,7 +200,7 @@ export function willingnessFactor(morale: number | null | undefined, market: num
  *  headline ask, calibrated to real comps at that term) — shorter/longer bend
  *  off that anchor at the same per-year rate in both directions. Never a
  *  refusal, just a bigger or smaller number. */
-export function termPremium(offerYears: number, preferredYears: number, age: number | null | undefined, slot?: LineSlot, salary?: number): number {
+export function termPremium(offerYears: number, preferredYears: number, age: number | null | undefined, slot?: LineSlot, salary?: number, elite = false): number {
   const extra = offerYears - preferredYears;
   if (extra === 0) return 1;
   const a = age ?? 27;
@@ -209,7 +209,9 @@ export function termPremium(offerYears: number, preferredYears: number, age: num
   // expected to be worth over its years — every extra season is a declining one, so a
   // longer deal carries a LOWER cap hit (Gostisbehere at 34: 4 years < 2 years per year),
   // and a short one keeps the price of today's player. `age` is his age when the deal starts.
-  if (a >= (isD ? 33 : 32)) return Math.max(0.5, termValue(offerYears, a, isD) / termValue(preferredYears, a, isD));
+  // an elite player ages a year slower still (top forwards don't drop off like depth players)
+  const shift = (isD ? 1 : 0) + (elite ? 1 : 0);
+  if (a >= 32 + shift) return Math.max(0.5, termValue(offerYears, a, shift) / termValue(preferredYears, a, shift));
   // Younger: a YOUNG player charges a lot to lock up his prime years, a 30-31 vet a
   // little for the risk; a prime-age (26-29) player is the cheapest to extend.
   const young = a <= 25;
@@ -221,19 +223,19 @@ export function termPremium(offerYears: number, preferredYears: number, age: num
   return 1 + extra * perYear;
 }
 
-/** Veteran value curve (1 = still at his peak) — a D ages a year later. */
-function vetCurve(age: number, isD: boolean): number {
-  const a = isD ? age - 1 : age;
+/** Veteran value curve (1 = still at his peak) — a D / an elite player ages later (shift). */
+function vetCurve(age: number, shift: number): number {
+  const a = age - shift;
   if (a <= 31) return 1;
   const c: Record<number, number> = { 32: 0.95, 33: 0.9, 34: 0.84, 35: 0.77, 36: 0.7, 37: 0.62 };
   return c[a] ?? 0.55;
 }
 /** Average value over an N-year deal starting at `age`, relative to year one. */
-function termValue(years: number, age: number, isD: boolean): number {
+function termValue(years: number, age: number, shift: number): number {
   const n = Math.max(1, years);
   let t = 0;
-  for (let i = 0; i < n; i++) t += vetCurve(age + i, isD);
-  return t / n / vetCurve(age, isD);
+  for (let i = 0; i < n; i++) t += vetCurve(age + i, shift);
+  return t / n / vetCurve(age, shift);
 }
 
 /** Bottom-of-the-lineup slots: 3rd/4th line, 3rd pair, extras. */
