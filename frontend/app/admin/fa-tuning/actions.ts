@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { isAdmin, getTeamSession } from "@/lib/auth";
 import { loadSettings, saveSettings, mergeSettings, DEFAULT_SETTINGS } from "@/lib/sim/settings";
@@ -93,9 +94,22 @@ export async function previewFaWeightsAction(draft: { f: FWeights; d: DWeights; 
   return out;
 }
 
+/** 1yr..4yr asking-price ladder — any subset may be set. A null/absent term
+ *  falls back to the engine's own computed value for that term (see
+ *  Expiring Contracts — Demand Watch, which reads this field directly). */
+export type OverrideLadder = { 1: number | null; 2: number | null; 3: number | null; 4: number | null };
+const EMPTY_LADDER: OverrideLadder = { 1: null, 2: null, 3: null, 4: null };
+
+function parseLadder(raw: unknown): OverrideLadder {
+  if (!raw || typeof raw !== "object") return { ...EMPTY_LADDER };
+  const r = raw as Record<string, unknown>;
+  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  return { 1: num(r["1"]), 2: num(r["2"]), 3: num(r["3"]), 4: num(r["4"]) };
+}
+
 export type OverrideRow = {
   id: number; name: string; teamName: string | null; position: string | null; isGoalie: boolean;
-  capHit: number | null; faDemandOverride: number | null;
+  capHit: number | null; ladder: OverrideLadder;
 };
 
 export async function searchPlayersForOverrideAction(query: string): Promise<OverrideRow[]> {
@@ -104,28 +118,42 @@ export async function searchPlayersForOverrideAction(query: string): Promise<Ove
   if (q.length < 2) return [];
   const rows = await prisma.player.findMany({
     where: { name: { contains: q, mode: "insensitive" }, rosterType: { in: ["NHL", "AHL"] } },
-    select: { id: true, name: true, position: true, isGoalie: true, capHit: true, faDemandOverride: true, team: { select: { name: true } } },
+    select: { id: true, name: true, position: true, isGoalie: true, capHit: true, faOverrideLadder: true, team: { select: { name: true } } },
     orderBy: { capHit: "desc" },
     take: 20,
   });
-  return rows.map((r) => ({ id: r.id, name: r.name, teamName: r.team?.name ?? null, position: r.position, isGoalie: r.isGoalie, capHit: r.capHit, faDemandOverride: r.faDemandOverride }));
+  return rows.map((r) => ({
+    id: r.id, name: r.name, teamName: r.team?.name ?? null, position: r.position, isGoalie: r.isGoalie, capHit: r.capHit,
+    ladder: parseLadder(r.faOverrideLadder),
+  }));
 }
 
-export async function setPlayerOverrideAction(playerId: number, value: number | null, note?: string): Promise<{ ok: true } | { ok: false; error: string }> {
+const money0 = (n: number) => `$${n.toLocaleString("en-US")}`;
+const ladderSummary = (l: OverrideLadder) => ([1, 2, 3, 4] as const).map((t) => `${t}yr ${l[t] != null ? money0(l[t]!) : "—"}`).join(" · ");
+
+/** Save the full 1-4yr ladder for one player. The 1yr rung also mirrors onto
+ *  the legacy flat `faDemandOverride` (Free Agent Frenzy's own headline-ask
+ *  override), so a hand-set ladder actually steers real negotiations too, not
+ *  just the Demand Watch preview. Passing an all-null ladder clears both. */
+export async function setPlayerOverrideAction(playerId: number, ladder: OverrideLadder, note?: string): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!(await isAdmin())) return { ok: false, error: "Admin only." };
-  const before = await prisma.player.findUnique({ where: { id: playerId }, select: { name: true, faDemandOverride: true } });
+  const before = await prisma.player.findUnique({ where: { id: playerId }, select: { name: true, faOverrideLadder: true } });
   if (!before) return { ok: false, error: "Player not found." };
-  await prisma.player.update({ where: { id: playerId }, data: { faDemandOverride: value } });
-  const from = before.faDemandOverride != null ? `$${before.faDemandOverride.toLocaleString("en-US")}` : "computed";
-  const to = value != null ? `$${value.toLocaleString("en-US")}` : "computed";
+  const beforeLadder = parseLadder(before.faOverrideLadder);
+  const anySet = ([1, 2, 3, 4] as const).some((t) => ladder[t] != null);
+  await prisma.player.update({
+    where: { id: playerId },
+    data: { faOverrideLadder: anySet ? ladder : Prisma.JsonNull, faDemandOverride: ladder[1] },
+  });
   await prisma.faTuningAudit.create({
     data: {
       byName: await actorName(),
       playerId,
-      summary: `${before.name}: demand override ${from} → ${to}${note ? ` — ${note}` : ""}`,
+      summary: `${before.name}: demand ladder [${ladderSummary(beforeLadder)}] → [${ladderSummary(ladder)}]${note ? ` — ${note}` : ""}`,
     },
   });
   revalidatePath("/admin/fa-tuning");
+  revalidatePath("/admin/expiring-contracts");
   return { ok: true };
 }
 

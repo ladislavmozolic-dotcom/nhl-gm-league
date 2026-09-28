@@ -25,6 +25,7 @@ type Row = {
     team: { name: string; code: string | null; logoUrl: string | null };
   };
   ufa: boolean; ladder: Record<number, number> | null; roleLabel: string | null; depth: boolean; preferredYears: number | null;
+  overrideTerms: Set<number>;
 };
 
 // AHL-only or fringe/no-rating players don't get a meaningful market read (no
@@ -66,7 +67,7 @@ export default async function ExpiringContractsPage({ searchParams }: { searchPa
       },
       select: {
         id: true, name: true, slug: true, position: true, age: true, birthDate: true, capHit: true, contractYears: true,
-        isGoalie: true, teamId: true, realCapHit: true, realContractYears: true,
+        isGoalie: true, teamId: true, realCapHit: true, realContractYears: true, faOverrideLadder: true,
         team: { select: { name: true, code: true, logoUrl: true } },
       },
     }),
@@ -78,17 +79,27 @@ export default async function ExpiringContractsPage({ searchParams }: { searchPa
   const rows: Row[] = await Promise.all(players.map(async (p) => {
     const info = await teamAsk(p.id, p.teamId, pool, cmap);
     const ufa = settings.faMode === "simple" || ufaAtExpiry(p);
-    if (!info) return { p, ufa, ladder: null, roleLabel: null, depth: false, preferredYears: null };
+    // Admin → FA Tuning hand-set ladder (any subset of terms) overrides the
+    // computed rung for those terms — the rest still come from the engine.
+    const override = p.faOverrideLadder && typeof p.faOverrideLadder === "object" ? (p.faOverrideLadder as Record<string, number>) : null;
+    const overrideTerms = new Set(TERMS.filter((t) => override?.[String(t)] != null));
+    if (!info) {
+      if (!override) return { p, ufa, ladder: null, roleLabel: null, depth: false, preferredYears: null, overrideTerms };
+      const ladder: Record<number, number> = {};
+      for (const t of overrideTerms) ladder[t] = override![String(t)];
+      return { p, ufa, ladder: Object.keys(ladder).length ? ladder : null, roleLabel: null, depth: false, preferredYears: null, overrideTerms };
+    }
     // No floor clamp here on purpose — a 35+ veteran's ladder is meant to run
     // DOWN as term grows (see termPremium), and clamping every rung at his
     // floorSalary would flatten that back out.
     const ladder: Record<number, number> = {};
     for (const t of TERMS) {
+      if (overrideTerms.has(t)) { ladder[t] = override![String(t)]; continue; }
       const capped = Math.min(t, MAX_TERM);
       const mult = termPremium(capped, info.ask.years, info.age, info.slot, info.ask.salary);
       ladder[t] = Math.max(LEAGUE_MIN, Math.round((info.ask.salary * mult) / 50_000) * 50_000);
     }
-    return { p, ufa, ladder, roleLabel: slotLabel(info.slot), depth: isDepthSlot(info.slot), preferredYears: info.ask.years };
+    return { p, ufa, ladder, roleLabel: slotLabel(info.slot), depth: isDepthSlot(info.slot), preferredYears: info.ask.years, overrideTerms };
   }));
 
   // Every value the demand ladder produces is computed, not a DB column, so
@@ -224,7 +235,7 @@ export default async function ExpiringContractsPage({ searchParams }: { searchPa
               </tr>
             </thead>
             <tbody>
-              {shown.map(({ p, ufa, ladder, roleLabel, depth, preferredYears }) => (
+              {shown.map(({ p, ufa, ladder, roleLabel, depth, preferredYears, overrideTerms }) => (
                 <tr key={p.id} className="border-b border-slate-800/40 hover:bg-slate-800/30 transition-colors last:border-0">
                   <td className="px-2 py-3 text-center">
                     <Link href={`/admin/fa-tuning?name=${encodeURIComponent(p.name)}`} title="Hand-override his demand"
@@ -260,8 +271,11 @@ export default async function ExpiringContractsPage({ searchParams }: { searchPa
                     {roleLabel ?? "—"}{depth ? " (depth)" : ""}
                   </td>
                   {TERMS.map((t) => (
-                    <td key={t} className={`px-3 py-3 text-right tabular-nums ${ladder && preferredYears === t ? "text-emerald-400 font-semibold" : "text-slate-300"}`}>
-                      {ladder ? money(ladder[t]) : "—"}
+                    <td key={t} title={overrideTerms.has(t) ? "Hand-overridden — Admin → FA Tuning" : undefined}
+                      className={`px-3 py-3 text-right tabular-nums ${
+                        overrideTerms.has(t) ? "text-amber-400 font-semibold bg-amber-500/5" : ladder && preferredYears === t ? "text-emerald-400 font-semibold" : "text-slate-300"
+                      }`}>
+                      {ladder ? money(ladder[t]) : "—"}{overrideTerms.has(t) && " ✏️"}
                     </td>
                   ))}
                 </tr>
