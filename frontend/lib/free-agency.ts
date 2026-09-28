@@ -181,24 +181,31 @@ export function willingnessFactor(morale: number | null | undefined, market: num
   const leverage = 0.55 + 0.65 * reputation;                       // fringe 0.55 … star 1.2
   return Math.max(0.88, Math.min(1.16, 1 + moodDelta * 0.2 * leverage));
 }
-/** Salary multiplier for the OFFERED term vs the player's sweet spot. More years
- *  than he'd like → he wants a raise (steeper for older players who see the risk);
- *  fewer years → no premium (he's happy to go short). Never a refusal. */
+/** Salary multiplier for the OFFERED term, continuous across the WHOLE 1-4yr
+ *  range — every extra year of term always costs more, and every year less
+ *  is always a bit cheaper, so a player's asking ladder climbs step by step
+ *  (a 1yr "prove-it" deal is always his cheapest price; 2yr costs more, 3yr
+ *  more again) — EXCEPT a 35+ veteran, who runs the other way (see below).
+ *  `preferredYears` is the anchor where the multiplier is exactly 1 (his
+ *  headline ask, calibrated to real comps at that term) — shorter/longer bend
+ *  off that anchor at the same per-year rate in both directions. Never a
+ *  refusal, just a bigger or smaller number. */
 export function termPremium(offerYears: number, preferredYears: number, age: number | null | undefined, slot?: LineSlot, salary?: number): number {
   const extra = offerYears - preferredYears;
-  if (extra <= 0) return 1;
+  if (extra === 0) return 1;
   const a = age ?? 27;
-  // U-shape: a YOUNG player charges a lot to lock up his prime years, an OLDER one
-  // charges for the risk of a long deal; a prime-age vet is the cheapest to extend.
-  // A young depth player (bridge-deal candidate) is the extreme case: every year past
-  // his 2-year bridge sells a season he expects to be worth much more — at a ~$1M
-  // salary 4 years instead of 2 costs about double. The relative jump shrinks as the
-  // salary grows (a $3.6M player's upside is a smaller share of his pay): +50 %/yr
-  // at ≤$1.2M, ~+17 %/yr at $3.6M, never under the top-role +15 %.
+  // U-shape up to 34: a YOUNG player charges a lot to lock up his prime years, a
+  // 30-34 vet charges for the risk of a long deal; a prime-age (26-29) vet is the
+  // cheapest to extend either way. Past 34 it FLIPS — a 35+ veteran signing multi-
+  // year is trading rate for security (a real-NHL pattern: Karlsson, Doughty-style
+  // team-friendly long extensions), so more term costs LESS per year, not more; a
+  // short "one more run" prove-it deal is where he actually charges a premium.
   const young = a <= 25;
   const depthRate = Math.max(0.15, Math.min(0.5, 0.5 * (1_200_000 / Math.max(1, salary ?? 1_200_000))));
-  const perYear = young ? (slot && isDepthSlot(slot) ? depthRate : 0.15) : a >= 33 ? 0.15 : a >= 30 ? 0.10 : 0.07;
-  return 1 + extra * perYear;
+  const perYear = young ? (slot && isDepthSlot(slot) ? depthRate : 0.15) : a >= 35 ? -0.06 : a >= 33 ? 0.15 : a >= 30 ? 0.10 : 0.07;
+  // floored well above 0 — even a big discount for going short (or long, for a
+  // 35+ vet) never makes the multiplier absurd.
+  return Math.max(0.5, 1 + extra * perYear);
 }
 
 /** Bottom-of-the-lineup slots: 3rd/4th line, 3rd pair, extras. */

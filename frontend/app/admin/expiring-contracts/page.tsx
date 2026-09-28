@@ -4,7 +4,7 @@ import { PageHeader, Card, BackPill } from "@/components/ui";
 import { money } from "@/lib/finance";
 import { cleanName } from "@/lib/playerName";
 import { loadMarketPool, teamContentionMap, teamAsk, ufaAtExpiry } from "@/lib/free-agency-server";
-import { termPremium, isDepthSlot, slotLabel, MAX_TERM } from "@/lib/free-agency";
+import { termPremium, isDepthSlot, slotLabel, MAX_TERM, LEAGUE_MIN } from "@/lib/free-agency";
 import { loadSettings } from "@/lib/sim/settings";
 
 export const dynamic = "force-dynamic";
@@ -54,11 +54,14 @@ export default async function ExpiringContractsPage({ searchParams }: { searchPa
     const info = await teamAsk(p.id, p.teamId, pool, cmap);
     const ufa = settings.faMode === "simple" || ufaAtExpiry(p);
     if (!info) return { p, ufa, ladder: null, roleLabel: null, depth: false, preferredYears: null };
+    // No floor clamp here on purpose — a 35+ veteran's ladder is meant to run
+    // DOWN as term grows (see termPremium), and clamping every rung at his
+    // floorSalary would flatten that back out.
     const ladder: Record<number, number> = {};
     for (const t of TERMS) {
       const capped = Math.min(t, MAX_TERM);
       const mult = termPremium(capped, info.ask.years, info.age, info.slot, info.ask.salary);
-      ladder[t] = Math.max(info.ask.floorSalary, Math.round((info.ask.salary * mult) / 50_000) * 50_000);
+      ladder[t] = Math.max(LEAGUE_MIN, Math.round((info.ask.salary * mult) / 50_000) * 50_000);
     }
     return { p, ufa, ladder, roleLabel: slotLabel(info.slot), depth: isDepthSlot(info.slot), preferredYears: info.ask.years };
   }));
