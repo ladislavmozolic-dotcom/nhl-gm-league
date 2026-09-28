@@ -144,7 +144,7 @@ export async function loadMarketPool(weights?: FaMarketWeights): Promise<MarketR
 /** Elite ladder. Every signed player of a position gets a star score = 75 % rating
  *  rank + 25 % production rank (points/GP, 40+ GP); the top 7 % are ranked and paid
  *  off the MAX contract, in order — the league's best D (Makar) asks more than the
- *  2nd-best (Werenski), who asks more than the 3rd… Rank 1 ≈ 88 % of max, the edge
+ *  2nd-best (Werenski), who asks more than the 3rd… Rank 1 ≈ 95 % of max, the edge
  *  of the top 7 % ≈ 45 %. Fades from 34; goalies get a flatter ladder. 0 = not elite. */
 const scoreCache = new WeakMap<MarketRow[], Map<FaPos, number[]>>();
 function groupScores(pool: MarketRow[], grp: FaPos): { scoreOf: (market: number, ppg: number | null) => number; sorted: number[] } {
@@ -203,7 +203,10 @@ export function eliteTarget(
   // "pretty good, not truly elite" goalie shouldn't be paid like one just for
   // clearing the top-7% cutoff. Same power curve as skaters (mid-tier gets
   // compressed toward the floor, not spread linearly) on a lower 22-52% band.
-  const frac = grp === "G" ? 0.20 + 0.32 * Math.pow(tier, 1.3) : 0.45 + 0.43 * Math.pow(tier, 1.3);
+  // rank 1 (McDavid-tier) should sit right up against the max contract, not
+  // noticeably under it — 95% of max, not 88%. The floor at the edge of the
+  // top 7% is unchanged (only the span above it grew).
+  const frac = grp === "G" ? 0.20 + 0.32 * Math.pow(tier, 1.3) : 0.45 + 0.50 * Math.pow(tier, 1.3);
   return Math.round((maxSalary * frac * ageScale) / 50_000) * 50_000;
 }
 

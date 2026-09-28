@@ -96,7 +96,7 @@ export default async function ExpiringContractsPage({ searchParams }: { searchPa
     for (const t of TERMS) {
       if (overrideTerms.has(t)) { ladder[t] = override![String(t)]; continue; }
       const capped = Math.min(t, MAX_TERM);
-      const mult = termPremium(capped, info.ask.years, info.age, info.slot, info.ask.salary);
+      const mult = termPremium(capped, info.ask.years, info.age, info.slot, info.ask.salary, info.elite > 0);
       ladder[t] = Math.max(LEAGUE_MIN, Math.round((info.ask.salary * mult) / 50_000) * 50_000);
     }
     return { p, ufa, ladder, roleLabel: slotLabel(info.slot), depth: isDepthSlot(info.slot), preferredYears: info.ask.years, overrideTerms };
