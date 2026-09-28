@@ -102,16 +102,23 @@ export async function findMissingNhlPlayers(): Promise<{ ok: boolean; candidates
   });
   if (!notYetTracked.length) return { ok: true, candidates: [] };
 
-  // real GP this season, so a not-yet-debuted draftee (0 games) doesn't flood the list
-  const { latestSeason } = await getLiveCalculatorConfig();
-  const seasonId = Number(latestSeason);
-  const [skaterStats, goalieStats] = await Promise.all([
-    fetchNhlCurrentStats(seasonId).catch(() => []),
-    fetchNhlGoalieStats(seasonId).catch(() => []),
+  // Real GP across BOTH the current and the prior real season, so a not-yet-debuted
+  // draftee (0 games anywhere) doesn't flood the list, but someone whose only real
+  // action was last season (e.g. scanning in the offseason, or early in a new season
+  // before anyone has played 10+ games yet) still counts — exactly like the Live
+  // Calculator blends cur+last instead of only ever looking at "this year".
+  const { latestSeason, previousSeason } = await getLiveCalculatorConfig();
+  const [curSkaters, curGoalies, lastSkaters, lastGoalies] = await Promise.all([
+    fetchNhlCurrentStats(Number(latestSeason)).catch(() => []),
+    fetchNhlGoalieStats(Number(latestSeason)).catch(() => []),
+    fetchNhlCurrentStats(Number(previousSeason)).catch(() => []),
+    fetchNhlGoalieStats(Number(previousSeason)).catch(() => []),
   ]);
   const gpByName = new Map<string, number>();
-  for (const s of skaterStats) gpByName.set(norm(s.name), s.gp ?? 0);
-  for (const g of goalieStats) gpByName.set(norm(g.name), g.gp ?? 0);
+  const addGp = (rows: { name: string; gp: number }[]) => {
+    for (const r of rows) gpByName.set(norm(r.name), (gpByName.get(norm(r.name)) ?? 0) + (r.gp ?? 0));
+  };
+  addGp(curSkaters); addGp(curGoalies); addGp(lastSkaters); addGp(lastGoalies);
 
   // already scouted in a team's Prospect pool — informational, not exclusionary
   const prospects = await prisma.prospect.findMany({ select: { name: true, team: { select: { code: true } } } });
@@ -165,20 +172,28 @@ export type ScanAndSyncResult = {
 
 /** The full "Skenovať" action: find every real NHL debutant we've never tracked,
  *  create a Player row for each one automatically (no manual per-player review —
- *  a real GP > 0 already means he's worth tracking), then ALSO re-pull current-
- *  season stats for the WHOLE league (every rosterType, including players already
- *  sitting in a PROSPECT pool from an earlier scan) so re-running the scan later
- *  keeps every rookie's underlying stats — and therefore his live-computed rating
- *  in rookieCalculatorRows() — current, not just newly discovered names. One
- *  shared stat fetch is reused for both steps instead of hitting the NHL API once
- *  per candidate. */
+ *  real GP > 0 in EITHER real season already means he's worth tracking), then
+ *  ALSO re-pull BOTH the current and the prior real season's stats for the WHOLE
+ *  league (every rosterType, including players already sitting in a PROSPECT pool
+ *  from an earlier scan) — exactly the two seasons edgeRatings() blends, same as
+ *  the Live Calculator. This matters most right when a new real season hasn't
+ *  started yet (curSeasonGP is 0 for literally everyone): without the "last"
+ *  season backfill, a genuine rookie from the season that just ended would show
+ *  up with no games anywhere and no rating, instead of being judged on the real
+ *  rookie season he actually just had. Re-running the scan later keeps every
+ *  rookie's underlying stats — and therefore his live-computed rating in
+ *  rookieCalculatorRows() — current, not just newly discovered names. */
 export async function scanAndSyncDebutants(): Promise<ScanAndSyncResult> {
   const found = await findMissingNhlPlayers();
   if (!found.ok) return { ok: false, created: [], statsRefreshed: 0, error: found.error };
 
-  const { latestSeason } = await getLiveCalculatorConfig();
-  const statRows: NhlStatRow[] = await fetchNhlCurrentStats(Number(latestSeason)).catch(() => []);
-  const gpByName = new Map(statRows.map((r) => [norm(r.name), r.gp ?? 0]));
+  const { latestSeason, previousSeason } = await getLiveCalculatorConfig();
+  const [curRows, lastRows]: [NhlStatRow[], NhlStatRow[]] = await Promise.all([
+    fetchNhlCurrentStats(Number(latestSeason)).catch(() => []),
+    fetchNhlCurrentStats(Number(previousSeason)).catch(() => []),
+  ]);
+  const gpByName = new Map<string, number>();
+  for (const r of [...curRows, ...lastRows]) gpByName.set(norm(r.name), (gpByName.get(norm(r.name)) ?? 0) + (r.gp ?? 0));
 
   const created: ScanAndSyncResult["created"] = [];
   for (const c of found.candidates) {
@@ -190,9 +205,10 @@ export async function scanAndSyncDebutants(): Promise<ScanAndSyncResult> {
   }
 
   let statsRefreshed = 0;
-  if (statRows.length) {
-    try { statsRefreshed = (await importNhlSkaterStats(statRows, "cur")).matched; } catch { /* creation already succeeded either way */ }
-  }
+  try {
+    if (curRows.length) statsRefreshed = (await importNhlSkaterStats(curRows, "cur")).matched;
+    if (lastRows.length) await importNhlSkaterStats(lastRows, "last");
+  } catch { /* creation already succeeded either way */ }
 
   return { ok: true, created, statsRefreshed };
 }

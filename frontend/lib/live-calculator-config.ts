@@ -1,4 +1,19 @@
 import { prisma } from "./prisma";
+import { CURRENT_SEASON_START } from "./finance";
+
+/** The real NHL season ids ("20262027") for the current and prior season, derived
+ *  from today's date (CURRENT_SEASON_START itself rolls over every July 1) — NOT
+ *  a stored, admin-set value. The whole point of a "Live" calculator is that it
+ *  always tracks the real, current season without anyone having to remember to
+ *  bump a setting once a year; MoneyPuck's own year (latestMpYear/previousMpYear
+ *  below) stays admin-editable separately, since MoneyPuck's CSV for a brand new
+ *  season can lag behind the real calendar by days/weeks. */
+function deriveNhlSeasons(): { latestSeason: string; previousSeason: string } {
+  return {
+    latestSeason: `${CURRENT_SEASON_START}${CURRENT_SEASON_START + 1}`,
+    previousSeason: `${CURRENT_SEASON_START - 1}${CURRENT_SEASON_START}`,
+  };
+}
 
 export type CustomMetricConfig = {
   id: string;
@@ -135,7 +150,7 @@ export const DEFAULT_CONFIG: LiveCalcConfigData = {
 export async function getLiveCalculatorConfig(): Promise<LiveCalcConfigData> {
   try {
     const row = await prisma.liveCalcConfig.findUnique({ where: { id: 1 } });
-    if (!row) return DEFAULT_CONFIG;
+    if (!row) return { ...DEFAULT_CONFIG, ...deriveNhlSeasons() };
 
     let weights = DEFAULT_LIVE_CALC_WEIGHTS;
     let goalieWeights = DEFAULT_GOALIE_WEIGHTS;
@@ -154,8 +169,7 @@ export async function getLiveCalculatorConfig(): Promise<LiveCalcConfigData> {
     }
 
     return {
-      latestSeason: row.latestSeason || DEFAULT_CONFIG.latestSeason,
-      previousSeason: row.previousSeason || DEFAULT_CONFIG.previousSeason,
+      ...deriveNhlSeasons(),
       latestMpYear: row.latestMpYear || DEFAULT_CONFIG.latestMpYear,
       previousMpYear: row.previousMpYear || DEFAULT_CONFIG.previousMpYear,
       latestWeight: row.latestWeight ?? DEFAULT_CONFIG.latestWeight,
@@ -172,7 +186,7 @@ export async function getLiveCalculatorConfig(): Promise<LiveCalcConfigData> {
     };
   } catch (err) {
     console.error("[LiveCalculatorConfig] Failed to load config, using defaults:", err);
-    return DEFAULT_CONFIG;
+    return { ...DEFAULT_CONFIG, ...deriveNhlSeasons() };
   }
 }
 
