@@ -6,7 +6,7 @@ import {
   calculateSimonTOverall,
   ParamKey,
 } from "./live-calculator-baseline";
-import { percentileOf } from "./edge-params";
+import { percentileOf, ratingFromCurve, durabilityFromAvailability, leadershipFrom } from "./edge-params";
 import { METRIC_BY_KEY } from "./live-calculator-catalog";
 
 export const SKATER_PARAMS: ParamKey[] = [
@@ -49,7 +49,14 @@ function safeRate(count: number, gp: number): number | null {
 
 /**
  * Execute the Live Calculator recalculation for all skaters.
- * Replicates the exact formulas from NextGen_Player_Ratings_AHL_PA_SC_V10_NHL_GP.xlsx.
+ * Replicates the exact formulas from NextGen_Player_Ratings_AHL_PA_SC_V10_NHL_GP.xlsx
+ * for PA/SC/DF/CK/DI/SK/ST/EX (isNhl players). EN/DU/PH/FO/LD/PS/FG are NOT part
+ * of that spreadsheet — the V10 model never computed them, always passing
+ * through a static baseline snapshot or flat default instead — so those 7 are
+ * ported here from the separate Edge engine's own tested formulas
+ * (lib/edge-params.ts's EDGE_COMPOSITES), so every skater param actually gets a
+ * real, working value from exactly one engine instead of splitting rookies (or
+ * anyone else) across two.
  */
 export async function runLiveCalculatorRecompute(): Promise<{
   totalProcessed: number;
@@ -77,6 +84,7 @@ export async function runLiveCalculatorRecompute(): Promise<{
       rosterType: true,
       age: true,
       overall: true,
+      captaincy: true,
       ck: true, fg: true, di: true, sk: true, st: true,
       en: true, du: true, ph: true, fo: true, pa: true,
       sc: true, df: true, ps: true, ex: true, ld: true,
@@ -84,11 +92,11 @@ export async function runLiveCalculatorRecompute(): Promise<{
       curSeasonHits: true, curSeasonBlocks: true, curSeasonPM: true,
       curSeasonTK: true, curSeasonGV: true, curSeasonPim: true,
       curSeasonToi: true, curSeasonShots: true, curSeasonShToi: true,
-      curSeasonTeamShToi: true,
+      curSeasonTeamShToi: true, curSeasonFoPct: true,
       lastSeasonGP: true, lastSeasonG: true, lastSeasonA: true,
       lastSeasonHits: true, lastSeasonBlocks: true, lastSeasonPM: true,
       lastSeasonTK: true, lastSeasonGV: true, lastSeasonPim: true,
-      lastSeasonToi: true, lastSeasonShots: true, lastSeasonShToi: true,
+      lastSeasonToi: true, lastSeasonShots: true, lastSeasonShToi: true, lastSeasonFoPct: true,
       mpSkater: true,
       edgeSpeed: true,
       careerGP: true,
@@ -134,6 +142,14 @@ export async function runLiveCalculatorRecompute(): Promise<{
     weight: number | null;
     careerRegGP: number | null;
     careerPoGP: number | null;
+    // EN/PH/FO/PS/FG/LD inputs (see the 7-param supplement block below)
+    toi: number | null;
+    tk60: number | null;
+    gv60: number | null;
+    off60: number | null;
+    foPct: number | null;
+    shpct: number | null;
+    captaincy: string | null;
     // AHL stats
     ahlG: number | null;
     ahlA: number | null;
@@ -280,6 +296,29 @@ export async function runLiveCalculatorRecompute(): Promise<{
     const careerRegGP = cGP.reg != null ? Number(cGP.reg) : null;
     const careerPoGP = cGP.po != null ? Number(cGP.po) : null;
 
+    // EN: ice time per game (already stored as TOI/game in seconds), blended
+    const toi = blendVal(p.curSeasonToi, p.lastSeasonToi);
+
+    // PH: takeaways/giveaways per 60 + off60 (goal+assist rate, reuses g60/a60 above)
+    const tk60Cur = safePer60(p.curSeasonTK ?? 0, (p.curSeasonToi ?? 0) * nhlGpLatest);
+    const tk60Last = safePer60(p.lastSeasonTK ?? 0, (p.lastSeasonToi ?? 0) * nhlGpPrevious);
+    const tk60 = blendVal(tk60Cur, tk60Last);
+    const gv60Cur = safePer60(p.curSeasonGV ?? 0, (p.curSeasonToi ?? 0) * nhlGpLatest);
+    const gv60Last = safePer60(p.lastSeasonGV ?? 0, (p.lastSeasonToi ?? 0) * nhlGpPrevious);
+    const gv60 = blendVal(gv60Cur, gv60Last);
+    const off60 = g60 != null || a60 != null ? (g60 ?? 0) + (a60 ?? 0) : null;
+
+    // FO: faceoff win% (centres only in practice — near-0 for wingers/D, filtered at read time)
+    const foPct = blendVal(p.curSeasonFoPct, p.lastSeasonFoPct);
+
+    // PS: shooting% (goals per shot), blended per season
+    const shpctCur = (p.curSeasonShots ?? 0) > 0 ? (p.curSeasonG ?? 0) / p.curSeasonShots! : null;
+    const shpctLast = (p.lastSeasonShots ?? 0) > 0 ? (p.lastSeasonG ?? 0) / p.lastSeasonShots! : null;
+    const shpct = blendVal(shpctCur, shpctLast);
+
+    // LD: captaincy (Player.captaincy: "C" | "A" | null)
+    const captaincy = p.captaincy ?? null;
+
     // AHL
     const ahlG = Number(ahlCur.g ?? ahlLast.g ?? 0);
     const ahlA = Number(ahlCur.a ?? ahlLast.a ?? 0);
@@ -302,6 +341,7 @@ export async function runLiveCalculatorRecompute(): Promise<{
       pkToiPg, xga5, relXga5, ga5, relXgaPk, blk60, xgfPct,
       hit60, hitPg, penBal60, pim60,
       burst20, weight, careerRegGP, careerPoGP,
+      toi, tk60, gv60, off60, foPct, shpct, captaincy,
       ahlG, ahlA, ahlShots, ahlPim, ahlPlusMinus,
     });
   }
@@ -315,6 +355,7 @@ export async function runLiveCalculatorRecompute(): Promise<{
       relXgaPk: [] as number[], blk60: [] as number[], xgfPct: [] as number[],
       hit60: [] as number[], hitPg: [] as number[], penBal60: [] as number[], pim60: [] as number[],
       burst20: [] as number[], weight: [] as number[], careerTotal: [] as number[],
+      toi: [] as number[], tk60: [] as number[], gv60: [] as number[], off60: [] as number[], foPct: [] as number[], shpct: [] as number[],
     },
     D: {
       apg: [] as number[], a60: [] as number[], a60_5v5: [] as number[],
@@ -323,6 +364,7 @@ export async function runLiveCalculatorRecompute(): Promise<{
       relXgaPk: [] as number[], blk60: [] as number[], xgfPct: [] as number[],
       hit60: [] as number[], hitPg: [] as number[], penBal60: [] as number[], pim60: [] as number[],
       burst20: [] as number[], weight: [] as number[], careerTotal: [] as number[],
+      toi: [] as number[], tk60: [] as number[], gv60: [] as number[], off60: [] as number[], foPct: [] as number[], shpct: [] as number[],
     },
     AHL: {
       apg: [] as number[], gpg: [] as number[], shotsPg: [] as number[], shPct: [] as number[],
@@ -355,6 +397,12 @@ export async function runLiveCalculatorRecompute(): Promise<{
     if (e.careerRegGP != null) {
       targetPool.careerTotal.push(e.careerRegGP * config.weights.ex.careerRegGP + (e.careerPoGP ?? 0) * config.weights.ex.careerPoGP);
     }
+    if (e.toi != null) targetPool.toi.push(e.toi);
+    if (e.tk60 != null) targetPool.tk60.push(e.tk60);
+    if (e.gv60 != null) targetPool.gv60.push(e.gv60);
+    if (e.off60 != null) targetPool.off60.push(e.off60);
+    if (e.foPct != null && e.foPct > 0) targetPool.foPct.push(e.foPct);
+    if (e.shpct != null) targetPool.shpct.push(e.shpct);
 
     if (!e.isNhl && (e.ahlGpLatest > 0 || e.ahlGpPrevious > 0)) {
       const ahlGp = e.ahlGpLatest || e.ahlGpPrevious;
@@ -577,6 +625,59 @@ export async function runLiveCalculatorRecompute(): Promise<{
         const compEX = totW_EX > 0 ? (stdEX + cSumEX) / totW_EX : 0.5;
         projected.ex = lookupRatingFromPercentile("EX", e.posGroup, compEX);
       }
+
+      // The remaining 7 skater params (EN/DU/PH/FO/LD/PS/FG) have no dedicated
+      // weight group of their own yet (no LiveCalcWeights.en/du/... to tune),
+      // so these use fixed weights — ported straight from the Edge engine's
+      // EDGE_COMPOSITES (lib/edge-params.ts), which already had real, tested
+      // formulas for all of them, instead of leaving them at a flat baseline
+      // pass-through. ratingFromCurve is the same non-linear percentile->rating
+      // curve the Edge engine uses (DEFAULT anchor: p50→74, p90→89, p99→95).
+
+      // EN (Endurance): ice time per game percentile
+      if (e.toi != null) {
+        projected.en = ratingFromCurve(percentileOf(e.toi, pool.toi), "DEFAULT");
+      }
+
+      // DU (Durability): games-played availability — not population-based
+      projected.du = durabilityFromAvailability(e.nhlGpLatest, 82, e.nhlGpPrevious);
+
+      // PH (Puck Handling): 50% off60 (G+A/60) + 20% takeaways/60 + 30% inv giveaways/60
+      {
+        const parts: [number, number][] = [];
+        if (e.off60 != null) parts.push([percentileOf(e.off60, pool.off60), 0.5]);
+        if (e.tk60 != null) parts.push([percentileOf(e.tk60, pool.tk60), 0.2]);
+        if (e.gv60 != null) parts.push([1 - percentileOf(e.gv60, pool.gv60), 0.3]);
+        const wtot = parts.reduce((s, [, wt]) => s + wt, 0);
+        if (wtot > 0) projected.ph = ratingFromCurve(parts.reduce((s, [pc, wt]) => s + pc * wt, 0) / wtot, "DEFAULT");
+      }
+
+      // FO (Faceoffs): win% percentile — only meaningful for centres who take draws
+      if (e.foPct != null && e.foPct > 0) {
+        projected.fo = ratingFromCurve(percentileOf(e.foPct, pool.foPct), "DEFAULT");
+      }
+
+      // PS (Penalty Shot / breakaway): 50% shooting% + 30% off60 + 20% g60
+      {
+        const parts: [number, number][] = [];
+        if (e.shpct != null) parts.push([percentileOf(e.shpct, pool.shpct), 0.5]);
+        if (e.off60 != null) parts.push([percentileOf(e.off60, pool.off60), 0.3]);
+        if (e.g60 != null) parts.push([percentileOf(e.g60, pool.g60), 0.2]);
+        const wtot = parts.reduce((s, [, wt]) => s + wt, 0);
+        if (wtot > 0) projected.ps = ratingFromCurve(parts.reduce((s, [pc, wt]) => s + pc * wt, 0) / wtot, "DEFAULT");
+      }
+
+      // FG (Fighting): 60% PIM/60 + 40% hits/60 (no fighting-major feed; PIM/hits proxy)
+      {
+        const parts: [number, number][] = [];
+        if (e.pim60 != null) parts.push([percentileOf(e.pim60, pool.pim60), 0.6]);
+        if (e.hit60 != null) parts.push([percentileOf(e.hit60, pool.hit60), 0.4]);
+        const wtot = parts.reduce((s, [, wt]) => s + wt, 0);
+        if (wtot > 0) projected.fg = ratingFromCurve(parts.reduce((s, [pc, wt]) => s + pc * wt, 0) / wtot, "DEFAULT");
+      }
+
+      // LD (Leadership): captaincy + experience
+      projected.ld = leadershipFrom(e.captaincy, projected.ex ?? actual.ex ?? 50);
     } else {
       // AHL / FARM Skater
       ahlCount++;
