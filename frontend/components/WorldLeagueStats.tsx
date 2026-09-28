@@ -1,0 +1,46 @@
+"use client";
+
+import { useMemo, useState } from "react";
+
+type Stat = {
+  id: number; playerName: string; position: string | null; epUrl: string | null;
+  teamId: number | null; teamName: string; teamLogoUrl: string | null;
+  isGoalie: boolean; gamesPlayed: number; goals: number; assists: number; points: number;
+  plusMinus: number | null; penaltyMinutes: number; wins: number | null; losses: number | null;
+  overtimeLosses: number | null; savePercentage: number | null; goalsAgainstAverage: number | null; shutouts: number | null;
+};
+type Team = { id: number; name: string; logoUrl: string | null; players: number };
+type SortKey = "playerName" | "teamName" | "gamesPlayed" | "goals" | "assists" | "points" | "plusMinus" | "penaltyMinutes" | "wins" | "losses" | "savePercentage" | "goalsAgainstAverage" | "shutouts";
+
+export default function WorldLeagueStats({ stats, teams, season, leagueCode }: { stats: Stat[]; teams: Team[]; season: string; leagueCode: string }) {
+  const [tab, setTab] = useState<"skaters" | "goalies" | "teams">("skaters");
+  const [teamId, setTeamId] = useState("");
+  const [query, setQuery] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("points");
+  const [descending, setDescending] = useState(true);
+  const filtered = useMemo(() => stats.filter((s) =>
+    (tab === "goalies" ? s.isGoalie : !s.isGoalie) &&
+    (!teamId || String(s.teamId) === teamId) &&
+    (!query || `${s.playerName} ${s.teamName}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
+  ).sort((a, b) => {
+    const left = a[sortKey] ?? (typeof a[sortKey] === "number" ? 0 : "");
+    const right = b[sortKey] ?? (typeof b[sortKey] === "number" ? 0 : "");
+    const comparison = typeof left === "string" && typeof right === "string" ? left.localeCompare(right) : Number(left) - Number(right);
+    return (descending ? -comparison : comparison) || a.playerName.localeCompare(b.playerName);
+  }), [stats, tab, teamId, query, sortKey, descending]);
+  const setSort = (key: SortKey) => { if (key === sortKey) setDescending(!descending); else { setSortKey(key); setDescending(key !== "playerName" && key !== "teamName" && key !== "goalsAgainstAverage"); } };
+  const header = (label: string, key: SortKey, left = false) => <th scope="col" className={`${left ? "text-left" : "text-right"} px-3 py-3 whitespace-nowrap`}><button type="button" onClick={() => setSort(key)} className="hover:text-sky-300" title={`Sort by ${label}`}>{label}{sortKey === key ? (descending ? " ↓" : " ↑") : ""}</button></th>;
+  const goalieCount = stats.filter((s) => s.isGoalie).length;
+  const skaterCount = stats.length - goalieCount;
+
+  return <section className="space-y-4">
+    <div className="flex flex-wrap gap-2" role="tablist" aria-label={`${leagueCode} statistics`}>
+      {([ ["skaters", `Skaters (${skaterCount})`], ["goalies", `Goalies (${goalieCount})`], ["teams", `Teams (${teams.length})`] ] as const).map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={tab === value} onClick={() => { setTab(value); setSortKey(value === "goalies" ? "savePercentage" : "points"); setDescending(true); }} className={`rounded-xl border px-4 py-2 text-sm font-bold transition-colors ${tab === value ? "border-sky-500/40 bg-sky-500/15 text-sky-300" : "border-slate-800 bg-slate-900/70 text-slate-400 hover:text-white"}`}>{label}</button>)}
+    </div>
+
+    {tab === "teams" ? <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">{teams.map((team) => <button key={team.id} type="button" onClick={() => { setTeamId(String(team.id)); setTab("skaters"); }} className="flex items-center gap-3 rounded-2xl bg-slate-900/70 border border-slate-800 p-4 text-left hover:border-sky-500/40"><span className="w-10 h-10 flex items-center justify-center">{team.logoUrl ? <img src={team.logoUrl} alt="" className="w-10 h-10 object-contain" /> : "🏒"}</span><span className="min-w-0"><span className="block font-semibold truncate">{team.name}</span><span className="text-xs text-slate-500">{team.players} player stat lines</span></span></button>)}</div> : <>
+      <div className="flex flex-wrap items-center gap-3"><input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search player or team…" aria-label="Search player or team" className="min-w-[210px] flex-1 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm outline-none focus:border-sky-500" /><select value={teamId} onChange={(e) => setTeamId(e.target.value)} aria-label="Filter by team" className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm"><option value="">All teams</option>{teams.map((t) => <option value={t.id} key={t.id}>{t.name}</option>)}</select><span className="text-xs text-slate-500">{filtered.length} players · {season}</span></div>
+      <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/70"><table className="w-full min-w-[780px] text-sm"><thead className="bg-slate-800/40 text-xs uppercase tracking-wider text-slate-400"><tr>{header("Player", "playerName", true)}{header("Team", "teamName", true)}<th className="text-left px-3 py-3">Pos</th>{header("GP", "gamesPlayed")}{tab === "skaters" ? <>{header("G", "goals")}{header("A", "assists")}{header("P", "points")}{header("+/-", "plusMinus")}{header("PIM", "penaltyMinutes")}</> : <>{header("W", "wins")}{header("L", "losses")}{header("SV%", "savePercentage")}{header("GAA", "goalsAgainstAverage")}{header("SO", "shutouts")}</>}</tr></thead><tbody>{filtered.map((s) => <tr key={s.id} className="border-t border-slate-800/70 hover:bg-slate-800/30"><td className="px-3 py-2.5 font-semibold whitespace-nowrap">{s.playerName}{s.epUrl && <a href={s.epUrl} target="_blank" rel="noopener noreferrer" className="ml-2 text-xs font-normal text-sky-400 hover:underline" title="EliteProspects profile">EP ↗</a>}</td><td className="px-3 py-2.5 text-slate-300 whitespace-nowrap"><span className="inline-flex items-center gap-2">{s.teamLogoUrl && <img src={s.teamLogoUrl} alt="" className="h-5 w-5 object-contain" />}{s.teamName}</span></td><td className="px-3 py-2.5 text-slate-400">{s.position || (s.isGoalie ? "G" : "—")}</td><td className="px-3 py-2.5 text-right tabular-nums">{s.gamesPlayed}</td>{tab === "skaters" ? <><td className="px-3 py-2.5 text-right tabular-nums">{s.goals}</td><td className="px-3 py-2.5 text-right tabular-nums">{s.assists}</td><td className="px-3 py-2.5 text-right tabular-nums font-bold text-sky-300">{s.points}</td><td className="px-3 py-2.5 text-right tabular-nums">{s.plusMinus ?? "—"}</td><td className="px-3 py-2.5 text-right tabular-nums">{s.penaltyMinutes}</td></> : <><td className="px-3 py-2.5 text-right tabular-nums">{s.wins ?? "—"}</td><td className="px-3 py-2.5 text-right tabular-nums">{s.losses ?? "—"}</td><td className="px-3 py-2.5 text-right tabular-nums font-bold text-sky-300">{s.savePercentage == null ? "—" : `${(s.savePercentage <= 1 ? s.savePercentage * 100 : s.savePercentage).toFixed(1)}%`}</td><td className="px-3 py-2.5 text-right tabular-nums">{s.goalsAgainstAverage?.toFixed(2) ?? "—"}</td><td className="px-3 py-2.5 text-right tabular-nums">{s.shutouts ?? "—"}</td></>}</tr>)}</tbody></table>{!filtered.length && <div className="p-8 text-center text-sm text-slate-500">No players match this filter.</div>}</div>
+    </>}
+  </section>;
+}
