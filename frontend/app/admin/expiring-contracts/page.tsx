@@ -11,15 +11,19 @@ export const dynamic = "force-dynamic";
 
 const TERMS = [1, 2, 3, 4] as const;
 
-const SORT_KEYS = ["name", "team", "age", "status", "capHit", "ask1", "ask2", "ask3", "ask4"] as const;
+const SORT_KEYS = ["name", "team", "age", "status", "capHit", "realCapHit", "ask1", "ask2", "ask3", "ask4"] as const;
 type SortKey = (typeof SORT_KEYS)[number];
 const isSortKey = (v: string | undefined): v is SortKey => !!v && (SORT_KEYS as readonly string[]).includes(v);
 // cap hit / asks lead with the biggest first; everything else starts alphabetical/youngest-first
-const DEFAULT_DIR: Record<SortKey, "asc" | "desc"> = { name: "asc", team: "asc", age: "asc", status: "asc", capHit: "desc", ask1: "desc", ask2: "desc", ask3: "desc", ask4: "desc" };
-const LABEL: Record<SortKey, string> = { name: "Player", team: "Club", age: "Age", status: "Status", capHit: "Current Cap Hit", ask1: "1yr ask", ask2: "2yr ask", ask3: "3yr ask", ask4: "4yr ask" };
+const DEFAULT_DIR: Record<SortKey, "asc" | "desc"> = { name: "asc", team: "asc", age: "asc", status: "asc", capHit: "desc", realCapHit: "desc", ask1: "desc", ask2: "desc", ask3: "desc", ask4: "desc" };
+const LABEL: Record<SortKey, string> = { name: "Player", team: "Club", age: "Age", status: "Status", capHit: "Current Cap Hit", realCapHit: "Real Cap Hit", ask1: "1yr ask", ask2: "2yr ask", ask3: "3yr ask", ask4: "4yr ask" };
 
 type Row = {
-  p: { id: number; name: string; slug: string; position: string | null; age: number | null; capHit: number | null; team: { name: string; code: string | null; logoUrl: string | null } };
+  p: {
+    id: number; name: string; slug: string; position: string | null; age: number | null; capHit: number | null;
+    realCapHit: number | null; realContractYears: number | null;
+    team: { name: string; code: string | null; logoUrl: string | null };
+  };
   ufa: boolean; ladder: Record<number, number> | null; roleLabel: string | null; depth: boolean; preferredYears: number | null;
 };
 
@@ -42,7 +46,8 @@ export default async function ExpiringContractsPage({ searchParams }: { searchPa
       },
       select: {
         id: true, name: true, slug: true, position: true, age: true, birthDate: true, capHit: true, contractYears: true,
-        isGoalie: true, teamId: true, team: { select: { name: true, code: true, logoUrl: true } },
+        isGoalie: true, teamId: true, realCapHit: true, realContractYears: true,
+        team: { select: { name: true, code: true, logoUrl: true } },
       },
     }),
     loadSettings(),
@@ -76,6 +81,7 @@ export default async function ExpiringContractsPage({ searchParams }: { searchPa
       case "age": return (a.p.age ?? 0) - (b.p.age ?? 0);
       case "status": return Number(a.ufa) - Number(b.ufa);
       case "capHit": return (a.p.capHit ?? 0) - (b.p.capHit ?? 0);
+      case "realCapHit": return (a.p.realCapHit ?? 0) - (b.p.realCapHit ?? 0);
       default: {
         const t = Number(sort.slice(3));
         return (a.ladder?.[t] ?? -1) - (b.ladder?.[t] ?? -1);
@@ -128,6 +134,7 @@ export default async function ExpiringContractsPage({ searchParams }: { searchPa
                 <SortHeader col="age" align="center" />
                 <SortHeader col="status" align="center" />
                 <SortHeader col="capHit" align="right" />
+                <SortHeader col="realCapHit" align="right" />
                 <th className="text-center px-3 py-3 font-medium">Projected Role</th>
                 <SortHeader col="ask1" align="right" />
                 <SortHeader col="ask2" align="right" />
@@ -153,6 +160,13 @@ export default async function ExpiringContractsPage({ searchParams }: { searchPa
                     </span>
                   </td>
                   <td className="px-3 py-3 text-right tabular-nums">{p.capHit ? money(p.capHit) : "—"}</td>
+                  <td className="px-3 py-3 text-right tabular-nums text-slate-400"
+                    title={p.realContractYears != null ? `${p.realContractYears} year${p.realContractYears === 1 ? "" : "s"} left on his real-life deal${p.realContractYears > MAX_TERM ? ` — extends ${p.realContractYears - MAX_TERM} year${p.realContractYears - MAX_TERM === 1 ? "" : "s"} past our ${MAX_TERM}yr cap` : ""}` : "No CapWages data synced for this player yet (Admin → Roster Source)"}>
+                    {p.realCapHit ? money(p.realCapHit) : "—"}
+                    {p.realContractYears != null && p.realContractYears > MAX_TERM && (
+                      <span className="ml-1 text-[10px] font-bold text-amber-400">🔒{p.realContractYears}y</span>
+                    )}
+                  </td>
                   <td className="px-3 py-3 text-center text-[11px] text-slate-400" title={preferredYears ? `Prefers a ${preferredYears}-year deal` : undefined}>
                     {roleLabel ?? "—"}{depth ? " (depth)" : ""}
                   </td>
@@ -164,7 +178,7 @@ export default async function ExpiringContractsPage({ searchParams }: { searchPa
                 </tr>
               ))}
               {rows.length === 0 && (
-                <tr><td colSpan={6 + TERMS.length} className="px-4 py-8 text-center text-slate-500">No player in the final year of his deal{q ? ` matches "${q}"` : ""}.</td></tr>
+                <tr><td colSpan={7 + TERMS.length} className="px-4 py-8 text-center text-slate-500">No player in the final year of his deal{q ? ` matches "${q}"` : ""}.</td></tr>
               )}
             </tbody>
           </table>
@@ -172,6 +186,9 @@ export default async function ExpiringContractsPage({ searchParams }: { searchPa
       </Card>
       <p className="text-xs text-slate-500 px-1">
         RFA/UFA status uses the real CBA rule (age 27 as of June 30 of the expiry year). The highlighted column is the player&apos;s own preferred term — shorter terms never carry a premium, longer ones do (steeper for very young or very old players). Click a column header to sort.
+      </p>
+      <p className="text-xs text-slate-500 px-1">
+        Real Cap Hit is his actual real-life NHL salary from CapWages (Admin → Roster Source → &quot;Fill Real Cap Hits&quot;) — re-run that sync to pick up a real-life extension. 🔒 flags a player whose real deal runs longer than our {MAX_TERM}yr cap.
       </p>
     </div>
   );
