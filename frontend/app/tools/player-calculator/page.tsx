@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui";
 import {
@@ -11,15 +12,31 @@ import { getLiveCalculatorConfig } from "@/lib/live-calculator-config";
 import { isAdmin } from "@/lib/auth";
 import { canManageLiveCalculator } from "@/lib/live-calculator-actions";
 import PlayerCalculatorView from "@/components/PlayerCalculatorView";
+import RookieCalculatorPanel from "@/components/RookieCalculatorPanel";
+import { rookieCalculatorRows, cameoRookieRows } from "@/lib/edge-params-server";
 
 export const dynamic = "force-dynamic";
 
 export default async function PlayerCalculatorPage({
   searchParams,
 }: {
-  searchParams: Promise<{ team?: string }>;
+  searchParams: Promise<{ team?: string; view?: string }>;
 }) {
-  const { team: teamSlug } = await searchParams;
+  const { team: teamSlug, view } = await searchParams;
+
+  if (view === "rookies") {
+    const [rookies, cameo, admin] = await Promise.all([rookieCalculatorRows(), cameoRookieRows(5, 9), isAdmin()]);
+    return (
+      <div className="space-y-6 py-2">
+        <PageHeader
+          title="Rookie Calculator"
+          subtitle="Prospekti, ktorí už odohrali reálne zápasy a zatiaľ nemajú vlastný rating"
+          right={<Link href="/tools/player-calculator" className="text-sm text-blue-400 hover:text-blue-300">← Live Calculator</Link>}
+        />
+        <RookieCalculatorPanel rookies={rookies} cameo={cameo} isAdmin={admin} />
+      </div>
+    );
+  }
 
   // Load all NHL teams along with their AHL affiliate
   const teams = await prisma.team.findMany({
@@ -79,6 +96,12 @@ export default async function PlayerCalculatorPage({
       <PageHeader
         title="Live Player Calculator"
         subtitle="Kompletný prehľad a živý prepočet parametrov korčuliarov a brankárov (NextGen V10 model: MoneyPuck, NHL API, EDGE a AHL)"
+        right={
+          <Link href="/tools/player-calculator?view=rookies"
+            className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white whitespace-nowrap">
+            🧒 Rookie Calculator
+          </Link>
+        }
       />
 
       <PlayerCalculatorView

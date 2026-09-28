@@ -223,8 +223,10 @@ export async function edgeRatings(league = "NHL", calibrate = true): Promise<Edg
   // Free agents (UFA) keep whatever rosterType their last team roster had, but a
   // released/expired player's real NHL performance data still lives on their
   // Player row — fold them into the same league population rather than losing
-  // them from the list entirely.
-  const players = await prisma.player.findMany({ where: { rosterType: { in: [league, "UFA"] }, isGoalie: false }, select: SEL });
+  // them from the list entirely. PROSPECT is folded in too (Rookie Calculator):
+  // a team's prospect-pool player who has started logging real NHL games needs to
+  // be judged against the REAL NHL distribution, not a tiny pool of other prospects.
+  const players = await prisma.player.findMany({ where: { rosterType: { in: [league, "UFA", "PROSPECT"] }, isGoalie: false }, select: SEL });
   const teams = await prisma.team.findMany({ select: { id: true, code: true } });
   const codeById = new Map(teams.map((t) => [t.id, t.code]));
 
@@ -632,4 +634,143 @@ export async function promoteParamSet(target: ParamSet): Promise<{ skaters: numb
   if (target === "sths") return restoreSthsSet();
   if (target === "unhl") return promoteFlatSet("unhl");
   return promoteNextGenSet();
+}
+
+// ---- Rookie Calculator ------------------------------------------------------
+// A per-PLAYER version of promoteNextGenSet(), for rating prospects/rookies nobody
+// in the league holds the rights to (rosterType UFA) so they can be signed as a UFA
+// like everyone else, without flipping the whole league onto Next Gen ratings.
+
+/** Compute and apply ONE player's Next Gen (Edge) rating onto his live ck/sc/pa/...
+ *  fields. Prefers the AHL-translated rating when he has real AHL production (more
+ *  signal than a handful of NHL games); otherwise uses the NHL-population rating,
+ *  which already includes UFA free agents and regresses small samples toward the
+ *  position mean so a 3-game call-up gets a sane, non-inflated number. */
+export async function promotePlayerToNextGen(playerId: number): Promise<{ ok: boolean; applied?: Record<string, number>; error?: string }> {
+  const player = await prisma.player.findUnique({ where: { id: playerId }, select: { id: true, isGoalie: true, ahlStats: true } });
+  if (!player) return { ok: false, error: "Player not found." };
+  await backupLiveIfNeeded();
+
+  if (player.isGoalie) {
+    const row = (await edgeGoalieRatings("NHL", true)).find((r) => r.playerId === playerId);
+    if (!row) return { ok: false, error: "No Edge rating yet for this goalie (missing MoneyPuck data)." };
+    const withGr = await prisma.player.findUnique({ where: { id: playerId }, select: { goalieRating: { select: { id: true } } } });
+    if (!withGr?.goalieRating) return { ok: false, error: "This player has no GoalieRating row." };
+    await prisma.goalieRating.update({
+      where: { id: withGr.goalieRating.id },
+      data: {
+        sk: row.ratings.SK, du: row.ratings.DU, en: row.ratings.EN, sz: row.ratings.SZ, ag: row.ratings.AG, rb: row.ratings.RB,
+        sc: row.ratings.SC, hs: row.ratings.HS, rt: row.ratings.RT, ph: row.ratings.PH, ps: row.ratings.PS, ex: row.ratings.EX,
+        ld: row.ratings.LD, mo: row.ratings.MO, overall: row.ratings.OV,
+      },
+    });
+    return { ok: true, applied: row.ratings };
+  }
+
+  const ahlBlob = (player.ahlStats as any) ?? {};
+  const ahlGp = (ahlBlob.cur?.gp ?? 0) + (ahlBlob.last?.gp ?? 0);
+  const row = ahlGp > 0
+    ? (await edgeAhlSkaterRatings(true)).find((r) => r.playerId === playerId)
+    : (await edgeRatings("NHL", true)).find((r) => r.playerId === playerId);
+  if (!row) return { ok: false, error: "No Edge rating could be computed for this player (no real stats yet)." };
+
+  await prisma.player.update({
+    where: { id: playerId },
+    data: {
+      ck: row.ratings.CK ?? undefined, df: row.ratings.DF ?? undefined, di: row.ratings.DI ?? undefined, du: row.ratings.DU ?? undefined,
+      en: row.ratings.EN ?? undefined, ex: row.ratings.EX ?? undefined, fg: row.ratings.FG ?? undefined, fo: row.ratings.FO ?? undefined,
+      ld: row.ratings.LD ?? undefined, mo: row.ratings.MO ?? undefined, pa: row.ratings.PA ?? undefined, ph: row.ratings.PH ?? undefined,
+      ps: row.ratings.PS ?? undefined, sc: row.ratings.SC ?? undefined, sk: row.ratings.SK ?? undefined, st: row.ratings.ST ?? undefined,
+      overall: row.ratings.OV ?? undefined,
+    },
+  });
+  return { ok: true, applied: row.ratings };
+}
+
+export type RookieRow = {
+  playerId: number; name: string; slug: string; position: string; teamCode: string | null;
+  age: number | null; curSeasonGP: number; lastSeasonGP: number; ahlGP: number; source: "NHL" | "AHL";
+  ratings: Record<string, number>;
+};
+
+/** Skaters who have NO established rating yet — sitting in a team's PROSPECT pool
+ *  (Player.rosterType === "PROSPECT") — but have already started logging real NHL
+ *  or AHL games. This is the actual "give him a real rating like everyone else"
+ *  gap: an already-rated veteran who merely happens to be an unsigned UFA (e.g. a
+ *  real-life free agent already imported with full ProfiNHL ratings) is NOT a
+ *  rookie and must NOT show up here — only genuine PROSPECT-rosterType players do.
+ *  Ranked/regressed against the SAME full league population as edgeRatings/
+ *  edgeAhlSkaterRatings (which now folds PROSPECT into its pool) — only the OUTPUT
+ *  is filtered to this pool, not the ranking population, so a 3-game call-up is
+ *  still judged against the real league distribution, not a sub-pool of his own. */
+export async function rookieCalculatorRows(): Promise<RookieRow[]> {
+  const prospects = await prisma.player.findMany({
+    where: { isGoalie: false, rosterType: "PROSPECT" },
+    select: { id: true, slug: true, age: true, curSeasonGP: true, lastSeasonGP: true, ahlStats: true },
+  });
+  const withProduction = prospects.filter((p) => {
+    const ahl = (p.ahlStats as any) ?? {};
+    const ahlGp = (ahl.cur?.gp ?? 0) + (ahl.last?.gp ?? 0);
+    return (p.curSeasonGP ?? 0) > 0 || (p.lastSeasonGP ?? 0) > 0 || ahlGp > 0;
+  });
+  if (!withProduction.length) return [];
+  const infoById = new Map(withProduction.map((p) => {
+    const ahl = (p.ahlStats as any) ?? {};
+    return [p.id, {
+      slug: p.slug, age: p.age, curSeasonGP: p.curSeasonGP ?? 0, lastSeasonGP: p.lastSeasonGP ?? 0,
+      ahlGP: (ahl.cur?.gp ?? 0) + (ahl.last?.gp ?? 0),
+    }] as const;
+  }));
+  const idSet = new Set(infoById.keys());
+
+  const [nhl, ahl] = await Promise.all([edgeRatings("NHL", true), edgeAhlSkaterRatings(true)]);
+  const out: RookieRow[] = [];
+  const seen = new Set<number>();
+  for (const r of ahl) {
+    if (!idSet.has(r.playerId)) continue;
+    const info = infoById.get(r.playerId)!;
+    if (info.ahlGP > 0) {
+      out.push({ playerId: r.playerId, name: r.name, position: r.position, teamCode: r.teamCode, source: "AHL", ratings: r.ratings, ...info });
+      seen.add(r.playerId);
+    }
+  }
+  for (const r of nhl) {
+    if (!idSet.has(r.playerId) || seen.has(r.playerId)) continue;
+    const info = infoById.get(r.playerId)!;
+    out.push({ playerId: r.playerId, name: r.name, position: r.position, teamCode: r.teamCode, source: "NHL", ratings: r.ratings, ...info });
+  }
+  return out.sort((a, b) => (b.ratings.OV ?? 0) - (a.ratings.OV ?? 0));
+}
+
+export type CameoRow = {
+  playerId: number; name: string; slug: string; position: string; teamCode: string | null; rosterType: string | null;
+  age: number | null; lastSeasonGP: number; lastSeasonG: number; lastSeasonA: number;
+  ratings: Record<string, number> | null;
+};
+
+/** Read-only watchlist: skaters who played between `minGp` and `maxGp` REAL NHL
+ *  games last season (default 5-9) — the smallest meaningful taste of NHL action,
+ *  worth a look regardless of who, if anyone, currently owns their rights. Shows the
+ *  same Next Gen rating as the calculator, already regressed for the small sample. */
+export async function cameoRookieRows(minGp = 5, maxGp = 9): Promise<CameoRow[]> {
+  const teams = await prisma.team.findMany({ select: { id: true, code: true } });
+  const codeById = new Map(teams.map((t) => [t.id, t.code]));
+  const players = await prisma.player.findMany({
+    where: { isGoalie: false, lastSeasonGP: { gte: minGp, lte: maxGp } },
+    select: { id: true, name: true, slug: true, position: true, teamId: true, rosterType: true, age: true, lastSeasonGP: true, lastSeasonG: true, lastSeasonA: true },
+    orderBy: { lastSeasonGP: "desc" },
+  });
+  if (!players.length) return [];
+  const [nhl, ahl] = await Promise.all([edgeRatings("NHL", true), edgeAhlSkaterRatings(true)]);
+  const nhlById = new Map(nhl.map((r) => [r.playerId, r]));
+  const ahlById = new Map(ahl.map((r) => [r.playerId, r]));
+  return players.map((p) => {
+    const edge = ahlById.get(p.id) ?? nhlById.get(p.id) ?? null;
+    return {
+      playerId: p.id, name: cleanName(p.name), slug: p.slug, position: p.position ?? "",
+      teamCode: p.teamId != null ? codeById.get(p.teamId) ?? null : null, rosterType: p.rosterType,
+      age: p.age, lastSeasonGP: p.lastSeasonGP ?? 0, lastSeasonG: p.lastSeasonG ?? 0, lastSeasonA: p.lastSeasonA ?? 0,
+      ratings: edge?.ratings ?? null,
+    };
+  });
 }

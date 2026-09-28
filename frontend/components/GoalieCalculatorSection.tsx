@@ -3,7 +3,6 @@
 import { useState, useRef } from "react";
 import Link from "next/link";
 import PlayerLink from "@/components/PlayerLink";
-import PlayerAvatar from "@/components/playerAvatar";
 import { cleanName } from "@/lib/playerName";
 import {
   ALL_GOALIE_PARAMS,
@@ -353,7 +352,6 @@ function GoalieTable({
                     {/* Sticky Name Cell */}
                     <td className="py-2 px-3 sticky left-0 z-10 bg-slate-900/95 group-hover:bg-slate-850/95 backdrop-blur-sm border-r border-slate-800/80">
                       <div className="flex items-center gap-2.5 min-w-[170px]">
-                        <PlayerAvatar src={p.photoUrl} alt={p.name} size={28} />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             {p.number != null && (
@@ -548,7 +546,6 @@ function GoalieHoverComparisonCard({
       {/* Header with avatar and Overall */}
       <div className="flex items-center justify-between gap-4 pb-3 mb-3 border-b border-slate-800">
         <div className="flex items-center gap-3.5 min-w-0">
-          <PlayerAvatar src={p.photoUrl} alt={p.name} size={48} />
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               {p.number != null && (
