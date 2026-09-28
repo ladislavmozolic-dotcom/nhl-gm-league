@@ -117,8 +117,8 @@ export async function loadMarketPool(): Promise<MarketRow[]> {
   });
 }
 
-/** Elite ladder. Every signed player of a position gets a star score = 55 % rating
- *  rank + 40 % production rank (points/GP, 40+ GP); the top 7 % are ranked and paid
+/** Elite ladder. Every signed player of a position gets a star score = 75 % rating
+ *  rank + 25 % production rank (points/GP, 40+ GP); the top 7 % are ranked and paid
  *  off the MAX contract, in order — the league's best D (Makar) asks more than the
  *  2nd-best (Werenski), who asks more than the 3rd… Rank 1 ≈ 88 % of max, the edge
  *  of the top 7 % ≈ 45 %. Fades from 34; goalies get a flatter ladder. 0 = not elite. */
@@ -131,7 +131,7 @@ function groupScores(pool: MarketRow[], grp: FaPos): { scoreOf: (market: number,
   const scoreOf = (market: number, ppg: number | null) => {
     const rp = below(markets, market);
     const pp = grp === "G" || ppg == null || ppgs.length < 20 ? rp : below(ppgs, ppg);
-    return 0.6 * rp + 0.4 * pp;
+    return 0.75 * rp + 0.25 * pp;
   };
   let cache = scoreCache.get(pool);
   if (!cache) { cache = new Map(); scoreCache.set(pool, cache); }
