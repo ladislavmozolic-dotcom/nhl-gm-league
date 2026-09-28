@@ -506,15 +506,20 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
   // an arbitration-eligible one (24-26) gets close to market (an arbitrator would).
   const expAge = p.birthDate ? ageAsOfJune30(p.birthDate, CURRENT_SEASON_START + Math.max(0, p.contractYears ?? 0)) : (p.age ?? 27);
   const rfaFactor = rfa ? (expAge <= 23 ? RFA_EXTENSION_FACTOR : 0.95) : 1;
+  // the age that matters is his age when the NEW deal starts: an in-season extension
+  // kicks in next season, so a 33-year-old is signing as a 34-year-old
+  const dealAge = extension && (p.contractYears ?? 0) >= 1 && p.birthDate ? ageAsOfJune30(p.birthDate, CURRENT_SEASON_START + p.contractYears!) : p.age;
   // an RFA isn't testing the market ⇒ the middle of his peer group; a pending UFA
   // could walk to it, so he's priced like the market (upper part of the group)
   const rated = anchorFromPool(marketPool, grp, market, rfa ? 0.5 : undefined);
   const maxSalary = await maxContract();
+  // the elite ladder prices today's player (Kucherov is still a $16M+ player now);
+  // his decline over a longer deal is priced by the term (termPremium from dealAge)
   const elite = eliteTarget(p, grp, market, marketPool, maxSalary);
   const role = roleAnchor(p, grp, marketPool);
   const anchor = role != null ? (rated.anchor + role) / 2 : rated.anchor, count = rated.count;
   const rawBase = buildDemand({
-    market, grp, age: p.age, anchor, comps: count, override: p.faDemandOverride, capGrowth: 1, round: rnd, priorBidders,
+    market, grp, age: dealAge, anchor, comps: count, override: p.faDemandOverride, capGrowth: 1, round: rnd, priorBidders,
     perf: performanceOf(p, grp, market, marketPool),
     availability: availabilityFactor(p.lastSeasonGP, fullGP, grp === "G"),
     eliteTarget: elite, maxSalary,
@@ -544,15 +549,15 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
   const desired = desiredDeployment(grp, line, p.df, slot === "XD" || slot === "XF");
   // projected ask = the club gives him the role he projects into, plus the ST he wants
   const projDeploy: Deployment = { line, pp: desired.wantPP, pk: desired.wantPK };
-  let ask = deploymentDemand(base, grp, projDeploy, desired, ctx.contention, p.age);
+  let ask = deploymentDemand(base, grp, projDeploy, desired, ctx.contention, dealAge);
   // an elite player's projected price is his ladder spot — the small PP/PK bends would
   // otherwise shuffle the order (a PK-capable Makar dipping under Werenski)
   if (elite > 0) ask = { ...ask, salary: base.salary, floorSalary: base.floorSalary };
   // a 32+ vet re-signing without a big year: his current deal stays the ceiling even
   // after the role/contention bend (the base already respects it — see buildDemand)
-  if (extension && p.faDemandOverride == null && elite === 0 && (p.age ?? 27) >= 32 && (p.capHit ?? 0) > 0) {
+  if (extension && p.faDemandOverride == null && elite === 0 && (dealAge ?? 27) >= 32 && (p.capHit ?? 0) > 0) {
     const avail = availabilityFactor(p.lastSeasonGP, await leagueFullGP(), grp === "G");
-    const big = performanceOf(p, grp, market, marketPool) >= 1.08 && (p.age ?? 27) < 35 && avail >= 0.95;
+    const big = performanceOf(p, grp, market, marketPool) >= 1.08 && (dealAge ?? 27) < 35 && avail >= 0.95;
     const cap = round50k(p.capHit! * (big ? 1.1 : 1) * avail);
     if (ask.salary > cap) ask = { ...ask, salary: cap, floorSalary: Math.min(ask.floorSalary, round50k(cap * 0.92)) };
   }
@@ -561,7 +566,7 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
   // …unless he's one of the league's elite: then his ladder spot is the ceiling (Celebrini ≈ Carlsson)
   const ceiling = rfa && expAge <= 23 ? Math.max(round50k(maxSalary * 0.7), elite) : maxSalary;
   if (ask.salary > ceiling) ask = { ...ask, salary: ceiling, floorSalary: Math.min(ask.floorSalary, round50k(ceiling * 0.92)) };
-  return { grp, base, slot, line, contention: ctx.contention, desired, ask, age: p.age, lowballBump: bump };
+  return { grp, base, slot, line, contention: ctx.contention, desired, ask, age: dealAge, lowballBump: bump };
 }
 
 /** Evaluate a concrete offer (money + term + promised deployment) at a club. */
@@ -582,7 +587,7 @@ export async function evaluateTeamOffer(
   const tp = termPremium(years, raw.years, info.age, info.slot, raw.floorSalary);
   const f = (1 - disc) * tp;
   const ask: Demand = f !== 1
-    ? { ...raw, floorSalary: Math.round((raw.floorSalary * f) / 50_000) * 50_000, salary: Math.round((raw.salary * f) / 50_000) * 50_000 }
+    ? { ...raw, floorSalary: Math.max(775_000, Math.round((raw.floorSalary * f) / 50_000) * 50_000), salary: Math.max(775_000, Math.round((raw.salary * f) / 50_000) * 50_000) }
     : raw;
   const acceptable = offerAcceptable(ask, salary, years);
   const utility = offerUtility(salary, info.grp, deploy, info.desired, info.contention, info.age) + disc * raw.salary;

@@ -204,18 +204,36 @@ export function termPremium(offerYears: number, preferredYears: number, age: num
   const extra = offerYears - preferredYears;
   if (extra === 0) return 1;
   const a = age ?? 27;
-  // U-shape up to 34: a YOUNG player charges a lot to lock up his prime years, a
-  // 30-34 vet charges for the risk of a long deal; a prime-age (26-29) vet is the
-  // cheapest to extend either way. Past 34 it FLIPS — a 35+ veteran signing multi-
-  // year is trading rate for security (a real-NHL pattern: Karlsson, Doughty-style
-  // team-friendly long extensions), so more term costs LESS per year, not more; a
-  // short "one more run" prove-it deal is where he actually charges a premium.
+  const isD = slot === "P1" || slot === "P2" || slot === "P3" || slot === "XD";
+  // A veteran past his peak (32+, a D from 33) prices a deal as the AVERAGE of what he's
+  // expected to be worth over its years — every extra season is a declining one, so a
+  // longer deal carries a LOWER cap hit (Gostisbehere at 34: 4 years < 2 years per year),
+  // and a short one keeps the price of today's player. `age` is his age when the deal starts.
+  if (a >= (isD ? 33 : 32)) return Math.max(0.5, termValue(offerYears, a, isD) / termValue(preferredYears, a, isD));
+  // Younger: a YOUNG player charges a lot to lock up his prime years, a 30-31 vet a
+  // little for the risk; a prime-age (26-29) player is the cheapest to extend.
   const young = a <= 25;
   const depthRate = Math.max(0.15, Math.min(0.5, 0.5 * (1_200_000 / Math.max(1, salary ?? 1_200_000))));
-  const perYear = young ? (slot && isDepthSlot(slot) ? depthRate : 0.15) : a >= 35 ? -0.06 : a >= 33 ? 0.15 : a >= 30 ? 0.10 : 0.07;
-  // floored well above 0 — even a big discount for going short (or long, for a
-  // 35+ vet) never makes the multiplier absurd.
-  return Math.max(0.5, 1 + extra * perYear);
+  const perYear = young ? (slot && isDepthSlot(slot) ? depthRate : 0.15) : a >= 30 ? 0.10 : 0.07;
+  // going SHORTER than his sweet spot is only a small discount (the steep young-depth
+  // rate prices extra years he'd be selling, not years he isn't) — max 5 %/yr, ≥ 0.85
+  if (extra < 0) return Math.max(0.85, 1 + extra * Math.min(perYear, 0.05));
+  return 1 + extra * perYear;
+}
+
+/** Veteran value curve (1 = still at his peak) — a D ages a year later. */
+function vetCurve(age: number, isD: boolean): number {
+  const a = isD ? age - 1 : age;
+  if (a <= 31) return 1;
+  const c: Record<number, number> = { 32: 0.95, 33: 0.9, 34: 0.84, 35: 0.77, 36: 0.7, 37: 0.62 };
+  return c[a] ?? 0.55;
+}
+/** Average value over an N-year deal starting at `age`, relative to year one. */
+function termValue(years: number, age: number, isD: boolean): number {
+  const n = Math.max(1, years);
+  let t = 0;
+  for (let i = 0; i < n; i++) t += vetCurve(age + i, isD);
+  return t / n / vetCurve(age, isD);
 }
 
 /** Bottom-of-the-lineup slots: 3rd/4th line, 3rd pair, extras. */
