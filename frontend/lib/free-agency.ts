@@ -209,7 +209,9 @@ export function termPremium(offerYears: number, preferredYears: number, age: num
   // expected to be worth over its years — every extra season is a declining one, so a
   // longer deal carries a LOWER cap hit (Gostisbehere at 34: 4 years < 2 years per year),
   // and a short one keeps the price of today's player. `age` is his age when the deal starts.
-  // an elite player ages a year slower still (top forwards don't drop off like depth players)
+  // an elite FORWARD holds his price over the whole deal through 35 (Kucherov: the same
+  // number for 1 or 4 years) — top players don't drop off like depth players do
+  if (elite && slot && (slot.startsWith("L") || slot === "XF") && a >= 30 && a <= 35) return 1;
   const shift = (isD ? 1 : 0) + (elite ? 1 : 0);
   if (a >= 32 + shift) return Math.max(0.5, termValue(offerYears, a, shift) / termValue(preferredYears, a, shift));
   // Younger: a YOUNG player charges a lot to lock up his prime years, a 30-31 vet a
