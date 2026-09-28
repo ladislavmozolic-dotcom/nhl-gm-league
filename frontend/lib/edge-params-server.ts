@@ -708,7 +708,7 @@ export async function promotePlayerToNextGen(playerId: number): Promise<{ ok: bo
 
   const totalGp = (player.curSeasonGP ?? 0) + (player.lastSeasonGP ?? 0) + ahlGp;
   const { weights } = await getLiveCalculatorConfig();
-  const ratings = applyRookieSamplePenalty(row.ratings, totalGp, weights.rookie?.penaltyBands);
+  const ratings = applyRookieSamplePenalty(row.ratings, totalGp, weights.rookie);
 
   await prisma.player.update({
     where: { id: playerId },
@@ -799,7 +799,7 @@ export async function rookieCalculatorRows(): Promise<RookieRow[]> {
   const idSet = new Set(infoById.keys());
 
   const [nhl, ahl, liveConfig] = await Promise.all([edgeRatings("NHL", true), edgeAhlSkaterRatings(true), getLiveCalculatorConfig()]);
-  const bands = liveConfig.weights.rookie?.penaltyBands;
+  const rookieConfig = liveConfig.weights.rookie;
   const out: RookieRow[] = [];
   const seen = new Set<number>();
   for (const r of ahl) {
@@ -807,7 +807,7 @@ export async function rookieCalculatorRows(): Promise<RookieRow[]> {
     const info = infoById.get(r.playerId)!;
     if (info.ahlGP > 0) {
       const totalGp = info.curSeasonGP + info.lastSeasonGP + info.ahlGP;
-      out.push({ playerId: r.playerId, name: r.name, position: r.position, teamCode: r.teamCode, source: "AHL", ratings: applyRookieSamplePenalty(r.ratings, totalGp, bands), ...info });
+      out.push({ playerId: r.playerId, name: r.name, position: r.position, teamCode: r.teamCode, source: "AHL", ratings: applyRookieSamplePenalty(r.ratings, totalGp, rookieConfig), ...info });
       seen.add(r.playerId);
     }
   }
@@ -815,7 +815,7 @@ export async function rookieCalculatorRows(): Promise<RookieRow[]> {
     if (!idSet.has(r.playerId) || seen.has(r.playerId)) continue;
     const info = infoById.get(r.playerId)!;
     const totalGp = info.curSeasonGP + info.lastSeasonGP + info.ahlGP;
-    out.push({ playerId: r.playerId, name: r.name, position: r.position, teamCode: r.teamCode, source: "NHL", ratings: applyRookieSamplePenalty(r.ratings, totalGp, bands), ...info });
+    out.push({ playerId: r.playerId, name: r.name, position: r.position, teamCode: r.teamCode, source: "NHL", ratings: applyRookieSamplePenalty(r.ratings, totalGp, rookieConfig), ...info });
   }
   return out.sort((a, b) => (b.ratings.OV ?? 0) - (a.ratings.OV ?? 0));
 }

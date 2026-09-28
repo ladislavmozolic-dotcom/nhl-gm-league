@@ -14,6 +14,7 @@ import { canManageLiveCalculator } from "@/lib/live-calculator-actions";
 import PlayerCalculatorView from "@/components/PlayerCalculatorView";
 import RookieCalculatorPanel from "@/components/RookieCalculatorPanel";
 import { rookieCalculatorRows } from "@/lib/edge-params-server";
+import { DEFAULT_ROOKIE_TUNING } from "@/lib/edge-params";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,7 @@ export default async function PlayerCalculatorPage({
           subtitle="Prospekti, ktorí už odohrali reálne zápasy a zatiaľ nemajú vlastný rating"
           right={<Link href="/tools/player-calculator" className="text-sm text-blue-400 hover:text-blue-300">← Live Calculator</Link>}
         />
-        <RookieCalculatorPanel rookies={rookies} isAdmin={admin} penaltyBands={rookieLiveConfig.weights.rookie?.penaltyBands ?? []} />
+        <RookieCalculatorPanel rookies={rookies} isAdmin={admin} tuningConfig={rookieLiveConfig.weights.rookie ?? DEFAULT_ROOKIE_TUNING} />
       </div>
     );
   }

@@ -3,7 +3,7 @@ import DebutantScanner from "@/components/DebutantScanner";
 import RookieTableRow from "@/components/RookieTableRow";
 import RookieTuningPanel from "@/components/RookieTuningPanel";
 import type { RookieRow } from "@/lib/edge-params-server";
-import type { RookiePenaltyBand } from "@/lib/edge-params";
+import type { RookieTuningConfig } from "@/lib/edge-params";
 
 const PARAM_COLS = ["CK", "FG", "DI", "SK", "ST", "EN", "DU", "PH", "FO", "PA", "SC", "DF", "PS", "EX", "LD", "OV"];
 
@@ -12,7 +12,7 @@ const PARAM_COLS = ["CK", "FG", "DI", "SK", "ST", "EN", "DU", "PH", "FO", "PA", 
  * nikdy nedostali vlastný vypočítaný rating — presne opačná skupina než hráči už
  * ohodnotení pri importe (napr. skutoční UFA veteráni), tí sem nepatria.
  */
-export default function RookieCalculatorPanel({ rookies, isAdmin, penaltyBands }: { rookies: RookieRow[]; isAdmin: boolean; penaltyBands: RookiePenaltyBand[] }) {
+export default function RookieCalculatorPanel({ rookies, isAdmin, tuningConfig }: { rookies: RookieRow[]; isAdmin: boolean; tuningConfig: RookieTuningConfig }) {
   return (
     <>
       <Card title="Ako to funguje" accent="text-slate-200">
@@ -42,7 +42,7 @@ export default function RookieCalculatorPanel({ rookies, isAdmin, penaltyBands }
       <Card
         title={`Prospekti s reálnymi zápasmi, zatiaľ bez ratingu (${rookies.length})`}
         accent="text-green-400"
-        right={isAdmin ? <RookieTuningPanel initialBands={penaltyBands} /> : undefined}
+        right={isAdmin ? <RookieTuningPanel initialConfig={tuningConfig} /> : undefined}
       >
         <div className="overflow-x-auto">
           <table className="w-full text-sm" style={{ minWidth: 1060 }}>

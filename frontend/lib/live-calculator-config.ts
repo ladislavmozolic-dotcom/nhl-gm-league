@@ -1,6 +1,6 @@
 import { prisma } from "./prisma";
 import { CURRENT_SEASON_START } from "./finance";
-import { type RookiePenaltyBand, DEFAULT_ROOKIE_PENALTY_BANDS } from "./edge-params";
+import { type RookieTuningConfig, DEFAULT_ROOKIE_TUNING } from "./edge-params";
 
 /** The real NHL season ids ("20262027") for the current and prior season, derived
  *  from today's date (CURRENT_SEASON_START itself rolls over every July 1) — NOT
@@ -36,10 +36,12 @@ export type LiveCalcWeights = {
   st: { weightPct: number };
   ex: { careerRegGP: number; careerPoGP: number };
   customMetrics?: Record<string, CustomMetricConfig[]>;
-  /** Rookie Calculator small-sample humility bands (see rookieSamplePenalty in
-   *  lib/edge-params.ts) — admin-tunable from the Rookie Calculator's own
-   *  "Tuning" panel, independent of every other Live Calculator weight above. */
-  rookie?: { penaltyBands: RookiePenaltyBand[] };
+  /** Rookie Calculator's own tuning knobs (small-sample penalty bands/params/floor,
+   *  debutant scanner GP filter — see RookieTuningConfig in lib/edge-params.ts),
+   *  admin-tunable from the Rookie Calculator's own "Tuning" panel, independent of
+   *  every other Live Calculator weight above and never touching the shared Next
+   *  Gen/Edge engine used by the league-wide Next Gen Parameters calculator. */
+  rookie?: RookieTuningConfig;
   ahl: {
     scEqGpg: number;
     scShots: number;
@@ -66,7 +68,7 @@ export const DEFAULT_LIVE_CALC_WEIGHTS: LiveCalcWeights = {
   st: { weightPct: 1.0 },
   ex: { careerRegGP: 0.70, careerPoGP: 0.30 },
   customMetrics: {},
-  rookie: { penaltyBands: DEFAULT_ROOKIE_PENALTY_BANDS },
+  rookie: DEFAULT_ROOKIE_TUNING,
   ahl: {
     scEqGpg: 0.80,
     scShots: 0.10,

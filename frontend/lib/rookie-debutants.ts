@@ -108,7 +108,8 @@ export async function findMissingNhlPlayers(): Promise<{ ok: boolean; candidates
   // action was last season (e.g. scanning in the offseason, or early in a new season
   // before anyone has played 10+ games yet) still counts — exactly like the Live
   // Calculator blends cur+last instead of only ever looking at "this year".
-  const { latestSeason, previousSeason } = await getLiveCalculatorConfig();
+  const { latestSeason, previousSeason, weights } = await getLiveCalculatorConfig();
+  const minScanGp = weights.rookie?.minScanGp ?? 1;
   const [curSkaters, curGoalies, lastSkaters, lastGoalies] = await Promise.all([
     fetchNhlCurrentStats(Number(latestSeason)).catch(() => []),
     fetchNhlGoalieStats(Number(latestSeason)).catch(() => []),
@@ -130,7 +131,7 @@ export async function findMissingNhlPlayers(): Promise<{ ok: boolean; candidates
       const n = norm(r.name);
       return { ...r, gp: gpByName.get(n) ?? 0, alreadyProspect: prospectTeamByName.has(n), prospectTeamCode: prospectTeamByName.get(n) ?? null };
     })
-    .filter((c) => c.gp > 0);
+    .filter((c) => c.gp >= minScanGp);
   return { ok: true, candidates };
 }
 

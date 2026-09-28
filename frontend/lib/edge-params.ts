@@ -163,10 +163,28 @@ export function leadershipFrom(captaincy: string | null | undefined, ex: number)
 
 export type RookiePenaltyBand = { gp: number; penalty: number };
 
-/** Default bands, admin-tunable from the Rookie Calculator's own "Tuning" panel
- *  (stored in LiveCalcConfig.weightsJson.rookie.penaltyBands — see
- *  lib/live-calculator-config.ts) — this is just the fallback when nothing has
- *  been configured yet. Bands run past ACTIVATE_AT_GP=10 (the main Parameter
+/** Every knob the Rookie Calculator's own "Tuning" panel exposes — deliberately
+ *  scoped to ONLY this feature (never touches the shared Next Gen/Edge engine
+ *  that also powers the league-wide Next Gen Parameters calculator), stored in
+ *  LiveCalcConfig.weightsJson.rookie (see lib/live-calculator-config.ts). */
+export type RookieTuningConfig = {
+  /** GP thresholds → point discount on `penaltyParams`. Sorted ascending by gp;
+   *  the first band whose threshold the player hasn't reached yet wins. */
+  penaltyBands: RookiePenaltyBand[];
+  /** Which of the 16 rating params take the small-sample discount. */
+  penaltyParams: string[];
+  /** A penalized param never drops below this floor. */
+  penaltyFloor: number;
+  /** Minimum real GP (cur + last real season combined) for the debutant scanner
+   *  to surface/auto-create a player at all — see findMissingNhlPlayers. */
+  minScanGp: number;
+};
+
+/** Default bands — a genuine NHL/AHL debutant with only a handful of games on
+ *  the books still deserves an extra conservative discount on the sim-critical
+ *  params, on top of the engine's own sample-size regression: a hot 4G/6A
+ *  week-one stretch is exactly the kind of small-sample spike a real scout
+ *  wouldn't bank on yet. Bands run past ACTIVATE_AT_GP=10 (the main Parameter
  *  Calculator's own "counts now" threshold) out to 20 GP, since a debutant has
  *  zero track record behind him, unlike a returning veteran who merely missed
  *  time. <3 GP → -12, <6 GP → -8, <10 GP → -5, <15 GP → -3, <20 GP → -1, ≥20 GP
@@ -179,27 +197,30 @@ export const DEFAULT_ROOKIE_PENALTY_BANDS: RookiePenaltyBand[] = [
   { gp: 20, penalty: 1 },
 ];
 
-/** Rookie Calculator small-sample humility, mirroring the Parameter Calculator's
- *  own games-missed penalty (lib/param-projection.ts gamesMissedPenalty): the
- *  built-in reliability regression already pulls a tiny sample toward the
- *  position mean, but a genuine NHL/AHL debutant with only a handful of games on
- *  the books still deserves an extra conservative discount on the sim-critical
- *  params — a hot 4G/6A week-one stretch is exactly the kind of small-sample
- *  spike a real scout wouldn't bank on yet. `bands` must be sorted ascending by
- *  `gp`; the first band whose threshold the player hasn't reached yet wins. */
+export const DEFAULT_ROOKIE_TUNING: RookieTuningConfig = {
+  penaltyBands: DEFAULT_ROOKIE_PENALTY_BANDS,
+  penaltyParams: ["CK", "SC", "PA", "DF"],
+  penaltyFloor: 20,
+  minScanGp: 1,
+};
+
 export function rookieSamplePenalty(totalGp: number, bands: RookiePenaltyBand[] = DEFAULT_ROOKIE_PENALTY_BANDS): number {
   for (const b of bands) if (totalGp < b.gp) return b.penalty;
   return 0;
 }
 
-/** Apply rookieSamplePenalty to the four sim-critical params (CK/SC/PA/DF),
- *  floored at 20 like the Parameter Calculator's own penalty. Mutates a copy. */
-export function applyRookieSamplePenalty(ratings: Record<string, number>, totalGp: number, bands?: RookiePenaltyBand[]): Record<string, number> {
+/** Apply the configured small-sample discount to the configured params, floored
+ *  at the configured minimum. Mutates a copy; any field left out of `config`
+ *  falls back to the matching DEFAULT_ROOKIE_TUNING value. */
+export function applyRookieSamplePenalty(ratings: Record<string, number>, totalGp: number, config?: Partial<RookieTuningConfig>): Record<string, number> {
+  const bands = config?.penaltyBands ?? DEFAULT_ROOKIE_TUNING.penaltyBands;
+  const params = config?.penaltyParams ?? DEFAULT_ROOKIE_TUNING.penaltyParams;
+  const floor = config?.penaltyFloor ?? DEFAULT_ROOKIE_TUNING.penaltyFloor;
   const penalty = rookieSamplePenalty(totalGp, bands);
   if (penalty === 0) return ratings;
   const out = { ...ratings };
-  for (const k of ["CK", "SC", "PA", "DF"]) {
-    if (out[k] != null) out[k] = Math.max(20, out[k] - penalty);
+  for (const k of params) {
+    if (out[k] != null) out[k] = Math.max(floor, out[k] - penalty);
   }
   return out;
 }
