@@ -6,7 +6,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runAllStarIfDue } from "@/lib/all-star-server";
 import { runDeadlineIfDue } from "@/lib/deadline-server";
-import { simulateDayIfDue, rolloverLeagueDateIfDue, autoOpenFrenzyIfDue, cleanupDeclinedTrades } from "@/lib/season-cron";
+import {
+  simulateDayIfDue,
+  rolloverLeagueDateIfDue,
+  autoOpenFrenzyIfDue,
+  cleanupDeclinedTrades,
+  autoEvaluateGamePicksIfDue,
+} from "@/lib/season-cron";
 
 export async function POST(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -26,5 +32,6 @@ export async function POST(req: NextRequest) {
   const declinedCleanup = await cleanupDeclinedTrades();
   const allStar = await runAllStarIfDue(now).catch((e) => `error: ${(e as Error).message}`);
   const deadline = await runDeadlineIfDue(now).catch((e) => `error: ${(e as Error).message}`);
-  return NextResponse.json({ ...result, rollover, frenzy, declinedCleanup, allStar, deadline });
+  const gamePicks = await autoEvaluateGamePicksIfDue(now).catch((e) => `error: ${(e as Error).message}`);
+  return NextResponse.json({ ...result, rollover, frenzy, declinedCleanup, allStar, deadline, gamePicks });
 }

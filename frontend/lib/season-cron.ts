@@ -204,3 +204,24 @@ export async function cleanupDeclinedTrades(): Promise<DeclinedTradeCleanupResul
   }
   return { deleted: ids.length, groupsDeleted };
 }
+
+export type GamePicksEvaluationResult = { ran: false; reason: string } | { ran: true; evaluatedCount: number; message?: string };
+
+const PICKS_EVAL_HOUR = 8;
+const PICKS_EVAL_WINDOW_MINUTES = 30; // 08:00 - 08:30 Europe/Bratislava
+
+/**
+ * Called by /api/cron/advance-day on every 5-minute tick.
+ * Automatically evaluates finished game picks around 08:00 AM Europe/Bratislava
+ * following the previous night's NHL matches.
+ */
+export async function autoEvaluateGamePicksIfDue(now: Date = new Date()): Promise<GamePicksEvaluationResult> {
+  const { hour, minute } = bratislavaParts(now);
+  if (!(hour === PICKS_EVAL_HOUR && minute >= 0 && minute < PICKS_EVAL_WINDOW_MINUTES)) {
+    return { ran: false, reason: `outside 08:00 Europe/Bratislava window (now ${hour}:${String(minute).padStart(2, "0")})` };
+  }
+
+  const { evaluateGamePicks } = await import("@/lib/game-picks-server");
+  const res = await evaluateGamePicks();
+  return { ran: true, evaluatedCount: res.evaluatedCount, message: res.message };
+}
