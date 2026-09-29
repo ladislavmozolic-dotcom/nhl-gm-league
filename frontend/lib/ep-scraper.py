@@ -29,9 +29,17 @@ Output: JSON to stdout, with structure:
 import sys
 import json
 import re
+import ssl
 import urllib.request
 import time
 import random
+
+# In Docker Debian-slim without ca-certificates, SSL verification fails.
+# We try verified first, fall back to unverified (HTTPS is still encrypted; we trust EP's domain).
+_ssl_ctx = ssl.create_default_context()
+_ssl_ctx_noverify = ssl.create_default_context()
+_ssl_ctx_noverify.check_hostname = False
+_ssl_ctx_noverify.verify_mode = ssl.CERT_NONE
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
@@ -55,8 +63,13 @@ def fetch_ep_player(url: str, retries: int = 2):
     for attempt in range(retries + 1):
         try:
             req = urllib.request.Request(fetch_url, headers=HEADERS)
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                html = resp.read().decode("utf-8", errors="replace")
+            try:
+                with urllib.request.urlopen(req, timeout=15, context=_ssl_ctx) as resp:
+                    html = resp.read().decode("utf-8", errors="replace")
+            except ssl.SSLError:
+                # Fallback: SSL cert verification disabled (Docker Debian-slim without ca-certs)
+                with urllib.request.urlopen(req, timeout=15, context=_ssl_ctx_noverify) as resp:
+                    html = resp.read().decode("utf-8", errors="replace")
             break
         except urllib.error.HTTPError as e:
             if e.code == 404 and attempt == 0:
