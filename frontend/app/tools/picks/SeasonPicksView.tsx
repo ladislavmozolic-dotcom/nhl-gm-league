@@ -253,6 +253,34 @@ export default function SeasonPicksView({
   const hasSubmitted = Boolean(initialData.mySubmission);
   const isLocked = (config.isLocked || hasSubmitted) && !isAdmin;
 
+  // Restore draft from localStorage on load if not yet submitted
+  useEffect(() => {
+    if (!hasSubmitted && viewerTeam?.id) {
+      try {
+        const saved = localStorage.getItem(`unhl_season_picks_draft_${viewerTeam.id}`);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && typeof parsed === "object") {
+            setFormPicks((prev) => ({ ...prev, ...parsed }));
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to load picks draft from localStorage", e);
+      }
+    }
+  }, [hasSubmitted, viewerTeam?.id]);
+
+  // Auto-save draft changes to localStorage
+  useEffect(() => {
+    if (!hasSubmitted && !isLocked && viewerTeam?.id) {
+      try {
+        localStorage.setItem(`unhl_season_picks_draft_${viewerTeam.id}`, JSON.stringify(formPicks));
+      } catch (e) {
+        // quota exceeded or private mode
+      }
+    }
+  }, [formPicks, hasSubmitted, isLocked, viewerTeam?.id]);
+
   const teams = initialData.teams || [];
   const players = initialData.players || [];
 
@@ -297,17 +325,34 @@ export default function SeasonPicksView({
   };
 
   const handleSavePicks = () => {
+    if (!viewerTeam) {
+      setMsg({ type: "error", text: "Pre odoslanie tipov sa prihláste ako GM tímu." });
+      return;
+    }
     if (!window.confirm("Naozaj chcete definitívne odoslať svoje tipy?\n\nUPOZORNENIE: Každý GM môže tipovať iba 1-krát a po odoslaní už NEBUDE MOŽNÉ ŽIADNE TIPY UPRAVOVAŤ ANI MENIŤ!")) {
       return;
     }
     setMsg(null);
     startTransition(async () => {
-      const res = await saveSeasonPicksAction(formPicks, config.season, config.league);
-      if (res.ok) {
-        setMsg({ type: "success", text: "Váš predsezónny tiket bol úspešne a definitívne odoslaný! Tipy už nie je možné meniť." });
+      try {
+        const res = await saveSeasonPicksAction(formPicks, config.season, config.league);
+        if (res.ok) {
+          try {
+            if (typeof window !== "undefined" && viewerTeam?.id) {
+              localStorage.removeItem(`unhl_season_picks_draft_${viewerTeam.id}`);
+            }
+          } catch {}
+          setMsg({ type: "success", text: "✅ Váš predsezónny tiket bol úspešne a definitívne odoslaný! Tipy už nie je možné meniť." });
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
+        } else {
+          setMsg({ type: "error", text: res.error || "Chyba pri ukladaní tipov." });
+        }
+      } catch (err: any) {
+        console.error("Save season picks error:", err);
+        alert("Aplikácia bola na serveri aktualizovaná na novú verziu. Váš vyplnený koncept tipov zostal bezpečne uložený. Stránka sa teraz obnoví — následne prosím kliknite na Odoslať tipy.");
         window.location.reload();
-      } else {
-        setMsg({ type: "error", text: res.error || "Chyba pri ukladaní tipov." });
       }
     });
   };

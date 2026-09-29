@@ -275,11 +275,17 @@ export default function GamePicksView({
     }
 
     startTransition(async () => {
-      const res = await saveDailyGamePicksAction(payload, config.season, config.league);
-      if (res.ok) {
-        setMsg({ type: "success", text: "✅ Vaše denné tipy boli úspešne uložené!" });
-      } else {
-        setMsg({ type: "error", text: res.error || "Chyba pri ukladaní tipov." });
+      try {
+        const res = await saveDailyGamePicksAction(payload, config.season, config.league);
+        if (res.ok) {
+          setMsg({ type: "success", text: "✅ Vaše denné tipy boli úspešne uložené!" });
+        } else {
+          setMsg({ type: "error", text: res.error || "Chyba pri ukladaní tipov." });
+        }
+      } catch (err: any) {
+        console.error("Save daily picks error:", err);
+        alert("Aplikácia bola na serveri aktualizovaná na novú verziu. Stránka sa teraz obnoví, prosím zopakujte odoslanie tipov.");
+        window.location.reload();
       }
     });
   };
@@ -295,36 +301,48 @@ export default function GamePicksView({
     }
 
     startTransition(async () => {
-      const res = await saveGameOfTheWeekPickAction(
-        {
-          gameId: gotwGame.id,
-          winnerTeamId: gotwPick.winnerTeamId!,
-          predictedScore: gotwPick.predictedScore,
-          firstGoalScorerId: gotwPick.firstGoalScorerId,
-          firstGoalScorerName: gotwPick.firstGoalScorerName,
-          topScorerPlayerId: gotwPick.topScorerPlayerId,
-          topScorerPlayerName: gotwPick.topScorerPlayerName,
-          isJoker: gotwPick.isJoker,
-        },
-        config.season,
-        config.league
-      );
+      try {
+        const res = await saveGameOfTheWeekPickAction(
+          {
+            gameId: gotwGame.id,
+            winnerTeamId: gotwPick.winnerTeamId!,
+            predictedScore: gotwPick.predictedScore,
+            firstGoalScorerId: gotwPick.firstGoalScorerId,
+            firstGoalScorerName: gotwPick.firstGoalScorerName,
+            topScorerPlayerId: gotwPick.topScorerPlayerId,
+            topScorerPlayerName: gotwPick.topScorerPlayerName,
+            isJoker: gotwPick.isJoker,
+          },
+          config.season,
+          config.league
+        );
 
-      if (res.ok) {
-        setMsg({ type: "success", text: "✅ Tip na Zápas týždňa (Game of the Week) bol úspešne uložený!" });
-      } else {
-        setMsg({ type: "error", text: res.error || "Chyba pri ukladaní tipu." });
+        if (res.ok) {
+          setMsg({ type: "success", text: "✅ Tip na Zápas týždňa (Game of the Week) bol úspešne uložený!" });
+        } else {
+          setMsg({ type: "error", text: res.error || "Chyba pri ukladaní tipu." });
+        }
+      } catch (err: any) {
+        console.error("Save GOTW error:", err);
+        alert("Aplikácia bola na serveri aktualizovaná na novú verziu. Stránka sa teraz obnoví, prosím zopakujte odoslanie tipu.");
+        window.location.reload();
       }
     });
   };
 
   const handleEvaluate = () => {
     startTransition(async () => {
-      const res = await evaluateGamePicksAction(config.season, config.league);
-      if (res.ok && "message" in res) {
-        setMsg({ type: "success", text: `⚡ ${res.message}` });
-      } else {
-        setMsg({ type: "error", text: (res as any).error || "Chyba pri vyhodnocovaní." });
+      try {
+        const res = await evaluateGamePicksAction(config.season, config.league);
+        if (res.ok && "message" in res) {
+          setMsg({ type: "success", text: `⚡ ${res.message}` });
+        } else {
+          setMsg({ type: "error", text: (res as any).error || "Chyba pri vyhodnocovaní." });
+        }
+      } catch (err: any) {
+        console.error("Evaluate error:", err);
+        alert("Aplikácia bola na serveri aktualizovaná. Stránka sa teraz obnoví.");
+        window.location.reload();
       }
     });
   };
