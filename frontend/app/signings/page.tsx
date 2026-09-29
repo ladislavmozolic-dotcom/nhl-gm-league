@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { PageHeader, Card } from "@/components/ui";
 import { cleanName } from "@/lib/playerName";
@@ -16,7 +15,8 @@ export default async function SigningsPage({ searchParams }: { searchParams: Pro
   // Admin/comish-only — reveals every club's bid on a player, which the live
   // board deliberately keeps blind from other GMs (fairness). Historical
   // signings are fair game for the commissioner to review, not for a rival GM.
-  if (!(await isAdmin())) redirect("/");
+  // Everyone sees WHO signed WHERE for how much; only the admin sees the competing bids.
+  const admin = await isAdmin();
 
   const round = [1, 2, 3].includes(Number((await searchParams).round)) ? Number((await searchParams).round) : 1;
 
@@ -27,7 +27,7 @@ export default async function SigningsPage({ searchParams }: { searchParams: Pro
   // every OTHER standing offer the signed player had — any status (COUNTERED /
   // SHORTLISTED / REJECTED), not just outright REJECTED, so a still-live
   // competing bid at the moment of signing shows up too.
-  const rivals = signedRound.length
+  const rivals = signedRound.length && admin
     ? await prisma.faOffer.findMany({ where: { status: { not: "ACCEPTED" }, playerId: { in: signedRound.map((o) => o.playerId) } } })
     : [];
   const rivalsByPlayer = new Map<number, typeof rivals>();
@@ -46,11 +46,11 @@ export default async function SigningsPage({ searchParams }: { searchParams: Pro
   // score every offer (winner + rivals) with the SAME utility function the
   // resolver used to pick the winner, so "why him" reflects the real logic
   // instead of a raw $ comparison.
-  const pool = await loadMarketPool();
-  const cmap = await teamContentionMap();
+  const pool = admin ? await loadMarketPool() : [];
+  const cmap = admin ? await teamContentionMap() : new Map();
   type Scored = { teamId: number; salary: number; years: number; line: number; pp: boolean; pk: boolean; status: string; utility: number | null; acceptable: boolean; roleBonus: number; contBonus: number; churnBonus: number; stBonus: number };
   const scoredByPlayer = new Map<number, Scored[]>();
-  for (const playerId of pIds) {
+  for (const playerId of admin ? pIds : []) {
     const offers = [...(accepted.filter((o) => o.playerId === playerId)), ...(rivalsByPlayer.get(playerId) ?? [])];
     const scored: Scored[] = [];
     for (const o of offers) {
@@ -74,7 +74,7 @@ export default async function SigningsPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="space-y-5 py-2">
-      <PageHeader title="Free-Agent Signings" subtitle="Admin view — who signed in each frenzy round, every competing bid, and why the winner beat the rest" />
+      <PageHeader title="Free-Agent Signings" subtitle={admin ? "Admin view — who signed in each frenzy round, every competing bid, and why the winner beat the rest" : "Who signed where in each Free Agent Frenzy round"} />
       <div className="flex gap-2 flex-wrap">{[1, 2, 3].map((r) => <Tab key={r} r={r} />)}</div>
 
       {signedRound.length === 0 ? (

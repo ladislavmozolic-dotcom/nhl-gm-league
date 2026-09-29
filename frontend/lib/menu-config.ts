@@ -16,6 +16,7 @@ export const DEFAULT_MENU: MenuItem[] = [
     { label: "🧱 Trade Block", href: "/trade-block" },
     { label: "📝 Waiver Wire", href: "/waivers" },
     { label: "📋 Trade Tracker", href: "/trades" },
+    { label: "✍️ Signings", href: "/signings" },
     { label: "⏰ Deadline Day", href: "/trades/deadline" },
     { label: "🧾 Transactions", href: "/transactions" },
   ] },
@@ -43,9 +44,11 @@ export const DEFAULT_MENU: MenuItem[] = [
     { label: "📑 Contracts", href: "/players/contracts" },
     { label: "💰 Demand Watch", href: "/admin/expiring-contracts" },
     { label: "👥 All Players", href: "/players/all" },
+    { label: "🧑‍✈️ Captains", href: "/captains" },
     { label: "🌍 Around the World", href: "/around-the-world" },
   ] },
   { key: "league", label: "League", href: "/league", children: [
+    { label: "🎯 Season Picks (Tipovačka)", href: "/league/picks" },
     { label: "📖 Rules", href: "/rules" },
     { label: "📣 Fan Interest", href: "/league/fan-interest" },
     { label: "💰 Finance", href: "/finance", children: [
@@ -64,12 +67,8 @@ export const DEFAULT_MENU: MenuItem[] = [
     { label: "⭐ All-Star Game", href: "/all-star" },
     { label: "⚖️ Player Safety", href: "/league/player-safety" },
     { label: "🦓 Officials", href: "/league/officials" },
-    { label: "📊 Parameters", href: "/league/parameters" },
-    { label: "🔍 Audit Log", href: "/league/audit" },
     { label: "👔 Team / GM", href: "/league" },
-    { label: "🧑‍✈️ Captains", href: "/captains" },
     { label: "🎓 Coaches", href: "/coaches" },
-    { label: "✍️ Signings", href: "/signings" },
   ] },
   { key: "draft", label: "Entry Draft", href: "/draft/room", children: [
     { label: "🎰 Draft Lottery", href: "/draft/lottery" },
@@ -94,6 +93,8 @@ export const DEFAULT_MENU: MenuItem[] = [
     { label: "🎚️ Parameters (calculator)", href: "/tools/player-calculator" },
     { label: "🎛️ Next Gen Parameters (calculator)", href: "/tools/edge-calculator" },
     { label: "🔄 Player Data Refresh", href: "/tools/player-data" },
+    { label: "📊 Parameters", href: "/league/parameters" },
+    { label: "🔍 Audit Log", href: "/league/audit" },
   ] },
   { key: "ahl", label: "AHL", href: "/ahl", children: [
     { label: "🏒 AHL Teams", href: "/ahl" },
