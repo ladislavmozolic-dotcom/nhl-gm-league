@@ -1031,12 +1031,15 @@ export default function GamePicksView({
 
           <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
             <h3 className="text-sm font-bold text-emerald-300 flex items-center gap-2">
-              <span>⚡ Série (Streaks) & 📅 Mesačné Súťaže</span>
+              <span>⚡ Série, 📅 Týždenné & Mesačné Odmeny</span>
             </h3>
-            <ul className="list-disc list-inside text-slate-400 space-y-1.5">
+            <ul className="list-disc list-inside text-slate-400 space-y-1.5 text-xs">
               <li>3 správne tipy v rade = <strong className="text-white">+2 bonusové body</strong></li>
               <li>5 správnych tipov v rade = <strong className="text-white">+5 bonusových bodov</strong></li>
               <li>10 správnych tipov v rade = <strong className="text-white">+15 bonusových bodov</strong></li>
+              <li>
+                <strong className="text-white">Víťaz Týždňa:</strong> Najlepší tipér týždňa získa 🎟️ <strong className="text-amber-300">Draft Pick v 8. kole</strong> (alebo 9. kole pri zaplnení).
+              </li>
               <li>
                 <strong className="text-white">Mesačný Šampión:</strong> Víťaz mesiaca získa <strong className="text-amber-300">+10 bodov</strong> do celkovej tabuľky, <strong className="text-emerald-400">+$250,000</strong> do klubovej kasy a odznak 🥇 na profile.
               </li>
@@ -1050,7 +1053,7 @@ export default function GamePicksView({
               <div>
                 <h3 className="text-base font-bold text-white">Oficiálne Odmeny pre Víťazov Tipovačky (Ceny, Draft Picky & Financie)</h3>
                 <p className="text-xs text-slate-400">
-                  Na konci sezóny sa po sčítaní Game Picks a Season Picks udelia špičkovým tipérom tieto klubové bonusy:
+                  Na konci sezóny sa po sčítaní Game Picks a Season Picks udelia všetkým trom špičkovým tipérom klubové financie a draft picky:
                 </p>
               </div>
             </div>
@@ -1064,7 +1067,7 @@ export default function GamePicksView({
                 </div>
                 <div className="text-lg font-black text-amber-300">+$3,000,000</div>
                 <ul className="text-slate-300 space-y-1 text-[11px]">
-                  <li>🎟️ <strong>Draft Pick v 8. kole</strong> (alebo 9. kole pri zaplnení)</li>
+                  <li>🎟️ <strong>Draft Pick v 8. kole</strong> (alebo 9. kole)</li>
                   <li>🥇 Zlatý odznak <strong>Season Predictor Champion</strong></li>
                 </ul>
               </div>
@@ -1077,7 +1080,7 @@ export default function GamePicksView({
                 </div>
                 <div className="text-lg font-black text-slate-200">+$1,500,000</div>
                 <ul className="text-slate-300 space-y-1 text-[11px]">
-                  <li>🎟️ <strong>Draft Pick v 8. kole</strong> (alebo 9. kole pri zaplnení)</li>
+                  <li>🎟️ <strong>Draft Pick v 8. kole</strong> (alebo 9. kole)</li>
                   <li>🥈 Strieborný odznak <strong>Vice-Champion</strong></li>
                 </ul>
               </div>
@@ -1090,14 +1093,23 @@ export default function GamePicksView({
                 </div>
                 <div className="text-lg font-black text-amber-400">+$750,000</div>
                 <ul className="text-slate-300 space-y-1 text-[11px]">
+                  <li>🎟️ <strong>Draft Pick v 8. kole</strong> (alebo 9. kole)</li>
                   <li>🥉 Bronzový odznak <strong>3rd Place</strong></li>
-                  <li>💵 Finančná injekcia do klubovej kasy</li>
                 </ul>
               </div>
             </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-300">
+                <strong className="text-indigo-300">📅 Týždenné Game Picks:</strong> Každý víťaz hracieho týždňa v Game Picks získa 🎟️ <strong>Draft Pick v 8. kole</strong> (alebo 9. kole pri zaplnení).
+              </div>
+              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-300">
+                <strong className="text-amber-300">🏆 Mesačný Šampión:</strong> Každý víťaz mesiaca získa <strong>+$250,000</strong>, <strong>+10 bodov</strong> do celkovej tabuľky a odznak.
+              </div>
+            </div>
+
             <div className="text-[11px] text-slate-400 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
-              ℹ️ <strong>Pravidlo pre Draft Picky:</strong> Bonusové draft picky sa generujú do <strong>8. kola</strong> draftu nováčikov. V prípade, že je v 8. kole už obsadených všetkých 32 pozícií, pick sa automaticky zapíše do <strong>9. kola</strong>.
+              ℹ️ <strong>Pravidlo pre Draft Picky:</strong> Všetky bonusové draft picky (celoročná TOP 3 aj týždenní víťazi) sa generujú do <strong>8. kola</strong> draftu nováčikov. V prípade, že je v 8. kole už obsadených všetkých 32 pozícií, pick sa automaticky zapíše do <strong>9. kola</strong>.
             </div>
           </div>
         </div>
