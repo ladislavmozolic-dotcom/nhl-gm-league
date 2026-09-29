@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef, useEffect } from "react";
 import Image from "next/image";
 import {
   saveSeasonPicksAction,
@@ -14,6 +14,180 @@ import type {
   H2HDuel,
   BoldStatement,
 } from "@/lib/season-picks-server";
+
+function SearchablePlayerSelect({
+  value,
+  onChange,
+  players,
+  teams,
+  placeholder = "-- Vyberte hráča --",
+  disabled = false,
+  filter,
+}: {
+  value?: number;
+  onChange: (playerId?: number, player?: any) => void;
+  players: any[];
+  teams: any[];
+  placeholder?: string;
+  disabled?: boolean;
+  filter?: (p: any) => boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const teamById = new Map(teams.map((t) => [t.id, t]));
+  const selectedPlayer = value ? players.find((p) => p.id === value) : null;
+  const selectedTeam = selectedPlayer?.teamId ? teamById.get(selectedPlayer.teamId) : null;
+
+  const eligiblePlayers = filter ? players.filter(filter) : players;
+  const filtered = query.trim()
+    ? eligiblePlayers.filter((p) => {
+        const q = query.toLowerCase();
+        const t = p.teamId ? teamById.get(p.teamId) : null;
+        return (
+          p.name.toLowerCase().includes(q) ||
+          p.position?.toLowerCase().includes(q) ||
+          t?.name.toLowerCase().includes(q) ||
+          t?.code?.toLowerCase().includes(q)
+        );
+      })
+    : eligiblePlayers;
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    if (open) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  return (
+    <div ref={containerRef} className="relative w-full">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen(!open)}
+        className={`w-full flex items-center justify-between gap-2 px-3 py-2 bg-slate-950 border rounded-xl text-left text-sm transition-all ${
+          disabled
+            ? "opacity-60 cursor-not-allowed border-slate-800"
+            : open
+            ? "border-indigo-500 ring-2 ring-indigo-500/20"
+            : "border-slate-700 hover:border-slate-600"
+        }`}
+      >
+        {selectedPlayer ? (
+          <div className="flex items-center gap-2 truncate">
+            {selectedPlayer.photoUrl ? (
+              <div className="relative w-5 h-5 rounded-full overflow-hidden flex-shrink-0 bg-slate-800">
+                <Image src={selectedPlayer.photoUrl} alt={selectedPlayer.name} fill className="object-cover" />
+              </div>
+            ) : (
+              <span className="w-5 h-5 rounded-full bg-slate-800 text-[10px] flex items-center justify-center text-slate-400 font-mono">
+                👤
+              </span>
+            )}
+            <span className="font-semibold text-white truncate">{selectedPlayer.name}</span>
+            <span className="text-xs px-1.5 py-0.5 rounded bg-slate-800 text-indigo-300 font-mono">
+              {selectedPlayer.position}
+            </span>
+            {selectedTeam && (
+              <span className="text-xs text-slate-400 truncate">
+                ({selectedTeam.code || selectedTeam.name})
+              </span>
+            )}
+          </div>
+        ) : (
+          <span className="text-slate-400 truncate">{placeholder}</span>
+        )}
+        <span className="text-slate-500 text-xs flex-shrink-0">▾</span>
+      </button>
+
+      {open && (
+        <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden">
+          <div className="p-2 border-b border-slate-800 bg-slate-950">
+            <input
+              type="text"
+              autoFocus
+              placeholder="🔍 Hľadať hráča podľa mena, tímu..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+            />
+          </div>
+
+          <div className="max-h-56 overflow-y-auto divide-y divide-slate-800/40 p-1">
+            <button
+              type="button"
+              onClick={() => {
+                onChange(undefined);
+                setOpen(false);
+              }}
+              className="w-full text-left px-3 py-1.5 text-xs text-slate-400 hover:bg-slate-800/80 rounded-lg transition-colors"
+            >
+              -- Nevybrané --
+            </button>
+
+            {filtered.length === 0 ? (
+              <div className="p-3 text-center text-xs text-slate-500">
+                Nenašiel sa žiadny hráč pre &quot;{query}&quot;
+              </div>
+            ) : (
+              filtered.slice(0, 50).map((p) => {
+                const tm = p.teamId ? teamById.get(p.teamId) : null;
+                const isSelected = p.id === value;
+
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => {
+                      onChange(p.id, p);
+                      setOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between gap-2 px-2.5 py-1.5 text-left rounded-lg transition-colors text-xs ${
+                      isSelected
+                        ? "bg-indigo-600 text-white font-semibold"
+                        : "hover:bg-slate-800 text-slate-200"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      {p.photoUrl ? (
+                        <div className="relative w-5 h-5 rounded-full overflow-hidden flex-shrink-0 bg-slate-800">
+                          <Image src={p.photoUrl} alt={p.name} fill className="object-cover" />
+                        </div>
+                      ) : (
+                        <span className="w-5 h-5 rounded-full bg-slate-800 text-[10px] flex items-center justify-center text-slate-400">
+                          👤
+                        </span>
+                      )}
+                      <span className="truncate">{p.name}</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <span className="px-1 py-0.5 rounded bg-slate-800/80 text-[10px] font-mono text-slate-300">
+                        {p.position}
+                      </span>
+                      {tm && (
+                        <span className="text-[11px] text-slate-400">
+                          {tm.code || tm.name}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const TOP_90_POINT_TEAMS = [
   "NEW YORK RANGERS",
@@ -710,7 +884,7 @@ export default function SeasonPicksView({
                 <span className="text-2xl">📊</span>
                 <div>
                   <h2 className="text-lg font-bold text-white">5. Bodovanie & Štatistiky NHL (Max 60 b)</h2>
-                  <p className="text-xs text-slate-400">Najproduktívnejší hráči a lídri jednotlivých štatistík.</p>
+                  <p className="text-xs text-slate-400">Najproduktívnejší hráči a lídri jednotlivých štatistík s vyhľadávaním.</p>
                 </div>
               </div>
               <div className="flex items-center gap-2 text-xs font-mono text-indigo-300 bg-indigo-950/40 px-3 py-1 rounded-lg border border-indigo-800/40">
@@ -724,27 +898,22 @@ export default function SeasonPicksView({
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                   🥇 Art Ross Trophy — Najviac bodov (15 b)
                 </label>
-                <select
+                <SearchablePlayerSelect
                   disabled={isLocked}
-                  value={formPicks.statLeaders?.artRossPlayerId || ""}
-                  onChange={(e) =>
+                  value={formPicks.statLeaders?.artRossPlayerId}
+                  players={players}
+                  teams={teams}
+                  placeholder="-- Hľadať Art Ross víťaza --"
+                  onChange={(pid) =>
                     setFormPicks({
                       ...formPicks,
                       statLeaders: {
                         ...formPicks.statLeaders,
-                        artRossPlayerId: Number(e.target.value) || undefined,
+                        artRossPlayerId: pid,
                       },
                     })
                   }
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-indigo-500"
-                >
-                  <option value="">-- Vyberte hráča --</option>
-                  {players.map((p: any) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({p.position})
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
 
               {/* Maurice Richard */}
@@ -752,27 +921,22 @@ export default function SeasonPicksView({
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                   🎯 Maurice Richard — Najlepší strelec (15 b)
                 </label>
-                <select
+                <SearchablePlayerSelect
                   disabled={isLocked}
-                  value={formPicks.statLeaders?.rocketRichardPlayerId || ""}
-                  onChange={(e) =>
+                  value={formPicks.statLeaders?.rocketRichardPlayerId}
+                  players={players}
+                  teams={teams}
+                  placeholder="-- Hľadať najlepšieho strelca --"
+                  onChange={(pid) =>
                     setFormPicks({
                       ...formPicks,
                       statLeaders: {
                         ...formPicks.statLeaders,
-                        rocketRichardPlayerId: Number(e.target.value) || undefined,
+                        rocketRichardPlayerId: pid,
                       },
                     })
                   }
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-indigo-500"
-                >
-                  <option value="">-- Vyberte hráča --</option>
-                  {players.map((p: any) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({p.position})
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
 
               {/* Assists */}
@@ -780,27 +944,22 @@ export default function SeasonPicksView({
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                   🅰️ Najviac asistencií (10 b)
                 </label>
-                <select
+                <SearchablePlayerSelect
                   disabled={isLocked}
-                  value={formPicks.statLeaders?.assistsPlayerId || ""}
-                  onChange={(e) =>
+                  value={formPicks.statLeaders?.assistsPlayerId}
+                  players={players}
+                  teams={teams}
+                  placeholder="-- Hľadať lídra asistencií --"
+                  onChange={(pid) =>
                     setFormPicks({
                       ...formPicks,
                       statLeaders: {
                         ...formPicks.statLeaders,
-                        assistsPlayerId: Number(e.target.value) || undefined,
+                        assistsPlayerId: pid,
                       },
                     })
                   }
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-indigo-500"
-                >
-                  <option value="">-- Vyberte hráča --</option>
-                  {players.map((p: any) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({p.position})
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
 
               {/* Top D-man */}
@@ -808,29 +967,23 @@ export default function SeasonPicksView({
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                   🛡️ Najproduktívnejší obranca (10 b)
                 </label>
-                <select
+                <SearchablePlayerSelect
                   disabled={isLocked}
-                  value={formPicks.statLeaders?.topDmanPlayerId || ""}
-                  onChange={(e) =>
+                  value={formPicks.statLeaders?.topDmanPlayerId}
+                  players={players}
+                  teams={teams}
+                  placeholder="-- Hľadať top obrancu --"
+                  filter={(p) => p.position?.includes("D")}
+                  onChange={(pid) =>
                     setFormPicks({
                       ...formPicks,
                       statLeaders: {
                         ...formPicks.statLeaders,
-                        topDmanPlayerId: Number(e.target.value) || undefined,
+                        topDmanPlayerId: pid,
                       },
                     })
                   }
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-indigo-500"
-                >
-                  <option value="">-- Vyberte obrancu --</option>
-                  {players
-                    .filter((p: any) => p.position?.includes("D"))
-                    .map((p: any) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.position})
-                      </option>
-                    ))}
-                </select>
+                />
               </div>
 
               {/* Top Rookie */}
@@ -838,27 +991,22 @@ export default function SeasonPicksView({
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                   🌟 Najproduktívnejší Rookie (10 b)
                 </label>
-                <select
+                <SearchablePlayerSelect
                   disabled={isLocked}
-                  value={formPicks.statLeaders?.topRookiePlayerId || ""}
-                  onChange={(e) =>
+                  value={formPicks.statLeaders?.topRookiePlayerId}
+                  players={players}
+                  teams={teams}
+                  placeholder="-- Hľadať top nováčika --"
+                  onChange={(pid) =>
                     setFormPicks({
                       ...formPicks,
                       statLeaders: {
                         ...formPicks.statLeaders,
-                        topRookiePlayerId: Number(e.target.value) || undefined,
+                        topRookiePlayerId: pid,
                       },
                     })
                   }
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-indigo-500"
-                >
-                  <option value="">-- Vyberte hráča --</option>
-                  {players.map((p: any) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({p.position})
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
             </div>
           </div>
@@ -876,16 +1024,60 @@ export default function SeasonPicksView({
                 </div>
               </div>
               <div className="flex items-center gap-2 text-xs font-mono">
-                <span className="text-slate-400">Použitie:</span>
-                <span className={`px-2 py-0.5 rounded ${confCounts[3] > 2 ? "bg-rose-500/20 text-rose-300 border border-rose-500" : "bg-slate-800 text-slate-300"}`}>
+                <span className="text-slate-400">Použitie limitov:</span>
+                <span className={`px-2 py-0.5 rounded ${confCounts[3] > 2 ? "bg-rose-500/20 text-rose-300 border border-rose-500 font-bold" : "bg-slate-800 text-slate-300"}`}>
                   Conf 3: {confCounts[3]}/2
                 </span>
-                <span className={`px-2 py-0.5 rounded ${confCounts[2] > 2 ? "bg-rose-500/20 text-rose-300 border border-rose-500" : "bg-slate-800 text-slate-300"}`}>
+                <span className={`px-2 py-0.5 rounded ${confCounts[2] > 2 ? "bg-rose-500/20 text-rose-300 border border-rose-500 font-bold" : "bg-slate-800 text-slate-300"}`}>
                   Conf 2: {confCounts[2]}/2
                 </span>
-                <span className={`px-2 py-0.5 rounded ${confCounts[1] > 2 ? "bg-rose-500/20 text-rose-300 border border-rose-500" : "bg-slate-800 text-slate-300"}`}>
+                <span className={`px-2 py-0.5 rounded ${confCounts[1] > 2 ? "bg-rose-500/20 text-rose-300 border border-rose-500 font-bold" : "bg-slate-800 text-slate-300"}`}>
                   Conf 1: {confCounts[1]}/2
                 </span>
+              </div>
+            </div>
+
+            {/* Confidence Explanatory Card */}
+            <div className="p-4 rounded-xl bg-gradient-to-r from-indigo-950/70 via-slate-900 to-indigo-950/70 border border-indigo-500/30 text-xs space-y-2.5">
+              <div className="flex items-center gap-2 text-indigo-300 font-bold text-sm">
+                <span>💡 Čo je to Confidence (Dôvera 1–3)?</span>
+              </div>
+              <p className="text-slate-300 leading-relaxed">
+                Pri každej trofeji určíte svoju mieru dôvery. Vyššia dôvera výrazne násobí body pri správnom tipe, no pri neúspechu sa body odčítajú. Z 6 trofejí musíte confidence vyvážiť — každú úroveň môžete použiť <strong>maximálne 2-krát</strong> (2×3, 2×2, 2×1):
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                <div className="bg-slate-950/80 p-2.5 rounded-lg border border-slate-800">
+                  <div className="font-bold text-indigo-400 flex items-center justify-between">
+                    <span>★★★ Confidence 3</span>
+                    <span className="text-[10px] bg-indigo-500/20 px-1.5 py-0.5 rounded text-indigo-300">max 2×</span>
+                  </div>
+                  <div className="text-[11px] mt-1 space-y-0.5">
+                    <div className="text-emerald-400 font-semibold">✓ Zásah: +30 bodov <span className="text-slate-400 font-normal">(10 × 3)</span></div>
+                    <div className="text-rose-400 font-semibold">✗ Vedľa: -15 bodov <span className="text-slate-400 font-normal">(-5 × 3)</span></div>
+                  </div>
+                </div>
+
+                <div className="bg-slate-950/80 p-2.5 rounded-lg border border-slate-800">
+                  <div className="font-bold text-blue-400 flex items-center justify-between">
+                    <span>★★☆ Confidence 2</span>
+                    <span className="text-[10px] bg-blue-500/20 px-1.5 py-0.5 rounded text-blue-300">max 2×</span>
+                  </div>
+                  <div className="text-[11px] mt-1 space-y-0.5">
+                    <div className="text-emerald-400 font-semibold">✓ Zásah: +20 bodov <span className="text-slate-400 font-normal">(10 × 2)</span></div>
+                    <div className="text-rose-400 font-semibold">✗ Vedľa: -10 bodov <span className="text-slate-400 font-normal">(-5 × 2)</span></div>
+                  </div>
+                </div>
+
+                <div className="bg-slate-950/80 p-2.5 rounded-lg border border-slate-800">
+                  <div className="font-bold text-amber-400 flex items-center justify-between">
+                    <span>★☆☆ Confidence 1</span>
+                    <span className="text-[10px] bg-amber-500/20 px-1.5 py-0.5 rounded text-amber-300">max 2×</span>
+                  </div>
+                  <div className="text-[11px] mt-1 space-y-0.5">
+                    <div className="text-emerald-400 font-semibold">✓ Zásah: +10 bodov <span className="text-slate-400 font-normal">(10 × 1)</span></div>
+                    <div className="text-rose-400 font-semibold">✗ Vedľa: -5 bodov <span className="text-slate-400 font-normal">(-5 × 1)</span></div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -921,7 +1113,7 @@ export default function SeasonPicksView({
                             });
                             setFormPicks({ ...formPicks, trophies: updated });
                           }}
-                          className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-indigo-500"
+                          className="w-full px-2.5 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
                         >
                           <option value="">-- Vyberte tím / trénera --</option>
                           {teams.map((t: any) => (
@@ -931,12 +1123,18 @@ export default function SeasonPicksView({
                           ))}
                         </select>
                       ) : (
-                        <select
+                        <SearchablePlayerSelect
                           disabled={isLocked}
-                          value={current.playerId || ""}
-                          onChange={(e) => {
-                            const pid = Number(e.target.value) || undefined;
-                            const pObj = players.find((p: any) => p.id === pid);
+                          value={current.playerId}
+                          players={players}
+                          teams={teams}
+                          placeholder={`-- Hľadať ${tDef.name.split(" ")[0]} víťaza --`}
+                          filter={(p) => {
+                            if (tDef.key === "Norris") return p.position?.includes("D");
+                            if (tDef.key === "Vezina") return p.isGoalie;
+                            return true;
+                          }}
+                          onChange={(pid, pObj) => {
                             const updated = trophyPicks.filter((tp) => tp.key !== tDef.key);
                             updated.push({
                               ...current,
@@ -945,21 +1143,7 @@ export default function SeasonPicksView({
                             });
                             setFormPicks({ ...formPicks, trophies: updated });
                           }}
-                          className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-indigo-500"
-                        >
-                          <option value="">-- Vyberte hráča --</option>
-                          {players
-                            .filter((p: any) => {
-                              if (tDef.key === "Norris") return p.position?.includes("D");
-                              if (tDef.key === "Vezina") return p.isGoalie;
-                              return true;
-                            })
-                            .map((p: any) => (
-                              <option key={p.id} value={p.id}>
-                                {p.name} ({p.position})
-                              </option>
-                            ))}
-                        </select>
+                        />
                       )}
                     </div>
 
