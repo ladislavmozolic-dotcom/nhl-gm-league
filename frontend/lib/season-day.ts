@@ -171,8 +171,27 @@ export async function simulateLeagueDay(day: Date) {
     runLiveCalculatorRecompute().catch((err) =>
       console.error("[LiveCalculator] Auto recompute error:", err)
     );
+    const { evaluateGamePicks } = await import("@/lib/game-picks-server");
+    await evaluateGamePicks(SEASON, "NHL").catch((err) =>
+      console.error("[game-picks:eval]", err)
+    );
   }
-  for (const p of ["/calendar", "/schedule", "/standings", "/scores", "/admin/season", "/finance", "/free-agents", "/signings", "/waivers", "/tools/player-calculator", "/"]) revalidatePath(p);
+  for (const p of [
+    "/calendar",
+    "/schedule",
+    "/standings",
+    "/scores",
+    "/admin/season",
+    "/finance",
+    "/free-agents",
+    "/signings",
+    "/waivers",
+    "/tools/player-calculator",
+    "/league/picks",
+    "/tools/picks",
+    "/",
+  ])
+    revalidatePath(p);
   return { date: day, phase: phToday, played, signed, warned: promises.warned, requested: promises.requested, capOffenders, expiredToUfa, waiverClaims: waivers.claimed, waiverClears: waivers.cleared };
 }
 

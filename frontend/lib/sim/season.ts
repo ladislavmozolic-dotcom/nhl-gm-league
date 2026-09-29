@@ -474,6 +474,16 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
     console.error("[playScheduledGames] audit failed:", e);
   }
 
+  // automatically score and persist game picks for the simulated round
+  if (played > 0) {
+    try {
+      const { evaluateGamePicks } = await import("../game-picks-server");
+      await evaluateGamePicks(opts.season ?? "2026-27", "NHL");
+    } catch (e) {
+      console.error("[playScheduledGames] evaluateGamePicks failed:", e);
+    }
+  }
+
   return { played };
 }
 

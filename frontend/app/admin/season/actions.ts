@@ -114,7 +114,19 @@ export async function simNextDayAction() {
   // resolve any in-season UFA deliberation window that's come due — so signings progress
   // even when the season is moved via game-sim (not just the calendar's Advance Day).
   const inSeasonFa = await resolveInSeasonWindows(await getLeagueDate());
-  for (const p of ["/schedule", "/standings", "/scores", "/stats/players", "/admin/season", "/finance", "/free-agents", "/signings"]) revalidatePath(p);
+  for (const p of [
+    "/schedule",
+    "/standings",
+    "/scores",
+    "/stats/players",
+    "/admin/season",
+    "/finance",
+    "/free-agents",
+    "/signings",
+    "/league/picks",
+    "/tools/picks",
+  ])
+    revalidatePath(p);
   return { played: r.played, round: next.round, date: next.gameDate, done: false, signed: inSeasonFa.signed };
 }
 
