@@ -119,11 +119,12 @@ export async function importRussianProspects() {
     prospectMap.set(k, [...(prospectMap.get(k) ?? []), p]);
   }
 
-  const uniqueCandidates = [...prospectMap.values()].map((list) => list[0]);
+  const uniqueCandidates = [...prospectMap.values()].map((list) => list.find((p) => p.nhlId) || list[0]);
   let imported = 0;
 
   await mapPool(uniqueCandidates, 8, async (prospect) => {
-    const pKey = norm(prospect.name);
+    try {
+      const pKey = norm(prospect.name);
 
     // 1. Check known special players (e.g. Artemi Pleshkov)
     const special = KNOWN_SPECIAL_PLAYERS[pKey];
@@ -239,8 +240,7 @@ export async function importRussianProspects() {
 
     if (!nhlId) return;
 
-    try {
-      const landingRes = await fetch(`https://api-web.nhle.com/v1/player/${nhlId}/landing`, {
+    const landingRes = await fetch(`https://api-web.nhle.com/v1/player/${nhlId}/landing`, {
         headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)" },
         cache: "no-store",
         signal: AbortSignal.timeout(6_000),
