@@ -21,19 +21,19 @@ export default async function AroundTheWorldPage({ searchParams }: { searchParam
     }),
     prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true } }),
     prisma.worldPlayerSeasonStat.findMany({
-      orderBy: [{ points: "desc" }, { gamesPlayed: "desc" }], take: 100,
+      where: { isGoalie: false },
+      orderBy: [{ points: "desc" }, { gamesPlayed: "desc" }], take: 30,
       include: { player: { include: { currentTeam: true } }, league: true, team: true },
     }),
   ]);
   const myProspects = teamId == null ? [] : await prisma.prospect.findMany({
     where: { teamId, source: rosterMode?.rosterMode === "real" ? "real" : "profinhl" },
-    include: { worldPlayer: { include: { currentTeam: { include: { league: true } }, stats: { orderBy: [{ season: "desc" }, { syncedAt: "desc" }], take: 1, include: { league: true, team: true } } } } },
+    include: { worldPlayer: { include: { currentTeam: { include: { league: true } }, stats: { orderBy: [{ season: "desc" }, { gamesPlayed: "desc" }, { syncedAt: "desc" }], take: 1, include: { league: true, team: true } } } } },
     orderBy: { name: "asc" },
   });
   const linked = myProspects.filter((p) => p.worldPlayer?.stats.length);
-  const { meta: leaderMeta } = await worldScoutingMeta(allStats.map((s) => s.player), teamId);
   const noData = leagues.length === 0;
-  const leaders = allStats.filter((s) => !s.isGoalie && (leaderMeta.get(s.playerId)?.rights || leaderMeta.get(s.playerId)?.draftable)).slice(0, 10);
+  const leaders = allStats;
   const juniorLeagues = leagues.filter((l) => l.region !== "Europe").sort((a, b) => Number(b._count.stats > 0) - Number(a._count.stats > 0) || a.name.localeCompare(b.name));
   const europeanLeagues = leagues.filter((l) => l.region === "Europe");
   const europeanStats = europeanLeagues.reduce((total, l) => total + l._count.stats, 0);
@@ -72,7 +72,7 @@ export default async function AroundTheWorldPage({ searchParams }: { searchParam
       )}
 
       {(view === "leaders" || leaders.length > 0) && <section>
-        <SectionTitle count={leaders.length} accent="text-sky-300">World League Leaders</SectionTitle>
+        <SectionTitle count={leaders.length} accent="text-sky-300">World League Leaders · Top 30</SectionTitle>
         <Card bodyClassName="p-0"><div className="overflow-x-auto"><table className="w-full min-w-[650px] text-sm"><thead><tr className="bg-slate-800/30 border-b border-slate-800 text-xs uppercase tracking-wider text-slate-500"><th className="text-left px-4 py-3">Player</th><th className="text-left px-3 py-3">League</th><th className="text-left px-3 py-3">Club</th><th className="text-right px-4 py-3">GP</th><th className="text-right px-3 py-3">G</th><th className="text-right px-3 py-3">A</th><th className="text-right px-4 py-3">P</th></tr></thead><tbody>{leaders.map((s) => <tr key={s.id} className="border-b border-slate-800/50 last:border-0"><td className="px-4 py-3 font-semibold">{s.player.name}</td><td className="px-3 py-3 text-slate-400">{s.league.code}</td><td className="px-3 py-3 text-slate-400">{s.team?.name || s.player.currentTeam?.name || "—"}</td><td className="px-4 py-3 text-right tabular-nums">{s.gamesPlayed}</td><td className="px-3 py-3 text-right tabular-nums">{s.goals}</td><td className="px-3 py-3 text-right tabular-nums">{s.assists}</td><td className="px-4 py-3 text-right tabular-nums font-black text-sky-300">{s.points}</td></tr>)}</tbody></table></div></Card>
       </section>}
 
