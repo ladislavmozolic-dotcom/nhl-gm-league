@@ -238,7 +238,7 @@ export default function SeasonPicksView({
     presidentsTrophy: { points: 112 },
     playoffTeams: [],
     statLeaders: {},
-    trophies: TROPHIES_LIST.map((t) => ({ key: t.key, name: t.name, confidence: 2 })),
+    trophies: TROPHIES_LIST.map((t) => ({ key: t.key, name: t.name })),
     overUnder: {},
     h2h: {},
     bold: {},
@@ -271,13 +271,7 @@ export default function SeasonPicksView({
   const h2hDuels: H2HDuel[] = config.h2hDuels || [];
   const boldStatements: BoldStatement[] = config.boldStatements || [];
 
-  // Confidence usage counter
   const trophyPicks = formPicks.trophies || [];
-  const confCounts = {
-    1: trophyPicks.filter((t) => t.confidence === 1).length,
-    2: trophyPicks.filter((t) => t.confidence === 2).length,
-    3: trophyPicks.filter((t) => t.confidence === 3).length,
-  };
 
   // Playoff team selection helper
   const selectedPlayoffs = new Set(formPicks.playoffTeams || []);
@@ -341,7 +335,7 @@ export default function SeasonPicksView({
               <span>🎯 Tipovacia Liga & Season Picks</span>
             </h1>
             <p className="text-sm text-slate-300 mt-1 max-w-2xl">
-              Veľká predsezónna tipovačka pre generálnych manažérov. 10 komplexných kategórií, váhované body, dynamické confidence násobitele a celosezónny súboj o kráľa tipov.
+              Veľká predsezónna tipovačka pre generálnych manažérov. 10 komplexných kategórií, váhované body, NHL trofeje a celosezónny súboj o kráľa tipov.
             </p>
           </div>
 
@@ -1011,82 +1005,25 @@ export default function SeasonPicksView({
             </div>
           </div>
 
-          {/* SECTION 6: TROPHIES WITH CONFIDENCE 1-3 */}
+          {/* SECTION 6: TROPHIES */}
           <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-md space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2.5">
                 <span className="text-2xl">🎖️</span>
                 <div>
-                  <h2 className="text-lg font-bold text-white">6. NHL Trofeje s Confidence 1–3</h2>
+                  <h2 className="text-lg font-bold text-white">6. NHL Trofeje (10 b za každú trofej, Max 60 b)</h2>
                   <p className="text-xs text-slate-400">
-                    Priraďte ku každej trofeji mieru dôvery (1 až 3). Zásah = 10 × Confidence, Vedľa = -5 × Confidence.
+                    Vyberte svojho favorita na zisk každej zo 6 prestížnych trofejí NHL. Za každý správny tip získate 10 bodov.
                   </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 text-xs font-mono">
-                <span className="text-slate-400">Použitie limitov:</span>
-                <span className={`px-2 py-0.5 rounded ${confCounts[3] > 2 ? "bg-rose-500/20 text-rose-300 border border-rose-500 font-bold" : "bg-slate-800 text-slate-300"}`}>
-                  Conf 3: {confCounts[3]}/2
-                </span>
-                <span className={`px-2 py-0.5 rounded ${confCounts[2] > 2 ? "bg-rose-500/20 text-rose-300 border border-rose-500 font-bold" : "bg-slate-800 text-slate-300"}`}>
-                  Conf 2: {confCounts[2]}/2
-                </span>
-                <span className={`px-2 py-0.5 rounded ${confCounts[1] > 2 ? "bg-rose-500/20 text-rose-300 border border-rose-500 font-bold" : "bg-slate-800 text-slate-300"}`}>
-                  Conf 1: {confCounts[1]}/2
-                </span>
-              </div>
-            </div>
-
-            {/* Confidence Explanatory Card */}
-            <div className="p-4 rounded-xl bg-gradient-to-r from-indigo-950/70 via-slate-900 to-indigo-950/70 border border-indigo-500/30 text-xs space-y-2.5">
-              <div className="flex items-center gap-2 text-indigo-300 font-bold text-sm">
-                <span>💡 Čo je to Confidence (Dôvera 1–3)?</span>
-              </div>
-              <p className="text-slate-300 leading-relaxed">
-                Pri každej trofeji určíte svoju mieru dôvery. Vyššia dôvera výrazne násobí body pri správnom tipe, no pri neúspechu sa body odčítajú. Z 6 trofejí musíte confidence vyvážiť — každú úroveň môžete použiť <strong>maximálne 2-krát</strong> (2×3, 2×2, 2×1):
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-                <div className="bg-slate-950/80 p-2.5 rounded-lg border border-slate-800">
-                  <div className="font-bold text-indigo-400 flex items-center justify-between">
-                    <span>★★★ Confidence 3</span>
-                    <span className="text-[10px] bg-indigo-500/20 px-1.5 py-0.5 rounded text-indigo-300">max 2×</span>
-                  </div>
-                  <div className="text-[11px] mt-1 space-y-0.5">
-                    <div className="text-emerald-400 font-semibold">✓ Zásah: +30 bodov <span className="text-slate-400 font-normal">(10 × 3)</span></div>
-                    <div className="text-rose-400 font-semibold">✗ Vedľa: -15 bodov <span className="text-slate-400 font-normal">(-5 × 3)</span></div>
-                  </div>
-                </div>
-
-                <div className="bg-slate-950/80 p-2.5 rounded-lg border border-slate-800">
-                  <div className="font-bold text-blue-400 flex items-center justify-between">
-                    <span>★★☆ Confidence 2</span>
-                    <span className="text-[10px] bg-blue-500/20 px-1.5 py-0.5 rounded text-blue-300">max 2×</span>
-                  </div>
-                  <div className="text-[11px] mt-1 space-y-0.5">
-                    <div className="text-emerald-400 font-semibold">✓ Zásah: +20 bodov <span className="text-slate-400 font-normal">(10 × 2)</span></div>
-                    <div className="text-rose-400 font-semibold">✗ Vedľa: -10 bodov <span className="text-slate-400 font-normal">(-5 × 2)</span></div>
-                  </div>
-                </div>
-
-                <div className="bg-slate-950/80 p-2.5 rounded-lg border border-slate-800">
-                  <div className="font-bold text-amber-400 flex items-center justify-between">
-                    <span>★☆☆ Confidence 1</span>
-                    <span className="text-[10px] bg-amber-500/20 px-1.5 py-0.5 rounded text-amber-300">max 2×</span>
-                  </div>
-                  <div className="text-[11px] mt-1 space-y-0.5">
-                    <div className="text-emerald-400 font-semibold">✓ Zásah: +10 bodov <span className="text-slate-400 font-normal">(10 × 1)</span></div>
-                    <div className="text-rose-400 font-semibold">✗ Vedľa: -5 bodov <span className="text-slate-400 font-normal">(-5 × 1)</span></div>
-                  </div>
                 </div>
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {TROPHIES_LIST.map((tDef, idx) => {
+              {TROPHIES_LIST.map((tDef) => {
                 const current = trophyPicks.find((tp) => tp.key === tDef.key) || {
                   key: tDef.key,
                   name: tDef.name,
-                  confidence: 2,
                 };
 
                 return (
@@ -1145,32 +1082,6 @@ export default function SeasonPicksView({
                           }}
                         />
                       )}
-                    </div>
-
-                    {/* Confidence Selector */}
-                    <div className="flex items-center justify-between pt-1">
-                      <span className="text-xs text-slate-400 font-medium">Confidence:</span>
-                      <div className="flex items-center gap-1">
-                        {[1, 2, 3].map((cVal) => (
-                          <button
-                            key={cVal}
-                            type="button"
-                            disabled={isLocked}
-                            onClick={() => {
-                              const updated = trophyPicks.filter((tp) => tp.key !== tDef.key);
-                              updated.push({ ...current, confidence: cVal as any });
-                              setFormPicks({ ...formPicks, trophies: updated });
-                            }}
-                            className={`px-2.5 py-1 rounded text-xs font-bold transition-all ${
-                              current.confidence === cVal
-                                ? "bg-indigo-600 text-white shadow"
-                                : "bg-slate-800 text-slate-400 hover:bg-slate-700"
-                            }`}
-                          >
-                            {cVal === 3 ? "★★★ (3)" : cVal === 2 ? "★★☆ (2)" : "★☆☆ (1)"}
-                          </button>
-                        ))}
-                      </div>
                     </div>
                   </div>
                 );
@@ -1670,7 +1581,7 @@ export default function SeasonPicksView({
                       <div className="grid grid-cols-2 gap-2 text-slate-400">
                         {(selectedSubmission.picks.trophies || []).map((t: any) => (
                           <div key={t.key}>
-                            {t.key}: <strong className="text-white">{t.playerName || t.teamName || "—"}</strong> (Conf {t.confidence})
+                            {t.key}: <strong className="text-white">{t.playerName || t.teamName || "—"}</strong>
                           </div>
                         ))}
                       </div>

@@ -74,7 +74,7 @@ export type TrophyPick = {
   playerName?: string;
   teamId?: number;
   teamName?: string;
-  confidence: 1 | 2 | 3;
+  confidence?: number;
 };
 
 export type SeasonPicksFormData = {
@@ -378,27 +378,23 @@ export function calculateSubmissionPoints(
   }
   total += statPoints;
 
-  // 6. Trophies with Confidence (Dynamic)
+  // 6. Trophies (10 pts each, Max 60)
   let trophyPoints = 0;
   const trophyDetails: Record<string, any> = {};
   if (official.trophies && Array.isArray(picks.trophies)) {
     for (const t of picks.trophies) {
       const realWinner = official.trophies[t.key];
       if (realWinner !== undefined && realWinner !== null) {
-        const conf = t.confidence || 1;
         const matched =
           (t.playerId && t.playerId === realWinner.playerId) ||
           (t.teamId && t.teamId === realWinner.teamId) ||
           (t.name && realWinner.name && t.name.toLowerCase() === realWinner.name.toLowerCase());
 
         if (matched) {
-          const gain = 10 * conf;
-          trophyPoints += gain;
-          trophyDetails[t.key] = { matched: true, gain, conf };
+          trophyPoints += 10;
+          trophyDetails[t.key] = { matched: true, gain: 10 };
         } else {
-          const loss = -5 * conf;
-          trophyPoints += loss;
-          trophyDetails[t.key] = { matched: false, loss, conf };
+          trophyDetails[t.key] = { matched: false, gain: 0 };
         }
       }
     }

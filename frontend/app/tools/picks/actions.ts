@@ -54,21 +54,6 @@ export async function saveSeasonPicksAction(
     };
   }
 
-  // Validate trophy confidence distribution if trophies provided
-  if (picks.trophies && picks.trophies.length > 0) {
-    const confCounts = { 1: 0, 2: 0, 3: 0 };
-    for (const t of picks.trophies) {
-      if (t.confidence === 1 || t.confidence === 2 || t.confidence === 3) {
-        confCounts[t.confidence]++;
-      }
-    }
-    if (confCounts[3] > 2 || confCounts[2] > 2 || confCounts[1] > 2) {
-      return {
-        ok: false,
-        error: "Prekročený limit hodnôt Confidence: každú úroveň (1, 2, 3) môžete použiť maximálne 2-krát.",
-      };
-    }
-  }
 
   const team = await prisma.team.findUnique({
     where: { id: teamId },
