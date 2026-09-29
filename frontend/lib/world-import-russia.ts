@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { epSearchName } from "@/lib/playerName";
 import { resolveWorldPlayer } from "@/lib/world-player-identity";
+import { scrapeEpPlayer, mapEpLeagueToCode } from "@/lib/ep-scraper";
 
 const norm = (s: string) =>
   epSearchName(s)
@@ -251,14 +252,187 @@ export async function importRussianProspects() {
       }
     }
 
-    if (!nhlId) return;
+    // 3. EP scraper fallback: if no nhlId found OR after NHL landing – try EP page.
+    // We always want to try EP if the prospect has an epUrl, since EP has more accurate
+    // current-season team assignments (especially for Russian leagues that block the NHL API).
+    const epUrl = prospect.epUrl;
+
+    if (!nhlId) {
+      // No NHL profile at all → try EP directly
+      if (!epUrl) return;
+      const epResult = await scrapeEpPlayer(epUrl);
+      if (!epResult.success || !epResult.season2627) {
+        // At minimum set current club from EP even without stats
+        if (epResult.success && epResult.currentTeam && epResult.currentLeague) {
+          const leagueCode = mapEpLeagueToCode(epResult.currentLeague, null);
+          const targetLeague = await prisma.worldLeague.upsert({
+            where: { code: leagueCode },
+            update: { active: true },
+            create: {
+              code: leagueCode,
+              name: epResult.currentLeague,
+              country: null,
+              region: "Europe",
+              active: true,
+            },
+          });
+          const teamSlug = norm(epResult.currentTeam).replace(/ /g, "-");
+          const team = await prisma.worldTeam.upsert({
+            where: { leagueId_slug: { leagueId: targetLeague.id, slug: teamSlug } },
+            update: { name: epResult.currentTeam },
+            create: { leagueId: targetLeague.id, slug: teamSlug, name: epResult.currentTeam },
+          });
+          const { player } = await resolveWorldPlayer({
+            provider: "ep-scraper",
+            externalId: String(epResult.epId),
+            name: prospect.name.replace(/\s*\([^)]*\)/g, "").trim(),
+            position: epResult.position || prospect.position || null,
+            currentTeamId: team.id,
+          });
+          const allMatching = prospectMap.get(pKey) ?? [prospect];
+          for (const m of allMatching) {
+            if (m.worldPlayerId !== player.id) {
+              await prisma.prospect.update({ where: { id: m.id }, data: { worldPlayerId: player.id } });
+            }
+          }
+          imported++;
+        }
+        return;
+      }
+
+      // We have 2026-27 stats from EP
+      const s = epResult.season2627;
+      const leagueCode = mapEpLeagueToCode(s.leagueName, s.leagueUrlPath);
+      const isGoalie = (epResult.position || prospect.position || "").toUpperCase() === "G";
+
+      const targetLeague = await prisma.worldLeague.upsert({
+        where: { code: leagueCode },
+        update: { active: true },
+        create: {
+          code: leagueCode,
+          name: s.leagueName ?? leagueCode,
+          country: null,
+          region: leagueCode === "LIIGA" || leagueCode === "KHL" || leagueCode === "SHL" || leagueCode === "VHL" || leagueCode === "MHL" ? "Europe" : "North America",
+          active: true,
+        },
+      });
+
+      const teamName = s.teamName ?? "Unknown Club";
+      const teamSlug = norm(teamName).replace(/ /g, "-");
+      const team = await prisma.worldTeam.upsert({
+        where: { leagueId_slug: { leagueId: targetLeague.id, slug: teamSlug } },
+        update: { name: teamName },
+        create: { leagueId: targetLeague.id, slug: teamSlug, name: teamName },
+      });
+
+      const { player } = await resolveWorldPlayer({
+        provider: "ep-scraper",
+        externalId: String(epResult.epId),
+        name: prospect.name.replace(/\s*\([^)]*\)/g, "").trim(),
+        position: epResult.position || prospect.position || null,
+        currentTeamId: team.id,
+      });
+
+      if (leagueCode !== "NCAA") {
+        await prisma.worldPlayerSeasonStat.upsert({
+          where: { playerId_leagueId_season: { playerId: player.id, leagueId: targetLeague.id, season: "2026-27" } },
+          update: {
+            teamId: team.id,
+            isGoalie,
+            gamesPlayed: s.gp,
+            goals: s.g,
+            assists: s.a,
+            points: s.pts,
+            plusMinus: s.pm ?? null,
+            penaltyMinutes: s.pim,
+            wins: isGoalie ? (s.w ?? null) : null,
+            savePercentage: isGoalie ? (s.svp ?? null) : null,
+            goalsAgainstAverage: isGoalie ? (s.gaa ?? null) : null,
+            shutouts: isGoalie ? (s.so ?? null) : null,
+            source: "ep-scraper",
+            syncedAt: new Date(),
+          },
+          create: {
+            playerId: player.id,
+            leagueId: targetLeague.id,
+            teamId: team.id,
+            season: "2026-27",
+            isGoalie,
+            gamesPlayed: s.gp,
+            goals: s.g,
+            assists: s.a,
+            points: s.pts,
+            plusMinus: s.pm ?? null,
+            penaltyMinutes: s.pim,
+            wins: isGoalie ? (s.w ?? null) : null,
+            savePercentage: isGoalie ? (s.svp ?? null) : null,
+            goalsAgainstAverage: isGoalie ? (s.gaa ?? null) : null,
+            shutouts: isGoalie ? (s.so ?? null) : null,
+            source: "ep-scraper",
+          },
+        });
+      }
+
+      const allMatching = prospectMap.get(pKey) ?? [prospect];
+      for (const m of allMatching) {
+        if (m.worldPlayerId !== player.id) {
+          await prisma.prospect.update({ where: { id: m.id }, data: { worldPlayerId: player.id } });
+        }
+        if (epUrl && !player.epUrl) {
+          await prisma.worldPlayer.update({ where: { id: player.id }, data: { epUrl } });
+        }
+      }
+      imported++;
+      return;
+    }
 
     const landingRes = await fetch(`https://api-web.nhle.com/v1/player/${nhlId}/landing`, {
         headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)" },
         cache: "no-store",
         signal: AbortSignal.timeout(6_000),
       });
-      if (!landingRes.ok) return;
+      if (!landingRes.ok) {
+        // NHL API failed → fall back to EP scraper
+        if (!epUrl) return;
+        const epResult = await scrapeEpPlayer(epUrl);
+        if (!epResult.success || !epResult.season2627) return;
+        const s = epResult.season2627;
+        const leagueCode = mapEpLeagueToCode(s.leagueName, s.leagueUrlPath);
+        const isGoalie = (epResult.position || prospect.position || "").toUpperCase() === "G";
+        const targetLeague = await prisma.worldLeague.upsert({
+          where: { code: leagueCode },
+          update: { active: true },
+          create: { code: leagueCode, name: s.leagueName ?? leagueCode, country: null, region: "Europe", active: true },
+        });
+        const teamName = s.teamName ?? "Unknown Club";
+        const teamSlug = norm(teamName).replace(/ /g, "-");
+        const team = await prisma.worldTeam.upsert({
+          where: { leagueId_slug: { leagueId: targetLeague.id, slug: teamSlug } },
+          update: { name: teamName },
+          create: { leagueId: targetLeague.id, slug: teamSlug, name: teamName },
+        });
+        const { player } = await resolveWorldPlayer({
+          provider: "ep-scraper",
+          externalId: String(epResult.epId),
+          name: prospect.name.replace(/\s*\([^)]*\)/g, "").trim(),
+          position: epResult.position || prospect.position || null,
+          currentTeamId: team.id,
+        });
+        if (leagueCode !== "NCAA") {
+          await prisma.worldPlayerSeasonStat.upsert({
+            where: { playerId_leagueId_season: { playerId: player.id, leagueId: targetLeague.id, season: "2026-27" } },
+            update: { teamId: team.id, isGoalie, gamesPlayed: s.gp, goals: s.g, assists: s.a, points: s.pts, plusMinus: s.pm, penaltyMinutes: s.pim, wins: isGoalie ? s.w : null, savePercentage: isGoalie ? s.svp : null, goalsAgainstAverage: isGoalie ? s.gaa : null, shutouts: isGoalie ? s.so : null, source: "ep-scraper", syncedAt: new Date() },
+            create: { playerId: player.id, leagueId: targetLeague.id, teamId: team.id, season: "2026-27", isGoalie, gamesPlayed: s.gp, goals: s.g, assists: s.a, points: s.pts, plusMinus: s.pm, penaltyMinutes: s.pim, wins: isGoalie ? s.w : null, savePercentage: isGoalie ? s.svp : null, goalsAgainstAverage: isGoalie ? s.gaa : null, shutouts: isGoalie ? s.so : null, source: "ep-scraper" },
+          });
+        }
+        const allMatching = prospectMap.get(pKey) ?? [prospect];
+        for (const m of allMatching) {
+          if (m.worldPlayerId !== player.id) await prisma.prospect.update({ where: { id: m.id }, data: { worldPlayerId: player.id } });
+          if (epUrl && !player.epUrl) await prisma.worldPlayer.update({ where: { id: player.id }, data: { epUrl } });
+        }
+        imported++;
+        return;
+      }
       const landing = (await landingRes.json()) as {
         seasonTotals?: Array<{
           gameTypeId?: number;
@@ -328,6 +502,39 @@ export async function importRussianProspects() {
       // ONLY pull season stats if they actually belong to the current 2026-27 season!
       // (Per user rule: all leagues must only pull 2026-27 stats; older seasons are never pulled)
       const stat2627 = regularStats.find((s) => s.season === 20262027 || String(s.season).startsWith("2026"));
+
+      // If NHL landing has no 2026-27 stats yet, try EP fallback for current stats
+      if (!stat2627 && epUrl) {
+        const epResult = await scrapeEpPlayer(epUrl);
+        if (epResult.success && epResult.season2627) {
+          const s = epResult.season2627;
+          const epLeagueCode = mapEpLeagueToCode(s.leagueName, s.leagueUrlPath);
+          if (epLeagueCode !== "NCAA") {
+            const epLeague = await prisma.worldLeague.upsert({
+              where: { code: epLeagueCode },
+              update: { active: true },
+              create: { code: epLeagueCode, name: s.leagueName ?? epLeagueCode, country: null, region: "Europe", active: true },
+            });
+            const epTeamName = s.teamName ?? "Unknown Club";
+            const epTeamSlug = norm(epTeamName).replace(/ /g, "-");
+            const epTeam = await prisma.worldTeam.upsert({
+              where: { leagueId_slug: { leagueId: epLeague.id, slug: epTeamSlug } },
+              update: { name: epTeamName },
+              create: { leagueId: epLeague.id, slug: epTeamSlug, name: epTeamName },
+            });
+            await prisma.worldPlayerSeasonStat.upsert({
+              where: { playerId_leagueId_season: { playerId: player.id, leagueId: epLeague.id, season: seasonLabel } },
+              update: { teamId: epTeam.id, isGoalie, gamesPlayed: s.gp, goals: s.g, assists: s.a, points: s.pts, plusMinus: s.pm, penaltyMinutes: s.pim, wins: isGoalie ? s.w : null, savePercentage: isGoalie ? s.svp : null, goalsAgainstAverage: isGoalie ? s.gaa : null, shutouts: isGoalie ? s.so : null, source: "ep-scraper", syncedAt: new Date() },
+              create: { playerId: player.id, leagueId: epLeague.id, teamId: epTeam.id, season: seasonLabel, isGoalie, gamesPlayed: s.gp, goals: s.g, assists: s.a, points: s.pts, plusMinus: s.pm, penaltyMinutes: s.pim, wins: isGoalie ? s.w : null, savePercentage: isGoalie ? s.svp : null, goalsAgainstAverage: isGoalie ? s.gaa : null, shutouts: isGoalie ? s.so : null, source: "ep-scraper" },
+            });
+            // Update currentTeam on the player profile
+            if (epTeam.id !== player.currentTeamId) {
+              await prisma.worldPlayer.update({ where: { id: player.id }, data: { currentTeamId: epTeam.id } });
+            }
+          }
+        }
+      }
+
       if (stat2627 && leagueCode !== "NCAA") {
         await prisma.worldPlayerSeasonStat.upsert({
           where: { playerId_leagueId_season: { playerId: player.id, leagueId: targetLeague.id, season: seasonLabel } },
