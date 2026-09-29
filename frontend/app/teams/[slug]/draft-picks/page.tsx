@@ -16,8 +16,13 @@ export default async function TeamDraftPicksPage({ params }: { params: Promise<{
     include: { draftPicks: { where: { source }, orderBy: [{ year: "asc" }, { round: "asc" }] } },
   });
   if (!team) notFound();
+  // bonus picks (round 8+) the commissioner awarded — contest prizes, rewards, …
+  const bonus = await prisma.draftBonusPick.findMany({
+    where: { teamId: team.id, ...(source === "real" ? { source: "real" } : { OR: [{ source: null }, { source: "profinhl" }] }) },
+    orderBy: [{ year: "asc" }, { round: "asc" }, { id: "asc" }],
+  });
 
-  if (team.draftPicks.length === 0) {
+  if (team.draftPicks.length === 0 && bonus.length === 0) {
     return <Card><p className="text-slate-500 text-center py-8">No draft picks.</p></Card>;
   }
 
@@ -41,18 +46,21 @@ export default async function TeamDraftPicksPage({ params }: { params: Promise<{
       return aName.localeCompare(bName);
     });
   }
-  const years = [...new Set(team.draftPicks.map((p) => p.year))].sort((a, b) => a - b);
+  const years = [...new Set([...team.draftPicks.map((p) => p.year), ...bonus.map((b) => b.year)])].sort((a, b) => a - b);
+  const bonusByYear = new Map<number, typeof bonus>();
+  for (const b of bonus) bonusByYear.set(b.year, [...(bonusByYear.get(b.year) ?? []), b]);
 
   return (
     <div className="space-y-4">
       <SectionTitle>Draft Picks</SectionTitle>
       <Card bodyClassName="p-0">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[700px]">
+          <table className="w-full text-sm min-w-[820px]">
             <thead>
               <tr className="border-b border-slate-800 text-slate-500 text-xs uppercase tracking-wider bg-slate-800/30">
                 <th className="px-4 py-3 text-left font-medium w-16">Year</th>
                 {[1, 2, 3, 4, 5, 6, 7].map((r) => <th key={r} className="px-2 py-3 text-center font-medium">Round {r}</th>)}
+                <th className="px-2 py-3 text-center font-medium text-amber-400/80 border-l border-slate-800">★ Bonus picks</th>
               </tr>
             </thead>
             <tbody>
@@ -86,6 +94,18 @@ export default async function TeamDraftPicksPage({ params }: { params: Promise<{
                       </td>
                     );
                   })}
+                  <td className="px-2 py-3 text-center border-l border-slate-800">
+                    <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                      {(bonusByYear.get(year) ?? []).map((b) => (
+                        <span key={b.id} title={b.reason ?? "Bonus pick"}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold tabular-nums">
+                          ★ R{b.round}
+                          {b.reason && <span className="font-normal text-amber-200/70 max-w-[140px] truncate">{b.reason}</span>}
+                        </span>
+                      ))}
+                      {!bonusByYear.get(year)?.length && <span className="text-slate-700">—</span>}
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
