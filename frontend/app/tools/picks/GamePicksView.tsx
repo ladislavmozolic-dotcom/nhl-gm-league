@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useState, useEffect, useTransition } from "react";
 import Image from "next/image";
 import {
   saveDailyGamePicksAction,
   saveGameOfTheWeekPickAction,
   evaluateGamePicksAction,
+  adminUpdateGamePicksConfigAction,
 } from "@/app/league/picks/game-actions";
 
 type Player = {
@@ -238,6 +239,43 @@ export default function GamePicksView({
     topScorerPlayerName: gotwSub?.topScorerPlayerName,
     isJoker: gotwSub?.isJoker || false,
   });
+
+  // Keep gotwPick in sync whenever gotwGame or viewer submissions change
+  useEffect(() => {
+    if (gotwGame) {
+      const sub = subMap.get(gotwGame.id);
+      if (sub) {
+        setGotwPick({
+          winnerTeamId: sub.winnerTeamId !== null && sub.winnerTeamId !== undefined ? sub.winnerTeamId : undefined,
+          predictedScore: sub.predictedScore || "4:2",
+          firstGoalScorerId: sub.firstGoalScorerId,
+          firstGoalScorerName: sub.firstGoalScorerName,
+          topScorerPlayerId: sub.topScorerPlayerId,
+          topScorerPlayerName: sub.topScorerPlayerName,
+          isJoker: sub.isJoker || false,
+        });
+      }
+    }
+  }, [gotwGame?.id, viewerSubmissions]);
+
+  const handleSetGotw = (gameId: number) => {
+    startTransition(async () => {
+      try {
+        const res = await adminUpdateGamePicksConfigAction(
+          { gameOfTheWeekId: gameId },
+          config.season,
+          config.league
+        );
+        if (res.ok) {
+          setMsg({ type: "success", text: "✅ Zápas týždňa (Game of the Week) bol úspešne zmenený!" });
+        } else {
+          setMsg({ type: "error", text: res.error || "Chyba pri zmene zápasu týždňa." });
+        }
+      } catch (err: any) {
+        console.error("Set GOTW error:", err);
+      }
+    });
+  };
 
   const [gameFilter, setGameFilter] = useState<"today" | "all_upcoming" | "results">("today");
 
@@ -755,18 +793,37 @@ export default function GamePicksView({
                   {gotwGame.awayTeam?.name} vs {gotwGame.homeTeam?.name}
                 </h2>
                 <p className="text-xs text-slate-300 mt-0.5">
-                  Špeciálny zápas týždňa. Natipujte víťaza, presné skóre, prvého strelca a najproduktívnejšieho hráča.
+                  Špeciálny zápas týždňa (vybraný na celý týždeň po-ne). Natipujte víťaza, presné skóre, prvého strelca a najproduktívnejšieho hráča.
                 </p>
               </div>
 
-              <button
-                type="button"
-                disabled={isPending || gotwGame.isLocked}
-                onClick={handleSaveGotw}
-                className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition-all shadow-lg shadow-amber-600/30 flex-shrink-0 flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                <span>💾 Uložiť Tip na Zápas Týždňa</span>
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                {isAdmin && (
+                  <select
+                    disabled={isPending}
+                    value={gotwGame.id}
+                    onChange={(e) => handleSetGotw(Number(e.target.value))}
+                    className="px-3 py-2 rounded-xl bg-slate-900 border border-amber-500/40 text-amber-300 text-xs font-bold focus:outline-none focus:border-amber-400"
+                  >
+                    {games
+                      .filter((g) => g.status === "SCHEDULED")
+                      .map((g) => (
+                        <option key={g.id} value={g.id}>
+                          👑 Admin GOTW: {g.awayTeam?.name} vs {g.homeTeam?.name} ({g.gameDate ? new Date(g.gameDate).toLocaleDateString("sk-SK", { weekday: "short", day: "numeric", month: "short" }) : `Deň #${g.round}`})
+                        </option>
+                      ))}
+                  </select>
+                )}
+
+                <button
+                  type="button"
+                  disabled={isPending || gotwGame.isLocked}
+                  onClick={handleSaveGotw}
+                  className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition-all shadow-lg shadow-amber-600/30 flex-shrink-0 flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <span>💾 Uložiť Tip na Zápas Týždňa</span>
+                </button>
+              </div>
             </div>
 
             {/* Matchup Header */}
@@ -832,6 +889,12 @@ export default function GamePicksView({
                   placeholder="napr. 5:3 alebo 4:2"
                   value={gotwPick.predictedScore}
                   onChange={(e) => setGotwPick({ ...gotwPick, predictedScore: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleSaveGotw();
+                    }
+                  }}
                   className="w-full px-3 py-2.5 bg-slate-950/90 border border-slate-700 rounded-xl text-sm font-bold text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
                 />
               </div>

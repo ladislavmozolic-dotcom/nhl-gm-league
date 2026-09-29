@@ -325,8 +325,67 @@ export async function getGamePicksData(season = REGULAR_SEASON, league = "NHL", 
     return gTime >= firstGameTime - 2 * 60 * 60 * 1000 && gTime <= gameNightEndTime;
   });
 
-  // Marquee match of the week (Game of the Week)
-  const gotwId = config.gameOfTheWeekId || todayGames[0]?.id || scheduledGames[0]?.id || mappedGames[0]?.id;
+  // Calculate current week range (Monday 00:00 to Sunday 23:59:59)
+  const day = now.getDay();
+  const diffToMon = day === 0 ? -6 : 1 - day;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diffToMon);
+  monday.setHours(0, 0, 0, 0);
+
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+
+  // Filter games occurring within the current week
+  const weekGames = mappedGames.filter((g) => {
+    if (!g.gameDate) return false;
+    const gd = new Date(g.gameDate);
+    return gd >= monday && gd <= sunday;
+  });
+
+  const RIVALRIES = new Set([
+    "MTL-TOR", "TOR-MTL", "NYR-BOS", "BOS-NYR", "EDM-CGY", "CGY-EDM",
+    "PIT-PHI", "PHI-PIT", "EDM-VAN", "VAN-EDM", "FLA-TBL", "TBL-FLA",
+    "COL-VGK", "VGK-COL", "NYR-NJD", "NJD-NYR", "TOR-BOS", "BOS-TOR",
+    "CAR-FLA", "FLA-CAR", "DAL-COL", "COL-DAL", "WSH-PIT", "PIT-WSH",
+    "CHI-DET", "DET-CHI", "NYI-NYR", "NYR-NYI", "CGY-VAN", "VAN-CGY",
+    "LAK-SJS", "SJS-LAK", "LAK-ANA", "ANA-LAK", "COL-EDM", "EDM-COL",
+  ]);
+
+  const candidatePool = weekGames.length > 0 ? weekGames : mappedGames;
+  const scoredGames = candidatePool.map((g) => {
+    let score = 0;
+    if (g.gameDate) {
+      const d = new Date(g.gameDate);
+      const dow = d.getDay();
+      if (dow === 6) score += 40; // Saturday prime time
+      else if (dow === 0) score += 25; // Sunday showcase
+      else if (dow === 5) score += 15; // Friday night
+    }
+
+    const hCode = g.homeTeam?.code?.toUpperCase() || "";
+    const aCode = g.awayTeam?.code?.toUpperCase() || "";
+    if (hCode && aCode && RIVALRIES.has(`${aCode}-${hCode}`)) {
+      score += 45;
+    }
+    if (g.isHomeUpset || g.isAwayUpset) score += 10;
+    return { game: g, score };
+  });
+
+  // Sort descending by score, then by gameDate ascending
+  scoredGames.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    const tA = a.game.gameDate ? new Date(a.game.gameDate).getTime() : 0;
+    const tB = b.game.gameDate ? new Date(b.game.gameDate).getTime() : 0;
+    return tA - tB;
+  });
+
+  // Stable Marquee Match of the Week (Game of the Week)
+  const bestMarqueeGame = scoredGames[0]?.game;
+  const gotwId =
+    (config.gameOfTheWeekId && mappedGames.some((g) => g.id === config.gameOfTheWeekId))
+      ? config.gameOfTheWeekId
+      : bestMarqueeGame?.id || scheduledGames[0]?.id || mappedGames[0]?.id;
 
   const allGameIds = mappedGames.map((g) => g.id);
 
