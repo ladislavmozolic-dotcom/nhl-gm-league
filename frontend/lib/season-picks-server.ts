@@ -204,6 +204,9 @@ export async function getSeasonPicksData(viewerTeamId?: number | null, season = 
 
   const mySubmission = viewerTeamId ? submissions.find((s) => s.teamId === viewerTeamId) : null;
 
+  const activePlayers =
+    gamePicksData.players && gamePicksData.players.length > 0 ? gamePicksData.players : players;
+
   return {
     config: {
       ...config,
@@ -211,7 +214,7 @@ export async function getSeasonPicksData(viewerTeamId?: number | null, season = 
     },
     gamePicksData,
     teams,
-    players,
+    players: activePlayers,
     submissions: submissions.map((s) => ({
       ...s,
       picks: isLocked || s.teamId === viewerTeamId ? (s.picks as SeasonPicksFormData) : null,

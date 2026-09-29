@@ -150,7 +150,8 @@ async function fetchRealNhlRostersForTeams(
             const firstName = p.firstName?.default || "";
             const lastName = p.lastName?.default || "";
             const fullName = `${firstName} ${lastName}`.trim();
-            const pos = p.positionCode || "F";
+            const rawPos = p.positionCode || "F";
+            const pos = rawPos === "L" ? "LW" : rawPos === "R" ? "RW" : rawPos;
             const isGoalie = pos === "G";
             const photoUrl = p.headshot || `https://assets.nhle.com/mugs/nhl/latest/${p.id}.png`;
 

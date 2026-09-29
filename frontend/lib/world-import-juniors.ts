@@ -275,7 +275,7 @@ async function importSlovakJuniorLevel(tournamentId: 1201 | 1202, level: "U20" |
     const name = `${baseName || teamCode} ${level}`;
     const team = await prisma.worldTeam.upsert({
       where: { leagueId_externalId: { leagueId: league.id, externalId: key } }, update: { name },
-      create: { leagueId: league.id, externalId: key, slug: slug(name), name },
+      create: { leagueId: league.id, externalId: key, slug: `${slug(name)}-${slug(key)}`, name },
     });
     teams.set(key, team.id); return team.id;
   };
