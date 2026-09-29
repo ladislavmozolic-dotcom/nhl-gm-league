@@ -243,8 +243,20 @@ export default function GamePicksView({
     isJoker: gotwSub?.isJoker || false,
   });
 
-  // Featured games (Games of the Day) vs regular
-  const featuredGames = games.filter((g) => g.isFeatured && !g.isGameOfTheWeek);
+  const [gameFilter, setGameFilter] = useState<"today" | "all_upcoming" | "results">("today");
+
+  // Filter games based on filter tab
+  const scheduledGames = games.filter((g) => g.status === "SCHEDULED");
+  const finalGames = games.filter((g) => g.status === "FINAL");
+
+  const activeRound = config.activeRound;
+  const todayGames = scheduledGames.filter((g) => (activeRound ? g.round === activeRound : g.isFeatured));
+  const gamesToDisplay =
+    gameFilter === "today"
+      ? (todayGames.length > 0 ? todayGames : scheduledGames.slice(0, 8))
+      : gameFilter === "all_upcoming"
+      ? scheduledGames
+      : finalGames;
 
   const jokersLeft = viewerProfile ? viewerProfile.jokersTotal - viewerProfile.jokersUsed : 5;
 
@@ -399,7 +411,7 @@ export default function GamePicksView({
           >
             <span>🎯 Zápasy Dňa (Confidence 1–3)</span>
             <span className="px-1.5 py-0.2 rounded bg-indigo-950/80 text-[10px] text-indigo-300 font-mono">
-              {featuredGames.length}
+              {todayGames.length > 0 ? todayGames.length : scheduledGames.length}
             </span>
           </button>
 
@@ -475,34 +487,84 @@ export default function GamePicksView({
           <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <span>🎯 UNHL Game of the Day / Vybrané Zápasy</span>
+                <span>🎯 UNHL Game of the Day / Zápasová Tipovačka</span>
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
                 Vyberte víťaza zápasu a priraďte mieru dôvery (Confidence 1, 2 alebo 3 body). Môžete nasadiť aj strategického <strong>Jokera (×3)</strong> alebo označiť <strong>Upset Pick (+5b)</strong>.
               </p>
             </div>
 
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={handleSaveDaily}
+                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-lg shadow-indigo-600/30 flex-shrink-0 flex items-center justify-center gap-1.5 disabled:opacity-50"
+              >
+                <span>💾 Uložiť Denné Tipy</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Filter Pills */}
+          <div className="flex items-center gap-2 text-xs">
             <button
               type="button"
-              disabled={isPending}
-              onClick={handleSaveDaily}
-              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-lg shadow-indigo-600/30 flex-shrink-0 flex items-center justify-center gap-1.5 disabled:opacity-50"
+              onClick={() => setGameFilter("today")}
+              className={`px-3 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 ${
+                gameFilter === "today"
+                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                  : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
+              }`}
             >
-              <span>💾 Uložiť Denné Tipy</span>
+              <span>🔥 Dnešné zápasy {activeRound ? `(Deň #${activeRound})` : ""}</span>
+              <span className="px-1.5 py-0.2 rounded bg-indigo-950 text-[10px] text-indigo-300 font-mono">
+                {todayGames.length > 0 ? todayGames.length : scheduledGames.slice(0, 8).length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setGameFilter("all_upcoming")}
+              className={`px-3 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 ${
+                gameFilter === "all_upcoming"
+                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                  : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
+              }`}
+            >
+              <span>📅 Všetky nadchádzajúce zápasy</span>
+              <span className="px-1.5 py-0.2 rounded bg-slate-800 text-[10px] text-slate-300 font-mono">
+                {scheduledGames.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setGameFilter("results")}
+              className={`px-3 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 ${
+                gameFilter === "results"
+                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                  : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
+              }`}
+            >
+              <span>📜 Nedávne výsledky</span>
+              <span className="px-1.5 py-0.2 rounded bg-slate-800 text-[10px] text-slate-300 font-mono">
+                {finalGames.length}
+              </span>
             </button>
           </div>
 
-          {featuredGames.length === 0 ? (
+          {gamesToDisplay.length === 0 ? (
             <div className="p-8 rounded-2xl bg-slate-900/60 border border-slate-800 text-center space-y-2">
               <div className="text-3xl">📅</div>
-              <div className="text-sm font-bold text-white">Žiadne naplánované zápasy dňa</div>
+              <div className="text-sm font-bold text-white">Žiadne zápasy v tejto kategórii</div>
               <div className="text-xs text-slate-400 max-w-md mx-auto">
-                Na najbližšie dni nie sú vybrané žiadne zápasy. Sledujte zápasový kalendár pred začiatkom nového hracieho kola.
+                Skontrolujte ostatné filtre alebo sledujte zápasový kalendár pred začiatkom nového hracieho kola.
               </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {featuredGames.map((g) => {
+              {gamesToDisplay.map((g) => {
                 const current = dailyPicks[g.id] || { confidence: 2 };
                 const sub = subMap.get(g.id);
                 const isLocked = g.isLocked;

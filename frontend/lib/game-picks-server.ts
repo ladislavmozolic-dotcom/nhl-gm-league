@@ -33,16 +33,18 @@ export async function getOrCreateGamePicksConfig(season = REGULAR_SEASON, league
   });
 
   if (!config) {
-    // Auto-select initial featured games and game of the week
+    // Find next upcoming scheduled games
     const upcomingGames = await prisma.game.findMany({
-      where: { season, league, seriesId: null },
+      where: { season, league, seriesId: null, status: "SCHEDULED" },
       orderBy: [{ round: "asc" }, { gameDate: "asc" }, { id: "asc" }],
-      take: 30,
+      take: 20,
       select: { id: true, homeTeamId: true, awayTeamId: true, gameDate: true, round: true },
     });
 
-    const featuredGameIds = upcomingGames.slice(0, 12).map((g) => g.id);
-    const gameOfTheWeekId = upcomingGames.length > 0 ? upcomingGames[0].id : null;
+    const earliestRound = upcomingGames[0]?.round ?? 1;
+    const currentRoundGames = upcomingGames.filter((g) => g.round === earliestRound);
+    const featuredGameIds = currentRoundGames.map((g) => g.id);
+    const gameOfTheWeekId = currentRoundGames[0]?.id ?? upcomingGames[0]?.id ?? null;
 
     // Get bottom 40% teams by standings / initial ranking as upset eligible
     const allTeams = await prisma.team.findMany({
@@ -58,7 +60,7 @@ export async function getOrCreateGamePicksConfig(season = REGULAR_SEASON, league
         featuredGameIds,
         gameOfTheWeekId,
         upsetTeamIds,
-        activeWeek: 1,
+        activeWeek: Math.max(1, Math.ceil(earliestRound / 7)),
         rivalPairings: [],
       },
     });
@@ -151,25 +153,40 @@ export async function getGamePicksData(season = REGULAR_SEASON, league = "NHL", 
     }),
   ]);
 
-  // Load featured games and recent games
-  const featuredIds = config.featuredGameIds || [];
-  const gotwId = config.gameOfTheWeekId;
-  const allGameIdsToFetch = Array.from(new Set([...featuredIds, ...(gotwId ? [gotwId] : [])]));
-
-  const games = await prisma.game.findMany({
+  // Load upcoming scheduled games
+  const upcomingGames = await prisma.game.findMany({
     where: {
-      OR: [
-        { id: { in: allGameIdsToFetch } },
-        {
-          season,
-          league,
-          seriesId: null,
-          status: "SCHEDULED",
-        },
-      ],
+      season,
+      league,
+      seriesId: null,
+      status: "SCHEDULED",
     },
-    take: 40,
+    take: 35,
     orderBy: [{ round: "asc" }, { gameDate: "asc" }, { id: "asc" }],
+    include: {
+      homeTeam: { select: { id: true, name: true, code: true, logoUrl: true } },
+      awayTeam: { select: { id: true, name: true, code: true, logoUrl: true } },
+      goalEvents: {
+        orderBy: [{ period: "asc" }, { seconds: "asc" }, { id: "asc" }],
+        take: 1,
+      },
+      playerStats: {
+        orderBy: [{ points: "desc" }, { goals: "desc" }],
+        take: 3,
+      },
+    },
+  });
+
+  // Load recent final games for results display
+  const recentFinalGames = await prisma.game.findMany({
+    where: {
+      season,
+      league,
+      seriesId: null,
+      status: "FINAL",
+    },
+    take: 15,
+    orderBy: [{ round: "desc" }, { gameDate: "desc" }, { id: "desc" }],
     include: {
       homeTeam: { select: { id: true, name: true, code: true, logoUrl: true } },
       awayTeam: { select: { id: true, name: true, code: true, logoUrl: true } },
@@ -186,10 +203,36 @@ export async function getGamePicksData(season = REGULAR_SEASON, league = "NHL", 
 
   const now = new Date();
 
+  // Determine active upcoming round
+  const activeRound = upcomingGames[0]?.round ?? null;
+  const activeRoundGames = activeRound !== null ? upcomingGames.filter((g) => g.round === activeRound) : upcomingGames.slice(0, 5);
+
+  // If featuredGameIds has no games or only FINAL games, auto-select current active round games
+  let featuredIds = (config.featuredGameIds || []).filter((id) =>
+    upcomingGames.some((g) => g.id === id)
+  );
+  if (featuredIds.length === 0) {
+    featuredIds = activeRoundGames.map((g) => g.id);
+  }
+
+  // If gameOfTheWeekId is null or already FINAL, auto-select from upcoming
+  let gotwId = config.gameOfTheWeekId;
+  if (!gotwId || !upcomingGames.some((g) => g.id === gotwId)) {
+    gotwId = activeRoundGames[0]?.id ?? upcomingGames[0]?.id ?? null;
+  }
+
+  const allGames = [...upcomingGames, ...recentFinalGames];
+  const allGameIds = allGames.map((g) => g.id);
+
   // Load viewer submissions
   const viewerSubmissions = viewerTeamId
     ? await prisma.gamePickSubmission.findMany({
-        where: { season, league, teamId: viewerTeamId },
+        where: {
+          season,
+          league,
+          teamId: viewerTeamId,
+          gameId: { in: allGameIds },
+        },
       })
     : [];
 
@@ -204,7 +247,7 @@ export async function getGamePicksData(season = REGULAR_SEASON, league = "NHL", 
       const rivalId = p.teamAId === viewerTeamId ? p.teamBId : p.teamAId;
       const rivalTeam = teams.find((t) => t.id === rivalId);
       const rivalProfile = allProfiles.find((ap) => ap.teamId === rivalId);
-      const duelGames = games.filter((g) => p.gameIds.includes(g.id));
+      const duelGames = allGames.filter((g) => p.gameIds.includes(g.id));
 
       currentRival = {
         week: p.week,
@@ -216,14 +259,19 @@ export async function getGamePicksData(season = REGULAR_SEASON, league = "NHL", 
   }
 
   return {
-    config,
+    config: {
+      ...config,
+      featuredGameIds: featuredIds,
+      gameOfTheWeekId: gotwId,
+      activeRound,
+    },
     teams,
     players,
-    games: games.map((g) => ({
+    games: allGames.map((g) => ({
       ...g,
       isLocked: g.status === "FINAL" || (g.gameDate ? now > g.gameDate : false),
       isGameOfTheWeek: g.id === gotwId,
-      isFeatured: featuredIds.includes(g.id),
+      isFeatured: featuredIds.includes(g.id) || g.round === activeRound,
       isHomeUpset: config.upsetTeamIds.includes(g.homeTeamId),
       isAwayUpset: config.upsetTeamIds.includes(g.awayTeamId),
     })),
