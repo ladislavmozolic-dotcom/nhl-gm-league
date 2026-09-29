@@ -17,7 +17,7 @@ import { loadSettings, type EngineSettings } from "./settings";
 import { activeSimEngine, engineVersionFor } from "./version";
 import { pairSig, unitPairs } from "./chemistry";
 import { computeStandings } from "./standings";
-import { getArenaSections, selloutRevenue, attendanceRate, priceAttendanceFactor } from "../finance";
+import { getArenaSections, selloutRevenue, attendanceRate, priceAttendanceFactor, projectedPointsPct } from "../finance";
 import type { SimTeam, SimGoalie, TeamBox } from "./types";
 import type { TeamLinesData } from "./lines-core";
 
@@ -299,7 +299,7 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
   // popularity + record (as of now) + opponent quality; arena sellout sets the gate.
   // Stored on each home game so the crowd figure is a real, locked-in record.
   const attStandings = await computeStandings(season, "NHL").catch(() => [] as Awaited<ReturnType<typeof computeStandings>>);
-  const pctBy = new Map(attStandings.map((s) => [s.teamId, s.pointsPct]));
+  const pctBy = new Map(attStandings.map((s) => [s.teamId, projectedPointsPct(s)]));
   const finTeams = await prisma.team.findMany({ where: { league: "NHL" }, select: { id: true, popularity: true, capacity: true, arenaSections: true } });
   const finBy = new Map(finTeams.map((t) => {
     const secs = getArenaSections(t);

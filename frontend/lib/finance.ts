@@ -262,8 +262,10 @@ export function attendanceRate(popularity: number, pointsPct: number): number {
   // Market POPULARITY is the dominant driver — a hockey mecca (Montreal, Toronto…)
   // packs the building nearly every night regardless of the standings, while a soft
   // market lives and dies by the record. Record still matters, just less than market.
-  const raw = 0.85 + (popularity - 100) / 100 * 0.7 + (pointsPct - 0.5) * 0.35;
-  return Math.max(0.6, Math.min(1.0, raw));
+  // Calibrated to the real NHL (~95% of capacity league-wide): an average market with an
+  // average record fills ~90%, a mecca sells out, only a cold market + bad record dips.
+  const raw = 0.90 + (popularity - 100) / 100 * 0.55 + (pointsPct - 0.5) * 0.30;
+  return Math.max(0.72, Math.min(1.0, raw));
 }
 
 /** A team with zero games played has a raw pointsPct of 0 (computeStandings' only
@@ -273,7 +275,11 @@ export function attendanceRate(popularity: number, pointsPct: number): number {
  *  neutral .500 assumption instead — every other pointsPct consumer (sorting
  *  standings, etc.) keeps using the raw 0, only the finance projection needs this. */
 export function projectedPointsPct(st: { pointsPct: number; gp: number } | null | undefined): number {
-  return st && st.gp > 0 ? st.pointsPct : 0.5;
+  // Regress toward .500 with a 20-game prior: after 2 games a 0-2 start is not a
+  // "winless team" — early crowds shouldn't swing on a handful of results.
+  if (!st || st.gp <= 0) return 0.5;
+  const w = st.gp / (st.gp + 20);
+  return 0.5 + (st.pointsPct - 0.5) * w;
 }
 
 // ---- buyouts ("vyplatený zo zmluvy") ---------------------------------------
