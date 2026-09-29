@@ -1951,8 +1951,8 @@ export default function SeasonPicksView({
               <span>📅 Denné Zápasy (Game Picks) & Zápas Týždňa (GOTW)</span>
             </h3>
             <ul className="list-disc list-inside text-slate-300 space-y-1.5 text-xs">
-              <li><strong className="text-white">Zápasy dňa:</strong> 2 body za správny tip na víťaza (alebo 6 bodov s aktivovaným Jokerom).</li>
-              <li><strong className="text-white">Zápas týždňa (Game of the Week):</strong> Hlavný šláger týždňa až za 15 bodov (Víťaz 2b, Presné skóre 5b, Prvý strelec 5b, Najproduktívnejší hráč 3b). S Jokerom až 45 bodov!</li>
+              <li><strong className="text-white">Zápasy dňa:</strong> 2 body za správny tip na výsledok po 60 min. (1 - X - 2) alebo 6 bodov s aktivovaným Jokerom.</li>
+              <li><strong className="text-white">Zápas týždňa (Game of the Week):</strong> Hlavný šláger týždňa až za 15 bodov (Výsledok 1-X-2 2b, Presné skóre 5b, Prvý strelec 5b, Najproduktívnejší hráč 3b). S Jokerom až 45 bodov!</li>
               <li><strong className="text-white">Jokeri (×3 násobič):</strong> Každý GM má na sezónu k dispozícii 5 Jokerov, ktoré môže použiť na ľubovoľný zápas.</li>
               <li><strong className="text-white">Série (Streaks):</strong> 3 správne tipy v rade = +2b, 5 v rade = +5b, 10 v rade = +15b.</li>
             </ul>

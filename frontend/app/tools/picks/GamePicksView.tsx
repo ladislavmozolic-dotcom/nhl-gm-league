@@ -213,7 +213,7 @@ export default function GamePicksView({
       const sub = subMap.get(g.id);
       if (sub && !sub.isGameOfTheWeek) {
         init[g.id] = {
-          winnerTeamId: sub.winnerTeamId,
+          winnerTeamId: sub.winnerTeamId !== null && sub.winnerTeamId !== undefined ? sub.winnerTeamId : undefined,
           isJoker: sub.isJoker || false,
         };
       } else {
@@ -230,7 +230,7 @@ export default function GamePicksView({
   const gotwGame = games.find((g) => g.isGameOfTheWeek);
   const gotwSub = gotwGame ? subMap.get(gotwGame.id) : null;
   const [gotwPick, setGotwPick] = useState({
-    winnerTeamId: gotwSub?.winnerTeamId,
+    winnerTeamId: gotwSub?.winnerTeamId !== null && gotwSub?.winnerTeamId !== undefined ? gotwSub.winnerTeamId : undefined,
     predictedScore: gotwSub?.predictedScore || "4:2",
     firstGoalScorerId: gotwSub?.firstGoalScorerId,
     firstGoalScorerName: gotwSub?.firstGoalScorerName,
@@ -295,8 +295,8 @@ export default function GamePicksView({
       setMsg({ type: "error", text: "Pre odoslanie tipu sa prihláste ako GM tímu." });
       return;
     }
-    if (!gotwGame || !gotwPick.winnerTeamId) {
-      setMsg({ type: "error", text: "Vyberte víťaza zápasu týždňa." });
+    if (!gotwGame || gotwPick.winnerTeamId === undefined) {
+      setMsg({ type: "error", text: "Vyberte víťaza zápasu týždňa (alebo remízu)." });
       return;
     }
 
@@ -501,7 +501,7 @@ export default function GamePicksView({
                 <span>🎯 UNHL Game of the Day / Zápasová Tipovačka</span>
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                Vyberte víťaza zápasu (2 body za správny tip). Môžete nasadiť aj strategického <strong>Jokera (×3 = 6b)</strong>.
+                Tipujte výsledok po základnom hracom čase (60 min): <strong>1 (Výhra domácich)</strong>, <strong>X (Remíza / predĺženie)</strong>, <strong>2 (Výhra hostí)</strong>. Správny tip = <strong>2 body</strong> (alebo <strong>6b s Jokerom ×3</strong>).
               </p>
             </div>
 
@@ -588,7 +588,7 @@ export default function GamePicksView({
                         ? sub.pointsAwarded > 0
                           ? "bg-emerald-950/20 border-emerald-500/40"
                           : "bg-rose-950/20 border-rose-500/30"
-                        : current.winnerTeamId
+                        : current.winnerTeamId !== undefined
                         ? "bg-slate-900 border-indigo-500/40 shadow-lg shadow-indigo-950/30"
                         : "bg-slate-950/70 border-slate-800"
                     }`}
@@ -629,9 +629,9 @@ export default function GamePicksView({
                       </div>
                     </div>
 
-                    {/* Matchup Team Selection Buttons (1 vs 2) */}
-                    <div className="grid grid-cols-2 gap-2">
-                      {/* Away Team */}
+                    {/* Matchup Team Selection Buttons (1 vs X vs 2) */}
+                    <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+                      {/* Away Team (2) */}
                       <button
                         type="button"
                         disabled={isLocked}
@@ -641,26 +641,46 @@ export default function GamePicksView({
                             [g.id]: { ...current, winnerTeamId: g.awayTeamId },
                           })
                         }
-                        className={`p-2.5 rounded-xl border text-left transition-all relative ${
+                        className={`p-2 sm:p-2.5 rounded-xl border text-center sm:text-left transition-all relative ${
                           current.winnerTeamId === g.awayTeamId
                             ? "bg-indigo-600 border-indigo-400 text-white font-bold shadow-md shadow-indigo-600/30"
                             : "bg-slate-900/90 border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-800/70"
                         }`}
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2">
                           {g.awayTeam?.logoUrl && (
-                            <div className="relative w-7 h-7 flex-shrink-0">
+                            <div className="relative w-6 h-6 sm:w-7 sm:h-7 flex-shrink-0">
                               <Image src={g.awayTeam.logoUrl} alt={g.awayTeam.name} fill className="object-contain" />
                             </div>
                           )}
-                          <div className="truncate">
+                          <div className="truncate text-center sm:text-left">
                             <div className="text-xs truncate font-bold">{g.awayTeam?.name}</div>
-                            <div className="text-[10px] text-slate-400 font-mono">Hostia</div>
+                            <div className="text-[10px] text-slate-400 font-mono">2 (Hostia)</div>
                           </div>
                         </div>
                       </button>
 
-                      {/* Home Team */}
+                      {/* Draw / Remíza (X) */}
+                      <button
+                        type="button"
+                        disabled={isLocked}
+                        onClick={() =>
+                          setDailyPicks({
+                            ...dailyPicks,
+                            [g.id]: { ...current, winnerTeamId: 0 },
+                          })
+                        }
+                        className={`p-2 sm:p-2.5 rounded-xl border text-center transition-all flex flex-col items-center justify-center relative ${
+                          current.winnerTeamId === 0
+                            ? "bg-amber-600 border-amber-400 text-white font-bold shadow-md shadow-amber-600/30"
+                            : "bg-slate-900/90 border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-800/70"
+                        }`}
+                      >
+                        <span className="text-sm sm:text-base font-black tracking-wider text-white">X</span>
+                        <span className="text-[9px] sm:text-[10px] text-slate-400 font-mono">Remíza (60 min)</span>
+                      </button>
+
+                      {/* Home Team (1) */}
                       <button
                         type="button"
                         disabled={isLocked}
@@ -670,21 +690,21 @@ export default function GamePicksView({
                             [g.id]: { ...current, winnerTeamId: g.homeTeamId },
                           })
                         }
-                        className={`p-2.5 rounded-xl border text-left transition-all relative ${
+                        className={`p-2 sm:p-2.5 rounded-xl border text-center sm:text-left transition-all relative ${
                           current.winnerTeamId === g.homeTeamId
                             ? "bg-indigo-600 border-indigo-400 text-white font-bold shadow-md shadow-indigo-600/30"
                             : "bg-slate-900/90 border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-800/70"
                         }`}
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2">
                           {g.homeTeam?.logoUrl && (
-                            <div className="relative w-7 h-7 flex-shrink-0">
+                            <div className="relative w-6 h-6 sm:w-7 sm:h-7 flex-shrink-0">
                               <Image src={g.homeTeam.logoUrl} alt={g.homeTeam.name} fill className="object-contain" />
                             </div>
                           )}
-                          <div className="truncate">
+                          <div className="truncate text-center sm:text-left">
                             <div className="text-xs truncate font-bold">{g.homeTeam?.name}</div>
-                            <div className="text-[10px] text-slate-400 font-mono">Doma</div>
+                            <div className="text-[10px] text-slate-400 font-mono">1 (Doma)</div>
                           </div>
                         </div>
                       </button>
@@ -754,9 +774,9 @@ export default function GamePicksView({
               {/* Pick Winner */}
               <div className="space-y-2">
                 <label className="block text-xs font-bold text-slate-300">
-                  1. Víťaz zápasu (2 body)
+                  1. Výsledok po 60 min. (2 body: 1 - X - 2)
                 </label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
                     disabled={gotwGame.isLocked}
@@ -767,8 +787,22 @@ export default function GamePicksView({
                         : "bg-slate-950/80 border-slate-800 text-slate-300 hover:bg-slate-800"
                     }`}
                   >
-                    <div className="text-sm font-bold">{gotwGame.awayTeam?.name}</div>
-                    <div className="text-[10px] text-slate-400">Hostia</div>
+                    <div className="text-sm font-bold truncate">{gotwGame.awayTeam?.name}</div>
+                    <div className="text-[10px] text-slate-400 font-mono">2 (Hostia)</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={gotwGame.isLocked}
+                    onClick={() => setGotwPick({ ...gotwPick, winnerTeamId: 0 })}
+                    className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center justify-center ${
+                      gotwPick.winnerTeamId === 0
+                        ? "bg-amber-600 border-amber-400 text-white font-bold shadow-lg"
+                        : "bg-slate-950/80 border-slate-800 text-slate-300 hover:bg-slate-800"
+                    }`}
+                  >
+                    <div className="text-sm font-black text-white">X</div>
+                    <div className="text-[10px] text-slate-400 font-mono">Remíza (OT/SO)</div>
                   </button>
 
                   <button
@@ -781,8 +815,8 @@ export default function GamePicksView({
                         : "bg-slate-950/80 border-slate-800 text-slate-300 hover:bg-slate-800"
                     }`}
                   >
-                    <div className="text-sm font-bold">{gotwGame.homeTeam?.name}</div>
-                    <div className="text-[10px] text-slate-400">Doma</div>
+                    <div className="text-sm font-bold truncate">{gotwGame.homeTeam?.name}</div>
+                    <div className="text-[10px] text-slate-400 font-mono">1 (Doma)</div>
                   </button>
                 </div>
               </div>
@@ -1016,7 +1050,8 @@ export default function GamePicksView({
               Každý hrací deň systém automaticky vyberie zápasy dňa podľa reálneho NHL programu.
             </p>
             <ul className="list-disc list-inside text-slate-400 space-y-1">
-              <li>Za každý správny tip na víťaza zápasu získate <strong className="text-white">2 body</strong>.</li>
+              <li>Tipuje sa výsledok po 60 minútach: <strong className="text-white">1 (Domáci)</strong>, <strong className="text-white">X (Remíza / predĺženie)</strong>, <strong className="text-white">2 (Hostia)</strong>.</li>
+              <li>Za každý správny tip získate <strong className="text-white">2 body</strong>.</li>
               <li>Pri nasadení Jokera získate za správny tip až <strong className="text-amber-400">6 bodov (×3)</strong>.</li>
             </ul>
           </div>
@@ -1029,7 +1064,7 @@ export default function GamePicksView({
               Jeden vybraný šláger týždňa s podrobnými tipmi:
             </p>
             <ul className="list-disc list-inside text-slate-400 space-y-1">
-              <li>Víťaz zápasu: <strong className="text-white">2 body</strong></li>
+              <li>Výsledok zápasu po 60 min. (1 - X - 2): <strong className="text-white">2 body</strong></li>
               <li>Presné skóre: <strong className="text-white">5 bodov</strong></li>
               <li>Prvý strelec zápasu: <strong className="text-white">5 bodov</strong></li>
               <li>Najviac bodov v zápase: <strong className="text-white">3 body</strong></li>

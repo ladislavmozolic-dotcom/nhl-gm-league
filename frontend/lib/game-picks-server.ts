@@ -108,6 +108,8 @@ async function fetchRealNhlSchedule(): Promise<any[]> {
           homeScore: g.homeTeam?.score ?? null,
           awayScore: g.awayTeam?.score ?? null,
           venue: g.venue?.default || "NHL Arena",
+          periodDescriptor: g.periodDescriptor,
+          gameOutcome: g.gameOutcome,
         });
       }
     }
@@ -261,7 +263,13 @@ export async function getGamePicksData(season = REGULAR_SEASON, league = "NHL", 
 
         let winnerTeamId: number | null = null;
         if (isFinal && typeof rg.homeScore === "number" && typeof rg.awayScore === "number") {
-          winnerTeamId = rg.homeScore > rg.awayScore ? homeTm.id : awayTm.id;
+          const lastPeriodType = rg.gameOutcome?.lastPeriodType || rg.periodDescriptor?.periodType;
+          const isDraw = lastPeriodType === "OT" || lastPeriodType === "SO" || (rg.periodDescriptor?.number && rg.periodDescriptor.number > 3);
+          if (isDraw) {
+            winnerTeamId = 0; // Remíza (X)
+          } else {
+            winnerTeamId = rg.homeScore > rg.awayScore ? homeTm.id : awayTm.id;
+          }
         }
 
         return {
@@ -439,8 +447,19 @@ export async function evaluateGamePicks(season = REGULAR_SEASON, league = "NHL")
         const homeTm = await prisma.team.findFirst({ where: { code: homeTeamCode, league } });
         const awayTm = await prisma.team.findFirst({ where: { code: awayTeamCode, league } });
 
-        const realWinnerId = homeScore > awayScore ? homeTm?.id : awayTm?.id;
-        isWinnerCorrect = Boolean(sub.winnerTeamId && realWinnerId && sub.winnerTeamId === realWinnerId);
+        const lastPeriodType = realData.gameOutcome?.lastPeriodType || realData.periodDescriptor?.periodType;
+        const isRegulationDraw = lastPeriodType === "OT" || lastPeriodType === "SO" || (realData.periodDescriptor?.number && realData.periodDescriptor.number > 3);
+
+        let realWinnerId: number | null = null;
+        if (isRegulationDraw) {
+          realWinnerId = 0; // Remíza (X)
+        } else if (homeScore > awayScore) {
+          realWinnerId = homeTm?.id || null;
+        } else if (awayScore > homeScore) {
+          realWinnerId = awayTm?.id || null;
+        }
+
+        isWinnerCorrect = Boolean(sub.winnerTeamId !== undefined && sub.winnerTeamId !== null && realWinnerId !== null && sub.winnerTeamId === realWinnerId);
 
         if (!sub.isGameOfTheWeek) {
           if (isWinnerCorrect) {
@@ -535,8 +554,14 @@ export async function evaluateGamePicks(season = REGULAR_SEASON, league = "NHL")
         }
       } else if (dbGame) {
         // Fallback DB game evaluation
-        const realWinner = dbGame.winnerTeamId;
-        isWinnerCorrect = Boolean(sub.winnerTeamId && realWinner && sub.winnerTeamId === realWinner);
+        const isDbDraw = dbGame.endedIn === "OT" || dbGame.endedIn === "SO";
+        let realWinner: number | null = null;
+        if (isDbDraw) {
+          realWinner = 0; // Remíza (X)
+        } else {
+          realWinner = dbGame.winnerTeamId;
+        }
+        isWinnerCorrect = Boolean(sub.winnerTeamId !== undefined && sub.winnerTeamId !== null && realWinner !== null && sub.winnerTeamId === realWinner);
 
         if (isWinnerCorrect) {
           const pts = 2 * multiplier;

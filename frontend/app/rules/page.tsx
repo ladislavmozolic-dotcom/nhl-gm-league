@@ -347,8 +347,8 @@ const SECTIONS: Sec[] = [
     intro: "The UNHL Predictor competition combines daily NHL Game Picks and Season-Long Predictions with tangible club rewards.",
     groups: [
       { h: "Daily Games & Game of the Week", points: [
-        "Daily Games (2 points per correct pick): every game night features official NHL games. Correctly picking the match winner earns 2 points (or 6 points with Joker ×3).",
-        "Game of the Week (up to 15 points): one marquee clash each week. Winner (2b), Exact score (5b), First goal scorer (5b), and Player with most points in game (3b). With Joker activated: up to 45 points.",
+        "Daily Games (2 points per correct pick): every game night features official NHL games. Tip the 60-minute regulation result (1 - Home Win, X - Draw/OT/SO, 2 - Away Win) to earn 2 points (or 6 points with Joker ×3).",
+        "Game of the Week (up to 15 points): one marquee clash each week. Regulation result 1-X-2 (2b), Exact score (5b), First goal scorer (5b), and Player with most points in game (3b). With Joker activated: up to 45 points.",
         "5 Jokers per season: can be deployed on any game to multiply all points earned from that game ×3.",
         "Streaks: winning streaks award bonus points (3 in a row = +2b, 5 in a row = +5b, 10 in a row = +15b).",
       ] },
@@ -650,8 +650,8 @@ const SECTIONS_CS: Sec[] = [
     intro: "Súťaž UNHL Predictor spája každodennú zápasovú tipovačku (Game Picks) a celosezónne tipy (Season Picks) s reálnymi klubovými odmenami.",
     groups: [
       { h: "Zápasy dňa a Zápas týždňa (Game of the Week)", points: [
-        "Zápasy dňa (2 body za správny tip): každý hrací deň systém vyberie oficiálne zápasy NHL. Za správny tip na víťaza získate 2 body (s Jokerom ×3 až 6 bodov).",
-        "Zápas týždňa / Game of the Week (až 15 bodov): jeden hlavný šláger týždňa. Tipuje sa víťaz (2b), presné skóre (5b), prvý strelec zápasu (5b) a najproduktívnejší hráč zápasu (3b). S Jokerom až 45 bodov!",
+        "Zápasy dňa (2 body za správny tip): každý hrací deň systém vyberie oficiálne zápasy NHL. Tipuje sa výsledok po 60 minútach: 1 (Výhra domácich), X (Remíza / predĺženie), 2 (Výhra hostí). Za správny tip získate 2 body (s Jokerom ×3 až 6 bodov).",
+        "Zápas týždňa / Game of the Week (až 15 bodov): jeden hlavný šláger týždňa. Tipuje sa výsledok po 60 min. 1-X-2 (2b), presné skóre (5b), prvý strelec zápasu (5b) a najproduktívnejší hráč zápasu (3b). S Jokerom až 45 bodov!",
         "5 Jokerov na celú sezónu: násobí všetky získané body z daného zápasu ×3.",
         "Série (Streaks): 3 správne tipy v rade = +2b, 5 v rade = +5b, 10 v rade = +15b.",
       ] },
