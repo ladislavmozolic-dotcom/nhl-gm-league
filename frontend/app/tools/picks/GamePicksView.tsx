@@ -299,24 +299,33 @@ export default function GamePicksView({
       return;
     }
 
-    const payload = Object.entries(dailyPicks)
-      .filter(([gId, p]) => p.winnerTeamId !== undefined)
+    const unsubmittedPayload = Object.entries(dailyPicks)
+      .filter(([gId, p]) => {
+        const numId = Number(gId);
+        const sub = subMap.get(numId);
+        return !sub && p.winnerTeamId !== undefined;
+      })
       .map(([gId, p]) => ({
         gameId: Number(gId),
         winnerTeamId: p.winnerTeamId!,
         isJoker: p.isJoker,
       }));
 
-    if (payload.length === 0) {
-      setMsg({ type: "error", text: "Vyberte aspoň jedného víťaza zápasu." });
+    if (unsubmittedPayload.length === 0) {
+      const hasAnyPicks = Object.values(dailyPicks).some((p) => p.winnerTeamId !== undefined);
+      if (hasAnyPicks) {
+        setMsg({ type: "error", text: "Všetky vybrané zápasy už boli odoslané a sú uzamknuté." });
+      } else {
+        setMsg({ type: "error", text: "Vyberte aspoň jedného víťaza zápasu." });
+      }
       return;
     }
 
     startTransition(async () => {
       try {
-        const res = await saveDailyGamePicksAction(payload, config.season, config.league);
+        const res = await saveDailyGamePicksAction(unsubmittedPayload, config.season, config.league);
         if (res.ok) {
-          setMsg({ type: "success", text: "✅ Vaše denné tipy boli úspešne uložené!" });
+          setMsg({ type: "success", text: "✅ Vaše denné tipy boli úspešne uložené a uzamknuté!" });
         } else {
           setMsg({ type: "error", text: res.error || "Chyba pri ukladaní tipov." });
         }
@@ -614,7 +623,7 @@ export default function GamePicksView({
               {gamesToDisplay.map((g) => {
                 const current = dailyPicks[g.id] || {};
                 const sub = subMap.get(g.id);
-                const isLocked = g.isLocked;
+                const isLocked = g.isLocked || Boolean(sub);
 
                 return (
                   <div
@@ -642,9 +651,13 @@ export default function GamePicksView({
                       </span>
 
                       <div className="flex items-center gap-1">
-                        {isLocked ? (
+                        {g.isLocked ? (
                           <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold text-[10px]">
                             {g.status === "FINAL" ? `FINAL ${g.homeGoals}:${g.awayGoals}` : "🔒 Uzamknuté"}
+                          </span>
+                        ) : sub ? (
+                          <span className="px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-bold text-[10px] border border-indigo-500/30">
+                            🔒 Natipované
                           </span>
                         ) : (
                           <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold text-[10px]">
@@ -679,8 +692,8 @@ export default function GamePicksView({
                         }
                         className={`p-2 sm:p-2.5 rounded-xl border text-center sm:text-left transition-all relative ${
                           current.winnerTeamId === g.awayTeamId
-                            ? "bg-indigo-600 border-indigo-400 text-white font-bold shadow-md shadow-indigo-600/30"
-                            : "bg-slate-900/90 border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-800/70"
+                            ? "bg-indigo-600 border-indigo-400 text-white font-bold shadow-md shadow-indigo-600/30 ring-2 ring-indigo-400 opacity-100"
+                            : "bg-slate-900/90 border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-800/70 disabled:opacity-40"
                         }`}
                       >
                         <div className="flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2">
@@ -708,8 +721,8 @@ export default function GamePicksView({
                         }
                         className={`p-2 sm:p-2.5 rounded-xl border text-center transition-all flex flex-col items-center justify-center relative ${
                           current.winnerTeamId === 0
-                            ? "bg-amber-600 border-amber-400 text-white font-bold shadow-md shadow-amber-600/30"
-                            : "bg-slate-900/90 border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-800/70"
+                            ? "bg-amber-600 border-amber-400 text-white font-bold shadow-md shadow-amber-600/30 ring-2 ring-amber-400 opacity-100"
+                            : "bg-slate-900/90 border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-800/70 disabled:opacity-40"
                         }`}
                       >
                         <span className="text-sm sm:text-base font-black tracking-wider text-white">X</span>
@@ -728,8 +741,8 @@ export default function GamePicksView({
                         }
                         className={`p-2 sm:p-2.5 rounded-xl border text-center sm:text-left transition-all relative ${
                           current.winnerTeamId === g.homeTeamId
-                            ? "bg-indigo-600 border-indigo-400 text-white font-bold shadow-md shadow-indigo-600/30"
-                            : "bg-slate-900/90 border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-800/70"
+                            ? "bg-indigo-600 border-indigo-400 text-white font-bold shadow-md shadow-indigo-600/30 ring-2 ring-indigo-400 opacity-100"
+                            : "bg-slate-900/90 border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-800/70 disabled:opacity-40"
                         }`}
                       >
                         <div className="flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2">
@@ -787,6 +800,11 @@ export default function GamePicksView({
                     <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono text-[10px]">
                       Max 15 bodov
                     </span>
+                    {gotwSub && (
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono text-[10px] border border-emerald-500/30">
+                        🔒 Natipované & Uzamknuté
+                      </span>
+                    )}
                   </div>
                   <h2 className="text-xl sm:text-2xl font-black text-white mt-1">
                     {gotwGame.awayTeam?.name} vs {gotwGame.homeTeam?.name}
@@ -820,11 +838,15 @@ export default function GamePicksView({
 
                   <button
                     type="button"
-                    disabled={isPending || gotwGame.isLocked}
+                    disabled={isPending || gotwGame.isLocked || Boolean(gotwSub)}
                     onClick={handleSaveGotw}
-                    className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition-all shadow-lg shadow-amber-600/30 flex-shrink-0 flex items-center justify-center gap-2 disabled:opacity-50"
+                    className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-lg flex-shrink-0 flex items-center justify-center gap-2 ${
+                      gotwSub
+                        ? "bg-slate-800 text-slate-400 border border-slate-700 cursor-not-allowed"
+                        : "bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/30 disabled:opacity-50"
+                    }`}
                   >
-                    <span>💾 Uložiť Tip na Zápas Týždňa</span>
+                    <span>{gotwSub ? "🔒 Tip odoslaný (Uzamknuté)" : "💾 Uložiť Tip na Zápas Týždňa"}</span>
                   </button>
                 </div>
               </div>
@@ -839,12 +861,12 @@ export default function GamePicksView({
                   <div className="grid grid-cols-3 gap-2">
                     <button
                       type="button"
-                      disabled={gotwGame.isLocked}
+                      disabled={gotwGame.isLocked || Boolean(gotwSub)}
                       onClick={() => setGotwPick({ ...gotwPick, winnerTeamId: gotwGame.awayTeamId })}
                       className={`p-3 rounded-xl border text-center transition-all ${
                         gotwPick.winnerTeamId === gotwGame.awayTeamId
-                          ? "bg-amber-600 border-amber-400 text-white font-bold shadow-lg"
-                          : "bg-slate-950/80 border-slate-800 text-slate-300 hover:bg-slate-800"
+                          ? "bg-amber-600 border-amber-400 text-white font-bold shadow-lg ring-2 ring-amber-400 opacity-100"
+                          : "bg-slate-950/80 border-slate-800 text-slate-300 hover:bg-slate-800 disabled:opacity-40"
                       }`}
                     >
                       <div className="text-sm font-bold truncate">{gotwGame.awayTeam?.name}</div>
@@ -853,12 +875,12 @@ export default function GamePicksView({
 
                     <button
                       type="button"
-                      disabled={gotwGame.isLocked}
+                      disabled={gotwGame.isLocked || Boolean(gotwSub)}
                       onClick={() => setGotwPick({ ...gotwPick, winnerTeamId: 0 })}
                       className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center justify-center ${
                         gotwPick.winnerTeamId === 0
-                          ? "bg-amber-600 border-amber-400 text-white font-bold shadow-lg"
-                          : "bg-slate-950/80 border-slate-800 text-slate-300 hover:bg-slate-800"
+                          ? "bg-amber-600 border-amber-400 text-white font-bold shadow-lg ring-2 ring-amber-400 opacity-100"
+                          : "bg-slate-950/80 border-slate-800 text-slate-300 hover:bg-slate-800 disabled:opacity-40"
                       }`}
                     >
                       <div className="text-sm font-black text-white">X</div>
@@ -867,12 +889,12 @@ export default function GamePicksView({
 
                     <button
                       type="button"
-                      disabled={gotwGame.isLocked}
+                      disabled={gotwGame.isLocked || Boolean(gotwSub)}
                       onClick={() => setGotwPick({ ...gotwPick, winnerTeamId: gotwGame.homeTeamId })}
                       className={`p-3 rounded-xl border text-center transition-all ${
                         gotwPick.winnerTeamId === gotwGame.homeTeamId
-                          ? "bg-amber-600 border-amber-400 text-white font-bold shadow-lg"
-                          : "bg-slate-950/80 border-slate-800 text-slate-300 hover:bg-slate-800"
+                          ? "bg-amber-600 border-amber-400 text-white font-bold shadow-lg ring-2 ring-amber-400 opacity-100"
+                          : "bg-slate-950/80 border-slate-800 text-slate-300 hover:bg-slate-800 disabled:opacity-40"
                       }`}
                     >
                       <div className="text-sm font-bold truncate">{gotwGame.homeTeam?.name}</div>
@@ -888,17 +910,17 @@ export default function GamePicksView({
                   </label>
                   <input
                     type="text"
-                    disabled={gotwGame.isLocked}
+                    disabled={gotwGame.isLocked || Boolean(gotwSub)}
                     placeholder="napr. 5:3 alebo 4:2"
                     value={gotwPick.predictedScore}
                     onChange={(e) => setGotwPick({ ...gotwPick, predictedScore: e.target.value })}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
-                        handleSaveGotw();
+                        if (!gotwSub) handleSaveGotw();
                       }
                     }}
-                    className="w-full px-3 py-2.5 bg-slate-950/90 border border-slate-700 rounded-xl text-sm font-bold text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                    className="w-full px-3 py-2.5 bg-slate-950/90 border border-slate-700 rounded-xl text-sm font-bold text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                 </div>
 
@@ -908,7 +930,7 @@ export default function GamePicksView({
                     3. Prvý strelec zápasu (5 bodov)
                   </label>
                   <SearchablePlayerSelect
-                    disabled={gotwGame.isLocked}
+                    disabled={gotwGame.isLocked || Boolean(gotwSub)}
                     value={gotwPick.firstGoalScorerId}
                     players={players}
                     teams={teams}
@@ -933,7 +955,7 @@ export default function GamePicksView({
                     4. Hráč s najviac bodmi v zápase (3 body)
                   </label>
                   <SearchablePlayerSelect
-                    disabled={gotwGame.isLocked}
+                    disabled={gotwGame.isLocked || Boolean(gotwSub)}
                     value={gotwPick.topScorerPlayerId}
                     players={players}
                     teams={teams}
@@ -958,10 +980,10 @@ export default function GamePicksView({
                 <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-200">
                   <input
                     type="checkbox"
-                    disabled={gotwGame.isLocked || (jokersLeft <= 0 && !gotwPick.isJoker)}
+                    disabled={gotwGame.isLocked || Boolean(gotwSub) || (jokersLeft <= 0 && !gotwPick.isJoker)}
                     checked={gotwPick.isJoker || false}
                     onChange={(e) => setGotwPick({ ...gotwPick, isJoker: e.target.checked })}
-                    className="rounded border-slate-700 text-amber-500 focus:ring-amber-500 bg-slate-900"
+                    className="rounded border-slate-700 text-amber-500 focus:ring-amber-500 bg-slate-900 disabled:cursor-not-allowed"
                   />
                   <span className="font-bold text-amber-300">
                     🃏 Použiť Jokera na Zápas Týždňa (Body ×3 = až 45 bodov!)

@@ -26,13 +26,7 @@ export async function saveDailyGamePicksAction(
   const now = new Date();
   const profile = await getOrCreateGamePicksProfile(teamId, season, league);
 
-  // Count how many jokers were already used vs how many new ones are requested
-  let jokersInRequest = 0;
-  for (const p of picks) {
-    if (p.isJoker) jokersInRequest++;
-  }
-
-  // Get games to verify locks
+  // Get games to verify locks and schedule
   const gameIds = picks.map((p) => p.gameId);
   const realGames = await fetchRealNhlSchedule();
   const realGameMap = new Map(realGames.map((g) => [g.id, g]));
@@ -43,7 +37,7 @@ export async function saveDailyGamePicksAction(
   });
   const dbGameMap = new Map(dbGames.map((g) => [g.id, g]));
 
-  // Check existing submissions for these games to compute net joker delta
+  // Check existing submissions for these games - once submitted, picks are permanently locked
   const existingSubs = await prisma.gamePickSubmission.findMany({
     where: {
       season,
@@ -52,17 +46,28 @@ export async function saveDailyGamePicksAction(
       gameId: { in: gameIds },
     },
   });
-  const existingJokers = existingSubs.filter((s) => s.isJoker).length;
-  const netJokerDelta = jokersInRequest - existingJokers;
+  const existingGameIdSet = new Set(existingSubs.map((s) => s.gameId));
 
-  if (profile.jokersUsed + netJokerDelta > profile.jokersTotal) {
+  // Filter out any already submitted picks so they cannot be overwritten
+  const newPicks = picks.filter((p) => !existingGameIdSet.has(p.gameId));
+  if (newPicks.length === 0) {
+    return { ok: false, error: "Všetky vybrané zápasy už boli natipované a sú uzamknuté." };
+  }
+
+  // Count how many jokers are in the new request
+  let newJokersInRequest = 0;
+  for (const p of newPicks) {
+    if (p.isJoker) newJokersInRequest++;
+  }
+
+  if (profile.jokersUsed + newJokersInRequest > profile.jokersTotal) {
     return {
       ok: false,
       error: `Prekročený počet Jokerov! Zostáva vám ${profile.jokersTotal - profile.jokersUsed} z ${profile.jokersTotal}.`,
     };
   }
 
-  for (const pick of picks) {
+  for (const pick of newPicks) {
     const rg = realGameMap.get(pick.gameId);
     const dg = dbGameMap.get(pick.gameId);
 
@@ -77,22 +82,8 @@ export async function saveDailyGamePicksAction(
       continue; // Skip locked games
     }
 
-    await prisma.gamePickSubmission.upsert({
-      where: {
-        season_league_teamId_gameId: {
-          season,
-          league,
-          teamId,
-          gameId: pick.gameId,
-        },
-      },
-      update: {
-        winnerTeamId: pick.winnerTeamId,
-        isJoker: pick.isJoker || false,
-        isGameOfTheWeek: false,
-        updatedAt: new Date(),
-      },
-      create: {
+    await prisma.gamePickSubmission.create({
+      data: {
         season,
         league,
         teamId,
@@ -145,29 +136,8 @@ export async function saveGameOfTheWeekPickAction(
     return { ok: false, error: "Tento zápas je už uzamknutý (začal alebo sa skončil)." };
   }
 
-  // Check profile joker count
-  const profile = await getOrCreateGamePicksProfile(teamId, season, league);
-  if (pick.isJoker) {
-    const existingSub = await prisma.gamePickSubmission.findUnique({
-      where: {
-        season_league_teamId_gameId: {
-          season,
-          league,
-          teamId,
-          gameId: pick.gameId,
-        },
-      },
-    });
-    const netDelta = existingSub?.isJoker ? 0 : 1;
-    if (profile.jokersUsed + netDelta > profile.jokersTotal) {
-      return {
-        ok: false,
-        error: `Prekročený počet Jokerov! Zostáva vám ${profile.jokersTotal - profile.jokersUsed} z ${profile.jokersTotal}.`,
-      };
-    }
-  }
-
-  await prisma.gamePickSubmission.upsert({
+  // Check if GOTW was already submitted - once submitted, it is permanently locked
+  const existingSub = await prisma.gamePickSubmission.findUnique({
     where: {
       season_league_teamId_gameId: {
         season,
@@ -176,18 +146,25 @@ export async function saveGameOfTheWeekPickAction(
         gameId: pick.gameId,
       },
     },
-    update: {
-      winnerTeamId: pick.winnerTeamId,
-      predictedScore: pick.predictedScore,
-      firstGoalScorerId: pick.firstGoalScorerId || null,
-      firstGoalScorerName: pick.firstGoalScorerName || null,
-      topScorerPlayerId: pick.topScorerPlayerId || null,
-      topScorerPlayerName: pick.topScorerPlayerName || null,
-      isJoker: pick.isJoker || false,
-      isGameOfTheWeek: true,
-      updatedAt: new Date(),
-    },
-    create: {
+  });
+
+  if (existingSub) {
+    return { ok: false, error: "Tip na Zápas týždňa už bol odoslaný a je uzamknutý bez možnosti úprav." };
+  }
+
+  // Check profile joker count
+  const profile = await getOrCreateGamePicksProfile(teamId, season, league);
+  if (pick.isJoker) {
+    if (profile.jokersUsed + 1 > profile.jokersTotal) {
+      return {
+        ok: false,
+        error: `Prekročený počet Jokerov! Zostáva vám ${profile.jokersTotal - profile.jokersUsed} z ${profile.jokersTotal}.`,
+      };
+    }
+  }
+
+  await prisma.gamePickSubmission.create({
+    data: {
       season,
       league,
       teamId,
