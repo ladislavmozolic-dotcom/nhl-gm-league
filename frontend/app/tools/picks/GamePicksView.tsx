@@ -1038,10 +1038,10 @@ export default function GamePicksView({
               <li>5 správnych tipov v rade = <strong className="text-white">+5 bonusových bodov</strong></li>
               <li>10 správnych tipov v rade = <strong className="text-white">+15 bonusových bodov</strong></li>
               <li>
-                <strong className="text-white">Víťaz Týždňa:</strong> Najlepší tipér týždňa získa 🎟️ <strong className="text-amber-300">Draft Pick v 8. kole</strong> (alebo 9. kole pri zaplnení).
+                <strong className="text-white">Víťaz Týždňa:</strong> Najlepší tipér týždňa získa <strong className="text-emerald-400">+$200,000</strong> do klubovej kasy.
               </li>
               <li>
-                <strong className="text-white">Mesačný Šampión:</strong> Víťaz mesiaca získa <strong className="text-amber-300">+10 bodov</strong> do celkovej tabuľky, <strong className="text-emerald-400">+$250,000</strong> do klubovej kasy a odznak 🥇 na profile.
+                <strong className="text-white">Mesačný Šampión:</strong> Víťaz mesiaca získa 🎟️ <strong className="text-amber-300">Draft Pick v 8. kole</strong> (alebo 9. kole), <strong className="text-amber-300">+10 bodov</strong> a odznak 🥇 na profile.
               </li>
             </ul>
           </div>
@@ -1101,15 +1101,15 @@ export default function GamePicksView({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
               <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-300">
-                <strong className="text-indigo-300">📅 Týždenné Game Picks:</strong> Každý víťaz hracieho týždňa v Game Picks získa 🎟️ <strong>Draft Pick v 8. kole</strong> (alebo 9. kole pri zaplnení).
+                <strong className="text-emerald-400">📅 Týždenné Game Picks:</strong> Každý víťaz hracieho týždňa v Game Picks získa <strong>+$200,000</strong> do klubovej kasy.
               </div>
               <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-300">
-                <strong className="text-amber-300">🏆 Mesačný Šampión:</strong> Každý víťaz mesiaca získa <strong>+$250,000</strong>, <strong>+10 bodov</strong> do celkovej tabuľky a odznak.
+                <strong className="text-amber-300">🏆 Mesačný Šampión:</strong> Každý víťaz mesiaca získa 🎟️ <strong>Draft Pick v 8. kole</strong> (alebo 9. kole), <strong>+10 bodov</strong> a odznak.
               </div>
             </div>
 
             <div className="text-[11px] text-slate-400 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
-              ℹ️ <strong>Pravidlo pre Draft Picky:</strong> Všetky bonusové draft picky (celoročná TOP 3 aj týždenní víťazi) sa generujú do <strong>8. kola</strong> draftu nováčikov. V prípade, že je v 8. kole už obsadených všetkých 32 pozícií, pick sa automaticky zapíše do <strong>9. kola</strong>.
+              ℹ️ <strong>Pravidlo pre Draft Picky:</strong> Všetky bonusové draft picky (celoročná TOP 3 aj mesační šampióni) sa generujú do <strong>8. kola</strong> draftu nováčikov. V prípade, že je v 8. kole už obsadených všetkých 32 pozícií, pick sa automaticky zapíše do <strong>9. kola</strong>.
             </div>
           </div>
         </div>

@@ -1436,7 +1436,7 @@ export default function SeasonPicksView({
               </div>
             </div>
             <div className="text-[10px] text-slate-400">
-              * Všetky bonusové draft picky (celoročná TOP 3 aj týždenní víťazi Game Picks) sa zapisujú do 8. kola draftu (ak je 32 pozícií plných, automaticky do 9. kola).
+              * Všetky bonusové draft picky (celoročná TOP 3 aj mesační šampióni Game Picks) sa zapisujú do 8. kola draftu (ak je 32 pozícií plných, automaticky do 9. kola).
             </div>
           </div>
 
@@ -1734,12 +1734,12 @@ export default function SeasonPicksView({
 
             {/* Weekly & Monthly info cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="p-4 rounded-xl bg-slate-950/70 border border-indigo-500/30 space-y-1">
-                <div className="flex items-center gap-2 text-sm font-bold text-indigo-300">
+              <div className="p-4 rounded-xl bg-slate-950/70 border border-emerald-500/30 space-y-1">
+                <div className="flex items-center gap-2 text-sm font-bold text-emerald-400">
                   <span>📅 Týždenná Tipovačka (Game Picks)</span>
                 </div>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Každý víťaz daného hracieho týždňa v zápasových tipoch získava 🎟️ <strong>Bonusový Draft Pick v 8. kole</strong> (alebo 9. kole).
+                  Každý víťaz daného hracieho týždňa v zápasových tipoch získava finančnú odmenu <strong className="text-emerald-300">+$200,000</strong> do klubovej kasy.
                 </p>
               </div>
 
@@ -1748,7 +1748,7 @@ export default function SeasonPicksView({
                   <span>🏆 Mesační Šampióni (Okt–Apr)</span>
                 </div>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Najlepší tipér mesiaca získa <strong>+$250,000</strong> do klubovej kasy, <strong>+10 bonusových bodov</strong> a odznak na profile.
+                  Najlepší tipér mesiaca získa 🎟️ <strong>Bonusový Draft Pick v 8. kole</strong> (alebo 9. kole), <strong>+10 bonusových bodov</strong> a odznak na profile.
                 </p>
               </div>
             </div>
@@ -1756,7 +1756,7 @@ export default function SeasonPicksView({
             <div className="text-xs text-slate-400 bg-slate-950/60 p-4 rounded-xl border border-slate-800 flex items-start gap-3">
               <span className="text-lg">ℹ️</span>
               <div>
-                <strong className="text-slate-200">Pravidlo alokácie draftových pickov:</strong> Všetky bonusové draft picky získané v tipovačke (celoročná TOP 3 aj týždenní víťazi) sa generujú do <strong>8. kola</strong> vstupného draftu nováčikov. Ak je v 8. kole zaplnených všetkých 32 pozícií, pick sa automaticky zapíše do <strong>9. kola</strong>.
+                <strong className="text-slate-200">Pravidlo alokácie draftových pickov:</strong> Všetky bonusové draft picky získané v tipovačke (celoročná TOP 3 aj mesační šampióni) sa generujú do <strong>8. kola</strong> vstupného draftu nováčikov. Ak je v 8. kole zaplnených všetkých 32 pozícií, pick sa automaticky zapíše do <strong>9. kola</strong>.
               </div>
             </div>
           </div>
