@@ -303,7 +303,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   moraleEnabled: true, moraleBase: 50, moraleWin: 2, moraleNeutral: 50, moraleSlope: 0.0018,
   moraleGoalieSlope: 0.0008, moraleFrustrationPct: 0.006,
   moraleDroughtGames: 10, moraleDroughtDrop: 1.5, moraleRoleDrop: 4, moraleTradeSwing: 12,
-  chemistryEnabled: true, chemistryBase: 35, chemistryGrowth: 2, chemistryDrop: 25,
+  chemistryEnabled: true, chemistryBase: 35, chemistryGrowth: 4, chemistryDrop: 25,
   chemistryCurve: [
     { chem: 0, bonusPct: -15 },
     { chem: 35, bonusPct: -10 },
