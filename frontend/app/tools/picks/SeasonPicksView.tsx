@@ -227,7 +227,7 @@ export default function SeasonPicksView({
   viewerTeam: { id: number; name: string; slug: string; logoUrl: string | null; gm?: string; gmNickname?: string | null } | null;
   isAdmin: boolean;
 }) {
-  const [tab, setTab] = useState<"picks" | "leaderboard" | "daily" | "admin">("picks");
+  const [tab, setTab] = useState<"picks" | "leaderboard" | "daily" | "rules" | "admin">("picks");
   const [config, setConfig] = useState(initialData.config);
   const [submissions, setSubmissions] = useState(initialData.submissions || []);
   const [selectedSubmission, setSelectedSubmission] = useState<any | null>(null);
@@ -394,6 +394,16 @@ export default function SeasonPicksView({
             }`}
           >
             <span>📅 Game Picks (Denná Tipovačka)</span>
+          </button>
+          <button
+            onClick={() => setTab("rules")}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 ${
+              tab === "rules"
+                ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30"
+                : "bg-slate-800/60 hover:bg-slate-800 text-slate-300"
+            }`}
+          >
+            <span>📖 Pravidlá & Odmeny</span>
           </button>
           {isAdmin && (
             <button
@@ -1634,6 +1644,275 @@ export default function SeasonPicksView({
           viewerTeam={viewerTeam}
           isAdmin={isAdmin}
         />
+      )}
+
+      {/* TAB: RULES & REWARDS */}
+      {tab === "rules" && (
+        <div className="space-y-6">
+          {/* REWARDS HERO CARD */}
+          <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-amber-950/40 via-slate-900 to-indigo-950/50 border border-amber-500/30 space-y-6 shadow-2xl">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-amber-500/20 pb-4">
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">🎁</span>
+                <div>
+                  <h2 className="text-xl font-black text-white">Oficiálne Odmeny pre Víťazov Tipovacej Ligy UNHL</h2>
+                  <p className="text-xs text-slate-300">
+                    Finančné dotácie do klubovej kasy, bonusové Entry Draft Picky a prestížne profilové odznaky.
+                  </p>
+                </div>
+              </div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold">
+                <span>🏆 Sezóna 2026/27</span>
+              </div>
+            </div>
+
+            {/* TOP 3 CARDS */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* 1st */}
+              <div className="p-5 rounded-2xl bg-slate-950/80 border border-amber-500/40 space-y-3 relative overflow-hidden shadow-lg">
+                <div className="flex items-center justify-between">
+                  <span className="text-2xl">🥇 1. Miesto</span>
+                  <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+                    Celkový Šampión
+                  </span>
+                </div>
+                <div className="text-2xl font-black text-amber-300">+$3,000,000</div>
+                <ul className="text-slate-300 space-y-1.5 text-xs">
+                  <li className="flex items-center gap-2">
+                    <span>🎟️</span>
+                    <span><strong>Draft Pick v 8. kole</strong> (alebo 9. kole)</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span>🥇</span>
+                    <span>Zlatý odznak <strong>Season Predictor Champion</strong></span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* 2nd */}
+              <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-700 space-y-3 relative overflow-hidden shadow-lg">
+                <div className="flex items-center justify-between">
+                  <span className="text-2xl">🥈 2. Miesto</span>
+                  <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-slate-500/20 text-slate-300 font-bold border border-slate-600">
+                    Vicemajster
+                  </span>
+                </div>
+                <div className="text-2xl font-black text-slate-200">+$1,500,000</div>
+                <ul className="text-slate-300 space-y-1.5 text-xs">
+                  <li className="flex items-center gap-2">
+                    <span>🎟️</span>
+                    <span><strong>Draft Pick v 8. kole</strong> (alebo 9. kole)</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span>🥈</span>
+                    <span>Strieborný odznak <strong>Vice-Champion</strong></span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* 3rd */}
+              <div className="p-5 rounded-2xl bg-slate-950/80 border border-amber-700/40 space-y-3 relative overflow-hidden shadow-lg">
+                <div className="flex items-center justify-between">
+                  <span className="text-2xl">🥉 3. Miesto</span>
+                  <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-amber-700/20 text-amber-400 font-bold border border-amber-700/40">
+                    3. Miesto
+                  </span>
+                </div>
+                <div className="text-2xl font-black text-amber-400">+$750,000</div>
+                <ul className="text-slate-300 space-y-1.5 text-xs">
+                  <li className="flex items-center gap-2">
+                    <span>🎟️</span>
+                    <span><strong>Draft Pick v 8. kole</strong> (alebo 9. kole)</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span>🥉</span>
+                    <span>Bronzový odznak <strong>3rd Place</strong></span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Weekly & Monthly info cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="p-4 rounded-xl bg-slate-950/70 border border-indigo-500/30 space-y-1">
+                <div className="flex items-center gap-2 text-sm font-bold text-indigo-300">
+                  <span>📅 Týždenná Tipovačka (Game Picks)</span>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Každý víťaz daného hracieho týždňa v zápasových tipoch získava 🎟️ <strong>Bonusový Draft Pick v 8. kole</strong> (alebo 9. kole).
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-950/70 border border-amber-500/30 space-y-1">
+                <div className="flex items-center gap-2 text-sm font-bold text-amber-300">
+                  <span>🏆 Mesační Šampióni (Okt–Apr)</span>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Najlepší tipér mesiaca získa <strong>+$250,000</strong> do klubovej kasy, <strong>+10 bonusových bodov</strong> a odznak na profile.
+                </p>
+              </div>
+            </div>
+
+            <div className="text-xs text-slate-400 bg-slate-950/60 p-4 rounded-xl border border-slate-800 flex items-start gap-3">
+              <span className="text-lg">ℹ️</span>
+              <div>
+                <strong className="text-slate-200">Pravidlo alokácie draftových pickov:</strong> Všetky bonusové draft picky získané v tipovačke (celoročná TOP 3 aj týždenní víťazi) sa generujú do <strong>8. kola</strong> vstupného draftu nováčikov. Ak je v 8. kole zaplnených všetkých 32 pozícií, pick sa automaticky zapíše do <strong>9. kola</strong>.
+              </div>
+            </div>
+          </div>
+
+          {/* SCORING BREAKDOWN: SEASON PICKS (10 SECTIONS) */}
+          <div className="p-6 sm:p-8 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-6 shadow-xl">
+            <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-800 pb-4">
+              <div>
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <span>📋 Bodový systém Celosezónnej Tipovačky (Season Picks)</span>
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Prehľad všetkých 10 kategórií tiketu, bodových hodnôt a bonusov (Celkovo až ~418 bodov).
+                </p>
+              </div>
+              <div className="px-3 py-1 rounded-lg bg-indigo-950/60 border border-indigo-500/30 text-xs font-mono text-indigo-300 font-bold">
+                10 Kategórií · Max ~418 bodov
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              {/* 1. SC */}
+              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
+                <div className="flex items-center justify-between font-bold text-white">
+                  <span className="text-indigo-400 font-mono">1.</span>
+                  <span>🏆 Stanley Cup</span>
+                  <span className="text-amber-400 font-mono">Max 50b</span>
+                </div>
+                <p className="text-slate-400">
+                  Víťaz pohára (25b), Finalista (15b), Presný stav finálovej série (10b).
+                </p>
+              </div>
+
+              {/* 2. Divisions */}
+              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
+                <div className="flex items-center justify-between font-bold text-white">
+                  <span className="text-indigo-400 font-mono">2.</span>
+                  <span>🥇 Víťazi Divízií</span>
+                  <span className="text-amber-400 font-mono">Max 55b</span>
+                </div>
+                <p className="text-slate-400">
+                  10b za každú správnu divíziu (Atlantic, Metro, Central, Pacific) + bonus 15b pri uhádnutí všetkých 4/4.
+                </p>
+              </div>
+
+              {/* 3. Presidents */}
+              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
+                <div className="flex items-center justify-between font-bold text-white">
+                  <span className="text-indigo-400 font-mono">3.</span>
+                  <span>🛡️ Presidents' Trophy</span>
+                  <span className="text-amber-400 font-mono">Max 25b</span>
+                </div>
+                <p className="text-slate-400">
+                  Víťaz základnej časti (15b) + presný odhad bodov tímu v tolerancii ±3 body (10b).
+                </p>
+              </div>
+
+              {/* 4. Playoff teams */}
+              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
+                <div className="flex items-center justify-between font-bold text-white">
+                  <span className="text-indigo-400 font-mono">4.</span>
+                  <span>🎟️ 16 Postupujúcich Tímov</span>
+                  <span className="text-amber-400 font-mono">Max 63b</span>
+                </div>
+                <p className="text-slate-400">
+                  3b za každý správne označený postupujúci tím do play-off + bonus 15b pri kompletnom uhádnutí 16/16.
+                </p>
+              </div>
+
+              {/* 5. Stat leaders */}
+              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
+                <div className="flex items-center justify-between font-bold text-white">
+                  <span className="text-indigo-400 font-mono">5.</span>
+                  <span>🎯 Štatistickí Lídri</span>
+                  <span className="text-amber-400 font-mono">Max 50b</span>
+                </div>
+                <p className="text-slate-400">
+                  Art Ross (10b), Rocket Richard (10b), Najviac asistencií (10b), Najproduktívnejší obranca (10b), Najproduktívnejší nováčik (10b).
+                </p>
+              </div>
+
+              {/* 6. Trophies */}
+              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
+                <div className="flex items-center justify-between font-bold text-white">
+                  <span className="text-indigo-400 font-mono">6.</span>
+                  <span>🎖️ NHL Trofeje</span>
+                  <span className="text-amber-400 font-mono">Max 70b</span>
+                </div>
+                <p className="text-slate-400">
+                  Hart, Norris, Vezina, Calder, Selke, Conn Smythe a Jack Adams Trophy – 10 bodov za každú správne trafenú trofej.
+                </p>
+              </div>
+
+              {/* 7. O/U */}
+              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
+                <div className="flex items-center justify-between font-bold text-white">
+                  <span className="text-indigo-400 font-mono">7.</span>
+                  <span>📊 Over / Under Body Tímov</span>
+                  <span className="text-amber-400 font-mono">Max 55b</span>
+                </div>
+                <p className="text-slate-400">
+                  5b za každý správny Over/Under tip na tímové body v základnej časti + bonus 15b pri 8/8.
+                </p>
+              </div>
+
+              {/* 8. H2H */}
+              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
+                <div className="flex items-center justify-between font-bold text-white">
+                  <span className="text-indigo-400 font-mono">8.</span>
+                  <span>⚔️ Head-to-Head Duely</span>
+                  <span className="text-amber-400 font-mono">Max 40b</span>
+                </div>
+                <p className="text-slate-400">
+                  6b za každý správny duel tímov o lepšie umiestnenie v tabuľke + bonus 10b pri 5/5.
+                </p>
+              </div>
+
+              {/* 9. Bold */}
+              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
+                <div className="flex items-center justify-between font-bold text-white">
+                  <span className="text-indigo-400 font-mono">9.</span>
+                  <span>⚡ Bold Predikcie</span>
+                  <span className="text-amber-400 font-mono">Max 30b</span>
+                </div>
+                <p className="text-slate-400">
+                  10b za každú správnu odpoveď na špeciálne ligové otázky.
+                </p>
+              </div>
+
+              {/* 10. Wildcard */}
+              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
+                <div className="flex items-center justify-between font-bold text-white">
+                  <span className="text-indigo-400 font-mono">10.</span>
+                  <span>🃏 Wildcard (Sleeper & Bust)</span>
+                  <span className="text-amber-400 font-mono">Max 20b</span>
+                </div>
+                <p className="text-slate-400">
+                  Sleeper tím (+10b ak postúpi do PO), Bust tím (+10b ak nepostúpi do PO).
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* GAME PICKS OVERVIEW CARD */}
+          <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-4 shadow-xl">
+            <h3 className="text-base font-bold text-emerald-300 flex items-center gap-2">
+              <span>📅 Denné Zápasy (Game Picks) & Zápas Týždňa (GOTW)</span>
+            </h3>
+            <ul className="list-disc list-inside text-slate-300 space-y-1.5 text-xs">
+              <li><strong className="text-white">Zápasy dňa:</strong> 2 body za správny tip na víťaza (alebo 6 bodov s aktivovaným Jokerom).</li>
+              <li><strong className="text-white">Zápas týždňa (Game of the Week):</strong> Hlavný šláger týždňa až za 15 bodov (Víťaz 2b, Presné skóre 5b, Prvý strelec 5b, Najproduktívnejší hráč 3b). S Jokerom až 45 bodov!</li>
+              <li><strong className="text-white">Jokeri (×3 násobič):</strong> Každý GM má na sezónu k dispozícii 5 Jokerov, ktoré môže použiť na ľubovoľný zápas.</li>
+              <li><strong className="text-white">Série (Streaks):</strong> 3 správne tipy v rade = +2b, 5 v rade = +5b, 10 v rade = +15b.</li>
+            </ul>
+          </div>
+        </div>
       )}
 
       {/* TAB 4: ADMIN CONTROLS */}
