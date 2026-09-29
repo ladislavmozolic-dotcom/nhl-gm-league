@@ -37,13 +37,14 @@ export async function saveDailyGamePicksAction(
   });
   const dbGameMap = new Map(dbGames.map((g) => [g.id, g]));
 
-  // Check existing submissions for these games - once submitted, picks are permanently locked
+  // Check existing submissions for these games - once submitted, daily picks are permanently locked
   const existingSubs = await prisma.gamePickSubmission.findMany({
     where: {
       season,
       league,
       teamId,
       gameId: { in: gameIds },
+      isGameOfTheWeek: false,
     },
   });
   const existingGameIdSet = new Set(existingSubs.map((s) => s.gameId));
@@ -145,11 +146,12 @@ export async function saveGameOfTheWeekPickAction(
   // Check if GOTW was already submitted - once submitted, it is permanently locked
   const existingSub = await prisma.gamePickSubmission.findUnique({
     where: {
-      season_league_teamId_gameId: {
+      season_league_teamId_gameId_isGameOfTheWeek: {
         season,
         league,
         teamId,
         gameId: pick.gameId,
+        isGameOfTheWeek: true,
       },
     },
   });

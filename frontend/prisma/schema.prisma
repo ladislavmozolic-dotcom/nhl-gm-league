@@ -1893,7 +1893,7 @@ model GamePickSubmission {
   updatedAt           DateTime @updatedAt
   team                Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
-  @@unique([season, league, teamId, gameId])
+  @@unique([season, league, teamId, gameId, isGameOfTheWeek])
   @@index([season, league, gameId])
   @@index([teamId])
 }

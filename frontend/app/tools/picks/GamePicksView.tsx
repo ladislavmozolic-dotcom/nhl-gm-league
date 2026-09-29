@@ -6,8 +6,6 @@ import {
   saveDailyGamePicksAction,
   saveGameOfTheWeekPickAction,
   evaluateGamePicksAction,
-  adminUpdateGamePicksConfigAction,
-  adminAutoSelectGotwAction,
 } from "@/app/league/picks/game-actions";
 
 type Player = {
@@ -207,13 +205,15 @@ export default function GamePicksView({
   const leaderboard: any[] = data.leaderboard || [];
   const currentRival = data.currentRival;
 
-  // Form State for Daily Games
-  const subMap = new Map(viewerSubmissions.map((s) => [s.gameId, s]));
+  // Form State for Daily Games (strictly non-GOTW submissions)
+  const dailySubMap = new Map(
+    viewerSubmissions.filter((s) => !s.isGameOfTheWeek).map((s) => [s.gameId, s])
+  );
   const [dailyPicks, setDailyPicks] = useState<Record<number, { winnerTeamId?: number; isJoker?: boolean }>>(() => {
     const init: Record<number, any> = {};
     for (const g of games) {
-      const sub = subMap.get(g.id);
-      if (sub && !sub.isGameOfTheWeek) {
+      const sub = dailySubMap.get(g.id);
+      if (sub) {
         init[g.id] = {
           winnerTeamId: sub.winnerTeamId !== null && sub.winnerTeamId !== undefined ? sub.winnerTeamId : undefined,
           isJoker: sub.isJoker || false,
@@ -228,9 +228,12 @@ export default function GamePicksView({
     return init;
   });
 
-  // Form State for Game of the Week
+  // Form State for Game of the Week (strictly GOTW submissions)
   const gotwGame = games.find((g) => g.isGameOfTheWeek);
-  const gotwSub = gotwGame ? subMap.get(gotwGame.id) : null;
+  const gotwSub = gotwGame
+    ? viewerSubmissions.find((s) => s.isGameOfTheWeek && s.gameId === gotwGame.id) || null
+    : null;
+
   const [gotwPick, setGotwPick] = useState({
     winnerTeamId: gotwSub?.winnerTeamId !== null && gotwSub?.winnerTeamId !== undefined ? gotwSub.winnerTeamId : undefined,
     predictedScore: gotwSub?.predictedScore || "4:2",
@@ -244,7 +247,7 @@ export default function GamePicksView({
   // Keep gotwPick in sync whenever gotwGame or viewer submissions change
   useEffect(() => {
     if (gotwGame) {
-      const sub = subMap.get(gotwGame.id);
+      const sub = viewerSubmissions.find((s) => s.isGameOfTheWeek && s.gameId === gotwGame.id);
       if (sub) {
         setGotwPick({
           winnerTeamId: sub.winnerTeamId !== null && sub.winnerTeamId !== undefined ? sub.winnerTeamId : undefined,
@@ -258,40 +261,6 @@ export default function GamePicksView({
       }
     }
   }, [gotwGame?.id, viewerSubmissions]);
-
-  const handleSetGotw = (gameId: number | null) => {
-    startTransition(async () => {
-      try {
-        const res = await adminUpdateGamePicksConfigAction(
-          { gameOfTheWeekId: gameId },
-          config.season,
-          config.league
-        );
-        if (res.ok) {
-          setMsg({ type: "success", text: gameId ? "✅ Zápas týždňa (Game of the Week) bol úspešne nastavený!" : "✅ Výber Zápasu Týždňa bol zrušený." });
-        } else {
-          setMsg({ type: "error", text: res.error || "Chyba pri zmene zápasu týždňa." });
-        }
-      } catch (err: any) {
-        console.error("Set GOTW error:", err);
-      }
-    });
-  };
-
-  const handleAutoSelectGotw = () => {
-    startTransition(async () => {
-      try {
-        const res = await adminAutoSelectGotwAction(config.season, config.league);
-        if (res.ok) {
-          setMsg({ type: "success", text: "🤖 AI úspešne vybrala a nastavila najzaujímavejší zápas týždňa!" });
-        } else {
-          setMsg({ type: "error", text: res.error || "Chyba pri automatickom výbere zápasu týždňa." });
-        }
-      } catch (err: any) {
-        console.error("Auto select GOTW error:", err);
-      }
-    });
-  };
 
   const [gameFilter, setGameFilter] = useState<"today" | "all_upcoming" | "results">("today");
 
@@ -318,7 +287,7 @@ export default function GamePicksView({
     const unsubmittedPayload = Object.entries(dailyPicks)
       .filter(([gId, p]) => {
         const numId = Number(gId);
-        const sub = subMap.get(numId);
+        const sub = dailySubMap.get(numId);
         return !sub && p.winnerTeamId !== undefined;
       })
       .map(([gId, p]) => ({
@@ -638,7 +607,7 @@ export default function GamePicksView({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {gamesToDisplay.map((g) => {
                 const current = dailyPicks[g.id] || {};
-                const sub = subMap.get(g.id);
+                const sub = dailySubMap.get(g.id);
                 const isLocked = g.isLocked || Boolean(sub);
 
                 return (
@@ -834,39 +803,6 @@ export default function GamePicksView({
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
-                  {isAdmin && (
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <button
-                        type="button"
-                        disabled={isPending}
-                        onClick={handleAutoSelectGotw}
-                        className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/20 disabled:opacity-50 flex items-center gap-1"
-                        title="Nechať AI vybrať najatraktívnejší zápas týždňa"
-                      >
-                        <span>🤖 AI Auto-Výber</span>
-                      </button>
-
-                      <select
-                        disabled={isPending}
-                        value={gotwGame.id}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          handleSetGotw(val ? Number(val) : null);
-                        }}
-                        className="px-3 py-2 rounded-xl bg-slate-900 border border-amber-500/40 text-amber-300 text-xs font-bold focus:outline-none focus:border-amber-400"
-                      >
-                        <option value="">-- Zrušiť výber Zápasu Týždňa --</option>
-                        {games
-                          .filter((g) => g.status === "SCHEDULED")
-                          .map((g) => (
-                            <option key={g.id} value={g.id}>
-                              👑 Zmeniť GOTW: {g.awayTeam?.name} vs {g.homeTeam?.name} ({g.gameDate ? new Date(g.gameDate).toLocaleDateString("sk-SK", { weekday: "short", day: "numeric", month: "short" }) : `Deň #${g.round}`})
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-                  )}
-
                   <button
                     type="button"
                     disabled={isPending || gotwGame.isLocked || Boolean(gotwSub)}
@@ -1058,43 +994,8 @@ export default function GamePicksView({
             <div className="text-4xl">🤖</div>
             <h3 className="text-base font-bold text-white">Zápas Týždňa (Game of the Week)</h3>
             <p className="text-xs text-slate-400 max-w-md mx-auto">
-              AI automaticky vyhodnocuje program a vyberá najatraktívnejší duel týždňa.
+              AI automaticky analyzuje rozpis zápasov a pripravuje najatraktívnejší duel týždňa.
             </p>
-
-            {isAdmin && (
-              <div className="mt-4 p-5 rounded-2xl bg-slate-950/90 border border-amber-500/40 text-left max-w-lg mx-auto space-y-3 shadow-xl">
-                <div className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
-                  <span>👑 Administrácia Zápasu Týždňa</span>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <button
-                    type="button"
-                    disabled={isPending}
-                    onClick={handleAutoSelectGotw}
-                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/20"
-                  >
-                    🤖 Spustiť AI Auto-Výber
-                  </button>
-                  <select
-                    disabled={isPending}
-                    onChange={(e) => {
-                      if (e.target.value) handleSetGotw(Number(e.target.value));
-                    }}
-                    className="flex-1 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs font-bold focus:border-amber-500"
-                    defaultValue=""
-                  >
-                    <option value="" disabled>-- Alebo vyberte manuálne --</option>
-                    {games
-                      .filter((g) => g.status === "SCHEDULED")
-                      .map((g) => (
-                        <option key={g.id} value={g.id}>
-                          {g.awayTeam?.name} vs {g.homeTeam?.name} ({g.gameDate ? new Date(g.gameDate).toLocaleDateString("sk-SK", { weekday: "short", day: "numeric", month: "short" }) : `Deň #${g.round}`})
-                        </option>
-                      ))}
-                  </select>
-                </div>
-              </div>
-            )}
           </div>
         )
       )}
