@@ -46,10 +46,15 @@ async function importSeason(code: HockeyTechLeague["code"]) {
   const rows = ((seasons.SiteKit as Json | undefined)?.Seasons ?? []) as Json[];
   const now = new Date().toISOString().slice(0, 10);
   const regularRows = rows.filter((s) => s.playoff === "0");
-  let season = regularRows.find((s) => String(s.start_date) <= now && String(s.end_date) >= now) ?? regularRows.find((s) => s.career === "1") ?? regularRows[0];
+  // Strictly target the current 2026-27 regular season across all leagues
+  const season =
+    regularRows.find((s) => String(s.start_date).startsWith("2026") && s.career === "1") ??
+    regularRows.find((s) => String(s.start_date) <= now && String(s.end_date) >= now) ??
+    regularRows.find((s) => s.career === "1") ??
+    regularRows[0];
   if (!season?.season_id) throw new Error(`${code} did not return an active regular season.`);
-  let seasonId = String(season.season_id);
-  let seasonName = seasonLabel(season);
+  const seasonId = String(season.season_id);
+  const seasonName = "2026-27";
 
   const fetchStats = async (sid: string) => {
     return Promise.all([
@@ -59,27 +64,9 @@ async function importSeason(code: HockeyTechLeague["code"]) {
     ]);
   };
 
-  let [teamsRaw, skatersRaw, goaliesRaw] = await fetchStats(seasonId);
+  const [teamsRaw, skatersRaw, goaliesRaw] = await fetchStats(seasonId);
   const sectionRows = (raw: Json) => (((raw as unknown as Json[])[0]?.sections as Json[] | undefined)?.[0]?.data ?? []) as Json[];
-  let skaterSection = sectionRows(skatersRaw);
-
-  // If the upcoming regular season has not played games yet (0 skaters), fall back to previous completed regular season
-  if (skaterSection.length === 0) {
-    const fallbackSeason = regularRows.find((s) => s.season_id !== seasonId && s.career === "1" && String(s.end_date) < now);
-    if (fallbackSeason?.season_id) {
-      const fallbackId = String(fallbackSeason.season_id);
-      const [fbTeams, fbSkaters, fbGoalies] = await fetchStats(fallbackId);
-      const fbSkaterSection = sectionRows(fbSkaters);
-      if (fbSkaterSection.length > 0) {
-        teamsRaw = fbTeams;
-        skatersRaw = fbSkaters;
-        goaliesRaw = fbGoalies;
-        skaterSection = fbSkaterSection;
-        seasonId = fallbackId;
-        seasonName = seasonLabel(fallbackSeason);
-      }
-    }
-  }
+  const skaterSection = sectionRows(skatersRaw);
 
   const league = await prisma.worldLeague.upsert({
     where: { code },

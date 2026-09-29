@@ -14,7 +14,8 @@ export default async function EuropeProspectsPage({ searchParams }: { searchPara
   const { season: requestedSeason } = await searchParams;
   const leagues = await prisma.worldLeague.findMany({ where: { active: true, region: "Europe" }, include: { teams: { orderBy: { name: "asc" } }, _count: { select: { stats: true } } }, orderBy: [{ country: "asc" }, { name: "asc" }] });
   const seasons = await prisma.worldPlayerSeasonStat.findMany({ where: { league: { region: "Europe", active: true } }, distinct: ["season"], select: { season: true }, orderBy: { season: "desc" } });
-  const season = seasons.find((s) => s.season === requestedSeason)?.season ?? seasons[0]?.season;
+  const defaultSeason = seasons.find((s) => s.season === "2026-27")?.season ?? "2026-27";
+  const season = requestedSeason ? (seasons.find((s) => s.season === requestedSeason)?.season ?? requestedSeason) : defaultSeason;
   const stats = season ? await prisma.worldPlayerSeasonStat.findMany({ where: { season, league: { region: "Europe", active: true } }, include: { player: true, league: true, team: true }, orderBy: [{ points: "desc" }, { gamesPlayed: "desc" }] }) : [];
   const teamId = await getTeamSession();
   const { year: draftYear, meta } = await worldScoutingMeta(stats.map((s) => s.player), teamId);

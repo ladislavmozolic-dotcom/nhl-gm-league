@@ -300,7 +300,7 @@ export async function importRussianProspects() {
       });
 
       const isGoalie = landing.position === "G";
-      const seasonLabel = formatSeason(lastStat.season);
+      const seasonLabel = "2026-27";
 
       const { player } = await resolveWorldPlayer({
         provider: "nhl-profile",
@@ -312,25 +312,27 @@ export async function importRussianProspects() {
         currentTeamId: team.id,
       });
 
-      // Per league commissioner rule: NCAA stats remain empty until season begins; only assign college team
-      if (leagueCode !== "NCAA") {
+      // ONLY pull season stats if they actually belong to the current 2026-27 season!
+      // (Per user rule: all leagues must only pull 2026-27 stats; older seasons are never pulled)
+      const stat2627 = regularStats.find((s) => s.season === 20262027 || String(s.season).startsWith("2026"));
+      if (stat2627 && leagueCode !== "NCAA") {
         await prisma.worldPlayerSeasonStat.upsert({
           where: { playerId_leagueId_season: { playerId: player.id, leagueId: targetLeague.id, season: seasonLabel } },
           update: {
             teamId: team.id,
             isGoalie,
-            gamesPlayed: lastStat.gamesPlayed ?? 0,
-            goals: lastStat.goals ?? 0,
-            assists: lastStat.assists ?? 0,
-            points: lastStat.points ?? 0,
-            plusMinus: lastStat.plusMinus ?? null,
-            penaltyMinutes: lastStat.pim ?? 0,
-            wins: isGoalie ? (lastStat.wins ?? null) : null,
-            losses: isGoalie ? (lastStat.losses ?? null) : null,
-            overtimeLosses: isGoalie ? (lastStat.otLosses ?? null) : null,
-            savePercentage: isGoalie && lastStat.savePctg != null ? lastStat.savePctg : null,
-            goalsAgainstAverage: isGoalie && lastStat.goalsAgainstAvg != null ? lastStat.goalsAgainstAvg : null,
-            shutouts: isGoalie ? (lastStat.shutouts ?? null) : null,
+            gamesPlayed: stat2627.gamesPlayed ?? 0,
+            goals: stat2627.goals ?? 0,
+            assists: stat2627.assists ?? 0,
+            points: stat2627.points ?? 0,
+            plusMinus: stat2627.plusMinus ?? null,
+            penaltyMinutes: stat2627.pim ?? 0,
+            wins: isGoalie ? (stat2627.wins ?? null) : null,
+            losses: isGoalie ? (stat2627.losses ?? null) : null,
+            overtimeLosses: isGoalie ? (stat2627.otLosses ?? null) : null,
+            savePercentage: isGoalie && stat2627.savePctg != null ? stat2627.savePctg : null,
+            goalsAgainstAverage: isGoalie && stat2627.goalsAgainstAvg != null ? stat2627.goalsAgainstAvg : null,
+            shutouts: isGoalie ? (stat2627.shutouts ?? null) : null,
             source: "official-feed",
             syncedAt: new Date(),
           },
@@ -340,18 +342,18 @@ export async function importRussianProspects() {
             teamId: team.id,
             season: seasonLabel,
             isGoalie,
-            gamesPlayed: lastStat.gamesPlayed ?? 0,
-            goals: lastStat.goals ?? 0,
-            assists: lastStat.assists ?? 0,
-            points: lastStat.points ?? 0,
-            plusMinus: lastStat.plusMinus ?? null,
-            penaltyMinutes: lastStat.pim ?? 0,
-            wins: isGoalie ? (lastStat.wins ?? null) : null,
-            losses: isGoalie ? (lastStat.losses ?? null) : null,
-            overtimeLosses: isGoalie ? (lastStat.otLosses ?? null) : null,
-            savePercentage: isGoalie && lastStat.savePctg != null ? lastStat.savePctg : null,
-            goalsAgainstAverage: isGoalie && lastStat.goalsAgainstAvg != null ? lastStat.goalsAgainstAvg : null,
-            shutouts: isGoalie ? (lastStat.shutouts ?? null) : null,
+            gamesPlayed: stat2627.gamesPlayed ?? 0,
+            goals: stat2627.goals ?? 0,
+            assists: stat2627.assists ?? 0,
+            points: stat2627.points ?? 0,
+            plusMinus: stat2627.plusMinus ?? null,
+            penaltyMinutes: stat2627.pim ?? 0,
+            wins: isGoalie ? (stat2627.wins ?? null) : null,
+            losses: isGoalie ? (stat2627.losses ?? null) : null,
+            overtimeLosses: isGoalie ? (stat2627.otLosses ?? null) : null,
+            savePercentage: isGoalie && stat2627.savePctg != null ? stat2627.savePctg : null,
+            goalsAgainstAverage: isGoalie && stat2627.goalsAgainstAvg != null ? stat2627.goalsAgainstAvg : null,
+            shutouts: isGoalie ? (stat2627.shutouts ?? null) : null,
             source: "official-feed",
           },
         });

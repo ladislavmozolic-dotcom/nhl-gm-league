@@ -1,3 +1,4 @@
+import { prisma } from "@/lib/prisma";
 import { seedWorldLeagueCatalog } from "@/lib/world-catalog";
 import { importAhlSeason, importOhlSeason, importQmjhlSeason, importWhlSeason } from "@/lib/world-import-hockeytech";
 import { importNcaaSeason } from "@/lib/world-import-ncaa";
@@ -19,6 +20,10 @@ import { reconcileAllProspects } from "@/lib/world-player-identity";
  */
 export async function runFullWorldSync() {
   await seedWorldLeagueCatalog();
+  // Ensure the database strictly retains only the active 2026-27 season stats
+  await prisma.worldPlayerSeasonStat.deleteMany({
+    where: { NOT: { season: "2026-27" } },
+  });
   const chl = await Promise.all([
     importWhlSeason().catch((e) => ({ error: (e as Error).message })),
     importOhlSeason().catch((e) => ({ error: (e as Error).message })),

@@ -31,7 +31,7 @@ export default async function AroundTheWorldPage({
     }),
     prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true } }),
     prisma.worldPlayerSeasonStat.findMany({
-      where: { isGoalie: false },
+      where: { isGoalie: false, season: "2026-27" },
       orderBy: [{ points: "desc" }, { gamesPlayed: "desc" }],
       take: 30,
       include: { player: { include: { currentTeam: true } }, league: true, team: true },
@@ -60,7 +60,8 @@ export default async function AroundTheWorldPage({
         include: {
           currentTeam: { include: { league: true } },
           stats: {
-            orderBy: [{ season: "desc" }, { gamesPlayed: "desc" }, { syncedAt: "desc" }],
+            where: { season: "2026-27" },
+            orderBy: [{ points: "desc" }, { gamesPlayed: "desc" }, { syncedAt: "desc" }],
             take: 1,
             include: { league: true, team: true },
           },

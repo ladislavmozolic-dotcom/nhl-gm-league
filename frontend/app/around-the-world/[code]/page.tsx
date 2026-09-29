@@ -21,7 +21,8 @@ export default async function WorldLeaguePage({ params, searchParams }: {
     prisma.worldPlayerSeasonStat.findMany({ where: { leagueId: league.id }, distinct: ["season"], select: { season: true }, orderBy: { season: "desc" } }),
     prisma.worldLeague.findMany({ where: { active: true }, select: { code: true, name: true }, orderBy: { name: "asc" } }),
   ]);
-  const season = seasons.find((s) => s.season === requestedSeason)?.season ?? seasons[0]?.season;
+  const defaultSeason = seasons.find((s) => s.season === "2026-27")?.season ?? "2026-27";
+  const season = requestedSeason ? (seasons.find((s) => s.season === requestedSeason)?.season ?? requestedSeason) : defaultSeason;
   const stats = season ? await prisma.worldPlayerSeasonStat.findMany({
     where: { leagueId: league.id, season },
     include: { player: true, team: true },
