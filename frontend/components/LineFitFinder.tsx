@@ -53,7 +53,7 @@ function SlotPicker({ pool, value, onPick, onClear }: {
   );
 }
 
-const fitPlayer = (p: Pickable | null): TacticalFitPlayer | null => p == null ? null : { ...p.a, position: p.position, shoots: p.shoots };
+const fitPlayer = (p: Pickable | null): TacticalFitPlayer | null => p == null ? null : { ...p.a, id: p.id, position: p.position, shoots: p.shoots };
 
 export default function LineFitFinder({ players, chem, tactics, pops, hasTeam }: {
   players: Pickable[]; chem: Record<string, number>; tactics: TeamTactics; pops: { F: RatingPop; D: RatingPop }; hasTeam: boolean;

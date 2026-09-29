@@ -22,7 +22,7 @@ type Atk = { id: number; name: string; position: string; overall: number; shoots
 const A = (v: number | null | undefined, d = 50) => v ?? d;
 const fitPlayer = (p: Atk | undefined): TacticalFitPlayer | null => p == null
   ? null
-  : { position: p.position, shoots: p.shoots, pa: p.pa, sc: p.sc, sk: p.sk, ck: p.ck, df: p.df, st: p.st, fo: p.fo, en: p.en, weight: p.weight, ph: p.ph };
+  : { id: p.id, position: p.position, shoots: p.shoots, pa: p.pa, sc: p.sc, sk: p.sk, ck: p.ck, df: p.df, st: p.st, fo: p.fo, en: p.en, weight: p.weight, ph: p.ph };
 const lastName = (byId: Map<number, Atk>, id: number) => displayName(byId.get(id)?.name ?? `#${id}`).split(" ").pop();
 
 /** AI GM Assistance — suggest a full lineup + per-line tactics + team system from

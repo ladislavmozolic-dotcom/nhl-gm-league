@@ -49,7 +49,7 @@ export async function positionPopulations(): Promise<{ F: RatingPop; D: RatingPo
 
 const fitPlayer = (player: P | null): TacticalFitPlayer | null => player == null
   ? null
-  : { ...player.a, position: player.position, shoots: player.shoots };
+  : { ...player.a, id: player.id, position: player.position, shoots: player.shoots };
 
 export async function teamLineBuilder(teamId: number, league = "NHL"): Promise<TeamLineBuild> {
   const rosterType = league === "AHL" ? "AHL" : "NHL";

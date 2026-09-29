@@ -73,7 +73,7 @@ export function chemFor(chem: Record<string, number>, slots: { role: string; id:
  *  enough rating data to classify him yet. */
 export function slotType(p: FitPlayer | null): string | null {
   if (!p) return null;
-  return playerType({ position: p.position, sc: p.a.sc, pa: p.a.pa, df: p.a.df, ck: p.a.ck, st: p.a.st, sk: p.a.sk, ph: p.a.ph });
+  return playerType({ id: p.id, position: p.position, sc: p.a.sc, pa: p.a.pa, df: p.a.df, ck: p.a.ck, st: p.a.st, sk: p.a.sk, ph: p.a.ph });
 }
 
 /** Whether a forward slotted at `role` (LW/C/RW) is off his natural position. */

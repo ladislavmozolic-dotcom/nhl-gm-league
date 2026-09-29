@@ -6,6 +6,7 @@ import { systemFit, type DZone, type PuckStyle, type TeamTactics } from "./tacti
 import { playerType } from "../player-type";
 
 export type TacticalFitPlayer = RoleFitAttrs & {
+  id?: number | null;
   position?: string | null;
   shoots?: string | null;
   en?: number | null;
@@ -102,7 +103,7 @@ export function tacticalFitForwards(
   });
   const positionFactor = count ? 0.75 + 0.25 * (good / count) : 0.85;
   const effectiveTactics = puckOverride ? { ...tactics, puckStyle: puckOverride } : tactics;
-  const types = present.map((p) => playerType({ position: p.position, sc: p.sc, pa: p.pa, df: p.df, ck: p.ck, st: p.st, sk: p.sk, ph: p.ph }));
+  const types = present.map((p) => playerType({ id: p.id, position: p.position, sc: p.sc, pa: p.pa, df: p.df, ck: p.ck, st: p.st, sk: p.sk, ph: p.ph }));
   const archFactor = lineIndex != null ? archetypeFactor(types, LINE_ARCHETYPE_F[lineIndex]) : 1;
   return clamp(roleScore * positionFactor * systemFit(unitProfile(present), effectiveTactics) * archFactor);
 }
@@ -123,7 +124,7 @@ export function tacticalFitDefense(
   if (players[1]?.shoots === "R") good++;
   const positionFactor = 0.78 + 0.22 * (good / 2);
   const effectiveTactics = dZoneOverride ? { ...tactics, dZone: dZoneOverride } : tactics;
-  const types = present.map((p) => playerType({ position: p.position, sc: p.sc, pa: p.pa, df: p.df, ck: p.ck, st: p.st, sk: p.sk, ph: p.ph }));
+  const types = present.map((p) => playerType({ id: p.id, position: p.position, sc: p.sc, pa: p.pa, df: p.df, ck: p.ck, st: p.st, sk: p.sk, ph: p.ph }));
   const archFactor = lineIndex != null ? archetypeFactor(types, LINE_ARCHETYPE_D[lineIndex]) : 1;
   return clamp(roleScore * positionFactor * systemFit(unitProfile(present), effectiveTactics) * archFactor);
 }

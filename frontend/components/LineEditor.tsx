@@ -404,7 +404,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
     // Real scouting TYPE (Sniper, Forechecker/Grinder, Two-Way Defenceman, ...) —
     // the same label shown on his profile page and used by Tactical Fit's
     // Depth-Chart Archetype Fit (Rules §16) to judge whether he suits THIS slot.
-    const ptype = p ? playerType({ position: p.position, sc: p.sc, pa: p.pa, df: p.df, ck: p.ck, st: p.st, sk: p.sk, ph: p.ph }) : null;
+    const ptype = p ? playerType({ id: p.id, position: p.position, sc: p.sc, pa: p.pa, df: p.df, ck: p.ck, st: p.st, sk: p.sk, ph: p.ph }) : null;
     return (
       <div className="lines-player-slot relative flex items-center gap-3 bg-slate-900/60 border border-slate-700 rounded-lg p-2.5 cursor-pointer hover:border-slate-600">
         <div className="relative flex-none">
