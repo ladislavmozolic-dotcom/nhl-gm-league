@@ -855,11 +855,24 @@ model WorldPlayer {
   stats            WorldPlayerSeasonStat[]
   prospects        Prospect[]              @relation("WorldPlayerProspects")
   unhlPlayers      Player[]                @relation("WorldPlayerUNHLPlayers")
+  externalIds      WorldPlayerExternalId[]
   createdAt        DateTime                @default(now())
   updatedAt        DateTime                @updatedAt
 
   @@index([normalizedName])
   @@index([currentTeamId])
+}
+
+model WorldPlayerExternalId {
+  id         Int         @id @default(autoincrement())
+  provider   String
+  externalId String
+  playerId   Int
+  player     WorldPlayer @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  createdAt  DateTime    @default(now())
+
+  @@unique([provider, externalId])
+  @@index([playerId])
 }
 
 model WorldPlayerSeasonStat {
