@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { isAdmin } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import { Card, SectionTitle } from "@/components/ui";
 import { pickIdsWithTradeHistory } from "@/lib/trade-history-server";
@@ -17,7 +18,9 @@ export default async function TeamDraftPicksPage({ params }: { params: Promise<{
   });
   if (!team) notFound();
   // bonus picks (round 8+) the commissioner awarded — contest prizes, rewards, …
-  const bonus = await prisma.draftBonusPick.findMany({
+  // commissioner-only for now: other GMs don't see the column at all
+  const admin = await isAdmin();
+  const bonus = !admin ? [] : await prisma.draftBonusPick.findMany({
     where: { teamId: team.id, ...(source === "real" ? { source: "real" } : { OR: [{ source: null }, { source: "profinhl" }] }) },
     orderBy: [{ year: "asc" }, { round: "asc" }, { id: "asc" }],
   });
@@ -55,12 +58,12 @@ export default async function TeamDraftPicksPage({ params }: { params: Promise<{
       <SectionTitle>Draft Picks</SectionTitle>
       <Card bodyClassName="p-0">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[820px]">
+          <table className={`w-full text-sm ${admin ? "min-w-[820px]" : "min-w-[700px]"}`}>
             <thead>
               <tr className="border-b border-slate-800 text-slate-500 text-xs uppercase tracking-wider bg-slate-800/30">
                 <th className="px-4 py-3 text-left font-medium w-16">Year</th>
                 {[1, 2, 3, 4, 5, 6, 7].map((r) => <th key={r} className="px-2 py-3 text-center font-medium">Round {r}</th>)}
-                <th className="px-2 py-3 text-center font-medium text-amber-400/80 border-l border-slate-800">★ Bonus picks</th>
+                {admin && <th className="px-2 py-3 text-center font-medium text-amber-400/80 border-l border-slate-800">★ Bonus picks</th>}
               </tr>
             </thead>
             <tbody>
@@ -94,7 +97,7 @@ export default async function TeamDraftPicksPage({ params }: { params: Promise<{
                       </td>
                     );
                   })}
-                  <td className="px-2 py-3 text-center border-l border-slate-800">
+                  {admin && <td className="px-2 py-3 text-center border-l border-slate-800">
                     <div className="flex items-center justify-center gap-1.5 flex-wrap">
                       {(bonusByYear.get(year) ?? []).map((b) => (
                         <span key={b.id} title={b.reason ?? "Bonus pick"}
@@ -105,7 +108,7 @@ export default async function TeamDraftPicksPage({ params }: { params: Promise<{
                       ))}
                       {!bonusByYear.get(year)?.length && <span className="text-slate-700">—</span>}
                     </div>
-                  </td>
+                  </td>}
                 </tr>
               ))}
             </tbody>
