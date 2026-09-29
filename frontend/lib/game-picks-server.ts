@@ -33,20 +33,6 @@ export async function getOrCreateGamePicksConfig(season = REGULAR_SEASON, league
   });
 
   if (!config) {
-    // Find next upcoming scheduled games
-    const upcomingGames = await prisma.game.findMany({
-      where: { season, league, seriesId: null, status: "SCHEDULED" },
-      orderBy: [{ round: "asc" }, { gameDate: "asc" }, { id: "asc" }],
-      take: 20,
-      select: { id: true, homeTeamId: true, awayTeamId: true, gameDate: true, round: true },
-    });
-
-    const earliestRound = upcomingGames[0]?.round ?? 1;
-    const currentRoundGames = upcomingGames.filter((g) => g.round === earliestRound);
-    const featuredGameIds = currentRoundGames.map((g) => g.id);
-    const gameOfTheWeekId = currentRoundGames[0]?.id ?? upcomingGames[0]?.id ?? null;
-
-    // Get bottom 40% teams by standings / initial ranking as upset eligible
     const allTeams = await prisma.team.findMany({
       where: { league, isAffiliate: false },
       select: { id: true },
@@ -57,10 +43,10 @@ export async function getOrCreateGamePicksConfig(season = REGULAR_SEASON, league
       data: {
         season,
         league,
-        featuredGameIds,
-        gameOfTheWeekId,
+        featuredGameIds: [],
+        gameOfTheWeekId: null,
         upsetTeamIds,
-        activeWeek: Math.max(1, Math.ceil(earliestRound / 7)),
+        activeWeek: 1,
         rivalPairings: [],
       },
     });
@@ -101,8 +87,41 @@ export async function getOrCreateGamePicksProfile(teamId: number, season = REGUL
   return profile;
 }
 
+/** Fetch live real NHL schedule from api-web.nhle.com with local database fallback */
+async function fetchRealNhlSchedule(): Promise<any[]> {
+  try {
+    const res = await fetch("https://api-web.nhle.com/v1/schedule/now", {
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const games: any[] = [];
+
+    const gameWeeks = data.gameWeek || [];
+    for (const week of gameWeeks) {
+      for (const g of week.games || []) {
+        games.push({
+          id: g.id,
+          startTimeUTC: g.startTimeUTC,
+          gameDate: g.startTimeUTC ? new Date(g.startTimeUTC) : null,
+          gameState: g.gameState,
+          homeAbbrev: g.homeTeam?.abbrev,
+          awayAbbrev: g.awayTeam?.abbrev,
+          homeScore: g.homeTeam?.score ?? null,
+          awayScore: g.awayTeam?.score ?? null,
+          venue: g.venue?.default || "NHL Arena",
+        });
+      }
+    }
+    return games;
+  } catch (err) {
+    console.warn("Failed to fetch real NHL schedule from api-web.nhle.com:", err);
+    return [];
+  }
+}
+
 export async function getGamePicksData(season = REGULAR_SEASON, league = "NHL", viewerTeamId?: number | null) {
-  const [config, teams, players, allProfiles] = await Promise.all([
+  const [config, teams, players, allProfiles, realNhlGames] = await Promise.all([
     getOrCreateGamePicksConfig(season, league),
     prisma.team.findMany({
       where: { league, isAffiliate: false },
@@ -151,80 +170,94 @@ export async function getGamePicksData(season = REGULAR_SEASON, league = "NHL", 
       },
       orderBy: [{ totalPoints: "desc" }, { bestStreak: "desc" }],
     }),
+    fetchRealNhlSchedule(),
   ]);
 
-  // Load upcoming scheduled games
-  const upcomingGames = await prisma.game.findMany({
-    where: {
-      season,
-      league,
-      seriesId: null,
-      status: "SCHEDULED",
-    },
-    take: 35,
-    orderBy: [{ round: "asc" }, { gameDate: "asc" }, { id: "asc" }],
-    include: {
-      homeTeam: { select: { id: true, name: true, code: true, logoUrl: true } },
-      awayTeam: { select: { id: true, name: true, code: true, logoUrl: true } },
-      goalEvents: {
-        orderBy: [{ period: "asc" }, { seconds: "asc" }, { id: "asc" }],
-        take: 1,
-      },
-      playerStats: {
-        orderBy: [{ points: "desc" }, { goals: "desc" }],
-        take: 3,
-      },
-    },
-  });
-
-  // Load recent final games for results display
-  const recentFinalGames = await prisma.game.findMany({
-    where: {
-      season,
-      league,
-      seriesId: null,
-      status: "FINAL",
-    },
-    take: 15,
-    orderBy: [{ round: "desc" }, { gameDate: "desc" }, { id: "desc" }],
-    include: {
-      homeTeam: { select: { id: true, name: true, code: true, logoUrl: true } },
-      awayTeam: { select: { id: true, name: true, code: true, logoUrl: true } },
-      goalEvents: {
-        orderBy: [{ period: "asc" }, { seconds: "asc" }, { id: "asc" }],
-        take: 1,
-      },
-      playerStats: {
-        orderBy: [{ points: "desc" }, { goals: "desc" }],
-        take: 3,
-      },
-    },
-  });
+  const teamByCode = new Map<string, typeof teams[0]>();
+  for (const tm of teams) {
+    if (tm.code) teamByCode.set(tm.code.toUpperCase(), tm);
+    if (tm.name) teamByCode.set(tm.name.toUpperCase(), tm);
+  }
 
   const now = new Date();
+  let mappedGames: any[] = [];
 
-  // Determine active upcoming round
-  const activeRound = upcomingGames[0]?.round ?? null;
-  const activeRoundGames = activeRound !== null ? upcomingGames.filter((g) => g.round === activeRound) : upcomingGames.slice(0, 5);
+  // Map real NHL schedule games to our teams
+  if (realNhlGames.length > 0) {
+    mappedGames = realNhlGames
+      .map((rg, idx) => {
+        const homeTm = teamByCode.get(rg.homeAbbrev?.toUpperCase());
+        const awayTm = teamByCode.get(rg.awayAbbrev?.toUpperCase());
 
-  // If featuredGameIds has no games or only FINAL games, auto-select current active round games
-  let featuredIds = (config.featuredGameIds || []).filter((id) =>
-    upcomingGames.some((g) => g.id === id)
-  );
-  if (featuredIds.length === 0) {
-    featuredIds = activeRoundGames.map((g) => g.id);
+        if (!homeTm || !awayTm) return null;
+
+        const isFinal = rg.gameState === "FINAL" || rg.gameState === "OFF";
+        const isLocked = isFinal || (rg.gameDate ? now > rg.gameDate : false);
+
+        let winnerTeamId: number | null = null;
+        if (isFinal && typeof rg.homeScore === "number" && typeof rg.awayScore === "number") {
+          winnerTeamId = rg.homeScore > rg.awayScore ? homeTm.id : awayTm.id;
+        }
+
+        return {
+          id: rg.id,
+          season,
+          league,
+          round: 1,
+          gameDate: rg.gameDate,
+          status: isFinal ? "FINAL" : "SCHEDULED",
+          homeTeamId: homeTm.id,
+          awayTeamId: awayTm.id,
+          homeTeam: homeTm,
+          awayTeam: awayTm,
+          homeGoals: rg.homeScore,
+          awayGoals: rg.awayScore,
+          winnerTeamId,
+          isLocked,
+          isHomeUpset: config.upsetTeamIds.includes(homeTm.id),
+          isAwayUpset: config.upsetTeamIds.includes(awayTm.id),
+        };
+      })
+      .filter(Boolean);
   }
 
-  // If gameOfTheWeekId is null or already FINAL, auto-select from upcoming
-  let gotwId = config.gameOfTheWeekId;
-  if (!gotwId || !upcomingGames.some((g) => g.id === gotwId)) {
-    gotwId = activeRoundGames[0]?.id ?? upcomingGames[0]?.id ?? null;
+  // Fallback: If NHL API returned nothing, use database scheduled games
+  if (mappedGames.length === 0) {
+    const dbGames = await prisma.game.findMany({
+      where: { season, league, seriesId: null, status: "SCHEDULED" },
+      take: 20,
+      orderBy: [{ round: "asc" }, { gameDate: "asc" }, { id: "asc" }],
+      include: {
+        homeTeam: { select: { id: true, name: true, code: true, logoUrl: true, gm: true, gmNickname: true } },
+        awayTeam: { select: { id: true, name: true, code: true, logoUrl: true, gm: true, gmNickname: true } },
+      },
+    });
+
+    mappedGames = dbGames.map((g) => ({
+      ...g,
+      isLocked: g.status === "FINAL" || (g.gameDate ? now > g.gameDate : false),
+      isHomeUpset: config.upsetTeamIds.includes(g.homeTeamId),
+      isAwayUpset: config.upsetTeamIds.includes(g.awayTeamId),
+    }));
   }
 
-  const allGames = [...upcomingGames, ...recentFinalGames];
-  const allGameIds = allGames.map((g) => g.id);
+  // Identify today's games (within the active game night / 20 hours from first scheduled game)
+  const scheduledGames = mappedGames.filter((g) => g.status === "SCHEDULED");
+  const firstGameTime = scheduledGames[0]?.gameDate ? new Date(scheduledGames[0].gameDate).getTime() : now.getTime();
+  const gameNightEndTime = firstGameTime + 20 * 60 * 60 * 1000;
 
-  // Load viewer submissions
+  const todayGames = scheduledGames.filter((g) => {
+    if (!g.gameDate) return true;
+    const gTime = new Date(g.gameDate).getTime();
+    return gTime >= firstGameTime - 2 * 60 * 60 * 1000 && gTime <= gameNightEndTime;
+  });
+
+  // Marquee match of the week (Game of the Week)
+  const gotwId = config.gameOfTheWeekId || todayGames[0]?.id || scheduledGames[0]?.id || mappedGames[0]?.id;
+
+  const allGameIds = mappedGames.map((g) => g.id);
+
+  // Load viewer submissions for these real games
   const viewerSubmissions = viewerTeamId
     ? await prisma.gamePickSubmission.findMany({
         where: {
@@ -238,83 +271,69 @@ export async function getGamePicksData(season = REGULAR_SEASON, league = "NHL", 
 
   const viewerProfile = viewerTeamId ? await getOrCreateGamePicksProfile(viewerTeamId, season, league) : null;
 
-  // Identify Rival for viewerTeam if pairings exist
-  let currentRival: any = null;
-  const pairings = (config.rivalPairings as RivalPairing[]) || [];
-  if (viewerTeamId && pairings.length > 0) {
-    const p = pairings.find((pair) => pair.teamAId === viewerTeamId || pair.teamBId === viewerTeamId);
-    if (p) {
-      const rivalId = p.teamAId === viewerTeamId ? p.teamBId : p.teamAId;
-      const rivalTeam = teams.find((t) => t.id === rivalId);
-      const rivalProfile = allProfiles.find((ap) => ap.teamId === rivalId);
-      const duelGames = allGames.filter((g) => p.gameIds.includes(g.id));
-
-      currentRival = {
-        week: p.week,
-        rivalTeam,
-        rivalProfile,
-        duelGames,
-      };
-    }
-  }
-
   return {
     config: {
       ...config,
-      featuredGameIds: featuredIds,
       gameOfTheWeekId: gotwId,
-      activeRound,
     },
     teams,
     players,
-    games: allGames.map((g) => ({
+    games: mappedGames.map((g) => ({
       ...g,
-      isLocked: g.status === "FINAL" || (g.gameDate ? now > g.gameDate : false),
       isGameOfTheWeek: g.id === gotwId,
-      isFeatured: featuredIds.includes(g.id) || g.round === activeRound,
-      isHomeUpset: config.upsetTeamIds.includes(g.homeTeamId),
-      isAwayUpset: config.upsetTeamIds.includes(g.awayTeamId),
+      isFeatured: todayGames.some((tg) => tg.id === g.id),
     })),
     viewerProfile,
     viewerSubmissions,
     leaderboard: allProfiles,
-    currentRival,
+    currentRival: null,
   };
 }
 
 export async function evaluateGamePicks(season = REGULAR_SEASON, league = "NHL") {
   const config = await getOrCreateGamePicksConfig(season, league);
 
-  // Find all evaluated final games
-  const finalGames = await prisma.game.findMany({
-    where: { season, league, status: "FINAL" },
-    include: {
-      goalEvents: {
-        orderBy: [{ period: "asc" }, { seconds: "asc" }, { id: "asc" }],
-      },
-      playerStats: {
-        orderBy: [{ points: "desc" }, { goals: "desc" }],
-      },
-    },
-  });
-
-  const finalGameMap = new Map(finalGames.map((g) => [g.id, g]));
-
-  // Find all un-evaluated submissions for final games
+  // Find all un-evaluated submissions
   const pendingSubmissions = await prisma.gamePickSubmission.findMany({
     where: {
       season,
       league,
-      gameId: { in: Array.from(finalGameMap.keys()) },
       isEvaluated: false,
     },
   });
 
   if (pendingSubmissions.length === 0) {
-    return { evaluatedCount: 0, message: "Žiadne nové zápasy na vyhodnotenie." };
+    return { evaluatedCount: 0, message: "Žiadne nové tipy na vyhodnotenie." };
   }
 
-  // Group submissions by teamId
+  // Fetch real score data from NHL API for pending games
+  const realScoreData: Record<number, any> = {};
+  const gameIds = Array.from(new Set(pendingSubmissions.map((s) => s.gameId)));
+
+  for (const gId of gameIds) {
+    try {
+      const res = await fetch(`https://api-web.nhle.com/v1/gamecenter/${gId}/landing`);
+      if (res.ok) {
+        const d = await res.json();
+        if (d.gameState === "FINAL" || d.gameState === "OFF") {
+          realScoreData[gId] = d;
+        }
+      }
+    } catch {
+      // Ignore network errors on single games
+    }
+  }
+
+  // Also check database for finished games
+  const dbFinalGames = await prisma.game.findMany({
+    where: { id: { in: gameIds }, status: "FINAL" },
+    include: {
+      goalEvents: { orderBy: [{ period: "asc" }, { seconds: "asc" }, { id: "asc" }] },
+      playerStats: { orderBy: [{ points: "desc" }, { goals: "desc" }] },
+    },
+  });
+  const dbGameMap = new Map(dbFinalGames.map((g) => [g.id, g]));
+
   const subsByTeam = new Map<number, typeof pendingSubmissions>();
   for (const s of pendingSubmissions) {
     if (!subsByTeam.has(s.teamId)) subsByTeam.set(s.teamId, []);
@@ -333,102 +352,83 @@ export async function evaluateGamePicks(season = REGULAR_SEASON, league = "NHL")
     const monthlyMap: Record<string, number> = (profile.monthlyPoints as Record<string, number>) || {};
 
     for (const sub of subs) {
-      const game = finalGameMap.get(sub.gameId);
-      if (!game) continue;
+      const realData = realScoreData[sub.gameId];
+      const dbGame = dbGameMap.get(sub.gameId);
+
+      if (!realData && !dbGame) continue; // Game not finished yet
 
       let subPoints = 0;
       const breakdown: Record<string, any> = {};
-
-      const realWinner = game.winnerTeamId;
-      const isWinnerCorrect = sub.winnerTeamId && realWinner && sub.winnerTeamId === realWinner;
-
       const multiplier = sub.isJoker ? 3 : 1;
       if (sub.isJoker) jokersUsed = Math.min(5, jokersUsed + 1);
 
-      // 1. Regular Pick / Game of the Day
-      if (!sub.isGameOfTheWeek) {
+      let isWinnerCorrect = false;
+
+      // Evaluate from Real NHL API Data
+      if (realData) {
+        const homeScore = realData.homeTeam?.score ?? 0;
+        const awayScore = realData.awayTeam?.score ?? 0;
+        const homeTeamCode = realData.homeTeam?.abbrev;
+        const awayTeamCode = realData.awayTeam?.abbrev;
+
+        const homeTm = await prisma.team.findFirst({ where: { code: homeTeamCode, league } });
+        const awayTm = await prisma.team.findFirst({ where: { code: awayTeamCode, league } });
+
+        const realWinnerId = homeScore > awayScore ? homeTm?.id : awayTm?.id;
+        isWinnerCorrect = Boolean(sub.winnerTeamId && realWinnerId && sub.winnerTeamId === realWinnerId);
+
+        if (!sub.isGameOfTheWeek) {
+          if (isWinnerCorrect) {
+            const conf = sub.confidence || 2;
+            const pts = conf * multiplier;
+            subPoints += pts;
+            breakdown.winner = { correct: true, points: pts, conf, multiplier };
+
+            if (sub.isUpsetPick && config.upsetTeamIds.includes(sub.winnerTeamId!)) {
+              subPoints += 5;
+              breakdown.upset = { correct: true, points: 5 };
+            }
+
+            currentStreak++;
+            if (currentStreak === 3) subPoints += 2;
+            else if (currentStreak === 5) subPoints += 5;
+            else if (currentStreak === 10) subPoints += 15;
+            bestStreak = Math.max(bestStreak, currentStreak);
+          } else {
+            breakdown.winner = { correct: false, points: 0 };
+            currentStreak = 0;
+          }
+        } else {
+          // Game of the Week
+          let gotwPts = 0;
+          if (isWinnerCorrect) {
+            gotwPts += 2;
+            breakdown.gotwWinner = { correct: true, points: 2 };
+          }
+          if (sub.predictedScore) {
+            const clean = sub.predictedScore.trim().replace(/\s+/g, "");
+            if (clean === `${homeScore}:${awayScore}` || clean === `${awayScore}:${homeScore}`) {
+              gotwPts += 5;
+              breakdown.gotwScore = { correct: true, points: 5 };
+            }
+          }
+          subPoints += gotwPts * multiplier;
+          if (isWinnerCorrect) {
+            currentStreak++;
+            bestStreak = Math.max(bestStreak, currentStreak);
+          } else {
+            currentStreak = 0;
+          }
+        }
+      } else if (dbGame) {
+        // Fallback DB game evaluation
+        const realWinner = dbGame.winnerTeamId;
+        isWinnerCorrect = Boolean(sub.winnerTeamId && realWinner && sub.winnerTeamId === realWinner);
+
         if (isWinnerCorrect) {
           const conf = sub.confidence || 2;
           const pts = conf * multiplier;
           subPoints += pts;
-          breakdown.winner = { correct: true, points: pts, conf, multiplier };
-
-          // Upset Bonus (+5 b)
-          if (sub.isUpsetPick && config.upsetTeamIds.includes(sub.winnerTeamId!)) {
-            subPoints += 5;
-            breakdown.upset = { correct: true, points: 5 };
-          }
-
-          // Streak increment
-          currentStreak++;
-          if (currentStreak === 3) {
-            subPoints += 2;
-            breakdown.streakBonus = { streak: 3, points: 2 };
-          } else if (currentStreak === 5) {
-            subPoints += 5;
-            breakdown.streakBonus = { streak: 5, points: 5 };
-          } else if (currentStreak === 10) {
-            subPoints += 15;
-            breakdown.streakBonus = { streak: 10, points: 15 };
-          }
-          bestStreak = Math.max(bestStreak, currentStreak);
-        } else {
-          breakdown.winner = { correct: false, points: 0 };
-          currentStreak = 0; // Streak reset
-        }
-      } else {
-        // 2. Game of the Week (Max 15 b * multiplier)
-        let gotwPoints = 0;
-
-        // Winner (+2 b)
-        if (isWinnerCorrect) {
-          gotwPoints += 2;
-          breakdown.gotwWinner = { correct: true, points: 2 };
-        }
-
-        // Exact Score (+5 b)
-        if (sub.predictedScore) {
-          const cleanPick = sub.predictedScore.trim().replace(/\s+/g, "");
-          const realScoreA = `${game.homeGoals}:${game.awayGoals}`;
-          const realScoreB = `${game.awayGoals}:${game.homeGoals}`;
-          if (cleanPick === realScoreA || cleanPick === realScoreB) {
-            gotwPoints += 5;
-            breakdown.gotwScore = { correct: true, points: 5 };
-          }
-        }
-
-        // First Goal Scorer (+5 b)
-        if (sub.firstGoalScorerId || sub.firstGoalScorerName) {
-          const firstGoal = game.goalEvents[0];
-          if (firstGoal) {
-            const matched =
-              (sub.firstGoalScorerId && sub.firstGoalScorerId === firstGoal.scorerId) ||
-              (sub.firstGoalScorerName &&
-                firstGoal.scorerName &&
-                sub.firstGoalScorerName.toLowerCase() === firstGoal.scorerName.toLowerCase());
-            if (matched) {
-              gotwPoints += 5;
-              breakdown.gotwFirstGoal = { correct: true, points: 5 };
-            }
-          }
-        }
-
-        // Top Scorer in game (+3 b)
-        if (sub.topScorerPlayerId || sub.topScorerPlayerName) {
-          const topStat = game.playerStats[0];
-          if (topStat) {
-            const matched = sub.topScorerPlayerId && sub.topScorerPlayerId === topStat.playerId;
-            if (matched) {
-              gotwPoints += 3;
-              breakdown.gotwTopScorer = { correct: true, points: 3 };
-            }
-          }
-        }
-
-        subPoints += gotwPoints * multiplier;
-        breakdown.gotwMultiplier = multiplier;
-
-        if (isWinnerCorrect) {
           currentStreak++;
           bestStreak = Math.max(bestStreak, currentStreak);
         } else {
@@ -436,7 +436,6 @@ export async function evaluateGamePicks(season = REGULAR_SEASON, league = "NHL")
         }
       }
 
-      // Update submission record
       await prisma.gamePickSubmission.update({
         where: { id: sub.id },
         data: {
@@ -449,12 +448,10 @@ export async function evaluateGamePicks(season = REGULAR_SEASON, league = "NHL")
       pointsToAdd += subPoints;
       evaluatedTotal++;
 
-      // Monthly points accumulation
-      const monthKey = game.gameDate ? game.gameDate.toISOString().slice(0, 7) : "2026-10";
+      const monthKey = new Date().toISOString().slice(0, 7);
       monthlyMap[monthKey] = (monthlyMap[monthKey] || 0) + subPoints;
     }
 
-    // Update GM Profile
     await prisma.gamePicksProfile.update({
       where: { id: profile.id },
       data: {
@@ -469,6 +466,6 @@ export async function evaluateGamePicks(season = REGULAR_SEASON, league = "NHL")
 
   return {
     evaluatedCount: evaluatedTotal,
-    message: `Úspešne vyhodnotených ${evaluatedTotal} tipov na zápasy.`,
+    message: `Úspešne vyhodnotených ${evaluatedTotal} tipov na zápasy podľa výsledkov NHL.`,
   };
 }
