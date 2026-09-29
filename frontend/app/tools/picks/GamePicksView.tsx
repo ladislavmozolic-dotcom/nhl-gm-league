@@ -1031,16 +1031,74 @@ export default function GamePicksView({
 
           <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
             <h3 className="text-sm font-bold text-emerald-300 flex items-center gap-2">
-              <span>⚡ Série (Streaks) & 🥇 Mesační Šampióni</span>
+              <span>⚡ Série (Streaks) & 📅 Mesačné Súťaže</span>
             </h3>
             <ul className="list-disc list-inside text-slate-400 space-y-1.5">
               <li>3 správne tipy v rade = <strong className="text-white">+2 bonusové body</strong></li>
               <li>5 správnych tipov v rade = <strong className="text-white">+5 bonusových bodov</strong></li>
               <li>10 správnych tipov v rade = <strong className="text-white">+15 bonusových bodov</strong></li>
               <li>
-                Najlepší tipér každého kalendárneho mesiaca získa <strong className="text-amber-300">+10 Season Points</strong> a prestížny odznak 🥇.
+                <strong className="text-white">Mesačný Šampión:</strong> Víťaz mesiaca získa <strong className="text-amber-300">+10 bodov</strong> do celkovej tabuľky, <strong className="text-emerald-400">+$250,000</strong> do klubovej kasy a odznak 🥇 na profile.
               </li>
             </ul>
+          </div>
+
+          {/* REWARDS SECTION */}
+          <div className="md:col-span-2 p-6 rounded-2xl bg-gradient-to-br from-amber-950/30 via-slate-900 to-indigo-950/40 border border-amber-500/30 space-y-4 shadow-xl">
+            <div className="flex items-center gap-3 border-b border-amber-500/20 pb-3">
+              <span className="text-2xl">🎁</span>
+              <div>
+                <h3 className="text-base font-bold text-white">Oficiálne Odmeny pre Víťazov Tipovačky (Ceny, Draft Picky & Financie)</h3>
+                <p className="text-xs text-slate-400">
+                  Na konci sezóny sa po sčítaní Game Picks a Season Picks udelia špičkovým tipérom tieto klubové bonusy:
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* 1st Place */}
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-amber-500/40 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xl">🥇 1. Miesto</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold">Šampión</span>
+                </div>
+                <div className="text-lg font-black text-amber-300">+$3,000,000</div>
+                <ul className="text-slate-300 space-y-1 text-[11px]">
+                  <li>🎟️ <strong>Draft Pick v 8. kole</strong> (alebo 9. kole pri zaplnení)</li>
+                  <li>🥇 Zlatý odznak <strong>Season Predictor Champion</strong></li>
+                </ul>
+              </div>
+
+              {/* 2nd Place */}
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-700 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xl">🥈 2. Miesto</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-500/20 text-slate-300 font-bold">Vicemajster</span>
+                </div>
+                <div className="text-lg font-black text-slate-200">+$1,500,000</div>
+                <ul className="text-slate-300 space-y-1 text-[11px]">
+                  <li>🎟️ <strong>Draft Pick v 8. kole</strong> (alebo 9. kole pri zaplnení)</li>
+                  <li>🥈 Strieborný odznak <strong>Vice-Champion</strong></li>
+                </ul>
+              </div>
+
+              {/* 3rd Place */}
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-amber-700/40 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xl">🥉 3. Miesto</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-700/20 text-amber-400 font-bold">3. Miesto</span>
+                </div>
+                <div className="text-lg font-black text-amber-400">+$750,000</div>
+                <ul className="text-slate-300 space-y-1 text-[11px]">
+                  <li>🥉 Bronzový odznak <strong>3rd Place</strong></li>
+                  <li>💵 Finančná injekcia do klubovej kasy</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="text-[11px] text-slate-400 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+              ℹ️ <strong>Pravidlo pre Draft Picky:</strong> Bonusové draft picky sa generujú do <strong>8. kola</strong> draftu nováčikov. V prípade, že je v 8. kole už obsadených všetkých 32 pozícií, pick sa automaticky zapíše do <strong>9. kola</strong>.
+            </div>
           </div>
         </div>
       )}

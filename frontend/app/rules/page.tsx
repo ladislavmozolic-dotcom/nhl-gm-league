@@ -342,6 +342,27 @@ const SECTIONS: Sec[] = [
       ] },
     ],
   },
+  {
+    id: "predictor", title: "17 · Predictor League & Rewards",
+    intro: "The UNHL Predictor competition combines daily NHL Game Picks and Season-Long Predictions with tangible club rewards.",
+    groups: [
+      { h: "Daily Games & Game of the Week", points: [
+        "Daily Games (2 points per correct pick): every game night features official NHL games. Correctly picking the match winner earns 2 points (or 6 points with Joker ×3).",
+        "Game of the Week (up to 15 points): one marquee clash each week. Winner (2b), Exact score (5b), First goal scorer (5b), and Player with most points in game (3b). With Joker activated: up to 45 points.",
+        "5 Jokers per season: can be deployed on any game to multiply all points earned from that game ×3.",
+        "Streaks: winning streaks award bonus points (3 in a row = +2b, 5 in a row = +5b, 10 in a row = +15b).",
+      ] },
+      { h: "Monthly Champions", points: [
+        "The top predictor in each calendar month (October through April) receives +10 bonus Season Points, a +$250,000 cash injection into the team bank account, and a 🥇 Monthly Champion badge.",
+      ] },
+      { h: "End-of-Season Prizes & Draft Picks", points: [
+        "1st Place (Season Champion): +$3,000,000 to club bank, bonus Entry Draft Pick in the 8th round (or 9th round if the 8th round is full with 32 picks), and 🥇 Season Predictor Champion gold profile badge.",
+        "2nd Place: +$1,500,000 to club bank, bonus Entry Draft Pick in the 8th round (or 9th round if full), and 🥈 Silver profile badge.",
+        "3rd Place: +$750,000 to club bank and 🥉 Bronze profile badge.",
+        "Draft Pick Allocation Rule: All bonus draft picks won through the predictor competition are placed into the 8th round of the Entry Draft. In case the 8th round has already reached its 32-team capacity, picks automatically slide into the 9th round.",
+      ] },
+    ],
+  },
 ];
 
 // ---- Czech rulebook (shown when the site language is Czech) ------------------
@@ -620,6 +641,27 @@ const SECTIONS_CS: Sec[] = [
         "Shoda archetypu podle sestavy porovnává reálný skautský TYP každého hráče — stejný štítek, jaký je vidět na jeho profilové stránce („Sniper”, „Playmaker”, „Dual-Threat”, „Two-Way Forward”, „Defensive Forward”, „Forechecker / Grinder”, „Offensive/Two-Way/Defensive/Stay-at-Home Defenceman” atd.) — s tím, co konkrétní post v sestavě opravdu chce, místo aby se každá lajna/pár hodnotily stejně bez ohledu na to, kde v sestavě sedí. 1. a 2. útočná lajna chtějí kvalitu („Sniper”, „Playmaker”, „Dual-Threat”, „Offensive Forward”) — i silový „Forechecker / Grinder”, který má pořád reálnou ofenzivu (klasifikátor ho zařadí jako dříče jen proto, že důraz mírně převáží nad ofenzivou, ne že by ji neměl), se tam počítá jako skutečný přínos, na OBOU útočných lajnách, ne jen tolerovaný; 3. lajna chce mix „Two-Way”/„Defensive”/„Grinder”; 4. lajna vyloženě chce typy „Forechecker / Grinder” a „Defensive Forward” — skutečnou obrannou/energetickou jednotku, ne zředěnou útočnou lajnu. Obránecké páry kopírují reálné rozdělení: první pár zůstává flexibilní (už je odměněn za mix ofenzivy/defenzivy Shodou rolí výše), druhý pár chce defenzivní sklon, a třetí pár vyloženě upřednostňuje skutečného „Stay-at-Home Defenceman” před pouhým „Defensive Defenceman” (ten dostane jen poloviční uznání) — takže vychází výrazně DEFENZIVNĚJŠÍ než druhý pár, ne jen podobně defenzivní. Lajna bez klasifikovatelných hráčů (chybí dost hodnocení) se v této složce hodnotí neutrálně, ne trestá.",
         "Právě složka Shody systému způsobuje, že Tactical Fit reaguje na Taktiku: lajna poskládaná z hráčů, kteří jednotlivě sedí na váš zvolený systém (rychlí dokončovatelé na Rush týmu, silní přihrávači na cyklovacím týmu), vyjde lépe než stejně rolově vyvážená lajna, která na systém nesedí — a tým hrající výchozí Vyvážený systém touto složkou vůbec neovlivní (Shoda systému je neutrální, ×1,0), takže Tactical Fit se zredukuje na Shodu rolí × post/hokejku × Shodu archetypu podle sestavy, dokud se stránky Taktika vůbec nedotknete.",
         "Tactical Fit je plánovací/zobrazovací číslo, ne to, co si sama simulace účtuje každý zápas: promítá se jen do PROJEKTOVANÉ startovní chemie, na které čerstvě sestavený nebo právě přeskládaný svazek začíná (dobře poskládaná, dobře sedící lajna má projektovanou teplejší startovní chemii, než má za sebou jediný společný zápas) — viz „proj” výše. Skutečný postih ve hře za jednotku s duplicitními rolemi jde čistě ze Shody rolí, kterou aplikuje přímo simulace; skutečný efekt Shody systému je taky samostatný — uplatňuje se na úrovni celé SOUPISKY (ne po lajnách), kde škáluje reálné přínosy a náklady vašeho týmového systému během odsimulovaných zápasů, jak je popsáno výše. Shoda archetypu podle sestavy se — stejně jako správnost postu a hokejky — promítá jen do projektované startovní chemie, není to samostatný postih ve hře.",
+      ] },
+    ],
+  },
+  {
+    id: "predictor", title: "17 · Tipovacia liga & Odmeny (Picks & Rewards)",
+    intro: "Súťaž UNHL Predictor spája každodennú zápasovú tipovačku (Game Picks) a celosezónne tipy (Season Picks) s reálnymi klubovými odmenami.",
+    groups: [
+      { h: "Zápasy dňa a Zápas týždňa (Game of the Week)", points: [
+        "Zápasy dňa (2 body za správny tip): každý hrací deň systém vyberie oficiálne zápasy NHL. Za správny tip na víťaza získate 2 body (s Jokerom ×3 až 6 bodov).",
+        "Zápas týždňa / Game of the Week (až 15 bodov): jeden hlavný šláger týždňa. Tipuje sa víťaz (2b), presné skóre (5b), prvý strelec zápasu (5b) a najproduktívnejší hráč zápasu (3b). S Jokerom až 45 bodov!",
+        "5 Jokerov na celú sezónu: násobí všetky získané body z daného zápasu ×3.",
+        "Série (Streaks): 3 správne tipy v rade = +2b, 5 v rade = +5b, 10 v rade = +15b.",
+      ] },
+      { h: "Mesační šampióni", points: [
+        "Najlepší tipér každého kalendárneho mesiaca (október až apríl) získa +10 bonusových bodov do celkového poradia, finančnú injekciu +$250,000 do klubovej kasy a odznak 🥇 Monthly Champion na profile.",
+      ] },
+      { h: "Celosezónne odmeny & Draftové picky", points: [
+        "1. miesto (Šampión tipovačky): finančný bonus +$3,000,000, bonusový Entry Draft Pick v 8. kole (alebo v 9. kole pri zaplnení 32 miest v 8. kole) a zlatý profilový odznak 🥇 Season Predictor Champion.",
+        "2. miesto: finančný bonus +$1,500,000, bonusový Entry Draft Pick v 8. kole (alebo v 9. kole) a strieborný odznak 🥈 Vice-Champion.",
+        "3. miesto: finančný bonus +$750,000 a bronzový odznak 🥉 3rd Place.",
+        "Pravidlo pre prideľovanie draftových pickov: Všetky extra draftové picky získané z tipovačky sa umiestňujú do 8. kola vstupného draftu nováčikov. V prípade, že je 8. kolo už kompletne zaplnené 32 pozíciami, pick sa automaticky zapíše do 9. kola.",
       ] },
     ],
   },

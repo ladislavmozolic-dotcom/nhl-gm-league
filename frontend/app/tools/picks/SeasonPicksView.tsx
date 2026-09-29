@@ -1406,6 +1406,30 @@ export default function SeasonPicksView({
             </div>
           </div>
 
+          {/* REWARDS SUMMARY CARDS */}
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-950/20 via-slate-950 to-indigo-950/30 border border-amber-500/20 space-y-3">
+            <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
+              <span>🎁 Odmeny pre top 3 tipérov sezóny:</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+              <div className="p-2.5 rounded-xl bg-slate-900/90 border border-amber-500/30">
+                <span className="font-bold text-amber-300">🥇 1. miesto:</span>{" "}
+                <strong className="text-white">+$3,000,000</strong> + 🎟️ <strong>8. kolo draft pick</strong> + Zlatý odznak
+              </div>
+              <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-700">
+                <span className="font-bold text-slate-300">🥈 2. miesto:</span>{" "}
+                <strong className="text-white">+$1,500,000</strong> + 🎟️ <strong>8. kolo draft pick</strong> + Strieborný odznak
+              </div>
+              <div className="p-2.5 rounded-xl bg-slate-900/90 border border-amber-700/30">
+                <span className="font-bold text-amber-400">🥉 3. miesto:</span>{" "}
+                <strong className="text-white">+$750,000</strong> + Bronzový odznak
+              </div>
+            </div>
+            <div className="text-[10px] text-slate-400">
+              * Draft picky sa zapisujú do 8. kola draftu (ak je 32 pozícií plných, automaticky do 9. kola).
+            </div>
+          </div>
+
           {submissions.length === 0 ? (
             <div className="text-center py-12 text-slate-400">
               Zatiaľ neboli odoslané žiadne tipy.
