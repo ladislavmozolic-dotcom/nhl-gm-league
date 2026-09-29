@@ -2,25 +2,17 @@
  * EliteProspects scraper bridge for the UNHL server.
  *
  * Direct fetch() calls to EP return HTTP 403 (Cloudflare Bot Management).
- * Python's urllib with a browser User-Agent gets through → we spawn a tiny
- * Python helper script (`lib/ep-scraper.py`) on the server and collect its
- * JSON output via child_process.
+ * Python's urllib with a browser User-Agent gets through on the VPS host —
+ * we call a tiny Python HTTP server (ep-scraper-server.py) running on the host
+ * via http://host.docker.internal:3333/scrape (accessible from Docker container).
+ *
+ * The Python server runs outside Docker (on the VPS host) so it uses the host's
+ * Python 3.14 which has a different TLS fingerprint that Cloudflare accepts.
  *
  * Usage:
  *   const result = await scrapeEpPlayer("https://www.eliteprospects.com/player/526036");
  *   if (result.success && result.season2627) { ... }
  */
-
-import { exec } from "child_process";
-import path from "path";
-import { promisify } from "util";
-
-const execAsync = promisify(exec);
-
-// Path to the Python scraper, resolved relative to this file's directory at runtime.
-// In production the app lives at /app (inside Docker); in dev it's the repo root.
-// We use process.cwd() which reliably points to /app in Docker (Next.js sets it).
-const SCRAPER_PATH = path.join(process.cwd(), "lib", "ep-scraper.py");
 
 export type EpSeason2627 = {
   teamName: string | null;
@@ -52,11 +44,23 @@ export type EpPlayerResult = {
   error: string;
 };
 
+// The EP scraper server runs on the VPS host outside Docker.
+// Docker containers can reach the host via host.docker.internal on Linux with --add-host
+// OR via the docker bridge gateway IP (172.17.0.1 by default).
+// We try host.docker.internal first, fall back to the Docker bridge gateway.
+const EP_SCRAPER_URLS = [
+  "http://host.docker.internal:3333/scrape",
+  "http://172.17.0.1:3333/scrape",
+  "http://172.18.0.1:3333/scrape",
+  // In development (local Mac), the server may also run on localhost
+  "http://127.0.0.1:3333/scrape",
+];
+
 /**
  * Scrape an EliteProspects player page and return 2026-27 season data.
  *
  * @param epUrl - Full EP URL like https://www.eliteprospects.com/player/526036
- * @param timeoutMs - Max time for the Python process (default 20s)
+ * @param timeoutMs - Max time for the request (default 20s)
  */
 export async function scrapeEpPlayer(
   epUrl: string,
@@ -64,26 +68,24 @@ export async function scrapeEpPlayer(
 ): Promise<EpPlayerResult> {
   if (!epUrl) return { success: false, error: "No epUrl provided" };
 
-  try {
-    const { stdout, stderr } = await execAsync(
-      `python3 "${SCRAPER_PATH}" "${epUrl.trim()}"`,
-      { timeout: timeoutMs }
-    );
+  const encodedUrl = encodeURIComponent(epUrl.trim());
 
-    if (stderr?.trim()) {
-      console.warn("[ep-scraper] stderr:", stderr.trim());
+  for (const base of EP_SCRAPER_URLS) {
+    try {
+      const res = await fetch(`${base}?url=${encodedUrl}`, {
+        signal: AbortSignal.timeout(timeoutMs),
+        cache: "no-store",
+      });
+      if (!res.ok) continue;
+      const parsed = (await res.json()) as EpPlayerResult;
+      return parsed;
+    } catch {
+      // try next URL
+      continue;
     }
-
-    const raw = stdout.trim();
-    if (!raw) return { success: false, error: "Empty output from ep-scraper.py" };
-
-    const parsed = JSON.parse(raw) as EpPlayerResult;
-    return parsed;
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error("[ep-scraper] Error:", msg);
-    return { success: false, error: msg };
   }
+
+  return { success: false, error: "EP scraper server not reachable (tried all endpoints)" };
 }
 
 /**
