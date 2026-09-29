@@ -161,3 +161,53 @@ export async function enforceLeagueDay(day: string, opts: { force?: boolean } = 
   await prisma.leagueBank.update({ where: { id: 1 }, data: { lastEnforcedDay: day } });
   return { ran: true, day, rosterFines, capFines, totalFined };
 }
+
+// ---- Game Picks (tipovačka) prizes, paid out of the league bank ----------------
+
+const PICKS_SEASON = "2026-27";
+
+/** Pay the winner(s) of one finished Game Picks week (ties: every tied club gets the prize). Idempotent per week. */
+export async function payWeeklyPicksWinners(weekKey: string): Promise<{ paid: string[]; prize: number }> {
+  const bank = await getBank();
+  const profiles = await prisma.gamePicksProfile.findMany({ where: { season: PICKS_SEASON, league: "NHL" }, select: { teamId: true, weeklyPoints: true } });
+  const pts = profiles.map((p) => ({ teamId: p.teamId, pts: Number((p.weeklyPoints as Record<string, number> | null)?.[weekKey] ?? 0) })).filter((x) => x.pts > 0);
+  if (!pts.length || bank.picksWeeklyPrize <= 0) return { paid: [], prize: bank.picksWeeklyPrize };
+  const top = Math.max(...pts.map((x) => x.pts));
+  const paid: string[] = [];
+  for (const w of pts.filter((x) => x.pts === top)) {
+    const ok = await postEntry({ kind: "PAYOUT", amount: -bank.picksWeeklyPrize, teamId: w.teamId, note: `Game Picks — winner of week ${weekKey} (${top} pts)`, dedupeKey: `PICKS_WEEK:${weekKey}:${w.teamId}` });
+    if (!ok) continue;
+    await moveTeamBank(w.teamId, bank.picksWeeklyPrize);
+    const t = await prisma.team.findUnique({ where: { id: w.teamId }, select: { name: true, slug: true } });
+    if (t) await prisma.dmMessage.create({ data: { fromTeamId: w.teamId, toTeamId: w.teamId, body: `🏆 Game Picks: you won the week of ${weekKey} with ${top} pts — ${money(bank.picksWeeklyPrize)} paid into your bank.`, tradeUrl: "/league/picks" } }).catch(() => {});
+    paid.push(t?.name ?? String(w.teamId));
+  }
+  return { paid, prize: bank.picksWeeklyPrize };
+}
+
+/** Called every cron tick: from 09:00 pays each completed week (up to yesterday's) that hasn't been paid yet. */
+export async function payPicksIfDue(now: Date, hour: number): Promise<{ ran: boolean; weeks?: string[]; reason?: string }> {
+  const bank = await getBank();
+  if (!bank.autoPickPayouts) return { ran: false, reason: "auto payouts off" };
+  if (hour < 9) return { ran: false, reason: "before 09:00" };
+  const { pickWeekKey } = await import("./game-picks-server");
+  const current = pickWeekKey(new Date(now.getTime() - 86400000)); // the week still collecting points
+  const profiles = await prisma.gamePicksProfile.findMany({ where: { season: PICKS_SEASON, league: "NHL" }, select: { weeklyPoints: true } });
+  const weeks = new Set<string>();
+  for (const p of profiles) for (const k of Object.keys((p.weeklyPoints as Record<string, number> | null) ?? {})) if (k < current && (!bank.lastPickWeekPaid || k > bank.lastPickWeekPaid)) weeks.add(k);
+  const sorted = [...weeks].sort();
+  for (const w of sorted) await payWeeklyPicksWinners(w);
+  if (sorted.length) await prisma.leagueBank.update({ where: { id: 1 }, data: { lastPickWeekPaid: sorted[sorted.length - 1] } });
+  return { ran: true, weeks: sorted };
+}
+
+/** Season-end TOP 3 (Game Picks + Season Picks combined — the commissioner picks the clubs). Idempotent per place. */
+export async function paySeasonTop3(teamIds: [number, number, number]): Promise<void> {
+  const bank = await getBank();
+  const prizes = [bank.picksPrize1, bank.picksPrize2, bank.picksPrize3];
+  for (let i = 0; i < 3; i++) {
+    if (!teamIds[i] || prizes[i] <= 0) continue;
+    const ok = await postEntry({ kind: "PAYOUT", amount: -prizes[i], teamId: teamIds[i], note: `Tipovačka ${PICKS_SEASON} — ${i + 1}. miesto`, dedupeKey: `PICKS_SEASON:${PICKS_SEASON}:${i + 1}` });
+    if (ok) await moveTeamBank(teamIds[i], prizes[i]);
+  }
+}

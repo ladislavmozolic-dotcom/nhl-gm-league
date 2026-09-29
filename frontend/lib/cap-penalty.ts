@@ -12,14 +12,15 @@ export async function capPenaltyFor(teamId: number, seasonStart: number): Promis
 /** teamId → ceiling reduction for `seasonStart`, for every club that has one. */
 export async function capPenaltyMap(seasonStart: number): Promise<Map<number, number>> {
   const [bank, rows] = await Promise.all([
-    prisma.leagueBank.findUnique({ where: { id: 1 }, select: { capPenaltyMultiplier: true } }),
+    prisma.leagueBank.findUnique({ where: { id: 1 }, select: { capPenaltyMultiplier: true, capPenaltyMax: true } }),
     prisma.teamCapPenalty.findMany({ where: { appliesSeasonStart: seasonStart, waived: false } }),
   ]);
   const mult = bank?.capPenaltyMultiplier ?? 2;
+  const max = bank?.capPenaltyMax ?? 10_000_000;
   const out = new Map<number, number>();
   for (const r of rows) {
     const amt = Math.max(0, Math.round(r.basis * mult) + r.manualAdj);
-    if (amt > 0) out.set(r.teamId, (out.get(r.teamId) ?? 0) + amt);
+    if (amt > 0) out.set(r.teamId, Math.min(max, (out.get(r.teamId) ?? 0) + amt));
   }
   return out;
 }

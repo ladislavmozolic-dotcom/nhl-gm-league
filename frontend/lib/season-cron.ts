@@ -236,7 +236,9 @@ export async function enforceLeagueBankIfDue(now: Date = new Date()) {
   const { dateStr, hour } = bratislavaParts(now);
   if (hour < 8) return { ran: false, reason: "before 08:00 Europe/Bratislava" };
   const { getBank, enforceLeagueDay } = await import("@/lib/league-bank-server");
+  const { payPicksIfDue } = await import("@/lib/league-bank-server");
+  const picks = await payPicksIfDue(now, hour).catch((e) => ({ ran: false, reason: `picks error: ${(e as Error).message}` }));
   const bank = await getBank();
-  if (bank.lastEnforcedDay === dateStr) return { ran: false, reason: "already enforced today" };
-  return enforceLeagueDay(dateStr);
+  if (bank.lastEnforcedDay === dateStr) return { ran: false, reason: "already enforced today", picks };
+  return { ...(await enforceLeagueDay(dateStr)), picks };
 }

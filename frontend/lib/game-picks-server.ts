@@ -1,6 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import { REGULAR_SEASON } from "@/lib/phase";
 
+/** Monday (UTC date, YYYY-MM-DD) of the week containing `d` — the Game Picks week key. */
+export function pickWeekKey(d: Date): string {
+  const x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  x.setUTCDate(x.getUTCDate() - ((x.getUTCDay() + 6) % 7));
+  return x.toISOString().slice(0, 10);
+}
+
 export type DailyGamePickInput = {
   gameId: number;
   winnerTeamId: number;
@@ -494,6 +501,7 @@ export async function evaluateGamePicks(season = REGULAR_SEASON, league = "NHL")
     let jokersUsed = profile.jokersUsed;
 
     const monthlyMap: Record<string, number> = (profile.monthlyPoints as Record<string, number>) || {};
+    const weeklyMap: Record<string, number> = (profile.weeklyPoints as Record<string, number>) || {};
 
     for (const sub of subs) {
       const realData = realScoreData[sub.gameId];
@@ -658,6 +666,9 @@ export async function evaluateGamePicks(season = REGULAR_SEASON, league = "NHL")
 
       const monthKey = new Date().toISOString().slice(0, 7);
       monthlyMap[monthKey] = (monthlyMap[monthKey] || 0) + subPoints;
+      // evaluation runs the morning after the NHL night, so the games belong to yesterday's week
+      const weekKey = pickWeekKey(new Date(Date.now() - 86400000));
+      weeklyMap[weekKey] = (weeklyMap[weekKey] || 0) + subPoints;
     }
 
     await prisma.gamePicksProfile.update({
@@ -668,6 +679,7 @@ export async function evaluateGamePicks(season = REGULAR_SEASON, league = "NHL")
         bestStreak,
         jokersUsed,
         monthlyPoints: monthlyMap,
+        weeklyPoints: weeklyMap,
       },
     });
   }

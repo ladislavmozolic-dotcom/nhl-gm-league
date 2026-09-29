@@ -1909,6 +1909,7 @@ model GamePicksProfile {
   jokersUsed    Int      @default(0)
   jokersTotal   Int      @default(5)
   monthlyPoints Json?    // { "2026-10": 45, "2026-11": 52, ... }
+  weeklyPoints  Json?    // { "2026-10-05": 12, ... } keyed by the Monday of the week the game was played
   badges        Json?    // [{ id, title, month, date }]
   rivalHistory  Json?    // [{ week, rivalTeamId, rivalName, myPts, rivalPts, won }]
   createdAt     DateTime @default(now())
@@ -1948,6 +1949,13 @@ model LeagueBank {
   ahlRosterFine        Int      @default(50000) // per day, AHL roster not compliant
   capFinePerDay        Int      @default(200000) // per day over the cap
   capPenaltyMultiplier Float    @default(2) // next-season cap reduction = accumulated overage × this
+  capPenaltyMax        Int      @default(10000000) // ceiling on one club's next-season cap reduction
+  picksWeeklyPrize     Int      @default(200000) // Game Picks: winner of each week
+  picksPrize1          Int      @default(3000000) // season TOP 3 prizes (Game Picks + Season Picks)
+  picksPrize2          Int      @default(1500000)
+  picksPrize3          Int      @default(750000)
+  autoPickPayouts      Boolean  @default(true) // pay each finished week's winner automatically
+  lastPickWeekPaid     String? // Monday (YYYY-MM-DD) of the last week already paid
   capAccumulate        String   @default("sum") // sum = every day's overage adds up | peak = only the worst day counts
   finesForAiClubs      Boolean  @default(false) // clubs without a human GM (AI-run) are normally not fined
   suspensionToBank     Boolean  @default(true) // forfeited suspension salary goes to the league bank

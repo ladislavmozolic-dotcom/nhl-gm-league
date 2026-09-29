@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { PageHeader, Card, BackPill } from "@/components/ui";
 import { getBank, bankBalance } from "@/lib/league-bank-server";
 import { CURRENT_SEASON_START, money, seasonLabel } from "@/lib/finance";
-import { saveBankSettings, bankTransfer, runEnforcementNow, adjustCapPenalty } from "./actions";
+import { payPicksWeek, payPicksSeason, saveBankSettings, bankTransfer, runEnforcementNow, adjustCapPenalty } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -45,9 +45,14 @@ export default async function LeagueBankPage() {
           <label className="flex items-center justify-between gap-2">AHL roster fine / day <input name="ahlRosterFine" defaultValue={bank.ahlRosterFine} className={`${inp} w-32`} /></label>
           <label className="flex items-center justify-between gap-2">Over-cap fine / day <input name="capFinePerDay" defaultValue={bank.capFinePerDay} className={`${inp} w-32`} /></label>
           <label className="flex items-center justify-between gap-2">Next-season cap reduction × <input name="capPenaltyMultiplier" defaultValue={bank.capPenaltyMultiplier} className={`${inp} w-32`} /></label>
+          <label className="flex items-center justify-between gap-2">Max cap reduction per club / season <input name="capPenaltyMax" defaultValue={bank.capPenaltyMax} className={`${inp} w-32`} /></label>
           <label className="flex items-center justify-between gap-2">Overage accumulates as
             <select name="capAccumulate" defaultValue={bank.capAccumulate} className={inp}><option value="sum">sum of every day over</option><option value="peak">worst single day only</option></select></label>
           <label className="flex items-center gap-2"><input type="checkbox" name="finesForAiClubs" defaultChecked={bank.finesForAiClubs} /> Also fine AI-run clubs (no human GM)</label>
+          <label className="flex items-center justify-between gap-2">Picks: weekly winner prize <input name="picksWeeklyPrize" defaultValue={bank.picksWeeklyPrize} className={`${inp} w-32`} /></label>
+          <label className="flex items-center gap-2"><input type="checkbox" name="autoPickPayouts" defaultChecked={bank.autoPickPayouts} /> Pay weekly winners automatically</label>
+          <label className="flex items-center justify-between gap-2">Picks: season 1st / 2nd / 3rd
+            <span className="flex gap-1"><input name="picksPrize1" defaultValue={bank.picksPrize1} className={`${inp} w-24`} /><input name="picksPrize2" defaultValue={bank.picksPrize2} className={`${inp} w-24`} /><input name="picksPrize3" defaultValue={bank.picksPrize3} className={`${inp} w-24`} /></span></label>
           <label className="flex items-center gap-2 md:col-span-2"><input type="checkbox" name="suspensionToBank" defaultChecked={bank.suspensionToBank} /> Forfeited suspension salary &amp; player fines go to the league bank</label>
           <div className="md:col-span-2"><button className={btn}>Save</button></div>
         </form>
@@ -70,10 +75,20 @@ export default async function LeagueBankPage() {
         <p className="text-[11px] text-slate-500 mt-2">Payout / bonus: league bank → club&apos;s bank. Fine: club → league bank. The +/− selector only applies to Income / Adjustment.</p>
       </Card>
 
+      <Card title="🎯 Tipovačka payouts" accent="text-violet-400">
+        <p className="text-xs text-slate-500 mb-2">Weekly winners are paid automatically (week = Mon–Sun by game day; last paid: {bank.lastPickWeekPaid ?? "none"}). Repeating is safe — one payout per club per week.</p>
+        <form action={payPicksWeek} className="flex gap-2 items-center text-sm mb-3"><input name="week" placeholder="Monday YYYY-MM-DD" className={`${inp} w-44`} /><button className={btn}>Pay that week&apos;s winner now</button></form>
+        <form action={payPicksSeason} className="flex flex-wrap gap-2 items-center text-sm">
+          <span className="text-xs text-slate-500">Season TOP 3 ({money(bank.picksPrize1)} / {money(bank.picksPrize2)} / {money(bank.picksPrize3)}):</span>
+          {["p1", "p2", "p3"].map((n, i) => <select key={n} name={n} className={inp}><option value="">{i + 1}. place</option>{teams.map((t) => <option key={t.id} value={t.id}>{t.code ?? t.name}</option>)}</select>)}
+          <button className={btn}>Pay season prizes</button>
+        </form>
+      </Card>
+
       <Card title={`Cap-overage accumulator — ${seasonLabel(CURRENT_SEASON_START)} → cap ${seasonLabel(CURRENT_SEASON_START + 1)}`} accent="text-red-400">
         {rows.length ? (
           <table className="w-full text-sm"><thead><tr className="text-xs text-slate-500 text-left"><th className="py-1">Club</th><th>Days over</th><th>Accumulated</th><th>Worst day</th><th>Cap reduction next season</th><th>Adjust</th></tr></thead>
-            <tbody>{rows.map((t) => { const p = penBy.get(t.id); const o = ovBy.get(t.id); const amt = p && !p.waived ? Math.max(0, Math.round(p.basis * bank.capPenaltyMultiplier) + p.manualAdj) : 0;
+            <tbody>{rows.map((t) => { const p = penBy.get(t.id); const o = ovBy.get(t.id); const amt = p && !p.waived ? Math.min(bank.capPenaltyMax, Math.max(0, Math.round(p.basis * bank.capPenaltyMultiplier) + p.manualAdj)) : 0;
               return (<tr key={t.id} className="border-t border-slate-800/70">
                 <td className="py-1.5 font-semibold">{t.code ?? t.name}</td><td>{o?._count._all ?? 0}</td><td className="tabular-nums">{money(p?.basis ?? 0)}</td><td className="tabular-nums">{money(o?._max.overBy ?? 0)}</td>
                 <td className={`tabular-nums font-semibold ${p?.waived ? "text-slate-500 line-through" : "text-red-400"}`}>−{money(amt)}{p?.waived ? " (waived)" : ""}</td>
