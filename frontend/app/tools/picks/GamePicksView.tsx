@@ -207,22 +207,18 @@ export default function GamePicksView({
 
   // Form State for Daily Games
   const subMap = new Map(viewerSubmissions.map((s) => [s.gameId, s]));
-  const [dailyPicks, setDailyPicks] = useState<Record<number, { winnerTeamId?: number; confidence: number; isUpsetPick?: boolean; isJoker?: boolean }>>(() => {
+  const [dailyPicks, setDailyPicks] = useState<Record<number, { winnerTeamId?: number; isJoker?: boolean }>>(() => {
     const init: Record<number, any> = {};
     for (const g of games) {
       const sub = subMap.get(g.id);
       if (sub && !sub.isGameOfTheWeek) {
         init[g.id] = {
           winnerTeamId: sub.winnerTeamId,
-          confidence: sub.confidence || 2,
-          isUpsetPick: sub.isUpsetPick || false,
           isJoker: sub.isJoker || false,
         };
       } else {
         init[g.id] = {
           winnerTeamId: undefined,
-          confidence: 2,
-          isUpsetPick: false,
           isJoker: false,
         };
       }
@@ -270,8 +266,6 @@ export default function GamePicksView({
       .map(([gId, p]) => ({
         gameId: Number(gId),
         winnerTeamId: p.winnerTeamId!,
-        confidence: p.confidence,
-        isUpsetPick: p.isUpsetPick,
         isJoker: p.isJoker,
       }));
 
@@ -408,7 +402,7 @@ export default function GamePicksView({
                 : "bg-slate-800/80 text-slate-300 hover:bg-slate-800"
             }`}
           >
-            <span>🎯 Zápasy Dňa (Confidence 1–3)</span>
+            <span>🎯 Zápasy Dňa (2b)</span>
             <span className="px-1.5 py-0.2 rounded bg-indigo-950/80 text-[10px] text-indigo-300 font-mono">
               {todayGames.length > 0 ? todayGames.length : scheduledGames.length}
             </span>
@@ -480,7 +474,7 @@ export default function GamePicksView({
         </div>
       )}
 
-      {/* SUBTAB 1: DAILY CONFIDENCE PICKS */}
+      {/* SUBTAB 1: DAILY PICKS */}
       {activeSubTab === "picks" && (
         <div className="space-y-4">
           <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -489,7 +483,7 @@ export default function GamePicksView({
                 <span>🎯 UNHL Game of the Day / Zápasová Tipovačka</span>
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                Vyberte víťaza zápasu a priraďte mieru dôvery (Confidence 1, 2 alebo 3 body). Môžete nasadiť aj strategického <strong>Jokera (×3)</strong> alebo označiť <strong>Upset Pick (+5b)</strong>.
+                Vyberte víťaza zápasu (2 body za správny tip). Môžete nasadiť aj strategického <strong>Jokera (×3 = 6b)</strong>.
               </p>
             </div>
 
@@ -564,7 +558,7 @@ export default function GamePicksView({
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {gamesToDisplay.map((g) => {
-                const current = dailyPicks[g.id] || { confidence: 2 };
+                const current = dailyPicks[g.id] || {};
                 const sub = subMap.get(g.id);
                 const isLocked = g.isLocked;
 
@@ -646,11 +640,6 @@ export default function GamePicksView({
                             <div className="text-[10px] text-slate-400 font-mono">Hostia</div>
                           </div>
                         </div>
-                        {g.isAwayUpset && (
-                          <span className="absolute top-1 right-1 text-[9px] px-1 rounded bg-amber-500/20 text-amber-300 font-mono">
-                            ⚡ Outsider
-                          </span>
-                        )}
                       </button>
 
                       {/* Home Team */}
@@ -680,44 +669,12 @@ export default function GamePicksView({
                             <div className="text-[10px] text-slate-400 font-mono">Doma</div>
                           </div>
                         </div>
-                        {g.isHomeUpset && (
-                          <span className="absolute top-1 right-1 text-[9px] px-1 rounded bg-amber-500/20 text-amber-300 font-mono">
-                            ⚡ Outsider
-                          </span>
-                        )}
                       </button>
                     </div>
 
-                    {/* Confidence Selector 1, 2, 3 */}
-                    <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs">
-                      <span className="text-slate-400 text-[11px] font-medium">Confidence:</span>
-                      <div className="flex items-center gap-1">
-                        {[1, 2, 3].map((cVal) => (
-                          <button
-                            key={cVal}
-                            type="button"
-                            disabled={isLocked}
-                            onClick={() =>
-                              setDailyPicks({
-                                ...dailyPicks,
-                                [g.id]: { ...current, confidence: cVal },
-                              })
-                            }
-                            className={`px-2 py-0.5 rounded text-xs font-bold transition-all ${
-                              current.confidence === cVal
-                                ? "bg-indigo-600 text-white shadow"
-                                : "bg-slate-800 text-slate-400 hover:bg-slate-700"
-                            }`}
-                          >
-                            {cVal === 3 ? "★★★ 3b" : cVal === 2 ? "★★☆ 2b" : "★☆☆ 1b"}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Modifiers: Joker & Upset */}
-                    <div className="flex items-center justify-between gap-2 pt-1 text-xs">
-                      {/* Joker Checkbox */}
+                    {/* Modifiers: Joker */}
+                    <div className="flex items-center justify-between pt-1 text-xs">
+                      <span className="text-[11px] text-slate-400">Výhra: <strong className="text-indigo-300">2b</strong></span>
                       <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
                         <input
                           type="checkbox"
@@ -732,26 +689,7 @@ export default function GamePicksView({
                           className="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500 bg-slate-900"
                         />
                         <span className={current.isJoker ? "font-bold text-amber-400" : ""}>
-                          🃏 Joker (×3)
-                        </span>
-                      </label>
-
-                      {/* Upset Checkbox */}
-                      <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
-                        <input
-                          type="checkbox"
-                          disabled={isLocked}
-                          checked={current.isUpsetPick || false}
-                          onChange={(e) =>
-                            setDailyPicks({
-                              ...dailyPicks,
-                              [g.id]: { ...current, isUpsetPick: e.target.checked },
-                            })
-                          }
-                          className="rounded border-slate-700 text-amber-600 focus:ring-amber-500 bg-slate-900"
-                        />
-                        <span className={current.isUpsetPick ? "font-bold text-amber-300" : ""}>
-                          🔥 Upset (+5b)
+                          🃏 Joker (×3 = 6b)
                         </span>
                       </label>
                     </div>
@@ -1054,15 +992,14 @@ export default function GamePicksView({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
           <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
             <h3 className="text-sm font-bold text-indigo-300 flex items-center gap-2">
-              <span>🎯 Zápasy Dňa & Confidence Body</span>
+              <span>🎯 Zápasy Dňa (2 body)</span>
             </h3>
             <p className="text-slate-300 leading-relaxed">
-              Každý hrací deň systém automaticky vyberie 3 zápasy dňa. GM tipuje víťaza a priradí body dôvery:
+              Každý hrací deň systém automaticky vyberie zápasy dňa podľa reálneho NHL programu.
             </p>
             <ul className="list-disc list-inside text-slate-400 space-y-1">
-              <li><strong className="text-white">★★★ Confidence 3</strong> = 3 body pri zásahu</li>
-              <li><strong className="text-white">★★☆ Confidence 2</strong> = 2 body pri zásahu</li>
-              <li><strong className="text-white">★☆☆ Confidence 1</strong> = 1 bod pri zásahu</li>
+              <li>Za každý správny tip na víťaza zápasu získate <strong className="text-white">2 body</strong>.</li>
+              <li>Pri nasadení Jokera získate za správny tip až <strong className="text-amber-400">6 bodov (×3)</strong>.</li>
             </ul>
           </div>
 
@@ -1083,14 +1020,11 @@ export default function GamePicksView({
 
           <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
             <h3 className="text-sm font-bold text-rose-300 flex items-center gap-2">
-              <span>🃏 Jokeri & 🔥 Upset Pick</span>
+              <span>🃏 Jokeri (×3)</span>
             </h3>
             <ul className="list-disc list-inside text-slate-400 space-y-1.5">
               <li>
-                <strong className="text-white">5× Joker na sezónu:</strong> Násobí všetky získané body z daného zápasu <strong className="text-amber-400">×3</strong>!
-              </li>
-              <li>
-                <strong className="text-white">Upset Pick (1× týždenne):</strong> Označte outsidera. Ak zvíťazí, získate bonus <strong className="text-amber-300">+5 bodov</strong>.
+                <strong className="text-white">5× Joker na celú sezónu:</strong> Môžete ho použiť na ľubovoľný zápas. Násobí všetky získané body z daného zápasu <strong className="text-amber-400">×3</strong> (pri bežnom zápase získate namiesto 2b až 6b, pri Game of the Week až do 45b)!
               </li>
             </ul>
           </div>

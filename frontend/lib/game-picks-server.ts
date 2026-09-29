@@ -4,8 +4,6 @@ import { REGULAR_SEASON } from "@/lib/phase";
 export type DailyGamePickInput = {
   gameId: number;
   winnerTeamId: number;
-  confidence?: number; // 1 | 2 | 3
-  isUpsetPick?: boolean;
   isJoker?: boolean;
 };
 
@@ -379,15 +377,9 @@ export async function evaluateGamePicks(season = REGULAR_SEASON, league = "NHL")
 
         if (!sub.isGameOfTheWeek) {
           if (isWinnerCorrect) {
-            const conf = sub.confidence || 2;
-            const pts = conf * multiplier;
+            const pts = 2 * multiplier;
             subPoints += pts;
-            breakdown.winner = { correct: true, points: pts, conf, multiplier };
-
-            if (sub.isUpsetPick && config.upsetTeamIds.includes(sub.winnerTeamId!)) {
-              subPoints += 5;
-              breakdown.upset = { correct: true, points: 5 };
-            }
+            breakdown.winner = { correct: true, points: pts, multiplier };
 
             currentStreak++;
             if (currentStreak === 3) subPoints += 2;
@@ -426,8 +418,7 @@ export async function evaluateGamePicks(season = REGULAR_SEASON, league = "NHL")
         isWinnerCorrect = Boolean(sub.winnerTeamId && realWinner && sub.winnerTeamId === realWinner);
 
         if (isWinnerCorrect) {
-          const conf = sub.confidence || 2;
-          const pts = conf * multiplier;
+          const pts = 2 * multiplier;
           subPoints += pts;
           currentStreak++;
           bestStreak = Math.max(bestStreak, currentStreak);

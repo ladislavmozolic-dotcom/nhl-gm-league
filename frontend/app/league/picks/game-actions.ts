@@ -78,8 +78,6 @@ export async function saveDailyGamePicksAction(
       },
       update: {
         winnerTeamId: pick.winnerTeamId,
-        confidence: pick.confidence || 2,
-        isUpsetPick: pick.isUpsetPick || false,
         isJoker: pick.isJoker || false,
         isGameOfTheWeek: false,
         updatedAt: new Date(),
@@ -90,8 +88,6 @@ export async function saveDailyGamePicksAction(
         teamId,
         gameId: pick.gameId,
         winnerTeamId: pick.winnerTeamId,
-        confidence: pick.confidence || 2,
-        isUpsetPick: pick.isUpsetPick || false,
         isJoker: pick.isJoker || false,
         isGameOfTheWeek: false,
       },
