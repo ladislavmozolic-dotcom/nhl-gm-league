@@ -69,7 +69,7 @@ export async function saveDailyGamePicksAction(
     const dg = dbGameMap.get(pick.gameId);
     if (!dg) continue;
 
-    const isLocked = dg.status === "FINAL" || (dg.gameDate ? now > dg.gameDate : false);
+    const isLocked = dg.status === "FINAL";
     if (isLocked) {
       continue; // Skip locked games
     }
@@ -123,7 +123,7 @@ export async function saveGameOfTheWeekPickAction(
     return { ok: false, error: "Zápas nebol nájdený." };
   }
 
-  const isLocked = dbGame.status === "FINAL" || (dbGame.gameDate ? now > dbGame.gameDate : false);
+  const isLocked = dbGame.status === "FINAL";
   if (isLocked) {
     return { ok: false, error: "Tento zápas je už uzamknutý (začal alebo sa skončil)." };
   }

@@ -181,7 +181,7 @@ export async function getGamePicksData(season = REGULAR_SEASON, league = "NHL", 
   // Map UNHL database games
   const mappedGames = dbGames.map((g) => {
     const isFinal = g.status === "FINAL";
-    const isLocked = isFinal || (g.gameDate ? now > g.gameDate : false);
+    const isLocked = isFinal;
 
     let winnerTeamId: number | null = null;
     if (isFinal) {
