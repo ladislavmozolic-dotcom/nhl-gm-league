@@ -34,8 +34,8 @@ export async function currentFrenzyRound(): Promise<number> {
 }
 
 /** CBA max contract: 20 % of the league's upper cap. */
-export async function maxContract(): Promise<number> {
-  return Math.round(((await loadLeagueCap()).upper * 0.2) / 50_000) * 50_000;
+export function maxContract(): Promise<number> {
+  return memoized("maxContract", 60_000, async () => Math.round(((await loadLeagueCap()).upper * 0.2) / 50_000) * 50_000);
 }
 
 export type LeagueCap = { mode: string; upper: number; lower: number; faOpen: boolean };
@@ -63,7 +63,21 @@ const SEL = {
 
 /** The "full slate" games played this season (p85 of everyone with a value) — a
  *  player who played well under this missed real time (injury/down year). */
-export async function leagueFullGP(): Promise<number> {
+// Short-lived memo for league-wide values that every single demand calculation
+// re-reads (a page valuing ~60 offers used to scan the whole player table ~120×).
+const memo = new Map<string, { at: number; v: Promise<unknown> }>();
+function memoized<T>(key: string, ttlMs: number, fn: () => Promise<T>): Promise<T> {
+  const hit = memo.get(key);
+  if (hit && Date.now() - hit.at < ttlMs) return hit.v as Promise<T>;
+  const v = fn().catch((e) => { memo.delete(key); throw e; });
+  memo.set(key, { at: Date.now(), v });
+  return v;
+}
+
+export function leagueFullGP(): Promise<number> {
+  return memoized("fullGP", 60_000, leagueFullGPUncached);
+}
+async function leagueFullGPUncached(): Promise<number> {
   const rows = await prisma.player.findMany({ where: { lastSeasonGP: { gt: 0 } }, select: { lastSeasonGP: true } });
   const gps = rows.map((r) => r.lastSeasonGP!).sort((a, b) => a - b);
   if (gps.length === 0) return 0;
@@ -422,7 +436,10 @@ async function teamOutlookScores(teamIds: number[], avgAgeById: Map<number, numb
  *  picks + a young core) becomes "rising" instead of a plain "rebuild", so a
  *  young/unhappy free agent can weigh a genuine rebuild timeline against just
  *  chasing whichever club is best today (see contentionModifier/Bonus). */
-export async function teamContentionMap(): Promise<Map<number, Contention>> {
+export function teamContentionMap(): Promise<Map<number, Contention>> {
+  return memoized("teamContentionMap", 60_000, teamContentionMapUncached);
+}
+async function teamContentionMapUncached(): Promise<Map<number, Contention>> {
   const players = await prisma.player.findMany({
     where: { rosterType: "NHL", isGoalie: false }, select: { teamId: true, overall: true, age: true },
   });
@@ -462,7 +479,10 @@ export async function teamContentionMap(): Promise<Map<number, Contention>> {
  *  had signed there as a free agent within the previous year — flipping a guy you
  *  just signed is the exact pattern that makes other players wary of signing there
  *  at all, so it weighs more than trading a long-tenured piece. */
-export async function teamChurnMap(): Promise<Map<number, number>> {
+export function teamChurnMap(): Promise<Map<number, number>> {
+  return memoized("teamChurnMap", 60_000, teamChurnMapUncached);
+}
+async function teamChurnMapUncached(): Promise<Map<number, number>> {
   const teams = await prisma.team.findMany({ where: { league: "NHL", isAffiliate: false }, select: { id: true, code: true } });
   const CHURN_WINDOW_DAYS = 270;
   const since = new Date(Date.now() - CHURN_WINDOW_DAYS * 86_400_000);
