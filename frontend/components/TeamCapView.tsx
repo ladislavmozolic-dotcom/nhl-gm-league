@@ -14,6 +14,7 @@ import { getLeagueClock, regularSeasonDayProgress } from "@/lib/calendar-server"
 import { teamDashboard } from "@/lib/detailed-finance-server";
 import { getTeamSession } from "@/lib/auth";
 import { teamRetentionStatus } from "@/lib/cap";
+import { capPenaltyFor } from "@/lib/cap-penalty";
 import { ROSTER_LIMITS } from "@/lib/roster-rules";
 import BuyoutButton from "@/components/BuyoutButton";
 import { buyoutPlayer } from "@/app/finance/[slug]/actions";
@@ -111,7 +112,23 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   const netPlayersForCap = team.players.map((p) => ({ capHit: Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0)) }));
   const realBuyoutsDeadMoney = deadMoneyForYear(realBuyouts, CURRENT_SEASON_START);
   const deadCapAmount = deadMoneyForYear(retentions, CURRENT_SEASON_START);
-  const cap = teamCapSummary(netPlayersForCap, settings, realBuyoutsDeadMoney + deadCapAmount);
+  // cap-ceiling reduction from past cap overages (League Bank) — lowers this club's ceiling
+  const capPenalty = await capPenaltyFor(team.id, CURRENT_SEASON_START);
+  const cap = teamCapSummary(netPlayersForCap, { ...settings, salaryCapUpper: settings.salaryCapUpper - capPenalty }, realBuyoutsDeadMoney + deadCapAmount);
+  // fines this club paid into the league bank this season (roster / cap violations)
+  const seasonStartDate = new Date(Date.UTC(CURRENT_SEASON_START, 6, 1));
+  const fineRows = await prisma.leagueBankEntry.findMany({
+    where: { teamId: team.id, kind: { in: ["FINE_NHL_ROSTER", "FINE_AHL_ROSTER", "FINE_CAP", "FINE_PLAYER", "SUSPENSION_SALARY", "REFUND"] }, createdAt: { gte: seasonStartDate } },
+    orderBy: { createdAt: "desc" },
+  });
+  const nextPenalty = await capPenaltyFor(team.id, CURRENT_SEASON_START + 1);
+  const fineTotals = { roster: 0, cap: 0, other: 0 };
+  for (const f of fineRows) {
+    if (f.kind === "FINE_NHL_ROSTER" || f.kind === "FINE_AHL_ROSTER") fineTotals.roster += f.amount;
+    else if (f.kind === "FINE_CAP") fineTotals.cap += f.amount;
+    else fineTotals.other += f.amount;
+  }
+  const finesTotal = fineTotals.roster + fineTotals.cap + fineTotals.other;
   // Projected Cap Space = biggest full-season cap hit a club can still add and
   // stay legal — unused cap banks each CALENDAR DAY (the real NHL mechanic,
   // same denominator for every club), so it grows toward the trade deadline.
@@ -331,7 +348,28 @@ export default async function TeamCapView({ slug }: { slug: string }) {
         </div>
       )}
 
-      <div className="text-xs text-slate-500">▲ Upper limit: {money(cap.upper)} · ▼ Lower limit: {money(cap.lower)}</div>
+      <div className="text-xs text-slate-500">▲ Upper limit: {money(cap.upper)}{capPenalty > 0 ? ` (reduced by ${money(capPenalty)} — cap penalty)` : ""} · ▼ Lower limit: {money(cap.lower)}</div>
+      {(fineRows.length > 0 || nextPenalty > 0 || capPenalty > 0) && (
+        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 space-y-2">
+          <h3 className="text-sm font-bold text-amber-400">💸 League fines &amp; penalties — {seasonLabel(CURRENT_SEASON_START)}</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+            <div><div className="text-slate-500">Total paid</div><div className="text-lg font-bold text-red-400 tabular-nums">{money(finesTotal)}</div></div>
+            <div><div className="text-slate-500">Roster violations</div><div className="tabular-nums text-slate-200">{money(fineTotals.roster)}</div></div>
+            <div><div className="text-slate-500">Over the cap</div><div className="tabular-nums text-slate-200">{money(fineTotals.cap)}</div></div>
+            <div><div className="text-slate-500">Cap reduction next season</div><div className="tabular-nums text-slate-200">{nextPenalty > 0 ? `−${money(nextPenalty)}` : "—"}</div></div>
+          </div>
+          {fineRows.length > 0 && (
+            <ul className="divide-y divide-slate-800/70 text-xs max-h-56 overflow-y-auto">
+              {fineRows.map((f) => (
+                <li key={f.id} className="py-1.5 flex justify-between gap-3">
+                  <span className="text-slate-400">{f.createdAt.toISOString().slice(0, 10)} · {f.note ?? f.kind}</span>
+                  <span className={`tabular-nums whitespace-nowrap ${f.amount > 0 ? "text-red-400" : "text-emerald-400"}`}>{f.amount > 0 ? "−" : "+"}{money(Math.abs(f.amount))}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {/* ── Multi-year Cap Projection ── */}
       <div className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 overflow-x-auto">

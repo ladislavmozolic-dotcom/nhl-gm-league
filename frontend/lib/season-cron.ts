@@ -225,3 +225,18 @@ export async function autoEvaluateGamePicksIfDue(now: Date = new Date()): Promis
   const res = await evaluateGamePicks();
   return { ran: true, evaluatedCount: res.evaluatedCount, message: res.message };
 }
+
+/**
+ * Called on every 5-minute tick. Once per Europe/Bratislava day (from 08:00 on, so
+ * the previous night's roster moves are settled) charges the League Bank fines for
+ * non-compliant NHL / AHL rosters and days over the cap. Independent of the pinned
+ * league phase — fines follow the real calendar. Idempotent per day.
+ */
+export async function enforceLeagueBankIfDue(now: Date = new Date()) {
+  const { dateStr, hour } = bratislavaParts(now);
+  if (hour < 8) return { ran: false, reason: "before 08:00 Europe/Bratislava" };
+  const { getBank, enforceLeagueDay } = await import("@/lib/league-bank-server");
+  const bank = await getBank();
+  if (bank.lastEnforcedDay === dateStr) return { ran: false, reason: "already enforced today" };
+  return enforceLeagueDay(dateStr);
+}

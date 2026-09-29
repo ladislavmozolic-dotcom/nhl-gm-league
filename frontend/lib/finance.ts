@@ -156,10 +156,10 @@ export const SEASON_GAMES = 82;
 export const SEASON_DAYS = 186;
 
 // NHL-style off-season cushion: a club may sit up to 10% over the upper limit
-// through the summer, but must be cap-compliant by regular-season opening day.
+// through the summer AND the playoffs; only the regular season is strict.
 export const OFFSEASON_CUSHION = 0.10;
 export function capCeilingForPhase(upper: number, phase: string): number {
-  return phase === "regular" || phase === "playoffs" ? upper : Math.round(upper * (1 + OFFSEASON_CUSHION));
+  return phase === "regular" ? upper : Math.round(upper * (1 + OFFSEASON_CUSHION));
 }
 
 // LTIR: a skater whose injury has driven his CON below 90 goes on Long-Term

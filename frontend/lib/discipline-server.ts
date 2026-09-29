@@ -19,6 +19,7 @@ import { REGULAR_SEASON } from "./phase";
 import { loadSettings } from "./sim/settings";
 import { cleanName } from "./playerName";
 import { money } from "./finance";
+import { suspensionSalaryToBank, playerFineToBank } from "./league-bank-server";
 
 const VIOLENT = ["Boarding", "Cross-checking", "Elbowing", "Charging", "Checking to the head", "Slew-footing", "Kneeing", "Slashing", "High-sticking", "Roughing", "Spearing", "Butt-ending", "Clipping"];
 export const APPEAL_HOURS = 48;
@@ -141,6 +142,7 @@ export async function reviewGames(gameIds: number[]): Promise<{ suspensions: num
         await prisma.suspension.create({ data: { season: REGULAR_SEASON, playerId, playerName: name, teamId: org, gameId: g.id, incident, kind: "FINE", fine, status: "SERVED" } });
         await prisma.transaction.create({ data: { type: "DISCIPLINE", message: `⚖️ Player Safety: ${name} fined $${fine.toLocaleString("en-US")} (maximum allowed under the CBA) — ${list[0].text}.` } }).catch(() => {});
         await notifyClub(org, `⚖️ Player Safety fined ${name} $${fine.toLocaleString("en-US")} for ${list[0].text}. No games — he's available tonight.`);
+        await playerFineToBank(org, fine, `${name} fined — ${list[0].text}`);
         fines++;
         continue;
       }
@@ -154,9 +156,9 @@ export async function reviewGames(gameIds: number[]): Promise<{ suspensions: num
       const forfeit = forfeitFor(pl.capHit ?? 0, games, repeat, days);
       await prisma.suspension.create({ data: { season: REGULAR_SEASON, playerId, playerName: name, teamId: org, gameId: g.id, incident, games, forfeit, repeatOffender: repeat } });
       await syncPlayer(playerId);
-      await credit(org, forfeit);
+      if (!(await suspensionSalaryToBank(org, forfeit, `${name} suspended ${games} game${games === 1 ? "" : "s"} — salary forfeited`))) await credit(org, forfeit);
       await prisma.transaction.create({ data: { type: "DISCIPLINE", message: `⚖️ Player Safety: ${name} suspended ${games} game${games === 1 ? "" : "s"}${repeat ? " (repeat offender)" : ""} — ${list[0].text}. Forfeits ${money(forfeit)}.` } }).catch(() => {});
-      await notifyClub(org, `⚖️ ${name} has been suspended for ${games} game${games === 1 ? "" : "s"}${repeat ? " as a repeat offender" : ""}: ${list.map((i) => i.text).join("; ")}. He forfeits ${money(forfeit)} of salary (credited back to your bank). You can appeal to the commissioner within ${APPEAL_HOURS} hours on the Player Safety page.`);
+      await notifyClub(org, `⚖️ ${name} has been suspended for ${games} game${games === 1 ? "" : "s"}${repeat ? " as a repeat offender" : ""}: ${list.map((i) => i.text).join("; ")}. He forfeits ${money(forfeit)} of salary (paid into the league bank). You can appeal to the commissioner within ${APPEAL_HOURS} hours on the Player Safety page.`);
       suspensions++;
     }
   }
@@ -220,7 +222,8 @@ export async function ruleOnSuspension(id: number, decision: "UPHELD" | "REDUCED
     games: newGames, forfeit: newForfeit, appealStatus: decision, appealNote: note.trim().slice(0, 1000) || null, appealDecidedAt: new Date(),
     status: decision === "OVERTURNED" ? "OVERTURNED" : s.gamesServed >= newGames ? "SERVED" : s.status,
   } });
-  await credit(s.teamId, newForfeit - s.forfeit); // a reduction pays the player back (the club's saving shrinks)
+  // a reduction pays the club back out of the league bank (or, with the rule off, shrinks the club's saving)
+  if (!(await suspensionSalaryToBank(s.teamId, newForfeit - s.forfeit, `${s.playerName} — appeal ${decision.toLowerCase()}`))) await credit(s.teamId, newForfeit - s.forfeit);
   await syncPlayer(s.playerId);
   const verdict = decision === "UPHELD" ? `upheld (${s.games} games)` : decision === "REDUCED" ? `reduced from ${s.games} to ${newGames} games` : "overturned";
   await prisma.transaction.create({ data: { type: "DISCIPLINE", message: `⚖️ Commissioner: ${s.playerName}'s suspension ${verdict}.${note.trim() ? ` "${note.trim().slice(0, 200)}"` : ""}` } }).catch(() => {});
@@ -239,6 +242,7 @@ export async function issueDiscipline(d: { playerId: number; kind: "SUSPENSION" 
     const fine = Math.max(0, Math.round(d.fine));
     await prisma.suspension.create({ data: { season: REGULAR_SEASON, playerId: d.playerId, playerName: name, teamId: org, incident, kind: "FINE", fine, status: "SERVED", source: "MANUAL" } });
     await prisma.transaction.create({ data: { type: "DISCIPLINE", message: `⚖️ Player Safety: ${name} fined $${fine.toLocaleString("en-US")} — ${incident}.` } }).catch(() => {});
+    await playerFineToBank(org, fine, `${name} fined — ${incident}`);
     await notifyClub(org, `⚖️ The commissioner fined ${name} $${fine.toLocaleString("en-US")}: ${incident}.`);
     return;
   }
@@ -247,9 +251,9 @@ export async function issueDiscipline(d: { playerId: number; kind: "SUSPENSION" 
   const forfeit = forfeitFor(pl.capHit ?? 0, games, repeat, await seasonDays());
   await prisma.suspension.create({ data: { season: REGULAR_SEASON, playerId: d.playerId, playerName: name, teamId: org, incident, games, forfeit, repeatOffender: repeat, source: "MANUAL" } });
   await syncPlayer(d.playerId);
-  await credit(org, forfeit);
+  if (!(await suspensionSalaryToBank(org, forfeit, `${name} suspended ${games} game${games === 1 ? "" : "s"} — salary forfeited`))) await credit(org, forfeit);
   await prisma.transaction.create({ data: { type: "DISCIPLINE", message: `⚖️ Player Safety: ${name} suspended ${games} game${games === 1 ? "" : "s"} — ${incident}. Forfeits ${money(forfeit)}.` } }).catch(() => {});
-  await notifyClub(org, `⚖️ The commissioner suspended ${name} for ${games} game${games === 1 ? "" : "s"}: ${incident}. He forfeits ${money(forfeit)} of salary (credited to your bank). You can appeal within ${APPEAL_HOURS} hours on the Player Safety page.`);
+  await notifyClub(org, `⚖️ The commissioner suspended ${name} for ${games} game${games === 1 ? "" : "s"}: ${incident}. He forfeits ${money(forfeit)} of salary (paid into the league bank). You can appeal within ${APPEAL_HOURS} hours on the Player Safety page.`);
 }
 
 export async function disciplineList(season = REGULAR_SEASON) {

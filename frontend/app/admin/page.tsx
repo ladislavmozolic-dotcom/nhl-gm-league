@@ -49,6 +49,7 @@ const GROUPS: Group[] = [
     titleKey: "admin.grpFinance",
     items: [
       { href: "/admin/finance", title: "Team Popularity", descKey: "admin.finance.d" },
+      { href: "/admin/league-bank", title: "🏦 League Bank", descKey: "admin.leagueBank.d" },
       { href: "/admin/cap-projection", title: "💰 Cap Limit Projections", descKey: "admin.capProjection.d" },
       { href: "/draft/lottery", title: "Draft Lottery", descKey: "admin.lottery.d" },
       { href: "/admin/real-drafts", title: "Real Draft Import", descKey: "admin.realDrafts.d" },

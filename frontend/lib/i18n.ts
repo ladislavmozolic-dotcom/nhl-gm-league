@@ -121,6 +121,7 @@ export const DICT: Dict = {
   "admin.ratings.d": { en: "Find a player and tune his ratings (OV, SC, PA…) — the sim reflects them.", cs: "Nájdi hráča a nalaď jeho ratingy (OV, SC, PA…) — sim ich odzrkadlí." },
   "admin.profile.d": { en: "Find a player and edit his bio — birth date, birthplace, nationality, height, weight, jersey number, shoots.", cs: "Nájdi hráča a uprav jeho profil — dátum narodenia, miesto narodenia, národnosť, výšku, váhu, číslo dresu, streľbu." },
   "admin.conditions.d": { en: "Track conditional trades; trigger settlement once conditions are met.", cs: "Sleduj podmienené trejdy; spusti vyrovnanie po splnení podmienok." },
+  "admin.leagueBank.d": { en: "League pot (20M): fines, suspension salary, bonuses, payouts + cap-overage accumulator.", cs: "Ligová kasa (20M): pokuty, platy z trestov, bonusy, výplaty + akumulátor prekročenia stropu." },
   "admin.finance.d": { en: "Set popularity — drives attendance and ticket revenue.", cs: "Nastav popularitu — poháňa návštevnosť a príjmy zo vstupného." },
   "admin.capProjection.d": { en: "Set projected salary cap ceilings for future seasons.", cs: "Nastav projektované cap limity pre budúce sezóny." },
   "admin.lottery.d": { en: "Draw the NHL-style lottery (16 non-playoff clubs, 2 weighted picks).", cs: "Vyžrebuj NHL-štýl lotériu (16 nepostupujúcich, 2 vážené picky)." },

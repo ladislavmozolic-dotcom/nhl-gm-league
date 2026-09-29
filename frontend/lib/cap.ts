@@ -6,6 +6,7 @@ import { prisma } from "./prisma";
 import { getLeagueClock } from "./calendar-server";
 import { loadLeagueCap } from "./free-agency-server";
 import { loadSettings } from "./sim/settings";
+import { capPenaltyFor } from "./cap-penalty";
 import { capCeilingForPhase, ltirRelief, deadMoneyForYear, liveCapHit, CURRENT_SEASON_START } from "./finance";
 
 export type CapStatus = {
@@ -31,6 +32,7 @@ export type CapStatus = {
   retentionPctUsed: number; retentionPctMax: number;
   retentionMaxPct: number; // max % a single contract may have retained (the slider's own cap)
   capUpper: number; // the real, uncushioned league cap ceiling — the base retentionPctUsed/Max are computed against
+  capPenalty: number; // ceiling reduction this club carries this season from past cap overages (League Bank)
 };
 
 export type RetentionStatus = {
@@ -103,7 +105,7 @@ export async function teamCapCommitted(teamId: number): Promise<{ totalSalaries:
 /** Cap status for one club. Pass `phaseOverride` (e.g. "regular") to test
  *  compliance against a different phase — used for the opening-day check. */
 export async function teamCapStatus(teamId: number, phaseOverride?: string): Promise<CapStatus> {
-  const [roster, capInfo, cap, clock, settings, retention, retainedIn] = await Promise.all([
+  const [roster, capInfo, cap, clock, settings, retention, retainedIn, capPenalty] = await Promise.all([
     prisma.player.findMany({ where: { teamId, rosterType: "NHL" }, select: { capHit: true, retainedSalary: true, injuryDaysLeft: true, condition: true, isGoalie: true, contractYears: true } }),
     teamCapCommitted(teamId),
     loadLeagueCap(),
@@ -111,6 +113,7 @@ export async function teamCapStatus(teamId: number, phaseOverride?: string): Pro
     loadSettings(),
     activeRetentionRecords(teamId),
     retainedInTotals(teamId),
+    capPenaltyFor(teamId, CURRENT_SEASON_START),
   ]);
   const phase = phaseOverride ?? clock.phase;
   const committed = capInfo.committed;
@@ -119,20 +122,21 @@ export async function teamCapStatus(teamId: number, phaseOverride?: string): Pro
   // and, same as there, a contract-less player's frozen capHit is 0, not stale.
   const ltirRoster = roster.map((p) => ({ ...p, capHit: Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0)) }));
   const ltir = ltirRelief(ltirRoster);
-  const ceiling = capCeilingForPhase(cap.upper, phase) + ltir;
+  const ceiling = capCeilingForPhase(cap.upper - capPenalty, phase) + ltir;
   const floor = cap.lower;
   return {
     committed, ltir, ceiling, space: ceiling - committed, floor,
     underFloorBy: Math.max(0, floor - committed),
     overBy: Math.max(0, committed - ceiling),
-    phase, cushioned: phase !== "regular" && phase !== "playoffs",
+    phase, cushioned: phase !== "regular",
     compliant: committed <= ceiling && committed >= floor,
-    strictSpace: cap.upper + ltir - committed,
+    strictSpace: cap.upper - capPenalty + ltir - committed,
     retentionSlotsOutUsed: retention.slotsUsed, retentionSlotsInUsed: retainedIn.count, retentionSlotsMax: settings.retentionMaxSlots,
     retentionPctUsed: cap.upper > 0 ? ((retention.deadCapAmount + retainedIn.dollars) / cap.upper) * 100 : 0,
     retentionPctMax: settings.retentionMaxTotalPct,
     retentionMaxPct: settings.retentionMaxPct,
     capUpper: cap.upper,
+    capPenalty,
   };
 }
 

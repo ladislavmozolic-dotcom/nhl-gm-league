@@ -10,6 +10,7 @@ const TABS = [
   { href: "/admin/simulation", label: "Simulation Engine" },
   { href: "/admin/team-lines", label: "Team Lines & Tactics" },
   { href: "/admin/contracts", label: "Contracts" },
+  { href: "/admin/league-bank", label: "League Bank" },
   { href: "/admin/ratings", label: "Player Ratings" },
 ];
 

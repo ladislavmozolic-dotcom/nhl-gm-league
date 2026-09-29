@@ -1934,3 +1934,67 @@ model GamePicksConfig {
   @@unique([season, league])
 }
 
+// League Bank — the commissioner's own pot (starts at 20M). Fines, forfeited
+// suspension salary and manual income flow in; bonuses / pick-em payouts flow out.
+// One singleton row (id 1) holds the opening balance + enforcement rules; every
+// movement is a LeagueBankEntry, so the balance is always openingBalance + Σ amount.
+model LeagueBank {
+  id                   Int      @id @default(1)
+  openingBalance       Int      @default(20000000)
+  enforcementEnabled   Boolean  @default(false) // daily automatic fines on/off
+  enforcementStart     String? // "YYYY-MM-DD" (Europe/Bratislava) — no fines before this day
+  lastEnforcedDay      String? // last day the automatic check already ran
+  nhlRosterFine        Int      @default(100000) // per day, NHL roster not compliant
+  ahlRosterFine        Int      @default(50000) // per day, AHL roster not compliant
+  capFinePerDay        Int      @default(200000) // per day over the cap
+  capPenaltyMultiplier Float    @default(2) // next-season cap reduction = accumulated overage × this
+  capAccumulate        String   @default("sum") // sum = every day's overage adds up | peak = only the worst day counts
+  finesForAiClubs      Boolean  @default(false) // clubs without a human GM (AI-run) are normally not fined
+  suspensionToBank     Boolean  @default(true) // forfeited suspension salary goes to the league bank
+  updatedAt            DateTime @updatedAt
+}
+
+model LeagueBankEntry {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  day       String? // "YYYY-MM-DD" the entry belongs to
+  kind      String // FINE_NHL_ROSTER | FINE_AHL_ROSTER | FINE_CAP | FINE_PLAYER | SUSPENSION_SALARY | BONUS | PAYOUT | INCOME | ADJUSTMENT | REFUND
+  amount    Int // + into the league bank, − out of it
+  teamId    Int? // club the money came from / went to
+  teamName  String?
+  note      String?
+  dedupeKey String?  @unique // makes the automatic daily fines idempotent
+
+  @@index([createdAt])
+  @@index([teamId])
+}
+
+// One row per club per day it sat over the salary cap (feeds the accumulator).
+model CapOverageDay {
+  id          Int    @id @default(autoincrement())
+  teamId      Int
+  day         String // "YYYY-MM-DD"
+  seasonStart Int // season the overage happened in (2026 = 2026-27)
+  overBy      Int
+  fine        Int    @default(0)
+
+  @@unique([teamId, day])
+  @@index([seasonStart])
+}
+
+// A cap-ceiling reduction a club carries into a later season, born from cap
+// overages: amount = accumulated overage × multiplier (+ commissioner adjustment).
+model TeamCapPenalty {
+  id                 Int      @id @default(autoincrement())
+  teamId             Int
+  sourceSeasonStart  Int // season the overages happened in
+  appliesSeasonStart Int // season whose cap ceiling is reduced (source + 1)
+  basis              Int      @default(0) // accumulated overage (per the bank's accumulate mode)
+  manualAdj          Int      @default(0) // ± commissioner adjustment on top
+  waived             Boolean  @default(false) // commissioner forgave it
+  note               String?
+  updatedAt          DateTime @updatedAt
+
+  @@unique([teamId, sourceSeasonStart])
+  @@index([appliesSeasonStart])
+}
