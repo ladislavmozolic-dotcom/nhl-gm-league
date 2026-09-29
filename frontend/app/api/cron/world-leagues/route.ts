@@ -3,6 +3,7 @@ import { importOhlSeason, importQmjhlSeason, importWhlSeason } from "@/lib/world
 import { importLiigaProspects } from "@/lib/world-import-liiga";
 import { importCzechExtraligaProspects, importShlProspects } from "@/lib/world-import-europe";
 import { importEuropeanJuniorLeagues } from "@/lib/world-import-juniors";
+import { importNcaaSeason } from "@/lib/world-import-ncaa";
 
 /** Daily CHL refresh. This remains deliberately separate from the simulation
  * cron: a temporary external-feed problem must never delay league simulation. */
@@ -12,7 +13,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   try {
-    const results = [await importWhlSeason(), await importOhlSeason(), await importQmjhlSeason()];
+    const results = [await importWhlSeason(), await importOhlSeason(), await importQmjhlSeason(), await importNcaaSeason()];
     const europe = [await importLiigaProspects(), await importShlProspects(), await importCzechExtraligaProspects()];
     const europeanJuniors = await importEuropeanJuniorLeagues();
     return NextResponse.json({ success: true, results, europe, europeanJuniors, timestamp: new Date().toISOString() });
