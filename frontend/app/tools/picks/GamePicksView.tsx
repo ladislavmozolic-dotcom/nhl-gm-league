@@ -249,8 +249,7 @@ export default function GamePicksView({
   const scheduledGames = games.filter((g) => g.status === "SCHEDULED");
   const finalGames = games.filter((g) => g.status === "FINAL");
 
-  const activeRound = config.activeRound;
-  const todayGames = scheduledGames.filter((g) => (activeRound ? g.round === activeRound : g.isFeatured));
+  const todayGames = scheduledGames.filter((g) => g.isFeatured);
   const gamesToDisplay =
     gameFilter === "today"
       ? (todayGames.length > 0 ? todayGames : scheduledGames.slice(0, 8))
@@ -517,7 +516,7 @@ export default function GamePicksView({
                   : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
               }`}
             >
-              <span>🔥 Dnešné zápasy {activeRound ? `(Deň #${activeRound})` : ""}</span>
+              <span>🔥 Dnešné zápasy</span>
               <span className="px-1.5 py-0.2 rounded bg-indigo-950 text-[10px] text-indigo-300 font-mono">
                 {todayGames.length > 0 ? todayGames.length : scheduledGames.slice(0, 8).length}
               </span>
