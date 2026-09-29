@@ -110,9 +110,15 @@ export async function saveGameOfTheWeekPickAction(
     return { ok: false, error: "Musíte byť prihlásený ako GM tímu." };
   }
 
-  const config = await getOrCreateGamePicksConfig(season, league);
-  if (!config.gameOfTheWeekId || config.gameOfTheWeekId !== pick.gameId) {
-    return { ok: false, error: "Zápas týždňa zatiaľ nebol vybraný administrátorom." };
+  let config = await getOrCreateGamePicksConfig(season, league);
+  if (!config.gameOfTheWeekId) {
+    await prisma.gamePicksConfig.update({
+      where: { season_league: { season, league } },
+      data: { gameOfTheWeekId: pick.gameId },
+    }).catch(() => {});
+    config.gameOfTheWeekId = pick.gameId;
+  } else if (config.gameOfTheWeekId !== pick.gameId) {
+    return { ok: false, error: "Zápas týždňa bol zmenený. Prosím obnovte stránku pre aktuálny zápas." };
   }
 
   const now = new Date();
@@ -222,3 +228,22 @@ export async function adminUpdateGamePicksConfigAction(
   revalidatePath("/tools/picks");
   return { ok: true };
 }
+
+export async function adminAutoSelectGotwAction(season = REGULAR_SEASON, league = "NHL") {
+  const admin = await isAdmin();
+  if (!admin) return { ok: false, error: "Prístup povolený len administrátorom." };
+
+  // Reset gameOfTheWeekId so getGamePicksData automatically calculates the best game
+  await prisma.gamePicksConfig.updateMany({
+    where: { season, league },
+    data: { gameOfTheWeekId: null },
+  });
+
+  const { getGamePicksData } = await import("@/lib/game-picks-server");
+  const data = await getGamePicksData(season, league);
+
+  revalidatePath("/league/picks");
+  revalidatePath("/tools/picks");
+  return { ok: true, gameOfTheWeekId: data.config.gameOfTheWeekId };
+}
+

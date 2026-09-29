@@ -7,6 +7,7 @@ import {
   saveGameOfTheWeekPickAction,
   evaluateGamePicksAction,
   adminUpdateGamePicksConfigAction,
+  adminAutoSelectGotwAction,
 } from "@/app/league/picks/game-actions";
 
 type Player = {
@@ -273,6 +274,21 @@ export default function GamePicksView({
         }
       } catch (err: any) {
         console.error("Set GOTW error:", err);
+      }
+    });
+  };
+
+  const handleAutoSelectGotw = () => {
+    startTransition(async () => {
+      try {
+        const res = await adminAutoSelectGotwAction(config.season, config.league);
+        if (res.ok) {
+          setMsg({ type: "success", text: "🤖 AI úspešne vybrala a nastavila najzaujímavejší zápas týždňa!" });
+        } else {
+          setMsg({ type: "error", text: res.error || "Chyba pri automatickom výbere zápasu týždňa." });
+        }
+      } catch (err: any) {
+        console.error("Auto select GOTW error:", err);
       }
     });
   };
@@ -795,13 +811,16 @@ export default function GamePicksView({
             <div className="p-6 rounded-2xl bg-gradient-to-br from-amber-950/40 via-slate-900 to-indigo-950/40 border border-amber-500/30 shadow-2xl space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-500/20 pb-4">
                 <div>
-                  <div className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <div className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5 flex-wrap">
                     <span>🌟 UNHL Game of the Week</span>
                     <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono text-[10px]">
                       Max 15 bodov
                     </span>
+                    <span className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-mono text-[10px] border border-indigo-500/30">
+                      🤖 AI Výber Týždňa
+                    </span>
                     {gotwSub && (
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono text-[10px] border border-emerald-500/30">
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono text-[10px] border border-emerald-500/30 font-bold">
                         🔒 Natipované & Uzamknuté
                       </span>
                     )}
@@ -810,30 +829,42 @@ export default function GamePicksView({
                     {gotwGame.awayTeam?.name} vs {gotwGame.homeTeam?.name}
                   </h2>
                   <p className="text-xs text-slate-300 mt-0.5">
-                    Špeciálny zápas týždňa. Natipujte víťaza, presné skóre, prvého strelca a najproduktívnejšieho hráča.
+                    Špeciálny zápas týždňa. Natipujte víťaza (1/X/2), presné skóre, prvého strelca a top bodujúceho hráča.
                   </p>
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
                   {isAdmin && (
-                    <select
-                      disabled={isPending}
-                      value={gotwGame.id}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        handleSetGotw(val ? Number(val) : null);
-                      }}
-                      className="px-3 py-2 rounded-xl bg-slate-900 border border-amber-500/40 text-amber-300 text-xs font-bold focus:outline-none focus:border-amber-400"
-                    >
-                      <option value="">-- Zrušiť výber Zápasu Týždňa --</option>
-                      {games
-                        .filter((g) => g.status === "SCHEDULED")
-                        .map((g) => (
-                          <option key={g.id} value={g.id}>
-                            👑 Zmeniť GOTW: {g.awayTeam?.name} vs {g.homeTeam?.name} ({g.gameDate ? new Date(g.gameDate).toLocaleDateString("sk-SK", { weekday: "short", day: "numeric", month: "short" }) : `Deň #${g.round}`})
-                          </option>
-                        ))}
-                    </select>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={handleAutoSelectGotw}
+                        className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/20 disabled:opacity-50 flex items-center gap-1"
+                        title="Nechať AI vybrať najatraktívnejší zápas týždňa"
+                      >
+                        <span>🤖 AI Auto-Výber</span>
+                      </button>
+
+                      <select
+                        disabled={isPending}
+                        value={gotwGame.id}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          handleSetGotw(val ? Number(val) : null);
+                        }}
+                        className="px-3 py-2 rounded-xl bg-slate-900 border border-amber-500/40 text-amber-300 text-xs font-bold focus:outline-none focus:border-amber-400"
+                      >
+                        <option value="">-- Zrušiť výber Zápasu Týždňa --</option>
+                        {games
+                          .filter((g) => g.status === "SCHEDULED")
+                          .map((g) => (
+                            <option key={g.id} value={g.id}>
+                              👑 Zmeniť GOTW: {g.awayTeam?.name} vs {g.homeTeam?.name} ({g.gameDate ? new Date(g.gameDate).toLocaleDateString("sk-SK", { weekday: "short", day: "numeric", month: "short" }) : `Deň #${g.round}`})
+                            </option>
+                          ))}
+                      </select>
+                    </div>
                   )}
 
                   <button
@@ -994,38 +1025,74 @@ export default function GamePicksView({
                   Zostáva vám {jokersLeft} Jokerov
                 </span>
               </div>
+
+              {/* Bottom Save Action Bar */}
+              <div className="pt-4 border-t border-amber-500/20 flex flex-col sm:flex-row items-center justify-between gap-3 bg-amber-950/20 p-4 rounded-xl">
+                <div className="text-xs text-slate-300">
+                  {gotwSub ? (
+                    <span className="text-emerald-400 font-bold flex items-center gap-1.5">
+                      ✅ Váš tip na Zápas týždňa je úspešne uložený a uzamknutý.
+                    </span>
+                  ) : (
+                    <span>Tipujte výsledok, skóre a hráčov. Po kliknutí na tlačidlo sa váš tip odošle a uzamkne.</span>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  disabled={isPending || gotwGame.isLocked || Boolean(gotwSub)}
+                  onClick={handleSaveGotw}
+                  className={`w-full sm:w-auto px-7 py-3 rounded-xl text-xs font-black transition-all shadow-xl flex items-center justify-center gap-2 ${
+                    gotwSub
+                      ? "bg-slate-800 text-slate-400 border border-slate-700 cursor-not-allowed"
+                      : "bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-amber-600/40 cursor-pointer active:scale-95"
+                  }`}
+                >
+                  <span>{gotwSub ? "🔒 Tip odoslaný (Uzamknuté)" : "💾 Uložiť Tip na Zápas Týždňa"}</span>
+                </button>
+              </div>
             </div>
           </div>
         ) : (
           <div className="p-8 rounded-2xl bg-slate-900/60 border border-slate-800 text-center space-y-4">
-            <div className="text-4xl">⏳</div>
-            <h3 className="text-base font-bold text-white">Zápas Týždňa (Game of the Week) zatiaľ nebol vybraný</h3>
+            <div className="text-4xl">🤖</div>
+            <h3 className="text-base font-bold text-white">Zápas Týždňa (Game of the Week)</h3>
             <p className="text-xs text-slate-400 max-w-md mx-auto">
-              Týždňová tipovačka bude sprístupnená ihneď, ako administrátor ligy vyberie oficiálny Zápas Týždňa.
+              AI automaticky vyhodnocuje program a vyberá najatraktívnejší duel týždňa.
             </p>
 
             {isAdmin && (
               <div className="mt-4 p-5 rounded-2xl bg-slate-950/90 border border-amber-500/40 text-left max-w-lg mx-auto space-y-3 shadow-xl">
                 <div className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
-                  <span>👑 Administrácia: Vyberte oficiálny Zápas Týždňa</span>
+                  <span>👑 Administrácia Zápasu Týždňa</span>
                 </div>
-                <select
-                  disabled={isPending}
-                  onChange={(e) => {
-                    if (e.target.value) handleSetGotw(Number(e.target.value));
-                  }}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs font-bold focus:border-amber-500"
-                  defaultValue=""
-                >
-                  <option value="" disabled>-- Vyberte zápas týždňa z programu --</option>
-                  {games
-                    .filter((g) => g.status === "SCHEDULED")
-                    .map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {g.awayTeam?.name} vs {g.homeTeam?.name} ({g.gameDate ? new Date(g.gameDate).toLocaleDateString("sk-SK", { weekday: "short", day: "numeric", month: "short" }) : `Deň #${g.round}`})
-                      </option>
-                    ))}
-                </select>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={handleAutoSelectGotw}
+                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/20"
+                  >
+                    🤖 Spustiť AI Auto-Výber
+                  </button>
+                  <select
+                    disabled={isPending}
+                    onChange={(e) => {
+                      if (e.target.value) handleSetGotw(Number(e.target.value));
+                    }}
+                    className="flex-1 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs font-bold focus:border-amber-500"
+                    defaultValue=""
+                  >
+                    <option value="" disabled>-- Alebo vyberte manuálne --</option>
+                    {games
+                      .filter((g) => g.status === "SCHEDULED")
+                      .map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.awayTeam?.name} vs {g.homeTeam?.name} ({g.gameDate ? new Date(g.gameDate).toLocaleDateString("sk-SK", { weekday: "short", day: "numeric", month: "short" }) : `Deň #${g.round}`})
+                        </option>
+                      ))}
+                  </select>
+                </div>
               </div>
             )}
           </div>

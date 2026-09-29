@@ -380,11 +380,24 @@ export async function getGamePicksData(season = REGULAR_SEASON, league = "NHL", 
     return tA - tB;
   });
 
-  // Game of the Week is ONLY active when explicitly chosen by admin
-  const gotwId =
+  // Find top upcoming scheduled game chosen by AI
+  const topScheduledCandidate = scoredGames.find((sg) => sg.game.status === "SCHEDULED" && !sg.game.isLocked)?.game;
+  const bestCandidate = topScheduledCandidate || scoredGames[0]?.game;
+
+  let gotwId =
     config.gameOfTheWeekId && mappedGames.some((g) => g.id === config.gameOfTheWeekId)
       ? config.gameOfTheWeekId
       : null;
+
+  // If no GOTW is currently active or previous GOTW is finished/not found, AI picks the most interesting game of the week
+  if (!gotwId && bestCandidate) {
+    gotwId = bestCandidate.id;
+    // Persist AI selection to DB so everyone in the league has the exact same GOTW
+    await prisma.gamePicksConfig.update({
+      where: { season_league: { season, league } },
+      data: { gameOfTheWeekId: gotwId },
+    }).catch(() => {});
+  }
 
   const allGameIds = mappedGames.map((g) => g.id);
 
