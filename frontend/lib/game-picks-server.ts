@@ -86,7 +86,7 @@ export async function getOrCreateGamePicksProfile(teamId: number, season = REGUL
 }
 
 /** Fetch live real NHL schedule from api-web.nhle.com with local database fallback */
-async function fetchRealNhlSchedule(): Promise<any[]> {
+export async function fetchRealNhlSchedule(): Promise<any[]> {
   try {
     const res = await fetch("https://api-web.nhle.com/v1/schedule/now", {
       next: { revalidate: 60 },
@@ -380,12 +380,11 @@ export async function getGamePicksData(season = REGULAR_SEASON, league = "NHL", 
     return tA - tB;
   });
 
-  // Stable Marquee Match of the Week (Game of the Week)
-  const bestMarqueeGame = scoredGames[0]?.game;
+  // Game of the Week is ONLY active when explicitly chosen by admin
   const gotwId =
-    (config.gameOfTheWeekId && mappedGames.some((g) => g.id === config.gameOfTheWeekId))
+    config.gameOfTheWeekId && mappedGames.some((g) => g.id === config.gameOfTheWeekId)
       ? config.gameOfTheWeekId
-      : bestMarqueeGame?.id || scheduledGames[0]?.id || mappedGames[0]?.id;
+      : null;
 
   const allGameIds = mappedGames.map((g) => g.id);
 

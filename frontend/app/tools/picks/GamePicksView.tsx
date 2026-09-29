@@ -258,7 +258,7 @@ export default function GamePicksView({
     }
   }, [gotwGame?.id, viewerSubmissions]);
 
-  const handleSetGotw = (gameId: number) => {
+  const handleSetGotw = (gameId: number | null) => {
     startTransition(async () => {
       try {
         const res = await adminUpdateGamePicksConfigAction(
@@ -267,7 +267,7 @@ export default function GamePicksView({
           config.league
         );
         if (res.ok) {
-          setMsg({ type: "success", text: "✅ Zápas týždňa (Game of the Week) bol úspešne zmenený!" });
+          setMsg({ type: "success", text: gameId ? "✅ Zápas týždňa (Game of the Week) bol úspešne nastavený!" : "✅ Výber Zápasu Týždňa bol zrušený." });
         } else {
           setMsg({ type: "error", text: res.error || "Chyba pri zmene zápasu týždňa." });
         }
@@ -464,21 +464,19 @@ export default function GamePicksView({
             </span>
           </button>
 
-          {gotwGame && (
-            <button
-              onClick={() => setActiveSubTab("gotw")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                activeSubTab === "gotw"
-                  ? "bg-amber-600 text-white shadow-md shadow-amber-600/30"
-                  : "bg-slate-800/80 text-amber-300 hover:bg-slate-800 border border-amber-500/20"
-              }`}
-            >
-              <span>🌟 Game of the Week</span>
-              <span className="px-1.5 py-0.2 rounded bg-amber-950/80 text-[10px] text-amber-300 font-mono">
-                15 b
-              </span>
-            </button>
-          )}
+          <button
+            onClick={() => setActiveSubTab("gotw")}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              activeSubTab === "gotw"
+                ? "bg-amber-600 text-white shadow-md shadow-amber-600/30"
+                : "bg-slate-800/80 text-amber-300 hover:bg-slate-800 border border-amber-500/20"
+            }`}
+          >
+            <span>🌟 Game of the Week</span>
+            <span className="px-1.5 py-0.2 rounded bg-amber-950/80 text-[10px] text-amber-300 font-mono">
+              {gotwGame ? "15 b" : "Čaká na výber"}
+            </span>
+          </button>
 
           <button
             onClick={() => setActiveSubTab("leaderboard")}
@@ -778,199 +776,238 @@ export default function GamePicksView({
       )}
 
       {/* SUBTAB 2: GAME OF THE WEEK */}
-      {activeSubTab === "gotw" && gotwGame && (
-        <div className="space-y-6">
-          <div className="p-6 rounded-2xl bg-gradient-to-br from-amber-950/40 via-slate-900 to-indigo-950/40 border border-amber-500/30 shadow-2xl space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-500/20 pb-4">
-              <div>
-                <div className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <span>🌟 UNHL Game of the Week</span>
-                  <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono text-[10px]">
-                    Max 15 bodov
-                  </span>
+      {activeSubTab === "gotw" && (
+        gotwGame ? (
+          <div className="space-y-6">
+            <div className="p-6 rounded-2xl bg-gradient-to-br from-amber-950/40 via-slate-900 to-indigo-950/40 border border-amber-500/30 shadow-2xl space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-500/20 pb-4">
+                <div>
+                  <div className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>🌟 UNHL Game of the Week</span>
+                    <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono text-[10px]">
+                      Max 15 bodov
+                    </span>
+                  </div>
+                  <h2 className="text-xl sm:text-2xl font-black text-white mt-1">
+                    {gotwGame.awayTeam?.name} vs {gotwGame.homeTeam?.name}
+                  </h2>
+                  <p className="text-xs text-slate-300 mt-0.5">
+                    Špeciálny zápas týždňa. Natipujte víťaza, presné skóre, prvého strelca a najproduktívnejšieho hráča.
+                  </p>
                 </div>
-                <h2 className="text-xl sm:text-2xl font-black text-white mt-1">
-                  {gotwGame.awayTeam?.name} vs {gotwGame.homeTeam?.name}
-                </h2>
-                <p className="text-xs text-slate-300 mt-0.5">
-                  Špeciálny zápas týždňa (vybraný na celý týždeň po-ne). Natipujte víťaza, presné skóre, prvého strelca a najproduktívnejšieho hráča.
-                </p>
-              </div>
 
-              <div className="flex items-center gap-2 flex-wrap">
-                {isAdmin && (
-                  <select
-                    disabled={isPending}
-                    value={gotwGame.id}
-                    onChange={(e) => handleSetGotw(Number(e.target.value))}
-                    className="px-3 py-2 rounded-xl bg-slate-900 border border-amber-500/40 text-amber-300 text-xs font-bold focus:outline-none focus:border-amber-400"
-                  >
-                    {games
-                      .filter((g) => g.status === "SCHEDULED")
-                      .map((g) => (
-                        <option key={g.id} value={g.id}>
-                          👑 Admin GOTW: {g.awayTeam?.name} vs {g.homeTeam?.name} ({g.gameDate ? new Date(g.gameDate).toLocaleDateString("sk-SK", { weekday: "short", day: "numeric", month: "short" }) : `Deň #${g.round}`})
-                        </option>
-                      ))}
-                  </select>
-                )}
-
-                <button
-                  type="button"
-                  disabled={isPending || gotwGame.isLocked}
-                  onClick={handleSaveGotw}
-                  className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition-all shadow-lg shadow-amber-600/30 flex-shrink-0 flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  <span>💾 Uložiť Tip na Zápas Týždňa</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Matchup Header */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Pick Winner */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-slate-300">
-                  1. Výsledok po 60 min. (2 body: 1 - X - 2)
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    disabled={gotwGame.isLocked}
-                    onClick={() => setGotwPick({ ...gotwPick, winnerTeamId: gotwGame.awayTeamId })}
-                    className={`p-3 rounded-xl border text-center transition-all ${
-                      gotwPick.winnerTeamId === gotwGame.awayTeamId
-                        ? "bg-amber-600 border-amber-400 text-white font-bold shadow-lg"
-                        : "bg-slate-950/80 border-slate-800 text-slate-300 hover:bg-slate-800"
-                    }`}
-                  >
-                    <div className="text-sm font-bold truncate">{gotwGame.awayTeam?.name}</div>
-                    <div className="text-[10px] text-slate-400 font-mono">2 (Hostia)</div>
-                  </button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {isAdmin && (
+                    <select
+                      disabled={isPending}
+                      value={gotwGame.id}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        handleSetGotw(val ? Number(val) : null);
+                      }}
+                      className="px-3 py-2 rounded-xl bg-slate-900 border border-amber-500/40 text-amber-300 text-xs font-bold focus:outline-none focus:border-amber-400"
+                    >
+                      <option value="">-- Zrušiť výber Zápasu Týždňa --</option>
+                      {games
+                        .filter((g) => g.status === "SCHEDULED")
+                        .map((g) => (
+                          <option key={g.id} value={g.id}>
+                            👑 Zmeniť GOTW: {g.awayTeam?.name} vs {g.homeTeam?.name} ({g.gameDate ? new Date(g.gameDate).toLocaleDateString("sk-SK", { weekday: "short", day: "numeric", month: "short" }) : `Deň #${g.round}`})
+                          </option>
+                        ))}
+                    </select>
+                  )}
 
                   <button
                     type="button"
-                    disabled={gotwGame.isLocked}
-                    onClick={() => setGotwPick({ ...gotwPick, winnerTeamId: 0 })}
-                    className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center justify-center ${
-                      gotwPick.winnerTeamId === 0
-                        ? "bg-amber-600 border-amber-400 text-white font-bold shadow-lg"
-                        : "bg-slate-950/80 border-slate-800 text-slate-300 hover:bg-slate-800"
-                    }`}
+                    disabled={isPending || gotwGame.isLocked}
+                    onClick={handleSaveGotw}
+                    className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition-all shadow-lg shadow-amber-600/30 flex-shrink-0 flex items-center justify-center gap-2 disabled:opacity-50"
                   >
-                    <div className="text-sm font-black text-white">X</div>
-                    <div className="text-[10px] text-slate-400 font-mono">Remíza (OT/SO)</div>
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={gotwGame.isLocked}
-                    onClick={() => setGotwPick({ ...gotwPick, winnerTeamId: gotwGame.homeTeamId })}
-                    className={`p-3 rounded-xl border text-center transition-all ${
-                      gotwPick.winnerTeamId === gotwGame.homeTeamId
-                        ? "bg-amber-600 border-amber-400 text-white font-bold shadow-lg"
-                        : "bg-slate-950/80 border-slate-800 text-slate-300 hover:bg-slate-800"
-                    }`}
-                  >
-                    <div className="text-sm font-bold truncate">{gotwGame.homeTeam?.name}</div>
-                    <div className="text-[10px] text-slate-400 font-mono">1 (Doma)</div>
+                    <span>💾 Uložiť Tip na Zápas Týždňa</span>
                   </button>
                 </div>
               </div>
 
-              {/* Exact Score */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-slate-300">
-                  2. Presné skóre (5 bodov)
-                </label>
-                <input
-                  type="text"
-                  disabled={gotwGame.isLocked}
-                  placeholder="napr. 5:3 alebo 4:2"
-                  value={gotwPick.predictedScore}
-                  onChange={(e) => setGotwPick({ ...gotwPick, predictedScore: e.target.value })}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleSaveGotw();
+              {/* Matchup Header */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Pick Winner */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-300">
+                    1. Výsledok po 60 min. (2 body: 1 - X - 2)
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      disabled={gotwGame.isLocked}
+                      onClick={() => setGotwPick({ ...gotwPick, winnerTeamId: gotwGame.awayTeamId })}
+                      className={`p-3 rounded-xl border text-center transition-all ${
+                        gotwPick.winnerTeamId === gotwGame.awayTeamId
+                          ? "bg-amber-600 border-amber-400 text-white font-bold shadow-lg"
+                          : "bg-slate-950/80 border-slate-800 text-slate-300 hover:bg-slate-800"
+                      }`}
+                    >
+                      <div className="text-sm font-bold truncate">{gotwGame.awayTeam?.name}</div>
+                      <div className="text-[10px] text-slate-400 font-mono">2 (Hostia)</div>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={gotwGame.isLocked}
+                      onClick={() => setGotwPick({ ...gotwPick, winnerTeamId: 0 })}
+                      className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center justify-center ${
+                        gotwPick.winnerTeamId === 0
+                          ? "bg-amber-600 border-amber-400 text-white font-bold shadow-lg"
+                          : "bg-slate-950/80 border-slate-800 text-slate-300 hover:bg-slate-800"
+                      }`}
+                    >
+                      <div className="text-sm font-black text-white">X</div>
+                      <div className="text-[10px] text-slate-400 font-mono">Remíza (OT/SO)</div>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={gotwGame.isLocked}
+                      onClick={() => setGotwPick({ ...gotwPick, winnerTeamId: gotwGame.homeTeamId })}
+                      className={`p-3 rounded-xl border text-center transition-all ${
+                        gotwPick.winnerTeamId === gotwGame.homeTeamId
+                          ? "bg-amber-600 border-amber-400 text-white font-bold shadow-lg"
+                          : "bg-slate-950/80 border-slate-800 text-slate-300 hover:bg-slate-800"
+                      }`}
+                    >
+                      <div className="text-sm font-bold truncate">{gotwGame.homeTeam?.name}</div>
+                      <div className="text-[10px] text-slate-400 font-mono">1 (Doma)</div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Exact Score */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-300">
+                    2. Presné skóre (5 bodov)
+                  </label>
+                  <input
+                    type="text"
+                    disabled={gotwGame.isLocked}
+                    placeholder="napr. 5:3 alebo 4:2"
+                    value={gotwPick.predictedScore}
+                    onChange={(e) => setGotwPick({ ...gotwPick, predictedScore: e.target.value })}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleSaveGotw();
+                      }
+                    }}
+                    className="w-full px-3 py-2.5 bg-slate-950/90 border border-slate-700 rounded-xl text-sm font-bold text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                {/* First Goal Scorer */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-300">
+                    3. Prvý strelec zápasu (5 bodov)
+                  </label>
+                  <SearchablePlayerSelect
+                    disabled={gotwGame.isLocked}
+                    value={gotwPick.firstGoalScorerId}
+                    players={players}
+                    teams={teams}
+                    placeholder="-- Vyberte prvého strelca gólu --"
+                    filter={(p) =>
+                      !p.isGoalie &&
+                      (p.teamId === gotwGame.homeTeamId || p.teamId === gotwGame.awayTeamId)
                     }
-                  }}
-                  className="w-full px-3 py-2.5 bg-slate-950/90 border border-slate-700 rounded-xl text-sm font-bold text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
-                />
+                    onChange={(pid, pObj) =>
+                      setGotwPick({
+                        ...gotwPick,
+                        firstGoalScorerId: pid,
+                        firstGoalScorerName: pObj?.name,
+                      })
+                    }
+                  />
+                </div>
+
+                {/* Top Scorer */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-300">
+                    4. Hráč s najviac bodmi v zápase (3 body)
+                  </label>
+                  <SearchablePlayerSelect
+                    disabled={gotwGame.isLocked}
+                    value={gotwPick.topScorerPlayerId}
+                    players={players}
+                    teams={teams}
+                    placeholder="-- Vyberte hráča s najviac bodmi --"
+                    filter={(p) =>
+                      !p.isGoalie &&
+                      (p.teamId === gotwGame.homeTeamId || p.teamId === gotwGame.awayTeamId)
+                    }
+                    onChange={(pid, pObj) =>
+                      setGotwPick({
+                        ...gotwPick,
+                        topScorerPlayerId: pid,
+                        topScorerPlayerName: pObj?.name,
+                      })
+                    }
+                  />
+                </div>
               </div>
 
-              {/* First Goal Scorer */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-slate-300">
-                  3. Prvý strelec zápasu (5 bodov)
+              {/* Joker Modifer on GOTW */}
+              <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
+                <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-200">
+                  <input
+                    type="checkbox"
+                    disabled={gotwGame.isLocked || (jokersLeft <= 0 && !gotwPick.isJoker)}
+                    checked={gotwPick.isJoker || false}
+                    onChange={(e) => setGotwPick({ ...gotwPick, isJoker: e.target.checked })}
+                    className="rounded border-slate-700 text-amber-500 focus:ring-amber-500 bg-slate-900"
+                  />
+                  <span className="font-bold text-amber-300">
+                    🃏 Použiť Jokera na Zápas Týždňa (Body ×3 = až 45 bodov!)
+                  </span>
                 </label>
-                <SearchablePlayerSelect
-                  disabled={gotwGame.isLocked}
-                  value={gotwPick.firstGoalScorerId}
-                  players={players}
-                  teams={teams}
-                  placeholder="-- Vyberte prvého strelca gólu --"
-                  filter={(p) =>
-                    !p.isGoalie &&
-                    (p.teamId === gotwGame.homeTeamId || p.teamId === gotwGame.awayTeamId)
-                  }
-                  onChange={(pid, pObj) =>
-                    setGotwPick({
-                      ...gotwPick,
-                      firstGoalScorerId: pid,
-                      firstGoalScorerName: pObj?.name,
-                    })
-                  }
-                />
-              </div>
 
-              {/* Top Scorer */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-slate-300">
-                  4. Hráč s najviac bodmi v zápase (3 body)
-                </label>
-                <SearchablePlayerSelect
-                  disabled={gotwGame.isLocked}
-                  value={gotwPick.topScorerPlayerId}
-                  players={players}
-                  teams={teams}
-                  placeholder="-- Vyberte hráča s najviac bodmi --"
-                  filter={(p) =>
-                    !p.isGoalie &&
-                    (p.teamId === gotwGame.homeTeamId || p.teamId === gotwGame.awayTeamId)
-                  }
-                  onChange={(pid, pObj) =>
-                    setGotwPick({
-                      ...gotwPick,
-                      topScorerPlayerId: pid,
-                      topScorerPlayerName: pObj?.name,
-                    })
-                  }
-                />
-              </div>
-            </div>
-
-            {/* Joker Modifer on GOTW */}
-            <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
-              <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-200">
-                <input
-                  type="checkbox"
-                  disabled={gotwGame.isLocked || (jokersLeft <= 0 && !gotwPick.isJoker)}
-                  checked={gotwPick.isJoker || false}
-                  onChange={(e) => setGotwPick({ ...gotwPick, isJoker: e.target.checked })}
-                  className="rounded border-slate-700 text-amber-500 focus:ring-amber-500 bg-slate-900"
-                />
-                <span className="font-bold text-amber-300">
-                  🃏 Použiť Jokera na Zápas Týždňa (Body ×3 = až 45 bodov!)
+                <span className="text-[11px] text-slate-400 font-mono">
+                  Zostáva vám {jokersLeft} Jokerov
                 </span>
-              </label>
-
-              <span className="text-[11px] text-slate-400 font-mono">
-                Zostáva vám {jokersLeft} Jokerov
-              </span>
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="p-8 rounded-2xl bg-slate-900/60 border border-slate-800 text-center space-y-4">
+            <div className="text-4xl">⏳</div>
+            <h3 className="text-base font-bold text-white">Zápas Týždňa (Game of the Week) zatiaľ nebol vybraný</h3>
+            <p className="text-xs text-slate-400 max-w-md mx-auto">
+              Týždňová tipovačka bude sprístupnená ihneď, ako administrátor ligy vyberie oficiálny Zápas Týždňa.
+            </p>
+
+            {isAdmin && (
+              <div className="mt-4 p-5 rounded-2xl bg-slate-950/90 border border-amber-500/40 text-left max-w-lg mx-auto space-y-3 shadow-xl">
+                <div className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                  <span>👑 Administrácia: Vyberte oficiálny Zápas Týždňa</span>
+                </div>
+                <select
+                  disabled={isPending}
+                  onChange={(e) => {
+                    if (e.target.value) handleSetGotw(Number(e.target.value));
+                  }}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs font-bold focus:border-amber-500"
+                  defaultValue=""
+                >
+                  <option value="" disabled>-- Vyberte zápas týždňa z programu --</option>
+                  {games
+                    .filter((g) => g.status === "SCHEDULED")
+                    .map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.awayTeam?.name} vs {g.homeTeam?.name} ({g.gameDate ? new Date(g.gameDate).toLocaleDateString("sk-SK", { weekday: "short", day: "numeric", month: "short" }) : `Deň #${g.round}`})
+                      </option>
+                    ))}
+                </select>
+              </div>
+            )}
+          </div>
+        )
       )}
 
       {/* SUBTAB 3: LEADERBOARD & MONTHLY */}
