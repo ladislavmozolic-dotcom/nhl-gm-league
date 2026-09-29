@@ -242,3 +242,41 @@ export async function enforceLeagueBankIfDue(now: Date = new Date()) {
   if (bank.lastEnforcedDay === dateStr) return { ran: false, reason: "already enforced today", picks };
   return { ...(await enforceLeagueDay(dateStr)), picks };
 }
+
+export type WorldSyncCronResult = { ran: false; reason: string } | { ran: true; timestamp: string };
+
+const WORLD_SYNC_HOUR = 6;
+const WORLD_SYNC_WINDOW_MINUTES = 30; // 06:00 - 06:30 Europe/Bratislava
+
+/**
+ * Called on every 5-minute tick by /api/cron/advance-day.
+ * Automatically synchronizes all Around the World prospect feeds and stats
+ * every morning between 06:00 and 06:30 Europe/Bratislava. Idempotent per day.
+ */
+export async function autoSyncWorldLeaguesIfDue(now: Date = new Date()): Promise<WorldSyncCronResult> {
+  const { hour, minute, dateStr } = bratislavaParts(now);
+  if (!(hour === WORLD_SYNC_HOUR && minute >= 0 && minute < WORLD_SYNC_WINDOW_MINUTES)) {
+    return {
+      ran: false,
+      reason: `outside 06:00 Europe/Bratislava window (now ${hour}:${String(minute).padStart(2, "0")})`,
+    };
+  }
+
+  // Check if already synced today
+  const latestStat = await prisma.worldPlayerSeasonStat.findFirst({
+    orderBy: { syncedAt: "desc" },
+    select: { syncedAt: true },
+  });
+
+  if (latestStat?.syncedAt) {
+    const { dateStr: lastDateStr } = bratislavaParts(latestStat.syncedAt);
+    if (lastDateStr === dateStr) {
+      return { ran: false, reason: "already synced today" };
+    }
+  }
+
+  const { runFullWorldSync } = await import("@/lib/world-sync");
+  const res = await runFullWorldSync();
+  return { ran: true, timestamp: res.timestamp };
+}
+

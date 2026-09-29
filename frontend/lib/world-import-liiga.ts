@@ -15,25 +15,32 @@ export async function importLiigaProspects() {
   const standingsResponse = await fetch(`https://www.liiga.fi/api/v2/standings/?season=${season}`, { headers: { "User-Agent": "UNHL Around-the-World/1.0 (+https://unhl.eu)" }, cache: "no-store", signal: AbortSignal.timeout(20_000) });
   const standings = standingsResponse.ok ? await standingsResponse.json() as { season?: Array<{ teamName?: string; teamLogos?: { darkBg?: string } }> } : {};
   const teamLogos = new Map((standings.season ?? []).map((t) => [t.teamName, t.teamLogos?.darkBg]));
-  const prospects = await prisma.prospect.findMany({ select: { id: true, name: true, epUrl: true, worldPlayerId: true, worldPlayer: { select: { externalId: true } } } });
+  const prospects = await prisma.prospect.findMany({ select: { id: true, name: true, epUrl: true, worldPlayerId: true, source: true } });
   const wanted = new Map<string, typeof prospects>();
-  for (const p of prospects) wanted.set(norm(p.name), [...(wanted.get(norm(p.name)) ?? []), p]);
+  for (const p of prospects) {
+    const k = norm(p.name.replace(/\s*\([^)]*\)/g, "").trim());
+    wanted.set(k, [...(wanted.get(k) ?? []), p]);
+  }
   const league = await prisma.worldLeague.upsert({ where: { code: "LIIGA" }, update: {}, create: { code: "LIIGA", name: "Liiga", country: "Finland", region: "Europe" } });
   let imported = 0;
   let goalies = 0;
   for (const row of [...rows, ...goalieRows]) {
     const isGoalie = row.goalkeeper === true;
-    const name = `${row.firstName ?? ""} ${row.lastName ?? ""}`.trim(); const matches = wanted.get(norm(name)) ?? [];
-    if (matches.length !== 1 || !row.playerId) continue;
-    const p = matches[0];
+    const name = `${row.firstName ?? ""} ${row.lastName ?? ""}`.trim();
+    if (!name || !row.playerId) continue;
+    const matches = wanted.get(norm(name)) ?? [];
+    if (!matches.length) continue;
     const externalId = `liiga:${row.playerId}`;
-    if (p.worldPlayerId && p.worldPlayer?.externalId !== externalId) continue;
+    const p = matches[0];
     const teamName = String(row.teamName ?? "Unknown"); const teamSlug = String(row.teamShortName ?? teamName).toLowerCase();
     const logoUrl = teamLogos.get(teamName) ?? null;
     const team = await prisma.worldTeam.upsert({ where: { leagueId_slug: { leagueId: league.id, slug: teamSlug } }, update: { name: teamName, logoUrl }, create: { leagueId: league.id, slug: teamSlug, name: teamName, logoUrl } });
     const player = await prisma.worldPlayer.upsert({ where: { externalId }, update: { name, normalizedName: norm(name), position: isGoalie ? "G" : String(row.role ?? "") || null, nationality: String(row.nationality ?? "") || null, currentTeamId: team.id, epUrl: p.epUrl }, create: { externalId, name, normalizedName: norm(name), position: isGoalie ? "G" : String(row.role ?? "") || null, nationality: String(row.nationality ?? "") || null, currentTeamId: team.id, epUrl: p.epUrl } });
     await prisma.worldPlayerSeasonStat.upsert({ where: { playerId_leagueId_season: { playerId: player.id, leagueId: league.id, season: `${season - 1}-${String(season).slice(2)}` } }, update: { teamId: team.id, isGoalie, gamesPlayed: number(isGoalie ? row.playedGames ?? row.games : row.games), goals: number(row.goals), assists: number(row.assists), points: number(row.points), plusMinus: isGoalie ? null : number(row.plusMinus), penaltyMinutes: number(row.penaltyMinutes), wins: isGoalie ? number(row.gkWins) : null, losses: isGoalie ? number(row.gkLosses) : null, savePercentage: isGoalie && row.savePercentage != null ? Number(row.savePercentage) : null, goalsAgainstAverage: isGoalie && row.goalsAgainstAvg != null ? Number(row.goalsAgainstAvg) : null, shutouts: isGoalie ? number(row.shutOut) : null, source: "official-feed", syncedAt: new Date() }, create: { playerId: player.id, leagueId: league.id, teamId: team.id, season: `${season - 1}-${String(season).slice(2)}`, isGoalie, gamesPlayed: number(isGoalie ? row.playedGames ?? row.games : row.games), goals: number(row.goals), assists: number(row.assists), points: number(row.points), plusMinus: isGoalie ? null : number(row.plusMinus), penaltyMinutes: number(row.penaltyMinutes), wins: isGoalie ? number(row.gkWins) : null, losses: isGoalie ? number(row.gkLosses) : null, savePercentage: isGoalie && row.savePercentage != null ? Number(row.savePercentage) : null, goalsAgainstAverage: isGoalie && row.goalsAgainstAvg != null ? Number(row.goalsAgainstAvg) : null, shutouts: isGoalie ? number(row.shutOut) : null, source: "official-feed" } });
-    if (!p.worldPlayerId) await prisma.prospect.update({ where: { id: p.id }, data: { worldPlayerId: player.id } });
+    for (const match of matches) {
+      if (match.worldPlayerId !== player.id) await prisma.prospect.update({ where: { id: match.id }, data: { worldPlayerId: player.id } });
+      if (match.epUrl && !player.epUrl) await prisma.worldPlayer.update({ where: { id: player.id }, data: { epUrl: match.epUrl } });
+    }
     imported++;
     if (isGoalie) goalies++;
   }

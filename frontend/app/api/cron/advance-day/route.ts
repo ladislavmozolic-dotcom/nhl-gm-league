@@ -13,6 +13,7 @@ import {
   cleanupDeclinedTrades,
   autoEvaluateGamePicksIfDue,
   enforceLeagueBankIfDue,
+  autoSyncWorldLeaguesIfDue,
 } from "@/lib/season-cron";
 
 export async function POST(req: NextRequest) {
@@ -35,5 +36,6 @@ export async function POST(req: NextRequest) {
   const deadline = await runDeadlineIfDue(now).catch((e) => `error: ${(e as Error).message}`);
   const gamePicks = await autoEvaluateGamePicksIfDue(now).catch((e) => `error: ${(e as Error).message}`);
   const leagueBank = await enforceLeagueBankIfDue(now).catch((e) => `error: ${(e as Error).message}`);
-  return NextResponse.json({ ...result, rollover, frenzy, declinedCleanup, allStar, deadline, gamePicks, leagueBank });
+  const worldLeagues = await autoSyncWorldLeaguesIfDue(now).catch((e) => `error: ${(e as Error).message}`);
+  return NextResponse.json({ ...result, rollover, frenzy, declinedCleanup, allStar, deadline, gamePicks, leagueBank, worldLeagues });
 }

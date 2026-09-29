@@ -7,6 +7,7 @@ export const WORLD_LEAGUE_CATALOG = [
   { code: "WHL", name: "Western Hockey League", country: "Canada / USA", region: "North America" },
   { code: "OHL", name: "Ontario Hockey League", country: "Canada", region: "North America" },
   { code: "QMJHL", name: "Quebec Maritimes Junior Hockey League", country: "Canada", region: "North America" },
+  { code: "AHL", name: "American Hockey League", country: "USA / Canada", region: "North America" },
   { code: "NCAA", name: "NCAA Division I", country: "USA", region: "North America" },
   { code: "SHL", name: "Swedish Hockey League", country: "Sweden", region: "Europe" },
   { code: "LIIGA", name: "Liiga", country: "Finland", region: "Europe" },
@@ -21,6 +22,8 @@ export const WORLD_LEAGUE_CATALOG = [
   { code: "MHL", name: "Molodezhnaya Hockey League", country: "Russia", region: "Europe" },
   { code: "SWE-U20", name: "Swedish U20 Nationell", country: "Sweden", region: "Europe" },
   { code: "SWE-U18", name: "Swedish U18 Nationell", country: "Sweden", region: "Europe" },
+  { code: "ECHL", name: "ECHL", country: "USA / Canada", region: "North America" },
+  { code: "VHL", name: "Vysshaya Hockey League", country: "Russia", region: "Europe" },
 ] as const;
 
 export async function seedWorldLeagueCatalog() {

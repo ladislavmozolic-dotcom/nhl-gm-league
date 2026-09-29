@@ -124,9 +124,8 @@ async function importSeason(season: { id: string; label: string }, teams: Team[]
   return { players: imported, teams: savedTeams };
 }
 
-/** Import every NCAA Division I skater and goalie. College Hockey News publishes
- * complete team stat tables, including players outside the national leaderboards.
- * A new NCAA season deliberately remains empty until its first real stats land. */
+/** Import every NCAA Division I skater and goalie to assign their college team.
+ * Per league policy, season stats remain blank until the 2026-27 games commence. */
 export async function importNcaaSeason() {
   const league = await prisma.worldLeague.upsert({
     where: { code: "NCAA" }, update: {},
@@ -135,33 +134,18 @@ export async function importNcaaSeason() {
   const teams = parseTeams(await page("/stats/"));
   if (!teams.length) throw new Error("NCAA team directory returned no Division I teams.");
 
-  const season = currentSeason();
+  // Fetch players from team directories to assign their college
+  const season = { id: "20252026", label: "2025-26" };
   const result = await importSeason(season, teams, league.id);
-  if (!result.players.length) return { season: season.label, teams: teams.length, players: 0, goalies: 0, linked: 0 };
+  if (!result.players.length) return { season: "2026-27", teams: teams.length, players: 0, goalies: 0, linked: 0 };
 
   let linked = 0;
   for (const entry of result.players) {
-    const { player, owned } = await resolveWorldPlayer({
+    const { owned } = await resolveWorldPlayer({
       provider: "collegehockeynews", externalId: entry.sourceId, name: entry.name,
       position: entry.position, currentTeamId: result.teams.get(entry.team.id) ?? null,
     });
-    await prisma.worldPlayerSeasonStat.upsert({
-      where: { playerId_leagueId_season: { playerId: player.id, leagueId: league.id, season: season.label } },
-      update: {
-        teamId: result.teams.get(entry.team.id) ?? null, isGoalie: entry.goalie, gamesPlayed: entry.gamesPlayed,
-        goals: entry.goals, assists: entry.assists, points: entry.points, plusMinus: entry.plusMinus, penaltyMinutes: entry.penaltyMinutes,
-        wins: entry.wins, losses: entry.losses, overtimeLosses: entry.overtimeLosses, savePercentage: entry.savePercentage,
-        goalsAgainstAverage: entry.goalsAgainstAverage, shutouts: null, source: "collegehockeynews", syncedAt: new Date(),
-      },
-      create: {
-        playerId: player.id, leagueId: league.id, teamId: result.teams.get(entry.team.id) ?? null, season: season.label,
-        isGoalie: entry.goalie, gamesPlayed: entry.gamesPlayed, goals: entry.goals, assists: entry.assists, points: entry.points,
-        plusMinus: entry.plusMinus, penaltyMinutes: entry.penaltyMinutes, wins: entry.wins, losses: entry.losses,
-        overtimeLosses: entry.overtimeLosses, savePercentage: entry.savePercentage, goalsAgainstAverage: entry.goalsAgainstAverage,
-        shutouts: null, source: "collegehockeynews",
-      },
-    });
     if (owned) linked++;
   }
-  return { season: season.label, teams: result.teams.size, players: result.players.length, goalies: result.players.filter((player) => player.goalie).length, linked };
+  return { season: "2026-27", teams: result.teams.size, players: result.players.length, goalies: result.players.filter((player) => player.goalie).length, linked };
 }

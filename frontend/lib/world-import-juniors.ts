@@ -259,20 +259,21 @@ async function fetchSlovakPages(path: string) {
   return [first, ...rest];
 }
 
-async function importSlovakJuniorLevel(tournamentId: 1201 | 1202, level: "U20" | "U18", code: "SVK-U20" | "SVK-U18") {
-  const competitionSlug = tournamentId === 1201 ? "extraliga-juniorov" : "kaufland-extraliga-dorastu";
+async function importSlovakJuniorLevel(tournamentId: 1197 | 1201 | 1202, level: "Senior" | "U20" | "U18", code: "SVK" | "SVK-U20" | "SVK-U18") {
+  const competitionSlug = tournamentId === 1197 ? "extraliga" : tournamentId === 1201 ? "extraliga-juniorov" : "kaufland-extraliga-dorastu";
+  const leagueTitle = tournamentId === 1197 ? "Tipos Extraliga" : tournamentId === 1201 ? "Slovak U20 Extraliga" : "Slovak U18 Extraliga";
   const [skaterPages, goaliePages, league] = await Promise.all([
     fetchSlovakPages(`/sk/stats/players/${tournamentId}/${competitionSlug}?StatsType=points`),
     fetchSlovakPages(`/sk/stats/goalies/${tournamentId}/${competitionSlug}?StatsType=svs`),
     prisma.worldLeague.upsert({
-      where: { code }, update: { active: true, name: tournamentId === 1201 ? "Slovak U20 Extraliga" : "Slovak U18 Extraliga" },
-      create: { code, name: tournamentId === 1201 ? "Slovak U20 Extraliga" : "Slovak U18 Extraliga", country: "Slovakia", region: "Europe" },
+      where: { code }, update: { active: true, name: leagueTitle },
+      create: { code, name: leagueTitle, country: "Slovakia", region: "Europe" },
     }),
   ]);
   const teams = new Map<string, number>();
   const ensureTeam = async (teamCode: string, baseName: string) => {
     const key = teamCode || slug(baseName); const cached = teams.get(key); if (cached) return cached;
-    const name = `${baseName || teamCode} ${level}`;
+    const name = level === "Senior" ? (baseName || teamCode) : `${baseName || teamCode} ${level}`;
     const team = await prisma.worldTeam.upsert({
       where: { leagueId_externalId: { leagueId: league.id, externalId: key } }, update: { name },
       create: { leagueId: league.id, externalId: key, slug: `${slug(name)}-${slug(key)}`, name },
@@ -316,6 +317,7 @@ async function importSlovakJuniorLevel(tournamentId: 1201 | 1202, level: "U20" |
   return { league: code, season: currentSeasonLabel(), imported, goalies, teams: teams.size };
 }
 
+export const importSlovakExtraliga = () => importSlovakJuniorLevel(1197, "Senior", "SVK");
 export const importFinnishU20 = () => importFinnishJuniorLevel("U20 SM-sarja", "FIN-U20");
 export const importFinnishU18 = () => importFinnishJuniorLevel("U18 SM-sarja", "FIN-U18");
 export const importSwedishU20 = () => importSwedishJuniorLevel("U20", "SWE-U20");
@@ -324,7 +326,7 @@ export const importSlovakU20 = () => importSlovakJuniorLevel(1201, "U20", "SVK-U
 export const importSlovakU18 = () => importSlovakJuniorLevel(1202, "U18", "SVK-U18");
 
 export async function importEuropeanJuniorLeagues() {
-  const importers = [importFinnishU20, importFinnishU18, importSwedishU20, importSwedishU18, importSlovakU20, importSlovakU18];
+  const importers = [importSlovakExtraliga, importFinnishU20, importFinnishU18, importSwedishU20, importSwedishU18, importSlovakU20, importSlovakU18];
   return Promise.all(importers.map(async (importer) => {
     try {
       return await importer();
