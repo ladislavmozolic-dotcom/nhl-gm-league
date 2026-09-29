@@ -39,12 +39,22 @@ export default function FaPlayerOverride({ initialQuery }: { initialQuery?: stri
   const setDraft = (id: number, term: number, v: string) =>
     setDrafts((prev) => ({ ...prev, [id]: { ...prev[id], [term]: v } }));
 
+  // Accepts either a whole dollar figure ("7500000") or millions ("7.5") — anything
+  // under 1,000 is read as millions (no real override is worth less than $1,000),
+  // so both styles work without the field silently misreading one as the other.
+  const dollarsFrom = (raw: string): number | null => {
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return null;
+    const dollars = n < 1_000 ? n * 1_000_000 : n;
+    return Math.round(dollars / 50_000) * 50_000;
+  };
+
   const ladderFrom = (id: number, current: OverrideLadder): OverrideLadder => {
     const d = drafts[id];
     const out = { ...EMPTY };
     for (const t of TERMS) {
       const raw = d?.[t];
-      out[t] = raw === undefined ? current[t] : raw.trim() === "" ? null : Math.round(Number(raw) * 1_000_000);
+      out[t] = raw === undefined ? current[t] : raw.trim() === "" ? null : dollarsFrom(raw);
     }
     return out;
   };
@@ -70,8 +80,9 @@ export default function FaPlayerOverride({ initialQuery }: { initialQuery?: stri
       <div ref={sectionRef} />
       <p className="text-xs text-slate-500 mb-3">
         Hand-set one player's 1-4yr asking ladder — any term you leave blank stays the engine's computed value.
-        The 1yr rung also becomes his Free Agent Frenzy headline ask, so this steers real negotiations too, not
-        just the Demand Watch preview. Leave the note field to explain why, for your own audit trail below.
+        Type a full dollar figure (7500000) or millions (7.5) — either works. The 1yr rung also becomes his
+        Free Agent Frenzy headline ask, so this steers real negotiations too, not just the Demand Watch preview.
+        Leave the note field to explain why, for your own audit trail below.
       </p>
       <input
         value={q} onChange={(e) => search(e.target.value)} placeholder="Search player by name…"
@@ -92,12 +103,12 @@ export default function FaPlayerOverride({ initialQuery }: { initialQuery?: stri
                 <div className="flex items-center gap-2">
                   {TERMS.map((t) => (
                     <label key={t} className="flex flex-col items-center gap-0.5">
-                      <span className="text-[10px] text-slate-500">{t}yr $M</span>
+                      <span className="text-[10px] text-slate-500">{t}yr $</span>
                       <input
-                        type="number" step={0.05} placeholder="—"
-                        defaultValue={p.ladder[t] != null ? p.ladder[t]! / 1_000_000 : ""}
+                        type="number" step={50000} placeholder="7500000 or 7.5"
+                        defaultValue={p.ladder[t] ?? ""}
                         onChange={(e) => setDraft(p.id, t, e.target.value)}
-                        className="w-16 bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-right tabular-nums text-xs"
+                        className="w-24 bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-right tabular-nums text-xs"
                       />
                     </label>
                   ))}
