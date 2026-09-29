@@ -324,7 +324,13 @@ export const importSlovakU20 = () => importSlovakJuniorLevel(1201, "U20", "SVK-U
 export const importSlovakU18 = () => importSlovakJuniorLevel(1202, "U18", "SVK-U18");
 
 export async function importEuropeanJuniorLeagues() {
-  const results = [];
-  for (const importer of [importFinnishU20, importFinnishU18, importSwedishU20, importSwedishU18, importSlovakU20, importSlovakU18]) results.push(await importer());
-  return results;
+  const importers = [importFinnishU20, importFinnishU18, importSwedishU20, importSwedishU18, importSlovakU20, importSlovakU18];
+  return Promise.all(importers.map(async (importer) => {
+    try {
+      return await importer();
+    } catch (error) {
+      console.error("[Around the World] Junior import failed:", error);
+      return { error: error instanceof Error ? error.message : "Unknown import error" };
+    }
+  }));
 }
