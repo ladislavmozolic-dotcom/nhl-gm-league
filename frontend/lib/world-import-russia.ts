@@ -74,9 +74,22 @@ const KNOWN_SPECIAL_PLAYERS: Record<string, {
     savePercentage: 0.932,
     goalsAgainstAverage: 2.49,
   },
+  "emil jarventie": {
+    teamName: "Tappara U20",
+    leagueCode: "FIN-U20",
+    position: "LW",
+    isGoalie: false,
+    epUrl: "https://www.eliteprospects.com/player/540337/emil-jarventie",
+    season: "2026-27",
+    gamesPlayed: 6,
+    goals: 10,
+    assists: 1,
+    points: 11,
+  },
 };
 
 const LEAGUE_MAP: Record<string, string> = {
+  "FIN-U20": "FIN-U20",
   KHL: "KHL",
   MHL: "MHL",
   VHL: "VHL",
@@ -133,7 +146,7 @@ export async function importRussianProspects() {
         const targetLeague = await prisma.worldLeague.upsert({
           where: { code: special.leagueCode },
           update: { active: true },
-          create: { code: special.leagueCode, name: special.leagueCode, region: "Europe", active: true },
+          create: { code: special.leagueCode, name: special.leagueCode === "FIN-U20" ? "Finnish U20 SM-sarja" : special.leagueCode, country: "Finland", region: "Europe", active: true },
         });
 
         const slug = norm(special.teamName).replace(/ /g, "-");
