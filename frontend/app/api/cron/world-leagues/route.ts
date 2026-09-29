@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { importOhlSeason, importQmjhlSeason, importWhlSeason } from "@/lib/world-import-hockeytech";
 import { importLiigaProspects } from "@/lib/world-import-liiga";
 import { importCzechExtraligaProspects, importShlProspects } from "@/lib/world-import-europe";
+import { importEuropeanJuniorLeagues } from "@/lib/world-import-juniors";
 
 /** Daily CHL refresh. This remains deliberately separate from the simulation
  * cron: a temporary external-feed problem must never delay league simulation. */
@@ -13,7 +14,8 @@ export async function POST(req: NextRequest) {
   try {
     const results = [await importWhlSeason(), await importOhlSeason(), await importQmjhlSeason()];
     const europe = [await importLiigaProspects(), await importShlProspects(), await importCzechExtraligaProspects()];
-    return NextResponse.json({ success: true, results, europe, timestamp: new Date().toISOString() });
+    const europeanJuniors = await importEuropeanJuniorLeagues();
+    return NextResponse.json({ success: true, results, europe, europeanJuniors, timestamp: new Date().toISOString() });
   } catch (error) {
     console.error("[Cron WorldLeagues] CHL import failed:", error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "CHL import failed." }, { status: 500 });

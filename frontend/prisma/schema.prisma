@@ -89,6 +89,7 @@ model Team {
   gmNickname        String? // shown in the top menu when this team's GM is signed in
   lastLoginAt       DateTime?
   forumSeenAt       DateTime? // last time this GM viewed the forum — drives the "new posts" menu badge
+  seasonPicksSubmissions SeasonPicksSubmission[]
 }
 
 model Player {
@@ -1830,3 +1831,39 @@ model Official {
   evenUp           Float   @default(0.5) // 0..1 how much he "manages the game" (evens up calls)
   active           Boolean @default(true)
 }
+
+// Season Picks — Pre-season prediction challenge across 10 categories
+model SeasonPicksConfig {
+  id                 Int       @id @default(autoincrement())
+  season             String    @default("2026-27")
+  league             String    @default("NHL")
+  status             String    @default("OPEN") // OPEN | LOCKED | RESOLVED
+  deadline           DateTime?
+  overUnderQuestions Json      @default("[]")
+  h2hDuels           Json      @default("[]")
+  boldStatements     Json      @default("[]")
+  officialResults    Json?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@unique([season, league])
+}
+
+model SeasonPicksSubmission {
+  id              Int      @id @default(autoincrement())
+  season          String   @default("2026-27")
+  league          String   @default("NHL")
+  teamId          Int
+  submittedBy     String?
+  submittedAt     DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  picks           Json
+  pointsBreakdown Json?
+  totalPoints     Int      @default(0)
+  team            Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([season, league, teamId])
+  @@index([season, league])
+  @@index([totalPoints])
+}
+
