@@ -7,6 +7,7 @@ import {
   updateSeasonPicksConfigAction,
   evaluateSeasonPicksAction,
 } from "./actions";
+import GamePicksView from "./GamePicksView";
 import type {
   SeasonPicksFormData,
   SectionPointsBreakdown,
@@ -392,7 +393,7 @@ export default function SeasonPicksView({
                 : "bg-slate-800/60 hover:bg-slate-800 text-slate-300"
             }`}
           >
-            <span>📅 Denná Tipovačka (Zápasy)</span>
+            <span>📅 Game Picks (Denná Tipovačka)</span>
           </button>
           {isAdmin && (
             <button
@@ -1602,18 +1603,13 @@ export default function SeasonPicksView({
         </div>
       )}
 
-      {/* TAB 3: DAILY PICKS PLACEHOLDER */}
+      {/* TAB 3: DAILY PICKS (GAME PICKS) */}
       {tab === "daily" && (
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl text-center space-y-4">
-          <div className="text-4xl">📅</div>
-          <h2 className="text-xl font-bold text-white">Denná Tipovačka (Zápasové Tikety)</h2>
-          <p className="text-sm text-slate-300 max-w-xl mx-auto">
-            Denná tipovačka na jednotlivé zápasy simulácie s kurzami (1 - X - 2). GM budú môcť každý herný deň podať svoj denný tiket a zbierať body do celoročného rebríčka dennej tipovacej ligy.
-          </p>
-          <div className="inline-block px-4 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-semibold">
-            🚀 Štartuje už čoskoro so začiatkom základnej časti!
-          </div>
-        </div>
+        <GamePicksView
+          data={initialData.gamePicksData || {}}
+          viewerTeam={viewerTeam}
+          isAdmin={isAdmin}
+        />
       )}
 
       {/* TAB 4: ADMIN CONTROLS */}

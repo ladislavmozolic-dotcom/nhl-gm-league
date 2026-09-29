@@ -90,6 +90,8 @@ model Team {
   lastLoginAt       DateTime?
   forumSeenAt       DateTime? // last time this GM viewed the forum — drives the "new posts" menu badge
   seasonPicksSubmissions SeasonPicksSubmission[]
+  gamePickSubmissions    GamePickSubmission[]
+  gamePicksProfiles      GamePicksProfile[]
 }
 
 model Player {
@@ -1865,5 +1867,70 @@ model SeasonPicksSubmission {
   @@unique([season, league, teamId])
   @@index([season, league])
   @@index([totalPoints])
+}
+
+// Game Picks — Daily & Weekly NHL Match Predictions
+model GamePickSubmission {
+  id                  Int      @id @default(autoincrement())
+  season              String   @default("2026-27")
+  league              String   @default("NHL")
+  teamId              Int
+  gameId              Int
+  winnerTeamId        Int?     // predicted winner team ID
+  confidence          Int?     // 1 | 2 | 3
+  isUpsetPick         Boolean  @default(false)
+  isJoker             Boolean  @default(false)
+  isGameOfTheWeek     Boolean  @default(false)
+  predictedScore      String?  // e.g. "5:3"
+  firstGoalScorerId   Int?     // player ID
+  firstGoalScorerName String?
+  topScorerPlayerId   Int?     // player ID
+  topScorerPlayerName String?
+  pointsAwarded       Int      @default(0)
+  isEvaluated         Boolean  @default(false)
+  breakdown           Json?    // details on points gained
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  team                Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([season, league, teamId, gameId])
+  @@index([season, league, gameId])
+  @@index([teamId])
+}
+
+model GamePicksProfile {
+  id            Int      @id @default(autoincrement())
+  season        String   @default("2026-27")
+  league        String   @default("NHL")
+  teamId        Int
+  totalPoints   Int      @default(0)
+  currentStreak Int      @default(0)
+  bestStreak    Int      @default(0)
+  jokersUsed    Int      @default(0)
+  jokersTotal   Int      @default(5)
+  monthlyPoints Json?    // { "2026-10": 45, "2026-11": 52, ... }
+  badges        Json?    // [{ id, title, month, date }]
+  rivalHistory  Json?    // [{ week, rivalTeamId, rivalName, myPts, rivalPts, won }]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  team          Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([season, league, teamId])
+  @@index([season, league, totalPoints])
+}
+
+model GamePicksConfig {
+  id              Int      @id @default(autoincrement())
+  season          String   @default("2026-27")
+  league          String   @default("NHL")
+  featuredGameIds Int[]    @default([])
+  gameOfTheWeekId Int?
+  rivalPairings   Json?    // [{ week: 1, teamAId: 1, teamBId: 2, gameIds: [10, 11, 12, 13, 14] }]
+  upsetTeamIds    Int[]    @default([])
+  activeWeek      Int?     @default(1)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([season, league])
 }
 

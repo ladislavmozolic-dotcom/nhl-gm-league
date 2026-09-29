@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { REGULAR_SEASON } from "@/lib/phase";
 import { computeStandings, type TeamStanding } from "@/lib/sim/standings";
 import { skaterTotals, goalieTotals } from "@/lib/stats-server";
+import { getGamePicksData } from "@/lib/game-picks-server";
 
 export type OverUnderQuestion = {
   id: number;
@@ -146,8 +147,9 @@ export async function getOrCreateSeasonPicksConfig(season = REGULAR_SEASON, leag
 }
 
 export async function getSeasonPicksData(viewerTeamId?: number | null, season = REGULAR_SEASON, league = "NHL") {
-  const [config, teams, players, submissions] = await Promise.all([
+  const [config, gamePicksData, teams, players, submissions] = await Promise.all([
     getOrCreateSeasonPicksConfig(season, league),
+    getGamePicksData(season, league, viewerTeamId),
     prisma.team.findMany({
       where: { league, isAffiliate: false },
       select: {
@@ -207,6 +209,7 @@ export async function getSeasonPicksData(viewerTeamId?: number | null, season = 
       ...config,
       isLocked,
     },
+    gamePicksData,
     teams,
     players,
     submissions: submissions.map((s) => ({
