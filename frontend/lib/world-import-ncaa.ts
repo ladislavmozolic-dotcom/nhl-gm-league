@@ -126,7 +126,7 @@ async function importSeason(season: { id: string; label: string }, teams: Team[]
 
 /** Import every NCAA Division I skater and goalie. College Hockey News publishes
  * complete team stat tables, including players outside the national leaderboards.
- * Before the first games of a new season it falls back to the completed season. */
+ * A new NCAA season deliberately remains empty until its first real stats land. */
 export async function importNcaaSeason() {
   const league = await prisma.worldLeague.upsert({
     where: { code: "NCAA" }, update: {},
@@ -135,14 +135,9 @@ export async function importNcaaSeason() {
   const teams = parseTeams(await page("/stats/"));
   if (!teams.length) throw new Error("NCAA team directory returned no Division I teams.");
 
-  let season = currentSeason();
-  let result = await importSeason(season, teams, league.id);
-  if (!result.players.length) {
-    const startYear = Number.parseInt(season.id.slice(0, 4), 10) - 1;
-    season = { id: `${startYear}${startYear + 1}`, label: `${startYear}-${String(startYear + 1).slice(2)}` };
-    result = await importSeason(season, teams, league.id);
-  }
-  if (!result.players.length) throw new Error(`NCAA did not return player statistics for ${season.label}.`);
+  const season = currentSeason();
+  const result = await importSeason(season, teams, league.id);
+  if (!result.players.length) return { season: season.label, teams: teams.length, players: 0, goalies: 0, linked: 0 };
 
   let linked = 0;
   for (const entry of result.players) {
