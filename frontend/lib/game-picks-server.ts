@@ -92,106 +92,8 @@ export async function getOrCreateGamePicksProfile(teamId: number, season = REGUL
   return profile;
 }
 
-/** Fetch live real NHL schedule from api-web.nhle.com with local database fallback */
-export async function fetchRealNhlSchedule(): Promise<any[]> {
-  try {
-    const res = await fetch("https://api-web.nhle.com/v1/schedule/now", {
-      next: { revalidate: 60 },
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    const games: any[] = [];
-
-    const gameWeeks = data.gameWeek || [];
-    for (const week of gameWeeks) {
-      for (const g of week.games || []) {
-        games.push({
-          id: g.id,
-          startTimeUTC: g.startTimeUTC,
-          gameDate: g.startTimeUTC ? new Date(g.startTimeUTC) : null,
-          gameState: g.gameState,
-          homeAbbrev: g.homeTeam?.abbrev,
-          awayAbbrev: g.awayTeam?.abbrev,
-          homeScore: g.homeTeam?.score ?? null,
-          awayScore: g.awayTeam?.score ?? null,
-          venue: g.venue?.default || "NHL Arena",
-          periodDescriptor: g.periodDescriptor,
-          gameOutcome: g.gameOutcome,
-        });
-      }
-    }
-    return games;
-  } catch (err) {
-    console.warn("Failed to fetch real NHL schedule from api-web.nhle.com:", err);
-    return [];
-  }
-}
-
-/** Cache for real NHL rosters in memory */
-let realRosterCache: { timestamp: number; players: any[] } | null = null;
-
-async function fetchRealNhlRostersForTeams(
-  teams: { id: number; code: string | null; name: string }[]
-): Promise<any[]> {
-  const now = Date.now();
-  if (realRosterCache && now - realRosterCache.timestamp < 60 * 60 * 1000 && realRosterCache.players.length > 0) {
-    return realRosterCache.players;
-  }
-
-  try {
-    const realPlayers: any[] = [];
-    await Promise.all(
-      teams.map(async (t) => {
-        if (!t.code) return;
-        try {
-          const code = t.code.toUpperCase();
-          const res = await fetch(`https://api-web.nhle.com/v1/roster/${code}/current`, {
-            next: { revalidate: 3600 },
-          });
-          if (!res.ok) return;
-          const data = await res.json();
-          const all = [
-            ...(data.forwards || []),
-            ...(data.defensemen || []),
-            ...(data.goalies || []),
-          ];
-          for (const p of all) {
-            const firstName = p.firstName?.default || "";
-            const lastName = p.lastName?.default || "";
-            const fullName = `${firstName} ${lastName}`.trim();
-            const rawPos = p.positionCode || "F";
-            const pos = rawPos === "L" ? "LW" : rawPos === "R" ? "RW" : rawPos;
-            const isGoalie = pos === "G";
-            const photoUrl = p.headshot || `https://assets.nhle.com/mugs/nhl/latest/${p.id}.png`;
-
-            realPlayers.push({
-              id: p.id,
-              name: fullName,
-              position: pos,
-              teamId: t.id,
-              isGoalie,
-              photoUrl,
-            });
-          }
-        } catch {
-          // ignore single team roster fetch error
-        }
-      })
-    );
-
-    if (realPlayers.length > 0) {
-      realRosterCache = { timestamp: now, players: realPlayers };
-      return realPlayers;
-    }
-  } catch (err) {
-    console.warn("Failed to fetch real NHL rosters:", err);
-  }
-
-  return [];
-}
-
 export async function getGamePicksData(season = REGULAR_SEASON, league = "NHL", viewerTeamId?: number | null) {
-  const [config, teams, dbPlayers, allProfiles, realNhlGames] = await Promise.all([
+  const [config, teams, dbPlayers, allProfiles, dbGames] = await Promise.all([
     getOrCreateGamePicksConfig(season, league),
     prisma.team.findMany({
       where: { league, isAffiliate: false },
@@ -240,115 +142,104 @@ export async function getGamePicksData(season = REGULAR_SEASON, league = "NHL", 
       },
       orderBy: [{ totalPoints: "desc" }, { bestStreak: "desc" }],
     }),
-    fetchRealNhlSchedule(),
-  ]);
-
-  // Fetch real NHL rosters for all teams
-  const realPlayers = await fetchRealNhlRostersForTeams(teams);
-  const activePlayers = realPlayers.length > 0 ? realPlayers : dbPlayers;
-
-  const teamByCode = new Map<string, typeof teams[0]>();
-  for (const tm of teams) {
-    if (tm.code) teamByCode.set(tm.code.toUpperCase(), tm);
-    if (tm.name) teamByCode.set(tm.name.toUpperCase(), tm);
-  }
-
-  const now = new Date();
-  let mappedGames: any[] = [];
-
-  // Map real NHL schedule games to our teams
-  if (realNhlGames.length > 0) {
-    mappedGames = realNhlGames
-      .map((rg, idx) => {
-        const homeTm = teamByCode.get(rg.homeAbbrev?.toUpperCase());
-        const awayTm = teamByCode.get(rg.awayAbbrev?.toUpperCase());
-
-        if (!homeTm || !awayTm) return null;
-
-        const isFinal = rg.gameState === "FINAL" || rg.gameState === "OFF";
-        const isLocked = isFinal || (rg.gameDate ? now > rg.gameDate : false);
-
-        let winnerTeamId: number | null = null;
-        if (isFinal && typeof rg.homeScore === "number" && typeof rg.awayScore === "number") {
-          const lastPeriodType = rg.gameOutcome?.lastPeriodType || rg.periodDescriptor?.periodType;
-          const isDraw = lastPeriodType === "OT" || lastPeriodType === "SO" || (rg.periodDescriptor?.number && rg.periodDescriptor.number > 3);
-          if (isDraw) {
-            winnerTeamId = 0; // Remíza (X)
-          } else {
-            winnerTeamId = rg.homeScore > rg.awayScore ? homeTm.id : awayTm.id;
-          }
-        }
-
-        return {
-          id: rg.id,
-          season,
-          league,
-          round: 1,
-          gameDate: rg.gameDate,
-          status: isFinal ? "FINAL" : "SCHEDULED",
-          homeTeamId: homeTm.id,
-          awayTeamId: awayTm.id,
-          homeTeam: homeTm,
-          awayTeam: awayTm,
-          homeGoals: rg.homeScore,
-          awayGoals: rg.awayScore,
-          winnerTeamId,
-          isLocked,
-          isHomeUpset: config.upsetTeamIds.includes(homeTm.id),
-          isAwayUpset: config.upsetTeamIds.includes(awayTm.id),
-        };
-      })
-      .filter(Boolean);
-  }
-
-  // Fallback: If NHL API returned nothing, use database scheduled games
-  if (mappedGames.length === 0) {
-    const dbGames = await prisma.game.findMany({
-      where: { season, league, seriesId: null, status: "SCHEDULED" },
-      take: 20,
+    prisma.game.findMany({
+      where: { season, league, seriesId: null },
       orderBy: [{ round: "asc" }, { gameDate: "asc" }, { id: "asc" }],
       include: {
-        homeTeam: { select: { id: true, name: true, code: true, logoUrl: true, gm: true, gmNickname: true } },
-        awayTeam: { select: { id: true, name: true, code: true, logoUrl: true, gm: true, gmNickname: true } },
+        homeTeam: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            code: true,
+            logoUrl: true,
+            gm: true,
+            gmNickname: true,
+            division: true,
+            conference: true,
+          },
+        },
+        awayTeam: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            code: true,
+            logoUrl: true,
+            gm: true,
+            gmNickname: true,
+            division: true,
+            conference: true,
+          },
+        },
       },
-    });
+    }),
+  ]);
 
-    mappedGames = dbGames.map((g) => ({
-      ...g,
-      isLocked: g.status === "FINAL" || (g.gameDate ? now > g.gameDate : false),
+  const now = new Date();
+
+  // Map UNHL database games
+  const mappedGames = dbGames.map((g) => {
+    const isFinal = g.status === "FINAL";
+    const isLocked = isFinal || (g.gameDate ? now > g.gameDate : false);
+
+    let winnerTeamId: number | null = null;
+    if (isFinal) {
+      const isDraw = g.endedIn === "OT" || g.endedIn === "SO";
+      if (isDraw) {
+        winnerTeamId = 0; // Remíza (X)
+      } else if (typeof g.homeGoals === "number" && typeof g.awayGoals === "number") {
+        winnerTeamId = g.homeGoals > g.awayGoals ? g.homeTeamId : g.awayTeamId;
+      } else {
+        winnerTeamId = g.winnerTeamId ?? null;
+      }
+    }
+
+    return {
+      id: g.id,
+      season: g.season,
+      league: g.league,
+      round: g.round,
+      gameDate: g.gameDate,
+      status: g.status,
+      homeTeamId: g.homeTeamId,
+      awayTeamId: g.awayTeamId,
+      homeTeam: g.homeTeam,
+      awayTeam: g.awayTeam,
+      homeGoals: g.homeGoals,
+      awayGoals: g.awayGoals,
+      winnerTeamId,
+      isLocked,
       isHomeUpset: config.upsetTeamIds.includes(g.homeTeamId),
       isAwayUpset: config.upsetTeamIds.includes(g.awayTeamId),
-    }));
-  }
+    };
+  });
 
-  // Identify today's games (within the active game night / 20 hours from first scheduled game)
+  // Identify today's active games batch (e.g. next upcoming round/day of scheduled UNHL matches)
   const scheduledGames = mappedGames.filter((g) => g.status === "SCHEDULED");
-  const firstGameTime = scheduledGames[0]?.gameDate ? new Date(scheduledGames[0].gameDate).getTime() : now.getTime();
-  const gameNightEndTime = firstGameTime + 20 * 60 * 60 * 1000;
+  let todayGames: typeof mappedGames = [];
 
-  const todayGames = scheduledGames.filter((g) => {
-    if (!g.gameDate) return true;
-    const gTime = new Date(g.gameDate).getTime();
-    return gTime >= firstGameTime - 2 * 60 * 60 * 1000 && gTime <= gameNightEndTime;
-  });
-
-  // Calculate current week range (Monday 00:00 to Sunday 23:59:59)
-  const day = now.getDay();
-  const diffToMon = day === 0 ? -6 : 1 - day;
-  const monday = new Date(now);
-  monday.setDate(now.getDate() + diffToMon);
-  monday.setHours(0, 0, 0, 0);
-
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  sunday.setHours(23, 59, 59, 999);
-
-  // Filter games occurring within the current week
-  const weekGames = mappedGames.filter((g) => {
-    if (!g.gameDate) return false;
-    const gd = new Date(g.gameDate);
-    return gd >= monday && gd <= sunday;
-  });
+  if (scheduledGames.length > 0) {
+    const firstScheduled = scheduledGames[0];
+    if (firstScheduled.gameDate) {
+      const targetDate = firstScheduled.gameDate.toISOString().slice(0, 10);
+      todayGames = scheduledGames.filter(
+        (g) => g.gameDate && g.gameDate.toISOString().slice(0, 10) === targetDate
+      );
+    } else if (firstScheduled.round) {
+      todayGames = scheduledGames.filter((g) => g.round === firstScheduled.round);
+    } else {
+      todayGames = scheduledGames.slice(0, 10);
+    }
+  } else {
+    // If all games played, show last round played
+    const lastPlayed = mappedGames[mappedGames.length - 1];
+    if (lastPlayed?.round) {
+      todayGames = mappedGames.filter((g) => g.round === lastPlayed.round);
+    } else {
+      todayGames = mappedGames.slice(-10);
+    }
+  }
 
   const RIVALRIES = new Set([
     "MTL-TOR", "TOR-MTL", "NYR-BOS", "BOS-NYR", "EDM-CGY", "CGY-EDM",
@@ -359,31 +250,23 @@ export async function getGamePicksData(season = REGULAR_SEASON, league = "NHL", 
     "LAK-SJS", "SJS-LAK", "LAK-ANA", "ANA-LAK", "COL-EDM", "EDM-COL",
   ]);
 
-  const candidatePool = weekGames.length > 0 ? weekGames : mappedGames;
+  const candidatePool = scheduledGames.length > 0 ? scheduledGames.slice(0, 25) : mappedGames.slice(0, 25);
   const scoredGames = candidatePool.map((g) => {
     let score = 0;
-    if (g.gameDate) {
-      const d = new Date(g.gameDate);
-      const dow = d.getDay();
-      if (dow === 6) score += 40; // Saturday prime time
-      else if (dow === 0) score += 25; // Sunday showcase
-      else if (dow === 5) score += 15; // Friday night
-    }
-
     const hCode = g.homeTeam?.code?.toUpperCase() || "";
     const aCode = g.awayTeam?.code?.toUpperCase() || "";
-    if (hCode && aCode && RIVALRIES.has(`${aCode}-${hCode}`)) {
-      score += 45;
+    if (hCode && aCode && (RIVALRIES.has(`${aCode}-${hCode}`) || RIVALRIES.has(`${hCode}-${aCode}`))) {
+      score += 50;
     }
     if (g.isHomeUpset || g.isAwayUpset) score += 10;
     return { game: g, score };
   });
 
-  // Sort descending by score, then by gameDate ascending
+  // Sort descending by score, then by gameDate/round
   scoredGames.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
-    const tA = a.game.gameDate ? new Date(a.game.gameDate).getTime() : 0;
-    const tB = b.game.gameDate ? new Date(b.game.gameDate).getTime() : 0;
+    const tA = a.game.gameDate ? new Date(a.game.gameDate).getTime() : a.game.id;
+    const tB = b.game.gameDate ? new Date(b.game.gameDate).getTime() : b.game.id;
     return tA - tB;
   });
 
@@ -396,10 +279,9 @@ export async function getGamePicksData(season = REGULAR_SEASON, league = "NHL", 
       ? config.gameOfTheWeekId
       : null;
 
-  // If no GOTW is currently active or previous GOTW is finished/not found, AI picks the most interesting game of the week
+  // If no GOTW is currently active or previous GOTW is finished/not found, AI picks the most interesting game
   if (!gotwId && bestCandidate) {
     gotwId = bestCandidate.id;
-    // Persist AI selection to DB so everyone in the league has the exact same GOTW
     await prisma.gamePicksConfig.update({
       where: { season_league: { season, league } },
       data: { gameOfTheWeekId: gotwId },
@@ -408,7 +290,7 @@ export async function getGamePicksData(season = REGULAR_SEASON, league = "NHL", 
 
   const allGameIds = mappedGames.map((g) => g.id);
 
-  // Load viewer submissions for these real games
+  // Load viewer submissions for these UNHL games
   const viewerSubmissions = viewerTeamId
     ? await prisma.gamePickSubmission.findMany({
         where: {
@@ -428,7 +310,7 @@ export async function getGamePicksData(season = REGULAR_SEASON, league = "NHL", 
       gameOfTheWeekId: gotwId,
     },
     teams,
-    players: activePlayers,
+    players: dbPlayers,
     games: mappedGames.map((g) => ({
       ...g,
       isGameOfTheWeek: g.id === gotwId,
@@ -442,8 +324,6 @@ export async function getGamePicksData(season = REGULAR_SEASON, league = "NHL", 
 }
 
 export async function evaluateGamePicks(season = REGULAR_SEASON, league = "NHL") {
-  const config = await getOrCreateGamePicksConfig(season, league);
-
   // Find all un-evaluated submissions
   const pendingSubmissions = await prisma.gamePickSubmission.findMany({
     where: {
@@ -457,25 +337,9 @@ export async function evaluateGamePicks(season = REGULAR_SEASON, league = "NHL")
     return { evaluatedCount: 0, message: "Žiadne nové tipy na vyhodnotenie." };
   }
 
-  // Fetch real score data from NHL API for pending games
-  const realScoreData: Record<number, any> = {};
   const gameIds = Array.from(new Set(pendingSubmissions.map((s) => s.gameId)));
 
-  for (const gId of gameIds) {
-    try {
-      const res = await fetch(`https://api-web.nhle.com/v1/gamecenter/${gId}/landing`);
-      if (res.ok) {
-        const d = await res.json();
-        if (d.gameState === "FINAL" || d.gameState === "OFF") {
-          realScoreData[gId] = d;
-        }
-      }
-    } catch {
-      // Ignore network errors on single games
-    }
-  }
-
-  // Also check database for finished games
+  // Load finished games from UNHL database
   const dbFinalGames = await prisma.game.findMany({
     where: { id: { in: gameIds }, status: "FINAL" },
     include: {
@@ -483,6 +347,7 @@ export async function evaluateGamePicks(season = REGULAR_SEASON, league = "NHL")
       playerStats: { orderBy: [{ points: "desc" }, { goals: "desc" }] },
     },
   });
+
   const dbGameMap = new Map(dbFinalGames.map((g) => [g.id, g]));
 
   const subsByTeam = new Map<number, typeof pendingSubmissions>();
@@ -504,147 +369,99 @@ export async function evaluateGamePicks(season = REGULAR_SEASON, league = "NHL")
     const weeklyMap: Record<string, number> = (profile.weeklyPoints as Record<string, number>) || {};
 
     for (const sub of subs) {
-      const realData = realScoreData[sub.gameId];
       const dbGame = dbGameMap.get(sub.gameId);
-
-      if (!realData && !dbGame) continue; // Game not finished yet
+      if (!dbGame) continue; // Game not finished yet in UNHL
 
       let subPoints = 0;
       const breakdown: Record<string, any> = {};
       const multiplier = sub.isJoker ? 3 : 1;
       if (sub.isJoker) jokersUsed = Math.min(5, jokersUsed + 1);
 
-      let isWinnerCorrect = false;
+      // Evaluate Regulation 1/X/2
+      const isDbDraw = dbGame.endedIn === "OT" || dbGame.endedIn === "SO";
+      let realWinnerId: number | null = null;
+      if (isDbDraw) {
+        realWinnerId = 0; // Remíza (X)
+      } else if (typeof dbGame.homeGoals === "number" && typeof dbGame.awayGoals === "number") {
+        realWinnerId = dbGame.homeGoals > dbGame.awayGoals ? dbGame.homeTeamId : dbGame.awayTeamId;
+      } else {
+        realWinnerId = dbGame.winnerTeamId ?? null;
+      }
 
-      // Evaluate from Real NHL API Data
-      if (realData) {
-        const homeScore = realData.homeTeam?.score ?? 0;
-        const awayScore = realData.awayTeam?.score ?? 0;
-        const homeTeamCode = realData.homeTeam?.abbrev;
-        const awayTeamCode = realData.awayTeam?.abbrev;
+      const isWinnerCorrect = Boolean(
+        sub.winnerTeamId !== undefined &&
+        sub.winnerTeamId !== null &&
+        realWinnerId !== null &&
+        sub.winnerTeamId === realWinnerId
+      );
 
-        const homeTm = await prisma.team.findFirst({ where: { code: homeTeamCode, league } });
-        const awayTm = await prisma.team.findFirst({ where: { code: awayTeamCode, league } });
-
-        const lastPeriodType = realData.gameOutcome?.lastPeriodType || realData.periodDescriptor?.periodType;
-        const isRegulationDraw = lastPeriodType === "OT" || lastPeriodType === "SO" || (realData.periodDescriptor?.number && realData.periodDescriptor.number > 3);
-
-        let realWinnerId: number | null = null;
-        if (isRegulationDraw) {
-          realWinnerId = 0; // Remíza (X)
-        } else if (homeScore > awayScore) {
-          realWinnerId = homeTm?.id || null;
-        } else if (awayScore > homeScore) {
-          realWinnerId = awayTm?.id || null;
-        }
-
-        isWinnerCorrect = Boolean(sub.winnerTeamId !== undefined && sub.winnerTeamId !== null && realWinnerId !== null && sub.winnerTeamId === realWinnerId);
-
-        if (!sub.isGameOfTheWeek) {
-          if (isWinnerCorrect) {
-            const pts = 2 * multiplier;
-            subPoints += pts;
-            breakdown.winner = { correct: true, points: pts, multiplier };
-
-            currentStreak++;
-            if (currentStreak === 3) subPoints += 2;
-            else if (currentStreak === 5) subPoints += 5;
-            else if (currentStreak === 10) subPoints += 15;
-            bestStreak = Math.max(bestStreak, currentStreak);
-          } else {
-            breakdown.winner = { correct: false, points: 0 };
-            currentStreak = 0;
-          }
-        } else {
-          // Game of the Week
-          let gotwPts = 0;
-          if (isWinnerCorrect) {
-            gotwPts += 2;
-            breakdown.gotwWinner = { correct: true, points: 2 };
-          }
-          if (sub.predictedScore) {
-            const clean = sub.predictedScore.trim().replace(/\s+/g, "");
-            if (clean === `${homeScore}:${awayScore}` || clean === `${awayScore}:${homeScore}`) {
-              gotwPts += 5;
-              breakdown.gotwScore = { correct: true, points: 5 };
-            }
-          }
-
-          // Real First Goal Scorer
-          let realFirstGoalPlayerId: number | null = null;
-          let realFirstGoalPlayerName: string | null = null;
-          if (realData.summary?.scoring && Array.isArray(realData.summary.scoring)) {
-            for (const period of realData.summary.scoring) {
-              if (period.goals && period.goals.length > 0) {
-                const g0 = period.goals[0];
-                realFirstGoalPlayerId = g0.playerId || null;
-                realFirstGoalPlayerName = g0.name?.default || `${g0.firstName?.default || ""} ${g0.lastName?.default || ""}`.trim();
-                break;
-              }
-            }
-          }
-
-          if (sub.firstGoalScorerId && realFirstGoalPlayerId) {
-            if (sub.firstGoalScorerId === realFirstGoalPlayerId) {
-              gotwPts += 5;
-              breakdown.gotwFirstGoal = { correct: true, points: 5, player: realFirstGoalPlayerName };
-            } else {
-              breakdown.gotwFirstGoal = { correct: false, points: 0, actual: realFirstGoalPlayerName };
-            }
-          }
-
-          // Real Top Scorer in Game (Most points)
-          if (sub.topScorerPlayerId) {
-            try {
-              const boxRes = await fetch(`https://api-web.nhle.com/v1/gamecenter/${sub.gameId}/boxscore`);
-              if (boxRes.ok) {
-                const boxData = await boxRes.json();
-                const stats = boxData.playerByGameStats || {};
-                const allSkaters = [
-                  ...(stats.homeTeam?.forwards || []),
-                  ...(stats.homeTeam?.defense || []),
-                  ...(stats.awayTeam?.forwards || []),
-                  ...(stats.awayTeam?.defense || []),
-                ];
-                const maxPts = Math.max(0, ...allSkaters.map((p: any) => p.points || 0));
-                if (maxPts > 0) {
-                  const topScorerIds = allSkaters.filter((p: any) => p.points === maxPts).map((p: any) => p.playerId);
-                  const topScorerNames = allSkaters.filter((p: any) => p.points === maxPts).map((p: any) => p.name?.default || "");
-                  if (topScorerIds.includes(sub.topScorerPlayerId)) {
-                    gotwPts += 3;
-                    breakdown.gotwTopScorer = { correct: true, points: 3, maxPoints: maxPts, leaders: topScorerNames.join(", ") };
-                  } else {
-                    breakdown.gotwTopScorer = { correct: false, points: 0, maxPoints: maxPts, leaders: topScorerNames.join(", ") };
-                  }
-                }
-              }
-            } catch {
-              // Ignore boxscore network error
-            }
-          }
-
-          subPoints += gotwPts * multiplier;
-          if (isWinnerCorrect) {
-            currentStreak++;
-            bestStreak = Math.max(bestStreak, currentStreak);
-          } else {
-            currentStreak = 0;
-          }
-        }
-      } else if (dbGame) {
-        // Fallback DB game evaluation
-        const isDbDraw = dbGame.endedIn === "OT" || dbGame.endedIn === "SO";
-        let realWinner: number | null = null;
-        if (isDbDraw) {
-          realWinner = 0; // Remíza (X)
-        } else {
-          realWinner = dbGame.winnerTeamId;
-        }
-        isWinnerCorrect = Boolean(sub.winnerTeamId !== undefined && sub.winnerTeamId !== null && realWinner !== null && sub.winnerTeamId === realWinner);
-
+      if (!sub.isGameOfTheWeek) {
+        // Daily Pick
         if (isWinnerCorrect) {
           const pts = 2 * multiplier;
           subPoints += pts;
+          breakdown.winner = { correct: true, points: pts, multiplier };
+
+          currentStreak++;
+          if (currentStreak === 3) subPoints += 2;
+          else if (currentStreak === 5) subPoints += 5;
+          else if (currentStreak === 10) subPoints += 15;
+          bestStreak = Math.max(bestStreak, currentStreak);
+        } else {
+          breakdown.winner = { correct: false, points: 0 };
+          currentStreak = 0;
+        }
+      } else {
+        // Game of the Week Pick
+        let gotwPts = 0;
+        if (isWinnerCorrect) {
+          gotwPts += 2;
+          breakdown.gotwWinner = { correct: true, points: 2 };
+        } else {
+          breakdown.gotwWinner = { correct: false, points: 0 };
+        }
+
+        // Exact Score
+        if (sub.predictedScore) {
+          const clean = sub.predictedScore.trim().replace(/\s+/g, "");
+          const homeG = dbGame.homeGoals ?? 0;
+          const awayG = dbGame.awayGoals ?? 0;
+          if (clean === `${homeG}:${awayG}` || clean === `${awayG}:${homeG}`) {
+            gotwPts += 5;
+            breakdown.gotwScore = { correct: true, points: 5, actualScore: `${homeG}:${awayG}` };
+          } else {
+            breakdown.gotwScore = { correct: false, points: 0, actualScore: `${homeG}:${awayG}` };
+          }
+        }
+
+        // First Goal Scorer
+        if (dbGame.goalEvents && dbGame.goalEvents.length > 0) {
+          const firstGoal = dbGame.goalEvents[0];
+          if (sub.firstGoalScorerId && firstGoal.scorerId && sub.firstGoalScorerId === firstGoal.scorerId) {
+            gotwPts += 5;
+            breakdown.gotwFirstGoal = { correct: true, points: 5, player: firstGoal.scorerName };
+          } else {
+            breakdown.gotwFirstGoal = { correct: false, points: 0, actual: firstGoal.scorerName };
+          }
+        }
+
+        // Top Scorer in Game (Most points)
+        if (sub.topScorerPlayerId && dbGame.playerStats && dbGame.playerStats.length > 0) {
+          const maxPts = Math.max(0, ...dbGame.playerStats.map((p) => p.points || 0));
+          if (maxPts > 0) {
+            const topScorers = dbGame.playerStats.filter((p) => (p.points || 0) === maxPts);
+            const topScorerIds = topScorers.map((p) => p.playerId);
+            if (topScorerIds.includes(sub.topScorerPlayerId)) {
+              gotwPts += 3;
+              breakdown.gotwTopScorer = { correct: true, points: 3, maxPoints: maxPts };
+            } else {
+              breakdown.gotwTopScorer = { correct: false, points: 0, maxPoints: maxPts };
+            }
+          }
+        }
+
+        subPoints += gotwPts * multiplier;
+        if (isWinnerCorrect) {
           currentStreak++;
           bestStreak = Math.max(bestStreak, currentStreak);
         } else {
@@ -666,8 +483,7 @@ export async function evaluateGamePicks(season = REGULAR_SEASON, league = "NHL")
 
       const monthKey = new Date().toISOString().slice(0, 7);
       monthlyMap[monthKey] = (monthlyMap[monthKey] || 0) + subPoints;
-      // evaluation runs the morning after the NHL night, so the games belong to yesterday's week
-      const weekKey = pickWeekKey(new Date(Date.now() - 86400000));
+      const weekKey = pickWeekKey(new Date());
       weeklyMap[weekKey] = (weeklyMap[weekKey] || 0) + subPoints;
     }
 
@@ -686,6 +502,6 @@ export async function evaluateGamePicks(season = REGULAR_SEASON, league = "NHL")
 
   return {
     evaluatedCount: evaluatedTotal,
-    message: `Úspešne vyhodnotených ${evaluatedTotal} tipov na zápasy podľa výsledkov NHL.`,
+    message: `Úspešne vyhodnotených ${evaluatedTotal} tipov na zápasy UNHL.`,
   };
 }

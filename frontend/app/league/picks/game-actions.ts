@@ -8,7 +8,6 @@ import {
   evaluateGamePicks,
   getOrCreateGamePicksProfile,
   getOrCreateGamePicksConfig,
-  fetchRealNhlSchedule,
   type DailyGamePickInput,
   type GameOfTheWeekPickInput,
 } from "@/lib/game-picks-server";
@@ -28,8 +27,6 @@ export async function saveDailyGamePicksAction(
 
   // Get games to verify locks and schedule
   const gameIds = picks.map((p) => p.gameId);
-  const realGames = await fetchRealNhlSchedule();
-  const realGameMap = new Map(realGames.map((g) => [g.id, g]));
 
   const dbGames = await prisma.game.findMany({
     where: { id: { in: gameIds } },
@@ -69,16 +66,10 @@ export async function saveDailyGamePicksAction(
   }
 
   for (const pick of newPicks) {
-    const rg = realGameMap.get(pick.gameId);
     const dg = dbGameMap.get(pick.gameId);
+    if (!dg) continue;
 
-    let isLocked = false;
-    if (rg) {
-      isLocked = rg.gameState === "FINAL" || rg.gameState === "OFF" || (rg.gameDate ? now > rg.gameDate : false);
-    } else if (dg) {
-      isLocked = dg.status === "FINAL" || (dg.gameDate ? now > dg.gameDate : false);
-    }
-
+    const isLocked = dg.status === "FINAL" || (dg.gameDate ? now > dg.gameDate : false);
     if (isLocked) {
       continue; // Skip locked games
     }
@@ -123,22 +114,16 @@ export async function saveGameOfTheWeekPickAction(
   }
 
   const now = new Date();
-  const realGames = await fetchRealNhlSchedule();
-  const realGame = realGames.find((g) => g.id === pick.gameId);
+  const dbGame = await prisma.game.findUnique({
+    where: { id: pick.gameId },
+    select: { id: true, gameDate: true, status: true },
+  });
 
-  let isLocked = false;
-  if (realGame) {
-    isLocked = realGame.gameState === "FINAL" || realGame.gameState === "OFF" || (realGame.gameDate ? now > realGame.gameDate : false);
-  } else {
-    const dbGame = await prisma.game.findUnique({
-      where: { id: pick.gameId },
-      select: { id: true, gameDate: true, status: true },
-    });
-    if (dbGame) {
-      isLocked = dbGame.status === "FINAL" || (dbGame.gameDate ? now > dbGame.gameDate : false);
-    }
+  if (!dbGame) {
+    return { ok: false, error: "Zápas nebol nájdený." };
   }
 
+  const isLocked = dbGame.status === "FINAL" || (dbGame.gameDate ? now > dbGame.gameDate : false);
   if (isLocked) {
     return { ok: false, error: "Tento zápas je už uzamknutý (začal alebo sa skončil)." };
   }
