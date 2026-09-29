@@ -118,8 +118,70 @@ async function fetchRealNhlSchedule(): Promise<any[]> {
   }
 }
 
+/** Cache for real NHL rosters in memory */
+let realRosterCache: { timestamp: number; players: any[] } | null = null;
+
+async function fetchRealNhlRostersForTeams(
+  teams: { id: number; code: string | null; name: string }[]
+): Promise<any[]> {
+  const now = Date.now();
+  if (realRosterCache && now - realRosterCache.timestamp < 60 * 60 * 1000 && realRosterCache.players.length > 0) {
+    return realRosterCache.players;
+  }
+
+  try {
+    const realPlayers: any[] = [];
+    await Promise.all(
+      teams.map(async (t) => {
+        if (!t.code) return;
+        try {
+          const code = t.code.toUpperCase();
+          const res = await fetch(`https://api-web.nhle.com/v1/roster/${code}/current`, {
+            next: { revalidate: 3600 },
+          });
+          if (!res.ok) return;
+          const data = await res.json();
+          const all = [
+            ...(data.forwards || []),
+            ...(data.defensemen || []),
+            ...(data.goalies || []),
+          ];
+          for (const p of all) {
+            const firstName = p.firstName?.default || "";
+            const lastName = p.lastName?.default || "";
+            const fullName = `${firstName} ${lastName}`.trim();
+            const pos = p.positionCode || "F";
+            const isGoalie = pos === "G";
+            const photoUrl = p.headshot || `https://assets.nhle.com/mugs/nhl/latest/${p.id}.png`;
+
+            realPlayers.push({
+              id: p.id,
+              name: fullName,
+              position: pos,
+              teamId: t.id,
+              isGoalie,
+              photoUrl,
+            });
+          }
+        } catch {
+          // ignore single team roster fetch error
+        }
+      })
+    );
+
+    if (realPlayers.length > 0) {
+      realRosterCache = { timestamp: now, players: realPlayers };
+      return realPlayers;
+    }
+  } catch (err) {
+    console.warn("Failed to fetch real NHL rosters:", err);
+  }
+
+  return [];
+}
+
 export async function getGamePicksData(season = REGULAR_SEASON, league = "NHL", viewerTeamId?: number | null) {
-  const [config, teams, players, allProfiles, realNhlGames] = await Promise.all([
+  const [config, teams, dbPlayers, allProfiles, realNhlGames] = await Promise.all([
     getOrCreateGamePicksConfig(season, league),
     prisma.team.findMany({
       where: { league, isAffiliate: false },
@@ -170,6 +232,10 @@ export async function getGamePicksData(season = REGULAR_SEASON, league = "NHL", 
     }),
     fetchRealNhlSchedule(),
   ]);
+
+  // Fetch real NHL rosters for all teams
+  const realPlayers = await fetchRealNhlRostersForTeams(teams);
+  const activePlayers = realPlayers.length > 0 ? realPlayers : dbPlayers;
 
   const teamByCode = new Map<string, typeof teams[0]>();
   for (const tm of teams) {
@@ -275,7 +341,7 @@ export async function getGamePicksData(season = REGULAR_SEASON, league = "NHL", 
       gameOfTheWeekId: gotwId,
     },
     teams,
-    players,
+    players: activePlayers,
     games: mappedGames.map((g) => ({
       ...g,
       isGameOfTheWeek: g.id === gotwId,
@@ -404,6 +470,60 @@ export async function evaluateGamePicks(season = REGULAR_SEASON, league = "NHL")
               breakdown.gotwScore = { correct: true, points: 5 };
             }
           }
+
+          // Real First Goal Scorer
+          let realFirstGoalPlayerId: number | null = null;
+          let realFirstGoalPlayerName: string | null = null;
+          if (realData.summary?.scoring && Array.isArray(realData.summary.scoring)) {
+            for (const period of realData.summary.scoring) {
+              if (period.goals && period.goals.length > 0) {
+                const g0 = period.goals[0];
+                realFirstGoalPlayerId = g0.playerId || null;
+                realFirstGoalPlayerName = g0.name?.default || `${g0.firstName?.default || ""} ${g0.lastName?.default || ""}`.trim();
+                break;
+              }
+            }
+          }
+
+          if (sub.firstGoalScorerId && realFirstGoalPlayerId) {
+            if (sub.firstGoalScorerId === realFirstGoalPlayerId) {
+              gotwPts += 5;
+              breakdown.gotwFirstGoal = { correct: true, points: 5, player: realFirstGoalPlayerName };
+            } else {
+              breakdown.gotwFirstGoal = { correct: false, points: 0, actual: realFirstGoalPlayerName };
+            }
+          }
+
+          // Real Top Scorer in Game (Most points)
+          if (sub.topScorerPlayerId) {
+            try {
+              const boxRes = await fetch(`https://api-web.nhle.com/v1/gamecenter/${sub.gameId}/boxscore`);
+              if (boxRes.ok) {
+                const boxData = await boxRes.json();
+                const stats = boxData.playerByGameStats || {};
+                const allSkaters = [
+                  ...(stats.homeTeam?.forwards || []),
+                  ...(stats.homeTeam?.defense || []),
+                  ...(stats.awayTeam?.forwards || []),
+                  ...(stats.awayTeam?.defense || []),
+                ];
+                const maxPts = Math.max(0, ...allSkaters.map((p: any) => p.points || 0));
+                if (maxPts > 0) {
+                  const topScorerIds = allSkaters.filter((p: any) => p.points === maxPts).map((p: any) => p.playerId);
+                  const topScorerNames = allSkaters.filter((p: any) => p.points === maxPts).map((p: any) => p.name?.default || "");
+                  if (topScorerIds.includes(sub.topScorerPlayerId)) {
+                    gotwPts += 3;
+                    breakdown.gotwTopScorer = { correct: true, points: 3, maxPoints: maxPts, leaders: topScorerNames.join(", ") };
+                  } else {
+                    breakdown.gotwTopScorer = { correct: false, points: 0, maxPoints: maxPts, leaders: topScorerNames.join(", ") };
+                  }
+                }
+              }
+            } catch {
+              // Ignore boxscore network error
+            }
+          }
+
           subPoints += gotwPts * multiplier;
           if (isWinnerCorrect) {
             currentStreak++;
