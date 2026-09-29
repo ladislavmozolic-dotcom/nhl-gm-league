@@ -5,7 +5,9 @@
 
 FROM node:22-slim AS base
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
+# openssl: required by Prisma query engine; python3: used by ep-scraper.py to bypass
+# Cloudflare Bot Management when fetching EliteProspects player pages
+RUN apt-get update && apt-get install -y --no-install-recommends openssl python3 && rm -rf /var/lib/apt/lists/*
 
 # --- deps: install all packages (needed for prisma generate + next build) ---
 FROM base AS deps
@@ -29,6 +31,8 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/data ./data
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/next.config.ts ./next.config.ts
+# EP scraper Python script — runs via child_process from ep-scraper.ts
+COPY --from=builder /app/lib/ep-scraper.py ./lib/ep-scraper.py
 # uploaded logos/wordmarks live here; the compose volume mounts over it so they persist
 RUN mkdir -p ./public/uploads/site
 EXPOSE 3000

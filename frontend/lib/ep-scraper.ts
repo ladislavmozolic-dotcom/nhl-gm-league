@@ -19,10 +19,8 @@ const execAsync = promisify(exec);
 
 // Path to the Python scraper, resolved relative to this file's directory at runtime.
 // In production the app lives at /app (inside Docker); in dev it's the repo root.
-const SCRAPER_PATH = path.join(
-  typeof __dirname !== "undefined" ? __dirname : process.cwd(),
-  "ep-scraper.py"
-);
+// We use process.cwd() which reliably points to /app in Docker (Next.js sets it).
+const SCRAPER_PATH = path.join(process.cwd(), "lib", "ep-scraper.py");
 
 export type EpSeason2627 = {
   teamName: string | null;
