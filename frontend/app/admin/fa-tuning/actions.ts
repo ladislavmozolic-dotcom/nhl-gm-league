@@ -135,8 +135,19 @@ const ladderSummary = (l: OverrideLadder) => ([1, 2, 3, 4] as const).map((t) => 
  *  the legacy flat `faDemandOverride` (Free Agent Frenzy's own headline-ask
  *  override), so a hand-set ladder actually steers real negotiations too, not
  *  just the Demand Watch preview. Passing an all-null ladder clears both. */
+// A stray extra zero (typing the full dollar figure into the "$M" field instead of
+// millions, e.g. "3500000" meaning $3.5M) produces a value that overflows Postgres'
+// Int column and crashes the whole page — reject it with a clear message instead.
+const MAX_OVERRIDE = 40_000_000;
+
 export async function setPlayerOverrideAction(playerId: number, ladder: OverrideLadder, note?: string): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!(await canEditPlayerContracts())) return { ok: false, error: "You don't have contract-edit access." };
+  for (const t of [1, 2, 3, 4] as const) {
+    const v = ladder[t];
+    if (v != null && (!Number.isFinite(v) || v < 0 || v > MAX_OVERRIDE)) {
+      return { ok: false, error: `${t}yr value looks like a typo (${v.toLocaleString("en-US")}) — enter it in $ MILLIONS, e.g. 7.5 for $7.5M, not the full dollar figure.` };
+    }
+  }
   const before = await prisma.player.findUnique({ where: { id: playerId }, select: { name: true, faOverrideLadder: true } });
   if (!before) return { ok: false, error: "Player not found." };
   const beforeLadder = parseLadder(before.faOverrideLadder);

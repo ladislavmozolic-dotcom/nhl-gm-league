@@ -15,6 +15,7 @@ export default function FaPlayerOverride({ initialQuery }: { initialQuery?: stri
   const [notes, setNotes] = useState<Record<number, string>>({});
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
+  const [msgOk, setMsgOk] = useState(true);
   const sectionRef = useRef<HTMLDivElement>(null);
 
   const search = (value: string) => {
@@ -51,17 +52,17 @@ export default function FaPlayerOverride({ initialQuery }: { initialQuery?: stri
   const save = (id: number, current: OverrideLadder) => start(async () => {
     const ladder = ladderFrom(id, current);
     const r = await setPlayerOverrideAction(id, ladder, notes[id]);
-    if (!r.ok) { setMsg(r.error); return; }
+    if (!r.ok) { setMsgOk(false); setMsg(r.error); return; }
     setRows((prev) => prev.map((p) => (p.id === id ? { ...p, ladder } : p)));
-    setMsg("Saved.");
+    setMsgOk(true); setMsg("Saved.");
   });
 
   const clear = (id: number) => start(async () => {
     const r = await setPlayerOverrideAction(id, EMPTY, notes[id]);
-    if (!r.ok) { setMsg(r.error); return; }
+    if (!r.ok) { setMsgOk(false); setMsg(r.error); return; }
     setRows((prev) => prev.map((p) => (p.id === id ? { ...p, ladder: EMPTY } : p)));
     setDrafts((prev) => ({ ...prev, [id]: {} }));
-    setMsg("Cleared — back to the computed ladder.");
+    setMsgOk(true); setMsg("Cleared — back to the computed ladder.");
   });
 
   return (
@@ -76,7 +77,7 @@ export default function FaPlayerOverride({ initialQuery }: { initialQuery?: stri
         value={q} onChange={(e) => search(e.target.value)} placeholder="Search player by name…"
         className="w-full max-w-sm bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm mb-3"
       />
-      {msg && <p className="text-sm text-emerald-400 mb-2">{msg}</p>}
+      {msg && <p className={`text-sm mb-2 ${msgOk ? "text-emerald-400" : "text-rose-400"}`}>{msg}</p>}
       {rows.length > 0 && (
         <div className="divide-y divide-slate-800/50">
           {rows.map((p) => {
