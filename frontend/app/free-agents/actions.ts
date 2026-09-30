@@ -1210,10 +1210,10 @@ export async function extendContractAction(
     const isUFA = tw.faMode === "simple" || ufaAtExpiry(player);
     const isRFA = !isUFA;
     // an RFA gets ONE round unless he's the club's Franchise tag (then 2); a UFA gets 2.
+    // Every rejected offer — even a first-round lowball — gets a counter first; he only
+    // walks once the club has had its full allotment of rounds and still isn't there.
     const maxRounds = isRFA && !player.franchiseTag ? 1 : 2;
-    const lowIce = player.lastSeasonGP != null && player.lastSeasonGP < 40;
-    const bigLowball = salary < ev.ask.floorSalary * 0.82;
-    const walk = nextRound > maxRounds || (round === 0 && bigLowball && (lowIce || isUFA));
+    const walk = nextRound > maxRounds;
     if (walk) {
       // RFA → offer-sheet eligible; UFA → tests free agency. Record the club's best
       // standing offer — that's the number a rival's offer sheet must beat.
