@@ -215,6 +215,7 @@ model Player {
   faDecisionAt          DateTime? // in-season UFA market: when his deliberation window resolves (collect offers 7d → counter 3d → sign)
   faCountered           Boolean                   @default(false) // in-season UFA market: he has issued counters (phase 2 — bidders match, then he signs)
   resignStatus          String? // null | open | countered | walkedToUFA | osEligible (RFA who declined → offer sheets)
+  rfaOsUsed             Boolean                   @default(false) // regular (non-franchise) RFA has already had his one offer-sheet trip — no second one; he negotiates on, uncapped, directly with just his own club
   resignCounterSalary   Int? // the player's counter in the current re-sign round
   resignCounterYears    Int?
   resignOfferSalary     Int? // club's last standing re-sign offer (the AAV an offer sheet must beat)

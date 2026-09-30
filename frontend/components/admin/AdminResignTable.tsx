@@ -146,6 +146,11 @@ export default function AdminResignTable({ rows }: { rows: ResignRowData[] }) {
                 const lowballPct = Math.round((p.lowballBump - 1) * 100);
                 const hasCounter = p.resignCounterSalary != null && p.resignCounterSalary > 0;
                 const hasOffer = p.resignOfferSalary != null && p.resignOfferSalary > 0;
+                // A regular RFA gets 1 round before OS; if OS doesn't land him elsewhere
+                // he negotiates on, uncapped, directly with just his club (rfaOsUsed) —
+                // no fixed "/N" cap or Final tag applies to him anymore at that point.
+                const postOs = p.cbaStatus === "RFA" && !p.franchiseTag && p.rfaOsUsed;
+                const roundCap = p.cbaStatus === "RFA" && !p.franchiseTag ? (postOs ? null : 1) : 2;
 
                 // Gap calculation
                 let gapText = null;
@@ -271,9 +276,12 @@ export default function AdminResignTable({ rows }: { rows: ResignRowData[] }) {
                         <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
                           <span>
                             Kolo {p.resignRound}
-                            {p.cbaStatus === "RFA" && !p.franchiseTag ? "/1" : "/2"}
+                            {roundCap != null ? `/${roundCap}` : ""}
                           </span>
-                          {p.resignRound === 2 && (
+                          {postOs && (
+                            <span className="text-purple-400 font-semibold">(po OS, priamo s klubom)</span>
+                          )}
+                          {roundCap != null && p.resignRound === roundCap && (
                             <span className="text-amber-400 font-semibold">(Finálne)</span>
                           )}
                         </div>

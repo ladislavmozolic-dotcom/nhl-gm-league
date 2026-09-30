@@ -20,7 +20,7 @@ export async function revertSigningAction(logId: number) {
       rosterType: log.prevRosterType ?? "NHL", teamId: log.prevTeamId ?? undefined,
       contractText: log.prevContractText,
       extCapHit: null, extYears: null, extContractType: null, extClause: null, extNoTradeTeams: [], extText: null,
-      resignStatus: null, resignRound: 0,
+      resignStatus: null, resignRound: 0, rfaOsUsed: false,
     },
   });
   if (log.kind !== "EXTEND") {

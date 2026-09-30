@@ -1127,7 +1127,7 @@ export async function extendContractAction(
 ) {
   if (!(await canManageTeam(teamId))) return { ok: false as const, error: "You don't manage this team." };
   const player = await prisma.player.findUnique({
-    where: { id: playerId }, select: { teamId: true, contractYears: true, capHit: true, ahlSalary: true, contractExpiry: true, contractType: true, tradeClause: true, noTradeTeams: true, contractText: true, age: true, birthDate: true, name: true, lastSeasonGP: true, resignRound: true, resignStatus: true, resignOfferSalary: true, rosterType: true, franchiseTag: true, overall: true, realFarmTeamId: true, iceWarnedAt: true, iceUnhappyChecks: true, promiseWarnGame: true, tradeRequested: true },
+    where: { id: playerId }, select: { teamId: true, contractYears: true, capHit: true, ahlSalary: true, contractExpiry: true, contractType: true, tradeClause: true, noTradeTeams: true, contractText: true, age: true, birthDate: true, name: true, lastSeasonGP: true, resignRound: true, resignStatus: true, resignOfferSalary: true, rosterType: true, franchiseTag: true, rfaOsUsed: true, overall: true, realFarmTeamId: true, iceWarnedAt: true, iceUnhappyChecks: true, promiseWarnGame: true, tradeRequested: true },
   });
   if (!player) return { ok: false as const, error: "Player not found." };
   // the club may re-sign its own NHL players AND its farm (AHL affiliate) players
@@ -1201,19 +1201,19 @@ export async function extendContractAction(
   const bumped = !ev.acceptable ? await recordLowball(playerId, teamId, salary, ev.ask.salary) : null;
   const insult = bumped ? ` 😠 The lowball insulted him — his ask to your club is now about ${Math.round((bumped - 1) * 100)}% higher.` : "";
   if (!ev.acceptable) {
-    // structured re-sign: you get 2 rounds. He counters after round 1; if the deal's
-    // still not there after round 2 — or he's a little-used/older player who'd rather
-    // test the market off a lowball — he walks (UFA → free agency, RFA → offer sheets).
+    // structured re-sign. He counters every rejected offer, never an instant walk.
+    // UFA / franchise RFA: 2 rounds, then walks (UFA → free agency, franchise RFA →
+    // offer sheets). Regular RFA: 1 round, then he's open to offer sheets — if nobody
+    // poaches him there, resolveOfferSheets reopens him to just his own club
+    // (rfaOsUsed), where he keeps negotiating uncapped — no second offer-sheet trip.
     const round = player.resignRound ?? 0;
     const nextRound = round + 1;
     // in the simple system there are no RFA rights — everyone tests free agency.
     const isUFA = tw.faMode === "simple" || ufaAtExpiry(player);
     const isRFA = !isUFA;
-    // an RFA gets ONE round unless he's the club's Franchise tag (then 2); a UFA gets 2.
-    // Every rejected offer — even a first-round lowball — gets a counter first; he only
-    // walks once the club has had its full allotment of rounds and still isn't there.
-    const maxRounds = isRFA && !player.franchiseTag ? 1 : 2;
-    const walk = nextRound > maxRounds;
+    const rfaPostOs = isRFA && !player.franchiseTag && player.rfaOsUsed;
+    const maxRounds = isRFA ? (player.franchiseTag ? 2 : 1) : 2;
+    const walk = !rfaPostOs && nextRound > maxRounds;
     if (walk) {
       // RFA → offer-sheet eligible; UFA → tests free agency. Record the club's best
       // standing offer — that's the number a rival's offer sheet must beat.
@@ -1226,8 +1226,8 @@ export async function extendContractAction(
       return {
         ok: false as const, walked: true, toUFA: !isRFA,
         reason: isRFA
-          ? (player.franchiseTag ? "Two rounds and no deal — as your franchise RFA he's now open to offer sheets." : "No deal — negotiations pause; he'll be open to offer sheets, and further rounds resume after that period.")
-          : (nextRound > maxRounds ? "Two rounds and no deal — he'll test the market when the season ends." : "That's well short — he'd rather test free agency than take it.") + insult,
+          ? (player.franchiseTag ? "Two rounds and no deal — as your franchise RFA he's now open to offer sheets." : "No deal — he's now open to offer sheets.")
+          : "Two rounds and no deal — he'll test the market when the season ends." + insult,
       };
     }
     // he counters (kept fuzzy — you don't see his exact number, just a range)
@@ -1238,7 +1238,9 @@ export async function extendContractAction(
     await prisma.faBid.create({ data: { playerId, teamId, salary, years, round: nextRound } }).catch(() => {});
     return {
       ok: false as const, rejected: true, round: nextRound,
-      reason: `Round ${nextRound} of ${maxRounds} — he's countering around ${fmtM(counterSalary)}–${fmtM(counterSalary * 1.06)} over ${counterYears}yr.${nextRound >= maxRounds ? " Last round before he walks." : ""}${insult}`,
+      reason: rfaPostOs
+        ? `Round ${nextRound} — no more offer sheets, straight talks with your club now. He's countering around ${fmtM(counterSalary)}–${fmtM(counterSalary * 1.06)} over ${counterYears}yr.${insult}`
+        : `Round ${nextRound} of ${maxRounds} — he's countering around ${fmtM(counterSalary)}–${fmtM(counterSalary * 1.06)} over ${counterYears}yr.${nextRound >= maxRounds ? " Last round before he walks." : ""}${insult}`,
       floor: ev.ask.floorSalary, minYears: ev.ask.minYears, maxYears: ev.ask.maxYears,
     };
   }
@@ -1273,7 +1275,7 @@ export async function extendContractAction(
       ...releaseNonRoster,
       ...newDeal,
       signPromiseLine: dep.line, signPromisePP: pp, signPromisePK: pk,
-      resignRound: 0, resignOfferSalary: null, resignCounterSalary: null, resignCounterYears: null, resignOfferAt: null,
+      resignRound: 0, resignOfferSalary: null, resignCounterSalary: null, resignCounterYears: null, resignOfferAt: null, rfaOsUsed: false,
       disgruntled: false, tradeRequested: false, promiseWarnGame: null,
       tradeRequestReason: null, iceUnhappyChecks: 0, iceWarnedAt: null,
     },

@@ -35,6 +35,7 @@ export async function resetResignAction(playerId: number, clearLowball = false) 
       resignCounterSalary: null,
       resignCounterYears: null,
       resignOfferAt: null,
+      rfaOsUsed: false,
     },
   }).catch(() => {});
 
@@ -191,6 +192,7 @@ export async function forceSignResignAction(
       resignOfferSalary: null,
       resignCounterSalary: null,
       resignCounterYears: null,
+      rfaOsUsed: false,
       disgruntled: false,
       tradeRequested: false,
       resignOfferAt: null,

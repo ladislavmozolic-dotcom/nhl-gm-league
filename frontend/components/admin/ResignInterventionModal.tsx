@@ -31,6 +31,7 @@ export type ResignPlayerData = {
   lowballBump: number;
   cbaStatus: "UFA" | "RFA";
   franchiseTag: boolean;
+  rfaOsUsed: boolean;
   aiAskSalary: number | null;
   aiFloorSalary: number | null;
   aiMinYears: number | null;
