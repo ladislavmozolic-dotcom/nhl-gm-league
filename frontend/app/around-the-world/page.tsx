@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getTeamSession } from "@/lib/auth";
-import { Card, PageHeader, Pill, SectionTitle, StatTile } from "@/components/ui";
+import { Card, PageHeader, SectionTitle, StatTile } from "@/components/ui";
 import Link from "next/link";
 import YourProspectTracker from "@/components/YourProspectTracker";
 import { worldTeamLevel } from "@/lib/world-team-level";
@@ -8,12 +8,18 @@ import { epPlayerSearchUrl } from "@/lib/playerName";
 
 export const dynamic = "force-dynamic";
 
-const leagueIcon = (region: string, code: string) => {
-  if (code === "NCAA") return "🎓";
-  if (code === "AHL") return "🏒";
-  if (region === "Europe") return "🇪🇺";
-  return "🌎";
+// Per-league visual config
+type LeagueStyle = { gradient: string; border: string; accent: string; icon: string; hover: string };
+const LEAGUE_STYLES: Record<string, LeagueStyle> = {
+  WHL:   { gradient: "from-orange-950/60 via-slate-900 to-slate-950", border: "border-orange-500/25", accent: "text-orange-300", hover: "hover:border-orange-400/50", icon: "🏒" },
+  OHL:   { gradient: "from-amber-950/60 via-slate-900 to-slate-950", border: "border-amber-500/25", accent: "text-amber-300", hover: "hover:border-amber-400/50", icon: "🏒" },
+  QMJHL: { gradient: "from-rose-950/60 via-slate-900 to-slate-950", border: "border-rose-500/25", accent: "text-rose-300", hover: "hover:border-rose-400/50", icon: "🏒" },
+  AHL:   { gradient: "from-red-950/60 via-slate-900 to-slate-950", border: "border-red-500/25", accent: "text-red-300", hover: "hover:border-red-400/50", icon: "🥅" },
+  NCAA:  { gradient: "from-blue-950/60 via-slate-900 to-slate-950", border: "border-blue-500/25", accent: "text-blue-300", hover: "hover:border-blue-400/50", icon: "🎓" },
 };
+const DEFAULT_STYLE: LeagueStyle = { gradient: "from-slate-900 via-slate-900 to-slate-950", border: "border-slate-700/60", accent: "text-sky-300", hover: "hover:border-sky-400/40", icon: "🌎" };
+
+function getStyle(code: string) { return LEAGUE_STYLES[code] ?? DEFAULT_STYLE; }
 
 export default async function AroundTheWorldPage({
   searchParams,
@@ -71,8 +77,8 @@ export default async function AroundTheWorldPage({
     orderBy: { name: "asc" },
   });
 
-  const withStats = myProspects.filter((p) => p.worldPlayer?.stats.length);
-  const assigned = myProspects.filter((p) => p.worldPlayer?.currentTeamId || p.worldPlayer?.stats.length);
+  const withStats = myProspects.filter((p) => p.worldPlayer?.stats.length).length;
+  const assigned = myProspects.filter((p) => p.worldPlayer?.currentTeamId || p.worldPlayer?.stats.length).length;
   const noData = leagues.length === 0;
   const leaders = allStats;
 
@@ -84,61 +90,50 @@ export default async function AroundTheWorldPage({
   const europeanLeagues = leagues.filter((l) => l.region === "Europe");
   const europeanStats = europeanLeagues.reduce((total, l) => total + l._count.stats, 0);
 
+  const totalStats = leagues.reduce((n, l) => n + l._count.stats, 0);
+
   return (
     <div className="space-y-6 py-2">
-      {/* Header Banner */}
-      <div className="relative overflow-hidden rounded-3xl border border-sky-500/20 bg-gradient-to-br from-sky-950/80 via-slate-900 to-violet-950/50 p-6 sm:p-8 shadow-xl shadow-black/20">
-        <div className="absolute -right-12 -top-16 h-52 w-52 rounded-full bg-sky-500/10 blur-3xl" />
-        <div className="absolute bottom-0 right-1/3 h-32 w-32 rounded-full bg-violet-500/10 blur-3xl" />
+      {/* ── Hero Banner ── */}
+      <div className="relative overflow-hidden rounded-3xl border border-sky-500/15 bg-gradient-to-br from-sky-950/70 via-slate-900 to-violet-950/40 p-7 sm:p-10 shadow-2xl shadow-black/30">
+        <div className="absolute -right-16 -top-20 h-72 w-72 rounded-full bg-sky-500/8 blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 h-48 w-48 rounded-full bg-violet-500/8 blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-64 w-96 rounded-full bg-indigo-500/5 blur-3xl" />
         <div className="relative">
-          <div className="mb-3 inline-flex rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-sky-300">
-            Global scouting hub
+          <div className="mb-4 inline-flex rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.2em] text-sky-300">
+            🌍 Global Scouting Hub
           </div>
           <PageHeader
-            title="🌍 Around the World"
+            title="Around the World"
             subtitle="Follow your prospects across junior, collegiate, AHL and European hockey — all in one place."
           />
           <div className="mt-5 flex flex-wrap gap-2">
-            <span className="rounded-full border border-slate-700/80 bg-slate-900/50 px-3 py-1 text-xs text-slate-300">
-              CHL (WHL · OHL · QMJHL)
-            </span>
-            <span className="rounded-full border border-sky-500/30 bg-sky-500/10 px-3 py-1 text-xs text-sky-200">
-              AHL & NCAA Division I
-            </span>
-            <span className="rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-xs text-violet-200">
-              🇪🇺 European Leagues & KHL
-            </span>
-            <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-200">
-              Daily Live Sync
-            </span>
+            {[
+              { label: "CHL · WHL · OHL · QMJHL", color: "border-orange-500/30 bg-orange-500/10 text-orange-200" },
+              { label: "AHL & NCAA Division I", color: "border-sky-500/30 bg-sky-500/10 text-sky-200" },
+              { label: "🇪🇺 Liiga · SHL · KHL · MHL · Czech · Slovak", color: "border-violet-500/30 bg-violet-500/10 text-violet-200" },
+              { label: "⚡ Daily Live Sync", color: "border-emerald-500/30 bg-emerald-500/10 text-emerald-200" },
+            ].map((b) => (
+              <span key={b.label} className={`rounded-full border px-3 py-1 text-xs font-semibold ${b.color}`}>{b.label}</span>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* High-level stats */}
+      {/* ── Stat Tiles ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatTile
-          label="Tracked leagues"
-          value={leagues.length}
-          sub="Junior, college, AHL & Europe"
-          color="text-sky-300"
-        />
-        <StatTile
-          label="Imported stat lines"
-          value={leagues.reduce((n, l) => n + l._count.stats, 0)}
-          sub="Across all competitions"
-          color="text-emerald-300"
-        />
+        <StatTile label="Tracked leagues" value={leagues.length} sub="Junior, college, AHL & Europe" color="text-sky-300" />
+        <StatTile label="Stat lines" value={totalStats} sub="2026-27 season" color="text-emerald-300" />
         <StatTile
           label={`${targetTeam?.code || "Team"} prospects`}
           value={myProspects.length}
-          sub={`${assigned.length} assigned · ${withStats.length} with stats`}
+          sub={`${assigned} assigned · ${withStats} with stats`}
           color="text-amber-300"
         />
         <StatTile label="Sync status" value="Active" sub="Daily live updates" color="text-violet-300" />
       </div>
 
-      {/* Featured Leagues Grid */}
+      {/* ── League Cards ── */}
       <section>
         <SectionTitle count={featuredLeagues.length + (europeanLeagues.length ? 1 : 0)}>
           Choose a competition
@@ -154,63 +149,80 @@ export default async function AroundTheWorldPage({
           </Card>
         ) : (
           <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
-            {featuredLeagues.map((l) => (
-              <Link
-                key={l.id}
-                href={`/around-the-world/${l.code.toLowerCase()}`}
-                className="block rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-sky-950/30 border border-slate-700/70 p-5 shadow-lg shadow-black/20 hover:border-sky-400/50 hover:-translate-y-0.5 transition-all group"
-              >
-                <div className="flex justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    {l.logoUrl ? (
-                      <img src={l.logoUrl} alt="" className="w-11 h-11 object-contain" />
-                    ) : (
-                      <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-400/10 text-2xl">
-                        {leagueIcon(l.region, l.code)}
-                      </span>
-                    )}
-                    <div>
-                      <div className="text-lg font-black group-hover:text-sky-300">{l.name}</div>
-                      <div className="mt-1 text-xs text-slate-400">
-                        {l.country || l.region} · {l._count.teams} teams
+            {featuredLeagues.map((l) => {
+              const s = getStyle(l.code);
+              return (
+                <Link
+                  key={l.id}
+                  href={`/around-the-world/${l.code.toLowerCase()}`}
+                  className={`group relative overflow-hidden block rounded-2xl bg-gradient-to-br ${s.gradient} border ${s.border} p-5 shadow-lg shadow-black/20 ${s.hover} hover:-translate-y-0.5 transition-all duration-200`}
+                >
+                  {/* Glow orb */}
+                  <div className="absolute -right-6 -bottom-6 h-24 w-24 rounded-full opacity-30 blur-2xl bg-current" />
+                  <div className="relative flex justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      {l.logoUrl ? (
+                        <img src={l.logoUrl} alt="" className="w-11 h-11 object-contain drop-shadow-lg" />
+                      ) : (
+                        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/5 text-2xl shadow-inner">
+                          {s.icon}
+                        </span>
+                      )}
+                      <div>
+                        <div className={`text-base font-black tracking-tight group-hover:${s.accent}`}>{l.name}</div>
+                        <div className="mt-1 text-xs text-slate-500">
+                          {l.country || l.region} · {l._count.teams} teams
+                        </div>
                       </div>
                     </div>
+                    <div className="shrink-0">
+                      {l._count.stats > 0 ? (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-bold text-emerald-300">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                          {l._count.stats}
+                        </span>
+                      ) : (
+                        <span className="rounded-full border border-slate-700 bg-slate-800/50 px-2.5 py-1 text-[11px] text-slate-500">
+                          {l.code === "NCAA" ? `${l._count.teams} teams` : "Awaiting"}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <Pill tone={l._count.stats ? "green" : "slate"}>
-                    {l.code === "NCAA"
-                      ? `${l._count.teams} teams (pending)`
-                      : l._count.stats
-                      ? `${l._count.stats} stat lines`
-                      : "Awaiting sync"}
-                  </Pill>
-                </div>
-                <div className="mt-5 border-t border-slate-800 pt-3 text-xs font-bold text-sky-400">
-                  Explore {l.code} →
-                </div>
-              </Link>
-            ))}
+                  <div className={`mt-4 border-t border-white/5 pt-3 text-xs font-black ${s.accent} flex items-center gap-1`}>
+                    Explore {l.code} <span className="group-hover:translate-x-1 transition-transform inline-block">→</span>
+                  </div>
+                </Link>
+              );
+            })}
 
+            {/* European Hub card */}
             {europeanLeagues.length > 0 && (
               <Link
                 href="/around-the-world/europe"
-                className="block rounded-2xl bg-gradient-to-br from-violet-950/60 via-slate-900 to-slate-900 border border-violet-500/30 p-5 shadow-lg shadow-black/20 hover:border-violet-400/60 hover:-translate-y-0.5 transition-all group"
+                className="group relative overflow-hidden block rounded-2xl bg-gradient-to-br from-violet-950/60 via-slate-900 to-slate-950 border border-violet-500/25 p-5 shadow-lg shadow-black/20 hover:border-violet-400/50 hover:-translate-y-0.5 transition-all duration-200"
               >
-                <div className="flex justify-between gap-3">
+                <div className="absolute -right-6 -bottom-6 h-24 w-24 rounded-full bg-violet-500/20 blur-2xl" />
+                <div className="relative flex justify-between gap-3">
                   <div className="flex items-start gap-3">
-                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-400/10 text-2xl">
-                      🇪🇺
-                    </span>
+                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-400/10 text-2xl shadow-inner">🇪🇺</span>
                     <div>
-                      <div className="text-lg font-black group-hover:text-violet-300">European & Russian Hub</div>
-                      <div className="mt-1 text-xs text-slate-400">Liiga, SHL, Czech, Slovak, KHL & MHL</div>
+                      <div className="text-base font-black tracking-tight group-hover:text-violet-300">European &amp; Russian Hub</div>
+                      <div className="mt-1 text-xs text-slate-500">Liiga · SHL · KHL · MHL · Czech · Slovak</div>
                     </div>
                   </div>
-                  <Pill tone={europeanStats ? "green" : "slate"}>
-                    {europeanStats ? `${europeanStats} stat lines` : "Awaiting sync"}
-                  </Pill>
+                  <div className="shrink-0">
+                    {europeanStats > 0 ? (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-bold text-emerald-300">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                        {europeanStats}
+                      </span>
+                    ) : (
+                      <span className="rounded-full border border-slate-700 bg-slate-800/50 px-2.5 py-1 text-[11px] text-slate-500">Awaiting</span>
+                    )}
+                  </div>
                 </div>
-                <div className="mt-5 border-t border-violet-500/20 pt-3 text-xs font-bold text-violet-300">
-                  Explore Europe & Russia →
+                <div className="mt-4 border-t border-violet-500/10 pt-3 text-xs font-black text-violet-300 flex items-center gap-1">
+                  Explore Europe &amp; Russia <span className="group-hover:translate-x-1 transition-transform inline-block">→</span>
                 </div>
               </Link>
             )}
@@ -218,7 +230,7 @@ export default async function AroundTheWorldPage({
         )}
       </section>
 
-      {/* Prospect Pool Tracker Table */}
+      {/* ── Prospect Tracker ── */}
       <section>
         <YourProspectTracker
           prospects={myProspects.map((p) => {
@@ -253,67 +265,84 @@ export default async function AroundTheWorldPage({
         />
       </section>
 
-      {/* Top 30 World League Leaders */}
+      {/* ── World Leaders Table ── */}
       {(view === "leaders" || leaders.length > 0) && (
         <section>
           <SectionTitle count={leaders.length} accent="text-sky-300">
-            World League Leaders · Top 30 Skaters
+            World League Leaders · Top 30 Skaters 2026-27
           </SectionTitle>
-          <Card bodyClassName="p-0">
+          <div className="overflow-hidden rounded-2xl border border-slate-700/60 bg-gradient-to-b from-slate-900 to-slate-950 shadow-xl shadow-black/20">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[650px] text-sm">
+              <table className="w-full min-w-[640px] text-sm">
                 <thead>
-                  <tr className="bg-slate-800/30 border-b border-slate-800 text-xs uppercase tracking-wider text-slate-500">
-                    <th className="text-left px-4 py-3">Player</th>
-                    <th className="text-left px-3 py-3">League</th>
-                    <th className="text-left px-3 py-3">Club</th>
-                    <th className="text-right px-4 py-3">GP</th>
-                    <th className="text-right px-3 py-3">G</th>
-                    <th className="text-right px-3 py-3">A</th>
-                    <th className="text-right px-4 py-3">P</th>
+                  <tr className="border-b border-slate-800 bg-slate-800/30 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                    <th className="w-10 px-4 py-3 text-center">#</th>
+                    <th className="px-4 py-3 text-left">Player</th>
+                    <th className="px-3 py-3 text-left">League</th>
+                    <th className="px-3 py-3 text-left">Club</th>
+                    <th className="px-4 py-3 text-right">GP</th>
+                    <th className="px-3 py-3 text-right">G</th>
+                    <th className="px-3 py-3 text-right">A</th>
+                    <th className="px-4 py-3 text-right">PTS</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/50">
-                  {leaders.map((s) => (
-                    <tr key={s.id} className="hover:bg-slate-800/20">
-                      <td className="px-4 py-3 font-semibold text-slate-100">{s.player.name}</td>
-                      <td className="px-3 py-3 text-slate-400 font-mono text-xs">{s.league.code}</td>
-                      <td className="px-3 py-3 text-slate-300">
+                <tbody className="divide-y divide-slate-800/40">
+                  {leaders.map((s, i) => (
+                    <tr key={s.id} className="group hover:bg-sky-500/[0.04] transition-colors">
+                      <td className="px-4 py-3 text-center">
+                        <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-black ${
+                          i === 0 ? "bg-amber-400/20 text-amber-300 ring-1 ring-amber-400/40" :
+                          i === 1 ? "bg-slate-400/20 text-slate-300 ring-1 ring-slate-400/30" :
+                          i === 2 ? "bg-orange-700/20 text-orange-400 ring-1 ring-orange-500/30" :
+                          "text-slate-600"
+                        }`}>
+                          {i + 1}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-bold text-slate-100 group-hover:text-white">{s.player.name}</td>
+                      <td className="px-3 py-3">
+                        <span className="rounded-md border border-slate-700/80 bg-slate-800/60 px-2 py-0.5 text-[10px] font-bold text-slate-300 font-mono">
+                          {s.league.code}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-slate-400 text-xs">
                         {s.team?.name || s.player.currentTeam?.name || "—"}
                       </td>
-                      <td className="px-4 py-3 text-right tabular-nums">{s.gamesPlayed}</td>
-                      <td className="px-3 py-3 text-right tabular-nums">{s.goals}</td>
-                      <td className="px-3 py-3 text-right tabular-nums">{s.assists}</td>
-                      <td className="px-4 py-3 text-right tabular-nums font-black text-sky-300">
-                        {s.points}
+                      <td className="px-4 py-3 text-right tabular-nums font-medium text-slate-400">{s.gamesPlayed}</td>
+                      <td className="px-3 py-3 text-right tabular-nums font-bold text-emerald-400">{s.goals}</td>
+                      <td className="px-3 py-3 text-right tabular-nums font-bold text-sky-400">{s.assists}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        <span className="inline-flex h-7 w-9 items-center justify-center rounded-lg bg-sky-500/15 text-sm font-black text-sky-200">
+                          {s.points}
+                        </span>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </Card>
+          </div>
         </section>
       )}
 
-      {/* Explanatory Info Card */}
-      <Card title="How Around the World works" accent="text-slate-300">
-        <div className="text-sm text-slate-400 space-y-2">
-          <p>
-            <b className="text-slate-200">CHL & AHL:</b> Direct league feeds (HockeyTech) provide live regular
-            season skater and goalie statistics updated daily.
-          </p>
-          <p>
-            <b className="text-slate-200">NCAA Division I:</b> All college rosters are tracked and mapped to your
-            prospects. Stat rows remain in pre-season status until games begin.
-          </p>
-          <p>
-            <b className="text-slate-200">Europe & Russia:</b> High-level senior and junior leagues (Liiga, SHL,
-            KHL, MHL, Czech & Slovak Extraliga) track all league assets with official profile and league stats.
-          </p>
+      {/* ── How it works ── */}
+      <div className="overflow-hidden rounded-2xl border border-slate-700/40 bg-slate-900/60 p-5">
+        <div className="mb-3 text-xs font-black uppercase tracking-widest text-slate-500">How Around the World works</div>
+        <div className="grid sm:grid-cols-3 gap-4 text-sm text-slate-400">
+          <div>
+            <div className="mb-1 font-bold text-slate-200">🏒 CHL &amp; AHL</div>
+            <p className="text-xs leading-relaxed">Direct HockeyTech league feeds — live regular season skater and goalie statistics updated daily.</p>
+          </div>
+          <div>
+            <div className="mb-1 font-bold text-slate-200">🎓 NCAA Division I</div>
+            <p className="text-xs leading-relaxed">All college rosters tracked and mapped to prospects. Stat rows in pre-season status until games begin.</p>
+          </div>
+          <div>
+            <div className="mb-1 font-bold text-slate-200">🇪🇺 Europe &amp; Russia</div>
+            <p className="text-xs leading-relaxed">Liiga, SHL, KHL, MHL, Czech &amp; Slovak Extraliga with EP scraper fallback for league data via official profiles.</p>
+          </div>
         </div>
-      </Card>
+      </div>
     </div>
   );
 }
-
