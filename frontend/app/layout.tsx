@@ -19,6 +19,7 @@ import TradeSuccessOverlay from "@/components/TradeSuccessOverlay";
 import TradeAnnouncementOverlay from "@/components/TradeAnnouncementOverlay";
 import RosterComplianceOverlay from "@/components/RosterComplianceOverlay";
 import VisitBeacon from "@/components/VisitBeacon";
+import DeploymentSync from "@/components/DeploymentSync";
 import SiteBanner from "@/components/SiteBanner";
 import MegaMenu from "@/components/MegaMenu";
 import SiteFooter from "@/components/SiteFooter";
@@ -146,6 +147,7 @@ export default async function RootLayout({
       >
         <LangProvider lang={lang}>
           <ScoreTracker />
+          <DeploymentSync />
           {deadlineFeed.deadline && <TradeDeadlineBanner initial={deadlineFeed} />}
           <VisitBeacon />
           <PullToRefresh />
