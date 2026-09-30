@@ -6,6 +6,7 @@ import { importLiigaProspects } from "@/lib/world-import-liiga";
 import { importCzechExtraligaProspects, importShlProspects } from "@/lib/world-import-europe";
 import { importEuropeanJuniorLeagues } from "@/lib/world-import-juniors";
 import { importRussianProspects } from "@/lib/world-import-russia";
+import { importKhlLeague } from "@/lib/world-import-khl";
 import { reconcileAllProspects } from "@/lib/world-player-identity";
 
 /**
@@ -38,6 +39,7 @@ export async function runFullWorldSync() {
     importEuropeanJuniorLeagues().catch((e) => ({ error: (e as Error).message })),
   ]);
   const russia = await importRussianProspects().catch((e) => ({ error: (e as Error).message }));
+  const khl = await importKhlLeague().catch((e) => ({ error: (e as Error).message }));
   const reconcile = await reconcileAllProspects().catch((e) => ({ error: (e as Error).message }));
 
   return {
@@ -51,6 +53,7 @@ export async function runFullWorldSync() {
     cze,
     juniors,
     russia,
+    khl,
     reconcile,
   };
 }
