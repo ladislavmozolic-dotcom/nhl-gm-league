@@ -127,3 +127,47 @@ export async function importDraftClass(year: number): Promise<{ imported: number
   ]);
   return { imported: rows.length };
 }
+
+/** Preview class from a pasted list (e.g. an EliteProspects ranking) — used before NHL
+ *  Central Scouting publishes. One prospect per line in rank order (best first):
+ *  `Name ; Pos ; Birth YYYY-MM-DD ; Country ; Club ; League` split by tab, `;` or `|`
+ *  (only the name is required). Rows are stored with csRank = null, so the automatic
+ *  Central Scouting import replaces them the moment NHL publishes. Refuses to touch a
+ *  year that already holds a Central Scouting class. */
+export async function importPreviewClass(year: number, text: string): Promise<{ imported: number; skipped: number; error?: string }> {
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true } });
+  const source = cfg?.rosterMode === "real" ? "real" : "profinhl";
+  const where = { draftYear: year, ...draftSourceWhere(cfg?.rosterMode) };
+  if (await prisma.draftProspect.count({ where: { ...where, csRank: { not: null } } })) {
+    return { imported: 0, skipped: 0, error: "This year already has a Central Scouting class — not overwriting it." };
+  }
+  const POS = new Set(["C", "LW", "RW", "D", "G", "L", "R", "F"]);
+  const rows: DraftClassRow[] = [];
+  let skipped = 0;
+  const seen = new Set<string>();
+  for (const line of text.split(/\r?\n/)) {
+    const cells = line.split(/\t|;|\|/).map((c) => c.trim());
+    const name = (cells[0] ?? "").replace(/^\d+[.)]?\s+/, "").trim(); // tolerate a leading "12." rank
+    if (!name || !/\s/.test(name)) { if (line.trim()) skipped++; continue; }
+    const key = name.toLowerCase();
+    if (seen.has(key)) { skipped++; continue; }
+    seen.add(key);
+    const posRaw = (cells[1] ?? "").toUpperCase();
+    const position = POS.has(posRaw) ? (posRaw === "F" ? "C" : mapPosition(posRaw)) : "C";
+    const birth = /^\d{4}-\d{2}-\d{2}$/.test(cells[2] ?? "") ? cells[2] : null;
+    const rank = rows.length + 1;
+    const potential = derivePotential(rank);
+    const [firstName, ...rest] = name.split(/\s+/);
+    rows.push({
+      draftYear: year, firstName, lastName: rest.join(" "), name, position, shoots: null, heightIn: null, weightLb: null,
+      birthDate: birth, country: cells[3] || null, amateurClub: cells[4] || null, amateurLeague: cells[5] || null,
+      csRank: null, category: position === "G" ? 3 : 1, ov: deriveOv(potential, rank), potential,
+    });
+  }
+  if (rows.length === 0) return { imported: 0, skipped, error: "No valid lines found." };
+  await prisma.$transaction([
+    prisma.draftProspect.deleteMany({ where: { ...where, draftedByTeamId: null } }),
+    prisma.draftProspect.createMany({ data: rows.map((r) => ({ ...r, source })) }),
+  ]);
+  return { imported: rows.length, skipped };
+}

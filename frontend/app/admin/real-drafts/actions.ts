@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { isAdmin } from "@/lib/auth";
 import { importRealDraft } from "@/lib/real-draft-import";
+import { importPreviewClass, currentDraftYear } from "@/lib/draft-class-import";
 import { revalidatePath } from "next/cache";
 
 /** Admin: import (or refresh) a real NHL draft year into real-roster Draft History. */
@@ -27,4 +28,15 @@ export async function deleteRealDraftAction(year: number) {
   revalidatePath("/admin/real-drafts");
   revalidatePath("/draft/history");
   return { ok: true as const };
+}
+
+/** Admin: load a pasted early ranking as this season's draft class until Central Scouting publishes. */
+export async function importPreviewClassAction(year: number, text: string) {
+  if (!(await isAdmin())) return { ok: false as const, error: "Admin only." };
+  if (year !== (await currentDraftYear()) && year !== (await currentDraftYear()) + 1) return { ok: false as const, error: "Only the current or next draft year." };
+  const r = await importPreviewClass(year, text);
+  if (r.error) return { ok: false as const, error: r.error };
+  revalidatePath("/draft/room");
+  revalidatePath("/draft/rankings");
+  return { ok: true as const, imported: r.imported, skipped: r.skipped };
 }
