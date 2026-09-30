@@ -193,6 +193,7 @@ export async function forceSignResignAction(
       resignCounterSalary: null,
       resignCounterYears: null,
       rfaOsUsed: false,
+      rightsReleased: false,
       disgruntled: false,
       tradeRequested: false,
       resignOfferAt: null,

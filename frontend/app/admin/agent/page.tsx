@@ -92,6 +92,7 @@ export default async function AdminAgentPage() {
         faDemandOverride: true,
         franchiseTag: true,
         rfaOsUsed: true,
+        rightsReleased: true,
         disgruntled: true,
         tradeRequested: true,
         iceWarnedAt: true,

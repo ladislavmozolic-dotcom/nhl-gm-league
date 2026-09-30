@@ -600,6 +600,7 @@ async function signFaOffer(playerId: number, player: { name: string; age: number
     tradeClause: clause, noTradeTeams,
     disgruntled: false, tradeRequested: false, promiseWarnGame: null,
     tradeRequestReason: null, iceUnhappyChecks: 0, iceWarnedAt: null,
+    rightsReleased: false,
   };
   const code = await prisma.$transaction(async (tx) => {
     // Snapshot and every resulting write belong to one transaction. The guarded
@@ -1118,6 +1119,23 @@ export async function setFranchiseTagAction(playerId: number, teamId: number, on
   return { ok: true as const };
 }
 
+/** GM declares he won't re-sign this RFA (real-NHL "not qualifying") — from now on
+ *  he's priced and treated like a UFA, and sweeps straight to the open market the
+ *  moment his deal expires instead of staying locked to the club. Reversible any
+ *  time before he actually expires. Releasing also drops a franchise tag — the two
+ *  are contradictory. */
+export async function setRightsReleasedAction(playerId: number, teamId: number, released: boolean) {
+  if (!(await canManageTeam(teamId))) return { ok: false as const, error: "You don't manage this team." };
+  const p = await prisma.player.findUnique({ where: { id: playerId }, select: { teamId: true } });
+  if (!p) return { ok: false as const, error: "Player not found." };
+  const org = await prisma.team.findUnique({ where: { id: teamId }, select: { affiliateTeams: { select: { id: true } } } });
+  const orgIds = [teamId, ...(org?.affiliateTeams.map((a) => a.id) ?? [])];
+  if (!orgIds.includes(p.teamId)) return { ok: false as const, error: "That player isn't in your organization." };
+  await prisma.player.update({ where: { id: playerId }, data: { rightsReleased: released, ...(released ? { franchiseTag: false } : {}) } });
+  revalidatePath(`/teams`);
+  return { ok: true as const };
+}
+
 /** Re-sign one of your OWN expiring players (contract up for renewal). Same engine
  *  as the frenzy, but a direct one-on-one negotiation: the player accepts if the
  *  offer clears his team-specific floor + term, otherwise he counters with why. */
@@ -1127,7 +1145,7 @@ export async function extendContractAction(
 ) {
   if (!(await canManageTeam(teamId))) return { ok: false as const, error: "You don't manage this team." };
   const player = await prisma.player.findUnique({
-    where: { id: playerId }, select: { teamId: true, contractYears: true, capHit: true, ahlSalary: true, contractExpiry: true, contractType: true, tradeClause: true, noTradeTeams: true, contractText: true, age: true, birthDate: true, name: true, lastSeasonGP: true, resignRound: true, resignStatus: true, resignOfferSalary: true, rosterType: true, franchiseTag: true, rfaOsUsed: true, overall: true, realFarmTeamId: true, iceWarnedAt: true, iceUnhappyChecks: true, promiseWarnGame: true, tradeRequested: true },
+    where: { id: playerId }, select: { teamId: true, contractYears: true, capHit: true, ahlSalary: true, contractExpiry: true, contractType: true, tradeClause: true, noTradeTeams: true, contractText: true, age: true, birthDate: true, name: true, lastSeasonGP: true, resignRound: true, resignStatus: true, resignOfferSalary: true, rosterType: true, franchiseTag: true, rfaOsUsed: true, rightsReleased: true, overall: true, realFarmTeamId: true, iceWarnedAt: true, iceUnhappyChecks: true, promiseWarnGame: true, tradeRequested: true },
   });
   if (!player) return { ok: false as const, error: "Player not found." };
   // the club may re-sign its own NHL players AND its farm (AHL affiliate) players
@@ -1283,7 +1301,7 @@ export async function extendContractAction(
       ...releaseNonRoster,
       ...newDeal,
       signPromiseLine: dep.line, signPromisePP: pp, signPromisePK: pk,
-      resignRound: 0, resignOfferSalary: null, resignCounterSalary: null, resignCounterYears: null, resignOfferAt: null, rfaOsUsed: false,
+      resignRound: 0, resignOfferSalary: null, resignCounterSalary: null, resignCounterYears: null, resignOfferAt: null, rfaOsUsed: false, rightsReleased: false,
       disgruntled: false, tradeRequested: false, promiseWarnGame: null,
       tradeRequestReason: null, iceUnhappyChecks: 0, iceWarnedAt: null,
     },

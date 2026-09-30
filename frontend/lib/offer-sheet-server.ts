@@ -191,7 +191,7 @@ async function executeOfferSheet(os: OfferSheetRow, playerName: string): Promise
           : `$${os.salary.toLocaleString("en-US")} × ${os.years}yr (through ${expiry})`,
         signPromiseLine: os.line, signPromisePP: os.pp, signPromisePK: os.pk,
         tradeClause: clause, noTradeTeams,
-        franchiseTag: false, resignStatus: null, resignRound: 0, resignCounterSalary: null, resignCounterYears: null, resignOfferSalary: null, rfaOsUsed: false,
+        franchiseTag: false, resignStatus: null, resignRound: 0, resignCounterSalary: null, resignCounterYears: null, resignOfferSalary: null, rfaOsUsed: false, rightsReleased: false,
         disgruntled: false, tradeRequested: false, promiseWarnGame: null,
         tradeRequestReason: null, iceUnhappyChecks: 0, iceWarnedAt: null,
       },

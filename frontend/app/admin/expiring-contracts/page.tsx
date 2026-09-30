@@ -67,7 +67,7 @@ export default async function ExpiringContractsPage({ searchParams }: { searchPa
       },
       select: {
         id: true, name: true, slug: true, position: true, age: true, birthDate: true, capHit: true, contractYears: true,
-        isGoalie: true, teamId: true, realCapHit: true, realContractYears: true, faOverrideLadder: true,
+        isGoalie: true, teamId: true, realCapHit: true, realContractYears: true, faOverrideLadder: true, rightsReleased: true,
         team: { select: { name: true, code: true, logoUrl: true } },
       },
     }),

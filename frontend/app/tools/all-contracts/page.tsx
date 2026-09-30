@@ -45,7 +45,7 @@ export default async function AllContractsPage({
     where: { teamId: { in: orgIds }, rosterType: { in: ["NHL", "AHL", "NONROSTER"] }, contractYears: yearsFilter, extCapHit: null, NOT: { capHit: 100_000 } },
     select: {
       id: true, name: true, slug: true, age: true, capHit: true, contractYears: true, position: true, isGoalie: true,
-      df: true, lastSeasonGP: true, lastSeasonPts: true, lastSeasonSvPct: true, birthDate: true, rosterType: true,
+      df: true, lastSeasonGP: true, lastSeasonPts: true, lastSeasonSvPct: true, birthDate: true, rosterType: true, rightsReleased: true,
     },
     orderBy: { capHit: "desc" },
   });

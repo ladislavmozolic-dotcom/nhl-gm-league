@@ -26,7 +26,7 @@ export async function applyPendingExtensions(): Promise<number> {
         contractType: p.extContractType ?? "ONE_WAY", tradeClause: p.extClause, noTradeTeams: p.extNoTradeTeams, contractText: p.extText,
         ahlSalary: p.extContractType === "TWO_WAY" ? TWO_WAY_AHL_SALARY : null,
         extCapHit: null, extYears: null, extContractType: null, extClause: null, extNoTradeTeams: [], extText: null,
-        resignStatus: null, resignRound: 0, resignCounterSalary: null, resignCounterYears: null, rfaOsUsed: false,
+        resignStatus: null, resignRound: 0, resignCounterSalary: null, resignCounterYears: null, rfaOsUsed: false, rightsReleased: false,
       },
     });
   }

@@ -197,7 +197,9 @@ export async function collectMoveOps(pkg: TradePackage) {
         // a trade resolves any grievance with the OLD club: its signing promise, his
         // ice-time complaint and a trade request don't follow him to the new one
         disgruntled: false, tradeRequested: false, tradeRequestReason: null, promiseWarnGame: null,
-        signPromiseLine: null, signPromisePP: null, signPromisePK: null, iceUnhappyChecks: 0, iceWarnedAt: null } }));
+        signPromiseLine: null, signPromisePP: null, signPromisePK: null, iceUnhappyChecks: 0, iceWarnedAt: null,
+        // likewise, the old club not planning to re-sign him isn't the new club's call
+        rightsReleased: false } }));
       if (destRoster === "NHL" && retainedSalary > 0) {
         acquiredRetainedCount.set(toNhlId, (acquiredRetainedCount.get(toNhlId) ?? 0) + 1);
         acquiredRetainedDollars.set(toNhlId, (acquiredRetainedDollars.get(toNhlId) ?? 0) + retainedSalary);

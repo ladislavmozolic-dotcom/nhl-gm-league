@@ -620,7 +620,7 @@ const CHEAP_DEAL_MAX = 1_500_000;
 /** The Interest feedback: what the player would want to sign at THIS club, given
  *  the role he projects into there + whether the club is a contender. */
 export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow[], cmap?: Map<number, Contention>, round?: number, churnMap?: Map<number, number>): Promise<TeamAsk | null> {
-  const p = await prisma.player.findUnique({ where: { id: playerId }, select: { ...SEL, age: true, faDemandOverride: true, df: true, teamId: true, birthDate: true, contractYears: true } });
+  const p = await prisma.player.findUnique({ where: { id: playerId }, select: { ...SEL, age: true, faDemandOverride: true, df: true, teamId: true, birthDate: true, contractYears: true, rightsReleased: true } });
   if (!p) return null;
   const marketPool = pool ?? (await loadMarketPool());
   const fullGP = await leagueFullGP();
@@ -761,8 +761,11 @@ const UFA_AGE = 27;
 
 /** CBA status at the END of his current deal: UFA if he's 27 on June 30 of the year
  *  it expires (not his age today — Quinn Hughes is 26 now but 27 by June 30, 2027).
- *  An already-expired deal (0 years) is judged at the June 30 just passed. */
-export function ufaAtExpiry(p: { age: number | null; birthDate?: string | Date | null; contractYears?: number | null }): boolean {
+ *  An already-expired deal (0 years) is judged at the June 30 just passed. A club that
+ *  has declared it won't re-sign an RFA (`rightsReleased` — real-NHL "not qualifying")
+ *  treats him as a UFA regardless of age. */
+export function ufaAtExpiry(p: { age: number | null; birthDate?: string | Date | null; contractYears?: number | null; rightsReleased?: boolean | null }): boolean {
+  if (p.rightsReleased) return true;
   const expiry = CURRENT_SEASON_START + Math.max(0, p.contractYears ?? 0);
   if (p.birthDate) return ageAsOfJune30(p.birthDate, expiry) >= UFA_AGE;
   return (p.age ?? UFA_AGE) + Math.max(0, (p.contractYears ?? 0) - 1) >= UFA_AGE;
@@ -783,10 +786,10 @@ async function expiredContractCandidates(): Promise<{ ufaIds: number[]; rfaIds: 
     loadSettings(),
     prisma.player.findMany({
       where: { rosterType: { in: ["NHL", "AHL"] }, contractYears: 0, NOT: { capHit: 100_000 } },
-      select: { id: true, age: true, birthDate: true, contractYears: true },
+      select: { id: true, age: true, birthDate: true, contractYears: true, rightsReleased: true },
     }),
   ]);
-  const isUfaAge = (p: { age: number | null; birthDate: string | Date | null; contractYears: number | null }) => settings.faMode === "simple" || ufaAtExpiry(p);
+  const isUfaAge = (p: { age: number | null; birthDate: string | Date | null; contractYears: number | null; rightsReleased: boolean }) => settings.faMode === "simple" || ufaAtExpiry(p);
   return {
     ufaIds: candidates.filter((p) => isUfaAge(p)).map((p) => p.id),
     rfaIds: candidates.filter((p) => !isUfaAge(p)).map((p) => p.id),

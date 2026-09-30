@@ -4,14 +4,14 @@ import SalaryStepper from "@/components/SalaryStepper";
 import { useEffect, useState, useTransition } from "react";
 import PlayerLink from "@/components/PlayerLink";
 import { useRouter } from "next/navigation";
-import { getInterestAction, extendContractAction, setFranchiseTagAction } from "@/app/free-agents/actions";
+import { getInterestAction, extendContractAction, setFranchiseTagAction, setRightsReleasedAction } from "@/app/free-agents/actions";
 import { Card } from "@/components/ui";
 import InfoTip from "@/components/InfoTip";
 import { cleanName } from "@/lib/playerName";
 import { clauseDiscount } from "@/lib/free-agency";
 import { friendlyActionError } from "@/lib/client/action-error";
 
-type ExpiringPlayer = { id: number; name: string; capHit: number | null; contractYears: number | null; contractText: string | null; farm?: boolean; franchiseTag?: boolean };
+type ExpiringPlayer = { id: number; name: string; capHit: number | null; contractYears: number | null; contractText: string | null; farm?: boolean; franchiseTag?: boolean; rightsReleased?: boolean };
 
 const M = (n: number) => `$${(n / 1e6).toFixed(2)}M`;
 function lineOptions(grp: string) {
@@ -204,6 +204,17 @@ export default function ReSignPanel({ teamId, players, title, blurb, accent = "t
       else setTagMsg(r.error ?? "Couldn't set the tag.");
     } catch (e) { setTagMsg(friendlyActionError(e)); }
   });
+  const [releasePending, startRelease] = useTransition();
+  const [released, setReleased] = useState<Set<number>>(new Set(players.filter((p) => p.rightsReleased).map((p) => p.id)));
+  const [releaseMsg, setReleaseMsg] = useState<string | null>(null);
+  const toggleRelease = (id: number, next: boolean) => startRelease(async () => {
+    setReleaseMsg(null);
+    try {
+      const r = await setRightsReleasedAction(id, teamId, next);
+      if (r.ok) setReleased((s) => { const n = new Set(s); if (next) n.add(id); else n.delete(id); return n; });
+      else setReleaseMsg(r.error ?? "Couldn't update.");
+    } catch (e) { setReleaseMsg(friendlyActionError(e)); }
+  });
   // hold the OPEN PLAYER OBJECT, not just an id — the server action's revalidatePath
   // re-renders this list without the just-signed player, and a find(openId) would go
   // undefined and tear the modal down before its confirmation shows.
@@ -219,6 +230,7 @@ export default function ReSignPanel({ teamId, players, title, blurb, accent = "t
         </p>
       )}
       {tagMsg && <p className="text-xs text-rose-400 mb-2">{tagMsg}</p>}
+      {releaseMsg && <p className="text-xs text-rose-400 mb-2">{releaseMsg}</p>}
       <div className="divide-y divide-slate-800/50">
         {players.map((p) => (
           <div key={p.id} className="flex items-center justify-between py-2 gap-3">
@@ -237,6 +249,21 @@ export default function ReSignPanel({ teamId, players, title, blurb, accent = "t
                   className={`px-2 py-1 rounded-md text-xs font-semibold whitespace-nowrap border ${tagged === p.id ? "bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/40" : "bg-slate-800 text-slate-400 border-slate-700 hover:text-fuchsia-300"} disabled:opacity-40`}>
                   ★ {tagged === p.id ? "Franchise" : "Tag"}
                 </button>
+              )}
+              {group === "RFA" && (
+                released.has(p.id) ? (
+                  <button onClick={() => toggleRelease(p.id, false)} disabled={releasePending}
+                    title="Rights released — he's priced like a UFA and hits the open market the moment his deal expires. Click to reclaim his RFA rights."
+                    className="px-2 py-1 rounded-md text-xs font-semibold whitespace-nowrap border bg-amber-950/50 text-amber-400 border-amber-800/50 hover:text-amber-300">
+                    🔓 Released
+                  </button>
+                ) : (
+                  <button onClick={() => toggleRelease(p.id, true)} disabled={releasePending}
+                    title="Declare you won't re-sign him (real-NHL 'not qualifying') — he's priced and treated like a UFA from now on, and hits the open market the moment his deal expires instead of staying RFA-locked to you."
+                    className="px-2 py-1 rounded-md text-xs font-semibold whitespace-nowrap border bg-slate-800 text-slate-400 border-slate-700 hover:text-rose-300">
+                    Release rights
+                  </button>
+                )
               )}
               {canNegotiate ? (
                 <button onClick={() => setOpenPlayer(p)}

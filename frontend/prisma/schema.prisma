@@ -212,6 +212,7 @@ model Player {
   faDemandOverride      Int? // Free Agent Frenzy: league Agent / admin hand-set contract demand ($ cap hit); overrides the computed market value
   faOverrideLadder      Json? // Admin → FA Tuning: hand-set 1-4yr asks ({"1":n,"2":n,"3":n,"4":n}, any subset) shown on Expiring Contracts — Demand Watch instead of the computed term ladder
   franchiseTag          Boolean                   @default(false) // RFA tagged as the club's Franchise player (1/team) → gets 2 re-sign rounds before offer sheets
+  rightsReleased        Boolean                   @default(false) // GM has declared he won't re-sign this RFA (real-NHL "not qualifying") — he's priced/treated as a UFA from now on and sweeps straight to the open market at contract expiry instead of staying RFA-locked to the club
   resignRound           Int                       @default(0) // own-player re-sign: 0 = no offer yet, 1/2 = after that round's offer (max 2)
   faDecisionAt          DateTime? // in-season UFA market: when his deliberation window resolves (collect offers 7d → counter 3d → sign)
   faCountered           Boolean                   @default(false) // in-season UFA market: he has issued counters (phase 2 — bidders match, then he signs)
