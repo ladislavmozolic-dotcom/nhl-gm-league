@@ -1232,7 +1232,9 @@ export async function extendContractAction(
       return {
         ok: false as const, walked: true, toUFA: !isRFA,
         reason: isRFA
-          ? (player.franchiseTag ? "Two rounds and no deal — as your franchise RFA he's now open to offer sheets." : "No deal — he's now open to offer sheets.")
+          ? (player.franchiseTag
+              ? "Two rounds and no deal — as your franchise RFA he's now open to offer sheets. If nobody signs him there, talks with you resume."
+              : "No deal — he'll wait to see if a rival submits an offer sheet. If nobody does, negotiations with you continue over the summer.")
           : "Two rounds and no deal — he'll test the market when the season ends." + insult,
       };
     }

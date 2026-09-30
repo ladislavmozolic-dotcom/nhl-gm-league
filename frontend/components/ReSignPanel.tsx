@@ -57,6 +57,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
 
   const router = useRouter();
   const [result, setResult] = useState<{ salary: number; years: number; next?: boolean } | null>(null);
+  const [walkedToUFA, setWalkedToUFA] = useState(true);
   const submit = () => start(async () => {
     setMsg(null);
     const salary = Math.round(parseFloat(salaryM) * 1e6);
@@ -68,8 +69,11 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
     // don't refresh yet — that would unmount this modal before the confirmation shows;
     // refresh when the GM closes it (Done button).
     if (r.ok) { setResult({ salary: r.salary, years: r.years, next: !!r.startsNextSeason }); setDone(true); return; }
-    const rr = r as { walked?: boolean; rejected?: boolean; reason?: string; error?: string };
-    if (rr.walked) { setDone(true); setMsg({ t: "err", s: rr.reason ?? "He walked away." }); return; }
+    const rr = r as { walked?: boolean; toUFA?: boolean; rejected?: boolean; reason?: string; error?: string };
+    // an RFA who exhausts his round(s) isn't leaving the club — he's just open to rival
+    // offer sheets, and comes back to the negotiating table if nobody bites (rfaOsUsed).
+    // Only a real UFA walk means he's actually testing outside free agency.
+    if (rr.walked) { setWalkedToUFA(rr.toUFA !== false); setDone(true); setMsg({ t: "err", s: rr.reason ?? "He walked away." }); return; }
     setMsg({ t: "err", s: rr.rejected ? (rr.reason ?? "") : (rr.error ?? "Failed.") });
   });
 
@@ -94,9 +98,16 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
         )}
         {done && !result && (
           <div className="text-center py-8">
-            <div className="text-4xl mb-2">🚪</div>
-            <div className="text-lg font-bold text-white">{cleanName(player.name)} walked away</div>
+            <div className="text-4xl mb-2">{walkedToUFA ? "🚪" : "📝"}</div>
+            <div className="text-lg font-bold text-white">
+              {walkedToUFA ? `${cleanName(player.name)} walked away` : `${cleanName(player.name)} is open to offer sheets`}
+            </div>
             <div className="text-sm text-amber-300 mt-1 max-w-xs mx-auto">{msg?.s}</div>
+            {!walkedToUFA && (
+              <div className="text-xs text-slate-500 mt-2 max-w-xs mx-auto">
+                He&apos;s still your player — if no rival club signs him to an offer sheet, negotiations with you resume.
+              </div>
+            )}
             <button onClick={() => { router.refresh(); onClose(); }} className="mt-6 px-8 py-2.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-semibold">Close</button>
           </div>
         )}
