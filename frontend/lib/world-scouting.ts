@@ -47,7 +47,7 @@ export async function worldScoutingMeta(players: WorldIdentity[], teamId: number
     const draftRow = draftMatches.length === 1 ? draftMatches[0] : null;
     const drafted = draftMatches.some((d) => d.draftedByTeamId != null);
     const saved = rankings.some((r) => (draftRow && r.draftProspectId === draftRow.id) || (r.draftProspectId == null && r.customName?.toLocaleLowerCase() === p.name.toLocaleLowerCase() && r.customBirth === p.birthDate));
-    meta.set(p.id, { age, rights: owner ?? null, draftable: !owner && !drafted && age != null && age <= 23, saved });
+    meta.set(p.id, { age, rights: owner ?? null, draftable: !owner && !drafted && (age == null || age <= 23), saved });
   }
   return { year, meta };
 }

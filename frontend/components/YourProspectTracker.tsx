@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export type TrackedProspect = {
   id: number;
@@ -143,6 +144,15 @@ export default function YourProspectTracker({
                 {pendingSeason} pending
               </span>
             )}
+
+            <Link
+              href="/draft/rankings"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-bold text-amber-300 hover:bg-amber-500/20 hover:text-amber-200 transition-all shadow-sm"
+              title="Go to private GM draft board"
+            >
+              <span>📋</span>
+              <span>Draft Board →</span>
+            </Link>
           </div>
         </div>
       </div>
@@ -200,7 +210,20 @@ export default function YourProspectTracker({
                     <span className={`shrink-0 inline-flex items-center justify-center rounded-md border px-1.5 py-0.5 text-[10px] font-black tracking-wide ${posBadge(p.position)}`}>
                       {p.position || "?"}
                     </span>
-                    <span className="font-bold text-slate-100 group-hover:text-white">{p.name}</span>
+                    {p.epUrl ? (
+                      <a
+                        href={p.epUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-bold text-slate-100 hover:text-sky-300 hover:underline transition-colors inline-flex items-center gap-1 group/pname"
+                        title="Open EliteProspects profile"
+                      >
+                        <span>{p.name}</span>
+                        <span className="text-[10px] text-sky-400/60 group-hover/pname:text-sky-300">↗</span>
+                      </a>
+                    ) : (
+                      <span className="font-bold text-slate-100 group-hover:text-white">{p.name}</span>
+                    )}
                   </div>
                 </td>
 

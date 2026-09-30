@@ -66,10 +66,13 @@ def fetch_ep_player(url: str, retries: int = 2):
             try:
                 with urllib.request.urlopen(req, timeout=15, context=_ssl_ctx) as resp:
                     html = resp.read().decode("utf-8", errors="replace")
-            except ssl.SSLError:
+            except (ssl.SSLError, urllib.error.URLError) as ssl_err:
                 # Fallback: SSL cert verification disabled (Docker Debian-slim without ca-certs)
-                with urllib.request.urlopen(req, timeout=15, context=_ssl_ctx_noverify) as resp:
-                    html = resp.read().decode("utf-8", errors="replace")
+                if "CERTIFICATE" in str(ssl_err).upper() or "SSL" in str(ssl_err).upper():
+                    with urllib.request.urlopen(req, timeout=15, context=_ssl_ctx_noverify) as resp:
+                        html = resp.read().decode("utf-8", errors="replace")
+                else:
+                    raise
             break
         except urllib.error.HTTPError as e:
             if e.code == 404 and attempt == 0:

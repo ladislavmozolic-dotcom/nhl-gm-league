@@ -299,7 +299,18 @@ export default async function AroundTheWorldPage({
                           {i + 1}
                         </span>
                       </td>
-                      <td className="px-4 py-3 font-bold text-slate-100 group-hover:text-white">{s.player.name}</td>
+                      <td className="px-4 py-3 font-bold text-slate-100 group-hover:text-white">
+                        <a
+                          href={s.player.epUrl || epPlayerSearchUrl(s.player.name)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hover:text-sky-300 hover:underline transition-colors inline-flex items-center gap-1 group/leadname"
+                          title="Open EliteProspects profile"
+                        >
+                          <span>{s.player.name}</span>
+                          <span className="text-[10px] text-sky-400/60 group-hover/leadname:text-sky-300">↗</span>
+                        </a>
+                      </td>
                       <td className="px-3 py-3">
                         <span className="rounded-md border border-slate-700/80 bg-slate-800/60 px-2 py-0.5 text-[10px] font-bold text-slate-300 font-mono">
                           {s.league.code}

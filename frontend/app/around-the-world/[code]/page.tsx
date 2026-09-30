@@ -30,7 +30,7 @@ export default async function WorldLeaguePage({ params, searchParams }: {
   }) : [];
   const teamId = await getTeamSession();
   const { year: draftYear, meta } = await worldScoutingMeta(stats.map((s) => s.player), teamId);
-  const visibleStats = stats.filter((s) => { const state = meta.get(s.playerId); return state?.rights || state?.draftable; });
+  const visibleStats = stats;
   const syncedAt = stats.reduce<Date | null>((latest, s) => !latest || s.syncedAt > latest ? s.syncedAt : latest, null);
   const skaters = visibleStats.filter((s) => !s.isGoalie);
   const goalies = visibleStats.filter((s) => s.isGoalie);
