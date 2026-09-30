@@ -27,7 +27,7 @@ function SkaterTable({ rows }: { rows: CareerSkaterRow[] }) {
               <td className="text-right px-1.5 tabular-nums">{r.goals}</td>
               <td className="text-right px-1.5 tabular-nums">{r.assists}</td>
               <td className="text-right px-1.5 tabular-nums font-semibold">{r.points}</td>
-              <td className="text-right px-1.5 tabular-nums">{r.plusMinus > 0 ? `+${r.plusMinus}` : r.plusMinus}</td>
+              <td className={`text-right px-1.5 tabular-nums ${r.plusMinus > 0 ? "text-emerald-400 font-medium" : r.plusMinus < 0 ? "text-rose-400 font-medium" : "text-slate-400"}`}>{r.plusMinus > 0 ? `+${r.plusMinus}` : r.plusMinus}</td>
               <td className="text-right px-1.5 tabular-nums">{r.pim}</td>
               <td className="text-right px-1.5 tabular-nums">{r.shots}</td>
               <td className="text-right px-1.5 tabular-nums hidden sm:table-cell">{r.hits}</td>

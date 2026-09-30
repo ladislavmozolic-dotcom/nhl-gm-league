@@ -15,13 +15,21 @@ export type Col = {
   team?: boolean;         // render as team badge: logo (row._teamLogo) + code, linking to /teams/(row._teamSlug)
 };
 
-function render(v: number | string, format?: ColFormat): string {
+function render(v: number | string, format?: ColFormat): React.ReactNode {
   if (format === "dash") return "—";
   if (format === "jersey") return v ? String(v) : "—";
   const n = Number(v);
   switch (format) {
-    case "plusMinus": return n > 0 ? "+" + n : String(n);
-    case "plusDec1": return (n > 0 ? "+" : "") + n.toFixed(1);
+    case "plusMinus": {
+      if (isNaN(n) || n === 0) return <span className="text-slate-400">0</span>;
+      if (n > 0) return <span className="text-emerald-400 font-medium">+{n}</span>;
+      return <span className="text-rose-400 font-medium">{n}</span>;
+    }
+    case "plusDec1": {
+      if (isNaN(n) || n === 0) return <span className="text-slate-400">0.0</span>;
+      if (n > 0) return <span className="text-emerald-400 font-medium">+{n.toFixed(1)}</span>;
+      return <span className="text-rose-400 font-medium">{n.toFixed(1)}</span>;
+    }
     case "pct3": return n.toFixed(3).replace(/^0/, "");
     case "pct1": return (n * 100).toFixed(1) + "%";
     case "dec1": return n.toFixed(1);

@@ -103,10 +103,17 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
   const topWins = [...gByPlayer.entries()].sort((a, b) => b[1].w - a[1].w)[0];
   const topSvp = [...gByPlayer.entries()].filter(([, g]) => g.sa > 0).sort((a, b) => b[1].sv / b[1].sa - a[1].sv / a[1].sa)[0];
 
-  const leaderOf = (top: { pid: number; val: number } | null, signed = false) =>
-    top ? { pid: top.pid, value: signed && top.val > 0 ? `+${top.val}` : String(top.val) } : { value: "0" };
+  const leaderOf = (top: { pid: number; val: number } | null, signed = false) => {
+    if (!top) return { value: "0" };
+    if (signed) {
+      if (top.val > 0) return { pid: top.pid, value: <span className="text-emerald-400">+{top.val}</span> };
+      if (top.val < 0) return { pid: top.pid, value: <span className="text-rose-400">{top.val}</span> };
+      return { pid: top.pid, value: <span className="text-slate-400">0</span> };
+    }
+    return { pid: top.pid, value: String(top.val) };
+  };
 
-  const leaders: { label: string; pid?: number; value: string }[] = [
+  const leaders: { label: string; pid?: number; value: ReactNode }[] = [
     { label: "Goals", ...leaderOf(topSk("goals")) },
     { label: "Assists", ...leaderOf(topSk("assists")) },
     { label: "Points", ...leaderOf(topSk("points")) },
@@ -287,7 +294,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
   );
 }
 
-function LeaderTile({ label, player, value }: { label: string; player?: { name: string; slug: string; photoUrl: string | null; position: string }; value: string }) {
+function LeaderTile({ label, player, value }: { label: string; player?: { name: string; slug: string; photoUrl: string | null; position: string }; value: ReactNode }) {
   return (
     <div className="bg-slate-800/40 rounded-xl overflow-hidden border-b-2 border-yellow-500/70">
       <div className="flex items-stretch">

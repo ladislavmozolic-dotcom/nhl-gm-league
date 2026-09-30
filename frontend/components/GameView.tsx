@@ -265,7 +265,7 @@ function SkaterTable({ side }: { side: Side }) {
                 <td className="px-2 text-right font-semibold tabular-nums">{s.goals}</td>
                 <td className="px-2 text-right font-semibold tabular-nums">{s.assists}</td>
                 <td className="px-2 text-right font-bold tabular-nums">{s.points}</td>
-                <td className="px-2 text-right tabular-nums">{s.plusMinus > 0 ? `+${s.plusMinus}` : s.plusMinus}</td>
+                <td className={`px-2 text-right tabular-nums ${s.plusMinus > 0 ? "text-emerald-400 font-medium" : s.plusMinus < 0 ? "text-rose-400 font-medium" : "text-slate-400"}`}>{s.plusMinus > 0 ? `+${s.plusMinus}` : s.plusMinus}</td>
                 <td className="px-2 text-right tabular-nums text-slate-300">{s.shots}</td>
                 <td className={`px-2 text-right tabular-nums ${s.xg && s.goals > s.xg + 0.5 ? "text-green-400" : "text-slate-400"}`} title={s.hdShots ? `${s.hdShots} high-danger` : undefined}>{s.xg != null ? s.xg.toFixed(1) : "—"}</td>
                 <td className="px-2 text-right tabular-nums text-slate-300">{s.pim}</td>

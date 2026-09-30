@@ -81,7 +81,7 @@ export default function PlayerGameLog({ isGoalie, skater, goalie }: { isGoalie: 
                 <td className="px-2.5 py-1.5 text-center tabular-nums font-semibold text-white">{r.goals}</td>
                 <td className="px-2.5 py-1.5 text-center tabular-nums">{r.assists}</td>
                 <td className="px-2.5 py-1.5 text-center tabular-nums font-semibold">{r.points}</td>
-                <td className={`px-2.5 py-1.5 text-center tabular-nums ${r.plusMinus > 0 ? "text-green-400" : r.plusMinus < 0 ? "text-red-400" : "text-slate-400"}`}>{r.plusMinus > 0 ? `+${r.plusMinus}` : r.plusMinus}</td>
+                <td className={`px-2.5 py-1.5 text-center tabular-nums ${r.plusMinus > 0 ? "text-emerald-400 font-medium" : r.plusMinus < 0 ? "text-rose-400 font-medium" : "text-slate-400"}`}>{r.plusMinus > 0 ? `+${r.plusMinus}` : r.plusMinus}</td>
                 <td className="px-2.5 py-1.5 text-center tabular-nums">{r.shots}</td>
                 <td className="px-2.5 py-1.5 text-center tabular-nums">{r.pim}</td>
                 <td className="px-2.5 py-1.5 text-center tabular-nums">{r.hits}</td>

@@ -133,7 +133,11 @@ type GlAgg = ReturnType<typeof aggGoalie>;
 const cellCls = "px-3 py-2.5 text-right tabular-nums whitespace-nowrap";
 const headRowCls = "bg-slate-800/30 border-b border-slate-800 text-slate-500 text-xs uppercase tracking-wider";
 const secHdr = "px-4 py-2 bg-slate-800/60 text-xs font-bold uppercase tracking-wide text-slate-300";
-const pmFmt = (v: number) => (v > 0 ? `+${v}` : String(v));
+const pmFmt = (v: number) => {
+  if (v > 0) return <span className="text-emerald-400 font-medium">+{v}</span>;
+  if (v < 0) return <span className="text-rose-400 font-medium">{v}</span>;
+  return <span className="text-slate-400">0</span>;
+};
 const pctFmt = (v: number | null, d = 1) => (v == null ? "—" : v.toFixed(d));
 const svpFmt = (v: number | null) => (v == null ? "—" : v.toFixed(3).replace(/^0/, ""));
 
@@ -144,9 +148,9 @@ const COL_TITLES: Record<string, string> = {
   STL: "Steals — games won where GSAx > margin of victory (excl. empty-net goals)",
 };
 const SK_COLS = ["GP", "G", "A", "PTS", "+/-", "PIM", "PPG", "SHG", "GWG", "S", "S%", "HITS", "BKS", "FO%", "TOI", "EV", "PP", "PK", "P/PG"];
-const skCells = (a: SkAgg) => [a.gp, a.g, a.a, a.pts, pmFmt(a.pm), a.pim, a.ppg, a.shg, a.gwg, a.s, pctFmt(a.sPct), a.hits, a.bks, a.foPct == null ? "—" : a.foPct.toFixed(1), a.toi, a.evToi, a.ppToi, a.pkToi, a.pPg.toFixed(2)];
+const skCells = (a: SkAgg): React.ReactNode[] => [a.gp, a.g, a.a, a.pts, pmFmt(a.pm), a.pim, a.ppg, a.shg, a.gwg, a.s, pctFmt(a.sPct), a.hits, a.bks, a.foPct == null ? "—" : a.foPct.toFixed(1), a.toi, a.evToi, a.ppToi, a.pkToi, a.pPg.toFixed(2)];
 const GL_COLS = ["GP", "W", "L", "OTL", "SV%", "GAA", "GSAx", "STL", "SO", "SA", "SV", "GA", "TOI"];
-const glCells = (a: GlAgg) => [
+const glCells = (a: GlAgg): React.ReactNode[] => [
   a.gp, a.w, a.l, a.otl, svpFmt(a.svPct), a.gaa.toFixed(2),
   (a.gsax >= 0 ? "+" : "") + a.gsax.toFixed(1), a.steals,
   a.so, a.sa, a.sv, a.ga, a.toi,
@@ -154,7 +158,7 @@ const glCells = (a: GlAgg) => [
 
 // A league block: "<LEAGUE> Seasons" (season row + career) and, if any, "<LEAGUE> Playoffs".
 function StatBlock({ league, cols, reg, po, cellsOf, team }: {
-  league: string; cols: string[]; reg: any; po: any; cellsOf: (a: any) => (string | number)[]; team: React.ReactNode;
+  league: string; cols: string[]; reg: any; po: any; cellsOf: (a: any) => React.ReactNode[]; team: React.ReactNode;
 }) {
   if (!reg && !po) return null;
   const Head = () => (

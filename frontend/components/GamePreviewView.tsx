@@ -430,7 +430,7 @@ export default function GamePreviewView({ data }: { data: MatchPreviewData }) {
                               {s.points} <span className="text-[10px] font-bold text-amber-500/80">PTS</span>
                             </div>
                             <div className="text-[10px] text-slate-400 tabular-nums mt-0.5">
-                              {s.goals}G · {s.assists}A ({s.plusMinus > 0 ? `+${s.plusMinus}` : s.plusMinus})
+                              {s.goals}G · {s.assists}A (<span className={s.plusMinus > 0 ? "text-emerald-400 font-medium" : s.plusMinus < 0 ? "text-rose-400 font-medium" : "text-slate-400"}>{s.plusMinus > 0 ? `+${s.plusMinus}` : s.plusMinus}</span>)
                             </div>
                           </>
                         ) : (
@@ -509,7 +509,7 @@ export default function GamePreviewView({ data }: { data: MatchPreviewData }) {
                               {s.points} <span className="text-[10px] font-bold text-amber-500/80">PTS</span>
                             </div>
                             <div className="text-[10px] text-slate-400 tabular-nums mt-0.5">
-                              {s.goals}G · {s.assists}A ({s.plusMinus > 0 ? `+${s.plusMinus}` : s.plusMinus})
+                              {s.goals}G · {s.assists}A (<span className={s.plusMinus > 0 ? "text-emerald-400 font-medium" : s.plusMinus < 0 ? "text-rose-400 font-medium" : "text-slate-400"}>{s.plusMinus > 0 ? `+${s.plusMinus}` : s.plusMinus}</span>)
                             </div>
                           </>
                         ) : (

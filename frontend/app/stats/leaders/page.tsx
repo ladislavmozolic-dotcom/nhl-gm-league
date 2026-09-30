@@ -11,7 +11,7 @@ import { getTeamSession } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-type Row = { playerId: number; name: string; teamId: number | null; teamCode: string | null; teamSlug: string | null; teamLogo: string | null; value: string; sub?: string };
+type Row = { playerId: number; name: string; teamId: number | null; teamCode: string | null; teamSlug: string | null; teamLogo: string | null; value: React.ReactNode; sub?: string };
 
 function LeaderCard({ title, rows, managedTeamIds }: { title: string; rows: Row[]; managedTeamIds: Set<number> }) {
   return (
@@ -43,8 +43,8 @@ function LeaderCard({ title, rows, managedTeamIds }: { title: string; rows: Row[
 }
 
 const top = <T,>(arr: T[], key: (t: T) => number, n = 10) => [...arr].sort((a, b) => key(b) - key(a)).slice(0, n);
-const skRow = (s: SkaterTotal, value: string, sub?: string): Row => ({ playerId: s.playerId, name: s.name, teamId: s.teamId, teamCode: s.teamCode, teamSlug: s.teamSlug, teamLogo: s.teamLogo, value, sub });
-const gkRow = (g: GoalieTotal, value: string, sub?: string): Row => ({ playerId: g.playerId, name: g.name, teamId: g.teamId, teamCode: g.teamCode, teamSlug: g.teamSlug, teamLogo: g.teamLogo, value, sub });
+const skRow = (s: SkaterTotal, value: React.ReactNode, sub?: string): Row => ({ playerId: s.playerId, name: s.name, teamId: s.teamId, teamCode: s.teamCode, teamSlug: s.teamSlug, teamLogo: s.teamLogo, value, sub });
+const gkRow = (g: GoalieTotal, value: React.ReactNode, sub?: string): Row => ({ playerId: g.playerId, name: g.name, teamId: g.teamId, teamCode: g.teamCode, teamSlug: g.teamSlug, teamLogo: g.teamLogo, value, sub });
 
 export default async function LeadersPage({ searchParams }: { searchParams: Promise<{ league?: string; phase?: string }> }) {
   const sp = await searchParams;
@@ -78,7 +78,7 @@ export default async function LeadersPage({ searchParams }: { searchParams: Prom
     { title: "Points", rows: top(sk, (s) => s.points).map((s) => skRow(s, String(s.points), `${s.goals}G+${s.assists}A`)) },
     { title: "Defensemen (points)", rows: top(sk.filter((s) => s.position.includes("D")), (s) => s.points).map((s) => skRow(s, String(s.points), `${s.goals}G+${s.assists}A`)) },
     { title: "Rookies (points)", rows: top(sk.filter((s) => s.rookie), (s) => s.points).map((s) => skRow(s, String(s.points), `${s.goals}G+${s.assists}A`)) },
-    { title: "Plus / Minus (5-on-5)", rows: top(sk, (s) => s.plusMinus5v5).map((s) => skRow(s, (s.plusMinus5v5 > 0 ? "+" : "") + s.plusMinus5v5, `${s.gp} GP`)) },
+    { title: "Plus / Minus (5-on-5)", rows: top(sk, (s) => s.plusMinus5v5).map((s) => skRow(s, <span className={s.plusMinus5v5 > 0 ? "text-emerald-400 font-medium" : s.plusMinus5v5 < 0 ? "text-rose-400 font-medium" : "text-slate-400"}>{(s.plusMinus5v5 > 0 ? "+" : "") + s.plusMinus5v5}</span>, `${s.gp} GP`)) },
     { title: "Goals Above Expected (G-xG)", rows: top(sk, (s) => s.goals - s.xg).map((s) => skRow(s, (s.goals - s.xg).toFixed(1), `${s.goals}G · ${s.xg.toFixed(1)} xG`)) },
     { title: "Minutes Played", rows: top(sk, (s) => s.toi).map((s) => skRow(s, String(mins(s.toi)), `${s.gp} GP`)) },
     { title: "Penalty Minutes", rows: top(sk, (s) => s.pim).map((s) => skRow(s, String(s.pim), `${s.gp} GP`)) },
