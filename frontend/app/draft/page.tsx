@@ -7,10 +7,25 @@ import DraftAvailableBoard, { type BoardProspect } from "@/components/DraftAvail
 
 export const dynamic = "force-dynamic";
 
-export default async function UpcomingDraftPage() {
-  const year = await currentDraftYear();
+export default async function UpcomingDraftPage({ searchParams }: { searchParams?: Promise<{ year?: string }> }) {
+  const sp = searchParams ? await searchParams : {};
+  const curYear = await currentDraftYear();
+  const src = await currentDraftSourceWhere();
+  
+  // Find all years with prospects
+  const availableYears = await prisma.draftProspect.findMany({
+    where: { draftedByTeamId: null, ...src },
+    select: { draftYear: true },
+    distinct: ["draftYear"],
+    orderBy: { draftYear: "desc" },
+  });
+  const years = availableYears.map((y) => y.draftYear);
+  if (!years.includes(curYear)) years.unshift(curYear);
+
+  const year = sp.year ? Number(sp.year) : (years.find((y) => y !== curYear) ?? curYear);
+
   const up = await prisma.draftProspect.findMany({
-    where: { draftYear: year, draftedByTeamId: null, ...(await currentDraftSourceWhere()) },
+    where: { draftYear: year, draftedByTeamId: null, ...src },
     orderBy: [{ potential: "desc" }, { ov: "desc" }],
   });
   const board: BoardProspect[] = up.map((p) => ({
@@ -21,10 +36,33 @@ export default async function UpcomingDraftPage() {
 
   return (
     <div className="space-y-6 py-2">
-      <PageHeader
-        title="Upcoming Draft"
-        subtitle={up.length ? `${year} class · ${up.length} prospects · NHL Central Scouting rankings` : `${year} NHL Entry Draft`}
-      />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <PageHeader
+          title="Upcoming Draft"
+          subtitle={up.length ? `${year} class · ${up.length} available prospects · NHL Central Scouting rankings` : `${year} NHL Entry Draft`}
+        />
+        <div className="flex items-center gap-2">
+          {years.map((y) => (
+            <a
+              key={y}
+              href={`/draft?year=${y}`}
+              className={`rounded-lg px-3 py-1.5 text-sm font-semibold border transition-all ${
+                y === year
+                  ? "border-sky-500 bg-sky-600/20 text-sky-300 font-bold"
+                  : "border-slate-800 bg-slate-900/60 text-slate-400 hover:text-white"
+              }`}
+            >
+              {y}
+            </a>
+          ))}
+          <a
+            href="/draft/rankings"
+            className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-sm font-bold text-amber-300 hover:bg-amber-500/20 transition-all"
+          >
+            📋 Draft Rankings →
+          </a>
+        </div>
+      </div>
       {up.length > 0 ? (
         <DraftAvailableBoard prospects={board} canPick={false} />
       ) : (

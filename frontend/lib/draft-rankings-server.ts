@@ -4,6 +4,7 @@
 import { prisma } from "./prisma";
 import { currentDraftSourceWhere } from "./draft-source";
 import { countryFlag } from "./flags";
+import { currentDraftYear } from "./draft-class-import";
 
 export type BoardRow = {
   id: number;                 // DraftRanking id (stable identity for queue/reorder)
@@ -20,9 +21,20 @@ export type BoardRow = {
  *  have UNDRAFTED prospects (a fully-drafted historical class is dropped). Ascending. */
 export async function scoutingYears(): Promise<number[]> {
   const src = await currentDraftSourceWhere();
-  const rows = await prisma.draftProspect.findMany({ where: { draftedByTeamId: null, ...src }, select: { draftYear: true }, distinct: ["draftYear"], orderBy: { draftYear: "asc" } });
-  return rows.map((r) => r.draftYear);
+  const [prospectRows, rankingRows, curYear] = await Promise.all([
+    prisma.draftProspect.findMany({ where: { draftedByTeamId: null, ...src }, select: { draftYear: true }, distinct: ["draftYear"], orderBy: { draftYear: "asc" } }),
+    prisma.draftRanking.findMany({ where: { customYear: { not: null } }, select: { customYear: true }, distinct: ["customYear"] }),
+    currentDraftYear().catch(() => 2027),
+  ]);
+
+  const set = new Set<number>();
+  for (const r of prospectRows) set.add(r.draftYear);
+  for (const r of rankingRows) if (r.customYear) set.add(r.customYear);
+  if (curYear) set.add(curYear);
+
+  return Array.from(set).sort((a, b) => a - b);
 }
+
 
 /** A GM's board for one draft year: queued rows (rank>0, ordered) then board-only (rank 0).
  *  Includes both board-linked prospects and custom off-board entries for that year. */
