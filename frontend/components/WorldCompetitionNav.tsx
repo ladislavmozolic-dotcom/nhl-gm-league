@@ -40,6 +40,13 @@ export default function WorldCompetitionNav({ activeCode }: { activeCode?: strin
         )}
       </div>
 
+      <div className="flex flex-wrap items-center gap-2">
+      <Link
+        href="/around-the-world/draft"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-bold text-amber-300 hover:bg-amber-500/20 hover:text-white"
+      >
+        🎯 Draft Board
+      </Link>
       <Link
         href="/around-the-world/europe"
         className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
@@ -51,6 +58,7 @@ export default function WorldCompetitionNav({ activeCode }: { activeCode?: strin
         <span>🇪🇺 European &amp; Russian Hub</span>
         <span className="text-[10px] text-violet-400">→</span>
       </Link>
+      </div>
     </div>
   );
 }

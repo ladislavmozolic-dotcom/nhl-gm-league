@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { isAdmin } from "@/lib/auth";
 import { importRealDraft } from "@/lib/real-draft-import";
 import { importPreviewClass, currentDraftYear } from "@/lib/draft-class-import";
+import { importTankathonClass } from "@/lib/tankathon-import";
 import { revalidatePath } from "next/cache";
 
 /** Admin: import (or refresh) a real NHL draft year into real-roster Draft History. */
@@ -39,4 +40,17 @@ export async function importPreviewClassAction(year: number, text: string) {
   revalidatePath("/draft/room");
   revalidatePath("/draft/rankings");
   return { ok: true as const, imported: r.imported, skipped: r.skipped };
+}
+
+/** Admin: load the Tankathon big board (in its order) as the preview class. */
+export async function importTankathonAction() {
+  if (!(await isAdmin())) return { ok: false as const, error: "Admin only." };
+  try {
+    const r = await importTankathonClass();
+    if (r.error) return { ok: false as const, error: r.error };
+    revalidatePath("/draft/room"); revalidatePath("/draft/rankings"); revalidatePath("/around-the-world");
+    return { ok: true as const, imported: r.imported, skipped: 0 };
+  } catch (e) {
+    return { ok: false as const, error: e instanceof Error ? e.message : "Tankathon import failed." };
+  }
 }

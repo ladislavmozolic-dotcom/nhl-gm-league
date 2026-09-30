@@ -135,12 +135,6 @@ export async function importDraftClass(year: number): Promise<{ imported: number
  *  Central Scouting import replaces them the moment NHL publishes. Refuses to touch a
  *  year that already holds a Central Scouting class. */
 export async function importPreviewClass(year: number, text: string): Promise<{ imported: number; skipped: number; error?: string }> {
-  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true } });
-  const source = cfg?.rosterMode === "real" ? "real" : "profinhl";
-  const where = { draftYear: year, ...draftSourceWhere(cfg?.rosterMode) };
-  if (await prisma.draftProspect.count({ where: { ...where, csRank: { not: null } } })) {
-    return { imported: 0, skipped: 0, error: "This year already has a Central Scouting class — not overwriting it." };
-  }
   const POS = new Set(["C", "LW", "RW", "D", "G", "L", "R", "F"]);
   const rows: DraftClassRow[] = [];
   let skipped = 0;
@@ -164,10 +158,32 @@ export async function importPreviewClass(year: number, text: string): Promise<{ 
       csRank: null, category: position === "G" ? 3 : 1, ov: deriveOv(potential, rank), potential,
     });
   }
-  if (rows.length === 0) return { imported: 0, skipped, error: "No valid lines found." };
+  const saved = await replacePreviewClass(year, rows);
+  return saved.error ? { imported: 0, skipped, error: saved.error } : { imported: rows.length, skipped };
+}
+
+/** Store an ordered preview class (rows best-first, csRank null) as the year's undrafted pool.
+ *  Refuses a year that already holds a Central Scouting class. */
+export async function replacePreviewClass(year: number, rows: DraftClassRow[]): Promise<{ error?: string }> {
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true } });
+  const source = cfg?.rosterMode === "real" ? "real" : "profinhl";
+  const where = { draftYear: year, ...draftSourceWhere(cfg?.rosterMode) };
+  if (rows.length === 0) return { error: "No valid lines found." };
+  if (await prisma.draftProspect.count({ where: { ...where, csRank: { not: null } } })) return { error: "This year already has a Central Scouting class — not overwriting it." };
   await prisma.$transaction([
     prisma.draftProspect.deleteMany({ where: { ...where, draftedByTeamId: null } }),
     prisma.draftProspect.createMany({ data: rows.map((r) => ({ ...r, source })) }),
   ]);
-  return { imported: rows.length, skipped };
+  return {};
+}
+
+/** Build a preview row from an ordered rank (shared by the paste and Tankathon importers). */
+export function previewRow(year: number, rank: number, f: Partial<DraftClassRow> & { name: string; position: string }): DraftClassRow {
+  const potential = derivePotential(rank);
+  const [firstName, ...rest] = f.name.split(/\s+/);
+  return {
+    draftYear: year, firstName, lastName: rest.join(" "), shoots: null, heightIn: null, weightLb: null, birthDate: null,
+    country: null, amateurClub: null, amateurLeague: null, csRank: null, category: f.position === "G" ? 3 : 1,
+    ov: deriveOv(potential, rank), potential, ...f,
+  };
 }
