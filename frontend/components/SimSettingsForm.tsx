@@ -477,7 +477,7 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
           <div>
             <NumField k="chemistryBase" label="Starting chemistry (new line) / fade floor" />
-            <NumField k="chemistryGrowth" label="Growth / game intact (5v5 fade = half this)" />
+            <NumField k="chemistryGrowth" label="Growth / game intact (full up to chem 50, then tapers; 5v5 fade = half)" />
             <NumField k="chemistryDrop" label="Drop when broken (special teams only)" />
           </div>
           <div>

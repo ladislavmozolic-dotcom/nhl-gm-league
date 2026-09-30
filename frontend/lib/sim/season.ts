@@ -57,6 +57,11 @@ export function syncChem(team: SimTeam, base: number) {
   for (const u of team.units) { const v = team.chemistry[u.sig] ?? base; for (const id of u.members) map.set(id, v); }
   for (const s of [...team.forwards, ...team.defense]) s.chem = map.get(s.id) ?? 100;
 }
+/** Chemistry gained this game by a bond at `cur`: full rate up to 50, then it tapers
+ *  linearly (4 at 50 → ~2 at 75 → ~0.8 at 90), so the last points take a long time. */
+function chemGain(cur: number, growth: number): number {
+  return cur < 50 ? growth : Math.max(0.4, growth * (100 - cur) / 50);
+}
 export function evolveChem(team: SimTeam, cfg: EngineSettings) {
   const dressed = new Set([...team.forwards, ...team.defense].map((s) => s.id));
   const slow = new Set(team.slowChem ?? []);
@@ -71,7 +76,8 @@ export function evolveChem(team: SimTeam, cfg: EngineSettings) {
     const cap = slow.has(u.sig) ? cfg.offPosChemCap : 100;   // off-position unit never fully gels
     for (const [a, b] of unitPairs(u.members)) {
       const sig = pairSig(a, b); together.add(sig);
-      team.chemistry[sig] = Math.min(cap, (team.chemistry[sig] ?? cfg.chemistryBase) + cfg.chemistryGrowth);
+      const cur = team.chemistry[sig] ?? cfg.chemistryBase;
+      team.chemistry[sig] = Math.min(cap, cur + chemGain(cur, cfg.chemistryGrowth));
     }
   }
   const fade = Math.max(0.5, cfg.chemistryGrowth * 0.5);     // bonds fade SLOWER than they build → a re-united duo keeps most of its history
@@ -83,7 +89,7 @@ export function evolveChem(team: SimTeam, cfg: EngineSettings) {
   for (const u of team.stUnits ?? []) {
     const intact = u.members.every((id) => dressed.has(id));
     const cur = team.chemistry[u.sig] ?? cfg.chemistryBase;
-    team.chemistry[u.sig] = intact ? Math.min(100, cur + cfg.chemistryGrowth) : Math.max(cfg.chemistryBase, cur - cfg.chemistryDrop);
+    team.chemistry[u.sig] = intact ? Math.min(100, cur + chemGain(cur, cfg.chemistryGrowth)) : Math.max(cfg.chemistryBase, cur - cfg.chemistryDrop);
   }
 }
 
