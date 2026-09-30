@@ -29,7 +29,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
   const [info, setInfo] = useState<Awaited<ReturnType<typeof getInterestAction>> | null>(null);
   const [msg, setMsg] = useState<{ t: "ok" | "err"; s: string } | null>(null);
   const [salaryM, setSalaryM] = useState("");
-  const [years, setYears] = useState(2);
+  const [years, setYears] = useState(0);
   const [line, setLine] = useState(2);
   const [pp, setPp] = useState(false);
   const [pk, setPk] = useState(false);
@@ -43,10 +43,11 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
       try {
         const i = await getInterestAction(player.id, teamId);
         setInfo(i);
-        if (i.ok) {
-          setSalaryM((i.askSalary / 1e6).toFixed(2)); setYears(i.askYears);
-          setLine(i.line); setPp(i.wantPP); setPk(i.wantPK);
-        }
+        // Salary and term start blank — his headline ask is shown as context above the
+        // form, not pre-filled into it, so every GM has to actually decide a number
+        // instead of just accepting the computed figure by default. Role/PP/PK still
+        // default to what he wants — those aren't the part being negotiated here.
+        if (i.ok) { setLine(i.line); setPp(i.wantPP); setPk(i.wantPK); }
       } catch (e) { setMsg({ t: "err", s: friendlyActionError(e) }); }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -62,6 +63,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
     setMsg(null);
     const salary = Math.round(parseFloat(salaryM) * 1e6);
     if (!Number.isFinite(salary)) { setMsg({ t: "err", s: "Enter a salary." }); return; }
+    if (years < 1) { setMsg({ t: "err", s: "Choose a term (years)." }); return; }
     let r: Awaited<ReturnType<typeof extendContractAction>>;
     try {
       r = await extendContractAction(player.id, teamId, salary, years, line, pp, pk, grantClause || null, grantClause === "M_NTC" ? breadth : null, twoWay);
@@ -118,7 +120,8 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
           <>
             <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-3 mb-3 text-sm">
               <p className="text-slate-300">Sees himself as your <b className="text-blue-300">{slotLabels[i.slot] ?? "—"}</b> · wants {i.wantPP ? "PP" : "no PP"} · {i.wantPK ? "PK" : "no PK"}</p>
-              <p className="mt-1 text-slate-200">He&apos;s looking for roughly <b className="text-amber-300">{M(i.floor)}–{M(i.askSalary * 1.05)}</b> <span className="text-slate-500">· term negotiable {i.minYears}-{i.maxYears}yr (more years = more money)</span></p>
+              <p className="mt-1 text-slate-200">He&apos;s looking for roughly <b className="text-amber-300">{M(i.floor)}–{M(i.askSalary * 1.05)} / {i.askYears}yr</b></p>
+              <p className="mt-0.5 text-xs text-slate-500">That&apos;s his base ask at his preferred term — offer a different length yourself and the price shifts ({i.minYears}-{i.maxYears}yr negotiable; more years usually costs more, except 35+ vets, where it's the reverse).</p>
               {i.moraleNote && <p className={`mt-1 text-xs font-medium ${i.moraleNote.startsWith("Happy") ? "text-emerald-400" : "text-amber-400"}`}>{i.moraleNote.startsWith("Happy") ? "😀 " : "😕 "}{i.moraleNote}</p>}
             </div>
 
@@ -133,7 +136,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                     <label className="text-xs text-slate-400 block mb-1">Term (years)</label>
                     <div className="flex items-center gap-1">
                       <button type="button" onClick={() => setYears((y) => Math.max(1, y - 1))} className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-lg leading-none">−</button>
-                      <div className="flex-1 text-center py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-sm tabular-nums font-semibold">{years} yr</div>
+                      <div className="flex-1 text-center py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-sm tabular-nums font-semibold">{years > 0 ? `${years} yr` : "— yr"}</div>
                       <button type="button" onClick={() => setYears((y) => Math.min(4, y + 1))} className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-lg leading-none">+</button>
                     </div>
                   </div>
