@@ -55,7 +55,7 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
   // original owner of any overall pick = the team at that fixed worst-first slot
   const originalOwnerOf = (overallPick: number) => revStd[(overallPick - 1) % ppr];
   const state = stateRaw ?? { liveRound: 0, currentPick: 33, status: "IDLE" as string };
-  const fullView = sp.round === "full";
+  const fullView = sp.round == null || sp.round === "full"; // Full Draft is the default landing view
   // extra rounds (8, 9, …) exist once the admin awards bonus picks
   const bonusRounds = [...new Set(order.filter((p) => p.round > 7 && !p.deferred).map((p) => p.round))].sort((a, b) => a - b);
   const allRounds = [...ROUNDS, ...bonusRounds];
@@ -133,13 +133,17 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
       )}
       {admin && <BonusPickManager teams={bonusTeams} bonus={bonusRows} />}
 
-      {me != null && <DraftIntelCard teamId={me} draftYear={DRAFT_YEAR} available={availableRaw} sourceWhere={src} />}
-
       {fullView ? (
         <div>
           <div className="text-sm text-slate-400 mb-2">Full Draft — <span className="text-slate-200">{allPicks.length}</span> selections · fills in live as picks are made</div>
+          {state.status === "LIVE" && (
+            <Link href={`/draft/room?round=${state.liveRound}`} className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-200 hover:bg-amber-500/15">
+              <span>● Round {state.liveRound} is live{onClockTeam ? ` — ${onClockTeam.name} on the clock (pick #${state.currentPick})` : ""}</span>
+              <span className="font-semibold">Open round {state.liveRound} →</span>
+            </Link>
+          )}
           {allPicks.length === 0 ? (
-            <Card><p className="text-slate-500 text-center py-8">No selections yet.</p></Card>
+            <p className="text-sm text-slate-500 mb-3">No selections yet.</p>
           ) : (
             <div className="space-y-1">
               {allPicks.map((p) => {
@@ -164,6 +168,10 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
               })}
             </div>
           )}
+          <div className="mt-5">
+            <div className="text-sm text-slate-400 mb-2">Draft class — <span className="text-slate-200">{board.length}</span> players available · board order</div>
+            <DraftAvailableBoard prospects={board} canPick={false} />
+          </div>
         </div>
       ) : roundComplete ? (
         <div>
@@ -277,6 +285,16 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
             <DraftChat canChat={me != null} myTeamId={me} />
           </div>
         </div>
+      )}
+
+      {me != null && (
+        <details className="group rounded-xl border border-slate-800 bg-slate-900/40">
+          <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-semibold text-slate-200">
+            <span className="text-slate-400 group-open:hidden">＋</span><span className="hidden text-slate-400 group-open:inline">－</span>
+            UNHL Intelligence <span className="text-xs font-normal text-slate-500">— scouting insight for your pick</span>
+          </summary>
+          <div className="px-2 pb-3"><DraftIntelCard teamId={me} draftYear={DRAFT_YEAR} available={availableRaw} sourceWhere={src} /></div>
+        </details>
       )}
       </div>
     </div>

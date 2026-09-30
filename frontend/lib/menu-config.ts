@@ -73,6 +73,7 @@ export const DEFAULT_MENU: MenuItem[] = [
   { key: "draft", label: "Entry Draft", href: "/draft/room", children: [
     { label: "🎰 Draft Lottery", href: "/draft/lottery" },
     { label: "🎯 Draft Room", href: "/draft/room" },
+    { label: "🌍 Draft Board", href: "/around-the-world/draft" },
     { label: "📅 Upcoming Draft", href: "/draft" },
     { label: "📜 Draft History", href: "/draft/history" },
     { label: "🏒 Expansion Draft", href: "/admin/expansion" },
