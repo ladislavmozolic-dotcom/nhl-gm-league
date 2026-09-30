@@ -19,9 +19,13 @@ const POSITIONS: ProspectPos[] = ["C", "LW", "RW", "D", "G"];
 export interface AvailableProspect {
   id: number; name: string; position: string; country: string | null;
   ov: number; potential: number; csRank: number | null;
+  birthDate?: string | null; heightIn?: number | null; weightLb?: number | null; shoots?: string | null; amateurLeague?: string | null; amateurClub?: string | null;
 }
 
-export interface BpaEntry { id: number; name: string; position: string; country: string | null; ov: number; potential: number; csRank: number | null; }
+export interface BpaEntry {
+  id: number; name: string; position: string; country: string | null; ov: number; potential: number; csRank: number | null;
+  birthDate?: string | null; heightIn?: number | null; weightLb?: number | null; shoots?: string | null; amateurLeague?: string | null; amateurClub?: string | null;
+}
 export interface RiskEntry extends BpaEntry { gap: number; } // potential - ov, smaller = closer to a finished product
 
 export interface PositionNeed {
@@ -51,7 +55,7 @@ export interface DraftIntelResult {
   comparables: { forProspect: string; picks: OutcomeComp[] };
 }
 
-const toBpa = (p: AvailableProspect): BpaEntry => ({ id: p.id, name: p.name, position: p.position, country: p.country, ov: p.ov, potential: p.potential, csRank: p.csRank });
+const toBpa = (p: AvailableProspect): BpaEntry => ({ id: p.id, name: p.name, position: p.position, country: p.country, ov: p.ov, potential: p.potential, csRank: p.csRank, birthDate: p.birthDate, heightIn: p.heightIn, weightLb: p.weightLb, shoots: p.shoots, amateurLeague: p.amateurLeague, amateurClub: p.amateurClub });
 
 function median(nums: number[]): number {
   if (!nums.length) return 0;

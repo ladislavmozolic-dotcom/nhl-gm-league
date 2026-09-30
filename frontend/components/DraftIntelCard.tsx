@@ -6,6 +6,24 @@ import { countryFlag } from "@/lib/flags";
 const posColor: Record<string, string> = { C: "text-sky-400", LW: "text-emerald-400", RW: "text-emerald-400", D: "text-amber-400", G: "text-rose-400" };
 const POS_LABEL: Record<string, string> = { C: "Center", LW: "Left Wing", RW: "Right Wing", D: "Defense", G: "Goalie" };
 
+/** Personal info line: age · height/weight (metric) · shoots · league. */
+function bioLine(p: BpaEntry): string {
+  const parts: string[] = [];
+  const m = p.birthDate ? /^(\d{4})-(\d{2})/.exec(p.birthDate) : null;
+  if (m) {
+    const now = new Date();
+    let age = now.getUTCFullYear() - +m[1];
+    if (now.getUTCMonth() + 1 < +m[2]) age--;
+    parts.push(`${age} r.`);
+  }
+  if (p.heightIn) parts.push(`${Math.round(p.heightIn * 2.54)} cm`);
+  if (p.weightLb) parts.push(`${Math.round(p.weightLb * 0.4536)} kg`);
+  if (p.shoots) parts.push(p.shoots === "L" ? "shoots L" : "shoots R");
+  const lg = [p.amateurClub, p.amateurLeague].filter(Boolean).join(" · ");
+  if (lg) parts.push(lg);
+  return parts.join(" · ");
+}
+
 function ProspectRow({ p, note }: { p: BpaEntry | RiskEntry; note?: string }) {
   return (
     <div className="flex items-center justify-between text-xs border border-slate-800 rounded-lg px-3 py-2">
@@ -13,7 +31,7 @@ function ProspectRow({ p, note }: { p: BpaEntry | RiskEntry; note?: string }) {
         {countryFlag(p.country)} {p.name} <span className={`ml-1 ${posColor[p.position] ?? "text-slate-400"}`}>{p.position}</span>
       </span>
       <span className="text-slate-400">
-        OV {p.ov} · POT {p.potential}{p.csRank != null && ` · CS #${p.csRank}`}{note}
+        {bioLine(p) || "—"}{p.csRank != null && ` · CS #${p.csRank}`}{note}
       </span>
     </div>
   );
@@ -27,7 +45,7 @@ function ProspectRow({ p, note }: { p: BpaEntry | RiskEntry; note?: string }) {
 // not gated to whoever's currently on the clock, so a club can prep ahead.
 export default async function DraftIntelCard({ teamId, draftYear, available, sourceWhere }: {
   teamId: number; draftYear: number;
-  available: { id: number; name: string; position: string; country: string | null; ov: number; potential: number; csRank: number | null }[];
+  available: { id: number; name: string; position: string; country: string | null; ov: number; potential: number; csRank: number | null; birthDate?: string | null; heightIn?: number | null; weightLb?: number | null; shoots?: string | null; amateurLeague?: string | null; amateurClub?: string | null }[];
   sourceWhere: DraftSourceWhere;
 }) {
   const intel = await draftIntelligence(teamId, draftYear, available, sourceWhere);
@@ -70,7 +88,7 @@ export default async function DraftIntelCard({ teamId, draftYear, available, sou
 
       <div>
         <div className="text-sm font-bold text-slate-200 mb-1">Best Player Available</div>
-        <p className="text-xs text-slate-400 mb-2">Zoradené podľa OV (draft-day rating), bez ohľadu na potrebu tímu.</p>
+        <p className="text-xs text-slate-400 mb-2">Najvyššie postavení na drafte podľa board poradia, bez ohľadu na potrebu tímu.</p>
         <div className="flex flex-col gap-1.5">
           {intel.bpa.map((p) => <ProspectRow key={p.id} p={p} />)}
         </div>
@@ -78,7 +96,7 @@ export default async function DraftIntelCard({ teamId, draftYear, available, sou
 
       <div>
         <div className="text-sm font-bold text-slate-200 mb-1">Highest Upside</div>
-        <p className="text-xs text-slate-400 mb-2">Zoradené podľa POT (odvodený strop) — najväčší priestor na rast, bez ohľadu na súčasný OV.</p>
+        <p className="text-xs text-slate-400 mb-2">Najväčší odhadovaný strop — najviac priestoru na rast.</p>
         <div className="flex flex-col gap-1.5">
           {intel.upside.map((p) => <ProspectRow key={p.id} p={p} />)}
         </div>
@@ -86,9 +104,9 @@ export default async function DraftIntelCard({ teamId, draftYear, available, sou
 
       <div>
         <div className="text-sm font-bold text-slate-200 mb-1">Lowest Risk</div>
-        <p className="text-xs text-slate-400 mb-2">Najmenší rozdiel medzi OV a POT spomedzi top 40 podľa OV — bližšie k hotovému produktu, menej závislé od projekcie.</p>
+        <p className="text-xs text-slate-400 mb-2">Spomedzi top 40 tí, čo sú najbližšie k hotovému produktu — menej závislí od projekcie.</p>
         <div className="flex flex-col gap-1.5">
-          {intel.lowestRisk.map((p) => <ProspectRow key={p.id} p={p} note={` · gap +${p.gap}`} />)}
+          {intel.lowestRisk.map((p) => <ProspectRow key={p.id} p={p} />)}
         </div>
       </div>
 
