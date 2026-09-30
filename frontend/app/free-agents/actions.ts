@@ -1144,6 +1144,12 @@ export async function extendContractAction(
   }
   const lockedUntil = await resignLockedUntil(teamId);
   if (lockedUntil) return { ok: false as const, error: `Extensions are closed for the first days of the regular season — they open on ${lockedUntil.toISOString().slice(0, 10)}.` };
+  // This club is only negotiating right now because of a commissioner resignLockExempt
+  // override, not because the league-wide window is actually open yet (resignLockedUntil()
+  // with no teamId ignores that exemption). Treat any resulting signing as a test run —
+  // it still happens for real on the roster/cap, but skip the public Transaction/news
+  // entry so early testing doesn't show up as league activity before everyone's unlocked.
+  const testSigning = !!(await resignLockedUntil());
   // A "1 year left" deal only means something once a real season is underway — before
   // regular season starts, only already-expired (0-year) deals are up for renewal.
   // Matches the same gate ContractSection uses to decide who's shown in the list.
@@ -1281,9 +1287,11 @@ export async function extendContractAction(
     },
   });
   await clearLowballs(playerId);
-  await prisma.transaction.create({
-    data: { type: "SIGNING", message: `${team?.code ?? "?"} re-signed ${player.name} — $${(salary / 1e6).toFixed(2)}M × ${years}yr${deferred ? ` (from ${startYear}-${String((startYear + 1) % 100).padStart(2, "0")})` : ""}` },
-  });
+  if (!testSigning) {
+    await prisma.transaction.create({
+      data: { type: "SIGNING", message: `${team?.code ?? "?"} re-signed ${player.name} — $${(salary / 1e6).toFixed(2)}M × ${years}yr${deferred ? ` (from ${startYear}-${String((startYear + 1) % 100).padStart(2, "0")})` : ""}` },
+    });
+  }
   // revertible record — restores the exact prior contract snapshot on revert
   await prisma.signingLog.create({ data: {
     playerId, playerName: player.name, teamCode: team?.code ?? null, kind: "EXTEND", salary, years,
