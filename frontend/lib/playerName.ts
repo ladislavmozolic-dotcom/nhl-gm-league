@@ -50,8 +50,9 @@ export function epProfileUrl(name: string): string {
   return `https://duckduckgo.com/?q=${encodeURIComponent("\\" + epSearchName(name) + " eliteprospects player")}`;
 }
 
-/** Safe fallback when no verified player ID is known: show EliteProspects'
- * own search results instead of guessing a direct profile for a namesake. */
+/** Safe fallback when no verified player ID is known: route directly to the player's
+ *  EliteProspects profile using DuckDuckGo's direct jump instead of EP's search-results page. */
 export function epPlayerSearchUrl(name: string): string {
-  return `https://www.eliteprospects.com/search/player?q=${encodeURIComponent(epSearchName(name))}`;
+  return epProfileUrl(name);
 }
+

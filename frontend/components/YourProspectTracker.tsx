@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { epProfileUrl } from "@/lib/playerName";
 
 export type TrackedProspect = {
   id: number;
@@ -210,20 +211,16 @@ export default function YourProspectTracker({
                     <span className={`shrink-0 inline-flex items-center justify-center rounded-md border px-1.5 py-0.5 text-[10px] font-black tracking-wide ${posBadge(p.position)}`}>
                       {p.position || "?"}
                     </span>
-                    {p.epUrl ? (
-                      <a
-                        href={p.epUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-bold text-slate-100 hover:text-sky-300 hover:underline transition-colors inline-flex items-center gap-1 group/pname"
-                        title="Open EliteProspects profile"
-                      >
-                        <span>{p.name}</span>
-                        <span className="text-[10px] text-sky-400/60 group-hover/pname:text-sky-300">↗</span>
-                      </a>
-                    ) : (
-                      <span className="font-bold text-slate-100 group-hover:text-white">{p.name}</span>
-                    )}
+                    <a
+                      href={p.epUrl || epProfileUrl(p.name)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-bold text-slate-100 hover:text-sky-300 hover:underline transition-colors inline-flex items-center gap-1 group/pname"
+                      title="Open EliteProspects profile"
+                    >
+                      <span>{p.name}</span>
+                      <span className="text-[10px] text-sky-400/60 group-hover/pname:text-sky-300">↗</span>
+                    </a>
                   </div>
                 </td>
 
@@ -302,18 +299,15 @@ export default function YourProspectTracker({
 
                 {/* EP link */}
                 <td className="px-5 py-3 text-right">
-                  {p.epUrl ? (
-                    <a
-                      href={p.epUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 rounded-md border border-sky-500/25 bg-sky-500/10 px-2 py-0.5 text-[11px] font-bold text-sky-400 hover:bg-sky-500/20 hover:text-sky-300 transition-all"
-                    >
-                      EP ↗
-                    </a>
-                  ) : (
-                    <span className="text-slate-700">—</span>
-                  )}
+                  <a
+                    href={p.epUrl || epProfileUrl(p.name)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 rounded-md border border-sky-500/25 bg-sky-500/10 px-2 py-0.5 text-[11px] font-bold text-sky-400 hover:bg-sky-500/20 hover:text-sky-300 transition-all"
+                    title="Open EliteProspects profile"
+                  >
+                    EP ↗
+                  </a>
                 </td>
               </tr>
             ))}

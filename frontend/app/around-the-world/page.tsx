@@ -4,7 +4,7 @@ import { Card, PageHeader, SectionTitle, StatTile } from "@/components/ui";
 import Link from "next/link";
 import YourProspectTracker from "@/components/YourProspectTracker";
 import { worldTeamLevel } from "@/lib/world-team-level";
-import { epPlayerSearchUrl } from "@/lib/playerName";
+import { epProfileUrl } from "@/lib/playerName";
 
 export const dynamic = "force-dynamic";
 
@@ -242,7 +242,7 @@ export default async function AroundTheWorldPage({
               id: p.id,
               name: p.name,
               position: p.position ?? w?.position ?? null,
-              epUrl: p.epUrl ?? w?.epUrl ?? epPlayerSearchUrl(p.name),
+              epUrl: p.epUrl ?? w?.epUrl ?? epProfileUrl(p.name),
               club: club?.name ?? null,
               league: league?.name ?? null,
               leagueCode: league?.code ?? null,
@@ -301,7 +301,7 @@ export default async function AroundTheWorldPage({
                       </td>
                       <td className="px-4 py-3 font-bold text-slate-100 group-hover:text-white">
                         <a
-                          href={s.player.epUrl || epPlayerSearchUrl(s.player.name)}
+                          href={s.player.epUrl || epProfileUrl(s.player.name)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="hover:text-sky-300 hover:underline transition-colors inline-flex items-center gap-1 group/leadname"

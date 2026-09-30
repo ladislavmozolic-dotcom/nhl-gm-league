@@ -3,6 +3,7 @@
 import { useState, useTransition, useRef } from "react";
 import { addToBoardAction, addCustomToBoardAction, removeRankingAction, updateNoteAction, saveQueueOrderAction, searchProspectsAction, type SearchHit } from "@/app/draft/rankings/actions";
 import type { BoardRow } from "@/lib/draft-rankings-server";
+import { epProfileUrl } from "@/lib/playerName";
 
 const posColor: Record<string, string> = { C: "text-sky-400", LW: "text-emerald-400", RW: "text-emerald-400", D: "text-amber-400", G: "text-rose-400" };
 const POSES = ["C", "LW", "RW", "D", "G"];
@@ -100,7 +101,7 @@ export default function DraftBoardManager({ year, years, rows, canEdit }: { year
                 <div className="flex items-center gap-2">
                   <span className="w-6 text-center text-sm font-black text-blue-400 tabular-nums">{i + 1}</span>
                   <span className="mr-0.5">{r.flag}</span>
-                  <span className="font-medium text-slate-100 truncate">{r.name}</span>
+                  <a href={r.epLink || epProfileUrl(r.name)} target="_blank" rel="noopener noreferrer" className="font-medium text-slate-100 hover:text-sky-300 hover:underline transition-colors truncate" title="Open EliteProspects profile">{r.name}</a>
                   <span className={`text-xs font-semibold ${posColor[r.position] ?? "text-slate-400"}`}>{r.position}</span>
                   {r.tier && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300">{r.tier}</span>}
                   {canEdit && (
@@ -127,7 +128,7 @@ export default function DraftBoardManager({ year, years, rows, canEdit }: { year
               <div key={r.id} className="px-3 py-2">
                 <div className="flex items-center gap-2">
                   <span className="mr-0.5">{r.flag}</span>
-                  <span className="font-medium text-slate-100 truncate">{r.name}</span>
+                  <a href={r.epLink || epProfileUrl(r.name)} target="_blank" rel="noopener noreferrer" className="font-medium text-slate-100 hover:text-sky-300 hover:underline transition-colors truncate" title="Open EliteProspects profile">{r.name}</a>
                   <span className={`text-xs font-semibold ${posColor[r.position] ?? "text-slate-400"}`}>{r.position}</span>
                   {r.tier && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300">{r.tier}</span>}
                   {canEdit && (
@@ -160,7 +161,7 @@ export default function DraftBoardManager({ year, years, rows, canEdit }: { year
               {hits.map((h) => (
                 <div key={h.id} className="flex items-center gap-2 px-3 py-2">
                   <span>{h.flag}</span>
-                  <span className="font-medium text-slate-100 truncate">{h.name}</span>
+                  <a href={epProfileUrl(h.name)} target="_blank" rel="noopener noreferrer" className="font-medium text-slate-100 hover:text-sky-300 hover:underline transition-colors truncate" title="Open EliteProspects profile">{h.name}</a>
                   <span className={`text-xs font-semibold ${posColor[h.position] ?? "text-slate-400"}`}>{h.position}</span>
                   <span className="text-[11px] text-slate-500 truncate">OV {h.ov} · CEIL {h.potential}{h.amateurLeague ? ` · ${h.amateurLeague}` : ""}{h.drafted ? " · drafted" : ""}</span>
                   <button onClick={() => addHit(h)} disabled={pending || h.onBoard} className="ml-auto px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-semibold">{h.onBoard ? "on board" : "+ Add"}</button>
