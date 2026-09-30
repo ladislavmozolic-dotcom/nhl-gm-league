@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { effectiveOrder, lastBasePick } from "@/lib/draft-order";
 import { currentDraftYear } from "@/lib/draft-class-import";
 import { currentDraftSourceWhere } from "@/lib/draft-source";
+import { draftRound1OpensAt } from "@/lib/draft-schedule";
 import { getLeagueDate } from "@/lib/calendar-server";
 
 const POSITIONS = ["C", "LW", "RW", "D", "G"];
@@ -117,7 +118,7 @@ export async function autoPickIfExpiringAction() {
   if (Date.now() < deadline - AUTO_LEAD_MS) return { acted: false as const }; // not in the final window yet
 
   const src = await currentDraftSourceWhere();
-  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true, draftTestMode: true } });
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true } });
   const source = cfg?.rosterMode === "real" ? "real" : "profinhl";
 
   // 1) on-clock club's highest usable queued entry — a still-available board prospect
@@ -147,7 +148,6 @@ export async function autoPickIfExpiringAction() {
   }
   if (!target) return { acted: false as const }; // nothing draftable — let the 0s backstop defer
 
-  const testMode = !!cfg?.draftTestMode;
   const nextPick = s.currentPick + 1;
   const deferralCount = await prisma.draftDeferral.count({ where: { year: YEAR } });
   const lastScheduled = order.filter((p) => !p.deferred).reduce((m, p) => Math.max(m, p.overallPick), await lastBasePick());
@@ -165,7 +165,7 @@ export async function autoPickIfExpiringAction() {
     if (upd.count === 0) return { acted: false as const };
     const took = await tx.draftProspect.updateMany({ where: { id: target!.id, draftedByTeamId: null }, data: { draftedByTeamId: slot.pickerTeamId, overallPick: s.currentPick } });
     if (took.count === 0) return { acted: false as const };
-    if (!testMode) await tx.prospect.create({ data: { name: target!.name, position: target!.position, draftYear: YEAR, overallPick: s.currentPick, teamId: slot.pickerTeamId, source } });
+    await tx.prospect.create({ data: { name: target!.name, position: target!.position, draftYear: YEAR, overallPick: s.currentPick, teamId: slot.pickerTeamId, source } });
     return { acted: true as const };
   });
   if (res.acted) revalidatePath("/draft/room");
@@ -190,12 +190,10 @@ export async function startRoundAction(round: number) {
   if (round < 1) return { ok: false, error: "Invalid round." };
   const YEAR = await currentDraftYear();
   if (round === 1) {
-    const [lot, tcfg] = await Promise.all([
-      prisma.draftLottery.count({ where: { year: YEAR } }),
-      prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { draftTestMode: true } }),
-    ]);
-    // in test mode round 1 runs on a synthesized reverse-standings order (see draftOrder)
-    if (lot === 0 && !tcfg?.draftTestMode) return { ok: false, error: "Draw the Draft Lottery first — it sets round 1." };
+    const opensAt = draftRound1OpensAt(YEAR);
+    if (opensAt && Date.now() < opensAt.getTime()) return { ok: false, error: "Round 1 opens on its scheduled start day." };
+    const lot = await prisma.draftLottery.count({ where: { year: YEAR } });
+    if (lot === 0) return { ok: false, error: "Draw the Draft Lottery first — it sets round 1." };
   }
   // the round's pick range comes from the order (base rounds are 32-wide; bonus
   // rounds 8+ are however many picks the admin awarded)
@@ -226,10 +224,9 @@ export async function makePickAction(prospectId: number) {
   const me = await getTeamSession();
   // testing: advance the board but don't write the player onto the team — and let ANY
   // signed-in GM make the pick (even off-turn) so everyone can rehearse the flow.
-  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true, draftTestMode: true } });
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true } });
   const source = cfg?.rosterMode === "real" ? "real" : "profinhl";
-  const testMode = !!cfg?.draftTestMode;
-  if (!admin && me !== slot.pickerTeamId && !(testMode && me != null)) return { ok: false, error: "It's not your pick." };
+  if (!admin && me !== slot.pickerTeamId) return { ok: false, error: "It's not your pick." };
 
   const prospect = await prisma.draftProspect.findUnique({ where: { id: prospectId }, select: { id: true, draftedByTeamId: true, draftYear: true, name: true, position: true } });
   if (!prospect || prospect.draftYear !== YEAR) return { ok: false, error: "Unknown prospect." };
@@ -254,37 +251,12 @@ export async function makePickAction(prospectId: number) {
     if (took.count === 0) return { ok: false as const, error: "Already drafted." };
     // in test mode the pick shows on the board but the player is NOT written onto the
     // club (no Prospect row) — reset the board to re-run the draft with the same names.
-    if (!testMode) await tx.prospect.create({ data: { name: prospect.name, position: prospect.position, draftYear: YEAR, overallPick: s.currentPick, teamId: slot.pickerTeamId, source } });
+    await tx.prospect.create({ data: { name: prospect.name, position: prospect.position, draftYear: YEAR, overallPick: s.currentPick, teamId: slot.pickerTeamId, source } });
     return { ok: true as const };
   });
   if (!res.ok) return res;
   revalidatePath("/draft/room");
   return { ok: true, roundDone, done };
-}
-
-/** Admin: flip draft "test mode" — picks advance the board but don't write players
- *  onto teams. Handy while testing the draft flow without polluting rosters. */
-export async function toggleDraftTestModeAction() {
-  if (!(await isAdmin())) return { ok: false as const, error: "Admin only." };
-  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { draftTestMode: true } });
-  const v = !cfg?.draftTestMode;
-  await prisma.leagueConfig.update({ where: { id: 1 }, data: { draftTestMode: v } });
-  revalidatePath("/draft/room");
-  return { ok: true as const, testMode: v };
-}
-
-/** Admin: reset the draft board for the current year — un-draft every prospect and
- *  rewind the clock so the same names can be re-drafted. Does NOT delete any Prospect
- *  rows already written onto teams (clear those via Roster tools if needed). */
-export async function resetDraftBoardAction() {
-  if (!(await isAdmin())) return { ok: false as const, error: "Admin only." };
-  const YEAR = await currentDraftYear();
-  const un = await prisma.draftProspect.updateMany({ where: { draftYear: YEAR }, data: { draftedByTeamId: null } });
-  await prisma.draftDeferral.deleteMany({ where: { year: YEAR } });
-  await prisma.chatMessage.deleteMany({ where: { channel: { contains: "draft" } } }); // clear the draft chat too
-  await prisma.draftState.upsert({ where: { year: YEAR }, create: { year: YEAR, currentPick: 1, status: "ROUND_DONE" }, update: { currentPick: 1, status: "ROUND_DONE", onClockAt: null } });
-  revalidatePath("/draft/room");
-  return { ok: true as const, unDrafted: un.count };
 }
 
 /** The on-the-clock GM drafts a player who ISN'T on the scouting board — a custom pick.
@@ -302,9 +274,7 @@ export async function makeOffBoardPickAction(input: { name: string; birthDate: s
 
   const admin = await isAdmin();
   const me = await getTeamSession();
-  const testCfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { draftTestMode: true } });
-  const testMode = !!testCfg?.draftTestMode; // any signed-in GM may add off-board picks while rehearsing
-  if (!admin && me !== slot.pickerTeamId && !(testMode && me != null)) return { ok: false, error: "It's not your pick." };
+  if (!admin && me !== slot.pickerTeamId) return { ok: false, error: "It's not your pick." };
 
   const name = input.name?.trim().replace(/\s+/g, " ").slice(0, 80);
   if (!name || name.length < 2) return { ok: false, error: "Enter the player's full name." };
@@ -363,14 +333,13 @@ export async function pickCustomFromRankingAction(rankingId: number) {
 
   const admin = await isAdmin();
   const me = await getTeamSession();
-  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true, draftTestMode: true } });
-  const testMode = !!cfg?.draftTestMode;
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true } });
   const source = cfg?.rosterMode === "real" ? "real" : "profinhl";
-  if (!admin && me !== slot.pickerTeamId && !(testMode && me != null)) return { ok: false, error: "It's not your pick." };
+  if (!admin && me !== slot.pickerTeamId) return { ok: false, error: "It's not your pick." };
 
   const r = await prisma.draftRanking.findUnique({ where: { id: rankingId }, select: { id: true, teamId: true, customName: true, customPos: true, customEp: true, customBirth: true, draftProspectId: true } });
   if (!r || r.draftProspectId != null || !r.customName) return { ok: false, error: "Not a custom board entry." };
-  if (!admin && !(testMode && me != null) && r.teamId !== slot.pickerTeamId) return { ok: false, error: "That entry isn't yours." };
+  if (!admin && r.teamId !== slot.pickerTeamId) return { ok: false, error: "That entry isn't yours." };
 
   // age gate (≤23 on draft day) only when a birth date was supplied
   if (r.customBirth) {
