@@ -124,6 +124,8 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
             </Link>
           );
         })}
+        <Link href="/around-the-world/draft" className="ml-auto px-3 py-1.5 rounded-lg text-sm font-medium border border-amber-500/40 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20">🌍 Draft Board</Link>
+        {me != null && <Link href="/draft/rankings" className="px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-800 bg-slate-900/50 text-slate-300 hover:border-slate-600">🎯 My Rankings</Link>}
       </div>
 
       {round1Opens && Date.now() < round1Opens.getTime() && (

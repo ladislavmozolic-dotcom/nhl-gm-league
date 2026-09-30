@@ -48,7 +48,10 @@ export default async function WorldDraftBoardPage({ searchParams }: { searchPara
 
   return (
     <div className="space-y-6 py-2">
-      <BackPill href="/around-the-world">Around the World</BackPill>
+      <div className="flex flex-wrap items-center gap-2">
+        <BackPill href="/draft/room">← Draft Room</BackPill>
+        <BackPill href="/around-the-world">Around the World</BackPill>
+      </div>
       <PageHeader title={`${year} Draft Board`} subtitle={myView ? `Your private board (Draft Rankings) · ${rows.length} players · ${withStats} with live stats` : `${rows.length} prospects in board order · ${withStats} with live stats from Around the World`} />
       {mine.length > 0 && (
         <div className="flex items-center gap-2 text-sm">
