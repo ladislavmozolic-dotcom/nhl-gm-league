@@ -393,7 +393,11 @@ export default function AdminResignTable({ rows }: { rows: ResignRowData[] }) {
                           <span>🛠️</span>
                           <span>Zasiahnuť</span>
                         </button>
-                        <ResetResignButton playerId={p.id} name={cleanName(p.name)} />
+                        <ResetResignButton
+                          playerId={p.id}
+                          name={cleanName(p.name)}
+                          label={p.resignStatus === "walkedToUFA" || p.resignStatus === "osEligible" ? "Zmazať" : "Reset"}
+                        />
                       </div>
                     </td>
                   </tr>

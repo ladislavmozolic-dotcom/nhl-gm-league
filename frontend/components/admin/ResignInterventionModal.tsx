@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { cleanName } from "@/lib/playerName";
+import { friendlyActionError } from "@/lib/client/action-error";
 import {
   updateResignNegotiationAction,
   forceSignResignAction,
@@ -51,6 +53,7 @@ export default function ResignInterventionModal({
   player: ResignPlayerData;
   onClose: () => void;
 }) {
+  const router = useRouter();
   const [tab, setTab] = useState<"edit" | "sign" | "quick">("edit");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -96,20 +99,30 @@ export default function ResignInterventionModal({
     setError(null);
     setSuccess(null);
     startTransition(async () => {
-      const res = await updateResignNegotiationAction(player.id, {
-        status: status === "null" ? null : status,
-        round,
-        offerSalary: offerSalary ? Number(offerSalary) : null,
-        counterSalary: counterSalary ? Number(counterSalary) : null,
-        counterYears: counterYears || null,
-        faDemandOverride: faDemandOverride ? Number(faDemandOverride) : null,
-        clearLowball,
-      });
-      if (!res.ok) {
-        setError(res.error ?? "Nepodarilo sa uložiť zmeny.");
-      } else {
-        setSuccess("Vyjednávanie bolo úspešne upravené.");
-        setTimeout(() => onClose(), 800);
+      try {
+        const res = await updateResignNegotiationAction(player.id, {
+          status: status === "null" ? null : status,
+          round,
+          offerSalary: offerSalary ? Number(offerSalary) : null,
+          counterSalary: counterSalary ? Number(counterSalary) : null,
+          counterYears: counterYears || null,
+          faDemandOverride: faDemandOverride ? Number(faDemandOverride) : null,
+          clearLowball,
+        });
+        if (!res.ok) {
+          setError(res.error ?? "Nepodarilo sa uložiť zmeny.");
+        } else {
+          router.refresh();
+          setSuccess("Vyjednávanie bolo úspešne upravené.");
+          setTimeout(() => onClose(), 800);
+        }
+      } catch (e) {
+        const msg = friendlyActionError(e);
+        if (/out of date/i.test(msg)) {
+          window.location.reload();
+        } else {
+          setError(msg);
+        }
       }
     });
   };
@@ -127,18 +140,28 @@ export default function ResignInterventionModal({
     }
 
     startTransition(async () => {
-      const res = await forceSignResignAction(player.id, {
-        salary: sal,
-        years: signYears,
-        twoWay,
-        clause: clause || null,
-        mNtcBreadth: clause === "M_NTC" ? mNtcBreadth : null,
-      });
-      if (!res.ok) {
-        setError(res.error ?? "Nepodarilo sa podpísať zmluvu.");
-      } else {
-        setSuccess("Zmluva bola úspešne predĺžená a zapísaná.");
-        setTimeout(() => onClose(), 800);
+      try {
+        const res = await forceSignResignAction(player.id, {
+          salary: sal,
+          years: signYears,
+          twoWay,
+          clause: clause || null,
+          mNtcBreadth: clause === "M_NTC" ? mNtcBreadth : null,
+        });
+        if (!res.ok) {
+          setError(res.error ?? "Nepodarilo sa podpísať zmluvu.");
+        } else {
+          router.refresh();
+          setSuccess("Zmluva bola úspešne predĺžená a zapísaná.");
+          setTimeout(() => onClose(), 800);
+        }
+      } catch (e) {
+        const msg = friendlyActionError(e);
+        if (/out of date/i.test(msg)) {
+          window.location.reload();
+        } else {
+          setError(msg);
+        }
       }
     });
   };
@@ -149,12 +172,22 @@ export default function ResignInterventionModal({
     }
     setError(null);
     startTransition(async () => {
-      const res = await resetResignAction(player.id, true);
-      if (!res.ok) {
-        setError(res.error ?? "Chyba pri resete.");
-      } else {
-        setSuccess("Vyjednávanie bolo resetované.");
-        setTimeout(() => onClose(), 800);
+      try {
+        const res = await resetResignAction(player.id, true);
+        if (!res.ok) {
+          setError(res.error ?? "Chyba pri resete.");
+        } else {
+          router.refresh();
+          setSuccess("Vyjednávanie bolo resetované.");
+          setTimeout(() => onClose(), 800);
+        }
+      } catch (e) {
+        const msg = friendlyActionError(e);
+        if (/out of date/i.test(msg)) {
+          window.location.reload();
+        } else {
+          setError(msg);
+        }
       }
     });
   };
@@ -164,12 +197,22 @@ export default function ResignInterventionModal({
     if (!confirm(`Ukončiť rokovania a poslať hráča do stavu: ${dest}?`)) return;
     setError(null);
     startTransition(async () => {
-      const res = await forceWalkResignAction(player.id, toUFA);
-      if (!res.ok) {
-        setError(res.error ?? "Chyba.");
-      } else {
-        setSuccess(`Hráč bol presunutý: ${dest}`);
-        setTimeout(() => onClose(), 800);
+      try {
+        const res = await forceWalkResignAction(player.id, toUFA);
+        if (!res.ok) {
+          setError(res.error ?? "Chyba.");
+        } else {
+          router.refresh();
+          setSuccess(`Hráč bol presunutý: ${dest}`);
+          setTimeout(() => onClose(), 800);
+        }
+      } catch (e) {
+        const msg = friendlyActionError(e);
+        if (/out of date/i.test(msg)) {
+          window.location.reload();
+        } else {
+          setError(msg);
+        }
       }
     });
   };
@@ -178,12 +221,22 @@ export default function ResignInterventionModal({
     if (!player.teamId) return;
     setError(null);
     startTransition(async () => {
-      const res = await clearPlayerLowballAction(player.id, player.teamId!);
-      if (!res.ok) {
-        setError(res.error ?? "Chyba pri mazaní lowballu.");
-      } else {
-        setSuccess("Urazenie z nízkej ponuky bolo zmazané.");
-        setTimeout(() => onClose(), 800);
+      try {
+        const res = await clearPlayerLowballAction(player.id, player.teamId!);
+        if (!res.ok) {
+          setError(res.error ?? "Chyba pri mazaní lowballu.");
+        } else {
+          router.refresh();
+          setSuccess("Urazenie z nízkej ponuky bolo zmazané.");
+          setTimeout(() => onClose(), 800);
+        }
+      } catch (e) {
+        const msg = friendlyActionError(e);
+        if (/out of date/i.test(msg)) {
+          window.location.reload();
+        } else {
+          setError(msg);
+        }
       }
     });
   };
