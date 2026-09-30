@@ -34,6 +34,7 @@ export async function resetResignAction(playerId: number, clearLowball = false) 
       resignOfferSalary: null,
       resignCounterSalary: null,
       resignCounterYears: null,
+      resignOfferAt: null,
     },
   }).catch(() => {});
 
@@ -73,7 +74,10 @@ export async function updateResignNegotiationAction(
   const updateData: Record<string, unknown> = {};
   if (data.status !== undefined) updateData.resignStatus = data.status;
   if (data.round !== undefined) updateData.resignRound = Math.max(0, Math.min(2, Math.round(data.round)));
-  if (data.offerSalary !== undefined) updateData.resignOfferSalary = data.offerSalary ? Math.round(data.offerSalary) : null;
+  if (data.offerSalary !== undefined) {
+    updateData.resignOfferSalary = data.offerSalary ? Math.round(data.offerSalary) : null;
+    updateData.resignOfferAt = data.offerSalary ? new Date() : null;
+  }
   if (data.counterSalary !== undefined) updateData.resignCounterSalary = data.counterSalary ? Math.round(data.counterSalary) : null;
   if (data.counterYears !== undefined) updateData.resignCounterYears = data.counterYears ? Math.max(1, Math.min(8, Math.round(data.counterYears))) : null;
   if (data.faDemandOverride !== undefined) updateData.faDemandOverride = data.faDemandOverride ? Math.round(data.faDemandOverride) : null;
@@ -189,6 +193,7 @@ export async function forceSignResignAction(
       resignCounterYears: null,
       disgruntled: false,
       tradeRequested: false,
+      resignOfferAt: null,
       promiseWarnGame: null,
       tradeRequestReason: null,
       iceUnhappyChecks: 0,

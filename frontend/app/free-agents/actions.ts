@@ -1219,7 +1219,8 @@ export async function extendContractAction(
       // standing offer — that's the number a rival's offer sheet must beat.
       const status = isRFA ? "osEligible" : "walkedToUFA";
       const bestOffer = Math.max(salary, player.resignOfferSalary ?? 0);
-      await prisma.player.update({ where: { id: playerId }, data: { resignStatus: status, resignRound: nextRound, resignOfferSalary: bestOffer } });
+      await prisma.player.update({ where: { id: playerId }, data: { resignStatus: status, resignRound: nextRound, resignOfferSalary: bestOffer, resignOfferAt: new Date() } });
+      await prisma.faBid.create({ data: { playerId, teamId, salary, years, round: nextRound } }).catch(() => {});
       // no revalidatePath here — it would tear down the open modal before its notice
       // shows; the client refreshes on Close.
       return {
@@ -1233,7 +1234,8 @@ export async function extendContractAction(
     const counterSalary = ev.ask.floorSalary;
     const counterYears = Math.min(Math.max(years, ev.ask.minYears), ev.ask.maxYears);
     const bestOffer = Math.max(salary, player.resignOfferSalary ?? 0);
-    await prisma.player.update({ where: { id: playerId }, data: { resignRound: nextRound, resignStatus: "countered", resignCounterSalary: counterSalary, resignCounterYears: counterYears, resignOfferSalary: bestOffer } });
+    await prisma.player.update({ where: { id: playerId }, data: { resignRound: nextRound, resignStatus: "countered", resignCounterSalary: counterSalary, resignCounterYears: counterYears, resignOfferSalary: bestOffer, resignOfferAt: new Date() } });
+    await prisma.faBid.create({ data: { playerId, teamId, salary, years, round: nextRound } }).catch(() => {});
     return {
       ok: false as const, rejected: true, round: nextRound,
       reason: `Round ${nextRound} of ${maxRounds} — he's countering around ${fmtM(counterSalary)}–${fmtM(counterSalary * 1.06)} over ${counterYears}yr.${nextRound >= maxRounds ? " Last round before he walks." : ""}${insult}`,
@@ -1271,7 +1273,7 @@ export async function extendContractAction(
       ...releaseNonRoster,
       ...newDeal,
       signPromiseLine: dep.line, signPromisePP: pp, signPromisePK: pk,
-      resignRound: 0, resignCounterSalary: null, resignCounterYears: null,
+      resignRound: 0, resignOfferSalary: null, resignCounterSalary: null, resignCounterYears: null, resignOfferAt: null,
       disgruntled: false, tradeRequested: false, promiseWarnGame: null,
       tradeRequestReason: null, iceUnhappyChecks: 0, iceWarnedAt: null,
     },

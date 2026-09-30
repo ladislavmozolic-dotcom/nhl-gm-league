@@ -24,6 +24,7 @@ export type ResignPlayerData = {
   resignStatus: string | null;
   resignRound: number;
   resignOfferSalary: number | null;
+  resignOfferAt?: Date | string | null;
   resignCounterSalary: number | null;
   resignCounterYears: number | null;
   faDemandOverride: number | null;

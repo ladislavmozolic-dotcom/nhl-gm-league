@@ -86,6 +86,7 @@ export default async function AdminAgentPage() {
         resignStatus: true,
         resignRound: true,
         resignOfferSalary: true,
+        resignOfferAt: true,
         resignCounterSalary: true,
         resignCounterYears: true,
         faDemandOverride: true,
@@ -158,6 +159,7 @@ export default async function AdminAgentPage() {
         resignStatus: p.resignStatus,
         resignRound: p.resignRound,
         resignOfferSalary: p.resignOfferSalary,
+        resignOfferAt: p.resignOfferAt,
         resignCounterSalary: p.resignCounterSalary,
         resignCounterYears: p.resignCounterYears,
         faDemandOverride: p.faDemandOverride,
@@ -295,7 +297,7 @@ export default async function AdminAgentPage() {
                   <th className="text-left px-3 py-3 font-semibold">Klub</th>
                   <th className="text-left px-3 py-3 font-semibold">Stav ponuky</th>
                   <th className="text-right px-3 py-3 font-semibold">Výška & Dĺžka</th>
-                  <th className="text-right px-3 py-3 font-semibold">Aktualizované</th>
+                  <th className="text-right px-3 py-3 font-semibold">Podaná / Zmena</th>
                   <th className="text-right px-4 py-3 font-semibold">Akcia</th>
                 </tr>
               </thead>
@@ -388,8 +390,15 @@ export default async function AdminAgentPage() {
                         <span className="font-bold text-white">{fmtM(o.salary)}</span>
                         <span className="text-slate-400 text-xs ml-1">× {o.years}r</span>
                       </td>
-                      <td className="px-3 py-3 text-right text-slate-400 text-xs tabular-nums whitespace-nowrap">
-                        {fmtDate(o.updatedAt)}
+                      <td className="px-3 py-3 text-right text-xs tabular-nums whitespace-nowrap font-mono">
+                        <div className="font-semibold text-slate-200">
+                          {fmtDate(o.createdAt)}
+                        </div>
+                        {o.updatedAt && Math.abs(new Date(o.updatedAt).getTime() - new Date(o.createdAt).getTime()) > 60_000 && (
+                          <div className="text-[10px] text-slate-400">
+                            zmena {fmtDate(o.updatedAt)}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <DeleteFaOfferButton offerId={o.id} name={cleanName(o.player.name)} />

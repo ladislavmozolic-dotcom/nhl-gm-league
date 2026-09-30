@@ -21,6 +21,18 @@ const fmtM = (c: number | null | undefined) => {
   return `$${(c / 1e6).toFixed(2)}M`;
 };
 
+const fmtDate = (d: Date | string | null | undefined) => {
+  if (!d) return "—";
+  const date = typeof d === "string" ? new Date(d) : d;
+  if (!date || isNaN(date.getTime())) return "—";
+  return date.toLocaleString("sk-SK", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
 export default function AdminResignTable({ rows }: { rows: ResignRowData[] }) {
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<"all" | "active" | "countered" | "stalled">("all");
@@ -124,6 +136,7 @@ export default function AdminResignTable({ rows }: { rows: ResignRowData[] }) {
                 <th className="text-left px-3 py-3 font-semibold">Stav & Kolo</th>
                 <th className="text-right px-3 py-3 font-semibold">Ponuka klubu</th>
                 <th className="text-right px-3 py-3 font-semibold">Protinávrh hráča</th>
+                <th className="text-right px-3 py-3 font-semibold">Podaná</th>
                 <th className="text-left px-4 py-3 font-semibold">AI Benchmark & Nálada</th>
                 <th className="text-right px-4 py-3 font-semibold">Administrácia</th>
               </tr>
@@ -294,6 +307,17 @@ export default function AdminResignTable({ rows }: { rows: ResignRowData[] }) {
                             </span>
                           )}
                         </div>
+                      ) : (
+                        <span className="text-slate-600">—</span>
+                      )}
+                    </td>
+
+                    {/* Offer Date */}
+                    <td className="px-3 py-3 text-right text-xs text-slate-400 font-mono whitespace-nowrap">
+                      {p.resignOfferAt ? (
+                        <span className="text-slate-200 font-medium">
+                          {fmtDate(p.resignOfferAt)}
+                        </span>
                       ) : (
                         <span className="text-slate-600">—</span>
                       )}
