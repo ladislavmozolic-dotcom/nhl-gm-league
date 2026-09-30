@@ -115,13 +115,37 @@ const SECTIONS: Sec[] = [
     ],
   },
   {
-    id: "rfa", title: "8 · RFAs, Offer Sheets & Franchise Tags",
+    id: "rfa", title: "8 · Re-Signing Your Own Players — UFA & RFA",
+    intro: "How the Agent negotiates when you try to extend one of your OWN expiring players, from the Contracts page.",
     groups: [
-      { points: [
-        "Restricted free agents must be tendered; their own club gets re-sign rounds before they're exposed.",
-        "Offer sheets are allowed against a commissioner-editable compensation ladder — the signing club forfeits its own original draft picks per the tier, verified by the league.",
-        "Each club may place one Franchise Tag, which buys the tagged player two re-sign rounds before offer sheets can reach him.",
-        "(A league may instead run the 'simple' free-agency system, where everyone tests the market and there are no tags or offer sheets — the commissioner sets this.)",
+      { h: "Who's a UFA, who's an RFA", points: [
+        "His status is decided by his age on June 30 of the year his CURRENT deal expires — not his age today. 27 or older by then = unrestricted; younger = restricted.",
+        "(A league may instead run the 'simple' free-agency system, where everyone tests the open market — no RFA rights, tags or offer sheets. The commissioner sets this.)",
+      ] },
+      { h: "When you can negotiate", points: [
+        "Any time he's in the final year of his deal or it's already expired — except during the Free Agent Frenzy itself (the open market has its own flow) and the first days of a new regular season (commissioner-set window, lets rosters settle first; the commissioner can exempt an individual club from that window, e.g. for testing).",
+      ] },
+      { h: "How the negotiation itself works", points: [
+        "Submit an offer — money, term, role, special teams, contract type, and any clause you'll grant. He never just refuses: every rejected offer gets a real counter-offer back, even a lowball first try.",
+        "UFA: 2 rounds. Reject his 2nd counter and he walks to test the open market.",
+        "RFA without your Franchise Tag: 1 round. Reject his counter and he's open to offer sheets from rival clubs.",
+        "RFA WITH your Franchise Tag: 2 rounds before he'd even be exposed to offer sheets.",
+        "An RFA who reaches offer sheets isn't gone — if nobody signs him there, he comes straight back to you, and from then on you negotiate directly, round after round, with no cap and no second trip to offer sheets.",
+      ] },
+      { h: "Offer sheets (RFA only)", points: [
+        "Open July 1–8 of the off-season; resolved July 10. A commissioner-set compensation ladder (his old club's own original draft picks, by AAV tier) is what the poaching club pays if he signs.",
+        "His AI picks the single best sheet that both meets his asking price AND beats YOUR last standing offer to him — there's no old-NHL 'right to match', so your own offer's number is what a raider actually has to clear.",
+      ] },
+      { h: "Franchise Tag", points: [
+        "One per club, RFA-age players only. While the tag is on him he's fully protected from offer sheets, however many rounds pass — you have to remove the tag yourself to expose him to the market.",
+      ] },
+      { h: "Release his rights instead", points: [
+        "\"Release rights\" on Team Contracts (RFAs only) declares you won't extend him: he's priced and treated like a UFA from then on — no RFA discount, no ceiling — and hits the open market the instant his deal runs out, instead of staying tied to you. Reversible any time before he actually expires.",
+      ] },
+      { h: "What shapes his price", points: [
+        "Lowball insult: undershoot his real floor by too much (a sliding bar — roughly a third on a modest deal, down to about a tenth on a $15M+ one) and he remembers it — his asking price to YOUR club specifically climbs (capped at +25% total) until he signs anywhere. Other clubs aren't affected.",
+        "Term pricing: his headline number is calibrated to his preferred length. Offer more or fewer years than that and the price bends — usually up for more term, down for less — EXCEPT a player 35 or older, who runs the other way: a longer deal costs LESS per year (a team-friendly, real-NHL-style extension), while a short 'one more run' year is his most expensive ask.",
+        "Promise him a worse role than he wants and he charges a premium, takes a shorter term — and a no-trade clause stops earning him a discount, since he wants to stay free to leave if you don't deliver.",
       ] },
     ],
   },
@@ -477,13 +501,37 @@ const SECTIONS_CS: Sec[] = [
     ],
   },
   {
-    id: "rfa", title: "8 · RFA, nabídkové listiny a franšízové tagy",
+    id: "rfa", title: "8 · Prodlužování vlastních hráčů — UFA a RFA",
+    intro: "Jak Agent vyjednává, když se pokusíte prodloužit jednoho z VLASTNÍCH končících hráčů, ze stránky Contracts.",
     groups: [
-      { points: [
-        "Chránění volní hráči (RFA) musí dostat nabídku (tender); jejich vlastní klub má kola na prodloužení, než jsou vystaveni.",
-        "Nabídkové listiny (offer sheets) jsou povolené proti kompenzačnímu žebříčku, který edituje komisař — podepisující klub odevzdá své původní volby v draftu dle stupně, ověřeno ligou.",
-        "Každý klub může udělit jeden franšízový tag, který otagovanému hráči koupí dvě kola na prodloužení, než se k němu dostanou nabídkové listiny.",
-        "(Liga může místo toho jet „jednoduchý“ systém volných hráčů, kde všichni testují trh a nejsou žádné tagy ani nabídkové listiny — nastavuje komisař.)",
+      { h: "Kdo je UFA a kdo RFA", points: [
+        "O jeho statusu rozhoduje věk k 30. červnu roku, kdy vyprší jeho SOUČASNÁ smlouva — ne jeho věk dnes. 27 let a víc = nechráněný; mladší = chráněný.",
+        "(Liga může místo toho jet „jednoduchý“ systém volných hráčů, kde všichni testují otevřený trh — žádná práva RFA, tagy ani nabídkové listiny. Nastavuje komisař.)",
+      ] },
+      { h: "Kdy můžete vyjednávat", points: [
+        "Kdykoliv, když je v posledním roce smlouvy nebo mu už vypršela — kromě období Free Agent Frenzy (otevřený trh má vlastní systém) a prvních dní nové základní části (okno nastavuje komisař, dává soupiskám čas se usadit; komisař může jeden konkrétní klub z tohoto okna výjimečně vyjmout, např. kvůli testování).",
+      ] },
+      { h: "Jak samotné vyjednávání funguje", points: [
+        "Podejte nabídku — peníze, délka, role, speciální formace, typ smlouvy a případná udělená klauzule. Hráč nikdy jen neodmítne: každá odmítnutá nabídka dostane skutečnou protinabídku zpět, i ta první podhozená.",
+        "UFA: 2 kola. Odmítnete-li jeho 2. protinabídku, odchází testovat otevřený trh.",
+        "RFA bez franšízového tagu: 1 kolo. Odmítnete-li jeho protinabídku, je otevřený nabídkovým listinám od soupeřů.",
+        "RFA S vaším franšízovým tagem: 2 kola, než by vůbec byl vystaven nabídkovým listinám.",
+        "RFA, který se dostane k nabídkovým listinám, není pryč — pokud ho tam nikdo nepodepíše, vrací se rovnou k vám a od té chvíle vyjednáváte přímo, kolo za kolem, bez limitu a bez druhé cesty k nabídkovým listinám.",
+      ] },
+      { h: "Nabídkové listiny (jen RFA)", points: [
+        "Otevřené 1.–8. července mimosezóny; vyřešeny 10. července. Kompenzační žebříček (vlastní originální draftové volby starého klubu, podle pásma AAV) nastavuje komisař a platí ho lákající klub, pokud hráč podepíše.",
+        "Jeho AI vybere jedinou nejlepší listinu, která zároveň splňuje jeho požadavek A překonává VAŠI poslední stojící nabídku — neexistuje starý NHL „právo dorovnat“, takže číslo vaší vlastní nabídky je to, co musí útočník skutečně překonat.",
+      ] },
+      { h: "Franšízový tag", points: [
+        "Jeden na klub, jen hráči ve věku RFA. Dokud na něm tag drží, je před nabídkovými listinami plně chráněný, ať uplyne jakkoliv mnoho kol — tag musíte sami sundat, aby byl trhu vystaven.",
+      ] },
+      { h: "Uvolnění práv místo prodloužení", points: [
+        "„Release rights“ na stránce Team Contracts (jen u RFA) prohlašuje, že hráče neprodloužíte: od té chvíle se oceňuje a chová jako UFA — žádná sleva RFA, žádný strop — a v okamžiku vypršení smlouvy padá rovnou na otevřený trh, místo aby zůstal vázaný na vás. Vratné kdykoliv, dokud mu smlouva skutečně nevyprší.",
+      ] },
+      { h: "Co ovlivňuje jeho cenu", points: [
+        "Urážka podhozenou nabídkou: podstřelíte-li jeho skutečné minimum o příliš mnoho (klouzavá hranice — zhruba třetina u skromné smlouvy, až kolem desetiny u smlouvy 15M$+), zapamatuje si to — jeho požadavek konkrétně vůči VAŠEMU klubu stoupá (strop +25 % celkem), dokud nepodepíše kdekoliv. Ostatní kluby to neovlivní.",
+        "Cena podle délky: jeho hlavní číslo je kalibrované na jeho preferovanou délku. Nabídnete-li víc nebo míň let, cena se ohne — obvykle nahoru za víc let, dolů za míň — KROMĚ hráče ve věku 35+, u kterého je to naopak: delší smlouva stojí za rok MÉNĚ (klubu přátelské prodloužení ve stylu reálné NHL), zatímco krátký rok „ještě jednou to zkusit“ je jeho nejdražší požadavek.",
+        "Slíbíte-li mu horší roli, než chce, účtuje si prémii a bere kratší smlouvu — a klauzule o nevyměnitelnosti mu už nepřináší slevu, protože chce zůstat volný odejít, pokud mu roli nedodáte.",
       ] },
     ],
   },
