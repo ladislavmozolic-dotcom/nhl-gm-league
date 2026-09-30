@@ -15,8 +15,14 @@ import {
 
 /** Extensions are closed for the first `resignLockDays` days of the regular season
  *  (counted from the regular-season phase start). Returns the league date they open
- *  on while locked, else null. */
-export async function resignLockedUntil(): Promise<Date | null> {
+ *  on while locked, else null. A club flagged `resignLockExempt` (commissioner
+ *  override, e.g. for testing) skips the lock entirely regardless of the league-wide
+ *  setting. */
+export async function resignLockedUntil(teamId?: number): Promise<Date | null> {
+  if (teamId != null) {
+    const team = await prisma.team.findUnique({ where: { id: teamId }, select: { resignLockExempt: true } });
+    if (team?.resignLockExempt) return null;
+  }
   const s = await loadSettings();
   const days = Math.max(0, Math.round(s.resignLockDays ?? 0));
   if (!days) return null;

@@ -79,6 +79,7 @@ model Team {
   isAdmin           Boolean         @default(false) // this team's GM login also has league-admin powers (manage any team)
   gmRole            String          @default("gm") // gm | agent | co_comish | comish — league role (comish-tier gets a 1-day FA head-start)
   rookieGm          Boolean         @default(false) // (R) new GM under commission oversight — his trades need commission approval
+  resignLockExempt  Boolean         @default(false) // commissioner override: this club's re-sign negotiations bypass the season-start resignLockDays window (testing / early access)
   aiMode            String          @default("base") // base | advanced — for GM-less (AI-run) clubs: advanced also negotiates trades with human GMs
   retainsBuyouts    Int             @default(0) // net retention / buyout dead-money adjustment (± dollars); counts into the cap hit
   ticketPricing     String          @default("STANDARD") // Detailed Finance: LOW | STANDARD | PREMIUM — trades revenue-per-seat vs demand

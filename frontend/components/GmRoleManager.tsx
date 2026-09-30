@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { setGmRoleAction, setRookieGmAction } from "@/app/admin/dashboard/actions";
+import { setGmRoleAction, setRookieGmAction, setResignLockExemptAction } from "@/app/admin/dashboard/actions";
 
-type Row = { id: number; name: string; gmRole: string; gmNickname: string | null; rookieGm?: boolean };
+type Row = { id: number; name: string; gmRole: string; gmNickname: string | null; rookieGm?: boolean; resignLockExempt?: boolean };
 const ROLES: [string, string][] = [["gm", "GM"], ["agent", "Agent"], ["trade_comish", "Trade Comish"], ["co_comish", "Co-Commissioner"], ["comish", "Commissioner"]];
 
 export default function GmRoleManager({ teams }: { teams: Row[] }) {
@@ -22,6 +22,12 @@ export default function GmRoleManager({ teams }: { teams: Row[] }) {
     if (r.ok) { setRows((rs) => rs.map((t) => (t.id === id ? { ...t, rookieGm: rookie } : t))); setMsg("Saved."); }
     else setMsg(r.error ?? "Failed.");
   });
+  const setResignExempt = (id: number, exempt: boolean) => start(async () => {
+    setMsg(null);
+    const r = await setResignLockExemptAction(id, exempt);
+    if (r.ok) { setRows((rs) => rs.map((t) => (t.id === id ? { ...t, resignLockExempt: exempt } : t))); setMsg("Saved."); }
+    else setMsg(r.error ?? "Failed.");
+  });
   return (
     <div>
       <p className="text-xs text-slate-500 mb-2">Commissioner &amp; Co-Commissioner get full admin powers; comish-tier (incl. Agent) get a 1-day free-agency head-start each round. <b>Trade Comish</b> only reviews rookie-GM trades (Accept/Decline/Modify at Trades → Trade Commission) — no other admin powers.</p>
@@ -32,6 +38,10 @@ export default function GmRoleManager({ teams }: { teams: Row[] }) {
             <label className="flex items-center gap-1 text-xs text-rose-300 cursor-pointer select-none" title="Rookie GM — his trades need commission approval">
               <input type="checkbox" checked={!!t.rookieGm} onChange={(e) => setRookie(t.id, e.target.checked)} disabled={pending} />
               (R)
+            </label>
+            <label className="flex items-center gap-1 text-xs text-emerald-300 cursor-pointer select-none" title="Exempt from the season-start re-sign lock (resignLockDays) — this club can negotiate extensions early">
+              <input type="checkbox" checked={!!t.resignLockExempt} onChange={(e) => setResignExempt(t.id, e.target.checked)} disabled={pending} />
+              🔓 Re-sign
             </label>
             <select value={t.gmRole} onChange={(e) => set(t.id, e.target.value)} disabled={pending}
               className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm">

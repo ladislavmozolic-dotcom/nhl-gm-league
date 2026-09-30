@@ -1142,7 +1142,7 @@ export async function extendContractAction(
   if (phase === "frenzy") {
     return { ok: false as const, error: "Extensions are closed during the Free Agent Frenzy — use the market offer flow instead." };
   }
-  const lockedUntil = await resignLockedUntil();
+  const lockedUntil = await resignLockedUntil(teamId);
   if (lockedUntil) return { ok: false as const, error: `Extensions are closed for the first days of the regular season — they open on ${lockedUntil.toISOString().slice(0, 10)}.` };
   // A "1 year left" deal only means something once a real season is underway — before
   // regular season starts, only already-expired (0-year) deals are up for renewal.
