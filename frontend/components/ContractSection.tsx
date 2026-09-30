@@ -20,7 +20,7 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
   // market. Blocked only during the Free Agent Frenzy itself, which has its own
   // dedicated offer/counter flow for players who've actually reached free agency.
   const phase = (await getLeagueClock()).phase;
-  const lockedUntil = await resignLockedUntil();
+  const lockedUntil = await resignLockedUntil(teamId);
   const canNegotiate = phase !== "frenzy" && !lockedUntil;
   // include the club's AHL/farm players whose deals are up too
   const org = await prisma.team.findUnique({ where: { id: teamId }, select: { affiliateTeams: { select: { id: true } } } });
