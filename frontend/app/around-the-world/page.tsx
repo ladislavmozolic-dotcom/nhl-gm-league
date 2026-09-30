@@ -163,7 +163,9 @@ export default async function AroundTheWorldPage({
                   <div className="relative flex justify-between gap-3">
                     <div className="flex items-start gap-3">
                       {l.logoUrl ? (
-                        <img src={l.logoUrl} alt="" className="w-11 h-11 object-contain drop-shadow-lg" />
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/10 p-1.5 shadow-inner">
+                          <img src={l.logoUrl} alt="" className="h-full w-full object-contain drop-shadow" />
+                        </div>
                       ) : (
                         <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/5 text-2xl shadow-inner">
                           {s.icon}
@@ -205,7 +207,9 @@ export default async function AroundTheWorldPage({
                 <div className="absolute -right-6 -bottom-6 h-24 w-24 rounded-full bg-violet-500/20 blur-2xl" />
                 <div className="relative flex justify-between gap-3">
                   <div className="flex items-start gap-3">
-                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-400/10 text-2xl shadow-inner">🇪🇺</span>
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-400/10 p-1.5 shadow-inner">
+                      <img src="/images/leagues/europe.svg" alt="" className="h-full w-full object-contain drop-shadow" />
+                    </div>
                     <div>
                       <div className="text-base font-black tracking-tight group-hover:text-violet-300">European &amp; Russian Hub</div>
                       <div className="mt-1 text-xs text-slate-500">Liiga · SHL · KHL · MHL · Czech · Slovak</div>
