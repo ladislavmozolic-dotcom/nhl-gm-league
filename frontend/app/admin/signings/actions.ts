@@ -1,42 +1,8 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
-import { isAdmin } from "@/lib/auth";
-import { revalidatePath } from "next/cache";
+import { executeRevertSigning } from "@/lib/revert-signing-server";
 
 /** Admin: undo a UFA signing / extension, restoring the player's prior contract. */
 export async function revertSigningAction(logId: number) {
-  if (!(await isAdmin())) throw new Error("Only a league admin can revert signings.");
-  const log = await prisma.signingLog.findUnique({ where: { id: logId } });
-  if (!log || log.reverted) return { ok: false as const, error: "Already reverted or not found." };
-
-  // both an immediate signing and a re-sign/extension now overwrite the contract
-  // right away — restore the pre-signing snapshot either way.
-  await prisma.player.update({
-    where: { id: log.playerId },
-    data: {
-      capHit: log.prevCapHit ?? 0, ahlSalary: log.prevAhlSalary, contractYears: log.prevYears, contractExpiry: log.prevExpiry,
-      contractType: log.prevType, tradeClause: log.prevClause, noTradeTeams: log.prevNoTrade,
-      rosterType: log.prevRosterType ?? "NHL", teamId: log.prevTeamId ?? undefined,
-      contractText: log.prevContractText,
-      extCapHit: null, extYears: null, extContractType: null, extClause: null, extNoTradeTeams: [], extText: null,
-      resignStatus: null, resignRound: 0, rfaOsUsed: false, rightsReleased: false,
-    },
-  });
-  if (log.kind !== "EXTEND") {
-    // drop the accepted FA offer so the player is a free agent again
-    await prisma.faOffer.deleteMany({ where: { playerId: log.playerId, status: "ACCEPTED" } }).catch(() => {});
-  }
-  await prisma.signingLog.update({ where: { id: logId }, data: { reverted: true } });
-  await prisma.transaction.create({
-    data: {
-      type: "SIGNING",
-      message: log.kind === "EXTEND"
-        ? `Commissioner reverted ${log.teamCode ?? "a club"}'s extension of ${log.playerName}.`
-        : `Commissioner reverted ${log.teamCode ?? "a club"}'s signing of ${log.playerName} — returned to the ${log.prevRosterType === "RFA" ? "RFA" : "UFA"} market.`,
-      playerId: log.playerId,
-    },
-  }).catch(() => {});
-  for (const p of ["/admin/signings", "/salary-cap", "/finance", "/free-agents", "/signings"]) revalidatePath(p);
-  return { ok: true as const };
+  return executeRevertSigning(logId);
 }
