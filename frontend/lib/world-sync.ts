@@ -7,6 +7,7 @@ import { importCzechExtraligaProspects, importShlProspects } from "@/lib/world-i
 import { importEuropeanJuniorLeagues } from "@/lib/world-import-juniors";
 import { importRussianProspects } from "@/lib/world-import-russia";
 import { importKhlLeague } from "@/lib/world-import-khl";
+import { importDelLeague } from "@/lib/world-import-del";
 import { reconcileAllProspects } from "@/lib/world-player-identity";
 
 /**
@@ -15,7 +16,7 @@ import { reconcileAllProspects } from "@/lib/world-player-identity";
  * 2. CHL Junior Leagues (WHL, OHL, QMJHL via HockeyTech)
  * 3. AHL (American Hockey League via HockeyTech)
  * 4. NCAA Division I rosters & club assignments (pre-season)
- * 5. European Senior & Junior Leagues (Liiga, SHL, Czechia, Slovakia, Juniors)
+ * 5. European Senior & Junior Leagues (Liiga, SHL, Czechia, Slovakia, Juniors, DEL)
  * 6. Russian Leagues (KHL, MHL, VHL) & Global Player Profiles
  * 7. Cross-source prospect identity reconciliation
  */
@@ -40,6 +41,7 @@ export async function runFullWorldSync() {
   ]);
   const russia = await importRussianProspects().catch((e) => ({ error: (e as Error).message }));
   const khl = await importKhlLeague().catch((e) => ({ error: (e as Error).message }));
+  const del = await importDelLeague().catch((e) => ({ error: (e as Error).message }));
   const reconcile = await reconcileAllProspects().catch((e) => ({ error: (e as Error).message }));
 
   return {
@@ -54,6 +56,7 @@ export async function runFullWorldSync() {
     juniors,
     russia,
     khl,
+    del,
     reconcile,
   };
 }

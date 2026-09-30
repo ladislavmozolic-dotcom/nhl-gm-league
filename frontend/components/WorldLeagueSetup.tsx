@@ -10,6 +10,8 @@ import {
   importEuropeAction,
   importNcaaAction,
   importRussiaAction,
+  importKhlAction,
+  importDelAction,
   manualLinkProspectAction,
   reconcileProspectsAction,
   seedWorldLeaguesAction,
@@ -281,6 +283,34 @@ export default function WorldLeagueSetup({
               className="mt-3 rounded-lg border border-slate-700 bg-slate-800/80 px-3 py-1.5 text-xs font-bold text-slate-200 hover:bg-slate-700 disabled:opacity-50"
             >
               {pending && activeAction === "Russia Import" ? "Importing…" : "Sync Russia"}
+            </button>
+          </div>
+
+          <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 flex flex-col justify-between">
+            <div>
+              <div className="font-bold text-slate-200">KHL Full League</div>
+              <div className="text-xs text-slate-500 mt-0.5">All 22 clubs via EliteProspects</div>
+            </div>
+            <button
+              onClick={() => runAction("KHL Import", importKhlAction)}
+              disabled={pending}
+              className="mt-3 rounded-lg border border-slate-700 bg-slate-800/80 px-3 py-1.5 text-xs font-bold text-slate-200 hover:bg-slate-700 disabled:opacity-50"
+            >
+              {pending && activeAction === "KHL Import" ? "Importing…" : "Sync KHL"}
+            </button>
+          </div>
+
+          <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 flex flex-col justify-between">
+            <div>
+              <div className="font-bold text-slate-200">German DEL</div>
+              <div className="text-xs text-slate-500 mt-0.5">All 14 clubs via EliteProspects</div>
+            </div>
+            <button
+              onClick={() => runAction("DEL Import", importDelAction)}
+              disabled={pending}
+              className="mt-3 rounded-lg border border-slate-700 bg-slate-800/80 px-3 py-1.5 text-xs font-bold text-slate-200 hover:bg-slate-700 disabled:opacity-50"
+            >
+              {pending && activeAction === "DEL Import" ? "Importing…" : "Sync DEL"}
             </button>
           </div>
 

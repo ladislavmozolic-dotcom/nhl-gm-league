@@ -21,7 +21,7 @@ export default async function EuropeProspectsPage({ searchParams }: { searchPara
   const teamId = await getTeamSession();
   const { year: draftYear, meta } = await worldScoutingMeta(stats.map((s) => s.player), teamId);
   const visibleStats = stats.filter((s) => { const state = meta.get(s.playerId); return state?.rights || state?.draftable; });
-  const importedLeagueCodes = new Set(visibleStats.map((s) => s.league.code));
+  const importedLeagueCodes = new Set(stats.map((s) => s.league.code));
   const teamCounts = new Map<number, number>();
   visibleStats.forEach((s) => { if (s.teamId) teamCounts.set(s.teamId, (teamCounts.get(s.teamId) ?? 0) + 1); });
   const syncedAt = stats.reduce<Date | null>((latest, s) => !latest || s.syncedAt > latest ? s.syncedAt : latest, null);

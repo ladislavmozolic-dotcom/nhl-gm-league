@@ -14,7 +14,7 @@ Run as systemd service ep-roster-scraper.service
 """
 
 import json, re, ssl, sys, time, random, urllib.request
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
 HEADERS = {
@@ -151,6 +151,6 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 3336
-    server = HTTPServer(("0.0.0.0", port), Handler)
+    server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
     print(f"EP Roster Scraper Server running on :{port}", flush=True)
     server.serve_forever()

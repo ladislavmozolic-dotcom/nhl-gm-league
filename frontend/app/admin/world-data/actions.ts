@@ -9,6 +9,8 @@ import { importLiigaProspects } from "@/lib/world-import-liiga";
 import { importCzechExtraligaProspects, importShlProspects } from "@/lib/world-import-europe";
 import { importEuropeanJuniorLeagues } from "@/lib/world-import-juniors";
 import { importRussianProspects } from "@/lib/world-import-russia";
+import { importKhlLeague } from "@/lib/world-import-khl";
+import { importDelLeague } from "@/lib/world-import-del";
 import { reconcileAllProspects, resolveWorldPlayer } from "@/lib/world-player-identity";
 import { revalidatePath } from "next/cache";
 
@@ -93,6 +95,34 @@ export async function importRussiaAction() {
     return { ok: true as const, ...russia };
   } catch (error) {
     return { ok: false as const, error: error instanceof Error ? error.message : "Russia import failed." };
+  }
+}
+
+/** Refresh KHL full league rosters & stats. */
+export async function importKhlAction() {
+  if (!(await isAdmin())) return { ok: false as const, error: "Admin only." };
+  try {
+    const khl = await importKhlLeague();
+    await reconcileAllProspects();
+    revalidatePath("/around-the-world");
+    revalidatePath("/admin/world-data");
+    return { ok: true as const, ...khl };
+  } catch (error) {
+    return { ok: false as const, error: error instanceof Error ? error.message : "KHL import failed." };
+  }
+}
+
+/** Refresh German DEL full league rosters & stats. */
+export async function importDelAction() {
+  if (!(await isAdmin())) return { ok: false as const, error: "Admin only." };
+  try {
+    const del = await importDelLeague();
+    await reconcileAllProspects();
+    revalidatePath("/around-the-world");
+    revalidatePath("/admin/world-data");
+    return { ok: true as const, ...del };
+  } catch (error) {
+    return { ok: false as const, error: error instanceof Error ? error.message : "DEL import failed." };
   }
 }
 

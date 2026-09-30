@@ -118,6 +118,8 @@ export function mapEpLeagueToCode(leagueName: string | null, leagueUrlPath: stri
     "u20-sm-sarja": "FIN-U20",
     "liiga-u20": "FIN-U20",
     "u20-sm": "FIN-U20",
+    "u18-sm-sarja": "FIN-U18",
+    "u18-sm": "FIN-U18",
     mestis: "MESTIS",
     "russia-jr": "RUS-JR",
     "russia-3": "RUS-3",
