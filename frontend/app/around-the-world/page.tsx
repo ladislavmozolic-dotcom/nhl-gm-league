@@ -16,6 +16,7 @@ const LEAGUE_STYLES: Record<string, LeagueStyle> = {
   QMJHL: { gradient: "from-rose-950/60 via-slate-900 to-slate-950", border: "border-rose-500/25", accent: "text-rose-300", hover: "hover:border-rose-400/50", icon: "🏒" },
   AHL:   { gradient: "from-red-950/60 via-slate-900 to-slate-950", border: "border-red-500/25", accent: "text-red-300", hover: "hover:border-red-400/50", icon: "🥅" },
   NCAA:  { gradient: "from-blue-950/60 via-slate-900 to-slate-950", border: "border-blue-500/25", accent: "text-blue-300", hover: "hover:border-blue-400/50", icon: "🎓" },
+  KHL:   { gradient: "from-sky-950/60 via-slate-900 to-slate-950", border: "border-sky-500/25", accent: "text-sky-300", hover: "hover:border-sky-400/50", icon: "⭐" },
 };
 const DEFAULT_STYLE: LeagueStyle = { gradient: "from-slate-900 via-slate-900 to-slate-950", border: "border-slate-700/60", accent: "text-sky-300", hover: "hover:border-sky-400/40", icon: "🌎" };
 
@@ -82,7 +83,7 @@ export default async function AroundTheWorldPage({
   const noData = leagues.length === 0;
   const leaders = allStats;
 
-  const featuredCodes = ["WHL", "OHL", "QMJHL", "AHL", "NCAA"];
+  const featuredCodes = ["WHL", "OHL", "QMJHL", "AHL", "NCAA", "KHL"];
   const featuredLeagues = featuredCodes
     .map((code) => leagues.find((l) => l.code === code))
     .filter((l): l is NonNullable<typeof l> => Boolean(l));

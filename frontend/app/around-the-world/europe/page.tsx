@@ -5,6 +5,7 @@ import { WORLD_LEAGUE_CATALOG } from "@/lib/world-catalog";
 import { epProfileUrl } from "@/lib/playerName";
 import { BackPill, Card, PageHeader, StatTile } from "@/components/ui";
 import WorldLeagueStats from "@/components/WorldLeagueStats";
+import WorldCompetitionNav from "@/components/WorldCompetitionNav";
 import { getTeamSession } from "@/lib/auth";
 import { worldScoutingMeta } from "@/lib/world-scouting";
 
@@ -29,6 +30,9 @@ export default async function EuropeProspectsPage({ searchParams }: { searchPara
   return <div className="space-y-6 py-2">
     <BackPill href="/around-the-world">Around the World</BackPill>
     <PageHeader title="🇪🇺 European Prospects" subtitle="One table for prospects across European competitions, with country, league and team age category." />
+
+    <WorldCompetitionNav activeCode="EUROPE" />
+
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
       <StatTile label="Prospect stat lines" value={visibleStats.length} sub={season || "No season yet"} color="text-violet-300" />
       <StatTile label="Skaters" value={skaters} color="text-emerald-300" />

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { BackPill, Card, PageHeader, StatTile } from "@/components/ui";
 import WorldLeagueStats from "@/components/WorldLeagueStats";
+import WorldCompetitionNav from "@/components/WorldCompetitionNav";
 import { epProfileUrl } from "@/lib/playerName";
 import { getTeamSession } from "@/lib/auth";
 import { worldScoutingMeta } from "@/lib/world-scouting";
@@ -17,10 +18,12 @@ export default async function WorldLeaguePage({ params, searchParams }: {
   const league = await prisma.worldLeague.findUnique({ where: { code: code.toUpperCase() }, include: { teams: { orderBy: { name: "asc" } } } });
   if (!league?.active) notFound();
 
-  const [seasons, otherLeagues] = await Promise.all([
-    prisma.worldPlayerSeasonStat.findMany({ where: { leagueId: league.id }, distinct: ["season"], select: { season: true }, orderBy: { season: "desc" } }),
-    prisma.worldLeague.findMany({ where: { active: true }, select: { code: true, name: true }, orderBy: { name: "asc" } }),
-  ]);
+  const seasons = await prisma.worldPlayerSeasonStat.findMany({
+    where: { leagueId: league.id },
+    distinct: ["season"],
+    select: { season: true },
+    orderBy: { season: "desc" },
+  });
   const defaultSeason = seasons.find((s) => s.season === "2026-27")?.season ?? "2026-27";
   const season = requestedSeason ? (seasons.find((s) => s.season === requestedSeason)?.season ?? requestedSeason) : defaultSeason;
   const stats = season ? await prisma.worldPlayerSeasonStat.findMany({
@@ -41,9 +44,8 @@ export default async function WorldLeaguePage({ params, searchParams }: {
     <BackPill href="/around-the-world">Around the World</BackPill>
     <PageHeader title={<span className="inline-flex items-center gap-3">{league.logoUrl && <img src={league.logoUrl} alt="" className="w-12 h-12 object-contain" />}{league.name}</span>} subtitle={`${league.country || league.region} · Real-world prospect statistics`} />
 
-    <nav className="flex flex-wrap gap-2" aria-label="World leagues">
-      {otherLeagues.map((item) => <Link key={item.code} href={`/around-the-world/${item.code.toLowerCase()}`} className={`rounded-lg px-3 py-1.5 text-sm font-semibold border transition-colors ${item.code === league.code ? "bg-sky-500/15 text-sky-300 border-sky-500/40" : "bg-slate-900/60 text-slate-400 border-slate-800 hover:text-white hover:border-slate-600"}`}>{item.code}</Link>)}
-    </nav>
+    <WorldCompetitionNav activeCode={league.code} />
+
 
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
       <StatTile label="Teams" value={league.teams.length} color="text-sky-300" />
