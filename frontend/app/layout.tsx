@@ -122,6 +122,12 @@ export default async function RootLayout({
     if (item.key === "frenzy" && item.children) {
       return { ...item, children: item.children.filter((c) => c.href !== "/signings" || t?.isAdmin) };
     }
+    if (item.key === "trades" && item.children) {
+      // Same commish-only gate as "frenzy" above — this menu links to the exact
+      // same /signings href and was missing the filter, so every GM saw it even
+      // though the page itself redirects anyone who isn't an admin.
+      return { ...item, children: item.children.filter((c) => c.href !== "/signings" || t?.isAdmin) };
+    }
     if (item.key === "draft" && item.children) {
       return { ...item, children: item.children.filter((c) => c.href !== "/admin/expansion" || t?.isAdmin) }; // commish-only — page itself redirects non-admins
     }

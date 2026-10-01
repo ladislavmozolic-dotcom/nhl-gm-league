@@ -18,7 +18,13 @@ export default async function SigningsPage({ searchParams }: { searchParams: Pro
   // signings are fair game for the commissioner to review, not for a rival GM.
   if (!(await isAdmin())) redirect("/");
 
-  const round = [1, 2, 3].includes(Number((await searchParams).round)) ? Number((await searchParams).round) : 1;
+  // Round 4 isn't a real negotiation round (those only run 1-3) — it's the flat
+  // bucket every post-frenzy open-market signing gets stamped with (see
+  // `roundToStamp` in app/free-agents/actions.ts: `win.postFrenzy ? 4 : ...`).
+  // This page only ever rendered tabs for 1-3, so every signing made after the
+  // frenzy closed was already in the data but had no tab to view it from.
+  const ROUNDS = [1, 2, 3, 4];
+  const round = ROUNDS.includes(Number((await searchParams).round)) ? Number((await searchParams).round) : 1;
 
   // every free-agent signing, with the round it happened in (from the accepted offer)
   const accepted = await prisma.faOffer.findMany({ where: { status: "ACCEPTED" }, orderBy: { salary: "desc" } });
@@ -41,7 +47,7 @@ export default async function SigningsPage({ searchParams }: { searchParams: Pro
   ]);
   const pById = new Map(players.map((p) => [p.id, p]));
   const code = new Map(teams.map((t) => [t.id, t.code ?? String(t.id)]));
-  const counts = [1, 2, 3].map((r) => accepted.filter((o) => (o.round || 3) === r).length);
+  const counts = ROUNDS.map((r) => accepted.filter((o) => (o.round || 3) === r).length);
 
   // score every offer (winner + rivals) with the SAME utility function the
   // resolver used to pick the winner, so "why him" reflects the real logic
@@ -68,17 +74,17 @@ export default async function SigningsPage({ searchParams }: { searchParams: Pro
   const Tab = ({ r }: { r: number }) => (
     <Link href={`/signings?round=${r}`}
       className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${round === r ? "bg-blue-600 text-white" : "border border-slate-700 text-slate-400 hover:bg-slate-800"}`}>
-      Round {r} <span className="text-xs opacity-70">({counts[r - 1]})</span>
+      {r === 4 ? "Trh (po Frenzy)" : `Round ${r}`} <span className="text-xs opacity-70">({counts[r - 1]})</span>
     </Link>
   );
 
   return (
     <div className="space-y-5 py-2">
       <PageHeader title="Free-Agent Signings" subtitle="Admin view — who signed in each frenzy round, every competing bid, and why the winner beat the rest" />
-      <div className="flex gap-2 flex-wrap">{[1, 2, 3].map((r) => <Tab key={r} r={r} />)}</div>
+      <div className="flex gap-2 flex-wrap">{ROUNDS.map((r) => <Tab key={r} r={r} />)}</div>
 
       {signedRound.length === 0 ? (
-        <Card><p className="text-sm text-slate-500">No signings in round {round} yet.</p></Card>
+        <Card><p className="text-sm text-slate-500">No signings in {round === 4 ? "the post-frenzy market" : `round ${round}`} yet.</p></Card>
       ) : (
         <div className="space-y-3">
           {signedRound.map((o) => {
