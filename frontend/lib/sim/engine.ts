@@ -1467,7 +1467,7 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
   };
   const onIceF = (team: SimTeam) => {
     const s = curStr[team.id];
-    if (s === "PP") { const pool = curSkaters[team.id] === 4 ? stUnit[team.id].pp4 : stUnit[team.id].pp; const u = pool[stIdx(team, pool)]; if (u?.f.length) return subMis(team, u.f, false); }
+    if (s === "PP") { const pool = curSkaters[team.id] === 4 ? stUnit[team.id].pp4 : stUnit[team.id].pp; const u = pool[stIdx(team, pool)]; if (u?.f.length) { const f = subMis(team, u.f, false); return st.emptyNet[team.id] ? extraAttacker(team, f) : f; } } // trailing on a PP with the goalie pulled → 6-on-4
     if (s === "SH") {
       const pool = curSkaters[team.id] === 3 ? stUnit[team.id].pk3 : stUnit[team.id].pk;
       const u = pool[stIdx(team, pool)]; if (u?.f.length) return subMis(team, u.f, false);
@@ -1680,7 +1680,8 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
       else { state = "FACEOFF"; setup = "carry"; press = 0; foZone = null; }
     }
     announceChange(home, tick); announceChange(away, tick);
-    // Empty net: a team trailing late in regulation, at even strength, may pull the
+    // Empty net: a team trailing late in regulation, at even strength OR on a power play
+    // (6-on-4: the goalie comes out for the extra attacker on top of the PP unit), may pull the
     // goalie for an extra attacker. Real mechanic for BOTH engines (not a v2-only
     // presentation choice) — the actual shot-probability effect lives at the SHOT
     // resolution below (attackerEmptyNet / defEmptyNet). Re-evaluated every tick so
@@ -1695,7 +1696,7 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
       // wide-open down-3 pull for the full 2 minutes was creating a lot of the
       // engine's excess blowout rate (a real, but too-generous, empty-net dagger).
       const trailWindow = trailBy === 1 ? pullWindow : trailBy === 2 ? pullWindow * 0.7 : pullWindow * 0.35;
-      const eligible = period === 3 && curStr[team.id] === "EV" && trailBy >= 1 && trailBy <= 3 && PERIOD_SECONDS - tick <= trailWindow;
+      const eligible = period === 3 && (curStr[team.id] === "EV" || curStr[team.id] === "PP") && trailBy >= 1 && trailBy <= 3 && PERIOD_SECONDS - tick <= trailWindow;
       if (eligible !== !!st.emptyNet[team.id]) {
         if (eligible) useTimeout(team, tick, "before pulling the goalie");
         st.emptyNet[team.id] = eligible;
