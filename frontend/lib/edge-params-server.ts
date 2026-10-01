@@ -7,6 +7,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { cleanName } from "./playerName";
+import { norm } from "./real-roster-import";
 import { per60, blend, percentileOf, ratingFromCurve, EDGE_COMPOSITES, EDGE_GOALIE_COMPOSITES, experienceFromAge, durabilityFromAvailability, leadershipFrom, EDGE_MO_DEFAULT } from "./edge-params";
 import { calculateRookieRatings } from "./rookie-calculator-engine";
 import { getLiveCalculatorConfig } from "./live-calculator-config";
@@ -695,13 +696,43 @@ const ROOKIE_RATING_FIELD: Record<string, string> = { ...ROOKIE_PARAM_FIELD, OV:
  *  scanAndSyncDebutants, which triggers a recompute after every scan); any
  *  param the engine left null for him (e.g. he's classified "AHL/FARM") falls
  *  back to the Edge engine. */
+async function resolveRookieAssignment(player: { id: number; name: string; nhlId: number | null; teamId: number }): Promise<{ teamId: number; rosterType: string }> {
+  const faTeam = await prisma.team.findFirst({ where: { league: "FA" }, select: { id: true } });
+  const faTeamId = faTeam?.id ?? 66;
+
+  // If already assigned to a real team in our league (not the FA holding pool), keep existing assignment
+  if (player.teamId !== faTeamId) {
+    return { teamId: player.teamId, rosterType: "PROSPECT" };
+  }
+
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true } });
+  const prospectSource = cfg?.rosterMode === "real" ? "real" : "profinhl";
+  const leagueProspects = await prisma.prospect.findMany({
+    where: { source: prospectSource },
+    select: { name: true, nhlId: true, teamId: true },
+  });
+
+  const pName = norm(player.name);
+  if (player.nhlId != null) {
+    const byId = leagueProspects.find((pr) => pr.nhlId === player.nhlId);
+    if (byId) return { teamId: byId.teamId, rosterType: "PROSPECT" };
+  }
+  const byName = leagueProspects.filter((pr) => norm(pr.name) === pName);
+  if (byName.length > 0 && !byName.some((pr) => pr.nhlId != null)) {
+    return { teamId: byName[0].teamId, rosterType: "PROSPECT" };
+  }
+
+  // Nobody has rights to him in our league -> goes to UFA
+  return { teamId: faTeamId, rosterType: "UFA" };
+}
+
 /** Copy a Rookie Calculator player's rating onto his live ck/sc/pa/... fields
  *  using the official Player Calculator lookup tables and rookie logic. */
 export async function activateRookieLiveRating(playerId: number): Promise<{ ok: boolean; applied?: Record<string, number>; error?: string }> {
   const player = await prisma.player.findUnique({
     where: { id: playerId },
     select: {
-      id: true, slug: true, name: true, position: true, teamId: true, age: true, isGoalie: true,
+      id: true, slug: true, name: true, position: true, teamId: true, age: true, isGoalie: true, nhlId: true,
       weight: true, edgeSpeed: true, careerGP: true,
       curSeasonGP: true, curSeasonG: true, curSeasonA: true,
       curSeasonHits: true, curSeasonBlocks: true, curSeasonPM: true,
@@ -729,7 +760,15 @@ export async function activateRookieLiveRating(playerId: number): Promise<{ ok: 
   }
   if (!Object.keys(data).length) return { ok: false, error: "No computed rating available." };
 
-  await prisma.player.update({ where: { id: playerId }, data });
+  const assignment = await resolveRookieAssignment(player);
+  await prisma.player.update({
+    where: { id: playerId },
+    data: {
+      ...data,
+      teamId: assignment.teamId,
+      rosterType: assignment.rosterType,
+    },
+  });
   return { ok: true, applied: ratings };
 }
 
@@ -741,7 +780,7 @@ export async function activateRookieLiveRating(playerId: number): Promise<{ ok: 
  *  rating keys are accepted, each clamped to [1, 99] and rounded, so a bad or
  *  malformed payload can't corrupt the row; unknown keys are silently ignored. */
 export async function applyRookieRatingsOverride(playerId: number, ratings: Record<string, number>): Promise<{ ok: boolean; applied?: Record<string, number>; error?: string }> {
-  const player = await prisma.player.findUnique({ where: { id: playerId }, select: { id: true, isGoalie: true, rosterType: true } });
+  const player = await prisma.player.findUnique({ where: { id: playerId }, select: { id: true, name: true, nhlId: true, teamId: true, isGoalie: true, rosterType: true } });
   if (!player) return { ok: false, error: "Player not found." };
   if (player.isGoalie) return { ok: false, error: "Goalie rating overrides aren't supported here." };
   if (player.rosterType !== "PROSPECT") return { ok: false, error: "Only Rookie Calculator (PROSPECT) players can be adjusted here." };
@@ -758,7 +797,15 @@ export async function applyRookieRatingsOverride(playerId: number, ratings: Reco
   }
   if (!Object.keys(data).length) return { ok: false, error: "No valid rating values supplied." };
 
-  await prisma.player.update({ where: { id: playerId }, data });
+  const assignment = await resolveRookieAssignment(player);
+  await prisma.player.update({
+    where: { id: playerId },
+    data: {
+      ...data,
+      teamId: assignment.teamId,
+      rosterType: assignment.rosterType,
+    },
+  });
   return { ok: true, applied };
 }
 
@@ -785,17 +832,22 @@ export type RookieRow = {
  *  (lib/rookie-calculator-engine.ts) so rookie numbers match realistic STHS values
  *  (OV 46-56) instead of inflated percentiles. */
 export async function rookieCalculatorRows(): Promise<RookieRow[]> {
+  const [teams, liveConfig, cfg] = await Promise.all([
+    prisma.team.findMany({ select: { id: true, code: true, league: true } }),
+    getLiveCalculatorConfig(),
+    prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true } }),
+  ]);
+  const codeById = new Map(teams.map((t) => [t.id, t.code]));
+  const faTeam = teams.find((t) => t.league === "FA");
+  const faTeamId = faTeam?.id ?? 66;
+
   const prospects = await prisma.player.findMany({
     where: {
       isGoalie: false,
       rosterType: "PROSPECT",
-      OR: [
-        { age: null },
-        { age: { lte: 25 } },
-      ],
     },
     select: {
-      id: true, slug: true, name: true, position: true, teamId: true, age: true,
+      id: true, slug: true, name: true, position: true, teamId: true, age: true, nhlId: true,
       weight: true, edgeSpeed: true, careerGP: true,
       curSeasonGP: true, curSeasonG: true, curSeasonA: true,
       curSeasonHits: true, curSeasonBlocks: true, curSeasonPM: true,
@@ -812,11 +864,12 @@ export async function rookieCalculatorRows(): Promise<RookieRow[]> {
   });
 
   const withProduction = prospects.filter((p) => {
-    // A player who is 26 or older is not a rookie/prospect
-    if (p.age != null && p.age > 25) return false;
     // An established NHLer with more than 50 regular season games is not a rookie
     const regGp = (p.careerGP as any)?.reg;
     if (regGp != null && regGp > 50) return false;
+
+    // For players already on a real team with an established rating, don't show veterans over 25
+    if (p.teamId !== faTeamId && p.age != null && p.age > 25) return false;
 
     const nhlGp = (p.curSeasonGP ?? 0) + (p.lastSeasonGP ?? 0);
     const ahl = (p.ahlStats as any) ?? {};
@@ -825,23 +878,47 @@ export async function rookieCalculatorRows(): Promise<RookieRow[]> {
   });
   if (!withProduction.length) return [];
 
-  const [teams, liveConfig] = await Promise.all([
-    prisma.team.findMany({ select: { id: true, code: true } }),
-    getLiveCalculatorConfig(),
-  ]);
-  const codeById = new Map(teams.map((t) => [t.id, t.code]));
+  const prospectSource = cfg?.rosterMode === "real" ? "real" : "profinhl";
+  const leagueProspects = await prisma.prospect.findMany({
+    where: { source: prospectSource },
+    select: { name: true, nhlId: true, teamId: true, team: { select: { code: true } } },
+  });
+  const prospectsByName = new Map<string, { nhlId: number | null; code: string | null }[]>();
+  for (const pr of leagueProspects) {
+    const n = norm(pr.name);
+    const list = prospectsByName.get(n) ?? [];
+    list.push({ nhlId: pr.nhlId, code: pr.team.code });
+    prospectsByName.set(n, list);
+  }
+  const matchProspectTeam = (nhlId: number | null, name: string): string | null => {
+    const list = prospectsByName.get(norm(name));
+    if (!list) return null;
+    if (nhlId != null) {
+      const byId = list.find((p) => p.nhlId === nhlId);
+      if (byId) return byId.code;
+    }
+    return list.some((p) => p.nhlId != null) ? null : list[0].code;
+  };
 
   const out: RookieRow[] = [];
   for (const p of withProduction) {
     const calc = calculateRookieRatings(p, liveConfig.weights);
     if (calc.gp <= 0) continue; // Never show rows with 0 games
 
+    let teamCode: string | null = null;
+    if (p.teamId !== faTeamId) {
+      teamCode = codeById.get(p.teamId) ?? null;
+    } else {
+      const rightsCode = matchProspectTeam(p.nhlId, p.name);
+      teamCode = rightsCode ?? "UFA";
+    }
+
     out.push({
       playerId: p.id,
       name: cleanName(p.name),
       slug: p.slug,
       position: p.position ?? "",
-      teamCode: p.teamId != null ? codeById.get(p.teamId) ?? null : null,
+      teamCode,
       age: p.age,
       curSeasonGP: p.curSeasonGP ?? 0,
       lastSeasonGP: p.lastSeasonGP ?? 0,

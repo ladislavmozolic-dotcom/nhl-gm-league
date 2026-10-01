@@ -44,7 +44,15 @@ export default function RookieTableRow({ row, isAdmin }: { row: RookieRow; isAdm
   return (
     <tr className="border-b border-slate-800/40 hover:bg-slate-800/30">
       <td className="px-3 py-1.5 font-medium"><PlayerLink id={row.playerId} slug={row.slug} name={row.name} /></td>
-      <td className="px-2 py-1.5 text-center text-slate-400">{row.teamCode ?? "—"}</td>
+      <td className="px-2 py-1.5 text-center text-slate-400">
+        {row.teamCode === "UFA" ? (
+          <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-amber-900/40 text-amber-300 border border-amber-800/60">
+            UFA
+          </span>
+        ) : (
+          row.teamCode ?? "—"
+        )}
+      </td>
       <td className="px-2 py-1.5 text-center text-slate-400">{row.position}</td>
       <td className="px-2 py-1.5 text-center tabular-nums">{row.age ?? "—"}</td>
       <td className="px-2 py-1.5 text-center text-slate-400">{row.source}</td>

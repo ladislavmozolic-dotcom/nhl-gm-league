@@ -173,12 +173,14 @@ async function createDebutantAsProspect(c: DebutantCandidate): Promise<{ ok: boo
   const dupe = await prisma.player.findFirst({ where: { nhlId: c.nhlId }, select: { id: true } });
   if (dupe) return { ok: false, error: "Already tracked (nhlId already on file)." };
 
-  const team = await prisma.team.findFirst({ where: { code: c.teamAbbrev, league: "NHL", isAffiliate: false }, select: { id: true } });
-  if (!team) return { ok: false, error: `No team found for ${c.teamAbbrev}.` };
+  const faTeam = await prisma.team.findFirst({ where: { league: "FA" }, select: { id: true } });
+  const fallbackTeam = faTeam ?? (await prisma.team.findFirst({ select: { id: true } }));
+  if (!fallbackTeam) return { ok: false, error: "No holding team found." };
 
   const base = slugify(c.name) || "player";
   let slug = base;
-  let rosterType: "PROSPECT" | "NHL" = "PROSPECT";
+  for (let i = 2; await prisma.player.findUnique({ where: { slug }, select: { id: true } }); i++) slug = `${base}-${i}`;
+
   let age: number | null = null;
   if (c.birthDate) {
     const b = new Date(c.birthDate);
@@ -188,14 +190,13 @@ async function createDebutantAsProspect(c: DebutantCandidate): Promise<{ ok: boo
       if (now.getMonth() < b.getMonth() || (now.getMonth() === b.getMonth() && now.getDate() < b.getDate())) {
         age--;
       }
-      if (age >= 26) rosterType = "NHL";
     }
   }
 
   const player = await prisma.player.create({
     data: {
       slug, name: c.name, position: c.position, isGoalie: c.isGoalie,
-      teamId: team.id, rosterType, nhlId: c.nhlId, age,
+      teamId: fallbackTeam.id, rosterType: "PROSPECT", nhlId: c.nhlId, age,
       height: c.heightCm ? `${c.heightCm} cm` : null, weight: c.weightKg ?? null,
       birthDate: c.birthDate, shoots: c.shoots, number: c.number, photoUrl: c.photoUrl,
       condition: 100, morale: 50,
