@@ -1263,9 +1263,11 @@ export async function extendContractAction(
           : "Two rounds and no deal — he'll test the market when the season ends." + insult,
       };
     }
-    // he counters (kept fuzzy — you don't see his exact number, just a range)
+    // he counters — kept fuzzy (a range) early on, but on his LAST round before a
+    // walk, he names his exact floor: the GM gets one real number to hit, not a guess.
     const counterSalary = ev.ask.floorSalary;
     const counterYears = Math.min(Math.max(years, ev.ask.minYears), ev.ask.maxYears);
+    const isLastRound = !rfaPostOs && nextRound >= maxRounds;
     const bestOffer = Math.max(salary, player.resignOfferSalary ?? 0);
     await prisma.player.update({ where: { id: playerId }, data: { resignRound: nextRound, resignStatus: "countered", resignCounterSalary: counterSalary, resignCounterYears: counterYears, resignOfferSalary: bestOffer, resignOfferAt: new Date() } });
     await prisma.faBid.create({ data: { playerId, teamId, salary, years, round: nextRound } }).catch(() => {});
@@ -1273,7 +1275,9 @@ export async function extendContractAction(
       ok: false as const, rejected: true, round: nextRound,
       reason: rfaPostOs
         ? `Round ${nextRound} — no more offer sheets, straight talks with your club now. He's countering around ${fmtM(counterSalary)}–${fmtM(counterSalary * 1.06)} over ${counterYears}yr.${insult}`
-        : `Round ${nextRound} of ${maxRounds} — he's countering around ${fmtM(counterSalary)}–${fmtM(counterSalary * 1.06)} over ${counterYears}yr.${nextRound >= maxRounds ? " Last round before he walks." : ""}${insult}`,
+        : isLastRound
+          ? `Round ${nextRound} of ${maxRounds} — last round. His absolute minimum is ${fmtM(counterSalary)} over ${counterYears}yr — fall short on your final offer and he walks.${insult}`
+          : `Round ${nextRound} of ${maxRounds} — he's countering around ${fmtM(counterSalary)}–${fmtM(counterSalary * 1.06)} over ${counterYears}yr.${insult}`,
       floor: ev.ask.floorSalary, minYears: ev.ask.minYears, maxYears: ev.ask.maxYears,
     };
   }
