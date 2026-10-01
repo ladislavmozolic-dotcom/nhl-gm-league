@@ -123,14 +123,35 @@ export async function findMissingNhlPlayers(): Promise<{ ok: boolean; candidates
   };
   addGp(curSkaters); addGp(curGoalies); addGp(lastSkaters); addGp(lastGoalies);
 
-  // already scouted in a team's Prospect pool — informational, not exclusionary
-  const prospects = await prisma.prospect.findMany({ select: { name: true, team: { select: { code: true } } } });
-  const prospectTeamByName = new Map(prospects.map((p) => [norm(p.name), p.team.code]));
+  // Already scouted in a team's Prospect pool — informational, not exclusionary.
+  // Name alone is NOT a safe key here: two unrelated real players can share a
+  // name (e.g. a common surname), and the Prospect table's name-only rows have
+  // no other way to tell them apart. Prefer nhlId when the Prospect row has one
+  // (authoritative — it's the same real person); only fall back to a name match
+  // when that scouted row has no nhlId recorded at all, and never let a name
+  // match win over a Prospect row that DOES have an nhlId but it's for someone
+  // else, since that's a confirmed non-match, not an unknown one.
+  const prospects = await prisma.prospect.findMany({ select: { name: true, nhlId: true, team: { select: { code: true } } } });
+  const prospectsByName = new Map<string, { nhlId: number | null; code: string | null }[]>();
+  for (const p of prospects) {
+    const n = norm(p.name);
+    const list = prospectsByName.get(n) ?? [];
+    list.push({ nhlId: p.nhlId, code: p.team.code });
+    prospectsByName.set(n, list);
+  }
+  const matchProspectTeam = (nhlId: number, name: string): string | null => {
+    const list = prospectsByName.get(norm(name));
+    if (!list) return null;
+    const byId = list.find((p) => p.nhlId === nhlId);
+    if (byId) return byId.code;
+    return list.some((p) => p.nhlId != null) ? null : list[0].code;
+  };
 
   const candidates: DebutantCandidate[] = notYetTracked
     .map((r) => {
       const n = norm(r.name);
-      return { ...r, gp: gpByName.get(n) ?? 0, alreadyProspect: prospectTeamByName.has(n), prospectTeamCode: prospectTeamByName.get(n) ?? null };
+      const prospectTeamCode = matchProspectTeam(r.nhlId, r.name);
+      return { ...r, gp: gpByName.get(n) ?? 0, alreadyProspect: prospectTeamCode != null, prospectTeamCode };
     })
     .filter((c) => c.gp >= minScanGp);
   return { ok: true, candidates };
