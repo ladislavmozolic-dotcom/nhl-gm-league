@@ -38,6 +38,7 @@ type Side = {
   shotSectors?: number[]; topShot?: number | null; topShotBy?: string | null; avgShot?: number | null;
   shotDots?: { sector: string; xg: number | null; goal: boolean; playerName: string | null }[];
   skaters: Skater[]; goalies: Goalie[]; lines?: LineGroup[];
+  record?: { w: number; l: number; otl: number } | null;
 };
 type GoalAssist = { name: string; slug: string | null; total: number | null };
 type GoalE = { period: number; seconds: number; teamId: number; scorerName: string; scorerSlug?: string | null; scorerSeasonGoal?: number; assistNames: string[]; assists?: GoalAssist[]; strength: string; emptyNet: boolean; homeScoreAfter: number; awayScoreAfter: number; onIceForNames?: string[]; onIceAgainstNames?: string[] };
@@ -52,6 +53,7 @@ type Data = {
   injuries?: InjuryRow[]; homeSystem?: SystemDials; awaySystem?: SystemDials;
   story?: { report: GameReport; flow: GameFlow } | null;
   attendance?: number | null; arena?: string | null; event?: { kind: string; title: string; venue: string | null } | null; officials?: { name: string; number: number | null; role: string }[]; gameDate?: string | Date | null;
+  seriesId?: number | null; gameNum?: number | null; round?: number | null;
 };
 
 function ShootoutView({ data }: { data: Data }) {
@@ -505,14 +507,13 @@ function ShotChartPanel({ data }: { data: Data }) {
   return (
     <div className="bg-slate-900/40 rounded-lg overflow-hidden border border-slate-800">
       <div className="px-4 py-2 text-xs font-bold text-slate-400 bg-slate-800/60 uppercase tracking-wide flex items-center gap-2">
-        <span className="text-amber-400">◆</span> High-Danger Shot Map
+        <span className="text-amber-400">◆</span> Shot Map
         <span className="ml-auto normal-case font-normal text-slate-500 flex items-center gap-3">
           <span><span className="text-amber-400">●</span> Goal</span>
           <span><span className="text-sky-400">●</span> {data.away.name}</span>
           <span><span className="text-rose-400">●</span> {data.home.name}</span>
         </span>
       </div>
-      <p className="px-4 pt-3 text-[11px] text-slate-500">Every goal, plus every high-danger scoring chance — not the full shot volume (see Shot Locations below for the complete zone breakdown).</p>
       <div className="p-4 flex flex-wrap gap-4">
         <Rink dots={away} side="away" name={data.away.name} />
         <Rink dots={home} side="home" name={data.home.name} />
@@ -655,16 +656,39 @@ export default function GameView({ data }: { data: Data }) {
     ["Blocked shots", teamSum(data.away, "blocks"), teamSum(data.home, "blocks")],
   ];
 
+  // period score string: "(1-0, 2-1, 1-0)"
+  const periodScoreStr = (() => {
+    const maxP = Math.max(data.home.goalsByPeriod.length, data.away.goalsByPeriod.length);
+    if (!maxP) return null;
+    const parts = [];
+    for (let i = 0; i < maxP; i++) {
+      const a = data.away.goalsByPeriod[i] ?? 0;
+      const h = data.home.goalsByPeriod[i] ?? 0;
+      parts.push(`${a}-${h}`);
+    }
+    return `(${parts.join(", ")})`;
+  })();
+
+  const isPlayoff = data.seriesId != null;
+  const badgeLabel = isPlayoff
+    ? `PLAYOFF GAME${data.gameNum != null ? ` ${data.gameNum}` : ""}`
+    : "REGULAR SEASON GAME";
+
   const TeamHeader = ({ side, align }: { side: Side; align: "left" | "right" }) => (
     <div className={`flex items-center gap-4 ${align === "right" ? "flex-row-reverse text-right" : ""}`}>
-      {side.logoUrl && <img src={side.logoUrl} alt="" className="w-14 h-14 object-contain" />}
-      <Link href={`/teams/${side.slug}`} className="text-xl font-bold hover:text-blue-400">{side.name}</Link>
-      <div className={`text-4xl font-black tabular-nums ${align === "right" ? "mr-auto" : "ml-auto"}`}>{side.goals}</div>
+      {side.logoUrl && <img src={side.logoUrl} alt="" className="w-16 h-16 object-contain" />}
+      <div className={`flex flex-col ${align === "right" ? "items-end" : "items-start"}`}>
+        <Link href={`/teams/${side.slug}`} className="text-xl font-bold hover:text-blue-400 leading-tight">{side.name}</Link>
+        {side.record && (
+          <span className="text-xs text-slate-500 tabular-nums mt-0.5">{side.record.w}-{side.record.l}-{side.record.otl}</span>
+        )}
+      </div>
+      <div className={`text-5xl font-black tabular-nums ${align === "right" ? "mr-auto" : "ml-auto"}`}>{side.goals}</div>
     </div>
   );
 
   return (
-    <div className="max-w-5xl mx-auto px-4 space-y-6 pb-16">
+    <div className="max-w-[1360px] mx-auto px-4 space-y-6 pb-16">
       <button
         onClick={() => { if (typeof window !== "undefined" && window.history.length > 1) router.back(); else router.push("/scores"); }}
         className="text-sm text-slate-400 hover:text-blue-400"
@@ -672,11 +696,17 @@ export default function GameView({ data }: { data: Data }) {
 
       {/* scoreboard */}
       <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 sm:p-6">
+        <div className="text-center text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-1">{badgeLabel}</div>
         <div className="text-center text-xs font-bold text-amber-400 tracking-widest mb-3 sm:mb-4">{finalTag}</div>
         {/* Desktop view */}
         <div className="hidden sm:grid sm:grid-cols-[1fr_auto_1fr] items-center gap-6">
           <TeamHeader side={data.away} align="left" />
-          <div className="text-slate-600 font-bold">@</div>
+          <div className="text-center">
+            <div className="text-slate-600 font-bold text-lg">@</div>
+            {periodScoreStr && (
+              <div className="text-xs text-slate-500 tabular-nums mt-1 whitespace-nowrap">{periodScoreStr}</div>
+            )}
+          </div>
           <TeamHeader side={data.home} align="right" />
         </div>
         {/* Mobile view */}
@@ -684,17 +714,26 @@ export default function GameView({ data }: { data: Data }) {
           <div className="flex items-center justify-between gap-3 bg-slate-800/40 p-3 rounded-lg border border-slate-800/60">
             <div className="flex items-center gap-3 min-w-0">
               {data.away.logoUrl && <img src={data.away.logoUrl} alt="" className="w-10 h-10 object-contain shrink-0" />}
-              <Link href={`/teams/${data.away.slug}`} className="text-base font-bold hover:text-blue-400 truncate">{data.away.name}</Link>
+              <div>
+                <Link href={`/teams/${data.away.slug}`} className="text-base font-bold hover:text-blue-400 truncate block">{data.away.name}</Link>
+                {data.away.record && <span className="text-[11px] text-slate-500 tabular-nums">{data.away.record.w}-{data.away.record.l}-{data.away.record.otl}</span>}
+              </div>
             </div>
             <div className="text-2xl font-black tabular-nums shrink-0">{data.away.goals}</div>
           </div>
           <div className="flex items-center justify-between gap-3 bg-slate-800/40 p-3 rounded-lg border border-slate-800/60">
             <div className="flex items-center gap-3 min-w-0">
               {data.home.logoUrl && <img src={data.home.logoUrl} alt="" className="w-10 h-10 object-contain shrink-0" />}
-              <Link href={`/teams/${data.home.slug}`} className="text-base font-bold hover:text-blue-400 truncate">{data.home.name}</Link>
+              <div>
+                <Link href={`/teams/${data.home.slug}`} className="text-base font-bold hover:text-blue-400 truncate block">{data.home.name}</Link>
+                {data.home.record && <span className="text-[11px] text-slate-500 tabular-nums">{data.home.record.w}-{data.home.record.l}-{data.home.record.otl}</span>}
+              </div>
             </div>
             <div className="text-2xl font-black tabular-nums shrink-0">{data.home.goals}</div>
           </div>
+          {periodScoreStr && (
+            <div className="text-center text-xs text-slate-500 tabular-nums">{periodScoreStr}</div>
+          )}
         </div>
 
         {data.event && (
@@ -717,6 +756,7 @@ export default function GameView({ data }: { data: Data }) {
       </div>
 
       {/* tab bar */}
+
       <div className="flex gap-5 border-b border-slate-800 overflow-x-auto overflow-y-hidden justify-center">
         {tabs.map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)}
@@ -879,13 +919,13 @@ export default function GameView({ data }: { data: Data }) {
         <div className="space-y-6">
           <GameReportCard report={data.story.report} />
           {data.story.flow.points.length > 2 && <GameFlowChart flow={data.story.flow} />}
+          <ShotChartPanel data={data} />
           <EdgePanel data={data} />
         </div>
       )}
 
       {tab === "stats" && (
         <div className="space-y-10">
-          <ShotChartPanel data={data} />
           <div className="space-y-4"><h2 className="text-xl font-bold">{data.away.name}</h2><SkaterTable side={data.away} /><GoalieBlock side={data.away} /></div>
           <div className="space-y-4"><h2 className="text-xl font-bold">{data.home.name}</h2><SkaterTable side={data.home} /><GoalieBlock side={data.home} /></div>
         </div>

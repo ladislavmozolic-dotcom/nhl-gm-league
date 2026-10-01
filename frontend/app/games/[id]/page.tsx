@@ -718,12 +718,21 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
     }));
 
   const story = game.status === "FINAL" ? await gameStory(game.id).catch(() => null) : null;
+
+  // Team W-L-OTL records for the hero scoreboard
+  const teamStandings = await computeStandings(game.season, game.league ?? "NHL").catch(() => []);
+  const homeSt = teamStandings.find((s) => s.teamId === game.homeTeamId);
+  const awaySt = teamStandings.find((s) => s.teamId === game.awayTeamId);
+
   let runningHomeScore = 0;
   let runningAwayScore = 0;
 
   const data = {
     id: game.id,
     endedIn: game.endedIn ?? "REG",
+    seriesId: game.seriesId ?? null,
+    gameNum: game.gameNum ?? null,
+    round: game.round ?? null,
     home: {
       ...teamMeta(game.homeTeam), goals: game.homeGoals ?? 0, shots: game.homeShots ?? 0,
       xg: game.homeXg ?? null, hd: game.homeHd ?? null,
@@ -733,6 +742,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
       goalsByPeriod: game.homeGoalsByPeriod, shotsByPeriod: game.homeShotsByPeriod,
       skaters: skaters(game.homeTeamId), goalies: goalies(game.homeTeamId), lines: homeLines,
       shotDots: shotDots(game.homeTeamId),
+      record: homeSt ? { w: homeSt.w, l: homeSt.l, otl: homeSt.otl } : null,
     },
     away: {
       ...teamMeta(game.awayTeam), goals: game.awayGoals ?? 0, shots: game.awayShots ?? 0,
@@ -743,6 +753,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
       goalsByPeriod: game.awayGoalsByPeriod, shotsByPeriod: game.awayShotsByPeriod,
       skaters: skaters(game.awayTeamId), goalies: goalies(game.awayTeamId), lines: awayLines,
       shotDots: shotDots(game.awayTeamId),
+      record: awaySt ? { w: awaySt.w, l: awaySt.l, otl: awaySt.otl } : null,
     },
     homeTeamId: game.homeTeamId,
     awayTeamId: game.awayTeamId,

@@ -31,29 +31,32 @@ export default function GameFlowChart({ flow }: { flow: GameFlow }) {
         <text x={6} y={padT + 10} className="fill-sky-400" fontSize={12} fontWeight="700">{flow.homeCode} ▲</text>
         <text x={6} y={padT + plotH - 2} className="fill-rose-400" fontSize={12} fontWeight="700">{flow.awayCode} ▼</text>
         {/* midline + period dividers */}
-        <line x1={padL} y1={mid} x2={W - padR} y2={mid} stroke="#475569" strokeWidth={1} />
-        {periodLines.map((t) => <line key={t} x1={xOf(t)} y1={padT} x2={xOf(t)} y2={padT + plotH} stroke="#1e293b" strokeWidth={1} strokeDasharray="3 3" />)}
-        {[0, 1, 2].map((i) => <text key={i} x={xOf(i * 1200 + 600)} y={H - 8} textAnchor="middle" className="fill-slate-600" fontSize={11}>{`${i + 1}${["st", "nd", "rd"][i]}`}</text>)}
-        {totalSec > 3600 && <text x={xOf(3600 + 300)} y={H - 8} textAnchor="middle" className="fill-slate-600" fontSize={11}>OT</text>}
+        <line x1={padL} y1={mid} x2={W - padR} y2={mid} stroke="#475569" strokeWidth={1} strokeOpacity={0.7} />
+        {periodLines.map((t) => <line key={t} x1={xOf(t)} y1={padT} x2={xOf(t)} y2={padT + plotH} stroke="#334155" strokeWidth={1.2} strokeDasharray="3 3" />)}
+        {[0, 1, 2].map((i) => <text key={i} x={xOf(i * 1200 + 600)} y={H - 8} textAnchor="middle" className="fill-slate-500 font-semibold" fontSize={11}>{`${i + 1}${["st", "nd", "rd"][i]} Period`}</text>)}
+        {totalSec > 3600 && <text x={xOf(3600 + 300)} y={H - 8} textAnchor="middle" className="fill-slate-500 font-semibold" fontSize={11}>OT</text>}
 
-        {/* advantage area + line */}
-        <path d={area} fill="url(#flowgrad)" opacity={0.5} />
         <defs>
+          <clipPath id="chartAreaClip">
+            <rect x={padL} y={padT} width={plotW} height={plotH} />
+          </clipPath>
           <linearGradient id="flowgrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.55" />
+            <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.6" />
             <stop offset="50%" stopColor="#38bdf8" stopOpacity="0.05" />
             <stop offset="50%" stopColor="#fb7185" stopOpacity="0.05" />
-            <stop offset="100%" stopColor="#fb7185" stopOpacity="0.55" />
+            <stop offset="100%" stopColor="#fb7185" stopOpacity="0.6" />
           </linearGradient>
         </defs>
-        <path d={line} fill="none" stroke="#e2e8f0" strokeWidth={2} strokeLinejoin="round" />
 
-        {/* goal markers */}
-        {flow.goals.map((g, i) => (
-          <g key={i}>
-            <circle cx={xOf(g.t)} cy={g.home ? padT + 6 : padT + plotH - 6} r={4} fill={g.home ? "#38bdf8" : "#fb7185"} stroke="#0f172a" strokeWidth={1} />
-          </g>
-        ))}
+        {/* advantage area + line strictly clipped */}
+        <g clipPath="url(#chartAreaClip)">
+          <path d={area} fill="url(#flowgrad)" opacity={0.65} />
+          <path d={line} fill="none" stroke="#f1f5f9" strokeWidth={2.2} strokeLinejoin="round" />
+          {/* goal markers */}
+          {flow.goals.map((g, i) => (
+            <circle key={i} cx={xOf(g.t)} cy={g.home ? padT + 6 : padT + plotH - 6} r={4.5} fill={g.home ? "#38bdf8" : "#fb7185"} stroke="#0f172a" strokeWidth={1.5} />
+          ))}
+        </g>
 
         {/* clickable bins */}
         {flow.bins.map((b, i) => (
