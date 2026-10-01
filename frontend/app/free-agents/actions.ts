@@ -1218,12 +1218,19 @@ export async function extendContractAction(
   const clause = grantClause && ["NTC", "NMC", "M_NTC"].includes(grantClause) ? grantClause : null;
   const breadth = clause === "M_NTC" ? ([6, 12, 18, 24].includes(mNtcBreadth ?? 0) ? mNtcBreadth! : 12) : null;
   const dep: Deployment = { line: clampLine(line), pp, pk };
-  const ev = await evaluateTeamOffer(playerId, teamId, salary, years, dep, undefined, undefined, undefined, { clause, breadth });
+  let ev = await evaluateTeamOffer(playerId, teamId, salary, years, dep, undefined, undefined, undefined, { clause, breadth });
   if (!ev) return { ok: false as const, error: "Could not value the player." };
   const team = await prisma.team.findUnique({ where: { id: teamId }, select: { code: true, slug: true } });
 
   const bumped = !ev.acceptable ? await recordLowball(playerId, teamId, salary, ev.ask.salary) : null;
   const insult = bumped ? ` 😠 The lowball insulted him — his ask to your club is now about ${Math.round((bumped - 1) * 100)}% higher.` : "";
+  // this rejection just raised his bump — re-value against the club NOW so the counter
+  // he throws back (and the floor/range we show) already reflects the higher ask,
+  // instead of the stale figure from before the insult was recorded.
+  if (bumped) {
+    const freshEv = await evaluateTeamOffer(playerId, teamId, salary, years, dep, undefined, undefined, undefined, { clause, breadth });
+    if (freshEv) ev = freshEv;
+  }
   if (!ev.acceptable) {
     // structured re-sign. He counters every rejected offer, never an instant walk.
     // UFA / franchise RFA: 2 rounds, then walks (UFA → free agency, franchise RFA →
