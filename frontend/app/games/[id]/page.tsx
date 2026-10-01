@@ -854,8 +854,10 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
 
   return (
     <>
-      <GameView data={data} />
-      {game.status === "FINAL" && (await getTeamSession()) != null && <PostGameIntelCard gameId={game.id} />}
+      <GameView
+        data={data}
+        intelSlot={game.status === "FINAL" && (await getTeamSession()) != null ? <PostGameIntelCard gameId={game.id} /> : undefined}
+      />
       {game.status === "FINAL" && (
         <GameIntegrity
           engineVersion={game.engineVersion}

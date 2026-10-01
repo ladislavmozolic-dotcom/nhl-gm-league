@@ -138,27 +138,41 @@ function threeStars(data: Data) {
 }
 
 // ---- small pieces -----------------------------------------------------------
-function Linescore({ title, side, home, field }: { title: string; side: Data; home: Side; field: "goalsByPeriod" | "shotsByPeriod" }) {
+// ---- small pieces -----------------------------------------------------------
+function Linescore({ title, sub, side, home, field }: { title: string; sub: string; side: Data; home: Side; field: "goalsByPeriod" | "shotsByPeriod" }) {
   const a = side.away[field], h = home[field];
   const hasOT = (a[3] ?? 0) > 0 || (h[3] ?? 0) > 0;
   const heads = hasOT ? ["1", "2", "3", "OT"] : ["1", "2", "3"];
   const idxs = heads.map((_, i) => i);
   const sum = (arr: number[]) => arr.reduce((x, y) => x + y, 0);
-  const Row = ({ name, arr }: { name: string; arr: number[] }) => (
-    <tr className="border-t border-slate-700/50">
-      <td className="py-1.5 pr-4 text-slate-200">{name}</td>
-      {idxs.map((c) => <td key={c} className="py-1.5 px-3 text-center tabular-nums text-slate-300">{arr[c] ?? 0}</td>)}
-      <td className="py-1.5 pl-3 text-center font-bold tabular-nums">{sum(arr)}</td>
+  const Row = ({ name, dotColor, arr }: { name: string; dotColor: string; arr: number[] }) => (
+    <tr className="hover:bg-slate-800/20 border-t border-slate-800/60 font-mono">
+      <td className="py-2.5 font-sans font-bold text-white flex items-center gap-2">
+        <span className={`w-2 h-2 rounded-full ${dotColor}`} />
+        <span>{name}</span>
+      </td>
+      {idxs.map((c) => <td key={c} className="py-2.5 px-3 text-center tabular-nums text-slate-300">{arr[c] ?? 0}</td>)}
+      <td className="py-2.5 pl-3 text-center font-black text-white text-base tabular-nums">{sum(arr)}</td>
     </tr>
   );
   return (
     <div>
-      <div className="text-sm font-semibold text-slate-400 mb-2">{title}</div>
+      <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center justify-between">
+        <span>{title}</span>
+        <span className="text-[11px] text-slate-500 font-mono">{sub}</span>
+      </div>
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-slate-500 text-xs"><th />{heads.map((x) => <th key={x} className="px-3 font-medium">{x}</th>)}<th className="pl-3 font-bold text-slate-300">T</th></tr>
+          <tr className="text-slate-500 text-xs border-b border-slate-800/80">
+            <th className="text-left font-medium pb-2 text-slate-400">Tím</th>
+            {heads.map((x) => <th key={x} className="text-center font-medium pb-2 px-3 w-10">{x}</th>)}
+            <th className="text-center font-black pb-2 pl-3 w-12 text-slate-200">T</th>
+          </tr>
         </thead>
-        <tbody><Row name={side.away.name} arr={a} /><Row name={home.name} arr={h} /></tbody>
+        <tbody>
+          <Row name={side.away.name} dotColor="bg-sky-400" arr={a} />
+          <Row name={home.name} dotColor="bg-rose-500" arr={h} />
+        </tbody>
       </table>
     </div>
   );
@@ -614,8 +628,9 @@ function EdgePanel({ data }: { data: Data }) {
 }
 
 // ---- main view --------------------------------------------------------------
-export default function GameView({ data }: { data: Data }) {
+export default function GameView({ data, intelSlot }: { data: Data; intelSlot?: React.ReactNode }) {
   const [tab, setTab] = useState("summary");
+  const [metric, setMetric] = useState<"shots" | "goals" | "pp" | "hits" | "fo" | "blocks" | "xg">("shots");
   const router = useRouter();
   const tabs = [
     { id: "summary", label: "Summary" },
@@ -669,90 +684,153 @@ export default function GameView({ data }: { data: Data }) {
     return `(${parts.join(", ")})`;
   })();
 
+  const metricData = (() => {
+    switch (metric) {
+      case "goals": return { title: "Góly (Goals)", valA: data.away.goals, valH: data.home.goals, rawA: data.away.goals, rawH: data.home.goals };
+      case "pp": return { title: "Presilovky (Power Play)", valA: `${ppFor(data.awayTeamId)}/${ppOpp(data.awayTeamId)}`, valH: `${ppFor(data.homeTeamId)}/${ppOpp(data.homeTeamId)}`, rawA: ppFor(data.awayTeamId), rawH: ppFor(data.homeTeamId) };
+      case "hits": return { title: "Bodyčeky (Hits)", valA: teamSum(data.away, "hits"), valH: teamSum(data.home, "hits"), rawA: teamSum(data.away, "hits"), rawH: teamSum(data.home, "hits") };
+      case "fo": return { title: "Vhadzovania (Faceoff %)", valA: foPct(data.away), valH: foPct(data.home), rawA: teamSum(data.away, "faceoffWins"), rawH: teamSum(data.home, "faceoffWins") };
+      case "blocks": return { title: "Zblokované strely (Blocks)", valA: teamSum(data.away, "blocks"), valH: teamSum(data.home, "blocks"), rawA: teamSum(data.away, "blocks"), rawH: teamSum(data.home, "blocks") };
+      case "xg": return { title: "Očakávané góly (xG)", valA: (data.away.xg ?? 0).toFixed(2), valH: (data.home.xg ?? 0).toFixed(2), rawA: data.away.xg ?? 0, rawH: data.home.xg ?? 0 };
+      default: return { title: "Strely na bránu (Shots on Goal)", valA: data.away.shots, valH: data.home.shots, rawA: data.away.shots, rawH: data.home.shots };
+    }
+  })();
+  const mTot = (Number(metricData.rawA) || 0) + (Number(metricData.rawH) || 0);
+  const mPctA = mTot > 0 ? Math.round(((Number(metricData.rawA) || 0) / mTot) * 100) : 50;
+  const mPctH = 100 - mPctA;
   const isPlayoff = data.seriesId != null;
   const badgeLabel = isPlayoff
     ? `PLAYOFF GAME${data.gameNum != null ? ` ${data.gameNum}` : ""}`
     : "REGULAR SEASON GAME";
 
-  const TeamHeader = ({ side, align }: { side: Side; align: "left" | "right" }) => (
-    <div className={`flex items-center gap-4 ${align === "right" ? "flex-row-reverse text-right" : ""}`}>
-      {side.logoUrl && <img src={side.logoUrl} alt="" className="w-16 h-16 object-contain" />}
-      <div className={`flex flex-col ${align === "right" ? "items-end" : "items-start"}`}>
-        <Link href={`/teams/${side.slug}`} className="text-xl font-bold hover:text-blue-400 leading-tight">{side.name}</Link>
-        {side.record && (
-          <span className="text-xs text-slate-500 tabular-nums mt-0.5">{side.record.w}-{side.record.l}-{side.record.otl}</span>
-        )}
-      </div>
-      <div className={`text-5xl font-black tabular-nums ${align === "right" ? "mr-auto" : "ml-auto"}`}>{side.goals}</div>
-    </div>
-  );
-
   return (
-    <div className="max-w-[1360px] mx-auto px-4 space-y-6 pb-16">
-      <button
-        onClick={() => { if (typeof window !== "undefined" && window.history.length > 1) router.back(); else router.push("/scores"); }}
-        className="text-sm text-slate-400 hover:text-blue-400"
-      >← Back</button>
+    <div className="max-w-[1360px] mx-auto px-2 sm:px-4 space-y-6 pb-16">
+      <div className="flex items-center justify-between text-xs text-slate-400">
+        <button
+          onClick={() => { if (typeof window !== "undefined" && window.history.length > 1) router.back(); else router.push("/scores"); }}
+          className="hover:text-sky-400 transition-colors flex items-center gap-1 font-semibold"
+        >← Späť na Zápasy</button>
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-[11px] font-semibold">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> {finalTag}
+        </span>
+      </div>
 
-      {/* scoreboard */}
-      <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 sm:p-6">
-        <div className="text-center text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-1">{badgeLabel}</div>
-        <div className="text-center text-xs font-bold text-amber-400 tracking-widest mb-3 sm:mb-4">{finalTag}</div>
-        {/* Desktop view */}
-        <div className="hidden sm:grid sm:grid-cols-[1fr_auto_1fr] items-center gap-6">
-          <TeamHeader side={data.away} align="left" />
-          <div className="text-center">
-            <div className="text-slate-600 font-bold text-lg">@</div>
+      {/* 1. HERO SCOREBOARD */}
+      <div className="relative bg-gradient-to-b from-[#0f172a]/95 via-[#0b1120] to-[#070b12] border border-slate-800/90 rounded-2xl overflow-hidden shadow-2xl p-5 sm:p-7">
+        <div className="relative text-center mb-6">
+          <span className="text-[11px] font-extrabold uppercase tracking-[0.25em] text-slate-300 bg-slate-900/90 px-4 py-1.5 rounded-full border border-slate-700/60 shadow-inner">
+            {badgeLabel}
+          </span>
+        </div>
+
+        <div className="relative grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-8">
+          {/* Away Team */}
+          <div className="flex flex-col sm:flex-row items-center sm:justify-end gap-3 sm:gap-5 text-center sm:text-right">
+            <div className="order-2 sm:order-1">
+              <Link href={`/teams/${data.away.slug}`} className="text-lg sm:text-2xl font-black text-white hover:text-sky-400 transition-colors tracking-wide uppercase block">{data.away.name}</Link>
+              {data.away.record && (
+                <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-slate-900/90 border border-slate-700/80 text-xs font-mono font-bold text-slate-200">
+                  <span className="text-slate-500 font-normal">REC</span> {data.away.record.w}-{data.away.record.l}-{data.away.record.otl}
+                </div>
+              )}
+            </div>
+            <div className="order-1 sm:order-2 w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-slate-800/50 border border-slate-700/60 p-2.5 flex items-center justify-center shadow-lg shrink-0">
+              {data.away.logoUrl && <img src={data.away.logoUrl} alt={data.away.name} className="w-full h-full object-contain filter drop-shadow" />}
+            </div>
+          </div>
+
+          {/* Center Score */}
+          <div className="flex flex-col items-center justify-center px-2 sm:px-6">
+            <div className="flex items-center gap-3 sm:gap-5">
+              <span className="text-4xl sm:text-6xl font-black tabular-nums tracking-tight text-white">{data.away.goals}</span>
+              <span className="text-xl sm:text-3xl font-light text-slate-600">—</span>
+              <span className="text-4xl sm:text-6xl font-black tabular-nums tracking-tight text-white">{data.home.goals}</span>
+            </div>
+            <div className="mt-2 inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold uppercase tracking-widest">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> {finalTag}
+            </div>
             {periodScoreStr && (
-              <div className="text-xs text-slate-500 tabular-nums mt-1 whitespace-nowrap">{periodScoreStr}</div>
+              <div className="mt-2 text-xs font-mono font-medium text-slate-400">
+                {periodScoreStr}
+              </div>
             )}
           </div>
-          <TeamHeader side={data.home} align="right" />
-        </div>
-        {/* Mobile view */}
-        <div className="sm:hidden flex flex-col gap-2.5">
-          <div className="flex items-center justify-between gap-3 bg-slate-800/40 p-3 rounded-lg border border-slate-800/60">
-            <div className="flex items-center gap-3 min-w-0">
-              {data.away.logoUrl && <img src={data.away.logoUrl} alt="" className="w-10 h-10 object-contain shrink-0" />}
-              <div>
-                <Link href={`/teams/${data.away.slug}`} className="text-base font-bold hover:text-blue-400 truncate block">{data.away.name}</Link>
-                {data.away.record && <span className="text-[11px] text-slate-500 tabular-nums">{data.away.record.w}-{data.away.record.l}-{data.away.record.otl}</span>}
-              </div>
+
+          {/* Home Team */}
+          <div className="flex flex-col sm:flex-row items-center sm:justify-start gap-3 sm:gap-5 text-center sm:text-left">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-slate-800/50 border border-slate-700/60 p-2.5 flex items-center justify-center shadow-lg shrink-0">
+              {data.home.logoUrl && <img src={data.home.logoUrl} alt={data.home.name} className="w-full h-full object-contain filter drop-shadow" />}
             </div>
-            <div className="text-2xl font-black tabular-nums shrink-0">{data.away.goals}</div>
-          </div>
-          <div className="flex items-center justify-between gap-3 bg-slate-800/40 p-3 rounded-lg border border-slate-800/60">
-            <div className="flex items-center gap-3 min-w-0">
-              {data.home.logoUrl && <img src={data.home.logoUrl} alt="" className="w-10 h-10 object-contain shrink-0" />}
-              <div>
-                <Link href={`/teams/${data.home.slug}`} className="text-base font-bold hover:text-blue-400 truncate block">{data.home.name}</Link>
-                {data.home.record && <span className="text-[11px] text-slate-500 tabular-nums">{data.home.record.w}-{data.home.record.l}-{data.home.record.otl}</span>}
-              </div>
+            <div>
+              <Link href={`/teams/${data.home.slug}`} className="text-lg sm:text-2xl font-black text-white hover:text-sky-400 transition-colors tracking-wide uppercase block">{data.home.name}</Link>
+              {data.home.record && (
+                <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-slate-900/90 border border-slate-700/80 text-xs font-mono font-bold text-slate-200">
+                  <span className="text-slate-500 font-normal">REC</span> {data.home.record.w}-{data.home.record.l}-{data.home.record.otl}
+                </div>
+              )}
             </div>
-            <div className="text-2xl font-black tabular-nums shrink-0">{data.home.goals}</div>
           </div>
-          {periodScoreStr && (
-            <div className="text-center text-xs text-slate-500 tabular-nums">{periodScoreStr}</div>
-          )}
         </div>
 
-        {data.event && (
-          <div className="text-center mt-3 pt-3 border-t border-slate-800/60">
-            <span className="inline-flex items-center gap-2 rounded-full border border-amber-500/40 bg-amber-500/10 pl-1 pr-3 py-1 text-xs font-bold text-amber-300"><EventBadge kind={data.event.kind} title={data.event.title} venue={data.event.venue} size={48} />{data.event.title}</span>
-          </div>
-        )}
-        {(data.arena || data.attendance != null) && (
-          <div className="text-center text-xs text-slate-400 mt-3 pt-3 border-t border-slate-800/60 flex items-center justify-center flex-wrap gap-x-3 gap-y-1">
+        {/* Footer Info inside Scoreboard */}
+        <div className="mt-6 pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-center sm:justify-between text-xs text-slate-400 gap-3">
+          <div className="flex items-center gap-4 flex-wrap">
             {data.arena && <span>🏟️ {data.arena}</span>}
-            {data.attendance != null && <span>👥 {data.attendance.toLocaleString()} fans</span>}
+            {data.attendance != null && <span>👥 {data.attendance.toLocaleString()} fanúšikov</span>}
           </div>
-        )}
-        {!!data.officials?.length && (
-          <div className="text-center text-[11px] text-slate-500 mt-1.5 flex items-center justify-center flex-wrap gap-x-3 gap-y-1">
-            <Link href="/league/officials" className="hover:text-slate-300">🦓 Referees: {data.officials.filter((o) => o.role === "REF").map((o) => `${o.name}${o.number ? ` #${o.number}` : ""}`).join(", ")}</Link>
-            <span>Linesmen: {data.officials.filter((o) => o.role !== "REF").map((o) => `${o.name}${o.number ? ` #${o.number}` : ""}`).join(", ")}</span>
+          {!!data.officials?.length && (
+            <div className="text-[11px] text-slate-400 flex items-center gap-3 flex-wrap">
+              <span>🦓 Rozhodcovia: {data.officials.map((o) => `${o.name}${o.number ? ` (#${o.number})` : ""}`).join(", ")}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 2. COMPARATIVE STATS BAR */}
+      <div className="bg-[#0b1120]/80 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+          <div className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+            <span className="w-2 h-2 rounded bg-sky-400"></span> Kľúčové tímové porovnanie
           </div>
-        )}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+            {(["shots", "goals", "pp", "hits", "fo", "blocks", "xg"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMetric(m)}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all uppercase ${metric === m ? "bg-sky-500 text-white shadow-sm" : "bg-slate-800 text-slate-400 hover:text-white"}`}
+              >
+                {m === "fo" ? "FO %" : m}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-slate-950/70 rounded-xl p-3.5 border border-slate-800/80">
+          <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider mb-2">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-sky-400"></span>
+              <span className="text-white font-extrabold">{data.away.code ?? data.away.name}</span>
+              <span className="text-base font-black text-sky-400 ml-1 tabular-nums">{metricData.valA}</span>
+            </div>
+            <span className="text-slate-400 text-xs font-semibold normal-case">{metricData.title}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-base font-black text-rose-400 mr-1 tabular-nums">{metricData.valH}</span>
+              <span className="text-white font-extrabold">{data.home.code ?? data.home.name}</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+            </div>
+          </div>
+
+          <div className="relative h-4 bg-slate-900 rounded-full overflow-hidden flex border border-slate-800 p-0.5">
+            <div className="h-full bg-gradient-to-r from-sky-600 to-sky-500 rounded-l-full transition-all duration-500 flex items-center justify-start pl-2" style={{ width: `${mPctA}%` }}>
+              <span className="text-[9px] font-black text-white/90">{mPctA}%</span>
+            </div>
+            <div className="w-0.5 h-full bg-slate-950 z-10"></div>
+            <div className="h-full bg-gradient-to-l from-rose-700 to-rose-600 rounded-r-full transition-all duration-500 flex items-center justify-end pr-2" style={{ width: `${mPctH}%` }}>
+              <span className="text-[9px] font-black text-white/90">{mPctH}%</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* tab bar */}
@@ -768,26 +846,48 @@ export default function GameView({ data }: { data: Data }) {
 
       {tab === "summary" && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-900/40 border border-slate-800 rounded-xl p-5">
-            <Linescore title="GOALS BY PERIOD" side={data} home={data.home} field="goalsByPeriod" />
-            <Linescore title="SHOTS BY PERIOD" side={data} home={data.home} field="shotsByPeriod" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-[#0b1120]/80 border border-slate-800 rounded-2xl p-5 shadow-lg md:divide-x md:divide-slate-800">
+            <div className="pr-0 md:pr-4">
+              <Linescore title="GOALS BY PERIOD" sub="GÓLY" side={data} home={data.home} field="goalsByPeriod" />
+            </div>
+            <div className="pt-4 md:pt-0 md:pl-6">
+              <Linescore title="SHOTS BY PERIOD" sub="STRELY" side={data} home={data.home} field="shotsByPeriod" />
+            </div>
           </div>
 
-          {/* scoring + penalties — side by side (goals left, penalties right), aligned per period */}
-          <div className="bg-slate-900/40 border border-slate-800 rounded-xl overflow-hidden">
-            <div className="grid grid-cols-1 md:grid-cols-2 bg-slate-800/60 text-xs font-bold tracking-wide text-slate-300">
-              <div className="px-4 py-2">GOALS</div><div className="px-4 py-2 hidden md:block md:border-l border-slate-700">PENALTIES</div>
+          {/* scoring + penalties — 2-column split with modern cards */}
+          <div className="bg-[#0b1120]/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+            <div className="grid grid-cols-2 bg-slate-900/95 text-xs font-black tracking-wider text-slate-300 border-b border-slate-800">
+              <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between">
+                <span className="flex items-center gap-2"><span>🚨</span> GOALS (GÓLY)</span>
+                <span className="text-[11px] font-normal text-slate-500 font-mono hidden sm:inline">Priebežný stav & Hráči na ľade</span>
+              </div>
+              <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between border-l border-slate-800 text-slate-300">
+                <span className="flex items-center gap-2"><span>⏱️</span> PENALTIES (VYLÚČENIA)</span>
+                <span className="text-[11px] font-normal text-slate-500 font-mono hidden sm:inline">Tresty & Presilovky</span>
+              </div>
             </div>
+
             {periods.map((p) => {
               const goals = data.goals.filter((g) => g.period === p && g.strength !== "SO");
               const pens = data.penalties.filter((x) => x.period === p);
+              const pGoalsA = goals.filter((g) => g.teamId === data.awayTeamId).length;
+              const pGoalsH = goals.filter((g) => g.teamId === data.homeTeamId).length;
               return (
                 <div key={p} className="border-b border-slate-800 last:border-0">
-                  <div className="px-4 py-1.5 bg-green-950/30 border-l-2 border-green-500 text-xs font-bold text-green-400 uppercase tracking-wide">{periodLabel(p, data.endedIn)}</div>
-                  <div className="grid grid-cols-1 md:grid-cols-2">
+                  <div className="px-4 sm:px-5 py-2.5 bg-emerald-950/30 border-l-4 border-emerald-500 text-xs font-extrabold text-emerald-400 uppercase tracking-widest flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400"></span> {periodLabel(p, data.endedIn)}
+                    </span>
+                    <span className="text-xs font-mono text-emerald-400/90 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded border border-emerald-500/20">
+                      Stav tretiny: {codeOf(data.awayTeamId)} {pGoalsA} – {pGoalsH} {codeOf(data.homeTeamId)}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 divide-x divide-slate-800 text-sm">
                     {/* Goals column */}
-                    <div className="md:border-r border-slate-800">
-                      {goals.length === 0 && <div className="px-4 py-2 text-slate-600 text-sm">—</div>}
+                    <div className="p-3 sm:p-5 space-y-3.5">
+                      {goals.length === 0 && <div className="text-slate-600 text-sm italic py-2 pl-2">V tejto tretine nepadol gól</div>}
                       {goals.map((g, i) => {
                         const tag = strengthTag(g);
                         const homeScored = g.teamId === data.home.teamId;
@@ -796,38 +896,95 @@ export default function GameView({ data }: { data: Data }) {
                         const scoringScore = homeScored ? g.homeScoreAfter : g.awayScoreAfter;
                         const opponentScore = homeScored ? g.awayScoreAfter : g.homeScoreAfter;
                         return (
-                          <div key={i} className="px-4 py-1.5 text-sm leading-snug">
-                            <span title="Score after goal" className="mr-2 inline-flex align-middle whitespace-nowrap rounded border border-slate-700 bg-slate-800/70 px-1.5 py-px text-[10px] font-bold tabular-nums text-slate-300">
-                              {scoringCode} {scoringScore}–{opponentScore} {opponentCode}
-                            </span>
-                            <span className="text-slate-500 tabular-nums mr-2">{mmss(g.seconds)}</span>
-                            <span title="Goal">🚨</span>{" "}
-                            {g.scorerSlug ? <Link href={`/players/${g.scorerSlug}`} className="font-semibold hover:text-blue-400">{cleanName(g.scorerName)}</Link> : <span className="font-semibold">{cleanName(g.scorerName)}</span>}
-                            {g.scorerSeasonGoal != null && <span className="text-amber-400/70" title="Season goal total"> ({g.scorerSeasonGoal})</span>}
-                            {tag && <span className="ml-1 text-[10px] font-bold text-amber-400">({tag})</span>}
-                            {g.assists && g.assists.length > 0 ? (
-                              <span className="text-slate-400"> <span title="Assists">🍎</span> {g.assists.map((a, j) => (
-                                <span key={j}>{a.slug ? <Link href={`/players/${a.slug}`} className="hover:text-blue-400">{cleanName(a.name)}</Link> : cleanName(a.name)}{a.total != null && <span className="text-amber-400/70"> ({a.total})</span>}{j < g.assists!.length - 1 ? ", " : ""}</span>
-                              ))}</span>
-                            ) : !g.emptyNet && <span className="text-slate-600"> (unassisted)</span>}
+                          <div key={i} className="group bg-slate-950/80 hover:bg-slate-900/60 border border-slate-800/90 hover:border-slate-700/80 rounded-xl p-3.5 transition-all shadow-sm">
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-mono font-bold text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">{mmss(g.seconds)}</span>
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-sky-500/20 border border-sky-500/40 text-sky-300 text-xs font-black">
+                                  🏒 {scoringCode}
+                                </span>
+                                {tag && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">{tag}</span>}
+                                {g.scorerSlug ? (
+                                  <Link href={`/players/${g.scorerSlug}`} className="font-black text-base sm:text-lg text-white group-hover:text-sky-400 transition-colors">{cleanName(g.scorerName)}</Link>
+                                ) : (
+                                  <span className="font-black text-base sm:text-lg text-white">{cleanName(g.scorerName)}</span>
+                                )}
+                                {g.scorerSeasonGoal != null && <span className="text-sm font-bold text-amber-400">({g.scorerSeasonGoal})</span>}
+                              </div>
+                              <span className="text-xs font-mono font-extrabold px-2.5 py-1 rounded bg-slate-900 border border-slate-700/70 text-slate-200">
+                                {scoringCode} {scoringScore} – {opponentScore} {opponentCode}
+                              </span>
+                            </div>
+
+                            {/* Assists */}
+                            <div className="text-xs sm:text-sm text-slate-200 flex items-center gap-1.5 mt-1.5 pl-1 font-medium">
+                              {g.assists && g.assists.length > 0 ? (
+                                <>
+                                  <span className="text-amber-400">🍎</span>
+                                  <span>{g.assists.map((a, j) => (
+                                    <span key={j}>
+                                      {a.slug ? <Link href={`/players/${a.slug}`} className="hover:text-sky-400">{cleanName(a.name)}</Link> : cleanName(a.name)}
+                                      {a.total != null && <span className="text-amber-400/80"> ({a.total})</span>}
+                                      {j < g.assists!.length - 1 ? ", " : ""}
+                                    </span>
+                                  ))}</span>
+                                </>
+                              ) : !g.emptyNet ? (
+                                <span className="text-slate-500 italic text-xs">(bez asistencie / unassisted)</span>
+                              ) : null}
+                            </div>
+
+                            {/* On-ice box */}
                             {(g.onIceForNames?.length || g.onIceAgainstNames?.length) ? (
-                              <div className="mt-0.5 text-[10px] text-slate-500 leading-relaxed">
-                                {g.onIceForNames?.length ? <><span className="text-emerald-400/70 font-semibold">ON+</span> {g.onIceForNames.map(cleanName).join(", ")}</> : null}
-                                {g.onIceAgainstNames?.length ? <><span className="text-red-400/60 font-semibold ml-2">ON−</span> {g.onIceAgainstNames.map(cleanName).join(", ")}</> : null}
+                              <div className="mt-2.5 pt-2 border-t border-slate-800/70 flex flex-col gap-1 text-[10px] font-mono leading-tight">
+                                {g.onIceForNames?.length ? (
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="px-1 py-0.2 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold text-[9px]">ON+ {scoringCode}</span>
+                                    <span className="text-slate-400">{g.onIceForNames.map(cleanName).join(", ")}</span>
+                                  </div>
+                                ) : null}
+                                {g.onIceAgainstNames?.length ? (
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="px-1 py-0.2 rounded bg-rose-500/15 border border-rose-500/30 text-rose-400 font-bold text-[9px]">ON− {opponentCode}</span>
+                                    <span className="text-slate-500">{g.onIceAgainstNames.map(cleanName).join(", ")}</span>
+                                  </div>
+                                ) : null}
                               </div>
                             ) : null}
                           </div>
                         );
                       })}
                     </div>
+
                     {/* Penalties column */}
-                    <div>
-                      {pens.length === 0 && <div className="px-4 py-2 text-slate-600 text-sm">—</div>}
+                    <div className="p-3 sm:p-5 bg-slate-950/20 space-y-3.5 text-xs">
+                      {pens.length === 0 && <div className="text-slate-600 text-sm italic py-2 pl-2">Žiadne tresty</div>}
                       {pens.map((x, i) => (
-                        <div key={i} className="px-4 py-1.5 text-sm leading-snug">
-                          <span className="text-slate-500 tabular-nums mr-2">{mmss(x.seconds)}</span>
-                          <span className="font-semibold">{cleanName(x.playerName)}</span> <span className="text-slate-500">({codeOf(x.teamId)})</span> for {x.type}<span className="text-slate-500"> ({x.severity})</span>
-                          {x.offsetting && <span className="ml-1 text-[10px] font-bold text-slate-500" title="No power play — offset by a penalty to the other team at the same stoppage">(offsetting)</span>}
+                        <div key={i} className="group bg-amber-950/10 hover:bg-amber-950/20 border border-amber-500/30 rounded-xl p-3.5 transition-all shadow-sm">
+                          <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">{mmss(x.seconds)}</span>
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-black text-xs border border-slate-700">
+                                {codeOf(x.teamId)}
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-extrabold text-[10px] border border-amber-500/30">{x.minutes} MIN</span>
+                            </div>
+                            {x.givesPP && (
+                              <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                                ⚡ Presilovka pre {codeOf(x.teamId === data.homeTeamId ? data.awayTeamId : data.homeTeamId)}
+                              </span>
+                            )}
+                            {x.offsetting && (
+                              <span className="text-[10px] font-bold text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700">
+                                Vzájomný trest (Offsetting)
+                              </span>
+                            )}
+                          </div>
+                          <div className="pl-1">
+                            <span className="font-bold text-white text-sm group-hover:text-amber-300 transition-colors">{cleanName(x.playerName)}</span>
+                            <span className="text-slate-400 text-xs"> — {x.type}</span>
+                            <span className="text-slate-500 font-mono text-[11px] block mt-0.5">{x.severity} · {x.minutes}:00</span>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -876,39 +1033,50 @@ export default function GameView({ data }: { data: Data }) {
           {/* SHOOTOUT — who shot, and the result of each attempt */}
           <ShootoutView data={data} />
 
-          {/* GOALTENDING — above team stats */}
-          <div>
-            <h2 className="text-lg font-bold mb-3">Goaltending</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-900/40 border border-slate-800 rounded-xl p-5">
-              <GoalieBlock side={data.away} />
-              <GoalieBlock side={data.home} />
-            </div>
-          </div>
-
-          {/* 3 STARS */}
-          <div>
-            <h2 className="text-lg font-bold mb-3">Three Stars</h2>
+          {/* THREE STARS */}
+          <div className="bg-[#0b1120]/80 border border-slate-800 rounded-2xl p-5 shadow-lg">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
+              <span>⭐</span> Three Stars of the Game
+            </h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {stars.map((s, i) => (
-                <div key={i} className="bg-slate-900/50 border border-slate-800 rounded-lg p-4 flex items-center gap-3">
-                  <div className="text-2xl font-black text-amber-400">{"★".repeat(i + 1)}</div>
+                <div key={i} className={`bg-slate-950/80 border ${i === 0 ? "border-amber-500/40" : i === 1 ? "border-slate-600/40" : "border-amber-800/40"} rounded-xl p-3.5 flex items-center gap-3 shadow-sm`}>
+                  <div className={`text-2xl font-black ${i === 0 ? "text-amber-400" : i === 1 ? "text-slate-300" : "text-amber-700"}`}>
+                    {"★".repeat(i + 1)}
+                  </div>
                   <div>
-                    <Link href={`/players/${s.slug ?? s.name}`} className="font-bold hover:text-blue-400">{cleanName(s.name)}</Link>
-                    <div className="text-xs text-slate-400">{nameOf(s.teamId)} · {s.line}</div>
+                    <Link href={`/players/${s.slug ?? s.name}`} className="font-extrabold text-sm text-white hover:text-sky-400 transition-colors block">{cleanName(s.name)}</Link>
+                    <div className="text-xs text-slate-400 font-mono mt-0.5">{nameOf(s.teamId)} · {s.line}</div>
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
+          {/* GOALTENDING */}
+          <div className="bg-[#0b1120]/80 border border-slate-800 rounded-2xl p-5 shadow-lg">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Brankári (Goaltending)</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <GoalieBlock side={data.away} />
+              <GoalieBlock side={data.home} />
+            </div>
+          </div>
+
+          {/* UNHL INTELLIGENCE CARD (POST-GAME) */}
+          {intelSlot && (
+            <div className="bg-[#0b1120]/90 border border-blue-900/50 rounded-2xl p-5 shadow-xl">
+              {intelSlot}
+            </div>
+          )}
+
           {/* TEAM STATS */}
-          <div className="bg-slate-900/40 rounded-lg overflow-hidden border border-slate-800">
-            <div className="grid grid-cols-3 px-4 py-2 text-xs font-bold text-slate-400 bg-slate-800/60">
-              <div>{data.away.name}</div><div className="text-center uppercase tracking-wide">Team Stats</div><div className="text-right">{data.home.name}</div>
+          <div className="bg-[#0b1120]/80 border border-slate-800 rounded-2xl overflow-hidden shadow-lg">
+            <div className="grid grid-cols-3 px-4 py-2.5 text-xs font-bold text-slate-300 bg-slate-900/80 border-b border-slate-800 uppercase tracking-wide">
+              <div>{data.away.name}</div><div className="text-center font-mono">Team Stats</div><div className="text-right">{data.home.name}</div>
             </div>
             {teamRows.map(([k, a, h]) => (
-              <div key={k} className="grid grid-cols-3 px-4 py-2 text-sm border-t border-slate-800 items-center">
-                <div className="font-bold tabular-nums">{a}</div><div className="text-center text-slate-400">{k}</div><div className="text-right font-bold tabular-nums">{h}</div>
+              <div key={k} className="grid grid-cols-3 px-4 py-2.5 text-sm border-t border-slate-800/60 items-center font-mono">
+                <div className="font-bold tabular-nums text-white">{a}</div><div className="text-center text-slate-400 font-sans text-xs">{k}</div><div className="text-right font-bold tabular-nums text-white">{h}</div>
               </div>
             ))}
           </div>
