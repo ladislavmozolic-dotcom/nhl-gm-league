@@ -845,10 +845,11 @@ export async function rookieCalculatorRows(): Promise<RookieRow[]> {
     where: {
       isGoalie: false,
       rosterType: "PROSPECT",
+      ltir: false,
     },
     select: {
       id: true, slug: true, name: true, position: true, teamId: true, age: true, nhlId: true,
-      weight: true, edgeSpeed: true, careerGP: true,
+      weight: true, edgeSpeed: true, careerGP: true, ltir: true,
       curSeasonGP: true, curSeasonG: true, curSeasonA: true,
       curSeasonHits: true, curSeasonBlocks: true, curSeasonPM: true,
       curSeasonTK: true, curSeasonGV: true, curSeasonPim: true,
@@ -864,6 +865,8 @@ export async function rookieCalculatorRows(): Promise<RookieRow[]> {
   });
 
   const withProduction = prospects.filter((p) => {
+    if (p.ltir) return false;
+
     // An established NHLer with more than 50 regular season games is not a rookie
     const regGp = (p.careerGP as any)?.reg;
     if (regGp != null && regGp > 50) return false;

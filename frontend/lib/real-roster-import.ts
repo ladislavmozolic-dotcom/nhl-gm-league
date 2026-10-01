@@ -291,7 +291,7 @@ export async function importRealRosters(opts: Options = {}) {
   const realMode = placeIfRealMode && (await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true } }))?.rosterMode === "real";
   const players = await prisma.player.findMany({
     where: onlyMissing ? { realTeamId: null } : {},
-    select: { id: true, name: true, rosterType: true, faDecisionAt: true, capHit: true, teamId: true },
+    select: { id: true, name: true, rosterType: true, faDecisionAt: true, capHit: true, teamId: true, ltir: true },
   });
   // A UFA currently under real in-game negotiation (a standing offer, or mid
   // deliberation) must NOT be silently overwritten by this real-world snapshot —
@@ -326,18 +326,23 @@ export async function importRealRosters(opts: Options = {}) {
     if (!tid) { unmatched.push(pl.name); continue; }
     const underNegotiation = pl.rosterType === "UFA" && (activeOfferIds.has(pl.id) || pl.faDecisionAt != null);
     const farmOnly = pl.capHit === 100_000;
-    const placement = realMode && !underNegotiation
+    const isLtir = pl.ltir === true;
+    const placement = realMode && !underNegotiation && !isLtir
       ? farmOnly
         ? { teamId: affiliateByParent.get(tid) ?? pl.teamId, rosterType: "AHL" as const }
         : { teamId: tid, rosterType: "NHL" as const }
-      : {};
+      : realMode && isLtir
+        ? { teamId: tid, rosterType: "PROSPECT" as const }
+        : {};
     await prisma.player.update({
       where: { id: pl.id },
       // set the real team; if we're live in real mode AND he's not mid-negotiation,
       // also place him now (no finance reset). A legacy $100k deal remains farm-only.
       data: { realTeamId: tid, ...placement },
     });
-    if (placement.rosterType) placedList.push({ name: pl.name, prevRosterType: pl.rosterType ?? "—", team: ab!, rosterType: placement.rosterType });
+    if (placement.rosterType && (placement.rosterType === "NHL" || placement.rosterType === "AHL")) {
+      placedList.push({ name: pl.name, prevRosterType: pl.rosterType ?? "—", team: ab!, rosterType: placement.rosterType });
+    }
     if (underNegotiation) skippedActive++;
     matched++;
   }
