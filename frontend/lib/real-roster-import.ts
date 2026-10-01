@@ -308,6 +308,14 @@ export async function importRealRosters(opts: Options = {}) {
 
   let matched = 0, skippedActive = 0;
   const unmatched: string[] = [];
+  // Every player this run actually MOVED onto a roster (not just tagged with a
+  // realTeamId) — this importer has no SigningLog/Transaction entry of its own
+  // (see the big comment above), so without this list an admin has no way to
+  // find out who just landed on an NHL active roster with zero review. A
+  // dormant player (e.g. one who'd been out of the league for a real-life
+  // reason) reappearing on a real roster after a run with no prior placement
+  // record is exactly the case this is for.
+  const placedList: { name: string; prevRosterType: string; team: string; rosterType: "NHL" | "AHL" }[] = [];
   for (const pl of players) {
     const key = norm(pl.name);
     // exact name first; else a first-initial+last-name match, but only when that
@@ -329,9 +337,10 @@ export async function importRealRosters(opts: Options = {}) {
       // also place him now (no finance reset). A legacy $100k deal remains farm-only.
       data: { realTeamId: tid, ...placement },
     });
+    if (placement.rosterType) placedList.push({ name: pl.name, prevRosterType: pl.rosterType ?? "—", team: ab!, rosterType: placement.rosterType });
     if (underNegotiation) skippedActive++;
     matched++;
   }
 
-  return { ok: true as const, matched, unmatchedCount: unmatched.length, unmatched: unmatched.slice(0, 60), rostersFetched, placed: realMode, skippedActive };
+  return { ok: true as const, matched, unmatchedCount: unmatched.length, unmatched: unmatched.slice(0, 60), rostersFetched, placed: realMode, skippedActive, placedList };
 }

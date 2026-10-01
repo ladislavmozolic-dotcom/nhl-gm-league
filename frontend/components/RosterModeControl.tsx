@@ -9,6 +9,7 @@ export default function RosterModeControl({ mode, realCount, profinhlCount, prof
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
   const [fillMsg, setFillMsg] = useState<string | null>(null);
+  const [placedList, setPlacedList] = useState<{ name: string; prevRosterType: string; team: string; rosterType: "NHL" | "AHL" }[] | null>(null);
   const [confirm, setConfirm] = useState<null | "profinhl" | "real">(null);
 
   const apply = (m: "profinhl" | "real") => start(async () => {
@@ -18,10 +19,11 @@ export default function RosterModeControl({ mode, realCount, profinhlCount, prof
   });
 
   const fill = () => start(async () => {
-    setFillMsg(null);
+    setFillMsg(null); setPlacedList(null);
     const r = await fillRealTeamsAction();
     if (!r.ok) { setFillMsg(`⚠ ${r.error}`); return; }
     setFillMsg(`✅ Matched ${r.matched} player${r.matched === 1 ? "" : "s"} to their real NHL team from ${r.rostersFetched} rosters${r.placed ? " (placed onto teams)" : ""}. ${r.unmatchedCount} still unmatched (not on any current NHL roster).${r.skippedActive ? ` ${r.skippedActive} left untouched — an active free-agent offer/deliberation on file, not silently overwritten.` : ""}`);
+    setPlacedList(r.placedList ?? []);
   });
 
   const fillCaps = () => start(async () => {
@@ -100,6 +102,20 @@ export default function RosterModeControl({ mode, realCount, profinhlCount, prof
           </button>
         </div>
         {fillMsg && <p className={`text-sm mt-3 ${fillMsg.startsWith("⚠") ? "text-rose-400" : "text-emerald-400"}`}>{fillMsg}</p>}
+        {placedList && placedList.length > 0 && (
+          <div className="mt-2 text-xs text-slate-400">
+            <p className="mb-1 text-slate-500">
+              Hráči, ktorých tento beh práve preradil na ich reálny tím — žiadna iná kontrola sa pri tom nerobí, over si ich ručne:
+            </p>
+            <ul className="list-disc pl-5 space-y-0.5">
+              {placedList.map((p, i) => (
+                <li key={i}>
+                  <b className="text-slate-300">{p.name}</b> — {p.prevRosterType} → {p.team} ({p.rosterType})
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );
