@@ -9,7 +9,7 @@ import { CURRENT_SEASON_START, TWO_WAY_AHL_SALARY, capCeilingForPhase, ltirRelie
 import { teamCapCommitted } from "@/lib/cap";
 import {
   loadMarketPool, teamContentionMap, teamChurnMap, teamAsk, evaluateTeamOffer, loadLeagueCap, weakestTeams,
-  recordLowball, clearLowballs, lowballNote,
+  recordLowball, clearLowballs, lowballNote, lowballInsultCount,
   ufaAtExpiry, resignLockedUntil,
 } from "@/lib/free-agency-server";
 import { MAX_TERM, faPosGroup, willingnessNote, twoWayObjection, type Deployment } from "@/lib/free-agency";
@@ -1222,16 +1222,33 @@ export async function extendContractAction(
   if (!ev) return { ok: false as const, error: "Could not value the player." };
   const team = await prisma.team.findUnique({ where: { id: teamId }, select: { code: true, slug: true } });
 
-  const bumped = !ev.acceptable ? await recordLowball(playerId, teamId, salary, ev.ask.salary) : null;
+  // Lowball him twice and his floor stops being enough — from here on with THIS club
+  // he holds out for his full headline ask, not just his bare minimum.
+  const priorInsultCount = await lowballInsultCount(playerId, teamId);
+  const requireFullAsk = priorInsultCount >= 2;
+  let acceptable = requireFullAsk
+    ? salary >= ev.ask.salary && years >= ev.ask.minYears && years <= ev.ask.maxYears
+    : ev.acceptable;
+
+  const bumped = !acceptable ? await recordLowball(playerId, teamId, salary, ev.ask.salary) : null;
   const insult = bumped ? ` 😠 The lowball insulted him — his ask to your club is now about ${Math.round((bumped - 1) * 100)}% higher.` : "";
   // this rejection just raised his bump — re-value against the club NOW so the counter
   // he throws back (and the floor/range we show) already reflects the higher ask,
   // instead of the stale figure from before the insult was recorded.
   if (bumped) {
     const freshEv = await evaluateTeamOffer(playerId, teamId, salary, years, dep, undefined, undefined, undefined, { clause, breadth });
-    if (freshEv) ev = freshEv;
+    if (freshEv) {
+      ev = freshEv;
+      acceptable = requireFullAsk
+        ? salary >= ev.ask.salary && years >= ev.ask.minYears && years <= ev.ask.maxYears
+        : ev.acceptable;
+    }
   }
-  if (!ev.acceptable) {
+  // once this rejection lands, has he now been insulted twice? If so, the counter he
+  // throws back (and any further offer) is judged against his full ask from here on.
+  const countAfterThis = priorInsultCount + (bumped ? 1 : 0);
+  const nextRequiresFullAsk = countAfterThis >= 2;
+  if (!acceptable) {
     // structured re-sign. He counters every rejected offer, never an instant walk.
     // UFA / franchise RFA: 2 rounds, then walks (UFA → free agency, franchise RFA →
     // offer sheets). Regular RFA: 1 round, then he's open to offer sheets — if nobody
@@ -1263,9 +1280,10 @@ export async function extendContractAction(
           : "Two rounds and no deal — he'll test the market when the season ends." + insult,
       };
     }
-    // he counters — kept fuzzy (a range) early on, but on his LAST round before a
-    // walk, he names his exact floor: the GM gets one real number to hit, not a guess.
-    const counterSalary = ev.ask.floorSalary;
+    // he counters — kept fuzzy (a range) early on. On his LAST round before a walk he
+    // names a real number to hit: his floor, UNLESS this club has now lowballed him
+    // twice, in which case floor doesn't cut it any more — it's his full ask or nothing.
+    const counterSalary = nextRequiresFullAsk ? ev.ask.salary : ev.ask.floorSalary;
     const counterYears = Math.min(Math.max(years, ev.ask.minYears), ev.ask.maxYears);
     const isLastRound = !rfaPostOs && nextRound >= maxRounds;
     const bestOffer = Math.max(salary, player.resignOfferSalary ?? 0);
@@ -1276,7 +1294,9 @@ export async function extendContractAction(
       reason: rfaPostOs
         ? `Round ${nextRound} — no more offer sheets, straight talks with your club now. He's countering around ${fmtM(counterSalary)}–${fmtM(counterSalary * 1.06)} over ${counterYears}yr.${insult}`
         : isLastRound
-          ? `Round ${nextRound} of ${maxRounds} — last round. His absolute minimum is ${fmtM(counterSalary)} over ${counterYears}yr — fall short on your final offer and he walks.${insult}`
+          ? nextRequiresFullAsk
+            ? `Round ${nextRound} of ${maxRounds} — last round. Lowballed twice, he won't take a penny under his full ask: ${fmtM(counterSalary)} over ${counterYears}yr — fall short and he walks.${insult}`
+            : `Round ${nextRound} of ${maxRounds} — last round. His absolute minimum is ${fmtM(counterSalary)} over ${counterYears}yr — fall short on your final offer and he walks.${insult}`
           : `Round ${nextRound} of ${maxRounds} — he's countering around ${fmtM(counterSalary)}–${fmtM(counterSalary * 1.06)} over ${counterYears}yr.${insult}`,
       floor: ev.ask.floorSalary, minYears: ev.ask.minYears, maxYears: ev.ask.maxYears,
     };

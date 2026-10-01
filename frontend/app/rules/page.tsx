@@ -143,7 +143,7 @@ const SECTIONS: Sec[] = [
         "\"Release rights\" on Team Contracts (RFAs only) declares you won't extend him: he's priced and treated like a UFA from then on — no RFA discount, no ceiling — and hits the open market the instant his deal runs out, instead of staying tied to you. Reversible any time before he actually expires.",
       ] },
       { h: "What shapes his price", points: [
-        "Lowball insult: undershoot his real floor by too much (a sliding bar — roughly a third on a modest deal, down to about a tenth on a $15M+ one) and he remembers it — his asking price to YOUR club specifically climbs (capped at +25% total) until he signs anywhere. Other clubs aren't affected.",
+        "Lowball insult: undershoot his real floor by too much (a sliding bar — roughly a third on a modest deal, down to about a tenth on a $15M+ one) and he remembers it — his asking price to YOUR club specifically climbs, with room for roughly two such insults before it caps out (never under the commissioner's own 25% floor, more on a cheap contract). Other clubs aren't affected. Insult him twice and floor money stops working — from then on it's his full ask or nothing.",
         "Term pricing: his headline number is calibrated to his preferred length. Offer more or fewer years than that and the price bends — usually up for more term, down for less — EXCEPT a player 35 or older, who runs the other way: a longer deal costs LESS per year (a team-friendly, real-NHL-style extension), while a short 'one more run' year is his most expensive ask.",
         "Promise him a worse role than he wants and he charges a premium, takes a shorter term — and a no-trade clause stops earning him a discount, since he wants to stay free to leave if you don't deliver.",
       ] },
@@ -230,7 +230,9 @@ const SECTIONS: Sec[] = [
         "Putting a player on the Trade Block costs him 8 morale (MO) once. It doesn't recover while he stays listed; once he's off the block (and isn't unhappy) it climbs back — through games, and +1 on every day his club doesn't play, up to the league baseline (50).",
       ] },
       { h: "Negotiating with free agents", points: [
-        "Lowballs have a cost: undershoot his headline ask past a tiered line (33 % on a modest ask, down to just 10 % on a $15M+ one) and he's insulted — his ask to YOUR club specifically goes up by a flat amount tied to that same tier ($500K on a small deal, up to $2M on a huge one), capped at +25 % total, until he signs anywhere. Other clubs aren't affected. Short of that line he'll still settle a touch below his headline number without holding a grudge.",
+        "Lowballs have a cost: undershoot his headline ask past a tiered line (33 % on a modest ask, down to just 10 % on a $15M+ one) and he's insulted — his ask to YOUR club specifically goes up by a flat amount tied to that same tier ($500K on a small deal, up to $2M on a huge one), until he signs anywhere. Other clubs aren't affected. Short of that line he'll still settle a touch below his headline number without holding a grudge.",
+        "That bump always leaves room for roughly two real insults before it caps out — never less than the commissioner's own floor (25 % by default), but it's raised automatically for a cheaper contract, where one bad lowball alone can already be close to 50 %.",
+        "Lowball him twice and floor money stops working from then on: he holds out for his full headline ask, not just his bare minimum, until he signs.",
         "Promise him a worse line than he wants and he charges a premium, takes a shorter deal — and a no-trade clause no longer buys a discount: he wants to be free to move on.",
       ] },
       { h: "Trade deadline", points: [
@@ -529,7 +531,7 @@ const SECTIONS_CS: Sec[] = [
         "„Release rights“ na stránce Team Contracts (jen u RFA) prohlašuje, že hráče neprodloužíte: od té chvíle se oceňuje a chová jako UFA — žádná sleva RFA, žádný strop — a v okamžiku vypršení smlouvy padá rovnou na otevřený trh, místo aby zůstal vázaný na vás. Vratné kdykoliv, dokud mu smlouva skutečně nevyprší.",
       ] },
       { h: "Co ovlivňuje jeho cenu", points: [
-        "Urážka podhozenou nabídkou: podstřelíte-li jeho skutečné minimum o příliš mnoho (klouzavá hranice — zhruba třetina u skromné smlouvy, až kolem desetiny u smlouvy 15M$+), zapamatuje si to — jeho požadavek konkrétně vůči VAŠEMU klubu stoupá (strop +25 % celkem), dokud nepodepíše kdekoliv. Ostatní kluby to neovlivní.",
+        "Urážka podhozenou nabídkou: podstřelíte-li jeho skutečné minimum o příliš mnoho (klouzavá hranice — zhruba třetina u skromné smlouvy, až kolem desetiny u smlouvy 15M$+), zapamatuje si to — jeho požadavek konkrétně vůči VAŠEMU klubu stoupá, s prostorem zhruba pro dvě takové urážky, než narazí na strop (nikdy pod komisařovým vlastním minimem 25 %, u levné smlouvy i víc). Ostatní kluby to neovlivní. Urazíte-li ho dvakrát, peníze za floor přestanou stačit — od té chvíle je to jen jeho plný ask, nebo nic.",
         "Cena podle délky: jeho hlavní číslo je kalibrované na jeho preferovanou délku. Nabídnete-li víc nebo míň let, cena se ohne — obvykle nahoru za víc let, dolů za míň — KROMĚ hráče ve věku 35+, u kterého je to naopak: delší smlouva stojí za rok MÉNĚ (klubu přátelské prodloužení ve stylu reálné NHL), zatímco krátký rok „ještě jednou to zkusit“ je jeho nejdražší požadavek.",
         "Slíbíte-li mu horší roli, než chce, účtuje si prémii a bere kratší smlouvu — a klauzule o nevyměnitelnosti mu už nepřináší slevu, protože chce zůstat volný odejít, pokud mu roli nedodáte.",
       ] },

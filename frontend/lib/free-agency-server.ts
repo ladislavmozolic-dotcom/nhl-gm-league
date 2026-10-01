@@ -583,6 +583,15 @@ export async function lowballBump(playerId: number, teamId: number): Promise<num
   return row.bump;
 }
 
+/** How many times this club has already insulted him with a real lowball — 0 if
+ *  never (or it's aged out). Once this reaches 2, he stops settling for his bare
+ *  floor from this club: see the requireFullAsk check in extendContractAction. */
+export async function lowballInsultCount(playerId: number, teamId: number): Promise<number> {
+  const row = await prisma.faLowball.findUnique({ where: { playerId_teamId: { playerId, teamId } } }).catch(() => null);
+  if (!row || Date.now() - row.updatedAt.getTime() > LOWBALL_MEMORY_DAYS * 86400000) return 0;
+  return row.count;
+}
+
 /** Call AFTER judging an offer against the pre-offer ask (his headline ask AT THIS TERM,
  *  not the discounted floor — see lowballTier). Returns the new bump when this offer
  *  counted as a real insult, else null. */
@@ -592,7 +601,14 @@ export async function recordLowball(playerId: number, teamId: number, salary: nu
   if (salary >= ask * (1 - maxUndershootPct)) return null;
   const s = await loadSettings();
   const prev = await lowballBump(playerId, teamId);
-  const bump = Math.min(1 + s.faLowballMaxBumpPct / 100, prev * (1 + bumpAmount / ask));
+  // The cap always leaves room for roughly TWO real insults before it clamps, whatever
+  // tier he's in. A flat % cap would exhaust itself on a single cheap-contract insult
+  // (bumpAmount is a bigger slice of a $1M ask than of a $10M one — ~50% in one shot
+  // vs ~10%) while barely denting a star's. Never goes below the commissioner's own
+  // floor (faLowballMaxBumpPct) — only raises it when one insult alone would need more.
+  const perInsultPct = bumpAmount / ask;
+  const capPct = Math.max(s.faLowballMaxBumpPct / 100, perInsultPct * 2);
+  const bump = Math.min(1 + capPct, prev * (1 + perInsultPct));
   await prisma.faLowball.upsert({
     where: { playerId_teamId: { playerId, teamId } },
     create: { playerId, teamId, bump, count: 1 },
