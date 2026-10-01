@@ -117,7 +117,7 @@ export const SKATER_PARAM_META: Record<SkaterParamKey, { label: string; name: st
   st: { label: "ST", name: "Strength (weight)", hasFormula: true },
   en: { label: "EN", name: "Endurance", hasFormula: false },
   du: { label: "DU", name: "Durability", hasFormula: false },
-  ph: { label: "PH", name: "Puck Handling", hasFormula: false },
+  ph: { label: "PH", name: "Puck Handling (turnovers / puck actions / takeaways)", hasFormula: true },
   fo: { label: "FO", name: "Faceoffs", hasFormula: false },
   pa: { label: "PA", name: "Passing (assists / 5v5)", hasFormula: true },
   sc: { label: "SC", name: "Scoring (goals / xG)", hasFormula: true },

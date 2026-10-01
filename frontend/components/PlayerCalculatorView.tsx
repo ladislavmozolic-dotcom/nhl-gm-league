@@ -1013,7 +1013,7 @@ export default function PlayerCalculatorView({
       <div className="rounded-xl border border-slate-800/80 bg-slate-900/40 p-4 text-xs text-slate-500 space-y-1.5">
         <p>
           <strong className="text-slate-300">Všetky parametre pripravené na prepočet:</strong>{" "}
-          Zobrazuje kompletných 15 parametrov (CK, FG, DI, SK, ST, EN, DU, PH, FO, PA, SC, DF, PS, EX, LD). Parametre s aktívnymi vzorcami (CK, SC, PA, DF) sú zvýraznené hviezdičkou <span className="text-amber-400 font-bold">*</span>. Ostatné parametre sú pripravené na doplnenie ďalších vzorcov. Prejdením myšou (hover) na hráča sa zobrazí okamžité porovnanie aktuálnych hodnôt a odhadov.
+          Zobrazuje kompletných 15 parametrov (CK, FG, DI, SK, ST, EN, DU, PH, FO, PA, SC, DF, PS, EX, LD). Parametre s aktívnymi vzorcami (CK, DI, SK, ST, PH, PA, SC, DF, EX) sú zvýraznené hviezdičkou <span className="text-amber-400 font-bold">*</span>. PH kombinuje ochranu puku pred stratami (60 %), NHL EDGE 5v5 offensive-zone puck time (25 %) a takeaways/60 (15 %). Prejdením myšou (hover) na hráča sa zobrazí okamžité porovnanie aktuálnych hodnôt a odhadov.
         </p>
         <p>
           <strong className="text-slate-300">Penalizácia za zranenia (GP):</strong> Hráč, ktorý vynechá ≥25 % zápasov, stráca −1 zo všetkých odhadov, pri ≥50 % stráca −2 a pri ≥75 % −3.
@@ -1649,5 +1649,3 @@ function PlayerHoverComparisonCard({
     </div>
   );
 }
-
-

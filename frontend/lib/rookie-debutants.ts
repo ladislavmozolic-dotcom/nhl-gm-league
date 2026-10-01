@@ -124,14 +124,19 @@ export async function findMissingNhlPlayers(): Promise<{ ok: boolean; candidates
   addGp(curSkaters); addGp(curGoalies); addGp(lastSkaters); addGp(lastGoalies);
 
   // Already scouted in a team's Prospect pool — informational, not exclusionary.
-  // Name alone is NOT a safe key here: two unrelated real players can share a
-  // name (e.g. a common surname), and the Prospect table's name-only rows have
-  // no other way to tell them apart. Prefer nhlId when the Prospect row has one
-  // (authoritative — it's the same real person); only fall back to a name match
-  // when that scouted row has no nhlId recorded at all, and never let a name
-  // match win over a Prospect row that DOES have an nhlId but it's for someone
-  // else, since that's a confirmed non-match, not an unknown one.
-  const prospects = await prisma.prospect.findMany({ select: { name: true, nhlId: true, team: { select: { code: true } } } });
+  // Only "real" (source="real", filled from the actual NHL draft-picks API) rows
+  // are eligible here — a "profinhl"-sourced row is a leftover from the old
+  // fictional-roster database (pre real-player mode) and represents a different,
+  // made-up identity that just happens to share a name with a real debutant; it
+  // was never meant to be cross-referenced against real NHL players at all.
+  // Name alone is ALSO not a safe key even among real rows: two unrelated real
+  // players can share a name, and some real rows have no nhlId to disambiguate
+  // with. Prefer nhlId when the Prospect row has one (authoritative — it's the
+  // same real person); only fall back to a name match when that scouted row has
+  // no nhlId recorded at all, and never let a name match win over a Prospect row
+  // that DOES have an nhlId but it's for someone else — that's a confirmed
+  // non-match, not an unknown one.
+  const prospects = await prisma.prospect.findMany({ where: { source: "real" }, select: { name: true, nhlId: true, team: { select: { code: true } } } });
   const prospectsByName = new Map<string, { nhlId: number | null; code: string | null }[]>();
   for (const p of prospects) {
     const n = norm(p.name);
@@ -173,12 +178,24 @@ async function createDebutantAsProspect(c: DebutantCandidate): Promise<{ ok: boo
 
   const base = slugify(c.name) || "player";
   let slug = base;
-  for (let i = 2; await prisma.player.findUnique({ where: { slug }, select: { id: true } }); i++) slug = `${base}-${i}`;
+  let rosterType: "PROSPECT" | "NHL" = "PROSPECT";
+  let age: number | null = null;
+  if (c.birthDate) {
+    const b = new Date(c.birthDate);
+    if (!isNaN(b.getTime())) {
+      const now = new Date();
+      age = now.getFullYear() - b.getFullYear();
+      if (now.getMonth() < b.getMonth() || (now.getMonth() === b.getMonth() && now.getDate() < b.getDate())) {
+        age--;
+      }
+      if (age >= 26) rosterType = "NHL";
+    }
+  }
 
   const player = await prisma.player.create({
     data: {
       slug, name: c.name, position: c.position, isGoalie: c.isGoalie,
-      teamId: team.id, rosterType: "PROSPECT", nhlId: c.nhlId,
+      teamId: team.id, rosterType, nhlId: c.nhlId, age,
       height: c.heightCm ? `${c.heightCm} cm` : null, weight: c.weightKg ?? null,
       birthDate: c.birthDate, shoots: c.shoots, number: c.number, photoUrl: c.photoUrl,
       condition: 100, morale: 50,

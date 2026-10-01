@@ -34,16 +34,18 @@ export default function LiveCalculatorConfigModal({
   initialConfig,
   isAdmin,
   canManage = false,
+  initialTab = "general",
 }: {
   isOpen: boolean;
   onClose: () => void;
   initialConfig: LiveCalcConfigData;
   isAdmin: boolean;
   canManage?: boolean;
+  initialTab?: "general" | "weights" | "goalies" | "ahl" | "rookie" | "promotion";
 }) {
   const isPermitted = isAdmin || canManage;
   const [config, setConfig] = useState<LiveCalcConfigData>(initialConfig);
-  const [activeTab, setActiveTab] = useState<"general" | "weights" | "goalies" | "ahl" | "promotion">("general");
+  const [activeTab, setActiveTab] = useState<"general" | "weights" | "goalies" | "ahl" | "rookie" | "promotion">(initialTab);
   const [isPending, startTransition] = useTransition();
   const [statusMsg, setStatusMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [promoStatus, setPromoStatus] = useState<PromotionStatus | null>(null);
@@ -357,6 +359,9 @@ export default function LiveCalculatorConfigModal({
 
   useEffect(() => {
     if (isOpen) {
+      if (initialTab) {
+        setActiveTab(initialTab);
+      }
       if (isAdmin) {
         loadPromoStatus();
         getAllTeamsForAssignmentAction()
@@ -364,7 +369,7 @@ export default function LiveCalculatorConfigModal({
           .catch((err) => console.error("Failed to load eligible teams:", err));
       }
     }
-  }, [isOpen, isAdmin]);
+  }, [isOpen, isAdmin, initialTab]);
 
   const handleToggleManagerTeam = (teamId: number) => {
     const current = config.managerTeamIds ?? [];
@@ -757,7 +762,7 @@ export default function LiveCalculatorConfigModal({
                 : "border-transparent text-slate-400 hover:text-slate-200"
             }`}
           >
-            Váhy korčuliarov (PA, SC, DF, CK, DI)
+            Váhy korčuliarov (PA, SC, DF, CK, DI, PH)
           </button>
           <button
             onClick={() => setActiveTab("goalies")}
@@ -779,6 +784,17 @@ export default function LiveCalculatorConfigModal({
             }`}
           >
             AHL & NHLe (V10 Ochrana)
+          </button>
+          <button
+            onClick={() => setActiveTab("rookie")}
+            className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition flex items-center gap-1.5 ${
+              activeTab === "rookie"
+                ? "border-sky-400 text-sky-400"
+                : "border-transparent text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <span>👶</span>
+            <span>Nováčikovia & Prospekti</span>
           </button>
           {isAdmin && (
             <button
@@ -1716,6 +1732,76 @@ export default function LiveCalculatorConfigModal({
                 </div>
               </div>
 
+              {/* PH */}
+              <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
+                {renderCardHeader(
+                  "Puck Handling (PH) Váhy",
+                  "text-cyan-400",
+                  "ph",
+                  (config.weights?.ph?.turnoverProtection ?? DEFAULT_LIVE_CALC_WEIGHTS.ph.turnoverProtection) +
+                    (config.weights?.ph?.offensiveZoneTime ?? DEFAULT_LIVE_CALC_WEIGHTS.ph.offensiveZoneTime) +
+                    (config.weights?.ph?.takeaways60 ?? DEFAULT_LIVE_CALC_WEIGHTS.ph.takeaways60)
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-slate-400 mb-1">Ochrana puku (inv. giveaways / puck actions):</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={config.weights?.ph?.turnoverProtection ?? DEFAULT_LIVE_CALC_WEIGHTS.ph.turnoverProtection}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          weights: {
+                            ...config.weights,
+                            ph: { ...(config.weights?.ph ?? DEFAULT_LIVE_CALC_WEIGHTS.ph), turnoverProtection: parseFloat(e.target.value) || 0 },
+                          },
+                        })
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-cyan-400 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 mb-1">NHL EDGE 5v5 offensive-zone puck time:</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={config.weights?.ph?.offensiveZoneTime ?? DEFAULT_LIVE_CALC_WEIGHTS.ph.offensiveZoneTime}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          weights: {
+                            ...config.weights,
+                            ph: { ...(config.weights?.ph ?? DEFAULT_LIVE_CALC_WEIGHTS.ph), offensiveZoneTime: parseFloat(e.target.value) || 0 },
+                          },
+                        })
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-cyan-400 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 mb-1">Takeaways / 60:</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={config.weights?.ph?.takeaways60 ?? DEFAULT_LIVE_CALC_WEIGHTS.ph.takeaways60}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          weights: {
+                            ...config.weights,
+                            ph: { ...(config.weights?.ph ?? DEFAULT_LIVE_CALC_WEIGHTS.ph), takeaways60: parseFloat(e.target.value) || 0 },
+                          },
+                        })
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-cyan-400 outline-none"
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-500">NHL EDGE meria, kde je puk počas hráčovho pobytu na ľade. Controlled-entry feed nie je verejne dostupný; tento 5v5 údaj je jeho trackingový possession proxy.</p>
+                {renderCustomMetricsSection("ph")}
+              </div>
+
               {/* SK, ST & EX */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
@@ -2266,6 +2352,69 @@ export default function LiveCalculatorConfigModal({
                   Systém automaticky chráni hráčov s overenou účasťou v NHL pred znížením parametrov PA a SC.
                   Hráči s aspoň 10 GP v NHL v sezóne 2025/26 alebo aspoň 10 GP v sezóne 2024/25, prípadne hráči
                   bez overených dát (UNKNOWN_GP) si zachovávajú plné pôvodné hodnoty bez penalizácie (zníženie 0, strop 99).
+                </p>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "rookie" && (
+            <div className="space-y-6">
+              <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
+                <h4 className="font-semibold text-sky-400 text-sm flex items-center gap-2">
+                  <span>👶</span> Prepojenie so živými parametrami korčuliarov
+                </h4>
+                <p className="text-slate-300 text-xs leading-relaxed">
+                  Rookie kalkulátor využíva <b>rovnaké živé metriky a váhy</b> ako bežný kalkulátor hráčov.
+                  Ak zmeníte váhy streľby (SC), nahrávok (PA), obrany (DF), bodyčekov (CK), disciplíny (DI),
+                  korčuľovania (SK) alebo AHL prevodných faktorov v záložkách <i>Váhy korčuliarov</i> a <i>AHL &amp; NHLe</i>,
+                  tieto zmeny sa priamo aplikujú aj na výpočet nováčikov a prospektov.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
+                <h4 className="font-semibold text-amber-400 text-sm flex items-center gap-2">
+                  <span>🎯</span> Filter skenera reálnych debutantov
+                </h4>
+                <p className="text-slate-400 text-xs">
+                  Minimálny počet reálnych odohraných zápasov (NHL + AHL spolu), aby bol hráč skenerom nájdený a automaticky založený:
+                </p>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="number"
+                    min={0}
+                    value={config.weights.rookie?.minScanGp ?? 1}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      setConfig({
+                        ...config,
+                        weights: {
+                          ...config.weights,
+                          rookie: {
+                            ...(config.weights.rookie ?? { minScanGp: 1 }),
+                            minScanGp: isNaN(val) ? 1 : val,
+                          },
+                        },
+                      });
+                    }}
+                    className="w-24 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-sky-400 outline-none"
+                  />
+                  <span className="text-xs text-slate-400">zápasov (default: 1)</span>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
+                <h4 className="font-semibold text-emerald-400 text-sm flex items-center gap-2">
+                  <span>🛡️</span> Ochrana pred malou vzorkou (Bayesian Sample Shrinkage)
+                </h4>
+                <p className="text-slate-400 text-xs leading-relaxed">
+                  U nováčikov s malým počtom zápasov (1–10 GP) môžu per-60 štatistiky umelo vystreliť do extrémov (napr. 1 gól v 2 zápasoch by inak znamenal 99. percentil a SC 92).
+                  Engine preto aplikuje Bayesovskú reguláciu:
+                </p>
+                <div className="p-3 bg-slate-900/60 rounded-lg font-mono text-xs text-slate-300">
+                  r = GP / (GP + 20) &nbsp;→&nbsp; P_vysledne = r × P_live + (1 - r) × P_novacik
+                </div>
+                <p className="text-slate-400 text-xs leading-relaxed">
+                  S rastúcim počtom zápasov sa vplyv live dát zvyšuje. Výsledný Overall mladých hráčov bez väčšej histórie sa tak realisticky drží v mantineloch <b>OV 46–56</b> namiesto nereálnych 65+.
                 </p>
               </div>
             </div>

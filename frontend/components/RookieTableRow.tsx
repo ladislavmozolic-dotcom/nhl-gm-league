@@ -39,7 +39,7 @@ export default function RookieTableRow({ row, isAdmin }: { row: RookieRow; isAdm
     setStatus(r.ok ? { ok: true, s: "Activated ✓" } : { ok: false, s: r.error ?? "Failed" });
   });
 
-  const gp = row.source === "AHL" ? row.ahlGP : (row.curSeasonGP || row.lastSeasonGP);
+  const gp = row.gp ?? (row.source === "AHL" ? row.ahlGP : (row.curSeasonGP + row.lastSeasonGP));
 
   return (
     <tr className="border-b border-slate-800/40 hover:bg-slate-800/30">

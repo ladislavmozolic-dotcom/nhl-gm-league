@@ -16,7 +16,10 @@ const UA = "Mozilla/5.0 (compatible; ProfiNHL-League/1.0)";
 export const EDGE_SEASON_CUR = CURRENT_SEASON_START * 10000 + (CURRENT_SEASON_START + 1);
 export const EDGE_SEASON_LAST = (CURRENT_SEASON_START - 1) * 10000 + CURRENT_SEASON_START;
 
-export type SpeedRow = { spd: number | null; brst: number | null; dist: number | null };
+/** NHL EDGE skating plus 5v5 offensive-zone puck-time share. The latter is a
+ * direct tracking measure of where the puck is while a player is on the ice,
+ * and feeds PH's controlled-possession component. */
+export type SpeedRow = { spd: number | null; brst: number | null; dist: number | null; ozEvPct: number | null };
 
 export async function fetchOne(nhlId: number, season: number): Promise<SpeedRow | null> {
   const ctrl = new AbortController();
@@ -29,8 +32,11 @@ export async function fetchOne(nhlId: number, season: number): Promise<SpeedRow 
     const spd = s?.speedMax?.percentile ?? null;
     const brst = s?.burstsOver20?.percentile ?? null;
     const dist = d?.totalDistanceSkated?.percentile ?? null;
-    if (spd == null && brst == null && dist == null) return null;
-    return { spd, brst, dist };
+    // Raw percentage, rather than NHL's all-position percentile: the calculator
+    // ranks it in its own F/D population alongside its other PH components.
+    const ozEvPct = d?.zoneTimeDetails?.offensiveZoneEvPctg ?? null;
+    if (spd == null && brst == null && dist == null && ozEvPct == null) return null;
+    return { spd, brst, dist, ozEvPct };
   } catch {
     return null;
   } finally {

@@ -32,7 +32,7 @@ test("reshuffleBySlot moves a power-forward-style Grinder off the 1st line onto 
   // Same player-type.ts raw thresholds used in tactical-fit.test.ts: this trio
   // classifies as "Forechecker / Grinder" (high CK, moderate offense, DF<69).
   const player = (pos: string, over: Partial<TacticalFitPlayer> = {}): TacticalFitPlayer & { id: number } => ({
-    id: 0, position: pos, pa: 45, sc: 45, sk: 55, ck: 80, df: 60, st: 65, fo: 50, en: 60, weight: 95, ...over,
+    position: pos, pa: 45, sc: 45, sk: 55, ck: 80, df: 60, st: 65, fo: 50, en: 60, weight: 95, ...over, id: (over.id ?? 0) as number,
   });
   // autoLines() would put the highest-overall trio on line 0 regardless of
   // archetype — simulate that: a Grinder trio (misplaced) on line 0, and a

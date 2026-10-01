@@ -8,6 +8,7 @@ import {
 } from "./live-calculator-baseline";
 import { percentileOf, ratingFromCurve, durabilityFromAvailability, leadershipFrom } from "./edge-params";
 import { METRIC_BY_KEY } from "./live-calculator-catalog";
+import { calculateRookieRatings } from "./rookie-calculator-engine";
 
 export const SKATER_PARAMS: ParamKey[] = [
   "ck", "fg", "di", "sk", "st",
@@ -145,7 +146,8 @@ export async function runLiveCalculatorRecompute(): Promise<{
     // EN/PH/FO/PS/FG/LD inputs (see the 7-param supplement block below)
     toi: number | null;
     tk60: number | null;
-    gv60: number | null;
+    turnoverRate: number | null;
+    offensiveZoneEvPct: number | null;
     off60: number | null;
     foPct: number | null;
     shpct: number | null;
@@ -299,13 +301,25 @@ export async function runLiveCalculatorRecompute(): Promise<{
     // EN: ice time per game (already stored as TOI/game in seconds), blended
     const toi = blendVal(p.curSeasonToi, p.lastSeasonToi);
 
-    // PH: takeaways/giveaways per 60 + off60 (goal+assist rate, reuses g60/a60 above)
+    // PH: puck protection is measured against the player's own puck-action
+    // volume, not simply by raw giveaways. MoneyPuck does not expose reliable
+    // individual controlled-entry totals. NHL EDGE does provide the tracked 5v5
+    // offensive-zone puck-time share, used below as the possession component.
+    // Weighted individual shot attempts and assists remain solely the denominator
+    // for turnover protection. Goals stay out of PH: finishing belongs in SC.
     const tk60Cur = safePer60(p.curSeasonTK ?? 0, (p.curSeasonToi ?? 0) * nhlGpLatest);
     const tk60Last = safePer60(p.lastSeasonTK ?? 0, (p.lastSeasonToi ?? 0) * nhlGpPrevious);
     const tk60 = blendVal(tk60Cur, tk60Last);
-    const gv60Cur = safePer60(p.curSeasonGV ?? 0, (p.curSeasonToi ?? 0) * nhlGpLatest);
-    const gv60Last = safePer60(p.lastSeasonGV ?? 0, (p.lastSeasonToi ?? 0) * nhlGpPrevious);
-    const gv60 = blendVal(gv60Cur, gv60Last);
+    const puckActions = (m: typeof mpCur) =>
+      Math.max(0, (m.shotAttempts ?? 0) + 1.5 * (m.a1 ?? 0) + 0.75 * (m.a2 ?? 0));
+    const puckActionsCur = puckActions(mpCur);
+    const puckActionsLast = puckActions(mpLast);
+    const giveawaysCur = p.curSeasonGV ?? mpCur.gv ?? 0;
+    const giveawaysLast = p.lastSeasonGV ?? mpLast.gv ?? 0;
+    const turnoverRateCur = puckActionsCur > 0 ? giveawaysCur / puckActionsCur : null;
+    const turnoverRateLast = puckActionsLast > 0 ? giveawaysLast / puckActionsLast : null;
+    const turnoverRate = blendVal(turnoverRateCur, turnoverRateLast);
+    const offensiveZoneEvPct = blendVal(es.cur?.ozEvPct ?? null, es.last?.ozEvPct ?? null);
     const off60 = g60 != null || a60 != null ? (g60 ?? 0) + (a60 ?? 0) : null;
 
     // FO: faceoff win% (centres only in practice — near-0 for wingers/D, filtered at read time)
@@ -341,7 +355,7 @@ export async function runLiveCalculatorRecompute(): Promise<{
       pkToiPg, xga5, relXga5, ga5, relXgaPk, blk60, xgfPct,
       hit60, hitPg, penBal60, pim60,
       burst20, weight, careerRegGP, careerPoGP,
-      toi, tk60, gv60, off60, foPct, shpct, captaincy,
+      toi, tk60, turnoverRate, offensiveZoneEvPct, off60, foPct, shpct, captaincy,
       ahlG, ahlA, ahlShots, ahlPim, ahlPlusMinus,
     });
   }
@@ -355,7 +369,7 @@ export async function runLiveCalculatorRecompute(): Promise<{
       relXgaPk: [] as number[], blk60: [] as number[], xgfPct: [] as number[],
       hit60: [] as number[], hitPg: [] as number[], penBal60: [] as number[], pim60: [] as number[],
       burst20: [] as number[], weight: [] as number[], careerTotal: [] as number[],
-      toi: [] as number[], tk60: [] as number[], gv60: [] as number[], off60: [] as number[], foPct: [] as number[], shpct: [] as number[],
+      toi: [] as number[], tk60: [] as number[], turnoverRate: [] as number[], offensiveZoneEvPct: [] as number[], off60: [] as number[], foPct: [] as number[], shpct: [] as number[],
     },
     D: {
       apg: [] as number[], a60: [] as number[], a60_5v5: [] as number[],
@@ -364,7 +378,7 @@ export async function runLiveCalculatorRecompute(): Promise<{
       relXgaPk: [] as number[], blk60: [] as number[], xgfPct: [] as number[],
       hit60: [] as number[], hitPg: [] as number[], penBal60: [] as number[], pim60: [] as number[],
       burst20: [] as number[], weight: [] as number[], careerTotal: [] as number[],
-      toi: [] as number[], tk60: [] as number[], gv60: [] as number[], off60: [] as number[], foPct: [] as number[], shpct: [] as number[],
+      toi: [] as number[], tk60: [] as number[], turnoverRate: [] as number[], offensiveZoneEvPct: [] as number[], off60: [] as number[], foPct: [] as number[], shpct: [] as number[],
     },
     AHL: {
       apg: [] as number[], gpg: [] as number[], shotsPg: [] as number[], shPct: [] as number[],
@@ -399,7 +413,8 @@ export async function runLiveCalculatorRecompute(): Promise<{
     }
     if (e.toi != null) targetPool.toi.push(e.toi);
     if (e.tk60 != null) targetPool.tk60.push(e.tk60);
-    if (e.gv60 != null) targetPool.gv60.push(e.gv60);
+    if (e.turnoverRate != null) targetPool.turnoverRate.push(e.turnoverRate);
+    if (e.offensiveZoneEvPct != null) targetPool.offensiveZoneEvPct.push(e.offensiveZoneEvPct);
     if (e.off60 != null) targetPool.off60.push(e.off60);
     if (e.foPct != null && e.foPct > 0) targetPool.foPct.push(e.foPct);
     if (e.shpct != null) targetPool.shpct.push(e.shpct);
@@ -642,14 +657,19 @@ export async function runLiveCalculatorRecompute(): Promise<{
       // DU (Durability): games-played availability — not population-based
       projected.du = durabilityFromAvailability(e.nhlGpLatest, 82, e.nhlGpPrevious);
 
-      // PH (Puck Handling): 50% off60 (G+A/60) + 20% takeaways/60 + 30% inv giveaways/60
+      // PH (Puck Handling): turnover protection, NHL EDGE 5v5 offensive-zone
+      // puck-time share, and takeaways/60. Every available component is ranked
+      // against same-position peers; lower turnover rate is better.
       {
         const parts: [number, number][] = [];
-        if (e.off60 != null) parts.push([percentileOf(e.off60, pool.off60), 0.5]);
-        if (e.tk60 != null) parts.push([percentileOf(e.tk60, pool.tk60), 0.2]);
-        if (e.gv60 != null) parts.push([1 - percentileOf(e.gv60, pool.gv60), 0.3]);
-        const wtot = parts.reduce((s, [, wt]) => s + wt, 0);
-        if (wtot > 0) projected.ph = ratingFromCurve(parts.reduce((s, [pc, wt]) => s + pc * wt, 0) / wtot, "DEFAULT");
+        if (e.turnoverRate != null) parts.push([1 - percentileOf(e.turnoverRate, pool.turnoverRate), w.ph.turnoverProtection]);
+        if (e.offensiveZoneEvPct != null) parts.push([percentileOf(e.offensiveZoneEvPct, pool.offensiveZoneEvPct), w.ph.offensiveZoneTime]);
+        if (e.tk60 != null) parts.push([percentileOf(e.tk60, pool.tk60), w.ph.takeaways60]);
+        const stdSum = parts.reduce((s, [pc, wt]) => s + pc * wt, 0);
+        const stdWeight = parts.reduce((s, [, wt]) => s + wt, 0);
+        const { sum: cSumPH, weight: cWeightPH } = evalCustom("ph", e.posGroup, e.p);
+        const totalWeight = stdWeight + cWeightPH;
+        if (totalWeight > 0) projected.ph = ratingFromCurve((stdSum + cSumPH) / totalWeight, "DEFAULT");
       }
 
       // FO (Faceoffs): win% percentile — only meaningful for centres who take draws
@@ -762,6 +782,15 @@ export async function runLiveCalculatorRecompute(): Promise<{
         if (projected.sc != null) {
           projected.sc = Math.max(30, Math.min(projected.sc - scRed, scCap));
         }
+      }
+    }
+
+    // Prospects / rookies without established ratings: use realistic Player Calculator logic
+    if (p.rosterType === "PROSPECT") {
+      const rookieRes = calculateRookieRatings(p as any, config.weights);
+      for (const [param, val] of Object.entries(rookieRes.ratings)) {
+        if (param === "OV") continue;
+        projected[param.toLowerCase() as ParamKey] = val;
       }
     }
 

@@ -8,6 +8,8 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { cleanName } from "./playerName";
 import { per60, blend, percentileOf, ratingFromCurve, EDGE_COMPOSITES, EDGE_GOALIE_COMPOSITES, experienceFromAge, durabilityFromAvailability, leadershipFrom, EDGE_MO_DEFAULT } from "./edge-params";
+import { calculateRookieRatings } from "./rookie-calculator-engine";
+import { getLiveCalculatorConfig } from "./live-calculator-config";
 
 const CUR_SEASON_GAMES = 82; // real season length reference for durability
 
@@ -693,44 +695,42 @@ const ROOKIE_RATING_FIELD: Record<string, string> = { ...ROOKIE_PARAM_FIELD, OV:
  *  scanAndSyncDebutants, which triggers a recompute after every scan); any
  *  param the engine left null for him (e.g. he's classified "AHL/FARM") falls
  *  back to the Edge engine. */
+/** Copy a Rookie Calculator player's rating onto his live ck/sc/pa/... fields
+ *  using the official Player Calculator lookup tables and rookie logic. */
 export async function activateRookieLiveRating(playerId: number): Promise<{ ok: boolean; applied?: Record<string, number>; error?: string }> {
-  const player = await prisma.player.findUnique({ where: { id: playerId }, select: { isGoalie: true, liveCalculatorRatings: true } });
+  const player = await prisma.player.findUnique({
+    where: { id: playerId },
+    select: {
+      id: true, slug: true, name: true, position: true, teamId: true, age: true, isGoalie: true,
+      weight: true, edgeSpeed: true, careerGP: true,
+      curSeasonGP: true, curSeasonG: true, curSeasonA: true,
+      curSeasonHits: true, curSeasonBlocks: true, curSeasonPM: true,
+      curSeasonTK: true, curSeasonGV: true, curSeasonPim: true,
+      curSeasonToi: true, curSeasonShots: true, curSeasonShToi: true,
+      curSeasonTeamShToi: true, curSeasonFoPct: true,
+      lastSeasonGP: true, lastSeasonG: true, lastSeasonA: true,
+      lastSeasonHits: true, lastSeasonBlocks: true, lastSeasonPM: true,
+      lastSeasonTK: true, lastSeasonGV: true, lastSeasonPim: true,
+      lastSeasonToi: true, lastSeasonShots: true, lastSeasonShToi: true,
+      lastSeasonFoPct: true,
+      ahlStats: true,
+    },
+  });
   if (!player) return { ok: false, error: "Player not found." };
   if (player.isGoalie) return { ok: false, error: "Goalies aren't supported in the Rookie Calculator yet." };
-  const live = player.liveCalculatorRatings as { projected?: Record<string, number | null>; overallProjected?: number | null } | null;
-  if (!live?.projected) return { ok: false, error: "Zatiaľ neprepočítané — skús znova skenovať alebo klikni Prepočítať ratingy v Live Calculatore." };
 
   await backupLiveIfNeeded();
-  const applied: Record<string, number> = {};
+  const liveConfig = await getLiveCalculatorConfig();
+  const { ratings } = calculateRookieRatings(player, liveConfig.weights);
   const data: Record<string, number> = {};
-  for (const [param, field] of Object.entries(ROOKIE_PARAM_FIELD)) {
-    const v = live.projected[field];
-    if (v == null) continue;
-    const rounded = Math.round(v);
-    applied[param] = rounded;
-    data[field] = rounded;
+  for (const [param, field] of Object.entries(ROOKIE_RATING_FIELD)) {
+    const v = ratings[param];
+    if (v != null) data[field] = v;
   }
-  if (live.overallProjected != null) {
-    applied.OV = Math.round(live.overallProjected);
-    data.overall = applied.OV;
-  }
-
-  const missing = Object.keys(ROOKIE_PARAM_FIELD).filter((param) => applied[param] == null);
-  if (missing.length) {
-    const edgeRow = (await edgeRatings("NHL", true)).find((r) => r.playerId === playerId);
-    if (edgeRow) {
-      for (const param of missing) {
-        const v = edgeRow.ratings[param];
-        if (v == null) continue;
-        applied[param] = v;
-        data[ROOKIE_PARAM_FIELD[param]] = v;
-      }
-    }
-  }
-  if (!Object.keys(data).length) return { ok: false, error: "No computed rating available yet." };
+  if (!Object.keys(data).length) return { ok: false, error: "No computed rating available." };
 
   await prisma.player.update({ where: { id: playerId }, data });
-  return { ok: true, applied };
+  return { ok: true, applied: ratings };
 }
 
 /** Write a GM-adjusted rating for one Rookie Calculator player directly onto his
@@ -763,72 +763,94 @@ export async function applyRookieRatingsOverride(playerId: number, ratings: Reco
 }
 
 export type RookieRow = {
-  playerId: number; name: string; slug: string; position: string; teamCode: string | null;
-  age: number | null; curSeasonGP: number; lastSeasonGP: number; ahlGP: number; g: number; a: number; source: "NHL" | "AHL";
+  playerId: number;
+  name: string;
+  slug: string;
+  position: string;
+  teamCode: string | null;
+  age: number | null;
+  curSeasonGP: number;
+  lastSeasonGP: number;
+  ahlGP: number;
+  gp: number;
+  g: number;
+  a: number;
+  source: "NHL" | "AHL";
   ratings: Record<string, number>;
 };
 
 /** Skaters who have NO established rating yet — sitting in a team's PROSPECT pool
  *  (Player.rosterType === "PROSPECT") — but have already started logging real NHL
- *  or AHL games. This is the actual "give him a real rating like everyone else"
- *  gap: an already-rated veteran who merely happens to be an unsigned UFA (e.g. a
- *  real-life free agent already imported with full ProfiNHL ratings) is NOT a
- *  rookie and must NOT show up here — only genuine PROSPECT-rosterType players do.
- *  Reads Player.liveCalculatorRatings — the SAME blob every other player's rating
- *  comes from — instead of running its own separate computation, so a rookie's
- *  number always matches what the shared "Live Calculator — Nastavenia &
- *  Tuning" engine (lib/live-calculator-engine.ts) would give him. Whatever that
- *  engine left null for him (e.g. an "AHL/FARM"-classified rookie, who only
- *  gets PA/SC/DF/DI from it) falls back to the Edge engine, which has a working
- *  formula for every param. A prospect whose blob hasn't been computed yet
- *  (never scanned/recomputed) is simply skipped here — scanAndSyncDebutants()
- *  always triggers a fresh recompute, so this should be rare; an admin can also
- *  always hit "Prepočítať ratingy" in Live Calculator. */
+ *  or AHL games. Uses the official Player Calculator lookup tables and rookie logic
+ *  (lib/rookie-calculator-engine.ts) so rookie numbers match realistic STHS values
+ *  (OV 46-56) instead of inflated percentiles. */
 export async function rookieCalculatorRows(): Promise<RookieRow[]> {
   const prospects = await prisma.player.findMany({
-    where: { isGoalie: false, rosterType: "PROSPECT" },
+    where: {
+      isGoalie: false,
+      rosterType: "PROSPECT",
+      OR: [
+        { age: null },
+        { age: { lte: 25 } },
+      ],
+    },
     select: {
       id: true, slug: true, name: true, position: true, teamId: true, age: true,
-      curSeasonGP: true, lastSeasonGP: true, ahlStats: true,
-      curSeasonG: true, curSeasonA: true, lastSeasonG: true, lastSeasonA: true,
-      liveCalculatorRatings: true,
+      weight: true, edgeSpeed: true, careerGP: true,
+      curSeasonGP: true, curSeasonG: true, curSeasonA: true,
+      curSeasonHits: true, curSeasonBlocks: true, curSeasonPM: true,
+      curSeasonTK: true, curSeasonGV: true, curSeasonPim: true,
+      curSeasonToi: true, curSeasonShots: true, curSeasonShToi: true,
+      curSeasonTeamShToi: true, curSeasonFoPct: true,
+      lastSeasonGP: true, lastSeasonG: true, lastSeasonA: true,
+      lastSeasonHits: true, lastSeasonBlocks: true, lastSeasonPM: true,
+      lastSeasonTK: true, lastSeasonGV: true, lastSeasonPim: true,
+      lastSeasonToi: true, lastSeasonShots: true, lastSeasonShToi: true,
+      lastSeasonFoPct: true,
+      ahlStats: true,
     },
   });
+
   const withProduction = prospects.filter((p) => {
+    // A player who is 26 or older is not a rookie/prospect
+    if (p.age != null && p.age > 25) return false;
+    // An established NHLer with more than 50 regular season games is not a rookie
+    const regGp = (p.careerGP as any)?.reg;
+    if (regGp != null && regGp > 50) return false;
+
+    const nhlGp = (p.curSeasonGP ?? 0) + (p.lastSeasonGP ?? 0);
     const ahl = (p.ahlStats as any) ?? {};
     const ahlGp = (ahl.cur?.gp ?? 0) + (ahl.last?.gp ?? 0);
-    return (p.curSeasonGP ?? 0) > 0 || (p.lastSeasonGP ?? 0) > 0 || ahlGp > 0;
+    return nhlGp > 0 || ahlGp > 0;
   });
   if (!withProduction.length) return [];
 
-  const teams = await prisma.team.findMany({ select: { id: true, code: true } });
+  const [teams, liveConfig] = await Promise.all([
+    prisma.team.findMany({ select: { id: true, code: true } }),
+    getLiveCalculatorConfig(),
+  ]);
   const codeById = new Map(teams.map((t) => [t.id, t.code]));
-  const edgeById = new Map((await edgeRatings("NHL", true)).map((r) => [r.playerId, r.ratings]));
 
   const out: RookieRow[] = [];
   for (const p of withProduction) {
-    const live = p.liveCalculatorRatings as { classification?: string; projected?: Record<string, number | null>; overallProjected?: number | null } | null;
-    if (!live?.projected) continue;
-
-    const ahl = (p.ahlStats as any) ?? {};
-    const ahlGP = (ahl.cur?.gp ?? 0) + (ahl.last?.gp ?? 0);
-    const ratings: Record<string, number> = {};
-    for (const [param, field] of Object.entries(ROOKIE_PARAM_FIELD)) {
-      const v = live.projected[field];
-      if (v != null) ratings[param] = Math.round(v);
-    }
-    if (live.overallProjected != null) ratings.OV = Math.round(live.overallProjected);
-    const edge = edgeById.get(p.id);
-    if (edge) for (const param of Object.keys(ROOKIE_PARAM_FIELD)) if (ratings[param] == null && edge[param] != null) ratings[param] = edge[param];
+    const calc = calculateRookieRatings(p, liveConfig.weights);
+    if (calc.gp <= 0) continue; // Never show rows with 0 games
 
     out.push({
-      playerId: p.id, name: cleanName(p.name), slug: p.slug, position: p.position ?? "",
+      playerId: p.id,
+      name: cleanName(p.name),
+      slug: p.slug,
+      position: p.position ?? "",
       teamCode: p.teamId != null ? codeById.get(p.teamId) ?? null : null,
-      age: p.age, curSeasonGP: p.curSeasonGP ?? 0, lastSeasonGP: p.lastSeasonGP ?? 0, ahlGP,
-      g: (p.curSeasonG ?? 0) + (p.lastSeasonG ?? 0) + (ahl.cur?.g ?? 0) + (ahl.last?.g ?? 0),
-      a: (p.curSeasonA ?? 0) + (p.lastSeasonA ?? 0) + (ahl.cur?.a ?? 0) + (ahl.last?.a ?? 0),
-      source: live.classification === "NHL" ? "NHL" : "AHL",
-      ratings,
+      age: p.age,
+      curSeasonGP: p.curSeasonGP ?? 0,
+      lastSeasonGP: p.lastSeasonGP ?? 0,
+      ahlGP: calc.ahlGP,
+      gp: calc.gp,
+      g: calc.g,
+      a: calc.a,
+      source: calc.source,
+      ratings: calc.ratings,
     });
   }
   return out.sort((a, b) => (b.ratings.OV ?? 0) - (a.ratings.OV ?? 0));

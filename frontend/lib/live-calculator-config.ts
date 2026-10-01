@@ -32,6 +32,7 @@ export type LiveCalcWeights = {
   dfF: { pkToiPg: number; relXgaPk: number; relXga5: number; xga5: number; ga5: number; xgfPct: number; blk60: number };
   ck: { hit60: number; hitPg: number };
   di: { penaltyBalance: number; invPim60: number };
+  ph: { turnoverProtection: number; offensiveZoneTime: number; takeaways60: number };
   sk: { edgeBursts20: number };
   st: { weightPct: number };
   ex: { careerRegGP: number; careerPoGP: number };
@@ -64,6 +65,7 @@ export const DEFAULT_LIVE_CALC_WEIGHTS: LiveCalcWeights = {
   dfF: { pkToiPg: 0.30, relXgaPk: 0.15, relXga5: 0.15, xga5: 0.15, ga5: 0.10, xgfPct: 0.10, blk60: 0.05 },
   ck: { hit60: 0.60, hitPg: 0.40 },
   di: { penaltyBalance: 0.60, invPim60: 0.40 },
+  ph: { turnoverProtection: 0.60, offensiveZoneTime: 0.25, takeaways60: 0.15 },
   sk: { edgeBursts20: 1.0 },
   st: { weightPct: 1.0 },
   ex: { careerRegGP: 0.70, careerPoGP: 0.30 },

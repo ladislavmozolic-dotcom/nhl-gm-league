@@ -1,9 +1,12 @@
+"use client";
+
+import { useState } from "react";
 import { Card } from "@/components/ui";
 import DebutantScanner from "@/components/DebutantScanner";
 import RookieTableRow from "@/components/RookieTableRow";
-import RookieTuningPanel from "@/components/RookieTuningPanel";
+import LiveCalculatorConfigModal from "@/components/LiveCalculatorConfigModal";
 import type { RookieRow } from "@/lib/edge-params-server";
-import type { RookieTuningConfig } from "@/lib/edge-params";
+import type { LiveCalcConfigData } from "@/lib/live-calculator-config";
 
 const PARAM_COLS = ["CK", "FG", "DI", "SK", "ST", "EN", "DU", "PH", "FO", "PA", "SC", "DF", "PS", "EX", "LD", "OV"];
 
@@ -12,13 +15,26 @@ const PARAM_COLS = ["CK", "FG", "DI", "SK", "ST", "EN", "DU", "PH", "FO", "PA", 
  * nikdy nedostali vlastný vypočítaný rating — presne opačná skupina než hráči už
  * ohodnotení pri importe (napr. skutoční UFA veteráni), tí sem nepatria.
  */
-export default function RookieCalculatorPanel({ rookies, isAdmin, tuningConfig }: { rookies: RookieRow[]; isAdmin: boolean; tuningConfig: RookieTuningConfig }) {
+export default function RookieCalculatorPanel({
+  rookies,
+  isAdmin,
+  canManage = false,
+  liveConfig,
+}: {
+  rookies: RookieRow[];
+  isAdmin: boolean;
+  canManage?: boolean;
+  liveConfig: LiveCalcConfigData;
+}) {
+  const [configModalOpen, setConfigModalOpen] = useState(false);
+  const isPermitted = isAdmin || canManage;
+
   return (
     <>
       <Card title="Ako to funguje" accent="text-slate-200">
         <ul className="text-sm text-slate-300 space-y-1 list-disc pl-5">
-          <li>Rovnaký engine ako celá liga — <b>Live Calculator</b> (V10, cez &quot;⚙️ Tuning &amp; Nastavenia&quot; na hlavnej stránke Live Calculatora): percentil voči reálnej populácii, vlastná ochrana pri malej vzorke zápasov (tzv. FARM tiers). Žiadny samostatný Next Gen engine, žiadne duplicitné čísla — jedno miesto, kde sa ladia váhy pre celú ligu vrátane rookies.</li>
-          <li>Zobrazujú sa len hráči, ktorí sú v <b>prospect poole</b> nejakého tímu (<code>rosterType = PROSPECT</code>) a už odohrali reálne NHL/AHL zápasy — teda ešte nemajú vlastný rating, nie hráči už ohodnotení pri importe (napr. skutoční voľní hráči/veteráni).</li>
+          <li>Rovnaká živá logika ako v <b>Parameters / Live Calculatore</b>: hodnotenia sú počítané priamo zo živých údajov (G/60, A/60, xG, xGA, hity, bloky, TOI, Edge speed bursts, vhadzovania a AHL s NHLe) podľa váh a metrík nastavených v <i>Nastavenia &amp; Tuning</i>. Ochrana pred malou vzorkou zápasov (Bayesian shrinkage nováčikovskej vzorky) a nováčikovské mantinely bránia prestreleným číslam pri pár odohraných zápasoch, takže výsledný Overall realisticky leží v rozmedzí <b>OV 46–56</b>.</li>
+          <li>Zobrazujú sa len hráči, ktorí sú v <b>prospect poole</b> nejakého tímu (<code>rosterType = PROSPECT</code>), spĺňajú nováčikovský limit (vek do 25 rokov) a už odohrali reálne NHL/AHL zápasy.</li>
           {isAdmin
             ? <li>Každá bunka s hodnotou je <b>editovateľná</b> — ak ti vypočítané číslo pripadá príliš vysoké/nízke (napr. PA/SC z pár zápasov horúcej série), priamo si ho preprav. &quot;Activate rating&quot; potom zapíše presne to, čo je v bunkách, do CK/SC/PA/DF/... polí hráča — nemení jeho rosterType ani tím, len rating.</li>
             : <li>Prihlás sa ako admin, ak chceš rating aj aktivovať alebo upraviť — tu ho zatiaľ len vidíš.</li>}
@@ -43,7 +59,17 @@ export default function RookieCalculatorPanel({ rookies, isAdmin, tuningConfig }
       <Card
         title={`Prospekti s reálnymi zápasmi, zatiaľ bez ratingu (${rookies.length})`}
         accent="text-green-400"
-        right={isAdmin ? <RookieTuningPanel initialConfig={tuningConfig} /> : undefined}
+        right={
+          isPermitted ? (
+            <button
+              onClick={() => setConfigModalOpen(true)}
+              className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white whitespace-nowrap flex items-center gap-1.5 transition border border-slate-700"
+            >
+              <span>⚙️</span>
+              <span>Tuning &amp; Nastavenia</span>
+            </button>
+          ) : undefined
+        }
       >
         <div className="overflow-x-auto">
           <table className="w-full text-sm" style={{ minWidth: 1060 }}>
@@ -70,6 +96,17 @@ export default function RookieCalculatorPanel({ rookies, isAdmin, tuningConfig }
           </table>
         </div>
       </Card>
+
+      {isPermitted && liveConfig && (
+        <LiveCalculatorConfigModal
+          isOpen={configModalOpen}
+          onClose={() => setConfigModalOpen(false)}
+          initialConfig={liveConfig}
+          isAdmin={isAdmin}
+          canManage={canManage}
+          initialTab="weights"
+        />
+      )}
     </>
   );
 }
