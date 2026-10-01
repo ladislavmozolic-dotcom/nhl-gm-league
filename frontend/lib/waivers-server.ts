@@ -1,6 +1,8 @@
 // Waivers — a club must expose a player on waivers before he can be sent to the
 // AHL; other clubs may claim him during a one-day window (priority = reverse
-// standings, worst team first). If nobody claims, he clears and drops to the
+// standings, worst team first — EXCEPT a club that has won a more recent claim
+// than another contender drops behind it regardless of standings, in every
+// phase; see waiverOrderCompare). If nobody claims, he clears and drops to the
 // affiliate. A no-movement clause (NMC) blocks waivers entirely; a no-trade
 // clause (NTC) does NOT — the player can still be waived.
 
@@ -22,33 +24,47 @@ export type WaiverRow = {
 
 export type WaiverPriorityRow = { teamId: number; code: string; name: string; logoUrl: string | null; rank: number };
 
+/** Shared ordering rule for both the display list (waiverPriorityOrder) and
+ *  actual claim resolution (processWaivers): a club that has won a more
+ *  recent claim than another contender drops BEHIND it, full stop — this
+ *  holds in every phase, not just the off-season queue, so a club can't keep
+ *  winning claim after claim just because its standings stay the worst. Only
+ *  once neither side has a "fresher" claim than the other (both null, or an
+ *  exact tie) do we fall back to the phase's normal tiebreak: reverse
+ *  standings in-season, else claim-submission order. */
+type WaiverOrderEntrant = { id: number; lastWaiverClaimAt: Date | null };
+function waiverOrderCompare(
+  a: WaiverOrderEntrant,
+  b: WaiverOrderEntrant,
+  useStandings: boolean,
+  priority: Map<number, number>,
+  fallbackTie: (a: WaiverOrderEntrant, b: WaiverOrderEntrant) => number,
+): number {
+  const la = a.lastWaiverClaimAt, lb = b.lastWaiverClaimAt;
+  if (la || lb) {
+    if (!la) return -1; // a has never claimed — ahead of b, who has
+    if (!lb) return 1; // b has never claimed — ahead of a, who has
+    if (la.getTime() !== lb.getTime()) return la.getTime() - lb.getTime(); // more recent claim sorts later (further back)
+  }
+  if (useStandings) return (priority.get(b.id) ?? -1) - (priority.get(a.id) ?? -1) || a.id - b.id;
+  return fallbackTie(a, b);
+}
+
 /** Full-league waiver-claim priority order, first-in-line first — the SAME
  *  ordering processWaivers uses to resolve a contested claim (reverse
- *  standings in-season, a claim-order queue otherwise), just computed for
- *  every club instead of one contested waiver so a GM can see where their
- *  club stands in line before claiming. */
+ *  standings in-season, a claim-order queue otherwise, with the "drops to
+ *  back after winning" override from waiverOrderCompare layered on top in
+ *  both), just computed for every club instead of one contested waiver so a
+ *  GM can see where their club stands in line before claiming. */
 export async function waiverPriorityOrder(phase: Phase): Promise<WaiverPriorityRow[]> {
   const teams = await prisma.team.findMany({
     where: { league: "NHL", isAffiliate: false },
     select: { id: true, code: true, name: true, logoUrl: true, lastWaiverClaimAt: true },
   });
   const useStandings = phase === "regular" || phase === "playoffs";
-  let ordered: typeof teams;
-  if (useStandings) {
-    const standings = await computeStandings();
-    const priority = new Map(standings.map((s, i) => [s.teamId, i])); // 0 = best
-    // worst standings (highest priority index) first, unranked teams last
-    ordered = [...teams].sort((a, b) => (priority.get(b.id) ?? -1) - (priority.get(a.id) ?? -1) || a.id - b.id);
-  } else {
-    // never-claimed/longest-idle first, same tie rule as processWaivers' queue branch
-    ordered = [...teams].sort((a, b) => {
-      const la = a.lastWaiverClaimAt, lb = b.lastWaiverClaimAt;
-      if (la === null && lb === null) return a.id - b.id;
-      if (la === null) return -1;
-      if (lb === null) return 1;
-      return la.getTime() - lb.getTime() || a.id - b.id;
-    });
-  }
+  const standings = useStandings ? await computeStandings() : [];
+  const priority = new Map(standings.map((s, i) => [s.teamId, i])); // 0 = best
+  const ordered = [...teams].sort((a, b) => waiverOrderCompare(a, b, useStandings, priority, (x, y) => x.id - y.id));
   return ordered.map((t, i) => ({ teamId: t.id, code: t.code ?? String(t.id), name: t.name, logoUrl: t.logoUrl, rank: i + 1 }));
 }
 
@@ -214,23 +230,24 @@ export async function processWaivers(currentDay: number, phase: Phase): Promise<
       const fromTeam = tById.get(w.fromTeamId);
       const fromTag = fromTeam?.code ? ` (${fromTeam.code})` : "";
       if (w.claims.length > 0) {
-        const winner = useStandings
-          // worst standings (highest priority index) wins; tie → earliest claim
-          ? [...w.claims].sort((a, b) => (priority.get(b.teamId) ?? -1) - (priority.get(a.teamId) ?? -1) || a.id - b.id)[0]
-          // claim-order queue: never-claimed/longest-idle club first, tie → earliest claim this round
-          : [...w.claims].sort((a, b) => {
-              const la = tById.get(a.teamId)?.lastWaiverClaimAt ?? null;
-              const lb = tById.get(b.teamId)?.lastWaiverClaimAt ?? null;
-              if (la === null && lb === null) return a.createdAt.getTime() - b.createdAt.getTime() || a.id - b.id;
-              if (la === null) return -1;
-              if (lb === null) return 1;
-              return la.getTime() - lb.getTime() || a.createdAt.getTime() - b.createdAt.getTime();
-            })[0];
+        // a club that won a more recent claim drops behind one that hasn't, in every
+        // phase (waiverOrderCompare); only once neither side is "fresher" does the
+        // phase's normal tiebreak (standings in-season, else earliest claim) decide
+        const winner = [...w.claims].sort((a, b) =>
+          waiverOrderCompare(
+            { id: a.teamId, lastWaiverClaimAt: tById.get(a.teamId)?.lastWaiverClaimAt ?? null },
+            { id: b.teamId, lastWaiverClaimAt: tById.get(b.teamId)?.lastWaiverClaimAt ?? null },
+            useStandings,
+            priority,
+            () => a.createdAt.getTime() - b.createdAt.getTime() || a.id - b.id,
+          )
+        )[0];
         await prisma.$transaction([
           // a new organization just claimed him — the old club's trade-block listing doesn't carry over
           prisma.player.update({ where: { id: w.playerId }, data: { teamId: winner.teamId, rosterType: "NHL", waiverStatus: "NONE", captaincy: null, onBlock: false, blockNote: null } }),
           prisma.waiver.update({ where: { id: w.id }, data: { status: "CLAIMED", claimedByTeamId: winner.teamId, resolvedAt: new Date() } }),
-          // move the winner to the back of the claim-order queue for next time (harmless in-season, since standings decide there anyway)
+          // move the winner to the back of the line for next time — now actually
+          // consulted in-season too (waiverOrderCompare checks this before standings)
           prisma.team.update({ where: { id: winner.teamId }, data: { lastWaiverClaimAt: new Date() } }),
           prisma.transaction.create({ data: { type: "WAIVER", playerId: w.playerId, teamId: winner.teamId, message: `${tById.get(winner.teamId)?.code ?? "A club"} claimed ${name}${fromTag} off waivers from ${tById.get(w.fromTeamId)?.code ?? "?"}.` } }),
         ]);
