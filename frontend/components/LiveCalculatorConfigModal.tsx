@@ -1732,15 +1732,16 @@ export default function LiveCalculatorConfigModal({
                 </div>
               </div>
 
-              {/* PH */}
+              {/* PH — position-specific like DF */}
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
               <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
                 {renderCardHeader(
-                  "Puck Handling (PH) Váhy",
+                  "Puck Handling (PH) Váhy — Útočníci (F)",
                   "text-cyan-400",
-                  "ph",
-                  (config.weights?.ph?.turnoverProtection ?? DEFAULT_LIVE_CALC_WEIGHTS.ph.turnoverProtection) +
-                    (config.weights?.ph?.offensiveZoneTime ?? DEFAULT_LIVE_CALC_WEIGHTS.ph.offensiveZoneTime) +
-                    (config.weights?.ph?.takeaways60 ?? DEFAULT_LIVE_CALC_WEIGHTS.ph.takeaways60)
+                  "phF",
+                  (config.weights?.phF?.turnoverProtection ?? DEFAULT_LIVE_CALC_WEIGHTS.phF.turnoverProtection) +
+                    (config.weights?.phF?.offensiveZoneTime ?? DEFAULT_LIVE_CALC_WEIGHTS.phF.offensiveZoneTime) +
+                    (config.weights?.phF?.takeaways60 ?? DEFAULT_LIVE_CALC_WEIGHTS.phF.takeaways60)
                 )}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
@@ -1748,13 +1749,13 @@ export default function LiveCalculatorConfigModal({
                     <input
                       type="number"
                       step="0.01"
-                      value={config.weights?.ph?.turnoverProtection ?? DEFAULT_LIVE_CALC_WEIGHTS.ph.turnoverProtection}
+                      value={config.weights?.phF?.turnoverProtection ?? DEFAULT_LIVE_CALC_WEIGHTS.phF.turnoverProtection}
                       onChange={(e) =>
                         setConfig({
                           ...config,
                           weights: {
                             ...config.weights,
-                            ph: { ...(config.weights?.ph ?? DEFAULT_LIVE_CALC_WEIGHTS.ph), turnoverProtection: parseFloat(e.target.value) || 0 },
+                            phF: { ...(config.weights?.phF ?? DEFAULT_LIVE_CALC_WEIGHTS.phF), turnoverProtection: parseFloat(e.target.value) || 0 },
                           },
                         })
                       }
@@ -1766,13 +1767,13 @@ export default function LiveCalculatorConfigModal({
                     <input
                       type="number"
                       step="0.01"
-                      value={config.weights?.ph?.offensiveZoneTime ?? DEFAULT_LIVE_CALC_WEIGHTS.ph.offensiveZoneTime}
+                      value={config.weights?.phF?.offensiveZoneTime ?? DEFAULT_LIVE_CALC_WEIGHTS.phF.offensiveZoneTime}
                       onChange={(e) =>
                         setConfig({
                           ...config,
                           weights: {
                             ...config.weights,
-                            ph: { ...(config.weights?.ph ?? DEFAULT_LIVE_CALC_WEIGHTS.ph), offensiveZoneTime: parseFloat(e.target.value) || 0 },
+                            phF: { ...(config.weights?.phF ?? DEFAULT_LIVE_CALC_WEIGHTS.phF), offensiveZoneTime: parseFloat(e.target.value) || 0 },
                           },
                         })
                       }
@@ -1784,13 +1785,13 @@ export default function LiveCalculatorConfigModal({
                     <input
                       type="number"
                       step="0.01"
-                      value={config.weights?.ph?.takeaways60 ?? DEFAULT_LIVE_CALC_WEIGHTS.ph.takeaways60}
+                      value={config.weights?.phF?.takeaways60 ?? DEFAULT_LIVE_CALC_WEIGHTS.phF.takeaways60}
                       onChange={(e) =>
                         setConfig({
                           ...config,
                           weights: {
                             ...config.weights,
-                            ph: { ...(config.weights?.ph ?? DEFAULT_LIVE_CALC_WEIGHTS.ph), takeaways60: parseFloat(e.target.value) || 0 },
+                            phF: { ...(config.weights?.phF ?? DEFAULT_LIVE_CALC_WEIGHTS.phF), takeaways60: parseFloat(e.target.value) || 0 },
                           },
                         })
                       }
@@ -1799,7 +1800,46 @@ export default function LiveCalculatorConfigModal({
                   </div>
                 </div>
                 <p className="text-[10px] text-slate-500">NHL EDGE meria, kde je puk počas hráčovho pobytu na ľade. Controlled-entry feed nie je verejne dostupný; tento 5v5 údaj je jeho trackingový possession proxy.</p>
-                {renderCustomMetricsSection("ph")}
+                {renderCustomMetricsSection("phF")}
+              </div>
+              <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
+                {renderCardHeader(
+                  "Puck Handling (PH) Váhy — Obrancovia (D)",
+                  "text-blue-400",
+                  "phD",
+                  (config.weights?.phD?.turnoverProtection ?? DEFAULT_LIVE_CALC_WEIGHTS.phD.turnoverProtection) +
+                    (config.weights?.phD?.offensiveZoneTime ?? DEFAULT_LIVE_CALC_WEIGHTS.phD.offensiveZoneTime) +
+                    (config.weights?.phD?.takeaways60 ?? DEFAULT_LIVE_CALC_WEIGHTS.phD.takeaways60)
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {([
+                    ["turnoverProtection", "Ochrana puku (inv. giveaways / puck actions):"],
+                    ["offensiveZoneTime", "NHL EDGE 5v5 offensive-zone puck time:"],
+                    ["takeaways60", "Takeaways / 60:"],
+                  ] as const).map(([key, label]) => (
+                    <div key={key}>
+                      <label className="block text-slate-400 mb-1">{label}</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={config.weights?.phD?.[key] ?? DEFAULT_LIVE_CALC_WEIGHTS.phD[key]}
+                        onChange={(e) =>
+                          setConfig({
+                            ...config,
+                            weights: {
+                              ...config.weights,
+                              phD: { ...(config.weights?.phD ?? DEFAULT_LIVE_CALC_WEIGHTS.phD), [key]: parseFloat(e.target.value) || 0 },
+                            },
+                          })
+                        }
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-blue-400 outline-none"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[10px] text-slate-500">Pre D má offensive-zone puck time len 10 % — tento údaj viac opisuje nasadenie páru a tímový útok než individuálne vedenie puku. Väčšia váha ide na ochranu puku.</p>
+                {renderCustomMetricsSection("phD")}
+              </div>
               </div>
 
               {/* SK, ST & EX */}

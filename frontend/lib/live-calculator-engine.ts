@@ -661,13 +661,17 @@ export async function runLiveCalculatorRecompute(): Promise<{
       // puck-time share, and takeaways/60. Every available component is ranked
       // against same-position peers; lower turnover rate is better.
       {
+        // A defender's offensive-zone time mostly reflects team deployment and
+        // blue-line usage, not individual carrying. It receives 10% for D but
+        // 30% for F; defenders instead lean on turnover protection.
+        const phW = e.posGroup === "D" ? w.phD : w.phF;
         const parts: [number, number][] = [];
-        if (e.turnoverRate != null) parts.push([1 - percentileOf(e.turnoverRate, pool.turnoverRate), w.ph.turnoverProtection]);
-        if (e.offensiveZoneEvPct != null) parts.push([percentileOf(e.offensiveZoneEvPct, pool.offensiveZoneEvPct), w.ph.offensiveZoneTime]);
-        if (e.tk60 != null) parts.push([percentileOf(e.tk60, pool.tk60), w.ph.takeaways60]);
+        if (e.turnoverRate != null) parts.push([1 - percentileOf(e.turnoverRate, pool.turnoverRate), phW.turnoverProtection]);
+        if (e.offensiveZoneEvPct != null) parts.push([percentileOf(e.offensiveZoneEvPct, pool.offensiveZoneEvPct), phW.offensiveZoneTime]);
+        if (e.tk60 != null) parts.push([percentileOf(e.tk60, pool.tk60), phW.takeaways60]);
         const stdSum = parts.reduce((s, [pc, wt]) => s + pc * wt, 0);
         const stdWeight = parts.reduce((s, [, wt]) => s + wt, 0);
-        const { sum: cSumPH, weight: cWeightPH } = evalCustom("ph", e.posGroup, e.p);
+        const { sum: cSumPH, weight: cWeightPH } = evalCustom(e.posGroup === "D" ? "phD" : "phF", e.posGroup, e.p);
         const totalWeight = stdWeight + cWeightPH;
         if (totalWeight > 0) projected.ph = ratingFromCurve((stdSum + cSumPH) / totalWeight, "DEFAULT");
       }
