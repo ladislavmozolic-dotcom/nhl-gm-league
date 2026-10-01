@@ -1691,7 +1691,7 @@ model LiveCalcConfig {
   previousMpYear   Int       @default(2024)
   latestWeight     Float     @default(0.8)
   previousWeight   Float     @default(0.2)
-  nhlGpLatestMin   Int       @default(10)
+  nhlGpLatestMin   Int       @default(1)
   nhlGpPrevMin     Int       @default(10)
   ahlNhleLatest    Float     @default(0.446)
   ahlNhlePrevious  Float     @default(0.448)

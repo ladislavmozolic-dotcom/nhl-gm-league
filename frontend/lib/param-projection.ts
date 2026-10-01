@@ -20,7 +20,7 @@ import {
 
 export const LAST_WEIGHT = 0.2;
 export const CUR_WEIGHT = 0.8;
-export const ACTIVATE_AT_GP = 10; // real season "counts" once players have ~10 games
+export const ACTIVATE_AT_GP = 1; // real season "counts" from the 1st game
 export const SEASON_GAMES = 82;   // reference full season for the games-missed penalty
 
 /** Games-missed rating penalty: a player who sits out chunks of the season doesn't
@@ -193,7 +193,7 @@ export async function projectAllSkaters(): Promise<{ rows: ProjSkater[]; active:
     },
   }) as unknown as Row[];
 
-  const active = players.filter((p) => Number(p.curSeasonGP ?? 0) >= ACTIVATE_AT_GP).length >= 50;
+  const active = players.filter((p) => Number(p.curSeasonGP ?? 0) >= ACTIVATE_AT_GP).length >= 10;
 
   const rows: ProjSkater[] = players.map((p) => {
     const pos = posOf(p.position);

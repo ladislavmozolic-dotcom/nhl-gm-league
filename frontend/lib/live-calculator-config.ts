@@ -149,7 +149,7 @@ export const DEFAULT_CONFIG: LiveCalcConfigData = {
   previousMpYear: 2024,
   latestWeight: 0.8,
   previousWeight: 0.2,
-  nhlGpLatestMin: 10,
+  nhlGpLatestMin: 1,
   nhlGpPrevMin: 10,
   ahlNhleLatest: 0.446,
   ahlNhlePrevious: 0.448,
