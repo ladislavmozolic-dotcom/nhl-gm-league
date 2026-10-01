@@ -39,3 +39,11 @@ profi.unhl.eu {
 		max_size 10MB
 	}
 }
+
+# Append this block to the EXISTING shared Caddyfile used by nhl-gm-league's
+# Caddy container (see DEPLOY.md step 4). Do not run a second Caddy container.
+breaks.unhl.eu {
+	encode gzip
+	reverse_proxy nhl-break-manager-app:3000
+}
+
