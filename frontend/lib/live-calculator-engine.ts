@@ -657,6 +657,10 @@ export async function runLiveCalculatorRecompute(): Promise<{
       // DU (Durability): games-played availability — not population-based
       projected.du = durabilityFromAvailability(e.nhlGpLatest, 82, e.nhlGpPrevious);
 
+      // PH changes only after the player has a meaningful current-season sample.
+      // Prior-season data supplies context for an active player; it must not move
+      // an inactive player's PH by itself (e.g. a player yet to dress this year).
+      if (e.nhlGpLatest >= config.nhlGpLatestMin) {
       // PH (Puck Handling): turnover protection, NHL EDGE 5v5 offensive-zone
       // puck-time share, and takeaways/60. Every available component is ranked
       // against same-position peers; lower turnover rate is better.
@@ -674,6 +678,7 @@ export async function runLiveCalculatorRecompute(): Promise<{
         const { sum: cSumPH, weight: cWeightPH } = evalCustom(e.posGroup === "D" ? "phD" : "phF", e.posGroup, e.p);
         const totalWeight = stdWeight + cWeightPH;
         if (totalWeight > 0) projected.ph = ratingFromCurve((stdSum + cSumPH) / totalWeight, "DEFAULT");
+      }
       }
 
       // FO (Faceoffs): win% percentile — only meaningful for centres who take draws
