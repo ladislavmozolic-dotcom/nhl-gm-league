@@ -141,7 +141,7 @@ function threeStars(data: Data) {
 // ---- small pieces -----------------------------------------------------------
 function Linescore({ title, sub, side, home, field }: { title: string; sub: string; side: Data; home: Side; field: "goalsByPeriod" | "shotsByPeriod" }) {
   const a = side.away[field], h = home[field];
-  const hasOT = (a[3] ?? 0) > 0 || (h[3] ?? 0) > 0;
+  const hasOT = side.endedIn !== "REG";
   const heads = hasOT ? ["1", "2", "3", "OT"] : ["1", "2", "3"];
   const idxs = heads.map((_, i) => i);
   const sum = (arr: number[]) => arr.reduce((x, y) => x + y, 0);
@@ -671,12 +671,12 @@ export default function GameView({ data, intelSlot }: { data: Data; intelSlot?: 
     ["Blocked shots", teamSum(data.away, "blocks"), teamSum(data.home, "blocks")],
   ];
 
-  // period score string: "(1-0, 2-1, 1-0)"
+  // period score string: e.g. "(1-0, 2-1, 1-0)" or "(1-0, 2-1, 1-0, 0-1)" for OT
   const periodScoreStr = (() => {
-    const maxP = Math.max(data.home.goalsByPeriod.length, data.away.goalsByPeriod.length);
-    if (!maxP) return null;
+    const isReg = data.endedIn === "REG";
+    const numPeriods = isReg ? 3 : 4;
     const parts = [];
-    for (let i = 0; i < maxP; i++) {
+    for (let i = 0; i < numPeriods; i++) {
       const a = data.away.goalsByPeriod[i] ?? 0;
       const h = data.home.goalsByPeriod[i] ?? 0;
       parts.push(`${a}-${h}`);
