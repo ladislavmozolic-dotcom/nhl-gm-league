@@ -485,6 +485,10 @@ export async function runLiveCalculatorRecompute(): Promise<{
   };
 
   const w = config.weights;
+  // Use the furthest current NHL games-played total as the season progress
+  // denominator for durability. In October, for example, one appearance must
+  // be judged against the 2–4 games a club could actually have played, not 82.
+  const currentNhlSeasonGames = Math.max(1, ...enriched.map((e) => e.nhlGpLatest));
   let nhlCount = 0;
   let ahlCount = 0;
 
@@ -655,7 +659,7 @@ export async function runLiveCalculatorRecompute(): Promise<{
       }
 
       // DU (Durability): games-played availability — not population-based
-      projected.du = durabilityFromAvailability(e.nhlGpLatest, 82, e.nhlGpPrevious);
+      projected.du = durabilityFromAvailability(e.nhlGpLatest, currentNhlSeasonGames, e.nhlGpPrevious);
 
       // PH begins updating as soon as a player has appeared in one current-season
       // NHL game. This deliberately does not use nhlGpLatestMin: that threshold
@@ -680,9 +684,10 @@ export async function runLiveCalculatorRecompute(): Promise<{
         const { sum: cSumPH, weight: cWeightPH } = evalCustom(e.posGroup === "D" ? "phD" : "phF", e.posGroup, e.p);
         const totalWeight = stdWeight + cWeightPH;
         if (totalWeight > 0) {
-          projected.ph = ratingFromCurve(
-            (stdSum + cSumPH) / totalWeight,
-            e.posGroup === "D" ? "PH_D" : "PH_F"
+          projected.ph = lookupRatingFromPercentile(
+            "PH",
+            e.posGroup,
+            (stdSum + cSumPH) / totalWeight
           );
         }
       }
@@ -709,7 +714,13 @@ export async function runLiveCalculatorRecompute(): Promise<{
         if (e.pim60 != null) parts.push([percentileOf(e.pim60, pool.pim60), 0.6]);
         if (e.hit60 != null) parts.push([percentileOf(e.hit60, pool.hit60), 0.4]);
         const wtot = parts.reduce((s, [, wt]) => s + wt, 0);
-        if (wtot > 0) projected.fg = ratingFromCurve(parts.reduce((s, [pc, wt]) => s + pc * wt, 0) / wtot, "DEFAULT");
+        if (wtot > 0) {
+          projected.fg = lookupRatingFromPercentile(
+            "FG",
+            e.posGroup,
+            parts.reduce((s, [pc, wt]) => s + pc * wt, 0) / wtot
+          );
+        }
       }
 
       // LD (Leadership): captaincy + experience

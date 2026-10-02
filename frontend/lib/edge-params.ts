@@ -34,13 +34,6 @@ export const RATING_CURVES: Record<string, Anchor[]> = {
   SC: ends([[0.10, 58], [0.25, 66], [0.50, 74], [0.70, 80], [0.85, 86], [0.93, 90], [0.97, 94], [0.99, 97], [0.997, 99]]),
   PA: ends([[0.10, 58], [0.25, 66], [0.50, 74], [0.70, 80], [0.84, 86], [0.91, 90], [0.96, 94], [0.99, 97], [0.997, 99]]),
   DEFAULT: ends([[0.10, 59], [0.25, 67], [0.50, 74], [0.70, 80], [0.85, 85], [0.93, 89], [0.97, 92], [0.99, 95], [0.997, 98]]),
-  // PH is calibrated to the league's established STHS parameter scale. The
-  // possession-event composite is percentile-based and would otherwise map its
-  // median directly to 74, a large artificial jump from the historic PH range.
-  // Keep normal players near that range while reserving high ratings for rare,
-  // clearly elite puck handlers.
-  PH_F: ends([[0.10, 37], [0.25, 46], [0.50, 53], [0.70, 58], [0.85, 66], [0.93, 74], [0.97, 82], [0.99, 90], [0.997, 96]]),
-  PH_D: ends([[0.10, 31], [0.25, 34], [0.50, 39], [0.70, 43], [0.85, 51], [0.93, 60], [0.97, 70], [0.99, 82], [0.997, 92]]),
 };
 
 /** Map a percentile (0..1) to a rating via the parameter's non-linear anchor curve. */
