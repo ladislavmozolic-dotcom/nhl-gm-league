@@ -6,6 +6,7 @@
 
 import { prisma } from "./prisma";
 import { cleanName } from "./playerName";
+import { getLiveCalculatorConfig } from "./live-calculator-config";
 
 const CSV = (season: number) => `https://moneypuck.com/moneypuck/playerData/seasonSummary/${season}/regular/goalies.csv`;
 const key = (name: string) => name.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z]/g, "");
@@ -101,7 +102,13 @@ async function fetchSeason(season: number): Promise<Map<string, GoalieMetrics>> 
 }
 
 export async function importMoneyPuckGoalies(): Promise<{ matched: number; total: number }> {
-  const [cur, last] = await Promise.all([fetchSeason(2025), fetchSeason(2024)]);
+  // Keep the live source in lockstep with the seasons selected in Calculator
+  // Tuning. This avoids a hidden year change whenever a new NHL season starts.
+  const config = await getLiveCalculatorConfig();
+  const [cur, last] = await Promise.all([
+    fetchSeason(config.latestMpYear),
+    fetchSeason(config.previousMpYear),
+  ]);
   const goalies = await prisma.player.findMany({ where: { isGoalie: true }, select: { id: true, name: true } });
   let matched = 0;
   for (const g of goalies) {

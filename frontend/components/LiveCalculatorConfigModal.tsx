@@ -1975,7 +1975,7 @@ export default function LiveCalculatorConfigModal({
                     <span>🥅</span> Váhy atribútov brankárov (STHS Goalie Ratings)
                   </h3>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    Prepočet brankárov z MoneyPuck pokročilých metrík (GSAx, HD SV%, Rebound Control...), NHL štatistík a biometrie. Morálka (MO) zostáva chránená a nedotknutá.
+                    Prepočet brankárov z MoneyPuck pokročilých metrík, NHL štatistík a biometrie. Každá karta umožňuje upraviť základné váhy a cez „Pridať metriku“ pripojiť SV%, GAA, GSAx, danger splity, dorážky, freezes či vyťaženosť. Morálka (MO) zostáva chránená a nedotknutá.
                   </p>
                 </div>
                 <div className="text-right">

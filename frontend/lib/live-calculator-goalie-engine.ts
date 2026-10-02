@@ -215,6 +215,9 @@ export async function runLiveCalculatorGoalieRecompute(): Promise<{
   for (const k of Object.values(GOALIE_CAL_MAP)) sthsRef[k].sort((a, b) => a - b);
 
   const gw = config.goalieWeights;
+  // At the start of a season, judge availability against games the league has
+  // actually reached, not the eventual 82-game schedule.
+  const currentNhlSeasonGames = Math.max(1, ...rows.map((r) => r.curGP));
 
   type ProjectedGoalie = {
     id: number;
@@ -301,7 +304,7 @@ export async function runLiveCalculatorGoalieRecompute(): Promise<{
     ratings.EX = Math.round(50 + exPct * 40);
 
     // Durability (DU)
-    const curAvailability = r.curGP / 82;
+    const curAvailability = r.curGP / currentNhlSeasonGames;
     const lastAvailability = r.lastGP / 82;
     const avail = curAvailability * REC_CUR + lastAvailability * REC_LAST;
     ratings.DU = Math.round(55 + Math.min(1, Math.max(0, avail * 1.5)) * 35);
