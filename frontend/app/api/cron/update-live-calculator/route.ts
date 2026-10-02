@@ -11,8 +11,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    console.log("[Cron LiveCalculator] Starting scheduled sync and recompute...");
-    const syncRes = await syncLiveCalculatorData();
+    const recomputeOnly = req.nextUrl.searchParams.get("recomputeOnly") === "1";
+    console.log(`[Cron LiveCalculator] Starting ${recomputeOnly ? "recompute" : "scheduled sync and recompute"}...`);
+    const syncRes = recomputeOnly ? null : await syncLiveCalculatorData();
     const recomputeRes = await runLiveCalculatorRecompute();
     const goalieRecomputeRes = await runLiveCalculatorGoalieRecompute();
 

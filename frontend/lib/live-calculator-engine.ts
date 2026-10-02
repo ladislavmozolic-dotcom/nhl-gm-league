@@ -831,6 +831,11 @@ export async function runLiveCalculatorRecompute(): Promise<{
     if (actual.ld != null && projected.ld != null) {
       projected.ld = Math.round(actual.ld * 0.85 + projected.ld * 0.15);
     }
+    // PH now has a useful live signal, but a one-season possession sample must
+    // not erase the established STHS puck-handling scale in a single update.
+    if (actual.ph != null && projected.ph != null) {
+      projected.ph = Math.round(actual.ph * 0.80 + projected.ph * 0.20);
+    }
 
     // Compute deltas
     for (const key of SKATER_PARAMS) {
