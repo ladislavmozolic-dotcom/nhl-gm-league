@@ -33,14 +33,52 @@ export default function TeamSubNav({ slug, isGm, isAffiliate, farmSlug, parentSl
   const tr = useT();
   const L = (label: string) => (LABEL_KEY[label] ? tr(LABEL_KEY[label]) : label);
   const base = `/teams/${slug}`;
-  // tap-to-toggle dropdowns (mobile has no hover); desktop still opens on hover.
   const [open, setOpen] = useState<string | null>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const navRef = useRef<HTMLElement>(null);
-  useEffect(() => setOpen(null), [pathname]); // close after navigating
+
+  const handleClose = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    setOpen(null);
+    if (typeof document !== "undefined") {
+      (document.activeElement as HTMLElement)?.blur();
+    }
+  };
+
+  const handleMouseEnter = (label: string) => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    setOpen(label);
+  };
+
+  const handleMouseLeave = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    closeTimer.current = setTimeout(() => {
+      setOpen(null);
+    }, 150);
+  };
+
   useEffect(() => {
-    const onDoc = (e: MouseEvent) => { if (navRef.current && !navRef.current.contains(e.target as Node)) setOpen(null); };
+    handleClose();
+  }, [pathname]); // close after navigating
+
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      if (navRef.current && !navRef.current.contains(e.target as Node)) {
+        handleClose();
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        handleClose();
+      }
+    };
     document.addEventListener("click", onDoc);
-    return () => document.removeEventListener("click", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("click", onDoc);
+      document.removeEventListener("keydown", onKey);
+      if (closeTimer.current) clearTimeout(closeTimer.current);
+    };
   }, []);
 
   const entries: Entry[] = isAffiliate
@@ -127,18 +165,51 @@ export default function TeamSubNav({ slug, isGm, isAffiliate, farmSlug, parentSl
           const groupActive = items.some((it) => isActive(it.href));
           const isOpen = open === e.label;
           return (
-            <div key={e.label} className="relative group">
-              <button type="button" onClick={() => setOpen(isOpen ? null : e.label)} aria-expanded={isOpen}
-                className={`${linkCls(groupActive)} inline-flex items-center gap-1`}>
-                {L(e.label)}<span className={`text-[8px] text-slate-500 transition-transform ${isOpen ? "rotate-180" : ""}`}>▼</span>
+            <div
+              key={e.label}
+              className="relative"
+              onMouseEnter={() => handleMouseEnter(e.label)}
+              onMouseLeave={handleMouseLeave}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  if (isOpen) {
+                    handleClose();
+                  } else {
+                    handleMouseEnter(e.label);
+                  }
+                }}
+                aria-expanded={isOpen}
+                className={`${linkCls(groupActive)} inline-flex items-center gap-1`}
+              >
+                {L(e.label)}
+                <span className={`text-[8px] text-slate-500 transition-transform ${isOpen ? "rotate-180" : ""}`}>
+                  ▼
+                </span>
               </button>
-              <div className={`absolute left-0 top-full z-40 ${isOpen ? "block" : "hidden md:group-hover:block md:group-focus-within:block"} min-w-[180px] rounded-lg border border-slate-700 bg-slate-900 shadow-xl py-1`}>
+              <div
+                className={`absolute left-0 top-full z-40 ${
+                  isOpen ? "block" : "hidden"
+                } min-w-[180px] rounded-lg border border-slate-700 bg-slate-900 shadow-xl py-1`}
+              >
                 {items.map((it) => {
                   const active = isActive(it.href);
                   return (
-                    <Link key={it.label} href={it.href} onClick={() => setOpen(null)}
-                      className={`block px-4 py-2.5 text-sm whitespace-nowrap ${active ? "text-blue-400 bg-slate-800/60" : "text-slate-300 hover:bg-slate-800/60 hover:text-white"}`}>
-                      {L(it.label)}{it.gm && <span className="ml-1 text-[9px] text-slate-500 align-top">GM</span>}
+                    <Link
+                      key={it.label}
+                      href={it.href}
+                      onClick={handleClose}
+                      className={`block px-4 py-2.5 text-sm whitespace-nowrap ${
+                        active
+                          ? "text-blue-400 bg-slate-800/60"
+                          : "text-slate-300 hover:bg-slate-800/60 hover:text-white"
+                      }`}
+                    >
+                      {L(it.label)}
+                      {it.gm && (
+                        <span className="ml-1 text-[9px] text-slate-500 align-top">GM</span>
+                      )}
                     </Link>
                   );
                 })}
