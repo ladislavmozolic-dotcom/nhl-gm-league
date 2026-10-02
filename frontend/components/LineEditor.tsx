@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import LinesNav from "@/components/LinesNav";
 import { autoFill, type TeamLinesData, type ForwardLine, type DefensePair, type SpecialUnit } from "@/lib/sim/lines-core";
@@ -66,6 +66,19 @@ const TAB_GROUPS = [
   { label: "Tactics", tabs: ["Strategy"] },
 ] as const;
 const TABS = TAB_GROUPS.flatMap((g) => g.tabs);
+
+// LineEditor declares its small sub-components INSIDE the component so they can
+// close over its state. A plain inner `const X = () => ...` gets a brand-new
+// identity on every render, so React unmounts and remounts it — which destroys
+// an open native <select> popup: the player picker flashed open and vanished
+// whenever anything re-rendered the editor (a background router.refresh, any
+// state change). useStable keeps ONE component identity for the editor's whole
+// life and always calls the latest closure, so nothing remounts.
+function useStable<P, R extends React.ReactNode>(render: (p: P) => R): (p: P) => R {
+  const ref = useRef(render);
+  ref.current = render;
+  return useCallback((p: P) => ref.current(p), []);
+}
 
 function Stepper({ value, onChange, min = 0, max = 99, step = 1, w = "w-14", compact = false }: {
   value: number; onChange: (v: number) => void; min?: number; max?: number; step?: number; w?: string; compact?: boolean;
@@ -151,7 +164,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
   // fresh/disrupted unit is slightly suppressed. Shown per line so the GM can see
   // which trios/pairs have jelled and which are still finding their game.
   const chemMap = chemistry ?? {};
-  const ChemBadge = ({ ids }: { ids: (number | null)[] }) => {
+  const ChemBadge = useStable(({ ids }: { ids: (number | null)[] }) => {
     if (!chemEnabled) return null;
     const members = ids.filter((x): x is number => x != null);
     if (members.length < 2) return null;
@@ -167,13 +180,13 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
         🧪 {r} · {label}
       </span>
     );
-  };
+  });
 
   // Role Fit — STHS rewards a complementary mix (a line wants a playmaker + a
   // sniper + a grinder; a pair wants an offensive + a stay-at-home D). Computed
   // live from the current line-up so a GM sees it while dragging players around,
   // before saving — same real formula the sim uses (feeds chemFactor).
-  const RoleFitBadge = ({ ids, isDef }: { ids: (number | null)[]; isDef: boolean }) => {
+  const RoleFitBadge = useStable(({ ids, isDef }: { ids: (number | null)[]; isDef: boolean }) => {
     const members = ids.filter((x): x is number => x != null).map((id) => byId.get(id)).filter((p): p is Player => !!p);
     if (members.length < 2) return null;
     const fit = roleFitOf(members, isDef);
@@ -186,9 +199,9 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
         ⚙ {label}
       </span>
     );
-  };
+  });
 
-  const TacticalFitBadge = ({ ids, isDef, puck, dZone, lineIndex }: { ids: (number | null)[]; isDef: boolean; puck?: PuckStyle; dZone?: DZone; lineIndex: number }) => {
+  const TacticalFitBadge = useStable(({ ids, isDef, puck, dZone, lineIndex }: { ids: (number | null)[]; isDef: boolean; puck?: PuckStyle; dZone?: DZone; lineIndex: number }) => {
     const members = ids.map((id) => id == null ? null : byId.get(id) ?? null);
     if (members.filter(Boolean).length < 2) return null;
     const tactics = mergeTactics(data.system);
@@ -202,7 +215,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
         ♟ Fit {fit}
       </span>
     );
-  };
+  });
 
   // A player may deliberately double-shift on two different lines. The invalid
   // case is occupying two positions inside the SAME line/pair/unit.
@@ -279,14 +292,14 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
   // select (opacity-0, so it has no visible bg/text of its own) lets the
   // browser fall back to its native popup styling, which on a dark-mode OS
   // can render white-on-white until an option is hovered/highlighted.
-  const Select = ({ value, onChange, pool, overlay = false, pill = false, allowEmpty = true }: { value: number | null; onChange: (v: number | null) => void; pool: Player[]; overlay?: boolean; pill?: boolean; allowEmpty?: boolean }) => (
+  const Select = useStable(({ value, onChange, pool, overlay = false, pill = false, allowEmpty = true }: { value: number | null; onChange: (v: number | null) => void; pool: Player[]; overlay?: boolean; pill?: boolean; allowEmpty?: boolean }) => (
     <select value={value != null && pool.some((p) => p.id === value) ? value : ""} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
       style={{ colorScheme: "dark" }}
       className={overlay ? "absolute inset-0 w-full h-full opacity-0 cursor-pointer" : pill ? "lines-goalie-select" : "lines-select w-full min-w-[132px] bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-sm"}>
       {allowEmpty && <option value="" style={{ backgroundColor: "#0f172a", color: "#e2e8f0" }}>— empty —</option>}
       {pool.map((p) => <option key={p.id} value={p.id} disabled={p.injured || p.tired} style={{ backgroundColor: "#0f172a", color: "#e2e8f0" }}>{p.name}{p.cap ? ` (${p.cap})` : ""} · {p.position} ({p.overall}){p.con != null ? ` · CON ${p.con}%${p.con < 90 ? " ⚠️" : ""}` : ""}{p.injured ? " 🤕 INJ" : p.tired ? " 😮‍💨 UNAVAILABLE" : ""}</option>)}
     </select>
-  );
+  ));
 
   // ---------- section renderers ----------
   const setFwd = (i: number, slot: "lw" | "c" | "rw", v: number | null) => change((d) => { d.forwardLines[i][slot] = v; });
@@ -304,7 +317,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
   const setFwdPuck = (i: number, v: PuckStyle | "") => change((d) => { if (v) d.forwardLines[i].puck = v; else delete d.forwardLines[i].puck; });
   const setDefDzone = (i: number, v: DZone | "") => change((d) => { if (v) d.defensePairs[i].dzone = v; else delete d.defensePairs[i].dzone; });
   const inheritTxt = lang === "cs" ? "Zdediť tímový systém (nastav voľbu pre override len tejto formácie)" : "Inherit the team system (set an option to override just this line)";
-  const SysSelect = ({ value, dial, opts, onChange }: { value: string | undefined; dial: "puckStyle" | "dZone" | "ppStyle" | "pkStyle"; opts: Record<string, string>; onChange: (v: string) => void }) => (
+  const SysSelect = useStable(({ value, dial, opts, onChange }: { value: string | undefined; dial: "puckStyle" | "dZone" | "ppStyle" | "pkStyle"; opts: Record<string, string>; onChange: (v: string) => void }) => (
     <select value={value ?? ""} onChange={(e) => onChange(e.target.value)}
       title={value ? dialDesc(lang, dial, value) : inheritTxt}
       style={{ colorScheme: "dark" }}
@@ -312,7 +325,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
       <option value="" title={inheritTxt} style={{ backgroundColor: "#1e293b", color: "#e2e8f0" }}>{lang === "cs" ? "Tím" : "Team"}</option>
       {Object.keys(opts).filter((k) => k !== "balanced").map((k) => <option key={k} value={k} title={dialDesc(lang, dial, k)} style={{ backgroundColor: "#1e293b", color: "#e2e8f0" }}>{dialLabel(lang, dial, k)}</option>)}
     </select>
-  );
+  ));
   // team-level special-teams formation (stored on data.system, persisted with lines)
   const setStyle = (k: "ppStyle" | "pkStyle", v: string) => change((d) => { d.system = { ...mergeTactics(d.system), [k]: v as PpStyle & PkStyle }; });
   const FormationPicker = (k: "ppStyle" | "pkStyle", label: string) => {
@@ -338,7 +351,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
   // runs Umbrella, or PK1 a Box while PK2 presses in a Diamond.
   const setUnitStyle = (key: "pp" | "pp4" | "pk4" | "pk3", ui: number, v: string) =>
     change((d) => { const u = (d.situations[key] as SpecialUnit[])[ui]; if (v) u.style = v as PpStyle & PkStyle; else delete u.style; });
-  const UnitFormationBlock = ({ unitKey, ui, dial, label, layouts, dStartIndex, accent }: {
+  const UnitFormationBlock = useStable(({ unitKey, ui, dial, label, layouts, dStartIndex, accent }: {
     unitKey: "pp" | "pp4" | "pk4" | "pk3"; ui: number; dial: "ppStyle" | "pkStyle"; label: string;
     layouts: Record<string, FormationRole[]>; dStartIndex: number; accent: string;
   }) => {
@@ -362,7 +375,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
         </div>
       </div>
     );
-  };
+  });
   const setUnitTac = (key: keyof TeamLinesData["situations"] & string, ui: number, k: "phy" | "df" | "of", v: number) =>
     change((d) => { const u = (d.situations[key] as SpecialUnit[])[ui]; u.tactic = { ...tac(u.tactic), [k]: v }; });
   // the DEFENSE game plan of a special-teams unit (its own PHY/DF/OF, parallel to the
@@ -370,7 +383,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
   const setUnitDTac = (key: keyof TeamLinesData["situations"] & string, ui: number, k: "phy" | "df" | "of", v: number) =>
     change((d) => { const u = (d.situations[key] as SpecialUnit[])[ui]; u.dTactic = { ...tac(u.dTactic), [k]: v }; });
   // three PHY/DF/OF steppers for one unit's tactic (clamped 0..5, red when the row ≠ 5)
-  const TacCells = ({ t, onSet }: { t?: { phy: number; df: number; of: number }; onSet: (k: "phy" | "df" | "of", v: number) => void }) => {
+  const TacCells = useStable(({ t, onSet }: { t?: { phy: number; df: number; of: number }; onSet: (k: "phy" | "df" | "of", v: number) => void }) => {
     const tt = tac(t); const bad = tt.phy + tt.df + tt.of !== 5;
     return (["phy", "df", "of"] as const).map((k) => (
       <td key={k} className="px-1 py-1.5 text-center">
@@ -378,7 +391,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
         {bad && k === "of" && <span className="ml-1 text-[10px] text-rose-400" title="PHY+DF+OF must total 5">≠5</span>}
       </td>
     ));
-  };
+  });
 
   // what each 0-5 tactic dial means (native hover tooltip)
   const TAC_DESC: Record<string, string> = {
@@ -387,18 +400,18 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
     OF: "Offensive push (0-5): pinching, joining the rush and pressing for chances. Higher = an attacking unit that generates more but leaks more.",
   };
   // one labelled 0-5 tactic stepper — hover the label for what it means
-  const TacStep = ({ label, value, onSet }: { label: string; value: number; onSet: (v: number) => void }) => (
+  const TacStep = useStable(({ label, value, onSet }: { label: string; value: number; onSet: (v: number) => void }) => (
     <div className="flex items-center gap-1.5">
       <span title={TAC_DESC[label]} className="text-[11px] uppercase tracking-wide text-slate-500 w-8 cursor-help border-b border-dotted border-slate-600">{label}</span>
       <Stepper value={value} step={1} compact onChange={(v) => onSet(Math.max(0, Math.min(5, v as unknown as number)))} />
     </div>
-  );
+  ));
   // a player slot: jersey card with the pick baked in — the visible chip is
   // purely decorative, a transparent native <select> (`overlay`) covers the
   // whole card so clicking anywhere (or the swap badge) opens the real
   // picker, same swap logic as the old plain dropdown.
   const SHORT_SLOT: Record<string, string> = { "Left Wing": "LW", "Center": "C", "Right Wing": "RW", "Left Defense": "LD", "Right Defense": "RD" };
-  const Slot = ({ label, value, onChange, pool }: { label: string; value: number | null; onChange: (v: number | null) => void; pool: Player[] }) => {
+  const Slot = useStable(({ label, value, onChange, pool }: { label: string; value: number | null; onChange: (v: number | null) => void; pool: Player[] }) => {
     const p = value != null ? byId.get(value) : null;
     const cleanLastName = p ? displayName(p.name).trim().split(/\s+/).pop() : null;
     // Real scouting TYPE (Sniper, Forechecker/Grinder, Two-Way Defenceman, ...) —
@@ -443,7 +456,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
         <Select value={value} onChange={onChange} pool={pool} overlay />
       </div>
     );
-  };
+  });
 
   const LineTotalBar = (rows: { timePct: number }[]) => {
     const tot = timeSum(rows);
@@ -629,7 +642,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
     change((d) => { d.situations.others[k][i] = v; });
   const setLastMin = (k: "off" | "def", i: number, v: number | null) => change((d) => { d.situations.lastMin[k][i] = v; });
 
-  const GoalieDepthCard = ({ role, value, onChange, starter = false, pool = goaliesByName }: { role: string; value: number | null; onChange: (v: number | null) => void; starter?: boolean; pool?: Player[] }) => {
+  const GoalieDepthCard = useStable(({ role, value, onChange, starter = false, pool = goaliesByName }: { role: string; value: number | null; onChange: (v: number | null) => void; starter?: boolean; pool?: Player[] }) => {
     const goalie = value == null ? null : byId.get(value) ?? null;
     const lastName = goalie ? displayName(goalie.name).trim().split(/\s+/).pop() : null;
     return (
@@ -668,7 +681,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
         </div>
       </article>
     );
-  };
+  });
 
   return (
     <div className="max-w-7xl mx-auto px-4 pb-28">
