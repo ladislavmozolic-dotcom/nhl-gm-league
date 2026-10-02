@@ -353,6 +353,17 @@ export async function runLiveCalculatorGoalieRecompute(): Promise<{
     }
   }
 
+  // Experience and leadership are accumulated / league-context attributes.
+  // Preserve the established STHS value as the dominant anchor and let the
+  // live model adjust it only gradually, preventing an incomplete career feed
+  // from making a veteran suddenly look inexperienced or unproven.
+  for (const p of projectedList) {
+    const actualEx = p.row.player.goalieRating?.ex;
+    const actualLd = p.row.player.goalieRating?.ld;
+    if (actualEx != null) p.ratings.EX = Math.round(actualEx * 0.85 + p.ratings.EX * 0.15);
+    if (actualLd != null) p.ratings.LD = Math.round(actualLd * 0.85 + p.ratings.LD * 0.15);
+  }
+
   // OV is included in GOALIE_CAL_MAP, so the affine pass above has already
   // mapped the raw core-average to the original STHS overall distribution.
   // Do not overwrite it with the uncalibrated arithmetic average here: doing

@@ -821,6 +821,17 @@ export async function runLiveCalculatorRecompute(): Promise<{
       }
     }
 
+    // EX and LD are long-term STHS attributes, not short-season performance
+    // ratings. Keep their established league scale as a strong anchor; real
+    // career data should refine them gradually, never erase a veteran's record
+    // because of a roster classification or an incomplete data import.
+    if (actual.ex != null && projected.ex != null) {
+      projected.ex = Math.round(actual.ex * 0.85 + projected.ex * 0.15);
+    }
+    if (actual.ld != null && projected.ld != null) {
+      projected.ld = Math.round(actual.ld * 0.85 + projected.ld * 0.15);
+    }
+
     // Compute deltas
     for (const key of SKATER_PARAMS) {
       const act = actual[key] ?? 50;
