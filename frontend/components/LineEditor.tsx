@@ -74,8 +74,17 @@ const TABS = TAB_GROUPS.flatMap((g) => g.tabs);
 // often never opened it. This is a plain in-page list (bottom sheet on a phone,
 // centred dialog on desktop) that lives in its own state, so nothing outside it
 // can dismiss it — only a pick, the backdrop, the ✕ button or Esc.
-function PlayerPickerOverlay({ value, onChange, pool, allowEmpty = true }: { value: number | null; onChange: (v: number | null) => void; pool: Player[]; allowEmpty?: boolean }) {
+type PickSort = "name" | "ov" | "ck" | "pa" | "sc" | "df";
+const PICK_SORTS: { k: PickSort; label: string }[] = [
+  { k: "name", label: "A–Z" }, { k: "ov", label: "OV" }, { k: "ck", label: "CK" }, { k: "pa", label: "PA" }, { k: "sc", label: "SC" }, { k: "df", label: "DF" },
+];
+const ovTone = (v: number) => (v >= 70 ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40" : v >= 60 ? "bg-sky-500/20 text-sky-300 border-sky-500/40" : v >= 50 ? "bg-amber-500/15 text-amber-300 border-amber-500/30" : "bg-slate-700/40 text-slate-300 border-slate-600/50");
+const statTone = (v: number | null | undefined) => (v == null ? "text-slate-500" : v >= 75 ? "text-emerald-300" : v >= 60 ? "text-sky-300" : v >= 45 ? "text-slate-200" : "text-rose-300");
+
+function PlayerPickerOverlay({ value, onChange, pool, allowEmpty = true, title }: { value: number | null; onChange: (v: number | null) => void; pool: Player[]; allowEmpty?: boolean; title?: string }) {
   const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const [sort, setSort] = useState<PickSort>("name");
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
@@ -84,44 +93,85 @@ function PlayerPickerOverlay({ value, onChange, pool, allowEmpty = true }: { val
     window.addEventListener("keydown", onKey);
     return () => { document.body.style.overflow = prev; window.removeEventListener("keydown", onKey); };
   }, [open]);
-  const pick = (v: number | null) => { onChange(v); setOpen(false); };
+  const close = () => { setOpen(false); setQ(""); };
+  const pick = (v: number | null) => { onChange(v); close(); };
+  const current = value != null ? pool.find((p) => p.id === value) ?? null : null;
+  const rows = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    const list = needle ? pool.filter((p) => p.name.toLowerCase().includes(needle)) : [...pool];
+    if (sort !== "name") list.sort((a, b) => ((b[sort === "ov" ? "overall" : sort] ?? -1) as number) - ((a[sort === "ov" ? "overall" : sort] ?? -1) as number));
+    return list;
+  }, [pool, q, sort]);
   return (
     <>
       <button type="button" aria-label="Change player" onClick={() => setOpen(true)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
       {open && createPortal(
-        <div className="fixed inset-0 z-[300] flex items-end sm:items-center justify-center bg-black/70" onClick={() => setOpen(false)}>
+        <div className="fixed inset-0 z-[300] flex items-end sm:items-center justify-center bg-slate-950/75 backdrop-blur-sm" onClick={close}>
           <div role="dialog" aria-label="Choose player" onClick={(e) => e.stopPropagation()}
-            className="w-full sm:max-w-md max-h-[80vh] flex flex-col rounded-t-2xl sm:rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
-              <span className="text-sm font-bold text-slate-200">Choose player</span>
-              <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="w-8 h-8 rounded-full bg-slate-800 text-slate-300 hover:text-white">✕</button>
+            className="w-full sm:max-w-lg max-h-[86vh] flex flex-col overflow-hidden rounded-t-3xl sm:rounded-2xl bg-slate-900 border border-slate-700/80 shadow-[0_-12px_60px_rgba(2,8,23,.65)]">
+            <div className="sm:hidden mx-auto mt-2 h-1 w-10 rounded-full bg-slate-700" />
+            <div className="px-4 pt-3 pb-3 border-b border-slate-800 bg-gradient-to-b from-slate-800/60 to-transparent">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[10px] font-extrabold uppercase tracking-widest text-blue-400">{title ? `Swap · ${title}` : "Choose player"}</div>
+                  <div className="text-sm text-slate-300 truncate">{current ? <>Now: <b className="text-white">{current.name}</b></> : <span className="italic text-slate-500">Slot is empty</span>}</div>
+                </div>
+                <button type="button" onClick={close} aria-label="Close" className="flex-none w-9 h-9 rounded-full bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500">✕</button>
+              </div>
+              <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search player…" enterKeyHint="search"
+                className="mt-3 w-full rounded-xl bg-slate-950/70 border border-slate-700 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-sky-500" />
+              <div className="mt-2 flex items-center gap-1.5 overflow-x-auto">
+                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500 mr-0.5">Sort</span>
+                {PICK_SORTS.map((o) => (
+                  <button key={o.k} type="button" onClick={() => setSort(o.k)}
+                    className={`flex-none rounded-full px-2.5 py-1 text-[11px] font-bold border ${sort === o.k ? "bg-blue-600 border-blue-500 text-white" : "bg-slate-800/70 border-slate-700 text-slate-400 hover:text-slate-200"}`}>{o.label}</button>
+                ))}
+              </div>
             </div>
-            <div className="overflow-y-auto overscroll-contain p-2 space-y-1">
-              {allowEmpty && (
-                <button type="button" onClick={() => pick(null)} className={`w-full text-left rounded-lg px-3 py-2.5 text-sm italic text-slate-400 hover:bg-slate-800 ${value == null ? "bg-slate-800" : ""}`}>— empty —</button>
+            <div className="overflow-y-auto overscroll-contain p-2.5 space-y-1.5">
+              {allowEmpty && !q && (
+                <button type="button" onClick={() => pick(null)} className={`w-full text-left rounded-xl px-3 py-2.5 text-sm italic text-slate-400 border ${value == null ? "bg-slate-800 border-slate-600" : "border-slate-800 hover:bg-slate-800/70"}`}>— empty —</button>
               )}
-              {pool.map((p) => {
+              {rows.map((p) => {
                 const off = !!(p.injured || p.tired);
+                const sel = p.id === value;
+                const type = p.position !== "G" ? playerType({ id: p.id, position: p.position, sc: p.sc, pa: p.pa, df: p.df, ck: p.ck, st: p.st, sk: p.sk, ph: p.ph }) : null;
+                const hasStats = p.ck != null || p.pa != null || p.sc != null || p.df != null;
                 return (
                   <button key={p.id} type="button" disabled={off} onClick={() => pick(p.id)}
-                    className={`w-full text-left rounded-lg px-3 py-2.5 text-sm ${off ? "opacity-40" : "hover:bg-slate-800"} ${p.id === value ? "bg-blue-600/25 border border-blue-500/50" : "border border-transparent"}`}>
-                    <span className="font-semibold text-slate-100">{p.name}</span>{p.cap ? <span className="text-slate-400"> ({p.cap})</span> : null}
-                    <span className="block text-xs text-slate-400">
-                      {p.position} · OV {p.overall}{p.con != null ? ` · CON ${p.con}%${p.con < 90 ? " ⚠️" : ""}` : ""}{p.injured ? " · 🤕 INJ" : p.tired ? " · 😮‍💨 UNAVAILABLE" : ""}
+                    className={`w-full text-left rounded-xl px-3 py-2.5 border flex items-center gap-3 transition-colors ${off ? "opacity-45 border-slate-800" : sel ? "bg-blue-600/20 border-blue-500/60" : "border-slate-800 bg-slate-900 hover:bg-slate-800/70 hover:border-slate-600"}`}>
+                    <span className={`flex-none w-11 h-11 rounded-xl border flex flex-col items-center justify-center leading-none ${ovTone(p.overall)}`}>
+                      <span className="text-base font-extrabold tabular-nums">{p.overall}</span>
+                      <span className="text-[8px] font-bold tracking-widest opacity-70 mt-0.5">OV</span>
                     </span>
-                    {(p.ck != null || p.pa != null || p.sc != null || p.df != null) && (
-                      <span className="mt-0.5 flex items-center gap-3 text-[11px] leading-none">
-                        {([["CK", p.ck], ["PA", p.pa], ["SC", p.sc], ["DF", p.df]] as const).map(([k, v]) => (
-                          <span key={k} className="whitespace-nowrap">
-                            <span className="text-slate-600 font-bold">{k}</span>{" "}
-                            <span className="text-slate-200 font-semibold tabular-nums">{v ?? "–"}</span>
-                          </span>
-                        ))}
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-bold text-[14px] text-white truncate">{p.name}</span>
+                        {p.cap ? <span className="text-[10px] font-extrabold text-amber-300">{p.cap}</span> : null}
+                        <span className="text-[10px] font-bold rounded px-1.5 py-0.5 bg-slate-800 border border-slate-700 text-slate-300">{p.position}</span>
+                        {sel && <span className="text-[10px] font-bold text-sky-300">● on this slot</span>}
                       </span>
-                    )}
+                      <span className="mt-0.5 flex items-center gap-2 flex-wrap text-[11px] text-slate-500">
+                        {type && <span className="text-sky-400/80 font-semibold">{type}</span>}
+                        {p.con != null && <span className={p.con < 90 ? "text-amber-400" : ""}>CON {p.con}%{p.con < 90 ? " ⚠️" : ""}</span>}
+                        {p.injured && <span className="text-rose-400 font-semibold">🤕 INJ</span>}
+                        {!p.injured && p.tired && <span className="text-amber-400 font-semibold">😮‍💨 unavailable</span>}
+                      </span>
+                      {hasStats && (
+                        <span className="mt-1.5 grid grid-cols-4 gap-1.5">
+                          {([["CK", p.ck], ["PA", p.pa], ["SC", p.sc], ["DF", p.df]] as const).map(([k, v]) => (
+                            <span key={k} className="rounded-md bg-slate-950/60 border border-slate-800 px-1.5 py-1 flex items-baseline justify-between leading-none">
+                              <span className="text-[9px] font-bold text-slate-500">{k}</span>
+                              <span className={`text-[12px] font-extrabold tabular-nums ${statTone(v)}`}>{v ?? "–"}</span>
+                            </span>
+                          ))}
+                        </span>
+                      )}
+                    </span>
                   </button>
                 );
               })}
+              {rows.length === 0 && <div className="py-8 text-center text-sm text-slate-500">No player matches “{q}”.</div>}
             </div>
           </div>
         </div>,
@@ -356,8 +406,8 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
   // select (opacity-0, so it has no visible bg/text of its own) lets the
   // browser fall back to its native popup styling, which on a dark-mode OS
   // can render white-on-white until an option is hovered/highlighted.
-  const Select = useStable(({ value, onChange, pool, overlay = false, pill = false, allowEmpty = true }: { value: number | null; onChange: (v: number | null) => void; pool: Player[]; overlay?: boolean; pill?: boolean; allowEmpty?: boolean }) => overlay ? (
-    <PlayerPickerOverlay value={value} onChange={onChange} pool={pool} allowEmpty={allowEmpty} />
+  const Select = useStable(({ value, onChange, pool, overlay = false, pill = false, allowEmpty = true, title }: { value: number | null; onChange: (v: number | null) => void; pool: Player[]; overlay?: boolean; pill?: boolean; allowEmpty?: boolean; title?: string }) => overlay ? (
+    <PlayerPickerOverlay value={value} onChange={onChange} pool={pool} allowEmpty={allowEmpty} title={title} />
   ) : (
     <select value={value != null && pool.some((p) => p.id === value) ? value : ""} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
       style={{ colorScheme: "dark" }}
@@ -519,7 +569,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
             </div>
           )}
         </div>
-        <Select value={value} onChange={onChange} pool={pool} overlay />
+        <Select value={value} onChange={onChange} pool={pool} overlay title={SHORT_SLOT[label] ?? label} />
       </div>
     );
   });
