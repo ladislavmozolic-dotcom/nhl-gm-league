@@ -109,6 +109,16 @@ function PlayerPickerOverlay({ value, onChange, pool, allowEmpty = true }: { val
                     <span className="block text-xs text-slate-400">
                       {p.position} · OV {p.overall}{p.con != null ? ` · CON ${p.con}%${p.con < 90 ? " ⚠️" : ""}` : ""}{p.injured ? " · 🤕 INJ" : p.tired ? " · 😮‍💨 UNAVAILABLE" : ""}
                     </span>
+                    {(p.ck != null || p.pa != null || p.sc != null || p.df != null) && (
+                      <span className="mt-0.5 flex items-center gap-3 text-[11px] leading-none">
+                        {([["CK", p.ck], ["PA", p.pa], ["SC", p.sc], ["DF", p.df]] as const).map(([k, v]) => (
+                          <span key={k} className="whitespace-nowrap">
+                            <span className="text-slate-600 font-bold">{k}</span>{" "}
+                            <span className="text-slate-200 font-semibold tabular-nums">{v ?? "–"}</span>
+                          </span>
+                        ))}
+                      </span>
+                    )}
                   </button>
                 );
               })}
