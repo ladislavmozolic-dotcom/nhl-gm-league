@@ -353,11 +353,10 @@ export async function runLiveCalculatorGoalieRecompute(): Promise<{
     }
   }
 
-  // Recalculate Overall after calibration
-  for (const p of projectedList) {
-    const core = [p.ratings.SC, p.ratings.RT, p.ratings.HS, p.ratings.AG, p.ratings.RB, p.ratings.EN, p.ratings.SZ];
-    p.ratings.OV = Math.round(core.reduce((a, b) => a + b, 0) / core.length);
-  }
+  // OV is included in GOALIE_CAL_MAP, so the affine pass above has already
+  // mapped the raw core-average to the original STHS overall distribution.
+  // Do not overwrite it with the uncalibrated arithmetic average here: doing
+  // so was what inflated elite goalies' projected OV despite a sensible RB/PH.
 
   // Save results to database in Player.liveCalculatorRatings
   const CHUNK = 100;
