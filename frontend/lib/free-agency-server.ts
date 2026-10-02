@@ -724,11 +724,14 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
 export async function evaluateTeamOffer(
   playerId: number, teamId: number, salary: number, years: number, deploy: Deployment,
   pool?: MarketRow[], cmap?: Map<number, Contention>, round?: number,
-  grant?: { clause?: string | null; breadth?: number | null },
+  grant?: { clause?: string | null; breadth?: number | null; ignoreRole?: boolean },
   churnMap?: Map<number, number>,
 ): Promise<{ acceptable: boolean; ask: Demand; utility: number; base: TeamAsk } | null> {
   const info = await teamAsk(playerId, teamId, pool, cmap, round, churnMap);
   if (!info) return null;
+  // a lone two-way bidder in the in-season market: the role promised isn't part of the
+  // deal, so judge it as exactly the role he projects into (no premium, no discount).
+  if (grant?.ignoreRole) deploy = { line: info.desired.line, pp: info.desired.wantPP, pk: info.desired.wantPK };
   const raw = deploymentDemand(info.base, info.grp, deploy, info.desired, info.contention, info.age, info.churn);
   // granting a clause lets him sign for less — discount his floor + headline ask.
   // EXCEPT when the club promises him a worse role than he wants: then he wants to

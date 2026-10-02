@@ -394,6 +394,12 @@ export async function submitOfferAction(
     relaxOlder = cold;
     relaxWeak = cold && clock.frenzyRound >= tw.weakRound;
   }
+  // In-season open market with nobody else bidding: he's glad of a deal, so even an
+  // established player settles for a 1-year two-way, and the role you promise doesn't
+  // factor into his price (see ignoreRole in evaluateTeamOffer / pickAndSign).
+  const othersBidding = await prisma.faOffer.count({ where: { playerId, teamId: { not: teamId }, status: { in: ["PENDING", "COUNTERED", "SHORTLISTED"] } } });
+  const coldInSeason = twoWay && win.immediate && !win.ownOnly && othersBidding === 0;
+  if (coldInSeason) { relaxOlder = true; relaxWeak = true; }
   const twoWayErr = twoWayObjection(twoWay, player, years, salary, {
     relaxOlder, relaxWeak, olderAge: tw.olderAge, gpLimit: tw.gpLimit, weakOverall: tw.weakOverall,
     maxYears: tw.maxYears, ahlMaxYears: tw.ahlMaxYears, fewGpMaxYears: tw.fewGpMaxYears, maxSalary: tw.maxSalary,
@@ -445,7 +451,7 @@ export async function submitOfferAction(
   const clause = grantClause && ["NTC", "NMC", "M_NTC"].includes(grantClause) ? grantClause : null;
   const breadth = clause === "M_NTC" ? ([6, 12, 18, 24].includes(mNtcBreadth ?? 0) ? mNtcBreadth! : 12) : null;
   const dep: Deployment = { line: clampLine(line), pp, pk };
-  const evalr = await evaluateTeamOffer(playerId, teamId, salary, years, dep, undefined, undefined, undefined, { clause, breadth });
+  const evalr = await evaluateTeamOffer(playerId, teamId, salary, years, dep, undefined, undefined, undefined, { clause, breadth, ignoreRole: coldInSeason });
   // judged against his pre-offer ask; a lowball then raises what he'll want from THIS club
   const bumped = evalr && !evalr.acceptable ? await recordLowball(playerId, teamId, salary, evalr.ask.salary) : null;
   const insult = bumped ? `😠 That lowball insulted him — from now on he'll ask your club about ${Math.round((bumped - 1) * 100)}% more.` : null;
@@ -583,7 +589,7 @@ type FaOfferRow = Awaited<ReturnType<typeof prisma.faOffer.findMany>>[number];
 
 /** Execute a signing: move the player to the club on `o` at (salary × years),
  *  accept that offer, reject the rest, log it. Returns the club code. */
-async function signFaOffer(playerId: number, player: { name: string; age: number | null }, o: FaOfferRow, salary: number, years: number, expectedTeamId?: number): Promise<string | null> {
+async function signFaOffer(playerId: number, player: { name: string; age: number | null }, o: FaOfferRow, salary: number, years: number, expectedTeamId?: number, noRole = false): Promise<string | null> {
   const twoWay = o.twoWay ?? ((player.age ?? 27) <= 24 && salary <= 3_000_000);
   const expiry = CURRENT_SEASON_START + years;
   const clause = o.grantClause && ["NTC", "NMC", "M_NTC"].includes(o.grantClause) ? o.grantClause : null;
@@ -596,7 +602,8 @@ async function signFaOffer(playerId: number, player: { name: string; age: number
     contractText: twoWay
       ? `$${salary.toLocaleString("en-US")} NHL / $${TWO_WAY_AHL_SALARY.toLocaleString("en-US")} AHL × ${years}yr (2-way, through ${expiry})`
       : `$${salary.toLocaleString("en-US")} × ${years}yr (through ${expiry})`,
-    signPromiseLine: o.line, signPromisePP: o.pp, signPromisePK: o.pk,
+    // a lone two-way bidder's role was never part of the deal, so no promise to police
+    signPromiseLine: noRole ? null : o.line, signPromisePP: noRole ? null : o.pp, signPromisePK: noRole ? null : o.pk,
     tradeClause: clause, noTradeTeams,
     disgruntled: false, tradeRequested: false, promiseWarnGame: null,
     tradeRequestReason: null, iceUnhappyChecks: 0, iceWarnedAt: null,
@@ -644,7 +651,7 @@ async function pickAndSign(
   let best: { offer: FaOfferRow; salary: number; years: number; utility: number } | null = null;
   let soleEv: Awaited<ReturnType<typeof evaluateTeamOffer>> = null;
   for (const o of offers) {
-    const ev = await evaluateTeamOffer(playerId, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, judgeRound, { clause: o.grantClause, breadth: o.mNtcBreadth }, churnMap);
+    const ev = await evaluateTeamOffer(playerId, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, judgeRound, { clause: o.grantClause, breadth: o.mNtcBreadth, ignoreRole: !!o.twoWay && offers.length === 1 }, churnMap);
     if (offers.length === 1) soleEv = ev;
     // A club already over the cap can still win a signing here — same as real
     // hockey, going over on a signing is legal in the moment; the club just
@@ -669,7 +676,7 @@ async function pickAndSign(
     }
   }
   if (!best) return null;
-  const code = await signFaOffer(playerId, player, best.offer, best.salary, best.years);
+  const code = await signFaOffer(playerId, player, best.offer, best.salary, best.years, undefined, !!best.offer.twoWay && offers.length === 1);
   if (code === null) return null; // already signed elsewhere (shouldn't happen in the single-threaded resolver)
   return `${player.name} → ${code} ($${(best.salary / 1e6).toFixed(2)}M × ${best.years}yr)`;
 }
@@ -742,7 +749,7 @@ export async function resolveInSeasonWindows(asOf: Date): Promise<{ signed: numb
       // pushes his price UP, it never asks for less than someone already offered.
       const round50k = (v: number) => Math.max(775_000, Math.round(v / 50_000) * 50_000);
       const evd = [] as { o: (typeof offers)[number]; ev: Awaited<ReturnType<typeof evaluateTeamOffer>> }[];
-      for (const o of offers) evd.push({ o, ev: await evaluateTeamOffer(p.id, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, 2, { clause: o.grantClause, breadth: o.mNtcBreadth }, churnMap) });
+      for (const o of offers) evd.push({ o, ev: await evaluateTeamOffer(p.id, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, 2, { clause: o.grantClause, breadth: o.mNtcBreadth, ignoreRole: !!o.twoWay && offers.length === 1 }, churnMap) });
       const serious = evd.filter((x) => x.ev && x.o.salary >= x.ev.ask.floorSalary * 0.6);
       const bestOffer = serious.reduce((m, x) => Math.max(m, x.o.salary), 0);
       const leverage = serious.length >= 3 ? 1.10 : serious.length >= 2 ? 1.05 : 1.0; // more suitors → push higher
@@ -828,7 +835,7 @@ export async function processRoundEnd(endedRound: number, sharedDecisionAt = new
     // Value every offer, drop hopeless lowballs, and start one shared
     // two-day window for every surviving bidder.
     const scored = [] as { o: (typeof list)[number]; ev: Awaited<ReturnType<typeof evaluateTeamOffer>> }[];
-    for (const o of list) scored.push({ o, ev: await evaluateTeamOffer(playerId, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, endedRound, { clause: o.grantClause, breadth: o.mNtcBreadth }, churnMap) });
+    for (const o of list) scored.push({ o, ev: await evaluateTeamOffer(playerId, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, endedRound, { clause: o.grantClause, breadth: o.mNtcBreadth, ignoreRole: !!o.twoWay && list.length === 1 }, churnMap) });
 
     const soleOffer = list.length === 1;
     const bestSalary = Math.max(...list.map((o) => o.salary));
@@ -962,7 +969,7 @@ export async function resolvePostFrenzyWindows(asOf: Date = new Date()): Promise
 
     if (!p.faCountered && offers.length > 1) {
       const scored = [] as { o: (typeof offers)[number]; ev: Awaited<ReturnType<typeof evaluateTeamOffer>> }[];
-      for (const o of offers) scored.push({ o, ev: await evaluateTeamOffer(p.id, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, 3, { clause: o.grantClause, breadth: o.mNtcBreadth }, churnMap) });
+      for (const o of offers) scored.push({ o, ev: await evaluateTeamOffer(p.id, o.teamId, o.salary, o.years, { line: o.line, pp: o.pp, pk: o.pk }, pool, cmap, 3, { clause: o.grantClause, breadth: o.mNtcBreadth, ignoreRole: !!o.twoWay && offers.length === 1 }, churnMap) });
       const bestSalary = Math.max(...offers.map((o) => o.salary));
       const closeRace = offers.filter((o) => o.salary >= bestSalary * 0.90).length >= 2;
       let survivors = 0;
