@@ -401,7 +401,7 @@ function pickShooter(rng: RNG, team: SimTeam): SimSkater {
   return pickShooterFromPool(rng, [...team.forwards, ...team.defense]);
 }
 
-function pickAssists(rng: RNG, onIce: SimSkater[], scorerId: number): number[] {
+function pickAssists(rng: RNG, onIce: SimSkater[], scorerId: number, creator?: SimSkater | null): number[] {
   const roll = rng.next();
   // ~1.6 assists per goal (NHL-realistic): mostly 2, occasionally unassisted
   const n = roll < 0.08 ? 0 : roll < 0.30 ? 1 : 2;
@@ -409,9 +409,18 @@ function pickAssists(rng: RNG, onIce: SimSkater[], scorerId: number): number[] {
   // assists come ONLY from the players who were on the ice for the goal
   const pool = onIce.filter((s) => s.id !== scorerId);
   const picked: number[] = [];
-  for (let i = 0; i < n && pool.length; i++) {
+  // the PRIMARY assist goes to the player who actually set the goal up (the pass
+  // that led to the one-timer, the shot that made the rebound) — so an elite
+  // playmaker's passes turn into HIS assists instead of a random linemate's.
+  const ci = creator ? pool.findIndex((s) => s.id === creator.id) : -1;
+  if (ci >= 0 && rng.chance((CFG.creatorAssistPct ?? 0) / 100)) { picked.push(pool[ci].id); pool.splice(ci, 1); }
+  for (let i = picked.length; i < n && pool.length; i++) {
+    // assist share follows PLAYMAKING on its own (steeper) curve — an elite passer
+    // (McDavid/Kucherov PA 78) collects far more of his line's assists than a 65 PA
+    // linemate; 0/unset = same curve as shooting (starExponent, the old behaviour)
+    const aExp = CFG.assistExponent || CFG.starExponent;
     const weights = pool.map((s) =>
-      involvement(s.playmaking * conFactor(s.con)) * s.iceTime * (s.isDefense ? D_ASSIST * ((CFG.dAssistPct ?? 100) / 100) : 1));
+      Math.pow((s.playmaking * conFactor(s.con)) / 60, aExp) * s.iceTime * (s.isDefense ? D_ASSIST * ((CFG.dAssistPct ?? 100) / 100) : 1));
     const idx = rng.weighted(weights);
     picked.push(pool[idx].id);
     pool.splice(idx, 1);
@@ -580,6 +589,7 @@ function recordGoal(
   strength: GoalEvent["strength"], emptyNet = false, explicitScorer?: SimSkater,
   shot?: { sector: string; shotType: string; xg: number },
   explicitSituation?: SituationKey,
+  creator?: SimSkater | null,
 ) {
   // when no explicit scorer is passed (the endgame's synthetic extra-attempt
   // model — OT always passes one), fall back to a shooter excluding anyone
@@ -597,7 +607,7 @@ function recordGoal(
   // conceding side: the real unit that was on the ice against (PK unit on a PP goal, etc.).
   const defIce = st.currentOnIce[def.id];
   const onAgainst: SimSkater[] = defIce && (defIce.f.length || defIce.d.length) ? [...defIce.f, ...defIce.d] : pickOnIce(st.rng, def);
-  const assists = strength === "SO" ? [] : pickAssists(st.rng, onFor, scorer.id);
+  const assists = strength === "SO" ? [] : pickAssists(st.rng, onFor, scorer.id, creator);
   const situation = explicitSituation ?? situationFor(st, off, def, period, strength, onFor.length, onAgainst.length);
   const offLines = st.lines[off.id];
   const sl = offLines[scorer.id];
@@ -1403,6 +1413,7 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
   let carrier: SimSkater = home.forwards[0];
   let zone: "DEF" | "NEU" | "OFF" = "NEU"; // relative to carrierTeam
   let setup: "carry" | "pass" | "rebound" = "carry"; // how the current look arose → shot danger
+  let creator: SimSkater | null = null; // who set the current look up (the passer / the rebound's shooter) → primary assist
   let press = 0; // consecutive shots in one sustained possession → screening/rebound pressure
 
   // special-teams personnel + the live man-advantage state per team. During a PP a
@@ -1861,7 +1872,11 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
     // is pulled toward his team's positional average — flatter lines, more depth scoring
     const dp = Math.max(0, Math.min(1, (CFG.depthParityPct ?? 0) / 100));
     // (forwards only — an elite offensive D keeps his edge, as the Makars and Hugheses do)
-    const depthAdj = dp > 0 && !carrier.isDefense ? Math.max(0.8, Math.min(1.25, 1 + dp * ((posAvgOff(carrierTeam, false) / Math.max(1, carrier.offense)) - 1))) : 1;
+    // reference level: the carrier's own team (old) or the league — the average of both
+    // clubs on the ice — so a star on a THIN team (McDavid on EDM) isn't pulled down
+    // harder than one on a deep team just because his linemates are weaker
+    const dpRef = CFG.depthParityLeague ? (posAvgOff(home, false) + posAvgOff(away, false)) / 2 : posAvgOff(carrierTeam, false);
+    const depthAdj = dp > 0 && !carrier.isDefense ? Math.max(0.8, Math.min(1.25, 1 + dp * ((dpRef / Math.max(1, carrier.offense)) - 1))) : 1;
     const atkSkill = (v: number, of = true) => v * (of ? tOff.of * atkTilt.of : 1) * chemFactor(carrier.chem, carrier.roleFit) * moraleFactor(carrier.morale) * fat(carrierTeam, carrier) * catchUp * teamMult * depthAdj;
     const defSkill = (v: number) => v * tDef.df * defTilt.df * dfat(def, dman);
     // puck-protection: SK still leads (skating/hands to evade pressure), but PH
@@ -2082,7 +2097,7 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
       const manAdvMult = manAdv3 ? 1.35 : 1;
       const ppMod = strength === "PP" ? (carrierTeam.ppChem / def.pkChem) * atkFx.ppConv * defFx.pkSuppress * manAdvMult : 1; // gelled PP1 + PP formation vs gelled PK1 + PK structure
       const shOffRaw = strength !== "EV" ? carrier.offense / carrier.posPenalty : carrier.offense; // off-position waived on ST
-      const shOff = dp > 0 && !carrier.isDefense ? shOffRaw + dp * (posAvgOff(carrierTeam, false) - shOffRaw) * 0.5 : shOffRaw;
+      const shOff = dp > 0 && !carrier.isDefense ? shOffRaw + dp * (dpRef - shOffRaw) * 0.5 : shOffRaw;
       // PARITY: compress the talent mismatch so favourites don't run away. The
       // shooter×goalie conversion is pulled toward the SAME situation with a
       // league-average shooter & keeper (danger/strength/home preserved), and the
@@ -2149,7 +2164,7 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
           }
         }
         if (!defEmptyNet) gLine.goalsAgainst++;
-        recordGoal(st, carrierTeam, def, period, tick, strength, defEmptyNet, carrier, { sector, shotType, xg });
+        recordGoal(st, carrierTeam, def, period, tick, strength, defEmptyNet, carrier, { sector, shotType, xg }, undefined, setup !== "carry" ? creator : null);
         if (failedChallenge) {
           st.sink.emit({ period, seconds: tick, type: "CHALLENGE", teamId: def.id, teamCode: def.code ?? undefined, playerId: carrier.id, playerName: carrier.name, importance: "MAJOR", meta: { kind: failedChallenge, won: false } });
           const server = onIceF(def)[0] ?? def.forwards[0];
@@ -2190,7 +2205,7 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
       }
       const rb = gSim.attrs.rb ?? 50;
       if (rng.chance(Math.max(0.05, 0.32 - rb / 300))) {
-        carrier = pickByAttr(rng, onIceF(carrierTeam), (s) => involvement(s.attrs.sc ?? 50) * 60) ?? carrier; setup = "rebound"; // rebound in the slot (press stays → escalating danger)
+        creator = carrier; carrier = pickByAttr(rng, onIceF(carrierTeam), (s) => involvement(s.attrs.sc ?? 50) * 60) ?? carrier; setup = "rebound"; // rebound in the slot (press stays → escalating danger)
         st.sink.emit({
           period, seconds: tick, type: "REBOUND", teamId: carrierTeam.id, teamCode: carrierTeam.code ?? undefined,
           playerId: carrier.id, playerName: carrier.name, zone: "OFF", importance: "NOTABLE",
@@ -2202,6 +2217,7 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
     }
     // PASS — completed (PA vs DF) → puck to a linemate (sets up a one-timer); else intercepted
     if (rng.chance(ratio(atkSkill(carrier.attrs.pa ?? 50), defSkill(dman.attrs.df ?? 50), 0.7))) {
+      creator = carrier;
       carrier = pickByAttr(rng, onIceF(carrierTeam), (s) => involvement(0.6 * (s.attrs.sc ?? 50) + 0.4 * (s.attrs.sk ?? 50)) * 60) ?? carrier;
       setup = "pass";
     } else {

@@ -159,8 +159,11 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
             <NumField k="starExponent" label="Star separation (exponent)" step={0.1} />
             <NumField k="finishExponent" label="Finishing spread (SC → conversion exponent)" step={0.1} />
             <NumField k="depthParityPct" label="Depth parity % (flatter forward lines)" step={5} />
+            <Toggle k="depthParityLeague" label="Depth parity vs league level (not own team)" />
             <NumField k="pointShotPct" label="Point shots % (D shots/goals)" step={5} />
             <NumField k="dAssistPct" label="D assist share %" step={5} />
+            <NumField k="creatorAssistPct" label="Primary assist to the real passer %" step={5} />
+            <NumField k="assistExponent" label="Assist exponent (PA star curve, 0 = star exp.)" step={0.1} />
             <p className="text-[11px] text-slate-500 mt-1">Higher = elite players take a bigger share of scoring.</p>
           </div>
         </Card>
