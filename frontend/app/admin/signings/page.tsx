@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { isAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { PageHeader, Card, BackPill } from "@/components/ui";
 import { cleanName } from "@/lib/playerName";
@@ -10,6 +12,7 @@ const fmtM = (c: number) => `$${(c / 1e6).toFixed(2)}M`;
 const fmtDate = (d: Date) => d.toLocaleString("sk-SK", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 export default async function AdminSigningsPage() {
+  if (!(await isAdmin())) redirect("/");
   const logs = await prisma.signingLog.findMany({ orderBy: { id: "desc" }, take: 60 });
 
   return (
