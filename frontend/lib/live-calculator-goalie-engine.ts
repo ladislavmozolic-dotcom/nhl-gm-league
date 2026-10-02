@@ -360,8 +360,14 @@ export async function runLiveCalculatorGoalieRecompute(): Promise<{
   for (const p of projectedList) {
     const actualEx = p.row.player.goalieRating?.ex;
     const actualLd = p.row.player.goalieRating?.ld;
+    const actualOv = p.row.player.goalieRating?.overall ?? p.row.player.overall;
     if (actualEx != null) p.ratings.EX = Math.round(actualEx * 0.85 + p.ratings.EX * 0.15);
     if (actualLd != null) p.ratings.LD = Math.round(actualLd * 0.85 + p.ratings.LD * 0.15);
+    // Overall is a league-scale summary. Keep the imported STHS overall as the
+    // stable reference and let calibrated live performance move it gradually,
+    // rather than turning a collection of elite-looking sub-ratings into a
+    // sudden double-digit overall jump.
+    if (actualOv != null) p.ratings.OV = Math.round(actualOv * 0.85 + p.ratings.OV * 0.15);
   }
 
   // OV is included in GOALIE_CAL_MAP, so the affine pass above has already
