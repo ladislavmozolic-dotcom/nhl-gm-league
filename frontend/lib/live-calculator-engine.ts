@@ -657,10 +657,12 @@ export async function runLiveCalculatorRecompute(): Promise<{
       // DU (Durability): games-played availability — not population-based
       projected.du = durabilityFromAvailability(e.nhlGpLatest, 82, e.nhlGpPrevious);
 
-      // PH changes only after the player has a meaningful current-season sample.
+      // PH begins updating as soon as a player has appeared in one current-season
+      // NHL game. This deliberately does not use nhlGpLatestMin: that threshold
+      // classifies NHL/AHL data for the wider calculator and may be set higher.
       // Prior-season data supplies context for an active player; it must not move
       // an inactive player's PH by itself (e.g. a player yet to dress this year).
-      if (e.nhlGpLatest >= config.nhlGpLatestMin) {
+      if (e.nhlGpLatest >= 1) {
       // PH (Puck Handling): turnover protection, NHL EDGE 5v5 offensive-zone
       // puck-time share, and takeaways/60. Every available component is ranked
       // against same-position peers; lower turnover rate is better.
