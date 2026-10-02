@@ -679,7 +679,12 @@ export async function runLiveCalculatorRecompute(): Promise<{
         const stdWeight = parts.reduce((s, [, wt]) => s + wt, 0);
         const { sum: cSumPH, weight: cWeightPH } = evalCustom(e.posGroup === "D" ? "phD" : "phF", e.posGroup, e.p);
         const totalWeight = stdWeight + cWeightPH;
-        if (totalWeight > 0) projected.ph = ratingFromCurve((stdSum + cSumPH) / totalWeight, "DEFAULT");
+        if (totalWeight > 0) {
+          projected.ph = ratingFromCurve(
+            (stdSum + cSumPH) / totalWeight,
+            e.posGroup === "D" ? "PH_D" : "PH_F"
+          );
+        }
       }
       }
 
