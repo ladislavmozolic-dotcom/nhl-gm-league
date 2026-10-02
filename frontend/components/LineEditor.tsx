@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import LinesNav from "@/components/LinesNav";
 import { autoFill, type TeamLinesData, type ForwardLine, type DefensePair, type SpecialUnit } from "@/lib/sim/lines-core";
@@ -66,6 +67,59 @@ const TAB_GROUPS = [
   { label: "Tactics", tabs: ["Strategy"] },
 ] as const;
 const TABS = TAB_GROUPS.flatMap((g) => g.tabs);
+
+// Player picker for the jersey-card slots. It used to be a transparent native
+// <select> laid over the card, but a native popup is owned by the browser: it
+// closed itself whenever the page shifted or re-rendered, and on phones the tap
+// often never opened it. This is a plain in-page list (bottom sheet on a phone,
+// centred dialog on desktop) that lives in its own state, so nothing outside it
+// can dismiss it — only a pick, the backdrop, the ✕ button or Esc.
+function PlayerPickerOverlay({ value, onChange, pool, allowEmpty = true }: { value: number | null; onChange: (v: number | null) => void; pool: Player[]; allowEmpty?: boolean }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => { document.body.style.overflow = prev; window.removeEventListener("keydown", onKey); };
+  }, [open]);
+  const pick = (v: number | null) => { onChange(v); setOpen(false); };
+  return (
+    <>
+      <button type="button" aria-label="Change player" onClick={() => setOpen(true)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+      {open && createPortal(
+        <div className="fixed inset-0 z-[300] flex items-end sm:items-center justify-center bg-black/70" onClick={() => setOpen(false)}>
+          <div role="dialog" aria-label="Choose player" onClick={(e) => e.stopPropagation()}
+            className="w-full sm:max-w-md max-h-[80vh] flex flex-col rounded-t-2xl sm:rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
+              <span className="text-sm font-bold text-slate-200">Choose player</span>
+              <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="w-8 h-8 rounded-full bg-slate-800 text-slate-300 hover:text-white">✕</button>
+            </div>
+            <div className="overflow-y-auto overscroll-contain p-2 space-y-1">
+              {allowEmpty && (
+                <button type="button" onClick={() => pick(null)} className={`w-full text-left rounded-lg px-3 py-2.5 text-sm italic text-slate-400 hover:bg-slate-800 ${value == null ? "bg-slate-800" : ""}`}>— empty —</button>
+              )}
+              {pool.map((p) => {
+                const off = !!(p.injured || p.tired);
+                return (
+                  <button key={p.id} type="button" disabled={off} onClick={() => pick(p.id)}
+                    className={`w-full text-left rounded-lg px-3 py-2.5 text-sm ${off ? "opacity-40" : "hover:bg-slate-800"} ${p.id === value ? "bg-blue-600/25 border border-blue-500/50" : "border border-transparent"}`}>
+                    <span className="font-semibold text-slate-100">{p.name}</span>{p.cap ? <span className="text-slate-400"> ({p.cap})</span> : null}
+                    <span className="block text-xs text-slate-400">
+                      {p.position} · OV {p.overall}{p.con != null ? ` · CON ${p.con}%${p.con < 90 ? " ⚠️" : ""}` : ""}{p.injured ? " · 🤕 INJ" : p.tired ? " · 😮‍💨 UNAVAILABLE" : ""}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
+    </>
+  );
+}
 
 // LineEditor declares its small sub-components INSIDE the component so they can
 // close over its state. A plain inner `const X = () => ...` gets a brand-new
@@ -292,7 +346,9 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
   // select (opacity-0, so it has no visible bg/text of its own) lets the
   // browser fall back to its native popup styling, which on a dark-mode OS
   // can render white-on-white until an option is hovered/highlighted.
-  const Select = useStable(({ value, onChange, pool, overlay = false, pill = false, allowEmpty = true }: { value: number | null; onChange: (v: number | null) => void; pool: Player[]; overlay?: boolean; pill?: boolean; allowEmpty?: boolean }) => (
+  const Select = useStable(({ value, onChange, pool, overlay = false, pill = false, allowEmpty = true }: { value: number | null; onChange: (v: number | null) => void; pool: Player[]; overlay?: boolean; pill?: boolean; allowEmpty?: boolean }) => overlay ? (
+    <PlayerPickerOverlay value={value} onChange={onChange} pool={pool} allowEmpty={allowEmpty} />
+  ) : (
     <select value={value != null && pool.some((p) => p.id === value) ? value : ""} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
       style={{ colorScheme: "dark" }}
       className={overlay ? "absolute inset-0 w-full h-full opacity-0 cursor-pointer" : pill ? "lines-goalie-select" : "lines-select w-full min-w-[132px] bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-sm"}>
