@@ -68,9 +68,13 @@ export async function commishToday(): Promise<CommishToday> {
     if (gaps.length) shortLineups.push({ teamId: t.id, code: t.code, name: t.name, slug: t.slug, detail: `short ${gaps.join(", ")}${r.injured ? ` (${r.injured} injured)` : ""}` });
   }
 
-  const capOffenders: TeamFlag[] = (capOff as { teamId: number; code: string | null; over: number }[])
-    .filter((o) => o.over > 0)
-    .map((o) => { const t = teams.find((x) => x.id === o.teamId); return { teamId: o.teamId, code: o.code, name: t?.name ?? o.code ?? "", slug: t?.slug ?? null, detail: `$${(o.over / 1_000_000).toFixed(2)}M over` }; });
+  const capOffenders: TeamFlag[] = (capOff as { teamId: number; code: string | null; over: number; underFloor: number }[])
+    .filter((o) => o.over > 0 || o.underFloor > 0)
+    .map((o) => {
+      const t = teams.find((x) => x.id === o.teamId);
+      const detail = o.over > 0 ? `$${(o.over / 1_000_000).toFixed(2)}M over cap` : `$${(o.underFloor / 1_000_000).toFixed(2)}M below floor`;
+      return { teamId: o.teamId, code: o.code, name: t?.name ?? o.code ?? "", slug: t?.slug ?? null, detail };
+    });
 
   const noWorthyGoalie: TeamFlag[] = teams
     .filter((t) => !worthyGoalie.get(t.id))

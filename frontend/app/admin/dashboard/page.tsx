@@ -71,7 +71,7 @@ export default async function CommissionerDashboard() {
           <div className="space-y-1.5">
             <div className="text-xs uppercase tracking-wide text-slate-400 mb-1">Pre-flight — the engine checks before it plays</div>
             {check(t.missingLines.length === 0, "Lines set for every team", `${t.missingLines.length} team(s) without lines — the sim uses position-aware auto lines`)}
-            {check(t.capOffenders.length === 0, "Every team cap-compliant", `${t.capOffenders.length} team(s) over the cap`)}
+            {check(t.capOffenders.length === 0, "Every team cap-compliant", `${t.capOffenders.length} team(s) non-compliant (over cap / below floor)`)}
             {check(t.shortLineups.length === 0, "Rosters legal (12F / 6D / 2G)", `${t.shortLineups.length} team(s) short — auto call-ups will fill them`)}
             {check(t.noWorthyGoalie.length === 0, "Every team has a worthy goalie", `${t.noWorthyGoalie.length} team(s) with no worthy goalie — not season-ready`)}
             {check(true, "Goalies assigned (starter picked by fatigue)", "")}
@@ -88,7 +88,7 @@ export default async function CommissionerDashboard() {
           <div className="text-xs uppercase tracking-wide text-slate-400">Needs attention</div>
           <FlagList title="⚠ Short / illegal lineups" flags={t.shortLineups} tone="text-red-400" />
           <FlagList title="Missing lines" flags={t.missingLines} tone="text-amber-400" />
-          <FlagList title="Over the cap" flags={t.capOffenders} tone="text-red-400" />
+          <FlagList title="Salary cap violations (over cap / below floor)" flags={t.capOffenders} tone="text-red-400" />
           <FlagList title="🥅 No worthy goalie" flags={t.noWorthyGoalie} tone="text-red-400" />
         </div>
       )}

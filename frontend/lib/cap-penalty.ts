@@ -1,11 +1,17 @@
-// Cap-ceiling penalties a club carries into a later season, born from days spent
-// over the salary cap (see lib/league-bank-server.ts). Kept in its own tiny file
+// Cap-ceiling and cap-floor penalties a club carries into a later season, born from days spent
+// over the salary cap or under the salary floor (see lib/league-bank-server.ts). Kept in its own tiny file
 // (prisma only) so lib/cap.ts can read it without an import cycle.
 import { prisma } from "./prisma";
 
 /** Amount the club's cap ceiling is reduced by in `seasonStart` (2026 = 2026-27). */
 export async function capPenaltyFor(teamId: number, seasonStart: number): Promise<number> {
   const m = await capPenaltyMap(seasonStart);
+  return m.get(teamId) ?? 0;
+}
+
+/** Amount the club's cap floor is raised by in `seasonStart` (2026 = 2026-27). */
+export async function capFloorPenaltyFor(teamId: number, seasonStart: number): Promise<number> {
+  const m = await capFloorPenaltyMap(seasonStart);
   return m.get(teamId) ?? 0;
 }
 
@@ -24,3 +30,20 @@ export async function capPenaltyMap(seasonStart: number): Promise<Map<number, nu
   }
   return out;
 }
+
+/** teamId → floor increase for `seasonStart`, for every club that has one. */
+export async function capFloorPenaltyMap(seasonStart: number): Promise<Map<number, number>> {
+  const [bank, rows] = await Promise.all([
+    prisma.leagueBank.findUnique({ where: { id: 1 }, select: { capPenaltyMultiplier: true, capPenaltyMax: true } }),
+    prisma.teamCapPenalty.findMany({ where: { appliesSeasonStart: seasonStart, floorWaived: false } }),
+  ]);
+  const mult = bank?.capPenaltyMultiplier ?? 2;
+  const max = bank?.capPenaltyMax ?? 10_000_000;
+  const out = new Map<number, number>();
+  for (const r of rows) {
+    const amt = Math.max(0, Math.round((r.floorBasis ?? 0) * mult) + (r.floorManualAdj ?? 0));
+    if (amt > 0) out.set(r.teamId, Math.min(max, (out.get(r.teamId) ?? 0) + amt));
+  }
+  return out;
+}
+

@@ -71,13 +71,22 @@ export async function adjustCapPenalty(fd: FormData) {
   await guard();
   const teamId = num(fd.get("teamId"));
   if (!teamId) throw new Error("Pick a club");
+  const kind = fd.get("kind") === "floor" ? "floor" : "ceiling";
   const adj = Math.round(num(fd.get("manualAdj")));
   const waived = fd.get("waived") === "on";
-  await prisma.teamCapPenalty.upsert({
-    where: { teamId_sourceSeasonStart: { teamId, sourceSeasonStart: CURRENT_SEASON_START } },
-    update: { manualAdj: adj, waived },
-    create: { teamId, sourceSeasonStart: CURRENT_SEASON_START, appliesSeasonStart: CURRENT_SEASON_START + 1, manualAdj: adj, waived },
-  });
+  if (kind === "floor") {
+    await prisma.teamCapPenalty.upsert({
+      where: { teamId_sourceSeasonStart: { teamId, sourceSeasonStart: CURRENT_SEASON_START } },
+      update: { floorManualAdj: adj, floorWaived: waived },
+      create: { teamId, sourceSeasonStart: CURRENT_SEASON_START, appliesSeasonStart: CURRENT_SEASON_START + 1, floorManualAdj: adj, floorWaived: waived },
+    });
+  } else {
+    await prisma.teamCapPenalty.upsert({
+      where: { teamId_sourceSeasonStart: { teamId, sourceSeasonStart: CURRENT_SEASON_START } },
+      update: { manualAdj: adj, waived },
+      create: { teamId, sourceSeasonStart: CURRENT_SEASON_START, appliesSeasonStart: CURRENT_SEASON_START + 1, manualAdj: adj, waived },
+    });
+  }
   done();
 }
 

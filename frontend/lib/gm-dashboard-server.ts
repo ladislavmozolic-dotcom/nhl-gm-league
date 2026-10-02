@@ -81,6 +81,7 @@ export async function gmDashboard(teamId: number): Promise<GmDashboard | null> {
   if (!linesOk) attention.push({ icon: "📋", tone: "text-amber-400", text: "Lines not submitted — set your lineup", href: `${teamHref}/lines` });
   if (!rosterOk) attention.push({ icon: "⛔", tone: "text-rose-400", text: `Illegal lineup — short ${gaps.join(", ")}`, href: `${teamHref}/roster` });
   if (cap && cap.overBy > 0) attention.push({ icon: "💰", tone: "text-rose-400", text: `Over the cap by ${money(cap.overBy)}`, href: `${teamHref}/salary` });
+  if (cap && cap.underFloorBy > 0) attention.push({ icon: "📉", tone: "text-amber-400", text: `Below the cap floor by ${money(cap.underFloorBy)}`, href: `${teamHref}/salary` });
   // low morale — the live, game-to-game mood (wins/losses, ice time, production),
   // same number shown as his MO parameter on the Ratings strip/Player Compare
   // (mo is kept in sync with morale at every write, see lib/sim/season.ts).

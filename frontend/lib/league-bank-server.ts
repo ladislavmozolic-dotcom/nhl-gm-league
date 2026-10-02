@@ -97,19 +97,34 @@ async function notifyClub(teamId: number, slug: string, body: string) {
   await prisma.dmMessage.create({ data: { fromTeamId: teamId, toTeamId: teamId, body, tradeUrl: `/finance/${slug}` } }).catch(() => {});
 }
 
-/** Rebuild every club's accumulated-overage penalty row for the current season from CapOverageDay. */
+/** Rebuild every club's accumulated-overage and floor-underage penalty row for the current season from CapOverageDay. */
 export async function recomputeCapPenalties(seasonStart = CURRENT_SEASON_START) {
   const bank = await getBank();
-  const days = await prisma.capOverageDay.findMany({ where: { seasonStart }, select: { teamId: true, overBy: true } });
-  const basis = new Map<number, number>();
+  const days = await prisma.capOverageDay.findMany({ where: { seasonStart }, select: { teamId: true, overBy: true, underFloorBy: true } });
+  const byTeamOver = new Map<number, number[]>();
+  const byTeamUnder = new Map<number, number[]>();
   for (const d of days) {
-    basis.set(d.teamId, bank.capAccumulate === "peak" ? Math.max(basis.get(d.teamId) ?? 0, d.overBy) : (basis.get(d.teamId) ?? 0) + d.overBy);
+    if (d.overBy > 0) {
+      const arr = byTeamOver.get(d.teamId) ?? [];
+      arr.push(d.overBy);
+      byTeamOver.set(d.teamId, arr);
+    }
+    if (d.underFloorBy > 0) {
+      const arr = byTeamUnder.get(d.teamId) ?? [];
+      arr.push(d.underFloorBy);
+      byTeamUnder.set(d.teamId, arr);
+    }
   }
-  for (const [teamId, b] of basis) {
+  const allTeamIds = new Set([...byTeamOver.keys(), ...byTeamUnder.keys()]);
+  for (const teamId of allTeamIds) {
+    const overs = byTeamOver.get(teamId) ?? [];
+    const unders = byTeamUnder.get(teamId) ?? [];
+    const basis = !overs.length ? 0 : bank.capAccumulate === "peak" ? Math.max(...overs) : overs.reduce((s, n) => s + n, 0);
+    const floorBasis = !unders.length ? 0 : bank.capAccumulate === "peak" ? Math.max(...unders) : unders.reduce((s, n) => s + n, 0);
     await prisma.teamCapPenalty.upsert({
       where: { teamId_sourceSeasonStart: { teamId, sourceSeasonStart: seasonStart } },
-      update: { basis: b },
-      create: { teamId, sourceSeasonStart: seasonStart, appliesSeasonStart: seasonStart + 1, basis: b },
+      update: { basis, floorBasis },
+      create: { teamId, sourceSeasonStart: seasonStart, appliesSeasonStart: seasonStart + 1, basis, floorBasis },
     });
   }
 }
@@ -152,8 +167,18 @@ export async function enforceLeagueDay(day: string, opts: { force?: boolean } = 
       if (fined) capFines++;
       await prisma.capOverageDay.upsert({
         where: { teamId_day: { teamId: t.id, day } },
-        update: { overBy: over },
+        update: { overBy: over, fine: fined ? bank.capFinePerDay : 0 },
         create: { teamId: t.id, day, seasonStart: CURRENT_SEASON_START, overBy: over, fine: fined ? bank.capFinePerDay : 0 },
+      });
+    }
+    if (cap.underFloorBy > 0) {
+      const under = Math.round(cap.underFloorBy);
+      const fined = await charge("FINE_FLOOR", bank.capFinePerDay, `under the salary cap floor by ${money(under)} on ${day} (accumulates into next season's cap floor increase)`);
+      if (fined) capFines++;
+      await prisma.capOverageDay.upsert({
+        where: { teamId_day: { teamId: t.id, day } },
+        update: { underFloorBy: under, fine: fined ? bank.capFinePerDay : 0 },
+        create: { teamId: t.id, day, seasonStart: CURRENT_SEASON_START, underFloorBy: under, fine: fined ? bank.capFinePerDay : 0 },
       });
     }
   }

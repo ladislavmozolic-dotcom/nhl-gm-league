@@ -11,22 +11,25 @@ export const dynamic = "force-dynamic";
 const inp = "bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm";
 const btn = "bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded px-3 py-1.5";
 const KIND_LABEL: Record<string, string> = {
-  FINE_NHL_ROSTER: "NHL roster fine", FINE_AHL_ROSTER: "AHL roster fine", FINE_CAP: "Over-cap fine", FINE_PLAYER: "Fine",
+  FINE_NHL_ROSTER: "NHL roster fine", FINE_AHL_ROSTER: "AHL roster fine", FINE_CAP: "Over-cap fine", FINE_FLOOR: "Under-floor fine", FINE_PLAYER: "Fine",
   SUSPENSION_SALARY: "Suspension salary", BONUS: "Bonus", PAYOUT: "Payout", INCOME: "Income", ADJUSTMENT: "Adjustment", REFUND: "Refund",
 };
 
 export default async function LeagueBankPage() {
   if (!(await isAdmin())) redirect("/login");
-  const [bank, balance, entries, teams, penalties, overage] = await Promise.all([
+  const [bank, balance, entries, teams, penalties, overage, underage] = await Promise.all([
     getBank(), bankBalance(),
     prisma.leagueBankEntry.findMany({ orderBy: { createdAt: "desc" }, take: 100 }),
     prisma.team.findMany({ where: { league: "NHL", isAffiliate: false }, select: { id: true, code: true, name: true }, orderBy: { name: "asc" } }),
     prisma.teamCapPenalty.findMany({ where: { sourceSeasonStart: CURRENT_SEASON_START } }),
-    prisma.capOverageDay.groupBy({ by: ["teamId"], where: { seasonStart: CURRENT_SEASON_START }, _count: { _all: true }, _sum: { overBy: true }, _max: { overBy: true } }),
+    prisma.capOverageDay.groupBy({ by: ["teamId"], where: { seasonStart: CURRENT_SEASON_START, overBy: { gt: 0 } }, _count: { _all: true }, _sum: { overBy: true }, _max: { overBy: true } }),
+    prisma.capOverageDay.groupBy({ by: ["teamId"], where: { seasonStart: CURRENT_SEASON_START, underFloorBy: { gt: 0 } }, _count: { _all: true }, _sum: { underFloorBy: true }, _max: { underFloorBy: true } }),
   ]);
   const penBy = new Map(penalties.map((p) => [p.teamId, p]));
   const ovBy = new Map(overage.map((o) => [o.teamId, o]));
-  const rows = teams.filter((t) => penBy.has(t.id) || ovBy.has(t.id));
+  const unBy = new Map(underage.map((u) => [u.teamId, u]));
+  const ceilingRows = teams.filter((t) => (penBy.get(t.id)?.basis ?? 0) > 0 || ovBy.has(t.id) || (penBy.get(t.id)?.manualAdj ?? 0) !== 0);
+  const floorRows = teams.filter((t) => (penBy.get(t.id)?.floorBasis ?? 0) > 0 || unBy.has(t.id) || (penBy.get(t.id)?.floorManualAdj ?? 0) !== 0);
   const totalIn = entries.filter((e) => e.amount > 0).reduce((s, e) => s + e.amount, 0);
 
   return (
@@ -85,18 +88,37 @@ export default async function LeagueBankPage() {
         </form>
       </Card>
 
-      <Card title={`Cap-overage accumulator — ${seasonLabel(CURRENT_SEASON_START)} → cap ${seasonLabel(CURRENT_SEASON_START + 1)}`} accent="text-red-400">
-        {rows.length ? (
+      <Card title={`Cap-overage accumulator (Over Cap) — ${seasonLabel(CURRENT_SEASON_START)} → cap reduction ${seasonLabel(CURRENT_SEASON_START + 1)}`} accent="text-red-400">
+        {ceilingRows.length ? (
           <table className="w-full text-sm"><thead><tr className="text-xs text-slate-500 text-left"><th className="py-1">Club</th><th>Days over</th><th>Accumulated</th><th>Worst day</th><th>Cap reduction next season</th><th>Adjust</th></tr></thead>
-            <tbody>{rows.map((t) => { const p = penBy.get(t.id); const o = ovBy.get(t.id); const amt = p && !p.waived ? Math.min(bank.capPenaltyMax, Math.max(0, Math.round(p.basis * bank.capPenaltyMultiplier) + p.manualAdj)) : 0;
+            <tbody>{ceilingRows.map((t) => { const p = penBy.get(t.id); const o = ovBy.get(t.id); const amt = p && !p.waived ? Math.min(bank.capPenaltyMax, Math.max(0, Math.round(p.basis * bank.capPenaltyMultiplier) + p.manualAdj)) : 0;
               return (<tr key={t.id} className="border-t border-slate-800/70">
                 <td className="py-1.5 font-semibold">{t.code ?? t.name}</td><td>{o?._count._all ?? 0}</td><td className="tabular-nums">{money(p?.basis ?? 0)}</td><td className="tabular-nums">{money(o?._max.overBy ?? 0)}</td>
                 <td className={`tabular-nums font-semibold ${p?.waived ? "text-slate-500 line-through" : "text-red-400"}`}>−{money(amt)}{p?.waived ? " (waived)" : ""}</td>
-                <td><form action={adjustCapPenalty} className="flex gap-1 items-center"><input type="hidden" name="teamId" value={t.id} /><input name="manualAdj" defaultValue={p?.manualAdj ?? 0} className={`${inp} w-24`} title="± manual adjustment ($)" /><label className="text-xs flex items-center gap-1"><input type="checkbox" name="waived" defaultChecked={p?.waived} />waive</label><button className="text-xs text-blue-400 hover:underline">save</button></form></td>
+                <td><form action={adjustCapPenalty} className="flex gap-1 items-center"><input type="hidden" name="teamId" value={t.id} /><input type="hidden" name="kind" value="ceiling" /><input name="manualAdj" defaultValue={p?.manualAdj ?? 0} className={`${inp} w-24`} title="± manual adjustment ($)" /><label className="text-xs flex items-center gap-1"><input type="checkbox" name="waived" defaultChecked={p?.waived} />waive</label><button className="text-xs text-blue-400 hover:underline">save</button></form></td>
               </tr>); })}</tbody></table>
         ) : <p className="text-sm text-slate-500">No club has been over the cap this season.</p>}
         <form action={adjustCapPenalty} className="flex gap-2 items-center mt-3 text-sm">
-          <span className="text-xs text-slate-500">Manual penalty for a club:</span>
+          <input type="hidden" name="kind" value="ceiling" />
+          <span className="text-xs text-slate-500">Manual ceiling penalty for a club:</span>
+          <select name="teamId" className={inp}><option value="">— club —</option>{teams.map((t) => <option key={t.id} value={t.id}>{t.code ?? t.name}</option>)}</select>
+          <input name="manualAdj" placeholder="± $" className={`${inp} w-28`} /><button className={btn}>Set</button>
+        </form>
+      </Card>
+
+      <Card title={`Cap-floor accumulator (Under Floor) — ${seasonLabel(CURRENT_SEASON_START)} → floor increase ${seasonLabel(CURRENT_SEASON_START + 1)}`} accent="text-amber-400">
+        {floorRows.length ? (
+          <table className="w-full text-sm"><thead><tr className="text-xs text-slate-500 text-left"><th className="py-1">Club</th><th>Days under</th><th>Accumulated</th><th>Worst day</th><th>Floor increase next season</th><th>Adjust</th></tr></thead>
+            <tbody>{floorRows.map((t) => { const p = penBy.get(t.id); const u = unBy.get(t.id); const amt = p && !p.floorWaived ? Math.min(bank.capPenaltyMax, Math.max(0, Math.round((p.floorBasis ?? 0) * bank.capPenaltyMultiplier) + (p.floorManualAdj ?? 0))) : 0;
+              return (<tr key={t.id} className="border-t border-slate-800/70">
+                <td className="py-1.5 font-semibold">{t.code ?? t.name}</td><td>{u?._count._all ?? 0}</td><td className="tabular-nums">{money(p?.floorBasis ?? 0)}</td><td className="tabular-nums">{money(u?._max.underFloorBy ?? 0)}</td>
+                <td className={`tabular-nums font-semibold ${p?.floorWaived ? "text-slate-500 line-through" : "text-amber-400"}`}>+{money(amt)}{p?.floorWaived ? " (waived)" : ""}</td>
+                <td><form action={adjustCapPenalty} className="flex gap-1 items-center"><input type="hidden" name="teamId" value={t.id} /><input type="hidden" name="kind" value="floor" /><input name="manualAdj" defaultValue={p?.floorManualAdj ?? 0} className={`${inp} w-24`} title="± manual adjustment ($)" /><label className="text-xs flex items-center gap-1"><input type="checkbox" name="waived" defaultChecked={p?.floorWaived} />waive</label><button className="text-xs text-blue-400 hover:underline">save</button></form></td>
+              </tr>); })}</tbody></table>
+        ) : <p className="text-sm text-slate-500">No club has been under the floor this season.</p>}
+        <form action={adjustCapPenalty} className="flex gap-2 items-center mt-3 text-sm">
+          <input type="hidden" name="kind" value="floor" />
+          <span className="text-xs text-slate-500">Manual floor penalty for a club:</span>
           <select name="teamId" className={inp}><option value="">— club —</option>{teams.map((t) => <option key={t.id} value={t.id}>{t.code ?? t.name}</option>)}</select>
           <input name="manualAdj" placeholder="± $" className={`${inp} w-28`} /><button className={btn}>Set</button>
         </form>

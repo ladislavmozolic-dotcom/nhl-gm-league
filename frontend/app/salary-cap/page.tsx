@@ -1,4 +1,4 @@
-import { capPenaltyMap } from "@/lib/cap-penalty";
+import { capPenaltyMap, capFloorPenaltyMap } from "@/lib/cap-penalty";
 import { prisma } from "@/lib/prisma";
 import { loadSettings } from "@/lib/sim/settings";
 import { teamCapCentral, deadMoneyForYear, CURRENT_SEASON_START, money, liveCapHit, ltirRelief } from "@/lib/finance";
@@ -37,7 +37,10 @@ export default async function SalaryCapPage() {
   // the team Finance page), so Total Salaries here is the sum of those same net
   // numbers. Buyouts and Dead Cap are this club's own dead money — kept apart
   // since a retention isn't a buyout — and both still add into the cap hit.
-  const penalties = await capPenaltyMap(CURRENT_SEASON_START);
+  const [penalties, floorPenalties] = await Promise.all([
+    capPenaltyMap(CURRENT_SEASON_START),
+    capFloorPenaltyMap(CURRENT_SEASON_START),
+  ]);
   const rows: CapRow[] = await Promise.all(teams.map(async (t) => {
     const gp = gpById.get(t.id) ?? 0;
     const gamesTotal = gamesTotalById.get(t.id) || 82;
@@ -48,7 +51,15 @@ export default async function SalaryCapPage() {
     const ltirRoster = t.players.map((p) => ({ ...p, capHit: Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0)) }));
     const ltir = ltirRelief(ltirRoster);
     const { totalSalaries, capHit, capSpace, underFloorBy, projCapHit, projCapSpace, count } =
-      teamCapCentral(netPlayers, buyouts + deadCap, { salaryCapUpper: settings.salaryCapUpper - (penalties.get(t.id) ?? 0), salaryCapLower: settings.salaryCapLower }, { daysPlayed, daysTotal });
+      teamCapCentral(
+        netPlayers,
+        buyouts + deadCap,
+        {
+          salaryCapUpper: settings.salaryCapUpper - (penalties.get(t.id) ?? 0),
+          salaryCapLower: settings.salaryCapLower + (floorPenalties.get(t.id) ?? 0),
+        },
+        { daysPlayed, daysTotal }
+      );
     return { id: t.id, name: t.name, slug: t.slug, logoUrl: t.logoUrl, gp, gamesTotal, count, totalSalaries, buyouts, deadCap, capHit, capSpace, underFloorBy, projCapHit, projCapSpace, ltir };
   }));
 

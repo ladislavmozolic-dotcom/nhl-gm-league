@@ -157,9 +157,10 @@ export async function simulateLeagueDay(day: Date) {
   // above — idempotent, so re-running it here just catches anyone who expired since).
   if (phYesterday !== "regular" && phToday === "regular") {
     const offenders = await leagueCapCompliance("regular");
-    capOffenders = offenders.filter((o) => o.over > 0).length;
+    capOffenders = offenders.filter((o) => o.over > 0 || o.underFloor > 0).length;
     for (const o of offenders) {
       if (o.over > 0) await prisma.transaction.create({ data: { type: "CAP_WARNING", message: `${o.code} is over the salary cap by ${money(o.over)} on opening day — must shed salary to be compliant.` } });
+      if (o.underFloor > 0) await prisma.transaction.create({ data: { type: "CAP_WARNING", message: `${o.code} is below the salary cap floor by ${money(o.underFloor)} on opening day — must add salary to be compliant.` } });
     }
     expiredToUfa += await sweepExpiredContractsToUfa();
     // RFA-age players never re-signed by their own club through the whole off-season

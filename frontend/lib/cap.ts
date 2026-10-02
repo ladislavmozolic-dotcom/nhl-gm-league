@@ -6,7 +6,7 @@ import { prisma } from "./prisma";
 import { getLeagueClock } from "./calendar-server";
 import { loadLeagueCap } from "./free-agency-server";
 import { loadSettings } from "./sim/settings";
-import { capPenaltyFor } from "./cap-penalty";
+import { capPenaltyFor, capFloorPenaltyFor } from "./cap-penalty";
 import { capCeilingForPhase, ltirRelief, deadMoneyForYear, liveCapHit, CURRENT_SEASON_START } from "./finance";
 
 export type CapStatus = {
@@ -33,6 +33,7 @@ export type CapStatus = {
   retentionMaxPct: number; // max % a single contract may have retained (the slider's own cap)
   capUpper: number; // the real, uncushioned league cap ceiling — the base retentionPctUsed/Max are computed against
   capPenalty: number; // ceiling reduction this club carries this season from past cap overages (League Bank)
+  capFloorPenalty: number; // floor increase this club carries this season from past under-floor days (League Bank)
 };
 
 export type RetentionStatus = {
@@ -105,7 +106,7 @@ export async function teamCapCommitted(teamId: number): Promise<{ totalSalaries:
 /** Cap status for one club. Pass `phaseOverride` (e.g. "regular") to test
  *  compliance against a different phase — used for the opening-day check. */
 export async function teamCapStatus(teamId: number, phaseOverride?: string): Promise<CapStatus> {
-  const [roster, capInfo, cap, clock, settings, retention, retainedIn, capPenalty] = await Promise.all([
+  const [roster, capInfo, cap, clock, settings, retention, retainedIn, capPenalty, capFloorPenalty] = await Promise.all([
     prisma.player.findMany({ where: { teamId, rosterType: "NHL" }, select: { capHit: true, retainedSalary: true, injuryDaysLeft: true, condition: true, isGoalie: true, contractYears: true } }),
     teamCapCommitted(teamId),
     loadLeagueCap(),
@@ -114,6 +115,7 @@ export async function teamCapStatus(teamId: number, phaseOverride?: string): Pro
     activeRetentionRecords(teamId),
     retainedInTotals(teamId),
     capPenaltyFor(teamId, CURRENT_SEASON_START),
+    capFloorPenaltyFor(teamId, CURRENT_SEASON_START),
   ]);
   const phase = phaseOverride ?? clock.phase;
   const committed = capInfo.committed;
@@ -123,7 +125,7 @@ export async function teamCapStatus(teamId: number, phaseOverride?: string): Pro
   const ltirRoster = roster.map((p) => ({ ...p, capHit: Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0)) }));
   const ltir = ltirRelief(ltirRoster);
   const ceiling = capCeilingForPhase(cap.upper - capPenalty, phase) + ltir;
-  const floor = cap.lower;
+  const floor = cap.lower + capFloorPenalty;
   return {
     committed, ltir, ceiling, space: ceiling - committed, floor,
     underFloorBy: Math.max(0, floor - committed),
@@ -137,6 +139,7 @@ export async function teamCapStatus(teamId: number, phaseOverride?: string): Pro
     retentionMaxPct: settings.retentionMaxPct,
     capUpper: cap.upper,
     capPenalty,
+    capFloorPenalty,
   };
 }
 

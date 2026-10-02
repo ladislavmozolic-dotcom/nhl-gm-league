@@ -1984,29 +1984,33 @@ model LeagueBankEntry {
   @@index([teamId])
 }
 
-// One row per club per day it sat over the salary cap (feeds the accumulator).
+// One row per club per day it sat over the salary cap or below the floor (feeds the accumulator).
 model CapOverageDay {
-  id          Int    @id @default(autoincrement())
-  teamId      Int
-  day         String // "YYYY-MM-DD"
-  seasonStart Int // season the overage happened in (2026 = 2026-27)
-  overBy      Int
-  fine        Int    @default(0)
+  id           Int    @id @default(autoincrement())
+  teamId       Int
+  day          String // "YYYY-MM-DD"
+  seasonStart  Int // season the overage/underage happened in (2026 = 2026-27)
+  overBy       Int    @default(0)
+  underFloorBy Int    @default(0)
+  fine         Int    @default(0)
 
   @@unique([teamId, day])
   @@index([seasonStart])
 }
 
-// A cap-ceiling reduction a club carries into a later season, born from cap
-// overages: amount = accumulated overage × multiplier (+ commissioner adjustment).
+// A cap-ceiling reduction (from overages) or cap-floor increase (from underages)
+// a club carries into a later season: amount = accumulated amount × multiplier (+ commissioner adjustment).
 model TeamCapPenalty {
   id                 Int      @id @default(autoincrement())
   teamId             Int
-  sourceSeasonStart  Int // season the overages happened in
-  appliesSeasonStart Int // season whose cap ceiling is reduced (source + 1)
-  basis              Int      @default(0) // accumulated overage (per the bank's accumulate mode)
-  manualAdj          Int      @default(0) // ± commissioner adjustment on top
-  waived             Boolean  @default(false) // commissioner forgave it
+  sourceSeasonStart  Int // season the violations happened in
+  appliesSeasonStart Int // season whose cap ceiling is reduced / floor raised (source + 1)
+  basis              Int      @default(0) // accumulated ceiling overage (per the bank's accumulate mode)
+  manualAdj          Int      @default(0) // ± commissioner adjustment for ceiling penalty
+  waived             Boolean  @default(false) // commissioner forgave ceiling penalty
+  floorBasis         Int      @default(0) // accumulated under-floor amount
+  floorManualAdj     Int      @default(0) // ± commissioner adjustment for floor penalty
+  floorWaived        Boolean  @default(false) // commissioner forgave floor penalty
   note               String?
   updatedAt          DateTime @updatedAt
 

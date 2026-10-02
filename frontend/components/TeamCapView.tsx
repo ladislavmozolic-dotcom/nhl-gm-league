@@ -14,7 +14,7 @@ import { getLeagueClock, regularSeasonDayProgress } from "@/lib/calendar-server"
 import { teamDashboard } from "@/lib/detailed-finance-server";
 import { getTeamSession } from "@/lib/auth";
 import { teamRetentionStatus } from "@/lib/cap";
-import { capPenaltyFor } from "@/lib/cap-penalty";
+import { capPenaltyFor, capFloorPenaltyFor } from "@/lib/cap-penalty";
 import { ROSTER_LIMITS } from "@/lib/roster-rules";
 import BuyoutButton from "@/components/BuyoutButton";
 import { buyoutPlayer } from "@/app/finance/[slug]/actions";
@@ -112,20 +112,30 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   const netPlayersForCap = team.players.map((p) => ({ capHit: Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0)) }));
   const realBuyoutsDeadMoney = deadMoneyForYear(realBuyouts, CURRENT_SEASON_START);
   const deadCapAmount = deadMoneyForYear(retentions, CURRENT_SEASON_START);
-  // cap-ceiling reduction from past cap overages (League Bank) — lowers this club's ceiling
-  const capPenalty = await capPenaltyFor(team.id, CURRENT_SEASON_START);
-  const cap = teamCapSummary(netPlayersForCap, { ...settings, salaryCapUpper: settings.salaryCapUpper - capPenalty }, realBuyoutsDeadMoney + deadCapAmount);
+  // cap penalties from past overages/underages (League Bank)
+  const [capPenalty, floorPenalty] = await Promise.all([
+    capPenaltyFor(team.id, CURRENT_SEASON_START),
+    capFloorPenaltyFor(team.id, CURRENT_SEASON_START),
+  ]);
+  const cap = teamCapSummary(
+    netPlayersForCap,
+    { ...settings, salaryCapUpper: settings.salaryCapUpper - capPenalty, salaryCapLower: settings.salaryCapLower + floorPenalty },
+    realBuyoutsDeadMoney + deadCapAmount
+  );
   // fines this club paid into the league bank this season (roster / cap violations)
   const seasonStartDate = new Date(Date.UTC(CURRENT_SEASON_START, 6, 1));
   const fineRows = await prisma.leagueBankEntry.findMany({
-    where: { teamId: team.id, kind: { in: ["FINE_NHL_ROSTER", "FINE_AHL_ROSTER", "FINE_CAP", "FINE_PLAYER", "SUSPENSION_SALARY", "REFUND"] }, createdAt: { gte: seasonStartDate } },
+    where: { teamId: team.id, kind: { in: ["FINE_NHL_ROSTER", "FINE_AHL_ROSTER", "FINE_CAP", "FINE_FLOOR", "FINE_PLAYER", "SUSPENSION_SALARY", "REFUND"] }, createdAt: { gte: seasonStartDate } },
     orderBy: { createdAt: "desc" },
   });
-  const nextPenalty = await capPenaltyFor(team.id, CURRENT_SEASON_START + 1);
+  const [nextPenalty, nextFloorPenalty] = await Promise.all([
+    capPenaltyFor(team.id, CURRENT_SEASON_START + 1),
+    capFloorPenaltyFor(team.id, CURRENT_SEASON_START + 1),
+  ]);
   const fineTotals = { roster: 0, cap: 0, other: 0 };
   for (const f of fineRows) {
     if (f.kind === "FINE_NHL_ROSTER" || f.kind === "FINE_AHL_ROSTER") fineTotals.roster += f.amount;
-    else if (f.kind === "FINE_CAP") fineTotals.cap += f.amount;
+    else if (f.kind === "FINE_CAP" || f.kind === "FINE_FLOOR") fineTotals.cap += f.amount;
     else fineTotals.other += f.amount;
   }
   const finesTotal = fineTotals.roster + fineTotals.cap + fineTotals.other;
@@ -142,6 +152,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
   const effectiveCeiling = cap.upper + ltir;
   const phaseComplianceCeiling = capCeilingForPhase(cap.upper, phase) + ltir;
   const overBy = Math.max(0, cap.capHit - phaseComplianceCeiling);
+  const underFloorBy = Math.max(0, cap.lower - cap.capHit);
   const cushioned = phase !== "regular" && phase !== "playoffs";
   const buyoutInSeason = !cushioned;
   const posCounts = splitByPos(team.players);
@@ -284,8 +295,9 @@ export default async function TeamCapView({ slug }: { slug: string }) {
 
           {/* Right Column: Salary Cap & Room */}
           <div className="space-y-1.5">
-            <div className="flex justify-between gap-4"><span className="text-slate-400" title="Total Salaries + Buyout Dead Cap + Retained Salary">Actual Cap Hit</span><span className="text-right font-semibold">{money(cap.capHit)}</span></div>
+            <div className="flex justify-between gap-4"><span className="text-slate-400" title="Total Salaries + Buyout Dead Cap + Retained Salary">Actual Cap Hit</span><span className={`text-right font-semibold ${overBy > 0 || underFloorBy > 0 ? "text-amber-400" : ""}`}>{money(cap.capHit)}</span></div>
             <div className="flex justify-between gap-4"><span className="text-slate-400" title="Salary cap upper limit / ceiling">Upper Limit (Base)</span><span className="text-right tabular-nums text-slate-200">{money(cap.upper)}</span></div>
+            <div className="flex justify-between gap-4"><span className="text-slate-400" title="Salary cap lower limit / floor">Salary Floor (Lower)</span><span className="text-right tabular-nums text-slate-200">{money(cap.lower)}{floorPenalty > 0 ? ` (+${money(floorPenalty)})` : ""}</span></div>
             {ltir > 0 && (
               <>
                 <div className="flex justify-between gap-4"><span className="text-slate-400" title="Long-Term Injured Reserve relief pool from injured skaters (CON < 90)">LTIR Relief</span><span className="text-right font-semibold text-sky-300">+{money(ltir)}</span></div>
@@ -301,10 +313,30 @@ export default async function TeamCapView({ slug }: { slug: string }) {
               <div className="flex justify-between gap-4"><span className="text-slate-400" title={`Ceiling ${money(cap.upper)} − Actual Cap Hit`}>Actual Cap Space</span><span className={`text-right font-semibold ${cap.capSpace < 0 ? "text-red-400" : "text-green-400"}`}>{money(cap.capSpace)}</span></div>
             )}
             <div className="flex justify-between gap-4"><span className="text-slate-400" title="Projected Cap Space">Projected Cap Space</span><span className={`text-right font-bold ${accrued.actual < 0 ? "text-red-400" : "text-emerald-400"}`}>{money(accrued.actual)}</span></div>
-            <div className="flex justify-between gap-4"><span className="text-slate-400">Cap Status</span><span className={`text-right font-bold ${overBy > 0 ? "text-red-400" : ltir > 0 ? "text-sky-300" : "text-green-400"}`}>{overBy > 0 ? `Over by ${money(overBy)}` : ltir > 0 ? "Compliant (LTIR) ✓" : cushioned ? "OK · off-season" : "Compliant ✓"}</span></div>
+            <div className="flex justify-between gap-4"><span className="text-slate-400">Cap Status</span><span className={`text-right font-bold ${overBy > 0 ? "text-red-400" : underFloorBy > 0 ? "text-amber-400" : ltir > 0 ? "text-sky-300" : "text-green-400"}`}>{overBy > 0 ? `Over by ${money(overBy)}` : underFloorBy > 0 ? `Below floor by ${money(underFloorBy)}` : ltir > 0 ? "Compliant (LTIR) ✓" : cushioned ? "OK · off-season" : "Compliant ✓"}</span></div>
           </div>
         </div>
       </div>
+
+      {/* Non-compliance Alerts */}
+      {underFloorBy > 0 && (
+        <div className="bg-amber-950/40 border border-amber-800/60 rounded-2xl px-5 py-3 text-xs text-amber-300 flex items-center gap-3 shadow-lg shadow-black/20">
+          <span className="text-xl">⚠️</span>
+          <div>
+            <div className="font-bold text-amber-200 text-sm">Non-compliant: Below Salary Cap Floor</div>
+            <div className="text-slate-300 mt-0.5">The club is <strong>{money(underFloorBy)}</strong> below the minimum salary floor ({money(cap.lower)}). Contracts must be added to reach compliance. Daily fines and next-season floor penalties apply during the regular season.</div>
+          </div>
+        </div>
+      )}
+      {overBy > 0 && (
+        <div className="bg-rose-950/40 border border-rose-800/60 rounded-2xl px-5 py-3 text-xs text-rose-300 flex items-center gap-3 shadow-lg shadow-black/20">
+          <span className="text-xl">⛔</span>
+          <div>
+            <div className="font-bold text-rose-200 text-sm">Non-compliant: Over Salary Cap Ceiling</div>
+            <div className="text-slate-300 mt-0.5">The club is <strong>{money(overBy)}</strong> over the salary ceiling ({money(phaseComplianceCeiling)}). Salary must be shed to reach compliance. Daily fines and next-season cap reductions apply during the regular season.</div>
+          </div>
+        </div>
+      )}
 
       {/* income / expenses — Detailed Finance (fan interest → demand → revenue) once the
           commish turns it on, otherwise the base ticket-only model. Detailed is a full-season
@@ -348,15 +380,16 @@ export default async function TeamCapView({ slug }: { slug: string }) {
         </div>
       )}
 
-      <div className="text-xs text-slate-500">▲ Upper limit: {money(cap.upper)}{capPenalty > 0 ? ` (reduced by ${money(capPenalty)} — cap penalty)` : ""} · ▼ Lower limit: {money(cap.lower)}</div>
-      {(fineRows.length > 0 || nextPenalty > 0 || capPenalty > 0) && (
+      <div className="text-xs text-slate-500">▲ Upper limit: {money(cap.upper)}{capPenalty > 0 ? ` (reduced by ${money(capPenalty)} — cap penalty)` : ""} · ▼ Lower limit: {money(cap.lower)}{floorPenalty > 0 ? ` (raised by ${money(floorPenalty)} — floor penalty)` : ""}</div>
+      {(fineRows.length > 0 || nextPenalty > 0 || nextFloorPenalty > 0 || capPenalty > 0 || floorPenalty > 0) && (
         <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 space-y-2">
           <h3 className="text-sm font-bold text-amber-400">💸 League fines &amp; penalties — {seasonLabel(CURRENT_SEASON_START)}</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-xs">
             <div><div className="text-slate-500">Total paid</div><div className="text-lg font-bold text-red-400 tabular-nums">{money(finesTotal)}</div></div>
             <div><div className="text-slate-500">Roster violations</div><div className="tabular-nums text-slate-200">{money(fineTotals.roster)}</div></div>
-            <div><div className="text-slate-500">Over the cap</div><div className="tabular-nums text-slate-200">{money(fineTotals.cap)}</div></div>
+            <div><div className="text-slate-500">Cap / Floor fines</div><div className="tabular-nums text-slate-200">{money(fineTotals.cap)}</div></div>
             <div><div className="text-slate-500">Cap reduction next season</div><div className="tabular-nums text-slate-200">{nextPenalty > 0 ? `−${money(nextPenalty)}` : "—"}</div></div>
+            <div><div className="text-slate-500">Floor increase next season</div><div className="tabular-nums text-slate-200">{nextFloorPenalty > 0 ? `+${money(nextFloorPenalty)}` : "—"}</div></div>
           </div>
           {fineRows.length > 0 && (
             <ul className="divide-y divide-slate-800/70 text-xs max-h-56 overflow-y-auto">
