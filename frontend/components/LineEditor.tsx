@@ -81,7 +81,7 @@ const PICK_SORTS: { k: PickSort; label: string }[] = [
 const ovTone = (v: number) => (v >= 70 ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40" : v >= 60 ? "bg-sky-500/20 text-sky-300 border-sky-500/40" : v >= 50 ? "bg-amber-500/15 text-amber-300 border-amber-500/30" : "bg-slate-700/40 text-slate-300 border-slate-600/50");
 const statTone = (v: number | null | undefined) => (v == null ? "text-slate-500" : v >= 75 ? "text-emerald-300" : v >= 60 ? "text-sky-300" : v >= 45 ? "text-slate-200" : "text-rose-300");
 
-function PlayerPickerOverlay({ value, onChange, pool, allowEmpty = true, title }: { value: number | null; onChange: (v: number | null) => void; pool: Player[]; allowEmpty?: boolean; title?: string }) {
+function PlayerPickerOverlay({ value, onChange, pool, allowEmpty = true, title, pill = false }: { value: number | null; onChange: (v: number | null) => void; pool: Player[]; allowEmpty?: boolean; title?: string; pill?: boolean }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<PickSort>("name");
@@ -104,7 +104,14 @@ function PlayerPickerOverlay({ value, onChange, pool, allowEmpty = true, title }
   }, [pool, q, sort]);
   return (
     <>
-      <button type="button" aria-label="Change player" onClick={() => setOpen(true)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+      {pill ? (
+        // goalie "Choose starter" control: same pill look as the old native select
+        <button type="button" onClick={() => setOpen(true)} className="lines-goalie-select block text-left truncate">
+          {current ? `${current.name} · ${current.position} (${current.overall})${current.con != null ? ` · CON ${current.con}%${current.con < 90 ? " ⚠️" : ""}` : ""}` : "— empty —"}
+        </button>
+      ) : (
+        <button type="button" aria-label="Change player" onClick={() => setOpen(true)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+      )}
       {open && createPortal(
         <div className="fixed inset-0 z-[300] flex items-end sm:items-center justify-center bg-slate-950/75 backdrop-blur-sm" onClick={close}>
           <div role="dialog" aria-label="Choose player" onClick={(e) => e.stopPropagation()}
@@ -122,7 +129,7 @@ function PlayerPickerOverlay({ value, onChange, pool, allowEmpty = true, title }
                 className="mt-3 w-full rounded-xl bg-slate-950/70 border border-slate-700 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-sky-500" />
               <div className="mt-2 flex items-center gap-1.5 overflow-x-auto">
                 <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500 mr-0.5">Sort</span>
-                {PICK_SORTS.map((o) => (
+                {PICK_SORTS.filter((o) => o.k === "name" || o.k === "ov" || pool.some((p) => p[o.k as "ck" | "pa" | "sc" | "df"] != null)).map((o) => (
                   <button key={o.k} type="button" onClick={() => setSort(o.k)}
                     className={`flex-none rounded-full px-2.5 py-1 text-[11px] font-bold border ${sort === o.k ? "bg-blue-600 border-blue-500 text-white" : "bg-slate-800/70 border-slate-700 text-slate-400 hover:text-slate-200"}`}>{o.label}</button>
                 ))}
@@ -406,8 +413,8 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
   // select (opacity-0, so it has no visible bg/text of its own) lets the
   // browser fall back to its native popup styling, which on a dark-mode OS
   // can render white-on-white until an option is hovered/highlighted.
-  const Select = useStable(({ value, onChange, pool, overlay = false, pill = false, allowEmpty = true, title }: { value: number | null; onChange: (v: number | null) => void; pool: Player[]; overlay?: boolean; pill?: boolean; allowEmpty?: boolean; title?: string }) => overlay ? (
-    <PlayerPickerOverlay value={value} onChange={onChange} pool={pool} allowEmpty={allowEmpty} title={title} />
+  const Select = useStable(({ value, onChange, pool, overlay = false, pill = false, allowEmpty = true, title }: { value: number | null; onChange: (v: number | null) => void; pool: Player[]; overlay?: boolean; pill?: boolean; allowEmpty?: boolean; title?: string }) => overlay || pill ? (
+    <PlayerPickerOverlay value={value} onChange={onChange} pool={pool} allowEmpty={allowEmpty} title={title ?? (pill ? "Starting goalie" : undefined)} pill={pill} />
   ) : (
     <select value={value != null && pool.some((p) => p.id === value) ? value : ""} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
       style={{ colorScheme: "dark" }}
