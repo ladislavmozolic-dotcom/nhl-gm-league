@@ -1957,13 +1957,17 @@ model LeagueBank {
   capFinePerDay        Int      @default(200000) // per day over the cap
   capPenaltyMultiplier Float    @default(2) // next-season cap reduction = accumulated overage × this
   capPenaltyMax        Int      @default(10000000) // ceiling on one club's next-season cap reduction
+  capAccumulate        String   @default("sum") // sum = every day's overage adds up | peak = only the worst day counts
+  floorFinePerDay        Int      @default(200000) // per day under the floor
+  floorPenaltyMultiplier Float    @default(2) // next-season floor increase = accumulated underage × this
+  floorPenaltyMax        Int      @default(10000000) // ceiling on one club's next-season floor increase
+  floorAccumulate        String   @default("sum") // sum = every day's underage adds up | peak = only the worst day counts
   picksWeeklyPrize     Int      @default(200000) // Game Picks: winner of each week
   picksPrize1          Int      @default(3000000) // season TOP 3 prizes (Game Picks + Season Picks)
   picksPrize2          Int      @default(1500000)
   picksPrize3          Int      @default(750000)
   autoPickPayouts      Boolean  @default(true) // pay each finished week's winner automatically
   lastPickWeekPaid     String? // Monday (YYYY-MM-DD) of the last week already paid
-  capAccumulate        String   @default("sum") // sum = every day's overage adds up | peak = only the worst day counts
   finesForAiClubs      Boolean  @default(false) // clubs without a human GM (AI-run) are normally not fined
   suspensionToBank     Boolean  @default(true) // forfeited suspension salary goes to the league bank
   updatedAt            DateTime @updatedAt

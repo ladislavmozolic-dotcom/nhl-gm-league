@@ -47,10 +47,15 @@ export default async function LeagueBankPage() {
           <label className="flex items-center justify-between gap-2">NHL roster fine / day <input name="nhlRosterFine" defaultValue={bank.nhlRosterFine} className={`${inp} w-32`} /></label>
           <label className="flex items-center justify-between gap-2">AHL roster fine / day <input name="ahlRosterFine" defaultValue={bank.ahlRosterFine} className={`${inp} w-32`} /></label>
           <label className="flex items-center justify-between gap-2">Over-cap fine / day <input name="capFinePerDay" defaultValue={bank.capFinePerDay} className={`${inp} w-32`} /></label>
+          <label className="flex items-center justify-between gap-2">Under-floor fine / day <input name="floorFinePerDay" defaultValue={bank.floorFinePerDay ?? bank.capFinePerDay} className={`${inp} w-32`} /></label>
           <label className="flex items-center justify-between gap-2">Next-season cap reduction × <input name="capPenaltyMultiplier" defaultValue={bank.capPenaltyMultiplier} className={`${inp} w-32`} /></label>
+          <label className="flex items-center justify-between gap-2">Next-season floor increase × <input name="floorPenaltyMultiplier" defaultValue={bank.floorPenaltyMultiplier ?? bank.capPenaltyMultiplier} className={`${inp} w-32`} /></label>
           <label className="flex items-center justify-between gap-2">Max cap reduction per club / season <input name="capPenaltyMax" defaultValue={bank.capPenaltyMax} className={`${inp} w-32`} /></label>
+          <label className="flex items-center justify-between gap-2">Max floor increase per club / season <input name="floorPenaltyMax" defaultValue={bank.floorPenaltyMax ?? bank.capPenaltyMax} className={`${inp} w-32`} /></label>
           <label className="flex items-center justify-between gap-2">Overage accumulates as
             <select name="capAccumulate" defaultValue={bank.capAccumulate} className={inp}><option value="sum">sum of every day over</option><option value="peak">worst single day only</option></select></label>
+          <label className="flex items-center justify-between gap-2">Underage accumulates as
+            <select name="floorAccumulate" defaultValue={bank.floorAccumulate ?? bank.capAccumulate} className={inp}><option value="sum">sum of every day under</option><option value="peak">worst single day only</option></select></label>
           <label className="flex items-center gap-2"><input type="checkbox" name="finesForAiClubs" defaultChecked={bank.finesForAiClubs} /> Also fine AI-run clubs (no human GM)</label>
           <label className="flex items-center justify-between gap-2">Picks: weekly winner prize <input name="picksWeeklyPrize" defaultValue={bank.picksWeeklyPrize} className={`${inp} w-32`} /></label>
           <label className="flex items-center gap-2"><input type="checkbox" name="autoPickPayouts" defaultChecked={bank.autoPickPayouts} /> Pay weekly winners automatically</label>
@@ -109,7 +114,7 @@ export default async function LeagueBankPage() {
       <Card title={`Cap-floor accumulator (Under Floor) — ${seasonLabel(CURRENT_SEASON_START)} → floor increase ${seasonLabel(CURRENT_SEASON_START + 1)}`} accent="text-amber-400">
         {floorRows.length ? (
           <table className="w-full text-sm"><thead><tr className="text-xs text-slate-500 text-left"><th className="py-1">Club</th><th>Days under</th><th>Accumulated</th><th>Worst day</th><th>Floor increase next season</th><th>Adjust</th></tr></thead>
-            <tbody>{floorRows.map((t) => { const p = penBy.get(t.id); const u = unBy.get(t.id); const amt = p && !p.floorWaived ? Math.min(bank.capPenaltyMax, Math.max(0, Math.round((p.floorBasis ?? 0) * bank.capPenaltyMultiplier) + (p.floorManualAdj ?? 0))) : 0;
+            <tbody>{floorRows.map((t) => { const p = penBy.get(t.id); const u = unBy.get(t.id); const mult = bank.floorPenaltyMultiplier ?? bank.capPenaltyMultiplier; const max = bank.floorPenaltyMax ?? bank.capPenaltyMax; const amt = p && !p.floorWaived ? Math.min(max, Math.max(0, Math.round((p.floorBasis ?? 0) * mult) + (p.floorManualAdj ?? 0))) : 0;
               return (<tr key={t.id} className="border-t border-slate-800/70">
                 <td className="py-1.5 font-semibold">{t.code ?? t.name}</td><td>{u?._count._all ?? 0}</td><td className="tabular-nums">{money(p?.floorBasis ?? 0)}</td><td className="tabular-nums">{money(u?._max.underFloorBy ?? 0)}</td>
                 <td className={`tabular-nums font-semibold ${p?.floorWaived ? "text-slate-500 line-through" : "text-amber-400"}`}>+{money(amt)}{p?.floorWaived ? " (waived)" : ""}</td>

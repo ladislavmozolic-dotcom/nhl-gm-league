@@ -120,7 +120,7 @@ export async function recomputeCapPenalties(seasonStart = CURRENT_SEASON_START) 
     const overs = byTeamOver.get(teamId) ?? [];
     const unders = byTeamUnder.get(teamId) ?? [];
     const basis = !overs.length ? 0 : bank.capAccumulate === "peak" ? Math.max(...overs) : overs.reduce((s, n) => s + n, 0);
-    const floorBasis = !unders.length ? 0 : bank.capAccumulate === "peak" ? Math.max(...unders) : unders.reduce((s, n) => s + n, 0);
+    const floorBasis = !unders.length ? 0 : (bank.floorAccumulate ?? bank.capAccumulate) === "peak" ? Math.max(...unders) : unders.reduce((s, n) => s + n, 0);
     await prisma.teamCapPenalty.upsert({
       where: { teamId_sourceSeasonStart: { teamId, sourceSeasonStart: seasonStart } },
       update: { basis, floorBasis },
@@ -163,22 +163,24 @@ export async function enforceLeagueDay(day: string, opts: { force?: boolean } = 
     const cap = await teamCapStatus(t.id);
     if (cap.overBy > 0) {
       const over = Math.round(cap.overBy);
-      const fined = await charge("FINE_CAP", bank.capFinePerDay, `over the salary cap by ${money(over)} on ${day} (accumulates into next season's cap reduction)`);
+      const fineAmount = bank.capFinePerDay ?? 200000;
+      const fined = await charge("FINE_CAP", fineAmount, `over the salary cap by ${money(over)} on ${day} (accumulates into next season's cap reduction)`);
       if (fined) capFines++;
       await prisma.capOverageDay.upsert({
         where: { teamId_day: { teamId: t.id, day } },
-        update: { overBy: over, fine: fined ? bank.capFinePerDay : 0 },
-        create: { teamId: t.id, day, seasonStart: CURRENT_SEASON_START, overBy: over, fine: fined ? bank.capFinePerDay : 0 },
+        update: { overBy: over, fine: fined ? fineAmount : 0 },
+        create: { teamId: t.id, day, seasonStart: CURRENT_SEASON_START, overBy: over, fine: fined ? fineAmount : 0 },
       });
     }
     if (cap.underFloorBy > 0) {
       const under = Math.round(cap.underFloorBy);
-      const fined = await charge("FINE_FLOOR", bank.capFinePerDay, `under the salary cap floor by ${money(under)} on ${day} (accumulates into next season's cap floor increase)`);
+      const fineAmount = bank.floorFinePerDay ?? bank.capFinePerDay ?? 200000;
+      const fined = await charge("FINE_FLOOR", fineAmount, `under the salary cap floor by ${money(under)} on ${day} (accumulates into next season's cap floor increase)`);
       if (fined) capFines++;
       await prisma.capOverageDay.upsert({
         where: { teamId_day: { teamId: t.id, day } },
-        update: { underFloorBy: under, fine: fined ? bank.capFinePerDay : 0 },
-        create: { teamId: t.id, day, seasonStart: CURRENT_SEASON_START, underFloorBy: under, fine: fined ? bank.capFinePerDay : 0 },
+        update: { underFloorBy: under, fine: fined ? fineAmount : 0 },
+        create: { teamId: t.id, day, seasonStart: CURRENT_SEASON_START, underFloorBy: under, fine: fined ? fineAmount : 0 },
       });
     }
   }
