@@ -9,7 +9,7 @@ import CommishTradeActions from "@/components/CommishTradeActions";
 // href set → the item is clickable: an internal /players/{id} link for a player, or
 // an external EliteProspects link (external: true) for a prospect (no profile route
 // of its own — same convention the Prospects tables use).
-type AssetItem = { text: string; href?: string | null; external?: boolean };
+type AssetItem = { text: string; href?: string | null; external?: boolean; retentionPct?: number };
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +42,15 @@ async function summarize(tradeId: number) {
   const codeByLogoId = new Map(origTeams.map((t) => [t.profinhlLogoId, t.code]));
   const pkN = new Map(picks.map((p) => [p.id, `${p.year} R${p.round}${codeByLogoId.get(p.ownerLogoId) ? ` (${codeByLogoId.get(p.ownerLogoId)})` : ""}`]));
   const side = (s: "FROM" | "TO"): AssetItem[] => assets.filter((a) => a.side === s).map((a): AssetItem => {
-    if (a.assetType === "PLAYER") return { text: pN.get(a.playerId!) ?? "player", href: a.playerId ? `/players/${a.playerId}` : null };
+    if (a.assetType === "PLAYER") {
+      const p = pN.get(a.playerId!) ?? "player";
+      const ret = a.retentionPct ? ` (${a.retentionPct}% ret.)` : "";
+      return {
+        text: `${p}${ret}`,
+        href: a.playerId ? `/players/${a.playerId}` : null,
+        retentionPct: a.retentionPct ?? undefined,
+      };
+    }
     if (a.assetType === "PROSPECT") return { text: prN.get(a.prospectId!) ?? "prospect", href: prHref.get(a.prospectId!) ?? null, external: true };
     if (a.assetType === "PICK") return { text: pkN.get(a.draftPickId!) ?? "pick" };
     if (a.assetType === "CASH") return { text: `$${((a.cashAmount ?? 0) / 1e6).toFixed(2)}M` };
@@ -56,6 +64,24 @@ type Row = { t: { id: number; status: string; fromTeamId: number; toTeamId: numb
 
 function AssetLine({ item }: { item: AssetItem }) {
   if (item.href && item.external) return <li>• <a href={item.href} target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 underline-offset-2 hover:underline">{item.text}</a></li>;
+  if (item.retentionPct) {
+    const nameOnly = item.text.replace(` (${item.retentionPct}% ret.)`, "");
+    return (
+      <li className="flex items-center gap-1.5 flex-wrap">
+        <span>•</span>
+        {item.href ? (
+          <Link href={item.href} className="hover:text-blue-400 underline-offset-2 hover:underline">
+            {nameOnly}
+          </Link>
+        ) : (
+          <span>{nameOnly}</span>
+        )}
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold bg-amber-500/20 border border-amber-500/40 text-amber-300">
+          {item.retentionPct}% ret.
+        </span>
+      </li>
+    );
+  }
   if (item.href) return <li>• <Link href={item.href} className="hover:text-blue-400 underline-offset-2 hover:underline">{item.text}</Link></li>;
   return <li>• {item.text}</li>;
 }
