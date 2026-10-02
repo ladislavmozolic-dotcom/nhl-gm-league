@@ -25,6 +25,8 @@ type SeasonTeam = SimTeam & { linesUsed: TeamLinesData };
 
 const DU_HIGH = 85; // durability at/above which CON recovers +2/day instead of +1
 export const PLAY_CON = 95; // a skater must be at CON >= 95 to dress (below = still hurt / rusty)
+const PICKED_REST_CON = 92; // the GM's chosen #1 is spelled below this CON
+const PICKED_MAX_STARTS = 64; // …and after this many starts (a real workhorse load)
 const GOALIE_REST_CON = 98; // auto-rotation: a goalie below this CON on game day is spelled by the fresher one (so CON 97 → backup starts)
 
 /** A hurt skater's CON, as a function of DAYS STILL TO GO. Calibrated to the
@@ -149,8 +151,18 @@ function chooseStarter(team: SeasonTeam, prevRound: number, state: Map<number, G
   // an opinion on, not to overrule a deliberate choice (rest a hot backup, etc).
   // Same fitness bar as a skater dressing (PLAY_CON) rather than the AI's own
   // stricter GOALIE_REST_CON, which is tuned for its own rotation heuristic.
+  // …but the GM's pick is his NUMBER ONE, not an iron man: he still sits the second
+  // night of a back-to-back, when he's run down, and once he's carried a real #1's
+  // workload — otherwise every picked starter played all 82 (incl. every b2b at the
+  // b2bFatigue penalty) and won 55-60 games. The auto-rotation below then decides,
+  // and it still favours him by OVERALL on normal nights.
   const picked = team.goalies.find((g) => g.id === team.linesUsed?.situations?.others?.starter);
-  if (picked && picked.con >= PLAY_CON) return picked;
+  if (picked && picked.con >= PLAY_CON) {
+    const st = state.get(picked.id);
+    const startedYesterday = (st?.lastStartRound ?? -99) === prevRound;
+    const hasBackup = team.goalies.some((g) => g.id !== picked.id && g.con >= PLAY_CON);
+    if (!hasBackup || (!startedYesterday && picked.con >= PICKED_REST_CON && (st?.starts ?? 0) < PICKED_MAX_STARTS)) return picked;
+  }
   const scored = [...team.goalies]
     .map((g) => {
       const startedYesterday = (state.get(g.id)?.lastStartRound ?? -99) === prevRound;
@@ -269,7 +281,20 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
     }
     catch { cache.set(id, null); return null; } // e.g. AHL team with no goalie -> skip its games
   };
+  // Seed the goalie rotation state from games ALREADY played this season — the live
+  // league sims one night per call, so without this the rotation forgot who started
+  // last night (no back-to-back rest) and every starter's workload reset to 0 daily.
   const gState = new Map<number, GoalieState>();
+  {
+    const prior = await prisma.goalieGameStat.findMany({
+      where: { started: true, game: { season, status: "FINAL", seriesId: null } },
+      select: { playerId: true, game: { select: { round: true } } },
+    });
+    for (const r of prior) {
+      const cur = gState.get(r.playerId) ?? { lastStartRound: -99, starts: 0 };
+      gState.set(r.playerId, { lastStartRound: Math.max(cur.lastStartRound, r.game.round ?? -99), starts: cur.starts + 1 });
+    }
+  }
 
   let currentRound = scheduled[0]?.round ?? 0;
   const recoverCon = (days: number) => {
