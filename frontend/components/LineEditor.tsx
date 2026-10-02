@@ -81,7 +81,7 @@ const PICK_SORTS: { k: PickSort; label: string }[] = [
 const ovTone = (v: number) => (v >= 70 ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40" : v >= 60 ? "bg-sky-500/20 text-sky-300 border-sky-500/40" : v >= 50 ? "bg-amber-500/15 text-amber-300 border-amber-500/30" : "bg-slate-700/40 text-slate-300 border-slate-600/50");
 const statTone = (v: number | null | undefined) => (v == null ? "text-slate-500" : v >= 75 ? "text-emerald-300" : v >= 60 ? "text-sky-300" : v >= 45 ? "text-slate-200" : "text-rose-300");
 
-function PlayerPickerOverlay({ value, onChange, pool, allowEmpty = true, title, pill = false }: { value: number | null; onChange: (v: number | null) => void; pool: Player[]; allowEmpty?: boolean; title?: string; pill?: boolean }) {
+function PlayerPickerOverlay({ value, onChange, pool, allowEmpty = true, title, pill = false, field = false }: { value: number | null; onChange: (v: number | null) => void; pool: Player[]; allowEmpty?: boolean; title?: string; pill?: boolean; field?: boolean }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<PickSort>("name");
@@ -104,7 +104,16 @@ function PlayerPickerOverlay({ value, onChange, pool, allowEmpty = true, title, 
   }, [pool, q, sort]);
   return (
     <>
-      {pill ? (
+      {field ? (
+        // plain dropdown replacement for PP / PK / OT / 4v4 / shootout / last-minute slots
+        <button type="button" onClick={() => setOpen(true)}
+          className="lines-select w-full min-w-[132px] bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-sm text-left flex items-center justify-between gap-2 hover:border-sky-500">
+          <span className={`truncate ${current ? "text-slate-100" : "text-slate-500 italic"}`}>
+            {current ? `${current.name}${current.cap ? ` (${current.cap})` : ""} · ${current.position} (${current.overall})${current.con != null ? ` · CON ${current.con}%${current.con < 90 ? " ⚠️" : ""}` : ""}` : "— empty —"}
+          </span>
+          <svg className="flex-none text-slate-500" width="12" height="12" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clipRule="evenodd" /></svg>
+        </button>
+      ) : pill ? (
         // goalie "Choose starter" control: same pill look as the old native select
         <button type="button" onClick={() => setOpen(true)} className="lines-goalie-select block text-left truncate">
           {current ? `${current.name} · ${current.position} (${current.overall})${current.con != null ? ` · CON ${current.con}%${current.con < 90 ? " ⚠️" : ""}` : ""}` : "— empty —"}
@@ -413,15 +422,8 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
   // select (opacity-0, so it has no visible bg/text of its own) lets the
   // browser fall back to its native popup styling, which on a dark-mode OS
   // can render white-on-white until an option is hovered/highlighted.
-  const Select = useStable(({ value, onChange, pool, overlay = false, pill = false, allowEmpty = true, title }: { value: number | null; onChange: (v: number | null) => void; pool: Player[]; overlay?: boolean; pill?: boolean; allowEmpty?: boolean; title?: string }) => overlay || pill ? (
-    <PlayerPickerOverlay value={value} onChange={onChange} pool={pool} allowEmpty={allowEmpty} title={title ?? (pill ? "Starting goalie" : undefined)} pill={pill} />
-  ) : (
-    <select value={value != null && pool.some((p) => p.id === value) ? value : ""} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
-      style={{ colorScheme: "dark" }}
-      className={overlay ? "absolute inset-0 w-full h-full opacity-0 cursor-pointer" : pill ? "lines-goalie-select" : "lines-select w-full min-w-[132px] bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-sm"}>
-      {allowEmpty && <option value="" style={{ backgroundColor: "#0f172a", color: "#e2e8f0" }}>— empty —</option>}
-      {pool.map((p) => <option key={p.id} value={p.id} disabled={p.injured || p.tired} style={{ backgroundColor: "#0f172a", color: "#e2e8f0" }}>{p.name}{p.cap ? ` (${p.cap})` : ""} · {p.position} ({p.overall}){p.con != null ? ` · CON ${p.con}%${p.con < 90 ? " ⚠️" : ""}` : ""}{p.injured ? " 🤕 INJ" : p.tired ? " 😮‍💨 UNAVAILABLE" : ""}</option>)}
-    </select>
+  const Select = useStable(({ value, onChange, pool, overlay = false, pill = false, allowEmpty = true, title }: { value: number | null; onChange: (v: number | null) => void; pool: Player[]; overlay?: boolean; pill?: boolean; allowEmpty?: boolean; title?: string }) => (
+    <PlayerPickerOverlay value={value} onChange={onChange} pool={pool} allowEmpty={allowEmpty} title={title ?? (pill ? "Starting goalie" : undefined)} pill={pill} field={!overlay && !pill} />
   ));
 
   // ---------- section renderers ----------
@@ -670,7 +672,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
           <tr key={ui} className="border-b border-slate-800/60">
             <td className="px-2 py-1.5 text-slate-500">{ui + 1}</td>
             {u.players.map((val, si) => (
-              <td key={si} className="px-2"><Select value={val} onChange={(v) => setUnit(key, ui, si, v)} pool={poolFor(si)} /></td>
+              <td key={si} className="px-2"><Select value={val} onChange={(v) => setUnit(key, ui, si, v)} pool={poolFor(si)} title={`Unit ${ui + 1} · ${labels[si] ?? ""}`} /></td>
             ))}
             <TacCells t={u.tactic} onSet={(k, v) => setUnitTac(key, ui, k, v)} />
             <td className="px-2 py-1.5 text-right"><Stepper value={u.timePct} step={5} onChange={(v) => setUnitTime(key, ui, v)} /></td>
@@ -721,7 +723,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
               {Array.from({ length: nF }).map((_, si) => (
                 <td key={si} className="px-2 align-top">
                   {roles && <div className="text-[10px] font-semibold uppercase tracking-wide text-sky-400/80 mb-0.5">{roles[si]?.label ?? "—"}</div>}
-                  <Select value={u.players[si]} onChange={(v) => setUnit(key, ui, si, v)} pool={fPool} />
+                  <Select value={u.players[si]} onChange={(v) => setUnit(key, ui, si, v)} pool={fPool} title={`Unit ${ui + 1} · ${fLabels[si] ?? "F"}`} />
                 </td>
               ))}
               <TacCells t={u.tactic} onSet={(k, v) => setUnitTac(key, ui, k, v)} />
@@ -739,7 +741,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
               {Array.from({ length: nD }).map((_, si) => (
                 <td key={si} className="px-2 align-top">
                   {roles && <div className="text-[10px] font-semibold uppercase tracking-wide text-rose-400/80 mb-0.5">{roles[nF + si]?.label ?? "—"}</div>}
-                  <Select value={u.players[nF + si]} onChange={(v) => setUnit(key, ui, nF + si, v)} pool={dPool} />
+                  <Select value={u.players[nF + si]} onChange={(v) => setUnit(key, ui, nF + si, v)} pool={dPool} title={`Unit ${ui + 1} · ${dLabels[si] ?? "D"}`} />
                 </td>
               ))}
               <TacCells t={u.dTactic} onSet={(k, v) => setUnitDTac(key, ui, k, v)} />
