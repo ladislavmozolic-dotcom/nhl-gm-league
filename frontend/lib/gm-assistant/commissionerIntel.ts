@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { leagueCapCompliance } from "@/lib/cap";
 import { ROSTER_LIMITS } from "@/lib/roster-rules";
-import { compositeRating } from "./leagueSlots";
 
 // UNHL Intelligence — Commissioner Intelligence (roadmap Phase 7, admin-only —
 // see memory: gm-assistant-intelligence). Same non-negotiable rule as every
@@ -96,55 +95,7 @@ async function rosterSizeFinding(): Promise<CommissionerFinding> {
   };
 }
 
-// ---- 3. Contract outlier detection — leaguewide, separately for skaters and
-// goalies (different rating scales): percentile rank by live cap hit vs.
-// percentile rank by the SAME rating the rest of UNHL Intelligence ranks on
-// (CK/PA/SC/DF composite for skaters, GoalieRating.overall for goalies) — a
-// large gap means "paid like a top-of-league player, rated like a middling
-// one," decomposed into both percentiles, never a single "overpaid" verdict. ----
-const GAP_THRESHOLD = 25; // percentage points — plainly stated, not fitted
-
-function percentileRanks<T>(items: T[], valueOf: (t: T) => number): number[] {
-  const sortedIdx = items.map((_, i) => i).sort((a, b) => valueOf(items[a]) - valueOf(items[b]));
-  const rank = new Array(items.length);
-  sortedIdx.forEach((origIdx, pos) => { rank[origIdx] = items.length > 1 ? (pos / (items.length - 1)) * 100 : 100; });
-  return rank;
-}
-
-async function contractOutlierFinding(): Promise<CommissionerFinding> {
-  const [skaters, goalies] = await Promise.all([
-    prisma.player.findMany({ where: { rosterType: "NHL", isGoalie: false }, select: { id: true, name: true, teamId: true, team: { select: { name: true } }, capHit: true, contractYears: true, ck: true, pa: true, sc: true, df: true, sk: true, ph: true } }),
-    prisma.player.findMany({ where: { rosterType: "NHL", isGoalie: true }, select: { id: true, name: true, teamId: true, team: { select: { name: true } }, capHit: true, contractYears: true, goalieRating: { select: { overall: true } } } }),
-  ]);
-
-  const rows: FindingRow[] = [];
-  const scan = (pool: { id: number; name: string; team: { name: string } | null; capHit: number | null; contractYears: number | null; rating: number | null }[]) => {
-    const eligible = pool.filter((p) => (p.contractYears ?? 0) > 0 && p.capHit != null && p.rating != null);
-    if (eligible.length < 12) return; // too small a pool for a percentile to mean anything
-    const capRanks = percentileRanks(eligible, (p) => p.capHit!);
-    const ratingRanks = percentileRanks(eligible, (p) => p.rating!);
-    eligible.forEach((p, i) => {
-      const gap = capRanks[i] - ratingRanks[i];
-      if (gap >= GAP_THRESHOLD) {
-        rows.push({
-          playerId: p.id, playerName: p.name, teamId: undefined, teamName: p.team?.name,
-          detail: `cap hit ${Math.round(capRanks[i])}. percentil, rating ${Math.round(ratingRanks[i])}. percentil (rozdiel ${Math.round(gap)} b.)`,
-        });
-      }
-    });
-  };
-  scan(skaters.map((p) => ({ ...p, rating: compositeRating(p) })));
-  scan(goalies.map((p) => ({ ...p, rating: p.goalieRating?.overall ?? null })));
-  rows.sort((a, b) => (b.detail > a.detail ? 1 : -1));
-
-  return {
-    id: "contract-outliers", label: "Kontraktné výkyvy (rating vs. cap hit)", severity: sev(rows.length, 1, 10),
-    summary: rows.length === 0 ? `Žiadny hráč nemá rozdiel cap-hit/rating percentilu ≥ ${GAP_THRESHOLD} b.` : `${rows.length} hráč(ov) je platených výrazne nad úrovňou svojho ratingu.`,
-    rows: rows.slice(0, 30),
-  };
-}
-
-// ---- 4. Data-consistency scans: duplicates, NHL/AHL conflicts, missing fields ----
+// ---- 3. Data-consistency scans: duplicates, NHL/AHL conflicts, missing fields ----
 async function duplicatePlayersFinding(): Promise<CommissionerFinding> {
   const dupes = await prisma.player.groupBy({ by: ["nhlId"], where: { nhlId: { not: null } }, _count: { nhlId: true }, having: { nhlId: { _count: { gt: 1 } } } });
   const rows: FindingRow[] = [];
@@ -213,7 +164,6 @@ export async function loadCommissionerIntel(): Promise<CommissionerIntel> {
   const findings = await Promise.all([
     capViolationsFinding(),
     rosterSizeFinding(),
-    contractOutlierFinding(),
     duplicatePlayersFinding(),
     nhlAhlConflictFinding(),
     missingFieldsFinding(),

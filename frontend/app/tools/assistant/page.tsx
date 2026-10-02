@@ -127,7 +127,7 @@ export default async function GmAssistantPage() {
 
       {admin && (
         <Card title="🛡️ Commissioner Intelligence" accent="text-red-400" href="/tools/assistant/commissioner">
-          <p className="text-sm text-slate-400">Admin-only: leaguewide cap violations, legálnosť rosterov, kontraktné výkyvy a data-consistency kontroly naprieč všetkými klubmi. Read-only, každé zobrazenie sa audit-loguje.</p>
+          <p className="text-sm text-slate-400">Admin-only: leaguewide cap violations, legálnosť rosterov a data-consistency kontroly naprieč všetkými klubmi. Read-only, každé zobrazenie sa audit-loguje.</p>
         </Card>
       )}
     </div>
