@@ -641,6 +641,32 @@ async function signFaOffer(playerId: number, player: { name: string; age: number
 /** Best acceptable offer for a player at `judgeRound`; with `allowSoleFloor`, a lone
  *  suitor whose offer fell short signs at the player's floor (cap-permitting). Signs
  *  and returns a detail string, or null if nobody cleared his bar. */
+/** Is a lone bid at/above half the player's Market value (the lone-bidder signing line)? */
+async function loneAboveMarketHalf(playerId: number, salary: number, pool: Awaited<ReturnType<typeof loadMarketPool>>): Promise<boolean> {
+  const mv = (await demandForPlayerId(playerId, pool))?.demand.salary ?? 0;
+  return mv > 0 && salary >= mv * 0.5;
+}
+
+/** A lone bidder under half the player's Market value doesn't get a flat "no": his camp
+ *  answers with a counter — the lowest he'll go (half his Market value, rounded up) — and the
+ *  club gets a window to raise to it. Returns null when the bid is high enough (or there is
+ *  no Market value to judge by). A two-way can't go at/above the commissioner's two-way
+ *  ceiling, so then the counter is flagged as one-way only. */
+async function loneLowballCounter(
+  playerId: number, o: { salary: number; years: number; twoWay: boolean }, pool: Awaited<ReturnType<typeof loadMarketPool>>,
+): Promise<{ want: number; years: number; mv: number; oneWayOnly: boolean; maxTwoWay: number } | null> {
+  const mv = (await demandForPlayerId(playerId, pool))?.demand.salary ?? 0;
+  if (mv <= 0 || o.salary >= mv * 0.5) return null;
+  const want = Math.max(o.salary, Math.ceil((mv * 0.5) / 50_000) * 50_000);
+  const maxTwoWay = (await loadSettings()).faTwoWayMaxSalary;
+  return { want, years: o.years, mv, oneWayOnly: o.twoWay && want >= maxTwoWay, maxTwoWay };
+}
+
+function lowballCounterMsg(nm: string, offer: number, c: { want: number; years: number; mv: number; oneWayOnly: boolean; maxTwoWay: number }, window: string): string {
+  return `📩 ${nm} thinks your offer (${fmtM(offer)}) is too low — well under his Market value (${fmtM(c.mv)}). He won't go below ${fmtM(c.want)} × ${c.years}yr: raise to at least that within ${window} or he'll reject it and wait for better options.`
+    + (c.oneWayOnly ? ` At that money he won't take a two-way (limit ${fmtM(c.maxTwoWay)}) — it would have to be a one-way deal.` : "");
+}
+
 /** What the player's camp tells the bidders when nobody signed him. A lone bidder who came in
  *  under half his Market value gets a specific "too low" answer (the same line pickAndSign
  *  enforces); everything else keeps the generic "no offer met his ask". */
@@ -780,7 +806,13 @@ export async function resolveInSeasonWindows(asOf: Date): Promise<{ signed: numb
       let kept = 0;
       for (const { o, ev } of evd) {
         if (!ev) continue;
-        if (o.salary < ev.ask.floorSalary * 0.6) {
+        // a LONE bidder under half his Market value gets a counter (the lowest he'll go), not a flat no
+        const lc = evd.length === 1 ? await loneLowballCounter(p.id, o, pool) : null;
+        if (lc) {
+          await prisma.faOffer.update({ where: { id: o.id }, data: { status: "COUNTERED", counterSalary: lc.want, counterYears: lc.years } });
+          countered++; kept++;
+          await agentDm(o.teamId, lowballCounterMsg(nm, o.salary, lc, `${IN_SEASON_MATCH_DAYS} days`), p.id, p.isGoalie);
+        } else if (o.salary < ev.ask.floorSalary * 0.6 && !(evd.length === 1 && (await loneAboveMarketHalf(p.id, o.salary, pool)))) {
           await prisma.faOffer.update({ where: { id: o.id }, data: { status: "REJECTED" } });
           await agentDm(o.teamId, `❌ ${nm}'s camp passed on your offer — it wasn't close to his value.`, p.id, p.isGoalie);
         } else {
@@ -1025,6 +1057,17 @@ export async function resolvePostFrenzyWindows(asOf: Date = new Date()): Promise
         unsigned++;
       }
       continue;
+    }
+
+    if (!p.faCountered && offers.length === 1) {
+      const lc = await loneLowballCounter(p.id, offers[0], pool);
+      if (lc) {
+        await prisma.faOffer.update({ where: { id: offers[0].id }, data: { status: "COUNTERED", counterSalary: lc.want, counterYears: lc.years } });
+        await agentDm(offers[0].teamId, lowballCounterMsg(nm, offers[0].salary, lc, "24 hours"), p.id, p.isGoalie);
+        await prisma.player.update({ where: { id: p.id }, data: { faCountered: true, faDecisionAt: new Date(asOf.getTime() + POST_FRENZY_WINDOW_MS) } });
+        countered++;
+        continue;
+      }
     }
 
     const detail = await pickAndSign(p.id, { name: p.name, age: p.age }, offers, 3, pool, cmap, true, churnMap);
