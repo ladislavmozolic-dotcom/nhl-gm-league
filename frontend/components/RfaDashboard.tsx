@@ -12,6 +12,7 @@ type Row = {
   comparables: { id: number; name: string; capHit: number | null; overall: number | null; age: number | null }[];
   player: { id: number; name: string; position: string; age: number | null; capHit: number | null; overall: number | null };
   team: { code: string | null; name: string; isAffiliate: boolean };
+  org: { id: number; code: string | null; name: string };
 };
 const M = (n: number | null) => n == null ? "—" : `$${(n / 1e6).toFixed(2)}M`;
 const label: Record<string, string> = { QO_DUE: "QO due", QO_TENDERED: "QO tendered", NEGOTIATING: "Negotiating", ARB_FILED: "Hearing open", AWARDED: "Awarded", OS_ELIGIBLE: "Offer-sheet eligible", WALKED_AWAY: "Walked away", UFA: "UFA", SIGNED: "Signed" };
@@ -40,20 +41,24 @@ function Risk({ level }: { level: Row["offerSheetRisk"] }) {
   return <span className={`font-semibold ${level === "High" ? "text-rose-300" : level === "Medium" ? "text-amber-300" : "text-emerald-300"}`}>{level}</span>;
 }
 
+const accent: Record<string, string> = { QO_DUE: "border-l-sky-500", QO_TENDERED: "border-l-emerald-500", NEGOTIATING: "border-l-amber-500", ARB_FILED: "border-l-violet-500", AWARDED: "border-l-violet-500", OS_ELIGIBLE: "border-l-rose-500" };
+const chip: Record<string, string> = { QO_DUE: "bg-sky-500/15 text-sky-300 border-sky-500/30", QO_TENDERED: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", NEGOTIATING: "bg-amber-500/15 text-amber-300 border-amber-500/30", ARB_FILED: "bg-violet-500/15 text-violet-300 border-violet-500/30", AWARDED: "bg-violet-500/15 text-violet-300 border-violet-500/30", OS_ELIGIBLE: "bg-rose-500/15 text-rose-300 border-rose-500/30" };
+
 function RfaRow({ r, pending, run }: { r: Row; pending: boolean; run: (fn: () => Promise<{ ok: boolean; error?: string }>) => void }) {
-  return <div className="px-4 py-3 sm:px-5">
+  return <div className={`border-l-4 px-4 py-3 sm:px-5 ${accent[r.status] ?? "border-l-slate-700"}`}>
     <div className="flex flex-wrap items-start gap-x-3 gap-y-1">
       <div className="min-w-0 flex-1">
         <PlayerLink id={r.player.id} name={r.player.name} className="font-semibold text-sm" />
         <span className="ml-2 text-xs text-slate-500">{r.player.position} · {r.player.age ?? "—"}r · {r.player.overall ?? "—"} OVR</span>
+        {r.team.isAffiliate && <span className="ml-2 rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase text-sky-300">AHL · {r.team.code}</span>}
       </div>
-      <span className="rounded-full border border-slate-700 bg-slate-800 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300">{label[r.status] ?? r.status}</span>
+      <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${chip[r.status] ?? "border-slate-700 bg-slate-800 text-slate-300"}`}>{label[r.status] ?? r.status}</span>
     </div>
-    <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:grid-cols-4">
-      <span className="text-slate-500">QO <b className="ml-1 text-sky-300">{M(r.qoAmount)}</b></span>
-      <span className="text-slate-500">Deadline <b className="ml-1 text-slate-300">{new Date(r.qoDueAt).toISOString().slice(0, 10)}</b></span>
-      <span className="text-slate-500">Arbitráž <b className={r.arbEligible ? "ml-1 text-violet-300" : "ml-1 text-slate-400"}>{r.arbEligible ? "eligible" : "nie"}</b></span>
-      <span className="text-slate-500">OS riziko <span className="ml-1"><Risk level={r.offerSheetRisk} /></span></span>
+    <div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+      <div className="rounded-lg bg-slate-950/50 px-2.5 py-1.5"><div className="text-[10px] uppercase tracking-wide text-slate-500">QO</div><b className="text-sky-300">{M(r.qoAmount)}</b></div>
+      <div className="rounded-lg bg-slate-950/50 px-2.5 py-1.5"><div className="text-[10px] uppercase tracking-wide text-slate-500">Deadline</div><b className="text-slate-200">{new Date(r.qoDueAt).toISOString().slice(0, 10)}</b></div>
+      <div className="rounded-lg bg-slate-950/50 px-2.5 py-1.5"><div className="text-[10px] uppercase tracking-wide text-slate-500">Arbitráž</div><b className={r.arbEligible ? "text-violet-300" : "text-slate-400"}>{r.arbEligible ? "eligible" : "nie"}</b></div>
+      <div className="rounded-lg bg-slate-950/50 px-2.5 py-1.5"><div className="text-[10px] uppercase tracking-wide text-slate-500">OS riziko</div><Risk level={r.offerSheetRisk} /></div>
     </div>
     {r.awardAav && <div className="mt-2 text-xs text-emerald-300">Arbitrážny verdikt: <b>{M(r.awardAav)} × {r.awardTerm}r</b></div>}
     <div className="mt-3 flex flex-wrap gap-2 text-xs">
@@ -69,41 +74,63 @@ function RfaRow({ r, pending, run }: { r: Row; pending: boolean; run: (fn: () =>
   </div>;
 }
 
-function TeamGroup({ team, rows, leagueView, pending, run }: { team: Row["team"]; rows: Row[]; leagueView: boolean; pending: boolean; run: (fn: () => Promise<{ ok: boolean; error?: string }>) => void }) {
+type Org = Row["org"];
+function TeamGroup({ org, rows, leagueView, pending, run }: { org: Org; rows: Row[]; leagueView: boolean; pending: boolean; run: (fn: () => Promise<{ ok: boolean; error?: string }>) => void }) {
   const urgent = rows.filter((r) => r.status === "QO_DUE").length;
+  const farm = rows.filter((r) => r.team.isAffiliate).length;
   const [open, setOpen] = useState(!leagueView);
+  // NHL players first, then the farm ones — both under the same NHL club
+  const sorted = [...rows].sort((a, b) => Number(a.team.isAffiliate) - Number(b.team.isAffiliate));
   return <section className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/40 shadow-sm">
-    <button onClick={() => setOpen((v) => !v)} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-800/50 sm:px-5">
-      <span className={`flex h-9 w-9 items-center justify-center rounded-lg text-xs font-black ${team.isAffiliate ? "bg-sky-500/15 text-sky-300" : "bg-blue-500/15 text-blue-300"}`}>{team.code ?? "TM"}</span>
-      <span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-slate-100">{team.name}</span><span className="text-[11px] text-slate-500">{team.isAffiliate ? "AHL affiliate" : "NHL club"}</span></span>
+    <button onClick={() => setOpen((v) => !v)} className="flex w-full items-center gap-3 bg-gradient-to-r from-slate-900 to-slate-900/30 px-4 py-3 text-left hover:from-slate-800/80 sm:px-5">
+      <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/15 text-xs font-black text-blue-300 ring-1 ring-blue-500/30">{org.code ?? "TM"}</span>
+      <span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-slate-100">{org.name}</span><span className="text-[11px] text-slate-500">{rows.length - farm} NHL{farm > 0 ? ` · ${farm} farm` : ""}</span></span>
       {urgent > 0 && <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-bold uppercase text-sky-300">{urgent} QO due</span>}
       <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs font-semibold text-slate-300">{rows.length}</span>
       <span className="text-slate-500">{open ? "⌃" : "⌄"}</span>
     </button>
-    {open && <div className="divide-y divide-slate-800/70 border-t border-slate-800/80">{rows.map((r) => <RfaRow key={r.id} r={r} pending={pending} run={run} />)}</div>}
+    {open && <div className="divide-y divide-slate-800/70 border-t border-slate-800/80">{sorted.map((r) => <RfaRow key={r.id} r={r} pending={pending} run={run} />)}</div>}
   </section>;
 }
+
+const FILTERS: { key: string; text: string; match: (s: string) => boolean }[] = [
+  { key: "all", text: "All", match: () => true },
+  { key: "due", text: "QO due", match: (s) => s === "QO_DUE" },
+  { key: "tendered", text: "Tendered / negotiating", match: (s) => s === "QO_TENDERED" || s === "NEGOTIATING" },
+  { key: "arb", text: "Arbitration", match: (s) => s === "ARB_FILED" || s === "AWARDED" },
+  { key: "os", text: "Offer-sheet eligible", match: (s) => s === "OS_ELIGIBLE" },
+];
 
 export default function RfaDashboard({ rows, leagueView = false }: { rows: Row[]; leagueView?: boolean }) {
   const [pending, start] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("all");
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>) => start(async () => { const r = await fn(); setMessage(r.ok ? "Uložené." : (r.error ?? "Akciu sa nepodarilo vykonať.")); });
-  const filtered = useMemo(() => rows.filter((r) => `${r.player.name} ${r.team.name} ${r.team.code ?? ""}`.toLowerCase().includes(query.toLowerCase())), [rows, query]);
+  const filtered = useMemo(() => {
+    const f = FILTERS.find((x) => x.key === filter) ?? FILTERS[0];
+    return rows.filter((r) => f.match(r.status) && `${r.player.name} ${r.org.name} ${r.org.code ?? ""} ${r.team.name}`.toLowerCase().includes(query.toLowerCase()));
+  }, [rows, query, filter]);
   const groups = useMemo(() => {
-    const map = new Map<number, { team: Row["team"]; rows: Row[] }>();
-    for (const r of filtered) { const g = map.get(r.teamId) ?? { team: r.team, rows: [] }; g.rows.push(r); map.set(r.teamId, g); }
-    return [...map.values()].sort((a, b) => a.team.name.localeCompare(b.team.name));
+    const map = new Map<number, { org: Org; rows: Row[] }>();
+    for (const r of filtered) { const g = map.get(r.org.id) ?? { org: r.org, rows: [] }; g.rows.push(r); map.set(r.org.id, g); }
+    return [...map.values()].sort((a, b) => a.org.name.localeCompare(b.org.name));
   }, [filtered]);
-  const qDue = rows.filter((r) => r.status === "QO_DUE").length;
-  const hearings = rows.filter((r) => r.status === "ARB_FILED" || r.status === "AWARDED").length;
+  const count = (key: string) => rows.filter((r) => (FILTERS.find((x) => x.key === key) ?? FILTERS[0]).match(r.status)).length;
   return <div className="space-y-4">
-    <div className="grid grid-cols-3 gap-2">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
       <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-3"><div className="text-[10px] font-bold uppercase tracking-wide text-slate-500">RFA cases</div><div className="mt-1 text-xl font-black text-slate-100">{rows.length}</div></div>
-      <div className="rounded-xl border border-sky-500/20 bg-sky-500/5 p-3"><div className="text-[10px] font-bold uppercase tracking-wide text-sky-300">QO due</div><div className="mt-1 text-xl font-black text-sky-200">{qDue}</div></div>
-      <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-3"><div className="text-[10px] font-bold uppercase tracking-wide text-violet-300">Hearings</div><div className="mt-1 text-xl font-black text-violet-200">{hearings}</div></div>
+      <div className="rounded-xl border border-sky-500/20 bg-sky-500/5 p-3"><div className="text-[10px] font-bold uppercase tracking-wide text-sky-300">QO due</div><div className="mt-1 text-xl font-black text-sky-200">{count("due")}</div></div>
+      <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-3"><div className="text-[10px] font-bold uppercase tracking-wide text-violet-300">Hearings</div><div className="mt-1 text-xl font-black text-violet-200">{count("arb")}</div></div>
+      <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-3"><div className="text-[10px] font-bold uppercase tracking-wide text-rose-300">Offer-sheet eligible</div><div className="mt-1 text-xl font-black text-rose-200">{count("os")}</div></div>
     </div>
-    <Card bodyClassName="p-3"><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={leagueView ? "Hľadať hráča alebo tím…" : "Hľadať vo svojej organizácii…"} className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none placeholder:text-slate-600 focus:border-sky-500" />{message && <p className="mt-2 text-xs text-sky-300">{message}</p>}</Card>
-    <div className="space-y-3">{groups.map((g) => <TeamGroup key={g.team.name} {...g} leagueView={leagueView} pending={pending} run={run} />)}{groups.length === 0 && <Card><p className="text-sm text-slate-500">Žiadny RFA nezodpovedá vyhľadávaniu.</p></Card>}</div>
+    <p className="rounded-xl border border-slate-800 bg-slate-900/40 px-4 py-3 text-xs leading-relaxed text-slate-400">A normal <b>Re-sign</b> remains available throughout the final contract year. Tendering the QO preserves RFA rights; missing it releases the player to UFA. Arbitration is optional, and an award can only be walked away from when it meets the league threshold. Farm (AHL) players are listed under their NHL club.</p>
+    <Card bodyClassName="p-3">
+      <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={leagueView ? "Hľadať hráča alebo tím…" : "Hľadať vo svojej organizácii…"} className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none placeholder:text-slate-600 focus:border-sky-500" />
+      <div className="mt-2 flex flex-wrap gap-1.5">{FILTERS.map((f) => <button key={f.key} onClick={() => setFilter(f.key)} className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${filter === f.key ? "border-sky-500 bg-sky-500/20 text-sky-200" : "border-slate-700 bg-slate-900 text-slate-400 hover:text-slate-200"}`}>{f.text} <span className="opacity-60">{count(f.key)}</span></button>)}</div>
+      {message && <p className="mt-2 text-xs text-sky-300">{message}</p>}
+    </Card>
+    <div className="space-y-3">{groups.map((g) => <TeamGroup key={g.org.id} {...g} leagueView={leagueView} pending={pending} run={run} />)}{groups.length === 0 && <Card><p className="text-sm text-slate-500">Žiadny RFA nezodpovedá vyhľadávaniu.</p></Card>}</div>
   </div>;
 }
+
