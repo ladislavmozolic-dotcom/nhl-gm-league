@@ -648,23 +648,30 @@ async function loneAboveMarketHalf(playerId: number, salary: number, pool: Await
 }
 
 /** A lone bidder under half the player's Market value doesn't get a flat "no": his camp
- *  answers with a counter — the lowest he'll go (half his Market value, rounded up) — and the
- *  club gets a window to raise to it. Returns null when the bid is high enough (or there is
- *  no Market value to judge by). A two-way can't go at/above the commissioner's two-way
- *  ceiling, so then the counter is flagged as one-way only. */
+ *  answers with a counter — his Market value less 25 % — and the club gets a window to
+ *  respond. It is only an ask: the club may offer less, and he still signs anything from
+ *  half his Market value up (the lone-bidder line in pickAndSign); under that he walks.
+ *  Returns null when the bid is already high enough (or there is no Market value to judge
+ *  by). A two-way can't reach the commissioner's two-way ceiling, so a two-way counter is
+ *  kept under it — and if even half his value is above it, only a one-way deal can work. */
 async function loneLowballCounter(
   playerId: number, o: { salary: number; years: number; twoWay: boolean }, pool: Awaited<ReturnType<typeof loadMarketPool>>,
-): Promise<{ want: number; years: number; mv: number; oneWayOnly: boolean; maxTwoWay: number } | null> {
+): Promise<{ want: number; years: number; mv: number; oneWayOnly: boolean; cappedByTwoWay: boolean; maxTwoWay: number } | null> {
   const mv = (await demandForPlayerId(playerId, pool))?.demand.salary ?? 0;
   if (mv <= 0 || o.salary >= mv * 0.5) return null;
-  const want = Math.max(o.salary, Math.ceil((mv * 0.5) / 50_000) * 50_000);
   const maxTwoWay = (await loadSettings()).faTwoWayMaxSalary;
-  return { want, years: o.years, mv, oneWayOnly: o.twoWay && want >= maxTwoWay, maxTwoWay };
+  const up50 = (v: number) => Math.ceil(v / 50_000) * 50_000;
+  const hardMin = up50(mv * 0.5);
+  const oneWayOnly = o.twoWay && hardMin >= maxTwoWay;
+  let want = Math.max(o.salary, up50(mv * 0.75));
+  const cappedByTwoWay = o.twoWay && !oneWayOnly && want >= maxTwoWay;
+  if (cappedByTwoWay) want = Math.max(hardMin, maxTwoWay - 50_000);
+  return { want, years: o.years, mv, oneWayOnly, cappedByTwoWay, maxTwoWay };
 }
 
-function lowballCounterMsg(nm: string, offer: number, c: { want: number; years: number; mv: number; oneWayOnly: boolean; maxTwoWay: number }, window: string): string {
-  return `📩 ${nm} thinks your offer (${fmtM(offer)}) is too low — well under his Market value (${fmtM(c.mv)}). He won't go below ${fmtM(c.want)} × ${c.years}yr: raise to at least that within ${window} or he'll reject it and wait for better options.`
-    + (c.oneWayOnly ? ` At that money he won't take a two-way (limit ${fmtM(c.maxTwoWay)}) — it would have to be a one-way deal.` : "");
+function lowballCounterMsg(nm: string, offer: number, c: { want: number; years: number; mv: number; oneWayOnly: boolean; cappedByTwoWay: boolean; maxTwoWay: number }, window: string): string {
+  return `📩 ${nm} thinks your offer (${fmtM(offer)}) is too low — well under his Market value (${fmtM(c.mv)}). He'd be happy with about ${fmtM(c.want)} × ${c.years}yr${c.oneWayOnly ? "" : " (a bit under his Market value)"}. You can offer less, but if you stay far below his Market value he'll reject it and wait for better options — you have ${window}.`
+    + (c.oneWayOnly ? ` Even half his value is above the two-way limit (${fmtM(c.maxTwoWay)}), so he'd only sign a one-way deal.` : c.cappedByTwoWay ? ` A two-way has to stay under ${fmtM(c.maxTwoWay)}.` : "");
 }
 
 /** What the player's camp tells the bidders when nobody signed him. A lone bidder who came in
