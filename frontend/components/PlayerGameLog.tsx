@@ -6,7 +6,7 @@ type GameSel = {
   homeTeam: { code: string | null }; awayTeam: { code: string | null };
 };
 type SkRow = { teamId: number; goals: number; assists: number; points: number; shots: number; pim: number; plusMinus: number; hits: number; blocks: number; toi: number; ppToi?: number; pkToi?: number; game: GameSel };
-type GlRow = { shotsAgainst: number; saves: number; goalsAgainst: number; decision: string | null; xga?: number | null; isSteal?: boolean; game: GameSel };
+type GlRow = { teamId: number; shotsAgainst: number; saves: number; goalsAgainst: number; decision: string | null; xga?: number | null; isSteal?: boolean; game: GameSel };
 
 const fmtDate = (d: Date | null) => (d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }) : "—");
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
@@ -41,10 +41,8 @@ export default function PlayerGameLog({ isGoalie, skater, goalie }: { isGoalie: 
         </thead>
         <tbody>
           {isGoalie ? goalie.map((r, i) => {
-            // goalie's team: he allowed `goalsAgainst`, which equals the opponent's goals
             const g = r.game;
-            const home = r.goalsAgainst === (g.awayGoals ?? -1);
-            const m = matchup(g, home ? g.homeTeamId : g.awayTeamId);
+            const m = matchup(g, r.teamId);
             const svp = r.shotsAgainst ? (r.saves / r.shotsAgainst) : 0;
             const gsax = r.xga != null ? r.xga - r.goalsAgainst : null;
             return (

@@ -157,8 +157,10 @@ const glCells = (a: GlAgg): React.ReactNode[] => [
 ];
 
 // A league block: "<LEAGUE> Seasons" (season row + career) and, if any, "<LEAGUE> Playoffs".
-function StatBlock({ league, cols, reg, po, cellsOf, team }: {
+type Split = { team: React.ReactNode; agg: any };
+function StatBlock({ league, cols, reg, po, cellsOf, team, regSplits, poSplits }: {
   league: string; cols: string[]; reg: any; po: any; cellsOf: (a: any) => React.ReactNode[]; team: React.ReactNode;
+  regSplits?: Split[]; poSplits?: Split[];
 }) {
   if (!reg && !po) return null;
   const Head = () => (
@@ -179,14 +181,24 @@ function StatBlock({ league, cols, reg, po, cellsOf, team }: {
     <div className="bg-slate-900/40 border border-slate-800 rounded-xl overflow-hidden">
       <div className="px-4 py-2 bg-blue-950/40 border-b border-blue-500/30 text-xs font-bold uppercase tracking-wide text-blue-300">{league} Seasons</div>
       <div className="overflow-x-auto"><table className="w-full text-sm"><Head /><tbody>
-        {reg && <Row label={SEASON} a={reg} teamNode={team} />}
+        {reg && (regSplits && regSplits.length > 1
+          ? <>
+              {regSplits.map((sp, i) => <Row key={i} label={SEASON} a={sp.agg} teamNode={sp.team} />)}
+              <Row label={`${SEASON} total`} a={reg} bold teamNode={<span className="text-slate-500">TOT</span>} />
+            </>
+          : <Row label={SEASON} a={reg} teamNode={regSplits?.[0]?.team ?? team} />)}
         {reg && <Row label="CAREER" a={reg} bold teamNode={<span className="text-slate-500">—</span>} />}
       </tbody></table></div>
       {po && (
         <>
           <div className="px-4 py-2 bg-amber-950/30 border-y border-amber-500/30 text-xs font-bold uppercase tracking-wide text-amber-300">{league} Playoffs</div>
           <div className="overflow-x-auto"><table className="w-full text-sm"><Head /><tbody>
-            <Row label={SEASON} a={po} teamNode={team} />
+            {poSplits && poSplits.length > 1
+              ? <>
+                  {poSplits.map((sp, i) => <Row key={i} label={SEASON} a={sp.agg} teamNode={sp.team} />)}
+                  <Row label={`${SEASON} total`} a={po} bold teamNode={<span className="text-slate-500">TOT</span>} />
+                </>
+              : <Row label={SEASON} a={po} teamNode={poSplits?.[0]?.team ?? team} />}
             <Row label="CAREER" a={po} bold teamNode={<span className="text-slate-500">—</span>} />
           </tbody></table></div>
         </>
@@ -224,7 +236,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         xga: true, teamId: true,
         game: {
           select: {
-            league: true, seriesId: true, homeTeamId: true, awayTeamId: true, homeGoals: true, awayGoals: true,
+            league: true, seriesId: true, gameDate: true, homeTeamId: true, awayTeamId: true, homeGoals: true, awayGoals: true,
             goalEvents: { where: { emptyNet: true }, select: { teamId: true } },
           },
         },
@@ -245,9 +257,9 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     const rows = await prisma.playerGameStat.findMany({
       where: { playerId: p.id, game: { season: SEASON, status: "FINAL" } },
       select: {
-        goals: true, assists: true, points: true, shots: true, pim: true, plusMinus: true,
+        teamId: true, goals: true, assists: true, points: true, shots: true, pim: true, plusMinus: true,
         ppGoals: true, shGoals: true, gwg: true, hits: true, blocks: true, faceoffWins: true, faceoffLosses: true, toi: true, ppToi: true, pkToi: true,
-        game: { select: { league: true, seriesId: true } },
+        game: { select: { league: true, seriesId: true, gameDate: true } },
       },
     });
     for (const r of rows) skB[bucketKey(r.game.league, r.game.seriesId)].push(r);
@@ -261,6 +273,35 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     nhlReg: gB.nhlReg.length ? aggGoalie(gB.nhlReg) : null, nhlPo: gB.nhlPo.length ? aggGoalie(gB.nhlPo) : null,
     ahlReg: gB.ahlReg.length ? aggGoalie(gB.ahlReg) : null, ahlPo: gB.ahlPo.length ? aggGoalie(gB.ahlPo) : null,
   };
+  // per-club split inside each bucket — a traded player shows one row per club he played for
+  // (in the order he played for them), plus a season total.
+  const splitIds = new Set<number>();
+  const splitsOf = (rows: any[]): { teamId: number; rows: any[] }[] => {
+    const by = new Map<number, { teamId: number; first: number; rows: any[] }>();
+    for (const r of rows) {
+      const t = r.game?.gameDate ? new Date(r.game.gameDate).getTime() : 0;
+      const e: { teamId: number; first: number; rows: any[] } = by.get(r.teamId) ?? { teamId: r.teamId, first: t, rows: [] as any[] };
+      e.first = Math.min(e.first, t); e.rows.push(r); by.set(r.teamId, e);
+      splitIds.add(r.teamId);
+    }
+    return [...by.values()].sort((a, b) => a.first - b.first);
+  };
+  const rawSplits = Object.fromEntries((["nhlReg", "nhlPo", "ahlReg", "ahlPo"] as const).map((k) => [k, splitsOf(isGoalie ? gB[k] : skB[k])])) as Record<"nhlReg" | "nhlPo" | "ahlReg" | "ahlPo", { teamId: number; rows: any[] }[]>;
+  const splitTeams = splitIds.size
+    ? new Map((await prisma.team.findMany({ where: { id: { in: [...splitIds] } }, select: { id: true, code: true, name: true, logoUrl: true } })).map((t) => [t.id, t]))
+    : new Map<number, { id: number; code: string | null; name: string; logoUrl: string | null }>();
+  const mkSplits = (k: "nhlReg" | "nhlPo" | "ahlReg" | "ahlPo"): Split[] => rawSplits[k].map((sp) => {
+    const t = splitTeams.get(sp.teamId);
+    return {
+      agg: isGoalie ? aggGoalie(sp.rows) : aggSkater(sp.rows),
+      team: (
+        <span className="inline-flex items-center gap-1.5">
+          {t?.logoUrl && <img src={t.logoUrl} alt="" className="w-4 h-4 object-contain" />}
+          <span className="font-medium">{t?.code ?? t?.name ?? "—"}</span>
+        </span>
+      ),
+    };
+  });
   const hasNhl = isGoalie ? !!(gl.nhlReg || gl.nhlPo) : !!(sk.nhlReg || sk.nhlPo);
   const hasAhl = isGoalie ? !!(gl.ahlReg || gl.ahlPo) : !!(sk.ahlReg || sk.ahlPo);
 
@@ -322,7 +363,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   // The NHL club he actually played his NHL games for (a call-up's current club may be
   // his AHL farm) — used as the team on the "NHL Seasons" block.
   const nhlTeamId = isGoalie
-    ? (goalieLog[0] ? (goalieLog[0].goalsAgainst === (goalieLog[0].game.awayGoals ?? -1) ? goalieLog[0].game.homeTeamId : goalieLog[0].game.awayTeamId) : null)
+    ? (goalieLog[0]?.teamId ?? null)
     : (skaterLog.length ? [...skaterLog.reduce((m, r) => m.set(r.teamId, (m.get(r.teamId) ?? 0) + 1), new Map<number, number>()).entries()].sort((a, b) => b[1] - a[1])[0][0] : null);
   const nhlTeam = nhlTeamId && nhlTeamId !== team?.id
     ? await prisma.team.findUnique({ where: { id: nhlTeamId }, select: { code: true, name: true, slug: true, logoUrl: true } })
@@ -556,8 +597,8 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         <ProfileStatsTabs
           season={hasNhl || hasAhl ? (
             <div className="space-y-6">
-              {hasNhl && <StatBlock league="NHL" cols={isGoalie ? GL_COLS : SK_COLS} reg={isGoalie ? gl.nhlReg : sk.nhlReg} po={isGoalie ? gl.nhlPo : sk.nhlPo} cellsOf={isGoalie ? glCells : skCells} team={<NhlTeamCell />} />}
-              {hasAhl && <StatBlock league="AHL" cols={isGoalie ? GL_COLS : SK_COLS} reg={isGoalie ? gl.ahlReg : sk.ahlReg} po={isGoalie ? gl.ahlPo : sk.ahlPo} cellsOf={isGoalie ? glCells : skCells} team={<TeamCell />} />}
+              {hasNhl && <StatBlock league="NHL" cols={isGoalie ? GL_COLS : SK_COLS} reg={isGoalie ? gl.nhlReg : sk.nhlReg} po={isGoalie ? gl.nhlPo : sk.nhlPo} cellsOf={isGoalie ? glCells : skCells} team={<NhlTeamCell />} regSplits={mkSplits("nhlReg")} poSplits={mkSplits("nhlPo")} />}
+              {hasAhl && <StatBlock league="AHL" cols={isGoalie ? GL_COLS : SK_COLS} reg={isGoalie ? gl.ahlReg : sk.ahlReg} po={isGoalie ? gl.ahlPo : sk.ahlPo} cellsOf={isGoalie ? glCells : skCells} team={<TeamCell />} regSplits={mkSplits("ahlReg")} poSplits={mkSplits("ahlPo")} />}
             </div>
           ) : (
             <div className="py-8 text-center text-slate-500">No games played in {SEASON}.</div>

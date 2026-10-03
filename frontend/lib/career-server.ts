@@ -101,15 +101,14 @@ export async function playerCareer(playerId: number): Promise<PlayerCareer> {
     for (const r of archived) goalie.push(mkGoalieRow(r, tc(r.teamId)));
     // live active season (reg + playoff, per league)
     for (const league of ["NHL", "AHL"]) for (const isPlayoff of [false, true]) {
-      const live = await liveGoalie(playerId, ACTIVE_SEASON, league, isPlayoff);
-      if (live) goalie.push(mkGoalieRow({ ...live, season: ACTIVE_SEASON, league, isPlayoff }, tc(live.teamId)));
+      // one row per club he played for this season (a traded player is split, not lumped under his latest team)
+      for (const live of await liveGoalie(playerId, ACTIVE_SEASON, league, isPlayoff)) goalie.push(mkGoalieRow({ ...live, season: ACTIVE_SEASON, league, isPlayoff }, tc(live.teamId)));
     }
   } else {
     const archived = await prisma.playerSeasonStat.findMany({ where: { playerId, season: { not: ACTIVE_SEASON } } });
     for (const r of archived) skater.push(mkSkaterRow(r, tc(r.teamId)));
     for (const league of ["NHL", "AHL"]) for (const isPlayoff of [false, true]) {
-      const live = await liveSkater(playerId, ACTIVE_SEASON, league, isPlayoff);
-      if (live) skater.push(mkSkaterRow({ ...live, season: ACTIVE_SEASON, league, isPlayoff }, tc(live.teamId)));
+      for (const live of await liveSkater(playerId, ACTIVE_SEASON, league, isPlayoff)) skater.push(mkSkaterRow({ ...live, season: ACTIVE_SEASON, league, isPlayoff }, tc(live.teamId)));
     }
   }
 
@@ -139,21 +138,24 @@ function mkGoalieRow(r: { season: string; league: string; isPlayoff: boolean; gp
 }
 
 async function liveSkater(playerId: number, season: string, league: string, isPlayoff: boolean) {
-  const agg = await prisma.playerGameStat.aggregate({
+  const groups = await prisma.playerGameStat.groupBy({
+    by: ["teamId"],
     where: { playerId, game: { season, league, status: "FINAL", ...(isPlayoff ? { seriesId: { not: null } } : { seriesId: null }) } },
-    _sum: { goals: true, assists: true, points: true, shots: true, pim: true, plusMinus: true, hits: true, blocks: true }, _count: { _all: true },
+    _sum: { goals: true, assists: true, points: true, shots: true, pim: true, plusMinus: true, hits: true, blocks: true }, _count: { _all: true }, _min: { gameId: true },
   });
-  if (!agg._count._all) return null;
-  const row = await prisma.playerGameStat.findFirst({ where: { playerId, game: { season, league, status: "FINAL", ...(isPlayoff ? { seriesId: { not: null } } : { seriesId: null }) } }, orderBy: { gameId: "desc" }, select: { teamId: true } });
-  return { teamId: row?.teamId ?? 0, gp: agg._count._all, goals: agg._sum.goals ?? 0, assists: agg._sum.assists ?? 0, points: agg._sum.points ?? 0, shots: agg._sum.shots ?? 0, pim: agg._sum.pim ?? 0, plusMinus: agg._sum.plusMinus ?? 0, hits: agg._sum.hits ?? 0, blocks: agg._sum.blocks ?? 0 };
+  return groups.sort((x, y) => (x._min.gameId ?? 0) - (y._min.gameId ?? 0)).map((g) => ({ teamId: g.teamId, gp: g._count._all, goals: g._sum.goals ?? 0, assists: g._sum.assists ?? 0, points: g._sum.points ?? 0, shots: g._sum.shots ?? 0, pim: g._sum.pim ?? 0, plusMinus: g._sum.plusMinus ?? 0, hits: g._sum.hits ?? 0, blocks: g._sum.blocks ?? 0 }));
 }
-
 async function liveGoalie(playerId: number, season: string, league: string, isPlayoff: boolean) {
-  const rows = await prisma.goalieGameStat.findMany({ where: { playerId, started: true, game: { season, league, status: "FINAL", ...(isPlayoff ? { seriesId: { not: null } } : { seriesId: null }) } }, select: { teamId: true, shotsAgainst: true, saves: true, goalsAgainst: true, decision: true } });
-  if (!rows.length) return null;
-  let w = 0, l = 0, otl = 0, so = 0, sa = 0, sv = 0, ga = 0, teamId = 0;
-  for (const r of rows) { sa += r.shotsAgainst; sv += r.saves; ga += r.goalsAgainst; if (r.decision === "W") w++; else if (r.decision === "OTL") otl++; else if (r.decision === "L") l++; if (r.goalsAgainst === 0) so++; teamId = r.teamId; }
-  return { teamId, gp: rows.length, wins: w, losses: l, otl, shutouts: so, shotsAgainst: sa, saves: sv, goalsAgainst: ga };
+  const rows = await prisma.goalieGameStat.findMany({ where: { playerId, started: true, game: { season, league, status: "FINAL", ...(isPlayoff ? { seriesId: { not: null } } : { seriesId: null }) } }, orderBy: { gameId: "asc" }, select: { teamId: true, shotsAgainst: true, saves: true, goalsAgainst: true, decision: true } });
+  const by = new Map<number, { teamId: number; gp: number; wins: number; losses: number; otl: number; shutouts: number; shotsAgainst: number; saves: number; goalsAgainst: number }>();
+  for (const r of rows) {
+    const e = by.get(r.teamId) ?? { teamId: r.teamId, gp: 0, wins: 0, losses: 0, otl: 0, shutouts: 0, shotsAgainst: 0, saves: 0, goalsAgainst: 0 };
+    e.gp++; e.shotsAgainst += r.shotsAgainst; e.saves += r.saves; e.goalsAgainst += r.goalsAgainst;
+    if (r.decision === "W") e.wins++; else if (r.decision === "OTL") e.otl++; else if (r.decision === "L") e.losses++;
+    if (r.goalsAgainst === 0) e.shutouts++;
+    by.set(r.teamId, e);
+  }
+  return [...by.values()]; // Map keeps first-appearance order (games are ordered oldest-first)
 }
 
 // ---------- franchise history ----------
