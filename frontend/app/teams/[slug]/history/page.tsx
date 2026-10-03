@@ -21,12 +21,16 @@ export default async function TeamHistoryPage({ params }: { params: Promise<{ sl
   const team = await prisma.team.findUnique({ where: { slug } });
   if (!team) notFound();
 
-  const [records, awards, fh] = await Promise.all([
+  const [records, awards, fh, transactions] = await Promise.all([
     prisma.seasonRecord.findMany({
       where: { OR: [{ championTeamId: team.id }, { runnerUpTeamId: team.id }, { presidentsTeamId: team.id }] },
     }),
     prisma.seasonAward.findMany({ where: { teamId: team.id } }),
     franchiseHistory(team.id, team.league ?? "NHL"),
+    prisma.transaction.findMany({
+      where: { teamId: team.id }, orderBy: { createdAt: "desc" }, take: 20,
+      select: { id: true, type: true, message: true, createdAt: true },
+    }),
   ]);
 
   if (records.length === 0 && awards.length === 0 && fh.seasons.length === 0) {
@@ -51,6 +55,11 @@ export default async function TeamHistoryPage({ params }: { params: Promise<{ sl
   const champs = records.filter((r) => r.championTeamId === team.id);
   const runnersUp = records.filter((r) => r.runnerUpTeamId === team.id);
   const presidents = records.filter((r) => r.presidentsTeamId === team.id);
+  const chronicle = [
+    ...transactions.map((event) => ({ key: `tx-${event.id}`, at: event.createdAt, icon: event.type === "TRADE" ? "🔁" : event.type === "SIGNING" ? "✍️" : "📌", title: event.message, detail: event.type })),
+    ...champs.map((record) => ({ key: `cup-${record.id}`, at: record.createdAt, icon: "🏆", title: `Won the ${record.league === "AHL" ? "Calder Cup" : "Stanley Cup"}`, detail: record.season })),
+    ...awards.map((award) => ({ key: `award-${award.id}`, at: new Date(`${award.season.slice(0, 4)}-07-01T00:00:00Z`), icon: "⭐", title: `${AWARD_LABEL[award.category] ?? award.category}: ${award.playerName ?? "Team award"}`, detail: award.season })),
+  ].sort((a, b) => b.at.getTime() - a.at.getTime()).slice(0, 20);
 
   const Trophy = ({ n, label, seasons, tone, icon }: { n: number; label: string; seasons: string[]; tone: string; icon: string }) => (
     <div className="relative bg-slate-800/40 rounded-xl p-4 text-center overflow-hidden">
@@ -121,6 +130,18 @@ export default async function TeamHistoryPage({ params }: { params: Promise<{ sl
         <Trophy n={runnersUp.length} icon="🥈" label="Finals Losses" tone="text-slate-300" seasons={runnersUp.map((c) => c.season)} />
         <Trophy n={presidents.length} icon="🎖️" label="Best Records" tone="text-green-400" seasons={presidents.map((c) => c.season)} />
       </div>
+
+      <Card title="Franchise Chronicle" accent="text-violet-300" right={<span className="text-xs text-slate-500">Auto-updated</span>}>
+        {chronicle.length === 0 ? <p className="py-4 text-center text-sm text-slate-500">The story begins with the franchise&apos;s first transaction, award or playoff run.</p> : (
+          <div className="relative ml-2 border-l border-violet-500/20 pl-5 space-y-4">
+            {chronicle.map((event) => <div key={event.key} className="relative">
+              <span className="absolute -left-[31px] grid h-5 w-5 place-items-center rounded-full border border-violet-400/30 bg-slate-900 text-[10px]">{event.icon}</span>
+              <p className="text-sm font-medium text-slate-200">{event.title}</p>
+              <p className="mt-0.5 text-[11px] uppercase tracking-wide text-slate-500">{event.detail} · {event.at.toLocaleDateString("en-CA", { timeZone: "UTC" })}</p>
+            </div>)}
+          </div>
+        )}
+      </Card>
 
       <Card title="All-Time Record" accent="text-blue-400">
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">

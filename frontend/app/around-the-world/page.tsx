@@ -67,9 +67,7 @@ export default async function AroundTheWorldPage({
         include: {
           currentTeam: { include: { league: true } },
           stats: {
-            where: { season: "2026-27" },
-            orderBy: [{ points: "desc" }, { gamesPlayed: "desc" }, { syncedAt: "desc" }],
-            take: 1,
+            orderBy: [{ season: "desc" }, { gamesPlayed: "desc" }, { syncedAt: "desc" }],
             include: { league: true, team: true },
           },
         },
@@ -240,9 +238,15 @@ export default async function AroundTheWorldPage({
         <YourProspectTracker
           prospects={myProspects.map((p) => {
             const w = p.worldPlayer;
-            const s = w?.stats[0];
+            const s = w?.stats.find((item) => item.season === "2026-27") ?? w?.stats[0];
+            const previous = s ? w?.stats.find((item) => item.id !== s.id && item.isGoalie === s.isGoalie) : null;
             const league = s?.league ?? w?.currentTeam?.league;
             const club = s?.team ?? w?.currentTeam;
+            const pointsPerGame = s && !s.isGoalie && s.gamesPlayed ? s.points / s.gamesPlayed : null;
+            const previousPointsPerGame = previous && !previous.isGoalie && previous.gamesPlayed ? previous.points / previous.gamesPlayed : null;
+            const trend = pointsPerGame == null || previousPointsPerGame == null ? "First tracked season" : pointsPerGame > previousPointsPerGame + 0.15 ? "Trending up" : pointsPerGame < previousPointsPerGame - 0.15 ? "Cooling off" : "Steady";
+            const role = (p.position ?? w?.position ?? "").toUpperCase() === "G" ? "Goaltender" : (p.position ?? w?.position ?? "").toUpperCase().includes("D") ? "Defensive prospect" : pointsPerGame != null && pointsPerGame >= 1 ? "Offensive driver" : "Forward prospect";
+            const alert = !w ? "Needs real-world match" : !s ? "Roster linked — awaiting stats" : s.gamesPlayed === 0 ? "Awaiting season debut" : pointsPerGame != null && pointsPerGame >= 1 ? "Strong offensive start" : "Live season tracking";
             return {
               id: p.id,
               name: p.name,
@@ -262,6 +266,10 @@ export default async function AroundTheWorldPage({
               isGoalie: s?.isGoalie ?? p.position === "G",
               wins: s?.wins ?? null,
               savePercentage: s?.savePercentage ?? null,
+              developmentLevel: league ? worldTeamLevel(league.name, club?.name ?? "") : null,
+              developmentRole: role,
+              developmentTrend: trend,
+              developmentAlert: alert,
             };
           })}
           teams={allTeams}
