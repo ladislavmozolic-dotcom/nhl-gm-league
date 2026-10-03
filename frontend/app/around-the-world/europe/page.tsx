@@ -7,7 +7,7 @@ import { BackPill, Card, PageHeader, StatTile } from "@/components/ui";
 import WorldLeagueStats from "@/components/WorldLeagueStats";
 import WorldCompetitionNav from "@/components/WorldCompetitionNav";
 import { getTeamSession } from "@/lib/auth";
-import { worldScoutingMeta } from "@/lib/world-scouting";
+import { worldScoutingMeta, draftYearForSeason } from "@/lib/world-scouting";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +19,7 @@ export default async function EuropeProspectsPage({ searchParams }: { searchPara
   const season = requestedSeason ? (seasons.find((s) => s.season === requestedSeason)?.season ?? requestedSeason) : defaultSeason;
   const stats = season ? await prisma.worldPlayerSeasonStat.findMany({ where: { season, league: { region: "Europe", active: true } }, include: { player: true, league: true, team: true }, orderBy: [{ points: "desc" }, { gamesPlayed: "desc" }] }) : [];
   const teamId = await getTeamSession();
-  const { year: draftYear, meta } = await worldScoutingMeta(stats.map((s) => s.player), teamId);
+  const { year: draftYear, meta } = await worldScoutingMeta(stats.map((s) => s.player), teamId, draftYearForSeason(season));
   const visibleStats = stats.filter((s) => { const state = meta.get(s.playerId); return state?.rights || state?.draftable; });
   const importedLeagueCodes = new Set(stats.map((s) => s.league.code));
   const teamCounts = new Map<number, number>();

@@ -14,7 +14,7 @@ export async function saveWorldPlayerToDraftList(worldPlayerId: number) {
   if (!player) return { ok: false as const, error: "Player not found." };
   const { year, meta } = await worldScoutingMeta([player], teamId);
   const state = meta.get(player.id)!;
-  if (!state.draftable) return { ok: false as const, error: "Player is not verified as draft-eligible (or UNHL rights are already held)." };
+  if (!state.draftable) return { ok: false as const, error: "Player is not draft-eligible (must be strictly under 24 on 30 June of draft year with no UNHL rights)." };
   if (state.saved) return { ok: true as const, year };
   const source = await currentDraftSourceWhere();
   const candidates = await prisma.draftProspect.findMany({ where: { ...source, draftYear: year, name: { equals: player.name, mode: "insensitive" }, draftedByTeamId: null }, select: { id: true, birthDate: true } });

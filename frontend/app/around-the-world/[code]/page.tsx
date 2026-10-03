@@ -6,7 +6,7 @@ import WorldLeagueStats from "@/components/WorldLeagueStats";
 import WorldCompetitionNav from "@/components/WorldCompetitionNav";
 import { epProfileUrl } from "@/lib/playerName";
 import { getTeamSession } from "@/lib/auth";
-import { worldScoutingMeta } from "@/lib/world-scouting";
+import { worldScoutingMeta, draftYearForSeason } from "@/lib/world-scouting";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +32,7 @@ export default async function WorldLeaguePage({ params, searchParams }: {
     orderBy: [{ points: "desc" }, { gamesPlayed: "desc" }],
   }) : [];
   const teamId = await getTeamSession();
-  const { year: draftYear, meta } = await worldScoutingMeta(stats.map((s) => s.player), teamId);
+  const { year: draftYear, meta } = await worldScoutingMeta(stats.map((s) => s.player), teamId, draftYearForSeason(season));
   const visibleStats = stats;
   const syncedAt = stats.reduce<Date | null>((latest, s) => !latest || s.syncedAt > latest ? s.syncedAt : latest, null);
   const skaters = visibleStats.filter((s) => !s.isGoalie);

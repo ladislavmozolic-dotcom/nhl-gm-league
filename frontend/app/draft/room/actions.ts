@@ -282,13 +282,13 @@ export async function makeOffBoardPickAction(input: { name: string; birthDate: s
   const link = input.epLink?.trim() || "";
   if (link && !/^https?:\/\//i.test(link)) return { ok: false, error: "The EP link must be a full https:// URL." };
 
-  // age gate: must be no older than 23 on draft day (the league date)
+  // age gate: must be under 24 on June 30 of the draft year (max age 23)
   const bd = new Date(`${input.birthDate}T00:00:00Z`);
   if (isNaN(bd.getTime())) return { ok: false, error: "Enter a valid birth date." };
-  const draftDay = await getLeagueDate();
-  if (bd.getTime() > draftDay.getTime()) return { ok: false, error: "Birth date can't be in the future." };
+  const cutoff = new Date(Date.UTC(YEAR, 5, 30));
+  if (bd.getTime() > cutoff.getTime()) return { ok: false, error: "Birth date can't be in the future." };
   const turns24 = new Date(Date.UTC(bd.getUTCFullYear() + 24, bd.getUTCMonth(), bd.getUTCDate()));
-  if (draftDay.getTime() >= turns24.getTime()) return { ok: false, error: "Player is over 23 on draft day — not eligible." };
+  if (cutoff.getTime() >= turns24.getTime()) return { ok: false, error: "Player will be 24 or older on 30 June of draft year — not eligible." };
 
   const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true } });
   const source = cfg?.rosterMode === "real" ? "real" : "profinhl";
