@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { seedWorldLeagueCatalog } from "@/lib/world-catalog";
 import { importAhlSeason, importOhlSeason, importQmjhlSeason, importWhlSeason } from "@/lib/world-import-hockeytech";
-import { importNcaaSeason } from "@/lib/world-import-ncaa";
 import { importLiigaProspects } from "@/lib/world-import-liiga";
 import { importCzechExtraligaProspects, importShlProspects } from "@/lib/world-import-europe";
 import { importEuropeanJuniorLeagues } from "@/lib/world-import-juniors";
@@ -15,7 +14,7 @@ import { reconcileAllProspects } from "@/lib/world-player-identity";
  * 1. Seeds/refreshes the competition catalog
  * 2. CHL Junior Leagues (WHL, OHL, QMJHL via HockeyTech)
  * 3. AHL (American Hockey League via HockeyTech)
- * 4. NCAA Division I rosters & club assignments (pre-season)
+ * 4. NCAA Division I rosters & club assignments (pre-season, on demand)
  * 5. European Senior & Junior Leagues (Liiga, SHL, Czechia, Slovakia, Juniors, DEL)
  * 6. Russian Leagues (KHL, MHL, VHL) & Global Player Profiles
  * 7. Cross-source prospect identity reconciliation
@@ -32,7 +31,10 @@ export async function runFullWorldSync() {
     importQmjhlSeason().catch((e) => ({ error: (e as Error).message })),
   ]);
   const ahl = await importAhlSeason().catch((e) => ({ error: (e as Error).message }));
-  const ncaa = await importNcaaSeason().catch((e) => ({ error: (e as Error).message }));
+  // NCAA has no current-season stats yet. Its full 63-team roster scan is
+  // intentionally deferred, so the daily live leagues (especially Liiga) are
+  // never held behind an empty college slate.
+  const ncaa = { status: "held for 2026-27 opening stats" };
   const [liiga, shl, cze, juniors] = await Promise.all([
     importLiigaProspects().catch((e) => ({ error: (e as Error).message })),
     importShlProspects().catch((e) => ({ error: (e as Error).message })),
