@@ -21,7 +21,7 @@ import { getArenaSections, selloutRevenue, attendanceRate, priceAttendanceFactor
 import type { SimTeam, SimGoalie, TeamBox } from "./types";
 import type { TeamLinesData } from "./lines-core";
 
-type SeasonTeam = SimTeam & { linesUsed: TeamLinesData };
+type SeasonTeam = SimTeam & { linesUsed: TeamLinesData; /** a registered human GM runs this club (AHL farm → its parent club's GM) */ humanGm?: boolean };
 
 const DU_HIGH = 85; // durability at/above which CON recovers +2/day instead of +1
 export const PLAY_CON = 95; // a skater must be at CON >= 95 to dress (below = still hurt / rusty)
@@ -157,6 +157,11 @@ function chooseStarter(team: SeasonTeam, prevRound: number, state: Map<number, G
   // b2bFatigue penalty) and won 55-60 games. The auto-rotation below then decides,
   // and it still favours him by OVERALL on normal nights.
   const picked = team.goalies.find((g) => g.id === team.linesUsed?.situations?.others?.starter);
+  // A human GM decides who is in net — full stop. No back-to-back / workload / CON-rest
+  // rotation overrides his pick (that rotation exists for AI-run clubs); the only thing that
+  // keeps his starter out is being genuinely unfit to dress (below PLAY_CON), and a b2b still
+  // costs the starter a little performance via `fatigued`.
+  if (team.humanGm && picked && picked.con >= PLAY_CON) return picked;
   if (picked && picked.con >= PLAY_CON) {
     const st = state.get(picked.id);
     const startedYesterday = (st?.lastStartRound ?? -99) === prevRound;
@@ -277,6 +282,8 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
     try {
       const t = await loadSimTeam(id, undefined, { chemBase: settings.chemistryBase, offPos: { wing: settings.offPosWingPct, center: settings.offPosCenterPct, def: settings.offPosDefPct, chemCap: settings.offPosChemCap } });
       applyPersistentState(t); // restore evolved morale/CON/drought after a reload
+      const own = await prisma.team.findUnique({ where: { id }, select: { passwordHash: true, parentTeam: { select: { passwordHash: true } } } });
+      (t as SeasonTeam).humanGm = !!(own?.passwordHash || own?.parentTeam?.passwordHash);
       cache.set(id, t); return t;
     }
     catch { cache.set(id, null); return null; } // e.g. AHL team with no goalie -> skip its games

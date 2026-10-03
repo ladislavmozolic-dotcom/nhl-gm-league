@@ -875,8 +875,8 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
               <span><strong>#{goalie.number ?? "—"}</strong> Jersey</span>
             </div>
           ) : <p className="text-xs text-slate-500">{starter ? "Choose a goalie for this role." : "Automatically set when you change the starter."}</p>}
-          {starter && goalie && goalieB2b[goalie.id] && goaliesByName.some((g) => g.id !== goalie.id && !g.tired && !g.injured) && (
-            <p className="text-xs text-amber-300 font-semibold">🔁 Back-to-back: {displayName(goalie.name)} started yesterday, so the sim rests him tonight and the backup gets the net — your pick is respected on normal nights.</p>
+          {starter && goalie && goalieB2b[goalie.id] && !goalie.tired && (
+            <p className="text-xs text-amber-300 font-semibold">🔁 Back-to-back: {displayName(goalie.name)} started yesterday. He still starts — it&apos;s your call — but tired legs cost him some save quality.</p>
           )}
           {starter && goalie?.tired && (
             <p className="text-xs text-rose-400 font-semibold">😮‍💨 Too gassed to start (CON below 95) — the sim will hand the net to the fresher goalie instead.</p>
