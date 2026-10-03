@@ -254,6 +254,7 @@ export default async function AroundTheWorldPage({
               overallPick: p.overallPick,
               birthDate: w?.birthDate,
               stats: w?.stats,
+              gradeOverride: p.gradeOverride,
             });
             return {
               id: p.id,

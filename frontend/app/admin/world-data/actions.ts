@@ -12,6 +12,7 @@ import { importRussianProspects } from "@/lib/world-import-russia";
 import { importKhlLeague } from "@/lib/world-import-khl";
 import { importDelLeague } from "@/lib/world-import-del";
 import { reconcileAllProspects, resolveWorldPlayer } from "@/lib/world-player-identity";
+import { backfillWorldBirthDates } from "@/lib/world-birthdate-backfill";
 import { revalidatePath } from "next/cache";
 
 /** Create/update the supported competition catalog. */
@@ -242,4 +243,26 @@ export async function manualLinkProspectAction(input: {
   } catch (error) {
     return { ok: false as const, error: error instanceof Error ? error.message : "Manual link failed." };
   }
+}
+
+/** Set (or clear, with an empty grade) the commissioner's manual projection grade for a prospect.
+ *  Applies to every Prospect row of the same name so profinhl/real copies stay consistent. */
+export async function setProspectGradeAction(formData: FormData) {
+  if (!(await isAdmin())) return;
+  const id = Number(formData.get("prospectId"));
+  const raw = String(formData.get("grade") ?? "").toUpperCase();
+  const grade = ["A", "B", "C", "D", "F"].includes(raw) ? raw : null;
+  const prospect = await prisma.prospect.findUnique({ where: { id }, select: { name: true } });
+  if (!prospect) return;
+  await prisma.prospect.updateMany({ where: { name: prospect.name }, data: { gradeOverride: grade } });
+  for (const path of ["/around-the-world", "/admin/world-data", "/tools/all-rosters", "/players/all"]) revalidatePath(path);
+  revalidatePath("/teams/[slug]/prospects", "page");
+}
+
+/** Admin button: fill missing prospect birth dates (improves the age part of the grade). */
+export async function backfillBirthDatesAction() {
+  if (!(await isAdmin())) return;
+  await backfillWorldBirthDates(300);
+  for (const path of ["/around-the-world", "/admin/world-data", "/tools/all-rosters", "/players/all"]) revalidatePath(path);
+  revalidatePath("/teams/[slug]/prospects", "page");
 }

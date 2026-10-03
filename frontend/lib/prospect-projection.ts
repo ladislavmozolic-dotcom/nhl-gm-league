@@ -24,6 +24,8 @@ export type ProspectProjectionInput = {
   overallPick?: number | null;
   birthDate?: string | null;
   stats?: ProjectionStat[];
+  /** Commissioner's manual grade (A–F); replaces the computed one. */
+  gradeOverride?: string | null;
 };
 
 export type ProspectProjection = {
@@ -35,6 +37,8 @@ export type ProspectProjection = {
   risk: "Low" | "Moderate" | "High";
   futureValue: number;
   summary: string;
+  /** True when the grade was set by hand rather than computed. */
+  manual?: boolean;
 };
 
 const JUNIOR = new Set(["WHL", "OHL", "QMJHL", "USHL", "BCHL", "FIN-U20", "SWE-U20", "CZE-U20", "SVK-U20", "MHL"]);
@@ -106,7 +110,17 @@ export function projectProspect(input: ProspectProjectionInput): ProspectProject
   const futureValue = Math.round(({ A: 950, B: 650, C: 380, D: 170, F: 70 }[grade]) * (0.8 + confidence / 500));
   const performance = !latest ? "No live stat line yet" : goalie ? `${Math.round((latest.savePercentage ?? 0) * 1000) / 10}% SV% in ${gp} GP` : `${((latest.points ?? 0) / gp).toFixed(2)} P/GP in ${code || "current league"}`;
 
-  return { grade, score, confidence, role: roleFor(pos, grade), eta, risk, futureValue, summary: `${performance} · ${risk.toLowerCase()} projection risk` };
+  const computed: ProspectProjection = { grade, score, confidence, role: roleFor(pos, grade), eta, risk, futureValue, summary: `${performance} · ${risk.toLowerCase()} projection risk` };
+  const manual = input.gradeOverride?.toUpperCase();
+  if (manual !== "A" && manual !== "B" && manual !== "C" && manual !== "D" && manual !== "F") return computed;
+  const g: ProjectionGrade = manual;
+  const mid = { A: 90, B: 75, C: 61, D: 47, F: 30 }[g];
+  const etaFor = g === "A" && proTrack ? "0–2 years" : g === "A" || (g === "B" && proTrack) ? "1–3 years" : g === "B" ? "2–4 years" : g === "C" ? "3–5 years" : "4+ years";
+  return {
+    grade: g, score: mid, confidence: 90, role: roleFor(pos, g), eta: etaFor, risk: "Low",
+    futureValue: Math.round(({ A: 950, B: 650, C: 380, D: 170, F: 70 }[g]) * 1.0),
+    summary: `Commissioner grade · ${performance}`, manual: true,
+  };
 }
 
 /** Prisma include that loads what projectProspect needs for a Prospect row. */
@@ -132,6 +146,7 @@ export function prospectProjectionCells(p: any, drafted: boolean) {
     overallPick: drafted ? p.overallPick : null,
     birthDate: w?.birthDate,
     stats: w?.stats,
+    gradeOverride: p.gradeOverride,
   });
   return { grade: proj.grade, score: proj.score, role: proj.role, eta: proj.eta, risk: proj.risk };
 }

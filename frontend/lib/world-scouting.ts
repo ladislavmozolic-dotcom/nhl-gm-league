@@ -14,6 +14,13 @@ export function ageOnDate(birthDate: string | null, date: Date): number | null {
   return age;
 }
 
+/** A player must still be under 24 at the draft year's June 30 cut-off.
+ * This deliberately does not use the current league date: an October page is
+ * scouting the following draft, while a March page is scouting the current one. */
+export function draftEligibilityCutoff(draftYear: number) {
+  return new Date(Date.UTC(draftYear, 5, 30));
+}
+
 /** Ownership is authoritative by WorldPlayer link. A name-only match is accepted
  * only when unique on both sides, avoiding a false rights badge for namesakes. */
 export async function worldScoutingMeta(players: WorldIdentity[], teamId: number | null): Promise<{ year: number; meta: Map<number, WorldScoutingMeta> }> {
@@ -22,6 +29,7 @@ export async function worldScoutingMeta(players: WorldIdentity[], teamId: number
     prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true } }),
   ]);
   const year = date.getUTCFullYear() + (date.getUTCMonth() >= 6 ? 1 : 0);
+  const eligibilityCutoff = draftEligibilityCutoff(year);
   const source = config?.rosterMode === "real" ? "real" : "profinhl";
   const ids = players.map((p) => p.id);
   const names = [...new Set(players.map((p) => p.name))];
@@ -42,12 +50,14 @@ export async function worldScoutingMeta(players: WorldIdentity[], teamId: number
   for (const p of players) {
     const exact = rightsByName.get(p.name.toLocaleLowerCase()) ?? [];
     const owner = byId.get(p.id) ?? (exact.length === 1 && nameCount.get(p.normalizedName) === 1 ? exact[0].team : null);
-    const age = ageOnDate(p.birthDate, date);
+    // The age shown in Around the World is the draft-age on 30 June, which is
+    // also the single authoritative eligibility rule for the Draft List.
+    const age = ageOnDate(p.birthDate, eligibilityCutoff);
     const draftMatches = draftRows.filter((d) => d.name.toLocaleLowerCase() === p.name.toLocaleLowerCase() && (!d.birthDate || d.birthDate === p.birthDate));
     const draftRow = draftMatches.length === 1 ? draftMatches[0] : null;
     const drafted = draftMatches.some((d) => d.draftedByTeamId != null);
     const saved = rankings.some((r) => (draftRow && r.draftProspectId === draftRow.id) || (r.draftProspectId == null && r.customName?.toLocaleLowerCase() === p.name.toLocaleLowerCase() && r.customBirth === p.birthDate));
-    meta.set(p.id, { age, rights: owner ?? null, draftable: !owner && !drafted && (age == null || age <= 23), saved });
+    meta.set(p.id, { age, rights: owner ?? null, draftable: !owner && !drafted && age != null && age < 24, saved });
   }
   return { year, meta };
 }

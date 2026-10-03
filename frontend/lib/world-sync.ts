@@ -7,6 +7,7 @@ import { importEuropeanJuniorLeagues } from "@/lib/world-import-juniors";
 import { importRussianProspects } from "@/lib/world-import-russia";
 import { importKhlLeague } from "@/lib/world-import-khl";
 import { importDelLeague } from "@/lib/world-import-del";
+import { backfillWorldBirthDates } from "@/lib/world-birthdate-backfill";
 import { reconcileAllProspects } from "@/lib/world-player-identity";
 
 /**
@@ -46,6 +47,8 @@ export async function runFullWorldSync() {
   const del = await importDelLeague().catch((e) => ({ error: (e as Error).message }));
   const reconcile = await reconcileAllProspects().catch((e) => ({ error: (e as Error).message }));
 
+  const birthDates = await backfillWorldBirthDates().catch((e) => ({ error: (e as Error).message }));
+
   return {
     success: true,
     timestamp: new Date().toISOString(),
@@ -60,5 +63,6 @@ export async function runFullWorldSync() {
     khl,
     del,
     reconcile,
+    birthDates,
   };
 }
