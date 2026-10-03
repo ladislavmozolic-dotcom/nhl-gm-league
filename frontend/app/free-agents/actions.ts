@@ -641,6 +641,19 @@ async function signFaOffer(playerId: number, player: { name: string; age: number
 /** Best acceptable offer for a player at `judgeRound`; with `allowSoleFloor`, a lone
  *  suitor whose offer fell short signs at the player's floor (cap-permitting). Signs
  *  and returns a detail string, or null if nobody cleared his bar. */
+/** What the player's camp tells the bidders when nobody signed him. A lone bidder who came in
+ *  under half his Market value gets a specific "too low" answer (the same line pickAndSign
+ *  enforces); everything else keeps the generic "no offer met his ask". */
+async function noSignNote(playerId: number, offers: { salary: number }[], pool: Awaited<ReturnType<typeof loadMarketPool>>, nm: string): Promise<string> {
+  if (offers.length === 1) {
+    const mv = (await demandForPlayerId(playerId, pool))?.demand.salary ?? 0;
+    if (mv > 0 && offers[0].salary < mv * 0.5) {
+      return `❌ Your offer for ${nm} (${fmtM(offers[0].salary)}) was far too low — well under his Market value (${fmtM(mv)}). He rejected it and will wait for better options.`;
+    }
+  }
+  return `${nm} didn't sign anyone — no offer met his ask. He stays available on the market.`;
+}
+
 async function pickAndSign(
   playerId: number, player: { name: string; age: number | null }, offers: FaOfferRow[],
   judgeRound: number, pool: Awaited<ReturnType<typeof loadMarketPool>>, cmap: Awaited<ReturnType<typeof teamContentionMap>>,
@@ -663,9 +676,11 @@ async function pickAndSign(
   // the Free Agents page — comparable-median, age/trend-adjusted, and it decays with the
   // season via faStaleFactor). Without this, a club-specific role/contention discount could
   // drag his floor to the league minimum and let a $2M-value player sign for $775K.
+  let mvHalf: number | null = null;
   if (offers.length === 1) {
     const mv = (await demandForPlayerId(playerId, pool))?.demand.salary ?? 0;
-    if (mv > 0 && offers[0].salary < mv * 0.5) return null;
+    if (mv > 0) mvHalf = mv * 0.5;
+    if (mvHalf != null && offers[0].salary < mvHalf) return null;
   }
   if (!best && allowSoleFloor && offers.length === 1 && soleEv) {
     // A lone bidder below his floor still signs him — waiting on nobody-else's
@@ -677,7 +692,8 @@ async function pickAndSign(
     // he goes unsigned, via the usual demand-decay elsewhere).
     const o = offers[0];
     const floorSalary = soleEv.ask.floorSalary;
-    if (o.salary >= floorSalary * 0.5) {
+    // the lone-bidder line is half his MARKET value (checked above), not half of this club's own floor
+    if (o.salary >= (mvHalf ?? floorSalary * 0.5)) {
       const info = await teamCapInfo(o.teamId);
       const ceiling = capCeilingForPhase(cap.upper, clockPhase) + info.ltir;
       if (info.committed + o.salary <= ceiling) best = { offer: o, salary: o.salary, years: Math.min(Math.max(o.years, soleEv.ask.minYears), soleEv.ask.maxYears), utility: 0 };
@@ -800,7 +816,7 @@ export async function resolveInSeasonWindows(asOf: Date): Promise<{ signed: numb
         }
       } else {
         await prisma.faOffer.updateMany({ where: { playerId: p.id, status: { in: ACTIVE } }, data: { status: "REJECTED" } });
-        for (const tid of bidders) await agentDm(tid, `${nm} didn't sign anyone — no offer met his ask. He stays on the market.`, p.id, p.isGoalie);
+        { const note = await noSignNote(p.id, offers, pool, nm); for (const tid of bidders) await agentDm(tid, note, p.id, p.isGoalie); }
       }
       await clearFaWindow(p.id);
     }
@@ -931,7 +947,7 @@ export async function resolveFrenzyDecisions(asOf: Date = new Date()): Promise<{
       if (current?.rosterType && FREE.includes(current.rosterType)) continue;
       unsigned++;
       await prisma.faOffer.updateMany({ where: { playerId: p.id, status: { in: ACTIVE } }, data: { status: "REJECTED" } });
-      for (const tid of bidders) await agentDm(tid, `${nm} didn't sign anyone — no offer met his ask. He stays on the market.`, p.id, p.isGoalie);
+      { const note = await noSignNote(p.id, offers, pool, nm); for (const tid of bidders) await agentDm(tid, note, p.id, p.isGoalie); }
     }
     await prisma.player.update({ where: { id: p.id }, data: { faDecisionAt: null, faCountered: false } });
   }
@@ -1026,7 +1042,7 @@ export async function resolvePostFrenzyWindows(asOf: Date = new Date()): Promise
       if (current?.rosterType && FREE.includes(current.rosterType)) continue;
       unsigned++;
       await prisma.faOffer.updateMany({ where: { playerId: p.id, status: { in: ACTIVE }, round: 4 }, data: { status: "REJECTED" } });
-      for (const tid of bidders) await agentDm(tid, `${nm} didn't sign anyone — no offer met his ask. He stays available on the market.`, p.id, p.isGoalie);
+      { const note = await noSignNote(p.id, offers, pool, nm); for (const tid of bidders) await agentDm(tid, note, p.id, p.isGoalie); }
     }
     await clearFaWindow(p.id);
   }
