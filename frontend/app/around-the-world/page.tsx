@@ -5,6 +5,7 @@ import Link from "next/link";
 import YourProspectTracker from "@/components/YourProspectTracker";
 import { worldTeamLevel } from "@/lib/world-team-level";
 import { epProfileUrl } from "@/lib/playerName";
+import { projectProspect } from "@/lib/prospect-projection";
 
 export const dynamic = "force-dynamic";
 
@@ -247,6 +248,13 @@ export default async function AroundTheWorldPage({
             const trend = pointsPerGame == null || previousPointsPerGame == null ? "First tracked season" : pointsPerGame > previousPointsPerGame + 0.15 ? "Trending up" : pointsPerGame < previousPointsPerGame - 0.15 ? "Cooling off" : "Steady";
             const role = (p.position ?? w?.position ?? "").toUpperCase() === "G" ? "Goaltender" : (p.position ?? w?.position ?? "").toUpperCase().includes("D") ? "Defensive prospect" : pointsPerGame != null && pointsPerGame >= 1 ? "Offensive driver" : "Forward prospect";
             const alert = !w ? "Needs real-world match" : !s ? "Roster linked — awaiting stats" : s.gamesPlayed === 0 ? "Awaiting season debut" : pointsPerGame != null && pointsPerGame >= 1 ? "Strong offensive start" : "Live season tracking";
+            const projection = projectProspect({
+              position: p.position ?? w?.position,
+              draftYear: p.draftYear,
+              overallPick: p.overallPick,
+              birthDate: w?.birthDate,
+              stats: w?.stats,
+            });
             return {
               id: p.id,
               name: p.name,
@@ -270,6 +278,7 @@ export default async function AroundTheWorldPage({
               developmentRole: role,
               developmentTrend: trend,
               developmentAlert: alert,
+              projection,
             };
           })}
           teams={allTeams}

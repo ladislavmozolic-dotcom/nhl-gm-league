@@ -15,6 +15,7 @@ import { analyzeTradeAction } from "@/app/trades/build/actions";
 import { playerValue, pickValueBySlot } from "@/lib/trade-value";
 import { getLeagueDate } from "./calendar-server";
 import { roundForDate } from "./calendar";
+import { projectProspect } from "./prospect-projection";
 
 const clean = (s: string) => s.replace(/\s*\([^)]*\)/g, "").trim();
 const grp = (pos: string | null) => { const P = (pos ?? "").toUpperCase(); if (/G/.test(P)) return "G"; if (/(^|\/)D(\/|$)|^D$/.test(P)) return "D"; if (/C/.test(P)) return "C"; return "W"; };
@@ -38,7 +39,7 @@ async function computeThresholds(): Promise<Thresholds> {
 const isStar = (ov: number, isGoalie: boolean, th: Thresholds) => ov >= (isGoalie ? th.gkStar : th.skStar);
 const isFranchise = (ov: number, isGoalie: boolean, th: Thresholds) => ov >= (isGoalie ? th.gkFranchise : th.skFranchise);
 
-type DecisionDetail = { aiGets: number; aiGives: number; ratio: number; need: number; star?: string; franchise?: string };
+type DecisionDetail = { aiGets: number; aiGives: number; ratio: number; need: number; star?: string; franchise?: string; prospectNote?: string };
 type Decision = { action: "accept" | "decline" | "counter"; reason: string; counter?: TradePackage; counterNote?: string; detail?: DecisionDetail };
 // GM-facing, human explanation of a decline (no raw numbers). `r` = ratio / target.
 function declineText(aiName: string, tradeId: number, dt?: DecisionDetail): string {
@@ -47,7 +48,8 @@ function declineText(aiName: string, tradeId: number, dt?: DecisionDetail): stri
   const core = dt?.franchise ? ` ${dt.franchise} is a cornerstone for us — it'd take a serious overpay to even start that conversation.`
     : dt?.star ? ` ${dt.star} is a big piece for us, so the return has to be higher.`
     : ` We'd need noticeably more — a roster piece or a good pick — to make it worth doing.`;
-  return `❌ ${aiName} passed on your offer (#${tradeId}). Honestly, it came in ${gap}.${core} Come back with more and we'll talk.`;
+  const prospect = dt?.prospectNote ? ` ${dt.prospectNote}` : "";
+  return `❌ ${aiName} passed on your offer (#${tradeId}). Honestly, it came in ${gap}.${core}${prospect} Come back with more and we'll talk.`;
 }
 
 /** Decide how an advanced-AI receiving club responds to one pending proposal. */
@@ -66,11 +68,24 @@ async function decide(tradeId: number, aiTeamId: number, contention: Contention,
   // player context for the assets AI would send / receive
   const outIds = pkg.toPlayers.map((p) => p.playerId);
   const inIds = pkg.fromPlayers.map((p) => p.playerId);
-  const [outP, inP, team] = await Promise.all([
+  const [outP, inP, team, outProspects, inProspects] = await Promise.all([
     prisma.player.findMany({ where: { id: { in: outIds } }, select: { id: true, name: true, overall: true, age: true, position: true, isGoalie: true } }),
     prisma.player.findMany({ where: { id: { in: inIds } }, select: { id: true, overall: true, age: true, position: true } }),
     prisma.team.findUnique({ where: { id: aiTeamId }, select: { needs: true } }),
+    prisma.prospect.findMany({
+      where: { id: { in: pkg.toProspects ?? [] } },
+      select: { name: true, position: true, draftYear: true, overallPick: true, worldPlayer: { select: { birthDate: true, stats: { include: { league: { select: { code: true, name: true } } }, orderBy: [{ season: "desc" }, { gamesPlayed: "desc" }] } } } },
+    }),
+    prisma.prospect.findMany({
+      where: { id: { in: pkg.fromProspects ?? [] } },
+      select: { name: true, position: true, draftYear: true, overallPick: true, worldPlayer: { select: { birthDate: true, stats: { include: { league: { select: { code: true, name: true } } }, orderBy: [{ season: "desc" }, { gamesPlayed: "desc" }] } } } },
+    }),
   ]);
+  const project = (p: (typeof outProspects)[number]) => projectProspect({ position: p.position, draftYear: p.draftYear, overallPick: p.overallPick, birthDate: p.worldPlayer?.birthDate, stats: p.worldPlayer?.stats });
+  const outProjections = outProspects.map((p) => ({ name: clean(p.name), ...project(p) }));
+  const inProjections = inProspects.map((p) => ({ name: clean(p.name), ...project(p) }));
+  const protectedProspect = outProjections.find((p) => p.grade === "A") ?? outProjections.find((p) => p.grade === "B" && p.confidence >= 60);
+  const premiumIncoming = inProjections.find((p) => p.grade === "A") ?? inProjections.find((p) => p.grade === "B" && p.confidence >= 60);
   const needs = new Set((team?.needs ?? []).map((s) => s.toUpperCase()));
   const avg = (xs: (number | null | undefined)[]) => { const v = xs.filter((x): x is number => x != null); return v.length ? v.reduce((s, x) => s + x, 0) / v.length : null; };
   const outOv = avg(outP.map((p) => p.overall)), inOv = avg(inP.map((p) => p.overall));
@@ -95,11 +110,21 @@ async function decide(tradeId: number, aiTeamId: number, contention: Contention,
   // star protection: never move a star without a real overpay
   if (franchise) T *= 1.25;
   else if (star) T *= 1.12;
+  // The package analysis already assigns a baseline value to prospects. This is a
+  // small *projection premium*, so a high-end, well-supported prospect is not
+  // treated as interchangeable with a similarly drafted but stalled one.
+  if (protectedProspect) T *= protectedProspect.grade === "A" ? 1.14 : 1.07;
+  if (contention === "rebuild" && premiumIncoming) T -= premiumIncoming.grade === "A" ? 0.06 : 0.03;
   // needs: incoming fills a hole → a touch more willing
   const fillsNeed = inP.some((p) => needs.has(grp(p.position)));
   if (fillsNeed) T -= 0.05;
   T = Math.max(0.9, T);
-  const detail: DecisionDetail = { aiGets, aiGives, ratio: +ratio.toFixed(2), need: +T.toFixed(2), star: star ? clean(star.name) : undefined, franchise: franchise ? clean(franchise.name) : undefined };
+  const prospectNote = protectedProspect
+    ? `${protectedProspect.name} carries a ${protectedProspect.grade} prospect projection (${protectedProspect.role}, ${protectedProspect.confidence}% confidence), so we need a premium return.`
+    : premiumIncoming && contention === "rebuild"
+      ? `We do value ${premiumIncoming.name}'s ${premiumIncoming.grade} prospect projection in a rebuild.`
+      : undefined;
+  const detail: DecisionDetail = { aiGets, aiGives, ratio: +ratio.toFixed(2), need: +T.toFixed(2), star: star ? clean(star.name) : undefined, franchise: franchise ? clean(franchise.name) : undefined, prospectNote };
 
   if (ratio >= T) return { action: "accept", reason: `value ${aiGets} vs ${aiGives} (×${ratio.toFixed(2)} ≥ ${T.toFixed(2)})`, detail };
 

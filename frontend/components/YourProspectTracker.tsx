@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { epProfileUrl } from "@/lib/playerName";
+import type { ProspectProjection } from "@/lib/prospect-projection";
 
 export type TrackedProspect = {
   id: number;
@@ -28,6 +29,7 @@ export type TrackedProspect = {
   developmentRole: string;
   developmentTrend: string;
   developmentAlert: string;
+  projection: ProspectProjection;
 };
 
 export type TeamOption = {
@@ -200,9 +202,9 @@ export default function YourProspectTracker({
           <thead className="sticky top-0 z-10 border-b border-slate-800 bg-slate-900/95 backdrop-blur text-[10px] font-bold uppercase tracking-widest text-slate-500">
             <tr>
               <th className="px-5 py-3 text-left">Prospect</th>
+              <th className="px-4 py-3 text-left">Projection</th>
               <th className="px-4 py-3 text-left">Club</th>
               <th className="px-4 py-3 text-left">League</th>
-              <th className="px-4 py-3 text-left">Development report</th>
               <th className="px-5 py-3 text-right">2026-27 Stats</th>
               <th className="px-5 py-3 text-right">EP</th>
             </tr>
@@ -230,13 +232,17 @@ export default function YourProspectTracker({
                 </td>
 
                 <td className="px-4 py-3">
-                  <div className="space-y-1">
-                    <div className="flex flex-wrap gap-1.5">
-                      {p.developmentLevel && <span className="rounded border border-violet-500/25 bg-violet-500/10 px-1.5 py-0.5 text-[10px] font-bold text-violet-200">{p.developmentLevel}</span>}
-                      <span className="rounded border border-slate-700 bg-slate-800/60 px-1.5 py-0.5 text-[10px] font-semibold text-slate-300">{p.developmentRole}</span>
-                      <span className={`text-[10px] font-bold ${p.developmentTrend === "Trending up" ? "text-emerald-300" : p.developmentTrend === "Cooling off" ? "text-amber-300" : "text-slate-500"}`}>{p.developmentTrend}</span>
+                  <div className="min-w-[210px] rounded-lg border border-slate-700/70 bg-slate-950/40 px-2.5 py-2 shadow-inner">
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex h-6 w-6 items-center justify-center rounded-md text-xs font-black ${p.projection.grade === "A" ? "bg-emerald-400/20 text-emerald-300" : p.projection.grade === "B" ? "bg-sky-400/20 text-sky-300" : p.projection.grade === "C" ? "bg-violet-400/20 text-violet-300" : p.projection.grade === "D" ? "bg-amber-400/20 text-amber-300" : "bg-slate-700 text-slate-400"}`}>{p.projection.grade}</span>
+                      <span className="text-[11px] font-bold text-slate-200">{p.projection.role}</span>
                     </div>
-                    <p className="text-[10px] text-sky-300/80">{p.developmentAlert}</p>
+                    <div className="mt-1.5 flex items-center justify-between gap-2 text-[10px]">
+                      <span className="text-slate-500">ETA {p.projection.eta}</span>
+                      <span className="font-bold text-sky-300">{p.projection.confidence}% · {p.projection.risk} risk</span>
+                    </div>
+                    <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-gradient-to-r from-violet-400 to-sky-400" style={{ width: `${p.projection.score}%` }} /></div>
+                    <p className="mt-1.5 text-[10px] text-slate-500">{p.projection.summary} · UNHL value {p.projection.futureValue}</p>
                   </div>
                 </td>
 
