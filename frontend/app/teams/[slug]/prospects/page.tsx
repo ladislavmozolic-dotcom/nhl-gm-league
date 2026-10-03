@@ -104,7 +104,7 @@ export default async function TeamProspectsPage({ params }: { params: Promise<{ 
           { key: "draftYear", label: "Draft Year", kind: "num" },
           { key: "round", label: "Round", kind: "num" },
           { key: "overallPick", label: "Overall Pick", kind: "num" },
-          { key: "grade", label: "Grade", kind: "text", title: "UNHL projection grade (A–F) from draft capital, age and current stats — see Around the World" },
+          { key: "grade", label: "Grade", kind: "grade", title: "UNHL projection grade (A–F) from draft capital, age and current stats — see Around the World" },
           { key: "score", label: "Score", kind: "num" },
           { key: "role", label: "Projected role", kind: "text" },
           { key: "eta", label: "ETA", kind: "text" },

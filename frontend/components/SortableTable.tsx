@@ -7,7 +7,7 @@ import { cleanName } from "@/lib/playerName";
 import InterestButton, { type InterestCtx } from "@/components/InterestButton";
 import InfoTip from "@/components/InfoTip";
 
-export type ColKind = "player" | "team" | "num" | "money" | "ovr" | "years" | "text" | "ext" | "interest";
+export type ColKind = "player" | "team" | "num" | "money" | "ovr" | "years" | "text" | "ext" | "interest" | "grade";
 export type SortCol = { key: string; label: string; kind?: ColKind; title?: string; info?: string; sticky?: boolean };
 export type SortRow = Record<string, any>;
 
@@ -207,6 +207,11 @@ export default function SortableTable({ cols, rows, initialSort, initialSortDir,
                 if (c.kind === "money") return <td key={c.key} className={`${base} tabular-nums text-slate-200 whitespace-nowrap`}>{money(Number(v ?? 0))}</td>;
                 if (c.kind === "ovr") { const n = Number(v ?? 0); return <td key={c.key} className={`${base} tabular-nums font-bold ${preColor ?? (n ? ovrColor(n) : "text-slate-400")}`}>{v ?? "—"}</td>; }
                 if (c.kind === "years") return <td key={c.key} className={`${base} tabular-nums text-slate-300`}>{v ?? "—"}</td>;
+                if (c.kind === "grade") {
+                  const g = String(v ?? "");
+                  const cls = g === "A" ? "bg-emerald-400/20 text-emerald-300" : g === "B" ? "bg-sky-400/20 text-sky-300" : g === "C" ? "bg-violet-400/20 text-violet-300" : g === "D" ? "bg-amber-400/20 text-amber-300" : "bg-slate-700 text-slate-400";
+                  return <td key={c.key} className={base}>{g ? <span className={`inline-flex h-6 w-6 items-center justify-center rounded-md text-xs font-black ${cls}`}>{g}</span> : "—"}</td>;
+                }
                 if (c.kind === "num") return <td key={c.key} className={`${base} tabular-nums ${preColor ?? "text-slate-400"}`}>{v ?? "—"}</td>;
                 return <td key={c.key} className={`${base} text-slate-400 whitespace-nowrap`}>{v ?? "—"}</td>;
               })}
