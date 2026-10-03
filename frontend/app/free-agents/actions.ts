@@ -8,7 +8,7 @@ import { addDays } from "@/lib/calendar";
 import { CURRENT_SEASON_START, TWO_WAY_AHL_SALARY, capCeilingForPhase, ltirRelief, accruedCapSpace, liveCapHit } from "@/lib/finance";
 import { teamCapCommitted } from "@/lib/cap";
 import {
-  loadMarketPool, teamContentionMap, teamChurnMap, teamAsk, evaluateTeamOffer, loadLeagueCap, weakestTeams,
+  loadMarketPool, teamContentionMap, teamChurnMap, teamAsk, evaluateTeamOffer, loadLeagueCap, weakestTeams, demandForPlayerId,
   recordLowball, clearLowballs, lowballNote, lowballInsultCount,
   ufaAtExpiry, resignLockedUntil,
 } from "@/lib/free-agency-server";
@@ -658,6 +658,14 @@ async function pickAndSign(
     // has to get back under the ceiling by the real compliance deadline
     // (trades, buyouts, waivers). Not something this picker enforces.
     if (ev?.acceptable && (!best || ev.utility > best.utility)) best = { offer: o, salary: o.salary, years: o.years, utility: ev.utility };
+  }
+  // A lone bidder never gets a player below half his MARKET value (the "Market" column on
+  // the Free Agents page — comparable-median, age/trend-adjusted, and it decays with the
+  // season via faStaleFactor). Without this, a club-specific role/contention discount could
+  // drag his floor to the league minimum and let a $2M-value player sign for $775K.
+  if (offers.length === 1) {
+    const mv = (await demandForPlayerId(playerId, pool))?.demand.salary ?? 0;
+    if (mv > 0 && offers[0].salary < mv * 0.5) return null;
   }
   if (!best && allowSoleFloor && offers.length === 1 && soleEv) {
     // A lone bidder below his floor still signs him — waiting on nobody-else's
