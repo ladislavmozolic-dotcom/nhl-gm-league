@@ -125,6 +125,16 @@ const SECTIONS: Sec[] = [
       { h: "When you can negotiate", points: [
         "Any time he's in the final year of his deal or it's already expired — except during the Free Agent Frenzy itself (the open market has its own flow) and the first days of a new regular season (commissioner-set window, lets rosters settle first; the commissioner can exempt an individual club from that window, e.g. for testing).",
       ] },
+      { h: "Qualifying offer (QO)", points: [
+        "Every RFA has a qualifying offer on RFA Central. Tender it by its deadline to keep the player's restricted rights. The QO is at least the league minimum and is normally based on his previous AAV; both the percentage and deadline are commissioner settings.",
+        "Missing the deadline releases the player's rights. Once his old contract has expired he becomes a normal UFA, and his former club can only sign him through the same open market as every other club.",
+        "A normal in-season Re-sign remains available and is always the cleanest outcome: signing the player closes his QO/arbitration case immediately. Arbitration is never required just to extend an RFA.",
+      ] },
+      { h: "Salary arbitration", points: [
+        "An RFA becomes arbitration-eligible after reaching the commissioner-set age or NHL-games-played threshold. Either the club or player may file after a QO has been tendered.",
+        "At the hearing, each side submits an AAV and term. RFA Central shows comparable players and a permitted salary range; the award is determined inside that range. An open arbitration hearing pauses ordinary re-sign negotiations until it is resolved.",
+        "An award is binding unless it reaches the commissioner-set walk-away threshold. Above that line, the club may Walk away; the player immediately becomes a UFA and does not remain an own-player negotiation.",
+      ] },
       { h: "How the negotiation itself works", points: [
         "Submit an offer — money, term, role, special teams, contract type, and any clause you'll grant. He never just refuses: every rejected offer gets a real counter-offer back, even a lowball first try.",
         "UFA: 2 rounds. Reject his 2nd counter and he walks to test the open market.",
@@ -133,8 +143,9 @@ const SECTIONS: Sec[] = [
         "An RFA who reaches offer sheets isn't gone — if nobody signs him there, he comes straight back to you, and from then on you negotiate directly, round after round, with no cap and no second trip to offer sheets.",
       ] },
       { h: "Offer sheets (RFA only)", points: [
-        "Open July 1–8 of the off-season; resolved July 10. A commissioner-set compensation ladder (his old club's own original draft picks, by AAV tier) is what the poaching club pays if he signs.",
+        "Only an RFA whose club tendered a QO can reach offer sheets. Open July 1–8 of the off-season; resolved July 10. A commissioner-set compensation ladder (his old club's own original draft picks, by AAV tier) is what the poaching club pays if he signs.",
         "His AI picks the single best sheet that both meets his asking price AND beats YOUR last standing offer to him — there's no old-NHL 'right to match', so your own offer's number is what a raider actually has to clear.",
+        "An arbitration award closes the offer-sheet path: the player either signs the award or the club walks away and he enters normal UFA free agency.",
       ] },
       { h: "Franchise Tag", points: [
         "One per club, RFA-age players only. While the tag is on him he's fully protected from offer sheets, however many rounds pass — you have to remove the tag yourself to expose him to the market.",

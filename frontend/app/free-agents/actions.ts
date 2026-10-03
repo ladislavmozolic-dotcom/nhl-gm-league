@@ -1280,6 +1280,8 @@ export async function extendContractAction(
   // negotiations may already be closed (walked to FA, or turned down → offer sheets)
   if (player.resignStatus === "walkedToUFA") return { ok: false as const, closed: true, error: "He's testing free agency now — negotiations are over for this window." };
   if (player.resignStatus === "osEligible") return { ok: false as const, closed: true, error: "He turned down your extension — after the season other clubs can submit offer sheets." };
+  const arbOpen = await prisma.rfaCase.findFirst({ where: { playerId, status: { in: ["ARB_FILED", "AWARDED"] } }, select: { id: true } });
+  if (arbOpen) return { ok: false as const, closed: true, error: "Arbitration is already open — resolve the hearing in RFA Central first." };
 
   // cap check — replace his current hit with the new one (off-season +10% cushion, + LTIR
   // relief). Skipped for a FARM player: his deal sits on the AHL, off the NHL cap.
@@ -1349,6 +1351,9 @@ export async function extendContractAction(
       const status = isRFA ? "osEligible" : "walkedToUFA";
       const bestOffer = Math.max(salary, player.resignOfferSalary ?? 0);
       await prisma.player.update({ where: { id: playerId }, data: { resignStatus: status, resignRound: nextRound, resignOfferSalary: bestOffer, resignOfferAt: new Date() } });
+      // A rejected RFA can only enter offer sheets if his club first tendered a
+      // qualifying offer. Legacy cases without a record keep their historic flow.
+      if (isRFA) await prisma.rfaCase.updateMany({ where: { playerId, status: { in: ["QO_TENDERED", "NEGOTIATING"] } }, data: { status: "OS_ELIGIBLE", offerSheetEligibleAt: new Date() } });
       await prisma.faBid.create({ data: { playerId, teamId, salary, years, round: nextRound } }).catch(() => {});
       // no revalidatePath here — it would tear down the open modal before its notice
       // shows; the client refreshes on Close.
@@ -1418,6 +1423,9 @@ export async function extendContractAction(
       tradeRequestReason: null, iceUnhappyChecks: 0, iceWarnedAt: null,
     },
   });
+  // Re-signing is deliberately still the primary, always-available RFA route.
+  // It simply closes any open QO/arbitration case instead of forcing arbitration.
+  await prisma.rfaCase.updateMany({ where: { playerId, status: { in: ["QO_DUE", "QO_TENDERED", "NEGOTIATING", "ARB_FILED", "AWARDED", "OS_ELIGIBLE"] } }, data: { status: "SIGNED", resolvedAt: new Date() } });
   await clearLowballs(playerId);
   if (!testSigning) {
     await prisma.transaction.create({

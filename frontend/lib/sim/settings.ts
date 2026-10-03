@@ -111,6 +111,12 @@ export type EngineSettings = {
   osOpenDay: number;          // offer-sheet window opens (off-season day, July 1 = 1)
   osCloseDay: number;         // offer-sheet window closes
   osDecisionDay: number;      // offer sheets are decided by this day
+  rfaQoPct: number;           // qualifying offer as % of previous AAV
+  rfaQoMin: number;           // qualifying-offer salary floor
+  rfaQoDeadlineDay: number;   // June day by which a QO must be tendered
+  arbMinAge: number;          // player-filed arbitration minimum age
+  arbMinLastSeasonGp: number; // alternative eligibility: NHL games last year
+  arbWalkAwayThreshold: number; // award at/above this permits a club walk-away
   // Free Agency market-rating weights (Admin → FA Tuning) — how a player's raw
   // attributes turn into the "market" score the whole demand engine (comps
   // anchor, elite ladder rank, everything) is built on. Each position group's
@@ -274,6 +280,8 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   faTwoWayOlderAge: 25, faTwoWayNhlGpLimit: 30, faTwoWayMaxYears: 1, faTwoWayRelaxRound: 2,
   faTwoWayWeakOverall: 55, faTwoWayWeakRound: 3, faTwoWayAhlMaxYears: 2, faTwoWayFewGpMaxYears: 2, faTwoWayMaxSalary: 1_300_000,
   rfaMaxAge: 26, osOpenDay: 1, osCloseDay: 8, osDecisionDay: 10,
+  rfaQoPct: 100, rfaQoMin: 775_000, rfaQoDeadlineDay: 25,
+  arbMinAge: 24, arbMinLastSeasonGp: 40, arbWalkAwayThreshold: 4_500_000,
   faWeightF: { sc: 0.42, pa: 0.38, df: 0.12, sk: 0.08 },
   faWeightD: { df: 0.40, pa: 0.30, sc: 0.20, sk: 0.10 },
   faWeightG: { ag: 0.34, sc: 0.30, rb: 0.26, hs: 0.10 },

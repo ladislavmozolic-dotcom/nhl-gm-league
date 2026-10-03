@@ -61,6 +61,7 @@ model Team {
   lastWaiverClaimAt DateTime? // when this club last won a contested waiver claim outside the regular season/playoffs — null (or oldest) sorts first for the next contested claim, so a club that just claimed drops to the back of the line. Ignored in-season, where reverse standings decide priority instead.
   draftPicks        DraftPick[]
   players           Player[]
+  rfaCases          RfaCase[] @relation("RfaClub")
   prospects         Prospect[]
   draftRankings     DraftRanking[]
   parentTeam        Team?           @relation("Affiliates", fields: [parentTeamId], references: [id])
@@ -231,6 +232,7 @@ model Player {
   tradeRequestReason    String? // "promise" (broken signing promise, lib/promises.ts) | "ice" (ice time below his role, lib/player-morale.ts)
   iceUnhappyChecks      Int                       @default(0) // consecutive daily checks with ice time below what his talent expects (lib/player-morale.ts)
   iceWarnedAt           DateTime? // when he told his GM he's unhappy with his ice time (cleared once it's fixed)
+  rfaCases              RfaCase[]
   ltir                  Boolean                   @default(false) // parked on LTIR (played <10 games last season) — sits in prospects/reserve, off the cap
   lastSeasonGP          Int? // real last-season games played (imported from the Players Calculator / hockey-reference)
   lastSeasonPts         Int? // real last-season points (G + A) — feeds the FA demand engine's performance signal
@@ -620,6 +622,43 @@ model OfferSheet {
   @@unique([playerId, fromTeamId]) // one offer sheet per club per player
   @@index([playerId])
   @@index([fromTeamId])
+}
+
+// The authoritative lifecycle for a restricted free agent in a particular
+// contract-expiry summer. Player.resign* remains the live negotiation UI state;
+// this record holds the CBA-style QO / arbitration / walk-away audit trail.
+model RfaCase {
+  id                Int      @id @default(autoincrement())
+  playerId          Int
+  teamId            Int
+  season            Int      // calendar year of the June 30 expiry, e.g. 2027
+  status            String   @default("QO_DUE") // QO_DUE | QO_TENDERED | NEGOTIATING | ARB_FILED | AWARDED | OS_ELIGIBLE | WALKED_AWAY | UFA | SIGNED
+  qoAmount          Int
+  qoDueAt           DateTime
+  qoTenderedAt      DateTime?
+  arbEligible       Boolean  @default(false)
+  arbFiledBy        String?  // PLAYER | CLUB
+  arbFiledAt        DateTime?
+  clubAskAav        Int?
+  clubAskTerm       Int?
+  playerAskAav      Int?
+  playerAskTerm     Int?
+  awardAav          Int?
+  awardTerm         Int?
+  walkAwayThreshold Int?
+  walkAwayDeadline  DateTime?
+  walkAwayAt        DateTime?
+  offerSheetEligibleAt DateTime?
+  resolvedAt        DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  team   Team   @relation("RfaClub", fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, season])
+  @@index([teamId, status])
+  @@index([status, qoDueAt])
 }
 
 model AutoSim {

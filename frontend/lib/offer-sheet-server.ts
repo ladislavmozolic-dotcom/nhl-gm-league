@@ -15,6 +15,7 @@ import { canManageTeam } from "./auth";
 import { getLeagueClock } from "./calendar-server";
 import { CURRENT_SEASON_START, TWO_WAY_AHL_SALARY, capCeilingForPhase, ltirRelief, liveCapHit } from "./finance";
 import { teamCapCommitted } from "./cap";
+import { ensureRfaCases } from "./rfa-server";
 
 type Ok = { ok: true };
 type Err = { ok: false; error: string };
@@ -118,6 +119,9 @@ export async function submitOfferSheetAction(
   if (player.teamId === fromTeamId) return { ok: false, error: "He's already yours — re-sign him on the Contracts page." };
   if (player.franchiseTag) return { ok: false, error: "He's Franchise-tagged — his club gets two re-sign rounds before any offer sheet." };
   if (player.resignStatus !== "osEligible") return { ok: false, error: "He isn't open to offer sheets — his club is still negotiating with him." };
+  await ensureRfaCases(player.teamId);
+  const rfa = await prisma.rfaCase.findFirst({ where: { playerId, teamId: player.teamId, status: "OS_ELIGIBLE" }, select: { id: true } });
+  if (!rfa) return { ok: false, error: "His club did not tender a qualifying offer, so he cannot receive an offer sheet." };
 
   const yrs = Math.max(1, Math.min(4, Math.round(years)));
   if (salary < 775_000) return { ok: false, error: "Below the league minimum salary." };
@@ -265,6 +269,7 @@ export async function resolveOfferSheets(): Promise<{ signed: number; declined: 
 
     if (winner) {
       await executeOfferSheet(winner.os, player.name);
+      await prisma.rfaCase.updateMany({ where: { playerId, status: "OS_ELIGIBLE" }, data: { status: "SIGNED", resolvedAt: new Date() } });
       signed++;
       const others = sheets.filter((s) => s.id !== winner!.os.id);
       if (others.length) await prisma.offerSheet.updateMany({ where: { id: { in: others.map((s) => s.id) }, status: "PENDING" }, data: { status: "DECLINED", note: "He signed a better offer sheet." } });
@@ -278,6 +283,7 @@ export async function resolveOfferSheets(): Promise<{ signed: number; declined: 
       await prisma.offerSheet.updateMany({ where: { id: { in: sheets.map((s) => s.id) }, status: "PENDING" }, data: { status: "DECLINED", note: "Didn't beat his club / meet his ask." } });
       declined += sheets.length;
       await prisma.player.update({ where: { id: playerId }, data: { resignStatus: "open", rfaOsUsed: true } });
+      await prisma.rfaCase.updateMany({ where: { playerId, status: "OS_ELIGIBLE" }, data: { status: "NEGOTIATING" } });
     }
   }
 
@@ -296,6 +302,7 @@ export async function resolveOfferSheets(): Promise<{ signed: number; declined: 
       where: { id: p.id },
       data: p.franchiseTag ? { resignStatus: "open", resignRound: 0 } : { resignStatus: "open", rfaOsUsed: true },
     });
+    await prisma.rfaCase.updateMany({ where: { playerId: p.id, status: "OS_ELIGIBLE" }, data: { status: "NEGOTIATING" } });
   }
 
   return { signed, declined, details };
