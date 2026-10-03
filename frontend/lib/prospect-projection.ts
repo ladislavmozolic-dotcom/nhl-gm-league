@@ -80,7 +80,7 @@ export function projectProspect(input: ProspectProjectionInput): ProspectProject
   let score = 33;
   const pick = input.overallPick;
   if (pick != null) {
-    score += pick <= 5 ? 38 : pick <= 15 ? 30 : pick <= 32 ? 23 : pick <= 64 ? 16 : pick <= 96 ? 10 : 5;
+    score += pick <= 3 ? 50 : pick <= 5 ? 44 : pick <= 15 ? 32 : pick <= 32 ? 23 : pick <= 64 ? 16 : pick <= 96 ? 10 : 5;
   }
   if (age != null) score += age <= 18 ? 10 : age === 19 ? 8 : age === 20 ? 5 : age === 21 ? 2 : age >= 23 ? -6 : 0;
 
