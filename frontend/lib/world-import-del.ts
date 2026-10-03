@@ -65,7 +65,7 @@ async function mapPool<T, R>(items: T[], limit: number, fn: (item: T) => Promise
 async function fetchDelTeamRoster(
   teamId: number,
   teamSlug: string
-): Promise<{ epUrl: string; name: string; position: string; epId: string }[]> {
+): Promise<{ epUrl: string; name: string; position: string; epId: string; dateOfBirth?: string | null }[]> {
   const url = `${EP_BASE}/team/${teamId}/${teamSlug}/2026-2027`;
   const encoded = encodeURIComponent(url);
 
@@ -81,7 +81,7 @@ async function fetchDelTeamRoster(
       if (!res.ok) continue;
       const data = (await res.json()) as {
         success: boolean;
-        players?: { epUrl: string; name: string; position: string; epId: string }[];
+        players?: { epUrl: string; name: string; position: string; epId: string; dateOfBirth?: string | null }[];
       };
       if (data.success && data.players && data.players.length > 0) return data.players;
     } catch {
@@ -136,20 +136,26 @@ export async function importDelLeague(): Promise<{
 
           totalPlayers++;
           const isGoalie = (epResult.position || pl.position || "").toUpperCase() === "G";
+          const birthDate = epResult.dateOfBirth || pl.dateOfBirth || null;
+          const epFullUrl = `${EP_BASE}${pl.epUrl}`;
 
           const { player } = await resolveWorldPlayer({
             provider: "ep-scraper",
             externalId: String(epResult.epId),
             name: pl.name,
             position: epResult.position || pl.position || null,
+            birthDate,
+            epUrl: epFullUrl,
             currentTeamId: worldTeam.id,
           });
 
           // Ensure epUrl is stored directly on worldPlayer
-          const epFullUrl = `${EP_BASE}${pl.epUrl}`;
           await prisma.worldPlayer.update({
             where: { id: player.id },
-            data: { epUrl: epFullUrl },
+            data: {
+              epUrl: epFullUrl,
+              ...(birthDate ? { birthDate } : {}),
+            },
           });
 
           if (epResult.season2627) {

@@ -36,6 +36,7 @@ export type EpPlayerResult = {
   epId: number;
   name: string;
   position: string;
+  dateOfBirth?: string | null;
   currentTeam: string | null;
   currentLeague: string | null;
   season2627: EpSeason2627 | null;

@@ -287,6 +287,8 @@ export async function importRussianProspects() {
             externalId: String(epResult.epId),
             name: prospect.name.replace(/\s*\([^)]*\)/g, "").trim(),
             position: epResult.position || prospect.position || null,
+            birthDate: epResult.dateOfBirth || null,
+            epUrl,
             currentTeamId: team.id,
           });
           const allMatching = prospectMap.get(pKey) ?? [prospect];
@@ -330,6 +332,8 @@ export async function importRussianProspects() {
         externalId: String(epResult.epId),
         name: prospect.name.replace(/\s*\([^)]*\)/g, "").trim(),
         position: epResult.position || prospect.position || null,
+        birthDate: epResult.dateOfBirth || null,
+        epUrl,
         currentTeamId: team.id,
       });
 
@@ -416,6 +420,8 @@ export async function importRussianProspects() {
           externalId: String(epResult.epId),
           name: prospect.name.replace(/\s*\([^)]*\)/g, "").trim(),
           position: epResult.position || prospect.position || null,
+          birthDate: epResult.dateOfBirth || null,
+          epUrl,
           currentTeamId: team.id,
         });
         if (leagueCode !== "NCAA") {
@@ -506,6 +512,9 @@ export async function importRussianProspects() {
       // If NHL landing has no 2026-27 stats yet, try EP fallback for current stats
       if (!stat2627 && epUrl) {
         const epResult = await scrapeEpPlayer(epUrl);
+        if (epResult.success && epResult.dateOfBirth && !player.birthDate) {
+          await prisma.worldPlayer.update({ where: { id: player.id }, data: { birthDate: epResult.dateOfBirth } });
+        }
         if (epResult.success && epResult.season2627) {
           const s = epResult.season2627;
           const epLeagueCode = mapEpLeagueToCode(s.leagueName, s.leagueUrlPath);

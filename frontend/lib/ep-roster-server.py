@@ -97,6 +97,7 @@ def scrape_team_roster(team_url: str) -> dict:
             "epUrl": ep_path,
             "name": name,
             "position": position,
+            "dateOfBirth": pl.get("dateOfBirth"),
             "epId": ep_id,
         })
 

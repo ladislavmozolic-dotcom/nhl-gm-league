@@ -142,6 +142,7 @@ def fetch_ep_player(url: str, retries: int = 2):
             "epId": int(ep_id),
             "name": player_name,
             "position": player_pos,
+            "dateOfBirth": player_data.get("dateOfBirth"),
             "currentTeam": best.get("teamName"),
             "currentLeague": best.get("leagueName"),
             "season2627": {
@@ -172,6 +173,7 @@ def fetch_ep_player(url: str, retries: int = 2):
             "epId": int(ep_id),
             "name": player_name,
             "position": player_pos,
+            "dateOfBirth": player_data.get("dateOfBirth"),
             "currentTeam": current_team,
             "currentLeague": current_league,
             "season2627": None

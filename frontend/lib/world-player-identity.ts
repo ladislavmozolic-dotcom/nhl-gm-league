@@ -6,6 +6,7 @@ export const normalizeWorldName = (value: string) => epSearchName(value).replace
 type IdentityInput = {
   provider: string; externalId: string; name: string; position?: string | null;
   birthDate?: string | null; nationality?: string | null; currentTeamId?: number | null;
+  epUrl?: string | null;
 };
 
 /** Resolve one real person across multiple providers/leagues. An exact unique UNHL
@@ -32,7 +33,7 @@ export async function resolveWorldPlayer(input: IdentityInput) {
   const prospect = activeProspects.length === 1 ? activeProspects[0] : prospects.length >= 1 ? prospects[0] : null;
   let player = prospect?.worldPlayerId ? await prisma.worldPlayer.findUnique({ where: { id: prospect.worldPlayerId } }) : null;
   player ??= alias?.player ?? legacy;
-  if (!player) player = await prisma.worldPlayer.create({ data: { name: cleanInput, normalizedName, position: input.position, birthDate: input.birthDate, nationality: input.nationality, currentTeamId: input.currentTeamId } });
+  if (!player) player = await prisma.worldPlayer.create({ data: { name: cleanInput, normalizedName, position: input.position, birthDate: input.birthDate, nationality: input.nationality, currentTeamId: input.currentTeamId, epUrl: input.epUrl } });
 
   // Remove an old provider-specific duplicate only when nothing in UNHL owns it.
   const duplicate = alias?.player ?? legacy;
@@ -51,7 +52,7 @@ export async function resolveWorldPlayer(input: IdentityInput) {
   player = await prisma.worldPlayer.update({ where: { id: player.id }, data: {
     name: cleanInput, normalizedName, position: input.position ?? player.position,
     birthDate: input.birthDate ?? player.birthDate, nationality: input.nationality ?? player.nationality,
-    currentTeamId: input.currentTeamId ?? player.currentTeamId, epUrl: prospect?.epUrl ?? player.epUrl,
+    currentTeamId: input.currentTeamId ?? player.currentTeamId, epUrl: input.epUrl ?? prospect?.epUrl ?? player.epUrl,
   } });
   // Link all matching prospect rows (both profinhl and real)
   for (const p of prospects) {
