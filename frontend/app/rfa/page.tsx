@@ -37,6 +37,6 @@ export default async function RfaPage() {
   return <main className="mx-auto max-w-4xl px-4 py-6 space-y-5">
     <PageHeader title={admin ? "RFA Central — League view" : "RFA Central — Your organization"} subtitle={admin ? "Every club's qualifying offers, arbitration cases and offer-sheet exposure" : "Your NHL club and affiliate qualifying offers, arbitration cases and offer-sheet exposure"} />
     <Card><p className="text-sm text-slate-400">A normal <b>Re-sign</b> remains available throughout the final contract year. Tendering the QO preserves RFA rights; missing it releases the player to UFA. Arbitration is optional, and an award can only be walked away from when it meets the league threshold.</p></Card>
-    {rows.length ? <RfaDashboard rows={withDashboardData} /> : <Card><p className="text-sm text-slate-500">No RFAs with expiring contracts right now.</p></Card>}
+    {rows.length ? <RfaDashboard rows={withDashboardData} leagueView={admin} /> : <Card><p className="text-sm text-slate-500">No RFAs with expiring contracts right now.</p></Card>}
   </main>;
 }

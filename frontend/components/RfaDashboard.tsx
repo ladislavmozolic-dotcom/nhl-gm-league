@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import PlayerLink from "@/components/PlayerLink";
 import { Card } from "@/components/ui";
 import { acceptArbitrationAwardAction, decideArbitrationAction, fileArbitrationAction, tenderQualifyingOfferAction, walkAwayArbitrationAction } from "@/app/rfa/actions";
@@ -36,38 +36,74 @@ function Hearing({ row }: { row: Row }) {
   </div>;
 }
 
-export default function RfaDashboard({ rows }: { rows: Row[] }) {
+function Risk({ level }: { level: Row["offerSheetRisk"] }) {
+  return <span className={`font-semibold ${level === "High" ? "text-rose-300" : level === "Medium" ? "text-amber-300" : "text-emerald-300"}`}>{level}</span>;
+}
+
+function RfaRow({ r, pending, run }: { r: Row; pending: boolean; run: (fn: () => Promise<{ ok: boolean; error?: string }>) => void }) {
+  return <div className="px-4 py-3 sm:px-5">
+    <div className="flex flex-wrap items-start gap-x-3 gap-y-1">
+      <div className="min-w-0 flex-1">
+        <PlayerLink id={r.player.id} name={r.player.name} className="font-semibold text-sm" />
+        <span className="ml-2 text-xs text-slate-500">{r.player.position} · {r.player.age ?? "—"}r · {r.player.overall ?? "—"} OVR</span>
+      </div>
+      <span className="rounded-full border border-slate-700 bg-slate-800 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300">{label[r.status] ?? r.status}</span>
+    </div>
+    <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:grid-cols-4">
+      <span className="text-slate-500">QO <b className="ml-1 text-sky-300">{M(r.qoAmount)}</b></span>
+      <span className="text-slate-500">Deadline <b className="ml-1 text-slate-300">{new Date(r.qoDueAt).toISOString().slice(0, 10)}</b></span>
+      <span className="text-slate-500">Arbitráž <b className={r.arbEligible ? "ml-1 text-violet-300" : "ml-1 text-slate-400"}>{r.arbEligible ? "eligible" : "nie"}</b></span>
+      <span className="text-slate-500">OS riziko <span className="ml-1"><Risk level={r.offerSheetRisk} /></span></span>
+    </div>
+    {r.awardAav && <div className="mt-2 text-xs text-emerald-300">Arbitrážny verdikt: <b>{M(r.awardAav)} × {r.awardTerm}r</b></div>}
+    <div className="mt-3 flex flex-wrap gap-2 text-xs">
+      {r.status === "QO_DUE" && <button disabled={pending} onClick={() => run(() => tenderQualifyingOfferAction(r.id, r.teamId))} className="rounded-lg bg-sky-700 px-2.5 py-1.5 font-semibold text-white hover:bg-sky-600 disabled:opacity-50">Tender QO</button>}
+      {["QO_TENDERED", "NEGOTIATING", "OS_ELIGIBLE"].includes(r.status) && r.arbEligible && <>
+        <button disabled={pending} onClick={() => run(() => fileArbitrationAction(r.id, r.teamId, "CLUB"))} className="rounded-lg bg-violet-700 px-2.5 py-1.5 font-semibold text-white hover:bg-violet-600 disabled:opacity-50">Klub podá arbitráž</button>
+        <button disabled={pending} onClick={() => run(() => fileArbitrationAction(r.id, r.teamId, "PLAYER"))} className="rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1.5 font-semibold text-slate-300 hover:bg-slate-700 disabled:opacity-50">Podanie hráča</button>
+      </>}
+      {r.status === "AWARDED" && <button disabled={pending} onClick={() => run(() => acceptArbitrationAwardAction(r.id, r.teamId))} className="rounded-lg bg-emerald-700 px-2.5 py-1.5 font-semibold text-white hover:bg-emerald-600 disabled:opacity-50">Prijať award</button>}
+      {r.status === "AWARDED" && r.awardAav != null && r.walkAwayThreshold != null && r.awardAav >= r.walkAwayThreshold && <button disabled={pending} onClick={() => run(() => walkAwayArbitrationAction(r.id, r.teamId))} className="rounded-lg bg-rose-800 px-2.5 py-1.5 font-semibold text-white hover:bg-rose-700 disabled:opacity-50">Walk away → UFA</button>}
+    </div>
+    <Hearing row={r} />
+  </div>;
+}
+
+function TeamGroup({ team, rows, leagueView, pending, run }: { team: Row["team"]; rows: Row[]; leagueView: boolean; pending: boolean; run: (fn: () => Promise<{ ok: boolean; error?: string }>) => void }) {
+  const urgent = rows.filter((r) => r.status === "QO_DUE").length;
+  const [open, setOpen] = useState(!leagueView);
+  return <section className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/40 shadow-sm">
+    <button onClick={() => setOpen((v) => !v)} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-800/50 sm:px-5">
+      <span className={`flex h-9 w-9 items-center justify-center rounded-lg text-xs font-black ${team.isAffiliate ? "bg-sky-500/15 text-sky-300" : "bg-blue-500/15 text-blue-300"}`}>{team.code ?? "TM"}</span>
+      <span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-slate-100">{team.name}</span><span className="text-[11px] text-slate-500">{team.isAffiliate ? "AHL affiliate" : "NHL club"}</span></span>
+      {urgent > 0 && <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-bold uppercase text-sky-300">{urgent} QO due</span>}
+      <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs font-semibold text-slate-300">{rows.length}</span>
+      <span className="text-slate-500">{open ? "⌃" : "⌄"}</span>
+    </button>
+    {open && <div className="divide-y divide-slate-800/70 border-t border-slate-800/80">{rows.map((r) => <RfaRow key={r.id} r={r} pending={pending} run={run} />)}</div>}
+  </section>;
+}
+
+export default function RfaDashboard({ rows, leagueView = false }: { rows: Row[]; leagueView?: boolean }) {
   const [pending, start] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>) => start(async () => { const r = await fn(); setMessage(r.ok ? "Uložené." : (r.error ?? "Akciu sa nepodarilo vykonať.")); });
-  return <Card bodyClassName="p-0">
-    {message && <p className="m-3 text-xs text-sky-300">{message}</p>}
-    <div className="divide-y divide-slate-800/60">
-      {rows.map((r) => <div key={r.id} className="px-4 py-3">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <PlayerLink id={r.player.id} name={r.player.name} className="font-semibold text-sm" />
-          <span className="text-xs text-slate-500">{r.player.position} · {r.player.age ?? "—"}r · {r.player.overall ?? "—"} OVR</span>
-          <span className={`text-[10px] font-bold uppercase ${r.team.isAffiliate ? "text-sky-300" : "text-slate-400"}`}>{r.team.code ?? r.team.name}{r.team.isAffiliate ? " · AHL" : ""}</span>
-          <span className="ml-auto rounded border border-slate-700 bg-slate-800 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-300">{label[r.status] ?? r.status}</span>
-        </div>
-        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
-          <span>QO <b className="text-sky-300">{M(r.qoAmount)}</b> · deadline {new Date(r.qoDueAt).toISOString().slice(0, 10)}</span>
-          <span>Current AAV {M(r.player.capHit)}</span>
-          <span>Arbitráž {r.arbEligible ? <b className="text-violet-300">eligible</b> : "not eligible"}</span>
-          <span>OS riziko <b className={r.offerSheetRisk === "High" ? "text-rose-300" : r.offerSheetRisk === "Medium" ? "text-amber-300" : "text-emerald-300"}>{r.offerSheetRisk}</b></span>
-          {r.awardAav && <span>Verdikt <b className="text-emerald-300">{M(r.awardAav)} × {r.awardTerm}r</b></span>}
-        </div>
-        <div className="mt-2 flex flex-wrap gap-2 text-xs">
-          {r.status === "QO_DUE" && <button disabled={pending} onClick={() => run(() => tenderQualifyingOfferAction(r.id, r.teamId))} className="rounded bg-sky-700 px-2 py-1.5 font-semibold disabled:opacity-50">Tender QO</button>}
-          {["QO_TENDERED", "NEGOTIATING", "OS_ELIGIBLE"].includes(r.status) && r.arbEligible && <>
-            <button disabled={pending} onClick={() => run(() => fileArbitrationAction(r.id, r.teamId, "CLUB"))} className="rounded bg-violet-700 px-2 py-1.5 font-semibold disabled:opacity-50">Klub podá arbitráž</button>
-            <button disabled={pending} onClick={() => run(() => fileArbitrationAction(r.id, r.teamId, "PLAYER"))} className="rounded bg-slate-700 px-2 py-1.5 font-semibold disabled:opacity-50">Simulovať podanie hráča</button>
-          </>}
-          {r.status === "AWARDED" && <button disabled={pending} onClick={() => run(() => acceptArbitrationAwardAction(r.id, r.teamId))} className="rounded bg-emerald-700 px-2 py-1.5 font-semibold disabled:opacity-50">Prijať award</button>}
-          {r.status === "AWARDED" && r.awardAav != null && r.walkAwayThreshold != null && r.awardAav >= r.walkAwayThreshold && <button disabled={pending} onClick={() => run(() => walkAwayArbitrationAction(r.id, r.teamId))} className="rounded bg-rose-800 px-2 py-1.5 font-semibold disabled:opacity-50">Walk away → UFA</button>}
-        </div>
-        <Hearing row={r} />
-      </div>)}
+  const filtered = useMemo(() => rows.filter((r) => `${r.player.name} ${r.team.name} ${r.team.code ?? ""}`.toLowerCase().includes(query.toLowerCase())), [rows, query]);
+  const groups = useMemo(() => {
+    const map = new Map<number, { team: Row["team"]; rows: Row[] }>();
+    for (const r of filtered) { const g = map.get(r.teamId) ?? { team: r.team, rows: [] }; g.rows.push(r); map.set(r.teamId, g); }
+    return [...map.values()].sort((a, b) => a.team.name.localeCompare(b.team.name));
+  }, [filtered]);
+  const qDue = rows.filter((r) => r.status === "QO_DUE").length;
+  const hearings = rows.filter((r) => r.status === "ARB_FILED" || r.status === "AWARDED").length;
+  return <div className="space-y-4">
+    <div className="grid grid-cols-3 gap-2">
+      <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-3"><div className="text-[10px] font-bold uppercase tracking-wide text-slate-500">RFA cases</div><div className="mt-1 text-xl font-black text-slate-100">{rows.length}</div></div>
+      <div className="rounded-xl border border-sky-500/20 bg-sky-500/5 p-3"><div className="text-[10px] font-bold uppercase tracking-wide text-sky-300">QO due</div><div className="mt-1 text-xl font-black text-sky-200">{qDue}</div></div>
+      <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-3"><div className="text-[10px] font-bold uppercase tracking-wide text-violet-300">Hearings</div><div className="mt-1 text-xl font-black text-violet-200">{hearings}</div></div>
     </div>
-  </Card>;
+    <Card bodyClassName="p-3"><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={leagueView ? "Hľadať hráča alebo tím…" : "Hľadať vo svojej organizácii…"} className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none placeholder:text-slate-600 focus:border-sky-500" />{message && <p className="mt-2 text-xs text-sky-300">{message}</p>}</Card>
+    <div className="space-y-3">{groups.map((g) => <TeamGroup key={g.team.name} {...g} leagueView={leagueView} pending={pending} run={run} />)}{groups.length === 0 && <Card><p className="text-sm text-slate-500">Žiadny RFA nezodpovedá vyhľadávaniu.</p></Card>}</div>
+  </div>;
 }
