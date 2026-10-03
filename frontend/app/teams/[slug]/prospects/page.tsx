@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { cleanName, epSearchName, epProfileUrl } from "@/lib/playerName";
 import { Card, SectionTitle } from "@/components/ui";
+import { projectProspect } from "@/lib/prospect-projection";
 import SortableTable, { type SortCol, type SortRow } from "@/components/SortableTable";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +13,12 @@ export default async function TeamProspectsPage({ params }: { params: Promise<{ 
   const source = cfg?.rosterMode === "real" ? "real" : "profinhl";
   const team = await prisma.team.findUnique({
     where: { slug },
-    include: { prospects: { where: { source } } },
+    include: {
+      prospects: {
+        where: { source },
+        include: { worldPlayer: { include: { stats: { orderBy: [{ season: "desc" }, { gamesPlayed: "desc" }], include: { league: true } } } } },
+      },
+    },
   });
   if (!team) notFound();
 
@@ -98,15 +104,31 @@ export default async function TeamProspectsPage({ params }: { params: Promise<{ 
           { key: "draftYear", label: "Draft Year", kind: "num" },
           { key: "round", label: "Round", kind: "num" },
           { key: "overallPick", label: "Overall Pick", kind: "num" },
+          { key: "grade", label: "Grade", kind: "text", title: "UNHL projection grade (A–F) from draft capital, age and current stats — see Around the World" },
+          { key: "score", label: "Score", kind: "num" },
+          { key: "role", label: "Projected role", kind: "text" },
+          { key: "eta", label: "ETA", kind: "text" },
+          { key: "risk", label: "Risk", kind: "text" },
         ];
         const drafted = (p: (typeof prospects)[number]) => !((p as any).undrafted && !p.draftYear);
-        const rows: SortRow[] = prospects.map((p) => ({
+        const rows: SortRow[] = prospects.map((p) => {
+          const w = p.worldPlayer;
+          const proj = projectProspect({
+            position: (p as any).position ?? w?.position,
+            draftYear: p.draftYear,
+            overallPick: drafted(p) ? p.overallPick : null,
+            birthDate: w?.birthDate,
+            stats: w?.stats.filter((x) => x.season === w.stats[0]?.season).map((x) => ({ ...x })),
+          });
+          return {
           _id: p.id, name: p.name, epUrl: (p as any).epUrl ?? epUrl(p.name),
           position: (p as any).position || "—",
           draftYear: drafted(p) ? p.draftYear ?? undefined : undefined,
           round: drafted(p) && p.overallPick ? Math.ceil(p.overallPick / 32) : undefined,
           overallPick: drafted(p) ? p.overallPick ?? undefined : undefined,
-        }));
+          grade: proj.grade, score: proj.score, role: proj.role, eta: proj.eta, risk: proj.risk,
+          };
+        });
         return (
           <>
             <SectionTitle count={prospects.length}>Prospects</SectionTitle>
