@@ -11,7 +11,7 @@ import { cleanName } from "@/lib/playerName";
 import { clauseDiscount } from "@/lib/free-agency";
 import { friendlyActionError } from "@/lib/client/action-error";
 
-type ExpiringPlayer = { id: number; name: string; capHit: number | null; contractYears: number | null; contractText: string | null; farm?: boolean; franchiseTag?: boolean; rightsReleased?: boolean };
+type ExpiringPlayer = { id: number; name: string; capHit: number | null; contractYears: number | null; contractText: string | null; farm?: boolean; franchiseTag?: boolean; rightsReleased?: boolean; rfaStatus?: string; qoAmount?: number; qoDueAt?: string };
 
 const M = (n: number) => `$${(n / 1e6).toFixed(2)}M`;
 function lineOptions(grp: string) {
@@ -244,6 +244,11 @@ export default function ReSignPanel({ teamId, players, title, blurb, accent = "t
                   profinhl string that can misrepresent the term; everyone here is in their
                   final year by the query filter, so label it plainly. */}
               <span className="text-xs text-slate-500 ml-2">{p.capHit ? `${M(p.capHit)} · last year` : "—"}</span>
+              {group === "RFA" && p.rfaStatus && (
+                <span className={`ml-2 text-[10px] font-bold uppercase ${p.rfaStatus === "QO_DUE" ? "text-sky-300" : "text-slate-400"}`}>
+                  {p.rfaStatus === "QO_DUE" ? `QO ${p.qoAmount ? M(p.qoAmount) : ""} due ${p.qoDueAt?.slice(0, 10) ?? ""}` : p.rfaStatus.replaceAll("_", " ")}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {group === "RFA" && franchiseEnabled && (
