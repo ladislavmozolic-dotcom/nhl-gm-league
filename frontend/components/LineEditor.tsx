@@ -10,7 +10,7 @@ import { roleFitOf } from "@/lib/sim/role-fit";
 import { tacticalFitDefense, tacticalFitForwards } from "@/lib/sim/tactical-fit";
 import { playerType } from "@/lib/player-type";
 import { DIAL_LABELS, mergeTactics, type PuckStyle, type DZone, type PpStyle, type PkStyle } from "@/lib/sim/tactics";
-import { PP_LAYOUTS, PP4_LAYOUTS, PK_LAYOUTS, PK3_LAYOUTS, type FormationRole } from "@/lib/sim/formation-layout";
+import { PP_LAYOUTS, PP4_LAYOUTS, PK_LAYOUTS, PK3_LAYOUTS, FOUR_V_FOUR_LAYOUTS, OT_LAYOUTS, LASTMIN_OFF_LAYOUT, LASTMIN_DEF_LAYOUT, type FormationRole } from "@/lib/sim/formation-layout";
 import { displayName } from "@/lib/playerName";
 import RinkFormationMap from "@/components/RinkFormationMap";
 import JerseyChip from "@/components/JerseyChip";
@@ -476,27 +476,28 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
   // runs Umbrella, or PK1 a Box while PK2 presses in a Diamond.
   const setUnitStyle = (key: "pp" | "pp4" | "pk4" | "pk3", ui: number, v: string) =>
     change((d) => { const u = (d.situations[key] as SpecialUnit[])[ui]; if (v) u.style = v as PpStyle & PkStyle; else delete u.style; });
-  const UnitFormationBlock = useStable(({ unitKey, ui, dial, label, layouts, dStartIndex, accent }: {
-    unitKey: "pp" | "pp4" | "pk4" | "pk3"; ui: number; dial: "ppStyle" | "pkStyle"; label: string;
-    layouts: Record<string, FormationRole[]>; dStartIndex: number; accent: string;
+  const UnitFormationBlock = useStable(({ unitKey, ui, dial, label, layouts, dStartIndex, accent, goalAtTop }: {
+    unitKey: "pp" | "pp4" | "pk4" | "pk3" | "fourVFour" | "overtime"; ui: number; dial?: "ppStyle" | "pkStyle"; label: string;
+    layouts: Record<string, FormationRole[]>; dStartIndex: number; accent: string; goalAtTop?: boolean;
   }) => {
     const unit = (data.situations[unitKey] as SpecialUnit[])[ui];
-    const teamDefault = ((mergeTactics(data.system) as Record<string, string>)[dial]) ?? "balanced";
-    const effective = unit?.style ?? teamDefault;
+    const teamDefault = dial ? (((mergeTactics(data.system) as Record<string, string>)[dial]) ?? "balanced") : "balanced";
+    const effective = (dial && unit?.style) ? unit.style : teamDefault;
     const filled = slotPlayers(unit?.players ?? [], dStartIndex).length;
     const total = unit?.players?.length ?? 0;
+    const isGoalAtTop = goalAtTop !== undefined ? goalAtTop : (unitKey === "pp" || unitKey === "pp4" || unitKey === "fourVFour" || unitKey === "overtime");
     return (
-      <div className="rounded-xl border border-slate-800 bg-gradient-to-b from-slate-900/60 to-slate-900/20 overflow-hidden">
+      <div className="rounded-xl border border-slate-800 bg-gradient-to-b from-slate-900/60 to-slate-900/20 overflow-hidden shadow-md">
         <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-slate-800/80" style={{ borderTopColor: accent, boxShadow: `inset 0 2px 0 0 ${accent}` }}>
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: accent }} />
-            <span className="text-sm font-bold tracking-wide">{label}</span>
-            <span className="text-[10px] text-slate-500 tabular-nums">{filled}/{total || "–"}</span>
+            <span className="w-2.5 h-2.5 rounded-full shrink-0 shadow-[0_0_8px_currentColor]" style={{ background: accent, color: accent }} />
+            <span className="text-sm font-bold tracking-wide text-white">{label}</span>
+            <span className="text-[10px] text-slate-400 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800 tabular-nums">{filled}/{total || "–"}</span>
           </div>
-          <SysSelect value={unit?.style} dial={dial} opts={DIAL_LABELS[dial]} onChange={(v) => setUnitStyle(unitKey, ui, v)} />
+          {dial && <SysSelect value={unit?.style} dial={dial} opts={DIAL_LABELS[dial]} onChange={(v) => setUnitStyle(unitKey as "pp" | "pp4" | "pk4" | "pk3", ui, v)} />}
         </div>
         <div className="p-3">
-          <RinkFormationMap roles={layouts[effective] ?? layouts.balanced} players={slotPlayersFixed(unit?.players ?? [], dStartIndex)} accent={accent} goalAtTop={unitKey === "pp" || unitKey === "pp4"} />
+          <RinkFormationMap roles={layouts[effective] ?? layouts.balanced} players={slotPlayersFixed(unit?.players ?? [], dStartIndex)} accent={accent} goalAtTop={isGoalAtTop} />
         </div>
       </div>
     );
@@ -667,32 +668,53 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
   const UnitSection = (key: "pp" | "pp4" | "fourVFour" | "pk4" | "pk3" | "overtime", title: string, labels: string[], poolFor: (i: number) => Player[]) => {
     const units = data.situations[key];
     return (
-      <UnitBlock title={title} head={["Unit", ...labels, "PHY", "DF", "OF", "Time %"]} timeTotal={timeSum(units)}>
-        {units.map((u, ui) => (
-          <tr key={ui} className="border-b border-slate-800/60">
-            <td className="px-2 py-1.5 text-slate-500">{ui + 1}</td>
-            {u.players.map((val, si) => (
-              <td key={si} className="px-2"><Select value={val} onChange={(v) => setUnit(key, ui, si, v)} pool={poolFor(si)} title={`Unit ${ui + 1} · ${labels[si] ?? ""}`} /></td>
-            ))}
-            <TacCells t={u.tactic} onSet={(k, v) => setUnitTac(key, ui, k, v)} />
-            <td className="px-2 py-1.5 text-right"><Stepper value={u.timePct} step={5} onChange={(v) => setUnitTime(key, ui, v)} /></td>
-          </tr>
-        ))}
-      </UnitBlock>
+      <div className="space-y-4">
+        {units.map((u, ui) => {
+          const t = tac(u.tactic);
+          const bad = t.phy + t.df + t.of !== 5;
+          return (
+            <div key={ui} className="lines-card bg-slate-900/40 border border-slate-800 rounded-lg p-3 space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-bold text-slate-300">{title} — Unit {ui + 1}</span>
+                  <ChemBadge ids={u.players} />
+                  <RoleFitBadge ids={u.players} isDef={false} />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] uppercase tracking-wide text-slate-500">Time</span>
+                  <Stepper value={u.timePct} step={5} onChange={(v) => setUnitTime(key, ui, v)} />
+                  <span className="text-slate-500 text-sm">%</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                {u.players.map((val, si) => (
+                  <Slot
+                    key={si}
+                    label={labels[si] ?? `Slot ${si + 1}`}
+                    value={val}
+                    onChange={(v) => setUnit(key, ui, si, v)}
+                    pool={poolFor(si)}
+                  />
+                ))}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-1 border-t border-slate-800/60">
+                <TacStep label="PHY" value={t.phy} onSet={(v) => setUnitTac(key, ui, "phy", v)} />
+                <TacStep label="DF" value={t.df} onSet={(v) => setUnitTac(key, ui, "df", v)} />
+                <TacStep label="OF" value={t.of} onSet={(v) => setUnitTac(key, ui, "of", v)} />
+                {bad && <span className="text-[11px] text-rose-400 font-semibold" title="PHY+DF+OF must total 5">PHY+DF+OF ≠ 5</span>}
+              </div>
+            </div>
+          );
+        })}
+        {LineTotalBar(units)}
+      </div>
     );
   };
 
-  // Split a special-teams unit into a FORWARDS table and a DEFENSE table (STHS
-  // style) — wider dropdowns so full names read cleanly. The first `nF` slots are
-  // forwards, the next `nD` are defense. Tactic (PHY/DF/OF) + Time % live on the
-  // forwards table (one game plan per unit); the defense table shows the pairing.
-  // `roleInfo`, when given (pp / pk4 / pk3 — the unit kinds with a real
-  // formation system), replaces the old fixed LW/C/RW/LD/RD-style labels
-  // with each SLOT's fixed role name under THAT unit's own chosen tactic
-  // (Point, Net-Front, Corner, …) — a seat's role never changes just because
-  // the GM swapped who occupies it (see formation-layout.ts's header
-  // comment for why this is a fixed slot→role mapping, not an attribute-fit
-  // reassignment).
+  // Split a special-teams unit into modern unit cards (matching 5v5 line cards)
+  // with slots for forwards and defense, tactical steppers, time %, and chemistry.
   const SplitUnitSection = (
     key: "pp" | "pp4" | "fourVFour" | "pk4" | "pk3", title: string, fLabels: string[], dLabels: string[],
     dPool: Player[] = dressedDefense, dHint?: string,
@@ -714,41 +736,98 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
           ? "Rola pod menom hráča ukazuje, koho miesto na ľade v aktuálne zvolenej taktike zaberá (mení sa podľa PP/PK formation vyššie). O buly sa vždy automaticky pokúša hráč s najvyšším FO na ľade — bez ohľadu na to, kde je zaradený."
           : "Buly berie automaticky hráč s najvyšším FO na ľade, bez ohľadu na pozíciu/slot."}</p>
         {dHint && <p className="text-xs text-slate-500 px-1">{dHint}</p>}
-        <UnitBlock title={`${title} — Forwards`} head={["Unit", ...fLabels, "PHY", "DF", "OF", "Time %"]} timeTotal={timeSum(units)}>
-          {units.map((u, ui) => {
-            const roles = rolesFor(ui);
-            return (
-            <tr key={ui} className="border-b border-slate-800/60">
-              <td className="px-2 py-1.5 text-slate-500">{ui + 1}</td>
-              {Array.from({ length: nF }).map((_, si) => (
-                <td key={si} className="px-2 align-top">
-                  {roles && <div className="text-[10px] font-semibold uppercase tracking-wide text-sky-400/80 mb-0.5">{roles[si]?.label ?? "—"}</div>}
-                  <Select value={u.players[si]} onChange={(v) => setUnit(key, ui, si, v)} pool={fPool} title={`Unit ${ui + 1} · ${fLabels[si] ?? "F"}`} />
-                </td>
-              ))}
-              <TacCells t={u.tactic} onSet={(k, v) => setUnitTac(key, ui, k, v)} />
-              <td className="px-2 py-1.5 text-right"><Stepper value={u.timePct} step={5} onChange={(v) => setUnitTime(key, ui, v)} /></td>
-            </tr>
-            );
-          })}
-        </UnitBlock>
-        <UnitBlock title={`${title} — Defense`} head={["Unit", ...dLabels, "PHY", "DF", "OF"]}>
-          {units.map((u, ui) => {
-            const roles = rolesFor(ui);
-            return (
-            <tr key={ui} className="border-b border-slate-800/60">
-              <td className="px-2 py-1.5 text-slate-500">{ui + 1}</td>
-              {Array.from({ length: nD }).map((_, si) => (
-                <td key={si} className="px-2 align-top">
-                  {roles && <div className="text-[10px] font-semibold uppercase tracking-wide text-rose-400/80 mb-0.5">{roles[nF + si]?.label ?? "—"}</div>}
-                  <Select value={u.players[nF + si]} onChange={(v) => setUnit(key, ui, nF + si, v)} pool={dPool} title={`Unit ${ui + 1} · ${dLabels[si] ?? "D"}`} />
-                </td>
-              ))}
-              <TacCells t={u.dTactic} onSet={(k, v) => setUnitDTac(key, ui, k, v)} />
-            </tr>
-            );
-          })}
-        </UnitBlock>
+        {units.map((u, ui) => {
+          const roles = rolesFor(ui);
+          const tFwd = tac(u.tactic);
+          const badFwd = tFwd.phy + tFwd.df + tFwd.of !== 5;
+          const tDef = tac(u.dTactic);
+          const badDef = tDef.phy + tDef.df + tDef.of !== 5;
+          return (
+            <div key={ui} className="lines-card bg-slate-900/40 border border-slate-800 rounded-lg p-3 space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-bold text-slate-300">{title} — Unit {ui + 1}</span>
+                  <ChemBadge ids={u.players} />
+                  <RoleFitBadge ids={u.players} isDef={false} />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] uppercase tracking-wide text-slate-500">Time</span>
+                  <Stepper value={u.timePct} step={5} onChange={(v) => setUnitTime(key, ui, v)} />
+                  <span className="text-slate-500 text-sm">%</span>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {/* Forwards */}
+                <div>
+                  <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                    <span>Útočníci ({nF})</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                    {Array.from({ length: nF }).map((_, si) => {
+                      const roleLabel = roles ? roles[si]?.label : (fLabels[si] ?? "F");
+                      return (
+                        <Slot
+                          key={si}
+                          label={roleLabel ?? `F${si + 1}`}
+                          value={u.players[si]}
+                          onChange={(v) => setUnit(key, ui, si, v)}
+                          pool={fPool}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Defense */}
+                {nD > 0 && (
+                  <div>
+                    <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1 flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                      <span>Obrana / Point ({nD})</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {Array.from({ length: nD }).map((_, si) => {
+                        const roleLabel = roles ? roles[nF + si]?.label : (dLabels[si] ?? "D");
+                        return (
+                          <Slot
+                            key={si}
+                            label={roleLabel ?? `D${si + 1}`}
+                            value={u.players[nF + si]}
+                            onChange={(v) => setUnit(key, ui, nF + si, v)}
+                            pool={dPool}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Tactical Controls */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-800/60">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                  <span className="text-[11px] font-bold text-slate-400">Útok:</span>
+                  <TacStep label="PHY" value={tFwd.phy} onSet={(v) => setUnitTac(key, ui, "phy", v)} />
+                  <TacStep label="DF" value={tFwd.df} onSet={(v) => setUnitTac(key, ui, "df", v)} />
+                  <TacStep label="OF" value={tFwd.of} onSet={(v) => setUnitTac(key, ui, "of", v)} />
+                  {badFwd && <span className="text-[11px] text-rose-400 font-semibold" title="PHY+DF+OF must total 5">PHY+DF+OF ≠ 5</span>}
+                </div>
+                {nD > 0 && (
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                    <span className="text-[11px] font-bold text-slate-400">Obrana:</span>
+                    <TacStep label="PHY" value={tDef.phy} onSet={(v) => setUnitDTac(key, ui, "phy", v)} />
+                    <TacStep label="DF" value={tDef.df} onSet={(v) => setUnitDTac(key, ui, "df", v)} />
+                    <TacStep label="OF" value={tDef.of} onSet={(v) => setUnitDTac(key, ui, "of", v)} />
+                    {badDef && <span className="text-[11px] text-rose-400 font-semibold" title="PHY+DF+OF must total 5">PHY+DF+OF ≠ 5</span>}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+        {LineTotalBar(units)}
       </div>
     );
   };
@@ -921,7 +1000,15 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
         </div>
         {SplitUnitSection("pp4", "Power Play (4 on 3)", ["F1", "F2", "F3"], ["D1"], stPointPool, "💡 Všetky štyri sloty ponúkajú oblečených korčuliarov. Rozostavenie počíta s tromi útočnými pozíciami a jedným quarterbackom na pointe.", { dial: "ppStyle", layouts: PP4_LAYOUTS }, allSkatersPool)}
       </>}
-      {tab === "4 vs 4" && SplitUnitSection("fourVFour", "4 vs 4", ["C", "W"], ["LD", "RD"])}
+      {tab === "4 vs 4" && (
+        <section className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-2">
+            <UnitFormationBlock unitKey="fourVFour" ui={0} label="4v4 — Unit 1" layouts={FOUR_V_FOUR_LAYOUTS} dStartIndex={2} accent="#38bdf8" goalAtTop />
+            <UnitFormationBlock unitKey="fourVFour" ui={1} label="4v4 — Unit 2" layouts={FOUR_V_FOUR_LAYOUTS} dStartIndex={2} accent="#818cf8" goalAtTop />
+          </div>
+          {SplitUnitSection("fourVFour", "4 vs 4", ["C", "W"], ["LD", "RD"])}
+        </section>
+      )}
       {tab === "PK4" && <>
         {FormationPicker("pkStyle", "Penalty-kill structure (team default)")}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
@@ -938,45 +1025,188 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
         </div>
         {SplitUnitSection("pk3", "Penalty Kill (3 on 5)", ["F1"], ["D1", "D2"], stPointPool, "💡 Ktorýkoľvek slot môže mať útočníka aj obrancu — dropdown ponúka oboje na oboch pozíciách.", { dial: "pkStyle", layouts: PK3_LAYOUTS }, allSkatersPool)}
       </>}
-      {tab === "Overtime" && UnitSection("overtime", "Overtime (3 vs 3)", ["OT1", "OT2", "OT3"], () => dressedPlayers)}
+      {tab === "Overtime" && (
+        <section className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-2">
+            <UnitFormationBlock unitKey="overtime" ui={0} label="OT1 — 3v3 Útok" layouts={OT_LAYOUTS} dStartIndex={2} accent="#22d3ee" goalAtTop />
+            <UnitFormationBlock unitKey="overtime" ui={1} label="OT2 — 3v3 Útok" layouts={OT_LAYOUTS} dStartIndex={2} accent="#38bdf8" goalAtTop />
+            <UnitFormationBlock unitKey="overtime" ui={2} label="OT3 — 3v3 Útok" layouts={OT_LAYOUTS} dStartIndex={2} accent="#0284c7" goalAtTop />
+          </div>
+          {UnitSection("overtime", "Overtime (3 vs 3)", ["OT1 (C)", "OT2 (W)", "OT3 (D)"], () => dressedPlayers)}
+        </section>
+      )}
 
       {tab === "Others" && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <ListBlock title="Extra Forwards" values={others.extraForwards} pool={forwards} onSet={(i, v) => setOtherList("extraForwards", i, v)} Select={Select} />
-            <ListBlock title="Extra Defense" values={others.extraDefense} pool={defense} onSet={(i, v) => setOtherList("extraDefense", i, v)} Select={Select} />
+            {/* Extra Forwards */}
+            <div className="lines-card bg-slate-900/40 border border-slate-800 rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wide">Extra Forwards</h3>
+                </div>
+                <span className="text-xs text-slate-400">Náhradní útočníci</span>
+              </div>
+              <div className="space-y-2">
+                {others.extraForwards.map((val, i) => (
+                  <Slot key={i} label={`Extra F${i + 1}`} value={val} onChange={(v) => setOtherList("extraForwards", i, v)} pool={forwards} />
+                ))}
+              </div>
+            </div>
+
+            {/* Extra Defense */}
+            <div className="lines-card bg-slate-900/40 border border-slate-800 rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wide">Extra Defense</h3>
+                </div>
+                <span className="text-xs text-slate-400">Náhradní obrancovia</span>
+              </div>
+              <div className="space-y-2">
+                {others.extraDefense.map((val, i) => (
+                  <Slot key={i} label={`Extra D${i + 1}`} value={val} onChange={(v) => setOtherList("extraDefense", i, v)} pool={defense} />
+                ))}
+              </div>
+            </div>
           </div>
-          <UnitBlock title="Substitutes" head={["Situation", "Player"]}>
-            <ORow label="Power-play sub"><Select value={others.subPP} onChange={(v) => setOther("subPP", v)} pool={dressedPlayers} /></ORow>
-            <ORow label="Penalty-kill 1 sub"><Select value={others.subPK1} onChange={(v) => setOther("subPK1", v)} pool={dressedPlayers} /></ORow>
-            <ORow label="Penalty-kill 2 sub"><Select value={others.subPK2} onChange={(v) => setOther("subPK2", v)} pool={dressedPlayers} /></ORow>
-          </UnitBlock>
-          <ListBlock title="Shootout order (1 → 5)" values={others.shootout} pool={dressedPlayers} numbered onSet={(i, v) => setOtherList("shootout", i, v)} Select={Select} />
+
+          {/* Substitutes */}
+          <div className="lines-card bg-slate-900/40 border border-slate-800 rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wide">Substitutes (Striedania pri únave / vylúčení)</h3>
+              </div>
+              <span className="text-xs text-slate-400">Špeciálne tímy</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Slot label="Power-play sub" value={others.subPP} onChange={(v) => setOther("subPP", v)} pool={dressedPlayers} />
+              <Slot label="Penalty-kill 1 sub" value={others.subPK1} onChange={(v) => setOther("subPK1", v)} pool={dressedPlayers} />
+              <Slot label="Penalty-kill 2 sub" value={others.subPK2} onChange={(v) => setOther("subPK2", v)} pool={dressedPlayers} />
+            </div>
+          </div>
+
+          {/* Shootout Order */}
+          <div className="lines-card bg-slate-900/40 border border-slate-800 rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-sky-400"></span>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wide">Shootout order (Samostatné nájazdy 1 → 5)</h3>
+              </div>
+              <span className="text-xs text-slate-400">Poradie exekútorov</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+              {others.shootout.map((val, i) => (
+                <Slot key={i} label={`Shooter #${i + 1}`} value={val} onChange={(v) => setOtherList("shootout", i, v)} pool={dressedPlayers} />
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
       {tab === "Last Min" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Fixed seats by position, same as Forward Lines/Defense Pairs — the F
-              slots pool forwards (incl. dual F/D-eligible players), the D slots
-              pool defensemen (incl. dual-eligible). off = pulled goalie (an
-              extra attacker up front, still 2 D back); def = goalie in net (a
-              normal 3F+2D shift). */}
-          <UnitBlock title="Offensive — chase the tie (goalie pulled)" head={["Pos", "Player"]}>
-            <ORow label="C"><Select value={data.situations.lastMin.off[0]} onChange={(v) => setLastMin("off", 0, v)} pool={dressedForwards} /></ORow>
-            <ORow label="LW"><Select value={data.situations.lastMin.off[1]} onChange={(v) => setLastMin("off", 1, v)} pool={dressedForwards} /></ORow>
-            <ORow label="RW"><Select value={data.situations.lastMin.off[2]} onChange={(v) => setLastMin("off", 2, v)} pool={dressedForwards} /></ORow>
-            <ORow label="F (extra attacker)"><Select value={data.situations.lastMin.off[3]} onChange={(v) => setLastMin("off", 3, v)} pool={dressedForwards} /></ORow>
-            <ORow label="LD"><Select value={data.situations.lastMin.off[4]} onChange={(v) => setLastMin("off", 4, v)} pool={dressedDefense} /></ORow>
-            <ORow label="RD"><Select value={data.situations.lastMin.off[5]} onChange={(v) => setLastMin("off", 5, v)} pool={dressedDefense} /></ORow>
-          </UnitBlock>
-          <UnitBlock title="Defensive — protect the lead" head={["Pos", "Player"]}>
-            <ORow label="C"><Select value={data.situations.lastMin.def[0]} onChange={(v) => setLastMin("def", 0, v)} pool={dressedForwards} /></ORow>
-            <ORow label="LW"><Select value={data.situations.lastMin.def[1]} onChange={(v) => setLastMin("def", 1, v)} pool={dressedForwards} /></ORow>
-            <ORow label="RW"><Select value={data.situations.lastMin.def[2]} onChange={(v) => setLastMin("def", 2, v)} pool={dressedForwards} /></ORow>
-            <ORow label="LD"><Select value={data.situations.lastMin.def[3]} onChange={(v) => setLastMin("def", 3, v)} pool={dressedDefense} /></ORow>
-            <ORow label="RD"><Select value={data.situations.lastMin.def[4]} onChange={(v) => setLastMin("def", 4, v)} pool={dressedDefense} /></ORow>
-          </UnitBlock>
+        <div className="space-y-6">
+          <p className="text-xs text-slate-500 px-1">
+            💡 Taktika a rozostavenie pre záverečný tlak: 6v5 s odvolaným brankárom na vyrovnanie skóre, alebo 5v5 defenzívny lockdown na udržanie tesného vedenia.
+          </p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* 6v5 Offensive */}
+            <div className="lines-card bg-slate-900/40 border border-slate-800 rounded-xl p-4 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                <div>
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-rose-950 text-rose-400 border border-rose-800">
+                    6 na 5 Extra Attacker
+                  </span>
+                  <h3 className="text-sm font-bold text-white mt-1">Offensive — Odvolaný brankár</h3>
+                </div>
+                <span className="text-xs text-slate-400 font-semibold">Vabank hra</span>
+              </div>
+
+              <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-2 overflow-hidden">
+                <RinkFormationMap
+                  roles={LASTMIN_OFF_LAYOUT}
+                  players={slotPlayersFixed(data.situations.lastMin.off, 4)}
+                  accent="#ef4444"
+                  goalAtTop={true}
+                />
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                    <span>Útočníci (4)</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <Slot label="Center" value={data.situations.lastMin.off[0]} onChange={(v) => setLastMin("off", 0, v)} pool={dressedForwards} />
+                    <Slot label="Left Wing" value={data.situations.lastMin.off[1]} onChange={(v) => setLastMin("off", 1, v)} pool={dressedForwards} />
+                    <Slot label="Right Wing" value={data.situations.lastMin.off[2]} onChange={(v) => setLastMin("off", 2, v)} pool={dressedForwards} />
+                    <Slot label="Extra Attacker" value={data.situations.lastMin.off[3]} onChange={(v) => setLastMin("off", 3, v)} pool={dressedForwards} />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                    <span>Obrana na pointe (2)</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <Slot label="Left Defense" value={data.situations.lastMin.off[4]} onChange={(v) => setLastMin("off", 4, v)} pool={dressedDefense} />
+                    <Slot label="Right Defense" value={data.situations.lastMin.off[5]} onChange={(v) => setLastMin("off", 5, v)} pool={dressedDefense} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 5v5 Defensive */}
+            <div className="lines-card bg-slate-900/40 border border-slate-800 rounded-xl p-4 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                <div>
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">
+                    5 na 5 Defenzívny Lockdown
+                  </span>
+                  <h3 className="text-sm font-bold text-white mt-1">Defensive — Udržanie vedenia</h3>
+                </div>
+                <span className="text-xs text-slate-400 font-semibold">Chránenie bránkoviska</span>
+              </div>
+
+              <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-2 overflow-hidden">
+                <RinkFormationMap
+                  roles={LASTMIN_DEF_LAYOUT}
+                  players={slotPlayersFixed(data.situations.lastMin.def, 3)}
+                  accent="#10b981"
+                  goalAtTop={false}
+                />
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                    <span>Útočníci (3)</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <Slot label="Center" value={data.situations.lastMin.def[0]} onChange={(v) => setLastMin("def", 0, v)} pool={dressedForwards} />
+                    <Slot label="Left Wing" value={data.situations.lastMin.def[1]} onChange={(v) => setLastMin("def", 1, v)} pool={dressedForwards} />
+                    <Slot label="Right Wing" value={data.situations.lastMin.def[2]} onChange={(v) => setLastMin("def", 2, v)} pool={dressedForwards} />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                    <span>Obrana (2)</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <Slot label="Left Defense" value={data.situations.lastMin.def[3]} onChange={(v) => setLastMin("def", 3, v)} pool={dressedDefense} />
+                    <Slot label="Right Defense" value={data.situations.lastMin.def[4]} onChange={(v) => setLastMin("def", 4, v)} pool={dressedDefense} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

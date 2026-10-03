@@ -69,9 +69,10 @@ export default function RinkFormationMap({ roles, players, accent = "#2563eb", g
             crease, a high role.y (point) stays up near the blue line. */}
         {assigned.map(({ role, player }) => {
           const svgY = goalAtTop ? role.y : 100 - role.y;
+          const labelY = svgY < 20 ? svgY + 11.5 : svgY - 9.2;
           return (
             <g key={role.key}>
-              <text x={role.x} y={svgY - 9.5} textAnchor="middle" fontSize="3.4" fill="#7c8ba3" fontWeight="600" letterSpacing="0.2">
+              <text x={role.x} y={labelY} textAnchor="middle" fontSize="3.3" fill="#94a3b8" fontWeight="700" letterSpacing="0.2">
                 {role.label.toUpperCase()}
               </text>
               {player ? (

@@ -136,3 +136,37 @@ export const PK3_LAYOUTS: Record<string, FormationRole[]> = {
     { key: "r3", label: "Right D", x: 68, y: 20 },
   ],
 };
+
+export const FOUR_V_FOUR_LAYOUTS: Record<string, FormationRole[]> = {
+  balanced: [
+    { key: "r1", label: "Center", x: 35, y: 52 },
+    { key: "r2", label: "Winger", x: 65, y: 52 },
+    { key: "r3", label: "Left D", x: 30, y: 82 },
+    { key: "r4", label: "Right D", x: 70, y: 82 },
+  ],
+};
+
+export const OT_LAYOUTS: Record<string, FormationRole[]> = {
+  balanced: [
+    { key: "r1", label: "Center (F1)", x: 30, y: 54 },
+    { key: "r2", label: "Winger (F2)", x: 70, y: 54 },
+    { key: "r3", label: "Mobile D", x: 50, y: 80 },
+  ],
+};
+
+export const LASTMIN_OFF_LAYOUT: FormationRole[] = [
+  { key: "r1", label: "Screen LW", x: 38, y: 18 },
+  { key: "r2", label: "Screen C", x: 62, y: 18 },
+  { key: "r3", label: "Left Half-Wall", x: 20, y: 52 },
+  { key: "r4", label: "Right Half-Wall", x: 80, y: 52 },
+  { key: "r5", label: "Left Point QB", x: 34, y: 84 },
+  { key: "r6", label: "Right Point QB", x: 66, y: 84 },
+];
+
+export const LASTMIN_DEF_LAYOUT: FormationRole[] = [
+  { key: "r1", label: "Defensive C", x: 50, y: 56 },
+  { key: "r2", label: "Board Grinder", x: 26, y: 48 },
+  { key: "r3", label: "Shot Blocker", x: 74, y: 48 },
+  { key: "r4", label: "Left D (Crease)", x: 34, y: 22 },
+  { key: "r5", label: "Right D (Crease)", x: 66, y: 22 },
+];
