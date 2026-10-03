@@ -765,11 +765,29 @@ function avgMorale(team: SimTeam): number {
   return wt ? sum / wt : CFG.moraleNeutral;
 }
 
+// A delayed-penalty call can pull a penalty's start up to ~12s EARLIER than rolled (see the
+// delayed-penalty block in the tick loop), so same-player penalties are kept this much apart.
+const DELAYED_SHIFT_MARGIN = 13;
+
 /** Record a single penalty (adds PIM, and — unless offsetting — a PP for the opponent). */
 function addPenalty(
   st: SimState, team: SimTeam, offender: SimSkater, period: number, at: number,
   type: string, minutes: number, severity: string, givesPP = true,
 ) {
+  // Whoever is already sitting in the box can't commit another infraction (he isn't on the
+  // ice) — a fight / brawl / heat-event / random-penalty pick that lands on him goes to a
+  // teammate instead. A penalty that STARTS at this very second is the same infraction
+  // (a misconduct or roughing add-on to the player's own minor), so that is left alone.
+  // Overlap test (not just "is he in the box right now"): penalties that are rolled earlier
+  // but land later on the clock — or a late-added misconduct — must not stack on a player
+  // whose box time they would overlap.
+  const until = at + minutes * 60;
+  const serving = (id: number) =>
+    st.penalties.some((q) => q.team === team.id && q.playerId === id && q.period === period && q.seconds !== at && q.seconds - DELAYED_SHIFT_MARGIN < until && at < q.seconds + q.minutes * 60 + DELAYED_SHIFT_MARGIN);
+  if (serving(offender.id)) {
+    const others = [...team.forwards, ...team.defense].filter((x) => !st.injured.has(x.id) && !serving(x.id));
+    if (others.length) offender = others[st.rng.int(others.length)];
+  }
   st.lines[team.id][offender.id].pim += minutes;
   st.box[team.id].pim += minutes;
   const isMisconduct = /Misconduct/i.test(type);
@@ -837,9 +855,18 @@ function generatePenalties(st: SimState, team: SimTeam, period: number, active: 
   // any other pre-period generation), but the cross-period case is now closed.
   const pool = [...team.forwards, ...team.defense].filter((s) => !st.injured.has(s.id));
   if (!pool.length) return;
+  // roll every infraction's clock time first and resolve them in order, so a player who is
+  // already serving a minor / major / misconduct can't be called for another penalty while
+  // he's still in the box (he isn't on the ice to commit one).
+  const times = Array.from({ length: count }, () => st.rng.int(PERIOD_SECONDS - 130)).sort((a, b) => a - b);
+  const servingAt = (id: number, t: number) =>
+    active.some((a) => a.team === team.id && a.playerId === id && !a.expired && a.start <= t && t < a.end + DELAYED_SHIFT_MARGIN)
+    || st.misconducts.some((m) => m.teamId === team.id && m.playerId === id && m.period === period && m.start <= t && t < m.end + DELAYED_SHIFT_MARGIN);
   for (let i = 0; i < count; i++) {
-    const at = st.rng.int(PERIOD_SECONDS - 130);
-    const offender = pool[st.rng.weighted(pool.map((s) => (105 - s.discipline) * (0.5 + s.iceTime)))];
+    const at = times[i];
+    const eligible = pool.filter((s) => !servingAt(s.id, at));
+    const cand = eligible.length ? eligible : pool;
+    const offender = cand[st.rng.weighted(cand.map((s) => (105 - s.discipline) * (0.5 + s.iceTime)))];
     const type = PENALTY_TYPES[st.rng.weighted(PENALTY_TYPES.map((p) => p[1]))][0];
     const roll = st.rng.next();
     const minutes = type === "Slashing" && roll < 0.05 ? 4 : roll < 0.02 ? 5 : 2;
