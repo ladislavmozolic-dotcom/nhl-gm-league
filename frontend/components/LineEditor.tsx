@@ -199,6 +199,62 @@ function PlayerPickerOverlay({ value, onChange, pool, allowEmpty = true, title, 
   );
 }
 
+// In-page option list (bottom sheet on a phone, centred dialog on desktop) for the small
+// "Team / Box / Diamond / …" style dropdowns — same reason as the player picker above: a
+// native <select> popup is owned by the browser, flickered shut on some desktops and never
+// opened on phones. Shows each option's description too (a phone has no hover tooltip).
+type PickOption = { value: string; label: string; desc?: string };
+function OptionPicker({ value, options, onChange, heading, buttonClass, buttonTitle }: {
+  value: string; options: PickOption[]; onChange: (v: string) => void; heading: string; buttonClass: string; buttonTitle?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => { document.body.style.overflow = prev; window.removeEventListener("keydown", onKey); };
+  }, [open]);
+  const current = options.find((o) => o.value === value) ?? options[0];
+  return (
+    <>
+      <button type="button" title={buttonTitle} onClick={() => setOpen(true)} className={`${buttonClass} inline-flex items-center gap-1.5`}>
+        <span className="truncate">{current?.label}</span>
+        <svg className="flex-none opacity-70" width="10" height="10" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clipRule="evenodd" /></svg>
+      </button>
+      {open && createPortal(
+        <div className="fixed inset-0 z-[300] flex items-end sm:items-center justify-center bg-slate-950/75 backdrop-blur-sm" onClick={() => setOpen(false)}>
+          <div role="dialog" aria-label={heading} onClick={(e) => e.stopPropagation()}
+            className="w-full sm:max-w-sm max-h-[80vh] flex flex-col overflow-hidden rounded-t-3xl sm:rounded-2xl bg-slate-900 border border-slate-700/80 shadow-[0_-12px_60px_rgba(2,8,23,.65)]">
+            <div className="sm:hidden mx-auto mt-2 h-1 w-10 rounded-full bg-slate-700" />
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
+              <span className="text-sm font-bold text-slate-100">{heading}</span>
+              <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 text-slate-300 hover:text-white">✕</button>
+            </div>
+            <div className="overflow-y-auto overscroll-contain p-2.5 space-y-1.5">
+              {options.map((o) => {
+                const sel = o.value === value;
+                return (
+                  <button key={o.value || "__none"} type="button" onClick={() => { onChange(o.value); setOpen(false); }}
+                    className={`w-full text-left rounded-xl px-3 py-2.5 border ${sel ? "bg-blue-600/20 border-blue-500/60" : "border-slate-800 bg-slate-900 hover:bg-slate-800/70 hover:border-slate-600"}`}>
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-bold text-white">{o.label}</span>
+                      {sel && <span className="text-[10px] font-bold text-sky-300">● selected</span>}
+                    </span>
+                    {o.desc && <span className="mt-0.5 block text-xs text-slate-400 leading-snug">{o.desc}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
+    </>
+  );
+}
+
 // LineEditor declares its small sub-components INSIDE the component so they can
 // close over its state. A plain inner `const X = () => ...` gets a brand-new
 // identity on every render, so React unmounts and remounts it — which destroys
@@ -444,14 +500,18 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
   const setFwdPuck = (i: number, v: PuckStyle | "") => change((d) => { if (v) d.forwardLines[i].puck = v; else delete d.forwardLines[i].puck; });
   const setDefDzone = (i: number, v: DZone | "") => change((d) => { if (v) d.defensePairs[i].dzone = v; else delete d.defensePairs[i].dzone; });
   const inheritTxt = lang === "cs" ? "Zdediť tímový systém (nastav voľbu pre override len tejto formácie)" : "Inherit the team system (set an option to override just this line)";
+  const DIAL_HEADINGS: Record<string, string> = { puckStyle: "Puck style", dZone: "D-zone system", ppStyle: "Power-play formation", pkStyle: "Penalty-kill formation" };
   const SysSelect = useStable(({ value, dial, opts, onChange }: { value: string | undefined; dial: "puckStyle" | "dZone" | "ppStyle" | "pkStyle"; opts: Record<string, string>; onChange: (v: string) => void }) => (
-    <select value={value ?? ""} onChange={(e) => onChange(e.target.value)}
-      title={value ? dialDesc(lang, dial, value) : inheritTxt}
-      style={{ colorScheme: "dark" }}
-      className={`lines-select bg-slate-800 border rounded px-1.5 py-1 text-xs cursor-help ${value ? "border-sky-600 text-sky-300" : "border-slate-700 text-slate-400"}`}>
-      <option value="" title={inheritTxt} style={{ backgroundColor: "#1e293b", color: "#e2e8f0" }}>{lang === "cs" ? "Tím" : "Team"}</option>
-      {Object.keys(opts).filter((k) => k !== "balanced").map((k) => <option key={k} value={k} title={dialDesc(lang, dial, k)} style={{ backgroundColor: "#1e293b", color: "#e2e8f0" }}>{dialLabel(lang, dial, k)}</option>)}
-    </select>
+    <OptionPicker
+      value={value ?? ""} onChange={onChange}
+      heading={DIAL_HEADINGS[dial] ?? "Choose"}
+      buttonTitle={value ? dialDesc(lang, dial, value) : inheritTxt}
+      buttonClass={`lines-select bg-slate-800 border rounded px-1.5 py-1 text-xs ${value ? "border-sky-600 text-sky-300" : "border-slate-700 text-slate-400"}`}
+      options={[
+        { value: "", label: lang === "cs" ? "Tím" : "Team", desc: inheritTxt },
+        ...Object.keys(opts).filter((k) => k !== "balanced").map((k) => ({ value: k, label: dialLabel(lang, dial, k), desc: dialDesc(lang, dial, k) })),
+      ]}
+    />
   ));
   // team-level special-teams formation (stored on data.system, persisted with lines)
   const setStyle = (k: "ppStyle" | "pkStyle", v: string) => change((d) => { d.system = { ...mergeTactics(d.system), [k]: v as PpStyle & PkStyle }; });
@@ -1276,11 +1336,13 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
                 {toggle("coachAdapt", "↯", "Adjust to the score", "From the 3rd: push when behind, tighten up when ahead")}
                 {toggle("timeout", "⏸", "Use the timeout", "Late after an icing (leading/tied) or right before pulling the goalie")}
                 <label className="lines-goalie-card" title="When to use the coach's challenge on a reviewable goal against (offside / goaltender interference). A failed challenge = 2-minute minor."><span className="lines-setting-icon">🎥</span><span>Coach&apos;s challenge<span className="block text-[10px] font-normal text-slate-400">Failed challenge = 2-min minor</span></span>
-                  <select className="rounded bg-slate-800 border border-slate-700 px-1.5 py-1 text-xs" value={cp.challenge} onChange={(e) => setCp({ challenge: e.target.value as CoachingPrefs["challenge"] })}>
-                    <option value="smart">When video looks good</option>
-                    <option value="always">Always</option>
-                    <option value="never">Never</option>
-                  </select></label>
+                  <OptionPicker value={cp.challenge} onChange={(v) => setCp({ challenge: v as CoachingPrefs["challenge"] })} heading="Coach's challenge"
+                    buttonClass="rounded bg-slate-800 border border-slate-700 px-1.5 py-1 text-xs"
+                    options={[
+                      { value: "smart", label: "When video looks good", desc: "Challenge only when the replay suggests the call will be overturned." },
+                      { value: "always", label: "Always", desc: "Challenge every reviewable goal against." },
+                      { value: "never", label: "Never", desc: "Never challenge — no risk of the 2-minute minor." },
+                    ]} /></label>
               </section>
             );
           })()}
