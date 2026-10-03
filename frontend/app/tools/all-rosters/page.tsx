@@ -10,6 +10,7 @@ import { redactAttrs } from "@/lib/player-attrs";
 import { pickIdsWithTradeHistory } from "@/lib/trade-history-server";
 import { getPickTradeHistoryAction } from "@/app/actions/pick-trade-history";
 import PickTradeBadge from "@/components/PickTradeBadge";
+import { PROSPECT_PROJECTION_INCLUDE, PROJECTION_COLS, prospectProjectionCells } from "@/lib/prospect-projection";
 import { livePlayerOverall } from "@/lib/player-overall";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +37,7 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
       // rosterType-filtered — a player parked as PROSPECT/UFA/RETIRED/RELEASED keeps
       // his teamId (schema requires one) but must never show as an active roster player.
       players: { where: { rosterType: "NHL" }, orderBy: { overall: "desc" }, include: { goalieRating: true } },
-      prospects: { where: { source: prospectSource }, orderBy: [{ name: "asc" }] },
+      prospects: { where: { source: prospectSource }, orderBy: [{ name: "asc" }], include: PROSPECT_PROJECTION_INCLUDE },
       draftPicks: { where: { source: prospectSource }, orderBy: [{ year: "asc" }, { round: "asc" }] },
       affiliateTeams: { include: { players: { where: { rosterType: "AHL" }, orderBy: { overall: "desc" }, include: { goalieRating: true } } } },
     },
@@ -196,6 +197,7 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
             { key: "position", label: "Pos", kind: "text" },
             { key: "draftYear", label: "Draft Year", kind: "num" },
             { key: "overallPick", label: "Overall Pick", kind: "num" },
+            ...PROJECTION_COLS,
           ];
           const drafted = (p: (typeof prospects)[number]) => !((p as any).undrafted && !p.draftYear);
           const rows: SortRow[] = prospects.map((p) => ({
@@ -203,10 +205,11 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
             position: (p as any).position || "—",
             draftYear: drafted(p) ? p.draftYear ?? undefined : undefined,
             overallPick: drafted(p) ? p.overallPick ?? undefined : undefined,
+            ...prospectProjectionCells(p, drafted(p)),
           }));
           return (
             <Card bodyClassName="p-2">
-              <SortableTable cols={cols} rows={rows} initialSort="name" minWidth={560} />
+              <SortableTable cols={cols} rows={rows} initialSort="name" minWidth={900} />
               <p className="text-[11px] text-slate-600 px-2 pt-1">Click any column header to sort.</p>
             </Card>
           );

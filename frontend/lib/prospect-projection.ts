@@ -108,3 +108,30 @@ export function projectProspect(input: ProspectProjectionInput): ProspectProject
 
   return { grade, score, confidence, role: roleFor(pos, grade), eta, risk, futureValue, summary: `${performance} · ${risk.toLowerCase()} projection risk` };
 }
+
+/** Prisma include that loads what projectProspect needs for a Prospect row. */
+export const PROSPECT_PROJECTION_INCLUDE = {
+  worldPlayer: { include: { stats: { orderBy: [{ season: "desc" as const }, { gamesPlayed: "desc" as const }], include: { league: true } } } },
+};
+
+/** SortableTable columns for the projection (pair with prospectProjectionCells). */
+export const PROJECTION_COLS = [
+  { key: "grade", label: "Grade", kind: "grade" as const, title: "UNHL projection grade (A–F) from draft capital, age and current stats — see Around the World" },
+  { key: "score", label: "Score", kind: "num" as const },
+  { key: "role", label: "Projected role", kind: "text" as const },
+  { key: "eta", label: "ETA", kind: "text" as const },
+  { key: "risk", label: "Risk", kind: "text" as const },
+];
+
+/** Row cells for PROJECTION_COLS, from a Prospect loaded with PROSPECT_PROJECTION_INCLUDE. */
+export function prospectProjectionCells(p: any, drafted: boolean) {
+  const w = p.worldPlayer;
+  const proj = projectProspect({
+    position: p.position ?? w?.position,
+    draftYear: p.draftYear,
+    overallPick: drafted ? p.overallPick : null,
+    birthDate: w?.birthDate,
+    stats: w?.stats,
+  });
+  return { grade: proj.grade, score: proj.score, role: proj.role, eta: proj.eta, risk: proj.risk };
+}

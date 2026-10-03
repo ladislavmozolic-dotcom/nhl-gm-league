@@ -4,6 +4,7 @@ import { PageHeader, Card } from "@/components/ui";
 import SortableTable, { type SortCol, type SortRow } from "@/components/SortableTable";
 import { posGroup, ratingColor, ovColor } from "@/lib/ratingBands";
 import { epProfileUrl } from "@/lib/playerName";
+import { PROSPECT_PROJECTION_INCLUDE, PROJECTION_COLS, prospectProjectionCells } from "@/lib/prospect-projection";
 import { isLoggedIn } from "@/lib/auth";
 import { liveCapHit } from "@/lib/finance";
 
@@ -34,7 +35,7 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
     const source = cfg?.rosterMode === "real" ? "real" : "profinhl";
     const prospects = await prisma.prospect.findMany({
       where: { source },
-      include: { team: { select: { code: true, slug: true, logoUrl: true } } },
+      include: { team: { select: { code: true, slug: true, logoUrl: true } }, ...PROSPECT_PROJECTION_INCLUDE },
       orderBy: { overallPick: "asc" },
     });
     count = prospects.length;
@@ -44,12 +45,14 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
       { key: "pos", label: "Pos", kind: "text" },
       { key: "year", label: "Draft Year", kind: "num" },
       { key: "pick", label: "Overall Pick", kind: "num" },
+      ...PROJECTION_COLS,
     ];
     rows = prospects.map((p) => ({
       _id: p.id, name: p.name, pos: (p as any).position,
       epUrl: (p as any).epUrl ?? epProfileUrl(p.name),
       teamCode: p.team?.code, teamSlug: p.team?.slug, teamLogo: p.team?.logoUrl,
       year: p.draftYear, pick: p.overallPick,
+      ...prospectProjectionCells(p, !((p as any).undrafted && !p.draftYear)),
     }));
     initialSort = "pick";
   } else {
@@ -108,7 +111,7 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
         <Card><p className="text-slate-500 text-center py-8">No {type} found</p></Card>
       ) : (
         <Card bodyClassName="p-2">
-          <SortableTable cols={cols} rows={rows} initialSort={initialSort} minWidth={type === "prospects" ? 640 : 1080} />
+          <SortableTable cols={cols} rows={rows} initialSort={initialSort} minWidth={type === "prospects" ? 900 : 1080} />
           <p className="text-[11px] text-slate-600 px-2 pt-1">Click any column header to sort.</p>
         </Card>
       )}
