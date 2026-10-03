@@ -29,7 +29,7 @@ export default async function RostersPage({ params, searchParams }: { params: Pr
     // only real roster players (NHL/AHL) — released UFAs, prospects and retirees keep a
     // team id (schema requires one) but must never surface in the roster manager.
     where: { teamId: { in: orgTeamIds }, rosterType: { in: ["NHL", "AHL"] } },
-    select: { id: true, name: true, position: true, overall: true, isGoalie: true, rosterType: true, contractType: true, capHit: true, ahlSalary: true, contractYears: true, scratched: true, teamId: true, waiverStatus: true, lastRecalledAt: true, goalieRating: { select: { overall: true } } },
+    select: { id: true, name: true, position: true, overall: true, isGoalie: true, condition: true, rosterType: true, contractType: true, capHit: true, ahlSalary: true, contractYears: true, scratched: true, teamId: true, waiverStatus: true, lastRecalledAt: true, goalieRating: { select: { overall: true } } },
     orderBy: [{ isGoalie: "asc" }, { overall: "desc" }],
   });
 
@@ -50,6 +50,7 @@ export default async function RostersPage({ params, searchParams }: { params: Pr
         return {
           id: p.id, name: p.name, position: p.position, overall: livePlayerOverall(p) ?? 0,
           isGoalie: p.isGoalie,
+          condition: p.condition,
           side: (p.rosterType === "AHL" ? (p.scratched ? "farm-scratched" : "farm") : (p.scratched ? "pro-scratched" : "pro")) as "pro" | "pro-scratched" | "farm" | "farm-scratched",
           contractType: (p.contractType as "ONE_WAY" | "TWO_WAY" | null) ?? null,
           capHit: liveCapHit(p),

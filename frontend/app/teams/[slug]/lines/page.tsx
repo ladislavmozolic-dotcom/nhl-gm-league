@@ -45,6 +45,21 @@ export default async function LinesPage({ params }: { params: Promise<{ slug: st
   const players = skaterRows.map((p) => ({ id: p.id, name: cleanName(p.name), position: p.position, shoots: p.shoots, overall: p.overall ?? 0, injured: (p.injuryDaysLeft ?? 0) > 0 || p.suspendedGames > 0, df: p.df, con: Math.round(p.condition ?? 100), cap: capOf(p), pa: p.pa, sk: p.sk, sc: p.sc, ck: p.ck, fo: p.fo, st: p.st, en: p.en, weight: p.weight, ph: p.ph, number: p.number }));
   const goalies = goalieRows.map((p) => ({ id: p.id, name: cleanName(p.name), position: "G", photoUrl: p.photoUrl, overall: p.overall ?? 0, injured: (p.injuryDaysLeft ?? 0) > 0 || p.suspendedGames > 0, tired: (p.condition ?? 100) < PLAY_CON, con: Math.round(p.condition ?? 100), cap: capOf(p), number: p.number }));
 
+  // Back-to-back: the sim sits a GM-picked starter on the second night of a back-to-back
+  // (he started the game-day before the team's next game) — flag who that is so the GM
+  // isn't surprised when the backup gets the net.
+  const nextGame = await prisma.game.findFirst({
+    where: { season: "2026-27", status: "SCHEDULED", seriesId: null, league: rosterType, round: { not: null }, OR: [{ homeTeamId: team.id }, { awayTeamId: team.id }] },
+    orderBy: { round: "asc" }, select: { round: true },
+  });
+  const b2bRows = nextGame?.round != null && goalieRows.length
+    ? await prisma.goalieGameStat.findMany({
+        where: { playerId: { in: goalieRows.map((g) => g.id) }, started: true, game: { season: "2026-27", status: "FINAL", seriesId: null, round: nextGame.round - 1 } },
+        select: { playerId: true },
+      })
+    : [];
+  const goalieB2b = Object.fromEntries(b2bRows.map((r) => [r.playerId, true as const]));
+
   const saved = await loadTeamLines(team.id);
   const lines = saved ?? autoLines(players, goalies);
 
@@ -62,6 +77,7 @@ export default async function LinesPage({ params }: { params: Promise<{ slug: st
       jerseyTeamSlug={team.league === "AHL" ? (team.parentTeam?.slug ?? slug) : slug}
       players={players}
       goalies={goalies}
+      goalieB2b={goalieB2b}
       initial={lines}
       chemistry={chemistry}
       chemBase={settings.chemistryBase}

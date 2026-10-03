@@ -8,7 +8,7 @@ import { ROSTER_LIMITS, WAIVER_CAP_HIT_LIMIT, isNhlSide, type MoveRow, type Rost
 
 type Player = {
   id: number; name: string; position: string; overall: number;
-  isGoalie: boolean; side: RosterSide; contractType: "ONE_WAY" | "TWO_WAY" | null;
+  isGoalie: boolean; condition?: number | null; side: RosterSide; contractType: "ONE_WAY" | "TWO_WAY" | null;
   capHit: number; ahlSalary?: number | null; onWaivers?: boolean;
   // Rule 30/10 recall pass — riding a free (no-waivers) trip back to the farm since
   // his last AHL→NHL call-up (≤30 days AND ≤10 NHL games played since then).
@@ -163,6 +163,12 @@ export default function RosterMover({ teamName, teamSlug, fromFarmSlug, affiliat
           <PlayerLink id={p.id} name={p.name} className="font-medium" />
           <span className="text-slate-500 text-xs ml-1.5">{p.position}</span>
         </span>
+        {p.isGoalie && p.condition != null && (
+          <span title="Goalie condition — below ~95 he can't start; the sim rests a tired starter"
+            className={`shrink-0 text-[11px] font-semibold tabular-nums px-1.5 py-0.5 rounded border border-slate-700 ${p.condition >= 98 ? "text-emerald-400" : p.condition >= 95 ? "text-green-400" : p.condition >= 90 ? "text-amber-400" : "text-red-400"}`}>
+            CON {Math.round(p.condition)}%
+          </span>
+        )}
         {ahlOnly ? (
           <span title="Minor-league (AHL-only) contract — below the NHL minimum salary, can't be called up"
             className="text-[10px] font-bold px-1.5 py-0.5 rounded border border-emerald-600/50 text-emerald-400">AHL only</span>
