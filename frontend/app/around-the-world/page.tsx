@@ -369,7 +369,7 @@ export default async function AroundTheWorldPage({
           </div>
           <div>
             <div className="mb-1 font-bold text-slate-200">🎓 NCAA Division I</div>
-            <p className="text-xs leading-relaxed">All college rosters tracked and mapped to prospects. Stat rows in pre-season status until games begin.</p>
+            <p className="text-xs leading-relaxed">College Hockey News direct feed — live 2026-27 Division I rosters, skater and goalie stats across all 63 programs.</p>
           </div>
           <div>
             <div className="mb-1 font-bold text-slate-200">🇪🇺 Europe &amp; Russia</div>

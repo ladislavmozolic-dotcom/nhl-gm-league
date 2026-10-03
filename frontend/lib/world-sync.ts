@@ -7,6 +7,7 @@ import { importEuropeanJuniorLeagues } from "@/lib/world-import-juniors";
 import { importRussianProspects } from "@/lib/world-import-russia";
 import { importKhlLeague } from "@/lib/world-import-khl";
 import { importDelLeague } from "@/lib/world-import-del";
+import { importNcaaSeason } from "@/lib/world-import-ncaa";
 import { backfillWorldBirthDates } from "@/lib/world-birthdate-backfill";
 import { reconcileAllProspects } from "@/lib/world-player-identity";
 
@@ -32,10 +33,7 @@ export async function runFullWorldSync() {
     importQmjhlSeason().catch((e) => ({ error: (e as Error).message })),
   ]);
   const ahl = await importAhlSeason().catch((e) => ({ error: (e as Error).message }));
-  // NCAA has no current-season stats yet. Its full 63-team roster scan is
-  // intentionally deferred, so the daily live leagues (especially Liiga) are
-  // never held behind an empty college slate.
-  const ncaa = { status: "held for 2026-27 opening stats" };
+  const ncaa = await importNcaaSeason().catch((e) => ({ error: (e as Error).message }));
   const [liiga, shl, cze, juniors] = await Promise.all([
     importLiigaProspects().catch((e) => ({ error: (e as Error).message })),
     importShlProspects().catch((e) => ({ error: (e as Error).message })),
