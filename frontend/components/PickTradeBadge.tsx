@@ -86,13 +86,14 @@ export default function PickTradeBadge({
                       )}
                     </div>
                     <div className="grid sm:grid-cols-2 gap-3">
-                      <div>
-                        <p className="text-[10px] uppercase tracking-wide text-slate-600 mb-1">{h.toTeam?.name ?? "Team"} {h.status === "PENDING" ? "would receive" : "received"}</p>
-                        <AssetChips items={h.fromLabels} />
-                      </div>
+                      {/* same order as the header (from → to): each column is what THAT club got */}
                       <div>
                         <p className="text-[10px] uppercase tracking-wide text-slate-600 mb-1">{h.fromTeam?.name ?? "Team"} {h.status === "PENDING" ? "would receive" : "received"}</p>
                         <AssetChips items={h.toLabels} />
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-slate-600 mb-1">{h.toTeam?.name ?? "Team"} {h.status === "PENDING" ? "would receive" : "received"}</p>
+                        <AssetChips items={h.fromLabels} />
                       </div>
                     </div>
                     <Link href={`/trades/${h.tradeId}`} className="text-xs text-blue-400 hover:text-blue-300 mt-2 inline-block">View full trade #{h.tradeId} →</Link>
