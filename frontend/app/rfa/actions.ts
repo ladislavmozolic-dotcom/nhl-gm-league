@@ -6,7 +6,7 @@ import { canManageTeam } from "@/lib/auth";
 import { getLeagueDate } from "@/lib/calendar-server";
 import { loadSettings } from "@/lib/sim/settings";
 import { arbitrationRange, ensureRfaCases, qoFormInfo, qoOneWayMessage } from "@/lib/rfa-server";
-import { CURRENT_SEASON_START, TWO_WAY_AHL_SALARY } from "@/lib/finance";
+import { CURRENT_SEASON_START } from "@/lib/finance";
 import { twoWayObjection } from "@/lib/free-agency";
 
 const refresh = () => { revalidatePath("/rfa"); revalidatePath("/offer-sheets"); };
@@ -86,7 +86,7 @@ export async function acceptArbitrationAwardAction(caseId: number, teamId: numbe
   const expiry = CURRENT_SEASON_START + c.awardTerm;
   const twoWay = c.awardContractType === "TWO_WAY";
   await prisma.$transaction([
-    prisma.player.update({ where: { id: c.playerId }, data: { capHit: c.awardAav, contractYears: c.awardTerm, contractExpiry: expiry, contractType: twoWay ? "TWO_WAY" : "ONE_WAY", ahlSalary: twoWay ? TWO_WAY_AHL_SALARY : null, contractText: `$${c.awardAav.toLocaleString("en-US")} × ${c.awardTerm}yr ${twoWay ? "two-way" : "one-way"} (arbitration award, through ${expiry})`, rightsReleased: false, resignStatus: null, resignRound: 0, franchiseTag: false } }),
+    prisma.player.update({ where: { id: c.playerId }, data: { capHit: c.awardAav, contractYears: c.awardTerm, contractExpiry: expiry, contractType: twoWay ? "TWO_WAY" : "ONE_WAY", ahlSalary: null /* two-way award: he is paid the FULL salary on the farm too — off the cap, into Finance (liveAhlSalary falls back to capHit) */, contractText: `$${c.awardAav.toLocaleString("en-US")} × ${c.awardTerm}yr ${twoWay ? "two-way" : "one-way"} (arbitration award, through ${expiry})`, rightsReleased: false, resignStatus: null, resignRound: 0, franchiseTag: false } }),
     prisma.rfaCase.update({ where: { id: caseId }, data: { status: "SIGNED", resolvedAt: new Date() } }),
   ]);
   refresh();
