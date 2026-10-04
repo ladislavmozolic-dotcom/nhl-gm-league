@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { arbitrationComparables, ensureRfaCases, resolveExpiredQODueDates } from "@/lib/rfa-server";
+import { arbitrationRange, ensureRfaCases, resolveExpiredQODueDates } from "@/lib/rfa-server";
 import { Card } from "@/components/ui";
 import RfaDashboard from "@/components/RfaDashboard";
 
@@ -27,7 +27,9 @@ export default async function RfaCentralSection({ teamId }: { teamId?: number })
     orderBy: [{ qoDueAt: "asc" }, { player: { name: "asc" } }],
   });
   const data = await Promise.all(rows.map(async (r) => {
-    const comparables = r.status === "ARB_FILED" ? await arbitrationComparables(r.playerId) : [];
+    const arb = r.status === "ARB_FILED" ? await arbitrationRange(r.playerId, r.qoAmount) : null;
+    const comparables = arb?.comps ?? [];
+    const range = arb ? { low: arb.low, high: arb.high } : null;
     const ovr = r.player.overall ?? 0;
     const offerSheetRisk = r.status === "OS_ELIGIBLE" ? (ovr >= 72 ? "High" : ovr >= 62 ? "Medium" : "Low") : "Low";
     const { parentTeam, parentTeamId, id: _id, ...team } = r.team;
@@ -35,7 +37,7 @@ export default async function RfaCentralSection({ teamId }: { teamId?: number })
     return {
       ...r, team, org,
       qoDueAt: r.qoDueAt.toISOString(), qoTenderedAt: r.qoTenderedAt?.toISOString() ?? null,
-      offerSheetRisk: offerSheetRisk as "Low" | "Medium" | "High", comparables,
+      offerSheetRisk: offerSheetRisk as "Low" | "Medium" | "High", comparables, range,
     };
   }));
   return data.length

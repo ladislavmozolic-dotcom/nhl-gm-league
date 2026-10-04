@@ -13,26 +13,45 @@ type Row = {
   player: { id: number; name: string; position: string; age: number | null; capHit: number | null; overall: number | null };
   team: { code: string | null; name: string; isAffiliate: boolean };
   org: { id: number; code: string | null; name: string };
+  range: { low: number; high: number } | null;
 };
 const M = (n: number | null) => n == null ? "—" : `$${(n / 1e6).toFixed(2)}M`;
 const label: Record<string, string> = { QO_DUE: "QO due", QO_TENDERED: "QO tendered", NEGOTIATING: "Negotiating", ARB_FILED: "Hearing open", AWARDED: "Awarded", OS_ELIGIBLE: "Offer-sheet eligible", WALKED_AWAY: "Walked away", UFA: "UFA", SIGNED: "Signed" };
 
 function Hearing({ row }: { row: Row }) {
   const [pending, start] = useTransition();
-  const [club, setClub] = useState(""); const [player, setPlayer] = useState("");
+  // Prefill with sensible submissions: the club argues for the bottom of the band,
+  // the player for the top — the award lands in the middle (clamped to the band).
+  const lo = row.range?.low ?? row.qoAmount;
+  const hi = row.range?.high ?? row.qoAmount;
+  const [club, setClub] = useState((lo / 1e6).toFixed(2)); const [player, setPlayer] = useState((hi / 1e6).toFixed(2));
+  const [clubTerm, setClubTerm] = useState(1); const [playerTerm, setPlayerTerm] = useState(2);
   const [msg, setMsg] = useState<string | null>(null);
   const decide = () => start(async () => {
-    const r = await decideArbitrationAction(row.id, row.teamId, Number(club) * 1e6, 1, Number(player) * 1e6, 1);
+    const r = await decideArbitrationAction(row.id, row.teamId, Number(club) * 1e6, clubTerm, Number(player) * 1e6, playerTerm);
     setMsg(r.ok ? `Verdikt: ${M(r.award)} × ${r.term} rok (pásmo ${M(r.low)}–${M(r.high)}).` : r.error);
   });
   if (row.status !== "ARB_FILED") return null;
-  return <div className="mt-2 text-xs">
-    <div className="mb-2 flex flex-wrap gap-x-3 gap-y-1 text-slate-400">Porovnateľní hráči: {row.comparables.map((p) => <span key={p.id}>{p.name} <b className="text-slate-200">{M(p.capHit)}</b> · {p.overall ?? "—"} OVR</span>)}</div>
-    <div className="flex flex-wrap items-center gap-2">
-    <input value={club} onChange={(e) => setClub(e.target.value)} placeholder="Klub AAV $M" inputMode="decimal" className="w-28 rounded border border-slate-700 bg-slate-950 px-2 py-1.5" />
-    <input value={player} onChange={(e) => setPlayer(e.target.value)} placeholder="Hráč AAV $M" inputMode="decimal" className="w-28 rounded border border-slate-700 bg-slate-950 px-2 py-1.5" />
-    <button onClick={decide} disabled={pending} className="rounded bg-violet-600 px-2 py-1.5 font-semibold disabled:opacity-50">Rozhodnúť hearing</button>
-    {msg && <span className={msg.startsWith("Verdikt") ? "text-emerald-300" : "text-rose-300"}>{msg}</span>}
+  const input = "w-24 rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-slate-100";
+  const select = "rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-slate-100";
+  return <div className="mt-3 space-y-3 rounded-xl border border-violet-500/20 bg-violet-500/5 p-3 text-xs">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <span className="font-bold uppercase tracking-wide text-violet-300">Arbitration hearing</span>
+      {row.range && <span className="rounded-full bg-slate-950/60 px-2.5 py-1 text-slate-300">Povolené pásmo: <b className="text-emerald-300">{M(row.range.low)} – {M(row.range.high)}</b></span>}
+    </div>
+    <div>
+      <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">Porovnateľní hráči</div>
+      <div className="grid gap-1 sm:grid-cols-2">{row.comparables.map((p) => <div key={p.id} className="flex items-center justify-between rounded-lg bg-slate-950/50 px-2.5 py-1.5"><span className="truncate text-slate-300">{p.name}</span><span className="ml-2 shrink-0 text-slate-500"><b className="text-slate-200">{M(p.capHit)}</b> · {p.overall ?? "—"} OVR</span></div>)}</div>
+    </div>
+    <div className="grid gap-2 sm:grid-cols-2">
+      <div className="rounded-lg bg-slate-950/50 p-2.5"><div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-sky-300">Návrh klubu</div>
+        <div className="flex items-center gap-2"><input value={club} onChange={(e) => setClub(e.target.value)} inputMode="decimal" className={input} /><span className="text-slate-500">$M ×</span><select value={clubTerm} onChange={(e) => setClubTerm(Number(e.target.value))} className={select}><option value={1}>1 rok</option><option value={2}>2 roky</option></select></div></div>
+      <div className="rounded-lg bg-slate-950/50 p-2.5"><div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-amber-300">Návrh hráča</div>
+        <div className="flex items-center gap-2"><input value={player} onChange={(e) => setPlayer(e.target.value)} inputMode="decimal" className={input} /><span className="text-slate-500">$M ×</span><select value={playerTerm} onChange={(e) => setPlayerTerm(Number(e.target.value))} className={select}><option value={1}>1 rok</option><option value={2}>2 roky</option></select></div></div>
+    </div>
+    <div className="flex flex-wrap items-center gap-3">
+      <button onClick={decide} disabled={pending} className="rounded-lg bg-violet-600 px-3 py-1.5 font-semibold text-white hover:bg-violet-500 disabled:opacity-50">Rozhodnúť hearing</button>
+      {msg && <span className={msg.startsWith("Verdikt") ? "text-emerald-300" : "text-rose-300"}>{msg}</span>}
     </div>
   </div>;
 }
