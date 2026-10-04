@@ -645,6 +645,7 @@ model RfaCase {
   playerAskTerm     Int?
   awardAav          Int?
   awardTerm         Int?
+  awardContractType String?  // ONE_WAY | TWO_WAY — chosen at the hearing, applied when the award is signed
   walkAwayThreshold Int?
   walkAwayDeadline  DateTime?
   walkAwayAt        DateTime?

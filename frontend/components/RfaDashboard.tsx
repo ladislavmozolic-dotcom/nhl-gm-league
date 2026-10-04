@@ -7,7 +7,7 @@ import { acceptArbitrationAwardAction, decideArbitrationAction, fileArbitrationA
 
 type Row = {
   id: number; teamId: number; status: string; qoAmount: number; qoDueAt: string; qoTenderedAt: string | null; arbEligible: boolean;
-  awardAav: number | null; awardTerm: number | null; walkAwayThreshold: number | null;
+  awardAav: number | null; awardTerm: number | null; awardContractType: string | null; walkAwayThreshold: number | null;
   offerSheetRisk: "Low" | "Medium" | "High";
   comparables: { id: number; name: string; capHit: number | null; overall: number | null; age: number | null }[];
   player: { id: number; name: string; position: string; age: number | null; capHit: number | null; overall: number | null };
@@ -25,11 +25,12 @@ function Hearing({ row }: { row: Row }) {
   const lo = row.range?.low ?? row.qoAmount;
   const hi = row.range?.high ?? row.qoAmount;
   const [club, setClub] = useState((lo / 1e6).toFixed(2)); const [player, setPlayer] = useState((hi / 1e6).toFixed(2));
+  const [type, setType] = useState<"ONE_WAY" | "TWO_WAY">("ONE_WAY");
   const [clubTerm, setClubTerm] = useState(1); const [playerTerm, setPlayerTerm] = useState(2);
   const [msg, setMsg] = useState<string | null>(null);
   const decide = () => start(async () => {
-    const r = await decideArbitrationAction(row.id, row.teamId, Number(club) * 1e6, clubTerm, Number(player) * 1e6, playerTerm);
-    setMsg(r.ok ? `Verdikt: ${M(r.award)} × ${r.term} rok (pásmo ${M(r.low)}–${M(r.high)}).` : r.error);
+    const r = await decideArbitrationAction(row.id, row.teamId, Number(club) * 1e6, clubTerm, Number(player) * 1e6, playerTerm, type);
+    setMsg(r.ok ? `Verdikt: ${M(r.award)} × ${r.term} rok, ${r.contractType === "TWO_WAY" ? "two-way" : "one-way"} (pásmo ${M(r.low)}–${M(r.high)}).` : r.error);
   });
   if (row.status !== "ARB_FILED") return null;
   const input = "w-24 rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-slate-100";
@@ -48,6 +49,10 @@ function Hearing({ row }: { row: Row }) {
         <div className="flex items-center gap-2"><input value={club} onChange={(e) => setClub(e.target.value)} inputMode="decimal" className={input} /><span className="text-slate-500">$M ×</span><select value={clubTerm} onChange={(e) => setClubTerm(Number(e.target.value))} className={select}><option value={1}>1 rok</option><option value={2}>2 roky</option></select></div></div>
       <div className="rounded-lg bg-slate-950/50 p-2.5"><div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-amber-300">Návrh hráča</div>
         <div className="flex items-center gap-2"><input value={player} onChange={(e) => setPlayer(e.target.value)} inputMode="decimal" className={input} /><span className="text-slate-500">$M ×</span><select value={playerTerm} onChange={(e) => setPlayerTerm(Number(e.target.value))} className={select}><option value={1}>1 rok</option><option value={2}>2 roky</option></select></div></div>
+    </div>
+    <div className="rounded-lg bg-slate-950/50 p-2.5">
+      <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">Typ zmluvy</div>
+      <div className="flex flex-wrap gap-2">{([["ONE_WAY", "One-way", "NHL plat celý rok, nemožno poslať na farmu"], ["TWO_WAY", "Two-way", "farmársky plat $0.10M pri pobyte v AHL; hráč ho nemusí prijať"]] as const).map(([k, t, d]) => <button key={k} type="button" onClick={() => setType(k)} className={`rounded-lg border px-3 py-1.5 text-left transition-colors ${type === k ? "border-violet-500 bg-violet-500/20 text-violet-100" : "border-slate-700 bg-slate-900 text-slate-400 hover:text-slate-200"}`}><b>{t}</b><span className="block text-[10px] opacity-70">{d}</span></button>)}</div>
     </div>
     <div className="flex flex-wrap items-center gap-3">
       <button onClick={decide} disabled={pending} className="rounded-lg bg-violet-600 px-3 py-1.5 font-semibold text-white hover:bg-violet-500 disabled:opacity-50">Rozhodnúť hearing</button>
@@ -79,7 +84,7 @@ function RfaRow({ r, pending, run }: { r: Row; pending: boolean; run: (fn: () =>
       <div className="rounded-lg bg-slate-950/50 px-2.5 py-1.5"><div className="text-[10px] uppercase tracking-wide text-slate-500">Arbitráž</div><b className={r.arbEligible ? "text-violet-300" : "text-slate-400"}>{r.arbEligible ? "eligible" : "nie"}</b></div>
       <div className="rounded-lg bg-slate-950/50 px-2.5 py-1.5"><div className="text-[10px] uppercase tracking-wide text-slate-500">OS riziko</div><Risk level={r.offerSheetRisk} /></div>
     </div>
-    {r.awardAav && <div className="mt-2 text-xs text-emerald-300">Arbitrážny verdikt: <b>{M(r.awardAav)} × {r.awardTerm}r</b></div>}
+    {r.awardAav && <div className="mt-2 text-xs text-emerald-300">Arbitrážny verdikt: <b>{M(r.awardAav)} × {r.awardTerm}r · {r.awardContractType === "TWO_WAY" ? "two-way" : "one-way"}</b></div>}
     <div className="mt-3 flex flex-wrap gap-2 text-xs">
       {r.status === "QO_DUE" && <button disabled={pending} onClick={() => run(() => tenderQualifyingOfferAction(r.id, r.teamId))} className="rounded-lg bg-sky-700 px-2.5 py-1.5 font-semibold text-white hover:bg-sky-600 disabled:opacity-50">Tender QO</button>}
       {["QO_TENDERED", "NEGOTIATING", "OS_ELIGIBLE"].includes(r.status) && r.arbEligible && <>
