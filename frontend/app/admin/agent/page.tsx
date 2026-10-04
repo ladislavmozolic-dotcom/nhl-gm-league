@@ -5,6 +5,7 @@ import { PageHeader, Card, BackPill } from "@/components/ui";
 import { cleanName } from "@/lib/playerName";
 import DeleteFaOfferButton from "@/components/DeleteFaOfferButton";
 import CancelQoButton from "@/components/CancelQoButton";
+import ForceVerdictButton from "@/components/ForceVerdictButton";
 import AdminResignTable, { type ResignRowData } from "@/components/admin/AdminResignTable";
 import { getLeagueClock } from "@/lib/calendar-server";
 import { loadSettings } from "@/lib/sim/settings";
@@ -467,10 +468,10 @@ export default async function AdminAgentPage() {
                       {c.player.overall != null && <span className="ml-1 text-[11px] font-black px-1.5 rounded bg-blue-950/60 text-blue-300 border border-blue-900/50">{c.player.overall}</span>}
                     </td>
                     <td className="px-3 py-3 font-bold text-slate-200">{c.team.parentTeam?.code ?? c.team.code ?? c.team.name}{c.team.parentTeam ? <span className="ml-1 text-[11px] font-normal text-slate-500">farm</span> : null}</td>
-                    <td className="px-3 py-3"><span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-950/60 text-sky-300 border border-sky-800/50">{qoStatusLabel[c.status] ?? c.status}</span></td>
+                    <td className="px-3 py-3"><span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-950/60 text-sky-300 border border-sky-800/50">{qoStatusLabel[c.status] ?? c.status}</span>{c.status === "ARB_FILED" && c.arbFiledAt && <span className="block text-[10px] text-slate-500 mt-0.5">verdikt do {fmtDate(new Date(c.arbFiledAt.getTime() + 48 * 3_600_000))}</span>}</td>
                     <td className="px-3 py-3 text-right tabular-nums font-mono font-bold text-white">{fmtM(c.qoAmount)}</td>
                     <td className="px-3 py-3 text-right text-xs tabular-nums whitespace-nowrap font-mono text-slate-300">{c.qoTenderedAt ? fmtDate(c.qoTenderedAt) : "—"}</td>
-                    <td className="px-4 py-3 text-right"><CancelQoButton caseId={c.id} name={cleanName(c.player.name)} deadlinePassed={c.qoDueAt < new Date()} /></td>
+                    <td className="px-4 py-3 text-right"><span className="inline-flex items-center gap-2">{c.status === "ARB_FILED" && <ForceVerdictButton caseId={c.id} name={cleanName(c.player.name)} />}<CancelQoButton caseId={c.id} name={cleanName(c.player.name)} deadlinePassed={c.qoDueAt < new Date()} /></span></td>
                   </tr>
                 ))}
               </tbody>

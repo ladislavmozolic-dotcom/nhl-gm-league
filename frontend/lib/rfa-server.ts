@@ -5,6 +5,7 @@ import { getLeagueDate } from "@/lib/calendar-server";
 import { loadSettings } from "@/lib/sim/settings";
 import { ufaAtExpiry } from "@/lib/free-agency-server";
 import { CURRENT_SEASON_START } from "@/lib/finance";
+import { twoWayObjection } from "@/lib/free-agency";
 
 export const RFA_OPEN_STATUSES = ["QO_DUE", "QO_TENDERED", "NEGOTIATING", "ARB_FILED", "AWARDED", "OS_ELIGIBLE"];
 
@@ -133,4 +134,62 @@ export async function qoFormInfo(players: QoFormPlayer[]): Promise<Map<number, Q
 
 export function qoOneWayMessage(i: QoFormInfo) {
   return `The CBA requires a one-way QO for him: ${i.gp3} NHL games in the last 3 seasons (180+), ${i.gpLast} last season (60+), no waivers. A two-way is only possible for players who miss one of these.`;
+}
+
+
+export const ARBITRATION_VERDICT_HOURS = 48;
+
+/** Deliver one arbitration verdict. The arbitrator picks a salary inside the comparables range
+ *  (midpoint of the club's and the player's submissions — by default the range's low and high),
+ *  and the term (1 or 2 years) is chosen by the side that did NOT start the arbitration: a
+ *  club filing hands the player the choice (he bets on himself: 1 year), a player filing hands
+ *  the club the choice (2 years of cost certainty — 1 if the award is walk-away money). The
+ *  club then has 48h to sign it or, at/above the walk-away threshold, walk. */
+export async function issueArbitrationVerdict(caseId: number): Promise<{ ok: boolean; award?: number; term?: number; error?: string }> {
+  const c = await prisma.rfaCase.findUnique({ where: { id: caseId }, include: { player: true, team: { select: { id: true, parentTeam: { select: { id: true } } } } } });
+  if (!c || c.status !== "ARB_FILED") return { ok: false, error: "No open arbitration hearing." };
+  const s = await loadSettings();
+  const range = await arbitrationRange(c.playerId, c.qoAmount);
+  const r50 = (v: number) => Math.round(v / 50_000) * 50_000;
+  const clubAsk = c.clubAskAav ?? range.low;
+  const playerAsk = c.playerAskAav ?? range.high;
+  const award = Math.max(range.low, Math.min(range.high, r50((clubAsk + playerAsk) / 2)));
+  const playerPicks = c.arbFiledBy !== "PLAYER"; // the side that did not file chooses the term
+  let term = playerPicks ? 1 : (award >= s.arbWalkAwayThreshold ? 1 : 2);
+  const twoWayOpts = {
+    olderAge: s.faTwoWayOlderAge, gpLimit: s.faTwoWayNhlGpLimit, weakOverall: s.faTwoWayWeakOverall,
+    maxYears: s.faTwoWayMaxYears, ahlMaxYears: s.faTwoWayAhlMaxYears, fewGpMaxYears: s.faTwoWayFewGpMaxYears, maxSalary: s.faTwoWayMaxSalary,
+  };
+  let type: "ONE_WAY" | "TWO_WAY" = "ONE_WAY";
+  if (c.player.contractType === "TWO_WAY") {
+    // a two-way player stays two-way when the award and term are allowed for one (else one-way)
+    if (!twoWayObjection(true, c.player, term, award, twoWayOpts)) type = "TWO_WAY";
+    else if (term > 1 && !twoWayObjection(true, c.player, 1, award, twoWayOpts)) { term = 1; type = "TWO_WAY"; }
+  }
+  const now = new Date();
+  await prisma.rfaCase.update({ where: { id: caseId }, data: {
+    status: "AWARDED", clubAskAav: Math.round(clubAsk), clubAskTerm: c.clubAskTerm ?? 2, playerAskAav: Math.round(playerAsk), playerAskTerm: c.playerAskTerm ?? 1,
+    awardAav: award, awardTerm: term, awardContractType: type, walkAwayThreshold: s.arbWalkAwayThreshold,
+    walkAwayDeadline: new Date(now.getTime() + 48 * 60 * 60 * 1000),
+  } });
+  // tell the club (DM from the Free Agents holding club — same sender as the agent messages)
+  const fa = await prisma.team.findFirst({ where: { league: "FA" }, select: { id: true } });
+  const clubId = c.team.parentTeam?.id ?? c.team.id;
+  const M = (v: number) => `$${(v / 1e6).toFixed(2)}M`;
+  if (fa) {
+    await prisma.dmMessage.create({ data: { fromTeamId: fa.id, toTeamId: clubId, body:
+      `⚖️ Arbitration verdict for ${c.player.name}: ${M(award)} × ${term}yr (${type === "TWO_WAY" ? "two-way" : "one-way"}), term chosen by the ${playerPicks ? "player" : "club"}. `
+      + (award >= s.arbWalkAwayThreshold ? `It is at/above the ${M(s.arbWalkAwayThreshold)} walk-away line — you have 48 hours to sign it or walk away (he becomes a UFA).` : `It is below the ${M(s.arbWalkAwayThreshold)} walk-away line — you must sign it.`),
+      tradeUrl: "/rfa" } }).catch(() => {});
+  }
+  return { ok: true, award, term };
+}
+
+/** The arbitrator rules within 48 hours of the filing — nobody has to click anything. */
+export async function resolveArbitrationVerdicts(now?: Date) {
+  const effectiveNow = now ?? new Date();
+  const due = await prisma.rfaCase.findMany({ where: { status: "ARB_FILED", arbFiledAt: { lte: new Date(effectiveNow.getTime() - ARBITRATION_VERDICT_HOURS * 3_600_000) } }, select: { id: true } });
+  let n = 0;
+  for (const c of due) { const r = await issueArbitrationVerdict(c.id).catch(() => ({ ok: false })); if (r.ok) n++; }
+  return n;
 }

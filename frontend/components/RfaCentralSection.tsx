@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { qoFormInfo, arbitrationRange, ensureRfaCases, resolveExpiredQODueDates } from "@/lib/rfa-server";
+import { qoFormInfo, arbitrationRange, ensureRfaCases, resolveExpiredQODueDates, resolveArbitrationVerdicts } from "@/lib/rfa-server";
 import { Card } from "@/components/ui";
 import RfaDashboard from "@/components/RfaDashboard";
 
@@ -18,6 +18,7 @@ export default async function RfaCentralSection({ teamId }: { teamId?: number })
     await ensureRfaCases(undefined);
   }
   await resolveExpiredQODueDates();
+  await resolveArbitrationVerdicts();
   const rows = await prisma.rfaCase.findMany({
     where: orgIds ? { teamId: { in: orgIds } } : undefined,
     include: {

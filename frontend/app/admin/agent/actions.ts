@@ -295,3 +295,12 @@ export async function cancelQualifyingOfferAction(caseId: number) {
   revalidatePath("/offer-sheets");
   return { ok: true as const };
 }
+
+/** Commissioner shortcut: issue an open arbitration verdict now instead of waiting the 48 hours. */
+export async function forceArbitrationVerdictAction(caseId: number) {
+  if (!(await isAdmin())) return { ok: false as const, error: "Admin only." };
+  const { issueArbitrationVerdict } = await import("@/lib/rfa-server");
+  const r = await issueArbitrationVerdict(caseId);
+  revalidatePath("/admin/agent"); revalidatePath("/rfa");
+  return r.ok ? { ok: true as const, award: r.award, term: r.term } : { ok: false as const, error: r.error ?? "Failed" };
+}

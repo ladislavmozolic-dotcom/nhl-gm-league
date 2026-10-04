@@ -16,7 +16,7 @@ import { playPreseasonDay, recoverPreseasonIdleTeams, PRE_SEASON } from "@/lib/p
 import { postWeeklyIfDue } from "@/lib/weekly-digest";
 import { resolveFrenzy, processRoundEnd, resolveInSeasonWindows } from "@/app/free-agents/actions";
 import { sweepExpiredContractsToUfa, sweepUnsignedRfasToNonRoster } from "@/lib/free-agency-server";
-import { ensureRfaCases, resolveExpiredQODueDates } from "@/lib/rfa-server";
+import { ensureRfaCases, resolveExpiredQODueDates, resolveArbitrationVerdicts } from "@/lib/rfa-server";
 import { checkPromises } from "@/lib/promises";
 import { checkIceTimeMorale, recoverMoraleOffDays } from "@/lib/player-morale";
 import { leagueCapCompliance } from "@/lib/cap";
@@ -76,6 +76,7 @@ export async function simulateLeagueDay(day: Date) {
   // the daily resolver makes a missed qualifying offer an actual loss of rights.
   await ensureRfaCases().catch((e) => console.error("[rfa] bootstrap", e));
   await resolveExpiredQODueDates(day).catch((e) => console.error("[rfa] QO deadlines", e));
+  await resolveArbitrationVerdicts().catch((e) => console.error("[rfa] arbitration verdicts", e));
   if (dayGames.length && dayGames[0].round != null) {
     await autoFillRosters("NHL");
     await fillAhlFromScratched();
