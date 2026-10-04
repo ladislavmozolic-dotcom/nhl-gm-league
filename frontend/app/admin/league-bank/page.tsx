@@ -65,7 +65,7 @@ export default async function LeagueBankPage() {
           <div className="md:col-span-2"><button className={btn}>Save</button></div>
         </form>
         <form action={runEnforcementNow} className="mt-3"><button className="text-xs text-slate-400 hover:text-white underline">Run today&apos;s check now (ignores on/off &amp; start date; safe to repeat — one fine per club per day)</button></form>
-        <p className="text-[11px] text-slate-500 mt-2">The check runs by itself once a day from 08:00 Europe/Bratislava, only during the regular season (off-season and playoffs the cap may be exceeded by 10%). NHL roster = over 23 players or dressed ≠ 12F/6D/2G; AHL roster = dressed ≠ 12F/6D/2G or organisation over 55. Each club sees its own fines on its Finance page.</p>
+        <p className="text-[11px] text-slate-500 mt-2">The check runs by itself once a day at 20:30 Europe/Bratislava (the evening sim time — clubs must be legal by then), only during the regular season (off-season and playoffs the cap may be exceeded by 10%). NHL roster = over 23 players or dressed ≠ 12F/6D/2G; AHL roster = dressed ≠ 12F/6D/2G or organisation over 55. Each club sees its own fines on its Finance page.</p>
       </Card>
 
       <Card title="Bonus · payout · manual fine" accent="text-blue-400">
