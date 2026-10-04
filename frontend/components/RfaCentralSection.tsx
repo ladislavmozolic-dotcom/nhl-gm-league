@@ -22,7 +22,7 @@ export default async function RfaCentralSection({ teamId }: { teamId?: number })
   const rows = await prisma.rfaCase.findMany({
     where: orgIds ? { teamId: { in: orgIds } } : undefined,
     include: {
-      player: { select: { id: true, name: true, position: true, age: true, capHit: true, overall: true, lastSeasonGP: true, mpSkater: true, careerGP: true } },
+      player: { select: { id: true, name: true, position: true, age: true, capHit: true, overall: true, lastSeasonGP: true, lastSeasonAhlGP: true, isGoalie: true, rosterType: true, mpSkater: true, careerGP: true } },
       team: { select: { id: true, code: true, name: true, isAffiliate: true, parentTeamId: true, parentTeam: { select: { id: true, code: true, name: true } } } },
     },
     orderBy: [{ qoDueAt: "asc" }, { player: { name: "asc" } }],
@@ -36,7 +36,7 @@ export default async function RfaCentralSection({ teamId }: { teamId?: number })
     const offerSheetRisk = r.status === "OS_ELIGIBLE" ? (ovr >= 72 ? "High" : ovr >= 62 ? "Medium" : "Low") : "Low";
     const { parentTeam, parentTeamId, id: _id, ...team } = r.team;
     const org = parentTeam ?? { id: r.team.id, code: r.team.code, name: r.team.name };
-    const { mpSkater: _mp, careerGP: _cg, lastSeasonGP: _gp, ...player } = r.player;
+    const { mpSkater: _mp, careerGP: _cg, lastSeasonGP: _gp, lastSeasonAhlGP: _lah, isGoalie: _ig, rosterType: _rt, ...player } = r.player;
     return {
       ...r, player, team, org, qoForm: forms.get(r.playerId)!,
       qoDueAt: r.qoDueAt.toISOString(), qoTenderedAt: r.qoTenderedAt?.toISOString() ?? null,

@@ -100,9 +100,24 @@ export async function arbitrationRange(playerId: number, qo: number) {
 export const QO_ONE_WAY_GP_3Y = 180;
 export const QO_ONE_WAY_GP_LAST = 60;
 
-export type QoFormInfo = { oneWayRequired: boolean; gp3: number; gpLast: number; waived: boolean };
+export type QoFormInfo = {
+  oneWayRequired: boolean;
+  gp3: number;
+  gpLast: number;
+  waived: boolean;
+  isGoalie: boolean;
+  gpStartedLast?: number;
+};
 
-type QoFormPlayer = { id: number; lastSeasonGP: number | null; mpSkater: unknown; careerGP: unknown };
+export type QoFormPlayer = {
+  id: number;
+  lastSeasonGP: number | null;
+  lastSeasonAhlGP?: number | null;
+  isGoalie?: boolean | null;
+  rosterType?: string | null;
+  mpSkater?: unknown;
+  careerGP?: unknown;
+};
 
 /** Games over the last 3 seasons: MoneyPuck per-season totals when present; goalies/others
  *  without them fall back to career regular-season games (an upper bound), then last season. */
@@ -117,6 +132,36 @@ function gamesLast3(p: QoFormPlayer): number {
   return Math.max(last, typeof career === "number" ? career : 0);
 }
 
+/** CBA Goaltender dressed rule:
+ *  For goalies, CBA counts games DRESSED (starter OR backup on the bench).
+ *  An established NHL tandem goalie (25+ starts, no farm stint) was dressed for almost all ~82 games.
+ *  A farm call-up (under 15 starts, AHL GP) was only dressed for a fraction. */
+function goalieDressedEstimates(p: QoFormPlayer): { dressedLast: number; dressed3y: number; startedLast: number } {
+  const startedLast = p.lastSeasonGP ?? 0;
+  const ahlGP = p.lastSeasonAhlGP ?? 0;
+  const career = (p.careerGP as { reg?: number; po?: number } | null)?.reg ?? startedLast;
+
+  let dressedLast = startedLast;
+  if (startedLast >= 60) {
+    dressedLast = startedLast;
+  } else if (startedLast >= 25 && ahlGP <= 5) {
+    dressedLast = Math.min(82, Math.round(startedLast + (82 - startedLast) * 0.8));
+  } else if (startedLast > 0 && ahlGP <= 15) {
+    dressedLast = Math.min(82, Math.round(startedLast * 1.5));
+  } else {
+    dressedLast = startedLast;
+  }
+
+  let dressed3y = dressedLast;
+  if (career >= 80 && ahlGP <= 10) {
+    dressed3y = Math.min(246, Math.round(career * 1.8));
+  } else {
+    dressed3y = Math.min(246, Math.round(career * 1.3));
+  }
+
+  return { dressedLast, dressed3y, startedLast };
+}
+
 /** Batch version — one waiver query for all players. "Since camp" is approximated by the
  *  last 365 days of recorded waiver placements. */
 export async function qoFormInfo(players: QoFormPlayer[]): Promise<Map<number, QoFormInfo>> {
@@ -126,15 +171,60 @@ export async function qoFormInfo(players: QoFormPlayer[]): Promise<Map<number, Q
     select: { playerId: true },
   }) : [];
   const waived = new Set(waivers.map((w) => w.playerId));
-  return new Map(players.map((p) => {
-    const gp3 = gamesLast3(p), gpLast = p.lastSeasonGP ?? 0, w = waived.has(p.id);
-    return [p.id, { oneWayRequired: gp3 >= QO_ONE_WAY_GP_3Y && gpLast >= QO_ONE_WAY_GP_LAST && !w, gp3, gpLast, waived: w }];
+
+  const goalieIds = players.filter((p) => p.isGoalie).map((p) => p.id);
+  const goalieStatsCount = new Map<number, number>();
+  if (goalieIds.length) {
+    const rows = await prisma.goalieGameStat.groupBy({
+      by: ["playerId"],
+      where: { playerId: { in: goalieIds } },
+      _count: { gameId: true },
+    });
+    for (const r of rows) {
+      goalieStatsCount.set(r.playerId, r._count.gameId);
+    }
+  }
+
+  return new Map<number, QoFormInfo>(players.map((p) => {
+    const isGoalie = !!p.isGoalie;
+    const w = waived.has(p.id);
+
+    if (isGoalie) {
+      const gSim = goalieStatsCount.get(p.id);
+      const est = goalieDressedEstimates(p);
+      const gpLast = gSim && gSim >= est.dressedLast ? gSim : est.dressedLast;
+      const gp3 = Math.max(gpLast, est.dressed3y);
+      const oneWayRequired = gp3 >= QO_ONE_WAY_GP_3Y && gpLast >= QO_ONE_WAY_GP_LAST && !w;
+      return [p.id, {
+        oneWayRequired,
+        gp3,
+        gpLast,
+        waived: w,
+        isGoalie: true,
+        gpStartedLast: est.startedLast,
+      }];
+    }
+
+    const gp3 = gamesLast3(p);
+    const gpLast = p.lastSeasonGP ?? 0;
+    const oneWayRequired = gp3 >= QO_ONE_WAY_GP_3Y && gpLast >= QO_ONE_WAY_GP_LAST && !w;
+    return [p.id, {
+      oneWayRequired,
+      gp3,
+      gpLast,
+      waived: w,
+      isGoalie: false,
+    }];
   }));
 }
 
 export function qoOneWayMessage(i: QoFormInfo) {
+  if (i.isGoalie) {
+    return `The CBA requires a one-way QO for this goaltender: ~${i.gp3} NHL games dressed/backup in the last 3 seasons (180+), ~${i.gpLast} last season (60+, ${i.gpStartedLast ?? 0} started), no waivers. A two-way is only possible for goalies who miss one of these.`;
+  }
   return `The CBA requires a one-way QO for him: ${i.gp3} NHL games in the last 3 seasons (180+), ${i.gpLast} last season (60+), no waivers. A two-way is only possible for players who miss one of these.`;
 }
+
 
 
 export const ARBITRATION_VERDICT_HOURS = 48;

@@ -8,7 +8,7 @@ import { acceptArbitrationAwardAction, decideArbitrationAction, fileArbitrationA
 type Row = {
   id: number; teamId: number; status: string; qoAmount: number; qoDueAt: string; qoTenderedAt: string | null; arbEligible: boolean;
   awardAav: number | null; awardTerm: number | null; awardContractType: string | null; qoContractType: string | null;
-  qoForm: { oneWayRequired: boolean; gp3: number; gpLast: number; waived: boolean }; walkAwayThreshold: number | null;
+  qoForm: { oneWayRequired: boolean; gp3: number; gpLast: number; waived: boolean; isGoalie?: boolean; gpStartedLast?: number }; walkAwayThreshold: number | null;
   offerSheetRisk: "Low" | "Medium" | "High";
   comparables: { id: number; name: string; capHit: number | null; overall: number | null; age: number | null }[];
   player: { id: number; name: string; position: string; age: number | null; capHit: number | null; overall: number | null };
@@ -85,7 +85,20 @@ function RfaRow({ r, pending, run }: { r: Row; pending: boolean; run: (fn: () =>
       <div className="rounded-lg bg-slate-950/50 px-2.5 py-1.5"><div className="text-[10px] uppercase tracking-wide text-slate-500">Arbitráž</div><b className={r.arbEligible ? "text-violet-300" : "text-slate-400"}>{r.arbEligible ? "eligible" : "nie"}</b></div>
       <div className="rounded-lg bg-slate-950/50 px-2.5 py-1.5"><div className="text-[10px] uppercase tracking-wide text-slate-500">OS riziko</div><Risk level={r.offerSheetRisk} /></div>
     </div>
-    {r.status === "QO_DUE" && <p className={`mt-2 text-[11px] ${r.qoForm.oneWayRequired ? "text-amber-300" : "text-slate-500"}`}>{r.qoForm.oneWayRequired ? "⚠ CBA: povinná one-way QO — " : "Two-way QO je možná — "}{r.qoForm.gp3} GP za 3 sezóny (limit 180) · {r.qoForm.gpLast} GP minulú sezónu (limit 60) · {r.qoForm.waived ? "bol na waiveroch" : "bez waiverov"}</p>}
+    {r.status === "QO_DUE" && (
+      <p className={`mt-2 text-[11px] ${r.qoForm.oneWayRequired ? "text-amber-300" : "text-slate-500"}`}>
+        {r.qoForm.oneWayRequired ? "⚠ CBA: povinná one-way QO — " : "Two-way QO je možná — "}
+        {r.qoForm.isGoalie ? (
+          <>
+            <span className="font-semibold text-slate-300">[Brankár: súpiska/dvojka]</span> ~{r.qoForm.gp3} na súpiske za 3 sezóny (limit 180) · ~{r.qoForm.gpLast} na súpiske vlani (limit 60, {r.qoForm.gpStartedLast ?? 0} odchytaných) · {r.qoForm.waived ? "bol na waiveroch" : "bez waiverov"}
+          </>
+        ) : (
+          <>
+            {r.qoForm.gp3} GP za 3 sezóny (limit 180) · {r.qoForm.gpLast} GP minulú sezónu (limit 60) · {r.qoForm.waived ? "bol na waiveroch" : "bez waiverov"}
+          </>
+        )}
+      </p>
+    )}
     {r.awardAav && <div className="mt-2 text-xs text-emerald-300">Arbitrážny verdikt: <b>{M(r.awardAav)} × {r.awardTerm}r · {r.awardContractType === "TWO_WAY" ? "two-way" : "one-way"}</b></div>}
     <div className="mt-3 flex flex-wrap gap-2 text-xs">
       {r.status === "QO_DUE" && <>
