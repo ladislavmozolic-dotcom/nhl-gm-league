@@ -227,17 +227,22 @@ export async function autoEvaluateGamePicksIfDue(now: Date = new Date()): Promis
 }
 
 /**
- * Called on every 5-minute tick. Once per Europe/Bratislava day (from 08:00 on, so
- * the previous night's roster moves are settled) charges the League Bank fines for
+ * Called on every 5-minute tick. Once per Europe/Bratislava day (from 20:30 on, the
+ * evening sim time — every club must be legal by then) charges the League Bank fines for
  * non-compliant NHL / AHL rosters and days over the cap. Independent of the pinned
  * league phase — fines follow the real calendar. Idempotent per day.
  */
 export async function enforceLeagueBankIfDue(now: Date = new Date()) {
-  const { dateStr, hour } = bratislavaParts(now);
+  const { dateStr, hour, minute } = bratislavaParts(now);
   if (hour < 8) return { ran: false, reason: "before 08:00 Europe/Bratislava" };
   const { getBank, enforceLeagueDay } = await import("@/lib/league-bank-server");
   const { payPicksIfDue } = await import("@/lib/league-bank-server");
   const picks = await payPicksIfDue(now, hour).catch((e) => ({ ran: false, reason: `picks error: ${(e as Error).message}` }));
+  // Cap/roster compliance is judged at the evening sim time (20:30), not in the morning —
+  // clubs have the whole day to get legal, and the snapshot is the roster the sim plays with.
+  if (hour < TRIGGER_HOUR || (hour === TRIGGER_HOUR && minute < TRIGGER_MINUTE)) {
+    return { ran: false, reason: `compliance is checked at ${TRIGGER_HOUR}:${TRIGGER_MINUTE} Europe/Bratislava`, picks };
+  }
   const bank = await getBank();
   if (bank.lastEnforcedDay === dateStr) return { ran: false, reason: "already enforced today", picks };
   return { ...(await enforceLeagueDay(dateStr)), picks };
