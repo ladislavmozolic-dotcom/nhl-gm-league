@@ -258,6 +258,16 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
       await prisma.$executeRawUnsafe(
         `UPDATE "Player" SET condition = LEAST(100, condition + CASE WHEN "isGoalie" THEN ${goalieRec} ELSE ${skaterRec} END) WHERE "injuryDaysLeft" <= 0 AND condition < 100 AND "teamId" NOT IN (${playingTeams.join(",")})`
       );
+      // A goalie who SAT on a club that plays tonight (the backup, or a starter being rested) must
+      // recover too — the NOT IN above only covers clubs that are idle tonight, so a goalie on a
+      // team playing most days never got a rest-day bump. Anyone who started on the last played
+      // game day (a back-to-back) gets nothing, like before.
+      const lastDay = lastPlayed._max.round;
+      if (lastDay != null) {
+        await prisma.$executeRawUnsafe(
+          `UPDATE "Player" SET condition = LEAST(100, condition + ${goalieRec}) WHERE "isGoalie" = true AND "injuryDaysLeft" <= 0 AND condition < 100 AND "teamId" IN (${playingTeams.join(",")}) AND id NOT IN (SELECT gs."playerId" FROM "GoalieGameStat" gs JOIN "Game" g ON g.id = gs."gameId" WHERE gs.started = true AND g.season = '${season.replace(/'/g, "")}' AND g.round = ${Number(lastDay)} AND g."seriesId" IS NULL)`
+        );
+      }
     }
   }
   const cache = new Map<number, SeasonTeam | null>();
