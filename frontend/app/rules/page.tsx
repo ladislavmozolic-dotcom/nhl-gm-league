@@ -127,7 +127,7 @@ const SECTIONS: Sec[] = [
       ] },
       { h: "Qualifying offer (QO)", points: [
         "Every RFA has a qualifying offer on RFA Central. Tender it by its deadline to keep the player's restricted rights. The QO is at least the league minimum and is normally based on his previous AAV; both the percentage and deadline are commissioner settings.",
-        "Missing the deadline releases the player's rights. Once his old contract has expired he becomes a normal UFA, and his former club can only sign him through the same open market as every other club.",
+        "Starting to negotiate with an RFA tenders his QO automatically, so a club that is already talking to him can't lose him to the deadline; a week before the deadline the club also gets a reminder (DM + banner on Team Contracts) listing every player still without a QO. Missing the deadline releases the player's rights. Once his old contract has expired he becomes a normal UFA, and his former club can only sign him through the same open market as every other club.",
         "A normal in-season Re-sign remains available and is always the cleanest outcome: signing the player closes his QO/arbitration case immediately. Arbitration is never required just to extend an RFA.",
       ] },
       { h: "Salary arbitration", points: [
@@ -139,7 +139,7 @@ const SECTIONS: Sec[] = [
         "Submit an offer — money, term, role, special teams, contract type, and any clause you'll grant. He never just refuses: every rejected offer gets a real counter-offer back, even a lowball first try.",
         "UFA: 2 rounds. Reject his 2nd counter and he walks to test the open market.",
         "RFA without your Franchise Tag: 1 round. Reject his counter and he's open to offer sheets from rival clubs.",
-        "RFA WITH your Franchise Tag: 2 rounds before he'd even be exposed to offer sheets.",
+        "RFA WITH your Franchise Tag: 2 rounds before he'd be exposed to offer sheets — after those two he is available to offer sheets just like any other RFA.",
         "An RFA who reaches offer sheets isn't gone — if nobody signs him there, he comes straight back to you, and from then on you negotiate directly, round after round, with no cap and no second trip to offer sheets.",
       ] },
       { h: "Offer sheets (RFA only)", points: [
@@ -148,7 +148,7 @@ const SECTIONS: Sec[] = [
         "An arbitration award closes the offer-sheet path: the player either signs the award or the club walks away and he enters normal UFA free agency.",
       ] },
       { h: "Franchise Tag", points: [
-        "One per club, RFA-age players only. While the tag is on him he's fully protected from offer sheets, however many rounds pass — you have to remove the tag yourself to expose him to the market.",
+        "One per club, RFA-age players only. The tag protects him from offer sheets through TWO re-sign rounds with you. If those two rounds end without a deal he becomes available to offer sheets like any other RFA (the tag falls away if a rival signs him); if nobody does, you keep negotiating with him directly.",
       ] },
       { h: "Release his rights instead", points: [
         "\"Release rights\" on Team Contracts (RFAs only) declares you won't extend him: he's priced and treated like a UFA from then on — no RFA discount, no ceiling — and hits the open market the instant his deal runs out, instead of staying tied to you. Reversible any time before he actually expires.",
@@ -536,7 +536,7 @@ const SECTIONS_CS: Sec[] = [
         "Jeho AI vybere jedinou nejlepší listinu, která zároveň splňuje jeho požadavek A překonává VAŠI poslední stojící nabídku — neexistuje starý NHL „právo dorovnat“, takže číslo vaší vlastní nabídky je to, co musí útočník skutečně překonat.",
       ] },
       { h: "Franšízový tag", points: [
-        "Jeden na klub, jen hráči ve věku RFA. Dokud na něm tag drží, je před nabídkovými listinami plně chráněný, ať uplyne jakkoliv mnoho kol — tag musíte sami sundat, aby byl trhu vystaven.",
+        "Jeden na klub, jen hráči ve věku RFA. Tag ho chrání před nabídkovými listinami během DVOU kol vyjednávání s vámi. Skončí-li obě kola bez dohody, stane se dostupným nabídkovým listinám jako každý jiný RFA (tag zmizí, pokud ho soupeř podepíše); nikdo-li ho nepodepíše, vyjednáváte s ním dál přímo.",
       ] },
       { h: "Uvolnění práv místo prodloužení", points: [
         "„Release rights“ na stránce Team Contracts (jen u RFA) prohlašuje, že hráče neprodloužíte: od té chvíle se oceňuje a chová jako UFA — žádná sleva RFA, žádný strop — a v okamžiku vypršení smlouvy padá rovnou na otevřený trh, místo aby zůstal vázaný na vás. Vratné kdykoliv, dokud mu smlouva skutečně nevyprší.",

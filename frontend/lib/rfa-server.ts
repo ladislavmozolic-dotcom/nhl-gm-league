@@ -283,3 +283,48 @@ export async function resolveArbitrationVerdicts(now?: Date) {
   for (const c of due) { const r = await issueArbitrationVerdict(c.id).catch(() => ({ ok: false })); if (r.ok) n++; }
   return n;
 }
+
+
+/** Opening negotiations with an RFA tenders his qualifying offer for the club. A club that is
+ *  already talking to him must not lose his rights to the QO deadline, and a QO is also what
+ *  makes him reachable by offer sheets afterwards. Cases that were opened AFTER their own
+ *  deadline (the club never had a window) are tendered too. Idempotent. */
+export async function autoTenderQo(playerId: number) {
+  const c = await prisma.rfaCase.findFirst({ where: { playerId, status: "QO_DUE" } });
+  if (!c) return false;
+  const today = await getLeagueDate();
+  if (c.qoDueAt < today && c.createdAt <= c.qoDueAt) return false; // a genuinely missed deadline is not undone here
+  await prisma.rfaCase.update({ where: { id: c.id }, data: { status: "QO_TENDERED", qoTenderedAt: new Date() } });
+  return true;
+}
+
+/** A week before the QO deadline: tell each club (once a day) which RFAs still have no QO. */
+export async function warnMissingQo(now?: Date) {
+  const today = now ?? await getLeagueDate();
+  const horizon = new Date(today.getTime() + 7 * 86_400_000);
+  const due = await prisma.rfaCase.findMany({
+    where: { status: "QO_DUE", qoDueAt: { gte: today, lte: horizon } },
+    include: { player: { select: { name: true } }, team: { select: { id: true, parentTeam: { select: { id: true } } } } },
+  });
+  if (!due.length) return 0;
+  const fa = await prisma.team.findFirst({ where: { league: "FA" }, select: { id: true } });
+  if (!fa) return 0;
+  const byClub = new Map<number, { names: string[]; due: Date }>();
+  for (const c of due) {
+    const club = c.team.parentTeam?.id ?? c.team.id;
+    const e = byClub.get(club) ?? { names: [], due: c.qoDueAt };
+    e.names.push(c.player.name); if (c.qoDueAt < e.due) e.due = c.qoDueAt;
+    byClub.set(club, e);
+  }
+  const since = new Date(Date.now() - 20 * 3_600_000);
+  let sent = 0;
+  for (const [clubId, e] of byClub) {
+    const recent = await prisma.dmMessage.findFirst({ where: { fromTeamId: fa.id, toTeamId: clubId, body: { startsWith: "⚠️ QO deadline" }, createdAt: { gte: since } }, select: { id: true } });
+    if (recent) continue;
+    const list = e.names.slice(0, 12).join(", ") + (e.names.length > 12 ? ` … (+${e.names.length - 12})` : "");
+    await prisma.dmMessage.create({ data: { fromTeamId: fa.id, toTeamId: clubId, tradeUrl: "/rfa", body:
+      `⚠️ QO deadline ${e.due.toISOString().slice(0, 10)}: ${e.names.length} RFA${e.names.length === 1 ? "" : "s"} still without a qualifying offer — ${list}. Tender the QO in RFA Central, or start negotiating with the player (that tenders it automatically). After the deadline an un-tendered RFA's rights are released and he becomes a UFA.` } }).catch(() => {});
+    sent++;
+  }
+  return sent;
+}

@@ -12,6 +12,7 @@ import {
   recordLowball, clearLowballs, lowballNote, lowballInsultCount,
   ufaAtExpiry, resignLockedUntil,
 } from "@/lib/free-agency-server";
+import { autoTenderQo } from "@/lib/rfa-server";
 import { MAX_TERM, faPosGroup, willingnessNote, twoWayObjection, type Deployment } from "@/lib/free-agency";
 import { loadSettings, saveSettings } from "@/lib/sim/settings";
 import { computeELC } from "@/lib/elc";
@@ -1342,8 +1343,11 @@ export async function extendContractAction(
     // in the simple system there are no RFA rights — everyone tests free agency.
     const isUFA = tw.faMode === "simple" || ufaAtExpiry(player);
     const isRFA = !isUFA;
-    const rfaPostOs = isRFA && !player.franchiseTag && player.rfaOsUsed;
+    const rfaPostOs = isRFA && player.rfaOsUsed;
     const maxRounds = isRFA ? (player.franchiseTag ? 2 : 1) : 2;
+    // Starting to negotiate with an RFA tenders his qualifying offer automatically — a club that is
+    // already talking to him must never lose his rights to a missed QO deadline.
+    if (isRFA) await autoTenderQo(playerId).catch(() => {});
     const walk = !rfaPostOs && nextRound > maxRounds;
     if (walk) {
       // RFA → offer-sheet eligible; UFA → tests free agency. Record the club's best
@@ -1361,7 +1365,7 @@ export async function extendContractAction(
         ok: false as const, walked: true, toUFA: !isRFA,
         reason: isRFA
           ? (player.franchiseTag
-              ? "Two rounds and no deal — as your franchise RFA he's now open to offer sheets. If nobody signs him there, talks with you resume."
+              ? "Two rounds and no deal — your Franchise Tag protection is over and he's now open to offer sheets. If nobody signs him there, talks with you resume."
               : "No deal — he'll wait to see if a rival submits an offer sheet. If nobody does, negotiations with you continue over the summer.")
           : "Two rounds and no deal — he'll test the market when the season ends." + insult,
       };

@@ -101,6 +101,19 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
         </Card>
       )}
 
+      {canManage && (() => {
+        const soon = new Date(Date.now() + 14 * 86_400_000);
+        const missing = expiring.filter((p) => { const c = rfaByPlayer.get(p.id); return c?.status === "QO_DUE" && c.qoDueAt >= new Date(Date.now() - 86_400_000) && c.qoDueAt <= soon; });
+        if (!missing.length) return null;
+        const first = missing.map((p) => rfaByPlayer.get(p.id)!.qoDueAt).sort((a, b) => a.getTime() - b.getTime())[0];
+        return (
+          <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+            <b>⚠️ QO deadline {first.toISOString().slice(0, 10)}</b> — {missing.length} RFA{missing.length === 1 ? "" : "s"} still without a qualifying offer: {missing.map((p) => p.name).join(", ")}.
+            Tender it in RFA Central, or start negotiating with the player (that tenders it automatically). Past the deadline his rights are released and he becomes a UFA.
+          </div>
+        );
+      })()}
+
       {(["UFA", "RFA"] as Group[]).map((g) =>
         groups[g].length === 0 ? null : canManage ? (
           <ReSignPanel key={g} teamId={teamId} title={META[g].title} blurb={META[g].blurb} accent={META[g].accent} group={g} franchiseEnabled={franchiseEnabled} canNegotiate={canNegotiate}

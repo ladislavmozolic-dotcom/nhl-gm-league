@@ -90,12 +90,12 @@ async function Board() {
           <div className="divide-y divide-slate-800/60">
             {rfas.map((p) => {
               const t = tById.get(p.teamId);
-              const eligible = p.resignStatus === "osEligible" && !p.franchiseTag;
+              const eligible = p.resignStatus === "osEligible";
               const mine = p.teamId === myTeam?.id;
               const existing = myByPlayer.get(p.id) ?? null;
 
               let status: { label: string; cls: string };
-              if (p.franchiseTag) status = { label: "Franchise — 2 rounds first", cls: "bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/30" };
+              if (p.franchiseTag && !eligible) status = { label: "Franchise — 2 rounds first", cls: "bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/30" };
               else if (eligible && !osWindow) status = { label: "Will be available for OS", cls: "bg-sky-500/15 text-sky-300 border-sky-500/30" };
               else status = { label: "Non eligible for OS", cls: "bg-slate-700/40 text-slate-400 border-slate-600/40" };
 

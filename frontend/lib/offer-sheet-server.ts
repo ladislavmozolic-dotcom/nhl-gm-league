@@ -117,7 +117,8 @@ export async function submitOfferSheetAction(
   });
   if (!player) return { ok: false, error: "Player not found." };
   if (player.teamId === fromTeamId) return { ok: false, error: "He's already yours — re-sign him on the Contracts page." };
-  if (player.franchiseTag) return { ok: false, error: "He's Franchise-tagged — his club gets two re-sign rounds before any offer sheet." };
+  // a Franchise-tagged RFA only reaches osEligible after his club's TWO re-sign rounds fail — until then the
+  // osEligible check below keeps him out of reach, afterwards he is as available as any other RFA.
   if (player.resignStatus !== "osEligible") return { ok: false, error: "He isn't open to offer sheets — his club is still negotiating with him." };
   await ensureRfaCases(player.teamId);
   const rfa = await prisma.rfaCase.findFirst({ where: { playerId, teamId: player.teamId, status: "OS_ELIGIBLE" }, select: { id: true } });
@@ -243,7 +244,7 @@ export async function resolveOfferSheets(): Promise<{ signed: number; declined: 
       select: { name: true, teamId: true, resignStatus: true, franchiseTag: true, resignOfferSalary: true },
     });
     // no longer eligible (signed elsewhere, tagged, etc.) → decline them all
-    if (!player || player.resignStatus !== "osEligible" || player.franchiseTag) {
+    if (!player || player.resignStatus !== "osEligible") {
       await prisma.offerSheet.updateMany({ where: { id: { in: sheets.map((s) => s.id) }, status: "PENDING" }, data: { status: "DECLINED", note: "No longer available." } });
       declined += sheets.length;
       continue;
@@ -290,9 +291,7 @@ export async function resolveOfferSheets(): Promise<{ signed: number; declined: 
   // A regular RFA who got NO offer sheets at all this window never appears in
   // byPlayer above — without this he'd be stuck in "osEligible" forever, unable to
   // re-sign with his own club (extendContractAction refuses while that status holds).
-  // Franchise-tag RFAs can never legally receive one (submitOfferSheetAction blocks
-  // them outright), so every franchise RFA who reaches osEligible lands here too —
-  // reopen him the same way a franchise player always has (a fresh round-2 cycle).
+  // (a franchise RFA who got no sheet lands here too, same as everybody else)
   const stranded = await prisma.player.findMany({
     where: { resignStatus: "osEligible", id: { notIn: [...byPlayer.keys()] } },
     select: { id: true, franchiseTag: true },
@@ -300,7 +299,7 @@ export async function resolveOfferSheets(): Promise<{ signed: number; declined: 
   for (const p of stranded) {
     await prisma.player.update({
       where: { id: p.id },
-      data: p.franchiseTag ? { resignStatus: "open", resignRound: 0 } : { resignStatus: "open", rfaOsUsed: true },
+      data: { resignStatus: "open", rfaOsUsed: true },
     });
     await prisma.rfaCase.updateMany({ where: { playerId: p.id, status: "OS_ELIGIBLE" }, data: { status: "NEGOTIATING" } });
   }
