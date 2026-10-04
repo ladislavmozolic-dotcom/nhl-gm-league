@@ -6,10 +6,13 @@ import { saveSimSettings } from "./actions";
 import { PageHeader, BackPill } from "@/components/ui";
 import { activeSimEngine } from "@/lib/sim/version";
 import { prisma } from "@/lib/prisma";
+import { isAdmin } from "@/lib/auth";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 export default async function SimulationAdminPage() {
+  if (!(await isAdmin())) redirect("/"); // commissioner only
   const [settings, engine, lc] = await Promise.all([
     loadSettings(),
     activeSimEngine(),

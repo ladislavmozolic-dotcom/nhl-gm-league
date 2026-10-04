@@ -2,10 +2,13 @@ import { prisma } from "@/lib/prisma";
 import { getAutoSim } from "@/lib/sim/auto";
 import AutoSimControl from "@/components/AutoSimControl";
 import { BackPill } from "@/components/ui";
+import { isAdmin } from "@/lib/auth";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminLinesPage() {
+  if (!(await isAdmin())) redirect("/"); // commissioner only
   const [teams, cfg] = await Promise.all([
     prisma.team.findMany({
       where: { league: "NHL", isAffiliate: false },

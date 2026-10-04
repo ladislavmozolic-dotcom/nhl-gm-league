@@ -6,6 +6,8 @@ import { cleanName } from "@/lib/playerName";
 import { loadMarketPool, teamContentionMap, teamChurnMap, teamAsk, ufaAtExpiry } from "@/lib/free-agency-server";
 import { termPremium, isDepthSlot, slotLabel, MAX_TERM, LEAGUE_MIN } from "@/lib/free-agency";
 import { loadSettings } from "@/lib/sim/settings";
+import { isAdmin } from "@/lib/auth";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +42,7 @@ type StatusFilter = (typeof STATUS_TABS)[number]["key"];
 const isStatusFilter = (v: string | undefined): v is StatusFilter => v === "all" || v === "ufa" || v === "rfa";
 
 export default async function ExpiringContractsPage({ searchParams }: { searchParams: Promise<{ q?: string; sort?: string; dir?: string; status?: string; team?: string }> }) {
+  if (!(await isAdmin())) redirect("/"); // commissioner only
   const sp = await searchParams;
   const q = sp.q?.trim() ?? "";
   const sort: SortKey = isSortKey(sp.sort) ? sp.sort : "capHit";

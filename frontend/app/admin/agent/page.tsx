@@ -16,6 +16,8 @@ import {
   ufaAtExpiry,
 } from "@/lib/free-agency-server";
 import { slotLabel } from "@/lib/free-agency";
+import { isAdmin } from "@/lib/auth";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +37,7 @@ const qoStatusLabel: Record<string, string> = {
 };
 
 export default async function AdminAgentPage() {
+  if (!(await isAdmin())) redirect("/"); // commissioner only
   const clock = await getLeagueClock();
 
   // Qualifying offers tendered by clubs (RFA system) — the commissioner can see and revoke them

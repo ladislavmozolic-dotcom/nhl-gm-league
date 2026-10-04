@@ -3,10 +3,13 @@ import PopularityEditor from "@/components/PopularityEditor";
 import CoachImportButton from "@/components/CoachImportButton";
 import { savePopularity } from "./actions";
 import { PageHeader, Card, BackPill } from "@/components/ui";
+import { isAdmin } from "@/lib/auth";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminFinancePage() {
+  if (!(await isAdmin())) redirect("/"); // commissioner only
   const teams = await prisma.team.findMany({
     where: { league: "NHL", isAffiliate: false },
     select: { id: true, name: true, logoUrl: true, popularity: true },

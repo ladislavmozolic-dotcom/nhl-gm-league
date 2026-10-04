@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { PageHeader, Card } from "@/components/ui";
+import { isAdmin } from "@/lib/auth";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +13,8 @@ function Tag({ children, c = "blue" }: { children: React.ReactNode; c?: string }
   return <span className={`inline-block px-1.5 py-0.5 rounded text-[11px] font-semibold border ${col[c]}`}>{children}</span>;
 }
 
-export default function SimGuidePage() {
+export default async function SimGuidePage() {
+  if (!(await isAdmin())) redirect("/"); // commissioner only
   return (
     <div className="space-y-6 py-2 max-w-3xl">
       <PageHeader

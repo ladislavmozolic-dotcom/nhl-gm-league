@@ -2,6 +2,8 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui";
 import { getLang } from "@/lib/lang-server";
 import { t as tt } from "@/lib/i18n";
+import { isAdmin } from "@/lib/auth";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +71,7 @@ const GROUPS: Group[] = [
 ];
 
 export default async function AdminPage() {
+  if (!(await isAdmin())) redirect("/"); // commissioner only
   const lang = await getLang();
   const T = (k: string) => tt(lang, k);
   return (

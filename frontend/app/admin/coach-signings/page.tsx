@@ -2,12 +2,15 @@ import { prisma } from "@/lib/prisma";
 import { PageHeader, Card, BackPill } from "@/components/ui";
 import { money } from "@/lib/finance";
 import RevertCoachSigningButton from "@/components/RevertCoachSigningButton";
+import { isAdmin } from "@/lib/auth";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 const fmtDate = (d: Date) => d.toLocaleString("sk-SK", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 export default async function AdminCoachSigningsPage() {
+  if (!(await isAdmin())) redirect("/"); // commissioner only
   const logs = await prisma.coachSigningLog.findMany({ orderBy: { id: "desc" }, take: 60 });
 
   return (
