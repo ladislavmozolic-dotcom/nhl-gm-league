@@ -351,7 +351,7 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
             <NumField k="faTwoWayRelaxRound" label="Older veteran relaxes from round" />
             <NumField k="faTwoWayWeakOverall" label="Weak/4th-line overall at or below" />
             <NumField k="faTwoWayWeakRound" label="Weak established relaxes from round" />
-            <NumField k="faTwoWayMaxSalary" label="Always one-way at/above ($)" step={50000} w="w-28" />
+            <NumField k="faTwoWayMaxSalary" label="Always one-way at/above ($) — 1,350,000 = two-way up to 1.3M" step={50000} w="w-28" />
           </div>
           <div>
             <div className="text-xs text-slate-500 mb-1">RFA / offer sheets</div>

@@ -278,7 +278,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
     { maxAav: 0, picks: [1, 1, 1, 1] },     // > $8M → four 1sts
   ],
   faTwoWayOlderAge: 25, faTwoWayNhlGpLimit: 30, faTwoWayMaxYears: 1, faTwoWayRelaxRound: 2,
-  faTwoWayWeakOverall: 55, faTwoWayWeakRound: 3, faTwoWayAhlMaxYears: 2, faTwoWayFewGpMaxYears: 2, faTwoWayMaxSalary: 1_300_000,
+  faTwoWayWeakOverall: 55, faTwoWayWeakRound: 3, faTwoWayAhlMaxYears: 2, faTwoWayFewGpMaxYears: 2, faTwoWayMaxSalary: 1_350_000, // refused at/above this → a two-way can be up to $1.3M (salaries move in $50k steps)
   rfaMaxAge: 26, osOpenDay: 1, osCloseDay: 8, osDecisionDay: 10,
   rfaQoPct: 100, rfaQoMin: 775_000, rfaQoDeadlineDay: 25,
   arbMinAge: 24, arbMinLastSeasonGp: 40, arbWalkAwayThreshold: 4_500_000,
