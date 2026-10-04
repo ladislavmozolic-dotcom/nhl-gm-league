@@ -23,7 +23,7 @@ import type { TeamLinesData } from "./lines-core";
 
 type SeasonTeam = SimTeam & { linesUsed: TeamLinesData; /** a registered human GM runs this club (AHL farm → its parent club's GM) */ humanGm?: boolean };
 
-const DU_HIGH = 85; // durability at/above which CON recovers +2/day instead of +1
+const DU_HIGH = 95; // goalie durability at/above which CON recovers +2/day instead of +1 (only the true iron men — ~11 of 70)
 export const PLAY_CON = 95; // a skater must be at CON >= 95 to dress (below = still hurt / rusty)
 const PICKED_REST_CON = 92; // the GM's chosen #1 is spelled below this CON
 const PICKED_MAX_STARTS = 64; // …and after this many starts (a real workhorse load)
@@ -253,10 +253,12 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
       // Only players who are actually RESTING recover — teams playing tonight are
       // handled by the game itself (the starter's conAfter etc.), so a starter never
       // gets a spurious rest-day bump on his own game day (which over-inflated CON).
-      const goalieRec = restDays * 1;                                 // goalies +1/rest day
+      const goalieRec = restDays * 1;                                 // goalies +1/rest day …
+      // … or +2 for a goalie with DU >= DU_HIGH (same rule as the in-memory recovery below)
+      const goalieRecSql = `${goalieRec} * CASE WHEN COALESCE((SELECT r.du FROM "GoalieRating" r WHERE r."playerId" = "Player".id), 0) >= ${DU_HIGH} THEN 2 ELSE 1 END`;
       const skaterRec = restDays * (settings.skaterConRecovery ?? 1);
       await prisma.$executeRawUnsafe(
-        `UPDATE "Player" SET condition = LEAST(100, condition + CASE WHEN "isGoalie" THEN ${goalieRec} ELSE ${skaterRec} END) WHERE "injuryDaysLeft" <= 0 AND condition < 100 AND "teamId" NOT IN (${playingTeams.join(",")})`
+        `UPDATE "Player" SET condition = LEAST(100, condition + CASE WHEN "isGoalie" THEN ${goalieRecSql} ELSE ${skaterRec} END) WHERE "injuryDaysLeft" <= 0 AND condition < 100 AND "teamId" NOT IN (${playingTeams.join(",")})`
       );
       // A goalie who SAT on a club that plays tonight (the backup, or a starter being rested) must
       // recover too — the NOT IN above only covers clubs that are idle tonight, so a goalie on a
@@ -265,7 +267,7 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
       const lastDay = lastPlayed._max.round;
       if (lastDay != null) {
         await prisma.$executeRawUnsafe(
-          `UPDATE "Player" SET condition = LEAST(100, condition + ${goalieRec}) WHERE "isGoalie" = true AND "injuryDaysLeft" <= 0 AND condition < 100 AND "teamId" IN (${playingTeams.join(",")}) AND id NOT IN (SELECT gs."playerId" FROM "GoalieGameStat" gs JOIN "Game" g ON g.id = gs."gameId" WHERE gs.started = true AND g.season = '${season.replace(/'/g, "")}' AND g.round = ${Number(lastDay)} AND g."seriesId" IS NULL)`
+          `UPDATE "Player" SET condition = LEAST(100, condition + ${goalieRecSql}) WHERE "isGoalie" = true AND "injuryDaysLeft" <= 0 AND condition < 100 AND "teamId" IN (${playingTeams.join(",")}) AND id NOT IN (SELECT gs."playerId" FROM "GoalieGameStat" gs JOIN "Game" g ON g.id = gs."gameId" WHERE gs.started = true AND g.season = '${season.replace(/'/g, "")}' AND g.round = ${Number(lastDay)} AND g."seriesId" IS NULL)`
         );
       }
     }
