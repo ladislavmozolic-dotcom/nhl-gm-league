@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { isAdmin } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
-import { CURRENT_SEASON_START, TWO_WAY_AHL_SALARY } from "@/lib/finance";
+import { CURRENT_SEASON_START } from "@/lib/finance";
 import { clearLowballs, weakestTeams } from "@/lib/free-agency-server";
 import { getLeagueClock } from "@/lib/calendar-server";
 
@@ -151,7 +151,7 @@ export async function forceSignResignAction(
   const noTradeTeams = clause === "M_NTC" ? await weakestTeams(breadth ?? 12, player.teamId) : [];
 
   const contractText = twoWay
-    ? `$${salary.toLocaleString("en-US")} NHL / $${TWO_WAY_AHL_SALARY.toLocaleString("en-US")} AHL × ${years}yr (2-way, through ${expiry})`
+    ? `$${salary.toLocaleString("en-US")} × ${years}yr (2-way, through ${expiry})`
     : `$${salary.toLocaleString("en-US")} × ${years}yr (through ${expiry})`;
 
   const releaseNonRoster = player.rosterType === "NONROSTER" ? { rosterType: "NHL" } : {};
@@ -173,7 +173,7 @@ export async function forceSignResignAction(
         tradeClause: clause,
         noTradeTeams,
         contractText,
-        ahlSalary: twoWay ? TWO_WAY_AHL_SALARY : null,
+        ahlSalary: null,
         extCapHit: null,
         extYears: null,
         extContractType: null,

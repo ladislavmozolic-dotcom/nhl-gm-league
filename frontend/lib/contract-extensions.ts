@@ -7,7 +7,7 @@
 // and a pending extension (Player.ext*, signed in-season — NHL rule: it starts next
 // season) becomes the player's contract. Idempotent: runs once per league year.
 import { prisma } from "./prisma";
-import { CURRENT_SEASON_START, TWO_WAY_AHL_SALARY, setCurrentSeasonStart } from "./finance";
+import { CURRENT_SEASON_START, setCurrentSeasonStart } from "./finance";
 
 const leagueYearOf = (d: Date) => (d.getUTCMonth() >= 6 ? d.getUTCFullYear() : d.getUTCFullYear() - 1);
 
@@ -24,7 +24,7 @@ export async function applyPendingExtensions(): Promise<number> {
       data: {
         capHit: p.extCapHit!, contractYears: years, contractExpiry: CURRENT_SEASON_START + years,
         contractType: p.extContractType ?? "ONE_WAY", tradeClause: p.extClause, noTradeTeams: p.extNoTradeTeams, contractText: p.extText,
-        ahlSalary: p.extContractType === "TWO_WAY" ? TWO_WAY_AHL_SALARY : null,
+        ahlSalary: null,
         extCapHit: null, extYears: null, extContractType: null, extClause: null, extNoTradeTeams: [], extText: null,
         resignStatus: null, resignRound: 0, resignCounterSalary: null, resignCounterYears: null, rfaOsUsed: false, rightsReleased: false,
       },

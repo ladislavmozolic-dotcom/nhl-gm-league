@@ -205,16 +205,16 @@ export async function offerTwoWayFromRoster(slug: string, playerId: number, requ
   if (objection) return { ok: false as const, error: objection };
 
   const expiry = computeContractExpiry(years);
-  const contractText = `$${salary.toLocaleString("en-US")} NHL / $${TWO_WAY_AHL_SALARY.toLocaleString("en-US")} AHL × ${years}yr (2-way, through ${expiry})`;
+  const contractText = `$${salary.toLocaleString("en-US")} × ${years}yr (2-way, through ${expiry})`;
   await prisma.$transaction([
     prisma.player.update({
       where: { id: player.id },
-      data: { capHit: salary, ahlSalary: TWO_WAY_AHL_SALARY, contractYears: years, contractExpiry: expiry, contractType: "TWO_WAY", contractText },
+      data: { capHit: salary, ahlSalary: null, contractYears: years, contractExpiry: expiry, contractType: "TWO_WAY", contractText },
     }),
     prisma.transaction.create({
       data: { type: "SIGNING", playerId: player.id, message: `${team.code ?? "?"} converted ${player.name} to a two-way contract — $${(salary / 1_000_000).toFixed(2)}M NHL / $0.10M AHL × ${years}yr` },
     }),
   ]);
   for (const path of [`/teams/${slug}/roster`, `/teams/${slug}/rosters`, `/teams/${slug}`, `/teams/${slug}/salary`, "/salary-cap", "/finance", "/signings"]) revalidatePath(path);
-  return { ok: true as const, name: player.name, capHit: salary, ahlSalary: TWO_WAY_AHL_SALARY, years };
+  return { ok: true as const, name: player.name, capHit: salary, ahlSalary: null, years };
 }

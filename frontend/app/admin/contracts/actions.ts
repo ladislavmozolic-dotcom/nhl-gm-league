@@ -5,7 +5,7 @@ import { isAdmin, isComishOrCoComish } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { SKATER_FIELDS } from "@/lib/skater-fields";
-import { computeContractExpiry, TWO_WAY_AHL_SALARY } from "@/lib/finance";
+import { computeContractExpiry } from "@/lib/finance";
 
 const slugify = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 
@@ -40,7 +40,7 @@ export async function createPlayer(formData: FormData) {
     height: heightCm ? `${heightCm} cm` : null, weight: num("weightKg"),
     birthDate: str("birthDate"), number: num("number"),
     capHit, contractYears, contractExpiry: contractYears ? computeContractExpiry(contractYears) : null, contractType,
-    ahlSalary: contractType === "TWO_WAY" && (capHit ?? 0) > TWO_WAY_AHL_SALARY ? TWO_WAY_AHL_SALARY : null,
+    ahlSalary: null,
     contractText: capHit ? `${capHit.toLocaleString("en-US")}$ / ${contractYears ?? 0}yr${contractYears === 1 ? "" : "s"}` : null,
     condition: 100, morale: 50,
   };
@@ -75,7 +75,7 @@ export async function updateContract(formData: FormData) {
     ? null
     : previous?.contractType === "TWO_WAY"
       ? previous.ahlSalary
-      : capHit > TWO_WAY_AHL_SALARY ? TWO_WAY_AHL_SALARY : null;
+      : null;
   // keep the shown contract string in sync (e.g. "9,000,000$ / 2yrs")
   const contractText = capHit ? `${capHit.toLocaleString("en-US")}$ / ${contractYears}yr${contractYears === 1 ? "" : "s"}` : null;
 

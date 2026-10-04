@@ -5,7 +5,7 @@
 
 import { prisma } from "./prisma";
 import { computeELC } from "./elc";
-import { CURRENT_SEASON_START, TWO_WAY_AHL_SALARY } from "./finance";
+import { CURRENT_SEASON_START } from "./finance";
 
 export type ReconAction = "DELETE" | "TO_PROSPECTS" | "LTIR_PROSPECT" | "ACTIVATE_NHL" | "ACTIVATE_NHL_ELC" | "ACTIVATE_AHL" | "NONE";
 
@@ -110,7 +110,7 @@ export async function applyReconcileOne(id: number): Promise<boolean> {
     await prisma.player.update({ where: { id }, data: {
       rosterType: "NHL", ...(parent ? { teamId: parent } : {}),
       capHit: c.capHit, contractYears: c.years, contractExpiry: expiry, contractType: "TWO_WAY",
-      ahlSalary: TWO_WAY_AHL_SALARY,
+      ahlSalary: null,
       contractText: `$${c.base.toLocaleString("en-US")} + $${c.bonus.toLocaleString("en-US")} bonus × ${c.years}yr (ELC, through ${expiry})`,
     } });
   } else if (action === "ACTIVATE_AHL") {

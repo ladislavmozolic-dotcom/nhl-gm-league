@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { canManageTeam, getTeamSession, isAdmin, isComishTier } from "@/lib/auth";
 import { getLeagueClock, getLeagueDate } from "@/lib/calendar-server";
 import { addDays } from "@/lib/calendar";
-import { CURRENT_SEASON_START, TWO_WAY_AHL_SALARY, capCeilingForPhase, ltirRelief, accruedCapSpace, liveCapHit } from "@/lib/finance";
+import { CURRENT_SEASON_START, capCeilingForPhase, ltirRelief, accruedCapSpace, liveCapHit } from "@/lib/finance";
 import { teamCapCommitted } from "@/lib/cap";
 import {
   loadMarketPool, teamContentionMap, teamChurnMap, teamAsk, evaluateTeamOffer, loadLeagueCap, weakestTeams, demandForPlayerId,
@@ -598,9 +598,9 @@ async function signFaOffer(playerId: number, player: { name: string; age: number
     teamId: o.teamId, rosterType: "NHL",
     capHit: salary, contractYears: years, contractExpiry: expiry,
     contractType: twoWay ? "TWO_WAY" : "ONE_WAY",
-    ahlSalary: twoWay ? TWO_WAY_AHL_SALARY : null,
+    ahlSalary: null,
     contractText: twoWay
-      ? `$${salary.toLocaleString("en-US")} NHL / $${TWO_WAY_AHL_SALARY.toLocaleString("en-US")} AHL × ${years}yr (2-way, through ${expiry})`
+      ? `$${salary.toLocaleString("en-US")} × ${years}yr (2-way, through ${expiry})`
       : `$${salary.toLocaleString("en-US")} × ${years}yr (through ${expiry})`,
     // a lone two-way bidder's role was never part of the deal, so no promise to police
     signPromiseLine: noRole ? null : o.line, signPromisePP: noRole ? null : o.pp, signPromisePK: noRole ? null : o.pk,
@@ -1120,7 +1120,7 @@ export async function applyElcAction(playerId: number) {
     where: { id: playerId },
     data: {
       capHit: c.capHit, contractYears: c.years, contractExpiry: expiry, contractType: "TWO_WAY",
-      ahlSalary: TWO_WAY_AHL_SALARY,
+      ahlSalary: null,
       contractText: `$${c.base.toLocaleString("en-US")} + $${c.bonus.toLocaleString("en-US")} bonus × ${c.years}yr (ELC, through ${expiry})`,
     },
   });
@@ -1164,7 +1164,7 @@ export async function applyAllElcAction() {
       where: { id: r.id },
       data: {
         capHit: r.capHit, contractYears: r.years, contractExpiry: expiry, contractType: "TWO_WAY",
-        ahlSalary: TWO_WAY_AHL_SALARY,
+        ahlSalary: null,
         contractText: `$${r.base.toLocaleString("en-US")} + $${r.bonus.toLocaleString("en-US")} bonus × ${r.years}yr (ELC, through ${expiry})`,
       },
     });
@@ -1396,7 +1396,7 @@ export async function extendContractAction(
   const expiry = startYear + years;
   const noTradeTeams = clause === "M_NTC" ? await weakestTeams(breadth ?? 12, teamId) : [];
   const contractText = twoWay
-    ? `$${salary.toLocaleString("en-US")} NHL / $${TWO_WAY_AHL_SALARY.toLocaleString("en-US")} AHL × ${years}yr (2-way, through ${expiry})`
+    ? `$${salary.toLocaleString("en-US")} × ${years}yr (2-way, through ${expiry})`
     : `$${salary.toLocaleString("en-US")} × ${years}yr (through ${expiry})`;
   // Non-roster release: an RFA benched at regular-season opening day for staying
   // unsigned (sweepUnsignedRfasToNonRoster) is usable again the moment his own club
@@ -1409,7 +1409,7 @@ export async function extendContractAction(
     : {
         capHit: salary, contractYears: years, contractExpiry: expiry,
         contractType: twoWay ? "TWO_WAY" : "ONE_WAY", tradeClause: clause, noTradeTeams, contractText,
-        ahlSalary: twoWay ? TWO_WAY_AHL_SALARY : null,
+        ahlSalary: null,
         extCapHit: null, extYears: null, extContractType: null, extClause: null, extNoTradeTeams: [], extText: null, resignStatus: null,
       };
   await prisma.player.update({
