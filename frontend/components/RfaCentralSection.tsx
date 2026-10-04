@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { arbitrationRange, ensureRfaCases, resolveExpiredQODueDates } from "@/lib/rfa-server";
+import { qoFormInfo, arbitrationRange, ensureRfaCases, resolveExpiredQODueDates } from "@/lib/rfa-server";
 import { Card } from "@/components/ui";
 import RfaDashboard from "@/components/RfaDashboard";
 
@@ -21,11 +21,12 @@ export default async function RfaCentralSection({ teamId }: { teamId?: number })
   const rows = await prisma.rfaCase.findMany({
     where: orgIds ? { teamId: { in: orgIds } } : undefined,
     include: {
-      player: { select: { id: true, name: true, position: true, age: true, capHit: true, overall: true } },
+      player: { select: { id: true, name: true, position: true, age: true, capHit: true, overall: true, lastSeasonGP: true, mpSkater: true, careerGP: true } },
       team: { select: { id: true, code: true, name: true, isAffiliate: true, parentTeamId: true, parentTeam: { select: { id: true, code: true, name: true } } } },
     },
     orderBy: [{ qoDueAt: "asc" }, { player: { name: "asc" } }],
   });
+  const forms = await qoFormInfo(rows.map((r) => r.player));
   const data = await Promise.all(rows.map(async (r) => {
     const arb = r.status === "ARB_FILED" ? await arbitrationRange(r.playerId, r.qoAmount) : null;
     const comparables = arb?.comps ?? [];
@@ -34,8 +35,9 @@ export default async function RfaCentralSection({ teamId }: { teamId?: number })
     const offerSheetRisk = r.status === "OS_ELIGIBLE" ? (ovr >= 72 ? "High" : ovr >= 62 ? "Medium" : "Low") : "Low";
     const { parentTeam, parentTeamId, id: _id, ...team } = r.team;
     const org = parentTeam ?? { id: r.team.id, code: r.team.code, name: r.team.name };
+    const { mpSkater: _mp, careerGP: _cg, lastSeasonGP: _gp, ...player } = r.player;
     return {
-      ...r, team, org,
+      ...r, player, team, org, qoForm: forms.get(r.playerId)!,
       qoDueAt: r.qoDueAt.toISOString(), qoTenderedAt: r.qoTenderedAt?.toISOString() ?? null,
       offerSheetRisk: offerSheetRisk as "Low" | "Medium" | "High", comparables, range,
     };

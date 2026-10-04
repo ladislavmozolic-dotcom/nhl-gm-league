@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { canManageTeam } from "@/lib/auth";
 import { getLeagueDate } from "@/lib/calendar-server";
 import { loadSettings } from "@/lib/sim/settings";
-import { arbitrationRange, ensureRfaCases } from "@/lib/rfa-server";
+import { arbitrationRange, ensureRfaCases, qoFormInfo, qoOneWayMessage } from "@/lib/rfa-server";
 import { CURRENT_SEASON_START, TWO_WAY_AHL_SALARY } from "@/lib/finance";
 import { twoWayObjection } from "@/lib/free-agency";
 
@@ -24,6 +24,9 @@ export async function tenderQualifyingOfferAction(caseId: number, teamId: number
   // the QO is a 1-year offer; as a two-way it must pass the same player-willingness rules
   const type = contractType === "TWO_WAY" ? "TWO_WAY" : "ONE_WAY";
   if (type === "TWO_WAY") {
+    // CBA: an established player (180+ GP in 3 yrs, 60+ last season, no waivers) must get a one-way QO
+    const info = (await qoFormInfo([c.player])).get(c.player.id);
+    if (info?.oneWayRequired) return { ok: false as const, error: qoOneWayMessage(info) };
     const s = await loadSettings();
     const objection = twoWayObjection(true, c.player, 1, c.qoAmount, {
       olderAge: s.faTwoWayOlderAge, gpLimit: s.faTwoWayNhlGpLimit, weakOverall: s.faTwoWayWeakOverall,
@@ -57,6 +60,10 @@ export async function decideArbitrationAction(caseId: number, teamId: number, cl
   const s = await loadSettings();
   // a two-way award obeys the same player-willingness rules as a two-way re-sign
   const type = contractType === "TWO_WAY" ? "TWO_WAY" : "ONE_WAY";
+  if (type === "TWO_WAY") {
+    const info = (await qoFormInfo([c.player])).get(c.player.id);
+    if (info?.oneWayRequired) return { ok: false as const, error: qoOneWayMessage(info) };
+  }
   const objection = twoWayObjection(type === "TWO_WAY", c.player, term, target, {
     olderAge: s.faTwoWayOlderAge, gpLimit: s.faTwoWayNhlGpLimit, weakOverall: s.faTwoWayWeakOverall,
     maxYears: s.faTwoWayMaxYears, ahlMaxYears: s.faTwoWayAhlMaxYears, fewGpMaxYears: s.faTwoWayFewGpMaxYears, maxSalary: s.faTwoWayMaxSalary,
