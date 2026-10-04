@@ -29,9 +29,14 @@ export async function ensureRfaCases(teamId?: number) {
     select: { id: true, teamId: true, capHit: true, contractExpiry: true, contractYears: true, age: true, birthDate: true, rightsReleased: true, lastSeasonGP: true },
   });
   let created = 0;
+  const today = await getLeagueDate();
   for (const p of players) {
     if (ufaAtExpiry(p)) continue;
     const season = expirySeason(p);
+    // The qualifying-offer window is an off-season deadline. If the league is already past it
+    // (e.g. this feature went live mid-season), opening a case now would hand every club an
+    // already-overdue QO and the next deadline sweep would cut its RFAs loose — so no case.
+    if (qoDueDate(season, settings.rfaQoDeadlineDay) < today) continue;
     const qo = Math.max(settings.rfaQoMin, Math.round(((p.capHit ?? 0) * settings.rfaQoPct) / 100 / 50_000) * 50_000);
     const eligible = (p.age ?? 0) >= settings.arbMinAge || (p.lastSeasonGP ?? 0) >= settings.arbMinLastSeasonGp;
     const r = await prisma.rfaCase.upsert({
@@ -53,6 +58,8 @@ export async function resolveExpiredQODueDates(now?: Date) {
     include: { player: { select: { contractYears: true } } },
   });
   for (const c of stale) {
+    // a case opened AFTER its own deadline never gave the club a chance to tender — leave it be
+    if (c.createdAt > c.qoDueAt) continue;
     await prisma.$transaction([
       prisma.rfaCase.update({ where: { id: c.id }, data: { status: "UFA", resolvedAt: effectiveNow } }),
       prisma.player.update({ where: { id: c.playerId }, data: { rightsReleased: true, franchiseTag: false, resignStatus: "walkedToUFA", ...(c.player.contractYears === 0 ? { rosterType: "UFA" } : {}) } }),
