@@ -16,12 +16,22 @@ async function ownedCase(caseId: number, teamId: number) {
   return prisma.rfaCase.findFirst({ where: { id: caseId, teamId }, include: { player: true } });
 }
 
-export async function tenderQualifyingOfferAction(caseId: number, teamId: number) {
+export async function tenderQualifyingOfferAction(caseId: number, teamId: number, contractType: "ONE_WAY" | "TWO_WAY" = "ONE_WAY") {
   const c = await ownedCase(caseId, teamId);
   if (!c) return { ok: false as const, error: "You don't manage this RFA." };
   if (c.status !== "QO_DUE") return { ok: false as const, error: "The qualifying-offer deadline has already been resolved." };
   if (c.qoDueAt < await getLeagueDate()) return { ok: false as const, error: "The QO deadline has passed." };
-  await prisma.rfaCase.update({ where: { id: caseId }, data: { status: "QO_TENDERED", qoTenderedAt: new Date() } });
+  // the QO is a 1-year offer; as a two-way it must pass the same player-willingness rules
+  const type = contractType === "TWO_WAY" ? "TWO_WAY" : "ONE_WAY";
+  if (type === "TWO_WAY") {
+    const s = await loadSettings();
+    const objection = twoWayObjection(true, c.player, 1, c.qoAmount, {
+      olderAge: s.faTwoWayOlderAge, gpLimit: s.faTwoWayNhlGpLimit, weakOverall: s.faTwoWayWeakOverall,
+      maxYears: s.faTwoWayMaxYears, ahlMaxYears: s.faTwoWayAhlMaxYears, fewGpMaxYears: s.faTwoWayFewGpMaxYears, maxSalary: s.faTwoWayMaxSalary,
+    });
+    if (objection) return { ok: false as const, error: objection };
+  }
+  await prisma.rfaCase.update({ where: { id: caseId }, data: { status: "QO_TENDERED", qoTenderedAt: new Date(), qoContractType: type } });
   refresh();
   return { ok: true as const };
 }

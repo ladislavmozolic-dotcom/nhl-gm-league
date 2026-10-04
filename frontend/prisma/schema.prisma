@@ -636,6 +636,7 @@ model RfaCase {
   qoAmount          Int
   qoDueAt           DateTime
   qoTenderedAt      DateTime?
+  qoContractType    String?  // ONE_WAY | TWO_WAY — form of the 1-year qualifying offer chosen when tendering
   arbEligible       Boolean  @default(false)
   arbFiledBy        String?  // PLAYER | CLUB
   arbFiledAt        DateTime?

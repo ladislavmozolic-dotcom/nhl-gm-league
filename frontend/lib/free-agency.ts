@@ -306,7 +306,7 @@ export function twoWayObjection(
   if (!twoWay) return null;
   const maxSalary = opts?.maxSalary;
   if (maxSalary != null && (salary ?? 0) >= maxSalary) {
-    return `At $${(maxSalary / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 1 })}M+ he won't take a two-way at any age or experience level — offer a one-way deal.`;
+    return `A two-way can't pay more than $${(maxSalary - 1).toLocaleString("en-US")} — above that he won't take it at any age or experience level. Offer a one-way deal.`;
   }
   const olderAge = opts?.olderAge ?? 25;
   const gpLimit = opts?.gpLimit ?? 30;

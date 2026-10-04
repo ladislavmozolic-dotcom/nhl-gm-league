@@ -7,7 +7,7 @@ import { acceptArbitrationAwardAction, decideArbitrationAction, fileArbitrationA
 
 type Row = {
   id: number; teamId: number; status: string; qoAmount: number; qoDueAt: string; qoTenderedAt: string | null; arbEligible: boolean;
-  awardAav: number | null; awardTerm: number | null; awardContractType: string | null; walkAwayThreshold: number | null;
+  awardAav: number | null; awardTerm: number | null; awardContractType: string | null; qoContractType: string | null; walkAwayThreshold: number | null;
   offerSheetRisk: "Low" | "Medium" | "High";
   comparables: { id: number; name: string; capHit: number | null; overall: number | null; age: number | null }[];
   player: { id: number; name: string; position: string; age: number | null; capHit: number | null; overall: number | null };
@@ -25,7 +25,7 @@ function Hearing({ row }: { row: Row }) {
   const lo = row.range?.low ?? row.qoAmount;
   const hi = row.range?.high ?? row.qoAmount;
   const [club, setClub] = useState((lo / 1e6).toFixed(2)); const [player, setPlayer] = useState((hi / 1e6).toFixed(2));
-  const [type, setType] = useState<"ONE_WAY" | "TWO_WAY">("ONE_WAY");
+  const [type, setType] = useState<"ONE_WAY" | "TWO_WAY">(row.qoContractType === "TWO_WAY" ? "TWO_WAY" : "ONE_WAY");
   const [clubTerm, setClubTerm] = useState(1); const [playerTerm, setPlayerTerm] = useState(2);
   const [msg, setMsg] = useState<string | null>(null);
   const decide = () => start(async () => {
@@ -37,7 +37,7 @@ function Hearing({ row }: { row: Row }) {
   const select = "rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-slate-100";
   return <div className="mt-3 space-y-3 rounded-xl border border-violet-500/20 bg-violet-500/5 p-3 text-xs">
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <span className="font-bold uppercase tracking-wide text-violet-300">Arbitration hearing</span>
+      <span className="font-bold uppercase tracking-wide text-violet-300">Arbitration hearing <span className="ml-1 rounded bg-slate-950/60 px-1.5 py-0.5 text-slate-300">{type === "TWO_WAY" ? "two-way" : "one-way"} · 1–2 roky</span></span>
       {row.range && <span className="rounded-full bg-slate-950/60 px-2.5 py-1 text-slate-300">Povolené pásmo: <b className="text-emerald-300">{M(row.range.low)} – {M(row.range.high)}</b></span>}
     </div>
     <div>
@@ -51,7 +51,7 @@ function Hearing({ row }: { row: Row }) {
         <div className="flex items-center gap-2"><input value={player} onChange={(e) => setPlayer(e.target.value)} inputMode="decimal" className={input} /><span className="text-slate-500">$M ×</span><select value={playerTerm} onChange={(e) => setPlayerTerm(Number(e.target.value))} className={select}><option value={1}>1 rok</option><option value={2}>2 roky</option></select></div></div>
     </div>
     <div className="rounded-lg bg-slate-950/50 p-2.5">
-      <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">Typ zmluvy</div>
+      <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">Forma zmluvy v awarde{row.qoContractType ? ` (QO bola ${row.qoContractType === "TWO_WAY" ? "two-way" : "one-way"})` : ""}</div>
       <div className="flex flex-wrap gap-2">{([["ONE_WAY", "One-way", "NHL plat celý rok, nemožno poslať na farmu"], ["TWO_WAY", "Two-way", "farmársky plat $0.10M pri pobyte v AHL; hráč ho nemusí prijať"]] as const).map(([k, t, d]) => <button key={k} type="button" onClick={() => setType(k)} className={`rounded-lg border px-3 py-1.5 text-left transition-colors ${type === k ? "border-violet-500 bg-violet-500/20 text-violet-100" : "border-slate-700 bg-slate-900 text-slate-400 hover:text-slate-200"}`}><b>{t}</b><span className="block text-[10px] opacity-70">{d}</span></button>)}</div>
     </div>
     <div className="flex flex-wrap items-center gap-3">
@@ -79,14 +79,17 @@ function RfaRow({ r, pending, run }: { r: Row; pending: boolean; run: (fn: () =>
       <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${chip[r.status] ?? "border-slate-700 bg-slate-800 text-slate-300"}`}>{label[r.status] ?? r.status}</span>
     </div>
     <div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-      <div className="rounded-lg bg-slate-950/50 px-2.5 py-1.5"><div className="text-[10px] uppercase tracking-wide text-slate-500">QO</div><b className="text-sky-300">{M(r.qoAmount)}</b></div>
+      <div className="rounded-lg bg-slate-950/50 px-2.5 py-1.5"><div className="text-[10px] uppercase tracking-wide text-slate-500">QO · 1 rok</div><b className="text-sky-300">{M(r.qoAmount)}</b>{r.qoContractType && <span className="ml-1.5 text-[10px] font-bold uppercase text-slate-400">{r.qoContractType === "TWO_WAY" ? "two-way" : "one-way"}</span>}</div>
       <div className="rounded-lg bg-slate-950/50 px-2.5 py-1.5"><div className="text-[10px] uppercase tracking-wide text-slate-500">Deadline</div><b className="text-slate-200">{new Date(r.qoDueAt).toISOString().slice(0, 10)}</b></div>
       <div className="rounded-lg bg-slate-950/50 px-2.5 py-1.5"><div className="text-[10px] uppercase tracking-wide text-slate-500">Arbitráž</div><b className={r.arbEligible ? "text-violet-300" : "text-slate-400"}>{r.arbEligible ? "eligible" : "nie"}</b></div>
       <div className="rounded-lg bg-slate-950/50 px-2.5 py-1.5"><div className="text-[10px] uppercase tracking-wide text-slate-500">OS riziko</div><Risk level={r.offerSheetRisk} /></div>
     </div>
     {r.awardAav && <div className="mt-2 text-xs text-emerald-300">Arbitrážny verdikt: <b>{M(r.awardAav)} × {r.awardTerm}r · {r.awardContractType === "TWO_WAY" ? "two-way" : "one-way"}</b></div>}
     <div className="mt-3 flex flex-wrap gap-2 text-xs">
-      {r.status === "QO_DUE" && <button disabled={pending} onClick={() => run(() => tenderQualifyingOfferAction(r.id, r.teamId))} className="rounded-lg bg-sky-700 px-2.5 py-1.5 font-semibold text-white hover:bg-sky-600 disabled:opacity-50">Tender QO</button>}
+      {r.status === "QO_DUE" && <>
+        <button disabled={pending} onClick={() => run(() => tenderQualifyingOfferAction(r.id, r.teamId, "ONE_WAY"))} className="rounded-lg bg-sky-700 px-2.5 py-1.5 font-semibold text-white hover:bg-sky-600 disabled:opacity-50">Tender QO · 1r one-way</button>
+        <button disabled={pending} onClick={() => run(() => tenderQualifyingOfferAction(r.id, r.teamId, "TWO_WAY"))} className="rounded-lg border border-sky-600 bg-sky-900/40 px-2.5 py-1.5 font-semibold text-sky-200 hover:bg-sky-800/60 disabled:opacity-50">Tender QO · 1r two-way</button>
+      </>}
       {["QO_TENDERED", "NEGOTIATING", "OS_ELIGIBLE"].includes(r.status) && r.arbEligible && <>
         <button disabled={pending} onClick={() => run(() => fileArbitrationAction(r.id, r.teamId, "CLUB"))} className="rounded-lg bg-violet-700 px-2.5 py-1.5 font-semibold text-white hover:bg-violet-600 disabled:opacity-50">Klub podá arbitráž</button>
         <button disabled={pending} onClick={() => run(() => fileArbitrationAction(r.id, r.teamId, "PLAYER"))} className="rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1.5 font-semibold text-slate-300 hover:bg-slate-700 disabled:opacity-50">Podanie hráča</button>

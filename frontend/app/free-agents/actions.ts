@@ -665,7 +665,7 @@ async function loneLowballCounter(
   const oneWayOnly = o.twoWay && hardMin >= maxTwoWay;
   let want = Math.max(o.salary, up50(mv * 0.75));
   const cappedByTwoWay = o.twoWay && !oneWayOnly && want >= maxTwoWay;
-  if (cappedByTwoWay) want = Math.max(hardMin, maxTwoWay - 50_000);
+  if (cappedByTwoWay) want = Math.max(hardMin, Math.floor((maxTwoWay - 1) / 50_000) * 50_000);
   return { want, years: o.years, mv, oneWayOnly, cappedByTwoWay, maxTwoWay };
 }
 
