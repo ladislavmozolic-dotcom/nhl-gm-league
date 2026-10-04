@@ -271,3 +271,27 @@ export async function clearPlayerLowballAction(playerId: number, teamId: number)
   revalidatePath("/admin/agent");
   return { ok: true as const };
 }
+
+/** Revoke a tendered qualifying offer (commissioner-only): the RFA case goes back to
+ *  "QO due" with the tender and any arbitration progress cleared. If his QO deadline has
+ *  already passed, the next deadline sweep treats him as un-tendered (rights lapse) — the
+ *  confirm dialog on the button says so. */
+export async function cancelQualifyingOfferAction(caseId: number) {
+  if (!(await isAdmin())) return { ok: false as const, error: "Admin only." };
+  const c = await prisma.rfaCase.findUnique({ where: { id: caseId } });
+  if (!c) return { ok: false as const, error: "Case not found." };
+  if (!["QO_TENDERED", "NEGOTIATING", "ARB_FILED", "AWARDED", "OS_ELIGIBLE"].includes(c.status)) return { ok: false as const, error: "No tendered QO to cancel." };
+  await prisma.rfaCase.update({
+    where: { id: caseId },
+    data: {
+      status: "QO_DUE", qoTenderedAt: null, arbFiledBy: null, arbFiledAt: null,
+      clubAskAav: null, clubAskTerm: null, playerAskAav: null, playerAskTerm: null,
+      awardAav: null, awardTerm: null, awardContractType: null,
+      walkAwayThreshold: null, walkAwayDeadline: null, walkAwayAt: null, offerSheetEligibleAt: null, resolvedAt: null,
+    },
+  });
+  revalidatePath("/admin/agent");
+  revalidatePath("/rfa");
+  revalidatePath("/offer-sheets");
+  return { ok: true as const };
+}

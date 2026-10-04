@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { PageHeader, Card, BackPill } from "@/components/ui";
 import { cleanName } from "@/lib/playerName";
 import DeleteFaOfferButton from "@/components/DeleteFaOfferButton";
+import CancelQoButton from "@/components/CancelQoButton";
 import AdminResignTable, { type ResignRowData } from "@/components/admin/AdminResignTable";
 import { getLeagueClock } from "@/lib/calendar-server";
 import { loadSettings } from "@/lib/sim/settings";
@@ -28,8 +29,24 @@ const fmtDate = (d: Date) =>
     minute: "2-digit",
   });
 
+const QO_TENDERED_STATUSES = ["QO_TENDERED", "NEGOTIATING", "ARB_FILED", "AWARDED", "OS_ELIGIBLE"];
+const qoStatusLabel: Record<string, string> = {
+  QO_TENDERED: "QO podaná", NEGOTIATING: "Vyjednáva sa", ARB_FILED: "Arbitráž podaná", AWARDED: "Arbitráž — rozhodnuté", OS_ELIGIBLE: "Otvorené pre offer sheety",
+};
+
 export default async function AdminAgentPage() {
   const clock = await getLeagueClock();
+
+  // Qualifying offers tendered by clubs (RFA system) — the commissioner can see and revoke them
+  const qoCases = await prisma.rfaCase.findMany({
+    where: { status: { in: QO_TENDERED_STATUSES } },
+    orderBy: [{ qoTenderedAt: "desc" }, { id: "desc" }],
+    include: {
+      player: { select: { id: true, name: true, slug: true, position: true, overall: true } },
+      team: { select: { name: true, code: true, parentTeam: { select: { code: true } } } },
+    },
+  });
+  const qoDueOpen = await prisma.rfaCase.count({ where: { status: "QO_DUE" } });
 
   // 1. Free Agent Frenzy: open-market standing offers
   const rawOffers = await prisma.faOffer.findMany({
@@ -409,6 +426,50 @@ export default async function AdminAgentPage() {
                     </tr>
                   );
                 })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      {/* Card 3: Qualifying offers tendered (RFA) */}
+      <Card
+        title="Podané kvalifikačné ponuky (QO) — RFA"
+        accent="text-sky-400"
+        right={<span className="text-xs text-slate-400 font-normal">{qoCases.length} podaných · {qoDueOpen} čaká na podanie</span>}
+      >
+        {qoCases.length === 0 ? (
+          <div className="text-center py-8 px-4 border border-dashed border-slate-800 rounded-2xl mx-4 my-2">
+            <p className="text-slate-500 text-sm font-medium">Zatiaľ žiadny klub nepodal kvalifikačnú ponuku.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[760px]">
+              <thead>
+                <tr className="text-xs text-slate-400 uppercase tracking-wider border-b border-slate-800 bg-slate-800/40">
+                  <th className="text-left px-4 py-3 font-semibold">Hráč</th>
+                  <th className="text-left px-3 py-3 font-semibold">Klub</th>
+                  <th className="text-left px-3 py-3 font-semibold">Stav</th>
+                  <th className="text-right px-3 py-3 font-semibold">QO</th>
+                  <th className="text-right px-3 py-3 font-semibold">Podaná</th>
+                  <th className="text-right px-4 py-3 font-semibold">Akcia</th>
+                </tr>
+              </thead>
+              <tbody>
+                {qoCases.map((c) => (
+                  <tr key={c.id} className="border-b border-slate-800/40 last:border-0 hover:bg-slate-800/30 transition">
+                    <td className="px-4 py-3 font-medium">
+                      <Link href={`/players/${c.player.slug ?? c.player.id}`} className="font-bold text-white hover:text-blue-400 transition">{cleanName(c.player.name)}</Link>
+                      {c.player.position && <span className="ml-2 text-[11px] font-semibold px-1.5 rounded bg-slate-800 text-slate-300">{c.player.position}</span>}
+                      {c.player.overall != null && <span className="ml-1 text-[11px] font-black px-1.5 rounded bg-blue-950/60 text-blue-300 border border-blue-900/50">{c.player.overall}</span>}
+                    </td>
+                    <td className="px-3 py-3 font-bold text-slate-200">{c.team.parentTeam?.code ?? c.team.code ?? c.team.name}{c.team.parentTeam ? <span className="ml-1 text-[11px] font-normal text-slate-500">farm</span> : null}</td>
+                    <td className="px-3 py-3"><span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-950/60 text-sky-300 border border-sky-800/50">{qoStatusLabel[c.status] ?? c.status}</span></td>
+                    <td className="px-3 py-3 text-right tabular-nums font-mono font-bold text-white">{fmtM(c.qoAmount)}</td>
+                    <td className="px-3 py-3 text-right text-xs tabular-nums whitespace-nowrap font-mono text-slate-300">{c.qoTenderedAt ? fmtDate(c.qoTenderedAt) : "—"}</td>
+                    <td className="px-4 py-3 text-right"><CancelQoButton caseId={c.id} name={cleanName(c.player.name)} deadlinePassed={c.qoDueAt < new Date()} /></td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
