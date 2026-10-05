@@ -8,9 +8,17 @@ const STEP = 0.05;
 const MIN = 0.775;
 const DEFAULT_MAX = 25;
 
-/** Millions from what the GM typed — "17.9", "17,9" or a whole dollar figure ("17900000"). NaN if unreadable. */
+/** Millions from what the GM typed — "17.9", "17,9", "$17.9M" or a whole
+ * dollar figure ("17 900 000"). NaN if unreadable. */
 export function salaryMillions(raw: string): number {
-  const n = parseFloat(raw.replace(/\s/g, "").replace(",", "."));
+  const compact = raw.trim().replace(/[$€Mm\s'_\u00a0]/g, "");
+  // A single comma with no dot is a Slovak decimal separator. Commas in any
+  // other form are thousands separators, so a pasted "$1,250,000" also works.
+  const normalized = compact.includes(".") || (compact.match(/,/g)?.length ?? 0) > 1
+    ? compact.replace(/,/g, "")
+    : compact.replace(",", ".");
+  if (!/^\d+(?:\.\d+)?$/.test(normalized)) return NaN;
+  const n = Number(normalized);
   if (!Number.isFinite(n)) return NaN;
   return n >= 1_000 ? n / 1_000_000 : n;
 }
@@ -36,9 +44,14 @@ export default function SalaryStepper({ value, onChange, max = DEFAULT_MAX }: { 
     <div className="flex items-center gap-1">
       <button type="button" aria-label="−$50K" onClick={() => bump(-1)} className={btn}>−</button>
       <input
-        type="text" inputMode="decimal" autoComplete="off" placeholder="e.g. 17.9 or 17900000" value={value}
-        onChange={(e) => { const v = e.target.value.replace(",", "."); if (/^\d*\.?\d*$/.test(v)) onChange(v); }}
-        onBlur={() => { const m = salaryMillions(value); if (Number.isFinite(m) && value !== "") onChange(m.toFixed(m === MIN ? 3 : 2)); }}
+        type="text" inputMode="decimal" autoComplete="off" placeholder="e.g. 17.9M or 17 900 000" value={value}
+        aria-label="Salary per year in millions or dollars"
+        title="Type a salary directly: 17.9, 17,9, $17.9M or 17 900 000"
+        // Keep every keystroke. The former character gate made normal editing
+        // and pasting feel broken whenever a GM used a currency sign, spaces or
+        // a thousands separator. Validation remains at submit time.
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={() => { const m = salaryMillions(value); if (Number.isFinite(m) && value.trim() !== "") onChange(m.toFixed(m === MIN ? 3 : 2)); }}
         className="w-full min-w-0 px-2 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-base sm:text-sm tabular-nums text-center" />
       <button type="button" aria-label="+$50K" onClick={() => bump(1)} className={btn}>+</button>
     </div>
