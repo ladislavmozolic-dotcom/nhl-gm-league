@@ -10,6 +10,7 @@ import { loadSettings } from "@/lib/sim/settings";
 import { placeOnWaivers, recallExemptions } from "@/lib/waivers-server";
 import { getLeagueDate } from "@/lib/calendar-server";
 import { twoWayObjection } from "@/lib/free-agency";
+import { displayName } from "@/lib/playerName";
 
 export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
   const team = await prisma.team.findUnique({
@@ -212,7 +213,7 @@ export async function offerTwoWayFromRoster(slug: string, playerId: number, requ
       data: { capHit: salary, ahlSalary: null, contractYears: years, contractExpiry: expiry, contractType: "TWO_WAY", contractText },
     }),
     prisma.transaction.create({
-      data: { type: "SIGNING", playerId: player.id, message: `${team.code ?? "?"} converted ${player.name} to a two-way contract — $${(salary / 1_000_000).toFixed(2)}M NHL / $0.10M AHL × ${years}yr` },
+      data: { type: "SIGNING", playerId: player.id, message: `${team.code ?? "?"} converted ${displayName(player.name)} to a two-way contract — $${(salary / 1_000_000).toFixed(2)}M NHL / $0.10M AHL × ${years}yr` },
     }),
   ]);
   for (const path of [`/teams/${slug}/roster`, `/teams/${slug}/rosters`, `/teams/${slug}`, `/teams/${slug}/salary`, "/salary-cap", "/finance", "/signings"]) revalidatePath(path);

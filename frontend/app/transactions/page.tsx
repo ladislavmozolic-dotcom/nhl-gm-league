@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { PageHeader, Card } from "@/components/ui";
 import LocalDateTime from "@/components/LocalDateTime";
+import { cleanTransactionMessage } from "@/lib/playerName";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ export const TX_WHERE = {
 };
 
 export function cleanTxMessage(msg: string): string {
-  return msg
+  return cleanTransactionMessage(msg)
     .replace(/\bfor assets\./gi, "for future considerations.")
     .replace(/\btraded assets to\b/gi, "traded future considerations to");
 }

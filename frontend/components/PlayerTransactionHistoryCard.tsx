@@ -1,5 +1,6 @@
 import { Card } from "@/components/ui";
 import type { PlayerEventEntry } from "@/lib/trade-history-server";
+import { cleanTransactionMessage } from "@/lib/playerName";
 
 const ICON: Record<PlayerEventEntry["kind"], string> = {
   TRADE_BLOCK: "🧱",
@@ -22,7 +23,7 @@ export default function PlayerTransactionHistoryCard({ history }: { history: Pla
           <div key={e.id} className="flex items-start justify-between gap-3 rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-2">
             <div className="flex items-start gap-2">
               <span className="text-sm shrink-0">{ICON[e.kind]}</span>
-              <span className="text-sm text-slate-200">{e.message}</span>
+              <span className="text-sm text-slate-200">{cleanTransactionMessage(e.message)}</span>
               {e.team && (
                 <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-300 shrink-0">
                   {e.team.logoUrl && <img src={e.team.logoUrl} alt="" className="w-4 h-4 object-contain" />}

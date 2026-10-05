@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import ComingSoon from "@/components/ComingSoon";
 import { Card } from "@/components/ui";
-import { cleanName } from "@/lib/playerName";
+import { cleanName, cleanTransactionMessage } from "@/lib/playerName";
 import { franchiseHistory, type FranchiseLeader } from "@/lib/career-server";
 
 export const dynamic = "force-dynamic";
@@ -56,7 +56,7 @@ export default async function TeamHistoryPage({ params }: { params: Promise<{ sl
   const runnersUp = records.filter((r) => r.runnerUpTeamId === team.id);
   const presidents = records.filter((r) => r.presidentsTeamId === team.id);
   const chronicle = [
-    ...transactions.map((event) => ({ key: `tx-${event.id}`, at: event.createdAt, icon: event.type === "TRADE" ? "🔁" : event.type === "SIGNING" ? "✍️" : "📌", title: event.message, detail: event.type })),
+    ...transactions.map((event) => ({ key: `tx-${event.id}`, at: event.createdAt, icon: event.type === "TRADE" ? "🔁" : event.type === "SIGNING" ? "✍️" : "📌", title: cleanTransactionMessage(event.message), detail: event.type })),
     ...champs.map((record) => ({ key: `cup-${record.id}`, at: record.createdAt, icon: "🏆", title: `Won the ${record.league === "AHL" ? "Calder Cup" : "Stanley Cup"}`, detail: record.season })),
     ...awards.map((award) => ({ key: `award-${award.id}`, at: new Date(`${award.season.slice(0, 4)}-07-01T00:00:00Z`), icon: "⭐", title: `${AWARD_LABEL[award.category] ?? award.category}: ${award.playerName ?? "Team award"}`, detail: award.season })),
   ].sort((a, b) => b.at.getTime() - a.at.getTime()).slice(0, 20);

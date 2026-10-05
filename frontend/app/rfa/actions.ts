@@ -8,6 +8,7 @@ import { loadSettings } from "@/lib/sim/settings";
 import { arbitrationRange, ensureRfaCases, qoFormInfo, qoOneWayMessage } from "@/lib/rfa-server";
 import { CURRENT_SEASON_START } from "@/lib/finance";
 import { twoWayObjection } from "@/lib/free-agency";
+import { displayName } from "@/lib/playerName";
 
 const refresh = () => { revalidatePath("/rfa"); revalidatePath("/offer-sheets"); };
 
@@ -85,7 +86,7 @@ async function logArbitrationSigning(c: { playerId: number; teamId: number; awar
   const team = await prisma.team.findUnique({ where: { id: c.teamId }, select: { code: true, parentTeam: { select: { code: true } } } });
   const code = team?.parentTeam?.code ?? team?.code ?? "?";
   const salary = c.awardAav ?? 0, years = c.awardTerm ?? 0;
-  await prisma.transaction.create({ data: { type: "SIGNING", message: `${code} signed ${c.player.name} via arbitration — $${(salary / 1e6).toFixed(2)}M × ${years}yr${deferred ? ` (from ${startYear}-${String((startYear + 1) % 100).padStart(2, "0")})` : ""}` } }).catch(() => {});
+  await prisma.transaction.create({ data: { type: "SIGNING", message: `${code} signed ${displayName(c.player.name)} via arbitration — $${(salary / 1e6).toFixed(2)}M × ${years}yr${deferred ? ` (from ${startYear}-${String((startYear + 1) % 100).padStart(2, "0")})` : ""}` } }).catch(() => {});
   await prisma.signingLog.create({ data: {
     playerId: c.playerId, playerName: c.player.name, teamCode: code, kind: "EXTEND", salary, years,
     prevCapHit: c.player.capHit, prevYears: c.player.contractYears, prevExpiry: c.player.contractExpiry,

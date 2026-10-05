@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { tradeBlockBoard } from "@/lib/trade-block-server";
+import { cleanTransactionMessage } from "@/lib/playerName";
 
 // Fallback for the top-of-page ScoreTracker row on days with nothing to score
 // (pre-season, the off-season) — a scrolling feed of recent league moves
@@ -58,7 +59,7 @@ export default async function NewsTicker() {
       createdAt: null,
     }));
 
-  const txItems: NewsItem[] = txRows.map((tx) => ({ key: `tx-${tx.id}`, type: tx.type, message: tx.message, teamId: tx.teamId, createdAt: tx.createdAt }));
+  const txItems: NewsItem[] = txRows.map((tx) => ({ key: `tx-${tx.id}`, type: tx.type, message: cleanTransactionMessage(tx.message), teamId: tx.teamId, createdAt: tx.createdAt }));
   const items = [...txItems, ...blockItems];
   if (items.length === 0) return null;
 

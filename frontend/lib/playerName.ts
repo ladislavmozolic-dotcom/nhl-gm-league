@@ -36,6 +36,18 @@ export function displayName(name: string): string {
   return cleanName(name).replace(/\s*\(R\)/g, "").trim();
 }
 
+/** Remove import-only player tags from a public transaction sentence. Historical
+ * transaction rows persist the name in their message, so this works on the
+ * whole sentence instead of requiring a player-record lookup. */
+export function cleanTransactionMessage(message: string): string {
+  return message
+    .replace(CAP_RE, "")
+    .replace(CLAUSE_RE, "")
+    .replace(/\s*\(R\)/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 /** Just the name for an external search (EliteProspects etc.) — strips captaincy
  *  quote-markers AND every parenthetical tag ((LTIR), (R), (NTC)…). */
 export function epSearchName(name: string): string {
@@ -55,4 +67,3 @@ export function epProfileUrl(name: string): string {
 export function epPlayerSearchUrl(name: string): string {
   return epProfileUrl(name);
 }
-

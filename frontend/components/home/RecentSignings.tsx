@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { cleanTransactionMessage } from "@/lib/playerName";
 
 export default async function RecentSignings() {
   const signings = await prisma.transaction.findMany({
@@ -29,7 +30,7 @@ export default async function RecentSignings() {
               className="border-b border-slate-700/30 pb-2"
             >
               <p className="text-sm text-white">
-                {item.message}
+                {cleanTransactionMessage(item.message)}
               </p>
 
               <p className="text-xs text-slate-400">

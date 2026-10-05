@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { isAdmin } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { displayName } from "@/lib/playerName";
 
 /** Core logic to revert a signing or contract extension, restoring pre-signing snapshot. */
 export async function executeRevertSigning(logId: number) {
@@ -86,8 +87,8 @@ export async function executeRevertSigning(logId: number) {
     data: {
       type: "SIGNING",
       message: log.kind === "EXTEND"
-        ? `Commissioner reverted ${log.teamCode ?? "a club"}'s extension of ${log.playerName}.`
-        : `Commissioner reverted ${log.teamCode ?? "a club"}'s signing of ${log.playerName} — returned to the ${log.prevRosterType === "RFA" ? "RFA" : "UFA"} market.`,
+        ? `Commissioner reverted ${log.teamCode ?? "a club"}'s extension of ${displayName(log.playerName)}.`
+        : `Commissioner reverted ${log.teamCode ?? "a club"}'s signing of ${displayName(log.playerName)} — returned to the ${log.prevRosterType === "RFA" ? "RFA" : "UFA"} market.`,
       playerId: log.playerId,
     },
   }).catch(() => {});

@@ -16,6 +16,7 @@ import { getLeagueClock } from "./calendar-server";
 import { CURRENT_SEASON_START, capCeilingForPhase, ltirRelief, liveCapHit } from "./finance";
 import { teamCapCommitted } from "./cap";
 import { ensureRfaCases } from "./rfa-server";
+import { displayName } from "./playerName";
 
 type Ok = { ok: true };
 type Err = { ok: false; error: string };
@@ -208,7 +209,7 @@ async function executeOfferSheet(os: OfferSheetRow, playerName: string): Promise
     prisma.draftPick.updateMany({ where: { id: { in: os.compPickIds } }, data: { teamId: os.toTeamId } }),
     prisma.offerSheet.update({ where: { id: os.id }, data: { status: "ACCEPTED" } }),
     prisma.transaction.create({
-      data: { type: "SIGNING", message: `${from?.code ?? "?"} signed ${playerName} to an offer sheet — $${(os.salary / 1e6).toFixed(2)}M × ${os.years}yr; ${to?.code ?? "?"} receives ${compensationLabel(await compRounds(os.compPickIds))}` },
+      data: { type: "SIGNING", message: `${from?.code ?? "?"} signed ${displayName(playerName)} to an offer sheet — $${(os.salary / 1e6).toFixed(2)}M × ${os.years}yr; ${to?.code ?? "?"} receives ${compensationLabel(await compRounds(os.compPickIds))}` },
     }),
   ]);
 }
