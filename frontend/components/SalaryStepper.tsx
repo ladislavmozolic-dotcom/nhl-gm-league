@@ -50,9 +50,12 @@ export default function SalaryStepper({ value, onChange, max = DEFAULT_MAX }: { 
         // Keep every keystroke. The former character gate made normal editing
         // and pasting feel broken whenever a GM used a currency sign, spaces or
         // a thousands separator. Validation remains at submit time.
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => { e.stopPropagation(); e.currentTarget.focus(); }}
+        onFocus={(e) => e.stopPropagation()}
         onChange={(e) => onChange(e.target.value)}
         onBlur={() => { const m = salaryMillions(value); if (Number.isFinite(m) && value.trim() !== "") onChange(m.toFixed(m === MIN ? 3 : 2)); }}
-        className="w-full min-w-0 px-2 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-base sm:text-sm tabular-nums text-center" />
+        className="min-h-10 min-w-0 flex-1 px-2 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-base sm:text-sm tabular-nums text-center outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20" />
       <button type="button" aria-label="+$50K" onClick={() => bump(1)} className={btn}>+</button>
     </div>
   );
