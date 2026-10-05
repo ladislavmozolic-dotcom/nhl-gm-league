@@ -83,15 +83,7 @@ export async function executeRevertSigning(logId: number) {
     data: { reverted: true },
   });
 
-  await prisma.transaction.create({
-    data: {
-      type: "SIGNING",
-      message: log.kind === "EXTEND"
-        ? `Commissioner reverted ${log.teamCode ?? "a club"}'s extension of ${displayName(log.playerName)}.`
-        : `Commissioner reverted ${log.teamCode ?? "a club"}'s signing of ${displayName(log.playerName)} — returned to the ${log.prevRosterType === "RFA" ? "RFA" : "UFA"} market.`,
-      playerId: log.playerId,
-    },
-  }).catch(() => {});
+  // no public Transactions line for a revert — commissioner tests/corrections stay out of the league feed
 
   const paths = [
     "/admin/signings",
