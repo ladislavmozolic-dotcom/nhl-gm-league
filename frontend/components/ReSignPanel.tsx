@@ -82,7 +82,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
       <div
-        className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-2xl max-h-[88dvh] overflow-y-auto p-5"
+        className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-[800px] max-h-[88dvh] overflow-y-auto p-5"
         role="dialog"
         aria-modal="true"
         aria-label={`Re-sign ${cleanName(player.name)}`}
