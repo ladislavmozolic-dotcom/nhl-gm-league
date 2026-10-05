@@ -165,8 +165,7 @@ export async function gmDashboard(teamId: number): Promise<GmDashboard | null> {
     const stillOurs = new Set(players.map((p) => cleanName(p.name).toLowerCase()));
     const prospect = candidates.find((c) => stillOurs.has(cleanName(c.name).toLowerCase()));
     if (prospect) briefing.push({ dept: "Scouting", icon: "🔭", text: `Prospect ${cleanName(prospect.name)} (${prospect.position}) is tracking up — ceiling ${prospect.potential}, now grading ${prospect.ov}.`, href: `${teamHref2}/prospects` });
-    else briefing.push({ dept: "Scouting", icon: "🔭", text: "Scouts are quiet this week — no new risers in the system." });
-  } catch { briefing.push({ dept: "Scouting", icon: "🔭", text: "Scouts are quiet this week — no new risers in the system." }); }
+  } catch { /* no scouting note — the card is simply omitted when there is nothing to report */ }
   // League — the next date on the calendar.
   const y = SEASON_START_YEAR;
   const deadline = new Date(Date.UTC(y + 1, 2, 3));   // ~Mar 3 trade deadline
