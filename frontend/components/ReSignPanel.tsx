@@ -421,7 +421,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                   <div>
                     <label className="text-xs font-semibold text-slate-400 block mb-2">
                       Charakter zmluvy (CBA Pravidlá)
-                      <InfoTip text="One-way garantuje rovnaký plat v NHL aj v AHL. Two-way platí na farme $100k — hráč starší ako 25 rokov (s 30+ NHL zápasmi vlani) ju neprijme; dvojcestná zmluva je povolená najviac do výšky platu $1.30M." />
+                      <InfoTip text="One-way aj Two-way zmluva garantuje rovnaký plat v NHL aj v AHL. Two-way umožňuje flexibilný pohyb na farmu a je povolená najviac do výšky platu $1.30M; etablovaní hráči (nad 25 rokov s 30+ NHL zápasmi vlani) dvojcestnú zmluvu odmietajú." />
                     </label>
                     <div className="grid grid-cols-2 gap-2">
                       <button
@@ -466,7 +466,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                             ? isSalaryAboveTwoWayMax
                               ? `Len do ${M(maxTwoWay)}`
                               : "Hráč odmieta 2-way"
-                            : "V AHL plat $100k"}
+                            : "Flexibilný pohyb do AHL (do $1.30M)"}
                         </span>
                       </button>
                     </div>
@@ -558,11 +558,11 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
             <div className="mt-8 pt-6 border-t border-amber-500/20">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end mb-6">
                 <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 text-center">
-                  <div className="h-10 flex items-center justify-center text-amber-300/90 font-serif italic text-lg">
-                    Generálny manažér
+                  <div className="h-10 flex items-center justify-center text-amber-300 font-serif italic text-lg tracking-wide">
+                    {i?.gmName || "Generálny manažér"}
                   </div>
                   <div className="border-t border-slate-800 pt-1 text-[10px] uppercase font-bold tracking-wider text-slate-500">
-                    Podpis autorizovaného zástupcu klubu
+                    Podpis GM {i?.teamName ? `(${i.teamName})` : "(autorizovaný zástupca klubu)"}
                   </div>
                 </div>
 
@@ -587,7 +587,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
               {/* Offer Summary Bar */}
               {Number.isFinite(currentSalaryDollars) && currentSalaryDollars >= 775_000 && (
                 <div className="mb-4 text-center text-xs text-slate-400">
-                  Pripravený návrh: <strong className="text-amber-300 font-mono">{M(currentSalaryDollars)}/rok</strong> × <strong className="text-white">{years} {years === 1 ? "rok" : years < 5 ? "roky" : "rokov"}</strong> ({M(currentSalaryDollars * years)} celkovo) • <span className={twoWay ? "text-blue-300 font-semibold" : "text-amber-300 font-semibold"}>{twoWay ? "2-way (AHL: $100k)" : "1-way"}</span>{grantClause ? ` • ${grantClause}` : ""}
+                  Pripravený návrh: <strong className="text-amber-300 font-mono">{M(currentSalaryDollars)}/rok</strong> × <strong className="text-white">{years} {years === 1 ? "rok" : years < 5 ? "roky" : "rokov"}</strong> ({M(currentSalaryDollars * years)} celkovo) • <span className={twoWay ? "text-blue-300 font-semibold" : "text-amber-300 font-semibold"}>{twoWay ? "2-way" : "1-way"}</span>{grantClause ? ` • ${grantClause}` : ""}
                 </div>
               )}
 

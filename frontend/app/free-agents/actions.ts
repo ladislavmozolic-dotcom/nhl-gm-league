@@ -130,6 +130,12 @@ export async function getInterestAction(playerId: number, teamId: number) {
     maxYears: tw.maxYears, ahlMaxYears: tw.ahlMaxYears, fewGpMaxYears: tw.fewGpMaxYears, maxSalary: tw.maxSalary,
   }) : null;
 
+  const team = await prisma.team.findUnique({
+    where: { id: teamId },
+    select: { name: true, gm: true, gmFirstName: true, gmLastName: true, gmNickname: true },
+  });
+  const gmName = team?.gmNickname || [team?.gmFirstName, team?.gmLastName].filter(Boolean).join(" ").trim() || team?.gm || "Generálny manažér";
+
   let capRoom: number | null = null;
   try {
     const cap = await loadLeagueCap();
@@ -143,6 +149,8 @@ export async function getInterestAction(playerId: number, teamId: number) {
   return {
     ok: true as const,
     name: player?.name ?? "",
+    teamName: team?.name ?? "",
+    gmName,
     age: player?.age ?? null,
     overall: player?.overall ?? null,
     grp: info.grp,
