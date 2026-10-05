@@ -1400,6 +1400,8 @@ export async function extendContractAction(
     const counterSalary = nextRequiresFullAsk ? ev.ask.salary : ev.ask.floorSalary;
     const counterYears = Math.min(Math.max(years, ev.ask.minYears), ev.ask.maxYears);
     const isLastRound = !rfaPostOs && nextRound >= maxRounds;
+    // an RFA doesn't leave — he becomes open to rival offer sheets (and returns to his club if nobody signs him)
+    const leaveNote = isRFA ? "he becomes open to rival offer sheets (if nobody signs him, talks with you resume)" : "he walks";
     const bestOffer = Math.max(salary, player.resignOfferSalary ?? 0);
     await prisma.player.update({ where: { id: playerId }, data: { resignRound: nextRound, resignStatus: "countered", resignCounterSalary: counterSalary, resignCounterYears: counterYears, resignOfferSalary: bestOffer, resignOfferAt: new Date() } });
     await prisma.faBid.create({ data: { playerId, teamId, salary, years, round: nextRound } }).catch(() => {});
@@ -1409,8 +1411,8 @@ export async function extendContractAction(
         ? `Round ${nextRound} — no more offer sheets, straight talks with your club now. He's countering around ${fmtM(counterSalary)}–${fmtM(counterSalary * 1.06)} over ${counterYears}yr.${insult}`
         : isLastRound
           ? nextRequiresFullAsk
-            ? `Round ${nextRound} of ${maxRounds} — last round. Lowballed twice, he won't take a penny under his full ask: ${fmtM(counterSalary)} over ${counterYears}yr — fall short and he walks.${insult}`
-            : `Round ${nextRound} of ${maxRounds} — last round. His absolute minimum is ${fmtM(counterSalary)} over ${counterYears}yr — fall short on your final offer and he walks.${insult}`
+            ? `Round ${nextRound} of ${maxRounds} — last round. Lowballed twice, he won't take a penny under his full ask: ${fmtM(counterSalary)} over ${counterYears}yr — fall short and ${leaveNote}.${insult}`
+            : `Round ${nextRound} of ${maxRounds} — last round. His absolute minimum is ${fmtM(counterSalary)} over ${counterYears}yr — fall short on your final offer and ${leaveNote}.${insult}`
           : `Round ${nextRound} of ${maxRounds} — he's countering around ${fmtM(counterSalary)}–${fmtM(counterSalary * 1.06)} over ${counterYears}yr.${insult}`,
       floor: ev.ask.floorSalary, minYears: ev.ask.minYears, maxYears: ev.ask.maxYears,
     };
