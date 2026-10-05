@@ -11,7 +11,8 @@ import { cleanName } from "@/lib/playerName";
 import { clauseDiscount } from "@/lib/free-agency";
 import { friendlyActionError } from "@/lib/client/action-error";
 
-type ExpiringPlayer = { id: number; name: string; capHit: number | null; contractYears: number | null; contractText: string | null; farm?: boolean; franchiseTag?: boolean; rightsReleased?: boolean; rfaStatus?: string; qoAmount?: number; qoDueAt?: string };
+type NegotiationSnapshot = { round: number | null; offerSalary: number | null; offerYears: number | null; offerLine: number | null; offerPP: boolean | null; offerPK: boolean | null; offerClause: string | null; offerTwoWay: boolean | null; counterSalary: number | null; counterYears: number | null; note: string | null };
+type ExpiringPlayer = { id: number; name: string; capHit: number | null; contractYears: number | null; contractText: string | null; farm?: boolean; franchiseTag?: boolean; rightsReleased?: boolean; rfaStatus?: string; qoAmount?: number; qoDueAt?: string; resignRound?: number | null; resignOfferSalary?: number | null; resignCounterSalary?: number | null; resignCounterYears?: number | null; negotiation?: NegotiationSnapshot };
 
 const M = (n: number) => `$${(n / 1e6).toFixed(2)}M`;
 function lineOptions(grp: string) {
@@ -43,11 +44,21 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
       try {
         const i = await getInterestAction(player.id, teamId);
         setInfo(i);
-        // Salary and term start blank — his headline ask is shown as context above the
-        // form, not pre-filled into it, so every GM has to actually decide a number
-        // instead of just accepting the computed figure by default. Role/PP/PK still
-        // default to what he wants — those aren't the part being negotiated here.
-        if (i.ok) { setLine(i.line); setPp(i.wantPP); setPk(i.wantPK); }
+        // A fresh negotiation starts with an intentionally blank financial offer. On
+        // later visits, preserve the previous offer and seed the reply with the
+        // player's counter, so a GM never has to reconstruct a failed negotiation.
+        if (i.ok) {
+          const previous = player.negotiation;
+          setLine(previous?.offerLine ?? i.line);
+          setPp(previous?.offerPP ?? i.wantPP);
+          setPk(previous?.offerPK ?? i.wantPK);
+          setGrantClause(previous?.offerClause ?? "");
+          setTwoWay(previous?.offerTwoWay ?? false);
+          const suggestedSalary = previous?.counterSalary ?? player.resignCounterSalary;
+          const suggestedYears = previous?.counterYears ?? player.resignCounterYears;
+          if (suggestedSalary) setSalaryM((suggestedSalary / 1e6).toFixed(3));
+          if (suggestedYears) setYears(suggestedYears);
+        }
       } catch (e) { setMsg({ t: "err", s: friendlyActionError(e) }); }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -130,6 +141,19 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
               <p className="mt-0.5 text-xs text-slate-500">That&apos;s his base ask at his preferred term — offer a different length yourself and the price shifts ({i.minYears}-{i.maxYears}yr negotiable; more years usually costs more, except 35+ vets, where it's the reverse).</p>
               {i.moraleNote && <p className={`mt-1 text-xs font-medium ${i.moraleNote.startsWith("Happy") ? "text-emerald-400" : "text-amber-400"}`}>{i.moraleNote.startsWith("Happy") ? "😀 " : "😕 "}{i.moraleNote}</p>}
             </div>
+
+            {(player.negotiation || (player.resignRound ?? 0) > 0) && (
+              <div className="bg-sky-500/5 border border-sky-500/25 rounded-lg p-3 mb-3 text-sm">
+                <p className="text-xs font-bold uppercase tracking-wide text-sky-300">Previous negotiation</p>
+                <p className="mt-1 text-slate-300">
+                  Your last offer: <b className="text-white tabular-nums">{player.negotiation?.offerSalary ? `${M(player.negotiation.offerSalary)} × ${player.negotiation.offerYears ?? "?"}yr` : player.resignOfferSalary ? M(player.resignOfferSalary) : "recorded"}</b>
+                  {player.negotiation?.offerLine ? <span className="text-slate-500"> · {slotLabels[`L${player.negotiation.offerLine}`] ?? `line ${player.negotiation.offerLine}`}</span> : null}
+                </p>
+                {(player.negotiation?.counterSalary ?? player.resignCounterSalary) && (
+                  <p className="mt-1 text-amber-300">Player&apos;s counter: <b className="tabular-nums">{M(player.negotiation?.counterSalary ?? player.resignCounterSalary!)} × {player.negotiation?.counterYears ?? player.resignCounterYears ?? "?"}yr</b> <span className="text-slate-500">— loaded into the form below.</span></p>
+                )}
+              </div>
+            )}
 
             {!done && (
               <div className="space-y-3">
@@ -278,9 +302,9 @@ export default function ReSignPanel({ teamId, players, title, blurb, accent = "t
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {group === "RFA" && franchiseEnabled && (
-                <button onClick={() => toggleTag(p.id)} disabled={tagPending}
-                  title="Franchise RFA — gets 2 re-sign rounds before offer sheets (1 per club)"
-                  className={`px-2 py-1 rounded-md text-xs font-semibold whitespace-nowrap border ${tagged === p.id ? "bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/40" : "bg-slate-800 text-slate-400 border-slate-700 hover:text-fuchsia-300"} disabled:opacity-40`}>
+                <button onClick={() => toggleTag(p.id)} disabled={tagPending || (!p.franchiseTag && (p.resignRound ?? 0) > 0)}
+                  title={!p.franchiseTag && (p.resignRound ?? 0) > 0 ? "Franchise Tag must be assigned before the first contract offer" : "Franchise RFA — gets 2 re-sign rounds before offer sheets (1 per club)"}
+                  className={`px-2 py-1 rounded-md text-xs font-semibold whitespace-nowrap border ${tagged === p.id ? "bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/40" : "bg-slate-800 text-slate-400 border-slate-700 hover:text-fuchsia-300"} disabled:opacity-40 disabled:cursor-not-allowed`}>
                   ★ {tagged === p.id ? "Franchise" : "Tag"}
                 </button>
               )}

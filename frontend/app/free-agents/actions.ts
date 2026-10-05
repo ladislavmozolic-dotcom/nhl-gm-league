@@ -1209,13 +1209,18 @@ export async function setFranchiseTagAction(playerId: number, teamId: number, on
   if (!(await canManageTeam(teamId))) return { ok: false as const, error: "You don't manage this team." };
   const settings = await loadSettings();
   if (settings.faMode === "simple") return { ok: false as const, error: "This league runs the simple free-agency system — no franchise tags or offer sheets." };
-  const p = await prisma.player.findUnique({ where: { id: playerId }, select: { teamId: true, age: true } });
+  const p = await prisma.player.findUnique({ where: { id: playerId }, select: { teamId: true, age: true, franchiseTag: true, resignRound: true } });
   if (!p) return { ok: false as const, error: "Player not found." };
   const org = await prisma.team.findUnique({ where: { id: teamId }, select: { affiliateTeams: { select: { id: true } } } });
   const orgIds = [teamId, ...(org?.affiliateTeams.map((a) => a.id) ?? [])];
   if (!orgIds.includes(p.teamId)) return { ok: false as const, error: "That player isn't in your organization." };
   if ((p.age ?? 27) > settings.rfaMaxAge) return { ok: false as const, error: `Only an RFA (${settings.rfaMaxAge} or younger) can be franchise-tagged.` };
   if (on) {
+    // The tag is a decision made before negotiations begin. Letting a club add it
+    // after an initial rejection would retroactively create an extra protected round.
+    if (!p.franchiseTag && (p.resignRound ?? 0) > 0) {
+      return { ok: false as const, error: "Franchise Tag must be assigned before the first contract offer." };
+    }
     await prisma.player.updateMany({ where: { teamId: { in: orgIds }, franchiseTag: true }, data: { franchiseTag: false } }); // one per club
     await prisma.player.update({ where: { id: playerId }, data: { franchiseTag: true } });
   } else {

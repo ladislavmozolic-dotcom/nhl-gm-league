@@ -45,11 +45,20 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
     // unsigned (see sweepUnsignedRfasToNonRoster) — still owned by this club and must
     // stay visible here, since re-signing him is the ONLY way he gets un-benched.
     where: { teamId: { in: orgIds }, rosterType: { in: ["NHL", "AHL", "NONROSTER"] }, contractYears: yearsFilter, extCapHit: null, NOT: { capHit: 100_000 } },
-    select: { id: true, name: true, age: true, capHit: true, contractYears: true, contractText: true, position: true, isGoalie: true, df: true, lastSeasonGP: true, lastSeasonPts: true, lastSeasonSvPct: true, rosterType: true, franchiseTag: true, birthDate: true, rightsReleased: true },
+    select: { id: true, name: true, age: true, capHit: true, contractYears: true, contractText: true, position: true, isGoalie: true, df: true, lastSeasonGP: true, lastSeasonPts: true, lastSeasonSvPct: true, rosterType: true, franchiseTag: true, birthDate: true, rightsReleased: true, resignRound: true, resignOfferSalary: true, resignCounterSalary: true, resignCounterYears: true },
     orderBy: { capHit: "desc" },
   });
   const rfaCases = await prisma.rfaCase.findMany({ where: { playerId: { in: expiring.map((p) => p.id) }, status: { in: ["QO_DUE", "QO_TENDERED", "NEGOTIATING", "ARB_FILED", "AWARDED", "OS_ELIGIBLE"] } }, select: { playerId: true, status: true, qoAmount: true, qoDueAt: true } });
   const rfaByPlayer = new Map(rfaCases.map((c) => [c.playerId, c]));
+  // Keep the latest actual offer alongside a player so returning to Re-sign after
+  // a rejection shows the GM exactly what was offered and what the player countered.
+  const negotiationRows = expiring.length ? await prisma.negotiationLog.findMany({
+    where: { playerId: { in: expiring.map((p) => p.id) }, kind: "OFFER" },
+    orderBy: { id: "desc" },
+    select: { playerId: true, round: true, offerSalary: true, offerYears: true, offerLine: true, offerPP: true, offerPK: true, offerClause: true, offerTwoWay: true, counterSalary: true, counterYears: true, note: true },
+  }) : [];
+  const negotiationByPlayer = new Map<number, typeof negotiationRows[number]>();
+  for (const row of negotiationRows) if (!negotiationByPlayer.has(row.playerId)) negotiationByPlayer.set(row.playerId, row);
 
   if (expiring.length === 0) {
     return (
@@ -119,7 +128,8 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
           <ReSignPanel key={g} teamId={teamId} title={META[g].title} blurb={META[g].blurb} accent={META[g].accent} group={g} franchiseEnabled={franchiseEnabled} canNegotiate={canNegotiate}
             players={groups[g].map((p) => {
               const rfa = rfaByPlayer.get(p.id);
-              return { id: p.id, name: p.name, capHit: p.capHit, contractYears: p.contractYears, contractText: p.contractText, farm: p.rosterType === "AHL", franchiseTag: p.franchiseTag, rightsReleased: p.rightsReleased, rfaStatus: rfa?.status, qoAmount: rfa?.qoAmount, qoDueAt: rfa?.qoDueAt?.toISOString() };
+              const negotiation = negotiationByPlayer.get(p.id);
+              return { id: p.id, name: p.name, capHit: p.capHit, contractYears: p.contractYears, contractText: p.contractText, farm: p.rosterType === "AHL", franchiseTag: p.franchiseTag, rightsReleased: p.rightsReleased, rfaStatus: rfa?.status, qoAmount: rfa?.qoAmount, qoDueAt: rfa?.qoDueAt?.toISOString(), resignRound: p.resignRound, resignOfferSalary: p.resignOfferSalary, resignCounterSalary: p.resignCounterSalary, resignCounterYears: p.resignCounterYears, negotiation: negotiation ? { round: negotiation.round, offerSalary: negotiation.offerSalary, offerYears: negotiation.offerYears, offerLine: negotiation.offerLine, offerPP: negotiation.offerPP, offerPK: negotiation.offerPK, offerClause: negotiation.offerClause, offerTwoWay: negotiation.offerTwoWay, counterSalary: negotiation.counterSalary, counterYears: negotiation.counterYears, note: negotiation.note } : undefined };
             })} />
         ) : (
           <Card key={g} title={`${META[g].title} (${groups[g].length})`} accent={META[g].accent}>
