@@ -116,8 +116,13 @@ const SECTIONS: Sec[] = [
   },
   {
     id: "rfa", title: "8 · Re-Signing Your Own Players — UFA & RFA",
-    intro: "How the Agent negotiates when you try to extend one of your OWN expiring players, from the Contracts page.",
+    intro: "Everything about extending one of your OWN expiring players: how the Agent negotiates, what a qualifying offer is, arbitration, offer sheets, the Franchise Tag and what moves a player's price. Start from Finance & Contracts → Team Contracts.",
     groups: [
+      { h: "The basics", points: [
+        "The longest one-way contract is 4 seasons; a two-way deal is at most 2 seasons (and only players who are willing will sign one — see the two-way rules in the Free Agency section).",
+        "Your cap space for next season is on your team page under Finance & Contracts → Salary Cap. The players whose deals end after the season are under Finance & Contracts → Team Contracts.",
+        "You don't have to extend anybody. A UFA you leave alone simply walks to the open market after the season. An RFA you leave alone stays with you only as long as the qualifying-offer rules below hold.",
+      ] },
       { h: "Who's a UFA, who's an RFA", points: [
         "His status is decided by his age on June 30 of the year his CURRENT deal expires — not his age today. 27 or older by then = unrestricted; younger = restricted.",
         "(A league may instead run the 'simple' free-agency system, where everyone tests the open market — no RFA rights, tags or offer sheets. The commissioner sets this.)",
@@ -125,22 +130,39 @@ const SECTIONS: Sec[] = [
       { h: "When you can negotiate", points: [
         "Any time he's in the final year of his deal or it's already expired — except during the Free Agent Frenzy itself (the open market has its own flow) and the first days of a new regular season (commissioner-set window, lets rosters settle first; the commissioner can exempt an individual club from that window, e.g. for testing).",
       ] },
-      { h: "Qualifying offer (QO)", points: [
-        "Every RFA has a qualifying offer on RFA Central. Tender it by its deadline to keep the player's restricted rights. The QO is at least the league minimum and is normally based on his previous AAV; both the percentage and deadline are commissioner settings.",
-        "Starting to negotiate with an RFA tenders his QO automatically, so a club that is already talking to him can't lose him to the deadline; a week before the deadline the club also gets a reminder (DM + banner on Team Contracts) listing every player still without a QO. Missing the deadline releases the player's rights. Once his old contract has expired he becomes a normal UFA, and his former club can only sign him through the same open market as every other club.",
-        "A normal in-season Re-sign remains available and is always the cleanest outcome: signing the player closes his QO/arbitration case immediately. Arbitration is never required just to extend an RFA.",
+      { h: "Step 1 — his demand", points: [
+        "When you open negotiations he states his demand: an approximate cap hit and the term he prefers, shown as a range (for example: looking for roughly 3.40M–4.04M / 3 years). The salary and term boxes start blank — you enter your own numbers.",
+        "Price depends on term. A player up to roughly 33–34 asks LESS for one year than for four (Quinn Hughes wants less on a 1-year deal than on a 4-year one). An older player runs the other way — Alex Killorn asks MORE for one year and less for three. All numbers are cap hits.",
+        "You only ever see the range at HIS preferred term. His exact demand at any other length stays hidden, so you have to feel your way.",
       ] },
-      { h: "Salary arbitration", points: [
-        "An RFA becomes arbitration-eligible after reaching the commissioner-set age or NHL-games-played threshold. Either the club or player may file after a QO has been tendered.",
-        "At the hearing, each side submits an AAV and term. RFA Central shows comparable players and a permitted salary range; the award is determined inside that range. An open arbitration hearing pauses ordinary re-sign negotiations until it is resolved.",
-        "An award is binding unless it reaches the commissioner-set walk-away threshold. Above that line, the club may Walk away; the player immediately becomes a UFA and does not remain an own-player negotiation.",
+      { h: "Step 2 — your offer and his reaction (not like real life)", points: [
+        "Example (invented): Cutter Gauthier's hidden demands are 10M for 1 year, 11M for 2, 12M for 3 and 13M for 4. You only see about 11.55M–12.5M for his preferred 3 years. You want him for 4, so you offer 4 years — his real demand there (13M) stays hidden.",
+        "In real life a club would counter low and meet in the middle. Here the PLAYER has the leverage: undershoot his demand by too much and he takes offence — his next demand goes UP (13M can become about 14.5M).",
+        "How far you can undershoot depends on his price tier: under $3M ≈ 33 %, $3–5M ≈ 25 %, $5–10M ≈ 20 %, $10–15M ≈ 15 %, $15M+ ≈ 10 %. At a 13M demand, an offer of roughly 11.05M or less insults him.",
+        "An insult is remembered for your club (about 200 days) and stacks: the first counter after an insult already shows the raised range, there is room for roughly two insults, and after TWO of them he only accepts his full ask. On his last round he names the exact minimum he will sign for.",
+        "If your offer is below his demand but NOT an insult, he turns it down without raising anything — he only tells you it isn't enough.",
+        "Players who ask for less will usually knock off about 250,000; more expensive ones up to about 500,000. How you use that is up to you.",
       ] },
-      { h: "How the negotiation itself works", points: [
-        "Submit an offer — money, term, role, special teams, contract type, and any clause you'll grant. He never just refuses: every rejected offer gets a real counter-offer back, even a lowball first try.",
-        "UFA: 2 rounds. Reject his 2nd counter and he walks to test the open market.",
-        "RFA without your Franchise Tag: 1 round. Reject his counter and he's open to offer sheets from rival clubs.",
-        "RFA WITH your Franchise Tag: 2 rounds before he'd be exposed to offer sheets — after those two he is available to offer sheets just like any other RFA.",
-        "An RFA who reaches offer sheets isn't gone — if nobody signs him there, he comes straight back to you, and from then on you negotiate directly, round after round, with no cap and no second trip to offer sheets.",
+      { h: "How many offers you get", points: [
+        "UFA: up to 3 offers. After each he either accepts, or rejects and tells you why (raising his demand if you undershot). After the 3rd rejection he announces he'll test the open market after the season and you can no longer extend him.",
+        "RFA (no tag): 2 offers. Reject his counter to the 2nd and talks stop for now — he waits for an offer sheet from a rival club.",
+        "RFA with your Franchise Tag: 3 offers (one extra round); he is protected from offer sheets until those rounds are used up.",
+        "An RFA nobody signed through offer sheets comes straight back to you: from then on you negotiate directly, offer after offer, with no cap on rounds and no second trip to offer sheets.",
+      ] },
+      { h: "Qualifying offer (QO) — RFAs only", points: [
+        "Every RFA has a qualifying offer on RFA Central: normally 100 % of his current AAV and at least the league minimum (both are commissioner settings). Tender it by the deadline (June 25) to keep his restricted rights.",
+        "A QO is tendered automatically the moment you start negotiating with him — a club that is already talking to a player can't lose him to a missed deadline. A week before the deadline you also get a reminder (a DM plus a banner on Team Contracts) listing every RFA still without a QO.",
+        "A QO is also what makes a player reachable by offer sheets: without one he can't receive any.",
+        "Missing the deadline with no QO and no negotiation releases his rights: he becomes a UFA — even at 26 or younger.",
+        "A normal Re-sign is always available and closes any QO or arbitration case immediately. Arbitration is never required just to extend an RFA.",
+      ] },
+      { h: "Salary arbitration — RFAs only", points: [
+        "Eligibility: age 24+ OR 40+ NHL games last season (commissioner settings). Either the club or the player may file once a QO has been tendered. While an arbitration case is open, ordinary re-sign offers are blocked.",
+        "The arbitrator compares six similar players (same position, similar rating and age) and sets a band: 80–120 % of their median cap hit, never below the QO. The club's and the player's submissions default to the bottom and the top of the band.",
+        "The verdict arrives automatically 48 hours after the filing (the commissioner can issue it sooner). The salary is the midpoint of the two submissions, inside the band.",
+        "The term (1 or 2 years) is chosen by the side that did NOT file: if the club filed, the player picks (1 year); if the player filed, the club picks (2 years — 1 year when the award is walk-away money).",
+        "A two-way award pays him the FULL salary on the farm too — it never counts against the salary cap, only against Finance. A two-way isn't possible at $1.3M or more, or for an established NHLer (180+ games over 3 seasons, 60+ last season, no waivers).",
+        "Below $4.5M the club must accept the award. At $4.5M or more it may walk away, and he then becomes a UFA. The new contract STARTS when his current deal expires — an award handed out during the season never changes this season's salary or cap hit.",
       ] },
       { h: "Offer sheets (RFA only)", points: [
         "Only an RFA whose club tendered a QO can reach offer sheets. Open July 1–8 of the off-season; resolved July 10. A commissioner-set compensation ladder (his old club's own original draft picks, by AAV tier) is what the poaching club pays if he signs.",
@@ -148,7 +170,7 @@ const SECTIONS: Sec[] = [
         "An arbitration award closes the offer-sheet path: the player either signs the award or the club walks away and he enters normal UFA free agency.",
       ] },
       { h: "Franchise Tag", points: [
-        "One per club, RFA-age players only. The tag protects him from offer sheets through TWO re-sign rounds with you. If those two rounds end without a deal he becomes available to offer sheets like any other RFA (the tag falls away if a rival signs him); if nobody does, you keep negotiating with him directly.",
+        "One per club, RFA-age players only. The tag gives you a 3rd offer and protects him from offer sheets through those rounds. If they end without a deal he becomes available to offer sheets like any other RFA (the tag falls away if a rival signs him); if nobody does, you keep negotiating with him directly.",
       ] },
       { h: "Release his rights instead", points: [
         "\"Release rights\" on Team Contracts (RFAs only) declares you won't extend him: he's priced and treated like a UFA from then on — no RFA discount, no ceiling — and hits the open market the instant his deal runs out, instead of staying tied to you. Reversible any time before he actually expires.",
@@ -157,6 +179,14 @@ const SECTIONS: Sec[] = [
         "Lowball insult: undershoot his real floor by too much (a sliding bar — roughly a third on a modest deal, down to about a tenth on a $15M+ one) and he remembers it — his asking price to YOUR club specifically climbs, with room for roughly two such insults before it caps out (never under the commissioner's own 25% floor, more on a cheap contract). Other clubs aren't affected. Insult him twice and floor money stops working — from then on it's his full ask or nothing.",
         "Term pricing: his headline number is calibrated to his preferred length. Offer more or fewer years than that and the price bends — usually up for more term, down for less — EXCEPT a player 35 or older, who runs the other way: a longer deal costs LESS per year (a team-friendly, real-NHL-style extension), while a short 'one more run' year is his most expensive ask.",
         "Promise him a worse role than he wants and he charges a premium, takes a shorter term — and a no-trade clause stops earning him a discount, since he wants to stay free to leave if you don't deliver.",
+        "Team strength: older players chase winners. At 32+ a contender can get up to about 7.5 % off his demand, while a rebuilding club pays up to about 12.5 % extra. Under 24 it barely matters (around 1 %). Check how strong you look under League → Fan Interest.",
+        "Role: he prices the line and special teams he expects. Meet every wish and he'll give a small discount (about 4 % at most); promise a 3rd line and no power play to someone who wants the 2nd line and PP and his demand can climb by up to about 17 %.",
+        "Trade activity: agents remember that you sign free agents and flip them within a year, and may raise demands for your future signings. It looks back about 270 days and counts only players signed on the open market — never ones you extended.",
+        "Kept promises: promise a 2nd line and PP time, then play him on the 3rd line without PP, and the agent remembers — other players at your club ask for more.",
+        "Morale: a happy player gives a discount (up to about 12 % for a star), an unhappy one asks for a premium (up to about 16 %). Better players are affected more, fringe players barely at all.",
+      ] },
+      { h: "Rookies (ELC contracts)", points: [
+        "When one of your prospects plays the required minimum of games (in real life), he jumps into your lineup for the next season with an automatic salary based on how he performed in his first NHL/AHL season. You can't influence it.",
       ] },
     ],
   },
@@ -515,8 +545,13 @@ const SECTIONS_CS: Sec[] = [
   },
   {
     id: "rfa", title: "8 · Prodlužování vlastních hráčů — UFA a RFA",
-    intro: "Jak Agent vyjednává, když se pokusíte prodloužit jednoho z VLASTNÍCH končících hráčů, ze stránky Contracts.",
+    intro: "Vše o prodlužování jednoho z VLASTNÍCH končících hráčů: jak Agent vyjednává, co je kvalifikační nabídka, arbitráž, nabídkové listiny, franšízový tag a co hýbe cenou hráče. Začněte na Finance & Contracts → Team Contracts.",
     groups: [
+      { h: "Základy", points: [
+        "Nejdelší one-way smlouva je na 4 sezóny; obousměrná (two-way) nejvýš na 2 sezóny (a podepíšou ji jen ochotní hráči — viz pravidla two-way v části o volných hráčích).",
+        "Prostor pod stropem na další sezónu najdete na stránce svého týmu pod Finance & Contracts → Salary Cap. Hráče, kterým po sezóně končí smlouva, pod Finance & Contracts → Team Contracts.",
+        "Nikoho prodlužovat nemusíte. UFA, kterého necháte být, po sezóně prostě odejde na trh. RFA, kterého necháte být, vám zůstane jen tak dlouho, dokud platí pravidla kvalifikační nabídky níže.",
+      ] },
       { h: "Kdo je UFA a kdo RFA", points: [
         "O jeho statusu rozhoduje věk k 30. červnu roku, kdy vyprší jeho SOUČASNÁ smlouva — ne jeho věk dnes. 27 let a víc = nechráněný; mladší = chráněný.",
         "(Liga může místo toho jet „jednoduchý“ systém volných hráčů, kde všichni testují otevřený trh — žádná práva RFA, tagy ani nabídkové listiny. Nastavuje komisař.)",
@@ -524,19 +559,46 @@ const SECTIONS_CS: Sec[] = [
       { h: "Kdy můžete vyjednávat", points: [
         "Kdykoliv, když je v posledním roce smlouvy nebo mu už vypršela — kromě období Free Agent Frenzy (otevřený trh má vlastní systém) a prvních dní nové základní části (okno nastavuje komisař, dává soupiskám čas se usadit; komisař může jeden konkrétní klub z tohoto okna výjimečně vyjmout, např. kvůli testování).",
       ] },
-      { h: "Jak samotné vyjednávání funguje", points: [
-        "Podejte nabídku — peníze, délka, role, speciální formace, typ smlouvy a případná udělená klauzule. Hráč nikdy jen neodmítne: každá odmítnutá nabídka dostane skutečnou protinabídku zpět, i ta první podhozená.",
-        "UFA: 2 kola. Odmítnete-li jeho 2. protinabídku, odchází testovat otevřený trh.",
-        "RFA bez franšízového tagu: 1 kolo. Odmítnete-li jeho protinabídku, je otevřený nabídkovým listinám od soupeřů.",
-        "RFA S vaším franšízovým tagem: 2 kola, než by vůbec byl vystaven nabídkovým listinám.",
-        "RFA, který se dostane k nabídkovým listinám, není pryč — pokud ho tam nikdo nepodepíše, vrací se rovnou k vám a od té chvíle vyjednáváte přímo, kolo za kolem, bez limitu a bez druhé cesty k nabídkovým listinám.",
+      { h: "Krok 1 — jeho požadavek", points: [
+        "Když zahájíte jednání, hráč přednese svůj požadavek: přibližný cap hit a preferovanou délku, ukázané jako rozmezí (například: hledá zhruba 3,40–4,04 M / 3 roky). Políčka plat a délka jsou na začátku prázdná — své hodnoty zadáváte vy.",
+        "Cena závisí na délce. Hráč do zhruba 33–34 let chce za jeden rok MÉNĚ než za čtyři (Quinn Hughes bude chtít na jednoletý kontrakt méně než na čtyřletý). Starší hráč jde opačně — Alex Killorn chce na jeden rok VÍC a na tři méně. Všechna čísla jsou cap hity.",
+        "Vidíte vždy jen rozmezí u JEHO preferované délky. Jeho přesný požadavek u jiné délky zůstává skrytý, takže musíte hledat.",
+      ] },
+      { h: "Krok 2 — vaše nabídka a jeho reakce (jinak než v realitě)", points: [
+        "Příklad (vymyšlený): Cutter Gauthier má skryté požadavky 10 M na 1 rok, 11 M na 2, 12 M na 3 a 13 M na 4. Vy vidíte jen zhruba 11,55–12,5 M na jeho preferované 3 roky. Chcete ho na 4, tak nabídnete 4 roky — jeho skutečný požadavek tam (13 M) zůstane skrytý.",
+        "V realitě by klub podal nízkou protinabídku a sešli by se uprostřed. Tady má páku HRÁČ: podstřelíte-li jeho požadavek o příliš mnoho, uráží se — jeho další požadavek jde NAHORU (13 M se může změnit zhruba na 14,5 M).",
+        "Kolik můžete podstřelit, závisí na jeho cenovém pásmu: pod 3 M ≈ 33 %, 3–5 M ≈ 25 %, 5–10 M ≈ 20 %, 10–15 M ≈ 15 %, 15 M+ ≈ 10 %. Při požadavku 13 M ho urazí nabídka zhruba 11,05 M a méně.",
+        "Urážka se u vašeho klubu pamatuje (zhruba 200 dní) a sčítá se: první protinabídka po urážce už ukazuje zvýšené rozmezí, prostor je zhruba na dvě urážky a po DVOU přijme jen svůj plný požadavek. V posledním kole jmenuje přesné minimum, za které podepíše.",
+        "Je-li vaše nabídka pod jeho požadavkem, ale NEJDE o urážku, odmítne ji bez zvýšení — jen vám řekne, že nestačí.",
+        "Hráči, kteří chtějí méně, obvykle slevíte zhruba 250 000; dražší až kolem 500 000. Jak to při jednání využijete, je na vás.",
+      ] },
+      { h: "Kolik nabídek máte", points: [
+        "UFA: až 3 nabídky. Po každé buď přijme, nebo odmítne a řekne proč (a zvýší požadavek, pokud jste podstřelili). Po 3. odmítnutí oznámí, že po sezóně otestuje trh, a už ho prodloužit nemůžete.",
+        "RFA (bez tagu): 2 nabídky. Odmítne-li protinabídku po 2., jednání se zatím zastaví — čeká na nabídkový list od soupeře.",
+        "RFA s vaším franšízovým tagem: 3 nabídky (o kolo navíc); před nabídkovými listinami je chráněný, dokud kola nevyčerpáte.",
+        "RFA, kterého nikdo neodvedl nabídkovým listem, se vrací rovnou k vám: odtud vyjednáváte napřímo, nabídku za nabídkou, bez limitu kol a bez druhé cesty na nabídkové listiny.",
+      ] },
+      { h: "Kvalifikační nabídka (QO) — jen RFA", points: [
+        "Každý RFA má na RFA Central kvalifikační nabídku: běžně 100 % jeho současného AAV a nejméně ligové minimum (obojí nastavuje komisař). Předložte ji do termínu (25. června), abyste si udrželi jeho omezená práva.",
+        "QO se předloží automaticky ve chvíli, kdy s ním začnete jednat — klub, který už s hráčem mluví, o něj nemůže přijít kvůli zmeškanému termínu. Týden před termínem navíc dostanete připomínku (DM a banner na Team Contracts) se seznamem všech RFA bez QO.",
+        "QO je také to, co hráče zpřístupní nabídkovým listinám: bez ní žádný dostat nemůže.",
+        "Zmeškáte-li termín bez QO a bez jednání, hráč se uvolní: stane se UFA — i ve 26 letech a méně.",
+        "Běžné prodloužení (Re-sign) je vždy k dispozici a okamžitě uzavře jakýkoli případ QO či arbitráže. Arbitráž není nikdy nutná jen k prodloužení RFA.",
+      ] },
+      { h: "Platová arbitráž — jen RFA", points: [
+        "Oprávněnost: věk 24+ NEBO 40+ zápasů v NHL v minulé sezóně (nastavuje komisař). Klub i hráč mohou podat, jakmile je předložena QO. Dokud je případ arbitráže otevřený, běžné nabídky na prodloužení jsou zablokované.",
+        "Rozhodce porovná šest podobných hráčů (stejný post, podobný rating a věk) a stanoví pásmo: 80–120 % jejich mediánu cap hitu, nikdy ne pod QO. Návrhy klubu a hráče jsou ve výchozím stavu spodek a vrchol pásma.",
+        "Verdikt přijde automaticky 48 hodin po podání (komisař ho může vydat dřív). Plat je střed obou návrhů uvnitř pásma.",
+        "Délku (1 nebo 2 roky) volí strana, která arbitráž NEPODALA: podal-li klub, vybírá hráč (1 rok); podal-li hráč, vybírá klub (2 roky — 1 rok, pokud jde o plat s právem odejít).",
+        "Two-way verdikt vyplácí plný plat i na farmě — nikdy se nepočítá do salary capu, jen do Finance. Two-way není možná od 1,3 M výše ani u zavedeného hráče NHL (180+ zápasů za 3 sezóny, 60+ za minulou, bez waiverů).",
+        "Pod 4,5 M klub verdikt přijmout musí. Od 4,5 M výše může odejít a hráč se stane UFA. Nová smlouva ZAČNE, až vyprší jeho současná — verdikt vydaný během sezóny nikdy nemění letošní plat ani cap hit.",
       ] },
       { h: "Nabídkové listiny (jen RFA)", points: [
         "Otevřené 1.–8. července mimosezóny; vyřešeny 10. července. Kompenzační žebříček (vlastní originální draftové volby starého klubu, podle pásma AAV) nastavuje komisař a platí ho lákající klub, pokud hráč podepíše.",
         "Jeho AI vybere jedinou nejlepší listinu, která zároveň splňuje jeho požadavek A překonává VAŠI poslední stojící nabídku — neexistuje starý NHL „právo dorovnat“, takže číslo vaší vlastní nabídky je to, co musí útočník skutečně překonat.",
       ] },
       { h: "Franšízový tag", points: [
-        "Jeden na klub, jen hráči ve věku RFA. Tag ho chrání před nabídkovými listinami během DVOU kol vyjednávání s vámi. Skončí-li obě kola bez dohody, stane se dostupným nabídkovým listinám jako každý jiný RFA (tag zmizí, pokud ho soupeř podepíše); nikdo-li ho nepodepíše, vyjednáváte s ním dál přímo.",
+        "Jeden na klub, jen hráči ve věku RFA. Tag vám dává 3. nabídku a chrání hráče před nabídkovými listinami po dobu těchto kol. Skončí-li bez dohody, stane se dostupným nabídkovým listinám jako každý jiný RFA (tag zmizí, pokud ho soupeř podepíše); nikdo-li ho nepodepíše, vyjednáváte s ním dál napřímo.",
       ] },
       { h: "Uvolnění práv místo prodloužení", points: [
         "„Release rights“ na stránce Team Contracts (jen u RFA) prohlašuje, že hráče neprodloužíte: od té chvíle se oceňuje a chová jako UFA — žádná sleva RFA, žádný strop — a v okamžiku vypršení smlouvy padá rovnou na otevřený trh, místo aby zůstal vázaný na vás. Vratné kdykoliv, dokud mu smlouva skutečně nevyprší.",
@@ -545,6 +607,14 @@ const SECTIONS_CS: Sec[] = [
         "Urážka podhozenou nabídkou: podstřelíte-li jeho skutečné minimum o příliš mnoho (klouzavá hranice — zhruba třetina u skromné smlouvy, až kolem desetiny u smlouvy 15M$+), zapamatuje si to — jeho požadavek konkrétně vůči VAŠEMU klubu stoupá, s prostorem zhruba pro dvě takové urážky, než narazí na strop (nikdy pod komisařovým vlastním minimem 25 %, u levné smlouvy i víc). Ostatní kluby to neovlivní. Urazíte-li ho dvakrát, peníze za floor přestanou stačit — od té chvíle je to jen jeho plný ask, nebo nic.",
         "Cena podle délky: jeho hlavní číslo je kalibrované na jeho preferovanou délku. Nabídnete-li víc nebo míň let, cena se ohne — obvykle nahoru za víc let, dolů za míň — KROMĚ hráče ve věku 35+, u kterého je to naopak: delší smlouva stojí za rok MÉNĚ (klubu přátelské prodloužení ve stylu reálné NHL), zatímco krátký rok „ještě jednou to zkusit“ je jeho nejdražší požadavek.",
         "Slíbíte-li mu horší roli, než chce, účtuje si prémii a bere kratší smlouvu — a klauzule o nevyměnitelnosti mu už nepřináší slevu, protože chce zůstat volný odejít, pokud mu roli nedodáte.",
+        "Síla týmu: starší hráči hledají vítěze. Od 32 let může contender dostat slevu až zhruba 7,5 % z požadavku, rebuildující klub naopak zaplatí příplatek až zhruba 12,5 %. U hráčů do 23 let to skoro nehraje roli (kolem 1 %). Jak silný tým máte, najdete v League → Fan Interest.",
+        "Role: hráč počítá s lajnou a speciálními týmy, které očekává. Vyhovíte-li všem přáním, dá malou slevu (nejvýš zhruba 4 %); slíbíte-li 3. lajnu a bez přesilovky tomu, kdo chce 2. lajnu a PP, jeho požadavek může vzrůst až zhruba o 17 %.",
+        "Aktivita v trejdech: agenti si pamatují, že podepisujete volné hráče a do roka je měníte, a mohou zvýšit požadavky vašich budoucích podpisů. Dívá se zhruba 270 dní zpět a počítá jen hráče podepsané na volném trhu — nikdy ty, které jste prodloužili.",
+        "Splněné sliby: slíbíte 2. lajnu a PP, ale pak ho nasadíte ve 3. lajně bez PP, a agent si to pamatuje — ostatní hráči u vašeho klubu chtějí víc.",
+        "Morálka: spokojený hráč dá slevu (u hvězdy až zhruba 12 %), nešťastný chce příplatek (až zhruba 16 %). Lepší hráči se nechají ovlivnit víc, slabší skoro vůbec.",
+      ] },
+      { h: "Nováčci (ELC smlouvy)", points: [
+        "Když některý z vašich prospektů (v realitě) odehraje potřebné minimum zápasů, na další sezónu naskočí do sestavy s automatickým platem podle toho, jak hrál ve své první sezóně v NHL/AHL. Neovlivníte to.",
       ] },
     ],
   },
