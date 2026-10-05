@@ -10,7 +10,7 @@ import { prisma } from "./prisma";
 import { loadSettings } from "./sim/settings";
 import { compensationFor, compensationLabel } from "./offer-sheet";
 import { twoWayObjection } from "./free-agency";
-import { evaluateTeamOffer, weakestTeams, loadLeagueCap } from "./free-agency-server";
+import { evaluateTeamOffer, weakestTeams, loadLeagueCap, maxContract } from "./free-agency-server";
 import { canManageTeam } from "./auth";
 import { getLeagueClock } from "./calendar-server";
 import { CURRENT_SEASON_START, capCeilingForPhase, ltirRelief, liveCapHit } from "./finance";
@@ -126,6 +126,8 @@ export async function submitOfferSheetAction(
 
   const yrs = Math.max(1, Math.min(4, Math.round(years)));
   if (salary < 775_000) return { ok: false, error: "Below the league minimum salary." };
+  const maxSalary = await maxContract();
+  if (salary > maxSalary) return { ok: false, error: `The maximum contract is $${(maxSalary / 1e6).toFixed(2)}M per year (20% of the salary cap).` };
   // two-way rules mirror the FA/extension flow (real NHL games, older players only —
   // an RFA target is by definition already an active NHL/AHL player, so the AHL-only/
   // few-games tiers still cover a young call-up type here too)

@@ -379,7 +379,8 @@ export async function submitOfferAction(
   }
   if (!Number.isFinite(salary) || !Number.isInteger(salary)) return { ok: false as const, error: "Invalid salary." };
   if (salary < 775_000) return { ok: false as const, error: "Below the league minimum salary." };
-  if (salary > 16_000_000) return { ok: false as const, error: "The maximum offer is $16.00M per year." };
+  const maxSalary = await maxContract();
+  if (salary > maxSalary) return { ok: false as const, error: `The maximum offer is ${fmtM(maxSalary)} per year (20% of the salary cap).` };
   if (!Number.isFinite(years)) return { ok: false as const, error: "Invalid contract term." };
   years = Math.max(1, Math.min(MAX_TERM, Math.round(years)));
   // one-way vs two-way: an established player refuses — UNLESS the market has gone
@@ -1236,6 +1237,8 @@ export async function extendContractAction(
   const orgIds = [teamId, ...(org?.affiliateTeams.map((a) => a.id) ?? [])];
   if (!orgIds.includes(player.teamId)) return { ok: false as const, error: "That player isn't in your organization." };
   if ((player.contractYears ?? 99) > 1) return { ok: false as const, error: "He's not in the final year of his deal yet." };
+  const maxSalary = await maxContract();
+  if (salary > maxSalary) return { ok: false as const, error: `The maximum contract is ${fmtM(maxSalary)} per year (20% of the salary cap).` };
   // A club can negotiate its own pending UFA/RFA any time except during the Free
   // Agent Frenzy itself, which has its own dedicated offer/counter flow for players
   // who've actually reached the open market.
