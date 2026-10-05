@@ -243,6 +243,9 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       },
     });
     for (const r of rows) {
+      // a backup who only sat on the bench (no start, no shot faced) didn't play a game — same
+      // rule as the league goalie tables (stats-server)
+      if (!r.started && r.shotsAgainst === 0) continue;
       const isHome = r.teamId === r.game.homeTeamId;
       const teamGoals = (isHome ? r.game.homeGoals : r.game.awayGoals) ?? 0;
       const oppGoals = (isHome ? r.game.awayGoals : r.game.homeGoals) ?? 0;
