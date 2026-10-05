@@ -1,6 +1,6 @@
 "use client";
 
-import SalaryStepper, { salaryDollars } from "@/components/SalaryStepper";
+import SalaryStepper, { salaryDollars, formatSalaryMillions, formatSalaryDisplay } from "@/components/SalaryStepper";
 import { useEffect, useState, useTransition } from "react";
 import {
   getInterestAction, getPlayerOffersAction, submitOfferAction, withdrawOfferAction, getAskAtAction, getBidHistoryAction,
@@ -21,7 +21,7 @@ export type InterestCtx = {
 type Interest = Awaited<ReturnType<typeof getInterestAction>>;
 type Offers = Awaited<ReturnType<typeof getPlayerOffersAction>>;
 
-const M = (n: number) => `$${(n / 1e6).toFixed(2)}M`;
+const M = formatSalaryDisplay;
 
 function lineOptions(grp: string) {
   if (grp === "G") return [[1, "Starter"], [2, "Backup"]] as const;
@@ -92,7 +92,7 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
         const ex = i.existing;
         // pre-fill only with the club's OWN previous offer; a fresh offer starts blank so
         // the GM has to judge the range himself (we no longer hand him the exact ask).
-        setSalaryM(ex && ex.status !== "COUNTERED" ? (ex.salary / 1e6).toFixed(2) : "");
+        setSalaryM(ex && ex.status !== "COUNTERED" ? formatSalaryMillions(ex.salary / 1e6) : "");
         setYears(ex?.years ?? i.askYears);
         setLine(ex?.line ?? i.line);
         setPp(ex?.pp ?? i.wantPP);

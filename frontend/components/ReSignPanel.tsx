@@ -1,6 +1,6 @@
 "use client";
 
-import { salaryDollars, salaryMillions } from "@/components/SalaryStepper";
+import { salaryDollars, salaryMillions, formatSalaryMillions, formatSalaryDisplay } from "@/components/SalaryStepper";
 import { useEffect, useState, useTransition } from "react";
 import PlayerLink from "@/components/PlayerLink";
 import { useRouter } from "next/navigation";
@@ -19,7 +19,7 @@ import { friendlyActionError } from "@/lib/client/action-error";
 type NegotiationSnapshot = { round: number | null; offerSalary: number | null; offerYears: number | null; offerLine: number | null; offerPP: boolean | null; offerPK: boolean | null; offerClause: string | null; offerTwoWay: boolean | null; counterSalary: number | null; counterYears: number | null; note: string | null };
 type ExpiringPlayer = { id: number; name: string; capHit: number | null; contractYears: number | null; contractText: string | null; farm?: boolean; franchiseTag?: boolean; rightsReleased?: boolean; rfaStatus?: string; qoAmount?: number; qoDueAt?: string; resignRound?: number | null; resignOfferSalary?: number | null; resignCounterSalary?: number | null; resignCounterYears?: number | null; negotiation?: NegotiationSnapshot };
 
-const M = (n: number) => `$${(n / 1e6).toFixed(2)}M`;
+const M = formatSalaryDisplay;
 function lineOptions(grp: string) {
   if (grp === "G") return [[1, "Starter"], [2, "Backup"]] as const;
   if (grp === "D") return [[1, "Top pair"], [2, "2nd pair"], [3, "3rd pair"]] as const;
@@ -58,7 +58,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
           setTwoWay(previous?.offerTwoWay ?? false);
           const suggestedSalary = previous?.counterSalary ?? player.resignCounterSalary;
           const suggestedYears = previous?.counterYears ?? player.resignCounterYears;
-          if (suggestedSalary) setSalaryM((suggestedSalary / 1e6).toFixed(3));
+          if (suggestedSalary) setSalaryM(formatSalaryMillions(suggestedSalary / 1e6));
           setYears(suggestedYears ?? i.askYears ?? 1);
         }
       } catch (e) { setMsg({ t: "err", s: friendlyActionError(e) }); }
@@ -95,7 +95,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
       next = snapped + dir * step;
     }
     next = Math.max(min, Math.min(max, next));
-    setSalaryM(Math.abs(next - min) < 1e-9 ? min.toFixed(3) : next.toFixed(2));
+    setSalaryM(formatSalaryMillions(next));
   };
 
   const router = useRouter();
@@ -279,11 +279,11 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                           onBlur={() => {
                             const m = salaryMillions(salaryM);
                             if (Number.isFinite(m) && salaryM.trim() !== "") {
-                              setSalaryM(m.toFixed(m === 0.775 ? 3 : 2));
+                              setSalaryM(formatSalaryMillions(m));
                             }
                           }}
                           className="h-10 w-full rounded-lg border-2 border-amber-500/40 bg-slate-900 px-3 text-center text-lg font-bold font-mono text-amber-300 outline-none placeholder:text-slate-600 focus:border-amber-400"
-                          placeholder={i.floor ? `${(i.floor / 1e6).toFixed(2)}` : "Plat v $M"}
+                          placeholder={i.floor ? formatSalaryMillions(i.floor / 1e6) : "Plat v $M"}
                         />
                         <span className="absolute right-3 top-2.5 text-[11px] font-bold text-slate-500 pointer-events-none">$M / rok</span>
                       </div>

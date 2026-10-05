@@ -1,13 +1,13 @@
 "use client";
 
-import SalaryStepper, { salaryDollars } from "@/components/SalaryStepper";
+import SalaryStepper, { salaryDollars, formatSalaryMillions, formatSalaryDisplay } from "@/components/SalaryStepper";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { getOsCompPlanAction, submitOfferSheetAction, withdrawOfferSheetAction } from "@/lib/offer-sheet-server";
 import { clauseDiscount } from "@/lib/free-agency";
 import InfoTip from "@/components/InfoTip";
 
-const M = (n: number) => `$${(n / 1e6).toFixed(2)}M`;
+const M = formatSalaryDisplay;
 
 function lineOptions(grp: string) {
   if (grp === "G") return [[1, "Starter"], [2, "Backup"]] as const;
@@ -28,7 +28,7 @@ export default function OfferSheetButton({
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<{ t: "ok" | "err"; s: string } | null>(null);
 
-  const [salaryM, setSalaryM] = useState(existing ? (existing.salary / 1e6).toFixed(2) : "");
+  const [salaryM, setSalaryM] = useState(existing ? formatSalaryMillions(existing.salary / 1e6) : "");
   const [years, setYears] = useState(existing?.years ?? 2);
   const [line, setLine] = useState(2);
   const [twoWay, setTwoWay] = useState(false);

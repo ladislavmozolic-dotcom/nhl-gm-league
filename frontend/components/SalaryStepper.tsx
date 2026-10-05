@@ -26,6 +26,20 @@ export function salaryMillions(raw: string): number {
 /** Whole dollars from what the GM typed, or NaN. */
 export const salaryDollars = (raw: string): number => Math.round(salaryMillions(raw) * 1e6);
 
+export function formatSalaryMillions(m: number): string {
+  if (!Number.isFinite(m)) return "";
+  const dollars = Math.round(m * 1e6);
+  const roundedM = dollars / 1e6;
+  return dollars % 10_000 !== 0 ? roundedM.toFixed(3) : roundedM.toFixed(2);
+}
+
+export function formatSalaryDisplay(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return "—";
+  const d = Math.round(n);
+  const m = d / 1e6;
+  return `$${d % 10_000 !== 0 ? m.toFixed(3) : m.toFixed(2)}M`;
+}
+
 export default function SalaryStepper({ value, onChange, max = DEFAULT_MAX }: { value: string; onChange: (v: string) => void; max?: number }) {
   const bump = (dir: 1 | -1) => {
     const cur = salaryMillions(value);
@@ -37,7 +51,7 @@ export default function SalaryStepper({ value, onChange, max = DEFAULT_MAX }: { 
       next = snapped + dir * STEP;
     }
     next = Math.max(MIN, Math.min(max, next));
-    onChange(Math.abs(next - MIN) < 1e-9 ? MIN.toFixed(3) : next.toFixed(2));
+    onChange(formatSalaryMillions(next));
   };
   const btn = "w-9 h-9 shrink-0 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-lg leading-none";
   return (
@@ -54,7 +68,7 @@ export default function SalaryStepper({ value, onChange, max = DEFAULT_MAX }: { 
         onClick={(e) => { e.stopPropagation(); e.currentTarget.focus(); }}
         onFocus={(e) => e.stopPropagation()}
         onChange={(e) => onChange(e.target.value)}
-        onBlur={() => { const m = salaryMillions(value); if (Number.isFinite(m) && value.trim() !== "") onChange(m.toFixed(m === MIN ? 3 : 2)); }}
+        onBlur={() => { const m = salaryMillions(value); if (Number.isFinite(m) && value.trim() !== "") onChange(formatSalaryMillions(m)); }}
         className="min-h-10 min-w-0 flex-1 px-2 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-base sm:text-sm tabular-nums text-center outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20" />
       <button type="button" aria-label="+$50K" onClick={() => bump(1)} className={btn}>+</button>
     </div>
