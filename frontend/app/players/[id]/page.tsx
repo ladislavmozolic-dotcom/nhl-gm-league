@@ -187,7 +187,6 @@ function StatBlock({ league, cols, reg, po, cellsOf, team, regSplits, poSplits }
               <Row label={`${SEASON} total`} a={reg} bold teamNode={<span className="text-slate-500">TOT</span>} />
             </>
           : <Row label={SEASON} a={reg} teamNode={regSplits?.[0]?.team ?? team} />)}
-        {reg && <Row label="CAREER" a={reg} bold teamNode={<span className="text-slate-500">—</span>} />}
       </tbody></table></div>
       {po && (
         <>
@@ -199,7 +198,6 @@ function StatBlock({ league, cols, reg, po, cellsOf, team, regSplits, poSplits }
                   <Row label={`${SEASON} total`} a={po} bold teamNode={<span className="text-slate-500">TOT</span>} />
                 </>
               : <Row label={SEASON} a={po} teamNode={poSplits?.[0]?.team ?? team} />}
-            <Row label="CAREER" a={po} bold teamNode={<span className="text-slate-500">—</span>} />
           </tbody></table></div>
         </>
       )}
