@@ -797,6 +797,9 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
   return { grp, base, slot, line, contention: ctx.contention, churn: ctx.churn, desired, ask, age: dealAge, lowballBump: bump, elite, ladder };
 }
 
+/** Asks from this up ignore the promised role entirely (price = Demand Watch value). */
+const ROLE_FREE_ASK = 6_000_000;
+
 /** Evaluate a concrete offer (money + term + promised deployment) at a club. */
 export async function evaluateTeamOffer(
   playerId: number, teamId: number, salary: number, years: number, deploy: Deployment,
@@ -814,15 +817,16 @@ export async function evaluateTeamOffer(
   // special teams he projects into. Promising MORE than that (a bigger line, PP/PK he didn't ask for) must
   // not buy a discount below it — only the clause discount below may lower it. A WORSE role than he projects
   // still costs a premium on top (the max keeps it).
-  raw = {
-    ...raw,
-    salary: Math.max(raw.salary, info.ask.salary),
-    floorSalary: Math.max(raw.floorSalary, info.ask.floorSalary),
-  };
+  // From ROLE_FREE_ASK up (stars) the role plays no part at all: the price IS the Demand Watch value,
+  // a worse promised role doesn't raise it either.
+  const roleFree = info.ask.salary >= ROLE_FREE_ASK;
+  raw = roleFree
+    ? { ...raw, salary: info.ask.salary, floorSalary: info.ask.floorSalary }
+    : { ...raw, salary: Math.max(raw.salary, info.ask.salary), floorSalary: Math.max(raw.floorSalary, info.ask.floorSalary) };
   // granting a clause lets him sign for less — discount his floor + headline ask.
   // EXCEPT when the club promises him a worse role than he wants: then he wants to
   // be free to move on, so a no-trade clause is worth nothing to him.
-  const roleWorse = deploy.line > info.desired.line;
+  const roleWorse = !roleFree && deploy.line > info.desired.line;
   const disc = roleWorse ? 0 : clauseDiscount(grant?.clause, grant?.breadth);
   // longer term than his sweet spot raises the price (always negotiable, never a refusal)
   const tp = termPremium(years, raw.years, info.age, info.slot, raw.floorSalary, info.elite > 0);
