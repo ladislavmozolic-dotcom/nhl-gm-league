@@ -1,6 +1,6 @@
 "use client";
 
-import SalaryStepper from "@/components/SalaryStepper";
+import SalaryStepper, { salaryDollars } from "@/components/SalaryStepper";
 import { useEffect, useState, useTransition } from "react";
 import PlayerLink from "@/components/PlayerLink";
 import { useRouter } from "next/navigation";
@@ -61,7 +61,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
   const [walkedToUFA, setWalkedToUFA] = useState(true);
   const submit = () => start(async () => {
     setMsg(null);
-    const salary = Math.round(parseFloat(salaryM) * 1e6);
+    const salary = salaryDollars(salaryM);
     if (!Number.isFinite(salary)) { setMsg({ t: "err", s: "Enter a salary." }); return; }
     if (years < 1) { setMsg({ t: "err", s: "Choose a term (years)." }); return; }
     let r: Awaited<ReturnType<typeof extendContractAction>>;
@@ -80,8 +80,8 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
-      <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-md max-h-[88dvh] overflow-y-auto p-5">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-lg font-bold">Re-sign {cleanName(player.name)}</h3>
           <button onClick={onClose} className="text-slate-500 hover:text-slate-200 text-xl leading-none">×</button>
@@ -130,7 +130,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs text-slate-400 block mb-1">Salary ($M / yr)</label>
-                    <SalaryStepper value={salaryM} onChange={setSalaryM} />
+                    <SalaryStepper value={salaryM} onChange={setSalaryM} max={i.maxSalary / 1e6} />
                   </div>
                   <div>
                     <label className="text-xs text-slate-400 block mb-1">Term (years)</label>

@@ -10,7 +10,7 @@ import { teamCapCommitted } from "@/lib/cap";
 import {
   loadMarketPool, teamContentionMap, teamChurnMap, teamAsk, evaluateTeamOffer, loadLeagueCap, weakestTeams, demandForPlayerId,
   recordLowball, clearLowballs, lowballNote, lowballInsultCount,
-  ufaAtExpiry, resignLockedUntil,
+  ufaAtExpiry, resignLockedUntil, maxContract,
 } from "@/lib/free-agency-server";
 import { autoTenderQo } from "@/lib/rfa-server";
 import { MAX_TERM, faPosGroup, willingnessNote, twoWayObjection, type Deployment } from "@/lib/free-agency";
@@ -110,6 +110,7 @@ export async function getInterestAction(playerId: number, teamId: number) {
     wantPP: info.desired.wantPP,
     wantPK: info.desired.wantPK,
     askSalary: info.ask.salary,
+    maxSalary: await maxContract(),
     askYears: info.ask.years,
     floor: info.ask.floorSalary,
     minYears: info.ask.minYears,

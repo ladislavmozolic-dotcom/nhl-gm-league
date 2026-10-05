@@ -1,6 +1,6 @@
 "use client";
 
-import SalaryStepper from "@/components/SalaryStepper";
+import SalaryStepper, { salaryDollars } from "@/components/SalaryStepper";
 import { useEffect, useState, useTransition } from "react";
 import {
   getInterestAction, getPlayerOffersAction, submitOfferAction, withdrawOfferAction, getAskAtAction, getBidHistoryAction,
@@ -110,7 +110,7 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
 
   const submit = () => {
     if (!teamId) return;
-    const salary = Math.round(parseFloat(salaryM) * 1e6);
+    const salary = salaryDollars(salaryM);
     if (!Number.isFinite(salary)) { setMsg({ t: "err", s: "Enter a salary." }); return; }
     start(async () => {
       let r: Awaited<ReturnType<typeof submitOfferAction>>;
@@ -177,7 +177,7 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setOpen(false)}>
-          <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-lg max-h-[88vh] overflow-y-auto p-5" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-lg max-h-[88dvh] overflow-y-auto p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-lg font-bold">{name}</h3>
               <button onClick={() => setOpen(false)} className="text-slate-500 hover:text-slate-200 text-xl leading-none">×</button>
@@ -256,7 +256,7 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-xs text-slate-400 block mb-1">Salary ($M / yr)</label>
-                        <SalaryStepper value={salaryM} onChange={setSalaryM} />
+                        <SalaryStepper value={salaryM} onChange={setSalaryM} max={i ? i.maxSalary / 1e6 : undefined} />
                       </div>
                       <div>
                         <label className="text-xs text-slate-400 block mb-1">Term (years)</label>

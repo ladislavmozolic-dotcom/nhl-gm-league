@@ -1,6 +1,6 @@
 "use client";
 
-import SalaryStepper from "@/components/SalaryStepper";
+import SalaryStepper, { salaryDollars } from "@/components/SalaryStepper";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { getOsCompPlanAction, submitOfferSheetAction, withdrawOfferSheetAction } from "@/lib/offer-sheet-server";
@@ -39,7 +39,7 @@ export default function OfferSheetButton({
   // live compensation preview as the salary changes
   useEffect(() => {
     if (!open) return;
-    const salary = Math.round(parseFloat(salaryM) * 1e6);
+    const salary = salaryDollars(salaryM);
     if (!Number.isFinite(salary) || salary <= 0) { setPlan(null); return; }
     let cancelled = false;
     getOsCompPlanAction(fromTeamId, salary).then((p) => { if (!cancelled) setPlan(p); });
@@ -47,7 +47,7 @@ export default function OfferSheetButton({
   }, [salaryM, open, fromTeamId]);
 
   const submit = () => {
-    const salary = Math.round(parseFloat(salaryM) * 1e6);
+    const salary = salaryDollars(salaryM);
     if (!Number.isFinite(salary) || salary <= 0) { setMsg({ t: "err", s: "Enter a salary." }); return; }
     start(async () => {
       const r = await submitOfferSheetAction(playerId, fromTeamId, salary, years, twoWay, line, false, false, grantClause || null, grantClause === "M_NTC" ? breadth : null);
@@ -73,7 +73,7 @@ export default function OfferSheetButton({
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setOpen(false)}>
-          <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-lg max-h-[88vh] overflow-y-auto p-5" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-lg max-h-[88dvh] overflow-y-auto p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-1">
               <h3 className="text-lg font-bold">Offer sheet · {name}</h3>
               <button onClick={() => setOpen(false)} className="text-slate-500 hover:text-slate-200 text-xl leading-none">×</button>
