@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { canManageTeam } from "@/lib/auth";
-import { getLeagueDate } from "@/lib/calendar-server";
+import { getLeagueClock, getLeagueDate } from "@/lib/calendar-server";
 import { loadSettings } from "@/lib/sim/settings";
 import { arbitrationRange, ensureRfaCases, qoFormInfo, qoOneWayMessage } from "@/lib/rfa-server";
 import { CURRENT_SEASON_START } from "@/lib/finance";
@@ -83,10 +83,31 @@ export async function decideArbitrationAction(caseId: number, teamId: number, cl
 export async function acceptArbitrationAwardAction(caseId: number, teamId: number) {
   const c = await ownedCase(caseId, teamId);
   if (!c || c.status !== "AWARDED" || !c.awardAav || !c.awardTerm) return { ok: false as const, error: "No award is ready to sign." };
-  const expiry = CURRENT_SEASON_START + c.awardTerm;
   const twoWay = c.awardContractType === "TWO_WAY";
+  const kind = twoWay ? "two-way" : "one-way";
+  const type = twoWay ? "TWO_WAY" : "ONE_WAY";
+  // Same rule as every other extension signed in-season: a player who still has a running deal
+  // keeps it (salary, cap hit, term) until it expires — the award only STARTS next season. Only a
+  // player whose deal has already run out (contractYears 0) takes the new contract right away.
+  const phase = (await getLeagueClock()).phase;
+  const deferred = (c.player.contractYears ?? 0) >= 1 && (phase === "regular" || phase === "playoffs");
+  if (deferred) {
+    const startYear = CURRENT_SEASON_START + (c.player.contractYears ?? 1);
+    const expiry = startYear + c.awardTerm;
+    await prisma.$transaction([
+      prisma.player.update({ where: { id: c.playerId }, data: {
+        extCapHit: c.awardAav, extYears: c.awardTerm, extContractType: type, extClause: null, extNoTradeTeams: [],
+        extText: `$${c.awardAav.toLocaleString("en-US")} × ${c.awardTerm}yr ${kind} (arbitration award, through ${expiry})`,
+        resignStatus: "extended", rightsReleased: false, franchiseTag: false,
+      } }),
+      prisma.rfaCase.update({ where: { id: caseId }, data: { status: "SIGNED", resolvedAt: new Date() } }),
+    ]);
+    refresh();
+    return { ok: true as const, deferred: true as const, startsSeason: startYear };
+  }
+  const expiry = CURRENT_SEASON_START + c.awardTerm;
   await prisma.$transaction([
-    prisma.player.update({ where: { id: c.playerId }, data: { capHit: c.awardAav, contractYears: c.awardTerm, contractExpiry: expiry, contractType: twoWay ? "TWO_WAY" : "ONE_WAY", ahlSalary: null /* two-way award: he is paid the FULL salary on the farm too — off the cap, into Finance (liveAhlSalary falls back to capHit) */, contractText: `$${c.awardAav.toLocaleString("en-US")} × ${c.awardTerm}yr ${twoWay ? "two-way" : "one-way"} (arbitration award, through ${expiry})`, rightsReleased: false, resignStatus: null, resignRound: 0, franchiseTag: false } }),
+    prisma.player.update({ where: { id: c.playerId }, data: { capHit: c.awardAav, contractYears: c.awardTerm, contractExpiry: expiry, contractType: type, ahlSalary: null /* two-way award: he is paid the FULL salary on the farm too — off the cap, into Finance (liveAhlSalary falls back to capHit) */, contractText: `$${c.awardAav.toLocaleString("en-US")} × ${c.awardTerm}yr ${kind} (arbitration award, through ${expiry})`, rightsReleased: false, resignStatus: null, resignRound: 0, franchiseTag: false } }),
     prisma.rfaCase.update({ where: { id: caseId }, data: { status: "SIGNED", resolvedAt: new Date() } }),
   ]);
   refresh();
