@@ -516,6 +516,17 @@ export default function LiveCalculatorConfigModal({
     });
   };
 
+  const removeGoalieMetricBtn = (attr: string, field: string) => (
+    <button
+      type="button"
+      onClick={() => updateGw(attr, field, 0)}
+      className="w-5 h-5 shrink-0 rounded-md bg-rose-500/10 hover:bg-rose-500/25 border border-rose-500/30 text-rose-400 hover:text-rose-200 flex items-center justify-center text-[10px] transition"
+      title="Odstrániť metriku z výpočtu (váha = 0)"
+    >
+      ✕
+    </button>
+  );
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 overflow-y-auto">
       {/* Add Custom Metric Modal Overlay */}
@@ -667,7 +678,7 @@ export default function LiveCalculatorConfigModal({
                   <input
                     type="number"
                     step="0.05"
-                    min="0.01"
+                    min="0"
                     max="1"
                     value={newWeight}
                     onChange={(e) => setNewWeight(parseFloat(e.target.value) || 0.1)}
@@ -1996,7 +2007,10 @@ export default function LiveCalculatorConfigModal({
                 )}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-slate-400 mb-1">Low-Danger SV% (Strely z diaľky):</label>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <label className="block text-slate-400">Low-Danger SV% (Strely z diaľky):</label>
+                      {removeGoalieMetricBtn("sc", "ldSv")}
+                    </div>
                     <input
                       type="number"
                       step="0.01"
@@ -2006,7 +2020,10 @@ export default function LiveCalculatorConfigModal({
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 mb-1">Medium-Danger SV% (Stredná vzdialenosť):</label>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <label className="block text-slate-400">Medium-Danger SV% (Stredná vzdialenosť):</label>
+                      {removeGoalieMetricBtn("sc", "mdSv")}
+                    </div>
                     <input
                       type="number"
                       step="0.01"
@@ -2016,7 +2033,10 @@ export default function LiveCalculatorConfigModal({
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 mb-1">GSAx / 60 min (Chytené góly nad očakávanie):</label>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <label className="block text-slate-400">GSAx / 60 min (Chytené góly nad očakávanie):</label>
+                      {removeGoalieMetricBtn("sc", "gsax60")}
+                    </div>
                     <input
                       type="number"
                       step="0.01"
@@ -2040,7 +2060,10 @@ export default function LiveCalculatorConfigModal({
                 )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-slate-400 mb-1">High-Danger SV% (Úspešnosť pri tutovkách):</label>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <label className="block text-slate-400">High-Danger SV% (Úspešnosť pri tutovkách):</label>
+                      {removeGoalieMetricBtn("rt", "hdSv")}
+                    </div>
                     <input
                       type="number"
                       step="0.01"
@@ -2050,7 +2073,10 @@ export default function LiveCalculatorConfigModal({
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 mb-1">HD GSAx (Chytené góly z tutoviek):</label>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <label className="block text-slate-400">HD GSAx (Chytené góly z tutoviek):</label>
+                      {removeGoalieMetricBtn("rt", "hdGsax")}
+                    </div>
                     <input
                       type="number"
                       step="0.01"
@@ -2074,7 +2100,10 @@ export default function LiveCalculatorConfigModal({
                 )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-slate-400 mb-1">High-Danger SV%:</label>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <label className="block text-slate-400">High-Danger SV%:</label>
+                      {removeGoalieMetricBtn("hs", "hdSv")}
+                    </div>
                     <input
                       type="number"
                       step="0.01"
@@ -2084,7 +2113,10 @@ export default function LiveCalculatorConfigModal({
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 mb-1">GSAx / 60 min:</label>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <label className="block text-slate-400">GSAx / 60 min:</label>
+                      {removeGoalieMetricBtn("hs", "gsax60")}
+                    </div>
                     <input
                       type="number"
                       step="0.01"
@@ -2108,7 +2140,10 @@ export default function LiveCalculatorConfigModal({
                 )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-slate-400 mb-1">Medium-Danger SV%:</label>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <label className="block text-slate-400">Medium-Danger SV%:</label>
+                      {removeGoalieMetricBtn("ag", "mdSv")}
+                    </div>
                     <input
                       type="number"
                       step="0.01"
@@ -2118,7 +2153,10 @@ export default function LiveCalculatorConfigModal({
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 mb-1">High-Danger SV%:</label>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <label className="block text-slate-400">High-Danger SV%:</label>
+                      {removeGoalieMetricBtn("ag", "hdSv")}
+                    </div>
                     <input
                       type="number"
                       step="0.01"
@@ -2212,7 +2250,10 @@ export default function LiveCalculatorConfigModal({
                 )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-slate-400 mb-1">Kariérne zápasy základná časť (Reg GP):</label>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <label className="block text-slate-400">Kariérne zápasy základná časť (Reg GP):</label>
+                      {removeGoalieMetricBtn("ex", "careerRegGP")}
+                    </div>
                     <input
                       type="number"
                       step="0.01"
@@ -2222,7 +2263,10 @@ export default function LiveCalculatorConfigModal({
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 mb-1">Kariérne zápasy play-off (PO GP):</label>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <label className="block text-slate-400">Kariérne zápasy play-off (PO GP):</label>
+                      {removeGoalieMetricBtn("ex", "careerPoGP")}
+                    </div>
                     <input
                       type="number"
                       step="0.01"
