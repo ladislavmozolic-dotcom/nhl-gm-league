@@ -13,7 +13,7 @@ import {
   ufaAtExpiry, resignLockedUntil, maxContract,
 } from "@/lib/free-agency-server";
 import { autoTenderQo } from "@/lib/rfa-server";
-import { MAX_TERM, faPosGroup, willingnessNote, twoWayObjection, type Deployment } from "@/lib/free-agency";
+import { MAX_TERM, TWO_WAY_MAX_YEARS, faPosGroup, willingnessNote, twoWayObjection, type Deployment } from "@/lib/free-agency";
 import { loadSettings, saveSettings } from "@/lib/sim/settings";
 import { computeELC } from "@/lib/elc";
 import { isCommissionOfferEmbargo } from "@/lib/sim-clock";
@@ -48,7 +48,7 @@ async function clampTwoWayYears(
   const gp = pl?.lastSeasonGP ?? null;
   const proven = gp != null ? gp > tw.gpLimit : (pl?.overall ?? 70) >= 72;
   const cap = proven ? tw.maxYears : gp == null || gp === 0 ? tw.ahlMaxYears : tw.fewGpMaxYears;
-  return Math.max(1, Math.min(years, cap));
+  return Math.max(1, Math.min(years, cap, TWO_WAY_MAX_YEARS));
 }
 
 const FREE = ["NHL", "AHL", "RETIRED", "PROSPECT", "RELEASED", "NONROSTER"]; // not a signable free agent

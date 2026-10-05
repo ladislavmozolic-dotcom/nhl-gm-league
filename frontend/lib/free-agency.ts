@@ -264,6 +264,10 @@ export function clauseDiscount(clause?: string | null, breadth?: number | null):
   return 0;
 }
 
+/** Hard league rule: a two-way contract never runs longer than this, whatever the
+ *  commissioner's per-situation term settings, age, games played or round say. */
+export const TWO_WAY_MAX_YEARS = 2;
+
 /** Why a player would turn down a two-way offer (null = he'll take it).
  *
  *  A hard money ceiling comes FIRST and overrides every other rule below: at or
@@ -304,6 +308,7 @@ export function twoWayObjection(
   },
 ): string | null {
   if (!twoWay) return null;
+  if (years > TWO_WAY_MAX_YEARS) return `A two-way contract can run at most ${TWO_WAY_MAX_YEARS} years — shorten the term or offer a one-way deal.`;
   const maxSalary = opts?.maxSalary;
   if (maxSalary != null && (salary ?? 0) >= maxSalary) {
     return `A two-way can't pay more than $${(maxSalary - 1).toLocaleString("en-US")} — above that he won't take it at any age or experience level. Offer a one-way deal.`;
