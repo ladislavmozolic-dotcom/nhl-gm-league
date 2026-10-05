@@ -1,5 +1,6 @@
 "use server";
 
+import { logNegotiation } from "@/lib/negotiation-log";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { canManageTeam, getTeamSession, isAdmin, isComishTier } from "@/lib/auth";
@@ -17,6 +18,7 @@ import { MAX_TERM, TWO_WAY_MAX_YEARS, faPosGroup, willingnessNote, twoWayObjecti
 import { loadSettings, saveSettings } from "@/lib/sim/settings";
 import { computeELC } from "@/lib/elc";
 import { isCommissionOfferEmbargo } from "@/lib/sim-clock";
+import { displayName } from "@/lib/playerName";
 
 /** Commissioner-tuned two-way thresholds, shaped for twoWayObjection's opts. */
 async function twoWayOpts(): Promise<{
@@ -653,7 +655,7 @@ async function signFaOffer(playerId: number, player: { name: string; age: number
       prevType: prev?.contractType ?? null, prevClause: prev?.tradeClause ?? null, prevNoTrade: prev?.noTradeTeams ?? [],
       prevRosterType: prev?.rosterType ?? null, prevTeamId: prev?.teamId ?? null, prevContractText: prev?.contractText ?? null,
     } });
-    await tx.transaction.create({ data: { type: "SIGNING", message: `${team?.code ?? "?"} signed ${player.name} — $${(salary / 1e6).toFixed(2)}M × ${years}yr` } });
+    await tx.transaction.create({ data: { type: "SIGNING", message: `${team?.code ?? "?"} signed ${displayName(player.name)} — $${(salary / 1e6).toFixed(2)}M × ${years}yr` } });
     return team?.code ?? "?";
   });
   if (code) await clearLowballs(playerId);
@@ -1148,7 +1150,7 @@ export async function applyElcAction(playerId: number) {
     },
   });
   const team = await prisma.team.findUnique({ where: { id: p.teamId }, select: { code: true, slug: true } });
-  await prisma.transaction.create({ data: { type: "SIGNING", message: `${team?.code ?? "?"} signed ${p.name} to an ELC — ${fmtM(c.capHit)} × ${c.years}yr` } });
+  await prisma.transaction.create({ data: { type: "SIGNING", message: `${team?.code ?? "?"} signed ${displayName(p.name)} to an ELC — ${fmtM(c.capHit)} × ${c.years}yr` } });
   if (team?.slug) revalidatePath(`/teams/${team.slug}/salary`);
   return { ok: true as const, capHit: c.capHit, base: c.base, bonus: c.bonus, years: c.years };
 }
@@ -1383,6 +1385,11 @@ export async function extendContractAction(
       // qualifying offer. Legacy cases without a record keep their historic flow.
       if (isRFA) await prisma.rfaCase.updateMany({ where: { playerId, status: { in: ["QO_TENDERED", "NEGOTIATING"] } }, data: { status: "OS_ELIGIBLE", offerSheetEligibleAt: new Date() } });
       await prisma.faBid.create({ data: { playerId, teamId, salary, years, round: nextRound } }).catch(() => {});
+      await logNegotiation({ playerId, playerName: player.name, teamId, teamCode: team?.code ?? null, kind: "OFFER" as const,
+    offerSalary: salary, offerYears: years, offerLine: dep.line, offerPP: pp, offerPK: pk, offerClause: clause, offerTwoWay: twoWay,
+    askSalary: ev.ask.salary, askFloor: ev.ask.floorSalary, askMinYears: ev.ask.minYears, askMaxYears: ev.ask.maxYears,
+        outcome: isRFA ? "OS_ELIGIBLE" : "WALKED_UFA", round: nextRound, insulted: !!bumped, lowballBump: bumped,
+        note: isRFA ? "No deal — open to offer sheets" : "No deal — walks to free agency" });
       // no revalidatePath here — it would tear down the open modal before its notice
       // shows; the client refreshes on Close.
       return {
@@ -1407,6 +1414,11 @@ export async function extendContractAction(
     const bestOffer = Math.max(salary, player.resignOfferSalary ?? 0);
     await prisma.player.update({ where: { id: playerId }, data: { resignRound: nextRound, resignStatus: "countered", resignCounterSalary: counterSalary, resignCounterYears: counterYears, resignOfferSalary: bestOffer, resignOfferAt: new Date() } });
     await prisma.faBid.create({ data: { playerId, teamId, salary, years, round: nextRound } }).catch(() => {});
+    await logNegotiation({ playerId, playerName: player.name, teamId, teamCode: team?.code ?? null, kind: "OFFER" as const,
+    offerSalary: salary, offerYears: years, offerLine: dep.line, offerPP: pp, offerPK: pk, offerClause: clause, offerTwoWay: twoWay,
+    askSalary: ev.ask.salary, askFloor: ev.ask.floorSalary, askMinYears: ev.ask.minYears, askMaxYears: ev.ask.maxYears,
+      outcome: "COUNTERED", round: nextRound, counterSalary, counterYears, insulted: !!bumped, lowballBump: bumped,
+      note: `${roundLabel}${isLastRound ? " (last)" : ""}${requireFullAsk ? " — full ask required (lowballed twice)" : ""}` });
     return {
       ok: false as const, rejected: true, round: nextRound,
       reason: rfaPostOs
@@ -1459,9 +1471,13 @@ export async function extendContractAction(
   // It simply closes any open QO/arbitration case instead of forcing arbitration.
   await prisma.rfaCase.updateMany({ where: { playerId, status: { in: ["QO_DUE", "QO_TENDERED", "NEGOTIATING", "ARB_FILED", "AWARDED", "OS_ELIGIBLE"] } }, data: { status: "SIGNED", resolvedAt: new Date() } });
   await clearLowballs(playerId);
+  await logNegotiation({ playerId, playerName: player.name, teamId, teamCode: team?.code ?? null, kind: "OFFER" as const,
+    offerSalary: salary, offerYears: years, offerLine: dep.line, offerPP: pp, offerPK: pk, offerClause: clause, offerTwoWay: twoWay,
+    askSalary: ev.ask.salary, askFloor: ev.ask.floorSalary, askMinYears: ev.ask.minYears, askMaxYears: ev.ask.maxYears,
+    outcome: "ACCEPTED", round: (player.resignRound ?? 0) + 1, note: `${deferred ? `Extension from ${startYear}` : "Signed"}${testSigning ? " (test signing)" : ""}` });
   if (!testSigning) {
     await prisma.transaction.create({
-      data: { type: "SIGNING", message: `${team?.code ?? "?"} re-signed ${player.name} — $${(salary / 1e6).toFixed(2)}M × ${years}yr${deferred ? ` (from ${startYear}-${String((startYear + 1) % 100).padStart(2, "0")})` : ""}` },
+      data: { type: "SIGNING", message: `${team?.code ?? "?"} re-signed ${displayName(player.name)} — $${(salary / 1e6).toFixed(2)}M × ${years}yr${deferred ? ` (from ${startYear}-${String((startYear + 1) % 100).padStart(2, "0")})` : ""}` },
     });
   }
   // revertible record — restores the exact prior contract snapshot on revert

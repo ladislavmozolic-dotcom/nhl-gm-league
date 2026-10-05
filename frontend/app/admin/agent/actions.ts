@@ -5,7 +5,9 @@ import { isAdmin } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { CURRENT_SEASON_START } from "@/lib/finance";
 import { clearLowballs, weakestTeams } from "@/lib/free-agency-server";
+import { logNegotiation } from "@/lib/negotiation-log";
 import { getLeagueClock } from "@/lib/calendar-server";
+import { displayName } from "@/lib/playerName";
 
 /** Cancel a standing open-market Free Agent Frenzy offer — commissioner-only
  *  cleanup, e.g. a stuck/stale bid. */
@@ -24,8 +26,9 @@ export async function resetResignAction(playerId: number, clearLowball = false) 
   if (!(await isAdmin())) return { ok: false as const, error: "Admin only." };
   const player = await prisma.player.findUnique({
     where: { id: playerId },
-    select: { teamId: true },
+    select: { teamId: true, name: true, team: { select: { code: true } } },
   });
+  if (player) await logNegotiation({ playerId, playerName: player.name, teamId: player.teamId, teamCode: player.team?.code ?? null, kind: "ADMIN", outcome: "RESET", actor: "Commissioner", note: clearLowball ? "Negotiation reset (lowball cleared)" : "Negotiation reset" });
   await prisma.player.update({
     where: { id: playerId },
     data: {
@@ -68,9 +71,14 @@ export async function updateResignNegotiationAction(
 
   const player = await prisma.player.findUnique({
     where: { id: playerId },
-    select: { id: true, teamId: true, name: true },
+    select: { id: true, teamId: true, name: true, team: { select: { code: true } } },
   });
   if (!player) return { ok: false as const, error: "Player not found." };
+  await logNegotiation({
+    playerId, playerName: player.name, teamId: player.teamId, teamCode: player.team?.code ?? null, kind: "ADMIN", outcome: "EDITED", actor: "Commissioner",
+    round: data.round, counterSalary: data.counterSalary ?? null, counterYears: data.counterYears ?? null, offerSalary: data.offerSalary ?? null,
+    note: `Edited: ${Object.entries(data).filter(([, v]) => v !== undefined).map(([k, v]) => `${k}=${v}`).join(", ")}`,
+  });
 
   const updateData: Record<string, unknown> = {};
   if (data.status !== undefined) updateData.resignStatus = data.status;
@@ -207,11 +215,12 @@ export async function forceSignResignAction(
   await clearLowballs(playerId);
 
   const teamCode = player.team?.code ?? "?";
+  await logNegotiation({ playerId, playerName: player.name, teamId: player.teamId, teamCode, kind: "ADMIN", outcome: "FORCE_SIGNED", actor: "Commissioner", offerSalary: salary, offerYears: years, offerClause: clause, offerTwoWay: twoWay, note: "Commissioner override signing" });
   await prisma.transaction.create({
     data: {
       type: "SIGNING",
       playerId: player.id,
-      message: `${teamCode} re-signed ${player.name} [Commissioner Override] — $${(salary / 1e6).toFixed(2)}M × ${years}yr${deferred ? ` (from ${startYear}-${String((startYear + 1) % 100).padStart(2, "0")})` : ""}`,
+      message: `${teamCode} re-signed ${displayName(player.name)} [Commissioner Override] — $${(salary / 1e6).toFixed(2)}M × ${years}yr${deferred ? ` (from ${startYear}-${String((startYear + 1) % 100).padStart(2, "0")})` : ""}`,
     },
   });
 
@@ -247,6 +256,8 @@ export async function forceWalkResignAction(playerId: number, toUFA: boolean) {
   if (!(await isAdmin())) return { ok: false as const, error: "Admin only." };
 
   const status = toUFA ? "walkedToUFA" : "osEligible";
+  const wp = await prisma.player.findUnique({ where: { id: playerId }, select: { name: true, teamId: true, team: { select: { code: true } } } });
+  if (wp) await logNegotiation({ playerId, playerName: wp.name, teamId: wp.teamId, teamCode: wp.team?.code ?? null, kind: "ADMIN", outcome: "FORCE_WALK", actor: "Commissioner", note: toUFA ? "Talks broken off — to free agency" : "Talks broken off — open to offer sheets" });
   await prisma.player.update({
     where: { id: playerId },
     data: {

@@ -116,6 +116,7 @@ export const DICT: Dict = {
   "admin.trades.d": { en: "Every completed trade — revoke one to return all assets.", cs: "Všetky dokončené výmeny — revoke vráti všetky aktíva." },
   "admin.signings.d": { en: "Every UFA signing & extension — click a player for his bid trail; revert a deal.", cs: "Všetky podpisy a predĺženia — klik na hráča ukáže priebeh ponúk; revert vráti zmluvu." },
   "admin.coachSignings.d": { en: "Every head-coach hire & fire — revert one to restore his prior contract.", cs: "Všetky prijatia a prepustenia trénerov — revert vráti jeho predchádzajúcu zmluvu." },
+  "admin.negotiations.d": { en: "Permanent audit of every re-sign negotiation — each offer, the player's counter, his ask and lowball insults, plus commissioner interventions.", cs: "Trvalý audit každého re-sign vyjednávania — každá ponuka, protinávrh hráča, jeho požiadavka, lowball urážky a zásahy komisára." },
   "admin.agent.d": { en: "Standing offers the negotiation engine is working through — Free Agent Frenzy market bids and clubs' own re-signings — delete a stuck or unwanted one.", cs: "Aktívne ponuky, ktoré rieši vyjednávací systém — trhové ponuky Free Agent Frenzy a vlastné re-signingy klubov — zmaž zaseknutú alebo nechcenú." },
   "admin.positions.d": { en: "Find a player and add/remove positions and shooting side.", cs: "Nájdi hráča a pridaj/odober pozície a stranu strely." },
   "admin.ratings.d": { en: "Find a player and tune his ratings (OV, SC, PA…) — the sim reflects them.", cs: "Nájdi hráča a nalaď jeho ratingy (OV, SC, PA…) — sim ich odzrkadlí." },

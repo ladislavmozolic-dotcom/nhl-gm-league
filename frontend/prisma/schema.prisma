@@ -2063,3 +2063,40 @@ model TeamCapPenalty {
   @@unique([teamId, sourceSeasonStart])
   @@index([appliesSeasonStart])
 }
+
+// Full audit trail of own-player re-sign negotiations (extendContractAction + the
+// commissioner's interventions): every offer with the player's answer, his ask at
+// that moment and any lowball insult. Player.resign* only holds the LIVE state, so
+// this is the only permanent history. Viewed at /admin/negotiations.
+model NegotiationLog {
+  id            Int      @id @default(autoincrement())
+  createdAt     DateTime @default(now())
+  playerId      Int
+  playerName    String
+  teamId        Int?
+  teamCode      String?
+  kind          String   // OFFER (club offer) | ADMIN (commissioner action)
+  outcome       String   // ACCEPTED | COUNTERED | WALKED_UFA | OS_ELIGIBLE | FORCE_SIGNED | FORCE_WALK | RESET | EDITED
+  round         Int?     // negotiation round after this offer
+  phase         String?  // league phase when it happened
+  offerSalary   Int?
+  offerYears    Int?
+  offerLine     Int?     // promised role: line
+  offerPP       Boolean?
+  offerPK       Boolean?
+  offerClause   String?
+  offerTwoWay   Boolean?
+  counterSalary Int?     // the player's reply
+  counterYears  Int?
+  askSalary     Int?     // his headline ask to THIS club at that moment
+  askFloor      Int?
+  askMinYears   Int?
+  askMaxYears   Int?
+  insulted      Boolean  @default(false)
+  lowballBump   Float?   // ask multiplier after this offer
+  note          String?
+  actor         String?
+
+  @@index([playerId, id])
+  @@index([createdAt])
+}
