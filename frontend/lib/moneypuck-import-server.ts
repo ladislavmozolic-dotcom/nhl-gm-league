@@ -105,14 +105,39 @@ function metricsFromRow(r: Record<string, string>): GoalieMetrics {
   };
 }
 
-async function fetchSeason(season: number): Promise<Map<string, GoalieMetrics>> {
+type SeasonIndex = {
+  byKey: Map<string, GoalieMetrics>;
+  byLast: Map<string, { first: string; m: GoalieMetrics }[]>;
+};
+
+async function fetchSeason(season: number): Promise<SeasonIndex> {
   const text = await (await fetch(CSV(season), { headers: { "User-Agent": "Mozilla/5.0" } })).text();
-  const out = new Map<string, GoalieMetrics>();
+  const byKey = new Map<string, GoalieMetrics>();
+  const byLast = new Map<string, { first: string; m: GoalieMetrics }[]>();
   for (const r of parseCsv(text)) {
     if (r.situation !== "all" || !r.name) continue;
-    out.set(key(r.name), metricsFromRow(r));
+    const m = metricsFromRow(r);
+    byKey.set(key(r.name), m);
+    const [first, ...rest] = r.name.trim().split(/\s+/);
+    const last = key(rest.join(" "));
+    if (!last) continue;
+    const list = byLast.get(last) ?? [];
+    list.push({ first: key(first), m });
+    byLast.set(last, list);
   }
-  return out;
+  return { byKey, byLast };
+}
+
+// Exact full-name match first; otherwise accept a nickname/short form of the first
+// name (Sam ↔ Samuel) only when the last name matches and exactly one goalie fits.
+function lookup(idx: SeasonIndex, name: string): GoalieMetrics | undefined {
+  const exact = idx.byKey.get(key(name));
+  if (exact) return exact;
+  const [first, ...rest] = name.trim().split(/\s+/);
+  const f = key(first), last = key(rest.join(" "));
+  if (f.length < 3 || !last) return undefined;
+  const hits = (idx.byLast.get(last) ?? []).filter((c) => c.first.startsWith(f) || f.startsWith(c.first));
+  return hits.length === 1 && hits[0].first.length >= 3 ? hits[0].m : undefined;
 }
 
 export async function importMoneyPuckGoalies(): Promise<{ matched: number; total: number }> {
@@ -126,8 +151,8 @@ export async function importMoneyPuckGoalies(): Promise<{ matched: number; total
   const goalies = await prisma.player.findMany({ where: { isGoalie: true }, select: { id: true, name: true } });
   let matched = 0;
   for (const g of goalies) {
-    const k = key(cleanName(g.name));
-    const c = cur.get(k), l = last.get(k);
+    const nm = cleanName(g.name);
+    const c = lookup(cur, nm), l = lookup(last, nm);
     if (!c && !l) continue;
     await prisma.player.update({ where: { id: g.id }, data: { goalieAdvanced: { cur: c ?? null, last: l ?? null } as object } });
     matched++;
