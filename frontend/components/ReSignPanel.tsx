@@ -17,7 +17,7 @@ import { clauseDiscount } from "@/lib/free-agency";
 import { friendlyActionError } from "@/lib/client/action-error";
 
 type NegotiationSnapshot = { round: number | null; offerSalary: number | null; offerYears: number | null; offerLine: number | null; offerPP: boolean | null; offerPK: boolean | null; offerClause: string | null; offerTwoWay: boolean | null; counterSalary: number | null; counterYears: number | null; note: string | null };
-type ExpiringPlayer = { id: number; name: string; capHit: number | null; contractYears: number | null; contractText: string | null; farm?: boolean; franchiseTag?: boolean; rightsReleased?: boolean; rfaStatus?: string; qoAmount?: number; qoDueAt?: string; resignRound?: number | null; resignOfferSalary?: number | null; resignCounterSalary?: number | null; resignCounterYears?: number | null; negotiation?: NegotiationSnapshot };
+type ExpiringPlayer = { id: number; name: string; capHit: number | null; contractYears: number | null; contractText: string | null; farm?: boolean; franchiseTag?: boolean; rightsReleased?: boolean; rfaStatus?: string; qoAmount?: number; qoDueAt?: string; resignRound?: number | null; resignStatus?: string | null; resignOfferSalary?: number | null; resignCounterSalary?: number | null; resignCounterYears?: number | null; negotiation?: NegotiationSnapshot };
 
 const M = formatSalaryDisplay;
 function lineOptions(grp: string) {
@@ -573,11 +573,25 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
   );
 }
 
-export default function ReSignPanel({ teamId, players, title, blurb, accent = "text-amber-400", group, franchiseEnabled = true, canNegotiate = true }: {
-  teamId: number; players: ExpiringPlayer[]; title?: string; blurb?: string; accent?: string; group?: string; franchiseEnabled?: boolean; canNegotiate?: boolean;
+export default function ReSignPanel({
+  teamId, players, title, blurb, accent = "text-amber-400", group,
+  franchiseEnabled = true, canNegotiate = true,
+  franchiseTagUsed = false, franchiseTaggedPlayer = null,
+}: {
+  teamId: number;
+  players: ExpiringPlayer[];
+  title?: string;
+  blurb?: string;
+  accent?: string;
+  group?: string;
+  franchiseEnabled?: boolean;
+  canNegotiate?: boolean;
+  franchiseTagUsed?: boolean;
+  franchiseTaggedPlayer?: { id: number; name: string } | null;
 }) {
   const [tagPending, startTag] = useTransition();
-  const [tagged, setTagged] = useState<number | null>(players.find((p) => p.franchiseTag)?.id ?? null);
+  const initialTaggedId = franchiseTaggedPlayer?.id ?? players.find((p) => p.franchiseTag)?.id ?? null;
+  const [tagged, setTagged] = useState<number | null>(initialTaggedId);
   const [tagMsg, setTagMsg] = useState<string | null>(null);
   const toggleTag = (id: number) => startTag(async () => {
     setTagMsg(null);
@@ -608,10 +622,20 @@ export default function ReSignPanel({ teamId, players, title, blurb, accent = "t
     <Card title={`${title ?? "Expiring Contracts"} (${players.length})`} accent={accent}>
       <p className="text-xs text-slate-500 mb-3">{blurb ?? "These players are entering the final year of their deal. Re-sign them before they reach free agency."}</p>
       {group === "RFA" && franchiseEnabled && (
-        <p className="text-xs text-slate-500 mb-2">
-          <span className="text-fuchsia-300 font-semibold">★ Franchise tag</span> (1 per club)
-          <InfoTip text="Tag one RFA as your Franchise player. A franchise RFA gets TWO re-sign rounds before rivals can submit offer sheets; every other RFA gets one round, then he's open to offer sheets. One tag per club at a time." />
-        </p>
+        <div className="mb-3 space-y-1.5">
+          <p className="text-xs text-slate-500">
+            <span className="text-fuchsia-300 font-semibold">★ Franchise tag</span> (1 per club)
+            <InfoTip text="Tag one RFA as your Franchise player. A franchise RFA gets TWO re-sign rounds before rivals can submit offer sheets; every other RFA gets one round, then he's open to offer sheets. Ak ho raz použijete v rokovaniach, už ho nemožno zmeniť ani použiť na iného hráča v tejto sezóne." />
+          </p>
+          {(franchiseTagUsed || (franchiseTaggedPlayer && tagged != null && ((players.find((p) => p.id === tagged)?.resignRound ?? 0) > 0 || players.find((p) => p.id === tagged)?.resignStatus === "extended"))) && (
+            <div className="flex items-center gap-1.5 text-xs text-fuchsia-300 bg-fuchsia-950/40 border border-fuchsia-800/50 rounded-lg px-2.5 py-1.5 font-medium">
+              <span className="text-fuchsia-400 font-bold">★</span>
+              <span>
+                Franchise Tag v tejto sezóne využitý: <b className="text-fuchsia-200">{franchiseTaggedPlayer?.name ?? players.find((p) => p.id === tagged)?.name ?? "Využitý"}</b> (1 na klub za sezónu)
+              </span>
+            </div>
+          )}
+        </div>
       )}
       {tagMsg && <p className="text-xs text-rose-400 mb-2">{tagMsg}</p>}
       {releaseMsg && <p className="text-xs text-rose-400 mb-2">{releaseMsg}</p>}
@@ -632,13 +656,37 @@ export default function ReSignPanel({ teamId, players, title, blurb, accent = "t
               )}
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              {group === "RFA" && franchiseEnabled && (
-                <button onClick={() => toggleTag(p.id)} disabled={tagPending || (!p.franchiseTag && (p.resignRound ?? 0) > 0)}
-                  title={!p.franchiseTag && (p.resignRound ?? 0) > 0 ? "Franchise Tag must be assigned before the first contract offer" : "Franchise RFA — gets 2 re-sign rounds before offer sheets (1 per club)"}
-                  className={`px-2 py-1 rounded-md text-xs font-semibold whitespace-nowrap border ${tagged === p.id ? "bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/40" : "bg-slate-800 text-slate-400 border-slate-700 hover:text-fuchsia-300"} disabled:opacity-40 disabled:cursor-not-allowed`}>
-                  ★ {tagged === p.id ? "Franchise" : "Tag"}
-                </button>
-              )}
+              {group === "RFA" && franchiseEnabled && (() => {
+                const isTagged = tagged === p.id;
+                const isUsed = franchiseTagUsed || (isTagged && ((p.resignRound ?? 0) > 0 || p.resignStatus === "extended"));
+                const isDisabled = tagPending || isUsed || (!isTagged && ((p.resignRound ?? 0) > 0 || tagged != null));
+                const tagTitle = isUsed
+                  ? (isTagged
+                      ? "Franchise Tag už bol pre tohto hráča v rokovaniach použitý — nemožno ho zmeniť"
+                      : `Váš klub už v tejto sezóne použil Franchise Tag (${franchiseTaggedPlayer?.name ?? "využitý"})`)
+                  : !isTagged && tagged != null
+                    ? `Franchise Tag už má priradený iný hráč (${franchiseTaggedPlayer?.name ?? "hráč"})`
+                    : !isTagged && (p.resignRound ?? 0) > 0
+                      ? "Franchise Tag musí byť priradený pred začiatkom rokovaní o zmluve"
+                      : isTagged
+                        ? "Franchise Tag — kliknutím zrušíte (ešte neprebehli rokovania)"
+                        : "Priradiť Franchise Tag (1 na klub za sezónu, chráni pred offer sheet na 2 kolá)";
+                return (
+                  <button
+                    type="button"
+                    onClick={() => toggleTag(p.id)}
+                    disabled={isDisabled}
+                    title={tagTitle}
+                    className={`px-2 py-1 rounded-md text-xs font-semibold whitespace-nowrap border ${
+                      isTagged
+                        ? "bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/40"
+                        : "bg-slate-800 text-slate-400 border-slate-700 hover:text-fuchsia-300"
+                    } disabled:opacity-40 disabled:cursor-not-allowed`}
+                  >
+                    ★ {isTagged ? "Franchise" : "Tag"}
+                  </button>
+                );
+              })()}
               {group === "RFA" && (
                 released.has(p.id) ? (
                   <button onClick={() => toggleRelease(p.id, false)} disabled={releasePending}

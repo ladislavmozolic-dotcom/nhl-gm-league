@@ -1256,21 +1256,52 @@ export async function setFranchiseTagAction(playerId: number, teamId: number, on
   if (!(await canManageTeam(teamId))) return { ok: false as const, error: "You don't manage this team." };
   const settings = await loadSettings();
   if (settings.faMode === "simple") return { ok: false as const, error: "This league runs the simple free-agency system — no franchise tags or offer sheets." };
-  const p = await prisma.player.findUnique({ where: { id: playerId }, select: { teamId: true, age: true, franchiseTag: true, resignRound: true } });
+  const p = await prisma.player.findUnique({
+    where: { id: playerId },
+    select: { id: true, name: true, teamId: true, age: true, franchiseTag: true, resignRound: true, resignStatus: true, extCapHit: true },
+  });
   if (!p) return { ok: false as const, error: "Player not found." };
-  const org = await prisma.team.findUnique({ where: { id: teamId }, select: { affiliateTeams: { select: { id: true } } } });
+  const org = await prisma.team.findUnique({
+    where: { id: teamId },
+    select: { franchiseTagUsedSeason: true, affiliateTeams: { select: { id: true } } },
+  });
   const orgIds = [teamId, ...(org?.affiliateTeams.map((a) => a.id) ?? [])];
   if (!orgIds.includes(p.teamId)) return { ok: false as const, error: "That player isn't in your organization." };
   if ((p.age ?? 27) > settings.rfaMaxAge) return { ok: false as const, error: `Only an RFA (${settings.rfaMaxAge} or younger) can be franchise-tagged.` };
+
+  // Check if any player in the org currently holds the tag, and whether it has been used
+  const existingTagged = await prisma.player.findFirst({
+    where: { teamId: { in: orgIds }, franchiseTag: true },
+    select: { id: true, name: true, resignRound: true, resignStatus: true, extCapHit: true },
+  });
+  const existingIsUsed = existingTagged && (
+    (existingTagged.resignRound ?? 0) > 0 ||
+    existingTagged.resignStatus === "extended" ||
+    existingTagged.extCapHit != null ||
+    existingTagged.resignStatus === "osEligible" ||
+    existingTagged.resignStatus === "walkedToUFA"
+  );
+  const clubUsedThisSeason = org?.franchiseTagUsedSeason === CURRENT_SEASON_START || Boolean(existingIsUsed);
+
   if (on) {
-    // The tag is a decision made before negotiations begin. Letting a club add it
-    // after an initial rejection would retroactively create an extra protected round.
-    if (!p.franchiseTag && (p.resignRound ?? 0) > 0) {
-      return { ok: false as const, error: "Franchise Tag must be assigned before the first contract offer." };
+    if (p.franchiseTag) return { ok: true as const };
+    if (clubUsedThisSeason) {
+      const who = existingTagged?.name ? ` (hráč: ${existingTagged.name})` : "";
+      return { ok: false as const, error: `Váš klub už v tejto sezóne Franchise Tag použil${who}. Každý klub má k dispozícii iba 1 Franchise Tag za sezónu.` };
     }
-    await prisma.player.updateMany({ where: { teamId: { in: orgIds }, franchiseTag: true }, data: { franchiseTag: false } }); // one per club
+    // Tag can only be set before negotiations begin
+    if ((p.resignRound ?? 0) > 0 || p.resignStatus === "extended" || p.extCapHit != null) {
+      return { ok: false as const, error: "Franchise Tag musí byť priradený pred začiatkom rokovaní o zmluve." };
+    }
+    // Untag any currently tagged player in the organization who hasn't used the tag yet
+    await prisma.player.updateMany({ where: { teamId: { in: orgIds }, franchiseTag: true }, data: { franchiseTag: false } });
     await prisma.player.update({ where: { id: playerId }, data: { franchiseTag: true } });
   } else {
+    if (!p.franchiseTag) return { ok: true as const };
+    const thisPlayerUsed = (p.resignRound ?? 0) > 0 || p.resignStatus === "extended" || p.extCapHit != null || p.resignStatus === "osEligible" || p.resignStatus === "walkedToUFA";
+    if (thisPlayerUsed || org?.franchiseTagUsedSeason === CURRENT_SEASON_START) {
+      return { ok: false as const, error: "Franchise Tag už bol pre tohto hráča v rokovaniach použitý a nemožno ho zrušiť." };
+    }
     await prisma.player.update({ where: { id: playerId }, data: { franchiseTag: false } });
   }
   revalidatePath(`/teams`);
@@ -1419,6 +1450,15 @@ export async function extendContractAction(
   // throws back (and any further offer) is judged against his full ask from here on.
   const countAfterThis = priorInsultCount + (bumped ? 1 : 0);
   const nextRequiresFullAsk = countAfterThis >= 2;
+
+  // If this RFA is franchise-tagged, mark the club's franchise tag as used for this season
+  if (player.franchiseTag) {
+    await prisma.team.update({
+      where: { id: teamId },
+      data: { franchiseTagUsedSeason: CURRENT_SEASON_START },
+    }).catch(() => {});
+  }
+
   if (!acceptable) {
     // structured re-sign. He counters every rejected offer, never an instant walk.
     // UFA / franchise RFA: 2 rounds, then walks (UFA → free agency, franchise RFA →

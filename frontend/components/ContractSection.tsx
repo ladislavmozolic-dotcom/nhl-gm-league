@@ -12,6 +12,7 @@ import { cleanName } from "@/lib/playerName";
 import { CONTRACT_GROUP_META as META, type ContractGroup as Group } from "@/lib/contract-status";
 import { ufaAtExpiry, resignLockedUntil } from "@/lib/free-agency-server";
 import { ensureRfaCases } from "@/lib/rfa-server";
+import { CURRENT_SEASON_START } from "@/lib/finance";
 
 export default async function ContractSection({ teamId }: { teamId: number }) {
   const canManage = await canManageTeam(teamId);
@@ -24,9 +25,28 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
   const lockedUntil = await resignLockedUntil(teamId);
   const canNegotiate = phase !== "frenzy" && !lockedUntil;
   // include the club's AHL/farm players whose deals are up too
-  const org = await prisma.team.findUnique({ where: { id: teamId }, select: { affiliateTeams: { select: { id: true } } } });
+  const org = await prisma.team.findUnique({
+    where: { id: teamId },
+    select: { franchiseTagUsedSeason: true, affiliateTeams: { select: { id: true } } },
+  });
   const orgIds = [teamId, ...(org?.affiliateTeams.map((a) => a.id) ?? [])];
   await Promise.all(orgIds.map((id) => ensureRfaCases(id)));
+
+  // Check if any player in the org currently holds the franchise tag and whether it's already been used
+  const taggedOrgPlayer = await prisma.player.findFirst({
+    where: { teamId: { in: orgIds }, franchiseTag: true },
+    select: { id: true, name: true, resignRound: true, resignStatus: true, extCapHit: true },
+  });
+  const franchiseTagUsed = org?.franchiseTagUsedSeason === CURRENT_SEASON_START || Boolean(
+    taggedOrgPlayer && (
+      (taggedOrgPlayer.resignRound ?? 0) > 0 ||
+      taggedOrgPlayer.resignStatus === "extended" ||
+      taggedOrgPlayer.extCapHit != null ||
+      taggedOrgPlayer.resignStatus === "osEligible" ||
+      taggedOrgPlayer.resignStatus === "walkedToUFA"
+    )
+  );
+  const franchiseTaggedPlayer = taggedOrgPlayer ? { id: taggedOrgPlayer.id, name: taggedOrgPlayer.name } : null;
   // players in the FINAL YEAR of their deal (1 left) or already expired (0). Minor-league
   // ($100k) farm deals are excluded — they renew automatically every off-season (a farm
   // body who makes the NHL simply signs an ELC), so a GM never has to re-sign them and
@@ -45,7 +65,7 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
     // unsigned (see sweepUnsignedRfasToNonRoster) — still owned by this club and must
     // stay visible here, since re-signing him is the ONLY way he gets un-benched.
     where: { teamId: { in: orgIds }, rosterType: { in: ["NHL", "AHL", "NONROSTER"] }, contractYears: yearsFilter, extCapHit: null, NOT: { capHit: 100_000 } },
-    select: { id: true, name: true, age: true, capHit: true, contractYears: true, contractText: true, position: true, isGoalie: true, df: true, lastSeasonGP: true, lastSeasonPts: true, lastSeasonSvPct: true, rosterType: true, franchiseTag: true, birthDate: true, rightsReleased: true, resignRound: true, resignOfferSalary: true, resignCounterSalary: true, resignCounterYears: true },
+    select: { id: true, name: true, age: true, capHit: true, contractYears: true, contractText: true, position: true, isGoalie: true, df: true, lastSeasonGP: true, lastSeasonPts: true, lastSeasonSvPct: true, rosterType: true, franchiseTag: true, birthDate: true, rightsReleased: true, resignRound: true, resignStatus: true, resignOfferSalary: true, resignCounterSalary: true, resignCounterYears: true },
     orderBy: { capHit: "desc" },
   });
   const rfaCases = await prisma.rfaCase.findMany({ where: { playerId: { in: expiring.map((p) => p.id) }, status: { in: ["QO_DUE", "QO_TENDERED", "NEGOTIATING", "ARB_FILED", "AWARDED", "OS_ELIGIBLE"] } }, select: { playerId: true, status: true, qoAmount: true, qoDueAt: true } });
@@ -126,10 +146,11 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
       {(["UFA", "RFA"] as Group[]).map((g) =>
         groups[g].length === 0 ? null : canManage ? (
           <ReSignPanel key={g} teamId={teamId} title={META[g].title} blurb={META[g].blurb} accent={META[g].accent} group={g} franchiseEnabled={franchiseEnabled} canNegotiate={canNegotiate}
+            franchiseTagUsed={franchiseTagUsed} franchiseTaggedPlayer={franchiseTaggedPlayer}
             players={groups[g].map((p) => {
               const rfa = rfaByPlayer.get(p.id);
               const negotiation = negotiationByPlayer.get(p.id);
-              return { id: p.id, name: p.name, capHit: p.capHit, contractYears: p.contractYears, contractText: p.contractText, farm: p.rosterType === "AHL", franchiseTag: p.franchiseTag, rightsReleased: p.rightsReleased, rfaStatus: rfa?.status, qoAmount: rfa?.qoAmount, qoDueAt: rfa?.qoDueAt?.toISOString(), resignRound: p.resignRound, resignOfferSalary: p.resignOfferSalary, resignCounterSalary: p.resignCounterSalary, resignCounterYears: p.resignCounterYears, negotiation: negotiation ? { round: negotiation.round, offerSalary: negotiation.offerSalary, offerYears: negotiation.offerYears, offerLine: negotiation.offerLine, offerPP: negotiation.offerPP, offerPK: negotiation.offerPK, offerClause: negotiation.offerClause, offerTwoWay: negotiation.offerTwoWay, counterSalary: negotiation.counterSalary, counterYears: negotiation.counterYears, note: negotiation.note } : undefined };
+              return { id: p.id, name: p.name, capHit: p.capHit, contractYears: p.contractYears, contractText: p.contractText, farm: p.rosterType === "AHL", franchiseTag: p.franchiseTag, rightsReleased: p.rightsReleased, rfaStatus: rfa?.status, qoAmount: rfa?.qoAmount, qoDueAt: rfa?.qoDueAt?.toISOString(), resignRound: p.resignRound, resignStatus: p.resignStatus, resignOfferSalary: p.resignOfferSalary, resignCounterSalary: p.resignCounterSalary, resignCounterYears: p.resignCounterYears, negotiation: negotiation ? { round: negotiation.round, offerSalary: negotiation.offerSalary, offerYears: negotiation.offerYears, offerLine: negotiation.offerLine, offerPP: negotiation.offerPP, offerPK: negotiation.offerPK, offerClause: negotiation.offerClause, offerTwoWay: negotiation.offerTwoWay, counterSalary: negotiation.counterSalary, counterYears: negotiation.counterYears, note: negotiation.note } : undefined };
             })} />
         ) : (
           <Card key={g} title={`${META[g].title} (${groups[g].length})`} accent={META[g].accent}>

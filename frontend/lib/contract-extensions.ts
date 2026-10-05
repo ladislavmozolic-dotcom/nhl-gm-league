@@ -54,6 +54,8 @@ export async function rollContractsIfDue(leagueDate?: Date): Promise<ContractRol
     // deals that end with this rollover — retention by a former club ends with them
     prisma.player.updateMany({ where: { contractYears: { gt: 0, lte: steps } }, data: { contractYears: 0, retainedSalary: 0 } }),
     prisma.player.updateMany({ where: { contractYears: { gt: steps } }, data: { contractYears: { decrement: steps } } }),
+    prisma.team.updateMany({ data: { franchiseTagUsedSeason: null } }),
+    prisma.player.updateMany({ where: { franchiseTag: true }, data: { franchiseTag: false } }),
   ]);
   const extensions = await applyPendingExtensions();
   await prisma.transaction.create({ data: { type: "LEAGUE", message: `📅 New league year ${to}-${String((to + 1) % 100).padStart(2, "0")}: ${expired.count} contracts expired, ${extensions} extensions kicked in.` } }).catch(() => {});
