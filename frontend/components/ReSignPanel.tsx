@@ -82,7 +82,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
       <div
-        className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-md max-h-[88dvh] overflow-y-auto p-5"
+        className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-2xl max-h-[88dvh] overflow-y-auto p-5"
         role="dialog"
         aria-modal="true"
         aria-label={`Re-sign ${cleanName(player.name)}`}
@@ -133,10 +133,10 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
 
             {!done && (
               <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-4">
                   <div>
                     <label className="text-xs text-slate-400 block mb-1">Salary ($M / yr)</label>
-                    <div className="grid grid-cols-[4.5rem_minmax(0,1fr)_4.5rem] items-center gap-1">
+                    <div className="grid grid-cols-[3.5rem_minmax(0,1fr)_3.5rem] items-center gap-2">
                       <button type="button" aria-label="Lower salary by $50K" onClick={() => {
                         const current = salaryMillions(salaryM);
                         setSalaryM(Math.max(0.775, (Number.isFinite(current) ? current : 0.825) - 0.05).toFixed(3));
@@ -148,7 +148,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                         step="0.01"
                         value={salaryM}
                         onChange={(e) => setSalaryM(e.currentTarget.value)}
-                        className="h-10 min-w-0 rounded-lg border border-sky-500/50 bg-slate-950 px-2 text-center text-base tabular-nums text-white outline-none ring-0 placeholder:text-slate-500 focus:border-sky-300 focus:ring-2 focus:ring-sky-400/30"
+                        className="h-10 min-w-0 w-full rounded-lg border border-sky-500/50 bg-slate-950 px-3 text-center text-lg font-semibold tabular-nums text-white outline-none ring-0 placeholder:text-slate-500 focus:border-sky-300 focus:ring-2 focus:ring-sky-400/30"
                         placeholder="Salary in $M"
                         aria-label="Salary per year in millions"
                       />
