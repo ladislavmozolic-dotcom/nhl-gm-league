@@ -1,6 +1,6 @@
 "use client";
 
-import SalaryStepper, { salaryDollars } from "@/components/SalaryStepper";
+import { salaryDollars, salaryMillions } from "@/components/SalaryStepper";
 import { useEffect, useState, useTransition } from "react";
 import PlayerLink from "@/components/PlayerLink";
 import { useRouter } from "next/navigation";
@@ -136,7 +136,27 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs text-slate-400 block mb-1">Salary ($M / yr)</label>
-                    <SalaryStepper value={salaryM} onChange={setSalaryM} max={i.maxSalary / 1e6} />
+                    <div className="grid grid-cols-[4.5rem_minmax(0,1fr)_4.5rem] items-center gap-1">
+                      <button type="button" aria-label="Lower salary by $50K" onClick={() => {
+                        const current = salaryMillions(salaryM);
+                        setSalaryM(Math.max(0.775, (Number.isFinite(current) ? current : 0.825) - 0.05).toFixed(3));
+                      }} className="h-10 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-lg leading-none">−</button>
+                      <input
+                        type="number"
+                        min="0.775"
+                        max={i.maxSalary / 1e6}
+                        step="0.01"
+                        value={salaryM}
+                        onChange={(e) => setSalaryM(e.currentTarget.value)}
+                        className="h-10 min-w-0 rounded-lg border border-sky-500/50 bg-slate-950 px-2 text-center text-base tabular-nums text-white outline-none ring-0 placeholder:text-slate-500 focus:border-sky-300 focus:ring-2 focus:ring-sky-400/30"
+                        placeholder="Salary in $M"
+                        aria-label="Salary per year in millions"
+                      />
+                      <button type="button" aria-label="Raise salary by $50K" onClick={() => {
+                        const current = salaryMillions(salaryM);
+                        setSalaryM(Math.min(i.maxSalary / 1e6, (Number.isFinite(current) ? current : 0.775) + 0.05).toFixed(3));
+                      }} className="h-10 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-lg leading-none">+</button>
+                    </div>
                   </div>
                   <div>
                     <label className="text-xs text-slate-400 block mb-1">Term (years)</label>
