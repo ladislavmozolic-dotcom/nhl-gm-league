@@ -33,6 +33,24 @@ async function twoWayOpts(): Promise<{
   };
 }
 
+/** A two-way's term can never exceed what twoWayObjection allows for that player, even
+ *  when the resolver stretches the term past what was offered (a lone bidder is bumped to
+ *  the player's minimum term). Mirrors signFaOffer's own two-way inference. */
+async function clampTwoWayYears(
+  playerId: number, o: { twoWay: boolean | null }, age: number | null, salary: number, years: number,
+): Promise<number> {
+  const twoWay = o.twoWay ?? ((age ?? 27) <= 24 && salary <= 3_000_000);
+  if (!twoWay) return years;
+  const [pl, tw] = await Promise.all([
+    prisma.player.findUnique({ where: { id: playerId }, select: { lastSeasonGP: true, overall: true } }),
+    twoWayOpts(),
+  ]);
+  const gp = pl?.lastSeasonGP ?? null;
+  const proven = gp != null ? gp > tw.gpLimit : (pl?.overall ?? 70) >= 72;
+  const cap = proven ? tw.maxYears : gp == null || gp === 0 ? tw.ahlMaxYears : tw.fewGpMaxYears;
+  return Math.max(1, Math.min(years, cap));
+}
+
 const FREE = ["NHL", "AHL", "RETIRED", "PROSPECT", "RELEASED", "NONROSTER"]; // not a signable free agent
 // In-season UFA market mirrors the summer frenzy in miniature, PER PLAYER: he collects
 // offers for a week, then counters the bidders and gives them a few days to match.
@@ -496,7 +514,8 @@ export async function submitOfferAction(
   // Playoffs "own UFAs only" re-sign: immediate — it's your own player, no competition.
   if (win.immediate) {
     if (evalr?.acceptable) {
-      const code = await signFaOffer(playerId, { name: player.name, age: player.age }, offer, salary, years, player.teamId ?? undefined);
+      const signYears = await clampTwoWayYears(playerId, offer, player.age, salary, years);
+      const code = await signFaOffer(playerId, { name: player.name, age: player.age }, offer, salary, signYears, player.teamId ?? undefined);
       if (code === null) {
         await prisma.faOffer.deleteMany({ where: { playerId, teamId } });
         return { ok: false as const, error: "Another club just signed this player." };
@@ -736,6 +755,7 @@ async function pickAndSign(
     }
   }
   if (!best) return null;
+  best.years = await clampTwoWayYears(playerId, best.offer, player.age, best.salary, best.years);
   const code = await signFaOffer(playerId, player, best.offer, best.salary, best.years, undefined, !!best.offer.twoWay && offers.length === 1);
   if (code === null) return null; // already signed elsewhere (shouldn't happen in the single-threaded resolver)
   return `${player.name} → ${code} ($${(best.salary / 1e6).toFixed(2)}M × ${best.years}yr)`;
