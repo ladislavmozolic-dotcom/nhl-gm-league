@@ -68,6 +68,10 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
   const grp = i?.grp ?? "F";
 
   const router = useRouter();
+  // A declined offer updates the player on the server, but the modal may be closed
+  // with the × or backdrop before its caller has refreshed. Always refresh on exit
+  // so reopening Re-sign receives the saved offer and counter rather than stale props.
+  const closeAndRefresh = () => { router.refresh(); onClose(); };
   const [result, setResult] = useState<{ salary: number; years: number; next?: boolean } | null>(null);
   const [walkedToUFA, setWalkedToUFA] = useState(true);
   const submit = () => start(async () => {
@@ -91,7 +95,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={closeAndRefresh}>
       <div
         className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-[800px] max-h-[88dvh] overflow-y-auto p-5"
         role="dialog"
@@ -101,7 +105,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
       >
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-lg font-bold">Re-sign {cleanName(player.name)}</h3>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-200 text-xl leading-none">×</button>
+          <button onClick={closeAndRefresh} className="text-slate-500 hover:text-slate-200 text-xl leading-none">×</button>
         </div>
         <p className="text-xs text-slate-500 mb-3">Current: {player.capHit ? `${M(player.capHit)} · last year` : "—"}</p>
 
