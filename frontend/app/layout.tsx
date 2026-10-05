@@ -128,6 +128,10 @@ export default async function RootLayout({
       // though the page itself redirects anyone who isn't an admin.
       return { ...item, children: item.children.filter((c) => c.href !== "/signings" || t?.isAdmin) };
     }
+    if (item.key === "players" && item.children) {
+      // Demand Watch (every expiring player's projected ask) is a commissioner tool — page itself redirects non-admins
+      return { ...item, children: item.children.filter((c) => c.href !== "/admin/expiring-contracts" || t?.isAdmin) };
+    }
     if (item.key === "draft" && item.children) {
       return { ...item, children: item.children.filter((c) => c.href !== "/admin/expansion" || t?.isAdmin) }; // commish-only — page itself redirects non-admins
     }
