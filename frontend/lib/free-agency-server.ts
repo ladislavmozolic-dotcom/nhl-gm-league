@@ -821,7 +821,7 @@ export async function evaluateTeamOffer(
   // a worse promised role doesn't raise it either.
   const roleFree = info.ask.salary >= ROLE_FREE_ASK;
   raw = roleFree
-    ? { ...raw, salary: info.ask.salary, floorSalary: info.ask.floorSalary }
+    ? { ...info.ask } // whole demand incl. term window — a worse promised role doesn't shorten it either
     : { ...raw, salary: Math.max(raw.salary, info.ask.salary), floorSalary: Math.max(raw.floorSalary, info.ask.floorSalary) };
   // granting a clause lets him sign for less — discount his floor + headline ask.
   // EXCEPT when the club promises him a worse role than he wants: then he wants to
