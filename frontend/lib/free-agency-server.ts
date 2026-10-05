@@ -809,7 +809,18 @@ export async function evaluateTeamOffer(
   // a lone two-way bidder in the in-season market: the role promised isn't part of the
   // deal, so judge it as exactly the role he projects into (no premium, no discount).
   if (grant?.ignoreRole) deploy = { line: info.desired.line, pp: info.desired.wantPP, pk: info.desired.wantPK };
-  const raw = deploymentDemand(info.base, info.grp, deploy, info.desired, info.contention, info.age, info.churn);
+  let raw = deploymentDemand(info.base, info.grp, deploy, info.desired, info.contention, info.age, info.churn);
+  // An elite player's price is his ladder spot (teamAsk already shows it that way) — promising him a
+  // bigger role / extra PP-PK time must not buy a discount off it. A WORSE role than he projects still
+  // costs a premium on top.
+  if (info.elite > 0) {
+    const worse = deploy.line > info.desired.line;
+    raw = {
+      ...raw,
+      salary: worse ? Math.max(raw.salary, info.base.salary) : info.base.salary,
+      floorSalary: worse ? Math.max(raw.floorSalary, info.base.floorSalary) : info.base.floorSalary,
+    };
+  }
   // granting a clause lets him sign for less — discount his floor + headline ask.
   // EXCEPT when the club promises him a worse role than he wants: then he wants to
   // be free to move on, so a no-trade clause is worth nothing to him.
