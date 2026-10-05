@@ -40,9 +40,10 @@ export default function TeamSubNav({ slug, isGm, isAffiliate, farmSlug, parentSl
   const handleClose = () => {
     if (closeTimer.current) clearTimeout(closeTimer.current);
     setOpen(null);
-    if (typeof document !== "undefined") {
-      (document.activeElement as HTMLElement)?.blur();
-    }
+    // only drop focus that sits inside this nav — blurring whatever is focused anywhere
+    // made every click into an input/select elsewhere on a team page lose focus at once
+    const active = typeof document !== "undefined" ? (document.activeElement as HTMLElement | null) : null;
+    if (active && navRef.current?.contains(active)) active.blur();
   };
 
   const handleMouseEnter = (label: string) => {
