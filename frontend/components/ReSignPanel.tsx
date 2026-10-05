@@ -354,7 +354,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                     </div>
                     {i.capRoom != null && (
                       <div className="text-left sm:text-right">
-                        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">Dopad na platový strop klubu</span>
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">Dopad na platový strop klubu{i.capSeason ? ` · sezóna ${i.capSeason}-${String((i.capSeason + 1) % 100).padStart(2, "0")}` : ""}</span>
                         <span className={`text-xs font-bold font-mono ${i.capRoom - currentSalaryDollars < 0 ? "text-rose-400" : "text-emerald-400"}`}>
                           {i.capRoom - currentSalaryDollars < 0
                             ? `⚠️ Prekročenie stropu o ${M(Math.abs(i.capRoom - currentSalaryDollars))}`

@@ -7,7 +7,7 @@ import { getLeagueClock } from "./calendar-server";
 import { loadLeagueCap } from "./free-agency-server";
 import { loadSettings } from "./sim/settings";
 import { capPenaltyFor, capFloorPenaltyFor } from "./cap-penalty";
-import { capCeilingForPhase, ltirRelief, deadMoneyForYear, liveCapHit, CURRENT_SEASON_START } from "./finance";
+import { capCeilingForPhase, ltirRelief, deadMoneyForYear, liveCapHit, CURRENT_SEASON_START, DEFAULT_PROJECTED_CAPS } from "./finance";
 
 export type CapStatus = {
   committed: number; ltir: number; ceiling: number; space: number;
@@ -161,4 +161,27 @@ export async function leagueCapCompliance(phase?: string): Promise<CapOffender[]
 export async function canAddCapHit(teamId: number, addHit: number): Promise<{ ok: boolean; status: CapStatus }> {
   const status = await teamCapStatus(teamId);
   return { ok: status.committed + addHit <= status.ceiling, status };
+}
+
+/** Cap picture for a FUTURE season `offset` years from now (1 = next season): the
+ *  projected upper limit for that season minus what the club already has committed
+ *  then (current deals still running, signed deferred extensions, buyouts/retention).
+ *  A final-year in-season extension starts next season, so it must be judged against
+ *  THAT season's cap — not the one being played. */
+export async function futureCapRoom(teamId: number, offset: number): Promise<{ upper: number; committed: number; room: number; seasonStart: number }> {
+  const seasonStart = CURRENT_SEASON_START + offset;
+  const [players, buyouts, proj, cap] = await Promise.all([
+    prisma.player.findMany({ where: { teamId, rosterType: "NHL" }, select: { capHit: true, contractYears: true, retainedSalary: true, extCapHit: true, extYears: true } }),
+    prisma.buyout.findMany({ where: { teamId }, select: { perYear: true, startYear: true, years: true } }),
+    prisma.capProjection.findFirst({ where: { year: seasonStart }, select: { upperLimit: true } }),
+    loadLeagueCap(),
+  ]);
+  const upper = proj?.upperLimit ?? DEFAULT_PROJECTED_CAPS[seasonStart]?.upper ?? cap.upper;
+  let committed = deadMoneyForYear(buyouts, seasonStart);
+  for (const p of players) {
+    const cy = p.contractYears ?? 0;
+    if (offset < cy) committed += Math.max(0, (p.capHit ?? 0) - (p.retainedSalary ?? 0));
+    else if (p.extCapHit && (p.extYears ?? 0) > 0 && offset < cy + p.extYears!) committed += p.extCapHit;
+  }
+  return { upper, committed, room: upper - committed, seasonStart };
 }

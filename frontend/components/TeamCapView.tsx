@@ -87,22 +87,32 @@ export default async function TeamCapView({ slug }: { slug: string }) {
 
   // ---- Multi-year cap projection (same SPAN=5 as the roster tables) ----
   /** Sum of cap hits for players with a live contract in a given offset year (0 = current). */
+  // A deferred extension (re-signed in-season with 1+ years left) isn't in contractYears/capHit —
+  // it sits in extCapHit/extYears and starts the season after the current deal ends. Count it
+  // from that offset so the projection shows the new years too.
+  type ExtP = { contractYears: number | null; extCapHit?: number | null; extYears?: number | null };
+  const underContract = (p: ExtP, o: number) => {
+    const cy = p.contractYears ?? 0;
+    if (o < cy) return "current" as const;
+    if (p.extCapHit && (p.extYears ?? 0) > 0 && o >= cy && o < cy + p.extYears!) return "ext" as const;
+    return null;
+  };
+  /** Sum of cap hits for players with a live contract in a given offset year (0 = current). */
   const nhlCapHitForYear = (offsetYear: number) =>
     team.players.reduce((s, p) => {
-      const net = Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0));
-      // Only count if the player still has contractYears covering that offset.
-      const yearsLeft = (p.contractYears ?? 0) - offsetYear;
-      return s + (yearsLeft > 0 ? net : 0);
+      const c = underContract(p, offsetYear);
+      if (c === "ext") return s + p.extCapHit!;
+      return s + (c === "current" ? Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0)) : 0);
     }, 0) +
     deadMoneyForYear(realBuyouts, CURRENT_SEASON_START + offsetYear) +
     deadMoneyForYear(retentions, CURRENT_SEASON_START + offsetYear);
   /** Count of NHL players still under contract in a given offset year. */
   const nhlContractsForYear = (offsetYear: number) =>
-    team.players.filter((p) => (p.contractYears ?? 0) - offsetYear > 0).length;
+    team.players.filter((p) => underContract(p, offsetYear)).length;
   /** Count of all org players (NHL+AHL) still under contract. */
   const allContractsForYear = (offsetYear: number) =>
-    team.players.filter((p) => (p.contractYears ?? 0) - offsetYear > 0).length +
-    farm.filter((p) => (p.contractYears ?? 0) - offsetYear > 0).length;
+    team.players.filter((p) => underContract(p, offsetYear)).length +
+    farm.filter((p) => underContract(p, offsetYear)).length;
   // Each player's own Cap Hit is shown net of any retention someone else pays
   // (see CapRows), so Total Salaries here is the sum of those same net numbers.
   // The rest of this club's own dead money splits into two lines matching the

@@ -6,8 +6,8 @@ import { revalidatePath } from "next/cache";
 import { canManageTeam, getTeamSession, isAdmin, isComishTier } from "@/lib/auth";
 import { getLeagueClock, getLeagueDate } from "@/lib/calendar-server";
 import { addDays } from "@/lib/calendar";
-import { CURRENT_SEASON_START, capCeilingForPhase, ltirRelief, accruedCapSpace, liveCapHit } from "@/lib/finance";
-import { teamCapCommitted } from "@/lib/cap";
+import { CURRENT_SEASON_START, seasonLabel, capCeilingForPhase, ltirRelief, accruedCapSpace, liveCapHit } from "@/lib/finance";
+import { teamCapCommitted, futureCapRoom } from "@/lib/cap";
 import {
   loadMarketPool, teamContentionMap, teamChurnMap, teamAsk, evaluateTeamOffer, loadLeagueCap, weakestTeams, demandForPlayerId,
   recordLowball, clearLowballs, lowballNote, lowballInsultCount,
@@ -117,7 +117,7 @@ export async function getInterestAction(playerId: number, teamId: number) {
   if (!info) return { ok: false as const, error: "Player not found." };
   const player = await prisma.player.findUnique({
     where: { id: playerId },
-    select: { name: true, faDecisionAt: true, age: true, overall: true, lastSeasonGP: true, rosterType: true, capHit: true },
+    select: { name: true, faDecisionAt: true, age: true, overall: true, lastSeasonGP: true, rosterType: true, capHit: true, contractYears: true },
   });
   const existing = await prisma.faOffer.findUnique({ where: { playerId_teamId: { playerId, teamId } } });
   const clock = await getLeagueClock();
@@ -137,11 +137,19 @@ export async function getInterestAction(playerId: number, teamId: number) {
   const gmName = team?.gmNickname || [team?.gmFirstName, team?.gmLastName].filter(Boolean).join(" ").trim() || team?.gm || "Generálny manažér";
 
   let capRoom: number | null = null;
+  let capSeason: number | null = null;
   try {
     const cap = await loadLeagueCap();
     const cInfo = await teamCapInfo(teamId);
     const ceiling = capCeilingForPhase(cap.upper, clock.phase) + cInfo.ltir;
     capRoom = Math.max(0, ceiling - cInfo.committed);
+    // a final-year re-sign during the season starts NEXT season — show the room against
+    // that season's projected cap (incl. already-signed future deals), not this one's.
+    if ((player?.contractYears ?? 0) >= 1 && (clock.phase === "regular" || clock.phase === "playoffs")) {
+      const f = await futureCapRoom(teamId, player!.contractYears!);
+      capRoom = Math.max(0, f.room);
+      capSeason = f.seasonStart;
+    }
   } catch {
     // optional cap room
   }
@@ -172,6 +180,7 @@ export async function getInterestAction(playerId: number, teamId: number) {
     twoWayReason: twoWayErr,
     twoWayMaxSalary: (tw.maxSalary ?? 1_300_001) - 1,
     capRoom,
+    capSeason,
     existing: existing && !mayStartFresh ? {
       salary: existing.salary, years: existing.years, line: existing.line, pp: existing.pp, pk: existing.pk,
       status: existing.status, counterSalary: existing.counterSalary, counterYears: existing.counterYears,
@@ -1365,6 +1374,15 @@ export async function extendContractAction(
     const ceiling = capCeilingForPhase(cap.upper, (await getLeagueClock()).phase) + info.ltir;
     if (committed + salary > ceiling) {
       return { ok: false as const, error: `Over the ceiling — you'd have ${fmtM(ceiling - committed)} of room, this deal is ${fmtM(salary)}.` };
+    }
+  }
+
+  // a deferred (in-season, final-year) extension lands in a future season — it must fit under
+  // THAT season's projected cap, with everything already committed then.
+  if (!onFarm && deferred) {
+    const f = await futureCapRoom(teamId, player.contractYears ?? 1);
+    if (f.committed + salary > f.upper) {
+      return { ok: false as const, error: `Over the ${seasonLabel(f.seasonStart)} cap — you'd have ${fmtM(Math.max(0, f.room))} of room that season, this deal is ${fmtM(salary)}.` };
     }
   }
 
