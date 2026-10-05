@@ -18,6 +18,7 @@ import { activeSimEngine, engineVersionFor } from "./version";
 import { pairSig, unitPairs } from "./chemistry";
 import { computeStandings } from "./standings";
 import { getArenaSections, selloutRevenue, attendanceRate, priceAttendanceFactor, projectedPointsPct } from "../finance";
+import { cleanName } from "../playerName";
 import type { SimTeam, SimGoalie, TeamBox } from "./types";
 import type { TeamLinesData } from "./lines-core";
 
@@ -41,6 +42,23 @@ export function injuryConTarget(daysLeft: number): number {
 /** After healing a day, re-derive injured skaters' CON from their remaining days,
  *  and bring the newly-returned back at the 95 threshold (rusty). */
 export async function updateInjuryCon() {
+  // Preserve a small league-wide return-to-play event before clearing the
+  // temporary injury fields. This feeds the home-page health tracker and runs
+  // only once per injury because the update below immediately clears injuryDesc.
+  const returners = await prisma.player.findMany({
+    where: { injuryDaysLeft: { lte: 0 }, injuryDesc: { not: null } },
+    select: { id: true, name: true, injuryDesc: true, teamId: true, team: { select: { code: true } } },
+  });
+  if (returners.length) {
+    await prisma.transaction.createMany({
+      data: returners.map((p) => ({
+        type: "INJURY_RETURN",
+        playerId: p.id,
+        teamId: p.teamId,
+        message: `🏥 ${cleanName(p.name)}${p.team?.code ? ` (${p.team.code})` : ""} returned from ${p.injuryDesc}.`,
+      })),
+    });
+  }
   await prisma.$executeRawUnsafe(
     `UPDATE "Player" SET condition = GREATEST(45, ROUND((${PLAY_CON} - 0.1866 * POWER("injuryDaysLeft", 1.22))::numeric, 2)) WHERE "injuryDaysLeft" > 0 AND "isGoalie" = false`,
   );

@@ -26,6 +26,7 @@ import type { HomeBlock } from "@/app/admin/site-editor/actions";
 import { getLang } from "@/lib/lang-server";
 import { t as tt } from "@/lib/i18n";
 import { articlePlainText, sanitizeArticleHtml } from "@/lib/news-html";
+import { currentInjuries } from "@/lib/injuries-server";
 
 export const dynamic = "force-dynamic";
 const SEASON = "2026-27";
@@ -95,6 +96,24 @@ export default async function HomePage() {
 
   // Waiver Wire — who's currently exposed, so it's on-screen without a click
   const waivers = await activeWaivers();
+
+  // League Health & Discipline — active injuries, current suspensions and a
+  // short return-to-play feed live directly below the waiver wire.
+  const [homeInjuries, homeSuspensions, injuryReturns] = await Promise.all([
+    currentInjuries({ league: "NHL" }),
+    prisma.suspension.findMany({
+      where: { season: SEASON, kind: "SUSPENSION", status: "ACTIVE" },
+      orderBy: { createdAt: "desc" }, take: 6,
+      select: { id: true, playerId: true, playerName: true, teamId: true, incident: true, games: true, gamesServed: true, createdAt: true },
+    }),
+    prisma.transaction.findMany({
+      where: { type: "INJURY_RETURN" }, orderBy: { createdAt: "desc" }, take: 5,
+      select: { id: true, playerId: true, teamId: true, message: true, createdAt: true },
+    }),
+  ]);
+  const activeHomeSuspensions = homeSuspensions.filter((s) => s.games > s.gamesServed);
+  const healthPlayerIds = [...new Set([...activeHomeSuspensions.map((s) => s.playerId), ...injuryReturns.map((r) => r.playerId).filter((id): id is number => id != null)])];
+  const healthPlayers = new Map((await prisma.player.findMany({ where: { id: { in: healthPlayerIds } }, select: { id: true, name: true, slug: true } })).map((p) => [p.id, p]));
 
   // Trade Tracker — only COMPLETED deals (the accepted-trade message reads "X traded
   // … to Y for …"); excludes proposed/declined/revoked noise. Latest 3.
@@ -618,6 +637,54 @@ export default async function HomePage() {
                 {waivers.length > 8 && <Link href="/waivers" className="block text-xs text-blue-400 hover:underline pt-1">+ {waivers.length - 8} more →</Link>}
               </div>
             ) : <p className="text-sm text-slate-500">{T("home.noWaivers")}</p>}
+          </Card>
+
+          <Card title={`Health & Discipline (${homeInjuries.length + activeHomeSuspensions.length})`} href="/players/injuries" accent="text-rose-300" viewLabel="injuries →">
+            <div className="space-y-2">
+              {homeInjuries.slice(0, 4).map((injury) => (
+                <div key={`injury-${injury.playerId}`} className="flex gap-2.5 rounded-xl border border-rose-500/15 bg-rose-500/[0.045] px-2.5 py-2">
+                  <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-rose-500/12 text-sm">🏥</span>
+                  {injury.teamLogo && <img src={injury.teamLogo} alt="" className="mt-0.5 h-6 w-6 shrink-0 object-contain" />}
+                  <div className="min-w-0 flex-1 leading-tight">
+                    {injury.slug ? <Link href={`/players/${injury.slug}`} className="font-semibold text-slate-100 hover:text-rose-300">{injury.name}</Link> : <span className="font-semibold text-slate-100">{injury.name}</span>}
+                    <p className="mt-0.5 truncate text-[11px] text-slate-400">{injury.desc}</p>
+                    <p className="mt-1 text-[11px] font-bold text-rose-300">Out · {injury.daysLeft === 1 ? "1 day" : injury.daysLeft < 7 ? `${injury.daysLeft} days` : `${Math.ceil(injury.daysLeft / 7)} week${Math.ceil(injury.daysLeft / 7) === 1 ? "" : "s"}`} left</p>
+                  </div>
+                </div>
+              ))}
+
+              {activeHomeSuspensions.slice(0, 3).map((suspension) => {
+                const player = healthPlayers.get(suspension.playerId);
+                const team = suspension.teamId != null ? teamById.get(suspension.teamId) : null;
+                const left = suspension.games - suspension.gamesServed;
+                return <div key={`suspension-${suspension.id}`} className="flex gap-2.5 rounded-xl border border-amber-500/20 bg-amber-500/[0.045] px-2.5 py-2">
+                  <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-amber-500/12 text-sm">🚫</span>
+                  {team?.logoUrl && <img src={team.logoUrl} alt="" className="mt-0.5 h-6 w-6 shrink-0 object-contain" />}
+                  <div className="min-w-0 flex-1 leading-tight">
+                    {player?.slug ? <Link href={`/players/${player.slug}`} className="font-semibold text-slate-100 hover:text-amber-300">{suspension.playerName}</Link> : <span className="font-semibold text-slate-100">{suspension.playerName}</span>}
+                    <p className="mt-0.5 line-clamp-1 text-[11px] text-slate-400">{suspension.incident}</p>
+                    <p className="mt-1 text-[11px] font-bold text-amber-300">Suspended · {left} game{left === 1 ? "" : "s"} left</p>
+                  </div>
+                </div>;
+              })}
+
+              {injuryReturns.slice(0, 2).map((returned) => {
+                const player = returned.playerId != null ? healthPlayers.get(returned.playerId) : null;
+                const team = returned.teamId != null ? teamById.get(returned.teamId) : null;
+                return <div key={`return-${returned.id}`} className="flex gap-2.5 rounded-xl border border-emerald-500/15 bg-emerald-500/[0.04] px-2.5 py-2">
+                  <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-emerald-500/12 text-sm">✓</span>
+                  {team?.logoUrl && <img src={team.logoUrl} alt="" className="mt-0.5 h-6 w-6 shrink-0 object-contain" />}
+                  <div className="min-w-0 flex-1 leading-tight">
+                    {player?.slug ? <Link href={`/players/${player.slug}`} className="font-semibold text-slate-100 hover:text-emerald-300">{player.name}</Link> : <span className="font-semibold text-slate-100">{returned.message.replace(/^🏥\s*/, "").split(" returned")[0]}</span>}
+                    <p className="mt-0.5 line-clamp-1 text-[11px] text-emerald-300/80">Back from injury</p>
+                  </div>
+                </div>;
+              })}
+
+              {!homeInjuries.length && !activeHomeSuspensions.length && !injuryReturns.length && <p className="py-1 text-sm text-slate-500">No active injuries or suspensions.</p>}
+              {(homeInjuries.length > 4 || activeHomeSuspensions.length > 3) && <Link href="/players/injuries" className="block pt-0.5 text-xs text-rose-300 hover:underline">View full injury report →</Link>}
+              {activeHomeSuspensions.length > 0 && <Link href="/league/player-safety" className="block text-xs text-amber-300 hover:underline">Player Safety →</Link>}
+            </div>
           </Card>
 
           <Card title={T("home.birthdays")} accent="text-pink-400">
