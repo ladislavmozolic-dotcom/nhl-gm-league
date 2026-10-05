@@ -64,6 +64,8 @@ const SEL = {
   // the NEW real season, once it's ~10 games in — blended into performanceOf() alongside
   // last season so demands start reacting to this year's actual form, not just last year's.
   curSeasonGP: true, curSeasonG: true, curSeasonA: true, curSeasonToi: true, goalieAdvanced: true,
+  // the Player Calculator's live blob (real current-season form → projected ratings) — feeds performanceOf()
+  liveCalculatorRatings: true,
   goalieRating: { select: { ag: true, rb: true, sc: true, hs: true } },
 } as const;
 
@@ -252,6 +254,57 @@ export function roleAnchor(
   return percentile(comps.map((c) => c.capHit), 0.55);
 }
 
+/** The Player Calculator's live read of this season: his projected ratings (what the real
+ *  current-season stats imply) priced against his actual ratings on the SAME market curve.
+ *  factor = anchor salary at the projected rating / anchor salary at the actual rating, clamped
+ *  to 0.90–1.10 — a skater the live data says has become a better (worse) player asks more
+ *  (less). Only for his NHL read; null without a blob / without the four rating inputs, and
+ *  null for goalies. */
+export function liveFormFactor(
+  p: { liveCalculatorRatings?: unknown },
+  grp: FaPos, market: number, pool: MarketRow[], w?: FaMarketWeights,
+): { gp: number; factor: number } | null {
+  const blob = p.liveCalculatorRatings as { classification?: string; nhlGpLatest?: number; nhlGpPrevious?: number; projected?: Record<string, number | null> } | null | undefined;
+  if (!blob || blob.classification !== "NHL" || !blob.projected) return null;
+  // latest === previous means the feed has no separate current-season sample yet (it fell back to
+  // last season), so there is no live form to react to — leave him on the old path.
+  if (blob.nhlGpLatest === blob.nhlGpPrevious) return null;
+  // Goalies stay on their save-% path: the calculator's projected goalie ratings run ~7 points
+  // below the STHS ratings across the board, so reading them as "form" would cut every goalie's price.
+  if (grp === "G") return null;
+  const pr = blob.projected;
+  const v = (k: string) => (typeof pr[k] === "number" ? (pr[k] as number) : null);
+  const sc = v("sc"), pa = v("pa"), df = v("df"), sk = v("sk");
+  if (sc == null || pa == null || df == null || sk == null) return null;
+  const projMarket = skaterMarket({ sc, pa, df, sk }, grp, grp === "D" ? w?.d : w?.f);
+  // Price the rating change with the league's own slope (salary vs rating over every signed
+  // player of his position) — smooth and monotone, unlike re-reading the comparable window,
+  // which jumps whenever a neighbour changes.
+  // …at half strength (a projection is still an estimate), capped at ±10 %.
+  const factor = Math.exp(0.5 * priceSlope(pool, grp) * (projMarket - market));
+  return { gp: Number(blob.nhlGpLatest ?? 0), factor: Math.max(0.9, Math.min(1.1, factor)) };
+}
+
+const slopeCache = new WeakMap<MarketRow[], Map<FaPos, number>>();
+/** d ln(cap hit) / d market-rating point, from a least-squares line through the signed pool. */
+function priceSlope(pool: MarketRow[], grp: FaPos): number {
+  let m = slopeCache.get(pool);
+  if (!m) { m = new Map(); slopeCache.set(pool, m); }
+  const hit = m.get(grp);
+  if (hit != null) return hit;
+  const rows = pool.filter((r) => r.grp === grp && r.capHit > 0);
+  let slope = 0.05;
+  if (rows.length >= 20) {
+    const xs = rows.map((r) => r.market), ys = rows.map((r) => Math.log(r.capHit));
+    const mx = xs.reduce((a, b) => a + b, 0) / xs.length, my = ys.reduce((a, b) => a + b, 0) / ys.length;
+    let sxy = 0, sxx = 0;
+    for (let i = 0; i < xs.length; i++) { sxy += (xs[i] - mx) * (ys[i] - my); sxx += (xs[i] - mx) ** 2; }
+    if (sxx > 0) slope = Math.max(0.01, Math.min(0.12, sxy / sxx));
+  }
+  m.set(grp, slope);
+  return slope;
+}
+
 /** Production vs. players rated like him → the demand's performance multiplier
  *  (1 = produced like his rating says). Skaters: points/GP against the same-rating
  *  comps (a D's points count less — his job isn't scoring). Goalies: save % against
@@ -269,10 +322,14 @@ export function performanceOf(
     lastSeasonGP?: number | null; lastSeasonPts?: number | null; lastSeasonSvPct?: number | null; lastSeasonToi?: number | null;
     curSeasonGP?: number | null; curSeasonG?: number | null; curSeasonA?: number | null; curSeasonToi?: number | null;
     goalieAdvanced?: unknown;
+    liveCalculatorRatings?: unknown;
   },
-  grp: FaPos, market: number, pool: MarketRow[],
+  grp: FaPos, market: number, pool: MarketRow[], w?: FaMarketWeights,
 ): number {
-  const curGp = p.curSeasonGP ?? 0;
+  // Prefer the Player Calculator's live read (projected vs actual ratings, with the real
+  // current-season game count). Without a blob, fall back to the imported cur-season columns.
+  const live = liveFormFactor(p, grp, market, pool, w);
+  const curGp = live ? live.gp : (p.curSeasonGP ?? 0);
   const curWeight = Math.max(0, Math.min(1, (curGp - 10) / 31));
 
   if (grp === "G") {
@@ -280,7 +337,7 @@ export function performanceOf(
       gp >= 10 && sv != null && sv > 0.8 ? Math.max(0.85, Math.min(1.15, 1 + (sv - 0.903) * 8)) : null;
     const lastF = (p.lastSeasonGP ?? 0) >= 15 ? goalieFactor(p.lastSeasonSvPct, p.lastSeasonGP ?? 0) : null;
     const adv = (p.goalieAdvanced ?? null) as { cur?: { svPct?: number; gp?: number } | null } | null;
-    const curF = goalieFactor(adv?.cur?.svPct, adv?.cur?.gp ?? 0);
+    const curF = live ? (live.gp >= 10 ? live.factor : null) : goalieFactor(adv?.cur?.svPct, adv?.cur?.gp ?? 0);
     if (lastF == null) return curF ?? 1;
     if (curF == null) return lastF;
     return lastF * (1 - curWeight) + curF * curWeight;
@@ -300,7 +357,7 @@ export function performanceOf(
   };
 
   const lastF = (p.lastSeasonGP ?? 0) >= 20 ? skaterFactor(p.lastSeasonGP ?? 0, p.lastSeasonPts ?? 0, p.lastSeasonToi) : null;
-  const curF = curGp >= 10 ? skaterFactor(curGp, (p.curSeasonG ?? 0) + (p.curSeasonA ?? 0), p.curSeasonToi) : null;
+  const curF = live ? (live.gp >= 10 ? live.factor : null) : (curGp >= 10 ? skaterFactor(curGp, (p.curSeasonG ?? 0) + (p.curSeasonA ?? 0), p.curSeasonToi) : null);
   if (lastF == null) return curF ?? 1;
   if (curF == null) return lastF;
   return lastF * (1 - curWeight) + curF * curWeight;
@@ -334,7 +391,7 @@ function demandFromRow(
   const anchor = role != null ? (rated.anchor + role) / 2 : rated.anchor, count = rated.count;
   const demand = buildDemand({
     market, grp, age: p.age, anchor, comps: count,
-    override: p.faDemandOverride, capGrowth: 1, round, priorBidders, perf: performanceOf(p, grp, market, pool),
+    override: p.faDemandOverride, capGrowth: 1, round, priorBidders, perf: performanceOf(p, grp, market, pool, weights),
     availability: availabilityFactor(p.lastSeasonGP, fullGP, grp === "G"),
     eliteTarget: eliteTarget(p, grp, market, pool, maxSalary), maxSalary,
     downSeason: isDownSeason(p.lastSeasonGP, fullGP, grp === "G"), morale: p.morale, currentSalary: p.capHit,
@@ -671,7 +728,7 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
   const anchor = role != null ? (rated.anchor + role) / 2 : rated.anchor, count = rated.count;
   const rawBase = buildDemand({
     market, grp, age: dealAge, anchor, comps: count, override: p.faDemandOverride, capGrowth: 1, round: rnd, priorBidders,
-    perf: performanceOf(p, grp, market, marketPool),
+    perf: performanceOf(p, grp, market, marketPool, { f: s.faWeightF, d: s.faWeightD, g: s.faWeightG }),
     availability: availabilityFactor(p.lastSeasonGP, fullGP, grp === "G"),
     eliteTarget: elite, maxSalary,
     downSeason: isDownSeason(p.lastSeasonGP, fullGP, grp === "G"), morale: p.morale, currentSalary: p.capHit, realCapHit: p.realCapHit,
@@ -708,7 +765,7 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
   // after the role/contention bend (the base already respects it — see buildDemand)
   if (extension && p.faDemandOverride == null && elite === 0 && (dealAge ?? 27) >= 32 && (p.capHit ?? 0) > 0) {
     const avail = availabilityFactor(p.lastSeasonGP, await leagueFullGP(), grp === "G");
-    const big = performanceOf(p, grp, market, marketPool) >= 1.08 && (dealAge ?? 27) < 35 && avail >= 0.95;
+    const big = performanceOf(p, grp, market, marketPool, { f: s.faWeightF, d: s.faWeightD, g: s.faWeightG }) >= 1.08 && (dealAge ?? 27) < 35 && avail >= 0.95;
     const cap = round50k(p.capHit! * (big ? 1.1 : 1) * avail);
     if (ask.salary > cap) ask = { ...ask, salary: cap, floorSalary: Math.min(ask.floorSalary, round50k(cap * 0.92)) };
   }
