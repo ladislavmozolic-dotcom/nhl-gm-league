@@ -81,7 +81,7 @@ export async function decideArbitrationAction(caseId: number, teamId: number, cl
 
 
 /** Put an arbitration signing into Recent Signings (public feed) and the revertible signing log. */
-async function logArbitrationSigning(c: { playerId: number; teamId: number; awardAav: number | null; awardTerm: number | null; player: { name: string; capHit: number | null; contractYears: number | null; contractExpiry: number | null; ahlSalary: number | null; contractType: string | null; tradeClause: string | null; noTradeTeams: string[]; rosterType: string | null; teamId: number; contractText: string | null } }, deferred: boolean, startYear: number) {
+async function logArbitrationSigning(c: { playerId: number; teamId: number; awardAav: number | null; awardTerm: number | null; player: { name: string; capHit: number | null; contractYears: number | null; contractExpiry: number | null; ahlSalary: number | null; contractType: string | null; tradeClause: string | null; noTradeTeams: number[]; rosterType: string | null; teamId: number; contractText: string | null } }, deferred: boolean, startYear: number) {
   const team = await prisma.team.findUnique({ where: { id: c.teamId }, select: { code: true, parentTeam: { select: { code: true } } } });
   const code = team?.parentTeam?.code ?? team?.code ?? "?";
   const salary = c.awardAav ?? 0, years = c.awardTerm ?? 0;
