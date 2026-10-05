@@ -1,7 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-import { getLeagueDate } from "@/lib/calendar-server";
+import { getLeagueDate, getLeagueClock } from "@/lib/calendar-server";
 import { loadSettings } from "@/lib/sim/settings";
 import { ufaAtExpiry } from "@/lib/free-agency-server";
 import { CURRENT_SEASON_START } from "@/lib/finance";
@@ -327,4 +327,10 @@ export async function warnMissingQo(now?: Date) {
     sent++;
   }
   return sent;
+}
+
+/** Arbitration is a summer process (off-season / Free Agent Frenzy) — never preseason or in-season. */
+export async function arbitrationWindowOpen(): Promise<boolean> {
+  const phase = (await getLeagueClock()).phase;
+  return phase === "offseason" || phase === "frenzy";
 }

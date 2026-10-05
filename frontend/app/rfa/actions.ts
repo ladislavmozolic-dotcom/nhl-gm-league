@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { canManageTeam } from "@/lib/auth";
 import { getLeagueClock, getLeagueDate } from "@/lib/calendar-server";
 import { loadSettings } from "@/lib/sim/settings";
-import { arbitrationRange, ensureRfaCases, qoFormInfo, qoOneWayMessage } from "@/lib/rfa-server";
+import { arbitrationWindowOpen, arbitrationRange, ensureRfaCases, qoFormInfo, qoOneWayMessage } from "@/lib/rfa-server";
 import { CURRENT_SEASON_START } from "@/lib/finance";
 import { twoWayObjection } from "@/lib/free-agency";
 import { displayName } from "@/lib/playerName";
@@ -45,6 +45,7 @@ export async function fileArbitrationAction(caseId: number, teamId: number, file
   if (!c) return { ok: false as const, error: "You don't manage this RFA." };
   if (!c.arbEligible) return { ok: false as const, error: "This player is not arbitration eligible yet." };
   if (!["QO_TENDERED", "NEGOTIATING", "OS_ELIGIBLE"].includes(c.status)) return { ok: false as const, error: "Tender a QO before filing arbitration." };
+  if (!(await arbitrationWindowOpen())) return { ok: false as const, error: "Arbitration can only be filed in the summer (off-season) — not during the preseason or the season." };
   await prisma.rfaCase.update({ where: { id: caseId }, data: { status: "ARB_FILED", arbFiledBy: filedBy, arbFiledAt: new Date() } });
   refresh();
   return { ok: true as const };

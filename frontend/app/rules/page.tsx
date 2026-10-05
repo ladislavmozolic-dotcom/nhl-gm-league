@@ -157,7 +157,7 @@ const SECTIONS: Sec[] = [
         "A normal Re-sign is always available and closes any QO or arbitration case immediately. Arbitration is never required just to extend an RFA.",
       ] },
       { h: "Salary arbitration — RFAs only", points: [
-        "Eligibility: age 24+ OR 40+ NHL games last season (commissioner settings). Either the club or the player may file once a QO has been tendered. While an arbitration case is open, ordinary re-sign offers are blocked.",
+        "Eligibility: age 24+ OR 40+ NHL games last season (commissioner settings). Either the club or the player may file once a QO has been tendered — but only in the summer (off-season / Free Agent Frenzy), never in the preseason or during the season. While an arbitration case is open, ordinary re-sign offers are blocked.",
         "The arbitrator compares six similar players (same position, similar rating and age) and sets a band: 80–120 % of their median cap hit, never below the QO. The club's and the player's submissions default to the bottom and the top of the band.",
         "The verdict arrives automatically 48 hours after the filing (the commissioner can issue it sooner). The salary is the midpoint of the two submissions, inside the band.",
         "The term (1 or 2 years) is chosen by the side that did NOT file: if the club filed, the player picks (1 year); if the player filed, the club picks (2 years — 1 year when the award is walk-away money).",

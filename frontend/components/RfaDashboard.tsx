@@ -69,7 +69,7 @@ function Risk({ level }: { level: Row["offerSheetRisk"] }) {
 const accent: Record<string, string> = { QO_DUE: "border-l-sky-500", QO_TENDERED: "border-l-emerald-500", NEGOTIATING: "border-l-amber-500", ARB_FILED: "border-l-violet-500", AWARDED: "border-l-violet-500", OS_ELIGIBLE: "border-l-rose-500" };
 const chip: Record<string, string> = { QO_DUE: "bg-sky-500/15 text-sky-300 border-sky-500/30", QO_TENDERED: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", NEGOTIATING: "bg-amber-500/15 text-amber-300 border-amber-500/30", ARB_FILED: "bg-violet-500/15 text-violet-300 border-violet-500/30", AWARDED: "bg-violet-500/15 text-violet-300 border-violet-500/30", OS_ELIGIBLE: "bg-rose-500/15 text-rose-300 border-rose-500/30" };
 
-function RfaRow({ r, pending, run }: { r: Row; pending: boolean; run: (fn: () => Promise<{ ok: boolean; error?: string }>) => void }) {
+function RfaRow({ r, pending, run, arbWindowOpen }: { r: Row; pending: boolean; arbWindowOpen: boolean; run: (fn: () => Promise<{ ok: boolean; error?: string }>) => void }) {
   return <div className={`border-l-4 px-4 py-3 sm:px-5 ${accent[r.status] ?? "border-l-slate-700"}`}>
     <div className="flex flex-wrap items-start gap-x-3 gap-y-1">
       <div className="min-w-0 flex-1">
@@ -105,7 +105,7 @@ function RfaRow({ r, pending, run }: { r: Row; pending: boolean; run: (fn: () =>
         <button disabled={pending} onClick={() => run(() => tenderQualifyingOfferAction(r.id, r.teamId, "ONE_WAY"))} className="rounded-lg bg-sky-700 px-2.5 py-1.5 font-semibold text-white hover:bg-sky-600 disabled:opacity-50">Tender QO · 1r one-way</button>
         <button disabled={pending || r.qoForm.oneWayRequired} title={r.qoForm.oneWayRequired ? "CBA: povinná one-way QO" : "Two-way QO"} onClick={() => run(() => tenderQualifyingOfferAction(r.id, r.teamId, "TWO_WAY"))} className="rounded-lg border border-sky-600 bg-sky-900/40 px-2.5 py-1.5 font-semibold text-sky-200 hover:bg-sky-800/60 disabled:cursor-not-allowed disabled:opacity-40">Tender QO · 1r two-way</button>
       </>}
-      {["QO_TENDERED", "NEGOTIATING", "OS_ELIGIBLE"].includes(r.status) && r.arbEligible && <>
+      {["QO_TENDERED", "NEGOTIATING", "OS_ELIGIBLE"].includes(r.status) && r.arbEligible && arbWindowOpen && <>
         <button disabled={pending} onClick={() => run(() => fileArbitrationAction(r.id, r.teamId, "CLUB"))} className="rounded-lg bg-violet-700 px-2.5 py-1.5 font-semibold text-white hover:bg-violet-600 disabled:opacity-50">Klub podá arbitráž</button>
         <button disabled={pending} onClick={() => run(() => fileArbitrationAction(r.id, r.teamId, "PLAYER"))} className="rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1.5 font-semibold text-slate-300 hover:bg-slate-700 disabled:opacity-50">Podanie hráča</button>
       </>}
@@ -117,7 +117,7 @@ function RfaRow({ r, pending, run }: { r: Row; pending: boolean; run: (fn: () =>
 }
 
 type Org = Row["org"];
-function TeamGroup({ org, rows, leagueView, pending, run }: { org: Org; rows: Row[]; leagueView: boolean; pending: boolean; run: (fn: () => Promise<{ ok: boolean; error?: string }>) => void }) {
+function TeamGroup({ org, rows, leagueView, pending, run, arbWindowOpen }: { org: Org; rows: Row[]; leagueView: boolean; pending: boolean; arbWindowOpen: boolean; run: (fn: () => Promise<{ ok: boolean; error?: string }>) => void }) {
   const urgent = rows.filter((r) => r.status === "QO_DUE").length;
   const farm = rows.filter((r) => r.team.isAffiliate).length;
   const [open, setOpen] = useState(!leagueView);
@@ -131,7 +131,7 @@ function TeamGroup({ org, rows, leagueView, pending, run }: { org: Org; rows: Ro
       <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs font-semibold text-slate-300">{rows.length}</span>
       <span className="text-slate-500">{open ? "⌃" : "⌄"}</span>
     </button>
-    {open && <div className="divide-y divide-slate-800/70 border-t border-slate-800/80">{sorted.map((r) => <RfaRow key={r.id} r={r} pending={pending} run={run} />)}</div>}
+    {open && <div className="divide-y divide-slate-800/70 border-t border-slate-800/80">{sorted.map((r) => <RfaRow key={r.id} r={r} pending={pending} run={run} arbWindowOpen={arbWindowOpen} />)}</div>}
   </section>;
 }
 
@@ -143,7 +143,7 @@ const FILTERS: { key: string; text: string; match: (s: string) => boolean }[] = 
   { key: "os", text: "Offer-sheet eligible", match: (s) => s === "OS_ELIGIBLE" },
 ];
 
-export default function RfaDashboard({ rows, leagueView = false }: { rows: Row[]; leagueView?: boolean }) {
+export default function RfaDashboard({ rows, leagueView = false, arbWindowOpen = true }: { rows: Row[]; leagueView?: boolean; arbWindowOpen?: boolean }) {
   const [pending, start] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -172,7 +172,7 @@ export default function RfaDashboard({ rows, leagueView = false }: { rows: Row[]
       <div className="mt-2 flex flex-wrap gap-1.5">{FILTERS.map((f) => <button key={f.key} onClick={() => setFilter(f.key)} className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${filter === f.key ? "border-sky-500 bg-sky-500/20 text-sky-200" : "border-slate-700 bg-slate-900 text-slate-400 hover:text-slate-200"}`}>{f.text} <span className="opacity-60">{count(f.key)}</span></button>)}</div>
       {message && <p className="mt-2 text-xs text-sky-300">{message}</p>}
     </Card>
-    <div className="space-y-3">{groups.map((g) => <TeamGroup key={g.org.id} {...g} leagueView={leagueView} pending={pending} run={run} />)}{groups.length === 0 && <Card><p className="text-sm text-slate-500">Žiadny RFA nezodpovedá vyhľadávaniu.</p></Card>}</div>
+    <div className="space-y-3">{groups.map((g) => <TeamGroup key={g.org.id} {...g} leagueView={leagueView} pending={pending} run={run} arbWindowOpen={arbWindowOpen} />)}{groups.length === 0 && <Card><p className="text-sm text-slate-500">Žiadny RFA nezodpovedá vyhľadávaniu.</p></Card>}</div>
   </div>;
 }
 

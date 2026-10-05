@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { qoFormInfo, arbitrationRange, ensureRfaCases, resolveExpiredQODueDates, resolveArbitrationVerdicts } from "@/lib/rfa-server";
+import { qoFormInfo, arbitrationRange, ensureRfaCases, resolveExpiredQODueDates, resolveArbitrationVerdicts, arbitrationWindowOpen } from "@/lib/rfa-server";
 import { Card } from "@/components/ui";
 import RfaDashboard from "@/components/RfaDashboard";
 
@@ -44,6 +44,6 @@ export default async function RfaCentralSection({ teamId }: { teamId?: number })
     };
   }));
   return data.length
-    ? <RfaDashboard rows={data} leagueView={!teamId} />
+    ? <RfaDashboard rows={data} leagueView={!teamId} arbWindowOpen={await arbitrationWindowOpen()} />
     : <Card><p className="text-sm text-slate-500">No RFAs with expiring contracts right now.</p></Card>;
 }
