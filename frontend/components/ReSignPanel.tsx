@@ -9,7 +9,6 @@ import {
   extendContractAction,
   setFranchiseTagAction,
   setRightsReleasedAction,
-  getAskAtAction,
 } from "@/app/free-agents/actions";
 import { Card } from "@/components/ui";
 import InfoTip from "@/components/InfoTip";
@@ -34,7 +33,6 @@ const slotLabels: Record<string, string> = {
 function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; teamId: number; onClose: () => void }) {
   const [pending, start] = useTransition();
   const [info, setInfo] = useState<Awaited<ReturnType<typeof getInterestAction>> | null>(null);
-  const [liveAsk, setLiveAsk] = useState<Awaited<ReturnType<typeof getAskAtAction>> | null>(null);
   const [msg, setMsg] = useState<{ t: "ok" | "err"; s: string } | null>(null);
   const [salaryM, setSalaryM] = useState("");
   const [years, setYears] = useState(1);
@@ -71,16 +69,6 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
   const i = info && info.ok ? info : null;
   const grp = i?.grp ?? "F";
 
-  // Re-calculate the live ask dynamically whenever line, pp/pk, clause, breadth or term changes!
-  useEffect(() => {
-    if (!teamId || !i) return;
-    let cancelled = false;
-    getAskAtAction(player.id, teamId, line, pp, pk, grantClause || null, grantClause === "M_NTC" ? breadth : null, years > 0 ? years : 1)
-      .then((r) => { if (!cancelled) setLiveAsk(r); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [line, pp, pk, teamId, i, grantClause, breadth, years, player.id]);
-
   const currentSalaryDollars = salaryDollars(salaryM);
   const maxTwoWay = i?.twoWayMaxSalary ?? 1_300_000;
   const isSalaryAboveTwoWayMax = Number.isFinite(currentSalaryDollars) && currentSalaryDollars > maxTwoWay;
@@ -99,7 +87,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
     const max = i ? i.maxSalary / 1e6 : 25;
     let next: number;
     if (!Number.isFinite(cur)) {
-      const base = liveAsk ? liveAsk.floor / 1e6 : (i ? i.floor / 1e6 : 0.825);
+      const base = i ? i.floor / 1e6 : 0.825;
       next = dir === 1 ? Math.min(max, base) : Math.max(min, base - 0.05);
     } else {
       const step = 0.05;
@@ -109,21 +97,6 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
     next = Math.max(min, Math.min(max, next));
     setSalaryM(Math.abs(next - min) < 1e-9 ? min.toFixed(3) : next.toFixed(2));
   };
-
-  const effectiveFloor = liveAsk?.floor ?? i?.floor ?? 0;
-  const effectiveAsk = liveAsk?.askSalary ?? i?.askSalary ?? 0;
-  let salaryStatus: { color: string; label: string; badge: string } | null = null;
-  if (salaryM.trim() !== "" && Number.isFinite(currentSalaryDollars)) {
-    if (currentSalaryDollars < 775_000) {
-      salaryStatus = { color: "text-rose-400", badge: "bg-rose-500/10 border-rose-500/30 text-rose-300", label: "Pod ligovým minimom ($775k)" };
-    } else if (currentSalaryDollars >= effectiveFloor) {
-      salaryStatus = { color: "text-emerald-400", badge: "bg-emerald-500/10 border-emerald-500/30 text-emerald-300", label: "V akceptovateľnom pásme hráča ✓" };
-    } else if (currentSalaryDollars >= effectiveFloor * 0.90) {
-      salaryStatus = { color: "text-amber-400", badge: "bg-amber-500/10 border-amber-500/30 text-amber-300", label: "Mierne pod požiadavkou (hrozí protinávrh)" };
-    } else {
-      salaryStatus = { color: "text-rose-400", badge: "bg-rose-500/10 border-rose-500/30 text-rose-300", label: "Výrazný lowball (hráč môže ukončiť rokovania)" };
-    }
-  }
 
   const router = useRouter();
   const closeAndRefresh = () => { router.refresh(); onClose(); };
@@ -243,10 +216,10 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
 
               <div className="text-left md:text-right bg-slate-900/90 px-3.5 py-2.5 rounded-lg border border-slate-800 shrink-0">
                 <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
-                  {liveAsk && (liveAsk.askSalary !== i.askSalary || liveAsk.askYears !== i.askYears) ? "Prepočítaná požiadavka agenta" : "Základná požiadavka agenta"}
+                  Požiadavka agenta
                 </span>
                 <span className="text-sm md:text-base font-bold text-amber-300 font-mono">
-                  {M(effectiveFloor)} – {M(effectiveAsk * 1.05)} <span className="text-xs font-normal text-slate-400">/ {years > 0 ? years : i.askYears}yr</span>
+                  {M(i.floor)} – {M(i.askSalary * 1.05)} <span className="text-xs font-normal text-slate-400">/ {i.askYears} {i.askYears === 1 ? "rok" : i.askYears < 5 ? "roky" : "rokov"}</span>
                 </span>
                 {i.moraleNote && (
                   <p className={`mt-0.5 text-[10px] font-medium ${i.moraleNote.startsWith("Happy") ? "text-emerald-400" : "text-amber-400"}`}>
@@ -255,15 +228,6 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                 )}
               </div>
             </div>
-
-            {/* Dynamic notice about role/term adjustment */}
-            {liveAsk && (liveAsk.askSalary !== i.askSalary || liveAsk.askYears !== i.askYears) && (
-              <div className="bg-amber-500/10 border border-amber-500/25 rounded-xl px-4 py-2.5 text-xs text-amber-300 flex items-center justify-between gap-2">
-                <span>
-                  ⚡ <b>Agent reaguje na ponúkanú rolu a dĺžku:</b> Pri zaradení do {slotLabels[["", "L1", "L2", "L3", "L4"][line] ?? ""] ?? `line ${line}`}{!pp && i.wantPP ? ", bez PP" : ""}{!pk && i.wantPK ? ", bez PK" : ""}{grantClause ? ` (${grantClause})` : ""} na {years} {years === 1 ? "rok" : "roky"} požaduje plat v rozmedzí <b>{M(effectiveFloor)} – {M(effectiveAsk * 1.05)}</b>.
-                </span>
-              </div>
-            )}
 
             {/* Previous Negotiation Alert */}
             {(player.negotiation || (player.resignRound ?? 0) > 0) && (
@@ -295,14 +259,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Salary input */}
                   <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-xs font-semibold text-slate-400">Garantovaný ročný plat v NHL (AAV)</label>
-                      {salaryStatus && (
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${salaryStatus.badge}`}>
-                          {salaryStatus.label}
-                        </span>
-                      )}
-                    </div>
+                    <label className="text-xs font-semibold text-slate-400 block mb-2">Garantovaný ročný plat v NHL (AAV)</label>
                     <div className="grid grid-cols-[3rem_minmax(0,1fr)_3rem] items-center gap-2">
                       <button
                         type="button"
@@ -326,7 +283,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                             }
                           }}
                           className="h-10 w-full rounded-lg border-2 border-amber-500/40 bg-slate-900 px-3 text-center text-lg font-bold font-mono text-amber-300 outline-none placeholder:text-slate-600 focus:border-amber-400"
-                          placeholder={effectiveFloor ? `${(effectiveFloor / 1e6).toFixed(2)}` : "Plat v $M"}
+                          placeholder={i.floor ? `${(i.floor / 1e6).toFixed(2)}` : "Plat v $M"}
                         />
                         <span className="absolute right-3 top-2.5 text-[11px] font-bold text-slate-500 pointer-events-none">$M / rok</span>
                       </div>
@@ -341,7 +298,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                     </div>
                     <div className="flex justify-between text-[10px] text-slate-500 mt-1.5 px-1">
                       <span>Min: $0.775M</span>
-                      <span className="text-slate-400">Požaduje: {M(effectiveFloor)}–{M(effectiveAsk * 1.05)}</span>
+                      <span className="text-slate-400">Požaduje: {M(i.floor)}–{M(i.askSalary * 1.05)}</span>
                       <span>Max: ${(i.maxSalary / 1e6).toFixed(1)}M</span>
                     </div>
                   </div>
@@ -351,13 +308,13 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                     <div className="flex items-center justify-between mb-2">
                       <label className="text-xs font-semibold text-slate-400">Dĺžka kontraktu (Term)</label>
                       <span className="text-[10px] text-slate-400">
-                        Preferuje: <b className="text-amber-300">{effectiveAsk ? (liveAsk?.askYears ?? i.askYears) : i.askYears} {((liveAsk?.askYears ?? i.askYears) === 1 ? "rok" : "roky")}</b>
+                        Preferuje: <b className="text-amber-300">{i.askYears} {i.askYears === 1 ? "rok" : i.askYears < 5 ? "roky" : "rokov"}</b>
                       </span>
                     </div>
                     <div className="grid grid-cols-4 gap-2">
                       {[1, 2, 3, 4].map((yr) => {
                         const isSelected = years === yr;
-                        const isPreferred = yr === (liveAsk?.askYears ?? i.askYears);
+                        const isPreferred = yr === i.askYears;
                         return (
                           <button
                             key={yr}
@@ -380,7 +337,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                       })}
                     </div>
                     <div className="text-[10px] text-slate-500 mt-1.5 px-1 flex justify-between">
-                      <span>Dlhší termín obvykle zvyšuje požadovaný plat</span>
+                      <span>Rozpätie rokov: {i.minYears}–{i.maxYears} yr (dlhší kontrakt zvyčajne stojí viac, pri 35+ naopak)</span>
                       <span>Limit ligy: 4 roky</span>
                     </div>
                   </div>
