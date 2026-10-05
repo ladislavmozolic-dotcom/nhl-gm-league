@@ -17,6 +17,16 @@ const LABEL_KEY: Record<string, string> = {
   "Depth Chart": "team.depthChart", "Injuries": "team.injuries",
 };
 
+// Keep the team navigation as easy to scan as the main-menu dropdowns. These
+// are deliberately visual helpers only; labels remain the accessible nav names.
+const MENU_ICON: Record<string, string> = {
+  "Home": "🏠", "Roster": "👥", "Depth Chart": "📋", "Injuries": "🩹", "Roster Moves": "🔁", "Lines": "🏒", "System": "⚙️",
+  "Schedule": "📅", "Scores": "🏁", "Statistics": "📊", "NHL Team": "🏆",
+  "Finance & Contracts": "💰", "Salary Cap": "🧮", "Team Contracts": "📝", "Free Agents": "✍️", "Arena & Tickets": "🏟️", "Dashboard & controls": "🎛️",
+  "Trades": "🔄", "Trade Tracker": "📨", "Transactions": "📜", "Trade Block": "🧱",
+  "Draft Picks": "🎯", "Prospects": "🌟", "Rivals": "⚔️", "Farm": "🚜", "History": "🏛️", "Retired Numbers": "🔢", "Team DNA": "🧬",
+};
+
 type Item = { label: string; href: string; gm?: boolean };
 type Group = { label: string; items: Item[] };
 type Entry = Item | Group;
@@ -32,6 +42,7 @@ export default function TeamSubNav({ slug, isGm, isAffiliate, farmSlug, parentSl
   const pathname = usePathname() || "";
   const tr = useT();
   const L = (label: string) => (LABEL_KEY[label] ? tr(LABEL_KEY[label]) : label);
+  const Icon = ({ label }: { label: string }) => MENU_ICON[label] ? <span aria-hidden className="w-5 text-center text-base leading-none">{MENU_ICON[label]}</span> : null;
   const base = `/teams/${slug}`;
   const [open, setOpen] = useState<string | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -157,7 +168,7 @@ export default function TeamSubNav({ slug, isGm, isAffiliate, farmSlug, parentSl
             const active = isActive(e.href);
             return (
               <Link key={e.label} href={e.href} className={linkCls(active)}>
-                {L(e.label)}{e.gm && <span className="ml-1 text-[9px] text-slate-500 align-top">GM</span>}
+                <span className="inline-flex items-center gap-1.5"><Icon label={e.label} />{L(e.label)}</span>{e.gm && <span className="ml-1 text-[9px] text-slate-500 align-top">GM</span>}
               </Link>
             );
           }
@@ -184,6 +195,7 @@ export default function TeamSubNav({ slug, isGm, isAffiliate, farmSlug, parentSl
                 aria-expanded={isOpen}
                 className={`${linkCls(groupActive)} inline-flex items-center gap-1`}
               >
+                <Icon label={e.label} />
                 {L(e.label)}
                 <span className={`text-[8px] text-slate-500 transition-transform ${isOpen ? "rotate-180" : ""}`}>
                   ▼
@@ -207,7 +219,7 @@ export default function TeamSubNav({ slug, isGm, isAffiliate, farmSlug, parentSl
                           : "text-slate-300 hover:bg-slate-800/60 hover:text-white"
                       }`}
                     >
-                      {L(it.label)}
+                      <span className="inline-flex items-center gap-2"><Icon label={it.label} />{L(it.label)}</span>
                       {it.gm && (
                         <span className="ml-1 text-[9px] text-slate-500 align-top">GM</span>
                       )}
