@@ -621,11 +621,25 @@ export function projectSlot(ctx: TeamContext, grp: FaPos, market: number): { slo
   return { slot, line: slotToLine(slot) };
 }
 
+/** A commissioner hand-set demand ladder (Admin → FA Tuning) is the player's price at each term —
+ *  exactly the numbers Demand Watch shows. When one exists it IS what he asks at that term: no
+ *  RFA discount, role or contention bend on top (a lowball insult to the club still raises it). */
+function ladderOf(raw: unknown): Record<number, number> | null {
+  if (!raw || typeof raw !== "object") return null;
+  const out: Record<number, number> = {};
+  for (const t of [1, 2, 3, 4]) {
+    const v = (raw as Record<string, unknown>)[String(t)];
+    if (typeof v === "number" && Number.isFinite(v) && v > 0) out[t] = v;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
 export type TeamAsk = {
   grp: FaPos; base: Demand; slot: LineSlot; line: number;
   contention: Contention; churn: number; desired: Desired; ask: Demand; age: number | null;
   lowballBump: number; // >1 when this club insulted him with a lowball earlier (his ask to THEM is up)
   elite: number; // elite-ladder price (0 = not elite)
+  ladder: Record<number, number> | null; // commissioner hand-set price per term (Admin → FA Tuning / Demand Watch)
 };
 
 // ---- lowball memory --------------------------------------------------------
@@ -693,7 +707,7 @@ const CHEAP_DEAL_MAX = 1_500_000;
 /** The Interest feedback: what the player would want to sign at THIS club, given
  *  the role he projects into there + whether the club is a contender. */
 export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow[], cmap?: Map<number, Contention>, round?: number, churnMap?: Map<number, number>): Promise<TeamAsk | null> {
-  const p = await prisma.player.findUnique({ where: { id: playerId }, select: { ...SEL, age: true, faDemandOverride: true, df: true, teamId: true, birthDate: true, contractYears: true, rightsReleased: true } });
+  const p = await prisma.player.findUnique({ where: { id: playerId }, select: { ...SEL, age: true, faDemandOverride: true, faOverrideLadder: true, df: true, teamId: true, birthDate: true, contractYears: true, rightsReleased: true } });
   if (!p) return null;
   const marketPool = pool ?? (await loadMarketPool());
   const fullGP = await leagueFullGP();
@@ -774,7 +788,13 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
   // …unless he's one of the league's elite: then his ladder spot is the ceiling (Celebrini ≈ Carlsson)
   const ceiling = rfa && expAge <= 23 ? Math.max(round50k(maxSalary * 0.7), elite) : maxSalary;
   if (ask.salary > ceiling) ask = { ...ask, salary: ceiling, floorSalary: Math.min(ask.floorSalary, round50k(ceiling * 0.92)) };
-  return { grp, base, slot, line, contention: ctx.contention, churn: ctx.churn, desired, ask, age: dealAge, lowballBump: bump, elite };
+  const ladder = ladderOf((p as { faOverrideLadder?: unknown }).faOverrideLadder);
+  if (ladder && ladder[ask.years] != null) {
+    const gap = ask.salary > 0 ? ask.floorSalary / ask.salary : 0.9;
+    const sal = Math.min(maxSalary, round50k(ladder[ask.years] * bump));
+    ask = { ...ask, salary: sal, floorSalary: Math.max(775_000, Math.min(sal, round50k(sal * gap))) };
+  }
+  return { grp, base, slot, line, contention: ctx.contention, churn: ctx.churn, desired, ask, age: dealAge, lowballBump: bump, elite, ladder };
 }
 
 /** Evaluate a concrete offer (money + term + promised deployment) at a club. */
@@ -798,9 +818,15 @@ export async function evaluateTeamOffer(
   // longer term than his sweet spot raises the price (always negotiable, never a refusal)
   const tp = termPremium(years, raw.years, info.age, info.slot, raw.floorSalary, info.elite > 0);
   const f = (1 - disc) * tp;
-  const ask: Demand = f !== 1
+  let ask: Demand = f !== 1
     ? { ...raw, floorSalary: Math.max(775_000, Math.round((raw.floorSalary * f) / 50_000) * 50_000), salary: Math.max(775_000, Math.round((raw.salary * f) / 50_000) * 50_000) }
     : raw;
+  // a hand-set ladder prices every term it covers directly (clause discounts still apply)
+  if (info.ladder && info.ladder[years] != null) {
+    const gap = raw.salary > 0 ? raw.floorSalary / raw.salary : 0.9;
+    const sal = Math.max(775_000, round50k(info.ladder[years] * info.lowballBump * (1 - disc)));
+    ask = { ...raw, salary: sal, floorSalary: Math.max(775_000, Math.min(sal, round50k(sal * gap))) };
+  }
   const acceptable = offerAcceptable(ask, salary, years);
   const utility = offerUtility(salary, info.grp, deploy, info.desired, info.contention, info.age, info.churn) + disc * raw.salary;
   return { acceptable, ask, utility, base: info };
