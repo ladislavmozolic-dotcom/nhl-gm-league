@@ -4,7 +4,13 @@ import { salaryDollars, salaryMillions } from "@/components/SalaryStepper";
 import { useEffect, useState, useTransition } from "react";
 import PlayerLink from "@/components/PlayerLink";
 import { useRouter } from "next/navigation";
-import { getInterestAction, extendContractAction, setFranchiseTagAction, setRightsReleasedAction } from "@/app/free-agents/actions";
+import {
+  getInterestAction,
+  extendContractAction,
+  setFranchiseTagAction,
+  setRightsReleasedAction,
+  getAskAtAction,
+} from "@/app/free-agents/actions";
 import { Card } from "@/components/ui";
 import InfoTip from "@/components/InfoTip";
 import { cleanName } from "@/lib/playerName";
@@ -28,9 +34,10 @@ const slotLabels: Record<string, string> = {
 function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; teamId: number; onClose: () => void }) {
   const [pending, start] = useTransition();
   const [info, setInfo] = useState<Awaited<ReturnType<typeof getInterestAction>> | null>(null);
+  const [liveAsk, setLiveAsk] = useState<Awaited<ReturnType<typeof getAskAtAction>> | null>(null);
   const [msg, setMsg] = useState<{ t: "ok" | "err"; s: string } | null>(null);
   const [salaryM, setSalaryM] = useState("");
-  const [years, setYears] = useState(0);
+  const [years, setYears] = useState(1);
   const [line, setLine] = useState(2);
   const [pp, setPp] = useState(false);
   const [pk, setPk] = useState(false);
@@ -44,9 +51,6 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
       try {
         const i = await getInterestAction(player.id, teamId);
         setInfo(i);
-        // A fresh negotiation starts with an intentionally blank financial offer. On
-        // later visits, preserve the previous offer and seed the reply with the
-        // player's counter, so a GM never has to reconstruct a failed negotiation.
         if (i.ok) {
           const previous = player.negotiation;
           setLine(previous?.offerLine ?? i.line);
@@ -57,7 +61,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
           const suggestedSalary = previous?.counterSalary ?? player.resignCounterSalary;
           const suggestedYears = previous?.counterYears ?? player.resignCounterYears;
           if (suggestedSalary) setSalaryM((suggestedSalary / 1e6).toFixed(3));
-          if (suggestedYears) setYears(suggestedYears);
+          setYears(suggestedYears ?? i.askYears ?? 1);
         }
       } catch (e) { setMsg({ t: "err", s: friendlyActionError(e) }); }
     });
@@ -67,31 +71,77 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
   const i = info && info.ok ? info : null;
   const grp = i?.grp ?? "F";
 
+  // Re-calculate the live ask dynamically whenever line, pp/pk, clause, breadth or term changes!
+  useEffect(() => {
+    if (!teamId || !i) return;
+    let cancelled = false;
+    getAskAtAction(player.id, teamId, line, pp, pk, grantClause || null, grantClause === "M_NTC" ? breadth : null, years > 0 ? years : 1)
+      .then((r) => { if (!cancelled) setLiveAsk(r); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [line, pp, pk, teamId, i, grantClause, breadth, years, player.id]);
+
+  const currentSalaryDollars = salaryDollars(salaryM);
+  const maxTwoWay = i?.twoWayMaxSalary ?? 1_300_000;
+  const isSalaryAboveTwoWayMax = Number.isFinite(currentSalaryDollars) && currentSalaryDollars > maxTwoWay;
+  const canTakeTwoWay = i ? (i.twoWayAllowed && !isSalaryAboveTwoWayMax) : !isSalaryAboveTwoWayMax;
+
+  // Auto-switch from two-way to one-way if GM raises salary over $1.30M
+  useEffect(() => {
+    if (isSalaryAboveTwoWayMax && twoWay) {
+      setTwoWay(false);
+    }
+  }, [isSalaryAboveTwoWayMax, twoWay]);
+
+  const stepSalary = (dir: 1 | -1) => {
+    const cur = salaryMillions(salaryM);
+    const min = 0.775;
+    const max = i ? i.maxSalary / 1e6 : 25;
+    let next: number;
+    if (!Number.isFinite(cur)) {
+      const base = liveAsk ? liveAsk.floor / 1e6 : (i ? i.floor / 1e6 : 0.825);
+      next = dir === 1 ? Math.min(max, base) : Math.max(min, base - 0.05);
+    } else {
+      const step = 0.05;
+      const snapped = (dir === 1 ? Math.floor(cur / step + 1e-9) : Math.ceil(cur / step - 1e-9)) * step;
+      next = snapped + dir * step;
+    }
+    next = Math.max(min, Math.min(max, next));
+    setSalaryM(Math.abs(next - min) < 1e-9 ? min.toFixed(3) : next.toFixed(2));
+  };
+
+  const effectiveFloor = liveAsk?.floor ?? i?.floor ?? 0;
+  const effectiveAsk = liveAsk?.askSalary ?? i?.askSalary ?? 0;
+  let salaryStatus: { color: string; label: string; badge: string } | null = null;
+  if (salaryM.trim() !== "" && Number.isFinite(currentSalaryDollars)) {
+    if (currentSalaryDollars < 775_000) {
+      salaryStatus = { color: "text-rose-400", badge: "bg-rose-500/10 border-rose-500/30 text-rose-300", label: "Pod ligovým minimom ($775k)" };
+    } else if (currentSalaryDollars >= effectiveFloor) {
+      salaryStatus = { color: "text-emerald-400", badge: "bg-emerald-500/10 border-emerald-500/30 text-emerald-300", label: "V akceptovateľnom pásme hráča ✓" };
+    } else if (currentSalaryDollars >= effectiveFloor * 0.90) {
+      salaryStatus = { color: "text-amber-400", badge: "bg-amber-500/10 border-amber-500/30 text-amber-300", label: "Mierne pod požiadavkou (hrozí protinávrh)" };
+    } else {
+      salaryStatus = { color: "text-rose-400", badge: "bg-rose-500/10 border-rose-500/30 text-rose-300", label: "Výrazný lowball (hráč môže ukončiť rokovania)" };
+    }
+  }
+
   const router = useRouter();
-  // A declined offer updates the player on the server, but the modal may be closed
-  // with the × or backdrop before its caller has refreshed. Always refresh on exit
-  // so reopening Re-sign receives the saved offer and counter rather than stale props.
   const closeAndRefresh = () => { router.refresh(); onClose(); };
   const [result, setResult] = useState<{ salary: number; years: number; next?: boolean } | null>(null);
   const [walkedToUFA, setWalkedToUFA] = useState(true);
   const submit = () => start(async () => {
     setMsg(null);
     const salary = salaryDollars(salaryM);
-    if (!Number.isFinite(salary)) { setMsg({ t: "err", s: "Enter a salary." }); return; }
-    if (years < 1) { setMsg({ t: "err", s: "Choose a term (years)." }); return; }
+    if (!Number.isFinite(salary)) { setMsg({ t: "err", s: "Zadajte plat hráča." }); return; }
+    if (years < 1) { setMsg({ t: "err", s: "Vyberte dĺžku kontraktu (roky)." }); return; }
     let r: Awaited<ReturnType<typeof extendContractAction>>;
     try {
       r = await extendContractAction(player.id, teamId, salary, years, line, pp, pk, grantClause || null, grantClause === "M_NTC" ? breadth : null, twoWay);
     } catch (e) { setMsg({ t: "err", s: friendlyActionError(e) }); return; }
-    // don't refresh yet — that would unmount this modal before the confirmation shows;
-    // refresh when the GM closes it (Done button).
     if (r.ok) { setResult({ salary: r.salary, years: r.years, next: !!r.startsNextSeason }); setDone(true); return; }
     const rr = r as { walked?: boolean; toUFA?: boolean; rejected?: boolean; reason?: string; error?: string };
-    // an RFA who exhausts his round(s) isn't leaving the club — he's just open to rival
-    // offer sheets, and comes back to the negotiating table if nobody bites (rfaOsUsed).
-    // Only a real UFA walk means he's actually testing outside free agency.
-    if (rr.walked) { setWalkedToUFA(rr.toUFA !== false); setDone(true); setMsg({ t: "err", s: rr.reason ?? "He walked away." }); return; }
-    setMsg({ t: "err", s: rr.rejected ? (rr.reason ?? "") : (rr.error ?? "Failed.") });
+    if (rr.walked) { setWalkedToUFA(rr.toUFA !== false); setDone(true); setMsg({ t: "err", s: rr.reason ?? "Hráč ukončil rokovania." }); return; }
+    setMsg({ t: "err", s: rr.rejected ? (rr.reason ?? "") : (rr.error ?? "Odoslanie ponuky zlyhalo.") });
   });
 
   return (
@@ -165,7 +215,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
         )}
 
         {!done && i && (
-          <div className="mt-5 space-y-6">
+          <div className="mt-5 space-y-5">
             
             {/* Player & Agent Dossier Box */}
             <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -179,19 +229,25 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                     <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
                       {player.rfaStatus ? "RFA" : "Expiring"}
                     </span>
+                    {i.age != null && <span className="text-xs text-slate-400">{i.age}r</span>}
+                    {i.overall != null && <span className="text-xs text-slate-400">· {i.overall} OVR</span>}
                     <span className="text-xs text-slate-400">
-                      Doterajší plat: <b className="text-slate-200">{player.capHit ? `${M(player.capHit)} · posledný rok` : "—"}</b>
+                      · Doterajší plat: <b className="text-slate-200">{player.capHit ? `${M(player.capHit)} · posledný rok` : "—"}</b>
                     </span>
                   </div>
                   <div className="text-xs text-slate-400 mt-1">
-                    Hráč sa vidí ako váš <b className="text-sky-300">{slotLabels[i.slot] ?? "—"}</b> · chce {i.wantPP ? "PP" : "bez PP"} · {i.wantPK ? "PK" : "bez PK"}
+                    Vidí sa ako váš <b className="text-sky-300">{slotLabels[i.slot] ?? "—"}</b> · chce {i.wantPP ? "PP" : "bez PP"} · {i.wantPK ? "PK" : "bez PK"}
                   </div>
                 </div>
               </div>
 
-              <div className="text-left md:text-right bg-slate-900/90 px-3.5 py-2 rounded-lg border border-slate-800 shrink-0">
-                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">Požiadavka agenta</span>
-                <span className="text-sm font-bold text-amber-300 font-mono">{M(i.floor)}–{M(i.askSalary * 1.05)} / {i.askYears}yr</span>
+              <div className="text-left md:text-right bg-slate-900/90 px-3.5 py-2.5 rounded-lg border border-slate-800 shrink-0">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
+                  {liveAsk && (liveAsk.askSalary !== i.askSalary || liveAsk.askYears !== i.askYears) ? "Prepočítaná požiadavka agenta" : "Základná požiadavka agenta"}
+                </span>
+                <span className="text-sm md:text-base font-bold text-amber-300 font-mono">
+                  {M(effectiveFloor)} – {M(effectiveAsk * 1.05)} <span className="text-xs font-normal text-slate-400">/ {years > 0 ? years : i.askYears}yr</span>
+                </span>
                 {i.moraleNote && (
                   <p className={`mt-0.5 text-[10px] font-medium ${i.moraleNote.startsWith("Happy") ? "text-emerald-400" : "text-amber-400"}`}>
                     {i.moraleNote.startsWith("Happy") ? "😀 " : "😕 "}{i.moraleNote}
@@ -199,6 +255,15 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                 )}
               </div>
             </div>
+
+            {/* Dynamic notice about role/term adjustment */}
+            {liveAsk && (liveAsk.askSalary !== i.askSalary || liveAsk.askYears !== i.askYears) && (
+              <div className="bg-amber-500/10 border border-amber-500/25 rounded-xl px-4 py-2.5 text-xs text-amber-300 flex items-center justify-between gap-2">
+                <span>
+                  ⚡ <b>Agent reaguje na ponúkanú rolu a dĺžku:</b> Pri zaradení do {slotLabels[["", "L1", "L2", "L3", "L4"][line] ?? ""] ?? `line ${line}`}{!pp && i.wantPP ? ", bez PP" : ""}{!pk && i.wantPK ? ", bez PK" : ""}{grantClause ? ` (${grantClause})` : ""} na {years} {years === 1 ? "rok" : "roky"} požaduje plat v rozmedzí <b>{M(effectiveFloor)} – {M(effectiveAsk * 1.05)}</b>.
+                </span>
+              </div>
+            )}
 
             {/* Previous Negotiation Alert */}
             {(player.negotiation || (player.resignRound ?? 0) > 0) && (
@@ -230,73 +295,118 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Salary input */}
                   <div>
-                    <label className="text-xs font-semibold text-slate-400 block mb-2">Garantovaný ročný plat v NHL (AAV)</label>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs font-semibold text-slate-400">Garantovaný ročný plat v NHL (AAV)</label>
+                      {salaryStatus && (
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${salaryStatus.badge}`}>
+                          {salaryStatus.label}
+                        </span>
+                      )}
+                    </div>
                     <div className="grid grid-cols-[3rem_minmax(0,1fr)_3rem] items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => {
-                          const current = salaryMillions(salaryM);
-                          setSalaryM(Math.max(0.775, (Number.isFinite(current) ? current : 0.825) - 0.05).toFixed(3));
-                        }}
+                        onClick={() => stepSalary(-1)}
                         className="h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-black text-lg border border-slate-700 active:scale-95 transition leading-none"
+                        aria-label="Znížiť plat o $50,000"
                       >
                         −
                       </button>
                       <div className="relative">
                         <input
-                          type="number"
-                          min="0.775"
-                          max={i.maxSalary / 1e6}
-                          step="0.01"
+                          type="text"
+                          inputMode="decimal"
+                          autoComplete="off"
                           value={salaryM}
-                          onChange={(e) => setSalaryM(e.currentTarget.value)}
+                          onChange={(e) => setSalaryM(e.target.value)}
+                          onBlur={() => {
+                            const m = salaryMillions(salaryM);
+                            if (Number.isFinite(m) && salaryM.trim() !== "") {
+                              setSalaryM(m.toFixed(m === 0.775 ? 3 : 2));
+                            }
+                          }}
                           className="h-10 w-full rounded-lg border-2 border-amber-500/40 bg-slate-900 px-3 text-center text-lg font-bold font-mono text-amber-300 outline-none placeholder:text-slate-600 focus:border-amber-400"
-                          placeholder="Plat v $M"
+                          placeholder={effectiveFloor ? `${(effectiveFloor / 1e6).toFixed(2)}` : "Plat v $M"}
                         />
                         <span className="absolute right-3 top-2.5 text-[11px] font-bold text-slate-500 pointer-events-none">$M / rok</span>
                       </div>
                       <button
                         type="button"
-                        onClick={() => {
-                          const current = salaryMillions(salaryM);
-                          setSalaryM(Math.min(i.maxSalary / 1e6, (Number.isFinite(current) ? current : 0.775) + 0.05).toFixed(3));
-                        }}
+                        onClick={() => stepSalary(1)}
                         className="h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-black text-lg border border-slate-700 active:scale-95 transition leading-none"
+                        aria-label="Zvýšiť plat o $50,000"
                       >
                         +
                       </button>
                     </div>
                     <div className="flex justify-between text-[10px] text-slate-500 mt-1.5 px-1">
                       <span>Min: $0.775M</span>
-                      <span className="text-slate-400">Požaduje: {M(i.floor)}–{M(i.askSalary * 1.05)}</span>
+                      <span className="text-slate-400">Požaduje: {M(effectiveFloor)}–{M(effectiveAsk * 1.05)}</span>
                       <span>Max: ${(i.maxSalary / 1e6).toFixed(1)}M</span>
                     </div>
                   </div>
 
                   {/* Term buttons */}
                   <div>
-                    <label className="text-xs font-semibold text-slate-400 block mb-2">Dĺžka kontraktu (Term)</label>
-                    <div className="grid grid-cols-4 gap-2">
-                      {[1, 2, 3, 4].map((yr) => (
-                        <button
-                          key={yr}
-                          type="button"
-                          onClick={() => setYears(yr)}
-                          className={`py-2.5 rounded-lg text-xs md:text-sm font-bold border transition-all ${
-                            years === yr
-                              ? "border-amber-500 bg-amber-500/25 text-white shadow-md shadow-amber-500/10"
-                              : "border-slate-800 bg-slate-900/90 text-slate-400 hover:text-slate-200 hover:border-slate-700"
-                          }`}
-                        >
-                          {yr} {yr === 1 ? "rok" : yr < 5 ? "roky" : "rokov"}
-                        </button>
-                      ))}
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs font-semibold text-slate-400">Dĺžka kontraktu (Term)</label>
+                      <span className="text-[10px] text-slate-400">
+                        Preferuje: <b className="text-amber-300">{effectiveAsk ? (liveAsk?.askYears ?? i.askYears) : i.askYears} {((liveAsk?.askYears ?? i.askYears) === 1 ? "rok" : "roky")}</b>
+                      </span>
                     </div>
-                    <div className="text-[10px] text-slate-500 mt-1.5 px-1">
-                      Rozpätie rokov: {i.minYears}–{i.maxYears} yr (dlhší kontrakt obvykle zvyšuje požadovaný plat)
+                    <div className="grid grid-cols-4 gap-2">
+                      {[1, 2, 3, 4].map((yr) => {
+                        const isSelected = years === yr;
+                        const isPreferred = yr === (liveAsk?.askYears ?? i.askYears);
+                        return (
+                          <button
+                            key={yr}
+                            type="button"
+                            onClick={() => setYears(yr)}
+                            className={`relative py-2.5 rounded-lg text-xs md:text-sm font-bold border transition-all ${
+                              isSelected
+                                ? "border-amber-500 bg-amber-500/25 text-white shadow-md shadow-amber-500/10 ring-1 ring-amber-500/40"
+                                : "border-slate-800 bg-slate-900/90 text-slate-400 hover:text-slate-200 hover:border-slate-700"
+                            }`}
+                          >
+                            {yr} {yr === 1 ? "rok" : yr < 5 ? "roky" : "rokov"}
+                            {isPreferred && (
+                              <span className="absolute -top-2 right-1.5 px-1 py-0.2 bg-amber-500/30 text-amber-300 text-[8px] font-black rounded border border-amber-500/40">
+                                Žiada
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="text-[10px] text-slate-500 mt-1.5 px-1 flex justify-between">
+                      <span>Dlhší termín obvykle zvyšuje požadovaný plat</span>
+                      <span>Limit ligy: 4 roky</span>
                     </div>
                   </div>
                 </div>
+
+                {/* Total Value & Cap Impact Bar */}
+                {Number.isFinite(currentSalaryDollars) && currentSalaryDollars >= 775_000 && years > 0 && (
+                  <div className="mt-4 pt-3.5 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs bg-slate-900/40 rounded-xl p-3">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">Celková hodnota kontraktu</span>
+                      <span className="text-sm font-black text-amber-300 font-mono">
+                        {M(currentSalaryDollars * years)} <span className="text-xs font-normal text-slate-400">({M(currentSalaryDollars)} / rok × {years} {years === 1 ? "rok" : years < 5 ? "roky" : "rokov"})</span>
+                      </span>
+                    </div>
+                    {i.capRoom != null && (
+                      <div className="text-left sm:text-right">
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">Dopad na platový strop klubu</span>
+                        <span className={`text-xs font-bold font-mono ${i.capRoom - currentSalaryDollars < 0 ? "text-rose-400" : "text-emerald-400"}`}>
+                          {i.capRoom - currentSalaryDollars < 0
+                            ? `⚠️ Prekročenie stropu o ${M(Math.abs(i.capRoom - currentSalaryDollars))}`
+                            : `Voľné miesto po podpise: ${M(i.capRoom - currentSalaryDollars)}`}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* §2 Forma zmluvy & Rola (Structure & Role) */}
@@ -310,35 +420,64 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                   {/* Contract Type (One-way vs Two-way) */}
                   <div>
                     <label className="text-xs font-semibold text-slate-400 block mb-2">
-                      Typ zmluvy
-                      <InfoTip text="One-way garantuje rovnaký plat v NHL aj v AHL. Two-way platí na farme $100k — hráč starší ako 25 rokov (s 30+ NHL zápasmi vlani) ju neprijme; mladí hráči ju podpisujú voľne do sumy $1.30M." />
+                      Charakter zmluvy (CBA Pravidlá)
+                      <InfoTip text="One-way garantuje rovnaký plat v NHL aj v AHL. Two-way platí na farme $100k — hráč starší ako 25 rokov (s 30+ NHL zápasmi vlani) ju neprijme; dvojcestná zmluva je povolená najviac do výšky platu $1.30M." />
                     </label>
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
                         onClick={() => setTwoWay(false)}
-                        className={`p-2.5 rounded-xl border text-left transition-all ${
+                        className={`p-3 rounded-xl border text-left transition-all ${
                           !twoWay
-                            ? "border-blue-500 bg-blue-500/15 text-white shadow-sm"
+                            ? "border-amber-500 bg-amber-500/15 text-white shadow-md shadow-amber-500/10 ring-1 ring-amber-500/40"
                             : "border-slate-800 bg-slate-900/80 text-slate-400 hover:border-slate-700"
                         }`}
                       >
-                        <span className="block text-xs font-bold text-blue-300">Jednocestná (1-way)</span>
+                        <span className="block text-xs font-bold text-amber-300">Jednocestná (1-way)</span>
                         <span className="block text-[10px] text-slate-400 mt-0.5">Plný NHL plat aj v AHL</span>
                       </button>
+
                       <button
                         type="button"
-                        onClick={() => setTwoWay(true)}
-                        className={`p-2.5 rounded-xl border text-left transition-all ${
-                          twoWay
-                            ? "border-blue-500 bg-blue-500/15 text-white shadow-sm"
-                            : "border-slate-800 bg-slate-900/80 text-slate-400 hover:border-slate-700"
+                        disabled={!canTakeTwoWay}
+                        onClick={() => {
+                          if (canTakeTwoWay) setTwoWay(true);
+                        }}
+                        className={`p-3 rounded-xl border text-left transition-all ${
+                          !canTakeTwoWay
+                            ? "border-slate-800/60 bg-slate-950/40 text-slate-600 opacity-60 cursor-not-allowed"
+                            : twoWay
+                              ? "border-blue-500 bg-blue-500/20 text-white shadow-md shadow-blue-500/10 ring-1 ring-blue-500/40"
+                              : "border-slate-800 bg-slate-900/80 text-slate-400 hover:border-slate-700"
                         }`}
                       >
-                        <span className="block text-xs font-bold text-blue-300">Dvojcestná (2-way)</span>
-                        <span className="block text-[10px] text-slate-400 mt-0.5">V AHL $100k (do $1.30M)</span>
+                        <div className="flex items-center justify-between">
+                          <span className={`block text-xs font-bold ${!canTakeTwoWay ? "text-slate-500" : "text-blue-300"}`}>
+                            Dvojcestná (2-way)
+                          </span>
+                          {!canTakeTwoWay && (
+                            <span className="text-[9px] uppercase font-black px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                              Nedostupná
+                            </span>
+                          )}
+                        </div>
+                        <span className="block text-[10px] text-slate-400 mt-0.5">
+                          {!canTakeTwoWay
+                            ? isSalaryAboveTwoWayMax
+                              ? `Len do ${M(maxTwoWay)}`
+                              : "Hráč odmieta 2-way"
+                            : "V AHL plat $100k"}
+                        </span>
                       </button>
                     </div>
+
+                    {!canTakeTwoWay && (
+                      <p className="text-[11px] text-amber-400/90 mt-2 bg-amber-500/10 border border-amber-500/20 p-2 rounded-lg">
+                        ℹ️ {isSalaryAboveTwoWayMax
+                          ? `Dvojcestná zmluva je podľa pravidiel CBA možná len do výšky platu ${M(maxTwoWay)}. Pri vyššej sume je povinná 1-way zmluva.`
+                          : i.twoWayReason ?? "Hráč má štatút etablovaného hráča NHL a neprijme dvojcestnú zmluvu."}
+                      </p>
+                    )}
                   </div>
 
                   {/* Role & Special teams */}
@@ -365,6 +504,9 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                         </label>
                       </div>
                     )}
+                    <span className="text-[10px] text-slate-500 mt-2 block">
+                      Zmena formácie alebo odobratie PP/PK dynamicky prepočítava hráčove platové nároky v reálnom čase.
+                    </span>
                   </div>
                 </div>
               </div>
@@ -376,7 +518,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                     <span className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-300 text-xs font-black flex items-center justify-center">§3</span>
                     <div>
                       <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200">Doložky o nevymeniteľnosti (NTC / NMC)</h3>
-                      <p className="text-[11px] text-slate-500">Udelenie klauzuly znižuje platové nároky hráča.</p>
+                      <p className="text-[11px] text-slate-500">Udelenie klauzuly znižuje platové nároky hráča (zľava sa prejaví na požiadavke agenta).</p>
                     </div>
                   </div>
                   <div className="flex gap-2 items-center flex-wrap">
@@ -439,6 +581,13 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                   msg.t === "ok" ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300" : "bg-rose-500/10 border-rose-500/30 text-rose-300"
                 }`}>
                   {msg.s}
+                </div>
+              )}
+
+              {/* Offer Summary Bar */}
+              {Number.isFinite(currentSalaryDollars) && currentSalaryDollars >= 775_000 && (
+                <div className="mb-4 text-center text-xs text-slate-400">
+                  Pripravený návrh: <strong className="text-amber-300 font-mono">{M(currentSalaryDollars)}/rok</strong> × <strong className="text-white">{years} {years === 1 ? "rok" : years < 5 ? "roky" : "rokov"}</strong> ({M(currentSalaryDollars * years)} celkovo) • <span className={twoWay ? "text-blue-300 font-semibold" : "text-amber-300 font-semibold"}>{twoWay ? "2-way (AHL: $100k)" : "1-way"}</span>{grantClause ? ` • ${grantClause}` : ""}
                 </div>
               )}
 

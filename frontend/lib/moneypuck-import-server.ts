@@ -25,6 +25,11 @@ export type GoalieMetrics = {
   mdSv: number;
   ldSv: number;
   hdGsax: number;
+  mdGsax: number;
+  ldGsax: number;
+  hdGsax60: number;
+  mdGsax60: number;
+  ldGsax60: number;
   rebCtrl: number;
   rebounds: number;
   xRebounds: number;
@@ -58,6 +63,10 @@ function metricsFromRow(r: Record<string, string>): GoalieMetrics {
   const hdS = n("highDangerShots"), hdG = n("highDangerGoals");
   const mdS = n("mediumDangerShots"), mdG = n("mediumDangerGoals");
   const ldS = n("lowDangerShots"), ldG = n("lowDangerGoals");
+  const hdGsax = n("highDangerxGoals") - hdG;
+  const mdGsax = n("mediumDangerxGoals") - mdG;
+  const ldGsax = n("lowDangerxGoals") - ldG;
+  const per60 = (v: number) => (toiSec > 0 ? (v / toiSec) * 3600 : 0);
   const sv = (s: number, g: number) => (s > 0 ? 1 - g / s : 0);
   const rebounds = n("rebounds"), xRebounds = n("xRebounds");
   const freeze = n("freeze"), xFreeze = n("xFreeze");
@@ -77,7 +86,12 @@ function metricsFromRow(r: Record<string, string>): GoalieMetrics {
     hdSv: sv(hdS, hdG),
     mdSv: sv(mdS, mdG),
     ldSv: sv(ldS, ldG),
-    hdGsax: n("highDangerxGoals") - hdG,
+    hdGsax,
+    mdGsax,
+    ldGsax,
+    hdGsax60: per60(hdGsax),
+    mdGsax60: per60(mdGsax),
+    ldGsax60: per60(ldGsax),
     rebCtrl,
     rebounds,
     xRebounds,

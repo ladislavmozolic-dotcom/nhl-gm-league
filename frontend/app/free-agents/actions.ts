@@ -115,14 +115,36 @@ async function teamCapInfo(teamId: number): Promise<{ committed: number; ltir: n
 export async function getInterestAction(playerId: number, teamId: number) {
   const info = await teamAsk(playerId, teamId);
   if (!info) return { ok: false as const, error: "Player not found." };
-  const player = await prisma.player.findUnique({ where: { id: playerId }, select: { name: true, faDecisionAt: true } });
+  const player = await prisma.player.findUnique({
+    where: { id: playerId },
+    select: { name: true, faDecisionAt: true, age: true, overall: true, lastSeasonGP: true, rosterType: true, capHit: true },
+  });
   const existing = await prisma.faOffer.findUnique({ where: { playerId_teamId: { playerId, teamId } } });
   const clock = await getLeagueClock();
   const mayStartFresh = existing?.status === "REJECTED" && player?.faDecisionAt == null
     && (clock.postFrenzyOpen || (clock.frenzyStage === "BIDDING" && existing.round < clock.frenzyRound));
+
+  const tw = await twoWayOpts();
+  const twoWayErr = player ? twoWayObjection(true, player, 1, 1_000_000, {
+    olderAge: tw.olderAge, gpLimit: tw.gpLimit, weakOverall: tw.weakOverall,
+    maxYears: tw.maxYears, ahlMaxYears: tw.ahlMaxYears, fewGpMaxYears: tw.fewGpMaxYears, maxSalary: tw.maxSalary,
+  }) : null;
+
+  let capRoom: number | null = null;
+  try {
+    const cap = await loadLeagueCap();
+    const cInfo = await teamCapInfo(teamId);
+    const ceiling = capCeilingForPhase(cap.upper, clock.phase) + cInfo.ltir;
+    capRoom = Math.max(0, ceiling - cInfo.committed);
+  } catch {
+    // optional cap room
+  }
+
   return {
     ok: true as const,
     name: player?.name ?? "",
+    age: player?.age ?? null,
+    overall: player?.overall ?? null,
     grp: info.grp,
     slot: info.slot,
     line: info.line,
@@ -138,6 +160,10 @@ export async function getInterestAction(playerId: number, teamId: number) {
     moraleNote: willingnessNote(info.ask.willingness),
     lowballNote: lowballNote(info.lowballBump),
     round: clock.frenzyRound,
+    twoWayAllowed: !twoWayErr,
+    twoWayReason: twoWayErr,
+    twoWayMaxSalary: (tw.maxSalary ?? 1_300_001) - 1,
+    capRoom,
     existing: existing && !mayStartFresh ? {
       salary: existing.salary, years: existing.years, line: existing.line, pp: existing.pp, pk: existing.pk,
       status: existing.status, counterSalary: existing.counterSalary, counterYears: existing.counterYears,
@@ -145,12 +171,16 @@ export async function getInterestAction(playerId: number, teamId: number) {
   };
 }
 
-/** The player's ask at a SPECIFIC promised deployment (line + PP/PK) — a worse
+/** The player's ask at a SPECIFIC promised deployment (line + PP/PK) and term — a worse
  *  role / stripped special-teams raises it. Used to live-update the offer modal. */
-export async function getAskAtAction(playerId: number, teamId: number, line: number, pp: boolean, pk: boolean, grantClause?: string | null, mNtcBreadth?: number | null) {
+export async function getAskAtAction(
+  playerId: number, teamId: number, line: number, pp: boolean, pk: boolean,
+  grantClause?: string | null, mNtcBreadth?: number | null, years: number = 1,
+) {
   const clause = grantClause && ["NTC", "NMC", "M_NTC"].includes(grantClause) ? grantClause : null;
   const breadth = clause === "M_NTC" ? ([6, 12, 18, 24].includes(mNtcBreadth ?? 0) ? mNtcBreadth! : 12) : null;
-  const ev = await evaluateTeamOffer(playerId, teamId, 0, 1, { line: clampLine(line), pp, pk }, undefined, undefined, undefined, { clause, breadth });
+  const term = Math.max(1, Math.min(4, Math.round(years || 1)));
+  const ev = await evaluateTeamOffer(playerId, teamId, 0, term, { line: clampLine(line), pp, pk }, undefined, undefined, undefined, { clause, breadth });
   if (!ev) return null;
   return { askSalary: ev.ask.salary, askYears: ev.ask.years, floor: ev.ask.floorSalary, minYears: ev.ask.minYears, maxYears: ev.ask.maxYears };
 }

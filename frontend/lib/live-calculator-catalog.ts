@@ -1190,6 +1190,101 @@ export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
     },
   },
   {
+    key: "hdGsax60",
+    label: "High-Danger GSAx / 60 min (Chytené góly z tutoviek za 60 min)",
+    source: "moneypuck",
+    description: "HD GSAx prepočítané na 60 minút čistého času brankára na ľade.",
+    defaultInvert: false,
+    unit: "HD GSAx/60",
+    getValue: (p, cfg) => {
+      const adv = (p.goalieAdvanced as any) ?? {};
+      return blend(
+        adv.cur?.hdGsax60,
+        adv.last?.hdGsax60,
+        adv.cur?.gp ?? p.curSeasonGP ?? 0,
+        adv.last?.gp ?? p.lastSeasonGP ?? 0,
+        cfg.latestWeight,
+        cfg.previousWeight
+      );
+    },
+  },
+  {
+    key: "mdGsax",
+    label: "Medium-Danger GSAx (Chytené góly zo strednej vzdialenosti)",
+    source: "moneypuck",
+    description: "GSAx vygenerované výhradne proti strelám so strednou nebezpečnosťou.",
+    defaultInvert: false,
+    unit: "MD GSAx",
+    getValue: (p, cfg) => {
+      const adv = (p.goalieAdvanced as any) ?? {};
+      return blend(
+        adv.cur?.mdGsax,
+        adv.last?.mdGsax,
+        adv.cur?.gp ?? p.curSeasonGP ?? 0,
+        adv.last?.gp ?? p.lastSeasonGP ?? 0,
+        cfg.latestWeight,
+        cfg.previousWeight
+      );
+    },
+  },
+  {
+    key: "mdGsax60",
+    label: "Medium-Danger GSAx / 60 min (Stredná vzdialenosť za 60 min)",
+    source: "moneypuck",
+    description: "MD GSAx prepočítané na 60 minút čistého času brankára na ľade.",
+    defaultInvert: false,
+    unit: "MD GSAx/60",
+    getValue: (p, cfg) => {
+      const adv = (p.goalieAdvanced as any) ?? {};
+      return blend(
+        adv.cur?.mdGsax60,
+        adv.last?.mdGsax60,
+        adv.cur?.gp ?? p.curSeasonGP ?? 0,
+        adv.last?.gp ?? p.lastSeasonGP ?? 0,
+        cfg.latestWeight,
+        cfg.previousWeight
+      );
+    },
+  },
+  {
+    key: "ldGsax",
+    label: "Low-Danger GSAx (Chytené góly z diaľky)",
+    source: "moneypuck",
+    description: "GSAx vygenerované výhradne proti strelám s nízkou nebezpečnosťou.",
+    defaultInvert: false,
+    unit: "LD GSAx",
+    getValue: (p, cfg) => {
+      const adv = (p.goalieAdvanced as any) ?? {};
+      return blend(
+        adv.cur?.ldGsax,
+        adv.last?.ldGsax,
+        adv.cur?.gp ?? p.curSeasonGP ?? 0,
+        adv.last?.gp ?? p.lastSeasonGP ?? 0,
+        cfg.latestWeight,
+        cfg.previousWeight
+      );
+    },
+  },
+  {
+    key: "ldGsax60",
+    label: "Low-Danger GSAx / 60 min (Z diaľky za 60 min)",
+    source: "moneypuck",
+    description: "LD GSAx prepočítané na 60 minút čistého času brankára na ľade.",
+    defaultInvert: false,
+    unit: "LD GSAx/60",
+    getValue: (p, cfg) => {
+      const adv = (p.goalieAdvanced as any) ?? {};
+      return blend(
+        adv.cur?.ldGsax60,
+        adv.last?.ldGsax60,
+        adv.cur?.gp ?? p.curSeasonGP ?? 0,
+        adv.last?.gp ?? p.lastSeasonGP ?? 0,
+        cfg.latestWeight,
+        cfg.previousWeight
+      );
+    },
+  },
+  {
     key: "mdSv",
     label: "Medium-Danger SV% (Úspešnosť striel zo strednej vzdialenosti)",
     source: "moneypuck",
