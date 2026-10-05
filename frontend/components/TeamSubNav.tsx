@@ -168,7 +168,7 @@ export default function TeamSubNav({ slug, isGm, isAffiliate, farmSlug, parentSl
             const active = isActive(e.href);
             return (
               <Link key={e.label} href={e.href} className={linkCls(active)}>
-                <span className="inline-flex items-center gap-1.5"><Icon label={e.label} />{L(e.label)}</span>{e.gm && <span className="ml-1 text-[9px] text-slate-500 align-top">GM</span>}
+                <span>{L(e.label)}</span>{e.gm && <span className="ml-1 text-[9px] text-slate-500 align-top">GM</span>}
               </Link>
             );
           }
@@ -195,7 +195,6 @@ export default function TeamSubNav({ slug, isGm, isAffiliate, farmSlug, parentSl
                 aria-expanded={isOpen}
                 className={`${linkCls(groupActive)} inline-flex items-center gap-1`}
               >
-                <Icon label={e.label} />
                 {L(e.label)}
                 <span className={`text-[8px] text-slate-500 transition-transform ${isOpen ? "rotate-180" : ""}`}>
                   ▼
