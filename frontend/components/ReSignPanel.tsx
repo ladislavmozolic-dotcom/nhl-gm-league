@@ -95,151 +95,372 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={closeAndRefresh}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-3 md:p-6 overflow-y-auto" onClick={closeAndRefresh}>
       <div
-        className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-[800px] max-h-[88dvh] overflow-y-auto p-5"
+        className="bg-gradient-to-b from-slate-900 via-[#0d1627] to-[#0a101d] border-2 border-amber-500/30 rounded-2xl w-full max-w-4xl max-h-[92dvh] overflow-y-auto p-5 md:p-8 shadow-2xl relative ring-1 ring-white/10"
         role="dialog"
         aria-modal="true"
         aria-label={`Re-sign ${cleanName(player.name)}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-bold">Re-sign {cleanName(player.name)}</h3>
-          <button onClick={closeAndRefresh} className="text-slate-500 hover:text-slate-200 text-xl leading-none">×</button>
+        {/* Document Header with Official Seal */}
+        <div className="flex items-start justify-between pb-4 border-b border-amber-500/20 relative">
+          <div>
+            <div className="flex items-center gap-2 text-[10px] md:text-xs text-amber-400/80 font-mono tracking-widest uppercase mb-1">
+              <span>Standard Player&apos;s Contract (SPC-1)</span>
+              <span>•</span>
+              <span>UNHL CBA Authorized</span>
+            </div>
+            <h2 className="text-lg md:text-2xl font-black tracking-wide text-white uppercase flex items-center gap-2">
+              <span className="text-amber-400">📜</span> Zmluva o predĺžení kontraktu
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Predloženie oficiálnej ponuky pre hráča: <b className="text-slate-200">{cleanName(player.name)}</b>
+            </p>
+          </div>
+          <button
+            onClick={closeAndRefresh}
+            className="text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-700 w-8 h-8 rounded-full flex items-center justify-center text-lg leading-none transition"
+            aria-label="Close"
+          >
+            ×
+          </button>
         </div>
-        <p className="text-xs text-slate-500 mb-3">Current: {player.capHit ? `${M(player.capHit)} · last year` : "—"}</p>
 
         {done && result && (
-          <div className="text-center py-8">
-            <div className="text-5xl mb-3">✅</div>
-            <div className="text-xs uppercase tracking-wide text-emerald-400/80">Contract signed</div>
-            <div className="text-2xl font-black text-white mt-1">{cleanName(player.name)}</div>
-            <div className="text-lg text-emerald-400 font-bold mt-1 tabular-nums">{M(result.salary)} × {result.years}yr</div>
-            <div className="text-xs text-slate-500 mt-1">{result.next ? "Extension — plays out his current deal this season; the new one starts next season." : `stays with the club through ${new Date().getUTCFullYear() + result.years}`}</div>
-            <button onClick={() => { router.refresh(); onClose(); }} className="mt-6 px-8 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-sm font-bold">Done</button>
-          </div>
-        )}
-        {done && !result && (
-          <div className="text-center py-8">
-            <div className="text-4xl mb-2">{walkedToUFA ? "🚪" : "📝"}</div>
-            <div className="text-lg font-bold text-white">
-              {walkedToUFA ? `${cleanName(player.name)} walked away` : `${cleanName(player.name)} is open to offer sheets`}
+          <div className="my-8 p-6 md:p-8 bg-slate-950/70 border-2 border-emerald-500/40 rounded-2xl text-center relative overflow-hidden">
+            <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-3xl">
+              ✍️
             </div>
-            <div className="text-sm text-amber-300 mt-1 max-w-xs mx-auto">{msg?.s}</div>
-            {!walkedToUFA && (
-              <div className="text-xs text-slate-500 mt-2 max-w-xs mx-auto">
-                He&apos;s still your player — if no rival club signs him to an offer sheet, negotiations with you resume.
-              </div>
-            )}
-            <button onClick={() => { router.refresh(); onClose(); }} className="mt-6 px-8 py-2.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-semibold">Close</button>
+            <div className="text-[11px] font-mono tracking-widest uppercase text-emerald-400 font-bold">Oficiálne zaregistrovaná zmluva</div>
+            <div className="text-2xl md:text-3xl font-black text-white mt-1">{cleanName(player.name)}</div>
+            <div className="text-xl text-emerald-300 font-bold mt-2 font-mono tabular-nums">{M(result.salary)} × {result.years} {result.years === 1 ? "rok" : result.years < 5 ? "roky" : "rokov"}</div>
+            <div className="text-xs text-slate-400 mt-2 max-w-md mx-auto">
+              {result.next ? "Kontrakt je podpísaný ako Extension — hráč dohrá túto sezónu za doterajších podmienok a nová zmluva začne platiť od budúcej sezóny." : `Hráč zostáva v klube do 30. júna ${new Date().getUTCFullYear() + result.years}.`}
+            </div>
+            <button onClick={() => { router.refresh(); onClose(); }} className="mt-6 px-8 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-sm font-bold text-white shadow-lg shadow-emerald-600/30">Hotovo</button>
           </div>
         )}
 
-        {pending && !i && <p className="text-slate-500 text-sm py-3">Loading…</p>}
+        {done && !result && (
+          <div className="my-8 p-6 md:p-8 bg-slate-950/70 border-2 border-amber-500/40 rounded-2xl text-center relative">
+            <div className="text-4xl mb-3">{walkedToUFA ? "🚪" : "📝"}</div>
+            <div className="text-xl font-black text-white">
+              {walkedToUFA ? `${cleanName(player.name)} ukončil rokovania (Walked away)` : `${cleanName(player.name)} je otvorený pre Offer Sheets`}
+            </div>
+            <div className="text-sm text-amber-300 mt-2 max-w-md mx-auto leading-relaxed">{msg?.s}</div>
+            {!walkedToUFA && (
+              <div className="text-xs text-slate-500 mt-2 max-w-md mx-auto">
+                Hráč je naďalej chránený — ak mu iný klub nepredloží akceptovateľný Offer Sheet, rokovania s vami sa po sezóne obnovia.
+              </div>
+            )}
+            <button onClick={() => { router.refresh(); onClose(); }} className="mt-6 px-8 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-sm font-semibold text-white">Zavrieť</button>
+          </div>
+        )}
+
+        {pending && !i && (
+          <div className="py-12 text-center text-slate-400 text-sm">
+            <span className="inline-block animate-spin mr-2">⏳</span> Načítavam zmluvné podklady a požiadavky agenta…
+          </div>
+        )}
 
         {!done && i && (
-          <>
-            <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-3 mb-3 text-sm">
-              <p className="text-slate-300">Sees himself as your <b className="text-blue-300">{slotLabels[i.slot] ?? "—"}</b> · wants {i.wantPP ? "PP" : "no PP"} · {i.wantPK ? "PK" : "no PK"}</p>
-              <p className="mt-1 text-slate-200">He&apos;s looking for roughly <b className="text-amber-300">{M(i.floor)}–{M(i.askSalary * 1.05)} / {i.askYears}yr</b></p>
-              <p className="mt-0.5 text-xs text-slate-500">That&apos;s his base ask at his preferred term — offer a different length yourself and the price shifts ({i.minYears}-{i.maxYears}yr negotiable; more years usually costs more, except 35+ vets, where it's the reverse).</p>
-              {i.moraleNote && <p className={`mt-1 text-xs font-medium ${i.moraleNote.startsWith("Happy") ? "text-emerald-400" : "text-amber-400"}`}>{i.moraleNote.startsWith("Happy") ? "😀 " : "😕 "}{i.moraleNote}</p>}
+          <div className="mt-5 space-y-6">
+            
+            {/* Player & Agent Dossier Box */}
+            <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-300 font-black text-base shrink-0">
+                  {cleanName(player.name).split(" ").map(w => w[0]).slice(0, 2).join("")}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-white text-base">{cleanName(player.name)}</span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      {player.rfaStatus ? "RFA" : "Expiring"}
+                    </span>
+                    <span className="text-xs text-slate-400">
+                      Doterajší plat: <b className="text-slate-200">{player.capHit ? `${M(player.capHit)} · posledný rok` : "—"}</b>
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-400 mt-1">
+                    Hráč sa vidí ako váš <b className="text-sky-300">{slotLabels[i.slot] ?? "—"}</b> · chce {i.wantPP ? "PP" : "bez PP"} · {i.wantPK ? "PK" : "bez PK"}
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-left md:text-right bg-slate-900/90 px-3.5 py-2 rounded-lg border border-slate-800 shrink-0">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">Požiadavka agenta</span>
+                <span className="text-sm font-bold text-amber-300 font-mono">{M(i.floor)}–{M(i.askSalary * 1.05)} / {i.askYears}yr</span>
+                {i.moraleNote && (
+                  <p className={`mt-0.5 text-[10px] font-medium ${i.moraleNote.startsWith("Happy") ? "text-emerald-400" : "text-amber-400"}`}>
+                    {i.moraleNote.startsWith("Happy") ? "😀 " : "😕 "}{i.moraleNote}
+                  </p>
+                )}
+              </div>
             </div>
 
+            {/* Previous Negotiation Alert */}
             {(player.negotiation || (player.resignRound ?? 0) > 0) && (
-              <div className="bg-sky-500/5 border border-sky-500/25 rounded-lg p-3 mb-3 text-sm">
-                <p className="text-xs font-bold uppercase tracking-wide text-sky-300">Previous negotiation</p>
-                <p className="mt-1 text-slate-300">
-                  Your last offer: <b className="text-white tabular-nums">{player.negotiation?.offerSalary ? `${M(player.negotiation.offerSalary)} × ${player.negotiation.offerYears ?? "?"}yr` : player.resignOfferSalary ? M(player.resignOfferSalary) : "recorded"}</b>
-                  {player.negotiation?.offerLine ? <span className="text-slate-500"> · {slotLabels[`L${player.negotiation.offerLine}`] ?? `line ${player.negotiation.offerLine}`}</span> : null}
-                </p>
+              <div className="bg-sky-500/5 border border-sky-500/25 rounded-xl p-3 text-xs flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <span className="font-bold uppercase tracking-wide text-sky-300 mr-2">Predchádzajúca ponuka:</span>
+                  <span className="text-slate-200 font-mono">
+                    {player.negotiation?.offerSalary ? `${M(player.negotiation.offerSalary)} × ${player.negotiation.offerYears ?? "?"}yr` : player.resignOfferSalary ? M(player.resignOfferSalary) : "zaznamenaná"}
+                  </span>
+                </div>
                 {(player.negotiation?.counterSalary ?? player.resignCounterSalary) && (
-                  <p className="mt-1 text-amber-300">Player&apos;s counter: <b className="tabular-nums">{M(player.negotiation?.counterSalary ?? player.resignCounterSalary!)} × {player.negotiation?.counterYears ?? player.resignCounterYears ?? "?"}yr</b> <span className="text-slate-500">— loaded into the form below.</span></p>
+                  <div className="text-amber-300">
+                    Protinávrh hráča: <b className="font-mono">{M(player.negotiation?.counterSalary ?? player.resignCounterSalary!)} × {player.negotiation?.counterYears ?? player.resignCounterYears ?? "?"}yr</b>
+                  </div>
                 )}
               </div>
             )}
 
-            {!done && (
-              <div className="space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-4">
+            {/* CONTRACT ARTICLES */}
+            <div className="space-y-4">
+              
+              {/* §1 Doba trvania & Odmena (Salary & Term) */}
+              <div className="border border-slate-800/80 rounded-xl p-5 bg-slate-950/40">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-300 text-xs font-black flex items-center justify-center">§1</span>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200">Doba trvania & Odmena (Salary & Term)</h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Salary input */}
                   <div>
-                    <label className="text-xs text-slate-400 block mb-1">Salary ($M / yr)</label>
-                    <div className="grid grid-cols-[3.5rem_minmax(0,1fr)_3.5rem] items-center gap-2">
-                      <button type="button" aria-label="Lower salary by $50K" onClick={() => {
-                        const current = salaryMillions(salaryM);
-                        setSalaryM(Math.max(0.775, (Number.isFinite(current) ? current : 0.825) - 0.05).toFixed(3));
-                      }} className="h-10 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-lg leading-none">−</button>
-                      <input
-                        type="number"
-                        min="0.775"
-                        max={i.maxSalary / 1e6}
-                        step="0.01"
-                        value={salaryM}
-                        onChange={(e) => setSalaryM(e.currentTarget.value)}
-                        className="h-10 min-w-0 w-full rounded-lg border border-sky-500/50 bg-slate-950 px-3 text-center text-lg font-semibold tabular-nums text-white outline-none ring-0 placeholder:text-slate-500 focus:border-sky-300 focus:ring-2 focus:ring-sky-400/30"
-                        placeholder="Salary in $M"
-                        aria-label="Salary per year in millions"
-                      />
-                      <button type="button" aria-label="Raise salary by $50K" onClick={() => {
-                        const current = salaryMillions(salaryM);
-                        setSalaryM(Math.min(i.maxSalary / 1e6, (Number.isFinite(current) ? current : 0.775) + 0.05).toFixed(3));
-                      }} className="h-10 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-lg leading-none">+</button>
+                    <label className="text-xs font-semibold text-slate-400 block mb-2">Garantovaný ročný plat v NHL (AAV)</label>
+                    <div className="grid grid-cols-[3rem_minmax(0,1fr)_3rem] items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const current = salaryMillions(salaryM);
+                          setSalaryM(Math.max(0.775, (Number.isFinite(current) ? current : 0.825) - 0.05).toFixed(3));
+                        }}
+                        className="h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-black text-lg border border-slate-700 active:scale-95 transition leading-none"
+                      >
+                        −
+                      </button>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="0.775"
+                          max={i.maxSalary / 1e6}
+                          step="0.01"
+                          value={salaryM}
+                          onChange={(e) => setSalaryM(e.currentTarget.value)}
+                          className="h-10 w-full rounded-lg border-2 border-amber-500/40 bg-slate-900 px-3 text-center text-lg font-bold font-mono text-amber-300 outline-none placeholder:text-slate-600 focus:border-amber-400"
+                          placeholder="Plat v $M"
+                        />
+                        <span className="absolute right-3 top-2.5 text-[11px] font-bold text-slate-500 pointer-events-none">$M / rok</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const current = salaryMillions(salaryM);
+                          setSalaryM(Math.min(i.maxSalary / 1e6, (Number.isFinite(current) ? current : 0.775) + 0.05).toFixed(3));
+                        }}
+                        className="h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-black text-lg border border-slate-700 active:scale-95 transition leading-none"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <div className="flex justify-between text-[10px] text-slate-500 mt-1.5 px-1">
+                      <span>Min: $0.775M</span>
+                      <span className="text-slate-400">Požaduje: {M(i.floor)}–{M(i.askSalary * 1.05)}</span>
+                      <span>Max: ${(i.maxSalary / 1e6).toFixed(1)}M</span>
                     </div>
                   </div>
+
+                  {/* Term buttons */}
                   <div>
-                    <label className="text-xs text-slate-400 block mb-1">Term (years)</label>
-                    <div className="flex items-center gap-1">
-                      <button type="button" onClick={() => setYears((y) => Math.max(1, y - 1))} className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-lg leading-none">−</button>
-                      <div className="flex-1 text-center py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-sm tabular-nums font-semibold">{years > 0 ? `${years} yr` : "— yr"}</div>
-                      <button type="button" onClick={() => setYears((y) => Math.min(4, y + 1))} className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-lg leading-none">+</button>
+                    <label className="text-xs font-semibold text-slate-400 block mb-2">Dĺžka kontraktu (Term)</label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {[1, 2, 3, 4].map((yr) => (
+                        <button
+                          key={yr}
+                          type="button"
+                          onClick={() => setYears(yr)}
+                          className={`py-2.5 rounded-lg text-xs md:text-sm font-bold border transition-all ${
+                            years === yr
+                              ? "border-amber-500 bg-amber-500/25 text-white shadow-md shadow-amber-500/10"
+                              : "border-slate-800 bg-slate-900/90 text-slate-400 hover:text-slate-200 hover:border-slate-700"
+                          }`}
+                        >
+                          {yr} {yr === 1 ? "rok" : yr < 5 ? "roky" : "rokov"}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="text-[10px] text-slate-500 mt-1.5 px-1">
+                      Rozpätie rokov: {i.minYears}–{i.maxYears} yr (dlhší kontrakt obvykle zvyšuje požadovaný plat)
                     </div>
                   </div>
                 </div>
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">Promised role</label>
-                  <select value={line} onChange={(e) => setLine(Number(e.target.value))}
-                    className="w-full px-2 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-sm">
-                    {lineOptions(grp).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                  </select>
+              </div>
+
+              {/* §2 Forma zmluvy & Rola (Structure & Role) */}
+              <div className="border border-slate-800/80 rounded-xl p-5 bg-slate-950/40">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-300 text-xs font-black flex items-center justify-center">§2</span>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200">Forma zmluvy & Úloha v tíme</h3>
                 </div>
-                {grp !== "G" && (
-                  <div className="flex gap-4 text-sm">
-                    <label className="flex items-center gap-2"><input type="checkbox" checked={pp} onChange={(e) => setPp(e.target.checked)} /> Power play</label>
-                    <label className="flex items-center gap-2"><input type="checkbox" checked={pk} onChange={(e) => setPk(e.target.checked)} /> Penalty kill</label>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Contract Type (One-way vs Two-way) */}
+                  <div>
+                    <label className="text-xs font-semibold text-slate-400 block mb-2">
+                      Typ zmluvy
+                      <InfoTip text="One-way garantuje rovnaký plat v NHL aj v AHL. Two-way platí na farme $100k — hráč starší ako 25 rokov (s 30+ NHL zápasmi vlani) ju neprijme; mladí hráči ju podpisujú voľne do sumy $1.30M." />
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setTwoWay(false)}
+                        className={`p-2.5 rounded-xl border text-left transition-all ${
+                          !twoWay
+                            ? "border-blue-500 bg-blue-500/15 text-white shadow-sm"
+                            : "border-slate-800 bg-slate-900/80 text-slate-400 hover:border-slate-700"
+                        }`}
+                      >
+                        <span className="block text-xs font-bold text-blue-300">Jednocestná (1-way)</span>
+                        <span className="block text-[10px] text-slate-400 mt-0.5">Plný NHL plat aj v AHL</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTwoWay(true)}
+                        className={`p-2.5 rounded-xl border text-left transition-all ${
+                          twoWay
+                            ? "border-blue-500 bg-blue-500/15 text-white shadow-sm"
+                            : "border-slate-800 bg-slate-900/80 text-slate-400 hover:border-slate-700"
+                        }`}
+                      >
+                        <span className="block text-xs font-bold text-blue-300">Dvojcestná (2-way)</span>
+                        <span className="block text-[10px] text-slate-400 mt-0.5">V AHL $100k (do $1.30M)</span>
+                      </button>
+                    </div>
                   </div>
-                )}
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">Contract type<InfoTip text="One-way pays the same in the NHL or AHL. Two-way pays less on the farm — an established player past 25 (30+ NHL games last season) won't accept one, whatever his rating; young players sign two-ways freely. A two-way runs at most 2 years." /></label>
-                  <div className="flex gap-1">
-                    <button type="button" onClick={() => setTwoWay(false)} className={`flex-1 py-1.5 rounded-lg text-sm font-semibold border ${!twoWay ? "bg-blue-600 text-white border-blue-500" : "bg-slate-800 text-slate-400 border-slate-700"}`}>One-way</button>
-                    <button type="button" onClick={() => setTwoWay(true)} className={`flex-1 py-1.5 rounded-lg text-sm font-semibold border ${twoWay ? "bg-blue-600 text-white border-blue-500" : "bg-slate-800 text-slate-400 border-slate-700"}`}>Two-way</button>
+
+                  {/* Role & Special teams */}
+                  <div>
+                    <label className="text-xs font-semibold text-slate-400 block mb-2">Sľúbená pozícia & Špeciálne formácie</label>
+                    <select
+                      value={line}
+                      onChange={(e) => setLine(Number(e.target.value))}
+                      className="w-full h-10 px-3 rounded-lg bg-slate-900 border border-slate-700 text-xs font-semibold text-slate-200 mb-2.5"
+                    >
+                      {lineOptions(grp).map(([v, l]) => (
+                        <option key={v} value={v}>{l}</option>
+                      ))}
+                    </select>
+                    {grp !== "G" && (
+                      <div className="flex gap-4 text-xs text-slate-300">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={pp} onChange={(e) => setPp(e.target.checked)} className="rounded bg-slate-900 border-slate-700 text-amber-500 focus:ring-0" />
+                          <span>Power play (PP)</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={pk} onChange={(e) => setPk(e.target.checked)} className="rounded bg-slate-900 border-slate-700 text-amber-500 focus:ring-0" />
+                          <span>Penalty kill (PK)</span>
+                        </label>
+                      </div>
+                    )}
                   </div>
                 </div>
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">Grant a no-trade clause (he signs for less)</label>
+              </div>
+
+              {/* §3 Doložky o nevymeniteľnosti (Clauses) */}
+              <div className="border border-slate-800/80 rounded-xl p-5 bg-slate-950/40">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-300 text-xs font-black flex items-center justify-center">§3</span>
+                    <div>
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200">Doložky o nevymeniteľnosti (NTC / NMC)</h3>
+                      <p className="text-[11px] text-slate-500">Udelenie klauzuly znižuje platové nároky hráča.</p>
+                    </div>
+                  </div>
                   <div className="flex gap-2 items-center flex-wrap">
-                    <select value={grantClause} onChange={(e) => setGrantClause(e.target.value)} className="px-2 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-sm">
-                      <option value="">No clause</option>
-                      <option value="NTC">NTC — no-trade</option>
-                      <option value="NMC">NMC — no-movement</option>
-                      <option value="M_NTC">M-NTC — modified</option>
+                    <select
+                      value={grantClause}
+                      onChange={(e) => setGrantClause(e.target.value)}
+                      className="h-9 px-3 rounded-lg bg-slate-900 border border-slate-700 text-xs font-semibold text-slate-200"
+                    >
+                      <option value="">Bez klauzuly (No clause)</option>
+                      <option value="NTC">NTC — zákaz výmeny</option>
+                      <option value="NMC">NMC — zákaz pohybu/farmy</option>
+                      <option value="M_NTC">M-NTC — modifikovaný zoznam</option>
                     </select>
                     {grantClause === "M_NTC" && (
-                      <select value={breadth} onChange={(e) => setBreadth(Number(e.target.value))} className="px-2 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-sm">
-                        {[6, 12, 18, 24].map((n) => <option key={n} value={n}>{n}-team list</option>)}
+                      <select
+                        value={breadth}
+                        onChange={(e) => setBreadth(Number(e.target.value))}
+                        className="h-9 px-3 rounded-lg bg-slate-900 border border-slate-700 text-xs font-semibold text-slate-200"
+                      >
+                        {[6, 12, 18, 24].map((n) => (
+                          <option key={n} value={n}>{n}-team list</option>
+                        ))}
                       </select>
                     )}
-                    {grantClause && <span className="text-xs text-emerald-400">≈ {Math.round(clauseDiscount(grantClause, breadth) * 100)}% cheaper</span>}
+                    {grantClause && (
+                      <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-md">
+                        ≈ {Math.round(clauseDiscount(grantClause, breadth) * 100)}% zľava z platu
+                      </span>
+                    )}
                   </div>
                 </div>
-                <button onClick={submit} disabled={pending}
-                  className="w-full px-3 py-2 rounded-lg bg-green-600 hover:bg-green-500 disabled:opacity-50 text-sm font-semibold">
-                  {pending ? "…" : "Offer extension"}
+              </div>
+
+            </div>
+
+            {/* Signature & Submission Block */}
+            <div className="mt-8 pt-6 border-t border-amber-500/20">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end mb-6">
+                <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 text-center">
+                  <div className="h-10 flex items-center justify-center text-amber-300/90 font-serif italic text-lg">
+                    Generálny manažér
+                  </div>
+                  <div className="border-t border-slate-800 pt-1 text-[10px] uppercase font-bold tracking-wider text-slate-500">
+                    Podpis autorizovaného zástupcu klubu
+                  </div>
+                </div>
+
+                <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 text-center">
+                  <div className="h-10 flex items-center justify-center text-slate-400 font-serif italic text-lg">
+                    {cleanName(player.name)}
+                  </div>
+                  <div className="border-t border-slate-800 pt-1 text-[10px] uppercase font-bold tracking-wider text-slate-500">
+                    Súhlas hráča a hráčskej asociácie (NHLPA)
+                  </div>
+                </div>
+              </div>
+
+              {msg && (
+                <div className={`mb-4 p-3 rounded-xl text-xs font-semibold border ${
+                  msg.t === "ok" ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300" : "bg-rose-500/10 border-rose-500/30 text-rose-300"
+                }`}>
+                  {msg.s}
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={closeAndRefresh}
+                  className="w-full sm:w-auto px-4 py-2.5 text-xs font-semibold text-slate-400 hover:text-slate-200"
+                >
+                  Zrušiť
+                </button>
+                <button
+                  onClick={submit}
+                  disabled={pending}
+                  className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 text-white font-black text-xs md:text-sm uppercase tracking-wider shadow-lg shadow-emerald-500/20 active:scale-[0.98] transition flex items-center justify-center gap-2"
+                >
+                  <span>✍️</span> {pending ? "Odosielam návrh zmluvy…" : "Pečatiť a odoslať ponuku zmluvy"}
                 </button>
               </div>
-            )}
-            {msg && <div className={`mt-3 text-sm ${msg.t === "ok" ? "text-green-300" : "text-red-300"}`}>{msg.s}</div>}
-          </>
+            </div>
+
+          </div>
         )}
       </div>
     </div>
