@@ -1402,6 +1402,8 @@ export async function extendContractAction(
     const isLastRound = !rfaPostOs && nextRound >= maxRounds;
     // an RFA doesn't leave — he becomes open to rival offer sheets (and returns to his club if nobody signs him)
     const leaveNote = isRFA ? "he becomes open to rival offer sheets (if nobody signs him, talks with you resume)" : "he walks";
+    // an RFA's counter is the answer to offer #nextRound — the NEXT offer is offer nextRound+1 of maxRounds+1 (Rules: RFA 2 offers, tagged 3)
+    const roundLabel = isRFA ? `Offer ${nextRound + 1} of ${maxRounds + 1}` : `Round ${nextRound} of ${maxRounds}`;
     const bestOffer = Math.max(salary, player.resignOfferSalary ?? 0);
     await prisma.player.update({ where: { id: playerId }, data: { resignRound: nextRound, resignStatus: "countered", resignCounterSalary: counterSalary, resignCounterYears: counterYears, resignOfferSalary: bestOffer, resignOfferAt: new Date() } });
     await prisma.faBid.create({ data: { playerId, teamId, salary, years, round: nextRound } }).catch(() => {});
@@ -1411,9 +1413,9 @@ export async function extendContractAction(
         ? `Round ${nextRound} — no more offer sheets, straight talks with your club now. He's countering around ${fmtM(counterSalary)}–${fmtM(counterSalary * 1.06)} over ${counterYears}yr.${insult}`
         : isLastRound
           ? nextRequiresFullAsk
-            ? `Round ${nextRound} of ${maxRounds} — last round. Lowballed twice, he won't take a penny under his full ask: ${fmtM(counterSalary)} over ${counterYears}yr — fall short and ${leaveNote}.${insult}`
-            : `Round ${nextRound} of ${maxRounds} — last round. His absolute minimum is ${fmtM(counterSalary)} over ${counterYears}yr — fall short on your final offer and ${leaveNote}.${insult}`
-          : `Round ${nextRound} of ${maxRounds} — he's countering around ${fmtM(counterSalary)}–${fmtM(counterSalary * 1.06)} over ${counterYears}yr.${insult}`,
+            ? `${roundLabel} — ${isRFA ? "your final offer" : "last round"}. Lowballed twice, he won't take a penny under his full ask: ${fmtM(counterSalary)} over ${counterYears}yr — fall short and ${leaveNote}.${insult}`
+            : `${roundLabel} — ${isRFA ? "your final offer" : "last round"}. His absolute minimum is ${fmtM(counterSalary)} over ${counterYears}yr — fall short on your final offer and ${leaveNote}.${insult}`
+          : `${roundLabel} — he's countering around ${fmtM(counterSalary)}–${fmtM(counterSalary * 1.06)} over ${counterYears}yr.${insult}`,
       floor: ev.ask.floorSalary, minYears: ev.ask.minYears, maxYears: ev.ask.maxYears,
     };
   }
