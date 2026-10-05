@@ -80,6 +80,21 @@ export async function decideArbitrationAction(caseId: number, teamId: number, cl
 }
 
 
+/** Put an arbitration signing into Recent Signings (public feed) and the revertible signing log. */
+async function logArbitrationSigning(c: { playerId: number; teamId: number; awardAav: number | null; awardTerm: number | null; player: { name: string; capHit: number | null; contractYears: number | null; contractExpiry: number | null; ahlSalary: number | null; contractType: string | null; tradeClause: string | null; noTradeTeams: string[]; rosterType: string | null; teamId: number; contractText: string | null } }, deferred: boolean, startYear: number) {
+  const team = await prisma.team.findUnique({ where: { id: c.teamId }, select: { code: true, parentTeam: { select: { code: true } } } });
+  const code = team?.parentTeam?.code ?? team?.code ?? "?";
+  const salary = c.awardAav ?? 0, years = c.awardTerm ?? 0;
+  await prisma.transaction.create({ data: { type: "SIGNING", message: `${code} signed ${c.player.name} via arbitration — $${(salary / 1e6).toFixed(2)}M × ${years}yr${deferred ? ` (from ${startYear}-${String((startYear + 1) % 100).padStart(2, "0")})` : ""}` } }).catch(() => {});
+  await prisma.signingLog.create({ data: {
+    playerId: c.playerId, playerName: c.player.name, teamCode: code, kind: "EXTEND", salary, years,
+    prevCapHit: c.player.capHit, prevYears: c.player.contractYears, prevExpiry: c.player.contractExpiry,
+    prevAhlSalary: c.player.ahlSalary != null ? Math.round(c.player.ahlSalary) : null,
+    prevType: c.player.contractType, prevClause: c.player.tradeClause, prevNoTrade: c.player.noTradeTeams,
+    prevRosterType: c.player.rosterType, prevTeamId: c.player.teamId, prevContractText: c.player.contractText,
+  } }).catch(() => {});
+}
+
 export async function acceptArbitrationAwardAction(caseId: number, teamId: number) {
   const c = await ownedCase(caseId, teamId);
   if (!c || c.status !== "AWARDED" || !c.awardAav || !c.awardTerm) return { ok: false as const, error: "No award is ready to sign." };
@@ -102,6 +117,7 @@ export async function acceptArbitrationAwardAction(caseId: number, teamId: numbe
       } }),
       prisma.rfaCase.update({ where: { id: caseId }, data: { status: "SIGNED", resolvedAt: new Date() } }),
     ]);
+    await logArbitrationSigning(c, true, startYear);
     refresh();
     return { ok: true as const, deferred: true as const, startsSeason: startYear };
   }
@@ -110,6 +126,7 @@ export async function acceptArbitrationAwardAction(caseId: number, teamId: numbe
     prisma.player.update({ where: { id: c.playerId }, data: { capHit: c.awardAav, contractYears: c.awardTerm, contractExpiry: expiry, contractType: type, ahlSalary: null /* two-way award: he is paid the FULL salary on the farm too — off the cap, into Finance (liveAhlSalary falls back to capHit) */, contractText: `$${c.awardAav.toLocaleString("en-US")} × ${c.awardTerm}yr ${kind} (arbitration award, through ${expiry})`, rightsReleased: false, resignStatus: null, resignRound: 0, franchiseTag: false } }),
     prisma.rfaCase.update({ where: { id: caseId }, data: { status: "SIGNED", resolvedAt: new Date() } }),
   ]);
+  await logArbitrationSigning(c, false, CURRENT_SEASON_START);
   refresh();
   return { ok: true as const };
 }
