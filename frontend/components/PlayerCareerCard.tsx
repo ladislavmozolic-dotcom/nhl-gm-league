@@ -74,7 +74,7 @@ function GoalieTable({ rows }: { rows: CareerGoalieRow[] }) {
 export default function PlayerCareerCard({ career }: { career: PlayerCareer }) {
   const hasRows = career.isGoalie ? career.goalie.length > 0 : career.skater.length > 0;
   return (
-    <Card title="Career" bodyClassName="p-4">
+    <Card title="Season History" bodyClassName="p-4">
       {career.awards.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-4">
           {career.awards.map((a, i) => (
