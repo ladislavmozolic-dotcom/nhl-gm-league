@@ -5,7 +5,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { isAdmin, canEditPlayerContracts, getTeamSession } from "@/lib/auth";
 import { loadSettings, saveSettings, mergeSettings, DEFAULT_SETTINGS } from "@/lib/sim/settings";
-import { loadMarketPool, loadFaWeights, playerMarket, eliteTarget, maxContract, type FaMarketWeights } from "@/lib/free-agency-server";
+import { loadMarketPool, loadFaWeights, playerMarket, eliteTarget, maxContract, weakestTeams, type FaMarketWeights } from "@/lib/free-agency-server";
 import { faPosGroup, type FWeights, type DWeights, type GWeights } from "@/lib/free-agency";
 
 async function actorName(): Promise<string> {
@@ -197,6 +197,41 @@ export async function bulkImportFaOverridesAction(): Promise<{ ok: true; applied
   revalidatePath("/admin/fa-tuning");
   revalidatePath("/admin/expiring-contracts");
   return { ok: true, applied, skipped };
+}
+
+/** Re-roll every existing M-NTC "won't go there" list (current contract AND a signed extension)
+ *  from the clubs' current roster strength — the same rule new signings now use — keeping
+ *  each list's own length (its breadth). Replaces lists that were frozen from noisy early
+ *  standings. Full-admin only; each run is logged in the audit trail. */
+export async function recomputeMntcListsAction(): Promise<{ ok: true; changed: number; total: number } | { ok: false; error: string }> {
+  if (!(await isAdmin())) return { ok: false, error: "Admin only." };
+  const players = await prisma.player.findMany({
+    where: { OR: [{ tradeClause: "M_NTC" }, { extClause: "M_NTC" }] },
+    select: { id: true, name: true, teamId: true, tradeClause: true, noTradeTeams: true, extClause: true, extNoTradeTeams: true },
+  });
+  const same = (a: number[], b: number[]) => a.length === b.length && a.every((x, i) => x === b[i]);
+  let changed = 0;
+  for (const p of players) {
+    const data: { noTradeTeams?: number[]; extNoTradeTeams?: number[] } = {};
+    if (p.tradeClause === "M_NTC") {
+      const next = await weakestTeams(p.noTradeTeams.length || 12, p.teamId);
+      if (!same(next, p.noTradeTeams)) data.noTradeTeams = next;
+    }
+    if (p.extClause === "M_NTC") {
+      const next = await weakestTeams(p.extNoTradeTeams.length || 12, p.teamId);
+      if (!same(next, p.extNoTradeTeams)) data.extNoTradeTeams = next;
+    }
+    if (Object.keys(data).length) {
+      await prisma.player.update({ where: { id: p.id }, data });
+      changed++;
+    }
+  }
+  await prisma.faTuningAudit.create({
+    data: { byName: await actorName(), summary: `M-NTC lists re-rolled by roster strength — ${changed} of ${players.length} players updated` },
+  });
+  revalidatePath("/admin/fa-tuning");
+  revalidatePath("/tools/clauses");
+  return { ok: true, changed, total: players.length };
 }
 
 export type AuditRow = { id: number; byName: string; playerId: number | null; summary: string; createdAt: string };
