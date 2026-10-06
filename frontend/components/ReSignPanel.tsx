@@ -20,9 +20,9 @@ type ExpiringPlayer = { id: number; name: string; age?: number | null; position?
 
 const M = formatSalaryDisplay;
 function lineOptions(grp: string) {
-  if (grp === "G") return [[1, "Starter"], [2, "Backup"], [3, "3rd goalie"]] as const;
-  if (grp === "D") return [[1, "Top pair"], [2, "2nd pair"], [3, "3rd pair"], [4, "7th D"]] as const;
-  return [[1, "1st line"], [2, "2nd line"], [3, "3rd line"], [4, "4th line"], [5, "Extra forward"]] as const;
+  if (grp === "G") return [[0, "Automatic — no promise"], [1, "Starter"], [2, "Backup"], [3, "3rd goalie"]] as const;
+  if (grp === "D") return [[0, "Automatic — no promise"], [1, "Top pair"], [2, "2nd pair"], [3, "3rd pair"], [4, "7th D"]] as const;
+  return [[0, "Automatic — no promise"], [1, "1st line"], [2, "2nd line"], [3, "3rd line"], [4, "4th line"], [5, "Extra forward"]] as const;
 }
 const slotLabels: Record<string, string> = {
   L1: "1st line", L2: "2nd line", L3: "3rd line", L4: "4th line", XF: "extra forward",
@@ -35,7 +35,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
   const [msg, setMsg] = useState<{ t: "ok" | "err"; s: string } | null>(null);
   const [salaryM, setSalaryM] = useState("");
   const [years, setYears] = useState(1);
-  const [line, setLine] = useState(2);
+  const [line, setLine] = useState(0);
   const [pp, setPp] = useState(false);
   const [pk, setPk] = useState(false);
   const [grantClause, setGrantClause] = useState("");
@@ -50,9 +50,9 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
         setInfo(i);
         if (i.ok) {
           const previous = player.negotiation;
-          setLine(previous?.offerLine ?? i.line);
-          setPp(previous?.offerPP ?? i.wantPP);
-          setPk(previous?.offerPK ?? i.wantPK);
+          setLine(previous?.offerLine ?? 0); // starts on "Automatic" — no role promise unless the GM picks one
+          setPp(previous?.offerPP ?? false);
+          setPk(previous?.offerPK ?? false);
           setGrantClause(previous?.offerClause ?? "");
           setTwoWay(previous?.offerTwoWay ?? false);
           const suggestedSalary = previous?.counterSalary ?? player.resignCounterSalary;
@@ -451,11 +451,11 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                     {grp !== "G" && (
                       <div className="flex gap-4 text-xs text-slate-300">
                         <label className="flex items-center gap-2 cursor-pointer">
-                          <input type="checkbox" checked={pp} onChange={(e) => setPp(e.target.checked)} className="rounded bg-slate-900 border-slate-700 text-amber-500 focus:ring-0" />
+                          <input type="checkbox" disabled={line === 0} checked={line !== 0 && pp} onChange={(e) => setPp(e.target.checked)} className="rounded bg-slate-900 border-slate-700 text-amber-500 focus:ring-0" />
                           <span>Power play (PP)</span>
                         </label>
                         <label className="flex items-center gap-2 cursor-pointer">
-                          <input type="checkbox" checked={pk} onChange={(e) => setPk(e.target.checked)} className="rounded bg-slate-900 border-slate-700 text-amber-500 focus:ring-0" />
+                          <input type="checkbox" disabled={line === 0} checked={line !== 0 && pk} onChange={(e) => setPk(e.target.checked)} className="rounded bg-slate-900 border-slate-700 text-amber-500 focus:ring-0" />
                           <span>Penalty kill (PK)</span>
                         </label>
                       </div>
@@ -628,29 +628,29 @@ export default function ReSignPanel({
   const capTotal = players.reduce((sum, p) => sum + (p.capHit ?? 0), 0);
   if (players.length === 0 && !openPlayer) return null;
   return (
-    <section className="overflow-hidden rounded-[26px] border border-slate-700/80 bg-[#08182c] shadow-2xl shadow-black/35">
-      <div className="flex items-center justify-between border-b border-slate-700/70 bg-gradient-to-r from-amber-500/15 via-slate-900/20 to-slate-900 px-5 py-4 sm:px-6">
-        <h2 className={`text-lg font-black uppercase tracking-tight sm:text-xl ${accent}`}>{title ?? "Contracts — up for renewal"} <span className="text-white">({players.length})</span></h2>
-        <div className="flex gap-5 text-sm font-black"><span className="text-rose-400">UFA {ufaCount}</span><span className="text-sky-400">RFA {rfaCount}</span></div>
+    <section className="overflow-hidden rounded-2xl border border-slate-700/80 bg-[#08182c] shadow-xl shadow-black/30">
+      <div className="flex items-center justify-between border-b border-slate-700/70 bg-gradient-to-r from-amber-500/15 via-slate-900/20 to-slate-900 px-4 py-3 sm:px-5">
+        <h2 className={`text-base font-black uppercase tracking-tight sm:text-lg ${accent}`}>{title ?? "Contracts — up for renewal"} <span className="text-white">({players.length})</span></h2>
+        <div className="flex gap-4 text-xs font-black sm:text-sm"><span className="text-rose-400">UFA {ufaCount}</span><span className="text-sky-400">RFA {rfaCount}</span></div>
       </div>
-      <div className="p-4 sm:p-5">
-      <div className="mb-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-2xl border border-slate-700 bg-[#0b1d34] p-4"><div className="text-3xl">🏳️</div><div className="mt-1 text-2xl font-black">{players.length}</div><div className="text-sm font-semibold text-slate-300">Total expiring</div><div className="mt-1 text-xs text-slate-500">{ufaCount} UFA · {rfaCount} RFA</div></div>
-        <div className="rounded-2xl border border-slate-700 bg-[#0b1d34] p-4"><div className="text-3xl text-emerald-400">♻</div><div className="mt-1 text-2xl font-black">{M(capTotal)}</div><div className="text-sm font-semibold text-slate-300">Total cap hit</div><div className="mt-1 text-xs text-slate-500">next season</div></div>
-        <div className="rounded-2xl border border-rose-500/25 bg-rose-950/20 p-4"><div className="text-3xl text-rose-400">⚠</div><div className="mt-1 text-2xl font-black">{priorities.length}</div><div className="text-sm font-semibold text-slate-300">High priority</div><div className="mt-1 text-xs text-slate-500">key decisions</div></div>
-        <div className="rounded-2xl border border-slate-700 bg-[#0b1d34] p-4"><div className="text-3xl text-sky-300">☷</div><div className="mt-1 text-2xl font-black">{Math.min(6, players.length)}</div><div className="text-sm font-semibold text-slate-300">Re-sign targets</div><div className="mt-1 text-xs text-slate-500">recommended</div></div>
+      <div className="p-3.5 sm:p-4">
+      <div className="mb-5 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-xl border border-slate-700 bg-[#0b1d34] p-3"><div className="text-2xl">🏳️</div><div className="mt-0.5 text-xl font-black">{players.length}</div><div className="text-xs font-semibold text-slate-300">Total expiring</div><div className="mt-0.5 text-[11px] text-slate-500">{ufaCount} UFA · {rfaCount} RFA</div></div>
+        <div className="rounded-xl border border-slate-700 bg-[#0b1d34] p-3"><div className="text-2xl text-emerald-400">♻</div><div className="mt-0.5 text-xl font-black">{M(capTotal)}</div><div className="text-xs font-semibold text-slate-300">Total cap hit</div><div className="mt-0.5 text-[11px] text-slate-500">next season</div></div>
+        <div className="rounded-xl border border-rose-500/25 bg-rose-950/20 p-3"><div className="text-2xl text-rose-400">⚠</div><div className="mt-0.5 text-xl font-black">{priorities.length}</div><div className="text-xs font-semibold text-slate-300">High priority</div><div className="mt-0.5 text-[11px] text-slate-500">key decisions</div></div>
+        <div className="rounded-xl border border-slate-700 bg-[#0b1d34] p-3"><div className="text-2xl text-sky-300">☷</div><div className="mt-0.5 text-xl font-black">{Math.min(6, players.length)}</div><div className="text-xs font-semibold text-slate-300">Re-sign targets</div><div className="mt-0.5 text-[11px] text-slate-500">recommended</div></div>
       </div>
       {priorities.length > 0 && (
-        <div className="mb-6">
-          <div className="mb-3 flex items-center justify-between"><span className="text-lg font-black uppercase tracking-tight text-amber-300">Top priority decisions</span><button type="button" onClick={() => setTab("ALL")} className="text-sm font-bold text-sky-400 hover:text-sky-300">View all {players.length} players →</button></div>
-          <div className="grid gap-3 lg:grid-cols-3">{priorities.map((p, i) => (
-            <div key={p.id} className={`relative overflow-hidden rounded-2xl border-2 p-4 ${i === 0 ? "border-rose-400/75 bg-gradient-to-br from-rose-950/45 to-[#0c1c31]" : "border-amber-400/65 bg-gradient-to-br from-amber-950/20 to-[#0c1c31]"}`}>
-              <div className="flex items-center justify-between"><span className={`flex h-9 w-9 items-center justify-center rounded-full text-lg font-black ${i === 0 ? "bg-rose-400 text-rose-950" : "bg-amber-300 text-amber-950"}`}>{i + 1}</span><div className="flex items-center gap-2"><span className={`text-xs font-black uppercase ${i === 0 ? "text-rose-300" : "text-amber-300"}`}>{i === 0 ? "High priority" : "Medium priority"}</span><span className="rounded-full bg-slate-800 px-2 py-1 text-xs font-bold text-slate-300">{p.position ?? "—"}</span></div></div>
-              <div className="mt-8 text-2xl font-black tracking-tight text-white">{cleanName(p.name)}</div>
-              <div className="mt-1 text-sm font-semibold text-slate-400">{p.type ?? "UFA"} · {p.age ?? "—"} years</div>
-              <div className="mt-4 text-3xl font-black text-white">{p.capHit ? M(p.capHit) : "—"}</div>
-              <div className="mt-3 flex gap-2 text-xs font-bold text-slate-300"><span className="rounded-lg bg-slate-950/60 px-2 py-1.5">{p.lastSeasonGP ?? 0} GP</span><span className="rounded-lg bg-slate-950/60 px-2 py-1.5">{p.isGoalie ? `${p.lastSeasonSvPct ? p.lastSeasonSvPct.toFixed(3) : "—"} SV%` : `${p.lastSeasonPts ?? 0} PTS`}</span></div>
-              <div className="mt-4 flex gap-2"><button type="button" onClick={() => setOpenPlayer(p)} className="flex-1 rounded-lg bg-emerald-600 py-2.5 text-sm font-black text-white transition hover:bg-emerald-500">Re-sign</button><button type="button" onClick={() => setBookmarked((s) => { const n = new Set(s); n.has(p.id) ? n.delete(p.id) : n.add(p.id); return n; })} aria-label="Bookmark player" className={`rounded-lg border px-3 text-lg ${bookmarked.has(p.id) ? "border-sky-400 bg-sky-400/15 text-sky-200" : "border-slate-600 bg-slate-900 text-slate-300"}`}>♧</button></div>
+        <div className="mb-5">
+          <div className="mb-2 flex items-center justify-between"><span className="text-sm font-black uppercase tracking-tight text-amber-300">Top priority decisions</span><button type="button" onClick={() => setTab("ALL")} className="text-xs font-bold text-sky-400 hover:text-sky-300">View all {players.length} players →</button></div>
+          <div className="grid gap-2.5 lg:grid-cols-3">{priorities.map((p, i) => (
+            <div key={p.id} className={`relative overflow-hidden rounded-xl border-2 p-3 ${i === 0 ? "border-rose-400/75 bg-gradient-to-br from-rose-950/45 to-[#0c1c31]" : "border-amber-400/65 bg-gradient-to-br from-amber-950/20 to-[#0c1c31]"}`}>
+              <div className="flex items-center justify-between"><span className={`flex h-7 w-7 items-center justify-center rounded-full text-sm font-black ${i === 0 ? "bg-rose-400 text-rose-950" : "bg-amber-300 text-amber-950"}`}>{i + 1}</span><div className="flex items-center gap-1.5"><span className={`text-[10px] font-black uppercase ${i === 0 ? "text-rose-300" : "text-amber-300"}`}>{i === 0 ? "High priority" : "Medium priority"}</span><span className="rounded-full bg-slate-800 px-1.5 py-0.5 text-[10px] font-bold text-slate-300">{p.position ?? "—"}</span></div></div>
+              <div className="mt-4 text-lg font-black tracking-tight text-white">{cleanName(p.name)}</div>
+              <div className="mt-0.5 text-xs font-semibold text-slate-400">{p.type ?? "UFA"} · {p.age ?? "—"} years</div>
+              <div className="mt-2 text-2xl font-black text-white">{p.capHit ? M(p.capHit) : "—"}</div>
+              <div className="mt-2 flex gap-1.5 text-[11px] font-bold text-slate-300"><span className="rounded-md bg-slate-950/60 px-1.5 py-1">{p.lastSeasonGP ?? 0} GP</span><span className="rounded-md bg-slate-950/60 px-1.5 py-1">{p.isGoalie ? `${p.lastSeasonSvPct ? p.lastSeasonSvPct.toFixed(3) : "—"} SV%` : `${p.lastSeasonPts ?? 0} PTS`}</span></div>
+              <div className="mt-3 flex gap-2"><button type="button" onClick={() => setOpenPlayer(p)} className="flex-1 rounded-md bg-emerald-600 py-2 text-xs font-black text-white transition hover:bg-emerald-500">Re-sign</button><button type="button" onClick={() => setBookmarked((s) => { const n = new Set(s); n.has(p.id) ? n.delete(p.id) : n.add(p.id); return n; })} aria-label="Bookmark player" className={`rounded-md border px-2 text-base ${bookmarked.has(p.id) ? "border-sky-400 bg-sky-400/15 text-sky-200" : "border-slate-600 bg-slate-900 text-slate-300"}`}>♧</button></div>
             </div>
           ))}</div>
         </div>
@@ -673,18 +673,18 @@ export default function ReSignPanel({
       )}
       {tagMsg && <p className="text-xs text-rose-400 mb-2">{tagMsg}</p>}
       {releaseMsg && <p className="text-xs text-rose-400 mb-2">{releaseMsg}</p>}
-      <div className="overflow-hidden rounded-2xl border border-slate-700/80 bg-[#091a2f]">
-        <div className="flex flex-col gap-3 border-b border-slate-700/70 px-3 pt-3 sm:flex-row sm:items-end sm:justify-between">
-          <div className="flex gap-1"><button type="button" onClick={() => setTab("ALL")} className={`border-b-2 px-4 py-3 text-sm font-black ${tab === "ALL" ? "border-sky-400 bg-sky-500/10 text-white" : "border-transparent text-slate-400 hover:text-white"}`}>All ({players.length})</button><button type="button" onClick={() => setTab("UFA")} className={`border-b-2 px-4 py-3 text-sm font-black ${tab === "UFA" ? "border-rose-400 bg-rose-500/10 text-rose-200" : "border-transparent text-slate-400 hover:text-white"}`}>UFA ({ufaCount})</button><button type="button" onClick={() => setTab("RFA")} className={`border-b-2 px-4 py-3 text-sm font-black ${tab === "RFA" ? "border-sky-400 bg-sky-500/10 text-sky-200" : "border-transparent text-slate-400 hover:text-white"}`}>RFA ({rfaCount})</button></div>
-          <div className="pb-2 text-xs font-semibold text-slate-400">Sort by <span className="ml-1 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-white">Cap Hit⌄</span><span className="ml-2 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2">⌕ Filter</span></div>
+      <div className="overflow-hidden rounded-xl border border-slate-700/80 bg-[#091a2f]">
+        <div className="flex flex-col gap-2 border-b border-slate-700/70 px-2.5 pt-2 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex gap-1"><button type="button" onClick={() => setTab("ALL")} className={`border-b-2 px-3 py-2 text-xs font-black ${tab === "ALL" ? "border-sky-400 bg-sky-500/10 text-white" : "border-transparent text-slate-400 hover:text-white"}`}>All ({players.length})</button><button type="button" onClick={() => setTab("UFA")} className={`border-b-2 px-3 py-2 text-xs font-black ${tab === "UFA" ? "border-rose-400 bg-rose-500/10 text-rose-200" : "border-transparent text-slate-400 hover:text-white"}`}>UFA ({ufaCount})</button><button type="button" onClick={() => setTab("RFA")} className={`border-b-2 px-3 py-2 text-xs font-black ${tab === "RFA" ? "border-sky-400 bg-sky-500/10 text-sky-200" : "border-transparent text-slate-400 hover:text-white"}`}>RFA ({rfaCount})</button></div>
+          <div className="pb-1.5 text-[11px] font-semibold text-slate-400">Sort by <span className="ml-1 rounded-md border border-slate-600 bg-slate-900 px-2 py-1.5 text-white">Cap Hit⌄</span><span className="ml-1.5 rounded-md border border-slate-600 bg-slate-900 px-2 py-1.5">⌕ Filter</span></div>
         </div>
-        <div className="hidden grid-cols-[28px_minmax(180px,1.8fr)_42px_54px_42px_76px_1fr_82px_34px] gap-2 border-b border-slate-700/70 bg-slate-900/65 px-4 py-3 text-[10px] font-black uppercase tracking-wide text-slate-400 md:grid"><span>#</span><span>Player</span><span>Pos</span><span>Type</span><span>Age</span><span>Cap hit</span><span>Priority</span><span>Action</span><span /></div>
+        <div className="hidden grid-cols-[24px_minmax(160px,1.8fr)_38px_48px_36px_68px_1fr_72px_28px] gap-2 border-b border-slate-700/70 bg-slate-900/65 px-3 py-2 text-[9px] font-black uppercase tracking-wide text-slate-400 md:grid"><span>#</span><span>Player</span><span>Pos</span><span>Type</span><span>Age</span><span>Cap hit</span><span>Priority</span><span>Action</span><span /></div>
       <div className="divide-y divide-slate-800/70">
         {visiblePlayers.map((p, index) => (
-          <div key={p.id} className="grid gap-2 px-3 py-3 transition-colors hover:bg-slate-800/35 md:grid-cols-[28px_minmax(180px,1.8fr)_42px_54px_42px_76px_1fr_82px_34px] md:items-center md:px-4">
-            <span className="hidden text-sm font-bold text-slate-500 md:block">{index + 1}</span>
+          <div key={p.id} className="grid gap-1.5 px-2.5 py-2 transition-colors hover:bg-slate-800/35 md:grid-cols-[24px_minmax(160px,1.8fr)_38px_48px_36px_68px_1fr_72px_28px] md:items-center md:px-3">
+            <span className="hidden text-xs font-bold text-slate-500 md:block">{index + 1}</span>
             <div className="min-w-0">
-              <PlayerLink id={p.id} name={p.name} className="font-medium truncate" />
+              <PlayerLink id={p.id} name={p.name} className="text-sm font-medium truncate" />
               {p.farm && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30">AHL</span>}
               {/* show the REAL current deal (cap hit) — the stored contractText is a stale
                   profinhl string that can misrepresent the term; everyone here is in their

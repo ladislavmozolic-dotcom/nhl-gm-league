@@ -50,7 +50,7 @@ export default async function MyOffersPage() {
                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${o.twoWay ? "border-slate-700 text-slate-400" : "border-amber-600/60 text-amber-400"}`}>
                     {o.twoWay ? "2-way" : "1-way"}
                   </span>
-                  {!o.isGoalie && <span className="text-slate-600">Line {o.line}{(o.pp || o.pk) && ` · ${[o.pp && "PP", o.pk && "PK"].filter(Boolean).join("/")}`}</span>}
+                  {!o.isGoalie && <span className="text-slate-600">{o.line === 0 ? "Auto" : `Line ${o.line}`}{(o.pp || o.pk) && ` · ${[o.pp && "PP", o.pk && "PK"].filter(Boolean).join("/")}`}</span>}
                   <span className="text-slate-600">Round {o.round || "—"}</span>
                   {o.status === "COUNTERED" && o.counterSalary != null && (
                     <span className="text-amber-400">Countered at {money(o.counterSalary)} × {o.counterYears}yr</span>

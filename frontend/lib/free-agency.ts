@@ -590,6 +590,8 @@ export function offerAcceptable(td: Demand, offerSalary: number, offerYears: num
 // the GM sign him for less. High-SC/PA players covet PP; high-DF players value PK.
 // ---------------------------------------------------------------------------
 
+/** line 0 = "Automatic": the GM promises no line / PP / PK. He is judged as the role he projects into, plus a small premium for the uncertainty. */
+export const NO_PROMISE_PREMIUM = 1.04;
 export type Deployment = { line: number; pp: boolean; pk: boolean }; // F line 1-4 (5 = extra forward) · D pair 1-3 (4 = 7th D) · G 1-2 (3 = 3rd goalie)
 export type Desired = { line: number; wantPP: boolean; wantPK: boolean };
 
@@ -619,6 +621,7 @@ export function desiredDeployment(grp: FaPos, projLine: number, df: number | nul
 
 /** Money bend from the PROMISED line (bigger promised role → he takes less). */
 export function deployRoleModifier(grp: FaPos, line: number): number {
+  if (line <= 0) return 1; // automatic — no role promise
   if (grp === "G") return line <= 1 ? 0.90 : 1.06;
   if (grp === "D") return line <= 1 ? 0.90 : line === 2 ? 0.97 : 1.06;
   return line <= 1 ? 0.90 : line === 2 ? 0.97 : line === 3 ? 1.04 : 1.10;
@@ -657,6 +660,7 @@ export function deploymentDemand(base: Demand, grp: FaPos, dep: Deployment, desi
 }
 
 export function deployRoleBonus(grp: FaPos, line: number): number {
+  if (line <= 0) return 0; // automatic — no role promise
   if (grp === "G") return line <= 1 ? 1_600_000 : -300_000;
   if (grp === "D") return line <= 1 ? 1_600_000 : line === 2 ? 700_000 : -200_000;
   return line <= 1 ? 1_600_000 : line === 2 ? 700_000 : line === 3 ? 0 : -600_000;

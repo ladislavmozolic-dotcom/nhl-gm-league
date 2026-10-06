@@ -8,7 +8,7 @@ import { CURRENT_SEASON_START, ageAsOfJune30 } from "./finance";
 import {
   faPosGroup, skaterMarket, goalieMarket, anchorFromPool, buildDemand, percentile, availabilityFactor, isDepthSlot,
   slotForRank, slotToLine, desiredDeployment, deploymentDemand, offerUtility, offerAcceptable, clauseDiscount, termPremium, lowballTier,
-  type MarketRow, type Demand, type FaPos, type Contention, type Deployment, type Desired, type LineSlot,
+  NO_PROMISE_PREMIUM, type MarketRow, type Demand, type FaPos, type Contention, type Deployment, type Desired, type LineSlot,
   type FWeights, type DWeights, type GWeights,
 } from "./free-agency";
 
@@ -817,7 +817,9 @@ export async function evaluateTeamOffer(
   if (!info) return null;
   // a lone two-way bidder in the in-season market: the role promised isn't part of the
   // deal, so judge it as exactly the role he projects into (no premium, no discount).
-  if (grant?.ignoreRole) deploy = { line: info.desired.line, pp: info.desired.wantPP, pk: info.desired.wantPK };
+  // line 0 = "Automatic" — no promise: priced as the role he projects into (+ a small uncertainty premium below)
+  const noPromise = deploy.line === 0 && !grant?.ignoreRole;
+  if (grant?.ignoreRole || deploy.line === 0) deploy = { line: info.desired.line, pp: info.desired.wantPP, pk: info.desired.wantPK };
   let raw = deploymentDemand(info.base, info.grp, deploy, info.desired, info.contention, info.age, info.churn);
   // The price Demand Watch / the re-sign window show (info.ask) is already the price for the role and
   // special teams he projects into. Promising MORE than that (a bigger line, PP/PK he didn't ask for) must
@@ -836,7 +838,7 @@ export async function evaluateTeamOffer(
   const disc = roleWorse ? 0 : clauseDiscount(grant?.clause, grant?.breadth);
   // longer term than his sweet spot raises the price (always negotiable, never a refusal)
   const tp = termPremium(years, raw.years, info.age, info.slot, raw.floorSalary, info.elite > 0);
-  const f = (1 - disc) * tp;
+  const f = (1 - disc) * tp * (noPromise && !roleFree && !info.ladder ? NO_PROMISE_PREMIUM : 1);
   let ask: Demand = f !== 1
     ? { ...raw, floorSalary: Math.max(775_000, Math.round((raw.floorSalary * f) / 50_000) * 50_000), salary: Math.max(775_000, Math.round((raw.salary * f) / 50_000) * 50_000) }
     : raw;

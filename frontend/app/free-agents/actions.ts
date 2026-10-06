@@ -197,6 +197,7 @@ export async function getAskAtAction(
   const clause = grantClause && ["NTC", "NMC", "M_NTC"].includes(grantClause) ? grantClause : null;
   const breadth = clause === "M_NTC" ? ([6, 12, 18, 24].includes(mNtcBreadth ?? 0) ? mNtcBreadth! : 12) : null;
   const term = Math.max(1, Math.min(4, Math.round(years || 1)));
+  if (clampLine(line) === 0) { pp = false; pk = false; } // "automatic": no role / special-teams promise
   const ev = await evaluateTeamOffer(playerId, teamId, 0, term, { line: clampLine(line), pp, pk }, undefined, undefined, undefined, { clause, breadth });
   if (!ev) return null;
   return { askSalary: ev.ask.salary, askYears: ev.ask.years, floor: ev.ask.floorSalary, minYears: ev.ask.minYears, maxYears: ev.ask.maxYears };
@@ -520,6 +521,7 @@ export async function submitOfferAction(
 
   const clause = grantClause && ["NTC", "NMC", "M_NTC"].includes(grantClause) ? grantClause : null;
   const breadth = clause === "M_NTC" ? ([6, 12, 18, 24].includes(mNtcBreadth ?? 0) ? mNtcBreadth! : 12) : null;
+  if (clampLine(line) === 0) { pp = false; pk = false; } // "automatic": no role / special-teams promise
   const dep: Deployment = { line: clampLine(line), pp, pk };
   const evalr = await evaluateTeamOffer(playerId, teamId, salary, years, dep, undefined, undefined, undefined, { clause, breadth, ignoreRole: coldInSeason });
   // judged against his pre-offer ask; a lowball then raises what he'll want from THIS club
@@ -674,7 +676,7 @@ async function signFaOffer(playerId: number, player: { name: string; age: number
       ? `$${salary.toLocaleString("en-US")} × ${years}yr (2-way, through ${expiry})`
       : `$${salary.toLocaleString("en-US")} × ${years}yr (through ${expiry})`,
     // a lone two-way bidder's role was never part of the deal, so no promise to police
-    signPromiseLine: noRole ? null : o.line, signPromisePP: noRole ? null : o.pp, signPromisePK: noRole ? null : o.pk,
+    signPromiseLine: noRole || o.line === 0 ? null : o.line, signPromisePP: noRole || o.line === 0 ? null : o.pp, signPromisePK: noRole || o.line === 0 ? null : o.pk,
     tradeClause: clause, noTradeTeams,
     disgruntled: false, tradeRequested: false, promiseWarnGame: null,
     tradeRequestReason: null, iceUnhappyChecks: 0, iceWarnedAt: null,
@@ -1247,7 +1249,7 @@ export async function applyAllElcAction() {
   return { ok: true as const, signed };
 }
 
-const clampLine = (n: number) => Math.max(1, Math.min(5, Math.round(n))); // 5 = extra F · 4 = 7th D · 3 = 3rd G (spare roles)
+const clampLine = (n: number) => Math.max(0, Math.min(5, Math.round(n))); // 0 = automatic, no role promise ·  // 5 = extra F · 4 = 7th D · 3 = 3rd G (spare roles)
 const fmtM = (n: number) => `$${(n / 1e6).toFixed(2)}M`;
 
 /** Tag / untag an RFA as the club's Franchise player (1 per team). A franchise RFA
@@ -1419,6 +1421,7 @@ export async function extendContractAction(
 
   const clause = grantClause && ["NTC", "NMC", "M_NTC"].includes(grantClause) ? grantClause : null;
   const breadth = clause === "M_NTC" ? ([6, 12, 18, 24].includes(mNtcBreadth ?? 0) ? mNtcBreadth! : 12) : null;
+  if (clampLine(line) === 0) { pp = false; pk = false; } // "automatic": no role / special-teams promise
   const dep: Deployment = { line: clampLine(line), pp, pk };
   let ev = await evaluateTeamOffer(playerId, teamId, salary, years, dep, undefined, undefined, undefined, { clause, breadth });
   if (!ev) return { ok: false as const, error: "Could not value the player." };
@@ -1562,7 +1565,7 @@ export async function extendContractAction(
     data: {
       ...releaseNonRoster,
       ...newDeal,
-      signPromiseLine: dep.line, signPromisePP: pp, signPromisePK: pk,
+      signPromiseLine: dep.line === 0 ? null : dep.line, signPromisePP: dep.line === 0 ? null : pp, signPromisePK: dep.line === 0 ? null : pk,
       resignRound: 0, resignOfferSalary: null, resignCounterSalary: null, resignCounterYears: null, resignOfferAt: null, rfaOsUsed: false, rightsReleased: false,
       disgruntled: false, tradeRequested: false, promiseWarnGame: null,
       tradeRequestReason: null, iceUnhappyChecks: 0, iceWarnedAt: null,

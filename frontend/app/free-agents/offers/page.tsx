@@ -106,7 +106,7 @@ export default async function AllOffersPage({ searchParams }: { searchParams: Pr
                               </span>
                             </>
                           )}
-                          {!p.isGoalie && <span className="text-slate-600">Line {o.line}{(o.pp || o.pk) && ` · ${[o.pp && "PP", o.pk && "PK"].filter(Boolean).join("/")}`}</span>}
+                          {!p.isGoalie && <span className="text-slate-600">{o.line === 0 ? "Auto" : `Line ${o.line}`}{(o.pp || o.pk) && ` · ${[o.pp && "PP", o.pk && "PK"].filter(Boolean).join("/")}`}</span>}
                           <span className="text-slate-600">Round {o.round || "—"}</span>
                         </div>
                         <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border shrink-0 ${st.cls}`}>{st.label}</span>

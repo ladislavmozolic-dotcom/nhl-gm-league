@@ -24,9 +24,9 @@ type Offers = Awaited<ReturnType<typeof getPlayerOffersAction>>;
 const M = formatSalaryDisplay;
 
 function lineOptions(grp: string) {
-  if (grp === "G") return [[1, "Starter"], [2, "Backup"], [3, "3rd goalie"]] as const;
-  if (grp === "D") return [[1, "Top pair"], [2, "2nd pair"], [3, "3rd pair"], [4, "7th D"]] as const;
-  return [[1, "1st line"], [2, "2nd line"], [3, "3rd line"], [4, "4th line"], [5, "Extra forward"]] as const;
+  if (grp === "G") return [[0, "Automatic — no promise"], [1, "Starter"], [2, "Backup"], [3, "3rd goalie"]] as const;
+  if (grp === "D") return [[0, "Automatic — no promise"], [1, "Top pair"], [2, "2nd pair"], [3, "3rd pair"], [4, "7th D"]] as const;
+  return [[0, "Automatic — no promise"], [1, "1st line"], [2, "2nd line"], [3, "3rd line"], [4, "4th line"], [5, "Extra forward"]] as const;
 }
 const slotLabels: Record<string, string> = {
   L1: "1st line", L2: "2nd line", L3: "3rd line", L4: "4th line", XF: "extra forward",
@@ -63,7 +63,7 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
   // offer form
   const [salaryM, setSalaryM] = useState("");
   const [years, setYears] = useState(1);
-  const [line, setLine] = useState(2);
+  const [line, setLine] = useState(0);
   const [pp, setPp] = useState(false);
   const [pk, setPk] = useState(false);
   const [grantClause, setGrantClause] = useState("");
@@ -94,9 +94,9 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
         // the GM has to judge the range himself (we no longer hand him the exact ask).
         setSalaryM(ex && ex.status !== "COUNTERED" ? formatSalaryMillions(ex.salary / 1e6) : "");
         setYears(ex?.years ?? i.askYears);
-        setLine(ex?.line ?? i.line);
-        setPp(ex?.pp ?? i.wantPP);
-        setPk(ex?.pk ?? i.wantPK);
+        setLine(ex?.line ?? 0); // starts on "Automatic" — no role promise unless the GM picks one
+        setPp(ex?.pp ?? false);
+        setPk(ex?.pk ?? false);
       }
     } catch (e) { setMsg({ t: "err", s: friendlyActionError(e) }); }
   });
@@ -242,7 +242,7 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
                   ) : (
                     <p className="mt-2 text-slate-200">
                       {liveAsk && (liveAsk.askSalary !== i.askSalary || liveAsk.askYears !== i.askYears)
-                        ? <>At <b className="text-slate-300">{slotLabels[["", "L1", "L2", "L3", "L4"][line] ?? ""] ?? `line ${line}`}</b>{!pp && i.wantPP ? ", no PP" : ""}{!pk && i.wantPK ? ", no PK" : ""} he&apos;s looking for </>
+                        ? <>At <b className="text-slate-300">{line === 0 ? "an automatic role (no promise)" : (lineOptions(grp).find(([v]) => v === line)?.[1] ?? `line ${line}`)}</b>{line !== 0 && !pp && i.wantPP ? ", no PP" : ""}{line !== 0 && !pk && i.wantPK ? ", no PK" : ""} he&apos;s looking for </>
                         : <>Looking for roughly </>}
                       <b className="text-amber-300">{M((liveAsk ?? i).floor * 0.95)}–{M((liveAsk ?? i).askSalary * 1.08)}</b>{" "}
                       <span className="text-slate-500">· term {(liveAsk ?? i).minYears}-{(liveAsk ?? i).maxYears}yr (longer = more)</span>
@@ -276,8 +276,8 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
                     </div>
                     {grp !== "G" && (
                       <div className="flex gap-4 text-sm">
-                        <label className="flex items-center gap-2"><input type="checkbox" checked={pp} onChange={(e) => setPp(e.target.checked)} /> Power play</label>
-                        <label className="flex items-center gap-2"><input type="checkbox" checked={pk} onChange={(e) => setPk(e.target.checked)} /> Penalty kill</label>
+                        <label className="flex items-center gap-2"><input type="checkbox" disabled={line === 0} checked={line !== 0 && pp} onChange={(e) => setPp(e.target.checked)} /> Power play</label>
+                        <label className="flex items-center gap-2"><input type="checkbox" disabled={line === 0} checked={line !== 0 && pk} onChange={(e) => setPk(e.target.checked)} /> Penalty kill</label>
                       </div>
                     )}
                     <div>
@@ -339,7 +339,7 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
                         return (
                           <div key={o.teamId} className="flex items-center justify-between gap-3 text-sm bg-slate-800/40 rounded px-2 py-1">
                             <span className="font-semibold shrink-0">{o.teamCode}</span>
-                            <span className="tabular-nums text-slate-300 flex-1 text-right">{M(o.salary)} × {o.years}yr · L{o.line}{o.pp ? " PP" : ""}{o.pk ? " PK" : ""}</span>
+                            <span className="tabular-nums text-slate-300 flex-1 text-right">{M(o.salary)} × {o.years}yr · {o.line === 0 ? "auto" : `L${o.line}`}{o.pp ? " PP" : ""}{o.pk ? " PK" : ""}</span>
                             <span className="text-[11px] text-slate-500 shrink-0 whitespace-nowrap" title={raised ? `Placed ${fmt(o.placedAt)} · raised ${fmt(o.updatedAt)}` : `Placed ${fmt(o.placedAt)}`}>
                               🕒 {fmt(o.updatedAt)}{raised ? " (raised)" : ""}
                             </span>

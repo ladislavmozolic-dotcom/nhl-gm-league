@@ -76,7 +76,7 @@ export default async function NegotiationsPage({ searchParams }: { searchParams:
                 {rows.map((r) => {
                   const o = OUTCOME[r.outcome] ?? { label: r.outcome, cls: "bg-slate-600/30 text-slate-300" };
                   const terms = [
-                    r.offerLine ? `L${r.offerLine}` : null,
+                    r.offerLine != null ? (r.offerLine === 0 ? "auto role" : `L${r.offerLine}`) : null,
                     r.offerPP ? "PP" : null,
                     r.offerPK ? "PK" : null,
                     r.offerClause,

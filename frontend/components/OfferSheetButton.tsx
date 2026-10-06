@@ -10,9 +10,9 @@ import InfoTip from "@/components/InfoTip";
 const M = formatSalaryDisplay;
 
 function lineOptions(grp: string) {
-  if (grp === "G") return [[1, "Starter"], [2, "Backup"], [3, "3rd goalie"]] as const;
-  if (grp === "D") return [[1, "Top pair"], [2, "2nd pair"], [3, "3rd pair"], [4, "7th D"]] as const;
-  return [[1, "1st line"], [2, "2nd line"], [3, "3rd line"], [4, "4th line"], [5, "Extra forward"]] as const;
+  if (grp === "G") return [[0, "Automatic — no promise"], [1, "Starter"], [2, "Backup"], [3, "3rd goalie"]] as const;
+  if (grp === "D") return [[0, "Automatic — no promise"], [1, "Top pair"], [2, "2nd pair"], [3, "3rd pair"], [4, "7th D"]] as const;
+  return [[0, "Automatic — no promise"], [1, "1st line"], [2, "2nd line"], [3, "3rd line"], [4, "4th line"], [5, "Extra forward"]] as const;
 }
 
 type Plan = Awaited<ReturnType<typeof getOsCompPlanAction>>;
@@ -30,7 +30,7 @@ export default function OfferSheetButton({
 
   const [salaryM, setSalaryM] = useState(existing ? formatSalaryMillions(existing.salary / 1e6) : "");
   const [years, setYears] = useState(existing?.years ?? 2);
-  const [line, setLine] = useState(2);
+  const [line, setLine] = useState(0);
   const [twoWay, setTwoWay] = useState(false);
   const [grantClause, setGrantClause] = useState("");
   const [breadth, setBreadth] = useState(12);
