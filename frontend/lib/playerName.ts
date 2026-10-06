@@ -75,16 +75,11 @@ export const CLAUSE_LABEL: Record<TradeClause, string> = {
   M_NTC: "Modified No-Trade Clause (M-NTC)",
 };
 
-/** A player's trade clause: the real `tradeClause` field wins, falling back to the
- *  legacy "(NTC)" / "(NMC)" marker some imported names still carry. */
-export function clauseOf(p: { tradeClause?: unknown; name?: string | null }): TradeClause | null {
+/** A player's trade clause — ONLY the real `tradeClause` field (granted in this league).
+ *  Legacy "(NTC)" markers in imported names are NOT clauses here: the league started with none. */
+export function clauseOf(p: { tradeClause?: unknown }): TradeClause | null {
   const c = p.tradeClause;
-  if (c === "NTC" || c === "NMC" || c === "M_NTC") return c;
-  const n = p.name ?? "";
-  if (/\(NMC\)/i.test(n)) return "NMC";
-  if (/\((?:M-NTC|NTC-M)\)/i.test(n)) return "M_NTC";
-  if (/\(NTC\)/i.test(n)) return "NTC";
-  return null;
+  return c === "NTC" || c === "NMC" || c === "M_NTC" ? c : null;
 }
 
 const asClause = (c: unknown): TradeClause | null => (c === "NTC" || c === "NMC" || c === "M_NTC" ? c : null);
