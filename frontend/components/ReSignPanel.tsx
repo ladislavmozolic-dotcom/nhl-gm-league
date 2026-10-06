@@ -678,10 +678,10 @@ export default function ReSignPanel({
           <div className="flex gap-1"><button type="button" onClick={() => setTab("ALL")} className={`border-b-2 px-3 py-2 text-xs font-black ${tab === "ALL" ? "border-sky-400 bg-sky-500/10 text-white" : "border-transparent text-slate-400 hover:text-white"}`}>All ({players.length})</button><button type="button" onClick={() => setTab("UFA")} className={`border-b-2 px-3 py-2 text-xs font-black ${tab === "UFA" ? "border-rose-400 bg-rose-500/10 text-rose-200" : "border-transparent text-slate-400 hover:text-white"}`}>UFA ({ufaCount})</button><button type="button" onClick={() => setTab("RFA")} className={`border-b-2 px-3 py-2 text-xs font-black ${tab === "RFA" ? "border-sky-400 bg-sky-500/10 text-sky-200" : "border-transparent text-slate-400 hover:text-white"}`}>RFA ({rfaCount})</button></div>
           <div className="pb-1.5 text-[11px] font-semibold text-slate-400">Sort by <span className="ml-1 rounded-md border border-slate-600 bg-slate-900 px-2 py-1.5 text-white">Cap Hit⌄</span><span className="ml-1.5 rounded-md border border-slate-600 bg-slate-900 px-2 py-1.5">⌕ Filter</span></div>
         </div>
-        <div className="hidden grid-cols-[24px_minmax(160px,1.8fr)_38px_48px_36px_68px_1fr_72px_28px] gap-2 border-b border-slate-700/70 bg-slate-900/65 px-3 py-2 text-[9px] font-black uppercase tracking-wide text-slate-400 md:grid"><span>#</span><span>Player</span><span>Pos</span><span>Type</span><span>Age</span><span>Cap hit</span><span>Priority</span><span>Action</span><span /></div>
+        <div className="hidden max-w-[1500px] grid-cols-[24px_minmax(220px,1.5fr)_38px_48px_36px_68px_92px_310px] gap-2 border-b border-slate-700/70 bg-slate-900/65 px-3 py-2 text-[9px] font-black uppercase tracking-wide text-slate-400 md:grid"><span>#</span><span>Player</span><span>Pos</span><span>Type</span><span>Age</span><span>Cap hit</span><span>Priority</span><span>Action</span></div>
       <div className="divide-y divide-slate-800/70">
         {visiblePlayers.map((p, index) => (
-          <div key={p.id} className="grid gap-1.5 px-2.5 py-2 transition-colors hover:bg-slate-800/35 md:grid-cols-[24px_minmax(160px,1.8fr)_38px_48px_36px_68px_1fr_72px_28px] md:items-center md:px-3">
+          <div key={p.id} className="grid max-w-[1500px] gap-1.5 px-2.5 py-2 transition-colors hover:bg-slate-800/35 md:grid-cols-[24px_minmax(220px,1.5fr)_38px_48px_36px_68px_92px_310px] md:items-center md:px-3">
             <span className="hidden text-xs font-bold text-slate-500 md:block">{index + 1}</span>
             <div className="min-w-0">
               <PlayerLink id={p.id} name={p.name} className="text-sm font-medium truncate" />
@@ -701,7 +701,7 @@ export default function ReSignPanel({
             <span className="hidden text-sm text-slate-300 md:block">{p.age ?? "—"}</span>
             <span className="hidden text-sm font-bold text-white md:block">{p.capHit ? M(p.capHit) : "—"}</span>
             <span className="hidden md:block"><span className={`rounded-lg px-2 py-1 text-xs font-black ${index < 1 ? "bg-rose-500/15 text-rose-300" : index < 6 ? "bg-amber-500/15 text-amber-300" : "bg-sky-500/15 text-sky-300"}`}>{index < 1 ? "High" : index < 6 ? "Medium" : "Low"}</span></span>
-            <div className="flex items-center gap-2 shrink-0 md:flex">
+            <div className="flex shrink-0 items-center gap-2 whitespace-nowrap md:flex-nowrap">
               {p.type === "RFA" && franchiseEnabled && (() => {
                 const isTagged = tagged === p.id;
                 const isUsed = franchiseTagUsed || (isTagged && ((p.resignRound ?? 0) > 0 || p.resignStatus === "extended"));
