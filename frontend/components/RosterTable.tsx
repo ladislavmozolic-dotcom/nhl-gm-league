@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { cleanName } from "@/lib/playerName";
 import { isWorthyGoalie } from "@/lib/goalie-rule";
+import ClauseStar from "@/components/ClauseStar";
 
 export type RosterPlayer = Record<string, number | string | null> & {
   id: number; name: string; position: string | null; slug?: string | null; age: number | null; overall: number | null; contractText: string | null; condition: number | null;
@@ -94,6 +95,7 @@ export default function RosterTable({ title, players, goalie = false, hideAttrs 
                 <tr key={p.id} className="border-b border-slate-800/60 hover:bg-slate-800/30">
                   <td className="px-2 py-1.5 text-left sticky left-0 bg-slate-900/60 backdrop-blur whitespace-nowrap">
                     {p.slug ? <Link href={`/players/${p.slug}`} className="text-white hover:text-blue-400 font-medium">{cleanName(p.name)}</Link> : <span className="text-white font-medium">{cleanName(p.name)}</span>}
+                    <ClauseStar player={p} />
                     {cap && <span className={`ml-1 text-[9px] font-bold ${cap === "C" ? "text-amber-400" : "text-slate-400"}`}>({cap})</span>}
                     {worthy && <span className="ml-1 text-green-400" title="Worthy goalie — meets the league's minimum-goalie rule">●</span>}
                   </td>

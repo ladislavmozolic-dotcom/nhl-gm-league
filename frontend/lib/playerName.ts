@@ -67,3 +67,22 @@ export function epProfileUrl(name: string): string {
 export function epPlayerSearchUrl(name: string): string {
   return epProfileUrl(name);
 }
+
+export type TradeClause = "NTC" | "NMC" | "M_NTC";
+export const CLAUSE_LABEL: Record<TradeClause, string> = {
+  NTC: "No-Trade Clause (NTC)",
+  NMC: "No-Movement Clause (NMC)",
+  M_NTC: "Modified No-Trade Clause (M-NTC)",
+};
+
+/** A player's trade clause: the real `tradeClause` field wins, falling back to the
+ *  legacy "(NTC)" / "(NMC)" marker some imported names still carry. */
+export function clauseOf(p: { tradeClause?: unknown; name?: string | null }): TradeClause | null {
+  const c = p.tradeClause;
+  if (c === "NTC" || c === "NMC" || c === "M_NTC") return c;
+  const n = p.name ?? "";
+  if (/\(NMC\)/i.test(n)) return "NMC";
+  if (/\((?:M-NTC|NTC-M)\)/i.test(n)) return "M_NTC";
+  if (/\(NTC\)/i.test(n)) return "NTC";
+  return null;
+}

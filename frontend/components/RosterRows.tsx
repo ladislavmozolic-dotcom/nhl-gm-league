@@ -1,5 +1,6 @@
 "use client";
 
+import ClauseStar from "@/components/ClauseStar";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import PlayerAvatar from "@/components/playerAvatar";
@@ -75,6 +76,7 @@ export default function RosterRows({ players, attrs, isGoalie, farm, hideAttrs =
                     <div className="min-w-max">
                       <Link href={`/players/${player.slug}`} className="font-medium text-sm text-white hover:text-blue-400 transition-colors whitespace-nowrap block">
                         {cleanName(player.name)}
+                        <ClauseStar player={player} />
                         {(player.capRole ?? player.captaincy) && <span className={`ml-1 text-[10px] font-bold ${(player.capRole ?? player.captaincy) === "C" ? "text-amber-400" : "text-slate-400"}`}>({player.capRole ?? player.captaincy})</span>}
                         {isGoalie && isWorthyGoalie(player) && <span className="ml-1 text-green-400" title="Worthy goalie — meets the league's minimum-goalie rule">●</span>}
                       </Link>
