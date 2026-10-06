@@ -274,10 +274,10 @@ export async function getGamePicksData(season = REGULAR_SEASON, league = "NHL", 
   const topScheduledCandidate = scoredGames.find((sg) => sg.game.status === "SCHEDULED" && !sg.game.isLocked)?.game;
   const bestCandidate = topScheduledCandidate || scoredGames[0]?.game;
 
-  let gotwId =
-    config.gameOfTheWeekId && mappedGames.some((g) => g.id === config.gameOfTheWeekId)
-      ? config.gameOfTheWeekId
-      : null;
+  // A GOTW that has already been played (FINAL) is done — its picks get evaluated by the
+  // daily job — so it must roll over to the next pick instead of staying pinned forever.
+  const currentGotw = config.gameOfTheWeekId ? mappedGames.find((g) => g.id === config.gameOfTheWeekId) : null;
+  let gotwId = currentGotw && currentGotw.status !== "FINAL" ? currentGotw.id : null;
 
   // If no GOTW is currently active or previous GOTW is finished/not found, AI picks the most interesting game
   if (!gotwId && bestCandidate) {
