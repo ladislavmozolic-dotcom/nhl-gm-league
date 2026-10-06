@@ -262,7 +262,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   injuriesEnabled: true, injuryChancePct: 8,
   starExponent: 2.1, finishExponent: 1.7, depthParityPct: 0, pointShotPct: 100, creatorAssistPct: 0, assistExponent: 0, depthParityLeague: false, dAssistPct: 100,
   winPts: 2, otWinPts: 2, otLossPts: 1, lossPts: 0,
-  playoffFormat: "division", playoffTeamsPerConf: 8, playoffBestOf: 7,
+  playoffFormat: "conference", playoffTeamsPerConf: 8, playoffBestOf: 7,
   salaryCapUpper: 85900000, salaryCapLower: 51500000, startingCapital: 40000000,
   buyoutPctSeason: 66, buyoutPctOffseason: 33,
   retentionMaxPct: 50, retentionMinSalary: 600000, retentionMaxPlayers: 3,

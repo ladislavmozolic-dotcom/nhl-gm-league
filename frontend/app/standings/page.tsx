@@ -9,6 +9,7 @@ import { PageHeader, Card } from "@/components/ui";
 import PhaseTabs from "@/components/PhaseTabs";
 import { seasonForPhase } from "@/lib/phase";
 import { defaultStatsPhase } from "@/lib/calendar-server";
+import { loadSettings } from "@/lib/sim/settings";
 
 export const dynamic = "force-dynamic";
 type View = "league" | "conference" | "division" | "power" | "race" | "odds";
@@ -22,11 +23,12 @@ export default async function StandingsPage({ searchParams }: { searchParams: Pr
   const phase: "pre" | "regular" = league !== "NHL" ? "regular" : explicit ?? (auto === "playoffs" ? "regular" : auto);
   const SEASON = seasonForPhase(phase);
   const view: View = sp.view === "league" || sp.view === "division" || sp.view === "power" || sp.view === "race" || sp.view === "odds" ? sp.view : "conference";
-  const [standings, power, teams, race] = await Promise.all([
+  const [standings, power, teams, race, settings] = await Promise.all([
     computeStandings(SEASON, league),
     powerRanking(SEASON, league, 10),
     prisma.team.findMany({ select: { id: true, logoUrl: true, slug: true } }),
     view === "race" && phase !== "pre" ? playoffRace(SEASON, league) : Promise.resolve([] as RaceConference[]),
+    loadSettings(),
   ]);
   const odds = view === "odds" && league === "NHL" && phase !== "pre" ? await latestOdds(SEASON) : null;
   const meta: TeamMeta = new Map(teams.map((t) => [t.id, { logoUrl: t.logoUrl, slug: t.slug }]));
@@ -76,7 +78,10 @@ export default async function StandingsPage({ searchParams }: { searchParams: Pr
       ) : view === "race" ? (
         <section className="space-y-8">
           <p className="text-slate-500 text-xs">
-            Top 3 per division + 2 wild cards make the playoffs. <b className="text-emerald-400">x</b> = clinched berth ·
+            {settings.playoffFormat === "conference"
+              ? "Top 8 tímov z každej konferencie postupuje do play-off."
+              : "Top 3 per division + 2 wild cards make the playoffs."}{" "}
+            <b className="text-emerald-400">x</b> = clinched berth ·
             {" "}<b className="text-emerald-300">p</b> = won division · <b className="text-amber-300">z</b> = Presidents&apos; Trophy ·
             {" "}<b className="text-red-400">e</b> = eliminated · <b className="text-sky-300">M#</b> = magic number to clinch a berth.
           </p>

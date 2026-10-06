@@ -9,6 +9,7 @@
 
 import { prisma } from "./prisma";
 import { computeStandings } from "./sim/standings";
+import { loadSettings } from "./sim/settings";
 
 export type RaceTeam = {
   teamId: number; name: string; code: string | null; logoUrl: string | null; slug: string | null;
@@ -23,10 +24,11 @@ export type RaceTeam = {
 export type RaceConference = { name: string; color: string; teams: RaceTeam[]; cutLinePoints: number | null };
 
 export async function playoffRace(season = "2026-27", league = "NHL"): Promise<RaceConference[]> {
-  const [standings, teams, games] = await Promise.all([
+  const [standings, teams, games, settings] = await Promise.all([
     computeStandings(season, league),
     prisma.team.findMany({ select: { id: true, logoUrl: true, slug: true } }),
     prisma.game.findMany({ where: { season, league, seriesId: null }, select: { homeTeamId: true, awayTeamId: true } }),
+    loadSettings(),
   ]);
   const meta = new Map(teams.map((t) => [t.id, t]));
   const totalGP = new Map<number, number>(); // scheduled games (any status) per team
@@ -52,7 +54,8 @@ export async function playoffRace(season = "2026-27", league = "NHL"): Promise<R
     const inSet = new Set<number>();
     const divLeaders = new Set<number>();
     const wildcards = new Set<number>();
-    if (divisions.length === 2) {
+    const isConference = settings.playoffFormat === "conference";
+    if (!isConference && divisions.length === 2) {
       const auto: number[] = [];
       for (const d of divisions) {
         const dTeams = ct.filter((t) => t.division === d);

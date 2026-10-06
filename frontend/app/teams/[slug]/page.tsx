@@ -9,6 +9,7 @@ import { teamRetentionStatus, teamCapStatus } from "@/lib/cap";
 import { deadMoneyForYear, CURRENT_SEASON_START, ltirRelief } from "@/lib/finance";
 import { teamManagerLabel } from "@/lib/team-gm";
 import ExpiringContractsWidget from "@/components/ExpiringContractsWidget";
+import TeamStandingsWidget from "@/components/TeamStandingsWidget";
 import { teamStatTotals, type TeamStatTotal } from "@/lib/stats-server";
 import { canManageTeam } from "@/lib/auth";
 import { computeStandings } from "@/lib/sim/standings";
@@ -323,7 +324,11 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
 
   const scheduleStrip = [...[...recentGames].reverse(), ...nextGames];
 
-  // Division teams for standings widget
+  // Conference & division teams for standings widget
+  const conferenceTeams = standings
+    .filter((s) => s.conference?.trim().toLowerCase() === team.conference?.trim().toLowerCase())
+    .sort((a, b) => b.points - a.points || b.rw - a.rw || b.diff - a.diff);
+
   const divisionTeams = standings
     .filter((s) => s.division === team.division)
     .sort((a, b) => b.points - a.points || b.rw - a.rw || b.diff - a.diff);
@@ -915,59 +920,15 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
             </div>
           )}
 
-          {/* DIVÍZIA & PLAY-OFF RACE */}
-          {divisionTeams.length > 0 && (
-            <div className="bg-[#0b1120] border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
-                <span className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                  <span>🏆</span> {team.division?.replace(/\s+division$/i, "") ?? "Divízia"} Division
-                </span>
-                <Link href="/standings" className="text-[10px] text-sky-400 hover:underline">
-                  Celá tabuľka →
-                </Link>
-              </div>
-
-              <div className="space-y-1 text-xs">
-                {divisionTeams.map((dt, idx) => {
-                  const isCurrent = dt.teamId === team.id;
-                  return (
-                    <div key={dt.teamId}>
-                      {idx === 3 && (
-                        <div className="border-t border-dashed border-slate-700/80 my-1 py-0.5 text-[10px] text-center text-slate-500 font-mono">
-                          --- Play-off hranica (Postupujú top 3 + Wild Cards) ---
-                        </div>
-                      )}
-                      <div
-                        className={`flex items-center justify-between p-1.5 rounded-lg transition-colors ${
-                          isCurrent
-                            ? "bg-amber-500/15 border border-amber-500/30 font-bold text-white"
-                            : "text-slate-400 hover:text-slate-200"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className={`font-mono w-3 ${isCurrent ? "text-amber-400 font-bold" : "text-slate-600"}`}>
-                            {idx + 1}.
-                          </span>
-                          {dt.code && (
-                            <img
-                              src={`https://assets.nhle.com/logos/nhl/svg/${dt.code}_light.svg`}
-                              className="w-4 h-4 object-contain"
-                              alt=""
-                            />
-                          )}
-                          <span className={isCurrent ? "text-amber-300 font-semibold" : ""}>
-                            {dt.name}
-                          </span>
-                        </div>
-                        <span className={`font-mono ${isCurrent ? "font-black text-amber-400" : "font-bold text-slate-200"}`}>
-                          {dt.points}b ({dt.w}-{dt.l}{dt.otl ? `-${dt.otl}` : ""})
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+          {/* TABUĽKA & PLAY-OFF RACE (KONFERENCIA TOP 8 / DIVÍZIA) */}
+          {(conferenceTeams.length > 0 || divisionTeams.length > 0) && (
+            <TeamStandingsWidget
+              currentTeamId={team.id}
+              conferenceName={team.conference}
+              divisionName={team.division}
+              conferenceTeams={conferenceTeams}
+              divisionTeams={divisionTeams}
+            />
           )}
 
           {/* MARÓDKA (INJURIES) */}
