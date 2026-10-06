@@ -92,33 +92,9 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
   // everyone on this list is finishing a contract → his next one is an RFA/UFA deal,
   // never an ELC (that's only a first contract). Status at June 30 of the expiry year.
   for (const p of expiring) groups[ufaAtExpiry(p) ? "UFA" : "RFA"].push(p);
-  const expiringCap = expiring.reduce((sum, p) => sum + (p.capHit ?? 0), 0);
 
   return (
     <div className="space-y-4">
-      <section className="relative overflow-hidden rounded-3xl border border-amber-500/20 bg-gradient-to-br from-slate-900 via-slate-950 to-amber-950/20 shadow-2xl shadow-black/25">
-        <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-amber-400/10 blur-3xl" />
-        <div className="relative p-5 sm:p-6">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <div className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em] text-amber-300"><span className="h-2 w-2 rounded-full bg-amber-400 shadow-[0_0_12px] shadow-amber-400" /> Finance &amp; Contracts</div>
-              <h2 className="text-2xl font-black tracking-tight text-white sm:text-3xl">Renewal Priority Desk</h2>
-              <p className="mt-1.5 max-w-2xl text-sm text-slate-400">Decisions that shape next season — secure your core before the market opens.</p>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-slate-400"><span className="rounded-full border border-slate-700 bg-slate-950/60 px-3 py-1.5">{expiring.length} decisions open</span><span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-3 py-1.5 font-semibold text-amber-200">Final contract year</span></div>
-          </div>
-          <div className="mt-6 grid gap-2 sm:grid-cols-3">
-            <div className="rounded-2xl border border-amber-500/25 bg-slate-950/55 p-4"><div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Expiring AAV</div><div className="mt-1 text-2xl font-black text-amber-300">${(expiringCap / 1e6).toFixed(1)}M</div><div className="mt-1 text-[11px] text-slate-500">contract value to decide</div></div>
-            <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-4"><div className="text-[10px] font-bold uppercase tracking-wider text-rose-300">UFA decisions</div><div className="mt-1 text-2xl font-black text-rose-100">{groups.UFA.length}</div><div className="mt-1 text-[11px] text-slate-500">can reach open market</div></div>
-            <div className="rounded-2xl border border-sky-500/20 bg-sky-500/5 p-4"><div className="text-[10px] font-bold uppercase tracking-wider text-sky-300">RFA decisions</div><div className="mt-1 text-2xl font-black text-sky-100">{groups.RFA.length}</div><div className="mt-1 text-[11px] text-slate-500">QO and arbitration rights</div></div>
-          </div>
-          <div className="mt-4 flex flex-wrap gap-3 text-xs">
-            {!canManage && <span className="rounded-lg border border-slate-700 bg-slate-950/40 px-3 py-2 text-slate-500">Sign in as this club&apos;s GM to re-sign.</span>}
-            {lockedUntil && <span className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-amber-200">🔒 Extensions open on {lockedUntil.toISOString().slice(0, 10)}.</span>}
-          </div>
-        </div>
-      </section>
-
       {groups.ELC.length > 0 && (
         <Card title={`${META.ELC.title} (${groups.ELC.length})`} accent={META.ELC.accent}>
           <p className="text-xs text-slate-500 mb-3">{META.ELC.blurb}</p>
@@ -158,16 +134,16 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
         );
       })()}
 
-      {(["UFA", "RFA"] as Group[]).map((g) =>
-        groups[g].length === 0 ? null : canManage ? (
-          <ReSignPanel key={g} teamId={teamId} title={META[g].title} blurb={META[g].blurb} accent={META[g].accent} group={g} franchiseEnabled={franchiseEnabled} canNegotiate={canNegotiate}
+      {canManage ? (
+          <ReSignPanel teamId={teamId} title="Contracts — up for renewal" accent="text-amber-300" group="ALL" franchiseEnabled={franchiseEnabled} canNegotiate={canNegotiate}
             franchiseTagUsed={franchiseTagUsed} franchiseTaggedPlayer={franchiseTaggedPlayer}
-            players={groups[g].map((p) => {
+            players={(["UFA", "RFA"] as Group[]).flatMap((g) => groups[g].map((p) => {
               const rfa = rfaByPlayer.get(p.id);
               const negotiation = negotiationByPlayer.get(p.id);
-              return { id: p.id, name: p.name, capHit: p.capHit, contractYears: p.contractYears, contractText: p.contractText, farm: p.rosterType === "AHL", franchiseTag: p.franchiseTag, rightsReleased: p.rightsReleased, rfaStatus: rfa?.status, qoAmount: rfa?.qoAmount, qoDueAt: rfa?.qoDueAt?.toISOString(), resignRound: p.resignRound, resignStatus: p.resignStatus, resignOfferSalary: p.resignOfferSalary, resignCounterSalary: p.resignCounterSalary, resignCounterYears: p.resignCounterYears, negotiation: negotiation ? { round: negotiation.round, offerSalary: negotiation.offerSalary, offerYears: negotiation.offerYears, offerLine: negotiation.offerLine, offerPP: negotiation.offerPP, offerPK: negotiation.offerPK, offerClause: negotiation.offerClause, offerTwoWay: negotiation.offerTwoWay, counterSalary: negotiation.counterSalary, counterYears: negotiation.counterYears, note: negotiation.note } : undefined };
-            })} />
-        ) : (
+              return { id: p.id, name: p.name, age: p.age, position: p.position, isGoalie: p.isGoalie, lastSeasonGP: p.lastSeasonGP, lastSeasonPts: p.lastSeasonPts, lastSeasonSvPct: p.lastSeasonSvPct, type: g as "UFA" | "RFA", capHit: p.capHit, contractYears: p.contractYears, contractText: p.contractText, farm: p.rosterType === "AHL", franchiseTag: p.franchiseTag, rightsReleased: p.rightsReleased, rfaStatus: rfa?.status, qoAmount: rfa?.qoAmount, qoDueAt: rfa?.qoDueAt?.toISOString(), resignRound: p.resignRound, resignStatus: p.resignStatus, resignOfferSalary: p.resignOfferSalary, resignCounterSalary: p.resignCounterSalary, resignCounterYears: p.resignCounterYears, negotiation: negotiation ? { round: negotiation.round, offerSalary: negotiation.offerSalary, offerYears: negotiation.offerYears, offerLine: negotiation.offerLine, offerPP: negotiation.offerPP, offerPK: negotiation.offerPK, offerClause: negotiation.offerClause, offerTwoWay: negotiation.offerTwoWay, counterSalary: negotiation.counterSalary, counterYears: negotiation.counterYears, note: negotiation.note } : undefined };
+            }))} />
+        ) : (["UFA", "RFA"] as Group[]).map((g) =>
+          groups[g].length === 0 ? null : (
           <Card key={g} title={`${META[g].title} (${groups[g].length})`} accent={META[g].accent}>
             <div className="divide-y divide-slate-800/50">
               {groups[g].map((p) => (
@@ -178,7 +154,7 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
               ))}
             </div>
           </Card>
-        )
+          )
       )}
     </div>
   );
