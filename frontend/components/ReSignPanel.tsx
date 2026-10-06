@@ -10,7 +10,6 @@ import {
   setFranchiseTagAction,
   setRightsReleasedAction,
 } from "@/app/free-agents/actions";
-import { Card } from "@/components/ui";
 import InfoTip from "@/components/InfoTip";
 import { cleanName } from "@/lib/playerName";
 import { clauseDiscount } from "@/lib/free-agency";
@@ -618,19 +617,26 @@ export default function ReSignPanel({
   // undefined and tear the modal down before its confirmation shows.
   const [openPlayer, setOpenPlayer] = useState<ExpiringPlayer | null>(null);
   const priorities = [...players].sort((a, b) => (b.capHit ?? 0) - (a.capHit ?? 0)).slice(0, 3);
+  const isRfa = group === "RFA";
   if (players.length === 0 && !openPlayer) return null;
   return (
-    <Card title={`${title ?? "Expiring Contracts"} (${players.length})`} accent={accent}>
-      <p className="text-xs text-slate-500 mb-3">{blurb ?? "These players are entering the final year of their deal. Re-sign them before they reach free agency."}</p>
+    <section className={`overflow-hidden rounded-2xl border bg-slate-900/70 shadow-xl shadow-black/15 ${isRfa ? "border-sky-500/20" : "border-rose-500/20"}`}>
+      <div className={`flex items-center justify-between border-b px-4 py-3 sm:px-5 ${isRfa ? "border-sky-500/15 bg-sky-500/[0.06]" : "border-rose-500/15 bg-rose-500/[0.06]"}`}>
+        <div className="flex items-center gap-3"><span className={`flex h-8 w-8 items-center justify-center rounded-xl border text-sm ${isRfa ? "border-sky-400/30 bg-sky-400/10 text-sky-300" : "border-rose-400/30 bg-rose-400/10 text-rose-300"}`}>{isRfa ? "R" : "U"}</span><div><h2 className={`text-sm font-black uppercase tracking-wide ${accent}`}>{title ?? "Expiring Contracts"}</h2><p className="text-[11px] text-slate-500">{players.length} player{players.length === 1 ? "" : "s"} awaiting a decision</p></div></div>
+        <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${isRfa ? "border-sky-400/25 bg-sky-400/10 text-sky-200" : "border-rose-400/25 bg-rose-400/10 text-rose-200"}`}>{isRfa ? "Protected rights" : "Open market risk"}</span>
+      </div>
+      <div className="p-4 sm:p-5">
+      <p className="mb-5 max-w-3xl text-xs leading-relaxed text-slate-400">{blurb ?? "These players are entering the final year of their deal. Re-sign them before they reach free agency."}</p>
       {priorities.length > 0 && (
-        <div className="mb-5">
-          <div className="mb-2 flex items-center justify-between"><span className="text-[10px] font-bold uppercase tracking-widest text-amber-300">Priority decisions</span><span className="text-[10px] text-slate-500">highest expiring AAV</span></div>
-          <div className="grid gap-2 md:grid-cols-3">{priorities.map((p, i) => (
-            <button key={p.id} onClick={() => setOpenPlayer(p)} className={`rounded-xl border p-3 text-left transition hover:-translate-y-0.5 ${i === 0 ? "border-amber-500/50 bg-amber-500/5" : "border-slate-700 bg-slate-950/40 hover:border-slate-600"}`}>
-              <div className="flex items-center justify-between text-[10px] font-bold uppercase"><span className={i === 0 ? "text-amber-300" : "text-slate-500"}>#{i + 1} priority</span><span className="text-slate-500">{p.farm ? "AHL" : group}</span></div>
-              <div className="mt-2 truncate text-sm font-bold text-white">{cleanName(p.name)}</div>
-              <div className="mt-1 text-lg font-black text-slate-100">{p.capHit ? M(p.capHit) : "—"}</div>
-              <div className="mt-2 text-[11px] font-semibold text-emerald-400">Open negotiation →</div>
+        <div className="mb-6">
+          <div className="mb-2.5 flex items-center justify-between"><span className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-300">Priority decisions</span><span className="text-[10px] text-slate-500">ranked by expiring AAV</span></div>
+          <div className="grid gap-3 lg:grid-cols-3">{priorities.map((p, i) => (
+            <button key={p.id} onClick={() => setOpenPlayer(p)} className={`group relative overflow-hidden rounded-2xl border p-4 text-left transition duration-200 hover:-translate-y-0.5 ${i === 0 ? "border-amber-400/45 bg-gradient-to-br from-amber-400/[0.13] to-slate-950 shadow-lg shadow-amber-950/20" : "border-slate-700/80 bg-slate-950/55 hover:border-slate-500"}`}>
+              {i === 0 && <span className="absolute right-0 top-0 h-16 w-16 rounded-bl-full bg-amber-300/10" />}
+              <div className="relative flex items-center justify-between text-[10px] font-black uppercase tracking-wider"><span className={i === 0 ? "text-amber-200" : "text-slate-500"}>#{i + 1} priority</span><span className="rounded-full bg-slate-800/80 px-2 py-0.5 text-slate-400">{p.farm ? "AHL" : group}</span></div>
+              <div className="relative mt-5 truncate text-base font-black text-white">{cleanName(p.name)}</div>
+              <div className="relative mt-1 text-xl font-black text-slate-100">{p.capHit ? M(p.capHit) : "—"}<span className="ml-1 text-[10px] font-medium text-slate-500">AAV</span></div>
+              <div className="relative mt-4 flex items-center justify-between text-[11px] font-bold text-emerald-400"><span>Open negotiation</span><span className="transition-transform group-hover:translate-x-1">→</span></div>
             </button>
           ))}</div>
         </div>
@@ -653,9 +659,11 @@ export default function ReSignPanel({
       )}
       {tagMsg && <p className="text-xs text-rose-400 mb-2">{tagMsg}</p>}
       {releaseMsg && <p className="text-xs text-rose-400 mb-2">{releaseMsg}</p>}
-      <div className="divide-y divide-slate-800/50">
+      <div className="overflow-hidden rounded-xl border border-slate-800/80 bg-slate-950/30">
+        <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900/70 px-3 py-2.5"><span className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">All contract decisions</span><span className="text-[10px] text-slate-500">AAV · status · action</span></div>
+      <div className="divide-y divide-slate-800/70">
         {players.map((p) => (
-          <div key={p.id} className="flex items-center justify-between py-2 gap-3">
+          <div key={p.id} className="flex items-center justify-between gap-3 px-3 py-3 transition-colors hover:bg-slate-800/35">
             <div className="min-w-0">
               <PlayerLink id={p.id} name={p.name} className="font-medium truncate" />
               {p.farm && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30">AHL</span>}
@@ -731,7 +739,9 @@ export default function ReSignPanel({
           </div>
         ))}
       </div>
+      </div>
       {openPlayer && <ReSignModal player={openPlayer} teamId={teamId} onClose={() => setOpenPlayer(null)} />}
-    </Card>
+      </div>
+    </section>
   );
 }

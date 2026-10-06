@@ -96,17 +96,28 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
 
   return (
     <div className="space-y-4">
-      <Card title={`Contracts — up for renewal (${expiring.length})`} accent="text-amber-400">
-        <div className="grid grid-cols-3 gap-2 text-sm sm:max-w-xl">
-          <div className="rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-2"><div className="text-[10px] font-bold uppercase text-slate-500">Expiring AAV</div><div className="font-black text-amber-300">${(expiringCap / 1e6).toFixed(1)}M</div></div>
-          <div className="rounded-lg border border-red-500/15 bg-red-500/5 px-3 py-2"><div className="text-[10px] font-bold uppercase text-red-300">UFA</div><div className="font-black text-red-200">{groups.UFA.length}</div></div>
-          <div className="rounded-lg border border-blue-500/15 bg-blue-500/5 px-3 py-2"><div className="text-[10px] font-bold uppercase text-blue-300">RFA</div><div className="font-black text-blue-200">{groups.RFA.length}</div></div>
+      <section className="relative overflow-hidden rounded-3xl border border-amber-500/20 bg-gradient-to-br from-slate-900 via-slate-950 to-amber-950/20 shadow-2xl shadow-black/25">
+        <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-amber-400/10 blur-3xl" />
+        <div className="relative p-5 sm:p-6">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <div className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em] text-amber-300"><span className="h-2 w-2 rounded-full bg-amber-400 shadow-[0_0_12px] shadow-amber-400" /> Finance &amp; Contracts</div>
+              <h2 className="text-2xl font-black tracking-tight text-white sm:text-3xl">Renewal Priority Desk</h2>
+              <p className="mt-1.5 max-w-2xl text-sm text-slate-400">Decisions that shape next season — secure your core before the market opens.</p>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-slate-400"><span className="rounded-full border border-slate-700 bg-slate-950/60 px-3 py-1.5">{expiring.length} decisions open</span><span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-3 py-1.5 font-semibold text-amber-200">Final contract year</span></div>
+          </div>
+          <div className="mt-6 grid gap-2 sm:grid-cols-3">
+            <div className="rounded-2xl border border-amber-500/25 bg-slate-950/55 p-4"><div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Expiring AAV</div><div className="mt-1 text-2xl font-black text-amber-300">${(expiringCap / 1e6).toFixed(1)}M</div><div className="mt-1 text-[11px] text-slate-500">contract value to decide</div></div>
+            <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-4"><div className="text-[10px] font-bold uppercase tracking-wider text-rose-300">UFA decisions</div><div className="mt-1 text-2xl font-black text-rose-100">{groups.UFA.length}</div><div className="mt-1 text-[11px] text-slate-500">can reach open market</div></div>
+            <div className="rounded-2xl border border-sky-500/20 bg-sky-500/5 p-4"><div className="text-[10px] font-bold uppercase tracking-wider text-sky-300">RFA decisions</div><div className="mt-1 text-2xl font-black text-sky-100">{groups.RFA.length}</div><div className="mt-1 text-[11px] text-slate-500">QO and arbitration rights</div></div>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-3 text-xs">
+            {!canManage && <span className="rounded-lg border border-slate-700 bg-slate-950/40 px-3 py-2 text-slate-500">Sign in as this club&apos;s GM to re-sign.</span>}
+            {lockedUntil && <span className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-amber-200">🔒 Extensions open on {lockedUntil.toISOString().slice(0, 10)}.</span>}
+          </div>
         </div>
-        <div className="mt-3 flex flex-wrap gap-4 text-sm">
-          {!canManage && <span className="text-slate-500 text-xs ml-auto self-center">Sign in as this club&apos;s GM to re-sign.</span>}
-          {lockedUntil && <span className="text-amber-300 text-xs ml-auto self-center">🔒 Extensions open on {lockedUntil.toISOString().slice(0, 10)} (first days of the regular season are closed)</span>}
-        </div>
-      </Card>
+      </section>
 
       {groups.ELC.length > 0 && (
         <Card title={`${META.ELC.title} (${groups.ELC.length})`} accent={META.ELC.accent}>
