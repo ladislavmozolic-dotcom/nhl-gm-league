@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import PlayerAvatar from "@/components/playerAvatar";
 import { cleanName } from "@/lib/playerName";
 import { salaryOf, fmtM } from "@/components/TeamRosterTable";
-import { teamRetentionStatus } from "@/lib/cap";
+import { teamRetentionStatus, teamCapStatus } from "@/lib/cap";
 import { deadMoneyForYear, CURRENT_SEASON_START, ltirRelief } from "@/lib/finance";
 import { teamManagerLabel } from "@/lib/team-gm";
 import ContractSection from "@/components/ContractSection";
@@ -41,9 +41,10 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
   if (!team) return notFound();
 
   const isNhl = team.league === "NHL" && !team.isAffiliate;
-  const [retention, buyouts] = await Promise.all([
+  const [retention, buyouts, capStatus] = await Promise.all([
     isNhl ? teamRetentionStatus(team.id) : Promise.resolve(null),
     isNhl ? prisma.buyout.findMany({ where: { teamId: team.id }, select: { perYear: true, startYear: true, years: true } }) : Promise.resolve([]),
+    isNhl ? teamCapStatus(team.id).catch(() => null) : Promise.resolve(null),
   ]);
   const proCount = team.players.length;
   const farmCount = team.affiliateTeams.reduce((s, a) => s + a.players.length, 0);
@@ -51,11 +52,10 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
   const nhlPlayers = team.players.filter((p) => p.rosterType === "NHL");
   const nhlSalaries = nhlPlayers.reduce((s, p) => s + Math.max(0, salaryOf(p) - (p.retainedSalary ?? 0)), 0);
   const deadMoney = deadMoneyForYear(buyouts, CURRENT_SEASON_START);
-  const totalCap = nhlSalaries + deadMoney;
-  const ltir = isNhl ? ltirRelief(nhlPlayers.map((p) => ({ ...p, capHit: Math.max(0, salaryOf(p) - (p.retainedSalary ?? 0)) }))) : 0;
-  const effectiveCeiling = capCeiling + ltir;
-  const capSpace = capCeiling - totalCap;
-  const effectiveSpace = effectiveCeiling - totalCap;
+  const totalCap = capStatus ? capStatus.committed : nhlSalaries + deadMoney;
+  const ltir = capStatus ? capStatus.ltir : (isNhl ? ltirRelief(nhlPlayers.map((p) => ({ ...p, capHit: Math.max(0, salaryOf(p) - (p.retainedSalary ?? 0)) }))) : 0);
+  const effectiveCeiling = capStatus ? capStatus.ceiling : capCeiling + ltir;
+  const effectiveSpace = capStatus ? capStatus.strictSpace : effectiveCeiling - totalCap;
   const capPct = Math.min(100, effectiveCeiling ? (totalCap / effectiveCeiling) * 100 : 0);
   const avgAge = proCount ? (team.players.reduce((s, p) => s + (p.age || 0), 0) / proCount).toFixed(1) : "0";
   const captains = team.players.filter((p) => p.captaincy === "C" || p.captaincy === "A").sort((a) => (a.captaincy === "C" ? -1 : 1));
@@ -845,12 +845,25 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
               <InfoRow
                 label={ltir > 0 ? "Priestor pod stropom (LTIR)" : "Cap Space"}
                 value={
-                  <span className={effectiveSpace < 0 ? "text-red-400 font-semibold" : "text-emerald-400 font-semibold"}>
-                    {fmtM(effectiveSpace)}
+                  <span className={effectiveSpace < 0 ? "text-red-400 font-bold" : "text-emerald-400 font-bold"}>
+                    {effectiveSpace < 0 ? `-$${(Math.abs(effectiveSpace) / 1_000_000).toFixed(2)}M` : fmtM(effectiveSpace)}
                   </span>
                 }
               />
               <InfoRow label="Platový strop" value={ltir > 0 ? `${fmtM(capCeiling)} (+${fmtM(ltir)} LTIR)` : fmtM(capCeiling)} />
+              {capStatus && (
+                <InfoRow label="Platová podlaha (Floor)" value={fmtM(capStatus.floor)} />
+              )}
+              {capStatus && (
+                <InfoRow
+                  label="Status súladu"
+                  value={
+                    <span className={`font-bold ${capStatus.compliant ? "text-emerald-400" : capStatus.underFloorBy > 0 ? "text-amber-400" : "text-rose-400"}`}>
+                      {capStatus.compliant ? "Compliant ✓" : capStatus.overBy > 0 ? `Nad stropom (${fmtM(capStatus.overBy)})` : `Pod podlahou (${fmtM(capStatus.underFloorBy)})`}
+                    </span>
+                  }
+                />
+              )}
               {retention && (
                 <>
                   <InfoRow label="Retenčné sloty" value={

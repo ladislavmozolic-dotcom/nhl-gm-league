@@ -5,6 +5,8 @@ import { computeStandings } from "@/lib/sim/standings";
 import TeamSubNav from "@/components/TeamSubNav";
 import { teamManagerLabel } from "@/lib/team-gm";
 import { fmtM } from "@/components/TeamRosterTable";
+import { teamCapStatus } from "@/lib/cap";
+import { money } from "@/lib/finance";
 
 const SEASON = "2026-27";
 
@@ -165,12 +167,40 @@ export default async function TeamLayout({
 
   // Cap space
   const isNhl = team.league === "NHL" && !team.isAffiliate;
+  const capStatus = isNhl ? await teamCapStatus(team.id).catch(() => null) : null;
   let capSpaceStr: string | null = null;
-  if (isNhl) {
-    const capCeiling = cfg ? (cfg.rosterMode === "real" ? cfg.realCapUpper : cfg.profinhlCapUpper) : 85_900_000;
-    const nhlSalaries = team.players.reduce((s, p) => s + Math.max(0, (p.capHit ?? 0) - (p.retainedSalary ?? 0)), 0);
-    const space = capCeiling - nhlSalaries;
-    capSpaceStr = fmtM(space);
+  let capSpaceSub = "pod stropom";
+  let capSpaceColor = "text-emerald-400";
+  let capStatusLabel = "Compliant ✓";
+  let capStatusColor = "text-emerald-400 border-emerald-500/30 bg-emerald-500/10";
+
+  if (capStatus) {
+    const space = capStatus.strictSpace;
+    const absM = `$${(Math.abs(space) / 1_000_000).toFixed(2)}M`;
+    if (space < 0) {
+      capSpaceStr = `-${absM}`;
+      capSpaceSub = "nad stropom";
+      capSpaceColor = "text-rose-400";
+    } else if (capStatus.underFloorBy > 0) {
+      capSpaceStr = absM;
+      capSpaceSub = "pod podlahou";
+      capSpaceColor = "text-amber-400";
+    } else {
+      capSpaceStr = absM;
+      capSpaceSub = "pod stropom";
+      capSpaceColor = "text-emerald-400";
+    }
+
+    if (capStatus.overBy > 0) {
+      capStatusLabel = `Over Cap (${fmtM(capStatus.overBy)})`;
+      capStatusColor = "text-rose-400 border-rose-500/30 bg-rose-500/10";
+    } else if (capStatus.underFloorBy > 0) {
+      capStatusLabel = `Below Floor (${fmtM(capStatus.underFloorBy)})`;
+      capStatusColor = "text-amber-400 border-amber-500/30 bg-amber-500/10";
+    } else {
+      capStatusLabel = "Compliant ✓";
+      capStatusColor = "text-emerald-400 border-emerald-500/30 bg-emerald-500/10";
+    }
   }
 
   const theme = getTeamColors(team.code || team.slug);
@@ -197,12 +227,12 @@ export default async function TeamLayout({
               <div className="flex items-center justify-center md:justify-start gap-2 flex-wrap">
                 {team.division && (
                   <span className={`text-xs font-mono font-bold uppercase tracking-wider ${theme.badge} px-2 py-0.5 rounded border`}>
-                    {team.division} Division
+                    {team.division.replace(/\s+division$/i, "")} Division
                   </span>
                 )}
                 {team.conference && (
                   <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
-                    {team.conference} Conference
+                    {team.conference.replace(/\s+conference$/i, "")} Conference
                   </span>
                 )}
                 {divRank > 0 && (
@@ -253,22 +283,31 @@ export default async function TeamLayout({
               </div>
             )}
             {capSpaceStr && (
-              <div className="bg-slate-900/90 border border-slate-800 rounded-xl px-4 py-2.5 text-center min-w-[90px]">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">CAP SPACE</span>
-                <span className="text-lg font-black text-emerald-400 tabular-nums">{capSpaceStr}</span>
-                <span className="text-[10px] text-slate-400 block">pod stropom</span>
-              </div>
+              <Link
+                href={`/teams/${slug}/salary`}
+                className="bg-slate-900/90 hover:bg-slate-800/90 border border-slate-800 hover:border-slate-700 rounded-xl px-4 py-2.5 text-center min-w-[90px] transition-colors group"
+                title={capStatus ? `Platový strop: ${money(capStatus.ceiling)}, Záväzky: ${money(capStatus.committed)}` : undefined}
+              >
+                <span className="text-[10px] font-bold text-slate-500 group-hover:text-slate-400 uppercase tracking-wider block">CAP SPACE</span>
+                <span className={`text-lg font-black tabular-nums ${capSpaceColor}`}>{capSpaceStr}</span>
+                <span className="text-[10px] text-slate-400 block">{capSpaceSub}</span>
+              </Link>
             )}
-            {!isGm ? (
+            {capStatus && (
+              <Link
+                href="/salary-cap"
+                className={`border rounded-xl px-4 py-2.5 text-center min-w-[90px] transition-colors hover:brightness-110 ${capStatusColor}`}
+                title="Stav súladu so stropom a podlahou v Cap Central"
+              >
+                <span className="text-[10px] font-bold uppercase tracking-wider block opacity-80">STATUS</span>
+                <span className="text-xs font-black block mt-1">{capStatusLabel}</span>
+              </Link>
+            )}
+            {!isGm && (
               <Link href={`/teams/${slug}/login`} className="bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 rounded-xl px-4 py-2.5 text-center group transition-colors min-w-[90px]">
                 <span className="text-[10px] font-bold text-slate-400 group-hover:text-amber-400 uppercase tracking-wider block">PRIHLÁSENIE</span>
                 <span className="text-xs font-bold text-white block mt-0.5">GM Login →</span>
               </Link>
-            ) : (
-              <div className="bg-blue-950/40 border border-blue-500/30 rounded-xl px-4 py-2.5 text-center min-w-[90px]">
-                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider block">STATUS</span>
-                <span className="text-xs font-bold text-blue-300 block mt-0.5">GM Aktívny</span>
-              </div>
             )}
           </div>
         </div>
