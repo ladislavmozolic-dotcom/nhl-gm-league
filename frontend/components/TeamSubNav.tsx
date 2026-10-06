@@ -78,7 +78,9 @@ export default function TeamSubNav({ slug, isGm, isAffiliate, farmSlug, parentSl
   // home always starts at the very top of the page.
   useEffect(() => {
     if (pathname !== base) return;
-    const id = requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0, behavior: "auto" }));
+    const top = () => window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    top(); // after Next's own segment scroll (it runs during commit, before effects)
+    const id = requestAnimationFrame(top); // and once more in case it lands a frame later
     return () => cancelAnimationFrame(id);
   }, [pathname, base]);
 
