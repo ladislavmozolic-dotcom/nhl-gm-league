@@ -4,7 +4,6 @@
 import { prisma } from "./prisma";
 import { loadSettings } from "./sim/settings";
 import { getLeagueClock } from "./calendar-server";
-import { computeStandings } from "./sim/standings";
 import { CURRENT_SEASON_START, ageAsOfJune30 } from "./finance";
 import {
   faPosGroup, skaterMarket, goalieMarket, anchorFromPool, buildDemand, percentile, availabilityFactor, isDepthSlot,
@@ -492,17 +491,10 @@ async function teamOutlookScores(teamIds: number[], avgAgeById: Map<number, numb
   return out;
 }
 
-/** Contender / middle / rebuild / rising for every NHL team. The base split is
- *  from CURRENT roster strength (mean OV of the top-18 skaters), thirds — same
- *  as before. The bottom third (the "rebuild" tier) is then split again by
- *  teamOutlookScores: the half of it with a real near-term window (prospects +
- *  picks + a young core) becomes "rising" instead of a plain "rebuild", so a
- *  young/unhappy free agent can weigh a genuine rebuild timeline against just
- *  chasing whichever club is best today (see contentionModifier/Bonus). */
-export function teamContentionMap(): Promise<Map<number, Contention>> {
-  return memoized("teamContentionMap", 60_000, teamContentionMapUncached);
-}
-async function teamContentionMapUncached(): Promise<Map<number, Contention>> {
+/** Every NHL team's roster strength — mean OV of its top-18 skaters — with its average
+ *  age, strongest first. The one measure behind the contender/rebuild split and the
+ *  M-NTC "weakest clubs" list. */
+async function rosterStrengthByTeam(): Promise<{ id: number; s: number; avgAge: number }[]> {
   const players = await prisma.player.findMany({
     where: { rosterType: "NHL", isGoalie: false }, select: { teamId: true, overall: true, age: true },
   });
@@ -514,11 +506,25 @@ async function teamContentionMapUncached(): Promise<Map<number, Contention>> {
     if (p.age != null) e.age.push(p.age);
     byTeam.set(p.teamId, e);
   }
-  const strength = [...byTeam.entries()].map(([id, e]) => {
+  return [...byTeam.entries()].map(([id, e]) => {
     const top = [...e.ov].sort((a, b) => b - a).slice(0, 18);
     const avgAge = e.age.length ? e.age.reduce((a, b) => a + b, 0) / e.age.length : 27;
     return { id, s: top.reduce((x, y) => x + y, 0) / Math.max(1, top.length), avgAge };
   }).sort((a, b) => b.s - a.s);
+}
+
+/** Contender / middle / rebuild / rising for every NHL team. The base split is
+ *  from CURRENT roster strength (mean OV of the top-18 skaters), thirds — same
+ *  as before. The bottom third (the "rebuild" tier) is then split again by
+ *  teamOutlookScores: the half of it with a real near-term window (prospects +
+ *  picks + a young core) becomes "rising" instead of a plain "rebuild", so a
+ *  young/unhappy free agent can weigh a genuine rebuild timeline against just
+ *  chasing whichever club is best today (see contentionModifier/Bonus). */
+export function teamContentionMap(): Promise<Map<number, Contention>> {
+  return memoized("teamContentionMap", 60_000, teamContentionMapUncached);
+}
+async function teamContentionMapUncached(): Promise<Map<number, Contention>> {
+  const strength = await rosterStrengthByTeam();
   const n = strength.length, third = Math.max(1, Math.round(n / 3));
 
   const rebuildTeams = strength.slice(n - third);
@@ -845,11 +851,14 @@ export async function evaluateTeamOffer(
   return { acceptable, ask, utility, base: info };
 }
 
-/** The `n` weakest NHL teams by standings (excluding `exceptTeamId`) — the clubs a
- *  player most wants to avoid, used to fill an M-NTC no-trade list of a given breadth. */
+/** The `n` weakest NHL teams by ROSTER STRENGTH (excluding `exceptTeamId`) — the clubs a
+ *  player most wants to avoid, used to fill an M-NTC no-trade list of a given breadth.
+ *  Uses the same strength measure as the contender/rebuild split (mean OV of the top-18
+ *  skaters), not the standings: after 2-3 games the table is pure noise and put clubs like
+ *  EDM or TBL on a star's "won't go there" list. */
 export async function weakestTeams(n: number, exceptTeamId: number): Promise<number[]> {
-  const standings = await computeStandings();
-  return [...standings].reverse().map((s) => s.teamId).filter((id) => id !== exceptTeamId).slice(0, n);
+  const ranked = await rosterStrengthByTeam(); // strongest first
+  return [...ranked].reverse().map((t) => t.id).filter((id) => id !== exceptTeamId).slice(0, n);
 }
 
 /** Batch-value a set of players (e.g. the whole free-agent board) against one pool. */
