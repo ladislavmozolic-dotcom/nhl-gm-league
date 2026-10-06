@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { seasonLabel, CURRENT_SEASON_START } from "@/lib/finance";
 import { PageHeader, Card } from "@/components/ui";
 import SortableTable, { type SortCol } from "@/components/SortableTable";
 
@@ -32,7 +33,11 @@ export default async function ContractsPage() {
     _id: p.id, name: p.name, slug: p.slug, photo: p.photoUrl,
     teamCode: p.team?.code, teamSlug: p.team?.slug, teamLogo: p.team?.logoUrl,
     pos: p.position, cap: p.capHit ?? 0, yrs: p.contractYears ?? null, type: contractTypeLabel(p.contractType),
-    clause: p.tradeClause ? (CLAUSE_LABEL[p.tradeClause] ?? p.tradeClause) : "",
+    clause: p.tradeClause
+      ? (CLAUSE_LABEL[p.tradeClause] ?? p.tradeClause)
+      : p.extClause
+        ? `${CLAUSE_LABEL[p.extClause] ?? p.extClause} (from ${seasonLabel(CURRENT_SEASON_START + (p.contractYears ?? 0))})`
+        : "",
   }));
 
   return (

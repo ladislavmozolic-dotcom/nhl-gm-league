@@ -21,7 +21,7 @@ import { buyoutPlayer } from "@/app/finance/[slug]/actions";
 
 const SEASON = "2026-27";
 const SPAN = 5;
-type CP = { id: number; name: string; position: string; age: number | null; birthDate?: string | Date | null; isGoalie: boolean; capHit: number | null; contractYears: number | null; contractType?: string | null; retainedSalary?: number | null; tradeClause?: string | null; noTradeTeams?: number[]; injuryDaysLeft?: number | null; condition?: number | null };
+type CP = { id: number; name: string; position: string; age: number | null; birthDate?: string | Date | null; isGoalie: boolean; capHit: number | null; contractYears: number | null; contractType?: string | null; retainedSalary?: number | null; tradeClause?: string | null; noTradeTeams?: number[]; extClause?: string | null; extNoTradeTeams?: number[]; injuryDaysLeft?: number | null; condition?: number | null };
 const CLAUSE_LABEL: Record<string, string> = { NTC: "NTC", NMC: "NMC", M_NTC: "M-NTC" };
 const isD = (pos: string) => /(^|\/)D(\/|$)/.test(pos) || pos === "D";
 /** capwages-style split: Forwards / Defense / Goalies as their own groups
@@ -38,7 +38,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
     where: { slug },
     select: {
       id: true, name: true, code: true, logoUrl: true, arena: true, popularity: true, arenaSections: true, capacity: true, bankAccount: true,
-      players: { where: { rosterType: "NHL" }, select: { id: true, name: true, position: true, age: true, birthDate: true, isGoalie: true, capHit: true, retainedSalary: true, contractType: true, contractYears: true, extCapHit: true, extYears: true, injuryDaysLeft: true, condition: true, tradeClause: true, noTradeTeams: true }, orderBy: [{ isGoalie: "asc" }, { capHit: "desc" }] },
+      players: { where: { rosterType: "NHL" }, select: { id: true, name: true, position: true, age: true, birthDate: true, isGoalie: true, capHit: true, retainedSalary: true, contractType: true, contractYears: true, extCapHit: true, extYears: true, injuryDaysLeft: true, condition: true, tradeClause: true, noTradeTeams: true, extClause: true, extNoTradeTeams: true }, orderBy: [{ isGoalie: "asc" }, { capHit: "desc" }] },
       affiliateTeams: { select: { players: { where: { rosterType: "AHL" }, select: { id: true, name: true, position: true, age: true, birthDate: true, isGoalie: true, capHit: true, ahlSalary: true, contractType: true, contractYears: true, extCapHit: true, extYears: true, tradeClause: true, noTradeTeams: true }, orderBy: [{ isGoalie: "asc" }, { capHit: "desc" }] } } },
     },
   });
@@ -207,7 +207,10 @@ export default async function TeamCapView({ slug }: { slug: string }) {
       // any more, so the standalone Cap Hit column shouldn't read as one either.
       const netCapHit = Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0));
       const cells = playerCapYears({ ...p, capHit: netCapHit }, CURRENT_SEASON_START, SPAN);
-      const protectedTeams = p.tradeClause === "M_NTC" ? (p.noTradeTeams ?? []).map((id) => teamCodeById.get(id)).filter(Boolean).join(", ") : "";
+      const pendingClause = !p.tradeClause && p.extClause ? p.extClause : null;
+      const protectedTeams = p.tradeClause === "M_NTC"
+        ? (p.noTradeTeams ?? []).map((id) => teamCodeById.get(id)).filter(Boolean).join(", ")
+        : pendingClause === "M_NTC" ? (p.extNoTradeTeams ?? []).map((id) => teamCodeById.get(id)).filter(Boolean).join(", ") : "";
       const isLtir = onLtir({ capHit: p.capHit, injuryDaysLeft: p.injuryDaysLeft, condition: p.condition, isGoalie: p.isGoalie });
       return (
         <tr key={p.id} className="border-b border-slate-800/60 hover:bg-slate-800/30">
@@ -225,7 +228,7 @@ export default async function TeamCapView({ slug }: { slug: string }) {
           <td className="px-2 py-1.5 text-center text-slate-400 tabular-nums whitespace-nowrap">{p.age ?? "—"}</td>
           <td className="px-2 py-1.5 text-center whitespace-nowrap"><TypeBadge type={p.contractType} /></td>
           <td className="px-2 py-1.5 text-center text-slate-400 tabular-nums whitespace-nowrap" title={protectedTeams ? `Protected against: ${protectedTeams}` : undefined}>
-            {p.tradeClause ? (CLAUSE_LABEL[p.tradeClause] ?? p.tradeClause) : ""}
+            {p.tradeClause ? (CLAUSE_LABEL[p.tradeClause] ?? p.tradeClause) : pendingClause ? <span className="text-amber-300/80" title={`Signed with his extension — takes effect from ${seasonLabel(CURRENT_SEASON_START + (p.contractYears ?? 0))}${protectedTeams ? `. Protected against: ${protectedTeams}` : ""}`}>{CLAUSE_LABEL[pendingClause] ?? pendingClause}*</span> : ""}
           </td>
           <td className="px-3 py-1.5 text-right tabular-nums font-medium text-xs whitespace-nowrap">{netCapHit ? money(netCapHit) : "—"}</td>
           {cells.map((c, i) => <td key={i} className="px-3 py-1.5 text-right tabular-nums text-xs whitespace-nowrap">{c.salary != null ? <span className="text-green-400">{money(c.salary)}</span> : c.status ? <Badge s={c.status} /> : ""}</td>)}

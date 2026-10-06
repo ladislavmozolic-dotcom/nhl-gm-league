@@ -416,7 +416,8 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     // just "Previous Cap Hit" repeated under a second label.
     ...(hasContract ? ([["Last Year Salary", capHit]] as [string, React.ReactNode][]) : []),
     // signed in-season extension — kicks in once the current deal runs out
-    ...(p.extCapHit && p.extYears ? ([["Extension", <span key="ext" className="text-emerald-300">{money(p.extCapHit)} × {p.extYears} yr{p.extYears === 1 ? "" : "s"} <span className="text-slate-400 font-normal">from {seasonLabel(expiryYear)}</span></span>]] as [string, React.ReactNode][]) : []),
+    ...(p.extCapHit && p.extYears ? ([["Extension", <span key="ext" className="text-emerald-300">{money(p.extCapHit)} × {p.extYears} yr{p.extYears === 1 ? "" : "s"} <span className="text-slate-400 font-normal">from {seasonLabel(expiryYear)}</span>{p.extClause && <span className="ml-1.5 text-[11px] font-bold text-amber-300">{p.extClause === "M_NTC" ? "M-NTC" : p.extClause}{p.extClause === "M_NTC" && p.extNoTradeTeams?.length ? ` · ${p.extNoTradeTeams.length} teams` : ""}</span>}</span>]] as [string, React.ReactNode][]) : []),
+    ...(p.tradeClause ? ([["Clause", <span key="clause" className="text-amber-300">{p.tradeClause === "M_NTC" ? "M-NTC" : p.tradeClause}{p.tradeClause === "M_NTC" && p.noTradeTeams?.length ? ` · ${p.noTradeTeams.length} teams protected` : ""}</span>]] as [string, React.ReactNode][]) : []),
   ];
 
   const InfoRow = ({ label, value, valueClass }: { label: string; value: React.ReactNode; valueClass?: string }) => (
