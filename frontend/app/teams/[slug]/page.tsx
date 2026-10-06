@@ -12,6 +12,7 @@ import ExpiringContractsWidget from "@/components/ExpiringContractsWidget";
 import TeamStandingsWidget from "@/components/TeamStandingsWidget";
 import { teamStatTotals, type TeamStatTotal } from "@/lib/stats-server";
 import { canManageTeam } from "@/lib/auth";
+import { getLang } from "@/lib/lang-server";
 import { computeStandings } from "@/lib/sim/standings";
 import { projectProspect } from "@/lib/prospect-projection";
 
@@ -40,6 +41,8 @@ const gradeBadgeStyle = (g: string) => {
 
 export default async function TeamHomePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
+  const lang = await getLang();
+  const isEn = lang !== "cs";
   const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 } });
   const rosterSource = cfg?.rosterMode === "real" ? "real" : "profinhl";
   const capCeiling = cfg ? (rosterSource === "real" ? cfg.realCapUpper : cfg.profinhlCapUpper) : 85_900_000;
@@ -125,12 +128,19 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
     };
   }).sort((a, b) => b.score - a.score || (b.draftYear ?? 0) - (a.draftYear ?? 0));
 
-  const gmLinks = [
-    ["Zostava (Rosters)", `/teams/${team.slug}/rosters`],
-    ["Formácie (Lines)", `/teams/${team.slug}/lines`],
-    ["Upraviť súpisku", `/teams/${team.slug}/roster/edit`],
-    ["Financie (Finance)", `/teams/${team.slug}/finance`],
-  ];
+  const gmLinks = isEn
+    ? [
+        ["Rosters", `/teams/${team.slug}/rosters`],
+        ["Lines", `/teams/${team.slug}/lines`],
+        ["Edit Roster", `/teams/${team.slug}/roster/edit`],
+        ["Finance", `/teams/${team.slug}/finance`],
+      ]
+    : [
+        ["Zostava (Rosters)", `/teams/${team.slug}/rosters`],
+        ["Formácie (Lines)", `/teams/${team.slug}/lines`],
+        ["Upraviť súpisku", `/teams/${team.slug}/roster/edit`],
+        ["Financie (Finance)", `/teams/${team.slug}/finance`],
+      ];
 
   // ===== leaders + team stats (this team, regular season) =====
   const gWhere = { teamId: team.id, game: { season: SEASON, status: "FINAL", seriesId: null } } as const;
@@ -205,16 +215,27 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
     return { pid: top.pid, value: String(top.val) };
   };
 
-  const leaders: { label: string; pid?: number; value: ReactNode; sub?: string }[] = [
-    { label: "GÓLY (GOALS)", ...leaderOf(topSk("goals")) },
-    { label: "ASISTENCIE (ASSISTS)", ...leaderOf(topSk("assists")) },
-    { label: "BODY (POINTS)", ...leaderOf(topSk("points"), false, true) },
-    { label: "OBRANCA (DEFENSEMAN)", ...leaderOf(topSk("points", (pid) => isDefPos(pById.get(pid)?.position))) },
-    { label: "TRESTNÉ MINÚTY (PIM)", ...leaderOf(topSk("pim")) },
-    { label: "BILANCIA (+/-)", ...leaderOf(topSk("plusMinus"), true) },
-    { label: "VÝHRY BRANKÁRA (WINS)", pid: topWins?.[0], value: topWins ? String(topWins[1].w) : "0", sub: topWins ? `${topWins[1].gp} štartov` : "" },
-    { label: "ÚSPEŠNOSŤ (SV%)", pid: topSvp?.[0], value: topSvp ? <span className="text-emerald-400">{(100 * topSvp[1].sv / topSvp[1].sa).toFixed(1)}%</span> : "—", sub: topSvp ? `${topSvp[1].sa} striel` : "" },
-  ];
+  const leaders: { label: string; pid?: number; value: ReactNode; sub?: string }[] = isEn
+    ? [
+        { label: "GOALS", ...leaderOf(topSk("goals")) },
+        { label: "ASSISTS", ...leaderOf(topSk("assists")) },
+        { label: "POINTS", ...leaderOf(topSk("points"), false, true) },
+        { label: "DEFENSEMAN POINTS", ...leaderOf(topSk("points", (pid) => isDefPos(pById.get(pid)?.position))) },
+        { label: "PENALTY MINUTES (PIM)", ...leaderOf(topSk("pim")) },
+        { label: "PLUS / MINUS (+/-)", ...leaderOf(topSk("plusMinus"), true) },
+        { label: "GOALIE WINS", pid: topWins?.[0], value: topWins ? String(topWins[1].w) : "0", sub: topWins ? `${topWins[1].gp} starts` : "" },
+        { label: "SAVE % (SV%)", pid: topSvp?.[0], value: topSvp ? <span className="text-emerald-400">{(100 * topSvp[1].sv / topSvp[1].sa).toFixed(1)}%</span> : "—", sub: topSvp ? `${topSvp[1].sa} shots` : "" },
+      ]
+    : [
+        { label: "GÓLY (GOALS)", ...leaderOf(topSk("goals")) },
+        { label: "ASISTENCIE (ASSISTS)", ...leaderOf(topSk("assists")) },
+        { label: "BODY (POINTS)", ...leaderOf(topSk("points"), false, true) },
+        { label: "OBRANCA (DEFENSEMAN)", ...leaderOf(topSk("points", (pid) => isDefPos(pById.get(pid)?.position))) },
+        { label: "TRESTNÉ MINÚTY (PIM)", ...leaderOf(topSk("pim")) },
+        { label: "BILANCIA (+/-)", ...leaderOf(topSk("plusMinus"), true) },
+        { label: "VÝHRY BRANKÁRA (WINS)", pid: topWins?.[0], value: topWins ? String(topWins[1].w) : "0", sub: topWins ? `${topWins[1].gp} štartov` : "" },
+        { label: "ÚSPEŠNOSŤ (SV%)", pid: topSvp?.[0], value: topSvp ? <span className="text-emerald-400">{(100 * topSvp[1].sv / topSvp[1].sa).toFixed(1)}%</span> : "—", sub: topSvp ? `${topSvp[1].sa} striel` : "" },
+      ];
 
   let gf = 0, ga = 0, sf = 0, sa = 0;
   for (const g of teamGames) {
@@ -249,8 +270,9 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
     const idx = sorted.findIndex((t) => t.teamId === team.id);
     return idx >= 0 ? idx + 1 : null;
   };
-  const ord = (n: number | null) => {
+  const ord = (n: number | null, isEnglish = isEn) => {
     if (!n) return "";
+    if (!isEnglish) return `${n}.`;
     const s = ["th", "st", "nd", "rd"], v = n % 100;
     return n + (s[(v - 20) % 10] || s[v] || s[0]);
   };
@@ -344,11 +366,15 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-base">📅</span>
-              <h2 className="text-sm font-black uppercase tracking-wider text-slate-200">Tímový kalendár & Zápasový rozpis</h2>
-              <span className="text-xs text-slate-500 hidden sm:inline">(Posledné výsledky & Najbližšie stretnutia)</span>
+              <h2 className="text-sm font-black uppercase tracking-wider text-slate-200">
+                {isEn ? "Team Calendar & Schedule" : "Tímový kalendár & Zápasový rozpis"}
+              </h2>
+              <span className="text-xs text-slate-500 hidden sm:inline">
+                {isEn ? "(Recent Results & Upcoming Games)" : "(Posledné výsledky & Najbližšie stretnutia)"}
+              </span>
             </div>
             <Link href={`/teams/${slug}/schedule`} className="text-xs text-sky-400 hover:text-sky-300 font-bold">
-              Celý rozpis sezóny (82 zápasov) →
+              {isEn ? "Full Season Schedule (82 games) →" : "Celý rozpis sezóny (82 zápasov) →"}
             </Link>
           </div>
 
@@ -375,7 +401,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
                 >
                   {isNext && (
                     <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-amber-500 text-black text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full shadow">
-                      NAJBLIŽŠÍ ZÁPAS
+                      {isEn ? "NEXT GAME" : "NAJBLIŽŠÍ ZÁPAS"}
                     </span>
                   )}
                   <div className="flex items-center justify-between text-[11px] text-slate-500 font-mono mb-2">
@@ -388,7 +414,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
                           ? "bg-amber-500/15 border-amber-500/30 text-amber-400"
                           : "bg-rose-500/15 border-rose-500/30 text-rose-400"
                       }`}>
-                        {result === "W" ? "VÝHRA" : result === "OTL" ? "OTL" : "PREHRA"}
+                        {result === "W" ? (isEn ? "WIN" : "VÝHRA") : result === "OTL" ? "OTL" : (isEn ? "LOSS" : "PREHRA")}
                       </span>
                     )}
                   </div>
@@ -411,7 +437,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
                       </>
                     ) : (
                       <span className="text-[10px] text-slate-500 font-medium">
-                        {isHome ? "Doma" : "Vonku"}
+                        {isHome ? (isEn ? "Home" : "Doma") : (isEn ? "Away" : "Vonku")}
                       </span>
                     )}
                   </div>
@@ -433,16 +459,20 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
               <div className="flex items-center gap-2">
                 <span className="text-amber-400 text-lg">📊</span>
                 <div>
-                  <h3 className="font-black text-sm uppercase tracking-wider text-white">Rozšírené tímové štatistiky (Team Stats)</h3>
-                  <p className="text-xs text-slate-400">Kompletný prehľad ofenzívy, defenzívy, špeciálnych formácií a ligového poradia</p>
+                  <h3 className="font-black text-sm uppercase tracking-wider text-white">
+                    {isEn ? "Expanded Team Stats" : "Rozšírené tímové štatistiky (Team Stats)"}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    {isEn ? "Comprehensive breakdown of offense, defense, special teams and league rankings" : "Kompletný prehľad ofenzívy, defenzívy, špeciálnych formácií a ligového poradia"}
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-mono font-bold text-slate-300 bg-slate-900 px-2.5 py-1 rounded border border-slate-800">
-                  {gp} {gp === 1 ? "odohratý zápas" : gp >= 2 && gp <= 4 ? "odohraté zápasy" : "odohratých zápasov"} (GP)
+                  {gp} {isEn ? (gp === 1 ? "game played" : "games played") : (gp === 1 ? "odohratý zápas" : gp >= 2 && gp <= 4 ? "odohraté zápasy" : "odohratých zápasov")} (GP)
                 </span>
                 <Link href={`/teams/${slug}/stats`} className="text-xs text-sky-400 hover:text-sky-300 font-bold ml-2">
-                  Podrobné štatistiky hráčov →
+                  {isEn ? "Detailed Player Stats →" : "Podrobné štatistiky hráčov →"}
                 </Link>
               </div>
             </div>
@@ -450,20 +480,20 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
             {/* 1. KĽÚČOVÉ LIGOVÉ UKAZOVATELE (TOP 4 TILES) */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 rounded-xl p-3.5 text-center">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block">Presilovky (PP%)</span>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">{isEn ? "Power Play (PP%)" : "Presilovky (PP%)"}</span>
                 <span className="text-2xl font-black text-amber-400 tabular-nums">{ppPct}</span>
                 <div className="flex items-center justify-center gap-1.5 mt-1">
                   <span className="text-[10px] font-mono text-slate-400">{teamStats?.ppGoalsFor ?? 0} / {teamStats?.ppOpp ?? 0} PPG</span>
                   {rankPP && (
                     <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">
-                      {ord(rankPP)} v NHL
+                      {ord(rankPP, isEn)} {isEn ? "in NHL" : "v NHL"}
                     </span>
                   )}
                 </div>
               </div>
 
               <div className="bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 rounded-xl p-3.5 text-center">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block">Oslabenia (PK%)</span>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">{isEn ? "Penalty Kill (PK%)" : "Oslabenia (PK%)"}</span>
                 <span className="text-2xl font-black text-sky-400 tabular-nums">{pkPct}</span>
                 <div className="flex items-center justify-center gap-1.5 mt-1">
                   <span className="text-[10px] font-mono text-slate-400">
@@ -471,33 +501,33 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
                   </span>
                   {rankPK && (
                     <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">
-                      {ord(rankPK)} v NHL
+                      {ord(rankPK, isEn)} {isEn ? "in NHL" : "v NHL"}
                     </span>
                   )}
                 </div>
               </div>
 
               <div className="bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 rounded-xl p-3.5 text-center">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block">Góly / zápas (GF/G)</span>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">{isEn ? "Goals / Game (GF/G)" : "Góly / zápas (GF/G)"}</span>
                 <span className="text-2xl font-black text-white tabular-nums">{per(gf)}</span>
                 <div className="flex items-center justify-center gap-1.5 mt-1">
-                  <span className="text-[10px] font-mono text-slate-400">{gf} gólov</span>
+                  <span className="text-[10px] font-mono text-slate-400">{gf} {isEn ? "goals" : "gólov"}</span>
                   {rankGF && (
                     <span className="text-[10px] text-slate-300 font-bold bg-slate-800 px-1.5 py-0.2 rounded">
-                      {ord(rankGF)} v NHL
+                      {ord(rankGF, isEn)} {isEn ? "in NHL" : "v NHL"}
                     </span>
                   )}
                 </div>
               </div>
 
               <div className="bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 rounded-xl p-3.5 text-center">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block">Inkasované / zápas (GA/G)</span>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">{isEn ? "Goals Against / Game (GA/G)" : "Inkasované / zápas (GA/G)"}</span>
                 <span className="text-2xl font-black text-emerald-400 tabular-nums">{per(ga)}</span>
                 <div className="flex items-center justify-center gap-1.5 mt-1">
-                  <span className="text-[10px] font-mono text-slate-400">{ga} inkasovaných</span>
+                  <span className="text-[10px] font-mono text-slate-400">{ga} {isEn ? "allowed" : "inkasovaných"}</span>
                   {rankGA && (
                     <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">
-                      {ord(rankGA)} v NHL
+                      {ord(rankGA, isEn)} {isEn ? "in NHL" : "v NHL"}
                     </span>
                   )}
                 </div>
@@ -510,13 +540,13 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
               <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3.5 space-y-2.5">
                 <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
                   <span className="text-xs font-bold text-amber-400 uppercase tracking-wide flex items-center gap-1.5">
-                    <span>🏒</span> Ofenzíva & Streľba
+                    <span>🏒</span> {isEn ? "Offense & Shooting" : "Ofenzíva & Streľba"}
                   </span>
-                  <span className="text-[10px] font-mono text-slate-500">Útočné dáta</span>
+                  <span className="text-[10px] font-mono text-slate-500">{isEn ? "Offensive Data" : "Útočné dáta"}</span>
                 </div>
                 <div className="space-y-2 text-xs">
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Strely na bránu (SF):</span>
+                    <span className="text-slate-400">{isEn ? "Shots on Goal (SF):" : "Strely na bránu (SF):"}</span>
                     <div className="flex items-center gap-1.5 font-mono">
                       <span className="font-bold text-white">{sf}</span>
                       <span className="text-[10px] text-slate-500">({per(sf)} / gm)</span>
@@ -524,28 +554,28 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Úspešnosť streľby (SH%):</span>
+                    <span className="text-slate-400">{isEn ? "Shooting % (SH%):" : "Úspešnosť streľby (SH%):"}</span>
                     <div className="flex items-center gap-1.5 font-mono">
                       <span className="font-bold text-white">{sf > 0 ? `${((gf / sf) * 100).toFixed(1)}%` : "—"}</span>
                       {rankBadge(rankSH)}
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Góly v oslabení (SHG):</span>
+                    <span className="text-slate-400">{isEn ? "Shorthanded Goals (SHG):" : "Góly v oslabení (SHG):"}</span>
                     <div className="flex items-center gap-1.5 font-mono">
                       <span className="font-bold text-white">{teamStats?.shGoals ?? 0}</span>
                       {rankBadge(rankSHG)}
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Očakávané góly (xGF/60):</span>
+                    <span className="text-slate-400">{isEn ? "Expected Goals (xGF/60):" : "Očakávané góly (xGF/60):"}</span>
                     <div className="flex items-center gap-1.5 font-mono">
                       <span className="font-bold text-sky-400">{teamStats?.xgf60 ? teamStats.xgf60.toFixed(2) : "—"}</span>
                       {rankBadge(rankXGF)}
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Nebezpečné šance (HDCF%):</span>
+                    <span className="text-slate-400">{isEn ? "High-Danger Chances (HDCF%):" : "Nebezpečné šance (HDCF%):"}</span>
                     <div className="flex items-center gap-1.5 font-mono">
                       <span className="font-bold text-emerald-400">{teamStats?.hdcfPct ? `${(teamStats.hdcfPct * 100).toFixed(1)}%` : "—"}</span>
                       {rankBadge(rankHDCF)}
@@ -558,13 +588,13 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
               <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3.5 space-y-2.5">
                 <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
                   <span className="text-xs font-bold text-sky-400 uppercase tracking-wide flex items-center gap-1.5">
-                    <span>🛡️</span> Defenzíva & Brankári
+                    <span>🛡️</span> {isEn ? "Defense & Goaltending" : "Defenzíva & Brankári"}
                   </span>
-                  <span className="text-[10px] font-mono text-slate-500">Obranné dáta</span>
+                  <span className="text-[10px] font-mono text-slate-500">{isEn ? "Defensive Data" : "Obranné dáta"}</span>
                 </div>
                 <div className="space-y-2 text-xs">
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Strely súpera (SA):</span>
+                    <span className="text-slate-400">{isEn ? "Shots Against (SA):" : "Strely súpera (SA):"}</span>
                     <div className="flex items-center gap-1.5 font-mono">
                       <span className="font-bold text-white">{sa}</span>
                       <span className="text-[10px] text-slate-500">({per(sa)} / gm)</span>
@@ -572,28 +602,28 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Úspešnosť zákrokov (SV%):</span>
+                    <span className="text-slate-400">{isEn ? "Save % (SV%):" : "Úspešnosť zákrokov (SV%):"}</span>
                     <div className="flex items-center gap-1.5 font-mono">
                       <span className="font-bold text-emerald-400">{sa > 0 ? `${(((sa - ga) / sa) * 100).toFixed(1)}%` : "—"}</span>
                       {rankBadge(rankSV)}
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Čisté kontá (Shutouts):</span>
+                    <span className="text-slate-400">{isEn ? "Shutouts:" : "Čisté kontá (Shutouts):"}</span>
                     <div className="flex items-center gap-1.5 font-mono">
                       <span className="font-bold text-white">{teamStats?.shutouts ?? 0}</span>
                       {rankBadge(rankSO)}
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Očak. inkasované (xGA/60):</span>
+                    <span className="text-slate-400">{isEn ? "Exp. Goals Against (xGA/60):" : "Očak. inkasované (xGA/60):"}</span>
                     <div className="flex items-center gap-1.5 font-mono">
                       <span className="font-bold text-emerald-400">{teamStats?.xga60 ? teamStats.xga60.toFixed(2) : "—"}</span>
                       {rankBadge(rankXGA)}
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Rozdiel gólov (DIFF):</span>
+                    <span className="text-slate-400">{isEn ? "Goal Differential (DIFF):" : "Rozdiel gólov (DIFF):"}</span>
                     <div className="flex items-center gap-1.5 font-mono">
                       <span className={`font-bold ${gf - ga >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
                         {gf - ga > 0 ? `+${gf - ga}` : gf - ga}
@@ -608,20 +638,20 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
               <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3.5 space-y-2.5">
                 <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
                   <span className="text-xs font-bold text-emerald-400 uppercase tracking-wide flex items-center gap-1.5">
-                    <span>⚖️</span> Fyzická hra & Bilancia
+                    <span>⚖️</span> {isEn ? "Physical Play & Record" : "Fyzická hra & Bilancia"}
                   </span>
-                  <span className="text-[10px] font-mono text-slate-500">Aktivita</span>
+                  <span className="text-[10px] font-mono text-slate-500">{isEn ? "Activity" : "Aktivita"}</span>
                 </div>
                 <div className="space-y-2 text-xs">
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Vhadzovania (Faceoffs%):</span>
+                    <span className="text-slate-400">{isEn ? "Faceoffs (FO%):" : "Vhadzovania (Faceoffs%):"}</span>
                     <div className="flex items-center gap-1.5 font-mono">
                       <span className="font-bold text-amber-400">{foPct}</span>
                       {rankBadge(rankFO)}
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Hity (Hits):</span>
+                    <span className="text-slate-400">{isEn ? "Hits:" : "Hity (Hits):"}</span>
                     <div className="flex items-center gap-1.5 font-mono">
                       <span className="font-bold text-white">{teamStats?.hits ?? 0}</span>
                       <span className="text-[10px] text-slate-500">({gp ? ((teamStats?.hits ?? 0) / gp).toFixed(1) : "0"} / gm)</span>
@@ -629,7 +659,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Zblokované strely (Blocks):</span>
+                    <span className="text-slate-400">{isEn ? "Blocked Shots (Blocks):" : "Zblokované strely (Blocks):"}</span>
                     <div className="flex items-center gap-1.5 font-mono">
                       <span className="font-bold text-white">{teamStats?.blocks ?? 0}</span>
                       <span className="text-[10px] text-slate-500">({gp ? ((teamStats?.blocks ?? 0) / gp).toFixed(1) : "0"} / gm)</span>
@@ -637,7 +667,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Trestné minúty (PIM):</span>
+                    <span className="text-slate-400">{isEn ? "Penalty Minutes (PIM):" : "Trestné minúty (PIM):"}</span>
                     <div className="flex items-center gap-1.5 font-mono">
                       <span className="font-bold text-white">{teamStats?.pim ?? 0} min</span>
                       <span className="text-[10px] text-slate-500">({gp ? ((teamStats?.pim ?? 0) / gp).toFixed(1) : "0"} / gm)</span>
@@ -645,7 +675,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Bilancia Doma / Vonku:</span>
+                    <span className="text-slate-400">{isEn ? "Home / Away Record:" : "Bilancia Doma / Vonku:"}</span>
                     <span className="font-mono font-bold text-white">{homeRecord} / {awayRecord}</span>
                   </div>
                 </div>
@@ -658,15 +688,19 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
                 <span className="text-yellow-400">👑</span>
-                <h3 className="font-black text-sm uppercase tracking-wider text-white">Tímoví lídri (Team Leaders)</h3>
+                <h3 className="font-black text-sm uppercase tracking-wider text-white">
+                  {isEn ? "Team Leaders" : "Tímoví lídri (Team Leaders)"}
+                </h3>
               </div>
               <Link href={`/teams/${slug}/stats`} className="text-xs text-sky-400 hover:text-sky-300 font-bold">
-                Všetky štatistiky hráčov →
+                {isEn ? "All Player Stats →" : "Všetky štatistiky hráčov →"}
               </Link>
             </div>
 
             {gp === 0 ? (
-              <p className="text-sm text-slate-500 py-4 text-center">Lídri sa zobrazia po odohraní prvých zápasov.</p>
+              <p className="text-sm text-slate-500 py-4 text-center">
+                {isEn ? "Leaders will appear after the first games are played." : "Lídri sa zobrazia po odohraní prvých zápasov."}
+              </p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 {leaders.map((l) => {
@@ -694,7 +728,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
                           <span className="text-sm text-slate-500 font-bold block">—</span>
                         )}
                         <span className="text-xs text-slate-400">
-                          {l.sub || (player ? `${gp} ${gp === 1 ? "zápas" : gp >= 2 && gp <= 4 ? "zápasy" : "zápasov"}` : "")}
+                          {l.sub || (player ? `${gp} ${isEn ? (gp === 1 ? "game" : "games") : (gp === 1 ? "zápas" : gp >= 2 && gp <= 4 ? "zápasy" : "zápasov")}` : "")}
                         </span>
                       </div>
                       <span className="text-2xl font-black text-white tabular-nums shrink-0">
@@ -712,15 +746,19 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
                 <span className="text-sky-400">📜</span>
-                <h3 className="font-black text-sm uppercase tracking-wider text-white">Posledná aktivita & Správy klubu</h3>
+                <h3 className="font-black text-sm uppercase tracking-wider text-white">
+                  {isEn ? "Recent Activity & Club News" : "Posledná aktivita & Správy klubu"}
+                </h3>
               </div>
               <Link href={`/teams/${slug}/transactions`} className="text-xs text-sky-400 hover:text-sky-300 font-bold">
-                Všetky transakcie →
+                {isEn ? "All Transactions →" : "Všetky transakcie →"}
               </Link>
             </div>
 
             {recentTransactions.length === 0 ? (
-              <p className="text-xs text-slate-500 py-2">Žiadna zaznamenaná aktivita v poslednej dobe.</p>
+              <p className="text-xs text-slate-500 py-2">
+                {isEn ? "No recent activity recorded." : "Žiadna zaznamenaná aktivita v poslednej dobe."}
+              </p>
             ) : (
               <div className="space-y-2">
                 {recentTransactions.map((tx) => (
@@ -749,7 +787,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
                   <span className="text-yellow-400">🌟</span>
                   <div className="flex items-center gap-2">
                     <h3 className="font-black text-sm uppercase tracking-wider text-white">
-                      Top Nádeje tímu (Prospects)
+                      {isEn ? "Top Prospects" : "Top Nádeje tímu (Prospects)"}
                     </h3>
                     <span className="text-[10px] font-bold text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded-full border border-slate-700">
                       {projectedProspects.length}
@@ -760,7 +798,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
                   href={`/teams/${slug}/prospects`}
                   className="text-xs text-sky-400 hover:text-sky-300 font-bold transition-colors"
                 >
-                  Všetky nádeje ({projectedProspects.length}) →
+                  {isEn ? `All Prospects (${projectedProspects.length}) →` : `Všetky nádeje (${projectedProspects.length}) →`}
                 </Link>
               </div>
 
@@ -768,11 +806,11 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
                 <table className="w-full text-left text-xs min-w-[580px]">
                   <thead>
                     <tr className="border-b border-slate-800/80 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-900/50">
-                      <th className="py-2.5 px-3">Hráč</th>
+                      <th className="py-2.5 px-3">{isEn ? "Player" : "Hráč"}</th>
                       <th className="py-2.5 px-3 text-center">Grade</th>
-                      <th className="py-2.5 px-3">Predikovaná rola & ETA</th>
+                      <th className="py-2.5 px-3">{isEn ? "Projected Role & ETA" : "Predikovaná rola & ETA"}</th>
                       <th className="py-2.5 px-3">Draft</th>
-                      <th className="py-2.5 px-3">Súčasný klub & Liga</th>
+                      <th className="py-2.5 px-3">{isEn ? "Current Club & League" : "Súčasný klub & Liga"}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/40">
@@ -828,12 +866,12 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
                                 <span>{pr.draftYear}</span>
                                 {pr.overallPick ? (
                                   <span className="text-slate-500 text-[10px] ml-1">
-                                    #{pr.overallPick} ({pr.round}. kolo)
+                                    #{pr.overallPick} ({isEn ? `Round ${pr.round}` : `${pr.round}. kolo`})
                                   </span>
                                 ) : null}
                               </div>
                             ) : pr.undrafted ? (
-                              <span className="text-slate-500 text-[10px]">Nedraftovaný</span>
+                              <span className="text-slate-500 text-[10px]">{isEn ? "Undrafted" : "Nedraftovaný"}</span>
                             ) : (
                               <span className="text-slate-600">—</span>
                             )}
@@ -869,13 +907,13 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
 
               <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs">
                 <span className="text-[11px] text-slate-500">
-                  Zoradené podľa projekčného skóre a draftu
+                  {isEn ? "Sorted by projection score and draft" : "Zoradené podľa projekčného skóre a draftu"}
                 </span>
                 <Link
                   href={`/teams/${slug}/prospects`}
                   className="px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white font-medium text-xs transition-colors border border-slate-700/60 inline-flex items-center gap-1.5"
                 >
-                  Zobraziť všetky nádeje ({projectedProspects.length}) →
+                  {isEn ? `View all prospects (${projectedProspects.length}) →` : `Zobraziť všetky nádeje (${projectedProspects.length}) →`}
                 </Link>
               </div>
             </div>
@@ -891,18 +929,18 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
             <div className="bg-gradient-to-b from-sky-950/40 via-slate-900 to-[#0b1120] border-2 border-sky-500/40 rounded-2xl p-4 sm:p-5 space-y-3 shadow-xl">
               <div className="flex items-center justify-between border-b border-sky-500/20 pb-2.5">
                 <span className="text-xs font-black uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
-                  <span>🎛️</span> GM Cockpit & Rýchle akcie
+                  <span>🎛️</span> {isEn ? "GM Cockpit & Quick Actions" : "GM Cockpit & Rýchle akcie"}
                 </span>
                 <span className="text-[10px] font-bold text-sky-300 bg-sky-500/20 px-2 py-0.5 rounded">GM MODE</span>
               </div>
 
               <div className="space-y-1.5 text-xs">
                 <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900/80 border border-slate-800">
-                  <span className="text-slate-300">Zostava a formácie:</span>
-                  <span className="text-emerald-400 font-bold">Pripravené ✓</span>
+                  <span className="text-slate-300">{isEn ? "Roster & Lines:" : "Zostava a formácie:"}</span>
+                  <span className="text-emerald-400 font-bold">{isEn ? "Ready ✓" : "Pripravené ✓"}</span>
                 </div>
                 <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900/80 border border-slate-800">
-                  <span className="text-slate-300">Platový strop (Cap Room):</span>
+                  <span className="text-slate-300">{isEn ? "Cap Space (Cap Room):" : "Platový strop (Cap Room):"}</span>
                   <span className={`font-bold ${effectiveSpace < 0 ? "text-rose-400" : "text-emerald-400"}`}>
                     {effectiveSpace < 0 ? `-$${(Math.abs(effectiveSpace) / 1_000_000).toFixed(2)}M` : fmtM(effectiveSpace)}
                   </span>
@@ -911,10 +949,10 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
 
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <Link href={`/teams/${slug}/lines`} className="px-3 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-black font-extrabold text-xs text-center transition-colors shadow">
-                  🏒 Zmeniť zostavu
+                  🏒 {isEn ? "Edit Lines" : "Zmeniť zostavu"}
                 </Link>
                 <Link href="/trades/build" className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs text-center border border-slate-700 transition-colors">
-                  🔄 Obchodovať (Trade)
+                  🔄 {isEn ? "Trade" : "Obchodovať (Trade)"}
                 </Link>
               </div>
             </div>
@@ -928,6 +966,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
               divisionName={team.division}
               conferenceTeams={conferenceTeams}
               divisionTeams={divisionTeams}
+              lang={lang}
             />
           )}
 
@@ -935,14 +974,16 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
           <div className="bg-[#0b1120] border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-3">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
               <span className="text-xs font-black uppercase tracking-wider text-rose-400 flex items-center gap-1.5">
-                <span>🏥</span> Maródka (Injuries)
+                <span>🏥</span> {isEn ? "Injuries" : "Maródka (Injuries)"}
               </span>
               <span className="text-[10px] font-mono text-rose-300 bg-rose-500/15 px-2 py-0.5 rounded border border-rose-500/30">
-                {injured.length} {injured.length === 1 ? "zranený" : injured.length >= 2 && injured.length <= 4 ? "zranení" : "zranených"}
+                {injured.length} {isEn ? "injured" : (injured.length === 1 ? "zranený" : injured.length >= 2 && injured.length <= 4 ? "zranení" : "zranených")}
               </span>
             </div>
             {injured.length === 0 ? (
-              <p className="text-xs text-slate-500 py-1">Žiadni zranení hráči v tíme.</p>
+              <p className="text-xs text-slate-500 py-1">
+                {isEn ? "No injured players on the roster." : "Žiadni zranení hráči v tíme."}
+              </p>
             ) : (
               <div className="space-y-2">
                 {injured.map((p) => (
@@ -951,10 +992,10 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
                       <Link href={`/players/${p.slug}`} className="font-bold text-white hover:text-rose-300 transition-colors block">
                         {cleanName(p.name)} <span className="text-slate-400 font-normal">({p.position})</span>
                       </Link>
-                      <span className="text-[10px] text-slate-400">{p.injuryDesc || "Zranenie"}</span>
+                      <span className="text-[10px] text-slate-400">{p.injuryDesc || (isEn ? "Injured" : "Zranenie")}</span>
                     </div>
                     <span className="text-xs font-mono font-bold text-rose-400">
-                      ešte {p.injuryDaysLeft} {p.injuryDaysLeft === 1 ? "deň" : p.injuryDaysLeft >= 2 && p.injuryDaysLeft <= 4 ? "dni" : "dní"}
+                      {isEn ? `${p.injuryDaysLeft} ${p.injuryDaysLeft === 1 ? "day left" : "days left"}` : `ešte ${p.injuryDaysLeft} ${p.injuryDaysLeft === 1 ? "deň" : p.injuryDaysLeft >= 2 && p.injuryDaysLeft <= 4 ? "dni" : "dní"}`}
                     </span>
                   </div>
                 ))}
@@ -963,7 +1004,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
           </div>
 
           {/* Končiace zmluvy & Podpisovanie (priamo pod Maródkou) */}
-          <ExpiringContractsWidget teamId={team.id} slug={slug} isGm={isGm} />
+          <ExpiringContractsWidget teamId={team.id} slug={slug} isGm={isGm} lang={lang} />
 
           {/* TEAM INFO */}
           <div className="bg-[#0b1120] border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-3">
@@ -974,12 +1015,12 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
             </div>
             <div className="space-y-2.5 text-xs">
               <InfoRow label="General Manager" value={teamManagerLabel(team)} />
-              <InfoRow label="Head Coach" value={<Link href={`/teams/${slug}/coach`} className="hover:text-blue-400">{team.headCoach?.name || team.coach || "TBD"} <span className="text-slate-500 text-xs">· spravovať</span></Link>} />
-              <InfoRow label="Konferencia" value={team.conference || "N/A"} />
-              <InfoRow label="Divízia" value={team.division || "N/A"} />
-              <InfoRow label="Aréna" value={team.arena} />
-              <InfoRow label="Kapacita" value={team.capacity ? team.capacity.toLocaleString() : "N/A"} />
-              {team.parentTeam && <InfoRow label="Materský klub" value={<Link href={`/teams/${team.parentTeam.slug}`} className="text-blue-400 hover:underline">{team.parentTeam.name}</Link>} />}
+              <InfoRow label="Head Coach" value={<Link href={`/teams/${slug}/coach`} className="hover:text-blue-400">{team.headCoach?.name || team.coach || "TBD"} <span className="text-slate-500 text-xs">{isEn ? "· manage" : "· spravovať"}</span></Link>} />
+              <InfoRow label={isEn ? "Conference" : "Konferencia"} value={team.conference || "N/A"} />
+              <InfoRow label={isEn ? "Division" : "Divízia"} value={team.division || "N/A"} />
+              <InfoRow label={isEn ? "Arena" : "Aréna"} value={team.arena} />
+              <InfoRow label={isEn ? "Capacity" : "Kapacita"} value={team.capacity ? team.capacity.toLocaleString() : "N/A"} />
+              {team.parentTeam && <InfoRow label={isEn ? "Parent Club" : "Materský klub"} value={<Link href={`/teams/${team.parentTeam.slug}`} className="text-blue-400 hover:underline">{team.parentTeam.name}</Link>} />}
             </div>
             {isNhl && (
               <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-slate-800">
@@ -996,12 +1037,12 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
               <span className="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
                 <span>💰</span> Salary Cap
               </span>
-              <Link href={`/teams/${slug}/salary`} className="text-xs text-slate-400 hover:text-blue-400">detaily →</Link>
+              <Link href={`/teams/${slug}/salary`} className="text-xs text-slate-400 hover:text-blue-400">{isEn ? "details →" : "detaily →"}</Link>
             </div>
             <div className="flex items-baseline justify-between mb-2">
               <span className="text-lg font-black text-white">{fmtM(totalCap)}</span>
               <span className="text-xs text-slate-400">
-                z {fmtM(capCeiling)} {ltir > 0 && <span className="text-sky-400 font-semibold">(+{fmtM(ltir)} LTIR)</span>}
+                {isEn ? "of" : "z"} {fmtM(capCeiling)} {ltir > 0 && <span className="text-sky-400 font-semibold">(+{fmtM(ltir)} LTIR)</span>}
               </span>
             </div>
             <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
@@ -1009,35 +1050,35 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
             </div>
             <div className="mt-3 space-y-2">
               <InfoRow
-                label={ltir > 0 ? "Priestor pod stropom (LTIR)" : "Cap Space"}
+                label={ltir > 0 ? (isEn ? "Cap Space (LTIR)" : "Priestor pod stropom (LTIR)") : "Cap Space"}
                 value={
                   <span className={effectiveSpace < 0 ? "text-red-400 font-bold" : "text-emerald-400 font-bold"}>
                     {effectiveSpace < 0 ? `-$${(Math.abs(effectiveSpace) / 1_000_000).toFixed(2)}M` : fmtM(effectiveSpace)}
                   </span>
                 }
               />
-              <InfoRow label="Platový strop" value={ltir > 0 ? `${fmtM(capCeiling)} (+${fmtM(ltir)} LTIR)` : fmtM(capCeiling)} />
+              <InfoRow label={isEn ? "Salary Cap Ceiling" : "Platový strop"} value={ltir > 0 ? `${fmtM(capCeiling)} (+${fmtM(ltir)} LTIR)` : fmtM(capCeiling)} />
               {capStatus && (
-                <InfoRow label="Platová podlaha (Floor)" value={fmtM(capStatus.floor)} />
+                <InfoRow label={isEn ? "Salary Floor" : "Platová podlaha (Floor)"} value={fmtM(capStatus.floor)} />
               )}
               {capStatus && (
                 <InfoRow
-                  label="Status súladu"
+                  label={isEn ? "Compliance Status" : "Status súladu"}
                   value={
                     <span className={`font-bold ${capStatus.compliant ? "text-emerald-400" : capStatus.underFloorBy > 0 ? "text-amber-400" : "text-rose-400"}`}>
-                      {capStatus.compliant ? "Compliant ✓" : capStatus.overBy > 0 ? `Nad stropom (${fmtM(capStatus.overBy)})` : `Pod podlahou (${fmtM(capStatus.underFloorBy)})`}
+                      {capStatus.compliant ? "Compliant ✓" : capStatus.overBy > 0 ? (isEn ? `Over Cap (${fmtM(capStatus.overBy)})` : `Nad stropom (${fmtM(capStatus.overBy)})`) : (isEn ? `Under Floor (${fmtM(capStatus.underFloorBy)})` : `Pod podlahou (${fmtM(capStatus.underFloorBy)})`)}
                     </span>
                   }
                 />
               )}
               {retention && (
                 <>
-                  <InfoRow label="Retenčné sloty" value={
+                  <InfoRow label={isEn ? "Retention Slots" : "Retenčné sloty"} value={
                     <span className={retention.slotsOutUsed + retention.slotsInUsed >= retention.slotsMax ? "text-red-400" : "text-slate-200"}>
-                      {retention.slotsOutUsed + retention.slotsInUsed}/{retention.slotsMax} <span className="text-slate-500 text-xs">({retention.slotsOutUsed} von, {retention.slotsInUsed} dnu)</span>
+                      {retention.slotsOutUsed + retention.slotsInUsed}/{retention.slotsMax} <span className="text-slate-500 text-xs">{isEn ? `(${retention.slotsOutUsed} out, ${retention.slotsInUsed} in)` : `(${retention.slotsOutUsed} von, ${retention.slotsInUsed} dnu)`}</span>
                     </span>
                   } />
-                  <InfoRow label="Retencia % zo stropu" value={
+                  <InfoRow label={isEn ? "Retention % of Cap" : "Retencia % zo stropu"} value={
                     <span className={retention.pctOfCap >= retention.pctMax ? "text-red-400" : "text-slate-200"}>{retention.pctOfCap.toFixed(1)}% <span className="text-slate-500">/ {retention.pctMax}%</span></span>
                   } />
                 </>
@@ -1049,30 +1090,30 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
           <div className="bg-[#0b1120] border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-3">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
               <span className="text-xs font-black uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
-                <span>📋</span> Zostava (Roster Info)
+                <span>📋</span> {isEn ? "Roster Info" : "Zostava (Roster Info)"}
               </span>
             </div>
             <div className="space-y-2.5 text-xs">
-              <InfoRow label="Všetci hráči v organizácii" value={`${proCount + farmCount} hráčov`} />
-              <InfoRow label="Aktívny NHL tím" value={`${proCount} hráčov`} />
+              <InfoRow label={isEn ? "All Org Players" : "Všetci hráči v organizácii"} value={`${proCount + farmCount} ${isEn ? "players" : "hráčov"}`} />
+              <InfoRow label={isEn ? "Active NHL Roster" : "Aktívny NHL tím"} value={`${proCount} ${isEn ? "players" : "hráčov"}`} />
               {farmCount > 0 && (
-                <InfoRow label="AHL Farma" value={
+                <InfoRow label={isEn ? "AHL Affiliate" : "AHL Farma"} value={
                   team.affiliateTeams[0] ? (
                     <Link href={`/teams/${team.affiliateTeams[0].slug}`} className="hover:text-blue-400">
-                      {farmCount} hráčov <span className="text-slate-500 text-xs">· {team.affiliateTeams[0].name}</span>
+                      {farmCount} {isEn ? "players" : "hráčov"} <span className="text-slate-500 text-xs">· {team.affiliateTeams[0].name}</span>
                     </Link>
-                  ) : `${farmCount} hráčov`
+                  ) : `${farmCount} ${isEn ? "players" : "hráčov"}`
                 } />
               )}
               {team._count.players > 0 && (
-                <InfoRow label="Mimo súpisky (Non-roster)" value={
+                <InfoRow label={isEn ? "Non-roster" : "Mimo súpisky (Non-roster)"} value={
                   <Link href={`/teams/${team.slug}/contracts`} className="text-amber-400 hover:text-amber-300">
-                    {team._count.players} nepodpísaných RFA →
+                    {team._count.players} {isEn ? "unsigned RFAs →" : "nepodpísaných RFA →"}
                   </Link>
                 } />
               )}
-              <InfoRow label="Počet nádejí (Prospects)" value={String(team.prospects.length)} />
-              <InfoRow label="Priemerný vek" value={String(avgAge)} />
+              <InfoRow label={isEn ? "Prospects Count" : "Počet nádejí (Prospects)"} value={String(team.prospects.length)} />
+              <InfoRow label={isEn ? "Average Age" : "Priemerný vek"} value={String(avgAge)} />
             </div>
           </div>
 

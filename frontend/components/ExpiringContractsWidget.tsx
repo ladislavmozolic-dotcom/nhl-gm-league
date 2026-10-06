@@ -3,16 +3,21 @@ import { prisma } from "@/lib/prisma";
 import { cleanName } from "@/lib/playerName";
 import { getLeagueClock } from "@/lib/calendar-server";
 import { ufaAtExpiry } from "@/lib/free-agency-server";
+import { getLang } from "@/lib/lang-server";
 
 export default async function ExpiringContractsWidget({
   teamId,
   slug,
   isGm,
+  lang,
 }: {
   teamId: number;
   slug: string;
   isGm?: boolean;
+  lang?: string;
 }) {
+  const currentLang = lang ?? (await getLang().catch(() => "en"));
+  const isEn = currentLang !== "cs";
   const clock = await getLeagueClock().catch(() => ({ phase: "regular" }));
   const phase = clock.phase;
   const SHOW_FINAL_YEAR = phase === "regular" || phase === "playoffs";
@@ -53,13 +58,15 @@ export default async function ExpiringContractsWidget({
       <div className="bg-[#0b1120] border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-2">
         <div className="flex items-center justify-between border-b border-slate-800 pb-2">
           <span className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-            <span>📄</span> Končiace zmluvy
+            <span>📄</span> {isEn ? "Expiring Contracts" : "Končiace zmluvy"}
           </span>
           <Link href={`/teams/${slug}/contracts`} className="text-xs text-sky-400 hover:text-sky-300 font-bold">
-            Zmluvy →
+            {isEn ? "Contracts →" : "Zmluvy →"}
           </Link>
         </div>
-        <p className="text-xs text-slate-500 py-1">Žiadnemu hráčovi v tíme momentálne nekončí zmluva.</p>
+        <p className="text-xs text-slate-500 py-1">
+          {isEn ? "No players on the team currently have expiring contracts." : "Žiadnemu hráčovi v tíme momentálne nekončí zmluva."}
+        </p>
       </div>
     );
   }
@@ -76,14 +83,14 @@ export default async function ExpiringContractsWidget({
         <div className="flex items-center gap-2">
           <span className="text-amber-400">📄</span>
           <span className="text-xs font-black uppercase tracking-wider text-amber-400">
-            Končiace zmluvy ({expiring.length})
+            {isEn ? `Expiring Contracts (${expiring.length})` : `Končiace zmluvy (${expiring.length})`}
           </span>
         </div>
         <Link
           href={`/teams/${slug}/contracts`}
           className="text-xs text-sky-400 hover:text-sky-300 font-bold transition-colors"
         >
-          Všetky ({expiring.length}) →
+          {isEn ? `All (${expiring.length}) →` : `Všetky (${expiring.length}) →`}
         </Link>
       </div>
 
@@ -98,7 +105,7 @@ export default async function ExpiringContractsWidget({
           <span className="text-sm font-black text-sky-400 tabular-nums">{rfaList.length}</span>
         </div>
         <div className="bg-slate-900/80 border border-slate-800/80 rounded-xl p-2">
-          <span className="text-[10px] text-slate-500 font-bold uppercase block">Objem</span>
+          <span className="text-[10px] text-slate-500 font-bold uppercase block">{isEn ? "Cap Hit" : "Objem"}</span>
           <span className="text-sm font-black text-white tabular-nums">${(totalCapHit / 1_000_000).toFixed(1)}M</span>
         </div>
       </div>
@@ -106,7 +113,7 @@ export default async function ExpiringContractsWidget({
       {/* Zoznam top končiacich zmlúv */}
       <div className="space-y-1.5 pt-1">
         <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block">
-          Najvyššie končiace kontrakty
+          {isEn ? "Top Expiring Deals" : "Najvyššie končiace kontrakty"}
         </span>
         {topExpiring.map((p) => {
           const isUfa = ufaAtExpiry(p);
@@ -133,7 +140,7 @@ export default async function ExpiringContractsWidget({
                     {cleanName(p.name)}
                   </Link>
                   <span className="text-[10px] text-slate-400">
-                    {p.position} · {p.age} r.
+                    {p.position} · {p.age} {isEn ? "yo" : "r."}
                   </span>
                 </div>
               </div>
@@ -143,7 +150,7 @@ export default async function ExpiringContractsWidget({
                   {p.capHit ? `$${(p.capHit / 1_000_000).toFixed(2)}M` : "—"}
                 </span>
                 <span className="text-[9px] text-slate-500">
-                  {p.contractYears === 0 ? "vypršaná" : "1 rok"}
+                  {p.contractYears === 0 ? (isEn ? "expired" : "vypršaná") : (isEn ? "1 yr left" : "1 rok")}
                 </span>
               </div>
             </div>
@@ -156,7 +163,7 @@ export default async function ExpiringContractsWidget({
         href={`/teams/${slug}/contracts`}
         className="block w-full py-2 px-3 text-center rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold transition-colors mt-2"
       >
-        {isGm ? "Rokovať & predĺžiť zmluvy →" : "Zobraziť všetky končiace zmluvy →"}
+        {isGm ? (isEn ? "Negotiate & Re-sign Deals →" : "Rokovať & predĺžiť zmluvy →") : (isEn ? "View All Expiring Deals →" : "Zobraziť všetky končiace zmluvy →")}
       </Link>
     </div>
   );

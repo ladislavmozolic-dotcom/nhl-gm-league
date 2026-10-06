@@ -19,6 +19,7 @@ interface TeamStandingsWidgetProps {
   divisionName: string | null;
   conferenceTeams: StandingsWidgetTeam[];
   divisionTeams: StandingsWidgetTeam[];
+  lang?: string;
 }
 
 export default function TeamStandingsWidget({
@@ -27,13 +28,18 @@ export default function TeamStandingsWidget({
   divisionName,
   conferenceTeams,
   divisionTeams,
+  lang = "en",
 }: TeamStandingsWidgetProps) {
   const [tab, setTab] = useState<"conf" | "div">("conf");
+  const isEn = lang !== "cs";
+
+  const confLabel = isEn ? "Conference" : "Konferencia";
+  const divLabel = isEn ? "Division" : "Divízia";
 
   const teams = tab === "conf" ? conferenceTeams : divisionTeams;
   const title = tab === "conf"
-    ? (conferenceName ?? "Konferencia")
-    : (divisionName?.replace(/\s+division$/i, "") ? `${divisionName.replace(/\s+division$/i, "")} Divízia` : "Divízia");
+    ? (conferenceName ?? confLabel)
+    : (divisionName?.replace(/\s+division$/i, "") ? (isEn ? `${divisionName.replace(/\s+division$/i, "")} Division` : `${divisionName.replace(/\s+division$/i, "")} Divízia`) : divLabel);
 
   return (
     <div className="bg-[#0b1120] border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-3">
@@ -52,7 +58,7 @@ export default function TeamStandingsWidget({
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >
-              Konferencia
+              {confLabel}
             </button>
             <button
               type="button"
@@ -63,11 +69,11 @@ export default function TeamStandingsWidget({
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >
-              Divízia
+              {divLabel}
             </button>
           </div>
           <Link href="/standings" className="text-[10px] text-sky-400 hover:underline ml-1">
-            Celá →
+            {isEn ? "All →" : "Celá →"}
           </Link>
         </div>
       </div>
@@ -82,7 +88,7 @@ export default function TeamStandingsWidget({
               {/* Play-off hranica po 8. mieste v konferencii */}
               {tab === "conf" && idx === 8 && (
                 <div className="border-t border-dashed border-emerald-500/40 my-1.5 py-0.5 text-[10px] text-center text-emerald-400/90 font-mono bg-emerald-950/20 rounded">
-                  --- Play-off hranica (Postupuje top 8) ---
+                  {isEn ? "--- Playoff Cutoff (Top 8 qualify) ---" : "--- Play-off hranica (Postupuje top 8) ---"}
                 </div>
               )}
               <div
@@ -118,7 +124,7 @@ export default function TeamStandingsWidget({
                   </span>
                 </div>
                 <span className={`font-mono shrink-0 ml-2 ${isCurrent ? "font-black text-amber-400" : "font-bold text-slate-200"}`}>
-                  {dt.points}b ({dt.w}-{dt.l}{dt.otl ? `-${dt.otl}` : ""})
+                  {dt.points}{isEn ? " pts" : "b"} ({dt.w}-{dt.l}{dt.otl ? `-${dt.otl}` : ""})
                 </span>
               </div>
             </div>
