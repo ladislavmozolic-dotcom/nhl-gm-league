@@ -16,6 +16,7 @@ const money = (v: number) => (v > 0 ? `$${(v / 1_000_000).toFixed(2)}M` : "—")
 const ovrColor = (v: number) => (v >= 80 ? "text-green-400" : v >= 70 ? "text-blue-400" : v >= 60 ? "text-yellow-400" : "text-slate-400");
 
 function sortVal(row: SortRow, c: SortCol) {
+  if (row[`_sort_${c.key}`] != null) return row[`_sort_${c.key}`];
   if (c.kind === "player" || c.kind === "ext") return (row.name ?? "").toString().toLowerCase();
   if (c.kind === "team") return (row.teamCode ?? "").toString().toLowerCase();
   if (numeric(c.kind)) return Number(row[c.key] ?? -Infinity);

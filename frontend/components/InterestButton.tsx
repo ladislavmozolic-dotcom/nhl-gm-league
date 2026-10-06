@@ -50,7 +50,19 @@ const bidStatusLabel: Record<string, string> = {
   ACCEPTED: "accepted", REJECTED: "rejected", WITHDRAWN: "withdrawn", SUPERSEDED: "raised over",
 };
 
-export default function InterestButton({ playerId, name, ctx }: { playerId: number; name: string; ctx: InterestCtx }) {
+export default function InterestButton({
+  playerId,
+  name,
+  ctx,
+  label,
+  className,
+}: {
+  playerId: number;
+  name: string;
+  ctx: InterestCtx;
+  label?: string;
+  className?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [teamId, setTeamId] = useState<number | null>(ctx.actingTeamId);
   const [info, setInfo] = useState<Interest | null>(null);
@@ -171,8 +183,8 @@ export default function InterestButton({ playerId, name, ctx }: { playerId: numb
       )}
       <button onClick={openModal} disabled={!ctx.frenzyOpen}
         title={ctx.frenzyOpen ? "Register interest / make an offer" : "Free-agent market is closed"}
-        className={`px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap ${ctx.frenzyOpen ? "bg-amber-600/80 hover:bg-amber-500 text-white" : "bg-slate-800 text-slate-600 cursor-not-allowed"}`}>
-        Interest
+        className={className ?? `px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap ${ctx.frenzyOpen ? "bg-amber-600/80 hover:bg-amber-500 text-white" : "bg-slate-800 text-slate-600 cursor-not-allowed"}`}>
+        {label ?? "Interest"}
       </button>
 
       {open && (
