@@ -92,13 +92,17 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
   // everyone on this list is finishing a contract → his next one is an RFA/UFA deal,
   // never an ELC (that's only a first contract). Status at June 30 of the expiry year.
   for (const p of expiring) groups[ufaAtExpiry(p) ? "UFA" : "RFA"].push(p);
+  const expiringCap = expiring.reduce((sum, p) => sum + (p.capHit ?? 0), 0);
 
   return (
     <div className="space-y-4">
       <Card title={`Contracts — up for renewal (${expiring.length})`} accent="text-amber-400">
-        <div className="flex flex-wrap gap-4 text-sm">
-          <span className="text-red-400 font-semibold">UFA {groups.UFA.length}</span>
-          <span className="text-blue-400 font-semibold">RFA {groups.RFA.length}</span>
+        <div className="grid grid-cols-3 gap-2 text-sm sm:max-w-xl">
+          <div className="rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-2"><div className="text-[10px] font-bold uppercase text-slate-500">Expiring AAV</div><div className="font-black text-amber-300">${(expiringCap / 1e6).toFixed(1)}M</div></div>
+          <div className="rounded-lg border border-red-500/15 bg-red-500/5 px-3 py-2"><div className="text-[10px] font-bold uppercase text-red-300">UFA</div><div className="font-black text-red-200">{groups.UFA.length}</div></div>
+          <div className="rounded-lg border border-blue-500/15 bg-blue-500/5 px-3 py-2"><div className="text-[10px] font-bold uppercase text-blue-300">RFA</div><div className="font-black text-blue-200">{groups.RFA.length}</div></div>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-4 text-sm">
           {!canManage && <span className="text-slate-500 text-xs ml-auto self-center">Sign in as this club&apos;s GM to re-sign.</span>}
           {lockedUntil && <span className="text-amber-300 text-xs ml-auto self-center">🔒 Extensions open on {lockedUntil.toISOString().slice(0, 10)} (first days of the regular season are closed)</span>}
         </div>

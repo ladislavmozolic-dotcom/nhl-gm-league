@@ -617,10 +617,24 @@ export default function ReSignPanel({
   // re-renders this list without the just-signed player, and a find(openId) would go
   // undefined and tear the modal down before its confirmation shows.
   const [openPlayer, setOpenPlayer] = useState<ExpiringPlayer | null>(null);
+  const priorities = [...players].sort((a, b) => (b.capHit ?? 0) - (a.capHit ?? 0)).slice(0, 3);
   if (players.length === 0 && !openPlayer) return null;
   return (
     <Card title={`${title ?? "Expiring Contracts"} (${players.length})`} accent={accent}>
       <p className="text-xs text-slate-500 mb-3">{blurb ?? "These players are entering the final year of their deal. Re-sign them before they reach free agency."}</p>
+      {priorities.length > 0 && (
+        <div className="mb-5">
+          <div className="mb-2 flex items-center justify-between"><span className="text-[10px] font-bold uppercase tracking-widest text-amber-300">Priority decisions</span><span className="text-[10px] text-slate-500">highest expiring AAV</span></div>
+          <div className="grid gap-2 md:grid-cols-3">{priorities.map((p, i) => (
+            <button key={p.id} onClick={() => setOpenPlayer(p)} className={`rounded-xl border p-3 text-left transition hover:-translate-y-0.5 ${i === 0 ? "border-amber-500/50 bg-amber-500/5" : "border-slate-700 bg-slate-950/40 hover:border-slate-600"}`}>
+              <div className="flex items-center justify-between text-[10px] font-bold uppercase"><span className={i === 0 ? "text-amber-300" : "text-slate-500"}>#{i + 1} priority</span><span className="text-slate-500">{p.farm ? "AHL" : group}</span></div>
+              <div className="mt-2 truncate text-sm font-bold text-white">{cleanName(p.name)}</div>
+              <div className="mt-1 text-lg font-black text-slate-100">{p.capHit ? M(p.capHit) : "—"}</div>
+              <div className="mt-2 text-[11px] font-semibold text-emerald-400">Open negotiation →</div>
+            </button>
+          ))}</div>
+        </div>
+      )}
       {group === "RFA" && franchiseEnabled && (
         <div className="mb-3 space-y-1.5">
           <p className="text-xs text-slate-500">
