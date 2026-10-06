@@ -42,8 +42,12 @@ function render(v: number | string, format?: ColFormat): React.ReactNode {
   }
 }
 
-export default function StatTable({ cols, rows, initialSort, minWidth = 720 }: {
+export default function StatTable({ cols, rows, initialSort, minWidth = 720, tieBreaks, showRank }: {
   cols: Col[]; rows: Record<string, string | number>[]; initialSort?: string; minWidth?: number;
+  /** When two rows tie on the sort column, break the tie with these columns in order — "goals" = more first, "-gp" = fewer first. */
+  tieBreaks?: Record<string, string[]>;
+  /** Number every row (1, 2, 3 …) in the current sort order, inside the frozen first column. */
+  showRank?: boolean;
 }) {
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 }>({ key: initialSort ?? cols[0].key, dir: -1 });
   const [hidden, setHidden] = useState<Set<string>>(() => new Set(cols.filter((c) => c.defaultHidden).map((c) => c.key)));
@@ -52,8 +56,16 @@ export default function StatTable({ cols, rows, initialSort, minWidth = 720 }: {
   const visible = cols.filter((c) => !hidden.has(c.key));
   const sorted = [...rows].sort((a, b) => {
     const av = a[sort.key], bv = b[sort.key];
-    if (typeof av === "number" && typeof bv === "number") return (av - bv) * sort.dir;
-    return String(av).localeCompare(String(bv)) * sort.dir;
+    const primary = typeof av === "number" && typeof bv === "number" ? (av - bv) * sort.dir : String(av).localeCompare(String(bv)) * sort.dir;
+    if (primary !== 0) return primary;
+    for (const spec of tieBreaks?.[sort.key] ?? []) {
+      const fewerFirst = spec.startsWith("-");
+      const k = fewerFirst ? spec.slice(1) : spec;
+      const x = a[k], y = b[k];
+      if (typeof x !== "number" || typeof y !== "number" || x === y) continue;
+      return (fewerFirst ? y - x : x - y) * sort.dir;
+    }
+    return 0;
   });
   const click = (key: string) => setSort((s) => (s.key === key ? { key, dir: (s.dir * -1) as 1 | -1 } : { key, dir: -1 }));
   const arrow = (key: string) => (sort.key === key ? (sort.dir === -1 ? " ▾" : " ▴") : "");
@@ -86,7 +98,7 @@ export default function StatTable({ cols, rows, initialSort, minWidth = 720 }: {
               {visible.map((c) => (
                 <th key={c.key} onClick={() => click(c.key)} title={c.title}
                   className={`px-2.5 py-2.5 cursor-pointer hover:text-slate-200 select-none whitespace-nowrap ${c.num ? "text-right" : "text-left"} ${c.frozen ? "sticky left-0 z-20 bg-slate-900 shadow-[2px_0_4px_rgba(0,0,0,0.3)]" : ""}`}>
-                  {c.label}{c.info && <InfoTip text={c.info} />}{arrow(c.key)}
+                  {showRank && c.frozen && <span className="inline-block w-6 mr-1.5 text-right text-slate-600">#</span>}{c.label}{c.info && <InfoTip text={c.info} />}{arrow(c.key)}
                 </th>
               ))}
             </tr>
@@ -96,6 +108,7 @@ export default function StatTable({ cols, rows, initialSort, minWidth = 720 }: {
               <tr key={i} className="border-b border-slate-800/60 hover:bg-slate-800/30 group">
                 {visible.map((c) => (
                   <td key={c.key} className={`px-2.5 py-2 ${c.num ? "text-right tabular-nums" : ""} ${c.frozen ? "sticky left-0 z-10 bg-slate-900 group-hover:bg-slate-850 shadow-[2px_0_4px_rgba(0,0,0,0.3)] font-medium" : c.num ? "text-slate-300" : "text-slate-400"}`}>
+                    {showRank && c.frozen && <span className="inline-block w-6 mr-1.5 text-right tabular-nums text-slate-500 font-normal">{i + 1}</span>}
                     {c.team ? (
                       r._teamSlug ? (
                         <Link href={`/teams/${r._teamSlug}`} className="inline-flex items-center gap-1.5 hover:text-blue-400 transition-colors">

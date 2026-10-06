@@ -106,7 +106,7 @@ export default async function PlayerStatsPage({ searchParams }: { searchParams: 
       </div>
       <p className="text-slate-400 text-sm">Click a header to sort; use Show / Hide Columns to customize.{phase === "pre" ? " Pre-season stats don't count toward profiles/careers." : ""}</p>
       {situation !== "all" && rows.length === 0 && <p className="text-xs text-amber-400/90">Exact situation tracking starts with games simulated after this feature was deployed; older games are not estimated.</p>}
-      <StatTable cols={situation === "all" ? COLS : SITUATION_COLS} rows={rows} initialSort="points" minWidth={situation === "all" ? 1250 : 1050} />
+      <StatTable cols={situation === "all" ? COLS : SITUATION_COLS} rows={rows} initialSort="points" minWidth={situation === "all" ? 1250 : 1050} showRank tieBreaks={{ points: ["goals", "-gp"] }} />
     </div>
   );
 }
