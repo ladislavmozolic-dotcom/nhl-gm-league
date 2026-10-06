@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import SortableTable, { type SortCol, type SortRow } from "@/components/SortableTable";
 import { Card } from "@/components/ui";
 
@@ -35,6 +38,7 @@ export default function PendingFreeAgentsView({
   selectedType?: string;
   isEn: boolean;
 }) {
+  const router = useRouter();
   const statusTab = (key: string, label: string, count?: number) => {
     const active = selectedStatus === key;
     const teamParam = selectedTeam ? `&team=${selectedTeam}` : "";
@@ -138,24 +142,24 @@ export default function PendingFreeAgentsView({
             {posTab("goalies", isEn ? "Goalies" : "Brankári")}
           </div>
 
-          <form action="/free-agents" method="GET" className="inline-block">
-            <input type="hidden" name="view" value="pending" />
-            <input type="hidden" name="status" value={selectedStatus} />
-            {selectedType && <input type="hidden" name="type" value={selectedType} />}
-            <select
-              name="team"
-              defaultValue={selectedTeam ?? ""}
-              onChange={(e) => e.target.form?.submit()}
-              className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-blue-500 cursor-pointer"
-            >
-              <option value="">{isEn ? "All NHL Teams" : "Všetky tímy NHL"}</option>
-              {teams.map((t) => (
-                <option key={t.id} value={t.slug}>
-                  {t.code ? `${t.code} · ` : ""}{t.name}
-                </option>
-              ))}
-            </select>
-          </form>
+          <select
+            defaultValue={selectedTeam ?? ""}
+            onChange={(e) => {
+              const val = e.target.value;
+              const teamParam = val ? `&team=${val}` : "";
+              const statusParam = selectedStatus !== "all" ? `&status=${selectedStatus}` : "";
+              const typeParam = selectedType ? `&type=${selectedType}` : "";
+              router.push(`/free-agents?view=pending${statusParam}${typeParam}${teamParam}`);
+            }}
+            className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-blue-500 cursor-pointer"
+          >
+            <option value="">{isEn ? "All NHL Teams" : "Všetky tímy NHL"}</option>
+            {teams.map((t) => (
+              <option key={t.id} value={t.slug}>
+                {t.code ? `${t.code} · ` : ""}{t.name}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
