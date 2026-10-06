@@ -73,6 +73,15 @@ export default function TeamSubNav({ slug, isGm, isAffiliate, farmSlug, parentSl
     handleClose();
   }, [pathname]); // close after navigating
 
+  // Next.js scrolls a navigation to the top of the segment that changed — here the page body, i.e. just
+  // BELOW this team menu — so on a phone the team home opened already scrolled past the hero. The team
+  // home always starts at the very top of the page.
+  useEffect(() => {
+    if (pathname !== base) return;
+    const id = requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0, behavior: "auto" }));
+    return () => cancelAnimationFrame(id);
+  }, [pathname, base]);
+
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
       if (navRef.current && !navRef.current.contains(e.target as Node)) {
