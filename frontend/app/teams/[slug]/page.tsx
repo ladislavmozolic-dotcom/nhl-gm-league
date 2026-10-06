@@ -8,7 +8,7 @@ import { salaryOf, fmtM } from "@/components/TeamRosterTable";
 import { teamRetentionStatus, teamCapStatus } from "@/lib/cap";
 import { deadMoneyForYear, CURRENT_SEASON_START, ltirRelief } from "@/lib/finance";
 import { teamManagerLabel } from "@/lib/team-gm";
-import ContractSection from "@/components/ContractSection";
+import ExpiringContractsWidget from "@/components/ExpiringContractsWidget";
 import { teamStatTotals, type TeamStatTotal } from "@/lib/stats-server";
 import { canManageTeam } from "@/lib/auth";
 import { computeStandings } from "@/lib/sim/standings";
@@ -799,7 +799,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
           </div>
 
           {/* Končiace zmluvy & Podpisovanie (priamo pod Maródkou) */}
-          <ContractSection teamId={team.id} />
+          <ExpiringContractsWidget teamId={team.id} slug={slug} isGm={isGm} />
 
           {/* TEAM INFO */}
           <div className="bg-[#0b1120] border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-3">
