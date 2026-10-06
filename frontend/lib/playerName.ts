@@ -86,3 +86,17 @@ export function clauseOf(p: { tradeClause?: unknown; name?: string | null }): Tr
   if (/\(NTC\)/i.test(n)) return "NTC";
   return null;
 }
+
+const asClause = (c: unknown): TradeClause | null => (c === "NTC" || c === "NMC" || c === "M_NTC" ? c : null);
+
+/** Hover text for the ★ — which clause he has now and, for a signed-but-deferred extension,
+ *  which one kicks in from next season. null = no clause at all. */
+export function clauseTooltip(p: { tradeClause?: unknown; extClause?: unknown; noTradeTeams?: unknown; name?: string | null }): string | null {
+  const cur = clauseOf(p);
+  const next = asClause(p.extClause);
+  const list = Array.isArray(p.noTradeTeams) && p.noTradeTeams.length ? ` — ${p.noTradeTeams.length}-team no-trade list` : "";
+  if (cur && next && next !== cur) return `${CLAUSE_LABEL[next]} — signed extension, from next season · until then: ${CLAUSE_LABEL[cur]}${list}`;
+  if (cur) return `${CLAUSE_LABEL[cur]}${list}`;
+  if (next) return `${CLAUSE_LABEL[next]} — starts next season (extension already signed)`;
+  return null;
+}
