@@ -750,12 +750,12 @@ export default function ReSignPanel({
               )}
               {canNegotiate ? (
                 <button onClick={() => setOpenPlayer(p)}
-                  className="px-3 py-1 rounded-md bg-green-600/80 hover:bg-green-500 text-white text-xs font-semibold whitespace-nowrap md:px-2">
+                  className="order-first px-3 py-1 rounded-md bg-green-600/80 hover:bg-green-500 text-white text-xs font-semibold whitespace-nowrap md:px-2">
                   Re-sign
                 </button>
               ) : (
                 <span title="Extensions open once the regular season starts — a player can only be re-signed during the final year of his deal."
-                  className="px-3 py-1 rounded-md bg-slate-800 text-slate-500 border border-slate-700 text-xs font-semibold whitespace-nowrap cursor-not-allowed">
+                  className="order-first px-3 py-1 rounded-md bg-slate-800 text-slate-500 border border-slate-700 text-xs font-semibold whitespace-nowrap cursor-not-allowed">
                   Unavailable
                 </span>
               )}
