@@ -137,13 +137,13 @@ function FeaturedGameHero({
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
           {/* Away Team */}
           <div className="md:col-span-4 flex items-center gap-4">
-            {g.awayTeam.logoUrl ? (
-              <img src={g.awayTeam.logoUrl} alt={g.awayTeam.name} className="w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-md shrink-0" />
-            ) : (
-              <div className="w-16 h-16 rounded-2xl bg-slate-800 flex items-center justify-center text-lg font-black text-slate-400 shrink-0">
-                {g.awayTeam.code || g.awayTeam.name.slice(0, 3)}
-              </div>
-            )}
+            <div className="rounded-2xl bg-slate-800/80 border border-slate-700/60 p-2.5 flex items-center justify-center shadow-lg shrink-0" style={{ width: 72, height: 72, minWidth: 72 }}>
+              {g.awayTeam.logoUrl ? (
+                <img src={g.awayTeam.logoUrl} alt={g.awayTeam.name} className="object-contain filter drop-shadow" style={{ width: 52, height: 52, maxWidth: 52, maxHeight: 52 }} />
+              ) : (
+                <span className="text-sm font-black text-slate-300">{g.awayTeam.code || g.awayTeam.name.slice(0, 3)}</span>
+              )}
+            </div>
             <div className="min-w-0">
               <span className="text-[11px] uppercase font-bold text-slate-400 block">
                 Hosťujúci tím {awayRecord ? `(${awayRecord})` : ""}
@@ -190,13 +190,13 @@ function FeaturedGameHero({
                 <span className="text-xs text-slate-400 mt-0.5 block">Strely: {g.homeShots}</span>
               )}
             </div>
-            {g.homeTeam.logoUrl ? (
-              <img src={g.homeTeam.logoUrl} alt={g.homeTeam.name} className="w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-md shrink-0" />
-            ) : (
-              <div className="w-16 h-16 rounded-2xl bg-slate-800 flex items-center justify-center text-lg font-black text-slate-400 shrink-0">
-                {g.homeTeam.code || g.homeTeam.name.slice(0, 3)}
-              </div>
-            )}
+            <div className="rounded-2xl bg-slate-800/80 border border-slate-700/60 p-2.5 flex items-center justify-center shadow-lg shrink-0" style={{ width: 72, height: 72, minWidth: 72 }}>
+              {g.homeTeam.logoUrl ? (
+                <img src={g.homeTeam.logoUrl} alt={g.homeTeam.name} className="object-contain filter drop-shadow" style={{ width: 52, height: 52, maxWidth: 52, maxHeight: 52 }} />
+              ) : (
+                <span className="text-sm font-black text-slate-300">{g.homeTeam.code || g.homeTeam.name.slice(0, 3)}</span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -270,13 +270,13 @@ type TeamCardInfo = {
   }) => (
     <div className="flex items-center justify-between gap-3">
       <div className="flex items-center gap-2.5 min-w-0">
-        {t.logoUrl ? (
-          <img src={t.logoUrl} alt={t.name} className="w-8 h-8 object-contain shrink-0 drop-shadow-sm" />
-        ) : (
-          <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-400 shrink-0">
-            {t.code || t.name.slice(0, 3)}
-          </div>
-        )}
+        <div className="rounded-xl bg-slate-800/80 border border-slate-700/60 p-1 flex items-center justify-center shrink-0 shadow-sm" style={{ width: 36, height: 36, minWidth: 36 }}>
+          {t.logoUrl ? (
+            <img src={t.logoUrl} alt={t.name} className="object-contain" style={{ width: 26, height: 26, maxWidth: 26, maxHeight: 26 }} />
+          ) : (
+            <span className="text-[10px] font-bold text-slate-400">{t.code || t.name.slice(0, 3)}</span>
+          )}
+        </div>
         <div className="min-w-0">
           <span className={`truncate text-sm leading-tight block ${isFinal ? (win ? "font-black text-white" : "font-medium text-slate-400") : "font-semibold text-slate-200"}`}>
             {t.name}
