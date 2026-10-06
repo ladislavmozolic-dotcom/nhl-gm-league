@@ -108,24 +108,56 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
       <PageHeader title={`${DRAFT_YEAR} Draft Room`} subtitle={`Real NHL Central Scouting class · ${drafted.length} picked · ${availableRaw.length} available`} />
 
       {/* round switcher */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        <Link href="/draft/room?round=full"
-          className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${fullView ? "border-blue-500 bg-blue-600 text-white" : "border-slate-800 bg-slate-900/50 text-slate-300 hover:border-slate-600"}`}>
-          Full Draft
-        </Link>
-        {allRounds.map((r) => {
-          const slots = order.filter((p) => p.round === r && !p.deferred);
-          const done = slots.length > 0 && slots.every((p) => draftedByPick.has(p.overallPick));
-          const live = state.status === "LIVE" && state.liveRound === r;
-          return (
-            <Link key={r} href={`/draft/room?round=${r}`}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${!fullView && r === round ? "border-blue-500 bg-blue-600 text-white" : r > 7 ? "border-amber-700/50 bg-amber-900/20 text-amber-200 hover:border-amber-600" : "border-slate-800 bg-slate-900/50 text-slate-300 hover:border-slate-600"}`}>
-              Round {r}{r > 7 && " ★"}{done && <span className="ml-1.5 text-[10px] text-emerald-400">✓</span>}{live && <span className="ml-1.5 text-[10px] text-amber-400">● live</span>}
+      <div className="bg-[#0b1120] border border-slate-800 rounded-2xl p-3 shadow-xl">
+        <div className="flex items-center justify-between gap-3 mb-2.5">
+          <span className="text-xs font-extrabold uppercase tracking-widest text-slate-400">Výber kola:</span>
+          <div className="flex items-center gap-2 text-xs">
+            <Link href="/around-the-world/draft" className="px-2.5 py-1 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-300 font-bold hover:bg-amber-500/20 transition-colors">
+              🌍 Draft Board
             </Link>
-          );
-        })}
-        <Link href="/around-the-world/draft" className="ml-auto px-3 py-1.5 rounded-lg text-sm font-medium border border-amber-500/40 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20">🌍 Draft Board</Link>
-        {me != null && <Link href="/draft/rankings" className="px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-800 bg-slate-900/50 text-slate-300 hover:border-slate-600">🎯 My Rankings</Link>}
+            {me != null && (
+              <Link href="/draft/rankings" className="px-2.5 py-1 rounded-lg border border-slate-800 bg-slate-900/80 text-slate-300 font-semibold hover:border-slate-700 transition-colors">
+                🎯 Moje poradie
+              </Link>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 custom-scroll">
+          <Link
+            href="/draft/room?round=full"
+            className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              fullView
+                ? "bg-sky-500 text-white shadow-md shadow-sky-500/30"
+                : "bg-slate-900/80 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700"
+            }`}
+          >
+            Kompletný Draft (Full)
+          </Link>
+          {allRounds.map((r) => {
+            const slots = order.filter((p) => p.round === r && !p.deferred);
+            const done = slots.length > 0 && slots.every((p) => draftedByPick.has(p.overallPick));
+            const live = state.status === "LIVE" && state.liveRound === r;
+            const active = !fullView && r === round;
+            return (
+              <Link
+                key={r}
+                href={`/draft/room?round=${r}`}
+                className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  active
+                    ? "bg-sky-500 text-white shadow-md shadow-sky-500/30"
+                    : r > 7
+                    ? "border border-amber-700/50 bg-amber-900/20 text-amber-200 hover:border-amber-600"
+                    : "bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700"
+                }`}
+              >
+                <span>{r}. Kolo{r > 7 && " ★"}</span>
+                {live && <span className="px-1.5 py-0.2 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black uppercase">LIVE</span>}
+                {done && !live && <span className="text-emerald-400 font-bold text-xs">✓</span>}
+              </Link>
+            );
+          })}
+        </div>
       </div>
 
       {round1Opens && Date.now() < round1Opens.getTime() && (
@@ -137,15 +169,26 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
 
       {fullView ? (
         <div>
-          <div className="text-sm text-slate-400 mb-2">Full Draft — <span className="text-slate-200">{allPicks.length}</span> selections · fills in live as picks are made</div>
+          <div className="text-sm text-slate-400 mb-2">Full Draft — <span className="text-slate-200 font-bold">{allPicks.length}</span> výberov · aktualizované naživo</div>
           {state.status === "LIVE" && (
-            <Link href={`/draft/room?round=${state.liveRound}`} className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-200 hover:bg-amber-500/15">
-              <span>● Round {state.liveRound} is live{onClockTeam ? ` — ${onClockTeam.name} on the clock (pick #${state.currentPick})` : ""}</span>
-              <span className="font-semibold">Open round {state.liveRound} →</span>
+            <Link
+              href={`/draft/room?round=${state.liveRound}`}
+              className="mb-4 flex items-center justify-between gap-3 rounded-2xl border-2 border-amber-500/40 bg-gradient-to-r from-amber-950/30 via-[#0b1120] to-slate-900 px-5 py-3.5 text-sm text-amber-200 hover:border-amber-500 shadow-xl transition-all"
+            >
+              <div className="flex items-center gap-3">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
+                <span className="font-bold text-white">Prebieha {state.liveRound}. Kolo</span>
+                {onClockTeam && (
+                  <span className="text-slate-300 text-xs">— Na rade: <strong className="text-amber-400">{onClockTeam.name}</strong> (voľba #{state.currentPick})</span>
+                )}
+              </div>
+              <span className="px-3 py-1 rounded-xl bg-amber-500/20 text-amber-300 font-bold text-xs border border-amber-500/40">
+                Otvoriť {state.liveRound}. Kolo →
+              </span>
             </Link>
           )}
           {allPicks.length === 0 ? (
-            <p className="text-sm text-slate-500 mb-3">No selections yet.</p>
+            <p className="text-sm text-slate-500 mb-3">Zatiaľ neboli uskutočnené žiadne výbery.</p>
           ) : (
             <div className="space-y-1">
               {allPicks.map((p) => {
@@ -155,15 +198,23 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
                 const newRound = (p.overallPick ?? 0) % ppr === 1;
                 return (
                   <div key={p.id}>
-                    {newRound && <div className="text-[10px] uppercase tracking-wider text-slate-600 pt-2 pb-1 px-1">Round {Math.ceil((p.overallPick ?? 0) / ppr)}</div>}
-                    <div className="flex items-center gap-3 rounded-lg border border-slate-800/70 bg-slate-900/40 px-3 py-1.5">
-                      <span className="w-8 text-center text-sm font-bold text-slate-500 tabular-nums">{p.overallPick}</span>
-                      {t?.logoUrl && <img src={t.logoUrl} alt="" className="w-6 h-6 object-contain" />}
-                      {orig?.logoUrl && <span className="flex items-center text-slate-600 text-[10px]">(<img src={orig.logoUrl} alt="" className="w-3.5 h-3.5 object-contain" />)</span>}
+                    {newRound && <div className="text-[10px] uppercase font-bold tracking-wider text-slate-500 pt-3 pb-1 px-1">{Math.ceil((p.overallPick ?? 0) / ppr)}. KOLO</div>}
+                    <div className="flex items-center gap-3 rounded-xl border border-slate-800/70 bg-slate-900/40 hover:bg-slate-900/70 px-3 py-2 transition-colors">
+                      <span className="w-8 text-center text-sm font-bold text-slate-500 tabular-nums font-mono">#{p.overallPick}</span>
+                      {t?.logoUrl && (
+                        <span className="inline-flex items-center justify-center rounded-lg bg-slate-800/80 border border-slate-700/60 p-0.5 shrink-0" style={{ width: 28, height: 28, minWidth: 28 }}>
+                          <img src={t.logoUrl} alt="" className="object-contain" style={{ width: 20, height: 20, maxWidth: 20, maxHeight: 20 }} />
+                        </span>
+                      )}
+                      {orig?.logoUrl && (
+                        <span className="flex items-center text-slate-600 text-[10px]">
+                          (<img src={orig.logoUrl} alt="" className="w-3.5 h-3.5 object-contain inline mx-0.5" />)
+                        </span>
+                      )}
                       <span className="mr-0.5">{countryFlag(p.country)}</span>
-                      <EpHoverName player={{ name: p.name, position: p.position, country: p.country, shoots: p.shoots, heightIn: p.heightIn, weightLb: p.weightLb, amateurLeague: p.amateurLeague, amateurClub: p.amateurClub, flag: countryFlag(p.country) }} className="font-medium text-slate-100 cursor-help">{p.name}</EpHoverName>
-                      <span className={`text-xs ${posColor[p.position] ?? "text-slate-400"}`}>{p.position}</span>
-                      <span className="ml-auto text-xs text-slate-500 truncate">{t?.code}</span>
+                      <EpHoverName player={{ name: p.name, position: p.position, country: p.country, shoots: p.shoots, heightIn: p.heightIn, weightLb: p.weightLb, amateurLeague: p.amateurLeague, amateurClub: p.amateurClub, flag: countryFlag(p.country) }} className="font-bold text-slate-100 hover:text-sky-300 transition-colors cursor-help">{p.name}</EpHoverName>
+                      <span className={`text-xs font-semibold ${posColor[p.position] ?? "text-slate-400"}`}>{p.position}</span>
+                      <span className="ml-auto text-xs text-slate-500 font-mono truncate">{t?.code}</span>
                     </div>
                   </div>
                 );
@@ -177,24 +228,30 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
         </div>
       ) : roundComplete ? (
         <div>
-          <div className="text-sm text-slate-400 mb-2">Round {round} — <span className="text-emerald-400">complete</span> · {roundPicks.length} selections</div>
+          <div className="text-sm text-slate-400 mb-2">Round {round} — <span className="text-emerald-400 font-bold">Ukončené</span> · {roundPicks.length} výberov</div>
           <div className="grid gap-2 sm:grid-cols-2">
             {roundPicks.map((p) => {
               const t = p.draftedByTeamId ? teamOf.get(p.draftedByTeamId) : undefined;
-              // original owner only for rounds 2-7 (round 1 ran on the real draft
-              // order/lottery, not our reverse-standings slots, so we can't derive it)
               const origId = (p.overallPick ?? 0) > ppr ? originalOwnerOf(p.overallPick!) : undefined;
               const orig = origId && origId !== p.draftedByTeamId ? teamOf.get(origId) : undefined;
               return (
-                <div key={p.id} className="flex items-center gap-3 rounded-lg border border-slate-800 bg-slate-900/50 px-3 py-2">
-                  <span className="w-8 text-center text-sm font-bold text-slate-500">{p.overallPick}</span>
+                <div key={p.id} className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/50 hover:bg-slate-900/80 px-3 py-2.5 transition-colors">
+                  <span className="w-8 text-center text-sm font-bold text-slate-500 font-mono">#{p.overallPick}</span>
                   <span className="flex items-center gap-1">
-                    {t?.logoUrl && <img src={t.logoUrl} alt="" className="w-7 h-7 object-contain" />}
-                    {orig?.logoUrl && <span className="flex items-center text-slate-600 text-xs">(<img src={orig.logoUrl} alt="" className="w-4 h-4 object-contain mx-0.5" />)</span>}
+                    {t?.logoUrl && (
+                      <span className="inline-flex items-center justify-center rounded-lg bg-slate-800/80 border border-slate-700/60 p-0.5 shrink-0" style={{ width: 32, height: 32, minWidth: 32 }}>
+                        <img src={t.logoUrl} alt="" className="object-contain" style={{ width: 22, height: 22, maxWidth: 22, maxHeight: 22 }} />
+                      </span>
+                    )}
+                    {orig?.logoUrl && (
+                      <span className="flex items-center text-slate-600 text-xs">
+                        (<img src={orig.logoUrl} alt="" className="w-4 h-4 object-contain mx-0.5" />)
+                      </span>
+                    )}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="font-medium text-slate-100 truncate">
-                      <EpHoverName player={{ name: p.name, position: p.position, country: p.country, shoots: p.shoots, heightIn: p.heightIn, weightLb: p.weightLb, amateurLeague: p.amateurLeague, amateurClub: p.amateurClub, flag: countryFlag(p.country) }} className="cursor-help">
+                    <div className="font-bold text-slate-100 truncate">
+                      <EpHoverName player={{ name: p.name, position: p.position, country: p.country, shoots: p.shoots, heightIn: p.heightIn, weightLb: p.weightLb, amateurLeague: p.amateurLeague, amateurClub: p.amateurClub, flag: countryFlag(p.country) }} className="cursor-help hover:text-sky-300 transition-colors">
                         <span className="mr-1">{countryFlag(p.country)}</span>{p.name} <span className={`text-xs ${posColor[p.position] ?? "text-slate-400"}`}>{p.position}</span>
                       </EpHoverName>
                     </div>
@@ -206,50 +263,84 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
           </div>
         </div>
       ) : (
-        <div className="space-y-3">
-          <div className="text-sm text-slate-400">Round {round} · picks <b className="text-slate-200">{roundLo}–{roundHi}</b></div>
+        <div className="space-y-4">
           {/* on the clock / admin controls */}
           {isLiveRound && currentSlot && onClockTeam ? (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3">
-              <div className="flex items-center gap-3">
-                {onClockTeam.logoUrl && <img src={onClockTeam.logoUrl} alt="" className="w-9 h-9 object-contain" />}
-                <div>
-                  <div className="text-[10px] uppercase tracking-widest text-amber-400/90">On the clock · pick #{state.currentPick}</div>
-                  <div className="font-bold text-white flex items-center gap-1.5">
-                    {onClockTeam.name}
-                    {currentSlot.pickerTeamId !== currentSlot.originalTeamId && teamOf.get(currentSlot.originalTeamId)?.logoUrl && (
-                      <span className="flex items-center text-amber-200/50 text-sm font-normal">(<img src={teamOf.get(currentSlot.originalTeamId)!.logoUrl!} alt="" className="w-5 h-5 object-contain mx-0.5" />)</span>
+            <div className="relative overflow-hidden rounded-3xl border-2 border-amber-500/50 bg-gradient-to-br from-[#10192e] via-[#0b1120] to-[#070b12] p-5 sm:p-6 shadow-2xl">
+              <div className="absolute -top-16 -left-16 w-64 h-64 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute -top-16 -right-16 w-64 h-64 bg-blue-500/15 rounded-full blur-3xl pointer-events-none" />
+
+              <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+                <div className="flex items-center gap-4">
+                  <div className="rounded-2xl bg-slate-800/90 border-2 border-amber-500/40 p-2 flex items-center justify-center shadow-xl shadow-amber-500/10 shrink-0" style={{ width: 68, height: 68, minWidth: 68 }}>
+                    {onClockTeam.logoUrl ? (
+                      <img src={onClockTeam.logoUrl} alt="" className="object-contain filter drop-shadow" style={{ width: 48, height: 48, maxWidth: 48, maxHeight: 48 }} />
+                    ) : (
+                      <span className="text-base font-black text-amber-400">{onClockTeam.code}</span>
                     )}
                   </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                        NA RADE · ON THE CLOCK
+                      </span>
+                      <span className="text-xs text-slate-400 font-mono">{round}. KOLO · VOĽBA #{state.currentPick}</span>
+                    </div>
+                    <div className="text-xl sm:text-2xl font-black text-white flex items-center gap-2 mt-1">
+                      <span>{onClockTeam.name}</span>
+                      {currentSlot.pickerTeamId !== currentSlot.originalTeamId && teamOf.get(currentSlot.originalTeamId)?.logoUrl && (
+                        <span className="flex items-center text-slate-400 text-xs font-normal">
+                          (pôvodne <img src={teamOf.get(currentSlot.originalTeamId)!.logoUrl!} alt="" className="w-4 h-4 object-contain inline mx-1" />)
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs text-amber-300/80 font-medium mt-0.5 block">
+                      {canPick ? "Váš výber — zvoľte hráča nižšie v zozname" : "Čaká sa na výber tímu…"}
+                    </span>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-5">
-                <div className="text-xs text-amber-200/70">{canPick ? "Your pick — choose below." : "Waiting for their selection…"}</div>
-                {pickDeadline && <DraftPickTimer deadline={pickDeadline} />}
+
+                <div className="flex items-center gap-4 bg-slate-900/90 border border-slate-800 rounded-2xl px-5 py-3 shadow-inner">
+                  {pickDeadline && (
+                    <div className="text-right">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Zostávajúci čas</span>
+                      <div className="text-xl sm:text-2xl font-black font-mono text-amber-400 flex items-center gap-1.5 mt-0.5">
+                        <DraftPickTimer deadline={pickDeadline} />
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           ) : (
-            <div className="text-sm text-slate-400">Round {round} — {state.liveRound === round ? "round complete" : "not open yet."} {admin ? "" : "The admin opens each round."}</div>
+            <div className="text-sm text-slate-400 p-3 rounded-xl bg-slate-900/40 border border-slate-800">
+              Round {round} — {state.liveRound === round ? "round complete" : "not open yet."} {admin ? "" : "The admin opens each round."}
+            </div>
           )}
 
           {admin && <DraftRoundStarter round={round} live={isLiveRound} status={state.status} />}
 
-          <div className="grid gap-4 xl:grid-cols-[240px_minmax(0,1fr)_340px]">
+          <div className="grid gap-4 xl:grid-cols-[260px_minmax(0,1fr)_340px]">
             {/* draft order for this round */}
-            <div className="rounded-xl border border-slate-800 bg-slate-900/50 flex flex-col max-h-[560px]">
-              <div className="px-3 py-2.5 border-b border-slate-800 text-sm font-semibold text-slate-200">Draft Order · R{round}</div>
-              <div className="overflow-y-auto p-1.5 space-y-0.5">
+            <div className="rounded-2xl border border-slate-800 bg-[#0b1120] flex flex-col max-h-[580px] shadow-xl">
+              <div className="px-3.5 py-3 border-b border-slate-800 text-xs font-black uppercase tracking-wider text-slate-300">Poradie výberov · {round}. Kolo</div>
+              <div className="overflow-y-auto p-2 space-y-1 custom-scroll">
                 {roundOrder.map((p) => {
                   const picker = teamOf.get(p.pickerTeamId);
                   const orig = p.pickerTeamId !== p.originalTeamId ? teamOf.get(p.originalTeamId) : undefined;
                   const picked = draftedByPick.get(p.overallPick);
                   const current = isLiveRound && p.overallPick === state.currentPick;
                   return (
-                    <div key={p.overallPick} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg ${current ? "bg-amber-500/15 ring-1 ring-amber-500/40" : picked ? "opacity-60" : "hover:bg-slate-800/40"}`}>
-                      <span className="w-6 text-right text-xs tabular-nums text-slate-500">{p.overallPick}</span>
-                      {picker?.logoUrl && <img src={picker.logoUrl} alt="" className="w-5 h-5 object-contain shrink-0" />}
+                    <div key={p.overallPick} className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl transition-colors ${current ? "bg-amber-500/15 border border-amber-500/50 shadow-sm" : picked ? "opacity-60 bg-slate-900/30" : "hover:bg-slate-800/40"}`}>
+                      <span className="w-6 text-right text-xs tabular-nums font-mono text-slate-500">#{p.overallPick}</span>
+                      {picker?.logoUrl && (
+                        <span className="inline-flex items-center justify-center rounded bg-slate-800 border border-slate-700/60 p-0.5 shrink-0" style={{ width: 22, height: 22, minWidth: 22 }}>
+                          <img src={picker.logoUrl} alt="" className="object-contain" style={{ width: 16, height: 16, maxWidth: 16, maxHeight: 16 }} />
+                        </span>
+                      )}
                       <span className="min-w-0 flex-1 truncate text-xs flex items-center gap-1">
-                        {picked ? <span className="text-slate-300 truncate">{picked.name}</span> : deferredSources.has(p.overallPick) ? <span className="text-red-400/70 line-through">{picker?.code} → deferred</span> : current ? <span className="text-amber-300 font-medium">on the clock</span> : <span className="text-slate-500">{picker?.code}</span>}
+                        {picked ? <span className="text-slate-300 font-medium truncate">{picked.name}</span> : deferredSources.has(p.overallPick) ? <span className="text-red-400/70 line-through">{picker?.code} → deferred</span> : current ? <span className="text-amber-300 font-black">NA RADE</span> : <span className="text-slate-400 font-semibold">{picker?.code}</span>}
                         {orig?.logoUrl && <span className="flex items-center text-slate-600 text-[10px] shrink-0">(<img src={orig.logoUrl} alt="" className="w-3.5 h-3.5 object-contain" />)</span>}
                       </span>
                     </div>

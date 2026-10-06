@@ -36,8 +36,12 @@ export default function DraftTicker({ year }: { year: number }) {
   const Item = ({ p }: { p: Pick }) => (
     <span className="inline-flex items-center gap-2 px-5 border-r border-slate-800/70">
       <span className="text-xs font-bold text-slate-500 tabular-nums">#{p.pick}</span>
-      {p.logo && <img src={p.logo} alt="" className="w-6 h-6 object-contain" />}
-      <span className="text-[15px] text-slate-100">{p.name}</span>
+      {p.logo && (
+        <span className="inline-flex items-center justify-center rounded-md bg-slate-900 border border-slate-800 p-0.5 shrink-0" style={{ width: 24, height: 24, minWidth: 24 }}>
+          <img src={p.logo} alt="" className="object-contain" style={{ width: 18, height: 18, maxWidth: 18, maxHeight: 18 }} />
+        </span>
+      )}
+      <span className="text-[14px] font-bold text-slate-100">{p.name}</span>
       <span className={`text-[10px] font-semibold ${posColor[p.position] ?? "text-slate-500"}`}>{p.position}</span>
     </span>
   );
