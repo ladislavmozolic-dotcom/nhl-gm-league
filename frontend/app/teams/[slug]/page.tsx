@@ -695,7 +695,9 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
                 </div>
                 <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900/80 border border-slate-800">
                   <span className="text-slate-300">Platový strop (Cap Room):</span>
-                  <span className="text-emerald-400 font-bold">{fmtM(effectiveSpace)}</span>
+                  <span className={`font-bold ${effectiveSpace < 0 ? "text-rose-400" : "text-emerald-400"}`}>
+                    {effectiveSpace < 0 ? `-$${(Math.abs(effectiveSpace) / 1_000_000).toFixed(2)}M` : fmtM(effectiveSpace)}
+                  </span>
                 </div>
               </div>
 
@@ -715,7 +717,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
             <div className="bg-[#0b1120] border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-3">
               <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
                 <span className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                  <span>🏆</span> {team.division ?? "Divízia"} Division
+                  <span>🏆</span> {team.division?.replace(/\s+division$/i, "") ?? "Divízia"} Division
                 </span>
                 <Link href="/standings" className="text-[10px] text-sky-400 hover:underline">
                   Celá tabuľka →
