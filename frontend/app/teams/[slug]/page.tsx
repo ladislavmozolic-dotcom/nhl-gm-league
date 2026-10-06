@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import PlayerAvatar from "@/components/playerAvatar";
-import { cleanName } from "@/lib/playerName";
+import { cleanName, epProfileUrl } from "@/lib/playerName";
 import { salaryOf, fmtM } from "@/components/TeamRosterTable";
 import { teamRetentionStatus, teamCapStatus } from "@/lib/cap";
 import { deadMoneyForYear, CURRENT_SEASON_START, ltirRelief } from "@/lib/finance";
@@ -12,6 +12,7 @@ import ExpiringContractsWidget from "@/components/ExpiringContractsWidget";
 import { teamStatTotals, type TeamStatTotal } from "@/lib/stats-server";
 import { canManageTeam } from "@/lib/auth";
 import { computeStandings } from "@/lib/sim/standings";
+import { projectProspect } from "@/lib/prospect-projection";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,21 @@ const SEASON = "2026-27";
 const isDefPos = (pos = "") => pos.includes("D") && !(pos.includes("C") || pos.includes("W") || pos.includes("F"));
 
 const fmtStripDate = (d: Date | null) => (d ? d.toLocaleDateString("sk-SK", { day: "numeric", month: "short" }) : "—");
+
+const gradeBadgeStyle = (g: string) => {
+  switch (g) {
+    case "A":
+      return "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
+    case "B":
+      return "bg-sky-500/20 text-sky-300 border-sky-500/30";
+    case "C":
+      return "bg-violet-500/20 text-violet-300 border-violet-500/30";
+    case "D":
+      return "bg-amber-500/20 text-amber-300 border-amber-500/30";
+    default:
+      return "bg-slate-700/30 text-slate-400 border-slate-600/30";
+  }
+};
 
 export default async function TeamHomePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -32,7 +48,17 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
     include: {
       players: { where: { rosterType: { in: ["NHL", "AHL"] } }, orderBy: { overall: "desc" }, select: { id: true, rosterType: true, isGoalie: true, position: true, age: true, capHit: true, contractYears: true, retainedSalary: true, contractText: true, name: true, slug: true, photoUrl: true, captaincy: true, nationality: true, injuryDaysLeft: true, condition: true, injuryDesc: true } },
       _count: { select: { players: { where: { rosterType: "NONROSTER" } } } },
-      prospects: { where: { source: rosterSource }, select: { id: true, name: true, position: true, draftYear: true } },
+      prospects: {
+        where: { source: rosterSource },
+        include: {
+          worldPlayer: {
+            include: {
+              currentTeam: { include: { league: true } },
+              stats: { orderBy: [{ season: "desc" }, { gamesPlayed: "desc" }], include: { league: true } },
+            },
+          },
+        },
+      },
       affiliateTeams: { select: { id: true, name: true, slug: true, logoUrl: true, code: true, players: { where: { rosterType: "AHL" }, select: { id: true } } } },
       parentTeam: true,
       headCoach: { select: { name: true } },
@@ -60,6 +86,43 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
   const avgAge = proCount ? (team.players.reduce((s, p) => s + (p.age || 0), 0) / proCount).toFixed(1) : "0";
   const captains = team.players.filter((p) => p.captaincy === "C" || p.captaincy === "A").sort((a) => (a.captaincy === "C" ? -1 : 1));
   const injured = team.players.filter((p) => (p.injuryDaysLeft ?? 0) > 0).sort((a, b) => (b.injuryDaysLeft ?? 0) - (a.injuryDaysLeft ?? 0));
+
+  // Projected prospects sorted by projection score and draft
+  const projectedProspects = team.prospects.map((pr) => {
+    const proj = projectProspect({
+      position: pr.position ?? pr.worldPlayer?.position,
+      draftYear: pr.draftYear,
+      overallPick: pr.overallPick,
+      birthDate: pr.worldPlayer?.birthDate,
+      stats: pr.worldPlayer?.stats,
+      gradeOverride: pr.gradeOverride,
+    });
+    const round = pr.overallPick ? Math.ceil(pr.overallPick / 32) : null;
+    const latestStat = pr.worldPlayer?.stats?.[0];
+    return {
+      id: pr.id,
+      name: cleanName(pr.name),
+      epUrl: pr.epUrl ?? epProfileUrl(pr.name),
+      position: pr.position ?? pr.worldPlayer?.position ?? "—",
+      draftYear: pr.draftYear,
+      overallPick: pr.overallPick,
+      round,
+      undrafted: pr.undrafted,
+      grade: proj.grade,
+      score: proj.score,
+      role: proj.role,
+      eta: proj.eta,
+      risk: proj.risk,
+      teamName: pr.worldPlayer?.currentTeam?.name ?? null,
+      leagueCode: pr.worldPlayer?.currentTeam?.league?.code ?? latestStat?.league?.code ?? null,
+      latestStat: latestStat ? {
+        gamesPlayed: latestStat.gamesPlayed,
+        points: latestStat.points,
+        savePercentage: latestStat.savePercentage,
+        isGoalie: latestStat.isGoalie,
+      } : null,
+    };
+  }).sort((a, b) => b.score - a.score || (b.draftYear ?? 0) - (a.draftYear ?? 0));
 
   const gmLinks = [
     ["Zostava (Rosters)", `/teams/${team.slug}/rosters`],
@@ -673,6 +736,146 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
             )}
           </div>
 
+          {/* TOP NÁDEJE & PROSPECTS (PREHĽAD S HODNOTENÍM A PROJEKCIAMI) */}
+          {projectedProspects.length > 0 && (
+            <div className="bg-[#0b1120] border border-slate-800 rounded-2xl p-5 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-yellow-400">🌟</span>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-black text-sm uppercase tracking-wider text-white">
+                      Top Nádeje tímu (Prospects)
+                    </h3>
+                    <span className="text-[10px] font-bold text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded-full border border-slate-700">
+                      {projectedProspects.length}
+                    </span>
+                  </div>
+                </div>
+                <Link
+                  href={`/teams/${slug}/prospects`}
+                  className="text-xs text-sky-400 hover:text-sky-300 font-bold transition-colors"
+                >
+                  Všetky nádeje ({projectedProspects.length}) →
+                </Link>
+              </div>
+
+              <div className="overflow-x-auto -mx-1">
+                <table className="w-full text-left text-xs min-w-[580px]">
+                  <thead>
+                    <tr className="border-b border-slate-800/80 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-900/50">
+                      <th className="py-2.5 px-3">Hráč</th>
+                      <th className="py-2.5 px-3 text-center">Grade</th>
+                      <th className="py-2.5 px-3">Predikovaná rola & ETA</th>
+                      <th className="py-2.5 px-3">Draft</th>
+                      <th className="py-2.5 px-3">Súčasný klub & Liga</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/40">
+                    {projectedProspects.slice(0, 7).map((pr) => {
+                      const isGoalie = pr.latestStat?.isGoalie || pr.position === "G";
+                      const statSummary = pr.latestStat
+                        ? isGoalie
+                          ? pr.latestStat.savePercentage
+                            ? `${Math.round(pr.latestStat.savePercentage * 1000) / 10}% SV`
+                            : `${pr.latestStat.gamesPlayed} Z`
+                          : `${pr.latestStat.gamesPlayed} Z · ${pr.latestStat.points ?? 0} B`
+                        : null;
+
+                      return (
+                        <tr key={pr.id} className="hover:bg-slate-800/20 transition-colors group">
+                          <td className="py-2.5 px-3">
+                            <div className="flex items-center gap-2">
+                              <a
+                                href={pr.epUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-bold text-slate-200 group-hover:text-sky-400 transition-colors inline-flex items-center gap-1"
+                                title="Otvoriť profil na EliteProspects"
+                              >
+                                {pr.name}
+                                <span className="text-[9px] text-slate-500 opacity-60 group-hover:opacity-100 transition-opacity">↗</span>
+                              </a>
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800/90 text-slate-300 border border-slate-700/80 shrink-0">
+                                {pr.position}
+                              </span>
+                            </div>
+                          </td>
+
+                          <td className="py-2.5 px-3 text-center">
+                            <div className="inline-flex items-center gap-1.5">
+                              <span className={`inline-flex items-center justify-center font-black rounded-md px-2 py-0.5 text-xs border ${gradeBadgeStyle(pr.grade)}`}>
+                                {pr.grade}
+                              </span>
+                              <span className="text-[11px] font-mono text-slate-400 tabular-nums">
+                                {pr.score}
+                              </span>
+                            </div>
+                          </td>
+
+                          <td className="py-2.5 px-3">
+                            <div className="text-slate-200 font-medium">{pr.role}</div>
+                            <div className="text-[10px] text-slate-500">ETA: {pr.eta}</div>
+                          </td>
+
+                          <td className="py-2.5 px-3 text-slate-300 font-mono text-[11px]">
+                            {pr.draftYear ? (
+                              <div>
+                                <span>{pr.draftYear}</span>
+                                {pr.overallPick ? (
+                                  <span className="text-slate-500 text-[10px] ml-1">
+                                    #{pr.overallPick} ({pr.round}. kolo)
+                                  </span>
+                                ) : null}
+                              </div>
+                            ) : pr.undrafted ? (
+                              <span className="text-slate-500 text-[10px]">Nedraftovaný</span>
+                            ) : (
+                              <span className="text-slate-600">—</span>
+                            )}
+                          </td>
+
+                          <td className="py-2.5 px-3">
+                            {pr.teamName || pr.leagueCode ? (
+                              <div>
+                                <div className="flex items-center gap-1.5 text-slate-300 font-medium">
+                                  <span className="truncate max-w-[130px]">{pr.teamName ?? "—"}</span>
+                                  {pr.leagueCode && (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-950/60 text-sky-400 border border-sky-800/40 shrink-0">
+                                      {pr.leagueCode}
+                                    </span>
+                                  )}
+                                </div>
+                                {statSummary && (
+                                  <div className="text-[10px] text-slate-400 font-mono">
+                                    {statSummary}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-slate-600">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs">
+                <span className="text-[11px] text-slate-500">
+                  Zoradené podľa projekčného skóre a draftu
+                </span>
+                <Link
+                  href={`/teams/${slug}/prospects`}
+                  className="px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white font-medium text-xs transition-colors border border-slate-700/60 inline-flex items-center gap-1.5"
+                >
+                  Zobraziť všetky nádeje ({projectedProspects.length}) →
+                </Link>
+              </div>
+            </div>
+          )}
+
         </div>
 
         {/* BOČNÝ PRAVÝ STĹPEC (4 stĺpce) */}
@@ -926,26 +1129,6 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
                     <PlayerAvatar src={c.photoUrl} alt={c.name} size={28} />
                     <Link href={`/players/${c.slug}`} className="flex-1 truncate text-white hover:text-blue-400">{cleanName(c.name)}</Link>
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${c.captaincy === "C" ? "bg-yellow-500/20 text-yellow-400" : "bg-slate-600/30 text-slate-300"}`}>{c.captaincy}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* TOP PROSPECTS */}
-          {team.prospects.length > 0 && (
-            <div className="bg-[#0b1120] border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
-                <span className="text-xs font-black uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
-                  <span>🌟</span> Top Prospects
-                </span>
-                <Link href={`/teams/${slug}/prospects`} className="text-xs text-slate-400 hover:text-blue-400">všetci →</Link>
-              </div>
-              <div className="space-y-2">
-                {team.prospects.slice(0, 6).map((pr) => (
-                  <div key={pr.id} className="flex items-center justify-between text-sm">
-                    <span className="truncate">{cleanName(pr.name)} <span className="text-slate-500 text-xs">{pr.position || ""}</span></span>
-                    <span className="text-slate-500 text-xs">{pr.draftYear || ""}</span>
                   </div>
                 ))}
               </div>
