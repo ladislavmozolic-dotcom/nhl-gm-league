@@ -590,7 +590,7 @@ export function offerAcceptable(td: Demand, offerSalary: number, offerYears: num
 // the GM sign him for less. High-SC/PA players covet PP; high-DF players value PK.
 // ---------------------------------------------------------------------------
 
-export type Deployment = { line: number; pp: boolean; pk: boolean }; // F line 1-4 · D pair 1-3 · G 1-2
+export type Deployment = { line: number; pp: boolean; pk: boolean }; // F line 1-4 (5 = extra forward) · D pair 1-3 (4 = 7th D) · G 1-2 (3 = 3rd goalie)
 export type Desired = { line: number; wantPP: boolean; wantPK: boolean };
 
 export function slotToLine(slot: LineSlot): number {
@@ -599,7 +599,7 @@ export function slotToLine(slot: LineSlot): number {
     case "L2": case "P2": case "G2": return 2;
     case "L3": case "P3": return 3;
     case "L4": return 4;
-    default: return slot === "XD" ? 3 : slot === "XF" ? 4 : 3; // extras sit just below the last real slot
+    default: return slot === "XD" ? 4 : slot === "XF" ? 5 : 3; // the spare role is its own step below the last real slot (13th F = 5, 7th D = 4, 3rd goalie = 3)
   }
 }
 

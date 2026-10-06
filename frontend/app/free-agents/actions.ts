@@ -1247,7 +1247,7 @@ export async function applyAllElcAction() {
   return { ok: true as const, signed };
 }
 
-const clampLine = (n: number) => Math.max(1, Math.min(4, Math.round(n)));
+const clampLine = (n: number) => Math.max(1, Math.min(5, Math.round(n))); // 5 = extra F · 4 = 7th D · 3 = 3rd G (spare roles)
 const fmtM = (n: number) => `$${(n / 1e6).toFixed(2)}M`;
 
 /** Tag / untag an RFA as the club's Franchise player (1 per team). A franchise RFA

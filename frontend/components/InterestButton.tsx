@@ -24,9 +24,9 @@ type Offers = Awaited<ReturnType<typeof getPlayerOffersAction>>;
 const M = formatSalaryDisplay;
 
 function lineOptions(grp: string) {
-  if (grp === "G") return [[1, "Starter"], [2, "Backup"]] as const;
-  if (grp === "D") return [[1, "Top pair"], [2, "2nd pair"], [3, "3rd pair"]] as const;
-  return [[1, "1st line"], [2, "2nd line"], [3, "3rd line"], [4, "4th line"]] as const;
+  if (grp === "G") return [[1, "Starter"], [2, "Backup"], [3, "3rd goalie"]] as const;
+  if (grp === "D") return [[1, "Top pair"], [2, "2nd pair"], [3, "3rd pair"], [4, "7th D"]] as const;
+  return [[1, "1st line"], [2, "2nd line"], [3, "3rd line"], [4, "4th line"], [5, "Extra forward"]] as const;
 }
 const slotLabels: Record<string, string> = {
   L1: "1st line", L2: "2nd line", L3: "3rd line", L4: "4th line", XF: "extra forward",

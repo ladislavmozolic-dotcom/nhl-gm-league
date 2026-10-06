@@ -21,7 +21,7 @@ const has = (arr: unknown, id: number): boolean =>
 /** Where the player is ACTUALLY deployed: from the GM's saved lines if he's in
  *  them, otherwise his talent-based auto-slot (so a GM must set lines to honor a
  *  promise that outruns the player's natural role). */
-async function actualDeployment(playerId: number, teamId: number, isGoalie: boolean, df: number | null): Promise<Deploy> {
+async function actualDeployment(playerId: number, teamId: number, isGoalie: boolean, df: number | null, isD = false): Promise<Deploy> {
   const lines = await prisma.teamLines.findUnique({ where: { teamId } });
   if (lines) {
     const fwd = (lines.forwardLines as any[]) ?? [];
@@ -34,7 +34,10 @@ async function actualDeployment(playerId: number, teamId: number, isGoalie: bool
       return { line, pp: has(sit.pp, playerId), pk: has(sit.pk4, playerId) || has(sit.pk3, playerId) };
     }
     // saved lines exist but he's not in them → he's a scratch: worst possible role
-    if (fwd.length || def.length) return { line: 5, pp: false, pk: false };
+    // (a goalie is never in these lists — his starter/backup role isn't tracked here, so never "worse")
+    if (isGoalie) return { line: null, pp: false, pk: false };
+    // a scratch holds the SPARE role of his group: extra forward = 5, 7th D = 4
+    if (fwd.length || def.length) return { line: isD ? 4 : 5, pp: false, pk: false };
   }
   // no saved lines → fall back to his talent-based auto slot
   const ctx = await loadTeamContext(teamId);
@@ -70,7 +73,7 @@ export async function checkPromises(): Promise<{ warned: number; requested: numb
   const players = await prisma.player.findMany({
     where: { rosterType: "NHL", signPromiseLine: { not: null }, team: { league: "NHL" } },
     select: {
-      id: true, name: true, teamId: true, isGoalie: true, df: true, morale: true,
+      id: true, name: true, teamId: true, isGoalie: true, position: true, df: true, morale: true,
       signPromiseLine: true, signPromisePP: true, signPromisePK: true,
       promiseWarnGame: true, disgruntled: true, tradeRequested: true,
       team: { select: { code: true } },
@@ -81,7 +84,7 @@ export async function checkPromises(): Promise<{ warned: number; requested: numb
   const notes: string[] = [];
 
   for (const p of players) {
-    const actual = await actualDeployment(p.id, p.teamId, p.isGoalie, p.df);
+    const actual = await actualDeployment(p.id, p.teamId, p.isGoalie, p.df, /D/.test(p.position ?? "") );
     const broken = promiseBroken(p.signPromiseLine!, !!p.signPromisePP, !!p.signPromisePK, actual);
     const name = cleanName(p.name);
 
