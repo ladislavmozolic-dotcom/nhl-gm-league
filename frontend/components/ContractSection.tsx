@@ -27,7 +27,7 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
   // include the club's AHL/farm players whose deals are up too
   const org = await prisma.team.findUnique({
     where: { id: teamId },
-    select: { franchiseTagUsedSeason: true, affiliateTeams: { select: { id: true } } },
+    select: { franchiseTagUsedSeason: true, contractPriorities: true, affiliateTeams: { select: { id: true } } },
   });
   const orgIds = [teamId, ...(org?.affiliateTeams.map((a) => a.id) ?? [])];
   await Promise.all(orgIds.map((id) => ensureRfaCases(id)));
@@ -136,6 +136,7 @@ export default async function ContractSection({ teamId }: { teamId: number }) {
 
       {canManage ? (
           <ReSignPanel teamId={teamId} title="Contracts — up for renewal" accent="text-amber-300" group="ALL" franchiseEnabled={franchiseEnabled} canNegotiate={canNegotiate}
+            initialPriorities={org?.contractPriorities ?? []}
             franchiseTagUsed={franchiseTagUsed} franchiseTaggedPlayer={franchiseTaggedPlayer}
             players={(["UFA", "RFA"] as Group[]).flatMap((g) => groups[g].map((p) => {
               const rfa = rfaByPlayer.get(p.id);

@@ -1327,6 +1327,18 @@ export async function setRightsReleasedAction(playerId: number, teamId: number, 
   return { ok: true as const };
 }
 
+/** GM sets/updates their custom TOP Priority contract renewals (up to 3 players). */
+export async function setContractPrioritiesAction(teamId: number, playerIds: number[]) {
+  if (!(await canManageTeam(teamId))) return { ok: false as const, error: "Nemáte oprávnenie spravovať tento tím." };
+  const clean = playerIds.filter((id) => typeof id === "number" && !isNaN(id) && id > 0).slice(0, 3);
+  await prisma.team.update({
+    where: { id: teamId },
+    data: { contractPriorities: clean },
+  });
+  revalidatePath(`/teams`);
+  return { ok: true as const, priorities: clean };
+}
+
 /** Re-sign one of your OWN expiring players (contract up for renewal). Same engine
  *  as the frenzy, but a direct one-on-one negotiation: the player accepts if the
  *  offer clears his team-specific floor + term, otherwise he counters with why. */

@@ -9,6 +9,7 @@ import {
   extendContractAction,
   setFranchiseTagAction,
   setRightsReleasedAction,
+  setContractPrioritiesAction,
 } from "@/app/free-agents/actions";
 import InfoTip from "@/components/InfoTip";
 import { cleanName } from "@/lib/playerName";
@@ -576,6 +577,7 @@ export default function ReSignPanel({
   teamId, players, title, blurb, accent = "text-amber-400", group,
   franchiseEnabled = true, canNegotiate = true,
   franchiseTagUsed = false, franchiseTaggedPlayer = null,
+  initialPriorities = [],
 }: {
   teamId: number;
   players: ExpiringPlayer[];
@@ -587,6 +589,7 @@ export default function ReSignPanel({
   canNegotiate?: boolean;
   franchiseTagUsed?: boolean;
   franchiseTaggedPlayer?: { id: number; name: string } | null;
+  initialPriorities?: number[];
 }) {
   const [tagPending, startTag] = useTransition();
   const initialTaggedId = franchiseTaggedPlayer?.id ?? players.find((p) => p.franchiseTag)?.id ?? null;
@@ -617,15 +620,88 @@ export default function ReSignPanel({
   // undefined and tear the modal down before its confirmation shows.
   const [openPlayer, setOpenPlayer] = useState<ExpiringPlayer | null>(null);
   const [tab, setTab] = useState<"ALL" | "UFA" | "RFA">("ALL");
-  const [bookmarked, setBookmarked] = useState<Set<number>>(new Set());
-  const priorities = [...players].sort((a, b) => {
+  const [prioritiesState, setPrioritiesState] = useState<number[]>(initialPriorities);
+  const [priorityPending, startPriority] = useTransition();
+  const [priorityMsg, setPriorityMsg] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<"capHit" | "priority" | "age" | "name">("capHit");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    setPrioritiesState(initialPriorities);
+  }, [initialPriorities]);
+
+  const togglePriority = (id: number) => {
+    setPriorityMsg(null);
+    let next: number[];
+    if (prioritiesState.includes(id)) {
+      next = prioritiesState.filter((pId) => pId !== id);
+    } else {
+      if (prioritiesState.length >= 3) {
+        setPriorityMsg("V TOP Priority môžete mať najviac 3 hráčov. Ak chcete pridať nového, najprv jedného odopnite kliknutím na 📌.");
+        return;
+      }
+      next = [...prioritiesState, id];
+    }
+    setPrioritiesState(next);
+    startPriority(async () => {
+      try {
+        const r = await setContractPrioritiesAction(teamId, next);
+        if (!r.ok) {
+          setPriorityMsg(r.error ?? "Nepodarilo sa uložiť prioritu.");
+          setPrioritiesState(prioritiesState);
+        }
+      } catch (e) {
+        setPriorityMsg(friendlyActionError(e));
+        setPrioritiesState(prioritiesState);
+      }
+    });
+  };
+
+  const defaultRanked = [...players].sort((a, b) => {
     const score = (p: ExpiringPlayer) => (p.capHit ?? 0) / 1_000_000 - Math.max(0, (p.age ?? 28) - 34) * 1.6;
     return score(b) - score(a);
-  }).slice(0, 3);
-  const visiblePlayers = players.filter((p) => tab === "ALL" || p.type === tab);
+  });
+  const pinnedPlayers = prioritiesState
+    .map((id) => players.find((p) => p.id === id))
+    .filter((p): p is ExpiringPlayer => Boolean(p));
+  const unpinnedRanked = defaultRanked.filter((p) => !prioritiesState.includes(p.id));
+  const priorityCards = [...pinnedPlayers, ...unpinnedRanked].slice(0, 3);
+
+  const filteredPlayers = players.filter((p) => {
+    if (tab !== "ALL" && p.type !== tab) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const matchName = cleanName(p.name).toLowerCase().includes(q);
+      const matchPos = (p.position ?? "").toLowerCase().includes(q);
+      if (!matchName && !matchPos) return false;
+    }
+    return true;
+  });
+
+  const sortedPlayers = [...filteredPlayers].sort((a, b) => {
+    if (sortBy === "priority") {
+      const aPinned = prioritiesState.includes(a.id);
+      const bPinned = prioritiesState.includes(b.id);
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
+      if (aPinned && bPinned) {
+        return prioritiesState.indexOf(a.id) - prioritiesState.indexOf(b.id);
+      }
+      return (b.capHit ?? 0) - (a.capHit ?? 0);
+    }
+    if (sortBy === "age") {
+      return (b.age ?? 0) - (a.age ?? 0);
+    }
+    if (sortBy === "name") {
+      return cleanName(a.name).localeCompare(cleanName(b.name));
+    }
+    return (b.capHit ?? 0) - (a.capHit ?? 0);
+  });
+
   const ufaCount = players.filter((p) => p.type === "UFA").length;
   const rfaCount = players.filter((p) => p.type === "RFA").length;
   const capTotal = players.reduce((sum, p) => sum + (p.capHit ?? 0), 0);
+
   if (players.length === 0 && !openPlayer) return null;
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-700/80 bg-[#08182c] shadow-xl shadow-black/30">
@@ -637,22 +713,60 @@ export default function ReSignPanel({
       <div className="mb-5 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-slate-700 bg-[#0b1d34] p-3"><div className="text-2xl">🏳️</div><div className="mt-0.5 text-xl font-black">{players.length}</div><div className="text-xs font-semibold text-slate-300">Total expiring</div><div className="mt-0.5 text-[11px] text-slate-500">{ufaCount} UFA · {rfaCount} RFA</div></div>
         <div className="rounded-xl border border-slate-700 bg-[#0b1d34] p-3"><div className="text-2xl text-emerald-400">♻</div><div className="mt-0.5 text-xl font-black">{M(capTotal)}</div><div className="text-xs font-semibold text-slate-300">Total cap hit</div><div className="mt-0.5 text-[11px] text-slate-500">next season</div></div>
-        <div className="rounded-xl border border-rose-500/25 bg-rose-950/20 p-3"><div className="text-2xl text-rose-400">⚠</div><div className="mt-0.5 text-xl font-black">{priorities.length}</div><div className="text-xs font-semibold text-slate-300">High priority</div><div className="mt-0.5 text-[11px] text-slate-500">key decisions</div></div>
+        <div className="rounded-xl border border-rose-500/25 bg-rose-950/20 p-3"><div className="text-2xl text-rose-400">⚠</div><div className="mt-0.5 text-xl font-black">{priorityCards.length}</div><div className="text-xs font-semibold text-slate-300">High priority</div><div className="mt-0.5 text-[11px] text-slate-500">{pinnedPlayers.length > 0 ? `${pinnedPlayers.length} zvolených GM 📌` : "key decisions"}</div></div>
         <div className="rounded-xl border border-slate-700 bg-[#0b1d34] p-3"><div className="text-2xl text-sky-300">☷</div><div className="mt-0.5 text-xl font-black">{Math.min(6, players.length)}</div><div className="text-xs font-semibold text-slate-300">Re-sign targets</div><div className="mt-0.5 text-[11px] text-slate-500">recommended</div></div>
       </div>
-      {priorities.length > 0 && (
+      {priorityCards.length > 0 && (
         <div className="mb-5">
-          <div className="mb-2 flex items-center justify-between"><span className="text-sm font-black uppercase tracking-tight text-amber-300">Top priority decisions</span><button type="button" onClick={() => setTab("ALL")} className="text-xs font-bold text-sky-400 hover:text-sky-300">View all {players.length} players →</button></div>
-          <div className="grid gap-2.5 lg:grid-cols-3">{priorities.map((p, i) => (
-            <div key={p.id} className={`relative overflow-hidden rounded-xl border-2 p-3 ${i === 0 ? "border-rose-400/75 bg-gradient-to-br from-rose-950/45 to-[#0c1c31]" : "border-amber-400/65 bg-gradient-to-br from-amber-950/20 to-[#0c1c31]"}`}>
-              <div className="flex items-center justify-between"><span className={`flex h-7 w-7 items-center justify-center rounded-full text-sm font-black ${i === 0 ? "bg-rose-400 text-rose-950" : "bg-amber-300 text-amber-950"}`}>{i + 1}</span><div className="flex items-center gap-1.5"><span className={`text-[10px] font-black uppercase ${i === 0 ? "text-rose-300" : "text-amber-300"}`}>{i === 0 ? "High priority" : "Medium priority"}</span><span className="rounded-full bg-slate-800 px-1.5 py-0.5 text-[10px] font-bold text-slate-300">{p.position ?? "—"}</span></div></div>
-              <div className="mt-4 text-lg font-black tracking-tight text-white">{cleanName(p.name)}</div>
-              <div className="mt-0.5 text-xs font-semibold text-slate-400">{p.type ?? "UFA"} · {p.age ?? "—"} years</div>
-              <div className="mt-2 text-2xl font-black text-white">{p.capHit ? M(p.capHit) : "—"}</div>
-              <div className="mt-2 flex gap-1.5 text-[11px] font-bold text-slate-300"><span className="rounded-md bg-slate-950/60 px-1.5 py-1">{p.lastSeasonGP ?? 0} GP</span><span className="rounded-md bg-slate-950/60 px-1.5 py-1">{p.isGoalie ? `${p.lastSeasonSvPct ? p.lastSeasonSvPct.toFixed(3) : "—"} SV%` : `${p.lastSeasonPts ?? 0} PTS`}</span></div>
-              <div className="mt-3 flex gap-2"><button type="button" onClick={() => setOpenPlayer(p)} className="flex-1 rounded-md bg-emerald-600 py-2 text-xs font-black text-white transition hover:bg-emerald-500">Re-sign</button><button type="button" onClick={() => setBookmarked((s) => { const n = new Set(s); n.has(p.id) ? n.delete(p.id) : n.add(p.id); return n; })} aria-label="Bookmark player" className={`rounded-md border px-2 text-base ${bookmarked.has(p.id) ? "border-sky-400 bg-sky-400/15 text-sky-200" : "border-slate-600 bg-slate-900 text-slate-300"}`}>♧</button></div>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-black uppercase tracking-tight text-amber-300">Top priority decisions</span>
+              <span className="text-xs font-semibold text-slate-400">
+                ({pinnedPlayers.length}/3 zvolené vlastné 📌)
+              </span>
             </div>
-          ))}</div>
+            <button type="button" onClick={() => { setTab("ALL"); setSortBy("capHit"); setSearchQuery(""); }} className="text-xs font-bold text-sky-400 hover:text-sky-300">View all {players.length} players →</button>
+          </div>
+          {priorityMsg && (
+            <div className="mb-2.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-300">
+              ⚠️ {priorityMsg}
+            </div>
+          )}
+          <div className="grid gap-2.5 lg:grid-cols-3">{priorityCards.map((p, i) => {
+            const isPinned = prioritiesState.includes(p.id);
+            return (
+              <div key={p.id} className={`relative overflow-hidden rounded-xl border-2 p-3 transition ${isPinned ? "border-amber-400/80 bg-gradient-to-br from-amber-950/30 via-[#0c1c31] to-[#08182c] shadow-lg shadow-amber-500/10" : i === 0 ? "border-rose-400/75 bg-gradient-to-br from-rose-950/45 to-[#0c1c31]" : "border-slate-700/80 bg-gradient-to-br from-slate-900/60 to-[#0c1c31]"}`}>
+                <div className="flex items-center justify-between">
+                  <span className={`flex h-7 w-7 items-center justify-center rounded-full text-sm font-black ${isPinned ? "bg-amber-400 text-amber-950" : i === 0 ? "bg-rose-400 text-rose-950" : "bg-slate-700 text-slate-200"}`}>{i + 1}</span>
+                  <div className="flex items-center gap-1.5">
+                    {isPinned ? (
+                      <span className="rounded-md bg-amber-400/20 px-1.5 py-0.5 text-[10px] font-black uppercase text-amber-300 border border-amber-400/40">📌 GM TOP Priority</span>
+                    ) : (
+                      <span className={`text-[10px] font-black uppercase ${i === 0 ? "text-rose-300" : "text-amber-300"}`}>{i === 0 ? "High priority" : "Medium priority"}</span>
+                    )}
+                    <span className="rounded-full bg-slate-800 px-1.5 py-0.5 text-[10px] font-bold text-slate-300">{p.position ?? "—"}</span>
+                  </div>
+                </div>
+                <div className="mt-4 text-lg font-black tracking-tight text-white">{cleanName(p.name)}</div>
+                <div className="mt-0.5 text-xs font-semibold text-slate-400">{p.type ?? "UFA"} · {p.age ?? "—"} years</div>
+                <div className="mt-2 text-2xl font-black text-white">{p.capHit ? M(p.capHit) : "—"}</div>
+                <div className="mt-2 flex gap-1.5 text-[11px] font-bold text-slate-300"><span className="rounded-md bg-slate-950/60 px-1.5 py-1">{p.lastSeasonGP ?? 0} GP</span><span className="rounded-md bg-slate-950/60 px-1.5 py-1">{p.isGoalie ? `${p.lastSeasonSvPct ? p.lastSeasonSvPct.toFixed(3) : "—"} SV%` : `${p.lastSeasonPts ?? 0} PTS`}</span></div>
+                <div className="mt-3 flex gap-2">
+                  <button type="button" onClick={() => setOpenPlayer(p)} className="flex-1 rounded-md bg-emerald-600 py-2 text-xs font-black text-white transition hover:bg-emerald-500">Re-sign</button>
+                  <button
+                    type="button"
+                    onClick={() => togglePriority(p.id)}
+                    disabled={priorityPending}
+                    title={isPinned ? "Odopnúť z TOP Priority" : "Pripnúť do TOP Priority"}
+                    aria-label={isPinned ? `Odopnúť ${cleanName(p.name)} z TOP Priority` : `Pripnúť ${cleanName(p.name)} do TOP Priority`}
+                    className={`rounded-md border px-2.5 py-2 text-sm transition flex items-center justify-center ${isPinned ? "border-amber-400 bg-amber-400/20 text-amber-300 shadow-sm shadow-amber-400/20 hover:bg-amber-400/30" : "border-slate-600 bg-slate-900 text-slate-400 hover:text-amber-300 hover:border-amber-400/50"}`}
+                  >
+                    📌
+                  </button>
+                </div>
+              </div>
+            );
+          })}</div>
         </div>
       )}
       {players.some((p) => p.type === "RFA") && franchiseEnabled && (
@@ -675,94 +789,155 @@ export default function ReSignPanel({
       {releaseMsg && <p className="text-xs text-rose-400 mb-2">{releaseMsg}</p>}
       <div className="overflow-hidden rounded-xl border border-slate-700/80 bg-[#091a2f]">
         <div className="flex flex-col gap-2 border-b border-slate-700/70 px-2.5 pt-2 sm:flex-row sm:items-end sm:justify-between">
-          <div className="flex gap-1"><button type="button" onClick={() => setTab("ALL")} className={`border-b-2 px-3 py-2 text-xs font-black ${tab === "ALL" ? "border-sky-400 bg-sky-500/10 text-white" : "border-transparent text-slate-400 hover:text-white"}`}>All ({players.length})</button><button type="button" onClick={() => setTab("UFA")} className={`border-b-2 px-3 py-2 text-xs font-black ${tab === "UFA" ? "border-rose-400 bg-rose-500/10 text-rose-200" : "border-transparent text-slate-400 hover:text-white"}`}>UFA ({ufaCount})</button><button type="button" onClick={() => setTab("RFA")} className={`border-b-2 px-3 py-2 text-xs font-black ${tab === "RFA" ? "border-sky-400 bg-sky-500/10 text-sky-200" : "border-transparent text-slate-400 hover:text-white"}`}>RFA ({rfaCount})</button></div>
-          <div className="pb-1.5 text-[11px] font-semibold text-slate-400">Sort by <span className="ml-1 rounded-md border border-slate-600 bg-slate-900 px-2 py-1.5 text-white">Cap Hit⌄</span><span className="ml-1.5 rounded-md border border-slate-600 bg-slate-900 px-2 py-1.5">⌕ Filter</span></div>
+          <div className="flex gap-1">
+            <button type="button" onClick={() => setTab("ALL")} className={`border-b-2 px-3 py-2 text-xs font-black ${tab === "ALL" ? "border-sky-400 bg-sky-500/10 text-white" : "border-transparent text-slate-400 hover:text-white"}`}>All ({players.length})</button>
+            <button type="button" onClick={() => setTab("UFA")} className={`border-b-2 px-3 py-2 text-xs font-black ${tab === "UFA" ? "border-rose-400 bg-rose-500/10 text-rose-200" : "border-transparent text-slate-400 hover:text-white"}`}>UFA ({ufaCount})</button>
+            <button type="button" onClick={() => setTab("RFA")} className={`border-b-2 px-3 py-2 text-xs font-black ${tab === "RFA" ? "border-sky-400 bg-sky-500/10 text-sky-200" : "border-transparent text-slate-400 hover:text-white"}`}>RFA ({rfaCount})</button>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 pb-1.5 text-[11px] font-semibold text-slate-400">
+            <div className="flex items-center gap-1">
+              <span>Sort by</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="rounded-md border border-slate-600 bg-slate-900 px-2 py-1 text-xs font-semibold text-white outline-none cursor-pointer hover:border-slate-500"
+              >
+                <option value="capHit">Cap Hit ▾</option>
+                <option value="priority">TOP Priorita ▾</option>
+                <option value="age">Vek ▾</option>
+                <option value="name">Meno ▾</option>
+              </select>
+            </div>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="⌕ Filter hráča…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="rounded-md border border-slate-600 bg-slate-900 px-2 py-1 text-xs text-white placeholder-slate-500 outline-none focus:border-sky-400 w-28 sm:w-36"
+              />
+              {searchQuery && (
+                <button type="button" onClick={() => setSearchQuery("")} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs">✕</button>
+              )}
+            </div>
+          </div>
         </div>
         <div className="hidden max-w-[1500px] grid-cols-[24px_minmax(220px,1.5fr)_38px_48px_36px_68px_92px_310px] gap-2 border-b border-slate-700/70 bg-slate-900/65 px-3 py-2 text-[9px] font-black uppercase tracking-wide text-slate-400 md:grid"><span>#</span><span>Player</span><span>Pos</span><span>Type</span><span>Age</span><span>Cap hit</span><span>Priority</span><span>Action</span></div>
       <div className="divide-y divide-slate-800/70">
-        {visiblePlayers.map((p, index) => (
-          <div key={p.id} className="grid max-w-[1500px] gap-1.5 px-2.5 py-2 transition-colors hover:bg-slate-800/35 md:grid-cols-[24px_minmax(220px,1.5fr)_38px_48px_36px_68px_92px_310px] md:items-center md:px-3">
-            <span className="hidden text-xs font-bold text-slate-500 md:block">{index + 1}</span>
-            <div className="min-w-0">
-              <PlayerLink id={p.id} name={p.name} className="text-sm font-medium truncate" />
-              {p.farm && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30">AHL</span>}
-              {/* show the REAL current deal (cap hit) — the stored contractText is a stale
-                  profinhl string that can misrepresent the term; everyone here is in their
-                  final year by the query filter, so label it plainly. */}
-              <span className="text-xs text-slate-500 ml-2">{p.capHit ? `${M(p.capHit)} · last year` : "—"}</span>
-              {p.type === "RFA" && p.rfaStatus && (
-                <span className={`ml-2 text-[10px] font-bold uppercase ${p.rfaStatus === "QO_DUE" ? "text-sky-300" : "text-slate-400"}`}>
-                  {p.rfaStatus === "QO_DUE" ? `QO ${p.qoAmount ? M(p.qoAmount) : ""} due ${p.qoDueAt?.slice(0, 10) ?? ""}` : p.rfaStatus.replaceAll("_", " ")}
-                </span>
-              )}
-            </div>
-            <span className="hidden text-sm font-bold text-slate-300 md:block">{p.position ?? "—"}</span>
-            <span className={`hidden text-sm font-black md:block ${p.type === "RFA" ? "text-sky-300" : "text-rose-300"}`}>{p.type ?? "UFA"}</span>
-            <span className="hidden text-sm text-slate-300 md:block">{p.age ?? "—"}</span>
-            <span className="hidden text-sm font-bold text-white md:block">{p.capHit ? M(p.capHit) : "—"}</span>
-            <span className="hidden md:block"><span className={`rounded-lg px-2 py-1 text-xs font-black ${index < 1 ? "bg-rose-500/15 text-rose-300" : index < 6 ? "bg-amber-500/15 text-amber-300" : "bg-sky-500/15 text-sky-300"}`}>{index < 1 ? "High" : index < 6 ? "Medium" : "Low"}</span></span>
-            <div className="flex shrink-0 items-center gap-2 whitespace-nowrap md:flex-nowrap">
-              {p.type === "RFA" && franchiseEnabled && (() => {
-                const isTagged = tagged === p.id;
-                const isUsed = franchiseTagUsed || (isTagged && ((p.resignRound ?? 0) > 0 || p.resignStatus === "extended"));
-                const isDisabled = tagPending || isUsed || (!isTagged && ((p.resignRound ?? 0) > 0 || tagged != null));
-                const tagTitle = isUsed
-                  ? (isTagged
-                      ? "Franchise Tag už bol pre tohto hráča v rokovaniach použitý — nemožno ho zmeniť"
-                      : `Váš klub už v tejto sezóne použil Franchise Tag (${franchiseTaggedPlayer?.name ?? "využitý"})`)
-                  : !isTagged && tagged != null
-                    ? `Franchise Tag už má priradený iný hráč (${franchiseTaggedPlayer?.name ?? "hráč"})`
-                    : !isTagged && (p.resignRound ?? 0) > 0
-                      ? "Franchise Tag musí byť priradený pred začiatkom rokovaní o zmluve"
-                      : isTagged
-                        ? "Franchise Tag — kliknutím zrušíte (ešte neprebehli rokovania)"
-                        : "Priradiť Franchise Tag (1 na klub za sezónu, chráni pred offer sheet na 2 kolá)";
-                return (
-                  <button
-                    type="button"
-                    onClick={() => toggleTag(p.id)}
-                    disabled={isDisabled}
-                    title={tagTitle}
-                    className={`px-2 py-1 rounded-md text-xs font-semibold whitespace-nowrap border ${
-                      isTagged
-                        ? "bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/40"
-                        : "bg-slate-800 text-slate-400 border-slate-700 hover:text-fuchsia-300"
-                    } disabled:opacity-40 disabled:cursor-not-allowed`}
-                  >
-                    ★ {isTagged ? "Franchise" : "Tag"}
-                  </button>
-                );
-              })()}
-              {p.type === "RFA" && (
-                released.has(p.id) ? (
-                  <button onClick={() => toggleRelease(p.id, false)} disabled={releasePending}
-                    title="Rights released — he's priced like a UFA and hits the open market the moment his deal expires. Click to reclaim his RFA rights."
-                    className="px-2 py-1 rounded-md text-xs font-semibold whitespace-nowrap border bg-amber-950/50 text-amber-400 border-amber-800/50 hover:text-amber-300">
-                    🔓 Released
+        {sortedPlayers.map((p, index) => {
+          const isPinned = prioritiesState.includes(p.id);
+          return (
+            <div key={p.id} className="grid max-w-[1500px] gap-1.5 px-2.5 py-2 transition-colors hover:bg-slate-800/35 md:grid-cols-[24px_minmax(220px,1.5fr)_38px_48px_36px_68px_92px_310px] md:items-center md:px-3">
+              <span className="hidden text-xs font-bold text-slate-500 md:block">{index + 1}</span>
+              <div className="min-w-0">
+                <PlayerLink id={p.id} name={p.name} className="text-sm font-medium truncate" />
+                {p.farm && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30">AHL</span>}
+                <span className="text-xs text-slate-500 ml-2">{p.capHit ? `${M(p.capHit)} · last year` : "—"}</span>
+                {p.type === "RFA" && p.rfaStatus && (
+                  <span className={`ml-2 text-[10px] font-bold uppercase ${p.rfaStatus === "QO_DUE" ? "text-sky-300" : "text-slate-400"}`}>
+                    {p.rfaStatus === "QO_DUE" ? `QO ${p.qoAmount ? M(p.qoAmount) : ""} due ${p.qoDueAt?.slice(0, 10) ?? ""}` : p.rfaStatus.replaceAll("_", " ")}
+                  </span>
+                )}
+              </div>
+              <span className="hidden text-sm font-bold text-slate-300 md:block">{p.position ?? "—"}</span>
+              <span className={`hidden text-sm font-black md:block ${p.type === "RFA" ? "text-sky-300" : "text-rose-300"}`}>{p.type ?? "UFA"}</span>
+              <span className="hidden text-sm text-slate-300 md:block">{p.age ?? "—"}</span>
+              <span className="hidden text-sm font-bold text-white md:block">{p.capHit ? M(p.capHit) : "—"}</span>
+              <span className="hidden md:block">
+                {isPinned ? (
+                  <span className="inline-flex items-center gap-1 rounded-lg border border-amber-500/50 bg-amber-500/25 px-2 py-0.5 text-xs font-black text-amber-300">
+                    📌 TOP
+                  </span>
+                ) : priorityCards.some((c) => c.id === p.id) ? (
+                  <span className="rounded-lg bg-rose-500/15 px-2 py-1 text-xs font-black text-rose-300">
+                    High
+                  </span>
+                ) : index < 6 ? (
+                  <span className="rounded-lg bg-amber-500/15 px-2 py-1 text-xs font-black text-amber-300">
+                    Medium
+                  </span>
+                ) : (
+                  <span className="rounded-lg bg-sky-500/15 px-2 py-1 text-xs font-black text-sky-300">
+                    Low
+                  </span>
+                )}
+              </span>
+              <div className="flex shrink-0 items-center gap-2 whitespace-nowrap md:flex-nowrap">
+                {p.type === "RFA" && franchiseEnabled && (() => {
+                  const isTagged = tagged === p.id;
+                  const isUsed = franchiseTagUsed || (isTagged && ((p.resignRound ?? 0) > 0 || p.resignStatus === "extended"));
+                  const isDisabled = tagPending || isUsed || (!isTagged && ((p.resignRound ?? 0) > 0 || tagged != null));
+                  const tagTitle = isUsed
+                    ? (isTagged
+                        ? "Franchise Tag už bol pre tohto hráča v rokovaniach použitý — nemožno ho zmeniť"
+                        : `Váš klub už v tejto sezóne použil Franchise Tag (${franchiseTaggedPlayer?.name ?? "využitý"})`)
+                    : !isTagged && tagged != null
+                      ? `Franchise Tag už má priradený iný hráč (${franchiseTaggedPlayer?.name ?? "hráč"})`
+                      : !isTagged && (p.resignRound ?? 0) > 0
+                        ? "Franchise Tag musí byť priradený pred začiatkom rokovaní o zmluve"
+                        : isTagged
+                          ? "Franchise Tag — kliknutím zrušíte (ešte neprebehli rokovania)"
+                          : "Priradiť Franchise Tag (1 na klub za sezónu, chráni pred offer sheet na 2 kolá)";
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => toggleTag(p.id)}
+                      disabled={isDisabled}
+                      title={tagTitle}
+                      className={`px-2 py-1 rounded-md text-xs font-semibold whitespace-nowrap border ${
+                        isTagged
+                          ? "bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/40"
+                          : "bg-slate-800 text-slate-400 border-slate-700 hover:text-fuchsia-300"
+                      } disabled:opacity-40 disabled:cursor-not-allowed`}
+                    >
+                      ★ {isTagged ? "Franchise" : "Tag"}
+                    </button>
+                  );
+                })()}
+                {p.type === "RFA" && (
+                  released.has(p.id) ? (
+                    <button onClick={() => toggleRelease(p.id, false)} disabled={releasePending}
+                      title="Rights released — he's priced like a UFA and hits the open market the moment his deal expires. Click to reclaim his RFA rights."
+                      className="px-2 py-1 rounded-md text-xs font-semibold whitespace-nowrap border bg-amber-950/50 text-amber-400 border-amber-800/50 hover:text-amber-300">
+                      🔓 Released
+                    </button>
+                  ) : (
+                    <button onClick={() => toggleRelease(p.id, true)} disabled={releasePending}
+                      title="Declare you won't re-sign him (real-NHL 'not qualifying') — he's priced and treated like a UFA from now on, and hits the open market the moment his deal expires instead of staying RFA-locked to you."
+                      className="px-2 py-1 rounded-md text-xs font-semibold whitespace-nowrap border bg-slate-800 text-slate-400 border-slate-700 hover:text-rose-300">
+                      Release rights
+                    </button>
+                  )
+                )}
+                {canNegotiate ? (
+                  <button onClick={() => setOpenPlayer(p)}
+                    className="order-first px-3 py-1 rounded-md bg-green-600/80 hover:bg-green-500 text-white text-xs font-semibold whitespace-nowrap md:px-2">
+                    Re-sign
                   </button>
                 ) : (
-                  <button onClick={() => toggleRelease(p.id, true)} disabled={releasePending}
-                    title="Declare you won't re-sign him (real-NHL 'not qualifying') — he's priced and treated like a UFA from now on, and hits the open market the moment his deal expires instead of staying RFA-locked to you."
-                    className="px-2 py-1 rounded-md text-xs font-semibold whitespace-nowrap border bg-slate-800 text-slate-400 border-slate-700 hover:text-rose-300">
-                    Release rights
-                  </button>
-                )
-              )}
-              {canNegotiate ? (
-                <button onClick={() => setOpenPlayer(p)}
-                  className="order-first px-3 py-1 rounded-md bg-green-600/80 hover:bg-green-500 text-white text-xs font-semibold whitespace-nowrap md:px-2">
-                  Re-sign
+                  <span title="Extensions open once the regular season starts — a player can only be re-signed during the final year of his deal."
+                    className="order-first px-3 py-1 rounded-md bg-slate-800 text-slate-500 border border-slate-700 text-xs font-semibold whitespace-nowrap cursor-not-allowed">
+                    Unavailable
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => togglePriority(p.id)}
+                  disabled={priorityPending}
+                  title={isPinned ? "Odopnúť z TOP Priority" : "Pripnúť do TOP Priority"}
+                  aria-label={`TOP Priority pre ${cleanName(p.name)}`}
+                  className={`hidden rounded-md border px-2.5 py-1 text-xs font-bold transition md:flex items-center justify-center ${
+                    isPinned
+                      ? "border-amber-400 bg-amber-400/20 text-amber-300 shadow-sm shadow-amber-400/20 hover:bg-amber-400/30"
+                      : "border-slate-700 bg-slate-900/60 text-slate-400 hover:text-amber-300 hover:border-amber-400/50"
+                  }`}
+                >
+                  📌
                 </button>
-              ) : (
-                <span title="Extensions open once the regular season starts — a player can only be re-signed during the final year of his deal."
-                  className="order-first px-3 py-1 rounded-md bg-slate-800 text-slate-500 border border-slate-700 text-xs font-semibold whitespace-nowrap cursor-not-allowed">
-                  Unavailable
-                </span>
-              )}
-              <button type="button" onClick={() => setBookmarked((s) => { const n = new Set(s); n.has(p.id) ? n.delete(p.id) : n.add(p.id); return n; })} aria-label={`Bookmark ${cleanName(p.name)}`} className={`hidden rounded-md border px-2 py-1 text-sm md:block ${bookmarked.has(p.id) ? "border-sky-400 bg-sky-400/15 text-sky-100" : "border-slate-700 text-slate-400"}`}>♧</button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       </div>
       {openPlayer && <ReSignModal player={openPlayer} teamId={teamId} onClose={() => setOpenPlayer(null)} />}
