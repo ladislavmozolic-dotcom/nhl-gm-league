@@ -70,12 +70,16 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
 
   // ===== leaders + team stats (this team, regular season) =====
   const gWhere = { teamId: team.id, game: { season: SEASON, status: "FINAL", seriesId: null } } as const;
-  const [skAgg, gRows, teamGames, allTeamStats, foAgg, recentGames, nextGames, standings, isGm, recentTransactions] = await Promise.all([
+  const [skAgg, gRows, teamGames, allTeamStats, allFoAgg, recentGames, nextGames, standings, isGm, recentTransactions] = await Promise.all([
     prisma.playerGameStat.groupBy({ by: ["playerId"], where: gWhere, _sum: { goals: true, assists: true, points: true, pim: true, plusMinus: true } }),
     prisma.goalieGameStat.findMany({ where: gWhere, select: { playerId: true, started: true, saves: true, shotsAgainst: true, decision: true } }),
     prisma.game.findMany({ where: { season: SEASON, status: "FINAL", seriesId: null, OR: [{ homeTeamId: team.id }, { awayTeamId: team.id }] }, select: { id: true, homeTeamId: true, awayTeamId: true, homeGoals: true, awayGoals: true, homeShots: true, awayShots: true, endedIn: true, winnerTeamId: true } }),
     teamStatTotals(SEASON, team.league ?? "NHL").catch(() => []),
-    prisma.playerGameStat.aggregate({ where: gWhere, _sum: { faceoffWins: true, faceoffLosses: true } }),
+    prisma.playerGameStat.groupBy({
+      by: ["teamId"],
+      where: { game: { season: SEASON, league: team.league ?? "NHL", status: "FINAL", seriesId: null } },
+      _sum: { faceoffWins: true, faceoffLosses: true },
+    }),
     prisma.game.findMany({
       where: { season: SEASON, league: team.league ?? "NHL", status: "FINAL", seriesId: null, OR: [{ homeTeamId: team.id }, { awayTeamId: team.id }] },
       orderBy: [{ gameDate: "desc" }, { id: "desc" }],
@@ -171,20 +175,69 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
     const idx = sorted.findIndex((t) => t.teamId === team.id);
     return idx >= 0 ? idx + 1 : null;
   };
+  const getCustomRank = (valFn: (t: TeamStatTotal) => number, higherIsBetter = true) => {
+    if (!allTeamStats.length || !teamStats) return null;
+    const sorted = [...allTeamStats].sort((a, b) => {
+      const va = valFn(a);
+      const vb = valFn(b);
+      return higherIsBetter ? vb - va : va - vb;
+    });
+    const idx = sorted.findIndex((t) => t.teamId === team.id);
+    return idx >= 0 ? idx + 1 : null;
+  };
   const ord = (n: number | null) => {
     if (!n) return "";
     const s = ["th", "st", "nd", "rd"], v = n % 100;
     return n + (s[(v - 20) % 10] || s[v] || s[0]);
   };
+
   const rankPP = getLeagueRank("ppPct", true);
   const rankPK = getLeagueRank("pkPct", true);
   const rankGF = getLeagueRank("gfPerGame", true);
   const rankGA = getLeagueRank("gaPerGame", false);
 
-  const fWins = foAgg._sum.faceoffWins ?? 0;
-  const fLoss = foAgg._sum.faceoffLosses ?? 0;
+  // Blok A: Ofenzíva ranks
+  const rankSF = getLeagueRank("sfPerGame", true);
+  const rankSH = getCustomRank((t) => (t.shotsFor > 0 ? t.gf / t.shotsFor : 0), true);
+  const rankSHG = getLeagueRank("shGoals", true);
+  const rankXGF = getLeagueRank("xgf60", true);
+  const rankHDCF = getLeagueRank("hdcfPct", true);
+
+  // Blok B: Defenzíva ranks
+  const rankSA = getLeagueRank("saPerGame", false);
+  const rankSV = getCustomRank((t) => (t.shotsAgainst > 0 ? (t.shotsAgainst - t.ga) / t.shotsAgainst : 0), true);
+  const rankSO = getLeagueRank("shutouts", true);
+  const rankXGA = getLeagueRank("xga60", false);
+  const rankDIFF = getLeagueRank("diff", true);
+
+  // Blok C: Fyzická hra ranks
+  const rankHits = getCustomRank((t) => (t.gp ? t.hits / t.gp : 0), true);
+  const rankBlocks = getCustomRank((t) => (t.gp ? t.blocks / t.gp : 0), true);
+  const rankPIM = getCustomRank((t) => (t.gp ? t.pim / t.gp : 0), false);
+
+  // Faceoff calculation & ranking
+  const thisTeamFo = allFoAgg.find((f) => f.teamId === team.id);
+  const fWins = thisTeamFo?._sum.faceoffWins ?? 0;
+  const fLoss = thisTeamFo?._sum.faceoffLosses ?? 0;
   const fTotal = fWins + fLoss;
   const foPct = fTotal > 0 ? `${((fWins / fTotal) * 100).toFixed(1)}%` : "—";
+
+  const foMap = new Map<number, number>();
+  for (const row of allFoAgg) {
+    const w = row._sum.faceoffWins ?? 0;
+    const l = row._sum.faceoffLosses ?? 0;
+    const tot = w + l;
+    foMap.set(row.teamId, tot > 0 ? w / tot : 0);
+  }
+  const sortedFo = [...foMap.entries()].sort((a, b) => b[1] - a[1]);
+  const foIdx = sortedFo.findIndex(([tid]) => tid === team.id);
+  const rankFO = foIdx >= 0 ? foIdx + 1 : null;
+
+  const rankBadge = (rank: number | null) => {
+    if (!rank) return null;
+    const color = rank <= 10 ? "text-emerald-400" : rank <= 20 ? "text-amber-400" : "text-slate-400";
+    return <span className={`text-[10px] font-bold ${color}`}>({ord(rank)})</span>;
+  };
 
   let homeW = 0, homeL = 0, homeOtl = 0;
   let awayW = 0, awayL = 0, awayOtl = 0;
@@ -212,8 +265,8 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
     .filter((s) => s.division === team.division)
     .sort((a, b) => b.points - a.points || b.rw - a.rw || b.diff - a.diff);
 
-  const ppPct = teamStats?.ppOpp ? `${teamStats.ppPct.toFixed(1)}%` : "—";
-  const pkPct = teamStats?.timesSh ? `${teamStats.pkPct.toFixed(1)}%` : "—";
+  const ppPct = teamStats?.ppOpp ? `${(teamStats.ppPct * 100).toFixed(1)}%` : "—";
+  const pkPct = teamStats?.timesSh ? `${(teamStats.pkPct * 100).toFixed(1)}%` : "—";
 
   return (
     <div className="space-y-6">
@@ -399,23 +452,36 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
                     <div className="flex items-center gap-1.5 font-mono">
                       <span className="font-bold text-white">{sf}</span>
                       <span className="text-[10px] text-slate-500">({per(sf)} / gm)</span>
+                      {rankBadge(rankSF)}
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-400">Úspešnosť streľby (SH%):</span>
-                    <span className="font-mono font-bold text-white">{sf > 0 ? `${((gf / sf) * 100).toFixed(1)}%` : "—"}</span>
+                    <div className="flex items-center gap-1.5 font-mono">
+                      <span className="font-bold text-white">{sf > 0 ? `${((gf / sf) * 100).toFixed(1)}%` : "—"}</span>
+                      {rankBadge(rankSH)}
+                    </div>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-400">Góly v oslabení (SHG):</span>
-                    <span className="font-mono font-bold text-white">{teamStats?.shGoals ?? 0}</span>
+                    <div className="flex items-center gap-1.5 font-mono">
+                      <span className="font-bold text-white">{teamStats?.shGoals ?? 0}</span>
+                      {rankBadge(rankSHG)}
+                    </div>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-400">Očakávané góly (xGF/60):</span>
-                    <span className="font-mono font-bold text-sky-400">{teamStats?.xgf60 ? teamStats.xgf60.toFixed(2) : "—"}</span>
+                    <div className="flex items-center gap-1.5 font-mono">
+                      <span className="font-bold text-sky-400">{teamStats?.xgf60 ? teamStats.xgf60.toFixed(2) : "—"}</span>
+                      {rankBadge(rankXGF)}
+                    </div>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-400">Nebezpečné šance (HDCF%):</span>
-                    <span className="font-mono font-bold text-emerald-400">{teamStats?.hdcfPct ? `${teamStats.hdcfPct.toFixed(1)}%` : "—"}</span>
+                    <div className="flex items-center gap-1.5 font-mono">
+                      <span className="font-bold text-emerald-400">{teamStats?.hdcfPct ? `${(teamStats.hdcfPct * 100).toFixed(1)}%` : "—"}</span>
+                      {rankBadge(rankHDCF)}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -434,25 +500,38 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
                     <div className="flex items-center gap-1.5 font-mono">
                       <span className="font-bold text-white">{sa}</span>
                       <span className="text-[10px] text-slate-500">({per(sa)} / gm)</span>
+                      {rankBadge(rankSA)}
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-400">Úspešnosť zákrokov (SV%):</span>
-                    <span className="font-mono font-bold text-emerald-400">{sa > 0 ? `${(((sa - ga) / sa) * 100).toFixed(1)}%` : "—"}</span>
+                    <div className="flex items-center gap-1.5 font-mono">
+                      <span className="font-bold text-emerald-400">{sa > 0 ? `${(((sa - ga) / sa) * 100).toFixed(1)}%` : "—"}</span>
+                      {rankBadge(rankSV)}
+                    </div>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-400">Čisté kontá (Shutouts):</span>
-                    <span className="font-mono font-bold text-white">{teamStats?.shutouts ?? 0}</span>
+                    <div className="flex items-center gap-1.5 font-mono">
+                      <span className="font-bold text-white">{teamStats?.shutouts ?? 0}</span>
+                      {rankBadge(rankSO)}
+                    </div>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-400">Očak. inkasované (xGA/60):</span>
-                    <span className="font-mono font-bold text-emerald-400">{teamStats?.xga60 ? teamStats.xga60.toFixed(2) : "—"}</span>
+                    <div className="flex items-center gap-1.5 font-mono">
+                      <span className="font-bold text-emerald-400">{teamStats?.xga60 ? teamStats.xga60.toFixed(2) : "—"}</span>
+                      {rankBadge(rankXGA)}
+                    </div>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-400">Rozdiel gólov (DIFF):</span>
-                    <span className={`font-mono font-bold ${gf - ga >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                      {gf - ga > 0 ? `+${gf - ga}` : gf - ga}
-                    </span>
+                    <div className="flex items-center gap-1.5 font-mono">
+                      <span className={`font-bold ${gf - ga >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                        {gf - ga > 0 ? `+${gf - ga}` : gf - ga}
+                      </span>
+                      {rankBadge(rankDIFF)}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -468,13 +547,17 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
                 <div className="space-y-2 text-xs">
                   <div className="flex items-center justify-between">
                     <span className="text-slate-400">Vhadzovania (Faceoffs%):</span>
-                    <span className="font-mono font-bold text-amber-400">{foPct}</span>
+                    <div className="flex items-center gap-1.5 font-mono">
+                      <span className="font-bold text-amber-400">{foPct}</span>
+                      {rankBadge(rankFO)}
+                    </div>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-400">Hity (Hits):</span>
                     <div className="flex items-center gap-1.5 font-mono">
                       <span className="font-bold text-white">{teamStats?.hits ?? 0}</span>
                       <span className="text-[10px] text-slate-500">({gp ? ((teamStats?.hits ?? 0) / gp).toFixed(1) : "0"} / gm)</span>
+                      {rankBadge(rankHits)}
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
@@ -482,6 +565,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
                     <div className="flex items-center gap-1.5 font-mono">
                       <span className="font-bold text-white">{teamStats?.blocks ?? 0}</span>
                       <span className="text-[10px] text-slate-500">({gp ? ((teamStats?.blocks ?? 0) / gp).toFixed(1) : "0"} / gm)</span>
+                      {rankBadge(rankBlocks)}
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
@@ -489,6 +573,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
                     <div className="flex items-center gap-1.5 font-mono">
                       <span className="font-bold text-white">{teamStats?.pim ?? 0} min</span>
                       <span className="text-[10px] text-slate-500">({gp ? ((teamStats?.pim ?? 0) / gp).toFixed(1) : "0"} / gm)</span>
+                      {rankBadge(rankPIM)}
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
