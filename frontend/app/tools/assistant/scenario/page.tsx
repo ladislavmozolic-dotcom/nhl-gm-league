@@ -6,6 +6,7 @@ import { money } from "@/lib/finance";
 import { PageHeader, Card, BackPill } from "@/components/ui";
 import { parseMoves, runScenario, searchUfaPlayers, listTeamRoster, listNhlTeams } from "@/lib/gm-assistant/scenarioEngine";
 import { addSignMoveAction, addWalkMoveAction, addTradeMoveAction, removeMoveAction } from "./actions";
+import { getLang } from "@/lib/lang-server";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,9 @@ export default async function ScenarioPage({ searchParams }: { searchParams: Pro
   const teamId = await getTeamSession();
   if (teamId == null) notFound();
   if (!(await intelligenceAccess()).full) notFound();
+
+  const lang = await getLang();
+  const cs = lang === "cs";
 
   const sp = await searchParams;
   const movesRaw = sp.moves ?? "";
@@ -54,13 +58,13 @@ export default async function ScenarioPage({ searchParams }: { searchParams: Pro
     <div className="py-2 flex flex-col gap-6">
       <PageHeader
         title="🧪 Scenario Engine"
-        subtitle="UNHL Intelligence — „Čo ak?“ simulácia bez zápisu do ligy, kým reálne krok nevykonáš."
+        subtitle={cs ? "UNHL Intelligence — „Čo ak?“ simulácia bez zápisu do ligy, kým reálne krok nevykonáš." : "UNHL Intelligence — “What if?” sandboxed simulation without writing to the league."}
         right={<BackPill href="/tools/assistant">UNHL Intelligence</BackPill>}
       />
 
-      <Card title={`Kroky scenára (${result.moves.length})`} accent="text-blue-400">
+      <Card title={`${cs ? "Kroky scenára" : "Scenario Moves"} (${result.moves.length})`} accent="text-blue-400">
         {result.moves.length === 0 ? (
-          <p className="text-sm text-slate-400">Zatiaľ žiadny krok — pridaj podpis, trade alebo uvoľnenie hráča nižšie.</p>
+          <p className="text-sm text-slate-400">{cs ? "Zatiaľ žiadny krok — pridaj podpis, trade alebo uvoľnenie hráča nižšie." : "No moves yet — add a mock signing, trade or release below."}</p>
         ) : (
           <div className="flex flex-col gap-2">
             {result.moves.map((m, i) => (
@@ -72,7 +76,7 @@ export default async function ScenarioPage({ searchParams }: { searchParams: Pro
                 <form action={removeMoveAction}>
                   <input type="hidden" name="currentMoves" value={movesRaw} />
                   <input type="hidden" name="index" value={i} />
-                  <button type="submit" className="text-xs text-slate-500 hover:text-red-400 shrink-0">✕ odstrániť</button>
+                  <button type="submit" className="text-xs text-slate-500 hover:text-red-400 shrink-0">✕ {cs ? "odstrániť" : "remove"}</button>
                 </form>
               </div>
             ))}
@@ -81,14 +85,14 @@ export default async function ScenarioPage({ searchParams }: { searchParams: Pro
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card title="Podpísať voľného agenta" accent="text-emerald-400">
+        <Card title={cs ? "Podpísať voľného agenta" : "Mock Sign UFA"} accent="text-emerald-400">
           <form method="get" className="flex gap-2 mb-3">
             <input type="hidden" name="moves" value={movesRaw} />
             {partner && <input type="hidden" name="partner" value={partner.id} />}
-            <input name="qsign" defaultValue={qsign} placeholder="Meno hráča…" className={inputCls} />
-            <button type="submit" className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm text-slate-200 shrink-0">Hľadať</button>
+            <input name="qsign" defaultValue={qsign} placeholder={cs ? "Meno hráča…" : "Player name…"} className={inputCls} />
+            <button type="submit" className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm text-slate-200 shrink-0">{cs ? "Hľadať" : "Search"}</button>
           </form>
-          {qsign && signCandidates.length === 0 && <p className="text-xs text-slate-500">Žiadny voľný agent nezodpovedá „{qsign}“.</p>}
+          {qsign && signCandidates.length === 0 && <p className="text-xs text-slate-500">{cs ? `Žiadny voľný agent nezodpovedá „${qsign}“.` : `No UFA matches “${qsign}”.`}</p>}
           <div className="flex flex-col gap-2 max-h-80 overflow-y-auto">
             {signCandidates.map((p) => (
               <form key={p.id} action={addSignMoveAction} className="flex flex-col gap-1.5 border border-slate-800 rounded-lg p-2">
@@ -99,36 +103,36 @@ export default async function ScenarioPage({ searchParams }: { searchParams: Pro
                   <input name="capHit" type="number" step={50000} min={0} defaultValue={1000000} className="w-24 bg-slate-800 rounded px-1.5 py-1 text-xs text-white" />
                   <span className="text-[11px] text-slate-500">×</span>
                   <input name="years" type="number" min={1} max={8} defaultValue={1} className="w-12 bg-slate-800 rounded px-1.5 py-1 text-xs text-white" />
-                  <span className="text-[11px] text-slate-500">r.</span>
-                  <button type="submit" className="ml-auto text-xs px-2 py-1 rounded bg-emerald-700 hover:bg-emerald-600 text-white font-semibold">Pridať</button>
+                  <span className="text-[11px] text-slate-500">{cs ? "r." : "yr"}</span>
+                  <button type="submit" className="ml-auto text-xs px-2 py-1 rounded bg-emerald-700 hover:bg-emerald-600 text-white font-semibold">{cs ? "Pridať" : "Add"}</button>
                 </div>
               </form>
             ))}
           </div>
         </Card>
 
-        <Card title="Pustiť hráča z kádra" accent="text-amber-400">
-          <p className="text-xs text-slate-500 mb-2">Zjednodušene: hráč odchádza bez náhrady a bez capu — bez modelu odstupného/buyoutu.</p>
+        <Card title={cs ? "Pustiť hráča z kádra" : "Release Player"} accent="text-amber-400">
+          <p className="text-xs text-slate-500 mb-2">{cs ? "Zjednodušene: hráč odchádza bez náhrady a bez capu — bez modelu odstupného/buyoutu." : "Simplified: player leaves with zero return and zero dead cap."}</p>
           <div className="flex flex-col gap-1.5 max-h-80 overflow-y-auto">
             {availableMine.map((p) => (
               <form key={p.id} action={addWalkMoveAction} className="flex items-center justify-between gap-2">
                 <input type="hidden" name="currentMoves" value={movesRaw} />
                 <input type="hidden" name="playerId" value={p.id} />
                 <span className="text-xs text-slate-300 truncate">{cleanName(p.name)} <span className="text-slate-500">({p.position}, {money(p.capHit ?? 0)})</span></span>
-                <button type="submit" className="text-xs px-2 py-0.5 rounded bg-amber-800/60 hover:bg-amber-700 text-white shrink-0">Pustiť</button>
+                <button type="submit" className="text-xs px-2 py-0.5 rounded bg-amber-800/60 hover:bg-amber-700 text-white shrink-0">{cs ? "Pustiť" : "Release"}</button>
               </form>
             ))}
           </div>
         </Card>
 
-        <Card title="Navrhnúť trade" accent="text-blue-400">
+        <Card title={cs ? "Navrhnúť trade" : "Mock Trade"} accent="text-blue-400">
           <form method="get" className="flex gap-2 mb-3">
             <input type="hidden" name="moves" value={movesRaw} />
             <select name="partner" defaultValue={partner?.id ?? ""} className={inputCls}>
-              <option value="">Zvoľ tím…</option>
+              <option value="">{cs ? "Zvoľ tím…" : "Select partner…"}</option>
               {teams.filter((t) => t.id !== teamId).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
-            <button type="submit" className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm text-slate-200 shrink-0">Zvoliť</button>
+            <button type="submit" className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm text-slate-200 shrink-0">{cs ? "Zvoliť" : "Select"}</button>
           </form>
           {partner && (
             <form action={addTradeMoveAction} className="flex flex-col gap-3">
@@ -136,7 +140,7 @@ export default async function ScenarioPage({ searchParams }: { searchParams: Pro
               <input type="hidden" name="partnerTeamId" value={partner.id} />
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <p className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Dávaš</p>
+                  <p className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">{cs ? "Dávaš" : "Giving"}</p>
                   <div className="flex flex-col gap-1 max-h-56 overflow-y-auto">
                     {availableMine.map((p) => (
                       <label key={p.id} className="flex items-center gap-2 text-xs text-slate-300">
@@ -147,7 +151,7 @@ export default async function ScenarioPage({ searchParams }: { searchParams: Pro
                   </div>
                 </div>
                 <div>
-                  <p className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Dostávaš ({partner.name})</p>
+                  <p className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">{cs ? `Dostávaš (${partner.name})` : `Getting (${partner.name})`}</p>
                   <div className="flex flex-col gap-1 max-h-56 overflow-y-auto">
                     {partnerRoster.map((p) => (
                       <label key={p.id} className="flex items-center gap-2 text-xs text-slate-300">
@@ -158,22 +162,24 @@ export default async function ScenarioPage({ searchParams }: { searchParams: Pro
                   </div>
                 </div>
               </div>
-              <button type="submit" className="self-start text-xs px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold">Pridať trade do scenára</button>
+              <button type="submit" className="self-start text-xs px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold">
+                {cs ? "Pridať trade do scenára" : "Add trade to scenario"}
+              </button>
             </form>
           )}
         </Card>
       </div>
 
-      <Card title="Dopad na cap podľa sezón" accent="text-blue-400">
-        <p className="text-xs text-slate-500 mb-3">Projekcia z reálnych zmlúv (rovnaká logika ako Cap Central) — strop ligy je aktuálne {money(result.capCeiling)}, najlepší dostupný odhad pre budúce sezóny.</p>
+      <Card title={cs ? "Dopad na cap podľa sezón" : "Cap Impact by Season"} accent="text-blue-400">
+        <p className="text-xs text-slate-500 mb-3">{cs ? `Projekcia z reálnych zmlúv (rovnaká logika ako Cap Central) — strop ligy je aktuálne ${money(result.capCeiling)}, najlepší dostupný odhad pre budúce sezóny.` : `Projected from contracts — league cap ceiling is currently ${money(result.capCeiling)}.`}</p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-slate-400 border-b border-slate-800">
-                <th className="py-1.5 pr-3">Sezóna</th>
-                <th className="py-1.5 pr-3">Pred</th>
-                <th className="py-1.5 pr-3">Po</th>
-                <th className="py-1.5">Zmena</th>
+                <th className="py-1.5 pr-3">{cs ? "Sezóna" : "Season"}</th>
+                <th className="py-1.5 pr-3">{cs ? "Pred" : "Before"}</th>
+                <th className="py-1.5 pr-3">{cs ? "Po" : "After"}</th>
+                <th className="py-1.5">{cs ? "Zmena" : "Delta"}</th>
               </tr>
             </thead>
             <tbody>
@@ -192,9 +198,9 @@ export default async function ScenarioPage({ searchParams }: { searchParams: Pro
         </div>
       </Card>
 
-      <Card title="Priemerný vek kádra" accent="text-blue-400">
+      <Card title={cs ? "Priemerný vek kádra" : "Average Roster Age"} accent="text-blue-400">
         {result.avgAge.before == null ? (
-          <p className="text-sm text-slate-400">Nedá sa vypočítať — roster nemá hráčov s vekom.</p>
+          <p className="text-sm text-slate-400">{cs ? "Nedá sa vypočítať — roster nemá hráčov s vekom." : "Cannot compute — roster lacks players with age."}</p>
         ) : (
           <p className="text-sm text-slate-300">
             <span className="font-semibold text-slate-200">{result.avgAge.before.toFixed(1)}</span> → <span className="font-semibold text-slate-200">{result.avgAge.after?.toFixed(1)}</span>
@@ -205,8 +211,8 @@ export default async function ScenarioPage({ searchParams }: { searchParams: Pro
         )}
       </Card>
 
-      <Card title="Posuny v rebríčku formácií/párov" accent="text-blue-400">
-        <p className="text-xs text-slate-500 mb-3">Rovnaké sloty a Role Score (resp. Goalie Quality Score pre brankárov) ako Analyze My Roster — po zmene sa zostava aj u dotknutých tímov prepočíta cez auto-lineup.</p>
+      <Card title={cs ? "Posuny v rebríčku formácií/párov" : "Line Rank Shifts"} accent="text-blue-400">
+        <p className="text-xs text-slate-500 mb-3">{cs ? "Rovnaké sloty a Role Score ako Analyze My Roster — po zmene sa zostava prepočíta cez auto-lineup." : "Same slots and Role Scores as Analyze My Roster — recomputed via auto-lineup."}</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {result.slots.map((s) => (
             <div key={s.id} className="border border-slate-800 bg-slate-900/40 rounded-xl p-3">
@@ -217,9 +223,9 @@ export default async function ScenarioPage({ searchParams }: { searchParams: Pro
                 )}
               </div>
               <p className="text-xs text-slate-400">
-                {s.before ? `${s.before.rank}. z ${s.before.size} (${s.before.avg})` : "nemáš tu nikoho"}
+                {s.before ? (cs ? `${s.before.rank}. z ${s.before.size} (${s.before.avg})` : `#${s.before.rank} of ${s.before.size} (${s.before.avg})`) : (cs ? "nemáš tu nikoho" : "none")}
                 {" → "}
-                {s.after ? `${s.after.rank}. z ${s.after.size} (${s.after.avg})` : "nemáš tu nikoho"}
+                {s.after ? (cs ? `${s.after.rank}. z ${s.after.size} (${s.after.avg})` : `#${s.after.rank} of ${s.after.size} (${s.after.avg})`) : (cs ? "nemáš tu nikoho" : "none")}
               </p>
             </div>
           ))}

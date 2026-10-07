@@ -6,17 +6,9 @@ import { findTradePartners } from "@/lib/gm-assistant/findTradePartners";
 import { SLOTS } from "@/lib/gm-assistant/leagueSlots";
 import { cleanName } from "@/lib/playerName";
 import { PageHeader, Card, BackPill } from "@/components/ui";
+import { getLang } from "@/lib/lang-server";
 
 export const dynamic = "force-dynamic";
-
-// UNHL Intelligence — "Find Trade Partner". Same rule as the other two tools:
-// no trade-value model, no willingness-to-deal guess. A slot you're weak at
-// (from Analyze My Roster) is ranked league-wide, and every other club is
-// listed in that order — nothing more than "here's where everyone else
-// stands at this slot right now". Clubs ranked above you are the real
-// surplus-seller candidates (highlighted); clubs at/below your own rank are
-// still shown for full league context, just dimmed. Open to any logged-in
-// GM (see memory: gm-assistant-intelligence) — 404s otherwise.
 
 const inputCls = "w-full bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500";
 const labelCls = "block text-xs uppercase tracking-wide text-slate-400 mb-1";
@@ -25,6 +17,9 @@ export default async function FindTradePartnerPage({ searchParams }: { searchPar
   const teamId = await getTeamSession();
   if (teamId == null) notFound();
   if (!(await intelligenceAccess()).full) notFound();
+
+  const lang = await getLang();
+  const cs = lang === "cs";
 
   const { slot: slotParam } = await searchParams;
   const slotId = SLOTS.some((s) => s.id === slotParam) ? (slotParam as string) : SLOTS[0].id;
@@ -42,35 +37,44 @@ export default async function FindTradePartnerPage({ searchParams }: { searchPar
       <Card bodyClassName="p-4">
         <form method="get" className="flex items-end gap-3">
           <div className="flex-1 max-w-xs">
-            <label className={labelCls}>Ktorý slot v zostave hľadáš posilniť?</label>
+            <label className={labelCls}>
+              {cs ? "Ktorý slot v zostave hľadáš posilniť?" : "Which roster slot are you looking to upgrade?"}
+            </label>
             <select name="slot" defaultValue={slotId} className={inputCls}>
               {SLOTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
             </select>
           </div>
-          <button type="submit" className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold">Hľadať</button>
+          <button type="submit" className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold">
+            {cs ? "Hľadať" : "Search"}
+          </button>
         </form>
       </Card>
 
       {!result ? (
-        <Card><p className="text-slate-500 text-center py-8">Neplatný slot.</p></Card>
+        <Card><p className="text-slate-500 text-center py-8">{cs ? "Neplatný slot." : "Invalid slot."}</p></Card>
       ) : (
         <>
-          <Card title="Tvoja pozícia" accent="text-blue-400">
+          <Card title={cs ? "Tvoja pozícia" : "Your Standing"} accent="text-blue-400">
             {result.myRank == null ? (
-              <p className="text-sm text-slate-400">Na tomto slote nemáš nikoho — každý klub v zozname nižšie je kandidát.</p>
+              <p className="text-sm text-slate-400">
+                {cs ? "Na tomto slote nemáš nikoho — každý klub v zozname nižšie je kandidát." : "No players at this slot — all clubs below are surplus candidates."}
+              </p>
             ) : (
               <div className="flex flex-col gap-2">
                 <p className="text-sm text-slate-400">
-                  {result.slot.label} — priemer <span className="text-slate-200 font-semibold">{result.myAvg}</span> rating,{" "}
-                  {result.myRank}. miesto z {result.leagueSize} klubov{result.myAuto ? " (z automaticky poskladanej zostavy — nemáš uložené vlastné formácie)" : ""}.
+                  {result.slot.label} — {cs ? "priemer" : "avg"} <span className="text-slate-200 font-semibold">{result.myAvg}</span> rating,{" "}
+                  {result.myRank}. {cs ? "miesto z" : "of"} {result.leagueSize} {cs ? "klubov" : "clubs"}
+                  {result.myAuto ? (cs ? " (z automaticky poskladanej zostavy — nemáš uložené vlastné formácie)" : " (from auto-lines — no saved custom lines)") : ""}.
                 </p>
               </div>
             )}
           </Card>
 
-          <Card title={`Kandidáti (${result.candidates.length})`} accent="text-emerald-400" bodyClassName="p-3">
+          <Card title={`${cs ? "Kandidáti" : "Candidates"} (${result.candidates.length})`} accent="text-emerald-400" bodyClassName="p-3">
             {result.candidates.length === 0 ? (
-              <p className="text-slate-500 text-center py-8">Na tomto slote nemá nikoho žiadny iný klub v lige.</p>
+              <p className="text-slate-500 text-center py-8">
+                {cs ? "Na tomto slote nemá nikoho žiadny iný klub v lige." : "No other clubs currently field players at this slot."}
+              </p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {result.candidates.map((c) => {
@@ -79,9 +83,11 @@ export default async function FindTradePartnerPage({ searchParams }: { searchPar
                   <div key={c.teamId} className="border border-slate-800 bg-slate-900/40 rounded-xl p-3.5 flex flex-col gap-2">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-bold text-slate-200">{c.teamName}</span>
-                      <span className={`text-xs font-bold ${isBetter ? "text-emerald-400" : "text-slate-500"}`}>{c.rank}. miesto — {c.avg} rating</span>
+                      <span className={`text-xs font-bold ${isBetter ? "text-emerald-400" : "text-slate-500"}`}>
+                        {c.rank}. {cs ? "miesto" : "rank"} — {c.avg} rating
+                      </span>
                     </div>
-                    {c.isAuto && <p className="text-[11px] text-amber-400/80">z automaticky poskladanej zostavy — klub nemá uložené vlastné formácie</p>}
+                    {c.isAuto && <p className="text-[11px] text-amber-400/80">{cs ? "z automaticky poskladanej zostavy — klub nemá uložené vlastné formácie" : "from auto-lines — club has not saved custom lines"}</p>}
                     <div className="flex flex-wrap gap-x-3 gap-y-1">
                       {c.players.map((p) => (
                         <Link key={p.id} href={`/players/${p.slug}`} className="text-xs text-slate-300 hover:text-blue-400">
@@ -90,7 +96,7 @@ export default async function FindTradePartnerPage({ searchParams }: { searchPar
                       ))}
                     </div>
                     <Link href={`/trades/build?opp=${c.teamId}`} className="self-start mt-1 text-xs px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold">
-                      Navrhnúť trade →
+                      {cs ? "Navrhnúť trade →" : "Propose Trade →"}
                     </Link>
                   </div>
                   );

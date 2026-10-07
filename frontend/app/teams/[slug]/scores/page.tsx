@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card } from "@/components/ui";
+import { getLang } from "@/lib/lang-server";
 
 export const dynamic = "force-dynamic";
 const SEASON = "2026-27";
@@ -22,6 +23,9 @@ function ResultBadge({ result }: { result: "W" | "L" | "OTL" }) {
 
 export default async function TeamScoresPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
+  const lang = await getLang();
+  const cs = lang === "cs";
+  const locale = cs ? "sk-SK" : lang === "de" ? "de-DE" : lang === "ru" ? "ru-RU" : "en-US";
   const team = await prisma.team.findUnique({ where: { slug } });
   if (!team) notFound();
 
@@ -40,13 +44,13 @@ export default async function TeamScoresPage({ params }: { params: Promise<{ slu
     },
   });
 
-  const fmtDate = (d: Date | null) => (d ? d.toLocaleDateString("sk-SK", { day: "numeric", month: "short" }) : "—");
+  const fmtDate = (d: Date | null) => (d ? d.toLocaleDateString(locale, { day: "numeric", month: "short", timeZone: "UTC" }) : "—");
 
   if (games.length === 0) {
     return (
       <div className="space-y-6">
-        <Card title="Results" accent="text-blue-400">
-          <p className="text-slate-500 text-center py-8">No results yet.</p>
+        <Card title={cs ? "Výsledky" : "Results"} accent="text-blue-400">
+          <p className="text-slate-500 text-center py-8">{cs ? "Zatiaľ žiadne výsledky." : "No results yet."}</p>
         </Card>
       </div>
     );
@@ -54,14 +58,14 @@ export default async function TeamScoresPage({ params }: { params: Promise<{ slu
 
   return (
     <div className="space-y-6">
-      <Card title="Results" accent="text-blue-400" bodyClassName="p-0">
+      <Card title={cs ? "Výsledky" : "Results"} accent="text-blue-400" bodyClassName="p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-800/30 border-b border-slate-800 text-slate-500 text-xs uppercase tracking-wider">
-                <th className="px-4 py-3 text-left font-medium w-20">Date</th>
-                <th className="px-4 py-3 text-left font-medium">Opponent</th>
-                <th className="px-4 py-3 text-right font-medium w-28">Result</th>
+                <th className="px-4 py-3 text-left font-medium w-20">{cs ? "Dátum" : "Date"}</th>
+                <th className="px-4 py-3 text-left font-medium">{cs ? "Súper" : "Opponent"}</th>
+                <th className="px-4 py-3 text-right font-medium w-28">{cs ? "Výsledok" : "Result"}</th>
               </tr>
             </thead>
             <tbody>

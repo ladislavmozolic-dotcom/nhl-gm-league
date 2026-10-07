@@ -7,6 +7,7 @@ import { liveCapHit } from "@/lib/finance";
 import { SKATER_ATTRS, GOALIE_ATTRS } from "@/lib/ratingBands";
 import { PageHeader, Card, BackPill } from "@/components/ui";
 import SortableTable, { type SortCol, type SortRow } from "@/components/SortableTable";
+import { getLang } from "@/lib/lang-server";
 
 export const dynamic = "force-dynamic";
 
@@ -74,6 +75,8 @@ export default async function FindPlayerPage({ searchParams }: { searchParams: P
   if (!(await intelligenceAccess()).full) notFound();
 
   const sp = await searchParams;
+  const lang = await getLang();
+  const cs = lang === "cs";
   const f = parseFilters(sp);
   const isGoalieSearch = f.searchGoalies;
 
@@ -132,7 +135,7 @@ export default async function FindPlayerPage({ searchParams }: { searchParams: P
     { key: "shoots", label: "Shoots", kind: "text" },
     { key: "age", label: "Age", kind: "num" },
     ...attrs.map((a): SortCol => ({ key: a.key, label: a.label, kind: "num" })),
-    { key: "ovr", label: "OVR", kind: "ovr", title: "Orientačné celkové číslo — na hľadanie použi radšej konkrétne parametre" },
+    { key: "ovr", label: "OVR", kind: "ovr", title: cs ? "Orientačné celkové číslo — na hľadanie použi radšej konkrétne parametre" : "General headline rating — scout by specific attributes instead" },
     { key: "cap", label: "Cap Hit", kind: "money" },
     { key: "yrs", label: "Yrs", kind: "years" },
     { key: "status", label: "Status", kind: "text" },
@@ -152,7 +155,7 @@ export default async function FindPlayerPage({ searchParams }: { searchParams: P
       <Card bodyClassName="p-4">
         <form method="get" className="flex flex-col gap-3">
           <div>
-            <label className={labelCls}>Pozícia (viac možností)</label>
+            <label className={labelCls}>{cs ? "Pozícia (viac možností)" : "Position (multi-select)"}</label>
             <div className="flex flex-wrap gap-x-4 gap-y-1.5">
               {SKATER_POS.map((p) => (
                 <label key={p} className="flex items-center gap-1.5 text-sm text-slate-200">
@@ -164,7 +167,9 @@ export default async function FindPlayerPage({ searchParams }: { searchParams: P
                 <input type="checkbox" name="pos" value="G" defaultChecked={f.searchGoalies} className="w-4 h-4" />
                 G
               </label>
-              <span className="text-[11px] text-slate-500 self-center">nič nezaškrtnuté = všetky korčuliari; G prepne hľadanie na brankárov</span>
+              <span className="text-[11px] text-slate-500 self-center">
+                {cs ? "nič nezaškrtnuté = všetky korčuliari; G prepne hľadanie na brankárov" : "unchecked = all skaters; G switches search to goalies"}
+              </span>
             </div>
           </div>
 
@@ -172,32 +177,34 @@ export default async function FindPlayerPage({ searchParams }: { searchParams: P
             <div>
               <label className={labelCls}>Status</label>
               <select name="rosterType" defaultValue={f.rosterType} className={inputCls}>
-                {ROSTER_TYPES.map((r) => <option key={r} value={r}>{r === "ANY" ? "Akýkoľvek" : r}</option>)}
+                {ROSTER_TYPES.map((r) => <option key={r} value={r}>{r === "ANY" ? (cs ? "Akýkoľvek" : "Any") : r}</option>)}
               </select>
             </div>
             <div>
               <label className={labelCls}>Shoots</label>
               <select name="shoots" defaultValue={f.shoots} className={inputCls}>
-                {SHOOTS.map((s) => <option key={s} value={s}>{s === "ANY" ? "Akákoľvek" : s}</option>)}
+                {SHOOTS.map((s) => <option key={s} value={s}>{s === "ANY" ? (cs ? "Akákoľvek" : "Any") : s}</option>)}
               </select>
             </div>
             <div>
               <label className={labelCls}>Max Cap Hit ($M)</label>
-              <input type="number" name="maxCap" min={0} step={0.1} defaultValue={f.maxCap != null ? f.maxCap / 1_000_000 : ""} className={inputCls} placeholder="bez limitu" />
+              <input type="number" name="maxCap" min={0} step={0.1} defaultValue={f.maxCap != null ? f.maxCap / 1_000_000 : ""} className={inputCls} placeholder={cs ? "bez limitu" : "no limit"} />
             </div>
             <div>
-              <label className={labelCls}>Max vek</label>
-              <input type="number" name="maxAge" min={17} max={45} defaultValue={f.maxAge ?? ""} className={inputCls} placeholder="bez limitu" />
+              <label className={labelCls}>{cs ? "Max vek" : "Max Age"}</label>
+              <input type="number" name="maxAge" min={17} max={45} defaultValue={f.maxAge ?? ""} className={inputCls} placeholder={cs ? "bez limitu" : "no limit"} />
             </div>
             <div className="flex items-center gap-2 pb-2.5">
               <input type="checkbox" id="tradeBlockOnly" name="tradeBlockOnly" value="1" defaultChecked={f.tradeBlockOnly} className="w-4 h-4" />
-              <label htmlFor="tradeBlockOnly" className="text-sm text-slate-300">Iba Trade Block</label>
+              <label htmlFor="tradeBlockOnly" className="text-sm text-slate-300">{cs ? "Iba Trade Block" : "Trade Block Only"}</label>
             </div>
           </div>
 
           {!f.searchGoalies && (
             <div>
-              <label className={`${labelCls} mb-1.5`}>Min. parametre (OVR je len orientačné — hľadaj radšej podľa týchto)</label>
+              <label className={`${labelCls} mb-1.5`}>
+                {cs ? "Min. parametre (OVR je len orientačné — hľadaj radšej podľa týchto)" : "Min. attributes (scout by specific attributes instead of OVR)"}
+              </label>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div>
                   <label className="block text-[11px] text-slate-500 mb-1">CK — Checking</label>
@@ -220,15 +227,17 @@ export default async function FindPlayerPage({ searchParams }: { searchParams: P
           )}
 
           <div className="flex gap-2">
-            <button type="submit" className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold">Hľadať</button>
+            <button type="submit" className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold">
+              {cs ? "Hľadať" : "Search"}
+            </button>
             <Link href="/tools/assistant/find-player" className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-semibold">Reset</Link>
           </div>
         </form>
       </Card>
 
-      <Card title={`Výsledky (${rows.length})`} bodyClassName="p-2">
+      <Card title={`${cs ? "Výsledky" : "Results"} (${rows.length})`} bodyClassName="p-2">
         {rows.length === 0 ? (
-          <p className="text-slate-500 text-center py-8">Žiadny hráč nezodpovedá filtrom.</p>
+          <p className="text-slate-500 text-center py-8">{cs ? "Žiadny hráč nezodpovedá filtrom." : "No players match the selected filters."}</p>
         ) : (
           <SortableTable cols={cols} rows={rows} initialSort={isGoalieSearch ? "ovr" : "sc"} minWidth={1400} />
         )}

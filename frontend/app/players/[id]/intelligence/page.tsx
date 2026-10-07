@@ -6,6 +6,7 @@ import { PageHeader, BackPill } from "@/components/ui";
 import PlayerIntelligenceCard from "@/components/PlayerIntelligenceCard";
 import PlayerFitCard from "@/components/PlayerFitCard";
 import ContractIntelCard from "@/components/ContractIntelCard";
+import { getLang } from "@/lib/lang-server";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,8 @@ export default async function PlayerIntelligencePage({ params }: { params: Promi
   const { id } = await params;
   const gmTeamId = await getTeamSession();
   if (gmTeamId == null) notFound();
+  const lang = await getLang();
+  const cs = lang === "cs";
 
   const where = /^\d+$/.test(id) ? { id: parseInt(id, 10) } : { slug: id };
   const player = await prisma.player.findFirst({
@@ -44,7 +47,7 @@ export default async function PlayerIntelligencePage({ params }: { params: Promi
           </span>
         }
         subtitle={player.team ? player.team.name : "Free Agent"}
-        right={<BackPill href={`/players/${player.id}`}>Späť na profil</BackPill>}
+        right={<BackPill href={`/players/${player.id}`}>{cs ? "Späť na profil" : "Back to profile"}</BackPill>}
       />
       <PlayerIntelligenceCard playerId={player.id} />
       <PlayerFitCard playerId={player.id} playerTeamId={player.teamId ?? null} viewerTeamId={gmTeamId} />

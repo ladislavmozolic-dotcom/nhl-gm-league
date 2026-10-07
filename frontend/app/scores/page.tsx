@@ -6,12 +6,18 @@ import { seasonForPhase, normalizePhase } from "@/lib/phase";
 import { defaultStatsPhase } from "@/lib/calendar-server";
 import { computeStandings } from "@/lib/sim/standings";
 import { cleanName } from "@/lib/playerName";
+import { getLang } from "@/lib/lang-server";
+import type { Lang } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
-const pretty = (d: Date) =>
-  d.toLocaleDateString("sk-SK", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+const localeOf = (lang: Lang) => (lang === "cs" ? "sk-SK" : lang === "de" ? "de-DE" : lang === "ru" ? "ru-RU" : "en-US");
+const tr = (lang: Lang, en: string, cs: string) => (lang === "cs" ? cs : en);
+const gamesWord = (lang: Lang, n: number) =>
+  lang === "cs" ? (n === 1 ? "zápas" : n > 1 && n < 5 ? "zápasy" : "zápasov") : n === 1 ? "game" : "games";
+const pretty = (d: Date, lang: Lang) =>
+  d.toLocaleDateString(localeOf(lang), { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
 type GoalItem = {
   id: number;
@@ -82,8 +88,10 @@ function FeaturedGameHero({
   g,
   homeRecord,
   awayRecord,
+  lang,
 }: {
   g: GameRow;
+  lang: Lang;
   homeRecord?: string | null;
   awayRecord?: string | null;
 }) {
@@ -103,32 +111,32 @@ function FeaturedGameHero({
         <div className="flex flex-wrap items-center justify-between gap-2 mb-5">
           <div className="flex items-center gap-2">
             <span className="px-3 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-sm">
-              <span>🔥</span> ŠLÁGER DŇA
+              <span>🔥</span> {tr(lang, "GAME OF THE DAY", "ŠLÁGER DŇA")}
             </span>
             <span className="text-xs text-slate-400">
-              {g.eventTitle || g.eventVenue || g.homeTeam.arena || "Aréna"}
-              {g.attendance ? ` · ${g.attendance.toLocaleString()} divákov` : ""}
+              {g.eventTitle || g.eventVenue || g.homeTeam.arena || tr(lang, "Arena", "Aréna")}
+              {g.attendance ? ` · ${g.attendance.toLocaleString(localeOf(lang))} ${tr(lang, "fans", "divákov")}` : ""}
             </span>
           </div>
           <div>
             {isFinal ? (
               g.endedIn === "OT" ? (
                 <span className="px-3 py-1 rounded-lg text-xs font-black uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                  KONIEC (PO PREDĹŽENÍ)
+                  {tr(lang, "FINAL (OT)", "KONIEC (PO PREDĹŽENÍ)")}
                 </span>
               ) : g.endedIn === "SO" ? (
                 <span className="px-3 py-1 rounded-lg text-xs font-black uppercase bg-purple-500/20 text-purple-300 border border-purple-500/40">
-                  KONIEC (PO NÁJAZDOCH)
+                  {tr(lang, "FINAL (SO)", "KONIEC (PO NÁJAZDOCH)")}
                 </span>
               ) : (
                 <span className="px-3 py-1 rounded-lg text-xs font-bold uppercase bg-slate-800 text-slate-200 border border-slate-700">
-                  KONIEC (FINAL)
+                  {tr(lang, "FINAL", "KONIEC")}
                 </span>
               )
             ) : (
               <span className="px-3 py-1 rounded-lg text-xs font-bold uppercase bg-sky-500/20 text-sky-400 border border-sky-500/40 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
-                NA PROGRAME
+                {tr(lang, "SCHEDULED", "NA PROGRAME")}
               </span>
             )}
           </div>
@@ -146,13 +154,13 @@ function FeaturedGameHero({
             </div>
             <div className="min-w-0">
               <span className="text-[11px] uppercase font-bold text-slate-400 block">
-                Hosťujúci tím {awayRecord ? `(${awayRecord})` : ""}
+                {tr(lang, "Away", "Hosťujúci tím")} {awayRecord ? `(${awayRecord})` : ""}
               </span>
               <h3 className={`text-lg sm:text-xl font-black truncate leading-tight ${isFinal ? (aw ? "text-white" : "text-slate-400") : "text-white"}`}>
                 {g.awayTeam.name}
               </h3>
               {g.awayShots != null && (
-                <span className="text-xs text-slate-400 mt-0.5 block">Strely: {g.awayShots}</span>
+                <span className="text-xs text-slate-400 mt-0.5 block">{tr(lang, "Shots", "Strely")}: {g.awayShots}</span>
               )}
             </div>
           </div>
@@ -171,7 +179,7 @@ function FeaturedGameHero({
             {periodsStr && (
               <div className="mt-2">
                 <span className="px-2.5 py-0.5 rounded-md bg-slate-900 border border-slate-800 text-[11px] text-slate-300 font-mono">
-                  Tretiny: ({periodsStr})
+                  {tr(lang, "Periods", "Tretiny")}: ({periodsStr})
                 </span>
               </div>
             )}
@@ -181,13 +189,13 @@ function FeaturedGameHero({
           <div className="md:col-span-4 flex items-center justify-end gap-4 text-right">
             <div className="min-w-0">
               <span className="text-[11px] uppercase font-bold text-slate-400 block">
-                Domáci tím {homeRecord ? `(${homeRecord})` : ""}
+                {tr(lang, "Home", "Domáci tím")} {homeRecord ? `(${homeRecord})` : ""}
               </span>
               <h3 className={`text-lg sm:text-xl font-black truncate leading-tight ${isFinal ? (hw ? "text-white" : "text-slate-400") : "text-white"}`}>
                 {g.homeTeam.name}
               </h3>
               {g.homeShots != null && (
-                <span className="text-xs text-slate-400 mt-0.5 block">Strely: {g.homeShots}</span>
+                <span className="text-xs text-slate-400 mt-0.5 block">{tr(lang, "Shots", "Strely")}: {g.homeShots}</span>
               )}
             </div>
             <div className="rounded-2xl bg-slate-800/80 border border-slate-700/60 p-2.5 flex items-center justify-center shadow-lg shrink-0" style={{ width: 72, height: 72, minWidth: 72 }}>
@@ -205,13 +213,13 @@ function FeaturedGameHero({
           <div className="text-xs text-slate-300 space-y-1 min-w-0 flex-1">
             {awayScorers && (
               <div className="flex items-center gap-2 truncate">
-                <span className="text-blue-400 font-bold shrink-0">{g.awayTeam.code || "HOSTIA"}:</span>
+                <span className="text-blue-400 font-bold shrink-0">{g.awayTeam.code || tr(lang, "AWAY", "HOSTIA")}:</span>
                 <span className="truncate text-slate-300">{awayScorers}</span>
               </div>
             )}
             {homeScorers && (
               <div className="flex items-center gap-2 truncate">
-                <span className="text-amber-400 font-bold shrink-0">{g.homeTeam.code || "DOMÁCI"}:</span>
+                <span className="text-amber-400 font-bold shrink-0">{g.homeTeam.code || tr(lang, "HOME", "DOMÁCI")}:</span>
                 <span className="truncate text-slate-300">{homeScorers}</span>
               </div>
             )}
@@ -221,7 +229,7 @@ function FeaturedGameHero({
             href={`/games/${g.id}`}
             className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-600/30 flex items-center gap-2 transition-all shrink-0 self-end sm:self-auto"
           >
-            <span>Detailný zápis zo zápasu (Boxscore)</span>
+            <span>{tr(lang, "Full Boxscore", "Detailný zápis zo zápasu (Boxscore)")}</span>
             <span>→</span>
           </Link>
         </div>
@@ -234,8 +242,10 @@ function ScoreCard({
   g,
   homeRecord,
   awayRecord,
+  lang,
 }: {
   g: GameRow;
+  lang: Lang;
   homeRecord?: string | null;
   awayRecord?: string | null;
 }) {
@@ -286,7 +296,7 @@ type TeamCardInfo = {
       </div>
       <div className="flex items-center gap-3 shrink-0">
         {shots != null && (
-          <span className="text-[11px] text-slate-500 tabular-nums font-mono">{shots} str</span>
+          <span className="text-[11px] text-slate-500 tabular-nums font-mono">{shots} {tr(lang, "SOG", "str")}</span>
         )}
         <span className={`tabular-nums text-2xl font-black min-w-[24px] text-right ${isFinal ? (win ? "text-white" : "text-slate-500") : "text-slate-600 font-normal"}`}>
           {isFinal ? (goals ?? "–") : "–"}
@@ -306,26 +316,26 @@ type TeamCardInfo = {
           {isFinal ? (
             g.endedIn === "OT" ? (
               <span className="px-2 py-0.5 rounded font-black uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] tracking-wide">
-                Koniec (OT)
+                {tr(lang, "Final (OT)", "Koniec (OT)")}
               </span>
             ) : g.endedIn === "SO" ? (
               <span className="px-2 py-0.5 rounded font-black uppercase bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[10px] tracking-wide">
-                Koniec (SO)
+                {tr(lang, "Final (SO)", "Koniec (SO)")}
               </span>
             ) : (
               <span className="px-2 py-0.5 rounded font-bold uppercase bg-slate-800/90 text-slate-300 border border-slate-700/60 text-[10px]">
-                Koniec (Final)
+                {tr(lang, "Final", "Koniec")}
               </span>
             )
           ) : (
             <span className="px-2 py-0.5 rounded font-bold uppercase bg-sky-500/20 text-sky-400 border border-sky-500/40 text-[10px] flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
-              Na programe
+              {tr(lang, "Scheduled", "Na programe")}
             </span>
           )}
 
           <span className="text-slate-400 text-[11px] truncate max-w-[170px] text-right">
-            {g.eventTitle || g.eventVenue || g.homeTeam.arena || "Zápas"}
+            {g.eventTitle || g.eventVenue || g.homeTeam.arena || tr(lang, "Game", "Zápas")}
           </span>
         </div>
 
@@ -338,9 +348,9 @@ type TeamCardInfo = {
         {/* Tretiny a odkaz na Boxscore */}
         <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
           {periodsStr ? (
-            <span className="text-slate-400 font-mono text-[10px]">Tretiny: ({periodsStr})</span>
+            <span className="text-slate-400 font-mono text-[10px]">{tr(lang, "Periods", "Tretiny")}: ({periodsStr})</span>
           ) : (
-            <span className="text-slate-500 text-[10px]">{g.league} Zápas</span>
+            <span className="text-slate-500 text-[10px]">{g.league} {tr(lang, "Game", "Zápas")}</span>
           )}
           <span className="text-blue-400 font-bold text-[11px] group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
             {isFinal ? "Boxscore" : "Preview"} <span className="text-xs">→</span>
@@ -352,13 +362,13 @@ type TeamCardInfo = {
           <div className="pt-2 border-t border-slate-800/60 text-[11px] space-y-1">
             {awayScorers && (
               <div className="flex items-start gap-1.5">
-                <span className="text-blue-400 font-bold shrink-0">{g.awayTeam.code || "HOSTIA"}:</span>
+                <span className="text-blue-400 font-bold shrink-0">{g.awayTeam.code || tr(lang, "AWAY", "HOSTIA")}:</span>
                 <span className="truncate text-slate-300">{awayScorers}</span>
               </div>
             )}
             {homeScorers && (
               <div className="flex items-start gap-1.5">
-                <span className="text-amber-400 font-bold shrink-0">{g.homeTeam.code || "DOMÁCI"}:</span>
+                <span className="text-amber-400 font-bold shrink-0">{g.homeTeam.code || tr(lang, "HOME", "DOMÁCI")}:</span>
                 <span className="truncate text-slate-300">{homeScorers}</span>
               </div>
             )}
@@ -375,6 +385,7 @@ export default async function ScoresPage({
   searchParams: Promise<{ date?: string; league?: string; phase?: string }>;
 }) {
   const sp = await searchParams;
+  const lang = await getLang();
   const auto = sp.phase ? null : await defaultStatsPhase();
   const phase = sp.phase ? (normalizePhase(sp.phase) === "pre" ? "pre" : "regular") : (auto === "pre" ? "pre" : "regular");
   const SEASON = seasonForPhase(phase);
@@ -399,7 +410,7 @@ export default async function ScoresPage({
   if (uniqueDays.length === 0) {
     return (
       <div className="space-y-4 py-2">
-        <PageHeader title={phase === "pre" ? "Pre-season Scores" : "Scores"} subtitle="No games have been scheduled yet." />
+        <PageHeader title={phase === "pre" ? "Pre-season Scores" : "Scores"} subtitle={tr(lang, "No games have been scheduled yet.", "Zatiaľ nie sú naplánované žiadne zápasy.")} />
         <PhaseTabs active={phase} league={onlyAhl ? "AHL" : "NHL"} basePath="/scores" />
       </div>
     );
@@ -503,7 +514,7 @@ export default async function ScoresPage({
       {/* Hlavička stránky */}
       <PageHeader
         title={`${onlyAhl ? "AHL " : onlyNhl ? "NHL " : ""}Scores`}
-        subtitle="Výsledky zápasov, podrobné štatistiky a herný kalendár ligy"
+        subtitle={tr(lang, "Game results, detailed stats and the league calendar", "Výsledky zápasov, podrobné štatistiky a herný kalendár ligy")}
         right={
           <div className="flex items-center gap-2">
             {!isLatest && defaultDay && (
@@ -511,7 +522,7 @@ export default async function ScoresPage({
                 href={`/scores?date=${defaultDay}${qLeague}${qPhase}`}
                 className="px-3 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm"
               >
-                <span>⚡ Najnovšie odohrané</span>
+                <span>⚡ {tr(lang, "Latest played", "Najnovšie odohrané")}</span>
               </Link>
             )}
             {prev ? (
@@ -519,11 +530,11 @@ export default async function ScoresPage({
                 href={`/scores?date=${prev}${qLeague}${qPhase}`}
                 className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700/60 transition-colors"
               >
-                ◀ Predchádzajúci
+                ◀ {tr(lang, "Previous", "Predchádzajúci")}
               </Link>
             ) : (
               <span className="px-3 py-1.5 rounded-xl bg-slate-900/60 text-slate-600 text-xs font-bold border border-slate-800/60 cursor-not-allowed">
-                ◀ Predchádzajúci
+                ◀ {tr(lang, "Previous", "Predchádzajúci")}
               </span>
             )}
             {next ? (
@@ -531,11 +542,11 @@ export default async function ScoresPage({
                 href={`/scores?date=${next}${qLeague}${qPhase}`}
                 className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700/60 transition-colors"
               >
-                Nasledujúci ▶
+                {tr(lang, "Next", "Nasledujúci")} ▶
               </Link>
             ) : (
               <span className="px-3 py-1.5 rounded-xl bg-slate-900/60 text-slate-600 text-xs font-bold border border-slate-800/60 cursor-not-allowed">
-                Nasledujúci ▶
+                {tr(lang, "Next", "Nasledujúci")} ▶
               </span>
             )}
           </div>
@@ -549,16 +560,16 @@ export default async function ScoresPage({
       <div className="bg-[#0b1120] border border-slate-800/90 rounded-2xl p-4 shadow-xl">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs uppercase tracking-wider font-extrabold text-slate-400">Dátum:</span>
+            <span className="text-xs uppercase tracking-wider font-extrabold text-slate-400">{tr(lang, "Date", "Dátum")}:</span>
             <span className="text-sm font-bold text-white capitalize">
-              {pretty(new Date(current + "T12:00:00"))}
+              {pretty(new Date(current + "T12:00:00"), lang)}
             </span>
             <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-500/15 text-blue-300 border border-blue-500/30">
-              {games.length} {games.length === 1 ? "zápas" : games.length < 5 ? "zápasy" : "zápasov"}
+              {games.length} {gamesWord(lang, games.length)}
             </span>
             {phase === "pre" && (
               <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                Pre-season (Príprava)
+                {tr(lang, "Pre-season", "Pre-season (Príprava)")}
               </span>
             )}
           </div>
@@ -569,7 +580,7 @@ export default async function ScoresPage({
                 href={`/scores?date=${uniqueDays[0]}${qLeague}${qPhase}`}
                 className="text-slate-400 hover:text-white transition-colors"
               >
-                « Prvý deň
+                « {tr(lang, "First day", "Prvý deň")}
               </Link>
             )}
             {startIdx > 0 && endIdx < uniqueDays.length && <span className="text-slate-700">·</span>}
@@ -578,7 +589,7 @@ export default async function ScoresPage({
                 href={`/scores?date=${uniqueDays[uniqueDays.length - 1]}${qLeague}${qPhase}`}
                 className="text-slate-400 hover:text-white transition-colors"
               >
-                Posledný deň »
+                {tr(lang, "Last day", "Posledný deň")} »
               </Link>
             )}
           </div>
@@ -589,9 +600,9 @@ export default async function ScoresPage({
           {visibleDays.map((d) => {
             const isSelected = d === current;
             const dateObj = new Date(d + "T12:00:00");
-            const dayName = dateObj.toLocaleDateString("sk-SK", { weekday: "short" });
+            const dayName = dateObj.toLocaleDateString(localeOf(lang), { weekday: "short" });
             const dayNum = dateObj.getDate();
-            const monthName = dateObj.toLocaleDateString("sk-SK", { month: "short" });
+            const monthName = dateObj.toLocaleDateString(localeOf(lang), { month: "short" });
             const info = dayCountMap.get(d) ?? { total: 0, played: 0 };
 
             if (isSelected) {
@@ -606,7 +617,7 @@ export default async function ScoresPage({
                   <span className="text-base font-black text-white mt-0.5">{dayNum}</span>
                   <span className="text-[10px] text-emerald-400 font-semibold mt-0.5 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                    {info.total} {info.total === 1 ? "zápas" : info.total < 5 ? "zápasy" : "zápasov"}
+                    {info.total} {gamesWord(lang, info.total)}
                   </span>
                 </div>
               );
@@ -623,7 +634,7 @@ export default async function ScoresPage({
                 </span>
                 <span className="text-sm font-black text-slate-300 mt-0.5">{dayNum}</span>
                 <span className="text-[10px] text-slate-500 mt-0.5">
-                  {info.total} {info.total === 1 ? "zápas" : info.total < 5 ? "zápasy" : "zápasov"}
+                  {info.total} {gamesWord(lang, info.total)}
                 </span>
               </Link>
             );
@@ -641,7 +652,7 @@ export default async function ScoresPage({
                 : "bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300"
             }`}
           >
-            Všetky ({games.length})
+            {tr(lang, "All", "Všetky")} ({games.length})
           </Link>
           <Link
             href={`/scores?date=${current}&league=NHL${qPhase}`}
@@ -651,7 +662,7 @@ export default async function ScoresPage({
                 : "bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300"
             }`}
           >
-            Iba NHL ({nhl.length})
+            {tr(lang, "NHL only", "Iba NHL")} ({nhl.length})
           </Link>
           <Link
             href={`/scores?date=${current}&league=AHL${qPhase}`}
@@ -661,7 +672,7 @@ export default async function ScoresPage({
                 : "bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300"
             }`}
           >
-            Iba AHL ({ahl.length})
+            {tr(lang, "AHL only", "Iba AHL")} ({ahl.length})
           </Link>
         </div>
       </div>
@@ -672,6 +683,7 @@ export default async function ScoresPage({
           g={featuredGame}
           homeRecord={recordMap.get(featuredGame.homeTeam.id)}
           awayRecord={recordMap.get(featuredGame.awayTeam.id)}
+          lang={lang}
         />
       )}
 
@@ -681,13 +693,13 @@ export default async function ScoresPage({
           <div className="flex items-center justify-between">
             <h2 className="text-base font-black uppercase tracking-wider text-blue-400 flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-              NHL Zápasy <span className="text-slate-500 font-normal text-xs">({nhl.length})</span>
+              {tr(lang, "NHL Games", "NHL Zápasy")} <span className="text-slate-500 font-normal text-xs">({nhl.length})</span>
             </h2>
           </div>
 
           {nhl.length === 0 ? (
             <div className="p-6 rounded-2xl bg-[#0b1120] border border-slate-800 text-center text-slate-500 text-sm">
-              Na tento deň nie sú naplánované žiadne zápasy NHL.
+              {tr(lang, "No NHL games scheduled for this day.", "Na tento deň nie sú naplánované žiadne zápasy NHL.")}
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -697,6 +709,7 @@ export default async function ScoresPage({
                   g={g}
                   homeRecord={recordMap.get(g.homeTeam.id)}
                   awayRecord={recordMap.get(g.awayTeam.id)}
+                  lang={lang}
                 />
               ))}
             </div>
@@ -710,13 +723,13 @@ export default async function ScoresPage({
           <div className="flex items-center justify-between">
             <h2 className="text-base font-black uppercase tracking-wider text-emerald-400 flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-              AHL Zápasy <span className="text-slate-500 font-normal text-xs">({ahl.length})</span>
+              {tr(lang, "AHL Games", "AHL Zápasy")} <span className="text-slate-500 font-normal text-xs">({ahl.length})</span>
             </h2>
           </div>
 
           {ahl.length === 0 ? (
             <div className="p-6 rounded-2xl bg-[#0b1120] border border-slate-800 text-center text-slate-500 text-sm">
-              Na tento deň nie sú naplánované žiadne zápasy AHL.
+              {tr(lang, "No AHL games scheduled for this day.", "Na tento deň nie sú naplánované žiadne zápasy AHL.")}
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -726,6 +739,7 @@ export default async function ScoresPage({
                   g={g}
                   homeRecord={recordMap.get(g.homeTeam.id)}
                   awayRecord={recordMap.get(g.awayTeam.id)}
+                  lang={lang}
                 />
               ))}
             </div>

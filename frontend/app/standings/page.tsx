@@ -10,6 +10,7 @@ import PhaseTabs from "@/components/PhaseTabs";
 import { seasonForPhase } from "@/lib/phase";
 import { defaultStatsPhase } from "@/lib/calendar-server";
 import { loadSettings } from "@/lib/sim/settings";
+import { getLang } from "@/lib/lang-server";
 
 export const dynamic = "force-dynamic";
 type View = "league" | "conference" | "division" | "power" | "race" | "odds";
@@ -17,6 +18,8 @@ type TeamMeta = Map<number, { logoUrl: string | null; slug: string }>;
 
 export default async function StandingsPage({ searchParams }: { searchParams: Promise<{ league?: string; view?: string; phase?: string }> }) {
   const sp = await searchParams;
+  const lang = await getLang();
+  const cs = lang === "cs";
   const league = sp.league === "AHL" ? "AHL" : "NHL";
   const explicit = sp.phase === "pre" || sp.phase === "regular" ? sp.phase : null;
   const auto = league === "NHL" ? await defaultStatsPhase() : "regular";
@@ -58,16 +61,16 @@ export default async function StandingsPage({ searchParams }: { searchParams: Pr
   return (
     <div className="space-y-6 py-2">
       <PageHeader
-        title={`${league} ${phase === "pre" ? "Pre-season " : ""}Standings`}
-        subtitle={`${played} games played${phase === "pre" ? " · exhibition — does not count" : ""}`}
+        title={`${league} ${phase === "pre" ? "Pre-season " : ""}${cs ? "Tabuľka" : "Standings"}`}
+        subtitle={cs ? `${played} odohraných zápasov${phase === "pre" ? " · príprava — nezapočítava sa" : ""}` : `${played} games played${phase === "pre" ? " · exhibition — does not count" : ""}`}
         right={
           <div className="flex gap-2 flex-wrap">
-            <Tab v="league" label="League" />
-            <Tab v="conference" label="Conference" />
-            <Tab v="division" label="Division" />
+            <Tab v="league" label={cs ? "Liga" : "League"} />
+            <Tab v="conference" label={cs ? "Konferencia" : "Conference"} />
+            <Tab v="division" label={cs ? "Divízia" : "Division"} />
             <Tab v="power" label="⚡ Power Ranking" />
-            {phase !== "pre" && <Tab v="race" label="🎯 Playoff Race" />}
-            {phase !== "pre" && league === "NHL" && <Tab v="odds" label="🎲 Odds" />}
+            {phase !== "pre" && <Tab v="race" label={cs ? "🎯 Boj o play-off" : "🎯 Playoff Race"} />}
+            {phase !== "pre" && league === "NHL" && <Tab v="odds" label={cs ? "🎲 Šance" : "🎲 Odds"} />}
           </div>
         }
       />
@@ -79,8 +82,8 @@ export default async function StandingsPage({ searchParams }: { searchParams: Pr
         <section className="space-y-8">
           <p className="text-slate-500 text-xs">
             {settings.playoffFormat === "conference"
-              ? "Top 8 tímov z každej konferencie postupuje do play-off."
-              : "Top 3 per division + 2 wild cards make the playoffs."}{" "}
+              ? (cs ? "Top 8 tímov z každej konferencie postupuje do play-off." : "Top 8 teams from each conference make the playoffs.")
+              : (cs ? "Top 3 z každej divízie + 2 wild cards postupujú do play-off." : "Top 3 per division + 2 wild cards make the playoffs.")}{" "}
             <b className="text-emerald-400">x</b> = clinched berth ·
             {" "}<b className="text-emerald-300">p</b> = won division · <b className="text-amber-300">z</b> = Presidents&apos; Trophy ·
             {" "}<b className="text-red-400">e</b> = eliminated · <b className="text-sky-300">M#</b> = magic number to clinch a berth.

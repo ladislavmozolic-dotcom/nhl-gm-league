@@ -4,6 +4,7 @@ import { isAdmin } from "@/lib/auth";
 import { commissionerName, recordCommishIntelView, recentCommishIntelAudits } from "@/lib/audit-server";
 import { loadCommissionerIntel, summarizeForAudit, type CommissionerFinding } from "@/lib/gm-assistant/commissionerIntel";
 import { PageHeader, Card, BackPill } from "@/components/ui";
+import { getLang } from "@/lib/lang-server";
 
 export const dynamic = "force-dynamic";
 
@@ -14,14 +15,17 @@ export const dynamic = "force-dynamic";
 // every view is logged (CommishIntelAudit), per the design doc's requirement
 // that every commissioner query be audited. See memory: gm-assistant-intelligence.
 
-const severityStyle: Record<CommissionerFinding["severity"], { text: string; bg: string; label: string }> = {
-  critical: { text: "text-red-400", bg: "bg-red-950/40 border-red-900/60", label: "Kritické" },
-  warning: { text: "text-amber-400", bg: "bg-amber-950/30 border-amber-900/50", label: "Pozor" },
-  ok: { text: "text-emerald-400", bg: "bg-emerald-950/20 border-emerald-900/40", label: "V poriadku" },
-};
-
 export default async function CommissionerIntelligencePage() {
   if (!(await isAdmin())) redirect("/login");
+
+  const lang = await getLang();
+  const cs = lang === "cs";
+
+  const severityStyle: Record<CommissionerFinding["severity"], { text: string; bg: string; label: string }> = {
+    critical: { text: "text-red-400", bg: "bg-red-950/40 border-red-900/60", label: cs ? "Kritické" : "Critical" },
+    warning: { text: "text-amber-400", bg: "bg-amber-950/30 border-amber-900/50", label: cs ? "Pozor" : "Warning" },
+    ok: { text: "text-emerald-400", bg: "bg-emerald-950/20 border-emerald-900/40", label: cs ? "V poriadku" : "OK" },
+  };
 
   const intel = await loadCommissionerIntel();
   const byName = await commissionerName();
@@ -34,15 +38,15 @@ export default async function CommissionerIntelligencePage() {
     <div className="py-2 flex flex-col gap-6">
       <PageHeader
         title="🛡️ Commissioner Intelligence"
-        subtitle="UNHL Intelligence — admin-only leaguewide integrity a data-consistency kontroly. Read-only, nič sa neopravuje automaticky."
+        subtitle={cs ? "UNHL Intelligence — admin-only leaguewide integrity a data-consistency kontroly. Read-only, nič sa neopravuje automaticky." : "UNHL Intelligence — admin-only integrity & data-consistency audits. Read-only."}
         right={<BackPill href="/tools/assistant">UNHL Intelligence</BackPill>}
       />
 
       <Card accent="text-blue-400">
         <p className="text-sm text-slate-400">
           {flaggedCount === 0
-            ? "Všetkých 6 kontrol je čistých — žiadny nález."
-            : `${flaggedCount} z 6 kontrol má aspoň jeden nález. Každé zobrazenie tejto stránky sa zaznamenáva do audit logu nižšie.`}
+            ? (cs ? "Všetkých 6 kontrol je čistých — žiadny nález." : "All 6 checks are clean — no integrity issues.")
+            : (cs ? `${flaggedCount} z 6 kontrol má aspoň jeden nález. Každé zobrazenie tejto stránky sa zaznamenáva do audit logu nižšie.` : `${flaggedCount} of 6 checks flagged at least one item. Every view of this page is audit-logged.`)}
         </p>
       </Card>
 
@@ -54,7 +58,7 @@ export default async function CommissionerIntelligencePage() {
               <div className={`border-b px-4 py-2.5 ${s.bg}`}>
                 <div className="flex items-center justify-between">
                   <span className={`text-xs font-bold uppercase tracking-wide ${s.text}`}>{s.label}</span>
-                  <span className="text-xs text-slate-400">{f.rows.length} nález(ov)</span>
+                  <span className="text-xs text-slate-400">{f.rows.length} {cs ? "nález(ov)" : "flag(s)"}</span>
                 </div>
                 <p className="text-xs text-slate-400 mt-1">{f.summary}</p>
               </div>
