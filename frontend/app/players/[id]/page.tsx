@@ -165,6 +165,8 @@ function StatBlock({ league, cols, reg, po, cellsOf, team, regSplits, poSplits, 
   regSplits?: Split[]; poSplits?: Split[]; season?: string;
 }) {
   if (!reg && !po) return null;
+  const isPre = season.endsWith("-PRE");
+  const regTitle = isPre ? `${league} · Príprava (Pre-season)` : `${league} · Základná časť`;
   const Head = () => (
     <thead><tr className={headRowCls}>
       <th className="px-3 py-2.5 text-left font-medium">Season</th>
@@ -181,7 +183,7 @@ function StatBlock({ league, cols, reg, po, cellsOf, team, regSplits, poSplits, 
   );
   return (
     <div className="bg-slate-900/40 border border-slate-800 rounded-xl overflow-hidden">
-      <div className="px-4 py-2 bg-blue-950/40 border-b border-blue-500/30 text-xs font-bold uppercase tracking-wide text-blue-300">{league} · Základná časť</div>
+      <div className="px-4 py-2 bg-blue-950/40 border-b border-blue-500/30 text-xs font-bold uppercase tracking-wide text-blue-300">{regTitle}</div>
       <div className="overflow-x-auto"><table className="w-full text-sm"><Head /><tbody>
         {reg && (regSplits && regSplits.length > 1
           ? <>
@@ -244,16 +246,39 @@ export default async function PlayerPage({
     },
     select: { season: true },
     distinct: ["season"],
-    orderBy: { season: "desc" },
   });
-  const availableSeasons = playedSeasonGames.length > 0
+  const rawSeasons = playedSeasonGames.length > 0
     ? playedSeasonGames.map((g) => g.season)
     : [SEASON];
+
+  // Sort seasons: current regular season first, then current preseason, then past seasons descending
+  const availableSeasons = [...rawSeasons].sort((a, b) => {
+    const aBase = a.replace(/-PRE$/, "");
+    const bBase = b.replace(/-PRE$/, "");
+    if (aBase !== bBase) {
+      return bBase.localeCompare(aBase);
+    }
+    const aIsPre = a.endsWith("-PRE");
+    const bIsPre = b.endsWith("-PRE");
+    if (aIsPre !== bIsPre) {
+      return aIsPre ? 1 : -1;
+    }
+    return b.localeCompare(a);
+  });
+
+  // Default season: ALWAYS active regular season if available, otherwise first available
+  const defaultSeason = availableSeasons.includes(SEASON)
+    ? SEASON
+    : (availableSeasons[0] || SEASON);
+
   const activeSeason = (sParams.season && availableSeasons.includes(sParams.season))
     ? sParams.season
-    : availableSeasons[0] || SEASON;
+    : defaultSeason;
 
-  const currentPhaseLabel = activeSeason === SEASON
+  const isPre = activeSeason.endsWith("-PRE");
+  const currentPhaseLabel = isPre
+    ? "Príprava (Pre-season)"
+    : activeSeason === SEASON
     ? (leagueClock.phase === "playoffs" ? "Play-off" : leagueClock.phase === "preseason" ? "Príprava" : "Základná časť")
     : "Ukončená sezóna";
 

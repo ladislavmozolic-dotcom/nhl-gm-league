@@ -103,11 +103,16 @@ export default function PlayerProfileTabs({
                   }}
                   className="appearance-none bg-slate-900 border border-slate-700 hover:border-slate-500 text-slate-100 text-xs md:text-sm font-semibold rounded-lg pl-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-sm transition-colors"
                 >
-                  {availableSeasons.map((s) => (
-                    <option key={s} value={s} className="bg-slate-900 text-slate-100">
-                      {s}
-                    </option>
-                  ))}
+                  {availableSeasons.map((s) => {
+                    const label = s.endsWith("-PRE")
+                      ? `${s.replace("-PRE", "")} · Príprava (Pre-season)`
+                      : `${s} · Základná časť`;
+                    return (
+                      <option key={s} value={s} className="bg-slate-900 text-slate-100">
+                        {label}
+                      </option>
+                    );
+                  })}
                 </select>
                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
