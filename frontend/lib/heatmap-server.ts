@@ -32,8 +32,8 @@ export type HeatMap = SkaterShotMap | GoalieSaveMap | null;
 export type DefCell = { zone: Zone; hits: number; blocks: number; takeaways: number; total: number };
 export type DefenseMap = { hits: number; blocks: number; takeaways: number; cells: DefCell[] } | null;
 
-export async function playerDefenseMap(playerId: number): Promise<DefenseMap> {
-  const gameFilter = { season: SEASON, league: "NHL", status: "FINAL" as const, seriesId: null };
+export async function playerDefenseMap(playerId: number, season: string = SEASON): Promise<DefenseMap> {
+  const gameFilter = { season, league: "NHL", status: "FINAL" as const, seriesId: null };
   const rows = await prisma.gameEvent.findMany({
     where: { playerId, type: { in: ["HIT", "BLOCK", "TAKEAWAY"] }, game: gameFilter },
     select: { type: true, sector: true },
@@ -51,11 +51,11 @@ export async function playerDefenseMap(playerId: number): Promise<DefenseMap> {
   return { hits, blocks, takeaways, cells };
 }
 
-export async function playerHeatMap(playerId: number): Promise<HeatMap> {
+export async function playerHeatMap(playerId: number, season: string = SEASON): Promise<HeatMap> {
   const p = await prisma.player.findUnique({ where: { id: playerId }, select: { position: true, isGoalie: true } });
   if (!p) return null;
   const isGoalie = p.isGoalie || p.position === "G";
-  const gameFilter = { season: SEASON, league: "NHL", status: "FINAL" as const, seriesId: null };
+  const gameFilter = { season, league: "NHL", status: "FINAL" as const, seriesId: null };
   // zone arrays are stored in SECTORS order: [POINT, PERIMETER, CIRCLE, SLOT, NET_FRONT]
   const ARR: Zone[] = ["POINT", "PERIMETER", "CIRCLE", "SLOT", "NET_FRONT"];
   const sumZones = (arrs: number[][]): Map<Zone, number> => {

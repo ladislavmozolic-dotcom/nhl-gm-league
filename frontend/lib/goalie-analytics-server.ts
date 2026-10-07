@@ -18,10 +18,10 @@ export type GoalieAnalytics = {
 
 const split = (shots: number, saves: number): DangerSplit => ({ shots, saves, svPct: shots ? saves / shots : 0 });
 
-export async function goalieAnalytics(playerId: number): Promise<GoalieAnalytics> {
+export async function goalieAnalytics(playerId: number, season: string = SEASON): Promise<GoalieAnalytics> {
   const p = await prisma.player.findUnique({ where: { id: playerId }, select: { position: true, isGoalie: true, condition: true, teamId: true } });
   if (!p || (!(p.isGoalie || p.position === "G"))) return null;
-  const where = { playerId, started: true, game: { season: SEASON, league: "NHL", status: "FINAL" as const, seriesId: null } };
+  const where = { playerId, started: true, game: { season, league: "NHL", status: "FINAL" as const, seriesId: null } };
 
   const agg = await prisma.goalieGameStat.aggregate({
     where, _count: { _all: true },

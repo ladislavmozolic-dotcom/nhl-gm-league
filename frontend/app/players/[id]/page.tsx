@@ -9,7 +9,6 @@ import { posGroup, ratingColor, ovColor, SKATER_ATTRS, GOALIE_ATTRS } from "@/li
 import { playerType } from "@/lib/player-type";
 import { playerCareer } from "@/lib/career-server";
 import PlayerCareerCard from "@/components/PlayerCareerCard";
-import ProfileStatsTabs from "@/components/ProfileStatsTabs";
 import PlayerGameLog from "@/components/PlayerGameLog";
 import { playerForm } from "@/lib/form-server";
 import PlayerFormCard from "@/components/PlayerFormCard";
@@ -26,6 +25,8 @@ import { playerTradeHistory, playerTransactionHistory } from "@/lib/trade-histor
 import PlayerTradeHistoryCard from "@/components/PlayerTradeHistoryCard";
 import PlayerTransactionHistoryCard from "@/components/PlayerTransactionHistoryCard";
 import PlayerHistoryTabs from "@/components/PlayerHistoryTabs";
+import PlayerProfileTabs from "@/components/PlayerProfileTabs";
+import PlayerAdvancedStatsCard from "@/components/PlayerAdvancedStatsCard";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +43,6 @@ async function getPlayer(idOrSlug: string) {
   return player;
 }
 
-
 function attrColor(val: number | null | undefined): string {
   if (val == null) return "text-slate-600";
   if (val >= 90) return "text-green-400 font-bold";
@@ -56,7 +56,7 @@ function attrColor(val: number | null | undefined): string {
 const NAT_FLAGS: Record<string, string> = {
   CAN: "🇨🇦", USA: "🇺🇸", SWE: "🇸🇪", FIN: "🇫🇮", RUS: "🇷🇺", CZE: "🇨🇿",
   SVK: "🇸🇰", SUI: "🇨🇭", CHE: "🇨🇭", GER: "🇩🇪", DEU: "🇩🇪", DEN: "🇩🇰",
-  DNK: "🇩🇰", NOR: "🇳🇴", LAT: "🇱🇻", LVA: "🇱🇻", AUT: "🇦🇹", FRA: "🇫🇷",
+  DNK: "🇩🇰", NOR: "🇳🇴", LAT: "🇱🇻", LVA: "🇱🇻", AUT: "🇦🇹", FRA: "FRA",
   SLO: "🇸🇮", SVN: "🇸🇮", BLR: "🇧🇾", UKR: "🇺🇦", GBR: "🇬🇧", AUS: "🇦🇺",
   KAZ: "🇰🇿", ITA: "🇮🇹", NED: "🇳🇱", NLD: "🇳🇱", POL: "🇵🇱", JPN: "🇯🇵",
   CRO: "🇭🇷", HRV: "🇭🇷", EST: "🇪🇪", LTU: "🇱🇹",
@@ -158,9 +158,10 @@ const glCells = (a: GlAgg): React.ReactNode[] => [
 
 // A league block: "<LEAGUE> Seasons" (season row + career) and, if any, "<LEAGUE> Playoffs".
 type Split = { team: React.ReactNode; agg: any };
-function StatBlock({ league, cols, reg, po, cellsOf, team, regSplits, poSplits }: {
+
+function StatBlock({ league, cols, reg, po, cellsOf, team, regSplits, poSplits, season = "2026-27" }: {
   league: string; cols: string[]; reg: any; po: any; cellsOf: (a: any) => React.ReactNode[]; team: React.ReactNode;
-  regSplits?: Split[]; poSplits?: Split[];
+  regSplits?: Split[]; poSplits?: Split[]; season?: string;
 }) {
   if (!reg && !po) return null;
   const Head = () => (
@@ -183,10 +184,10 @@ function StatBlock({ league, cols, reg, po, cellsOf, team, regSplits, poSplits }
       <div className="overflow-x-auto"><table className="w-full text-sm"><Head /><tbody>
         {reg && (regSplits && regSplits.length > 1
           ? <>
-              {regSplits.map((sp, i) => <Row key={i} label={SEASON} a={sp.agg} teamNode={sp.team} />)}
-              <Row label={`${SEASON} total`} a={reg} bold teamNode={<span className="text-slate-500">TOT</span>} />
+              {regSplits.map((sp, i) => <Row key={i} label={season} a={sp.agg} teamNode={sp.team} />)}
+              <Row label={`${season} total`} a={reg} bold teamNode={<span className="text-slate-500">TOT</span>} />
             </>
-          : <Row label={SEASON} a={reg} teamNode={regSplits?.[0]?.team ?? team} />)}
+          : <Row label={season} a={reg} teamNode={regSplits?.[0]?.team ?? team} />)}
       </tbody></table></div>
       {po && (
         <>
@@ -194,10 +195,10 @@ function StatBlock({ league, cols, reg, po, cellsOf, team, regSplits, poSplits }
           <div className="overflow-x-auto"><table className="w-full text-sm"><Head /><tbody>
             {poSplits && poSplits.length > 1
               ? <>
-                  {poSplits.map((sp, i) => <Row key={i} label={SEASON} a={sp.agg} teamNode={sp.team} />)}
-                  <Row label={`${SEASON} total`} a={po} bold teamNode={<span className="text-slate-500">TOT</span>} />
+                  {poSplits.map((sp, i) => <Row key={i} label={season} a={sp.agg} teamNode={sp.team} />)}
+                  <Row label={`${season} total`} a={po} bold teamNode={<span className="text-slate-500">TOT</span>} />
                 </>
-              : <Row label={SEASON} a={po} teamNode={poSplits?.[0]?.team ?? team} />}
+              : <Row label={season} a={po} teamNode={poSplits?.[0]?.team ?? team} />}
           </tbody></table></div>
         </>
       )}
@@ -205,8 +206,15 @@ function StatBlock({ league, cols, reg, po, cellsOf, team, regSplits, poSplits }
   );
 }
 
-export default async function PlayerPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PlayerPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<{ tab?: string; season?: string }>;
+}) {
   const { id } = await params;
+  const sParams = searchParams ? await searchParams : {};
   const [p, loggedIn, gmTeamId] = await Promise.all([getPlayer(id) as Promise<any>, isLoggedIn(), getTeamSession()]);
   const isGoalie: boolean = p.isGoalie || p.position === "G";
   // goalieRating.mo is never touched by the sim (it only writes the live
@@ -219,8 +227,27 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     ? { id: p.id, isGoalie: true, position: p.position, ag: p.goalieRating?.ag, rb: p.goalieRating?.rb, sz: p.goalieRating?.sz }
     : { id: p.id, position: p.position, sc: p.sc, pa: p.pa, df: p.df, ck: p.ck, st: p.st, sk: p.sk, ph: p.ph });
 
-  // Aggregate the simulated 2026-27 season, split by league (NHL / AHL) and regular / playoffs.
-  // If a player suited up in both leagues, both blocks show; NHL-only players hide the AHL block.
+  // Query distinct seasons where the player has played in our league
+  const playedSeasonGames = await prisma.game.findMany({
+    where: {
+      OR: [
+        { playerStats: { some: { playerId: p.id } } },
+        { goalieStats: { some: { playerId: p.id } } },
+      ],
+      status: "FINAL",
+    },
+    select: { season: true },
+    distinct: ["season"],
+    orderBy: { season: "desc" },
+  });
+  const availableSeasons = playedSeasonGames.length > 0
+    ? playedSeasonGames.map((g) => g.season)
+    : [SEASON];
+  const activeSeason = (sParams.season && availableSeasons.includes(sParams.season))
+    ? sParams.season
+    : availableSeasons[0] || SEASON;
+
+  // Aggregate season, split by league (NHL / AHL) and regular / playoffs.
   const bucketKey = (league: string | null, seriesId: number | null) =>
     `${league === "AHL" ? "ahl" : "nhl"}${seriesId != null ? "Po" : "Reg"}`;
   const skB: Record<string, any[]> = { nhlReg: [], nhlPo: [], ahlReg: [], ahlPo: [] };
@@ -228,7 +255,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
 
   if (isGoalie) {
     const rows = await prisma.goalieGameStat.findMany({
-      where: { playerId: p.id, game: { season: SEASON, status: "FINAL" } },
+      where: { playerId: p.id, game: { season: activeSeason, status: "FINAL" } },
       select: {
         started: true, shotsAgainst: true, saves: true, goalsAgainst: true, decision: true,
         xga: true, teamId: true,
@@ -241,8 +268,6 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       },
     });
     for (const r of rows) {
-      // a backup who only sat on the bench (no start, no shot faced) didn't play a game — same
-      // rule as the league goalie tables (stats-server)
       if (!r.started && r.shotsAgainst === 0) continue;
       const isHome = r.teamId === r.game.homeTeamId;
       const teamGoals = (isHome ? r.game.homeGoals : r.game.awayGoals) ?? 0;
@@ -256,7 +281,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     }
   } else {
     const rows = await prisma.playerGameStat.findMany({
-      where: { playerId: p.id, game: { season: SEASON, status: "FINAL" } },
+      where: { playerId: p.id, game: { season: activeSeason, status: "FINAL" } },
       select: {
         teamId: true, goals: true, assists: true, points: true, shots: true, pim: true, plusMinus: true,
         ppGoals: true, shGoals: true, gwg: true, hits: true, blocks: true, faceoffWins: true, faceoffLosses: true, toi: true, ppToi: true, pkToi: true,
@@ -274,8 +299,8 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     nhlReg: gB.nhlReg.length ? aggGoalie(gB.nhlReg) : null, nhlPo: gB.nhlPo.length ? aggGoalie(gB.nhlPo) : null,
     ahlReg: gB.ahlReg.length ? aggGoalie(gB.ahlReg) : null, ahlPo: gB.ahlPo.length ? aggGoalie(gB.ahlPo) : null,
   };
-  // per-club split inside each bucket — a traded player shows one row per club he played for
-  // (in the order he played for them), plus a season total.
+
+  // per-club split inside each bucket
   const splitIds = new Set<number>();
   const splitsOf = (rows: any[]): { teamId: number; rows: any[] }[] => {
     const by = new Map<number, { teamId: number; first: number; rows: any[] }>();
@@ -307,18 +332,57 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   const hasAhl = isGoalie ? !!(gl.ahlReg || gl.ahlPo) : !!(sk.ahlReg || sk.ahlPo);
 
   const careerAll = await playerCareer(p.id);
-  // Career = NHL only (AHL is shown split under "Player Stats"; career tracks the show)
+  // Career = NHL only
   const career = { ...careerAll, skater: careerAll.skater.filter((r) => r.league === "NHL"), goalie: careerAll.goalie.filter((r) => r.league === "NHL") };
   const form = await playerForm(p.id);
-  const heatMap = await playerHeatMap(p.id);
-  const defenseMap = isGoalie ? null : await playerDefenseMap(p.id);
-  const goalieStats = isGoalie ? await goalieAnalytics(p.id) : null;
+  const heatMap = await playerHeatMap(p.id, activeSeason);
+  const defenseMap = isGoalie ? null : await playerDefenseMap(p.id, activeSeason);
+  const goalieStats = isGoalie ? await goalieAnalytics(p.id, activeSeason) : null;
   const tradeHistory = await playerTradeHistory(p.id);
   const txHistory = await playerTransactionHistory(p.id);
   const star = await starPowerForPlayer(p.id);
 
+  // Skater advanced metrics for activeSeason
+  let skaterAdvMetrics = null;
+  if (!isGoalie) {
+    const [advAgg, sitRows] = await Promise.all([
+      prisma.playerGameStat.aggregate({
+        where: { playerId: p.id, game: { season: activeSeason, status: "FINAL" } },
+        _sum: { xg: true, hdShots: true, shifts: true, positiveShifts: true, goals: true, shots: true },
+        _max: { topShot: true },
+      }),
+      prisma.playerSituationGameStat.groupBy({
+        by: ["situation"],
+        where: { playerId: p.id, game: { season: activeSeason, status: "FINAL" } },
+        _sum: { toi: true, goals: true, assists: true, points: true, shots: true, xg: true, plusMinus: true },
+      }),
+    ]);
+    const s = advAgg._sum;
+    if (advAgg._max.topShot != null || (s.shifts ?? 0) > 0 || (s.shots ?? 0) > 0 || sitRows.length > 0) {
+      skaterAdvMetrics = {
+        xg: s.xg ?? 0,
+        goals: s.goals ?? 0,
+        hdShots: s.hdShots ?? 0,
+        shots: s.shots ?? 0,
+        topShot: advAgg._max.topShot ?? 0,
+        shifts: s.shifts ?? 0,
+        positiveShifts: s.positiveShifts ?? 0,
+        situations: sitRows.map((r) => ({
+          situation: r.situation,
+          toi: r._sum.toi ?? 0,
+          goals: r._sum.goals ?? 0,
+          assists: r._sum.assists ?? 0,
+          points: r._sum.points ?? 0,
+          shots: r._sum.shots ?? 0,
+          xg: r._sum.xg ?? 0,
+          plusMinus: r._sum.plusMinus ?? 0,
+        })).sort((a, b) => b.toi - a.toi),
+      };
+    }
+  }
+
   // NHL game-by-game log (regular season)
-  const nhlGL = { season: SEASON, status: "FINAL" as const, league: "NHL", seriesId: null };
+  const nhlGL = { season: activeSeason, status: "FINAL" as const, league: "NHL", seriesId: null };
   const gameSel = { id: true, gameDate: true, homeTeamId: true, awayTeamId: true, homeGoals: true, awayGoals: true, homeTeam: { select: { code: true } }, awayTeam: { select: { code: true } } };
   const skaterLog = isGoalie ? [] : await prisma.playerGameStat.findMany({
     where: { playerId: p.id, game: nhlGL },
@@ -350,19 +414,12 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     return { ...r, isSteal };
   });
 
-  // teamId always points somewhere (schema requires it, even for a free agent — it's
-  // his last club before hitting the market), so p.team alone can't tell "on a roster"
-  // from "used to be here". Match the exact rosterType set /free-agents itself treats
-  // as a signable free agent (UFA/RFA and friends) — those show "Free Agent", not a
-  // stale team.
   const NOT_FREE_AGENT = ["NHL", "AHL", "RETIRED", "PROSPECT", "RELEASED", "NONROSTER"];
   const isFreeAgent = p.rosterType != null && !NOT_FREE_AGENT.includes(p.rosterType);
   const team = isFreeAgent ? null : (p.team as any);
   const teamCode: string = team?.code ?? team?.name ?? "—";
   const backHref = team ? `/teams/${team.slug}` : "/free-agents";
 
-  // The NHL club he actually played his NHL games for (a call-up's current club may be
-  // his AHL farm) — used as the team on the "NHL Seasons" block.
   const nhlTeamId = isGoalie
     ? (goalieLog[0]?.teamId ?? null)
     : (skaterLog.length ? [...skaterLog.reduce((m, r) => m.set(r.teamId, (m.get(r.teamId) ?? 0) + 1), new Map<number, number>()).entries()].sort((a, b) => b[1] - a[1])[0][0] : null);
@@ -375,9 +432,6 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   const status = p.injuryDaysLeft > 0 ? "Injured" : (p.rosterType ?? "—");
   const contractType = p.contractType === "TWO_WAY" ? "Two-Way" : p.contractType === "ONE_WAY" ? "One-Way" : "—";
   const capHit = p.capHit != null ? money(p.capHit) : "—";
-  // Player.capHit deliberately freezes at its last value once contractYears
-  // hits 0 rather than clearing to 0 — useful history here on the profile, but
-  // only here: it must read as a PAST number, not his current cap charge.
   const hasContract = (p.contractYears ?? 0) > 0;
 
   const leftInfo: [string, React.ReactNode][] = [
@@ -392,10 +446,6 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   ];
   const retained = p.retainedSalary ?? 0;
   const retainedPct = retained > 0 && p.capHit ? Math.round((retained / p.capHit) * 100) : 0;
-  // "Until" = the last season his CURRENT deal actually covers; "Expiry Status" =
-  // what he becomes the moment after that — same UFA/RFA cutoff the team cap
-  // page uses (playerCapYears in lib/finance.ts): age as of June 30 of the
-  // expiry year, from his actual birth date, not a rounded-up age+years guess.
   const contractYearsN = p.contractYears ?? 0;
   const untilYear = contractYearsN > 0 ? seasonLabel(CURRENT_SEASON_START + contractYearsN - 1) : null;
   const expiryYear = CURRENT_SEASON_START + contractYearsN;
@@ -412,10 +462,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       ["Salary Retention", <span className="text-amber-300">{retainedPct}% retained</span>],
       ["Actual Salary after Retention", <b className="text-emerald-300">{money(Math.max(0, (p.capHit ?? 0) - retained))}</b>],
     ] as [string, React.ReactNode][]) : []),
-    // Only worth its own row when there IS a current deal — otherwise it's
-    // just "Previous Cap Hit" repeated under a second label.
     ...(hasContract ? ([["Last Year Salary", capHit]] as [string, React.ReactNode][]) : []),
-    // signed in-season extension — kicks in once the current deal runs out
     ...(p.extCapHit && p.extYears ? ([["Extension", <span key="ext" className="text-emerald-300">{money(p.extCapHit)} × {p.extYears} yr{p.extYears === 1 ? "" : "s"} <span className="text-slate-400 font-normal">from {seasonLabel(expiryYear)}</span>{p.extClause && <span className="ml-1.5 text-[11px] font-bold text-amber-300">{p.extClause === "M_NTC" ? "M-NTC" : p.extClause}{p.extClause === "M_NTC" && p.extNoTradeTeams?.length ? ` · ${p.extNoTradeTeams.length} teams` : ""}</span>}</span>]] as [string, React.ReactNode][]) : []),
     ...(p.tradeClause ? ([["Clause", <span key="clause" className="text-amber-300">{p.tradeClause === "M_NTC" ? "M-NTC" : p.tradeClause}{p.tradeClause === "M_NTC" && p.noTradeTeams?.length ? ` · ${p.noTradeTeams.length} teams protected` : ""}</span>]] as [string, React.ReactNode][]) : []),
   ];
@@ -427,10 +474,6 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     </div>
   );
 
-  const th = "px-3 py-2.5 font-medium whitespace-nowrap";
-  const headRow = "bg-slate-800/30 border-b border-slate-800 text-slate-500 text-xs uppercase tracking-wider";
-  const cell = "px-3 py-2.5 text-right tabular-nums whitespace-nowrap";
-
   const TeamCell = () =>
     team ? (
       <span className="inline-flex items-center gap-1.5">
@@ -441,7 +484,6 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       <span className="text-slate-600">—</span>
     );
 
-  // team shown on the NHL block: the NHL club he suited up for (falls back to current)
   const NhlTeamCell = () =>
     nhlTeam ? (
       <span className="inline-flex items-center gap-1.5">
@@ -452,9 +494,79 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       <TeamCell />
     );
 
-  const pm = (v: number) => (v > 0 ? `+${v}` : String(v));
-  const pct = (v: number | null, d = 1) => (v == null ? "—" : v.toFixed(d));
-  const svp = (v: number | null) => (v == null ? "—" : v.toFixed(3).replace(/^0/, ""));
+  // Tab content 1: Overview & Career
+  const overviewContent = (
+    <div className="space-y-6">
+      {/* ── CAREER ─────────────────────────────────────────────────── */}
+      <PlayerCareerCard career={career} />
+
+      {/* ── TRADE / TRANSACTION HISTORY ───────────────────────────── */}
+      <PlayerHistoryTabs
+        tradeCard={<PlayerTradeHistoryCard playerName={cleanName(p.name)} history={tradeHistory} />}
+        txCard={<PlayerTransactionHistoryCard history={txHistory} />}
+      />
+    </div>
+  );
+
+  // Tab content 2: Seasons & Analytics
+  const seasonsContent = (
+    <div className="space-y-6">
+      {/* ── SEASON STAT TABLES ────────────────────────────────────── */}
+      {hasNhl || hasAhl ? (
+        <div className="space-y-6">
+          {hasNhl && (
+            <StatBlock
+              league="NHL"
+              cols={isGoalie ? GL_COLS : SK_COLS}
+              reg={isGoalie ? gl.nhlReg : sk.nhlReg}
+              po={isGoalie ? gl.nhlPo : sk.nhlPo}
+              cellsOf={isGoalie ? glCells : skCells}
+              team={<NhlTeamCell />}
+              regSplits={mkSplits("nhlReg")}
+              poSplits={mkSplits("nhlPo")}
+              season={activeSeason}
+            />
+          )}
+          {hasAhl && (
+            <StatBlock
+              league="AHL"
+              cols={isGoalie ? GL_COLS : SK_COLS}
+              reg={isGoalie ? gl.ahlReg : sk.ahlReg}
+              po={isGoalie ? gl.ahlPo : sk.ahlPo}
+              cellsOf={isGoalie ? glCells : skCells}
+              team={<TeamCell />}
+              regSplits={mkSplits("ahlReg")}
+              poSplits={mkSplits("ahlPo")}
+              season={activeSeason}
+            />
+          )}
+        </div>
+      ) : (
+        <Card bodyClassName="py-8 text-center text-slate-500">
+          Žiadne odohrané zápasy v sezóne {activeSeason}.
+        </Card>
+      )}
+
+      {/* ── SKATER ADVANCED ANALYTICS & SITUATION SPLITS ─────────── */}
+      {skaterAdvMetrics && <PlayerAdvancedStatsCard metrics={skaterAdvMetrics} />}
+
+      {/* ── GOALIE ANALYTICS CENTER ────────────────────────────────── */}
+      {goalieStats && <GoalieAnalyticsCard a={goalieStats} />}
+
+      {/* ── SHOT / SAVE + DEFENSIVE HEAT MAPS ──────────────────────── */}
+      {(heatMap || defenseMap) && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {heatMap && <RinkHeatMap map={heatMap} />}
+          {defenseMap && <RinkDefenseMap map={defenseMap} />}
+        </div>
+      )}
+
+      {/* ── GAME LOG ──────────────────────────────────────────────── */}
+      <Card title={`Game Log · ${activeSeason}`} bodyClassName="p-0">
+        <PlayerGameLog isGoalie={isGoalie} skater={skaterLog} goalie={goalieLog} />
+      </Card>
+    </div>
+  );
 
   return (
     <div className="space-y-6 py-2">
@@ -463,7 +575,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       {/* ── PLAYER BIO ─────────────────────────────────────────────── */}
       <Card title="Player Bio" bodyClassName="p-0">
         <div className="theme-dark-scope relative overflow-hidden bg-gradient-to-r from-[#0a1628] via-[#1e3a5f] to-[#0a1628]">
-          {/* player action shot (NHL CDN) as the background; hidden gracefully if none */}
+          {/* player action shot (NHL CDN) as the background */}
           {p.nhlId && (
             <img src={`https://assets.nhle.com/mugs/actionshots/1296x729/${p.nhlId}.jpg`} alt=""
               className="pointer-events-none absolute inset-0 w-full h-full object-cover object-[center_top] opacity-30" />
@@ -546,18 +658,16 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                     {rightInfo.map(([label, value]) => (
                       <InfoRow key={label} label={label} value={value} />
                     ))}
-                    {/* Current Form — derived, in the space under Overall */}
+                    {/* Current Form */}
                     <PlayerFormCard form={form} />
                   </div>
                 </div>
               </div>
             </div>
           </div>
-
-        {/* action-shot hero ends here */}
         </div>
 
-        {/* ── ATTRIBUTES — solid strip below the hero so the background never hides them ── */}
+        {/* ── ATTRIBUTES — solid strip below the hero ── */}
         <div className="border-t border-slate-800 bg-slate-900">
           <div className="overflow-x-auto">
             <div className="flex min-w-max">
@@ -583,63 +693,38 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         </div>
       </Card>
 
-      {/* ── GOALIE ANALYTICS CENTER ────────────────────────────────── */}
-      {goalieStats && <GoalieAnalyticsCard a={goalieStats} />}
-
-      {/* ── SHOT / SAVE + DEFENSIVE HEAT MAPS ──────────────────────── */}
-      {(heatMap || defenseMap) && (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {heatMap && <RinkHeatMap map={heatMap} />}
-          {defenseMap && <RinkDefenseMap map={defenseMap} />}
-        </div>
-      )}
-
-      {/* ── PLAYER STATS (Season / Game Log tabs) ─────────────────── */}
-      <Card bodyClassName="p-0">
-        <ProfileStatsTabs
-          season={hasNhl || hasAhl ? (
-            <div className="space-y-6">
-              {hasNhl && <StatBlock league="NHL" cols={isGoalie ? GL_COLS : SK_COLS} reg={isGoalie ? gl.nhlReg : sk.nhlReg} po={isGoalie ? gl.nhlPo : sk.nhlPo} cellsOf={isGoalie ? glCells : skCells} team={<NhlTeamCell />} regSplits={mkSplits("nhlReg")} poSplits={mkSplits("nhlPo")} />}
-              {hasAhl && <StatBlock league="AHL" cols={isGoalie ? GL_COLS : SK_COLS} reg={isGoalie ? gl.ahlReg : sk.ahlReg} po={isGoalie ? gl.ahlPo : sk.ahlPo} cellsOf={isGoalie ? glCells : skCells} team={<TeamCell />} regSplits={mkSplits("ahlReg")} poSplits={mkSplits("ahlPo")} />}
-            </div>
-          ) : (
-            <div className="py-8 text-center text-slate-500">No games played in {SEASON}.</div>
-          )}
-          gameLog={<PlayerGameLog isGoalie={isGoalie} skater={skaterLog} goalie={goalieLog} />}
-        />
-      </Card>
-
-      {/* ── CAREER ─────────────────────────────────────────────────── */}
-      <PlayerCareerCard career={career} />
-
-      {/* ── TRADE / TRANSACTION HISTORY ───────────────────────────── */}
-      <PlayerHistoryTabs
-        tradeCard={<PlayerTradeHistoryCard playerName={cleanName(p.name)} history={tradeHistory} />}
-        txCard={<PlayerTransactionHistoryCard history={txHistory} />}
-      />
-
-      {/* ── INJURY ─────────────────────────────────────────────────── */}
+      {/* ── INJURY (if active) ─────────────────────────────────────── */}
       {p.injuryDaysLeft > 0 && (() => {
         const sev: string = p.injurySeverity ?? (p.injuryDaysLeft >= 120 ? "Season-ending" : p.injuryDaysLeft >= 45 ? "Long-term" : p.injuryDaysLeft >= 20 ? "Multi-week" : p.injuryDaysLeft >= 7 ? "Week-to-Week" : "Day-to-Day");
         const sevCls = sev === "Season-ending" ? "text-red-500 font-bold" : sev === "Long-term" ? "text-red-400" : sev === "Multi-week" ? "text-orange-400" : sev === "Week-to-Week" ? "text-amber-400" : "text-slate-400";
         const eta = p.injuryDaysLeft <= 6 ? `${p.injuryDaysLeft}d` : p.injuryDaysLeft < 14 ? "~1 week" : p.injuryDaysLeft < 45 ? `~${Math.round(p.injuryDaysLeft / 7)} weeks` : p.injuryDaysLeft < 120 ? `~${Math.round(p.injuryDaysLeft / 30)} months` : "out for the season";
         const ltir = onLtir({ capHit: p.capHit, injuryDaysLeft: p.injuryDaysLeft, condition: p.condition, isGoalie: p.isGoalie });
         return (
-        <Card title="Injury" accent="text-red-400">
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-slate-300">{p.injuryDesc || "Injured"}</span>
-              <span className={`text-xs font-semibold ${sevCls}`}>{sev}</span>
+          <Card title="Injury" accent="text-red-400">
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-300">{p.injuryDesc || "Injured"}</span>
+                <span className={`text-xs font-semibold ${sevCls}`}>{sev}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span>Est. return: <span className="text-amber-400 font-semibold">{eta}</span> <span className="text-slate-600">({p.injuryDaysLeft} days)</span></span>
+                {ltir
+                  ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300" title={`On LTIR — the club may exceed the cap by his ${money(liveCapHit(p))} hit to call up a replacement.`}>LTIR · +{money(liveCapHit(p))}</span>
+                  : (sev === "Multi-week" ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-300">IR</span> : null)}
+              </div>
             </div>
-            <div className="flex items-center justify-between text-xs text-slate-500">
-              <span>Est. return: <span className="text-amber-400 font-semibold">{eta}</span> <span className="text-slate-600">({p.injuryDaysLeft} days)</span></span>
-              {ltir
-                ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300" title={`On LTIR — the club may exceed the cap by his ${money(liveCapHit(p))} hit to call up a replacement.`}>LTIR · +{money(liveCapHit(p))}</span>
-                : (sev === "Multi-week" ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-300">IR</span> : null)}
-            </div>
-          </div>
-        </Card>
-      );})()}
+          </Card>
+        );
+      })()}
+
+      {/* ── PROFILE TABS: OVERVIEW & CAREER vs SEASONS & ANALYTICS ──── */}
+      <PlayerProfileTabs
+        overviewContent={overviewContent}
+        seasonsContent={seasonsContent}
+        availableSeasons={availableSeasons}
+        currentSeason={activeSeason}
+        playerSlugOrId={p.slug ?? p.id}
+      />
     </div>
   );
 }
