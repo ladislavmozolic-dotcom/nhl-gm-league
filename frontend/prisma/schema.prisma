@@ -1996,7 +1996,7 @@ model LeagueBank {
   enforcementEnabled   Boolean  @default(false) // daily automatic fines on/off
   enforcementStart     String? // "YYYY-MM-DD" (Europe/Bratislava) — no fines before this day
   lastEnforcedDay      String? // last day the automatic check already ran
-  nhlRosterFine        Int      @default(200000) // per day, NHL roster not compliant
+  nhlRosterFine        Int      @default(100000) // per day, NHL roster not compliant
   ahlRosterFine        Int      @default(50000) // per day, AHL roster not compliant
   capFinePerDay        Int      @default(200000) // per day over the cap
   capPenaltyMultiplier Float    @default(2) // next-season cap reduction = accumulated overage × this
