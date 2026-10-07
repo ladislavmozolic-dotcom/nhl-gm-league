@@ -30,8 +30,8 @@ export default async function CalendarPage() {
   const keyDates = await leagueKeyDates().catch(() => []);
   const today0 = utcDay(clock.date).getTime();
   const fmtKey = (d: Date, timed: boolean) => timed
-    ? d.toLocaleString("sk-SK", { timeZone: "Europe/Bratislava", weekday: "short", day: "numeric", month: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })
-    : d.toLocaleDateString("sk-SK", { timeZone: "UTC", weekday: "short", day: "numeric", month: "numeric", year: "numeric" });
+    ? d.toLocaleString("en-GB", { timeZone: "Europe/Bratislava", weekday: "short", day: "numeric", month: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })
+    : d.toLocaleDateString("en-GB", { timeZone: "UTC", weekday: "short", day: "numeric", month: "numeric", year: "numeric" });
   const nextDate = upcoming[0]?.gameDate ?? null;
   const nextDayGames = nextDate
     ? upcoming.filter((g) => g.gameDate && utcDay(g.gameDate).getTime() === utcDay(nextDate).getTime())

@@ -12,7 +12,7 @@ export default function DaySimControls() {
   const [days, setDays] = useState(1);
 
   const fmt = (d: Date | string | null, round: number | null) =>
-    d ? new Date(d).toLocaleDateString("sk-SK", { day: "numeric", month: "long" }) : `day ${round}`;
+    d ? new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "long" }) : `day ${round}`;
 
   const simDay = () => start(async () => {
     setMsg(null);

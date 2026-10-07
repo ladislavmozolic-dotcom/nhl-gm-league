@@ -414,7 +414,7 @@ export async function clearResults(eventId: number): Promise<void> {
 // messages + cron
 // ---------------------------------------------------------------------------
 
-const fmt = (d: Date) => d.toLocaleString("sk-SK", { timeZone: "Europe/Bratislava", dateStyle: "medium", timeStyle: "short" });
+const fmt = (d: Date) => d.toLocaleString("en-GB", { timeZone: "Europe/Bratislava", dateStyle: "medium", timeStyle: "short" });
 async function notify(teamId: number, body: string, url: string) {
   await prisma.dmMessage.create({ data: { fromTeamId: teamId, toTeamId: teamId, body, tradeUrl: url } }).catch(() => {});
 }

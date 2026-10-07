@@ -51,7 +51,7 @@ export default async function WorldLeaguePage({ params, searchParams }: {
       <StatTile label="Teams" value={league.teams.length} color="text-sky-300" />
       <StatTile label="Skaters" value={skaters.length} sub={season || "No season yet"} color="text-emerald-300" />
       <StatTile label="Goalies" value={goalies.length} sub={season || "No season yet"} color="text-violet-300" />
-      <StatTile label="Last sync" value={syncedAt ? syncedAt.toLocaleDateString("sk-SK", { timeZone: "Europe/Bratislava" }) : "—"} sub="Source data snapshot" color="text-amber-300" />
+      <StatTile label="Last sync" value={syncedAt ? syncedAt.toLocaleDateString("en-GB", { timeZone: "Europe/Bratislava" }) : "—"} sub="Source data snapshot" color="text-amber-300" />
     </div>
 
     {season ? <>

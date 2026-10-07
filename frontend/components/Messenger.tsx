@@ -83,7 +83,7 @@ export default function Messenger({ initialTeams, initialActive }: { initialTeam
     if (r.ok) { setText(""); setEmojiOpen(false); stickBottomRef.current = true; await loadConvo(active); }
   };
 
-  const fmtTime = (iso: string) => new Date(iso).toLocaleString("sk-SK", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
+  const fmtTime = (iso: string) => new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-4 h-[70vh] min-h-[460px]">

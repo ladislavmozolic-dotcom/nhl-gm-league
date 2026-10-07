@@ -5,7 +5,7 @@ import { PageHeader, Card, BackPill } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
-const fmt = (d: Date) => d.toLocaleString("sk-SK", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+const fmt = (d: Date) => d.toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 // Known crawlers/bots — returns the bot's name if the UA is one, else null.
 const botName = (ua: string | null): string | null => {
   if (!ua) return null;

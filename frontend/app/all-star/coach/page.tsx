@@ -5,7 +5,7 @@ import { latestEvent, teamsOf, phaseOf, nomineesOf, coachDeadline, DIVS, type Di
 import CoachRoom from "@/components/all-star/CoachRoom";
 
 export const dynamic = "force-dynamic";
-const fmt = (d: Date) => d.toLocaleString("sk-SK", { timeZone: "Europe/Bratislava", dateStyle: "medium", timeStyle: "short" });
+const fmt = (d: Date) => d.toLocaleString("en-GB", { timeZone: "Europe/Bratislava", dateStyle: "medium", timeStyle: "short" });
 
 export default async function CoachRoomPage({ searchParams }: { searchParams: Promise<{ div?: string }> }) {
   const sp = await searchParams;

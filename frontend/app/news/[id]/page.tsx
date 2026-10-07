@@ -50,7 +50,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
               : <div className="w-10 h-10 rounded-full bg-slate-700 grid place-items-center font-bold">{author?.name?.[0] ?? "?"}</div>}
             <div>
               <p className="text-sm font-bold">{gmName(author)}</p>
-              <p className="text-xs text-slate-500">{author?.name} · {article.createdAt.toLocaleString("sk-SK")}</p>
+              <p className="text-xs text-slate-500">{author?.name} · {article.createdAt.toLocaleString("en-GB")}</p>
             </div>
           </div>
           {canEdit && <Link href={`/news/${article.id}/edit`} className="text-xs text-blue-400 hover:text-blue-300 shrink-0">Edit →</Link>}
@@ -75,7 +75,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
                 <div className="flex items-center gap-2 mb-1">
                   {t?.logoUrl && <img src={t.logoUrl} alt="" className="w-5 h-5 object-contain" />}
                   <span className="text-xs font-semibold">{gmName(t)}</span>
-                  <span className="text-[10px] text-slate-500">{c.createdAt.toLocaleDateString("sk-SK")}</span>
+                  <span className="text-[10px] text-slate-500">{c.createdAt.toLocaleDateString("en-GB")}</span>
                 </div>
                 <p className="text-sm text-slate-300">{c.body}</p>
               </div>

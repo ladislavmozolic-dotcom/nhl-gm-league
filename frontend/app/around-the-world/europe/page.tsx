@@ -37,7 +37,7 @@ export default async function EuropeProspectsPage({ searchParams }: { searchPara
       <StatTile label="Prospect stat lines" value={visibleStats.length} sub={season || "No season yet"} color="text-violet-300" />
       <StatTile label="Skaters" value={skaters} color="text-emerald-300" />
       <StatTile label="Goalies" value={visibleStats.length - skaters} color="text-sky-300" />
-      <StatTile label="Last sync" value={syncedAt ? syncedAt.toLocaleDateString("sk-SK", { timeZone: "Europe/Bratislava" }) : "—"} color="text-amber-300" />
+      <StatTile label="Last sync" value={syncedAt ? syncedAt.toLocaleDateString("en-GB", { timeZone: "Europe/Bratislava" }) : "—"} color="text-amber-300" />
     </div>
 
     <Card title="European competitions">

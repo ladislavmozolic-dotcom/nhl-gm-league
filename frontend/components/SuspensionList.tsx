@@ -5,7 +5,7 @@ import { APPEAL_HOURS } from "@/lib/discipline-server";
 import { AppealForm, RulingForm } from "@/components/PlayerSafety";
 
 type Row = Awaited<ReturnType<typeof disciplineList>>[number];
-const when = (d: Date) => d.toLocaleString("sk-SK", { timeZone: "Europe/Bratislava", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
+const when = (d: Date) => d.toLocaleString("en-GB", { timeZone: "Europe/Bratislava", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
 
 /** One ruling card — shared by the public Player Safety page and the admin console. */
 export function SuspensionItem({ r, myTeamId, admin, now }: { r: Row; myTeamId: number | null; admin: boolean; now: number }) {

@@ -9,7 +9,7 @@ import RevertSigningButton from "@/components/RevertSigningButton";
 export const dynamic = "force-dynamic";
 
 const fmtM = (c: number) => `$${(c / 1e6).toFixed(2)}M`;
-const fmtDate = (d: Date) => d.toLocaleString("sk-SK", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const fmtDate = (d: Date) => d.toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 export default async function AdminSigningsPage() {
   if (!(await isAdmin())) redirect("/");

@@ -31,7 +31,7 @@ export default function NominationForm({ compact = false }: { compact?: boolean 
     if (r.ok) { setMsg({ ok: true, text: "✅ Nomination sent — you can change it until the deadline." }); load(); }
     else setMsg({ ok: false, text: r.error });
   });
-  const closes = data.closesAt ? new Date(data.closesAt).toLocaleString("sk-SK", { timeZone: "Europe/Bratislava", dateStyle: "medium", timeStyle: "short" }) : null;
+  const closes = data.closesAt ? new Date(data.closesAt).toLocaleString("en-GB", { timeZone: "Europe/Bratislava", dateStyle: "medium", timeStyle: "short" }) : null;
 
   return (
     <div className={`mt-2 rounded-xl border border-slate-700 bg-slate-900/80 ${compact ? "p-2.5" : "p-4"} text-slate-100 space-y-3`}>

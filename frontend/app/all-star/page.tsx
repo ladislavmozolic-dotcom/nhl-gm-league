@@ -12,7 +12,7 @@ import Countdown from "@/components/all-star/Countdown";
 
 export const dynamic = "force-dynamic";
 
-const fmt = (d: Date) => d.toLocaleString("sk-SK", { timeZone: "Europe/Bratislava", dateStyle: "medium", timeStyle: "short" });
+const fmt = (d: Date) => d.toLocaleString("en-GB", { timeZone: "Europe/Bratislava", dateStyle: "medium", timeStyle: "short" });
 const TEAM_TONE: Record<DivKey, string> = { ATL: "text-sky-300", MET: "text-violet-300", CEN: "text-amber-300", PAC: "text-rose-300" };
 const DOT: Record<DivKey, string> = { ATL: "bg-sky-400", MET: "bg-violet-400", CEN: "bg-amber-400", PAC: "bg-rose-400" };
 

@@ -24,7 +24,7 @@ export default async function GmProfilePage({ params }: { params: Promise<{ slug
   const pct = (gm.record.pointsPct * 100).toFixed(1);
   const x = await gmCareerExtras(gm.teamId);
   const gradeTone = (g: string) => g.startsWith("A") ? "text-emerald-400 border-emerald-500/40" : g.startsWith("B") ? "text-sky-400 border-sky-500/40" : g === "C" ? "text-amber-400 border-amber-500/40" : "text-red-400 border-red-500/40";
-  const day = (d: Date | null) => d ? d.toLocaleDateString("sk-SK", { timeZone: "Europe/Bratislava", day: "numeric", month: "numeric", year: "numeric" }) : "";
+  const day = (d: Date | null) => d ? d.toLocaleDateString("en-GB", { timeZone: "Europe/Bratislava", day: "numeric", month: "numeric", year: "numeric" }) : "";
   const TradeLine = ({ t, label }: { t: GmTradeRow; label?: string }) => (
     <div className="flex items-start gap-3 py-2">
       <span className={`shrink-0 w-9 text-center rounded border font-black text-sm py-0.5 ${gradeTone(t.grade)}`}>{t.grade}</span>

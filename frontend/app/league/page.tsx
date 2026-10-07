@@ -6,7 +6,7 @@ import { teamManagerLabel } from "@/lib/team-gm";
 export const dynamic = "force-dynamic";
 
 const fmtDate = (d: Date | null) =>
-  d ? d.toLocaleDateString("sk-SK", { day: "numeric", month: "short", year: "numeric" }) + ", " + d.toLocaleTimeString("sk-SK", { hour: "2-digit", minute: "2-digit" }) : "never";
+  d ? d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) + ", " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "never";
 
 export default async function LeagueDirectoryPage() {
   const teams = await prisma.team.findMany({

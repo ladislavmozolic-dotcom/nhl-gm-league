@@ -205,7 +205,7 @@ export default async function HomePage() {
     }
   }
 
-  const dateStr = (d: Date) => d.toLocaleDateString("sk-SK", { day: "numeric", month: "short" });
+  const dateStr = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
   const nextGame = await prisma.game.findFirst({
     where: { status: "SCHEDULED", seriesId: null, league: "NHL", gameDate: { not: null } },
@@ -787,7 +787,7 @@ export default async function HomePage() {
                       {author?.gmNickname || [author?.gmFirstName, author?.gmLastName].filter(Boolean).join(" ").trim() || author?.gm || author?.name || "GM"}
                     </p>
                     <p className="text-[11px] text-slate-400 font-mono">
-                      {author?.name} · {a.createdAt.toLocaleDateString("sk-SK")}
+                      {author?.name} · {a.createdAt.toLocaleDateString("en-GB")}
                     </p>
                   </div>
                 </div>

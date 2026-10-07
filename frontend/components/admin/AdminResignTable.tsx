@@ -25,7 +25,7 @@ const fmtDate = (d: Date | string | null | undefined) => {
   if (!d) return "—";
   const date = typeof d === "string" ? new Date(d) : d;
   if (!date || isNaN(date.getTime())) return "—";
-  return date.toLocaleString("sk-SK", {
+  return date.toLocaleString("en-GB", {
     day: "numeric",
     month: "short",
     hour: "2-digit",

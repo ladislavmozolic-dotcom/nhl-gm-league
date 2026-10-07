@@ -630,7 +630,7 @@ export default function PlayerCalculatorView({
               </span>
               {liveConfig?.lastCalculatedAt && (
                 <span className="text-[10px] text-slate-400">
-                  Recalculated: {new Date(liveConfig.lastCalculatedAt).toLocaleString("sk-SK")}
+                  Recalculated: {new Date(liveConfig.lastCalculatedAt).toLocaleString("en-GB")}
                 </span>
               )}
             </div>

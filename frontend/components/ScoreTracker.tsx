@@ -5,7 +5,7 @@ import ScoreScrollRow from "@/components/ScoreScrollRow";
 
 type TeamLite = { code: string | null; logoUrl: string | null };
 
-const dateStr = (d: Date) => d.toLocaleDateString("sk-SK", { day: "numeric", month: "short" });
+const dateStr = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
 const TeamRow = ({
   t,

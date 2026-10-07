@@ -9,7 +9,7 @@ import { gradeTradeCached, type TradeGrade } from "./gm-awards";
 
 export const DEADLINE_WEEK_DAYS = 7;
 const GRADE_SCORE: Record<string, number> = { "A+": 4.3, A: 4, "B+": 3.3, B: 3, C: 2, D: 1, F: 0 };
-const fmt = (d: Date) => d.toLocaleString("sk-SK", { timeZone: "Europe/Bratislava", weekday: "long", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
+const fmt = (d: Date) => d.toLocaleString("en-GB", { timeZone: "Europe/Bratislava", weekday: "long", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
 
 export type DeadlineDeal = TradeGrade & {
   at: Date; fromTeamId: number; toTeamId: number;

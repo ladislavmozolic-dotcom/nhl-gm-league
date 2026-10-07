@@ -1056,13 +1056,13 @@ export default function LiveCalculatorConfigModal({
                     <div className="flex justify-between">
                       <span>Posledný prepočet:</span>
                       <span className="font-mono text-slate-200">
-                        {config.lastCalculatedAt ? new Date(config.lastCalculatedAt).toLocaleString("sk-SK") : "Zatiaľ neprebehol"}
+                        {config.lastCalculatedAt ? new Date(config.lastCalculatedAt).toLocaleString("en-GB") : "Zatiaľ neprebehol"}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Posledná synchronizácia:</span>
                       <span className="font-mono text-slate-200">
-                        {config.lastSyncedAt ? new Date(config.lastSyncedAt).toLocaleString("sk-SK") : "Zatiaľ neprebehla"}
+                        {config.lastSyncedAt ? new Date(config.lastSyncedAt).toLocaleString("en-GB") : "Zatiaľ neprebehla"}
                       </span>
                     </div>
                   </div>
@@ -2563,7 +2563,7 @@ export default function LiveCalculatorConfigModal({
                   </div>
                   <div className="text-sm font-bold text-slate-100">
                     {config.lastCalculatedAt
-                      ? new Date(config.lastCalculatedAt).toLocaleDateString("sk-SK", {
+                      ? new Date(config.lastCalculatedAt).toLocaleDateString("en-GB", {
                           day: "numeric",
                           month: "numeric",
                           hour: "2-digit",

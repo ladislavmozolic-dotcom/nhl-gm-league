@@ -110,7 +110,7 @@ export default async function AllOffersPage({ searchParams }: { searchParams: Pr
                           <span className="text-slate-600">Round {o.round || "—"}</span>
                         </div>
                         <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border shrink-0 ${st.cls}`}>{st.label}</span>
-                        <span className="text-[10px] text-slate-600 shrink-0 hidden sm:inline">{new Date(o.updatedAt).toLocaleString("sk-SK", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                        <span className="text-[10px] text-slate-600 shrink-0 hidden sm:inline">{new Date(o.updatedAt).toLocaleString("en-GB", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
                       </div>
                     );
                   })}

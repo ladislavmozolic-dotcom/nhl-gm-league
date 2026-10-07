@@ -32,7 +32,7 @@ export default async function AdminAllStarPage() {
             <div className="space-y-3">
               {teamsOf(ev).map((t) => (
                 <AllStarTeamRow key={t.key} eventId={ev.id} div={t.key} name={t.name} coachTeamId={t.coachTeamId} gms={gms}
-                  status={`${DIVS.find((d) => d.key === t.key)!.division} · ${t.roster ? (t.auto ? "auto lineup" : `lineup saved ${new Date(t.submittedAt!).toLocaleString("sk-SK", { timeZone: "Europe/Bratislava" })}`) : "no lineup yet"}`} />
+                  status={`${DIVS.find((d) => d.key === t.key)!.division} · ${t.roster ? (t.auto ? "auto lineup" : `lineup saved ${new Date(t.submittedAt!).toLocaleString("en-GB", { timeZone: "Europe/Bratislava" })}`) : "no lineup yet"}`} />
               ))}
             </div>
           </Card>

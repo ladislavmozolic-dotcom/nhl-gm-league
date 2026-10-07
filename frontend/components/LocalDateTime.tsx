@@ -7,7 +7,7 @@ export default function LocalDateTime({ value, withYear = true }: { value: strin
 
   useEffect(() => {
     const date = new Date(value);
-    setFormatted(Number.isNaN(date.getTime()) ? "—" : date.toLocaleString("sk-SK", {
+    setFormatted(Number.isNaN(date.getTime()) ? "—" : date.toLocaleString("en-GB", {
       day: "numeric",
       month: "short",
       ...(withYear ? { year: "numeric" } : {}),

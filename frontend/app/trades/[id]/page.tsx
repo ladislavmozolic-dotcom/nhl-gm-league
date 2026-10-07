@@ -152,7 +152,7 @@ export default async function TradePage({ params }: { params: Promise<{ id: stri
         {trade.condition && <p className="text-xs text-amber-300/80 mb-3">📎 {trade.condition}</p>}
 
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <p className="text-xs text-slate-600">{trade.createdAt.toLocaleDateString("sk-SK", { day: "numeric", month: "long", year: "numeric" })}</p>
+          <p className="text-xs text-slate-600">{trade.createdAt.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}</p>
           {(role || admin) && <TradeActions tradeId={trade.id} role={role} admin={admin} pending={trade.status === "PENDING"} />}
         </div>
         {!role && !admin && trade.status === "PENDING" && (

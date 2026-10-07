@@ -213,7 +213,7 @@ export default async function WeeklyPage({ searchParams }: { searchParams: Promi
         <div className="divide-y divide-slate-800/60">
           {d.trades.length === 0 && <div className="px-4 py-4 text-slate-500 text-sm">No trades this {period}.{d.tradeOfWeek ? <> Latest deal: <span className="text-slate-300">{d.tradeOfWeek}</span></> : null}</div>}
           {d.trades.map((t) => (
-            <div key={t.id} className="px-4 py-2.5 text-sm text-slate-200">{t.message} <span className="text-slate-600 text-xs ml-1">{new Date(t.createdAt).toLocaleDateString("sk-SK")}</span></div>
+            <div key={t.id} className="px-4 py-2.5 text-sm text-slate-200">{t.message} <span className="text-slate-600 text-xs ml-1">{new Date(t.createdAt).toLocaleDateString("en-GB")}</span></div>
           ))}
         </div>
       </Card>

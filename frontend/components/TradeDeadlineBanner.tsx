@@ -12,7 +12,7 @@ function parts(ms: number) {
   return { d: Math.floor(s / 86400), h: Math.floor((s % 86400) / 3600), m: Math.floor((s % 3600) / 60), s: s % 60 };
 }
 const pad = (n: number) => String(n).padStart(2, "0");
-const time = (iso: string) => new Date(iso).toLocaleTimeString("sk-SK", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Bratislava" });
+const time = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Bratislava" });
 
 /** Site-wide trade-deadline strip: countdown in the final 14 days, a red 🚨 live
  *  breaking-trades ticker on deadline day (polls every 30 s), then a short
@@ -78,7 +78,7 @@ export default function TradeDeadlineBanner({ initial, variant = "strip" }: { in
         <div className="max-w-[1400px] mx-auto px-4 py-1.5 flex items-center gap-3">
           <span className="font-bold whitespace-nowrap">⏰ Trade deadline in</span>
           <span className="tabular-nums font-bold">{p.d > 0 ? `${p.d} d ` : ""}{pad(p.h)}:{pad(p.m)}:{pad(p.s)}</span>
-          <span className="text-amber-200/70 text-xs hidden sm:inline">{new Date(dl).toLocaleString("sk-SK", { timeZone: "Europe/Bratislava", dateStyle: "medium", timeStyle: "short" })}</span>
+          <span className="text-amber-200/70 text-xs hidden sm:inline">{new Date(dl).toLocaleString("en-GB", { timeZone: "Europe/Bratislava", dateStyle: "medium", timeStyle: "short" })}</span>
           <Link href="/trades/deadline" className="ml-auto whitespace-nowrap underline text-xs">Deadline Day →</Link>
         </div>
       </div>

@@ -627,7 +627,7 @@ export default function GamePicksView({
                     <div className="flex items-center justify-between text-[11px] text-slate-400">
                       <span className="font-mono">
                         {g.gameDate
-                          ? new Date(g.gameDate).toLocaleDateString("sk-SK", {
+                          ? new Date(g.gameDate).toLocaleDateString("en-GB", {
                               weekday: "short",
                               day: "numeric",
                               month: "short",

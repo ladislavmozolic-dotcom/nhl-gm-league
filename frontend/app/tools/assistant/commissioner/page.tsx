@@ -90,7 +90,7 @@ export default async function CommissionerIntelligencePage() {
           <div className="flex flex-col gap-1.5">
             {recent.map((r) => (
               <div key={r.id} className="text-xs text-slate-400 flex items-center gap-3 border-b border-slate-900 pb-1.5">
-                <span className="text-slate-500 shrink-0">{new Date(r.createdAt).toLocaleString("sk-SK")}</span>
+                <span className="text-slate-500 shrink-0">{new Date(r.createdAt).toLocaleString("en-GB")}</span>
                 <span className="font-semibold text-slate-300 shrink-0">{r.byName}</span>
                 <span className="truncate">{r.summary}</span>
               </div>

@@ -8,7 +8,7 @@ import { cleanName } from "@/lib/playerName";
 export const dynamic = "force-dynamic";
 
 const fmtM = (c: number) => `$${(c / 1e6).toFixed(2)}M`;
-const fmtDate = (d: Date) => d.toLocaleString("sk-SK", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const fmtDate = (d: Date) => d.toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 // Admin: the full UFA bidding trail for a player — every offer/raise from every club,
 // oldest first, plus how it ended. Reachable from Latest Signings (click the player).

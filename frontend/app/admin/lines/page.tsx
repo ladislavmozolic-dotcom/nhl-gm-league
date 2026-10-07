@@ -20,7 +20,7 @@ export default async function AdminLinesPage() {
   const SIM_HOUR = `${String(cfg.hour).padStart(2, "0")}:${String(cfg.minute).padStart(2, "0")} Bratislava`;
 
   const fmt = (d: Date | null | undefined) =>
-    d ? d.toLocaleString("sk-SK", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "never submitted";
+    d ? d.toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "never submitted";
 
   return (
     <div className="max-w-3xl mx-auto px-4">

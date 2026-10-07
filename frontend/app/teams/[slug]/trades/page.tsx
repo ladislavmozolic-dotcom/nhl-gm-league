@@ -75,7 +75,7 @@ export default async function TeamTradesPage({ params }: { params: Promise<{ slu
     );
   };
 
-  const fmtDate = (d: Date) => d.toLocaleDateString("sk-SK", { day: "numeric", month: "short", year: "numeric" });
+  const fmtDate = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
   const cards = trades.map((t) => {
     // fromTeam sent the "from" side assets, toTeam sent the "to" side —

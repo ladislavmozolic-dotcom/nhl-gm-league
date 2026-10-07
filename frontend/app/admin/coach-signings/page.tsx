@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-const fmtDate = (d: Date) => d.toLocaleString("sk-SK", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const fmtDate = (d: Date) => d.toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 export default async function AdminCoachSigningsPage() {
   if (!(await isAdmin())) redirect("/"); // commissioner only

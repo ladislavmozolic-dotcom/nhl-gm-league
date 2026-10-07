@@ -22,7 +22,7 @@ const SEASON = "2026-27";
 
 const isDefPos = (pos = "") => pos.includes("D") && !(pos.includes("C") || pos.includes("W") || pos.includes("F"));
 
-const fmtStripDate = (d: Date | null) => (d ? d.toLocaleDateString("sk-SK", { day: "numeric", month: "short" }) : "—");
+const fmtStripDate = (d: Date | null) => (d ? d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "—");
 
 const gradeBadgeStyle = (g: string) => {
   switch (g) {

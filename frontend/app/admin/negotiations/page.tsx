@@ -8,7 +8,7 @@ import { cleanName } from "@/lib/playerName";
 export const dynamic = "force-dynamic";
 
 const fmtM = (c: number | null) => (c == null ? "—" : `$${(c / 1e6).toFixed(2)}M`);
-const fmtDate = (d: Date) => d.toLocaleString("sk-SK", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+const fmtDate = (d: Date) => d.toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
 const OUTCOME: Record<string, { label: string; cls: string }> = {
   ACCEPTED: { label: "SIGNED", cls: "bg-emerald-600/20 text-emerald-300" },

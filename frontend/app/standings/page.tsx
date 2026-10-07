@@ -231,7 +231,7 @@ function OddsView({ odds, meta }: { odds: { day: Date; data: OddsSnapshotData } 
   return (
     <section className="space-y-8">
       <p className="text-slate-500 text-xs">
-        {data.sims.toLocaleString()} simulations of the {data.remaining} remaining games · updated {new Date(data.at).toLocaleString("sk-SK", { timeZone: "Europe/Bratislava", dateStyle: "medium", timeStyle: "short" })}.
+        {data.sims.toLocaleString()} simulations of the {data.remaining} remaining games · updated {new Date(data.at).toLocaleString("en-GB", { timeZone: "Europe/Bratislava", dateStyle: "medium", timeStyle: "short" })}.
         {" "}Strength = today&apos;s win-% and goal differential, blended with a roster prior that fades over the first ~25 games; every game has a home-ice edge and a 23 % overtime chance.
         The playoffs follow the NHL bracket and the #1 pick uses our real lottery draw.
       </p>

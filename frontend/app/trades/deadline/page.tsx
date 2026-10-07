@@ -7,8 +7,8 @@ import { deadlineDeals, winnersAndLosers, DEADLINE_WEEK_DAYS } from "@/lib/deadl
 
 export const dynamic = "force-dynamic";
 
-const fmt = (d: Date) => d.toLocaleString("sk-SK", { timeZone: "Europe/Bratislava", weekday: "long", day: "numeric", month: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
-const time = (d: Date) => d.toLocaleString("sk-SK", { timeZone: "Europe/Bratislava", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
+const fmt = (d: Date) => d.toLocaleString("en-GB", { timeZone: "Europe/Bratislava", weekday: "long", day: "numeric", month: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
+const time = (d: Date) => d.toLocaleString("en-GB", { timeZone: "Europe/Bratislava", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
 const gradeTone = (g: string) => g.startsWith("A") ? "text-emerald-400 border-emerald-500/40" : g.startsWith("B") ? "text-sky-400 border-sky-500/40" : g === "C" ? "text-amber-400 border-amber-500/40" : "text-red-400 border-red-500/40";
 
 export default async function DeadlineDayPage() {
@@ -33,7 +33,7 @@ export default async function DeadlineDayPage() {
           </>) : (<>
             <div className="text-[11px] uppercase tracking-widest text-slate-400">{live ? "🚨 Deadline day — live" : "Trade deadline in"}</div>
             <div className="text-4xl font-black text-white mt-1"><Countdown to={deadline.toISOString()} done="closed" /></div>
-            <p className="text-xs text-slate-400 mt-2">Deals must be accepted (and approved, for rookie GMs) before {deadline.toLocaleTimeString("sk-SK", { timeZone: "Europe/Bratislava", hour: "2-digit", minute: "2-digit" })} Bratislava time. Tonight&apos;s sim then runs with the new rosters.</p>
+            <p className="text-xs text-slate-400 mt-2">Deals must be accepted (and approved, for rookie GMs) before {deadline.toLocaleTimeString("en-GB", { timeZone: "Europe/Bratislava", hour: "2-digit", minute: "2-digit" })} Bratislava time. Tonight&apos;s sim then runs with the new rosters.</p>
           </>)}
       </div>
 

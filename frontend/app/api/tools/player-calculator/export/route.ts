@@ -519,11 +519,11 @@ export async function GET(req: Request) {
       ["AHL NHLe faktor predošlý", config.ahlNhlePrevious],
       [
         "Posledný prepočet",
-        config.lastCalculatedAt ? new Date(config.lastCalculatedAt).toLocaleString("sk-SK") : "Nikdy",
+        config.lastCalculatedAt ? new Date(config.lastCalculatedAt).toLocaleString("en-GB") : "Nikdy",
       ],
       [
         "Posledná synchronizácia",
-        config.lastSyncedAt ? new Date(config.lastSyncedAt).toLocaleString("sk-SK") : "Nikdy",
+        config.lastSyncedAt ? new Date(config.lastSyncedAt).toLocaleString("en-GB") : "Nikdy",
       ],
       [],
       ["VÁHY KOMPONENTOV (KORČULIARI):"],

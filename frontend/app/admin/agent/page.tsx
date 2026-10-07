@@ -25,7 +25,7 @@ export const dynamic = "force-dynamic";
 const ACTIVE_OFFERS = ["PENDING", "COUNTERED", "SHORTLISTED"];
 const fmtM = (c: number) => `$${(c / 1e6).toFixed(2)}M`;
 const fmtDate = (d: Date) =>
-  d.toLocaleString("sk-SK", {
+  d.toLocaleString("en-GB", {
     day: "numeric",
     month: "short",
     hour: "2-digit",

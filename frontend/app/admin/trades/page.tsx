@@ -54,7 +54,7 @@ export default async function AdminTradesPage() {
                       {ft?.logoUrl && <img src={ft.logoUrl} alt="" className="w-6 h-6 object-contain" />}{ft?.code}
                       <span className="text-slate-600">⇄</span>
                       {tt?.logoUrl && <img src={tt.logoUrl} alt="" className="w-6 h-6 object-contain" />}{tt?.code}
-                      <span className="text-[11px] text-slate-500 font-normal">#{t.id} · declined {t.respondedAt?.toLocaleDateString("sk-SK", { day: "numeric", month: "short", year: "numeric" }) ?? ""}</span>
+                      <span className="text-[11px] text-slate-500 font-normal">#{t.id} · declined {t.respondedAt?.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) ?? ""}</span>
                     </div>
                     <RestoreTradeButton tradeId={t.id} />
                   </div>
@@ -85,7 +85,7 @@ export default async function AdminTradesPage() {
                     {ft?.logoUrl && <img src={ft.logoUrl} alt="" className="w-6 h-6 object-contain" />}{ft?.code}
                     <span className="text-slate-600">⇄</span>
                     {tt?.logoUrl && <img src={tt.logoUrl} alt="" className="w-6 h-6 object-contain" />}{tt?.code}
-                    <span className="text-[11px] text-slate-500 font-normal">#{t.id} · {t.respondedAt?.toLocaleDateString("sk-SK", { day: "numeric", month: "short", year: "numeric" }) ?? ""}</span>
+                    <span className="text-[11px] text-slate-500 font-normal">#{t.id} · {t.respondedAt?.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) ?? ""}</span>
                   </div>
                   <RevokeTradeButton tradeId={t.id} />
                 </div>
