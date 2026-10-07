@@ -21,7 +21,7 @@ function SearchablePlayerSelect({
   onChange,
   players,
   teams,
-  placeholder = "-- Vyberte hráča --",
+  placeholder = "-- Select a player --",
   disabled = false,
   filter,
 }: {
@@ -114,7 +114,7 @@ function SearchablePlayerSelect({
             <input
               type="text"
               autoFocus
-              placeholder="🔍 Hľadať hráča podľa mena, tímu..."
+              placeholder="🔍 Search player by name, team..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
@@ -130,12 +130,12 @@ function SearchablePlayerSelect({
               }}
               className="w-full text-left px-3 py-1.5 text-xs text-slate-400 hover:bg-slate-800/80 rounded-lg transition-colors"
             >
-              -- Nevybrané --
+              -- Not selected --
             </button>
 
             {filtered.length === 0 ? (
               <div className="p-3 text-center text-xs text-slate-500">
-                Nenašiel sa žiadny hráč pre &quot;{query}&quot;
+                No player found for &quot;{query}&quot;
               </div>
             ) : (
               filtered.slice(0, 50).map((p) => {
@@ -210,12 +210,12 @@ const TOP_90_POINT_TEAMS = [
 ];
 
 const TROPHIES_LIST = [
-  { key: "Hart", name: "Hart Memorial Trophy", desc: "Najužitočnejší hráč (MVP) základnej časti" },
-  { key: "Norris", name: "James Norris Memorial Trophy", desc: "Najlepší obranca" },
-  { key: "Vezina", name: "Vezina Trophy", desc: "Najlepší brankár" },
-  { key: "Calder", name: "Calder Memorial Trophy", desc: "Nováčik roka (Rookie)" },
-  { key: "Selke", name: "Frank J. Selke Trophy", desc: "Najlepšie brániaci útočník" },
-  { key: "JackAdams", name: "Jack Adams Award", desc: "Tréner roka" },
+  { key: "Hart", name: "Hart Memorial Trophy", desc: "Most valuable player (MVP) of the regular season" },
+  { key: "Norris", name: "James Norris Memorial Trophy", desc: "Best defenseman" },
+  { key: "Vezina", name: "Vezina Trophy", desc: "Best goalie" },
+  { key: "Calder", name: "Calder Memorial Trophy", desc: "Rookie of the year" },
+  { key: "Selke", name: "Frank J. Selke Trophy", desc: "Best defensive forward" },
+  { key: "JackAdams", name: "Jack Adams Award", desc: "Coach of the year" },
 ];
 
 export default function SeasonPicksView({
@@ -326,10 +326,10 @@ export default function SeasonPicksView({
 
   const handleSavePicks = () => {
     if (!viewerTeam) {
-      setMsg({ type: "error", text: "Pre odoslanie tipov sa prihláste ako GM tímu." });
+      setMsg({ type: "error", text: "Sign in as a team GM to submit picks." });
       return;
     }
-    if (!window.confirm("Naozaj chcete definitívne odoslať svoje tipy?\n\nUPOZORNENIE: Každý GM môže tipovať iba 1-krát a po odoslaní už NEBUDE MOŽNÉ ŽIADNE TIPY UPRAVOVAŤ ANI MENIŤ!")) {
+    if (!window.confirm("Do you really want to submit your picks for good?\n\nWARNING: Each GM can pick only once and after submitting NO PICKS CAN BE EDITED OR CHANGED!")) {
       return;
     }
     setMsg(null);
@@ -342,16 +342,16 @@ export default function SeasonPicksView({
               localStorage.removeItem(`unhl_season_picks_draft_${viewerTeam.id}`);
             }
           } catch {}
-          setMsg({ type: "success", text: "✅ Váš predsezónny tiket bol úspešne a definitívne odoslaný! Tipy už nie je možné meniť." });
+          setMsg({ type: "success", text: "✅ Your pre-season ticket was submitted successfully and for good! Picks can no longer be changed." });
           setTimeout(() => {
             window.location.reload();
           }, 1500);
         } else {
-          setMsg({ type: "error", text: res.error || "Chyba pri ukladaní tipov." });
+          setMsg({ type: "error", text: res.error || "Error saving picks." });
         }
       } catch (err: any) {
         console.error("Save season picks error:", err);
-        alert("Aplikácia bola na serveri aktualizovaná na novú verziu. Váš vyplnený koncept tipov zostal bezpečne uložený. Stránka sa teraz obnoví — následne prosím kliknite na Odoslať tipy.");
+        alert("The app was updated to a new version on the server. Your filled-in draft of picks is safely saved. The page will now reload — please then click Submit picks.");
         window.location.reload();
       }
     });
@@ -374,14 +374,14 @@ export default function SeasonPicksView({
                     : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
                 }`}
               >
-                {config.status === "OPEN" ? "🟢 OTVORENÉ PRE TIPY" : "🔒 UZAMKNUTÉ"}
+                {config.status === "OPEN" ? "🟢 OPEN FOR PICKS" : "🔒 LOCKED"}
               </span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-3">
-              <span>🎯 Tipovacia Liga & Season Picks</span>
+              <span>🎯 Picks League & Season Picks</span>
             </h1>
             <p className="text-sm text-slate-300 mt-1 max-w-2xl">
-              Veľká predsezónna tipovačka pre generálnych manažérov. 10 komplexných kategórií, váhované body, NHL trofeje a celosezónny súboj o kráľa tipov.
+              The big pre-season picks game for general managers. 10 comprehensive categories, weighted points, NHL trophies and a season-long battle for the king of predictions.
             </p>
           </div>
 
@@ -394,7 +394,7 @@ export default function SeasonPicksView({
                   </div>
                 )}
                 <div>
-                  <div className="text-xs text-slate-400 font-medium">Prihlásený GM</div>
+                  <div className="text-xs text-slate-400 font-medium">Signed-in GM</div>
                   <div className="text-sm font-bold text-white leading-tight">
                     {viewerTeam.gmNickname || viewerTeam.gm || viewerTeam.name}
                   </div>
@@ -402,7 +402,7 @@ export default function SeasonPicksView({
               </div>
             ) : (
               <div className="px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium">
-                ⚠️ Pre odoslanie tipov sa prihláste ako GM tímu.
+                ⚠️ Sign in as a team GM to submit picks.
               </div>
             )}
           </div>
@@ -418,7 +418,7 @@ export default function SeasonPicksView({
                 : "bg-slate-800/60 hover:bg-slate-800 text-slate-300"
             }`}
           >
-            <span>📝 Season Picks (Môj Tiket)</span>
+            <span>📝 Season Picks (My Ticket)</span>
           </button>
           <button
             onClick={() => setTab("leaderboard")}
@@ -428,7 +428,7 @@ export default function SeasonPicksView({
                 : "bg-slate-800/60 hover:bg-slate-800 text-slate-300"
             }`}
           >
-            <span>🏆 Rebríček GM ({submissions.length})</span>
+            <span>🏆 GM Leaderboard ({submissions.length})</span>
           </button>
           <button
             onClick={() => setTab("daily")}
@@ -438,7 +438,7 @@ export default function SeasonPicksView({
                 : "bg-slate-800/60 hover:bg-slate-800 text-slate-300"
             }`}
           >
-            <span>📅 Game Picks (Denná Tipovačka)</span>
+            <span>📅 Game Picks (Daily Picks)</span>
           </button>
           <button
             onClick={() => setTab("rules")}
@@ -448,7 +448,7 @@ export default function SeasonPicksView({
                 : "bg-slate-800/60 hover:bg-slate-800 text-slate-300"
             }`}
           >
-            <span>📖 Pravidlá & Odmeny</span>
+            <span>📖 Rules & Rewards</span>
           </button>
           {isAdmin && (
             <button
@@ -459,7 +459,7 @@ export default function SeasonPicksView({
                   : "bg-slate-800/60 hover:bg-slate-800 text-amber-300 border border-amber-500/20"
               }`}
             >
-              <span>⚙️ Správa & Vyhodnotenie</span>
+              <span>⚙️ Admin & Evaluation</span>
             </button>
           )}
         </div>
@@ -475,7 +475,7 @@ export default function SeasonPicksView({
         >
           <span>{msg.text}</span>
           <button onClick={() => setMsg(null)} className="text-xs underline hover:opacity-80">
-            Zavrieť
+            Close
           </button>
         </div>
       )}
@@ -488,9 +488,9 @@ export default function SeasonPicksView({
             <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-200 text-sm flex items-start gap-3">
               <span className="text-2xl flex-shrink-0">🔒</span>
               <div>
-                <strong className="font-bold text-white text-base block mb-0.5">Váš predsezónny tiket bol odoslaný</strong>
+                <strong className="font-bold text-white text-base block mb-0.5">Your pre-season ticket has been submitted</strong>
                 <p className="text-xs text-indigo-200/90 leading-relaxed">
-                  Každý GM môže tipovať iba <strong>1-krát</strong> pod svojím prihlásením. Tipy už <strong>nie je možné upravovať ani meniť</strong>. Nižšie si môžete prezrieť svoje odoslané voľby.
+                  Each GM can pick only <strong>once</strong> under their login. Picks <strong>can no longer be edited or changed</strong>. Below you can review your submitted choices.
                 </p>
               </div>
             </div>
@@ -498,9 +498,9 @@ export default function SeasonPicksView({
             <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-sm flex items-start gap-3">
               <span className="text-2xl flex-shrink-0">⏰</span>
               <div>
-                <strong className="font-bold text-white text-base block mb-0.5">Tipovačka je po deadline uzamknutá</strong>
+                <strong className="font-bold text-white text-base block mb-0.5">The picks game is locked after the deadline</strong>
                 <p className="text-xs text-amber-200/90 leading-relaxed">
-                  Termín na odosielanie predsezónnych tipov vypršal. Nové tikety už nie je možné odoslať.
+                  The deadline for submitting pre-season picks has passed. New tickets can no longer be submitted.
                 </p>
               </div>
             </div>
@@ -509,9 +509,9 @@ export default function SeasonPicksView({
               <div className="flex items-start gap-3">
                 <span className="text-2xl flex-shrink-0">⚠️</span>
                 <div>
-                  <strong className="font-bold text-amber-300 text-sm block">DÔLEŽITÉ UPOZORNENIE: Každý GM môže tipovať iba 1-krát!</strong>
+                  <strong className="font-bold text-amber-300 text-sm block">IMPORTANT NOTICE: Each GM can pick only once!</strong>
                   <p className="text-xs text-amber-200/90 mt-0.5 leading-relaxed">
-                    Po definitívnom odoslaní formulára už <strong>NIE JE MOŽNÉ TIPY MENIŤ</strong>. Pred odoslaním si prosím dôkladne skontrolujte všetky svoje voľby vo všetkých 10 sekciách.
+                    After the form is submitted for good, <strong>PICKS CAN NO LONGER BE CHANGED</strong>. Before submitting, please carefully check all your choices in all 10 sections.
                   </p>
                 </div>
               </div>
@@ -521,7 +521,7 @@ export default function SeasonPicksView({
                   disabled={isPending}
                   className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-lg shadow-emerald-600/30 transition-all disabled:opacity-50 flex items-center gap-2 flex-shrink-0 w-full md:w-auto justify-center"
                 >
-                  {isPending ? "Odosielam..." : "🚀 Definitívne odoslať tiket"}
+                  {isPending ? "Submitting..." : "🚀 Submit ticket for good"}
                 </button>
               )}
             </div>
@@ -533,19 +533,19 @@ export default function SeasonPicksView({
               <div className="flex items-center gap-2.5">
                 <span className="text-2xl">🏆</span>
                 <div>
-                  <h2 className="text-lg font-bold text-white">1. Stanley Cup (Max 70 b)</h2>
-                  <p className="text-xs text-slate-400">Celkový víťaz, porazený finalista a presný výsledok série.</p>
+                  <h2 className="text-lg font-bold text-white">1. Stanley Cup (Max 70 pts)</h2>
+                  <p className="text-xs text-slate-400">Overall winner, losing finalist and the exact series result.</p>
                 </div>
               </div>
               <div className="flex items-center gap-2 text-xs font-mono text-indigo-300 bg-indigo-950/40 px-3 py-1 rounded-lg border border-indigo-800/40">
-                Víťaz: 30b | Finalista: 15b | Dvojica: +15b | Séria: 10b
+                Winner: 30 pts | Finalist: 15 pts | Pair: +15 pts | Series: 10 pts
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  🥇 Víťaz Stanley Cupu (30 b)
+                  🥇 Stanley Cup Winner (30 pts)
                 </label>
                 <select
                   disabled={isLocked}
@@ -561,7 +561,7 @@ export default function SeasonPicksView({
                   }
                   className="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-indigo-500"
                 >
-                  <option value="">-- Vyberte tím --</option>
+                  <option value="">-- Select a team --</option>
                   {teams.map((t: any) => (
                     <option key={t.id} value={t.id}>
                       {t.name}
@@ -572,7 +572,7 @@ export default function SeasonPicksView({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  🥈 Porazený finalista (15 b)
+                  🥈 Losing finalist (15 pts)
                 </label>
                 <select
                   disabled={isLocked}
@@ -588,7 +588,7 @@ export default function SeasonPicksView({
                   }
                   className="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-indigo-500"
                 >
-                  <option value="">-- Vyberte tím --</option>
+                  <option value="">-- Select a team --</option>
                   {teams
                     .filter((t: any) => t.id !== formPicks.stanleyCup?.winnerTeamId)
                     .map((t: any) => (
@@ -601,7 +601,7 @@ export default function SeasonPicksView({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  🎯 Výsledok série finále (10 b)
+                  🎯 Final series result (10 pts)
                 </label>
                 <select
                   disabled={isLocked}
@@ -632,12 +632,12 @@ export default function SeasonPicksView({
               <div className="flex items-center gap-2.5">
                 <span className="text-2xl">🥇</span>
                 <div>
-                  <h2 className="text-lg font-bold text-white">2. Víťazi divízií (Max 55 b)</h2>
-                  <p className="text-xs text-slate-400">Tipnite víťaza každej zo 4 divízií NHL.</p>
+                  <h2 className="text-lg font-bold text-white">2. Division winners (Max 55 pts)</h2>
+                  <p className="text-xs text-slate-400">Pick the winner of each of the 4 NHL divisions.</p>
                 </div>
               </div>
               <div className="flex items-center gap-2 text-xs font-mono text-indigo-300 bg-indigo-950/40 px-3 py-1 rounded-lg border border-indigo-800/40">
-                10b za každú divíziu | 4/4 bonus: +15b
+                10 pts per division | 4/4 bonus: +15 pts
               </div>
             </div>
 
@@ -661,7 +661,7 @@ export default function SeasonPicksView({
                   }
                   className="w-full px-2.5 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-indigo-500"
                 >
-                  <option value="">-- Vyberte tím --</option>
+                  <option value="">-- Select a team --</option>
                   {atlanticTeams.map((t: any) => (
                     <option key={t.id} value={t.id}>
                       {t.name}
@@ -689,7 +689,7 @@ export default function SeasonPicksView({
                   }
                   className="w-full px-2.5 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-indigo-500"
                 >
-                  <option value="">-- Vyberte tím --</option>
+                  <option value="">-- Select a team --</option>
                   {metroTeams.map((t: any) => (
                     <option key={t.id} value={t.id}>
                       {t.name}
@@ -717,7 +717,7 @@ export default function SeasonPicksView({
                   }
                   className="w-full px-2.5 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-indigo-500"
                 >
-                  <option value="">-- Vyberte tím --</option>
+                  <option value="">-- Select a team --</option>
                   {centralTeams.map((t: any) => (
                     <option key={t.id} value={t.id}>
                       {t.name}
@@ -745,7 +745,7 @@ export default function SeasonPicksView({
                   }
                   className="w-full px-2.5 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-indigo-500"
                 >
-                  <option value="">-- Vyberte tím --</option>
+                  <option value="">-- Select a team --</option>
                   {pacificTeams.map((t: any) => (
                     <option key={t.id} value={t.id}>
                       {t.name}
@@ -762,19 +762,19 @@ export default function SeasonPicksView({
               <div className="flex items-center gap-2.5">
                 <span className="text-2xl">🛡️</span>
                 <div>
-                  <h2 className="text-lg font-bold text-white">3. Presidents' Trophy (Max 25 b)</h2>
-                  <p className="text-xs text-slate-400">Víťaz základnej časti a tip na jeho bodový zisk.</p>
+                  <h2 className="text-lg font-bold text-white">3. Presidents' Trophy (Max 25 pts)</h2>
+                  <p className="text-xs text-slate-400">Regular-season winner and a prediction of his point total.</p>
                 </div>
               </div>
               <div className="flex items-center gap-2 text-xs font-mono text-indigo-300 bg-indigo-950/40 px-3 py-1 rounded-lg border border-indigo-800/40">
-                Tím: 15b | Body: Presne 10b / ±2b: 7b / ±5b: 4b
+                Team: 15 pts | Points: Exact 10 pts / ±2: 7 pts / ±5: 4 pts
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Tím s najviac bodmi v základnej časti (15 b)
+                  Team with the most points in the regular season (15 pts)
                 </label>
                 <select
                   disabled={isLocked}
@@ -790,7 +790,7 @@ export default function SeasonPicksView({
                   }
                   className="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-indigo-500"
                 >
-                  <option value="">-- Vyberte tím --</option>
+                  <option value="">-- Select a team --</option>
                   {teams.map((t: any) => (
                     <option key={t.id} value={t.id}>
                       {t.name}
@@ -801,7 +801,7 @@ export default function SeasonPicksView({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Tip na počet bodov víťaza ZČ (napr. 116 b)
+                  Prediction of the RS winner's point total (e.g. 116 pts)
                 </label>
                 <input
                   type="number"
@@ -831,14 +831,14 @@ export default function SeasonPicksView({
               <div className="flex items-center gap-2.5">
                 <span className="text-2xl">🎟️</span>
                 <div>
-                  <h2 className="text-lg font-bold text-white">4. Playoff Teams (Max 52 b)</h2>
+                  <h2 className="text-lg font-bold text-white">4. Playoff Teams (Max 52 pts)</h2>
                   <p className="text-xs text-slate-400">
-                    Označte 16 postupujúcich tímov (8 Východ + 8 Západ).
+                    Select the 16 teams that advance (8 East + 8 West).
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-2 text-xs font-mono text-indigo-300 bg-indigo-950/40 px-3 py-1 rounded-lg border border-indigo-800/40">
-                2b za tím | Bonus za 8/8 na konferenciu: +10b
+                2 pts per team | 8/8 bonus per conference: +10 pts
               </div>
             </div>
 
@@ -846,7 +846,7 @@ export default function SeasonPicksView({
               {/* Eastern Conference */}
               <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-800 space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="font-bold text-sm text-blue-400">VÝCHODNÁ KONFERENCIA</div>
+                  <div className="font-bold text-sm text-blue-400">EASTERN CONFERENCE</div>
                   <div
                     className={`text-xs font-mono px-2.5 py-0.5 rounded-full ${
                       eastSelectedCount === 8
@@ -854,7 +854,7 @@ export default function SeasonPicksView({
                         : "bg-slate-800 text-slate-400"
                     }`}
                   >
-                    Vybrané: {eastSelectedCount} / 8
+                    Selected: {eastSelectedCount} / 8
                   </div>
                 </div>
 
@@ -887,7 +887,7 @@ export default function SeasonPicksView({
               {/* Western Conference */}
               <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-800 space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="font-bold text-sm text-rose-400">ZÁPADNÁ KONFERENCIA</div>
+                  <div className="font-bold text-sm text-rose-400">WESTERN CONFERENCE</div>
                   <div
                     className={`text-xs font-mono px-2.5 py-0.5 rounded-full ${
                       westSelectedCount === 8
@@ -895,7 +895,7 @@ export default function SeasonPicksView({
                         : "bg-slate-800 text-slate-400"
                     }`}
                   >
-                    Vybrané: {westSelectedCount} / 8
+                    Selected: {westSelectedCount} / 8
                   </div>
                 </div>
 
@@ -933,12 +933,12 @@ export default function SeasonPicksView({
               <div className="flex items-center gap-2.5">
                 <span className="text-2xl">📊</span>
                 <div>
-                  <h2 className="text-lg font-bold text-white">5. Bodovanie & Štatistiky NHL (Max 60 b)</h2>
-                  <p className="text-xs text-slate-400">Najproduktívnejší hráči a lídri jednotlivých štatistík s vyhľadávaním.</p>
+                  <h2 className="text-lg font-bold text-white">5. NHL Scoring & Statistics (Max 60 pts)</h2>
+                  <p className="text-xs text-slate-400">Top scorers and leaders in individual stats, with search.</p>
                 </div>
               </div>
               <div className="flex items-center gap-2 text-xs font-mono text-indigo-300 bg-indigo-950/40 px-3 py-1 rounded-lg border border-indigo-800/40">
-                Art Ross: 15b | Richard: 15b | Asistencie: 10b | Obranca: 10b | Rookie: 10b
+                Art Ross: 15 pts | Richard: 15 pts | Assists: 10 pts | Defenseman: 10 pts | Rookie: 10 pts
               </div>
             </div>
 
@@ -946,14 +946,14 @@ export default function SeasonPicksView({
               {/* Art Ross */}
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  🥇 Art Ross Trophy — Najviac bodov (15 b)
+                  🥇 Art Ross Trophy — Most points (15 pts)
                 </label>
                 <SearchablePlayerSelect
                   disabled={isLocked}
                   value={formPicks.statLeaders?.artRossPlayerId}
                   players={players}
                   teams={teams}
-                  placeholder="-- Hľadať Art Ross víťaza --"
+                  placeholder="-- Search Art Ross winner --"
                   onChange={(pid) =>
                     setFormPicks({
                       ...formPicks,
@@ -969,14 +969,14 @@ export default function SeasonPicksView({
               {/* Maurice Richard */}
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  🎯 Maurice Richard — Najlepší strelec (15 b)
+                  🎯 Maurice Richard — Top goal scorer (15 pts)
                 </label>
                 <SearchablePlayerSelect
                   disabled={isLocked}
                   value={formPicks.statLeaders?.rocketRichardPlayerId}
                   players={players}
                   teams={teams}
-                  placeholder="-- Hľadať najlepšieho strelca --"
+                  placeholder="-- Search top goal scorer --"
                   onChange={(pid) =>
                     setFormPicks({
                       ...formPicks,
@@ -992,14 +992,14 @@ export default function SeasonPicksView({
               {/* Assists */}
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  🅰️ Najviac asistencií (10 b)
+                  🅰️ Most assists (10 pts)
                 </label>
                 <SearchablePlayerSelect
                   disabled={isLocked}
                   value={formPicks.statLeaders?.assistsPlayerId}
                   players={players}
                   teams={teams}
-                  placeholder="-- Hľadať lídra asistencií --"
+                  placeholder="-- Search assists leader --"
                   onChange={(pid) =>
                     setFormPicks({
                       ...formPicks,
@@ -1015,14 +1015,14 @@ export default function SeasonPicksView({
               {/* Top D-man */}
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  🛡️ Najproduktívnejší obranca (10 b)
+                  🛡️ Top-scoring defenseman (10 pts)
                 </label>
                 <SearchablePlayerSelect
                   disabled={isLocked}
                   value={formPicks.statLeaders?.topDmanPlayerId}
                   players={players}
                   teams={teams}
-                  placeholder="-- Hľadať top obrancu --"
+                  placeholder="-- Search top defenseman --"
                   filter={(p) => p.position?.includes("D")}
                   onChange={(pid) =>
                     setFormPicks({
@@ -1039,14 +1039,14 @@ export default function SeasonPicksView({
               {/* Top Rookie */}
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  🌟 Najproduktívnejší Rookie (10 b)
+                  🌟 Top-scoring rookie (10 pts)
                 </label>
                 <SearchablePlayerSelect
                   disabled={isLocked}
                   value={formPicks.statLeaders?.topRookiePlayerId}
                   players={players}
                   teams={teams}
-                  placeholder="-- Hľadať top nováčika --"
+                  placeholder="-- Search top rookie --"
                   onChange={(pid) =>
                     setFormPicks({
                       ...formPicks,
@@ -1067,9 +1067,9 @@ export default function SeasonPicksView({
               <div className="flex items-center gap-2.5">
                 <span className="text-2xl">🎖️</span>
                 <div>
-                  <h2 className="text-lg font-bold text-white">6. NHL Trofeje (10 b za každú trofej, Max 60 b)</h2>
+                  <h2 className="text-lg font-bold text-white">6. NHL Trophies (10 pts per trophy, Max 60 pts)</h2>
                   <p className="text-xs text-slate-400">
-                    Vyberte svojho favorita na zisk každej zo 6 prestížnych trofejí NHL. Za každý správny tip získate 10 bodov.
+                    Choose your favorite to win each of the 6 prestigious NHL trophies. You earn 10 points for every correct pick.
                   </p>
                 </div>
               </div>
@@ -1108,7 +1108,7 @@ export default function SeasonPicksView({
                           }}
                           className="w-full px-2.5 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
                         >
-                          <option value="">-- Vyberte tím / trénera --</option>
+                          <option value="">-- Select a team / coach --</option>
                           {teams.map((t: any) => (
                             <option key={t.id} value={t.id}>
                               {t.name}
@@ -1121,7 +1121,7 @@ export default function SeasonPicksView({
                           value={current.playerId}
                           players={players}
                           teams={teams}
-                          placeholder={`-- Hľadať ${tDef.name.split(" ")[0]} víťaza --`}
+                          placeholder={`-- Search ${tDef.name.split(" ")[0]} winner --`}
                           filter={(p) => {
                             if (tDef.key === "Norris") return p.position?.includes("D");
                             if (tDef.key === "Vezina") return p.isGoalie;
@@ -1151,12 +1151,12 @@ export default function SeasonPicksView({
               <div className="flex items-center gap-2.5">
                 <span className="text-2xl">📈</span>
                 <div>
-                  <h2 className="text-lg font-bold text-white">7. Over / Under (4 b za správny tip)</h2>
-                  <p className="text-xs text-slate-400">Prekonajú vybraní hráči a tímy stanovenú bodovú hranicu?</p>
+                  <h2 className="text-lg font-bold text-white">7. Over / Under (4 pts per correct pick)</h2>
+                  <p className="text-xs text-slate-400">Will the selected players and teams beat the set point line?</p>
                 </div>
               </div>
               <div className="text-xs font-mono text-indigo-300 bg-indigo-950/40 px-3 py-1 rounded-lg border border-indigo-800/40">
-                4b za každý správny tip
+                4 pts per correct pick
               </div>
             </div>
 
@@ -1220,12 +1220,12 @@ export default function SeasonPicksView({
               <div className="flex items-center gap-2.5">
                 <span className="text-2xl">⚔️</span>
                 <div>
-                  <h2 className="text-lg font-bold text-white">8. Head-to-Head Duely (3 b za správny tip)</h2>
-                  <p className="text-xs text-slate-400">Kto dosiahne viac bodov v priamom mikrodueli?</p>
+                  <h2 className="text-lg font-bold text-white">8. Head-to-Head Duels (3 pts per correct pick)</h2>
+                  <p className="text-xs text-slate-400">Who will earn more points in a direct micro-duel?</p>
                 </div>
               </div>
               <div className="text-xs font-mono text-indigo-300 bg-indigo-950/40 px-3 py-1 rounded-lg border border-indigo-800/40">
-                3b za každý správny duel
+                3 pts per correct duel
               </div>
             </div>
 
@@ -1288,12 +1288,12 @@ export default function SeasonPicksView({
               <div className="flex items-center gap-2.5">
                 <span className="text-2xl">⚡</span>
                 <div>
-                  <h2 className="text-lg font-bold text-white">9. Bold Predictions (4 b za správny tip)</h2>
-                  <p className="text-xs text-slate-400">Odvážne predsezónne výroky: Áno alebo Nie?</p>
+                  <h2 className="text-lg font-bold text-white">9. Bold Predictions (4 pts per correct pick)</h2>
+                  <p className="text-xs text-slate-400">Bold pre-season statements: Yes or No?</p>
                 </div>
               </div>
               <div className="text-xs font-mono text-indigo-300 bg-indigo-950/40 px-3 py-1 rounded-lg border border-indigo-800/40">
-                4b za každý správny výrok
+                4 pts per correct statement
               </div>
             </div>
 
@@ -1319,7 +1319,7 @@ export default function SeasonPicksView({
                             : "bg-slate-800 text-slate-400 hover:bg-slate-700"
                         }`}
                       >
-                        ÁNO ✓
+                        YES ✓
                       </button>
                       <button
                         type="button"
@@ -1336,7 +1336,7 @@ export default function SeasonPicksView({
                             : "bg-slate-800 text-slate-400 hover:bg-slate-700"
                         }`}
                       >
-                        NIE ✗
+                        NO ✗
                       </button>
                     </div>
                   </div>
@@ -1351,24 +1351,24 @@ export default function SeasonPicksView({
               <div className="flex items-center gap-2.5">
                 <span className="text-2xl">🌟</span>
                 <div>
-                  <h2 className="text-lg font-bold text-white">10. Wildcard: Sleeper & Bust tímy (Max 30 b)</h2>
+                  <h2 className="text-lg font-bold text-white">10. Wildcard: Sleeper & Bust teams (Max 30 pts)</h2>
                   <p className="text-xs text-slate-400">
-                    Sleeper (prekvapenie sezóny) a Bust (očakávané sklamanie z top tímov).
+                    Sleeper (the surprise of the season) and Bust (an expected disappointment among top teams).
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-2 text-xs font-mono text-indigo-300 bg-indigo-950/40 px-3 py-1 rounded-lg border border-indigo-800/40">
-                Sleeper: PO (+10b) / Divízia (+20b) | Bust: Mimo PO (+10b)
+                Sleeper: PO (+10 pts) / Division (+20 pts) | Bust: Out of PO (+10 pts)
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-2">
                 <div className="font-bold text-sm text-emerald-400 flex items-center gap-2">
-                  <span>🚀 Sleeper Team (Skokan sezóny)</span>
+                  <span>🚀 Sleeper Team (Riser of the season)</span>
                 </div>
                 <div className="text-xs text-slate-400">
-                  Tím, od ktorého čakáte výrazne lepšiu sezónu. Postup do PO = +10b, výhra v divízii = +20b.
+                  A team you expect a much better season from. Making the PO = +10 pts, winning the division = +20 pts.
                 </div>
                 <select
                   disabled={isLocked}
@@ -1384,7 +1384,7 @@ export default function SeasonPicksView({
                   }
                   className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-indigo-500 mt-2"
                 >
-                  <option value="">-- Vyberte tím --</option>
+                  <option value="">-- Select a team --</option>
                   {teams.map((t: any) => (
                     <option key={t.id} value={t.id}>
                       {t.name}
@@ -1395,10 +1395,10 @@ export default function SeasonPicksView({
 
               <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-2">
                 <div className="font-bold text-sm text-rose-400 flex items-center gap-2">
-                  <span>📉 Bust Team (Sklamanie sezóny)</span>
+                  <span>📉 Bust Team (Disappointment of the season)</span>
                 </div>
                 <div className="text-xs text-slate-400">
-                  Top tím z minulej sezóny (90+ bodov), ktorý nepostúpi do play-off (+10b).
+                  A top team from last season (90+ points) that misses the playoffs (+10 pts).
                 </div>
                 <select
                   disabled={isLocked}
@@ -1414,7 +1414,7 @@ export default function SeasonPicksView({
                   }
                   className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-indigo-500 mt-2"
                 >
-                  <option value="">-- Vyberte tím (iba 90+ b minulú sezónu) --</option>
+                  <option value="">-- Select a team (only 90+ pts last season) --</option>
                   {bustEligibleTeams.map((t: any) => (
                     <option key={t.id} value={t.id}>
                       {t.name}
@@ -1430,14 +1430,14 @@ export default function SeasonPicksView({
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900 border border-slate-800">
               <div className="text-xs text-amber-300 flex items-center gap-2">
                 <span className="text-lg">⚠️</span>
-                <span>Upozornenie: Po odoslaní už nebude možné tipy meniť. Formulár môžete odoslať iba raz.</span>
+                <span>Notice: After submitting, picks can no longer be changed. You can submit the form only once.</span>
               </div>
               <button
                 onClick={handleSavePicks}
                 disabled={isPending}
                 className="px-8 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-base shadow-xl shadow-emerald-600/30 transition-all disabled:opacity-50 flex items-center gap-2 w-full sm:w-auto justify-center"
               >
-                {isPending ? "Odosielam..." : "🚀 Definitívne odoslať tiket (Nemožno meniť)"}
+                {isPending ? "Submitting..." : "🚀 Submit ticket for good (cannot be changed)"}
               </button>
             </div>
           )}
@@ -1450,34 +1450,34 @@ export default function SeasonPicksView({
           <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-800 pb-3">
             <div>
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <span>🏆 Poradie & Rebríček Tipovacej Ligy</span>
+                <span>🏆 Standings & Leaderboard of the Picks League</span>
               </h2>
               <p className="text-xs text-slate-400">
-                Oficiálne poradie generálnych manažérov v celosezónnej tipovačke.
+                Official ranking of general managers in the season-long picks game.
               </p>
             </div>
             <div className="text-xs text-slate-400 font-mono">
-              Celkovo odovzdaných tiketov: {submissions.length}
+              Total tickets submitted: {submissions.length}
             </div>
           </div>
 
           {/* REWARDS SUMMARY CARDS */}
           <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-950/20 via-slate-950 to-indigo-950/30 border border-amber-500/20 space-y-3">
             <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
-              <span>🎁 Celosezónne odmeny pre TOP 3 tipérov:</span>
+              <span>🎁 Season-long rewards for the TOP 3 predictors:</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
               <div className="p-2.5 rounded-xl bg-slate-900/90 border border-amber-500/30">
                 <span className="font-bold text-amber-300">🥇 1. miesto:</span>{" "}
-                <strong className="text-white">+$3,000,000</strong> + 🎟️ <strong>8. kolo draft pick</strong> + Zlatý odznak
+                <strong className="text-white">+$3,000,000</strong> + 🎟️ <strong>Round 8 draft pick</strong> + Gold badge
               </div>
               <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-700">
                 <span className="font-bold text-slate-300">🥈 2. miesto:</span>{" "}
-                <strong className="text-white">+$1,500,000</strong> + 🎟️ <strong>8. kolo draft pick</strong> + Strieborný odznak
+                <strong className="text-white">+$1,500,000</strong> + 🎟️ <strong>Round 8 draft pick</strong> + Silver badge
               </div>
               <div className="p-2.5 rounded-xl bg-slate-900/90 border border-amber-700/30">
                 <span className="font-bold text-amber-400">🥉 3. miesto:</span>{" "}
-                <strong className="text-white">+$750,000</strong> + 🎟️ <strong>8. kolo draft pick</strong> + Bronzový odznak
+                <strong className="text-white">+$750,000</strong> + 🎟️ <strong>Round 8 draft pick</strong> + Bronze badge
               </div>
             </div>
             <div className="text-[10px] text-slate-400">
@@ -1487,7 +1487,7 @@ export default function SeasonPicksView({
 
           {submissions.length === 0 ? (
             <div className="text-center py-12 text-slate-400">
-              Zatiaľ neboli odoslané žiadne tipy.
+              No picks have been submitted yet.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -1495,12 +1495,12 @@ export default function SeasonPicksView({
                 <thead>
                   <tr className="border-b border-slate-800 text-slate-400 text-xs uppercase tracking-wider font-semibold">
                     <th className="py-3 px-3">#</th>
-                    <th className="py-3 px-3">Tím / GM</th>
+                    <th className="py-3 px-3">Team / GM</th>
                     <th className="py-3 px-3 text-center">SC</th>
-                    <th className="py-3 px-3 text-center">Divízie</th>
+                    <th className="py-3 px-3 text-center">Divisions</th>
                     <th className="py-3 px-3 text-center">Presidents</th>
                     <th className="py-3 px-3 text-center">Playoff</th>
-                    <th className="py-3 px-3 text-center">Lídri</th>
+                    <th className="py-3 px-3 text-center">Leaders</th>
                     <th className="py-3 px-3 text-center">Trofeje</th>
                     <th className="py-3 px-3 text-center">O/U</th>
                     <th className="py-3 px-3 text-center">H2H</th>
@@ -1556,7 +1556,7 @@ export default function SeasonPicksView({
                             onClick={() => setSelectedSubmission(sub)}
                             className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 rounded-lg transition-all"
                           >
-                            👁️ Tiket
+                            👁️ Ticket
                           </button>
                         </td>
                       </tr>
@@ -1580,10 +1580,10 @@ export default function SeasonPicksView({
                     )}
                     <div>
                       <h3 className="text-lg font-bold text-white">
-                        Tiket GM: {selectedSubmission.submittedBy || selectedSubmission.team?.name}
+                        GM Ticket: {selectedSubmission.submittedBy || selectedSubmission.team?.name}
                       </h3>
                       <div className="text-xs text-slate-400">
-                        Celkový počet bodov: <strong className="text-indigo-400 font-mono">{selectedSubmission.totalPoints} b</strong>
+                        Total points: <strong className="text-indigo-400 font-mono">{selectedSubmission.totalPoints} pts</strong>
                       </div>
                     </div>
                   </div>
@@ -1597,7 +1597,7 @@ export default function SeasonPicksView({
 
                 {!selectedSubmission.picks ? (
                   <div className="p-6 text-center text-slate-400 text-sm">
-                    🔒 Tipy tohto GM sú skryté až do uzávierky (deadline).
+                    🔒 This GM's picks are hidden until the deadline.
                   </div>
                 ) : (
                   <div className="space-y-4 text-xs">
@@ -1605,13 +1605,13 @@ export default function SeasonPicksView({
                     <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
                       <div className="font-bold text-slate-300 mb-1">1. Stanley Cup:</div>
                       <div className="text-slate-400">
-                        Víťaz: <strong className="text-white">{teams.find((t: any) => t.id === selectedSubmission.picks.stanleyCup?.winnerTeamId)?.name || "—"}</strong> | Finalista: <strong className="text-white">{teams.find((t: any) => t.id === selectedSubmission.picks.stanleyCup?.finalistTeamId)?.name || "—"}</strong> | Séria: <strong className="text-white font-mono">{selectedSubmission.picks.stanleyCup?.seriesScore || "—"}</strong>
+                        Winner: <strong className="text-white">{teams.find((t: any) => t.id === selectedSubmission.picks.stanleyCup?.winnerTeamId)?.name || "—"}</strong> | Finalist: <strong className="text-white">{teams.find((t: any) => t.id === selectedSubmission.picks.stanleyCup?.finalistTeamId)?.name || "—"}</strong> | Series: <strong className="text-white font-mono">{selectedSubmission.picks.stanleyCup?.seriesScore || "—"}</strong>
                       </div>
                     </div>
 
                     {/* Divs */}
                     <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                      <div className="font-bold text-slate-300 mb-1">2. Víťazi divízií:</div>
+                      <div className="font-bold text-slate-300 mb-1">2. Division winners:</div>
                       <div className="grid grid-cols-2 gap-2 text-slate-400">
                         <div>ATL: <strong className="text-white">{teams.find((t: any) => t.id === selectedSubmission.picks.divisionWinners?.atlanticTeamId)?.name || "—"}</strong></div>
                         <div>MET: <strong className="text-white">{teams.find((t: any) => t.id === selectedSubmission.picks.divisionWinners?.metroTeamId)?.name || "—"}</strong></div>
@@ -1624,13 +1624,13 @@ export default function SeasonPicksView({
                     <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
                       <div className="font-bold text-slate-300 mb-1">3. Presidents' Trophy:</div>
                       <div className="text-slate-400">
-                        Tím: <strong className="text-white">{teams.find((t: any) => t.id === selectedSubmission.picks.presidentsTrophy?.teamId)?.name || "—"}</strong> ({selectedSubmission.picks.presidentsTrophy?.points} bodov)
+                        Team: <strong className="text-white">{teams.find((t: any) => t.id === selectedSubmission.picks.presidentsTrophy?.teamId)?.name || "—"}</strong> ({selectedSubmission.picks.presidentsTrophy?.points} pts)
                       </div>
                     </div>
 
                     {/* Playoff Teams */}
                     <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                      <div className="font-bold text-slate-300 mb-1">4. Playoff tímy ({selectedSubmission.picks.playoffTeams?.length || 0}/16):</div>
+                      <div className="font-bold text-slate-300 mb-1">4. Playoff teams ({selectedSubmission.picks.playoffTeams?.length || 0}/16):</div>
                       <div className="flex flex-wrap gap-1.5 mt-1">
                         {(selectedSubmission.picks.playoffTeams || []).map((tid: number) => {
                           const tObj = teams.find((t: any) => t.id === tid);
@@ -1645,7 +1645,7 @@ export default function SeasonPicksView({
 
                     {/* Stat Leaders */}
                     <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                      <div className="font-bold text-slate-300 mb-1">5. Štatistickí lídri:</div>
+                      <div className="font-bold text-slate-300 mb-1">5. Statistical leaders:</div>
                       <div className="grid grid-cols-2 gap-2 text-slate-400">
                         <div>Art Ross: <strong className="text-white">{players.find((p: any) => p.id === selectedSubmission.picks.statLeaders?.artRossPlayerId)?.name || "—"}</strong></div>
                         <div>Richard: <strong className="text-white">{players.find((p: any) => p.id === selectedSubmission.picks.statLeaders?.rocketRichardPlayerId)?.name || "—"}</strong></div>
@@ -1700,14 +1700,14 @@ export default function SeasonPicksView({
               <div className="flex items-center gap-3">
                 <span className="text-3xl">🎁</span>
                 <div>
-                  <h2 className="text-xl font-black text-white">Oficiálne Odmeny pre Víťazov Tipovacej Ligy UNHL</h2>
+                  <h2 className="text-xl font-black text-white">Official Rewards for UNHL Picks League Winners</h2>
                   <p className="text-xs text-slate-300">
-                    Finančné dotácie do klubovej kasy, bonusové Entry Draft Picky a prestížne profilové odznaky.
+                    Financial grants to the club bank account, bonus Entry Draft picks and prestigious profile badges.
                   </p>
                 </div>
               </div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold">
-                <span>🏆 Sezóna 2026/27</span>
+                <span>🏆 Season 2026/27</span>
               </div>
             </div>
 
@@ -1718,7 +1718,7 @@ export default function SeasonPicksView({
                 <div className="flex items-center justify-between">
                   <span className="text-2xl">🥇 1. Miesto</span>
                   <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
-                    Celkový Šampión
+                    Overall Champion
                   </span>
                 </div>
                 <div className="text-2xl font-black text-amber-300">+$3,000,000</div>
@@ -1729,7 +1729,7 @@ export default function SeasonPicksView({
                   </li>
                   <li className="flex items-center gap-2">
                     <span>🥇</span>
-                    <span>Zlatý odznak <strong>Season Predictor Champion</strong></span>
+                    <span>Gold badge <strong>Season Predictor Champion</strong></span>
                   </li>
                 </ul>
               </div>
@@ -1750,7 +1750,7 @@ export default function SeasonPicksView({
                   </li>
                   <li className="flex items-center gap-2">
                     <span>🥈</span>
-                    <span>Strieborný odznak <strong>Vice-Champion</strong></span>
+                    <span>Silver badge <strong>Vice-Champion</strong></span>
                   </li>
                 </ul>
               </div>
@@ -1771,7 +1771,7 @@ export default function SeasonPicksView({
                   </li>
                   <li className="flex items-center gap-2">
                     <span>🥉</span>
-                    <span>Bronzový odznak <strong>3rd Place</strong></span>
+                    <span>Bronze badge <strong>3rd Place</strong></span>
                   </li>
                 </ul>
               </div>
@@ -1781,19 +1781,19 @@ export default function SeasonPicksView({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="p-4 rounded-xl bg-slate-950/70 border border-emerald-500/30 space-y-1">
                 <div className="flex items-center gap-2 text-sm font-bold text-emerald-400">
-                  <span>📅 Týždenná Tipovačka (Game Picks)</span>
+                  <span>📅 Weekly Picks (Game Picks)</span>
                 </div>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Každý víťaz daného hracieho týždňa v zápasových tipoch získava finančnú odmenu <strong className="text-emerald-300">+$200,000</strong> do klubovej kasy.
+                  Every winner of a given game week in game picks earns a financial reward of <strong className="text-emerald-300">+$200,000</strong> for the club bank account.
                 </p>
               </div>
 
               <div className="p-4 rounded-xl bg-slate-950/70 border border-amber-500/30 space-y-1">
                 <div className="flex items-center gap-2 text-sm font-bold text-amber-300">
-                  <span>🏆 Mesační Šampióni (Okt–Apr)</span>
+                  <span>🏆 Monthly Champions (Oct–Apr)</span>
                 </div>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Najlepší tipér mesiaca získa 🎟️ <strong>Bonusový Draft Pick v 8. kole</strong> (alebo 9. kole), <strong>+10 bonusových bodov</strong> a odznak na profile.
+                  The best predictor of the month gets a 🎟️ <strong>Bonus Round 8 Draft Pick</strong> (or Round 9), <strong>+10 bonus points</strong> and a badge on the profile.
                 </p>
               </div>
             </div>
@@ -1801,7 +1801,7 @@ export default function SeasonPicksView({
             <div className="text-xs text-slate-400 bg-slate-950/60 p-4 rounded-xl border border-slate-800 flex items-start gap-3">
               <span className="text-lg">ℹ️</span>
               <div>
-                <strong className="text-slate-200">Pravidlo alokácie draftových pickov:</strong> Všetky bonusové draft picky získané v tipovačke (celoročná TOP 3 aj mesační šampióni) sa generujú do <strong>8. kola</strong> vstupného draftu nováčikov. Ak je v 8. kole zaplnených všetkých 32 pozícií, pick sa automaticky zapíše do <strong>9. kola</strong>.
+                <strong className="text-slate-200">Draft pick allocation rule:</strong> All bonus draft picks earned in the picks game (the season TOP 3 and the monthly champions) are generated in <strong>Round 8</strong> of the entry draft. If all 32 positions in Round 8 are filled, the pick is automatically recorded in <strong>Round 9</strong>.
               </div>
             </div>
           </div>
@@ -1811,14 +1811,14 @@ export default function SeasonPicksView({
             <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-800 pb-4">
               <div>
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <span>📋 Bodový systém Celosezónnej Tipovačky (Season Picks)</span>
+                  <span>📋 Scoring System of the Season Picks game</span>
                 </h3>
                 <p className="text-xs text-slate-400">
-                  Prehľad všetkých 10 kategórií tiketu, bodových hodnôt a bonusov (Celkovo až ~418 bodov).
+                  Overview of all 10 ticket categories, point values and bonuses (up to ~418 points in total).
                 </p>
               </div>
               <div className="px-3 py-1 rounded-lg bg-indigo-950/60 border border-indigo-500/30 text-xs font-mono text-indigo-300 font-bold">
-                10 Kategórií · Max ~418 bodov
+                10 Categories · Max ~418 points
               </div>
             </div>
 
@@ -1828,10 +1828,10 @@ export default function SeasonPicksView({
                 <div className="flex items-center justify-between font-bold text-white">
                   <span className="text-indigo-400 font-mono">1.</span>
                   <span>🏆 Stanley Cup</span>
-                  <span className="text-amber-400 font-mono">Max 50b</span>
+                  <span className="text-amber-400 font-mono">Max 50 pts</span>
                 </div>
                 <p className="text-slate-400">
-                  Víťaz pohára (25b), Finalista (15b), Presný stav finálovej série (10b).
+                  Cup winner (25 pts), Finalist (15 pts), Exact final series result (10 pts).
                 </p>
               </div>
 
@@ -1839,11 +1839,11 @@ export default function SeasonPicksView({
               <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
                 <div className="flex items-center justify-between font-bold text-white">
                   <span className="text-indigo-400 font-mono">2.</span>
-                  <span>🥇 Víťazi Divízií</span>
-                  <span className="text-amber-400 font-mono">Max 55b</span>
+                  <span>🥇 Division Winners</span>
+                  <span className="text-amber-400 font-mono">Max 55 pts</span>
                 </div>
                 <p className="text-slate-400">
-                  10b za každú správnu divíziu (Atlantic, Metro, Central, Pacific) + bonus 15b pri uhádnutí všetkých 4/4.
+                  10 pts per correct division (Atlantic, Metro, Central, Pacific) + a 15 pts bonus for getting all 4/4.
                 </p>
               </div>
 
@@ -1852,10 +1852,10 @@ export default function SeasonPicksView({
                 <div className="flex items-center justify-between font-bold text-white">
                   <span className="text-indigo-400 font-mono">3.</span>
                   <span>🛡️ Presidents' Trophy</span>
-                  <span className="text-amber-400 font-mono">Max 25b</span>
+                  <span className="text-amber-400 font-mono">Max 25 pts</span>
                 </div>
                 <p className="text-slate-400">
-                  Víťaz základnej časti (15b) + presný odhad bodov tímu v tolerancii ±3 body (10b).
+                  Regular-season winner (15 pts) + an exact team point estimate within ±3 points (10 pts).
                 </p>
               </div>
 
@@ -1863,11 +1863,11 @@ export default function SeasonPicksView({
               <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
                 <div className="flex items-center justify-between font-bold text-white">
                   <span className="text-indigo-400 font-mono">4.</span>
-                  <span>🎟️ 16 Postupujúcich Tímov</span>
-                  <span className="text-amber-400 font-mono">Max 63b</span>
+                  <span>🎟️ 16 Advancing Teams</span>
+                  <span className="text-amber-400 font-mono">Max 63 pts</span>
                 </div>
                 <p className="text-slate-400">
-                  3b za každý správne označený postupujúci tím do play-off + bonus 15b pri kompletnom uhádnutí 16/16.
+                  3 pts per correctly selected team advancing to the playoffs + a 15 pts bonus for getting all 16/16.
                 </p>
               </div>
 
@@ -1875,11 +1875,11 @@ export default function SeasonPicksView({
               <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
                 <div className="flex items-center justify-between font-bold text-white">
                   <span className="text-indigo-400 font-mono">5.</span>
-                  <span>🎯 Štatistickí Lídri</span>
-                  <span className="text-amber-400 font-mono">Max 50b</span>
+                  <span>🎯 Statistical Leaders</span>
+                  <span className="text-amber-400 font-mono">Max 50 pts</span>
                 </div>
                 <p className="text-slate-400">
-                  Art Ross (10b), Rocket Richard (10b), Najviac asistencií (10b), Najproduktívnejší obranca (10b), Najproduktívnejší nováčik (10b).
+                  Art Ross (10 pts), Rocket Richard (10 pts), Most assists (10 pts), Top-scoring defenseman (10 pts), Top-scoring rookie (10 pts).
                 </p>
               </div>
 
@@ -1888,10 +1888,10 @@ export default function SeasonPicksView({
                 <div className="flex items-center justify-between font-bold text-white">
                   <span className="text-indigo-400 font-mono">6.</span>
                   <span>🎖️ NHL Trofeje</span>
-                  <span className="text-amber-400 font-mono">Max 70b</span>
+                  <span className="text-amber-400 font-mono">Max 70 pts</span>
                 </div>
                 <p className="text-slate-400">
-                  Hart, Norris, Vezina, Calder, Selke, Conn Smythe a Jack Adams Trophy – 10 bodov za každú správne trafenú trofej.
+                  Hart, Norris, Vezina, Calder, Selke, Conn Smythe and Jack Adams Trophy – 10 points for every correctly picked trophy.
                 </p>
               </div>
 
@@ -1899,11 +1899,11 @@ export default function SeasonPicksView({
               <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
                 <div className="flex items-center justify-between font-bold text-white">
                   <span className="text-indigo-400 font-mono">7.</span>
-                  <span>📊 Over / Under Body Tímov</span>
-                  <span className="text-amber-400 font-mono">Max 55b</span>
+                  <span>📊 Over / Under Team Points</span>
+                  <span className="text-amber-400 font-mono">Max 55 pts</span>
                 </div>
                 <p className="text-slate-400">
-                  5b za každý správny Over/Under tip na tímové body v základnej časti + bonus 15b pri 8/8.
+                  5 pts per correct Over/Under pick on team points in the regular season + a 15 pts bonus for 8/8.
                 </p>
               </div>
 
@@ -1912,10 +1912,10 @@ export default function SeasonPicksView({
                 <div className="flex items-center justify-between font-bold text-white">
                   <span className="text-indigo-400 font-mono">8.</span>
                   <span>⚔️ Head-to-Head Duely</span>
-                  <span className="text-amber-400 font-mono">Max 40b</span>
+                  <span className="text-amber-400 font-mono">Max 40 pts</span>
                 </div>
                 <p className="text-slate-400">
-                  6b za každý správny duel tímov o lepšie umiestnenie v tabuľke + bonus 10b pri 5/5.
+                  6 pts per correct team duel for a better place in the standings + a 10 pts bonus for 5/5.
                 </p>
               </div>
 
@@ -1924,10 +1924,10 @@ export default function SeasonPicksView({
                 <div className="flex items-center justify-between font-bold text-white">
                   <span className="text-indigo-400 font-mono">9.</span>
                   <span>⚡ Bold Predikcie</span>
-                  <span className="text-amber-400 font-mono">Max 30b</span>
+                  <span className="text-amber-400 font-mono">Max 30 pts</span>
                 </div>
                 <p className="text-slate-400">
-                  10b za každú správnu odpoveď na špeciálne ligové otázky.
+                  10 pts per correct answer to the special league questions.
                 </p>
               </div>
 
@@ -1936,10 +1936,10 @@ export default function SeasonPicksView({
                 <div className="flex items-center justify-between font-bold text-white">
                   <span className="text-indigo-400 font-mono">10.</span>
                   <span>🃏 Wildcard (Sleeper & Bust)</span>
-                  <span className="text-amber-400 font-mono">Max 20b</span>
+                  <span className="text-amber-400 font-mono">Max 20 pts</span>
                 </div>
                 <p className="text-slate-400">
-                  Sleeper tím (+10b ak postúpi do PO), Bust tím (+10b ak nepostúpi do PO).
+                  Sleeper team (+10 pts if it makes the PO), Bust team (+10 pts if it misses the PO).
                 </p>
               </div>
             </div>
@@ -1948,13 +1948,13 @@ export default function SeasonPicksView({
           {/* GAME PICKS OVERVIEW CARD */}
           <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-4 shadow-xl">
             <h3 className="text-base font-bold text-emerald-300 flex items-center gap-2">
-              <span>📅 Denné Zápasy (Game Picks) & Zápas Týždňa (GOTW)</span>
+              <span>📅 Daily Games (Game Picks) & Game of the Week (GOTW)</span>
             </h3>
             <ul className="list-disc list-inside text-slate-300 space-y-1.5 text-xs">
-              <li><strong className="text-white">Zápasy dňa:</strong> 2 body za správny tip na výsledok po 60 min. (1 - X - 2) alebo 6 bodov s aktivovaným Jokerom.</li>
-              <li><strong className="text-white">Zápas týždňa (Game of the Week):</strong> Hlavný šláger týždňa až za 15 bodov (Výsledok 1-X-2 2b, Presné skóre 5b, Prvý strelec 5b, Najproduktívnejší hráč 3b). S Jokerom až 45 bodov!</li>
-              <li><strong className="text-white">Jokeri (×3 násobič):</strong> Každý GM má na sezónu k dispozícii 5 Jokerov, ktoré môže použiť na ľubovoľný zápas.</li>
-              <li><strong className="text-white">Série (Streaks):</strong> 3 správne tipy v rade = +2b, 5 v rade = +5b, 10 v rade = +15b.</li>
+              <li><strong className="text-white">Games of the day:</strong> 2 points for a correct pick of the result after 60 min. (1 - X - 2) or 6 points with an activated Joker.</li>
+              <li><strong className="text-white">Game of the Week:</strong> The headline game of the week for up to 15 points (Result 1-X-2 2 pts, Exact score 5 pts, First goal scorer 5 pts, Top-scoring player 3 pts). With a Joker up to 45 points!</li>
+              <li><strong className="text-white">Jokers (×3 multiplier):</strong> Each GM has 5 Jokers available per season, which can be used on any game.</li>
+              <li><strong className="text-white">Streaks:</strong> 3 correct picks in a row = +2 pts, 5 in a row = +5 pts, 10 in a row = +15 pts.</li>
             </ul>
           </div>
         </div>
@@ -1966,16 +1966,16 @@ export default function SeasonPicksView({
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <div>
               <h2 className="text-lg font-bold text-amber-300 flex items-center gap-2">
-                <span>⚙️ Administrácia & Vyhodnotenie Season Picks</span>
+                <span>⚙️ Season Picks Administration & Evaluation</span>
               </h2>
-              <p className="text-xs text-slate-400">Nastavenie stavu, deadline a spustenie výpočtu bodov.</p>
+              <p className="text-xs text-slate-400">Set the status and deadline and run the points calculation.</p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                Stav tipovačky
+                Picks game status
               </label>
               <select
                 value={config.status}
@@ -1986,15 +1986,15 @@ export default function SeasonPicksView({
                 }}
                 className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-indigo-500"
               >
-                <option value="OPEN">🟢 OTVORENÁ (OPEN)</option>
-                <option value="LOCKED">🔒 UZAMKNUTÁ (LOCKED)</option>
-                <option value="RESOLVED">🏁 VYHODNOTENÁ (RESOLVED)</option>
+                <option value="OPEN">🟢 OPEN</option>
+                <option value="LOCKED">🔒 LOCKED</option>
+                <option value="RESOLVED">🏁 RESOLVED</option>
               </select>
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                Deadline pre tipy
+                Deadline for picks
               </label>
               <input
                 type="datetime-local"
@@ -2014,16 +2014,16 @@ export default function SeasonPicksView({
                   startTransition(async () => {
                     const res = await evaluateSeasonPicksAction(config.season, config.league);
                     if (res.ok && "count" in res) {
-                      setMsg({ type: "success", text: `Úspešne prepočítaných ${res.count} tiketov.` });
+                      setMsg({ type: "success", text: `Successfully recalculated ${res.count} tickets.` });
                     } else if ("error" in res) {
-                      setMsg({ type: "error", text: res.error || "Chyba pri vyhodnotení." });
+                      setMsg({ type: "error", text: res.error || "Error during evaluation." });
                     }
                   });
                 }}
                 disabled={isPending}
                 className="w-full px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl shadow-lg shadow-amber-600/30 transition-all text-sm disabled:opacity-50"
               >
-                {isPending ? "Prepočítavam..." : "⚡ Spustiť Vyhodnotenie Bodov"}
+                {isPending ? "Recalculating..." : "⚡ Run Points Evaluation"}
               </button>
             </div>
           </div>

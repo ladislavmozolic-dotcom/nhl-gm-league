@@ -106,7 +106,7 @@ function SearchablePlayerSelect({
             <input
               type="text"
               autoFocus
-              placeholder="🔍 Hľadať hráča..."
+              placeholder="🔍 Search player..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
@@ -122,12 +122,12 @@ function SearchablePlayerSelect({
               }}
               className="w-full text-left px-3 py-1.5 text-xs text-slate-400 hover:bg-slate-800/80 rounded-lg transition-colors"
             >
-              -- Nevybrané --
+              -- Not selected --
             </button>
 
             {filtered.length === 0 ? (
               <div className="p-3 text-center text-xs text-slate-500">
-                Nenašiel sa žiadny hráč
+                No player found
               </div>
             ) : (
               filtered.slice(0, 50).map((p) => {
@@ -280,7 +280,7 @@ export default function GamePicksView({
 
   const handleSaveDaily = () => {
     if (!viewerTeam) {
-      setMsg({ type: "error", text: "Pre odoslanie tipov sa prihláste ako GM tímu." });
+      setMsg({ type: "error", text: "Sign in as a team GM to submit picks." });
       return;
     }
 
@@ -299,9 +299,9 @@ export default function GamePicksView({
     if (unsubmittedPayload.length === 0) {
       const hasAnyPicks = Object.values(dailyPicks).some((p) => p.winnerTeamId !== undefined);
       if (hasAnyPicks) {
-        setMsg({ type: "error", text: "Všetky vybrané zápasy už boli odoslané a sú uzamknuté." });
+        setMsg({ type: "error", text: "All selected games have already been submitted and are locked." });
       } else {
-        setMsg({ type: "error", text: "Vyberte aspoň jedného víťaza zápasu." });
+        setMsg({ type: "error", text: "Select at least one game winner." });
       }
       return;
     }
@@ -310,13 +310,13 @@ export default function GamePicksView({
       try {
         const res = await saveDailyGamePicksAction(unsubmittedPayload, config.season, config.league);
         if (res.ok) {
-          setMsg({ type: "success", text: "✅ Vaše denné tipy boli úspešne uložené a uzamknuté!" });
+          setMsg({ type: "success", text: "✅ Your daily picks were saved and locked!" });
         } else {
-          setMsg({ type: "error", text: res.error || "Chyba pri ukladaní tipov." });
+          setMsg({ type: "error", text: res.error || "Error saving picks." });
         }
       } catch (err: any) {
         console.error("Save daily picks error:", err);
-        alert("Aplikácia bola na serveri aktualizovaná na novú verziu. Stránka sa teraz obnoví, prosím zopakujte odoslanie tipov.");
+        alert("The app was updated to a new version on the server. The page will now reload — please submit your picks again.");
         window.location.reload();
       }
     });
@@ -324,11 +324,11 @@ export default function GamePicksView({
 
   const handleSaveGotw = () => {
     if (!viewerTeam) {
-      setMsg({ type: "error", text: "Pre odoslanie tipu sa prihláste ako GM tímu." });
+      setMsg({ type: "error", text: "Sign in as a team GM to submit a pick." });
       return;
     }
     if (!gotwGame || gotwPick.winnerTeamId === undefined) {
-      setMsg({ type: "error", text: "Vyberte víťaza zápasu týždňa (alebo remízu)." });
+      setMsg({ type: "error", text: "Select the winner of the Game of the Week (or a draw)." });
       return;
     }
 
@@ -350,13 +350,13 @@ export default function GamePicksView({
         );
 
         if (res.ok) {
-          setMsg({ type: "success", text: "✅ Tip na Zápas týždňa (Game of the Week) bol úspešne uložený!" });
+          setMsg({ type: "success", text: "✅ Your Game of the Week pick was saved!" });
         } else {
-          setMsg({ type: "error", text: res.error || "Chyba pri ukladaní tipu." });
+          setMsg({ type: "error", text: res.error || "Error saving the pick." });
         }
       } catch (err: any) {
         console.error("Save GOTW error:", err);
-        alert("Aplikácia bola na serveri aktualizovaná na novú verziu. Stránka sa teraz obnoví, prosím zopakujte odoslanie tipu.");
+        alert("The app was updated to a new version on the server. The page will now reload — please submit your pick again.");
         window.location.reload();
       }
     });
@@ -369,11 +369,11 @@ export default function GamePicksView({
         if (res.ok && "message" in res) {
           setMsg({ type: "success", text: `⚡ ${res.message}` });
         } else {
-          setMsg({ type: "error", text: (res as any).error || "Chyba pri vyhodnocovaní." });
+          setMsg({ type: "error", text: (res as any).error || "Error during evaluation." });
         }
       } catch (err: any) {
         console.error("Evaluate error:", err);
-        alert("Aplikácia bola na serveri aktualizovaná. Stránka sa teraz obnoví.");
+        alert("The app was updated on the server. The page will now reload.");
         window.location.reload();
       }
     });
@@ -390,11 +390,11 @@ export default function GamePicksView({
                 🏒
               </div>
               <div>
-                <div className="text-xs text-indigo-300 font-semibold uppercase tracking-wider">Môj Profil Tipéra</div>
+                <div className="text-xs text-indigo-300 font-semibold uppercase tracking-wider">My Predictor Profile</div>
                 <div className="text-lg font-black text-white flex items-center gap-2">
                   <span>{viewerTeam.gmNickname || viewerTeam.gm || viewerTeam.name}</span>
                   <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono">
-                    {viewerProfile.totalPoints} bodov
+                    {viewerProfile.totalPoints} pts
                   </span>
                 </div>
               </div>
@@ -405,7 +405,7 @@ export default function GamePicksView({
               <div className="px-3 py-2 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center gap-2">
                 <span className="text-base">🔥</span>
                 <div>
-                  <div className="text-[10px] text-slate-400 font-medium">Séria (Streak)</div>
+                  <div className="text-[10px] text-slate-400 font-medium">Streak</div>
                   <div className="font-bold text-amber-400">
                     {viewerProfile.currentStreak} v rade{" "}
                     <span className="text-[10px] text-slate-400 font-normal">(Rekord: {viewerProfile.bestStreak})</span>
@@ -419,7 +419,7 @@ export default function GamePicksView({
                 <div>
                   <div className="text-[10px] text-slate-400 font-medium">Jokeri (×3)</div>
                   <div className="font-bold text-indigo-300 font-mono">
-                    {jokersLeft} / {viewerProfile.jokersTotal} k dispozícii
+                    {jokersLeft} / {viewerProfile.jokersTotal} available
                   </div>
                 </div>
               </div>
@@ -429,9 +429,9 @@ export default function GamePicksView({
                 <div className="px-3 py-2 rounded-xl bg-slate-950/80 border border-rose-500/30 flex items-center gap-2">
                   <span className="text-base">⚔️</span>
                   <div>
-                    <div className="text-[10px] text-rose-300 font-medium">Rival Týždňa #{currentRival.week}</div>
+                    <div className="text-[10px] text-rose-300 font-medium">Rival of the Week #{currentRival.week}</div>
                     <div className="font-bold text-white truncate max-w-[120px]">
-                      vs {currentRival.rivalTeam?.name || "Súper"}
+                      vs {currentRival.rivalTeam?.name || "Opponent"}
                     </div>
                   </div>
                 </div>
@@ -452,7 +452,7 @@ export default function GamePicksView({
                 : "bg-slate-800/80 text-slate-300 hover:bg-slate-800"
             }`}
           >
-            <span>🎯 Zápasy Dňa (2b)</span>
+            <span>🎯 Games of the Day (2 pts)</span>
             <span className="px-1.5 py-0.2 rounded bg-indigo-950/80 text-[10px] text-indigo-300 font-mono">
               {todayGames.length > 0 ? todayGames.length : scheduledGames.length}
             </span>
@@ -468,7 +468,7 @@ export default function GamePicksView({
           >
             <span>🌟 Game of the Week</span>
             <span className="px-1.5 py-0.2 rounded bg-amber-950/80 text-[10px] text-amber-300 font-mono">
-              {gotwGame ? "15 b" : "Čaká na výber"}
+              {gotwGame ? "15 pts" : "Awaiting selection"}
             </span>
           </button>
 
@@ -480,7 +480,7 @@ export default function GamePicksView({
                 : "bg-slate-800/80 text-slate-300 hover:bg-slate-800"
             }`}
           >
-            <span>🏆 Rebríček Game Picks</span>
+            <span>🏆 Game Picks Leaderboard</span>
           </button>
 
           <button
@@ -491,7 +491,7 @@ export default function GamePicksView({
                 : "bg-slate-800/80 text-slate-400 hover:bg-slate-800"
             }`}
           >
-            <span>📖 Pravidlá & Bodovanie</span>
+            <span>📖 Rules & Scoring</span>
           </button>
         </div>
 
@@ -502,7 +502,7 @@ export default function GamePicksView({
             onClick={handleEvaluate}
             className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-md shadow-amber-600/20 disabled:opacity-50"
           >
-            <span>⚡ Spustiť Vyhodnotenie Zápasov</span>
+            <span>⚡ Run Game Evaluation</span>
           </button>
         )}
       </div>
@@ -517,7 +517,7 @@ export default function GamePicksView({
         >
           <span>{msg.text}</span>
           <button onClick={() => setMsg(null)} className="underline hover:opacity-80">
-            Zavrieť
+            Close
           </button>
         </div>
       )}
@@ -528,10 +528,10 @@ export default function GamePicksView({
           <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <span>🎯 UNHL Game of the Day / Zápasová Tipovačka</span>
+                <span>🎯 UNHL Game of the Day / Game Picks</span>
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                Tipujte výsledok po základnom hracom čase (60 min): <strong>1 (Výhra domácich)</strong>, <strong>X (Remíza / predĺženie)</strong>, <strong>2 (Výhra hostí)</strong>. Správny tip = <strong>2 body</strong> (alebo <strong>6b s Jokerom ×3</strong>).
+                Predict the result after regulation (60 min): <strong>1 (Home win)</strong>, <strong>X (Draw / overtime)</strong>, <strong>2 (Away win)</strong>. A correct pick = <strong>2 points</strong> (or <strong>6 pts with a ×3 Joker</strong>).
               </p>
             </div>
 
@@ -542,7 +542,7 @@ export default function GamePicksView({
                 onClick={handleSaveDaily}
                 className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-lg shadow-indigo-600/30 flex-shrink-0 flex items-center justify-center gap-1.5 disabled:opacity-50"
               >
-                <span>💾 Uložiť Denné Tipy</span>
+                <span>💾 Save Daily Picks</span>
               </button>
             </div>
           </div>
@@ -558,7 +558,7 @@ export default function GamePicksView({
                   : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
               }`}
             >
-              <span>🔥 Dnešné zápasy</span>
+              <span>🔥 Today's games</span>
               <span className="px-1.5 py-0.2 rounded bg-indigo-950 text-[10px] text-indigo-300 font-mono">
                 {todayGames.length > 0 ? todayGames.length : scheduledGames.slice(0, 8).length}
               </span>
@@ -573,7 +573,7 @@ export default function GamePicksView({
                   : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
               }`}
             >
-              <span>📅 Všetky nadchádzajúce zápasy</span>
+              <span>📅 All upcoming games</span>
               <span className="px-1.5 py-0.2 rounded bg-slate-800 text-[10px] text-slate-300 font-mono">
                 {scheduledGames.length}
               </span>
@@ -588,7 +588,7 @@ export default function GamePicksView({
                   : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
               }`}
             >
-              <span>📜 Nedávne výsledky</span>
+              <span>📜 Recent results</span>
               <span className="px-1.5 py-0.2 rounded bg-slate-800 text-[10px] text-slate-300 font-mono">
                 {finalGames.length}
               </span>
@@ -598,9 +598,9 @@ export default function GamePicksView({
           {gamesToDisplay.length === 0 ? (
             <div className="p-8 rounded-2xl bg-slate-900/60 border border-slate-800 text-center space-y-2">
               <div className="text-3xl">📅</div>
-              <div className="text-sm font-bold text-white">Žiadne zápasy v tejto kategórii</div>
+              <div className="text-sm font-bold text-white">No games in this category</div>
               <div className="text-xs text-slate-400 max-w-md mx-auto">
-                Skontrolujte ostatné filtre alebo sledujte zápasový kalendár pred začiatkom nového hracieho kola.
+                Check the other filters or watch the game calendar before the next round starts.
               </div>
             </div>
           ) : (
@@ -638,15 +638,15 @@ export default function GamePicksView({
                       <div className="flex items-center gap-1">
                         {g.isLocked ? (
                           <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold text-[10px]">
-                            {g.status === "FINAL" ? `FINAL ${g.homeGoals}:${g.awayGoals}` : "🔒 Uzamknuté"}
+                            {g.status === "FINAL" ? `FINAL ${g.homeGoals}:${g.awayGoals}` : "🔒 Locked"}
                           </span>
                         ) : sub ? (
                           <span className="px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-bold text-[10px] border border-indigo-500/30">
-                            🔒 Natipované
+                            🔒 Picked
                           </span>
                         ) : (
                           <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold text-[10px]">
-                            🟢 Otvorené
+                            🟢 Open
                           </span>
                         )}
                         {sub?.isEvaluated && (
@@ -711,7 +711,7 @@ export default function GamePicksView({
                         }`}
                       >
                         <span className="text-sm sm:text-base font-black tracking-wider text-white">X</span>
-                        <span className="text-[9px] sm:text-[10px] text-slate-400 font-mono">Remíza (60 min)</span>
+                        <span className="text-[9px] sm:text-[10px] text-slate-400 font-mono">Draw (60 min)</span>
                       </button>
 
                       {/* Home Team (1) */}
@@ -746,7 +746,7 @@ export default function GamePicksView({
 
                     {/* Modifiers: Joker */}
                     <div className="flex items-center justify-between pt-1 text-xs">
-                      <span className="text-[11px] text-slate-400">Výhra: <strong className="text-indigo-300">2b</strong></span>
+                      <span className="text-[11px] text-slate-400">Win: <strong className="text-indigo-300">2 pts</strong></span>
                       <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 hover:text-white">
                         <input
                           type="checkbox"
@@ -761,7 +761,7 @@ export default function GamePicksView({
                           className="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500 bg-slate-900"
                         />
                         <span className={current.isJoker ? "font-bold text-amber-400" : ""}>
-                          🃏 Joker (×3 = 6b)
+                          🃏 Joker (×3 = 6 pts)
                         </span>
                       </label>
                     </div>
@@ -783,14 +783,14 @@ export default function GamePicksView({
                   <div className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5 flex-wrap">
                     <span>🌟 UNHL Game of the Week</span>
                     <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono text-[10px]">
-                      Max 15 bodov
+                      Max 15 points
                     </span>
                     <span className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-mono text-[10px] border border-indigo-500/30">
-                      🤖 AI Výber Týždňa
+                      🤖 AI Pick of the Week
                     </span>
                     {gotwSub && (
                       <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono text-[10px] border border-emerald-500/30 font-bold">
-                        🔒 Natipované & Uzamknuté
+                        🔒 Picked & Locked
                       </span>
                     )}
                   </div>
@@ -798,7 +798,7 @@ export default function GamePicksView({
                     {gotwGame.awayTeam?.name} vs {gotwGame.homeTeam?.name}
                   </h2>
                   <p className="text-xs text-slate-300 mt-0.5">
-                    Špeciálny zápas týždňa. Natipujte víťaza (1/X/2), presné skóre, prvého strelca a top bodujúceho hráča.
+                    The special game of the week. Predict the winner (1/X/2), the exact score, the first goal scorer and the top-scoring player.
                   </p>
                 </div>
 
@@ -813,7 +813,7 @@ export default function GamePicksView({
                         : "bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/30 disabled:opacity-50"
                     }`}
                   >
-                    <span>{gotwSub ? "🔒 Tip odoslaný (Uzamknuté)" : "💾 Uložiť Tip na Zápas Týždňa"}</span>
+                    <span>{gotwSub ? "🔒 Pick submitted (Locked)" : "💾 Save Game of the Week Pick"}</span>
                   </button>
                 </div>
               </div>
@@ -823,7 +823,7 @@ export default function GamePicksView({
                 {/* Pick Winner */}
                 <div className="space-y-2">
                   <label className="block text-xs font-bold text-slate-300">
-                    1. Výsledok po 60 min. (2 body: 1 - X - 2)
+                    1. Result after 60 min. (2 points: 1 - X - 2)
                   </label>
                   <div className="grid grid-cols-3 gap-2">
                     <button
@@ -851,7 +851,7 @@ export default function GamePicksView({
                       }`}
                     >
                       <div className="text-sm font-black text-white">X</div>
-                      <div className="text-[10px] text-slate-400 font-mono">Remíza (OT/SO)</div>
+                      <div className="text-[10px] text-slate-400 font-mono">Draw (OT/SO)</div>
                     </button>
 
                     <button
@@ -873,12 +873,12 @@ export default function GamePicksView({
                 {/* Exact Score */}
                 <div className="space-y-2">
                   <label className="block text-xs font-bold text-slate-300">
-                    2. Presné skóre (5 bodov)
+                    2. Exact score (5 points)
                   </label>
                   <input
                     type="text"
                     disabled={gotwGame.isLocked || Boolean(gotwSub)}
-                    placeholder="napr. 5:3 alebo 4:2"
+                    placeholder="e.g. 5:3 or 4:2"
                     value={gotwPick.predictedScore}
                     onChange={(e) => setGotwPick({ ...gotwPick, predictedScore: e.target.value })}
                     onKeyDown={(e) => {
@@ -894,14 +894,14 @@ export default function GamePicksView({
                 {/* First Goal Scorer */}
                 <div className="space-y-2">
                   <label className="block text-xs font-bold text-slate-300">
-                    3. Prvý strelec zápasu (5 bodov)
+                    3. First goal scorer (5 points)
                   </label>
                   <SearchablePlayerSelect
                     disabled={gotwGame.isLocked || Boolean(gotwSub)}
                     value={gotwPick.firstGoalScorerId}
                     players={players}
                     teams={teams}
-                    placeholder="-- Vyberte prvého strelca gólu --"
+                    placeholder="-- Select the first goal scorer --"
                     filter={(p) =>
                       !p.isGoalie &&
                       (p.teamId === gotwGame.homeTeamId || p.teamId === gotwGame.awayTeamId)
@@ -919,14 +919,14 @@ export default function GamePicksView({
                 {/* Top Scorer */}
                 <div className="space-y-2">
                   <label className="block text-xs font-bold text-slate-300">
-                    4. Hráč s najviac bodmi v zápase (3 body)
+                    4. Player with the most points in the game (3 points)
                   </label>
                   <SearchablePlayerSelect
                     disabled={gotwGame.isLocked || Boolean(gotwSub)}
                     value={gotwPick.topScorerPlayerId}
                     players={players}
                     teams={teams}
-                    placeholder="-- Vyberte hráča s najviac bodmi --"
+                    placeholder="-- Select the player with the most points --"
                     filter={(p) =>
                       !p.isGoalie &&
                       (p.teamId === gotwGame.homeTeamId || p.teamId === gotwGame.awayTeamId)
@@ -953,12 +953,12 @@ export default function GamePicksView({
                     className="rounded border-slate-700 text-amber-500 focus:ring-amber-500 bg-slate-900 disabled:cursor-not-allowed"
                   />
                   <span className="font-bold text-amber-300">
-                    🃏 Použiť Jokera na Zápas Týždňa (Body ×3 = až 45 bodov!)
+                    🃏 Use the Joker on the Game of the Week (Points ×3 = up to 45 points!)
                   </span>
                 </label>
 
                 <span className="text-[11px] text-slate-400 font-mono">
-                  Zostáva vám {jokersLeft} Jokerov
+                  You have {jokersLeft} Jokers left
                 </span>
               </div>
 
@@ -967,10 +967,10 @@ export default function GamePicksView({
                 <div className="text-xs text-slate-300">
                   {gotwSub ? (
                     <span className="text-emerald-400 font-bold flex items-center gap-1.5">
-                      ✅ Váš tip na Zápas týždňa je úspešne uložený a uzamknutý.
+                      ✅ Your Game of the Week pick has been saved and locked.
                     </span>
                   ) : (
-                    <span>Tipujte výsledok, skóre a hráčov. Po kliknutí na tlačidlo sa váš tip odošle a uzamkne.</span>
+                    <span>Predict the result, the score and the players. After you click the button your pick is submitted and locked.</span>
                   )}
                 </div>
 
@@ -984,7 +984,7 @@ export default function GamePicksView({
                       : "bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-amber-600/40 cursor-pointer active:scale-95"
                   }`}
                 >
-                  <span>{gotwSub ? "🔒 Tip odoslaný (Uzamknuté)" : "💾 Uložiť Tip na Zápas Týždňa"}</span>
+                  <span>{gotwSub ? "🔒 Pick submitted (Locked)" : "💾 Save Game of the Week Pick"}</span>
                 </button>
               </div>
             </div>
@@ -992,9 +992,9 @@ export default function GamePicksView({
         ) : (
           <div className="p-8 rounded-2xl bg-slate-900/60 border border-slate-800 text-center space-y-4">
             <div className="text-4xl">🤖</div>
-            <h3 className="text-base font-bold text-white">Zápas Týždňa (Game of the Week)</h3>
+            <h3 className="text-base font-bold text-white">Game of the Week</h3>
             <p className="text-xs text-slate-400 max-w-md mx-auto">
-              AI automaticky analyzuje rozpis zápasov a pripravuje najatraktívnejší duel týždňa.
+              The AI automatically analyses the schedule and prepares the most attractive matchup of the week.
             </p>
           </div>
         )
@@ -1005,8 +1005,8 @@ export default function GamePicksView({
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-xl bg-slate-900 border border-slate-800">
             <div>
-              <h2 className="text-base font-bold text-white">🏆 Rebríček Game Picks (Celosezónny & Mesačný)</h2>
-              <p className="text-xs text-slate-400">Prehľad bodov, streakov a víťazov jednotlivých mesiacov.</p>
+              <h2 className="text-base font-bold text-white">🏆 Game Picks Leaderboard (Season & Monthly)</h2>
+              <p className="text-xs text-slate-400">Overview of points, streaks and winners for each month.</p>
             </div>
 
             <div className="flex items-center gap-1 text-xs">
@@ -1046,18 +1046,18 @@ export default function GamePicksView({
               <thead className="bg-slate-900/90 text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-800">
                 <tr>
                   <th className="py-3 px-4 w-12 text-center">#</th>
-                  <th className="py-3 px-4">Generálny Manažér / Tím</th>
+                  <th className="py-3 px-4">General Manager / Team</th>
                   <th className="py-3 px-4 text-center">🔥 Streak</th>
-                  <th className="py-3 px-4 text-center">⚡ Rekord</th>
-                  <th className="py-3 px-4 text-center">🃏 Jokeri</th>
-                  <th className="py-3 px-4 text-right font-bold text-white">Body ({selectedMonth === "all" ? "Celkovo" : selectedMonth})</th>
+                  <th className="py-3 px-4 text-center">⚡ Record</th>
+                  <th className="py-3 px-4 text-center">🃏 Jokers</th>
+                  <th className="py-3 px-4 text-right font-bold text-white">Points ({selectedMonth === "all" ? "Total" : selectedMonth})</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
                 {leaderboard.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-8 text-center text-slate-500">
-                      Zatiaľ žiadne záznamy v rebríčku tipovačky.
+                      No entries in the picks leaderboard yet.
                     </td>
                   </tr>
                 ) : (
@@ -1134,57 +1134,57 @@ export default function GamePicksView({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
           <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
             <h3 className="text-sm font-bold text-indigo-300 flex items-center gap-2">
-              <span>🎯 Zápasy Dňa (2 body)</span>
+              <span>🎯 Games of the Day (2 points)</span>
             </h3>
             <p className="text-slate-300 leading-relaxed">
-              Každý hrací deň systém automaticky vyberie zápasy dňa podľa reálneho NHL programu.
+              Every game day the system automatically selects the games of the day based on the real NHL schedule.
             </p>
             <ul className="list-disc list-inside text-slate-400 space-y-1">
-              <li>Tipuje sa výsledok po 60 minútach: <strong className="text-white">1 (Domáci)</strong>, <strong className="text-white">X (Remíza / predĺženie)</strong>, <strong className="text-white">2 (Hostia)</strong>.</li>
-              <li>Za každý správny tip získate <strong className="text-white">2 body</strong>.</li>
-              <li>Pri nasadení Jokera získate za správny tip až <strong className="text-amber-400">6 bodov (×3)</strong>.</li>
+              <li>You predict the result after 60 minutes: <strong className="text-white">1 (Home)</strong>, <strong className="text-white">X (Draw / overtime)</strong>, <strong className="text-white">2 (Away)</strong>.</li>
+              <li>You earn <strong className="text-white">2 points</strong> for every correct pick.</li>
+              <li>When you play a Joker, a correct pick earns up to <strong className="text-amber-400">6 points (×3)</strong>.</li>
             </ul>
           </div>
 
           <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
             <h3 className="text-sm font-bold text-amber-300 flex items-center gap-2">
-              <span>🌟 Game of the Week (Max 15b)</span>
+              <span>🌟 Game of the Week (Max 15 pts)</span>
             </h3>
             <p className="text-slate-300 leading-relaxed">
-              Jeden vybraný šláger týždňa s podrobnými tipmi:
+              One selected headline game of the week with detailed picks:
             </p>
             <ul className="list-disc list-inside text-slate-400 space-y-1">
-              <li>Výsledok zápasu po 60 min. (1 - X - 2): <strong className="text-white">2 body</strong></li>
-              <li>Presné skóre: <strong className="text-white">5 bodov</strong></li>
-              <li>Prvý strelec zápasu: <strong className="text-white">5 bodov</strong></li>
-              <li>Najviac bodov v zápase: <strong className="text-white">3 body</strong></li>
+              <li>Game result after 60 min. (1 - X - 2): <strong className="text-white">2 points</strong></li>
+              <li>Exact score: <strong className="text-white">5 points</strong></li>
+              <li>First goal scorer: <strong className="text-white">5 points</strong></li>
+              <li>Most points in the game: <strong className="text-white">3 points</strong></li>
             </ul>
           </div>
 
           <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
             <h3 className="text-sm font-bold text-rose-300 flex items-center gap-2">
-              <span>🃏 Jokeri (×3)</span>
+              <span>🃏 Jokers (×3)</span>
             </h3>
             <ul className="list-disc list-inside text-slate-400 space-y-1.5">
               <li>
-                <strong className="text-white">5× Joker na celú sezónu:</strong> Môžete ho použiť na ľubovoľný zápas. Násobí všetky získané body z daného zápasu <strong className="text-amber-400">×3</strong> (pri bežnom zápase získate namiesto 2b až 6b, pri Game of the Week až do 45b)!
+                <strong className="text-white">5× Joker for the whole season:</strong> You can use it on any game. It multiplies all points earned from that game by <strong className="text-amber-400">×3</strong> (for a regular game you earn up to 6 pts instead of 2, for the Game of the Week up to 45 pts)!
               </li>
             </ul>
           </div>
 
           <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
             <h3 className="text-sm font-bold text-emerald-300 flex items-center gap-2">
-              <span>⚡ Série, 📅 Týždenné & Mesačné Odmeny</span>
+              <span>⚡ Streaks, 📅 Weekly & Monthly Rewards</span>
             </h3>
             <ul className="list-disc list-inside text-slate-400 space-y-1.5 text-xs">
-              <li>3 správne tipy v rade = <strong className="text-white">+2 bonusové body</strong></li>
-              <li>5 správnych tipov v rade = <strong className="text-white">+5 bonusových bodov</strong></li>
-              <li>10 správnych tipov v rade = <strong className="text-white">+15 bonusových bodov</strong></li>
+              <li>3 correct picks in a row = <strong className="text-white">+2 bonus points</strong></li>
+              <li>5 correct picks in a row = <strong className="text-white">+5 bonus points</strong></li>
+              <li>10 correct picks in a row = <strong className="text-white">+15 bonus points</strong></li>
               <li>
-                <strong className="text-white">Víťaz Týždňa:</strong> Najlepší tipér týždňa získa <strong className="text-emerald-400">+$200,000</strong> do klubovej kasy.
+                <strong className="text-white">Winner of the Week:</strong> The best predictor of the week earns <strong className="text-emerald-400">+$200,000</strong> for the club bank account.
               </li>
               <li>
-                <strong className="text-white">Mesačný Šampión:</strong> Víťaz mesiaca získa 🎟️ <strong className="text-amber-300">Draft Pick v 8. kole</strong> (alebo 9. kole), <strong className="text-amber-300">+10 bodov</strong> a odznak 🥇 na profile.
+                <strong className="text-white">Monthly Champion:</strong> The winner of the month gets a 🎟️ <strong className="text-amber-300">Round 8 Draft Pick</strong> (or Round 9), <strong className="text-amber-300">+10 points</strong> and a 🥇 badge on the profile.
               </li>
             </ul>
           </div>
@@ -1194,9 +1194,9 @@ export default function GamePicksView({
             <div className="flex items-center gap-3 border-b border-amber-500/20 pb-3">
               <span className="text-2xl">🎁</span>
               <div>
-                <h3 className="text-base font-bold text-white">Oficiálne Odmeny pre Víťazov Tipovačky (Ceny, Draft Picky & Financie)</h3>
+                <h3 className="text-base font-bold text-white">Official Rewards for Picks Winners (Prizes, Draft Picks & Finances)</h3>
                 <p className="text-xs text-slate-400">
-                  Na konci sezóny sa po sčítaní Game Picks a Season Picks udelia všetkým trom špičkovým tipérom klubové financie a draft picky:
+                  At the end of the season, after Game Picks and Season Picks are tallied, the top three predictors are awarded club finances and draft picks:
                 </p>
               </div>
             </div>
@@ -1206,12 +1206,12 @@ export default function GamePicksView({
               <div className="p-4 rounded-xl bg-slate-950/80 border border-amber-500/40 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xl">🥇 1. Miesto</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold">Šampión</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold">Champion</span>
                 </div>
                 <div className="text-lg font-black text-amber-300">+$3,000,000</div>
                 <ul className="text-slate-300 space-y-1 text-[11px]">
                   <li>🎟️ <strong>Draft Pick v 8. kole</strong> (alebo 9. kole)</li>
-                  <li>🥇 Zlatý odznak <strong>Season Predictor Champion</strong></li>
+                  <li>🥇 Gold badge <strong>Season Predictor Champion</strong></li>
                 </ul>
               </div>
 
@@ -1224,7 +1224,7 @@ export default function GamePicksView({
                 <div className="text-lg font-black text-slate-200">+$1,500,000</div>
                 <ul className="text-slate-300 space-y-1 text-[11px]">
                   <li>🎟️ <strong>Draft Pick v 8. kole</strong> (alebo 9. kole)</li>
-                  <li>🥈 Strieborný odznak <strong>Vice-Champion</strong></li>
+                  <li>🥈 Silver badge <strong>Vice-Champion</strong></li>
                 </ul>
               </div>
 
@@ -1237,22 +1237,22 @@ export default function GamePicksView({
                 <div className="text-lg font-black text-amber-400">+$750,000</div>
                 <ul className="text-slate-300 space-y-1 text-[11px]">
                   <li>🎟️ <strong>Draft Pick v 8. kole</strong> (alebo 9. kole)</li>
-                  <li>🥉 Bronzový odznak <strong>3rd Place</strong></li>
+                  <li>🥉 Bronze badge <strong>3rd Place</strong></li>
                 </ul>
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
               <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-300">
-                <strong className="text-emerald-400">📅 Týždenné Game Picks:</strong> Každý víťaz hracieho týždňa v Game Picks získa <strong>+$200,000</strong> do klubovej kasy.
+                <strong className="text-emerald-400">📅 Weekly Game Picks:</strong> Every winner of a game week in Game Picks earns <strong>+$200,000</strong> for the club bank account.
               </div>
               <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-300">
-                <strong className="text-amber-300">🏆 Mesačný Šampión:</strong> Každý víťaz mesiaca získa 🎟️ <strong>Draft Pick v 8. kole</strong> (alebo 9. kole), <strong>+10 bodov</strong> a odznak.
+                <strong className="text-amber-300">🏆 Monthly Champion:</strong> Every winner of the month gets a 🎟️ <strong>Round 8 Draft Pick</strong> (or Round 9), <strong>+10 points</strong> and a badge.
               </div>
             </div>
 
             <div className="text-[11px] text-slate-400 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
-              ℹ️ <strong>Pravidlo pre Draft Picky:</strong> Všetky bonusové draft picky (celoročná TOP 3 aj mesační šampióni) sa generujú do <strong>8. kola</strong> draftu nováčikov. V prípade, že je v 8. kole už obsadených všetkých 32 pozícií, pick sa automaticky zapíše do <strong>9. kola</strong>.
+              ℹ️ <strong>Draft Pick rule:</strong> All bonus draft picks (the season TOP 3 and the monthly champions) are generated in <strong>Round 8</strong> of the rookie draft. If all 32 positions in Round 8 are already taken, the pick is automatically recorded in <strong>Round 9</strong>.
             </div>
           </div>
         </div>

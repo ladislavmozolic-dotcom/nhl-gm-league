@@ -17,7 +17,7 @@ export async function saveSeasonPicksAction(
 ) {
   const teamId = await getTeamSession();
   if (!teamId) {
-    return { ok: false, error: "Musíte byť prihlásený ako GM tímu." };
+    return { ok: false, error: "You must be signed in as a team GM." };
   }
 
   const admin = await isAdmin();
@@ -32,7 +32,7 @@ export async function saveSeasonPicksAction(
   if (isLocked && !admin) {
     return {
       ok: false,
-      error: "Tipovačka je už uzamknutá po deadline. Tipy nie je možné meniť.",
+      error: "The picks game is locked after the deadline. Picks can no longer be changed.",
     };
   }
 
@@ -50,7 +50,7 @@ export async function saveSeasonPicksAction(
   if (existing && !admin) {
     return {
       ok: false,
-      error: "Tipy ste už odoslali. Každý GM môže tipovať iba raz a odoslané tipy nie je možné meniť.",
+      error: "You have already submitted your picks. Each GM can pick only once and submitted picks cannot be changed.",
     };
   }
 
@@ -102,7 +102,7 @@ export async function updateSeasonPicksConfigAction(
   league = "NHL"
 ) {
   const admin = await isAdmin();
-  if (!admin) return { ok: false, error: "Prístup povolený len administrátorom." };
+  if (!admin) return { ok: false, error: "Access is restricted to administrators." };
 
   const updateData: any = {};
   if (data.status) updateData.status = data.status;
@@ -131,7 +131,7 @@ export async function updateSeasonPicksConfigAction(
 
 export async function evaluateSeasonPicksAction(season = REGULAR_SEASON, league = "NHL") {
   const admin = await isAdmin();
-  if (!admin) return { ok: false, error: "Prístup povolený len administrátorom." };
+  if (!admin) return { ok: false, error: "Access is restricted to administrators." };
 
   const res = await evaluateAllSubmissions(season, league);
   revalidatePath("/league/picks");
