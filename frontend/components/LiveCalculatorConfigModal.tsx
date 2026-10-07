@@ -239,16 +239,16 @@ export default function LiveCalculatorConfigModal({
           <h4 className={`font-semibold ${titleColor} text-sm`}>{title}</h4>
           {customList.length > 0 && (
             <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">
-              +{customList.length} vlastn{customList.length === 1 ? "á" : "é"}
+              +{customList.length} custom
             </span>
           )}
         </div>
         <div className="flex items-center gap-2.5">
           <span
             className="text-xs text-slate-400 font-mono"
-            title={`Štandardné: ${(stdSum * 100).toFixed(0)}% + Vlastné: ${(customSum * 100).toFixed(0)}%`}
+            title={`Standard: ${(stdSum * 100).toFixed(0)}% + Custom: ${(customSum * 100).toFixed(0)}%`}
           >
-            Súčet: {(totalSum * 100).toFixed(0)}%
+            Total: {(totalSum * 100).toFixed(0)}%
           </span>
           <button
             type="button"
@@ -256,12 +256,12 @@ export default function LiveCalculatorConfigModal({
             className="px-2.5 py-1 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 text-sky-400 hover:text-sky-300 border border-sky-500/30 text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 shadow-sm"
             title={
               targetType === "goalie"
-                ? "Pridať novú metriku pre brankára"
-                : "Pridať novú metriku z NHL API, MoneyPuck, EDGE, AHL alebo Biometrie"
+                ? "Add a new goalie metric"
+                : "Add a new metric from the NHL API, MoneyPuck, EDGE, AHL or Biometrics"
             }
           >
             <span className="text-sm leading-none font-bold">+</span>
-            <span>Pridať metriku</span>
+            <span>Add metric</span>
           </button>
         </div>
       </div>
@@ -281,10 +281,10 @@ export default function LiveCalculatorConfigModal({
       <div className="pt-3 mt-3 border-t border-slate-700/60 space-y-2">
         <div className="flex items-center justify-between text-[11px] font-semibold text-slate-300">
           <span className="flex items-center gap-1.5">
-            <span>✨</span> Vlastné pridané metriky ({list.length})
+            <span>✨</span> Custom added metrics ({list.length})
           </span>
           <span className="text-[10px] text-slate-400 font-normal">
-            Normalizuje sa automaticky do celkového percentilu
+            Normalized automatically into the overall percentile
           </span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -306,7 +306,7 @@ export default function LiveCalculatorConfigModal({
                       {sourceMeta?.badge ?? cm.source}
                     </span>
                     <span className="text-[10px] text-slate-400 font-mono">
-                      {cm.invert ? "↓ nižšie = lepšie" : "↑ vyššie = lepšie"}
+                      {cm.invert ? "↓ lower = better" : "↑ higher = better"}
                     </span>
                   </div>
                   <div className="text-xs font-semibold text-slate-100 truncate" title={cm.label}>
@@ -321,7 +321,7 @@ export default function LiveCalculatorConfigModal({
 
                 <div className="flex items-center gap-2 shrink-0">
                   <div>
-                    <label className="block text-[9px] text-slate-500 mb-0.5 font-mono">Váha:</label>
+                    <label className="block text-[9px] text-slate-500 mb-0.5 font-mono">Weight:</label>
                     <input
                       type="number"
                       step="0.01"
@@ -338,7 +338,7 @@ export default function LiveCalculatorConfigModal({
                     type="button"
                     onClick={() => handleRemoveCustomMetric(groupKey, cm.id, targetType)}
                     className="w-7 h-7 rounded-lg bg-rose-500/10 hover:bg-rose-500/25 border border-rose-500/30 text-rose-400 hover:text-rose-200 flex items-center justify-center text-xs transition"
-                    title="Odstrániť metriku"
+                    title="Remove metric"
                   >
                     ✕
                   </button>
@@ -387,10 +387,10 @@ export default function LiveCalculatorConfigModal({
       try {
         const res = await saveLiveCalculatorConfigAction(config);
         if (res.success) {
-          setStatusMsg({ type: "success", text: "Nastavenia boli úspešne uložené." });
+          setStatusMsg({ type: "success", text: "Settings saved successfully." });
         }
       } catch (err: any) {
-        setStatusMsg({ type: "error", text: err.message || "Chyba pri ukladaní nastavení." });
+        setStatusMsg({ type: "error", text: err.message || "Error saving settings." });
       }
     });
   };
@@ -403,11 +403,11 @@ export default function LiveCalculatorConfigModal({
         if (res.success) {
           setStatusMsg({
             type: "success",
-            text: `Prepočet dokončený! Spracovaných ${res.totalProcessed} hráčov (${res.nhlCount} NHL, ${res.ahlCount} AHL).`,
+            text: `Recalculation complete! Processed ${res.totalProcessed} players (${res.nhlCount} NHL, ${res.ahlCount} AHL).`,
           });
         }
       } catch (err: any) {
-        setStatusMsg({ type: "error", text: err.message || "Chyba pri prepočte." });
+        setStatusMsg({ type: "error", text: err.message || "Error during recalculation." });
       }
     });
   };
@@ -420,34 +420,34 @@ export default function LiveCalculatorConfigModal({
         if (res.success) {
           setStatusMsg({
             type: "success",
-            text: `Synchronizácia a prepočet dokončené! MoneyPuck zhod: ${res.sync.moneyPuckMatched}, AHL zhod: ${res.sync.ahlMatchedCur}.`,
+            text: `Sync and recalculation complete! MoneyPuck matches: ${res.sync.moneyPuckMatched}, AHL matches: ${res.sync.ahlMatchedCur}.`,
           });
         }
       } catch (err: any) {
-        setStatusMsg({ type: "error", text: err.message || "Chyba pri synchronizácii." });
+        setStatusMsg({ type: "error", text: err.message || "Error during sync." });
       }
     });
   };
 
   const handleResetDefaults = () => {
-    if (confirm("Naozaj chcete obnoviť všetky váhy a nastavenia na predvolené hodnoty?")) {
+    if (confirm("Do you really want to reset all weights and settings to the defaults?")) {
       setConfig({
         ...DEFAULT_CONFIG,
         lastCalculatedAt: config.lastCalculatedAt,
         lastSyncedAt: config.lastSyncedAt,
       });
-      setStatusMsg({ type: "success", text: "Obnovené predvolené hodnoty (nezabudnite kliknúť Uložiť)." });
+      setStatusMsg({ type: "success", text: "Defaults restored (do not forget to click Save)." });
     }
   };
 
   const handlePromote = () => {
     if (
       !confirm(
-        "Pozor! Chystáte sa aplikovať prepočítané Live ratingy do oficiálnych STHS ratingov hráčov.\n\n" +
-          "• Systém automaticky vytvorí trvalú zálohu pôvodných STHS ratingov, ak ešte neexistuje.\n" +
-          "• Kedykoľvek ich budete môcť jedným klikom vrátiť späť (Rollback).\n" +
-          "• Morálka (MO) hráčov zostáva nezmenená.\n\n" +
-          "Naozaj chcete aplikovať Live ratingy do ligovej databázy?"
+        "Warning! You are about to apply the recalculated Live ratings to the official STHS player ratings.\n\n" +
+          "• The system automatically creates a permanent backup of the original STHS ratings if one does not exist yet.\n" +
+          "• You can restore them with one click at any time (Rollback).\n" +
+          "• Players' morale (MO) stays unchanged.\n\n" +
+          "Do you really want to apply the Live ratings to the league database?"
       )
     ) {
       return;
@@ -460,12 +460,12 @@ export default function LiveCalculatorConfigModal({
         if (res.success) {
           setStatusMsg({
             type: "success",
-            text: `Live ratingy boli úspešne aplikované do STHS! Aktualizovaných ${res.updatedCount} hráčov (zálohovaných: ${res.backedUpCount}).`,
+            text: `Live ratings were applied to STHS successfully! Updated ${res.updatedCount} players (backed up: ${res.backedUpCount}).`,
           });
           loadPromoStatus();
         }
       } catch (err: any) {
-        setStatusMsg({ type: "error", text: err.message || "Chyba pri aplikovaní ratingov." });
+        setStatusMsg({ type: "error", text: err.message || "Error applying the ratings." });
       }
     });
   };
@@ -473,8 +473,8 @@ export default function LiveCalculatorConfigModal({
   const handleRestore = () => {
     if (
       !confirm(
-        "Naozaj chcete obnoviť pôvodné oficiálne STHS ratingy zo zálohy?\n\n" +
-          "Všetkým hráčom sa vrátia pôvodné parametre spred aplikovania Live kalkulátora."
+        "Do you really want to restore the original official STHS ratings from the backup?\n\n" +
+          "All players get back their original parameters from before the Live calculator was applied."
       )
     ) {
       return;
@@ -487,12 +487,12 @@ export default function LiveCalculatorConfigModal({
         if (res.success) {
           setStatusMsg({
             type: "success",
-            text: `Pôvodné STHS ratingy boli úspešne obnovené zo zálohy (${res.restoredCount} hráčov)!`,
+            text: `The original STHS ratings were restored from the backup successfully (${res.restoredCount} players)!`,
           });
           loadPromoStatus();
         }
       } catch (err: any) {
-        setStatusMsg({ type: "error", text: err.message || "Chyba pri obnove zo zálohy." });
+        setStatusMsg({ type: "error", text: err.message || "Error restoring from the backup." });
       }
     });
   };
@@ -521,7 +521,7 @@ export default function LiveCalculatorConfigModal({
       type="button"
       onClick={() => updateGw(attr, field, 0)}
       className="w-5 h-5 shrink-0 rounded-md bg-rose-500/10 hover:bg-rose-500/25 border border-rose-500/30 text-rose-400 hover:text-rose-200 flex items-center justify-center text-[10px] transition"
-      title="Odstrániť metriku z výpočtu (váha = 0)"
+      title="Remove the metric from the calculation (weight = 0)"
     >
       ✕
     </button>
@@ -541,10 +541,10 @@ export default function LiveCalculatorConfigModal({
                 </div>
                 <div>
                   <h3 className="font-bold text-white text-sm">
-                    Pridať novú metriku do výpočtu {addModal.targetType === "goalie" ? "(Brankári)" : "(Korčuliari)"}
+                    Add a new metric to the calculation {addModal.targetType === "goalie" ? "(Goalies)" : "(Skaters)"}
                   </h3>
                   <p className="text-[11px] text-slate-400">
-                    Cieľový parameter: <span className="text-sky-300 font-semibold">{addModal.groupName}</span>
+                    Target parameter: <span className="text-sky-300 font-semibold">{addModal.groupName}</span>
                   </p>
                 </div>
               </div>
@@ -562,7 +562,7 @@ export default function LiveCalculatorConfigModal({
               {/* Step 1: Server */}
               <div>
                 <label className="block text-slate-300 font-semibold mb-1.5">
-                  1. Dátový server / zdroj hodnôt:
+                  1. Data server / value source:
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {availableSources.map((src) => {
@@ -595,7 +595,7 @@ export default function LiveCalculatorConfigModal({
               {/* Step 2: Metric */}
               <div>
                 <label className="block text-slate-300 font-semibold mb-1.5">
-                  2. Vyberte metriku / štatistiku:
+                  2. Select a metric / statistic:
                 </label>
                 <select
                   value={newMetricKey}
@@ -618,7 +618,7 @@ export default function LiveCalculatorConfigModal({
               {/* Step 3: Custom Name / Label */}
               <div>
                 <label className="block text-slate-300 font-semibold mb-1">
-                  3. Názov metriky (Label):
+                  3. Metric name (Label):
                 </label>
                 <input
                   type="text"
@@ -646,8 +646,8 @@ export default function LiveCalculatorConfigModal({
                   >
                     <span className="text-base">📈</span>
                     <div>
-                      <div className="font-semibold text-xs">Vyššia = lepšie</div>
-                      <div className="text-[10px] text-slate-400">Body, rýchlosť, hity...</div>
+                      <div className="font-semibold text-xs">Higher = better</div>
+                      <div className="text-[10px] text-slate-400">Points, speed, hits...</div>
                     </div>
                   </button>
 
@@ -662,7 +662,7 @@ export default function LiveCalculatorConfigModal({
                   >
                     <span className="text-base">📉</span>
                     <div>
-                      <div className="font-semibold text-xs">Nižšia = lepšie (Inverzné)</div>
+                      <div className="font-semibold text-xs">Lower = better (Inverse)</div>
                       <div className="text-[10px] text-slate-400">xGA, GA, PIM, straty...</div>
                     </div>
                   </button>
@@ -672,7 +672,7 @@ export default function LiveCalculatorConfigModal({
               {/* Step 5: Initial Weight */}
               <div>
                 <label className="block text-slate-300 font-semibold mb-1">
-                  5. Počiatočná váha vo vzorci:
+                  5. Initial weight in the formula:
                 </label>
                 <div className="flex items-center gap-3">
                   <input
@@ -697,14 +697,14 @@ export default function LiveCalculatorConfigModal({
                   onClick={() => setAddModal(null)}
                   className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition"
                 >
-                  Zrušiť
+                  Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={!newMetricKey}
                   className="px-5 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-400 hover:to-indigo-400 text-white font-bold text-xs shadow-md shadow-sky-500/20 transition disabled:opacity-50"
                 >
-                  Pridať do výpočtu
+                  Add to the calculation
                 </button>
               </div>
             </form>
@@ -727,7 +727,7 @@ export default function LiveCalculatorConfigModal({
                 </span>
               </h2>
               <p className="text-xs text-slate-400">
-                Konfigurácia váh sezón, MoneyPuck dát, NHLe koeficientov a prepočtových vzorcov.
+                Configuration of season weights, MoneyPuck data, NHLe coefficients and recalculation formulas.
               </p>
             </div>
           </div>
@@ -763,7 +763,7 @@ export default function LiveCalculatorConfigModal({
                 : "border-transparent text-slate-400 hover:text-slate-200"
             }`}
           >
-            Všeobecné & Sezóny (CONFIG_V8)
+            General & Seasons (CONFIG_V8)
           </button>
           <button
             onClick={() => setActiveTab("weights")}
@@ -773,7 +773,7 @@ export default function LiveCalculatorConfigModal({
                 : "border-transparent text-slate-400 hover:text-slate-200"
             }`}
           >
-            Váhy korčuliarov (PA, SC, DF, CK, DI, PH)
+            Skater weights (PA, SC, DF, CK, DI, PH)
           </button>
           <button
             onClick={() => setActiveTab("goalies")}
@@ -784,7 +784,7 @@ export default function LiveCalculatorConfigModal({
             }`}
           >
             <span>🥅</span>
-            <span>Váhy brankárov (SC, RT, HS, AG...)</span>
+            <span>Goalie weights (SC, RT, HS, AG...)</span>
           </button>
           <button
             onClick={() => setActiveTab("ahl")}
@@ -805,7 +805,7 @@ export default function LiveCalculatorConfigModal({
             }`}
           >
             <span>👶</span>
-            <span>Nováčikovia & Prospekti</span>
+            <span>Rookies & Prospects</span>
           </button>
           {isAdmin && (
             <button
@@ -820,10 +820,10 @@ export default function LiveCalculatorConfigModal({
               }`}
             >
               <span>👑</span>
-              <span>Aplikovať do STHS (Komisár)</span>
+              <span>Apply to STHS (Commissioner)</span>
               {promoStatus?.hasBackup && (
                 <span
-                  title="Záloha existuje"
+                  title="A backup exists"
                   className="w-2 h-2 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50 inline-block ml-0.5"
                 />
               )}
@@ -839,7 +839,7 @@ export default function LiveCalculatorConfigModal({
                 <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3.5">
                   <div className="flex items-center justify-between">
                     <h3 className="font-semibold text-slate-200 text-sm flex items-center gap-2">
-                      <span>🗓️</span> Váhy sezón
+                      <span>🗓️</span> Season weights
                     </h3>
                     <label className="flex items-center gap-1.5 cursor-pointer text-slate-400 hover:text-slate-200 text-[11px] select-none">
                       <input
@@ -848,14 +848,14 @@ export default function LiveCalculatorConfigModal({
                         onChange={(e) => setAutoBalanceSeasons(e.target.checked)}
                         className="rounded border-slate-700 text-sky-500 focus:ring-sky-400 bg-slate-900 w-3.5 h-3.5"
                       />
-                      <span>Dopočítavať do 100%</span>
+                      <span>Auto-complete to 100%</span>
                     </label>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-slate-400 mb-1 font-medium text-[11px]">
-                        Aktuálna sezóna (LatestWeight):
+                        Current season (LatestWeight):
                       </label>
                       <div className="relative flex items-center">
                         <input
@@ -893,7 +893,7 @@ export default function LiveCalculatorConfigModal({
 
                     <div>
                       <label className="block text-slate-400 mb-1 font-medium text-[11px]">
-                        Predošlá sezóna (PreviousWeight):
+                        Previous season (PreviousWeight):
                       </label>
                       <div className="relative flex items-center">
                         <input
@@ -932,7 +932,7 @@ export default function LiveCalculatorConfigModal({
 
                   <div>
                     <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
-                      <span>Pomer sezón (posuvník):</span>
+                      <span>Season ratio (slider):</span>
                       <span className="font-mono text-slate-200">
                         {(config.latestWeight * 100).toFixed(1).replace(/\.0$/, "")}% : {(config.previousWeight * 100).toFixed(1).replace(/\.0$/, "")}%
                       </span>
@@ -963,10 +963,10 @@ export default function LiveCalculatorConfigModal({
                   {Math.abs(config.latestWeight + config.previousWeight - 1) > 0.001 && (
                     <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-between flex-wrap gap-1.5 text-[11px]">
                       <div className="text-amber-300">
-                        <span>Súčet: </span>
+                        <span>Total: </span>
                         <strong className="font-mono">{((config.latestWeight + config.previousWeight) * 100).toFixed(1)}%</strong>
                         <span className="text-slate-400 ml-1">
-                          (efektívne {((config.latestWeight / (config.latestWeight + config.previousWeight || 1)) * 100).toFixed(1)}% / {((config.previousWeight / (config.latestWeight + config.previousWeight || 1)) * 100).toFixed(1)}%)
+                          (effective {((config.latestWeight / (config.latestWeight + config.previousWeight || 1)) * 100).toFixed(1)}% / {((config.previousWeight / (config.latestWeight + config.previousWeight || 1)) * 100).toFixed(1)}%)
                         </span>
                       </div>
                       <button
@@ -983,7 +983,7 @@ export default function LiveCalculatorConfigModal({
                         }}
                         className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 text-[10px] font-semibold border border-amber-500/30 transition"
                       >
-                        Normalizovať na 100%
+                        Normalize to 100%
                       </button>
                     </div>
                   )}
@@ -991,11 +991,11 @@ export default function LiveCalculatorConfigModal({
 
                 <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
                   <h3 className="font-semibold text-slate-200 text-sm flex items-center gap-2">
-                    <span>🏒</span> Klasifikačné prahy (NHL vs AHL)
+                    <span>🏒</span> Classification thresholds (NHL vs AHL)
                   </h3>
                   <div>
                     <label className="block text-slate-400 mb-1">
-                      Min. GP aktuálna sezóna (NHL_GP_Latest_Min):
+                      Min. GP current season (NHL_GP_Latest_Min):
                     </label>
                     <input
                       type="number"
@@ -1004,12 +1004,12 @@ export default function LiveCalculatorConfigModal({
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-sky-400 outline-none"
                     />
                     <p className="text-[10px] text-slate-500 mt-1">
-                      Hráč s aspoň toľkoto GP v aktuálnej sezóne patrí do NHL skupiny.
+                      A player with at least this many GP in the current season belongs to the NHL group.
                     </p>
                   </div>
                   <div>
                     <label className="block text-slate-400 mb-1">
-                      Min. GP predošlá sezóna (NHL_GP_Previous_MinExclusive):
+                      Min. GP previous season (NHL_GP_Previous_MinExclusive):
                     </label>
                     <input
                       type="number"
@@ -1024,11 +1024,11 @@ export default function LiveCalculatorConfigModal({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
                   <h3 className="font-semibold text-slate-200 text-sm flex items-center gap-2">
-                    <span>📁</span> MoneyPuck priečinky
+                    <span>📁</span> MoneyPuck folders
                   </h3>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-slate-400 mb-1">Aktuálny rok (LatestMPYear):</label>
+                      <label className="block text-slate-400 mb-1">Current year (LatestMPYear):</label>
                       <input
                         type="number"
                         value={config.latestMpYear}
@@ -1037,7 +1037,7 @@ export default function LiveCalculatorConfigModal({
                       />
                     </div>
                     <div>
-                      <label className="block text-slate-400 mb-1">Predošlý rok (PreviousMPYear):</label>
+                      <label className="block text-slate-400 mb-1">Previous year (PreviousMPYear):</label>
                       <input
                         type="number"
                         value={config.previousMpYear}
@@ -1050,19 +1050,19 @@ export default function LiveCalculatorConfigModal({
 
                 <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
                   <h3 className="font-semibold text-slate-200 text-sm flex items-center gap-2">
-                    <span>ℹ️</span> Informácie o stave
+                    <span>ℹ️</span> Status information
                   </h3>
                   <div className="space-y-1.5 text-slate-400">
                     <div className="flex justify-between">
-                      <span>Posledný prepočet:</span>
+                      <span>Last recalculation:</span>
                       <span className="font-mono text-slate-200">
-                        {config.lastCalculatedAt ? new Date(config.lastCalculatedAt).toLocaleString("en-GB") : "Zatiaľ neprebehol"}
+                        {config.lastCalculatedAt ? new Date(config.lastCalculatedAt).toLocaleString("en-GB") : "Not run yet"}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Posledná synchronizácia:</span>
+                      <span>Last sync:</span>
                       <span className="font-mono text-slate-200">
-                        {config.lastSyncedAt ? new Date(config.lastSyncedAt).toLocaleString("en-GB") : "Zatiaľ neprebehla"}
+                        {config.lastSyncedAt ? new Date(config.lastSyncedAt).toLocaleString("en-GB") : "Not run yet"}
                       </span>
                     </div>
                   </div>
@@ -1074,14 +1074,14 @@ export default function LiveCalculatorConfigModal({
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <div>
                         <h3 className="font-semibold text-slate-200 text-sm flex items-center gap-2">
-                          <span>👥</span> Poverení GMovia (Správa Live Kalkulátora)
+                          <span>👥</span> Delegated GMs (Live Calculator management)
                         </h3>
                         <p className="text-[11px] text-slate-400 mt-0.5">
-                          Označte tímy / GM, ktorí budú mať prístup <strong>výhradne k tomuto kalkulátoru</strong> (úprava váh, sync, prepočet), bez administrátorských práv nad ligou.
+                          Select the teams / GMs who will have access <strong>to this calculator only</strong> (editing weights, sync, recalculation), without administrator rights over the league.
                         </p>
                       </div>
                       <span className="text-xs px-2.5 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-semibold font-mono">
-                        {(config.managerTeamIds ?? []).length} poverených
+                        {(config.managerTeamIds ?? []).length} delegated
                       </span>
                     </div>
 
@@ -1089,7 +1089,7 @@ export default function LiveCalculatorConfigModal({
                     <div className="pt-1">
                       <input
                         type="text"
-                        placeholder="Filtrovať podľa tímu, kódu alebo mena GM..."
+                        placeholder="Filter by team, code or GM name..."
                         value={teamFilter}
                         onChange={(e) => setTeamFilter(e.target.value)}
                         className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 placeholder-slate-500 text-xs focus:border-sky-400 outline-none"
@@ -1143,7 +1143,7 @@ export default function LiveCalculatorConfigModal({
                         })}
                       {eligibleTeams.length === 0 && (
                         <div className="col-span-full text-center py-4 text-slate-500 text-xs">
-                          Načítavam zoznam tímov...
+                          Loading the team list...
                         </div>
                       )}
                     </div>
@@ -1158,7 +1158,7 @@ export default function LiveCalculatorConfigModal({
               {/* PA */}
               <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
                 {renderCardHeader(
-                  "Passing (PA) Váhy",
+                  "Passing (PA) Weights",
                   "text-sky-400",
                   "pa",
                   (config.weights?.pa?.apg ?? 0.45) +
@@ -1167,7 +1167,7 @@ export default function LiveCalculatorConfigModal({
                 )}
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-slate-400 mb-1">A/GP (Asistencie / zápas):</label>
+                    <label className="block text-slate-400 mb-1">A/GP (Assists / game):</label>
                     <input
                       type="number"
                       step="0.01"
@@ -1185,7 +1185,7 @@ export default function LiveCalculatorConfigModal({
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 mb-1">A/60 All (Všetky herné situácie):</label>
+                    <label className="block text-slate-400 mb-1">A/60 All (All game situations):</label>
                     <input
                       type="number"
                       step="0.01"
@@ -1203,7 +1203,7 @@ export default function LiveCalculatorConfigModal({
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 mb-1">A/60 5v5 (Rovnovážny stav):</label>
+                    <label className="block text-slate-400 mb-1">A/60 5v5 (Even strength):</label>
                     <input
                       type="number"
                       step="0.01"
@@ -1227,7 +1227,7 @@ export default function LiveCalculatorConfigModal({
               {/* SC */}
               <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
                 {renderCardHeader(
-                  "Scoring (SC) Váhy",
+                  "Scoring (SC) Weights",
                   "text-emerald-400",
                   "sc",
                   (config.weights?.sc?.gpg ?? 0.45) +
@@ -1237,7 +1237,7 @@ export default function LiveCalculatorConfigModal({
                 )}
                 <div className="grid grid-cols-4 gap-3">
                   <div>
-                    <label className="block text-slate-400 mb-1">G/GP (Góly / zápas):</label>
+                    <label className="block text-slate-400 mb-1">G/GP (Goals / game):</label>
                     <input
                       type="number"
                       step="0.01"
@@ -1255,7 +1255,7 @@ export default function LiveCalculatorConfigModal({
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 mb-1">G/60 (Góly / 60 min):</label>
+                    <label className="block text-slate-400 mb-1">G/60 (Goals / 60 min):</label>
                     <input
                       type="number"
                       step="0.01"
@@ -1273,7 +1273,7 @@ export default function LiveCalculatorConfigModal({
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 mb-1">xG/60 (Očakávané góly):</label>
+                    <label className="block text-slate-400 mb-1">xG/60 (Expected goals):</label>
                     <input
                       type="number"
                       step="0.01"
@@ -1315,7 +1315,7 @@ export default function LiveCalculatorConfigModal({
               {/* DF - Defensemen */}
               <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
                 {renderCardHeader(
-                  "Defense (DF) Váhy — Obrancovia (D)",
+                  "Defense (DF) Weights — Defensemen (D)",
                   "text-cyan-400",
                   "dfD",
                   (config.weights?.dfD?.pkToiPg ?? DEFAULT_LIVE_CALC_WEIGHTS.dfD.pkToiPg) +
@@ -1454,7 +1454,7 @@ export default function LiveCalculatorConfigModal({
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 mb-1">xGF% (Očakávané góly %):</label>
+                    <label className="block text-slate-400 mb-1">xGF% (Expected goals %):</label>
                     <input
                       type="number"
                       step="0.01"
@@ -1481,7 +1481,7 @@ export default function LiveCalculatorConfigModal({
               {/* DF - Forwards */}
               <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
                 {renderCardHeader(
-                  "Defense (DF) Váhy — Útočníci (F)",
+                  "Defense (DF) Weights — Forwards (F)",
                   "text-blue-400",
                   "dfF",
                   (config.weights?.dfF?.pkToiPg ?? DEFAULT_LIVE_CALC_WEIGHTS.dfF.pkToiPg) +
@@ -1599,7 +1599,7 @@ export default function LiveCalculatorConfigModal({
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 mb-1">xGF% (Očakávané góly %):</label>
+                    <label className="block text-slate-400 mb-1">xGF% (Expected goals %):</label>
                     <input
                       type="number"
                       step="0.01"
@@ -1648,7 +1648,7 @@ export default function LiveCalculatorConfigModal({
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
                   {renderCardHeader(
-                    "Checking (CK) Váhy",
+                    "Checking (CK) Weights",
                     "text-rose-400",
                     "ck",
                     (config.weights?.ck?.hit60 ?? 0.6) + (config.weights?.ck?.hitPg ?? 0.4)
@@ -1696,7 +1696,7 @@ export default function LiveCalculatorConfigModal({
 
                 <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
                   {renderCardHeader(
-                    "Discipline (DI) Váhy",
+                    "Discipline (DI) Weights",
                     "text-amber-400",
                     "di",
                     (config.weights?.di?.penaltyBalance ?? 0.6) + (config.weights?.di?.invPim60 ?? 0.4)
@@ -1747,7 +1747,7 @@ export default function LiveCalculatorConfigModal({
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
               <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
                 {renderCardHeader(
-                  "Puck Handling (PH) Váhy — Útočníci (F)",
+                  "Puck Handling (PH) Weights — Forwards (F)",
                   "text-cyan-400",
                   "phF",
                   (config.weights?.phF?.turnoverProtection ?? DEFAULT_LIVE_CALC_WEIGHTS.phF.turnoverProtection) +
@@ -1810,12 +1810,12 @@ export default function LiveCalculatorConfigModal({
                     />
                   </div>
                 </div>
-                <p className="text-[10px] text-slate-500">NHL EDGE meria, kde je puk počas hráčovho pobytu na ľade. Controlled-entry feed nie je verejne dostupný; tento 5v5 údaj je jeho trackingový possession proxy.</p>
+                <p className="text-[10px] text-slate-500">NHL EDGE measures where the puck is while the player is on the ice. The controlled-entry feed is not publicly available; this 5v5 figure is its tracking possession proxy.</p>
                 {renderCustomMetricsSection("phF")}
               </div>
               <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
                 {renderCardHeader(
-                  "Puck Handling (PH) Váhy — Obrancovia (D)",
+                  "Puck Handling (PH) Weights — Defensemen (D)",
                   "text-blue-400",
                   "phD",
                   (config.weights?.phD?.turnoverProtection ?? DEFAULT_LIVE_CALC_WEIGHTS.phD.turnoverProtection) +
@@ -1848,7 +1848,7 @@ export default function LiveCalculatorConfigModal({
                     </div>
                   ))}
                 </div>
-                <p className="text-[10px] text-slate-500">Pre D má offensive-zone puck time len 10 % — tento údaj viac opisuje nasadenie páru a tímový útok než individuálne vedenie puku. Väčšia váha ide na ochranu puku.</p>
+                <p className="text-[10px] text-slate-500">For D, offensive-zone puck time is only 10% — this figure describes the pair's deployment and the team offense more than individual puck handling. More weight goes to puck protection.</p>
                 {renderCustomMetricsSection("phD")}
               </div>
               </div>
@@ -1857,7 +1857,7 @@ export default function LiveCalculatorConfigModal({
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
                   {renderCardHeader(
-                    "Skating (SK) Váhy",
+                    "Skating (SK) Weights",
                     "text-teal-400",
                     "sk",
                     config.weights?.sk?.edgeBursts20 ?? DEFAULT_LIVE_CALC_WEIGHTS.sk.edgeBursts20
@@ -1882,20 +1882,20 @@ export default function LiveCalculatorConfigModal({
                       }
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-teal-400 outline-none"
                     />
-                    <p className="text-[10px] text-slate-500 mt-1">Frekvencia rýchlostných šprintov &gt; 32 km/h za 60 minút.</p>
+                    <p className="text-[10px] text-slate-500 mt-1">Frequency of speed bursts &gt; 32 km/h per 60 minutes.</p>
                   </div>
                   {renderCustomMetricsSection("sk")}
                 </div>
 
                 <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
                   {renderCardHeader(
-                    "Strength (ST) Váhy",
+                    "Strength (ST) Weights",
                     "text-orange-400",
                     "st",
                     config.weights?.st?.weightPct ?? DEFAULT_LIVE_CALC_WEIGHTS.st.weightPct
                   )}
                   <div>
-                    <label className="block text-slate-400 mb-1">Hmotnosť hráča (Weight %):</label>
+                    <label className="block text-slate-400 mb-1">Player weight (Weight %):</label>
                     <input
                       type="number"
                       step="0.01"
@@ -1914,14 +1914,14 @@ export default function LiveCalculatorConfigModal({
                       }
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-orange-400 outline-none"
                     />
-                    <p className="text-[10px] text-slate-500 mt-1">Percentil hmotnosti v rámci ligy (fyzická sila).</p>
+                    <p className="text-[10px] text-slate-500 mt-1">Weight percentile within the league (physical strength).</p>
                   </div>
                   {renderCustomMetricsSection("st")}
                 </div>
 
                 <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
                   {renderCardHeader(
-                    "Experience (EX) Váhy",
+                    "Experience (EX) Weights",
                     "text-violet-400",
                     "ex",
                     (config.weights?.ex?.careerRegGP ?? DEFAULT_LIVE_CALC_WEIGHTS.ex.careerRegGP) +
@@ -1929,7 +1929,7 @@ export default function LiveCalculatorConfigModal({
                   )}
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-slate-400 mb-1">Kariéra reg. GP:</label>
+                      <label className="block text-slate-400 mb-1">Career reg. GP:</label>
                       <input
                         type="number"
                         step="0.01"
@@ -1950,7 +1950,7 @@ export default function LiveCalculatorConfigModal({
                       />
                     </div>
                     <div>
-                      <label className="block text-slate-400 mb-1">Kariéra play-off GP:</label>
+                      <label className="block text-slate-400 mb-1">Career playoff GP:</label>
                       <input
                         type="number"
                         step="0.01"
@@ -1971,7 +1971,7 @@ export default function LiveCalculatorConfigModal({
                       />
                     </div>
                   </div>
-                  <p className="text-[10px] text-slate-500">Skúsenosti na základe odohratých zápasov v NHL.</p>
+                  <p className="text-[10px] text-slate-500">Experience based on NHL games played.</p>
                   {renderCustomMetricsSection("ex")}
                 </div>
               </div>
@@ -1983,10 +1983,10 @@ export default function LiveCalculatorConfigModal({
               <div className="p-4 rounded-xl bg-slate-800/60 border border-emerald-500/30 flex items-center justify-between">
                 <div>
                   <h3 className="font-bold text-white text-sm flex items-center gap-2">
-                    <span>🥅</span> Váhy atribútov brankárov (STHS Goalie Ratings)
+                    <span>🥅</span> Goalie attribute weights (STHS Goalie Ratings)
                   </h3>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    Prepočet brankárov z MoneyPuck pokročilých metrík, NHL štatistík a biometrie. Každá karta umožňuje upraviť základné váhy a cez „Pridať metriku“ pripojiť SV%, GAA, GSAx, danger splity, dorážky, freezes či vyťaženosť. Morálka (MO) zostáva chránená a nedotknutá.
+                    Goalie recalculation from MoneyPuck advanced metrics, NHL stats and biometrics. Each card lets you adjust the base weights and, via "Add metric", attach SV%, GAA, GSAx, danger splits, rebounds, freezes or workload. Morale (MO) stays protected and untouched.
                   </p>
                 </div>
                 <div className="text-right">
@@ -2008,7 +2008,7 @@ export default function LiveCalculatorConfigModal({
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <div className="flex items-center justify-between gap-2 mb-1">
-                      <label className="block text-slate-400">Low-Danger SV% (Strely z diaľky):</label>
+                      <label className="block text-slate-400">Low-Danger SV% (Long-range shots):</label>
                       {removeGoalieMetricBtn("sc", "ldSv")}
                     </div>
                     <input
@@ -2021,7 +2021,7 @@ export default function LiveCalculatorConfigModal({
                   </div>
                   <div>
                     <div className="flex items-center justify-between gap-2 mb-1">
-                      <label className="block text-slate-400">Medium-Danger SV% (Stredná vzdialenosť):</label>
+                      <label className="block text-slate-400">Medium-Danger SV% (Mid-range):</label>
                       {removeGoalieMetricBtn("sc", "mdSv")}
                     </div>
                     <input
@@ -2034,7 +2034,7 @@ export default function LiveCalculatorConfigModal({
                   </div>
                   <div>
                     <div className="flex items-center justify-between gap-2 mb-1">
-                      <label className="block text-slate-400">GSAx / 60 min (Chytené góly nad očakávanie):</label>
+                      <label className="block text-slate-400">GSAx / 60 min (Goals saved above expected):</label>
                       {removeGoalieMetricBtn("sc", "gsax60")}
                     </div>
                     <input
@@ -2052,7 +2052,7 @@ export default function LiveCalculatorConfigModal({
               {/* RT */}
               <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
                 {renderCardHeader(
-                  "Reaction Time (RT) – Bleskové reakcie a tutovky",
+                  "Reaction Time (RT) – Lightning reactions and sure goals",
                   "text-emerald-400",
                   "rt",
                   (gw.rt?.hdSv ?? 0.6) + (gw.rt?.hdGsax ?? 0.4),
@@ -2061,7 +2061,7 @@ export default function LiveCalculatorConfigModal({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <div className="flex items-center justify-between gap-2 mb-1">
-                      <label className="block text-slate-400">High-Danger SV% (Úspešnosť pri tutovkách):</label>
+                      <label className="block text-slate-400">High-Danger SV% (Save % on sure goals):</label>
                       {removeGoalieMetricBtn("rt", "hdSv")}
                     </div>
                     <input
@@ -2074,7 +2074,7 @@ export default function LiveCalculatorConfigModal({
                   </div>
                   <div>
                     <div className="flex items-center justify-between gap-2 mb-1">
-                      <label className="block text-slate-400">HD GSAx (Chytené góly z tutoviek):</label>
+                      <label className="block text-slate-400">HD GSAx (Goals saved from sure goals):</label>
                       {removeGoalieMetricBtn("rt", "hdGsax")}
                     </div>
                     <input
@@ -2092,7 +2092,7 @@ export default function LiveCalculatorConfigModal({
               {/* HS */}
               <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
                 {renderCardHeader(
-                  "Hand Speed (HS) – Rýchlosť rúk (Lapačka & Vyrážačka)",
+                  "Hand Speed (HS) – Hand speed (Glove & Blocker)",
                   "text-amber-400",
                   "hs",
                   (gw.hs?.hdSv ?? 0.5) + (gw.hs?.gsax60 ?? 0.5),
@@ -2132,7 +2132,7 @@ export default function LiveCalculatorConfigModal({
               {/* AG */}
               <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
                 {renderCardHeader(
-                  "Agility (AG) – Pohyblivosť v bránkovisku",
+                  "Agility (AG) – Mobility in the crease",
                   "text-teal-400",
                   "ag",
                   (gw.ag?.mdSv ?? 0.5) + (gw.ag?.hdSv ?? 0.5),
@@ -2172,7 +2172,7 @@ export default function LiveCalculatorConfigModal({
               {/* RB */}
               <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
                 {renderCardHeader(
-                  "Rebound Control (RB) – Kontrola dorážok",
+                  "Rebound Control (RB) – Rebound control",
                   "text-indigo-400",
                   "rb",
                   gw.rb?.rebCtrl ?? 1.0,
@@ -2180,7 +2180,7 @@ export default function LiveCalculatorConfigModal({
                 )}
                 <div>
                   <label className="block text-slate-400 mb-1">
-                    Rebound Control (xRebounds − Inkasované dorážky):
+                    Rebound Control (xRebounds − Rebounds allowed):
                   </label>
                   <input
                     type="number"
@@ -2196,7 +2196,7 @@ export default function LiveCalculatorConfigModal({
               {/* EN */}
               <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
                 {renderCardHeader(
-                  "Endurance (EN) – Fyzická výdrž & vyťaženie",
+                  "Endurance (EN) – Physical endurance & workload",
                   "text-orange-400",
                   "en",
                   gw.en?.icetime ?? 1.0,
@@ -2204,7 +2204,7 @@ export default function LiveCalculatorConfigModal({
                 )}
                 <div>
                   <label className="block text-slate-400 mb-1">
-                    Ice Time (Celkový odchytaný čas v minútach):
+                    Ice Time (Total time in net, in minutes):
                   </label>
                   <input
                     type="number"
@@ -2220,14 +2220,14 @@ export default function LiveCalculatorConfigModal({
               {/* SZ */}
               <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
                 {renderCardHeader(
-                  "Size (SZ) – Fyzické rozmery a výška",
+                  "Size (SZ) – Physical size and height",
                   "text-blue-400",
                   "sz",
                   gw.sz?.sz ?? 1.0,
                   "goalie"
                 )}
                 <div>
-                  <label className="block text-slate-400 mb-1">Výška brankára (Height cm):</label>
+                  <label className="block text-slate-400 mb-1">Goalie height (Height cm):</label>
                   <input
                     type="number"
                     step="0.05"
@@ -2242,7 +2242,7 @@ export default function LiveCalculatorConfigModal({
               {/* EX */}
               <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
                 {renderCardHeader(
-                  "Experience (EX) – Kariérne skúsenosti v NHL",
+                  "Experience (EX) – Career NHL experience",
                   "text-purple-400",
                   "ex",
                   (gw.ex?.careerRegGP ?? 0.7) + (gw.ex?.careerPoGP ?? 0.3),
@@ -2251,7 +2251,7 @@ export default function LiveCalculatorConfigModal({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <div className="flex items-center justify-between gap-2 mb-1">
-                      <label className="block text-slate-400">Kariérne zápasy základná časť (Reg GP):</label>
+                      <label className="block text-slate-400">Career regular-season games (Reg GP):</label>
                       {removeGoalieMetricBtn("ex", "careerRegGP")}
                     </div>
                     <input
@@ -2264,7 +2264,7 @@ export default function LiveCalculatorConfigModal({
                   </div>
                   <div>
                     <div className="flex items-center justify-between gap-2 mb-1">
-                      <label className="block text-slate-400">Kariérne zápasy play-off (PO GP):</label>
+                      <label className="block text-slate-400">Career playoff games (PO GP):</label>
                       {removeGoalieMetricBtn("ex", "careerPoGP")}
                     </div>
                     <input
@@ -2282,14 +2282,14 @@ export default function LiveCalculatorConfigModal({
               {/* DU */}
               <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
                 {renderCardHeader(
-                  "Durability (DU) – Odolnosť a štartovacia stabilita",
+                  "Durability (DU) – Durability and starting stability",
                   "text-pink-400",
                   "du",
                   gw.du?.availability ?? 1.0,
                   "goalie"
                 )}
                 <div>
-                  <label className="block text-slate-400 mb-1">Dostupnosť / Štartované zápasy v sezóne:</label>
+                  <label className="block text-slate-400 mb-1">Availability / Games started in the season:</label>
                   <input
                     type="number"
                     step="0.05"
@@ -2304,14 +2304,14 @@ export default function LiveCalculatorConfigModal({
               {/* PH */}
               <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
                 {renderCardHeader(
-                  "Puck Handling & Freeze (PH) – Práca s pukom a podržanie",
+                  "Puck Handling & Freeze (PH) – Puck handling and freezing",
                   "text-cyan-400",
                   "ph",
                   gw.ph?.freezePct ?? 1.0,
                   "goalie"
                 )}
                 <div>
-                  <label className="block text-slate-400 mb-1">Freeze % (Pomer podržaných pukov):</label>
+                  <label className="block text-slate-400 mb-1">Freeze % (Share of pucks frozen):</label>
                   <input
                     type="number"
                     step="0.05"
@@ -2326,14 +2326,14 @@ export default function LiveCalculatorConfigModal({
               {/* SK */}
               <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
                 {renderCardHeader(
-                  "Skating (SK) – Korčuľovanie a mobilita",
+                  "Skating (SK) – Skating and mobility",
                   "text-lime-400",
                   "sk",
                   gw.sk?.agility ?? 1.0,
                   "goalie"
                 )}
                 <div>
-                  <label className="block text-slate-400 mb-1">Mobilita v bránkovisku:</label>
+                  <label className="block text-slate-400 mb-1">Mobility in the crease:</label>
                   <input
                     type="number"
                     step="0.05"
@@ -2348,7 +2348,7 @@ export default function LiveCalculatorConfigModal({
               {/* PS */}
               <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
                 {renderCardHeader(
-                  "Penalty Shot (PS) – Samostatné nájazdy a čisté brejky",
+                  "Penalty Shot (PS) – Shootouts and clean breakaways",
                   "text-rose-400",
                   "ps",
                   gw.ps?.hdSv ?? 1.0,
@@ -2370,14 +2370,14 @@ export default function LiveCalculatorConfigModal({
               {/* LD */}
               <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
                 {renderCardHeader(
-                  "Leadership (LD) – Vodcovstvo a rešpekt",
+                  "Leadership (LD) – Leadership and respect",
                   "text-amber-300",
                   "ld",
                   gw.ld?.experience ?? 1.0,
                   "goalie"
                 )}
                 <div>
-                  <label className="block text-slate-400 mb-1">Skúsenosti & veteránstvo:</label>
+                  <label className="block text-slate-400 mb-1">Experience & veteran status:</label>
                   <input
                     type="number"
                     step="0.05"
@@ -2400,7 +2400,7 @@ export default function LiveCalculatorConfigModal({
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-slate-400 mb-1">
-                      AHL NHLe aktuálna sezóna (AHL_NHLe_Latest):
+                      AHL NHLe current season (AHL_NHLe_Latest):
                     </label>
                     <input
                       type="number"
@@ -2410,12 +2410,12 @@ export default function LiveCalculatorConfigModal({
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-purple-400 outline-none"
                     />
                     <p className="text-[10px] text-slate-500 mt-1">
-                      Prepočet AHL bodov/gólov na úroveň NHL (default 0.446 zodpovedá ~45%).
+                      Conversion of AHL points/goals to the NHL level (the default 0.446 corresponds to ~45%).
                     </p>
                   </div>
                   <div>
                     <label className="block text-slate-400 mb-1">
-                      AHL NHLe predošlá sezóna (AHL_NHLe_Previous):
+                      AHL NHLe previous season (AHL_NHLe_Previous):
                     </label>
                     <input
                       type="number"
@@ -2430,12 +2430,12 @@ export default function LiveCalculatorConfigModal({
 
               <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
                 <h4 className="font-semibold text-slate-200 text-sm">
-                  Ochranné pravidlá V10 (AHL_PA_SC_BALANCE)
+                  V10 protection rules (AHL_PA_SC_BALANCE)
                 </h4>
                 <p className="text-slate-400 text-xs leading-relaxed">
-                  Systém automaticky chráni hráčov s overenou účasťou v NHL pred znížením parametrov PA a SC.
-                  Hráči s aspoň 10 GP v NHL v sezóne 2025/26 alebo aspoň 10 GP v sezóne 2024/25, prípadne hráči
-                  bez overených dát (UNKNOWN_GP) si zachovávajú plné pôvodné hodnoty bez penalizácie (zníženie 0, strop 99).
+                  The system automatically protects players with verified NHL participation from reductions of the PA and SC parameters.
+                  Players with at least 10 GP in the NHL in the 2025/26 season or at least 10 GP in the 2024/25 season, or players
+                  without verified data (UNKNOWN_GP) keep their full original values without penalty (reduction 0, cap 99).
                 </p>
               </div>
             </div>
@@ -2445,22 +2445,22 @@ export default function LiveCalculatorConfigModal({
             <div className="space-y-6">
               <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
                 <h4 className="font-semibold text-sky-400 text-sm flex items-center gap-2">
-                  <span>👶</span> Prepojenie so živými parametrami korčuliarov
+                  <span>👶</span> Link with the live skater parameters
                 </h4>
                 <p className="text-slate-300 text-xs leading-relaxed">
-                  Rookie kalkulátor využíva <b>rovnaké živé metriky a váhy</b> ako bežný kalkulátor hráčov.
-                  Ak zmeníte váhy streľby (SC), nahrávok (PA), obrany (DF), bodyčekov (CK), disciplíny (DI),
-                  korčuľovania (SK) alebo AHL prevodných faktorov v záložkách <i>Váhy korčuliarov</i> a <i>AHL &amp; NHLe</i>,
-                  tieto zmeny sa priamo aplikujú aj na výpočet nováčikov a prospektov.
+                  The Rookie calculator uses the <b>same live metrics and weights</b> as the regular player calculator.
+                  If you change the weights for shooting (SC), passing (PA), defense (DF), hits (CK), discipline (DI),
+                  skating (SK) or AHL conversion factors in the <i>Skater weights</i> and <i>AHL &amp; NHLe</i> tabs,
+                  these changes are applied directly to the rookie and prospect calculation as well.
                 </p>
               </div>
 
               <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3">
                 <h4 className="font-semibold text-amber-400 text-sm flex items-center gap-2">
-                  <span>🎯</span> Filter skenera reálnych debutantov
+                  <span>🎯</span> Real-debutant scanner filter
                 </h4>
                 <p className="text-slate-400 text-xs">
-                  Minimálny počet reálnych odohraných zápasov (NHL + AHL spolu), aby bol hráč skenerom nájdený a automaticky založený:
+                  Minimum number of real games played (NHL + AHL combined) for a player to be found by the scanner and created automatically:
                 </p>
                 <div className="flex items-center gap-3">
                   <input
@@ -2482,7 +2482,7 @@ export default function LiveCalculatorConfigModal({
                     }}
                     className="w-24 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-sky-400 outline-none"
                   />
-                  <span className="text-xs text-slate-400">zápasov (default: 1)</span>
+                  <span className="text-xs text-slate-400">games (default: 1)</span>
                 </div>
               </div>
 
@@ -2491,14 +2491,14 @@ export default function LiveCalculatorConfigModal({
                   <span>🛡️</span> Ochrana pred malou vzorkou (Bayesian Sample Shrinkage)
                 </h4>
                 <p className="text-slate-400 text-xs leading-relaxed">
-                  U nováčikov s malým počtom zápasov (1–10 GP) môžu per-60 štatistiky umelo vystreliť do extrémov (napr. 1 gól v 2 zápasoch by inak znamenal 99. percentil a SC 92).
-                  Engine preto aplikuje Bayesovskú reguláciu:
+                  For rookies with few games (1–10 GP), per-60 stats can artificially spike to extremes (e.g. 1 goal in 2 games would otherwise mean the 99th percentile and SC 92).
+                  The engine therefore applies Bayesian regularization:
                 </p>
                 <div className="p-3 bg-slate-900/60 rounded-lg font-mono text-xs text-slate-300">
-                  r = GP / (GP + 20) &nbsp;→&nbsp; P_vysledne = r × P_live + (1 - r) × P_novacik
+                  r = GP / (GP + 20) &nbsp;→&nbsp; P_final = r × P_live + (1 - r) × P_rookie
                 </div>
                 <p className="text-slate-400 text-xs leading-relaxed">
-                  S rastúcim počtom zápasov sa vplyv live dát zvyšuje. Výsledný Overall mladých hráčov bez väčšej histórie sa tak realisticky drží v mantineloch <b>OV 46–56</b> namiesto nereálnych 65+.
+                  As the number of games grows, the influence of live data increases. The resulting Overall of young players without much history therefore realistically stays within <b>OV 46–56</b> instead of an unrealistic 65+.
                 </p>
               </div>
             </div>
@@ -2510,13 +2510,13 @@ export default function LiveCalculatorConfigModal({
               <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-2">
                 <div className="flex items-center gap-2 font-bold text-amber-300 text-sm">
                   <span>👑</span>
-                  <span>Správa oficiálnych ligových ratingov (Nástroj komisára)</span>
+                  <span>Official league rating management (Commissioner tool)</span>
                 </div>
                 <p className="text-slate-300 text-xs leading-relaxed">
-                  Tento nástroj umožňuje komisárovi preniesť vypočítané Live ratingy do oficiálnej databázy hráčov
-                  (používanej v simulácii, súpiskách a profiloch hráčov). Pred prvým aplikovaním systém automaticky
-                  vytvorí <b>trvalú zálohu pôvodných STHS hodnôt</b> (<code className="text-amber-300 font-mono">sthsBackup</code>),
-                  vďaka čomu sa viete kedykoľvek jedným klikom vrátiť k pôvodnému stavu.
+                  This tool lets the commissioner transfer the calculated Live ratings to the official player database
+                  (used in the simulation, rosters and player profiles). Before the first application the system automatically
+                  creates a <b>permanent backup of the original STHS values</b> (<code className="text-amber-300 font-mono">sthsBackup</code>),
+                  so you can return to the original state with one click at any time.
                 </p>
               </div>
 
@@ -2524,7 +2524,7 @@ export default function LiveCalculatorConfigModal({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/60 space-y-1">
                   <div className="text-[11px] uppercase tracking-wider font-semibold text-slate-400">
-                    Stav STHS zálohy
+                    STHS backup status
                   </div>
                   <div className="flex items-center gap-2">
                     <span
@@ -2534,32 +2534,32 @@ export default function LiveCalculatorConfigModal({
                     />
                     <span className="text-sm font-bold text-slate-100">
                       {promoStatus?.hasBackup
-                        ? `${promoStatus.backupCount} hráčov chránených`
-                        : "Zatiaľ nevytvorená"}
+                        ? `${promoStatus.backupCount} players protected`
+                        : "Not created yet"}
                     </span>
                   </div>
                   <p className="text-[10px] text-slate-500">
                     {promoStatus?.hasBackup
-                      ? "Pôvodné STHS hodnoty sú bezpečne uložené."
-                      : "Záloha sa vytvorí automaticky pri 1. aplikácii."}
+                      ? "The original STHS values are safely stored."
+                      : "The backup is created automatically on the 1st application."}
                   </p>
                 </div>
 
                 <div className="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/60 space-y-1">
                   <div className="text-[11px] uppercase tracking-wider font-semibold text-slate-400">
-                    Prepočítané Live ratingy
+                    Recalculated Live ratings
                   </div>
                   <div className="text-sm font-bold text-slate-100">
-                    {promoStatus?.calculatedSkaters ?? 0} / {promoStatus?.totalSkaters ?? 0} hráčov
+                    {promoStatus?.calculatedSkaters ?? 0} / {promoStatus?.totalSkaters ?? 0} players
                   </div>
                   <p className="text-[10px] text-slate-500">
-                    Všetci korčuliari majú pripravené projekcie na aplikáciu.
+                    All skaters have projections ready to apply.
                   </p>
                 </div>
 
                 <div className="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/60 space-y-1">
                   <div className="text-[11px] uppercase tracking-wider font-semibold text-slate-400">
-                    Naposledy prepočítané
+                    Last recalculated
                   </div>
                   <div className="text-sm font-bold text-slate-100">
                     {config.lastCalculatedAt
@@ -2572,7 +2572,7 @@ export default function LiveCalculatorConfigModal({
                       : "Nikdy"}
                   </div>
                   <p className="text-[10px] text-slate-500">
-                    Aktualizuje sa automaticky po odohratých zápasoch alebo ručne.
+                    Updated automatically after games are played or manually.
                   </p>
                 </div>
               </div>
@@ -2583,11 +2583,11 @@ export default function LiveCalculatorConfigModal({
                   <div>
                     <h4 className="text-sm font-bold text-white flex items-center gap-2">
                       <span>⚡</span>
-                      <span>Aplikovať Live Ratingy do oficiálnej STHS databázy</span>
+                      <span>Apply Live Ratings to the official STHS database</span>
                     </h4>
                     <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                      Prepíše hodnoty parametrov korčuliarov v databáze (tabuľky <code className="text-slate-300">Player</code> a <code className="text-slate-300">SkaterRating</code>)
-                      vypočítanými hodnotami z Live kalkulátora:
+                      Overwrites the skater parameter values in the database (tables <code className="text-slate-300">Player</code> a <code className="text-slate-300">SkaterRating</code>)
+                      with the values computed by the Live calculator:
                     </p>
                     <div className="flex flex-wrap gap-1.5 mt-2.5">
                       {["CK", "FG", "DI", "SK", "ST", "EN", "DU", "PH", "FO", "PA", "SC", "DF", "PS", "EX", "LD", "Overall"].map((p) => (
@@ -2601,7 +2601,7 @@ export default function LiveCalculatorConfigModal({
                     </div>
                     <p className="text-[11px] text-emerald-400 mt-2 flex items-center gap-1">
                       <span>✓</span>
-                      <span>Morálka (MO) hráčov je úplne vynechaná a zostáva v pôvodnom stave.</span>
+                      <span>Players' morale (MO) is left out entirely and stays in its original state.</span>
                     </p>
                   </div>
 
@@ -2612,7 +2612,7 @@ export default function LiveCalculatorConfigModal({
                     className="shrink-0 px-5 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs transition shadow-lg shadow-amber-500/25 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-[0.98]"
                   >
                     <span>{isPending ? "⏳" : "🚀"}</span>
-                    <span>{isPending ? "Aplikujem…" : "Aplikovať do STHS"}</span>
+                    <span>{isPending ? "Applying…" : "Apply to STHS"}</span>
                   </button>
                 </div>
               </div>
@@ -2623,15 +2623,15 @@ export default function LiveCalculatorConfigModal({
                   <div>
                     <h4 className="text-sm font-bold text-slate-200 flex items-center gap-2">
                       <span>↩️</span>
-                      <span>Rollback — Obnoviť pôvodné STHS ratingy zo zálohy</span>
+                      <span>Rollback — Restore the original STHS ratings from the backup</span>
                     </h4>
                     <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                      Ak chcete zrušiť aplikované Live ratingy a vrátiť všetkým hráčom ich pôvodné hodnoty pred aplikáciou,
-                      kliknite na tlačidlo obnovy. Hodnoty sa okamžite načítajú z trvalej STHS zálohy.
+                      If you want to undo the applied Live ratings and return all players their original values from before the application,
+                      click the restore button. The values are loaded immediately from the permanent STHS backup.
                     </p>
                     {!promoStatus?.hasBackup && (
                       <p className="text-[11px] text-amber-400/80 mt-1">
-                        Záloha zatiaľ nebola vytvorená (vytvorí sa pri prvej aplikácii Live ratingov).
+                        No backup has been created yet (it is created on the first application of Live ratings).
                       </p>
                     )}
                   </div>
@@ -2643,7 +2643,7 @@ export default function LiveCalculatorConfigModal({
                     className="shrink-0 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 font-semibold text-xs transition flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-[0.98]"
                   >
                     <span>{isPending ? "⏳" : "🔄"}</span>
-                    <span>{isPending ? "Obnovujem…" : "Obnoviť zo zálohy"}</span>
+                    <span>{isPending ? "Restoring…" : "Restore from backup"}</span>
                   </button>
                 </div>
               </div>
@@ -2658,7 +2658,7 @@ export default function LiveCalculatorConfigModal({
             disabled={!isPermitted || isPending}
             className="text-xs text-slate-400 hover:text-slate-200 underline transition disabled:opacity-50"
           >
-            Obnoviť predvolené
+            Reset to defaults
           </button>
 
           <div className="flex items-center gap-3">
@@ -2668,7 +2668,7 @@ export default function LiveCalculatorConfigModal({
               className="px-3.5 py-2 rounded-xl bg-indigo-600/80 hover:bg-indigo-600 text-white font-medium text-xs transition flex items-center gap-1.5 shadow-md shadow-indigo-600/20 disabled:opacity-50"
             >
               <span>{isPending ? "⏳" : "🔄"}</span>
-              <span>Sync Live Dáta (MP + AHL)</span>
+              <span>Sync Live Data (MP + AHL)</span>
             </button>
 
             <button
@@ -2677,7 +2677,7 @@ export default function LiveCalculatorConfigModal({
               className="px-3.5 py-2 rounded-xl bg-emerald-600/80 hover:bg-emerald-600 text-white font-medium text-xs transition flex items-center gap-1.5 shadow-md shadow-emerald-600/20 disabled:opacity-50"
             >
               <span>{isPending ? "⏳" : "⚡"}</span>
-              <span>Prepočítať ratingy</span>
+              <span>Recalculate ratings</span>
             </button>
 
             <button
@@ -2685,7 +2685,7 @@ export default function LiveCalculatorConfigModal({
               disabled={!isPermitted || isPending}
               className="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs transition shadow-md shadow-sky-500/20 disabled:opacity-50"
             >
-              {isPending ? "Ukladám…" : "Uložiť nastavenia"}
+              {isPending ? "Saving…" : "Save settings"}
             </button>
           </div>
         </div>
