@@ -377,8 +377,8 @@ export default async function HomePage() {
               <p className="text-xs uppercase tracking-wider text-amber-400 font-black flex items-center gap-1.5">
                 <span>⭐</span> {T("home.threeStars")}
               </p>
-              <Link href="/players/three-stars" className="text-[11px] text-slate-400 hover:text-amber-300 transition-colors font-bold uppercase tracking-wider">
-                {T("ui.viewAll")} →
+              <Link href="/players/three-stars" className="text-xs text-slate-400 hover:text-amber-300 transition-colors font-semibold">
+                {T("ui.viewAll")}
               </Link>
             </div>
             {stars.length === 0 ? <p className="text-sm text-slate-500 py-6 text-center">Po ďalšej simulácii.</p> : (
@@ -439,8 +439,8 @@ export default async function HomePage() {
               <p className="text-xs uppercase tracking-wider text-indigo-400 font-black flex items-center gap-1.5">
                 <span>🌙</span> {T("home.tonightsBest")}
               </p>
-              <Link href="/league/digest" className="text-[11px] text-slate-400 hover:text-indigo-300 transition-colors font-bold uppercase tracking-wider">
-                {T("ui.viewAll")} →
+              <Link href="/league/digest" className="text-xs text-slate-400 hover:text-indigo-300 transition-colors font-semibold">
+                {T("ui.viewAll")}
               </Link>
             </div>
             {digest && digest.gameCount > 0 && (digest.gameOfNight || digest.playerOfNight || digest.bestGoalie) ? (
@@ -574,8 +574,8 @@ export default async function HomePage() {
               <p className="text-xs uppercase tracking-wider text-sky-400 font-black flex items-center gap-1.5">
                 <span>🔁</span> Recent Trades
               </p>
-              <Link href="/trades" className="text-[11px] text-slate-400 group-hover/trades:text-sky-300 transition-colors font-bold uppercase tracking-wider">
-                {T("ui.viewAll")} →
+              <Link href="/trades" className="text-xs text-slate-400 group-hover/trades:text-sky-300 transition-colors font-semibold">
+                {T("ui.viewAll")}
               </Link>
             </div>
             {recentTrades.length ? (
