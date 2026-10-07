@@ -27,6 +27,7 @@ import PlayerTransactionHistoryCard from "@/components/PlayerTransactionHistoryC
 import PlayerHistoryTabs from "@/components/PlayerHistoryTabs";
 import PlayerProfileTabs from "@/components/PlayerProfileTabs";
 import PlayerAdvancedStatsCard from "@/components/PlayerAdvancedStatsCard";
+import { getLeagueClock } from "@/lib/calendar-server";
 
 export const dynamic = "force-dynamic";
 
@@ -180,7 +181,7 @@ function StatBlock({ league, cols, reg, po, cellsOf, team, regSplits, poSplits, 
   );
   return (
     <div className="bg-slate-900/40 border border-slate-800 rounded-xl overflow-hidden">
-      <div className="px-4 py-2 bg-blue-950/40 border-b border-blue-500/30 text-xs font-bold uppercase tracking-wide text-blue-300">{league} Seasons</div>
+      <div className="px-4 py-2 bg-blue-950/40 border-b border-blue-500/30 text-xs font-bold uppercase tracking-wide text-blue-300">{league} · Základná časť</div>
       <div className="overflow-x-auto"><table className="w-full text-sm"><Head /><tbody>
         {reg && (regSplits && regSplits.length > 1
           ? <>
@@ -191,7 +192,7 @@ function StatBlock({ league, cols, reg, po, cellsOf, team, regSplits, poSplits, 
       </tbody></table></div>
       {po && (
         <>
-          <div className="px-4 py-2 bg-amber-950/30 border-y border-amber-500/30 text-xs font-bold uppercase tracking-wide text-amber-300">{league} Playoffs</div>
+          <div className="px-4 py-2 bg-amber-950/30 border-y border-amber-500/30 text-xs font-bold uppercase tracking-wide text-amber-300">{league} · Play-off</div>
           <div className="overflow-x-auto"><table className="w-full text-sm"><Head /><tbody>
             {poSplits && poSplits.length > 1
               ? <>
@@ -215,7 +216,12 @@ export default async function PlayerPage({
 }) {
   const { id } = await params;
   const sParams = searchParams ? await searchParams : {};
-  const [p, loggedIn, gmTeamId] = await Promise.all([getPlayer(id) as Promise<any>, isLoggedIn(), getTeamSession()]);
+  const [p, loggedIn, gmTeamId, leagueClock] = await Promise.all([
+    getPlayer(id) as Promise<any>,
+    isLoggedIn(),
+    getTeamSession(),
+    getLeagueClock(),
+  ]);
   const isGoalie: boolean = p.isGoalie || p.position === "G";
   // goalieRating.mo is never touched by the sim (it only writes the live
   // value to Player.mo/morale) — keep the live one, not the stale copy.
@@ -246,6 +252,10 @@ export default async function PlayerPage({
   const activeSeason = (sParams.season && availableSeasons.includes(sParams.season))
     ? sParams.season
     : availableSeasons[0] || SEASON;
+
+  const currentPhaseLabel = activeSeason === SEASON
+    ? (leagueClock.phase === "playoffs" ? "Play-off" : leagueClock.phase === "preseason" ? "Príprava" : "Základná časť")
+    : "Ukončená sezóna";
 
   // Aggregate season, split by league (NHL / AHL) and regular / playoffs.
   const bucketKey = (league: string | null, seriesId: number | null) =>
@@ -724,6 +734,7 @@ export default async function PlayerPage({
         availableSeasons={availableSeasons}
         currentSeason={activeSeason}
         playerSlugOrId={p.slug ?? p.id}
+        currentPhase={currentPhaseLabel}
       />
     </div>
   );
