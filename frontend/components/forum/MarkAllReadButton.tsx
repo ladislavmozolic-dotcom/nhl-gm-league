@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { markForumSeen } from "@/app/forum/actions";
+import { markAllForumsReadAction } from "@/app/forum/actions";
 
 export default function MarkAllReadButton() {
   const [pending, start] = useTransition();
@@ -10,7 +10,7 @@ export default function MarkAllReadButton() {
 
   const handleClick = () => {
     start(async () => {
-      await markForumSeen();
+      await markAllForumsReadAction();
       router.refresh();
     });
   };

@@ -66,12 +66,20 @@ export async function deletePost(postId: number) {
   return { ok: true as const, threadDeleted: false };
 }
 
-/** Mark the forum as "seen" for the signed-in GM (clears the new-posts menu badge). */
+/** Mark the forum as "seen" for the signed-in GM. Safe to call during page render (no revalidatePath). */
 export async function markForumSeen() {
   const me = await getTeamSession();
   if (!me) return;
   await prisma.team.update({ where: { id: me }, data: { forumSeenAt: new Date() } }).catch(() => {});
+}
+
+/** Server action triggered by the "Označiť všetko ako prečítané" button. */
+export async function markAllForumsReadAction() {
+  const me = await getTeamSession();
+  if (!me) return { ok: false as const };
+  await prisma.team.update({ where: { id: me }, data: { forumSeenAt: new Date() } }).catch(() => {});
   revalidatePath("/forum");
+  return { ok: true as const };
 }
 
 /** Toggle an emoji reaction on a post (add if absent, remove if present). */
