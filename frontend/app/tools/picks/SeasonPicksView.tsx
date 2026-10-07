@@ -8,6 +8,7 @@ import {
   evaluateSeasonPicksAction,
 } from "./actions";
 import GamePicksView from "./GamePicksView";
+import { useLang } from "@/components/LangProvider";
 import type {
   SeasonPicksFormData,
   SectionPointsBreakdown,
@@ -227,6 +228,9 @@ export default function SeasonPicksView({
   viewerTeam: { id: number; name: string; slug: string; logoUrl: string | null; gm?: string; gmNickname?: string | null } | null;
   isAdmin: boolean;
 }) {
+  const lang = useLang();
+  const isEn = lang === "en";
+
   const [tab, setTab] = useState<"picks" | "leaderboard" | "daily" | "rules" | "admin">("picks");
   const [config, setConfig] = useState(initialData.config);
   const [submissions, setSubmissions] = useState(initialData.submissions || []);
@@ -418,7 +422,7 @@ export default function SeasonPicksView({
                 : "bg-slate-800/60 hover:bg-slate-800 text-slate-300"
             }`}
           >
-            <span>📝 Season Picks (My Ticket)</span>
+            <span>📝 {isEn ? "Season Picks (My Ticket)" : "Sezónne tipy (Môj tiket)"}</span>
           </button>
           <button
             onClick={() => setTab("leaderboard")}
@@ -428,7 +432,7 @@ export default function SeasonPicksView({
                 : "bg-slate-800/60 hover:bg-slate-800 text-slate-300"
             }`}
           >
-            <span>🏆 GM Leaderboard ({submissions.length})</span>
+            <span>🏆 {isEn ? "GM Leaderboard" : "Tabuľka GM"} ({submissions.length})</span>
           </button>
           <button
             onClick={() => setTab("daily")}
@@ -438,7 +442,7 @@ export default function SeasonPicksView({
                 : "bg-slate-800/60 hover:bg-slate-800 text-slate-300"
             }`}
           >
-            <span>📅 Game Picks (Daily Picks)</span>
+            <span>📅 {isEn ? "Game Picks (Daily)" : "Denné tipy (Game Picks)"}</span>
           </button>
           <button
             onClick={() => setTab("rules")}
@@ -448,7 +452,7 @@ export default function SeasonPicksView({
                 : "bg-slate-800/60 hover:bg-slate-800 text-slate-300"
             }`}
           >
-            <span>📖 Rules & Rewards</span>
+            <span>📖 {isEn ? "Rules & Rewards" : "Pravidlá a odmeny"}</span>
           </button>
           {isAdmin && (
             <button
@@ -459,7 +463,7 @@ export default function SeasonPicksView({
                   : "bg-slate-800/60 hover:bg-slate-800 text-amber-300 border border-amber-500/20"
               }`}
             >
-              <span>⚙️ Admin & Evaluation</span>
+              <span>⚙️ {isEn ? "Admin & Evaluation" : "Admin a vyhodnotenie"}</span>
             </button>
           )}
         </div>
