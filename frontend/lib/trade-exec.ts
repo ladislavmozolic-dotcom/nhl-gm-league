@@ -192,8 +192,10 @@ export async function collectMoveOps(pkg: TradePackage) {
       // being shopped was the OLD club's decision — it doesn't carry over to whoever
       // just acquired him, so clear the trade-block flag on every trade.
       const moraleDelta = moraleDeltas.get(pl.id);
-      const morale = moraleDelta != null ? Math.max(1, Math.min(100, Math.round((pl.morale ?? 50) + moraleDelta))) : undefined;
-      ops.push(prisma.player.update({ where: { id: pl.id }, data: { teamId: destId, rosterType: destRoster, capHit, retainedSalary, captaincy: null, onBlock: false, blockNote: null, ...(morale != null ? { morale, mo: morale } : {}),
+      // morale resets to the neutral 50 baseline on a trade (a fresh start with the new club —
+      // the old club's low morale doesn't follow him); the trade's own swing applies on top.
+      const morale = Math.max(1, Math.min(100, Math.round(50 + (moraleDelta ?? 0))));
+      ops.push(prisma.player.update({ where: { id: pl.id }, data: { teamId: destId, rosterType: destRoster, capHit, retainedSalary, captaincy: null, onBlock: false, blockNote: null, morale, mo: morale,
         // a trade resolves any grievance with the OLD club: its signing promise, his
         // ice-time complaint and a trade request don't follow him to the new one
         disgruntled: false, tradeRequested: false, tradeRequestReason: null, promiseWarnGame: null,

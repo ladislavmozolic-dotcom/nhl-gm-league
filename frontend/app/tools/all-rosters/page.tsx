@@ -136,7 +136,7 @@ export default async function AllRostersPage({ searchParams }: { searchParams: P
 
       <div>
         <SectionTitle accent="text-blue-400">NHL Roster</SectionTitle>
-        <p className="text-xs text-slate-400 -mt-1 mb-3"><span className="text-amber-400 font-bold">★</span> = trade clause on his contract (NTC / NMC / M-NTC) — hover the star to see which. He can't be traded without his consent.</p>
+        <p className="text-xs text-slate-400 -mt-1 mb-3"><span className="text-amber-400 font-bold">★</span> = trade clause on his contract (NTC / NMC / M-NTC) — click the star to see which. He can't be traded without his consent.</p>
         <RosterTable title="Skaters" players={skaters.map((p) => toRP(p, nhlHasField))} hideAttrs={!loggedIn} />
         <RosterTable title="Goalies" players={goalies.map((p) => toRP(p, nhlHasField))} goalie hideAttrs={!loggedIn} />
       </div>
