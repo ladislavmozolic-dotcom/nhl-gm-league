@@ -156,7 +156,7 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
                     : "bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700"
                 }`}
               >
-                <span>{r}. Kolo{r > 7 && " ★"}</span>
+                <span>Round {r}{r > 7 && " ★"}</span>
                 {live && <span className="px-1.5 py-0.2 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black uppercase">LIVE</span>}
                 {done && !live && <span className="text-emerald-400 font-bold text-xs">✓</span>}
               </Link>
@@ -182,7 +182,7 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
             >
               <div className="flex items-center gap-3">
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
-                <span className="font-bold text-white">Prebieha {state.liveRound}. Kolo</span>
+                <span className="font-bold text-white">Round {state.liveRound} in progress</span>
                 {onClockTeam && (
                   <span className="text-slate-300 text-xs">— On the clock: <strong className="text-amber-400">{onClockTeam.name}</strong> (pick #{state.currentPick})</span>
                 )}

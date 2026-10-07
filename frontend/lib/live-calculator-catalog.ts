@@ -684,7 +684,7 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "mpUnblockedAttempts60",
-    label: "Unblocked Shot Attempts / 60 (Fenwick For za 60 min)",
+    label: "Unblocked Shot Attempts / 60 (Fenwick For per 60 min)",
     source: "moneypuck",
     description: "The player's own unblocked shots on and off goal per 60 minutes.",
     defaultInvert: false,
@@ -796,7 +796,7 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "mpMdShots60",
-    label: "Medium-Danger Shots / 60 (Strely zo strednej vzdialenosti)",
+    label: "Medium-Danger Shots / 60 (Mid-range shots)",
     source: "moneypuck",
     description: "Shots from the circles and mid-range per 60 minutes.",
     defaultInvert: false,

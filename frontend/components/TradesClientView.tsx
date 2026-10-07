@@ -827,7 +827,7 @@ function TradeAssetRow({ asset }: { asset: EnrichedTradeAsset }) {
           <div className="min-w-0">
             <div className="text-xs font-bold text-slate-100 group-hover:text-amber-300 transition-colors truncate">
               {asset.pickYear && asset.pickRound
-                ? `${asset.pickYear} · ${asset.pickRound}. Kolo Draftu`
+                ? `${asset.pickYear} · Round ${asset.pickRound} Draft Pick`
                 : asset.text}
             </div>
             <div className="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">

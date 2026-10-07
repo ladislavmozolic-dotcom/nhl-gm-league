@@ -133,7 +133,7 @@ export default function AdminResignTable({ rows }: { rows: ResignRowData[] }) {
               <tr className="text-xs text-slate-400 uppercase tracking-wider border-b border-slate-800 bg-slate-800/40">
                 <th className="text-left px-4 py-3 font-semibold">Player & CBA</th>
                 <th className="text-left px-3 py-3 font-semibold">Klub</th>
-                <th className="text-left px-3 py-3 font-semibold">Stav & Kolo</th>
+                <th className="text-left px-3 py-3 font-semibold">Status & Round</th>
                 <th className="text-right px-3 py-3 font-semibold">Club offer</th>
                 <th className="text-right px-3 py-3 font-semibold">Player counter-offer</th>
                 <th className="text-right px-3 py-3 font-semibold">Submitted</th>
@@ -269,13 +269,13 @@ export default function AdminResignTable({ rows }: { rows: ResignRowData[] }) {
                           )}
                           {!p.resignStatus && (
                             <span className="text-[11px] px-2 py-0.5 rounded-full font-bold bg-slate-800 text-slate-400">
-                              Kolo {p.resignRound}
+                              Round {p.resignRound}
                             </span>
                           )}
                         </div>
                         <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
                           <span>
-                            Kolo {p.resignRound}
+                            Round {p.resignRound}
                             {roundCap != null ? `/${roundCap}` : ""}
                           </span>
                           {postOs && (

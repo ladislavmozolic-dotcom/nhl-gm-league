@@ -408,7 +408,7 @@ export default function GamePicksView({
                   <div className="text-[10px] text-slate-400 font-medium">Streak</div>
                   <div className="font-bold text-amber-400">
                     {viewerProfile.currentStreak} v rade{" "}
-                    <span className="text-[10px] text-slate-400 font-normal">(Rekord: {viewerProfile.bestStreak})</span>
+                    <span className="text-[10px] text-slate-400 font-normal">(Best: {viewerProfile.bestStreak})</span>
                   </div>
                 </div>
               </div>
@@ -1022,9 +1022,9 @@ export default function GamePicksView({
                   }`}
                 >
                   {mKey === "all"
-                    ? "Celkovo"
+                    ? "Total"
                     : mKey === "2026-10"
-                    ? "Okt"
+                    ? "Oct"
                     : mKey === "2026-11"
                     ? "Nov"
                     : mKey === "2026-12"

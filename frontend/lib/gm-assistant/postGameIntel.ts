@@ -97,10 +97,10 @@ async function teamSwings(teamId: number, isHome: boolean, game: {
     if (avg == null || n === 0) return;
     swings.push({ key, label, gameValue: round1(gameVal), seasonAvg: round1(avg), delta: round1(gameVal - avg), gamesInBaseline: n });
   };
-  pushMetric("shots", "Strely", shotsFor, "Shots");
+  pushMetric("shots", "Shots", shotsFor, "Shots");
   pushMetric("goals", "Goals", goalsFor, "Goals");
   pushMetric("xg", "Expected Goals (xG)", xgFor, "Xg");
-  pushMetric("hd", "High-danger strely", hdFor, "Hd");
+  pushMetric("hd", "High-danger shots", hdFor, "Hd");
 
   const thisWins = thisFo._sum.faceoffWins ?? 0, thisLosses = thisFo._sum.faceoffLosses ?? 0;
   const priorWins = priorFo._sum.faceoffWins ?? 0, priorLosses = priorFo._sum.faceoffLosses ?? 0;

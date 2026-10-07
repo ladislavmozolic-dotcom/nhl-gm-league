@@ -1649,15 +1649,15 @@ export default function SeasonPicksView({
                       <div className="grid grid-cols-2 gap-2 text-slate-400">
                         <div>Art Ross: <strong className="text-white">{players.find((p: any) => p.id === selectedSubmission.picks.statLeaders?.artRossPlayerId)?.name || "—"}</strong></div>
                         <div>Richard: <strong className="text-white">{players.find((p: any) => p.id === selectedSubmission.picks.statLeaders?.rocketRichardPlayerId)?.name || "—"}</strong></div>
-                        <div>Asistencie: <strong className="text-white">{players.find((p: any) => p.id === selectedSubmission.picks.statLeaders?.assistsPlayerId)?.name || "—"}</strong></div>
-                        <div>Top Obranca: <strong className="text-white">{players.find((p: any) => p.id === selectedSubmission.picks.statLeaders?.topDmanPlayerId)?.name || "—"}</strong></div>
+                        <div>Assists: <strong className="text-white">{players.find((p: any) => p.id === selectedSubmission.picks.statLeaders?.assistsPlayerId)?.name || "—"}</strong></div>
+                        <div>Top Defenseman: <strong className="text-white">{players.find((p: any) => p.id === selectedSubmission.picks.statLeaders?.topDmanPlayerId)?.name || "—"}</strong></div>
                         <div>Top Rookie: <strong className="text-white">{players.find((p: any) => p.id === selectedSubmission.picks.statLeaders?.topRookiePlayerId)?.name || "—"}</strong></div>
                       </div>
                     </div>
 
                     {/* Trophies */}
                     <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                      <div className="font-bold text-slate-300 mb-1">6. Trofeje:</div>
+                      <div className="font-bold text-slate-300 mb-1">6. Trophies:</div>
                       <div className="grid grid-cols-2 gap-2 text-slate-400">
                         {(selectedSubmission.picks.trophies || []).map((t: any) => (
                           <div key={t.key}>
