@@ -1,5 +1,5 @@
-import { PageHeader, Card } from "@/components/ui";
 import { getLang } from "@/lib/lang-server";
+import RulesClient from "@/components/rules/RulesClient";
 
 export const metadata = { title: "League Rules" };
 
@@ -812,41 +812,11 @@ export default async function RulesPage() {
   const sections = lang === "cs" ? SECTIONS_CS : SECTIONS;
   const tr = lang === "cs" ? RULES_T.cs : RULES_T.en;
   return (
-    <div className="space-y-6 py-2 max-w-4xl">
-      <PageHeader title={tr.title} subtitle={tr.subtitle} />
-
-      {/* quick index */}
-      <Card>
-        <div className="flex flex-wrap gap-2">
-          {sections.map((s) => (
-            <a key={s.id} href={`#${s.id}`} className="text-xs px-2.5 py-1 rounded-full bg-slate-800/70 text-slate-300 hover:bg-blue-600 hover:text-white transition-colors">{s.title}</a>
-          ))}
-        </div>
-      </Card>
-
-      <div className="space-y-5">
-        {sections.map((s) => (
-          <section key={s.id} id={s.id} className="scroll-mt-24">
-            <Card title={s.title} accent="text-blue-400">
-              {s.intro && <p className="text-sm text-slate-400 mb-3">{s.intro}</p>}
-              <div className="space-y-4">
-                {s.groups.map((g, gi) => (
-                  <div key={gi}>
-                    {g.h && <div className="text-xs font-bold uppercase tracking-wide text-emerald-400/90 mb-1.5">{g.h}</div>}
-                    <ul className="space-y-1.5 text-slate-300 text-sm list-disc list-inside marker:text-slate-600">
-                      {g.points.map((p, i) => Array.isArray(p)
-                        ? <ul key={i} className="ml-5 space-y-1 list-[circle] list-inside text-slate-400">{p.map((x, j) => <li key={j}>{x}</li>)}</ul>
-                        : <li key={i}>{p}</li>)}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </section>
-        ))}
-      </div>
-
-      <p className="text-xs text-slate-500 text-center pb-4">{tr.note}</p>
-    </div>
+    <RulesClient
+      sections={sections}
+      title={tr.title}
+      subtitle={tr.subtitle}
+      note={tr.note}
+    />
   );
 }
