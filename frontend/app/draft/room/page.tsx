@@ -167,7 +167,7 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
 
       {round1Opens && Date.now() < round1Opens.getTime() && (
         <div className="rounded-xl border border-blue-700/40 bg-blue-950/20 px-4 py-3 text-sm text-slate-300">
-          🗓️ Draft sa začína <b>{round1Opens.toLocaleString("en-GB", { timeZone: "Europe/Bratislava", dateStyle: "long", timeStyle: "short" })}</b> — 1. kolo sa otvorí automaticky.
+          🗓️ The draft starts <b>{round1Opens.toLocaleString("en-GB", { timeZone: "Europe/Bratislava", dateStyle: "long", timeStyle: "short" })}</b> — round 1 opens automatically.
         </div>
       )}
       {admin && <BonusPickManager teams={bonusTeams} bonus={bonusRows} />}

@@ -120,7 +120,7 @@ export async function GET(req: Request) {
     // 1. Prepare NHL_PLAYERS
     const nhlAoa: any[][] = [
       ["NHL PLAYERS — V10 live model"],
-      ["NHL bucket = latest NHL GP >=10 OR previous NHL GP >=10. Vypočítané Live parametre V10."],
+      ["NHL bucket = latest NHL GP >=10 OR previous NHL GP >=10. Computed Live parameters V10."],
       [],
       [
         "Player",
@@ -155,9 +155,9 @@ export async function GET(req: Request) {
 
     // 2. Prepare AHL_PLAYERS
     const ahlAoa: any[][] = [
-      ["AHL / FARM PLAYERS — V10 (PA/SC zohľadňuje NHL GP)"],
+      ["AHL / FARM PLAYERS — V10 (PA/SC takes NHL GP into account)"],
       [
-        "Hráči s NHL GP podľa pravidla majú PA/SC na úrovni NHL. Chýbajúce GP ≠ 0; pri neoverených údajoch zostanú pôvodné hodnoty.",
+        "By rule, players with NHL GP have PA/SC at NHL level. Missing GP ≠ 0; with unverified data the original values are kept.",
       ],
       [],
       [
@@ -190,7 +190,7 @@ export async function GET(req: Request) {
         "OV",
         "PA pred V9",
         "SC pred V9",
-        "NHL kariéra GP (overené)",
+        "NHL career GP (verified)",
         "Skupina PA/SC V10",
         "PA rozdiel",
         "SC rozdiel",
@@ -311,7 +311,7 @@ export async function GET(req: Request) {
     // 3. Prepare NHL_GOALIES
     const nhlGoaliesAoa: any[][] = [
       ["NHL GOALIES — V10 live model"],
-      ["Brankári v NHL. Vypočítané Live parametre V10 (MoneyPuck & NHL API)."],
+      ["Goalies in the NHL. Computed Live parameters V10 (MoneyPuck & NHL API)."],
       [],
       [
         "Player",
@@ -337,7 +337,7 @@ export async function GET(req: Request) {
         "EX",
         "LD",
         "MO",
-        "OV nový",
+        "OV new",
         "OV baseline",
         "OV rozdiel",
         "SV%",
@@ -353,15 +353,15 @@ export async function GET(req: Request) {
         "SA",
         "GA",
         "xGA",
-        "Kariéra ZČ",
-        "Kariéra PO",
+        "Career RS",
+        "Career PO",
       ],
     ];
 
     // 4. Prepare AHL_GOALIES
     const ahlGoaliesAoa: any[][] = [
       ["AHL / FARM GOALIES — V10 live model"],
-      ["Brankári v AHL/FARM tímoch. Live parametre V10."],
+      ["Goalies on AHL/FARM teams. Live parameters V10."],
       [],
       [
         "Player",
@@ -387,7 +387,7 @@ export async function GET(req: Request) {
         "EX",
         "LD",
         "MO",
-        "OV nový",
+        "OV new",
         "OV baseline",
         "OV rozdiel",
         "SV%",
@@ -403,8 +403,8 @@ export async function GET(req: Request) {
         "SA",
         "GA",
         "xGA",
-        "Kariéra ZČ",
-        "Kariéra PO",
+        "Career RS",
+        "Career PO",
       ],
     ];
 
@@ -505,46 +505,46 @@ export async function GET(req: Request) {
 
     // 5. Prepare CONFIG_V10 info sheet
     const cfgAoa: any[][] = [
-      ["UNHL Live Calculator — Konfigurácia & Parametre"],
+      ["UNHL Live Calculator — Configuration & Parameters"],
       [],
       ["Parameter", "Hodnota"],
-      ["Filter tímov", targetTeamIds ? (teamSlug?.toUpperCase() ?? "Vybraný tím") : "Všetky tímy ligy (ALL)"],
-      ["Aktuálna sezóna", config.latestSeason],
-      ["Predošlá sezóna", config.previousSeason],
-      ["Váha aktuálnej sezóny", `${(config.latestWeight * 100).toFixed(1).replace(/\.0$/, "")} %`],
-      ["Váha predošlej sezóny", `${(config.previousWeight * 100).toFixed(1).replace(/\.0$/, "")} %`],
-      ["Min. GP aktuálna sezóna (NHL prah)", config.nhlGpLatestMin],
-      ["Min. GP predošlá sezóna (NHL prah)", config.nhlGpPrevMin],
-      ["AHL NHLe faktor aktuálny", config.ahlNhleLatest],
-      ["AHL NHLe faktor predošlý", config.ahlNhlePrevious],
+      ["Team filter", targetTeamIds ? (teamSlug?.toUpperCase() ?? "Selected team") : "All league teams (ALL)"],
+      ["Current season", config.latestSeason],
+      ["Previous season", config.previousSeason],
+      ["Current season weight", `${(config.latestWeight * 100).toFixed(1).replace(/\.0$/, "")} %`],
+      ["Previous season weight", `${(config.previousWeight * 100).toFixed(1).replace(/\.0$/, "")} %`],
+      ["Min. GP current season (NHL threshold)", config.nhlGpLatestMin],
+      ["Min. GP previous season (NHL threshold)", config.nhlGpPrevMin],
+      ["AHL NHLe factor current", config.ahlNhleLatest],
+      ["AHL NHLe factor previous", config.ahlNhlePrevious],
       [
-        "Posledný prepočet",
-        config.lastCalculatedAt ? new Date(config.lastCalculatedAt).toLocaleString("en-GB") : "Nikdy",
+        "Last recalculation",
+        config.lastCalculatedAt ? new Date(config.lastCalculatedAt).toLocaleString("en-GB") : "Never",
       ],
       [
-        "Posledná synchronizácia",
-        config.lastSyncedAt ? new Date(config.lastSyncedAt).toLocaleString("en-GB") : "Nikdy",
+        "Last sync",
+        config.lastSyncedAt ? new Date(config.lastSyncedAt).toLocaleString("en-GB") : "Never",
       ],
       [],
-      ["VÁHY KOMPONENTOV (KORČULIARI):"],
+      ["COMPONENT WEIGHTS (SKATERS):"],
       ["Passing (PA)", `A/GP: ${config.weights.pa.apg}, A60 All: ${config.weights.pa.a60All}, A60 5v5: ${config.weights.pa.a60_5v5}`],
       ["Scoring (SC)", `G/GP: ${config.weights.sc.gpg}, G60: ${config.weights.sc.g60}, xG60: ${config.weights.sc.xg60}, Fin: ${config.weights.sc.g_xg60}`],
       ["Defense (DF) Obrancovia", `PK TOI: ${config.weights.dfD.pkToiPg}, xGA: ${config.weights.dfD.xga5}, Rel xGA: ${config.weights.dfD.relXga5}, GA: ${config.weights.dfD.ga5}, Rel xGA PK: ${config.weights.dfD.relXgaPk}, Blk: ${config.weights.dfD.blk60}, xGF%: ${config.weights.dfD.xgfPct}`],
-      ["Defense (DF) Útočníci", `PK TOI: ${config.weights.dfF.pkToiPg}, Rel xGA PK: ${config.weights.dfF.relXgaPk}, Rel xGA: ${config.weights.dfF.relXga5}, xGA: ${config.weights.dfF.xga5}, GA: ${config.weights.dfF.ga5}, xGF%: ${config.weights.dfF.xgfPct}, Blk: ${config.weights.dfF.blk60}`],
+      ["Defense (DF) Forwards", `PK TOI: ${config.weights.dfF.pkToiPg}, Rel xGA PK: ${config.weights.dfF.relXgaPk}, Rel xGA: ${config.weights.dfF.relXga5}, xGA: ${config.weights.dfF.xga5}, GA: ${config.weights.dfF.ga5}, xGF%: ${config.weights.dfF.xgfPct}, Blk: ${config.weights.dfF.blk60}`],
       ["Checking (CK)", `Hits/60: ${config.weights.ck.hit60}, Hits/GP: ${config.weights.ck.hitPg}`],
       ["Discipline (DI)", `Pen Bal: ${config.weights.di.penaltyBalance}, invPIM: ${config.weights.di.invPim60}`],
       ["Skating (SK)", `Bursts >20mph: ${config.weights.sk.edgeBursts20}`],
       ["Strength (ST)", `Weight %: ${config.weights.st.weightPct}`],
       ["Experience (EX)", `Reg GP: ${config.weights.ex.careerRegGP}, PO GP: ${config.weights.ex.careerPoGP}`],
       [],
-      ["VÁHY KOMPONENTOV (BRANKÁRI):"],
+      ["COMPONENT WEIGHTS (GOALIES):"],
       ["Style Control (SC)", `LD SV%: ${config.goalieWeights.sc.ldSv}, MD SV%: ${config.goalieWeights.sc.mdSv}, GSAx/60: ${config.goalieWeights.sc.gsax60}`],
       ["Reaction Time (RT)", `HD SV%: ${config.goalieWeights.rt.hdSv}, HD GSAx: ${config.goalieWeights.rt.hdGsax}`],
       ["Hand Speed (HS)", `HD SV%: ${config.goalieWeights.hs.hdSv}, GSAx/60: ${config.goalieWeights.hs.gsax60}`],
       ["Agility (AG)", `MD SV%: ${config.goalieWeights.ag.mdSv}, HD SV%: ${config.goalieWeights.ag.hdSv}`],
       ["Rebound Control (RB)", `RebCtrl: ${config.goalieWeights.rb.rebCtrl}`],
       ["Endurance (EN)", `Ice time: ${config.goalieWeights.en.icetime}`],
-      ["Size (SZ)", `Výška: ${config.goalieWeights.sz.sz}`],
+      ["Size (SZ)", `Height: ${config.goalieWeights.sz.sz}`],
       ["Experience (EX)", `Reg GP: ${config.goalieWeights.ex.careerRegGP}, PO GP: ${config.goalieWeights.ex.careerPoGP}`],
     ];
 
@@ -602,7 +602,7 @@ export async function GET(req: Request) {
       { wch: 14 }, // GP prev
       { wch: 25 }, // Status
       ...Array(14).fill({ wch: 6 }), // Ratings SK..MO
-      { wch: 9 },  // OV nový
+      { wch: 9 },  // OV new
       { wch: 11 }, // OV baseline
       { wch: 11 }, // OV rozdiel
       { wch: 10 }, // SV%
@@ -618,8 +618,8 @@ export async function GET(req: Request) {
       { wch: 8 },  // SA
       { wch: 8 },  // GA
       { wch: 8 },  // xGA
-      { wch: 12 }, // Kariéra ZČ
-      { wch: 12 }, // Kariéra PO
+      { wch: 12 }, // Career RS
+      { wch: 12 }, // Career PO
     ];
     wsNhlGoalies["!cols"] = goalieCols;
     wsAhlGoalies["!cols"] = goalieCols;

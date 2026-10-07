@@ -2781,7 +2781,7 @@ export async function getLeagueRecords(
         const tmInfo = resolveTeams(entry.teamIds, teamById);
         return {
           rank: idx + 1,
-          name: p ? cleanName(p.name) : "Hráč",
+          name: p ? cleanName(p.name) : "Player",
           slug: p?.slug,
           photoUrl: p?.photoUrl,
           ...tmInfo,
