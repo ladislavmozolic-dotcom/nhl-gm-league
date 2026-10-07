@@ -21,6 +21,7 @@ import RosterComplianceOverlay from "@/components/RosterComplianceOverlay";
 import VisitBeacon from "@/components/VisitBeacon";
 import DeploymentSync from "@/components/DeploymentSync";
 import SiteBanner from "@/components/SiteBanner";
+import TeamNavStrip from "@/components/TeamNavStrip";
 import MegaMenu from "@/components/MegaMenu";
 import SiteFooter from "@/components/SiteFooter";
 import { LangProvider } from "@/components/LangProvider";
@@ -78,6 +79,11 @@ export default async function RootLayout({
   const gm = t ? { nickname: t.gmNickname || t.gm || "GM", slug: t.slug, admin: t.isAdmin, pendingJoins, unreadDm, forumNew } : null;
   const site = await loadSiteConfig();
   const branding = site.branding;
+  const nhlTeams = await prisma.team.findMany({
+    where: { league: "NHL" },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true, code: true, slug: true, logoUrl: true },
+  }).catch(() => []);
   // published, in-menu custom pages become extra top-nav items (key "page:<slug>")
   const customPages = await prisma.customPage.findMany({ where: { published: true, inMenu: true }, orderBy: { order: "asc" }, select: { slug: true, title: true, menuLabel: true } }).catch(() => []);
   const extra = customPages.map((p) => ({ key: `page:${p.slug}`, label: p.menuLabel || p.title, href: `/p/${p.slug}` }));
@@ -167,6 +173,7 @@ export default async function RootLayout({
           {gm && <RosterComplianceOverlay />}
           {!gm && <SessionResume />}
           <SiteBanner branding={branding} />
+          <TeamNavStrip teams={nhlTeams} />
           <MegaMenu gm={gm} items={menu} lang={lang} light={branding.navLight} hideForum={hideForum} />
           <main className="pt-4 pb-16 max-w-[1400px] mx-auto px-4 w-full flex-1">{children}</main>
           <SiteFooter branding={branding} />
