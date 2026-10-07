@@ -4,6 +4,7 @@ import type { Lang } from "@/lib/i18n";
 const SECTIONS = [
   { key: "league", labelEn: "League Overview", labelSk: "Prehľad ligy", href: "/finance", icon: "🌐" },
   { key: "dashboard", labelEn: "Club Dashboard", labelSk: "Klubový pult", href: "/finance/dashboard", icon: "📊" },
+  { key: "fines-rewards", labelEn: "Fines & Rewards", labelSk: "Odmeny & Pokuty", href: "/finance/fines-rewards", icon: "⚖️" },
   { key: "fan-interest", labelEn: "Fan Interest", labelSk: "Záujem fanúšikov", href: "/finance/fan-interest", icon: "🎟" },
   { key: "season-tickets", labelEn: "Season Tickets", labelSk: "Permanentky", href: "/finance/season-tickets", icon: "🎫" },
   { key: "attendance", labelEn: "Attendance", labelSk: "Návštevnosť", href: "/finance/attendance", icon: "🏟" },

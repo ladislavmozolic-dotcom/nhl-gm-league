@@ -208,6 +208,7 @@ export async function getGamePicksData(season = REGULAR_SEASON, league = "NHL", 
       awayTeam: g.awayTeam,
       homeGoals: g.homeGoals,
       awayGoals: g.awayGoals,
+      endedIn: g.endedIn,
       winnerTeamId,
       isLocked,
       isHomeUpset: config.upsetTeamIds.includes(g.homeTeamId),
@@ -299,6 +300,7 @@ export async function getGamePicksData(season = REGULAR_SEASON, league = "NHL", 
           teamId: viewerTeamId,
           gameId: { in: allGameIds },
         },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       })
     : [];
 

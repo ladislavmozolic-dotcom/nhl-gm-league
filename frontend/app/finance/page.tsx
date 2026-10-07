@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { loadSettings } from "@/lib/sim/settings";
 import { computeStandings } from "@/lib/sim/standings";
@@ -7,12 +8,13 @@ import { PageHeader } from "@/components/ui";
 import FinanceNav from "@/components/FinanceNav";
 import { leagueDetailedFinance } from "@/lib/detailed-finance-server";
 import { getLang } from "@/lib/lang-server";
+import { bankBalance } from "@/lib/league-bank-server";
 
 export const dynamic = "force-dynamic";
 const SEASON = "2026-27";
 
 export default async function FinancePage() {
-  const [teams, settings, standings, homeCounts, lang] = await Promise.all([
+  const [teams, settings, standings, homeCounts, lang, bankBal, fineCount] = await Promise.all([
     prisma.team.findMany({
       where: { league: "NHL", isAffiliate: false },
       select: {
@@ -31,6 +33,8 @@ export default async function FinancePage() {
       _count: { _all: true },
     }),
     getLang(),
+    bankBalance(),
+    prisma.leagueBankEntry.count(),
   ]);
 
   const stById = new Map(standings.map((s) => [s.teamId, s]));
@@ -109,6 +113,35 @@ export default async function FinancePage() {
         }
       />
       <FinanceNav current="league" lang={lang} />
+
+      {/* League Bank & Fines/Rewards Highlight Banner */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-gradient-to-r from-slate-900/90 via-slate-900/70 to-slate-950 border border-slate-800 shadow-md backdrop-blur">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center text-lg shrink-0">
+            ⚖️
+          </div>
+          <div>
+            <div className="text-xs font-bold text-white flex items-center gap-2">
+              <span>{isSk ? "Ligová pokladňa, odmeny a sankcie" : "League Bank, Rewards & Penalties"}</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono font-bold">
+                {money(bankBal)}
+              </span>
+            </div>
+            <div className="text-[11px] text-slate-400 mt-0.5">
+              {isSk
+                ? `${fineCount} zaznamenaných operácií (pokuty za súpisky, platový strop a odmeny).`
+                : `${fineCount} recorded movements (roster fines, cap penalties and rewards).`}
+            </div>
+          </div>
+        </div>
+        <Link
+          href="/finance/fines-rewards"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 text-xs font-bold transition-all shadow-sm shrink-0"
+        >
+          <span>{isSk ? "Prezrieť odmeny & pokuty →" : "View Fines & Rewards →"}</span>
+        </Link>
+      </div>
+
       <FinanceTable rows={rows} lang={lang} />
     </div>
   );

@@ -55,6 +55,7 @@ export const DEFAULT_MENU: MenuItem[] = [
     { label: "💰 Finance", href: "/finance", children: [
       { label: "🏦 Finance (bank & income)", href: "/finance" },
       { label: "🧢 Salary Cap (Cap Central)", href: "/salary-cap" },
+      { label: "⚖️ Fines & Rewards (Pokuty a odmeny)", href: "/finance/fines-rewards" },
       { label: "🎟️ Season Tickets — league", href: "/finance/season-tickets" },
       { label: "🏟️ Attendance — league", href: "/finance/attendance" },
       { label: "🛍️ Merchandise — league", href: "/finance/merchandise" },
