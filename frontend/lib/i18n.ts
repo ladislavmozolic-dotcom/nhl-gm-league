@@ -419,6 +419,29 @@ export const DICT: Dict = {
   "player.noGamesInSeason": { en: "No games played in season", cs: "Žiadne odohrané zápasy v sezóne", de: "Keine Spiele in Saison", ru: "Нет матчей в сезоне" },
   "player.stolenGames": { en: "stolen games", cs: "ukradnuté zápasy", de: "gestohlene Spiele", ru: "украденные матчи" },
   "player.stealBadge": { en: "Steal — high goalie impact win", cs: "Ukradnutý zápas (Steal)", de: "Steal — Torhüter-Sieg", ru: "Украденный матч вратарем" },
+
+  // Schedule page
+  "schedule.title": { en: "Schedule", cs: "Rozpis zápasov", de: "Spielplan", ru: "Расписание" },
+  "schedule.subtitle": { en: "games • played", cs: "zápasov • odohraných", de: "Spiele • gespielt", ru: "матчей • сыграно" },
+  "schedule.allTeams": { en: "All Teams", cs: "Všetky tímy", de: "Alle Teams", ru: "Все команды" },
+  "schedule.filterTeam": { en: "Filter by team...", cs: "Filtrovať tím...", de: "Team filtern...", ru: "Фильтр по команде..." },
+  "schedule.allMonths": { en: "All Months", cs: "Všetky mesiace", de: "Alle Monate", ru: "Все месяцы" },
+  "schedule.statusAll": { en: "All Games", cs: "Všetky zápasy", de: "Alle Spiele", ru: "Все матчи" },
+  "schedule.statusUpcoming": { en: "Upcoming", cs: "Nasledujúce", de: "Kommende", ru: "Предстоящие" },
+  "schedule.statusCompleted": { en: "Completed", cs: "Odohrané", de: "Beendet", ru: "Завершенные" },
+  "schedule.jumpToCurrent": { en: "Current Day", cs: "Aktuálny hrací deň", de: "Aktueller Spieltag", ru: "Текущий день" },
+  "schedule.noGamesFound": { en: "No games found matching your filters.", cs: "Nenašli sa žiadne zápasy zodpovedajúce filtrom.", de: "Keine Spiele gefunden.", ru: "Матчи не найдены." },
+  "schedule.noGamesScheduled": { en: "No games scheduled yet.", cs: "Zatiaľ nie sú naplánované žiadne zápasy.", de: "Noch keine Spiele geplant.", ru: "Матчи еще не запланированы." },
+  "schedule.preseasonBadge": { en: "PRE-SEASON", cs: "PRÍPRAVA", de: "VORSAISON", ru: "ПРЕДСЕЗОН" },
+  "schedule.boxscore": { en: "Boxscore", cs: "Zápis", de: "Spielbericht", ru: "Отчет" },
+  "schedule.scheduled": { en: "SCHEDULED", cs: "NA PROGRAME", de: "ANGESETZT", ru: "ЗАПЛАНИРОВАНО" },
+  "schedule.final": { en: "FINAL", cs: "KONIEC", de: "ENDE", ru: "ФИНАЛ" },
+  "schedule.gamesCount": { en: "games", cs: "zápasov", de: "Spiele", ru: "матчей" },
+  "schedule.oneGame": { en: "game", cs: "zápas", de: "Spiel", ru: "матч" },
+  "schedule.statTotal": { en: "Total Games", cs: "Celkovo zápasov", de: "Spiele gesamt", ru: "Всего матчей" },
+  "schedule.statPlayed": { en: "Completed", cs: "Odohraných", de: "Gespielt", ru: "Сыграно" },
+  "schedule.statRemaining": { en: "Remaining", cs: "Zostáva", de: "Verbleibend", ru: "Осталось" },
+  "schedule.statNextDate": { en: "Next Game Day", cs: "Najbližší hrací deň", de: "Nächster Spieltag", ru: "Следующий тур" },
 };
 
 /** Translate "section.key" into `lang`, with English then key as fallbacks. */
