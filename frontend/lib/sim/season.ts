@@ -12,7 +12,7 @@ import { prisma } from "../prisma";
 import { loadSimTeam } from "./index";
 import { simulateGame } from "./engine";
 import { saveGameResult } from "./persist";
-import { fixtureSeed } from "./rng";
+import { secureSeed } from "./secure-seed";
 import { loadSettings, type EngineSettings } from "./settings";
 import { activeSimEngine, engineVersionFor } from "./version";
 import { pairSig, unitPairs } from "./chemistry";
@@ -420,7 +420,7 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
     // Seed folds in the game row id + its sim count, so a RE-SIM (simCount++) and a
     // fresh schedule rebuild (new row id) each re-roll the result, while replaying
     // the very same row unchanged stays reproducible.
-    const seed = fixtureSeed(gm.homeTeamId, gm.awayTeamId, round + (gm.simCount ?? 0) * 1_000_003 + gm.id * 7);
+    const seed = secureSeed(); // unpredictable, drawn at sim time (lib/sim/secure-seed.ts)
     const rivalry = home.rivalTeamIds.includes(away.id) || away.rivalTeamIds.includes(home.id);
     const crew = crews.get(gm.id);
     const crowd = crowdOf(gm);
@@ -507,6 +507,9 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
       where: { id: { in: skippedIds } },
       data: { status: "FINAL", homeGoals: 0, awayGoals: 0, endedIn: "REG", playedAt: new Date(), lastSimBy: "No contest (roster unavailable)" },
     });
+    // sealed too, so a no-contest can't be confused with (or swapped for) a simulated result
+    const { sealGame } = await import("../integrity-server");
+    await prisma.$transaction(async (tx) => { for (const id of skippedIds) await sealGame(tx, id, "NO_CONTEST"); });
   }
 
   // persist final CON + morale back to the players (goalies + skaters), using the

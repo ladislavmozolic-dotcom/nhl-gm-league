@@ -18,7 +18,10 @@ export default function GameIntegrity({ engineVersion, seed, simCount, lastSimBy
         <div><div className="text-[11px] uppercase tracking-wide text-slate-500">When</div><div className="text-slate-200">{when ?? "—"}</div></div>
       </div>
       {resimmed && <p className="mt-2 text-[11px] text-amber-400/80">This game was simulated more than once. The result shown is the most recent run — see the League Audit Log for the full history.</p>}
-      <p className="mt-2 text-[11px] text-slate-600">Same engine + seed + rosters always reproduces this exact game. Results are logged and can&apos;t be silently re-rolled.</p>
+      <p className="mt-2 text-[11px] text-slate-600">
+        Produced by the simulation engine from a random seed drawn at the moment of simulation — it can&apos;t be known or planned in advance — and sealed in a tamper-evident hash chain.{" "}
+        <a href="/league/integrity" className="text-sky-500 hover:underline">Verify result integrity →</a>
+      </p>
     </div>
   );
 }

@@ -285,3 +285,14 @@ export async function autoSyncWorldLeaguesIfDue(now: Date = new Date()): Promise
   return { ran: true, timestamp: res.timestamp };
 }
 
+
+
+/** Every 5-minute tick: one-time legacy sealing of results that predate the seal chain, then one public
+ *  chain-head checkpoint per Bratislava day (from 08:00). Idempotent. */
+export async function integrityTick(now: Date = new Date()) {
+  const { backfillLegacySeals, postDailyCheckpoint } = await import("@/lib/integrity-server");
+  const sealedLegacy = await backfillLegacySeals();
+  const { dateStr, hour } = bratislavaParts(now);
+  const checkpoint = hour >= 8 ? await postDailyCheckpoint(dateStr) : false;
+  return { sealedLegacy, checkpoint };
+}

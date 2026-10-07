@@ -14,6 +14,7 @@ import {
   autoEvaluateGamePicksIfDue,
   enforceLeagueBankIfDue,
   autoSyncWorldLeaguesIfDue,
+  integrityTick,
 } from "@/lib/season-cron";
 
 export async function POST(req: NextRequest) {
@@ -37,5 +38,6 @@ export async function POST(req: NextRequest) {
   const gamePicks = await autoEvaluateGamePicksIfDue(now).catch((e) => `error: ${(e as Error).message}`);
   const leagueBank = await enforceLeagueBankIfDue(now).catch((e) => `error: ${(e as Error).message}`);
   const worldLeagues = await autoSyncWorldLeaguesIfDue(now).catch((e) => `error: ${(e as Error).message}`);
-  return NextResponse.json({ ...result, rollover, frenzy, declinedCleanup, allStar, deadline, gamePicks, leagueBank, worldLeagues });
+  const integrity = await integrityTick(now).catch((e) => `error: ${(e as Error).message}`);
+  return NextResponse.json({ ...result, rollover, frenzy, declinedCleanup, allStar, deadline, gamePicks, leagueBank, worldLeagues, integrity });
 }

@@ -1286,6 +1286,25 @@ model GameAudit {
   @@index([createdAt])
 }
 
+// Tamper-evident seal on every simulated result (lib/integrity-server.ts). Written in the
+// SAME transaction that saves the game, chained by SHA-256 (hash = H(prevHash | resultDigest |
+// gameId | seed | engine | source | sealedAt)). Editing a result or a seal afterwards breaks the
+// check on /league/integrity. seedSource: CSPRNG = random seed drawn by the server at sim time;
+// LEGACY = result that already existed when sealing was introduced (sealed as-is, not at sim time).
+model GameSeal {
+  id            Int      @id @default(autoincrement())
+  gameId        Int
+  seed          Int?
+  engineVersion String?
+  seedSource    String // CSPRNG | LEGACY | NO_CONTEST | GENESIS (marker)
+  resultDigest  String // SHA-256 of the canonical result (score, periods, shots, winner, goal list)
+  prevHash      String
+  hash          String   @unique
+  sealedAt      DateTime @default(now())
+
+  @@index([gameId])
+}
+
 // UNHL Intelligence — Commissioner Intelligence (Phase 7, admin-only). One row
 // per admin view of the leaguewide integrity/consistency scan — the feature's
 // design doc requires every commissioner query to be audit-logged, same

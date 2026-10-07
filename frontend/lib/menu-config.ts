@@ -98,6 +98,7 @@ export const DEFAULT_MENU: MenuItem[] = [
     { label: "🔄 Player Data Refresh", href: "/tools/player-data" },
     { label: "📊 Parameters", href: "/league/parameters" },
     { label: "🔍 Audit Log", href: "/league/audit" },
+    { label: "🔒 Result Integrity", href: "/league/integrity" },
   ] },
   { key: "ahl", label: "AHL", href: "/ahl", children: [
     { label: "🏒 AHL Teams", href: "/ahl" },

@@ -5,6 +5,7 @@ import { prisma } from "../prisma";
 import type { GameResult, TeamBox } from "./types";
 import type { TeamLinesData } from "./lines-core";
 import { cleanName } from "../playerName";
+import { sealGame } from "../integrity-server";
 
 export type GameMeta = {
   season?: string;
@@ -183,6 +184,9 @@ export async function saveGameResult(result: GameResult, meta: GameMeta = {}) {
     if (result.goals.length) await tx.gameGoal.createMany({ data: goalRows(gameId) });
     if (result.penalties.length) await tx.gamePenalty.createMany({ data: penaltyRows(gameId) });
     if (result.events?.length) await tx.gameEvent.createMany({ data: eventRows(gameId) });
+
+    // tamper-evident seal, in the same transaction as the result (see lib/integrity-server.ts)
+    await sealGame(tx, gameId, "CSPRNG");
 
     return gameId;
   });

@@ -6,7 +6,7 @@ import { prisma } from "./../prisma";
 import { loadSimTeam } from "./index";
 import { simulateGame } from "./engine";
 import { saveGameResult } from "./persist";
-import { fixtureSeed } from "./rng";
+import { secureSeed } from "./secure-seed";
 import { loadSettings } from "./settings";
 import { activeSimEngine, engineVersionFor } from "./version";
 import { computeStandings } from "./standings";
@@ -117,7 +117,7 @@ export async function playSeries(seriesId: number, season: string) {
     const highHome = HOME_2211[gameNum] ?? true;
     const home = highHome ? high : low;
     const away = highHome ? low : high;
-    const seed = fixtureSeed(seriesId * 101 + gameNum, s.highSeedTeamId, s.round);
+    const seed = secureSeed(); // unpredictable, drawn at sim time (lib/sim/secure-seed.ts)
     const result = simulateGame(home, away, { seed, settings, noShootout: true, engineVersion });
     // date the game so it lands on the schedule: playoffs open after the regular
     // season (~day 200), each round two weeks later, series games every other day.
@@ -260,7 +260,7 @@ export async function advancePlayoffDay(season: string, league: string, dayStart
     const highHome = HOME_2211[(g.gameNum ?? 1) - 1] ?? true;
     const [high, low] = await Promise.all([getTeam(s.highSeedTeamId), getTeam(s.lowSeedTeamId)]);
     const home = highHome ? high : low, away = highHome ? low : high;
-    const seed = fixtureSeed(s.id * 101 + (g.gameNum ?? 1), s.highSeedTeamId, s.round);
+    const seed = secureSeed(); // unpredictable, drawn at sim time (lib/sim/secure-seed.ts)
     const crew = crews.get(g.id);
     const result = simulateGame(home, away, { seed, settings, noShootout: true, engineVersion, officials: crew ? { penaltyMult: crew.penaltyMult, evenUp: crew.evenUp } : undefined, crowd: league === "NHL" ? { fill: 1 } : undefined });
     if (crew) await prisma.game.update({ where: { id: g.id }, data: { officialIds: crew.ids } }).catch(() => {});

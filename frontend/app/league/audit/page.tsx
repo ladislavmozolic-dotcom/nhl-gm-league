@@ -10,7 +10,7 @@ export default async function AuditLogPage() {
 
   return (
     <div className="space-y-5 py-2">
-      <PageHeader title="League Audit Log" subtitle="Every simulation on record — who ran it, the engine version and the RNG seed. Results are reproducible and can't be silently re-rolled." />
+      <PageHeader title="League Audit Log" subtitle={<>Every simulation on record — who ran it, the engine version and the RNG seed. Results are sealed in a tamper-evident chain — <Link href="/league/integrity" className="text-sky-400 hover:underline">verify result integrity</Link>.</>} />
 
       <div className="flex flex-wrap gap-3 text-sm">
         <span className="rounded-lg bg-slate-800/60 px-3 py-1.5">{rows.length} entries</span>

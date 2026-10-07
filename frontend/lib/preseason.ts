@@ -8,7 +8,8 @@
 
 import { prisma } from "./prisma";
 import { assignCrews, type Crew } from "./officials-server";
-import { loadSimTeam, fixtureSeed } from "./sim";
+import { loadSimTeam } from "./sim";
+import { secureSeed } from "./sim/secure-seed";
 import { simulateGame } from "./sim/engine";
 import { saveGameResult } from "./sim/persist";
 import { evolveChem, injuryConTarget, syncChem, updateInjuryCon } from "./sim/season";
@@ -273,7 +274,7 @@ async function simPreseason(where: object, actor: string): Promise<{ played: num
       }
       syncChem(team, settings.chemistryBase);
     }
-    const seed = fixtureSeed(gm.homeTeamId, gm.awayTeamId, (gm.round ?? 0) + gm.id * 7);
+    const seed = secureSeed(); // unpredictable, drawn at sim time (lib/sim/secure-seed.ts)
     const rivalry = home.rivalTeamIds.includes(away.id) || away.rivalTeamIds.includes(home.id);
     const league = gm.league === "AHL" ? "AHL" : "NHL";
     const crew = await crewFor(gm);
