@@ -24,35 +24,35 @@ export const METRIC_SOURCES: Record<MetricSource, MetricSourceMeta> = {
     name: "NHL API / Boxscore",
     badge: "NHL",
     color: "text-sky-400 bg-sky-500/10 border-sky-500/30",
-    description: "Oficiálne zápasové štatistiky a herné situácie (TOI, oslabenia, buly, hity, bloky, +/-).",
+    description: "Official game statistics and game situations (TOI, penalty kills, faceoffs, hits, blocks, +/-).",
   },
   moneypuck: {
     id: "moneypuck",
     name: "MoneyPuck Analytics",
     badge: "MoneyPuck",
     color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/30",
-    description: "Pokročilá analytika (xG, relatívne xGA 5v5/oslabenia, finishing, primárne asistencie).",
+    description: "Advanced analytics (xG, relative xGA 5v5/PK, finishing, primary assists).",
   },
   edge: {
     id: "edge",
     name: "NHL EDGE Tracking",
     badge: "EDGE",
     color: "text-teal-400 bg-teal-500/10 border-teal-500/30",
-    description: "Senzorové merania pohybu (rýchlostné šprinty > 20 mph, maximálna rýchlosť, vzdialenosť).",
+    description: "Sensor movement measurements (speed bursts > 20 mph, top speed, distance).",
   },
   ahl: {
     id: "ahl",
     name: "AHL HockeyTech",
     badge: "AHL",
     color: "text-purple-400 bg-purple-500/10 border-purple-500/30",
-    description: "Oficiálne dáta z AHL s možnosťou aplikácie NHLe koeficientov.",
+    description: "Official AHL data with the option to apply NHLe coefficients.",
   },
   bio: {
     id: "bio",
-    name: "Biometria & Kariéra",
+    name: "Biometrics & Career",
     badge: "BIO",
     color: "text-amber-400 bg-amber-500/10 border-amber-500/30",
-    description: "Fyzické a kariérne atribúty (hmotnosť, vek, odohraté zápasy ZČ a play-off).",
+    description: "Physical and career attributes (weight, age, regular-season and playoff games played).",
   },
 };
 
@@ -108,9 +108,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   // ========================= NHL API =========================
   {
     key: "teamPkToiPg",
-    label: "Team PK TOI/GP (Tímový čas v oslabení / zápas)",
+    label: "Team PK TOI/GP",
     source: "nhl",
-    description: "Priemerný čas za zápas, ktorý tím strávi v oslabení (v sekundách alebo minútach).",
+    description: "Average time per game the team spends shorthanded (in seconds or minutes).",
     defaultInvert: false,
     unit: "min/GP",
     getValue: (p, cfg) => {
@@ -123,9 +123,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "playerPkToiPg",
-    label: "Player PK TOI/GP (Hráčov čas v oslabení / zápas)",
+    label: "Player PK TOI/GP",
     source: "nhl",
-    description: "Priemerný čas hráča na ľade v oslabeniach za zápas.",
+    description: "Average time the player spends on ice shorthanded per game.",
     defaultInvert: false,
     unit: "min/GP",
     getValue: (p, cfg) => {
@@ -138,9 +138,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "totalToiPg",
-    label: "Total TOI/GP (Celkový čas na ľade / zápas)",
+    label: "Total TOI/GP",
     source: "nhl",
-    description: "Priemerný celkový čas na ľade za zápas vo všetkých herných situáciách.",
+    description: "Average total time on ice per game in all game situations.",
     defaultInvert: false,
     unit: "min/GP",
     getValue: (p, cfg) => {
@@ -153,9 +153,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "foPct",
-    label: "Faceoff % (Úspešnosť na vhadzovaniach)",
+    label: "Faceoff %",
     source: "nhl",
-    description: "Percentuálna úspešnosť na vhadzovaniach (centri).",
+    description: "Faceoff win percentage (centers).",
     defaultInvert: false,
     unit: "%",
     getValue: (p, cfg) => {
@@ -166,9 +166,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "tk60",
-    label: "Takeaways / 60 (Získané puky na 60 min)",
+    label: "Takeaways / 60",
     source: "nhl",
-    description: "Počet odobratých pukov súperovi v prepočte na 60 minút ľadu.",
+    description: "Number of pucks taken from the opponent per 60 minutes on ice.",
     defaultInvert: false,
     unit: "/60 min",
     getValue: (p, cfg) => {
@@ -183,9 +183,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "gv60",
-    label: "Giveaways / 60 (Stratené puky na 60 min)",
+    label: "Giveaways / 60",
     source: "nhl",
-    description: "Počet stratených pukov na 60 minút ľadu (nižšie je lepšie).",
+    description: "Number of pucks lost per 60 minutes on ice (lower is better).",
     defaultInvert: true,
     unit: "/60 min",
     getValue: (p, cfg) => {
@@ -200,9 +200,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "pmPg",
-    label: "+/- per Game (Plus/Mínus na zápas)",
+    label: "+/- per Game",
     source: "nhl",
-    description: "Bilancia účasti pri strelených a inkasovaných góloch na zápas.",
+    description: "Balance of involvement in goals scored and allowed per game.",
     defaultInvert: false,
     unit: "+/- / GP",
     getValue: (p, cfg) => {
@@ -215,9 +215,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "pimPg",
-    label: "PIM / GP (Trestné minúty na zápas)",
+    label: "PIM / GP",
     source: "nhl",
-    description: "Trestné minúty na zápas (menej je lepšie).",
+    description: "Penalty minutes per game (less is better).",
     defaultInvert: true,
     unit: "min/GP",
     getValue: (p, cfg) => {
@@ -230,9 +230,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "ppgPg",
-    label: "Powerplay Goals / GP (Presilovkové góly)",
+    label: "Powerplay Goals / GP",
     source: "nhl",
-    description: "Góly strelené v početnej výhode za zápas.",
+    description: "Goals scored on the power play per game.",
     defaultInvert: false,
     unit: "G/GP",
     getValue: (p, cfg) => {
@@ -245,9 +245,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "shotsPg",
-    label: "Shots / GP (Strely na bránu na zápas)",
+    label: "Shots / GP",
     source: "nhl",
-    description: "Priemerný počet striel na bránu za zápas.",
+    description: "Average number of shots on goal per game.",
     defaultInvert: false,
     unit: "S/GP",
     getValue: (p, cfg) => {
@@ -260,9 +260,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "hitsPg",
-    label: "Hits / GP (Hity na zápas)",
+    label: "Hits / GP",
     source: "nhl",
-    description: "Priemerný počet rozdaných hitov / bodyčekov za zápas.",
+    description: "Average number of hits delivered per game.",
     defaultInvert: false,
     unit: "Hits/GP",
     getValue: (p, cfg) => {
@@ -275,9 +275,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "blocksPg",
-    label: "Blocks / GP (Zblokované strely na zápas)",
+    label: "Blocks / GP",
     source: "nhl",
-    description: "Priemerný počet zblokovaných striel súpera za zápas.",
+    description: "Average number of opponent shots blocked per game.",
     defaultInvert: false,
     unit: "Blk/GP",
     getValue: (p, cfg) => {
@@ -292,9 +292,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   // ========================= MONEYPUCK =========================
   {
     key: "xga5",
-    label: "On-Ice xGA/60 5v5 (Očakávané góly proti 5v5)",
+    label: "On-Ice xGA/60 5v5",
     source: "moneypuck",
-    description: "Očakávané inkasované góly súpera za 60 minút pri hre 5 na 5.",
+    description: "Opponent's expected goals against per 60 minutes at 5-on-5.",
     defaultInvert: true,
     unit: "xGA/60",
     getValue: (p, cfg) => {
@@ -308,9 +308,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "offXga5",
-    label: "Off-Ice xGA/60 5v5 (xGA súpera keď hráč sedí)",
+    label: "Off-Ice xGA/60 5v5",
     source: "moneypuck",
-    description: "Defenzívna úroveň tímu, keď hráč nie je na ľade pri hre 5v5.",
+    description: "The team's defensive level when the player is off the ice at 5v5.",
     defaultInvert: false,
     unit: "xGA/60",
     getValue: (p, cfg) => {
@@ -324,9 +324,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "relXga5",
-    label: "Rel xGA/60 5v5 (Relatívne xGA tímu 5v5)",
+    label: "Rel xGA/60 5v5",
     source: "moneypuck",
-    description: "Rozdiel v očakávaných góloch súpera s ním vs bez neho pri hre 5v5.",
+    description: "Difference in the opponent's expected goals with him vs without him at 5v5.",
     defaultInvert: true,
     unit: "Rel xGA/60",
     getValue: (p, cfg) => {
@@ -345,9 +345,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "ga5",
-    label: "On-Ice GA/60 5v5 (Reálne inkasované góly 5v5)",
+    label: "On-Ice GA/60 5v5",
     source: "moneypuck",
-    description: "Skutočné góly inkasované tímom za 60 minút pri hre 5 na 5.",
+    description: "Actual goals allowed by the team per 60 minutes at 5-on-5.",
     defaultInvert: true,
     unit: "GA/60",
     getValue: (p, cfg) => {
@@ -361,9 +361,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "relGa5",
-    label: "Rel GA/60 5v5 (Relatívne inkasované góly 5v5)",
+    label: "Rel GA/60 5v5",
     source: "moneypuck",
-    description: "Rozdiel v reálnych góloch súpera na ľade vs mimo neho.",
+    description: "Difference in the opponent's real goals on ice vs off ice.",
     defaultInvert: true,
     unit: "Rel GA/60",
     getValue: (p, cfg) => {
@@ -382,9 +382,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "xgaPk",
-    label: "On-Ice xGA/60 PK (xGA súpera v oslabení 4v5)",
+    label: "On-Ice xGA/60 PK",
     source: "moneypuck",
-    description: "Očakávané góly súpera v oslabení na 60 minút.",
+    description: "Opponent's expected goals while shorthanded per 60 minutes.",
     defaultInvert: true,
     unit: "xGA/60",
     getValue: (p, cfg) => {
@@ -398,9 +398,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "relXgaPk",
-    label: "Rel xGA/60 PK (Relatívne xGA v oslabení)",
+    label: "Rel xGA/60 PK",
     source: "moneypuck",
-    description: "Rozdiel v xGA oslabenia tímu s ním vs bez neho.",
+    description: "Difference in the team's penalty-kill xGA with him vs without him.",
     defaultInvert: true,
     unit: "Rel xGA/60",
     getValue: (p, cfg) => {
@@ -419,9 +419,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "xgfPct",
-    label: "xGF% 5v5 (Podiel očakávaných gólov 5v5)",
+    label: "xGF% 5v5",
     source: "moneypuck",
-    description: "Percentuálny podiel očakávaných gólov tímu 5 na 5 (>50% = prevaha tímu).",
+    description: "The team's expected-goals share at 5-on-5 (>50% = team dominance).",
     defaultInvert: false,
     unit: "%",
     getValue: (p, cfg) => {
@@ -439,9 +439,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "ixg60",
-    label: "ixG/60 (Individuálne očakávané góly / 60 min)",
+    label: "ixG/60",
     source: "moneypuck",
-    description: "Kvalita a objem vlastných streleckých šancí hráča za 60 minút.",
+    description: "Quality and volume of the player's own scoring chances per 60 minutes.",
     defaultInvert: false,
     unit: "ixG/60",
     getValue: (p, cfg) => {
@@ -455,9 +455,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "g_xg60",
-    label: "(G - xG)/60 (Finishing / efektivita streľby)",
+    label: "(G - xG)/60",
     source: "moneypuck",
-    description: "Rozdiel medzi skutočnými a očakávanými gólmi (efektivita zakončenia).",
+    description: "Difference between actual and expected goals (finishing efficiency).",
     defaultInvert: false,
     unit: "G-xG/60",
     getValue: (p, cfg) => {
@@ -471,9 +471,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "a1_5v5_60",
-    label: "Primary Assists / 60 5v5 (Prvé asistencie 5v5)",
+    label: "Primary Assists / 60 5v5",
     source: "moneypuck",
-    description: "Priame gólové prihrávky pri rovnovážnom stave 5 na 5 za 60 minút.",
+    description: "Primary goal passes at even strength 5-on-5 per 60 minutes.",
     defaultInvert: false,
     unit: "A1/60",
     getValue: (p, cfg) => {
@@ -487,9 +487,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "a2_5v5_60",
-    label: "Secondary Assists / 60 5v5 (Druhé asistencie 5v5)",
+    label: "Secondary Assists / 60 5v5",
     source: "moneypuck",
-    description: "Sekundárne prihrávky pri rovnovážnom stave 5 na 5 za 60 minút.",
+    description: "Secondary passes at even strength 5-on-5 per 60 minutes.",
     defaultInvert: false,
     unit: "A2/60",
     getValue: (p, cfg) => {
@@ -503,9 +503,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "ppa1_60",
-    label: "PP Primary Assists / 60 (Presilovkové primárne asistencie)",
+    label: "PP Primary Assists / 60",
     source: "moneypuck",
-    description: "Priame gólové nahrávky v presilovkách za 60 minút.",
+    description: "Primary goal assists on the power play per 60 minutes.",
     defaultInvert: false,
     unit: "PPA1/60",
     getValue: (p, cfg) => {
@@ -519,9 +519,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "ong60",
-    label: "On-Ice Goals For / 60 (Góly tímu na ľade)",
+    label: "On-Ice Goals For / 60",
     source: "moneypuck",
-    description: "Góly strelené tímom, keď je hráč na ľade (za 60 minút).",
+    description: "Goals scored by the team while the player is on ice (per 60 minutes).",
     defaultInvert: false,
     unit: "GF/60",
     getValue: (p, cfg) => {
@@ -535,9 +535,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "onga60",
-    label: "On-Ice Goals Against / 60 (Inkasované góly celkovo)",
+    label: "On-Ice Goals Against / 60",
     source: "moneypuck",
-    description: "Góly inkasované tímom za 60 minút, keď je hráč na ľade (menej je lepšie).",
+    description: "Goals allowed by the team per 60 minutes while the player is on ice (less is better).",
     defaultInvert: true,
     unit: "GA/60",
     getValue: (p, cfg) => {
@@ -551,9 +551,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "mpPenaltiesDrawnPg",
-    label: "Penalties Drawn / GP (Vybojované presilovky na zápas)",
+    label: "Penalties Drawn / GP",
     source: "moneypuck",
-    description: "Počet vybojovaných faulov/presiloviek pre tím v prepočte na zápas.",
+    description: "Number of penalties/power plays drawn for the team per game.",
     defaultInvert: false,
     unit: "fauly/GP",
     getValue: (p, cfg) => {
@@ -567,9 +567,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "mpPenaltiesDrawn60",
-    label: "Penalties Drawn / 60 (Vybojované presilovky / 60 min)",
+    label: "Penalties Drawn / 60",
     source: "moneypuck",
-    description: "Frekvencia vybojovaných faulov/presiloviek súpera za 60 minút na ľade.",
+    description: "Frequency of opponent penalties/power plays drawn per 60 minutes on ice.",
     defaultInvert: false,
     unit: "fauly/60",
     getValue: (p, cfg) => {
@@ -583,9 +583,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "mpPenaltiesTakenPg",
-    label: "Penalties Taken / GP (Spáchané fauly na zápas)",
+    label: "Penalties Taken / GP",
     source: "moneypuck",
-    description: "Počet menších a väčších trestov udelených hráčovi na zápas (menej = lepšie).",
+    description: "Number of minor and major penalties assessed to the player per game (less = better).",
     defaultInvert: true,
     unit: "fauly/GP",
     getValue: (p, cfg) => {
@@ -599,9 +599,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "mpPenaltiesTaken60",
-    label: "Penalties Taken / 60 (Spáchané fauly / 60 min)",
+    label: "Penalties Taken / 60",
     source: "moneypuck",
-    description: "Frekvencia udelených trestov za 60 minút na ľade (menej = lepšie).",
+    description: "Frequency of penalties assessed per 60 minutes on ice (less = better).",
     defaultInvert: true,
     unit: "fauly/60",
     getValue: (p, cfg) => {
@@ -615,9 +615,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "mpPenaltyBalance",
-    label: "Net Penalties / 60 (Čistá bilancia faulov Drawn − Taken)",
+    label: "Net Penalties / 60",
     source: "moneypuck",
-    description: "Rozdiel medzi vybojovanými a spáchanými faulami za 60 minút (Penalty Differential).",
+    description: "Difference between penalties drawn and taken per 60 minutes (Penalty Differential).",
     defaultInvert: false,
     unit: "rozdiel/60",
     getValue: (p, cfg) => {
@@ -636,9 +636,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "mpPimDrawnPg",
-    label: "PIM Drawn / GP (Vybojované trestné minúty / zápas)",
+    label: "PIM Drawn / GP",
     source: "moneypuck",
-    description: "Koľko trestných minút súperov hráč vybojoval pre svoj tím na zápas.",
+    description: "How many opponent penalty minutes the player drew for his team per game.",
     defaultInvert: false,
     unit: "min/GP",
     getValue: (p, cfg) => {
@@ -652,9 +652,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "mpGameScorePg",
-    label: "Game Score / GP (Celkový vplyv na hru MoneyPuck)",
+    label: "Game Score / GP",
     source: "moneypuck",
-    description: "Komplexné hodnotenie výkonu hráča (Dom Luszczyszyn / MoneyPuck model) na zápas.",
+    description: "Comprehensive evaluation of the player's performance (Dom Luszczyszyn / MoneyPuck model) per game.",
     defaultInvert: false,
     unit: "GS/GP",
     getValue: (p, cfg) => {
@@ -668,9 +668,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "mpShotAttempts60",
-    label: "Shot Attempts / 60 (Individuálny Corsi For za 60 min)",
+    label: "Shot Attempts / 60",
     source: "moneypuck",
-    description: "Všetky vlastné strelecké pokusy hráča (na bránu, mimo, blokované) za 60 minút.",
+    description: "All of the player's own shot attempts (on goal, wide, blocked) per 60 minutes.",
     defaultInvert: false,
     unit: "/60 min",
     getValue: (p, cfg) => {
@@ -686,7 +686,7 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
     key: "mpUnblockedAttempts60",
     label: "Unblocked Shot Attempts / 60 (Fenwick For za 60 min)",
     source: "moneypuck",
-    description: "Vlastné neblokované strely hráča na bránu a mimo nej za 60 minút.",
+    description: "The player's own unblocked shots on and off goal per 60 minutes.",
     defaultInvert: false,
     unit: "/60 min",
     getValue: (p, cfg) => {
@@ -700,11 +700,11 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "mpReboundsCreated60",
-    label: "Rebounds Created / 60 (Vytvorené dorážky)",
+    label: "Rebounds Created / 60",
     source: "moneypuck",
-    description: "Počet vytvorených dorážok zo striel hráča za 60 minút na ľade.",
+    description: "Number of rebounds generated from the player's shots per 60 minutes on ice.",
     defaultInvert: false,
-    unit: "dorážky/60",
+    unit: "rebounds/60",
     getValue: (p, cfg) => {
       const mp = (p.mpSkater as any) ?? {};
       const c = mp[String(cfg.latestMpYear)] ?? {};
@@ -716,9 +716,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "mpReboundGoalsPg",
-    label: "Rebound Goals / GP (Góly z dorážok na zápas)",
+    label: "Rebound Goals / GP",
     source: "moneypuck",
-    description: "Góly strelené z dorážok pred bránkoviskom na zápas.",
+    description: "Goals scored from rebounds in front of the crease per game.",
     defaultInvert: false,
     unit: "G/GP",
     getValue: (p, cfg) => {
@@ -732,9 +732,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "mpDzoneGiveaways60",
-    label: "D-Zone Giveaways / 60 (Straty puku vo vlastnom pásme)",
+    label: "D-Zone Giveaways / 60",
     source: "moneypuck",
-    description: "Straty puku vo vlastnom obrannom pásme za 60 minút (menej = lepšie).",
+    description: "Turnovers in the own defensive zone per 60 minutes (less = better).",
     defaultInvert: true,
     unit: "/60 min",
     getValue: (p, cfg) => {
@@ -748,9 +748,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "mpHdShots60",
-    label: "High-Danger Shots / 60 (Strely z bezprostrednej blízkosti)",
+    label: "High-Danger Shots / 60",
     source: "moneypuck",
-    description: "Vlastné strely z nebezpečného pásma pred bránkou za 60 minút.",
+    description: "The player's own shots from the dangerous area in front of the net per 60 minutes.",
     defaultInvert: false,
     unit: "/60 min",
     getValue: (p, cfg) => {
@@ -764,9 +764,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "mpHdGoalsPg",
-    label: "High-Danger Goals / GP (Góly z tutoviek na zápas)",
+    label: "High-Danger Goals / GP",
     source: "moneypuck",
-    description: "Góly strelené z bezprostrednej blízkosti pred bránou na zápas.",
+    description: "Goals scored from close range in front of the net per game.",
     defaultInvert: false,
     unit: "G/GP",
     getValue: (p, cfg) => {
@@ -780,9 +780,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "mpHdXg60",
-    label: "High-Danger xG / 60 (Očakávané góly z tutoviek / 60)",
+    label: "High-Danger xG / 60",
     source: "moneypuck",
-    description: "Kvalita vytvorených nebezpečných šancí v slote za 60 minút.",
+    description: "Quality of high-danger chances created in the slot per 60 minutes.",
     defaultInvert: false,
     unit: "HD xG/60",
     getValue: (p, cfg) => {
@@ -798,7 +798,7 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
     key: "mpMdShots60",
     label: "Medium-Danger Shots / 60 (Strely zo strednej vzdialenosti)",
     source: "moneypuck",
-    description: "Strely z kruhov a strednej vzdialenosti za 60 minút.",
+    description: "Shots from the circles and mid-range per 60 minutes.",
     defaultInvert: false,
     unit: "/60 min",
     getValue: (p, cfg) => {
@@ -812,9 +812,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "mpLdShots60",
-    label: "Low-Danger Shots / 60 (Strely z diaľky / od modrej)",
+    label: "Low-Danger Shots / 60",
     source: "moneypuck",
-    description: "Strely z diaľky a od mantinelov za 60 minút.",
+    description: "Shots from long range and from the boards per 60 minutes.",
     defaultInvert: false,
     unit: "/60 min",
     getValue: (p, cfg) => {
@@ -828,9 +828,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "mpOzoneStartsPct",
-    label: "O-Zone Start % (Vhadzovania v útočnom pásme)",
+    label: "O-Zone Start %",
     source: "moneypuck",
-    description: "Percento striedaní začatých v útočnom pásme oproti obrannému.",
+    description: "Share of shifts started in the offensive zone versus the defensive zone.",
     defaultInvert: false,
     unit: "%",
     getValue: (p, cfg) => {
@@ -846,9 +846,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "mpOnIceCorsiPct",
-    label: "On-Ice Corsi % (CF% Pomer striel tímu na ľade)",
+    label: "On-Ice Corsi %",
     source: "moneypuck",
-    description: "Percentuálny pomer všetkých streleckých pokusov tímu s hráčom na ľade (>50% = dominancia).",
+    description: "Share of all of the team's shot attempts with the player on ice (>50% = dominance).",
     defaultInvert: false,
     unit: "%",
     getValue: (p, cfg) => {
@@ -862,9 +862,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "mpOnIceFenwickPct",
-    label: "On-Ice Fenwick % (FF% Pomer neblokovaných striel)",
+    label: "On-Ice Fenwick %",
     source: "moneypuck",
-    description: "Percentuálny pomer neblokovaných striel tímu, keď je hráč na ľade.",
+    description: "Share of the team's unblocked shots while the player is on ice.",
     defaultInvert: false,
     unit: "%",
     getValue: (p, cfg) => {
@@ -878,9 +878,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "mpShiftsPg",
-    label: "Shifts / GP (Počet striedaní na zápas)",
+    label: "Shifts / GP",
     source: "moneypuck",
-    description: "Priemerný počet odohraných striedaní za zápas.",
+    description: "Average number of shifts played per game.",
     defaultInvert: false,
     unit: "striedania/GP",
     getValue: (p, cfg) => {
@@ -896,9 +896,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   // ========================= NHL EDGE =========================
   {
     key: "burst20",
-    label: "Speed Bursts > 20 mph / 60 (Šprinty > 32 km/h)",
+    label: "Speed Bursts > 20 mph / 60",
     source: "edge",
-    description: "Frekvencia rýchlostných šprintov nad 32 km/h za 60 minút.",
+    description: "Frequency of speed bursts above 32 km/h per 60 minutes.",
     defaultInvert: false,
     unit: "/60 min",
     getValue: (p, cfg) => {
@@ -912,9 +912,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "edgeMaxSpeed",
-    label: "Max Skating Speed (Maximálna nameraná rýchlosť)",
+    label: "Max Skating Speed",
     source: "edge",
-    description: "Najvyššia nameraná rýchlosť korčuľovania (mph).",
+    description: "Highest measured skating speed (mph).",
     defaultInvert: false,
     unit: "mph",
     getValue: (p, cfg) => {
@@ -928,9 +928,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "edgeDistance",
-    label: "Total Skating Distance / 60 (Nakorčuľovaná vzdialenosť)",
+    label: "Total Skating Distance / 60",
     source: "edge",
-    description: "Nakorčuľovaná vzdialenosť v míľach na 60 minút ľadu.",
+    description: "Distance skated in miles per 60 minutes on ice.",
     defaultInvert: false,
     unit: "mi/60",
     getValue: (p, cfg) => {
@@ -946,9 +946,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   // ========================= AHL HOCKEYTECH =========================
   {
     key: "ahlGpg",
-    label: "AHL Goals / GP (Góly na zápas v AHL)",
+    label: "AHL Goals / GP",
     source: "ahl",
-    description: "Góly na zápas vo farmárskej AHL s NHLe prepočtom.",
+    description: "Goals per game in the AHL with the NHLe conversion.",
     defaultInvert: false,
     unit: "G/GP",
     getValue: (p, cfg) => {
@@ -964,9 +964,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "ahlApg",
-    label: "AHL Assists / GP (Asistencie na zápas v AHL)",
+    label: "AHL Assists / GP",
     source: "ahl",
-    description: "Asistencie na zápas vo farmárskej AHL s NHLe prepočtom.",
+    description: "Assists per game in the AHL with the NHLe conversion.",
     defaultInvert: false,
     unit: "A/GP",
     getValue: (p, cfg) => {
@@ -982,9 +982,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "ahlShotsPg",
-    label: "AHL Shots / GP (Strely na zápas v AHL)",
+    label: "AHL Shots / GP",
     source: "ahl",
-    description: "Strely na zápas v AHL.",
+    description: "Shots per game in the AHL.",
     defaultInvert: false,
     unit: "S/GP",
     getValue: (p, cfg) => {
@@ -998,9 +998,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "ahlPlusMinusPg",
-    label: "AHL +/- per Game (Plus/Mínus na zápas v AHL)",
+    label: "AHL +/- per Game",
     source: "ahl",
-    description: "Účasť pri strelených a inkasovaných góloch na zápas v AHL.",
+    description: "Involvement in goals scored and allowed per game in the AHL.",
     defaultInvert: false,
     unit: "+/- / GP",
     getValue: (p, cfg) => {
@@ -1014,9 +1014,9 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "ahlPimPg",
-    label: "AHL PIM / GP (Trestné minúty v AHL)",
+    label: "AHL PIM / GP",
     source: "ahl",
-    description: "Trestné minúty v AHL (menej je lepšie).",
+    description: "Penalty minutes in the AHL (less is better).",
     defaultInvert: true,
     unit: "min/GP",
     getValue: (p, cfg) => {
@@ -1032,36 +1032,36 @@ export const CATALOG_METRICS: CatalogMetricItem[] = [
   // ========================= BIOMETRICS & CAREER =========================
   {
     key: "weight",
-    label: "Hmotnosť hráča (Weight lbs)",
+    label: "Player weight (Weight lbs)",
     source: "bio",
-    description: "Hmotnosť hráča v librách (fyzická dispozícia a sila).",
+    description: "Player weight in pounds (physical build and strength).",
     defaultInvert: false,
     unit: "lbs",
     getValue: (p) => (p.weight != null && p.weight > 0 ? p.weight : null),
   },
   {
     key: "careerRegGP",
-    label: "Kariérne zápasy ZČ (Career Regular GP)",
+    label: "Career regular-season games (Career Regular GP)",
     source: "bio",
-    description: "Celkový počet odohratých zápasov v základnej časti NHL.",
+    description: "Total number of NHL regular-season games played.",
     defaultInvert: false,
     unit: "GP",
     getValue: (p) => (p.careerGP as any)?.reg ?? null,
   },
   {
     key: "careerPoGP",
-    label: "Kariérne zápasy Play-off (Career Playoff GP)",
+    label: "Career playoff games (Career Playoff GP)",
     source: "bio",
-    description: "Celkový počet odohratých zápasov v play-off NHL.",
+    description: "Total number of NHL playoff games played.",
     defaultInvert: false,
     unit: "GP",
     getValue: (p) => (p.careerGP as any)?.po ?? null,
   },
   {
     key: "age",
-    label: "Vek hráča (Age)",
+    label: "Player age (Age)",
     source: "bio",
-    description: "Aktuálny vek hráča.",
+    description: "The player's current age.",
     defaultInvert: false,
     unit: "rokov",
     getValue: (p) => (p.age != null && p.age > 0 ? p.age : null),
@@ -1077,9 +1077,9 @@ export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
   // ========================= MONEYPUCK GOALIE =========================
   {
     key: "svPct",
-    label: "Save % (Celková úspešnosť zásahov)",
+    label: "Save %",
     source: "moneypuck",
-    description: "Celková percentuálna úspešnosť zásahov brankára (SV%).",
+    description: "The goalie's overall save percentage (SV%).",
     defaultInvert: false,
     unit: "%",
     getValue: (p, cfg) => {
@@ -1096,9 +1096,9 @@ export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "gaa",
-    label: "GAA (Priemer inkasovaných gólov / 60 min)",
+    label: "GAA",
     source: "moneypuck",
-    description: "Priemerný počet inkasovaných gólov za 60 minút hry (menej je lepšie).",
+    description: "Average goals against per 60 minutes of play (less is better).",
     defaultInvert: true,
     unit: "GAA",
     getValue: (p, cfg) => {
@@ -1115,9 +1115,9 @@ export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "gsax",
-    label: "GSAx (Chytené góly nad očakávanie celkovo)",
+    label: "GSAx",
     source: "moneypuck",
-    description: "Celkový počet gólov, ktoré brankár chytil navyše oproti očakávaniu (xG − inkasované góly).",
+    description: "Total number of goals the goalie saved above expectation (xG − goals allowed).",
     defaultInvert: false,
     unit: "GSAx",
     getValue: (p, cfg) => {
@@ -1134,9 +1134,9 @@ export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "gsax60",
-    label: "GSAx / 60 min (Chytené góly nad očakávanie za zápas)",
+    label: "GSAx / 60 min",
     source: "moneypuck",
-    description: "GSAx prepočítané na 60 minút čistého času brankára na ľade.",
+    description: "GSAx per 60 minutes of the goalie's net time on ice.",
     defaultInvert: false,
     unit: "GSAx/60",
     getValue: (p, cfg) => {
@@ -1153,9 +1153,9 @@ export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "hdSv",
-    label: "High-Danger SV% (Úspešnosť pri tutovkách a dorážkach)",
+    label: "High-Danger SV%",
     source: "moneypuck",
-    description: "Úspešnosť zásahov proti strelám z bezprostrednej blízkosti a slotu (HD SV%).",
+    description: "Save percentage against shots from close range and the slot (HD SV%).",
     defaultInvert: false,
     unit: "%",
     getValue: (p, cfg) => {
@@ -1172,9 +1172,9 @@ export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "hdGsax",
-    label: "High-Danger GSAx (Chytené góly z tutoviek)",
+    label: "High-Danger GSAx",
     source: "moneypuck",
-    description: "GSAx vygenerované výhradne proti strelám s vysokou nebezpečnosťou.",
+    description: "GSAx generated exclusively against high-danger shots.",
     defaultInvert: false,
     unit: "HD GSAx",
     getValue: (p, cfg) => {
@@ -1191,9 +1191,9 @@ export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "hdGsax60",
-    label: "High-Danger GSAx / 60 min (Chytené góly z tutoviek za 60 min)",
+    label: "High-Danger GSAx / 60 min",
     source: "moneypuck",
-    description: "HD GSAx prepočítané na 60 minút čistého času brankára na ľade.",
+    description: "HD GSAx per 60 minutes of the goalie's net time on ice.",
     defaultInvert: false,
     unit: "HD GSAx/60",
     getValue: (p, cfg) => {
@@ -1210,9 +1210,9 @@ export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "mdGsax",
-    label: "Medium-Danger GSAx (Chytené góly zo strednej vzdialenosti)",
+    label: "Medium-Danger GSAx",
     source: "moneypuck",
-    description: "GSAx vygenerované výhradne proti strelám so strednou nebezpečnosťou.",
+    description: "GSAx generated exclusively against medium-danger shots.",
     defaultInvert: false,
     unit: "MD GSAx",
     getValue: (p, cfg) => {
@@ -1229,9 +1229,9 @@ export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "mdGsax60",
-    label: "Medium-Danger GSAx / 60 min (Stredná vzdialenosť za 60 min)",
+    label: "Medium-Danger GSAx / 60 min",
     source: "moneypuck",
-    description: "MD GSAx prepočítané na 60 minút čistého času brankára na ľade.",
+    description: "MD GSAx per 60 minutes of the goalie's net time on ice.",
     defaultInvert: false,
     unit: "MD GSAx/60",
     getValue: (p, cfg) => {
@@ -1248,9 +1248,9 @@ export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "ldGsax",
-    label: "Low-Danger GSAx (Chytené góly z diaľky)",
+    label: "Low-Danger GSAx",
     source: "moneypuck",
-    description: "GSAx vygenerované výhradne proti strelám s nízkou nebezpečnosťou.",
+    description: "GSAx generated exclusively against low-danger shots.",
     defaultInvert: false,
     unit: "LD GSAx",
     getValue: (p, cfg) => {
@@ -1267,9 +1267,9 @@ export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "ldGsax60",
-    label: "Low-Danger GSAx / 60 min (Z diaľky za 60 min)",
+    label: "Low-Danger GSAx / 60 min",
     source: "moneypuck",
-    description: "LD GSAx prepočítané na 60 minút čistého času brankára na ľade.",
+    description: "LD GSAx per 60 minutes of the goalie's net time on ice.",
     defaultInvert: false,
     unit: "LD GSAx/60",
     getValue: (p, cfg) => {
@@ -1286,9 +1286,9 @@ export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "mdSv",
-    label: "Medium-Danger SV% (Úspešnosť striel zo strednej vzdialenosti)",
+    label: "Medium-Danger SV%",
     source: "moneypuck",
-    description: "Úspešnosť zásahov zo stredného pásma a kruhov (MD SV%).",
+    description: "Save percentage on shots from the mid-range and circles (MD SV%).",
     defaultInvert: false,
     unit: "%",
     getValue: (p, cfg) => {
@@ -1305,9 +1305,9 @@ export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "ldSv",
-    label: "Low-Danger SV% (Úspešnosť z diaľky / modrej čiary)",
+    label: "Low-Danger SV%",
     source: "moneypuck",
-    description: "Úspešnosť zásahov proti strelám z diaľky a od mantinelov (LD SV%).",
+    description: "Save percentage against shots from long range and the boards (LD SV%).",
     defaultInvert: false,
     unit: "%",
     getValue: (p, cfg) => {
@@ -1324,9 +1324,9 @@ export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "rebCtrl",
-    label: "Rebound Control (Kontrola dorážok xRebounds − Rebounds)",
+    label: "Rebound Control",
     source: "moneypuck",
-    description: "Miera eliminácie nebezpečných dorážok súperom oproti očakávaniu (kladné = menej dorážok).",
+    description: "Rate of eliminating dangerous opponent rebounds versus expectation (positive = fewer rebounds).",
     defaultInvert: false,
     unit: "RebCtrl",
     getValue: (p, cfg) => {
@@ -1343,9 +1343,9 @@ export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "freezePct",
-    label: "Freeze % (Prerušenie hry / podržanie pukov)",
+    label: "Freeze %",
     source: "moneypuck",
-    description: "Percento zásahov, po ktorých brankár bezpečne prikryl puk a prerušil hru.",
+    description: "Percentage of saves after which the goalie safely covered the puck and stopped play.",
     defaultInvert: false,
     unit: "%",
     getValue: (p, cfg) => {
@@ -1362,9 +1362,9 @@ export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "icetime",
-    label: "Ice Time / Vyťaženie brankára (Celkový čas v minútach)",
+    label: "Ice Time / Goalie workload",
     source: "moneypuck",
-    description: "Celkový odchytaný čas v sezóne vyjadrený v minútach (vytrvalosť & jednotka tímu).",
+    description: "Total time in net in the season expressed in minutes (endurance & team unit).",
     defaultInvert: false,
     unit: "min",
     getValue: (p, cfg) => {
@@ -1383,9 +1383,9 @@ export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "gp",
-    label: "Games Played (Odchytané zápasy v sezóne)",
+    label: "Games Played",
     source: "nhl",
-    description: "Počet odchytaných zápasov v aktuálnej a predchádzajúcej sezóne.",
+    description: "Number of games played in the current and previous season.",
     defaultInvert: false,
     unit: "GP",
     getValue: (p, cfg) => {
@@ -1397,9 +1397,9 @@ export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "sz",
-    label: "Výška brankára (Height cm)",
+    label: "Goalie height (Height cm)",
     source: "bio",
-    description: "Výška brankára v centimetroch (veľkosť a priestorové pokrytie brány).",
+    description: "Goalie height in centimeters (size and net coverage).",
     defaultInvert: false,
     unit: "cm",
     getValue: (p) => {
@@ -1409,36 +1409,36 @@ export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "weight",
-    label: "Hmotnosť brankára (Weight lbs)",
+    label: "Goalie weight (Weight lbs)",
     source: "bio",
-    description: "Hmotnosť brankára v librách.",
+    description: "Goalie weight in pounds.",
     defaultInvert: false,
     unit: "lbs",
     getValue: (p) => (p.weight != null && p.weight > 0 ? p.weight : null),
   },
   {
     key: "careerRegGP",
-    label: "Kariérne zápasy ZČ (Career Regular GP)",
+    label: "Career regular-season games (Career Regular GP)",
     source: "bio",
-    description: "Celkový počet odohratých zápasov v základnej časti NHL.",
+    description: "Total number of NHL regular-season games played.",
     defaultInvert: false,
     unit: "GP",
     getValue: (p) => (p.careerGP as any)?.reg ?? null,
   },
   {
     key: "careerPoGP",
-    label: "Kariérne zápasy Play-off (Career Playoff GP)",
+    label: "Career playoff games (Career Playoff GP)",
     source: "bio",
-    description: "Celkový počet odohratých zápasov v play-off NHL.",
+    description: "Total number of NHL playoff games played.",
     defaultInvert: false,
     unit: "GP",
     getValue: (p) => (p.careerGP as any)?.po ?? null,
   },
   {
     key: "goals",
-    label: "Inkasované góly (Goals Against)",
+    label: "Goals allowed (Goals Against)",
     source: "moneypuck",
-    description: "Celkový počet inkasovaných gólov brankára (menej je lepšie).",
+    description: "Total number of goals allowed by the goalie (less is better).",
     defaultInvert: true,
     unit: "GA",
     getValue: (p, cfg) => {
@@ -1455,9 +1455,9 @@ export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "xGoals",
-    label: "xGoals (Očakávané inkasované góly súpera)",
+    label: "xGoals",
     source: "moneypuck",
-    description: "Súčet xG všetkých striel, ktorým brankár čelil.",
+    description: "Sum of the xG of all shots the goalie faced.",
     defaultInvert: false,
     unit: "xGA",
     getValue: (p, cfg) => {
@@ -1474,9 +1474,9 @@ export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "shots",
-    label: "Shots Against (Čelené strely na bránu)",
+    label: "Shots Against",
     source: "moneypuck",
-    description: "Celkový počet striel smerujúcich do priestoru brány.",
+    description: "Total number of shots directed at the net.",
     defaultInvert: false,
     unit: "SA",
     getValue: (p, cfg) => {
@@ -1493,9 +1493,9 @@ export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "rebounds",
-    label: "Rebounds Allowed (Vyprodukované dorážky pre súpera)",
+    label: "Rebounds Allowed",
     source: "moneypuck",
-    description: "Počet dorážok, ktoré súper získal po zásahu brankára (menej je lepšie).",
+    description: "Number of rebounds the opponent got after a goalie save (less is better).",
     defaultInvert: true,
     unit: "Reb",
     getValue: (p, cfg) => {
@@ -1512,9 +1512,9 @@ export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "xRebounds",
-    label: "Expected Rebounds (Očakávané dorážky podľa typu striel)",
+    label: "Expected Rebounds",
     source: "moneypuck",
-    description: "Očakávaný počet dorážok vygenerovaný na základe kvality a trajektórie striel.",
+    description: "Expected number of rebounds generated from the quality and trajectory of shots.",
     defaultInvert: false,
     unit: "xReb",
     getValue: (p, cfg) => {
@@ -1531,9 +1531,9 @@ export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "freeze",
-    label: "Puk prikrytý / Freezes (Počet prerušení hry)",
+    label: "Puck covered / Freezes",
     source: "moneypuck",
-    description: "Absolútny počet prerušení hry prikrytím alebo zovretím puku po strele.",
+    description: "Absolute number of stoppages by covering or freezing the puck after a shot.",
     defaultInvert: false,
     unit: "Frz",
     getValue: (p, cfg) => {
@@ -1550,9 +1550,9 @@ export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "xFreeze",
-    label: "Expected Freezes (Očakávané prerušenia)",
+    label: "Expected Freezes",
     source: "moneypuck",
-    description: "Očakávaný počet prerušení hry podľa trajektórie a nebezpečnosti striel.",
+    description: "Expected number of stoppages by shot trajectory and danger.",
     defaultInvert: false,
     unit: "xFrz",
     getValue: (p, cfg) => {
@@ -1569,9 +1569,9 @@ export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "penalties",
-    label: "Penalties (Tresty brankára)",
+    label: "Penalties",
     source: "moneypuck",
-    description: "Počet menších alebo väčších trestov udelených brankárovi (menej je lepšie).",
+    description: "Number of minor or major penalties assessed to the goalie (less is better).",
     defaultInvert: true,
     unit: "Pen",
     getValue: (p, cfg) => {
@@ -1588,9 +1588,9 @@ export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "pim",
-    label: "PIM (Trestné minúty brankára)",
+    label: "PIM",
     source: "moneypuck",
-    description: "Celkové trestné minúty brankára (menej je lepšie).",
+    description: "The goalie's total penalty minutes (less is better).",
     defaultInvert: true,
     unit: "min",
     getValue: (p, cfg) => {
@@ -1609,7 +1609,7 @@ export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
     key: "flurryAxg",
     label: "Flurry-Adjusted xG Against",
     source: "moneypuck",
-    description: "Očakávané góly proti po očistení o rýchle opakované strely zblízka.",
+    description: "Expected goals against after adjusting for quick repeated shots from close range.",
     defaultInvert: false,
     unit: "xGA",
     getValue: (p, cfg) => {
@@ -1626,9 +1626,9 @@ export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "unblockedShots",
-    label: "Unblocked Shot Attempts Against (Nezblokované strely súpera)",
+    label: "Unblocked Shot Attempts Against",
     source: "moneypuck",
-    description: "Počet striel a striel mimo brány, ktoré neboli zblokované hráčmi v poli.",
+    description: "Number of shots and shots wide that were not blocked by skaters.",
     defaultInvert: false,
     unit: "USAT",
     getValue: (p, cfg) => {
@@ -1645,9 +1645,9 @@ export const GOALIE_CATALOG_METRICS: CatalogMetricItem[] = [
   },
   {
     key: "age",
-    label: "Vek brankára (Age)",
+    label: "Goalie age (Age)",
     source: "bio",
-    description: "Aktuálny vek brankára.",
+    description: "The goalie's current age.",
     defaultInvert: false,
     unit: "rokov",
     getValue: (p) => (p.age != null && p.age > 0 ? p.age : null),
