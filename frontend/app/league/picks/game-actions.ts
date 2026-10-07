@@ -19,7 +19,7 @@ export async function saveDailyGamePicksAction(
 ) {
   const teamId = await getTeamSession();
   if (!teamId) {
-    return { ok: false, error: "Musíte byť prihlásený ako GM tímu." };
+    return { ok: false, error: "You must be signed in as a team GM." };
   }
 
   const now = new Date();
@@ -49,7 +49,7 @@ export async function saveDailyGamePicksAction(
   // Filter out any already submitted picks so they cannot be overwritten
   const newPicks = picks.filter((p) => !existingGameIdSet.has(p.gameId));
   if (newPicks.length === 0) {
-    return { ok: false, error: "Všetky vybrané zápasy už boli natipované a sú uzamknuté." };
+    return { ok: false, error: "All selected games have already been picked and are locked." };
   }
 
   // Count how many jokers are in the new request
@@ -61,7 +61,7 @@ export async function saveDailyGamePicksAction(
   if (profile.jokersUsed + newJokersInRequest > profile.jokersTotal) {
     return {
       ok: false,
-      error: `Prekročený počet Jokerov! Zostáva vám ${profile.jokersTotal - profile.jokersUsed} z ${profile.jokersTotal}.`,
+      error: `Joker limit exceeded! You have ${profile.jokersTotal - profile.jokersUsed} of ${profile.jokersTotal} left.`,
     };
   }
 
@@ -99,7 +99,7 @@ export async function saveGameOfTheWeekPickAction(
 ) {
   const teamId = await getTeamSession();
   if (!teamId) {
-    return { ok: false, error: "Musíte byť prihlásený ako GM tímu." };
+    return { ok: false, error: "You must be signed in as a team GM." };
   }
 
   let config = await getOrCreateGamePicksConfig(season, league);
@@ -110,7 +110,7 @@ export async function saveGameOfTheWeekPickAction(
     }).catch(() => {});
     config.gameOfTheWeekId = pick.gameId;
   } else if (config.gameOfTheWeekId !== pick.gameId) {
-    return { ok: false, error: "Zápas týždňa bol zmenený. Prosím obnovte stránku pre aktuálny zápas." };
+    return { ok: false, error: "The Game of the Week has changed. Please refresh the page for the current game." };
   }
 
   const now = new Date();
@@ -120,12 +120,12 @@ export async function saveGameOfTheWeekPickAction(
   });
 
   if (!dbGame) {
-    return { ok: false, error: "Zápas nebol nájdený." };
+    return { ok: false, error: "Game not found." };
   }
 
   const isLocked = dbGame.status === "FINAL";
   if (isLocked) {
-    return { ok: false, error: "Tento zápas je už uzamknutý (začal alebo sa skončil)." };
+    return { ok: false, error: "This game is already locked (it has started or finished)." };
   }
 
   // Check if GOTW was already submitted - once submitted, it is permanently locked
@@ -142,7 +142,7 @@ export async function saveGameOfTheWeekPickAction(
   });
 
   if (existingSub) {
-    return { ok: false, error: "Tip na Zápas týždňa už bol odoslaný a je uzamknutý bez možnosti úprav." };
+    return { ok: false, error: "The Game of the Week pick has already been submitted and is locked." };
   }
 
   // Check profile joker count
@@ -151,7 +151,7 @@ export async function saveGameOfTheWeekPickAction(
     if (profile.jokersUsed + 1 > profile.jokersTotal) {
       return {
         ok: false,
-        error: `Prekročený počet Jokerov! Zostáva vám ${profile.jokersTotal - profile.jokersUsed} z ${profile.jokersTotal}.`,
+        error: `Joker limit exceeded! You have ${profile.jokersTotal - profile.jokersUsed} of ${profile.jokersTotal} left.`,
       };
     }
   }
@@ -180,7 +180,7 @@ export async function saveGameOfTheWeekPickAction(
 
 export async function evaluateGamePicksAction(season = REGULAR_SEASON, league = "NHL") {
   const admin = await isAdmin();
-  if (!admin) return { ok: false, error: "Prístup povolený len administrátorom." };
+  if (!admin) return { ok: false, error: "Access is restricted to administrators." };
 
   const res = await evaluateGamePicks(season, league);
   revalidatePath("/league/picks");
@@ -199,7 +199,7 @@ export async function adminUpdateGamePicksConfigAction(
   league = "NHL"
 ) {
   const admin = await isAdmin();
-  if (!admin) return { ok: false, error: "Prístup povolený len administrátorom." };
+  if (!admin) return { ok: false, error: "Access is restricted to administrators." };
 
   await prisma.gamePicksConfig.upsert({
     where: { season_league: { season, league } },
@@ -218,7 +218,7 @@ export async function adminUpdateGamePicksConfigAction(
 
 export async function adminAutoSelectGotwAction(season = REGULAR_SEASON, league = "NHL") {
   const admin = await isAdmin();
-  if (!admin) return { ok: false, error: "Prístup povolený len administrátorom." };
+  if (!admin) return { ok: false, error: "Access is restricted to administrators." };
 
   // Reset gameOfTheWeekId so getGamePicksData automatically calculates the best game
   await prisma.gamePicksConfig.updateMany({

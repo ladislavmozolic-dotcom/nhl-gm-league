@@ -83,9 +83,9 @@ export default async function CommissionerIntelligencePage() {
         })}
       </div>
 
-      <Card title="Audit log — posledné dopyty" accent="text-slate-400">
+      <Card title="Audit log — latest queries" accent="text-slate-400">
         {recent.length === 0 ? (
-          <p className="text-sm text-slate-500">Zatiaľ žiadny záznam.</p>
+          <p className="text-sm text-slate-500">No entries yet.</p>
         ) : (
           <div className="flex flex-col gap-1.5">
             {recent.map((r) => (

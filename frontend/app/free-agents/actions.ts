@@ -134,7 +134,7 @@ export async function getInterestAction(playerId: number, teamId: number) {
     where: { id: teamId },
     select: { name: true, gm: true, gmFirstName: true, gmLastName: true, gmNickname: true },
   });
-  const gmName = team?.gmNickname || [team?.gmFirstName, team?.gmLastName].filter(Boolean).join(" ").trim() || team?.gm || "Generálny manažér";
+  const gmName = team?.gmNickname || [team?.gmFirstName, team?.gmLastName].filter(Boolean).join(" ").trim() || team?.gm || "General Manager";
 
   let capRoom: number | null = null;
   let capSeason: number | null = null;
@@ -428,7 +428,7 @@ export async function submitOfferAction(
   // commissioner offices, so it can never become an unofficial head start.
   const lockSettings = await loadSettings();
   if (lockSettings.faSignLock) {
-    return { ok: false as const, error: "🔒 UFA podpisy sú momentálne zamknuté komisárom." };
+    return { ok: false as const, error: "🔒 UFA signings are currently locked by the commissioner." };
   }
   const clock = await getLeagueClock();
   let win = clock.faWindow;
@@ -1288,12 +1288,12 @@ export async function setFranchiseTagAction(playerId: number, teamId: number, on
   if (on) {
     if (p.franchiseTag) return { ok: true as const };
     if (clubUsedThisSeason) {
-      const who = existingTagged?.name ? ` (hráč: ${existingTagged.name})` : "";
-      return { ok: false as const, error: `Váš klub už v tejto sezóne Franchise Tag použil${who}. Každý klub má k dispozícii iba 1 Franchise Tag za sezónu.` };
+      const who = existingTagged?.name ? ` (player: ${existingTagged.name})` : "";
+      return { ok: false as const, error: `Your club has already used its Franchise Tag this season${who}. Each club has only 1 Franchise Tag per season.` };
     }
     // Tag can only be set before negotiations begin
     if ((p.resignRound ?? 0) > 0 || p.resignStatus === "extended" || p.extCapHit != null) {
-      return { ok: false as const, error: "Franchise Tag musí byť priradený pred začiatkom rokovaní o zmluve." };
+      return { ok: false as const, error: "The Franchise Tag must be assigned before contract negotiations begin." };
     }
     // Untag any currently tagged player in the organization who hasn't used the tag yet
     await prisma.player.updateMany({ where: { teamId: { in: orgIds }, franchiseTag: true }, data: { franchiseTag: false } });
@@ -1302,7 +1302,7 @@ export async function setFranchiseTagAction(playerId: number, teamId: number, on
     if (!p.franchiseTag) return { ok: true as const };
     const thisPlayerUsed = (p.resignRound ?? 0) > 0 || p.resignStatus === "extended" || p.extCapHit != null || p.resignStatus === "osEligible" || p.resignStatus === "walkedToUFA";
     if (thisPlayerUsed || org?.franchiseTagUsedSeason === CURRENT_SEASON_START) {
-      return { ok: false as const, error: "Franchise Tag už bol pre tohto hráča v rokovaniach použitý a nemožno ho zrušiť." };
+      return { ok: false as const, error: "The Franchise Tag was already used on this player in negotiations and cannot be removed." };
     }
     await prisma.player.update({ where: { id: playerId }, data: { franchiseTag: false } });
   }
@@ -1329,7 +1329,7 @@ export async function setRightsReleasedAction(playerId: number, teamId: number, 
 
 /** GM sets/updates their custom TOP Priority contract renewals (up to 3 players). */
 export async function setContractPrioritiesAction(teamId: number, playerIds: number[]) {
-  if (!(await canManageTeam(teamId))) return { ok: false as const, error: "Nemáte oprávnenie spravovať tento tím." };
+  if (!(await canManageTeam(teamId))) return { ok: false as const, error: "You are not authorized to manage this team." };
   const clean = playerIds.filter((id) => typeof id === "number" && !isNaN(id) && id > 0).slice(0, 3);
   await prisma.team.update({
     where: { id: teamId },

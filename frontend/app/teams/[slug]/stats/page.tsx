@@ -43,7 +43,7 @@ const GOALIE_COLS: Col[] = [
   { key: "svPct", label: "PCT", title: "Save Percentage", num: true, format: "pct3" },
   { key: "gaa", label: "GAA", title: "Goals-Against Average", num: true, format: "dec2" },
   { key: "gsax", label: "GSAx", title: "Goals Saved Above Expected (xGA − GA)", num: true, format: "plusDec1", info: "Goals Saved Above Expected (xGA − GA)." },
-  { key: "steals", label: "STL", title: "Steals (Ukradnuté zápasy)", num: true, info: "Ukradnuté zápasy (Steals): Zápasy s výhrou, kde brankárov GSAx prevýšil gólový náskok tímu (bez gólov do prázdnej brány)." },
+  { key: "steals", label: "STL", title: "Steals (Stolen games)", num: true, info: "Stolen games (Steals): Wins where the goalie's GSAx exceeded the team's goal margin (excluding empty-net goals)." },
   { key: "mp", label: "MP", title: "Minutes Played", num: true },
   { key: "shutouts", label: "SO", title: "Shutouts", num: true },
   { key: "goalsAgainst", label: "GA", title: "Goals Against", num: true },

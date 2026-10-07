@@ -36,7 +36,7 @@ export default async function PlayerCalculatorPage({
       <div className="space-y-6 py-2">
         <PageHeader
           title="Rookie Calculator"
-          subtitle="Prospekti, ktorí už odohrali reálne zápasy a zatiaľ nemajú vlastný rating"
+          subtitle="Prospects who have already played real games and do not have their own rating yet"
           right={<Link href="/tools/player-calculator" className="text-sm text-blue-400 hover:text-blue-300">← Live Calculator</Link>}
         />
         <RookieCalculatorPanel
@@ -77,7 +77,7 @@ export default async function PlayerCalculatorPage({
     id: 0,
     slug: "all",
     code: "ALL",
-    name: "Všetky tímy ligy (All Teams)",
+    name: "All league teams (All Teams)",
     logoUrl: null,
     conference: null,
     division: null,
@@ -106,7 +106,7 @@ export default async function PlayerCalculatorPage({
     <div className="space-y-6 py-2">
       <PageHeader
         title="Live Player Calculator"
-        subtitle="Kompletný prehľad a živý prepočet parametrov korčuliarov a brankárov (NextGen V10 model: MoneyPuck, NHL API, EDGE a AHL)"
+        subtitle="A complete overview and live recalculation of skater and goalie parameters (NextGen V10 model: MoneyPuck, NHL API, EDGE and AHL)"
         right={
           <Link href="/tools/player-calculator?view=rookies"
             className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white whitespace-nowrap">

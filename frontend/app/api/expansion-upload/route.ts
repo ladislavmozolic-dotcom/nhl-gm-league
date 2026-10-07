@@ -17,8 +17,8 @@ export async function POST(request: Request) {
   const file = form.get("file");
   if (!(file instanceof File)) return NextResponse.json({ error: "No file" }, { status: 400 });
   const ext = EXT[file.type];
-  if (!ext) return NextResponse.json({ error: "Nepodporovaný formát (PNG/JPG/WEBP/GIF/SVG)" }, { status: 400 });
-  if (file.size > 4_000_000) return NextResponse.json({ error: "Súbor je príliš veľký (max 4 MB)" }, { status: 400 });
+  if (!ext) return NextResponse.json({ error: "Unsupported format (PNG/JPG/WEBP/GIF/SVG)" }, { status: 400 });
+  if (file.size > 4_000_000) return NextResponse.json({ error: "File is too large (max 4 MB)" }, { status: 400 });
 
   const name = `${randomBytes(8).toString("hex")}.${ext}`;
   const bytes = Buffer.from(await file.arrayBuffer());

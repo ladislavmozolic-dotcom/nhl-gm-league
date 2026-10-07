@@ -305,7 +305,7 @@ export default async function TeamLayout({
             )}
             {!isGm && (
               <Link href={`/teams/${slug}/login`} className="bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 rounded-xl px-4 py-2.5 text-center group transition-colors min-w-[90px]">
-                <span className="text-[10px] font-bold text-slate-400 group-hover:text-amber-400 uppercase tracking-wider block">PRIHLÁSENIE</span>
+                <span className="text-[10px] font-bold text-slate-400 group-hover:text-amber-400 uppercase tracking-wider block">SIGN IN</span>
                 <span className="text-xs font-bold text-white block mt-0.5">GM Login →</span>
               </Link>
             )}

@@ -48,8 +48,8 @@ export default async function GmAssistantPage() {
         ) : (
           <div className="flex flex-col gap-3">
             <p className="text-sm text-slate-400">
-              {analysis.teamName} — priemerný <span className="text-slate-300 font-semibold">Role Score</span> hráčov na danom slote formácie/páru
-              (vlastná váhová kombinácia STHS parametrov podľa roly — top-6 vs. bottom-6, PP vs. PK, ... — každý prepočítaný na percentil v rámci C/W/D/G; OV je len orientačné, nepoužíva sa na porovnanie),
+              {analysis.teamName} — average <span className="text-slate-300 font-semibold">Role Score</span> of the players at that lineup/pair slot
+              (a custom weighted combination of STHS parameters by role — top-6 vs. bottom-6, PP vs. PK, ... — each converted to a percentile within C/W/D/G; OV is only indicative and is not used for comparison),
               {cs ? "porovnaný voči rovnakému slotu vo všetkých 32 NHL kluboch." : "compared against the same slot across all 32 NHL clubs."}
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -124,18 +124,18 @@ export default async function GmAssistantPage() {
           <p className="text-sm text-slate-400">{cs ? "„Čo ak?“ — podpíš, obchoduj alebo pusti hráča nanečisto a uvidíš dopad na cap, rebríček aj vek kádra, bez zápisu do ligy." : "“What if?” — mock signings, trades and releases to preview the cap, ranking and age impact without writing to the league."}</p>
         </Card>
         </> : (
-          <Card title="Čoskoro" accent="text-slate-500" className="md:col-span-2">
-            <p className="text-sm text-slate-400">Find Player, Find Trade Partner a Scenario Engine komisár sprístupní v ďalšej vlne.</p>
+          <Card title="Coming soon" accent="text-slate-500" className="md:col-span-2">
+            <p className="text-sm text-slate-400">Find Player, Find Trade Partner and the Scenario Engine will be enabled by the commissioner in the next wave.</p>
           </Card>
         )}
         <Card title="🧩 Line Fit Finder" accent="text-blue-400" href="/tools/line-fit">
-          <p className="text-sm text-slate-400">Zostav lajnu z ľubovoľných hráčov — vlastný roster, voľný agent alebo hráč iného klubu — a uvidíš projekciu chémie aj taktického fitu, ešte pred akoukoľvek dohodou.</p>
+          <p className="text-sm text-slate-400">Build a line from any players — your own roster, a free agent or a player from another club — and see a projection of chemistry and tactical fit before any deal.</p>
         </Card>
       </div>
 
       {admin && (
         <Card title="🛡️ Commissioner Intelligence" accent="text-red-400" href="/tools/assistant/commissioner">
-          <p className="text-sm text-slate-400">Admin-only: leaguewide cap violations, legálnosť rosterov a data-consistency kontroly naprieč všetkými klubmi. Read-only, každé zobrazenie sa audit-loguje.</p>
+          <p className="text-sm text-slate-400">Admin-only: leaguewide cap violations, roster legality and data-consistency checks across all clubs. Read-only, every view is audit-logged.</p>
         </Card>
       )}
     </div>

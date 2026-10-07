@@ -22,13 +22,13 @@ export default async function GmLoginPage({ searchParams }: { searchParams: Prom
 
   return (
     <div className="space-y-6 py-2 max-w-3xl">
-      <PageHeader title="GM Sign In" subtitle="Prihlás sa svojím emailom alebo prezývkou — dostaneš sa rovno na svoj roster." />
+      <PageHeader title="GM Sign In" subtitle="Sign in with your email or nickname — you go straight to your roster." />
 
       {current && (
         <div className="flex items-center gap-3 bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-3 text-sm">
           {current.logoUrl && <img src={current.logoUrl} alt="" className="w-8 h-8 object-contain" />}
-          <span>Prihlásený ako GM <b>{current.name}</b>.</span>
-          <Link href={`/teams/${current.slug}/roster`} className="ml-auto text-green-300 hover:underline">Otvoriť roster →</Link>
+          <span>Signed in as GM <b>{current.name}</b>.</span>
+          <Link href={`/teams/${current.slug}/roster`} className="ml-auto text-green-300 hover:underline">Open roster →</Link>
         </div>
       )}
 
@@ -38,8 +38,8 @@ export default async function GmLoginPage({ searchParams }: { searchParams: Prom
       {/* new GM registration — the only place a team is picked */}
       {openTeams.length > 0 && (
         <div className="space-y-3 pt-2">
-          <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400">Nový GM? Vyber si voľný tím</h2>
-          <p className="text-xs text-slate-500">Registrácia je len prvýkrát — vyber neobsadený klub a pošli žiadosť komisárovi. Potom sa už prihlasuješ hore.</p>
+          <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400">New GM? Pick a free team</h2>
+          <p className="text-xs text-slate-500">Registration is only needed the first time — pick an unclaimed club and send a request to the commissioner. After that you sign in above.</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {openTeams.map((t) => (
               <Link key={t.id} href={`/teams/${t.slug}/login`}
@@ -53,7 +53,7 @@ export default async function GmLoginPage({ searchParams }: { searchParams: Prom
       )}
 
       <p className="text-xs text-slate-500">
-        Admin (league operations) je oddelený — pozri <Link href="/admin/season" className="text-blue-400 hover:underline">Admin</Link>.
+        Admin (league operations) is separate — see <Link href="/admin/season" className="text-blue-400 hover:underline">Admin</Link>.
       </p>
     </div>
   );

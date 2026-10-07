@@ -387,8 +387,8 @@ export default async function TradesPage() {
   return (
     <div className="space-y-6 py-2">
       <PageHeader
-        title="Výmeny (Trades)"
-        subtitle="Prehľad uskutočnených dohôd, aktívnych návrhov a 3-tímových výmen"
+        title="Trades"
+        subtitle="Overview of completed deals, active proposals and 3-team trades"
       />
 
       <TradesClientView

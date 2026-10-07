@@ -31,13 +31,13 @@ export default async function TeamLoginPage({
 
       {submitted && (
         <div className="mb-4 rounded-xl border border-green-500/40 bg-green-500/10 px-4 py-3 text-sm text-green-200">
-          ✅ <b>Žiadosť odoslaná!</b> Komisár ju musí schváliť — potom sa budeš môcť prihlásiť týmto heslom.
+          ✅ <b>Request sent!</b> The commissioner must approve it — then you will be able to sign in with this password.
         </div>
       )}
 
       {firstTime && pending && !submitted && (
         <div className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-          ⏳ Pre tento tím už čaká žiadosť (<b>{pending.nickname}</b>) na schválenie komisárom.
+          ⏳ A request for this team (<b>{pending.nickname}</b>) is already awaiting commissioner approval.
         </div>
       )}
 
@@ -45,7 +45,7 @@ export default async function TeamLoginPage({
         <input type="hidden" name="slug" value={slug} />
         {firstTime && (
           <>
-            <p className="text-xs text-slate-500">Registrácia — vyplň svoj GM profil. <b>Nickname</b> sa zobrazuje na stránke. Žiadosť schvaľuje komisár.</p>
+            <p className="text-xs text-slate-500">Registration — fill in your GM profile. The <b>Nickname</b> is shown on the site. The commissioner approves the request.</p>
             <div className="grid grid-cols-2 gap-2">
               <label className="block text-sm"><span className="text-slate-300">First name</span>
                 <input name="firstName" required className="mt-1 w-full bg-slate-900 border border-slate-700 rounded px-3 py-2" /></label>
@@ -68,7 +68,7 @@ export default async function TeamLoginPage({
         {error === "wrong" && <p className="text-sm text-red-400">Wrong password.</p>}
         {error === "short" && <p className="text-sm text-red-400">Password must be at least 3 characters.</p>}
         {error === "profile" && <p className="text-sm text-red-400">Please fill in all profile fields.</p>}
-        {error === "pending" && <p className="text-sm text-amber-400">Pre tento tím už čaká žiadosť na schválenie.</p>}
+        {error === "pending" && <p className="text-sm text-amber-400">A request for this team is already awaiting approval.</p>}
         <button className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-500 font-semibold text-sm">
           {firstTime ? "Send join request" : "Sign in"}
         </button>

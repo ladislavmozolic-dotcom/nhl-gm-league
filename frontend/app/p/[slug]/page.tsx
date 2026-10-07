@@ -26,7 +26,7 @@ export default async function CustomPageView({ params }: { params: Promise<{ slu
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
       {!page.published && (
-        <div className="mb-4 text-xs text-amber-400 border border-amber-500/30 rounded-lg px-3 py-1.5 inline-block">Náhľad — stránka nie je publikovaná</div>
+        <div className="mb-4 text-xs text-amber-400 border border-amber-500/30 rounded-lg px-3 py-1.5 inline-block">Preview — this page is not published</div>
       )}
       <h1 className="text-3xl font-black mb-4">{page.title}</h1>
       <article className="text-slate-200" dangerouslySetInnerHTML={{ __html: renderMarkdown(page.body) }} />

@@ -39,7 +39,7 @@ export async function suggestLinesAction(slug: string): Promise<{ ok: false; err
   });
   const skaters: Atk[] = rows.filter((p) => !p.isGoalie).map((p) => ({ id: p.id, name: p.name, position: p.position ?? "C", overall: p.overall ?? 50, shoots: p.shoots, sc: A(p.sc), pa: A(p.pa), ck: A(p.ck), df: A(p.df), st: A(p.st), fg: A(p.fg), fo: A(p.fo), ph: A(p.ph, 75), sk: A(p.sk), en: A(p.en), weight: p.weight ?? 90 }));
   const goalies = rows.filter((p) => p.isGoalie).map((p) => ({ id: p.id, overall: p.overall ?? 50 }));
-  if (skaters.length < 5) return { ok: false, error: "Príliš málo hráčov na návrh zostavy." };
+  if (skaters.length < 5) return { ok: false, error: "Too few players to suggest a lineup." };
 
   // position-aware base lineup, then data-driven tactics
   const lines = autoLines(skaters.map((p) => ({ id: p.id, position: p.position, overall: p.overall, shoots: p.shoots })), goalies);
@@ -68,15 +68,15 @@ export async function suggestLinesAction(slug: string): Promise<{ ok: false; err
   const fScore = (fs: ForwardLine[]) => fs.reduce((sum, l, i) =>
     sum + tacticalFitForwards([l.lw, l.c, l.rw].map((id) => id != null ? fitPlayer(byId.get(id)) : null), chosenTactics, l.puck, i), 0);
   const { units: reshuffledF, swaps: fSwaps } = reshuffleBySlot(lines.forwardLines, ["c", "lw", "rw"], fScore,
-    (a, b, key, i, j) => `${lastName(byId, a)} ↔ ${lastName(byId, b)} (${String(key).toUpperCase()}, ${i + 1}. ↔ ${j + 1}. lajna) — lepšie sedia na opačnú líniu`);
+    (a, b, key, i, j) => `${lastName(byId, a)} ↔ ${lastName(byId, b)} (${String(key).toUpperCase()}, ${i + 1} ↔ ${j + 1} line) — fit better on the opposite line`);
   lines.forwardLines = reshuffledF;
   const dScore = (ds: DefensePair[]) => ds.reduce((sum, p, i) =>
     sum + tacticalFitDefense([p.ld, p.rd].map((id) => id != null ? fitPlayer(byId.get(id)) : null), chosenTactics, p.dzone, i), 0);
   const { units: reshuffledD, swaps: dSwaps } = reshuffleBySlot(lines.defensePairs, ["ld", "rd"], dScore,
-    (a, b, key, i, j) => `${lastName(byId, a)} ↔ ${lastName(byId, b)} (${String(key).toUpperCase()}, ${i + 1}. ↔ ${j + 1}. pár) — lepšie sedia na opačný pár`);
+    (a, b, key, i, j) => `${lastName(byId, a)} ↔ ${lastName(byId, b)} (${String(key).toUpperCase()}, ${i + 1} ↔ ${j + 1} pair) — fit better on the opposite pair`);
   lines.defensePairs = reshuffledD;
-  for (const s of fSwaps) rationale.push(`Výmena na útoku: ${s}`);
-  for (const s of dSwaps) rationale.push(`Výmena v obrane: ${s}`);
+  for (const s of fSwaps) rationale.push(`Forward swap: ${s}`);
+  for (const s of dSwaps) rationale.push(`Defense swap: ${s}`);
 
   // forward lines: allocate a 5-point PHY/DF/OF budget from the (now reshuffled) trio's profile
   lines.forwardLines.forEach((l, i) => {
@@ -85,14 +85,14 @@ export async function suggestLinesAction(slug: string): Promise<{ ok: false; err
     const avg = (f: (p: Atk) => number) => trio.reduce((s, p) => s + f(p), 0) / trio.length;
     const off = avg((p) => (p.sc + p.pa) / 2), def = avg((p) => p.df), phy = avg((p) => (p.ck + p.st + p.fg) / 3);
     let t: { phy: number; df: number; of: number }, why: string;
-    if (off - def >= 6) { t = { phy: 0, df: 1, of: 4 }; why = "ofenzívna elitná lajna (vysoké SC/PA)"; }
-    else if (def - off >= 5) { t = { phy: 1, df: 3, of: 1 }; why = "obranná/checkerská lajna (vysoké DF)"; }
-    else if (phy >= 62 && off < 58) { t = { phy: 2, df: 2, of: 1 }; why = "energia/fyzická lajna (vysoké CK/ST/FG)"; }
-    else if (i <= 1) { t = { phy: 1, df: 1, of: 3 }; why = "vyvážená útočná lajna"; }
-    else { t = { phy: 1, df: 2, of: 2 }; why = "vyvážená stredná lajna"; }
+    if (off - def >= 6) { t = { phy: 0, df: 1, of: 4 }; why = "offensive elite line (high SC/PA)"; }
+    else if (def - off >= 5) { t = { phy: 1, df: 3, of: 1 }; why = "defensive/checking line (high DF)"; }
+    else if (phy >= 62 && off < 58) { t = { phy: 2, df: 2, of: 1 }; why = "energy/physical line (high CK/ST/FG)"; }
+    else if (i <= 1) { t = { phy: 1, df: 1, of: 3 }; why = "balanced offensive line"; }
+    else { t = { phy: 1, df: 2, of: 2 }; why = "balanced middle line"; }
     l.tactic = { phy: clamp(t.phy), df: clamp(t.df), of: clamp(t.of) };
     const names = trio.map((p) => displayName(p.name).split(" ").pop()).join("-");
-    rationale.push(`${i + 1}. útok (${names}): ${why} → PHY ${l.tactic.phy} / DF ${l.tactic.df} / OF ${l.tactic.of}`);
+    rationale.push(`Line ${i + 1} (${names}): ${why} → PHY ${l.tactic.phy} / DF ${l.tactic.df} / OF ${l.tactic.of}`);
   });
 
   // defence pairs: top pair two-way, then by their offensive punch
@@ -102,13 +102,13 @@ export async function suggestLinesAction(slug: string): Promise<{ ok: false; err
     const off = pair.reduce((s, x) => s + (x.sc + x.pa) / 2, 0) / pair.length;
     const def = pair.reduce((s, x) => s + x.df, 0) / pair.length;
     let t: { phy: number; df: number; of: number }, why: string;
-    if (i === 0) { t = { phy: 1, df: 2, of: 2 }; why = "prvý pár — dvojcestný"; }
-    else if (off >= 58) { t = { phy: 1, df: 2, of: 2 }; why = "ofenzívny pár (dobré SC/PA)"; }
-    else if (def >= 66) { t = { phy: 1, df: 4, of: 0 }; why = "shut-down pár (vysoké DF)"; }
-    else { t = { phy: 1, df: 3, of: 1 }; why = "obranný pár"; }
+    if (i === 0) { t = { phy: 1, df: 2, of: 2 }; why = "first pair — two-way"; }
+    else if (off >= 58) { t = { phy: 1, df: 2, of: 2 }; why = "offensive pair (good SC/PA)"; }
+    else if (def >= 66) { t = { phy: 1, df: 4, of: 0 }; why = "shut-down pair (high DF)"; }
+    else { t = { phy: 1, df: 3, of: 1 }; why = "defensive pair"; }
     p.tactic = { phy: clamp(t.phy), df: clamp(t.df), of: clamp(t.of) };
     const dnames = pair.map((x) => displayName(x.name).split(" ").pop()).join("-");
-    rationale.push(`${i + 1}. obranný pár (${dnames}): ${why} → PHY ${p.tactic.phy} / DF ${p.tactic.df} / OF ${p.tactic.of}`);
+    rationale.push(`Pair ${i + 1} (${dnames}): ${why} → PHY ${p.tactic.phy} / DF ${p.tactic.df} / OF ${p.tactic.of}`);
   });
 
   return { ok: true, lines, system: bestName, rationale };
