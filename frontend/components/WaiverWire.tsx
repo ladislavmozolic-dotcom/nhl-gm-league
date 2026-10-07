@@ -5,6 +5,7 @@ import Link from "next/link";
 import PlayerAvatar from "@/components/playerAvatar";
 import { money } from "@/lib/finance";
 import { claimWaiverAction } from "@/app/waivers/actions";
+import { useLang } from "@/components/LangProvider";
 import type { WaiverRow, WaiverPriorityRow } from "@/lib/waivers-server";
 
 export type MyTeamInfo = {
@@ -40,13 +41,18 @@ export default function WaiverWire({
   myTeam,
   inSeason,
   order,
+  waiversEnabled = true,
 }: {
   waivers: WaiverRow[];
   myTeamId: number | null;
   myTeam?: MyTeamInfo;
   inSeason: boolean;
   order: WaiverPriorityRow[];
+  waiversEnabled?: boolean;
 }) {
+  const lang = useLang();
+  const isCs = lang === "cs";
+
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<{ t: "ok" | "err"; s: string } | null>(null);
   const [search, setSearch] = useState("");
@@ -79,8 +85,34 @@ export default function WaiverWire({
     start(async () => {
       setMsg(null);
       const r = await fn();
-      setMsg(r.ok ? { t: "ok", s: okMsg } : { t: "err", s: r.error ?? "Nastala chyba." });
+      setMsg(r.ok ? { t: "ok", s: okMsg } : { t: "err", s: r.error ?? (isCs ? "Nastala chyba." : "Failed.") });
     });
+
+  if (!waiversEnabled) {
+    return (
+      <div className="space-y-6">
+        <div className="pb-2 border-b border-slate-800/80">
+          <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Waiver Wire</h1>
+          <p className="text-sm text-slate-400 mt-1">
+            {isCs
+              ? "Waiver listina a prioritné poradie nárokov"
+              : "24-hour waiver window to assign players to the AHL & full-league claim priority order."}
+          </p>
+        </div>
+        <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 text-sm text-slate-400">
+          {isCs ? (
+            <p>
+              Waiver listina je v tejto lige <b>vypnutá</b> — kluby presúvajú hráčov medzi NHL a AHL farmou voľne cez správu zostavy bez nutnosti waiveru.
+            </p>
+          ) : (
+            <p>
+              The waiver wire is <b>turned off</b> in this league — clubs move players between the NHL and their AHL affiliate freely with no claims. The commissioner can enable waivers in engine settings.
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -88,13 +120,15 @@ export default function WaiverWire({
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2 border-b border-slate-800/80">
         <div>
           <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-sky-950/60 border border-sky-800/50 text-[11px] font-bold text-sky-400 uppercase tracking-widest mb-2 shadow-sm">
-            <span>🛡️</span> UNHL Transactions &bull; 24h Window
+            <span>🛡️</span> {isCs ? "UNHL Transakcie · 24h Okno" : "UNHL Transactions · 24h Window"}
           </div>
           <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
             Waiver Wire
           </h1>
           <p className="text-sm text-slate-400 mt-1 max-w-2xl">
-            24-hodinové waiver okno na presun hráčov na farmu v AHL a prioritné poradie nárokov (Claims).
+            {isCs
+              ? "24-hodinové waiver okno na presun hráčov na farmu v AHL a prioritné poradie nárokov (Claims)."
+              : "24-hour waiver window to assign players to the AHL & full-league claim priority order."}
           </p>
         </div>
 
@@ -105,14 +139,14 @@ export default function WaiverWire({
             )}
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-slate-400">Váš tím:</span>
+                <span className="text-xs font-bold text-slate-400">{isCs ? "Váš tím:" : "Your club:"}</span>
                 <span className="text-xs font-black text-white">{myTeam.name}</span>
               </div>
               <div className="text-[11px] text-sky-400 font-bold">
                 {myPriorityRank ? (
-                  <span>#{myPriorityRank} v poradí nárokov</span>
+                  <span>{isCs ? `#${myPriorityRank} v poradí nárokov` : `#${myPriorityRank} in claim priority`}</span>
                 ) : (
-                  <span>Prihlásený GM</span>
+                  <span>{isCs ? "Prihlásený GM" : "Signed-in GM"}</span>
                 )}
               </div>
             </div>
@@ -126,7 +160,7 @@ export default function WaiverWire({
         <div className="bg-slate-900/70 border border-slate-800/90 rounded-2xl p-4 sm:p-5 shadow-lg shadow-black/20 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs uppercase font-bold tracking-wider text-slate-400">
-              Na waiveri
+              {isCs ? "Na waiveri" : "On Waivers"}
             </span>
             <span className="text-base">📋</span>
           </div>
@@ -135,11 +169,15 @@ export default function WaiverWire({
               {waivers.length}
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              {waivers.length === 1
-                ? "1 aktívny hráč"
-                : waivers.length >= 2 && waivers.length <= 4
-                ? `${waivers.length} aktívni hráči`
-                : `${waivers.length} aktívnych hráčov`}
+              {isCs
+                ? waivers.length === 1
+                  ? "1 aktívny hráč"
+                  : waivers.length >= 2 && waivers.length <= 4
+                  ? `${waivers.length} aktívni hráči`
+                  : `${waivers.length} aktívnych hráčov`
+                : waivers.length === 1
+                ? "1 active player"
+                : `${waivers.length} active players`}
             </p>
           </div>
         </div>
@@ -148,7 +186,7 @@ export default function WaiverWire({
         <div className="bg-slate-900/70 border border-slate-800/90 rounded-2xl p-4 sm:p-5 shadow-lg shadow-black/20 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs uppercase font-bold tracking-wider text-slate-400">
-              Priorita klubu
+              {isCs ? "Priorita klubu" : "Your Priority"}
             </span>
             <span className="text-base">🎯</span>
           </div>
@@ -157,7 +195,7 @@ export default function WaiverWire({
               {myPriorityRank ? `#${myPriorityRank}` : myTeam ? myTeam.code : "—"}
             </div>
             <p className="text-xs text-slate-400 mt-0.5 truncate">
-              {myTeam ? myTeam.name : "Prihláste sa ako GM"}
+              {myTeam ? myTeam.name : isCs ? "Prihláste sa ako GM" : "Sign in as GM"}
             </p>
           </div>
         </div>
@@ -166,7 +204,7 @@ export default function WaiverWire({
         <div className="bg-slate-900/70 border border-slate-800/90 rounded-2xl p-4 sm:p-5 shadow-lg shadow-black/20 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs uppercase font-bold tracking-wider text-slate-400">
-              Kľúč priorít
+              {isCs ? "Kľúč priorít" : "Priority Rule"}
             </span>
             <span className="text-base">⚖️</span>
           </div>
@@ -175,7 +213,13 @@ export default function WaiverWire({
               {inSeason ? "Reverse Standings" : "Claim Queue"}
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              {inSeason ? "Podľa tabuľky (najhorší prvý)" : "Rotujúci rad bez nároku"}
+              {inSeason
+                ? isCs
+                  ? "Podľa tabuľky (najhorší prvý)"
+                  : "Worst record in standings first"
+                : isCs
+                ? "Rotujúci rad bez nároku"
+                : "Queue (longest since claim)"}
             </p>
           </div>
         </div>
@@ -184,16 +228,16 @@ export default function WaiverWire({
         <div className="bg-slate-900/70 border border-slate-800/90 rounded-2xl p-4 sm:p-5 shadow-lg shadow-black/20 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs uppercase font-bold tracking-wider text-slate-400">
-              Ochranné okno
+              {isCs ? "Ochranné okno" : "Waiver Window"}
             </span>
             <span className="text-base">⏱️</span>
           </div>
           <div>
             <div className="text-2xl sm:text-3xl font-black text-purple-300 tracking-tight">
-              24 hodín
+              {isCs ? "24 hodín" : "24 Hours"}
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              Recall pass: 30 dní / 10 zápasov
+              {isCs ? "Recall pass: 30 dní / 10 zápasov" : "Recall pass: 30 days / 10 games"}
             </p>
           </div>
         </div>
@@ -226,7 +270,7 @@ export default function WaiverWire({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <h2 className="text-lg font-black text-white uppercase tracking-wide">
-              Aktívni hráči na waiver listine
+              {isCs ? "Aktívni hráči na waiver listine" : "Active Players on Waivers"}
             </h2>
             <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300">
               {waivers.length}
@@ -240,10 +284,14 @@ export default function WaiverWire({
               🛡️
             </div>
             <h3 className="text-lg font-bold text-white mb-2">
-              Momentálne sa na waiver listine nenachádza žiaden hráč
+              {isCs
+                ? "Momentálne sa na waiver listine nenachádza žiaden hráč"
+                : "No players are on waivers right now"}
             </h3>
             <p className="text-xs sm:text-sm text-slate-400 max-w-lg mx-auto leading-relaxed">
-              Všetci hráči boli úspešne priradení do zostáv alebo ich 24-hodinové okno vypršalo. Ak klub umiestni hráča na waiver listinu pred odoslaním do AHL, objaví sa tu s možnosťou prednostného nároku.
+              {isCs
+                ? "Všetci hráči boli úspešne priradení do zostáv alebo ich 24-hodinové okno vypršalo. Ak klub umiestni hráča na waiver listinu pred odoslaním do AHL, objaví sa tu s možnosťou prednostného nároku."
+                : "All waived players have cleared to the AHL or were claimed by other clubs. When a club exposes a player on waivers before assigning him to the farm, he will appear here for 24 hours."}
             </p>
             {myTeam?.slug && (
               <div className="mt-6">
@@ -251,7 +299,7 @@ export default function WaiverWire({
                   href={`/teams/${myTeam.slug}/roster/edit`}
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold border border-slate-700 transition-colors shadow-sm"
                 >
-                  <span>📋</span> Prejsť na správu zostavy vášho tímu &rarr;
+                  <span>📋</span> {isCs ? "Prejsť na správu zostavy vášho tímu →" : "Manage your team roster →"}
                 </Link>
               </div>
             )}
@@ -283,14 +331,14 @@ export default function WaiverWire({
                         )}
                         {w.age != null && (
                           <span className="text-[11px] font-mono text-slate-400 bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700/60">
-                            {w.age} r.
+                            {w.age} {isCs ? "r." : "yo"}
                           </span>
                         )}
                       </div>
 
                       <span className="text-[11px] text-slate-400 flex items-center gap-1 font-mono">
                         <span>⏱️</span>
-                        {new Date(w.placedAt).toLocaleString("sk-SK", {
+                        {new Date(w.placedAt).toLocaleString(isCs ? "sk-SK" : "en-US", {
                           day: "numeric",
                           month: "numeric",
                           hour: "2-digit",
@@ -320,7 +368,7 @@ export default function WaiverWire({
                           </span>
                         )}
                         <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
-                          <span>Umiestnil tím:</span>
+                          <span>{isCs ? "Umiestnil tím:" : "Waived by:"}</span>
                           <span className="font-bold text-slate-200 inline-flex items-center gap-1">
                             {w.fromLogoUrl && (
                               <img src={w.fromLogoUrl} alt="" className="w-3.5 h-3.5 object-contain" />
@@ -339,16 +387,18 @@ export default function WaiverWire({
                         </div>
                         <div className="font-mono font-bold text-amber-300 text-sm">
                           {formatCap(w.capHit)}
-                          <span className="text-[10px] text-slate-400 font-normal ml-0.5">/rok</span>
+                          <span className="text-[10px] text-slate-400 font-normal ml-0.5">{isCs ? "/rok" : "/yr"}</span>
                         </div>
                       </div>
                       <div className="text-right">
                         <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                          Platnosť zmluvy
+                          {isCs ? "Platnosť zmluvy" : "Contract Term"}
                         </div>
                         <div className="font-bold text-slate-200">
                           {w.contractYears
-                            ? `${w.contractYears} ${w.contractYears === 1 ? "rok" : w.contractYears <= 4 ? "roky" : "rokov"}`
+                            ? isCs
+                              ? `${w.contractYears} ${w.contractYears === 1 ? "rok" : w.contractYears <= 4 ? "roky" : "rokov"}`
+                              : `${w.contractYears} ${w.contractYears === 1 ? "year" : "years"}`
                             : money(w.capHit)}
                         </div>
                       </div>
@@ -357,9 +407,9 @@ export default function WaiverWire({
                     {/* Claims Section */}
                     <div className="pt-1">
                       <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                        <span>Záujem o hráča</span>
+                        <span>{isCs ? "Záujem o hráča" : "Submitted Claims"}</span>
                         <span className="font-mono text-xs text-slate-300">
-                          {w.claims.length} {w.claims.length === 1 ? "tím" : w.claims.length >= 2 && w.claims.length <= 4 ? "tímy" : "tímov"}
+                          {w.claims.length} {isCs ? (w.claims.length === 1 ? "tím" : "tímov") : (w.claims.length === 1 ? "claim" : "claims")}
                         </span>
                       </div>
                       {w.claims.length > 0 ? (
@@ -376,7 +426,7 @@ export default function WaiverWire({
                         </div>
                       ) : (
                         <div className="text-xs text-slate-400 italic">
-                          Doposiaľ žiadny uplatnený nárok.
+                          {isCs ? "Doposiaľ žiadny uplatnený nárok." : "No claims submitted yet."}
                         </div>
                       )}
                     </div>
@@ -387,29 +437,31 @@ export default function WaiverWire({
                     {myTeamId != null ? (
                       mine ? (
                         <div className="text-center py-2 px-3 rounded-xl bg-slate-800/40 border border-slate-800 text-xs text-slate-400 font-medium">
-                          Váš hráč (nevratný waiver)
+                          {isCs ? "Váš hráč (nevratný waiver)" : "Your player (waiving is final)"}
                         </div>
                       ) : alreadyClaimed ? (
                         <div className="text-center py-2 px-3 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm">
-                          <span>✓</span> Nárokované (Čaká na vyhodnotenie)
+                          <span>✓</span> {isCs ? "Nárokované (Čaká na vyhodnotenie)" : "Claimed ✓ (Awaiting resolution)"}
                         </div>
                       ) : (
                         <button
                           onClick={() =>
                             run(
                               () => claimWaiverAction(w.id, myTeamId),
-                              `Nárok na hráča ${w.playerName} bol úspešne odoslaný!`
+                              isCs
+                                ? `Nárok na hráča ${w.playerName} bol úspešne odoslaný!`
+                                : `Claim for ${w.playerName} submitted successfully!`
                             )
                           }
                           disabled={pending}
                           className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-bold text-xs shadow-lg shadow-sky-600/20 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                         >
-                          <span>⚡</span> Požiadať o hráča (Claim)
+                          <span>⚡</span> {isCs ? "Požiadať o hráča (Claim)" : "Submit Claim"}
                         </button>
                       )
                     ) : (
                       <div className="text-center py-2 px-3 rounded-xl bg-slate-800/30 text-xs text-slate-400">
-                        Pre uplatnenie nároku sa prihláste ako GM.
+                        {isCs ? "Pre uplatnenie nároku sa prihláste ako GM." : "Sign in as GM to claim players."}
                       </div>
                     )}
                   </div>
@@ -427,18 +479,30 @@ export default function WaiverWire({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-black text-white uppercase tracking-wide">
-                  Prioritné poradie nárokov
+                  {isCs ? "Prioritné poradie nárokov" : "Claim Priority Order"}
                 </h2>
                 <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300">
-                  {order.length} tímov
+                  {order.length} {isCs ? "tímov" : "clubs"}
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Kto vyhrá sporný nárok pri viacerých záujemcoch — {inSeason ? (
-                  <>podľa aktuálnej tabuľky (<b>najhorší tím má najvyššiu prioritu</b>)</>
+                {isCs ? (
+                  <>
+                    Kto vyhrá sporný nárok pri viacerých záujemcoch — {inSeason ? (
+                      <>podľa aktuálnej tabuľky (<b>najhorší tím má najvyššiu prioritu</b>)</>
+                    ) : (
+                      <>podľa rotujúcej fronty nárokov</>
+                    )}. Klub po úspešnom nároku klesá na 32. miesto.
+                  </>
                 ) : (
-                  <>podľa rotujúcej fronty nárokov</>
-                )}. Klub po úspešnom nároku klesá na 32. miesto.
+                  <>
+                    Who wins a contested claim when multiple clubs claim — {inSeason ? (
+                      <>currently the <b>worst team in the standings gets priority</b></>
+                    ) : (
+                      <>currently a <b>claim-order queue</b> (whoever has gone longest without winning a claim)</>
+                    )}. A club drops to 32nd the moment it wins a claim.
+                  </>
+                )}
               </p>
             </div>
 
@@ -454,7 +518,7 @@ export default function WaiverWire({
                       : "text-slate-400 hover:text-white"
                   }`}
                 >
-                  Všetky ({order.length})
+                  {isCs ? `Všetky (${order.length})` : `All (${order.length})`}
                 </button>
                 <button
                   onClick={() => setFilterTab("TOP10")}
@@ -475,7 +539,7 @@ export default function WaiverWire({
                         : "text-slate-400 hover:text-white"
                     }`}
                   >
-                    Váš tím
+                    {isCs ? "Váš tím" : "Your Team"}
                   </button>
                 )}
               </div>
@@ -486,7 +550,7 @@ export default function WaiverWire({
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Filtrovať tím..."
+                  placeholder={isCs ? "Filtrovať tím..." : "Filter club..."}
                   className="bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 w-32 sm:w-40"
                 />
                 {search && (
@@ -512,7 +576,7 @@ export default function WaiverWire({
                 return (
                   <div
                     key={t.teamId}
-                    title={`${t.name} (Poradie: #${t.rank})`}
+                    title={`${t.name} (${isCs ? "Poradie" : "Rank"}: #${t.rank})`}
                     className={`group relative flex items-center gap-2 p-2 rounded-xl border transition-all ${
                       isMine
                         ? "bg-sky-950/60 border-sky-500/80 shadow-[0_0_15px_rgba(14,165,233,0.3)] ring-1 ring-sky-500/50"
@@ -557,10 +621,10 @@ export default function WaiverWire({
                         <span className={`text-xs font-black truncate ${isMine ? "text-sky-300" : "text-white"}`}>
                           {t.code}
                         </span>
-                        {isTop1 && <span className="text-[10px]" title="1. priorita">👑</span>}
+                        {isTop1 && <span className="text-[10px]" title={isCs ? "1. priorita" : "1st priority"}>👑</span>}
                         {isMine && !isTop1 && (
                           <span className="text-[9px] font-extrabold text-sky-400 tracking-tighter">
-                            VÁŠ
+                            {isCs ? "VÁŠ" : "YOU"}
                           </span>
                         )}
                       </div>
@@ -572,7 +636,7 @@ export default function WaiverWire({
 
             {filteredOrder.length === 0 && (
               <div className="text-center py-6 text-slate-400 text-xs">
-                Žiadny tím nezodpovedá vyhľadávaniu.
+                {isCs ? "Žiadny tím nezodpovedá vyhľadávaniu." : "No teams matching your filter."}
               </div>
             )}
           </div>
@@ -582,7 +646,7 @@ export default function WaiverWire({
       {/* Section 3: Rules & Guide */}
       <section className="space-y-4 pt-2">
         <h2 className="text-lg font-black text-white uppercase tracking-wide flex items-center gap-2">
-          <span>📖</span> Ako funguje Waiver Wire &bull; Pravidlá ligy
+          <span>📖</span> {isCs ? "Ako funguje Waiver Wire · Pravidlá ligy" : "How the Waiver Wire Works · League Rules"}
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -593,10 +657,12 @@ export default function WaiverWire({
                 ⏱️
               </div>
               <h3 className="text-sm font-bold text-white mb-1.5">
-                24-Hodinové okno
+                {isCs ? "24-Hodinové okno" : "24-Hour Window"}
               </h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Každý hráč s jednocestnou zmluvou musí pred odoslaním do farmárskej AHL stráviť 24 hodín na waiver listine. Počas tejto doby si ho môže nárokovať ktorýkoľvek iný klub.
+                {isCs
+                  ? "Každý hráč s jednocestnou zmluvou musí pred odoslaním do farmárskej AHL stráviť 24 hodín na waiver listine. Počas tejto doby si ho môže nárokovať ktorýkoľvek iný klub."
+                  : "A player on a one-way contract must spend 24 hours on waivers before being assigned to the AHL affiliate. Any other club can submit a claim during this window."}
               </p>
             </div>
           </div>
@@ -608,10 +674,12 @@ export default function WaiverWire({
                 ⚖️
               </div>
               <h3 className="text-sm font-bold text-white mb-1.5">
-                Prioritný systém nárokov
+                {isCs ? "Prioritný systém nárokov" : "Claim Priority Order"}
               </h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                V priebehu sezóny rozhoduje obrátené poradie ligovej tabuľky (najhorší tím má prednosť). Po úspešnom nároku klub automaticky klesá na 32. miesto v poradí.
+                {isCs
+                  ? "V priebehu sezóny rozhoduje obrátené poradie ligovej tabuľky (najhorší tím má prednosť). Po úspešnom nároku klub automaticky klesá na 32. miesto v poradí."
+                  : "In-season, claims follow reverse standings (worst record gets priority). Winning a claim moves that club to the back of the line (32nd)."}
               </p>
             </div>
           </div>
@@ -623,10 +691,12 @@ export default function WaiverWire({
                 🚫
               </div>
               <h3 className="text-sm font-bold text-white mb-1.5">
-                NMC & NTC Klauzuly
+                {isCs ? "NMC & NTC Klauzuly" : "NMC & NTC Clauses"}
               </h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Doložka o neprenosnosti (NMC) úplne blokuje umiestnenie hráča na waiver. No-trade klauzula (NTC) waiver nezakazuje a hráča je možné ponúknuť.
+                {isCs
+                  ? "Doložka o neprenosnosti (NMC) úplne blokuje umiestnenie hráča na waiver. No-trade klauzula (NTC) waiver nezakazuje a hráča je možné ponúknuť."
+                  : "A No-Movement Clause (NMC) blocks waivers entirely. A No-Trade Clause (NTC) does not block waivers — the player can still be waived."}
               </p>
             </div>
           </div>
@@ -638,10 +708,12 @@ export default function WaiverWire({
                 🔄
               </div>
               <h3 className="text-sm font-bold text-white mb-1.5">
-                Pravidlo 30/10 (Recall pass)
+                {isCs ? "Pravidlo 30/10 (Recall pass)" : "Rule 30/10 (Recall Pass)"}
               </h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Povolaný hráč z AHL môže byť poslaný späť bez waiveru, ak od jeho povolania neuplynulo viac ako 30 kalendárnych dní a neodohral viac ako 10 zápasov NHL.
+                {isCs
+                  ? "Povolaný hráč z AHL môže byť poslaný späť bez waiveru, ak od jeho povolania neuplynulo viac ako 30 kalendárnych dní a neodohral viac ako 10 zápasov NHL."
+                  : "A player called up from the farm can be returned without waivers if it has been 30 days or fewer and 10 NHL games or fewer since that recall."}
               </p>
             </div>
           </div>

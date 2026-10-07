@@ -27,27 +27,14 @@ export default async function WaiversPage() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto px-3 sm:px-6 py-6">
-      {!settings.waiversEnabled ? (
-        <div className="space-y-4">
-          <PageHeader
-            title="Waiver Wire"
-            subtitle="24-hodinové waiver okno na presun hráčov na farmu a prioritné poradie nárokov"
-          />
-          <Card>
-            <p className="text-sm text-slate-400 p-6">
-              Waiver listina je v tejto lige <b>vypnutá</b> — kluby presúvajú hráčov medzi NHL a AHL farmou voľne cez správu zostavy bez nutnosti waiveru.
-            </p>
-          </Card>
-        </div>
-      ) : (
-        <WaiverWire
-          waivers={waivers}
-          myTeamId={session}
-          myTeam={myTeam}
-          inSeason={inSeason}
-          order={order}
-        />
-      )}
+      <WaiverWire
+        waivers={waivers}
+        myTeamId={session}
+        myTeam={myTeam}
+        inSeason={inSeason}
+        order={order}
+        waiversEnabled={settings.waiversEnabled}
+      />
     </div>
   );
 }
