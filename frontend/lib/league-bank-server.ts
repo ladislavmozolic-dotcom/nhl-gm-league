@@ -4,7 +4,7 @@
 //
 // Daily enforcement — REGULAR SEASON ONLY (off-season + playoffs: +10% cap cushion, no fines).
 // (called from the cron, once per Europe/Bratislava day):
-//   • NHL roster not compliant  → nhlRosterFine   (default 100K)
+//   • NHL roster not compliant  → nhlRosterFine   (default 200K)
 //   • AHL roster not compliant  → ahlRosterFine   (default  50K)
 //   • club over the salary cap  → capFinePerDay    (default 200K) and the overage
 //     is logged in CapOverageDay; accumulated overage × capPenaltyMultiplier
