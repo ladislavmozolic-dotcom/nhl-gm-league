@@ -17,9 +17,24 @@ import { WAIVER_CAP_HIT_LIMIT, RECALL_EXEMPT_DAYS, RECALL_EXEMPT_GAMES } from ".
 import type { Phase } from "./calendar";
 
 export type WaiverRow = {
-  id: number; playerId: number; playerName: string; playerSlug: string | null; position: string; capHit: number;
-  fromTeamId: number; fromCode: string; placedDay: number; placedAt: Date; clause: string | null;
-  claims: { teamId: number; code: string }[];
+  id: number;
+  playerId: number;
+  playerName: string;
+  playerSlug: string | null;
+  position: string;
+  capHit: number;
+  photoUrl?: string | null;
+  overall?: number | null;
+  age?: number | null;
+  contractYears?: number | null;
+  fromTeamId: number;
+  fromCode: string;
+  fromName?: string;
+  fromLogoUrl?: string | null;
+  placedDay: number;
+  placedAt: Date;
+  clause: string | null;
+  claims: { teamId: number; code: string; name?: string; logoUrl?: string | null }[];
 };
 
 export type WaiverPriorityRow = { teamId: number; code: string; name: string; logoUrl: string | null; rank: number };
@@ -114,18 +129,61 @@ export async function recallExemptions(players: { id: number; lastRecalledAt: Da
 export async function activeWaivers(): Promise<WaiverRow[]> {
   const waivers = await prisma.waiver.findMany({ where: { status: "ACTIVE" }, orderBy: { createdAt: "desc" }, include: { claims: true } });
   if (waivers.length === 0) return [];
-  const players = await prisma.player.findMany({ where: { id: { in: waivers.map((w) => w.playerId) } }, select: { id: true, name: true, slug: true, position: true, capHit: true, contractYears: true, tradeClause: true } });
+  const players = await prisma.player.findMany({
+    where: { id: { in: waivers.map((w) => w.playerId) } },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      position: true,
+      capHit: true,
+      contractYears: true,
+      tradeClause: true,
+      photoUrl: true,
+      nhlId: true,
+      age: true,
+      overall: true,
+    },
+  });
   const pById = new Map(players.map((p) => [p.id, p]));
   const teamIds = new Set<number>();
   for (const w of waivers) { teamIds.add(w.fromTeamId); w.claims.forEach((c) => teamIds.add(c.teamId)); }
-  const teams = await prisma.team.findMany({ where: { id: { in: [...teamIds] } }, select: { id: true, code: true } });
-  const code = new Map(teams.map((t) => [t.id, t.code ?? String(t.id)]));
+  const teams = await prisma.team.findMany({
+    where: { id: { in: [...teamIds] } },
+    select: { id: true, code: true, name: true, logoUrl: true },
+  });
+  const tMap = new Map(teams.map((t) => [t.id, t]));
   return waivers.map((w) => {
     const p = pById.get(w.playerId);
+    const fromTeam = tMap.get(w.fromTeamId);
+    const photo = p?.photoUrl ?? (p?.nhlId ? `https://assets.nhle.com/mugs/nhl/latest/${p.nhlId}/168x168.png` : null);
     return {
-      id: w.id, playerId: w.playerId, playerName: cleanName(p?.name ?? ""), playerSlug: p?.slug ?? null, position: p?.position ?? "", capHit: p ? liveCapHit(p) : 0,
-      fromTeamId: w.fromTeamId, fromCode: code.get(w.fromTeamId) ?? "?", placedDay: w.placedDay, placedAt: w.placedAt, clause: p?.tradeClause ?? null,
-      claims: w.claims.map((c) => ({ teamId: c.teamId, code: code.get(c.teamId) ?? "?" })),
+      id: w.id,
+      playerId: w.playerId,
+      playerName: cleanName(p?.name ?? ""),
+      playerSlug: p?.slug ?? null,
+      photoUrl: photo,
+      position: p?.position ?? "",
+      capHit: p ? liveCapHit(p) : 0,
+      contractYears: p?.contractYears ?? null,
+      age: p?.age ?? null,
+      overall: p?.overall ?? null,
+      fromTeamId: w.fromTeamId,
+      fromCode: fromTeam?.code ?? String(w.fromTeamId),
+      fromName: fromTeam?.name ?? "",
+      fromLogoUrl: fromTeam?.logoUrl ?? null,
+      placedDay: w.placedDay,
+      placedAt: w.placedAt,
+      clause: p?.tradeClause ?? null,
+      claims: w.claims.map((c) => {
+        const ct = tMap.get(c.teamId);
+        return {
+          teamId: c.teamId,
+          code: ct?.code ?? String(c.teamId),
+          name: ct?.name ?? "",
+          logoUrl: ct?.logoUrl ?? null,
+        };
+      }),
     };
   });
 }
