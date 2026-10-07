@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { isCommission, getTeamSession } from "@/lib/auth";
 import { displayName, epProfileUrl } from "@/lib/playerName";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, BackPill } from "@/components/ui";
 import CommishTradeActions from "@/components/CommishTradeActions";
 
 // href set → the item is clickable: an internal /players/{id} link for a player, or
@@ -141,7 +141,11 @@ export default async function CommishTradesPage() {
 
   return (
     <div className="space-y-5 py-2">
-      <PageHeader title="Trade Commission" subtitle="Rookie-GM trades awaiting commission review. Accept executes the deal · Decline kills it · Modify sends it back to the GM to rebalance." />
+      <PageHeader
+        title="Trade Commission"
+        subtitle="Rookie-GM trades awaiting commission review. Accept executes the deal · Decline kills it · Modify sends it back to the GM to rebalance."
+        right={<BackPill href="/trades">Trade Tracker</BackPill>}
+      />
       {actionableRows.length === 0 ? (
         <Card><p className="text-center text-slate-500 py-10 text-sm">No trades awaiting review. 🎉</p></Card>
       ) : actionableRows.map(({ t, sum }) => (
