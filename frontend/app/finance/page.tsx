@@ -6,20 +6,22 @@ import FinanceTable, { type FinanceRow } from "@/components/FinanceTable";
 import { PageHeader } from "@/components/ui";
 import FinanceNav from "@/components/FinanceNav";
 import { leagueDetailedFinance } from "@/lib/detailed-finance-server";
+import { getLang } from "@/lib/lang-server";
 
 export const dynamic = "force-dynamic";
 const SEASON = "2026-27";
 
 export default async function FinancePage() {
-  const [teams, settings, standings, homeCounts] = await Promise.all([
+  const [teams, settings, standings, homeCounts, lang] = await Promise.all([
     prisma.team.findMany({
       where: { league: "NHL", isAffiliate: false },
       select: {
-        id: true, name: true, slug: true, logoUrl: true, popularity: true,
+        id: true, name: true, slug: true, logoUrl: true, code: true, division: true, conference: true, popularity: true,
         capacity: true, arenaSections: true, bankAccount: true, ledgerAdj: true, seasonOpeningBank: true,
         players: { where: { rosterType: "NHL" }, select: { capHit: true, retainedSalary: true, contractYears: true } },
         affiliateTeams: { select: { players: { where: { rosterType: "AHL" }, select: { capHit: true, ahlSalary: true, contractType: true, contractYears: true } } } },
       },
+      orderBy: { name: "asc" },
     }),
     loadSettings(),
     computeStandings(SEASON, "NHL"),
@@ -28,7 +30,9 @@ export default async function FinancePage() {
       where: { season: SEASON, league: "NHL", status: "FINAL", seriesId: null },
       _count: { _all: true },
     }),
+    getLang(),
   ]);
+
   const stById = new Map(standings.map((s) => [s.teamId, s]));
   const homeById = new Map(homeCounts.map((h) => [h.homeTeamId, h._count._all]));
   const detailed = settings.financeMode === "detailed" ? await leagueDetailedFinance(SEASON) : null;
@@ -41,48 +45,71 @@ export default async function FinancePage() {
       const openingBank = t.seasonOpeningBank ?? settings.startingCapital;
       const ledger = t.ledgerAdj ?? 0;
       return {
-        id: t.id, name: t.name, slug: t.slug, logoUrl: t.logoUrl,
+        id: t.id,
+        name: t.name,
+        slug: t.slug,
+        logoUrl: t.logoUrl,
+        code: t.code,
+        division: t.division,
+        conference: t.conference,
         popularity: t.popularity,
-        actualIncome: Math.round(df.revenue * progress), projectedIncome: df.revenue,
-        actualExpenses: Math.round(df.expenses * progress), projectedExpenses: df.expenses,
+        actualIncome: Math.round(df.revenue * progress),
+        projectedIncome: df.revenue,
+        actualExpenses: Math.round(df.expenses * progress),
+        projectedExpenses: df.expenses,
         projectedResult: df.net,
         bankAccount: t.bankAccount ?? openingBank,
         projectedBankAccount: openingBank + df.net + ledger,
       };
     }
-    // the league's actual configured starting capital — matches what processFinances
-    // (the function that sets the real team.bankAccount) uses, not the legacy
-    // realMode/profinhlBank fallback this used to read, which could disagree with it.
+
     const startBank = settings.startingCapital;
-    const ledger = t.ledgerAdj ?? 0; // GM cash moves (trades/buyouts/fines) on top of ticket/salary
+    const ledger = t.ledgerAdj ?? 0;
     const fin = computeTeamFinance({
       popularity: t.popularity,
       pointsPct: projectedPointsPct(st),
       selloutRevenue: selloutRevenue(getArenaSections(t)),
-      salary: t.players.reduce((s, p) => s + Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0)), 0)
-        + farmSalaryExpense(t.affiliateTeams.flatMap((a) => a.players)),
+      salary:
+        t.players.reduce((s, p) => s + Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0)), 0) +
+        farmSalaryExpense(t.affiliateTeams.flatMap((a) => a.players)),
       homeGamesPlayed: homeById.get(t.id) ?? 0,
       totalGamesPlayed: st?.gp ?? 0,
       startingBank: startBank,
     });
+
     return {
-      id: t.id, name: t.name, slug: t.slug, logoUrl: t.logoUrl,
+      id: t.id,
+      name: t.name,
+      slug: t.slug,
+      logoUrl: t.logoUrl,
+      code: t.code,
+      division: t.division,
+      conference: t.conference,
       popularity: fin.popularity,
-      actualIncome: fin.actualIncome, projectedIncome: fin.projectedIncome,
-      actualExpenses: fin.actualExpenses, projectedExpenses: fin.projectedExpenses,
+      actualIncome: fin.actualIncome,
+      projectedIncome: fin.projectedIncome,
+      actualExpenses: fin.actualExpenses,
+      projectedExpenses: fin.projectedExpenses,
       projectedResult: fin.projectedResult,
-      bankAccount: fin.bankAccount + ledger, projectedBankAccount: fin.projectedBankAccount + ledger,
+      bankAccount: fin.bankAccount + ledger,
+      projectedBankAccount: fin.projectedBankAccount + ledger,
     };
   });
 
+  const isSk = lang === "cs";
+
   return (
-    <div className="space-y-6 py-2">
+    <div className="max-w-7xl mx-auto space-y-6 py-2 px-3 sm:px-6">
       <PageHeader
-        title={`${SEASON} Finance`}
-        subtitle={`Salary cap ${money(settings.salaryCapUpper)} · floor ${money(settings.salaryCapLower)} · click a column to sort`}
+        title={isSk ? `Financie ligy — ${SEASON}` : `League Finance — ${SEASON}`}
+        subtitle={
+          isSk
+            ? `Platový strop ${money(settings.salaryCapUpper)} · Platová podlaha ${money(settings.salaryCapLower)} · Prehľad príjmov a nákladov klubov`
+            : `Salary Cap ${money(settings.salaryCapUpper)} · Floor ${money(settings.salaryCapLower)} · Franchise revenue and expense ledger`
+        }
       />
-      <FinanceNav current="league" />
-      <FinanceTable rows={rows} />
+      <FinanceNav current="league" lang={lang} />
+      <FinanceTable rows={rows} lang={lang} />
     </div>
   );
 }

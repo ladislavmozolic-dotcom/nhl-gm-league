@@ -1,30 +1,53 @@
 import Link from "next/link";
-import { BackPill } from "@/components/ui";
+import type { Lang } from "@/lib/i18n";
 
-const sections = [
-  ["fan-interest", "Fan Interest", "/finance/fan-interest"],
-  ["season-tickets", "Season Tickets", "/finance/season-tickets"],
-  ["attendance", "Attendance", "/finance/attendance"],
-  ["merchandise", "Merchandise", "/finance/merchandise"],
-  ["sponsorship", "Sponsorship", "/finance/sponsorship"],
-  ["playoffs", "Playoff Revenue", "/finance/playoffs"],
+const SECTIONS = [
+  { key: "league", labelEn: "League Overview", labelSk: "Prehľad ligy", href: "/finance", icon: "🌐" },
+  { key: "dashboard", labelEn: "Club Dashboard", labelSk: "Klubový pult", href: "/finance/dashboard", icon: "📊" },
+  { key: "fan-interest", labelEn: "Fan Interest", labelSk: "Záujem fanúšikov", href: "/finance/fan-interest", icon: "🎟" },
+  { key: "season-tickets", labelEn: "Season Tickets", labelSk: "Permanentky", href: "/finance/season-tickets", icon: "🎫" },
+  { key: "attendance", labelEn: "Attendance", labelSk: "Návštevnosť", href: "/finance/attendance", icon: "🏟" },
+  { key: "merchandise", labelEn: "Merchandise", labelSk: "Merchandise", href: "/finance/merchandise", icon: "👕" },
+  { key: "sponsorship", labelEn: "Sponsorship", labelSk: "Sponzoring", href: "/finance/sponsorship", icon: "🤝" },
+  { key: "playoffs", labelEn: "Playoffs", labelSk: "Playoff", href: "/finance/playoffs", icon: "🏆" },
 ] as const;
 
-export default function FinanceNav({ current }: { current: "dashboard" | "league" | (typeof sections)[number][0] }) {
+export default function FinanceNav({
+  current,
+  lang = "en",
+}: {
+  current: string;
+  lang?: Lang;
+}) {
+  const isSk = lang === "cs";
+
   return (
-    <nav aria-label="Finance sections" className="flex flex-wrap items-center gap-2">
-      {current !== "dashboard" && <BackPill href="/finance/dashboard">Finance Dashboard</BackPill>}
-      {current === "dashboard" && (
-        <Link href="/finance/dashboard" aria-current="page" className="inline-flex items-center rounded-lg border border-blue-500/40 bg-blue-500/15 px-3 py-1.5 text-sm font-medium text-blue-200 whitespace-nowrap">
-          Finance Dashboard
-        </Link>
-      )}
-      {sections.map(([key, label, href]) => (
-        <Link key={key} href={href} aria-current={current === key ? "page" : undefined}
-          className={`inline-flex items-center rounded-lg border px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors ${current === key ? "border-blue-500/40 bg-blue-500/15 text-blue-200" : "border-slate-700/70 bg-slate-800/60 text-slate-300 hover:bg-slate-700 hover:text-white"}`}>
-          {label} →
-        </Link>
-      ))}
+    <nav aria-label="Finance sections" className="flex items-center gap-1.5 overflow-x-auto pb-1 custom-scrollbar">
+      {SECTIONS.map((s) => {
+        const isActive = current === s.key;
+        return (
+          <Link
+            key={s.key}
+            href={s.href}
+            aria-current={isActive ? "page" : undefined}
+            className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold whitespace-nowrap transition-all duration-200 ${
+              isActive
+                ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300 shadow-md shadow-cyan-950/20"
+                : "border-slate-800 bg-slate-900/80 text-slate-400 hover:border-slate-700 hover:text-white hover:bg-slate-850"
+            }`}
+          >
+            <span className="text-sm">{s.icon}</span>
+            <span>{isSk ? s.labelSk : s.labelEn}</span>
+          </Link>
+        );
+      })}
+      <Link
+        href="/salary-cap"
+        className="ml-auto inline-flex items-center gap-1 rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-1.5 text-xs font-semibold text-slate-400 hover:text-cyan-300 hover:border-cyan-500/40 transition-colors whitespace-nowrap shrink-0"
+      >
+        <span>🧢</span>
+        <span>{isSk ? "Cap Central →" : "Cap Central →"}</span>
+      </Link>
     </nav>
   );
 }

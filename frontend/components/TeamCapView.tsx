@@ -291,46 +291,197 @@ export default async function TeamCapView({ slug }: { slug: string }) {
       </div>
 
       {/* header + cap summary */}
-      <div className="flex flex-wrap items-center gap-6 bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 p-5">
-        {team.logoUrl && <img src={team.logoUrl} alt="" className="w-16 h-16 object-contain" />}
-        <div className="flex-1 min-w-[180px]">
-          <h1 className="text-2xl font-bold">{team.name}</h1>
-          <p className="text-sm text-slate-500">{team.arena} · popularity {team.popularity} · attendance {((dash?.attendancePct ?? fin.attendance) * 100).toFixed(0)}%</p>
-          {isGm && <Link href={`/teams/${slug}/finance`} className="text-xs text-blue-400 hover:underline">Ticket prices →</Link>}
-        </div>
-        <div className="text-sm grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1.5 tabular-nums w-full lg:w-auto">
-          {/* Left Column: Contracts & Organization */}
-          <div className="space-y-1.5">
-            <div className="flex justify-between gap-4"><span className="text-slate-400" title="NHL + AHL players in the organization, vs. the league's max org roster size">Roster Size</span><span className={`${orgTotal > ROSTER_LIMITS.orgMax ? "text-red-400 font-semibold" : ""}`}>{orgTotal}/{ROSTER_LIMITS.orgMax} <span className="text-slate-500 text-xs">({team.players.length} NHL · {farm.length} AHL)</span></span></div>
-            <div className="flex justify-between gap-4"><span className="text-slate-400" title="Sum of each player's Cap Hit — already net of any retention someone else pays">Total Salaries</span><span className="text-right">{money(cap.totalSalaries)}</span></div>
-            <div className="flex justify-between gap-4"><span className="text-slate-400" title="Dead cap from this club's bought-out contracts">Dead Cap — Buyouts</span><span className="text-right">{realBuyoutsDeadMoney ? money(realBuyoutsDeadMoney) : "—"}</span></div>
-            <div className="flex justify-between gap-4"><span className="text-slate-400" title="Salary this club retains on players it traded away">Retained Salary</span><span className="text-right">{deadCapAmount ? money(deadCapAmount) : "—"}</span></div>
-            <div className="flex justify-between gap-4"><span className="text-slate-400" title="Contracts retained on (out) + retained-salary players rostered (in) — one combined pool vs. the league's configured max per team">Retention Slots</span><span className={`text-right ${retention.slotsOutUsed + retention.slotsInUsed >= retention.slotsMax ? "text-red-400 font-semibold" : ""}`}>{retention.slotsOutUsed + retention.slotsInUsed}/{retention.slotsMax}</span></div>
-            <div className="flex justify-between gap-4"><span className="text-slate-400" title="Dead Cap as a % of the cap ceiling vs. the league's configured max">Retention % of Cap</span><span className={`text-right ${retention.pctOfCap >= retention.pctMax ? "text-red-400 font-semibold" : ""}`}>{retention.pctOfCap.toFixed(1)}% <span className="text-slate-500">/ {retention.pctMax}%</span></span></div>
-            <div className="flex justify-between gap-4"><span className="text-slate-400">Bank Account</span><span className="text-right text-amber-300 font-semibold">{money(team.bankAccount)}</span></div>
+      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-xl p-5 space-y-5 backdrop-blur-sm">
+        {/* Top Team Identity Bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-2xl bg-slate-950 p-2 border border-slate-800 flex items-center justify-center shrink-0 shadow-inner">
+              {team.logoUrl ? (
+                <img src={team.logoUrl} alt="" className="w-12 h-12 object-contain" />
+              ) : (
+                <span className="text-2xl">🏒</span>
+              )}
+            </div>
+            <div>
+              <h1 className="text-2xl font-black text-white tracking-tight">{team.name}</h1>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {team.arena} · Popularity {team.popularity} · Attendance {((dash?.attendancePct ?? fin.attendance) * 100).toFixed(0)}%
+              </p>
+            </div>
           </div>
 
-          {/* Right Column: Salary Cap & Room */}
-          <div className="space-y-1.5">
-            <div className="flex justify-between gap-4"><span className="text-slate-400" title="Total Salaries + Buyout Dead Cap + Retained Salary">Actual Cap Hit</span><span className={`text-right font-semibold ${overBy > 0 || underFloorBy > 0 ? "text-amber-400" : ""}`}>{money(cap.capHit)}</span></div>
-            <div className="flex justify-between gap-4"><span className="text-slate-400" title="Salary cap upper limit / ceiling">Upper Limit (Base)</span><span className="text-right tabular-nums text-slate-200">{money(cap.upper)}</span></div>
-            <div className="flex justify-between gap-4"><span className="text-slate-400" title="Salary cap lower limit / floor">Salary Floor (Lower)</span><span className="text-right tabular-nums text-slate-200">{money(cap.lower)}{floorPenalty > 0 ? ` (+${money(floorPenalty)})` : ""}</span></div>
-            {ltir > 0 && (
-              <>
-                <div className="flex justify-between gap-4"><span className="text-slate-400" title="Long-Term Injured Reserve relief pool from injured skaters (CON < 90)">LTIR Relief</span><span className="text-right font-semibold text-sky-300">+{money(ltir)}</span></div>
-                <div className="flex justify-between gap-4"><span className="text-slate-400" title="Maximum allowed cap hit including LTIR Relief (Upper Limit + LTIR Relief)">Effective Ceiling</span><span className="text-right font-semibold text-sky-200">{money(effectiveCeiling)}</span></div>
-                <div className="flex justify-between gap-4 bg-emerald-950/40 px-2 py-0.5 -mx-2 rounded border border-emerald-800/40">
-                  <span className="text-emerald-300 font-medium" title="Real available space to call up players from AHL or add salaries (Effective Ceiling − Actual Cap Hit)">Available Cap (with LTIR)</span>
-                  <span className={`text-right font-bold ${effectiveCeiling - cap.capHit < 0 ? "text-red-400" : "text-emerald-400"}`}>{money(effectiveCeiling - cap.capHit)}</span>
-                </div>
-                <div className="flex justify-between gap-4"><span className="text-slate-400 text-xs" title={`Base Ceiling ${money(cap.upper)} − Actual Cap Hit (without LTIR)`}>Base Space (excl. LTIR)</span><span className={`text-right text-xs ${cap.capSpace < 0 ? "text-red-400" : "text-slate-300"}`}>{money(cap.capSpace)}</span></div>
-              </>
+          <div className="flex items-center gap-2">
+            {isGm && (
+              <Link
+                href={`/teams/${slug}/finance`}
+                className="px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-xs font-bold text-slate-200 transition-colors"
+              >
+                🎟 Ticket Prices →
+              </Link>
             )}
-            {ltir === 0 && (
-              <div className="flex justify-between gap-4"><span className="text-slate-400" title={`Ceiling ${money(cap.upper)} − Actual Cap Hit`}>Actual Cap Space</span><span className={`text-right font-semibold ${cap.capSpace < 0 ? "text-red-400" : "text-green-400"}`}>{money(cap.capSpace)}</span></div>
-            )}
-            <div className="flex justify-between gap-4"><span className="text-slate-400" title="Projected Cap Space">Projected Cap Space</span><span className={`text-right font-bold ${accrued.actual < 0 ? "text-red-400" : "text-emerald-400"}`}>{money(accrued.actual)}</span></div>
-            <div className="flex justify-between gap-4"><span className="text-slate-400">Cap Status</span><span className={`text-right font-bold ${overBy > 0 ? "text-red-400" : underFloorBy > 0 ? "text-amber-400" : ltir > 0 ? "text-sky-300" : "text-green-400"}`}>{overBy > 0 ? `Over by ${money(overBy)}` : underFloorBy > 0 ? `Below floor by ${money(underFloorBy)}` : ltir > 0 ? "Compliant (LTIR) ✓" : cushioned ? "OK · off-season" : "Compliant ✓"}</span></div>
+          </div>
+        </div>
+
+        {/* 4 Quick Stat HUD Tiles */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {/* Cap Space */}
+          <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3 shadow-inner">
+            <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center justify-between">
+              <span>{ltir > 0 ? "Cap Space (w/ LTIR)" : "Actual Cap Space"}</span>
+              <span className={`font-mono text-[10px] ${cap.capSpace < 0 ? "text-rose-400" : "text-emerald-400"}`}>
+                {overBy > 0 ? "OVER" : ltir > 0 ? "LTIR" : "OK"}
+              </span>
+            </div>
+            <div
+              className={`text-lg sm:text-xl font-mono font-black mt-1 ${
+                (effectiveCeiling - cap.capHit < 0) ? "text-rose-400" : "text-emerald-400"
+              }`}
+            >
+              {money(ltir > 0 ? effectiveCeiling - cap.capHit : cap.capSpace)}
+            </div>
+            <div className="text-[10px] text-slate-500 mt-0.5">
+              {ltir > 0 ? `Base: ${money(cap.capSpace)}` : `Ceiling: ${money(cap.upper)}`}
+            </div>
+          </div>
+
+          {/* Actual Cap Hit */}
+          <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3 shadow-inner">
+            <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center justify-between">
+              <span>Actual Cap Hit</span>
+              <span className="font-mono text-[10px] text-slate-400">
+                {((cap.capHit / (effectiveCeiling || 1)) * 100).toFixed(1)}%
+              </span>
+            </div>
+            <div className="text-lg sm:text-xl font-mono font-black text-slate-200 mt-1">
+              {money(cap.capHit)}
+            </div>
+            <div className="w-full bg-slate-800 h-1 rounded-full mt-1.5 overflow-hidden">
+              <div
+                className={`h-full rounded-full ${
+                  overBy > 0 ? "bg-rose-500" : underFloorBy > 0 ? "bg-amber-500" : "bg-emerald-500"
+                }`}
+                style={{ width: `${Math.min(100, (cap.capHit / (effectiveCeiling || 1)) * 100)}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Projected Cap Space */}
+          <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3 shadow-inner">
+            <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center justify-between">
+              <span>Projected Deadline Space</span>
+              <span className="text-amber-400 font-bold text-[10px]">⚡ ACCRUAL</span>
+            </div>
+            <div
+              className={`text-lg sm:text-xl font-mono font-black mt-1 ${
+                accrued.actual < 0 ? "text-rose-400" : "text-emerald-400"
+              }`}
+            >
+              {money(accrued.actual)}
+            </div>
+            <div className="text-[10px] text-slate-500 mt-0.5">
+              Available deadline buying power
+            </div>
+          </div>
+
+          {/* Bank Account */}
+          <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3 shadow-inner">
+            <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center justify-between">
+              <span>Bank Balance</span>
+              <span className="text-amber-400 font-bold text-[10px]">💰 CASH</span>
+            </div>
+            <div className="text-lg sm:text-xl font-mono font-black text-amber-300 mt-1">
+              {money(team.bankAccount)}
+            </div>
+            <div className="text-[10px] text-slate-500 mt-0.5">
+              Available liquid club reserves
+            </div>
+          </div>
+        </div>
+
+        {/* Two Structured Detail Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          {/* Card 1: Contracts & Roster Organization */}
+          <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-3.5 space-y-2">
+            <div className="text-[11px] font-bold text-slate-300 uppercase tracking-wider border-b border-slate-800/80 pb-2 flex items-center justify-between">
+              <span>Roster &amp; Organization</span>
+              <span className={orgTotal > ROSTER_LIMITS.orgMax ? "text-rose-400 font-mono" : "text-slate-400 font-mono"}>
+                {orgTotal}/{ROSTER_LIMITS.orgMax}
+              </span>
+            </div>
+            <div className="space-y-1.5 pt-1">
+              <div className="flex justify-between items-center py-0.5">
+                <span className="text-slate-400">Roster Limit</span>
+                <span className={`font-mono ${orgTotal > ROSTER_LIMITS.orgMax ? "text-rose-400 font-bold" : "text-slate-200"}`}>
+                  {team.players.length} NHL · {farm.length} AHL
+                </span>
+              </div>
+              <div className="flex justify-between items-center py-0.5">
+                <span className="text-slate-400">Total Active Salaries</span>
+                <span className="font-mono text-slate-200 font-semibold">{money(cap.totalSalaries)}</span>
+              </div>
+              <div className="flex justify-between items-center py-0.5">
+                <span className="text-slate-400">Dead Cap (Buyouts)</span>
+                <span className="font-mono text-slate-300">{realBuyoutsDeadMoney ? money(realBuyoutsDeadMoney) : "—"}</span>
+              </div>
+              <div className="flex justify-between items-center py-0.5">
+                <span className="text-slate-400">Retained Salary (Out)</span>
+                <span className="font-mono text-slate-300">{deadCapAmount ? money(deadCapAmount) : "—"}</span>
+              </div>
+              <div className="flex justify-between items-center py-0.5 border-t border-slate-800/60 pt-1.5">
+                <span className="text-slate-400">Retention Capacity</span>
+                <span className={`font-mono ${retention.slotsOutUsed + retention.slotsInUsed >= retention.slotsMax ? "text-rose-400 font-bold" : "text-slate-200"}`}>
+                  {retention.slotsOutUsed + retention.slotsInUsed} / {retention.slotsMax} slots · {retention.pctOfCap.toFixed(1)}% / {retention.pctMax}%
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: Salary Cap & Legal Limits */}
+          <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-3.5 space-y-2">
+            <div className="text-[11px] font-bold text-slate-300 uppercase tracking-wider border-b border-slate-800/80 pb-2 flex items-center justify-between">
+              <span>Salary Cap Parameters</span>
+              <span
+                className={`font-mono font-bold px-1.5 py-0.2 rounded text-[10px] ${
+                  overBy > 0
+                    ? "bg-rose-950/60 text-rose-300 border border-rose-800/50"
+                    : underFloorBy > 0
+                    ? "bg-amber-950/60 text-amber-300 border border-amber-800/50"
+                    : ltir > 0
+                    ? "bg-sky-950/60 text-sky-300 border border-sky-800/50"
+                    : "bg-emerald-950/60 text-emerald-300 border border-emerald-800/50"
+                }`}
+              >
+                {overBy > 0 ? "Over Limit" : underFloorBy > 0 ? "Below Floor" : ltir > 0 ? "LTIR Relief" : "Compliant ✓"}
+              </span>
+            </div>
+            <div className="space-y-1.5 pt-1">
+              <div className="flex justify-between items-center py-0.5">
+                <span className="text-slate-400">Upper Ceiling (Base)</span>
+                <span className="font-mono text-slate-200">{money(cap.upper)}{capPenalty > 0 ? ` (−${money(capPenalty)})` : ""}</span>
+              </div>
+              <div className="flex justify-between items-center py-0.5">
+                <span className="text-slate-400">Salary Floor (Lower)</span>
+                <span className="font-mono text-slate-200">{money(cap.lower)}{floorPenalty > 0 ? ` (+${money(floorPenalty)})` : ""}</span>
+              </div>
+              {ltir > 0 && (
+                <>
+                  <div className="flex justify-between items-center py-0.5 text-sky-300">
+                    <span>LTIR Relief Pool</span>
+                    <span className="font-mono font-bold">+{money(ltir)}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-0.5 text-sky-200">
+                    <span>Effective Ceiling (with LTIR)</span>
+                    <span className="font-mono font-bold">{money(effectiveCeiling)}</span>
+                  </div>
+                </>
+              )}
+              <div className="flex justify-between items-center py-0.5 border-t border-slate-800/60 pt-1.5">
+                <span className="text-slate-400">Compliance Status</span>
+                <span className={`font-mono font-bold ${overBy > 0 ? "text-rose-400" : underFloorBy > 0 ? "text-amber-400" : "text-emerald-400"}`}>
+                  {overBy > 0 ? `Over by ${money(overBy)}` : underFloorBy > 0 ? `Below floor by ${money(underFloorBy)}` : ltir > 0 ? "Compliant via LTIR" : "Compliant ✓"}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
