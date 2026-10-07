@@ -169,7 +169,7 @@ export default async function TeamLayout({
   const isNhl = team.league === "NHL" && !team.isAffiliate;
   const capStatus = isNhl ? await teamCapStatus(team.id).catch(() => null) : null;
   let capSpaceStr: string | null = null;
-  let capSpaceSub = "pod stropom";
+  let capSpaceSub = "under the cap";
   let capSpaceColor = "text-emerald-400";
   let capStatusLabel = "Compliant ✓";
   let capStatusColor = "text-emerald-400 border-emerald-500/30 bg-emerald-500/10";
@@ -179,15 +179,15 @@ export default async function TeamLayout({
     const absM = `$${(Math.abs(space) / 1_000_000).toFixed(2)}M`;
     if (space < 0) {
       capSpaceStr = `-${absM}`;
-      capSpaceSub = "nad stropom";
+      capSpaceSub = "over the cap";
       capSpaceColor = "text-rose-400";
     } else if (capStatus.underFloorBy > 0) {
       capSpaceStr = absM;
-      capSpaceSub = "pod podlahou";
+      capSpaceSub = "under the floor";
       capSpaceColor = "text-amber-400";
     } else {
       capSpaceStr = absM;
-      capSpaceSub = "pod stropom";
+      capSpaceSub = "under the cap";
       capSpaceColor = "text-emerald-400";
     }
 
@@ -237,7 +237,7 @@ export default async function TeamLayout({
                 )}
                 {divRank > 0 && (
                   <span className="text-xs font-mono font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                    {divRank}. v Divízii
+                    {(() => { const n = divRank; const sfx = n % 100 >= 11 && n % 100 <= 13 ? "th" : n % 10 === 1 ? "st" : n % 10 === 2 ? "nd" : n % 10 === 3 ? "rd" : "th"; return `${n}${sfx} in Division`; })()}
                   </span>
                 )}
                 {(team.league === "AHL" || team.isAffiliate) && (
@@ -270,23 +270,23 @@ export default async function TeamLayout({
           <div className="flex items-center gap-3 shrink-0 flex-wrap justify-center">
             {row && (
               <div className="bg-slate-900/90 border border-slate-800 rounded-xl px-4 py-2.5 text-center min-w-[90px]">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">BILANCIA</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">RECORD</span>
                 <span className="text-lg font-black text-white tabular-nums">{row.w}-{row.l}-{row.otl}</span>
-                <span className="text-[10px] text-emerald-400 font-bold block">{row.points} {row.points === 1 ? "bod" : row.points >= 2 && row.points <= 4 ? "body" : "bodov"}</span>
+                <span className="text-[10px] text-emerald-400 font-bold block">{row.points} {row.points === 1 ? "pt" : "pts"}</span>
               </div>
             )}
             {streakType && (
               <div className="bg-slate-900/90 border border-slate-800 rounded-xl px-4 py-2.5 text-center min-w-[90px]">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">FORMA</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">FORM</span>
                 <span className={`text-lg font-black tabular-nums ${streakType === "W" ? "text-amber-400" : "text-rose-400"}`}>{streakLabel}</span>
-                <span className="text-[10px] text-slate-400 block">{streakType === "W" ? `Séria ${streakCount} výhier` : `Séria ${streakCount} prehier`}</span>
+                <span className="text-[10px] text-slate-400 block">{streakType === "W" ? `${streakCount}-game win streak` : `${streakCount}-game losing streak`}</span>
               </div>
             )}
             {capSpaceStr && (
               <Link
                 href={`/teams/${slug}/salary`}
                 className="bg-slate-900/90 hover:bg-slate-800/90 border border-slate-800 hover:border-slate-700 rounded-xl px-4 py-2.5 text-center min-w-[90px] transition-colors group"
-                title={capStatus ? `Platový strop: ${money(capStatus.ceiling)}, Záväzky: ${money(capStatus.committed)}` : undefined}
+                title={capStatus ? `Salary cap: ${money(capStatus.ceiling)}, Committed: ${money(capStatus.committed)}` : undefined}
               >
                 <span className="text-[10px] font-bold text-slate-500 group-hover:text-slate-400 uppercase tracking-wider block">CAP SPACE</span>
                 <span className={`text-lg font-black tabular-nums ${capSpaceColor}`}>{capSpaceStr}</span>
@@ -297,7 +297,7 @@ export default async function TeamLayout({
               <Link
                 href="/salary-cap"
                 className={`border rounded-xl px-4 py-2.5 text-center min-w-[90px] transition-colors hover:brightness-110 ${capStatusColor}`}
-                title="Stav súladu so stropom a podlahou v Cap Central"
+                title="Cap and floor compliance status in Cap Central"
               >
                 <span className="text-[10px] font-bold uppercase tracking-wider block opacity-80">STATUS</span>
                 <span className="text-xs font-black block mt-1">{capStatusLabel}</span>

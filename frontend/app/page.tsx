@@ -381,7 +381,7 @@ export default async function HomePage() {
                 {T("ui.viewAll")}
               </Link>
             </div>
-            {stars.length === 0 ? <p className="text-sm text-slate-500 py-6 text-center">Po ďalšej simulácii.</p> : (
+            {stars.length === 0 ? <p className="text-sm text-slate-500 py-6 text-center">After the next simulation.</p> : (
               <div className="space-y-2">
                 {stars.map((s, i) => {
                   const rankBadgeClass = i === 0
@@ -473,7 +473,7 @@ export default async function HomePage() {
                             {gon.away} <span className="text-slate-500 font-normal">@</span> {gon.home}
                           </div>
                           <div className="text-[10px] text-indigo-400 font-medium truncate flex items-center gap-1">
-                            <span>🔥</span> Zápas dňa
+                            <span>🔥</span> Game of the Day
                           </div>
                         </div>
                       </div>
@@ -509,7 +509,7 @@ export default async function HomePage() {
                             {pon.slug ? <Link href={`/players/${pon.slug}`}>{pon.name}</Link> : pon.name}
                           </div>
                           <div className="text-[10px] text-sky-400 font-medium flex items-center gap-1">
-                            <span>⭐</span> {pon.team ?? "Hráč dňa"}
+                            <span>⭐</span> {pon.team ?? "Player of the Day"}
                           </div>
                         </div>
                       </div>
@@ -518,7 +518,7 @@ export default async function HomePage() {
                           {pon.points != null ? `${pon.points} PTS` : pon.line}
                         </div>
                         <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                          {pon.goals != null && pon.assists != null ? `${pon.goals}G + ${pon.assists}A` : "Top útočník"}
+                          {pon.goals != null && pon.assists != null ? `${pon.goals}G + ${pon.assists}A` : "Top Skater"}
                         </div>
                       </div>
                     </div>
@@ -545,7 +545,7 @@ export default async function HomePage() {
                             {bg.slug ? <Link href={`/players/${bg.slug}`}>{bg.name}</Link> : bg.name}
                           </div>
                           <div className="text-[10px] text-emerald-400 font-medium flex items-center gap-1">
-                            <span>🧤</span> {bg.team ?? "Brankár dňa"}
+                            <span>🧤</span> {bg.team ?? "Goalie of the Day"}
                           </div>
                         </div>
                       </div>
@@ -554,7 +554,7 @@ export default async function HomePage() {
                           {bg.svPct != null ? `${bg.svPct.toFixed(1)}%` : bg.line}
                         </div>
                         <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                          {bg.saves != null && bg.shotsAgainst != null ? `${bg.saves}/${bg.shotsAgainst} SVS` : "Top brankár"}
+                          {bg.saves != null && bg.shotsAgainst != null ? `${bg.saves}/${bg.shotsAgainst} SVS` : "Top Goalie"}
                         </div>
                       </div>
                     </div>
@@ -562,7 +562,7 @@ export default async function HomePage() {
                 })()}
               </div>
             ) : (
-              <p className="text-sm text-slate-500 py-6 text-center">Po ďalšej simulácii.</p>
+              <p className="text-sm text-slate-500 py-6 text-center">After the next simulation.</p>
             )}
           </div>
         </div>
@@ -612,7 +612,7 @@ export default async function HomePage() {
                       {t.fromAssets && t.toAssets ? (
                         <>
                           <span className="text-slate-200 font-semibold">{t.fromAssets}</span>
-                          <span className="text-slate-500"> za </span>
+                          <span className="text-slate-500"> for </span>
                           <span className="text-slate-200 font-semibold">{t.toAssets}</span>
                         </>
                       ) : (
@@ -623,7 +623,7 @@ export default async function HomePage() {
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-slate-500 py-6 text-center">Zatiaľ žiadne výmeny — zrealizované výmeny sa zobrazia tu.</p>
+              <p className="text-xs text-slate-500 py-6 text-center">No trades yet — completed trades will appear here.</p>
             )}
           </div>
         </div>
@@ -664,7 +664,7 @@ export default async function HomePage() {
                     </div>
                   </div>
                 ))}
-                {tbListed.length > 8 && <Link href="/trade-block" className="block text-center text-[11px] text-sky-400 hover:underline pt-1">+ ďalších {tbListed.length - 8} hráčov →</Link>}
+                {tbListed.length > 8 && <Link href="/trade-block" className="block text-center text-[11px] text-sky-400 hover:underline pt-1">+ {tbListed.length - 8} more players →</Link>}
               </div>
             ) : <p className="text-xs text-slate-500 py-2">{T("home.noTradeBlock")}</p>}
           </Card>
@@ -683,12 +683,12 @@ export default async function HomePage() {
                     </div>
                   </div>
                 ))}
-                {waivers.length > 8 && <Link href="/waivers" className="block text-center text-[11px] text-sky-400 hover:underline pt-1">+ ďalších {waivers.length - 8} hráčov →</Link>}
+                {waivers.length > 8 && <Link href="/waivers" className="block text-center text-[11px] text-sky-400 hover:underline pt-1">+ {waivers.length - 8} more players →</Link>}
               </div>
             ) : <p className="text-xs text-slate-500 py-2">{T("home.noWaivers")}</p>}
           </Card>
 
-          <Card title={`Health & Discipline (${homeInjuries.length + activeHomeSuspensions.length})`} href="/players/injuries" accent="text-rose-400" viewLabel="Prehľad →">
+          <Card title={`Health & Discipline (${homeInjuries.length + activeHomeSuspensions.length})`} href="/players/injuries" accent="text-rose-400" viewLabel="View all →">
             <div className="space-y-2 text-xs">
               {homeInjuries.slice(0, 4).map((injury) => (
                 <div key={`injury-${injury.playerId}`} className="flex gap-2.5 rounded-xl border border-rose-500/20 bg-rose-500/[0.06] p-2">
@@ -701,7 +701,7 @@ export default async function HomePage() {
                   <div className="min-w-0 flex-1 leading-tight">
                     {injury.slug ? <Link href={`/players/${injury.slug}`} className="font-bold text-slate-100 hover:text-rose-300">{injury.name}</Link> : <span className="font-bold text-slate-100">{injury.name}</span>}
                     <p className="mt-0.5 truncate text-[11px] text-slate-400">{injury.desc}</p>
-                    <p className="mt-1 text-[10px] font-bold text-rose-300 font-mono">Out · {injury.daysLeft === 1 ? "1 deň" : injury.daysLeft < 7 ? `${injury.daysLeft}d` : `${Math.ceil(injury.daysLeft / 7)}t`} zostáva</p>
+                    <p className="mt-1 text-[10px] font-bold text-rose-300 font-mono">Out · {injury.daysLeft === 1 ? "1 day" : injury.daysLeft < 7 ? `${injury.daysLeft}d` : `${Math.ceil(injury.daysLeft / 7)}w`} left</p>
                   </div>
                 </div>
               ))}
@@ -727,8 +727,8 @@ export default async function HomePage() {
                 );
               })}
 
-              {!homeInjuries.length && !activeHomeSuspensions.length && <p className="py-1 text-xs text-slate-500 text-center">Žiadne aktívne zranenia ani tresty.</p>}
-              {(homeInjuries.length > 4 || activeHomeSuspensions.length > 3) && <Link href="/players/injuries" className="block pt-0.5 text-xs text-rose-300 hover:underline">Zobraziť kompletný zoznam →</Link>}
+              {!homeInjuries.length && !activeHomeSuspensions.length && <p className="py-1 text-xs text-slate-500 text-center">No active injuries or suspensions.</p>}
+              {(homeInjuries.length > 4 || activeHomeSuspensions.length > 3) && <Link href="/players/injuries" className="block pt-0.5 text-xs text-rose-300 hover:underline">View full list →</Link>}
             </div>
           </Card>
 
@@ -745,7 +745,7 @@ export default async function HomePage() {
               <span>📰</span> {T("home.latestArticle")}
             </h2>
             <Link href="/news/create" className="text-xs bg-sky-500 hover:bg-sky-400 text-white px-3 py-1.5 rounded-xl font-bold shadow-md shadow-sky-500/20 transition-colors">
-              + {T("home.addArticle")}
+              {T("home.addArticle")}
             </Link>
           </div>
 
@@ -804,7 +804,7 @@ export default async function HomePage() {
 
                 <div className="flex items-center gap-4 text-xs text-slate-400 pt-2 border-t border-slate-800/80">
                   <Link href={`/news/${a.id}`} className="text-sky-400 hover:text-sky-300 font-bold transition-colors">
-                    Čítať celý článok →
+                    Read full article →
                   </Link>
                   <span className="flex items-center gap-1 font-mono">👍 {a._count.reactions}</span>
                   <span className="flex items-center gap-1 font-mono">💬 {a._count.comments}</span>
@@ -836,7 +836,7 @@ export default async function HomePage() {
                   </div>
                 ))}
               </div>
-            ) : <p className="text-xs text-slate-500 py-2">Žiadni voľní hráči.</p>}
+            ) : <p className="text-xs text-slate-500 py-2">No free agents.</p>}
           </Card>
 
           <Card title={T("home.quickLinks")}>
@@ -866,7 +866,7 @@ function MiniStandings({ title, color, rows }: {
       <table className="w-full text-xs">
         <thead>
           <tr className="text-[10px] text-slate-500 border-b border-slate-800/80 font-mono">
-            <th className="text-left font-bold pb-1 uppercase">Tím</th>
+            <th className="text-left font-bold pb-1 uppercase">Team</th>
             {["GP", "W", "L", "OTL", "PTS"].map((h) => <th key={h} className="text-right font-bold pb-1 pl-1.5 uppercase">{h}</th>)}
           </tr>
         </thead>
