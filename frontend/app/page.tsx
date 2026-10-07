@@ -168,7 +168,7 @@ export default async function HomePage() {
   const lastDay = await prisma.game.findFirst({ where: { season: activeSeason, status: "FINAL", seriesId: null, gameDate: { not: null } }, orderBy: { gameDate: "desc" }, select: { gameDate: true } });
   let ticker: { id: number; league: string; hg: number | null; ag: number | null; home: any; away: any }[] = [];
   let highlights: string[] = [];
-  let stars: { id?: number; slug?: string | null; name: string; teamCode: string; teamSlug?: string | null; logoUrl: string | null; g: number; a: number; pts: number; gameId: number }[] = [];
+  let stars: { id?: number; slug?: string | null; name: string; photoUrl: string | null; teamCode: string; teamSlug?: string | null; logoUrl: string | null; g: number; a: number; pts: number; gameId: number }[] = [];
   let dayGoals = 0, dayPoints = 0;
   if (lastDay?.gameDate) {
     const d = lastDay.gameDate;
@@ -191,7 +191,7 @@ export default async function HomePage() {
     const top3 = [...stats].sort((a, b) => b.points - a.points || b.goals - a.goals).slice(0, 3);
     const need = [...new Set([...notable, ...top3].map((s) => s.playerId))];
     if (need.length) {
-      const pById = new Map((await prisma.player.findMany({ where: { id: { in: need } }, select: { id: true, name: true, slug: true, team: { select: { code: true, slug: true, logoUrl: true } } } })).map((p) => [p.id, p]));
+      const pById = new Map((await prisma.player.findMany({ where: { id: { in: need } }, select: { id: true, name: true, photoUrl: true, slug: true, team: { select: { code: true, slug: true, logoUrl: true } } } })).map((p) => [p.id, p]));
       highlights = notable.map((n) => {
         const p = pById.get(n.playerId);
         const nm = cleanName(p?.name ?? "Player"); const tc = p?.team?.code ?? "";
@@ -200,7 +200,7 @@ export default async function HomePage() {
       });
       stars = top3.map((s) => {
         const p = pById.get(s.playerId);
-        return { id: s.playerId, slug: p?.slug ?? null, name: cleanName(p?.name ?? "Player"), teamCode: p?.team?.code ?? "", teamSlug: p?.team?.slug ?? null, logoUrl: p?.team?.logoUrl ?? null, g: s.goals, a: s.assists, pts: s.points, gameId: s.gameId };
+        return { id: s.playerId, slug: p?.slug ?? null, name: cleanName(p?.name ?? "Player"), photoUrl: p?.photoUrl ?? null, teamCode: p?.team?.code ?? "", teamSlug: p?.team?.slug ?? null, logoUrl: p?.team?.logoUrl ?? null, g: s.goals, a: s.assists, pts: s.points, gameId: s.gameId };
       });
     }
   }
@@ -272,6 +272,16 @@ export default async function HomePage() {
   const gonAwayTeam = gon ? (gon.awaySlug ? teamBySlug.get(gon.awaySlug) : (gon.away ? teamByCode.get(gon.away) : null)) : null;
   const gonHomeTeam = gon ? (gon.homeSlug ? teamBySlug.get(gon.homeSlug) : (gon.home ? teamByCode.get(gon.home) : null)) : null;
 
+  // Enrich digest players with photoUrl & logos
+  const digestPlayerSlugs = [digest?.playerOfNight?.slug, digest?.bestGoalie?.slug].filter((s): s is string => !!s);
+  const digestPlayerMap = digestPlayerSlugs.length
+    ? new Map((await prisma.player.findMany({ where: { slug: { in: digestPlayerSlugs } }, select: { slug: true, photoUrl: true } })).map((p) => [p.slug, p.photoUrl]))
+    : new Map<string, string | null>();
+  const ponPhoto = digest?.playerOfNight?.slug ? digestPlayerMap.get(digest.playerOfNight.slug) ?? null : null;
+  const bgPhoto = digest?.bestGoalie?.slug ? digestPlayerMap.get(digest.bestGoalie.slug) ?? null : null;
+  const ponTeam = digest?.playerOfNight ? (digest.playerOfNight.teamSlug ? teamBySlug.get(digest.playerOfNight.teamSlug) : (digest.playerOfNight.team ? teamByCode.get(digest.playerOfNight.team) : null)) : null;
+  const bgTeam = digest?.bestGoalie ? (digest.bestGoalie.teamSlug ? teamBySlug.get(digest.bestGoalie.teamSlug) : (digest.bestGoalie.team ? teamByCode.get(digest.bestGoalie.team) : null)) : null;
+
   return (
     <div className="py-2 space-y-6">
       {deadlineFeed?.isDeadlineDay && <TradeDeadlineBanner initial={deadlineFeed} variant="feed" />}
@@ -328,17 +338,17 @@ export default async function HomePage() {
         </div>
       )}
 
-      {/* 2. HERO DECK (Game of the Night / League Central + GM Hub) */}
+      {/* 2. MEDIA HUB HERO DECK (7 cols: Game of the Night & Tonight's Best / 5 cols: GM Cockpit & 3-Stars Podium) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Left 8 cols: Featured Matchup or League Hero */}
-        <div className="lg:col-span-8">
-          {gon ? (
-            <div className="relative overflow-hidden rounded-3xl border-2 border-amber-500/40 bg-gradient-to-br from-[#10192e] via-[#0b1120] to-[#070b12] p-5 sm:p-6 shadow-2xl h-full flex flex-col justify-between">
-              <div className="absolute -top-16 -left-16 w-56 h-56 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
-              <div className="absolute -top-16 -right-16 w-56 h-56 bg-sky-500/15 rounded-full blur-3xl pointer-events-none" />
+        {/* Left 7 cols: Featured Matchup & Tonight's Best Storyline */}
+        <div className="lg:col-span-7 flex flex-col justify-between rounded-3xl border-2 border-indigo-500/40 bg-gradient-to-br from-[#10192e] via-[#0b1120] to-[#070b12] p-5 sm:p-6 shadow-2xl relative overflow-hidden">
+          <div className="absolute -top-20 -left-20 w-64 h-64 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -top-20 -right-20 w-64 h-64 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
 
+          {gon ? (
+            <div className="relative z-10 flex flex-col h-full justify-between space-y-4">
               <div>
-                <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 mb-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                   <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
                     ZÁPAS KOLA · GAME OF THE NIGHT
@@ -348,77 +358,132 @@ export default async function HomePage() {
                   </span>
                 </div>
 
-                <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-5 py-2">
+                {/* Matchup Duel */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-2 px-3 rounded-2xl bg-slate-900/60 border border-slate-800/80">
                   {/* Away Team */}
-                  <div className="flex items-center gap-3.5 flex-1 min-w-0">
-                    <div className="rounded-2xl bg-slate-800/90 border border-slate-700/80 p-2 flex items-center justify-center shadow-xl shrink-0" style={{ width: 62, height: 62, minWidth: 62 }}>
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="rounded-2xl bg-slate-800/90 border border-slate-700/80 p-2 flex items-center justify-center shadow-xl shrink-0" style={{ width: 56, height: 56, minWidth: 56 }}>
                       {gonAwayTeam?.logoUrl ? (
-                        <img src={gonAwayTeam.logoUrl} alt="" className="object-contain filter drop-shadow" style={{ width: 44, height: 44, maxWidth: 44, maxHeight: 44 }} />
+                        <img src={gonAwayTeam.logoUrl} alt="" className="object-contain filter drop-shadow" style={{ width: 40, height: 40, maxWidth: 40, maxHeight: 40 }} />
                       ) : (
-                        <span className="text-lg font-black text-slate-300">{gon.away}</span>
+                        <span className="text-base font-black text-slate-300">{gon.away}</span>
                       )}
                     </div>
                     <div className="min-w-0">
-                      <div className="text-base sm:text-lg font-black text-white truncate">{gonAwayTeam?.name ?? gon.away}</div>
-                      <div className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Hostia · {gon.away}</div>
+                      <div className="text-sm sm:text-base font-black text-white truncate">{gonAwayTeam?.name ?? gon.away}</div>
+                      <div className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Hostia · {gon.away}</div>
                     </div>
                   </div>
 
                   {/* Center Score */}
-                  <Link href={`/games/${gon.id}`} className="flex flex-col items-center justify-center px-6 py-2.5 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-amber-500/50 shadow-inner transition-colors group shrink-0">
-                    <div className="text-3xl sm:text-4xl font-black font-mono text-white tracking-tight flex items-center gap-2">
+                  <Link href={`/games/${gon.id}`} className="flex flex-col items-center justify-center px-5 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-amber-500/50 shadow-inner transition-colors group shrink-0">
+                    <div className="text-2xl sm:text-3xl font-black font-mono text-white tracking-tight flex items-center gap-2">
                       <span className={gon.awayGoals > gon.homeGoals ? "text-amber-400" : "text-slate-200"}>{gon.awayGoals}</span>
-                      <span className="text-slate-600 text-2xl">:</span>
+                      <span className="text-slate-600 text-xl">:</span>
                       <span className={gon.homeGoals > gon.awayGoals ? "text-amber-400" : "text-slate-200"}>{gon.homeGoals}</span>
                     </div>
-                    <div className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider mt-0.5 group-hover:text-amber-300 transition-colors">
+                    <div className="text-[9px] uppercase font-bold text-emerald-400 tracking-wider mt-0.5 group-hover:text-amber-300 transition-colors">
                       {gon.endedIn !== "REG" ? gon.endedIn : "Konečný stav"} →
                     </div>
                   </Link>
 
                   {/* Home Team */}
-                  <div className="flex items-center gap-3.5 flex-1 min-w-0 justify-end text-right">
+                  <div className="flex items-center gap-3 flex-1 min-w-0 justify-end text-right">
                     <div className="min-w-0">
-                      <div className="text-base sm:text-lg font-black text-white truncate">{gonHomeTeam?.name ?? gon.home}</div>
-                      <div className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Domáci · {gon.home}</div>
+                      <div className="text-sm sm:text-base font-black text-white truncate">{gonHomeTeam?.name ?? gon.home}</div>
+                      <div className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Domáci · {gon.home}</div>
                     </div>
-                    <div className="rounded-2xl bg-slate-800/90 border border-slate-700/80 p-2 flex items-center justify-center shadow-xl shrink-0" style={{ width: 62, height: 62, minWidth: 62 }}>
+                    <div className="rounded-2xl bg-slate-800/90 border border-slate-700/80 p-2 flex items-center justify-center shadow-xl shrink-0" style={{ width: 56, height: 56, minWidth: 56 }}>
                       {gonHomeTeam?.logoUrl ? (
-                        <img src={gonHomeTeam.logoUrl} alt="" className="object-contain filter drop-shadow" style={{ width: 44, height: 44, maxWidth: 44, maxHeight: 44 }} />
+                        <img src={gonHomeTeam.logoUrl} alt="" className="object-contain filter drop-shadow" style={{ width: 40, height: 40, maxWidth: 40, maxHeight: 40 }} />
                       ) : (
-                        <span className="text-lg font-black text-slate-300">{gon.home}</span>
+                        <span className="text-base font-black text-slate-300">{gon.home}</span>
                       )}
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="relative z-10 mt-4 pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs">
-                <div className="flex flex-wrap items-center gap-2 text-slate-300">
-                  {digest?.playerOfNight && (
-                    <span className="flex items-center gap-1">
-                      <span className="text-amber-400 font-bold">⭐ Hráč noci:</span>
-                      <span>{digest.playerOfNight.name} ({digest.playerOfNight.team}) — {digest.playerOfNight.line}</span>
-                    </span>
+              {/* Tonight's Best Stories Row (Player of Night, Best Goalie, etc.) */}
+              <div className="pt-2 border-t border-slate-800/80">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
+                    <span>🌙</span> {T("home.tonightsBest")}
+                  </span>
+                  <Link href="/league/digest" className="text-[11px] text-slate-400 hover:text-sky-400 font-semibold transition-colors">
+                    Ligový digest →
+                  </Link>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {/* Player of Night Card */}
+                  {digest?.playerOfNight ? (
+                    <div className="flex items-center gap-2.5 p-2.5 rounded-2xl bg-slate-900/80 border border-slate-800/90 hover:border-slate-700 transition-colors">
+                      <div className="relative shrink-0">
+                        <PlayerAvatar src={ponPhoto} alt={digest.playerOfNight.name} size={42} />
+                        {ponTeam?.logoUrl && (
+                          <span className="absolute -bottom-1 -right-1 inline-flex items-center justify-center rounded-full bg-slate-800 border border-slate-700 p-0.5" style={{ width: 18, height: 18, minWidth: 18 }}>
+                            <img src={ponTeam.logoUrl} alt="" className="object-contain" style={{ width: 12, height: 12, maxWidth: 12, maxHeight: 12 }} />
+                          </span>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[10px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1">
+                          <span>⭐</span> Hráč noci
+                        </div>
+                        <div className="text-xs font-bold text-white truncate">
+                          {digest.playerOfNight.slug ? (
+                            <Link href={`/players/${digest.playerOfNight.slug}`} className="hover:text-sky-300 transition-colors">{digest.playerOfNight.name}</Link>
+                          ) : digest.playerOfNight.name}
+                        </div>
+                        <div className="text-[11px] text-slate-400 font-mono font-medium truncate">
+                          {digest.playerOfNight.line}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-2xl bg-slate-900/50 border border-slate-800/70 text-xs text-slate-500">
+                      Hráč noci po ďalšej simulácii.
+                    </div>
                   )}
-                  {digest?.bestGoalie && (
-                    <span className="flex items-center gap-1 text-slate-400">
-                      · <span className="text-emerald-400 font-bold">🧤 Brankár:</span>
-                      <span>{digest.bestGoalie.name} ({digest.bestGoalie.team})</span>
-                    </span>
+
+                  {/* Best Goalie Card */}
+                  {digest?.bestGoalie ? (
+                    <div className="flex items-center gap-2.5 p-2.5 rounded-2xl bg-slate-900/80 border border-slate-800/90 hover:border-slate-700 transition-colors">
+                      <div className="relative shrink-0">
+                        <PlayerAvatar src={bgPhoto} alt={digest.bestGoalie.name} size={42} />
+                        {bgTeam?.logoUrl && (
+                          <span className="absolute -bottom-1 -right-1 inline-flex items-center justify-center rounded-full bg-slate-800 border border-slate-700 p-0.5" style={{ width: 18, height: 18, minWidth: 18 }}>
+                            <img src={bgTeam.logoUrl} alt="" className="object-contain" style={{ width: 12, height: 12, maxWidth: 12, maxHeight: 12 }} />
+                          </span>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[10px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1">
+                          <span>🧤</span> Brankár noci
+                        </div>
+                        <div className="text-xs font-bold text-white truncate">
+                          {digest.bestGoalie.slug ? (
+                            <Link href={`/players/${digest.bestGoalie.slug}`} className="hover:text-sky-300 transition-colors">{digest.bestGoalie.name}</Link>
+                          ) : digest.bestGoalie.name}
+                        </div>
+                        <div className="text-[11px] text-slate-400 font-mono font-medium truncate">
+                          {digest.bestGoalie.line}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-2xl bg-slate-900/50 border border-slate-800/70 text-xs text-slate-500">
+                      Brankár noci po ďalšej simulácii.
+                    </div>
                   )}
                 </div>
-                <Link href={`/games/${gon.id}`} className="text-sky-400 hover:text-sky-300 font-bold flex items-center gap-1 transition-colors">
-                  Otvoriť GameCenter →
-                </Link>
               </div>
             </div>
           ) : (
-            <div className="relative overflow-hidden rounded-3xl border border-slate-800 bg-gradient-to-br from-[#10192e] via-[#0b1120] to-[#070b12] p-5 sm:p-6 shadow-2xl h-full flex flex-col justify-between">
-              <div className="absolute -top-16 -left-16 w-56 h-56 bg-sky-500/10 rounded-full blur-3xl pointer-events-none" />
-              <div className="absolute -top-16 -right-16 w-56 h-56 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-              <div className="relative z-10">
-                <span className="px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/40 text-[10px] font-black uppercase tracking-widest">
+            <div className="relative z-10 flex flex-col justify-between h-full">
+              <div>
+                <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 text-[10px] font-black uppercase tracking-widest">
                   uNHL LEAGUE CENTRAL · SEZÓNA {activeSeason}
                 </span>
                 <h2 className="text-xl sm:text-2xl font-black text-white mt-2">Vitajte v uNHL Fantasy GM League</h2>
@@ -441,10 +506,11 @@ export default async function HomePage() {
           )}
         </div>
 
-        {/* Right 4 cols: GM Command Hub */}
-        <div className="lg:col-span-4 rounded-3xl border border-slate-800 bg-[#0b1120] p-5 shadow-2xl flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-3 border-b border-slate-800/80 pb-2.5">
+        {/* Right 5 cols: GM Cockpit & 3-Stars Podium */}
+        <div className="lg:col-span-5 flex flex-col justify-between gap-4">
+          {/* GM Cockpit: Next Match & Sim Countdown */}
+          <div className="rounded-3xl border border-slate-800 bg-[#0b1120] p-4 sm:p-5 shadow-2xl">
+            <div className="flex items-center justify-between mb-2.5 border-b border-slate-800/80 pb-2">
               <span className="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                 {T("home.yourNextGame")}
@@ -459,19 +525,19 @@ export default async function HomePage() {
             {myNextGame && myNextOpponent ? (
               <Link
                 href={`/games/${myNextGame.id}`}
-                className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 transition-all group"
+                className="flex items-center justify-between gap-3 p-2.5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 transition-all group"
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className="rounded-xl bg-slate-800/90 border border-slate-700/70 p-1 flex items-center justify-center shrink-0" style={{ width: 44, height: 44, minWidth: 44 }}>
+                  <div className="rounded-xl bg-slate-800/90 border border-slate-700/70 p-1 flex items-center justify-center shrink-0" style={{ width: 42, height: 42, minWidth: 42 }}>
                     {myNextOpponent.logoUrl ? (
-                      <img src={myNextOpponent.logoUrl} alt="" className="object-contain" style={{ width: 32, height: 32, maxWidth: 32, maxHeight: 32 }} />
+                      <img src={myNextOpponent.logoUrl} alt="" className="object-contain" style={{ width: 30, height: 30, maxWidth: 30, maxHeight: 30 }} />
                     ) : (
                       <span className="text-xs font-black text-slate-400">{myNextOpponent.code?.slice(0, 3) ?? "?"}</span>
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="text-xs font-bold text-slate-200 flex items-center gap-1.5 group-hover:text-white transition-colors truncate">
-                      <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded ${isMyGameHome ? "bg-blue-900/50 text-blue-300 border border-blue-700/50" : "bg-amber-900/50 text-amber-300 border border-amber-700/50"}`}>
+                      <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${isMyGameHome ? "bg-blue-900/50 text-blue-300 border border-blue-700/50" : "bg-amber-900/50 text-amber-300 border border-amber-700/50"}`}>
                         {isMyGameHome ? "DOMA" : "VONKU"}
                       </span>
                       <span className="truncate">{myNextOpponent.name}</span>
@@ -484,84 +550,125 @@ export default async function HomePage() {
                 <span className="text-xs text-slate-500 group-hover:text-sky-400 transition-colors shrink-0">→</span>
               </Link>
             ) : me != null ? (
-              <div className="p-3 rounded-2xl bg-slate-900/50 border border-slate-800 text-xs text-slate-400">
+              <div className="p-2.5 rounded-2xl bg-slate-900/50 border border-slate-800 text-xs text-slate-400">
                 Žiadny naplánovaný zápas. Skontrolujte <Link href={`/teams/${myTeam?.slug ?? ""}/schedule`} className="text-sky-400 underline">rozpis tímu</Link>.
               </div>
             ) : (
-              <div className="p-3 rounded-2xl bg-slate-900/50 border border-slate-800">
+              <div className="p-2.5 rounded-2xl bg-slate-900/50 border border-slate-800">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-xs font-bold text-slate-300">{T("ui.gmLogin")}</span>
                   <Link href="/login" className="text-xs text-sky-400 font-bold hover:underline">Prihlásiť sa →</Link>
                 </div>
-                <p className="text-xs text-slate-500">{T("home.loginPrompt")}</p>
+                <p className="text-[11px] text-slate-500">{T("home.loginPrompt")}</p>
               </div>
             )}
+
+            <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center justify-between gap-2">
+              <NextSimCountdown
+                frenzyAt={cfg?.frenzyAutoOpenAt?.toISOString() ?? null}
+                frenzyOpen={clock.frenzyOpen} frenzyRound={clock.frenzyRound} frenzyDay={clock.frenzyDay}
+                frenzyRoundStartedAt={clock.frenzyRoundStartedAt}
+                frenzyStage={clock.frenzyStage}
+                nextGameDate={nextGame?.gameDate?.toISOString() ?? null}
+              />
+              <span className="text-[11px] text-slate-500 font-mono shrink-0">{fmtLeagueDate(clock.date)}</span>
+            </div>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-slate-800/80">
-            <NextSimCountdown
-              frenzyAt={cfg?.frenzyAutoOpenAt?.toISOString() ?? null}
-              frenzyOpen={clock.frenzyOpen} frenzyRound={clock.frenzyRound} frenzyDay={clock.frenzyDay}
-              frenzyRoundStartedAt={clock.frenzyRoundStartedAt}
-              frenzyStage={clock.frenzyStage}
-              nextGameDate={nextGame?.gameDate?.toISOString() ?? null}
-            />
-            <p className="text-[11px] text-slate-500 mt-2 font-mono">{fmtLeagueDate(clock.date)} · <span className="text-slate-400">{clock.phaseLabel}</span></p>
+          {/* 3D Visual Podium: 3 Stars of the Day */}
+          <div className="rounded-3xl border border-slate-800 bg-[#0b1120] p-4 sm:p-5 shadow-2xl flex-1 flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-3 border-b border-slate-800/80 pb-2">
+              <span className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                <span>⭐</span> {T("home.threeStars")} · HVIEZDY DŇA
+              </span>
+              <Link href="/players/three-stars" className="text-[11px] text-slate-400 hover:text-sky-400 font-semibold transition-colors">
+                {T("ui.viewAll")} →
+              </Link>
+            </div>
+
+            {stars.length === 0 ? (
+              <p className="text-xs text-slate-500 py-6 text-center">Po ďalšej simulácii.</p>
+            ) : (
+              <div className="grid grid-cols-3 gap-2 pt-2 items-end">
+                {/* 2nd Star (Silver) */}
+                {stars[1] ? (
+                  <div className="flex flex-col items-center text-center p-2 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition-colors">
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-slate-400/20 text-slate-300 border border-slate-400/30 mb-2">
+                      2. HVIEZDA
+                    </span>
+                    <div className="relative mb-1.5">
+                      <PlayerAvatar src={stars[1].photoUrl} alt={stars[1].name} size={48} />
+                      {stars[1].logoUrl && (
+                        <span className="absolute -bottom-1 -right-1 inline-flex items-center justify-center rounded-full bg-slate-800 border border-slate-700 p-0.5" style={{ width: 18, height: 18, minWidth: 18 }}>
+                          <img src={stars[1].logoUrl} alt="" className="object-contain" style={{ width: 12, height: 12, maxWidth: 12, maxHeight: 12 }} />
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs font-bold text-white truncate max-w-full">
+                      {stars[1].slug ? <Link href={`/players/${stars[1].slug}`} className="hover:text-sky-300">{stars[1].name}</Link> : stars[1].name}
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-mono">{stars[1].teamCode}</div>
+                    <div className="mt-1 font-mono font-black text-xs text-slate-200">{stars[1].pts} PTS</div>
+                    <div className="text-[9px] text-slate-500 font-mono">{stars[1].g}G + {stars[1].a}A</div>
+                  </div>
+                ) : <div />}
+
+                {/* 1st Star (Gold Podium - Higher & Highlighted) */}
+                {stars[0] ? (
+                  <div className="flex flex-col items-center text-center p-2.5 rounded-2xl bg-gradient-to-b from-amber-950/40 via-slate-900/90 to-slate-900 border-2 border-amber-500/50 shadow-xl shadow-amber-500/10">
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 mb-2">
+                      👑 1. ZLATO
+                    </span>
+                    <div className="relative mb-1.5">
+                      <div className="rounded-full ring-2 ring-amber-400/80 p-0.5">
+                        <PlayerAvatar src={stars[0].photoUrl} alt={stars[0].name} size={54} />
+                      </div>
+                      {stars[0].logoUrl && (
+                        <span className="absolute -bottom-1 -right-1 inline-flex items-center justify-center rounded-full bg-slate-800 border border-slate-700 p-0.5" style={{ width: 20, height: 20, minWidth: 20 }}>
+                          <img src={stars[0].logoUrl} alt="" className="object-contain" style={{ width: 14, height: 14, maxWidth: 14, maxHeight: 14 }} />
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs font-black text-amber-200 truncate max-w-full">
+                      {stars[0].slug ? <Link href={`/players/${stars[0].slug}`} className="hover:text-amber-100">{stars[0].name}</Link> : stars[0].name}
+                    </div>
+                    <div className="text-[10px] text-amber-400/80 font-mono">{stars[0].teamCode}</div>
+                    <div className="mt-1 font-mono font-black text-sm text-amber-300">{stars[0].pts} PTS</div>
+                    <div className="text-[10px] text-amber-400/70 font-mono">{stars[0].g}G + {stars[0].a}A</div>
+                  </div>
+                ) : <div />}
+
+                {/* 3rd Star (Bronze) */}
+                {stars[2] ? (
+                  <div className="flex flex-col items-center text-center p-2 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition-colors">
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-700/20 text-amber-400 border border-amber-700/30 mb-2">
+                      3. BRONZ
+                    </span>
+                    <div className="relative mb-1.5">
+                      <PlayerAvatar src={stars[2].photoUrl} alt={stars[2].name} size={48} />
+                      {stars[2].logoUrl && (
+                        <span className="absolute -bottom-1 -right-1 inline-flex items-center justify-center rounded-full bg-slate-800 border border-slate-700 p-0.5" style={{ width: 18, height: 18, minWidth: 18 }}>
+                          <img src={stars[2].logoUrl} alt="" className="object-contain" style={{ width: 12, height: 12, maxWidth: 12, maxHeight: 12 }} />
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs font-bold text-white truncate max-w-full">
+                      {stars[2].slug ? <Link href={`/players/${stars[2].slug}`} className="hover:text-sky-300">{stars[2].name}</Link> : stars[2].name}
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-mono">{stars[2].teamCode}</div>
+                    <div className="mt-1 font-mono font-black text-xs text-amber-400/90">{stars[2].pts} PTS</div>
+                    <div className="text-[9px] text-slate-500 font-mono">{stars[2].g}G + {stars[2].a}A</div>
+                  </div>
+                ) : <div />}
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* 3. PULSE STATS ROW (4 Cards) */}
+      {/* 3. PULSE STATS ROW (4 Compact Cards: Recent Trades, Waiver Wire, Injuries, Highlights) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {/* Card 1: 3 Stars of the Day */}
-        <div className="bg-[#0b1120] border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-3 border-b border-slate-800/80 pb-2">
-              <span className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-                <span>⭐</span> {T("home.threeStars")}
-              </span>
-              <Link href="/players/three-stars" className="text-xs text-slate-400 hover:text-sky-400 transition-colors font-semibold">
-                {T("ui.viewAll")} →
-              </Link>
-            </div>
-            {stars.length === 0 ? (
-              <p className="text-xs text-slate-500 py-3 text-center">Po ďalšej simulácii.</p>
-            ) : (
-              <div className="space-y-2">
-                {stars.map((s, i) => {
-                  const starCount = 3 - i;
-                  const starColor = i === 0 ? "text-amber-400" : i === 1 ? "text-slate-300" : "text-amber-500/80";
-                  return (
-                    <div key={i} className="flex items-center justify-between gap-2.5 p-2 rounded-xl bg-slate-900/60 border border-slate-800/70 hover:border-slate-700 transition-colors">
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <span className={`shrink-0 w-6 text-center text-xs font-black ${starColor}`} title={`${i + 1}. hviezda`}>
-                          {Array.from({ length: starCount }, (_, j) => <span key={j}>★</span>)}
-                        </span>
-                        {s.logoUrl && (
-                          <span className="inline-flex items-center justify-center rounded bg-slate-800 border border-slate-700/60 p-0.5 shrink-0" style={{ width: 22, height: 22, minWidth: 22 }}>
-                            <img src={s.logoUrl} alt="" className="object-contain" style={{ width: 16, height: 16, maxWidth: 16, maxHeight: 16 }} />
-                          </span>
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <div className="text-xs font-bold text-slate-200 truncate">
-                            {s.slug ? <Link href={`/players/${s.slug}`} className="hover:text-sky-300 transition-colors">{s.name}</Link> : s.name}
-                          </div>
-                          <div className="text-[10px] text-slate-500 font-mono">{s.teamCode}</div>
-                        </div>
-                      </div>
-                      <Link href={`/games/${s.gameId}`} className="text-right shrink-0">
-                        <div className="text-xs font-black text-amber-300 font-mono">{s.pts} PTS</div>
-                        <div className="text-[10px] text-slate-500 font-mono">{s.g}G + {s.a}A</div>
-                      </Link>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Card 2: Recent Trades */}
+        {/* Card 1: Recent Trades */}
         <div className="bg-[#0b1120] border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-3 border-b border-slate-800/80 pb-2">
@@ -614,7 +721,7 @@ export default async function HomePage() {
           </div>
         </div>
 
-        {/* Card 3: Waiver Wire */}
+        {/* Card 2: Waiver Wire */}
         <div className="bg-[#0b1120] border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-3 border-b border-slate-800/80 pb-2">
@@ -650,7 +757,7 @@ export default async function HomePage() {
           </div>
         </div>
 
-        {/* Card 4: Health & Discipline */}
+        {/* Card 3: Health & Discipline */}
         <div className="bg-[#0b1120] border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-3 border-b border-slate-800/80 pb-2">
@@ -702,6 +809,38 @@ export default async function HomePage() {
                 <p className="text-xs text-slate-500 py-3 text-center">Žiadne aktívne zranenia ani tresty.</p>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* Card 4: Night Highlights & Upset */}
+        <div className="bg-[#0b1120] border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-3 border-b border-slate-800/80 pb-2">
+              <span className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                <span>⚡</span> {highlights.length ? "Momenty dňa" : digest?.upset ? "Prekvapenie kola" : "Ligový pulz"}
+              </span>
+              <Link href="/league/digest" className="text-xs text-slate-400 hover:text-sky-400 transition-colors font-semibold">
+                Digest →
+              </Link>
+            </div>
+            {highlights.length > 0 ? (
+              <div className="space-y-1.5 text-xs">
+                {highlights.slice(0, 3).map((h, i) => (
+                  <div key={i} className="p-1.5 rounded-xl bg-slate-900/60 border border-slate-800/60 text-slate-300 leading-snug">
+                    {h}
+                  </div>
+                ))}
+              </div>
+            ) : digest?.upset ? (
+              <div className="p-2 rounded-xl bg-purple-950/20 border border-purple-500/30 text-xs">
+                <div className="font-bold text-purple-300 mb-1">😱 {digest.upset.note}</div>
+                <div className="text-slate-300 font-mono">
+                  {digest.upset.away} {digest.upset.awayGoals} : {digest.upset.homeGoals} {digest.upset.home}
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500 py-3 text-center">Ligové štatistiky a highlighty po simulácii.</p>
+            )}
           </div>
         </div>
       </div>
