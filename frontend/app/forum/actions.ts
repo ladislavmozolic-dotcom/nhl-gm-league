@@ -88,3 +88,23 @@ export async function toggleReaction(postId: number, emoji: string) {
   if (post) revalidatePath(`/forum/${post.threadId}`);
   return { ok: true as const };
 }
+
+/** Toggle pin status of a thread — admin or comish only. */
+export async function togglePinThread(threadId: number) {
+  const me = await getTeamSession();
+  if (!me) return { ok: false as const, error: "Prihlás sa ako administrátor." };
+  if (!(await isAdmin())) return { ok: false as const, error: "Pripínať vlákna môže len komisár alebo administrátor." };
+
+  const thread = await prisma.forumThread.findUnique({ where: { id: threadId }, select: { pinned: true, category: true } });
+  if (!thread) return { ok: false as const, error: "Vlákno sa nenašlo." };
+
+  await prisma.forumThread.update({
+    where: { id: threadId },
+    data: { pinned: !thread.pinned },
+  });
+
+  revalidatePath(`/forum/${threadId}`);
+  revalidatePath(`/forum/c/${thread.category}`);
+  revalidatePath("/forum");
+  return { ok: true as const, pinned: !thread.pinned };
+}

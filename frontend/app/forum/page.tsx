@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { PageHeader } from "@/components/ui";
 import { CATEGORIES, CAT_META } from "./categories";
 import { markForumSeen } from "./actions";
 
@@ -8,97 +7,357 @@ export const dynamic = "force-dynamic";
 
 const ago = (d: Date) => {
   const s = Math.floor((Date.now() - d.getTime()) / 1000);
-  if (s < 60) return "just now";
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  return `${Math.floor(s / 86400)}d ago`;
+  if (s < 60) return "práve teraz";
+  if (s < 3600) return `pred ${Math.floor(s / 60)}m`;
+  if (s < 86400) return `pred ${Math.floor(s / 3600)}h`;
+  const days = Math.floor(s / 86400);
+  if (days === 1) return "včera";
+  if (days < 30) return `pred ${days}d`;
+  return d.toLocaleDateString("sk-SK", { day: "numeric", month: "short" });
 };
 
 export default async function ForumPage() {
   await markForumSeen();
-  const cats = await Promise.all(CATEGORIES.map(async (cat) => {
-    const [topics, posts, last] = await Promise.all([
-      prisma.forumThread.count({ where: { category: cat } }),
-      prisma.forumPost.count({ where: { thread: { category: cat } } }),
-      prisma.forumPost.findFirst({
-        where: { thread: { category: cat } },
-        orderBy: { id: "desc" },
-        select: { createdAt: true, thread: { select: { id: true, title: true } }, team: { select: { code: true, logoUrl: true, gmNickname: true } } },
-      }),
-    ]);
-    return { cat, topics, posts, last };
-  }));
+
+  // Load category details, counts and latest posts
+  const [cats, totalTeams, activeTeams, latestPostOverall] = await Promise.all([
+    Promise.all(
+      CATEGORIES.map(async (cat) => {
+        const [topics, posts, last] = await Promise.all([
+          prisma.forumThread.count({ where: { category: cat } }),
+          prisma.forumPost.count({ where: { thread: { category: cat } } }),
+          prisma.forumPost.findFirst({
+            where: { thread: { category: cat } },
+            orderBy: { id: "desc" },
+            select: {
+              createdAt: true,
+              thread: { select: { id: true, title: true } },
+              team: { select: { code: true, logoUrl: true, gmNickname: true, name: true } },
+            },
+          }),
+        ]);
+        return { cat, topics, posts, last };
+      })
+    ),
+    prisma.team.count(),
+    prisma.team.findMany({
+      where: { lastLoginAt: { not: null } },
+      orderBy: { lastLoginAt: "desc" },
+      take: 8,
+      select: {
+        id: true,
+        code: true,
+        gmNickname: true,
+        name: true,
+        slug: true,
+        isAdmin: true,
+        gmRole: true,
+        lastLoginAt: true,
+      },
+    }),
+    prisma.forumPost.findFirst({
+      orderBy: { id: "desc" },
+      select: {
+        createdAt: true,
+        thread: { select: { id: true, title: true } },
+        team: { select: { gmNickname: true, code: true } },
+      },
+    }),
+  ]);
 
   const totalTopics = cats.reduce((n, c) => n + c.topics, 0);
   const totalPosts = cats.reduce((n, c) => n + c.posts, 0);
 
+  const nowFormatted = new Date().toLocaleString("sk-SK", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
   return (
-    <div className="space-y-6 py-2">
-      <PageHeader
-        title="League Forum"
-        subtitle="Board index — vyber si podfórum."
-        right={
-          <div className="hidden sm:flex gap-2">
-            <div className="rounded-xl bg-slate-800/50 border border-slate-700/60 px-4 py-2 text-center">
-              <div className="text-2xl font-black text-white leading-none tabular-nums">{totalTopics}</div>
-              <div className="text-[10px] uppercase tracking-wider text-slate-500 mt-1">Vlákien</div>
+    <div className="space-y-6 py-2 max-w-6xl mx-auto">
+      {/* Top phpBB Board Header */}
+      <div className="rounded-2xl border border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-950 p-5 shadow-xl">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">🏛️</span>
+              <h1 className="text-2xl font-black text-white tracking-tight">
+                UNHL Diskusné Fórum
+              </h1>
             </div>
-            <div className="rounded-xl bg-slate-800/50 border border-slate-700/60 px-4 py-2 text-center">
-              <div className="text-2xl font-black text-white leading-none tabular-nums">{totalPosts}</div>
-              <div className="text-[10px] uppercase tracking-wider text-slate-500 mt-1">Príspevkov</div>
+            <p className="text-xs sm:text-sm text-slate-400">
+              Hlavný rozcestník ligových diskusií, vyjednávaní a oficiálnych oznamov.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-slate-800/60 border border-slate-700/60 px-4 py-2 text-center min-w-[80px]">
+              <div className="text-xl sm:text-2xl font-black text-white tabular-nums leading-none">
+                {totalTopics}
+              </div>
+              <div className="text-[10px] uppercase tracking-wider text-slate-400 mt-1 font-semibold">
+                Tém
+              </div>
+            </div>
+            <div className="rounded-xl bg-slate-800/60 border border-slate-700/60 px-4 py-2 text-center min-w-[80px]">
+              <div className="text-xl sm:text-2xl font-black text-white tabular-nums leading-none">
+                {totalPosts}
+              </div>
+              <div className="text-[10px] uppercase tracking-wider text-slate-400 mt-1 font-semibold">
+                Príspevkov
+              </div>
             </div>
           </div>
-        }
-      />
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {cats.map(({ cat, topics, posts, last }) => {
-          const m = CAT_META[cat];
-          return (
-            <Link
-              key={cat}
-              href={`/forum/c/${cat}`}
-              className={`group relative overflow-hidden rounded-2xl border ${m.ring} bg-slate-900/70 shadow-lg shadow-black/20 transition-all hover:shadow-xl hover:-translate-y-0.5`}
-            >
-              <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${m.glow} to-transparent opacity-60`} />
-              <div className="relative p-5 sm:p-6">
-                <div className="flex items-start gap-4">
-                  <div className="shrink-0 grid place-items-center w-14 h-14 rounded-2xl bg-slate-800/70 border border-slate-700/60 text-3xl">
+        <div className="mt-4 pt-3 border-t border-slate-800/70 flex items-center justify-between text-[11px] text-slate-500 flex-wrap gap-2">
+          <div className="flex items-center gap-1.5">
+            <span>🕒</span>
+            <span>Aktuálny čas na serveri:</span>
+            <span className="text-slate-400 font-medium">{nowFormatted}</span>
+          </div>
+          {latestPostOverall && (
+            <div className="flex items-center gap-1.5 truncate">
+              <span>Posledný príspevok v lige:</span>
+              <Link
+                href={`/forum/${latestPostOverall.thread.id}`}
+                className="text-blue-400 hover:underline font-medium truncate max-w-[200px]"
+              >
+                {latestPostOverall.thread.title}
+              </Link>
+              <span className="text-slate-600">({ago(latestPostOverall.createdAt)})</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Main Categories phpBB Table Container */}
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/90 shadow-2xl overflow-hidden">
+        {/* Category Header */}
+        <div className="bg-slate-800/60 px-5 py-3 border-b border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-black uppercase tracking-wider text-slate-200">
+              🏒 Ligové sekcie a podfóra
+            </span>
+          </div>
+          <span className="text-xs text-slate-400 font-medium hidden sm:inline">
+            Board Index
+          </span>
+        </div>
+
+        {/* Table Column Headers */}
+        <div className="hidden sm:flex items-center justify-between px-5 py-2.5 bg-slate-950/70 border-b border-slate-800/80 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+          <div className="flex-1">Podfórum / Popis</div>
+          <div className="w-32 text-center">Štatistika</div>
+          <div className="w-64 pl-5">Posledný príspevok</div>
+        </div>
+
+        {/* Category Rows */}
+        <div className="divide-y divide-slate-800/70">
+          {cats.map(({ cat, topics, posts, last }) => {
+            const m = CAT_META[cat];
+            return (
+              <div
+                key={cat}
+                className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-5 gap-3 transition-all hover:bg-slate-800/40"
+              >
+                {/* Left: Icon & Subforum Info */}
+                <div className="flex items-start sm:items-center gap-4 min-w-0 flex-1">
+                  <Link
+                    href={`/forum/c/${cat}`}
+                    className="shrink-0 w-12 h-12 rounded-xl bg-slate-800 border border-slate-700/80 grid place-items-center text-2xl shadow-sm transition-transform group-hover:scale-105"
+                  >
                     {m.icon}
-                  </div>
-                  <div className="min-w-0 flex-1">
+                  </Link>
+
+                  <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h2 className={`text-xl font-black tracking-tight ${m.color} group-hover:underline`}>{m.label}</h2>
-                      {m.adminOnly && <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-500/80 bg-amber-500/10 ring-1 ring-amber-500/30 rounded px-1.5 py-0.5">len komisár</span>}
+                      <Link
+                        href={`/forum/c/${cat}`}
+                        className={`text-base font-bold tracking-tight ${m.color} group-hover:text-blue-300 transition-colors`}
+                      >
+                        {m.label}
+                      </Link>
+                      {m.adminOnly && (
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/15 border border-amber-500/30 rounded px-1.5 py-0.5">
+                          len komisár
+                        </span>
+                      )}
                     </div>
-                    <p className="text-sm text-slate-400 mt-1">{m.desc}</p>
-                    <div className="flex items-center gap-2 mt-3">
-                      <span className={`text-xs font-semibold rounded-full px-2.5 py-1 ${m.chip}`}>{topics} vlákien</span>
-                      <span className={`text-xs font-semibold rounded-full px-2.5 py-1 ${m.chip}`}>{posts} príspevkov</span>
+                    <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+                      {m.desc}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Center: Topics & Posts Counters */}
+                <div className="flex items-center justify-between sm:justify-center gap-6 shrink-0 sm:w-32 pl-16 sm:pl-0">
+                  <div className="text-center">
+                    <div className="text-base font-black text-slate-200 tabular-nums leading-none">
+                      {topics}
+                    </div>
+                    <div className="text-[10px] uppercase tracking-wider text-slate-500 mt-1 font-semibold">
+                      Tém
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-base font-black text-slate-400 tabular-nums leading-none">
+                      {posts}
+                    </div>
+                    <div className="text-[10px] uppercase tracking-wider text-slate-500 mt-1 font-semibold">
+                      Správ
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-5 pt-4 border-t border-slate-800/70">
+                {/* Right: Last Post Information */}
+                <div className="shrink-0 sm:w-64 pl-16 sm:pl-0 sm:border-l border-slate-800/80 sm:pl-5">
                   {last ? (
                     <div className="flex items-center gap-3">
-                      {last.team.logoUrl
-                        ? <img src={last.team.logoUrl} alt="" className="w-9 h-9 object-contain shrink-0" />
-                        : <div className="w-9 h-9 rounded-full bg-slate-800 grid place-items-center text-xs text-slate-400 shrink-0">{(last.team.gmNickname || last.team.code || "?").slice(0, 2)}</div>}
+                      {last.team.logoUrl ? (
+                        <img
+                          src={last.team.logoUrl}
+                          alt=""
+                          className="w-8 h-8 object-contain shrink-0 rounded-md bg-slate-900/50 p-0.5 border border-slate-800"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-lg bg-slate-800 grid place-items-center text-[10px] text-slate-400 shrink-0 font-bold">
+                          {(last.team.gmNickname || last.team.code || "?").slice(0, 2)}
+                        </div>
+                      )}
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm font-semibold text-slate-200 truncate group-hover:text-white">{last.thread.title}</div>
-                        <div className="text-[11px] text-slate-500">{last.team.gmNickname || last.team.code || "GM"} · {ago(last.createdAt)}</div>
+                        <Link
+                          href={`/forum/${last.thread.id}`}
+                          className="text-xs font-bold text-slate-200 truncate group-hover:text-blue-400 transition-colors block"
+                        >
+                          {last.thread.title}
+                        </Link>
+                        <div className="text-[11px] text-slate-500 mt-0.5">
+                          od{" "}
+                          <span className="text-slate-400 font-medium">
+                            {last.team.gmNickname || last.team.code || "GM"}
+                          </span>{" "}
+                          • {ago(last.createdAt)}
+                        </div>
                       </div>
-                      <span className="text-slate-600 text-lg group-hover:text-slate-400 transition-colors">→</span>
+                      <Link
+                        href={`/forum/${last.thread.id}`}
+                        className="text-slate-600 group-hover:text-blue-400 transition-colors text-base px-1"
+                        title="Zobraziť tému"
+                      >
+                        →
+                      </Link>
                     </div>
                   ) : (
-                    <div className="text-sm text-slate-600 italic">Zatiaľ žiadne príspevky — buď prvý.</div>
+                    <div className="text-xs text-slate-600 italic">
+                      Zatiaľ žiadne príspevky.
+                    </div>
                   )}
                 </div>
               </div>
-            </Link>
-          );
-        })}
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Board Statistics & Who Is Online Panel */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        {/* Forum Stats */}
+        <div className="md:col-span-2 rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-xl space-y-3">
+          <div className="flex items-center justify-between pb-2.5 border-b border-slate-800">
+            <h2 className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-2">
+              <span>📊</span>
+              <span>Štatistiky fóra</span>
+            </h2>
+            <span className="text-[11px] text-slate-500">
+              Celkovo {totalTeams} klubov v lige
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3 text-center py-1">
+            <div className="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800/80">
+              <div className="text-xl font-black text-white tabular-nums">{totalPosts}</div>
+              <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold mt-0.5">
+                Príspevkov
+              </div>
+            </div>
+            <div className="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800/80">
+              <div className="text-xl font-black text-white tabular-nums">{totalTopics}</div>
+              <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold mt-0.5">
+                Vlákien
+              </div>
+            </div>
+            <div className="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800/80">
+              <div className="text-xl font-black text-emerald-400 tabular-nums">
+                {activeTeams.length}
+              </div>
+              <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold mt-0.5">
+                Aktívnych GM
+              </div>
+            </div>
+          </div>
+
+          {/* Active GMs List */}
+          <div className="pt-2 text-xs text-slate-400 space-y-1.5">
+            <div className="font-semibold text-slate-300 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+              <span>🟢</span>
+              <span>Nedávno aktívni GM:</span>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {activeTeams.map((t) => {
+                const isComish = t.gmRole === "comish" || t.gmRole === "co_comish";
+                const isAdmin = t.isAdmin;
+                return (
+                  <Link
+                    key={t.id}
+                    href={`/teams/${t.slug}`}
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold border transition-colors ${
+                      isComish
+                        ? "bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20"
+                        : isAdmin
+                        ? "bg-purple-500/10 text-purple-300 border-purple-500/30 hover:bg-purple-500/20"
+                        : "bg-slate-800 text-slate-300 border-slate-700 hover:text-white"
+                    }`}
+                  >
+                    <span>{t.gmNickname || t.code || t.name}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Legend of Icons */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-xl space-y-3">
+          <div className="pb-2.5 border-b border-slate-800">
+            <h2 className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-2">
+              <span>ℹ️</span>
+              <span>Legenda fóra</span>
+            </h2>
+          </div>
+
+          <div className="space-y-2 text-xs text-slate-400 pt-1">
+            <div className="flex items-center gap-2.5">
+              <span className="w-6 text-center text-sm">💬</span>
+              <span>Bežná diskusná téma</span>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <span className="w-6 text-center text-sm">📌</span>
+              <span>Pripnuté oznámenie / pravidlá</span>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <span className="w-6 text-center text-sm">🔥</span>
+              <span>Horúca téma (viac ako 10 odpovedí)</span>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <span className="w-6 text-center text-sm">👑</span>
+              <span className="text-amber-300">Vedenie ligy / Komisár</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
