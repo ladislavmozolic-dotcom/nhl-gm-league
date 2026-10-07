@@ -31,7 +31,7 @@ export async function saveLiveCalculatorConfigAction(data: LiveCalcConfigUpdate)
   const isFullAdmin = await isAdmin();
   const canManage = isFullAdmin || (await canManageLiveCalculator());
   if (!canManage) {
-    throw new Error("Nemáte oprávnenie meniť konfiguráciu kalkulátora.");
+    throw new Error("You are not authorized to change the calculator configuration.");
   }
   // Only the full league administrator (commissioner) can change manager team assignments
   const updateData = { ...data };
@@ -45,7 +45,7 @@ export async function saveLiveCalculatorConfigAction(data: LiveCalcConfigUpdate)
 
 export async function triggerLiveCalculatorRecomputeAction() {
   if (!(await canManageLiveCalculator())) {
-    throw new Error("Nemáte oprávnenie spustiť prepočet kalkulátora.");
+    throw new Error("You are not authorized to run the calculator recalculation.");
   }
   const [skaters, goalies] = await Promise.all([
     runLiveCalculatorRecompute(),
@@ -64,7 +64,7 @@ export async function triggerLiveCalculatorRecomputeAction() {
 
 export async function triggerLiveCalculatorSyncAction() {
   if (!(await canManageLiveCalculator())) {
-    throw new Error("Nemáte oprávnenie spustiť synchronizáciu dát.");
+    throw new Error("You are not authorized to run the data sync.");
   }
   const syncResult = await syncLiveCalculatorData();
   const [skaters, goalies] = await Promise.all([
@@ -105,7 +105,7 @@ export async function getAllTeamsForAssignmentAction(): Promise<TeamAssignmentIt
     id: t.id,
     name: t.name,
     code: t.code,
-    gmName: t.gmNickname || [t.gmFirstName, t.gmLastName].filter(Boolean).join(" ") || "Bez priradeného GM",
+    gmName: t.gmNickname || [t.gmFirstName, t.gmLastName].filter(Boolean).join(" ") || "No GM assigned",
     gmEmail: t.gmEmail,
   }));
 }
@@ -213,7 +213,7 @@ export async function promoteLiveCalculatorRatingsAction(): Promise<{
   timestamp: string;
 }> {
   if (!(await isAdmin())) {
-    throw new Error("Iba administrátor ligy môže aplikovať ratingy do STHS.");
+    throw new Error("Only the league administrator can apply ratings to STHS.");
   }
 
   // 1. Ensure permanent STHS snapshot exists for both skaters and goalies
@@ -243,7 +243,7 @@ export async function promoteLiveCalculatorRatingsAction(): Promise<{
   });
 
   if (!skaters.length && !goalies.length) {
-    throw new Error("Žiadny hráči ani brankári nemajú vypočítané Live ratingy. Najprv spustite prepočet.");
+    throw new Error("No skaters or goalies have computed Live ratings. Run the recalculation first.");
   }
 
   const CHUNK_SIZE = 100;
@@ -364,7 +364,7 @@ export async function restoreSthsBackupAction(): Promise<{
   restoredCount: number;
 }> {
   if (!(await isAdmin())) {
-    throw new Error("Iba administrátor ligy môže obnoviť ratingy zo zálohy.");
+    throw new Error("Only the league administrator can restore ratings from the backup.");
   }
 
   // Restore Player table for skaters

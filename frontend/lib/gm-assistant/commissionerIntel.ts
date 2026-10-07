@@ -40,8 +40,8 @@ async function capViolationsFinding(): Promise<CommissionerFinding> {
     detail: o.over > 0 ? `$${(o.over / 1_000_000).toFixed(2)}M nad stropom` : `$${(o.underFloor / 1_000_000).toFixed(2)}M pod podlahou`,
   }));
   return {
-    id: "cap-violations", label: "Porušenia salary capu", severity: sev(rows.length, 1, 3),
-    summary: rows.length === 0 ? "Žiadny klub momentálne neporušuje strop ani podlahu capu." : `${rows.length} klub(y) momentálne mimo capu.`,
+    id: "cap-violations", label: "Salary cap violations", severity: sev(rows.length, 1, 3),
+    summary: rows.length === 0 ? "No club is currently violating the cap ceiling or floor." : `${rows.length} club(s) currently outside the cap.`,
     rows,
   };
 }
@@ -82,15 +82,15 @@ async function rosterSizeFinding(): Promise<CommissionerFinding> {
 
     const problems: string[] = [];
     if (proCount > ROSTER_LIMITS.proMax) problems.push(`NHL roster ${proCount}/${ROSTER_LIMITS.proMax}`);
-    if (farmActiveCount > ROSTER_LIMITS.ahlMax) problems.push(`AHL aktívny roster ${farmActiveCount}/${ROSTER_LIMITS.ahlMax}`);
-    if (orgCount > ROSTER_LIMITS.orgMax) problems.push(`organizácia ${orgCount}/${ROSTER_LIMITS.orgMax}`);
-    if (orgGoalies > ROSTER_LIMITS.orgMaxGoalies) problems.push(`brankári ${orgGoalies}/${ROSTER_LIMITS.orgMaxGoalies}`);
+    if (farmActiveCount > ROSTER_LIMITS.ahlMax) problems.push(`AHL active roster ${farmActiveCount}/${ROSTER_LIMITS.ahlMax}`);
+    if (orgCount > ROSTER_LIMITS.orgMax) problems.push(`organization ${orgCount}/${ROSTER_LIMITS.orgMax}`);
+    if (orgGoalies > ROSTER_LIMITS.orgMaxGoalies) problems.push(`goalies ${orgGoalies}/${ROSTER_LIMITS.orgMaxGoalies}`);
     if (problems.length) rows.push({ teamId: t.id, teamName: t.name, detail: problems.join(", ") });
   }
 
   return {
-    id: "roster-size", label: "Legálnosť veľkosti rosteru", severity: sev(rows.length, 1, 4),
-    summary: rows.length === 0 ? "Všetky kluby sú v rámci limitov NHL/AHL/organizácie." : `${rows.length} klub(y) prekračujú limit rosteru.`,
+    id: "roster-size", label: "Roster size legality", severity: sev(rows.length, 1, 4),
+    summary: rows.length === 0 ? "All clubs are within the NHL/AHL/organization limits." : `${rows.length} club(s) exceed the roster limit.`,
     rows,
   };
 }
@@ -104,8 +104,8 @@ async function duplicatePlayersFinding(): Promise<CommissionerFinding> {
     rows.push({ detail: `nhlId ${d.nhlId}: ${players.map((p) => `${p.name} (${p.team?.name ?? "?"}, #${p.id})`).join(" a ")}` });
   }
   return {
-    id: "duplicate-players", label: "Duplicitní hráči (rovnaké nhlId)", severity: sev(rows.length, 1, 3),
-    summary: rows.length === 0 ? "Žiadne dve Player záznamy nezdieľajú rovnaké nhlId." : `${rows.length} nhlId má viac ako jeden záznam hráča.`,
+    id: "duplicate-players", label: "Duplicate players (same nhlId)", severity: sev(rows.length, 1, 3),
+    summary: rows.length === 0 ? "No two Player records share the same nhlId." : `${rows.length} nhlId values have more than one player record.`,
     rows,
   };
 }
@@ -121,17 +121,17 @@ async function nhlAhlConflictFinding(): Promise<CommissionerFinding> {
   });
   const rows: FindingRow[] = [];
   for (const p of players) {
-    if (!p.team) { rows.push({ playerId: p.id, playerName: p.name, detail: `rosterType ${p.rosterType}, ale bez priradeného tímu` }); continue; }
+    if (!p.team) { rows.push({ playerId: p.id, playerName: p.name, detail: `rosterType ${p.rosterType}, but no team assigned` }); continue; }
     if (p.rosterType === "NHL" && p.team.league !== "NHL") {
-      rows.push({ playerId: p.id, playerName: p.name, teamId: p.team.id, teamName: p.team.name, detail: `rosterType NHL, ale tím "${p.team.name}" je AHL/farm` });
+      rows.push({ playerId: p.id, playerName: p.name, teamId: p.team.id, teamName: p.team.name, detail: `rosterType NHL, but team "${p.team.name}" is AHL/farm` });
     }
     if (p.rosterType === "AHL" && p.team.league !== "AHL") {
-      rows.push({ playerId: p.id, playerName: p.name, teamId: p.team.id, teamName: p.team.name, detail: `rosterType AHL, ale tím "${p.team.name}" nie je farm klub` });
+      rows.push({ playerId: p.id, playerName: p.name, teamId: p.team.id, teamName: p.team.name, detail: `rosterType AHL, but team "${p.team.name}" is not a farm club` });
     }
   }
   return {
     id: "nhl-ahl-conflicts", label: "NHL/AHL nezrovnalosti", severity: sev(rows.length, 1, 5),
-    summary: rows.length === 0 ? "rosterType každého hráča sedí s ligou jeho tímu." : `${rows.length} hráč(ov) má rosterType nesedící s tímom, na ktorom sedí.`,
+    summary: rows.length === 0 ? "Every player's rosterType matches his team's league." : `${rows.length} player(s) have a rosterType that does not match their team.`,
     rows: rows.slice(0, 40),
   };
 }
@@ -147,15 +147,15 @@ async function missingFieldsFinding(): Promise<CommissionerFinding> {
   });
   const rows: FindingRow[] = [];
   for (const p of skaters) {
-    const missing = [!p.capHit ? "cap hit" : null, p.age == null ? "vek" : null, !p.birthDate ? "dátum narodenia" : null, !p.position ? "pozícia" : null].filter((x): x is string => x != null);
-    if (missing.length) rows.push({ playerId: p.id, playerName: p.name, teamName: p.team?.name, detail: `chýba: ${missing.join(", ")}` });
+    const missing = [!p.capHit ? "cap hit" : null, p.age == null ? "age" : null, !p.birthDate ? "birth date" : null, !p.position ? "position" : null].filter((x): x is string => x != null);
+    if (missing.length) rows.push({ playerId: p.id, playerName: p.name, teamName: p.team?.name, detail: `missing: ${missing.join(", ")}` });
   }
   for (const g of goalies) {
-    if (!g.goalieRating) rows.push({ playerId: g.id, playerName: g.name, teamName: g.team?.name, detail: "chýba GoalieRating" });
+    if (!g.goalieRating) rows.push({ playerId: g.id, playerName: g.name, teamName: g.team?.name, detail: "missing GoalieRating" });
   }
   return {
-    id: "missing-fields", label: "Chýbajúce polia na rostrovaných hráčoch", severity: sev(rows.length, 1, 10),
-    summary: rows.length === 0 ? "Žiadny rostrovaný hráč nemá chýbajúce kľúčové pole." : `${rows.length} hráč(ov) má chýbajúce kľúčové pole.`,
+    id: "missing-fields", label: "Missing fields on rostered players", severity: sev(rows.length, 1, 10),
+    summary: rows.length === 0 ? "No rostered player has a missing key field." : `${rows.length} player(s) have a missing key field.`,
     rows: rows.slice(0, 40),
   };
 }
@@ -173,6 +173,6 @@ export async function loadCommissionerIntel(): Promise<CommissionerIntel> {
 
 export function summarizeForAudit(intel: CommissionerIntel): string {
   const flagged = intel.findings.filter((f) => f.rows.length > 0);
-  if (!flagged.length) return "Žiadne nálezy — všetky kontroly čisté.";
+  if (!flagged.length) return "No findings — all checks clean.";
   return flagged.map((f) => `${f.label}: ${f.rows.length}`).join("; ");
 }

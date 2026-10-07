@@ -70,9 +70,9 @@ function positionForFinding(f: RosterFinding): "C" | "LW" | "RW" | "D" | "G" | n
 function marketActions(f: RosterFinding): BriefingAction[] {
   const position = positionForFinding(f);
   const actions: BriefingAction[] = [
-    { label: "Porovnať hĺbku klubov", href: `/tools/assistant/find-trade-partner?slot=${f.id}` },
+    { label: "Compare club depth", href: `/tools/assistant/find-trade-partner?slot=${f.id}` },
   ];
-  if (position) actions.push({ label: "Preskúmať UFA trh", href: `/tools/assistant/find-player?pos=${position}&rosterType=UFA`, tone: "emerald" });
+  if (position) actions.push({ label: "Explore the UFA market", href: `/tools/assistant/find-player?pos=${position}&rosterType=UFA`, tone: "emerald" });
   return actions;
 }
 
@@ -145,26 +145,26 @@ async function marketRadar(teamId: number, analysis: RosterAnalysis, phase: Phas
 
 function strategyItem(contention: Contention, analysis: RosterAnalysis): BriefingItem {
   const strengths = analysis.findings.filter((f) => f.severity === "ok").slice(0, 2).map((f) => f.label);
-  const strengthNote = strengths.length ? ` Silné opory: ${strengths.join(", ")}.` : "";
+  const strengthNote = strengths.length ? ` Strengths: ${strengths.join(", ")}.` : "";
   if (contention === "contender") return {
-    id: "strategy", priority: "next", title: "Režim: útok na výsledok",
-    detail: `Tím je vedený ako contender. Pri posilách uprednostni okamžitý prínos do najslabšieho slotu pred hromadením hĺbky.${strengthNote}`,
-    actions: [{ label: "Simulovať krok nanečisto", href: "/tools/assistant/scenario" }],
+    id: "strategy", priority: "next", title: "Mode: go for the result",
+    detail: `The team is classed as a contender. When adding players, prefer an immediate gain at the weakest slot over stacking depth.${strengthNote}`,
+    actions: [{ label: "Dry-run a move", href: "/tools/assistant/scenario" }],
   };
   if (contention === "rebuild") return {
-    id: "strategy", priority: "next", title: "Režim: budovanie jadra",
-    detail: `Tím je vedený ako rebuild. Chráň draft kapitál a cap flexibilitu; pri výmene veterána si najprv porovnaj, či neotvára priestor mladšiemu hráčovi.${strengthNote}`,
-    actions: [{ label: "Otvoriť draft", href: "/draft" }],
+    id: "strategy", priority: "next", title: "Mode: building the core",
+    detail: `The team is classed as a rebuild. Protect draft capital and cap flexibility; before trading a veteran, check whether it opens room for a younger player.${strengthNote}`,
+    actions: [{ label: "Open the draft", href: "/draft" }],
   };
   if (contention === "rising") return {
-    id: "strategy", priority: "next", title: "Režim: rast bez skratky",
-    detail: `Tím je vedený ako rising. Posilňuj iba miesta, ktoré brzdia jadro; neobetuj budúce aktíva za malý krátkodobý posun.${strengthNote}`,
-    actions: [{ label: "Simulovať krok nanečisto", href: "/tools/assistant/scenario" }],
+    id: "strategy", priority: "next", title: "Mode: growth without shortcuts",
+    detail: `The team is classed as rising. Only strengthen spots that hold the core back; do not sacrifice future assets for a small short-term gain.${strengthNote}`,
+    actions: [{ label: "Dry-run a move", href: "/tools/assistant/scenario" }],
   };
   return {
-    id: "strategy", priority: "watch", title: "Režim: vyhodnotiť smer",
-    detail: `Tím je v strednej zóne. Pred väčším trade počkaj na jasný trend v tabuľke a rieš iba evidentné slabé miesto.${strengthNote}`,
-    actions: [{ label: "Otvoriť tabuľku", href: "/standings" }],
+    id: "strategy", priority: "watch", title: "Mode: assess the direction",
+    detail: `The team is in the middle zone. Before a bigger trade, wait for a clear trend in the standings and only address the obvious weak spot.${strengthNote}`,
+    actions: [{ label: "Open the standings", href: "/standings" }],
   };
 }
 
@@ -189,35 +189,35 @@ export async function loadGmBriefing(teamId: number, existingAnalysis?: RosterAn
   const weaknesses = analysis.findings.filter((f) => f.severity === "critical").slice(0, 2);
   for (const weakness of weaknesses) {
     items.push({
-      id: `gap-${weakness.id}`, priority: "now", title: `Priorita: ${weakness.label}`,
-      detail: `Role Score ${weakness.teamValue}, teda ${weakness.leagueRank}. miesto z ${weakness.leagueSize}. Toto je porovnanie s rovnakým slotom naprieč ligou, nie odhad ochoty iného GM obchodovať.`,
+      id: `gap-${weakness.id}`, priority: "now", title: `Priority: ${weakness.label}`,
+      detail: `Role Score ${weakness.teamValue}, i.e. #${weakness.leagueRank} of ${weakness.leagueSize}. This is a comparison with the same slot across the league, not an estimate of another GM's willingness to trade.`,
       actions: marketActions(weakness),
     });
   }
   if (form.streak <= -3) {
     items.push({
-      id: "cold-streak", priority: "now", title: `${Math.abs(form.streak)} prehry za sebou — najprv diagnostika`,
-      detail: `Posledných ${form.results.length} zápasov: ${form.results.reduce((sum, r) => sum + (r.won ? 2 : r.otLoss ? 1 : 0), 0)} bodov. Neber sériu porážok automaticky ako signál na trade; najprv porovnaj výkon posledného zápasu so sezónnym priemerom a over fit formácií.`,
-      actions: [{ label: "Line Fit Finder", href: "/tools/line-fit" }, { label: "Posledné výsledky", href: "/scores", tone: "amber" }],
+      id: "cold-streak", priority: "now", title: `${Math.abs(form.streak)} straight losses — diagnose first`,
+      detail: `Last ${form.results.length} games: ${form.results.reduce((sum, r) => sum + (r.won ? 2 : r.otLoss ? 1 : 0), 0)} points. Do not automatically treat a losing streak as a signal to trade; first compare the last game's performance with the season average and check lineup fit.`,
+      actions: [{ label: "Line Fit Finder", href: "/tools/line-fit" }, { label: "Latest results", href: "/scores", tone: "amber" }],
     });
   } else if (form.streak >= 4) {
     items.push({
-      id: "hot-streak", priority: "watch", title: `${form.streak} výhry za sebou — over udržateľnosť`,
-      detail: `Séria je pozitívny signál, no rozhodnutie o agresívnom posilnení opieraj o slabé sloty a celosezónne postavenie, nie iba o krátku formu.`,
-      actions: [{ label: "Otvoriť tabuľku", href: "/standings" }],
+      id: "hot-streak", priority: "watch", title: `${form.streak} straight wins — check sustainability`,
+      detail: `The streak is a positive signal, but base a decision on aggressive reinforcement on weak slots and the full-season standing, not only on short-term form.`,
+      actions: [{ label: "Open the standings", href: "/standings" }],
     });
   }
   if (space != null && space < 2_000_000) {
     items.push({
-      id: "cap", priority: "next", title: "Tesný cap priestor",
-      detail: `Aktuálny priestor pod stropom je ${Math.round(space / 100_000) / 10} mil. $. Každé posilnenie najprv otestuj v Scenario Engine, aby sa neprekrývalo s budúcimi záväzkami.`,
+      id: "cap", priority: "next", title: "Tight cap room",
+      detail: `Current room under the cap is $${Math.round(space / 100_000) / 10}M. Test every addition in the Scenario Engine first so it does not collide with future commitments.`,
       actions: [{ label: "Scenario Engine", href: "/tools/assistant/scenario" }],
     });
   }
   items.push(strategyItem(contention, analysis));
   if (!items.some((item) => item.id.startsWith("gap-"))) {
     const watch = analysis.findings.find((f) => f.severity === "warning");
-    if (watch) items.push({ id: `watch-${watch.id}`, priority: "watch", title: `Sledovať: ${watch.label}`, detail: `Role Score ${watch.teamValue}; ${watch.leagueRank}. miesto z ${watch.leagueSize}. Nie je to núdzový nákup, ale jasný bod pre priebežný scouting.`, actions: marketActions(watch) });
+    if (watch) items.push({ id: `watch-${watch.id}`, priority: "watch", title: `Watch: ${watch.label}`, detail: `Role Score ${watch.teamValue}; #${watch.leagueRank} of ${watch.leagueSize}. Not an emergency purchase, but a clear point for ongoing scouting.`, actions: marketActions(watch) });
   }
   return {
     teamName: analysis.teamName,

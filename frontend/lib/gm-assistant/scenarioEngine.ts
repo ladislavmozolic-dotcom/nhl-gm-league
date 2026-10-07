@@ -186,24 +186,24 @@ export async function runScenario(teamId: number, moves: ScenarioMove[]): Promis
   const describeMove = (move: ScenarioMove): ScenarioMoveDescribed => {
     if (move.kind === "sign") {
       const p = signById.get(move.playerId);
-      if (!p) return { move, label: `Podpísať hráča #${move.playerId}`, valid: false, problem: "hráč sa nenašiel medzi voľnými agentmi" };
-      return { move, label: `Podpísať ${p.name} — ${money(move.capHit)} × ${move.years} r.`, valid: true };
+      if (!p) return { move, label: `Sign player #${move.playerId}`, valid: false, problem: "player not found among free agents" };
+      return { move, label: `Sign ${p.name} — ${money(move.capHit)} × ${move.years} yr`, valid: true };
     }
     if (move.kind === "walk") {
       const onRoster = (rosterByTeam.get(teamId) ?? []).some((p) => p.id === move.playerId);
-      const name = nameById.get(move.playerId) ?? `hráč #${move.playerId}`;
-      if (!onRoster) return { move, label: `Vyradiť ${name} z kádra`, valid: false, problem: "hráč momentálne nie je na tvojom NHL rosteri" };
-      return { move, label: `Vyradiť ${name} z kádra (odchádza bez náhrady, bez capu)`, valid: true };
+      const name = nameById.get(move.playerId) ?? `player #${move.playerId}`;
+      if (!onRoster) return { move, label: `Remove ${name} from the roster`, valid: false, problem: "player is not currently on your NHL roster" };
+      return { move, label: `Remove ${name} from the roster (leaves with no return, no cap)`, valid: true };
     }
-    const partnerName = teamNameById.get(move.partnerTeamId) ?? `tím #${move.partnerTeamId}`;
+    const partnerName = teamNameById.get(move.partnerTeamId) ?? `team #${move.partnerTeamId}`;
     const giveNames = move.giveIds.map((id) => nameById.get(id) ?? `#${id}`);
     const getNames = move.getIds.map((id) => nameById.get(id) ?? `#${id}`);
     const giveOk = move.giveIds.every((id) => (rosterByTeam.get(teamId) ?? []).some((p) => p.id === id));
     const getOk = move.getIds.every((id) => (rosterByTeam.get(move.partnerTeamId) ?? []).some((p) => p.id === id));
     if (!giveOk || !getOk) {
-      return { move, label: `Trade s ${partnerName}: dávaš [${giveNames.join(", ") || "—"}] za [${getNames.join(", ") || "—"}]`, valid: false, problem: "niektorý z hráčov nie je na očakávanom rosteri" };
+      return { move, label: `Trade with ${partnerName}: you give [${giveNames.join(", ") || "—"}] for [${getNames.join(", ") || "—"}]`, valid: false, problem: "one of the players is not on the expected roster" };
     }
-    return { move, label: `Trade s ${partnerName}: dávaš [${giveNames.join(", ") || "—"}] za [${getNames.join(", ") || "—"}]`, valid: true };
+    return { move, label: `Trade with ${partnerName}: you give [${giveNames.join(", ") || "—"}] for [${getNames.join(", ") || "—"}]`, valid: true };
   };
 
   // Validate AND apply each move in order against the roster state left by

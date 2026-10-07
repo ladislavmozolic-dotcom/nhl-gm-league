@@ -103,7 +103,7 @@ export async function contractIntel(playerId: number): Promise<ContractIntelResu
 
   const risk: ContractRiskFactor[] = [
     { key: "age", label: "Vek", value: `${player.age ?? "—"} rokov`, elevated: (player.age ?? 0) >= AGE_RISK },
-    { key: "term", label: "Zostávajúca dĺžka", value: `${contractYears} ${contractYears === 1 ? "rok" : contractYears < 5 ? "roky" : "rokov"}`, elevated: contractYears >= TERM_RISK_YEARS },
+    { key: "term", label: "Remaining term", value: `${contractYears} ${contractYears === 1 ? "year" : "years"}`, elevated: contractYears >= TERM_RISK_YEARS },
     { key: "capShare", label: "Podiel na cape", value: `${(capShare * 100).toFixed(1)}%`, elevated: capShare >= CAP_SHARE_RISK },
     { key: "expiring", label: "Koniec zmluvy", value: `${expiryYear} (${expiryStatus})`, elevated: contractYears <= EXPIRING_YEARS },
   ];

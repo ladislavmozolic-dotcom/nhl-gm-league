@@ -30,10 +30,10 @@ export const THEME_DEFAULTS: Theme = {
 };
 
 export const FONTS: { key: string; name: string; stack: string }[] = [
-  { key: "inter", name: "Inter (predvolené)", stack: "" }, // "" = keep the next/font Inter
-  { key: "system", name: "Systémové", stack: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" },
-  { key: "rounded", name: "Zaoblené", stack: "'Trebuchet MS', 'Segoe UI', Verdana, sans-serif" },
-  { key: "condensed", name: "Úzke", stack: "'Arial Narrow', 'Roboto Condensed', 'Segoe UI', sans-serif" },
+  { key: "inter", name: "Inter (default)", stack: "" }, // "" = keep the next/font Inter
+  { key: "system", name: "System", stack: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" },
+  { key: "rounded", name: "Rounded", stack: "'Trebuchet MS', 'Segoe UI', Verdana, sans-serif" },
+  { key: "condensed", name: "Condensed", stack: "'Arial Narrow', 'Roboto Condensed', 'Segoe UI', sans-serif" },
   { key: "serif", name: "Serif", stack: "Georgia, 'Times New Roman', serif" },
   { key: "mono", name: "Monospace", stack: "'Courier New', ui-monospace, monospace" },
 ];

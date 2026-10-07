@@ -30,32 +30,32 @@ export async function sendWelcomeEmail(opts: { to: string; gmName: string; teamN
   const loginUrl = `${SITE_URL}/teams/${opts.teamSlug}/login`;
 
   const html = welcomeHtml({ ...opts, leagueName, accent, logoUrl, loginUrl });
-  const text = `Vitaj v ${leagueName}! 🏒
+  const text = `Welcome to ${leagueName}! 🏒
 
-Ahoj ${opts.gmName},
+Hi ${opts.gmName},
 
-Sme radi, že si sa pridal do našej ligy ako GM klubu ${opts.teamName}, a veríme, že sa ti u nás bude páčiť.
+We are glad you joined our league as the GM of ${opts.teamName}, and we hope you will enjoy it here.
 
-Aby ti nič dôležité neušlo, odporúčame sa aspoň raz denne prihlásiť na ${SITE_URL.replace("https://", "")}, kde nájdeš všetko podstatné ohľadom svojho tímu, zápasov, správ a diania v lige.
+So you do not miss anything important, we recommend signing in at least once a day at ${SITE_URL.replace("https://", "")}, where you will find everything relevant about your team, games, news and what is happening in the league.
 
-KOMUNIKÁCIA CEZ VIBER
-Na bežnú komunikáciu medzi manažérmi používame Viber, kde máme spoločný ligový chat. Riešime tam aktuálne informácie, zápasy, dohody medzi manažérmi aj rôzne novinky z ligy. Preto ťa prosíme:
-- stiahni si aplikáciu Viber, ak ju ešte nemáš,
-- pošli nám svoje telefónne číslo, pod ktorým Viber používaš,
-- následne ťa pridáme do spoločného ligového chatu.
+COMMUNICATION VIA VIBER
+For everyday communication between managers we use Viber, where we have a shared league chat. We discuss current information, games, deals between managers and various league news there. So please:
+- download the Viber app if you do not have it yet,
+- send us the phone number you use Viber with,
+- we will then add you to the shared league chat.
 
-POTREBUJEŠ POMOC?
-Admin ligy pôsobí v hre ako manažér tímu Pittsburgh Penguins. Ak budeš mať akúkoľvek otázku, nebude ti niečo jasné alebo budeš potrebovať s niečím pomôcť, pokojne ho môžeš kedykoľvek kontaktovať prostredníctvom súkromnej správy priamo na webe ${SITE_URL.replace("https://", "")}. Neboj sa pýtať – hlavne zo začiatku ti radi pomôžeme zorientovať sa.
+NEED HELP?
+The league admin plays in the game as the manager of the Pittsburgh Penguins. If you have any question, something is unclear or you need help with anything, feel free to contact them at any time via a private message directly on the site ${SITE_URL.replace("https://", "")}. Do not be afraid to ask – especially at the beginning we are happy to help you find your way around.
 
-Prihlásiť sa môžeš tu: ${loginUrl}
+You can sign in here: ${loginUrl}
 
-Ešte raz vitaj v ${leagueName} a prajeme veľa zábavy, dobrých trejdov a úspechov s tvojím tímom! 🏆
+Once again, welcome to ${leagueName} — we wish you lots of fun, great trades and success with your team! 🏆
 
 ${leagueName}
 ${SITE_URL.replace("https://", "")}`;
 
   try {
-    await r.emails.send({ from: FROM, to: opts.to, subject: `Vitaj v ${leagueName}! 🏒`, html, text });
+    await r.emails.send({ from: FROM, to: opts.to, subject: `Welcome to ${leagueName}! 🏒`, html, text });
   } catch (err) {
     console.error("[email] sendWelcomeEmail failed", err);
   }
@@ -73,53 +73,53 @@ function welcomeHtml(opts: { gmName: string; teamName: string; leagueName: strin
 
         <tr><td style="background-color:#0a1628;border-bottom:3px solid ${accent};padding:36px 32px 28px;text-align:center;">
           ${logoUrl ? `<img src="${logoUrl}" alt="${leagueName}" height="60" style="height:60px;width:auto;margin-bottom:16px;" />` : ""}
-          <div style="color:#ffffff;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:700;letter-spacing:0.2px;">Vitaj v ${leagueName}! 🏒</div>
+          <div style="color:#ffffff;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:700;letter-spacing:0.2px;">Welcome to ${leagueName}! 🏒</div>
         </td></tr>
 
         <tr><td style="padding:32px;">
-          <p style="color:#f1f5f9;font-size:16px;font-weight:700;margin:0 0 14px;">Ahoj ${gmName},</p>
+          <p style="color:#f1f5f9;font-size:16px;font-weight:700;margin:0 0 14px;">Hi ${gmName},</p>
           <p style="color:#cbd5e1;font-size:14px;line-height:1.65;margin:0 0 16px;">
-            Sme radi, že si sa pridal do našej ligy ako GM klubu
-            <strong style="color:${accent};">${teamName}</strong>, a veríme, že sa ti u nás bude páčiť.
+            We are glad you joined our league as the GM of
+            <strong style="color:${accent};">${teamName}</strong>, and we hope you will enjoy it here.
           </p>
           <p style="color:#cbd5e1;font-size:14px;line-height:1.65;margin:0 0 28px;">
-            Aby ti nič dôležité neušlo, odporúčame sa aspoň raz denne prihlásiť na
+            So you do not miss anything important, we recommend signing in at least once a day at
             <a href="${SITE_URL}" style="color:${accent};text-decoration:none;">${domain}</a>,
-            kde nájdeš všetko podstatné ohľadom svojho tímu, zápasov, správ a diania v lige.
+            where you will find everything relevant about your team, games, news and what is happening in the league.
           </p>
 
           <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 28px;">
             <tr><td style="background:${accent};border-radius:10px;">
-              <a href="${loginUrl}" style="display:inline-block;padding:13px 30px;color:#0a1628;font-size:14px;font-weight:700;text-decoration:none;">Prihlásiť sa →</a>
+              <a href="${loginUrl}" style="display:inline-block;padding:13px 30px;color:#0a1628;font-size:14px;font-weight:700;text-decoration:none;">Sign in →</a>
             </td></tr>
           </table>
 
           <div style="background:#131f35;border:1px solid #1e293b;border-radius:12px;padding:20px 22px;margin:0 0 16px;">
-            <p style="color:${accent};font-size:13px;font-weight:800;letter-spacing:0.3px;margin:0 0 10px;">📱 KOMUNIKÁCIA CEZ VIBER</p>
+            <p style="color:${accent};font-size:13px;font-weight:800;letter-spacing:0.3px;margin:0 0 10px;">📱 COMMUNICATION VIA VIBER</p>
             <p style="color:#cbd5e1;font-size:13.5px;line-height:1.6;margin:0 0 10px;">
-              Na bežnú komunikáciu medzi manažérmi používame Viber, kde máme spoločný ligový chat.
-              Riešime tam aktuálne informácie, zápasy, dohody medzi manažérmi aj rôzne novinky z ligy.
-              Preto ťa prosíme:
+              For everyday communication between managers we use Viber, where we have a shared league chat.
+              We discuss current information, games, deals between managers and various league news there.
+              So please:
             </p>
             <ul style="color:#cbd5e1;font-size:13.5px;line-height:1.7;margin:0;padding-left:18px;">
-              <li>stiahni si aplikáciu Viber, ak ju ešte nemáš,</li>
-              <li>pošli nám svoje telefónne číslo, pod ktorým Viber používaš,</li>
-              <li>následne ťa pridáme do spoločného ligového chatu.</li>
+              <li>download the Viber app if you do not have it yet,</li>
+              <li>send us the phone number you use Viber with,</li>
+              <li>we will then add you to the shared league chat.</li>
             </ul>
           </div>
 
           <div style="background:#131f35;border:1px solid #1e293b;border-radius:12px;padding:20px 22px;margin:0 0 28px;">
-            <p style="color:${accent};font-size:13px;font-weight:800;letter-spacing:0.3px;margin:0 0 10px;">🏒 POTREBUJEŠ POMOC?</p>
+            <p style="color:${accent};font-size:13px;font-weight:800;letter-spacing:0.3px;margin:0 0 10px;">🏒 NEED HELP?</p>
             <p style="color:#cbd5e1;font-size:13.5px;line-height:1.6;margin:0;">
-              Admin ligy pôsobí v hre ako manažér tímu Pittsburgh Penguins. Ak budeš mať akúkoľvek otázku,
-              nebude ti niečo jasné alebo budeš potrebovať s niečím pomôcť, pokojne ho môžeš kedykoľvek
-              kontaktovať prostredníctvom súkromnej správy priamo na webe ${domain}.
-              Neboj sa pýtať – hlavne zo začiatku ti radi pomôžeme zorientovať sa.
+              The league admin plays in the game as the manager of the Pittsburgh Penguins. If you have any question,
+              something is unclear or you need help with anything, feel free to contact them at any time
+              via a private message directly on the site ${domain}.
+              Do not be afraid to ask – especially at the beginning we are happy to help you find your way around.
             </p>
           </div>
 
           <p style="color:#cbd5e1;font-size:14px;line-height:1.65;margin:0;">
-            Ešte raz vitaj v ${leagueName} a prajeme veľa zábavy, dobrých trejdov a úspechov s tvojím tímom! 🏆
+            Once again, welcome to ${leagueName} — we wish you lots of fun, great trades and success with your team! 🏆
           </p>
         </td></tr>
 

@@ -49,7 +49,7 @@ export const DEFAULT_MENU: MenuItem[] = [
     { label: "🌍 Around the World", href: "/around-the-world" },
   ] },
   { key: "league", label: "League", href: "/league", children: [
-    { label: "🎯 Season Picks (Tipovačka)", href: "/league/picks" },
+    { label: "🎯 Season Picks", href: "/league/picks" },
     { label: "📖 Rules", href: "/rules" },
     { label: "📣 Fan Interest", href: "/league/fan-interest" },
     { label: "💰 Finance", href: "/finance", children: [

@@ -234,7 +234,7 @@ export async function paySeasonTop3(teamIds: [number, number, number]): Promise<
   const prizes = [bank.picksPrize1, bank.picksPrize2, bank.picksPrize3];
   for (let i = 0; i < 3; i++) {
     if (!teamIds[i] || prizes[i] <= 0) continue;
-    const ok = await postEntry({ kind: "PAYOUT", amount: -prizes[i], teamId: teamIds[i], note: `Tipovačka ${PICKS_SEASON} — ${i + 1}. miesto`, dedupeKey: `PICKS_SEASON:${PICKS_SEASON}:${i + 1}` });
+    const ok = await postEntry({ kind: "PAYOUT", amount: -prizes[i], teamId: teamIds[i], note: `Season Picks ${PICKS_SEASON} — place ${i + 1}`, dedupeKey: `PICKS_SEASON:${PICKS_SEASON}:${i + 1}` });
     if (ok) await moveTeamBank(teamIds[i], prizes[i]);
   }
 }

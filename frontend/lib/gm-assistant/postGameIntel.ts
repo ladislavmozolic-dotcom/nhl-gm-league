@@ -98,7 +98,7 @@ async function teamSwings(teamId: number, isHome: boolean, game: {
     swings.push({ key, label, gameValue: round1(gameVal), seasonAvg: round1(avg), delta: round1(gameVal - avg), gamesInBaseline: n });
   };
   pushMetric("shots", "Strely", shotsFor, "Shots");
-  pushMetric("goals", "Góly", goalsFor, "Goals");
+  pushMetric("goals", "Goals", goalsFor, "Goals");
   pushMetric("xg", "Expected Goals (xG)", xgFor, "Xg");
   pushMetric("hd", "High-danger strely", hdFor, "Hd");
 

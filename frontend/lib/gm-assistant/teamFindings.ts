@@ -49,11 +49,11 @@ async function capOutlookFinding(teamId: number): Promise<TeamFinding | null> {
 
   return {
     id: "cap-outlook",
-    label: "Výhľad na cap budúcu sezónu",
+    label: "Next-season cap outlook",
     severity,
     summary: expiring.length === 0
-      ? `Budúcu sezónu vám neexpiruje žiadna zmluva. Projected cap space (pri strope ${money(cap.upper)}) je ${money(projectedSpace)}.`
-      : `Do budúcej sezóny expiruje ${expiring.length} zmlúv (${ufaCount} UFA, ${rfaCount} RFA) v hodnote ${money(expiringValue)}. Bez nich je projected cap space ${money(projectedSpace)} (pri strope ${money(cap.upper)}).`,
+      ? `No contract expires next season. Projected cap space (at a ${money(cap.upper)} ceiling) is ${money(projectedSpace)}.`
+      : `${expiring.length} contracts expire before next season (${ufaCount} UFA, ${rfaCount} RFA) worth ${money(expiringValue)}. Without them projected cap space is ${money(projectedSpace)} (at a ${money(cap.upper)} ceiling).`,
   };
 }
 
@@ -86,9 +86,9 @@ async function ageCurveFinding(teamId: number): Promise<TeamFinding | null> {
 
   return {
     id: "age-curve",
-    label: "Vekový profil zostavy",
+    label: "Roster age profile",
     severity: oldestThird ? "warning" : "ok",
-    summary: `Priemerný vek rosteru je ${rows[idx].avg.toFixed(1)} rokov (ligový priemer ${leagueAvg.toFixed(1)}) — ${rank}. najstarší roster z ${leagueSize} klubov.`,
+    summary: `The average roster age is ${rows[idx].avg.toFixed(1)} years (league average ${leagueAvg.toFixed(1)}) — the #${rank} oldest roster of ${leagueSize} clubs.`,
   };
 }
 
@@ -155,10 +155,10 @@ async function prospectPipelineFinding(teamId: number): Promise<TeamFinding | nu
   for (const b of BUCKETS) {
     const avg = leagueAvg[b];
     if (mine[b] === 0 && avg > 0.5) {
-      gaps.push(`${b}: 0 (ligový priemer ${avg.toFixed(1)}) — chýba nástupca`);
+      gaps.push(`${b}: 0 (league average ${avg.toFixed(1)}) — no successor`);
       severity = "critical";
     } else if (avg > 0 && mine[b] < avg * 0.5) {
-      gaps.push(`${b}: ${mine[b]} (pod ligovým priemerom ${avg.toFixed(1)})`);
+      gaps.push(`${b}: ${mine[b]} (below the league average ${avg.toFixed(1)})`);
       if (severity === "ok") severity = "warning";
     } else if (avg > 0 && mine[b] > avg * 1.5) {
       strong.push(`${b}: ${mine[b]} (nad priemerom ${avg.toFixed(1)})`);
@@ -166,7 +166,7 @@ async function prospectPipelineFinding(teamId: number): Promise<TeamFinding | nu
   }
 
   if (!gaps.length && !strong.length) {
-    return { id: "prospect-pipeline", label: "Prospect pipeline", severity: "ok", summary: "Počet prospektov podľa F/D/G je v rámci ligového priemeru." };
+    return { id: "prospect-pipeline", label: "Prospect pipeline", severity: "ok", summary: "Prospect counts by F/D/G are within the league average." };
   }
   const parts: string[] = [];
   if (gaps.length) parts.push(gaps.join("; "));
@@ -201,17 +201,17 @@ async function rosterBalanceFinding(teamId: number): Promise<TeamFinding | null>
     const avg = leagueAvg[code];
     if (avg <= 0) continue;
     const ratio = mine[code] / avg;
-    if (ratio < 0.6) shortages.push(`${code} (${mine[code]} vs. priemer ${avg.toFixed(1)})`);
-    else if (ratio > 1.5) surpluses.push(`${code} (${mine[code]} vs. priemer ${avg.toFixed(1)})`);
+    if (ratio < 0.6) shortages.push(`${code} (${mine[code]} vs. avg ${avg.toFixed(1)})`);
+    else if (ratio > 1.5) surpluses.push(`${code} (${mine[code]} vs. avg ${avg.toFixed(1)})`);
   }
 
   if (!shortages.length && !surpluses.length) {
-    return { id: "roster-balance", label: "Rovnováha zostavy", severity: "ok", summary: "Počty hráčov podľa pozície sú v rámci ligového priemeru — žiadny výrazný prebytok ani nedostatok." };
+    return { id: "roster-balance", label: "Roster balance", severity: "ok", summary: "Player counts by position are within the league average — no significant surplus or shortage." };
   }
   const parts: string[] = [];
-  if (shortages.length) parts.push(`Nedostatok: ${shortages.join(", ")}`);
-  if (surpluses.length) parts.push(`Prebytok: ${surpluses.join(", ")}`);
-  return { id: "roster-balance", label: "Rovnováha zostavy", severity: shortages.length ? "warning" : "ok", summary: parts.join(". ") + "." };
+  if (shortages.length) parts.push(`Shortage: ${shortages.join(", ")}`);
+  if (surpluses.length) parts.push(`Surplus: ${surpluses.join(", ")}`);
+  return { id: "roster-balance", label: "Roster balance", severity: shortages.length ? "warning" : "ok", summary: parts.join(". ") + "." };
 }
 
 export async function teamWideFindings(teamId: number): Promise<TeamFinding[]> {

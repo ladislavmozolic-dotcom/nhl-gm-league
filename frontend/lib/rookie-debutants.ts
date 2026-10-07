@@ -271,7 +271,7 @@ export async function scanAndSyncDebutants(): Promise<ScanAndSyncResult> {
   let ratingsRecomputed = 0;
   try {
     ratingsRecomputed = (await runLiveCalculatorRecompute()).totalProcessed;
-  } catch { /* stats already refreshed either way — an admin can also hit "Prepočítať ratingy" directly */ }
+  } catch { /* stats already refreshed either way — an admin can also hit "Recalculate ratings" directly */ }
 
   return { ok: true, created, statsRefreshed, ratingsRecomputed };
 }

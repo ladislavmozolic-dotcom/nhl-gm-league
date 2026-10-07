@@ -187,7 +187,7 @@ export async function getGamePicksData(season = REGULAR_SEASON, league = "NHL", 
     if (isFinal) {
       const isDraw = g.endedIn === "OT" || g.endedIn === "SO";
       if (isDraw) {
-        winnerTeamId = 0; // Remíza (X)
+        winnerTeamId = 0; // Draw (X)
       } else if (typeof g.homeGoals === "number" && typeof g.awayGoals === "number") {
         winnerTeamId = g.homeGoals > g.awayGoals ? g.homeTeamId : g.awayTeamId;
       } else {
@@ -334,7 +334,7 @@ export async function evaluateGamePicks(season = REGULAR_SEASON, league = "NHL")
   });
 
   if (pendingSubmissions.length === 0) {
-    return { evaluatedCount: 0, message: "Žiadne nové tipy na vyhodnotenie." };
+    return { evaluatedCount: 0, message: "No new picks to evaluate." };
   }
 
   const gameIds = Array.from(new Set(pendingSubmissions.map((s) => s.gameId)));
@@ -381,7 +381,7 @@ export async function evaluateGamePicks(season = REGULAR_SEASON, league = "NHL")
       const isDbDraw = dbGame.endedIn === "OT" || dbGame.endedIn === "SO";
       let realWinnerId: number | null = null;
       if (isDbDraw) {
-        realWinnerId = 0; // Remíza (X)
+        realWinnerId = 0; // Draw (X)
       } else if (typeof dbGame.homeGoals === "number" && typeof dbGame.awayGoals === "number") {
         realWinnerId = dbGame.homeGoals > dbGame.awayGoals ? dbGame.homeTeamId : dbGame.awayTeamId;
       } else {
@@ -502,6 +502,6 @@ export async function evaluateGamePicks(season = REGULAR_SEASON, league = "NHL")
 
   return {
     evaluatedCount: evaluatedTotal,
-    message: `Úspešne vyhodnotených ${evaluatedTotal} tipov na zápasy UNHL.`,
+    message: `Successfully evaluated ${evaluatedTotal} UNHL game picks.`,
   };
 }
