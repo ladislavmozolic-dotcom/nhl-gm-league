@@ -1,18 +1,22 @@
+"use client";
+
 import Link from "next/link";
+import { useT } from "@/components/LangProvider";
 
 const TABS = [
-  { key: "leaders", label: "Leaders", icon: "👑", href: "/stats/leaders" },
-  { key: "players", label: "Skaters", icon: "👤", href: "/stats/players" },
-  { key: "goalies", label: "Goalies", icon: "🧤", href: "/stats/goalies" },
-  { key: "teams", label: "Teams", icon: "🛡️", href: "/stats/teams" },
-  { key: "advanced", label: "Advanced", icon: "⚡", href: "/stats/advanced" },
-  { key: "edge", label: "EDGE", icon: "📡", href: "/stats/edge" },
-  { key: "career", label: "Career", icon: "📜", href: "/stats/career" },
-  { key: "star-power", label: "Star Power", icon: "⭐", href: "/stats/star-power" },
-  { key: "franchise", label: "Franchise", icon: "🏛️", href: "/stats/franchise" },
+  { key: "leaders", dictKey: "stats.tab.leaders", defaultLabel: "Leaders", icon: "👑", href: "/stats/leaders" },
+  { key: "players", dictKey: "stats.tab.players", defaultLabel: "Skaters", icon: "👤", href: "/stats/players" },
+  { key: "goalies", dictKey: "stats.tab.goalies", defaultLabel: "Goalies", icon: "🧤", href: "/stats/goalies" },
+  { key: "teams", dictKey: "stats.tab.teams", defaultLabel: "Teams", icon: "🛡️", href: "/stats/teams" },
+  { key: "advanced", dictKey: "stats.tab.advanced", defaultLabel: "Advanced", icon: "⚡", href: "/stats/advanced" },
+  { key: "edge", dictKey: "stats.tab.edge", defaultLabel: "EDGE", icon: "📡", href: "/stats/edge" },
+  { key: "career", dictKey: "stats.tab.career", defaultLabel: "Career", icon: "📜", href: "/stats/career" },
+  { key: "star-power", dictKey: "stats.tab.starPower", defaultLabel: "Star Power", icon: "⭐", href: "/stats/star-power" },
+  { key: "franchise", dictKey: "stats.tab.franchise", defaultLabel: "Franchise", icon: "🏛️", href: "/stats/franchise" },
 ];
 
 export default function StatsTabs({ active, league = "NHL" }: { active: string; league?: string }) {
+  const tr = useT();
   const q = league === "AHL" ? "?league=AHL" : "";
   return (
     <div className="bg-slate-900/80 border border-slate-800/90 p-1.5 rounded-2xl flex flex-wrap items-center gap-1.5 shadow-xl backdrop-blur-md">
@@ -23,6 +27,7 @@ export default function StatsTabs({ active, league = "NHL" }: { active: string; 
       )}
       {TABS.map((t) => {
         const isActive = active === t.key;
+        const label = tr(t.dictKey) || t.defaultLabel;
         return (
           <Link
             key={t.key}
@@ -34,7 +39,7 @@ export default function StatsTabs({ active, league = "NHL" }: { active: string; 
             }`}
           >
             <span className="text-sm leading-none">{t.icon}</span>
-            <span>{t.label}</span>
+            <span>{label}</span>
           </Link>
         );
       })}

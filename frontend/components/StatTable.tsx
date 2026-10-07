@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import InfoTip from "@/components/InfoTip";
+import { useT } from "@/components/LangProvider";
 
 export type ColFormat = "plusMinus" | "plusDec1" | "pct3" | "pct1" | "dec1" | "dec2" | "minutesClock" | "jersey" | "dash";
 export type Col = {
@@ -50,6 +51,7 @@ export default function StatTable({ cols, rows, initialSort, minWidth = 720, tie
   /** Number every row (1, 2, 3 …) in the current sort order, inside the frozen first column. */
   showRank?: boolean;
 }) {
+  const tr = useT();
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 }>({ key: initialSort ?? cols[0].key, dir: -1 });
   const [hidden, setHidden] = useState<Set<string>>(() => new Set(cols.filter((c) => c.defaultHidden).map((c) => c.key)));
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -109,7 +111,7 @@ export default function StatTable({ cols, rows, initialSort, minWidth = 720, tie
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Filter player or team..."
+              placeholder={tr("stats.filterPlaceholder") || "Filter player or team..."}
               className="w-full bg-[#0b1120] border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all pl-8 shadow-sm"
             />
             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span>
@@ -127,7 +129,7 @@ export default function StatTable({ cols, rows, initialSort, minWidth = 720, tie
           {hasPositionCol && !isGoalieTable && (
             <div className="flex items-center gap-1 bg-slate-900/90 border border-slate-800 p-0.5 rounded-xl">
               {[
-                { k: "ALL", l: "All" },
+                { k: "ALL", l: tr("stats.posAll") || "All" },
                 { k: "F", l: "F" },
                 { k: "C", l: "C" },
                 { k: "W", l: "W" },
@@ -150,7 +152,7 @@ export default function StatTable({ cols, rows, initialSort, minWidth = 720, tie
 
           {/* Row count badge */}
           <span className="text-[11px] font-mono text-slate-400 px-2 py-1 rounded-lg bg-slate-900/60 border border-slate-800/80">
-            Showing <strong className="text-white font-bold">{sorted.length}</strong> of {rows.length}
+            {tr("stats.showing")} <strong className="text-white font-bold">{sorted.length}</strong> {tr("stats.of")} {rows.length}
           </span>
         </div>
 
@@ -160,7 +162,7 @@ export default function StatTable({ cols, rows, initialSort, minWidth = 720, tie
             onClick={() => setPickerOpen((o) => !o)}
             className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors"
           >
-            <span>Columns ({visible.length}/{cols.length})</span>
+            <span>{tr("stats.columns")} ({visible.length}/{cols.length})</span>
             <span className="text-[10px]">{pickerOpen ? "▴" : "▾"}</span>
           </button>
           {pickerOpen && (
@@ -201,7 +203,7 @@ export default function StatTable({ cols, rows, initialSort, minWidth = 720, tie
                     c.num ? "text-right" : "text-left"
                   } ${
                     c.frozen
-                      ? "sticky left-0 z-20 bg-slate-950 shadow-[2px_0_6px_rgba(0,0,0,0.5)] border-r border-slate-800/80"
+                      ? "sticky left-0 z-20 bg-slate-950 shadow-[2px_0_6px_rgba(0,0,0,0.5)] border-r border-slate-800/80 min-w-[200px]"
                       : ""
                   }`}
                 >
@@ -221,9 +223,9 @@ export default function StatTable({ cols, rows, initialSort, minWidth = 720, tie
                 {visible.map((c) => (
                   <td
                     key={c.key}
-                    className={`px-3 py-2.5 ${c.num ? "text-right tabular-nums font-mono text-xs" : ""} ${
+                    className={`px-3 py-2.5 whitespace-nowrap ${c.num ? "text-right tabular-nums font-mono text-xs" : ""} ${
                       c.frozen
-                        ? "sticky left-0 z-10 bg-[#0b1120] group-hover:bg-[#10192d] shadow-[2px_0_6px_rgba(0,0,0,0.5)] border-r border-slate-800/60 font-semibold"
+                        ? "sticky left-0 z-10 bg-[#0b1120] group-hover:bg-[#10192d] shadow-[2px_0_6px_rgba(0,0,0,0.5)] border-r border-slate-800/60 font-semibold min-w-[200px]"
                         : c.num
                         ? "text-slate-300"
                         : "text-slate-400"
@@ -256,7 +258,7 @@ export default function StatTable({ cols, rows, initialSort, minWidth = 720, tie
                     ) : c.link && (r._slug || r._pid) != null && (r._slug || r._pid) !== "" ? (
                       <Link
                         href={`/players/${r._slug || r._pid}`}
-                        className="hover:text-blue-400 font-bold text-white transition-colors"
+                        className="hover:text-blue-400 font-bold text-white transition-colors whitespace-nowrap inline-block"
                       >
                         {render(r[c.key], c.format)}
                       </Link>
@@ -271,7 +273,7 @@ export default function StatTable({ cols, rows, initialSort, minWidth = 720, tie
         </table>
         {sorted.length === 0 && (
           <div className="p-8 text-center text-slate-500 text-sm">
-            No matching players or teams found.
+            {tr("stats.noResults")}
           </div>
         )}
       </div>

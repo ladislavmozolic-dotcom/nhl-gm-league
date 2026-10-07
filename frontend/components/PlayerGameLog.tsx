@@ -60,7 +60,7 @@ export default function PlayerGameLog({ isGoalie, skater, goalie }: { isGoalie: 
                 </td>
                 <td className="px-2.5 py-1.5 text-center">
                   {r.isSteal ? (
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 ring-1 ring-amber-400/30" title="Ukradnutý zápas (Steal)">
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 ring-1 ring-amber-400/30" title="Steal — high goalie impact win">
                       🧤 Steal
                     </span>
                   ) : (

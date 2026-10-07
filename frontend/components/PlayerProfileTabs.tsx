@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useT } from "@/components/LangProvider";
 
 interface PlayerProfileTabsProps {
   overviewContent: React.ReactNode;
@@ -18,8 +19,9 @@ export default function PlayerProfileTabs({
   availableSeasons,
   currentSeason,
   playerSlugOrId,
-  currentPhase = "Základná časť",
+  currentPhase = "Regular Season",
 }: PlayerProfileTabsProps) {
+  const tr = useT();
   const router = useRouter();
   const searchParams = useSearchParams();
   const paramTab = searchParams.get("tab");
@@ -62,7 +64,7 @@ export default function PlayerProfileTabs({
             }`}
           >
             <span>👤</span>
-            <span>Prehľad & Kariéra</span>
+            <span>{tr("player.tab.overview") || "Overview & Career"}</span>
           </button>
           <button
             type="button"
@@ -74,24 +76,24 @@ export default function PlayerProfileTabs({
             }`}
           >
             <span>📊</span>
-            <span>Sezóny & Analytika</span>
+            <span>{tr("player.tab.seasons") || "Seasons & Analytics"}</span>
           </button>
         </div>
 
         {/* Season Dropdown & Current Phase badge when in Seasons tab */}
         {activeTab === "seasons" && (
           <div className="flex flex-wrap items-center gap-3 self-start sm:self-auto">
-            {/* Aktuálna fáza sezóny */}
+            {/* Current Phase badge */}
             <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs font-semibold shadow-sm">
               <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-              <span className="text-slate-400 font-normal">Aktuálna fáza:</span>
+              <span className="text-slate-400 font-normal">{tr("player.currentPhase") || "Current phase:"}</span>
               <span className="text-white font-bold">{currentPhase}</span>
             </div>
 
-            {/* Dropdown pre prepínanie medzi sezónami */}
+            {/* Dropdown for switching seasons */}
             <div className="flex items-center gap-1.5">
               <label htmlFor="season-dropdown" className="text-xs uppercase tracking-wider text-slate-400 font-bold">
-                Sezóna:
+                {tr("player.seasonLabel") || "Season:"}
               </label>
               <div className="relative">
                 <select
@@ -105,8 +107,8 @@ export default function PlayerProfileTabs({
                 >
                   {availableSeasons.map((s) => {
                     const label = s.endsWith("-PRE")
-                      ? `${s.replace("-PRE", "")} · Príprava (Pre-season)`
-                      : `${s} · Základná časť`;
+                      ? `${s.replace("-PRE", "")} · ${tr("phase.pre") || "Pre-season"}`
+                      : `${s} · ${tr("phase.regular") || "Regular Season"}`;
                     return (
                       <option key={s} value={s} className="bg-slate-900 text-slate-100">
                         {label}

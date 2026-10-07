@@ -1,5 +1,6 @@
 import { Card } from "@/components/ui";
 import type { GoalieAnalytics, DangerSplit } from "@/lib/goalie-analytics-server";
+import { t, type Lang } from "@/lib/i18n";
 
 const svTone = (pct: number, danger: "hd" | "md" | "ld" | "all") => {
   const good = danger === "hd" ? 0.82 : danger === "md" ? 0.9 : danger === "ld" ? 0.96 : 0.91;
@@ -20,7 +21,7 @@ function DangerRow({ label, d, danger }: { label: string; d: DangerSplit; danger
   );
 }
 
-export default function GoalieAnalyticsCard({ a }: { a: GoalieAnalytics }) {
+export default function GoalieAnalyticsCard({ a, lang = "en" }: { a: GoalieAnalytics; lang?: Lang }) {
   if (!a) return null;
   const f = a.fatigue;
   return (
@@ -29,7 +30,7 @@ export default function GoalieAnalyticsCard({ a }: { a: GoalieAnalytics }) {
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
         <Tile big={`${(a.svPct * 100).toFixed(1)}`} label="SV%" tone={svTone(a.svPct, "all")} />
         <Tile big={`${a.gsax >= 0 ? "+" : ""}${a.gsax}`} label="GSAx" tone={a.gsax >= 0 ? "text-emerald-400" : "text-rose-400"} sub="goals saved vs xG" />
-        <Tile big={String(a.steals)} label="Steals" tone="text-amber-400" sub="ukradnuté zápasy" />
+        <Tile big={String(a.steals)} label="Steals" tone="text-amber-400" sub={t(lang, "player.stolenGames") || "stolen games"} />
         <Tile big={`${a.xga.toFixed(1)}`} label="xGA" sub={`${a.goalsAgainst} allowed`} />
         <Tile big={a.gaa.toFixed(2)} label="GAA" sub={`${a.gp} GP`} />
       </div>

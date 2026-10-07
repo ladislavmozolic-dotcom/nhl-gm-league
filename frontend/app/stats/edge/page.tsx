@@ -9,6 +9,8 @@ import { PageHeader } from "@/components/ui";
 import PhaseTabs from "@/components/PhaseTabs";
 import { seasonForPhase } from "@/lib/phase";
 import { defaultStatsPhase } from "@/lib/calendar-server";
+import { getLang } from "@/lib/lang-server";
+import { t } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 

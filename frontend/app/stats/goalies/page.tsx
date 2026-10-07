@@ -8,6 +8,8 @@ import { seasonForPhase } from "@/lib/phase";
 import { defaultStatsPhase } from "@/lib/calendar-server";
 import StatTable, { type Col } from "@/components/StatTable";
 import { PageHeader } from "@/components/ui";
+import { getLang } from "@/lib/lang-server";
+import { t } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +51,7 @@ export default async function GoalieStatsPage({ searchParams }: { searchParams: 
   const SEASON = seasonForPhase(phase);
 
   const sessionTeamId = await getTeamSession();
+  const lang = await getLang();
   const [gk, managedTeams] = await Promise.all([
     goalieTotals(SEASON, league),
     sessionTeamId == null
@@ -77,8 +80,8 @@ export default async function GoalieStatsPage({ searchParams }: { searchParams: 
 
     if (wLeader) {
       heroCards.push({
-        badge: "🏆 MOST WINS",
-        subBadge: "#1 VÝHRY",
+        badge: t(lang, "stats.badge.mostWins"),
+        subBadge: t(lang, "stats.subBadge.wins"),
         playerId: wLeader.playerId,
         slug: wLeader.slug,
         name: wLeader.name,
@@ -96,8 +99,8 @@ export default async function GoalieStatsPage({ searchParams }: { searchParams: 
     }
     if (svLeader) {
       heroCards.push({
-        badge: "🧤 SAVE PERCENTAGE",
-        subBadge: "TOP ÚSPEŠNOSŤ",
+        badge: t(lang, "stats.badge.savePct"),
+        subBadge: t(lang, "stats.subBadge.savePct"),
         playerId: svLeader.playerId,
         slug: svLeader.slug,
         name: svLeader.name,
@@ -115,8 +118,8 @@ export default async function GoalieStatsPage({ searchParams }: { searchParams: 
     }
     if (gsaxLeader) {
       heroCards.push({
-        badge: "⚡ GOALS SAVED (GSAX)",
-        subBadge: "NAD OČAKÁVANIE",
+        badge: t(lang, "stats.badge.gsax"),
+        subBadge: t(lang, "stats.subBadge.aboveExpected"),
         playerId: gsaxLeader.playerId,
         slug: gsaxLeader.slug,
         name: gsaxLeader.name,
@@ -134,8 +137,8 @@ export default async function GoalieStatsPage({ searchParams }: { searchParams: 
     }
     if (stlLeader) {
       heroCards.push({
-        badge: "🥷 UKRADNUTÉ ZÁPASY",
-        subBadge: "STEALS",
+        badge: t(lang, "stats.badge.steals"),
+        subBadge: t(lang, "stats.subBadge.steals"),
         playerId: stlLeader.playerId,
         slug: stlLeader.slug,
         name: stlLeader.name,
@@ -163,7 +166,12 @@ export default async function GoalieStatsPage({ searchParams }: { searchParams: 
 
   return (
     <div className="space-y-6 py-2">
-      <PageHeader title="Statistics" subtitle={`All goalies — ${league} ${phase === "pre" ? "pre-season (exhibition)" : "regular season"}`} />
+      <PageHeader
+        title={t(lang, "menu.stats") || "Statistics"}
+        subtitle={lang === "cs"
+          ? `Brankári — ${league} ${phase === "pre" ? "príprava" : "základná časť"}`
+          : `All goalies — ${league} ${phase === "pre" ? "pre-season (exhibition)" : "regular season"}`}
+      />
       <StatsTabs active="goalies" league={league} />
       <PhaseTabs active={phase} league={league} basePath="/stats/goalies" showPlayoffs={false} />
 
@@ -173,8 +181,12 @@ export default async function GoalieStatsPage({ searchParams }: { searchParams: 
       )}
 
       <p className="text-slate-400 text-sm">
-        Click a header to sort; use live search or Show / Hide Columns to customize.
-        {phase === "pre" ? " Pre-season stats don't count toward profiles/careers." : ""}
+        {lang === "cs"
+          ? "Kliknutím na stĺpec zotriediš tabuľku; použi vyhľadávanie alebo zobrazenie stĺpcov."
+          : "Click a header to sort; use live search or Show / Hide Columns to customize."}
+        {phase === "pre"
+          ? (lang === "cs" ? " Zápasy z prípravy sa nezapočítavajú do profilov/kariéry." : " Pre-season stats don't count toward profiles/careers.")
+          : ""}
       </p>
       <StatTable cols={COLS} rows={rows} initialSort="wins" minWidth={1160} showRank />
       <p className="text-xs text-slate-600">

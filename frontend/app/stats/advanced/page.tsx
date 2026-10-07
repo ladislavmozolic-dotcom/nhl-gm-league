@@ -8,6 +8,8 @@ import { PageHeader } from "@/components/ui";
 import PhaseTabs from "@/components/PhaseTabs";
 import { seasonForPhase } from "@/lib/phase";
 import { defaultStatsPhase } from "@/lib/calendar-server";
+import { getLang } from "@/lib/lang-server";
+import { t } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +52,7 @@ export default async function AdvancedStatsPage({ searchParams }: { searchParams
   const SEASON = seasonForPhase(phase);
 
   const sessionTeamId = await getTeamSession();
+  const lang = await getLang();
   const [sk, gk, managedTeams] = await Promise.all([
     skaterTotals(SEASON, league),
     goalieTotals(SEASON, league),
@@ -72,8 +75,8 @@ export default async function AdvancedStatsPage({ searchParams }: { searchParams
 
     if (xgLeader) {
       heroCards.push({
-        badge: "🎯 XG GENERATOR",
-        subBadge: "KVALITA ŠANCÍ",
+        badge: t(lang, "stats.badge.xgGenerator"),
+        subBadge: t(lang, "stats.subBadge.chanceQuality"),
         playerId: xgLeader.playerId,
         slug: xgLeader.slug,
         name: xgLeader.name,
@@ -85,15 +88,17 @@ export default async function AdvancedStatsPage({ searchParams }: { searchParams
         teamLogo: xgLeader.teamLogo,
         value: xgLeader.xg.toFixed(1),
         unit: "xG",
-        sub: `${xgLeader.goals} G zo ${xgLeader.shots} striel (${xgLeader.gp} GP)`,
+        sub: lang === "cs"
+          ? `${xgLeader.goals} G zo ${xgLeader.shots} striel (${xgLeader.gp} GP)`
+          : `${xgLeader.goals} G on ${xgLeader.shots} shots (${xgLeader.gp} GP)`,
         accentColor: "amber",
       });
     }
     if (finLeader) {
       const diff = finLeader.goals - finLeader.xg;
       heroCards.push({
-        badge: "💎 TOP FINISHER",
-        subBadge: "ZAKONČENIE G−XG",
+        badge: t(lang, "stats.badge.topFinisher"),
+        subBadge: t(lang, "stats.subBadge.finishing"),
         playerId: finLeader.playerId,
         slug: finLeader.slug,
         name: finLeader.name,
@@ -105,14 +110,16 @@ export default async function AdvancedStatsPage({ searchParams }: { searchParams
         teamLogo: finLeader.teamLogo,
         value: (diff > 0 ? "+" : "") + diff.toFixed(1),
         unit: "G-xG",
-        sub: `${finLeader.goals} G (očakávaných ${finLeader.xg.toFixed(1)} xG)`,
+        sub: lang === "cs"
+          ? `${finLeader.goals} G (očakávaných ${finLeader.xg.toFixed(1)} xG)`
+          : `${finLeader.goals} G (${finLeader.xg.toFixed(1)} expected xG)`,
         accentColor: "rose",
       });
     }
     if (gsaxLeader) {
       heroCards.push({
-        badge: "🧤 GSAX WALL",
-        subBadge: "BRANKÁRSKA STENA",
+        badge: t(lang, "stats.badge.gsaxWall"),
+        subBadge: t(lang, "stats.subBadge.goalieWall"),
         playerId: gsaxLeader.playerId,
         slug: gsaxLeader.slug,
         name: gsaxLeader.name,
@@ -124,7 +131,9 @@ export default async function AdvancedStatsPage({ searchParams }: { searchParams
         teamLogo: gsaxLeader.teamLogo,
         value: (gsaxLeader.gsax > 0 ? "+" : "") + gsaxLeader.gsax.toFixed(1),
         unit: "GSAx",
-        sub: `${gsaxLeader.goalsAgainst} GA z ${gsaxLeader.xga.toFixed(1)} xGA (${gsaxLeader.gp} GP)`,
+        sub: lang === "cs"
+          ? `${gsaxLeader.goalsAgainst} GA z ${gsaxLeader.xga.toFixed(1)} xGA (${gsaxLeader.gp} GP)`
+          : `${gsaxLeader.goalsAgainst} GA on ${gsaxLeader.xga.toFixed(1)} xGA (${gsaxLeader.gp} GP)`,
         accentColor: "emerald",
       });
     }
@@ -147,7 +156,12 @@ export default async function AdvancedStatsPage({ searchParams }: { searchParams
 
   return (
     <div className="space-y-6 py-2">
-      <PageHeader title="Statistics" subtitle={`Advanced — shot quality & expected goals · ${league} 2026-27 ${phase === "pre" ? "pre-season" : "regular season"}`} />
+      <PageHeader
+        title={t(lang, "menu.stats") || "Statistics"}
+        subtitle={lang === "cs"
+          ? `Pokročilé — kvalita šancí & očakávané góly · ${league} 2026-27 ${phase === "pre" ? "príprava" : "základná časť"}`
+          : `Advanced — shot quality & expected goals · ${league} 2026-27 ${phase === "pre" ? "pre-season" : "regular season"}`}
+      />
       <StatsTabs active="advanced" league={league} />
       <PhaseTabs active={phase} league={league} basePath="/stats/advanced" showPlayoffs={false} />
 

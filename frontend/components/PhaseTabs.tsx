@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import { type Phase } from "@/lib/phase";
+import { useT } from "@/components/LangProvider";
 
 /** Phase switcher shared by Scores / Standings / Stats. Pre-season & Regular swap
  *  the season the page reads; Playoffs links to the bracket / playoff views.
@@ -7,13 +10,14 @@ import { type Phase } from "@/lib/phase";
 export default function PhaseTabs({ active, league, basePath, playoffsHref = "/playoffs", showPlayoffs = true, keep = "" }: {
   active: Phase; league: "NHL" | "AHL"; basePath: string; playoffsHref?: string; showPlayoffs?: boolean; keep?: string; // keep = extra query to carry over, e.g. "view=goalies"
 }) {
+  const tr = useT();
   const lg = league === "AHL" ? "league=AHL" : "";
   const q = (extra: string) => { const parts = [extra, keep, lg].filter(Boolean); return parts.length ? `?${parts.join("&")}` : ""; };
   const tabs: { key: Phase; label: string; href: string }[] = [
-    { key: "pre" as Phase, label: "Pre-season", href: `${basePath}${q("phase=pre")}` },
+    { key: "pre" as Phase, label: tr("phase.pre") || "Pre-season", href: `${basePath}${q("phase=pre")}` },
     // explicit phase=regular — otherwise the page follows the league clock, which is pre-season during pre-season
-    { key: "regular", label: "Regular Season", href: `${basePath}${q("phase=regular")}` },
-    ...(showPlayoffs ? [{ key: "playoffs" as Phase, label: "Playoffs", href: `${playoffsHref}${league === "AHL" ? "?league=AHL" : ""}` }] : []),
+    { key: "regular", label: tr("phase.regular") || "Regular Season", href: `${basePath}${q("phase=regular")}` },
+    ...(showPlayoffs ? [{ key: "playoffs" as Phase, label: tr("phase.playoffs") || "Playoffs", href: `${playoffsHref}${league === "AHL" ? "?league=AHL" : ""}` }] : []),
   ];
   return (
     <div className="flex gap-2 flex-wrap">

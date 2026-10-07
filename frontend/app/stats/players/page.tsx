@@ -9,6 +9,8 @@ import { seasonForPhase } from "@/lib/phase";
 import { defaultStatsPhase } from "@/lib/calendar-server";
 import StatTable, { type Col } from "@/components/StatTable";
 import { PageHeader } from "@/components/ui";
+import { getLang } from "@/lib/lang-server";
+import { t } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -75,6 +77,7 @@ export default async function PlayerStatsPage({ searchParams }: { searchParams: 
   const situation = DB_SITUATION[sp.situation ?? ""] ? sp.situation! : "all";
 
   const sessionTeamId = await getTeamSession();
+  const lang = await getLang();
   const [sk, managedTeams] = await Promise.all([
     situation === "all"
       ? skaterTotals(SEASON, league)
@@ -104,8 +107,8 @@ export default async function PlayerStatsPage({ searchParams }: { searchParams: 
 
     if (pLeader) {
       heroCards.push({
-        badge: "🎯 TOP SCORER",
-        subBadge: "#1 BODOVANIE",
+        badge: t(lang, "stats.badge.topScorer"),
+        subBadge: t(lang, "stats.subBadge.points"),
         playerId: pLeader.playerId,
         slug: pLeader.slug,
         name: pLeader.name,
@@ -123,8 +126,8 @@ export default async function PlayerStatsPage({ searchParams }: { searchParams: 
     }
     if (gLeader) {
       heroCards.push({
-        badge: "🚀 TOP GOALSCORER",
-        subBadge: "#1 STRELEC",
+        badge: t(lang, "stats.badge.topGoalscorer"),
+        subBadge: t(lang, "stats.subBadge.goals"),
         playerId: gLeader.playerId,
         slug: gLeader.slug,
         name: gLeader.name,
@@ -142,8 +145,8 @@ export default async function PlayerStatsPage({ searchParams }: { searchParams: 
     }
     if (aLeader) {
       heroCards.push({
-        badge: "🅰️ TOP PLAYMAKER",
-        subBadge: "#1 NAHRÁVAČ",
+        badge: t(lang, "stats.badge.topPlaymaker"),
+        subBadge: t(lang, "stats.subBadge.assists"),
         playerId: aLeader.playerId,
         slug: aLeader.slug,
         name: aLeader.name,
@@ -162,7 +165,7 @@ export default async function PlayerStatsPage({ searchParams }: { searchParams: 
     if (pmLeader) {
       const pmVal = "plusMinus5v5" in pmLeader ? Number(pmLeader.plusMinus5v5) : pmLeader.plusMinus;
       heroCards.push({
-        badge: "🛡️ PLUS / MINUS",
+        badge: t(lang, "stats.badge.plusMinus"),
         subBadge: "5v5 DEF/OFF",
         playerId: pmLeader.playerId,
         slug: pmLeader.slug,
@@ -196,9 +199,19 @@ export default async function PlayerStatsPage({ searchParams }: { searchParams: 
     gax: s.goals - s.xg,
   }));
 
+  const SITUATION_LABELS_CS: Record<string, string> = {
+    all: "Všetky", "5v5": "5 na 5", "4v4": "4 na 4", "3v3": "3 na 3",
+    pp: "Presilovka", pk: "Oslabenie", "en-own": "Prázdna brána (vlastná)", "en-opp": "Prázdna brána (súper)",
+  };
+
   return (
     <div className="space-y-6 py-2">
-      <PageHeader title="Statistics" subtitle={`All skaters — ${league} ${phase === "pre" ? "pre-season (exhibition)" : "regular season"}`} />
+      <PageHeader
+        title={t(lang, "menu.stats") || "Statistics"}
+        subtitle={lang === "cs"
+          ? `Hráči — ${league} ${phase === "pre" ? "príprava" : "základná časť"}`
+          : `All skaters — ${league} ${phase === "pre" ? "pre-season (exhibition)" : "regular season"}`}
+      />
       <StatsTabs active="players" league={league} />
       <PhaseTabs active={phase} league={league} basePath="/stats/players" showPlayoffs={false} />
 
@@ -214,6 +227,7 @@ export default async function PlayerStatsPage({ searchParams }: { searchParams: 
           if (league === "AHL") qs.set("league", "AHL");
           qs.set("phase", phase);
           if (key !== "all") qs.set("situation", key);
+          const displayLabel = (lang === "cs" && SITUATION_LABELS_CS[key]) ? SITUATION_LABELS_CS[key] : label;
           return (
             <Link
               key={key}
@@ -224,15 +238,19 @@ export default async function PlayerStatsPage({ searchParams }: { searchParams: 
                   : "bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800/60"
               }`}
             >
-              {label}
+              {displayLabel}
             </Link>
           );
         })}
       </div>
 
       <p className="text-slate-400 text-sm">
-        Click a header to sort; use live filter or position tabs to narrow players.
-        {phase === "pre" ? " Pre-season stats don't count toward profiles/careers." : ""}
+        {lang === "cs"
+          ? "Kliknutím na stĺpec zotriediš tabuľku; použi filter alebo pozície pre zúženie výberu."
+          : "Click a header to sort; use live filter or position tabs to narrow players."}
+        {phase === "pre"
+          ? (lang === "cs" ? " Zápasy z prípravy sa nezapočítavajú do profilov/kariéry." : " Pre-season stats don't count toward profiles/careers.")
+          : ""}
       </p>
 
       {situation !== "all" && rows.length === 0 && (
@@ -245,7 +263,7 @@ export default async function PlayerStatsPage({ searchParams }: { searchParams: 
         cols={situation === "all" ? COLS : SITUATION_COLS}
         rows={rows}
         initialSort="points"
-        minWidth={situation === "all" ? 1250 : 1050}
+        minWidth={situation === "all" ? 1400 : 1100}
         showRank
         tieBreaks={{ points: ["goals", "-gp"] }}
       />

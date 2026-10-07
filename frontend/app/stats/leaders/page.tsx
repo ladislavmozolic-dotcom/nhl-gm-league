@@ -9,6 +9,8 @@ import { seasonForPhase } from "@/lib/phase";
 import { defaultStatsPhase } from "@/lib/calendar-server";
 import { PageHeader, SectionTitle } from "@/components/ui";
 import { getTeamSession } from "@/lib/auth";
+import { getLang } from "@/lib/lang-server";
+import { t, type Lang } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +35,7 @@ function LeaderCard({
   rows,
   managedTeamIds,
   league,
+  lang = "en",
 }: {
   title: string;
   icon?: string;
@@ -40,6 +43,7 @@ function LeaderCard({
   rows: Row[];
   managedTeamIds: Set<number>;
   league: string;
+  lang?: Lang;
 }) {
   const top1 = rows[0];
   const rest = rows.slice(1);
@@ -178,7 +182,7 @@ function LeaderCard({
           href={`/stats/players${league === "AHL" ? "?league=AHL" : ""}`}
           className="text-blue-400 hover:text-blue-300 font-medium"
         >
-          Full stats →
+          {t(lang, "stats.fullStatsLink") || "Full stats →"}
         </Link>
       </div>
     </div>
@@ -228,6 +232,7 @@ export default async function LeadersPage({
   const phase: "pre" | "regular" = league !== "NHL" ? "regular" : explicit ?? (auto === "playoffs" ? "regular" : auto);
   const SEASON = seasonForPhase(phase);
   const sessionTeamId = await getTeamSession();
+  const lang = await getLang();
 
   const [sk, gk, finals, managedTeams] = await Promise.all([
     skaterTotals(SEASON, league),
@@ -276,7 +281,7 @@ export default async function LeadersPage({
 
   const goalieCards: Array<{ title: string; icon: string; unit: string; rows: Row[] }> = [
     { title: "Wins", icon: "🏆", unit: "Wins", rows: top(gk, (g) => g.wins).map((g) => gkRow(g, String(g.wins), `${g.gp} GP`)) },
-    { title: "Steals (Ukradnuté zápasy)", icon: "🥷", unit: "Steals", rows: top(gk.filter((g) => g.steals > 0), (g) => g.steals).map((g) => gkRow(g, String(g.steals), `${g.wins} W · ${g.gp} GP`)) },
+    { title: lang === "cs" ? "Ukradnuté zápasy (Steals)" : "Steals", icon: "🥷", unit: "Steals", rows: top(gk.filter((g) => g.steals > 0), (g) => g.steals).map((g) => gkRow(g, String(g.steals), `${g.wins} W · ${g.gp} GP`)) },
     { title: "Goals Saved Above Expected (GSAx)", icon: "📈", unit: "GSAx", rows: top(gk, (g) => g.gsax).map((g) => gkRow(g, (g.gsax > 0 ? "+" : "") + g.gsax.toFixed(1), `${g.goalsAgainst} GA · ${g.xga.toFixed(1)} xGA`)) },
     { title: "Save Percentage", icon: "🧤", unit: "SV%", rows: top(qualGk, (g) => g.svPct).map((g) => gkRow(g, g.svPct.toFixed(3).replace(/^0/, ""), `${g.gp} GP`)) },
     { title: "Goals-Against Average", icon: "🔒", unit: "GAA", rows: top(qualGk, (g) => -g.gaa).map((g) => gkRow(g, g.gaa.toFixed(2), `${g.gp} GP`)) },
@@ -290,12 +295,15 @@ export default async function LeadersPage({
 
   return (
     <div className="space-y-6 py-2">
-      <PageHeader title="Statistics" subtitle="League leaders across skaters and goalies" />
+      <PageHeader
+        title={t(lang, "menu.stats") || "Statistics"}
+        subtitle={t(lang, "stats.leaders.subtitle") || "League leaders across skaters and goalies"}
+      />
       <StatsTabs active="leaders" league={league} />
       <PhaseTabs active={phase} league={league} basePath="/stats/leaders" showPlayoffs={false} />
       {phase === "pre" && (
         <p className="text-xs text-amber-400/90">
-          Pre-season (exhibition) — these stats don&apos;t count toward player profiles or careers.
+          {t(lang, "stats.preseasonNotice") || "Pre-season (exhibition) — these stats don't count toward player profiles or careers."}
         </p>
       )}
 
@@ -308,9 +316,9 @@ export default async function LeadersPage({
             <div>
               <div className="flex items-center justify-between mb-3">
                 <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                  👑 ART ROSS LEADER
+                  {t(lang, "stats.badge.artRoss")}
                 </span>
-                <span className="text-xs font-mono font-bold text-slate-400">#1 BODOVANIE</span>
+                <span className="text-xs font-mono font-bold text-slate-400">{t(lang, "stats.subBadge.points")}</span>
               </div>
               <div className="flex items-center gap-3.5">
                 <div className="w-14 h-14 rounded-2xl bg-slate-900 border-2 border-amber-400/80 overflow-hidden shadow-lg shrink-0">
@@ -340,9 +348,9 @@ export default async function LeadersPage({
             <div>
               <div className="flex items-center justify-between mb-3">
                 <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/30">
-                  🎯 ROCKET RICHARD
+                  {t(lang, "stats.badge.rocketRichard")}
                 </span>
-                <span className="text-xs font-mono font-bold text-slate-400">#1 STRELEC</span>
+                <span className="text-xs font-mono font-bold text-slate-400">{t(lang, "stats.subBadge.goals")}</span>
               </div>
               <div className="flex items-center gap-3.5">
                 <div className="w-14 h-14 rounded-2xl bg-slate-900 border-2 border-red-400/80 overflow-hidden shadow-lg shrink-0">
@@ -372,9 +380,9 @@ export default async function LeadersPage({
             <div>
               <div className="flex items-center justify-between mb-3">
                 <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  🛡️ VEZINA LEADER
+                  {t(lang, "stats.badge.vezina")}
                 </span>
-                <span className="text-xs font-mono font-bold text-slate-400">#1 BRANKÁR</span>
+                <span className="text-xs font-mono font-bold text-slate-400">{t(lang, "stats.subBadge.goalie")}</span>
               </div>
               <div className="flex items-center gap-3.5">
                 <div className="w-14 h-14 rounded-2xl bg-slate-900 border-2 border-emerald-400/80 overflow-hidden shadow-lg shrink-0">
@@ -402,7 +410,9 @@ export default async function LeadersPage({
 
       {/* SKATERS SECTION */}
       <section className="space-y-3">
-        <SectionTitle accent="text-blue-400">Skater Leaders — {league} {SEASON}</SectionTitle>
+        <SectionTitle accent="text-blue-400">
+          {lang === "cs" ? `Lídri korčuliarov — ${league} ${SEASON}` : `Skater Leaders — ${league} ${SEASON}`}
+        </SectionTitle>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {skaterCards.map((c) => (
             <LeaderCard
@@ -413,6 +423,7 @@ export default async function LeadersPage({
               rows={c.rows}
               managedTeamIds={managedTeamIds}
               league={league}
+              lang={lang}
             />
           ))}
         </div>
@@ -421,7 +432,9 @@ export default async function LeadersPage({
       {/* GOALIES SECTION */}
       <section className="space-y-3">
         <SectionTitle accent="text-red-400">
-          Goalie Leaders — SV%/GAA need ≥20% of team games ({repMin}+ GP)
+          {lang === "cs"
+            ? `Lídri brankárov — Úspešnosť/GAA vyžadujú ≥20% zápasov tímu (${repMin}+ GP)`
+            : `Goalie Leaders — SV%/GAA need ≥20% of team games (${repMin}+ GP)`}
         </SectionTitle>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {goalieCards.map((c) => (
@@ -433,6 +446,7 @@ export default async function LeadersPage({
               rows={c.rows}
               managedTeamIds={managedTeamIds}
               league={league}
+              lang={lang}
             />
           ))}
         </div>
@@ -444,7 +458,7 @@ export default async function LeadersPage({
         </p>
         <p className="text-xs text-slate-600">
           <Link href={`/stats/players${league === "AHL" ? "?league=AHL" : ""}`} className="hover:text-blue-400">
-            Full player stats →
+            {t(lang, "stats.fullPlayerStatsLink") || "Full player stats →"}
           </Link>
         </p>
       </div>

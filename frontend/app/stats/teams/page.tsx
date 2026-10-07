@@ -8,6 +8,8 @@ import { PageHeader } from "@/components/ui";
 import PhaseTabs from "@/components/PhaseTabs";
 import { seasonForPhase } from "@/lib/phase";
 import { defaultStatsPhase } from "@/lib/calendar-server";
+import { getLang } from "@/lib/lang-server";
+import { t } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +74,7 @@ export default async function TeamStatsPage({ searchParams }: { searchParams: Pr
   const SEASON = seasonForPhase(phase);
 
   const sessionTeamId = await getTeamSession();
+  const lang = await getLang();
   const [teams, managedTeams] = await Promise.all([
     teamStatTotals(SEASON, league),
     sessionTeamId == null
@@ -95,8 +98,8 @@ export default async function TeamStatsPage({ searchParams }: { searchParams: Pr
 
     if (ptsLeader) {
       heroCards.push({
-        badge: "🥇 POINTS LEADER",
-        subBadge: "#1 TABUĽKA",
+        badge: t(lang, "stats.badge.pointsLeader"),
+        subBadge: t(lang, "stats.subBadge.standings"),
         name: ptsLeader.name,
         teamId: ptsLeader.teamId,
         teamSlug: ptsLeader.slug,
@@ -110,8 +113,8 @@ export default async function TeamStatsPage({ searchParams }: { searchParams: Pr
     }
     if (gfLeader) {
       heroCards.push({
-        badge: "🎯 TOP OFFENSE",
-        subBadge: "GÓLY / ZÁPAS",
+        badge: t(lang, "stats.badge.topOffense"),
+        subBadge: t(lang, "stats.subBadge.goalsPerGame"),
         name: gfLeader.name,
         teamId: gfLeader.teamId,
         teamSlug: gfLeader.slug,
@@ -125,8 +128,8 @@ export default async function TeamStatsPage({ searchParams }: { searchParams: Pr
     }
     if (gaLeader) {
       heroCards.push({
-        badge: "🛡️ TOP DEFENSE",
-        subBadge: "NAJMENEJ INKASOVANÉ",
+        badge: t(lang, "stats.badge.topDefense"),
+        subBadge: t(lang, "stats.subBadge.leastGa"),
         name: gaLeader.name,
         teamId: gaLeader.teamId,
         teamSlug: gaLeader.slug,
@@ -140,8 +143,8 @@ export default async function TeamStatsPage({ searchParams }: { searchParams: Pr
     }
     if (ppLeader) {
       heroCards.push({
-        badge: "⚡ POWER PLAY",
-        subBadge: "PRESILOVKY",
+        badge: t(lang, "stats.badge.powerPlay"),
+        subBadge: t(lang, "stats.subBadge.pp"),
         name: ppLeader.name,
         teamId: ppLeader.teamId,
         teamSlug: ppLeader.slug,
@@ -170,7 +173,12 @@ export default async function TeamStatsPage({ searchParams }: { searchParams: Pr
 
   return (
     <div className="space-y-6 py-2">
-      <PageHeader title="Statistics" subtitle={`Team totals — ${league} 2026-27 ${phase === "pre" ? "pre-season (exhibition)" : "regular season"}`} />
+      <PageHeader
+        title={t(lang, "menu.stats") || "Statistics"}
+        subtitle={lang === "cs"
+          ? `Tímy — ${league} 2026-27 ${phase === "pre" ? "príprava" : "základná časť"}`
+          : `Team totals — ${league} 2026-27 ${phase === "pre" ? "pre-season (exhibition)" : "regular season"}`}
+      />
       <StatsTabs active="teams" league={league} />
       <PhaseTabs active={phase} league={league} basePath="/stats/teams" showPlayoffs={false} />
 
@@ -179,7 +187,11 @@ export default async function TeamStatsPage({ searchParams }: { searchParams: Pr
         <StatHeroDeck cards={heroCards} managedTeamIds={managedTeamIds} />
       )}
 
-      <p className="text-slate-400 text-sm">Click a header to sort; use live search or Show / Hide Columns to add more stats.</p>
+      <p className="text-slate-400 text-sm">
+        {lang === "cs"
+          ? "Kliknutím na stĺpec zotriediš tabuľku; použi vyhľadávanie alebo zobrazenie stĺpcov."
+          : "Click a header to sort; use live search or Show / Hide Columns to add more stats."}
+      </p>
       <StatTable cols={COLS} rows={rows} initialSort="points" minWidth={1000} showRank />
       <p className="text-xs text-slate-600">More columns (PP opportunities, times short-handed, 5-on-5 SH%/SV%, raw high-danger counts, shots, shutouts) are available in Show / Hide Columns. Special-teams and high-danger numbers come from the sim&apos;s event stream.</p>
     </div>

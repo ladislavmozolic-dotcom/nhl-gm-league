@@ -28,6 +28,8 @@ import PlayerHistoryTabs from "@/components/PlayerHistoryTabs";
 import PlayerProfileTabs from "@/components/PlayerProfileTabs";
 import PlayerAdvancedStatsCard from "@/components/PlayerAdvancedStatsCard";
 import { getLeagueClock } from "@/lib/calendar-server";
+import { getLang } from "@/lib/lang-server";
+import { t, type Lang } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -160,13 +162,14 @@ const glCells = (a: GlAgg): React.ReactNode[] => [
 // A league block: "<LEAGUE> Seasons" (season row + career) and, if any, "<LEAGUE> Playoffs".
 type Split = { team: React.ReactNode; agg: any };
 
-function StatBlock({ league, cols, reg, po, cellsOf, team, regSplits, poSplits, season = "2026-27" }: {
+function StatBlock({ league, cols, reg, po, cellsOf, team, regSplits, poSplits, season = "2026-27", lang = "en" }: {
   league: string; cols: string[]; reg: any; po: any; cellsOf: (a: any) => React.ReactNode[]; team: React.ReactNode;
-  regSplits?: Split[]; poSplits?: Split[]; season?: string;
+  regSplits?: Split[]; poSplits?: Split[]; season?: string; lang?: Lang;
 }) {
   if (!reg && !po) return null;
   const isPre = season.endsWith("-PRE");
-  const regTitle = isPre ? `${league} · Príprava (Pre-season)` : `${league} · Základná časť`;
+  const regTitle = isPre ? `${league} · ${t(lang, "phase.pre")}` : `${league} · ${t(lang, "phase.regular")}`;
+  const poTitle = `${league} · ${t(lang, "phase.playoffs")}`;
   const Head = () => (
     <thead><tr className={headRowCls}>
       <th className="px-3 py-2.5 text-left font-medium">Season</th>
@@ -275,12 +278,13 @@ export default async function PlayerPage({
     ? sParams.season
     : defaultSeason;
 
+  const lang = await getLang();
   const isPre = activeSeason.endsWith("-PRE");
   const currentPhaseLabel = isPre
-    ? "Príprava (Pre-season)"
+    ? t(lang, "phase.pre")
     : activeSeason === SEASON
-    ? (leagueClock.phase === "playoffs" ? "Play-off" : leagueClock.phase === "preseason" ? "Príprava" : "Základná časť")
-    : "Ukončená sezóna";
+    ? (leagueClock.phase === "playoffs" ? t(lang, "phase.playoffs") : leagueClock.phase === "preseason" ? t(lang, "phase.pre") : t(lang, "phase.regular"))
+    : t(lang, "phase.completed");
 
   // Aggregate season, split by league (NHL / AHL) and regular / playoffs.
   const bucketKey = (league: string | null, seriesId: number | null) =>
@@ -533,7 +537,7 @@ export default async function PlayerPage({
   const overviewContent = (
     <div className="space-y-6">
       {/* ── CAREER ─────────────────────────────────────────────────── */}
-      <PlayerCareerCard career={career} />
+      <PlayerCareerCard career={career} lang={lang} />
 
       {/* ── TRADE / TRANSACTION HISTORY ───────────────────────────── */}
       <PlayerHistoryTabs
@@ -560,6 +564,7 @@ export default async function PlayerPage({
               regSplits={mkSplits("nhlReg")}
               poSplits={mkSplits("nhlPo")}
               season={activeSeason}
+              lang={lang}
             />
           )}
           {hasAhl && (
@@ -573,12 +578,13 @@ export default async function PlayerPage({
               regSplits={mkSplits("ahlReg")}
               poSplits={mkSplits("ahlPo")}
               season={activeSeason}
+              lang={lang}
             />
           )}
         </div>
       ) : (
         <Card bodyClassName="py-8 text-center text-slate-500">
-          Žiadne odohrané zápasy v sezóne {activeSeason}.
+          {t(lang, "player.noGamesInSeason")} {activeSeason}.
         </Card>
       )}
 
@@ -586,7 +592,7 @@ export default async function PlayerPage({
       {skaterAdvMetrics && <PlayerAdvancedStatsCard metrics={skaterAdvMetrics} />}
 
       {/* ── GOALIE ANALYTICS CENTER ────────────────────────────────── */}
-      {goalieStats && <GoalieAnalyticsCard a={goalieStats} />}
+      {goalieStats && <GoalieAnalyticsCard a={goalieStats} lang={lang} />}
 
       {/* ── SHOT / SAVE + DEFENSIVE HEAT MAPS ──────────────────────── */}
       {(heatMap || defenseMap) && (

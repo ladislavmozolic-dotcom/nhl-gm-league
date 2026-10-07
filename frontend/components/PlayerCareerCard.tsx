@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Card } from "@/components/ui";
 import type { PlayerCareer, CareerSkaterRow, CareerGoalieRow } from "@/lib/career-server";
+import { t, type Lang } from "@/lib/i18n";
 
 const AWARD_ICON: Record<string, string> = {
   Hart: "🏆", "Art Ross": "🎯", "Rocket Richard": "🚀", Norris: "🛡️", Vezina: "🧤",
@@ -19,7 +20,7 @@ const pmFmt = (v: number) => {
 const pctFmt = (v: number | null, d = 1) => (v == null ? "—" : v.toFixed(d));
 const svpFmt = (v: number | null) => (v == null ? "—" : v.toFixed(3).replace(/^0/, ""));
 
-function SkaterSection({ title, rows, isPlayoff }: { title: string; rows: CareerSkaterRow[]; isPlayoff?: boolean }) {
+function SkaterSection({ title, rows, isPlayoff, lang = "en" }: { title: string; rows: CareerSkaterRow[]; isPlayoff?: boolean; lang?: Lang }) {
   if (!rows.length) return null;
 
   const total = rows.reduce(
@@ -102,7 +103,7 @@ function SkaterSection({ title, rows, isPlayoff }: { title: string; rows: Career
             })}
             {/* Totals Row */}
             <tr className="border-t border-slate-700 bg-slate-800/40 font-semibold">
-              <td className="px-3 py-2.5 text-left font-bold">Kariéra celkovo</td>
+              <td className="px-3 py-2.5 text-left font-bold">{t(lang, "player.careerTotal") || "Career Total"}</td>
               <td className="px-3 py-2.5 text-left">
                 <span className="text-slate-500 font-bold">TOT</span>
               </td>
@@ -125,7 +126,7 @@ function SkaterSection({ title, rows, isPlayoff }: { title: string; rows: Career
   );
 }
 
-function GoalieSection({ title, rows, isPlayoff }: { title: string; rows: CareerGoalieRow[]; isPlayoff?: boolean }) {
+function GoalieSection({ title, rows, isPlayoff, lang = "en" }: { title: string; rows: CareerGoalieRow[]; isPlayoff?: boolean; lang?: Lang }) {
   if (!rows.length) return null;
 
   const total = rows.reduce(
@@ -201,7 +202,7 @@ function GoalieSection({ title, rows, isPlayoff }: { title: string; rows: Career
             ))}
             {/* Totals Row */}
             <tr className="border-t border-slate-700 bg-slate-800/40 font-semibold">
-              <td className="px-3 py-2.5 text-left font-bold">Kariéra celkovo</td>
+              <td className="px-3 py-2.5 text-left font-bold">{t(lang, "player.careerTotal") || "Career Total"}</td>
               <td className="px-3 py-2.5 text-left">
                 <span className="text-slate-500 font-bold">TOT</span>
               </td>
@@ -223,7 +224,7 @@ function GoalieSection({ title, rows, isPlayoff }: { title: string; rows: Career
   );
 }
 
-export default function PlayerCareerCard({ career }: { career: PlayerCareer }) {
+export default function PlayerCareerCard({ career, lang = "en" }: { career: PlayerCareer; lang?: Lang }) {
   const isGoalie = career.isGoalie;
   const regRows = isGoalie
     ? career.goalie.filter((r) => !r.isPlayoff)
@@ -233,9 +234,11 @@ export default function PlayerCareerCard({ career }: { career: PlayerCareer }) {
     : career.skater.filter((r) => r.isPlayoff);
 
   const hasRows = regRows.length > 0 || poRows.length > 0;
+  const regTitle = `NHL · ${t(lang, "phase.regular") || "Regular Season"}`;
+  const poTitle = `NHL · ${t(lang, "phase.playoffs") || "Playoffs"}`;
 
   return (
-    <Card title="Season History" bodyClassName="p-4 space-y-5">
+    <Card title={t(lang, "player.seasonHistory") || "Season History"} bodyClassName="p-4 space-y-5">
       {career.awards.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {career.awards.map((a, i) => (
@@ -255,18 +258,18 @@ export default function PlayerCareerCard({ career }: { career: PlayerCareer }) {
         <div className="space-y-5">
           {isGoalie ? (
             <>
-              <GoalieSection title="NHL · Základná časť" rows={regRows as CareerGoalieRow[]} isPlayoff={false} />
-              <GoalieSection title="NHL · Play-off" rows={poRows as CareerGoalieRow[]} isPlayoff={true} />
+              <GoalieSection title={regTitle} rows={regRows as CareerGoalieRow[]} isPlayoff={false} lang={lang} />
+              <GoalieSection title={poTitle} rows={poRows as CareerGoalieRow[]} isPlayoff={true} lang={lang} />
             </>
           ) : (
             <>
-              <SkaterSection title="NHL · Základná časť" rows={regRows as CareerSkaterRow[]} isPlayoff={false} />
-              <SkaterSection title="NHL · Play-off" rows={poRows as CareerSkaterRow[]} isPlayoff={true} />
+              <SkaterSection title={regTitle} rows={regRows as CareerSkaterRow[]} isPlayoff={false} lang={lang} />
+              <SkaterSection title={poTitle} rows={poRows as CareerSkaterRow[]} isPlayoff={true} lang={lang} />
             </>
           )}
         </div>
       ) : (
-        <p className="py-6 text-center text-slate-500 text-sm">Žiadne zaznamenané zápasy.</p>
+        <p className="py-6 text-center text-slate-500 text-sm">{t(lang, "player.noRecordedGames") || "No recorded games."}</p>
       )}
     </Card>
   );
