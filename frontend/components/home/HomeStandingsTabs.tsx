@@ -65,7 +65,7 @@ export default function HomeStandingsTabs({
         <table className="w-full text-xs">
           <thead>
             <tr className="text-[10px] uppercase font-bold text-slate-500 border-b border-slate-800/60 pb-1">
-              <th className="text-left font-semibold pb-1.5 pl-1">Tím</th>
+              <th className="text-left font-semibold pb-1.5 pl-1">Team</th>
               <th className="text-right font-semibold pb-1.5 pl-2">Z</th>
               <th className="text-right font-semibold pb-1.5 pl-2">V</th>
               <th className="text-right font-semibold pb-1.5 pl-2">P</th>

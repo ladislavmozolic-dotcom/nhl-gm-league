@@ -93,7 +93,7 @@ export default function ForumPostCard({
     "text-[12px] font-semibold px-2.5 py-1 rounded bg-slate-800/80 border border-slate-700/70 hover:bg-slate-700 text-slate-300 hover:text-white transition-all shadow-sm flex items-center gap-1";
 
   const badge = post.authorRoleBadge ?? {
-    label: "Generálny Manažér",
+    label: "General Manager",
     bg: "bg-slate-800",
     text: "text-slate-300",
     border: "border-slate-700",
@@ -149,7 +149,7 @@ export default function ForumPostCard({
               )}
               {post.isOP && (
                 <span
-                  title="Zakladateľ témy (Original Poster)"
+                  title="Thread starter (Original Poster)"
                   className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.2 rounded bg-blue-600/25 border border-blue-500/40 text-blue-300"
                 >
                   OP
@@ -175,7 +175,7 @@ export default function ForumPostCard({
 
             {/* Post stats counter */}
             <div className="text-[11px] text-slate-500 pt-1 border-t border-slate-800/60 hidden md:flex items-center justify-center gap-1.5">
-              <span>Príspevky:</span>
+              <span>Posts:</span>
               <span className="font-bold text-slate-300 tabular-nums">
                 {post.authorPostsCount ?? "—"}
               </span>
@@ -196,12 +196,12 @@ export default function ForumPostCard({
                 {post.isNewPost && (
                   <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-500 text-white shadow-sm flex items-center gap-1 animate-pulse">
                     <span className="w-1.5 h-1.5 rounded-full bg-white" />
-                    <span>NOVÝ PRÍSPEVOK</span>
+                    <span>NEW POST</span>
                   </span>
                 )}
                 {post.edited && (
                   <span className="text-[10px] text-slate-500 italic bg-slate-800/50 px-1.5 py-0.5 rounded border border-slate-800">
-                    upravené
+                    edited
                   </span>
                 )}
               </div>
@@ -233,14 +233,14 @@ export default function ForumPostCard({
                     }}
                     className="px-3.5 py-1.5 rounded-lg border border-slate-700 text-slate-300 text-xs font-semibold hover:bg-slate-800"
                   >
-                    Zrušiť
+                    Cancel
                   </button>
                   <button
                     onClick={saveEdit}
                     disabled={pending || !draft.trim()}
                     className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-xs font-bold shadow"
                   >
-                    Uložiť zmeny
+                    Save changes
                   </button>
                 </div>
               </div>
@@ -260,10 +260,10 @@ export default function ForumPostCard({
                 <button
                   onClick={quote}
                   className={`${btn} hover:text-blue-400 hover:border-blue-500/50`}
-                  title="Citovať tento príspevok v odpovedi"
+                  title="Quote this post in a reply"
                 >
                   <span>❝</span>
-                  <span>Citovať</span>
+                  <span>Quote</span>
                 </button>
               )}
               {post.canModify && !editing && (
@@ -274,10 +274,10 @@ export default function ForumPostCard({
                       setConfirmDel(false);
                     }}
                     className={`${btn} hover:text-amber-300 hover:border-amber-500/50`}
-                    title="Upraviť príspevok"
+                    title="Edit post"
                   >
                     <span>✎</span>
-                    <span>Upraviť</span>
+                    <span>Edit</span>
                   </button>
                   {confirmDel ? (
                     <span className="flex items-center gap-1 bg-rose-950/40 p-0.5 rounded border border-rose-500/40">
@@ -286,7 +286,7 @@ export default function ForumPostCard({
                         disabled={pending}
                         className="text-[11px] font-bold px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-500 text-white"
                       >
-                        Naozaj zmazať?
+                        Really delete?
                       </button>
                       <button
                         onClick={() => setConfirmDel(false)}
@@ -299,10 +299,10 @@ export default function ForumPostCard({
                     <button
                       onClick={() => setConfirmDel(true)}
                       className={`${btn} hover:text-rose-400 hover:border-rose-500/50`}
-                      title="Zmazať príspevok"
+                      title="Delete post"
                     >
                       <span>🗑</span>
-                      <span>Zmazať</span>
+                      <span>Delete</span>
                     </button>
                   )}
                 </>

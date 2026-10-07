@@ -15,7 +15,7 @@ export default function ExpansionTeamForm({ action }: { action: (input: CreateEx
   const upload = async (file: File | undefined) => {
     setErr(null);
     if (!file) return;
-    if (!file.type.startsWith("image/")) { setErr("Musí to byť obrázok."); return; }
+    if (!file.type.startsWith("image/")) { setErr("It must be an image."); return; }
     setUploading(true);
     try {
       const fd = new FormData(); fd.append("file", file);
@@ -29,10 +29,10 @@ export default function ExpansionTeamForm({ action }: { action: (input: CreateEx
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setErr(null);
-    if (!f.name.trim()) { setErr("Zadaj názov tímu."); return; }
+    if (!f.name.trim()) { setErr("Enter a team name."); return; }
     start(async () => {
       const res = await action(f);
-      if (res && !res.ok) setErr(res.error || "Nepodarilo sa vytvoriť tím.");
+      if (res && !res.ok) setErr(res.error || "Could not create the team.");
     });
   };
 
@@ -48,33 +48,33 @@ export default function ExpansionTeamForm({ action }: { action: (input: CreateEx
           <div className="h-16 w-16 rounded bg-slate-800 border border-slate-700 grid place-items-center text-slate-600 text-xl">🏒</div>
         )}
         <label className="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-semibold cursor-pointer">
-          {uploading ? "Nahrávam…" : "Nahrať logo"}
+          {uploading ? "Uploading…" : "Upload logo"}
           <input type="file" accept="image/*" className="hidden" onChange={(e) => upload(e.target.files?.[0])} />
         </label>
-        {f.logoUrl && <button type="button" onClick={() => set("logoUrl", "")} className="text-sm text-red-400 hover:text-red-300">Odstrániť</button>}
+        {f.logoUrl && <button type="button" onClick={() => set("logoUrl", "")} className="text-sm text-red-400 hover:text-red-300">Remove</button>}
       </div>
 
-      <label className="block"><span className="text-xs text-slate-400">Názov tímu (napr. SEATTLE KRAKEN)</span>
+      <label className="block"><span className="text-xs text-slate-400">Team name (e.g. SEATTLE KRAKEN)</span>
         <input value={f.name} onChange={(e) => set("name", e.target.value)} className={field} placeholder="Team name" /></label>
 
       <div className="grid md:grid-cols-2 gap-4">
-        <label className="block"><span className="text-xs text-slate-400">Aréna</span>
+        <label className="block"><span className="text-xs text-slate-400">Arena</span>
           <input value={f.arena} onChange={(e) => set("arena", e.target.value)} className={field} placeholder="Climate Pledge Arena" /></label>
-        <label className="block"><span className="text-xs text-slate-400">Kapacita (voliteľné)</span>
+        <label className="block"><span className="text-xs text-slate-400">Capacity (optional)</span>
           <input value={f.capacity} onChange={(e) => set("capacity", e.target.value.replace(/[^0-9]/g, ""))} className={field} placeholder="17151" /></label>
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
         <label className="block"><span className="text-xs text-slate-400">Konferencia</span>
           <input value={f.conference} onChange={(e) => set("conference", e.target.value)} className={field} placeholder="Western" /></label>
-        <label className="block"><span className="text-xs text-slate-400">Divízia</span>
+        <label className="block"><span className="text-xs text-slate-400">Division</span>
           <input value={f.division} onChange={(e) => set("division", e.target.value)} className={field} placeholder="Pacific" /></label>
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
-        <label className="block"><span className="text-xs text-slate-400">Skratka (2-4 písmená, voliteľné — inak sa odvodí)</span>
+        <label className="block"><span className="text-xs text-slate-400">Abbreviation (2-4 letters, optional — otherwise derived)</span>
           <input value={f.code} onChange={(e) => set("code", e.target.value.toUpperCase().slice(0, 4))} className={field} placeholder="SEA" /></label>
-        <label className="block"><span className="text-xs text-slate-400">Počiatočný bankový účet (voliteľné — inak default ligy)</span>
+        <label className="block"><span className="text-xs text-slate-400">Starting bank account (optional — otherwise league default)</span>
           <input value={f.startingCapital} onChange={(e) => set("startingCapital", e.target.value.replace(/[^0-9]/g, ""))} className={field} placeholder="40000000" /></label>
       </div>
 
@@ -83,7 +83,7 @@ export default function ExpansionTeamForm({ action }: { action: (input: CreateEx
       <p className="text-[11px] text-slate-500">Vytvorí sa aj AHL farm klub a náhradný tréner — obidva môžeš neskôr premenovať/upraviť ako pri každom inom tíme. Tím nemá GM, kým si niekto nepodá žiadosť o vstup.</p>
 
       <button type="submit" disabled={pending} className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-semibold">
-        {pending ? "Vytváram…" : "Vytvoriť expanzný tím"}
+        {pending ? "Creating…" : "Create expansion team"}
       </button>
     </form>
   );

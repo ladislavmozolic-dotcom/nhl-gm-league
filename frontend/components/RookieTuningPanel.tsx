@@ -31,7 +31,7 @@ export default function RookieTuningPanel({ initialConfig }: { initialConfig: Ro
     setMsg(null);
     try {
       await saveLiveCalculatorConfigAction({ weights: { rookie: config } });
-      setMsg("Uložené ✓");
+      setMsg("Saved ✓");
       router.refresh();
     } catch (e: any) {
       setMsg(e?.message ?? "Zlyhalo.");
@@ -66,14 +66,14 @@ export default function RookieTuningPanel({ initialConfig }: { initialConfig: Ro
 
             <div className="flex items-center justify-between mt-5 pt-3 border-t border-slate-800">
               <button onClick={() => setConfig(DEFAULT_ROOKIE_TUNING)} className="text-xs text-slate-500 hover:text-slate-300 underline">
-                Obnoviť predvolené
+                Reset to defaults
               </button>
               <div className="flex items-center gap-2">
                 {msg && <span className="text-xs text-slate-400">{msg}</span>}
-                <button onClick={() => setOpen(false)} className="px-3 py-1.5 rounded-lg text-sm bg-slate-800 text-slate-300 hover:bg-slate-700">Zavrieť</button>
+                <button onClick={() => setOpen(false)} className="px-3 py-1.5 rounded-lg text-sm bg-slate-800 text-slate-300 hover:bg-slate-700">Close</button>
                 <button onClick={save} disabled={pending}
                   className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50">
-                  {pending ? "Ukladám…" : "Uložiť"}
+                  {pending ? "Saving…" : "Save"}
                 </button>
               </div>
             </div>

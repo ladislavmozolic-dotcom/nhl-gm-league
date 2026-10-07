@@ -10,7 +10,7 @@ export default function ForceVerdictButton({ caseId, name }: { caseId: number; n
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
   const run = () => {
-    if (!confirm(`Vynútiť arbitrážny verdikt pre ${name} teraz (bez čakania 48 h)?`)) return;
+    if (!confirm(`Force the arbitration verdict for ${name} now (without waiting 48 h)?`)) return;
     setMsg(null);
     start(async () => {
       try {

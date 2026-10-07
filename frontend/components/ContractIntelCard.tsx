@@ -3,7 +3,7 @@ import { Card } from "@/components/ui";
 import { money } from "@/lib/finance";
 import { cleanName } from "@/lib/playerName";
 
-const CONFIDENCE_LABEL: Record<string, string> = { high: "vysoká", medium: "stredná", low: "nízka" };
+const CONFIDENCE_LABEL: Record<string, string> = { high: "high", medium: "medium", low: "low" };
 const CONFIDENCE_COLOR: Record<string, string> = { high: "text-emerald-400", medium: "text-amber-400", low: "text-red-400" };
 
 // UNHL Intelligence — "Contract & Market Intelligence" (Player Intelligence,
@@ -22,13 +22,13 @@ export default async function ContractIntelCard({ playerId }: { playerId: number
         <div>
           <div className="text-sm font-bold text-slate-200 mb-1">Market Range</div>
           <p className="text-xs text-slate-400 mb-2">
-            Rozsah cap hitu z {intel.market.sampleSize} najbližších profilov (Similar Players) — spoľahlivosť{" "}
+            Cap-hit range from the {intel.market.sampleSize} closest profiles (Similar Players) — confidence{" "}
             <span className={`font-semibold ${CONFIDENCE_COLOR[intel.market.confidence]}`}>{CONFIDENCE_LABEL[intel.market.confidence]}</span>
-            {intel.market.confidence !== "high" && " (málo alebo rozptýlených porovnaní)"}. Referenčný rozsah, nie odporúčaná cena.
+            {intel.market.confidence !== "high" && " (few or scattered comparisons)"}. A reference range, not a recommended price.
           </p>
           <div className="flex flex-wrap gap-3 text-xs mb-2">
             {[
-              ["Min", intel.market.min], ["P25", intel.market.p25], ["Medián", intel.market.median],
+              ["Min", intel.market.min], ["P25", intel.market.p25], ["Median", intel.market.median],
               ["P75", intel.market.p75], ["Max", intel.market.max],
             ].map(([label, val]) => (
               <div key={label as string} className="border border-slate-800 rounded-lg px-3 py-2">
@@ -50,7 +50,7 @@ export default async function ContractIntelCard({ playerId }: { playerId: number
       <div>
         <div className="text-sm font-bold text-slate-200 mb-1">Contract Risk</div>
         <p className="text-xs text-slate-400 mb-2">
-          {elevatedCount === 0 ? "Žiadny faktor nie je zvýšený." : `${elevatedCount} zo ${intel.risk.length} faktorov je zvýšených.`}{" "}
+          {elevatedCount === 0 ? "No factor is elevated." : `${elevatedCount} of ${intel.risk.length} factors are elevated.`}{" "}
           Cap hit {money(intel.capHit)}, zmluva do {intel.expiryYear} ({intel.expiryStatus}).
         </p>
         <div className="flex flex-col gap-1.5">
@@ -58,7 +58,7 @@ export default async function ContractIntelCard({ playerId }: { playerId: number
             <div key={r.key} className="flex items-center justify-between text-xs border border-slate-800 rounded-lg px-3 py-2">
               <span className="text-slate-300">{r.label}</span>
               <span className={`font-semibold ${r.elevated ? "text-red-400" : "text-slate-400"}`}>
-                {r.value}{r.elevated && " · zvýšené"}
+                {r.value}{r.elevated && " · elevated"}
               </span>
             </div>
           ))}

@@ -82,7 +82,7 @@ export default function RookieTableRow({ row, isAdmin }: { row: RookieRow; isAdm
               {status && !status.ok && <span className="text-xs text-red-400">{status.s}</span>}
               <button onClick={apply} disabled={pending}
                 className="px-3 py-1 rounded-md bg-blue-600/80 hover:bg-blue-500 text-white text-xs font-semibold whitespace-nowrap disabled:opacity-50">
-                {pending ? "…" : edited ? "Activate (upravené)" : "Activate rating"}
+                {pending ? "…" : edited ? "Activate (edited)" : "Activate rating"}
               </button>
             </span>
           )}

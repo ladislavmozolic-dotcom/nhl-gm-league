@@ -11,7 +11,7 @@ export default function DeleteFaOfferButton({ offerId, name }: { offerId: number
   const [err, setErr] = useState<string | null>(null);
 
   const handleDelete = () => {
-    if (!confirm(`Zmazať túto ponuku na hráča ${name}?`)) return;
+    if (!confirm(`Delete this offer for ${name}?`)) return;
     setErr(null);
     start(async () => {
       try {
@@ -39,7 +39,7 @@ export default function DeleteFaOfferButton({ offerId, name }: { offerId: number
         onClick={handleDelete}
         className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white text-xs font-semibold whitespace-nowrap shadow-sm transition"
       >
-        {pending ? "Mažem…" : "Delete"}
+        {pending ? "Deleting…" : "Delete"}
       </button>
       {err && <span className="text-[10px] text-rose-400 font-medium">{err}</span>}
     </span>

@@ -4,9 +4,9 @@ import { Card } from "@/components/ui";
 import { cleanName } from "@/lib/playerName";
 
 function gamePlural(n: number): string {
-  if (n === 1) return "zápas";
-  if (n >= 2 && n <= 4) return "zápasy";
-  return "zápasov";
+  if (n === 1) return "game";
+  if (n >= 2 && n <= 4) return "games";
+  return "games";
 }
 
 function SwingRow({ s, unit = "" }: { s: TeamGameSwing; unit?: string }) {
@@ -14,7 +14,7 @@ function SwingRow({ s, unit = "" }: { s: TeamGameSwing; unit?: string }) {
     <div className="flex items-center justify-between text-xs border border-slate-800 rounded-lg px-3 py-2">
       <span className="text-slate-300">{s.label}</span>
       <span className="text-slate-400">
-        {s.gameValue}{unit} vs. sezónny priemer {s.seasonAvg}{unit} ({s.gamesInBaseline} {gamePlural(s.gamesInBaseline)})
+        {s.gameValue}{unit} vs. season average {s.seasonAvg}{unit} ({s.gamesInBaseline} {gamePlural(s.gamesInBaseline)})
         <span className={`ml-2 font-semibold ${s.delta > 0 ? "text-emerald-400" : s.delta < 0 ? "text-red-400" : "text-slate-500"}`}>
           {s.delta > 0 ? `+${s.delta}` : s.delta}{unit}
         </span>
@@ -28,7 +28,7 @@ function GoalieRow({ g }: { g: GoalieGameSwing }) {
     return (
       <div className="border border-slate-800 rounded-lg px-3 py-2 text-xs">
         <div className="text-slate-200 font-medium mb-1">
-          {cleanName(g.name)} <span className="text-slate-500 font-normal text-[11px]">(1. štart v sezóne)</span>
+          {cleanName(g.name)} <span className="text-slate-500 font-normal text-[11px]">(1st start of the season)</span>
         </div>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-slate-400">
           <span>SV% {g.savePct}%</span>
@@ -50,7 +50,7 @@ function GoalieRow({ g }: { g: GoalieGameSwing }) {
           </span>
         </span>
         <span>
-          GSAx {g.gsax} vs. priemer {g.seasonGsaxPerGame}/zápas
+          GSAx {g.gsax} vs. avg {g.seasonGsaxPerGame}/game
           <span className={`ml-1.5 font-semibold ${gsaxDelta > 0 ? "text-emerald-400" : gsaxDelta < 0 ? "text-red-400" : "text-slate-500"}`}>
             {gsaxDelta > 0 ? `+${gsaxDelta}` : gsaxDelta}
           </span>
@@ -84,7 +84,7 @@ function TeamColumn({ team }: { team: TeamPostGame }) {
       {team.goalies.length > 0 && (
         <div>
           <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-            {team.goalies.length === 1 ? "Brankár" : "Brankári"}
+            {team.goalies.length === 1 ? "Goalie" : "Goalies"}
           </div>
           <div className="flex flex-col gap-1.5">
             {team.goalies.map((g) => (
@@ -112,7 +112,7 @@ export default async function PostGameIntelCard({ gameId }: { gameId: number }) 
   return (
     <Card title="🧠 UNHL Intelligence — Post-Game" accent="text-blue-400" bodyClassName="p-3 flex flex-col gap-4">
       <div>
-        <div className="text-xs text-slate-400 mb-2">Tímové čísla tohto zápasu oproti vlastnému sezónnemu priemeru — najväčšie výkyvy hore.</div>
+        <div className="text-xs text-slate-400 mb-2">Team numbers for this game versus its own season average — biggest swings first.</div>
         <div className="grid gap-4 sm:grid-cols-2">
           <TeamColumn team={intel.away} />
           <TeamColumn team={intel.home} />

@@ -28,15 +28,15 @@ export default function LoginForm({ initialError }: { initialError?: string }) {
 
   return (
     <form action={submit} className="space-y-3 bg-slate-900/50 border border-slate-800 rounded-2xl p-6 max-w-sm shadow-lg shadow-black/20">
-      <label className="block text-sm"><span className="text-slate-300">Email alebo prezývka</span>
+      <label className="block text-sm"><span className="text-slate-300">Email or nickname</span>
         <input name="identifier" autoFocus autoComplete="username" required
           className="mt-1 w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 focus:border-blue-500 outline-none" /></label>
       <label className="block text-sm"><span className="text-slate-300">Heslo</span>
         <input type="password" name="password" autoComplete="current-password" required
           className="mt-1 w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 focus:border-blue-500 outline-none" /></label>
-      {error && <p className="text-sm text-red-400">Nesprávny email/prezývka alebo heslo.</p>}
+      {error && <p className="text-sm text-red-400">Incorrect email/nickname or password.</p>}
       <button disabled={pending} className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 font-semibold text-sm">
-        {pending ? "…" : "Prihlásiť sa"}
+        {pending ? "…" : "Sign in"}
       </button>
     </form>
   );

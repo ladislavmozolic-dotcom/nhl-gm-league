@@ -410,7 +410,7 @@ export default function MegaMenu({ gm, items, lang = "en", light = false, hideFo
                           <div className="px-3 py-1 text-[10px] text-amber-500/80 uppercase tracking-wide">{tr("ui.admin")}</div>
                           <a href="/admin" className={`block px-3 py-1.5 text-sm ${gmPanelText}`}>{tr("ui.adminPanel")}</a>
                           <a href="/admin/join-requests" className={`flex items-center justify-between px-3 py-1.5 text-sm ${gmPanelText}`}>
-                            <span>Žiadosti o vstup</span>
+                            <span>Join Requests</span>
                             {(gm.pendingJoins ?? 0) > 0 && <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm.pendingJoins}</span>}
                           </a>
                           <a href="/calendar" className={`block px-3 py-1.5 text-sm ${gmPanelText}`}>League Calendar</a>
@@ -512,7 +512,7 @@ export default function MegaMenu({ gm, items, lang = "en", light = false, hideFo
                   href: "#",
                   children: [
                     { label: tr("ui.adminPanel"), href: "/admin" },
-                    { label: "Žiadosti o vstup", href: "/admin/join-requests" },
+                    { label: "Join Requests", href: "/admin/join-requests" },
                     { label: "League Calendar", href: "/calendar" },
                     { label: "ELC Rookies", href: "/admin/elc" },
                     { label: "Roster Update", href: "/admin/roster-update" },

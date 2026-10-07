@@ -19,7 +19,7 @@ export default function ResetResignButton({
   const [err, setErr] = useState<string | null>(null);
 
   const handleReset = () => {
-    if (!confirm(`Vymazať rozpracované vyjednávanie / ponuku pre hráča ${name}?`)) return;
+    if (!confirm(`Clear the in-progress negotiation / offer for ${name}?`)) return;
     setErr(null);
     start(async () => {
       try {
@@ -47,7 +47,7 @@ export default function ResetResignButton({
         onClick={handleReset}
         className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white text-xs font-semibold whitespace-nowrap shadow-sm transition"
       >
-        {pending ? "Mažem…" : label}
+        {pending ? "Deleting…" : label}
       </button>
       {err && <span className="text-[10px] text-rose-400 font-medium">{err}</span>}
     </span>

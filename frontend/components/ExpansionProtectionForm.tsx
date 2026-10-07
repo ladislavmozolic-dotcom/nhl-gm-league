@@ -109,10 +109,10 @@ export default function ExpansionProtectionForm({
       <div className="flex items-center gap-3">
         <button type="button" onClick={submit} disabled={pending || !complete}
           className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-sm font-semibold">
-          {pending ? "Ukladám…" : "Odoslať protection list"}
+          {pending ? "Saving…" : "Submit protection list"}
         </button>
-        {!complete && <span className="text-xs text-slate-500">Vyber presne {format === "7-3-1" ? `${slots.f} F, ${slots.d} D, ${slots.g} G` : `${slots.skaters} skaters, ${slots.g} G`} (vrátane force-protected).</span>}
-        {saved && complete && !err && <span className="text-emerald-400 text-sm">✓ Odoslané</span>}
+        {!complete && <span className="text-xs text-slate-500">Select exactly {format === "7-3-1" ? `${slots.f} F, ${slots.d} D, ${slots.g} G` : `${slots.skaters} skaters, ${slots.g} G`} (including force-protected).</span>}
+        {saved && complete && !err && <span className="text-emerald-400 text-sm">✓ Submitted</span>}
       </div>
     </div>
   );

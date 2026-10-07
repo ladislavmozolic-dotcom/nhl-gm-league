@@ -33,31 +33,31 @@ export default function RookieCalculatorPanel({
     <>
       <Card title="Ako to funguje" accent="text-slate-200">
         <ul className="text-sm text-slate-300 space-y-1 list-disc pl-5">
-          <li>Rovnaká živá logika ako v <b>Parameters / Live Calculatore</b>: hodnotenia sú počítané priamo zo živých údajov (G/60, A/60, xG, xGA, hity, bloky, TOI, Edge speed bursts, vhadzovania a AHL s NHLe) podľa váh a metrík nastavených v <i>Nastavenia &amp; Tuning</i>. Ochrana pred malou vzorkou zápasov (Bayesian shrinkage nováčikovskej vzorky) a nováčikovské mantinely bránia prestreleným číslam pri pár odohraných zápasoch, takže výsledný Overall realisticky leží v rozmedzí <b>OV 46–56</b>.</li>
-          <li>Zobrazujú sa len hráči, ktorí sú v <b>prospect poole</b> nejakého tímu (<code>rosterType = PROSPECT</code>), spĺňajú nováčikovský limit (vek do 25 rokov) a už odohrali reálne NHL/AHL zápasy.</li>
+          <li>The same live logic as in <b>Parameters / Live Calculator</b>: ratings are computed directly from live data (G/60, A/60, xG, xGA, hits, blocks, TOI, Edge speed bursts, faceoffs and AHL with NHLe) using the weights and metrics set in <i>Settings &amp; Tuning</i>. Small-sample protection (Bayesian shrinkage of the rookie sample) and rookie guard rails prevent inflated numbers after a few games, so the resulting Overall realistically lands in the <b>OV 46–56</b> range.</li>
+          <li>Only players who are in some team's <b>prospect pool</b> (<code>rosterType = PROSPECT</code>), meet the rookie limit (age up to 25) and have already played real NHL/AHL games are shown.</li>
           {isAdmin
-            ? <li>Každá bunka s hodnotou je <b>editovateľná</b> — ak ti vypočítané číslo pripadá príliš vysoké/nízke (napr. PA/SC z pár zápasov horúcej série), priamo si ho preprav. &quot;Activate rating&quot; potom zapíše presne to, čo je v bunkách, do CK/SC/PA/DF/... polí hráča — nemení jeho rosterType ani tím, len rating.</li>
-            : <li>Prihlás sa ako admin, ak chceš rating aj aktivovať alebo upraviť — tu ho zatiaľ len vidíš.</li>}
+            ? <li>Every cell with a value is <b>editable</b> — if a computed number looks too high/low (e.g. PA/SC from a few games of a hot streak), just overwrite it. &quot;Activate rating&quot; then writes exactly what is in the cells into the player's CK/SC/PA/DF/... fields — it does not change his rosterType or team, only the rating.</li>
+            : <li>Sign in as admin if you also want to activate or edit the rating — for now you can only view it.</li>}
         </ul>
       </Card>
 
       {isAdmin && (
-        <Card title="Chýbajúci reální NHL hráči — žiadny Player záznam u nás" accent="text-amber-400">
+        <Card title="Missing real NHL players — no Player record here" accent="text-amber-400">
           <p className="text-xs text-slate-500 mb-3">
-            Nájde hráčov, ktorí <b>už odohrali aspoň 1 reálny NHL zápas</b> tento sezónny ročník a nemajú u nás vôbec žiadny <code>Player</code> záznam
-            (nedraftovaní juniori bez zápasu sa tu preto neukazujú — nemá ich čo hodnotiť), a <b>automaticky ich založí</b> ako <code>Player</code>
-            (<code>rosterType = PROSPECT</code>) — bez ďalšieho potvrdzovania po jednom. Zároveň obnoví aktuálne štatistiky pre všetkých hráčov v
-            databáze (aj tých založených pri predošlom skenovaní) a spustí prepočet cez Live Calculator engine, takže ratingy v tabuľke nižšie
-            sú vždy čerstvé. Stĺpec vo výsledku ukáže, či
-            bol hráč predtým aj scoutovaný v <code>Prospect</code> tabuľke niektorého tímu — to nie je duplicita, len iná, ľahšia tabuľka na scouting.
-            Skenovanie prejde všetkých 32 reálnych NHL rostrov (chvíľu trvá — preto sa nespúšťa automaticky pri načítaní stránky).
+            Finds players who <b>have already played at least 1 real NHL game</b> this season and have no <code>Player</code> record here at all
+            (undrafted juniors without a game are therefore not shown — there is nothing to rate), and <b>automatically creates them</b> as a <code>Player</code>
+            (<code>rosterType = PROSPECT</code>) — with no further one-by-one confirmation. It also refreshes current stats for all players in the
+            database (including those created in a previous scan) and runs a recompute through the Live Calculator engine, so the ratings in the table below
+            are always fresh. A column in the result shows whether
+            the player was previously also scouted in some team's <code>Prospect</code> table — that is not a duplicate, just a different, lighter scouting table.
+            The scan goes through all 32 real NHL rosters (it takes a moment — so it does not run automatically on page load).
           </p>
           <DebutantScanner />
         </Card>
       )}
 
       <Card
-        title={`Prospekti s reálnymi zápasmi, zatiaľ bez ratingu (${rookies.length})`}
+        title={`Prospects with real games, no rating yet (${rookies.length})`}
         accent="text-green-400"
         right={
           isPermitted ? (
@@ -90,7 +90,7 @@ export default function RookieCalculatorPanel({
             <tbody>
               {rookies.map((r) => <RookieTableRow key={r.playerId} row={r} isAdmin={isAdmin} />)}
               {rookies.length === 0 && (
-                <tr><td colSpan={PARAM_COLS.length + (isAdmin ? 8 : 7)} className="px-4 py-8 text-center text-slate-500">Žiadny prospekt so skutočnými zápasmi zatiaľ nečaká na rating.</td></tr>
+                <tr><td colSpan={PARAM_COLS.length + (isAdmin ? 8 : 7)} className="px-4 py-8 text-center text-slate-500">No prospect with real games is waiting for a rating yet.</td></tr>
               )}
             </tbody>
           </table>

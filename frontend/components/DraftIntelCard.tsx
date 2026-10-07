@@ -55,13 +55,13 @@ export default async function DraftIntelCard({ teamId, draftYear, available, sou
     <Card title="🧠 UNHL Intelligence — Draft Intelligence" accent="text-blue-400" bodyClassName="p-3 flex flex-col gap-5">
       <div>
         <div className="text-sm font-bold text-slate-200 mb-1">Position Need</div>
-        <p className="text-xs text-slate-400 mb-2">Váš tím podľa priemeru CK/PA/SC/DF (resp. overall pre brankárov) na danom poste, oproti ligovému mediánu.</p>
+        <p className="text-xs text-slate-400 mb-2">Your team by the CK/PA/SC/DF average (or overall for goalies) at that position, versus the league median.</p>
         <div className="flex flex-col gap-1.5">
           {intel.positionNeeds.map((n) => (
             <div key={n.position} className="flex items-center justify-between text-xs border border-slate-800 rounded-lg px-3 py-2">
               <span className={posColor[n.position] ?? "text-slate-300"}>{POS_LABEL[n.position]}</span>
               <span className="text-slate-400">
-                {n.teamRating != null ? <>Váš priemer {n.teamRating} · medián {n.leagueMedian}</> : "nemáte tu nikoho"}
+                {n.teamRating != null ? <>Your average {n.teamRating} · median {n.leagueMedian}</> : "you have no one here"}
                 {n.delta != null && (
                   <span className={`ml-2 font-semibold ${n.delta > 0 ? "text-emerald-400" : n.delta < 0 ? "text-red-400" : "text-slate-500"}`}>
                     {n.delta > 0 ? `+${n.delta}` : n.delta}
@@ -78,7 +78,7 @@ export default async function DraftIntelCard({ teamId, draftYear, available, sou
         <div>
           <div className="text-sm font-bold text-slate-200 mb-1">Best Org Fit — {POS_LABEL[intel.bestOrgFit.position]}</div>
           <p className="text-xs text-slate-400 mb-2">
-            Váš relatívne najslabší post spomedzi vlastného rosteru ({intel.bestOrgFit.delta != null ? (intel.bestOrgFit.delta > 0 ? `+${intel.bestOrgFit.delta}` : intel.bestOrgFit.delta) : "—"} oproti ligovému mediánu) — najlepšie dostupní prospekti na tomto poste.
+            Your relatively weakest position on your own roster ({intel.bestOrgFit.delta != null ? (intel.bestOrgFit.delta > 0 ? `+${intel.bestOrgFit.delta}` : intel.bestOrgFit.delta) : "—"} vs. the league median) — best available prospects at this position.
           </p>
           <div className="flex flex-col gap-1.5">
             {intel.bestOrgFit.prospects.map((p) => <ProspectRow key={p.id} p={p} />)}
@@ -88,7 +88,7 @@ export default async function DraftIntelCard({ teamId, draftYear, available, sou
 
       <div>
         <div className="text-sm font-bold text-slate-200 mb-1">Best Player Available</div>
-        <p className="text-xs text-slate-400 mb-2">Najvyššie postavení na drafte podľa board poradia, bez ohľadu na potrebu tímu.</p>
+        <p className="text-xs text-slate-400 mb-2">Highest-ranked in the draft by board order, regardless of team need.</p>
         <div className="flex flex-col gap-1.5">
           {intel.bpa.map((p) => <ProspectRow key={p.id} p={p} />)}
         </div>
@@ -96,7 +96,7 @@ export default async function DraftIntelCard({ teamId, draftYear, available, sou
 
       <div>
         <div className="text-sm font-bold text-slate-200 mb-1">Highest Upside</div>
-        <p className="text-xs text-slate-400 mb-2">Najväčší odhadovaný strop — najviac priestoru na rast.</p>
+        <p className="text-xs text-slate-400 mb-2">Highest projected ceiling — the most room to grow.</p>
         <div className="flex flex-col gap-1.5">
           {intel.upside.map((p) => <ProspectRow key={p.id} p={p} />)}
         </div>
@@ -104,7 +104,7 @@ export default async function DraftIntelCard({ teamId, draftYear, available, sou
 
       <div>
         <div className="text-sm font-bold text-slate-200 mb-1">Lowest Risk</div>
-        <p className="text-xs text-slate-400 mb-2">Spomedzi top 40 tí, čo sú najbližšie k hotovému produktu — menej závislí od projekcie.</p>
+        <p className="text-xs text-slate-400 mb-2">Among the top 40, those closest to a finished product — less dependent on projection.</p>
         <div className="flex flex-col gap-1.5">
           {intel.lowestRisk.map((p) => <ProspectRow key={p.id} p={p} />)}
         </div>
@@ -114,7 +114,7 @@ export default async function DraftIntelCard({ teamId, draftYear, available, sou
         <div>
           <div className="text-sm font-bold text-slate-200 mb-1">Comparable Past Prospects — {intel.comparables.forProspect}</div>
           <p className="text-xs text-slate-400 mb-2">
-            Minulí prospekti na rovnakom poste s podobným draft-day OV/POT a tým, čím sa reálne stali v tejto lige. Chýbajúci rating = hráč sa neudržal na NHL rostri.
+            Past prospects at the same position with a similar draft-day OV/POT, and what they actually became in this league. Missing rating = the player did not stick on an NHL roster.
           </p>
           <div className="flex flex-col gap-1.5">
             {intel.comparables.picks.map((c, i) => (

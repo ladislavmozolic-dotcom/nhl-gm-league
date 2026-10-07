@@ -92,7 +92,7 @@ export default function NextSimCountdown({ frenzyAt, frenzyOpen, frenzyRound, fr
 
       <p className="text-[11px] text-slate-400 font-medium flex items-center gap-1.5 mt-1">
         <span>⏰</span>
-        <span>{frenzyPending ? "Otvára sa" : roundActive ? "Uzávierka" : "Simulácia"} o <strong className="text-slate-200 font-semibold">{targetLabel}</strong></span>
+        <span>{frenzyPending ? "Opens" : roundActive ? "Deadline" : "Simulation"} at <strong className="text-slate-200 font-semibold">{targetLabel}</strong></span>
       </p>
     </div>
   );

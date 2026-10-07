@@ -55,16 +55,16 @@ export default async function PlayerIntelligenceCard({ playerId }: { playerId: n
         <div>
           <div className="text-sm font-bold text-slate-200 mb-1">Ideal role</div>
           <p className="text-xs text-slate-400 mb-2">
-            Najbližšie jeho profilu ({role.playerRating.toFixed(1)}) zodpovedá{" "}
-            <span className="text-emerald-400 font-semibold">{bestRole.slotLabel}</span> — tam by v lige rátingom skončil na{" "}
-            {bestRole.rank}. mieste z {bestRole.outOf}. Rozpis podľa všetkých postov, na ktoré má nárok:
+            His profile ({role.playerRating.toFixed(1)}) most closely matches{" "}
+            <span className="text-emerald-400 font-semibold">{bestRole.slotLabel}</span> — there he would rank{" "}
+            #{bestRole.rank} of {bestRole.outOf} in the league. Breakdown by every position he qualifies for:
           </p>
           <div className="flex flex-col gap-1.5">
             {role.slots.map((s) => (
               <div key={s.slotId} className="flex items-center justify-between text-xs border border-slate-800 rounded-lg px-3 py-2">
                 <span className="text-slate-300">{s.slotLabel}</span>
                 <span className="text-slate-400">
-                  Ligový medián {s.leagueMedian} · hráč {s.playerRating}
+                  League median {s.leagueMedian} · player {s.playerRating}
                   <span className={`ml-2 font-semibold ${s.delta > 0 ? "text-emerald-400" : s.delta < 0 ? "text-red-400" : "text-slate-500"}`}>
                     {s.delta > 0 ? `+${s.delta}` : s.delta}
                   </span>
@@ -80,8 +80,8 @@ export default async function PlayerIntelligenceCard({ playerId }: { playerId: n
         <div>
           <div className="text-sm font-bold text-slate-200 mb-1">Similar Players</div>
           <p className="text-xs text-slate-400 mb-2">
-            Najbližší profil podľa {similar.isGoalie ? "overall ratingu" : "CK/PA/SC/DF"} a veku — v poradí zoradenom od najbližšieho.
-            Zmluvy v tabuľke slúžia aj ako contract comparables.
+            Closest profiles by {similar.isGoalie ? "overall rating" : "CK/PA/SC/DF"} and age — ordered from closest.
+            The contracts in the table also serve as contract comparables.
           </p>
           <SortableTable cols={similarCols(similar.isGoalie)} rows={similar.players.map((p) => ({
             _id: p.id, name: p.name, slug: p.slug, photo: p.photoUrl, teamCode: p.teamCode, teamSlug: p.teamSlug, teamLogo: p.teamLogo,
@@ -97,10 +97,10 @@ export default async function PlayerIntelligenceCard({ playerId }: { playerId: n
         <div>
           <div className="text-sm font-bold text-slate-200 mb-1">Cheaper Replacement Options</div>
           <p className="text-xs text-slate-400 mb-2">
-            Podobný profil ako tento hráč (cap hit {money(cheaper.targetCapHit)}), ale za menej — zoradené od najbližšieho profilu.
-            Nehovorí nič o tom, či je hráč dostupný alebo ochotný podpísať.
+            A similar profile to this player (cap hit {money(cheaper.targetCapHit)}), but for less — ordered from the closest profile.
+            Says nothing about whether the player is available or willing to sign.
           </p>
-          <SortableTable cols={[...similarCols(cheaper.isGoalie), { key: "savings", label: "Úspora", kind: "money" }]} rows={cheaperRows} minWidth={840} />
+          <SortableTable cols={[...similarCols(cheaper.isGoalie), { key: "savings", label: "Savings", kind: "money" }]} rows={cheaperRows} minWidth={840} />
         </div>
       )}
     </Card>

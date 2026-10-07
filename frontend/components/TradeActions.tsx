@@ -61,7 +61,7 @@ export default function TradeActions({ tradeId, role, admin, pending: isPending 
       {(role === "receiver" || role === "proposer" || admin) && (
         <button onClick={analyze} disabled={aiPending}
           className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-sm font-semibold disabled:opacity-40"
-          title="GM Assist — over hodnotu a zmysel výmeny pred rozhodnutím">
+          title="GM Assist — check the value and sense of the trade before deciding">
           {aiPending ? "Analyzujem…" : "🤖 GM Assist"}
         </button>
       )}

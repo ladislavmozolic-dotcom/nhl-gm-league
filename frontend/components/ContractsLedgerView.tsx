@@ -378,10 +378,10 @@ export default function ContractsLedgerView({
                       title={
                         p.clause.includes("NMC")
                           ? isCs
-                            ? "No-Movement Clause — hráč nemôže byť vymenený ani poslaný na waiver bez súhlasu"
+                            ? "No-Movement Clause — the player cannot be traded or placed on waivers without consent"
                             : "No-Movement Clause — cannot be waived or traded without consent"
                           : isCs
-                          ? "No-Trade Clause — obmedzenie výmeny"
+                          ? "No-Trade Clause — trade restriction"
                           : "No-Trade Clause — trade restriction"
                       }
                     >

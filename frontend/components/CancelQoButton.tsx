@@ -11,8 +11,8 @@ export default function CancelQoButton({ caseId, name, deadlinePassed }: { caseI
   const [err, setErr] = useState<string | null>(null);
 
   const run = () => {
-    const warn = deadlinePassed ? "\n\nPozor: termín QO už uplynul — po zrušení klub QO nestihne podať znova a práva na hráča môžu prepadnúť." : "";
-    if (!confirm(`Zrušiť podanú QO pre ${name}? Prípad sa vráti do stavu „QO due".${warn}`)) return;
+    const warn = deadlinePassed ? "\n\nWarning: the QO deadline has already passed — after cancelling, the club cannot file the QO again and the rights to the player may lapse." : "";
+    if (!confirm(`Cancel the submitted QO for ${name}? The case returns to the "QO due" state.${warn}`)) return;
     setErr(null);
     start(async () => {
       try {
@@ -30,7 +30,7 @@ export default function CancelQoButton({ caseId, name, deadlinePassed }: { caseI
     <span className="inline-flex flex-col items-end gap-0.5">
       <button disabled={pending} onClick={run}
         className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white text-xs font-semibold whitespace-nowrap shadow-sm transition">
-        {pending ? "Rušim…" : "Zrušiť QO"}
+        {pending ? "Cancelling…" : "Cancel QO"}
       </button>
       {err && <span className="text-[10px] text-rose-400 font-medium">{err}</span>}
     </span>

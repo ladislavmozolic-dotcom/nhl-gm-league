@@ -76,25 +76,25 @@ export default function ForumEditorToolbar({ textareaRef, onInsert }: Props) {
     <div className="flex items-center gap-1.5 p-1.5 bg-slate-900/90 border border-b-0 border-slate-700 rounded-t-lg flex-wrap">
       <button
         type="button"
-        onClick={() => applyWrap("**", "**", "tučný text")}
+        onClick={() => applyWrap("**", "**", "bold text")}
         className={btnClass}
-        title="Tučné písmo (Ctrl+B)"
+        title="Bold (Ctrl+B)"
       >
         <span className="font-bold">B</span>
       </button>
       <button
         type="button"
-        onClick={() => applyWrap("*", "*", "kurzíva")}
+        onClick={() => applyWrap("*", "*", "italic")}
         className={btnClass}
-        title="Kurzíva (Ctrl+I)"
+        title="Italic (Ctrl+I)"
       >
         <span className="italic font-serif">I</span>
       </button>
       <button
         type="button"
-        onClick={() => applyWrap("~~", "~~", "prečiarknuté")}
+        onClick={() => applyWrap("~~", "~~", "strikethrough")}
         className={btnClass}
-        title="Prečiarknuté"
+        title="Strikethrough"
       >
         <span className="line-through">S</span>
       </button>
@@ -103,9 +103,9 @@ export default function ForumEditorToolbar({ textareaRef, onInsert }: Props) {
 
       <button
         type="button"
-        onClick={() => applyWrap('[quote="GM"]\n', "\n[/quote]", "Citovaný text")}
+        onClick={() => applyWrap('[quote="GM"]\n', "\n[/quote]", "Quoted text")}
         className={btnClass}
-        title="Vložiť citáciu [quote]"
+        title="Insert quote [quote]"
       >
         <span className="text-amber-400 font-serif">❝❞</span>
       </button>
@@ -113,15 +113,15 @@ export default function ForumEditorToolbar({ textareaRef, onInsert }: Props) {
         type="button"
         onClick={insertLink}
         className={btnClass}
-        title="Vložiť odkaz"
+        title="Insert link"
       >
         <span>🔗</span>
       </button>
       <button
         type="button"
-        onClick={() => applyWrap("`", "`", "kód")}
+        onClick={() => applyWrap("`", "`", "code")}
         className={btnClass}
-        title="Kód"
+        title="Code"
       >
         <span className="font-mono text-emerald-400 text-[11px]">&lt;/&gt;</span>
       </button>
@@ -129,7 +129,7 @@ export default function ForumEditorToolbar({ textareaRef, onInsert }: Props) {
         type="button"
         onClick={() => insertLinePrefix("•")}
         className={btnClass}
-        title="Odrážkový zoznam"
+        title="Bullet list"
       >
         <span>• ≡</span>
       </button>

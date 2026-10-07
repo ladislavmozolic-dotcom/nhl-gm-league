@@ -64,7 +64,7 @@ export default function ForumReply({ threadId }: { threadId: number }) {
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
           rows={6}
-          placeholder="Napíš odpoveď do diskusie... (podporuje BBCode a Markdown, Ctrl+Enter pre odoslanie)"
+          placeholder="Write a reply to the discussion... (supports BBCode and Markdown, Ctrl+Enter to send)"
           className="w-full resize-y bg-transparent p-3.5 text-[14px] leading-relaxed text-slate-100 placeholder:text-slate-500 focus:outline-none"
         />
       </div>
@@ -73,7 +73,7 @@ export default function ForumReply({ threadId }: { threadId: number }) {
 
       <div className="flex items-center justify-between pt-1">
         <span className="text-[11px] text-slate-500 hidden sm:inline-block">
-          Tip: Použi tlačidlá na formátovanie alebo <span className="font-mono bg-slate-800 px-1 py-0.5 rounded text-slate-400">Ctrl+Enter</span> pre rýchle odoslanie.
+          Tip: Use the formatting buttons or <span className="font-mono bg-slate-800 px-1 py-0.5 rounded text-slate-400">Ctrl+Enter</span> for quick sending.
         </span>
         <div className="flex items-center gap-2 ml-auto">
           {text.trim() && (
@@ -82,7 +82,7 @@ export default function ForumReply({ threadId }: { threadId: number }) {
               onClick={() => setText("")}
               className="px-3 py-2 text-xs text-slate-400 hover:text-slate-200 transition-colors"
             >
-              Vymazať
+              Clear
             </button>
           )}
           <button
@@ -98,7 +98,7 @@ export default function ForumReply({ threadId }: { threadId: number }) {
             ) : (
               <>
                 <span>💬</span>
-                <span>Odoslať odpoveď</span>
+                <span>Send reply</span>
               </>
             )}
           </button>

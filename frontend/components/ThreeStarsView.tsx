@@ -239,18 +239,18 @@ export default function ThreeStarsView({
             >
               {pos === "ALL"
                 ? isCs
-                  ? "Všetky"
+                  ? "All"
                   : "All"
                 : pos === "F"
                 ? isCs
-                  ? "Útočníci"
+                  ? "Skaters"
                   : "Forwards"
                 : pos === "D"
                 ? isCs
                   ? "Obrancovia"
                   : "Defense"
                 : isCs
-                ? "Brankári"
+                ? "Goalies"
                 : "Goalies"}
             </button>
           ))}

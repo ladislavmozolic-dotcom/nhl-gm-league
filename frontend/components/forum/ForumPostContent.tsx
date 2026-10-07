@@ -56,8 +56,8 @@ function parsePostContent(text: string): React.ReactNode[] {
             <span className="text-blue-400 font-serif text-sm">❝</span>
             <span>
               {currentQuoteAuthor
-                ? `Citácia: ${currentQuoteAuthor} napísal(a):`
-                : "Citácia:"}
+                ? `Quote: ${currentQuoteAuthor} wrote:`
+                : "Quote:"}
             </span>
           </div>
           <div className="p-3 text-slate-300 italic whitespace-pre-wrap text-[13.5px] leading-relaxed border-l-2 border-blue-500/50">
@@ -82,8 +82,8 @@ function parsePostContent(text: string): React.ReactNode[] {
             <span className="text-blue-400 font-serif text-sm">❝</span>
             <span>
               {bbQuoteAuthor
-                ? `Citácia: ${bbQuoteAuthor} napísal(a):`
-                : "Citácia:"}
+                ? `Quote: ${bbQuoteAuthor} wrote:`
+                : "Quote:"}
             </span>
           </div>
           <div className="p-3 text-slate-300 italic whitespace-pre-wrap text-[13.5px] leading-relaxed border-l-2 border-blue-500/50">

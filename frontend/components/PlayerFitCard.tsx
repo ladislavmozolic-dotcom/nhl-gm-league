@@ -27,9 +27,9 @@ export default async function PlayerFitCard({
         <div>
           <div className="text-sm font-bold text-slate-200 mb-1">Fit for my team ({fit.teamName})</div>
           <p className="text-xs text-slate-400 mb-2">
-            Cap hit {money(fit.playerCapHit)} vs. vaše cap space {money(fit.capSpace)} —{" "}
+            Cap hit {money(fit.playerCapHit)} vs. your cap space {money(fit.capSpace)} —{" "}
             <span className={fit.capFits ? "text-emerald-400 font-semibold" : "text-red-400 font-semibold"}>
-              {fit.capFits ? "zmestí sa pod cap" : "presiahol by cap"}
+              {fit.capFits ? "fits under the cap" : "would exceed the cap"}
             </span>.
           </p>
           <div className="flex flex-col gap-1.5">
@@ -37,11 +37,11 @@ export default async function PlayerFitCard({
               <div key={s.slotId} className="flex items-center justify-between text-xs border border-slate-800 rounded-lg px-3 py-2">
                 <span className="text-slate-300">{s.slotLabel}</span>
                 <span className="text-slate-400">
-                  {s.teamRating != null ? <>Váš priemer {s.teamRating}{s.teamAuto && " (auto)"}</> : "nemáte tu nikoho"}
-                  {" · hráč "}{s.playerRating ?? "?"}
+                  {s.teamRating != null ? <>Your average {s.teamRating}{s.teamAuto && " (auto)"}</> : "you have no one here"}
+                  {" · player "}{s.playerRating ?? "?"}
                   {s.delta != null && (
                     <span className={`ml-2 font-semibold ${s.delta > 0 ? "text-emerald-400" : s.delta < 0 ? "text-red-400" : "text-slate-500"}`}>
-                      {s.delta > 0 ? `+${s.delta} zlepšenie` : s.delta < 0 ? `${s.delta} pokles` : "rovnaká úroveň"}
+                      {s.delta > 0 ? `+${s.delta} improvement` : s.delta < 0 ? `${s.delta} decline` : "same level"}
                     </span>
                   )}
                 </span>
@@ -55,7 +55,7 @@ export default async function PlayerFitCard({
         <div>
           <div className="text-sm font-bold text-slate-200 mb-1">Who could want him</div>
           <p className="text-xs text-slate-400 mb-2">
-            Kluby, ktorých zodpovedajúci slot momentálne ratuje nižšie než tento hráč — reálna potreba, nie ochota obchodovať.
+            Clubs whose matching slot currently rates lower than this player — a real need, not a willingness to trade.
           </p>
           <div className="flex flex-wrap gap-2">
             {interest.teams.map((t) => (

@@ -16,7 +16,7 @@ export default function RemoveGmButton({ teamId, gmLabel, teamName }: { teamId: 
       }}
       className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-red-600 text-slate-200 text-xs font-semibold disabled:opacity-50 whitespace-nowrap"
     >
-      {pending ? "…" : "Vymazať GM"}
+      {pending ? "…" : "Remove GM"}
     </button>
   );
 }

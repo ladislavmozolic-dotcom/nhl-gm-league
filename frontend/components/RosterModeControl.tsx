@@ -105,7 +105,7 @@ export default function RosterModeControl({ mode, realCount, profinhlCount, prof
         {placedList && placedList.length > 0 && (
           <div className="mt-2 text-xs text-slate-400">
             <p className="mb-1 text-slate-500">
-              Hráči, ktorých tento beh práve preradil na ich reálny tím — žiadna iná kontrola sa pri tom nerobí, over si ich ručne:
+              Players this run just moved to their real team — no other check is done, so verify them manually:
             </p>
             <ul className="list-disc pl-5 space-y-0.5">
               {placedList.map((p, i) => (

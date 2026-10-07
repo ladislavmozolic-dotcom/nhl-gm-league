@@ -83,7 +83,7 @@ export default function CapCalculator({
   const isCs = lang === "cs";
   const locale = isCs ? "sk-SK" : lang === "de" ? "de-DE" : lang === "ru" ? "ru-RU" : "en-US";
   const weekdays = isCs
-    ? ["Ne", "Po", "Ut", "St", "Št", "Pi", "So"]
+    ? ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]
     : lang === "de"
     ? ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"]
     : lang === "ru"
@@ -190,7 +190,7 @@ export default function CapCalculator({
                   ? "Priestor pod stropom dnes"
                   : "Unused below ceiling today"
                 : isCs
-                ? "Prekročenie stropu"
+                ? "Over the cap"
                 : "Over the cap ceiling"}
             </p>
           </div>

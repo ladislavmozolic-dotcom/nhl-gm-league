@@ -36,25 +36,25 @@ export default function DebutantScanner() {
       <div className="flex items-center gap-3 flex-wrap">
         <button onClick={scan} disabled={pending}
           className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-sm font-semibold">
-          {pending ? "Skenujem 32 tímov, obnovujem štatistiky a prepočítavam ratingy…" : "Skenovať reálne NHL rostre"}
+          {pending ? "Scanning 32 teams, refreshing stats and recomputing ratings…" : "Scan real NHL rosters"}
         </button>
         {error && <span className="text-sm text-red-400">{error}</span>}
       </div>
       {result && (
         <div className="text-sm space-y-2">
           <p className="text-slate-400">
-            Štatistiky obnovené u <b className="text-slate-200">{result.statsRefreshed}</b> hráčov, ratingy prepočítané cez Live
-            Calculator engine u <b className="text-slate-200">{result.ratingsRecomputed}</b> hráčov (vrátane už skôr založených
-            prospektov nižšie).
+            Stats refreshed for <b className="text-slate-200">{result.statsRefreshed}</b> players, ratings recomputed via the Live
+            Calculator engine for <b className="text-slate-200">{result.ratingsRecomputed}</b> players (including previously created
+            prospects below).
           </p>
           {result.created.length === 0 ? (
-            <p className="text-slate-500">Žiadny nový reálny NHL debutant sa nenašiel — všetci s odohratým zápasom už u nás majú Player záznam.</p>
+            <p className="text-slate-500">No new real NHL debutant found — everyone with a played game already has a Player record here.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm" style={{ minWidth: 520 }}>
                 <thead>
                   <tr className="bg-slate-800/30 border-b border-slate-800 text-slate-500 text-[11px] uppercase tracking-wider">
-                    <th className="px-3 py-2 text-left">Novo založený</th>
+                    <th className="px-3 py-2 text-left">Newly created</th>
                     <th className="px-2 py-2">Team</th>
                     <th className="px-2 py-2">GP</th>
                     <th className="px-2 py-2">Prospect pool?</th>
@@ -69,15 +69,15 @@ export default function DebutantScanner() {
                       <td className="px-2 py-1.5 text-center tabular-nums">{c.gp}</td>
                       <td className="px-2 py-1.5 text-center">
                         {c.alreadyProspect
-                          ? <span className="text-amber-300 text-xs">Áno ({c.prospectTeamCode})</span>
+                          ? <span className="text-amber-300 text-xs">Yes ({c.prospectTeamCode})</span>
                           : <span className="text-slate-600 text-xs">Nie — nikde</span>}
                       </td>
                       <td className="px-2 py-1.5 text-xs">
                         {c.error
                           ? <span className="text-red-400">{c.error}</span>
                           : c.isGoalie
-                            ? <span className="text-amber-300">Založený — brankári zatiaľ nie sú v Rookie Calculatore podporovaní</span>
-                            : <span className="text-green-400">Založený ✓, pridaný do tabuľky nižšie</span>}
+                            ? <span className="text-amber-300">Created — goalies are not yet supported in the Rookie Calculator</span>
+                            : <span className="text-green-400">Created ✓, added to the table below</span>}
                       </td>
                     </tr>
                   ))}

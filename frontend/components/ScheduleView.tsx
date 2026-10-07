@@ -167,7 +167,7 @@ export default function ScheduleView({
       const mLabel = d
         ? d.toLocaleDateString(locale, { month: "long", year: "numeric", timeZone: "UTC" })
         : isCs
-        ? "Nenaplánované"
+        ? "Unscheduled"
         : "Unscheduled";
 
       let m = result[result.length - 1];
@@ -187,7 +187,7 @@ export default function ScheduleView({
             timeZone: "UTC",
           })
         : isCs
-        ? "Nenaplánované"
+        ? "Unscheduled"
         : "Unscheduled";
       const dShort = d
         ? d.toLocaleDateString(locale, {
@@ -465,7 +465,7 @@ export default function ScheduleView({
           </h3>
           <p className="text-xs text-slate-400 max-w-md mx-auto">
             {isCs
-              ? "Skúste upraviť filter tímu, vybraný mesiac alebo vyhľadávací dotaz."
+              ? "Try adjusting the team filter, the selected month or the search query."
               : "Try adjusting the selected team, month tab or search filter."}
           </p>
           <div className="mt-4">

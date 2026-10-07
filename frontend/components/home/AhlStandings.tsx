@@ -104,8 +104,8 @@ export default async function AhlStandings() {
 
       {noDataAtAll && (
         <p className="text-xs text-amber-400 mb-4">
-          Žiadne AHL tímy nenájdené. Skontroluj, či máš v tabuľke Team
-          stĺpec <code className="bg-slate-800 px-1 rounded">league</code> s hodnotou <code className="bg-slate-800 px-1 rounded">"AHL"</code>.
+          No AHL teams found. Check that the Team table has the
+          <code className="bg-slate-800 px-1 rounded">league</code> column set to <code className="bg-slate-800 px-1 rounded">"AHL"</code>.
         </p>
       )}
 

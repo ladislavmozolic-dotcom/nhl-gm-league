@@ -164,7 +164,7 @@ export default function SystemEditor({ teamId, profile, initial, coachEx = 70 }:
           className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-semibold transition-colors">
           {pending ? tr("sys.saving") : saved ? tr("sys.savedTick") : tr("sys.save")}
         </button>
-        {error && <p className="text-xs text-red-400">Nepodarilo sa uložiť ({error}). Skús sa znova prihlásiť a uložiť ešte raz.</p>}
+        {error && <p className="text-xs text-red-400">Could not save ({error}). Try signing in again and saving once more.</p>}
         <p className="text-xs text-slate-600">{tr("sys.footer")}</p>
       </div>
     </div>

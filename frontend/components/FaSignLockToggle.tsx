@@ -15,7 +15,7 @@ export default function FaSignLockToggle({ locked, comish }: { locked: boolean; 
     if (!locked) return null;
     return (
       <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-200">
-        🔒 UFA podpisy sú momentálne <b>zamknuté</b> komisárom.
+        🔒 UFA signings are currently <b>locked</b> by the commissioner.
       </div>
     );
   }
@@ -23,12 +23,12 @@ export default function FaSignLockToggle({ locked, comish }: { locked: boolean; 
   return (
     <div className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-2.5 text-sm ${locked ? "border-amber-500/40 bg-amber-500/10" : "border-emerald-500/40 bg-emerald-500/10"}`}>
       <span className={locked ? "text-amber-200" : "text-emerald-200"}>
-        {locked ? "🔒 UFA ponuky sú ZAMKNUTÉ pre všetky tímy vrátane komisárov." : "🔓 UFA ponuky sú ODOMKNUTÉ — všetky tímy môžu podávať ponuky."}
-        <span className="text-slate-500 ml-1.5 text-xs">(túto lištu vidí len komisár)</span>
+        {locked ? "🔒 UFA offers are LOCKED for all teams including commissioners." : "🔓 UFA offers are UNLOCKED — all teams can submit offers."}
+        <span className="text-slate-500 ml-1.5 text-xs">(only the commissioner sees this bar)</span>
       </span>
       <button onClick={toggle} disabled={pending}
         className={`shrink-0 px-3.5 py-1.5 rounded-lg font-semibold text-white text-sm disabled:opacity-50 ${locked ? "bg-emerald-600 hover:bg-emerald-500" : "bg-amber-600 hover:bg-amber-500"}`}>
-        {pending ? "…" : locked ? "🔓 Odblokovať podpisy" : "🔒 Zamknúť podpisy"}
+        {pending ? "…" : locked ? "🔓 Unlock signings" : "🔒 Lock signings"}
       </button>
     </div>
   );
