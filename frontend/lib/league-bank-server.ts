@@ -131,7 +131,7 @@ export async function recomputeCapPenalties(seasonStart = CURRENT_SEASON_START) 
 
 export type EnforcementResult = { ran: boolean; reason?: string; day?: string; rosterFines?: number; capFines?: number; totalFined?: number };
 
-/** One day's automatic check. Idempotent per (club, day, kind). `force` skips the on/off + start-day gates (manual run). */
+/** One day's automatic check — only clubs with a game that day are fined. Idempotent per (club, day, kind). `force` skips the on/off + start-day gates (manual run). */
 export async function enforceLeagueDay(day: string, opts: { force?: boolean } = {}): Promise<EnforcementResult> {
   const bank = await getBank();
   if (!opts.force) {
@@ -144,9 +144,26 @@ export async function enforceLeagueDay(day: string, opts: { force?: boolean } = 
     where: { league: "NHL", isAffiliate: false },
     select: { id: true, slug: true, name: true, passwordHash: true, affiliateTeams: { select: { id: true } } },
   });
+  // Fines only bite a club on a day it actually had a game: NHL club in an NHL game, its
+  // AHL affiliate in an AHL game (identified by the affiliate's parent club).
+  const dayStart = new Date(`${day}T00:00:00Z`);
+  const dayGames = await prisma.game.findMany({
+    where: { gameDate: { gte: dayStart, lt: new Date(dayStart.getTime() + 86_400_000) } },
+    select: { league: true, homeTeamId: true, awayTeamId: true },
+  });
+  const nhlPlayed = new Set<number>();
+  const ahlTeamsPlayed = new Set<number>();
+  for (const g of dayGames) for (const id of [g.homeTeamId, g.awayTeamId]) (g.league === "AHL" ? ahlTeamsPlayed : nhlPlayed).add(id);
+  const ahlParentsPlayed = new Set<number>();
+  if (ahlTeamsPlayed.size) {
+    const aff = await prisma.team.findMany({ where: { id: { in: [...ahlTeamsPlayed] } }, select: { parentTeamId: true } });
+    for (const a of aff) if (a.parentTeamId != null) ahlParentsPlayed.add(a.parentTeamId);
+  }
   let rosterFines = 0, capFines = 0, totalFined = 0;
   for (const t of teams) {
     if (!bank.finesForAiClubs && !t.passwordHash) continue; // AI-run club: nobody to fine
+    const playedNhl = nhlPlayed.has(t.id), playedAhl = ahlParentsPlayed.has(t.id);
+    if (!playedNhl && !playedAhl) continue; // no game today → no fines of any kind
     const problems = await rosterProblems(t.id, t.affiliateTeams[0]?.id ?? null);
     const charge = async (kind: string, amount: number, why: string) => {
       if (amount <= 0) return false;
@@ -157,10 +174,11 @@ export async function enforceLeagueDay(day: string, opts: { force?: boolean } = 
       totalFined += amount;
       return true;
     };
-    if (problems.nhl && await charge("FINE_NHL_ROSTER", bank.nhlRosterFine, `NHL roster not compliant on ${day}: ${problems.nhl}`)) rosterFines++;
-    if (problems.ahl && await charge("FINE_AHL_ROSTER", bank.ahlRosterFine, `AHL roster not compliant on ${day}: ${problems.ahl}`)) rosterFines++;
+    if (playedNhl && problems.nhl && await charge("FINE_NHL_ROSTER", bank.nhlRosterFine, `NHL roster not compliant on ${day}: ${problems.nhl}`)) rosterFines++;
+    if (playedAhl && problems.ahl && await charge("FINE_AHL_ROSTER", bank.ahlRosterFine, `AHL roster not compliant on ${day}: ${problems.ahl}`)) rosterFines++;
 
     const cap = await teamCapStatus(t.id);
+    if (!playedNhl) continue; // cap/floor fines also need an NHL game that day
     if (cap.overBy > 0) {
       const over = Math.round(cap.overBy);
       const fineAmount = bank.capFinePerDay ?? 200000;
