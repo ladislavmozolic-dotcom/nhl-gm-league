@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { respondToTrade, cancelTrade, deleteTradeAction, analyzeTradeByIdAction } from "@/app/trades/build/actions";
+import GMAssistModal from "@/components/GMAssistModal";
 
 export default function TradeActions({ tradeId, role, admin, pending: isPending }: { tradeId: number; role?: "receiver" | "proposer" | null; admin?: boolean; pending?: boolean }) {
   const [pending, start] = useTransition();
@@ -66,45 +67,7 @@ export default function TradeActions({ tradeId, role, admin, pending: isPending 
       )}
       {err && <span className="text-red-400 text-xs">{err}</span>}
 
-      {ai && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setAi(null)}>
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-bold flex items-center gap-2">🤖 GM Assist — analýza výmeny</h3>
-              <button onClick={() => setAi(null)} className="text-slate-400 hover:text-white text-xl leading-none">×</button>
-            </div>
-            {!ai.ok ? <p className="text-rose-400 text-sm">{ai.error}</p> : (
-              <>
-                <div className={`rounded-xl px-4 py-3 mb-4 border ${ai.tilt === "even" ? "bg-emerald-950/30 border-emerald-800/50 text-emerald-300" : "bg-amber-950/30 border-amber-800/50 text-amber-300"}`}>
-                  <div className="text-sm font-bold">{ai.verdict}</div>
-                  <div className="text-xs mt-1 text-slate-400">{ai.fromName}: {ai.meGives} hodnoty daných · {ai.meGets} získaných</div>
-                </div>
-                <div className="grid grid-cols-2 gap-3 mb-4 text-xs">
-                  {([[ai.fromName, ai.fromItems], [ai.toName, ai.toItems]] as const).map(([nm, items], k) => (
-                    <div key={k} className="bg-slate-800/30 rounded-lg p-2.5">
-                      <div className="font-bold text-slate-300 mb-1">{nm} dáva:</div>
-                      {items.length === 0 ? <div className="text-slate-600">— nič —</div> : items.map((it, i) => (
-                        <div key={i} className="flex justify-between gap-2 border-b border-slate-800/50 py-0.5 last:border-0"><span className="text-slate-300">{it.label}</span><span className="text-slate-500 tabular-nums">{it.value}</span></div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-                {ai.fit.length > 0 && (
-                  <div className="mb-3">
-                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Zapadnutie do tímu</div>
-                    <ul className="space-y-1">{ai.fit.map((f, i) => <li key={i} className="text-sm text-slate-200 flex gap-2"><span className="text-sky-400">▸</span><span dangerouslySetInnerHTML={{ __html: f }} /></li>)}</ul>
-                  </div>
-                )}
-                <ul className="space-y-1.5 mb-3">
-                  {ai.reasoning.map((r, i) => <li key={i} className="text-sm text-slate-200 flex gap-2"><span className="text-violet-400">•</span><span dangerouslySetInnerHTML={{ __html: r }} /></li>)}
-                </ul>
-                <p className="text-[11px] text-slate-500 mb-3">Heuristická analýza (parametre CK/PA/SC/DF, vek, reálny NHL/AHL vývoj, cap, pick hodnota) — orientačná.</p>
-                <button onClick={() => setAi(null)} className="px-5 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 font-semibold text-sm">Zavrieť</button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      <GMAssistModal data={ai} onClose={() => setAi(null)} />
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { clauseTermsAction, analyzeTradeAction, type TradePackage } from "@/app/
 import ConditionModal from "@/components/ConditionModal";
 import { describeConditionSpec, type ConditionSpec } from "@/lib/trade-conditions-shared";
 import { t, type Lang } from "@/lib/i18n";
+import GMAssistModal from "@/components/GMAssistModal";
 
 type Player = { id: number; name: string; position: string; capHit: number; farm: boolean; clause?: string | null; noTradeTeams?: number[]; retainedAmount?: number; tradeFreezeDaysLeft?: number };
 type Pick = { id: number; round?: number; label: string; logoUrl?: string | null; locked?: boolean };
@@ -487,32 +488,8 @@ export default function TradeBuilder({ me, opp, mine, theirs, meCap, oppCap, onP
             {msg && <p className="text-green-400 text-sm">{msg}</p>}
             {err && <p className="text-red-400 text-sm">{err}</p>}
 
-            {/* GM Assist result — inline in this column */}
-            {ai && (
-              <div className="border-t border-slate-800 pt-3">
-                {!ai.ok ? (
-                  <p className="text-rose-400 text-sm">{ai.error}</p>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-bold flex items-center gap-1.5">🤖 GM Assist</h3>
-                      <button onClick={() => setAi(null)} className="text-slate-500 hover:text-white text-lg leading-none">×</button>
-                    </div>
-                    <div className={`rounded-lg px-3 py-2 border ${ai.tilt === "even" ? "bg-emerald-950/30 border-emerald-800/50 text-emerald-300" : "bg-amber-950/30 border-amber-800/50 text-amber-300"}`}>
-                      <div className="text-sm font-bold">{ai.verdict}</div>
-                      <div className="text-[11px] mt-1 text-slate-400">{ai.fromName}: {ai.meGives} daných · {ai.meGets} získaných</div>
-                    </div>
-                    {ai.fit.length > 0 && (
-                      <ul className="space-y-1">{ai.fit.map((f, i) => <li key={i} className="text-xs text-slate-200 flex gap-1.5"><span className="text-sky-400 shrink-0">▸</span><span dangerouslySetInnerHTML={{ __html: f }} /></li>)}</ul>
-                    )}
-                    <ul className="space-y-1">
-                      {ai.reasoning.map((r, i) => <li key={i} className="text-xs text-slate-300 flex gap-1.5"><span className="text-violet-400 shrink-0">•</span><span dangerouslySetInnerHTML={{ __html: r }} /></li>)}
-                    </ul>
-                    <p className="text-[10px] text-slate-500">Heuristika (parametre CK/PA/SC/DF, vek, reálny NHL/AHL vývoj, cap, hodnota pickov) — orientačná.</p>
-                  </div>
-                )}
-              </div>
-            )}
+            {/* GM Assist Modal */}
+            <GMAssistModal data={ai} onClose={() => setAi(null)} />
           </div>
         </div>
 

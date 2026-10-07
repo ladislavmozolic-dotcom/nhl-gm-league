@@ -11,8 +11,67 @@ import { playerValue, pickValueBySlot, realFormFactor } from "@/lib/trade-value"
 import { livePlayerOverall } from "@/lib/player-overall";
 import { hasWorthyGoalie } from "@/lib/goalie-rule";
 import { displayName } from "@/lib/playerName";
+import { getLang } from "@/lib/lang-server";
 
 export type { TradePlayer, TradePackage } from "@/lib/trade-exec";
+
+export type GMAssistItem = {
+  type: "PLAYER" | "PICK" | "PROSPECT" | "CASH";
+  label: string;
+  value: number;
+  sub?: string;
+  ov?: number;
+  pos?: string;
+  age?: number;
+  retentionPct?: number;
+  isGoalie?: boolean;
+  year?: number;
+  round?: number;
+  slot?: number;
+  projectedPlayer?: string;
+  potential?: number;
+  cashAmount?: number;
+};
+
+export type GMAssistResult = {
+  ok: true;
+  fromName: string;
+  toName: string;
+  fromTeam: { id: number; name: string; code: string | null; logoUrl: string | null };
+  toTeam: { id: number; name: string; code: string | null; logoUrl: string | null };
+  meGives: number;
+  meGets: number;
+  verdict: string;
+  tilt: "even" | "from" | "to";
+  archetype: {
+    key: "WIN_NOW" | "REBUILD" | "CAP_RELIEF" | "HOCKEY_TRADE" | "BLOCKBUSTER" | "DEPTH";
+    title: string;
+    badge: string;
+    description: string;
+  };
+  shares: {
+    fromPct: number;
+    toPct: number;
+    diff: number;
+    fairnessScore: number;
+  };
+  gapCloser: string | null;
+  editorialNarrative: string;
+  fromItems: GMAssistItem[];
+  toItems: GMAssistItem[];
+  capAnalysis: {
+    fromDelta: number;
+    toDelta: number;
+    fromFmt: string;
+    toFmt: string;
+    summary: string;
+    retainedCount: number;
+  };
+  reasoning: string[];
+  fit: string[];
+};
+
+export type GMAssistResponse = { ok: false; error: string } | GMAssistResult;
 
 // ---- AI GM Assistance: trade analysis -------------------------------------
 // player trade-value heuristic (shared with the AI GM) — see lib/trade-value.ts
@@ -20,12 +79,11 @@ export type { TradePlayer, TradePackage } from "@/lib/trade-exec";
 /** Analyse a proposed trade — value per side, whether it's balanced, and the fit
  *  for each club (cap, age). Pure heuristic (no external AI). Symmetric, so both
  *  the proposing and the reviewing GM see the same read. */
-export async function analyzeTradeAction(pkg: TradePackage): Promise<
-  { ok: false; error: string } | { ok: true; fromName: string; toName: string; meGives: number; meGets: number; verdict: string; tilt: "even" | "from" | "to"; reasoning: string[]; fromItems: { label: string; value: number }[]; toItems: { label: string; value: number }[]; fit: string[] }
-> {
+export async function analyzeTradeAction(pkg: TradePackage): Promise<GMAssistResponse> {
+  const lang = await getLang().catch(() => "en");
   const [fromTeam, toTeam] = await Promise.all([
-    prisma.team.findUnique({ where: { id: pkg.fromTeamId }, select: { name: true } }),
-    prisma.team.findUnique({ where: { id: pkg.toTeamId }, select: { name: true } }),
+    prisma.team.findUnique({ where: { id: pkg.fromTeamId }, select: { id: true, name: true, code: true, logoUrl: true } }),
+    prisma.team.findUnique({ where: { id: pkg.toTeamId }, select: { id: true, name: true, code: true, logoUrl: true } }),
   ]);
   if (!fromTeam || !toTeam) return { ok: false, error: "Team not found." };
 
@@ -72,12 +130,12 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
 
   const yearDisc = (year: number) => Math.max(0.6, 1 - Math.max(0, year - CURRENT_SEASON_START) * 0.08);
   const kv = (id: number) => { const k = kById.get(id); return k ? Math.round(pickValueBySlot(slotOfPick(k)) * yearDisc(k.year)) : 0; };
-  const kLabel = (id: number) => { const k = kById.get(id); if (!k) return `Pick #${id}`; const slot = slotOfPick(k); const proj = boards.get(k.year)?.[slot - 1]; return `Pick ${k.year} R${k.round} (odhad #${slot})${proj ? ` → ${clean(proj)}` : ""}`; };
+  const kLabel = (id: number) => { const k = kById.get(id); if (!k) return `Pick #${id}`; const slot = slotOfPick(k); const proj = boards.get(k.year)?.[slot - 1]; return `Pick ${k.year} R${k.round} (${lang === "cs" ? "odhad" : "proj."} #${slot})${proj ? ` → ${clean(proj)}` : ""}`; };
   // 250 (not 100) for a prospect with no scouting-board match AND no known draft
   // slot — a rare gap-data case, but 100 undersold even an unranked/undrafted
   // prospect against picks/players that never fall that low elsewhere.
   const prv = (id: number) => { const p = prById.get(id); if (!p) return 250; const dp = potOf(p); if (dp) return Math.max(60, prospectValueByPot(dp.potential)); return p.overallPick ? Math.max(50, pickValueBySlot(p.overallPick)) : 250; };
-  const prLabel = (id: number) => { const p = prById.get(id); if (!p) return `Prospekt #${id}`; const dp = potOf(p); const tail = dp ? ` · potenciál ${dp.potential}${dp.ov ? `/${dp.ov} OV` : ""}` : p.overallPick ? ` · draft #${p.overallPick}` : ""; return `Prospekt: ${clean(p.name)}${p.position ? ` (${p.position})` : ""}${tail}`; };
+  const prLabel = (id: number) => { const p = prById.get(id); if (!p) return `Prospekt #${id}`; const dp = potOf(p); const tail = dp ? ` · ${lang === "cs" ? "potenciál" : "potential"} ${dp.potential}${dp.ov ? `/${dp.ov} OV` : ""}` : p.overallPick ? ` · draft #${p.overallPick}` : ""; return `${lang === "cs" ? "Prospekt" : "Prospect"}: ${clean(p.name)}${p.position ? ` (${p.position})` : ""}${tail}`; };
   const cashV = (c: number) => Math.round((c / 1_000_000) * 30);
 
   const sideValue = (pls: TradePlayer[], pk: number[], pr: number[], cash: number) =>
@@ -87,13 +145,59 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
   const meGives = sideValue(pkg.fromPlayers, pkg.fromPicks, pkg.fromProspects, pkg.fromCash);
   const meGets = sideValue(pkg.toPlayers, pkg.toPicks, pkg.toProspects, pkg.toCash);
 
-  // itemised breakdown of every selected asset per side
-  const sideItems = (pls: TradePlayer[], pk: number[], pr: number[], cash: number): { label: string; value: number }[] => {
-    const out: { label: string; value: number }[] = [];
-    for (const x of pls) { const p = pById.get(x.playerId); const ov = ovOf(x.playerId); out.push({ label: `${p ? clean(p.name) : `#${x.playerId}`}${p ? ` (${ov} OV${p.position ? `, ${p.position}` : ""})` : ""}${x.retentionPct ? ` · ${x.retentionPct}% ret.` : ""}`, value: playerValue(ov, p?.age ?? null, realFormOf(x.playerId)) }); }
-    for (const id of pk) out.push({ label: kLabel(id), value: kv(id) });
-    for (const id of pr) out.push({ label: prLabel(id), value: prv(id) });
-    if (cash > 0) out.push({ label: `Cash $${cash.toLocaleString("en-US")}`, value: cashV(cash) });
+  // itemised breakdown of every selected asset per side with rich typing
+  const sideItems = (pls: TradePlayer[], pk: number[], pr: number[], cash: number): GMAssistItem[] => {
+    const out: GMAssistItem[] = [];
+    for (const x of pls) {
+      const p = pById.get(x.playerId);
+      const ov = ovOf(x.playerId);
+      const retText = x.retentionPct ? ` · ${x.retentionPct}% ret.` : "";
+      out.push({
+        type: "PLAYER",
+        label: `${p ? clean(p.name) : `#${x.playerId}`}${p ? ` (${ov} OV${p.position ? `, ${p.position}` : ""})` : ""}${retText}`,
+        value: playerValue(ov, p?.age ?? null, realFormOf(x.playerId)),
+        sub: p ? `${p.position ?? "F"} · ${p.age ?? "?"} ${lang === "cs" ? "r." : "yo"}` : undefined,
+        ov,
+        pos: p?.position ?? undefined,
+        age: p?.age ?? undefined,
+        retentionPct: x.retentionPct || undefined,
+        isGoalie: p?.isGoalie,
+      });
+    }
+    for (const id of pk) {
+      const k = kById.get(id);
+      const slot = k ? slotOfPick(k) : undefined;
+      const proj = k && slot ? boards.get(k.year)?.[slot - 1] : undefined;
+      out.push({
+        type: "PICK",
+        label: kLabel(id),
+        value: kv(id),
+        year: k?.year,
+        round: k?.round,
+        slot,
+        projectedPlayer: proj ? clean(proj) : undefined,
+      });
+    }
+    for (const id of pr) {
+      const p = prById.get(id);
+      const dp = p ? potOf(p) : null;
+      out.push({
+        type: "PROSPECT",
+        label: prLabel(id),
+        value: prv(id),
+        pos: p?.position ?? undefined,
+        potential: dp?.potential,
+        ov: dp?.ov,
+      });
+    }
+    if (cash > 0) {
+      out.push({
+        type: "CASH",
+        label: `Cash $${cash.toLocaleString("en-US")}`,
+        value: cashV(cash),
+        cashAmount: cash,
+      });
+    }
     return out;
   };
   const fromItems = sideItems(pkg.fromPlayers, pkg.fromPicks, pkg.fromProspects, pkg.fromCash);
@@ -102,28 +206,113 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
   const pct = bal / Math.max(1, (meGives + meGets) / 2);
   const tilt: "even" | "from" | "to" = Math.abs(pct) < 0.12 ? "even" : bal > 0 ? "from" : "to";
   const winner = tilt === "from" ? fromTeam.name : toTeam.name;
-  const verdict = tilt === "even" ? "Vyrovnaná výmena — hodnotovo férová pre oba tímy."
-    : `${Math.abs(pct) > 0.30 ? "Výrazne" : "Mierne"} v prospech ${winner}.`;
+  const verdict = tilt === "even"
+    ? (lang === "cs" ? "Vyrovnaná výmena — hodnotovo férová pre oba tímy." : "Fair & Balanced Trade — equal value for both sides.")
+    : (lang === "cs"
+        ? `${Math.abs(pct) > 0.30 ? "Výrazne" : "Mierne"} v prospech ${winner}.`
+        : `${Math.abs(pct) > 0.30 ? "Significantly in favor of" : "Slight edge to"} ${winner}.`);
 
-  // fit reasoning
-  const reasoning: string[] = [];
+  // Cap breakdown
   const capOf = (pls: TradePlayer[]) => pls.reduce((s, x) => { const p = pById.get(x.playerId); return s + (p ? liveCapHit(p) : 0); }, 0);
   const capIn = capOf(pkg.toPlayers), capOut = capOf(pkg.fromPlayers);
   const capDelta = capIn - capOut;
   const fmt = (n: number) => `$${Math.abs(Math.round(n)).toLocaleString("en-US")}`;
-  reasoning.push(`Hodnota: <b>${fromTeam.name}</b> dáva ${meGives}, dostáva ${meGets} bodov hodnoty.`);
-  if (capDelta > 0) reasoning.push(`Cap: <b>${fromTeam.name}</b> si pridá ${fmt(capDelta)} na plate (${toTeam.name} uvoľní).`);
-  else if (capDelta < 0) reasoning.push(`Cap: <b>${fromTeam.name}</b> uvoľní ${fmt(capDelta)} platu.`);
+  const retained = [...pkg.fromPlayers, ...pkg.toPlayers].filter((p) => p.retentionPct > 0);
+
+  // Shares & Balance Meter
+  const totalVal = Math.max(1, meGives + meGets);
+  const fromShare = Math.round((meGives / totalVal) * 100);
+  const toShare = 100 - fromShare;
+  const diff = Math.abs(meGives - meGets);
+  const fairnessScore = Math.max(0, Math.min(100, Math.round(100 - (diff / Math.max(1, (meGives + meGets) / 2)) * 100)));
+
+  // Archetype
+  let archKey: "WIN_NOW" | "REBUILD" | "CAP_RELIEF" | "HOCKEY_TRADE" | "BLOCKBUSTER" | "DEPTH" = "DEPTH";
+  let archTitle = lang === "cs" ? "Doplnenie hĺbky kádra" : "Depth Adjustment";
+  let archBadge = "🔄 DEPTH";
+  let archDesc = lang === "cs" ? "Bežná výmena pre doladenie hĺbky zostavy bez zásadného dopadu na jadro tímov." : "Routine transaction adjusting depth without altering team cores.";
+
+  const maxOv = Math.max(...[...pkg.fromPlayers, ...pkg.toPlayers].map((p) => ovOf(p.playerId)), 0);
+  const hasR1Pick = [...pkg.fromPicks, ...pkg.toPicks].some((id) => kById.get(id)?.round === 1);
+
+  if (meGives + meGets >= 1800 || maxOv >= 80 || hasR1Pick) {
+    archKey = "BLOCKBUSTER";
+    archBadge = "💥 BLOCKBUSTER";
+    archTitle = lang === "cs" ? "Veľká výmena (Blockbuster)" : "Blockbuster Trade";
+    archDesc = lang === "cs" ? "Masívny obchod s vysokou hodnotou aktív, ktorý výrazne mení tvár oboch tímov." : "High-stakes deal shifting elite assets and altering both franchises.";
+  } else if (Math.abs(capDelta) >= 3_500_000 || retained.length > 0) {
+    archKey = "CAP_RELIEF";
+    archBadge = "📦 SALARY DUMP / RETENTION";
+    archTitle = lang === "cs" ? "Platové uvoľnenie (Cap Relief)" : "Salary Cap Maneuver";
+    archDesc = lang === "cs" ? "Primárnou motiváciou je flexibilita pod platovým stropom a uvoľnenie financií." : "Move primarily driven by financial cap clearing and flexibility.";
+  } else if ((pkg.fromPlayers.some(p => ovOf(p.playerId) >= 74) && pkg.toPicks.length + (pkg.toProspects?.length ?? 0) > 0) ||
+             (pkg.toPlayers.some(p => ovOf(p.playerId) >= 74) && pkg.fromPicks.length + (pkg.fromProspects?.length ?? 0) > 0)) {
+    archKey = "WIN_NOW";
+    archBadge = "🔥 WIN-NOW ACQUISITION";
+    archTitle = lang === "cs" ? "Win-Now posilnenie vs Budúcnosť" : "Win-Now vs Future Assets";
+    archDesc = lang === "cs" ? "Jeden tím nakupuje okamžitú kvalitu do zostavy na úkor draftového kapitálu." : "One team buys immediate impact in exchange for future draft capital.";
+  } else if (pkg.fromPlayers.length > 0 && pkg.toPlayers.length > 0) {
+    archKey = "HOCKEY_TRADE";
+    archBadge = "⚖️ HOCKEY TRADE";
+    archTitle = lang === "cs" ? "Hokejová výmena (Hráč za hráča)" : "Hockey Trade (Player for Player)";
+    archDesc = lang === "cs" ? "Priama výmena aktívnych hráčov pre zmenu impulzu alebo riešenie pozičných potrieb." : "Direct exchange of rostered players to address positional needs.";
+  }
+
+  // Gap closer suggestion
+  let gapCloser: string | null = null;
+  if (tilt !== "even" && diff >= 75) {
+    const favoredTeam = tilt === "from" ? toTeam.name : fromTeam.name;
+    if (diff >= 900) {
+      gapCloser = lang === "cs"
+        ? `Na dorovnanie rozdielu (~${diff} b.) by ${favoredTeam} mal pridať voľbu v 1. kole draftu alebo etablovaného hráča (~78-82 OV).`
+        : `To bridge the ~${diff} pt gap, ${favoredTeam} should add a 1st-round draft pick or top player (~78-82 OV).`;
+    } else if (diff >= 400) {
+      gapCloser = lang === "cs"
+        ? `Na dorovnanie rozdielu (~${diff} b.) by ${favoredTeam} mal priložiť voľbu v 2. kole draftu (odhad ~450-550 b.) alebo špičkového prospekta.`
+        : `To bridge the ~${diff} pt gap, ${favoredTeam} should attach a 2nd-round draft pick (~450-550 pts) or top prospect.`;
+    } else if (diff >= 180) {
+      gapCloser = lang === "cs"
+        ? `Na dorovnanie rozdielu (~${diff} b.) by postačila voľba v 3. kole draftu alebo mladík pre farmu.`
+        : `To bridge the ~${diff} pt gap, a 3rd-round pick or young depth player would suffice.`;
+    } else {
+      gapCloser = lang === "cs"
+        ? `Mierny rozdiel (~${diff} b.) — postačí neskoršia voľba v drafte (4.-5. kolo) alebo finančná kompenzácia.`
+        : `Minor gap (~${diff} pts) — a later draft pick (4th-5th round) or cash adjustment would balance this deal.`;
+    }
+  }
+
+  // fit reasoning
+  const reasoning: string[] = [];
+  reasoning.push(lang === "cs"
+    ? `Hodnota: <b>${fromTeam.name}</b> dáva ${meGives}, dostáva ${meGets} bodov hodnoty.`
+    : `Value: <b>${fromTeam.name}</b> sends ${meGives}, receives ${meGets} value points.`);
+
+  if (capDelta > 0) {
+    reasoning.push(lang === "cs"
+      ? `Cap: <b>${fromTeam.name}</b> si pridá ${fmt(capDelta)} na plate (${toTeam.name} uvoľní).`
+      : `Cap: <b>${fromTeam.name}</b> absorbs ${fmt(capDelta)} in salary (${toTeam.name} frees up space).`);
+  } else if (capDelta < 0) {
+    reasoning.push(lang === "cs"
+      ? `Cap: <b>${fromTeam.name}</b> uvoľní ${fmt(capDelta)} platu (${toTeam.name} prevezme záťaž).`
+      : `Cap: <b>${fromTeam.name}</b> sheds ${fmt(capDelta)} in cap hit (${toTeam.name} takes on salary).`);
+  }
+
   const ages = (pls: TradePlayer[]) => { const a = pls.map((x) => pById.get(x.playerId)?.age).filter((x): x is number => x != null); return a.length ? a.reduce((s, x) => s + x, 0) / a.length : null; };
   const ageIn = ages(pkg.toPlayers), ageOut = ages(pkg.fromPlayers);
   if (ageIn != null && ageOut != null) {
     const d = ageIn - ageOut;
-    if (Math.abs(d) >= 1.5) reasoning.push(`Vek: <b>${fromTeam.name}</b> ${d < 0 ? "omladzuje" : "starne"} (priemer prichádzajúcich ${ageIn.toFixed(1)} vs odchádzajúcich ${ageOut.toFixed(1)}).`);
+    if (Math.abs(d) >= 1.5) {
+      reasoning.push(lang === "cs"
+        ? `Vek: <b>${fromTeam.name}</b> ${d < 0 ? "omladzuje" : "starne"} (priemer prichádzajúcich ${ageIn.toFixed(1)} vs odchádzajúcich ${ageOut.toFixed(1)}).`
+        : `Age: <b>${fromTeam.name}</b> gets ${d < 0 ? "younger" : "older"} (incoming avg ${ageIn.toFixed(1)} vs outgoing ${ageOut.toFixed(1)}).`);
+    }
   }
-  const retained = [...pkg.fromPlayers, ...pkg.toPlayers].filter((p) => p.retentionPct > 0);
-  if (retained.length) reasoning.push(`Retencia: ${retained.length} hráč(ov) so zadržaným platom — mení reálny cap náklad.`);
-  // parameter profile (CK/PA/SC/DF) — decomposed, not folded only into a single
-  // OV number (see memory: OV is orientational, build on the specific ratings)
+  if (retained.length) {
+    reasoning.push(lang === "cs"
+      ? `Retencia: ${retained.length} hráč(ov) so zadržaným platom — viaže cap space aj v ďalších rokoch.`
+      : `Retention: ${retained.length} player(s) with retained salary — ties up salary cap space over future years.`);
+  }
+
   const skaterParams = (pls: TradePlayer[]) => {
     const rows = pls.map((x) => pById.get(x.playerId)).filter((p): p is NonNullable<typeof p> => !!p && !p.isGoalie && p.ck != null && p.pa != null && p.sc != null && p.df != null);
     if (!rows.length) return null;
@@ -135,27 +324,42 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
     const parts = (["ck", "pa", "sc", "df"] as const)
       .map((k) => ({ k, v: Math.round(paramsIn[k] - paramsOut[k]) }))
       .filter((x) => Math.abs(x.v) >= 3);
-    if (parts.length) reasoning.push(`Parametre: <b>${fromTeam.name}</b> mení profil hráčov oproti odchádzajúcim — ${parts.map((x) => `${x.k.toUpperCase()} ${x.v > 0 ? "+" : ""}${x.v}`).join(", ")}.`);
+    if (parts.length) {
+      reasoning.push(lang === "cs"
+        ? `Parametre: <b>${fromTeam.name}</b> mení profil hráčov oproti odchádzajúcim — ${parts.map((x) => `${x.k.toUpperCase()} ${x.v > 0 ? "+" : ""}${x.v}`).join(", ")}.`
+        : `Attributes: <b>${fromTeam.name}</b> alters attribute profile — ${parts.map((x) => `${x.k.toUpperCase()} ${x.v > 0 ? "+" : ""}${x.v}`).join(", ")}.`);
+    }
   }
-  reasoning.push(tilt === "even" ? "Doporučenie: férová výmena, dá sa akceptovať." : `Doporučenie: ${winner} z nej ťaží — druhá strana by mala pridať hodnotu alebo zvážiť odmietnutie.`);
 
-  // roster-fit: where would each incoming player slot on his NEW club, and does he
-  // fill a need there? (fromPlayers go TO toTeam; toPlayers go TO fromTeam)
+  reasoning.push(tilt === "even"
+    ? (lang === "cs" ? "Doporučenie: férová výmena, dá sa akceptovať." : "Recommendation: fair trade, safe to accept.")
+    : (lang === "cs"
+        ? `Doporučenie: ${winner} z nej ťaží — druhá strana by mala pridať hodnotu alebo zvážiť odmietnutie.`
+        : `Recommendation: ${winner} benefits most — the other side should seek more value or decline.`));
+
+  // Roster fit analysis
   const grp = (pos: string | null) => { const P = (pos ?? "").toUpperCase(); if (/G/.test(P)) return "G"; if (/(^|\/)D(\/|$)|^D$/.test(P)) return "D"; if (/C/.test(P)) return "C"; return "W"; };
   const [fromRoster0, toRoster0] = await Promise.all([
     prisma.player.findMany({ where: { teamId: pkg.fromTeamId, rosterType: "NHL" }, select: { id: true, overall: true, position: true, isGoalie: true, lastSeasonGP: true, lastSeasonSvPct: true, goalieRating: { select: { overall: true } } } }),
     prisma.player.findMany({ where: { teamId: pkg.toTeamId, rosterType: "NHL" }, select: { id: true, overall: true, position: true, isGoalie: true, lastSeasonGP: true, lastSeasonSvPct: true, goalieRating: { select: { overall: true } } } }),
   ]);
-  // normalise to LIVE overall (a goalie's overall can lag his goalieRating) once,
-  // so every roster comparison below uses current values, not a stale column.
   const fromRoster = fromRoster0.map((r) => ({ ...r, overall: livePlayerOverall(r) }));
   const toRoster = toRoster0.map((r) => ({ ...r, overall: livePlayerOverall(r) }));
-  const grpLabel: Record<string, string> = { C: "centra", W: "krídla", D: "obrancu", G: "brankára" };
+  const grpLabel: Record<string, string> = lang === "cs"
+    ? { C: "centra", W: "krídla", D: "obrancu", G: "brankára" }
+    : { C: "center", W: "winger", D: "defenseman", G: "goalie" };
+
   const slotFor = (g: string, slot: number) => {
-    if (g === "G") return slot === 1 ? "brankársku jednotku" : "brankársku dvojku";
-    if (g === "D") return slot <= 2 ? "1. obranný pár" : slot <= 4 ? "top-4 obranu" : slot <= 6 ? "3. obranný pár" : "7. obrancu / farmu";
-    return slot <= 3 ? "elitnú lajnu" : slot <= 6 ? "top-6 útok" : slot <= 9 ? "3. lajnu" : slot <= 12 ? "4. lajnu" : "13. útočníka / farmu";
+    if (lang === "cs") {
+      if (g === "G") return slot === 1 ? "brankársku jednotku" : "brankársku dvojku";
+      if (g === "D") return slot <= 2 ? "1. obranný pár" : slot <= 4 ? "top-4 obranu" : slot <= 6 ? "3. obranný pár" : "7. obrancu / farmu";
+      return slot <= 3 ? "elitnú lajnu" : slot <= 6 ? "top-6 útok" : slot <= 9 ? "3. lajnu" : slot <= 12 ? "4. lajnu" : "13. útočníka / farmu";
+    }
+    if (g === "G") return slot === 1 ? "starting goalie" : "backup goalie";
+    if (g === "D") return slot <= 2 ? "top pairing D" : slot <= 4 ? "top-4 D" : slot <= 6 ? "bottom pairing D" : "7th D / AHL";
+    return slot <= 3 ? "1st line" : slot <= 6 ? "top-6 forward" : slot <= 9 ? "3rd line" : slot <= 12 ? "4th line" : "extra forward / AHL";
   };
+
   const fit: string[] = [];
   const analyzeFit = (movers: TradePlayer[], destRoster: { overall: number | null; position: string | null; isGoalie: boolean }[], destName: string) => {
     for (const x of movers) {
@@ -165,11 +369,12 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
       const better = same.filter((r) => (r.overall ?? 0) > ov).length;
       const goodAt = same.filter((r) => (r.overall ?? 0) >= 55).length;
       const need = (g === "C" && goodAt < 3) || (g === "W" && goodAt < 6) || (g === "D" && goodAt < 5) || (g === "G" && goodAt < 2);
-      fit.push(`→ <b>${destName}</b>: ${clean(p.name)} (${ov} OV) by obsadil <b>${slotFor(g, better + 1)}</b>${need ? ` — <b>kryje slabšie miesto na poste ${grpLabel[g]}</b>` : ""}.`);
+      fit.push(lang === "cs"
+        ? `→ <b>${destName}</b>: ${clean(p.name)} (${ov} OV) by obsadil <b>${slotFor(g, better + 1)}</b>${need ? ` — <b>kryje slabšie miesto na poste ${grpLabel[g]}</b>` : ""}.`
+        : `→ <b>${destName}</b>: ${clean(p.name)} (${ov} OV) slots as <b>${slotFor(g, better + 1)}</b>${need ? ` — <b>fills a critical need at ${grpLabel[g]}</b>` : ""}.`);
     }
   };
-  // outgoing impact: what does a club LOSE by dealing this player away? (his roster
-  // still includes him, so his slot there tells us if he was a key piece or depth.)
+
   const analyzeOut = (movers: TradePlayer[], ownRoster: { overall: number | null; position: string | null; isGoalie: boolean }[], teamName: string) => {
     for (const x of movers) {
       const p = pById.get(x.playerId); if (!p) continue;
@@ -179,7 +384,9 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
       const goodLeft = same.filter((r) => (r.overall ?? 0) >= 55).length - (ov >= 55 ? 1 : 0);
       const key = (g === "G" && better === 0) || (g === "D" && better < 4) || ((g === "C" || g === "W") && better < 6);
       const thin = (g === "C" && goodLeft < 2) || (g === "W" && goodLeft < 5) || (g === "D" && goodLeft < 4) || (g === "G" && goodLeft < 1);
-      fit.push(`← <b>${teamName}</b> stráca ${clean(p.name)} (${ov} OV, ${slotFor(g, better + 1)})${key ? ` — <b>kľúčový hráč, oslabí ${grpLabel[g]}</b>${thin ? " (vznikne diera)" : ""}` : " — hĺbka, odchod výrazne nebolí"}.`);
+      fit.push(lang === "cs"
+        ? `← <b>${teamName}</b> stráca ${clean(p.name)} (${ov} OV, ${slotFor(g, better + 1)})${key ? ` — <b>kľúčový hráč, oslabí ${grpLabel[g]}</b>${thin ? " (vznikne diera)" : ""}` : " — hĺbka, odchod výrazne nebolí"}.`
+        : `← <b>${teamName}</b> loses ${clean(p.name)} (${ov} OV, ${slotFor(g, better + 1)})${key ? ` — <b>key core asset, weakens ${grpLabel[g]}</b>${thin ? " (leaves a void)" : ""}` : " — depth asset, minimal roster shock"}.`);
     }
   };
   analyzeFit(pkg.fromPlayers, toRoster, toTeam.name);
@@ -187,37 +394,119 @@ export async function analyzeTradeAction(pkg: TradePackage): Promise<
   analyzeFit(pkg.toPlayers, fromRoster, fromTeam.name);
   analyzeOut(pkg.toPlayers, toRoster, toTeam.name);
 
-  // real-life signal for young players: is his REAL NHL counterpart currently
-  // playing real NHL minutes or down in the real AHL right now (curSeasonGP vs
-  // ahlStats.cur.gp)? Advisory only — no data outside the season/import window.
+  // Real-world form note
   const realFormNote = (movers: TradePlayer[]) => {
     for (const x of movers) {
       const p = pById.get(x.playerId); if (!p || p.isGoalie || p.age == null || p.age > 23) continue;
       const nhlGp = p.curSeasonGP ?? 0, ahlGp = ahlGpOf(p);
       if (nhlGp + ahlGp < 5) continue;
       const nhlShare = nhlGp / (nhlGp + ahlGp);
-      const tag = nhlShare >= 0.6 ? "pravidelne hráva reálnu NHL" : nhlShare <= 0.3 ? "v reálnom živote zatiaľ skôr v AHL" : "delí čas medzi reálnou NHL a AHL";
-      fit.push(`📡 <b>${clean(p.name)}</b> (${p.age} r., reálny vývoj): ${tag} — ${nhlGp} NHL / ${ahlGp} AHL zápasov v reálnej sezóne.`);
+      const tag = lang === "cs"
+        ? (nhlShare >= 0.6 ? "pravidelne hráva reálnu NHL" : nhlShare <= 0.3 ? "v reálnom živote zatiaľ skôr v AHL" : "delí čas medzi reálnou NHL a AHL")
+        : (nhlShare >= 0.6 ? "regular in real NHL" : nhlShare <= 0.3 ? "developing mainly in AHL" : "split minutes between NHL and AHL");
+      fit.push(`📡 <b>${clean(p.name)}</b> (${p.age} ${lang === "cs" ? "r." : "yo"}): ${tag} — ${nhlGp} NHL / ${ahlGp} AHL.`);
     }
   };
   realFormNote(pkg.fromPlayers);
   realFormNote(pkg.toPlayers);
 
-  // League rule: every club needs a "worthy" goalie (lib/goalie-rule.ts). Advisory
-  // only — doesn't block the trade — but flag a side that would lose its last
-  // qualifying goalie in this deal.
+  // Worthy goalie advisory rule check
   const outFromIds = new Set(pkg.fromPlayers.map((p) => p.playerId));
   const outToIds = new Set(pkg.toPlayers.map((p) => p.playerId));
   const incomingToFrom = pkg.toPlayers.map((p) => pById.get(p.playerId)).filter((p): p is NonNullable<typeof p> => !!p?.isGoalie);
   const incomingToTo = pkg.fromPlayers.map((p) => pById.get(p.playerId)).filter((p): p is NonNullable<typeof p> => !!p?.isGoalie);
-  // fromRoster/toRoster are already normalised to live overall above; incoming
-  // goalies (from pById) still need it applied.
   const postFromGoalies = [...fromRoster.filter((r) => r.isGoalie && !outFromIds.has(r.id)), ...incomingToFrom.map((p) => ({ ...p, overall: livePlayerOverall(p) }))];
   const postToGoalies = [...toRoster.filter((r) => r.isGoalie && !outToIds.has(r.id)), ...incomingToTo.map((p) => ({ ...p, overall: livePlayerOverall(p) }))];
-  if (!hasWorthyGoalie(postFromGoalies)) fit.push(`⚠️ <b>${fromTeam.name}</b> by po tomto trejde nemal žiadneho dostojného brankára — podľa pravidiel ligy jeho súpiska nie je pripravená na zápas.`);
-  if (!hasWorthyGoalie(postToGoalies)) fit.push(`⚠️ <b>${toTeam.name}</b> by po tomto trejde nemal žiadneho dostojného brankára — podľa pravidiel ligy jeho súpiska nie je pripravená na zápas.`);
+  if (!hasWorthyGoalie(postFromGoalies)) {
+    fit.push(lang === "cs"
+      ? `⚠️ <b>${fromTeam.name}</b> by po tomto trejde nemal žiadneho dôstojného brankára — súpiska nebude podľa pravidiel pripravená na zápas.`
+      : `⚠️ <b>${fromTeam.name}</b> would be left without a starting-caliber goalie — roster violates league readiness rules.`);
+  }
+  if (!hasWorthyGoalie(postToGoalies)) {
+    fit.push(lang === "cs"
+      ? `⚠️ <b>${toTeam.name}</b> by po tomto trejde nemal žiadneho dôstojného brankára — súpiska nebude podľa pravidiel pripravená na zápas.`
+      : `⚠️ <b>${toTeam.name}</b> would be left without a starting-caliber goalie — roster violates league readiness rules.`);
+  }
 
-  return { ok: true, fromName: fromTeam.name, toName: toTeam.name, meGives, meGets, verdict, tilt, reasoning, fromItems, toItems, fit };
+  // Editorial Narrative Synthesis
+  let editorialNarrative = "";
+  if (lang === "cs") {
+    editorialNarrative = `${archTitle}: Táto výmena jasne odráža rozdielne priority oboch generálnych manažérov. `;
+    if (archKey === "WIN_NOW") {
+      editorialNarrative += `${winner} vsádza na okamžité posilnenie a získava okamžitú istotu do zostavy, zatiaľ čo protistrana hromadí budúce aktíva. `;
+    } else if (archKey === "CAP_RELIEF") {
+      editorialNarrative += `Významným motorom je uvoľnenie platového priestoru (${fmt(Math.abs(capDelta))}), ktoré otvára dôležitý manévrovací priestor pod platovým stropom. `;
+    } else if (archKey === "BLOCKBUSTER") {
+      editorialNarrative += `Ide o prvotriedny blockbuster s masívnym balíkom bodov, ktorý zásadne zmení hierarchiu oboch klubov v divízii. `;
+    } else {
+      editorialNarrative += `Ide o cielené vyváženie zostavy, kde si oba tímy vymieňajú potrebné diely skladačky. `;
+    }
+    if (tilt === "even") {
+      editorialNarrative += `Z pohľadu ligovej metodiky ide o vyrovnaný a vzájomne prospešný obchod.`;
+    } else {
+      editorialNarrative += `Hodnotová miska váh je však naklonená na stranu tímu ${winner} (+${diff} b.). ${gapCloser ?? ""}`;
+    }
+  } else {
+    editorialNarrative = `${archTitle}: This proposal reflects distinct institutional priorities for both front offices. `;
+    if (archKey === "WIN_NOW") {
+      editorialNarrative += `${winner} targets immediate on-ice upgrades for a playoff run, while the counterparty stockpiles long-term capital. `;
+    } else if (archKey === "CAP_RELIEF") {
+      editorialNarrative += `The primary financial driver is cap relief (${fmt(Math.abs(capDelta))}), creating vital maneuvering room under the ceiling. `;
+    } else if (archKey === "BLOCKBUSTER") {
+      editorialNarrative += `A franchise-altering blockbuster moving heavyweight assets that reshapes both rosters in the conference. `;
+    } else {
+      editorialNarrative += `A targeted rebalancing deal where both squads address specific positional depths. `;
+    }
+    if (tilt === "even") {
+      editorialNarrative += `By all quantitative league standards, this is a clean, equitable hockey trade.`;
+    } else {
+      editorialNarrative += `The numerical leverage firmly rests with ${winner} (+${diff} pts). ${gapCloser ?? ""}`;
+    }
+  }
+
+  const capSummary = capDelta > 0
+    ? (lang === "cs" ? `${fromTeam.name} pridáva +${fmt(capDelta)} na plate` : `${fromTeam.name} absorbs +${fmt(capDelta)} in salary`)
+    : capDelta < 0
+      ? (lang === "cs" ? `${fromTeam.name} uvoľňuje -${fmt(capDelta)} platu` : `${fromTeam.name} sheds -${fmt(capDelta)} in cap hit`)
+      : (lang === "cs" ? "Neutrálny cap dopad ($0)" : "Neutral cap impact ($0)");
+
+  return {
+    ok: true,
+    fromName: fromTeam.name,
+    toName: toTeam.name,
+    fromTeam,
+    toTeam,
+    meGives,
+    meGets,
+    verdict,
+    tilt,
+    archetype: {
+      key: archKey,
+      title: archTitle,
+      badge: archBadge,
+      description: archDesc,
+    },
+    shares: {
+      fromPct: fromShare,
+      toPct: toShare,
+      diff,
+      fairnessScore,
+    },
+    gapCloser,
+    editorialNarrative,
+    fromItems,
+    toItems,
+    capAnalysis: {
+      fromDelta: -capDelta,
+      toDelta: capDelta,
+      fromFmt: capDelta < 0 ? `+${fmt(capDelta)} uvoľnených` : `-${fmt(capDelta)} absorbovaných`,
+      toFmt: capDelta > 0 ? `+${fmt(capDelta)} uvoľnených` : `-${fmt(capDelta)} absorbovaných`,
+      summary: capSummary,
+      retainedCount: retained.length,
+    },
+    reasoning,
+    fit,
+  };
 }
 
 /** Analyse an already-proposed trade by id — so the reviewing GM can verify it
