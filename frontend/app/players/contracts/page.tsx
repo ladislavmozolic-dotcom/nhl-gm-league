@@ -1,63 +1,57 @@
 import { prisma } from "@/lib/prisma";
 import { seasonLabel, CURRENT_SEASON_START } from "@/lib/finance";
-import { PageHeader, Card } from "@/components/ui";
-import SortableTable, { type SortCol } from "@/components/SortableTable";
+import { PageHeader } from "@/components/ui";
+import { getLang } from "@/lib/lang-server";
+import ContractsLedgerView, { type ContractRow } from "@/components/ContractsLedgerView";
 
 export const dynamic = "force-dynamic";
-
-function contractTypeLabel(t: string | null): string {
-  if (t === "TWO_WAY") return "2-way";
-  if (t === "ONE_WAY") return "1-way";
-  return "—";
-}
 
 const CLAUSE_LABEL: Record<string, string> = { NTC: "NTC", NMC: "NMC", M_NTC: "M-NTC" };
 
 export default async function ContractsPage() {
-  const players = await prisma.player.findMany({
-    where: { rosterType: { in: ["NHL", "AHL"] }, capHit: { gt: 0 }, contractYears: { gt: 0 } },
-    include: { team: { select: { code: true, slug: true, logoUrl: true } } },
-    orderBy: { capHit: "desc" },
-  });
+  const [lang, players] = await Promise.all([
+    getLang(),
+    prisma.player.findMany({
+      where: { rosterType: { in: ["NHL", "AHL"] }, capHit: { gt: 0 }, contractYears: { gt: 0 } },
+      include: { team: { select: { code: true, slug: true, logoUrl: true, name: true } } },
+      orderBy: { capHit: "desc" },
+    }),
+  ]);
 
-  const cols: SortCol[] = [
-    { key: "name", label: "Player", kind: "player", sticky: true },
-    { key: "team", label: "Team", kind: "team" },
-    { key: "pos", label: "Pos", kind: "text" },
-    { key: "cap", label: "Cap Hit", kind: "money" },
-    { key: "yrs", label: "Years", kind: "years" },
-    { key: "type", label: "Type", kind: "text" },
-    { key: "clause", label: "Clause", kind: "text" },
-  ];
-  const rows = players.map((p) => ({
-    _id: p.id, name: p.name, slug: p.slug, photo: p.photoUrl,
-    teamCode: p.team?.code, teamSlug: p.team?.slug, teamLogo: p.team?.logoUrl,
-    pos: p.position, cap: p.capHit ?? 0, yrs: p.contractYears ?? null, type: contractTypeLabel(p.contractType),
+  const isCs = lang === "cs";
+
+  const rows: ContractRow[] = players.map((p) => ({
+    id: p.id,
+    name: p.name,
+    slug: p.slug,
+    photoUrl: p.photoUrl,
+    position: p.position,
+    teamCode: p.team?.code ?? null,
+    teamSlug: p.team?.slug ?? null,
+    teamLogoUrl: p.team?.logoUrl ?? null,
+    teamName: p.team?.name ?? null,
+    capHit: p.capHit ?? 0,
+    years: p.contractYears ?? null,
+    contractType: p.contractType,
     clause: p.tradeClause
-      ? (CLAUSE_LABEL[p.tradeClause] ?? p.tradeClause)
+      ? CLAUSE_LABEL[p.tradeClause] ?? p.tradeClause
       : p.extClause
-        ? `${CLAUSE_LABEL[p.extClause] ?? p.extClause} (from ${seasonLabel(CURRENT_SEASON_START + (p.contractYears ?? 0))})`
-        : "",
+      ? `${CLAUSE_LABEL[p.extClause] ?? p.extClause} (${seasonLabel(CURRENT_SEASON_START + (p.contractYears ?? 0))})`
+      : null,
   }));
 
   return (
     <div className="space-y-6 py-2">
-      <PageHeader title="Contracts" subtitle={`${players.length} player${players.length === 1 ? "" : "s"} under an active contract`} />
+      <PageHeader
+        title={isCs ? "Zmluvy hráčov" : "Player Contracts"}
+        subtitle={
+          isCs
+            ? `Prehľad všetkých ${players.length} aktívnych zmlúv v lige s platovými stropmi a klauzulami`
+            : `${players.length} active player contracts across the league with cap hits and clauses`
+        }
+      />
 
-      <Card>
-        <p className="text-sm text-slate-400">
-          Contract signing (e.g. a 2-year deal with year 1 two-way and year 2 one-way) will run
-          through a dedicated signing engine — coming soon. This is the current contracts ledger. Click any column to sort.
-        </p>
-      </Card>
-
-      {players.length === 0 ? (
-        <Card><p className="text-slate-500 text-center py-8">No active contracts</p></Card>
-      ) : (
-        <Card bodyClassName="p-2">
-          <SortableTable cols={cols} rows={rows} initialSort="cap" minWidth={720} />
-        </Card>
-      )}
+      <ContractsLedgerView rows={rows} lang={lang} />
     </div>
   );
 }
