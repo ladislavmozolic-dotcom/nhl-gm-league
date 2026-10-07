@@ -105,15 +105,15 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
   const submit = () => start(async () => {
     setMsg(null);
     const salary = salaryDollars(salaryM);
-    if (!Number.isFinite(salary)) { setMsg({ t: "err", s: "Zadajte plat hráča." }); return; }
-    if (years < 1) { setMsg({ t: "err", s: "Vyberte dĺžku kontraktu (roky)." }); return; }
+    if (!Number.isFinite(salary)) { setMsg({ t: "err", s: "Enter the player's salary." }); return; }
+    if (years < 1) { setMsg({ t: "err", s: "Select the contract length (years)." }); return; }
     let r: Awaited<ReturnType<typeof extendContractAction>>;
     try {
       r = await extendContractAction(player.id, teamId, salary, years, line, pp, pk, grantClause || null, grantClause === "M_NTC" ? breadth : null, twoWay);
     } catch (e) { setMsg({ t: "err", s: friendlyActionError(e) }); return; }
     if (r.ok) { setResult({ salary: r.salary, years: r.years, next: !!r.startsNextSeason }); setDone(true); return; }
     const rr = r as { walked?: boolean; toUFA?: boolean; rejected?: boolean; reason?: string; error?: string };
-    if (rr.walked) { setWalkedToUFA(rr.toUFA !== false); setDone(true); setMsg({ t: "err", s: rr.reason ?? "Hráč ukončil rokovania." }); return; }
+    if (rr.walked) { setWalkedToUFA(rr.toUFA !== false); setDone(true); setMsg({ t: "err", s: rr.reason ?? "The player ended negotiations." }); return; }
     setMsg({ t: "err", s: rr.rejected ? (rr.reason ?? "") : (rr.error ?? "Odoslanie ponuky zlyhalo.") });
   });
 
@@ -135,10 +135,10 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
               <span>UNHL CBA Authorized</span>
             </div>
             <h2 className="text-lg md:text-2xl font-black tracking-wide text-white uppercase flex items-center gap-2">
-              <span className="text-amber-400">📜</span> Zmluva o predĺžení kontraktu
+              <span className="text-amber-400">📜</span> Contract extension agreement
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              Predloženie oficiálnej ponuky pre hráča: <b className="text-slate-200">{cleanName(player.name)}</b>
+              Submitting an official offer for: <b className="text-slate-200">{cleanName(player.name)}</b>
             </p>
           </div>
           <button
@@ -155,11 +155,11 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
             <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-3xl">
               ✍️
             </div>
-            <div className="text-[11px] font-mono tracking-widest uppercase text-emerald-400 font-bold">Oficiálne zaregistrovaná zmluva</div>
+            <div className="text-[11px] font-mono tracking-widest uppercase text-emerald-400 font-bold">Officially registered contract</div>
             <div className="text-2xl md:text-3xl font-black text-white mt-1">{cleanName(player.name)}</div>
             <div className="text-xl text-emerald-300 font-bold mt-2 font-mono tabular-nums">{M(result.salary)} × {result.years} {result.years === 1 ? "rok" : result.years < 5 ? "roky" : "rokov"}</div>
             <div className="text-xs text-slate-400 mt-2 max-w-md mx-auto">
-              {result.next ? "Kontrakt je podpísaný ako Extension — hráč dohrá túto sezónu za doterajších podmienok a nová zmluva začne platiť od budúcej sezóny." : `Hráč zostáva v klube do 30. júna ${new Date().getUTCFullYear() + result.years}.`}
+              {result.next ? "The contract is signed as an Extension — the player finishes this season on his current terms and the new contract starts next season." : `The player stays with the club until June 30, ${new Date().getUTCFullYear() + result.years}.`}
             </div>
             <button onClick={() => { router.refresh(); onClose(); }} className="mt-6 px-8 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-sm font-bold text-white shadow-lg shadow-emerald-600/30">Hotovo</button>
           </div>
@@ -169,21 +169,21 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
           <div className="my-8 p-6 md:p-8 bg-slate-950/70 border-2 border-amber-500/40 rounded-2xl text-center relative">
             <div className="text-4xl mb-3">{walkedToUFA ? "🚪" : "📝"}</div>
             <div className="text-xl font-black text-white">
-              {walkedToUFA ? `${cleanName(player.name)} ukončil rokovania (Walked away)` : `${cleanName(player.name)} je otvorený pre Offer Sheets`}
+              {walkedToUFA ? `${cleanName(player.name)} ended negotiations (Walked away)` : `${cleanName(player.name)} is open to Offer Sheets`}
             </div>
             <div className="text-sm text-amber-300 mt-2 max-w-md mx-auto leading-relaxed">{msg?.s}</div>
             {!walkedToUFA && (
               <div className="text-xs text-slate-500 mt-2 max-w-md mx-auto">
-                Hráč je naďalej chránený — ak mu iný klub nepredloží akceptovateľný Offer Sheet, rokovania s vami sa po sezóne obnovia.
+                The player is still protected — unless another club submits an acceptable Offer Sheet, negotiations with you resume after the season.
               </div>
             )}
-            <button onClick={() => { router.refresh(); onClose(); }} className="mt-6 px-8 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-sm font-semibold text-white">Zavrieť</button>
+            <button onClick={() => { router.refresh(); onClose(); }} className="mt-6 px-8 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-sm font-semibold text-white">Close</button>
           </div>
         )}
 
         {pending && !i && (
           <div className="py-12 text-center text-slate-400 text-sm">
-            <span className="inline-block animate-spin mr-2">⏳</span> Načítavam zmluvné podklady a požiadavky agenta…
+            <span className="inline-block animate-spin mr-2">⏳</span> Loading contract details and the agent's demands…
           </div>
         )}
 
@@ -205,18 +205,18 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                     {i.age != null && <span className="text-xs text-slate-400">{i.age}r</span>}
                     {i.overall != null && <span className="text-xs text-slate-400">· {i.overall} OVR</span>}
                     <span className="text-xs text-slate-400">
-                      · Doterajší plat: <b className="text-slate-200">{player.capHit ? `${M(player.capHit)} · posledný rok` : "—"}</b>
+                      · Current salary: <b className="text-slate-200">{player.capHit ? `${M(player.capHit)} · final year` : "—"}</b>
                     </span>
                   </div>
                   <div className="text-xs text-slate-400 mt-1">
-                    Vidí sa ako váš <b className="text-sky-300">{slotLabels[i.slot] ?? "—"}</b> · chce {i.wantPP ? "PP" : "bez PP"} · {i.wantPK ? "PK" : "bez PK"}
+                    He sees himself as your <b className="text-sky-300">{slotLabels[i.slot] ?? "—"}</b> · wants {i.wantPP ? "PP" : "no PP"} · {i.wantPK ? "PK" : "no PK"}
                   </div>
                 </div>
               </div>
 
               <div className="text-left md:text-right bg-slate-900/90 px-3.5 py-2.5 rounded-lg border border-slate-800 shrink-0">
                 <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
-                  Požiadavka agenta
+                  Agent's demand
                 </span>
                 <span className="text-sm md:text-base font-bold text-amber-300 font-mono">
                   {M(i.floor)} – {M(i.askSalary * 1.05)} <span className="text-xs font-normal text-slate-400">/ {i.askYears} {i.askYears === 1 ? "rok" : i.askYears < 5 ? "roky" : "rokov"}</span>
@@ -233,14 +233,14 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
             {(player.negotiation || (player.resignRound ?? 0) > 0) && (
               <div className="bg-sky-500/5 border border-sky-500/25 rounded-xl p-3 text-xs flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <span className="font-bold uppercase tracking-wide text-sky-300 mr-2">Predchádzajúca ponuka:</span>
+                  <span className="font-bold uppercase tracking-wide text-sky-300 mr-2">Previous offer:</span>
                   <span className="text-slate-200 font-mono">
-                    {player.negotiation?.offerSalary ? `${M(player.negotiation.offerSalary)} × ${player.negotiation.offerYears ?? "?"}yr` : player.resignOfferSalary ? M(player.resignOfferSalary) : "zaznamenaná"}
+                    {player.negotiation?.offerSalary ? `${M(player.negotiation.offerSalary)} × ${player.negotiation.offerYears ?? "?"}yr` : player.resignOfferSalary ? M(player.resignOfferSalary) : "recorded"}
                   </span>
                 </div>
                 {(player.negotiation?.counterSalary ?? player.resignCounterSalary) && (
                   <div className="text-amber-300">
-                    Protinávrh hráča: <b className="font-mono">{M(player.negotiation?.counterSalary ?? player.resignCounterSalary!)} × {player.negotiation?.counterYears ?? player.resignCounterYears ?? "?"}yr</b>
+                    Player counter-offer: <b className="font-mono">{M(player.negotiation?.counterSalary ?? player.resignCounterSalary!)} × {player.negotiation?.counterYears ?? player.resignCounterYears ?? "?"}yr</b>
                   </div>
                 )}
               </div>
@@ -259,13 +259,13 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Salary input */}
                   <div>
-                    <label className="text-xs font-semibold text-slate-400 block mb-2">Garantovaný ročný plat v NHL (AAV)</label>
+                    <label className="text-xs font-semibold text-slate-400 block mb-2">Guaranteed annual NHL salary (AAV)</label>
                     <div className="grid grid-cols-[3rem_minmax(0,1fr)_3rem] items-center gap-2">
                       <button
                         type="button"
                         onClick={() => stepSalary(-1)}
                         className="h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-black text-lg border border-slate-700 active:scale-95 transition leading-none"
-                        aria-label="Znížiť plat o $50,000"
+                        aria-label="Decrease salary by $50,000"
                       >
                         −
                       </button>
@@ -291,14 +291,14 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                         type="button"
                         onClick={() => stepSalary(1)}
                         className="h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-black text-lg border border-slate-700 active:scale-95 transition leading-none"
-                        aria-label="Zvýšiť plat o $50,000"
+                        aria-label="Increase salary by $50,000"
                       >
                         +
                       </button>
                     </div>
                     <div className="flex justify-between text-[10px] text-slate-500 mt-1.5 px-1">
                       <span>Min: $0.775M</span>
-                      <span className="text-slate-400">Požaduje: {M(i.floor)}–{M(i.askSalary * 1.05)}</span>
+                      <span className="text-slate-400">Asks: {M(i.floor)}–{M(i.askSalary * 1.05)}</span>
                       <span>Max: ${(i.maxSalary / 1e6).toFixed(1)}M</span>
                     </div>
                   </div>
@@ -306,7 +306,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                   {/* Term buttons */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <label className="text-xs font-semibold text-slate-400">Dĺžka kontraktu (Term)</label>
+                      <label className="text-xs font-semibold text-slate-400">Contract length (Term)</label>
                       <span className="text-[10px] text-slate-400">
                         Preferuje: <b className="text-amber-300">{i.askYears} {i.askYears === 1 ? "rok" : i.askYears < 5 ? "roky" : "rokov"}</b>
                       </span>
@@ -329,7 +329,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                             {yr} {yr === 1 ? "rok" : yr < 5 ? "roky" : "rokov"}
                             {isPreferred && (
                               <span className="absolute -top-2 right-1.5 px-1 py-0.2 bg-amber-500/30 text-amber-300 text-[8px] font-black rounded border border-amber-500/40">
-                                Žiada
+                                Asks
                               </span>
                             )}
                           </button>
@@ -337,7 +337,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                       })}
                     </div>
                     <div className="text-[10px] text-slate-500 mt-1.5 px-1 flex justify-between">
-                      <span>Rozpätie rokov: {i.minYears}–{i.maxYears} yr (dlhší kontrakt zvyčajne stojí viac, pri 35+ naopak)</span>
+                      <span>Year range: {i.minYears}–{i.maxYears} yr (a longer contract usually costs more, the opposite at 35+)</span>
                       <span>Limit ligy: 4 roky</span>
                     </div>
                   </div>
@@ -347,18 +347,18 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                 {Number.isFinite(currentSalaryDollars) && currentSalaryDollars >= 775_000 && years > 0 && (
                   <div className="mt-4 pt-3.5 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs bg-slate-900/40 rounded-xl p-3">
                     <div>
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">Celková hodnota kontraktu</span>
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">Total contract value</span>
                       <span className="text-sm font-black text-amber-300 font-mono">
-                        {M(currentSalaryDollars * years)} <span className="text-xs font-normal text-slate-400">({M(currentSalaryDollars)} / rok × {years} {years === 1 ? "rok" : years < 5 ? "roky" : "rokov"})</span>
+                        {M(currentSalaryDollars * years)} <span className="text-xs font-normal text-slate-400">({M(currentSalaryDollars)} / rok × {years} {years === 1 ? "year" : "years"})</span>
                       </span>
                     </div>
                     {i.capRoom != null && (
                       <div className="text-left sm:text-right">
-                        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">Dopad na platový strop klubu{i.capSeason ? ` · sezóna ${i.capSeason}-${String((i.capSeason + 1) % 100).padStart(2, "0")}` : ""}</span>
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">Impact on the club's salary cap{i.capSeason ? ` · season ${i.capSeason}-${String((i.capSeason + 1) % 100).padStart(2, "0")}` : ""}</span>
                         <span className={`text-xs font-bold font-mono ${i.capRoom - currentSalaryDollars < 0 ? "text-rose-400" : "text-emerald-400"}`}>
                           {i.capRoom - currentSalaryDollars < 0
-                            ? `⚠️ Prekročenie stropu o ${M(Math.abs(i.capRoom - currentSalaryDollars))}`
-                            : `Voľné miesto po podpise: ${M(i.capRoom - currentSalaryDollars)}`}
+                            ? `⚠️ Over the cap by ${M(Math.abs(i.capRoom - currentSalaryDollars))}`
+                            : `Room after signing: ${M(i.capRoom - currentSalaryDollars)}`}
                         </span>
                       </div>
                     )}
@@ -370,15 +370,15 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
               <div className="border border-slate-800/80 rounded-xl p-5 bg-slate-950/40">
                 <div className="flex items-center gap-2 mb-4">
                   <span className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-300 text-xs font-black flex items-center justify-center">§2</span>
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200">Forma zmluvy & Úloha v tíme</h3>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200">Contract form & role on the team</h3>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Contract Type (One-way vs Two-way) */}
                   <div>
                     <label className="text-xs font-semibold text-slate-400 block mb-2">
-                      Charakter zmluvy (CBA Pravidlá)
-                      <InfoTip text="One-way aj Two-way zmluva garantuje rovnaký plat v NHL aj v AHL. Two-way umožňuje flexibilný pohyb na farmu a je povolená najviac do výšky platu $1.30M; etablovaní hráči (nad 25 rokov s 30+ NHL zápasmi vlani) dvojcestnú zmluvu odmietajú." />
+                      Contract type (CBA rules)
+                      <InfoTip text="Both one-way and two-way contracts guarantee the same salary in the NHL and the AHL. Two-way allows flexible movement to the farm and is permitted only up to a salary of $1.30M; established players (over 25 with 30+ NHL games last year) refuse a two-way contract." />
                     </label>
                     <div className="grid grid-cols-2 gap-2">
                       <button
@@ -390,8 +390,8 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                             : "border-slate-800 bg-slate-900/80 text-slate-400 hover:border-slate-700"
                         }`}
                       >
-                        <span className="block text-xs font-bold text-amber-300">Jednocestná (1-way)</span>
-                        <span className="block text-[10px] text-slate-400 mt-0.5">Plný NHL plat aj v AHL</span>
+                        <span className="block text-xs font-bold text-amber-300">One-way (1-way)</span>
+                        <span className="block text-[10px] text-slate-400 mt-0.5">Full NHL salary in the AHL too</span>
                       </button>
 
                       <button
@@ -410,11 +410,11 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                       >
                         <div className="flex items-center justify-between">
                           <span className={`block text-xs font-bold ${!canTakeTwoWay ? "text-slate-500" : "text-blue-300"}`}>
-                            Dvojcestná (2-way)
+                            Two-way (2-way)
                           </span>
                           {!canTakeTwoWay && (
                             <span className="text-[9px] uppercase font-black px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30">
-                              Nedostupná
+                              Unavailable
                             </span>
                           )}
                         </div>
@@ -422,8 +422,8 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                           {!canTakeTwoWay
                             ? isSalaryAboveTwoWayMax
                               ? `Len do ${M(maxTwoWay)}`
-                              : "Hráč odmieta 2-way"
-                            : "Flexibilný pohyb do AHL (do $1.30M)"}
+                              : "Player refuses 2-way"
+                            : "Flexible movement to the AHL (up to $1.30M)"}
                         </span>
                       </button>
                     </div>
@@ -431,15 +431,15 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                     {!canTakeTwoWay && (
                       <p className="text-[11px] text-amber-400/90 mt-2 bg-amber-500/10 border border-amber-500/20 p-2 rounded-lg">
                         ℹ️ {isSalaryAboveTwoWayMax
-                          ? `Dvojcestná zmluva je podľa pravidiel CBA možná len do výšky platu ${M(maxTwoWay)}. Pri vyššej sume je povinná 1-way zmluva.`
-                          : i.twoWayReason ?? "Hráč má štatút etablovaného hráča NHL a neprijme dvojcestnú zmluvu."}
+                          ? `A two-way contract is possible under the CBA rules only up to a salary of ${M(maxTwoWay)}. Above that a 1-way contract is mandatory.`
+                          : i.twoWayReason ?? "The player has established-NHL-player status and will not accept a two-way contract."}
                       </p>
                     )}
                   </div>
 
                   {/* Role & Special teams */}
                   <div>
-                    <label className="text-xs font-semibold text-slate-400 block mb-2">Sľúbená pozícia & Špeciálne formácie</label>
+                    <label className="text-xs font-semibold text-slate-400 block mb-2">Promised role & special-teams units</label>
                     <select
                       value={line}
                       onChange={(e) => setLine(Number(e.target.value))}
@@ -462,7 +462,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                       </div>
                     )}
                     <span className="text-[10px] text-slate-500 mt-2 block">
-                      Zmena formácie alebo odobratie PP/PK dynamicky prepočítava hráčove platové nároky v reálnom čase.
+                      Changing the unit or removing PP/PK dynamically recalculates the player's salary demands in real time.
                     </span>
                   </div>
                 </div>
@@ -474,8 +474,8 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                   <div className="flex items-center gap-2">
                     <span className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-300 text-xs font-black flex items-center justify-center">§3</span>
                     <div>
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200">Doložky o nevymeniteľnosti (NTC / NMC)</h3>
-                      <p className="text-[11px] text-slate-500">Udelenie klauzuly znižuje platové nároky hráča (zľava sa prejaví na požiadavke agenta).</p>
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200">No-trade clauses (NTC / NMC)</h3>
+                      <p className="text-[11px] text-slate-500">Granting a clause lowers the player's salary demands (the discount shows in the agent's demand).</p>
                     </div>
                   </div>
                   <div className="flex gap-2 items-center flex-wrap">
@@ -485,9 +485,9 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                       className="h-9 px-3 rounded-lg bg-slate-900 border border-slate-700 text-xs font-semibold text-slate-200"
                     >
                       <option value="">Bez klauzuly (No clause)</option>
-                      <option value="NTC">NTC — zákaz výmeny</option>
-                      <option value="NMC">NMC — zákaz pohybu/farmy</option>
-                      <option value="M_NTC">M-NTC — modifikovaný zoznam</option>
+                      <option value="NTC">NTC — no trade</option>
+                      <option value="NMC">NMC — no movement/farm</option>
+                      <option value="M_NTC">M-NTC — modified list</option>
                     </select>
                     {grantClause === "M_NTC" && (
                       <select
@@ -502,7 +502,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                     )}
                     {grantClause && (
                       <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-md">
-                        ≈ {Math.round(clauseDiscount(grantClause, breadth) * 100)}% zľava z platu
+                        ≈ {Math.round(clauseDiscount(grantClause, breadth) * 100)}% salary discount
                       </span>
                     )}
                   </div>
@@ -516,10 +516,10 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end mb-6">
                 <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 text-center">
                   <div className="h-10 flex items-center justify-center text-amber-300 font-serif italic text-lg tracking-wide">
-                    {i?.gmName || "Generálny manažér"}
+                    {i?.gmName || "General Manager"}
                   </div>
                   <div className="border-t border-slate-800 pt-1 text-[10px] uppercase font-bold tracking-wider text-slate-500">
-                    Podpis GM {i?.teamName ? `(${i.teamName})` : "(autorizovaný zástupca klubu)"}
+                    GM signature {i?.teamName ? `(${i.teamName})` : "(authorized club representative)"}
                   </div>
                 </div>
 
@@ -528,7 +528,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                     {cleanName(player.name)}
                   </div>
                   <div className="border-t border-slate-800 pt-1 text-[10px] uppercase font-bold tracking-wider text-slate-500">
-                    Súhlas hráča a hráčskej asociácie (NHLPA)
+                    Player and players' association (NHLPA) consent
                   </div>
                 </div>
               </div>
@@ -544,7 +544,7 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
               {/* Offer Summary Bar */}
               {Number.isFinite(currentSalaryDollars) && currentSalaryDollars >= 775_000 && (
                 <div className="mb-4 text-center text-xs text-slate-400">
-                  Pripravený návrh: <strong className="text-amber-300 font-mono">{M(currentSalaryDollars)}/rok</strong> × <strong className="text-white">{years} {years === 1 ? "rok" : years < 5 ? "roky" : "rokov"}</strong> ({M(currentSalaryDollars * years)} celkovo) • <span className={twoWay ? "text-blue-300 font-semibold" : "text-amber-300 font-semibold"}>{twoWay ? "2-way" : "1-way"}</span>{grantClause ? ` • ${grantClause}` : ""}
+                  Prepared proposal: <strong className="text-amber-300 font-mono">{M(currentSalaryDollars)}/yr</strong> × <strong className="text-white">{years} {years === 1 ? "year" : "years"}</strong> ({M(currentSalaryDollars * years)} total) • <span className={twoWay ? "text-blue-300 font-semibold" : "text-amber-300 font-semibold"}>{twoWay ? "2-way" : "1-way"}</span>{grantClause ? ` • ${grantClause}` : ""}
                 </div>
               )}
 
@@ -554,14 +554,14 @@ function ReSignModal({ player, teamId, onClose }: { player: ExpiringPlayer; team
                   onClick={closeAndRefresh}
                   className="w-full sm:w-auto px-4 py-2.5 text-xs font-semibold text-slate-400 hover:text-slate-200"
                 >
-                  Zrušiť
+                  Cancel
                 </button>
                 <button
                   onClick={submit}
                   disabled={pending}
                   className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 text-white font-black text-xs md:text-sm uppercase tracking-wider shadow-lg shadow-emerald-500/20 active:scale-[0.98] transition flex items-center justify-center gap-2"
                 >
-                  <span>✍️</span> {pending ? "Odosielam návrh zmluvy…" : "Pečatiť a odoslať ponuku zmluvy"}
+                  <span>✍️</span> {pending ? "Sending the contract proposal…" : "Seal and submit the contract offer"}
                 </button>
               </div>
             </div>
@@ -637,7 +637,7 @@ export default function ReSignPanel({
       next = prioritiesState.filter((pId) => pId !== id);
     } else {
       if (prioritiesState.length >= 3) {
-        setPriorityMsg("V TOP Priority môžete mať najviac 3 hráčov. Ak chcete pridať nového, najprv jedného odopnite kliknutím na 📌.");
+        setPriorityMsg("You can have at most 3 players in TOP Priority. To add a new one, first unpin one by clicking 📌.");
         return;
       }
       next = [...prioritiesState, id];
@@ -647,7 +647,7 @@ export default function ReSignPanel({
       try {
         const r = await setContractPrioritiesAction(teamId, next);
         if (!r.ok) {
-          setPriorityMsg(r.error ?? "Nepodarilo sa uložiť prioritu.");
+          setPriorityMsg(r.error ?? "Could not save the priority.");
           setPrioritiesState(prioritiesState);
         }
       } catch (e) {
@@ -713,7 +713,7 @@ export default function ReSignPanel({
       <div className="mb-5 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-slate-700 bg-[#0b1d34] p-3"><div className="text-2xl">🏳️</div><div className="mt-0.5 text-xl font-black">{players.length}</div><div className="text-xs font-semibold text-slate-300">Total expiring</div><div className="mt-0.5 text-[11px] text-slate-500">{ufaCount} UFA · {rfaCount} RFA</div></div>
         <div className="rounded-xl border border-slate-700 bg-[#0b1d34] p-3"><div className="text-2xl text-emerald-400">♻</div><div className="mt-0.5 text-xl font-black">{M(capTotal)}</div><div className="text-xs font-semibold text-slate-300">Total cap hit</div><div className="mt-0.5 text-[11px] text-slate-500">next season</div></div>
-        <div className="rounded-xl border border-rose-500/25 bg-rose-950/20 p-3"><div className="text-2xl text-rose-400">⚠</div><div className="mt-0.5 text-xl font-black">{priorityCards.length}</div><div className="text-xs font-semibold text-slate-300">High priority</div><div className="mt-0.5 text-[11px] text-slate-500">{pinnedPlayers.length > 0 ? `${pinnedPlayers.length} zvolených GM 📌` : "key decisions"}</div></div>
+        <div className="rounded-xl border border-rose-500/25 bg-rose-950/20 p-3"><div className="text-2xl text-rose-400">⚠</div><div className="mt-0.5 text-xl font-black">{priorityCards.length}</div><div className="text-xs font-semibold text-slate-300">High priority</div><div className="mt-0.5 text-[11px] text-slate-500">{pinnedPlayers.length > 0 ? `${pinnedPlayers.length} GM-picked 📌` : "key decisions"}</div></div>
         <div className="rounded-xl border border-slate-700 bg-[#0b1d34] p-3"><div className="text-2xl text-sky-300">☷</div><div className="mt-0.5 text-xl font-black">{Math.min(6, players.length)}</div><div className="text-xs font-semibold text-slate-300">Re-sign targets</div><div className="mt-0.5 text-[11px] text-slate-500">recommended</div></div>
       </div>
       {priorityCards.length > 0 && (
@@ -757,8 +757,8 @@ export default function ReSignPanel({
                     type="button"
                     onClick={() => togglePriority(p.id)}
                     disabled={priorityPending}
-                    title={isPinned ? "Odopnúť z TOP Priority" : "Pripnúť do TOP Priority"}
-                    aria-label={isPinned ? `Odopnúť ${cleanName(p.name)} z TOP Priority` : `Pripnúť ${cleanName(p.name)} do TOP Priority`}
+                    title={isPinned ? "Unpin from TOP Priority" : "Pin to TOP Priority"}
+                    aria-label={isPinned ? `Unpin ${cleanName(p.name)} from TOP Priority` : `Pin ${cleanName(p.name)} to TOP Priority`}
                     className={`rounded-md border px-2.5 py-2 text-sm transition flex items-center justify-center ${isPinned ? "border-amber-400 bg-amber-400/20 text-amber-300 shadow-sm shadow-amber-400/20 hover:bg-amber-400/30" : "border-slate-600 bg-slate-900 text-slate-400 hover:text-amber-300 hover:border-amber-400/50"}`}
                   >
                     📌
@@ -773,7 +773,7 @@ export default function ReSignPanel({
         <div className="mb-3 space-y-1.5">
           <p className="text-xs text-slate-500">
             <span className="text-fuchsia-300 font-semibold">★ Franchise tag</span> (1 per club)
-            <InfoTip text="Tag one RFA as your Franchise player. A franchise RFA gets TWO re-sign rounds before rivals can submit offer sheets; every other RFA gets one round, then he's open to offer sheets. Ak ho raz použijete v rokovaniach, už ho nemožno zmeniť ani použiť na iného hráča v tejto sezóne." />
+            <InfoTip text="Tag one RFA as your Franchise player. A franchise RFA gets TWO re-sign rounds before rivals can submit offer sheets; every other RFA gets one round, then he's open to offer sheets. Once you use it in negotiations, it can no longer be changed or used on another player this season." />
           </p>
           {(franchiseTagUsed || (franchiseTaggedPlayer && tagged != null && ((players.find((p) => p.id === tagged)?.resignRound ?? 0) > 0 || players.find((p) => p.id === tagged)?.resignStatus === "extended"))) && (
             <div className="flex items-center gap-1.5 text-xs text-fuchsia-300 bg-fuchsia-950/40 border border-fuchsia-800/50 rounded-lg px-2.5 py-1.5 font-medium">
@@ -872,12 +872,12 @@ export default function ReSignPanel({
                         ? "The Franchise Tag was already used on this player in negotiations — it can't be changed"
                         : `Your club already used its Franchise Tag this season (${franchiseTaggedPlayer?.name ?? "used"})`)
                     : !isTagged && tagged != null
-                      ? `Franchise Tag už má priradený iný hráč (${franchiseTaggedPlayer?.name ?? "hráč"})`
+                      ? `Franchise Tag is already assigned to another player (${franchiseTaggedPlayer?.name ?? "player"})`
                       : !isTagged && (p.resignRound ?? 0) > 0
-                        ? "Franchise Tag musí byť priradený pred začiatkom rokovaní o zmluve"
+                        ? "The Franchise Tag must be assigned before contract negotiations begin"
                         : isTagged
-                          ? "Franchise Tag — kliknutím zrušíte (ešte neprebehli rokovania)"
-                          : "Priradiť Franchise Tag (1 na klub za sezónu, chráni pred offer sheet na 2 kolá)";
+                          ? "Franchise Tag — click to remove (no negotiations yet)"
+                          : "Assign the Franchise Tag (1 per club per season, protects against offer sheets for 2 rounds)";
                   return (
                     <button
                       type="button"
@@ -924,7 +924,7 @@ export default function ReSignPanel({
                   type="button"
                   onClick={() => togglePriority(p.id)}
                   disabled={priorityPending}
-                  title={isPinned ? "Odopnúť z TOP Priority" : "Pripnúť do TOP Priority"}
+                  title={isPinned ? "Unpin from TOP Priority" : "Pin to TOP Priority"}
                   aria-label={`TOP Priority pre ${cleanName(p.name)}`}
                   className={`hidden rounded-md border px-2.5 py-1 text-xs font-bold transition md:flex items-center justify-center ${
                     isPinned

@@ -49,16 +49,16 @@ export default function RookieTuningPanel({ initialConfig }: { initialConfig: Ro
           <div className="bg-slate-900 border border-slate-700 rounded-xl p-5 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-bold text-white mb-1">Rookie Calculator — Tuning</h3>
             <p className="text-xs text-slate-500 mb-5">
-              Samotný rating (PA/SC/DF/CK/... aj ochrana pri malej vzorke zápasov) sa počíta rovnakým enginom ako zvyšok ligy —
-              cez <b>Live Calculator — Nastavenia &amp; Tuning</b> na hlavnej stránke Live Calculatora. Táto voľba tu je jediná vec,
-              čo je špecifická len pre Rookie Calculator.
+              The rating itself (PA/SC/DF/CK/... including small-sample protection) is computed by the same engine as the rest of the league —
+              via <b>Live Calculator — Settings &amp; Tuning</b> on the main Live Calculator page. This option here is the only thing
+              that is specific to the Rookie Calculator.
             </p>
 
             <section className="mb-2">
-              <h4 className="text-sm font-semibold text-slate-200 mb-1">Filter skenera</h4>
+              <h4 className="text-sm font-semibold text-slate-200 mb-1">Scanner filter</h4>
               <p className="text-xs text-slate-500 mb-2">
-                Minimálny počet reálnych zápasov (NHL + AHL spolu), aby sa hráč vôbec objavil (a automaticky založil) v skeneri
-                chýbajúcich debutantov.
+                Minimum number of real games (NHL + AHL combined) for a player to appear (and be created automatically) in the scanner
+                of missing debutants.
               </p>
               <input type="number" min={0} value={config.minScanGp} onChange={(e) => setMinScanGp(e.target.value)}
                 className="w-24 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-slate-200 focus:outline-none focus:border-blue-500" />

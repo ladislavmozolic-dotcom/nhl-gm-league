@@ -112,14 +112,14 @@ export default function GoalieCalculatorSection({
       : "0";
 
   const nhlTitle = isAll
-    ? "NHL — Všetci brankári ligy"
-    : `${selectedTeam.name} — NHL Brankári`;
+    ? "NHL — All league goalies"
+    : `${selectedTeam.name} — NHL Goalies`;
 
   const ahlTitle = isAll
-    ? "AHL — Všetci brankári ligy (Farma)"
+    ? "AHL — All league goalies (Farm)"
     : affiliate
-    ? `${affiliate.name} — AHL Farm Brankári`
-    : `${selectedTeam.name} — AHL Farm Brankári`;
+    ? `${affiliate.name} — AHL Farm Goalies`
+    : `${selectedTeam.name} — AHL Farm Goalies`;
 
   return (
     <div className="space-y-6">
@@ -137,7 +137,7 @@ export default function GoalieCalculatorSection({
         active={active}
         onRowMouseEnter={handleMouseEnter}
         onRowMouseLeave={handleMouseLeave}
-        emptyMessage={emptyMessage || "Žiadni brankári na NHL súpiske nezodpovedajú filtru."}
+        emptyMessage={emptyMessage || "No goalies on the NHL roster match the filter."}
         showTeamBadge={showTeamBadge}
         teamMap={teamMap}
       />
@@ -156,7 +156,7 @@ export default function GoalieCalculatorSection({
         active={active}
         onRowMouseEnter={handleMouseEnter}
         onRowMouseLeave={handleMouseLeave}
-        emptyMessage={emptyMessage || "Žiadni brankári na AHL súpiske nezodpovedajú filtru."}
+        emptyMessage={emptyMessage || "No goalies on the AHL roster match the filter."}
         showTeamBadge={showTeamBadge}
         teamMap={teamMap}
       />
@@ -223,7 +223,7 @@ function GoalieTable({
 
         <div className="flex items-center gap-3 text-xs text-slate-400">
           <span>
-            Brankári: <b className="text-white">{goalies.length}</b>
+            Goalies: <b className="text-white">{goalies.length}</b>
           </span>
           <span className="text-slate-700">·</span>
           <span>
@@ -242,7 +242,7 @@ function GoalieTable({
                 onClick={() => onSort("name")}
                 className="py-2.5 px-3 font-bold text-slate-300 hover:text-white cursor-pointer sticky left-0 z-30 bg-slate-950 min-w-[190px] border-r border-slate-800/80"
               >
-                Brankár{arrow("name")}
+                Goalie{arrow("name")}
               </th>
 
               {/* Age */}
@@ -257,7 +257,7 @@ function GoalieTable({
               <th
                 onClick={() => onSort("gp")}
                 className="py-2.5 px-2 text-center font-bold hover:text-white cursor-pointer w-12"
-                title="Zápasy v aktuálnej sezóne"
+                title="Games in the current season"
               >
                 GP{arrow("gp")}
               </th>
@@ -266,7 +266,7 @@ function GoalieTable({
               <th
                 onClick={() => onSort("ov")}
                 className="py-2.5 px-2.5 text-center font-black text-amber-300 hover:text-amber-200 cursor-pointer w-12 border-r border-slate-800/80 bg-amber-950/20"
-                title="Celkový rating brankára (Overall)"
+                title="Goalie overall rating (Overall)"
               >
                 OV{arrow("ov")}
               </th>
@@ -275,21 +275,21 @@ function GoalieTable({
               <th
                 onClick={() => onSort("svPct")}
                 className="py-2.5 px-2 text-center font-bold text-emerald-400 hover:text-white cursor-pointer w-16"
-                title="Save % (Úspešnosť zásahov)"
+                title="Save % (Save percentage)"
               >
                 SV%{arrow("svPct")}
               </th>
               <th
                 onClick={() => onSort("gaa")}
                 className="py-2.5 px-2 text-center font-bold text-emerald-400 hover:text-white cursor-pointer w-14"
-                title="GAA (Priemer gólov / 60)"
+                title="GAA (Goals-against average / 60)"
               >
                 GAA{arrow("gaa")}
               </th>
               <th
                 onClick={() => onSort("gsax")}
                 className="py-2.5 px-2 text-center font-bold text-emerald-400 hover:text-white cursor-pointer w-14"
-                title="GSAx (Góly chytené nad očakávanie)"
+                title="GSAx (Goals saved above expected)"
               >
                 GSAx{arrow("gsax")}
               </th>
@@ -303,7 +303,7 @@ function GoalieTable({
               <th
                 onClick={() => onSort("hdSv")}
                 className="py-2.5 px-2 text-center font-bold text-emerald-400 hover:text-white cursor-pointer w-16 border-r border-slate-800/80"
-                title="High-Danger SV% (Úspešnosť pri tutovkách)"
+                title="High-Danger SV% (Save % on high-danger shots)"
               >
                 HD SV%{arrow("hdSv")}
               </th>
@@ -370,7 +370,7 @@ function GoalieTable({
                                 href={`/tools/player-calculator?team=${teamMap.get(p.teamId)?.slug ?? "all"}`}
                                 onClick={(e) => e.stopPropagation()}
                                 className="shrink-0 px-1.5 py-0.2 rounded text-[10px] font-bold font-mono bg-slate-800/90 hover:bg-amber-600/30 text-slate-300 hover:text-amber-200 border border-slate-700/80 transition"
-                                title={teamMap.get(p.teamId)?.name ?? "Prejsť na tím"}
+                                title={teamMap.get(p.teamId)?.name ?? "Go to team"}
                               >
                                 {teamMap.get(p.teamId)?.code ?? "—"}
                               </Link>
@@ -488,7 +488,7 @@ function GoalieTable({
                                   className={`text-[9px] font-bold ${
                                     diff > 0 ? "text-emerald-400" : "text-rose-400"
                                   }`}
-                                  title={`Aktuálne: ${act} → Prepočítané: ${proj} (${diff > 0 ? `+${diff}` : diff})`}
+                                  title={`Current: ${act} → Recalculated: ${proj} (${diff > 0 ? `+${diff}` : diff})`}
                                 >
                                   {diff > 0 ? `+${diff}` : diff}
                                 </span>
@@ -592,7 +592,7 @@ function GoalieHoverComparisonCard({
         <div className="flex items-center gap-3 shrink-0">
           <div className="text-right">
             <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">
-              Celkový Rating (OV)
+              Overall Rating (OV)
             </div>
             <div className="flex items-center gap-2">
               <div className="text-lg font-bold text-slate-300 px-2.5 py-1 rounded-xl bg-slate-800/80 border border-slate-700/80 tabular-nums">

@@ -80,7 +80,7 @@ export default function ExpansionTeamForm({ action }: { action: (input: CreateEx
 
       {err && <p className="text-sm text-red-400">{err}</p>}
 
-      <p className="text-[11px] text-slate-500">Vytvorí sa aj AHL farm klub a náhradný tréner — obidva môžeš neskôr premenovať/upraviť ako pri každom inom tíme. Tím nemá GM, kým si niekto nepodá žiadosť o vstup.</p>
+      <p className="text-[11px] text-slate-500">An AHL farm club and a replacement coach are created too — you can rename/edit both later like for any other team. The team has no GM until someone submits a join request.</p>
 
       <button type="submit" disabled={pending} className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-semibold">
         {pending ? "Creating…" : "Create expansion team"}

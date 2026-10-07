@@ -438,7 +438,7 @@ export default function PlayerCalculatorView({
           <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
             <span>🏒 Select NHL Club</span>
             <span className="text-slate-600">·</span>
-            <span className="text-slate-500 font-normal">{teams.length} teams + Celá liga</span>
+            <span className="text-slate-500 font-normal">{teams.length} teams + Whole league</span>
           </div>
           <div className="text-xs text-slate-500 hidden sm:block">
             Scroll or click to switch team
@@ -450,7 +450,7 @@ export default function PlayerCalculatorView({
           <Link
             key="all"
             href="/tools/player-calculator?team=all"
-            title="Všetci hráči a brankári celej ligy (All Teams)"
+            title="All skaters and goalies in the whole league (All Teams)"
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all shrink-0 text-xs font-bold ${
               isAll
                 ? "bg-gradient-to-r from-blue-600 to-indigo-600 border-blue-400 text-white shadow-md shadow-blue-900/40 scale-[1.02]"
@@ -523,11 +523,11 @@ export default function PlayerCalculatorView({
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-2xl font-black text-white tracking-tight">
-                  {isAll ? "Celá liga UNHL — Všetky tímy" : selectedTeam.name}
+                  {isAll ? "Whole UNHL league — All teams" : selectedTeam.name}
                 </h1>
                 {isAll ? (
                   <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-blue-500/20 border border-blue-500/40 text-blue-300">
-                    32 Tímov NHL + 32 AHL
+                    32 NHL teams + 32 AHL
                   </span>
                 ) : (
                   <>
@@ -546,11 +546,11 @@ export default function PlayerCalculatorView({
               </div>
               <div className="flex items-center gap-2 mt-1.5 flex-wrap text-xs text-slate-400">
                 <span>
-                  Korčuliari: <b>{nhlSkaters.length}</b> NHL (Avg OV: <b>{nhlAvgOv}</b>) · <b>{ahlSkaters.length}</b> AHL (Avg OV: <b>{ahlAvgOv}</b>)
+                  Skaters: <b>{nhlSkaters.length}</b> NHL (Avg OV: <b>{nhlAvgOv}</b>) · <b>{ahlSkaters.length}</b> AHL (Avg OV: <b>{ahlAvgOv}</b>)
                 </span>
                 <span className="text-slate-600">·</span>
                 <span>
-                  Brankári: <b>{nhlGoalies.length}</b> NHL (Avg OV: <b>{nhlAvgGoalieOv}</b>) · <b>{ahlGoalies.length}</b> AHL (Avg OV: <b>{ahlAvgGoalieOv}</b>)
+                  Goalies: <b>{nhlGoalies.length}</b> NHL (Avg OV: <b>{nhlAvgGoalieOv}</b>) · <b>{ahlGoalies.length}</b> AHL (Avg OV: <b>{ahlAvgGoalieOv}</b>)
                 </span>
                 {!isAll && affiliate && (
                   <>
@@ -582,12 +582,12 @@ export default function PlayerCalculatorView({
                 className="text-xs font-semibold px-3 py-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 transition flex items-center gap-1.5 shadow-sm hover:scale-[1.02]"
                 title={
                   isAll
-                    ? "Stiahnuť kompletný Excel zošit celej ligy (NHL & AHL korčuliari a brankári)"
-                    : `Stiahnuť Excel zošit pre tím ${selectedTeam.code} a farmu (vrátane brankárov)`
+                    ? "Download the complete Excel workbook for the whole league (NHL & AHL skaters and goalies)"
+                    : `Download the Excel workbook for team ${selectedTeam.code} and its farm (including goalies)`
                 }
               >
                 <span>📥</span>
-                <span>{isAll ? "Export do Excelu (Celá liga)" : `Export do Excelu (${selectedTeam.code})`}</span>
+                <span>{isAll ? "Export to Excel (Whole league)" : `Export to Excel (${selectedTeam.code})`}</span>
               </a>
 
               {!isAll && (
@@ -595,9 +595,9 @@ export default function PlayerCalculatorView({
                   href="/api/tools/player-calculator/export"
                   download
                   className="text-[11px] text-slate-400 hover:text-emerald-300 transition underline whitespace-nowrap"
-                  title="Stiahnuť kompletný Excel zošit pre celú ligu"
+                  title="Download the complete Excel workbook for the whole league"
                 >
-                  alebo celá liga (.xlsx)
+                  or whole league (.xlsx)
                 </a>
               )}
 
@@ -626,11 +626,11 @@ export default function PlayerCalculatorView({
 
             <div className="flex flex-col items-end text-[11px] text-slate-500">
               <span>
-                Váhy: {Math.round(lastWeight * 100)}% minulá + {Math.round(curWeight * 100)}% táto sezóna
+                Weights: {Math.round(lastWeight * 100)}% last season + {Math.round(curWeight * 100)}% this season
               </span>
               {liveConfig?.lastCalculatedAt && (
                 <span className="text-[10px] text-slate-400">
-                  Prepočítané: {new Date(liveConfig.lastCalculatedAt).toLocaleString("sk-SK")}
+                  Recalculated: {new Date(liveConfig.lastCalculatedAt).toLocaleString("sk-SK")}
                 </span>
               )}
             </div>
@@ -651,7 +651,7 @@ export default function PlayerCalculatorView({
                 : "bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-800"
             }`}
           >
-            <span>👥 Všetci (Korčuliari aj Brankári)</span>
+            <span>👥 All (Skaters and Goalies)</span>
             <span
               className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
                 playerType === "all"
@@ -672,7 +672,7 @@ export default function PlayerCalculatorView({
                 : "bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-800"
             }`}
           >
-            <span>🏒 Iba korčuliari</span>
+            <span>🏒 Skaters only</span>
             <span
               className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
                 playerType === "skaters"
@@ -693,7 +693,7 @@ export default function PlayerCalculatorView({
                 : "bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-800"
             }`}
           >
-            <span>🥅 Iba brankári</span>
+            <span>🥅 Goalies only</span>
             <span
               className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
                 playerType === "goalies"
@@ -718,10 +718,10 @@ export default function PlayerCalculatorView({
               onChange={(e) => setSearch(e.target.value)}
               placeholder={
                 playerType === "skaters"
-                  ? "Hľadať korčuliara podľa mena alebo pozície..."
+                  ? "Search skater by name or position..."
                   : playerType === "goalies"
-                  ? "Hľadať brankára podľa mena..."
-                  : "Hľadať hráča alebo brankára podľa mena či pozície..."
+                  ? "Search goalie by name..."
+                  : "Search player or goalie by name or position..."
               }
               className="w-full pl-9 pr-8 py-2 text-sm bg-slate-950/80 border border-slate-700/80 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
             />
@@ -746,7 +746,7 @@ export default function PlayerCalculatorView({
               [
                 { key: "diff", label: "Diff (Rozdiel)", icon: "▲" },
                 { key: "compare", label: "Porovnanie", icon: "⇄" },
-                { key: "projected", label: "Projektované", icon: "★" },
+                { key: "projected", label: "Projected", icon: "★" },
               ] as const
             ).map((item) => (
               <button
@@ -771,7 +771,7 @@ export default function PlayerCalculatorView({
           {playerType !== "goalies" ? (
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-slate-500 font-medium mr-1">
-                {playerType === "all" ? "Pozícia korčuliarov:" : "Position:"}
+                {playerType === "all" ? "Skater position:" : "Position:"}
               </span>
               {(
                 [
@@ -798,9 +798,9 @@ export default function PlayerCalculatorView({
             </div>
           ) : (
             <div className="text-slate-400 flex items-center gap-2">
-              <span className="text-amber-400 font-bold">🥅 Brankári</span>
+              <span className="text-amber-400 font-bold">🥅 Goalies</span>
               <span className="text-slate-600">·</span>
-              <span>Sledované štatistiky: SV%, GAA, GSAx, GSAx/60, HD SV%, RebCtrl, Freeze%</span>
+              <span>Tracked stats: SV%, GAA, GSAx, GSAx/60, HD SV%, RebCtrl, Freeze%</span>
             </div>
           )}
 
@@ -812,14 +812,14 @@ export default function PlayerCalculatorView({
               onChange={(e) => setOnlyChanges(e.target.checked)}
               className="rounded border-slate-700 bg-slate-900 text-blue-600 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer"
             />
-            <span>Iba hráči so zmenou (▲ / ▼)</span>
+            <span>Only players with a change (▲ / ▼)</span>
           </label>
         </div>
 
         {/* Cross-Team Search Prompt */}
         {!isAll && playerType !== "goalies" && otherTeamMatches.length > 0 && (
           <div className="pt-2 border-t border-slate-800/60 flex items-center gap-2 flex-wrap text-xs text-slate-400">
-            <span className="text-amber-300 font-semibold">💡 Nájdené v iných tímoch:</span>
+            <span className="text-amber-300 font-semibold">💡 Found on other teams:</span>
             {otherTeamMatches.map(({ skater, team: t }) => (
               <button
                 key={skater.id}
@@ -838,7 +838,7 @@ export default function PlayerCalculatorView({
 
         {!isAll && playerType !== "skaters" && otherGoalieMatches.length > 0 && (
           <div className="pt-2 border-t border-slate-800/60 flex items-center gap-2 flex-wrap text-xs text-slate-400">
-            <span className="text-amber-300 font-semibold">💡 Nájdené v iných tímoch:</span>
+            <span className="text-amber-300 font-semibold">💡 Found on other teams:</span>
             {otherGoalieMatches.map(({ goalie, team: t }) => (
               <button
                 key={goalie.id}
@@ -864,10 +864,10 @@ export default function PlayerCalculatorView({
             <div className="flex items-center gap-2.5">
               <span className="text-xl">🏒</span>
               <h2 className="text-lg font-black text-white tracking-tight">
-                Korčuliari (Skaters)
+                Skaters
               </h2>
               <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-blue-500/20 border border-blue-500/30 text-blue-300 font-bold">
-                {nhlSkaters.length + ahlSkaters.length} korčuliarov
+                {nhlSkaters.length + ahlSkaters.length} skaters
               </span>
             </div>
 
@@ -877,14 +877,14 @@ export default function PlayerCalculatorView({
                 className="text-xs font-semibold px-3 py-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 transition flex items-center gap-1.5 shadow-sm"
               >
                 <span>↓</span>
-                <span>Prejsť na brankárov ({nhlGoalies.length + ahlGoalies.length})</span>
+                <span>Go to goalies ({nhlGoalies.length + ahlGoalies.length})</span>
               </a>
             )}
           </div>
 
           {/* SECTION A: NHL ROSTER */}
           <RosterSection
-            title={isAll ? "NHL — Všetci korčuliari ligy" : `${selectedTeam.name} — NHL Roster`}
+            title={isAll ? "NHL — All league skaters" : `${selectedTeam.name} — NHL Roster`}
             badgeText="NHL"
             badgeColor="bg-blue-600/20 text-blue-300 border-blue-500/30"
             teamLogo={isAll ? null : selectedTeam.logoUrl}
@@ -902,10 +902,10 @@ export default function PlayerCalculatorView({
             teamMap={teamMap}
             emptyMessage={
               search || posFilter !== "ALL" || onlyChanges
-                ? "Žiadni NHL hráči nezodpovedajú filtrom."
+                ? "No NHL players match the filters."
                 : isAll
-                ? "V lige neboli nájdení žiadni NHL korčuliari."
-                : "Tento tím nemá žiadnych korčuliarov na NHL súpiske."
+                ? "No NHL skaters were found in the league."
+                : "This team has no skaters on the NHL roster."
             }
           />
 
@@ -913,7 +913,7 @@ export default function PlayerCalculatorView({
           <RosterSection
             title={
               isAll
-                ? "AHL — Všetci korčuliari ligy (Farma)"
+                ? "AHL — All league skaters (Farm)"
                 : affiliate
                 ? `${affiliate.name} — AHL Farm Roster`
                 : `${selectedTeam.name} — AHL Farm Roster`
@@ -935,10 +935,10 @@ export default function PlayerCalculatorView({
             teamMap={teamMap}
             emptyMessage={
               search || posFilter !== "ALL" || onlyChanges
-                ? "Žiadni AHL hráči nezodpovedajú filtrom."
+                ? "No AHL players match the filters."
                 : isAll
-                ? "V lige neboli nájdení žiadni AHL korčuliari."
-                : "Tento tím nemá žiadnych korčuliarov na AHL súpiske."
+                ? "No AHL skaters were found in the league."
+                : "This team has no skaters on the AHL roster."
             }
           />
 
@@ -955,7 +955,7 @@ export default function PlayerCalculatorView({
           </div>
           <div className="relative flex justify-center">
             <span className="bg-slate-950 px-4 text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
-              <span>⚡ Rozdelenie: Korčuliari & Brankári ⚡</span>
+              <span>⚡ Split: Skaters & Goalies ⚡</span>
             </span>
           </div>
         </div>
@@ -968,10 +968,10 @@ export default function PlayerCalculatorView({
             <div className="flex items-center gap-2.5">
               <span className="text-xl">🥅</span>
               <h2 className="text-lg font-black text-white tracking-tight">
-                Brankári (Goalies)
+                Goalies
               </h2>
               <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-300 font-bold">
-                {nhlGoalies.length + ahlGoalies.length} brankárov
+                {nhlGoalies.length + ahlGoalies.length} goalies
               </span>
             </div>
 
@@ -981,7 +981,7 @@ export default function PlayerCalculatorView({
                 className="text-xs font-semibold px-3 py-1.5 rounded-xl border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 transition flex items-center gap-1.5 shadow-sm"
               >
                 <span>↑</span>
-                <span>Hore na korčuliarov ({nhlSkaters.length + ahlSkaters.length})</span>
+                <span>Up to skaters ({nhlSkaters.length + ahlSkaters.length})</span>
               </a>
             )}
           </div>
@@ -1000,10 +1000,10 @@ export default function PlayerCalculatorView({
             teamMap={teamMap}
             emptyMessage={
               search || onlyChanges
-                ? "Žiadni brankári nezodpovedajú filtrom."
+                ? "No goalies match the filters."
                 : isAll
-                ? "V lige neboli nájdení žiadni brankári."
-                : "Tento tím nemá žiadnych brankárov na súpiske."
+                ? "No goalies were found in the league."
+                : "This team has no goalies on the roster."
             }
           />
         </section>
@@ -1012,11 +1012,11 @@ export default function PlayerCalculatorView({
       {/* FOOTER EXPLANATION */}
       <div className="rounded-xl border border-slate-800/80 bg-slate-900/40 p-4 text-xs text-slate-500 space-y-1.5">
         <p>
-          <strong className="text-slate-300">Všetky parametre pripravené na prepočet:</strong>{" "}
-          Zobrazuje kompletných 15 parametrov (CK, FG, DI, SK, ST, EN, DU, PH, FO, PA, SC, DF, PS, EX, LD). Parametre s aktívnymi vzorcami (CK, DI, SK, ST, PH, PA, SC, DF, EX) sú zvýraznené hviezdičkou <span className="text-amber-400 font-bold">*</span>. PH kombinuje ochranu puku pred stratami (60 %), NHL EDGE 5v5 offensive-zone puck time (25 %) a takeaways/60 (15 %). Prejdením myšou (hover) na hráča sa zobrazí okamžité porovnanie aktuálnych hodnôt a odhadov.
+          <strong className="text-slate-300">All parameters ready for recalculation:</strong>{" "}
+          Shows all 15 parameters (CK, FG, DI, SK, ST, EN, DU, PH, FO, PA, SC, DF, PS, EX, LD). Parameters with active formulas (CK, DI, SK, ST, PH, PA, SC, DF, EX) are marked with an asterisk <span className="text-amber-400 font-bold">*</span>. PH combines puck protection against giveaways (60%), NHL EDGE 5v5 offensive-zone puck time (25%) and takeaways/60 (15%). Hovering over a player shows an instant comparison of current values and estimates.
         </p>
         <p>
-          <strong className="text-slate-300">Penalizácia za zranenia (GP):</strong> Hráč, ktorý vynechá ≥25 % zápasov, stráca −1 zo všetkých odhadov, pri ≥50 % stráca −2 a pri ≥75 % −3.
+          <strong className="text-slate-300">Injury penalty (GP):</strong> A player who misses ≥25% of games loses −1 on all estimates, −2 at ≥50% and −3 at ≥75%.
         </p>
       </div>
 
@@ -1095,7 +1095,7 @@ function RosterSection({
 
         <div className="flex items-center gap-3 text-xs text-slate-400">
           <span>
-            Korčuliari: <b className="text-white">{skaters.length}</b>
+            Skaters: <b className="text-white">{skaters.length}</b>
             {totalCount !== skaters.length && (
               <span className="text-slate-500 font-normal"> / {totalCount}</span>
             )}
@@ -1125,7 +1125,7 @@ function RosterSection({
                 onClick={() => onSort("name")}
                 className="py-2.5 px-3 font-bold text-slate-300 hover:text-white cursor-pointer sticky left-0 z-30 bg-slate-950 min-w-[190px] border-r border-slate-800/80"
               >
-                Hráč{arrow("name")}
+                Player{arrow("name")}
               </th>
 
               {/* Position */}
@@ -1148,7 +1148,7 @@ function RosterSection({
               <th
                 onClick={() => onSort("gp")}
                 className="py-2.5 px-2 text-center font-bold hover:text-white cursor-pointer w-12"
-                title="Zápasy v aktuálnej NHL sezóne"
+                title="Games in the current NHL season"
               >
                 GP{arrow("gp")}
               </th>
@@ -1157,7 +1157,7 @@ function RosterSection({
               <th
                 onClick={() => onSort("ov")}
                 className="py-2.5 px-2.5 text-center font-black text-blue-300 hover:text-blue-200 cursor-pointer w-12 border-r border-slate-800/80 bg-blue-950/20"
-                title="Celkový rating (Overall)"
+                title="Overall rating (Overall)"
               >
                 OV{arrow("ov")}
               </th>
@@ -1174,7 +1174,7 @@ function RosterSection({
                     className={`py-2.5 px-1.5 text-center font-bold hover:text-white cursor-pointer transition-colors ${
                       isCalculated ? "text-amber-300/90 hover:text-amber-200" : "text-slate-300"
                     } ${isSorted ? "bg-slate-800/50" : ""}`}
-                    title={`${meta.label} — ${meta.name}${isCalculated ? " (Aktívny prepočet vzorcom)" : " (Zatiaľ základná hodnota)"}`}
+                    title={`${meta.label} — ${meta.name}${isCalculated ? " (Active formula recalculation)" : " (Base value for now)"}`}
                   >
                     <span className="inline-flex items-center justify-center gap-0.5">
                       <span>{meta.label}</span>
@@ -1227,7 +1227,7 @@ function RosterSection({
                                 href={`/tools/player-calculator?team=${teamMap.get(p.teamId)?.slug ?? "all"}`}
                                 onClick={(e) => e.stopPropagation()}
                                 className="shrink-0 px-1.5 py-0.2 rounded text-[10px] font-bold font-mono bg-slate-800/90 hover:bg-blue-600/30 text-slate-300 hover:text-blue-200 border border-slate-700/80 transition"
-                                title={teamMap.get(p.teamId)?.name ?? "Prejsť na tím"}
+                                title={teamMap.get(p.teamId)?.name ?? "Go to team"}
                               >
                                 {teamMap.get(p.teamId)?.code ?? "—"}
                               </Link>
@@ -1261,7 +1261,7 @@ function RosterSection({
                           {p.missedPenalty > 0 && (
                             <span
                               className="text-[10px] font-bold text-rose-400 px-1 py-0.2 rounded bg-rose-500/10 border border-rose-500/30"
-                              title={`Vynechal značnú časť sezóny: penalizácia −${p.missedPenalty} na prepočítaných parametroch`}
+                              title={`Missed a large part of the season: −${p.missedPenalty} penalty on recalculated parameters`}
                             >
                               −{p.missedPenalty}
                             </span>
@@ -1350,7 +1350,7 @@ function RosterSection({
                                   className={`text-[9px] font-bold ${
                                     diff > 0 ? "text-emerald-400" : "text-rose-400"
                                   }`}
-                                  title={`Aktuálne: ${act} → Prepočítané: ${proj} (${diff > 0 ? `+${diff}` : diff})`}
+                                  title={`Current: ${act} → Recalculated: ${proj} (${diff > 0 ? `+${diff}` : diff})`}
                                 >
                                   {diff > 0 ? `+${diff}` : diff}
                                 </span>
@@ -1455,7 +1455,7 @@ function PlayerHoverComparisonCard({
               )}
               {p.missedPenalty > 0 && (
                 <span className="text-xs text-rose-400 font-bold bg-rose-500/15 border border-rose-500/40 px-2 py-0.5 rounded-lg">
-                  Penalizácia za zranenia −{p.missedPenalty}
+                  Injury penalty −{p.missedPenalty}
                 </span>
               )}
             </div>
@@ -1465,7 +1465,7 @@ function PlayerHoverComparisonCard({
         <div className="flex items-center gap-3 shrink-0">
           <div className="text-right">
             <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">
-              Celkový Rating
+              Overall Rating
             </div>
             <div className="flex items-center gap-2">
               <div className="text-lg font-bold text-slate-300 px-2.5 py-1 rounded-xl bg-slate-800/80 border border-slate-700/80 tabular-nums">
@@ -1622,7 +1622,7 @@ function PlayerHoverComparisonCard({
       <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center justify-between gap-3 text-xs flex-wrap">
         {changes.length > 0 ? (
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-slate-400 font-semibold">Odhadované zmeny:</span>
+            <span className="text-slate-400 font-semibold">Estimated changes:</span>
             {changes.map((c) => (
               <span
                 key={c.key}
@@ -1639,7 +1639,7 @@ function PlayerHoverComparisonCard({
           </div>
         ) : (
           <span className="text-slate-500 italic text-xs">
-            Všetky parametre zatiaľ stabilné (bez odhadovanej zmeny)
+            All parameters stable for now (no estimated change)
           </span>
         )}
         <span className="text-[11px] text-slate-500 ml-auto">
