@@ -722,7 +722,7 @@ export default function ReSignPanel({
             <div className="flex items-center gap-2">
               <span className="text-sm font-black uppercase tracking-tight text-amber-300">Top priority decisions</span>
               <span className="text-xs font-semibold text-slate-400">
-                ({pinnedPlayers.length}/3 zvolené vlastné 📌)
+                ({pinnedPlayers.length}/3 hand-picked 📌)
               </span>
             </div>
             <button type="button" onClick={() => { setTab("ALL"); setSortBy("capHit"); setSearchQuery(""); }} className="text-xs font-bold text-sky-400 hover:text-sky-300">View all {players.length} players →</button>
@@ -779,7 +779,7 @@ export default function ReSignPanel({
             <div className="flex items-center gap-1.5 text-xs text-fuchsia-300 bg-fuchsia-950/40 border border-fuchsia-800/50 rounded-lg px-2.5 py-1.5 font-medium">
               <span className="text-fuchsia-400 font-bold">★</span>
               <span>
-                Franchise Tag v tejto sezóne využitý: <b className="text-fuchsia-200">{franchiseTaggedPlayer?.name ?? players.find((p) => p.id === tagged)?.name ?? "Využitý"}</b> (1 na klub za sezónu)
+                Franchise Tag used this season: <b className="text-fuchsia-200">{franchiseTaggedPlayer?.name ?? players.find((p) => p.id === tagged)?.name ?? "Used"}</b> (1 per club per season)
               </span>
             </div>
           )}
@@ -869,8 +869,8 @@ export default function ReSignPanel({
                   const isDisabled = tagPending || isUsed || (!isTagged && ((p.resignRound ?? 0) > 0 || tagged != null));
                   const tagTitle = isUsed
                     ? (isTagged
-                        ? "Franchise Tag už bol pre tohto hráča v rokovaniach použitý — nemožno ho zmeniť"
-                        : `Váš klub už v tejto sezóne použil Franchise Tag (${franchiseTaggedPlayer?.name ?? "využitý"})`)
+                        ? "The Franchise Tag was already used on this player in negotiations — it can't be changed"
+                        : `Your club already used its Franchise Tag this season (${franchiseTaggedPlayer?.name ?? "used"})`)
                     : !isTagged && tagged != null
                       ? `Franchise Tag už má priradený iný hráč (${franchiseTaggedPlayer?.name ?? "hráč"})`
                       : !isTagged && (p.resignRound ?? 0) > 0

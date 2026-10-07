@@ -645,7 +645,7 @@ export default async function HomePage() {
                       <PlayerLink slug={meta?.slug ?? undefined} id={s.playerId} name={s.name} clean={false} />
                       <span className="text-slate-500 font-mono text-[10px] ml-1.5">{s.teamCode}</span>
                     </span>
-                    <span className="font-mono font-black text-white text-xs">{s.points} B</span>
+                    <span className="font-mono font-black text-white text-xs">{s.points} P</span>
                   </div>
                 );
               })}

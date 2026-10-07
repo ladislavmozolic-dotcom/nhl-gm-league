@@ -175,7 +175,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
     computeStandings(SEASON, team.league ?? "NHL").catch(() => []),
     canManageTeam(team.id),
     prisma.transaction.findMany({
-      where: { OR: [{ teamId: team.id }, { message: { contains: team.name } }] },
+      where: { OR: [{ teamId: team.id }, { message: { contains: team.name } }, ...(team.code ? [{ message: { startsWith: `${team.code} ` } }] : [])] },
       orderBy: { createdAt: "desc" },
       take: 3,
     }),
@@ -1122,7 +1122,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
             <div className="bg-[#0b1120] border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-3">
               <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
                 <span className="text-xs font-black uppercase tracking-wider text-yellow-400 flex items-center gap-1.5">
-                  <span>🎖️</span> Vedenie tímu (Leadership)
+                  <span>🎖️</span> Leadership
                 </span>
               </div>
               <div className="space-y-2">
