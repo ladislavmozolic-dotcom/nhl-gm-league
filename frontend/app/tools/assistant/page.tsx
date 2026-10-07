@@ -5,6 +5,7 @@ import { intelligenceAccess } from "@/lib/gm-assistant/access";
 import { analyzeRoster, type RosterFinding } from "@/lib/gm-assistant/analyzeRoster";
 import { slotById, slotPositionFilter } from "@/lib/gm-assistant/leagueSlots";
 import { cleanName } from "@/lib/playerName";
+import { loadGmBriefing, type BriefingItem } from "@/lib/gm-assistant/gmBriefing";
 import { PageHeader, Card } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +22,7 @@ export default async function GmAssistantPage() {
   const admin = access.admin;
 
   const analysis = await analyzeRoster(teamId);
+  const briefing = await loadGmBriefing(teamId, analysis);
 
   const severityStyle: Record<RosterFinding["severity"], { text: string; bg: string; label: string }> = {
     critical: { text: "text-red-400", bg: "bg-red-950/40 border-red-900/60", label: "Slabé miesto" },
@@ -31,6 +33,8 @@ export default async function GmAssistantPage() {
   return (
     <div className="py-2 flex flex-col gap-6">
       <PageHeader title="🧠 UNHL Intelligence" subtitle="Explainable roster intelligence — každé zistenie s presnými číslami a hráčmi za ním." />
+
+      {briefing && <GmAssistantBriefing briefing={briefing} />}
 
       <Card title="Analyze My Roster" accent="text-blue-400">
         {!analysis ? (
@@ -132,4 +136,32 @@ export default async function GmAssistantPage() {
       )}
     </div>
   );
+}
+
+function GmAssistantBriefing({ briefing }: { briefing: NonNullable<Awaited<ReturnType<typeof loadGmBriefing>>> }) {
+  const style: Record<BriefingItem["priority"], { label: string; text: string; border: string }> = {
+    now: { label: "Teraz", text: "text-rose-300", border: "border-rose-900/60 bg-rose-950/20" },
+    next: { label: "Ďalší krok", text: "text-amber-300", border: "border-amber-900/60 bg-amber-950/20" },
+    watch: { label: "Sledovať", text: "text-sky-300", border: "border-sky-900/60 bg-sky-950/20" },
+  };
+  return <Card title="✨ GM Assistant — denný briefing" accent="text-violet-400">
+    <div className="flex flex-col gap-3">
+      <p className="text-sm text-slate-400">
+        Smer tímu: <span className="font-semibold text-violet-300">{briefing.contentionLabel}</span>
+        {briefing.record && <> · {briefing.record.points} b. v {briefing.record.gp} z. ({(briefing.record.pointsPct * 100).toFixed(1)} %)</>}
+        {briefing.form && briefing.form.streak !== 0 && <> · aktuálna séria: <span className={briefing.form.streak > 0 ? "text-emerald-300" : "text-rose-300"}>{briefing.form.streak > 0 ? `${briefing.form.streak} výhry` : `${Math.abs(briefing.form.streak)} prehry`}</span></>}
+      </p>
+      <p className="text-xs text-slate-500">Prioritizované odporúčania z postavenia tímu, formy, capu a porovnania role score. Sú poradenské — žiadny krok sa nevykoná automaticky.</p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        {briefing.items.map((item) => {
+          const s = style[item.priority];
+          return <div key={item.id} className={`border rounded-xl p-3.5 ${s.border}`}>
+            <div className="flex items-center justify-between gap-3 mb-1"><span className="text-sm font-semibold text-slate-100">{item.title}</span><span className={`text-[10px] font-bold uppercase tracking-wider ${s.text}`}>{s.label}</span></div>
+            <p className="text-xs leading-relaxed text-slate-400">{item.detail}</p>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2.5">{item.actions.map((action) => <Link key={action.href} href={action.href} className={action.tone === "emerald" ? "text-xs font-semibold text-emerald-400 hover:text-emerald-300" : action.tone === "amber" ? "text-xs font-semibold text-amber-400 hover:text-amber-300" : "text-xs font-semibold text-blue-400 hover:text-blue-300"}>{action.label} →</Link>)}</div>
+          </div>;
+        })}
+      </div>
+    </div>
+  </Card>;
 }
