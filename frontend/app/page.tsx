@@ -250,7 +250,7 @@ export default async function HomePage() {
     const gDate = new Date(myNextGame.gameDate);
     const diff = daysBetween(clock.date, gDate);
     const weekday = gDate.toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" });
-    const dayMonth = `${gDate.getUTCDate()}.${gDate.getUTCMonth() + 1}.`;
+    const dayMonth = gDate.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
     const dateFormatted = `${weekday}, ${dayMonth}`;
     if (diff === 0) {
       myNextGameWhen = `Today · ${dateFormatted}`;
@@ -334,7 +334,7 @@ export default async function HomePage() {
                       <div className="min-w-0 flex-1">
                         <div className="text-xs font-bold text-slate-100 flex items-center gap-1.5 group-hover:text-emerald-300 transition-colors truncate">
                           <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${isMyGameHome ? "bg-blue-900/60 text-blue-300 border border-blue-700/60" : "bg-amber-900/60 text-amber-300 border border-amber-700/60"}`}>
-                            {isMyGameHome ? "DOMA" : "VONKU"}
+                            {isMyGameHome ? "HOME" : "AWAY"}
                           </span>
                           <span className="truncate">{myNextOpponent.name}</span>
                         </div>

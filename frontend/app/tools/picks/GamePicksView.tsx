@@ -689,7 +689,7 @@ export default function GamePicksView({
                           )}
                           <div className="truncate text-center sm:text-left">
                             <div className="text-xs truncate font-bold">{g.awayTeam?.name}</div>
-                            <div className="text-[10px] text-slate-400 font-mono">2 (Hostia)</div>
+                            <div className="text-[10px] text-slate-400 font-mono">2 (Away)</div>
                           </div>
                         </div>
                       </button>
@@ -738,7 +738,7 @@ export default function GamePicksView({
                           )}
                           <div className="truncate text-center sm:text-left">
                             <div className="text-xs truncate font-bold">{g.homeTeam?.name}</div>
-                            <div className="text-[10px] text-slate-400 font-mono">1 (Doma)</div>
+                            <div className="text-[10px] text-slate-400 font-mono">1 (Home)</div>
                           </div>
                         </div>
                       </button>
@@ -837,7 +837,7 @@ export default function GamePicksView({
                       }`}
                     >
                       <div className="text-sm font-bold truncate">{gotwGame.awayTeam?.name}</div>
-                      <div className="text-[10px] text-slate-400 font-mono">2 (Hostia)</div>
+                      <div className="text-[10px] text-slate-400 font-mono">2 (Away)</div>
                     </button>
 
                     <button
@@ -865,7 +865,7 @@ export default function GamePicksView({
                       }`}
                     >
                       <div className="text-sm font-bold truncate">{gotwGame.homeTeam?.name}</div>
-                      <div className="text-[10px] text-slate-400 font-mono">1 (Doma)</div>
+                      <div className="text-[10px] text-slate-400 font-mono">1 (Home)</div>
                     </button>
                   </div>
                 </div>

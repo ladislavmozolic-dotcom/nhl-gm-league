@@ -66,7 +66,7 @@ export default function RookieCalculatorPanel({
               className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white whitespace-nowrap flex items-center gap-1.5 transition border border-slate-700"
             >
               <span>⚙️</span>
-              <span>Tuning &amp; Nastavenia</span>
+              <span>Tuning &amp; Settings</span>
             </button>
           ) : undefined
         }

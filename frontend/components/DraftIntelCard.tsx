@@ -121,7 +121,7 @@ export default async function DraftIntelCard({ teamId, draftYear, available, sou
               <div key={i} className="flex items-center justify-between text-xs border border-slate-800 rounded-lg px-3 py-2">
                 <span className="text-slate-300">{c.name} <span className="text-slate-500">({c.draftYear}{c.overallPick ? `, #${c.overallPick}` : ""})</span></span>
                 <span className="text-slate-400">
-                  draft OV {c.draftOv}/POT {c.draftPotential} → teraz {c.nowRating != null ? c.nowRating.toFixed(1) : "nie je v NHL"}
+                  draft OV {c.draftOv}/POT {c.draftPotential} → now {c.nowRating != null ? c.nowRating.toFixed(1) : "not in the NHL"}
                 </span>
               </div>
             ))}

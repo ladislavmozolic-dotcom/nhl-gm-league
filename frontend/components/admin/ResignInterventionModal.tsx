@@ -175,7 +175,7 @@ export default function ResignInterventionModal({
       try {
         const res = await resetResignAction(player.id, true);
         if (!res.ok) {
-          setError(res.error ?? "Chyba pri resete.");
+          setError(res.error ?? "Error while resetting.");
         } else {
           router.refresh();
           setSuccess("The negotiation was reset.");
@@ -200,7 +200,7 @@ export default function ResignInterventionModal({
       try {
         const res = await forceWalkResignAction(player.id, toUFA);
         if (!res.ok) {
-          setError(res.error ?? "Chyba.");
+          setError(res.error ?? "Error.");
         } else {
           router.refresh();
           setSuccess(`The player was moved to: ${dest}`);

@@ -721,7 +721,7 @@ export default function LiveCalculatorConfigModal({
             </div>
             <div>
               <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                Live Calculator — Nastavenia & Tuning
+                Live Calculator — Settings & Tuning
                 <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
                   V10 Engine
                 </span>

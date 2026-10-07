@@ -457,7 +457,7 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
                         <span className="text-slate-500 group-open:rotate-90 transition-transform">▶</span>
                         Available draft talent ({board.length} players)
                       </span>
-                      <span className="text-[10px] text-slate-500">Kliknite pre zobrazenie</span>
+                      <span className="text-[10px] text-slate-500">Click to view</span>
                     </summary>
                     <div className="p-3 border-t border-slate-800">
                       <DraftAvailableBoard prospects={board} canPick={false} />

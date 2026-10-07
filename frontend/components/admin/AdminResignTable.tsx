@@ -134,7 +134,7 @@ export default function AdminResignTable({ rows }: { rows: ResignRowData[] }) {
                 <th className="text-left px-4 py-3 font-semibold">Player & CBA</th>
                 <th className="text-left px-3 py-3 font-semibold">Klub</th>
                 <th className="text-left px-3 py-3 font-semibold">Stav & Kolo</th>
-                <th className="text-right px-3 py-3 font-semibold">Ponuka klubu</th>
+                <th className="text-right px-3 py-3 font-semibold">Club offer</th>
                 <th className="text-right px-3 py-3 font-semibold">Player counter-offer</th>
                 <th className="text-right px-3 py-3 font-semibold">Submitted</th>
                 <th className="text-left px-4 py-3 font-semibold">AI Benchmark & Mood</th>

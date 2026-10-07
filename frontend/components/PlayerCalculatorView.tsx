@@ -608,7 +608,7 @@ export default function PlayerCalculatorView({
                   className="text-xs font-semibold px-3 py-1.5 rounded-xl border border-indigo-500/40 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 transition flex items-center gap-1.5 shadow-sm hover:scale-[1.02]"
                 >
                   <span>⚙️</span>
-                  <span>Tuning & Nastavenia</span>
+                  <span>Tuning & Settings</span>
                 </button>
               )}
 
