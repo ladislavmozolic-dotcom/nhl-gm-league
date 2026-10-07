@@ -7,7 +7,9 @@ import { DRESS_TARGET } from "@/lib/roster-rules";
 type Issue = Extract<RosterComplianceResult, { compliant: false }>;
 
 const KEY = "dismissedRosterCompliance";
-const sigOf = (r: Issue) => `${r.teamSlug}:${r.sides.map((s) => `${s.level}-${s.counts.F}-${s.counts.D}-${s.counts.G}`).join(",")}`;
+const sigOf = (r: Issue) => `${r.teamSlug}:${r.sides.map((s) => `${s.level}-${s.counts.F}-${s.counts.D}-${s.counts.G}`).join(",")}:${r.cap ? `${r.cap.kind}-${r.cap.amount}` : "cap-ok"}`;
+const money = (n: number) => (n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(2)}M` : `$${Math.round(n / 1000)}K`);
+const GROUP_SK = { F: "útočníka", D: "obrancu", G: "brankára" } as const;
 
 export default function RosterComplianceOverlay() {
   const [issue, setIssue] = useState<Issue | null>(null);
@@ -47,12 +49,25 @@ export default function RosterComplianceOverlay() {
     );
   };
   const levelLabel: Record<"NHL" | "AHL", string> = { NHL: "NHL zostava", AHL: "AHL zostava" };
+  const hints = (s: Issue["sides"][number]) => {
+    const out: string[] = [];
+    for (const g of ["F", "D", "G"] as const) {
+      const diff = s.counts[g] - DRESS_TARGET[g];
+      if (diff > 0) out.push(`Navyše ${diff}× ${GROUP_SK[g]} — prebytočných označ ako scratched${s.level === "NHL" ? " alebo pošli na farmu" : ""}.`);
+      if (diff < 0) {
+        out.push(`Chýba ${-diff}× ${GROUP_SK[g]}${s.level === "NHL" ? " — povolaj z farmy" : " — aktivuj scratched hráča"}.`);
+        if (s.level === "NHL" && issue.noCallupGroups.includes(g)) out.push(`Na farme nemáš nikoho, koho možno povolať (zmluvy za $100K sú len pre AHL) — musíš získať ${GROUP_SK[g]} s NHL zmluvou cez trade alebo free agency.`);
+      }
+    }
+    return out;
+  };
+  const f = issue.fines;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={close}>
       <div onClick={(e) => e.stopPropagation()}
         className="w-full max-w-md rounded-2xl border border-amber-500/40 bg-[#1a1408] p-6 shadow-2xl shadow-amber-500/10">
-        <h2 className="text-lg font-black text-white mb-1 flex items-center gap-2">⚠️ Zostava nie je v poriadku</h2>
+        <h2 className="text-lg font-black text-white mb-1 flex items-center gap-2">⚠️ {issue.sides.length ? "Zostava nie je v poriadku" : "Tím je mimo salary capu"}</h2>
         <p className="text-xs text-slate-400 mb-4">
           Do zápasu smie nastúpiť presne 20 hráčov — 12 útočníkov, 6 obrancov, 2 brankári — v NHL aj v AHL. Zvyšní hráči na súpiske musia byť označení ako <b>scratched</b>.
         </p>
@@ -63,8 +78,30 @@ export default function RosterComplianceOverlay() {
               {row("Útočníci (F)", s.counts.F, DRESS_TARGET.F)}
               {row("Obrancovia (D)", s.counts.D, DRESS_TARGET.D)}
               {row("Brankári (G)", s.counts.G, DRESS_TARGET.G)}
+              {hints(s).length > 0 && (
+                <ul className="mt-2 pt-2 border-t border-slate-800 space-y-1 text-xs text-slate-300 list-disc pl-4">
+                  {hints(s).map((h, i) => <li key={i}>{h}</li>)}
+                </ul>
+              )}
+              <div className="text-[11px] text-rose-300">Pokuta: {money(s.level === "NHL" ? f.nhlRoster : f.ahlRoster)} za každý deň s neplatnou súpiskou</div>
             </div>
           ))}
+          {issue.cap && (
+            <div className="rounded-xl bg-slate-900/70 border border-slate-800 p-3 text-sm space-y-1.5">
+              <div className="text-[11px] font-bold uppercase tracking-wide text-amber-300 mb-1">Salary cap</div>
+              <div className="text-slate-300">
+                {issue.cap.kind === "over"
+                  ? <>Si <b className="text-rose-300">{money(issue.cap.amount)} nad stropom</b> ({money(issue.cap.committed)} z {money(issue.cap.limit)}). Musíš znížiť platy o aspoň {money(issue.cap.amount)} — trade, buyout, waivers alebo poslanie hráča na farmu.</>
+                  : <>Si <b className="text-rose-300">{money(issue.cap.amount)} pod spodnou hranicou</b> ({money(issue.cap.committed)} z minima {money(issue.cap.limit)}). Musíš pridať platy aspoň za {money(issue.cap.amount)}.</>}
+              </div>
+              <div className="text-[11px] text-rose-300">
+                Pokuta: {money(issue.cap.kind === "over" ? f.cap : f.floor)} za každý deň; zároveň sa to započíta do zníženia/zvýšenia capu na budúcu sezónu.
+              </div>
+            </div>
+          )}
+          <p className="text-[11px] text-slate-500">
+            Pokuty idú do League Bank a strhnú sa z účtu tímu. Kontrola prebieha každý deň o 20:30 (bratislavský čas){f.active ? "." : " — automatické pokuty sú momentálne vypnuté, ale pravidlá platia."}
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <a href={`/teams/${issue.teamSlug}/rosters`} onClick={close}
