@@ -64,7 +64,13 @@ export default function DraftChat({ canChat, myTeamId, channel = "draft" }: { ca
           const mine = m.teamId === myTeamId;
           return (
             <div key={m.id} className={`flex gap-2 ${mine ? "flex-row-reverse" : ""}`}>
-              {m.logoUrl ? <img src={m.logoUrl} alt="" className="w-6 h-6 object-contain shrink-0 mt-0.5" /> : <div className="w-6 h-6 rounded bg-slate-800 shrink-0" />}
+              {m.logoUrl ? (
+                <span className="inline-flex items-center justify-center rounded bg-slate-800 border border-slate-700/60 p-0.5 shrink-0 mt-0.5" style={{ width: 24, height: 24, minWidth: 24 }}>
+                  <img src={m.logoUrl} alt="" className="object-contain" style={{ width: 18, height: 18, maxWidth: 18, maxHeight: 18 }} />
+                </span>
+              ) : (
+                <div className="w-6 h-6 rounded bg-slate-800 shrink-0 mt-0.5" />
+              )}
               <div className={`max-w-[78%] ${mine ? "text-right" : ""}`}>
                 <div className="text-[10px] text-slate-500">{m.code ?? m.name} · {time(m.at)}</div>
                 <div className={`inline-block px-2.5 py-1.5 rounded-lg text-sm ${mine ? "bg-blue-600/80 text-white" : "bg-slate-800 text-slate-200"} break-words`}>{m.text}</div>

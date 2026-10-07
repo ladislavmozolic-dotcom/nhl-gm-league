@@ -54,13 +54,14 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
   const ppr = revStd.length;
   // original owner of any overall pick = the team at that fixed worst-first slot
   const originalOwnerOf = (overallPick: number) => revStd[(overallPick - 1) % ppr];
-  const state = stateRaw ?? { liveRound: 0, currentPick: 33, status: "IDLE" as string };
-  const fullView = sp.round == null || sp.round === "full"; // Full Draft is the default landing view
+  const state = stateRaw ?? { liveRound: 0, currentPick: 1, status: "IDLE" as string };
+  const fullView = sp.round === "full"; // Default landing is Round 1 / live round, "full" is opt-in
   // extra rounds (8, 9, …) exist once the admin awards bonus picks
   const bonusRounds = [...new Set(order.filter((p) => p.round > 7 && !p.deferred).map((p) => p.round))].sort((a, b) => a - b);
   const allRounds = [...ROUNDS, ...bonusRounds];
   const maxRound = allRounds[allRounds.length - 1] ?? 7;
-  const round = Math.min(maxRound, Math.max(1, Number(sp.round) || (state.liveRound >= 2 ? state.liveRound : 2)));
+  const defaultRound = state.liveRound >= 1 ? state.liveRound : 1;
+  const round = Math.min(maxRound, Math.max(1, Number(sp.round) || defaultRound));
   const allPicks = [...drafted].filter((p) => p.overallPick != null).sort((a, b) => (a.overallPick ?? 0) - (b.overallPick ?? 0));
 
   // the selected round's pick range from the order (base rounds are 32-wide; bonus rounds vary)
@@ -78,6 +79,10 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
   // pick deadline: on-the-clock time + allotted minutes (20 for R1/deferred, 30 R2-7)
   const PICK_MINUTES = currentSlot?.deferred || currentSlot?.round === 1 ? 20 : 30;
   const pickDeadline = isLiveRound && stateRaw?.onClockAt ? new Date(new Date(stateRaw.onClockAt).getTime() + PICK_MINUTES * 60000).toISOString() : null;
+
+  // upcoming / first pick of this round if not live
+  const firstSlotOfRound = order.find((p) => p.overallPick === roundLo);
+  const stageTeam = onClockTeam || (firstSlotOfRound ? teamOf.get(firstSlotOfRound.pickerTeamId) : undefined);
 
   // draft order for the selected round (who picks from which slot)
   const draftedByPick = new Map(drafted.filter((d) => d.overallPick != null).map((d) => [d.overallPick as number, d]));
@@ -226,45 +231,9 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
             <DraftAvailableBoard prospects={board} canPick={false} />
           </div>
         </div>
-      ) : roundComplete ? (
-        <div>
-          <div className="text-sm text-slate-400 mb-2">Round {round} — <span className="text-emerald-400 font-bold">Ukončené</span> · {roundPicks.length} výberov</div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {roundPicks.map((p) => {
-              const t = p.draftedByTeamId ? teamOf.get(p.draftedByTeamId) : undefined;
-              const origId = (p.overallPick ?? 0) > ppr ? originalOwnerOf(p.overallPick!) : undefined;
-              const orig = origId && origId !== p.draftedByTeamId ? teamOf.get(origId) : undefined;
-              return (
-                <div key={p.id} className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/50 hover:bg-slate-900/80 px-3 py-2.5 transition-colors">
-                  <span className="w-8 text-center text-sm font-bold text-slate-500 font-mono">#{p.overallPick}</span>
-                  <span className="flex items-center gap-1">
-                    {t?.logoUrl && (
-                      <span className="inline-flex items-center justify-center rounded-lg bg-slate-800/80 border border-slate-700/60 p-0.5 shrink-0" style={{ width: 32, height: 32, minWidth: 32 }}>
-                        <img src={t.logoUrl} alt="" className="object-contain" style={{ width: 22, height: 22, maxWidth: 22, maxHeight: 22 }} />
-                      </span>
-                    )}
-                    {orig?.logoUrl && (
-                      <span className="flex items-center text-slate-600 text-xs">
-                        (<img src={orig.logoUrl} alt="" className="w-4 h-4 object-contain mx-0.5" />)
-                      </span>
-                    )}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="font-bold text-slate-100 truncate">
-                      <EpHoverName player={{ name: p.name, position: p.position, country: p.country, shoots: p.shoots, heightIn: p.heightIn, weightLb: p.weightLb, amateurLeague: p.amateurLeague, amateurClub: p.amateurClub, flag: countryFlag(p.country) }} className="cursor-help hover:text-sky-300 transition-colors">
-                        <span className="mr-1">{countryFlag(p.country)}</span>{p.name} <span className={`text-xs ${posColor[p.position] ?? "text-slate-400"}`}>{p.position}</span>
-                      </EpHoverName>
-                    </div>
-                    <div className="text-xs text-slate-500 truncate">{t?.name ?? "—"} · {p.amateurLeague ?? p.country ?? ""}</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
       ) : (
         <div className="space-y-4">
-          {/* on the clock / admin controls */}
+          {/* Draft Stage Hero Banner: On-the-clock podium if live, otherwise prominent Stage Hero */}
           {isLiveRound && currentSlot && onClockTeam ? (
             <div className="relative overflow-hidden rounded-3xl border-2 border-amber-500/50 bg-gradient-to-br from-[#10192e] via-[#0b1120] to-[#070b12] p-5 sm:p-6 shadow-2xl">
               <div className="absolute -top-16 -left-16 w-64 h-64 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
@@ -291,7 +260,7 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
                       <span>{onClockTeam.name}</span>
                       {currentSlot.pickerTeamId !== currentSlot.originalTeamId && teamOf.get(currentSlot.originalTeamId)?.logoUrl && (
                         <span className="flex items-center text-slate-400 text-xs font-normal">
-                          (pôvodne <img src={teamOf.get(currentSlot.originalTeamId)!.logoUrl!} alt="" className="w-4 h-4 object-contain inline mx-1" />)
+                          (pôvodne <img src={teamOf.get(currentSlot.originalTeamId)!.logoUrl!} alt="" className="object-contain inline mx-1" style={{ width: 16, height: 16, maxWidth: 16, maxHeight: 16 }} />)
                         </span>
                       )}
                     </div>
@@ -314,8 +283,79 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
               </div>
             </div>
           ) : (
-            <div className="text-sm text-slate-400 p-3 rounded-xl bg-slate-900/40 border border-slate-800">
-              Round {round} — {state.liveRound === round ? "round complete" : "not open yet."} {admin ? "" : "The admin opens each round."}
+            <div className="relative overflow-hidden rounded-3xl border border-slate-800 bg-gradient-to-br from-[#10192e] via-[#0b1120] to-[#070b12] p-5 sm:p-6 shadow-2xl">
+              <div className="absolute -top-16 -left-16 w-64 h-64 bg-sky-500/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute -top-16 -right-16 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+
+              <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+                <div className="flex items-center gap-4">
+                  <div className="rounded-2xl bg-slate-800/90 border border-slate-700/80 p-2 flex items-center justify-center shadow-xl shrink-0" style={{ width: 68, height: 68, minWidth: 68 }}>
+                    {stageTeam?.logoUrl ? (
+                      <img src={stageTeam.logoUrl} alt="" className="object-contain filter drop-shadow" style={{ width: 48, height: 48, maxWidth: 48, maxHeight: 48 }} />
+                    ) : (
+                      <span className="text-base font-black text-slate-400">{stageTeam?.code ?? "NHL"}</span>
+                    )}
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm border ${
+                        roundComplete
+                          ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                          : state.status === "LIVE"
+                          ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                          : "bg-sky-500/20 text-sky-300 border-sky-500/40"
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${roundComplete ? "bg-emerald-400" : state.status === "LIVE" ? "bg-amber-400 animate-ping" : "bg-sky-400"}`} />
+                        {roundComplete
+                          ? `${round}. KOLO DOKONČENÉ`
+                          : state.status === "LIVE"
+                          ? `DRAFT PREBIEHA V ${state.liveRound}. KOLE`
+                          : `PRIPRAVENÉ · ${round}. KOLO`}
+                      </span>
+                      <span className="text-xs text-slate-400 font-mono">
+                        {roundComplete ? `${roundPicks.length}/${roundSlots.length} VÝBEROV HOTOVÝCH` : `PRVÁ VOĽBA KOLA: #${firstSlotOfRound?.overallPick ?? roundLo}`}
+                      </span>
+                    </div>
+                    <div className="text-xl sm:text-2xl font-black text-white flex items-center gap-2 mt-1">
+                      <span>{stageTeam ? stageTeam.name : `${DRAFT_YEAR} NHL Entry Draft`}</span>
+                      {firstSlotOfRound && firstSlotOfRound.pickerTeamId !== firstSlotOfRound.originalTeamId && teamOf.get(firstSlotOfRound.originalTeamId)?.logoUrl && (
+                        <span className="flex items-center text-slate-400 text-xs font-normal">
+                          (pôvodne <img src={teamOf.get(firstSlotOfRound.originalTeamId)!.logoUrl!} alt="" className="object-contain inline mx-1" style={{ width: 16, height: 16, maxWidth: 16, maxHeight: 16 }} />)
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs text-slate-400 font-medium mt-0.5 block">
+                      {roundComplete
+                        ? `Všetky výbery v ${round}. kole boli úspešne odovzdané.`
+                        : state.status === "LIVE"
+                        ? `Prebieha výber #${state.currentPick}. Môžete prepnúť na živé ${state.liveRound}. kolo.`
+                        : round1Opens && Date.now() < round1Opens.getTime()
+                        ? `Začiatok kola: ${round1Opens.toLocaleString("sk-SK", { timeZone: "Europe/Bratislava", dateStyle: "long", timeStyle: "short" })}`
+                        : "Kolo zatiaľ nie je otvorené. Administrátor otvorí kolo alebo sa spustí podľa harmonogramu."}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3 bg-slate-900/90 border border-slate-800 rounded-2xl px-4 py-3 shadow-inner">
+                  <div className="text-left md:text-right">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block tracking-wider">Dostupných v triede</span>
+                    <span className="text-base font-black text-slate-200">{availableRaw.length} talentov</span>
+                  </div>
+                  <div className="w-px h-8 bg-slate-800 hidden sm:block" />
+                  <div className="text-left md:text-right">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block tracking-wider">Výbery v kole</span>
+                    <span className="text-base font-black text-slate-200">{roundPicks.length} / {roundSlots.length}</span>
+                  </div>
+                  {state.status === "LIVE" && (
+                    <Link
+                      href={`/draft/room?round=${state.liveRound}`}
+                      className="ml-2 px-3 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-black text-xs hover:bg-amber-400 transition-colors shadow-md shadow-amber-500/20 shrink-0"
+                    >
+                      Prejsť na LIVE ⚡
+                    </Link>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
@@ -341,7 +381,7 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
                       )}
                       <span className="min-w-0 flex-1 truncate text-xs flex items-center gap-1">
                         {picked ? <span className="text-slate-300 font-medium truncate">{picked.name}</span> : deferredSources.has(p.overallPick) ? <span className="text-red-400/70 line-through">{picker?.code} → deferred</span> : current ? <span className="text-amber-300 font-black">NA RADE</span> : <span className="text-slate-400 font-semibold">{picker?.code}</span>}
-                        {orig?.logoUrl && <span className="flex items-center text-slate-600 text-[10px] shrink-0">(<img src={orig.logoUrl} alt="" className="w-3.5 h-3.5 object-contain" />)</span>}
+                        {orig?.logoUrl && <span className="flex items-center text-slate-600 text-[10px] shrink-0">(<img src={orig.logoUrl} alt="" className="object-contain" style={{ width: 14, height: 14, maxWidth: 14, maxHeight: 14 }} />)</span>}
                       </span>
                     </div>
                   );
@@ -356,8 +396,12 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
                       const current = isLiveRound && p.overallPick === state.currentPick;
                       return (
                         <div key={p.overallPick} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg ${current ? "bg-amber-500/15 ring-1 ring-amber-500/40" : picked ? "opacity-60" : "hover:bg-slate-800/40"}`}>
-                          <span className="w-6 text-right text-xs tabular-nums text-slate-500">{p.overallPick}</span>
-                          {picker?.logoUrl && <img src={picker.logoUrl} alt="" className="w-5 h-5 object-contain shrink-0" />}
+                          <span className="w-6 text-right text-xs tabular-nums text-slate-500">#{p.overallPick}</span>
+                          {picker?.logoUrl && (
+                            <span className="inline-flex items-center justify-center rounded bg-slate-800 border border-slate-700/60 p-0.5 shrink-0" style={{ width: 22, height: 22, minWidth: 22 }}>
+                              <img src={picker.logoUrl} alt="" className="object-contain" style={{ width: 16, height: 16, maxWidth: 16, maxHeight: 16 }} />
+                            </span>
+                          )}
                           <span className="min-w-0 flex-1 truncate text-xs">
                             {picked ? <span className="text-slate-300">{picked.name}</span> : current ? <span className="text-amber-300 font-medium">on the clock</span> : <span className="text-slate-500">{picker?.code} · was #{p.sourcePick}</span>}
                           </span>
@@ -370,10 +414,64 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
             </div>
 
             <div className="space-y-3">
-              {me != null && <DraftQueuePanel queue={myQueue} canPick={canPick} />}
-              <DraftAvailableBoard prospects={board} canPick={canPick} onClock={currentSlot && onClockTeam ? { teamName: onClockTeam.name, teamLogo: onClockTeam.logoUrl, pick: state.currentPick } : undefined} />
-              {canPick && currentSlot && <OffBoardPickForm pick={state.currentPick} />}
-              {admin && <OffBoardVerifyPanel picks={offBoardPicks} />}
+              {roundComplete ? (
+                <div className="space-y-3">
+                  <div className="rounded-2xl border border-slate-800 bg-[#0b1120] p-4 shadow-xl">
+                    <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                        <span className="text-xs font-black uppercase tracking-wider text-slate-200">Vybraní hráči v {round}. kole</span>
+                      </div>
+                      <span className="text-xs font-mono text-emerald-400 font-bold">{roundPicks.length} výberov</span>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2 max-h-[500px] overflow-y-auto custom-scroll pr-1">
+                      {roundPicks.map((p) => {
+                        const t = p.draftedByTeamId ? teamOf.get(p.draftedByTeamId) : undefined;
+                        const origId = (p.overallPick ?? 0) > ppr ? originalOwnerOf(p.overallPick!) : undefined;
+                        const orig = origId && origId !== p.draftedByTeamId ? teamOf.get(origId) : undefined;
+                        return (
+                          <div key={p.id} className="flex items-center gap-2.5 rounded-xl border border-slate-800/80 bg-slate-900/50 hover:bg-slate-900/90 px-3 py-2 transition-colors">
+                            <span className="w-7 text-center text-xs font-bold text-slate-500 font-mono">#{p.overallPick}</span>
+                            {t?.logoUrl && (
+                              <span className="inline-flex items-center justify-center rounded-lg bg-slate-800/80 border border-slate-700/60 p-0.5 shrink-0" style={{ width: 28, height: 28, minWidth: 28 }}>
+                                <img src={t.logoUrl} alt="" className="object-contain" style={{ width: 20, height: 20, maxWidth: 20, maxHeight: 20 }} />
+                              </span>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <div className="font-bold text-slate-100 text-xs truncate">
+                                <EpHoverName player={{ name: p.name, position: p.position, country: p.country, shoots: p.shoots, heightIn: p.heightIn, weightLb: p.weightLb, amateurLeague: p.amateurLeague, amateurClub: p.amateurClub, flag: countryFlag(p.country) }} className="cursor-help hover:text-sky-300 transition-colors">
+                                  <span className="mr-1">{countryFlag(p.country)}</span>{p.name} <span className={`text-[10px] ${posColor[p.position] ?? "text-slate-400"}`}>{p.position}</span>
+                                </EpHoverName>
+                              </div>
+                              <div className="text-[10px] text-slate-500 truncate">{t?.name ?? "—"} · {p.amateurLeague ?? p.country ?? ""}</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <details className="rounded-2xl border border-slate-800 bg-[#0b1120] overflow-hidden shadow-xl group">
+                    <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-xs font-bold text-slate-300 hover:text-white transition-colors">
+                      <span className="flex items-center gap-2">
+                        <span className="text-slate-500 group-open:rotate-90 transition-transform">▶</span>
+                        Dostupné talenty na drafte ({board.length} hráčov)
+                      </span>
+                      <span className="text-[10px] text-slate-500">Kliknite pre zobrazenie</span>
+                    </summary>
+                    <div className="p-3 border-t border-slate-800">
+                      <DraftAvailableBoard prospects={board} canPick={false} />
+                    </div>
+                  </details>
+                </div>
+              ) : (
+                <>
+                  {me != null && <DraftQueuePanel queue={myQueue} canPick={canPick} />}
+                  <DraftAvailableBoard prospects={board} canPick={canPick} onClock={currentSlot && onClockTeam ? { teamName: onClockTeam.name, teamLogo: onClockTeam.logoUrl, pick: state.currentPick } : undefined} />
+                  {canPick && currentSlot && <OffBoardPickForm pick={state.currentPick} />}
+                  {admin && <OffBoardVerifyPanel picks={offBoardPicks} />}
+                </>
+              )}
             </div>
             <DraftChat canChat={me != null} myTeamId={me} />
           </div>
