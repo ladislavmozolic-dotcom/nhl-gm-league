@@ -69,6 +69,7 @@ export const DEFAULT_MENU: MenuItem[] = [
     { label: "⭐ All-Star Game", href: "/all-star" },
     { label: "⚖️ Player Safety", href: "/league/player-safety" },
     { label: "🦓 Officials", href: "/league/officials" },
+    { label: "🔒 Result Integrity", href: "/league/integrity" },
     { label: "👔 Team / GM", href: "/league" },
     { label: "🎓 Coaches", href: "/coaches" },
   ] },
