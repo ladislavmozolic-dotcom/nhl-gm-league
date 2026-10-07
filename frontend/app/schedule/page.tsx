@@ -5,6 +5,7 @@ import { isAdmin } from "@/lib/auth";
 import DaySimControls from "@/components/DaySimControls";
 import { PRE_SEASON } from "@/lib/phase";
 import { getLang } from "@/lib/lang-server";
+import { getLeagueDate } from "@/lib/calendar-server";
 import { t } from "@/lib/i18n";
 import ScheduleView, { type ScheduleGameItem, type ScheduleTeamOption } from "@/components/ScheduleView";
 
@@ -20,7 +21,7 @@ export default async function SchedulePage({
   const league = leagueParam === "AHL" ? "AHL" : "NHL";
   const otherLeague = league === "AHL" ? "NHL" : "AHL";
 
-  const [games, admin, leagueCfg, allTeams, lang] = await Promise.all([
+  const [games, admin, leagueCfg, allTeams, lang, leagueDate] = await Promise.all([
     prisma.game.findMany({
       where: { season: SEASON, league, seriesId: null },
       orderBy: [{ round: "asc" }, { gameDate: "asc" }, { id: "asc" }],
@@ -37,12 +38,10 @@ export default async function SchedulePage({
       orderBy: { name: "asc" },
     }),
     getLang(),
+    getLeagueDate(),
   ]);
 
   const played = games.filter((g) => g.status === "FINAL").length;
-
-  // The current day = the first not-yet-played game;
-  const currentId = games.find((g) => g.status !== "FINAL")?.id;
 
   // Global game number for the REGULAR season only
   const numById = new Map(games.map((g, i) => [g.id, i + 1]));
@@ -64,6 +63,24 @@ export default async function SchedulePage({
     ...preGames.map((g) => ({ ...g, isPre: true as const })),
     ...games.map((g) => ({ ...g, isPre: false as const })),
   ].sort((a, b) => (a.gameDate?.getTime() ?? 0) - (b.gameDate?.getTime() ?? 0));
+
+  // Determine current active game / day
+  // 1. First check if any game matches the current leagueDate
+  // 2. Otherwise find the first not-yet-played game
+  // 3. Fallback to last played game or first game
+  const leagueDateIso = leagueDate ? leagueDate.toISOString().slice(0, 10) : null;
+  const gameOnLeagueDate = leagueDateIso
+    ? rawAllGames.find((g) => g.gameDate && g.gameDate.toISOString().slice(0, 10) === leagueDateIso)
+    : null;
+
+  const firstUnplayed = rawAllGames.find((g) => g.status !== "FINAL");
+  const lastPlayed = [...rawAllGames].reverse().find((g) => g.status === "FINAL");
+
+  const activeGame = gameOnLeagueDate ?? firstUnplayed ?? lastPlayed ?? rawAllGames[0];
+  const currentId = activeGame?.id ?? null;
+  const currentMonthKey = activeGame?.gameDate
+    ? `${activeGame.gameDate.getUTCFullYear()}-${String(activeGame.gameDate.getUTCMonth() + 1).padStart(2, "0")}`
+    : null;
 
   // Serialize games for client component
   const serializedGames: ScheduleGameItem[] = rawAllGames.map((g) => ({
@@ -134,6 +151,7 @@ export default async function SchedulePage({
         league={league}
         season={SEASON}
         currentId={currentId}
+        initialMonth={currentMonthKey}
         lang={lang}
       />
     </div>

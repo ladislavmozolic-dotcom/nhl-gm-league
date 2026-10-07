@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import EventBadge from "@/components/EventBadge";
 import type { Lang } from "@/lib/i18n";
@@ -45,6 +45,7 @@ interface ScheduleViewProps {
   league: "NHL" | "AHL";
   season: string;
   currentId?: number | null;
+  initialMonth?: string | null;
   lang: Lang;
 }
 
@@ -54,16 +55,27 @@ export default function ScheduleView({
   league,
   season,
   currentId,
+  initialMonth,
   lang,
 }: ScheduleViewProps) {
   const isCs = lang === "cs";
   const locale = isCs ? "sk-SK" : lang === "de" ? "de-DE" : lang === "ru" ? "ru-RU" : "en-US";
 
-  // Filter states
+  // Filter states: default to current active month if available, else ALL
   const [selectedTeam, setSelectedTeam] = useState<string>("ALL");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "UPCOMING" | "COMPLETED">("ALL");
-  const [selectedMonth, setSelectedMonth] = useState<string>("ALL");
+  const [selectedMonth, setSelectedMonth] = useState<string>(initialMonth ?? "ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
+
+  // Smooth auto-scroll to current day on page mount
+  useEffect(() => {
+    const el = document.getElementById("current-day");
+    if (el) {
+      setTimeout(() => {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
+    }
+  }, [selectedMonth]);
 
   // Total summary counts
   const totalGames = games.length;
@@ -207,10 +219,16 @@ export default function ScheduleView({
   }, [filteredGames, locale, isCs, currentId]);
 
   const scrollToCurrentDay = () => {
-    const el = document.getElementById("current-day");
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    // If the current game's month is hidden by the selected month filter, reset month to initial or ALL
+    if (initialMonth && selectedMonth !== initialMonth && selectedMonth !== "ALL") {
+      setSelectedMonth(initialMonth);
     }
+    setTimeout(() => {
+      const el = document.getElementById("current-day");
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }, 50);
   };
 
   return (
@@ -411,20 +429,27 @@ export default function ScheduleView({
             >
               {t(lang, "schedule.allMonths")}
             </button>
-            {monthOptions.map((m) => (
-              <button
-                key={m.key}
-                type="button"
-                onClick={() => setSelectedMonth(m.key)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all shrink-0 capitalize ${
-                  selectedMonth === m.key
-                    ? "bg-blue-600 text-white font-bold shadow-sm"
-                    : "text-slate-400 hover:text-white hover:bg-slate-800/40"
-                }`}
-              >
-                {m.label} ({m.count})
-              </button>
-            ))}
+            {monthOptions.map((m) => {
+              const isCurrentActive = initialMonth === m.key;
+              const isSelected = selectedMonth === m.key;
+              return (
+                <button
+                  key={m.key}
+                  type="button"
+                  onClick={() => setSelectedMonth(m.key)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all shrink-0 capitalize flex items-center gap-1.5 ${
+                    isSelected
+                      ? "bg-blue-600 text-white font-bold shadow-sm"
+                      : isCurrentActive
+                      ? "text-sky-300 bg-sky-950/60 border border-sky-800/50 hover:bg-sky-900/60"
+                      : "text-slate-400 hover:text-white hover:bg-slate-800/40"
+                  }`}
+                >
+                  {isCurrentActive && <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />}
+                  <span>{m.label} ({m.count})</span>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
@@ -481,13 +506,32 @@ export default function ScheduleView({
             {m.days.map((d) => (
               <div
                 key={d.key}
-                className="bg-slate-900/70 border border-slate-800/90 rounded-2xl overflow-hidden shadow-lg"
+                id={d.isTodayOrNext ? "current-day" : undefined}
+                className={`bg-slate-900/70 border rounded-2xl overflow-hidden shadow-lg transition-all ${
+                  d.isTodayOrNext
+                    ? "border-sky-500/60 ring-1 ring-sky-500/40 shadow-[0_0_20px_rgba(14,165,233,0.15)] scroll-mt-28"
+                    : "border-slate-800/90"
+                }`}
               >
                 {/* Day Header Sub-banner */}
-                <div className="px-4 py-2 bg-slate-800/60 border-b border-slate-800 flex items-center justify-between">
+                <div
+                  className={`px-4 py-2 border-b flex items-center justify-between ${
+                    d.isTodayOrNext
+                      ? "bg-gradient-to-r from-sky-950/70 to-slate-850 border-sky-800/50"
+                      : "bg-slate-800/60 border-slate-800"
+                  }`}
+                >
                   <div className="flex items-center gap-2.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-sky-400 shrink-0" />
-                    <span className="text-xs font-black text-slate-200 tracking-wide capitalize">
+                    <span
+                      className={`w-2 h-2 rounded-full shrink-0 ${
+                        d.isTodayOrNext ? "bg-amber-400 animate-pulse" : "bg-sky-400"
+                      }`}
+                    />
+                    <span
+                      className={`text-xs font-black tracking-wide capitalize ${
+                        d.isTodayOrNext ? "text-amber-300 font-extrabold" : "text-slate-200"
+                      }`}
+                    >
                       {d.label}
                     </span>
                     {d.isTodayOrNext && (
@@ -508,15 +552,13 @@ export default function ScheduleView({
                     const awayWin = isFinal && (g.awayGoals ?? 0) > (g.homeGoals ?? 0);
                     const homeWin = isFinal && (g.homeGoals ?? 0) > (g.awayGoals ?? 0);
                     const tag = g.endedIn && g.endedIn !== "REG" ? g.endedIn : "";
-                    const isAnchor = g.id === currentId;
 
                     return (
                       <div
                         key={g.id}
-                        id={isAnchor ? "current-day" : undefined}
                         className={`transition-colors hover:bg-slate-800/40 ${
-                          isAnchor ? "scroll-mt-36 ring-1 ring-inset ring-sky-500/50 bg-sky-500/[0.04]" : ""
-                        } ${g.isPre ? "bg-sky-950/15" : ""}`}
+                          g.isPre ? "bg-sky-950/15" : ""
+                        }`}
                       >
                         <div className="flex items-center gap-2 sm:gap-4 px-3 sm:px-5 py-3">
                           {/* Left: Tag # or PRE */}
