@@ -28,6 +28,7 @@ export type GoalieTotal = {
 export type SituationTotal = {
   playerId: number; name: string; position: string; number: number | null;
   teamId: number | null; teamCode: string | null; teamSlug: string | null; teamLogo: string | null;
+  photoUrl?: string | null; slug?: string | null;
   gp: number; goals: number; assists: number; points: number; shots: number;
   toi: number; xg: number; plusMinus: number;
 };
@@ -104,7 +105,7 @@ export async function skaterSituationTotals(
     _count: { _all: true },
   });
   const [players, teams] = await Promise.all([
-    prisma.player.findMany({ where: { id: { in: grouped.map((g) => g.playerId) } }, select: { id: true, name: true, position: true, number: true } }),
+    prisma.player.findMany({ where: { id: { in: grouped.map((g) => g.playerId) } }, select: { id: true, name: true, position: true, number: true, photoUrl: true, slug: true } }),
     teamLookup(),
   ]);
   const pById = new Map(players.map((p) => [p.id, p]));
@@ -114,6 +115,7 @@ export async function skaterSituationTotals(
     return {
       playerId: g.playerId, name: cleanName(p?.name ?? "—"), position: p?.position ?? "—", number: p?.number ?? null,
       teamId: g.teamId, teamCode: t?.code ?? null, teamSlug: t?.slug ?? null, teamLogo: t?.logoUrl ?? null,
+      photoUrl: p?.photoUrl ?? null, slug: p?.slug ?? null,
       gp: g._count._all, goals: g._sum.goals ?? 0, assists: g._sum.assists ?? 0, points: g._sum.points ?? 0,
       shots: g._sum.shots ?? 0, toi: g._sum.toi ?? 0, xg: g._sum.xg ?? 0, plusMinus: g._sum.plusMinus ?? 0,
     };
@@ -234,7 +236,8 @@ const burstsPerGame = (sk: number) => Math.max(0, (sk - 72) / 3.5); // 22+ mph b
 const milesPerGame = (toiSecPerGame: number) => (toiSecPerGame / 60) * 0.155;
 
 export type SkaterEdge = {
-  playerId: number; name: string; position: string; teamCode: string | null; teamSlug: string | null; teamLogo: string | null;
+  playerId: number; name: string; position: string; teamId?: number | null; teamCode: string | null; teamSlug: string | null; teamLogo: string | null;
+  photoUrl?: string | null; slug?: string | null;
   gp: number; toi: number; topShot: number; hits: number;
   topSkateSpeed: number; bursts: number; miles: number; sk: number;
 };
@@ -249,7 +252,7 @@ export async function skaterEdge(season: string, league = "NHL"): Promise<Skater
   });
   const ids = grouped.map((g) => g.playerId);
   const [players, ratings, teams] = await Promise.all([
-    prisma.player.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, position: true } }),
+    prisma.player.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, position: true, photoUrl: true, slug: true } }),
     prisma.skaterRating.findMany({ where: { playerId: { in: ids } }, select: { playerId: true, sk: true } }),
     teamLookup(),
   ]);
@@ -263,7 +266,8 @@ export async function skaterEdge(season: string, league = "NHL"): Promise<Skater
     const toi = g._sum.toi ?? 0;
     return {
       playerId: g.playerId, name: cleanName(p?.name ?? "—"), position: p?.position ?? "—",
-      teamCode: t?.code ?? null, teamSlug: t?.slug ?? null, teamLogo: t?.logoUrl ?? null,
+      teamId: g.teamId, teamCode: t?.code ?? null, teamSlug: t?.slug ?? null, teamLogo: t?.logoUrl ?? null,
+      photoUrl: p?.photoUrl ?? null, slug: p?.slug ?? null,
       gp, toi, topShot: g._max.topShot ?? 0, hits: g._sum.hits ?? 0,
       topSkateSpeed: skateTopSpeed(sk, g.playerId), bursts: Math.round(burstsPerGame(sk) * gp),
       miles: gp ? milesPerGame(toi / gp) * gp : 0, sk,
@@ -272,7 +276,8 @@ export async function skaterEdge(season: string, league = "NHL"): Promise<Skater
 }
 
 export type GoalieEdge = {
-  playerId: number; name: string; teamCode: string | null; teamSlug: string | null; teamLogo: string | null;
+  playerId: number; name: string; teamId?: number | null; teamCode: string | null; teamSlug: string | null; teamLogo: string | null;
+  photoUrl?: string | null; slug?: string | null;
   gp: number; hdSvPct: number; mdSvPct: number; ldSvPct: number;
   hdShotsAg: number; mdShotsAg: number; ldShotsAg: number; svPct: number;
 };
@@ -295,15 +300,17 @@ export async function goalieEdge(season: string, league = "NHL"): Promise<Goalie
     a.hdA += r.hdShotsAg; a.hdS += r.hdSaves; a.mdA += r.mdShotsAg; a.mdS += r.mdSaves; a.ldA += r.ldShotsAg; a.ldS += r.ldSaves;
   }
   const [players, teams] = await Promise.all([
-    prisma.player.findMany({ where: { id: { in: [...acc.values()].map((a) => a.playerId) } }, select: { id: true, name: true } }),
+    prisma.player.findMany({ where: { id: { in: [...acc.values()].map((a) => a.playerId) } }, select: { id: true, name: true, photoUrl: true, slug: true } }),
     teamLookup(),
   ]);
   const pById = new Map(players.map((p) => [p.id, p]));
   return [...acc.values()].map((a) => {
     const t = a.teamId ? teams.get(a.teamId) : null;
+    const p = pById.get(a.playerId);
     return {
-      playerId: a.playerId, name: cleanName(pById.get(a.playerId)?.name ?? "—"),
-      teamCode: t?.code ?? null, teamSlug: t?.slug ?? null, teamLogo: t?.logoUrl ?? null, gp: a.gp,
+      playerId: a.playerId, name: cleanName(p?.name ?? "—"),
+      teamId: a.teamId, teamCode: t?.code ?? null, teamSlug: t?.slug ?? null, teamLogo: t?.logoUrl ?? null,
+      photoUrl: p?.photoUrl ?? null, slug: p?.slug ?? null, gp: a.gp,
       hdSvPct: a.hdA ? a.hdS / a.hdA : 0, mdSvPct: a.mdA ? a.mdS / a.mdA : 0, ldSvPct: a.ldA ? a.ldS / a.ldA : 0,
       hdShotsAg: a.hdA, mdShotsAg: a.mdA, ldShotsAg: a.ldA, svPct: a.sa ? a.sv / a.sa : 0,
     };

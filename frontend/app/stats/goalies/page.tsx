@@ -1,6 +1,9 @@
-import { goalieTotals } from "@/lib/stats-server";
+import { prisma } from "@/lib/prisma";
+import { getTeamSession } from "@/lib/auth";
+import { goalieTotals, type GoalieTotal } from "@/lib/stats-server";
 import StatsTabs from "@/components/StatsTabs";
 import PhaseTabs from "@/components/PhaseTabs";
+import StatHeroDeck, { type HeroCardItem } from "@/components/StatHeroDeck";
 import { seasonForPhase } from "@/lib/phase";
 import { defaultStatsPhase } from "@/lib/calendar-server";
 import StatTable, { type Col } from "@/components/StatTable";
@@ -44,22 +47,139 @@ export default async function GoalieStatsPage({ searchParams }: { searchParams: 
   const auto = league === "NHL" ? await defaultStatsPhase() : "regular";
   const phase: "pre" | "regular" = league !== "NHL" ? "regular" : explicit ?? (auto === "playoffs" ? "regular" : auto);
   const SEASON = seasonForPhase(phase);
-  const gk = await goalieTotals(SEASON, league);
+
+  const sessionTeamId = await getTeamSession();
+  const [gk, managedTeams] = await Promise.all([
+    goalieTotals(SEASON, league),
+    sessionTeamId == null
+      ? Promise.resolve([])
+      : prisma.team.findMany({ where: { OR: [{ id: sessionTeamId }, { parentTeamId: sessionTeamId }] }, select: { id: true } }),
+  ]);
+  const managedTeamIds = new Set(managedTeams.map((t) => t.id));
+
+  // Compute Top 4 Goalie Spotlight Cards
+  let heroCards: HeroCardItem[] = [];
+  if (gk.length > 0) {
+    const sortedW = [...gk].sort((a, b) => b.wins - a.wins || b.svPct - a.svPct);
+    const sortedGsax = [...gk].sort((a, b) => b.gsax - a.gsax || b.wins - a.wins);
+    const sortedStl = [...gk].sort((a, b) => b.steals - a.steals || b.wins - a.wins);
+
+    // Filter minimum workload for SV% leader
+    const maxSa = Math.max(0, ...gk.map((g) => g.shotsAgainst));
+    const minSa = Math.max(15, Math.round(maxSa * 0.25));
+    const qualGk = gk.filter((g) => g.shotsAgainst >= minSa);
+    const sortedSv = [...(qualGk.length ? qualGk : gk)].sort((a, b) => b.svPct - a.svPct || a.gaa - b.gaa);
+
+    const wLeader = sortedW[0];
+    const svLeader = sortedSv[0];
+    const gsaxLeader = sortedGsax[0];
+    const stlLeader = sortedStl[0];
+
+    if (wLeader) {
+      heroCards.push({
+        badge: "🏆 MOST WINS",
+        subBadge: "#1 VÝHRY",
+        playerId: wLeader.playerId,
+        slug: wLeader.slug,
+        name: wLeader.name,
+        photoUrl: wLeader.photoUrl,
+        position: "G",
+        teamId: wLeader.teamId,
+        teamCode: wLeader.teamCode,
+        teamSlug: wLeader.teamSlug,
+        teamLogo: wLeader.teamLogo,
+        value: wLeader.wins,
+        unit: "W",
+        sub: `${wLeader.wins}-${wLeader.losses}-${wLeader.otl} (${wLeader.gp} GP)`,
+        accentColor: "amber",
+      });
+    }
+    if (svLeader) {
+      heroCards.push({
+        badge: "🧤 SAVE PERCENTAGE",
+        subBadge: "TOP ÚSPEŠNOSŤ",
+        playerId: svLeader.playerId,
+        slug: svLeader.slug,
+        name: svLeader.name,
+        photoUrl: svLeader.photoUrl,
+        position: "G",
+        teamId: svLeader.teamId,
+        teamCode: svLeader.teamCode,
+        teamSlug: svLeader.teamSlug,
+        teamLogo: svLeader.teamLogo,
+        value: svLeader.svPct.toFixed(3).replace(/^0/, ""),
+        unit: "SV%",
+        sub: `${svLeader.gaa.toFixed(2)} GAA (${svLeader.gp} GP)`,
+        accentColor: "sky",
+      });
+    }
+    if (gsaxLeader) {
+      heroCards.push({
+        badge: "⚡ GOALS SAVED (GSAX)",
+        subBadge: "NAD OČAKÁVANIE",
+        playerId: gsaxLeader.playerId,
+        slug: gsaxLeader.slug,
+        name: gsaxLeader.name,
+        photoUrl: gsaxLeader.photoUrl,
+        position: "G",
+        teamId: gsaxLeader.teamId,
+        teamCode: gsaxLeader.teamCode,
+        teamSlug: gsaxLeader.teamSlug,
+        teamLogo: gsaxLeader.teamLogo,
+        value: (gsaxLeader.gsax > 0 ? "+" : "") + gsaxLeader.gsax.toFixed(1),
+        unit: "GSAx",
+        sub: `${gsaxLeader.goalsAgainst} GA · ${gsaxLeader.xga.toFixed(1)} xGA`,
+        accentColor: "emerald",
+      });
+    }
+    if (stlLeader) {
+      heroCards.push({
+        badge: "🥷 UKRADNUTÉ ZÁPASY",
+        subBadge: "STEALS",
+        playerId: stlLeader.playerId,
+        slug: stlLeader.slug,
+        name: stlLeader.name,
+        photoUrl: stlLeader.photoUrl,
+        position: "G",
+        teamId: stlLeader.teamId,
+        teamCode: stlLeader.teamCode,
+        teamSlug: stlLeader.teamSlug,
+        teamLogo: stlLeader.teamLogo,
+        value: stlLeader.steals,
+        unit: "STL",
+        sub: `${stlLeader.wins} W · ${stlLeader.gp} GP`,
+        accentColor: "purple",
+      });
+    }
+  }
+
   const rows = gk.map((g) => ({
-    _pid: g.playerId, name: g.name, teamCode: g.teamCode ?? "—", _teamSlug: g.teamSlug ?? "", _teamLogo: g.teamLogo ?? "", gp: g.gp, wins: g.wins, losses: g.losses, otl: g.otl,
+    _pid: g.playerId, _slug: g.slug, name: g.name, teamCode: g.teamCode ?? "—", _teamSlug: g.teamSlug ?? "", _teamLogo: g.teamLogo ?? "", gp: g.gp, wins: g.wins, losses: g.losses, otl: g.otl,
     svPct: g.svPct, gaa: g.gaa, gsax: g.gsax, steals: g.steals, mp: g.toiMin, pim: 0, shutouts: g.shutouts,
     goalsAgainst: g.goalsAgainst, shotsAgainst: g.shotsAgainst, saves: g.saves,
     xga: g.xga,
     a: 0, eg: 0, psPct: 0, psa: 0, st: 0, bg: 0, s1: 0, s2: 0, s3: 0,
   }));
+
   return (
     <div className="space-y-6 py-2">
       <PageHeader title="Statistics" subtitle={`All goalies — ${league} ${phase === "pre" ? "pre-season (exhibition)" : "regular season"}`} />
       <StatsTabs active="goalies" league={league} />
       <PhaseTabs active={phase} league={league} basePath="/stats/goalies" showPlayoffs={false} />
-      <p className="text-slate-400 text-sm">Click a header to sort; use Show / Hide Columns to customize.{phase === "pre" ? " Pre-season stats don't count toward profiles/careers." : ""}</p>
-      <StatTable cols={COLS} rows={rows} initialSort="wins" minWidth={1160} />
-      <p className="text-xs text-slate-600">Columns showing “—” (PIM, A, EG, PS %, PSA, ST, BG, S1–S3) are stat fields the sim engine doesn’t record yet — hide them with Show / Hide Columns, or ask to add shootout & penalty-shot tracking.</p>
+
+      {/* Hero Spotlight Cards */}
+      {heroCards.length > 0 && (
+        <StatHeroDeck cards={heroCards} managedTeamIds={managedTeamIds} />
+      )}
+
+      <p className="text-slate-400 text-sm">
+        Click a header to sort; use live search or Show / Hide Columns to customize.
+        {phase === "pre" ? " Pre-season stats don't count toward profiles/careers." : ""}
+      </p>
+      <StatTable cols={COLS} rows={rows} initialSort="wins" minWidth={1160} showRank />
+      <p className="text-xs text-slate-600">
+        Columns showing “—” (PIM, A, EG, PS %, PSA, ST, BG, S1–S3) are stat fields the sim engine doesn’t record yet.
+      </p>
     </div>
   );
 }

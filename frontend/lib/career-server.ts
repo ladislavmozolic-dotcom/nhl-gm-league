@@ -249,8 +249,8 @@ async function franchiseLeaders(teamId: number, league: string): Promise<Franchi
 
 // ---------- league-wide career leaderboard ----------
 
-export type CareerSkaterTotal = { playerId: number; name: string; slug: string | null; position: string; teamCode: string | null; teamSlug: string | null; teamLogo: string | null; seasons: number; gp: number; goals: number; assists: number; points: number; plusMinus: number; pim: number; shots: number; ppGoals: number; shGoals: number; gwg: number; hits: number; blocks: number };
-export type CareerGoalieTotal = { playerId: number; name: string; slug: string | null; teamCode: string | null; teamSlug: string | null; teamLogo: string | null; seasons: number; gp: number; wins: number; losses: number; otl: number; shutouts: number; shotsAgainst: number; saves: number; goalsAgainst: number; svPct: number; gaa: number };
+export type CareerSkaterTotal = { playerId: number; name: string; slug: string | null; photoUrl?: string | null; position: string; teamId?: number | null; teamCode: string | null; teamSlug: string | null; teamLogo: string | null; seasons: number; gp: number; goals: number; assists: number; points: number; plusMinus: number; pim: number; shots: number; ppGoals: number; shGoals: number; gwg: number; hits: number; blocks: number };
+export type CareerGoalieTotal = { playerId: number; name: string; slug: string | null; photoUrl?: string | null; teamId?: number | null; teamCode: string | null; teamSlug: string | null; teamLogo: string | null; seasons: number; gp: number; wins: number; losses: number; otl: number; shutouts: number; shotsAgainst: number; saves: number; goalsAgainst: number; svPct: number; gaa: number };
 
 /** Career totals for EVERY player who has ever played in our league: frozen
  *  PlayerSeasonStat/GoalieSeasonStat rows for finished seasons + the active
@@ -268,7 +268,7 @@ export async function careerLeaderboard(league = "NHL", isPlayoff = false): Prom
     prisma.goalieGameStat.findMany({ where: { started: true, game: gameFilter }, select: { playerId: true, shotsAgainst: true, saves: true, goalsAgainst: true, decision: true } }),
   ]);
 
-  const sk = new Map<number, Omit<CareerSkaterTotal, "name" | "slug" | "position" | "teamCode" | "teamSlug" | "teamLogo" | "playerId">>();
+  const sk = new Map<number, Omit<CareerSkaterTotal, "name" | "slug" | "photoUrl" | "position" | "teamId" | "teamCode" | "teamSlug" | "teamLogo" | "playerId">>();
   const skOf = (id: number) => { let r = sk.get(id); if (!r) { r = { seasons: 0, gp: 0, goals: 0, assists: 0, points: 0, plusMinus: 0, pim: 0, shots: 0, ppGoals: 0, shGoals: 0, gwg: 0, hits: 0, blocks: 0 }; sk.set(id, r); } return r; };
   for (const a of archSk) {
     const r = skOf(a.playerId); r.seasons++;
@@ -298,8 +298,20 @@ export async function careerLeaderboard(league = "NHL", isPlayoff = false): Prom
   }
 
   const ids = [...new Set([...sk.keys(), ...gk.keys()])];
-  const players = new Map((await prisma.player.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, slug: true, position: true, team: { select: { code: true, slug: true, logoUrl: true } } } })).map((p) => [p.id, p]));
-  const meta = (id: number) => { const p = players.get(id); return { name: cleanName(p?.name ?? "?"), slug: p?.slug ?? null, position: p?.position ?? "", teamCode: p?.team?.code ?? null, teamSlug: p?.team?.slug ?? null, teamLogo: p?.team?.logoUrl ?? null }; };
+  const players = new Map((await prisma.player.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, slug: true, position: true, photoUrl: true, teamId: true, team: { select: { id: true, code: true, slug: true, logoUrl: true } } } })).map((p) => [p.id, p]));
+  const meta = (id: number) => {
+    const p = players.get(id);
+    return {
+      name: cleanName(p?.name ?? "?"),
+      slug: p?.slug ?? null,
+      photoUrl: p?.photoUrl ?? null,
+      position: p?.position ?? "",
+      teamId: p?.teamId ?? null,
+      teamCode: p?.team?.code ?? null,
+      teamSlug: p?.team?.slug ?? null,
+      teamLogo: p?.team?.logoUrl ?? null,
+    };
+  };
 
   const skaters: CareerSkaterTotal[] = [...sk.entries()]
     .filter(([id]) => meta(id).position !== "G")
@@ -308,7 +320,19 @@ export async function careerLeaderboard(league = "NHL", isPlayoff = false): Prom
   const goalies: CareerGoalieTotal[] = [...gk.entries()].map(([id, r]) => {
     const m = meta(id);
     // GAA over ~60 min per start — the per-game rows don't carry goalie TOI
-    return { playerId: id, name: m.name, slug: m.slug, teamCode: m.teamCode, teamSlug: m.teamSlug, teamLogo: m.teamLogo, ...r, svPct: r.shotsAgainst ? r.saves / r.shotsAgainst : 0, gaa: r.gp ? r.goalsAgainst / r.gp : 0 };
+    return {
+      playerId: id,
+      name: m.name,
+      slug: m.slug,
+      photoUrl: m.photoUrl,
+      teamId: m.teamId,
+      teamCode: m.teamCode,
+      teamSlug: m.teamSlug,
+      teamLogo: m.teamLogo,
+      ...r,
+      svPct: r.shotsAgainst ? r.saves / r.shotsAgainst : 0,
+      gaa: r.gp ? r.goalsAgainst / r.gp : 0,
+    };
   }).sort((a, b) => b.wins - a.wins || b.svPct - a.svPct);
   return { skaters, goalies };
 }

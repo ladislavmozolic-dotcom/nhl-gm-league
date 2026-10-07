@@ -1,5 +1,8 @@
-import { teamStatTotals } from "@/lib/stats-server";
+import { prisma } from "@/lib/prisma";
+import { getTeamSession } from "@/lib/auth";
+import { teamStatTotals, type TeamStatTotal } from "@/lib/stats-server";
 import StatsTabs from "@/components/StatsTabs";
+import StatHeroDeck, { type HeroCardItem } from "@/components/StatHeroDeck";
 import StatTable, { type Col } from "@/components/StatTable";
 import { PageHeader } from "@/components/ui";
 import PhaseTabs from "@/components/PhaseTabs";
@@ -63,12 +66,95 @@ const COLS: Col[] = [
 export default async function TeamStatsPage({ searchParams }: { searchParams: Promise<{ league?: string; phase?: string }> }) {
   const sp = await searchParams;
   const league = sp.league === "AHL" ? "AHL" : "NHL";
-  // same rule as Player Stats: explicit ?phase= wins, else follow the league clock
   const explicit = sp.phase === "pre" || sp.phase === "regular" ? sp.phase : null;
   const auto = league === "NHL" ? await defaultStatsPhase() : "regular";
   const phase: "pre" | "regular" = league !== "NHL" ? "regular" : explicit ?? (auto === "playoffs" ? "regular" : auto);
   const SEASON = seasonForPhase(phase);
-  const teams = await teamStatTotals(SEASON, league);
+
+  const sessionTeamId = await getTeamSession();
+  const [teams, managedTeams] = await Promise.all([
+    teamStatTotals(SEASON, league),
+    sessionTeamId == null
+      ? Promise.resolve([])
+      : prisma.team.findMany({ where: { OR: [{ id: sessionTeamId }, { parentTeamId: sessionTeamId }] }, select: { id: true } }),
+  ]);
+  const managedTeamIds = new Set(managedTeams.map((t) => t.id));
+
+  // Compute Top 4 Team Spotlight Cards
+  let heroCards: HeroCardItem[] = [];
+  if (teams.length > 0) {
+    const sortedPts = [...teams].sort((a, b) => b.points - a.points || b.diff - a.diff);
+    const sortedGf = [...teams].sort((a, b) => b.gfPerGame - a.gfPerGame || b.gf - a.gf);
+    const sortedGa = [...teams].sort((a, b) => a.gaPerGame - b.gaPerGame || a.ga - b.ga);
+    const sortedPp = [...teams].filter((t) => t.ppOpp >= 5).sort((a, b) => b.ppPct - a.ppPct);
+
+    const ptsLeader = sortedPts[0];
+    const gfLeader = sortedGf[0];
+    const gaLeader = sortedGa[0];
+    const ppLeader = sortedPp[0] ?? sortedPts[0];
+
+    if (ptsLeader) {
+      heroCards.push({
+        badge: "🥇 POINTS LEADER",
+        subBadge: "#1 TABUĽKA",
+        name: ptsLeader.name,
+        teamId: ptsLeader.teamId,
+        teamSlug: ptsLeader.slug,
+        teamLogo: ptsLeader.logoUrl,
+        teamCode: ptsLeader.code,
+        value: ptsLeader.points,
+        unit: "PTS",
+        sub: `${ptsLeader.w}-${ptsLeader.l}-${ptsLeader.otl} (${ptsLeader.gp} GP)`,
+        accentColor: "amber",
+      });
+    }
+    if (gfLeader) {
+      heroCards.push({
+        badge: "🎯 TOP OFFENSE",
+        subBadge: "GÓLY / ZÁPAS",
+        name: gfLeader.name,
+        teamId: gfLeader.teamId,
+        teamSlug: gfLeader.slug,
+        teamLogo: gfLeader.logoUrl,
+        teamCode: gfLeader.code,
+        value: gfLeader.gfPerGame.toFixed(2),
+        unit: "GF/G",
+        sub: `${gfLeader.gf} GF (${gfLeader.gp} GP)`,
+        accentColor: "rose",
+      });
+    }
+    if (gaLeader) {
+      heroCards.push({
+        badge: "🛡️ TOP DEFENSE",
+        subBadge: "NAJMENEJ INKASOVANÉ",
+        name: gaLeader.name,
+        teamId: gaLeader.teamId,
+        teamSlug: gaLeader.slug,
+        teamLogo: gaLeader.logoUrl,
+        teamCode: gaLeader.code,
+        value: gaLeader.gaPerGame.toFixed(2),
+        unit: "GA/G",
+        sub: `${gaLeader.ga} GA (${gaLeader.gp} GP)`,
+        accentColor: "emerald",
+      });
+    }
+    if (ppLeader) {
+      heroCards.push({
+        badge: "⚡ POWER PLAY",
+        subBadge: "PRESILOVKY",
+        name: ppLeader.name,
+        teamId: ppLeader.teamId,
+        teamSlug: ppLeader.slug,
+        teamLogo: ppLeader.logoUrl,
+        teamCode: ppLeader.code,
+        value: `${(ppLeader.ppPct * 100).toFixed(1)}%`,
+        unit: "PP%",
+        sub: `${ppLeader.ppGoalsFor} PPG / ${ppLeader.ppOpp} PPO`,
+        accentColor: "sky",
+      });
+    }
+  }
+
   const rows = teams.map((t) => ({
     name: t.name, _teamSlug: t.slug ?? "", _teamLogo: t.logoUrl ?? "", gp: t.gp, w: t.w, l: t.l, otl: t.otl, points: t.points,
     gf: t.gf, ga: t.ga, diff: t.diff, gfPerGame: t.gfPerGame, gaPerGame: t.gaPerGame,
@@ -81,13 +167,20 @@ export default async function TeamStatsPage({ searchParams }: { searchParams: Pr
     ppOpp: t.ppOpp, ppGoalsFor: t.ppGoalsFor, timesSh: t.timesSh, ppGoalsAgainst: t.ppGoalsAgainst,
     evShPct: t.evShPct, evSvPct: t.evSvPct, hdcf: t.hdcf, hdca: t.hdca, hdGoalsFor: t.hdGoalsFor,
   }));
+
   return (
     <div className="space-y-6 py-2">
       <PageHeader title="Statistics" subtitle={`Team totals — ${league} 2026-27 ${phase === "pre" ? "pre-season (exhibition)" : "regular season"}`} />
       <StatsTabs active="teams" league={league} />
       <PhaseTabs active={phase} league={league} basePath="/stats/teams" showPlayoffs={false} />
-      <p className="text-slate-400 text-sm">Click a header to sort; use Show / Hide Columns to add more stats.</p>
-      <StatTable cols={COLS} rows={rows} initialSort="points" minWidth={1000} />
+
+      {/* Hero Spotlight Cards */}
+      {heroCards.length > 0 && (
+        <StatHeroDeck cards={heroCards} managedTeamIds={managedTeamIds} />
+      )}
+
+      <p className="text-slate-400 text-sm">Click a header to sort; use live search or Show / Hide Columns to add more stats.</p>
+      <StatTable cols={COLS} rows={rows} initialSort="points" minWidth={1000} showRank />
       <p className="text-xs text-slate-600">More columns (PP opportunities, times short-handed, 5-on-5 SH%/SV%, raw high-danger counts, shots, shutouts) are available in Show / Hide Columns. Special-teams and high-danger numbers come from the sim&apos;s event stream.</p>
     </div>
   );

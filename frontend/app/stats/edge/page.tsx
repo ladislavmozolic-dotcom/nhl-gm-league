@@ -1,6 +1,9 @@
 import Link from "next/link";
+import { prisma } from "@/lib/prisma";
+import { getTeamSession } from "@/lib/auth";
 import { skaterEdge, goalieEdge, teamEdge } from "@/lib/stats-server";
 import StatsTabs from "@/components/StatsTabs";
+import StatHeroDeck, { type HeroCardItem } from "@/components/StatHeroDeck";
 import StatTable, { type Col } from "@/components/StatTable";
 import { PageHeader } from "@/components/ui";
 import PhaseTabs from "@/components/PhaseTabs";
@@ -10,10 +13,10 @@ import { defaultStatsPhase } from "@/lib/calendar-server";
 export const dynamic = "force-dynamic";
 
 type View = "teams" | "skaters" | "goalies";
-const VIEWS: { key: View; label: string }[] = [
-  { key: "skaters", label: "Skaters" },
-  { key: "goalies", label: "Goalies" },
-  { key: "teams", label: "Teams" },
+const VIEWS: { key: View; label: string; icon: string }[] = [
+  { key: "skaters", label: "Skaters", icon: "👤" },
+  { key: "goalies", label: "Goalies", icon: "🧤" },
+  { key: "teams", label: "Teams", icon: "🛡️" },
 ];
 
 const SKATER_COLS: Col[] = [
@@ -54,7 +57,6 @@ const TEAM_COLS: Col[] = [
 export default async function EdgeStatsPage({ searchParams }: { searchParams: Promise<{ league?: string; view?: string; phase?: string }> }) {
   const sp = await searchParams;
   const league = sp.league === "AHL" ? "AHL" : "NHL";
-  // same rule as Player Stats: explicit ?phase= wins, else follow the league clock
   const explicit = sp.phase === "pre" || sp.phase === "regular" ? sp.phase : null;
   const auto = league === "NHL" ? await defaultStatsPhase() : "regular";
   const phase: "pre" | "regular" = league !== "NHL" ? "regular" : explicit ?? (auto === "playoffs" ? "regular" : auto);
@@ -62,33 +64,168 @@ export default async function EdgeStatsPage({ searchParams }: { searchParams: Pr
   const view: View = sp.view === "goalies" ? "goalies" : sp.view === "teams" ? "teams" : "skaters";
   const q = `${league === "AHL" ? "&league=AHL" : ""}&phase=${phase}`;
 
-  let rows: Record<string, string | number>[] = [];
+  const sessionTeamId = await getTeamSession();
+  const managedTeams = sessionTeamId == null
+    ? []
+    : await prisma.team.findMany({ where: { OR: [{ id: sessionTeamId }, { parentTeamId: sessionTeamId }] }, select: { id: true } });
+  const managedTeamIds = new Set(managedTeams.map((t) => t.id));
+
+  let rows: Record<string, string | number | null | undefined>[] = [];
   let cols = SKATER_COLS;
   let initialSort = "topShot";
   let minNote = "";
+  let heroCards: HeroCardItem[] = [];
 
   if (view === "skaters") {
     const sk = await skaterEdge(SEASON, league);
-    // adaptive minimum: scales with the busiest skater so leaders show from the first
-    // games and the bar tightens to 10 GP as the season matures.
     const maxGp = sk.reduce((m, s) => Math.max(m, s.gp), 0);
     const skMin = Math.min(10, Math.max(1, Math.ceil(maxGp * 0.4)));
-    rows = sk.filter((s) => s.gp >= skMin).map((s) => ({
-      _pid: s.playerId, name: s.name, teamCode: s.teamCode ?? "—", _teamSlug: s.teamSlug ?? "", _teamLogo: s.teamLogo ?? "", pos: s.position, gp: s.gp,
+    const filtered = sk.filter((s) => s.gp >= skMin);
+    rows = filtered.map((s) => ({
+      _pid: s.playerId, _slug: s.slug, name: s.name, teamCode: s.teamCode ?? "—", _teamSlug: s.teamSlug ?? "", _teamLogo: s.teamLogo ?? "", pos: s.position, gp: s.gp,
       topSkate: s.topSkateSpeed, bursts: s.bursts, miles: s.miles, topShot: s.topShot, hits: s.hits,
     }));
     cols = SKATER_COLS; initialSort = "topShot";
     minNote = `Minimum ${skMin} GP (scales up to 10). Top Shot is tracked; Top Speed / bursts / distance are modelled.`;
+
+    if (filtered.length > 0) {
+      const fastest = [...filtered].sort((a, b) => b.topSkateSpeed - a.topSkateSpeed)[0];
+      const hardest = [...filtered].sort((a, b) => b.topShot - a.topShot)[0];
+      const dist = [...filtered].sort((a, b) => b.miles - a.miles)[0];
+
+      if (fastest) {
+        heroCards.push({
+          badge: "⚡ TOP SKATER SPEED",
+          subBadge: "RÝCHLOSŤ",
+          playerId: fastest.playerId,
+          slug: fastest.slug,
+          name: fastest.name,
+          photoUrl: fastest.photoUrl,
+          position: fastest.position,
+          teamId: fastest.teamId,
+          teamCode: fastest.teamCode,
+          teamSlug: fastest.teamSlug,
+          teamLogo: fastest.teamLogo,
+          value: fastest.topSkateSpeed.toFixed(1),
+          unit: "mph",
+          sub: `${fastest.bursts} šprintov nad 22 mph`,
+          accentColor: "sky",
+        });
+      }
+      if (hardest) {
+        heroCards.push({
+          badge: "💥 HARDEST SHOT",
+          subBadge: "RÝCHLOSŤ STRELY",
+          playerId: hardest.playerId,
+          slug: hardest.slug,
+          name: hardest.name,
+          photoUrl: hardest.photoUrl,
+          position: hardest.position,
+          teamId: hardest.teamId,
+          teamCode: hardest.teamCode,
+          teamSlug: hardest.teamSlug,
+          teamLogo: hardest.teamLogo,
+          value: hardest.topShot.toFixed(1),
+          unit: "mph",
+          sub: `${hardest.hits} hitov (${hardest.gp} GP)`,
+          accentColor: "rose",
+        });
+      }
+      if (dist) {
+        heroCards.push({
+          badge: "🏃 MARATHON SKATER",
+          subBadge: "NAJKORČUĽOVANÉ MÍLE",
+          playerId: dist.playerId,
+          slug: dist.slug,
+          name: dist.name,
+          photoUrl: dist.photoUrl,
+          position: dist.position,
+          teamId: dist.teamId,
+          teamCode: dist.teamCode,
+          teamSlug: dist.teamSlug,
+          teamLogo: dist.teamLogo,
+          value: dist.miles.toFixed(1),
+          unit: "mi",
+          sub: `${(dist.toi / 60).toFixed(0)} min na ľade`,
+          accentColor: "emerald",
+        });
+      }
+    }
   } else if (view === "goalies") {
     const gk = await goalieEdge(SEASON, league);
     const maxSa = gk.reduce((m, g) => Math.max(m, g.hdShotsAg + g.mdShotsAg + g.ldShotsAg), 0);
     const saMin = Math.min(150, Math.max(1, Math.ceil(maxSa * 0.4)));
     minNote = `Minimum ${saMin} shots against (scales up to 150). Real NHL: HD ≈ .80, MD ≈ .92, LD ≈ .98.`;
-    rows = gk.filter((g) => g.hdShotsAg + g.mdShotsAg + g.ldShotsAg >= saMin).map((g) => ({
-      _pid: g.playerId, name: g.name, teamCode: g.teamCode ?? "—", _teamSlug: g.teamSlug ?? "", _teamLogo: g.teamLogo ?? "", gp: g.gp, svPct: g.svPct,
+    const filtered = gk.filter((g) => g.hdShotsAg + g.mdShotsAg + g.ldShotsAg >= saMin);
+    rows = filtered.map((g) => ({
+      _pid: g.playerId, _slug: g.slug, name: g.name, teamCode: g.teamCode ?? "—", _teamSlug: g.teamSlug ?? "", _teamLogo: g.teamLogo ?? "", gp: g.gp, svPct: g.svPct,
       hdSv: g.hdSvPct, mdSv: g.mdSvPct, ldSv: g.ldSvPct, hdShotsAg: g.hdShotsAg,
     }));
     cols = GOALIE_COLS; initialSort = "hdSv";
+
+    if (filtered.length > 0) {
+      const hdLeader = [...filtered].sort((a, b) => b.hdSvPct - a.hdSvPct)[0];
+      const svLeader = [...filtered].sort((a, b) => b.svPct - a.svPct)[0];
+      const mdLeader = [...filtered].sort((a, b) => b.mdSvPct - a.mdSvPct)[0];
+
+      if (hdLeader) {
+        heroCards.push({
+          badge: "🧤 HIGH-DANGER LOCKDOWN",
+          subBadge: "ZÁKROKY V SLOTE",
+          playerId: hdLeader.playerId,
+          slug: hdLeader.slug,
+          name: hdLeader.name,
+          photoUrl: hdLeader.photoUrl,
+          position: "G",
+          teamId: hdLeader.teamId,
+          teamCode: hdLeader.teamCode,
+          teamSlug: hdLeader.teamSlug,
+          teamLogo: hdLeader.teamLogo,
+          value: hdLeader.hdSvPct.toFixed(3).replace(/^0/, ""),
+          unit: "HD SV%",
+          sub: `${hdLeader.hdShotsAg} striel zo slotu`,
+          accentColor: "emerald",
+        });
+      }
+      if (svLeader) {
+        heroCards.push({
+          badge: "🛡️ OVERALL SAVE %",
+          subBadge: "CELKOVÁ ÚSPEŠNOSŤ",
+          playerId: svLeader.playerId,
+          slug: svLeader.slug,
+          name: svLeader.name,
+          photoUrl: svLeader.photoUrl,
+          position: "G",
+          teamId: svLeader.teamId,
+          teamCode: svLeader.teamCode,
+          teamSlug: svLeader.teamSlug,
+          teamLogo: svLeader.teamLogo,
+          value: svLeader.svPct.toFixed(3).replace(/^0/, ""),
+          unit: "SV%",
+          sub: `${svLeader.gp} odchytaných zápasov`,
+          accentColor: "sky",
+        });
+      }
+      if (mdLeader) {
+        heroCards.push({
+          badge: "🎯 MID-DANGER WALL",
+          subBadge: "ZÁKROKY Z KRUHOV",
+          playerId: mdLeader.playerId,
+          slug: mdLeader.slug,
+          name: mdLeader.name,
+          photoUrl: mdLeader.photoUrl,
+          position: "G",
+          teamId: mdLeader.teamId,
+          teamCode: mdLeader.teamCode,
+          teamSlug: mdLeader.teamSlug,
+          teamLogo: mdLeader.teamLogo,
+          value: mdLeader.mdSvPct.toFixed(3).replace(/^0/, ""),
+          unit: "MD SV%",
+          sub: `${mdLeader.mdShotsAg} striel zo strednej vzdialenosti`,
+          accentColor: "amber",
+        });
+      }
+    }
   } else {
     const te = await teamEdge(SEASON, league);
     rows = te.map((t) => ({
@@ -96,6 +233,58 @@ export default async function EdgeStatsPage({ searchParams }: { searchParams: Pr
       avgShot: t.avgShot, topShot: t.topShot, hitsPg: t.hitsPerGame, skate: t.avgSkateSpeed,
     }));
     cols = TEAM_COLS; initialSort = "ozPct";
+
+    if (te.length > 0) {
+      const ozLeader = [...te].sort((a, b) => b.ozPct - a.ozPct)[0];
+      const shotLeader = [...te].sort((a, b) => b.topShot - a.topShot)[0];
+      const skateLeader = [...te].sort((a, b) => b.avgSkateSpeed - a.avgSkateSpeed)[0];
+
+      if (ozLeader) {
+        heroCards.push({
+          badge: "⏱️ OFFENSIVE ZONE TIME",
+          subBadge: "ÚTOČNÉ PÁSMO",
+          name: ozLeader.name,
+          teamId: ozLeader.teamId,
+          teamSlug: ozLeader.slug,
+          teamLogo: ozLeader.logoUrl,
+          teamCode: ozLeader.code,
+          value: ozLeader.ozPct.toFixed(1),
+          unit: "OZ%",
+          sub: `${ozLeader.gp} odohraných zápasov`,
+          accentColor: "amber",
+        });
+      }
+      if (shotLeader) {
+        heroCards.push({
+          badge: "💥 HARDEST TEAM SHOT",
+          subBadge: "MAX RÝCHLOSŤ STRELY",
+          name: shotLeader.name,
+          teamId: shotLeader.teamId,
+          teamSlug: shotLeader.slug,
+          teamLogo: shotLeader.logoUrl,
+          teamCode: shotLeader.code,
+          value: shotLeader.topShot.toFixed(1),
+          unit: "mph",
+          sub: `Priemer tímu ${shotLeader.avgShot.toFixed(1)} mph`,
+          accentColor: "rose",
+        });
+      }
+      if (skateLeader) {
+        heroCards.push({
+          badge: "⚡ FASTEST ROSTER",
+          subBadge: "RÝCHLOSŤ TÍMU",
+          name: skateLeader.name,
+          teamId: skateLeader.teamId,
+          teamSlug: skateLeader.slug,
+          teamLogo: skateLeader.logoUrl,
+          teamCode: skateLeader.code,
+          value: skateLeader.avgSkateSpeed.toFixed(1),
+          unit: "mph",
+          sub: `${skateLeader.hitsPerGame.toFixed(1)} hitov / zápas`,
+          accentColor: "sky",
+        });
+      }
+    }
   }
 
   return (
@@ -104,24 +293,36 @@ export default async function EdgeStatsPage({ searchParams }: { searchParams: Pr
       <StatsTabs active="edge" league={league} />
       <PhaseTabs active={phase} league={league} basePath="/stats/edge" showPlayoffs={false} keep={`view=${view}`} />
 
-      <div className="flex flex-wrap gap-1.5">
+      {/* View Switcher Pills */}
+      <div className="flex flex-wrap gap-2">
         {VIEWS.map((v) => (
-          <Link key={v.key} href={`/stats/edge?view=${v.key}${q}`}
-            className={`px-3 py-1.5 rounded-md text-[13px] font-semibold transition-colors ${
-              view === v.key ? "bg-sky-600 text-white" : "text-slate-400 hover:text-white hover:bg-slate-800/60"
-            }`}>
-            {v.label}
+          <Link
+            key={v.key}
+            href={`/stats/edge?view=${v.key}${q}`}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-[13px] font-bold transition-all ${
+              view === v.key
+                ? "bg-sky-600 text-white shadow-md shadow-sky-500/20"
+                : "bg-slate-900/60 border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800/60"
+            }`}
+          >
+            <span>{v.icon}</span>
+            <span>{v.label}</span>
           </Link>
         ))}
       </div>
 
+      {/* Hero Spotlight Cards */}
+      {heroCards.length > 0 && (
+        <StatHeroDeck cards={heroCards} managedTeamIds={managedTeamIds} />
+      )}
+
       <p className="text-slate-400 text-sm">
-        {view === "skaters" && "Shot speed is tracked from every shot. Skating speed, 22+ mph bursts and distance are modelled from a skater's SK rating and ice time (the sim doesn't simulate stride-level movement)."}
+        {view === "skaters" && "Shot speed is tracked from every shot. Skating speed, 22+ mph bursts and distance are modelled from a skater's SK rating and ice time."}
         {view === "goalies" && "Save % split by shot danger — high-danger (slot / net-front), mid-danger (circles) and low-danger (point / perimeter) — all from the sim's per-shot quality."}
         {view === "teams" && "Zone time (offensive / neutral / defensive), shot speed and hits are tracked from the sim. Average skating speed is the roster's modelled SK speed."}
       </p>
 
-      <StatTable cols={cols} rows={rows} initialSort={initialSort} minWidth={820} />
+      <StatTable cols={cols} rows={rows} initialSort={initialSort} minWidth={820} showRank />
 
       {minNote && <p className="text-xs text-slate-600">{minNote}</p>}
     </div>

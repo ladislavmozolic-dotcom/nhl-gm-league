@@ -1,5 +1,8 @@
+import { prisma } from "@/lib/prisma";
+import { getTeamSession } from "@/lib/auth";
 import { skaterTotals, goalieTotals } from "@/lib/stats-server";
 import StatsTabs from "@/components/StatsTabs";
+import StatHeroDeck, { type HeroCardItem } from "@/components/StatHeroDeck";
 import StatTable, { type Col } from "@/components/StatTable";
 import { PageHeader } from "@/components/ui";
 import PhaseTabs from "@/components/PhaseTabs";
@@ -45,16 +48,92 @@ export default async function AdvancedStatsPage({ searchParams }: { searchParams
   const auto = league === "NHL" ? await defaultStatsPhase() : "regular";
   const phase: "pre" | "regular" = league !== "NHL" ? "regular" : explicit ?? (auto === "playoffs" ? "regular" : auto);
   const SEASON = seasonForPhase(phase);
-  const [sk, gk] = await Promise.all([skaterTotals(SEASON, league), goalieTotals(SEASON, league)]);
+
+  const sessionTeamId = await getTeamSession();
+  const [sk, gk, managedTeams] = await Promise.all([
+    skaterTotals(SEASON, league),
+    goalieTotals(SEASON, league),
+    sessionTeamId == null
+      ? Promise.resolve([])
+      : prisma.team.findMany({ where: { OR: [{ id: sessionTeamId }, { parentTeamId: sessionTeamId }] }, select: { id: true } }),
+  ]);
+  const managedTeamIds = new Set(managedTeams.map((t) => t.id));
 
   // adaptive minimums — show from the early games, tighten as the sample grows
   const skShotMin = Math.min(20, Math.max(1, Math.ceil(sk.reduce((m, s) => Math.max(m, s.shots), 0) * 0.4)));
   const gkSaMin = Math.min(150, Math.max(1, Math.ceil(gk.reduce((m, g) => Math.max(m, g.shotsAgainst), 0) * 0.4)));
 
+  // Analytics Spotlight Cards (xG Machine, Top Finisher, GSAx Wall)
+  let heroCards: HeroCardItem[] = [];
+  if (sk.length > 0 || gk.length > 0) {
+    const xgLeader = [...sk].sort((a, b) => b.xg - a.xg)[0];
+    const finLeader = [...sk].filter((s) => s.shots >= 5).sort((a, b) => (b.goals - b.xg) - (a.goals - a.xg))[0];
+    const gsaxLeader = [...gk].sort((a, b) => b.gsax - a.gsax)[0];
+
+    if (xgLeader) {
+      heroCards.push({
+        badge: "🎯 XG GENERATOR",
+        subBadge: "KVALITA ŠANCÍ",
+        playerId: xgLeader.playerId,
+        slug: xgLeader.slug,
+        name: xgLeader.name,
+        photoUrl: xgLeader.photoUrl,
+        position: xgLeader.position,
+        teamId: xgLeader.teamId,
+        teamCode: xgLeader.teamCode,
+        teamSlug: xgLeader.teamSlug,
+        teamLogo: xgLeader.teamLogo,
+        value: xgLeader.xg.toFixed(1),
+        unit: "xG",
+        sub: `${xgLeader.goals} G zo ${xgLeader.shots} striel (${xgLeader.gp} GP)`,
+        accentColor: "amber",
+      });
+    }
+    if (finLeader) {
+      const diff = finLeader.goals - finLeader.xg;
+      heroCards.push({
+        badge: "💎 TOP FINISHER",
+        subBadge: "ZAKONČENIE G−XG",
+        playerId: finLeader.playerId,
+        slug: finLeader.slug,
+        name: finLeader.name,
+        photoUrl: finLeader.photoUrl,
+        position: finLeader.position,
+        teamId: finLeader.teamId,
+        teamCode: finLeader.teamCode,
+        teamSlug: finLeader.teamSlug,
+        teamLogo: finLeader.teamLogo,
+        value: (diff > 0 ? "+" : "") + diff.toFixed(1),
+        unit: "G-xG",
+        sub: `${finLeader.goals} G (očakávaných ${finLeader.xg.toFixed(1)} xG)`,
+        accentColor: "rose",
+      });
+    }
+    if (gsaxLeader) {
+      heroCards.push({
+        badge: "🧤 GSAX WALL",
+        subBadge: "BRANKÁRSKA STENA",
+        playerId: gsaxLeader.playerId,
+        slug: gsaxLeader.slug,
+        name: gsaxLeader.name,
+        photoUrl: gsaxLeader.photoUrl,
+        position: "G",
+        teamId: gsaxLeader.teamId,
+        teamCode: gsaxLeader.teamCode,
+        teamSlug: gsaxLeader.teamSlug,
+        teamLogo: gsaxLeader.teamLogo,
+        value: (gsaxLeader.gsax > 0 ? "+" : "") + gsaxLeader.gsax.toFixed(1),
+        unit: "GSAx",
+        sub: `${gsaxLeader.goalsAgainst} GA z ${gsaxLeader.xga.toFixed(1)} xGA (${gsaxLeader.gp} GP)`,
+        accentColor: "emerald",
+      });
+    }
+  }
+
   const skaterRows = sk
     .filter((s) => s.shots >= skShotMin)
     .map((s) => ({
-      _pid: s.playerId, name: s.name, teamCode: s.teamCode ?? "—", _teamSlug: s.teamSlug ?? "", _teamLogo: s.teamLogo ?? "", pos: s.position, gp: s.gp,
+      _pid: s.playerId, _slug: s.slug, name: s.name, teamCode: s.teamCode ?? "—", _teamSlug: s.teamSlug ?? "", _teamLogo: s.teamLogo ?? "", pos: s.position, gp: s.gp,
       goals: s.goals, xg: s.xg, fin: s.goals - s.xg, hdShots: s.hdShots, shots: s.shots,
       shPct: s.shots ? (s.goals / s.shots) * 100 : 0, points: s.points,
     }));
@@ -62,7 +141,7 @@ export default async function AdvancedStatsPage({ searchParams }: { searchParams
   const goalieRows = gk
     .filter((g) => g.shotsAgainst >= gkSaMin)
     .map((g) => ({
-      _pid: g.playerId, name: g.name, teamCode: g.teamCode ?? "—", _teamSlug: g.teamSlug ?? "", _teamLogo: g.teamLogo ?? "", gp: g.gp, gsax: g.gsax, steals: g.steals, xga: g.xga,
+      _pid: g.playerId, _slug: g.slug, name: g.name, teamCode: g.teamCode ?? "—", _teamSlug: g.teamSlug ?? "", _teamLogo: g.teamLogo ?? "", gp: g.gp, gsax: g.gsax, steals: g.steals, xga: g.xga,
       goalsAgainst: g.goalsAgainst, svPct: g.svPct, gaa: g.gaa, shotsAgainst: g.shotsAgainst,
     }));
 
@@ -71,21 +150,33 @@ export default async function AdvancedStatsPage({ searchParams }: { searchParams
       <PageHeader title="Statistics" subtitle={`Advanced — shot quality & expected goals · ${league} 2026-27 ${phase === "pre" ? "pre-season" : "regular season"}`} />
       <StatsTabs active="advanced" league={league} />
       <PhaseTabs active={phase} league={league} basePath="/stats/advanced" showPlayoffs={false} />
+
+      {/* Hero Spotlight Cards */}
+      {heroCards.length > 0 && (
+        <StatHeroDeck cards={heroCards} managedTeamIds={managedTeamIds} />
+      )}
+
       <p className="text-slate-400 text-sm">
         Expected goals (xG) rate every shot by its location, type and situation — independent of who shot it or who was
         in net. A skater’s <strong>G−xG</strong> is pure finishing; a goalie’s <strong>GSAx</strong> is goals saved
         above expected. Click a header to sort.
       </p>
 
-      <section className="space-y-2">
-        <h2 className="text-lg font-bold">Skaters — expected goals &amp; finishing</h2>
-        <StatTable cols={SKATER_COLS} rows={skaterRows} initialSort="xg" minWidth={860} />
+      <section className="space-y-3">
+        <h2 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+          <span>🏒</span>
+          <span>Skaters — expected goals &amp; finishing</span>
+        </h2>
+        <StatTable cols={SKATER_COLS} rows={skaterRows} initialSort="xg" minWidth={860} showRank />
         <p className="text-xs text-slate-600">Minimum {skShotMin} shots (scales up to 20). G−xG above zero = finished better than an average shooter would from those spots.</p>
       </section>
 
-      <section className="space-y-2">
-        <h2 className="text-lg font-bold">Goalies — goals saved above expected</h2>
-        <StatTable cols={GOALIE_COLS} rows={goalieRows} initialSort="gsax" minWidth={760} />
+      <section className="space-y-3">
+        <h2 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+          <span>🧤</span>
+          <span>Goalies — goals saved above expected</span>
+        </h2>
+        <StatTable cols={GOALIE_COLS} rows={goalieRows} initialSort="gsax" minWidth={760} showRank />
         <p className="text-xs text-slate-600">Minimum {gkSaMin} shots against (scales up to 150). GSAx above zero = stopped more than the shot quality faced would predict.</p>
       </section>
     </div>
